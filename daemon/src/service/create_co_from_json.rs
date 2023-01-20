@@ -13,6 +13,8 @@ use tokio::sync::Mutex;
 use crate::entities::State;
 use serde;
 
+use super::PersistentState;
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Body {
@@ -31,7 +33,7 @@ impl Into<Co> for Body {
 }
 
 /// Store JSON representation of an `Co` and return `Cid` for it.
-pub async fn create_co_from_json(storage: Arc<dyn Storage + Send + Sync>, state: Arc<Mutex<State>>, data: Value) -> Result<Cid> {
+pub async fn create_co_from_json(storage: Arc<dyn Storage + Send + Sync>, state: Arc<PersistentState>, data: Value) -> Result<Cid> {
     // create co
     let body: Body = serde_json::from_value(data)?;
     let create: Co = body.into();
@@ -40,7 +42,7 @@ pub async fn create_co_from_json(storage: Arc<dyn Storage + Send + Sync>, state:
 
     // update state
     {
-        let mut state_locked = state.lock().await;
+        let mut state_locked = state.state.lock().await;
 
         // read current cids
         let mut cids: Vec<Cid> = match state_locked.root {
@@ -55,7 +57,11 @@ pub async fn create_co_from_json(storage: Arc<dyn Storage + Send + Sync>, state:
 
         // update
         state_locked.root = Some(next_root);
+        
     };
+    
+    // save
+    state.save().await?;
 
     // result
     Ok(cid)

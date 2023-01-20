@@ -1,4 +1,7 @@
 
+use std::net::SocketAddr;
+use std::sync::Arc;
+
 use axum::response::IntoResponse;
 use axum::{Router, Json};
 use axum::http::{StatusCode};
@@ -8,17 +11,16 @@ use co_sdk::drivers::storage::iroh::{IrohStorage, IrohConfig};
 use co_sdk::entities::co::Co;
 use serde::{Serialize, Deserialize};
 use service::read_cos;
-use tokio::sync::Mutex;
-use std::net::SocketAddr;
-use std::sync::{Arc};
 use serde_json::{Value, json};
 use anyhow::Result;
-use crate::service::create_co_from_json;
-use crate::entities::State;
+
+use crate::service::{create_co_from_json, PersistentState};
+
 
 mod service;
 mod error;
 mod entities;
+
 
 #[tokio::main]
 async fn main() {
@@ -29,7 +31,7 @@ async fn main() {
         quic_port: None,
     };
     let storage = Arc::new(IrohStorage::new(config).await.unwrap());
-    let state = Arc::new(Mutex::new(State { root: None }));
+    let state = Arc::new(PersistentState::open("/tmp/co.json").await.unwrap());
 
     // build our application with a route
     let app = Router::new()
@@ -70,12 +72,9 @@ enum GetCosItem {
     },
 }
 
-async fn get_cos(storage: Extension<Arc<IrohStorage>>, state: Extension<Arc<Mutex<State>>>) -> axum::response::Response {
+async fn get_cos(storage: Extension<Arc<IrohStorage>>, state: Extension<Arc<PersistentState>>) -> axum::response::Response {
     handle_error(async {
-        let root = {
-            state.lock().await.root.clone()
-        };
-        let result: Vec<GetCosItem> = read_cos(storage.0, &root)
+        let result: Vec<GetCosItem> = read_cos(storage.0, &state.state().await.root)
             .await?
             .into_iter()
             .map::<GetCosItem, _>(|i| match i {
@@ -88,7 +87,7 @@ async fn get_cos(storage: Extension<Arc<IrohStorage>>, state: Extension<Arc<Mute
 }
 
 #[axum_macros::debug_handler]
-async fn post_cos(storage: Extension<Arc<IrohStorage>>, state: Extension<Arc<Mutex<State>>>, Json(payload): Json<Value>) -> axum::response::Response {
+async fn post_cos(storage: Extension<Arc<IrohStorage>>, state: Extension<Arc<PersistentState>>, Json(payload): Json<Value>) -> axum::response::Response {
     handle_error(
         create_co_from_json(storage.0, state.0, payload).await
             .map(|id| { Json(id.to_string()) })
