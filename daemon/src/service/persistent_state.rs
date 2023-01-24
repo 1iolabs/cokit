@@ -1,7 +1,6 @@
 use std::io::ErrorKind;
-
 use futures::Future;
-use tokio::{sync::{Mutex}, fs};
+use tokio::{fs, sync::Mutex};
 use crate::entities::State;
 use serde_json;
 

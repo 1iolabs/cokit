@@ -9,8 +9,6 @@ use libipld::cid::Cid;
 use serde::{Serialize, Deserialize};
 use serde_json::{Value};
 use anyhow::Result;
-use tokio::sync::Mutex;
-use crate::entities::State;
 use serde;
 
 use super::PersistentState;
