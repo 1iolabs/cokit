@@ -1,0 +1,19 @@
+[package]
+name = "co-state"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+async-stream = { workspace = true }
+async-trait = { workspace = true }
+derive_more = "0.99.17"
+futures = { workspace = true }
+futures-util = { workspace = true }
+quic-rpc = { version = "0.3.1", default-features = false }
+rxrust = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+static_assertions = "1.1.0"
+tokio = { workspace = true }
+tokio-stream = { workspace = true }

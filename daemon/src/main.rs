@@ -1,26 +1,21 @@
-
+use crate::service::{create_co_from_json, PersistentState};
+use anyhow::Result;
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::routing::get;
+use axum::Extension;
+use axum::{Json, Router};
+use co_sdk::drivers::storage::iroh::{IrohConfig, IrohStorage};
+use co_sdk::types::co::Co;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use service::read_cos;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::response::IntoResponse;
-use axum::{Router, Json};
-use axum::http::{StatusCode};
-use axum::routing::{get};
-use axum::Extension;
-use co_sdk::drivers::storage::iroh::{IrohStorage, IrohConfig};
-use co_sdk::entities::co::Co;
-use serde::{Serialize, Deserialize};
-use service::read_cos;
-use serde_json::{Value, json};
-use anyhow::Result;
-
-use crate::service::{create_co_from_json, PersistentState};
-
-
-mod service;
-mod error;
 mod entities;
-
+mod error;
+mod service;
 
 #[tokio::main]
 async fn main() {
@@ -52,18 +47,16 @@ async fn main() {
 fn handle_error(result: Result<impl IntoResponse>) -> axum::response::Response {
     match result {
         Ok(r) => r.into_response(),
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"message": format!("Something went wrong: {}", e)}))
-            )
-                .into_response()
-        },
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "message": format!("Something went wrong: {}", e) })),
+        )
+            .into_response(),
     }
 }
 
 #[derive(Debug, Serialize)]
-#[serde(untagged)] 
+#[serde(untagged)]
 enum GetCosItem {
     Ok(Co),
     Err {
@@ -72,36 +65,47 @@ enum GetCosItem {
     },
 }
 
-async fn get_cos(storage: Extension<Arc<IrohStorage>>, state: Extension<Arc<PersistentState>>) -> axum::response::Response {
-    handle_error(async {
-        let result: Vec<GetCosItem> = read_cos(storage.0, &state.state().await.root)
-            .await?
-            .into_iter()
-            .map::<GetCosItem, _>(|i| match i {
-                Ok(c) => GetCosItem::Ok(c),
-                Err(e) => GetCosItem::Err{err: format!("{}", e)},
-            })
-            .collect();
-        Ok(Json(result))
-    }.await)
+async fn get_cos(
+    storage: Extension<Arc<IrohStorage>>,
+    state: Extension<Arc<PersistentState>>,
+) -> axum::response::Response {
+    handle_error(
+        async {
+            let result: Vec<GetCosItem> = read_cos(storage.0, &state.state().await.root)
+                .await?
+                .into_iter()
+                .map::<GetCosItem, _>(|i| match i {
+                    Ok(c) => GetCosItem::Ok(c),
+                    Err(e) => GetCosItem::Err {
+                        err: format!("{}", e),
+                    },
+                })
+                .collect();
+            Ok(Json(result))
+        }
+        .await,
+    )
 }
 
 #[axum_macros::debug_handler]
-async fn post_cos(storage: Extension<Arc<IrohStorage>>, state: Extension<Arc<PersistentState>>, Json(payload): Json<Value>) -> axum::response::Response {
+async fn post_cos(
+    storage: Extension<Arc<IrohStorage>>,
+    state: Extension<Arc<PersistentState>>,
+    Json(payload): Json<Value>,
+) -> axum::response::Response {
     handle_error(
-        create_co_from_json(storage.0, state.0, payload).await
-            .map(|id| { Json(id.to_string()) })
+        create_co_from_json(storage.0, state.0, payload)
+            .await
+            .map(|id| Json(id.to_string())),
     )
 }
 
 async fn handler() -> axum::response::Json<VersionInfo> {
-    axum::response::Json(
-        VersionInfo {
-            name: "co",
-            version: "0.0.1",
-            commit: "",
-        }
-    )
+    axum::response::Json(VersionInfo {
+        name: "co",
+        version: "0.0.1",
+        commit: "",
+    })
 }
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -3,11 +3,10 @@ name = "co-sdk"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+co-state = { path = "../state" }
 futures = { workspace = true }
 iroh-api = "0.2.0"
 iroh-embed = "0.2.0"
@@ -15,7 +14,9 @@ iroh-resolver = "0.2.0"
 iroh-rpc-client = "0.2.0"
 iroh-unixfs = "0.2.0"
 libipld = { workspace = true, features = ["default", "serde-codec"] }
+rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }

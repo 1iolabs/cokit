@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use anyhow::Result;
-use co_sdk::{drivers::storage::Storage, entities::co::Co};
+use co_sdk::{drivers::storage::Storage, types::co::Co};
 use futures::future::join_all;
 use libipld::{Cid, serde::from_ipld};
 

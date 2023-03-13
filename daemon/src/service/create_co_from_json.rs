@@ -2,7 +2,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use co_sdk::drivers::storage::Storage;
-use co_sdk::entities::co::Co;
+use co_sdk::types::co::Co;
 use libipld::Ipld;
 use libipld::serde::{to_ipld, from_ipld};
 use libipld::cid::Cid;

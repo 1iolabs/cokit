@@ -7,6 +7,7 @@ mod tests {
     }
 }
 
-pub mod entities;
+pub mod types;
 pub mod errors;
 pub mod drivers;
+pub mod epics;
