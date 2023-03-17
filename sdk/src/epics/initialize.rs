@@ -5,6 +5,7 @@ use crate::types::{
     state::CoState,
 };
 use anyhow::{Error, Result};
+use co_state::EndWithExt;
 use co_state::{ActionObservable, StateObservable};
 use libipld::{Cid, Ipld};
 use rxrust::prelude::*;
@@ -26,9 +27,11 @@ pub fn initialize<O: Observer<CoAction, Infallible> + 'static>(
         .take(1)
         .flat_map(move |path| context.from_future(load_settings_from_path(path)))
         .flat_map(move |result| from_iter(result.into_action(ErrorKind::Fatal)))
+        .end_with(vec![CoAction::Initialized])
 }
 
 async fn load_settings_from_path(path: impl AsRef<Path>) -> Result<Vec<CoAction>> {
+    println!("debug: load_settings_from_path: {:?}", path.as_ref());
     let mut result = Vec::new();
     let data = match read_to_string(path.as_ref()).await {
         Ok(data) => data,

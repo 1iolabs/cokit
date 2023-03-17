@@ -16,7 +16,7 @@ where
 impl<R, C> CombineEpics<R, C>
 where
     R: Reducer + 'static,
-    C: Clone + Send + 'static,
+    C: Clone + 'static,
 {
     pub fn new() -> Self {
         Self { epics: Vec::new() }
@@ -34,7 +34,7 @@ where
 impl<R, C, O> Epic<R, C, O> for CombineEpics<R, C>
 where
     R: Reducer + 'static,
-    C: Clone + Send + 'static,
+    C: Clone + 'static,
     O: Observer<R::Action, Infallible> + 'static,
 {
     type Unsub = impl Subscription;
@@ -111,10 +111,9 @@ mod tests {
         local
             .run_until(async move {
                 let reducer = FnReducer::<i32, i32>::new(|state, action| state + action);
-                let mut middleware = Box::new(EpicMiddleware::new());
-                let (runner, runner_subscription) = middleware.runner(epics, Context {});
-                let store = SyncStore::new(0, reducer).with_middleware(middleware);
-                let runner_handle = tokio::task::spawn_local(runner.run(Box::new(store.clone())));
+                let (middleware, runner, runner_subscription) = EpicMiddleware::create();
+                let store = SyncStore::new(0, reducer).with_middleware(Box::new(middleware));
+                let runner_handle = tokio::task::spawn_local(runner.run(Box::new(store.clone()), epics, Context {}));
 
                 // dispatch
                 store.dispatch(15).await; // 15 + 5
@@ -122,7 +121,7 @@ mod tests {
 
                 // shutdown
                 runner_subscription.unsubscribe();
-                runner_handle.await??;
+                runner_handle.await?;
 
                 // check
                 assert_eq!(42, store.state().await);

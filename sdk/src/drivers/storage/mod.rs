@@ -1,9 +1,12 @@
-use libipld::ipld::Ipld;
-use libipld::cid::Cid;
 use anyhow::Result;
+use libipld::cid::Cid;
+use libipld::ipld::Ipld;
+use std::sync::Arc;
 use thiserror::Error;
 
 pub mod iroh;
+
+pub type StorageType = Arc<dyn Storage + Send + Sync + 'static>;
 
 #[async_trait::async_trait]
 pub trait Storage {

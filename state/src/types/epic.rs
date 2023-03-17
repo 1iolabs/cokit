@@ -1,6 +1,9 @@
 use crate::{Middleware, Reducer, StoreApi, SyncStoreApi};
+#[cfg(feature = "futures-runtime")]
+use futures::channel::mpsc::{unbounded as unbounded_channel, UnboundedReceiver, UnboundedSender};
 use rxrust::{observer::BoxObserver, ops::box_it::BoxOp, prelude::*};
 use std::{convert::Infallible, fmt::Debug};
+#[cfg(feature = "tokio-runtime")]
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 pub trait Epic<R, C, O>
@@ -158,44 +161,23 @@ where
     R: Reducer + 'static,
 {
     commands_tx: UnboundedSender<EpicCommand<R>>,
-    commands_rx: Option<UnboundedReceiver<EpicCommand<R>>>,
 }
 
 impl<R> EpicMiddleware<R>
 where
     R: Reducer + 'static,
 {
-    pub fn new() -> Self {
+    pub fn create() -> (Self, EpicRunner<R>, EpicSubscription<R>) {
         let (commands_tx, commands_rx) = unbounded_channel();
-        Self {
-            commands_tx,
-            commands_rx: Some(commands_rx),
-        }
-    }
 
-    pub fn runner<E, C>(
-        &mut self,
-        epic: E,
-        context: C,
-    ) -> (EpicRunner<R, E, C>, EpicSubscription<R>)
-    where
-        C: Clone + 'static,
-        E: Epic<R, C, EpicObserver<R>> + 'static,
-    {
-        (
-            EpicRunner {
-                commands_tx: self.commands_tx.clone(),
-                commands_rx: self
-                    .commands_rx
-                    .take()
-                    .expect("Can only get one runner for an EpicMiddleware."),
-                epic,
-                context,
-            },
-            EpicSubscription {
-                commands_tx: self.commands_tx.clone(),
-            },
-        )
+        let runner = EpicRunner {
+            commands_tx: commands_tx.clone(),
+            commands_rx: commands_rx,
+        };
+        let subscription = EpicSubscription {
+            commands_tx: commands_tx.clone(),
+        };
+        (Self { commands_tx }, runner, subscription)
     }
 }
 
@@ -214,35 +196,31 @@ where
     }
 }
 
-pub struct EpicRunner<R, E, C>
+pub struct EpicRunner<R>
 where
     R: Reducer + 'static,
-    C: Clone + 'static,
-    E: Epic<R, C, EpicObserver<R>> + 'static,
 {
     commands_tx: UnboundedSender<EpicCommand<R>>,
     commands_rx: UnboundedReceiver<EpicCommand<R>>,
-    epic: E,
-    context: C,
 }
-impl<R, E, C> EpicRunner<R, E, C>
+impl<R> EpicRunner<R>
 where
     R: Reducer + Send + 'static,
-    C: Clone + 'static,
-    E: Epic<R, C, EpicObserver<R>> + 'static,
 {
-    pub async fn run(
+    pub async fn run<E, C>(
         mut self,
-        store: Box<dyn SyncStoreApi<R> + Send + 'static>,
-    ) -> anyhow::Result<()> {
+        store: Box<dyn SyncStoreApi<R> + Send + Sync + 'static>,
+        epic: E,
+        context: C,
+    ) where
+        C: Clone + 'static,
+        E: Epic<R, C, EpicObserver<R>> + 'static,
+    {
         // execute epic
         let mut actions = Some(ActionObservable::<R::Action>::new());
         let mut states = Some(StateObservable::<R::State>::new());
-        let result_observable = self.epic.epic(
-            actions.clone().unwrap(),
-            states.clone().unwrap(),
-            self.context.clone(),
-        );
+        let result_observable =
+            epic.epic(actions.clone().unwrap(), states.clone().unwrap(), context);
         result_observable.actual_subscribe(EpicObserver {
             commands: self.commands_tx.clone(),
         });
@@ -272,15 +250,11 @@ where
                 }
                 EpicCommand::Complete => {
                     break;
-                }
-                // EpicCommand::Error(err) => {
-                //     return Err(err);
-                // }
+                } // EpicCommand::Error(err) => {
+                  //     return Err(err);
+                  // }
             }
         }
-
-        // result
-        Ok(())
     }
 }
 
@@ -332,97 +306,157 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        ActionObservable, Epic, EpicMiddleware, FnReducer, StateObservable, SyncStore, SyncStoreApi,
-    };
-    use rxrust::{
-        prelude::{Observable, ObservableExt, Observer},
-        subscription::Subscription,
-    };
-    use std::convert::Infallible;
 
-    #[tokio::test]
-    async fn function_epic() -> anyhow::Result<()> {
-        fn my_epic<O: Observer<i32, Infallible> + 'static>(
-            actions: ActionObservable<i32>,
-            _states: StateObservable<i32>,
-            _context: (),
-        ) -> impl Observable<i32, Infallible, O> {
-            actions.filter(|i| *i > 10).map(|i| i % 10)
-        }
+    #[cfg(feature = "tokio-runtime")]
+    mod tokio_runtime {
+        use crate::{
+            ActionObservable, Epic, EpicMiddleware, FnReducer, StateObservable, SyncStore,
+            SyncStoreApi,
+        };
+        use rxrust::{
+            prelude::{Observable, ObservableExt, Observer},
+            subscription::Subscription,
+        };
+        use std::convert::Infallible;
 
-        let local = tokio::task::LocalSet::new();
-        local
-            .run_until(async move {
-                let reducer = FnReducer::<i32, i32>::new(|state, action| state + action);
-                let mut middleware = Box::new(EpicMiddleware::new());
-                let (runner, runner_subscription) = middleware.runner(my_epic, ());
-                let store = SyncStore::new(0, reducer).with_middleware(middleware);
-                let runner_handle = tokio::task::spawn_local(runner.run(Box::new(store.clone())));
-
-                // dispatch
-                store.dispatch(15).await;
-
-                // shutdown
-                runner_subscription.unsubscribe();
-                runner_handle.await??;
-
-                // check
-                assert_eq!(20, store.state().await);
-
-                // done
-                Ok::<(), anyhow::Error>(())
-            })
-            .await?;
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn example() -> anyhow::Result<()> {
-        struct TestEpic {}
-        impl<O: Observer<i32, Infallible> + 'static> Epic<FnReducer<i32, i32>, (), O> for TestEpic {
-            type Unsub = impl Subscription;
-            type Result = impl Observable<i32, Infallible, O, Unsub = Self::Unsub>;
-
-            fn epic(
-                &self,
+        #[tokio::test]
+        async fn function_epic() -> anyhow::Result<()> {
+            fn my_epic<O: Observer<i32, Infallible> + 'static>(
                 actions: ActionObservable<i32>,
                 _states: StateObservable<i32>,
                 _context: (),
-            ) -> Self::Result {
+            ) -> impl Observable<i32, Infallible, O> {
                 actions.filter(|i| *i > 10).map(|i| i % 10)
             }
+
+            let local = tokio::task::LocalSet::new();
+            local
+                .run_until(async move {
+                    let reducer = FnReducer::<i32, i32>::new(|state, action| state + action);
+                    let (middleware, runner, runner_subscription) = EpicMiddleware::create();
+                    let store = SyncStore::new(0, reducer).with_middleware(Box::new(middleware));
+                    let runner_handle =
+                        tokio::task::spawn_local(runner.run(Box::new(store.clone()), my_epic, ()));
+
+                    // dispatch
+                    store.dispatch(15).await;
+
+                    // shutdown
+                    runner_subscription.unsubscribe();
+                    runner_handle.await?;
+
+                    // check
+                    assert_eq!(20, store.state().await);
+
+                    // done
+                    Ok::<(), anyhow::Error>(())
+                })
+                .await?;
+            Ok(())
         }
 
-        // fn my_epic(actions: ActionObservable<i32>, states: StateObservable<i32>, context: Context) -> impl Observable<i32, Infallible, EpicObserver<FnReducer<i32, i32>>> {
-        //    actions.filter(|i| *i > 10).map(|i| i % 10)
-        // }
+        #[tokio::test]
+        async fn example() -> anyhow::Result<()> {
+            struct TestEpic {}
+            impl<O: Observer<i32, Infallible> + 'static> Epic<FnReducer<i32, i32>, (), O> for TestEpic {
+                type Unsub = impl Subscription;
+                type Result = impl Observable<i32, Infallible, O, Unsub = Self::Unsub>;
 
-        let local = tokio::task::LocalSet::new();
-        local
-            .run_until(async move {
-                let reducer = FnReducer::<i32, i32>::new(|state, action| state + action);
-                let mut middleware = Box::new(EpicMiddleware::new());
-                let (runner, runner_subscription) = middleware.runner(TestEpic {}, ());
-                let store = SyncStore::new(0, reducer).with_middleware(middleware);
-                let runner_handle = tokio::task::spawn_local(runner.run(Box::new(store.clone())));
+                fn epic(
+                    &self,
+                    actions: ActionObservable<i32>,
+                    _states: StateObservable<i32>,
+                    _context: (),
+                ) -> Self::Result {
+                    actions.filter(|i| *i > 10).map(|i| i % 10)
+                }
+            }
 
-                // dispatch
-                store.dispatch(15).await;
+            // fn my_epic(actions: ActionObservable<i32>, states: StateObservable<i32>, context: Context) -> impl Observable<i32, Infallible, EpicObserver<FnReducer<i32, i32>>> {
+            //    actions.filter(|i| *i > 10).map(|i| i % 10)
+            // }
 
-                // shutdown
-                runner_subscription.unsubscribe();
-                runner_handle.await??;
+            let local = tokio::task::LocalSet::new();
+            local
+                .run_until(async move {
+                    let reducer = FnReducer::<i32, i32>::new(|state, action| state + action);
+                    let (middleware, runner, runner_subscription) = EpicMiddleware::create();
+                    let store = SyncStore::new(0, reducer).with_middleware(Box::new(middleware));
+                    let runner_handle = tokio::task::spawn_local(runner.run(
+                        Box::new(store.clone()),
+                        TestEpic {},
+                        (),
+                    ));
 
-                // check
-                assert_eq!(20, store.state().await);
+                    // dispatch
+                    store.dispatch(15).await;
 
-                // done
-                Ok::<(), anyhow::Error>(())
-            })
-            .await?;
+                    // shutdown
+                    runner_subscription.unsubscribe();
+                    runner_handle.await?;
 
-        // done
-        Ok(())
+                    // check
+                    assert_eq!(20, store.state().await);
+
+                    // done
+                    Ok::<(), anyhow::Error>(())
+                })
+                .await?;
+
+            // done
+            Ok(())
+        }
+    }
+
+    #[cfg(feature = "futures-runtime")]
+    mod futures_runtime {
+        use crate::{
+            ActionObservable, Epic, EpicMiddleware, FnReducer, StateObservable, SyncStore,
+            SyncStoreApi,
+        };
+        use rxrust::{
+            prelude::{Observable, ObservableExt, Observer},
+            subscription::Subscription,
+        };
+        use std::convert::Infallible;
+
+        #[test]
+        async fn futures_executor() {
+            use futures::{executor::LocalPool, task::LocalSpawnExt};
+
+            fn my_epic<O: Observer<i32, Infallible> + 'static>(
+                actions: ActionObservable<i32>,
+                _states: StateObservable<i32>,
+                _context: (),
+            ) -> impl Observable<i32, Infallible, O> {
+                actions.filter(|i| *i > 10).map(|i| i % 10)
+            }
+
+            let reducer = FnReducer::<i32, i32>::new(|state, action| state + action);
+            let (middleware, runner, runner_subscription) = EpicMiddleware::create();
+            let store = SyncStore::new(0, reducer).with_middleware(Box::new(middleware));
+
+            // setup
+            let mut local = LocalPool::new();
+            let spawner = local.spawner();
+            spawner
+                .spawn_local(runner.run(Box::new(store.clone()), my_epic, ()))
+                .unwrap();
+            spawner
+                .spawn_local(async move {
+                    // dispatch
+                    store.dispatch(15).await;
+
+                    // shutdown
+                    runner_subscription.unsubscribe();
+
+                    // check
+                    assert_eq!(20, store.state().await);
+                })
+                .unwrap();
+
+            // run
+            local.run();
+        }
     }
 }

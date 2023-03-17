@@ -859,6 +859,7 @@ dependencies = [
  "async-trait",
  "co-state",
  "futures",
+ "hyper",
  "iroh-api",
  "iroh-embed",
  "iroh-resolver",
@@ -871,6 +872,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "uuid",
 ]
 
 [[package]]
@@ -1226,8 +1228,11 @@ dependencies = [
  "axum",
  "axum-macros",
  "co-sdk",
+ "co-state",
  "futures",
+ "hyper",
  "libipld",
+ "rxrust",
  "serde",
  "serde_json",
  "thiserror",
@@ -1235,7 +1240,6 @@ dependencies = [
  "tower",
  "tracing",
  "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]
@@ -5199,8 +5203,6 @@ dependencies = [
 [[package]]
 name = "rxrust"
 version = "1.0.0-beta.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e9c542da1e8cc16c42580f5222f5bcd2666fc4a7100198a1d39b879c957ab28"
 dependencies = [
  "futures",
  "futures-time",

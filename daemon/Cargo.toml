@@ -10,14 +10,21 @@ edition = "2021"
 anyhow = { workspace = true }
 axum = "0.6.1"
 axum-macros = "0.3.1"
-co-sdk = { path = "../sdk" }
+co-sdk = { path = "../sdk", features = ["tokio-runtime"] }
+co-state = { path = "../state", features = ["tokio-runtime"] }
 futures = { workspace = true }
+hyper = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
+rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
+tokio = { workspace = true, optional = true, features = ["full"] }
 tower = { version = "0.4", features = ["util"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
-uuid = { version = "1.2.2", features = ["default", "v4"] }
+
+[features]
+"default" = ["tokio-runtime"]
+"tokio-runtime" = ["tokio"]
+"futures-runtime" = []

@@ -1,6 +1,7 @@
+use super::reference::{Request, Response};
+use crate::{Co, CoCreate, ErrorContext, IntoAction};
 use libipld::{Cid, Ipld};
 use std::path::PathBuf;
-use super::error::{ErrorContext, IntoAction};
 
 /// Co Application Actions.
 ///
@@ -9,10 +10,13 @@ use super::error::{ErrorContext, IntoAction};
 pub enum CoAction {
     Error(String, ErrorContext),
     Initialize(PathBuf),
+    Initialized,
     SettingChange(String, Ipld),
     SettingChanged(String, Ipld),
     RootChange(Cid),
     RootChanged(Cid),
+    CoCreate(Request<CoCreate>),
+    CoCreateResponse(Response<Co>),
 }
 
 impl IntoAction<CoAction> for anyhow::Result<CoAction> {

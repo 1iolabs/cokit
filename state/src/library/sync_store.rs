@@ -1,4 +1,4 @@
-use crate::{Store, Middleware, StoreApi, SyncReducer, SyncStoreApi, SyncAction, SyncState, Reducer};
+use crate::{Action, Middleware, Reducer, State, Store, StoreApi, SyncStoreApi};
 use rxrust::{
     prelude::{from_stream, Observable, ObservableExt, Observer},
     scheduler::{NormalReturn, TaskHandle},
@@ -28,9 +28,9 @@ where
 
 impl<R> SyncStore<R>
 where
-    R: SyncReducer + Send + 'static,
-    R::Action: SyncAction,
-    R::State: SyncState,
+    R: Reducer + Send + 'static,
+    R::Action: Action,
+    R::State: State,
 {
     pub fn new(state: R::State, reducer: R) -> Self {
         let (tx, rx) = watch::channel(state.clone());
@@ -114,11 +114,7 @@ where
         from_stream(stream, tokio::runtime::Handle::current()).actual_subscribe(observer)
     }
 }
-impl<R> ObservableExt<R::State, Infallible> for SyncStore<R>
-where
-    R: Reducer + Send + 'static,
-{
-}
+impl<R> ObservableExt<R::State, Infallible> for SyncStore<R> where R: Reducer + Send + 'static {}
 
 #[cfg(test)]
 mod tests {

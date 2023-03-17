@@ -8,6 +8,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 co-state = { path = "../state" }
 futures = { workspace = true }
+hyper = { workspace = true }
 iroh-api = "0.2.0"
 iroh-embed = "0.2.0"
 iroh-resolver = "0.2.0"
@@ -18,5 +19,11 @@ rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true }
-tokio-stream = { workspace = true }
+tokio = { workspace = true, optional = true }
+tokio-stream = { workspace = true, optional = true }
+uuid = { version = "1.2.2", features = ["default", "v4"] }
+
+[features]
+"default" = ["tokio-runtime"]
+"tokio-runtime" = ["tokio", "tokio-stream"]
+"futures-runtime" = []

@@ -1,29 +1,38 @@
+use crate::StorageType;
+use futures::Future;
+use rxrust::{
+    prelude::{Observable, ObservableExt, Observer},
+    scheduler::{FutureTask, NormalReturn, Scheduler, TaskHandle},
+};
 use std::convert::Infallible;
 
-use futures::{executor::{LocalPool, LocalSpawner}, Future};
-use rxrust::{prelude::{Observer, Observable, ObservableExt}, scheduler::{TaskHandle, NormalReturn, Scheduler, FutureTask}};
+#[cfg(feature = "tokio-runtime")]
+pub type CoContextScheduler = rxrust::scheduler::TokioLocalScheduler;
+#[cfg(feature = "futures-runtime")]
+pub type CoContextScheduler = rxrust::scheduler::FuturesLocalScheduler;
 
-pub struct CoContext
-{
-    pool: LocalPool, // todo: replace with LocalSet?
+pub struct CoContext {
+    scheduler: CoContextScheduler,
+    storage: StorageType,
 }
 
-impl CoContext
-{
-    pub fn new() -> Self {
-        Self {
-            pool: LocalPool::new(),
-        }
+impl CoContext {
+    pub fn new(storage: StorageType, scheduler: CoContextScheduler) -> Self {
+        Self { scheduler, storage }
     }
 
     /// Future to observable.
-    /// 
+    ///
     /// Todo: Use from rxrust when type has fixed.
-    pub fn from_future<F>(&self, future: F) -> FutureObservable<F, LocalSpawner> {
+    pub fn from_future<F>(&self, future: F) -> FutureObservable<F, CoContextScheduler> {
         FutureObservable {
             future,
-            scheduler: self.pool.spawner(),
+            scheduler: self.scheduler.clone(),
         }
+    }
+
+    pub fn storage(&self) -> StorageType {
+        self.storage.clone()
     }
 }
 
@@ -50,9 +59,9 @@ impl<F: Future, S> ObservableExt<F::Output, Infallible> for FutureObservable<F, 
 
 fn item_task<Item, O>(item: Item, mut observer: O) -> NormalReturn<()>
 where
-  O: Observer<Item, Infallible>,
+    O: Observer<Item, Infallible>,
 {
-  observer.next(item);
-  observer.complete();
-  NormalReturn::new(())
+    observer.next(item);
+    observer.complete();
+    NormalReturn::new(())
 }

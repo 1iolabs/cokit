@@ -12,8 +12,13 @@ futures = { workspace = true }
 futures-util = { workspace = true }
 quic-rpc = { version = "0.3.1", default-features = false }
 rxrust = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 static_assertions = "1.1.0"
-tokio = { workspace = true }
-tokio-stream = { workspace = true }
+tokio = { workspace = true, optional = true }
+tokio-stream = { workspace = true, optional = true }
+
+[features]
+"default" = ["tokio-runtime"]
+"tokio-runtime" = ["tokio", "tokio-stream"]
+"futures-runtime" = []

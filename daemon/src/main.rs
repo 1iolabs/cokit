@@ -1,58 +1,62 @@
-use crate::service::{create_co_from_json, PersistentState};
-use anyhow::Result;
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
-use axum::routing::get;
-use axum::Extension;
-use axum::{Json, Router};
-use co_sdk::drivers::storage::iroh::{IrohConfig, IrohStorage};
-use co_sdk::types::co::Co;
+use axum::{http::StatusCode, routing::get, Extension, Json, Router};
+use co_sdk::ActionsType;
+use co_sdk::Co;
+use co_sdk::CoAction;
+use co_sdk::CoCreate;
+use co_sdk::Request;
+use co_sdk::State;
+use co_sdk::StorageType;
+use co_sdk::{IrohConfig, IrohStorage, StoreType};
+use library::read_cos::read_cos;
+use rxrust::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use service::read_cos;
+use serde_json::to_value;
+use serde_json::Value;
 use std::net::SocketAddr;
+use std::ops::Deref;
 use std::sync::Arc;
+use tokio::join;
+
+use crate::types::http_error::HttpResult;
 
 mod entities;
 mod error;
+mod library;
 mod service;
+mod types;
 
 #[tokio::main]
 async fn main() {
     // drivers
     let config = IrohConfig {
-        base_path: "/tmp/iroh".into(),
+        base_path: "/tmp/co/storage".into(),
         tcp_port: None,
         quic_port: None,
     };
-    let storage = Arc::new(IrohStorage::new(config).await.unwrap());
-    let state = Arc::new(PersistentState::open("/tmp/co.json").await.unwrap());
+    let storage: StorageType = Arc::new(IrohStorage::new(config).await.unwrap());
+    let actions: ActionsType = ActionsType::default();
+    let state = State::new(
+        "/tmp/co/state.json".into(),
+        storage.clone(),
+        actions.clone(),
+    );
+    let store: StoreType = state.store();
 
     // build our application with a route
     let app = Router::new()
         .route("/", get(handler))
         .route("/cos", get(get_cos).post(post_cos))
         .layer(Extension(storage))
-        .layer(Extension(state));
+        .layer(Extension(store))
+        .layer(Extension(actions));
 
     // run it
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("listening on http://{}/", addr);
-    axum::Server::bind(&addr)
+    let result: hyper::Result<()> = axum::Server::bind(&addr)
         .serve(app.into_make_service())
-        .await
-        .unwrap();
-}
-
-fn handle_error(result: Result<impl IntoResponse>) -> axum::response::Response {
-    match result {
-        Ok(r) => r.into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "message": format!("Something went wrong: {}", e) })),
-        )
-            .into_response(),
-    }
+        .await;
+    result.unwrap();
 }
 
 #[derive(Debug, Serialize)]
@@ -65,39 +69,63 @@ enum GetCosItem {
     },
 }
 
+#[axum_macros::debug_handler]
 async fn get_cos(
-    storage: Extension<Arc<IrohStorage>>,
-    state: Extension<Arc<PersistentState>>,
-) -> axum::response::Response {
-    handle_error(
-        async {
-            let result: Vec<GetCosItem> = read_cos(storage.0, &state.state().await.root)
-                .await?
-                .into_iter()
-                .map::<GetCosItem, _>(|i| match i {
-                    Ok(c) => GetCosItem::Ok(c),
-                    Err(e) => GetCosItem::Err {
-                        err: format!("{}", e),
-                    },
-                })
-                .collect();
-            Ok(Json(result))
-        }
-        .await,
-    )
+    storage: Extension<StorageType>,
+    store: Extension<StoreType>,
+) -> HttpResult<(StatusCode, Json<Vec<GetCosItem>>)> {
+    let result: Vec<GetCosItem> = read_cos(storage.0, &store.state().await.root)
+        .await?
+        .into_iter()
+        .map::<GetCosItem, _>(|i| match i {
+            Ok(c) => GetCosItem::Ok(c),
+            Err(e) => GetCosItem::Err {
+                err: format!("{}", e),
+            },
+        })
+        .collect();
+    Ok((StatusCode::OK, Json(result)))
 }
 
 #[axum_macros::debug_handler]
 async fn post_cos(
-    storage: Extension<Arc<IrohStorage>>,
-    state: Extension<Arc<PersistentState>>,
+    store: Extension<StoreType>,
+    actions: Extension<ActionsType>,
     Json(payload): Json<Value>,
-) -> axum::response::Response {
-    handle_error(
-        create_co_from_json(storage.0, state.0, payload)
-            .await
-            .map(|id| Json(id.to_string())),
-    )
+) -> HttpResult<(StatusCode, Json<Value>)> {
+    let actions = actions.deref().clone();
+
+    // parse
+    let body: CoCreate = serde_json::from_value(payload)?;
+
+    // create
+    let request = Request::new(body);
+    let action = CoAction::CoCreate(request.clone());
+    let (response, _) = join!(
+        actions
+            .filter_map(move |action| match action {
+                CoAction::CoCreateResponse(response) => {
+                    if response.reference == request.reference {
+                        Some(response)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            })
+            .take(1)
+            .to_future(),
+        store.dispatch(action),
+    );
+
+    // response
+    match response??.response {
+        Ok(i) => Ok((StatusCode::OK, Json(to_value(i)?))),
+        Err(e) => Ok((
+            e.status.unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+            Json(to_value(e)?),
+        )),
+    }
 }
 
 async fn handler() -> axum::response::Json<VersionInfo> {

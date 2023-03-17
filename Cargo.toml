@@ -1,10 +1,5 @@
 [workspace]
-members = [
-    "api",
-    "daemon",
-    "sdk",
-    "state",
-]
+members = ["api", "daemon", "sdk", "state"]
 
 [profile.release]
 panic = "unwind"
@@ -15,8 +10,12 @@ async-stream = "0.3.3"
 async-trait = "0.1.57"
 futures = "0.3"
 futures-util = "0.3.26"
+hyper = { version = "0.14.23" }
 libipld = "0.15"
-rxrust = { version = "1.0.0-beta.0", features = ["tokio-scheduler"] }
+# rxrust = { version = "1.0.0-beta.0", features = ["tokio-scheduler"] }
+rxrust = { path = "/Users/dominik/Workspaces/github/rxRust/rxRust", features = [
+    "tokio-scheduler",
+] }
 serde = "1"
 serde_json = "1"
 thiserror = "1"
