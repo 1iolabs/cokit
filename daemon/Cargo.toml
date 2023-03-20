@@ -23,6 +23,7 @@ tokio = { workspace = true, optional = true, features = ["full"] }
 tower = { version = "0.4", features = ["util"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tracing-bunyan-formatter = "0.3.6"
 
 [features]
 "default" = ["tokio-runtime"]

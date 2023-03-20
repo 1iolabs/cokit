@@ -1,3 +1,4 @@
+use crate::types::http_error::HttpResult;
 use axum::{http::StatusCode, routing::get, Extension, Json, Router};
 use co_sdk::ActionsType;
 use co_sdk::Co;
@@ -16,8 +17,9 @@ use std::net::SocketAddr;
 use std::ops::Deref;
 use std::sync::Arc;
 use tokio::join;
-
-use crate::types::http_error::HttpResult;
+use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::Registry;
 
 mod entities;
 mod error;
@@ -27,6 +29,15 @@ mod types;
 
 #[tokio::main]
 async fn main() {
+    // tracing
+    let log_file = std::fs::File::create("daemon.log").unwrap();
+    // let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), std::io::stdout);
+    let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), log_file);
+    let subscriber = Registry::default()
+        .with(JsonStorageLayer)
+        .with(formatting_layer);
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
     // drivers
     let config = IrohConfig {
         base_path: "/tmp/co/storage".into(),
@@ -52,7 +63,7 @@ async fn main() {
 
     // run it
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    println!("listening on http://{}/", addr);
+    tracing::info! {addr = format!("http://{}/", addr), "listening"};
     let result: hyper::Result<()> = axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await;

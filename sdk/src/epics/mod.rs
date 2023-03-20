@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 pub mod co_create;
 pub mod initialize;
+pub mod store_settings;
 
 pub fn sdk_epics<R>() -> CombineEpics<R, Arc<CoContext>>
 where
@@ -12,5 +13,6 @@ where
     let mut result = CombineEpics::new();
     result.add(initialize::initialize);
     result.add(co_create::co_create);
+    result.add(store_settings::store_settings);
     result
 }

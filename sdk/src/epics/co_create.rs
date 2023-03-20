@@ -1,5 +1,9 @@
 use crate::{
-    types::{action::CoAction, context::CoContext, state::CoState},
+    types::{
+        action::{Cause, CoAction},
+        context::CoContext,
+        state::CoState,
+    },
     Co, CoCreate, Request, StorageType,
 };
 use anyhow::Result;
@@ -23,9 +27,11 @@ pub fn co_create<O: Observer<CoAction, Infallible> + 'static>(
         })
         .with_latest_from(states)
         .flat_map(move |(request, state)| {
-            context
-                .from_future(create(context.storage(), state, request))
-                .flat_map(|i| from_iter(i))
+            observable::from_future(
+                create(context.storage(), state, request),
+                context.scheduler(),
+            )
+            .flat_map(|i| from_iter(i))
         })
 }
 
@@ -49,7 +55,7 @@ async fn create(storage: StorageType, state: CoState, create: Request<CoCreate>)
     // result
     match next_root {
         Ok(root) => vec![
-            CoAction::RootChanged(root),
+            CoAction::RootChanged(root, Cause::Change),
             CoAction::CoCreateResponse(create.response(Ok(co))),
         ],
         Err(e) => vec![CoAction::CoCreateResponse(create.response(Err(e.into())))],

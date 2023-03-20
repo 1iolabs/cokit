@@ -17,6 +17,7 @@ serde_json = { workspace = true }
 static_assertions = "1.1.0"
 tokio = { workspace = true, optional = true }
 tokio-stream = { workspace = true, optional = true }
+tracing = { workspace = true }
 
 [features]
 "default" = ["tokio-runtime"]

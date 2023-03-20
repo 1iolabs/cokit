@@ -4,8 +4,8 @@ use libipld::{Cid, Ipld};
 pub fn reducer(state: CoState, action: &CoAction) -> CoState {
     use CoAction::*;
     match action {
-        RootChanged(id) => root_changed(state, id),
-        SettingChanged(key, value) => setting_changed(state, key, value),
+        RootChanged(id, _) => root_changed(state, id),
+        SettingChanged(key, value, _) => setting_changed(state, key, value),
         _ => state,
     }
 }

@@ -12,12 +12,9 @@ impl<R> Middleware<R> for LogMiddleware
 where
     R: Reducer + 'static,
 {
-    fn dispatch<'a>(
-        &mut self,
-        next: &'a mut dyn crate::StoreApi<R>,
-        action: <R as Reducer>::Action,
-    ) {
-        println!("dispatch: {:?}", action);
+    fn dispatch<'a>(&mut self, next: &'a mut dyn crate::StoreApi<R>, action: R::Action) {
+        // span
+        tracing::span!(tracing::Level::INFO, "dispatch", ?action);
 
         // next
         next.dispatch(action);

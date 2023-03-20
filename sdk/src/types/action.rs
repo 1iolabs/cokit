@@ -11,12 +11,16 @@ pub enum CoAction {
     Error(String, ErrorContext),
     Initialize(PathBuf),
     Initialized,
-    SettingChange(String, Ipld),
-    SettingChanged(String, Ipld),
-    RootChange(Cid),
-    RootChanged(Cid),
+    SettingChanged(String, Ipld, Cause),
+    RootChanged(Cid, Cause),
     CoCreate(Request<CoCreate>),
     CoCreateResponse(Response<Co>),
+}
+
+#[derive(Debug, Clone)]
+pub enum Cause {
+    Initialize,
+    Change,
 }
 
 impl IntoAction<CoAction> for anyhow::Result<CoAction> {
