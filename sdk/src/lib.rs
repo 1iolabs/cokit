@@ -3,6 +3,8 @@ mod epics;
 mod errors;
 mod types;
 
+pub use drivers::network::libp2p::*;
+pub use drivers::network::Network;
 pub use drivers::state::*;
 pub use drivers::storage::iroh::*;
 pub use drivers::storage::*;

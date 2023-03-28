@@ -4,10 +4,14 @@ use co_sdk::ActionsType;
 use co_sdk::Co;
 use co_sdk::CoAction;
 use co_sdk::CoCreate;
+use co_sdk::Libp2pNetwork;
+use co_sdk::Libp2pNetworkConfig;
 use co_sdk::Request;
 use co_sdk::State;
 use co_sdk::StorageType;
 use co_sdk::{IrohConfig, IrohStorage, StoreType};
+use libp2p::identity;
+use libp2p::PeerId;
 use library::read_cos::read_cos;
 use rxrust::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -21,7 +25,6 @@ use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::Registry;
 
-mod entities;
 mod error;
 mod library;
 mod service;
@@ -38,13 +41,26 @@ async fn main() {
         .with(formatting_layer);
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    // drivers
+    // driver: storage
     let config = IrohConfig {
         base_path: "/tmp/co/storage".into(),
         tcp_port: None,
         quic_port: None,
     };
-    let storage: StorageType = Arc::new(IrohStorage::new(config).await.unwrap());
+    let storage: StorageType = Arc::new(IrohStorage::new(config).await.expect("storage"));
+
+    // driver: network
+    let network_key = identity::Keypair::generate_ed25519(); // todo: persist?
+    let network_peer_id = PeerId::from(network_key.public());
+    let network_config = Libp2pNetworkConfig {
+        addr: None,
+        bootstap: Vec::new(),
+        keypair: network_key.clone(),
+    };
+    let network = Libp2pNetwork::new(network_config).await.expect("network");
+    tracing::info!(peer_id = ?network_peer_id, "network");
+
+    // driver: state
     let actions: ActionsType = ActionsType::default();
     let state = State::new(
         "/tmp/co/state.json".into(),

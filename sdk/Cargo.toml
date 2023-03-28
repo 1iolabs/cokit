@@ -15,6 +15,7 @@ iroh-resolver = "0.2.0"
 iroh-rpc-client = "0.2.0"
 iroh-unixfs = "0.2.0"
 libipld = { workspace = true, features = ["default", "serde-codec"] }
+libp2p = { workspace = true, features = ["rendezvous"] }
 rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

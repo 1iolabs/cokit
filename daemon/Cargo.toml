@@ -15,6 +15,7 @@ co-state = { path = "../state", features = ["tokio-runtime"] }
 futures = { workspace = true }
 hyper = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
+libp2p = { workspace = true, features = ["rendezvous"] }
 rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -22,8 +23,8 @@ thiserror = { workspace = true }
 tokio = { workspace = true, optional = true, features = ["full"] }
 tower = { version = "0.4", features = ["util"] }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
 tracing-bunyan-formatter = "0.3.6"
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [features]
 "default" = ["tokio-runtime"]
