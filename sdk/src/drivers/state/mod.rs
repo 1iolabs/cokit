@@ -82,8 +82,8 @@ impl State {
                 });
             }
 
-            // TODO: debug
-            println!("debug: epics stopped");
+            // log
+            tracing::debug!("state-thread-shutdown");
         });
 
         // result

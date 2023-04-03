@@ -57,7 +57,10 @@ impl Libp2pNetwork {
         // run
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
         let run_config = config.clone();
-        tokio::task::spawn_blocking(move || run(swarm, run_config, shutdown_rx));
+        let handle = tokio::runtime::Handle::current().clone();
+        tokio::task::spawn_blocking(move || {
+            handle.block_on(run(swarm, run_config, shutdown_rx));
+        });
 
         // result
         Ok(Self {
@@ -77,9 +80,9 @@ async fn run(
 
     // handle
     while match shutdown.try_recv() {
-        Ok(Some(_)) => true,
-        Ok(None) => false,
-        Err(_) => false,
+        Ok(None) => true,     // run not received value
+        Ok(Some(_)) => false, // shutdown when received value
+        Err(_) => false,      // shutdown when dropped
     } {
         run_once(&mut swarm).await;
     }
@@ -91,11 +94,13 @@ async fn run(
 async fn run_once(swarm: &mut Swarm<Behaviour>) {
     match swarm.select_next_some().await {
         SwarmEvent::NewListenAddr { address, .. } => {
-            println!("Listening on {:?}", address)
+            tracing::info!(?address, "network-listening");
         }
-        SwarmEvent::Behaviour(event) => println!("Behaviour Event: {:?}", event),
-        i => {
-            println!("Event {:?}", i);
+        SwarmEvent::Behaviour(event) => {
+            tracing::info!(?event, "network-behaviour-event");
+        }
+        event => {
+            tracing::info!(?event, "network-event");
         }
     }
 }

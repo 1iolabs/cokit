@@ -1,4 +1,5 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use libipld::cid::Cid;
 use libipld::ipld::Ipld;
 use std::sync::Arc;
@@ -8,7 +9,7 @@ pub(crate) mod iroh;
 
 pub type StorageType = Arc<dyn Storage + Send + Sync + 'static>;
 
-#[async_trait::async_trait]
+#[async_trait]
 pub trait Storage {
     async fn get_object(&self, cid: &Cid) -> Result<Ipld>;
     async fn put_object(&self, data: &Ipld) -> Result<Cid>;

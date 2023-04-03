@@ -22,6 +22,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use tokio::join;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::Registry;
 
@@ -37,6 +38,7 @@ async fn main() {
     // let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), std::io::stdout);
     let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), log_file);
     let subscriber = Registry::default()
+        .with(LevelFilter::INFO)
         .with(JsonStorageLayer)
         .with(formatting_layer);
     tracing::subscriber::set_global_default(subscriber).unwrap();

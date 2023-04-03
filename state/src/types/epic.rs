@@ -216,6 +216,9 @@ where
         C: Clone + 'static,
         E: Epic<R, C, EpicObserver<R>> + 'static,
     {
+        // log
+        tracing::debug!("epic-runner-starting");
+
         // execute epic
         let mut actions = Some(ActionObservable::<R::Action>::new());
         let mut states = Some(StateObservable::<R::State>::new());
@@ -255,6 +258,9 @@ where
                   // }
             }
         }
+
+        // log
+        tracing::debug!("epic-runner-stopped");
     }
 }
 
