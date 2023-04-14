@@ -23,13 +23,13 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(path: PathBuf, storage: StorageType, actions: ActionsType) -> Self {
+    pub fn new(base_path: PathBuf, storage: StorageType, actions: ActionsType) -> Self {
         // middleware
         let (epic_middleware, epic_runner, epic_subscription) = EpicMiddleware::create();
         let subject_middlware = SubjectMiddleware::new(actions);
 
         // store
-        let store = SyncStore::new(CoState::default(), FnReducer::new(reducer::reducer))
+        let store = SyncStore::new(CoState::new(base_path), FnReducer::new(reducer::reducer))
             .with_middleware(Box::new(epic_middleware))
             .with_middleware(Box::new(subject_middlware))
             .with_middleware(Box::new(LogMiddleware::new()));
@@ -52,7 +52,7 @@ impl State {
                     .unwrap();
                 local
                     .spawn_local(async move {
-                        dispatch_store.dispatch(CoAction::Initialize(path)).await;
+                        dispatch_store.dispatch(CoAction::Initialize).await;
                     })
                     .unwrap();
                 pool.run();
@@ -73,7 +73,7 @@ impl State {
                         context,
                     ));
                     let dispatch_handle = local.spawn_local(async move {
-                        dispatch_store.dispatch(CoAction::Initialize(path)).await;
+                        dispatch_store.dispatch(CoAction::Initialize).await;
                     });
 
                     // run

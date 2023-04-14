@@ -15,6 +15,10 @@ use libipld::{
 use rxrust::prelude::*;
 use std::{convert::Infallible, sync::Arc};
 
+/// Create and store CO metadata.
+///
+/// In: CoAction::CoCreate
+/// Out: CoAction::RootChanged, CoAction::CoCreateResponse
 pub fn co_create<O: Observer<CoAction, Infallible> + 'static>(
     actions: ActionObservable<CoAction>,
     states: StateObservable<CoState>,

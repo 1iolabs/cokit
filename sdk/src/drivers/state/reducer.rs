@@ -1,12 +1,22 @@
+use std::path::PathBuf;
+
 use crate::{CoAction, CoState};
 use libipld::{Cid, Ipld};
 
 pub fn reducer(state: CoState, action: &CoAction) -> CoState {
     use CoAction::*;
     match action {
+        Initialize(path) => initialize(state, path),
         RootChanged(id, _) => root_changed(state, id),
         SettingChanged(key, value, _) => setting_changed(state, key, value),
         _ => state,
+    }
+}
+
+fn initialize(state: CoState, path: &PathBuf) -> CoState {
+    CoState {
+        base_path: Some(path.clone()),
+        ..state
     }
 }
 

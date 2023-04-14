@@ -64,11 +64,7 @@ async fn main() {
 
     // driver: state
     let actions: ActionsType = ActionsType::default();
-    let state = State::new(
-        "/tmp/co/state.json".into(),
-        storage.clone(),
-        actions.clone(),
-    );
+    let state = State::new("/tmp/co".into(), storage.clone(), actions.clone());
     let store: StoreType = state.store();
 
     // build our application with a route

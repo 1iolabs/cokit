@@ -13,21 +13,26 @@ use rxrust::prelude::*;
 use std::{convert::Infallible, path::Path, sync::Arc};
 use tokio::fs::read_to_string;
 
+/// Load configuration on startup.
+///
+/// In: CoAction::Initialize
+/// Out: CoAction::Error, CoAction::RootChanged, CoAction::SettingChanged, CoAction::Initialized
 pub fn initialize<O: Observer<CoAction, Infallible> + 'static>(
     actions: ActionObservable<CoAction>,
-    _states: StateObservable<CoState>,
+    states: StateObservable<CoState>,
     context: Arc<CoContext>,
 ) -> impl Observable<CoAction, Infallible, O> {
     actions
-        .filter_map(|action| match action {
-            CoAction::Initialize(path) => Some(path),
-            _ => None,
-        })
+        .filter(|action| action == CoAction::Initialize)
+        .with_latest_from(states)
         .take(1)
-        .flat_map(move |path| {
-            observable::from_future(load_settings_from_path(path), context.scheduler())
+        .flat_map(|state| {
+            observable::from_future(
+                load_settings_from_path(state.base_path / "state.json"),
+                context.scheduler(),
+            )
         })
-        .flat_map(move |result| from_iter(result.into_action(ErrorKind::Fatal)))
+        .flat_map(|result| from_iter(result.into_action(ErrorKind::Fatal)))
         .end_with(vec![CoAction::Initialized])
 }
 
