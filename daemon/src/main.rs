@@ -1,6 +1,10 @@
 use crate::types::http_error::HttpResult;
-use axum::{http::StatusCode, routing::get, Extension, Json, Router};
-use co_sdk::ActionsType;
+use axum::extract::Path;
+use axum::{
+    http::StatusCode,
+    routing::{get, post},
+    Extension, Json, Router,
+};
 use co_sdk::Co;
 use co_sdk::CoAction;
 use co_sdk::CoCreate;
@@ -9,14 +13,15 @@ use co_sdk::Libp2pNetworkConfig;
 use co_sdk::Request;
 use co_sdk::State;
 use co_sdk::StorageType;
+use co_sdk::{ActionsType, CoExecuteState};
 use co_sdk::{IrohConfig, IrohStorage, StoreType};
 use libp2p::identity;
 use libp2p::PeerId;
 use library::read_cos::read_cos;
 use rxrust::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::to_value;
 use serde_json::Value;
+use serde_json::{json, to_value};
 use std::net::SocketAddr;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -71,6 +76,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(handler))
         .route("/cos", get(get_cos).post(post_cos))
+        .route("/cos/:id/start", post(post_cos_start))
         .layer(Extension(storage))
         .layer(Extension(store))
         .layer(Extension(actions));
@@ -110,6 +116,74 @@ async fn get_cos(
         })
         .collect();
     Ok((StatusCode::OK, Json(result)))
+}
+
+#[axum_macros::debug_handler]
+async fn post_cos_start(
+    Path(co_id): Path<String>,
+    store: Extension<StoreType>,
+    actions: Extension<ActionsType>,
+) -> HttpResult<(StatusCode, Json<Value>)> {
+    let actions = actions.deref().clone();
+
+    // validate
+    let state = store.state().await;
+    let execute_state = state.execute.get(&co_id);
+    match execute_state {
+        Some(CoExecuteState::Running) => {
+            return Ok((
+                StatusCode::CONFLICT,
+                json!({"message": "CO already running."}).into(),
+            ));
+        }
+        Some(CoExecuteState::Stopping) => {
+            return Ok((
+                StatusCode::CONFLICT,
+                json!({"message": "CO is currently stopping."}).into(),
+            ));
+        }
+        Some(CoExecuteState::Starting) => {
+            return Ok((
+                StatusCode::CONFLICT,
+                json!({"message": "CO already starting."}).into(),
+            ));
+        }
+        Some(CoExecuteState::Stopped) | None => {}
+    }
+
+    // start and wait for running of stopped (failed)
+    let action = CoAction::CoStartup { id: co_id.clone() };
+    let (response, _) = join!(
+        actions
+            .filter_map(move |action| match action {
+                CoAction::CoExecuteStateChanged {
+                    id,
+                    state: CoExecuteState::Running,
+                } if id == co_id => {
+                    Some(CoExecuteState::Running)
+                }
+                CoAction::CoExecuteStateChanged {
+                    id,
+                    state: CoExecuteState::Stopped,
+                } if id == co_id => {
+                    Some(CoExecuteState::Stopped)
+                }
+                _ => None,
+            })
+            .take(1)
+            .to_future(),
+        store.dispatch(action),
+    );
+
+    // response
+    match response?? {
+        CoExecuteState::Running => Ok((StatusCode::OK, json!("{}").into())),
+        CoExecuteState::Stopped => Ok((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({"message": "CO startup failed."}).into(),
+        )),
+        _ => unreachable!("Invalid response state"),
+    }
 }
 
 #[axum_macros::debug_handler]
