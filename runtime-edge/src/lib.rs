@@ -95,8 +95,8 @@ pub mod opaque {
 // https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-    spec_name: create_runtime_str!("node-template"),
-    impl_name: create_runtime_str!("node-template"),
+    spec_name: create_runtime_str!("co-runtime-edge"),
+    impl_name: create_runtime_str!("co-runtime-edge"),
     authoring_version: 1,
     // The version of the runtime specification. A full node will not attempt to use its native
     //   runtime in substitute for the on-chain Wasm runtime unless all of `spec_name`,
@@ -116,7 +116,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 /// up by `pallet_aura` to implement `fn slot_duration()`.
 ///
 /// Change this to adjust the block time.
-pub const MILLISECS_PER_BLOCK: u64 = 6000;
+pub const MILLISECS_PER_BLOCK: u64 = 1000;
 
 // NOTE: Currently it is not possible to change the slot duration after the chain has started.
 //       Attempting to do so will brick block production.
@@ -234,32 +234,32 @@ impl pallet_timestamp::Config for Runtime {
 /// Existential deposit.
 pub const EXISTENTIAL_DEPOSIT: u128 = 500;
 
-impl pallet_balances::Config for Runtime {
-    type MaxLocks = ConstU32<50>;
-    type MaxReserves = ();
-    type ReserveIdentifier = [u8; 8];
-    /// The type for recording an account's balance.
-    type Balance = Balance;
-    /// The ubiquitous event type.
-    type RuntimeEvent = RuntimeEvent;
-    type DustRemoval = ();
-    type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
-    type AccountStore = System;
-    type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
-}
+// impl pallet_balances::Config for Runtime {
+//     type MaxLocks = ConstU32<50>;
+//     type MaxReserves = ();
+//     type ReserveIdentifier = [u8; 8];
+//     /// The type for recording an account's balance.
+//     type Balance = Balance;
+//     /// The ubiquitous event type.
+//     type RuntimeEvent = RuntimeEvent;
+//     type DustRemoval = ();
+//     type ExistentialDeposit = ConstU128<EXISTENTIAL_DEPOSIT>;
+//     type AccountStore = System;
+//     type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
+// }
 
 parameter_types! {
     pub FeeMultiplier: Multiplier = Multiplier::one();
 }
 
-impl pallet_transaction_payment::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
-    type OnChargeTransaction = CurrencyAdapter<Balances, ()>;
-    type OperationalFeeMultiplier = ConstU8<5>;
-    type WeightToFee = IdentityFee<Balance>;
-    type LengthToFee = IdentityFee<Balance>;
-    type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
-}
+// impl pallet_transaction_payment::Config for Runtime {
+//     type RuntimeEvent = RuntimeEvent;
+//     type OnChargeTransaction = CurrencyAdapter<Balances, ()>;
+//     type OperationalFeeMultiplier = ConstU8<5>;
+//     type WeightToFee = IdentityFee<Balance>;
+//     type LengthToFee = IdentityFee<Balance>;
+//     type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
+// }
 
 impl pallet_sudo::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
@@ -280,11 +280,11 @@ construct_runtime!(
         UncheckedExtrinsic = UncheckedExtrinsic,
     {
         System: frame_system,
-        Timestamp: pallet_timestamp,
+        //Timestamp: pallet_timestamp,
         Aura: pallet_aura,
         Grandpa: pallet_grandpa,
-        Balances: pallet_balances,
-        TransactionPayment: pallet_transaction_payment,
+        //Balances: pallet_balances,
+        //TransactionPayment: pallet_transaction_payment,
         Sudo: pallet_sudo,
         // Include the custom logic from the pallet-template in the runtime.
         //TemplateModule: pallet_template,
@@ -306,7 +306,7 @@ pub type SignedExtra = (
     frame_system::CheckEra<Runtime>,
     frame_system::CheckNonce<Runtime>,
     frame_system::CheckWeight<Runtime>,
-    pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+    // pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
 );
 
 /// Unchecked extrinsic type as expected by this runtime.
@@ -454,49 +454,49 @@ impl_runtime_apis! {
         }
     }
 
-    impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance> for Runtime {
-        fn query_info(
-            uxt: <Block as BlockT>::Extrinsic,
-            len: u32,
-        ) -> pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo<Balance> {
-            TransactionPayment::query_info(uxt, len)
-        }
-        fn query_fee_details(
-            uxt: <Block as BlockT>::Extrinsic,
-            len: u32,
-        ) -> pallet_transaction_payment::FeeDetails<Balance> {
-            TransactionPayment::query_fee_details(uxt, len)
-        }
-        fn query_weight_to_fee(weight: Weight) -> Balance {
-            TransactionPayment::weight_to_fee(weight)
-        }
-        fn query_length_to_fee(length: u32) -> Balance {
-            TransactionPayment::length_to_fee(length)
-        }
-    }
+    // impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi<Block, Balance> for Runtime {
+    //     fn query_info(
+    //         uxt: <Block as BlockT>::Extrinsic,
+    //         len: u32,
+    //     ) -> pallet_transaction_payment_rpc_runtime_api::RuntimeDispatchInfo<Balance> {
+    //         TransactionPayment::query_info(uxt, len)
+    //     }
+    //     fn query_fee_details(
+    //         uxt: <Block as BlockT>::Extrinsic,
+    //         len: u32,
+    //     ) -> pallet_transaction_payment::FeeDetails<Balance> {
+    //         TransactionPayment::query_fee_details(uxt, len)
+    //     }
+    //     fn query_weight_to_fee(weight: Weight) -> Balance {
+    //         TransactionPayment::weight_to_fee(weight)
+    //     }
+    //     fn query_length_to_fee(length: u32) -> Balance {
+    //         TransactionPayment::length_to_fee(length)
+    //     }
+    // }
 
-    impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentCallApi<Block, Balance, RuntimeCall>
-        for Runtime
-    {
-        fn query_call_info(
-            call: RuntimeCall,
-            len: u32,
-        ) -> pallet_transaction_payment::RuntimeDispatchInfo<Balance> {
-            TransactionPayment::query_call_info(call, len)
-        }
-        fn query_call_fee_details(
-            call: RuntimeCall,
-            len: u32,
-        ) -> pallet_transaction_payment::FeeDetails<Balance> {
-            TransactionPayment::query_call_fee_details(call, len)
-        }
-        fn query_weight_to_fee(weight: Weight) -> Balance {
-            TransactionPayment::weight_to_fee(weight)
-        }
-        fn query_length_to_fee(length: u32) -> Balance {
-            TransactionPayment::length_to_fee(length)
-        }
-    }
+    // impl pallet_transaction_payment_rpc_runtime_api::TransactionPaymentCallApi<Block, Balance, RuntimeCall>
+    //     for Runtime
+    // {
+    //     fn query_call_info(
+    //         call: RuntimeCall,
+    //         len: u32,
+    //     ) -> pallet_transaction_payment::RuntimeDispatchInfo<Balance> {
+    //         TransactionPayment::query_call_info(call, len)
+    //     }
+    //     fn query_call_fee_details(
+    //         call: RuntimeCall,
+    //         len: u32,
+    //     ) -> pallet_transaction_payment::FeeDetails<Balance> {
+    //         TransactionPayment::query_call_fee_details(call, len)
+    //     }
+    //     fn query_weight_to_fee(weight: Weight) -> Balance {
+    //         TransactionPayment::weight_to_fee(weight)
+    //     }
+    //     fn query_length_to_fee(length: u32) -> Balance {
+    //         TransactionPayment::length_to_fee(length)
+    //     }
+    // }
 
     #[cfg(feature = "runtime-benchmarks")]
     impl frame_benchmarking::Benchmark<Block> for Runtime {
