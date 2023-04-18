@@ -72,32 +72,32 @@ impl TransferKeepAliveBuilder {
     }
 }
 
-impl frame_benchmarking_cli::ExtrinsicBuilder for TransferKeepAliveBuilder {
-    fn pallet(&self) -> &str {
-        "balances"
-    }
+// impl frame_benchmarking_cli::ExtrinsicBuilder for TransferKeepAliveBuilder {
+//     fn pallet(&self) -> &str {
+//         "balances"
+//     }
 
-    fn extrinsic(&self) -> &str {
-        "transfer_keep_alive"
-    }
+//     fn extrinsic(&self) -> &str {
+//         "transfer_keep_alive"
+//     }
 
-    fn build(&self, nonce: u32) -> std::result::Result<OpaqueExtrinsic, &'static str> {
-        let acc = Sr25519Keyring::Bob.pair();
-        let extrinsic: OpaqueExtrinsic = create_benchmark_extrinsic(
-            self.client.as_ref(),
-            acc,
-            BalancesCall::transfer_keep_alive {
-                dest: self.dest.clone().into(),
-                value: self.value.into(),
-            }
-            .into(),
-            nonce,
-        )
-        .into();
+//     fn build(&self, nonce: u32) -> std::result::Result<OpaqueExtrinsic, &'static str> {
+//         let acc = Sr25519Keyring::Bob.pair();
+//         let extrinsic: OpaqueExtrinsic = create_benchmark_extrinsic(
+//             self.client.as_ref(),
+//             acc,
+//             BalancesCall::transfer_keep_alive {
+//                 dest: self.dest.clone().into(),
+//                 value: self.value.into(),
+//             }
+//             .into(),
+//             nonce,
+//         )
+//         .into();
 
-        Ok(extrinsic)
-    }
-}
+//         Ok(extrinsic)
+//     }
+// }
 
 /// Create a transaction using the given `call`.
 ///
@@ -131,7 +131,7 @@ pub fn create_benchmark_extrinsic(
         )),
         frame_system::CheckNonce::<runtime::Runtime>::from(nonce),
         frame_system::CheckWeight::<runtime::Runtime>::new(),
-        pallet_transaction_payment::ChargeTransactionPayment::<runtime::Runtime>::from(0),
+        // pallet_transaction_payment::ChargeTransactionPayment::<runtime::Runtime>::from(0),
     );
 
     let raw_payload = runtime::SignedPayload::from_raw(
@@ -145,7 +145,7 @@ pub fn create_benchmark_extrinsic(
             best_hash,
             (),
             (),
-            (),
+            // (),
         ),
     );
     let signature = raw_payload.using_encoded(|e| sender.sign(e));

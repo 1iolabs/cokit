@@ -183,11 +183,11 @@ pub fn run() -> sc_cli::Result<()> {
                         // Register the *Remark* and *TKA* builders.
                         let ext_factory = ExtrinsicFactory(vec![
                             Box::new(RemarkBuilder::new(client.clone())),
-                            Box::new(TransferKeepAliveBuilder::new(
-                                client.clone(),
-                                Sr25519Keyring::Alice.to_account_id(),
-                                EXISTENTIAL_DEPOSIT,
-                            )),
+                            // Box::new(TransferKeepAliveBuilder::new(
+                            //     client.clone(),
+                            //     Sr25519Keyring::Alice.to_account_id(),
+                            //     EXISTENTIAL_DEPOSIT,
+                            // )),
                         ]);
 
                         cmd.run(client, inherent_benchmark_data()?, Vec::new(), &ext_factory)
