@@ -1042,17 +1042,47 @@ dependencies = [
 
 [[package]]
 name = "clap"
+version = "3.2.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71655c45cb9845d3270c9d6df84ebe72b4dad3c2ba3f7023ad47c144e4e473a5"
+dependencies = [
+ "atty",
+ "bitflags",
+ "clap_derive 3.2.18",
+ "clap_lex 0.2.4",
+ "indexmap",
+ "once_cell",
+ "strsim",
+ "termcolor",
+ "textwrap",
+]
+
+[[package]]
+name = "clap"
 version = "4.0.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7db700bc935f9e43e88d00b0850dae18a63773cfbec6d8e070fccf7fef89a39"
 dependencies = [
  "bitflags",
- "clap_derive",
- "clap_lex",
+ "clap_derive 4.0.21",
+ "clap_lex 0.3.0",
  "is-terminal",
  "once_cell",
  "strsim",
  "termcolor",
+]
+
+[[package]]
+name = "clap_derive"
+version = "3.2.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea0c8bce528c4be4da13ea6fead8965e95b6073585a2f05204bd8f4119f82a65"
+dependencies = [
+ "heck",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1070,6 +1100,15 @@ dependencies = [
 
 [[package]]
 name = "clap_lex"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2850f2f5a82cbf437dd5af4d49848fbdfc27c157c3d010345776f952765261c5"
+dependencies = [
+ "os_str_bytes",
+]
+
+[[package]]
+name = "clap_lex"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d4198f73e42b4936b35b5bb248d81d2b595ecb170da0bac7655c54eedfa8da8"
@@ -1081,7 +1120,7 @@ dependencies = [
 name = "co-node-edge"
 version = "0.1.0-dev"
 dependencies = [
- "clap",
+ "clap 4.0.32",
  "co-runtime-edge",
  "frame-benchmarking",
  "frame-benchmarking-cli",
@@ -1162,6 +1201,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "co-node-edge",
  "co-state",
  "futures",
  "hyper",
@@ -1172,7 +1212,11 @@ dependencies = [
  "iroh-unixfs",
  "libipld",
  "libp2p",
+ "names 0.14.0",
  "rxrust",
+ "sc-cli",
+ "sc-network",
+ "sc-service",
  "serde",
  "serde_json",
  "thiserror",
@@ -2412,7 +2456,7 @@ dependencies = [
  "Inflector",
  "array-bytes",
  "chrono",
- "clap",
+ "clap 4.0.32",
  "comfy-table",
  "frame-benchmarking",
  "frame-support",
@@ -3591,7 +3635,7 @@ dependencies = [
  "axum",
  "bytes",
  "cid 0.9.0",
- "clap",
+ "clap 4.0.32",
  "config",
  "futures",
  "git-version",
@@ -3673,7 +3717,7 @@ dependencies = [
  "axum",
  "bytes",
  "cid 0.9.0",
- "clap",
+ "clap 4.0.32",
  "config",
  "futures",
  "headers",
@@ -3707,7 +3751,7 @@ dependencies = [
  "asynchronous-codec",
  "bytes",
  "cid 0.9.0",
- "clap",
+ "clap 4.0.32",
  "config",
  "futures",
  "futures-util",
@@ -3817,7 +3861,7 @@ dependencies = [
  "bytecheck",
  "bytes",
  "cid 0.9.0",
- "clap",
+ "clap 4.0.32",
  "config",
  "ctrlc",
  "futures",
@@ -5350,6 +5394,7 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bddcd3bf5144b6392de80e04c347cd7fab2508f6df16a85fc496ecd5cec39bc"
 dependencies = [
+ "clap 3.2.23",
  "rand 0.8.5",
 ]
 
@@ -5655,9 +5700,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.16.0"
+version = "1.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
+checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
 
 [[package]]
 name = "opaque-debug"
@@ -7292,11 +7337,12 @@ dependencies = [
 
 [[package]]
 name = "rxrust"
-version = "1.0.0-beta.1"
+version = "1.0.0-beta.3"
 dependencies = [
  "futures",
  "futures-time",
  "gloo-timers",
+ "once_cell",
  "pin-project-lite 0.2.9",
  "smallvec",
  "tokio",
@@ -7413,7 +7459,7 @@ source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.4
 dependencies = [
  "array-bytes",
  "chrono",
- "clap",
+ "clap 4.0.32",
  "fdlimit",
  "futures",
  "libp2p",
@@ -8126,7 +8172,7 @@ name = "sc-storage-monitor"
 version = "0.1.0"
 source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.40#76fed9b9082daade5392663f25ed8968f8e8c11c"
 dependencies = [
- "clap",
+ "clap 4.0.32",
  "fs4",
  "futures",
  "log",
@@ -9788,6 +9834,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3369f5ac52d5eb6ab48c6b4ffdc8efbcad6b89c765749064ba298f2c68a16a76"
 
 [[package]]
+name = "textwrap"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "222a222a5bfe1bba4a77b45ec488a741b3cb8872e5e499451fd7d0129c9c7c3d"
+
+[[package]]
 name = "thiserror"
 version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10351,7 +10403,7 @@ version = "0.10.0-dev"
 source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.40#76fed9b9082daade5392663f25ed8968f8e8c11c"
 dependencies = [
  "async-trait",
- "clap",
+ "clap 4.0.32",
  "frame-remote-externalities",
  "frame-try-runtime",
  "hex",

@@ -23,12 +23,12 @@ pub fn initialize<O: Observer<CoAction, Infallible> + 'static>(
     context: Arc<CoContext>,
 ) -> impl Observable<CoAction, Infallible, O> {
     actions
-        .filter(|action| action == CoAction::Initialize)
+        .filter(|action| *action == CoAction::Initialize)
         .with_latest_from(states)
         .take(1)
-        .flat_map(|state| {
+        .flat_map(move |(_, state)| {
             observable::from_future(
-                load_settings_from_path(state.base_path / "state.json"),
+                load_settings_from_path(state.base_path.join("state.json")),
                 context.scheduler(),
             )
         })

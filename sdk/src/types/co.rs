@@ -2,15 +2,17 @@ use libipld::ipld::Ipld;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+pub type CoId = String;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Co {
-    pub id: String,
+    pub id: CoId,
     pub name: String,
     pub data: BTreeMap<String, Ipld>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CoCreate {
     pub id: Option<String>,
@@ -26,4 +28,14 @@ impl Into<Co> for CoCreate {
             data: self.data.unwrap_or_else(|| BTreeMap::new()),
         }
     }
+}
+
+#[derive(Default, PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CoExecuteState {
+    #[default]
+    Stopped,
+    Starting,
+    Running,
+    Stopping,
 }

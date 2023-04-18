@@ -19,7 +19,7 @@ impl PartialEq<Reference> for Reference {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Request<T> {
     pub reference: Reference,
     pub request: T,
@@ -41,7 +41,7 @@ impl<T> Request<T> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Response<T> {
     pub reference: Reference,
     pub response: Result<T, ResponseError>,
@@ -56,7 +56,7 @@ impl<T> Response<T> {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ResponseError {
     pub message: String,
     #[serde(serialize_with = "serialize_status")]

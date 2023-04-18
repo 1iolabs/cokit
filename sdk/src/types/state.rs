@@ -1,12 +1,19 @@
+use crate::CoExecuteState;
 use libipld::{Cid, Ipld};
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+};
 
 #[derive(Default, Debug, Clone)]
 pub struct CoState {
     pub base_path: PathBuf,
     pub root: Option<Cid>,
-    pub settings: BTreeMap<String, Ipld>,
+    pub settings: CoSettings,
+    pub execute: HashMap<String, CoExecuteState>,
 }
+
+pub type CoSettings = BTreeMap<String, Ipld>;
 
 impl CoState {
     pub fn new(base_path: PathBuf) -> Self {

@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+co-node-edge = { path = "../node-edge" }
 co-state = { path = "../state" }
 futures = { workspace = true }
 hyper = { workspace = true }
@@ -16,6 +17,7 @@ iroh-rpc-client = "0.2.0"
 iroh-unixfs = "0.2.0"
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 libp2p = { workspace = true, features = ["rendezvous"] }
+names = "0.14.0"
 rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -24,6 +26,11 @@ tokio = { workspace = true, optional = true }
 tokio-stream = { workspace = true, optional = true }
 tracing = { workspace = true }
 uuid = { version = "1.2.2", features = ["default", "v4"] }
+
+# substrate
+sc-cli = { workspace = true }
+sc-network = { workspace = true }
+sc-service = { workspace = true }
 
 [features]
 "default" = ["tokio-runtime"]
