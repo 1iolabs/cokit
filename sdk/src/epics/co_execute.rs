@@ -1,12 +1,14 @@
 use crate::{
     library::generate_random_name::generate_random_name,
     types::{action::CoAction, context::CoContext, state::CoState},
-    CoExecuteState, CoSettings, ErrorKind, IntoAction,
+    ActionsType, CoExecuteState, CoSettings, ErrorKind, IntoAction,
 };
 use anyhow::Result;
 use co_node_edge::{chain_spec::development_config, service};
 use co_state::{ActionObservable, StateObservable};
+use futures::FutureExt;
 use libipld::Ipld;
+use libp2p::multiaddr;
 use rxrust::prelude::*;
 use sc_cli::ChainSpec;
 use sc_service::{
@@ -16,7 +18,8 @@ use sc_service::{
     },
     BasePath, Configuration, DatabaseSource, Role, RpcMethods,
 };
-use std::{convert::Infallible, path::PathBuf, sync::Arc};
+use std::{convert::Infallible, iter, net::Ipv4Addr, path::PathBuf, sync::Arc};
+use tokio::select;
 
 /// Startup CO blockchain.
 ///
@@ -44,21 +47,14 @@ pub fn co_execute<O: Observer<CoAction, Infallible> + 'static>(
                 state: CoExecuteState::Running,
             };
             let stopped = CoAction::CoExecuteStateChanged {
-                id: id,
+                id: id.clone(),
                 state: CoExecuteState::Stopped,
             };
+            let runner_actions = context.actions();
             of(running)
                 .merge(
                     observable::from_future(
-                        tokio::spawn(async move {
-                            tracing::info!("substrate-start");
-                            let result = service::new_full(config); // todo: result
-                            match result {
-                                Ok(_task_manager) => {}
-                                Err(err) => tracing::error!(?err, "substrate-error"),
-                            }
-                            tracing::info!("substrate-stop");
-                        }),
+                        tokio::spawn(async move { runner.run(config, runner_actions).await }),
                         context.scheduler(),
                     )
                     .map_to(stopped),
@@ -71,10 +67,73 @@ fn to_co_path(base_path: &PathBuf, co_id: &str) -> PathBuf {
     base_path.join(co_id)
 }
 
+// fn create_shutdown_signal(
+//     actions: ActionObservable<CoAction>,
+//     id: String,
+// ) -> tokio::sync::oneshot::Receiver<bool> {
+//     let (tx, rx) = tokio::sync::oneshot::channel();
+//     let id2 = id.clone();
+//     actions
+//         .clone()
+//         .filter_map(move |action| match action {
+//             CoAction::CoStartup { id: action_id } if action_id == id => Some(false),
+//             CoAction::Shutdown { force } => Some(force),
+//             _ => None,
+//         })
+//         // force shutdown if action observable completes
+//         .default_if_empty(true)
+//         .take(1)
+//         .take_until(actions.filter_map(move |action| match action {
+//             CoAction::CoShutdown { id } if id == id2 => Some(()),
+//             _ => None,
+//         }))
+//         .subscribe(|force| {
+//             tx.send(force);
+//         });
+//     rx
+// }
+
 struct CoRunner {
     pub id: String,
     pub co_path: PathBuf,
     // pub shared_params: SharedParams,
+}
+
+impl CoRunner {
+    #[tracing::instrument(name = "substrate", fields(co = &self.id), skip_all)]
+    async fn run(&self, config: Configuration, actions: ActionsType) -> anyhow::Result<()> {
+        // tokio::task::spawn_blocking(|| {
+        //    let runtime = build_runtime().expect("Runtime to be build.");
+        let shutdown_id = self.id.clone();
+        let shutdown = actions
+            .filter_map(move |action| match action {
+                CoAction::CoShutdown { id } if shutdown_id == id => Some(false),
+                CoAction::Shutdown { force } => Some(force),
+                _ => None,
+            })
+            // force shutdown if action observable completes
+            .default_if_empty(true)
+            .take(1)
+            .to_future()
+            .fuse();
+
+        // create
+        let mut task_manager = service::new_full(config)?;
+        let task_handle = task_manager.future().fuse();
+        select! {
+            res = task_handle => res?,
+            _ = shutdown => {},
+        }
+
+        // shutdown
+        //  drop task_manager to trigger shutdown
+        let _task_registry = task_manager.into_task_registry();
+        // todo: shutdown runtime futures?
+        //       https://github.com/paritytech/substrate/blob/master/client/cli/src/runner.rs#L181-L183
+
+        // result
+        Ok(())
+    }
 }
 
 impl CoRunner {
@@ -130,12 +189,19 @@ impl CoRunner {
             _ => generate_random_name(64),
         };
         let client_version = format!("{}/{}", Self::impl_name(), Self::impl_version());
-        Ok(NetworkConfiguration::new(
+        let mut network_config = NetworkConfiguration::new(
             format!("{}/{}", node_name, self.id),
             client_version,
             node_key,
             Some(self.co_path.join("network")),
-        ))
+        );
+        network_config.listen_addresses =
+            vec![
+                iter::once(multiaddr::Protocol::Ip4(Ipv4Addr::new(127, 0, 0, 1)))
+                    .chain(iter::once(multiaddr::Protocol::Tcp(0)))
+                    .collect(),
+            ];
+        Ok(network_config)
     }
 
     fn keystore_config(&self) -> Result<KeystoreConfig> {
@@ -187,7 +253,7 @@ impl CoRunner {
                 offchain_worker: ExecutionStrategy::AlwaysWasm,
                 other: ExecutionStrategy::AlwaysWasm,
             },
-            rpc_http: None,
+            rpc_http: Some(std::net::SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0)),
             rpc_ws: None,
             rpc_ipc: None,
             rpc_ws_max_connections: None,
@@ -209,7 +275,7 @@ impl CoRunner {
             force_authoring: true,
             disable_grandpa: false,
             dev_key_seed: None,
-            tracing_targets: None,
+            tracing_targets: Some(format!("node-edge/{}", self.id).to_owned()),
             tracing_receiver: sc_service::TracingReceiver::Log,
             max_runtime_instances: get_int_setting(settings, "substrate.max_runtime_instances")
                 .unwrap_or(8),

@@ -1735,6 +1735,7 @@ dependencies = [
  "tower",
  "tracing",
  "tracing-bunyan-formatter",
+ "tracing-log",
  "tracing-subscriber 0.3.16",
 ]
 

@@ -1,4 +1,5 @@
 #![feature(type_alias_impl_trait)]
+// #![feature(impl_trait_in_assoc_type)] // used in newer nightly
 // #![feature(associated_type_defaults)]
 // #![feature(return_position_impl_trait_in_trait)]
 

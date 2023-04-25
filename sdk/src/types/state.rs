@@ -1,11 +1,12 @@
 use crate::CoExecuteState;
 use libipld::{Cid, Ipld};
+use serde::Serialize;
 use std::{
     collections::{BTreeMap, HashMap},
     path::PathBuf,
 };
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize)]
 pub struct CoState {
     pub base_path: PathBuf,
     pub root: Option<Cid>,

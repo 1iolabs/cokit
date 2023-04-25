@@ -26,7 +26,7 @@ impl State {
     pub fn new(base_path: PathBuf, storage: StorageType, actions: ActionsType) -> Self {
         // middleware
         let (epic_middleware, epic_runner, epic_subscription) = EpicMiddleware::create();
-        let subject_middlware = SubjectMiddleware::new(actions);
+        let subject_middlware = SubjectMiddleware::new(actions.clone());
 
         // store
         let store = SyncStore::new(CoState::new(base_path), FnReducer::new(reducer::reducer))
@@ -41,7 +41,12 @@ impl State {
             {
                 let mut pool = LocalPool::new();
                 let local = pool.spawner();
-                let context = Arc::new(CoContext::new(storage, local.clone()));
+                let context = Arc::new(CoContext::new(
+                    storage,
+                    local.clone(),
+                    Arc::new(epic_store.clone()),
+                    actions.clone(),
+                ));
                 let dispatch_store = epic_store.clone();
                 local
                     .spawn_local(epic_runner.run(
@@ -63,7 +68,12 @@ impl State {
             {
                 let runtime = tokio::runtime::Runtime::new().unwrap();
                 let local = Rc::new(tokio::task::LocalSet::new());
-                let context = Arc::new(CoContext::new(storage, local.clone()));
+                let context = Arc::new(CoContext::new(
+                    storage,
+                    local.clone(),
+                    Arc::new(epic_store.clone()),
+                    actions.clone(),
+                ));
                 local.block_on(&runtime, async {
                     // setup and run futures
                     let dispatch_store = epic_store.clone();

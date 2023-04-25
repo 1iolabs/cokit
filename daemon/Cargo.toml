@@ -24,6 +24,7 @@ tokio = { workspace = true, optional = true, features = ["full"] }
 tower = { version = "0.4", features = ["util"] }
 tracing = { workspace = true }
 tracing-bunyan-formatter = "0.3.6"
+tracing-log = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [features]

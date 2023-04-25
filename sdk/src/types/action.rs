@@ -14,9 +14,20 @@ pub enum CoAction {
     RootChanged(Cid, Cause),
     CoCreate(Request<CoCreate>),
     CoCreateResponse(Response<Co>),
-    CoStartup { id: String },
-    CoShutdown { id: String },
-    CoExecuteStateChanged { id: String, state: CoExecuteState },
+    CoStartup {
+        id: String,
+    },
+    CoShutdown {
+        id: String,
+    },
+    CoExecuteStateChanged {
+        id: String,
+        state: CoExecuteState,
+    },
+    /// Shutdown application. When force is set to true kill all operations.
+    Shutdown {
+        force: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]

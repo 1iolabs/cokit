@@ -21,7 +21,7 @@ fn execute(state: CoState, action: &CoAction) -> CoState {
         _ => None,
     };
     if let Some((id, execute_state)) = change {
-        if state.execute.get(id) == Some(&execute_state) {
+        if state.execute.get(id) != Some(&execute_state) {
             let mut execute = state.execute.clone();
             if execute_state == CoExecuteState::default() {
                 execute.remove(id);
