@@ -894,6 +894,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cbor4ii"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b544cf8c89359205f4f990d0e6f3828db42df85b5dac95d09157a250eb0749c4"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.78"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -994,6 +1003,7 @@ dependencies = [
  "multibase",
  "multihash 0.16.3",
  "serde",
+ "serde_bytes",
  "unsigned-varint",
 ]
 
@@ -5903,6 +5913,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-co"
+version = "4.0.0-dev"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "libipld",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "serde_ipld_dagcbor",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-grandpa"
 version = "4.0.0-dev"
 source = "git+https://github.com/paritytech/substrate.git?branch=polkadot-v0.9.40#76fed9b9082daade5392663f25ed8968f8e8c11c"
@@ -8567,6 +8595,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "serde_ipld_dagcbor"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2433e94ffb5977e67afbd75733abd6ada1c4f497125894a8c89b3fdc5fd6a058"
+dependencies = [
+ "cbor4ii",
+ "cid 0.8.6",
+ "scopeguard",
+ "serde",
 ]
 
 [[package]]

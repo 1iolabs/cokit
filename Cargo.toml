@@ -1,5 +1,13 @@
 [workspace]
-members = ["api", "daemon", "sdk", "state", "runtime-edge", "node-edge"]
+members = [
+    "api",
+    "daemon",
+    "node-edge",
+    "pallet-co",
+    "runtime-edge",
+    "sdk",
+    "state",
+]
 
 [profile.release]
 panic = "unwind"
