@@ -10,11 +10,11 @@ co-node-edge = { path = "../node-edge" }
 co-state = { path = "../state" }
 futures = { workspace = true }
 hyper = { workspace = true }
-iroh-api = "0.2.0"
-iroh-embed = "0.2.0"
-iroh-resolver = "0.2.0"
-iroh-rpc-client = "0.2.0"
-iroh-unixfs = "0.2.0"
+iroh-api = { path = "../../../github/n0-computer/beetle/iroh-api" }
+iroh-embed = { path = "../../../github/n0-computer/beetle/iroh-embed" }
+iroh-resolver = { path = "../../../github/n0-computer/beetle/iroh-resolver" }
+iroh-rpc-client = { path = "../../../github/n0-computer/beetle/iroh-rpc-client" }
+iroh-unixfs = { path = "../../../github/n0-computer/beetle/iroh-unixfs" }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 libp2p = { workspace = true, features = ["rendezvous"] }
 names = "0.14.0"
@@ -26,6 +26,8 @@ tokio = { workspace = true, optional = true }
 tokio-stream = { workspace = true, optional = true }
 tracing = { workspace = true }
 uuid = { version = "1.2.2", features = ["default", "v4"] }
+#rocksdb = { version = "0.20.1" }
+#librocksdb-sys = { version = "0.10.0+7.9.2" }
 
 # substrate
 sc-cli = { workspace = true }

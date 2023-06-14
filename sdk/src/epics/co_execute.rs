@@ -233,7 +233,6 @@ impl CoRunner {
             transaction_pool: Default::default(),
             network: self.network_config(settings, node_key)?,
             keystore: self.keystore_config()?,
-            keystore_remote: None,
             database: self.database_config(settings)?,
             trie_cache_maximum_size: get_int_setting::<usize>(
                 settings,
