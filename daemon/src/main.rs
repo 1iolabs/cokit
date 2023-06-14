@@ -65,7 +65,7 @@ async fn main() {
         bootstap: Vec::new(),
         keypair: network_key.clone(),
     };
-    let network = Libp2pNetwork::new(network_config).await.expect("network");
+    let _network = Libp2pNetwork::new(network_config).await.expect("network");
     tracing::info!(peer_id = ?network_peer_id, "network");
 
     // driver: state

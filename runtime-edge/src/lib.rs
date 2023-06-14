@@ -45,8 +45,8 @@ use pallet_transaction_payment::{ConstFeeMultiplier, CurrencyAdapter, Multiplier
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
-/// Import the template pallet.
-//pub use pallet_template;
+/// Import the CO pallet.
+pub use pallet_co;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -266,10 +266,10 @@ impl pallet_sudo::Config for Runtime {
     type RuntimeCall = RuntimeCall;
 }
 
-/// Configure the pallet-template in pallets/template.
-// impl pallet_template::Config for Runtime {
-// 	type RuntimeEvent = RuntimeEvent;
-// }
+/// Configure the pallet-co in pallet-co.
+impl pallet_co::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+}
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -286,8 +286,8 @@ construct_runtime!(
         //Balances: pallet_balances,
         //TransactionPayment: pallet_transaction_payment,
         Sudo: pallet_sudo,
-        // Include the custom logic from the pallet-template in the runtime.
-        //TemplateModule: pallet_template,
+        // Include the custom logic from the pallet-co in the runtime.
+        Co: pallet_co,
     }
 );
 
@@ -334,7 +334,7 @@ mod benches {
         [frame_system, SystemBench::<Runtime>]
         [pallet_balances, Balances]
         [pallet_timestamp, Timestamp]
-        //[pallet_template, TemplateModule]
+        [pallet_co, Co]
     );
 }
 
@@ -354,9 +354,9 @@ impl_runtime_apis! {
     }
 
     impl sp_api::Metadata<Block> for Runtime {
-        fn metadata() -> OpaqueMetadata {
-            OpaqueMetadata::new(Runtime::metadata().into())
-        }
+		fn metadata() -> OpaqueMetadata {
+			OpaqueMetadata::new(Runtime::metadata().into())
+		}
 
 		fn metadata_at_version(version: u32) -> Option<OpaqueMetadata> {
 			Runtime::metadata_at_version(version)
@@ -365,7 +365,7 @@ impl_runtime_apis! {
 		fn metadata_versions() -> sp_std::vec::Vec<u32> {
 			Runtime::metadata_versions()
 		}
-    }
+	}
 
     impl sp_block_builder::BlockBuilder<Block> for Runtime {
         fn apply_extrinsic(extrinsic: <Block as BlockT>::Extrinsic) -> ApplyExtrinsicResult {
