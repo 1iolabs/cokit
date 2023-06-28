@@ -2,6 +2,7 @@
 members = [
     "api",
     "daemon",
+    "did-co",
     "node-edge",
     "pallet-co",
     "runtime-edge",

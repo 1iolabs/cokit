@@ -2038,6 +2038,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "did-co"
+version = "0.1.0-dev"
+dependencies = [
+ "did_url",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "did_url"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70d5f6334e473e3bb5650ab4ef3e4c910296b76968e62758e7c66157ff767c05"
+dependencies = [
+ "form_urlencoded",
+]
+
+[[package]]
 name = "difflib"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
