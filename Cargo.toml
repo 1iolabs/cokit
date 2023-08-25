@@ -8,6 +8,7 @@ members = [
     "runtime-edge",
     "sdk",
     "state",
+    "network-co",
 ]
 
 [profile.release]

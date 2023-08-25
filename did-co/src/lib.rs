@@ -7,6 +7,8 @@ pub const DID_CO_SUB_TYPE_REFERENCE: &str = "ref";
 
 #[derive(Debug, PartialEq)]
 pub enum DidCo {
+	/// String: `did:co:id:<genesis_hash>:<name>`
 	Id(String, String),
+	/// String: `did:co:ref:<reference>:<name>`
 	Reference(String, String),
 }

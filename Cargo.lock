@@ -5699,6 +5699,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "network-co"
+version = "0.1.0-dev"
+dependencies = [
+ "async-trait",
+ "futures",
+ "libp2p",
+ "prost-build",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nix"
 version = "0.24.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

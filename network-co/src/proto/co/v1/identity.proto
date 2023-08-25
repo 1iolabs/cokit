@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package co.v1.discovery;
+
+import "google/protobuf/any.proto";
+
+
+message ResolveIdentityRequest
+{
+    string did = 1;
+}
+
+message ResolveIdentityResponse
+{
+    string did = 1;
+    google.protobuf.Any document = 2;
+}
+
