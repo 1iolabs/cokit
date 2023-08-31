@@ -22,13 +22,14 @@ futures = "0.3"
 futures-util = "0.3.26"
 hyper = { version = "0.14.23" }
 libipld = "0.15"
-libp2p = "0.50.0"
+libp2p = "0.52.2"
 # rxrust = { version = "1.0.0-beta.0", features = ["tokio-scheduler"] }
 rxrust = { path = "/Users/dominik/Workspaces/github/rxRust/rxRust", features = [
     "tokio-scheduler",
 ] }
 serde = "1"
 serde_json = "1"
+smallvec = "^1.6.1"
 thiserror = "1"
 tokio = "1"
 tokio-context = "0.1.3"
