@@ -88,7 +88,7 @@ impl Behavior {
 	fn try_send(&mut self, peer: &PeerId, protocol: MessageProtocol) -> Option<MessageProtocol> {
 		if let Some(connections) = self.connected.get_mut(peer) {
 			if connections.is_empty() {
-				return Some(protocol);
+				return Some(protocol)
 			}
 			// let ix = (request.request_id.0 as usize) % connections.len();
 			let conn = &mut connections[0]; // TODO: choose random?
@@ -219,7 +219,7 @@ impl NetworkBehaviour for Behavior {
 		_params: &mut impl PollParameters,
 	) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
 		if let Some(event) = self.pending_events.pop_front() {
-			return Poll::Ready(event);
+			return Poll::Ready(event)
 		} else if self.pending_events.capacity() > 100 {
 			self.pending_events.shrink_to_fit();
 		}
@@ -249,9 +249,8 @@ impl NetworkBehaviour for Behavior {
 
 	fn on_swarm_event(&mut self, event: FromSwarm<Self::ConnectionHandler>) {
 		match event {
-			FromSwarm::ConnectionEstablished(connection_established) => {
-				self.on_connection_established(connection_established)
-			},
+			FromSwarm::ConnectionEstablished(connection_established) =>
+				self.on_connection_established(connection_established),
 			FromSwarm::ConnectionClosed(connection_closed) => self.on_connection_closed(connection_closed),
 			FromSwarm::AddressChange(address_change) => self.on_address_change(address_change),
 			FromSwarm::DialFailure(dial_failure) => self.on_dial_failure(dial_failure),

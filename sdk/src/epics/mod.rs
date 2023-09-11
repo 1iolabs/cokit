@@ -9,12 +9,12 @@ pub mod store_settings;
 
 pub fn sdk_epics<R>() -> CombineEpics<R, Arc<CoContext>>
 where
-    R: Reducer<State = CoState, Action = CoAction>,
+	R: Reducer<State = CoState, Action = CoAction>,
 {
-    let mut result = CombineEpics::new();
-    result.add(initialize::initialize);
-    result.add(co_create::co_create);
-    result.add(store_settings::store_settings);
-    result.add(co_execute::co_execute);
-    result
+	let mut result = CombineEpics::new();
+	result.add(initialize::initialize);
+	result.add(co_create::co_create);
+	result.add(store_settings::store_settings);
+	result.add(co_execute::co_execute);
+	result
 }
