@@ -1,6 +1,4 @@
-
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
-    Message(Vec<u8>),
+	Message(Vec<u8>),
 }
