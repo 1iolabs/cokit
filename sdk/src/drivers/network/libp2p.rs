@@ -6,7 +6,7 @@ use libp2p::{
 	mdns,
 	mdns::tokio::Behaviour as MdnsBehaviour,
 	ping,
-	swarm::{NetworkBehaviour, SwarmEvent},
+	swarm::{NetworkBehaviour, SwarmBuilder, SwarmEvent},
 	tokio_development_transport, Multiaddr, PeerId, Swarm,
 };
 
@@ -34,12 +34,12 @@ impl Network for Libp2pNetwork {
 impl Libp2pNetwork {
 	pub async fn new(config: Libp2pNetworkConfig) -> anyhow::Result<Libp2pNetwork> {
 		let local_peer_id = PeerId::from(config.keypair.public().clone());
-		let gossipsub_config = gossipsub::GossipsubConfigBuilder::default()
-			.max_transmit_size(262144)
+		let gossipsub_config = gossipsub::ConfigBuilder::default()
+			.max_transmit_size(256 * 1024)
 			.build()
 			.expect("valid config");
 		let behaviour = Behaviour {
-			gossipsub: gossipsub::Gossipsub::new(
+			gossipsub: gossipsub::Behaviour::new(
 				gossipsub::MessageAuthenticity::Signed(config.keypair.clone()),
 				gossipsub_config,
 			)
@@ -49,10 +49,10 @@ impl Libp2pNetwork {
 				config.keypair.public(),
 			)),
 			ping: ping::Behaviour::new(ping::Config::new()),
-			mdns: MdnsBehaviour::new(mdns::Config::default())?,
+			mdns: MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?,
 		};
 		let transport = tokio_development_transport(config.keypair.clone())?;
-		let mut swarm = Swarm::with_tokio_executor(transport, behaviour, local_peer_id);
+		let mut swarm = SwarmBuilder::with_tokio_executor(transport, behaviour, local_peer_id).build();
 
 		// listen
 		swarm.listen_on(config.addr.clone().unwrap_or("/ip4/0.0.0.0/tcp/0".parse()?))?;
@@ -104,7 +104,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>) {
 #[derive(NetworkBehaviour)]
 #[behaviour(out_event = "Event")]
 struct Behaviour {
-	gossipsub: gossipsub::Gossipsub,
+	gossipsub: gossipsub::Behaviour,
 	identify: identify::Behaviour,
 	ping: ping::Behaviour,
 	mdns: MdnsBehaviour,
@@ -112,14 +112,14 @@ struct Behaviour {
 
 #[derive(Debug)]
 enum Event {
-	Gossipsub(gossipsub::GossipsubEvent),
+	Gossipsub(gossipsub::Event),
 	Identify(identify::Event),
 	Ping(ping::Event),
 	Mdns(mdns::Event),
 }
 
-impl From<gossipsub::GossipsubEvent> for Event {
-	fn from(event: gossipsub::GossipsubEvent) -> Self {
+impl From<gossipsub::Event> for Event {
+	fn from(event: gossipsub::Event) -> Self {
 		Self::Gossipsub(event)
 	}
 }
