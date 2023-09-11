@@ -7,7 +7,6 @@ pub use pallet::*;
 
 mod error;
 mod library;
-mod std;
 
 #[cfg(test)]
 mod mock;
@@ -24,8 +23,9 @@ pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
-	use crate::{library::ListReference, std::*};
+	use crate::library::ListReference;
 	use cid::Cid;
+	use sp_std::prelude::*;
 
 	#[pallet::pallet]
 	#[pallet::without_storage_info]

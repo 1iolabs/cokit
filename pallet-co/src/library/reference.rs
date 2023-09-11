@@ -1,12 +1,10 @@
 extern crate alloc;
 
-use crate::{
-	error::{Error, Result},
-	std::*,
-};
+use crate::error::{Error, Result};
 use alloc::{collections::BTreeMap, string::String};
 use cid::Cid;
 use libipld_core::ipld::Ipld;
+use sp_std::vec::Vec;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListReference {
