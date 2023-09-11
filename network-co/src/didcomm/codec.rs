@@ -27,7 +27,7 @@ impl Codec {
 	pub async fn receive_message<S: AsyncRead + Unpin>(&self, socket: &mut S) -> Result<Message, Error> {
 		let data = read_length_prefixed(socket, self.max_message_size_bytes).await?;
 		if data.is_empty() {
-			return Err(Error::Empty)
+			return Err(Error::Empty);
 		}
 		Ok(Message::Message(data))
 	}
@@ -38,7 +38,7 @@ impl Codec {
 		Message::Message(data): Message,
 	) -> Result<(), Error> {
 		if data.len() > self.max_message_size_bytes {
-			return Err(std::io::ErrorKind::InvalidInput.into())
+			return Err(std::io::ErrorKind::InvalidInput.into());
 		}
 		write_length_prefixed(socket, data).await?;
 		Ok(())

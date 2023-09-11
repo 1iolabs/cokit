@@ -1,6 +1,7 @@
 use std::{
 	collections::VecDeque,
 	task::{Context, Poll},
+	time::{Duration, Instant},
 };
 
 use libp2p::swarm::{
@@ -19,6 +20,7 @@ pub enum Event {
 }
 
 pub struct Handler {
+	/// Keep alive while waiting for inbound/outbound task.
 	keep_alive: KeepAlive,
 
 	/// A pending fatal error that results in the connection being closed.
@@ -29,6 +31,14 @@ pub struct Handler {
 
 	/// Outbound messages to be sent.
 	outbound: VecDeque<MessageProtocol>,
+	pending_outbound: i32,
+
+	/// The keep-alive timeout of idle connections. A connection is considered
+	/// idle if there are no outbound substreams.
+	keep_alive_timeout: Duration,
+
+	/// The outbound message send timeout.
+	send_timeout: Duration,
 }
 
 impl Handler {
@@ -38,6 +48,9 @@ impl Handler {
 			outbound: VecDeque::new(),
 			pending_error: None,
 			pending_events: VecDeque::new(),
+			pending_outbound: 0,
+			send_timeout: Duration::from_millis(30000),
+			keep_alive_timeout: Duration::from_millis(1000),
 		}
 	}
 }
@@ -95,6 +108,7 @@ impl ConnectionHandler for Handler {
 	}
 
 	fn on_behaviour_event(&mut self, v: Self::FromBehaviour) {
+		self.keep_alive = KeepAlive::Yes;
 		self.outbound.push_back(v);
 	}
 
@@ -109,23 +123,33 @@ impl ConnectionHandler for Handler {
 		// check for a pending (fatal) error
 		if let Some(err) = self.pending_error.take() {
 			// The handler will not be polled again by the `Swarm`.
-			return Poll::Ready(ConnectionHandlerEvent::Close(err))
+			return Poll::Ready(ConnectionHandlerEvent::Close(err));
 		}
 
 		// drain pending events
 		if let Some(event) = self.pending_events.pop_front() {
-			return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(event))
+			return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(event));
 		} else if self.pending_events.capacity() > 100 {
 			self.pending_events.shrink_to_fit();
 		}
 
 		// open outbound streams
 		if let Some(message) = self.outbound.pop_front() {
+			self.pending_outbound += 1;
 			return Poll::Ready(ConnectionHandlerEvent::OutboundSubstreamRequest {
-				protocol: SubstreamProtocol::new(message, ()),
-			})
+				protocol: SubstreamProtocol::new(message, ()).with_timeout(self.send_timeout),
+			});
 		} else if self.outbound.capacity() > 100 {
 			self.outbound.shrink_to_fit();
+		}
+
+		// keep alive
+		//  @todo when not using an keep alive timeout the sent event will be never received.
+		if self.keep_alive.is_yes() {
+			self.keep_alive = match self.pending_outbound {
+				0 => KeepAlive::Until(Instant::now() + self.keep_alive_timeout),
+				_ => KeepAlive::Until(Instant::now() + self.send_timeout),
+			};
 		}
 
 		// nothing todo right now
@@ -146,13 +170,16 @@ impl ConnectionHandler for Handler {
 				self.pending_events.push_back(Event::Received { message: protocol });
 			},
 			ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound { protocol, .. }) => {
+				self.keep_alive = KeepAlive::Yes;
+				self.pending_outbound -= 1;
 				if let Some(message) = protocol {
 					self.pending_events.push_back(Event::Sent { message });
 				}
 			},
 			ConnectionEvent::DialUpgradeError(dial_upgrade_error) => self.on_dial_upgrade_error(dial_upgrade_error),
-			ConnectionEvent::ListenUpgradeError(listen_upgrade_error) =>
-				self.on_listen_upgrade_error(listen_upgrade_error),
+			ConnectionEvent::ListenUpgradeError(listen_upgrade_error) => {
+				self.on_listen_upgrade_error(listen_upgrade_error)
+			},
 			ConnectionEvent::AddressChange(_) => {},
 			ConnectionEvent::LocalProtocolsChange(_) => {},
 			ConnectionEvent::RemoteProtocolsChange(_) => {},

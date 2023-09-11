@@ -23,7 +23,7 @@ impl MessageProtocol {
 	}
 
 	pub fn into_message(self) -> Option<Message> {
-		return self.message
+		return self.message;
 	}
 }
 

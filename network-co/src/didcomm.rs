@@ -41,6 +41,16 @@ pub enum OutboundFailure {
 	UnsupportedProtocols,
 }
 
+pub struct Config {
+	/// Try to dail peer if not connected yet.
+	pub auto_dail: bool,
+}
+impl Default for Config {
+	fn default() -> Self {
+		Self { auto_dail: true }
+	}
+}
+
 pub struct Behavior {
 	/// Pending events to return from `poll`.
 	pending_events: VecDeque<ToSwarm<Event, MessageProtocol>>,
@@ -50,18 +60,22 @@ pub struct Behavior {
 	/// Requests that have not yet been sent and are waiting for a connection
 	/// to be established.
 	pending_outbound: HashMap<PeerId, SmallVec<[MessageProtocol; 10]>>,
+	/// Config.
+	config: Config,
 }
 
 impl Behavior {
-	pub fn new() -> Self {
-		Self { pending_events: VecDeque::new(), connected: HashMap::new(), pending_outbound: HashMap::new() }
+	pub fn new(config: Config) -> Self {
+		Self { pending_events: VecDeque::new(), connected: HashMap::new(), pending_outbound: HashMap::new(), config }
 	}
 
 	pub fn send(&mut self, peer: &PeerId, message: Message) {
 		let protocol = MessageProtocol::outbound(message);
 		if let Some(protocol) = self.try_send(peer, protocol) {
-			self.pending_events
-				.push_back(ToSwarm::Dial { opts: DialOpts::peer_id(*peer).build() });
+			if self.config.auto_dail {
+				self.pending_events
+					.push_back(ToSwarm::Dial { opts: DialOpts::peer_id(*peer).build() });
+			}
 			self.pending_outbound.entry(*peer).or_default().push(protocol);
 		}
 	}
@@ -74,7 +88,7 @@ impl Behavior {
 	fn try_send(&mut self, peer: &PeerId, protocol: MessageProtocol) -> Option<MessageProtocol> {
 		if let Some(connections) = self.connected.get_mut(peer) {
 			if connections.is_empty() {
-				return Some(protocol)
+				return Some(protocol);
 			}
 			// let ix = (request.request_id.0 as usize) % connections.len();
 			let conn = &mut connections[0]; // TODO: choose random?
@@ -191,7 +205,7 @@ impl Behavior {
 
 impl Default for Behavior {
 	fn default() -> Self {
-		Self::new()
+		Self::new(Default::default())
 	}
 }
 
@@ -205,7 +219,7 @@ impl NetworkBehaviour for Behavior {
 		_params: &mut impl PollParameters,
 	) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
 		if let Some(event) = self.pending_events.pop_front() {
-			return Poll::Ready(event)
+			return Poll::Ready(event);
 		} else if self.pending_events.capacity() > 100 {
 			self.pending_events.shrink_to_fit();
 		}
@@ -235,8 +249,9 @@ impl NetworkBehaviour for Behavior {
 
 	fn on_swarm_event(&mut self, event: FromSwarm<Self::ConnectionHandler>) {
 		match event {
-			FromSwarm::ConnectionEstablished(connection_established) =>
-				self.on_connection_established(connection_established),
+			FromSwarm::ConnectionEstablished(connection_established) => {
+				self.on_connection_established(connection_established)
+			},
 			FromSwarm::ConnectionClosed(connection_closed) => self.on_connection_closed(connection_closed),
 			FromSwarm::AddressChange(address_change) => self.on_address_change(address_change),
 			FromSwarm::DialFailure(dial_failure) => self.on_dial_failure(dial_failure),
@@ -258,6 +273,7 @@ impl NetworkBehaviour for Behavior {
 		_connection_id: ConnectionId,
 		event: THandlerOutEvent<Self>,
 	) {
+		tracing::debug!(?peer, ?event, "on_connection_handler_event");
 		match event {
 			handler::Event::Received { message } => {
 				self.pending_events

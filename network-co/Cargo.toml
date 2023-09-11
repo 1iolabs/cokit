@@ -17,6 +17,8 @@ prost-build = { version = "0.11" }
 [dependencies]
 async-stream = { workspace = true }
 async-trait = { workspace = true }
+did_url = "^0.1"
+did-key = "^0.2"
 futures = { workspace = true }
 libp2p = { workspace = true, features = ["full"] }
 rand = "0.8.5"
@@ -27,6 +29,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-stream = { workspace = true, optional = true }
 tracing = { workspace = true }
+uuid = { version = "1.2.2", features = ["default", "v4"] }
 
 #prost = "0.11"
 #prost-types = "0.11"
