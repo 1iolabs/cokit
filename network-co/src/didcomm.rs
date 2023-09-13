@@ -4,12 +4,13 @@ use std::{
 };
 
 use libp2p::{
-	core::{ConnectedPoint, Endpoint},
+	core::ConnectedPoint,
 	swarm::{
+		behaviour::{AddressChange, ConnectionClosed, DialFailure, FromSwarm},
 		derive_prelude::{ConnectionEstablished, ConnectionId},
 		dial_opts::DialOpts,
-		AddressChange, ConnectionClosed, ConnectionDenied, DialFailure, FromSwarm, NetworkBehaviour, NotifyHandler,
-		PollParameters, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
+		ConnectionHandler, IntoConnectionHandler, NetworkBehaviour, NetworkBehaviourAction, NotifyHandler,
+		PollParameters,
 	},
 	Multiaddr, PeerId,
 };
@@ -53,7 +54,7 @@ impl Default for Config {
 
 pub struct Behavior {
 	/// Pending events to return from `poll`.
-	pending_events: VecDeque<ToSwarm<Event, MessageProtocol>>,
+	pending_events: VecDeque<NetworkBehaviourAction<Event, handler::Handler>>,
 	/// The currently connected peers, their pending outbound and inbound responses and their known,
 	/// reachable addresses, if any.
 	connected: HashMap<PeerId, SmallVec<[Connection; 2]>>,
@@ -73,8 +74,9 @@ impl Behavior {
 		let protocol = MessageProtocol::outbound(message);
 		if let Some(protocol) = self.try_send(peer, protocol) {
 			if self.config.auto_dail {
+				let handler = self.new_handler();
 				self.pending_events
-					.push_back(ToSwarm::Dial { opts: DialOpts::peer_id(*peer).build() });
+					.push_back(NetworkBehaviourAction::Dial { opts: DialOpts::peer_id(*peer).build(), handler });
 			}
 			self.pending_outbound.entry(*peer).or_default().push(protocol);
 		}
@@ -94,7 +96,7 @@ impl Behavior {
 			let conn = &mut connections[0]; // TODO: choose random?
 								// conn.pending_inbound_responses.insert(request.request_id);
 			tracing::info!(?peer, connection_id = ?conn.id, "try-send");
-			self.pending_events.push_back(ToSwarm::NotifyHandler {
+			self.pending_events.push_back(NetworkBehaviourAction::NotifyHandler {
 				peer_id: *peer,
 				handler: NotifyHandler::One(conn.id),
 				event: protocol,
@@ -152,7 +154,7 @@ impl Behavior {
 		}
 	}
 
-	fn on_dial_failure(&mut self, DialFailure { peer_id, connection_id, error }: DialFailure) {
+	fn on_dial_failure(&mut self, DialFailure { peer_id, handler, error }: DialFailure<Handler>) {
 		if let Some(peer_id) = peer_id {
 			// log
 			let message_discard_count = match self.pending_outbound.get(&peer_id) {
@@ -160,9 +162,9 @@ impl Behavior {
 				None => 0,
 			};
 			if message_discard_count > 0 {
-				tracing::warn!(?peer_id, ?connection_id, ?error, ?message_discard_count, "dail-failure");
+				tracing::warn!(?peer_id, ?error, ?message_discard_count, "dail-failure");
 			} else {
-				tracing::info!(?peer_id, ?connection_id, ?error, ?message_discard_count, "dail-failure");
+				tracing::info!(?peer_id, ?error, ?message_discard_count, "dail-failure");
 			}
 
 			// If there are pending outgoing requests when a dial failure occurs,
@@ -174,11 +176,12 @@ impl Behavior {
 			if let Some(pending) = self.pending_outbound.remove(&peer_id) {
 				for request in pending {
 					if let Some(message) = request.into_message() {
-						self.pending_events.push_back(ToSwarm::GenerateEvent(Event::OutboundFailure {
-							peer_id,
-							message: Some(message),
-							error: OutboundFailure::DialFailure,
-						}));
+						self.pending_events
+							.push_back(NetworkBehaviourAction::GenerateEvent(Event::OutboundFailure {
+								peer_id,
+								message: Some(message),
+								error: OutboundFailure::DialFailure,
+							}));
 					}
 				}
 			}
@@ -211,13 +214,14 @@ impl Default for Behavior {
 
 impl NetworkBehaviour for Behavior {
 	type ConnectionHandler = Handler;
-	type ToSwarm = Event;
+	// type ToSwarm = Event;
+	type OutEvent = Event;
 
 	fn poll(
 		&mut self,
 		_cx: &mut Context<'_>,
 		_params: &mut impl PollParameters,
-	) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
+	) -> Poll<NetworkBehaviourAction<Self::OutEvent, Self::ConnectionHandler>> {
 		if let Some(event) = self.pending_events.pop_front() {
 			return Poll::Ready(event)
 		} else if self.pending_events.capacity() > 100 {
@@ -227,24 +231,28 @@ impl NetworkBehaviour for Behavior {
 		Poll::Pending
 	}
 
-	fn handle_established_inbound_connection(
-		&mut self,
-		_connection_id: ConnectionId,
-		_peer: PeerId,
-		_local_addr: &Multiaddr,
-		_remote_addr: &Multiaddr,
-	) -> Result<THandler<Self>, ConnectionDenied> {
-		Ok(Handler::new())
-	}
+	// fn handle_established_inbound_connection(
+	// 	&mut self,
+	// 	_connection_id: ConnectionId,
+	// 	_peer: PeerId,
+	// 	_local_addr: &Multiaddr,
+	// 	_remote_addr: &Multiaddr,
+	// ) -> Result<THandler<Self>, ConnectionDenied> {
+	// 	Ok(Handler::new())
+	// }
 
-	fn handle_established_outbound_connection(
-		&mut self,
-		_connection_id: ConnectionId,
-		_peer: PeerId,
-		_addr: &Multiaddr,
-		_role_override: Endpoint,
-	) -> Result<THandler<Self>, ConnectionDenied> {
-		Ok(Handler::new())
+	// fn handle_established_outbound_connection(
+	// 	&mut self,
+	// 	_connection_id: ConnectionId,
+	// 	_peer: PeerId,
+	// 	_addr: &Multiaddr,
+	// 	_role_override: Endpoint,
+	// ) -> Result<THandler<Self>, ConnectionDenied> {
+	// 	Ok(Handler::new())
+	// }
+
+	fn new_handler(&mut self) -> Self::ConnectionHandler {
+		Handler::new()
 	}
 
 	fn on_swarm_event(&mut self, event: FromSwarm<Self::ConnectionHandler>) {
@@ -260,9 +268,11 @@ impl NetworkBehaviour for Behavior {
 			FromSwarm::ExpiredListenAddr(_) => {},
 			FromSwarm::ListenerError(_) => {},
 			FromSwarm::ListenerClosed(_) => {},
-			FromSwarm::NewExternalAddrCandidate(_) => {},
-			FromSwarm::ExternalAddrExpired(_) => {},
-			FromSwarm::ExternalAddrConfirmed(_) => {},
+			FromSwarm::NewExternalAddr(_) => {},
+			FromSwarm::ExpiredExternalAddr(_) => {},
+			// FromSwarm::NewExternalAddrCandidate(_) => {},
+			// FromSwarm::ExternalAddrExpired(_) => {},
+			// FromSwarm::ExternalAddrConfirmed(_) => {},
 		}
 	}
 
@@ -270,31 +280,33 @@ impl NetworkBehaviour for Behavior {
 		&mut self,
 		peer: PeerId,
 		_connection_id: ConnectionId,
-		event: THandlerOutEvent<Self>,
+		event: <<Self::ConnectionHandler as IntoConnectionHandler>::Handler as ConnectionHandler>::OutEvent,
 	) {
 		tracing::debug!(?peer, ?event, "on_connection_handler_event");
 		match event {
 			handler::Event::Received { message } => {
 				self.pending_events
-					.push_back(ToSwarm::GenerateEvent(Event::Received { peer_id: peer, message }));
+					.push_back(NetworkBehaviourAction::GenerateEvent(Event::Received { peer_id: peer, message }));
 			},
 			handler::Event::Sent { message } => {
 				self.pending_events
-					.push_back(ToSwarm::GenerateEvent(Event::Sent { peer_id: peer, message }));
+					.push_back(NetworkBehaviourAction::GenerateEvent(Event::Sent { peer_id: peer, message }));
 			},
 			handler::Event::OutboundUnsupportedProtocols => {
-				self.pending_events.push_back(ToSwarm::GenerateEvent(Event::OutboundFailure {
-					peer_id: peer,
-					message: None,
-					error: OutboundFailure::UnsupportedProtocols,
-				}));
+				self.pending_events
+					.push_back(NetworkBehaviourAction::GenerateEvent(Event::OutboundFailure {
+						peer_id: peer,
+						message: None,
+						error: OutboundFailure::UnsupportedProtocols,
+					}));
 			},
 			handler::Event::OutboundTimeout => {
-				self.pending_events.push_back(ToSwarm::GenerateEvent(Event::OutboundFailure {
-					peer_id: peer,
-					message: None,
-					error: OutboundFailure::Timeout,
-				}));
+				self.pending_events
+					.push_back(NetworkBehaviourAction::GenerateEvent(Event::OutboundFailure {
+						peer_id: peer,
+						message: None,
+						error: OutboundFailure::Timeout,
+					}));
 			},
 		}
 	}

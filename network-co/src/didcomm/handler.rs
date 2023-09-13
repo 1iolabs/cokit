@@ -4,9 +4,14 @@ use std::{
 	time::{Duration, Instant},
 };
 
-use libp2p::swarm::{
-	handler::{ConnectionEvent, DialUpgradeError, FullyNegotiatedInbound, FullyNegotiatedOutbound, ListenUpgradeError},
-	ConnectionHandler, ConnectionHandlerEvent, KeepAlive, StreamUpgradeError, SubstreamProtocol,
+use libp2p::{
+	core::{upgrade::NegotiationError, UpgradeError},
+	swarm::{
+		handler::{
+			ConnectionEvent, DialUpgradeError, FullyNegotiatedInbound, FullyNegotiatedOutbound, ListenUpgradeError,
+		},
+		ConnectionHandler, ConnectionHandlerEvent, ConnectionHandlerUpgrErr, KeepAlive, SubstreamProtocol,
+	},
 };
 
 use super::{codec, message::Message, protocol::MessageProtocol};
@@ -64,10 +69,11 @@ impl Handler {
 		>,
 	) {
 		match error {
-			StreamUpgradeError::Timeout => {
+			ConnectionHandlerUpgrErr::Timeout => {
 				self.pending_events.push_back(Event::OutboundTimeout);
 			},
-			StreamUpgradeError::NegotiationFailed => {
+			// StreamUpgradeError::NegotiationFailed => {
+			ConnectionHandlerUpgrErr::Upgrade(UpgradeError::Select(NegotiationError::Failed)) => {
 				// The remote merely doesn't support the protocol(s) we requested.
 				// This is no reason to close the connection, which may
 				// successfully communicate with other protocols already.
@@ -75,14 +81,18 @@ impl Handler {
 				// the remote peer does not support the requested protocol(s).
 				self.pending_events.push_back(Event::OutboundUnsupportedProtocols);
 			},
-			StreamUpgradeError::Apply(_e) => {
-				// log::debug!("outbound stream {info} failed: {e}");
-			},
-			StreamUpgradeError::Io(_e) => {
+			// StreamUpgradeError::Apply(_e) => {
+			// 	// log::debug!("outbound stream {info} failed: {e}");
+			// },
+			// StreamUpgradeError::Io(_e) => {
+			// 	// log::debug!("outbound stream {info} failed: {e}");
+			// },
+			_e => {
 				// log::debug!("outbound stream {info} failed: {e}");
 			},
 		}
 	}
+
 	fn on_listen_upgrade_error(
 		&mut self,
 		ListenUpgradeError { .. }: ListenUpgradeError<
@@ -95,8 +105,10 @@ impl Handler {
 }
 
 impl ConnectionHandler for Handler {
-	type FromBehaviour = MessageProtocol;
-	type ToBehaviour = Event;
+	// type FromBehaviour = MessageProtocol;
+	// type ToBehaviour = Event;
+	type InEvent = MessageProtocol;
+	type OutEvent = Event;
 	type Error = codec::Error;
 	type InboundProtocol = MessageProtocol;
 	type OutboundProtocol = MessageProtocol;
@@ -107,7 +119,7 @@ impl ConnectionHandler for Handler {
 		SubstreamProtocol::new(MessageProtocol::inbound(), ())
 	}
 
-	fn on_behaviour_event(&mut self, v: Self::FromBehaviour) {
+	fn on_behaviour_event(&mut self, v: Self::InEvent) {
 		self.keep_alive = KeepAlive::Yes;
 		self.outbound.push_back(v);
 	}
@@ -119,7 +131,7 @@ impl ConnectionHandler for Handler {
 	fn poll(
 		&mut self,
 		_cx: &mut Context<'_>,
-	) -> Poll<ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::ToBehaviour, Self::Error>> {
+	) -> Poll<ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::OutEvent, Self::Error>> {
 		// check for a pending (fatal) error
 		if let Some(err) = self.pending_error.take() {
 			// The handler will not be polled again by the `Swarm`.
@@ -128,7 +140,8 @@ impl ConnectionHandler for Handler {
 
 		// drain pending events
 		if let Some(event) = self.pending_events.pop_front() {
-			return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(event))
+			// return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(event))
+			return Poll::Ready(ConnectionHandlerEvent::Custom(event))
 		} else if self.pending_events.capacity() > 100 {
 			self.pending_events.shrink_to_fit();
 		}
@@ -180,8 +193,8 @@ impl ConnectionHandler for Handler {
 			ConnectionEvent::ListenUpgradeError(listen_upgrade_error) =>
 				self.on_listen_upgrade_error(listen_upgrade_error),
 			ConnectionEvent::AddressChange(_) => {},
-			ConnectionEvent::LocalProtocolsChange(_) => {},
-			ConnectionEvent::RemoteProtocolsChange(_) => {},
+			//ConnectionEvent::LocalProtocolsChange(_) => {},
+			//ConnectionEvent::RemoteProtocolsChange(_) => {},
 		}
 	}
 }
