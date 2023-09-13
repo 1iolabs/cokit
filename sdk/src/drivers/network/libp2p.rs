@@ -1,4 +1,3 @@
-use super::Network;
 use co_network::didcomm;
 use futures::{channel::oneshot, StreamExt};
 use libp2p::{
@@ -23,28 +22,56 @@ pub struct Libp2pNetworkConfig {
 	pub bootstap: Vec<Multiaddr>,
 }
 
-impl Network for Libp2pNetwork {
-	fn shutdown(mut self) {
-		match self.shutdown.take() {
-			Some(i) => i.send(()).unwrap(),
-			None => {},
-		}
+struct Runtime {
+	config: Libp2pNetworkConfig,
+	shutdown: Option<oneshot::Receiver<()>>,
+	listener_id: Option<libp2p::core::transport::ListenerId>,
+}
+impl Runtime {
+	fn new(config: Libp2pNetworkConfig, shutdown: oneshot::Receiver<()>) -> Self {
+		Self { config, shutdown: Some(shutdown), listener_id: None }
+	}
+
+	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
+		self.listener_id = Some(id);
+	}
+
+	fn is_running(&mut self, swarm: &mut Swarm<Behaviour>) -> bool {
+		let running = match &mut self.shutdown {
+			None => false,
+			Some(r) => match r.try_recv() {
+				// dropped or received signal
+				Err(_) | Ok(Some(_)) => {
+					// stop listening
+					if let Some(listener_id) = self.listener_id.take() {
+						swarm.remove_listener(listener_id);
+					}
+
+					// do not ask again
+					self.shutdown = None;
+
+					// not running
+					false
+				},
+
+				// no signal received yet
+				Ok(None) => true,
+			},
+		};
+		running || swarm.connected_peers().peekable().peek().is_some()
 	}
 }
 
 impl Libp2pNetwork {
 	pub async fn new(config: Libp2pNetworkConfig) -> anyhow::Result<Libp2pNetwork> {
 		let local_peer_id = PeerId::from(config.keypair.public().clone());
-		let gossipsub_config = gossipsub::ConfigBuilder::default()
+		let gossipsub_config = gossipsub::GossipsubConfigBuilder::default()
 			.max_transmit_size(256 * 1024)
 			.build()
 			.expect("valid config");
-		let didcomm_config: didcomm::Config = didcomm::Config {
-			..Default::default(),
-			auto_dail: false,
-		};
+		let didcomm_config: didcomm::Config = didcomm::Config { auto_dail: false, ..Default::default() };
 		let behaviour = Behaviour {
-			gossipsub: gossipsub::Behaviour::new(
+			gossipsub: gossipsub::Gossipsub::new(
 				gossipsub::MessageAuthenticity::Signed(config.keypair.clone()),
 				gossipsub_config,
 			)
@@ -60,35 +87,38 @@ impl Libp2pNetwork {
 		let transport = tokio_development_transport(config.keypair.clone())?;
 		let mut swarm = SwarmBuilder::with_tokio_executor(transport, behaviour, local_peer_id).build();
 
+		// runtime
+		let (shutdown_tx, shutdown_rx) = oneshot::channel();
+		let mut runtime = Runtime::new(config.clone(), shutdown_rx);
+
 		// listen
-		swarm.listen_on(config.addr.clone().unwrap_or("/ip4/0.0.0.0/tcp/0".parse()?))?;
+		runtime.listen(swarm.listen_on(config.addr.clone().unwrap_or("/ip4/0.0.0.0/tcp/0".parse()?))?);
 
 		// run
-		let (shutdown_tx, shutdown_rx) = oneshot::channel();
-		let run_config = config.clone();
 		let handle = tokio::runtime::Handle::current().clone();
 		tokio::task::spawn_blocking(move || {
-			handle.block_on(run(swarm, run_config, shutdown_rx));
+			handle.block_on(run(swarm, runtime));
 		});
 
 		// result
 		Ok(Self { config, shutdown: Some(shutdown_tx) })
 	}
+
+	pub fn shutdown(&mut self) {
+		// trigger shutdown signal
+		if let Some(shutdown) = self.shutdown.take() {
+			let _ = shutdown.send(());
+		}
+	}
 }
 
-async fn run(mut swarm: Swarm<Behaviour>, config: Libp2pNetworkConfig, mut shutdown: oneshot::Receiver<()>) {
+async fn run(mut swarm: Swarm<Behaviour>, mut runtime: Runtime) {
 	// log
 	tracing::info!("network-running");
 
 	// handle
-	let mut running = true;
-	while running {
-		tokio::select! {
-			_ = shutdown = {
-				running = false;
-			},
-			_ = run_once(&mut swarm) => {},
-		}
+	while runtime.is_running(&mut swarm) {
+		run_once(&mut swarm).await;
 	}
 
 	// log
@@ -112,7 +142,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>) {
 #[derive(NetworkBehaviour)]
 struct Behaviour {
 	didcomm: didcomm::Behavior,
-	gossipsub: gossipsub::Behaviour,
+	gossipsub: gossipsub::Gossipsub,
 	identify: identify::Behaviour,
 	mdns: MdnsBehaviour,
 	ping: ping::Behaviour,

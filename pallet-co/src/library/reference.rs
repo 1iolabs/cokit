@@ -90,7 +90,7 @@ impl TryInto<(Cid, Vec<u8>)> for ListReference {
 
 		// libipld_cbor
 		let ipld_data: Ipld = self.into();
-		let data = DagCborCodec.encode(&ipld_data);
+		let data = DagCborCodec.encode(&ipld_data)?;
 		let hash = Code::Sha2_256.digest(&data);
 		Ok((Cid::new_v1(DagCborCodec.into(), hash), data))
 	}
