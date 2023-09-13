@@ -1,5 +1,5 @@
 [package]
-name = "network-co"
+name = "co-network"
 version = "0.1.0-dev"
 description = "CO network protocols."
 authors = ["dk"]
