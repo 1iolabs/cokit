@@ -23,6 +23,7 @@ mod handler;
 mod message;
 mod protocol;
 
+pub use codec::Error;
 pub use message::Message;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -6,13 +6,28 @@ use libp2p::{
 	mdns,
 	mdns::tokio::Behaviour as MdnsBehaviour,
 	ping,
-	swarm::{NetworkBehaviour, SwarmBuilder, SwarmEvent},
+	swarm::{ConnectionHandler, IntoConnectionHandler, NetworkBehaviour, SwarmBuilder, SwarmEvent},
 	tokio_development_transport, Multiaddr, PeerId, Swarm,
 };
+use rxrust::prelude::*;
+use std::sync::Arc;
+
+pub type Task<B> = Box<dyn Send + Fn(&mut Swarm<B>)>;
+pub type OnSwarmEvent<B, E> = Box<dyn Send + Fn(&mut Swarm<B>, SwarmEvent<E, THandlerErr<B>>)>;
+pub type EventsSubject<B, E> = SubjectThreads<Arc<SwarmEvent<E, THandlerErr<B>>>, ()>;
+
+// pub type BehaviourConnectionHandler<B: NetworkBehaviour> =
+// 	<<B as NetworkBehaviour>::ConnectionHandler as IntoConnectionHandler>::Handler;
+// pub type BehaviourOutEventType<B: NetworkBehaviour> = <BehaviourConnectionHandler<B> as ConnectionHandler>::OutEvent;
+// pub type BehaviourErrorType<B: NetworkBehaviour> = <BehaviourConnectionHandler<B> as ConnectionHandler>::Error;
+
+type THandlerErr<TBehaviour> = <<<TBehaviour as NetworkBehaviour>::ConnectionHandler as IntoConnectionHandler>::Handler as ConnectionHandler>::Error;
 
 pub struct Libp2pNetwork {
 	config: Libp2pNetworkConfig,
 	shutdown: Option<oneshot::Sender<()>>,
+	tasks: tokio::sync::mpsc::UnboundedSender<Task<Behaviour>>,
+	events: EventsSubject<Behaviour, BehaviourEvent>,
 }
 
 #[derive(Clone, Debug)]
@@ -26,10 +41,19 @@ struct Runtime {
 	config: Libp2pNetworkConfig,
 	shutdown: Option<oneshot::Receiver<()>>,
 	listener_id: Option<libp2p::core::transport::ListenerId>,
+	tasks: tokio::sync::mpsc::UnboundedReceiver<Task<Behaviour>>,
+	// on_swarm_event: OnSwarmEvent<Behaviour>,
+	events: SubjectThreads<Arc<SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>>, ()>,
 }
 impl Runtime {
-	fn new(config: Libp2pNetworkConfig, shutdown: oneshot::Receiver<()>) -> Self {
-		Self { config, shutdown: Some(shutdown), listener_id: None }
+	fn new(
+		config: Libp2pNetworkConfig,
+		shutdown: oneshot::Receiver<()>,
+		tasks: tokio::sync::mpsc::UnboundedReceiver<Task<Behaviour>>,
+		// on_swarm_event: OnSwarmEvent<Behaviour>,
+		events: SubjectThreads<Arc<SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>>, ()>,
+	) -> Self {
+		Self { config, shutdown: Some(shutdown), listener_id: None, tasks, events }
 	}
 
 	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
@@ -87,9 +111,15 @@ impl Libp2pNetwork {
 		let transport = tokio_development_transport(config.keypair.clone())?;
 		let mut swarm = SwarmBuilder::with_tokio_executor(transport, behaviour, local_peer_id).build();
 
+		// tasks
+		let (tasks_tx, tasks_rx) = tokio::sync::mpsc::unbounded_channel();
+
+		// events
+		let events = SubjectThreads::default();
+
 		// runtime
 		let (shutdown_tx, shutdown_rx) = oneshot::channel();
-		let mut runtime = Runtime::new(config.clone(), shutdown_rx);
+		let mut runtime = Runtime::new(config.clone(), shutdown_rx, tasks_rx, events.clone());
 
 		// listen
 		runtime.listen(swarm.listen_on(config.addr.clone().unwrap_or("/ip4/0.0.0.0/tcp/0".parse()?))?);
@@ -101,14 +131,29 @@ impl Libp2pNetwork {
 		});
 
 		// result
-		Ok(Self { config, shutdown: Some(shutdown_tx) })
+		Ok(Self { config, shutdown: Some(shutdown_tx), tasks: tasks_tx, events })
 	}
 
+	/// Gracefully shutdown the network stack.
+	/// This will stop accepting new connections and waits until established connections are done.
 	pub fn shutdown(&mut self) {
 		// trigger shutdown signal
 		if let Some(shutdown) = self.shutdown.take() {
 			let _ = shutdown.send(());
 		}
+	}
+
+	/// Sends a task to execute on the behavior to the queue.
+	pub fn queue_behaviour_task(
+		&self,
+		task: Task<Behaviour>,
+	) -> Result<(), tokio::sync::mpsc::error::SendError<Task<Behaviour>>> {
+		self.tasks.send(task)
+	}
+
+	/// Swarm events subject.
+	pub fn events(&self) -> EventsSubject<Behaviour, BehaviourEvent> {
+		self.events.clone()
 	}
 }
 
@@ -118,15 +163,18 @@ async fn run(mut swarm: Swarm<Behaviour>, mut runtime: Runtime) {
 
 	// handle
 	while runtime.is_running(&mut swarm) {
-		run_once(&mut swarm).await;
+		run_once(&mut swarm, &mut runtime).await;
 	}
 
 	// log
 	tracing::info!("network-shutdown");
 }
 
-async fn run_once(swarm: &mut Swarm<Behaviour>) {
-	match swarm.select_next_some().await {
+async fn run_once(swarm: &mut Swarm<Behaviour>, runtime: &mut Runtime) {
+	let event = swarm.select_next_some().await;
+
+	// log
+	match &event {
 		SwarmEvent::NewListenAddr { address, .. } => {
 			tracing::info!(?address, "network-listening");
 		},
@@ -137,10 +185,14 @@ async fn run_once(swarm: &mut Swarm<Behaviour>) {
 			tracing::info!(?event, "network-event");
 		},
 	}
+
+	// handler
+	// TODO: solution without heap? performance?
+	runtime.events.next(Arc::new(event));
 }
 
 #[derive(NetworkBehaviour)]
-struct Behaviour {
+pub struct Behaviour {
 	didcomm: didcomm::Behavior,
 	gossipsub: gossipsub::Gossipsub,
 	identify: identify::Behaviour,
