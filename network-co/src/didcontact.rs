@@ -1,4 +1,11 @@
-use libp2p::{gossipsub, identity::Keypair};
+use libp2p::{
+	gossipsub::{
+		error::{PublishError, SubscriptionError},
+		Gossipsub as Behaviour, GossipsubConfigBuilder as ConfigBuilder, IdentTopic, MessageAuthenticity,
+	},
+	identity::Keypair,
+};
+// use libp2p::gossipsub::{Behaviour, PublishError, SubscriptionError, ConfigBuilder};
 
 // modules
 mod did;
@@ -27,11 +34,7 @@ pub enum Error {
 }
 
 /// Publish InviteRequest on gossipsub.
-pub fn publish(
-	gossipsub: &mut gossipsub::Behaviour,
-	rendezvous_point: gossipsub::IdentTopic,
-	message: Vec<u8>,
-) -> Result<(), Error> {
+pub fn publish(gossipsub: &mut Behaviour, rendezvous_point: IdentTopic, message: Vec<u8>) -> Result<(), Error> {
 	tracing::info!(?rendezvous_point, "didcontact-publish");
 	gossipsub
 		.publish(rendezvous_point, message)
@@ -40,49 +43,42 @@ pub fn publish(
 }
 
 /// Subscribe InviteRequest's on gossipsub.
-pub fn subscribe(
-	gossipsub: &mut gossipsub::Behaviour,
-	rendezvous_point: &gossipsub::IdentTopic,
-) -> Result<bool, Error> {
+pub fn subscribe(gossipsub: &mut Behaviour, rendezvous_point: &IdentTopic) -> Result<bool, Error> {
 	tracing::info!(?rendezvous_point, "didcontact-subscribe");
 	gossipsub.subscribe(rendezvous_point).map_err(|e| -> Error { e.into() })
 }
 
 /// Unsubscribe InviteRequest's on gossipsub.
-pub fn unsubscribe(
-	gossipsub: &mut gossipsub::Behaviour,
-	rendezvous_point: &gossipsub::IdentTopic,
-) -> Result<bool, Error> {
+pub fn unsubscribe(gossipsub: &mut Behaviour, rendezvous_point: &IdentTopic) -> Result<bool, Error> {
 	tracing::info!(?rendezvous_point, "didcontact-unsubscribe");
 	gossipsub.unsubscribe(rendezvous_point).map_err(|e| -> Error { e.into() })
 }
 
-pub fn create_gossipsub(keypair: Keypair) -> gossipsub::Behaviour {
-	let gossipsub_config = gossipsub::ConfigBuilder::default()
+pub fn create_gossipsub(keypair: Keypair) -> Behaviour {
+	let gossipsub_config = ConfigBuilder::default()
 		.max_transmit_size(256 * 1024)
 		.build()
 		.expect("valid config");
-	gossipsub::Behaviour::new(gossipsub::MessageAuthenticity::Signed(keypair), gossipsub_config)
-		.expect("Valid configuration")
+	Behaviour::new(MessageAuthenticity::Signed(keypair), gossipsub_config).expect("Valid configuration")
 }
 
-impl From<gossipsub::PublishError> for Error {
-	fn from(value: gossipsub::PublishError) -> Self {
+impl From<PublishError> for Error {
+	fn from(value: PublishError) -> Self {
 		match value {
-			gossipsub::PublishError::Duplicate => Self::Message,
-			gossipsub::PublishError::SigningError(_) => Self::Message,
-			gossipsub::PublishError::InsufficientPeers => Self::Network { source: value.into() },
-			gossipsub::PublishError::MessageTooLarge => Self::Message,
-			gossipsub::PublishError::TransformFailed(_) => Self::Message,
+			PublishError::Duplicate => Self::Message,
+			PublishError::SigningError(_) => Self::Message,
+			PublishError::InsufficientPeers => Self::Network { source: value.into() },
+			PublishError::MessageTooLarge => Self::Message,
+			PublishError::TransformFailed(_) => Self::Message,
 		}
 	}
 }
 
-impl From<gossipsub::SubscriptionError> for Error {
-	fn from(value: gossipsub::SubscriptionError) -> Self {
+impl From<SubscriptionError> for Error {
+	fn from(value: SubscriptionError) -> Self {
 		match value {
-			gossipsub::SubscriptionError::PublishError(e) => e.into(),
-			gossipsub::SubscriptionError::NotAllowed => Error::Permission,
+			SubscriptionError::PublishError(e) => e.into(),
+			SubscriptionError::NotAllowed => Error::Permission,
 		}
 	}
 }
