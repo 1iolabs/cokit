@@ -24,7 +24,7 @@ pub fn store_settings<O: Observer<CoAction, Infallible> + 'static>(
 		.filter(|_a: &Vec<CoAction>| true)
 		.with_latest_from(states.clone())
 		.flat_map(move |(_actions, state)| {
-			from_future(store_settings_to_path(state.base_path.join("state.json"), state.into()), context.scheduler())
+			from_future(store_settings_to_path(state.config_path.join("state.json"), state.into()), context.scheduler())
 				.filter_map(|result| -> Option<CoAction> {
 					match result {
 						Ok(_) => None,

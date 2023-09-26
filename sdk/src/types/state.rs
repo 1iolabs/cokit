@@ -8,16 +8,24 @@ use std::{
 
 #[derive(Default, Debug, Clone, Serialize)]
 pub struct CoState {
-	pub base_path: PathBuf,
+	/// Config storage folder path.
+	pub config_path: PathBuf,
+	/// Data storage folder path.
+	pub data_path: PathBuf,
+	/// References the local CO list.
 	pub root: Option<Cid>,
+	/// Locally persisted application settings.
 	pub settings: CoSettings,
+	/// CO runtime states.
 	pub execute: HashMap<String, CoExecuteState>,
+	/// Currently registered didcontact rendezvous points.
+	pub didcontact: Vec<String>,
 }
 
 pub type CoSettings = BTreeMap<String, Ipld>;
 
 impl CoState {
-	pub fn new(base_path: PathBuf) -> Self {
-		CoState { base_path, ..Default::default() }
+	pub fn new(config_path: PathBuf, data_path: PathBuf) -> Self {
+		CoState { config_path, data_path, ..Default::default() }
 	}
 }

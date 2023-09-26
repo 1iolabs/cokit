@@ -37,7 +37,7 @@ pub fn co_execute<O: Observer<CoAction, Infallible> + 'static>(
 		})
 		.with_latest_from(states)
 		.flat_map(move |(id, state)| {
-			let runner = CoRunner::new(&state.base_path, id.clone());
+			let runner = CoRunner::new(&state.data_path, id.clone());
 			let config = match runner.configuration(&state.settings) {
 				Ok(value) => value,
 				Err(err) => return of(err.into_action(ErrorKind::Warning)).box_it(),
@@ -64,27 +64,11 @@ fn to_co_path(base_path: &PathBuf, co_id: &str) -> PathBuf {
 // fn create_shutdown_signal(
 //     actions: ActionObservable<CoAction>,
 //     id: String,
-// ) -> tokio::sync::oneshot::Receiver<bool> {
-//     let (tx, rx) = tokio::sync::oneshot::channel();
-//     let id2 = id.clone();
-//     actions
-//         .clone()
-//         .filter_map(move |action| match action {
-//             CoAction::CoStartup { id: action_id } if action_id == id => Some(false),
-//             CoAction::Shutdown { force } => Some(force),
-//             _ => None,
-//         })
-//         // force shutdown if action observable completes
-//         .default_if_empty(true)
-//         .take(1)
-//         .take_until(actions.filter_map(move |action| match action {
-//             CoAction::CoShutdown { id } if id == id2 => Some(()),
-//             _ => None,
-//         }))
-//         .subscribe(|force| {
-//             tx.send(force);
-//         });
-//     rx
+// ) -> tokio::sync::oneshot::Receiver<bool> { let (tx, rx) = tokio::sync::oneshot::channel(); let id2 = id.clone();
+//   actions .clone() .filter_map(move |action| match action { CoAction::CoStartup { id: action_id } if action_id == id
+//   => Some(false), CoAction::Shutdown { force } => Some(force), _ => None, }) // force shutdown if action observable
+//   completes .default_if_empty(true) .take(1) .take_until(actions.filter_map(move |action| match action {
+//   CoAction::CoShutdown { id } if id == id2 => Some(()), _ => None, })) .subscribe(|force| { tx.send(force); }); rx
 // }
 
 struct CoRunner {

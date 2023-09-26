@@ -1,16 +1,19 @@
-use crate::types::http_error::HttpResult;
+use crate::{
+	library::{path, read_cos::read_cos},
+	types::http_error::HttpResult,
+};
 use axum::{
 	extract::Path,
 	http::StatusCode,
 	routing::{get, post},
 	Extension, Json, Router,
 };
+use clap::Parser;
 use co_sdk::{
-	ActionsType, Co, CoAction, CoCreate, CoExecuteState, IrohConfig, IrohStorage, Libp2pNetwork, Libp2pNetworkConfig,
-	Request, State, StorageType, StoreType,
+	ActionsType, Co, CoAction, CoCreate, CoExecuteState, CoState, IrohConfig, IrohStorage, Libp2pNetwork,
+	Libp2pNetworkConfig, Request, State, StorageType, StoreType,
 };
-use libp2p::{identity, PeerId};
-use library::read_cos::read_cos;
+use libp2p::PeerId;
 use rxrust::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, to_value, Value};
@@ -26,8 +29,25 @@ mod types;
 
 #[tokio::main]
 async fn main() {
+	// cli
+	let cli = library::cli::Cli::parse();
+
+	// paths
+	let config_path = path::create_folder(path::config_path(&cli.base_path, &cli.config_path).unwrap())
+		.await
+		.expect("config_path");
+	let storage_path = path::create_folder(path::storage_path(&cli.base_path, &cli.storage_path).unwrap())
+		.await
+		.expect("storage_path");
+	let log_path = path::create_folder(path::log_path(&cli.base_path, &cli.log_path).unwrap())
+		.await
+		.expect("log_path");
+	let data_path = path::create_folder(path::data_path(&cli.base_path, &cli.data_path).unwrap())
+		.await
+		.expect("data_path");
+
 	// tracing
-	let log_file = std::fs::File::create("daemon.log").unwrap();
+	let log_file = std::fs::File::create(log_path.join("daemon.log")).unwrap();
 	// let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), std::io::stdout);
 	let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), log_file);
 	let subscriber = Registry::default()
@@ -38,19 +58,21 @@ async fn main() {
 	tracing_log::LogTracer::init().unwrap();
 
 	// driver: storage
-	let config = IrohConfig { base_path: "/tmp/co/storage".into(), tcp_port: None, quic_port: None };
+	let config = IrohConfig { base_path: storage_path, tcp_port: None, quic_port: None };
 	let storage: StorageType = Arc::new(IrohStorage::new(config).await.expect("storage"));
 
 	// driver: network
-	let network_key = identity::Keypair::generate_ed25519(); // todo: persist?
+	let network_key = crate::library::local_key::local_key(Some(config_path.join("peer.pb")), cli.force_new_peer_id)
+		.await
+		.expect("peer-id");
 	let network_peer_id = PeerId::from(network_key.public());
 	let network_config = Libp2pNetworkConfig { addr: None, bootstap: Vec::new(), keypair: network_key.clone() };
-	let _network = Libp2pNetwork::new(network_config).await.expect("network");
+	let network: Libp2pNetwork = Libp2pNetwork::new(network_config).await.expect("network");
 	tracing::info!(peer_id = ?network_peer_id, "network");
 
 	// driver: state
 	let actions: ActionsType = ActionsType::default();
-	let state = State::new("/tmp/co".into(), storage.clone(), actions.clone());
+	let state = State::new(CoState::new(config_path, data_path), network, storage.clone(), actions.clone());
 	let store: StoreType = state.store();
 
 	// build our application with a route

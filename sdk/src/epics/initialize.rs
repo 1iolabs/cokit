@@ -25,7 +25,7 @@ pub fn initialize<O: Observer<CoAction, Infallible> + 'static>(
 		.with_latest_from(states)
 		.take(1)
 		.flat_map(move |(_, state)| {
-			observable::from_future(load_settings_from_path(state.base_path.join("state.json")), context.scheduler())
+			observable::from_future(load_settings_from_path(state.config_path.join("state.json")), context.scheduler())
 		})
 		.flat_map(|result| from_iter(result.into_action(ErrorKind::Fatal)))
 		.end_with(vec![CoAction::Initialized])

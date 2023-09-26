@@ -76,7 +76,11 @@
                     "kind": "bin"
                 }
             },
-            "args": [],
+            "args": [
+                "--base-path",
+                "/tmp/co",
+                "http"
+            ],
             "cwd": "${workspaceFolder}"
         },
         {
