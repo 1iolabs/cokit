@@ -1,0 +1,34 @@
+[package]
+name = "co-wasm-runtime"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# co-network = { path = "../network-co" }
+# co-node-edge = { path = "../node-edge" }
+# co-state = { path = "../state" }
+# hyper = { workspace = true }
+# iroh-api = { path = "../../../github/n0-computer/beetle/iroh-api" }
+# iroh-embed = { path = "../../../github/n0-computer/beetle/iroh-embed" }
+# iroh-resolver = { path = "../../../github/n0-computer/beetle/iroh-resolver" }
+# iroh-rpc-client = { path = "../../../github/n0-computer/beetle/iroh-rpc-client" }
+# iroh-unixfs = { path = "../../../github/n0-computer/beetle/iroh-unixfs" }
+# libp2p = { workspace = true, features = ["rendezvous", "tokio"] }
+# librocksdb-sys = { version = "0.10.0+7.9.2" }
+# rocksdb = { version = "0.20.1" }
+aead = { version = "0.5.2", features = ["stream"] }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+chacha20poly1305 = "0.10.1"
+futures = { workspace = true }
+libipld = { workspace = true, features = ["default", "serde-codec"] }
+names = "0.14.0"
+rxrust = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_ipld_dagcbor = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, optional = true, features = ["macros"] }
+tokio-stream = { workspace = true, optional = true }
+tracing = { workspace = true }
+uuid = { version = "1.2.2", features = ["default", "v4"] }
