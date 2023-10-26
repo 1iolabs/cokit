@@ -1,64 +1,19 @@
+use self::{block::Algorithm, secret::Secret};
 use crate::types::{codec::MultiCodec, storage::Storage};
-use aead::stream::{Decryptor, Encryptor};
-use chacha20poly1305::{
-	aead::{Aead, AeadCore, KeyInit, OsRng},
-	XChaCha20Poly1305,
-};
 use libipld::{
 	multihash::{Code, MultihashDigest},
 	Block, Cid, DefaultParams,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-	borrow::BorrowMut,
-	cell::RefCell,
-	collections::BTreeMap,
-	fmt::{Debug, Display},
-};
+use std::{collections::BTreeMap, default, fmt::Debug};
 
-struct Key {
-	key: Vec<u8>,
-}
-impl Key {
-	pub fn new(key: Vec<u8>) -> Self {
-		Self { key }
-	}
-
-	pub fn key(&self) -> &Vec<u8> {
-		&self.key
-	}
-}
-impl Display for Key {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str("Key")
-	}
-}
-impl Debug for Key {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		let v = "*****".to_owned();
-		f.debug_struct("Key").field("key", &v).finish()
-	}
-}
+pub mod block;
+pub mod secret;
 
 struct EncryptedStorage {
-	key: Key,
+	key: Secret,
 	algorithm: Algorithm,
 	next: Box<dyn Storage>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum Algorithm {
-	XChaCha20Poly1305([u8; 24]),
-}
-impl Algorithm {
-	pub fn generate_XChaCha20Poly1305() -> Algorithm {
-		Algorithm::XChaCha20Poly1305(XChaCha20Poly1305::generate_nonce(&mut OsRng).into())
-	}
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-enum HashAlgorithm {
-	Argon2Id(),
 }
 
 impl Storage for EncryptedStorage {
@@ -69,39 +24,6 @@ impl Storage for EncryptedStorage {
 	fn set(&mut self, block: Block<DefaultParams>) {
 		todo!()
 	}
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum EncryptionVersion {
-	V1 = 1,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncryptedBlock {
-	pub version: EncryptionVersion,
-	pub algorithm: Algorithm,
-	pub keyslots: Vec<Keyslot>,
-	pub cid: Cid,
-	pub data: Vec<u8>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum KeyslotVersion {
-	V1 = 1,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Keyslot {
-	pub version: KeyslotVersion,
-	pub algorithm: Algorithm,
-	// pub hash: HashAlgorithm,
-	// pub hash_salt: Vec<u8>,
-	/// Encrypted master key.
-	/// The key encryption key is derived from the master key.
-	pub key: Vec<u8>,
-	pub salt: Vec<u8>,
-
-	pub nonce: Vec<u8>,
 }
 
 struct Record {
