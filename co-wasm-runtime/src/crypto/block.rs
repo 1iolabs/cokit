@@ -41,7 +41,7 @@ pub enum AlgorithmError {
 	#[error("Generic encoding error")]
 	Encoding,
 
-	#[error("Size is to lage")]
+	#[error("Size is to large")]
 	Size,
 }
 impl From<aead::Error> for AlgorithmError {
@@ -306,6 +306,11 @@ where
 			.decrypt(&data_secret, &self.header.nonce, &self.data, &aad)?;
 		Ok(data)
 	}
+
+	/// Test is encrypted block is valid.
+	pub fn is_valid(&self) -> bool {
+		self.header.is_valid()
+	}
 }
 impl<S> TryInto<Block<S>> for EncryptedBlock<S>
 where
@@ -338,6 +343,11 @@ where
 		let block: EncryptedBlock<S> =
 			serde_ipld_dagcbor::from_slice(value.data()).map_err(|_| AlgorithmError::Decoding)?;
 
+		// validate
+		if !block.is_valid() {
+			return Err(AlgorithmError::Decoding)
+		}
+
 		// result
 		Ok(block)
 	}
@@ -364,6 +374,13 @@ pub struct Header {
 impl Header {
 	pub fn new(algorithm: Algorithm, key_slots: Vec<KeySlot>) -> Self {
 		Self { version: EncryptionVersion::V1, algorithm, nonce: algorithm.generate_nonce(), key_slots }
+	}
+
+	/// Test if header is valid.
+	pub fn is_valid(&self) -> bool {
+		self.version == EncryptionVersion::V1 &&
+			self.nonce.len() == self.algorithm.nonce_size() &&
+			self.key_slots.iter().all(KeySlot::is_valid)
 	}
 
 	/// Get AAD bytes for this header.
@@ -482,6 +499,13 @@ impl KeySlot {
 		Ok(Self { version: KeySlotVersion::V1, algorithm, key: block_secret_encrypted, nonce, salt })
 	}
 
+	/// Test if is keyslot is valid.
+	pub fn is_valid(&self) -> bool {
+		self.version == KeySlotVersion::V1 &&
+			self.key.len() == self.algorithm.key_size() + self.algorithm.tag_size() &&
+			self.nonce.len() == self.algorithm.nonce_size()
+	}
+
 	/// Get block secret from key slot.
 	pub fn block_secret(&self, secret: &Secret) -> Result<Secret, AlgorithmError> {
 		let secret_derived = secret.derive_serect_with_salt(BLOCK_KEY_DERIVATION, &self.salt);
@@ -522,6 +546,15 @@ mod tests {
 	}
 
 	#[test]
+	fn is_valid() {
+		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
+		let block_secret = Secret::new(repeat(1u8).take(Algorithm::default().key_size()).collect());
+		let key_slot = KeySlot::new(Algorithm::default(), &secret, &block_secret).unwrap();
+		let header = Header::new(Algorithm::default(), vec![key_slot]);
+		assert!(header.is_valid());
+	}
+
+	#[test]
 	fn serialize_header() {
 		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
 		let block_secret = Secret::new(repeat(1u8).take(Algorithm::default().key_size()).collect());
@@ -550,6 +583,7 @@ mod tests {
 		// deserialize
 		let header_deserialized: Header = serde_ipld_dagcbor::from_slice(bytes.as_slice()).unwrap();
 		assert_eq!(header, header_deserialized);
+		assert!(header.is_valid());
 	}
 
 	#[test]

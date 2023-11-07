@@ -34,7 +34,7 @@ impl EncryptedStorage {
 		Ok(Self { algorithm, key, mapping, next })
 	}
 
-	/// Flush mapping to storage.
+	/// Flush mapping to (parent) storage.
 	///
 	/// Note: This will not be encrypted and is intendet for local use only.
 	pub fn flush_mapping(&mut self) -> Result<Cid, StorageError> {
@@ -111,7 +111,7 @@ impl BlockMapping {
 
 		// get node
 		let node: Node<(Cid, Cid)> =
-			serde_ipld_dagcbor::from_slice(block.data()).map_err(|e| StorageError::InvalidArgument)?;
+			serde_ipld_dagcbor::from_slice(block.data()).map_err(|_| StorageError::InvalidArgument)?;
 
 		// read
 		match node {

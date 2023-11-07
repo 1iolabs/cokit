@@ -21,6 +21,7 @@ pub enum StorageError {
 	InvalidArgument,
 }
 
+/// Async storage interface.
 #[async_trait::async_trait]
 pub trait AsyncStorage {
 	/// Returns a block from storage.
