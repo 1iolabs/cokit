@@ -23,7 +23,7 @@ where
 	pub fn resolve(&self, storage: &dyn Storage) -> Result<T, ResolveError> {
 		match self.cid.codec().try_into().map_err(|v| ResolveError::UnknownCodec(v))? {
 			MultiCodec::DagCbor => {
-				let buf = storage.get(&self.cid);
+				let buf = storage.get(&self.cid).expect("block");
 				let result = serde_ipld_dagcbor::from_slice(buf.data()).map_err(|e| -> ResolveError { e.into() })?;
 				Ok(result)
 			},

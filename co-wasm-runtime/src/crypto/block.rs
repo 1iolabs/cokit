@@ -1,10 +1,14 @@
-use super::Secret;
+use super::secret::Secret;
 use aead::{generic_array::typenum::Unsigned, KeySizeUser, Payload};
 use chacha20poly1305::{
 	aead::{Aead, AeadCore, KeyInit, OsRng},
 	Key, XChaCha20Poly1305,
 };
-use libipld::{store::StoreParams, Block, Cid};
+use libipld::{
+	multihash::{Code, MultihashDigest},
+	store::StoreParams,
+	Block, Cid,
+};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{fmt::Debug, marker::PhantomData};
@@ -14,6 +18,7 @@ use std::{fmt::Debug, marker::PhantomData};
 /// [application] [commit timestamp] [purpose]", e.g., "example.com 2019-12-25 16:18:03 session tokens v1
 pub const BLOCK_KEY_DERIVATION: &str = "co 2023-10-24T10:25:23Z block key derivation v1";
 pub const BLOCK_DERIVATION: &str = "co 2023-10-26T14:31:38Z block derivation v1";
+pub const BLOCK_MULTICODEC: u64 = 0x301000;
 
 /// Nonce.
 pub type Nonce = Vec<u8>;
@@ -32,6 +37,12 @@ pub enum AlgorithmError {
 
 	#[error("Generic decoding error")]
 	Decoding,
+
+	#[error("Generic encoding error")]
+	Encoding,
+
+	#[error("Size is to lage")]
+	Size,
 }
 impl From<aead::Error> for AlgorithmError {
 	fn from(_: aead::Error) -> Self {
@@ -61,6 +72,13 @@ impl Algorithm {
 	pub fn nonce_size(&self) -> usize {
 		match self {
 			Algorithm::XChaCha20Poly1305 => <XChaCha20Poly1305 as AeadCore>::NonceSize::USIZE,
+		}
+	}
+
+	/// Cipher algorithm tag size in bytes.
+	pub fn tag_size(&self) -> usize {
+		match self {
+			Algorithm::XChaCha20Poly1305 => <XChaCha20Poly1305 as AeadCore>::TagSize::USIZE,
 		}
 	}
 
@@ -205,22 +223,36 @@ impl<S> EncryptedBlock<S>
 where
 	S: StoreParams,
 {
-	pub fn encrypt(secret: &Secret, block: Block<S>) -> Result<EncryptedBlock<S>, AlgorithmError> {
-		let block_secret = Algorithm::default().generate_serect();
-		Self::encrypt_with_block_secret(secret, &block_secret, block)
+	/// Encrypt block (automatically generate block secret).
+	pub fn encrypt(
+		algorithm: Algorithm,
+		secret: &Secret,
+		block: Block<S>,
+	) -> Result<EncryptedBlock<S>, AlgorithmError> {
+		let block_secret = algorithm.generate_serect();
+		Self::encrypt_with_block_secret(algorithm, secret, &block_secret, block)
 	}
 
+	/// Encrypt block with custom block secret.
 	pub fn encrypt_with_block_secret(
+		algorithm: Algorithm,
 		secret: &Secret,
 		block_secret: &Secret,
 		block: Block<S>,
 	) -> Result<EncryptedBlock<S>, AlgorithmError> {
+		// validate that we not overflow the block size
+		if block.data().len() >
+			S::MAX_BLOCK_SIZE - Header::encoded_size(algorithm) - 64 - algorithm.tag_size() - algorithm.tag_size()
+		{
+			return Err(AlgorithmError::Size)
+		}
+
 		// dervice data key
 		let data_secret = block_secret.derive_serect(BLOCK_DERIVATION);
 
 		// header
-		let key_slot = KeySlot::new(secret, block_secret)?;
-		let header = Header::new(vec![key_slot]);
+		let key_slot = KeySlot::new(algorithm, secret, block_secret)?;
+		let header = Header::new(algorithm, vec![key_slot]);
 
 		// result
 		let (cid, data) = block.into_inner();
@@ -237,18 +269,21 @@ where
 		})
 	}
 
+	/// Get decrypted block.
 	pub fn block(&self, secret: &Secret) -> Result<Block<S>, AlgorithmError> {
 		let block_secret = self.header.block_secret(secret).ok_or(AlgorithmError::InvalidArguments)?;
 		let aad = self.header.aad();
 		Ok(Block::new_unchecked(self.decrypt_cid(&block_secret, &aad)?, self.decrypt_data(&block_secret, &aad)?))
 	}
 
+	/// Get decrypted CID.
 	pub fn cid(&self, secret: &Secret) -> Result<Cid, AlgorithmError> {
 		let block_secret = self.header.block_secret(secret).ok_or(AlgorithmError::InvalidArguments)?;
 		let aad = self.header.aad();
 		self.decrypt_cid(&block_secret, &aad)
 	}
 
+	/// Get decrypted payload.
 	pub fn data(&self, secret: &Secret) -> Result<Vec<u8>, AlgorithmError> {
 		let block_secret = self.header.block_secret(secret).ok_or(AlgorithmError::InvalidArguments)?;
 		let aad = self.header.aad();
@@ -272,6 +307,41 @@ where
 		Ok(data)
 	}
 }
+impl<S> TryInto<Block<S>> for EncryptedBlock<S>
+where
+	S: StoreParams,
+{
+	type Error = AlgorithmError;
+
+	/// Convert to encrypted Block.
+	fn try_into(self) -> Result<Block<S>, Self::Error> {
+		let encrypted_data = serde_ipld_dagcbor::to_vec(&self).map_err(|_| AlgorithmError::Encoding)?;
+		let mh = Code::Blake3_256.digest(&encrypted_data);
+		let cid = Cid::new_v1(BLOCK_MULTICODEC, mh);
+		Ok(Block::new_unchecked(cid, encrypted_data))
+	}
+}
+impl<S> TryFrom<Block<S>> for EncryptedBlock<S>
+where
+	S: StoreParams,
+{
+	type Error = AlgorithmError;
+
+	/// Convert from encrypted Block.
+	fn try_from(value: Block<S>) -> Result<Self, Self::Error> {
+		// validate
+		if value.cid().codec() != BLOCK_MULTICODEC {
+			return Err(AlgorithmError::InvalidArguments)
+		}
+
+		// decode
+		let block: EncryptedBlock<S> =
+			serde_ipld_dagcbor::from_slice(value.data()).map_err(|_| AlgorithmError::Decoding)?;
+
+		// result
+		Ok(block)
+	}
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Header {
@@ -292,8 +362,7 @@ pub struct Header {
 	pub nonce: Nonce,
 }
 impl Header {
-	pub fn new(key_slots: Vec<KeySlot>) -> Self {
-		let algorithm = Algorithm::default();
+	pub fn new(algorithm: Algorithm, key_slots: Vec<KeySlot>) -> Self {
 		Self { version: EncryptionVersion::V1, algorithm, nonce: algorithm.generate_nonce(), key_slots }
 	}
 
@@ -318,6 +387,23 @@ impl Header {
 			.map(|key_slot| key_slot.block_secret(secret))
 			.filter_map(|r| r.ok())
 			.next()
+	}
+
+	/// Calulate CBOR header encoded size with single key slot.
+	///
+	/// XChaCha20Poly1305: 153
+	pub fn encoded_size(algorithm: Algorithm) -> usize {
+		let field_size = 1;
+		let cbor_size = 1;
+		return cbor_size
+			// version
+			+ 1 + field_size + cbor_size
+			// algorithm
+			+ 1 + field_size + cbor_size
+			// key_slots
+			+ KeySlot::encoded_size(algorithm) + field_size + cbor_size + cbor_size
+			// nonce
+			+ algorithm.nonce_size() + field_size + cbor_size + cbor_size + cbor_size
 	}
 }
 // impl Into<Vec<u8>> for Header {
@@ -366,9 +452,28 @@ pub struct KeySlot {
 	pub nonce: Nonce,
 }
 impl KeySlot {
+	/// Calulate CBOR encoded size.
+	///
+	/// XChaCha20Poly1305: 116
+	pub fn encoded_size(algorithm: Algorithm) -> usize {
+		let tag_size = algorithm.tag_size();
+		let field_size = 1;
+		let cbor_size = 1;
+		return cbor_size
+			// version
+			+ 1 + field_size + cbor_size
+			// algorithm
+			+ 1 + field_size + cbor_size
+			// key
+			+ algorithm.key_size() + field_size + tag_size + cbor_size + cbor_size + cbor_size
+			// salt
+			+ algorithm.nonce_size() + field_size + cbor_size + cbor_size + cbor_size
+			// nonce
+			+ algorithm.nonce_size() + field_size + cbor_size + cbor_size + cbor_size
+	}
+
 	/// Create new key slot using the CO Key (serect) and a generated block secret (may reused).
-	pub fn new(secret: &Secret, block_secret: &Secret) -> Result<Self, AlgorithmError> {
-		let algorithm = Algorithm::default();
+	pub fn new(algorithm: Algorithm, secret: &Secret, block_secret: &Secret) -> Result<Self, AlgorithmError> {
 		let salt = algorithm.generate_nonce(); // TODO: needs specific size?
 		let secret_derived = secret.derive_serect_with_salt(BLOCK_KEY_DERIVATION, &salt);
 		let nonce = algorithm.generate_nonce();
@@ -420,15 +525,15 @@ mod tests {
 	fn serialize_header() {
 		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
 		let block_secret = Secret::new(repeat(1u8).take(Algorithm::default().key_size()).collect());
-		let key_slot = KeySlot::new(&secret, &block_secret).unwrap();
-		let header = Header::new(vec![key_slot]);
+		let key_slot = KeySlot::new(Algorithm::default(), &secret, &block_secret).unwrap();
+		let header = Header::new(Algorithm::default(), vec![key_slot]);
 
-		// serialize
+		// serialize header
 		let bytes = serde_ipld_dagcbor::to_vec(&header).unwrap();
 		// println!("{:?}", header);
 		// let raw_bytes = Into::<Vec<u8>>::into(header.clone());
 		// println!("raw_bytes: {}", raw_bytes.len()); // 129
-		// println!("bytes: {}", bytes.len()); // 153
+		// println!("bytes: {}", bytes.len()); // 153 (153 - 129 = 24)
 		// hexdump::hexdump(Into::<Vec<u8>>::into(header.clone()).as_slice());
 		// println!("key");
 		// hexdump::hexdump(header.key_slots[0].key.as_slice());
@@ -448,24 +553,50 @@ mod tests {
 	}
 
 	#[test]
+	fn key_slot_encoded_size() {
+		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
+		let block_secret = Secret::new(repeat(1u8).take(Algorithm::default().key_size()).collect());
+		let key_slot = KeySlot::new(Algorithm::default(), &secret, &block_secret).unwrap();
+
+		// serialize header
+		let bytes = serde_ipld_dagcbor::to_vec(&key_slot).unwrap();
+		//hexdump::hexdump(bytes.as_slice());
+		assert_eq!(KeySlot::encoded_size(Algorithm::default()), bytes.len());
+	}
+
+	#[test]
+	fn header_encoded_size() {
+		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
+		let block_secret = Secret::new(repeat(1u8).take(Algorithm::default().key_size()).collect());
+		let key_slot = KeySlot::new(Algorithm::default(), &secret, &block_secret).unwrap();
+		let header = Header::new(Algorithm::default(), vec![key_slot]);
+
+		// serialize header
+		let bytes = serde_ipld_dagcbor::to_vec(&header).unwrap();
+		//hexdump::hexdump(bytes.as_slice());
+		assert_eq!(Header::encoded_size(Algorithm::default()), bytes.len());
+	}
+
+	#[test]
 	fn encrypt_block_roundtrip() {
 		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
 		let block = Block::<DefaultParams>::encode(DagCborCodec, Code::Blake3_256, "Hello World!").unwrap();
 
-		println!("cid: ({}): {}", block.cid().to_bytes().len(), block.cid()); // 36
-		println!("data: ({}): {:?}", block.data().len(), block.data()); // 13
+		//println!("cid: ({}): {}", block.cid().to_bytes().len(), block.cid()); // 36
+		//println!("data: ({}): {:?}", block.data().len(), block.data()); // 13
 
 		// encrypt
-		let encrypted_block = EncryptedBlock::encrypt(&secret, block.clone()).unwrap();
+		let encrypted_block = EncryptedBlock::encrypt(Algorithm::default(), &secret, block.clone()).unwrap();
 		assert_ne!(block.data(), encrypted_block.data);
-		println!("cid: ({}): {:?}", encrypted_block.cid.len(), encrypted_block.cid); // 52 = 36 + 16
-		println!("data: ({}): {:?}", encrypted_block.data.len(), encrypted_block.data); // 29 = 13 + 16
+		//println!("cid: ({}): {:?}", encrypted_block.cid.len(), encrypted_block.cid); // 52 = 36 + 16
+		//println!("data: ({}): {:?}", encrypted_block.data.len(), encrypted_block.data); // 29 = 13 + 16
 
 		// serialize
 		let encrypted_block_bytes = serde_ipld_dagcbor::to_vec(&encrypted_block).unwrap();
-		assert_eq!(245, encrypted_block_bytes.len()); // header (153), cid + tag (52), data + tag (29)
-		println!("length: {}", encrypted_block_bytes.len());
-		hexdump::hexdump(&encrypted_block_bytes);
+		// cbor (11), header (153), cid+tag (52), data+tag (29)
+		assert_eq!(245, encrypted_block_bytes.len());
+		//println!("length: {}", encrypted_block_bytes.len());
+		//hexdump::hexdump(&encrypted_block_bytes);
 
 		// deserialize
 		let encrypted_block_deserialized: EncryptedBlock<DefaultParams> =
