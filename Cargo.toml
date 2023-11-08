@@ -1,5 +1,5 @@
 [workspace]
-members = ["co-wasm-runtime", "co-wasm-api"]
+members = ["co-wasm-runtime", "co-wasm-api", "co-storage"]
 resolver = "2"
 
 [profile.release]
