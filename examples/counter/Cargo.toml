@@ -1,12 +1,17 @@
 [package]
-name = "co-wasm-api"
+name = "example-counter"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+crate-type = ["cdylib"]
+
+[build]
+target = "wasm32-unknown-unknown"
+
 [dependencies]
 anyhow = { workspace = true }
-async-trait = { workspace = true }
-futures = { workspace = true }
+co-wasm-api = { path = "../../co-wasm-api" }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }

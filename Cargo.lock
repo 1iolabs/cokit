@@ -419,16 +419,10 @@ dependencies = [
  "async-trait",
  "futures",
  "libipld",
- "names",
- "rxrust",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",
  "thiserror",
- "tokio",
- "tokio-stream",
- "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -815,6 +809,19 @@ name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
+
+[[package]]
+name = "example-counter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "co-wasm-api",
+ "libipld",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "thiserror",
+]
 
 [[package]]
 name = "fallible-iterator"
