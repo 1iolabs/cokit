@@ -1,10 +1,10 @@
-use libipld::{Block, Cid, DefaultParams};
+mod co_v1;
+mod library;
+mod types;
 
-/// Storage interface.
-pub trait Storage {
-	/// Returns a block from storage.
-	fn get(&self, cid: &Cid) -> Block<DefaultParams>;
+pub use libipld::Cid;
+pub use library::reduce;
+pub use types::{Block, Context, Date, Did, Reducer, ReducerAction, Storage};
 
-	/// Inserts a block into storage.
-	fn set(&mut self, block: Block<DefaultParams>);
-}
+#[cfg(test)]
+mod example;
