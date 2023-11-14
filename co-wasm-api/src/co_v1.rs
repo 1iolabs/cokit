@@ -1,10 +1,3 @@
-#![allow(non_camel_case_types)]
-
-use std::ffi::c_void;
-
-pub type c_ssize_t = isize;
-pub type c_size_t = usize;
-
 #[link(wasm_import_module = "co_v1")]
 extern "C" {
 	/// Read block.
@@ -13,36 +6,26 @@ extern "C" {
 	/// If the buffer_size is smaller than the returned byte length only the the first bytes until buffer_size are
 	/// placed in buffer. The caller may call this again with an larger buffer.
 	/// Also it is possible to call it with buffer_size=0 to only retrieve the size of the block.
-	pub fn storage_block_get(
-		cid: *const c_void,
-		cid_size: c_size_t,
-		buffer: *mut c_void,
-		buffer_size: c_size_t,
-	) -> c_ssize_t;
+	pub fn storage_block_get(cid: *const u8, cid_size: u32, buffer: *mut u8, buffer_size: u32) -> u32;
 
 	/// Write block.
-	pub fn storage_block_set(
-		cid: *const c_void,
-		cid_size: c_size_t,
-		buffer: *const c_void,
-		buffer_size: c_size_t,
-	) -> c_ssize_t;
+	pub fn storage_block_set(cid: *const u8, cid_size: u32, buffer: *const u8, buffer_size: u32) -> u32;
 
 	/// Read state CID.
 	/// Returns the byte length of the cid.
 	/// If the buffer_size is smaller than the returned byte length only the the first bytes until buffer_size are
 	/// placed in buffer. The caller may call this again with an larger buffer.
 	/// Encoding: Binary
-	pub fn state_cid_read(buffer: *mut c_void, buffer_size: c_size_t) -> c_ssize_t;
+	pub fn state_cid_read(buffer: *mut u8, buffer_size: u32) -> u32;
 
 	/// Write state CID.
 	/// Encoding: Binary
-	pub fn state_cid_write(buffer: *const c_void, buffer_size: c_size_t) -> c_ssize_t;
+	pub fn state_cid_write(buffer: *const u8, buffer_size: u32) -> u32;
 
 	/// Read event CID.
 	/// Returns the byte length of the cid.
 	/// If the buffer_size is smaller than the returned byte length only the the first bytes until buffer_size are
 	/// placed in buffer. The caller may call this again with an larger buffer.
 	/// Encoding: Binary
-	pub fn event_cid_read(buffer: *mut c_void, buffer_size: c_size_t) -> c_ssize_t;
+	pub fn event_cid_read(buffer: *mut u8, buffer_size: u32) -> u32;
 }

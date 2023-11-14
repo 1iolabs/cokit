@@ -11,12 +11,18 @@ pub trait Storage {
 
 #[derive(Debug, thiserror::Error)]
 pub enum StorageError {
+	/// Block not found error.
+	/// This error is may be temporarily as the block may comes availabvle on the network.
 	#[error("Block not found")]
 	NotFound,
 
+	/// Internal storage error.
+	/// This indicates some invalid state and is not be retriable with same parameters.
 	#[error("Internal storage error")]
 	Internal,
 
+	/// Invalid argument passes to call or storage configuration.
+	/// This is not be retriable with same parameters.
 	#[error("Invalid argument")]
 	InvalidArgument,
 }

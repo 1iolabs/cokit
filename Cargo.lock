@@ -431,6 +431,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "co-storage",
+ "co-wasm-api",
  "futures",
  "hexdump",
  "insta",

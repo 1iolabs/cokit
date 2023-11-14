@@ -22,6 +22,6 @@ impl Reducer for Counter {
 }
 
 #[no_mangle]
-pub extern "C" fn execute() {
+pub extern "C" fn state() {
 	reduce::<Counter>()
 }

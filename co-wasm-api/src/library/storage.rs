@@ -1,5 +1,4 @@
-use crate::{co_v1, library::result_size, Block, Cid, Storage};
-use std::ffi::c_void;
+use crate::{co_v1, Block, Cid, Storage};
 
 pub struct StorageApi {}
 
@@ -18,31 +17,31 @@ impl Storage for StorageApi {
 		let buffer_size = 2 ^ 10; // 1024
 		let mut buffer = Vec::with_capacity(buffer_size);
 		buffer.resize(buffer_size, 0);
-		let block_size = result_size(unsafe {
+		let block_size = unsafe {
 			co_v1::storage_block_get(
-				cid_bytes.as_ptr() as *const c_void,
-				cid_bytes.len(),
-				buffer.as_mut_ptr() as *mut c_void,
-				buffer.len(),
+				cid_bytes.as_ptr(),
+				cid_bytes.len().try_into().expect("u32"),
+				buffer.as_mut_ptr(),
+				buffer.len().try_into().expect("u32"),
 			)
-		});
+		};
 
 		// read again with larger buffer if block is larger
-		if block_size > buffer.len() {
+		if (block_size as usize) > buffer.len() {
 			buffer.resize(block_size as usize, 0);
-			let block_size = result_size(unsafe {
+			let block_size = unsafe {
 				co_v1::storage_block_get(
-					cid_bytes.as_ptr() as *const c_void,
-					cid_bytes.len(),
-					buffer.as_mut_ptr() as *mut c_void,
-					buffer.len(),
+					cid_bytes.as_ptr(),
+					cid_bytes.len().try_into().expect("u32"),
+					buffer.as_mut_ptr(),
+					buffer.len().try_into().expect("u32"),
 				)
-			});
-			assert_eq!(buffer.len(), block_size);
+			};
+			assert_eq!(buffer.len(), block_size as usize);
 		}
 		// truncate buffer to actual block size
-		else if block_size < buffer.len() {
-			buffer.truncate(block_size);
+		else if (block_size as usize) < buffer.len() {
+			buffer.truncate(block_size as usize);
 		}
 
 		// result
@@ -51,14 +50,14 @@ impl Storage for StorageApi {
 
 	fn set(&mut self, block: Block) {
 		let cid_bytes = block.cid().to_bytes();
-		let block_size = result_size(unsafe {
+		let block_size = unsafe {
 			co_v1::storage_block_set(
-				cid_bytes.as_ptr() as *const c_void,
-				cid_bytes.len(),
-				block.data().as_ptr() as *mut c_void,
-				block.data().len(),
+				cid_bytes.as_ptr(),
+				cid_bytes.len().try_into().expect("u32"),
+				block.data().as_ptr(),
+				block.data().len().try_into().expect("u32"),
 			)
-		});
-		assert_eq!(block_size, block.data().len());
+		};
+		assert_eq!(block_size as usize, block.data().len());
 	}
 }
