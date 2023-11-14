@@ -4,10 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib"]
-
-[build]
-target = "wasm32-unknown-unknown"
+crate-type = ["lib", "cdylib"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -17,3 +14,8 @@ serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+co-storage = { path = "../../co-storage" }
+co-wasm-runtime = { path = "../../co-wasm-runtime" }
+co-primitives = { path = "../../co-primitives" }

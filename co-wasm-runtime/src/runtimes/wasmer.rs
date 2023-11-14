@@ -4,6 +4,7 @@ use wasmer::{imports, AsStoreMut, Function, FunctionEnv, FunctionEnvMut, Instanc
 pub struct WasmerRuntime {
 	store: Store,
 	instance: Instance,
+	env: FunctionEnv<WasmerEnv>,
 }
 
 pub struct WasmerEnv {
@@ -43,13 +44,17 @@ impl WasmerRuntime {
 		instance.exports.get_function("state")?;
 
 		// result
-		Ok(Self { store, instance })
+		Ok(Self { store, instance, env })
 	}
 
 	pub fn execute(&mut self) -> Result<(), WasmerError> {
 		let state = self.instance.exports.get_function("state").unwrap();
 		state.call(&mut self.store, &[])?;
 		Ok(())
+	}
+
+	pub fn api(&self) -> &CoV1Api {
+		&self.env.as_ref(&self.store).api
 	}
 
 	fn imports(store: &mut impl AsStoreMut, env: &FunctionEnv<WasmerEnv>) -> wasmer::Imports {

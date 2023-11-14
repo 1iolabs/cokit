@@ -383,6 +383,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-primitives"
+version = "0.1.0"
+dependencies = [
+ "libipld",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "co-storage"
 version = "0.1.0"
 dependencies = [
@@ -417,6 +428,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "co-primitives",
  "futures",
  "libipld",
  "serde",
@@ -817,7 +829,10 @@ name = "example-counter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "co-primitives",
+ "co-storage",
  "co-wasm-api",
+ "co-wasm-runtime",
  "libipld",
  "serde",
  "serde_ipld_dagcbor",

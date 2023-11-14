@@ -4,8 +4,17 @@ use std::cmp::min;
 
 pub struct CoV1Api {
 	storage: Box<dyn Storage + Send + Sync>,
-	state: Cid,
+	state: Option<Cid>,
 	event: Cid,
+}
+impl CoV1Api {
+	pub fn new(storage: Box<dyn Storage + Send + Sync>, state: Option<Cid>, event: Cid) -> Self {
+		Self { storage, state, event }
+	}
+
+	pub fn state(&self) -> &Option<Cid> {
+		&self.state
+	}
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -61,18 +70,25 @@ pub fn storage_block_set(api: &mut CoV1Api, cid: &[u8], buffer: &[u8]) -> Result
 }
 
 pub fn state_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> u32 {
-	let cid_buffer = api.state.to_bytes();
-	buffer.copy_from_slice(&cid_buffer.as_slice()[0..buffer.len()]);
-	cid_buffer.len().try_into().expect("u32")
+	match api.state {
+		Some(cid) => {
+			let cid_buffer = cid.to_bytes();
+			let size = min(buffer.len(), cid_buffer.len());
+			buffer[0..size].copy_from_slice(&cid_buffer.as_slice()[0..size]);
+			cid_buffer.len().try_into().expect("u32")
+		},
+		None => 0,
+	}
 }
 
 pub fn state_cid_write(api: &mut CoV1Api, buffer: &[u8]) -> Result<u32, CoV1ApiError> {
-	api.state = Cid::try_from(buffer)?;
+	api.state = Some(Cid::try_from(buffer)?);
 	Ok(buffer.len().try_into().expect("u32"))
 }
 
 pub fn event_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> u32 {
 	let cid_buffer = api.event.to_bytes();
-	buffer.copy_from_slice(&cid_buffer.as_slice()[0..buffer.len()]);
+	let size = min(buffer.len(), cid_buffer.len());
+	buffer[0..size].copy_from_slice(&cid_buffer.as_slice()[0..size]);
 	cid_buffer.len().try_into().expect("u32")
 }

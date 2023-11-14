@@ -1,19 +1,11 @@
 [package]
-name = "co-wasm-api"
+name = "co-primitives"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = { workspace = true }
-async-trait = { workspace = true }
-co-primitives = { path = "../co-primitives" }
-futures = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-
-[features]
-default = []
-wasm32 = []

@@ -1,15 +1,15 @@
 use crate::{co_v1, Block, Cid, Storage};
 
-pub struct StorageApi {}
+pub struct WasmStorage {}
 
 /// Storage implementation for the co_v1 API.
-impl StorageApi {
+impl WasmStorage {
 	pub fn new() -> Self {
 		Self {}
 	}
 }
 
-impl Storage for StorageApi {
+impl Storage for WasmStorage {
 	fn get(&self, cid: &Cid) -> Block {
 		let cid_bytes = cid.to_bytes();
 

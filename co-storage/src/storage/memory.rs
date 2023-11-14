@@ -1,9 +1,6 @@
-use crate::types::{
-	codec::MultiCodec,
-	storage::{Storage, StorageError},
-};
+use crate::types::storage::{Storage, StorageError};
 use libipld::{Block, Cid, DefaultParams};
-use std::{collections::BTreeMap, fmt::Debug};
+use std::collections::BTreeMap;
 
 pub struct MemoryStorage {
 	records: BTreeMap<Cid, Record>,
@@ -50,20 +47,4 @@ impl Storage for MemoryStorage {
 struct Record {
 	block: Block<DefaultParams>,
 	pin: bool,
-}
-
-#[derive(Debug, Clone)]
-pub struct AddOptions {
-	pin: bool,
-	codec: u64,
-}
-impl AddOptions {
-	pub fn new(codec: u64) -> Self {
-		Self { pin: Default::default(), codec }
-	}
-}
-impl Default for AddOptions {
-	fn default() -> Self {
-		Self { pin: Default::default(), codec: MultiCodec::Raw as u64 }
-	}
 }
