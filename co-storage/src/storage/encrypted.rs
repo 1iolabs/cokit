@@ -4,30 +4,28 @@ use crate::{
 		secret::Secret,
 	},
 	library::node_builder::{Node, NodeBuilder},
-	types::storage::{Storage, StorageError},
+	Storage, StorageError,
 };
 use libipld::{cbor::DagCborCodec, Block, Cid, DefaultParams};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-pub struct EncryptedStorage {
+pub struct EncryptedStorage<S> {
 	key: Secret,
 	algorithm: Algorithm,
-	next: Box<dyn Storage>,
+	next: S,
 	mapping: BlockMapping,
 }
-impl EncryptedStorage {
+impl<S> EncryptedStorage<S>
+where
+	S: Storage,
+{
 	/// Create storage encryption layer.
-	pub fn new(
-		next: Box<dyn Storage>,
-		key: Secret,
-		algorithm: Algorithm,
-		map: Option<Cid>,
-	) -> Result<Self, StorageError> {
+	pub fn new(next: S, key: Secret, algorithm: Algorithm, map: Option<Cid>) -> Result<Self, StorageError> {
 		// load mapping
 		let mut mapping = BlockMapping::new();
 		if let Some(mapping_root) = map {
-			mapping.read(next.as_ref(), &mapping_root)?;
+			mapping.read(&next, &mapping_root)?;
 		}
 
 		// result
@@ -38,20 +36,23 @@ impl EncryptedStorage {
 	///
 	/// Note: This will not be encrypted and is intendet for local use only.
 	pub fn flush_mapping(&mut self) -> Result<Cid, StorageError> {
-		self.mapping.write(self.next.as_mut(), Default::default())
+		self.mapping.write(&mut self.next, Default::default())
 	}
 
 	/// Get next storage layer.
-	pub fn storage_mut(&mut self) -> &mut dyn Storage {
-		self.next.as_mut()
+	pub fn storage_mut(&mut self) -> &mut S {
+		&mut self.next
 	}
 
 	/// Get next storage layer.
-	pub fn storage(&self) -> &dyn Storage {
-		self.next.as_ref()
+	pub fn storage(&self) -> &S {
+		&self.next
 	}
 }
-impl Storage for EncryptedStorage {
+impl<S> Storage for EncryptedStorage<S>
+where
+	S: Storage,
+{
 	/// Returns a block from storage.
 	///
 	/// Note: This expects the unencrypted CID.
@@ -206,7 +207,7 @@ mod tests {
 		let memory = MemoryStorage::new();
 		let algorithm = Algorithm::default();
 		let key = Secret::new(repeat(42).take(algorithm.key_size()).collect());
-		let mut encryption = EncryptedStorage::new(Box::new(memory), key, algorithm, None).unwrap();
+		let mut encryption = EncryptedStorage::new(memory, key, algorithm, None).unwrap();
 
 		// block
 		let data = Test { hello: "world".to_owned() };

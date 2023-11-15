@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
 /// A (serializable) typed link.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(into = "Cid", from = "Cid")]
 pub struct Link<T: Clone> {
 	_type: PhantomData<T>,

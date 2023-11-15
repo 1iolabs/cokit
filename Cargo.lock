@@ -849,12 +849,16 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "co-primitives",
+ "co-storage",
  "co-wasm-api",
+ "co-wasm-runtime",
  "libipld",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",
  "thiserror",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

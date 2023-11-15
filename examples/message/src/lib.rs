@@ -4,22 +4,22 @@ use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MessageState {
 	#[serde(rename = "v")]
-	version: MessageVersion,
+	pub version: MessageVersion,
 
 	#[serde(rename = "n")]
-	name: String,
+	pub name: String,
 
 	#[serde(rename = "m")]
-	message_count: u64,
+	pub message_count: u64,
 
-	#[serde(rename = "p", skip_serializing_if = "Vec::is_empty")]
-	pinned: Vec<Cid>,
+	#[serde(rename = "p", default, skip_serializing_if = "Vec::is_empty")]
+	pub pinned: Vec<Cid>,
 
-	#[serde(rename = "r", skip_serializing_if = "BTreeMap::is_empty")]
-	participants: BTreeMap<Did, Link<Role>>,
+	#[serde(rename = "r", default, skip_serializing_if = "BTreeMap::is_empty")]
+	pub participants: BTreeMap<Did, Link<Role>>,
 }
 
 impl Default for MessageState {
@@ -34,7 +34,7 @@ impl Default for MessageState {
 	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MessageVersion {
 	V1 = 1,
 }

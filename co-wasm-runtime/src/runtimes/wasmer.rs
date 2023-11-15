@@ -66,8 +66,14 @@ impl WasmerRuntime {
 		Ok(())
 	}
 
+	/// API Access.
 	pub fn api(&self) -> &CoV1Api {
 		&self.env.as_ref(&self.store).api
+	}
+
+	/// Mutable API accress.
+	pub fn api_mut(&mut self) -> &mut CoV1Api {
+		&mut self.env.as_mut(&mut self.store).api
 	}
 
 	fn imports(store: &mut impl AsStoreMut, env: &FunctionEnv<WasmerEnv>) -> wasmer::Imports {

@@ -17,5 +17,8 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-#co-storage = { path = "../../co-storage" }
-#co-wasm-runtime = { path = "../../co-wasm-runtime" }
+co-storage = { path = "../../co-storage" }
+co-wasm-runtime = { path = "../../co-wasm-runtime" }
+co-primitives = { path = "../../co-primitives" }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
