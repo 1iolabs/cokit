@@ -1,14 +1,8 @@
-use crate::types::{
-	cid::Link,
-	reducer::{Context, Reducer, ReducerAction},
-	storage::Storage,
-	Date,
-};
+use co_primitives::{Date, Did, Link};
+use co_wasm_api::{reduce, Context, Reducer, ReducerAction, Storage, StorageExt};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap as Map;
-
-type Did = String;
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageState {
@@ -24,8 +18,8 @@ pub struct MessageState {
 	#[serde(rename = "p", skip_serializing_if = "Vec::is_empty")]
 	pinned: Vec<Cid>,
 
-	#[serde(rename = "r", skip_serializing_if = "Map::is_empty")]
-	participants: Map<Did, Link<Role>>,
+	#[serde(rename = "r", skip_serializing_if = "BTreeMap::is_empty")]
+	participants: BTreeMap<Did, Link<Role>>,
 }
 
 impl Default for MessageState {
@@ -66,7 +60,7 @@ impl Permission {
 	pub fn has(&self, storage: &dyn Storage, state: &MessageState, participant: &Did) -> bool {
 		match state.participants.get(participant) {
 			Some(link) => {
-				let role = link.resolve(storage).unwrap_or(Role::None);
+				let role = storage.get_value(link).unwrap_or(Role::None);
 				match role {
 					Role::None => false,
 					Role::Custom { name: _, permissions } => permissions.contains(self),
@@ -89,7 +83,7 @@ impl Permission {
 	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Role {
 	None,
 	Custom { name: String, permissions: Vec<Permission> },
@@ -108,18 +102,47 @@ pub enum MessageAction {
 impl Reducer for MessageState {
 	type Action = MessageAction;
 
-	fn reduce(self, action: &ReducerAction<Self::Action>, context: &Context) -> Self {
-		let mut state = self;
+	fn reduce(self, action: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		match &action.payload {
 			MessageAction::SetName(name) =>
-				if Permission::Name.has(context.storage.as_ref(), &state, &action.from) {
-					state = MessageState { name: name.clone(), ..state };
+				if Permission::Name.has(context.storage(), &self, &action.from) {
+					MessageState { name: name.clone(), ..self }
+				} else {
+					self
 				},
-			MessageAction::Message => todo!(),
-			MessageAction::Pin(_) => todo!(),
-			MessageAction::SetRole(_, _) => todo!(),
+			MessageAction::Message => {
+				let participants = match self.participants.get(&action.from) {
+					Some(_) => self.participants,
+					None => {
+						let mut new = self.participants.clone();
+						new.insert(action.from.clone(), context.storage_mut().set_value(&Role::Participant));
+						new
+					},
+				};
+				MessageState { participants, message_count: self.message_count + 1, ..self }
+			},
+			MessageAction::Pin(id) => {
+				let mut pinned = self.pinned.clone();
+				pinned.push(id.clone());
+				MessageState { pinned, ..self }
+			},
+			MessageAction::SetRole(did, role_link) => {
+				let from_role_link_option = self.participants.get(&action.from);
+				match from_role_link_option {
+					Some(from_role_link) => {
+						let role = context.storage().get_value(from_role_link).expect("valid role");
+						if role == Role::Admin {
+							let mut participants = self.participants.clone();
+							participants.insert(did.clone(), role_link.clone());
+							MessageState { participants, ..self }
+						} else {
+							self
+						}
+					},
+					None => self,
+				}
+			},
 		}
-		state
 	}
 }
 
@@ -147,3 +170,8 @@ impl MessageState {
 // 	// #[api]
 // 	pub fn set_name(name: String) -> SetNameEvent {}
 // }
+
+#[no_mangle]
+pub extern "C" fn state() {
+	reduce::<MessageState>()
+}

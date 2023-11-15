@@ -402,6 +402,7 @@ dependencies = [
  "async-trait",
  "blake3",
  "chacha20poly1305",
+ "co-primitives",
  "futures",
  "hexdump",
  "insta",
@@ -833,6 +834,22 @@ dependencies = [
  "co-storage",
  "co-wasm-api",
  "co-wasm-runtime",
+ "libipld",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "example-message"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "co-primitives",
+ "co-wasm-api",
  "libipld",
  "serde",
  "serde_ipld_dagcbor",

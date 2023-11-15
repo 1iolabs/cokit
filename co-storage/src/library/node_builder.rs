@@ -1,7 +1,5 @@
-use crate::{
-	library::to_serialized_block::to_serialized_block,
-	types::{cid::Link, storage::StorageError},
-};
+use crate::{library::to_serialized_block::to_serialized_block, types::storage::StorageError};
+use co_primitives::Link;
 use libipld::{Block, DefaultParams};
 use serde::{Deserialize, Serialize};
 use std::mem::take;
@@ -79,7 +77,7 @@ where
 	pub fn into_blocks(mut self) -> Result<Vec<Block<DefaultParams>>, NodeBuilderError> {
 		// flush
 		if !self.items.is_empty() {
-			self.flush();
+			self.flush()?;
 		}
 
 		// result

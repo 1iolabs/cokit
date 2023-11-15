@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use libipld::{Block, Cid, DefaultParams};
 
 /// Storage interface.

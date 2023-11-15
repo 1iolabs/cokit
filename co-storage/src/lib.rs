@@ -1,6 +1,4 @@
 mod crypto;
-#[cfg(test)]
-mod example;
 mod library;
 mod storage;
 mod types;
@@ -11,8 +9,4 @@ pub use library::{
 	to_serialized_block::{to_serialized_block, SerializeOptions},
 };
 pub use storage::{encrypted::EncryptedStorage, memory::MemoryStorage, sync::SyncStorage};
-pub use types::{
-	cid::{Link, ResolveError},
-	storage::{Storage, StorageError},
-	Date, Did,
-};
+pub use types::storage::{Storage, StorageError};

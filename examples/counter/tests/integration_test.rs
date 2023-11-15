@@ -7,6 +7,12 @@ use std::process::Command;
 
 #[test]
 fn integration_test() {
+	tracing_subscriber::fmt::fmt()
+		.with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
+		.with_target(false)
+		.with_level(false)
+		.init();
+
 	// build
 	Command::new("cargo")
 		.args(["build", "--target=wasm32-unknown-unknown", "--release"])

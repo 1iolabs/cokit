@@ -1,5 +1,7 @@
 mod read_cid;
 mod reduce;
+pub mod resolve_link;
+pub mod storage_ext;
 mod wasm_context;
 mod wasm_storage;
 mod write_cid;

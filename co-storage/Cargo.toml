@@ -22,6 +22,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 blake3 = "=1.5.0"
 chacha20poly1305 = "=0.10.1"
+co-primitives = { path = "../co-primitives" }
 futures = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 names = "0.14.0"

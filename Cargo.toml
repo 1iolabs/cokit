@@ -5,6 +5,7 @@ members = [
     "co-wasm-api",
     "co-storage",
     "examples/counter",
+    "examples/message",
 ]
 resolver = "2"
 

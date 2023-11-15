@@ -15,7 +15,7 @@ pub enum CounterAction {
 impl Reducer for Counter {
 	type Action = CounterAction;
 
-	fn reduce(self, event: &ReducerAction<Self::Action>, _: &dyn Context) -> Self {
+	fn reduce(self, event: &ReducerAction<Self::Action>, _: &mut dyn Context) -> Self {
 		match event.payload {
 			CounterAction::Increment(i) => Counter(self.0 + i),
 			CounterAction::Decrement(i) => Counter(self.0 - i),
