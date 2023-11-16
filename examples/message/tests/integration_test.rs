@@ -1,8 +1,5 @@
 use co_primitives::{Link, ReducerAction};
-use co_storage::{
-	from_serialized_block, to_serialized_block, Algorithm, EncryptedStorage, MemoryStorage, Secret, Storage,
-	SyncStorage,
-};
+use co_storage::{Algorithm, BlockSerializer, EncryptedStorage, MemoryStorage, Secret, Storage, SyncStorage};
 use co_wasm_runtime::{co_v1::CoV1Api, runtime_execute};
 use example_message::{MessageAction, MessageState, Role};
 use libipld::Cid;
@@ -31,7 +28,7 @@ fn integration_test() {
 
 	// action
 	let action = ReducerAction { payload: MessageAction::Message, from: "did:local:test".to_owned(), time: 0 };
-	let action_block = to_serialized_block(&action, Default::default()).unwrap();
+	let action_block = BlockSerializer::default().serialize(&action).unwrap();
 	let action_cid = action_block.cid().clone();
 	storage.set(action_block).unwrap();
 
@@ -48,7 +45,7 @@ fn integration_test() {
 
 	// test state
 	let block = storage.get(&next_state.unwrap()).unwrap();
-	let state: MessageState = from_serialized_block(&block).unwrap();
+	let state: MessageState = BlockSerializer::default().deserialize(&block).unwrap();
 	let mut participants = BTreeMap::new();
 	participants.insert(
 		"did:local:test".to_string(),

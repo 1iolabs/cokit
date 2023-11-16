@@ -3,7 +3,7 @@ use crate::{
 		block::{Algorithm, EncryptedBlock, BLOCK_MULTICODEC},
 		secret::Secret,
 	},
-	library::node_builder::{Node, NodeBuilder},
+	library::node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
 	AlgorithmError, Storage, StorageError,
 };
 use libipld::{cbor::DagCborCodec, Block, Cid, DefaultParams};
@@ -22,14 +22,17 @@ where
 {
 	/// Create storage encryption layer.
 	pub fn new(next: S, key: Secret, algorithm: Algorithm, map: Option<Cid>) -> Result<Self, StorageError> {
+		let mut instance = Self { algorithm, key, mapping: BlockMapping::new(), next };
+
 		// load mapping
-		let mut mapping = BlockMapping::new();
 		if let Some(mapping_root) = map {
-			mapping.read(&next, &mapping_root)?;
+			let mut mapping = BlockMapping::new();
+			mapping.read(&mut instance, &mapping_root)?;
+			instance.mapping = mapping;
 		}
 
 		// result
-		Ok(Self { algorithm, key, mapping, next })
+		Ok(instance)
 	}
 
 	/// Get next storage layer.
@@ -42,11 +45,26 @@ where
 		&self.next
 	}
 
+	/// Consume storage and return next layer.
+	pub fn into_storage(self) -> S {
+		self.next
+	}
+
 	/// Flush mapping to (parent) storage.
-	///
-	/// Note: This will not be encrypted and is intendet for local use only.
+	/// Returns the encrypted mapping CID.
+	/// The mapping tree will also only link to encrypted CIDs.
 	pub fn flush_mapping(&mut self) -> Result<Cid, StorageError> {
-		self.mapping.write(&mut self.next, Default::default())
+		let (root_cid, blocks) = self
+			.mapping
+			.to_blocks(EncryptedNodeSerializer::from_storage(self), Default::default())?;
+
+		// store
+		for block in blocks {
+			self.storage_mut().set(block)?
+		}
+
+		// result
+		Ok(root_cid)
 	}
 
 	/// This will regenerate and flush the encryption block mapping using supplied CIDs.
@@ -74,7 +92,7 @@ where
 
 	/// Inserts a block into storage.
 	///
-	/// Note: This exepects the unencrypted Block.
+	/// Note: This expects the unencrypted Block.
 	fn set(&mut self, block: Block<DefaultParams>) -> Result<(), StorageError> {
 		let cid = block.cid().clone();
 
@@ -153,7 +171,7 @@ impl BlockMapping {
 
 		// get block
 		let block = storage.get(cid)?;
-		if cid.codec() != Into::<u64>::into(DagCborCodec) {
+		if block.cid().codec() != Into::<u64>::into(DagCborCodec) {
 			return Err(StorageError::InvalidArgument)
 		}
 
@@ -165,8 +183,7 @@ impl BlockMapping {
 		match node {
 			Node::Node(links) =>
 				for link in links {
-					let link_cid: Cid = link.into();
-					count += self.read(storage, &link_cid)?;
+					count += self.read(storage, link.cid())?;
 				},
 			Node::Leaf(entries) =>
 				for (key, value) in entries.into_iter() {
@@ -182,14 +199,21 @@ impl BlockMapping {
 	/// Encode mapping into blocks.
 	///
 	/// Returns the root cid and all blocks.
-	pub fn to_blocks(&self, options: WriteOptions) -> Result<(Cid, Vec<Block<DefaultParams>>), StorageError> {
+	pub fn to_blocks<S>(
+		&self,
+		serializer: S,
+		options: WriteOptions,
+	) -> Result<(Cid, Vec<Block<DefaultParams>>), StorageError>
+	where
+		S: NodeSerializer<(Cid, Cid)>,
+	{
 		// validate
 		if self.map.is_empty() {
 			return Err(StorageError::InvalidArgument)
 		}
 
 		// blocks
-		let mut builder = NodeBuilder::<(Cid, Cid)>::new(options.max_children);
+		let mut builder = NodeBuilder::<(Cid, Cid), S>::new(options.max_children, serializer);
 		for (key, value) in self.map.iter() {
 			builder.push((key.clone(), value.clone())).map_err(|e| e.into())?;
 		}
@@ -199,20 +223,32 @@ impl BlockMapping {
 		// result
 		Ok((root_cid, blocks))
 	}
+}
 
-	/// Write block mappings to an storage.
-	///
-	/// Returns `StorageError::InvalidArgument` when the map is empty.
-	pub fn write(&self, storage: &mut dyn Storage, options: WriteOptions) -> Result<Cid, StorageError> {
-		let (root_cid, blocks) = self.to_blocks(options)?;
-
-		// store
-		for block in blocks {
-			storage.set(block)?
-		}
-
-		// result
-		Ok(root_cid)
+/// Create encrypted block.
+struct EncryptedNodeSerializer {
+	key: Secret,
+	algorithm: Algorithm,
+}
+impl EncryptedNodeSerializer {
+	pub fn from_storage<S>(storage: &EncryptedStorage<S>) -> Self {
+		Self { key: storage.key.clone(), algorithm: storage.algorithm }
+	}
+}
+impl<T> NodeSerializer<T> for EncryptedNodeSerializer
+where
+	T: Clone + Serialize,
+{
+	fn serialize(&self, node: &Node<T>) -> Result<Block<DefaultParams>, NodeBuilderError> {
+		let block = DefaultNodeSerializer::new().serialize(node)?;
+		let encrypted = EncryptedBlock::encrypt(self.algorithm, &self.key, block)?;
+		let encrypted_block: Block<DefaultParams> = encrypted.try_into()?;
+		Ok(encrypted_block)
+	}
+}
+impl From<AlgorithmError> for NodeBuilderError {
+	fn from(_: AlgorithmError) -> Self {
+		NodeBuilderError::Encoding
 	}
 }
 
@@ -235,11 +271,15 @@ impl Default for WriteOptions {
 #[cfg(test)]
 mod tests {
 	use crate::{
-		crypto::{block::Algorithm, secret::Secret},
-		library::to_serialized_block::to_serialized_block,
+		crypto::{
+			block::{Algorithm, BLOCK_MULTICODEC},
+			secret::Secret,
+		},
 		storage::{encrypted::EncryptedStorage, memory::MemoryStorage},
 		types::storage::{Storage, StorageError},
+		BlockSerializer,
 	};
+	use libipld::{store::StoreParams, Cid, DefaultParams};
 	use serde::{Deserialize, Serialize};
 	use std::iter::repeat;
 
@@ -258,7 +298,7 @@ mod tests {
 
 		// block
 		let data = Test { hello: "world".to_owned() };
-		let block = to_serialized_block(&data, Default::default()).unwrap();
+		let block = BlockSerializer::default().serialize(&data).unwrap();
 
 		// set
 		encryption.set(block.clone()).unwrap();
@@ -268,5 +308,43 @@ mod tests {
 
 		// validate that the CID dosn't exist in parent storage layer
 		assert!(matches!(encryption.storage().get(block.cid()), Err(StorageError::NotFound)));
+	}
+
+	#[test]
+	fn store_mapping() {
+		// storage
+		let memory = MemoryStorage::new();
+		let algorithm = Algorithm::default();
+		let key = Secret::new(repeat(42).take(algorithm.key_size()).collect());
+		let mut encryption = EncryptedStorage::new(memory, key.clone(), algorithm.clone(), None).unwrap();
+
+		// blocks
+		let mut cids: Vec<Cid> = Default::default();
+		for i in 0..1024 {
+			let data = Test { hello: format!("Hi {}!", i).to_owned() };
+			let block = BlockSerializer::default().serialize(&data).unwrap();
+			cids.push(block.cid().clone());
+			encryption.set(block.clone()).unwrap();
+		}
+
+		// validate mapping
+		let mapping_cid = encryption.flush_mapping().unwrap();
+		assert_eq!(BLOCK_MULTICODEC, mapping_cid.codec()); // encrypted?
+
+		// validate cids
+		let memory: MemoryStorage = encryption.into_storage();
+		let memory_cids: Vec<Cid> = memory.iter().cloned().collect();
+		assert_eq!(7 + 1024, memory_cids.len()); // 7 (merkle) mapping blocks and 1024 data blocks
+		for memory_cid in memory_cids.iter() {
+			let memory_block = memory.get(memory_cid).unwrap();
+			assert_eq!(BLOCK_MULTICODEC, memory_cid.codec()); // all blocks are encrypted
+			assert!(DefaultParams::MAX_BLOCK_SIZE > memory_block.data().len()); // all blocks fit in max block size
+		}
+
+		// validate load blocks again
+		let encryption = EncryptedStorage::new(memory, key, algorithm, Some(mapping_cid)).unwrap();
+		for cid in cids {
+			encryption.get(&cid).unwrap();
+		}
 	}
 }

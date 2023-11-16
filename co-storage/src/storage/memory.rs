@@ -30,6 +30,11 @@ impl MemoryStorage {
 			None => false,
 		}
 	}
+
+	/// Iterator over all stored CIDs.
+	pub fn iter(&self) -> impl Iterator<Item = &Cid> {
+		self.records.iter().map(|(cid, _)| cid)
+	}
 }
 
 impl Storage for MemoryStorage {

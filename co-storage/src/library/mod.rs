@@ -1,3 +1,2 @@
-pub mod from_serialized_block;
+pub mod block_serializer;
 pub mod node_builder;
-pub mod to_serialized_block;

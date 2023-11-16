@@ -1,4 +1,4 @@
-use crate::{library::to_serialized_block::to_serialized_block, types::storage::StorageError};
+use crate::{types::storage::StorageError, BlockSerializer};
 use co_primitives::Link;
 use libipld::{Block, DefaultParams};
 use serde::{Deserialize, Serialize};
@@ -28,12 +28,37 @@ impl Into<StorageError> for NodeBuilderError {
 	}
 }
 
+pub trait NodeSerializer<T>
+where
+	T: Clone,
+{
+	fn serialize(&self, node: &Node<T>) -> Result<Block<DefaultParams>, NodeBuilderError>;
+}
+
+pub struct DefaultNodeSerializer {}
+impl DefaultNodeSerializer {
+	pub fn new() -> Self {
+		Self {}
+	}
+}
+impl<T> NodeSerializer<T> for DefaultNodeSerializer
+where
+	T: Clone + Serialize,
+{
+	fn serialize(&self, node: &Node<T>) -> Result<Block<DefaultParams>, NodeBuilderError> {
+		BlockSerializer::default()
+			.serialize(node)
+			.map_err(|_| NodeBuilderError::Encoding)
+	}
+}
+
 /// Create a balances merkler tree of Node blocks.
 ///
 /// Note: This implementation requires the data to fit into memory.
-pub struct NodeBuilder<T>
+pub struct NodeBuilder<T, S = DefaultNodeSerializer>
 where
 	T: Clone,
+	S: NodeSerializer<T>,
 {
 	// Current Items.
 	items: Vec<T>,
@@ -43,13 +68,17 @@ where
 
 	/// Max children for each block.
 	max_children: usize,
+
+	/// Serializer.
+	serializer: S,
 }
-impl<T> NodeBuilder<T>
+impl<T, S> NodeBuilder<T, S>
 where
 	T: Clone + Serialize,
+	S: NodeSerializer<T>,
 {
-	pub fn new(max_children: usize) -> Self {
-		Self { items: Vec::new(), blocks: Vec::new(), max_children }
+	pub fn new(max_children: usize, serializer: S) -> Self {
+		Self { items: Vec::new(), blocks: Vec::new(), max_children, serializer }
 	}
 
 	pub fn push(&mut self, item: T) -> Result<(), NodeBuilderError> {
@@ -68,7 +97,7 @@ where
 	/// Flush items into new leaf block.
 	fn flush(&mut self) -> Result<(), NodeBuilderError> {
 		let leaf = Node::Leaf(take(&mut self.items));
-		let block = Self::serialize_node(&leaf)?;
+		let block = self.serializer.serialize(&leaf)?;
 		self.blocks.push(block);
 		Ok(())
 	}
@@ -81,17 +110,13 @@ where
 		}
 
 		// result
-		Self::create_balanced_links(self.blocks, self.max_children)
-	}
-
-	/// Serialize node into Block.
-	fn serialize_node(node: &Node<T>) -> Result<Block<DefaultParams>, NodeBuilderError> {
-		to_serialized_block(node, Default::default()).map_err(|_| NodeBuilderError::Encoding)
+		Self::create_balanced_links(&self.serializer, self.blocks, self.max_children)
 	}
 
 	/// Create balanced links for all blocks.
 	/// The first block in the result is the root block.
 	fn create_balanced_links(
+		serializer: &S,
 		mut blocks: Vec<Block<DefaultParams>>,
 		max_children: usize,
 	) -> Result<Vec<Block<DefaultParams>>, NodeBuilderError> {
@@ -107,9 +132,9 @@ where
 					.map(|chunk| -> Node<T> {
 						Node::Node(chunk.iter().map(|block| block.cid().clone().into()).collect())
 					})
-					.map(|node| Self::serialize_node(&node))
+					.map(|node| serializer.serialize(&node))
 					.collect();
-				Self::create_balanced_links(level_link_blocks?, max_children)?
+				Self::create_balanced_links(serializer, level_link_blocks?, max_children)?
 			},
 		};
 
@@ -120,23 +145,23 @@ where
 		Ok(link_blocks)
 	}
 }
-impl<T> Default for NodeBuilder<T>
+impl<T> Default for NodeBuilder<T, DefaultNodeSerializer>
 where
 	T: Clone + Serialize,
 {
 	fn default() -> Self {
-		Self::new(174)
+		Self::new(174, DefaultNodeSerializer::new())
 	}
 }
 
 #[cfg(test)]
 mod tests {
-	use crate::library::node_builder::{Node, NodeBuilder};
+	use crate::library::node_builder::{DefaultNodeSerializer, Node, NodeBuilder};
 
 	#[test]
 	fn into_blocks() {
 		// build
-		let mut builder = NodeBuilder::<u8>::new(2);
+		let mut builder = NodeBuilder::<u8>::new(2, DefaultNodeSerializer::new());
 		builder.push(1).unwrap();
 		builder.push(2).unwrap();
 		builder.push(3).unwrap();
@@ -155,7 +180,7 @@ mod tests {
 	#[test]
 	fn roundtrip() {
 		// build
-		let mut builder = NodeBuilder::<u8>::new(2);
+		let mut builder = NodeBuilder::<u8>::new(2, DefaultNodeSerializer::new());
 		builder.push(1).unwrap();
 		builder.push(2).unwrap();
 		builder.push(3).unwrap();

@@ -1,5 +1,5 @@
 use co_primitives::ReducerAction;
-use co_storage::{from_serialized_block, to_serialized_block, MemoryStorage, Storage, SyncStorage};
+use co_storage::{BlockSerializer, MemoryStorage, Storage, SyncStorage};
 use co_wasm_runtime::{co_v1::CoV1Api, runtime_execute};
 use example_counter::{Counter, CounterAction};
 use libipld::Cid;
@@ -24,7 +24,7 @@ fn integration_test() {
 
 	// action
 	let action = ReducerAction { payload: CounterAction::Increment(10), from: "did:local:test".to_owned(), time: 0 };
-	let action_block = to_serialized_block(&action, Default::default()).unwrap();
+	let action_block = BlockSerializer::default().serialize(&action).unwrap();
 	let action_cid = action_block.cid().clone();
 	storage.set(action_block).unwrap();
 
@@ -39,6 +39,6 @@ fn integration_test() {
 	// test
 	assert_eq!(Some(Cid::try_from("bafyr4ibjkgjouhwikzwvmoy2owd6l4azqwam3piehbbpkcikjqmxyiggpi").unwrap()), next_state);
 	let block = storage.get(&next_state.unwrap()).unwrap();
-	let state: Counter = from_serialized_block(&block).unwrap();
+	let state: Counter = BlockSerializer::default().deserialize(&block).unwrap();
 	assert_eq!(Counter(10), state);
 }

@@ -8,9 +8,6 @@ pub use crypto::{
 	block::{Algorithm, AlgorithmError},
 	secret::Secret,
 };
-pub use library::{
-	from_serialized_block::from_serialized_block,
-	to_serialized_block::{to_serialized_block, SerializeOptions},
-};
+pub use library::block_serializer::BlockSerializer;
 pub use storage::{encrypted::EncryptedStorage, memory::MemoryStorage, sync::SyncStorage};
 pub use types::storage::{Storage, StorageError};
