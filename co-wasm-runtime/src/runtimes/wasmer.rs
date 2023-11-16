@@ -72,6 +72,7 @@ impl WasmerRuntime {
 	}
 
 	/// Mutable API accress.
+	#[allow(dead_code)]
 	pub fn api_mut(&mut self) -> &mut CoV1Api {
 		&mut self.env.as_mut(&mut self.store).api
 	}

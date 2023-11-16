@@ -4,7 +4,7 @@ use crate::{
 		secret::Secret,
 	},
 	library::node_builder::{Node, NodeBuilder},
-	Storage, StorageError,
+	AlgorithmError, Storage, StorageError,
 };
 use libipld::{cbor::DagCborCodec, Block, Cid, DefaultParams};
 use serde::{Deserialize, Serialize};
@@ -32,13 +32,6 @@ where
 		Ok(Self { algorithm, key, mapping, next })
 	}
 
-	/// Flush mapping to (parent) storage.
-	///
-	/// Note: This will not be encrypted and is intendet for local use only.
-	pub fn flush_mapping(&mut self) -> Result<Cid, StorageError> {
-		self.mapping.write(&mut self.next, Default::default())
-	}
-
 	/// Get next storage layer.
 	pub fn storage_mut(&mut self) -> &mut S {
 		&mut self.next
@@ -47,6 +40,19 @@ where
 	/// Get next storage layer.
 	pub fn storage(&self) -> &S {
 		&self.next
+	}
+
+	/// Flush mapping to (parent) storage.
+	///
+	/// Note: This will not be encrypted and is intendet for local use only.
+	pub fn flush_mapping(&mut self) -> Result<Cid, StorageError> {
+		self.mapping.write(&mut self.next, Default::default())
+	}
+
+	/// This will regenerate and flush the encryption block mapping using supplied CIDs.
+	pub fn regenerate_mapping(&mut self, cids: impl Iterator<Item = Cid>) -> Result<Cid, StorageError> {
+		self.mapping = BlockMapping::from_cids(self, cids).map_err(|e| e.into())?;
+		self.flush_mapping()
 	}
 }
 impl<S> Storage for EncryptedStorage<S>
@@ -89,6 +95,29 @@ where
 	}
 }
 
+#[derive(Debug, thiserror::Error)]
+enum BlockMappingError {
+	#[error("Storage Error")]
+	Storage(#[from] StorageError),
+
+	#[error("Algorithm Error")]
+	Algorithm(#[from] AlgorithmError),
+}
+impl Into<StorageError> for BlockMappingError {
+	fn into(self) -> StorageError {
+		match self {
+			BlockMappingError::Storage(e) => e,
+			BlockMappingError::Algorithm(e) => match e {
+				AlgorithmError::Cipher => StorageError::InvalidArgument, // likely wrong key supplied for given CID.
+				AlgorithmError::InvalidArguments => StorageError::InvalidArgument,
+				AlgorithmError::Decoding => StorageError::Internal,
+				AlgorithmError::Encoding => StorageError::Internal,
+				AlgorithmError::Size => StorageError::Internal,
+			},
+		}
+	}
+}
+
 /// Serializeable block mapping.
 /// This is used to store the mapping itself as an block.
 #[derive(Debug, Serialize, Deserialize)]
@@ -98,6 +127,24 @@ struct BlockMapping {
 impl BlockMapping {
 	pub fn new() -> Self {
 		Self { map: BTreeMap::new() }
+	}
+
+	/// Create new mapping by inspecting supplied CIDs.
+	pub fn from_cids<S>(
+		storage: &EncryptedStorage<S>,
+		cids: impl Iterator<Item = Cid>,
+	) -> Result<Self, BlockMappingError>
+	where
+		S: Storage,
+	{
+		let mut mapping = BlockMapping::new();
+		for cid in cids {
+			if cid.codec() == BLOCK_MULTICODEC {
+				let encrypted_block: EncryptedBlock<DefaultParams> = storage.storage().get(&cid)?.try_into()?;
+				mapping.map.insert(encrypted_block.cid(&storage.key)?, cid);
+			}
+		}
+		Ok(mapping)
 	}
 
 	/// Read block mappings from `cid` via an block storage.

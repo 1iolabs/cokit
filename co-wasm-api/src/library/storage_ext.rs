@@ -1,4 +1,5 @@
-use super::resolve_link::ResolveError;
+use std::convert::Infallible;
+
 use crate::{Block, Storage};
 use co_primitives::Link;
 use libipld::{
@@ -37,6 +38,34 @@ pub trait StorageExt: Storage {
 		result
 	}
 }
-
 impl<T> StorageExt for T where T: Storage + ?Sized {}
-// impl<T> StorageExt for &T where T: Storage + ?Sized {}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ResolveError {
+	#[error("Unknown codec")]
+	UnknownCodec(u64),
+	#[error("Generic decoding error")]
+	Codec,
+	#[error("Invalid argument")]
+	InvalidArgument,
+}
+impl From<serde_ipld_dagcbor::DecodeError<Infallible>> for ResolveError {
+	fn from(value: serde_ipld_dagcbor::DecodeError<Infallible>) -> Self {
+		match value {
+			serde_ipld_dagcbor::DecodeError::Msg(_) => ResolveError::Codec,
+			serde_ipld_dagcbor::DecodeError::Read(_) => ResolveError::Codec,
+			serde_ipld_dagcbor::DecodeError::Eof => ResolveError::InvalidArgument,
+			serde_ipld_dagcbor::DecodeError::Mismatch { expect_major: _, byte: _ } => ResolveError::Codec,
+			serde_ipld_dagcbor::DecodeError::TypeMismatch { name: _, byte: _ } => ResolveError::Codec,
+			serde_ipld_dagcbor::DecodeError::CastOverflow(_) => ResolveError::Codec,
+			serde_ipld_dagcbor::DecodeError::Overflow { name: _ } => ResolveError::Codec,
+			serde_ipld_dagcbor::DecodeError::RequireBorrowed { name: _ } => ResolveError::Codec,
+			serde_ipld_dagcbor::DecodeError::RequireLength { name: _, expect: _, value: _ } => ResolveError::Codec,
+			serde_ipld_dagcbor::DecodeError::InvalidUtf8(_) => ResolveError::Codec,
+			serde_ipld_dagcbor::DecodeError::Unsupported { byte: _ } => ResolveError::Codec,
+			serde_ipld_dagcbor::DecodeError::DepthLimit => ResolveError::Codec,
+			serde_ipld_dagcbor::DecodeError::TrailingData => ResolveError::Codec,
+			serde_ipld_dagcbor::DecodeError::IndefiniteSize => ResolveError::Codec,
+		}
+	}
+}

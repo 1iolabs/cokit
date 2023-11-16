@@ -284,6 +284,7 @@ where
 	}
 
 	/// Get decrypted payload.
+	#[allow(dead_code)]
 	pub fn data(&self, secret: &Secret) -> Result<Vec<u8>, AlgorithmError> {
 		let block_secret = self.header.block_secret(secret).ok_or(AlgorithmError::InvalidArguments)?;
 		let aad = self.header.aad();

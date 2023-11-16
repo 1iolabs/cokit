@@ -17,6 +17,7 @@ impl Storage for WasmStorage {
 		let buffer_size = 2 ^ 10; // 1024
 		let mut buffer = Vec::with_capacity(buffer_size);
 		buffer.resize(buffer_size, 0);
+		#[allow(unused_unsafe)]
 		let block_size = unsafe {
 			co_v1::storage_block_get(
 				cid_bytes.as_ptr(),
@@ -29,6 +30,7 @@ impl Storage for WasmStorage {
 		// read again with larger buffer if block is larger
 		if (block_size as usize) > buffer.len() {
 			buffer.resize(block_size as usize, 0);
+			#[allow(unused_unsafe)]
 			let block_size = unsafe {
 				co_v1::storage_block_get(
 					cid_bytes.as_ptr(),
@@ -50,6 +52,7 @@ impl Storage for WasmStorage {
 
 	fn set(&mut self, block: Block) {
 		let cid_bytes = block.cid().to_bytes();
+		#[allow(unused_unsafe)]
 		let block_size = unsafe {
 			co_v1::storage_block_set(
 				cid_bytes.as_ptr(),
