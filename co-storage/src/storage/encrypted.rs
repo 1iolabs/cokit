@@ -183,7 +183,7 @@ impl BlockMapping {
 		match node {
 			Node::Node(links) =>
 				for link in links {
-					count += self.read(storage, link.cid())?;
+					count += self.read(storage, link.as_ref())?;
 				},
 			Node::Leaf(entries) =>
 				for (key, value) in entries.into_iter() {

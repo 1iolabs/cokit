@@ -1,5 +1,5 @@
 use co_primitives::{Date, Did, Link};
-use co_wasm_api::{reduce, Context, Reducer, ReducerAction, Storage, StorageExt};
+use co_wasm_api::{reduce, CoMetadata, Context, Metadata, Reducer, ReducerAction, Storage, StorageExt};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -31,6 +31,12 @@ impl Default for MessageState {
 			pinned: Default::default(),
 			participants: Default::default(),
 		}
+	}
+}
+
+impl CoMetadata for MessageState {
+	fn metadata() -> Vec<co_wasm_api::Metadata> {
+		vec![Metadata::External(vec!["pinned".to_string()])]
 	}
 }
 

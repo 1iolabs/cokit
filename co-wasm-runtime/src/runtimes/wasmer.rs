@@ -37,14 +37,14 @@ pub enum WasmerError {
 
 impl WasmerRuntime {
 	#[tracing::instrument(err, ret, skip(bytes), fields(bytes.len = bytes.len()))]
-	pub fn new(api: CoV1Api, bytes: Vec<u8>) -> Result<Self, WasmerError> {
+	pub fn new(api: CoV1Api, bytes: &Vec<u8>) -> Result<Self, WasmerError> {
 		let mut store = Store::default();
 
 		// env
 		let env = FunctionEnv::new(&mut store, WasmerEnv { memory: None, api });
 
 		// module
-		let module = Module::new(&store, &bytes)?;
+		let module = Module::new(&store, bytes)?;
 
 		// instance
 		let import_object = Self::imports(&mut store, &env);

@@ -1,6 +1,6 @@
 use co_primitives::ReducerAction;
 use co_storage::{BlockSerializer, MemoryStorage, Storage, SyncStorage};
-use co_wasm_runtime::{co_v1::CoV1Api, runtime_execute};
+use co_wasm_runtime::{co_v1::CoV1Api, create_runtime};
 use example_counter::{Counter, CounterAction};
 use libipld::Cid;
 use std::process::Command;
@@ -34,7 +34,7 @@ fn integration_test() {
 	// wasm
 	let wasm_path = "../../target/wasm32-unknown-unknown/release/example_counter.wasm";
 	let wasm_bytes = std::fs::read(wasm_path).unwrap();
-	let next_state = runtime_execute(api, wasm_bytes).unwrap();
+	let next_state = create_runtime(wasm_bytes).execute(api).unwrap();
 
 	// test
 	assert_eq!(Some(Cid::try_from("bafyr4ibjkgjouhwikzwvmoy2owd6l4azqwam3piehbbpkcikjqmxyiggpi").unwrap()), next_state);

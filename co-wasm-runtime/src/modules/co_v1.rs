@@ -1,6 +1,6 @@
 use co_storage::{Storage, StorageError};
 use co_wasm_api::{Block, Cid};
-use std::{cmp::min, fmt::Debug};
+use std::{cmp::min, fmt::Debug, mem::swap};
 
 pub struct CoV1Api {
 	storage: Box<dyn Storage + Send + Sync>,
@@ -14,6 +14,16 @@ impl CoV1Api {
 
 	pub fn state(&self) -> &Option<Cid> {
 		&self.state
+	}
+
+	pub fn swap(&mut self, other: &mut CoV1Api) {
+		swap(&mut self.storage, &mut other.storage);
+		swap(&mut self.event, &mut other.event);
+		swap(&mut self.state, &mut other.state);
+	}
+
+	pub fn storage_mut(&mut self) -> &mut dyn Storage {
+		self.storage.as_mut()
 	}
 }
 impl Debug for CoV1Api {

@@ -8,6 +8,13 @@ pub use crypto::{
 	block::{Algorithm, AlgorithmError},
 	secret::Secret,
 };
-pub use library::block_serializer::BlockSerializer;
+pub use library::{
+	block_serializer::BlockSerializer,
+	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
+	node_reader::node_reader,
+};
 pub use storage::{encrypted::EncryptedStorage, memory::MemoryStorage, sync::SyncStorage};
-pub use types::storage::{Storage, StorageError};
+pub use types::{
+	pin::{PinApi, PinKind, PinOptions},
+	storage::{Storage, StorageError},
+};

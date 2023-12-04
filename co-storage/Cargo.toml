@@ -7,6 +7,7 @@ edition = "2021"
 # co-network = { path = "../network-co" }
 # co-node-edge = { path = "../node-edge" }
 # co-state = { path = "../state" }
+# genawaiter = "=0.99.1"
 # hyper = { workspace = true }
 # iroh-api = { path = "../../../github/n0-computer/beetle/iroh-api" }
 # iroh-embed = { path = "../../../github/n0-computer/beetle/iroh-embed" }

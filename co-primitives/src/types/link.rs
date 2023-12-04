@@ -10,11 +10,6 @@ pub struct Link<T: Clone> {
 	cid: Cid,
 }
 impl<T: Clone> Link<T> {
-	pub fn cid(&self) -> &Cid {
-		&self.cid
-	}
-}
-impl<T: Clone> Link<T> {
 	pub fn new(cid: Cid) -> Self {
 		Self { cid, _type: Default::default() }
 	}
@@ -33,4 +28,13 @@ impl<T: Clone> AsRef<Cid> for Link<T> {
 	fn as_ref(&self) -> &Cid {
 		&self.cid
 	}
+}
+impl<T: Clone> Linkable<T> for Link<T> {
+	fn cid(&self) -> &Cid {
+		&self.cid
+	}
+}
+
+pub trait Linkable<T> {
+	fn cid(&self) -> &Cid;
 }

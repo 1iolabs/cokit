@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 
 use crate::{Block, Storage};
-use co_primitives::Link;
+use co_primitives::{Link, Linkable};
 use libipld::{
 	cbor::DagCborCodec,
 	multihash::{Code, MultihashDigest},
@@ -10,7 +10,7 @@ use libipld::{
 
 pub trait StorageExt: Storage {
 	/// Get value from link.
-	fn get_value<T>(&self, link: &Link<T>) -> Result<T, ResolveError>
+	fn get_value<T, L: Linkable<T>>(&self, link: &L) -> Result<T, ResolveError>
 	where
 		T: Clone + serde::de::DeserializeOwned,
 	{

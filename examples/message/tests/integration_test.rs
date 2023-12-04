@@ -1,6 +1,6 @@
 use co_primitives::{Link, ReducerAction};
 use co_storage::{Algorithm, BlockSerializer, EncryptedStorage, MemoryStorage, Secret, Storage, SyncStorage};
-use co_wasm_runtime::{co_v1::CoV1Api, runtime_execute};
+use co_wasm_runtime::{co_v1::CoV1Api, create_runtime};
 use example_message::{MessageAction, MessageState, Role};
 use libipld::Cid;
 use std::{collections::BTreeMap, iter::repeat, process::Command, str::FromStr};
@@ -38,7 +38,7 @@ fn integration_test() {
 	// wasm
 	let wasm_path = "../../target/wasm32-unknown-unknown/release/example_message.wasm";
 	let wasm_bytes = std::fs::read(wasm_path).unwrap();
-	let next_state = runtime_execute(api, wasm_bytes).unwrap();
+	let next_state = create_runtime(wasm_bytes).execute(api).unwrap();
 
 	// test
 	assert_eq!(Some(Cid::try_from("bafyr4icsv74udrd3j5ewaybjf2sfp2frygniduzpf6scuu6ahlpdefdvoi").unwrap()), next_state);
