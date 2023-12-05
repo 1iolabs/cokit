@@ -168,16 +168,6 @@ fn decode(storage: &dyn Storage, cid: &Cid) -> Result<Ipld, DecodeError> {
 	}
 }
 
-fn inspect<F: Fn(&Cid) -> bool>(found: &F, storage: &dyn Storage, cid: &Cid) -> anyhow::Result<()> {
-	if cid.codec() == Into::<u64>::into(DagCborCodec) {
-		let block = storage.get(cid)?;
-		let ipld: Ipld = DagCborCodec.decode(block.data())?;
-		let mut cids = BTreeSet::new();
-		find_ipld_cids(&mut cids, storage, &ipld);
-	}
-	Ok(())
-}
-
 /// Recursively find all referenced `Cid`'s in an `Ipld` data structure by calling `found`.
 fn find_ipld_cids(result: &mut BTreeSet<Cid>, storage: &dyn Storage, ipld: &Ipld) {
 	match ipld {
@@ -239,7 +229,6 @@ fn get_external(ipld: &Ipld) -> Result<HashSet<String>, GetExternalError> {
 		.into_iter()
 		.filter_map(|v| match v {
 			Metadata::External(f) => Some(f),
-			_ => None,
 		})
 		.flatten()
 		.map(|s| s.to_owned())

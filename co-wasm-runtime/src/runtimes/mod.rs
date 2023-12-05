@@ -84,7 +84,7 @@ impl Runtime for Wasmer {
 			RuntimeState::Intialized(runtime) => runtime.api_mut(),
 		};
 		let state = api.state().ok_or(RuntimeError::InvalidState)?;
-		let mapping = PinMapping::from_state(api.storage_mut(), state, pin).map_err(|e| RuntimeError::Internal)?;
+		let mapping = PinMapping::from_state(api.storage_mut(), state, pin).map_err(|_| RuntimeError::Internal)?;
 		Ok(mapping.pin)
 	}
 }
