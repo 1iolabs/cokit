@@ -7,6 +7,7 @@ use tokio::fs::{read, write};
 use tracing::info;
 
 /// Read or generate and persist key-pair from/to file.
+/// If no `local_key_path` is specified a new `Keypair` will be generated for each call.
 pub async fn local_key(local_key_path: Option<PathBuf>, force_new_peer_id: bool) -> Result<Keypair, Error> {
 	if let Some(local_key_path) = local_key_path {
 		// force?

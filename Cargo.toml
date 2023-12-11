@@ -9,6 +9,7 @@ members = [
     "sdk",
     "state",
     "network-co",
+    "co-log",
 ]
 resolver = "2"
 

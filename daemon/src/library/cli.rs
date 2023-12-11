@@ -1,4 +1,4 @@
-use std::{default, path::PathBuf};
+use std::path::PathBuf;
 
 /// Run COs via an HTTP Daemon.
 #[derive(Debug, Clone, clap::Parser)]
@@ -53,10 +53,14 @@ pub enum CliCommand {
 #[derive(Debug, Clone, clap::Args)]
 pub struct HttpCommand {
 	/// The port to listen on for HTTP connections.
+	///
+	/// Defaults to random OS assigned port.
 	#[arg(short, long)]
 	pub port: Option<u16>,
 
 	/// The port to listen on for peer-to-peer connections.
+	///
+	/// Defaults to random OS assigned port.
 	#[arg(long)]
 	pub p2p_port: Option<u16>,
 }
