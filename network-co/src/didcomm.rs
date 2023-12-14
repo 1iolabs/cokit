@@ -1,8 +1,4 @@
-use std::{
-	collections::{HashMap, VecDeque},
-	task::{Context, Poll},
-};
-
+use self::{handler::Handler, protocol::MessageProtocol};
 use libp2p::{
 	core::ConnectedPoint,
 	swarm::{
@@ -15,8 +11,10 @@ use libp2p::{
 	Multiaddr, PeerId,
 };
 use smallvec::SmallVec;
-
-use self::{handler::Handler, protocol::MessageProtocol};
+use std::{
+	collections::{HashMap, VecDeque},
+	task::{Context, Poll},
+};
 
 mod codec;
 mod handler;

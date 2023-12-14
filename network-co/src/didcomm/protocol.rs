@@ -1,9 +1,7 @@
-use std::iter;
-
+use super::{codec, message::Message};
 use futures::{future::BoxFuture, AsyncWriteExt, FutureExt};
 use libp2p::{core::UpgradeInfo, swarm::NegotiatedSubstream, InboundUpgrade, OutboundUpgrade};
-
-use super::{codec, message::Message};
+use std::iter;
 
 pub const PROTOCOL_NAME: &'static str = "/didcomm/2";
 

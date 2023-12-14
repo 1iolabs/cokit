@@ -1,7 +1,6 @@
+use super::message::Message;
 use futures::{AsyncRead, AsyncWrite};
 use libp2p::core::upgrade::{read_length_prefixed, write_length_prefixed};
-
-use super::message::Message;
 
 #[derive(Debug, Clone)]
 pub struct Codec {

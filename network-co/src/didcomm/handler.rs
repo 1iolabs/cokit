@@ -1,9 +1,4 @@
-use std::{
-	collections::VecDeque,
-	task::{Context, Poll},
-	time::{Duration, Instant},
-};
-
+use super::{codec, message::Message, protocol::MessageProtocol};
 use libp2p::{
 	core::{upgrade::NegotiationError, UpgradeError},
 	swarm::{
@@ -13,8 +8,11 @@ use libp2p::{
 		ConnectionHandler, ConnectionHandlerEvent, ConnectionHandlerUpgrErr, KeepAlive, SubstreamProtocol,
 	},
 };
-
-use super::{codec, message::Message, protocol::MessageProtocol};
+use std::{
+	collections::VecDeque,
+	task::{Context, Poll},
+	time::{Duration, Instant},
+};
 
 #[derive(Debug, Clone)]
 pub enum Event {

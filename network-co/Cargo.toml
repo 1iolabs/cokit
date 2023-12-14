@@ -19,7 +19,7 @@ anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
 did_url = "^0.1"
-did-key = "^0.2"
+did-key = "0.2.1"
 futures = { workspace = true }
 libp2p = { workspace = true, features = ["full"] }
 rand = "0.8.5"
