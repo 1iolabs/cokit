@@ -7,7 +7,9 @@ use crate::Entry;
 /// Lamport Clock.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Clock {
+	#[serde(rename = "i", with = "serde_bytes")]
 	pub id: Vec<u8>,
+	#[serde(rename = "t")]
 	pub time: u64,
 }
 impl Clock {

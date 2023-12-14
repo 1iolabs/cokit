@@ -1,13 +1,13 @@
 use super::{
 	conflict::last_write_wins,
-	entry::{self, EntryBlock},
+	entry::EntryBlock,
+	heads::find_heads,
 	storage::{EntryStorage, TypedStorage},
 };
 use crate::{library::clock::max_clock, Clock, Entry, Identity};
 use anyhow::{anyhow, Context};
 use libipld::Cid;
 use std::collections::{BTreeSet, HashSet};
-use tracing::Event;
 
 pub struct Log {
 	id: Vec<u8>,
@@ -47,7 +47,7 @@ impl Log {
 	// }
 
 	/// Iterate entries starting at the head.
-	fn iter(&self) -> LogIterator {
+	pub fn iter(&self) -> LogIterator {
 		let stack: Result<Vec<EntryBlock>, anyhow::Error> = self
 			.heads
 			.iter()
@@ -57,7 +57,7 @@ impl Log {
 	}
 
 	/// Push item as new entry.
-	fn push(&mut self, item: Cid) -> Result<Cid, anyhow::Error> {
+	pub fn push(&mut self, item: Cid) -> Result<Cid, anyhow::Error> {
 		// create entry
 		let entry = Entry {
 			id: self.id().to_vec(),
@@ -76,21 +76,19 @@ impl Log {
 			next: self.heads(),
 			refs: Vec::new(),
 		};
-		let mut entry_block = EntryBlock::from_entry(entry)?;
-		entry_block.sign(self.identity.as_ref())?;
+		let entry_block = EntryBlock::from_entry(self.identity.as_ref(), entry)?;
 		let entry_cid = entry_block.cid().clone();
 
 		// set state
 		self.entry_store.set(entry_block)?; // to be atomic in case of error do this first
-		self.heads.clear();
-		self.heads.insert(entry_cid.clone());
 		self.index.insert(entry_cid.clone());
+		self.heads_set([entry_cid.clone()].into_iter());
 
 		// result
 		Ok(entry_cid)
 	}
 
-	fn join_entry(&mut self, identity: &dyn Identity, entry: EntryBlock) -> Result<bool, anyhow::Error> {
+	pub fn join_entry(&mut self, identity: &dyn Identity, entry: EntryBlock) -> Result<bool, anyhow::Error> {
 		if self.index.contains(entry.cid()) {
 			return Ok(false)
 		}
@@ -98,6 +96,7 @@ impl Log {
 		// verify
 		verify_entry(self, identity, &entry)?;
 
+		// calculate
 		let mut entries_to_add: BTreeSet<Cid> = BTreeSet::new();
 		entries_to_add.insert(entry.cid().clone());
 		let mut entries_to_get: BTreeSet<Cid> = BTreeSet::new();
@@ -110,40 +109,62 @@ impl Log {
 			while let Some(cid) = entries_to_get.pop_first() {
 				let e = self.entry_store.get(&cid)?;
 				verify_entry(&self, identity, &e)?;
-				entries_to_add.insert(e.signed_cid().unwrap().clone());
+				entries_to_add.insert(e.cid().clone());
 
 				for next in e.entry().next.iter().chain(e.entry().refs.iter()) {
 					if !self.index.contains(next) && !entries_to_add.contains(next) {
 						entries_to_get.insert(next.clone());
-					} else if (self.heads.contains(next)) {
+					} else if self.heads.contains(next) {
 						connected_heads.insert(next.clone());
 					}
 				}
 			}
 		}
 
-		// add new entries to index
+		// resolve
+		let heads = self
+			.heads
+			.iter()
+			// skip connected entries
+			.filter(|cid| !connected_heads.contains(cid))
+			.chain([entry.cid()].into_iter())
+			.map(|cid| self.entry_store.get(cid))
+			.collect::<Result<Vec<_>, _>>()?;
+
+		// mut: index
 		for cid in entries_to_add.into_iter() {
 			self.index.insert(cid);
 		}
 
-		// remove heads which new entries connect to
-		for cid in connected_heads.iter() {
-			self.heads.remove(cid);
-		}
+		// mut: heads
+		self.heads_set(find_heads(heads.iter()).iter().map(|e| e.cid().clone()));
 
-		// add new entry to heads
-		// TODO: can we join "old" entries?
-		self.heads.insert(entry.cid().clone());
-
+		// result
 		Ok(true)
 	}
 
-	fn join(&mut self, other: &Log) -> Result<(), anyhow::Error> {
+	pub fn join(&mut self, other: &Log) -> Result<(), anyhow::Error> {
 		for head in other.heads.iter() {
 			self.join_entry(other.identity.as_ref(), other.get(head).ok_or(anyhow!("not found: {}", head))?)?;
 		}
 		Ok(())
+	}
+
+	// fn heads_insert(&mut self, cid: Cid) -> Result<(), anyhow::Error> {
+	// 	let entries = self
+	// 		.heads
+	// 		.iter()
+	// 		.chain([cid].iter())
+	// 		.map(|cid| self.entry_store.get(cid))
+	// 		.collect::<Result<Vec<_>, _>>()?;
+	// 	let new_heads = find_heads(entries.iter());
+	// 	self.heads_set(new_heads.iter().map(|e| e.cid().clone()));
+	// 	Ok(())
+	// }
+
+	fn heads_set(&mut self, heads: impl Iterator<Item = Cid>) {
+		self.heads.clear();
+		self.heads.extend(heads);
 	}
 }
 
@@ -154,18 +175,15 @@ fn verify_entry(log: &Log, identity: &dyn Identity, entry: &EntryBlock) -> Resul
 	}
 
 	// verify signature
-	match entry.verify(identity) {
-		Some(Ok(true)) => Ok(()),
-		Some(Ok(false)) => Err(anyhow::anyhow!("Invalid entry signature")),
-		Some(Err(e)) => Err(e.into()),
-		None => Err(anyhow::anyhow!("Entry is not signed")),
-	}?;
+	if !entry.verify(identity)? {
+		return Err(anyhow::anyhow!("Invalid entry signature"))
+	}
 
 	// ok
 	Ok(())
 }
 
-struct LogIterator<'a> {
+pub struct LogIterator<'a> {
 	storage: &'a EntryStorage,
 	stack: Vec<EntryBlock>,
 	error: Option<anyhow::Error>,
@@ -207,8 +225,8 @@ impl<'a> Iterator for LogIterator<'a> {
 				self.traversed.insert(entry.cid().clone());
 
 				// TODO: (pre) fetch refs
-				// self.storage.fetch(entry.entry().next);
-				// self.storage.fetch(entry.entry().refs);
+				// self.storage.fetch(entry.entry().next.iter());
+				// self.storage.fetch(entry.entry().refs.iter());
 
 				// read next and add to stack
 				let nexts: Result<Vec<EntryBlock>, anyhow::Error> = entry
@@ -230,30 +248,3 @@ impl<'a> Iterator for LogIterator<'a> {
 		None
 	}
 }
-
-// trait Log {
-// 	/// Get head entries.
-// 	fn heads(&self) -> Vec<Cid>;
-
-// 	/// Get entry.
-// 	fn get(&self, cid: Cid) -> Option<EntryBlock>;
-
-// 	fn contains(&self, cid: &Cid) -> bool;
-// }
-
-// trait LogIterable {
-// 	type Item;
-// 	type Iter: Iterator<Item = Self::Item>;
-
-// 	fn iter(&self) -> Self::Iter;
-// }
-
-// trait LogWriter {
-// 	type Item;
-
-// 	fn push(&mut self, item: Self::Item) -> EntryBlock;
-
-// 	fn join(&mut self, other: &dyn LogApi<Item = Self::Item, ItemIterator = Self::ItemIterator>);
-
-// 	fn join_entry(&mut self, entry: EntryBlock) -> Result<(), ()>;
-// }

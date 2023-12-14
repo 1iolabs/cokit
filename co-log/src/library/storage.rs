@@ -1,7 +1,6 @@
+use super::entry::EntryBlock;
 use co_storage::{Storage, StorageError};
 use libipld::Cid;
-
-use super::entry::EntryBlock;
 
 pub trait TypedStorage<T> {
 	/// Returns a block from storage.
@@ -21,14 +20,10 @@ impl EntryStorage {
 }
 impl TypedStorage<EntryBlock> for EntryStorage {
 	fn get(&self, cid: &Cid) -> Result<EntryBlock, StorageError> {
-		EntryBlock::from_signed_block(self.next.get(cid)?).map_err(|e| StorageError::InvalidArgument)
+		EntryBlock::from_signed_block(self.next.get(cid)?).map_err(|_| StorageError::InvalidArgument)
 	}
 
 	fn set(&mut self, block: EntryBlock) -> Result<(), StorageError> {
-		match block.signed_block() {
-			None => Err(StorageError::InvalidArgument),
-			Some(Ok(block)) => self.next.set(block),
-			Some(Err(e)) => Err(StorageError::InvalidArgument),
-		}
+		self.next.set(block.block().map_err(|_| StorageError::InvalidArgument)?)
 	}
 }

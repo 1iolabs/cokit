@@ -1,6 +1,6 @@
 pub trait Identity {
 	/// The identities identifier (who).
-	fn identity(&self) -> String;
+	fn identity(&self) -> &str;
 
 	/// Public key of the identity if it need to be referenced with the message.
 	fn public_key(&self) -> Option<Vec<u8>>;

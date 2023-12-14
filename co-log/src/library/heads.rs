@@ -3,9 +3,9 @@ use libipld::Cid;
 use std::collections::BTreeSet;
 
 /// Find heads.
-pub fn find_heads(entries: impl Iterator<Item = EntryBlock>) -> Vec<EntryBlock> {
+pub fn find_heads<'a>(entries: impl Iterator<Item = &'a EntryBlock>) -> Vec<&'a EntryBlock> {
 	let mut all_next_cids: BTreeSet<Cid> = Default::default();
-	let mut all_entries: BTreeSet<EntryBlock> = Default::default();
+	let mut all_entries: BTreeSet<&'a EntryBlock> = Default::default();
 	for entry in entries {
 		for next in entry.entry().next.iter() {
 			all_next_cids.insert(next.clone());
