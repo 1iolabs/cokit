@@ -9,7 +9,7 @@ pub use crypto::{
 	secret::Secret,
 };
 pub use library::{
-	block_serializer::BlockSerializer,
+	block_serializer::{BlockSerializer, SerializeError},
 	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
 	node_reader::node_reader,
 };
