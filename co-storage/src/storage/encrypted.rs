@@ -83,9 +83,9 @@ where
 	fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError> {
 		match if cid.codec() == BLOCK_MULTICODEC { Some(cid) } else { self.mapping.map.get(cid) } {
 			Some(encrypted_cid) => EncryptedBlock::try_from(self.next.get(encrypted_cid)?)
-				.map_err(|_| StorageError::Internal)?
+				.map_err(|e| StorageError::Internal(e.into()))?
 				.block(&self.key)
-				.map_err(|_| StorageError::Internal),
+				.map_err(|e| StorageError::Internal(e.into())),
 			None => self.next.get(cid),
 		}
 	}
@@ -98,8 +98,10 @@ where
 
 		// encrypt
 		let encrypted =
-			EncryptedBlock::encrypt(self.algorithm, &self.key, block).map_err(|_| StorageError::Internal)?;
-		let encrypted_block: Block<DefaultParams> = encrypted.try_into().map_err(|_| StorageError::Internal)?;
+			EncryptedBlock::encrypt(self.algorithm, &self.key, block).map_err(|e| StorageError::Internal(e.into()))?;
+		let encrypted_block: Block<DefaultParams> = encrypted
+			.try_into()
+			.map_err(|e: AlgorithmError| StorageError::Internal(e.into()))?;
 		let encrypted_cid = encrypted_block.cid().clone();
 
 		// store
@@ -128,9 +130,9 @@ impl Into<StorageError> for BlockMappingError {
 			BlockMappingError::Algorithm(e) => match e {
 				AlgorithmError::Cipher => StorageError::InvalidArgument, // likely wrong key supplied for given CID.
 				AlgorithmError::InvalidArguments => StorageError::InvalidArgument,
-				AlgorithmError::Decoding => StorageError::Internal,
-				AlgorithmError::Encoding => StorageError::Internal,
-				AlgorithmError::Size => StorageError::Internal,
+				AlgorithmError::Decoding => StorageError::Internal(e.into()),
+				AlgorithmError::Encoding => StorageError::Internal(e.into()),
+				AlgorithmError::Size => StorageError::Internal(e.into()),
 			},
 		}
 	}
@@ -307,7 +309,7 @@ mod tests {
 		assert_eq!(block, encryption.get(block.cid()).unwrap());
 
 		// validate that the CID dosn't exist in parent storage layer
-		assert!(matches!(encryption.storage().get(block.cid()), Err(StorageError::NotFound)));
+		assert!(matches!(encryption.storage().get(block.cid()), Err(StorageError::NotFound(_))));
 	}
 
 	#[test]

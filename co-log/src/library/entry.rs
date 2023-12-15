@@ -30,7 +30,9 @@ pub struct SignedEntry {
 	pub signature: Vec<u8>,
 
 	/// Entry.
-	#[serde(flatten)]
+	#[serde(rename = "e")]
+	// note: this causes serde to write unbounded maps which are indefinite length maps which are not supported in
+	// DAG-CBOR. #[serde(flatten)]
 	pub entry: Entry,
 }
 
@@ -47,8 +49,7 @@ impl EntryBlock {
 	pub fn from_entry(identity: &dyn Identity, entry: Entry) -> Result<Self, SerializeError> {
 		let block = BlockSerializer::default().serialize(&entry)?;
 		let signature = identity.sign(block.data());
-		let signed_entry = SignedEntry { identity: identity.identity().to_string(), signature, entry };
-		Ok(Self { cid: block.into_inner().0, data: signed_entry })
+		Self::from_signed_entry(SignedEntry { identity: identity.identity().to_string(), signature, entry })
 	}
 
 	pub fn from_unsigned_block(identity: &dyn Identity, block: Block<DefaultParams>) -> Result<Self, SerializeError> {
@@ -61,7 +62,7 @@ impl EntryBlock {
 		Ok(Self { cid: signed_block.into_inner().0, data: entry })
 	}
 
-	pub fn from_signed_block(block: Block<DefaultParams>) -> Result<Self, SerializeError> {
+	pub fn from_block(block: Block<DefaultParams>) -> Result<Self, SerializeError> {
 		let entry: SignedEntry = BlockSerializer::default().deserialize(&block)?;
 		Ok(Self { cid: block.into_inner().0, data: entry })
 	}
@@ -109,5 +110,49 @@ impl PartialOrd for EntryBlock {
 impl Ord for EntryBlock {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		self.cid().cmp(&other.cid())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use co_storage::BlockSerializer;
+	use serde::{Deserialize, Serialize};
+
+	use crate::{Clock, DidKeyIdentity, EntryBlock};
+
+	#[test]
+	fn test_serialize() {
+		#[derive(Debug, Serialize, Deserialize)]
+		struct Event {
+			#[serde(rename = "type")]
+			t: String,
+		}
+
+		//data
+		let data = Event { t: "hello".to_string() };
+		let block = BlockSerializer::default().serialize(&data).unwrap();
+
+		// entry
+		let identity = Box::new(DidKeyIdentity::generate(None));
+		let entry = EntryBlock::from_entry(
+			identity.as_ref(),
+			crate::Entry {
+				id: vec![0],
+				payload: block.cid().clone(),
+				next: vec![],
+				refs: vec![],
+				clock: Clock::new(vec![1], 0),
+			},
+		)
+		.unwrap();
+
+		// serialize
+		let signed_block = entry.block().unwrap();
+
+		// deserialize
+		let entry_desertialized = EntryBlock::from_block(signed_block).unwrap();
+
+		// check
+		assert_eq!(entry.entry(), entry_desertialized.entry());
 	}
 }

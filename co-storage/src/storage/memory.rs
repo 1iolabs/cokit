@@ -40,12 +40,17 @@ impl MemoryStorage {
 impl Storage for MemoryStorage {
 	fn set(&mut self, block: Block<DefaultParams>) -> Result<(), StorageError> {
 		// let cid = Cid::new_v1(options.codec, Code::Blake3_256.digest(&data[..]));
+		tracing::debug!(cid = ?block.cid(), "memory-store-set");
 		self.records.insert(block.cid().clone(), Record { pin: false, block });
 		Ok(())
 	}
 
 	fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError> {
-		self.records.get(cid).map(|r| r.block.clone()).ok_or(StorageError::NotFound)
+		tracing::debug!(?cid, "memory-store-get");
+		self.records
+			.get(cid)
+			.map(|r| r.block.clone())
+			.ok_or(StorageError::NotFound(cid.clone()))
 	}
 }
 

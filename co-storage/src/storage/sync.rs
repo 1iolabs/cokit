@@ -40,11 +40,11 @@ impl Storage for SyncStorage {
 		let (sender, receiver) = std::sync::mpsc::channel::<Result<Block<DefaultParams>, StorageError>>();
 		self.sender
 			.send(Message::Get(cid.clone(), sender))
-			.map_err(|_| StorageError::Internal)?;
+			.map_err(|e| StorageError::Internal(e.into()))?;
 		let result = receiver.recv();
 		match result {
 			Ok(e) => e,
-			Err(_) => Err(StorageError::Internal),
+			Err(e) => Err(StorageError::Internal(e.into())),
 		}
 	}
 
@@ -52,11 +52,11 @@ impl Storage for SyncStorage {
 		let (sender, receiver) = std::sync::mpsc::channel::<Result<(), StorageError>>();
 		self.sender
 			.send(Message::Set(block, sender))
-			.map_err(|_| StorageError::Internal)?;
+			.map_err(|e| StorageError::Internal(e.into()))?;
 		let result = receiver.recv();
 		match result {
 			Ok(e) => e,
-			Err(_) => Err(StorageError::Internal),
+			Err(e) => Err(StorageError::Internal(e.into())),
 		}
 	}
 }

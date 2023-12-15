@@ -20,7 +20,7 @@ impl EntryStorage {
 }
 impl TypedStorage<EntryBlock> for EntryStorage {
 	fn get(&self, cid: &Cid) -> Result<EntryBlock, StorageError> {
-		EntryBlock::from_signed_block(self.next.get(cid)?).map_err(|_| StorageError::InvalidArgument)
+		EntryBlock::from_block(self.next.get(cid)?).map_err(|_| StorageError::InvalidArgument)
 	}
 
 	fn set(&mut self, block: EntryBlock) -> Result<(), StorageError> {

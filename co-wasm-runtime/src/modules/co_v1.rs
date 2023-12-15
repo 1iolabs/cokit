@@ -64,7 +64,7 @@ impl CoV1ApiError {
 	/// Whether is error is retriable with same parameters.
 	pub fn is_retriable(&self) -> bool {
 		match self {
-			CoV1ApiError::Storage(StorageError::NotFound) => true,
+			CoV1ApiError::Storage(StorageError::NotFound(_)) => true,
 			_ => false,
 		}
 	}

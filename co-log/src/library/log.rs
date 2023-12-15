@@ -30,6 +30,11 @@ impl Log {
 		Log { id, identity, heads: heads.into_iter().collect(), entry_store: store, index: Default::default() }
 	}
 
+	/// Create new log with random ID.
+	pub fn create(identity: Box<dyn Identity>, store: EntryStorage) -> Self {
+		Self::new(uuid::Uuid::new_v4().to_bytes_le().to_vec(), identity, store, Default::default())
+	}
+
 	pub fn id(&self) -> &[u8] {
 		&self.id
 	}
@@ -165,6 +170,7 @@ impl Log {
 	fn heads_set(&mut self, heads: impl Iterator<Item = Cid>) {
 		self.heads.clear();
 		self.heads.extend(heads);
+		tracing::debug!(log = ?self.id, heads = ?self.heads, "log-heads-set");
 	}
 }
 

@@ -23,7 +23,7 @@ pub enum NodeBuilderError {
 impl Into<StorageError> for NodeBuilderError {
 	fn into(self) -> StorageError {
 		match self {
-			NodeBuilderError::Encoding => StorageError::Internal,
+			NodeBuilderError::Encoding => StorageError::Internal(self.into()),
 		}
 	}
 }

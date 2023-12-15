@@ -153,7 +153,7 @@ impl Behavior {
 		}
 	}
 
-	fn on_dial_failure(&mut self, DialFailure { peer_id, handler, error }: DialFailure<Handler>) {
+	fn on_dial_failure(&mut self, DialFailure { peer_id, handler: _, error }: DialFailure<Handler>) {
 		if let Some(peer_id) = peer_id {
 			// log
 			let message_discard_count = match self.pending_outbound.get(&peer_id) {
