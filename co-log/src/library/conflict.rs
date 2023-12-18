@@ -81,27 +81,27 @@ mod tests {
 	fn test_last_write_wins_returns_less_when_a_is_less_then_b() {
 		let a = create_test_entry(1, "A", 1);
 		let b = create_test_entry(1, "B", 2);
-		assert_eq!(Ordering::Less, last_write_wins(&a, &b));
+		assert_eq!(last_write_wins(&a, &b), Ordering::Less);
 	}
 
 	#[test]
 	fn test_last_write_wins_returns_greater_when_a_is_greater_then_b() {
 		let a = create_test_entry(1, "A", 2);
 		let b = create_test_entry(1, "B", 1);
-		assert_eq!(Ordering::Greater, last_write_wins(&a, &b));
+		assert_eq!(last_write_wins(&a, &b), Ordering::Greater);
 	}
 
 	#[test]
 	fn test_last_write_wins_returns_less_when_a_is_equal_to_b() {
 		let a = create_test_entry(1, "A", 1);
 		let b = create_test_entry(1, "B", 1);
-		assert_eq!(Ordering::Less, last_write_wins(&a, &b));
+		assert_eq!(last_write_wins(&a, &b), Ordering::Less);
 	}
 
 	#[test]
 	fn test_last_write_wins_returns_equal_when_a_and_b_are_the_same() {
 		let a = create_test_entry(1, "A", 1);
 		let b = create_test_entry(1, "A", 1);
-		assert_eq!(Ordering::Equal, last_write_wins(&a, &b));
+		assert_eq!(last_write_wins(&a, &b), Ordering::Equal);
 	}
 }

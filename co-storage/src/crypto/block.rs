@@ -538,12 +538,12 @@ mod tests {
 
 	#[test]
 	fn algorithm_key_size() {
-		assert_eq!(32, Algorithm::XChaCha20Poly1305.key_size());
+		assert_eq!(Algorithm::XChaCha20Poly1305.key_size(), 32);
 	}
 
 	#[test]
 	fn algorithm_nonce_size() {
-		assert_eq!(24, Algorithm::XChaCha20Poly1305.nonce_size());
+		assert_eq!(Algorithm::XChaCha20Poly1305.nonce_size(), 24);
 	}
 
 	#[test]
@@ -579,11 +579,11 @@ mod tests {
 		// hexdump::hexdump(header.nonce.as_slice());
 		// println!("bytes");
 		// hexdump::hexdump(bytes.as_slice());
-		assert_eq!(153, bytes.len());
+		assert_eq!(bytes.len(), 153);
 
 		// deserialize
 		let header_deserialized: Header = serde_ipld_dagcbor::from_slice(bytes.as_slice()).unwrap();
-		assert_eq!(header, header_deserialized);
+		assert_eq!(header_deserialized, header);
 		assert!(header.is_valid());
 	}
 
@@ -596,7 +596,7 @@ mod tests {
 		// serialize header
 		let bytes = serde_ipld_dagcbor::to_vec(&key_slot).unwrap();
 		//hexdump::hexdump(bytes.as_slice());
-		assert_eq!(KeySlot::encoded_size(Algorithm::default()), bytes.len());
+		assert_eq!(bytes.len(), KeySlot::encoded_size(Algorithm::default()));
 	}
 
 	#[test]
@@ -609,7 +609,7 @@ mod tests {
 		// serialize header
 		let bytes = serde_ipld_dagcbor::to_vec(&header).unwrap();
 		//hexdump::hexdump(bytes.as_slice());
-		assert_eq!(Header::encoded_size(Algorithm::default()), bytes.len());
+		assert_eq!(bytes.len(), Header::encoded_size(Algorithm::default()));
 	}
 
 	#[test]
@@ -622,14 +622,14 @@ mod tests {
 
 		// encrypt
 		let encrypted_block = EncryptedBlock::encrypt(Algorithm::default(), &secret, block.clone()).unwrap();
-		assert_ne!(block.data(), encrypted_block.data);
+		assert_ne!(encrypted_block.data, block.data());
 		//println!("cid: ({}): {:?}", encrypted_block.cid.len(), encrypted_block.cid); // 52 = 36 + 16
 		//println!("data: ({}): {:?}", encrypted_block.data.len(), encrypted_block.data); // 29 = 13 + 16
 
 		// serialize
 		let encrypted_block_bytes = serde_ipld_dagcbor::to_vec(&encrypted_block).unwrap();
 		// cbor (11), header (153), cid+tag (52), data+tag (29)
-		assert_eq!(245, encrypted_block_bytes.len());
+		assert_eq!(encrypted_block_bytes.len(), 245);
 		//println!("length: {}", encrypted_block_bytes.len());
 		//hexdump::hexdump(&encrypted_block_bytes);
 
@@ -639,7 +639,7 @@ mod tests {
 
 		// decrypt
 		let decrypted_block = encrypted_block_deserialized.block(&secret).unwrap();
-		assert_eq!(block.cid(), decrypted_block.cid());
-		assert_eq!(block.data(), decrypted_block.data());
+		assert_eq!(decrypted_block.cid(), block.cid());
+		assert_eq!(decrypted_block.data(), block.data());
 	}
 }

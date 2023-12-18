@@ -41,7 +41,7 @@ fn integration_test() {
 	let next_state = create_runtime(wasm_bytes).execute(api).unwrap();
 
 	// test
-	assert_eq!(Some(Cid::try_from("bafyr4icsv74udrd3j5ewaybjf2sfp2frygniduzpf6scuu6ahlpdefdvoi").unwrap()), next_state);
+	assert_eq!(next_state, Some(Cid::try_from("bafyr4icsv74udrd3j5ewaybjf2sfp2frygniduzpf6scuu6ahlpdefdvoi").unwrap()));
 
 	// test state
 	let block = storage.get(&next_state.unwrap()).unwrap();
@@ -51,5 +51,5 @@ fn integration_test() {
 		"did:local:test".to_string(),
 		Link::<Role>::new(Cid::from_str("bafyr4igf663hpuvdpvque42uxmkbacg5ubd4cgageulmwmqo33g2tpod7e").unwrap()),
 	);
-	assert_eq!(MessageState { message_count: 1, participants, ..MessageState::default() }, state);
+	assert_eq!(state, MessageState { message_count: 1, participants, ..MessageState::default() });
 }

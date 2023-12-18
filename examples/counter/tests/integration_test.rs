@@ -40,5 +40,5 @@ fn integration_test() {
 	assert_eq!(Some(Cid::try_from("bafyr4ibjkgjouhwikzwvmoy2owd6l4azqwam3piehbbpkcikjqmxyiggpi").unwrap()), next_state);
 	let block = storage.get(&next_state.unwrap()).unwrap();
 	let state: Counter = BlockSerializer::default().deserialize(&block).unwrap();
-	assert_eq!(Counter(10), state);
+	assert_eq!(state, Counter(10));
 }

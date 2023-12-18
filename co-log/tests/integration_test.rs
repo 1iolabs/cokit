@@ -29,10 +29,17 @@ fn it_should_travers_sinlge_user_logs() {
 
 	// check log
 	let entries = log.iter().collect::<Result<Vec<_>, _>>().unwrap();
-	assert_eq!(3, entries.len());
-	assert_eq!(3, entries[0].entry().clock.time);
-	assert_eq!(2, entries[1].entry().clock.time);
-	assert_eq!(1, entries[2].entry().clock.time);
+	assert_eq!(entries.len(), 3);
+
+	// time
+	assert_eq!(entries[1].entry().clock.time, 2);
+	assert_eq!(entries[0].entry().clock.time, 3);
+	assert_eq!(entries[2].entry().clock.time, 1);
+
+	// next
+	assert_eq!(entries[0].entry().next, vec![entries[1].cid().clone()]);
+	assert_eq!(entries[1].entry().next, vec![entries[2].cid().clone()]);
+	assert_eq!(entries[2].entry().next, vec![]);
 }
 
 #[derive(Debug, Serialize, Deserialize)]

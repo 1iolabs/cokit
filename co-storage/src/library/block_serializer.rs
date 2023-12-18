@@ -76,7 +76,7 @@ mod tests {
 	fn should_serialize() {
 		let test = Test { hello: "world".to_owned() };
 		let block = BlockSerializer::default().serialize(&test).unwrap();
-		assert_eq!("bafyr4iahzl6dyblh5gjfk5lo46xkkfk7fvxhyot4636rdglz3n5tayegd4", block.cid().to_string());
-		assert_eq!([161, 101, 104, 101, 108, 108, 111, 101, 119, 111, 114, 108, 100], block.data());
+		assert_eq!(block.cid().to_string(), "bafyr4iahzl6dyblh5gjfk5lo46xkkfk7fvxhyot4636rdglz3n5tayegd4");
+		assert_eq!(block.data(), [161, 101, 104, 101, 108, 108, 111, 101, 119, 111, 114, 108, 100]);
 	}
 }

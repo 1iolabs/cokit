@@ -306,7 +306,7 @@ mod tests {
 		encryption.set(block.clone()).unwrap();
 
 		// get
-		assert_eq!(block, encryption.get(block.cid()).unwrap());
+		assert_eq!(encryption.get(block.cid()).unwrap(), block);
 
 		// validate that the CID dosn't exist in parent storage layer
 		assert!(matches!(encryption.storage().get(block.cid()), Err(StorageError::NotFound(_))));
@@ -331,15 +331,15 @@ mod tests {
 
 		// validate mapping
 		let mapping_cid = encryption.flush_mapping().unwrap();
-		assert_eq!(BLOCK_MULTICODEC, mapping_cid.codec()); // encrypted?
+		assert_eq!(mapping_cid.codec(), BLOCK_MULTICODEC); // encrypted?
 
 		// validate cids
 		let memory: MemoryStorage = encryption.into_storage();
 		let memory_cids: Vec<Cid> = memory.iter().cloned().collect();
-		assert_eq!(7 + 1024, memory_cids.len()); // 7 (merkle) mapping blocks and 1024 data blocks
+		assert_eq!(memory_cids.len(), 7 + 1024); // 7 (merkle) mapping blocks and 1024 data blocks
 		for memory_cid in memory_cids.iter() {
 			let memory_block = memory.get(memory_cid).unwrap();
-			assert_eq!(BLOCK_MULTICODEC, memory_cid.codec()); // all blocks are encrypted
+			assert_eq!(memory_cid.codec(), BLOCK_MULTICODEC); // all blocks are encrypted
 			assert!(DefaultParams::MAX_BLOCK_SIZE > memory_block.data().len()); // all blocks fit in max block size
 		}
 

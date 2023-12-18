@@ -173,7 +173,7 @@ mod tests {
 
 		// blocks
 		let blocks = builder.into_blocks().unwrap();
-		assert_eq!(7, blocks.len());
+		assert_eq!(blocks.len(), 77);
 		insta::assert_debug_snapshot!(blocks);
 	}
 

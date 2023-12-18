@@ -120,7 +120,7 @@ mod tests {
 				runner_handle.await?;
 
 				// check
-				assert_eq!(42, store.state().await);
+				assert_eq!(store.state().await, 42);
 
 				// done
 				Ok::<(), anyhow::Error>(())

@@ -61,6 +61,6 @@ impl Storage for WasmStorage {
 				block.data().len().try_into().expect("u32"),
 			)
 		};
-		assert_eq!(block_size as usize, block.data().len());
+		assert_eq!(block.data().len(), block_size as usize);
 	}
 }
