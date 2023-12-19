@@ -17,6 +17,14 @@ impl EntryStorage {
 	pub fn new(next: Box<dyn Storage>) -> Self {
 		Self { next }
 	}
+
+	pub fn storage(&self) -> &dyn Storage {
+		self.next.as_ref()
+	}
+
+	pub fn storage_mut(&mut self) -> &mut dyn Storage {
+		self.next.as_mut()
+	}
 }
 impl TypedStorage<EntryBlock> for EntryStorage {
 	fn get(&self, cid: &Cid) -> Result<EntryBlock, StorageError> {

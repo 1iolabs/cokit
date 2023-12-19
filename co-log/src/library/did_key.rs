@@ -1,18 +1,27 @@
+use super::identity::{IdentityResolver, PrivateIdentity, SignError};
 use crate::Identity;
 use anyhow::anyhow;
-use did_key::{generate, resolve, CoreSign, Ed25519KeyPair, Fingerprint, KeyMaterial, PatchedKeyPair};
+use did_key::{generate, resolve, CoreSign, DIDCore, Ed25519KeyPair, KeyMaterial, PatchedKeyPair};
+use std::{fmt::Debug, sync::Arc};
 
+#[derive(Clone)]
 pub struct DidKeyIdentity {
 	did: String,
-	key: PatchedKeyPair,
+	key: Arc<PatchedKeyPair>,
+	private: bool,
 }
 impl DidKeyIdentity {
 	pub fn generate(seed: Option<&[u8]>) -> Self {
 		Self::from_key(generate::<Ed25519KeyPair>(seed))
 	}
 
-	fn from_key(key: PatchedKeyPair) -> Self {
-		Self { did: key.fingerprint(), key }
+	pub fn from_identity(identity: &str) -> Result<Self, anyhow::Error> {
+		Self::try_from(identity)
+	}
+
+	pub fn from_key(key: PatchedKeyPair) -> Self {
+		let private = !key.private_key_bytes().is_empty();
+		Self { did: key.get_did_document(Default::default()).id, key: Arc::new(key), private }
 	}
 
 	pub fn from_bytes(bytes: &[u8]) -> Result<Self, anyhow::Error> {
@@ -23,11 +32,26 @@ impl DidKeyIdentity {
 		self.identity().as_bytes()
 	}
 }
+impl Debug for DidKeyIdentity {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("DidKeyIdentity")
+			.field("did", &self.did)
+			.field("public_key", &format_args!("{:02X?}", self.key.public_key_bytes()))
+			.finish()
+	}
+}
 impl TryFrom<&[u8]> for DidKeyIdentity {
 	type Error = anyhow::Error;
 
 	fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
 		Ok(Self::from_key(resolve(std::str::from_utf8(value)?).map_err(|e| anyhow!("resolve failed: {:?}", e))?))
+	}
+}
+impl TryFrom<&str> for DidKeyIdentity {
+	type Error = anyhow::Error;
+
+	fn try_from(value: &str) -> Result<Self, Self::Error> {
+		Ok(Self::from_key(resolve(value).map_err(|e| anyhow!("resolve failed: {:?}", e))?))
 	}
 }
 impl Identity for DidKeyIdentity {
@@ -36,22 +60,71 @@ impl Identity for DidKeyIdentity {
 	}
 
 	fn public_key(&self) -> Option<Vec<u8>> {
-		Some(self.key.public_key_bytes())
-	}
-
-	fn sign(&self, data: &[u8]) -> Vec<u8> {
-		self.key.sign(data)
+		// Some(self.key.public_key_bytes())
+		None
 	}
 
 	fn verify(&self, signature: &[u8], data: &[u8], public_key: Option<&[u8]>) -> bool {
-		// if key is provided verifgy its our key
+		// if key is provided verify its our key
 		if let Some(key) = public_key {
-			if key != &self.key.private_key_bytes() {
+			if key != &self.key.public_key_bytes() {
 				return false
 			}
 		}
 
 		// verify signature
 		self.key.verify(data, signature).is_ok()
+	}
+}
+impl PrivateIdentity for DidKeyIdentity {
+	fn sign(&self, data: &[u8]) -> Result<Vec<u8>, SignError> {
+		if !self.private {
+			return Err(SignError::Unauthorized);
+		}
+		Ok(self.key.sign(data))
+	}
+}
+
+pub struct DidKeyIdentityResolver {}
+impl DidKeyIdentityResolver {
+	pub fn new() -> DidKeyIdentityResolver {
+		Self {}
+	}
+}
+impl IdentityResolver for DidKeyIdentityResolver {
+	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Option<Box<dyn Identity>> {
+		if identity.starts_with("did:key:") {
+			if let Ok(identity) = DidKeyIdentity::try_from(identity) {
+				if match (public_key, identity.public_key()) {
+					(Some(a), Some(b)) => a == b,
+					_ => true,
+				} {
+					return Some(Box::new(identity));
+				}
+			}
+		}
+		None
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{library::identity::PrivateIdentity, DidKeyIdentity, Identity};
+
+	#[test]
+	fn it_should_sign_and_verfiy() {
+		let data = "hello world".as_bytes();
+		let identity = DidKeyIdentity::generate(None);
+		let signature = identity.sign(data).unwrap();
+		assert!(identity.verify(signature.as_slice(), data, None));
+	}
+
+	#[test]
+	fn it_should_sign_and_verfiy_with_public_key() {
+		let data = "hello world".as_bytes();
+		let identity = DidKeyIdentity::generate(None);
+		let public_key = identity.public_key();
+		let signature = identity.sign(data).unwrap();
+		assert!(identity.verify(signature.as_slice(), data, public_key.as_ref().map(|k| k.as_slice())));
 	}
 }

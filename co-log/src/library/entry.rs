@@ -1,3 +1,4 @@
+use super::identity::{PrivateIdentity, SignError};
 use crate::{Clock, Identity};
 use co_storage::{BlockSerializer, SerializeError};
 use libipld::{Block, Cid, DefaultParams};
@@ -25,6 +26,10 @@ pub struct SignedEntry {
 	#[serde(rename = "u")]
 	pub identity: String,
 
+	/// Identity public key.
+	#[serde(rename = "k", default, with = "serde_bytes", skip_serializing_if = "Option::is_none")]
+	pub public_key: Option<Vec<u8>>,
+
 	/// The identity.
 	#[serde(rename = "s", with = "serde_bytes")]
 	pub signature: Vec<u8>,
@@ -34,6 +39,15 @@ pub struct SignedEntry {
 	// note: this causes serde to write unbounded maps which are indefinite length maps which are not supported in
 	// DAG-CBOR. #[serde(flatten)]
 	pub entry: Entry,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EntryError {
+	#[error("Serialize failed: {0}")]
+	Serialize(#[from] SerializeError),
+
+	#[error("Signature failed: {0}")]
+	Sign(#[from] SignError),
 }
 
 /// Deserialized block.
@@ -46,23 +60,31 @@ pub struct EntryBlock {
 	data: SignedEntry,
 }
 impl EntryBlock {
-	pub fn from_entry(identity: &dyn Identity, entry: Entry) -> Result<Self, SerializeError> {
+	pub fn from_entry(identity: &dyn PrivateIdentity, entry: Entry) -> Result<Self, EntryError> {
 		let block = BlockSerializer::default().serialize(&entry)?;
-		let signature = identity.sign(block.data());
-		Self::from_signed_entry(SignedEntry { identity: identity.identity().to_string(), signature, entry })
+		let signature = identity.sign(block.data())?;
+		Self::from_signed_entry(SignedEntry {
+			identity: identity.identity().to_string(),
+			signature,
+			entry,
+			public_key: identity.public_key(),
+		})
 	}
 
-	pub fn from_unsigned_block(identity: &dyn Identity, block: Block<DefaultParams>) -> Result<Self, SerializeError> {
+	pub fn from_unsigned_block(
+		identity: &dyn PrivateIdentity,
+		block: Block<DefaultParams>,
+	) -> Result<Self, EntryError> {
 		let entry = BlockSerializer::default().deserialize(&block)?;
 		Self::from_entry(identity, entry)
 	}
 
-	pub fn from_signed_entry(entry: SignedEntry) -> Result<Self, SerializeError> {
+	pub fn from_signed_entry(entry: SignedEntry) -> Result<Self, EntryError> {
 		let signed_block = BlockSerializer::default().serialize(&entry)?;
 		Ok(Self { cid: signed_block.into_inner().0, data: entry })
 	}
 
-	pub fn from_block(block: Block<DefaultParams>) -> Result<Self, SerializeError> {
+	pub fn from_block(block: Block<DefaultParams>) -> Result<Self, EntryError> {
 		let entry: SignedEntry = BlockSerializer::default().deserialize(&block)?;
 		Ok(Self { cid: block.into_inner().0, data: entry })
 	}
@@ -75,20 +97,24 @@ impl EntryBlock {
 		&self.data.entry
 	}
 
-	pub fn unsigned_block(&self) -> Result<Block<DefaultParams>, SerializeError> {
-		BlockSerializer::default().serialize(self.entry())
+	pub fn unsigned_block(&self) -> Result<Block<DefaultParams>, EntryError> {
+		Ok(BlockSerializer::default().serialize(self.entry())?)
 	}
 
 	pub fn signed_entry(&self) -> &SignedEntry {
 		&self.data
 	}
 
-	pub fn block(&self) -> Result<Block<DefaultParams>, SerializeError> {
-		BlockSerializer::default().serialize(&self.data)
+	pub fn block(&self) -> Result<Block<DefaultParams>, EntryError> {
+		Ok(BlockSerializer::default().serialize(&self.data)?)
 	}
 
-	pub fn verify(&self, identity: &dyn Identity) -> Result<bool, SerializeError> {
-		Ok(identity.verify(&self.data.signature, self.block()?.data(), None))
+	pub fn verify(&self, identity: &dyn Identity) -> Result<bool, EntryError> {
+		Ok(identity.verify(
+			&self.data.signature,
+			self.unsigned_block()?.data(),
+			self.signed_entry().public_key.as_ref().map(Vec::as_slice),
+		))
 	}
 }
 impl Into<Entry> for EntryBlock {
@@ -115,13 +141,12 @@ impl Ord for EntryBlock {
 
 #[cfg(test)]
 mod tests {
+	use crate::{Clock, DidKeyIdentity, EntryBlock};
 	use co_storage::BlockSerializer;
 	use serde::{Deserialize, Serialize};
 
-	use crate::{Clock, DidKeyIdentity, EntryBlock};
-
 	#[test]
-	fn test_serialize() {
+	fn smoke() {
 		#[derive(Debug, Serialize, Deserialize)]
 		struct Event {
 			#[serde(rename = "type")]
@@ -154,5 +179,8 @@ mod tests {
 
 		// check
 		assert_eq!(entry.entry(), entry_desertialized.entry());
+
+		// verify
+		assert!(entry.verify(identity.as_ref()).unwrap());
 	}
 }

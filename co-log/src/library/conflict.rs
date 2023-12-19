@@ -26,7 +26,13 @@ pub fn sort_by_clock_id(a: &EntryBlock, b: &EntryBlock) -> Ordering {
 #[cfg(test)]
 mod tests {
 	use super::last_write_wins;
-	use crate::{library::entry::EntryBlock, Clock, Entry, Identity};
+	use crate::{
+		library::{
+			entry::EntryBlock,
+			identity::{PrivateIdentity, SignError},
+		},
+		Clock, Entry, Identity,
+	};
 	use co_storage::BlockSerializer;
 	use serde::Serialize;
 	use std::{
@@ -50,14 +56,16 @@ mod tests {
 		fn public_key(&self) -> Option<Vec<u8>> {
 			None
 		}
-		fn sign(&self, data: &[u8]) -> Vec<u8> {
+		fn verify(&self, signature: &[u8], data: &[u8], _public_key: Option<&[u8]>) -> bool {
+			signature == self.sign(data).unwrap()
+		}
+	}
+	impl PrivateIdentity for TestIdentity {
+		fn sign(&self, data: &[u8]) -> Result<Vec<u8>, SignError> {
 			let mut hasher = DefaultHasher::new();
 			self.identity().hash(&mut hasher);
 			data.hash(&mut hasher);
-			hasher.finish().to_be_bytes().to_vec()
-		}
-		fn verify(&self, signature: &[u8], data: &[u8], _public_key: Option<&[u8]>) -> bool {
-			signature == self.sign(data)
+			Ok(hasher.finish().to_be_bytes().to_vec())
 		}
 	}
 

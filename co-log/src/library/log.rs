@@ -2,10 +2,12 @@ use super::{
 	conflict::last_write_wins,
 	entry::EntryBlock,
 	heads::find_heads,
+	identity::PrivateIdentity,
 	storage::{EntryStorage, TypedStorage},
 };
-use crate::{library::clock::max_clock, Clock, Entry, Identity};
+use crate::{library::clock::max_clock, Clock, Entry, IdentityResolver};
 use anyhow::{anyhow, Context};
+use co_storage::Storage;
 use libipld::Cid;
 use std::collections::{BTreeSet, HashSet};
 
@@ -13,7 +15,8 @@ pub struct Log {
 	id: Vec<u8>,
 
 	/// Identity.
-	identity: Box<dyn Identity>,
+	identity: Box<dyn PrivateIdentity>,
+	identity_resolver: Box<dyn IdentityResolver>,
 
 	/// Current heads.
 	heads: BTreeSet<Cid>,
@@ -26,13 +29,38 @@ pub struct Log {
 }
 
 impl Log {
-	pub fn new(id: Vec<u8>, identity: Box<dyn Identity>, store: EntryStorage, heads: Vec<Cid>) -> Self {
-		Log { id, identity, heads: heads.into_iter().collect(), entry_store: store, index: Default::default() }
+	pub fn new(
+		id: Vec<u8>,
+		identity: Box<dyn PrivateIdentity>,
+		identity_resolver: Box<dyn IdentityResolver>,
+		store: EntryStorage,
+		heads: Vec<Cid>,
+	) -> Self {
+		Log {
+			id,
+			identity,
+			identity_resolver,
+			heads: heads.into_iter().collect(),
+			entry_store: store,
+			index: Default::default(),
+		}
 	}
 
 	/// Create new log with random ID.
-	pub fn create(identity: Box<dyn Identity>, store: EntryStorage) -> Self {
-		Self::new(uuid::Uuid::new_v4().to_bytes_le().to_vec(), identity, store, Default::default())
+	pub fn create(
+		identity: Box<dyn PrivateIdentity>,
+		identity_resolver: Box<dyn IdentityResolver>,
+		store: EntryStorage,
+	) -> Self {
+		Self::new(uuid::Uuid::new_v4().to_bytes_le().to_vec(), identity, identity_resolver, store, Default::default())
+	}
+
+	pub fn storage(&self) -> &dyn Storage {
+		self.entry_store.storage()
+	}
+
+	pub fn storage_mut(&mut self) -> &mut dyn Storage {
+		self.entry_store.storage_mut()
 	}
 
 	pub fn id(&self) -> &[u8] {
@@ -93,13 +121,13 @@ impl Log {
 		Ok(entry_cid)
 	}
 
-	pub fn join_entry(&mut self, identity: &dyn Identity, entry: EntryBlock) -> Result<bool, anyhow::Error> {
+	pub fn join_entry(&mut self, entry: EntryBlock) -> Result<bool, anyhow::Error> {
 		if self.index.contains(entry.cid()) {
 			return Ok(false)
 		}
 
 		// verify
-		verify_entry(self, identity, &entry)?;
+		verify_entry(self, self.identity_resolver.as_ref(), &entry)?;
 
 		// calculate
 		let mut entries_to_add: BTreeSet<Cid> = BTreeSet::new();
@@ -113,7 +141,7 @@ impl Log {
 			// self.entry_store.fetch(entries_to_get.iter())
 			while let Some(cid) = entries_to_get.pop_first() {
 				let e = self.entry_store.get(&cid)?;
-				verify_entry(&self, identity, &e)?;
+				verify_entry(&self, self.identity_resolver.as_ref(), &e)?;
 				entries_to_add.insert(e.cid().clone());
 
 				for next in e.entry().next.iter().chain(e.entry().refs.iter()) {
@@ -150,7 +178,7 @@ impl Log {
 
 	pub fn join(&mut self, other: &Log) -> Result<(), anyhow::Error> {
 		for head in other.heads.iter() {
-			self.join_entry(other.identity.as_ref(), other.get(head).ok_or(anyhow!("not found: {}", head))?)?;
+			self.join_entry(other.get(head).ok_or(anyhow!("not found: {}", head))?)?;
 		}
 		Ok(())
 	}
@@ -174,15 +202,30 @@ impl Log {
 	}
 }
 
-fn verify_entry(log: &Log, identity: &dyn Identity, entry: &EntryBlock) -> Result<(), anyhow::Error> {
+fn verify_entry(log: &Log, identity_resolver: &dyn IdentityResolver, entry: &EntryBlock) -> Result<(), anyhow::Error> {
 	// verify log
 	if &entry.entry().id != log.id() {
-		return Err(anyhow::anyhow!("Invalid log"))
+		return Err(anyhow::anyhow!("Invalid log: {:02X?} != {:02X?}", &entry.entry().id, log.id()))
 	}
 
 	// verify signature
-	if !entry.verify(identity)? {
-		return Err(anyhow::anyhow!("Invalid entry signature"))
+	let identity = identity_resolver
+		.resolve(&entry.signed_entry().identity, entry.signed_entry().public_key.as_ref().map(|v| v.as_slice()));
+	let identity = match identity {
+		Some(identity) => identity,
+		None => return Err(anyhow::anyhow!("Resolve identity failed: {}", entry.signed_entry().identity)),
+	};
+	if !entry.verify(identity.as_ref())? {
+		// log
+		tracing::info!(
+			entry_identity = entry.signed_entry().identity,
+			resolved_identity = identity.identity(),
+			entry_signature = ?entry.signed_entry().signature.iter().map(|c| format!("{:02X}", c)).collect::<String>(),
+			"verify-failed"
+		);
+
+		// error
+		return Err(anyhow::anyhow!("Invalid entry signature"));
 	}
 
 	// ok
