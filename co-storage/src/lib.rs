@@ -13,7 +13,7 @@ pub use library::{
 	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
 	node_reader::node_reader,
 };
-pub use storage::{encrypted::EncryptedStorage, memory::MemoryStorage, sync::SyncStorage};
+pub use storage::{encrypted::EncryptedStorage, fs::FsStorage, memory::MemoryStorage, sync::SyncStorage};
 pub use types::{
 	pin::{PinApi, PinKind, PinOptions},
 	storage::{Storage, StorageError},
