@@ -10,6 +10,7 @@ use libp2p::{
 	},
 	Multiaddr, PeerId,
 };
+pub use message::Message;
 use smallvec::SmallVec;
 use std::{
 	collections::{HashMap, VecDeque},
@@ -20,9 +21,6 @@ mod codec;
 mod handler;
 mod message;
 mod protocol;
-
-pub use codec::Error;
-pub use message::Message;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
