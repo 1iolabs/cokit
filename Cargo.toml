@@ -2,6 +2,7 @@
 members = [
     "api",
     "co-log",
+    "co-network",
     "co-primitives",
     "co-storage",
     "co-wasm-api",
@@ -10,7 +11,6 @@ members = [
     "did-co",
     "examples/counter",
     "examples/message",
-    "network-co",
     "node-edge",
     "pallet-co",
     "runtime-edge",

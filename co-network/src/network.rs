@@ -1,8 +1,12 @@
-use co_network::didcomm;
+use super::didcomm;
 use futures::{channel::oneshot, StreamExt};
 use libp2p::{
 	gossipsub, identify,
 	identity::Keypair,
+	kad::{
+		record::store::{MemoryStore, MemoryStoreConfig},
+		Kademlia, KademliaConfig,
+	},
 	mdns,
 	mdns::tokio::Behaviour as MdnsBehaviour,
 	ping,
@@ -35,6 +39,19 @@ pub struct Libp2pNetworkConfig {
 	pub keypair: Keypair,
 	pub addr: Option<Multiaddr>,
 	pub bootstap: Vec<Multiaddr>,
+	pub mode: NetworkMode,
+}
+impl Libp2pNetworkConfig {
+	pub fn from_keypair(keypair: Keypair) -> Self {
+		Self { keypair, addr: Default::default(), bootstap: Default::default(), mode: Default::default() }
+	}
+}
+
+#[derive(Clone, Debug, Default)]
+pub enum NetworkMode {
+	#[default]
+	Full,
+	Light,
 }
 
 struct Runtime {
@@ -44,6 +61,7 @@ struct Runtime {
 	tasks: tokio::sync::mpsc::UnboundedReceiver<Task<Behaviour>>,
 	// on_swarm_event: OnSwarmEvent<Behaviour>,
 	events: SubjectThreads<Arc<SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>>, ()>,
+	mode: NetworkMode,
 }
 impl Runtime {
 	fn new(
@@ -53,7 +71,14 @@ impl Runtime {
 		// on_swarm_event: OnSwarmEvent<Behaviour>,
 		events: SubjectThreads<Arc<SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>>, ()>,
 	) -> Self {
-		Self { config, shutdown: Some(shutdown), listener_id: None, tasks, events }
+		Self { mode: config.mode.clone(), config, shutdown: Some(shutdown), listener_id: None, tasks, events }
+	}
+
+	/// Network mode to optimize for.
+	/// This may change dynamically.
+	/// For example when a mobile device gets plugged in to an power outlet.
+	fn network_mode(&self) -> &NetworkMode {
+		&self.mode
 	}
 
 	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
@@ -94,6 +119,7 @@ impl Libp2pNetwork {
 			.build()
 			.expect("valid config");
 		let didcomm_config: didcomm::Config = didcomm::Config { auto_dail: false, ..Default::default() };
+		let kademlia_config: KademliaConfig = Default::default();
 		let behaviour = Behaviour {
 			gossipsub: gossipsub::Gossipsub::new(
 				gossipsub::MessageAuthenticity::Signed(config.keypair.clone()),
@@ -107,6 +133,7 @@ impl Libp2pNetwork {
 			ping: ping::Behaviour::new(ping::Config::new()),
 			mdns: MdnsBehaviour::new(mdns::Config::default() /* , local_peer_id.clone() */)?,
 			didcomm: didcomm::Behavior::new(didcomm_config),
+			kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()), kademlia_config),
 		};
 		let transport = tokio_development_transport(config.keypair.clone())?;
 		let mut swarm = SwarmBuilder::with_tokio_executor(transport, behaviour, local_peer_id).build();
@@ -181,6 +208,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, runtime: &mut Runtime) {
 		SwarmEvent::Behaviour(event) => {
 			tracing::info!(?event, "network-behaviour-event");
 		},
+		SwarmEvent::Behaviour(BehaviourEvent::Mdns(mdns_event)) => handle_mdns(swarm, runtime, mdns_event),
 		event => {
 			tracing::info!(?event, "network-event");
 		},
@@ -198,4 +226,26 @@ pub struct Behaviour {
 	identify: identify::Behaviour,
 	mdns: MdnsBehaviour,
 	ping: ping::Behaviour,
+	kad: Kademlia<MemoryStore>,
+}
+
+fn handle_mdns(swarm: &mut Swarm<Behaviour>, runtime: &mut Runtime, event: &mdns::Event) {
+	match event {
+		mdns::Event::Discovered(list) => {
+			tracing::debug!(?list, "mdns::Event::Discovered");
+
+			// use for gossipsub
+			// for (peer_id, _multiaddr) in list {
+			// 	runtime.add_explicit_peer(&mut swarm, &peer_id);
+			// }
+		},
+		mdns::Event::Expired(list) => {
+			tracing::debug!(?list, "mdns::Event::Expired");
+
+			// use for gossipsub
+			// for (peer_id, _multiaddr) in list {
+			// 	runtime.remove_explicit_peer(&mut swarm, &peer_id);
+			// }
+		},
+	}
 }

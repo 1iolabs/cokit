@@ -4,9 +4,8 @@ use axum::{
 	Extension, Router,
 };
 use clap::Parser;
-use co_sdk::{
-	ActionsType, CoState, IrohConfig, IrohStorage, Libp2pNetwork, Libp2pNetworkConfig, State, StorageType, StoreType,
-};
+use co_network::{Libp2pNetwork, Libp2pNetworkConfig};
+use co_sdk::{ActionsType, CoState, IrohConfig, IrohStorage, State, StorageType, StoreType};
 use libp2p::PeerId;
 use std::{net::SocketAddr, sync::Arc};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
@@ -57,7 +56,7 @@ async fn main() {
 		.await
 		.expect("peer-id");
 	let network_peer_id = PeerId::from(network_key.public());
-	let network_config = Libp2pNetworkConfig { addr: None, bootstap: Vec::new(), keypair: network_key.clone() };
+	let network_config = Libp2pNetworkConfig::from_keypair(network_key.clone());
 	let network: Libp2pNetwork = Libp2pNetwork::new(network_config).await.expect("network");
 	tracing::info!(peer_id = ?network_peer_id, "network");
 

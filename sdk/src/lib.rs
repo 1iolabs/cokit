@@ -5,7 +5,6 @@ mod library;
 mod types;
 
 pub use drivers::{
-	network::{libp2p::*, Network},
 	state::*,
 	storage::{iroh::*, *},
 };
