@@ -1,15 +1,21 @@
 [workspace]
 members = [
     "api",
+    "co-log",
+    "co-network",
+    "co-primitives",
+    "co-storage",
+    "co-wasm-api",
+    "co-wasm-runtime",
     "daemon",
     "did-co",
+    "examples/counter",
+    "examples/message",
     "node-edge",
     "pallet-co",
     "runtime-edge",
     "sdk",
     "state",
-    "network-co",
-    "co-log",
 ]
 resolver = "2"
 
@@ -30,7 +36,10 @@ rxrust = { path = "/Users/dominik/Workspaces/github/rxRust/rxRust", features = [
     "tokio-scheduler",
 ] }
 serde = "1"
+serde_bytes = "0.11.12"
+serde_ipld_dagcbor = "0.4.2"
 serde_json = "1"
+serde_repr = "0.1"
 smallvec = "^1.6.1"
 thiserror = "1"
 tokio = "1"

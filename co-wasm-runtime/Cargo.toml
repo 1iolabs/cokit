@@ -1,0 +1,31 @@
+[package]
+name = "co-wasm-runtime"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+co-storage = { path = "../co-storage" }
+co-wasm-api = { path = "../co-wasm-api" }
+futures = { workspace = true }
+libipld = { workspace = true, features = ["default", "serde-codec"] }
+names = "0.14.0"
+rxrust = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_bytes = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
+serde_json = { workspace = true }
+serde_repr = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, optional = true, features = ["macros"] }
+tokio-stream = { workspace = true, optional = true }
+tracing = { workspace = true }
+uuid = { version = "1.2.2", features = ["default", "v4"] }
+wasmer = "4.2.3"
+zeroize = "=1.6.0"
+
+[dev-dependencies]
+hexdump = "0.1.1"
+insta = { version = "1.34.0", features = ["default", "yaml"] }
+tracing-subscriber = { workspace = true }

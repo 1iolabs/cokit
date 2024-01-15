@@ -5,6 +5,7 @@ use_small_heuristics = "Max"
 # Imports
 imports_granularity = "Crate"
 reorder_imports = true
+group_imports = "One"
 # Consistency
 newline_style = "Unix"
 # Format comments

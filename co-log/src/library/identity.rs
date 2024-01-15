@@ -1,0 +1,52 @@
+/// Identity representation.
+pub trait Identity {
+	/// The identities identifier (who).
+	fn identity(&self) -> &str;
+
+	/// Public key of the identity if it need to be referenced with the message.
+	fn public_key(&self) -> Option<Vec<u8>>;
+
+	/// Verify signature with this identity.
+	fn verify(&self, signature: &[u8], data: &[u8], public_key: Option<&[u8]>) -> bool;
+}
+
+/// Private identity representation.
+pub trait PrivateIdentity: Identity {
+	/// Sign data and return the signature as bytes (only signature without input data).
+	fn sign(&self, data: &[u8]) -> Result<Vec<u8>, SignError>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SignError {
+	/// Unauthorized error.
+	/// Ususally this means that this identity has no private key.
+	#[error("Unauthorized")]
+	Unauthorized,
+
+	/// Other error
+	#[error("Signature failed")]
+	Other(#[source] anyhow::Error),
+}
+
+pub trait IdentityResolver {
+	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Option<Box<dyn Identity>>;
+}
+
+pub struct JoinIdentityResolver {
+	resolvers: Vec<Box<dyn IdentityResolver>>,
+}
+impl JoinIdentityResolver {
+	pub fn new(resolvers: Vec<Box<dyn IdentityResolver>>) -> Self {
+		Self { resolvers }
+	}
+}
+impl IdentityResolver for JoinIdentityResolver {
+	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Option<Box<dyn Identity>> {
+		for resolver in self.resolvers.iter() {
+			if let Some(i) = resolver.resolve(identity, public_key) {
+				return Some(i)
+			}
+		}
+		None
+	}
+}

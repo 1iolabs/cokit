@@ -1,8 +1,9 @@
 use crate::{
 	epics::sdk_epics,
 	types::{action::CoAction, context::CoContext, state::CoState},
-	Libp2pNetwork, StorageType,
+	StorageType,
 };
+use co_network::Libp2pNetwork;
 use co_state::{
 	EpicMiddleware, EpicSubscription, FnReducer, LogMiddleware, SubjectMiddleware, SyncStore, SyncStoreApi,
 };

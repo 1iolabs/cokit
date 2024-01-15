@@ -228,11 +228,9 @@ where
 					}
 					// todo: add timeout?
 				},
-				EpicCommand::Complete => {
-					break
-				}, /* EpicCommand::Error(err) => {
-				    *     return Err(err);
-				    * } */
+				EpicCommand::Complete => break, /* EpicCommand::Error(err) => {
+				                                 *     return Err(err);
+				                                 * } */
 			}
 		}
 
@@ -323,7 +321,7 @@ mod tests {
 					runner_handle.await?;
 
 					// check
-					assert_eq!(20, store.state().await);
+					assert_eq!(store.state().await, 20);
 
 					// done
 					Ok::<(), anyhow::Error>(())
@@ -369,7 +367,7 @@ mod tests {
 					runner_handle.await?;
 
 					// check
-					assert_eq!(20, store.state().await);
+					assert_eq!(store.state().await, 20);
 
 					// done
 					Ok::<(), anyhow::Error>(())
@@ -419,7 +417,7 @@ mod tests {
 					runner_subscription.unsubscribe();
 
 					// check
-					assert_eq!(20, store.state().await);
+					assert_eq!(store.state().await, 20);
 				})
 				.unwrap();
 
