@@ -1,4 +1,5 @@
 {
     "editor.formatOnSave": true,
-    "rust-analyzer.lru.capacity": 4096
+    "rust-analyzer.lru.capacity": 4096,
+    "git.rebaseWhenSync": true
 }
