@@ -1,4 +1,5 @@
-use crate::{ActionsType, Libp2pNetwork, StorageType, StoreType};
+use crate::{ActionsType, StorageType, StoreType};
+use co_network::Libp2pNetwork;
 
 #[cfg(feature = "tokio-runtime")]
 pub type CoContextScheduler = rxrust::scheduler::TokioLocalScheduler;

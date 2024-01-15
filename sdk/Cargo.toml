@@ -6,9 +6,6 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-co-node-edge = { path = "../node-edge" }
-co-state = { path = "../state" }
-co-network = { path = "../co-network" }
 futures = { workspace = true }
 hyper = { workspace = true }
 iroh-api = { path = "../../../github/n0-computer/beetle/iroh-api" }
@@ -29,6 +26,11 @@ tracing = { workspace = true }
 uuid = { version = "1.2.2", features = ["default", "v4"] }
 #rocksdb = { version = "0.20.1" }
 #librocksdb-sys = { version = "0.10.0+7.9.2" }
+
+# co
+co-node-edge = { path = "../node-edge" }
+co-state = { path = "../state" }
+co-network = { path = "../co-network" }
 
 # substrate
 sc-cli = { workspace = true }
