@@ -32,11 +32,6 @@ co-node-edge = { path = "../node-edge" }
 co-state = { path = "../state" }
 co-network = { path = "../co-network" }
 
-# substrate
-sc-cli = { workspace = true }
-sc-network = { workspace = true }
-sc-service = { workspace = true }
-
 [features]
 "default" = ["tokio-runtime"]
 "tokio-runtime" = ["tokio", "tokio-stream"]
