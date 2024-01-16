@@ -13,7 +13,9 @@ pub use library::{
 	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
 	node_reader::node_reader,
 };
-pub use storage::{encrypted::EncryptedStorage, fs::FsStorage, memory::MemoryStorage, sync::SyncStorage};
+pub use storage::{
+	encrypted::EncryptedStorage, fs::FsStorage, memory::MemoryStorage, sync::SyncStorage, tokio::SyncBlockStorage,
+};
 pub use types::{
 	block::{BlockStat, BlockStorage},
 	pin::{PinApi, PinKind, PinOptions},

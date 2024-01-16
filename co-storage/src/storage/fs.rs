@@ -9,6 +9,7 @@ use std::{io::ErrorKind, os::unix::fs::MetadataExt, path::PathBuf};
 /// Creates one file per CID.
 /// To ensure directories arend getting too many entries extra folders are created for the furst two bytes of the CID
 /// digest.
+#[derive(Debug, Clone)]
 pub struct FsStorage {
 	path: PathBuf,
 }

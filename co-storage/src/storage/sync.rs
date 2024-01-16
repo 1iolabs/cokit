@@ -8,10 +8,10 @@ use std::{
 	thread::{self, JoinHandle},
 };
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SyncStorage {
 	sender: Sender<Message>,
-	handle: Arc<JoinHandle<()>>,
+	_handle: Arc<JoinHandle<()>>,
 }
 
 impl SyncStorage {
@@ -36,7 +36,7 @@ impl SyncStorage {
 				}
 			}
 		});
-		Self { sender, handle: Arc::new(handle) }
+		Self { sender, _handle: Arc::new(handle) }
 	}
 }
 

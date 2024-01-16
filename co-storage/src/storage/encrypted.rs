@@ -7,10 +7,7 @@ use crate::{
 	AlgorithmError, BlockStat, BlockStorage, Storage, StorageError,
 };
 use async_trait::async_trait;
-use futures::{
-	stream::{FuturesOrdered, FuturesUnordered},
-	StreamExt,
-};
+use futures::{stream::FuturesOrdered, StreamExt};
 use libipld::{cbor::DagCborCodec, store::StoreParams, Block, Cid, DefaultParams};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -98,7 +95,7 @@ where
 
 		// store
 		for block in blocks {
-			self.storage_mut().set(block).await;
+			self.storage_mut().set(block).await?;
 		}
 
 		// result
@@ -505,7 +502,7 @@ mod tests {
 
 		// validate load blocks again
 		let mut encryption = EncryptedStorage::new(memory, key, algorithm);
-		encryption.load_mapping(&mapping_cid);
+		encryption.load_mapping(&mapping_cid).unwrap();
 		for cid in cids {
 			encryption.get(&cid).unwrap();
 		}

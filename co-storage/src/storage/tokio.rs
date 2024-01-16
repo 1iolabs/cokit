@@ -10,7 +10,7 @@ use tokio::{
 	task::JoinHandle,
 };
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SyncBlockStorage<P: StoreParams> {
 	sender: UnboundedSender<Message<P>>,
 	_handle: Arc<JoinHandle<()>>,
