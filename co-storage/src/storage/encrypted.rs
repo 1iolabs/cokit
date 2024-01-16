@@ -113,6 +113,16 @@ where
 		// result
 		Ok(())
 	}
+
+	/// Remove a block from storage.
+	///
+	/// Note: This expects the unencrypted CID.
+	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {
+		match if cid.codec() == BLOCK_MULTICODEC { Some(cid) } else { self.mapping.map.get(cid) } {
+			Some(encrypted_cid) => self.next.remove(encrypted_cid),
+			None => self.next.remove(cid),
+		}
+	}
 }
 
 #[derive(Debug, thiserror::Error)]

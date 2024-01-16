@@ -28,6 +28,7 @@ impl SyncStorage {
 					Err(_) => break, // sender dropped
 					Ok(Message::Get(cid, result)) => handle_send_result(result.send(next.get(&cid))),
 					Ok(Message::Set(block, result)) => handle_send_result(result.send(next.set(block))),
+					Ok(Message::Remove(cid, result)) => handle_send_result(result.send(next.remove(&cid))),
 				}
 			}
 		});
@@ -59,10 +60,23 @@ impl Storage for SyncStorage {
 			Err(e) => Err(StorageError::Internal(e.into())),
 		}
 	}
+
+	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {
+		let (sender, receiver) = std::sync::mpsc::channel::<Result<(), StorageError>>();
+		self.sender
+			.send(Message::Remove(cid.clone(), sender))
+			.map_err(|e| StorageError::Internal(e.into()))?;
+		let result = receiver.recv();
+		match result {
+			Ok(e) => e,
+			Err(e) => Err(StorageError::Internal(e.into())),
+		}
+	}
 }
 
 #[derive(Debug)]
 enum Message {
 	Get(Cid, Sender<Result<Block<DefaultParams>, StorageError>>),
 	Set(Block<DefaultParams>, Sender<Result<(), StorageError>>),
+	Remove(Cid, Sender<Result<(), StorageError>>),
 }

@@ -52,6 +52,12 @@ impl Storage for MemoryStorage {
 			.map(|r| r.block.clone())
 			.ok_or(StorageError::NotFound(cid.clone()))
 	}
+
+	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {
+		tracing::debug!(?cid, "memory-store-remove");
+		self.records.remove(cid);
+		Ok(())
+	}
 }
 
 struct Record {

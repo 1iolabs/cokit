@@ -67,6 +67,15 @@ impl Storage for FsStorage {
 		// result
 		Ok(())
 	}
+
+	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {
+		let path = to_cid_path(&self.path, cid);
+		match std::fs::remove_file(path) {
+			Ok(_) => Ok(()),
+			Err(e) if e.kind() == ErrorKind::NotFound => Ok(()),
+			Err(e) => Err(StorageError::Internal(e.into())),
+		}
+	}
 }
 
 fn to_cid_path(path: &PathBuf, cid: &Cid) -> PathBuf {
