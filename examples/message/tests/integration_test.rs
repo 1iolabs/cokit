@@ -23,8 +23,8 @@ fn integration_test() {
 	let memory = MemoryStorage::new();
 	let algorithm = Algorithm::default();
 	let key = Secret::new(repeat(42).take(algorithm.key_size()).collect());
-	let encrypted = EncryptedStorage::new(memory, key, algorithm, None).unwrap();
-	let (mut storage, _) = SyncStorage::new(encrypted);
+	let encrypted = EncryptedStorage::new(memory, key, algorithm);
+	let mut storage = SyncStorage::new(encrypted);
 
 	// action
 	let action = ReducerAction { payload: MessageAction::Message, from: "did:local:test".to_owned(), time: 0 };

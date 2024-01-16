@@ -20,7 +20,7 @@ fn integration_test() {
 		.unwrap();
 
 	// storage
-	let (mut storage, _) = SyncStorage::new(MemoryStorage::new());
+	let mut storage = SyncStorage::new(MemoryStorage::new());
 
 	// action
 	let action = ReducerAction { payload: CounterAction::Increment(10), from: "did:local:test".to_owned(), time: 0 };

@@ -11,7 +11,7 @@ fn smoke() {
 	// 	.init();
 
 	// create store
-	let (mut store, _) = SyncStorage::new(MemoryStorage::new());
+	let mut store = SyncStorage::new(MemoryStorage::new());
 	let block0 = create_event(&mut store, "hello");
 
 	// create log
@@ -35,7 +35,7 @@ fn smoke() {
 #[test]
 fn traverse_sinlge_user_log() {
 	// create store
-	let (mut store, _) = SyncStorage::new(MemoryStorage::new());
+	let mut store = SyncStorage::new(MemoryStorage::new());
 	let block0 = create_event(&mut store, "hello");
 	let block1 = create_event(&mut store, "world");
 	let block2 = create_event(&mut store, "whats");
@@ -66,7 +66,7 @@ fn traverse_sinlge_user_log() {
 
 #[test]
 fn join_is_associative() {
-	let (store, _) = SyncStorage::new(MemoryStorage::new());
+	let store = SyncStorage::new(MemoryStorage::new());
 	let identity1 = DidKeyIdentity::generate(None);
 	let identity2 = DidKeyIdentity::generate(None);
 	let identity3 = DidKeyIdentity::generate(None);
@@ -111,7 +111,7 @@ fn join_is_associative() {
 
 #[test]
 fn join_is_commutative() {
-	let (store, _) = SyncStorage::new(MemoryStorage::new());
+	let store = SyncStorage::new(MemoryStorage::new());
 	let identity1 = DidKeyIdentity::generate(None);
 	let identity2 = DidKeyIdentity::generate(None);
 

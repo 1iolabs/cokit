@@ -1,19 +1,21 @@
 use crate::StorageError;
+use async_trait::async_trait;
 use libipld::Cid;
 
 /// Storage Pin API.
+#[async_trait(?Send)]
 pub trait PinApi {
 	/// Create new pin.
-	fn add(&mut self, cid: &Cid, options: PinOptions) -> Result<(), StorageError>;
+	async fn add(&mut self, cid: &Cid, options: PinOptions) -> Result<(), StorageError>;
 
 	/// Remove pin.
-	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError>;
+	async fn remove(&mut self, cid: &Cid) -> Result<(), StorageError>;
 
 	/// Returns whether the CID is pinned.
-	fn is_pinned(&self, cid: &Cid) -> Option<PinKind>;
+	async fn is_pinned(&self, cid: &Cid) -> Option<PinKind>;
 
 	/// List all pins.
-	fn iter(&self) -> Box<dyn Iterator<Item = (Cid, PinKind)>>;
+	async fn iter(&self) -> Box<dyn Iterator<Item = (Cid, PinKind)>>;
 }
 
 #[derive(Debug, Default, Clone)]
@@ -23,8 +25,17 @@ pub struct PinOptions {
 
 #[derive(Debug, Default, Clone)]
 pub enum PinKind {
+	/// Recursively PIN.
+	/// Supported types:
+	/// - dag-cbor
+	/// - dag-json
+	/// - dag-pb
 	#[default]
 	Recursive,
+
+	/// Directly pinned.
 	Direct,
+
+	/// Indirectly pinned (through an recursive direct pin).
 	Indirect,
 }

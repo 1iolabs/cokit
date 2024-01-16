@@ -1,18 +1,22 @@
 use crate::{Storage, StorageError};
 use libipld::{Block, Cid, DefaultParams};
 use std::{
-	sync::mpsc::{SendError, Sender},
+	sync::{
+		mpsc::{SendError, Sender},
+		Arc,
+	},
 	thread::{self, JoinHandle},
 };
 
 #[derive(Clone)]
 pub struct SyncStorage {
 	sender: Sender<Message>,
+	handle: Arc<JoinHandle<()>>,
 }
 
 impl SyncStorage {
 	/// Construct threaded storage with next as underlying storage.
-	pub fn new<T>(mut next: T) -> (Self, JoinHandle<()>)
+	pub fn new<T>(mut next: T) -> Self
 	where
 		T: Storage + Send + 'static,
 	{
@@ -32,7 +36,7 @@ impl SyncStorage {
 				}
 			}
 		});
-		(Self { sender }, handle)
+		Self { sender, handle: Arc::new(handle) }
 	}
 }
 

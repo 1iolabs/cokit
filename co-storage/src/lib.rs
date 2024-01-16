@@ -15,6 +15,7 @@ pub use library::{
 };
 pub use storage::{encrypted::EncryptedStorage, fs::FsStorage, memory::MemoryStorage, sync::SyncStorage};
 pub use types::{
+	block::{BlockStat, BlockStorage},
 	pin::{PinApi, PinKind, PinOptions},
 	storage::{Storage, StorageError},
 };

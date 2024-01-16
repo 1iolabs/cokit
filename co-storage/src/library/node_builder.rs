@@ -1,6 +1,6 @@
 use crate::{types::storage::StorageError, BlockSerializer};
 use co_primitives::Link;
-use libipld::{Block, DefaultParams};
+use libipld::{store::StoreParams, Block, DefaultParams};
 use serde::{Deserialize, Serialize};
 use std::mem::take;
 
@@ -28,11 +28,12 @@ impl Into<StorageError> for NodeBuilderError {
 	}
 }
 
-pub trait NodeSerializer<T>
+pub trait NodeSerializer<T, P>
 where
 	T: Clone,
+	P: StoreParams,
 {
-	fn serialize(&self, node: &Node<T>) -> Result<Block<DefaultParams>, NodeBuilderError>;
+	fn serialize(&self, node: &Node<T>) -> Result<Block<P>, NodeBuilderError>;
 }
 
 pub struct DefaultNodeSerializer {}
@@ -41,30 +42,30 @@ impl DefaultNodeSerializer {
 		Self {}
 	}
 }
-impl<T> NodeSerializer<T> for DefaultNodeSerializer
+impl<T, P> NodeSerializer<T, P> for DefaultNodeSerializer
 where
 	T: Clone + Serialize,
+	P: StoreParams,
 {
-	fn serialize(&self, node: &Node<T>) -> Result<Block<DefaultParams>, NodeBuilderError> {
-		BlockSerializer::default()
-			.serialize(node)
-			.map_err(|_| NodeBuilderError::Encoding)
+	fn serialize(&self, node: &Node<T>) -> Result<Block<P>, NodeBuilderError> {
+		BlockSerializer::new().serialize(node).map_err(|_| NodeBuilderError::Encoding)
 	}
 }
 
 /// Create a balances merkler tree of Node blocks.
 ///
 /// Note: This implementation requires the data to fit into memory.
-pub struct NodeBuilder<T, S = DefaultNodeSerializer>
+pub struct NodeBuilder<T, S = DefaultNodeSerializer, P = DefaultParams>
 where
 	T: Clone,
-	S: NodeSerializer<T>,
+	S: NodeSerializer<T, P>,
+	P: StoreParams,
 {
 	// Current Items.
 	items: Vec<T>,
 
 	/// Computed leaf blocks to store.
-	blocks: Vec<Block<DefaultParams>>,
+	blocks: Vec<Block<P>>,
 
 	/// Max children for each block.
 	max_children: usize,
@@ -72,10 +73,11 @@ where
 	/// Serializer.
 	serializer: S,
 }
-impl<T, S> NodeBuilder<T, S>
+impl<T, S, P> NodeBuilder<T, S, P>
 where
 	T: Clone + Serialize,
-	S: NodeSerializer<T>,
+	S: NodeSerializer<T, P>,
+	P: StoreParams,
 {
 	pub fn new(max_children: usize, serializer: S) -> Self {
 		Self { items: Vec::new(), blocks: Vec::new(), max_children, serializer }
@@ -103,7 +105,7 @@ where
 	}
 
 	/// Convert builder into blocks.
-	pub fn into_blocks(mut self) -> Result<Vec<Block<DefaultParams>>, NodeBuilderError> {
+	pub fn into_blocks(mut self) -> Result<Vec<Block<P>>, NodeBuilderError> {
 		// flush
 		if !self.items.is_empty() {
 			self.flush()?;
@@ -117,16 +119,16 @@ where
 	/// The first block in the result is the root block.
 	fn create_balanced_links(
 		serializer: &S,
-		mut blocks: Vec<Block<DefaultParams>>,
+		mut blocks: Vec<Block<P>>,
 		max_children: usize,
-	) -> Result<Vec<Block<DefaultParams>>, NodeBuilderError> {
+	) -> Result<Vec<Block<P>>, NodeBuilderError> {
 		// create link blocks (all levels)
 		let mut link_blocks = match blocks.len() {
 			// no links needed
 			0 | 1 => vec![],
 			// create link nodes
 			_ => {
-				let level_link_blocks: Result<Vec<Block<DefaultParams>>, NodeBuilderError> = blocks
+				let level_link_blocks: Result<Vec<Block<P>>, NodeBuilderError> = blocks
 					.as_slice()
 					.chunks(max_children)
 					.map(|chunk| -> Node<T> {

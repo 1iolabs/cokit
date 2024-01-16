@@ -1,4 +1,8 @@
-use crate::types::storage::{Storage, StorageError};
+use crate::types::{
+	block::{BlockStat, BlockStorage},
+	storage::{Storage, StorageError},
+};
+use async_trait::async_trait;
 use libipld::{Block, Cid, DefaultParams};
 use std::collections::BTreeMap;
 
@@ -57,6 +61,30 @@ impl Storage for MemoryStorage {
 		tracing::debug!(?cid, "memory-store-remove");
 		self.records.remove(cid);
 		Ok(())
+	}
+}
+
+#[async_trait(?Send)]
+impl BlockStorage for MemoryStorage {
+	type StoreParams = DefaultParams;
+
+	async fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError> {
+		Storage::get(self, cid)
+	}
+
+	async fn set(&mut self, block: Block<DefaultParams>) -> Result<(), StorageError> {
+		Storage::set(self, block)
+	}
+
+	async fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {
+		Storage::remove(self, cid)
+	}
+
+	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
+		self.records
+			.get(cid)
+			.map(|r| BlockStat { size: r.block.data().len() as u64 })
+			.ok_or(StorageError::NotFound(cid.clone()))
 	}
 }
 

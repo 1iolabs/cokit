@@ -26,13 +26,17 @@ pub struct BlockSerializer<S> {
 	codec: u64,
 }
 impl<S> BlockSerializer<S> {
-	pub fn new(codec: u64) -> Self {
+	pub fn new() -> Self {
+		Self::new_codec(DagCborCodec.into())
+	}
+
+	pub fn new_codec(codec: u64) -> Self {
 		Self { _s: Default::default(), codec }
 	}
 }
 impl Default for BlockSerializer<DefaultParams> {
 	fn default() -> Self {
-		Self::new(DagCborCodec.into())
+		Self::new()
 	}
 }
 impl<S> BlockSerializer<S>
