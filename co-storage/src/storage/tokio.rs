@@ -1,18 +1,19 @@
 use crate::{BlockStat, BlockStorage, StorageError};
 use async_trait::async_trait;
-use libipld::{store::StoreParams, Block, Cid};
-use std::sync::Arc;
-use tokio::{
-	sync::{
-		mpsc::{unbounded_channel, UnboundedSender},
+use futures::{
+	channel::{
+		mpsc::{self},
 		oneshot::{self},
 	},
-	task::JoinHandle,
+	SinkExt, StreamExt,
 };
+use libipld::{store::StoreParams, Block, Cid};
+use std::sync::Arc;
+use tokio::task::JoinHandle;
 
 #[derive(Debug, Clone)]
 pub struct SyncBlockStorage<P: StoreParams> {
-	sender: UnboundedSender<Message<P>>,
+	sender: mpsc::UnboundedSender<Message<P>>,
 	_handle: Arc<JoinHandle<()>>,
 }
 
@@ -22,22 +23,24 @@ impl<P: StoreParams> SyncBlockStorage<P> {
 	where
 		T: BlockStorage<StoreParams = P> + Send + 'static,
 	{
-		let (sender, mut receiver) = unbounded_channel::<Message<P>>();
-		let handle = tokio::task::spawn_local(async move {
-			fn handle_send_result<T>(t: Result<(), T>) {
-				if t.is_err() {
-					// TODO: add log?
+		let (sender, mut receiver) = mpsc::unbounded::<Message<P>>();
+		let runtime_handle = tokio::runtime::Handle::current();
+		let handle = tokio::task::spawn_blocking(move || {
+			runtime_handle.block_on(async move {
+				fn handle_send_result<T>(t: Result<(), T>) {
+					if t.is_err() {
+						// TODO: add log?
+					}
 				}
-			}
-			loop {
-				match receiver.recv().await {
-					None => break, // sender dropped
-					Some(Message::Get(cid, result)) => handle_send_result(result.send(next.get(&cid).await)),
-					Some(Message::Set(block, result)) => handle_send_result(result.send(next.set(block).await)),
-					Some(Message::Remove(cid, result)) => handle_send_result(result.send(next.remove(&cid).await)),
-					Some(Message::Stat(cid, result)) => handle_send_result(result.send(next.stat(&cid).await)),
+				while let Some(message) = receiver.next().await {
+					match message {
+						Message::Get(cid, result) => handle_send_result(result.send(next.get(&cid).await)),
+						Message::Set(block, result) => handle_send_result(result.send(next.set(block).await)),
+						Message::Remove(cid, result) => handle_send_result(result.send(next.remove(&cid).await)),
+						Message::Stat(cid, result) => handle_send_result(result.send(next.stat(&cid).await)),
+					}
 				}
-			}
+			});
 		});
 		Self { sender, _handle: Arc::new(handle) }
 	}
@@ -50,7 +53,9 @@ impl<P: StoreParams> BlockStorage for SyncBlockStorage<P> {
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		let (sender, receiver) = oneshot::channel();
 		self.sender
+			.clone()
 			.send(Message::Get(cid.clone(), sender))
+			.await
 			.map_err(|e| StorageError::Internal(e.into()))?;
 		let result = receiver.await;
 		match result {
@@ -63,6 +68,7 @@ impl<P: StoreParams> BlockStorage for SyncBlockStorage<P> {
 		let (sender, receiver) = oneshot::channel();
 		self.sender
 			.send(Message::Set(block, sender))
+			.await
 			.map_err(|e| StorageError::Internal(e.into()))?;
 		let result = receiver.await;
 		match result {
@@ -75,6 +81,7 @@ impl<P: StoreParams> BlockStorage for SyncBlockStorage<P> {
 		let (sender, receiver) = oneshot::channel();
 		self.sender
 			.send(Message::Remove(cid.clone(), sender))
+			.await
 			.map_err(|e| StorageError::Internal(e.into()))?;
 		let result = receiver.await;
 		match result {
@@ -86,7 +93,9 @@ impl<P: StoreParams> BlockStorage for SyncBlockStorage<P> {
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		let (sender, receiver) = oneshot::channel();
 		self.sender
+			.clone()
 			.send(Message::Stat(cid.clone(), sender))
+			.await
 			.map_err(|e| StorageError::Internal(e.into()))?;
 		let result = receiver.await;
 		match result {
@@ -102,4 +111,19 @@ enum Message<P> {
 	Set(Block<P>, oneshot::Sender<Result<(), StorageError>>),
 	Remove(Cid, oneshot::Sender<Result<(), StorageError>>),
 	Stat(Cid, oneshot::Sender<Result<BlockStat, StorageError>>),
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{BlockSerializer, BlockStorage, MemoryStorage, SyncBlockStorage};
+
+	#[tokio::test]
+	async fn smoke() {
+		let memory = MemoryStorage::new();
+		let mut sync = SyncBlockStorage::new(memory);
+		let block = BlockSerializer::default().serialize(&123).unwrap();
+		sync.set(block.clone()).await.unwrap();
+		let block_get = sync.get(block.cid()).await.unwrap();
+		assert_eq!(block_get, block);
+	}
 }
