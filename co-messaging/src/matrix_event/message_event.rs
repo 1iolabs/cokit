@@ -1,0 +1,433 @@
+use crate::{
+    matrix_event::relation::RelatesTo, multimedia::VideoInfo, relation::Relation, EventContent,
+};
+use libipld::Cid;
+use macros::common_event_content;
+use serde::{Deserialize, Serialize};
+
+use super::{
+    multimedia::{AudioInfo, FileInfo, ImageInfo, LocationInfo},
+    poll_event::PollMessageType,
+};
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(tag = "msgtype")]
+pub enum MessageType {
+    #[serde(rename = "m.text")]
+    Text(TextContent),
+    #[serde(rename = "m.notice")]
+    Notice(NoticeContent),
+    #[serde(rename = "m.image")]
+    Image(ImageContent),
+    #[serde(rename = "m.audio")]
+    Audio(AudioContent),
+    #[serde(rename = "m.video")]
+    Video(VideoContent),
+    #[serde(rename = "m.file")]
+    File(FileContent),
+    #[serde(rename = "m.location")]
+    Location(LocationContent),
+    #[serde(untagged)]
+    Poll(PollMessageType),
+}
+
+impl MessageType {
+    pub fn generate_message_type(&self) -> String {
+        match self {
+            MessageType::Text(_) => String::from("m.text"),
+            MessageType::Notice(_) => String::from("m.notice"),
+            MessageType::Image(_) => String::from("m.image"),
+            MessageType::Audio(_) => String::from("m.audio"),
+            MessageType::Video(_) => String::from("m.video"),
+            MessageType::File(_) => String::from("m.file"),
+            MessageType::Location(_) => String::from("m.location"),
+            MessageType::Poll(PollMessageType::Start(_)) => String::from("m.poll.start"),
+            MessageType::Poll(PollMessageType::Response(_)) => String::from("m.poll.response"),
+            MessageType::Poll(PollMessageType::End(_)) => String::from("m.poll.end"),
+        }
+    }
+}
+
+impl Relation for MessageType {
+    fn generate_relation_type(&self) -> Option<String> {
+        match self {
+            MessageType::Text(content) => content.generate_relation_type(),
+            MessageType::Notice(content) => content.generate_relation_type(),
+            MessageType::Image(content) => content.generate_relation_type(),
+            MessageType::Audio(content) => content.generate_relation_type(),
+            MessageType::Video(content) => content.generate_relation_type(),
+            MessageType::File(content) => content.generate_relation_type(),
+            MessageType::Location(content) => content.generate_relation_type(),
+            MessageType::Poll(content) => content.generate_relation_type(),
+        }
+    }
+    fn get_in_reply_to(&self) -> Option<String> {
+        match self {
+            MessageType::Text(content) => content.get_in_reply_to(),
+            MessageType::Notice(content) => content.get_in_reply_to(),
+            MessageType::Image(content) => content.get_in_reply_to(),
+            MessageType::Audio(content) => content.get_in_reply_to(),
+            MessageType::Video(content) => content.get_in_reply_to(),
+            MessageType::File(content) => content.get_in_reply_to(),
+            MessageType::Location(content) => content.get_in_reply_to(),
+            MessageType::Poll(content) => content.get_in_reply_to(),
+        }
+    }
+}
+
+impl Into<EventContent> for MessageType {
+    fn into(self) -> EventContent {
+        EventContent::Message(self)
+    }
+}
+
+pub trait Formattable {
+    fn format_body(&self) -> String;
+    fn set_format(&mut self, formatted_body: impl Into<String>, format: impl Into<String>);
+    fn remove_format(&mut self);
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Mentions {
+    pub user_ids: Vec<String>,
+}
+
+/**
+ * formatted body and format are not pub to ensure with setters that formatted body is only set when a format is also given
+ */
+#[common_event_content]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct TextContent {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    formatted_body: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    format: Option<String>,
+    pub body: String,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "m.mentions")]
+    pub mentions: Option<Mentions>,
+}
+
+impl TextContent {
+    pub fn new(body: impl Into<String>) -> Self {
+        Self {
+            body: body.into(),
+            formatted_body: None,
+            format: None,
+            is_silent: None,
+            relates_to: None,
+            mentions: None,
+        }
+    }
+}
+
+impl Into<EventContent> for TextContent {
+    fn into(self) -> EventContent {
+        MessageType::Text(self).into()
+    }
+}
+
+impl Formattable for TextContent {
+    fn set_format(&mut self, formatted_body: impl Into<String>, format: impl Into<String>) {
+        // todo: validate format
+        self.formatted_body = Some(formatted_body.into());
+        self.format = Some(format.into());
+    }
+    fn remove_format(&mut self) {
+        self.formatted_body = None;
+        self.format = None;
+    }
+    fn format_body(&self) -> String {
+        todo!()
+    }
+}
+
+impl Relation for TextContent {
+    fn generate_relation_type(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.generate_relation_type(),
+            None => None,
+        }
+    }
+    fn get_in_reply_to(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.get_in_reply_to(),
+            None => None,
+        }
+    }
+}
+
+/**
+ * formatted body and format are not pub to ensure with setters that formatted body is only set when a format is also given
+ */
+#[common_event_content]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct NoticeContent {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    formatted_body: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    format: Option<String>,
+    pub body: String,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "m.mentions")]
+    pub mentions: Option<Mentions>,
+}
+
+impl NoticeContent {
+    pub fn new(body: impl Into<String>) -> Self {
+        Self {
+            body: body.into(),
+            formatted_body: None,
+            format: None,
+            is_silent: Default::default(),
+            relates_to: None,
+            mentions: None,
+        }
+    }
+}
+
+impl Into<EventContent> for NoticeContent {
+    fn into(self) -> EventContent {
+        MessageType::Notice(self).into()
+    }
+}
+
+impl Formattable for NoticeContent {
+    fn set_format(&mut self, formatted_body: impl Into<String>, format: impl Into<String>) {
+        // todo validate format
+        self.formatted_body = Some(formatted_body.into());
+        self.format = Some(format.into());
+    }
+    fn remove_format(&mut self) {
+        self.formatted_body = None;
+        self.format = None;
+    }
+    fn format_body(&self) -> String {
+        todo!()
+    }
+}
+
+impl Relation for NoticeContent {
+    fn generate_relation_type(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.generate_relation_type(),
+            None => None,
+        }
+    }
+    fn get_in_reply_to(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.get_in_reply_to(),
+            None => None,
+        }
+    }
+}
+
+#[common_event_content]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct ImageContent {
+    pub body: String,    // a text representing the image in some way
+    pub file: Cid,       // CID to the image file
+    pub info: ImageInfo, // image metadata
+}
+
+impl ImageContent {
+    pub fn new(body: impl Into<String>, file: Cid, info: ImageInfo) -> Self {
+        Self {
+            body: body.into(),
+            file,
+            info,
+            is_silent: None,
+            relates_to: None,
+        }
+    }
+}
+
+impl Into<EventContent> for ImageContent {
+    fn into(self) -> EventContent {
+        MessageType::Image(self).into()
+    }
+}
+
+impl Relation for ImageContent {
+    fn generate_relation_type(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.generate_relation_type(),
+            None => None,
+        }
+    }
+    fn get_in_reply_to(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.get_in_reply_to(),
+            None => None,
+        }
+    }
+}
+
+#[common_event_content]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct AudioContent {
+    pub body: String,    // a text representing the audio in same way
+    pub file: Cid,       // CID to the audio file
+    pub info: AudioInfo, // audio metadata
+}
+
+impl AudioContent {
+    pub fn new(body: impl Into<String>, file: Cid, info: AudioInfo) -> Self {
+        Self {
+            body: body.into(),
+            file,
+            info,
+            is_silent: None,
+            relates_to: None,
+        }
+    }
+}
+
+impl Into<EventContent> for AudioContent {
+    fn into(self) -> EventContent {
+        MessageType::Audio(self).into()
+    }
+}
+
+impl Relation for AudioContent {
+    fn generate_relation_type(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.generate_relation_type(),
+            None => None,
+        }
+    }
+    fn get_in_reply_to(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.get_in_reply_to(),
+            None => None,
+        }
+    }
+}
+
+#[common_event_content]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct VideoContent {
+    pub body: String,    // textual representation of the video
+    pub file: Cid,       // CID to the video
+    pub info: VideoInfo, // video metadata
+}
+
+impl VideoContent {
+    pub fn new(body: impl Into<String>, file: Cid, info: VideoInfo) -> Self {
+        Self {
+            body: body.into(),
+            file,
+            info,
+            is_silent: None,
+            relates_to: None,
+        }
+    }
+}
+
+impl Into<EventContent> for VideoContent {
+    fn into(self) -> EventContent {
+        MessageType::Video(self).into()
+    }
+}
+
+impl Relation for VideoContent {
+    fn generate_relation_type(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.generate_relation_type(),
+            None => None,
+        }
+    }
+    fn get_in_reply_to(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.get_in_reply_to(),
+            None => None,
+        }
+    }
+}
+
+#[common_event_content]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct FileContent {
+    pub body: String,     // a text representing the file in some way
+    pub file: Cid,        // CID to the file
+    pub filename: String, // the name of the file
+    pub info: FileInfo,   // file metadata
+}
+
+impl FileContent {
+    pub fn new(
+        body: impl Into<String>,
+        file: Cid,
+        filename: impl Into<String>,
+        info: FileInfo,
+    ) -> Self {
+        Self {
+            body: body.into(),
+            file,
+            filename: filename.into(),
+            info,
+            is_silent: None,
+            relates_to: None,
+        }
+    }
+}
+
+impl Into<EventContent> for FileContent {
+    fn into(self) -> EventContent {
+        MessageType::File(self).into()
+    }
+}
+
+impl Relation for FileContent {
+    fn generate_relation_type(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.generate_relation_type(),
+            None => None,
+        }
+    }
+    fn get_in_reply_to(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.get_in_reply_to(),
+            None => None,
+        }
+    }
+}
+
+#[common_event_content]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct LocationContent {
+    pub body: String,       // textual representation of the location
+    pub geo_uri: String, // a geo uri by definition of https://datatracker.ietf.org/doc/html/rfc5870
+    pub info: LocationInfo, // location metadata
+}
+
+impl LocationContent {
+    pub fn new(body: impl Into<String>, geo_uri: impl Into<String>, info: LocationInfo) -> Self {
+        Self {
+            body: body.into(),
+            geo_uri: geo_uri.into(),
+            info,
+            is_silent: None,
+            relates_to: None,
+        }
+    }
+}
+
+impl Into<EventContent> for LocationContent {
+    fn into(self) -> EventContent {
+        MessageType::Location(self).into()
+    }
+}
+
+impl Relation for LocationContent {
+    fn generate_relation_type(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.generate_relation_type(),
+            None => None,
+        }
+    }
+    fn get_in_reply_to(&self) -> Option<String> {
+        match &self.relates_to {
+            Some(relates_to) => relates_to.get_in_reply_to(),
+            None => None,
+        }
+    }
+}

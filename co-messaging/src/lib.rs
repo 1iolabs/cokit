@@ -1,0 +1,137 @@
+mod matrix_event;
+
+pub static FORMATTED_BODY_FORMAT: &str = "some.html.standard.format";
+
+use matrix_event::call_event::CallType;
+use matrix_event::ephemeral_event::EphemeralType;
+use matrix_event::relation::Relation;
+use matrix_event::state_event::StateType;
+use matrix_event::{message_event::MessageType, relation::ReactionContent};
+
+pub use crate::matrix_event::{
+    call_event, ephemeral_event, message_event, multimedia, poll_event, relation, state_event,
+};
+
+use serde::{Deserialize, Serialize};
+
+pub trait EventType {
+    fn generate_event_type(&self) -> String;
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct MatrixEvent {
+    pub event_id: String,
+    pub timestamp: i64,
+    pub room_id: String,
+    pub sender: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state_key: Option<String>,
+    #[serde(flatten)]
+    pub content: EventContent,
+}
+
+impl MatrixEvent {
+    pub fn new(
+        event_id: impl Into<String>,
+        timestamp: i64,
+        room_id: impl Into<String>,
+        sender: impl Into<String>,
+        content: impl Into<EventContent>,
+    ) -> Self {
+        Self {
+            event_id: event_id.into(),
+            timestamp,
+            room_id: room_id.into(),
+            sender: sender.into(),
+            content: content.into(),
+            state_key: None,
+        }
+    }
+    pub fn event_type(&self) -> String {
+        self.content.generate_event_type()
+    }
+    pub fn set_state_key(&mut self, state_key: String) {
+        // todo filter for event types that can have a state key
+        self.state_key = Some(state_key);
+    }
+    pub fn set_timestamp(&mut self, ts: i64) {
+        self.timestamp = ts;
+    }
+}
+
+impl Relation for MatrixEvent {
+    fn generate_relation_type(&self) -> Option<String> {
+        self.content.generate_relation_type()
+    }
+    fn get_in_reply_to(&self) -> Option<String> {
+        self.content.get_in_reply_to()
+    }
+}
+
+impl EventType for MatrixEvent {
+    fn generate_event_type(&self) -> String {
+        self.content.generate_event_type()
+    }
+}
+
+/**
+ * Simple enum to fit the different possible contents.
+ * Unique event type string can be generated from this using pattern matching.
+ */
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(tag = "type", content = "content")]
+pub enum EventContent {
+    #[serde(rename = "m.room.message")]
+    Message(MessageType),
+    #[serde(rename = "m.reaction")]
+    Reaction(ReactionContent),
+    #[serde(untagged)]
+    State(StateType),
+    #[serde(untagged)]
+    Call(CallType),
+    #[serde(untagged)]
+    Ephemeral(EphemeralType),
+}
+
+impl EventContent {
+    // will generate the message type if it is a EventContent::Message. Returns an error otherwise
+    pub fn generate_message_type(&self) -> Result<String, String> {
+        match self {
+            EventContent::Message(m) => Ok(m.generate_message_type()),
+            _ => Err("Not a message".into()),
+        }
+    }
+}
+
+impl EventType for EventContent {
+    fn generate_event_type(&self) -> String {
+        match self {
+            EventContent::Message(_) => String::from("m.room.message"),
+            EventContent::Reaction(_) => String::from("m.reaction"),
+            EventContent::State(state) => state.generate_event_type(),
+            EventContent::Call(call) => call.generate_event_type(),
+            EventContent::Ephemeral(content) => content.generate_event_type(),
+        }
+    }
+}
+
+impl Relation for EventContent {
+    fn generate_relation_type(&self) -> Option<String> {
+        match self {
+            EventContent::Message(content) => content.generate_relation_type(),
+            EventContent::Reaction(content) => content.generate_relation_type(),
+            EventContent::State(_) => None,
+            EventContent::Call(_) => None,
+            EventContent::Ephemeral(_) => None,
+        }
+    }
+    fn get_in_reply_to(&self) -> Option<String> {
+        match self {
+            EventContent::Message(content) => content.get_in_reply_to(),
+            EventContent::Reaction(content) => content.get_in_reply_to(),
+            EventContent::State(_) => None,
+            EventContent::Call(_) => None,
+            EventContent::Ephemeral(_) => None,
+        }
+    }
+}
