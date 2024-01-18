@@ -1,6 +1,6 @@
 use crate::{library::read_cos::read_cos, types::http_error::HttpResult};
 use axum::{Extension, Json};
-use co_sdk::{ActionsType, Co, CoAction, CoCreate, Request, StorageType, StoreType};
+use co_sdk::{ActionsType, Co, CoAction, CoCreate, CoStorage, Request, StoreType};
 use hyper::StatusCode;
 use rxrust::prelude::*;
 use serde::Serialize;
@@ -24,10 +24,10 @@ pub enum GetCosItem {
 /// Route: /cos
 #[axum_macros::debug_handler]
 pub async fn get(
-	storage: Extension<StorageType>,
+	storage: Extension<CoStorage>,
 	store: Extension<StoreType>,
 ) -> HttpResult<(StatusCode, Json<Vec<GetCosItem>>)> {
-	let result: Vec<GetCosItem> = read_cos(storage.0, &store.state().await.root)
+	let result: Vec<GetCosItem> = read_cos(&storage, &store.state().await.root)
 		.await?
 		.into_iter()
 		.map::<GetCosItem, _>(|i| match i {

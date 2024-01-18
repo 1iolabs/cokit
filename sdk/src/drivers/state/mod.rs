@@ -1,14 +1,14 @@
 use crate::{
 	epics::sdk_epics,
 	types::{action::CoAction, context::CoContext, state::CoState},
-	StorageType,
+	CoStorage,
 };
 use co_network::Libp2pNetwork;
 use co_state::{
 	EpicMiddleware, EpicSubscription, FnReducer, LogMiddleware, SubjectMiddleware, SyncStore, SyncStoreApi,
 };
 use rxrust::{subject::SubjectThreads, subscription::Subscription};
-use std::{convert::Infallible, path::PathBuf, rc::Rc, sync::Arc, thread::JoinHandle};
+use std::{convert::Infallible, rc::Rc, sync::Arc, thread::JoinHandle};
 
 mod reducer;
 
@@ -23,7 +23,7 @@ pub struct State {
 }
 
 impl State {
-	pub fn new(intial_state: CoState, network: Libp2pNetwork, storage: StorageType, actions: ActionsType) -> Self {
+	pub fn new(intial_state: CoState, network: Libp2pNetwork, storage: CoStorage, actions: ActionsType) -> Self {
 		// middleware
 		let (epic_middleware, epic_runner, epic_subscription) = EpicMiddleware::create();
 		let subject_middlware = SubjectMiddleware::new(actions.clone());

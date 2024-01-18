@@ -4,8 +4,6 @@ use libipld::{cid::Cid, ipld::Ipld};
 use std::sync::Arc;
 use thiserror::Error;
 
-pub(crate) mod iroh;
-
 pub type StorageType = Arc<dyn Storage + Send + Sync + 'static>;
 
 #[async_trait]

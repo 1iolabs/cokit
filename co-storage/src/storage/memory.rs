@@ -4,7 +4,8 @@ use crate::types::{
 };
 use async_trait::async_trait;
 use libipld::{Block, Cid, DefaultParams};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
+use tokio::sync::RwLock;
 
 pub struct MemoryStorage {
 	records: BTreeMap<Cid, Record>,
@@ -64,30 +65,52 @@ impl Storage for MemoryStorage {
 	}
 }
 
-#[async_trait(?Send)]
-impl BlockStorage for MemoryStorage {
+#[derive(Debug, Clone)]
+pub struct MemoryBlockStorage {
+	records: Arc<RwLock<BTreeMap<Cid, Record>>>,
+}
+
+#[async_trait]
+impl BlockStorage for MemoryBlockStorage {
 	type StoreParams = DefaultParams;
 
-	async fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError> {
-		Storage::get(self, cid)
+	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+		tracing::debug!(?cid, "memory-store-get");
+		self.records
+			.read()
+			.await
+			.get(cid)
+			.map(|r| r.block.clone())
+			.ok_or(StorageError::NotFound(cid.clone()))
 	}
 
-	async fn set(&mut self, block: Block<DefaultParams>) -> Result<(), StorageError> {
-		Storage::set(self, block)
+	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+		tracing::debug!(cid = ?block.cid(), "memory-store-set");
+		let result = block.cid().clone();
+		self.records
+			.write()
+			.await
+			.insert(block.cid().clone(), Record { pin: false, block });
+		Ok(result)
 	}
 
-	async fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {
-		Storage::remove(self, cid)
+	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
+		tracing::debug!(?cid, "memory-store-remove");
+		self.records.write().await.remove(cid);
+		Ok(())
 	}
 
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		self.records
+			.read()
+			.await
 			.get(cid)
 			.map(|r| BlockStat { size: r.block.data().len() as u64 })
 			.ok_or(StorageError::NotFound(cid.clone()))
 	}
 }
 
+#[derive(Debug, Clone)]
 struct Record {
 	block: Block<DefaultParams>,
 	pin: bool,

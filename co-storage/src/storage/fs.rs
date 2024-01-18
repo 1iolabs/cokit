@@ -72,7 +72,7 @@ impl Storage for FsStorage {
 	}
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl BlockStorage for FsStorage {
 	type StoreParams = DefaultParams;
 
@@ -81,7 +81,7 @@ impl BlockStorage for FsStorage {
 		into_block_result(cid, tokio::fs::read(path).await)
 	}
 
-	async fn set(&mut self, block: Block<Self::StoreParams>) -> Result<(), StorageError> {
+	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		let path = to_cid_path(&self.path, block.cid());
 
 		// exists?
@@ -99,7 +99,7 @@ impl BlockStorage for FsStorage {
 						path,
 					)));
 				}
-				return Ok(())
+				return Ok(block.into_inner().0)
 			},
 			// continue with write
 			Err(e) if e.kind() == ErrorKind::NotFound => {},
@@ -120,10 +120,10 @@ impl BlockStorage for FsStorage {
 			.map_err(|e| StorageError::Internal(e.into()))?;
 
 		// result
-		Ok(())
+		Ok(block.into_inner().0)
 	}
 
-	async fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {
+	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
 		let path = to_cid_path(&self.path, cid);
 		into_storage_result(cid, tokio::fs::remove_file(path).await)
 	}

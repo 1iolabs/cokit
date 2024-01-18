@@ -4,14 +4,12 @@ use crate::{
 		context::CoContext,
 		state::CoState,
 	},
-	Co, CoCreate, Request, StorageType,
+	Co, CoCreate, CoStorage, Request,
 };
 use anyhow::Result;
 use co_state::{ActionObservable, StateObservable};
-use libipld::{
-	serde::{from_ipld, to_ipld},
-	Cid,
-};
+use co_storage::BlockSerializer;
+use libipld::Cid;
 use rxrust::prelude::*;
 use std::{convert::Infallible, sync::Arc};
 
@@ -37,12 +35,13 @@ pub fn co_create<O: Observer<CoAction, Infallible> + 'static>(
 }
 
 /// Store an `Co` and return `Cid` for it.
-async fn create(storage: StorageType, state: CoState, create: Request<CoCreate>) -> Vec<CoAction> {
+async fn create(storage: CoStorage, state: CoState, create: Request<CoCreate>) -> Vec<CoAction> {
 	// store co
 	let co: Co = create.clone().request.into();
 	let next_root: Result<Cid> = async {
-		let ipld: libipld::Ipld = to_ipld(co.clone())?;
-		let cid = storage.put_object(&ipld).await?;
+		let block = BlockSerializer::default().serialize(&co)?;
+		let cid = block.cid().clone();
+		storage.set(block).await?;
 
 		// update root
 		modify_root(storage, state.root, |mut cids| {
@@ -61,15 +60,14 @@ async fn create(storage: StorageType, state: CoState, create: Request<CoCreate>)
 	}
 }
 
-async fn modify_root<F: FnOnce(Vec<Cid>) -> Vec<Cid>>(storage: StorageType, root: Option<Cid>, f: F) -> Result<Cid> {
+async fn modify_root<F: FnOnce(Vec<Cid>) -> Vec<Cid>>(storage: CoStorage, root: Option<Cid>, f: F) -> Result<Cid> {
 	// read current cids
 	let cids: Vec<Cid> = match root {
-		Some(root_current) => from_ipld(storage.get_object(&root_current).await?)?,
+		Some(root_current) => BlockSerializer::default().deserialize(&storage.get(&root_current).await?)?,
 		None => Vec::new(),
 	};
 	let next_cids = f(cids);
 
 	// store
-	let next_cids_ipld = to_ipld(next_cids)?;
-	Ok(storage.put_object(&next_cids_ipld).await?)
+	Ok(storage.set(BlockSerializer::default().serialize(&next_cids)?).await?)
 }

@@ -5,7 +5,8 @@ use axum::{
 };
 use clap::Parser;
 use co_network::{Libp2pNetwork, Libp2pNetworkConfig};
-use co_sdk::{ActionsType, CoState, IrohConfig, IrohStorage, State, StorageType, StoreType};
+use co_sdk::{ActionsType, CoState, CoStorage, State, StoreType};
+use co_storage::FsStorage;
 use libp2p::PeerId;
 use std::{net::SocketAddr, sync::Arc};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
@@ -48,8 +49,7 @@ async fn main() {
 	tracing_log::LogTracer::init().unwrap();
 
 	// driver: storage
-	let config = IrohConfig { base_path: storage_path, tcp_port: None, quic_port: None };
-	let storage: StorageType = Arc::new(IrohStorage::new(config).await.expect("storage"));
+	let storage: CoStorage = Arc::new(FsStorage::new(storage_path));
 
 	// driver: network
 	let network_key = crate::library::local_key::local_key(Some(config_path.join("peer.pb")), cli.force_new_peer_id)

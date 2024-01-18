@@ -1,14 +1,19 @@
-use crate::{ActionsType, StorageType, StoreType};
+use crate::{ActionsType, StoreType};
 use co_network::Libp2pNetwork;
+use co_storage::BlockStorage;
+use libipld::DefaultParams;
+use std::sync::Arc;
 
 #[cfg(feature = "tokio-runtime")]
 pub type CoContextScheduler = rxrust::scheduler::TokioLocalScheduler;
 #[cfg(feature = "futures-runtime")]
 pub type CoContextScheduler = rxrust::scheduler::FuturesLocalScheduler;
 
+pub type CoStorage = Arc<dyn BlockStorage<StoreParams = DefaultParams> + Send + Sync>;
+
 pub struct CoContext {
 	scheduler: CoContextScheduler,
-	storage: StorageType,
+	storage: CoStorage,
 	store: StoreType,
 	actions: ActionsType,
 	network: Libp2pNetwork,
@@ -17,7 +22,7 @@ pub struct CoContext {
 impl CoContext {
 	pub fn new(
 		network: Libp2pNetwork,
-		storage: StorageType,
+		storage: CoStorage,
 		scheduler: CoContextScheduler,
 		store: StoreType,
 		actions: ActionsType,
@@ -31,7 +36,7 @@ impl CoContext {
 	}
 
 	/// Storage.
-	pub fn storage(&self) -> StorageType {
+	pub fn storage(&self) -> CoStorage {
 		self.storage.clone()
 	}
 

@@ -14,7 +14,10 @@ pub use library::{
 	node_reader::node_reader,
 };
 pub use storage::{
-	encrypted::EncryptedStorage, fs::FsStorage, memory::MemoryStorage, sync::SyncStorage, tokio::SyncBlockStorage,
+	encrypted::{EncryptedBlockStorage, EncryptedStorage},
+	fs::FsStorage,
+	memory::MemoryStorage,
+	sync::SyncStorage,
 };
 pub use types::{
 	block::{BlockStat, BlockStorage},
