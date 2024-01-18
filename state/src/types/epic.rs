@@ -178,6 +178,10 @@ where
 	fn unsubscribe(self) {
 		self.commands_tx.send(EpicCommand::Shutdown).unwrap();
 	}
+
+	fn is_closed(&self) -> bool {
+		self.commands_tx.is_closed()
+	}
 }
 
 pub struct EpicRunner<R>

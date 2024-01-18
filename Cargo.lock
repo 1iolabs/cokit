@@ -1180,6 +1180,7 @@ dependencies = [
  "async-trait",
  "co-network",
  "co-state",
+ "co-storage",
  "futures",
  "hyper",
  "libipld",
@@ -1665,6 +1666,7 @@ dependencies = [
  "co-network",
  "co-sdk",
  "co-state",
+ "co-storage",
  "directories",
  "futures",
  "hyper",
@@ -5257,7 +5259,9 @@ dependencies = [
 
 [[package]]
 name = "rxrust"
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9a529052da83e8897bb1f40459a0837b3c048eafabfae3bf1e7c050146b8141"
 dependencies = [
  "futures",
  "futures-time",
