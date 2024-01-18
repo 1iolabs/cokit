@@ -8,11 +8,6 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }
 hyper = { workspace = true }
-iroh-api = { path = "../../../github/n0-computer/beetle/iroh-api" }
-iroh-embed = { path = "../../../github/n0-computer/beetle/iroh-embed" }
-iroh-resolver = { path = "../../../github/n0-computer/beetle/iroh-resolver" }
-iroh-rpc-client = { path = "../../../github/n0-computer/beetle/iroh-rpc-client" }
-iroh-unixfs = { path = "../../../github/n0-computer/beetle/iroh-unixfs" }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 libp2p = { workspace = true, features = ["rendezvous", "tokio"] }
 names = "0.14.0"
@@ -28,9 +23,9 @@ uuid = { version = "1.2.2", features = ["default", "v4"] }
 #librocksdb-sys = { version = "0.10.0+7.9.2" }
 
 # co
-co-node-edge = { path = "../node-edge" }
 co-state = { path = "../state" }
 co-network = { path = "../co-network" }
+co-storage = { path = "../co-storage" }
 
 [features]
 "default" = ["tokio-runtime"]

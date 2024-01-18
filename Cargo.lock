@@ -5259,9 +5259,8 @@ dependencies = [
 
 [[package]]
 name = "rxrust"
-version = "1.0.0-beta.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9a529052da83e8897bb1f40459a0837b3c048eafabfae3bf1e7c050146b8141"
+version = "1.0.0-beta.6"
+source = "git+https://github.com/dkuhnert/rxRust.git?branch=master#b8f7829a280c4244ec40b884bedd04ef75a7bc37"
 dependencies = [
  "futures",
  "futures-time",
