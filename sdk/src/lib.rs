@@ -5,6 +5,7 @@ mod library;
 mod types;
 
 pub use drivers::{state::*, storage::*};
+pub use library::generate_random_name::generate_random_name;
 pub use types::{
 	action::*,
 	co::*,

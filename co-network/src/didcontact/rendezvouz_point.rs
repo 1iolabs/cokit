@@ -1,12 +1,10 @@
+use super::did::ResolveResult;
 use did_key::{Fingerprint, PatchedKeyPair};
 use libp2p::gossipsub::IdentTopic;
 use uuid::Uuid;
 
-use super::did::ResolveResult;
-
 enum RendezvousPointSource {
 	String(String),
-	None,
 }
 pub struct RendezvousPoint {
 	source: RendezvousPointSource,
@@ -45,7 +43,6 @@ impl Into<Option<String>> for &RendezvousPoint {
 	fn into(self) -> Option<String> {
 		match &self.source {
 			RendezvousPointSource::String(value) => Some(value.clone()),
-			RendezvousPointSource::None => None,
 		}
 	}
 }

@@ -74,11 +74,10 @@ pub enum NetworkMode {
 }
 
 struct Runtime {
-	config: Libp2pNetworkConfig,
+	_config: Libp2pNetworkConfig,
 	listener_id: Option<libp2p::core::transport::ListenerId>,
 	// on_swarm_event: OnSwarmEvent<Behaviour>,
 	events: SubjectThreads<Arc<SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>>, ()>,
-	mode: NetworkMode,
 	running: bool,
 }
 impl Runtime {
@@ -87,15 +86,15 @@ impl Runtime {
 		// on_swarm_event: OnSwarmEvent<Behaviour>,
 		events: SubjectThreads<Arc<SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>>, ()>,
 	) -> Self {
-		Self { mode: config.mode.clone(), config, listener_id: None, events, running: true }
+		Self { _config: config, listener_id: None, events, running: true }
 	}
 
-	/// Network mode to optimize for.
-	/// This may change dynamically.
-	/// For example when a mobile device gets plugged in to an power outlet.
-	fn network_mode(&self) -> &NetworkMode {
-		&self.mode
-	}
+	// /// Network mode to optimize for.
+	// /// This may change dynamically.
+	// /// For example when a mobile device gets plugged in to an power outlet.
+	// fn network_mode(&self) -> &NetworkMode {
+	// 	&self._config.mode
+	// }
 
 	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
 		self.listener_id = Some(id);
@@ -222,6 +221,10 @@ impl Libp2pNetwork {
 	/// Swarm events subject.
 	pub fn events(&self) -> EventsSubject<Behaviour, BehaviourEvent> {
 		self.events.clone()
+	}
+
+	pub fn config(&self) -> &Libp2pNetworkConfig {
+		&self.config
 	}
 }
 
