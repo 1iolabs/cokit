@@ -6,3 +6,4 @@ pub mod poll_event;
 pub mod receipts;
 pub mod relation;
 pub mod state_event;
+pub mod user_events;

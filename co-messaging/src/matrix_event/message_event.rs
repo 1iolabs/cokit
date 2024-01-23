@@ -93,6 +93,9 @@ pub trait Formattable {
 	fn remove_format(&mut self);
 }
 
+/**
+ * Used to describe which users got mentioned in the body of a message
+ */
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Mentions {
 	pub user_ids: Vec<Did>,
@@ -106,12 +109,12 @@ pub struct Mentions {
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct TextContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
-	formatted_body: Option<String>,
+	formatted_body: Option<String>, // A formatted version of the body
 	#[serde(skip_serializing_if = "Option::is_none")]
-	format: Option<String>,
-	pub body: String,
+	format: Option<String>, // The format used in formatted body
+	pub body: String, // The body of the message
 	#[serde(skip_serializing_if = "Option::is_none", rename = "m.mentions")]
-	pub mentions: Option<Mentions>,
+	pub mentions: Option<Mentions>, // Users that are mentioned in the body
 }
 
 impl TextContent {
@@ -123,6 +126,7 @@ impl TextContent {
 			is_silent: None,
 			relates_to: None,
 			mentions: None,
+			new_content: None,
 		}
 	}
 }
@@ -171,12 +175,12 @@ impl Relation for TextContent {
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct NoticeContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
-	formatted_body: Option<String>,
+	formatted_body: Option<String>, // A formatted version of the body
 	#[serde(skip_serializing_if = "Option::is_none")]
-	format: Option<String>,
-	pub body: String,
+	format: Option<String>, // The format used in formatted body
+	pub body: String, // The body of the message
 	#[serde(skip_serializing_if = "Option::is_none", rename = "m.mentions")]
-	pub mentions: Option<Mentions>,
+	pub mentions: Option<Mentions>, // Users that are mentioned in the body
 }
 
 impl NoticeContent {
@@ -188,6 +192,7 @@ impl NoticeContent {
 			is_silent: Default::default(),
 			relates_to: None,
 			mentions: None,
+			new_content: None,
 		}
 	}
 }
@@ -238,7 +243,7 @@ pub struct ImageContent {
 
 impl ImageContent {
 	pub fn new(body: impl Into<String>, file: Cid, info: ImageInfo) -> Self {
-		Self { body: body.into(), file, info, is_silent: None, relates_to: None }
+		Self { body: body.into(), file, info, is_silent: None, relates_to: None, new_content: None }
 	}
 }
 
@@ -273,7 +278,7 @@ pub struct AudioContent {
 
 impl AudioContent {
 	pub fn new(body: impl Into<String>, file: Cid, info: AudioInfo) -> Self {
-		Self { body: body.into(), file, info, is_silent: None, relates_to: None }
+		Self { body: body.into(), file, info, is_silent: None, relates_to: None, new_content: None }
 	}
 }
 
@@ -308,7 +313,7 @@ pub struct VideoContent {
 
 impl VideoContent {
 	pub fn new(body: impl Into<String>, file: Cid, info: VideoInfo) -> Self {
-		Self { body: body.into(), file, info, is_silent: None, relates_to: None }
+		Self { body: body.into(), file, info, is_silent: None, relates_to: None, new_content: None }
 	}
 }
 
@@ -344,7 +349,15 @@ pub struct FileContent {
 
 impl FileContent {
 	pub fn new(body: impl Into<String>, file: Cid, filename: impl Into<String>, info: FileInfo) -> Self {
-		Self { body: body.into(), file, filename: filename.into(), info, is_silent: None, relates_to: None }
+		Self {
+			body: body.into(),
+			file,
+			filename: filename.into(),
+			info,
+			is_silent: None,
+			relates_to: None,
+			new_content: None,
+		}
 	}
 }
 
@@ -379,7 +392,7 @@ pub struct LocationContent {
 
 impl LocationContent {
 	pub fn new(body: impl Into<String>, geo_uri: impl Into<String>, info: LocationInfo) -> Self {
-		Self { body: body.into(), geo_uri: geo_uri.into(), info, is_silent: None, relates_to: None }
+		Self { body: body.into(), geo_uri: geo_uri.into(), info, is_silent: None, relates_to: None, new_content: None }
 	}
 }
 

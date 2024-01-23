@@ -1,9 +1,10 @@
 mod matrix_event;
 
+// todo
 pub static FORMATTED_BODY_FORMAT: &str = "some.html.standard.format";
 
 pub use crate::matrix_event::{
-	call_event, ephemeral_event, message_event, multimedia, poll_event, receipts, relation, state_event,
+	call_event, ephemeral_event, message_event, multimedia, poll_event, receipts, relation, state_event, user_events,
 };
 use co_primitives::Did;
 use matrix_event::{
@@ -11,8 +12,9 @@ use matrix_event::{
 	ephemeral_event::EphemeralType,
 	message_event::MessageType,
 	receipts::ReceiptType,
-	relation::{ReactionContent, Relation},
+	relation::{ReactionContent, RedactionContent, Relation},
 	state_event::StateType,
+	user_events::UserType,
 };
 use serde::{Deserialize, Serialize};
 
@@ -87,6 +89,8 @@ pub enum EventContent {
 	Message(MessageType),
 	#[serde(rename = "m.reaction")]
 	Reaction(ReactionContent),
+	#[serde(rename = "m.room.redaction")]
+	Redaction(RedactionContent),
 	#[serde(rename = "m.receipt")]
 	Receipt(ReceiptType),
 	#[serde(untagged)]
@@ -95,6 +99,8 @@ pub enum EventContent {
 	Call(CallType),
 	#[serde(untagged)]
 	Ephemeral(EphemeralType),
+	#[serde(untagged)]
+	User(UserType),
 }
 
 impl EventContent {
@@ -112,10 +118,12 @@ impl EventType for EventContent {
 		match self {
 			EventContent::Message(_) => "m.room.message".into(),
 			EventContent::Reaction(_) => "m.reaction".into(),
+			EventContent::Redaction(_) => "m.room.redaction".into(),
 			EventContent::Receipt(_) => "m.receipt".into(),
 			EventContent::State(state) => state.generate_event_type(),
 			EventContent::Call(call) => call.generate_event_type(),
 			EventContent::Ephemeral(content) => content.generate_event_type(),
+			EventContent::User(content) => content.generate_event_type(),
 		}
 	}
 }

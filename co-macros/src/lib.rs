@@ -18,6 +18,13 @@ pub fn common_event_content(args: TokenStream, input: TokenStream) -> TokenStrea
 				.parse2(quote! { #[serde(skip_serializing_if = "Option::is_none")] pub relates_to: Option<RelatesTo> })
 				.unwrap(),
 		);
+		fields.named.push(
+			syn::Field::parse_named
+				.parse2(
+					quote! { #[serde(skip_serializing_if = "Option::is_none", rename = "m.new_content")] pub new_content: Option<Box<EventContent>> },
+				)
+				.unwrap(),
+		);
 	}
 
 	return quote! {

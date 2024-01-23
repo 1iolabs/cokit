@@ -1,4 +1,4 @@
-use crate::EventContent;
+use crate::{EventContent, EventType};
 use co_macros::common_event_content;
 use serde::{Deserialize, Serialize};
 
@@ -8,8 +8,8 @@ pub trait Relation {
 }
 
 /**
- * empty content as the only purpose is holding a relation to another event
- * mostly used for annotation events
+ * Empty content as the only purpose is holding a relation to another event.
+ * Mostly used for annotation events
  */
 #[common_event_content]
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -17,7 +17,7 @@ pub struct ReactionContent {}
 
 impl ReactionContent {
 	pub fn new(relation: RelatesTo) -> Self {
-		Self { is_silent: None, relates_to: Some(relation) }
+		Self { is_silent: None, relates_to: Some(relation), new_content: None }
 	}
 }
 
@@ -42,20 +42,30 @@ impl Relation for ReactionContent {
 	}
 }
 
+impl EventType for ReactionContent {
+	fn generate_event_type(&self) -> String {
+		"m.reaction".into()
+	}
+}
+
+/**
+ * Used in some event contents to define a relation to other events
+ */
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename = "m.relates_to")]
 pub struct RelatesTo {
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub rel_type: Option<RelationType>,
+	pub rel_type: Option<RelationType>, // The type of the relation
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub event_id: Option<String>,
+	pub event_id: Option<String>, // The ID of the event that is being related to
 	#[serde(rename = "m.in_reply_to")]
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub in_reply_to: Option<ReplyContent>,
+	pub in_reply_to: Option<ReplyContent>, /* Special relation to depict replies. Listed extra as this can happen
+	                                        * with the other relations simultaneously */
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub room_id: Option<String>,
+	pub room_id: Option<String>, // The ID of the room the related-to event is in. Only needed for forwarding.
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub key: Option<String>,
+	pub key: Option<String>, // Used for annotations. Defines the type of emoji that has been reacted with.
 }
 
 impl RelatesTo {
@@ -148,6 +158,9 @@ impl Relation for RelatesTo {
 	}
 }
 
+/**
+ * Simple enum containing all different types of relation that events can have to other events
+ */
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum RelationType {
 	#[serde(rename = "m.annotation")]
@@ -180,4 +193,28 @@ impl Relation for RelationType {
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct ReplyContent {
 	pub event_id: String,
+}
+
+/**
+ * Event content used to redact other events. Sender of this event must be either the same as the sender of the
+ * original event or a user with the necessary permissions.
+ * Redactions are idempotent and irreversible. They do not use the same relation fields as other events
+ */
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct RedactionContent {
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub reason: Option<String>, // An optional reason field mostly used when event got redacted by another user
+	pub redacts: String, // Event ID of the redacted event
+}
+
+impl Into<EventContent> for RedactionContent {
+	fn into(self) -> EventContent {
+		EventContent::Redaction(self)
+	}
+}
+
+impl RedactionContent {
+	pub fn new(redacts: impl Into<String>, reason: Option<String>) -> Self {
+		Self { reason, redacts: redacts.into() }
+	}
 }

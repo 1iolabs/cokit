@@ -2,6 +2,9 @@ use crate::{matrix_event::relation::RelatesTo, message_event::MessageType, relat
 use co_macros::common_event_content;
 use serde::{Deserialize, Serialize};
 
+/**
+ * All events that interact with or create a poll
+ */
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(tag = "msgtype")]
 pub enum PollMessageType {
@@ -36,11 +39,14 @@ impl Relation for PollMessageType {
 	}
 }
 
+/**
+ * Event used to create a poll.
+ */
 #[common_event_content]
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct PollStartContent {
-	pub body: String,
-	pub info: PollCreationInfo,
+	pub body: String,           // A textual representation of the poll, i.e. the question
+	pub info: PollCreationInfo, // Information about the created poll
 }
 
 impl PollStartContent {
@@ -51,6 +57,7 @@ impl PollStartContent {
 			info: PollCreationInfo::new(question, answers, kind),
 			is_silent: None,
 			relates_to: None,
+			new_content: None,
 		}
 	}
 	pub fn add_answer(&mut self, answer: PollAnswer) {
@@ -112,8 +119,8 @@ impl PollCreationInfo {
  */
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct PollAnswer {
-	pub id: String,
-	pub answer: String,
+	pub id: String,     // Unique ID to identify an answer
+	pub answer: String, // Text of the answer
 }
 
 impl PollAnswer {
@@ -125,25 +132,31 @@ impl PollAnswer {
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum PollKind {
 	#[serde(rename = "disclosed")]
-	Disclosed,
+	Disclosed, // In disclosed polls all participants can see the already cast votes (including who cast them)
 	#[serde(rename = "undisclosed")]
-	Undisclosed,
+	Undisclosed, // In undisclosed polls the votes will only appear when the poll has ended
 	#[serde(rename = "anonymous")]
-	Anonymous,
+	Anonymous, // As undisclosed but voters will stay hidden even after poll has ended
 }
 
 #[common_event_content]
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct PollResponseContent {
-	pub body: String,
-	pub answers: Vec<PollAnswer>,
+	pub body: String,         // Textual representation of the answers
+	pub answers: Vec<String>, // List of IDs of the answers the user has responded with
 }
 
 impl PollResponseContent {
-	pub fn new(body: impl Into<String>, answers: Vec<PollAnswer>, poll_event: impl Into<String>) -> Self {
-		Self { body: body.into(), answers, is_silent: None, relates_to: Some(RelatesTo::poll(poll_event)) }
+	pub fn new(body: impl Into<String>, answers: Vec<String>, poll_event: impl Into<String>) -> Self {
+		Self {
+			body: body.into(),
+			answers,
+			is_silent: None,
+			relates_to: Some(RelatesTo::poll(poll_event)),
+			new_content: None,
+		}
 	}
-	pub fn add_answer(&mut self, answer: PollAnswer) {
+	pub fn add_answer(&mut self, answer: String) {
 		self.answers.push(answer);
 	}
 }
@@ -156,10 +169,8 @@ impl Relation for PollResponseContent {
 		}
 	}
 	fn get_in_reply_to(&self) -> Option<String> {
-		match &self.relates_to {
-			Some(relates_to) => relates_to.get_in_reply_to(),
-			None => None,
-		}
+		// Poll response cannot be in reply to other events
+		None
 	}
 }
 
@@ -169,15 +180,18 @@ impl Into<EventContent> for PollResponseContent {
 	}
 }
 
+/**
+ * Event that closes the poll. For undisclosed and anonymous polls, this is the point where the reults are shown.
+ */
 #[common_event_content]
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct PollEndContent {
-	pub body: String,
+	pub body: String, // Textual representation of the poll ending
 }
 
 impl PollEndContent {
 	pub fn new(body: impl Into<String>, poll_event: impl Into<String>) -> Self {
-		Self { body: body.into(), is_silent: None, relates_to: Some(RelatesTo::poll(poll_event)) }
+		Self { body: body.into(), is_silent: None, relates_to: Some(RelatesTo::poll(poll_event)), new_content: None }
 	}
 }
 

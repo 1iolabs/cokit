@@ -2,7 +2,7 @@ use co_messaging::{
 	message_event::{self, Formattable, LocationContent, Mentions, TextContent},
 	multimedia::{AudioInfo, FileInfo, ImageInfo, LocationInfo, ThumbnailInfo, VideoInfo},
 	poll_event::{self, PollAnswer},
-	relation::{ReactionContent, RelatesTo, Relation},
+	relation::{ReactionContent, RedactionContent, RelatesTo, Relation},
 	MatrixEvent, FORMATTED_BODY_FORMAT,
 };
 use libipld::Cid;
@@ -141,7 +141,7 @@ fn test_poll_start() {
 #[test]
 fn test_poll_response() {
 	let mut event_content = poll_event::PollResponseContent::new("response", vec![], "some_poll_start");
-	event_content.add_answer(PollAnswer::new("test", "Test"));
+	event_content.add_answer("test".into());
 	let event = MatrixEvent::new("some_poll_response", 1577836800000, "@some.room", "did:web:some_user", event_content);
 	assert_eq!(event.event_type(), "m.room.message");
 	assert_eq!(event.content.generate_relation_type(), Some("m.poll".into()));
@@ -181,6 +181,17 @@ fn test_annotation() {
 	let event = MatrixEvent::new("some_event", 1577836800000, "@some.room", "did:web:some_user", event_content);
 	assert_eq!(event.event_type(), "m.reaction");
 	assert_eq!(event.generate_relation_type(), Some("m.annotation".into()));
+	let json = serde_json::to_string_pretty(&event).unwrap();
+	println!("JSON: {}", json);
+	let serded_event: MatrixEvent = serde_json::from_str(&json).unwrap();
+	assert_eq!(event, serded_event);
+}
+
+#[test]
+fn test_redaction() {
+	let event_content = RedactionContent::new("some_older_event", None);
+	let event = MatrixEvent::new("some_event", 1577836800000, "@some.room", "did:web:some_user", event_content);
+	assert_eq!(event.event_type(), "m.room.redaction");
 	let json = serde_json::to_string_pretty(&event).unwrap();
 	println!("JSON: {}", json);
 	let serded_event: MatrixEvent = serde_json::from_str(&json).unwrap();
