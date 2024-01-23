@@ -1,7 +1,7 @@
 use co_primitives::{Did, ReducerAction, Tags};
 use co_wasm_api::{reduce, Context, Reducer};
 use libipld::Cid;
-use libp2p_core::PeerId;
+use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::{BTreeMap, BTreeSet};

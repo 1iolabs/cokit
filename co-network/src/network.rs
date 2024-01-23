@@ -3,15 +3,13 @@ use futures::{channel::oneshot, StreamExt};
 use libp2p::{
 	gossipsub, identify,
 	identity::Keypair,
-	kad::{record::store::MemoryStore, Kademlia, KademliaConfig},
+	kad::{record::store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig},
 	mdns,
 	mdns::tokio::Behaviour as MdnsBehaviour,
 	multiaddr::Protocol,
 	ping,
-	swarm::{
-		dial_opts::DialOpts, ConnectionHandler, IntoConnectionHandler, NetworkBehaviour, SwarmBuilder, SwarmEvent,
-	},
-	tokio_development_transport, Multiaddr, PeerId, Swarm,
+	swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent, THandlerErr},
+	Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 use rxrust::prelude::*;
 use std::sync::Arc;
@@ -24,8 +22,8 @@ pub type EventsSubject<B, E> = SubjectThreads<Arc<SwarmEvent<E, THandlerErr<B>>>
 // 	<<B as NetworkBehaviour>::ConnectionHandler as IntoConnectionHandler>::Handler;
 // pub type BehaviourOutEventType<B: NetworkBehaviour> = <BehaviourConnectionHandler<B> as ConnectionHandler>::OutEvent;
 // pub type BehaviourErrorType<B: NetworkBehaviour> = <BehaviourConnectionHandler<B> as ConnectionHandler>::Error;
-
-type THandlerErr<TBehaviour> = <<<TBehaviour as NetworkBehaviour>::ConnectionHandler as IntoConnectionHandler>::Handler as ConnectionHandler>::Error;
+// type THandlerErr<TBehaviour> = <<<TBehaviour as NetworkBehaviour>::ConnectionHandler as
+// IntoConnectionHandler>::Handler as ConnectionHandler>::Error;
 
 pub struct Libp2pNetwork {
 	config: Libp2pNetworkConfig,
@@ -52,8 +50,8 @@ impl Libp2pNetworkConfig {
 		let mut failed = Vec::new();
 		for multiaddr in bootstap {
 			let mut addr = multiaddr.to_owned();
-			if let Some(Protocol::P2p(mh)) = addr.pop() {
-				let peer_id = PeerId::from_multihash(mh).unwrap();
+			if let Some(Protocol::P2p(peer_id)) = addr.pop() {
+				// let peer_id = PeerId::from_multihash(mh).unwrap();
 				self.bootstap.push((peer_id, addr));
 			} else {
 				failed.push(multiaddr.clone());
@@ -132,7 +130,7 @@ impl Runtime {
 #[derive(NetworkBehaviour)]
 pub struct Behaviour {
 	didcomm: didcomm::Behavior,
-	gossipsub: gossipsub::Gossipsub,
+	gossipsub: gossipsub::Behaviour,
 	identify: identify::Behaviour,
 	mdns: MdnsBehaviour,
 	ping: ping::Behaviour,
@@ -142,14 +140,14 @@ pub struct Behaviour {
 impl Libp2pNetwork {
 	pub async fn new(config: Libp2pNetworkConfig) -> anyhow::Result<Libp2pNetwork> {
 		let local_peer_id = PeerId::from(config.keypair.public().clone());
-		let gossipsub_config = gossipsub::GossipsubConfigBuilder::default()
+		let gossipsub_config = gossipsub::ConfigBuilder::default()
 			.max_transmit_size(256 * 1024)
 			.build()
 			.expect("valid config");
 		let didcomm_config: didcomm::Config = didcomm::Config { auto_dail: false, ..Default::default() };
 		let kademlia_config: KademliaConfig = Default::default();
 		let mut behaviour = Behaviour {
-			gossipsub: gossipsub::Gossipsub::new(
+			gossipsub: gossipsub::Behaviour::new(
 				gossipsub::MessageAuthenticity::Signed(config.keypair.clone()),
 				gossipsub_config,
 			)
@@ -159,7 +157,7 @@ impl Libp2pNetwork {
 				config.keypair.public(),
 			)),
 			ping: ping::Behaviour::new(ping::Config::new()),
-			mdns: MdnsBehaviour::new(mdns::Config::default() /* , local_peer_id.clone() */)?,
+			mdns: MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?,
 			didcomm: didcomm::Behavior::new(didcomm_config),
 			kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()), kademlia_config),
 		};
@@ -172,11 +170,12 @@ impl Libp2pNetwork {
 			tracing::warn!(?err, "kad-bootstrap-failed");
 		}
 
-		// transport
-		let transport = tokio_development_transport(config.keypair.clone())?;
-
 		// swarm
-		let mut swarm = SwarmBuilder::with_tokio_executor(transport, behaviour, local_peer_id).build();
+		let mut swarm = SwarmBuilder::with_existing_identity(config.keypair.clone())
+			.with_tokio()
+			.with_quic()
+			.with_behaviour(|_| behaviour)?
+			.build();
 
 		// tasks
 		let (tasks_tx, tasks_rx) = tokio::sync::mpsc::unbounded_channel();

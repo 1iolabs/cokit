@@ -1,11 +1,7 @@
 use libp2p::{
-	gossipsub::{
-		error::{PublishError, SubscriptionError},
-		Gossipsub as Behaviour, GossipsubConfigBuilder as ConfigBuilder, IdentTopic, MessageAuthenticity,
-	},
+	gossipsub::{Behaviour, ConfigBuilder, IdentTopic, MessageAuthenticity, PublishError, SubscriptionError},
 	identity::Keypair,
 };
-// use libp2p::gossipsub::{Behaviour, PublishError, SubscriptionError, ConfigBuilder};
 
 // modules
 mod did;

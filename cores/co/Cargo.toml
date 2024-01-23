@@ -11,7 +11,7 @@ anyhow = { workspace = true }
 co-primitives = { path = "../../co-primitives" }
 co-wasm-api = { path = "../../co-wasm-api" }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
-libp2p-core = { workspace = true }
+libp2p = { workspace = true, features = [] }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
