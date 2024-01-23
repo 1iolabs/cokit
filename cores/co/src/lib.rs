@@ -37,18 +37,6 @@ pub struct Co {
 	/// CO known peers.
 	// #[co_wasm_api::Dag]
 	pub peers: BTreeSet<PeerId>,
-	//
-	// /// CO settings.
-	// /// Normally settings are formatted with an dot notation.
-	// /// Formats:
-	// /// - `<core_name>.<setting_name>`
-	// /// - `<core_name>.<setting_namespaces>.<setting_name>`
-	// ///
-	// /// Examples:
-	// /// - `co.`
-	// ///
-	// /// Todo: Use Tags (Vec<(String, Ipld)>)?
-	// pub settings: BTreeMap<String, Ipld>,
 }
 
 // #[co_wasm_api::Data]
@@ -60,12 +48,8 @@ pub struct Core {
 	/// COre Tags.
 	pub tags: Tags,
 
-	// /// The CID of the permission binaries.
-	// /// If multiple binaries are specified they will be executed in parallel.
-	// /// If not specified the permissions are managed by the reducer.
-	// pub permission_binaries: Vec<Cid>,
 	/// The latest stream state.
-	pub state: Cid,
+	pub state: Option<Cid>,
 }
 
 // #[co_wasm_api::Data]
@@ -86,35 +70,7 @@ pub struct Participant {
 
 	/// Participant tags.
 	pub tags: Tags,
-	// /// Participant permissions.
-	// /// Only used when the default permission check is used.
-	// pub permissions: BTreeSet<Permission>,
-	//
-	// /// Additional participant settings and metadata.
-	// pub settings: BTreeMap<String, Ipld>,
 }
-
-// // #[co_wasm_api::Data]
-// #[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq, Eq, PartialOrd, Ord)]
-// #[non_exhaustive]
-// #[repr(u8)]
-// pub enum Permission {
-// 	ParticipantInvite = 0,
-// 	/// Change participants permission and settings.
-// 	ParticipantChange = 1,
-// 	SettingChange = 2,
-// 	CoreCreate = 3,
-// 	CoreRemove = 4,
-// 	KeyRotate = 5,
-// 	NameChange = 6,
-// }
-// impl Permission {
-// 	pub fn defaults() -> BTreeSet<Permission> {
-// 		let mut result = BTreeSet::new();
-// 		result.insert(Permission::CoreCreate);
-// 		result
-// 	}
-// }
 
 #[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq)]
 #[repr(u8)]
@@ -144,22 +100,16 @@ pub enum KeyState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CoAction {
-	// #[serde(rename = "i")]
-	Invite { did: Did, tags: Tags },
-	Join { did: Did },
 	Heads { heads: BTreeSet<Cid> },
+	ParticipantInvite { participant: Did, tags: Tags },
+	ParticipantJoin { participant: Did },
+	ParticipantTagsInsert { participant: Did, tags: Tags },
+	ParticipantTagsRemove { participant: Did, tags: Tags },
+	CoreCreate { core: String, binary: Cid, tags: Tags },
+	CoreRemove { core: String },
+	CoreTagsInsert { core: String, tags: Tags },
+	CoreTagsRemove { core: String, tags: Tags },
 }
-
-// impl Co {
-// 	pub fn set_name(mut self, event: &ReducerAction<CoAction>, name: String) -> Result<Self, anyhow::Error> {
-// 		let permissions = self.participants.get(&event.from).map(|p| p.permissions).unwrap_or_default();
-// 		if !permissions.contains(&Permission::NameChange) {
-// 			return Err(anyhow!("no permission"));
-// 		}
-// 		self.name = name;
-// 		Ok(self)
-// 	}
-// }
 
 impl Reducer for Co {
 	type Action = CoAction;
@@ -167,20 +117,47 @@ impl Reducer for Co {
 	fn reduce(self, event: &ReducerAction<Self::Action>, _: &mut dyn Context) -> Self {
 		let mut result = self;
 		match &event.payload {
-			CoAction::Invite { did, tags } =>
-				if !result.participants.contains_key(did) {
+			CoAction::ParticipantInvite { participant, tags } =>
+				if !result.participants.contains_key(participant) {
 					result.participants.insert(
-						did.clone(),
-						Participant { did: did.clone(), state: ParticipantState::Invite, tags: tags.clone() },
+						participant.clone(),
+						Participant { did: participant.clone(), state: ParticipantState::Invite, tags: tags.clone() },
 					);
 				},
-			CoAction::Join { did } =>
-				if let Some(participant) = result.participants.get_mut(did) {
+			CoAction::ParticipantJoin { participant } =>
+				if let Some(participant) = result.participants.get_mut(participant) {
 					participant.state = ParticipantState::Active;
 				},
 			CoAction::Heads { heads } => {
 				result.heads = heads.clone();
 			},
+			CoAction::CoreCreate { core, binary, tags } =>
+				if !result.cores.contains_key(core) {
+					result
+						.cores
+						.insert(core.clone(), Core { binary: binary.clone(), tags: tags.clone(), state: None });
+				},
+			CoAction::CoreRemove { core } => {
+				result.cores.remove(core);
+			},
+			CoAction::ParticipantTagsInsert { participant, tags } => {
+				if let Some(participant) = result.participants.get_mut(participant) {
+					participant.tags.append(&mut tags.clone());
+				}
+			},
+			CoAction::ParticipantTagsRemove { participant, tags } => {
+				if let Some(participant) = result.participants.get_mut(participant) {
+					participant.tags.clear(Some(tags));
+				}
+			},
+			CoAction::CoreTagsInsert { core, tags } =>
+				if let Some(core) = result.cores.get_mut(core) {
+					core.tags.append(&mut tags.clone());
+				},
+			CoAction::CoreTagsRemove { core, tags } =>
+				if let Some(core) = result.cores.get_mut(core) {
+					core.tags.clear(Some(tags));
+				},
 		}
 		result
 	}

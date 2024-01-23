@@ -79,12 +79,31 @@ pub struct Tags {
 	tags: BTreeSet<Tag>,
 }
 impl Tags {
+	/// Insert tag.
 	pub fn insert(&mut self, tag: Tag) {
 		self.tags.insert(tag);
 	}
 
+	/// Remove tag.
 	pub fn remove(&mut self, tag: &Tag) {
 		self.tags.remove(tag);
+	}
+
+	/// Insert mutiple tags.
+	pub fn append(&mut self, tags: &mut Tags) {
+		self.tags.append(&mut tags.tags);
+	}
+
+	/// Remove specified tags.
+	/// If no tags are specified all tags will be removed.
+	pub fn clear(&mut self, tags: Option<&Tags>) {
+		match tags {
+			Some(tags) =>
+				for tag in tags.tags.iter() {
+					self.tags.remove(tag);
+				},
+			None => self.tags.clear(),
+		}
 	}
 }
 impl Debug for Tags {
