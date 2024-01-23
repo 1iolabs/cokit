@@ -1121,7 +1121,7 @@ dependencies = [
  "co-storage",
  "co-wasm-api",
  "co-wasm-runtime",
- "libipld",
+ "libipld 0.15.0",
  "libp2p-core",
  "serde",
  "serde_ipld_dagcbor",
@@ -1141,7 +1141,7 @@ dependencies = [
  "co-storage",
  "co-wasm-api",
  "co-wasm-runtime",
- "libipld",
+ "libipld 0.15.0",
  "libp2p-core",
  "serde",
  "serde_ipld_dagcbor",
@@ -1227,7 +1227,7 @@ name = "co-primitives"
 version = "0.1.0"
 dependencies = [
  "derive_more",
- "libipld  0.15.0",
+ "libipld 0.15.0",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",
