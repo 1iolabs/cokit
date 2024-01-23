@@ -6,4 +6,5 @@ pub use types::{
 	did::Did,
 	link::{Link, Linkable},
 	metadata::{CoMetadata, Metadata, WithCoMetadata},
+	tags::{Tag, Tags},
 };

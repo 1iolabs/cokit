@@ -1113,6 +1113,46 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 
 [[package]]
+name = "co-core-co"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "co-primitives",
+ "co-storage",
+ "co-wasm-api",
+ "co-wasm-runtime",
+ "libipld",
+ "libp2p-core",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "serde_repr",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "co-core-keystore"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "co-primitives",
+ "co-storage",
+ "co-wasm-api",
+ "co-wasm-runtime",
+ "libipld",
+ "libp2p-core",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "serde_repr",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "co-log"
 version = "0.1.0"
 dependencies = [
@@ -1186,7 +1226,8 @@ dependencies = [
 name = "co-primitives"
 version = "0.1.0"
 dependencies = [
- "libipld 0.15.0",
+ "derive_more",
+ "libipld  0.15.0",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",

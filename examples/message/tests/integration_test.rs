@@ -27,7 +27,12 @@ fn integration_test() {
 	let mut storage = SyncStorage::new(encrypted);
 
 	// action
-	let action = ReducerAction { payload: MessageAction::Message, from: "did:local:test".to_owned(), time: 0 };
+	let action = ReducerAction {
+		core: "".to_owned(),
+		payload: MessageAction::Message,
+		from: "did:local:test".to_owned(),
+		time: 0,
+	};
 	let action_block = BlockSerializer::default().serialize(&action).unwrap();
 	let action_cid = action_block.cid().clone();
 	storage.set(action_block).unwrap();

@@ -9,6 +9,8 @@ members = [
     "co-storage",
     "co-wasm-api",
     "co-wasm-runtime",
+    "cores/co",
+    "cores/keystore",
     "daemon",
     "did-co",
     "examples/counter",
@@ -27,9 +29,11 @@ async-stream = "0.3.3"
 async-trait = "0.1.57"
 futures = "0.3"
 futures-util = "0.3.26"
+derive_more = "0.99.17"
 hyper = { version = "0.14.23" }
 libipld = "0.15"
 libp2p = { version = "0.50", features = ["full"] }
+libp2p-core = { version = "0.38" }
 rxrust = { version = "1.0.0-beta.6", git = "https://github.com/dkuhnert/rxRust.git", branch = "master", features = [
     "tokio-scheduler",
 ] }
