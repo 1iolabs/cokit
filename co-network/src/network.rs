@@ -3,20 +3,19 @@ use futures::{channel::oneshot, StreamExt};
 use libp2p::{
 	gossipsub, identify,
 	identity::Keypair,
-	kad::{record::store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig},
+	kad::{store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig},
 	mdns,
 	mdns::tokio::Behaviour as MdnsBehaviour,
 	multiaddr::Protocol,
 	ping,
-	swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent, THandlerErr},
+	swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
 	Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 use rxrust::prelude::*;
 use std::sync::Arc;
 
 pub type Task<B> = Box<dyn Send + Fn(&mut Swarm<B>)>;
-// pub type OnSwarmEvent<B, E> = Box<dyn Send + Fn(&mut Swarm<B>, SwarmEvent<E, THandlerErr<B>>)>;
-pub type EventsSubject<B, E> = SubjectThreads<Arc<SwarmEvent<E, THandlerErr<B>>>, ()>;
+pub type EventsSubject<E> = SubjectThreads<Arc<SwarmEvent<E>>, ()>;
 
 // pub type BehaviourConnectionHandler<B: NetworkBehaviour> =
 // 	<<B as NetworkBehaviour>::ConnectionHandler as IntoConnectionHandler>::Handler;
@@ -29,7 +28,7 @@ pub struct Libp2pNetwork {
 	config: Libp2pNetworkConfig,
 	shutdown: Option<oneshot::Sender<()>>,
 	tasks: tokio::sync::mpsc::UnboundedSender<Task<Behaviour>>,
-	events: EventsSubject<Behaviour, BehaviourEvent>,
+	events: EventsSubject<BehaviourEvent>,
 }
 
 #[derive(Clone, Debug)]
@@ -74,16 +73,11 @@ pub enum NetworkMode {
 struct Runtime {
 	_config: Libp2pNetworkConfig,
 	listener_id: Option<libp2p::core::transport::ListenerId>,
-	// on_swarm_event: OnSwarmEvent<Behaviour>,
-	events: SubjectThreads<Arc<SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>>, ()>,
+	events: EventsSubject<BehaviourEvent>,
 	running: bool,
 }
 impl Runtime {
-	fn new(
-		config: Libp2pNetworkConfig,
-		// on_swarm_event: OnSwarmEvent<Behaviour>,
-		events: SubjectThreads<Arc<SwarmEvent<BehaviourEvent, THandlerErr<Behaviour>>>, ()>,
-	) -> Self {
+	fn new(config: Libp2pNetworkConfig, events: EventsSubject<BehaviourEvent>) -> Self {
 		Self { _config: config, listener_id: None, events, running: true }
 	}
 
@@ -218,7 +212,7 @@ impl Libp2pNetwork {
 	}
 
 	/// Swarm events subject.
-	pub fn events(&self) -> EventsSubject<Behaviour, BehaviourEvent> {
+	pub fn events(&self) -> EventsSubject<BehaviourEvent> {
 		self.events.clone()
 	}
 

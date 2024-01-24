@@ -5,8 +5,7 @@ use libp2p::{
 		behaviour::{AddressChange, ConnectionClosed, DialFailure, FromSwarm},
 		derive_prelude::{ConnectionEstablished, ConnectionId},
 		dial_opts::DialOpts,
-		ConnectionDenied, NetworkBehaviour, NotifyHandler, PollParameters, THandler, THandlerInEvent, THandlerOutEvent,
-		ToSwarm,
+		ConnectionDenied, NetworkBehaviour, NotifyHandler, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
 	},
 	Multiaddr, PeerId,
 };
@@ -129,9 +128,7 @@ impl Behavior {
 
 	fn on_connection_closed(
 		&mut self,
-		ConnectionClosed { peer_id, connection_id, remaining_established, .. }: ConnectionClosed<
-			<Self as NetworkBehaviour>::ConnectionHandler,
-		>,
+		ConnectionClosed { peer_id, connection_id, remaining_established, .. }: ConnectionClosed<'_>,
 	) {
 		let connections = self
 			.connected
@@ -211,11 +208,7 @@ impl NetworkBehaviour for Behavior {
 	type ConnectionHandler = Handler;
 	type ToSwarm = Event;
 
-	fn poll(
-		&mut self,
-		_cx: &mut Context<'_>,
-		_params: &mut impl PollParameters,
-	) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
+	fn poll(&mut self, _cx: &mut Context<'_>) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
 		if let Some(event) = self.pending_events.pop_front() {
 			return Poll::Ready(event)
 		} else if self.pending_events.capacity() > 100 {
@@ -245,22 +238,14 @@ impl NetworkBehaviour for Behavior {
 		Ok(Handler::new())
 	}
 
-	fn on_swarm_event(&mut self, event: FromSwarm<Self::ConnectionHandler>) {
+	fn on_swarm_event(&mut self, event: FromSwarm) {
 		match event {
 			FromSwarm::ConnectionEstablished(connection_established) =>
 				self.on_connection_established(connection_established),
 			FromSwarm::ConnectionClosed(connection_closed) => self.on_connection_closed(connection_closed),
 			FromSwarm::AddressChange(address_change) => self.on_address_change(address_change),
 			FromSwarm::DialFailure(dial_failure) => self.on_dial_failure(dial_failure),
-			FromSwarm::ListenFailure(_) => {},
-			FromSwarm::NewListener(_) => {},
-			FromSwarm::NewListenAddr(_) => {},
-			FromSwarm::ExpiredListenAddr(_) => {},
-			FromSwarm::ListenerError(_) => {},
-			FromSwarm::ListenerClosed(_) => {},
-			FromSwarm::NewExternalAddrCandidate(_) => {},
-			FromSwarm::ExternalAddrExpired(_) => {},
-			FromSwarm::ExternalAddrConfirmed(_) => {},
+			_ => {},
 		}
 	}
 

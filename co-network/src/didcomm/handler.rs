@@ -1,12 +1,11 @@
-use super::{codec, message::Message, protocol::MessageProtocol};
+use super::{message::Message, protocol::MessageProtocol};
 use libp2p::swarm::{
 	handler::{ConnectionEvent, DialUpgradeError, FullyNegotiatedInbound, FullyNegotiatedOutbound, ListenUpgradeError},
-	ConnectionHandler, ConnectionHandlerEvent, KeepAlive, StreamUpgradeError, SubstreamProtocol,
+	ConnectionHandler, ConnectionHandlerEvent, StreamUpgradeError, SubstreamProtocol,
 };
 use std::{
 	collections::VecDeque,
 	task::{Context, Poll},
-	time::{Duration, Instant},
 };
 
 #[derive(Debug, Clone)]
@@ -18,38 +17,17 @@ pub enum Event {
 }
 
 pub struct Handler {
-	/// Keep alive while waiting for inbound/outbound task.
-	keep_alive: KeepAlive,
-
-	/// A pending fatal error that results in the connection being closed.
-	pending_error: Option<codec::Error>,
-
 	/// Pending events to be emitted by `poll`.
 	pending_events: VecDeque<Event>,
 
 	/// Outbound messages to be sent.
 	outbound: VecDeque<MessageProtocol>,
 	pending_outbound: i32,
-
-	/// The keep-alive timeout of idle connections. A connection is considered
-	/// idle if there are no outbound substreams.
-	keep_alive_timeout: Duration,
-
-	/// The outbound message send timeout.
-	send_timeout: Duration,
 }
 
 impl Handler {
 	pub fn new() -> Self {
-		Handler {
-			keep_alive: KeepAlive::Yes,
-			outbound: VecDeque::new(),
-			pending_error: None,
-			pending_events: VecDeque::new(),
-			pending_outbound: 0,
-			send_timeout: Duration::from_millis(30000),
-			keep_alive_timeout: Duration::from_millis(1000),
-		}
+		Handler { outbound: VecDeque::new(), pending_events: VecDeque::new(), pending_outbound: 0 }
 	}
 }
 
@@ -96,9 +74,6 @@ impl Handler {
 impl ConnectionHandler for Handler {
 	type FromBehaviour = MessageProtocol;
 	type ToBehaviour = Event;
-	// type InEvent = MessageProtocol;
-	// type OutEvent = Event;
-	type Error = codec::Error;
 	type InboundProtocol = MessageProtocol;
 	type OutboundProtocol = MessageProtocol;
 	type OutboundOpenInfo = ();
@@ -109,24 +84,17 @@ impl ConnectionHandler for Handler {
 	}
 
 	fn on_behaviour_event(&mut self, v: Self::FromBehaviour) {
-		self.keep_alive = KeepAlive::Yes;
 		self.outbound.push_back(v);
 	}
 
-	fn connection_keep_alive(&self) -> KeepAlive {
-		self.keep_alive
+	fn connection_keep_alive(&self) -> bool {
+		self.pending_outbound > 0 || self.outbound.len() > 0 || self.pending_events.len() > 0
 	}
 
 	fn poll(
 		&mut self,
 		_cx: &mut Context<'_>,
-	) -> Poll<ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::ToBehaviour, Self::Error>> {
-		// check for a pending (fatal) error
-		if let Some(err) = self.pending_error.take() {
-			// The handler will not be polled again by the `Swarm`.
-			return Poll::Ready(ConnectionHandlerEvent::Close(err))
-		}
-
+	) -> Poll<ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::ToBehaviour>> {
 		// drain pending events
 		if let Some(event) = self.pending_events.pop_front() {
 			return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(event))
@@ -138,19 +106,10 @@ impl ConnectionHandler for Handler {
 		if let Some(message) = self.outbound.pop_front() {
 			self.pending_outbound += 1;
 			return Poll::Ready(ConnectionHandlerEvent::OutboundSubstreamRequest {
-				protocol: SubstreamProtocol::new(message, ()).with_timeout(self.send_timeout),
+				protocol: SubstreamProtocol::new(message, ()),
 			})
 		} else if self.outbound.capacity() > 100 {
 			self.outbound.shrink_to_fit();
-		}
-
-		// keep alive
-		//  @todo when not using an keep alive timeout the sent event will be never received.
-		if self.keep_alive.is_yes() {
-			self.keep_alive = match self.pending_outbound {
-				0 => KeepAlive::Until(Instant::now() + self.keep_alive_timeout),
-				_ => KeepAlive::Until(Instant::now() + self.send_timeout),
-			};
 		}
 
 		// nothing todo right now
@@ -171,7 +130,6 @@ impl ConnectionHandler for Handler {
 				self.pending_events.push_back(Event::Received { message: protocol });
 			},
 			ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound { protocol, .. }) => {
-				self.keep_alive = KeepAlive::Yes;
 				self.pending_outbound -= 1;
 				if let Some(message) = protocol {
 					self.pending_events.push_back(Event::Sent { message });
@@ -180,9 +138,7 @@ impl ConnectionHandler for Handler {
 			ConnectionEvent::DialUpgradeError(dial_upgrade_error) => self.on_dial_upgrade_error(dial_upgrade_error),
 			ConnectionEvent::ListenUpgradeError(listen_upgrade_error) =>
 				self.on_listen_upgrade_error(listen_upgrade_error),
-			ConnectionEvent::AddressChange(_) => {},
-			ConnectionEvent::LocalProtocolsChange(_) => {},
-			ConnectionEvent::RemoteProtocolsChange(_) => {},
+			_ => {},
 		}
 	}
 }

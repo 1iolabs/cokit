@@ -32,7 +32,7 @@ futures-util = "0.3.26"
 derive_more = "0.99.17"
 hyper = { version = "0.14.23" }
 libipld = "0.15"
-libp2p = { version = "0.52", features = ["full"] }
+libp2p = { version = "0.53", features = ["full"] }
 rxrust = { version = "1.0.0-beta.6", git = "https://github.com/dkuhnert/rxRust.git", branch = "master", features = [
     "tokio-scheduler",
 ] }

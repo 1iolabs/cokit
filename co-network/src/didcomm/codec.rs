@@ -1,6 +1,6 @@
 use super::message::Message;
-use futures::{AsyncRead, AsyncWrite};
-use libp2p::core::upgrade::{read_length_prefixed, write_length_prefixed};
+use asynchronous_codec::{FramedRead, FramedWrite, LengthCodec};
+use futures::{AsyncRead, AsyncWrite, SinkExt, TryStreamExt};
 
 #[derive(Debug, Clone)]
 pub struct Codec {
@@ -24,11 +24,12 @@ impl From<std::io::ErrorKind> for Error {
 
 impl Codec {
 	pub async fn receive_message<S: AsyncRead + Unpin>(&self, socket: &mut S) -> Result<Message, Error> {
-		let data = read_length_prefixed(socket, self.max_message_size_bytes).await?;
-		if data.is_empty() {
-			return Err(Error::Empty)
+		let mut framed = FramedRead::new(socket, LengthCodec {});
+		let frame = framed.try_next().await?;
+		match frame {
+			None => Err(Error::Empty),
+			Some(data) => Ok(Message::Message(data.into())),
 		}
-		Ok(Message::Message(data))
 	}
 
 	pub async fn send_message<S: AsyncWrite + Unpin>(
@@ -39,7 +40,9 @@ impl Codec {
 		if data.len() > self.max_message_size_bytes {
 			return Err(std::io::ErrorKind::InvalidInput.into())
 		}
-		write_length_prefixed(socket, data).await?;
+		let mut framed = FramedWrite::new(socket, LengthCodec {});
+		framed.send(data.into()).await?;
+		framed.flush().await?;
 		Ok(())
 	}
 }

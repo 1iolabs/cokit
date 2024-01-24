@@ -1,6 +1,6 @@
 use super::{codec, message::Message};
 use futures::{future::BoxFuture, AsyncWriteExt, FutureExt};
-use libp2p::{core::UpgradeInfo, swarm::NegotiatedSubstream, InboundUpgrade, OutboundUpgrade};
+use libp2p::{core::UpgradeInfo, InboundUpgrade, OutboundUpgrade, Stream};
 use std::iter;
 
 pub const PROTOCOL_NAME: &'static str = "/didcomm/2";
@@ -34,12 +34,12 @@ impl UpgradeInfo for MessageProtocol {
 	}
 }
 
-impl InboundUpgrade<NegotiatedSubstream> for MessageProtocol {
+impl InboundUpgrade<Stream> for MessageProtocol {
 	type Output = Message;
 	type Error = codec::Error;
 	type Future = BoxFuture<'static, Result<Self::Output, Self::Error>>;
 
-	fn upgrade_inbound(self, mut socket: NegotiatedSubstream, _info: Self::Info) -> Self::Future {
+	fn upgrade_inbound(self, mut socket: Stream, _info: Self::Info) -> Self::Future {
 		async move {
 			// read
 			let read = self.codec.receive_message(&mut socket);
@@ -55,12 +55,12 @@ impl InboundUpgrade<NegotiatedSubstream> for MessageProtocol {
 	}
 }
 
-impl OutboundUpgrade<NegotiatedSubstream> for MessageProtocol {
+impl OutboundUpgrade<Stream> for MessageProtocol {
 	type Output = Option<Message>;
 	type Error = codec::Error;
 	type Future = BoxFuture<'static, Result<Self::Output, Self::Error>>;
 
-	fn upgrade_outbound(mut self, mut socket: NegotiatedSubstream, _info: Self::Info) -> Self::Future {
+	fn upgrade_outbound(mut self, mut socket: Stream, _info: Self::Info) -> Self::Future {
 		async move {
 			let mut result = None;
 
