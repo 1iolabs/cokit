@@ -11,6 +11,7 @@ members = [
     "co-wasm-runtime",
     "cores/co",
     "cores/keystore",
+    "cores/room",
     "daemon",
     "did-co",
     "examples/counter",
