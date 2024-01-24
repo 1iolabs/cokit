@@ -14,15 +14,8 @@ use libp2p::{
 use rxrust::prelude::*;
 use std::sync::Arc;
 
-pub type Task<B> = Box<dyn Send + Fn(&mut Swarm<B>)>;
+pub type Task<B> = Box<dyn Fn(&mut Swarm<B>) + Send>;
 pub type EventsSubject<E> = SubjectThreads<Arc<SwarmEvent<E>>, ()>;
-
-// pub type BehaviourConnectionHandler<B: NetworkBehaviour> =
-// 	<<B as NetworkBehaviour>::ConnectionHandler as IntoConnectionHandler>::Handler;
-// pub type BehaviourOutEventType<B: NetworkBehaviour> = <BehaviourConnectionHandler<B> as ConnectionHandler>::OutEvent;
-// pub type BehaviourErrorType<B: NetworkBehaviour> = <BehaviourConnectionHandler<B> as ConnectionHandler>::Error;
-// type THandlerErr<TBehaviour> = <<<TBehaviour as NetworkBehaviour>::ConnectionHandler as
-// IntoConnectionHandler>::Handler as ConnectionHandler>::Error;
 
 pub struct Libp2pNetwork {
 	config: Libp2pNetworkConfig,
@@ -36,6 +29,10 @@ pub struct Libp2pNetworkConfig {
 	pub keypair: Keypair,
 	pub addr: Option<Multiaddr>,
 	pub bootstap: Vec<(PeerId, Multiaddr)>,
+
+	/// Network mode to optimize for.
+	/// This may change dynamically.
+	/// For example when a mobile device gets plugged in to an power outlet.
 	pub mode: NetworkMode,
 }
 impl Libp2pNetworkConfig {
@@ -63,7 +60,7 @@ impl Libp2pNetworkConfig {
 	}
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Copy, PartialEq)]
 pub enum NetworkMode {
 	#[default]
 	Full,
@@ -81,13 +78,6 @@ impl Runtime {
 		Self { _config: config, listener_id: None, events, running: true }
 	}
 
-	// /// Network mode to optimize for.
-	// /// This may change dynamically.
-	// /// For example when a mobile device gets plugged in to an power outlet.
-	// fn network_mode(&self) -> &NetworkMode {
-	// 	&self._config.mode
-	// }
-
 	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
 		self.listener_id = Some(id);
 	}
@@ -95,30 +85,6 @@ impl Runtime {
 	fn is_running(&self) -> bool {
 		self.running
 	}
-	// fn is_running(&mut self, swarm: &mut Swarm<Behaviour>) -> bool {
-	// 	let running = match &mut self.shutdown {
-	// 		None => false,
-	// 		Some(r) => match r.try_recv() {
-	// 			// dropped or received signal
-	// 			Err(_) | Ok(Some(_)) => {
-	// 				// stop listening
-	// 				if let Some(listener_id) = self.listener_id.take() {
-	// 					swarm.remove_listener(listener_id);
-	// 				}
-
-	// 				// do not ask again
-	// 				self.shutdown = None;
-
-	// 				// not running
-	// 				false
-	// 			},
-
-	// 			// no signal received yet
-	// 			Ok(None) => true,
-	// 		},
-	// 	};
-	// 	running || swarm.connected_peers().peekable().peek().is_some()
-	// }
 }
 
 #[derive(NetworkBehaviour)]
@@ -129,6 +95,17 @@ pub struct Behaviour {
 	mdns: MdnsBehaviour,
 	ping: ping::Behaviour,
 	kad: Kademlia<MemoryStore>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Libp2pNetworkError {
+	#[error("Shutdown in progress. Operation canceled.")]
+	Shutdown,
+}
+impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Libp2pNetworkError {
+	fn from(_: tokio::sync::mpsc::error::SendError<T>) -> Self {
+		Self::Shutdown
+	}
 }
 
 impl Libp2pNetwork {
@@ -160,6 +137,7 @@ impl Libp2pNetwork {
 		for (peer, address) in config.bootstap.iter() {
 			behaviour.kad.add_address(peer, address.clone());
 		}
+		set_network_mode(&mut behaviour, config.mode);
 		if let Err(err) = behaviour.kad.bootstrap() {
 			tracing::warn!(?err, "kad-bootstrap-failed");
 		}
@@ -204,11 +182,9 @@ impl Libp2pNetwork {
 	}
 
 	/// Sends a task to execute on the behavior to the queue.
-	pub fn queue_behaviour_task(
-		&self,
-		task: Task<Behaviour>,
-	) -> Result<(), tokio::sync::mpsc::error::SendError<Task<Behaviour>>> {
-		self.tasks.send(task)
+	pub fn queue_behaviour_task(&self, task: Task<Behaviour>) -> Result<(), Libp2pNetworkError> {
+		self.tasks.send(task)?;
+		Ok(())
 	}
 
 	/// Swarm events subject.
@@ -218,6 +194,24 @@ impl Libp2pNetwork {
 
 	pub fn config(&self) -> &Libp2pNetworkConfig {
 		&self.config
+	}
+
+	/// Change network mode.
+	pub fn set_network_mode(&mut self, mode: NetworkMode) -> Result<(), Libp2pNetworkError> {
+		if self.config.mode != mode {
+			self.config.mode = mode;
+			self.queue_behaviour_task(Box::new(move |swarm| {
+				set_network_mode(swarm.behaviour_mut(), mode);
+			}))?;
+		}
+		Ok(())
+	}
+}
+
+fn set_network_mode(behaviour: &mut Behaviour, mode: NetworkMode) {
+	match mode {
+		NetworkMode::Full => behaviour.kad.set_mode(Some(libp2p::kad::Mode::Server)),
+		NetworkMode::Light => behaviour.kad.set_mode(Some(libp2p::kad::Mode::Client)),
 	}
 }
 
