@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /**
  * All events that interact with or create a poll
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "msgtype")]
 pub enum PollMessageType {
 	#[serde(rename = "m.poll.start")]
@@ -43,7 +43,7 @@ impl Relation for PollMessageType {
  * Event used to create a poll.
  */
 #[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PollStartContent {
 	pub body: String,           // A textual representation of the poll, i.e. the question
 	pub info: PollCreationInfo, // Information about the created poll
@@ -92,7 +92,7 @@ impl Relation for PollStartContent {
 /**
  * metadata for poll creation event
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PollCreationInfo {
 	pub question: String,         // the question the poll was created for
 	pub answers: Vec<PollAnswer>, // vector with possible answers
@@ -117,7 +117,7 @@ impl PollCreationInfo {
 /**
  * One possible answer in a poll. ID should be unique across answers.
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PollAnswer {
 	pub id: String,     // Unique ID to identify an answer
 	pub answer: String, // Text of the answer
@@ -129,7 +129,7 @@ impl PollAnswer {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum PollKind {
 	#[serde(rename = "disclosed")]
 	Disclosed, // In disclosed polls all participants can see the already cast votes (including who cast them)
@@ -140,7 +140,7 @@ pub enum PollKind {
 }
 
 #[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PollResponseContent {
 	pub body: String,         // Textual representation of the answers
 	pub answers: Vec<String>, // List of IDs of the answers the user has responded with
@@ -184,7 +184,7 @@ impl Into<EventContent> for PollResponseContent {
  * Event that closes the poll. For undisclosed and anonymous polls, this is the point where the reults are shown.
  */
 #[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PollEndContent {
 	pub body: String, // Textual representation of the poll ending
 }

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 /**
  * All events that in some way alter the state of a room
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type", content = "content")]
 pub enum StateType {
 	#[serde(rename = "m.room.name")]
@@ -36,7 +36,7 @@ impl EventType for StateType {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RoomNameContent {
 	pub name: String,
 }
@@ -59,7 +59,7 @@ impl Into<EventContent> for RoomNameContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RoomTopicContent {
 	pub topic: String,
 }
@@ -82,7 +82,7 @@ impl Into<EventContent> for RoomTopicContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RoomAvatarContent {
 	pub file: Cid,
 	pub info: ImageInfo,
@@ -106,7 +106,7 @@ impl Into<EventContent> for RoomAvatarContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PinnedEventsContent {
 	pub pinned: Vec<String>,
 }

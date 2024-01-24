@@ -12,7 +12,7 @@ pub trait Relation {
  * Mostly used for annotation events
  */
 #[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ReactionContent {}
 
 impl ReactionContent {
@@ -51,7 +51,7 @@ impl EventType for ReactionContent {
 /**
  * Used in some event contents to define a relation to other events
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename = "m.relates_to")]
 pub struct RelatesTo {
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -161,7 +161,7 @@ impl Relation for RelatesTo {
 /**
  * Simple enum containing all different types of relation that events can have to other events
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum RelationType {
 	#[serde(rename = "m.annotation")]
 	Annotation,
@@ -190,7 +190,7 @@ impl Relation for RelationType {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ReplyContent {
 	pub event_id: String,
 }
@@ -200,7 +200,7 @@ pub struct ReplyContent {
  * original event or a user with the necessary permissions.
  * Redactions are idempotent and irreversible. They do not use the same relation fields as other events
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RedactionContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub reason: Option<String>, // An optional reason field mostly used when event got redacted by another user

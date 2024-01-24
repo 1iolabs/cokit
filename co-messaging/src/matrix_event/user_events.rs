@@ -2,7 +2,7 @@ use crate::{EventContent, EventType};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type", content = "content")]
 pub enum UserType {
 	#[serde(rename = "m.user.story.post")]
@@ -29,7 +29,7 @@ impl Into<EventContent> for UserType {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PostUserStoryContent {
 	pub lifetime: u64,     // How long users can view the story after it was posted in ms
 	pub display_time: u64, // How long the story will be shown once opened in ms
@@ -54,7 +54,7 @@ impl PostUserStoryContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ViewUserStoryContent {
 	pub story: String, // ID of the event that containes the viewed story
 }
@@ -77,7 +77,7 @@ impl ViewUserStoryContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct UpdateProfileContent {
 	pub display_name: String, // The name that the user likes to use as a default
 	pub avatar: Cid,          // Content ID pointing to the avatar of the user

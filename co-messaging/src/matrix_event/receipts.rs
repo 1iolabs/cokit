@@ -5,7 +5,7 @@ use std::collections::HashMap;
 /**
  * Receipt events are used to indicate that all messages up to a specific event have been read by a user.
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ReceiptType {
 	#[serde(untagged)]
 	Public(PublicReceiptContent),
@@ -24,7 +24,7 @@ impl Into<EventContent> for ReceiptType {
  * event were read by the user that sent this receipt event. This becomes public knowledge to all users
  * participating in the CO.
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PublicReceiptContent {
 	#[serde(rename = "m.read")]
 	pub read: String, // The ID of the latest event read by the user
@@ -40,7 +40,7 @@ impl Into<EventContent> for PublicReceiptContent {
 /**
  * A read receipt for one specific room. Indicates that a user has read all messages up to the given event.
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PrivateReceipt {
 	pub event_id: String,  // The ID of the event the receipt references
 	pub thread_id: String, // The ID of the thread if receipt is threaded
@@ -51,7 +51,7 @@ pub struct PrivateReceipt {
  * in this event only needs to contain the delta on the users receipts. This means that there is no need to contain
  * the complete read receipt state in this event but only the changes.
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PrivateReceiptContent {
 	#[serde(rename = "m.read.private")]
 	pub read: HashMap<String, PrivateReceipt>, // Map of all room IDs to receipts

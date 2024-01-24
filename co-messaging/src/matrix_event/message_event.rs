@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 /**
  * Events that sent actual messages that can be seen by all participants in a room.
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "msgtype")]
 pub enum MessageType {
 	#[serde(rename = "m.text")]
@@ -96,7 +96,7 @@ pub trait Formattable {
 /**
  * Used to describe which users got mentioned in the body of a message
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Mentions {
 	pub user_ids: Vec<Did>,
 }
@@ -106,7 +106,7 @@ pub struct Mentions {
  * also given.
  */
 #[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TextContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	formatted_body: Option<String>, // A formatted version of the body
@@ -172,7 +172,7 @@ impl Relation for TextContent {
  * also given
  */
 #[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct NoticeContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	formatted_body: Option<String>, // A formatted version of the body
@@ -234,7 +234,7 @@ impl Relation for NoticeContent {
 }
 
 #[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ImageContent {
 	pub body: String,    // a text representing the image in some way
 	pub file: Cid,       // CID to the image file
@@ -269,7 +269,7 @@ impl Relation for ImageContent {
 }
 
 #[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct AudioContent {
 	pub body: String,    // a text representing the audio in same way
 	pub file: Cid,       // CID to the audio file
@@ -304,7 +304,7 @@ impl Relation for AudioContent {
 }
 
 #[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct VideoContent {
 	pub body: String,    // textual representation of the video
 	pub file: Cid,       // CID to the video
@@ -339,7 +339,7 @@ impl Relation for VideoContent {
 }
 
 #[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct FileContent {
 	pub body: String,     // a text representing the file in some way
 	pub file: Cid,        // CID to the file
@@ -383,7 +383,7 @@ impl Relation for FileContent {
 }
 
 #[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct LocationContent {
 	pub body: String,       // textual representation of the location
 	pub geo_uri: String,    // a geo uri by definition of https://datatracker.ietf.org/doc/html/rfc5870

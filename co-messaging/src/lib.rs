@@ -22,7 +22,7 @@ pub trait EventType {
 	fn generate_event_type(&self) -> String;
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MatrixEvent {
 	pub event_id: String,
 	pub timestamp: i64,
@@ -82,7 +82,7 @@ impl EventType for MatrixEvent {
  * Simple enum to fit the different possible contents.
  * Unique event type string can be generated from this using pattern matching.
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type", content = "content")]
 pub enum EventContent {
 	#[serde(rename = "m.room.message")]
