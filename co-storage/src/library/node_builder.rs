@@ -170,12 +170,12 @@ mod tests {
 		builder.push(4).unwrap();
 		builder.push(5).unwrap();
 		builder.push(6).unwrap();
+		builder.push(7).unwrap();
 		builder.push(8).unwrap();
-		builder.push(9).unwrap();
 
 		// blocks
 		let blocks = builder.into_blocks().unwrap();
-		assert_eq!(blocks.len(), 77);
+		assert_eq!(blocks.len(), 7);
 		insta::assert_debug_snapshot!(blocks);
 	}
 
