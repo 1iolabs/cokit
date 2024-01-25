@@ -8,7 +8,6 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 anyhow = { workspace = true }
-co-primitives = { path = "../../co-primitives" }
 co-api = { path = "../../co-api" }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { workspace = true, features = ["derive"] }
@@ -17,6 +16,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+co-sdk = { path = "../../co-sdk" }
 co-storage = { path = "../../co-storage" }
 co-runtime = { path = "../../co-runtime" }
 co-primitives = { path = "../../co-primitives" }

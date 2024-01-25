@@ -19,6 +19,7 @@ thiserror = { workspace = true }
 co-primitives = { path = "../../co-primitives" }
 co-storage = { path = "../../co-storage" }
 co-runtime = { path = "../../co-runtime" }
+co-sdk = { path = "../../co-sdk" }
 tokio = { workspace = true }
 tokio-util = { workspace = true, features = ["compat"] }
 tracing = { workspace = true }

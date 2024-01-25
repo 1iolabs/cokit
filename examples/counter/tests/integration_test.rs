@@ -1,5 +1,5 @@
-use co_primitives::ReducerAction;
-use co_runtime::{co_v1::CoV1Api, create_runtime};
+use co_api::ReducerAction;
+use co_runtime::{co_v1::CoV1Api, create_runtime, RuntimeContext};
 use co_storage::{BlockSerializer, MemoryStorage, Storage, SyncStorage};
 use example_counter::{Counter, CounterAction};
 use libipld::Cid;
@@ -34,7 +34,7 @@ fn integration_test() {
 	storage.set(action_block).unwrap();
 
 	// api
-	let api = CoV1Api::new(Box::new(storage.clone()), None, action_cid);
+	let api = CoV1Api::new(Box::new(storage.clone()), RuntimeContext { state: None, event: action_cid });
 
 	// wasm
 	let wasm_path = "../../target/wasm32-unknown-unknown/release/example_counter.wasm";

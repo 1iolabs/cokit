@@ -1,8 +1,8 @@
-use crate::{co_v1::CoV1Api, runtimes::RuntimeError, RuntimeInstance};
-use co_storage::{BlockStorage, StorageError};
-use libipld::Cid;
+use crate::{co_v1::CoV1Api, runtimes::RuntimeError, RuntimeContext, RuntimeInstance};
+use co_storage::{BlockStorage, StorageError, SyncBlockStorage};
+use libipld::{Cid, DefaultParams};
 use std::{collections::VecDeque, sync::Arc};
-use tokio::sync::Mutex;
+use tokio::{runtime::Handle, sync::Mutex};
 
 #[derive(Debug)]
 pub struct IdleRuntimePool {
@@ -47,10 +47,18 @@ impl RuntimePool {
 		Self { pool: Arc::new(Mutex::new(pool)) }
 	}
 
-	pub async fn execute<S>(&self, storage: &S, cid: &Cid, api: CoV1Api) -> Result<Option<Cid>, SharedRuntimePoolError>
+	pub async fn execute<S>(
+		&self,
+		storage: &S,
+		cid: &Cid,
+		context: RuntimeContext,
+	) -> Result<Option<Cid>, RuntimePoolError>
 	where
-		S: BlockStorage + Send,
+		S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + Clone + 'static,
 	{
+		// api
+		let api = CoV1Api::new(Box::new(SyncBlockStorage::new(storage.clone(), Handle::current())), context);
+
 		// get/create instance
 		let pool_instance = self.pool.lock().await.get(cid);
 		let mut instance = match pool_instance {
@@ -65,7 +73,7 @@ impl RuntimePool {
 				Ok((result, instance))
 			})
 			.await
-			.map_err(|e| SharedRuntimePoolError::Other(e.into()))??;
+			.map_err(|e| RuntimePoolError::Other(e.into()))??;
 
 		// pool instance
 		self.pool.lock().await.insert(instance);
@@ -81,7 +89,7 @@ impl Default for RuntimePool {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum SharedRuntimePoolError {
+pub enum RuntimePoolError {
 	#[error("Storage error")]
 	Storage(#[from] StorageError),
 

@@ -1,25 +1,24 @@
+use crate::RuntimeContext;
 use co_api::{Block, Cid};
 use co_storage::{Storage, StorageError};
 use std::{cmp::min, fmt::Debug, mem::swap};
 
 pub struct CoV1Api {
 	storage: Box<dyn Storage + Send + Sync>,
-	state: Option<Cid>,
-	event: Cid,
+	context: RuntimeContext,
 }
 impl CoV1Api {
-	pub fn new(storage: Box<dyn Storage + Send + Sync>, state: Option<Cid>, event: Cid) -> Self {
-		Self { storage, state, event }
+	pub fn new(storage: Box<dyn Storage + Send + Sync>, context: RuntimeContext) -> Self {
+		Self { storage, context }
 	}
 
 	pub fn state(&self) -> &Option<Cid> {
-		&self.state
+		&self.context.state
 	}
 
 	pub fn swap(&mut self, other: &mut CoV1Api) {
 		swap(&mut self.storage, &mut other.storage);
-		swap(&mut self.event, &mut other.event);
-		swap(&mut self.state, &mut other.state);
+		swap(&mut self.context, &mut other.context);
 	}
 
 	pub fn storage_mut(&mut self) -> &mut dyn Storage {
@@ -30,8 +29,7 @@ impl Debug for CoV1Api {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("CoV1Api")
 			// .field("storage", &"storage")
-			.field("state", &self.state)
-			.field("event", &self.event)
+			.field("context", &self.context)
 			.finish()
 	}
 }
@@ -89,7 +87,7 @@ pub fn storage_block_set(api: &mut CoV1Api, cid: &[u8], buffer: &[u8]) -> Result
 }
 
 pub fn state_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> u32 {
-	match api.state {
+	match api.context.state {
 		Some(cid) => {
 			let cid_buffer = cid.to_bytes();
 			let size = min(buffer.len(), cid_buffer.len());
@@ -101,12 +99,12 @@ pub fn state_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> u32 {
 }
 
 pub fn state_cid_write(api: &mut CoV1Api, buffer: &[u8]) -> Result<u32, CoV1ApiError> {
-	api.state = Some(Cid::try_from(buffer)?);
+	api.context.state = Some(Cid::try_from(buffer)?);
 	Ok(buffer.len().try_into().expect("u32"))
 }
 
 pub fn event_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> u32 {
-	let cid_buffer = api.event.to_bytes();
+	let cid_buffer = api.context.event.to_bytes();
 	let size = min(buffer.len(), cid_buffer.len());
 	buffer[0..size].copy_from_slice(&cid_buffer.as_slice()[0..size]);
 	cid_buffer.len().try_into().expect("u32")

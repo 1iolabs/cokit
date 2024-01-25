@@ -1,5 +1,4 @@
-use co_api::{reduce, CoMetadata, Context, Metadata, Reducer, ReducerAction, Storage, StorageExt};
-use co_primitives::{Date, Did, Link};
+use co_api::{reduce, CoMetadata, Context, Date, Did, Link, Metadata, Reducer, ReducerAction, Storage, StorageExt};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

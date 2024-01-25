@@ -4,8 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+#librocksdb-sys = { version = "0.10.0+7.9.2" }
+#rocksdb = { version = "0.20.1" }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+co-network = { path = "../co-network" }
+co-runtime = { path = "../co-runtime" }
+co-state = { path = "../state" }
+co-storage = { path = "../co-storage" }
 futures = { workspace = true }
 hyper = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
@@ -19,13 +25,6 @@ tokio = { workspace = true, optional = true, features = ["macros"] }
 tokio-stream = { workspace = true, optional = true }
 tracing = { workspace = true }
 uuid = { version = "1.2.2", features = ["default", "v4"] }
-#rocksdb = { version = "0.20.1" }
-#librocksdb-sys = { version = "0.10.0+7.9.2" }
-
-# co
-co-state = { path = "../state" }
-co-network = { path = "../co-network" }
-co-storage = { path = "../co-storage" }
 
 [features]
 "default" = ["tokio-runtime"]

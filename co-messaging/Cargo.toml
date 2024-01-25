@@ -3,12 +3,10 @@ name = "co-messaging"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+co-macros = { path = "../co-macros" }
+co-primitives = { path = "../co-primitives" }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
-serde =  {version = "1.0", features = ["derive"]}
-serde_json = "1.0.108"
+serde = { version = "1.0", features = ["derive"] }
 serde_ipld_dagcbor = "0.4.2"
-co-macros = {path = "../co-macros"}
-co-primitives = {path = "../co-primitives"}
+serde_json = "1.0.108"

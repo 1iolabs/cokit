@@ -1,9 +1,8 @@
-use std::{collections::VecDeque, convert::Infallible};
-
 use crate::{Node, Storage, StorageError};
 use libipld::{cbor::DagCborCodec, Cid};
 use serde::de::DeserializeOwned;
 use serde_ipld_dagcbor::DecodeError;
+use std::{collections::VecDeque, convert::Infallible};
 
 // pub fn node_reader_fn<T, F>(storage: &dyn Storage, cid: &Cid, f: &F) -> anyhow::Result<()>
 // where

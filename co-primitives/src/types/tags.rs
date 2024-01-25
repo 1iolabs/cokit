@@ -75,10 +75,13 @@ pub type Tag = (String, TagValue);
 /// Tags.
 #[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
 pub struct Tags {
-	#[serde(flatten)]
 	tags: BTreeSet<Tag>,
 }
 impl Tags {
+	pub fn new() -> Self {
+		Self { tags: Default::default() }
+	}
+
 	/// Insert tag.
 	pub fn insert(&mut self, tag: Tag) {
 		self.tags.insert(tag);
