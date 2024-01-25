@@ -1,5 +1,5 @@
 [package]
-name = "co-wasm-runtime"
+name = "co-runtime"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 co-storage = { path = "../co-storage" }
-co-wasm-api = { path = "../co-wasm-api" }
+co-api = { path = "../co-api" }
 futures = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 names = "0.14.0"

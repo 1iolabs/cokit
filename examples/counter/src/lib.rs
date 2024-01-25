@@ -1,4 +1,4 @@
-use co_wasm_api::{reduce, Context, Reducer, ReducerAction};
+use co_api::{reduce, Context, Reducer, ReducerAction};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]

@@ -1,14 +1,13 @@
 [workspace]
 members = [
-    "api",
     "co-log",
     "co-macros",
     "co-messaging",
     "co-network",
     "co-primitives",
     "co-storage",
-    "co-wasm-api",
-    "co-wasm-runtime",
+    "co-api",
+    "co-runtime",
     "cores/co",
     "cores/keystore",
     "cores/room",
@@ -16,7 +15,7 @@ members = [
     "did-co",
     "examples/counter",
     "examples/message",
-    "sdk",
+    "co-sdk",
     "state",
 ]
 resolver = "2"

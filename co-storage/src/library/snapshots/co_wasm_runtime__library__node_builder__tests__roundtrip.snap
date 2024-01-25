@@ -1,5 +1,5 @@
 ---
-source: co-wasm-runtime/src/library/node_builder.rs
+source: co-runtime/src/library/node_builder.rs
 assertion_line: 178
 expression: nodes
 ---

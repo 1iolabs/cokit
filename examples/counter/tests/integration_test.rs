@@ -1,6 +1,6 @@
 use co_primitives::ReducerAction;
+use co_runtime::{co_v1::CoV1Api, create_runtime};
 use co_storage::{BlockSerializer, MemoryStorage, Storage, SyncStorage};
-use co_wasm_runtime::{co_v1::CoV1Api, create_runtime};
 use example_counter::{Counter, CounterAction};
 use libipld::Cid;
 use std::process::Command;

@@ -1,6 +1,6 @@
 use anyhow::anyhow;
+use co_api::Metadata;
 use co_storage::{node_reader, DefaultNodeSerializer, NodeBuilder, Storage, StorageError};
-use co_wasm_api::Metadata;
 use libipld::{cbor::DagCborCodec, prelude::Codec, serde::from_ipld, Cid, Ipld};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashSet};

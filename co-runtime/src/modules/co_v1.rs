@@ -1,5 +1,5 @@
+use co_api::{Block, Cid};
 use co_storage::{Storage, StorageError};
-use co_wasm_api::{Block, Cid};
 use std::{cmp::min, fmt::Debug, mem::swap};
 
 pub struct CoV1Api {

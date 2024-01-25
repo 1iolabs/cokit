@@ -8,8 +8,7 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 anyhow = { workspace = true }
-co-primitives = { path = "../../co-primitives" }
-co-wasm-api = { path = "../../co-wasm-api" }
+co-api = { path = "../../co-api" }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
@@ -19,6 +18,6 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 co-storage = { path = "../../co-storage" }
-co-wasm-runtime = { path = "../../co-wasm-runtime" }
+co-runtime = { path = "../../co-runtime" }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

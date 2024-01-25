@@ -1,6 +1,6 @@
 use co_primitives::{Link, ReducerAction};
+use co_runtime::{co_v1::CoV1Api, create_runtime};
 use co_storage::{Algorithm, BlockSerializer, EncryptedStorage, MemoryStorage, Secret, Storage, SyncStorage};
-use co_wasm_runtime::{co_v1::CoV1Api, create_runtime};
 use example_message::{MessageAction, MessageState, Role};
 use libipld::Cid;
 use std::{collections::BTreeMap, iter::repeat, process::Command, str::FromStr};

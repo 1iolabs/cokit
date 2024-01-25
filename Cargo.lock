@@ -149,13 +149,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "api"
-version = "0.1.0"
-dependencies = [
- "co-sdk",
-]
-
-[[package]]
 name = "arrayref"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -995,14 +988,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 
 [[package]]
+name = "co-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "co-primitives",
+ "futures",
+ "libipld",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "co-core-co"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "co-primitives",
+ "co-api",
+ "co-runtime",
  "co-storage",
- "co-wasm-api",
- "co-wasm-runtime",
  "libipld",
  "libp2p",
  "serde",
@@ -1019,10 +1026,9 @@ name = "co-core-keystore"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "co-primitives",
+ "co-api",
+ "co-runtime",
  "co-storage",
- "co-wasm-api",
- "co-wasm-runtime",
  "libipld",
  "serde",
  "serde_ipld_dagcbor",
@@ -1038,11 +1044,10 @@ name = "co-core-room"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "co-api",
  "co-messaging",
- "co-primitives",
+ "co-runtime",
  "co-storage",
- "co-wasm-api",
- "co-wasm-runtime",
  "libipld",
  "serde",
  "serde_ipld_dagcbor",
@@ -1137,6 +1142,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "co-api",
+ "co-storage",
+ "futures",
+ "hexdump",
+ "insta",
+ "libipld",
+ "names",
+ "rust-unixfs",
+ "rxrust",
+ "serde",
+ "serde_bytes",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "serde_repr",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "wasmer",
+ "zeroize",
+]
+
+[[package]]
 name = "co-sdk"
 version = "0.1.0"
 dependencies = [
@@ -1208,51 +1243,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "co-wasm-api"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "co-primitives",
- "futures",
- "libipld",
- "serde",
- "serde_ipld_dagcbor",
- "serde_json",
- "thiserror",
-]
-
-[[package]]
-name = "co-wasm-runtime"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "co-storage",
- "co-wasm-api",
- "futures",
- "hexdump",
- "insta",
- "libipld",
- "names",
- "rust-unixfs",
- "rxrust",
- "serde",
- "serde_bytes",
- "serde_ipld_dagcbor",
- "serde_json",
- "serde_repr",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "wasmer",
  "zeroize",
 ]
 
@@ -2111,10 +2101,10 @@ name = "example-counter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "co-api",
  "co-primitives",
+ "co-runtime",
  "co-storage",
- "co-wasm-api",
- "co-wasm-runtime",
  "libipld",
  "serde",
  "serde_ipld_dagcbor",
@@ -2131,10 +2121,10 @@ name = "example-message"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "co-api",
  "co-primitives",
+ "co-runtime",
  "co-storage",
- "co-wasm-api",
- "co-wasm-runtime",
  "libipld",
  "serde",
  "serde_ipld_dagcbor",

@@ -1,5 +1,4 @@
-use co_primitives::{ReducerAction, Tags};
-use co_wasm_api::{reduce, Context, Reducer};
+use co_api::{reduce, Context, Reducer, ReducerAction, Tags};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 

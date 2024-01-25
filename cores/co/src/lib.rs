@@ -1,12 +1,11 @@
-use co_primitives::{Did, ReducerAction, Tags};
-use co_wasm_api::{reduce, Context, Reducer};
+use co_api::{reduce, Context, Did, Reducer, ReducerAction, Tags};
 use libipld::Cid;
 use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::{BTreeMap, BTreeSet};
 
-// #[co_wasm_api::State]
+// #[co_api::State]
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Co {
 	/// CO UUID.
@@ -35,11 +34,11 @@ pub struct Co {
 	pub keys: Option<Vec<Key>>,
 
 	/// CO known peers.
-	// #[co_wasm_api::Dag]
+	// #[co_api::Dag]
 	pub peers: BTreeSet<PeerId>,
 }
 
-// #[co_wasm_api::Data]
+// #[co_api::Data]
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Core {
 	/// The CID of the core binary.
@@ -52,14 +51,14 @@ pub struct Core {
 	pub state: Option<Cid>,
 }
 
-// #[co_wasm_api::Data]
+// #[co_api::Data]
 #[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq)]
 #[repr(u8)]
 pub enum Architecture {
 	Wasm = 0,
 }
 
-// #[co_wasm_api::Data]
+// #[co_api::Data]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Participant {
 	/// The participant DID.

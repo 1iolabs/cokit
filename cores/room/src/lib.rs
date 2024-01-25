@@ -1,6 +1,5 @@
+use co_api::{Context, Reducer, ReducerAction, Tags};
 use co_messaging::{state_event::StateType, EventContent, MatrixEvent};
-use co_primitives::Tags;
-use co_wasm_api::Reducer;
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 
@@ -30,7 +29,7 @@ pub struct Room {
 impl Reducer for Room {
 	type Action = MatrixEvent;
 
-	fn reduce(self, event: &co_primitives::ReducerAction<Self::Action>, _: &mut dyn co_wasm_api::Context) -> Self {
+	fn reduce(self, event: &ReducerAction<Self::Action>, _: &mut dyn Context) -> Self {
 		let matrix_event = &event.payload;
 
 		// validate room id
