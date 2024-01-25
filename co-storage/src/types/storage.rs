@@ -27,5 +27,5 @@ pub enum StorageError {
 	/// Invalid argument passes to call or storage configuration.
 	/// This is not be retriable with same parameters.
 	#[error("Invalid argument")]
-	InvalidArgument,
+	InvalidArgument(#[source] anyhow::Error),
 }

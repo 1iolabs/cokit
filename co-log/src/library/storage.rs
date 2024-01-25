@@ -28,10 +28,11 @@ impl EntryStorage {
 }
 impl TypedStorage<EntryBlock> for EntryStorage {
 	fn get(&self, cid: &Cid) -> Result<EntryBlock, StorageError> {
-		EntryBlock::from_block(self.next.get(cid)?).map_err(|_| StorageError::InvalidArgument)
+		EntryBlock::from_block(self.next.get(cid)?).map_err(|e| StorageError::InvalidArgument(e.into()))
 	}
 
 	fn set(&mut self, block: EntryBlock) -> Result<(), StorageError> {
-		self.next.set(block.block().map_err(|_| StorageError::InvalidArgument)?)
+		self.next
+			.set(block.block().map_err(|e| StorageError::InvalidArgument(e.into()))?)
 	}
 }

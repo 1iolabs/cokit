@@ -16,8 +16,10 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+co-primitives = { path = "../../co-primitives" }
 co-storage = { path = "../../co-storage" }
 co-wasm-runtime = { path = "../../co-wasm-runtime" }
-co-primitives = { path = "../../co-primitives" }
+tokio = { workspace = true }
+tokio-util = { workspace = true, features = ["compat"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

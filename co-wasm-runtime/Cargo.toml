@@ -11,6 +11,7 @@ co-wasm-api = { path = "../co-wasm-api" }
 futures = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 names = "0.14.0"
+rust-unixfs = { workspace = true }
 rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
@@ -18,7 +19,7 @@ serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
 serde_repr = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, optional = true, features = ["macros"] }
+tokio = { workspace = true, features = ["macros", "sync"] }
 tokio-stream = { workspace = true, optional = true }
 tracing = { workspace = true }
 uuid = { version = "1.2.2", features = ["default", "v4"] }

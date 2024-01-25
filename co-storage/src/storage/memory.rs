@@ -70,6 +70,12 @@ pub struct MemoryBlockStorage {
 	records: Arc<RwLock<BTreeMap<Cid, Record>>>,
 }
 
+impl MemoryBlockStorage {
+	pub fn new() -> Self {
+		Self { records: Default::default() }
+	}
+}
+
 #[async_trait]
 impl BlockStorage for MemoryBlockStorage {
 	type StoreParams = DefaultParams;

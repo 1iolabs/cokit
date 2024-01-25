@@ -65,7 +65,7 @@ async fn main() {
 	let state = State::new(CoState::new(config_path, data_path), network, storage.clone(), actions.clone());
 	let store: StoreType = state.store();
 
-	// build our application with a route
+	// build routes
 	let app = Router::new()
 		.route("/", get(http::get))
 		.route("/cos", get(http::cos::get).post(http::cos::post))

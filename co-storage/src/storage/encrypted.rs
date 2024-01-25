@@ -6,6 +6,7 @@ use crate::{
 	library::node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
 	AlgorithmError, BlockStat, BlockStorage, Storage, StorageError,
 };
+use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::{stream::FuturesOrdered, StreamExt};
 use libipld::{cbor::DagCborCodec, store::StoreParams, Block, Cid, DefaultParams};
@@ -275,8 +276,9 @@ impl Into<StorageError> for BlockMappingError {
 		match self {
 			BlockMappingError::Storage(e) => e,
 			BlockMappingError::Algorithm(e) => match e {
-				AlgorithmError::Cipher => StorageError::InvalidArgument, // likely wrong key supplied for given CID.
-				AlgorithmError::InvalidArguments => StorageError::InvalidArgument,
+				AlgorithmError::Cipher => StorageError::InvalidArgument(e.into()), /* likely wrong key supplied for */
+				// given CID.
+				AlgorithmError::InvalidArguments => StorageError::InvalidArgument(e.into()),
 				AlgorithmError::Decoding => StorageError::Internal(e.into()),
 				AlgorithmError::Encoding => StorageError::Internal(e.into()),
 				AlgorithmError::Size => StorageError::Internal(e.into()),
@@ -346,12 +348,12 @@ impl BlockMapping {
 		// get block
 		let block = storage.get(cid)?;
 		if block.cid().codec() != Into::<u64>::into(DagCborCodec) {
-			return Err(StorageError::InvalidArgument)
+			return Err(StorageError::InvalidArgument(anyhow!("Invalid codec")))
 		}
 
 		// get node
 		let node: Node<(Cid, Cid)> =
-			serde_ipld_dagcbor::from_slice(block.data()).map_err(|_| StorageError::InvalidArgument)?;
+			serde_ipld_dagcbor::from_slice(block.data()).map_err(|e| StorageError::InvalidArgument(e.into()))?;
 
 		// read
 		match node {
@@ -385,12 +387,12 @@ impl BlockMapping {
 
 			// validate
 			if block.cid().codec() != Into::<u64>::into(DagCborCodec) {
-				return Err(StorageError::InvalidArgument)
+				return Err(StorageError::InvalidArgument(anyhow!("Invalid codec")))
 			}
 
 			// get node
 			let node: Node<(Cid, Cid)> =
-				serde_ipld_dagcbor::from_slice(block.data()).map_err(|_| StorageError::InvalidArgument)?;
+				serde_ipld_dagcbor::from_slice(block.data()).map_err(|e| StorageError::InvalidArgument(e.into()))?;
 
 			// read
 			match node {
@@ -423,7 +425,7 @@ impl BlockMapping {
 	{
 		// validate
 		if self.map.is_empty() {
-			return Err(StorageError::InvalidArgument)
+			return Err(StorageError::InvalidArgument(anyhow!("Empty")))
 		}
 
 		// blocks

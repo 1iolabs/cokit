@@ -1,8 +1,6 @@
-use libipld::Cid;
-
-use crate::{co_v1::CoV1Api, library::pin::PinMapping};
-
 use self::wasmer::WasmerRuntime;
+use crate::{co_v1::CoV1Api, library::pin::PinMapping};
+use libipld::Cid;
 
 pub mod wasmer;
 
@@ -89,7 +87,7 @@ impl Runtime for Wasmer {
 	}
 }
 
-pub fn create_runtime(bytes: Vec<u8>) -> Box<dyn Runtime> {
+pub fn create_runtime(bytes: Vec<u8>) -> Box<dyn Runtime + Send> {
 	Box::new(Wasmer::new(bytes))
 }
 

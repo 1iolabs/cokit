@@ -4,20 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# co-network = { path = "../network-co" }
-# co-node-edge = { path = "../node-edge" }
-# co-state = { path = "../state" }
-# genawaiter = "=0.99.1"
-# hyper = { workspace = true }
-# iroh-api = { path = "../../../github/n0-computer/beetle/iroh-api" }
-# iroh-embed = { path = "../../../github/n0-computer/beetle/iroh-embed" }
-# iroh-resolver = { path = "../../../github/n0-computer/beetle/iroh-resolver" }
-# iroh-rpc-client = { path = "../../../github/n0-computer/beetle/iroh-rpc-client" }
-# iroh-unixfs = { path = "../../../github/n0-computer/beetle/iroh-unixfs" }
-# libp2p = { workspace = true, features = ["rendezvous", "tokio"] }
-# librocksdb-sys = { version = "0.10.0+7.9.2" }
-# rocksdb = { version = "0.20.1" }
-# unsigned-varint = "0.7.2"
 aead = { version = "0.5.2", features = ["stream"] }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -27,6 +13,7 @@ co-primitives = { path = "../co-primitives" }
 futures = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 names = "0.14.0"
+rust-unixfs = { workspace = true }
 rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }

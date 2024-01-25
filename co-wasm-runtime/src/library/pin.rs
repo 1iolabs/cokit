@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use co_storage::{node_reader, DefaultNodeSerializer, NodeBuilder, Storage, StorageError};
 use co_wasm_api::Metadata;
 use libipld::{cbor::DagCborCodec, prelude::Codec, serde::from_ipld, Cid, Ipld};
@@ -103,8 +104,8 @@ impl PinEntry {
 
 					// child
 					result
-						.get_mut(&root.ok_or(StorageError::InvalidArgument)?)
-						.ok_or(StorageError::InvalidArgument)?
+						.get_mut(&root.ok_or(StorageError::InvalidArgument(anyhow!("No root id")))?)
+						.ok_or(StorageError::InvalidArgument(anyhow!("No root")))?
 						.insert(cid);
 				},
 			}
@@ -115,7 +116,7 @@ impl PinEntry {
 	fn write(storage: &mut dyn Storage, map: &BTreeMap<Cid, BTreeSet<Cid>>) -> anyhow::Result<Cid> {
 		// validate
 		if map.is_empty() {
-			return Err(StorageError::InvalidArgument)?
+			return Err(StorageError::InvalidArgument(anyhow!("Empty")))?
 		}
 
 		// build

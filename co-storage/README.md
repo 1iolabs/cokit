@@ -1,3 +1,3 @@
-# CO WASM Runtime
+# CO Storage
 ## Abstract
-CO WebAssemliy Runtime to execute CO "state reducers".
+Content addressed block storage.
