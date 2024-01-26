@@ -10,7 +10,6 @@ crate-type = ["lib", "cdylib"]
 anyhow = { workspace = true }
 co-api = { path = "../../co-api" }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
-libp2p = { workspace = true, features = [] }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }

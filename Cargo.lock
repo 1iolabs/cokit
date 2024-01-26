@@ -1011,7 +1011,6 @@ dependencies = [
  "co-sdk",
  "co-storage",
  "libipld",
- "libp2p",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",

@@ -1,6 +1,5 @@
 use co_api::{reduce, Context, Did, Reducer, ReducerAction, Tags};
 use libipld::Cid;
-use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::{BTreeMap, BTreeSet};
@@ -33,9 +32,10 @@ pub struct Co {
 	/// Keys are normally stored in the Local CO.
 	pub keys: Option<Vec<Key>>,
 
-	/// CO known peers.
+	/// CO known peers
+	/// See: libp2p::PeerId
 	// #[co_api::Dag]
-	pub peers: BTreeSet<PeerId>,
+	pub peers: BTreeSet<Vec<u8>>,
 }
 
 // #[co_api::Data]
@@ -100,6 +100,8 @@ pub enum KeyState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CoAction {
 	Heads { heads: BTreeSet<Cid> },
+	TagsInsert { tags: Tags },
+	TagsRemove { tags: Tags },
 	ParticipantInvite { participant: Did, tags: Tags },
 	ParticipantJoin { participant: Did },
 	ParticipantTagsInsert { participant: Did, tags: Tags },
@@ -157,6 +159,12 @@ impl Reducer for Co {
 				if let Some(core) = result.cores.get_mut(core) {
 					core.tags.clear(Some(tags));
 				},
+			CoAction::TagsInsert { tags } => {
+				result.tags.append(&mut tags.clone());
+			},
+			CoAction::TagsRemove { tags } => {
+				result.tags.clear(Some(tags));
+			},
 		}
 		result
 	}

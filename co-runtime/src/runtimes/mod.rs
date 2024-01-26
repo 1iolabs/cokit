@@ -1,5 +1,6 @@
 use self::wasmer::WasmerRuntime;
 use crate::{co_v1::CoV1Api, library::pin::PinMapping};
+use anyhow::anyhow;
 use libipld::Cid;
 
 pub mod wasmer;
@@ -7,24 +8,24 @@ pub mod wasmer;
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
 	#[error("Invalid argument")]
-	InvalidArgument,
+	InvalidArgument(anyhow::Error),
 
 	#[error("Internal error")]
-	Internal,
+	Internal(anyhow::Error),
 
 	#[error("Runtime error")]
-	Runtime,
+	Runtime(anyhow::Error),
 
 	#[error("Invalid runtime state")]
-	InvalidState,
+	InvalidState(anyhow::Error),
 }
 impl From<wasmer::WasmerError> for RuntimeError {
 	fn from(value: wasmer::WasmerError) -> Self {
 		match value {
-			wasmer::WasmerError::Compile(_) => Self::InvalidArgument,
-			wasmer::WasmerError::Instantiation(_) => Self::InvalidArgument,
-			wasmer::WasmerError::Export(_) => Self::InvalidArgument,
-			wasmer::WasmerError::Runtime(_) => Self::Runtime,
+			wasmer::WasmerError::Compile(e) => Self::InvalidArgument(e.into()),
+			wasmer::WasmerError::Instantiation(e) => Self::InvalidArgument(e.into()),
+			wasmer::WasmerError::Export(e) => Self::InvalidArgument(e.into()),
+			wasmer::WasmerError::Runtime(e) => Self::Runtime(e.into()),
 		}
 	}
 }
@@ -78,11 +79,12 @@ impl Runtime for Wasmer {
 
 	fn pin(&mut self, pin: Option<Cid>) -> Result<Cid, RuntimeError> {
 		let api = match &mut self.state {
-			RuntimeState::Unintialized(_) => return Err(RuntimeError::InvalidState),
+			RuntimeState::Unintialized(_) => return Err(RuntimeError::InvalidState(anyhow!("runtime uninitialized"))),
 			RuntimeState::Intialized(runtime) => runtime.api_mut(),
 		};
-		let state = api.state().ok_or(RuntimeError::InvalidState)?;
-		let mapping = PinMapping::from_state(api.storage_mut(), state, pin).map_err(|_| RuntimeError::Internal)?;
+		let state = api.state().ok_or(RuntimeError::InvalidState(anyhow!("no state")))?;
+		let mapping =
+			PinMapping::from_state(api.storage_mut(), state, pin).map_err(|e| RuntimeError::Internal(e.into()))?;
 		Ok(mapping.pin)
 	}
 }

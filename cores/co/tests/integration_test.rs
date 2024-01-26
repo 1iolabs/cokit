@@ -1,0 +1,58 @@
+use co_api::{ReducerAction, Tags};
+use co_core_co::{Co, CoAction};
+use co_sdk::{RuntimeContext, RuntimePool};
+use co_storage::{unixfs_add, BlockSerializer, BlockStorage, MemoryBlockStorage};
+use libipld::Cid;
+use std::process::Command;
+use tokio_util::compat::TokioAsyncReadCompatExt;
+
+#[tokio::test]
+async fn integration_test() {
+	// tracing_subscriber::fmt::fmt()
+	// 	.with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
+	// 	.with_target(false)
+	// 	.with_level(false)
+	// 	.init();
+
+	// build
+	Command::new("cargo")
+		.args(["build", "--target=wasm32-unknown-unknown", "--release"])
+		.output()
+		.unwrap();
+
+	// storage
+	let storage = MemoryBlockStorage::new();
+
+	// action
+	let mut tags = Tags::new();
+	tags.insert(("hello".to_owned(), "world".to_owned().into()));
+	let action = ReducerAction {
+		core: "".to_owned(),
+		payload: CoAction::TagsInsert { tags: tags.clone() },
+		from: "did:local:test".to_owned(),
+		time: 0,
+	};
+	let action_block = BlockSerializer::default().serialize(&action).unwrap();
+	let action_cid = action_block.cid().clone();
+	storage.set(action_block).await.unwrap();
+
+	// wasm
+	let wasm_path = "../../target/wasm32-unknown-unknown/release/co_core_co.wasm";
+	let mut file = tokio::fs::File::open(wasm_path).await.unwrap().compat();
+	let wasm = unixfs_add(&storage, &mut file).await.unwrap().last().unwrap().to_owned();
+
+	// execute
+	let next_state = RuntimePool::default()
+		.execute(&storage, &wasm, RuntimeContext { state: None, event: action_cid })
+		.await
+		.unwrap();
+
+	// test
+	assert_eq!(Some(Cid::try_from("bafyr4ibmd6uphrtohimaoreqgl3hkwfsefhc5p65zthxffscar6iuhr4vq").unwrap()), next_state);
+	let block = storage.get(&next_state.unwrap()).await.unwrap();
+	let state: Co = BlockSerializer::default().deserialize(&block).unwrap();
+	// Co { id: [], tags: Tags { hello: String("world") }, name: "", heads: {}, participants: {}, cores: {}, keys: None,
+	// peers: {} }
+	// println!("{:?}", state);
+	assert_eq!(tags, state.tags);
+}
