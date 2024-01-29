@@ -1,4 +1,5 @@
 pub mod action;
+#[deprecated]
 pub mod co;
 pub mod context;
 pub mod error;

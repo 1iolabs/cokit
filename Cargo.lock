@@ -1178,10 +1178,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "co-log",
  "co-network",
  "co-runtime",
  "co-state",
  "co-storage",
+ "directories",
  "futures",
  "hyper",
  "libipld",
@@ -1189,11 +1191,15 @@ dependencies = [
  "names",
  "rxrust",
  "serde",
+ "serde_ipld_dagcbor",
  "serde_json",
  "thiserror",
  "tokio",
  "tokio-stream",
  "tracing",
+ "tracing-bunyan-formatter",
+ "tracing-log 0.1.4",
+ "tracing-subscriber",
  "uuid",
 ]
 

@@ -22,6 +22,7 @@ pub struct CoState {
 	pub didcontact: Vec<String>,
 }
 
+#[deprecated]
 pub type CoSettings = BTreeMap<String, Ipld>;
 
 impl CoState {

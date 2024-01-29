@@ -1,0 +1,96 @@
+use directories::ProjectDirs;
+use std::path::PathBuf;
+use tracing::{level_filters::LevelFilter, subscriber::set_global_default};
+use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_log::LogTracer;
+use tracing_subscriber::{layer::SubscriberExt, Registry};
+
+#[derive(Debug, Clone)]
+pub struct Application {
+	/// The Unique Application Instance Identifier.
+	/// The Identifier should be hardcoded in the application.
+	///
+	/// Warning: When the application can have mulitple instances you need to pass a different identifier for every
+	/// instance.
+	identifier: String,
+
+	/// Shared storage path.
+	/// This path can be shared between different application which use the co-sdk.
+	/// This enables using some shared resources like the storage and the same local CO.
+	storage_path: PathBuf,
+
+	/// Application state path.
+	application_path: PathBuf,
+
+	/// Path for application logs. If None no logs will be produced.
+	log: Log,
+}
+impl Application {
+	/// Initialize application.
+	///
+	/// Panics:
+	/// - Can not create/open log file.
+	fn init(&self) {
+		// log
+		match &self.log {
+			Log::Bunyan(log_path) => {
+				std::fs::create_dir_all(log_path.parent().expect("not root")).expect("create folders");
+				let log_file = std::fs::File::create(log_path).unwrap();
+				// let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), std::io::stdout);
+				let formatting_layer = BunyanFormattingLayer::new(self.identifier.clone().into(), log_file);
+				let subscriber = Registry::default()
+					.with(LevelFilter::INFO)
+					.with(JsonStorageLayer)
+					.with(formatting_layer);
+				set_global_default(subscriber).unwrap();
+				LogTracer::init().unwrap();
+			},
+			_ => {},
+		}
+	}
+}
+
+pub struct ApplicationBuilder {
+	identifier: String,
+	path: PathBuf,
+	log: Log,
+}
+impl ApplicationBuilder {
+	/// Create new instance with path.
+	pub fn new_with_path(identifier: String, path: PathBuf) -> Self {
+		Self { identifier, path, log: Log::None }
+	}
+
+	pub fn new(identifier: String) -> Self {
+		let dirs = ProjectDirs::from("co.app", "1io", "co").expect("home directory");
+		Self { identifier, path: dirs.data_dir().into(), log: Log::None }
+	}
+
+	/// Enable bunyan logging to log_path.
+	/// If no path is specified {path}/log/application.log is used.
+	pub fn with_bunyan_logging(self, log_path: Option<PathBuf>) -> Self {
+		let log_path = match log_path {
+			Some(p) => p,
+			//None => self.path.join("log").join(format!("{}.log", &self.identifier)),
+			None => self.path.join("log").join("application.log"),
+		};
+		Self { log: Log::Bunyan(log_path), ..self }
+	}
+
+	pub fn build(self) -> Application {
+		let result = Application {
+			storage_path: self.path.join("data"),
+			application_path: self.path.join("etc").join(&self.identifier),
+			identifier: self.identifier,
+			log: self.log,
+		};
+		result.init();
+		result
+	}
+}
+
+#[derive(Debug, Clone)]
+enum Log {
+	None,
+	Bunyan(PathBuf),
+}

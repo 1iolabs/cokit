@@ -6,6 +6,7 @@ use libipld::{Cid, Ipld};
 ///
 /// Note: Adding new items should not be considered a breaking change.
 #[derive(Debug, Clone, PartialEq)]
+#[deprecated]
 pub enum CoAction {
 	Error(String, ErrorContext),
 	Initialize,
@@ -31,6 +32,7 @@ pub enum CoAction {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[deprecated]
 pub enum Cause {
 	Initialize,
 	Change,
