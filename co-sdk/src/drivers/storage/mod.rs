@@ -1,19 +1,16 @@
-use anyhow::Result;
-use async_trait::async_trait;
-use libipld::{cid::Cid, ipld::Ipld};
-use std::sync::Arc;
-use thiserror::Error;
+use crate::CoStorage;
+use co_storage::FsStorage;
+use std::{path::PathBuf, sync::Arc};
 
-pub type StorageType = Arc<dyn Storage + Send + Sync + 'static>;
-
-#[async_trait]
-pub trait Storage {
-	async fn get_object(&self, cid: &Cid) -> Result<Ipld>;
-	async fn put_object(&self, data: &Ipld) -> Result<Cid>;
+pub struct Storage {
+	storage: CoStorage,
 }
+impl Storage {
+	pub fn new(storage_path: PathBuf) -> Self {
+		Self { storage: Arc::new(FsStorage::new(storage_path)) }
+	}
 
-#[derive(Error, Debug)]
-pub enum StorageError {
-	#[error("read unexpected data type")]
-	UnexpectedDataType,
+	pub fn storage(&self) -> CoStorage {
+		self.storage.clone()
+	}
 }

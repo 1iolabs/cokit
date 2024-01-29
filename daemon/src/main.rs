@@ -4,11 +4,8 @@ use axum::{
 	Extension, Router,
 };
 use clap::Parser;
-use co_network::{Libp2pNetwork, Libp2pNetworkConfig};
-use co_sdk::{ActionsType, CoState, CoStorage, State, StoreType};
-use co_storage::FsStorage;
-use libp2p::PeerId;
-use std::{net::SocketAddr, sync::Arc};
+use co_sdk::{CoState, Network, State, Storage};
+use std::net::SocketAddr;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, Registry};
 
@@ -49,21 +46,16 @@ async fn main() {
 	tracing_log::LogTracer::init().unwrap();
 
 	// driver: storage
-	let storage: CoStorage = Arc::new(FsStorage::new(storage_path));
+	let storage = Storage::new(storage_path);
 
 	// driver: network
 	let network_key = crate::library::local_key::local_key(Some(config_path.join("peer.pb")), cli.force_new_peer_id)
 		.await
 		.expect("peer-id");
-	let network_peer_id = PeerId::from(network_key.public());
-	let network_config = Libp2pNetworkConfig::from_keypair(network_key.clone());
-	let network: Libp2pNetwork = Libp2pNetwork::new(network_config).await.expect("network");
-	tracing::info!(peer_id = ?network_peer_id, "network");
+	let network = Network::new(network_key);
 
 	// driver: state
-	let actions: ActionsType = ActionsType::default();
-	let state = State::new(CoState::new(config_path, data_path), network, storage.clone(), actions.clone());
-	let store: StoreType = state.store();
+	let state = State::new(CoState::new(config_path, data_path), network.into_network(), storage.storage());
 
 	// build routes
 	let app = Router::new()
@@ -71,9 +63,9 @@ async fn main() {
 		.route("/cos", get(http::cos::get).post(http::cos::post))
 		.route("/cos/:id", post(http::co::post))
 		.route("/state", get(http::state::get))
-		.layer(Extension(storage))
-		.layer(Extension(store))
-		.layer(Extension(actions));
+		.layer(Extension(storage.storage()))
+		.layer(Extension(state.store()))
+		.layer(Extension(state.actions()));
 
 	// run it
 	let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

@@ -17,13 +17,16 @@ pub type StoreType = Arc<dyn SyncStoreApi<ReducerType> + Send + Sync + 'static>;
 pub type ActionsType = SubjectThreads<CoAction, Infallible>;
 
 pub struct State {
+	actions: ActionsType,
 	store: SyncStore<ReducerType>,
 	epic_subscription: EpicSubscription<ReducerType>,
 	epic_handle: JoinHandle<()>,
 }
 
 impl State {
-	pub fn new(intial_state: CoState, network: Libp2pNetwork, storage: CoStorage, actions: ActionsType) -> Self {
+	pub fn new(intial_state: CoState, network: Libp2pNetwork, storage: CoStorage) -> Self {
+		let actions = ActionsType::default();
+
 		// middleware
 		let (epic_middleware, epic_runner, epic_subscription) = EpicMiddleware::create();
 		let subject_middlware = SubjectMiddleware::new(actions.clone());
@@ -36,6 +39,7 @@ impl State {
 
 		// epic
 		let epic_store = store.clone();
+		let epic_actions = actions.clone();
 		let epic_handle = std::thread::spawn(move || {
 			#[cfg(feature = "futures-runtime")]
 			{
@@ -46,7 +50,7 @@ impl State {
 					storage,
 					local.clone(),
 					Arc::new(epic_store.clone()),
-					actions.clone(),
+					epic_actions,
 				));
 				let dispatch_store = epic_store.clone();
 				local
@@ -70,7 +74,7 @@ impl State {
 					storage,
 					local.clone(),
 					Arc::new(epic_store.clone()),
-					actions.clone(),
+					epic_actions,
 				));
 				local.block_on(&runtime, async {
 					// setup and run futures
@@ -91,7 +95,11 @@ impl State {
 		});
 
 		// result
-		Self { store, epic_subscription, epic_handle }
+		Self { store, epic_subscription, epic_handle, actions }
+	}
+
+	pub fn actions(&self) -> ActionsType {
+		self.actions.clone()
 	}
 
 	pub fn store(&self) -> Arc<dyn SyncStoreApi<ReducerType> + Send + Sync + 'static> {

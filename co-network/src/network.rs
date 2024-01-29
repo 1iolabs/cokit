@@ -23,93 +23,8 @@ pub struct Libp2pNetwork {
 	tasks: tokio::sync::mpsc::UnboundedSender<Task<Behaviour>>,
 	events: EventsSubject<BehaviourEvent>,
 }
-
-#[derive(Clone, Debug)]
-pub struct Libp2pNetworkConfig {
-	pub keypair: Keypair,
-	pub addr: Option<Multiaddr>,
-	pub bootstap: Vec<(PeerId, Multiaddr)>,
-
-	/// Network mode to optimize for.
-	/// This may change dynamically.
-	/// For example when a mobile device gets plugged in to an power outlet.
-	pub mode: NetworkMode,
-}
-impl Libp2pNetworkConfig {
-	pub fn from_keypair(keypair: Keypair) -> Self {
-		Self { keypair, addr: Default::default(), bootstap: Default::default(), mode: Default::default() }
-	}
-
-	/// Add bootstrap peer.
-	/// The multiaddress is required to inclide an address (protocol) and and peer id (p2p).
-	pub fn add_bootstrap<'a>(&mut self, bootstap: impl Iterator<Item = &'a Multiaddr>) -> Result<(), Vec<Multiaddr>> {
-		let mut failed = Vec::new();
-		for multiaddr in bootstap {
-			let mut addr = multiaddr.to_owned();
-			if let Some(Protocol::P2p(peer_id)) = addr.pop() {
-				// let peer_id = PeerId::from_multihash(mh).unwrap();
-				self.bootstap.push((peer_id, addr));
-			} else {
-				failed.push(multiaddr.clone());
-			}
-		}
-		match failed.len() {
-			0 => Ok(()),
-			_ => Err(failed),
-		}
-	}
-}
-
-#[derive(Clone, Debug, Default, Copy, PartialEq)]
-pub enum NetworkMode {
-	#[default]
-	Full,
-	Light,
-}
-
-struct Runtime {
-	_config: Libp2pNetworkConfig,
-	listener_id: Option<libp2p::core::transport::ListenerId>,
-	events: EventsSubject<BehaviourEvent>,
-	running: bool,
-}
-impl Runtime {
-	fn new(config: Libp2pNetworkConfig, events: EventsSubject<BehaviourEvent>) -> Self {
-		Self { _config: config, listener_id: None, events, running: true }
-	}
-
-	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
-		self.listener_id = Some(id);
-	}
-
-	fn is_running(&self) -> bool {
-		self.running
-	}
-}
-
-#[derive(NetworkBehaviour)]
-pub struct Behaviour {
-	didcomm: didcomm::Behavior,
-	gossipsub: gossipsub::Behaviour,
-	identify: identify::Behaviour,
-	mdns: MdnsBehaviour,
-	ping: ping::Behaviour,
-	kad: Kademlia<MemoryStore>,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum Libp2pNetworkError {
-	#[error("Shutdown in progress. Operation canceled.")]
-	Shutdown,
-}
-impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Libp2pNetworkError {
-	fn from(_: tokio::sync::mpsc::error::SendError<T>) -> Self {
-		Self::Shutdown
-	}
-}
-
 impl Libp2pNetwork {
-	pub async fn new(config: Libp2pNetworkConfig) -> anyhow::Result<Libp2pNetwork> {
+	pub fn new(config: Libp2pNetworkConfig) -> anyhow::Result<Libp2pNetwork> {
 		let local_peer_id = PeerId::from(config.keypair.public().clone());
 		let gossipsub_config = gossipsub::ConfigBuilder::default()
 			.max_transmit_size(256 * 1024)
@@ -205,6 +120,90 @@ impl Libp2pNetwork {
 			}))?;
 		}
 		Ok(())
+	}
+}
+
+#[derive(Clone, Debug)]
+pub struct Libp2pNetworkConfig {
+	pub keypair: Keypair,
+	pub addr: Option<Multiaddr>,
+	pub bootstap: Vec<(PeerId, Multiaddr)>,
+
+	/// Network mode to optimize for.
+	/// This may change dynamically.
+	/// For example when a mobile device gets plugged in to an power outlet.
+	pub mode: NetworkMode,
+}
+impl Libp2pNetworkConfig {
+	pub fn from_keypair(keypair: Keypair) -> Self {
+		Self { keypair, addr: Default::default(), bootstap: Default::default(), mode: Default::default() }
+	}
+
+	/// Add bootstrap peer.
+	/// The multiaddress is required to inclide an address (protocol) and and peer id (p2p).
+	pub fn add_bootstrap<'a>(&mut self, bootstap: impl Iterator<Item = &'a Multiaddr>) -> Result<(), Vec<Multiaddr>> {
+		let mut failed = Vec::new();
+		for multiaddr in bootstap {
+			let mut addr = multiaddr.to_owned();
+			if let Some(Protocol::P2p(peer_id)) = addr.pop() {
+				// let peer_id = PeerId::from_multihash(mh).unwrap();
+				self.bootstap.push((peer_id, addr));
+			} else {
+				failed.push(multiaddr.clone());
+			}
+		}
+		match failed.len() {
+			0 => Ok(()),
+			_ => Err(failed),
+		}
+	}
+}
+
+#[derive(Clone, Debug, Default, Copy, PartialEq)]
+pub enum NetworkMode {
+	#[default]
+	Full,
+	Light,
+}
+
+struct Runtime {
+	_config: Libp2pNetworkConfig,
+	listener_id: Option<libp2p::core::transport::ListenerId>,
+	events: EventsSubject<BehaviourEvent>,
+	running: bool,
+}
+impl Runtime {
+	fn new(config: Libp2pNetworkConfig, events: EventsSubject<BehaviourEvent>) -> Self {
+		Self { _config: config, listener_id: None, events, running: true }
+	}
+
+	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
+		self.listener_id = Some(id);
+	}
+
+	fn is_running(&self) -> bool {
+		self.running
+	}
+}
+
+#[derive(NetworkBehaviour)]
+pub struct Behaviour {
+	didcomm: didcomm::Behavior,
+	gossipsub: gossipsub::Behaviour,
+	identify: identify::Behaviour,
+	mdns: MdnsBehaviour,
+	ping: ping::Behaviour,
+	kad: Kademlia<MemoryStore>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Libp2pNetworkError {
+	#[error("Shutdown in progress. Operation canceled.")]
+	Shutdown,
+}
+impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Libp2pNetworkError {
+	fn from(_: tokio::sync::mpsc::error::SendError<T>) -> Self {
+		Self::Shutdown
 	}
 }
 
