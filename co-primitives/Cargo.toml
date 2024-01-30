@@ -10,3 +10,4 @@ serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+co-macros = {path = "../co-macros"}

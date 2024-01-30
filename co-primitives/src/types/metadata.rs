@@ -14,7 +14,7 @@ pub enum Metadata {
 
 #[derive(Clone, Serialize)]
 pub struct WithCoMetadata<T: CoMetadata + Serialize> {
-	#[serde(rename = "$co")]
+	#[serde(rename = "$co", skip_serializing_if = "Vec::is_empty")]
 	co: Vec<Metadata>,
 	#[serde(flatten)]
 	value: T,
@@ -55,9 +55,9 @@ impl<T: CoMetadata + Serialize> From<T> for WithCoMetadata<T> {
 
 #[cfg(test)]
 mod tests {
-	use crate::{CoMetadata, Metadata};
-
 	use super::WithCoMetadata;
+	use crate::{CoMetadata, Metadata};
+	use co_macros::TaggedFields;
 	use libipld::Cid;
 	use serde::{Deserialize, Serialize};
 
@@ -84,7 +84,23 @@ mod tests {
 		// 	}
 		// }
 
-		let json = serde_json::to_string(&WithCoMetadata::new(Test {
+		let json = serde_json::to_string_pretty(&WithCoMetadata::new(Test {
+			hello: 1,
+			world: Cid::try_from("bafyr4igf663hpuvdpvque42uxmkbacg5ubd4cgageulmwmqo33g2tpod7e").unwrap(),
+		}))
+		.unwrap();
+		println!("{json}");
+	}
+
+	#[test]
+	fn metadata_derive() {
+		#[derive(Debug, Clone, Serialize, Deserialize, TaggedFields)]
+		struct Test {
+			hello: i32,
+			#[tagged(external)]
+			world: Cid,
+		}
+		let json = serde_json::to_string_pretty(&WithCoMetadata::new(Test {
 			hello: 1,
 			world: Cid::try_from("bafyr4igf663hpuvdpvque42uxmkbacg5ubd4cgageulmwmqo33g2tpod7e").unwrap(),
 		}))
