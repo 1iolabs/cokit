@@ -28,8 +28,22 @@ pub enum SignError {
 	Other(#[source] anyhow::Error),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum IdentityResolverError {
+	/// Identity not found.
+	/// Ususally this means that the resolver is not capable of resolving this identity.
+	/// Therefore this is not retryable.
+	#[error("Identity not found")]
+	NotFound,
+
+	/// Other error
+	/// This ispossible retryable.
+	#[error("Resolve Identitiy failed: {0}")]
+	Other(String, #[source] anyhow::Error),
+}
+
 pub trait IdentityResolver {
-	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Option<Box<dyn Identity>>;
+	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<Box<dyn Identity>, IdentityResolverError>;
 }
 
 pub struct JoinIdentityResolver {
@@ -41,12 +55,15 @@ impl JoinIdentityResolver {
 	}
 }
 impl IdentityResolver for JoinIdentityResolver {
-	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Option<Box<dyn Identity>> {
+	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<Box<dyn Identity>, IdentityResolverError> {
+		let mut last_error: Option<IdentityResolverError> = None;
 		for resolver in self.resolvers.iter() {
-			if let Some(i) = resolver.resolve(identity, public_key) {
-				return Some(i)
+			match resolver.resolve(identity, public_key) {
+				Ok(i) => return Ok(i),
+				Err(IdentityResolverError::NotFound) => {},
+				Err(e) => last_error = Some(e),
 			}
 		}
-		None
+		return Err(last_error.unwrap_or(IdentityResolverError::NotFound));
 	}
 }

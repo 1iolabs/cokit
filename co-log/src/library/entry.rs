@@ -1,8 +1,9 @@
 use super::identity::{PrivateIdentity, SignError};
 use crate::{Clock, Identity};
 use co_storage::{BlockSerializer, SerializeError};
-use libipld::{Block, Cid, DefaultParams};
+use libipld::{store::StoreParams, Block, Cid};
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Entry {
@@ -52,16 +53,18 @@ pub enum EntryError {
 
 /// Deserialized block.
 #[derive(Debug, Clone)]
-pub struct EntryBlock {
+pub struct EntryBlock<P> {
+	_p: PhantomData<P>,
+
 	/// CID of the signed entry.
 	cid: Cid,
 
 	/// The entry.
 	data: SignedEntry,
 }
-impl EntryBlock {
+impl<P: StoreParams> EntryBlock<P> {
 	pub fn from_entry(identity: &dyn PrivateIdentity, entry: Entry) -> Result<Self, EntryError> {
-		let block = BlockSerializer::default().serialize(&entry)?;
+		let block = BlockSerializer::<P>::new().serialize(&entry)?;
 		let signature = identity.sign(block.data())?;
 		Self::from_signed_entry(SignedEntry {
 			identity: identity.identity().to_string(),
@@ -71,22 +74,19 @@ impl EntryBlock {
 		})
 	}
 
-	pub fn from_unsigned_block(
-		identity: &dyn PrivateIdentity,
-		block: Block<DefaultParams>,
-	) -> Result<Self, EntryError> {
-		let entry = BlockSerializer::default().deserialize(&block)?;
+	pub fn from_unsigned_block(identity: &dyn PrivateIdentity, block: Block<P>) -> Result<Self, EntryError> {
+		let entry = BlockSerializer::<P>::new().deserialize(&block)?;
 		Self::from_entry(identity, entry)
 	}
 
 	pub fn from_signed_entry(entry: SignedEntry) -> Result<Self, EntryError> {
-		let signed_block = BlockSerializer::default().serialize(&entry)?;
-		Ok(Self { cid: signed_block.into_inner().0, data: entry })
+		let signed_block = BlockSerializer::<P>::new().serialize(&entry)?;
+		Ok(Self { _p: Default::default(), cid: signed_block.into_inner().0, data: entry })
 	}
 
-	pub fn from_block(block: Block<DefaultParams>) -> Result<Self, EntryError> {
-		let entry: SignedEntry = BlockSerializer::default().deserialize(&block)?;
-		Ok(Self { cid: block.into_inner().0, data: entry })
+	pub fn from_block(block: Block<P>) -> Result<Self, EntryError> {
+		let entry: SignedEntry = BlockSerializer::<P>::new().deserialize(&block)?;
+		Ok(Self { _p: Default::default(), cid: block.into_inner().0, data: entry })
 	}
 
 	pub fn cid(&self) -> &Cid {
@@ -97,16 +97,16 @@ impl EntryBlock {
 		&self.data.entry
 	}
 
-	pub fn unsigned_block(&self) -> Result<Block<DefaultParams>, EntryError> {
-		Ok(BlockSerializer::default().serialize(self.entry())?)
+	pub fn unsigned_block(&self) -> Result<Block<P>, EntryError> {
+		Ok(BlockSerializer::<P>::new().serialize(self.entry())?)
 	}
 
 	pub fn signed_entry(&self) -> &SignedEntry {
 		&self.data
 	}
 
-	pub fn block(&self) -> Result<Block<DefaultParams>, EntryError> {
-		Ok(BlockSerializer::default().serialize(&self.data)?)
+	pub fn block(&self) -> Result<Block<P>, EntryError> {
+		Ok(BlockSerializer::new().serialize(&self.data)?)
 	}
 
 	pub fn verify(&self, identity: &dyn Identity) -> Result<bool, EntryError> {
@@ -117,23 +117,23 @@ impl EntryBlock {
 		))
 	}
 }
-impl Into<Entry> for EntryBlock {
+impl<P: StoreParams> Into<Entry> for EntryBlock<P> {
 	fn into(self) -> Entry {
 		self.data.entry
 	}
 }
-impl PartialEq for EntryBlock {
+impl<P: StoreParams> PartialEq for EntryBlock<P> {
 	fn eq(&self, other: &Self) -> bool {
 		self.cid() == other.cid()
 	}
 }
-impl Eq for EntryBlock {}
-impl PartialOrd for EntryBlock {
+impl<P: StoreParams> Eq for EntryBlock<P> {}
+impl<P: StoreParams> PartialOrd for EntryBlock<P> {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
 		self.cid().partial_cmp(&other.cid())
 	}
 }
-impl Ord for EntryBlock {
+impl<P: StoreParams> Ord for EntryBlock<P> {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		self.cid().cmp(&other.cid())
 	}
@@ -143,6 +143,7 @@ impl Ord for EntryBlock {
 mod tests {
 	use crate::{Clock, DidKeyIdentity, EntryBlock};
 	use co_storage::BlockSerializer;
+	use libipld::DefaultParams;
 	use serde::{Deserialize, Serialize};
 
 	#[test]
@@ -159,7 +160,7 @@ mod tests {
 
 		// entry
 		let identity = Box::new(DidKeyIdentity::generate(None));
-		let entry = EntryBlock::from_entry(
+		let entry = EntryBlock::<DefaultParams>::from_entry(
 			identity.as_ref(),
 			crate::Entry {
 				id: vec![0],

@@ -1,7 +1,8 @@
 use super::entry::EntryBlock;
+use libipld::store::StoreParams;
 use std::cmp::Ordering;
 
-pub fn last_write_wins(a: &EntryBlock, b: &EntryBlock) -> Ordering {
+pub fn last_write_wins<P: StoreParams>(a: &EntryBlock<P>, b: &EntryBlock<P>) -> Ordering {
 	match sort_by_clocks(a, b) {
 		Ordering::Equal => match sort_by_clock_id(a, b) {
 			Ordering::Equal => sort_by_cid(a, b),
@@ -11,15 +12,15 @@ pub fn last_write_wins(a: &EntryBlock, b: &EntryBlock) -> Ordering {
 	}
 }
 
-pub fn sort_by_cid(a: &EntryBlock, b: &EntryBlock) -> Ordering {
+pub fn sort_by_cid<P: StoreParams>(a: &EntryBlock<P>, b: &EntryBlock<P>) -> Ordering {
 	a.cid().cmp(b.cid())
 }
 
-pub fn sort_by_clocks(a: &EntryBlock, b: &EntryBlock) -> Ordering {
+pub fn sort_by_clocks<P: StoreParams>(a: &EntryBlock<P>, b: &EntryBlock<P>) -> Ordering {
 	a.entry().clock.cmp(&b.entry().clock)
 }
 
-pub fn sort_by_clock_id(a: &EntryBlock, b: &EntryBlock) -> Ordering {
+pub fn sort_by_clock_id<P: StoreParams>(a: &EntryBlock<P>, b: &EntryBlock<P>) -> Ordering {
 	a.entry().clock.id.cmp(&b.entry().clock.id)
 }
 
@@ -34,6 +35,7 @@ mod tests {
 		Clock, Entry, Identity,
 	};
 	use co_storage::BlockSerializer;
+	use libipld::DefaultParams;
 	use serde::Serialize;
 	use std::{
 		cmp::Ordering,
@@ -73,7 +75,7 @@ mod tests {
 	struct Test {
 		v: i32,
 	}
-	fn create_test_entry(v: i32, identity: &'static str, time: u64) -> EntryBlock {
+	fn create_test_entry(v: i32, identity: &'static str, time: u64) -> EntryBlock<DefaultParams> {
 		let payload = BlockSerializer::default().serialize(&Test { v }).unwrap();
 		let entry = Entry {
 			id: "test".to_string().into_bytes(),

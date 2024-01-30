@@ -1,5 +1,5 @@
 use super::identity::{IdentityResolver, PrivateIdentity, SignError};
-use crate::Identity;
+use crate::{Identity, IdentityResolverError};
 use anyhow::anyhow;
 use did_key::{generate, resolve, CoreSign, DIDCore, Ed25519KeyPair, KeyMaterial, PatchedKeyPair};
 use std::{fmt::Debug, sync::Arc};
@@ -92,18 +92,18 @@ impl DidKeyIdentityResolver {
 	}
 }
 impl IdentityResolver for DidKeyIdentityResolver {
-	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Option<Box<dyn Identity>> {
+	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<Box<dyn Identity>, IdentityResolverError> {
 		if identity.starts_with("did:key:") {
-			if let Ok(identity) = DidKeyIdentity::try_from(identity) {
-				if match (public_key, identity.public_key()) {
+			if let Ok(did_key_identity) = DidKeyIdentity::try_from(identity) {
+				if match (public_key, did_key_identity.public_key()) {
 					(Some(a), Some(b)) => a == b,
 					_ => true,
 				} {
-					return Some(Box::new(identity));
+					return Ok(Box::new(did_key_identity));
 				}
 			}
 		}
-		None
+		Err(IdentityResolverError::NotFound)
 	}
 }
 

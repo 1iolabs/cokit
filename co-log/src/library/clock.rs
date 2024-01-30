@@ -1,8 +1,6 @@
-use std::cmp::max;
-
-use serde::{Deserialize, Serialize};
-
 use crate::Entry;
+use serde::{Deserialize, Serialize};
+use std::cmp::max;
 
 /// Lamport Clock.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

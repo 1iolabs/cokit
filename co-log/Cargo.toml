@@ -8,7 +8,9 @@ crate-type = ["lib"]
 
 [dependencies]
 anyhow = { workspace = true }
+async-stream = "0.3.5"
 async-trait = { workspace = true }
+co-primitives = { path = "../co-primitives" }
 co-storage = { path = "../co-storage" }
 did-key = "0.2.1"
 futures = { workspace = true }
@@ -29,4 +31,5 @@ form_urlencoded = "=1.2.0"
 "default" = []
 
 [dev-dependencies]
+tokio = { workspace = true }
 tracing-subscriber = { workspace = true }

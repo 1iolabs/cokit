@@ -1,17 +1,14 @@
 use super::{
-	conflict::last_write_wins,
-	entry::EntryBlock,
-	heads::find_heads,
-	identity::PrivateIdentity,
-	storage::{EntryStorage, TypedStorage},
+	entry::EntryBlock, get_entry_block::get_entry_blocks, identity::PrivateIdentity, join::JoinEntry,
+	stream::create_stream,
 };
-use crate::{library::clock::max_clock, Clock, Entry, IdentityResolver};
-use anyhow::{anyhow, Context};
-use co_storage::Storage;
+use crate::{library::clock::max_clock, Clock, Entry, IdentityResolver, LogError};
+use co_storage::BlockStorage;
+use futures::Stream;
 use libipld::Cid;
 use std::collections::{BTreeSet, HashSet};
 
-pub struct Log {
+pub struct Log<S> {
 	id: Vec<u8>,
 
 	/// Identity.
@@ -22,18 +19,48 @@ pub struct Log {
 	heads: BTreeSet<Cid>,
 
 	/// Storage for entries.
-	entry_store: EntryStorage,
+	entry_store: S,
 
 	// Index of entries.
 	index: HashSet<Cid>,
 }
+impl<S> Log<S> {
+	pub fn id(&self) -> &[u8] {
+		&self.id
+	}
 
-impl Log {
+	pub fn heads(&self) -> Vec<Cid> {
+		self.heads.iter().cloned().collect()
+	}
+
+	pub fn identity_resolver(&self) -> &Box<dyn IdentityResolver> {
+		&self.identity_resolver
+	}
+
+	pub fn storage(&self) -> &S {
+		&self.entry_store
+	}
+
+	/// Test if the logs currently knowns about the entry id.
+	/// Note: This is not an complete view and only represents loaded/joined entries.
+	pub fn contains(&self, cid: &Cid) -> bool {
+		self.index.contains(cid)
+	}
+
+	/// Test if cid is currently a head.
+	pub fn is_head(&self, cid: &Cid) -> bool {
+		self.heads.contains(cid)
+	}
+}
+impl<S> Log<S>
+where
+	S: BlockStorage + Sync + Send + 'static,
+{
 	pub fn new(
 		id: Vec<u8>,
 		identity: Box<dyn PrivateIdentity>,
 		identity_resolver: Box<dyn IdentityResolver>,
-		store: EntryStorage,
+		store: S,
 		heads: Vec<Cid>,
 	) -> Self {
 		Log {
@@ -47,73 +74,42 @@ impl Log {
 	}
 
 	/// Create new log with random ID.
-	pub fn create(
-		identity: Box<dyn PrivateIdentity>,
-		identity_resolver: Box<dyn IdentityResolver>,
-		store: EntryStorage,
-	) -> Self {
+	pub fn create(identity: Box<dyn PrivateIdentity>, identity_resolver: Box<dyn IdentityResolver>, store: S) -> Self {
 		Self::new(uuid::Uuid::new_v4().to_bytes_le().to_vec(), identity, identity_resolver, store, Default::default())
 	}
 
-	pub fn storage(&self) -> &dyn Storage {
-		self.entry_store.storage()
+	pub async fn get(&self, cid: &Cid) -> Result<EntryBlock<S::StoreParams>, LogError> {
+		let block = self.entry_store.get(cid).await?;
+		Ok(EntryBlock::from_block(block)?)
 	}
-
-	pub fn storage_mut(&mut self) -> &mut dyn Storage {
-		self.entry_store.storage_mut()
-	}
-
-	pub fn id(&self) -> &[u8] {
-		&self.id
-	}
-
-	pub fn heads(&self) -> Vec<Cid> {
-		self.heads.iter().cloned().collect()
-	}
-
-	pub fn get(&self, cid: &Cid) -> Option<EntryBlock> {
-		self.entry_store.get(cid).ok()
-	}
-
-	// fn contains(&self, cid: &Cid) -> bool {
-	// 	self.index.contains(cid)
-	// }
 
 	/// Iterate entries starting at the head.
-	pub fn iter(&self) -> LogIterator {
-		let stack: Result<Vec<EntryBlock>, anyhow::Error> = self
-			.heads
-			.iter()
-			.map(|cid| -> Result<_, anyhow::Error> { self.entry_store.get(cid).context("Get entry from storage") })
-			.collect();
-		LogIterator::new(&self.entry_store, stack)
+	pub fn stream<'a>(&'a self) -> impl Stream<Item = Result<EntryBlock<S::StoreParams>, LogError>> + 'a {
+		create_stream(&self.entry_store, self.heads())
 	}
 
 	/// Push item as new entry.
-	pub fn push(&mut self, item: Cid) -> Result<Cid, anyhow::Error> {
+	pub async fn push(&mut self, item: Cid) -> Result<Cid, LogError> {
+		// heads
+		let head_entries = get_entry_blocks(&self.entry_store, self.heads.iter()).await?;
+
 		// create entry
 		let entry = Entry {
 			id: self.id().to_vec(),
 			clock: Clock::new(
 				self.identity.identity().as_bytes().to_vec(),
-				max_clock(
-					self.heads
-						.iter()
-						.map(|item| -> Result<Entry, anyhow::Error> { Ok(self.entry_store.get(item)?.into()) })
-						.collect::<Result<Vec<Entry>, _>>()?
-						.into_iter(),
-				),
+				max_clock(head_entries.into_iter().map(|e| e.into())),
 			)
 			.next(),
 			payload: item,
 			next: self.heads(),
 			refs: Vec::new(),
 		};
-		let entry_block = EntryBlock::from_entry(self.identity.as_ref(), entry)?;
+		let entry_block = EntryBlock::<S::StoreParams>::from_entry(self.identity.as_ref(), entry)?;
 		let entry_cid = entry_block.cid().clone();
 
 		// set state
-		self.entry_store.set(entry_block)?; // to be atomic in case of error do this first
+		self.entry_store.set(entry_block.block()?).await?; // to be atomic in case of error do this first
 		self.index.insert(entry_cid.clone());
 		self.heads_set([entry_cid.clone()].into_iter());
 
@@ -121,48 +117,25 @@ impl Log {
 		Ok(entry_cid)
 	}
 
-	pub fn join_entry(&mut self, entry: EntryBlock) -> Result<bool, anyhow::Error> {
-		if self.index.contains(entry.cid()) {
-			return Ok(false)
+	pub async fn join_entry(&mut self, entry: EntryBlock<S::StoreParams>) -> Result<bool, LogError> {
+		let mut join = JoinEntry::new(self.heads.clone());
+		if join.join_entry(&self, entry).await? {
+			self.join_commit(join).await?;
+			return Ok(true)
 		}
+		Ok(false)
+	}
 
-		// verify
-		verify_entry(self, self.identity_resolver.as_ref(), &entry)?;
-
-		// calculate
-		let mut entries_to_add: BTreeSet<Cid> = BTreeSet::new();
-		entries_to_add.insert(entry.cid().clone());
-		let mut entries_to_get: BTreeSet<Cid> = BTreeSet::new();
-		entries_to_get.extend(entry.entry().next.iter());
-		entries_to_get.extend(entry.entry().refs.iter());
-		let mut connected_heads: BTreeSet<Cid> = BTreeSet::new();
-		while !entries_to_get.is_empty() {
-			// TODO: prefetch
-			// self.entry_store.fetch(entries_to_get.iter())
-			while let Some(cid) = entries_to_get.pop_first() {
-				let e = self.entry_store.get(&cid)?;
-				verify_entry(&self, self.identity_resolver.as_ref(), &e)?;
-				entries_to_add.insert(e.cid().clone());
-
-				for next in e.entry().next.iter().chain(e.entry().refs.iter()) {
-					if !self.index.contains(next) && !entries_to_add.contains(next) {
-						entries_to_get.insert(next.clone());
-					} else if self.heads.contains(next) {
-						connected_heads.insert(next.clone());
-					}
-				}
-			}
+	pub async fn join(&mut self, other: &Log<S>) -> Result<(), LogError> {
+		let entries = get_entry_blocks(&self.entry_store, other.heads.iter()).await?;
+		for entry in entries {
+			self.join_entry(entry).await?;
 		}
+		Ok(())
+	}
 
-		// resolve
-		let heads = self
-			.heads
-			.iter()
-			// skip connected entries
-			.filter(|cid| !connected_heads.contains(cid))
-			.chain([entry.cid()].into_iter())
-			.map(|cid| self.entry_store.get(cid))
-			.collect::<Result<Vec<_>, _>>()?;
+	async fn join_commit(&mut self, join: JoinEntry<S>) -> Result<(), LogError> {
+		let (heads, entries_to_add) = join.into_inner();
 
 		// mut: index
 		for cid in entries_to_add.into_iter() {
@@ -170,16 +143,9 @@ impl Log {
 		}
 
 		// mut: heads
-		self.heads_set(find_heads(heads.iter()).iter().map(|e| e.cid().clone()));
+		self.heads_set(heads.into_iter());
 
-		// result
-		Ok(true)
-	}
-
-	pub fn join(&mut self, other: &Log) -> Result<(), anyhow::Error> {
-		for head in other.heads.iter() {
-			self.join_entry(other.get(head).ok_or(anyhow!("not found: {}", head))?)?;
-		}
+		//result
 		Ok(())
 	}
 
@@ -199,101 +165,5 @@ impl Log {
 		self.heads.clear();
 		self.heads.extend(heads);
 		tracing::debug!(log = ?self.id, heads = ?self.heads, "log-heads-set");
-	}
-}
-
-fn verify_entry(log: &Log, identity_resolver: &dyn IdentityResolver, entry: &EntryBlock) -> Result<(), anyhow::Error> {
-	// verify log
-	if &entry.entry().id != log.id() {
-		return Err(anyhow::anyhow!("Invalid log: {:02X?} != {:02X?}", &entry.entry().id, log.id()))
-	}
-
-	// verify signature
-	let identity = identity_resolver
-		.resolve(&entry.signed_entry().identity, entry.signed_entry().public_key.as_ref().map(|v| v.as_slice()));
-	let identity = match identity {
-		Some(identity) => identity,
-		None => return Err(anyhow::anyhow!("Resolve identity failed: {}", entry.signed_entry().identity)),
-	};
-	if !entry.verify(identity.as_ref())? {
-		// log
-		tracing::info!(
-			entry_identity = entry.signed_entry().identity,
-			resolved_identity = identity.identity(),
-			entry_signature = ?entry.signed_entry().signature.iter().map(|c| format!("{:02X}", c)).collect::<String>(),
-			"verify-failed"
-		);
-
-		// error
-		return Err(anyhow::anyhow!("Invalid entry signature"));
-	}
-
-	// ok
-	Ok(())
-}
-
-pub struct LogIterator<'a> {
-	storage: &'a EntryStorage,
-	stack: Vec<EntryBlock>,
-	error: Option<anyhow::Error>,
-	traversed: HashSet<Cid>,
-}
-impl<'a> LogIterator<'a> {
-	fn new(storage: &'a EntryStorage, stack: Result<Vec<EntryBlock>, anyhow::Error>) -> Self {
-		match stack {
-			Ok(s) => LogIterator { storage, stack: s, error: None, traversed: Default::default() },
-			Err(e) => LogIterator { storage, stack: Default::default(), error: Some(e), traversed: Default::default() },
-		}
-	}
-
-	fn sort(&mut self) {
-		self.stack.sort_by(last_write_wins);
-	}
-}
-impl<'a> Iterator for LogIterator<'a> {
-	type Item = Result<EntryBlock, anyhow::Error>;
-
-	fn next(&mut self) -> Option<Self::Item> {
-		// error?
-		if let Some(e) = self.error.take() {
-			// clear stack because we are done after an error
-			self.stack.clear();
-
-			// return error
-			return Some(Err(e))
-		}
-
-		// sort stack
-		//  TODO: do we need to consider causality or is the clock enought?
-		self.sort();
-
-		// stack
-		if let Some(entry) = self.stack.pop() {
-			if !self.traversed.contains(entry.cid()) {
-				// flag as traversed
-				self.traversed.insert(entry.cid().clone());
-
-				// TODO: (pre) fetch refs
-				// self.storage.fetch(entry.entry().next.iter());
-				// self.storage.fetch(entry.entry().refs.iter());
-
-				// read next and add to stack
-				let nexts: Result<Vec<EntryBlock>, anyhow::Error> = entry
-					.entry()
-					.next
-					.iter()
-					.map(|cid| -> Result<_, anyhow::Error> { self.storage.get(cid).context("Get entry from storage") })
-					.collect();
-				match nexts {
-					Ok(mut i) => self.stack.append(&mut i),
-					Err(e) => self.error = Some(e),
-				}
-
-				// result
-				return Some(Ok(entry))
-			}
-		}
-
-		None
 	}
 }

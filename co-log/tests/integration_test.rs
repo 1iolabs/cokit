@@ -1,28 +1,29 @@
-use co_log::{DidKeyIdentity, DidKeyIdentityResolver, EntryStorage, Log};
-use co_storage::{BlockSerializer, MemoryStorage, Storage, SyncStorage};
+use co_log::{DidKeyIdentity, DidKeyIdentityResolver, Log};
+use co_storage::{BlockSerializer, BlockStorage, MemoryBlockStorage};
+use futures::TryStreamExt;
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 
-#[test]
-fn smoke() {
+#[tokio::test]
+async fn smoke() {
 	// tracing_subscriber::fmt::fmt()
 	// 	.with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
 	// 	.with_max_level(tracing::Level::TRACE)
 	// 	.init();
 
 	// create store
-	let mut store = SyncStorage::new(MemoryStorage::new());
-	let block0 = create_event(&mut store, "hello");
+	let mut store = MemoryBlockStorage::new();
+	let block0 = create_event(&mut store, "hello").await;
 
 	// create log
 	let identity = Box::new(DidKeyIdentity::generate(None));
-	let mut log = create_empty_log(&identity, &store);
+	let mut log = create_empty_log(&identity, &store).await;
 
 	// populate log
-	log.push(block0.clone()).unwrap();
+	log.push(block0.clone()).await.unwrap();
 
 	// check log
-	let entries = log.iter().collect::<Result<Vec<_>, _>>().unwrap();
+	let entries: Vec<_> = log.stream().try_collect().await.unwrap();
 	assert_eq!(entries.len(), 1);
 
 	// time
@@ -32,25 +33,25 @@ fn smoke() {
 	assert_eq!(entries[0].entry().next, vec![]);
 }
 
-#[test]
-fn traverse_sinlge_user_log() {
+#[tokio::test]
+async fn traverse_sinlge_user_log() {
 	// create store
-	let mut store = SyncStorage::new(MemoryStorage::new());
-	let block0 = create_event(&mut store, "hello");
-	let block1 = create_event(&mut store, "world");
-	let block2 = create_event(&mut store, "whats");
+	let mut store = MemoryBlockStorage::new();
+	let block0 = create_event(&mut store, "hello").await;
+	let block1 = create_event(&mut store, "world").await;
+	let block2 = create_event(&mut store, "whats").await;
 
 	// create log
 	let identity = Box::new(DidKeyIdentity::generate(None));
-	let mut log = create_empty_log(&identity, &store);
+	let mut log = create_empty_log(&identity, &store).await;
 
 	// populate log
-	log.push(block0.clone()).unwrap();
-	log.push(block1.clone()).unwrap();
-	log.push(block2.clone()).unwrap();
+	log.push(block0.clone()).await.unwrap();
+	log.push(block1.clone()).await.unwrap();
+	log.push(block2.clone()).await.unwrap();
 
 	// check log
-	let entries = log.iter().collect::<Result<Vec<_>, _>>().unwrap();
+	let entries: Vec<_> = log.stream().try_collect().await.unwrap();
 	assert_eq!(entries.len(), 3);
 
 	// time
@@ -64,44 +65,44 @@ fn traverse_sinlge_user_log() {
 	assert_eq!(entries[2].entry().next, vec![]);
 }
 
-#[test]
-fn join_is_associative() {
-	let store = SyncStorage::new(MemoryStorage::new());
+#[tokio::test]
+async fn join_is_associative() {
+	let store = MemoryBlockStorage::new();
 	let identity1 = DidKeyIdentity::generate(None);
 	let identity2 = DidKeyIdentity::generate(None);
 	let identity3 = DidKeyIdentity::generate(None);
 
 	// create logs
-	let mut log1 = create_empty_log(&identity1, &store);
-	let mut log2 = create_empty_log(&identity2, &store);
-	let mut log3 = create_empty_log(&identity3, &store);
-	log_push(&mut log1, "helloA1");
-	log_push(&mut log1, "helloA2");
-	log_push(&mut log2, "helloB1");
-	log_push(&mut log2, "helloB2");
-	log_push(&mut log3, "helloC1");
-	log_push(&mut log3, "helloC2");
+	let mut log1 = create_empty_log(&identity1, &store).await;
+	let mut log2 = create_empty_log(&identity2, &store).await;
+	let mut log3 = create_empty_log(&identity3, &store).await;
+	log_push(&mut log1, "helloA1").await;
+	log_push(&mut log1, "helloA2").await;
+	log_push(&mut log2, "helloB1").await;
+	log_push(&mut log2, "helloB2").await;
+	log_push(&mut log3, "helloC1").await;
+	log_push(&mut log3, "helloC2").await;
 
 	// log1 + (log2 + log3)
-	log2.join(&log3).unwrap();
-	log1.join(&log2).unwrap();
-	let res1 = log1.iter().collect::<Result<Vec<_>, _>>().unwrap();
+	log2.join(&log3).await.unwrap();
+	log1.join(&log2).await.unwrap();
+	let res1: Vec<_> = log1.stream().try_collect().await.unwrap();
 
 	// create logs
-	let mut log1 = create_empty_log(&identity1, &store);
-	let mut log2 = create_empty_log(&identity2, &store);
-	let mut log3 = create_empty_log(&identity3, &store);
-	log_push(&mut log1, "helloA1");
-	log_push(&mut log1, "helloA2");
-	log_push(&mut log2, "helloB1");
-	log_push(&mut log2, "helloB2");
-	log_push(&mut log3, "helloC1");
-	log_push(&mut log3, "helloC2");
+	let mut log1 = create_empty_log(&identity1, &store).await;
+	let mut log2 = create_empty_log(&identity2, &store).await;
+	let mut log3 = create_empty_log(&identity3, &store).await;
+	log_push(&mut log1, "helloA1").await;
+	log_push(&mut log1, "helloA2").await;
+	log_push(&mut log2, "helloB1").await;
+	log_push(&mut log2, "helloB2").await;
+	log_push(&mut log3, "helloC1").await;
+	log_push(&mut log3, "helloC2").await;
 
 	// (log1 + log2) + log3)
-	log1.join(&log2).unwrap();
-	log3.join(&log1).unwrap();
-	let res2 = log3.iter().collect::<Result<Vec<_>, _>>().unwrap();
+	log1.join(&log2).await.unwrap();
+	log3.join(&log1).await.unwrap();
+	let res2: Vec<_> = log3.stream().try_collect().await.unwrap();
 
 	// associativity: log1 + (log2 + log3) == (log1 + log2) + log3
 	assert_eq!(res1.len(), 6);
@@ -109,35 +110,35 @@ fn join_is_associative() {
 	assert_eq!(res2, res1);
 }
 
-#[test]
-fn join_is_commutative() {
-	let store = SyncStorage::new(MemoryStorage::new());
+#[tokio::test]
+async fn join_is_commutative() {
+	let store = MemoryBlockStorage::new();
 	let identity1 = DidKeyIdentity::generate(None);
 	let identity2 = DidKeyIdentity::generate(None);
 
 	// create logs
-	let mut log1 = create_empty_log(&identity1, &store);
-	let mut log2 = create_empty_log(&identity2, &store);
-	log_push(&mut log1, "helloA1");
-	log_push(&mut log1, "helloA2");
-	log_push(&mut log2, "helloB1");
-	log_push(&mut log2, "helloB2");
+	let mut log1 = create_empty_log(&identity1, &store).await;
+	let mut log2 = create_empty_log(&identity2, &store).await;
+	log_push(&mut log1, "helloA1").await;
+	log_push(&mut log1, "helloA2").await;
+	log_push(&mut log2, "helloB1").await;
+	log_push(&mut log2, "helloB2").await;
 
 	// log2 + log1
-	log2.join(&log1).unwrap();
-	let res1 = log2.iter().collect::<Result<Vec<_>, _>>().unwrap();
+	log2.join(&log1).await.unwrap();
+	let res1: Vec<_> = log2.stream().try_collect().await.unwrap();
 
 	// create logs
-	let mut log1 = create_empty_log(&identity1, &store);
-	let mut log2 = create_empty_log(&identity2, &store);
-	log_push(&mut log1, "helloA1");
-	log_push(&mut log1, "helloA2");
-	log_push(&mut log2, "helloB1");
-	log_push(&mut log2, "helloB2");
+	let mut log1 = create_empty_log(&identity1, &store).await;
+	let mut log2 = create_empty_log(&identity2, &store).await;
+	log_push(&mut log1, "helloA1").await;
+	log_push(&mut log1, "helloA2").await;
+	log_push(&mut log2, "helloB1").await;
+	log_push(&mut log2, "helloB2").await;
 
 	// log1 + log2
-	log1.join(&log2).unwrap();
-	let res2 = log1.iter().collect::<Result<Vec<_>, _>>().unwrap();
+	log1.join(&log2).await.unwrap();
+	let res2: Vec<_> = log1.stream().try_collect().await.unwrap();
 
 	// commutativity: log2 + log1 == log1 + log2
 	assert_eq!(res1.len(), 4);
@@ -145,26 +146,28 @@ fn join_is_commutative() {
 	assert_eq!(res2, res1);
 }
 
-fn create_empty_log(identity: &DidKeyIdentity, store: &SyncStorage) -> Log {
+async fn create_empty_log<S: BlockStorage + Send + Sync + Clone + 'static>(
+	identity: &DidKeyIdentity,
+	store: &S,
+) -> Log<S> {
 	Log::new(
 		"test".as_bytes().to_vec(),
 		Box::new(identity.clone()),
 		Box::new(DidKeyIdentityResolver::new()),
-		EntryStorage::new(Box::new(store.clone())),
+		store.clone(),
 		Vec::new(),
 	)
 }
 
-fn log_push(log: &mut Log, t: &str) -> (Cid, Cid) {
-	let block = create_event(log.storage_mut(), t);
-	let entry = log.push(block.clone()).unwrap();
+async fn log_push<S: BlockStorage + Send + Sync + 'static>(log: &mut Log<S>, t: &str) -> (Cid, Cid) {
+	let block = create_event(log.storage(), t).await;
+	let entry = log.push(block.clone()).await.unwrap();
 	(block, entry)
 }
 
-fn create_event(storage: &mut dyn Storage, t: &str) -> Cid {
-	let block = BlockSerializer::default().serialize(&Event { t: t.to_owned() }).unwrap();
-	storage.set(block.clone()).unwrap();
-	block.into_inner().0
+async fn create_event<S: BlockStorage + Send + Sync>(storage: &S, t: &str) -> Cid {
+	let block = BlockSerializer::new().serialize(&Event { t: t.to_owned() }).unwrap();
+	storage.set(block.clone()).await.unwrap()
 }
 
 #[derive(Debug, Serialize, Deserialize)]
