@@ -27,13 +27,7 @@ pub fn sort_by_clock_id<P: StoreParams>(a: &EntryBlock<P>, b: &EntryBlock<P>) ->
 #[cfg(test)]
 mod tests {
 	use super::last_write_wins;
-	use crate::{
-		library::{
-			entry::EntryBlock,
-			identity::{PrivateIdentity, SignError},
-		},
-		Clock, Entry, Identity,
-	};
+	use crate::{library::entry::EntryBlock, Clock, Entry, Identity, PrivateIdentity, SignError};
 	use co_storage::BlockSerializer;
 	use libipld::DefaultParams;
 	use serde::Serialize;

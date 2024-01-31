@@ -1,8 +1,5 @@
-use super::{
-	entry::EntryBlock, get_entry_block::get_entry_blocks, identity::PrivateIdentity, join::JoinEntry,
-	stream::create_stream,
-};
-use crate::{library::clock::max_clock, Clock, Entry, IdentityResolver, LogError};
+use super::{entry::EntryBlock, get_entry_block::get_entry_blocks, join::JoinEntry, stream::create_stream};
+use crate::{library::clock::max_clock, Clock, Entry, IdentityResolver, LogError, PrivateIdentity};
 use co_storage::BlockStorage;
 use futures::Stream;
 use libipld::Cid;

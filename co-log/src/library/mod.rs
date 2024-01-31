@@ -1,10 +1,8 @@
 pub mod clock;
 pub mod conflict;
-pub mod did_key;
 pub mod entry;
 pub mod find_heads;
 pub mod get_entry_block;
-pub mod identity;
 pub mod join;
 pub mod log;
 pub mod stream;

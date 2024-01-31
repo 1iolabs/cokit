@@ -1,5 +1,4 @@
-use super::identity::{PrivateIdentity, SignError};
-use crate::{Clock, Identity};
+use crate::{Clock, Identity, PrivateIdentity, SignError};
 use co_storage::{BlockSerializer, SerializeError};
 use libipld::{store::StoreParams, Block, Cid};
 use serde::{Deserialize, Serialize};

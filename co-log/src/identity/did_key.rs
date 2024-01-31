@@ -1,5 +1,4 @@
-use super::identity::{IdentityResolver, PrivateIdentity, SignError};
-use crate::{Identity, IdentityResolverError};
+use crate::{Identity, IdentityResolver, IdentityResolverError, PrivateIdentity, SignError};
 use anyhow::anyhow;
 use did_key::{generate, resolve, CoreSign, DIDCore, Ed25519KeyPair, KeyMaterial, PatchedKeyPair};
 use std::{fmt::Debug, sync::Arc};
@@ -109,7 +108,7 @@ impl IdentityResolver for DidKeyIdentityResolver {
 
 #[cfg(test)]
 mod tests {
-	use crate::{library::identity::PrivateIdentity, DidKeyIdentity, Identity};
+	use crate::{DidKeyIdentity, Identity, PrivateIdentity};
 
 	#[test]
 	fn it_should_sign_and_verfiy() {
