@@ -270,7 +270,8 @@ fn get_external(ipld: &Ipld) -> Result<HashSet<String>, GetExternalError> {
 #[cfg(test)]
 mod tests {
 	use super::PinMapping;
-	use co_storage::{BlockSerializer, MemoryStorage, Storage};
+	use co_primitives::BlockSerializer;
+	use co_storage::{MemoryStorage, Storage};
 	use libipld::Cid;
 	use serde::{Deserialize, Serialize};
 

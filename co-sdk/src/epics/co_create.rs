@@ -7,8 +7,8 @@ use crate::{
 	Co, CoCreate, CoStorage, Request,
 };
 use anyhow::Result;
+use co_primitives::BlockSerializer;
 use co_state::{ActionObservable, StateObservable};
-use co_storage::BlockSerializer;
 use libipld::Cid;
 use rxrust::prelude::*;
 use std::{convert::Infallible, sync::Arc};

@@ -1,5 +1,7 @@
+mod library;
 mod types;
 
+pub use library::block_serializer::{BlockSerializer, BlockSerializerError};
 pub use types::{
 	action::ReducerAction,
 	date::Date,

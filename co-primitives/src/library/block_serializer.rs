@@ -9,7 +9,7 @@ use serde_ipld_dagcbor::{DecodeError, EncodeError};
 use std::{collections::TryReserveError, convert::Infallible, marker::PhantomData};
 
 #[derive(Debug, thiserror::Error)]
-pub enum SerializeError {
+pub enum BlockSerializerError {
 	#[error("Block size {1} exceeds {0}.")]
 	BlockToLarge(usize, usize),
 
@@ -44,13 +44,13 @@ where
 	S: StoreParams,
 {
 	/// Serialize item to block.
-	pub fn serialize<T>(&self, item: &T) -> Result<Block<S>, SerializeError>
+	pub fn serialize<T>(&self, item: &T) -> Result<Block<S>, BlockSerializerError>
 	where
 		T: Serialize,
 	{
 		let data = serde_ipld_dagcbor::to_vec(item)?;
 		if S::MAX_BLOCK_SIZE < data.len() {
-			return Err(SerializeError::BlockToLarge(S::MAX_BLOCK_SIZE, data.len()))
+			return Err(BlockSerializerError::BlockToLarge(S::MAX_BLOCK_SIZE, data.len()))
 		}
 		let mh = Code::Blake3_256.digest(&data);
 		let cid = Cid::new_v1(self.codec, mh);
@@ -58,7 +58,7 @@ where
 	}
 
 	/// Deserialize block to item.
-	pub fn deserialize<'a, T>(&self, item: &'a Block<S>) -> Result<T, SerializeError>
+	pub fn deserialize<'a, T>(&self, item: &'a Block<S>) -> Result<T, BlockSerializerError>
 	where
 		T: serde::de::Deserialize<'a>,
 	{

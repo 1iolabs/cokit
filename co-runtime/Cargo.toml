@@ -6,8 +6,9 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-co-storage = { path = "../co-storage" }
 co-api = { path = "../co-api" }
+co-primitives = { path = "../co-primitives" }
+co-storage = { path = "../co-storage" }
 futures = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 names = "0.14.0"

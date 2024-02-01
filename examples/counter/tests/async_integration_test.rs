@@ -1,6 +1,6 @@
-use co_api::ReducerAction;
+use co_api::{BlockSerializer, ReducerAction};
 use co_sdk::{RuntimeContext, RuntimePool};
-use co_storage::{store_file, BlockSerializer, BlockStorage, MemoryBlockStorage};
+use co_storage::{store_file, BlockStorage, MemoryBlockStorage};
 use example_counter::{Counter, CounterAction};
 use libipld::Cid;
 use std::process::Command;

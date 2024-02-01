@@ -1,6 +1,6 @@
 use co_log::{DidKeyIdentity, DidKeyIdentityResolver, Entry, Log};
-use co_primitives::Link;
-use co_storage::{BlockSerializer, BlockStorage, MemoryBlockStorage};
+use co_primitives::{BlockSerializer, Link};
+use co_storage::{BlockStorage, MemoryBlockStorage};
 use futures::TryStreamExt;
 use libipld::Cid;
 use serde::{Deserialize, Serialize};

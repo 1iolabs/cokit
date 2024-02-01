@@ -161,8 +161,9 @@ mod tests {
 	use super::Reducer;
 	use crate::application::reducer::ReducerBuilder;
 	use co_log::{LocalIdentityResolver, Log};
+	use co_primitives::BlockSerializer;
 	use co_runtime::{IdleRuntimePool, RuntimePool};
-	use co_storage::{store_file, BlockSerializer, BlockStorage, MemoryBlockStorage};
+	use co_storage::{store_file, BlockStorage, MemoryBlockStorage};
 	use example_counter::{Counter, CounterAction};
 	use tokio::process::Command;
 

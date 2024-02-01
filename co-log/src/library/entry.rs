@@ -1,5 +1,5 @@
 use crate::{Clock, Identity, PrivateIdentity, SignError};
-use co_storage::{BlockSerializer, SerializeError};
+use co_primitives::{BlockSerializer, BlockSerializerError};
 use libipld::{store::StoreParams, Block, Cid};
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
@@ -44,7 +44,7 @@ pub struct SignedEntry {
 #[derive(Debug, thiserror::Error)]
 pub enum EntryError {
 	#[error("Serialize failed: {0}")]
-	Serialize(#[from] SerializeError),
+	Serialize(#[from] BlockSerializerError),
 
 	#[error("Signature failed: {0}")]
 	Sign(#[from] SignError),
@@ -141,7 +141,7 @@ impl<P: StoreParams> Ord for EntryBlock<P> {
 #[cfg(test)]
 mod tests {
 	use crate::{Clock, DidKeyIdentity, EntryBlock};
-	use co_storage::BlockSerializer;
+	use co_primitives::BlockSerializer;
 	use libipld::DefaultParams;
 	use serde::{Deserialize, Serialize};
 

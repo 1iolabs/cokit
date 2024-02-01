@@ -1,5 +1,5 @@
-use crate::{types::storage::StorageError, BlockSerializer};
-use co_primitives::Link;
+use crate::types::storage::StorageError;
+use co_primitives::{BlockSerializer, Link};
 use libipld::{store::StoreParams, Block, DefaultParams};
 use serde::{Deserialize, Serialize};
 use std::mem::take;

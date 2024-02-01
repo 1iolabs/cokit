@@ -1,7 +1,7 @@
-use co_api::{ReducerAction, Tags};
+use co_api::{BlockSerializer, ReducerAction, Tags};
 use co_core_co::{Co, CoAction};
 use co_sdk::{RuntimeContext, RuntimePool};
-use co_storage::{store_file, unixfs_add, BlockSerializer, BlockStorage, MemoryBlockStorage};
+use co_storage::{store_file, BlockStorage, MemoryBlockStorage};
 use libipld::Cid;
 use std::process::Command;
 

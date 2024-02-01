@@ -1,6 +1,6 @@
 use anyhow::Result;
+use co_primitives::BlockSerializer;
 use co_sdk::{Co, CoStorage};
-use co_storage::BlockSerializer;
 use futures::future::join_all;
 use libipld::Cid;
 

@@ -505,8 +505,8 @@ mod tests {
 		},
 		storage::{encrypted::EncryptedStorage, memory::MemoryStorage},
 		types::storage::{Storage, StorageError},
-		BlockSerializer,
 	};
+	use co_primitives::BlockSerializer;
 	use libipld::{store::StoreParams, Cid, DefaultParams};
 	use serde::{Deserialize, Serialize};
 	use std::iter::repeat;
