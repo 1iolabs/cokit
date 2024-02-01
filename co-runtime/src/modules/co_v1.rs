@@ -1,14 +1,15 @@
 use crate::RuntimeContext;
 use co_api::{Block, Cid};
 use co_storage::{Storage, StorageError};
+use libipld::DefaultParams;
 use std::{cmp::min, fmt::Debug, mem::swap};
 
 pub struct CoV1Api {
-	storage: Box<dyn Storage + Send + Sync>,
+	storage: Box<dyn Storage<StoreParams = DefaultParams> + Send + Sync>,
 	context: RuntimeContext,
 }
 impl CoV1Api {
-	pub fn new(storage: Box<dyn Storage + Send + Sync>, context: RuntimeContext) -> Self {
+	pub fn new(storage: Box<dyn Storage<StoreParams = DefaultParams> + Send + Sync>, context: RuntimeContext) -> Self {
 		Self { storage, context }
 	}
 
@@ -21,7 +22,7 @@ impl CoV1Api {
 		swap(&mut self.context, &mut other.context);
 	}
 
-	pub fn storage_mut(&mut self) -> &mut dyn Storage {
+	pub fn storage_mut(&mut self) -> &mut dyn Storage<StoreParams = DefaultParams> {
 		self.storage.as_mut()
 	}
 }

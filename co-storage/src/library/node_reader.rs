@@ -34,34 +34,36 @@ use std::{collections::VecDeque, convert::Infallible};
 // 	Ok(())
 // }
 
-pub fn node_reader<'a, T>(storage: &'a dyn Storage, cid: &'a Cid) -> impl Iterator<Item = anyhow::Result<T>> + 'a
+pub fn node_reader<'a, T, S: Storage>(storage: &'a S, cid: &'a Cid) -> impl Iterator<Item = anyhow::Result<T>> + 'a
 where
 	T: Clone + DeserializeOwned + 'static,
 {
 	NodeIterator::new(storage, cid)
 }
 
-struct NodeIterator<'a, T>
+struct NodeIterator<'a, T, S>
 where
 	T: Clone + DeserializeOwned,
 {
-	storage: &'a dyn Storage,
+	storage: &'a S,
 	stack: VecDeque<Cid>,
 	entries: VecDeque<T>,
 }
-impl<'a, T> NodeIterator<'a, T>
+impl<'a, T, S> NodeIterator<'a, T, S>
 where
 	T: Clone + DeserializeOwned,
+	S: Storage,
 {
-	pub fn new(storage: &'a dyn Storage, cid: &Cid) -> Self {
+	pub fn new(storage: &'a S, cid: &Cid) -> Self {
 		let mut stack = VecDeque::new();
 		stack.push_front(cid.clone());
 		Self { storage, stack, entries: Default::default() }
 	}
 }
-impl<'a, T> Iterator for NodeIterator<'a, T>
+impl<'a, T, S> Iterator for NodeIterator<'a, T, S>
 where
 	T: Clone + DeserializeOwned,
+	S: Storage,
 {
 	type Item = anyhow::Result<T>;
 
@@ -97,7 +99,7 @@ enum NodeReadError {
 	Decode(#[from] DecodeError<Infallible>),
 }
 
-fn read_node<T: Clone + DeserializeOwned>(storage: &dyn Storage, cid: &Cid) -> Result<Node<T>, NodeReadError> {
+fn read_node<T: Clone + DeserializeOwned, S: Storage>(storage: &S, cid: &Cid) -> Result<Node<T>, NodeReadError> {
 	// get block
 	let block = storage.get(cid)?;
 	if block.cid().codec() != Into::<u64>::into(DagCborCodec) {

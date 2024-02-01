@@ -18,7 +18,7 @@ impl PinMapping {
 	/// # Arguments
 	/// - `state` - The CID of the state we want to pin.
 	/// - `pin` - The CID of the pin mapping of a previous state.
-	pub fn from_state(storage: &mut dyn Storage, state: Cid, pin: Option<Cid>) -> anyhow::Result<PinMapping> {
+	pub fn from_state<S: Storage + Sized>(storage: &mut S, state: Cid, pin: Option<Cid>) -> anyhow::Result<PinMapping> {
 		// get current pins
 		let mut pins = if let Some(cid) = pin { PinEntry::read(storage, &cid)? } else { Default::default() };
 
@@ -42,11 +42,11 @@ impl PinMapping {
 	}
 }
 
-fn compute_entry(
+fn compute_entry<S: Storage>(
 	from: &mut BTreeMap<Cid, BTreeSet<Cid>>,
 	to: &mut BTreeMap<Cid, BTreeSet<Cid>>,
 	added: &mut BTreeSet<Cid>,
-	storage: &dyn Storage,
+	storage: &S,
 	cid: &Cid,
 ) -> anyhow::Result<()> {
 	if !move_entry(from, to, &cid) {
@@ -89,7 +89,7 @@ enum PinEntry {
 	Child(Cid),
 }
 impl PinEntry {
-	fn read(storage: &dyn Storage, cid: &Cid) -> anyhow::Result<BTreeMap<Cid, BTreeSet<Cid>>> {
+	fn read<S: Storage>(storage: &S, cid: &Cid) -> anyhow::Result<BTreeMap<Cid, BTreeSet<Cid>>> {
 		let mut result = BTreeMap::<Cid, BTreeSet<Cid>>::new();
 		let mut root = None;
 		for item in node_reader(storage, cid) {
@@ -113,14 +113,14 @@ impl PinEntry {
 		Ok(result)
 	}
 
-	fn write(storage: &mut dyn Storage, map: &BTreeMap<Cid, BTreeSet<Cid>>) -> anyhow::Result<Cid> {
+	fn write<S: Storage>(storage: &mut S, map: &BTreeMap<Cid, BTreeSet<Cid>>) -> anyhow::Result<Cid> {
 		// validate
 		if map.is_empty() {
 			return Err(StorageError::InvalidArgument(anyhow!("Empty")))?
 		}
 
 		// build
-		let mut builder = NodeBuilder::<PinEntry, DefaultNodeSerializer>::default();
+		let mut builder = NodeBuilder::<PinEntry, DefaultNodeSerializer, S::StoreParams>::default();
 		for (k, v) in map.iter() {
 			// skip empty sets as their CID's will be added as childs by referencing roots
 			// in case of single root state onyl write the root node
@@ -159,7 +159,7 @@ enum DecodeError {
 	UnsupportedCodec,
 }
 
-fn decode(storage: &dyn Storage, cid: &Cid) -> Result<Ipld, DecodeError> {
+fn decode<S: Storage>(storage: &S, cid: &Cid) -> Result<Ipld, DecodeError> {
 	if cid.codec() == Into::<u64>::into(DagCborCodec) {
 		let block = storage.get(cid)?;
 		let ipld: Ipld = DagCborCodec.decode(block.data())?;
@@ -170,7 +170,7 @@ fn decode(storage: &dyn Storage, cid: &Cid) -> Result<Ipld, DecodeError> {
 }
 
 /// Recursively find all referenced `Cid`'s in an `Ipld` data structure by calling `found`.
-fn find_ipld_cids(result: &mut BTreeSet<Cid>, storage: &dyn Storage, ipld: &Ipld) {
+fn find_ipld_cids<S: Storage>(result: &mut BTreeSet<Cid>, storage: &S, ipld: &Ipld) {
 	match ipld {
 		Ipld::List(v) =>
 			for i in v.iter() {

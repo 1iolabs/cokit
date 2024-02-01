@@ -10,6 +10,10 @@ pub enum CounterAction {
 	Increment(i64),
 	#[serde(rename = "d")]
 	Decrement(i64),
+	#[serde(rename = "m")]
+	Multiply(i64),
+	#[serde(rename = "s")]
+	Set(i64),
 }
 
 impl Reducer for Counter {
@@ -19,6 +23,8 @@ impl Reducer for Counter {
 		match event.payload {
 			CounterAction::Increment(i) => Counter(self.0 + i),
 			CounterAction::Decrement(i) => Counter(self.0 - i),
+			CounterAction::Multiply(i) => Counter(self.0 * i),
+			CounterAction::Set(i) => Counter(i),
 		}
 	}
 }

@@ -12,12 +12,14 @@ pub use library::{
 	block_serializer::{BlockSerializer, SerializeError},
 	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
 	node_reader::node_reader,
+	store_file::store_file,
 	unixfs::{unixfs_add, unixfs_cat_buffer},
 };
 pub use storage::{
 	encrypted::{EncryptedBlockStorage, EncryptedStorage},
 	fs::FsStorage,
 	memory::{MemoryBlockStorage, MemoryStorage},
+	store_params::StoreParamsBlockStorage,
 	sync::{SyncBlockStorage, SyncStorage},
 };
 pub use types::{

@@ -6,7 +6,7 @@ use crate::{
 use anyhow::Context;
 use co_storage::{BlockStorage, Storage};
 use futures::{stream, Stream, StreamExt, TryStreamExt};
-use libipld::{Cid, DefaultParams};
+use libipld::Cid;
 use std::collections::HashSet;
 
 pub fn create_stream<'a, S>(
@@ -54,7 +54,7 @@ where
 	S: Storage,
 {
 	storage: S,
-	stack: Vec<EntryBlock<DefaultParams>>,
+	stack: Vec<EntryBlock<S::StoreParams>>,
 	error: Option<anyhow::Error>,
 	traversed: HashSet<Cid>,
 }
@@ -62,7 +62,7 @@ impl<S> LogIterator<S>
 where
 	S: Storage,
 {
-	pub fn new(storage: S, stack: Vec<EntryBlock<DefaultParams>>) -> Self {
+	pub fn new(storage: S, stack: Vec<EntryBlock<S::StoreParams>>) -> Self {
 		LogIterator { storage, stack, error: None, traversed: Default::default() }
 	}
 
@@ -74,7 +74,7 @@ impl<S> Iterator for LogIterator<S>
 where
 	S: Storage,
 {
-	type Item = Result<EntryBlock<DefaultParams>, anyhow::Error>;
+	type Item = Result<EntryBlock<S::StoreParams>, anyhow::Error>;
 
 	fn next(&mut self) -> Option<Self::Item> {
 		// error?
@@ -101,11 +101,11 @@ where
 				// self.storage.fetch(entry.entry().refs.iter());
 
 				// read next and add to stack
-				let nexts: Result<Vec<EntryBlock<DefaultParams>>, anyhow::Error> = entry
+				let nexts: Result<Vec<EntryBlock<S::StoreParams>>, anyhow::Error> = entry
 					.entry()
 					.next
 					.iter()
-					.map(|cid| -> Result<EntryBlock<DefaultParams>, anyhow::Error> {
+					.map(|cid| -> Result<EntryBlock<S::StoreParams>, anyhow::Error> {
 						match self.storage.get(cid).context("Get entry from storage") {
 							Ok(block) => EntryBlock::from_block(block).context("Validate block"),
 							Err(e) => Err(e),

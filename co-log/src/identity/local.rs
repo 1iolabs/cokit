@@ -2,10 +2,12 @@ use crate::{Identity, IdentityResolver, IdentityResolverError, PrivateIdentity};
 
 /// A local identity without any actual signatures.
 #[derive(Debug, Clone)]
-pub struct LocalIdentity {}
+pub struct LocalIdentity {
+	did: String,
+}
 impl Identity for LocalIdentity {
 	fn identity(&self) -> &str {
-		"local"
+		self.did.as_str()
 	}
 
 	fn public_key(&self) -> Option<Vec<u8>> {
@@ -24,11 +26,20 @@ impl PrivateIdentity for LocalIdentity {
 
 #[derive(Debug, Clone, Default)]
 pub struct LocalIdentityResolver {}
-impl IdentityResolver for LocalIdentityResolver {
-	fn resolve(&self, identity: &str, _public_key: Option<&[u8]>) -> Result<Box<dyn Identity>, IdentityResolverError> {
-		if identity == "local" {
-			return Ok(Box::new(LocalIdentity {}));
+impl LocalIdentityResolver {
+	fn into_local_identity(identity: &str) -> Result<LocalIdentity, IdentityResolverError> {
+		if identity.starts_with("did:local:") {
+			return Ok(LocalIdentity { did: identity.to_owned() });
 		}
 		return Err(IdentityResolverError::NotFound);
+	}
+
+	pub fn private_identity(&self, identity: &str) -> Result<Box<dyn PrivateIdentity>, IdentityResolverError> {
+		Ok(Box::new(Self::into_local_identity(identity)?))
+	}
+}
+impl IdentityResolver for LocalIdentityResolver {
+	fn resolve(&self, identity: &str, _public_key: Option<&[u8]>) -> Result<Box<dyn Identity>, IdentityResolverError> {
+		Ok(Box::new(Self::into_local_identity(identity)?))
 	}
 }

@@ -1,12 +1,14 @@
-use libipld::{Block, Cid, DefaultParams};
+use libipld::{store::StoreParams, Block, Cid};
 
 /// Storage interface.
 pub trait Storage {
+	type StoreParams: StoreParams;
+
 	/// Returns a block from storage.
-	fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError>;
+	fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError>;
 
 	/// Inserts a block into storage.
-	fn set(&mut self, block: Block<DefaultParams>) -> Result<(), StorageError>;
+	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<(), StorageError>;
 
 	/// Remove a block from storage.
 	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError>;

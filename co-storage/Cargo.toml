@@ -23,6 +23,7 @@ serde_repr = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "fs", "rt"] }
 tokio-stream = { workspace = true }
+tokio-util = { workspace = true, features = ["compat"] }
 tracing = { workspace = true }
 uuid = { version = "1.2.2", features = ["default", "v4"] }
 zeroize = "=1.6.0"

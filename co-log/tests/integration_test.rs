@@ -1,4 +1,5 @@
-use co_log::{DidKeyIdentity, DidKeyIdentityResolver, Log};
+use co_log::{DidKeyIdentity, DidKeyIdentityResolver, Entry, Log};
+use co_primitives::Link;
 use co_storage::{BlockSerializer, BlockStorage, MemoryBlockStorage};
 use futures::TryStreamExt;
 use libipld::Cid;
@@ -159,7 +160,7 @@ async fn create_empty_log<S: BlockStorage + Send + Sync + Clone + 'static>(
 	)
 }
 
-async fn log_push<S: BlockStorage + Send + Sync + 'static>(log: &mut Log<S>, t: &str) -> (Cid, Cid) {
+async fn log_push<S: BlockStorage + Send + Sync + 'static>(log: &mut Log<S>, t: &str) -> (Cid, Link<Entry>) {
 	let block = create_event(log.storage(), t).await;
 	let entry = log.push(block.clone()).await.unwrap();
 	(block, entry)

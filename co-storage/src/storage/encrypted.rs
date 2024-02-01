@@ -99,10 +99,12 @@ impl<S> Storage for EncryptedStorage<S>
 where
 	S: Storage,
 {
+	type StoreParams = S::StoreParams;
+
 	/// Returns a block from storage.
 	///
 	/// Note: This expects the unencrypted CID.
-	fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError> {
+	fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		match if cid.codec() == BLOCK_MULTICODEC { Some(cid) } else { self.mapping.map.get(cid) } {
 			Some(encrypted_cid) => EncryptedBlock::try_from(self.next.get(encrypted_cid)?)
 				.map_err(|e| StorageError::Internal(e.into()))?
@@ -115,13 +117,13 @@ where
 	/// Inserts a block into storage.
 	///
 	/// Note: This expects the unencrypted Block.
-	fn set(&mut self, block: Block<DefaultParams>) -> Result<(), StorageError> {
+	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<(), StorageError> {
 		let cid = block.cid().clone();
 
 		// encrypt
 		let encrypted =
 			EncryptedBlock::encrypt(self.algorithm, &self.key, block).map_err(|e| StorageError::Internal(e.into()))?;
-		let encrypted_block: Block<DefaultParams> = encrypted
+		let encrypted_block: Block<Self::StoreParams> = encrypted
 			.try_into()
 			.map_err(|e: AlgorithmError| StorageError::Internal(e.into()))?;
 		let encrypted_cid = encrypted_block.cid().clone();
@@ -167,6 +169,10 @@ impl<S> EncryptedBlockStorage<S>
 where
 	S: BlockStorage + Send + Sync,
 {
+	pub fn new(next: S, key: Secret) -> Self {
+		Self { algorithm: Default::default(), key, mapping: Default::default(), next }
+	}
+
 	/// Load mapping from CID.
 	pub async fn load_mapping(&mut self, map: &Cid) -> Result<(), StorageError> {
 		let mut mapping = BlockMapping::new();
@@ -317,7 +323,7 @@ impl BlockMapping {
 		let mut mapping = BlockMapping::new();
 		for cid in cids {
 			if cid.codec() == BLOCK_MULTICODEC {
-				let encrypted_block: EncryptedBlock<DefaultParams> = storage.storage().get(&cid)?.try_into()?;
+				let encrypted_block: EncryptedBlock<S::StoreParams> = storage.storage().get(&cid)?.try_into()?;
 				mapping.insert(encrypted_block.cid(&storage.key)?, cid);
 			}
 		}
@@ -342,7 +348,7 @@ impl BlockMapping {
 	}
 
 	/// Read block mappings from `cid` via an block storage.
-	pub fn read_mappings_storage(&mut self, storage: &dyn Storage, cid: &Cid) -> Result<usize, StorageError> {
+	pub fn read_mappings_storage<S: Storage>(&mut self, storage: &S, cid: &Cid) -> Result<usize, StorageError> {
 		let mut count = 0;
 
 		// get block
@@ -438,6 +444,11 @@ impl BlockMapping {
 
 		// result
 		Ok((root_cid, blocks))
+	}
+}
+impl Default for BlockMapping {
+	fn default() -> Self {
+		Self { map: Default::default() }
 	}
 }
 

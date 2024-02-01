@@ -147,9 +147,10 @@ where
 		Ok(link_blocks)
 	}
 }
-impl<T> Default for NodeBuilder<T, DefaultNodeSerializer>
+impl<T, P> Default for NodeBuilder<T, DefaultNodeSerializer, P>
 where
 	T: Clone + Serialize,
+	P: StoreParams,
 {
 	fn default() -> Self {
 		Self::new(174, DefaultNodeSerializer::new())

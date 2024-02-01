@@ -13,11 +13,14 @@ co-network = { path = "../co-network" }
 co-runtime = { path = "../co-runtime" }
 co-state = { path = "../state" }
 co-storage = { path = "../co-storage" }
+co-primitives = { path = "../co-primitives" }
 directories = "5.0.1"
 futures = { workspace = true }
 hyper = { workspace = true }
+keyring = "2.3.2"
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 libp2p = { workspace = true, features = ["rendezvous", "tokio"] }
+multibase = "0.9.1"
 names = "0.14.0"
 rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -31,6 +34,9 @@ tracing-bunyan-formatter = "0.3.6"
 tracing-log = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { version = "1.2.2", features = ["default", "v4"] }
+
+[dev-dependencies]
+example-counter = { path = "../examples/counter" }
 
 [features]
 "default" = ["tokio-runtime"]

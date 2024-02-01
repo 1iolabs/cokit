@@ -21,6 +21,5 @@ co-runtime = { path = "../../co-runtime" }
 co-sdk = { path = "../../co-sdk" }
 co-storage = { path = "../../co-storage" }
 tokio = { workspace = true }
-tokio-util = { workspace = true, features = ["compat"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

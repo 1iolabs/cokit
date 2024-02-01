@@ -1,6 +1,6 @@
 use crate::{co_v1::CoV1Api, runtimes::RuntimeError, RuntimeContext, RuntimeInstance};
-use co_storage::{BlockStorage, StorageError, SyncBlockStorage};
-use libipld::{Cid, DefaultParams};
+use co_storage::{BlockStorage, StorageError, StoreParamsBlockStorage, SyncBlockStorage};
+use libipld::Cid;
 use std::{collections::VecDeque, sync::Arc};
 use tokio::{runtime::Handle, sync::Mutex};
 
@@ -50,20 +50,28 @@ impl RuntimePool {
 	pub async fn execute<S>(
 		&self,
 		storage: &S,
-		cid: &Cid,
+		core: &Cid,
 		context: RuntimeContext,
 	) -> Result<Option<Cid>, RuntimePoolError>
 	where
-		S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + Clone + 'static,
+		S: BlockStorage + Send + Sync + Clone + 'static,
 	{
+		#[cfg(debug_assertions)]
+		let checked = false;
+		#[cfg(not(debug_assertions))]
+		let checked = false;
+
 		// api
-		let api = CoV1Api::new(Box::new(SyncBlockStorage::new(storage.clone(), Handle::current())), context);
+		let api = CoV1Api::new(
+			Box::new(SyncBlockStorage::new(StoreParamsBlockStorage::new(storage.clone(), checked), Handle::current())),
+			context,
+		);
 
 		// get/create instance
-		let pool_instance = self.pool.lock().await.get(cid);
+		let pool_instance = self.pool.lock().await.get(core);
 		let mut instance = match pool_instance {
 			Some(i) => i,
-			None => RuntimeInstance::create(storage, cid).await?,
+			None => RuntimeInstance::create(storage, core).await?,
 		};
 
 		// execute

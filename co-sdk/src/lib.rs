@@ -10,6 +10,7 @@ pub use application::{
 	local::LocalCo,
 };
 pub use co_runtime::{co_v1, RuntimeContext, RuntimeInstance, RuntimePool, RuntimePoolError};
+pub use co_storage::store_file;
 pub use drivers::{
 	network::Network,
 	state::{ActionsType, ReducerType, State, StoreType},

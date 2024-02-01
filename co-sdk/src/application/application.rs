@@ -1,11 +1,13 @@
+use crate::CoStorage;
+use co_storage::FsStorage;
 use directories::ProjectDirs;
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 use tracing::{level_filters::LevelFilter, subscriber::set_global_default};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
 use tracing_subscriber::{layer::SubscriberExt, Registry};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Application {
 	/// The Unique Application Instance Identifier.
 	/// The Identifier should be hardcoded in the application.
@@ -24,6 +26,9 @@ pub struct Application {
 
 	/// Path for application logs. If None no logs will be produced.
 	log: Log,
+
+	/// CO Storage.
+	storage: CoStorage,
 }
 impl Application {
 	/// Initialize application.
@@ -78,8 +83,10 @@ impl ApplicationBuilder {
 	}
 
 	pub fn build(self) -> Application {
+		let storage_path = self.path.join("data");
 		let result = Application {
-			storage_path: self.path.join("data"),
+			storage: Arc::new(FsStorage::new(storage_path.clone())),
+			storage_path,
 			application_path: self.path.join("etc").join(&self.identifier),
 			identifier: self.identifier,
 			log: self.log,

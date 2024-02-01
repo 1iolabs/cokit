@@ -1,10 +1,9 @@
 use co_api::{ReducerAction, Tags};
 use co_core_co::{Co, CoAction};
 use co_sdk::{RuntimeContext, RuntimePool};
-use co_storage::{unixfs_add, BlockSerializer, BlockStorage, MemoryBlockStorage};
+use co_storage::{store_file, unixfs_add, BlockSerializer, BlockStorage, MemoryBlockStorage};
 use libipld::Cid;
 use std::process::Command;
-use tokio_util::compat::TokioAsyncReadCompatExt;
 
 #[tokio::test]
 async fn integration_test() {
@@ -37,9 +36,9 @@ async fn integration_test() {
 	storage.set(action_block).await.unwrap();
 
 	// wasm
-	let wasm_path = "../../target/wasm32-unknown-unknown/release/co_core_co.wasm";
-	let mut file = tokio::fs::File::open(wasm_path).await.unwrap().compat();
-	let wasm = unixfs_add(&storage, &mut file).await.unwrap().last().unwrap().to_owned();
+	let wasm = store_file(&storage, "../../target/wasm32-unknown-unknown/release/co_core_co.wasm")
+		.await
+		.unwrap();
 
 	// execute
 	let next_state = RuntimePool::default()

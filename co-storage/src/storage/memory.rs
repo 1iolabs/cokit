@@ -43,6 +43,8 @@ impl MemoryStorage {
 }
 
 impl Storage for MemoryStorage {
+	type StoreParams = DefaultParams;
+
 	fn set(&mut self, block: Block<DefaultParams>) -> Result<(), StorageError> {
 		// let cid = Cid::new_v1(options.codec, Code::Blake3_256.digest(&data[..]));
 		tracing::debug!(cid = ?block.cid(), "memory-store-set");

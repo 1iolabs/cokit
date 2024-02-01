@@ -1,6 +1,5 @@
-use std::fmt::Debug;
-
 use crate::co_v1::{event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set, CoV1Api};
+use std::fmt::Debug;
 use wasmer::{imports, AsStoreMut, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, Store, WasmPtr};
 
 pub struct WasmerRuntime {
@@ -40,11 +39,11 @@ impl WasmerRuntime {
 	pub fn new(api: CoV1Api, bytes: &Vec<u8>) -> Result<Self, WasmerError> {
 		let mut store = Store::default();
 
-		// env
-		let env = FunctionEnv::new(&mut store, WasmerEnv { memory: None, api });
-
 		// module
 		let module = Module::new(&store, bytes)?;
+
+		// env
+		let env = FunctionEnv::new(&mut store, WasmerEnv { memory: None, api });
 
 		// instance
 		let import_object = Self::imports(&mut store, &env);
@@ -72,7 +71,6 @@ impl WasmerRuntime {
 	}
 
 	/// Mutable API accress.
-	#[allow(dead_code)]
 	pub fn api_mut(&mut self) -> &mut CoV1Api {
 		&mut self.env.as_mut(&mut self.store).api
 	}

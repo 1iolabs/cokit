@@ -23,6 +23,8 @@ impl FsStorage {
 	}
 }
 impl Storage for FsStorage {
+	type StoreParams = DefaultParams;
+
 	fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError> {
 		let path = to_cid_path(&self.path, cid);
 		into_block_result(cid, std::fs::read(path))

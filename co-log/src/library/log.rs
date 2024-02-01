@@ -1,8 +1,10 @@
 use super::{entry::EntryBlock, get_entry_block::get_entry_blocks, join::JoinEntry, stream::create_stream};
-use crate::{library::clock::max_clock, Clock, Entry, IdentityResolver, LogError, PrivateIdentity};
-use co_storage::BlockStorage;
+use crate::{library::clock::max_clock, Clock, Entry, Identity, IdentityResolver, LogError, PrivateIdentity};
+use co_primitives::Link;
+use co_storage::{BlockSerializer, BlockStorage};
 use futures::Stream;
 use libipld::Cid;
+use serde::Serialize;
 use std::collections::{BTreeSet, HashSet};
 
 pub struct Log<S> {
@@ -28,6 +30,14 @@ impl<S> Log<S> {
 
 	pub fn heads(&self) -> Vec<Cid> {
 		self.heads.iter().cloned().collect()
+	}
+
+	pub fn heads_iter(&self) -> impl Iterator<Item = &Cid> {
+		self.heads.iter()
+	}
+
+	pub fn identity(&self) -> &dyn Identity {
+		self.identity.as_ref()
 	}
 
 	pub fn identity_resolver(&self) -> &Box<dyn IdentityResolver> {
@@ -86,7 +96,7 @@ where
 	}
 
 	/// Push item as new entry.
-	pub async fn push(&mut self, item: Cid) -> Result<Cid, LogError> {
+	pub async fn push(&mut self, item: Cid) -> Result<Link<Entry>, LogError> {
 		// heads
 		let head_entries = get_entry_blocks(&self.entry_store, self.heads.iter()).await?;
 
@@ -111,7 +121,21 @@ where
 		self.heads_set([entry_cid.clone()].into_iter());
 
 		// result
-		Ok(entry_cid)
+		Ok(entry_cid.into())
+	}
+
+	/// Push serializable item as new entry.
+	/// Returns the `Cid` of the `Entry`.
+	pub async fn push_event<T: Serialize>(&mut self, item: &T) -> Result<Link<Entry>, LogError> {
+		let cid = self
+			.entry_store
+			.set(
+				BlockSerializer::new()
+					.serialize(item)
+					.map_err(|e| LogError::InvalidArgument(e.into()))?,
+			)
+			.await?;
+		Ok(self.push(cid).await?.into())
 	}
 
 	pub async fn join_entry(&mut self, entry: EntryBlock<S::StoreParams>) -> Result<bool, LogError> {
