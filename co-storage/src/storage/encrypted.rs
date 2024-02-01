@@ -3,13 +3,13 @@ use crate::{
 		block::{Algorithm, EncryptedBlock, BLOCK_MULTICODEC},
 		secret::Secret,
 	},
-	library::node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
 	AlgorithmError, BlockStat, BlockStorage, Storage, StorageError,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
+use co_primitives::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer};
 use futures::{stream::FuturesOrdered, StreamExt};
-use libipld::{cbor::DagCborCodec, store::StoreParams, Block, Cid, DefaultParams};
+use libipld::{cbor::DagCborCodec, store::StoreParams, Block, Cid};
 use serde::{Deserialize, Serialize};
 use std::{
 	borrow::{Borrow, Cow},
@@ -437,9 +437,11 @@ impl BlockMapping {
 		// blocks
 		let mut builder = NodeBuilder::<(Cid, Cid), S, P>::new(options.max_children, serializer);
 		for (key, value) in self.map.iter() {
-			builder.push((key.clone(), value.clone())).map_err(|e| e.into())?;
+			builder
+				.push((key.clone(), value.clone()))
+				.map_err(|e| StorageError::Internal(e.into()))?;
 		}
-		let blocks = builder.into_blocks().map_err(|e| e.into())?;
+		let blocks = builder.into_blocks().map_err(|e| StorageError::Internal(e.into()))?;
 		let root_cid = blocks.get(0).expect("at least one block when have items").cid().clone();
 
 		// result

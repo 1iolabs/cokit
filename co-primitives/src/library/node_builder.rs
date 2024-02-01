@@ -1,5 +1,4 @@
-use crate::types::storage::StorageError;
-use co_primitives::{BlockSerializer, Link};
+use crate::{BlockSerializer, Link};
 use libipld::{store::StoreParams, Block, DefaultParams};
 use serde::{Deserialize, Serialize};
 use std::mem::take;
@@ -19,13 +18,6 @@ where
 pub enum NodeBuilderError {
 	#[error("Encoding failed")]
 	Encoding,
-}
-impl Into<StorageError> for NodeBuilderError {
-	fn into(self) -> StorageError {
-		match self {
-			NodeBuilderError::Encoding => StorageError::Internal(self.into()),
-		}
-	}
 }
 
 pub trait NodeSerializer<T, P>

@@ -1197,6 +1197,7 @@ version = "0.1.0"
 dependencies = [
  "co-macros",
  "derive_more",
+ "insta",
  "libipld",
  "serde",
  "serde_ipld_dagcbor",

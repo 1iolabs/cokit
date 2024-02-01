@@ -9,7 +9,6 @@ pub use crypto::{
 	secret::Secret,
 };
 pub use library::{
-	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
 	node_reader::node_reader,
 	store_file::store_file,
 	unixfs::{unixfs_add, unixfs_cat_buffer},

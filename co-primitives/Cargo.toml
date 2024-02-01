@@ -10,4 +10,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-co-macros = {path = "../co-macros"}
+co-macros = { path = "../co-macros" }
+
+[dev-dependencies]
+insta = { version = "1.34.0", features = ["default", "yaml"] }

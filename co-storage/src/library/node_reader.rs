@@ -1,4 +1,5 @@
-use crate::{Node, Storage, StorageError};
+use crate::{Storage, StorageError};
+use co_primitives::Node;
 use libipld::{cbor::DagCborCodec, Cid};
 use serde::de::DeserializeOwned;
 use serde_ipld_dagcbor::DecodeError;
