@@ -42,7 +42,7 @@ async fn integration_test() {
 
 	// execute
 	let next_state = RuntimePool::default()
-		.execute(&storage, &wasm, RuntimeContext { state: None, event: action_cid })
+		.execute(&storage, &wasm.into(), RuntimeContext { state: None, event: action_cid })
 		.await
 		.unwrap();
 

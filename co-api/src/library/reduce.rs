@@ -1,4 +1,4 @@
-use super::WasmContext;
+use super::wasm_context::WasmContext;
 use crate::{Block, Cid, Context, Reducer, ReducerAction};
 use libipld::{
 	cbor::DagCborCodec,
@@ -48,6 +48,6 @@ where
 	if cid.is_none() || cid.unwrap() != next_cid {
 		let store_cid = next_cid.clone();
 		context.storage_mut().set(next_block);
-		context.store_state(&store_cid);
+		context.store_state(store_cid);
 	}
 }

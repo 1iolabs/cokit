@@ -10,7 +10,10 @@ pub use co_primitives::{
 };
 pub use co_v1::{event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set};
 pub use libipld::Cid;
-pub use library::{reduce, ResolveError, StorageExt};
+pub use library::{
+	reduce::{reduce, reduce_with_context},
+	storage_ext::{ResolveError, StorageExt},
+};
 pub use types::{
 	reducer::{Context, Reducer},
 	storage::Storage,

@@ -50,7 +50,7 @@ impl Storage for WasmStorage {
 		Block::new_unchecked(cid.clone(), buffer)
 	}
 
-	fn set(&mut self, block: Block) {
+	fn set(&mut self, block: Block) -> Cid {
 		let cid_bytes = block.cid().to_bytes();
 		#[allow(unused_unsafe)]
 		let block_size = unsafe {
@@ -62,5 +62,6 @@ impl Storage for WasmStorage {
 			)
 		};
 		assert_eq!(block.data().len(), block_size as usize);
+		block.into_inner().0
 	}
 }

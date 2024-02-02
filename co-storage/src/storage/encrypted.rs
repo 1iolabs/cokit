@@ -82,7 +82,7 @@ where
 
 		// store
 		for block in blocks {
-			self.storage_mut().set(block)?
+			self.storage_mut().set(block)?;
 		}
 
 		// result
@@ -117,7 +117,7 @@ where
 	/// Inserts a block into storage.
 	///
 	/// Note: This expects the unencrypted Block.
-	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<(), StorageError> {
+	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		let cid = block.cid().clone();
 
 		// encrypt

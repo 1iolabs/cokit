@@ -1,8 +1,5 @@
-use crate::{
-	event_cid_read,
-	library::{read_cid, write_cid, WasmStorage},
-	state_cid_read, state_cid_write, Cid, Context, Storage,
-};
+use super::{read_cid::read_cid, wasm_storage::WasmStorage, write_cid::write_cid};
+use crate::{event_cid_read, state_cid_read, state_cid_write, Cid, Context, Storage};
 
 pub struct WasmContext {
 	storage: WasmStorage,
@@ -31,7 +28,7 @@ impl Context for WasmContext {
 		read_cid(state_cid_read)
 	}
 
-	fn store_state(&self, cid: &Cid) {
-		write_cid(state_cid_write, cid);
+	fn store_state(&mut self, cid: Cid) {
+		write_cid(state_cid_write, &cid);
 	}
 }

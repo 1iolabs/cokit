@@ -126,7 +126,7 @@ where
 
 	/// Push serializable item as new entry.
 	/// Returns the `Cid` of the `Entry`.
-	pub async fn push_event<T: Serialize>(&mut self, item: &T) -> Result<Link<Entry>, LogError> {
+	pub async fn push_event<T: Serialize + Clone>(&mut self, item: &T) -> Result<(Link<Entry>, Link<T>), LogError> {
 		let cid = self
 			.entry_store
 			.set(
@@ -135,7 +135,7 @@ where
 					.map_err(|e| LogError::InvalidArgument(e.into()))?,
 			)
 			.await?;
-		Ok(self.push(cid).await?.into())
+		Ok((self.push(cid.clone()).await?.into(), cid.into()))
 	}
 
 	pub async fn join_entry(&mut self, entry: EntryBlock<S::StoreParams>) -> Result<bool, LogError> {
@@ -147,12 +147,22 @@ where
 		Ok(false)
 	}
 
-	pub async fn join(&mut self, other: &Log<S>) -> Result<(), LogError> {
-		let entries = get_entry_blocks(&self.entry_store, other.heads.iter()).await?;
+	pub async fn join(&mut self, other: &Log<S>) -> Result<bool, LogError> {
+		self.join_heads(other.heads.iter()).await
+	}
+
+	pub async fn join_heads<'a>(
+		&'a mut self,
+		other_heads: impl Iterator<Item = &'a Cid> + 'a,
+	) -> Result<bool, LogError> {
+		let mut result = false;
+		let entries = get_entry_blocks(&self.entry_store, other_heads).await?;
 		for entry in entries {
-			self.join_entry(entry).await?;
+			if self.join_entry(entry).await? {
+				result = true;
+			}
 		}
-		Ok(())
+		Ok(result)
 	}
 
 	async fn join_commit(&mut self, join: JoinEntry<S>) -> Result<(), LogError> {

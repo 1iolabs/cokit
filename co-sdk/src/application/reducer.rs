@@ -1,9 +1,9 @@
 use anyhow::anyhow;
 use co_log::Log;
 use co_primitives::{Linkable, ReducerAction};
-use co_runtime::{RuntimeContext, RuntimePool};
+use co_runtime::{Core, RuntimeContext, RuntimePool};
 use co_storage::BlockStorage;
-use libipld::{codec::Codec, Cid, Ipld, IpldCodec};
+use libipld::Cid;
 use serde::Serialize;
 use std::{
 	collections::{BTreeSet, HashMap},
@@ -14,7 +14,7 @@ pub struct ReducerBuilder<S> {
 	/// Storage.
 	log: Log<S>,
 	/// The (root) core which composes the state.
-	core: Cid,
+	core: Core,
 	/// Latest state.
 	state: Option<Cid>,
 	/// Latests heads.
@@ -26,7 +26,7 @@ impl<S> ReducerBuilder<S>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
 {
-	pub fn new(core: Cid, log: Log<S>) -> Self {
+	pub fn new(core: Core, log: Log<S>) -> Self {
 		Self { core, heads: Default::default(), snapshots: Default::default(), state: None, log }
 	}
 
@@ -58,7 +58,7 @@ pub struct Reducer<S> {
 	/// Storage.
 	log: Log<S>,
 	/// The (root) core which composes the state.
-	core: Cid,
+	core: Core,
 	/// Latest state.
 	state: Option<Cid>,
 	/// Latests heads.
@@ -126,7 +126,7 @@ where
 			from: self.log.identity().identity().to_owned(),
 			time: SystemTime::now().duration_since(UNIX_EPOCH).expect("Valid time").as_millis(),
 		};
-		let entry = self.log.push_event(&action).await?;
+		let (_, action) = self.log.push_event(&action).await?;
 
 		// // debug
 		// let block = self.log.storage().get(entry.as_ref()).await.unwrap();
@@ -135,7 +135,7 @@ where
 
 		// apply to state
 		let state = runtime
-			.execute(self.log.storage(), &self.core, RuntimeContext { state: self.state, event: entry.cid().clone() })
+			.execute(self.log.storage(), &self.core, RuntimeContext { state: self.state, event: action.into() })
 			.await?;
 
 		// snapshot
@@ -162,7 +162,7 @@ mod tests {
 	use crate::application::reducer::ReducerBuilder;
 	use co_log::{LocalIdentityResolver, Log};
 	use co_primitives::BlockSerializer;
-	use co_runtime::{IdleRuntimePool, RuntimePool};
+	use co_runtime::{Core, IdleRuntimePool, RuntimePool};
 	use co_storage::{store_file, BlockStorage, MemoryBlockStorage};
 	use example_counter::{Counter, CounterAction};
 	use tokio::process::Command;
@@ -210,9 +210,9 @@ mod tests {
 		let runtime = RuntimePool::new(IdleRuntimePool::default());
 
 		// reducer
-		let mut reducer1 = ReducerBuilder::new(wasm.clone(), log1).build().await.unwrap();
-		let mut reducer2 = ReducerBuilder::new(wasm.clone(), log2).build().await.unwrap();
-		let mut reducer3 = ReducerBuilder::new(wasm.clone(), log3).build().await.unwrap();
+		let mut reducer1 = ReducerBuilder::new(Core::native::<Counter>(), log1).build().await.unwrap();
+		let mut reducer2 = ReducerBuilder::new(wasm.into(), log2).build().await.unwrap();
+		let mut reducer3 = ReducerBuilder::new(wasm.into(), log3).build().await.unwrap();
 
 		// 1-6
 		reducer1.push(&runtime, "test", &CounterAction::Increment(1)).await.unwrap();

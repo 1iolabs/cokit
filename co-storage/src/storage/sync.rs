@@ -72,8 +72,8 @@ where
 		}
 	}
 
-	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<(), StorageError> {
-		let (sender, receiver) = std::sync::mpsc::channel::<Result<(), StorageError>>();
+	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+		let (sender, receiver) = std::sync::mpsc::channel::<Result<Cid, StorageError>>();
 		self.sender
 			.send(Message::Set(block, sender))
 			.map_err(|e| StorageError::Internal(e.into()))?;
@@ -100,7 +100,7 @@ where
 #[derive(Debug)]
 enum Message<P: StoreParams> {
 	Get(Cid, Sender<Result<Block<P>, StorageError>>),
-	Set(Block<P>, Sender<Result<(), StorageError>>),
+	Set(Block<P>, Sender<Result<Cid, StorageError>>),
 	Remove(Cid, Sender<Result<(), StorageError>>),
 }
 
@@ -141,12 +141,9 @@ where
 		self.execute(async move { storage.get(&cid).await })
 	}
 
-	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<(), StorageError> {
+	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		let storage = self.storage.clone();
-		self.execute(async move {
-			storage.set(block).await?;
-			Ok(())
-		})
+		self.execute(async move { Ok(storage.set(block).await?) })
 	}
 
 	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {

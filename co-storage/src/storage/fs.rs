@@ -30,7 +30,7 @@ impl Storage for FsStorage {
 		into_block_result(cid, std::fs::read(path))
 	}
 
-	fn set(&mut self, block: Block<DefaultParams>) -> Result<(), StorageError> {
+	fn set(&mut self, block: Block<DefaultParams>) -> Result<Cid, StorageError> {
 		let path = to_cid_path(&self.path, block.cid());
 
 		// exists?
@@ -48,7 +48,7 @@ impl Storage for FsStorage {
 						path,
 					)));
 				}
-				return Ok(())
+				return Ok(block.into_inner().0)
 			},
 			// continue with write
 			Err(e) if e.kind() == ErrorKind::NotFound => {},
@@ -65,7 +65,7 @@ impl Storage for FsStorage {
 		std::fs::write(path, block.data()).map_err(|e| StorageError::Internal(e.into()))?;
 
 		// result
-		Ok(())
+		Ok(block.into_inner().0)
 	}
 
 	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {

@@ -45,11 +45,12 @@ impl MemoryStorage {
 impl Storage for MemoryStorage {
 	type StoreParams = DefaultParams;
 
-	fn set(&mut self, block: Block<DefaultParams>) -> Result<(), StorageError> {
+	fn set(&mut self, block: Block<DefaultParams>) -> Result<Cid, StorageError> {
 		// let cid = Cid::new_v1(options.codec, Code::Blake3_256.digest(&data[..]));
 		tracing::debug!(cid = ?block.cid(), "memory-store-set");
+		let result = block.cid().clone();
 		self.records.insert(block.cid().clone(), Record { pin: false, block });
-		Ok(())
+		Ok(result)
 	}
 
 	fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError> {

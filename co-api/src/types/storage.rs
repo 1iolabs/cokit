@@ -6,5 +6,5 @@ pub trait Storage {
 	fn get(&self, cid: &Cid) -> Block;
 
 	/// Inserts a block into storage.
-	fn set(&mut self, block: Block);
+	fn set(&mut self, block: Block) -> Cid;
 }

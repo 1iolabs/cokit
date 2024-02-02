@@ -8,7 +8,7 @@ pub trait Storage {
 	fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError>;
 
 	/// Inserts a block into storage.
-	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<(), StorageError>;
+	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError>;
 
 	/// Remove a block from storage.
 	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError>;

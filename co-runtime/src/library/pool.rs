@@ -1,4 +1,5 @@
-use crate::{co_v1::CoV1Api, runtimes::RuntimeError, RuntimeContext, RuntimeInstance};
+use crate::{co_v1::CoV1Api, runtimes::RuntimeError, ApiContext, Core, RuntimeContext, RuntimeInstance};
+use co_api::Context;
 use co_storage::{BlockStorage, StorageError, StoreParamsBlockStorage, SyncBlockStorage};
 use libipld::Cid;
 use std::{collections::VecDeque, sync::Arc};
@@ -50,9 +51,9 @@ impl RuntimePool {
 	pub async fn execute<S>(
 		&self,
 		storage: &S,
-		core: &Cid,
+		core: &Core,
 		context: RuntimeContext,
-	) -> Result<Option<Cid>, RuntimePoolError>
+	) -> Result<Option<Cid>, ExecuteError>
 	where
 		S: BlockStorage + Send + Sync + Clone + 'static,
 	{
@@ -67,24 +68,43 @@ impl RuntimePool {
 			context,
 		);
 
-		// get/create instance
-		let pool_instance = self.pool.lock().await.get(core);
-		let mut instance = match pool_instance {
-			Some(i) => i,
-			None => RuntimeInstance::create(storage, core).await?,
-		};
-
 		// execute
-		let (result, instance): (Option<Cid>, RuntimeInstance) =
-			tokio::task::spawn_blocking(move || -> Result<(Option<Cid>, RuntimeInstance), RuntimeError> {
-				let result = instance.runtime_mut().execute(api)?;
-				Ok((result, instance))
-			})
-			.await
-			.map_err(|e| RuntimePoolError::Other(e.into()))??;
+		let result = match core {
+			Core::Wasm(core) => {
+				// get/create instance
+				let pool_instance = self.pool.lock().await.get(core);
+				let mut instance = match pool_instance {
+					Some(i) => i,
+					None => RuntimeInstance::create(storage, core).await?,
+				};
 
-		// pool instance
-		self.pool.lock().await.insert(instance);
+				// execute
+				let (result, instance): (Option<Cid>, RuntimeInstance) =
+					tokio::task::spawn_blocking(move || -> Result<(Option<Cid>, RuntimeInstance), RuntimeError> {
+						let result = instance.runtime_mut().execute(api)?;
+						Ok((result, instance))
+					})
+					.await
+					.map_err(|e| ExecuteError::Other(e.into()))??;
+
+				// pool instance
+				self.pool.lock().await.insert(instance);
+
+				// result
+				result
+			},
+			Core::Native(f) => {
+				let execute = f.clone();
+				tokio::task::spawn_blocking(move || -> Result<Option<Cid>, RuntimeError> {
+					let mut context = ApiContext::new(api);
+					// Todo: handle panics to not crash the host
+					execute(&mut context);
+					Ok(context.state())
+				})
+				.await
+				.map_err(|e| ExecuteError::Other(e.into()))??
+			},
+		};
 
 		// result
 		Ok(result)
@@ -97,7 +117,7 @@ impl Default for RuntimePool {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum RuntimePoolError {
+pub enum ExecuteError {
 	#[error("Storage error")]
 	Storage(#[from] StorageError),
 

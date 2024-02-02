@@ -4,9 +4,10 @@ mod runtimes;
 mod types;
 
 pub use library::{
+	api_context::ApiContext,
 	instance::RuntimeInstance,
-	pool::{IdleRuntimePool, RuntimePool, RuntimePoolError},
+	pool::{ExecuteError, IdleRuntimePool, RuntimePool},
 };
 pub use modules::co_v1;
 pub use runtimes::create_runtime;
-pub use types::context::RuntimeContext;
+pub use types::{context::RuntimeContext, core::Core};

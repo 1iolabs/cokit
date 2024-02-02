@@ -15,5 +15,5 @@ pub trait Context {
 
 	fn state(&self) -> Option<Cid>;
 
-	fn store_state(&self, cid: &Cid);
+	fn store_state(&mut self, cid: Cid);
 }
