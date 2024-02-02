@@ -1,7 +1,7 @@
 use co_api::{reduce_with_context, Context, Reducer};
 use libipld::Cid;
 use serde::{de::DeserializeOwned, Serialize};
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 /// A executable core reference.
 #[derive(Clone)]
@@ -16,6 +16,14 @@ impl Core {
 		S::Action: DeserializeOwned,
 	{
 		Core::Native(Arc::new(|context| reduce_with_context::<S>(context)))
+	}
+}
+impl Debug for Core {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Wasm(arg0) => f.debug_tuple("Wasm").field(arg0).finish(),
+			Self::Native(_) => f.debug_tuple("Native").field(&"[native]").finish(),
+		}
 	}
 }
 impl From<Cid> for Core {

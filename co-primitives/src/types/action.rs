@@ -1,7 +1,7 @@
 use crate::{Date, Did};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ReducerAction<T> {
 	/// Sender.
 	#[serde(rename = "f")]

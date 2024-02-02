@@ -7,11 +7,11 @@ use anyhow::Context;
 use co_storage::{BlockStorage, Storage};
 use futures::{stream, Stream, StreamExt, TryStreamExt};
 use libipld::Cid;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 pub fn create_stream<'a, S>(
 	storage: &'a S,
-	heads: Vec<Cid>,
+	heads: BTreeSet<Cid>,
 ) -> impl Stream<Item = Result<EntryBlock<S::StoreParams>, LogError>> + 'a
 where
 	S: BlockStorage + Sync + Send + 'a,

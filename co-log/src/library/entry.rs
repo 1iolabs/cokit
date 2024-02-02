@@ -2,7 +2,7 @@ use crate::{Clock, Identity, PrivateIdentity, SignError};
 use co_primitives::{BlockSerializer, BlockSerializerError};
 use libipld::{store::StoreParams, Block, Cid};
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
+use std::{collections::BTreeSet, marker::PhantomData};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Entry {
@@ -13,9 +13,9 @@ pub struct Entry {
 	#[serde(rename = "p")]
 	pub payload: Cid,
 	#[serde(rename = "n")]
-	pub next: Vec<Cid>,
-	#[serde(rename = "r", default, skip_serializing_if = "Vec::is_empty")]
-	pub refs: Vec<Cid>,
+	pub next: BTreeSet<Cid>,
+	#[serde(rename = "r", default, skip_serializing_if = "BTreeSet::is_empty")]
+	pub refs: BTreeSet<Cid>,
 	#[serde(rename = "c")]
 	pub clock: Clock,
 }
@@ -164,8 +164,8 @@ mod tests {
 			crate::Entry {
 				id: vec![0],
 				payload: block.cid().clone(),
-				next: vec![],
-				refs: vec![],
+				next: Default::default(),
+				refs: Default::default(),
 				clock: Clock::new(vec![1], 0),
 			},
 		)

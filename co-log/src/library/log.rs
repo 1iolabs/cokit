@@ -28,8 +28,8 @@ impl<S> Log<S> {
 		&self.id
 	}
 
-	pub fn heads(&self) -> Vec<Cid> {
-		self.heads.iter().cloned().collect()
+	pub fn heads(&self) -> &BTreeSet<Cid> {
+		&self.heads
 	}
 
 	pub fn heads_iter(&self) -> impl Iterator<Item = &Cid> {
@@ -92,7 +92,7 @@ where
 
 	/// Iterate entries starting at the head.
 	pub fn stream<'a>(&'a self) -> impl Stream<Item = Result<EntryBlock<S::StoreParams>, LogError>> + 'a {
-		create_stream(&self.entry_store, self.heads())
+		create_stream(&self.entry_store, self.heads().clone())
 	}
 
 	/// Push item as new entry.
@@ -109,8 +109,8 @@ where
 			)
 			.next(),
 			payload: item,
-			next: self.heads(),
-			refs: Vec::new(),
+			next: self.heads().clone(),
+			refs: Default::default(),
 		};
 		let entry_block = EntryBlock::<S::StoreParams>::from_entry(self.identity.as_ref(), entry)?;
 		let entry_cid = entry_block.cid().clone();

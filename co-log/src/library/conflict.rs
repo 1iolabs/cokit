@@ -74,8 +74,8 @@ mod tests {
 		let entry = Entry {
 			id: "test".to_string().into_bytes(),
 			payload: payload.cid().clone(),
-			next: vec![],
-			refs: vec![],
+			next: Default::default(),
+			refs: Default::default(),
 			clock: Clock::new(identity.as_bytes().to_vec(), time),
 		};
 		EntryBlock::from_entry(&TestIdentity::new(identity), entry).unwrap()

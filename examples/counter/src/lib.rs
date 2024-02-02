@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Counter(pub i64);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum CounterAction {
 	#[serde(rename = "i")]
 	Increment(i64),

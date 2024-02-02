@@ -1,12 +1,14 @@
+use crate::CoreResolver;
 use anyhow::anyhow;
-use co_log::Log;
-use co_primitives::{Linkable, ReducerAction};
+use co_log::{EntryBlock, Log, LogError};
+use co_primitives::ReducerAction;
 use co_runtime::{Core, RuntimeContext, RuntimePool};
 use co_storage::BlockStorage;
+use futures::{pin_mut, StreamExt};
 use libipld::Cid;
 use serde::Serialize;
 use std::{
-	collections::{BTreeSet, HashMap},
+	collections::{BTreeSet, HashMap, VecDeque},
 	time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -101,15 +103,12 @@ where
 		self.snapshots.insert(heads, state);
 	}
 
-	/// Find start position to continue with heads.
-	/// If None is retuned the state needs to be recreated from log root.
-	async fn find_start(heads: BTreeSet<Cid>) -> Option<(Cid, BTreeSet<Cid>)> {
-		todo!()
-	}
-
-	/// Create the initial state for the core.
-	pub async fn create_initial_state(core: Cid, storage: S) -> Result<Cid, anyhow::Error> {
-		todo!()
+	/// Find the state matching the specified heads, if one.
+	fn find_state(&self, heads: &BTreeSet<Cid>) -> Option<Cid> {
+		if self.heads.eq(heads) {
+			return self.state;
+		}
+		self.snapshots.get(heads).cloned()
 	}
 
 	/// Push an event.
@@ -151,20 +150,118 @@ where
 		Ok(())
 	}
 
-	/// Join heads.
+	/// Join heads (from other log).
 	/// This is used to join logs from other peers.
-	pub async fn join(heads: BTreeSet<Cid>) {}
+	/// Returns true if state has changed.
+	pub async fn join(
+		&mut self,
+		heads: &BTreeSet<Cid>,
+		runtime: &RuntimePool,
+		core_resolver: &dyn CoreResolver,
+	) -> Result<bool, LogError> {
+		let mut result = false;
+		if self.log_mut().join_heads(heads.iter()).await? || &self.heads != self.log.heads() {
+			// sync state
+			let (next_state, next_heads) = self.compute_state(runtime, core_resolver).await?;
+			result = next_state != self.state;
+			self.state = next_state;
+			self.heads = next_heads;
+		}
+		Ok(result)
+	}
+
+	/// Compute state for log heads.
+	/// Returns whether the start has changed.
+	async fn compute_state(
+		&self,
+		runtime: &RuntimePool,
+		core_resolver: &dyn CoreResolver,
+	) -> Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error> {
+		let heads: BTreeSet<Cid> = self.log.heads().clone();
+
+		// compute stack
+		let (mut state, stack) = self.compute_stack().await?;
+
+		// apply stack
+		for entry in stack {
+			state = runtime
+				.execute(
+					self.log.storage(),
+					&core_resolver.resolve_core(&entry.entry().payload).await?,
+					RuntimeContext { state, event: entry.entry().payload },
+				)
+				.await?;
+		}
+
+		// result
+		Ok((state, heads))
+	}
+
+	/// Compute stack to apply to an state.
+	/// The computed start position is self.heads.
+	/// The computed end position is self.log.heads.
+	/// Algorithm: We search for the lowest known ancestors of the heads while walking the log backwards.
+	async fn compute_stack(&self) -> Result<(Option<Cid>, VecDeque<EntryBlock<S::StoreParams>>), anyhow::Error> {
+		let heads: BTreeSet<Cid> = self.log.heads().clone();
+		let mut state = self.state;
+		let mut stack = VecDeque::new();
+
+		// is latest state?
+		if self.heads != heads {
+			// find latest usable historic state
+			let entries = self.log.stream();
+			pin_mut!(entries);
+			let mut missing_heads = heads.clone();
+			let mut state_events: Option<BTreeSet<Cid>> = None;
+			while let Some(entry) = entries.next().await {
+				let entry = entry?;
+
+				// when we found a state we continue to go back until we see all of its entry heads (entry.next)
+				if let Some(state_events) = &mut state_events {
+					// remove seen elements
+					if state_events.remove(entry.cid()) {
+						// if we have seen all entries which generated the found state the stack is complete
+						// and ready to reapply
+						if state_events.is_empty() {
+							break;
+						}
+						continue;
+					}
+				} else {
+					// remove all seen entries from missing
+					// when we have seen all heads we can search for an known state
+					missing_heads.remove(entry.cid());
+					if missing_heads.is_empty() {
+						// does this entry reference an state we know?
+						// note: this will never match if we have no previous states
+						//  and a new state will be recomputed from scratch
+						if let Some(entry_state) = self.find_state(&entry.entry().next) {
+							state = Some(entry_state);
+							state_events = Some(entry.entry().next.clone());
+						}
+					}
+				}
+
+				// put on stack to reapply
+				stack.push_front(entry);
+			}
+		}
+
+		// result
+		Ok((state, stack))
+	}
 }
 
 #[cfg(test)]
 mod tests {
 	use super::Reducer;
-	use crate::application::reducer::ReducerBuilder;
+	use crate::{application::reducer::ReducerBuilder, SingleCoreResolver};
 	use co_log::{LocalIdentityResolver, Log};
-	use co_primitives::BlockSerializer;
+	use co_primitives::{BlockSerializer, ReducerAction};
 	use co_runtime::{Core, IdleRuntimePool, RuntimePool};
 	use co_storage::{store_file, BlockStorage, MemoryBlockStorage};
 	use example_counter::{Counter, CounterAction};
+	use futures::StreamExt;
 	use tokio::process::Command;
 
 	#[tokio::test]
@@ -208,6 +305,7 @@ mod tests {
 
 		// pool
 		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let core_resolver = SingleCoreResolver::new(wasm.into());
 
 		// reducer
 		let mut reducer1 = ReducerBuilder::new(Core::native::<Counter>(), log1).build().await.unwrap();
@@ -221,74 +319,106 @@ mod tests {
 		reducer1.push(&runtime, "test", &CounterAction::Increment(4)).await.unwrap();
 		reducer1.push(&runtime, "test", &CounterAction::Increment(5)).await.unwrap();
 		reducer1.push(&runtime, "test", &CounterAction::Increment(6)).await.unwrap();
-		reducer2.log_mut().join(&reducer1.log()).await.unwrap();
-		reducer3.log_mut().join(&reducer1.log()).await.unwrap();
+		reducer2.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer3.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
 		assert_eq!(21, counter_state(&storage, &reducer1).await.0); // 1 + 2 + 3 + 4 + 5 + 6
 		assert_eq!(21, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(21, counter_state(&storage, &reducer3).await.0);
 
 		// 7
 		reducer2.push(&runtime, "test", &CounterAction::Increment(7)).await.unwrap();
-		reducer3.log_mut().join(&reducer2.log()).await.unwrap();
-		reducer1.log_mut().join(&reducer3.log()).await.unwrap();
+		reducer3.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer1.join(reducer3.heads(), &runtime, &core_resolver).await.unwrap();
 		assert_eq!(28, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(28, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(28, counter_state(&storage, &reducer3).await.0);
 
 		// 8
 		reducer3.push(&runtime, "test", &CounterAction::Increment(8)).await.unwrap();
-		reducer2.log_mut().join(&reducer3.log()).await.unwrap();
-		reducer1.log_mut().join(&reducer2.log()).await.unwrap();
+		reducer2.join(reducer3.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer1.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
 		assert_eq!(36, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(36, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(36, counter_state(&storage, &reducer3).await.0);
 
 		// 9
 		reducer3.push(&runtime, "test", &CounterAction::Increment(9)).await.unwrap();
-		reducer2.log_mut().join(&reducer3.log()).await.unwrap();
-		reducer1.log_mut().join(&reducer2.log()).await.unwrap();
+		reducer2.join(reducer3.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer1.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
 		assert_eq!(45, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(45, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(45, counter_state(&storage, &reducer3).await.0);
 
-		// A, B
+		// A
 		reducer1.push(&runtime, "test", &CounterAction::Increment(10)).await.unwrap();
+		reducer2.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer3.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
+		assert_eq!(55, counter_state(&storage, &reducer1).await.0);
+		assert_eq!(55, counter_state(&storage, &reducer2).await.0);
+		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
+
+		// B
 		reducer1.push(&runtime, "test", &CounterAction::Set(11)).await.unwrap();
-		reducer2.log_mut().join(&reducer1.log()).await.unwrap();
+		reducer2.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
 		assert_eq!(11, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(11, counter_state(&storage, &reducer2).await.0);
-		assert_eq!(45, counter_state(&storage, &reducer3).await.0);
+		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
 
 		// C
 		reducer1.push(&runtime, "test", &CounterAction::Increment(12)).await.unwrap();
 		reducer2.push(&runtime, "test", &CounterAction::Increment(12)).await.unwrap();
-		reducer2.log_mut().join(&reducer1.log()).await.unwrap();
-		reducer1.log_mut().join(&reducer2.log()).await.unwrap();
+		reducer2.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer1.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
 		assert_eq!(35, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(35, counter_state(&storage, &reducer2).await.0);
-		assert_eq!(45, counter_state(&storage, &reducer3).await.0);
+		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
 
 		// D
 		reducer1.push(&runtime, "test", &CounterAction::Increment(13)).await.unwrap();
-		reducer2.log_mut().join(&reducer1.log()).await.unwrap();
+		reducer2.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
 		assert_eq!(48, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(48, counter_state(&storage, &reducer2).await.0);
-		assert_eq!(45, counter_state(&storage, &reducer3).await.0);
+		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
 
 		// E
 		reducer2.push(&runtime, "test", &CounterAction::Increment(14)).await.unwrap();
-		reducer1.log_mut().join(&reducer2.log()).await.unwrap();
+		reducer1.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
 		assert_eq!(62, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(62, counter_state(&storage, &reducer2).await.0);
-		assert_eq!(45, counter_state(&storage, &reducer3).await.0);
+		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
 
 		// B*
 		reducer3.push(&runtime, "test", &CounterAction::Increment(11)).await.unwrap();
-		reducer2.log_mut().join(&reducer3.log()).await.unwrap();
-		reducer1.log_mut().join(&reducer2.log()).await.unwrap();
+		reducer3.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer2.join(reducer3.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer1.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
 		assert_eq!(73, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(73, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(73, counter_state(&storage, &reducer3).await.0);
+
+		// actions
+		let a1 = actions(reducer1.log()).await;
+		let a2 = actions(reducer2.log()).await;
+		let a3 = actions(reducer3.log()).await;
+		assert_eq!(a1, a2);
+		assert_eq!(a1, a3);
+	}
+
+	async fn actions<S>(log: &Log<S>) -> Vec<ReducerAction<CounterAction>>
+	where
+		S: BlockStorage + Send + Sync + Clone + 'static,
+	{
+		let storage_ref = log.storage();
+		log.stream()
+			.map(|entry| entry.unwrap().entry().payload)
+			.then(move |cid| async move { storage_ref.clone().get(&cid).await })
+			.map(|result| {
+				BlockSerializer::new()
+					.deserialize::<ReducerAction<CounterAction>>(&result.unwrap())
+					.unwrap()
+			})
+			.collect()
+			.await
 	}
 
 	async fn counter_state<S>(storage: &S, reducer: &Reducer<S>) -> Counter

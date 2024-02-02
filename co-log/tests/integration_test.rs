@@ -4,6 +4,7 @@ use co_storage::{BlockStorage, MemoryBlockStorage};
 use futures::TryStreamExt;
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 #[tokio::test]
 async fn smoke() {
@@ -31,7 +32,7 @@ async fn smoke() {
 	assert_eq!(entries[0].entry().clock.time, 1);
 
 	// next
-	assert_eq!(entries[0].entry().next, vec![]);
+	assert_eq!(BTreeSet::new(), entries[0].entry().next);
 }
 
 #[tokio::test]
@@ -61,9 +62,9 @@ async fn traverse_sinlge_user_log() {
 	assert_eq!(entries[2].entry().clock.time, 1);
 
 	// next
-	assert_eq!(entries[0].entry().next, vec![entries[1].cid().clone()]);
-	assert_eq!(entries[1].entry().next, vec![entries[2].cid().clone()]);
-	assert_eq!(entries[2].entry().next, vec![]);
+	assert_eq!(entries[0].entry().next, BTreeSet::from([entries[1].cid().clone()]));
+	assert_eq!(entries[1].entry().next, BTreeSet::from([entries[2].cid().clone()]));
+	assert_eq!(entries[2].entry().next, BTreeSet::from([]));
 }
 
 #[tokio::test]

@@ -7,6 +7,7 @@ mod types;
 
 pub use application::{
 	application::{Application, ApplicationBuilder},
+	core_resolver::{CoreResolver, SingleCoreResolver},
 	local::LocalCo,
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
