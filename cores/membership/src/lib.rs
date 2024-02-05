@@ -1,4 +1,4 @@
-use co_api::{reduce, Context, Did, Reducer, ReducerAction, Tags, TagsPattern};
+use co_api::{reduce, Context, Did, Reducer, ReducerAction, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 
