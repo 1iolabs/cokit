@@ -157,7 +157,7 @@ async fn create_empty_log<S: BlockStorage + Send + Sync + Clone + 'static>(
 		Box::new(identity.clone()),
 		Box::new(DidKeyIdentityResolver::new()),
 		store.clone(),
-		Vec::new(),
+		Default::default(),
 	)
 }
 

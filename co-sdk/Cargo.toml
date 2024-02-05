@@ -8,12 +8,13 @@ edition = "2021"
 #rocksdb = { version = "0.20.1" }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+co-core-co = { path = "../cores/co" }
 co-log = { path = "../co-log" }
 co-network = { path = "../co-network" }
+co-primitives = { path = "../co-primitives" }
 co-runtime = { path = "../co-runtime" }
 co-state = { path = "../state" }
 co-storage = { path = "../co-storage" }
-co-primitives = { path = "../co-primitives" }
 directories = "5.0.1"
 futures = { workspace = true }
 hyper = { workspace = true }

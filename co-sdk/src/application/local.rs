@@ -1,52 +1,83 @@
-use crate::CoStorage;
+use crate::{application::core_resolver::CoCoreResolver, Reducer, ReducerBuilder};
 use anyhow::Context;
-use co_log::{IdentityResolver, LocalIdentityResolver, Log};
-use co_storage::{Algorithm, BlockStorage, EncryptedBlockStorage, Secret};
+use co_log::{LocalIdentityResolver, Log};
+use co_runtime::RuntimePool;
+use co_storage::{Algorithm, BlockStorage, BlockStorageExt, EncryptedBlockStorage, Secret};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, io::ErrorKind, path::PathBuf};
+
+type LocalReducerBuilder<S> = ReducerBuilder<EncryptedBlockStorage<S>, CoCoreResolver<EncryptedBlockStorage<S>>>;
+type LocalReducer<S> = Reducer<EncryptedBlockStorage<S>, CoCoreResolver<EncryptedBlockStorage<S>>>;
 
 pub struct LocalCo {
 	/// Our application identifier.
 	identifier: String,
 	/// The application base path.
 	application_path: PathBuf,
-	/// Local CO State.
-	state: Option<Cid>,
 }
 impl LocalCo {
 	pub fn new(identifier: String, application_path: PathBuf) -> Self {
-		Self { identifier, application_path, state: Default::default() }
+		Self { identifier, application_path }
 	}
 
-	/// Try to load the local co state from disk.
-	pub async fn load<S>(&self, storage: S) -> Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>
+	/// Read the local co state from disk.
+	/// As we trust all of the local states we use all the states without fuhter checks to continue.
+	///
+	/// Note: This assumes the same encryption key is used by all local applications.
+	pub async fn read<S>(&self, storage: S, runtime: &RuntimePool) -> Result<LocalReducer<S>, anyhow::Error>
 	where
 		S: BlockStorage + Sync + Send + Clone + 'static,
 	{
-		let mut heads: BTreeSet<Cid> = Default::default();
-		let mut state: Option<Cid> = Default::default();
-
 		// read applications
+		let mut builder: Option<LocalReducerBuilder<S>> = None;
 		let mut dir = tokio::fs::read_dir(&self.application_path).await?;
 		while let Some(child) = dir.next_entry().await? {
 			let local = ApplicationLocal::read(&child.path().join("local.cbor")).await?;
 			if let Some(local) = local {
-				// heads
-				heads.extend(local.heads.iter());
-
-				// state
-				if child.file_name().as_encoded_bytes() == self.identifier.as_bytes() || state.is_none() {
-					state = Some(local.state);
-				}
+				builder = Some(match builder {
+					Some(builder) => builder.with_snapshot(local.state, local.heads),
+					None => local.reducer_builder(storage.clone()).await?,
+				});
 			}
 		}
 
-		// TODO: state
-		todo!();
+		// builder
+		let result = match builder {
+			// load
+			Some(builder) => builder,
+			// create empty
+			None =>
+				create_reducer_builder(
+					create_local_log(create_encrypted_storage(storage).await?, Default::default()).await?,
+					None,
+				)
+				.await?,
+		};
 
 		// result
-		Ok((state, heads))
+		Ok(result.build(runtime).await?)
+	}
+
+	/// Write state to disk.
+	/// Returns false and does nothing if reducer is empty.
+	pub async fn write<S>(&self, reducer: &LocalReducer<S>) -> Result<bool, anyhow::Error>
+	where
+		S: BlockStorage + Sync + Send + Clone + 'static,
+	{
+		if let Some(state) = reducer.state() {
+			let local = ApplicationLocal::new(
+				reducer.heads().clone(),
+				state.clone(),
+				reducer.log().storage().clone().flush_mapping().await?,
+			);
+			local
+				.write(&self.application_path.join(&self.identifier).join("local.cbor"))
+				.await
+				.map(|_| true)
+		} else {
+			Ok(false)
+		}
 	}
 }
 
@@ -59,7 +90,7 @@ struct ApplicationLocal {
 	/// The latest heads.
 	/// Todo: Do we need this as this is encoded in the state anyway?
 	#[serde(rename = "h")]
-	pub heads: Vec<Cid>,
+	pub heads: BTreeSet<Cid>,
 
 	/// The latest state.
 	#[serde(rename = "s")]
@@ -74,7 +105,7 @@ impl ApplicationLocal {
 		1
 	}
 
-	pub fn new(heads: Vec<Cid>, state: Cid, mapping: Cid) -> Self {
+	pub fn new(heads: BTreeSet<Cid>, state: Cid, mapping: Cid) -> Self {
 		Self { heads, state, version: Self::version(), mapping }
 	}
 
@@ -99,31 +130,73 @@ impl ApplicationLocal {
 		Ok(())
 	}
 
+	pub async fn storage<S>(&self, storage: S) -> Result<EncryptedBlockStorage<S>, anyhow::Error>
+	where
+		S: BlockStorage + Sync + Send + Clone + 'static,
+	{
+		let mut encrypted_storage = create_encrypted_storage(storage).await?;
+		encrypted_storage.load_mapping(&self.mapping).await?;
+		Ok(encrypted_storage)
+	}
+
 	pub async fn log<S>(&self, storage: S) -> Result<Log<EncryptedBlockStorage<S>>, anyhow::Error>
 	where
 		S: BlockStorage + Sync + Send + Clone + 'static,
 	{
-		// encryption
-		let entry = keyring::Entry::new_with_target("local", "co", "device")?;
-		let key_as_base64 = match entry.get_password() {
-			Ok(p) => p,
-			Err(keyring::Error::NoEntry) => {
-				let secret = Algorithm::default().generate_serect();
-				multibase::encode(multibase::Base::Base64, secret.divulge())
-			},
-			Err(e) => return Err(e.into()),
-		};
-		let key = Secret::new(multibase::decode(key_as_base64)?.1);
-		let mut encrypted_storage = EncryptedBlockStorage::new(storage.clone(), key);
-		encrypted_storage.load_mapping(&self.mapping).await?;
-
-		// log
-		Ok(Log::new(
-			"local".as_bytes().to_vec(),
-			LocalIdentityResolver::default().private_identity("did:local:device")?,
-			Box::new(LocalIdentityResolver::default()),
-			encrypted_storage.clone(),
-			self.heads.iter().cloned().collect(),
-		))
+		create_local_log(self.storage(storage).await?, self.heads.clone()).await
 	}
+
+	pub async fn reducer_builder<S>(&self, storage: S) -> Result<LocalReducerBuilder<S>, anyhow::Error>
+	where
+		S: BlockStorage + Sync + Send + Clone + 'static,
+	{
+		create_reducer_builder(self.log(storage).await?, Some(&self.state)).await
+	}
+}
+
+async fn create_encrypted_storage<S>(storage: S) -> Result<EncryptedBlockStorage<S>, anyhow::Error>
+where
+	S: BlockStorage + Sync + Send + Clone + 'static,
+{
+	let entry = keyring::Entry::new_with_target("local", "co", "device")?;
+	let key_as_base64 = match entry.get_password() {
+		Ok(p) => p,
+		Err(keyring::Error::NoEntry) => {
+			let secret = Algorithm::default().generate_serect();
+			multibase::encode(multibase::Base::Base64, secret.divulge())
+		},
+		Err(e) => return Err(e.into()),
+	};
+	let key = Secret::new(multibase::decode(key_as_base64)?.1);
+	Ok(EncryptedBlockStorage::new(storage.clone(), key))
+}
+
+async fn create_local_log<S>(
+	encrypted_storage: EncryptedBlockStorage<S>,
+	heads: BTreeSet<Cid>,
+) -> Result<Log<EncryptedBlockStorage<S>>, anyhow::Error>
+where
+	S: BlockStorage + Sync + Send + Clone + 'static,
+{
+	Ok(Log::new(
+		"local".as_bytes().to_vec(),
+		LocalIdentityResolver::default().private_identity("did:local:device")?,
+		Box::new(LocalIdentityResolver::default()),
+		encrypted_storage,
+		heads,
+	))
+}
+
+async fn create_reducer_builder<S>(
+	log: Log<EncryptedBlockStorage<S>>,
+	state_cid: Option<&Cid>,
+) -> Result<LocalReducerBuilder<S>, anyhow::Error>
+where
+	S: BlockStorage + Sync + Send + Clone + 'static,
+{
+	let state = match state_cid {
+		Some(cid) => log.storage().get_deserialized(cid).await?,
+		None => None,
+	};
+	Ok(ReducerBuilder::new(CoCoreResolver::new(log.storage().clone(), state, None), log))
 }

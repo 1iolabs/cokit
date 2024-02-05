@@ -6,6 +6,7 @@ mod types;
 pub use library::{
 	api_context::ApiContext,
 	instance::RuntimeInstance,
+	pin::PinMapping,
 	pool::{ExecuteError, IdleRuntimePool, RuntimePool},
 };
 pub use modules::co_v1;

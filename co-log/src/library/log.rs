@@ -68,16 +68,9 @@ where
 		identity: Box<dyn PrivateIdentity>,
 		identity_resolver: Box<dyn IdentityResolver>,
 		store: S,
-		heads: Vec<Cid>,
+		heads: BTreeSet<Cid>,
 	) -> Self {
-		Log {
-			id,
-			identity,
-			identity_resolver,
-			heads: heads.into_iter().collect(),
-			entry_store: store,
-			index: Default::default(),
-		}
+		Log { id, identity, identity_resolver, heads, entry_store: store, index: Default::default() }
 	}
 
 	/// Create new log with random ID.

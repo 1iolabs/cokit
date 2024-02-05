@@ -1262,6 +1262,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "co-core-co",
  "co-log",
  "co-network",
  "co-primitives",

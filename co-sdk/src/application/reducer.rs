@@ -1,8 +1,8 @@
 use crate::CoreResolver;
 use anyhow::anyhow;
 use co_log::{EntryBlock, Log, LogError};
-use co_primitives::ReducerAction;
-use co_runtime::{Core, RuntimeContext, RuntimePool};
+use co_primitives::{Linkable, ReducerAction};
+use co_runtime::{RuntimeContext, RuntimePool};
 use co_storage::BlockStorage;
 use futures::{pin_mut, StreamExt};
 use libipld::Cid;
@@ -12,11 +12,11 @@ use std::{
 	time::{SystemTime, UNIX_EPOCH},
 };
 
-pub struct ReducerBuilder<S> {
+pub struct ReducerBuilder<S, R> {
 	/// Storage.
 	log: Log<S>,
-	/// The (root) core which composes the state.
-	core: Core,
+	/// The core resolver which composes the state.
+	core_resolver: R,
 	/// Latest state.
 	state: Option<Cid>,
 	/// Latests heads.
@@ -24,12 +24,17 @@ pub struct ReducerBuilder<S> {
 	/// Avilable historic snapshots.
 	snapshots: HashMap<BTreeSet<Cid>, Cid>,
 }
-impl<S> ReducerBuilder<S>
+impl<S, R> ReducerBuilder<S, R>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
+	R: CoreResolver + Send + Sync + 'static,
 {
-	pub fn new(core: Core, log: Log<S>) -> Self {
-		Self { core, heads: Default::default(), snapshots: Default::default(), state: None, log }
+	pub fn new(core_resolver: R, log: Log<S>) -> Self {
+		Self { core_resolver, heads: Default::default(), snapshots: Default::default(), state: None, log }
+	}
+
+	pub fn core_resolver_mut(&mut self) -> &mut R {
+		&mut self.core_resolver
 	}
 
 	pub fn with_latest_state(self, state: Cid, heads: BTreeSet<Cid>) -> Self {
@@ -42,25 +47,30 @@ where
 		Self { snapshots, ..self }
 	}
 
-	pub async fn build(self) -> Result<Reducer<S>, anyhow::Error> {
+	pub async fn build(self, runtime: &RuntimePool) -> Result<Reducer<S, R>, anyhow::Error> {
 		// validate heads
 		if self.state.is_some() && !self.log.heads_iter().eq(self.heads.iter()) {
 			return Err(anyhow!("Invalid heads. The log and state heads must be the same"));
 		}
 
 		// build
-		let mut result =
-			Reducer { core: self.core, heads: self.heads, snapshots: self.snapshots, state: self.state, log: self.log };
-		result.initialize().await?;
+		let mut result = Reducer {
+			core_resolver: self.core_resolver,
+			heads: self.heads,
+			snapshots: self.snapshots,
+			state: self.state,
+			log: self.log,
+		};
+		result.initialize(runtime).await?;
 		Ok(result)
 	}
 }
 
-pub struct Reducer<S> {
+pub struct Reducer<S, R> {
 	/// Storage.
 	log: Log<S>,
-	/// The (root) core which composes the state.
-	core: Core,
+	/// The core resolver which composes the state.
+	core_resolver: R,
 	/// Latest state.
 	state: Option<Cid>,
 	/// Latests heads.
@@ -68,14 +78,40 @@ pub struct Reducer<S> {
 	/// Avilable historic snapshots in chronologic order.
 	snapshots: HashMap<BTreeSet<Cid>, Cid>,
 }
-impl<S> Reducer<S>
+impl<S, R> Reducer<S, R>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
+	R: CoreResolver + Send + Sync + 'static,
 {
 	/// Initialize this reducer by computing current state if one.
-	pub async fn initialize(&mut self) -> Result<(), anyhow::Error> {
-		if self.state.is_none() {}
+	pub async fn initialize(&mut self, runtime: &RuntimePool) -> Result<(), anyhow::Error> {
+		// if we have snapshots but no state/heads join all heads from snapshots
+		// find latest state if we have snapshots but no latest selection
+		if self.state.is_none() && self.heads.is_empty() && !self.snapshots.is_empty() {
+			for (heads, _) in self.snapshots.iter() {
+				self.log.join_heads(heads.iter()).await?;
+			}
+		}
+
+		// if we have heads but no state compute latest state
+		if self.state.is_none() && !self.heads.is_empty() {
+			let (state, heads) = self.compute_state(runtime).await?;
+			self.state = state;
+			self.heads = heads;
+		}
+
+		// if we have state and heads we are fine
 		Ok(())
+	}
+
+	/// CoreResolver.
+	pub fn core_resolver(&self) -> &R {
+		&self.core_resolver
+	}
+
+	/// Mutable CoreResolver.
+	pub fn core_resolver_mut(&mut self) -> &mut R {
+		&mut self.core_resolver
 	}
 
 	/// Latest state.
@@ -132,9 +168,12 @@ where
 		// let ipld: Ipld = IpldCodec::DagCbor.decode(block.data()).unwrap();
 		// println!("entry = {:?}", ipld);
 
+		// core
+		let core = self.core_resolver.resolve_core(action.cid()).await?;
+
 		// apply to state
 		let state = runtime
-			.execute(self.log.storage(), &self.core, RuntimeContext { state: self.state, event: action.into() })
+			.execute(self.log.storage(), &core, RuntimeContext { state: self.state, event: action.into() })
 			.await?;
 
 		// snapshot
@@ -153,16 +192,11 @@ where
 	/// Join heads (from other log).
 	/// This is used to join logs from other peers.
 	/// Returns true if state has changed.
-	pub async fn join(
-		&mut self,
-		heads: &BTreeSet<Cid>,
-		runtime: &RuntimePool,
-		core_resolver: &dyn CoreResolver,
-	) -> Result<bool, LogError> {
+	pub async fn join(&mut self, heads: &BTreeSet<Cid>, runtime: &RuntimePool) -> Result<bool, LogError> {
 		let mut result = false;
 		if self.log_mut().join_heads(heads.iter()).await? || &self.heads != self.log.heads() {
 			// sync state
-			let (next_state, next_heads) = self.compute_state(runtime, core_resolver).await?;
+			let (next_state, next_heads) = self.compute_state(runtime).await?;
 			result = next_state != self.state;
 			self.state = next_state;
 			self.heads = next_heads;
@@ -171,14 +205,8 @@ where
 	}
 
 	/// Compute state for log heads.
-	/// Returns whether the start has changed.
-	async fn compute_state(
-		&self,
-		runtime: &RuntimePool,
-		core_resolver: &dyn CoreResolver,
-	) -> Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error> {
-		let heads: BTreeSet<Cid> = self.log.heads().clone();
-
+	/// Returns the resulting state if one.
+	async fn compute_state(&self, runtime: &RuntimePool) -> Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error> {
 		// compute stack
 		let (mut state, stack) = self.compute_stack().await?;
 
@@ -187,14 +215,14 @@ where
 			state = runtime
 				.execute(
 					self.log.storage(),
-					&core_resolver.resolve_core(&entry.entry().payload).await?,
+					&self.core_resolver.resolve_core(&entry.entry().payload).await?,
 					RuntimeContext { state, event: entry.entry().payload },
 				)
 				.await?;
 		}
 
 		// result
-		Ok((state, heads))
+		Ok((state, self.log.heads().clone()))
 	}
 
 	/// Compute stack to apply to an state.
@@ -232,7 +260,7 @@ where
 					// when we have seen all heads we can search for an known state
 					missing_heads.remove(entry.cid());
 					if missing_heads.is_empty() {
-						// does this entry reference an state we know?
+						// does this entry reference a state we know?
 						// note: this will never match if we have no previous states
 						//  and a new state will be recomputed from scratch
 						if let Some(entry_state) = self.find_state(&entry.entry().next) {
@@ -255,7 +283,7 @@ where
 #[cfg(test)]
 mod tests {
 	use super::Reducer;
-	use crate::{application::reducer::ReducerBuilder, SingleCoreResolver};
+	use crate::{application::reducer::ReducerBuilder, CoreResolver, SingleCoreResolver};
 	use co_log::{LocalIdentityResolver, Log};
 	use co_primitives::{BlockSerializer, ReducerAction};
 	use co_runtime::{Core, IdleRuntimePool, RuntimePool};
@@ -286,31 +314,32 @@ mod tests {
 			LocalIdentityResolver::default().private_identity("did:local:p1").unwrap(),
 			Box::new(LocalIdentityResolver::default()),
 			storage.clone(),
-			Vec::new(),
+			Default::default(),
 		);
 		let log2 = Log::new(
 			"test".as_bytes().to_vec(),
 			LocalIdentityResolver::default().private_identity("did:local:p2").unwrap(),
 			Box::new(LocalIdentityResolver::default()),
 			storage.clone(),
-			Vec::new(),
+			Default::default(),
 		);
 		let log3 = Log::new(
 			"test".as_bytes().to_vec(),
 			LocalIdentityResolver::default().private_identity("did:local:p3").unwrap(),
 			Box::new(LocalIdentityResolver::default()),
 			storage.clone(),
-			Vec::new(),
+			Default::default(),
 		);
 
 		// pool
 		let runtime = RuntimePool::new(IdleRuntimePool::default());
 		let core_resolver = SingleCoreResolver::new(wasm.into());
+		let native_core_resolver = SingleCoreResolver::new(Core::native::<Counter>());
 
 		// reducer
-		let mut reducer1 = ReducerBuilder::new(Core::native::<Counter>(), log1).build().await.unwrap();
-		let mut reducer2 = ReducerBuilder::new(wasm.into(), log2).build().await.unwrap();
-		let mut reducer3 = ReducerBuilder::new(wasm.into(), log3).build().await.unwrap();
+		let mut reducer1 = ReducerBuilder::new(native_core_resolver, log1).build(&runtime).await.unwrap();
+		let mut reducer2 = ReducerBuilder::new(core_resolver.clone(), log2).build(&runtime).await.unwrap();
+		let mut reducer3 = ReducerBuilder::new(core_resolver.clone(), log3).build(&runtime).await.unwrap();
 
 		// 1-6
 		reducer1.push(&runtime, "test", &CounterAction::Increment(1)).await.unwrap();
@@ -319,47 +348,47 @@ mod tests {
 		reducer1.push(&runtime, "test", &CounterAction::Increment(4)).await.unwrap();
 		reducer1.push(&runtime, "test", &CounterAction::Increment(5)).await.unwrap();
 		reducer1.push(&runtime, "test", &CounterAction::Increment(6)).await.unwrap();
-		reducer2.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
-		reducer3.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer2.join(reducer1.heads(), &runtime).await.unwrap();
+		reducer3.join(reducer1.heads(), &runtime).await.unwrap();
 		assert_eq!(21, counter_state(&storage, &reducer1).await.0); // 1 + 2 + 3 + 4 + 5 + 6
 		assert_eq!(21, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(21, counter_state(&storage, &reducer3).await.0);
 
 		// 7
 		reducer2.push(&runtime, "test", &CounterAction::Increment(7)).await.unwrap();
-		reducer3.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
-		reducer1.join(reducer3.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer3.join(reducer2.heads(), &runtime).await.unwrap();
+		reducer1.join(reducer3.heads(), &runtime).await.unwrap();
 		assert_eq!(28, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(28, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(28, counter_state(&storage, &reducer3).await.0);
 
 		// 8
 		reducer3.push(&runtime, "test", &CounterAction::Increment(8)).await.unwrap();
-		reducer2.join(reducer3.heads(), &runtime, &core_resolver).await.unwrap();
-		reducer1.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer2.join(reducer3.heads(), &runtime).await.unwrap();
+		reducer1.join(reducer2.heads(), &runtime).await.unwrap();
 		assert_eq!(36, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(36, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(36, counter_state(&storage, &reducer3).await.0);
 
 		// 9
 		reducer3.push(&runtime, "test", &CounterAction::Increment(9)).await.unwrap();
-		reducer2.join(reducer3.heads(), &runtime, &core_resolver).await.unwrap();
-		reducer1.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer2.join(reducer3.heads(), &runtime).await.unwrap();
+		reducer1.join(reducer2.heads(), &runtime).await.unwrap();
 		assert_eq!(45, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(45, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(45, counter_state(&storage, &reducer3).await.0);
 
 		// A
 		reducer1.push(&runtime, "test", &CounterAction::Increment(10)).await.unwrap();
-		reducer2.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
-		reducer3.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer2.join(reducer1.heads(), &runtime).await.unwrap();
+		reducer3.join(reducer2.heads(), &runtime).await.unwrap();
 		assert_eq!(55, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(55, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
 
 		// B
 		reducer1.push(&runtime, "test", &CounterAction::Set(11)).await.unwrap();
-		reducer2.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer2.join(reducer1.heads(), &runtime).await.unwrap();
 		assert_eq!(11, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(11, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
@@ -367,31 +396,31 @@ mod tests {
 		// C
 		reducer1.push(&runtime, "test", &CounterAction::Increment(12)).await.unwrap();
 		reducer2.push(&runtime, "test", &CounterAction::Increment(12)).await.unwrap();
-		reducer2.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
-		reducer1.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer2.join(reducer1.heads(), &runtime).await.unwrap();
+		reducer1.join(reducer2.heads(), &runtime).await.unwrap();
 		assert_eq!(35, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(35, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
 
 		// D
 		reducer1.push(&runtime, "test", &CounterAction::Increment(13)).await.unwrap();
-		reducer2.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer2.join(reducer1.heads(), &runtime).await.unwrap();
 		assert_eq!(48, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(48, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
 
 		// E
 		reducer2.push(&runtime, "test", &CounterAction::Increment(14)).await.unwrap();
-		reducer1.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer1.join(reducer2.heads(), &runtime).await.unwrap();
 		assert_eq!(62, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(62, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
 
 		// B*
 		reducer3.push(&runtime, "test", &CounterAction::Increment(11)).await.unwrap();
-		reducer3.join(reducer1.heads(), &runtime, &core_resolver).await.unwrap();
-		reducer2.join(reducer3.heads(), &runtime, &core_resolver).await.unwrap();
-		reducer1.join(reducer2.heads(), &runtime, &core_resolver).await.unwrap();
+		reducer3.join(reducer1.heads(), &runtime).await.unwrap();
+		reducer2.join(reducer3.heads(), &runtime).await.unwrap();
+		reducer1.join(reducer2.heads(), &runtime).await.unwrap();
 		assert_eq!(73, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(73, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(73, counter_state(&storage, &reducer3).await.0);
@@ -421,9 +450,10 @@ mod tests {
 			.await
 	}
 
-	async fn counter_state<S>(storage: &S, reducer: &Reducer<S>) -> Counter
+	async fn counter_state<S, R>(storage: &S, reducer: &Reducer<S, R>) -> Counter
 	where
 		S: BlockStorage + Send + Sync + Clone + 'static,
+		R: CoreResolver + Send + Sync + 'static,
 	{
 		BlockSerializer::new()
 			.deserialize(&storage.get(&reducer.state().unwrap()).await.unwrap())

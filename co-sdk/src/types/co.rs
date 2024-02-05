@@ -2,8 +2,12 @@ use libipld::ipld::Ipld;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+pub const CO_CORE_NAME: &str = "co";
+
+#[deprecated]
 pub type CoId = String;
 
+#[deprecated]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Co {
@@ -12,6 +16,7 @@ pub struct Co {
 	pub data: BTreeMap<String, Ipld>,
 }
 
+#[deprecated]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CoCreate {
@@ -30,6 +35,7 @@ impl Into<Co> for CoCreate {
 	}
 }
 
+#[deprecated]
 #[derive(Default, PartialEq, Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum CoExecuteState {

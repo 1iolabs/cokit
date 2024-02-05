@@ -7,7 +7,7 @@ mod types;
 
 pub use application::{
 	application::{Application, ApplicationBuilder},
-	core_resolver::{CoreResolver, SingleCoreResolver},
+	core_resolver::{CoCoreResolver, CoreResolver, CoreResolverError, MappingCoreResolver, SingleCoreResolver},
 	local::LocalCo,
 	reducer::{Reducer, ReducerBuilder},
 };
@@ -21,7 +21,7 @@ pub use drivers::{
 pub use library::generate_random_name::generate_random_name;
 pub use types::{
 	action::{Cause, CoAction},
-	co::{Co, CoCreate, CoExecuteState, CoId},
+	co::{Co, CoCreate, CoExecuteState, CoId, CO_CORE_NAME},
 	context::{CoContext, CoContextScheduler, CoStorage},
 	error::{ErrorContext, ErrorKind, IntoAction},
 	reference::{Reference, Request, Response, ResponseError},
