@@ -1,0 +1,25 @@
+[package]
+name = "co-core-membership"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+anyhow = { workspace = true }
+co-api = { path = "../../co-api" }
+libipld = { workspace = true, features = ["default", "serde-codec"] }
+serde = { workspace = true, features = ["derive"] }
+serde_ipld_dagcbor = { workspace = true }
+serde_json = { workspace = true }
+serde_repr = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+co-sdk = { path = "../../co-sdk" }
+co-storage = { path = "../../co-storage" }
+tokio = { workspace = true }
+tokio-util = { workspace = true, features = ["compat"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

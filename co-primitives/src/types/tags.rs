@@ -119,6 +119,12 @@ impl Debug for Tags {
 	}
 }
 
+/// Tags match pattern.
+///
+/// Todo: implement
+#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
+pub struct TagsPattern {}
+
 /// f64 float wich uses total order from IEEE 754 (2008 revision).
 #[derive(Debug, Clone, Copy, From, Into)]
 pub struct TotalFloat(f64);

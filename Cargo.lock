@@ -1099,6 +1099,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-core-membership"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "co-api",
+ "co-sdk",
+ "co-storage",
+ "libipld",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "serde_repr",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "co-core-room"
 version = "0.1.0"
 dependencies = [
