@@ -1,0 +1,19 @@
+[package]
+name = "co-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { version = "^4.3.23", features = ["derive"] }
+co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
+futures = { workspace = true }
+libipld = { workspace = true, features = ["default", "serde-codec"] }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+toml = "0.8.9"
+tracing = { workspace = true }
+tracing-bunyan-formatter = "0.3.6"
+tracing-log = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }

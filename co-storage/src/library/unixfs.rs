@@ -1,7 +1,7 @@
 use crate::{BlockStorage, StorageError};
 use anyhow::anyhow;
 use futures::{AsyncRead, AsyncReadExt};
-use libipld::{pb::DagPbCodec, Block, Cid};
+use libipld::{pb::DagPbCodec, store::StoreParams, Block, Cid};
 use rust_unixfs::file::{adder::FileAdder, visit::IdleFileVisit};
 
 /// Read unixfs file into buffer.
@@ -85,6 +85,22 @@ where
 		}
 	}
 	Ok(result)
+}
+
+/// Encode buffer into blocks.
+/// The last block in the result is the root.
+pub fn unixfs_encode_buffer<P: StoreParams>(buf: &[u8]) -> Vec<Block<P>> {
+	let mut result = Vec::new();
+	let mut adder = FileAdder::default();
+	let mut total = 0;
+	while total < buf.len() {
+		let (blocks, consumed) = adder.push(&buf[total..]);
+		for (cid, data) in blocks {
+			result.push(Block::new_unchecked(cid, data));
+		}
+		total += consumed;
+	}
+	result
 }
 
 /// Add blocks to storage and add its CID's to `cids`.

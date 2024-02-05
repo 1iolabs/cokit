@@ -11,7 +11,7 @@ pub use crypto::{
 pub use library::{
 	node_reader::node_reader,
 	store_file::store_file,
-	unixfs::{unixfs_add, unixfs_cat_buffer},
+	unixfs::{unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer},
 };
 pub use storage::{
 	encrypted::{EncryptedBlockStorage, EncryptedStorage},

@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "co-api",
+    "co-cli",
     "co-log",
     "co-macros",
     "co-messaging",

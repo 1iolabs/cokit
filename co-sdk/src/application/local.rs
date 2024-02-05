@@ -42,21 +42,23 @@ impl LocalCo {
 			}
 		}
 
-		// builder
-		let result = match builder {
+		// result
+		Ok(match builder {
 			// load
-			Some(builder) => builder,
+			Some(builder) => builder.build(runtime).await?,
 			// create empty
-			None =>
-				create_reducer_builder(
+			None => {
+				let reducer = create_reducer_builder(
 					create_local_log(create_encrypted_storage(storage).await?, Default::default()).await?,
 					None,
 				)
-				.await?,
-		};
-
-		// result
-		Ok(result.build(runtime).await?)
+				.await?
+				.build(runtime)
+				.await?;
+				// Todo: Setup other COres
+				reducer
+			},
+		})
 	}
 
 	/// Write state to disk.
@@ -154,6 +156,11 @@ impl ApplicationLocal {
 	}
 }
 
+/// Create encrypted storage by using `storage` as unterlying storage.
+/// Tries to receive the key from the OS keychain.
+/// If no key exists a new random one will be created.
+///
+/// Todo: What happens if muliple applications try to access the same key?
 async fn create_encrypted_storage<S>(storage: S) -> Result<EncryptedBlockStorage<S>, anyhow::Error>
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
