@@ -6,11 +6,14 @@ pub async fn keystore_fetch<F: FnOnce() -> Key>(
 	reducer: &CoReducer,
 	key: &str,
 	create: F,
+	force_create: bool,
 ) -> Result<Key, anyhow::Error> {
 	// get
-	let keystore: KeyStore = reducer.state(Cores::to_core_name(CO_CORE_KEYSTORE)).await?;
-	if let Some(result) = keystore.keys.get(key) {
-		return Ok(result.to_owned())
+	if !force_create {
+		let keystore: KeyStore = reducer.state(Cores::to_core_name(CO_CORE_KEYSTORE)).await?;
+		if let Some(result) = keystore.keys.get(key) {
+			return Ok(result.to_owned())
+		}
 	}
 
 	// create
