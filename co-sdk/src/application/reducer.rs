@@ -6,9 +6,11 @@ use co_runtime::{RuntimeContext, RuntimePool};
 use co_storage::BlockStorage;
 use futures::{pin_mut, StreamExt};
 use libipld::Cid;
+use rxrust::{observer::Observer, subject::SubjectThreads};
 use serde::Serialize;
 use std::{
 	collections::{BTreeSet, HashMap, VecDeque},
+	convert::Infallible,
 	time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -60,6 +62,7 @@ where
 			snapshots: self.snapshots,
 			state: self.state,
 			log: self.log,
+			states: Default::default(),
 		};
 		result.initialize(runtime).await?;
 		Ok(result)
@@ -77,6 +80,8 @@ pub struct Reducer<S, R> {
 	heads: BTreeSet<Cid>,
 	/// Avilable historic snapshots in chronologic order.
 	snapshots: HashMap<BTreeSet<Cid>, Cid>,
+	/// State observable.
+	states: SubjectThreads<(Cid, BTreeSet<Cid>), Infallible>,
 }
 impl<S, R> Reducer<S, R>
 where
@@ -100,8 +105,16 @@ where
 			self.heads = heads;
 		}
 
+		// notify
+		self.notify();
+
 		// if we have state and heads we are fine
 		Ok(())
+	}
+
+	/// Get state observable.
+	pub fn observable(&self) -> SubjectThreads<(Cid, BTreeSet<Cid>), Infallible> {
+		self.states.clone()
 	}
 
 	/// CoreResolver.
@@ -185,6 +198,9 @@ where
 		self.state = state;
 		self.heads = self.log.heads_iter().cloned().collect();
 
+		// notify
+		self.notify();
+
 		// result
 		Ok(())
 	}
@@ -200,8 +216,18 @@ where
 			result = next_state != self.state;
 			self.state = next_state;
 			self.heads = next_heads;
+
+			// notify
+			self.notify();
 		}
 		Ok(result)
+	}
+
+	/// Notify subscribers about change.
+	fn notify(&mut self) {
+		if let Some(state) = self.state {
+			self.states.next((state, self.heads.clone()));
+		}
 	}
 
 	/// Compute state for log heads.
