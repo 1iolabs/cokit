@@ -1067,6 +1067,7 @@ dependencies = [
  "anyhow",
  "clap 4.4.11",
  "co-sdk",
+ "exitcode",
  "futures",
  "libipld",
  "serde",
@@ -1282,6 +1283,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "co-core-co",
+ "co-core-keystore",
+ "co-core-membership",
+ "co-core-room",
  "co-log",
  "co-network",
  "co-primitives",
@@ -1304,6 +1308,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "toml",
  "tracing",
  "tracing-bunyan-formatter",
  "tracing-log 0.1.4",
@@ -2273,6 +2278,12 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
 ]
+
+[[package]]
+name = "exitcode"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de853764b47027c2e862a995c34978ffa63c1501f2e15f987ba11bd4f9bba193"
 
 [[package]]
 name = "fallible-iterator"

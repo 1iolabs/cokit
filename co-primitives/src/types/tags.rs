@@ -7,6 +7,26 @@ use std::{
 	fmt::Debug,
 };
 
+/// Tags inline macro.
+///
+/// ```
+/// use co_primitives::tags;
+/// let tags = tags!("hello": "world", "test": 123);
+/// println!("tags: {:?}", tags);
+/// ```
+#[macro_export]
+macro_rules! tags{
+    ( $($key:tt : $val:expr),* $(,)? ) =>{{
+        #[allow(unused_mut)]
+        let mut map = $crate::Tags::new();
+        $(
+            #[allow(unused_parens)]
+            let _ = map.insert(($key.to_owned(), $val.to_owned().into()));
+        )*
+        map
+    }};
+}
+
 /// Tag Value
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
 #[serde(into = "Ipld", from = "Ipld")]
@@ -82,6 +102,11 @@ impl Tags {
 		Self { tags: Default::default() }
 	}
 
+	/// Tag count.
+	pub fn len(&self) -> usize {
+		self.tags.len()
+	}
+
 	/// Insert tag.
 	pub fn insert(&mut self, tag: Tag) {
 		self.tags.insert(tag);
@@ -142,5 +167,18 @@ impl PartialOrd for TotalFloat {
 impl Ord for TotalFloat {
 	fn cmp(&self, other: &Self) -> Ordering {
 		self.0.total_cmp(&other.0)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::Tags;
+
+	#[test]
+	fn test_macro() {
+		let mut tags = Tags::new();
+		tags.insert(("hello".to_owned(), "world".to_owned().into()));
+		let tags_macro = tags!( "hello": "world" );
+		assert_eq!(tags, tags_macro);
 	}
 }

@@ -7,12 +7,13 @@ edition = "2021"
 anyhow = { workspace = true }
 clap = { version = "^4.3.23", features = ["derive"] }
 co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
+exitcode = "1.1.2"
 futures = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
-toml = "0.8.9"
+toml = { workspace = true }
 tracing = { workspace = true }
 tracing-bunyan-formatter = "0.3.6"
 tracing-log = { workspace = true }

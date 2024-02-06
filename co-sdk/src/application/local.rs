@@ -1,6 +1,7 @@
-use crate::{application::core_resolver::CoCoreResolver, Reducer, ReducerBuilder};
+use crate::{CoCoreResolver, Cores, Reducer, ReducerBuilder, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP};
 use anyhow::Context;
 use co_log::{LocalIdentityResolver, Log};
+use co_primitives::{tags, Tags};
 use co_runtime::RuntimePool;
 use co_storage::{Algorithm, BlockStorage, BlockStorageExt, EncryptedBlockStorage, Secret};
 use libipld::Cid;
@@ -48,14 +49,19 @@ impl LocalCo {
 			Some(builder) => builder.build(runtime).await?,
 			// create empty
 			None => {
-				let reducer = create_reducer_builder(
+				// create empty reducer
+				let mut reducer = create_reducer_builder(
 					create_local_log(create_encrypted_storage(storage).await?, Default::default()).await?,
 					None,
 				)
 				.await?
 				.build(runtime)
 				.await?;
-				// Todo: Setup other COres
+
+				// setup
+				setup_local_co(runtime, &mut reducer).await?;
+
+				//result
 				reducer
 			},
 		})
@@ -206,4 +212,29 @@ where
 		None => None,
 	};
 	Ok(ReducerBuilder::new(CoCoreResolver::new(log.storage().clone(), state, None), log))
+}
+
+/// Setup the Local CO by adding cores.
+async fn setup_local_co<S>(runtime: &RuntimePool, reducer: &mut LocalReducer<S>) -> Result<(), anyhow::Error>
+where
+	S: BlockStorage + Sync + Send + Clone + 'static,
+{
+	// add mermbership core
+	let action = co_core_co::CoAction::CoreCreate {
+		core: Cores::to_core_name(CO_CORE_MEMBERSHIP).to_owned(),
+		binary: Cores::default().binary(CO_CORE_MEMBERSHIP).expect(CO_CORE_MEMBERSHIP),
+		tags: tags!( "core": Cores::to_core_name(CO_CORE_MEMBERSHIP) ),
+	};
+	reducer.push(runtime, "co", &action).await?;
+
+	// add keystore core
+	let action = co_core_co::CoAction::CoreCreate {
+		core: Cores::to_core_name(CO_CORE_KEYSTORE).to_owned(),
+		binary: Cores::default().binary(CO_CORE_KEYSTORE).expect(CO_CORE_KEYSTORE),
+		tags: tags!( "core": Cores::to_core_name(CO_CORE_KEYSTORE) ),
+	};
+	reducer.push(runtime, "co", &action).await?;
+
+	// done
+	Ok(())
 }

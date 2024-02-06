@@ -23,6 +23,7 @@ pub use types::{
 	action::{Cause, CoAction},
 	co::{Co, CoCreate, CoExecuteState, CoId, CO_CORE_NAME},
 	context::{CoContext, CoContextScheduler, CoStorage},
+	cores::{Cores, CO_CORE_CO, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_ROOM},
 	error::{ErrorContext, ErrorKind, IntoAction},
 	reference::{Reference, Request, Response, ResponseError},
 	state::{CoSettings, CoState},
