@@ -1,0 +1,74 @@
+use super::wasm_storage::WasmStorage;
+use crate::{Node, NodeSerializer, Storage};
+use libipld::{cbor::DagCborCodec, Cid};
+use serde::{de::DeserializeOwned, Deserialize};
+use serde_json::map::Iter;
+use std::collections::VecDeque;
+
+pub fn wasm_node_reader<'a, T>(storage: &'a WasmStorage, cid: &'a Cid) -> impl Iterator<Item = Result<T, String>> + 'a
+where
+	T: Clone + DeserializeOwned + 'static,
+{
+	NodeIterator::new(storage, cid)
+}
+
+struct NodeIterator<'a, T>
+where
+	T: 'a + Clone + DeserializeOwned,
+{
+	storage: &'a WasmStorage,
+	stack: VecDeque<Cid>,
+	entries: VecDeque<T>,
+}
+
+impl<'a, T> NodeIterator<'a, T>
+where
+	T: Clone + DeserializeOwned,
+{
+	pub fn new(storage: &'a WasmStorage, cid: &Cid) -> Self {
+		let mut stack = VecDeque::new();
+		stack.push_front(cid.clone());
+		Self { storage, stack, entries: Default::default() }
+	}
+}
+
+impl<'a, T> Iterator for NodeIterator<'a, T>
+where
+	T: 'a + Clone + DeserializeOwned,
+{
+	type Item = Result<T, String>;
+	fn next(&mut self) -> Option<Self::Item> {
+		// read node
+		while self.entries.is_empty() && !self.stack.is_empty() {
+			if let Some(next_cid) = self.stack.pop_front() {
+				let node = match read_node(self.storage, &next_cid) {
+					Ok(n) => n,
+					Err(e) => return Some(Err(e)),
+				};
+				match node {
+					Node::Node(links) => {
+						self.stack.extend(links.into_iter().map(|link| -> Cid { link.into() }));
+					},
+					Node::Leaf(entries) => self.entries = entries.into(),
+				}
+			}
+		}
+
+		// read
+		self.entries.pop_front().map(|entry| Ok(entry))
+	}
+}
+
+fn read_node<T: Clone + DeserializeOwned>(storage: &WasmStorage, cid: &Cid) -> Result<Node<T>, String> {
+	// get block
+	let block = storage.get(cid);
+	if block.cid().codec() != Into::<u64>::into(DagCborCodec) {
+		return Err("Invalid".into())
+	}
+
+	// get node
+	let node: Node<T> = serde_ipld_dagcbor::from_slice(block.data()).unwrap();
+
+	// result
+	Ok(node)
+}
