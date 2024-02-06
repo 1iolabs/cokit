@@ -1,21 +1,15 @@
-use crate::{library::read_cos::read_cos, types::http_error::HttpResult};
+use crate::types::http_error::HttpResult;
 use axum::{Extension, Json};
-use co_sdk::{ActionsType, Co, CoAction, CoCreate, CoStorage, Request, StoreType};
+use co_core_membership::Memberships;
+use co_sdk::{CoReducer, Cores, Tags, CO_CORE_MEMBERSHIP};
 use hyper::StatusCode;
-use rxrust::prelude::*;
 use serde::Serialize;
-use serde_json::{to_value, Value};
-use std::ops::Deref;
-use tokio::join;
+use serde_json::Value;
 
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
-pub enum GetCosItem {
-	Ok(Co),
-	Err {
-		#[serde(rename = "$err")]
-		err: String,
-	},
+pub enum GetItem {
+	Ok { id: String, tags: Tags },
 }
 
 /// Read COs.
@@ -23,17 +17,12 @@ pub enum GetCosItem {
 /// Method: GET
 /// Route: /cos
 #[axum_macros::debug_handler]
-pub async fn get(
-	storage: Extension<CoStorage>,
-	store: Extension<StoreType>,
-) -> HttpResult<(StatusCode, Json<Vec<GetCosItem>>)> {
-	let result: Vec<GetCosItem> = read_cos(&storage, &store.state().await.root)
-		.await?
+pub async fn get(local_co: Extension<CoReducer>) -> HttpResult<(StatusCode, Json<Vec<GetItem>>)> {
+	let memberships: Memberships = local_co.state(Cores::to_core_name(CO_CORE_MEMBERSHIP)).await?;
+	let result: Vec<GetItem> = memberships
+		.memberships
 		.into_iter()
-		.map::<GetCosItem, _>(|i| match i {
-			Ok(c) => GetCosItem::Ok(c),
-			Err(e) => GetCosItem::Err { err: format!("{}", e) },
-		})
+		.map(|item| GetItem::Ok { id: item.id, tags: item.tags })
 		.collect();
 	Ok((StatusCode::OK, Json(result)))
 }
@@ -43,39 +32,6 @@ pub async fn get(
 /// Method: POST
 /// Route: /cos
 #[axum_macros::debug_handler]
-pub async fn post(
-	store: Extension<StoreType>,
-	actions: Extension<ActionsType>,
-	Json(payload): Json<Value>,
-) -> HttpResult<(StatusCode, Json<Value>)> {
-	let actions = actions.deref().clone();
-
-	// parse
-	let body: CoCreate = serde_json::from_value(payload)?;
-
-	// create
-	let request = Request::new(body);
-	let action = CoAction::CoCreate(request.clone());
-	let (response, _) = join!(
-		actions
-			.filter_map(move |action| match action {
-				CoAction::CoCreateResponse(response) => {
-					if response.reference == request.reference {
-						Some(response)
-					} else {
-						None
-					}
-				},
-				_ => None,
-			})
-			.take(1)
-			.to_future(),
-		store.dispatch(action),
-	);
-
-	// response
-	match response??.response {
-		Ok(i) => Ok((StatusCode::OK, Json(to_value(i)?))),
-		Err(e) => Ok((e.status.unwrap_or(StatusCode::INTERNAL_SERVER_ERROR), Json(to_value(e)?))),
-	}
+pub async fn post(Json(_payload): Json<Value>) -> HttpResult<(StatusCode, Json<Value>)> {
+	unimplemented!()
 }

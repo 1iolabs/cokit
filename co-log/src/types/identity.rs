@@ -43,5 +43,9 @@ pub enum IdentityResolverError {
 }
 
 pub trait IdentityResolver {
-	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<Box<dyn Identity>, IdentityResolverError>;
+	fn resolve(
+		&self,
+		identity: &str,
+		public_key: Option<&[u8]>,
+	) -> Result<Box<dyn Identity + Send + Sync>, IdentityResolverError>;
 }

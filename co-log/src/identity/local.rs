@@ -34,12 +34,19 @@ impl LocalIdentityResolver {
 		return Err(IdentityResolverError::NotFound);
 	}
 
-	pub fn private_identity(&self, identity: &str) -> Result<Box<dyn PrivateIdentity>, IdentityResolverError> {
+	pub fn private_identity(
+		&self,
+		identity: &str,
+	) -> Result<Box<dyn PrivateIdentity + Send + Sync>, IdentityResolverError> {
 		Ok(Box::new(Self::into_local_identity(identity)?))
 	}
 }
 impl IdentityResolver for LocalIdentityResolver {
-	fn resolve(&self, identity: &str, _public_key: Option<&[u8]>) -> Result<Box<dyn Identity>, IdentityResolverError> {
+	fn resolve(
+		&self,
+		identity: &str,
+		_public_key: Option<&[u8]>,
+	) -> Result<Box<dyn Identity + Send + Sync>, IdentityResolverError> {
 		Ok(Box::new(Self::into_local_identity(identity)?))
 	}
 }

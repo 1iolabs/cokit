@@ -1,14 +1,9 @@
-use anyhow::anyhow;
 use axum::{
 	routing::{get, post},
 	Extension, Router,
 };
 use clap::Parser;
-use co_core_keystore::Key;
-use co_sdk::{
-	keystore_fetch, local_keypair_fetch, Application, ApplicationBuilder, CoReducer, CoState, Network, State, Storage,
-};
-use libp2p::{identity::Keypair, PeerId};
+use co_sdk::{local_keypair_fetch, ApplicationBuilder, Network};
 use std::net::SocketAddr;
 
 mod error;
@@ -41,20 +36,15 @@ async fn main() {
 	let network_key = local_keypair_fetch(&local_co).await.expect("peer-id");
 
 	// driver: network
-	let network = Network::new(network_key);
-
-	// driver: state
-	let state = State::new(CoState::new("".into(), "".into()), network.into_network(), application.storage());
+	let _network = Network::new(network_key);
 
 	// build routes
 	let app = Router::new()
 		.route("/", get(http::get))
 		.route("/cos", get(http::cos::get).post(http::cos::post))
 		.route("/cos/:id", post(http::co::post))
-		.route("/state", get(http::state::get))
-		.layer(Extension(application.storage()))
-		.layer(Extension(state.store()))
-		.layer(Extension(state.actions()));
+		.layer(Extension(local_co))
+		.layer(Extension(application.storage()));
 
 	// run it
 	let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

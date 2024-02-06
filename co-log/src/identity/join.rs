@@ -9,7 +9,11 @@ impl JoinIdentityResolver {
 	}
 }
 impl IdentityResolver for JoinIdentityResolver {
-	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<Box<dyn Identity>, IdentityResolverError> {
+	fn resolve(
+		&self,
+		identity: &str,
+		public_key: Option<&[u8]>,
+	) -> Result<Box<dyn Identity + Send + Sync>, IdentityResolverError> {
 		let mut last_error: Option<IdentityResolverError> = None;
 		for resolver in self.resolvers.iter() {
 			match resolver.resolve(identity, public_key) {

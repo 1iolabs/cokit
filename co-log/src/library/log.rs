@@ -11,8 +11,8 @@ pub struct Log<S> {
 	id: Vec<u8>,
 
 	/// Identity.
-	identity: Box<dyn PrivateIdentity>,
-	identity_resolver: Box<dyn IdentityResolver>,
+	identity: Box<dyn PrivateIdentity + Send + Sync>,
+	identity_resolver: Box<dyn IdentityResolver + Send + Sync>,
 
 	/// Current heads.
 	heads: BTreeSet<Cid>,
@@ -40,7 +40,7 @@ impl<S> Log<S> {
 		self.identity.as_ref()
 	}
 
-	pub fn identity_resolver(&self) -> &Box<dyn IdentityResolver> {
+	pub fn identity_resolver(&self) -> &Box<dyn IdentityResolver + Send + Sync> {
 		&self.identity_resolver
 	}
 
@@ -65,8 +65,8 @@ where
 {
 	pub fn new(
 		id: Vec<u8>,
-		identity: Box<dyn PrivateIdentity>,
-		identity_resolver: Box<dyn IdentityResolver>,
+		identity: Box<dyn PrivateIdentity + Send + Sync>,
+		identity_resolver: Box<dyn IdentityResolver + Send + Sync>,
 		store: S,
 		heads: BTreeSet<Cid>,
 	) -> Self {
@@ -74,7 +74,11 @@ where
 	}
 
 	/// Create new log with random ID.
-	pub fn create(identity: Box<dyn PrivateIdentity>, identity_resolver: Box<dyn IdentityResolver>, store: S) -> Self {
+	pub fn create(
+		identity: Box<dyn PrivateIdentity + Send + Sync>,
+		identity_resolver: Box<dyn IdentityResolver + Send + Sync>,
+		store: S,
+	) -> Self {
 		Self::new(uuid::Uuid::new_v4().to_bytes_le().to_vec(), identity, identity_resolver, store, Default::default())
 	}
 

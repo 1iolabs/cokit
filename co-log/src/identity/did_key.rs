@@ -91,7 +91,11 @@ impl DidKeyIdentityResolver {
 	}
 }
 impl IdentityResolver for DidKeyIdentityResolver {
-	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<Box<dyn Identity>, IdentityResolverError> {
+	fn resolve(
+		&self,
+		identity: &str,
+		public_key: Option<&[u8]>,
+	) -> Result<Box<dyn Identity + Send + Sync>, IdentityResolverError> {
 		if identity.starts_with("did:key:") {
 			if let Ok(did_key_identity) = DidKeyIdentity::try_from(identity) {
 				if match (public_key, did_key_identity.public_key()) {

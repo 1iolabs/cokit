@@ -1,6 +1,7 @@
 use co_api::{reduce, Context, Did, Reducer, ReducerAction, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 /// Membership COre.
 /// Stores membership information of an CO (counterpart to co participants).
@@ -11,8 +12,14 @@ pub struct Memberships {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Membership {
+	/// The CO UUID
+	pub id: String,
+
 	/// The CO state (usually co-core-co).
 	pub co: Cid,
+
+	/// The CO heads.
+	pub heads: BTreeSet<Cid>,
 
 	/// The did used for the membership.
 	pub did: Did,

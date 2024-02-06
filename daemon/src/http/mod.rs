@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 pub mod co;
 pub mod cos;
-pub mod state;
 
 /// Get version info route.
 /// Route: /

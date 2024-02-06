@@ -1,4 +1,4 @@
-use crate::CO_CORE_NAME;
+use crate::{Cores, CO_CORE_CO};
 use async_trait::async_trait;
 use co_core_co::Co;
 use co_primitives::ReducerAction;
@@ -63,7 +63,7 @@ where
 {
 	pub fn new(storage: S, state: Option<Co>, co_core: Option<Core>) -> Self {
 		let mut by_co_name = HashMap::<String, Core>::new();
-		by_co_name.insert(CO_CORE_NAME.to_owned(), co_core.unwrap_or(Core::native::<Co>()));
+		by_co_name.insert(Cores::to_core_name(CO_CORE_CO).to_owned(), co_core.unwrap_or(Core::native::<Co>()));
 		Self { storage, state, by_co_name }
 	}
 
@@ -104,7 +104,7 @@ where
 	}
 
 	async fn on_state_changed(&mut self, co: &str, state: Cid) -> Result<(), CoreResolverError> {
-		if co == CO_CORE_NAME {
+		if co == Cores::to_core_name(CO_CORE_CO) {
 			self.set_state(self.storage.get_deserialized(&state).await?);
 		}
 		Ok(())
