@@ -1,15 +1,10 @@
-use crate::{ActionsType, StoreType};
+use crate::{ActionsType, CoStorage, StoreType};
 use co_network::Libp2pNetwork;
-use co_storage::BlockStorage;
-use libipld::DefaultParams;
-use std::sync::Arc;
 
 #[cfg(feature = "tokio-runtime")]
 pub type CoContextScheduler = rxrust::scheduler::TokioLocalScheduler;
 #[cfg(feature = "futures-runtime")]
 pub type CoContextScheduler = rxrust::scheduler::FuturesLocalScheduler;
-
-pub type CoStorage = Arc<dyn BlockStorage<StoreParams = DefaultParams> + Send + Sync>;
 
 pub struct CoContext {
 	scheduler: CoContextScheduler,

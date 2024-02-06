@@ -99,6 +99,7 @@ pub enum KeyState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CoAction {
+	Create { id: Vec<u8>, name: String, cores: BTreeMap<String, Core>, participants: BTreeMap<Did, Participant> },
 	Heads { heads: BTreeSet<Cid> },
 	TagsInsert { tags: Tags },
 	TagsRemove { tags: Tags },
@@ -118,6 +119,16 @@ impl Reducer for Co {
 	fn reduce(self, event: &ReducerAction<Self::Action>, _: &mut dyn Context) -> Self {
 		let mut result = self;
 		match &event.payload {
+			CoAction::Create { id, name, cores, participants } => {
+				// only allowed for empty COs
+				// id can not be changed afterwards
+				if result.id.is_empty() {
+					result.id = id.to_owned();
+					result.name = name.to_owned();
+					result.cores = cores.to_owned();
+					result.participants = participants.to_owned();
+				}
+			},
 			CoAction::ParticipantInvite { participant, tags } =>
 				if !result.participants.contains_key(participant) {
 					result.participants.insert(

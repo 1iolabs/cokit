@@ -9,6 +9,7 @@ use crate::{
 use anyhow::Result;
 use co_primitives::BlockSerializer;
 use co_state::{ActionObservable, StateObservable};
+use co_storage::BlockStorage;
 use libipld::Cid;
 use rxrust::prelude::*;
 use std::{convert::Infallible, sync::Arc};

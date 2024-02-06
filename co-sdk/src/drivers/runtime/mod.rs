@@ -8,7 +8,7 @@ impl Runtime {
 		Self { pool: Default::default() }
 	}
 
-	pub fn pool(&self) -> &RuntimePool {
+	pub fn runtime(&self) -> &RuntimePool {
 		&self.pool
 	}
 }

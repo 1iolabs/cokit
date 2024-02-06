@@ -1,12 +1,16 @@
-use crate::{CoCoreResolver, Cores, Reducer, ReducerBuilder, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP};
+use crate::{CoCoreResolver, Cores, Reducer, ReducerBuilder, CO_CORE_CO, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP};
 use anyhow::Context;
 use co_log::{LocalIdentityResolver, Log};
-use co_primitives::{tags, Tags};
+use co_primitives::{tags, Did};
 use co_runtime::RuntimePool;
 use co_storage::{Algorithm, BlockStorage, BlockStorageExt, EncryptedBlockStorage, Secret};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, io::ErrorKind, path::PathBuf};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	io::ErrorKind,
+	path::PathBuf,
+};
 
 type LocalReducerBuilder<S> = ReducerBuilder<EncryptedBlockStorage<S>, CoCoreResolver<EncryptedBlockStorage<S>>>;
 type LocalReducer<S> = Reducer<EncryptedBlockStorage<S>, CoCoreResolver<EncryptedBlockStorage<S>>>;
@@ -219,21 +223,36 @@ async fn setup_local_co<S>(runtime: &RuntimePool, reducer: &mut LocalReducer<S>)
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
-	// add mermbership core
-	let action = co_core_co::CoAction::CoreCreate {
-		core: Cores::to_core_name(CO_CORE_MEMBERSHIP).to_owned(),
-		binary: Cores::default().binary(CO_CORE_MEMBERSHIP).expect(CO_CORE_MEMBERSHIP),
-		tags: tags!( "core": Cores::to_core_name(CO_CORE_MEMBERSHIP) ),
-	};
-	reducer.push(runtime, "co", &action).await?;
-
-	// add keystore core
-	let action = co_core_co::CoAction::CoreCreate {
-		core: Cores::to_core_name(CO_CORE_KEYSTORE).to_owned(),
-		binary: Cores::default().binary(CO_CORE_KEYSTORE).expect(CO_CORE_KEYSTORE),
-		tags: tags!( "core": Cores::to_core_name(CO_CORE_KEYSTORE) ),
-	};
-	reducer.push(runtime, "co", &action).await?;
+	// create
+	let mut cores = BTreeMap::<String, co_core_co::Core>::new();
+	cores.insert(
+		Cores::to_core_name(CO_CORE_MEMBERSHIP).to_owned(),
+		co_core_co::Core {
+			binary: Cores::default().binary(CO_CORE_MEMBERSHIP).expect(CO_CORE_MEMBERSHIP),
+			tags: tags!( "core": Cores::to_core_name(CO_CORE_MEMBERSHIP) ),
+			state: None,
+		},
+	);
+	cores.insert(
+		Cores::to_core_name(CO_CORE_KEYSTORE).to_owned(),
+		co_core_co::Core {
+			binary: Cores::default().binary(CO_CORE_KEYSTORE).expect(CO_CORE_KEYSTORE),
+			tags: tags!( "core": Cores::to_core_name(CO_CORE_KEYSTORE) ),
+			state: None,
+		},
+	);
+	let mut participants = BTreeMap::<Did, co_core_co::Participant>::new();
+	participants.insert(
+		"did:local:device".to_owned(),
+		co_core_co::Participant {
+			did: "did:local:device".to_owned(),
+			state: co_core_co::ParticipantState::Active,
+			tags: tags!(),
+		},
+	);
+	let action =
+		co_core_co::CoAction::Create { id: "local".as_bytes().to_vec(), name: "local".to_owned(), cores, participants };
+	reducer.push(runtime, Cores::to_core_name(CO_CORE_CO), &action).await?;
 
 	// done
 	Ok(())

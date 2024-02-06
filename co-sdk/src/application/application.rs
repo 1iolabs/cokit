@@ -1,7 +1,8 @@
-use crate::CoStorage;
-use co_storage::FsStorage;
+use crate::{CoReducer, CoStorage, LocalCo, Runtime, Storage};
+use co_runtime::RuntimePool;
 use directories::ProjectDirs;
 use std::{path::PathBuf, sync::Arc};
+use tokio::sync::RwLock;
 use tracing::{level_filters::LevelFilter, subscriber::set_global_default};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
@@ -27,15 +28,44 @@ pub struct Application {
 	/// Path for application logs. If None no logs will be produced.
 	log: Log,
 
-	/// CO Storage.
-	storage: CoStorage,
+	/// CO Storage Driver.
+	storage: Arc<Storage>,
+
+	/// CO Runtime Driver.
+	runtime: Arc<Runtime>,
 }
 impl Application {
+	pub fn identifier(&self) -> &str {
+		&self.identifier
+	}
+
+	pub fn application_path(&self) -> &PathBuf {
+		&self.application_path
+	}
+
+	pub fn storage_path(&self) -> &PathBuf {
+		&self.storage_path
+	}
+
+	pub fn storage(&self) -> CoStorage {
+		self.storage.storage().clone()
+	}
+
+	pub fn runtime(&self) -> &RuntimePool {
+		self.runtime.runtime()
+	}
+
+	pub async fn create_local_co(&self) -> Result<CoReducer, anyhow::Error> {
+		let local_co = LocalCo::new(self.identifier.clone(), self.application_path.clone());
+		let local_co_reducer = local_co.read(self.storage(), self.runtime()).await?;
+		Ok(CoReducer { reducer: Arc::new(RwLock::new(local_co_reducer)), runtime: self.runtime.clone() })
+	}
+
 	/// Initialize application.
 	///
 	/// Panics:
 	/// - Can not create/open log file.
-	fn init(&self) {
+	async fn init(&self) -> Result<(), anyhow::Error> {
 		// log
 		match &self.log {
 			Log::Bunyan(log_path) => {
@@ -52,6 +82,9 @@ impl Application {
 			},
 			_ => {},
 		}
+
+		// result
+		Ok(())
 	}
 }
 
@@ -82,17 +115,18 @@ impl ApplicationBuilder {
 		Self { log: Log::Bunyan(log_path), ..self }
 	}
 
-	pub fn build(self) -> Application {
+	pub async fn build(self) -> Result<Application, anyhow::Error> {
 		let storage_path = self.path.join("data");
 		let result = Application {
-			storage: Arc::new(FsStorage::new(storage_path.clone())),
+			storage: Arc::new(Storage::new(storage_path.clone())),
+			runtime: Arc::new(Runtime::new()),
 			storage_path,
 			application_path: self.path.join("etc").join(&self.identifier),
 			identifier: self.identifier,
 			log: self.log,
 		};
-		result.init();
-		result
+		result.init().await?;
+		Ok(result)
 	}
 }
 

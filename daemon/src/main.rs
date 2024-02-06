@@ -1,13 +1,15 @@
-use crate::library::path;
+use anyhow::anyhow;
 use axum::{
 	routing::{get, post},
 	Extension, Router,
 };
 use clap::Parser;
-use co_sdk::{CoState, Network, State, Storage};
+use co_core_keystore::Key;
+use co_sdk::{
+	keystore_fetch, local_keypair_fetch, Application, ApplicationBuilder, CoReducer, CoState, Network, State, Storage,
+};
+use libp2p::{identity::Keypair, PeerId};
 use std::net::SocketAddr;
-use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
-use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, Registry};
 
 mod error;
 mod http;
@@ -15,47 +17,34 @@ mod library;
 mod service;
 mod types;
 
+const APP_IDENTIFIER: &str = "co-http";
+
 #[tokio::main]
 async fn main() {
 	// cli
 	let cli = library::cli::Cli::parse();
 
-	// paths
-	let config_path = path::create_folder(path::config_path(&cli.base_path, &cli.config_path).unwrap())
-		.await
-		.expect("config_path");
-	let storage_path = path::create_folder(path::storage_path(&cli.base_path, &cli.storage_path).unwrap())
-		.await
-		.expect("storage_path");
-	let log_path = path::create_folder(path::log_path(&cli.base_path, &cli.log_path).unwrap())
-		.await
-		.expect("log_path");
-	let data_path = path::create_folder(path::data_path(&cli.base_path, &cli.data_path).unwrap())
-		.await
-		.expect("data_path");
+	// application
+	let mut application_builder = match cli.base_path {
+		None => ApplicationBuilder::new(APP_IDENTIFIER.to_owned()),
+		Some(path) => ApplicationBuilder::new_with_path(APP_IDENTIFIER.to_owned(), path),
+	};
+	if cli.no_log == false {
+		application_builder = application_builder.with_bunyan_logging(cli.log_path);
+	}
+	let application = application_builder.build().await.expect("application");
 
-	// tracing
-	let log_file = std::fs::File::create(log_path.join("daemon.log")).unwrap();
-	// let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), std::io::stdout);
-	let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), log_file);
-	let subscriber = Registry::default()
-		.with(LevelFilter::INFO)
-		.with(JsonStorageLayer)
-		.with(formatting_layer);
-	tracing::subscriber::set_global_default(subscriber).unwrap();
-	tracing_log::LogTracer::init().unwrap();
+	// local
+	let local_co = application.create_local_co().await.expect("local-co");
 
-	// driver: storage
-	let storage = Storage::new(storage_path);
+	// peer-id
+	let network_key = local_keypair_fetch(&local_co).await.expect("peer-id");
 
 	// driver: network
-	let network_key = crate::library::local_key::local_key(Some(config_path.join("peer.pb")), cli.force_new_peer_id)
-		.await
-		.expect("peer-id");
 	let network = Network::new(network_key);
 
 	// driver: state
-	let state = State::new(CoState::new(config_path, data_path), network.into_network(), storage.storage());
+	let state = State::new(CoState::new("".into(), "".into()), network.into_network(), application.storage());
 
 	// build routes
 	let app = Router::new()
@@ -63,7 +52,7 @@ async fn main() {
 		.route("/cos", get(http::cos::get).post(http::cos::post))
 		.route("/cos/:id", post(http::co::post))
 		.route("/state", get(http::state::get))
-		.layer(Extension(storage.storage()))
+		.layer(Extension(application.storage()))
 		.layer(Extension(state.store()))
 		.layer(Extension(state.actions()));
 

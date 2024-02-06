@@ -7,7 +7,7 @@ pub struct Storage {
 }
 impl Storage {
 	pub fn new(storage_path: PathBuf) -> Self {
-		Self { storage: Arc::new(FsStorage::new(storage_path)) }
+		Self { storage: CoStorage::new(Arc::new(FsStorage::new(storage_path))) }
 	}
 
 	pub fn storage(&self) -> CoStorage {

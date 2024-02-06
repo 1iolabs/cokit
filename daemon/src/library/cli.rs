@@ -23,25 +23,18 @@ pub struct Cli {
 	/// - storage_path: <base_path>/storage
 	/// - config_path: <base_path>/etc
 	/// - log_path: <base_path>/log
-	/// - data_path: <data_path>/data
+	///
+	/// Default: `~/Application Support/co.app.1io.co`
 	#[arg(long)]
 	pub base_path: Option<PathBuf>,
-
-	/// Storage folder path.
-	#[arg(long)]
-	pub storage_path: Option<PathBuf>,
-
-	/// Configuration config path.
-	#[arg(long)]
-	pub config_path: Option<PathBuf>,
 
 	/// Log path.
 	#[arg(long)]
 	pub log_path: Option<PathBuf>,
 
-	/// Data storage path.
-	#[arg(long)]
-	pub data_path: Option<PathBuf>,
+	/// Disable logging to file.
+	#[arg(long, default_value_t = false)]
+	pub no_log: bool,
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]
