@@ -14,6 +14,9 @@ serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+co-storage = { path = "../co-storage" }
+
 [features]
 default = []
 wasm32 = []

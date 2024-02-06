@@ -1,11 +1,9 @@
-use super::wasm_storage::WasmStorage;
-use crate::{Node, NodeSerializer, Storage};
+use crate::{Node, Storage};
 use libipld::{cbor::DagCborCodec, Cid};
-use serde::{de::DeserializeOwned, Deserialize};
-use serde_json::map::Iter;
+use serde::de::DeserializeOwned;
 use std::collections::VecDeque;
 
-pub fn wasm_node_reader<'a, T>(storage: &'a WasmStorage, cid: &'a Cid) -> impl Iterator<Item = Result<T, String>> + 'a
+pub fn node_reader<'a, T>(storage: &'a dyn Storage, cid: &'a Cid) -> impl Iterator<Item = Result<T, String>> + 'a
 where
 	T: Clone + DeserializeOwned + 'static,
 {
@@ -16,7 +14,7 @@ struct NodeIterator<'a, T>
 where
 	T: 'a + Clone + DeserializeOwned,
 {
-	storage: &'a WasmStorage,
+	storage: &'a dyn Storage,
 	stack: VecDeque<Cid>,
 	entries: VecDeque<T>,
 }
@@ -25,7 +23,7 @@ impl<'a, T> NodeIterator<'a, T>
 where
 	T: Clone + DeserializeOwned,
 {
-	pub fn new(storage: &'a WasmStorage, cid: &Cid) -> Self {
+	pub fn new(storage: &'a dyn Storage, cid: &Cid) -> Self {
 		let mut stack = VecDeque::new();
 		stack.push_front(cid.clone());
 		Self { storage, stack, entries: Default::default() }
@@ -59,7 +57,7 @@ where
 	}
 }
 
-fn read_node<T: Clone + DeserializeOwned>(storage: &WasmStorage, cid: &Cid) -> Result<Node<T>, String> {
+fn read_node<T: Clone + DeserializeOwned>(storage: &dyn Storage, cid: &Cid) -> Result<Node<T>, String> {
 	// get block
 	let block = storage.get(cid);
 	if block.cid().codec() != Into::<u64>::into(DagCborCodec) {
