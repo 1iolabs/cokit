@@ -5,7 +5,7 @@ use libipld::DefaultParams;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, env::current_exe, process::Command};
 
-pub async fn cores_build() -> Result<ExitCode, anyhow::Error> {
+pub async fn command() -> Result<ExitCode, anyhow::Error> {
 	let paths = ["co", "keystore", "membership", "room"];
 
 	// get repository root path

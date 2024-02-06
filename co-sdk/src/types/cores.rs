@@ -1,7 +1,7 @@
 use co_runtime::Core;
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 pub const CO_CORE_CO: &str = "co-core-co";
 pub const CO_CORE_KEYSTORE: &str = "co-core-keystore";
@@ -10,7 +10,7 @@ pub const CO_CORE_ROOM: &str = "co-core-room";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Cores {
-	cores: HashMap<String, Cid>,
+	cores: HashMap<String, String>,
 }
 impl Default for Cores {
 	fn default() -> Self {
@@ -31,7 +31,7 @@ impl Cores {
 	pub fn built_in(&self) -> HashMap<String, Core> {
 		self.cores
 			.iter()
-			.map(|(name, cid)| (name.to_owned(), Core::Wasm(cid.clone())))
+			.map(|(name, cid)| (name.to_owned(), Core::Wasm(Cid::from_str(cid).expect("valid cid"))))
 			.collect()
 	}
 
@@ -42,14 +42,20 @@ impl Cores {
 
 	/// Get the binary CID for a built-in core.
 	pub fn binary(&self, crate_name: &str) -> Option<Cid> {
-		self.cores.get(crate_name).cloned()
+		self.cores
+			.get(crate_name)
+			.map(|cid_str| Cid::from_str(cid_str).expect("valid cid"))
 	}
 
 	/// Test if the core is a built in core.
 	pub fn is_built_in(&self, core: Core) -> bool {
 		match &core {
 			Core::Native(_) => true,
-			Core::Wasm(cid) => self.cores.iter().find(|(_, i)| *i == cid).is_some(),
+			Core::Wasm(cid) => self
+				.cores
+				.iter()
+				.find(|(_, i)| &Cid::from_str(i).expect("valid cid") == cid)
+				.is_some(),
 		}
 	}
 }
@@ -58,6 +64,7 @@ impl Cores {
 /// Panics:
 /// - When a core listed in Cores.toml are not present in the match below. This can only happen when the list is out of
 ///   sync.
+/// Note: When changing this you have to run `co core build builtin` to get ``
 fn get_native(name: &str) -> Core {
 	match name {
 		CO_CORE_CO => Core::native::<co_core_co::Co>(),
@@ -65,5 +72,16 @@ fn get_native(name: &str) -> Core {
 		CO_CORE_MEMBERSHIP => Core::native::<co_core_membership::Memberships>(),
 		CO_CORE_ROOM => Core::native::<co_core_room::Room>(),
 		_ => panic!("unknown native core name: {}", name),
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::Cores;
+
+	#[test]
+	fn test_built_in_native() {
+		// make sure all cores are registered as native
+		assert_eq!(Cores::default().built_in().len(), Cores::default().built_in_native().len());
 	}
 }
