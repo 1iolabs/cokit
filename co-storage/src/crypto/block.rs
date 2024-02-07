@@ -4,6 +4,7 @@ use chacha20poly1305::{
 	aead::{Aead, AeadCore, KeyInit, OsRng},
 	Key, XChaCha20Poly1305,
 };
+use co_primitives::{MultiCodec, MultiCodecError};
 use libipld::{
 	multihash::{Code, MultihashDigest},
 	store::StoreParams,
@@ -33,7 +34,7 @@ pub enum AlgorithmError {
 	Cipher,
 
 	#[error("Invalid arguments specified")]
-	InvalidArguments,
+	InvalidArguments(#[source] anyhow::Error),
 
 	#[error("Generic decoding error")]
 	Decoding,
@@ -47,6 +48,11 @@ pub enum AlgorithmError {
 impl From<aead::Error> for AlgorithmError {
 	fn from(_: aead::Error) -> Self {
 		AlgorithmError::Cipher
+	}
+}
+impl From<MultiCodecError> for AlgorithmError {
+	fn from(value: MultiCodecError) -> Self {
+		AlgorithmError::InvalidArguments(value.into())
 	}
 }
 
@@ -106,10 +112,10 @@ impl Algorithm {
 	) -> Result<Vec<u8>, AlgorithmError> {
 		// validate
 		if self.nonce_size() != nonce.len() {
-			return Err(AlgorithmError::InvalidArguments)
+			return Err(AlgorithmError::InvalidArguments(anyhow::anyhow!("nonce size")))
 		}
 		if self.key_size() != secret.divulge().len() {
-			return Err(AlgorithmError::InvalidArguments)
+			return Err(AlgorithmError::InvalidArguments(anyhow::anyhow!("key size")))
 		}
 
 		// encrypt
@@ -134,10 +140,10 @@ impl Algorithm {
 	) -> Result<Vec<u8>, AlgorithmError> {
 		// validate
 		if self.nonce_size() != nonce.len() {
-			return Err(AlgorithmError::InvalidArguments)
+			return Err(AlgorithmError::InvalidArguments(anyhow::anyhow!("nonce size")))
 		}
 		if self.key_size() != secret.divulge().len() {
-			return Err(AlgorithmError::InvalidArguments)
+			return Err(AlgorithmError::InvalidArguments(anyhow::anyhow!("key size")))
 		}
 
 		// decrypt
@@ -271,14 +277,20 @@ where
 
 	/// Get decrypted block.
 	pub fn block(&self, secret: &Secret) -> Result<Block<S>, AlgorithmError> {
-		let block_secret = self.header.block_secret(secret).ok_or(AlgorithmError::InvalidArguments)?;
+		let block_secret = self
+			.header
+			.block_secret(secret)
+			.ok_or(AlgorithmError::InvalidArguments(anyhow::anyhow!("key")))?;
 		let aad = self.header.aad();
 		Ok(Block::new_unchecked(self.decrypt_cid(&block_secret, &aad)?, self.decrypt_data(&block_secret, &aad)?))
 	}
 
 	/// Get decrypted CID.
 	pub fn cid(&self, secret: &Secret) -> Result<Cid, AlgorithmError> {
-		let block_secret = self.header.block_secret(secret).ok_or(AlgorithmError::InvalidArguments)?;
+		let block_secret = self
+			.header
+			.block_secret(secret)
+			.ok_or(AlgorithmError::InvalidArguments(anyhow::anyhow!("key")))?;
 		let aad = self.header.aad();
 		self.decrypt_cid(&block_secret, &aad)
 	}
@@ -286,7 +298,10 @@ where
 	/// Get decrypted payload.
 	#[allow(dead_code)]
 	pub fn data(&self, secret: &Secret) -> Result<Vec<u8>, AlgorithmError> {
-		let block_secret = self.header.block_secret(secret).ok_or(AlgorithmError::InvalidArguments)?;
+		let block_secret = self
+			.header
+			.block_secret(secret)
+			.ok_or(AlgorithmError::InvalidArguments(anyhow::anyhow!("key")))?;
 		let aad = self.header.aad();
 		self.decrypt_data(&block_secret, &aad)
 	}
@@ -323,7 +338,7 @@ where
 	fn try_into(self) -> Result<Block<S>, Self::Error> {
 		let encrypted_data = serde_ipld_dagcbor::to_vec(&self).map_err(|_| AlgorithmError::Encoding)?;
 		let mh = Code::Blake3_256.digest(&encrypted_data);
-		let cid = Cid::new_v1(BLOCK_MULTICODEC, mh);
+		let cid = Cid::new_v1(MultiCodec::CoEncryptedBlock.into(), mh);
 		Ok(Block::new_unchecked(cid, encrypted_data))
 	}
 }
@@ -336,9 +351,7 @@ where
 	/// Convert from encrypted Block.
 	fn try_from(value: Block<S>) -> Result<Self, Self::Error> {
 		// validate
-		if value.cid().codec() != BLOCK_MULTICODEC {
-			return Err(AlgorithmError::InvalidArguments)
-		}
+		MultiCodec::codec(MultiCodec::CoEncryptedBlock, value.cid())?;
 
 		// decode
 		let block: EncryptedBlock<S> =
@@ -530,10 +543,9 @@ impl KeySlot {
 
 #[cfg(test)]
 mod tests {
-	use libipld::{cbor::DagCborCodec, multihash::Code, Block, DefaultParams};
-
 	use super::{Algorithm, EncryptedBlock, Header, KeySlot};
 	use crate::crypto::secret::Secret;
+	use libipld::{cbor::DagCborCodec, multihash::Code, Block, DefaultParams};
 	use std::iter::repeat;
 
 	#[test]

@@ -1,3 +1,4 @@
+use co_primitives::MultiCodecError;
 use libipld::{store::StoreParams, Block, Cid};
 
 /// Storage interface.
@@ -30,4 +31,9 @@ pub enum StorageError {
 	/// This is not be retriable with same parameters.
 	#[error("Invalid argument")]
 	InvalidArgument(#[source] anyhow::Error),
+}
+impl From<MultiCodecError> for StorageError {
+	fn from(value: MultiCodecError) -> Self {
+		StorageError::InvalidArgument(value.into())
+	}
 }

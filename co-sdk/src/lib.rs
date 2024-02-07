@@ -7,7 +7,7 @@ mod types;
 
 pub use application::{
 	application::{Application, ApplicationBuilder},
-	core_resolver::{CoCoreResolver, CoreResolver, CoreResolverError, MappingCoreResolver, SingleCoreResolver},
+	core_resolver::{CoCoreResolver, CoreResolver, CoreResolverError, SingleCoreResolver},
 	local::LocalCo,
 	reducer::{Reducer, ReducerBuilder},
 };

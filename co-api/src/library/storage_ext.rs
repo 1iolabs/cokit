@@ -1,27 +1,18 @@
+use crate::Storage;
+use co_primitives::{BlockSerializer, Link, Linkable, MultiCodec};
 use std::convert::Infallible;
-
-use crate::{Block, Storage};
-use co_primitives::{Link, Linkable};
-use libipld::{
-	cbor::DagCborCodec,
-	multihash::{Code, MultihashDigest},
-	Cid,
-};
 
 pub trait StorageExt: Storage {
 	/// Get value from link.
-	fn get_value<T, L: Linkable<T>>(&self, link: &L) -> Result<T, ResolveError>
+	fn get_value<T, L: Linkable<T>>(&self, link: &L) -> Result<T, StorageError>
 	where
 		T: Clone + serde::de::DeserializeOwned,
 	{
-		match link.cid().codec() {
-			v if v == Into::<u64>::into(DagCborCodec) => {
-				let buf = self.get(link.cid());
-				let result = serde_ipld_dagcbor::from_slice(buf.data())?;
-				Ok(result)
-			},
-			v => Err(ResolveError::UnknownCodec(v)),
-		}
+		Ok(BlockSerializer::new()
+			.deserialize(
+				&self.get(MultiCodec::dag_cbor(link.cid()).map_err(|e| StorageError::InvalidArgument(e.into()))?),
+			)
+			.map_err(|e| StorageError::InvalidArgument(e.into()))?)
 	}
 
 	/// Create link for value.
@@ -29,43 +20,19 @@ pub trait StorageExt: Storage {
 	where
 		T: Clone + serde::Serialize,
 	{
-		let data = serde_ipld_dagcbor::to_vec(value).expect("value to serialize");
-		let mh = Code::Blake3_256.digest(&data);
-		let cid = Cid::new_v1(DagCborCodec.into(), mh);
-		let result = Link::new(cid.clone());
-		let block = Block::new_unchecked(cid, data);
-		self.set(block);
-		result
+		self.set(BlockSerializer::new().serialize(value).expect("value to serialize"))
+			.into()
 	}
 }
 impl<T> StorageExt for T where T: Storage + ?Sized {}
 
 #[derive(Debug, thiserror::Error)]
-pub enum ResolveError {
-	#[error("Unknown codec")]
-	UnknownCodec(u64),
-	#[error("Generic decoding error")]
-	Codec,
+pub enum StorageError {
 	#[error("Invalid argument")]
-	InvalidArgument,
+	InvalidArgument(#[source] anyhow::Error),
 }
-impl From<serde_ipld_dagcbor::DecodeError<Infallible>> for ResolveError {
+impl From<serde_ipld_dagcbor::DecodeError<Infallible>> for StorageError {
 	fn from(value: serde_ipld_dagcbor::DecodeError<Infallible>) -> Self {
-		match value {
-			serde_ipld_dagcbor::DecodeError::Msg(_) => ResolveError::Codec,
-			serde_ipld_dagcbor::DecodeError::Read(_) => ResolveError::Codec,
-			serde_ipld_dagcbor::DecodeError::Eof => ResolveError::InvalidArgument,
-			serde_ipld_dagcbor::DecodeError::Mismatch { expect_major: _, byte: _ } => ResolveError::Codec,
-			serde_ipld_dagcbor::DecodeError::TypeMismatch { name: _, byte: _ } => ResolveError::Codec,
-			serde_ipld_dagcbor::DecodeError::CastOverflow(_) => ResolveError::Codec,
-			serde_ipld_dagcbor::DecodeError::Overflow { name: _ } => ResolveError::Codec,
-			serde_ipld_dagcbor::DecodeError::RequireBorrowed { name: _ } => ResolveError::Codec,
-			serde_ipld_dagcbor::DecodeError::RequireLength { name: _, expect: _, value: _ } => ResolveError::Codec,
-			serde_ipld_dagcbor::DecodeError::InvalidUtf8(_) => ResolveError::Codec,
-			serde_ipld_dagcbor::DecodeError::Unsupported { byte: _ } => ResolveError::Codec,
-			serde_ipld_dagcbor::DecodeError::DepthLimit => ResolveError::Codec,
-			serde_ipld_dagcbor::DecodeError::TrailingData => ResolveError::Codec,
-			serde_ipld_dagcbor::DecodeError::IndefiniteSize => ResolveError::Codec,
-		}
+		StorageError::InvalidArgument(value.into())
 	}
 }

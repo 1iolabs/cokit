@@ -109,6 +109,7 @@ pub enum CoAction {
 	ParticipantTagsRemove { participant: Did, tags: Tags },
 	CoreCreate { core: String, binary: Cid, tags: Tags },
 	CoreRemove { core: String },
+	CoreChange { core: String, state: Option<Cid> },
 	CoreTagsInsert { core: String, tags: Tags },
 	CoreTagsRemove { core: String, tags: Tags },
 }
@@ -162,6 +163,10 @@ impl Reducer for Co {
 					participant.tags.clear(Some(tags));
 				}
 			},
+			CoAction::CoreChange { core, state } =>
+				if let Some(core) = result.cores.get_mut(core) {
+					core.state = state.clone();
+				},
 			CoAction::CoreTagsInsert { core, tags } =>
 				if let Some(core) = result.cores.get_mut(core) {
 					core.tags.append(&mut tags.clone());

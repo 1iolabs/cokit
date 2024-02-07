@@ -13,7 +13,7 @@ pub use co_v1::{event_cid_read, state_cid_read, state_cid_write, storage_block_g
 pub use libipld::Cid;
 pub use library::{
 	reduce::{reduce, reduce_with_context},
-	storage_ext::{ResolveError, StorageExt},
+	storage_ext::{StorageError, StorageExt},
 };
 pub use types::{
 	dag_link::{DagLink, DagMap, DagSet, DagVec},

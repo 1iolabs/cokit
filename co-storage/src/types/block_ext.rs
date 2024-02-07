@@ -1,7 +1,7 @@
 use crate::{BlockStorage, StorageError};
 use async_trait::async_trait;
-use co_primitives::{BlockSerializer, Link, Linkable};
-use libipld::{cbor::DagCborCodec, Cid};
+use co_primitives::{BlockSerializer, Link, Linkable, MultiCodec};
+use libipld::Cid;
 
 #[async_trait]
 pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {
@@ -11,16 +11,13 @@ pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {
 		T: Send + Sync + Clone + serde::de::DeserializeOwned,
 		L: Linkable<T> + Send + Sync,
 	{
-		match link.cid().codec() {
-			v if v == Into::<u64>::into(DagCborCodec) => Ok(BlockSerializer::new()
-				.deserialize(&self.get(link.cid()).await?)
-				.map_err(|e| StorageError::InvalidArgument(e.into()))?),
-			v => Err(StorageError::InvalidArgument(anyhow::anyhow!("unknown codec {}", v))),
-		}
+		Ok(BlockSerializer::new()
+			.deserialize(&self.get(MultiCodec::dag_cbor(link.cid())?).await?)
+			.map_err(|e| StorageError::InvalidArgument(e.into()))?)
 	}
 
 	/// Create link for value.
-	async fn set_value<T>(&mut self, value: &T) -> Result<Link<T>, StorageError>
+	async fn set_value<T>(&self, value: &T) -> Result<Link<T>, StorageError>
 	where
 		T: Send + Sync + Clone + serde::Serialize,
 	{
@@ -35,16 +32,13 @@ pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {
 	where
 		T: Send + Sync + Clone + serde::de::DeserializeOwned,
 	{
-		match item.codec() {
-			v if v == Into::<u64>::into(DagCborCodec) => Ok(BlockSerializer::new()
-				.deserialize(&self.get(item).await?)
-				.map_err(|e| StorageError::InvalidArgument(e.into()))?),
-			v => Err(StorageError::InvalidArgument(anyhow::anyhow!("unknown codec {}", v))),
-		}
+		Ok(BlockSerializer::new()
+			.deserialize(&self.get(MultiCodec::dag_cbor(item)?).await?)
+			.map_err(|e| StorageError::InvalidArgument(e.into()))?)
 	}
 
 	/// Set serialized value.
-	async fn set_serialized<T>(&mut self, value: &T) -> Result<Cid, StorageError>
+	async fn set_serialized<T>(&self, value: &T) -> Result<Cid, StorageError>
 	where
 		T: Send + Sync + Clone + serde::Serialize,
 	{
@@ -52,6 +46,20 @@ pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {
 			.serialize(value)
 			.map_err(|e| StorageError::InvalidArgument(e.into()))?;
 		Ok(self.set(block).await?)
+	}
+
+	/// Get deserialized value.
+	async fn get_default<T>(&self, item: &Option<Cid>) -> Result<T, StorageError>
+	where
+		T: Send + Default + Sync + Clone + serde::de::DeserializeOwned,
+	{
+		Ok(if let Some(item) = item {
+			BlockSerializer::new()
+				.deserialize(&self.get(MultiCodec::dag_cbor(item)?).await?)
+				.map_err(|e| StorageError::InvalidArgument(e.into()))?
+		} else {
+			T::default()
+		})
 	}
 }
 impl<T> BlockStorageExt for T where T: BlockStorage + ?Sized + Send + Sync + 'static {}

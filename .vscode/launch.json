@@ -81,6 +81,9 @@
                 "/tmp/co",
                 "http"
             ],
+            "env": {
+                "RUST_BACKTRACE": "full"
+            },
             "cwd": "${workspaceFolder}"
         },
         {

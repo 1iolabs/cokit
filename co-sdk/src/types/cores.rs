@@ -40,6 +40,14 @@ impl Cores {
 		self.cores.iter().map(|(name, _)| (name.to_owned(), get_native(name))).collect()
 	}
 
+	/// Map WASM CIDs to native built-in versions.
+	pub fn built_in_native_mapping(&self) -> HashMap<Cid, Core> {
+		self.cores
+			.iter()
+			.map(|(name, wasm)| (Cid::from_str(wasm).expect("valid cid"), get_native(name)))
+			.collect()
+	}
+
 	/// Get the binary CID for a built-in core.
 	pub fn binary(&self, crate_name: &str) -> Option<Cid> {
 		self.cores

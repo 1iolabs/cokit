@@ -6,7 +6,7 @@ use libipld::{
 };
 use serde::Serialize;
 use serde_ipld_dagcbor::{DecodeError, EncodeError};
-use std::{collections::TryReserveError, convert::Infallible, marker::PhantomData};
+use std::{any::type_name, collections::TryReserveError, convert::Infallible, marker::PhantomData};
 
 #[derive(Debug, thiserror::Error)]
 pub enum BlockSerializerError {
@@ -16,8 +16,8 @@ pub enum BlockSerializerError {
 	#[error("Encode failed.")]
 	Encode(#[from] EncodeError<TryReserveError>),
 
-	#[error("Decode failed.")]
-	Decode(#[from] DecodeError<Infallible>),
+	#[error("Decode {0:?} to '{1}' failed")]
+	Decode(Cid, String, DecodeError<Infallible>),
 }
 
 /// DagCbor Block Serializer/Deserializer.
@@ -62,7 +62,8 @@ where
 	where
 		T: serde::de::Deserialize<'a>,
 	{
-		Ok(serde_ipld_dagcbor::from_slice::<'a, T>(item.data())?)
+		Ok(serde_ipld_dagcbor::from_slice::<'a, T>(item.data())
+			.map_err(|e| BlockSerializerError::Decode(item.cid().clone(), type_name::<T>().to_owned(), e.into()))?)
 	}
 }
 

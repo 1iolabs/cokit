@@ -1,9 +1,8 @@
 use crate::{Storage, StorageError};
-use co_primitives::Node;
-use libipld::{cbor::DagCborCodec, Cid};
+use co_primitives::{BlockSerializer, MultiCodec, Node};
+use libipld::Cid;
 use serde::de::DeserializeOwned;
-use serde_ipld_dagcbor::DecodeError;
-use std::{collections::VecDeque, convert::Infallible};
+use std::collections::VecDeque;
 
 // pub fn node_reader_fn<T, F>(storage: &dyn Storage, cid: &Cid, f: &F) -> anyhow::Result<()>
 // where
@@ -90,25 +89,14 @@ where
 	}
 }
 
-#[derive(Debug, thiserror::Error)]
-enum NodeReadError {
-	#[error("Invalid argument")]
-	InvalidArgument,
-	#[error("Storage error")]
-	Storage(#[from] StorageError),
-	#[error("Decode error")]
-	Decode(#[from] DecodeError<Infallible>),
-}
-
-fn read_node<T: Clone + DeserializeOwned, S: Storage>(storage: &S, cid: &Cid) -> Result<Node<T>, NodeReadError> {
+fn read_node<T: Clone + DeserializeOwned, S: Storage>(storage: &S, cid: &Cid) -> Result<Node<T>, StorageError> {
 	// get block
-	let block = storage.get(cid)?;
-	if block.cid().codec() != Into::<u64>::into(DagCborCodec) {
-		return Err(NodeReadError::InvalidArgument)
-	}
+	let block = storage.get(MultiCodec::dag_cbor(cid)?)?;
 
 	// get node
-	let node: Node<T> = serde_ipld_dagcbor::from_slice(block.data())?;
+	let node: Node<T> = BlockSerializer::new()
+		.deserialize(&block)
+		.map_err(|e| StorageError::InvalidArgument(e.into()))?;
 
 	// result
 	Ok(node)

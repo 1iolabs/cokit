@@ -1,7 +1,7 @@
 use crate::{BlockStorage, StorageError};
-use anyhow::anyhow;
+use co_primitives::MultiCodec;
 use futures::{AsyncRead, AsyncReadExt};
-use libipld::{pb::DagPbCodec, store::StoreParams, Block, Cid};
+use libipld::{store::StoreParams, Block, Cid};
 use rust_unixfs::file::{adder::FileAdder, visit::IdleFileVisit};
 
 /// Read unixfs file into buffer.
@@ -9,9 +9,6 @@ use rust_unixfs::file::{adder::FileAdder, visit::IdleFileVisit};
 /// See: https://github.com/dariusc93/rust-ipfs/blob/libp2p-next/unixfs/examples/cat.rs
 pub async fn unixfs_cat_buffer<S: BlockStorage + Send>(storage: &S, cid: &Cid) -> Result<Vec<u8>, StorageError> {
 	let mut result = Vec::new();
-	if cid.codec() != Into::<u64>::into(DagPbCodec) {
-		return Err(StorageError::InvalidArgument(anyhow!("Invalid codec")));
-	}
 
 	// The blockstore specific way of reading the block. Here we assume go-ipfs 0.5 default flatfs
 	// configuration, which puts the files at sharded directories and names the blocks as base32
@@ -21,7 +18,7 @@ pub async fn unixfs_cat_buffer<S: BlockStorage + Send>(storage: &S, cid: &Cid) -
 	// possible content gets to be processed, at minimum one step of the walk as shown in this
 	// example.
 	let mut buf = Vec::new();
-	buf.append(&mut storage.get(cid).await?.into_inner().1);
+	buf.append(&mut storage.get(MultiCodec::codec(MultiCodec::DagPb, cid)?).await?.into_inner().1);
 
 	// First step of the walk can give content or continued visitation but not both.
 	let (content, _, _metadata, mut step) = IdleFileVisit::default()

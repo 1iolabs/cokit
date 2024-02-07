@@ -3,7 +3,7 @@ use anyhow::Context;
 use co_log::{LocalIdentityResolver, Log};
 use co_primitives::{tags, Did};
 use co_runtime::RuntimePool;
-use co_storage::{Algorithm, BlockStorage, BlockStorageExt, EncryptedBlockStorage, Secret};
+use co_storage::{Algorithm, BlockStorage, EncryptedBlockStorage, Secret};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -12,8 +12,8 @@ use std::{
 	path::PathBuf,
 };
 
-type LocalReducerBuilder<S> = ReducerBuilder<EncryptedBlockStorage<S>, CoCoreResolver<EncryptedBlockStorage<S>>>;
-type LocalReducer<S> = Reducer<EncryptedBlockStorage<S>, CoCoreResolver<EncryptedBlockStorage<S>>>;
+type LocalReducerBuilder<S> = ReducerBuilder<EncryptedBlockStorage<S>, CoCoreResolver>;
+type LocalReducer<S> = Reducer<EncryptedBlockStorage<S>, CoCoreResolver>;
 
 pub struct LocalCo {
 	/// Our application identifier.
@@ -36,7 +36,16 @@ impl LocalCo {
 	{
 		// read applications
 		let mut builder: Option<LocalReducerBuilder<S>> = None;
-		let mut dir = tokio::fs::read_dir(&self.application_path).await?;
+		let mut dir = match tokio::fs::read_dir(&self.application_path).await {
+			Err(e) if e.kind() == ErrorKind::NotFound => {
+				// create
+				tokio::fs::create_dir_all(&self.application_path).await?;
+
+				// retry
+				tokio::fs::read_dir(&self.application_path).await
+			},
+			i => i,
+		}?;
 		while let Some(child) = dir.next_entry().await? {
 			let local = ApplicationLocal::read(&child.path().join("local.cbor")).await?;
 			if let Some(local) = local {
@@ -56,7 +65,6 @@ impl LocalCo {
 				// create empty reducer
 				let mut reducer = create_reducer_builder(
 					create_local_log(create_encrypted_storage(storage).await?, Default::default()).await?,
-					None,
 				)
 				.await?
 				.build(runtime)
@@ -162,7 +170,7 @@ impl ApplicationLocal {
 	where
 		S: BlockStorage + Sync + Send + Clone + 'static,
 	{
-		create_reducer_builder(self.log(storage).await?, Some(&self.state)).await
+		create_reducer_builder(self.log(storage).await?).await
 	}
 }
 
@@ -175,7 +183,7 @@ async fn create_encrypted_storage<S>(storage: S) -> Result<EncryptedBlockStorage
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
-	let entry = keyring::Entry::new_with_target("local", "co", "device")?;
+	let entry = keyring::Entry::new("co.app", "did:local:device")?;
 	let key_as_base64 = match entry.get_password() {
 		Ok(p) => p,
 		Err(keyring::Error::NoEntry) => {
@@ -185,7 +193,7 @@ where
 		Err(e) => return Err(e.into()),
 	};
 	let key = Secret::new(multibase::decode(key_as_base64)?.1);
-	Ok(EncryptedBlockStorage::new(storage.clone(), key))
+	Ok(EncryptedBlockStorage::new(storage.clone(), key, Default::default()))
 }
 
 async fn create_local_log<S>(
@@ -204,18 +212,11 @@ where
 	))
 }
 
-async fn create_reducer_builder<S>(
-	log: Log<EncryptedBlockStorage<S>>,
-	state_cid: Option<&Cid>,
-) -> Result<LocalReducerBuilder<S>, anyhow::Error>
+async fn create_reducer_builder<S>(log: Log<EncryptedBlockStorage<S>>) -> Result<LocalReducerBuilder<S>, anyhow::Error>
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
-	let state = match state_cid {
-		Some(cid) => log.storage().get_deserialized(cid).await?,
-		None => None,
-	};
-	Ok(ReducerBuilder::new(CoCoreResolver::new(log.storage().clone(), state, None), log))
+	Ok(ReducerBuilder::new(CoCoreResolver::with_mapping(Cores::default().built_in_native_mapping()), log))
 }
 
 /// Setup the Local CO by adding cores.

@@ -2,7 +2,7 @@ use crate::CoreResolver;
 use anyhow::anyhow;
 use co_log::{EntryBlock, Log, LogError};
 use co_primitives::{Linkable, ReducerAction};
-use co_runtime::{RuntimeContext, RuntimePool};
+use co_runtime::RuntimePool;
 use co_storage::BlockStorage;
 use futures::{pin_mut, StreamExt};
 use libipld::Cid;
@@ -29,7 +29,7 @@ pub struct ReducerBuilder<S, R> {
 impl<S, R> ReducerBuilder<S, R>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
-	R: CoreResolver + Send + Sync + 'static,
+	R: CoreResolver<S> + Send + Sync + 'static,
 {
 	pub fn new(core_resolver: R, log: Log<S>) -> Self {
 		Self { core_resolver, heads: Default::default(), snapshots: Default::default(), state: None, log }
@@ -69,6 +69,7 @@ where
 	}
 }
 
+/// The reducers combines the log to a root state.
 pub struct Reducer<S, R> {
 	/// Storage.
 	log: Log<S>,
@@ -86,7 +87,7 @@ pub struct Reducer<S, R> {
 impl<S, R> Reducer<S, R>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
-	R: CoreResolver + Send + Sync + 'static,
+	R: CoreResolver<S> + Send + Sync + 'static,
 {
 	/// Initialize this reducer by computing current state if one.
 	pub async fn initialize(&mut self, runtime: &RuntimePool) -> Result<(), anyhow::Error> {
@@ -106,7 +107,7 @@ where
 		}
 
 		// notify
-		self.notify();
+		self.on_state_changed().await?;
 
 		// if we have state and heads we are fine
 		Ok(())
@@ -161,7 +162,7 @@ where
 	}
 
 	/// Push an event.
-	pub async fn push<T: Serialize + 'static>(
+	pub async fn push<T: Serialize + Send + Sync + 'static>(
 		&mut self,
 		runtime: &RuntimePool,
 		co: &str,
@@ -181,12 +182,10 @@ where
 		// let ipld: Ipld = IpldCodec::DagCbor.decode(block.data()).unwrap();
 		// println!("entry = {:?}", ipld);
 
-		// core
-		let core = self.core_resolver.resolve_core(action.cid()).await?;
-
 		// apply to state
-		let state = runtime
-			.execute(self.log.storage(), &core, RuntimeContext { state: self.state, event: action.into() })
+		let state = self
+			.core_resolver
+			.execute(self.log.storage(), runtime, &self.state, action.cid())
 			.await?;
 
 		// snapshot
@@ -199,7 +198,7 @@ where
 		self.heads = self.log.heads_iter().cloned().collect();
 
 		// notify
-		self.notify();
+		self.on_state_changed().await?;
 
 		// result
 		Ok(())
@@ -218,16 +217,20 @@ where
 			self.heads = next_heads;
 
 			// notify
-			self.notify();
+			self.on_state_changed().await?;
 		}
 		Ok(result)
 	}
 
 	/// Notify subscribers about change.
-	fn notify(&mut self) {
+	async fn on_state_changed(&mut self) -> Result<(), LogError> {
+		// states
 		if let Some(state) = self.state {
 			self.states.next((state, self.heads.clone()));
 		}
+
+		// result
+		Ok(())
 	}
 
 	/// Compute state for log heads.
@@ -238,12 +241,9 @@ where
 
 		// apply stack
 		for entry in stack {
-			state = runtime
-				.execute(
-					self.log.storage(),
-					&self.core_resolver.resolve_core(&entry.entry().payload).await?,
-					RuntimeContext { state, event: entry.entry().payload },
-				)
+			state = self
+				.core_resolver
+				.execute(self.log.storage(), runtime, &state, &entry.entry().payload)
 				.await?;
 		}
 
@@ -479,7 +479,7 @@ mod tests {
 	async fn counter_state<S, R>(storage: &S, reducer: &Reducer<S, R>) -> Counter
 	where
 		S: BlockStorage + Send + Sync + Clone + 'static,
-		R: CoreResolver + Send + Sync + 'static,
+		R: CoreResolver<S> + Send + Sync + 'static,
 	{
 		BlockSerializer::new()
 			.deserialize(&storage.get(&reducer.state().unwrap()).await.unwrap())

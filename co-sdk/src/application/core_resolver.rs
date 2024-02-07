@@ -1,22 +1,22 @@
 use crate::{Cores, CO_CORE_CO};
 use async_trait::async_trait;
-use co_core_co::Co;
 use co_primitives::ReducerAction;
-use co_runtime::Core;
+use co_runtime::{Core, ExecuteError, RuntimeContext, RuntimePool};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use libipld::Cid;
 use serde::de::IgnoredAny;
 use std::collections::HashMap;
 
 #[async_trait]
-pub trait CoreResolver {
-	/// Resolve the COre responsible for reducing the action.
-	async fn resolve_core(&self, action: &Cid) -> Result<Core, CoreResolverError>;
-
-	/// Called when a rediced state has changed.
-	async fn on_state_changed(&mut self, _co: &str, _state: Cid) -> Result<(), CoreResolverError> {
-		Ok(())
-	}
+pub trait CoreResolver<S> {
+	/// Apply action to root state.
+	async fn execute(
+		&self,
+		storage: &S,
+		runtime: &RuntimePool,
+		state: &Option<Cid>,
+		action: &Cid,
+	) -> Result<Option<Cid>, CoreResolverError>;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -32,6 +32,10 @@ pub enum CoreResolverError {
 	/// The core referenced by the action can not be found.
 	#[error("Core not found: {0}")]
 	CoreNotFound(String),
+
+	/// The core referenced by the action can not be found.
+	#[error("Execute core failed: {0}")]
+	Execute(String, ExecuteError),
 }
 
 #[derive(Debug, Clone)]
@@ -44,98 +48,108 @@ impl SingleCoreResolver {
 	}
 }
 #[async_trait]
-impl CoreResolver for SingleCoreResolver {
-	async fn resolve_core(&self, _action: &Cid) -> Result<Core, CoreResolverError> {
-		Ok(self.core.clone())
+impl<S> CoreResolver<S> for SingleCoreResolver
+where
+	S: BlockStorage + Send + Sync + Clone + 'static,
+{
+	async fn execute(
+		&self,
+		storage: &S,
+		runtime: &RuntimePool,
+		state: &Option<Cid>,
+		action: &Cid,
+	) -> Result<Option<Cid>, CoreResolverError> {
+		Ok(runtime
+			.execute(storage, &self.core, RuntimeContext { state: state.clone(), event: action.into() })
+			.await
+			.map_err(|e| CoreResolverError::Execute("root".to_owned(), e))?)
 	}
 }
 
 /// Resolve to core to use from
-#[derive(Debug, Clone)]
-pub struct CoCoreResolver<S: Clone> {
-	storage: S,
-	by_co_name: HashMap<String, Core>,
-	state: Option<Co>,
+#[derive(Debug, Default, Clone)]
+pub struct CoCoreResolver {
+	mapping: HashMap<Cid, Core>,
 }
-impl<S> CoCoreResolver<S>
-where
-	S: BlockStorage + Send + Sync + Clone + 'static,
-{
-	pub fn new(storage: S, state: Option<Co>, co_core: Option<Core>) -> Self {
-		let mut by_co_name = HashMap::<String, Core>::new();
-		by_co_name.insert(Cores::to_core_name(CO_CORE_CO).to_owned(), co_core.unwrap_or(Core::native::<Co>()));
-		Self { storage, state, by_co_name }
+impl CoCoreResolver {
+	pub fn with_mapping(mapping: HashMap<Cid, Core>) -> Self {
+		Self { mapping }
 	}
 
-	pub fn insert_core(&mut self, co: String, core: Core) {
-		self.by_co_name.insert(co, core);
+	fn core(&self, wasm: Cid) -> Core {
+		self.mapping.get(&wasm).cloned().unwrap_or(Core::Wasm(wasm))
 	}
 
-	pub fn set_state(&mut self, state: Option<Co>) {
-		self.state = state;
+	fn root_core(&self) -> Core {
+		self.core(Cores::default().binary(CO_CORE_CO).expect("co core binary"))
 	}
 }
 #[async_trait]
-impl<S> CoreResolver for CoCoreResolver<S>
+impl<S> CoreResolver<S> for CoCoreResolver
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
 {
-	async fn resolve_core(&self, action: &Cid) -> Result<Core, CoreResolverError> {
+	async fn execute(
+		&self,
+		storage: &S,
+		runtime: &RuntimePool,
+		state: &Option<Cid>,
+		action: &Cid,
+	) -> Result<Option<Cid>, CoreResolverError> {
 		// get action
-		let reducer_action: ReducerAction<IgnoredAny> = self
-			.storage
+		let reducer_action: ReducerAction<IgnoredAny> = storage
 			.get_deserialized(action)
 			.await
 			.map_err(|e| CoreResolverError::InvalidArgument(e.into()))?;
 
-		// resolve from known
-		if let Some(core) = self.by_co_name.get(&reducer_action.core) {
-			return Ok(core.clone());
+		// find core
+		let root = reducer_action.core == Cores::to_core_name(CO_CORE_CO);
+		let (core_state, core) = if root {
+			(state.clone(), self.root_core())
+		} else {
+			// get root state
+			let state: co_core_co::Co = storage.get_default(state).await?;
+
+			// get core
+			let core: &co_core_co::Core = state
+				.cores
+				.get(&reducer_action.core)
+				.ok_or_else(|| CoreResolverError::CoreNotFound(reducer_action.core.clone()))?;
+
+			// resolve from known
+			(core.state, self.core(core.binary))
+		};
+
+		// apply to state
+		let mut result = runtime
+			.execute(storage, &core, RuntimeContext { state: core_state, event: action.into() })
+			.await
+			.map_err(|e| CoreResolverError::Execute(reducer_action.core.clone(), e))?;
+
+		// apply to root
+		if !root {
+			// Note: this action must be deterministic so we pass no time otherwise when we retry this could introduce
+			// random values.
+			let action: ReducerAction<co_core_co::CoAction> = ReducerAction {
+				core: Cores::to_core_name(CO_CORE_CO).to_owned(),
+				from: "did:local:device".to_owned(),
+				payload: co_core_co::CoAction::CoreChange { core: reducer_action.core.clone(), state: result },
+				time: 0,
+			};
+			let action_cid = storage.set_serialized(&action).await?;
+
+			// apply
+			result = runtime
+				.execute(storage, &self.root_core(), RuntimeContext { state: state.clone(), event: action_cid })
+				.await
+				.map_err(|e| CoreResolverError::Execute(reducer_action.core.clone(), e))?;
+
+			// remove action
+			// TODO: put this action into an "overlay storage" which used only memory?
+			storage.remove(&action_cid).await?;
 		}
 
-		// resolve from co state
-		self.state
-			.as_ref()
-			.ok_or_else(|| CoreResolverError::CoreNotFound(reducer_action.core.to_owned()))?
-			.cores
-			.get(&reducer_action.core)
-			.ok_or_else(|| CoreResolverError::CoreNotFound(reducer_action.core))
-			.map(|core| Core::Wasm(core.binary))
-	}
-
-	async fn on_state_changed(&mut self, co: &str, state: Cid) -> Result<(), CoreResolverError> {
-		if co == Cores::to_core_name(CO_CORE_CO) {
-			self.set_state(self.storage.get_deserialized(&state).await?);
-		}
-		Ok(())
-	}
-}
-
-/// Mapping core resolve.
-/// Can be used to map WebAssembly core Cids to Native versions.
-#[derive(Debug)]
-pub struct MappingCoreResolver<R> {
-	next: R,
-	mapping: HashMap<Cid, Core>,
-}
-impl<R> MappingCoreResolver<R> {
-	pub fn new(next: R) -> Self {
-		Self { next, mapping: Default::default() }
-	}
-
-	pub fn insert(&mut self, from: Cid, to: Core) {
-		self.mapping.insert(from, to);
-	}
-}
-#[async_trait]
-impl<R> CoreResolver for MappingCoreResolver<R>
-where
-	R: CoreResolver + Sync + Send,
-{
-	async fn resolve_core(&self, action: &Cid) -> Result<Core, CoreResolverError> {
-		self.next.resolve_core(action).await.map(|core| match core {
-			Core::Wasm(cid) => self.mapping.get(&cid).cloned().unwrap_or(Core::Wasm(cid)),
-			core => core,
-		})
+		// result
+		Ok(result)
 	}
 }

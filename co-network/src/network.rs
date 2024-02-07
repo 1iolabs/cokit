@@ -75,7 +75,7 @@ impl Libp2pNetwork {
 		let mut runtime = Runtime::new(config.clone(), events.clone());
 
 		// listen
-		runtime.listen(swarm.listen_on(config.addr.clone().unwrap_or("/ip4/0.0.0.0/tcp/0".parse()?))?);
+		runtime.listen(swarm.listen_on(config.addr.clone().unwrap_or("/ip4/0.0.0.0/udp/0/quic-v1".parse()?))?);
 
 		// run
 		let handle = tokio::runtime::Handle::current().clone();

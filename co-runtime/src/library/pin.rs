@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use co_api::Metadata;
-use co_primitives::{DefaultNodeSerializer, NodeBuilder};
+use co_primitives::{DefaultNodeSerializer, MultiCodec, NodeBuilder};
 use co_storage::{node_reader, Storage, StorageError};
 use libipld::{cbor::DagCborCodec, prelude::Codec, serde::from_ipld, Cid, Ipld};
 use serde::{Deserialize, Serialize};
@@ -150,24 +150,12 @@ struct PinState {
 	pins: BTreeMap<Cid, BTreeSet<Cid>>,
 }
 
-#[derive(Debug, thiserror::Error)]
-enum DecodeError {
-	#[error("Storage Error")]
-	Storage(#[from] StorageError),
-	#[error("Decode Error")]
-	Decode(#[from] anyhow::Error),
-	#[error("Unsupported Codec Error")]
-	UnsupportedCodec,
-}
-
-fn decode<S: Storage>(storage: &S, cid: &Cid) -> Result<Ipld, DecodeError> {
-	if cid.codec() == Into::<u64>::into(DagCborCodec) {
-		let block = storage.get(cid)?;
-		let ipld: Ipld = DagCborCodec.decode(block.data())?;
-		Ok(ipld)
-	} else {
-		Err(DecodeError::UnsupportedCodec)
-	}
+fn decode<S: Storage>(storage: &S, cid: &Cid) -> Result<Ipld, StorageError> {
+	let block = storage.get(MultiCodec::dag_cbor(cid)?)?;
+	let ipld: Ipld = DagCborCodec
+		.decode(block.data())
+		.map_err(|e| StorageError::InvalidArgument(e.into()))?;
+	Ok(ipld)
 }
 
 /// Recursively find all referenced `Cid`'s in an `Ipld` data structure by calling `found`.

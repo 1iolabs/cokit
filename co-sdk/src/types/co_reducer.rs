@@ -7,8 +7,7 @@ use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct CoReducer {
-	pub(crate) reducer:
-		Arc<RwLock<Reducer<EncryptedBlockStorage<CoStorage>, CoCoreResolver<EncryptedBlockStorage<CoStorage>>>>>,
+	pub(crate) reducer: Arc<RwLock<Reducer<EncryptedBlockStorage<CoStorage>, CoCoreResolver>>>,
 	pub(crate) runtime: Arc<Runtime>,
 }
 
@@ -54,7 +53,7 @@ impl CoReducer {
 
 		// other
 		let co_state: co_core_co::Co = if let Some(state_cid) = state {
-			return Ok(storage.get_deserialized(&state_cid).await?)
+			storage.get_deserialized(&state_cid).await?
 		} else {
 			co_core_co::Co::default()
 		};

@@ -1,7 +1,7 @@
 use super::{entry::EntryBlock, get_entry_block::get_entry_blocks, join::JoinEntry, stream::create_stream};
 use crate::{library::clock::max_clock, Clock, Entry, Identity, IdentityResolver, LogError, PrivateIdentity};
-use co_primitives::{BlockSerializer, Link};
-use co_storage::BlockStorage;
+use co_primitives::Link;
+use co_storage::{BlockStorage, BlockStorageExt};
 use futures::Stream;
 use libipld::Cid;
 use serde::Serialize;
@@ -123,15 +123,11 @@ where
 
 	/// Push serializable item as new entry.
 	/// Returns the `Cid` of the `Entry`.
-	pub async fn push_event<T: Serialize + Clone>(&mut self, item: &T) -> Result<(Link<Entry>, Link<T>), LogError> {
-		let cid = self
-			.entry_store
-			.set(
-				BlockSerializer::new()
-					.serialize(item)
-					.map_err(|e| LogError::InvalidArgument(e.into()))?,
-			)
-			.await?;
+	pub async fn push_event<T: Serialize + Send + Sync + Clone>(
+		&mut self,
+		item: &T,
+	) -> Result<(Link<Entry>, Link<T>), LogError> {
+		let cid = self.entry_store.set_serialized(item).await?;
 		Ok((self.push(cid.clone()).await?.into(), cid.into()))
 	}
 

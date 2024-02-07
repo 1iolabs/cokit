@@ -7,9 +7,9 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_primitives::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer};
+use co_primitives::{DefaultNodeSerializer, MultiCodec, Node, NodeBuilder, NodeBuilderError, NodeSerializer};
 use futures::{stream::FuturesOrdered, StreamExt};
-use libipld::{cbor::DagCborCodec, store::StoreParams, Block, Cid};
+use libipld::{store::StoreParams, Block, Cid};
 use serde::{Deserialize, Serialize};
 use std::{
 	borrow::{Borrow, Cow},
@@ -91,7 +91,7 @@ where
 
 	/// This will regenerate and flush the encryption block mapping using supplied CIDs.
 	pub fn regenerate_mapping(&mut self, cids: impl Iterator<Item = Cid>) -> Result<Cid, StorageError> {
-		self.mapping = BlockMapping::from_cids_storage(self, cids).map_err(|e| e.into())?;
+		self.mapping = BlockMapping::from_cids_storage(self, cids).map_err(|e| StorageError::Internal(e.into()))?;
 		self.flush_mapping()
 	}
 }
@@ -116,7 +116,7 @@ where
 
 	/// Inserts a block into storage.
 	///
-	/// Note: This expects the unencrypted Block.
+	/// Note: As the API is transparent this expects the unencrypted Block and returns the unencrypted CID.
 	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		let cid = block.cid().clone();
 
@@ -126,16 +126,15 @@ where
 		let encrypted_block: Block<Self::StoreParams> = encrypted
 			.try_into()
 			.map_err(|e: AlgorithmError| StorageError::Internal(e.into()))?;
-		let encrypted_cid = encrypted_block.cid().clone();
 
 		// store
-		let result = self.next.set(encrypted_block)?;
+		let encrypted_cid = self.next.set(encrypted_block)?;
 
 		// map
-		self.mapping.insert(cid, encrypted_cid);
+		self.mapping.insert(cid.clone(), encrypted_cid);
 
 		// result
-		Ok(result)
+		Ok(cid)
 	}
 
 	/// Remove a block from storage.
@@ -169,8 +168,8 @@ impl<S> EncryptedBlockStorage<S>
 where
 	S: BlockStorage + Send + Sync,
 {
-	pub fn new(next: S, key: Secret) -> Self {
-		Self { algorithm: Default::default(), key, mapping: Default::default(), next }
+	pub fn new(next: S, key: Secret, algorithm: Algorithm) -> Self {
+		Self { algorithm, key, mapping: Default::default(), next }
 	}
 
 	/// Load mapping from CID.
@@ -204,7 +203,11 @@ where
 
 	/// This will regenerate and flush the encryption block mapping using supplied CIDs.
 	pub async fn regenerate_mapping(&mut self, cids: impl Iterator<Item = Cid>) -> Result<Cid, StorageError> {
-		self.mapping = Arc::new(RwLock::new(BlockMapping::from_cids(self, cids).await.map_err(|e| e.into())?));
+		self.mapping = Arc::new(RwLock::new(
+			BlockMapping::from_cids(self, cids)
+				.await
+				.map_err(|e| StorageError::Internal(e.into()))?,
+		));
 		self.flush_mapping().await
 	}
 }
@@ -239,17 +242,16 @@ where
 		let encrypted_block: Block<Self::StoreParams> = encrypted
 			.try_into()
 			.map_err(|e: AlgorithmError| StorageError::Internal(e.into()))?;
-		let encrypted_cid = encrypted_block.cid().clone();
 
 		// store
-		let result = self.next.set(encrypted_block).await?;
+		let encrypted_cid = self.next.set(encrypted_block).await?;
 
 		// map
 		// TODO: Make Sync?
-		self.mapping.write().await.insert(cid, encrypted_cid);
+		self.mapping.write().await.insert(cid.clone(), encrypted_cid);
 
 		// result
-		Ok(result)
+		Ok(cid)
 	}
 
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
@@ -284,7 +286,7 @@ impl Into<StorageError> for BlockMappingError {
 			BlockMappingError::Algorithm(e) => match e {
 				AlgorithmError::Cipher => StorageError::InvalidArgument(e.into()), /* likely wrong key supplied for */
 				// given CID.
-				AlgorithmError::InvalidArguments => StorageError::InvalidArgument(e.into()),
+				AlgorithmError::InvalidArguments(_) => StorageError::InvalidArgument(e.into()),
 				AlgorithmError::Decoding => StorageError::Internal(e.into()),
 				AlgorithmError::Encoding => StorageError::Internal(e.into()),
 				AlgorithmError::Size => StorageError::Internal(e.into()),
@@ -353,9 +355,7 @@ impl BlockMapping {
 
 		// get block
 		let block = storage.get(cid)?;
-		if block.cid().codec() != Into::<u64>::into(DagCborCodec) {
-			return Err(StorageError::InvalidArgument(anyhow!("Invalid codec")))
-		}
+		MultiCodec::dag_cbor(block.cid())?;
 
 		// get node
 		let node: Node<(Cid, Cid)> =
@@ -392,9 +392,7 @@ impl BlockMapping {
 			let block = block?;
 
 			// validate
-			if block.cid().codec() != Into::<u64>::into(DagCborCodec) {
-				return Err(StorageError::InvalidArgument(anyhow!("Invalid codec")))
-			}
+			MultiCodec::dag_cbor(block.cid())?;
 
 			// get node
 			let node: Node<(Cid, Cid)> =
@@ -507,6 +505,7 @@ mod tests {
 		},
 		storage::{encrypted::EncryptedStorage, memory::MemoryStorage},
 		types::storage::{Storage, StorageError},
+		BlockStorage, EncryptedBlockStorage, MemoryBlockStorage,
 	};
 	use co_primitives::BlockSerializer;
 	use libipld::{store::StoreParams, Cid, DefaultParams};
@@ -519,7 +518,7 @@ mod tests {
 	}
 
 	#[test]
-	fn roundtrip() {
+	fn roundtrip_storage() {
 		// storage
 		let memory = MemoryStorage::new();
 		let algorithm = Algorithm::default();
@@ -531,13 +530,37 @@ mod tests {
 		let block = BlockSerializer::default().serialize(&data).unwrap();
 
 		// set
-		encryption.set(block.clone()).unwrap();
+		let result = encryption.set(block.clone()).unwrap();
+		assert_eq!(&result, block.cid());
 
 		// get
 		assert_eq!(encryption.get(block.cid()).unwrap(), block);
 
 		// validate that the CID dosn't exist in parent storage layer
 		assert!(matches!(encryption.storage().get(block.cid()), Err(StorageError::NotFound(_))));
+	}
+
+	#[tokio::test]
+	async fn roundtrip() {
+		// storage
+		let memory = MemoryBlockStorage::new();
+		let algorithm = Algorithm::default();
+		let key = Secret::new(repeat(42).take(algorithm.key_size()).collect());
+		let encryption = EncryptedBlockStorage::new(memory.clone(), key, algorithm);
+
+		// block
+		let data = Test { hello: "world".to_owned() };
+		let block = BlockSerializer::default().serialize(&data).unwrap();
+
+		// set
+		let result = encryption.set(block.clone()).await.unwrap();
+		assert_eq!(&result, block.cid());
+
+		// get
+		assert_eq!(encryption.get(block.cid()).await.unwrap(), block);
+
+		// validate that the CID dosn't exist in parent storage layer
+		assert!(matches!(memory.get(block.cid()).await, Err(StorageError::NotFound(_))));
 	}
 
 	#[test]

@@ -14,4 +14,7 @@ pub enum LogError {
 
 	#[error("Invalid argument")]
 	InvalidArgument(#[from] anyhow::Error),
+
+	#[error("Internal error")]
+	Internal(#[source] anyhow::Error),
 }
