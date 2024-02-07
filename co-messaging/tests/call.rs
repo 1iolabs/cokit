@@ -10,7 +10,7 @@ use co_messaging::{
 fn init_call() {
 	let mut event_content = CallInviteContent::new("call_1", "some_device_address", None, 10000, "some_sdp_string");
 	event_content.invitee = Some("did:some:invitee".into());
-	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", "did:some:user", event_content);
+	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", event_content);
 	assert_eq!(event.generate_event_type(), "m.call.invite");
 	let json = serde_json::to_string_pretty(&event).unwrap();
 	println!("{json}");
@@ -20,7 +20,7 @@ fn init_call() {
 #[test]
 fn answer_call() {
 	let event_content = AnswerCallContent::new("call_1", "some_other_device_address", "some_sdp_string");
-	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", "did:some:user", event_content);
+	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", event_content);
 	assert_eq!(event.generate_event_type(), "m.call.answer");
 	let json = serde_json::to_string_pretty(&event).unwrap();
 	println!("{json}");
@@ -34,7 +34,7 @@ fn call_candidates() {
 		"some_device_address",
 		vec![ICECandidate::new("some_candidate", "video", 0), ICECandidate::new("some_other_candidate", "audio", 1)],
 	);
-	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", "did:some:user", event_content);
+	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", event_content);
 	assert_eq!(event.generate_event_type(), "m.call.candidates");
 	let json = serde_json::to_string_pretty(&event).unwrap();
 	println!("{json}");
@@ -44,7 +44,7 @@ fn call_candidates() {
 #[test]
 fn select_call_answer() {
 	let event_content = SelectCallAnswerContent::new("call_1", "some_device_address", "some_other_device_address");
-	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", "did:some:user", event_content);
+	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", event_content);
 	assert_eq!(event.generate_event_type(), "m.call.select_answer");
 	let json = serde_json::to_string_pretty(&event).unwrap();
 	println!("{json}");
@@ -73,7 +73,7 @@ fn call_negotiation() {
 	event_content.set_offer("some_offer_sdp", 10000);
 	// assert that answer is not set
 	assert_eq!(event_content.get_answer(), None);
-	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", "did:some:user", event_content);
+	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", event_content);
 	assert_eq!(event.generate_event_type(), "m.call.negotiate");
 	let json = serde_json::to_string_pretty(&event).unwrap();
 	println!("{json}");
@@ -83,7 +83,7 @@ fn call_negotiation() {
 #[test]
 fn reject_call() {
 	let event_content = RejectCallContent::new("call_1", "some_device_address");
-	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", "did:some:user", event_content);
+	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", event_content);
 	assert_eq!(event.generate_event_type(), "m.call.reject");
 	let json = serde_json::to_string_pretty(&event).unwrap();
 	println!("{json}");
@@ -93,7 +93,7 @@ fn reject_call() {
 #[test]
 fn hangup_call() {
 	let event_content = HangupCallContent::new("call_1", "some_device_address", HangupCallReason::UserHangup);
-	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", "did:some:user", event_content);
+	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", event_content);
 	assert_eq!(event.generate_event_type(), "m.call.hangup");
 	let json = serde_json::to_string_pretty(&event).unwrap();
 	println!("{json}");

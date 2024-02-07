@@ -6,8 +6,7 @@ use co_messaging::{
 #[test]
 fn test_replace_text_content() {
 	let original_content = TextContent::new("Some message");
-	let original_event =
-		MatrixEvent::new("some_event", 1577836800000, "@some.room", "did:web:some_user", original_content);
+	let original_event = MatrixEvent::new("some_event", 1577836800000, "@some.room", original_content);
 
 	let mut replacement_event_content = (match original_event.content {
 		EventContent::Message(MessageType::Text(c)) => Ok(c),
@@ -15,8 +14,7 @@ fn test_replace_text_content() {
 	})
 	.unwrap();
 	replacement_event_content.new_content = Some(Box::new(TextContent::new("Some new fancy body").into()));
-	let event =
-		MatrixEvent::new("some_event", 1577836805000, "@some.room", "did:web:some_user", replacement_event_content);
+	let event = MatrixEvent::new("some_event", 1577836805000, "@some.room", replacement_event_content);
 
 	let json = serde_json::to_string_pretty(&event).unwrap();
 	println!("JSON: {}", json);

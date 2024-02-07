@@ -7,7 +7,7 @@ use libipld::Cid;
 #[test]
 fn test_story_post() {
 	let event_content = PostUserStoryContent::new(86400000, 10000, Cid::default());
-	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", "did:some:user", event_content);
+	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", event_content);
 	assert_eq!(event.generate_event_type(), "m.user.story.post");
 	let json = serde_json::to_string_pretty(&event).unwrap();
 	println!("{json}");
@@ -17,7 +17,7 @@ fn test_story_post() {
 #[test]
 fn test_story_view() {
 	let event_content = ViewUserStoryContent::new("some_event_id");
-	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", "did:some:user", event_content);
+	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", event_content);
 	assert_eq!(event.generate_event_type(), "m.user.story.view");
 	let json = serde_json::to_string_pretty(&event).unwrap();
 	println!("{json}");
@@ -27,7 +27,7 @@ fn test_story_view() {
 #[test]
 fn test_profile_update() {
 	let event_content = UpdateProfileContent::new("Max Mustermann", Cid::default(), "am mustern");
-	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", "did:some:user", event_content);
+	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", event_content);
 	assert_eq!(event.generate_event_type(), "m.user.profile.update");
 	let json = serde_json::to_string_pretty(&event).unwrap();
 	println!("{json}");

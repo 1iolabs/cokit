@@ -6,7 +6,6 @@ pub static FORMATTED_BODY_FORMAT: &str = "some.html.standard.format";
 pub use crate::matrix_event::{
 	call_event, ephemeral_event, message_event, multimedia, poll_event, receipts, relation, state_event, user_events,
 };
-use co_primitives::Did;
 use matrix_event::{
 	call_event::CallType,
 	ephemeral_event::EphemeralType,
@@ -27,7 +26,6 @@ pub struct MatrixEvent {
 	pub event_id: String,
 	pub timestamp: i64,
 	pub room_id: String,
-	pub sender: Did,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub state_key: Option<String>,
 	#[serde(flatten)]
@@ -39,17 +37,9 @@ impl MatrixEvent {
 		event_id: impl Into<String>,
 		timestamp: i64,
 		room_id: impl Into<String>,
-		sender: impl Into<String>,
 		content: impl Into<EventContent>,
 	) -> Self {
-		Self {
-			event_id: event_id.into(),
-			timestamp,
-			room_id: room_id.into(),
-			sender: sender.into(),
-			content: content.into(),
-			state_key: None,
-		}
+		Self { event_id: event_id.into(), timestamp, room_id: room_id.into(), content: content.into(), state_key: None }
 	}
 	pub fn event_type(&self) -> String {
 		self.content.generate_event_type()
