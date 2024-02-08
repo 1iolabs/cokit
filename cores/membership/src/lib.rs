@@ -12,7 +12,7 @@ pub struct Memberships {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Membership {
-	/// The CO UUID
+	/// The CO Unique Identifier.
 	pub id: String,
 
 	/// The CO state (usually co-core-co).

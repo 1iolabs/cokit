@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Co {
 	/// CO UUID.
-	pub id: Vec<u8>,
+	pub id: String,
 
 	/// CO Tags.
 	pub tags: Tags,
@@ -99,7 +99,7 @@ pub enum KeyState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CoAction {
-	Create { id: Vec<u8>, name: String, cores: BTreeMap<String, Core>, participants: BTreeMap<Did, Participant> },
+	Create { id: String, name: String, cores: BTreeMap<String, Core>, participants: BTreeMap<Did, Participant> },
 	Heads { heads: BTreeSet<Cid> },
 	TagsInsert { tags: Tags },
 	TagsRemove { tags: Tags },
