@@ -1,18 +1,19 @@
-use co_api::{Content as _, DagMap, Reducer, Tags};
+use co_api::{CreateLink, DagMap, DagSet, FromLink, Reducer, Storage, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 /**
  * COre that handles pinning and unpinning
  */
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Pin {
-	pub pinned_events: DagMap<Cid, Vec<Tags>>,
+	pub pins: DagMap<Cid, DagSet<Tags>>,
 }
 
 impl Pin {
-	pub fn is_pinned(&self, cid: &Cid) -> bool {
-		let pin_map = self.pinned_events.content();
+	pub fn is_pinned(&self, cid: &Cid, s: &dyn Storage) -> bool {
+		let pin_map = self.pins.from_link(s);
 		if let Some(_) = pin_map.get(cid) {
 			return true;
 		}
@@ -28,34 +29,41 @@ pub enum PinAction {
 
 impl Reducer for Pin {
 	type Action = PinAction;
-	fn reduce(self, event: &co_api::ReducerAction<Self::Action>, _context: &mut dyn co_api::Context) -> Self {
-		let mut pin_map = self.pinned_events.content();
+	fn reduce(self, event: &co_api::ReducerAction<Self::Action>, context: &mut dyn co_api::Context) -> Self {
+		let s = context.storage_mut();
+		let mut pin_map = self.pins.from_link(s);
 		match &event.payload {
 			PinAction::Pin(cid, tags) =>
 			// get tags for the given cid
-				if let Some(current_tags) = pin_map.get(cid).cloned().as_mut() {
+				if let Some(dag_tags) = pin_map.get(cid).cloned().as_mut() {
+					let mut current_tags = dag_tags.from_link(s);
 					// push new tag to tags vec
-					current_tags.push(tags.clone());
+					current_tags.insert(tags.clone());
 					// update map
-					pin_map.insert(*cid, current_tags.clone());
+					pin_map.insert(*cid, DagSet::to_link(current_tags, s));
 				} else {
 					// no tags found -> just insert as new vector
-					pin_map.insert(*cid, vec![tags.clone()]);
+					let mut new_set = BTreeSet::new();
+					new_set.insert(tags.clone());
+					pin_map.insert(*cid, DagSet::to_link(new_set, s));
 				},
 			PinAction::Unpin(cid, tags) =>
 			// get current tags for cid
 				if let Some(current_tags) = pin_map.get(cid).cloned() {
-					// reomve given tag from array
-					let new_tags: Vec<Tags> = current_tags.into_iter().filter(|i| *i != *tags).collect();
+					// remove given tag from array
+					// TODO: use new iter function here
+					let new_tags_tags =
+						DagSet::to_link(current_tags.from_link(s).into_iter().filter(|i| *i != *tags).collect(), s);
 					// TODO: validate if something got removed?
 
 					// update map
-					pin_map.insert(*cid, new_tags);
+					pin_map.insert(*cid, new_tags_tags);
 				} else {
 					// Not currently pinned, cannot unpin!
 					// NOTE: maybe we should return an error here?
 				},
 		};
-		self
+		// TODO: update instead of rewrite
+		Self { pins: DagMap::to_link(pin_map, s) }
 	}
 }
