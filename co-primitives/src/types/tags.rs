@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::{
 	cmp::Ordering,
 	collections::{BTreeMap, BTreeSet},
-	fmt::Debug,
+	fmt::{Debug, Display},
 };
 
 /// Tags inline macro.
@@ -139,6 +139,21 @@ impl Debug for Tags {
 			s.field(key, value);
 		}
 		s.finish()
+	}
+}
+impl Display for Tags {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let mut result = Ok(());
+		let mut first = true;
+		for (key, value) in self.0.iter() {
+			if first {
+				first = false;
+				result = write!(f, "{}: {:?}", key, value)
+			} else {
+				result = write!(f, ", {}: {:?}", key, value)
+			}
+		}
+		result
 	}
 }
 

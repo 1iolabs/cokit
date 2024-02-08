@@ -1,8 +1,8 @@
 use crate::{CoCoreResolver, CoStorage, Cores, Reducer, Runtime, CO_CORE_CO};
-use anyhow::anyhow;
-use co_storage::{BlockStorageExt, EncryptedBlockStorage};
+use co_storage::{BlockStorageExt, EncryptedBlockStorage, StorageError};
+use libipld::Cid;
 use serde::{de::DeserializeOwned, Serialize};
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 use tokio::sync::RwLock;
 
 #[derive(Clone)]
@@ -12,6 +12,12 @@ pub struct CoReducer {
 }
 
 impl CoReducer {
+	/// Get current reducer state and heads.
+	pub async fn reducer_state(&self) -> (Option<Cid>, BTreeSet<Cid>) {
+		let reducer = self.reducer.read().await;
+		(reducer.state().clone(), reducer.heads().clone())
+	}
+
 	/// Push event into reducer.
 	pub async fn push<T: Serialize + Send + Sync + Clone + 'static>(
 		&self,
@@ -22,7 +28,7 @@ impl CoReducer {
 	}
 
 	/// Read co reducer state.
-	pub async fn co(&self) -> Result<co_core_co::Co, anyhow::Error> {
+	pub async fn co(&self) -> Result<co_core_co::Co, CoReducerError> {
 		let (storage, state) = {
 			let reducer = self.reducer.read().await;
 			(reducer.log().storage().clone(), reducer.state().clone())
@@ -37,7 +43,7 @@ impl CoReducer {
 	pub async fn state<T: DeserializeOwned + Send + Sync + Default + Clone + 'static>(
 		&self,
 		co: &str,
-	) -> Result<T, anyhow::Error> {
+	) -> Result<T, CoReducerError> {
 		let (storage, state) = {
 			let reducer = self.reducer.read().await;
 			(reducer.log().storage().clone(), reducer.state().clone())
@@ -66,8 +72,17 @@ impl CoReducer {
 		}
 
 		// not found
-		return Err(anyhow!("Core not found: {}", co));
+		return Err(CoReducerError::CoreNotFound(co.to_owned()));
 	}
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CoReducerError {
+	#[error("Storage error")]
+	Storage(#[from] StorageError),
+
+	#[error("Core not found: {0}")]
+	CoreNotFound(String),
 }
 
 // pub type CoReducer = Reducer<EncryptedBlockStorage<CoStorage>, CoCoreResolver<EncryptedBlockStorage<CoStorage>>>;

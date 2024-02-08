@@ -149,12 +149,17 @@ impl LocalCo {
 		reducer
 	}
 
+	/// Key path if no keychain should be used.
 	fn key_path(&self) -> Option<PathBuf> {
-		if self.keychain {
-			Some(self.application_path.join("key.cbor"))
-		} else {
-			None
+		// use file
+		if !self.keychain {
+			if let Some(parent) = self.application_path.parent() {
+				return Some(parent.join("key.cbor"))
+			}
 		}
+
+		// use keychain
+		None
 	}
 }
 #[async_trait]

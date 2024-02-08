@@ -17,8 +17,8 @@ serde_repr = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-co-sdk = { path = "../../co-sdk" }
 co-storage = { path = "../../co-storage" }
+co-runtime = { path = "../../co-runtime" }
 tokio = { workspace = true }
 tokio-util = { workspace = true, features = ["compat"] }
 tracing = { workspace = true }

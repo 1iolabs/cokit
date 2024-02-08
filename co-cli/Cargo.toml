@@ -6,11 +6,16 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 clap = { version = "^4.3.23", features = ["derive"] }
+co-core-co = { path = "../cores/co" }
+co-core-keystore = { path = "../cores/keystore" }
+co-core-membership = { path = "../cores/membership" }
 co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
 exitcode = "1.1.2"
 futures = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { workspace = true, features = ["derive"] }
+serde_ipld_dagcbor = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 toml = { workspace = true }

@@ -90,6 +90,33 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Debug executable 'co-cli'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=co-cli",
+                    "--package=co-cli"
+                ],
+                "filter": {
+                    "name": "co-cli",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--base-path",
+                "/tmp/co",
+                "--no-keychain",
+                "co",
+                "ls"
+            ],
+            "env": {
+                "RUST_BACKTRACE": "full"
+            },
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests in executable 'daemon'",
             "cargo": {
                 "args": [

@@ -2,15 +2,18 @@ use crate::types::http_error::HttpResult;
 use axum::{Extension, Json};
 use co_core_co::Co;
 use co_core_membership::Memberships;
-use co_sdk::{CoReducer, Cores, Tags, CO_CORE_CO, CO_CORE_MEMBERSHIP};
+use co_sdk::{memberships, CoReducer, Cores, Tags, CO_CORE_CO, CO_CORE_MEMBERSHIP};
+use futures::{StreamExt, TryStreamExt};
 use hyper::StatusCode;
+use libipld::Cid;
 use serde::Serialize;
 use serde_json::Value;
 
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum GetItem {
-	Ok { id: String, tags: Tags },
+	Ok { id: String, state: Option<Cid>, tags: Tags },
+	Err { err: String },
 }
 
 /// Read COs.
@@ -19,15 +22,16 @@ pub enum GetItem {
 /// Route: /cos
 #[axum_macros::debug_handler]
 pub async fn get(local_co: Extension<CoReducer>) -> HttpResult<(StatusCode, Json<Vec<GetItem>>)> {
-	let co: Co = local_co.state(Cores::to_core_name(CO_CORE_CO)).await?;
-	let memberships: Memberships = local_co.state(Cores::to_core_name(CO_CORE_MEMBERSHIP)).await?;
-	let local = vec![GetItem::Ok { id: co.id, tags: co.tags }].into_iter();
-	let memberships = memberships
-		.memberships
-		.into_iter()
-		.map(|item| GetItem::Ok { id: item.id, tags: item.tags });
-	let result: Vec<_> = local.chain(memberships).collect();
-	Ok((StatusCode::OK, Json(result)))
+	let memberships: Vec<GetItem> = memberships(local_co.0.clone())
+		.map(|item| -> GetItem {
+			match item {
+				Ok((id, state, tags)) => GetItem::Ok { id, state, tags },
+				Err(e) => GetItem::Err { err: format!("{:?}", e) },
+			}
+		})
+		.collect()
+		.await;
+	Ok((StatusCode::OK, Json(memberships)))
 }
 
 /// Create CO.

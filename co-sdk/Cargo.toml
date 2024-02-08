@@ -7,6 +7,7 @@ edition = "2021"
 #librocksdb-sys = { version = "0.10.0+7.9.2" }
 #rocksdb = { version = "0.20.1" }
 anyhow = { workspace = true }
+async-stream = { workspace = true }
 async-trait = { workspace = true }
 co-core-co = { path = "../cores/co" }
 co-core-keystore = { path = "../cores/keystore" }
