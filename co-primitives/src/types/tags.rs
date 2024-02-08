@@ -94,32 +94,30 @@ pub type Tag = (String, TagValue);
 
 /// Tags.
 #[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
-pub struct Tags {
-	tags: BTreeSet<Tag>,
-}
+pub struct Tags(BTreeSet<Tag>);
 impl Tags {
 	pub fn new() -> Self {
-		Self { tags: Default::default() }
+		Self(Default::default())
 	}
 
 	/// Tag count.
 	pub fn len(&self) -> usize {
-		self.tags.len()
+		self.0.len()
 	}
 
 	/// Insert tag.
 	pub fn insert(&mut self, tag: Tag) {
-		self.tags.insert(tag);
+		self.0.insert(tag);
 	}
 
 	/// Remove tag.
 	pub fn remove(&mut self, tag: &Tag) {
-		self.tags.remove(tag);
+		self.0.remove(tag);
 	}
 
 	/// Insert mutiple tags.
 	pub fn append(&mut self, tags: &mut Tags) {
-		self.tags.append(&mut tags.tags);
+		self.0.append(&mut tags.0);
 	}
 
 	/// Remove specified tags.
@@ -127,17 +125,17 @@ impl Tags {
 	pub fn clear(&mut self, tags: Option<&Tags>) {
 		match tags {
 			Some(tags) =>
-				for tag in tags.tags.iter() {
-					self.tags.remove(tag);
+				for tag in tags.0.iter() {
+					self.0.remove(tag);
 				},
-			None => self.tags.clear(),
+			None => self.0.clear(),
 		}
 	}
 }
 impl Debug for Tags {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let mut s = f.debug_struct("Tags");
-		for (key, value) in self.tags.iter() {
+		for (key, value) in self.0.iter() {
 			s.field(key, value);
 		}
 		s.finish()
