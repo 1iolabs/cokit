@@ -1,4 +1,4 @@
-use co_api::{Content as _, DagMap, Reducer, TagsPattern};
+use co_api::{Content as _, DagMap, Reducer, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
  */
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Pin {
-	pub pinned_events: DagMap<Cid, Vec<TagsPattern>>,
+	pub pinned_events: DagMap<Cid, Vec<Tags>>,
 }
 
 impl Pin {
@@ -22,8 +22,8 @@ impl Pin {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PinAction {
-	Pin(Cid, TagsPattern),
-	Unpin(Cid, TagsPattern),
+	Pin(Cid, Tags),
+	Unpin(Cid, Tags),
 }
 
 impl Reducer for Pin {
@@ -45,12 +45,15 @@ impl Reducer for Pin {
 			PinAction::Unpin(cid, tags) =>
 			// get current tags for cid
 				if let Some(current_tags) = pin_map.get(cid).cloned() {
-					// reomve given tag from array TODO: validate if something got removed?
-					let new_tags: Vec<TagsPattern> = current_tags.into_iter().filter(|i| *i != *tags).collect();
+					// reomve given tag from array
+					let new_tags: Vec<Tags> = current_tags.into_iter().filter(|i| *i != *tags).collect();
+					// TODO: validate if something got removed?
+
 					// update map
 					pin_map.insert(*cid, new_tags);
 				} else {
-					// Not currently pinned, cannot unpin! TODO: error?
+					// Not currently pinned, cannot unpin!
+					// NOTE: maybe we should return an error here?
 				},
 		};
 		self
