@@ -55,8 +55,8 @@ impl Application {
 		self.runtime.runtime()
 	}
 
-	pub async fn create_local_co(&self) -> Result<CoReducer, anyhow::Error> {
-		let local_co = LocalCo::new(self.identifier.clone(), self.application_path.clone());
+	pub async fn create_local_co(&self, keychain: bool) -> Result<CoReducer, anyhow::Error> {
+		let local_co = LocalCo::new(self.identifier.clone(), self.application_path.clone(), keychain);
 		let local_co_reducer = local_co.read(self.storage(), self.runtime()).await?;
 		let auto_write = local_co.auto_write(local_co_reducer);
 		Ok(CoReducer { reducer: Arc::new(RwLock::new(auto_write)), runtime: self.runtime.clone() })
@@ -107,6 +107,10 @@ impl ApplicationBuilder {
 
 	/// Enable bunyan logging to log_path.
 	/// If no path is specified {path}/log/application.log is used.
+	/// Command read without network stuff:
+	/// ```sh
+	/// tail -0f ~/Application\ Support/co.app/log/application.log | bunyan -c '!/^(libp2p|hickory_proto)/.test(this.target)'
+	/// ```
 	pub fn with_bunyan_logging(self, log_path: Option<PathBuf>) -> Self {
 		let log_path = match log_path {
 			Some(p) => p,

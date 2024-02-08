@@ -35,6 +35,12 @@ pub struct Cli {
 	/// Disable logging to file.
 	#[arg(long, default_value_t = false)]
 	pub no_log: bool,
+
+	/// Read/Write Local CO encryption key to file instead of the OS keychain.
+	///
+	/// Warning: This option is INSECURE only use when you know the implications.
+	#[arg(long, default_value_t = false)]
+	pub no_keychain: bool,
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]

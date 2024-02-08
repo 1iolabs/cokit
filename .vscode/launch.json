@@ -79,6 +79,7 @@
             "args": [
                 "--base-path",
                 "/tmp/co",
+                "--no-keychain",
                 "http"
             ],
             "env": {

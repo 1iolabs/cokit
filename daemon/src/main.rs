@@ -30,7 +30,7 @@ async fn main() {
 	let application = application_builder.build().await.expect("application");
 
 	// local
-	let local_co = application.create_local_co().await.expect("local-co");
+	let local_co = application.create_local_co(!cli.no_keychain).await.expect("local-co");
 
 	// peer-id
 	let network_key = local_keypair_fetch(&local_co, cli.force_new_peer_id).await.expect("peer-id");
