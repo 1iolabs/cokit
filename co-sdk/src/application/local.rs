@@ -183,17 +183,27 @@ async fn create_encrypted_storage<S>(storage: S) -> Result<EncryptedBlockStorage
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
-	let entry = keyring::Entry::new("co.app", "did:local:device")?;
+	let key = fetch_secret("co.app", "did:local:device", true)?;
+	Ok(EncryptedBlockStorage::new(storage.clone(), key, Default::default()))
+}
+
+/// Get or create encryption key in OS Keychain.
+fn fetch_secret(service: &str, user: &str, allow_create: bool) -> Result<Secret, anyhow::Error> {
+	let entry = keyring::Entry::new(service, user)?;
 	let key_as_base64 = match entry.get_password() {
 		Ok(p) => p,
-		Err(keyring::Error::NoEntry) => {
+		Err(keyring::Error::NoEntry) if allow_create => {
+			// generate and set key
 			let secret = Algorithm::default().generate_serect();
-			multibase::encode(multibase::Base::Base64, secret.divulge())
+			let secret_base64 = multibase::encode(multibase::Base::Base64, secret.divulge());
+			entry.set_password(&secret_base64)?;
+
+			// fetch again to make sure the key has persisted
+			return fetch_secret(service, user, false)
 		},
 		Err(e) => return Err(e.into()),
 	};
-	let key = Secret::new(multibase::decode(key_as_base64)?.1);
-	Ok(EncryptedBlockStorage::new(storage.clone(), key, Default::default()))
+	Ok(Secret::new(multibase::decode(key_as_base64)?.1))
 }
 
 async fn create_local_log<S>(
@@ -251,8 +261,7 @@ where
 			tags: tags!(),
 		},
 	);
-	let action =
-		co_core_co::CoAction::Create { id: "local".as_bytes().to_vec(), name: "local".to_owned(), cores, participants };
+	let action = co_core_co::CoAction::Create { id: "local".to_owned(), name: "local".to_owned(), cores, participants };
 	reducer.push(runtime, Cores::to_core_name(CO_CORE_CO), &action).await?;
 
 	// done
