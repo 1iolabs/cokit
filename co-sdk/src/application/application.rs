@@ -22,7 +22,7 @@ pub struct Application {
 	/// This enables using some shared resources like the storage and the same local CO.
 	storage_path: PathBuf,
 
-	/// Application state path.
+	/// Application preferences path.
 	application_path: PathBuf,
 
 	/// Path for application logs. If None no logs will be produced.
@@ -58,7 +58,8 @@ impl Application {
 	pub async fn create_local_co(&self) -> Result<CoReducer, anyhow::Error> {
 		let local_co = LocalCo::new(self.identifier.clone(), self.application_path.clone());
 		let local_co_reducer = local_co.read(self.storage(), self.runtime()).await?;
-		Ok(CoReducer { reducer: Arc::new(RwLock::new(local_co_reducer)), runtime: self.runtime.clone() })
+		let auto_write = local_co.auto_write(local_co_reducer);
+		Ok(CoReducer { reducer: Arc::new(RwLock::new(auto_write)), runtime: self.runtime.clone() })
 	}
 
 	/// Initialize application.
@@ -74,7 +75,7 @@ impl Application {
 				// let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), std::io::stdout);
 				let formatting_layer = BunyanFormattingLayer::new(self.identifier.clone().into(), log_file);
 				let subscriber = Registry::default()
-					.with(LevelFilter::INFO)
+					.with(LevelFilter::TRACE)
 					.with(JsonStorageLayer)
 					.with(formatting_layer);
 				set_global_default(subscriber).unwrap();

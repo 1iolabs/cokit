@@ -9,7 +9,7 @@ pub use application::{
 	application::{Application, ApplicationBuilder},
 	core_resolver::{CoCoreResolver, CoreResolver, CoreResolverError, SingleCoreResolver},
 	local::LocalCo,
-	reducer::{Reducer, ReducerBuilder},
+	reducer::{Reducer, ReducerBuilder, ReducerChangedHandler},
 };
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 pub use co_primitives::{tags, BlockSerializer, Tag, Tags};

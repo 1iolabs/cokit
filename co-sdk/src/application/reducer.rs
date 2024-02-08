@@ -1,10 +1,11 @@
 use crate::CoreResolver;
 use anyhow::anyhow;
+use async_trait::async_trait;
 use co_log::{EntryBlock, Log, LogError};
 use co_primitives::{Linkable, ReducerAction};
 use co_runtime::RuntimePool;
 use co_storage::BlockStorage;
-use futures::{pin_mut, StreamExt};
+use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use libipld::Cid;
 use rxrust::{observer::Observer, subject::SubjectThreads};
 use serde::Serialize;
@@ -63,6 +64,7 @@ where
 			state: self.state,
 			log: self.log,
 			states: Default::default(),
+			change_handlers: Default::default(),
 		};
 		result.initialize(runtime).await?;
 		Ok(result)
@@ -83,6 +85,8 @@ pub struct Reducer<S, R> {
 	snapshots: HashMap<BTreeSet<Cid>, Cid>,
 	/// State observable.
 	states: SubjectThreads<(Cid, BTreeSet<Cid>), Infallible>,
+	// Change handlers.
+	change_handlers: Vec<Box<dyn ReducerChangedHandler<S, R> + Send + Sync>>,
 }
 impl<S, R> Reducer<S, R>
 where
@@ -116,6 +120,11 @@ where
 	/// Get state observable.
 	pub fn observable(&self) -> SubjectThreads<(Cid, BTreeSet<Cid>), Infallible> {
 		self.states.clone()
+	}
+
+	/// Get state observable.
+	pub fn add_change_handler(&mut self, handler: Box<dyn ReducerChangedHandler<S, R> + Send + Sync>) {
+		self.change_handlers.push(handler);
 	}
 
 	/// CoreResolver.
@@ -224,6 +233,13 @@ where
 
 	/// Notify subscribers about change.
 	async fn on_state_changed(&mut self) -> Result<(), LogError> {
+		// handlers
+		let reducer: &Self = &self;
+		stream::iter(self.change_handlers.iter())
+			.map(Ok)
+			.try_for_each_concurrent(5, |handler| async move { handler.on_state_changed(reducer).await })
+			.await?;
+
 		// states
 		if let Some(state) = self.state {
 			self.states.next((state, self.heads.clone()));
@@ -304,6 +320,11 @@ where
 		// result
 		Ok((state, stack))
 	}
+}
+
+#[async_trait]
+pub trait ReducerChangedHandler<S, R> {
+	async fn on_state_changed(&self, reducer: &Reducer<S, R>) -> Result<(), anyhow::Error>;
 }
 
 #[cfg(test)]

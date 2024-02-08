@@ -75,10 +75,11 @@ where
 	/// Returns the encrypted mapping CID.
 	/// The mapping tree will also only link to encrypted CIDs.
 	pub fn flush_mapping(&mut self) -> Result<Cid, StorageError> {
-		let encryption: &dyn Encryption = self;
-		let (root_cid, blocks) = self
-			.mapping
-			.to_blocks(EncryptedNodeSerializer::from(encryption), Default::default())?;
+		// serializer
+		let node_serializer = EncryptedNodeSerializer { algorithm: self.algorithm, key: self.key.clone() };
+
+		// blocks
+		let (root_cid, blocks) = self.mapping.to_blocks(node_serializer, Default::default())?;
 
 		// store
 		for block in blocks {
@@ -184,12 +185,11 @@ where
 	/// Returns the encrypted mapping CID.
 	/// The mapping tree will also only link to encrypted CIDs.
 	pub async fn flush_mapping(&mut self) -> Result<Cid, StorageError> {
-		let encryption: &dyn Encryption = self;
-		let (root_cid, blocks) = self
-			.mapping
-			.read()
-			.await
-			.to_blocks(EncryptedNodeSerializer::from(encryption), Default::default())?;
+		// serializer
+		let node_serializer = EncryptedNodeSerializer { algorithm: self.algorithm, key: self.key.clone() };
+
+		// blocks
+		let (root_cid, blocks) = self.mapping.read().await.to_blocks(node_serializer, Default::default())?;
 
 		// store
 		for block in blocks {
@@ -456,11 +456,6 @@ impl Default for BlockMapping {
 struct EncryptedNodeSerializer {
 	key: Secret,
 	algorithm: Algorithm,
-}
-impl From<&dyn Encryption> for EncryptedNodeSerializer {
-	fn from(value: &dyn Encryption) -> Self {
-		Self { key: value.key().clone(), algorithm: value.algorithm() }
-	}
 }
 impl<T, P> NodeSerializer<T, P> for EncryptedNodeSerializer
 where

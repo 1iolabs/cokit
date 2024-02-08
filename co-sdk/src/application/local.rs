@@ -1,5 +1,10 @@
-use crate::{CoCoreResolver, Cores, Reducer, ReducerBuilder, CO_CORE_CO, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP};
+use super::reducer::ReducerChangedHandler;
+use crate::{
+	library::{fs_read::fs_read_option, fs_write::fs_write},
+	CoCoreResolver, Cores, Reducer, ReducerBuilder, CO_CORE_CO, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP,
+};
 use anyhow::Context;
+use async_trait::async_trait;
 use co_log::{LocalIdentityResolver, Log};
 use co_primitives::{tags, Did};
 use co_runtime::RuntimePool;
@@ -15,10 +20,15 @@ use std::{
 type LocalReducerBuilder<S> = ReducerBuilder<EncryptedBlockStorage<S>, CoCoreResolver>;
 type LocalReducer<S> = Reducer<EncryptedBlockStorage<S>, CoCoreResolver>;
 
+#[derive(Debug, Clone)]
 pub struct LocalCo {
 	/// Our application identifier.
 	identifier: String,
+
 	/// The application base path.
+	/// Normally compused of `{base_path}/etc/{identifier}`.
+	/// The read method tries to read states of all applications by searching for `{application_path}/../*/local.cbor`
+	/// files.
 	application_path: PathBuf,
 }
 impl LocalCo {
@@ -36,7 +46,14 @@ impl LocalCo {
 	{
 		// read applications
 		let mut builder: Option<LocalReducerBuilder<S>> = None;
-		let mut dir = match tokio::fs::read_dir(&self.application_path).await {
+		let mut dir = match tokio::fs::read_dir(
+			&self
+				.application_path
+				.parent()
+				.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", self.application_path))?,
+		)
+		.await
+		{
 			Err(e) if e.kind() == ErrorKind::NotFound => {
 				// create
 				tokio::fs::create_dir_all(&self.application_path).await?;
@@ -47,12 +64,20 @@ impl LocalCo {
 			i => i,
 		}?;
 		while let Some(child) = dir.next_entry().await? {
-			let local = ApplicationLocal::read(&child.path().join("local.cbor")).await?;
+			let local_path = child.path().join("local.cbor");
+			let local = ApplicationLocal::read(&local_path).await?;
 			if let Some(local) = local {
-				builder = Some(match builder {
-					Some(builder) => builder.with_snapshot(local.state, local.heads),
-					None => local.reducer_builder(storage.clone()).await?,
-				});
+				// trace
+				tracing::trace!(app = ?self.identifier, path = ?local_path, state = ?local.state, heads = ?local.heads, "local-co-read");
+
+				// apply to builder as snapshot
+				builder = Some(
+					match builder {
+						Some(builder) => builder,
+						None => local.reducer_builder(storage.clone()).await?,
+					}
+					.with_snapshot(local.state, local.heads),
+				);
 			}
 		}
 
@@ -86,18 +111,45 @@ impl LocalCo {
 		S: BlockStorage + Sync + Send + Clone + 'static,
 	{
 		if let Some(state) = reducer.state() {
+			let path = self.application_path.join("local.cbor");
+
+			// trace
+			tracing::trace!(app = ?self.identifier, ?path, ?state, "local-co-write");
+
+			// create format
 			let local = ApplicationLocal::new(
 				reducer.heads().clone(),
 				state.clone(),
 				reducer.log().storage().clone().flush_mapping().await?,
 			);
-			local
-				.write(&self.application_path.join(&self.identifier).join("local.cbor"))
-				.await
-				.map(|_| true)
+
+			// write
+			local.write(&path).await.map(|_| true)
 		} else {
 			Ok(false)
 		}
+	}
+
+	/// Setup auto-write on change for an reducer.
+	pub fn auto_write<S>(self, mut reducer: LocalReducer<S>) -> LocalReducer<S>
+	where
+		S: BlockStorage + Sync + Send + Clone + 'static,
+	{
+		reducer.add_change_handler(Box::new(self));
+		reducer
+	}
+}
+#[async_trait]
+impl<S> ReducerChangedHandler<EncryptedBlockStorage<S>, CoCoreResolver> for LocalCo
+where
+	S: BlockStorage + Sync + Send + Clone + 'static,
+{
+	async fn on_state_changed(
+		&self,
+		reducer: &Reducer<EncryptedBlockStorage<S>, CoCoreResolver>,
+	) -> Result<(), anyhow::Error> {
+		self.write(reducer).await?;
+		Ok(())
 	}
 }
 
@@ -130,23 +182,33 @@ impl ApplicationLocal {
 	}
 
 	async fn read(path: &PathBuf) -> anyhow::Result<Option<ApplicationLocal>> {
-		match tokio::fs::read(path).await {
-			Ok(data) => {
-				let result: ApplicationLocal = serde_ipld_dagcbor::from_slice(&data)?;
-				if result.version != Self::version() {
-					return Err(anyhow::anyhow!("Invalid file version"));
-				}
-				Ok(Some(result))
+		Ok(
+			match fs_read_option(path)
+				.await
+				.with_context(|| format!("Reading file: {:?}", path))?
+			{
+				Some(data) => {
+					let result: ApplicationLocal = serde_ipld_dagcbor::from_slice(&data)?;
+					if result.version != Self::version() {
+						return Err(anyhow::anyhow!("Invalid file version"));
+					}
+					Some(result)
+				},
+				None => None,
 			},
-			Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
-			Err(e) => Err(e),
-		}
-		.context(format!("while reading file {:?}", path))
+		)
 	}
 
 	async fn write(&self, path: &PathBuf) -> anyhow::Result<()> {
+		// serialize
 		let data = serde_ipld_dagcbor::to_vec(self)?;
-		tokio::fs::write(path, data).await?;
+
+		// write
+		fs_write(path, data, true)
+			.await
+			.with_context(|| format!("Writing file: {:?}", path))?;
+
+		// result
 		Ok(())
 	}
 
