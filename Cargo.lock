@@ -1140,6 +1140,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-core-pin"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "co-api",
+ "co-runtime",
+ "co-storage",
+ "libipld",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "serde_repr",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "co-core-room"
 version = "0.1.0"
 dependencies = [

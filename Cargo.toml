@@ -13,6 +13,7 @@ members = [
     "cores/co",
     "cores/keystore",
     "cores/membership",
+    "cores/pin",
     "cores/room",
     "daemon",
     "did-co",
