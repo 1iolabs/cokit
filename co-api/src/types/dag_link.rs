@@ -1,7 +1,7 @@
 use crate::{library::node_reader::node_reader, Block, Storage};
 use co_primitives::{DefaultNodeSerializer, NodeBuilder};
 use libipld::Cid;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	marker::PhantomData,
@@ -22,9 +22,17 @@ pub trait FromBlocks {
 }
 
 /**
+ * Simple trait for getting the content inside a Dag type
+ */
+pub trait Content {
+	type Item;
+	fn content(&self) -> Self::Item;
+}
+
+/**
  * A wrapper type for DagLink types that use vectors
  */
-#[derive(PartialEq, Debug)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DagVec<V: Clone + Serialize> {
 	pub content: DagLink<V, Vec<V>>,
 }
@@ -32,6 +40,16 @@ pub struct DagVec<V: Clone + Serialize> {
 impl<V: Clone + Serialize> DagVec<V> {
 	pub fn new(content: Vec<V>) -> Self {
 		Self { content: DagLink::new(content) }
+	}
+}
+
+impl<V> Content for DagVec<V>
+where
+	V: Clone + Serialize,
+{
+	type Item = Vec<V>;
+	fn content(&self) -> Self::Item {
+		self.content.content()
 	}
 }
 
@@ -56,7 +74,7 @@ where
 /**
  * A wrapper for DagLink types that use the BTreeSet type
  */
-#[derive(PartialEq, Debug)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DagSet<V>
 where
 	V: Ord + Clone + Serialize,
@@ -70,6 +88,16 @@ where
 {
 	pub fn new(content: BTreeSet<V>) -> Self {
 		Self { content: DagLink::<V, BTreeSet<V>>::new(content) }
+	}
+}
+
+impl<V> Content for DagSet<V>
+where
+	V: Clone + Serialize + Ord,
+{
+	type Item = BTreeSet<V>;
+	fn content(&self) -> Self::Item {
+		self.content.content()
 	}
 }
 
@@ -94,7 +122,7 @@ where
 /**
  * A wrapper for DagLink types that use the BTreeMap type
  */
-#[derive(PartialEq, Debug)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DagMap<K, V>
 where
 	K: std::cmp::Ord + Clone + Serialize,
@@ -110,6 +138,17 @@ where
 {
 	pub fn new(content: BTreeMap<K, V>) -> Self {
 		Self { content: DagLink::<(K, V), BTreeMap<K, V>>::new(content) }
+	}
+}
+
+impl<K, V> Content for DagMap<K, V>
+where
+	K: std::cmp::Ord + Clone + Serialize,
+	V: Clone + Serialize,
+{
+	type Item = BTreeMap<K, V>;
+	fn content(&self) -> Self::Item {
+		self.content.content()
 	}
 }
 
@@ -139,7 +178,7 @@ where
  * data and CIDs
  * Types this is mainly used for: Vec, BTreeSet, BTreeMap
  */
-#[derive(PartialEq, Debug)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DagLink<F, C>
 where
 	F: Clone + Serialize,
@@ -156,6 +195,17 @@ where
 {
 	pub fn new(content: C) -> Self {
 		Self { _p_data: PhantomData::default(), content }
+	}
+}
+
+impl<F, C> Content for DagLink<F, C>
+where
+	F: Clone + Serialize,
+	C: IntoIterator + FromIterator<F> + Clone + Serialize,
+{
+	type Item = C;
+	fn content(&self) -> Self::Item {
+		self.content.clone()
 	}
 }
 
@@ -267,6 +317,7 @@ mod test {
 			}
 			let ts = TestStorage { mem_storage: s };
 			let restored_map = DagMap::<String, String>::from_blocks(&first_block.cid(), &ts);
+			println!("{:?}", restored_map);
 			assert_eq!(dag_map, restored_map)
 		}
 	}
