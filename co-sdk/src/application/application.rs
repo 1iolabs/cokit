@@ -1,11 +1,15 @@
 use crate::{
 	library::find_membership::find_membership, CoCoreResolver, CoReducer, CoStorage, LocalCo, ReducerBuilder, Runtime,
-	Storage, CO_CORE_KEYSTORE,
+	Storage, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
+use co_core_co::CoAction;
+use co_core_keystore::{Key, KeyStoreAction};
+use co_core_membership::{Membership, MembershipsAction};
 use co_log::{LocalIdentityResolver, Log};
+use co_primitives::tags;
 use co_runtime::RuntimePool;
-use co_storage::{EncryptedBlockStorage, Secret};
+use co_storage::{Algorithm, EncryptedBlockStorage, Secret};
 use directories::ProjectDirs;
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
@@ -75,6 +79,8 @@ impl Application {
 	}
 
 	/// Creates a CoReducer instance a CO which we have a membership for.
+	///
+	/// Todo: Identity
 	async fn create_co_instance(&self, local: CoReducer, co: &str) -> Result<Option<CoReducer>, anyhow::Error> {
 		let membership = match find_membership(local.clone(), co).await? {
 			Some(m) => m,
@@ -84,7 +90,7 @@ impl Application {
 		// storage
 		let storage: CoStorage = match &membership.key {
 			Some(key_reference) => {
-				let key_store: co_core_keystore::KeyStore = local.state(CO_CORE_KEYSTORE).await?;
+				let key_store: co_core_keystore::KeyStore = local.state(CO_CORE_NAME_KEYSTORE).await?;
 				let key = key_store
 					.shared_key(key_reference)
 					.ok_or(anyhow!("Shared key not found: {}", key_reference))?;
@@ -107,6 +113,8 @@ impl Application {
 			.with_latest_state(membership.state, membership.heads.clone())
 			.build(self.runtime())
 			.await?;
+
+		// todo: setup auto write to local co
 
 		// result
 		Ok(Some(CoReducer::new(self.runtime.clone(), reducer)))
@@ -164,24 +172,102 @@ impl Application {
 		Ok(reducer)
 	}
 
-	/// Initialize application.
+	/// Create a new CO.
 	///
-	/// Panics:
-	/// - Can not create/open log file.
+	/// Todo:
+	/// - Identity
+	/// - Public
+	/// - Cleanup when something fails?
+	pub async fn create_co(&self, co: &str, name: &str) -> Result<CoReducer, anyhow::Error> {
+		// local
+		let local = self.local_co_reducer().await?;
+
+		// storage
+		let secret = Algorithm::default().generate_serect();
+		let storage: CoStorage =
+			CoStorage::new(EncryptedBlockStorage::new(self.storage(), secret.clone(), Default::default()));
+
+		// log
+		let log = Log::new(
+			co.as_bytes().to_vec(),
+			LocalIdentityResolver::default().private_identity("did:local:device")?,
+			Box::new(LocalIdentityResolver::default()),
+			storage,
+			Default::default(),
+		);
+
+		// reducer
+		let mut reducer = ReducerBuilder::new(CoCoreResolver::default(), log)
+			.build(self.runtime())
+			.await?;
+
+		// initialize
+		reducer
+			.push(
+				self.runtime(),
+				CO_CORE_NAME_CO,
+				&CoAction::Create {
+					id: co.to_owned(),
+					name: name.to_owned(),
+					cores: Default::default(),
+					participants: Default::default(),
+				},
+			)
+			.await?;
+		let state = reducer.state().ok_or(anyhow!("Excpected state after create"))?;
+
+		// store key
+		let key_uri = format!("urn:{}:{}", co, uuid::Uuid::new_v4());
+		let key = Key {
+			uri: key_uri.clone(),
+			name: format!("co ({})", co),
+			description: "".to_owned(),
+			secret: co_core_keystore::Secret::SharedKey(secret.divulge().clone()),
+			tags: tags!(),
+		};
+		local.push(CO_CORE_NAME_KEYSTORE, &KeyStoreAction::Set(key)).await?;
+
+		// add membership to local co
+		let membership: Membership = Membership {
+			did: reducer.log().identity().identity().to_owned(),
+			heads: reducer.heads().clone(),
+			id: co.to_owned(),
+			key: Some(key_uri),
+			membership_state: co_core_membership::MembershipState::Active,
+			state,
+			tags: tags!(),
+		};
+		local
+			.push(CO_CORE_NAME_MEMBERSHIP, &MembershipsAction::Join(membership))
+			.await?;
+
+		// todo: setup auto write to local co
+
+		// co reducer
+		let co_reducer = CoReducer::new(self.runtime.clone(), reducer);
+
+		// store
+		self.reducers.write().await.insert(co.to_owned(), co_reducer.clone());
+
+		// result
+		Ok(co_reducer)
+	}
+
+	/// Initialize application.
 	async fn init(&self) -> Result<(), anyhow::Error> {
 		// log
 		match &self.log {
 			Logging::Bunyan(log_path) => {
-				std::fs::create_dir_all(log_path.parent().expect("not root")).expect("create folders");
-				let log_file = std::fs::File::create(log_path).unwrap();
+				std::fs::create_dir_all(log_path.parent().ok_or(anyhow!("no parent"))?)?;
+				let log_file = std::fs::File::create(log_path)?;
 				// let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), std::io::stdout);
 				let formatting_layer = BunyanFormattingLayer::new(self.identifier.clone().into(), log_file);
 				let subscriber = Registry::default()
 					.with(LevelFilter::TRACE)
 					.with(JsonStorageLayer)
 					.with(formatting_layer);
-				set_global_default(subscriber).unwrap();
-				LogTracer::init().unwrap();
+				set_global_default(subscriber)?;
+				LogTracer::init()?;
 			},
 			_ => {},
 		}

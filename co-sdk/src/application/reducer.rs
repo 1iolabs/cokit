@@ -79,7 +79,7 @@ pub struct Reducer<S, R> {
 	core_resolver: R,
 	/// Latest state.
 	state: Option<Cid>,
-	/// Latests heads.
+	/// Latest heads.
 	heads: BTreeSet<Cid>,
 	/// Avilable historic snapshots in chronologic order.
 	snapshots: HashMap<BTreeSet<Cid>, Cid>,
@@ -103,8 +103,8 @@ where
 			}
 		}
 
-		// if we have heads but no state compute latest state
-		if self.state.is_none() && !self.heads.is_empty() {
+		// if log heads are different from reducer heads compute the state
+		if &self.heads != self.log.heads() {
 			let (state, heads) = self.compute_state(runtime).await?;
 			self.state = state;
 			self.heads = heads;
@@ -113,6 +113,11 @@ where
 		// fail if we have state but no heads
 		if self.state.is_some() && self.heads.is_empty() {
 			return Err(anyhow!("State but no heads"));
+		}
+
+		// fail if we have heads but no state
+		if self.state.is_none() && !self.heads.is_empty() {
+			return Err(anyhow!("Heads but no state"));
 		}
 
 		// notify
