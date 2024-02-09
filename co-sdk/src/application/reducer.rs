@@ -110,11 +110,20 @@ where
 			self.heads = heads;
 		}
 
+		// fail if we have state but no heads
+		if self.state.is_some() && self.heads.is_empty() {
+			return Err(anyhow!("State but no heads"));
+		}
+
 		// notify
 		self.on_state_changed().await?;
 
 		// if we have state and heads we are fine
 		Ok(())
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.heads.is_empty() && self.state.is_none()
 	}
 
 	/// Get state observable.

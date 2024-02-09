@@ -8,6 +8,13 @@ pub const CO_CORE_KEYSTORE: &str = "co-core-keystore";
 pub const CO_CORE_MEMBERSHIP: &str = "co-core-membership";
 pub const CO_CORE_ROOM: &str = "co-core-room";
 
+/// CO Core name expected by the SDK implementation (key to `co.cores`).
+pub const CO_CORE_NAME_CO: &str = "co";
+/// keystore core name expected by the SDK implementation (key to `co.cores`).
+pub const CO_CORE_NAME_KEYSTORE: &str = "keystore";
+/// Membership core names expected by the SDK implementation (key to `co.cores`).
+pub const CO_CORE_NAME_MEMBERSHIP: &str = "membership";
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Cores {
 	cores: HashMap<String, String>,
@@ -20,6 +27,10 @@ impl Default for Cores {
 impl Cores {
 	/// Returns the core name used across the co-sdk fot an core create name.
 	/// Example: `co-core-co` reutrns `co`
+	/// See:
+	/// - [`CO_CORE_NAME_CO`]
+	/// - [`CO_CORE_NAME_KEYSTORE`]
+	/// - [`CO_CORE_NAME_MEMBERSHIP`]
 	pub fn to_core_name<'a>(crate_name: &'a str) -> &'a str {
 		if crate_name.starts_with("co-core-") {
 			return &crate_name["co-core-".len()..];

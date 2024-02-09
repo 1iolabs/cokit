@@ -9,8 +9,11 @@ pub struct CoStorage {
 	inner: Arc<dyn BlockStorage<StoreParams = DefaultParams> + Send + Sync>,
 }
 impl CoStorage {
-	pub fn new(storage: Arc<dyn BlockStorage<StoreParams = DefaultParams> + Send + Sync>) -> Self {
-		Self { inner: storage }
+	pub fn new<S>(storage: S) -> Self
+	where
+		S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + 'static,
+	{
+		Self { inner: Arc::new(storage) }
 	}
 }
 #[async_trait]

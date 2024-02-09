@@ -1,0 +1,17 @@
+use crate::{CoReducer, CoReducerError, Cores, CO_CORE_MEMBERSHIP};
+use co_core_membership::{Membership, Memberships};
+
+/// Find the Membership entry in `reducer` for `co`.
+pub async fn find_membership(reducer: CoReducer, co: &str) -> Result<Option<Membership>, CoReducerError> {
+	let memberships: Memberships = match reducer.state(Cores::to_core_name(CO_CORE_MEMBERSHIP)).await {
+		Ok(memberships) => memberships,
+		Err(CoReducerError::CoreNotFound(_)) => Memberships::default(),
+		Err(e) => Err(e)?,
+	};
+	for membership in memberships.memberships {
+		if membership.id == co {
+			return Ok(Some(membership))
+		}
+	}
+	Ok(None)
+}

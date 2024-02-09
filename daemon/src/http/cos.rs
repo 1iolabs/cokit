@@ -1,9 +1,7 @@
 use crate::types::http_error::HttpResult;
 use axum::{Extension, Json};
-use co_core_co::Co;
-use co_core_membership::Memberships;
-use co_sdk::{memberships, CoReducer, Cores, Tags, CO_CORE_CO, CO_CORE_MEMBERSHIP};
-use futures::{StreamExt, TryStreamExt};
+use co_sdk::{memberships, CoReducer, Tags};
+use futures::StreamExt;
 use hyper::StatusCode;
 use libipld::Cid;
 use serde::Serialize;
@@ -12,7 +10,7 @@ use serde_json::Value;
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum GetItem {
-	Ok { id: String, state: Option<Cid>, tags: Tags },
+	Ok { id: String, state: Cid, tags: Tags },
 	Err { err: String },
 }
 

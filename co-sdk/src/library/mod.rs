@@ -1,3 +1,4 @@
+pub mod find_membership;
 pub mod fs_read;
 pub mod fs_write;
 pub mod generate_random_name;

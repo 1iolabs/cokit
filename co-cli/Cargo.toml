@@ -12,6 +12,7 @@ co-core-membership = { path = "../cores/membership" }
 co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
 exitcode = "1.1.2"
 futures = { workspace = true }
+hexdump = "0.1.1"
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }

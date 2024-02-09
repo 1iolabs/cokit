@@ -59,6 +59,18 @@ impl Reducer for KeyStore {
 	}
 }
 
+impl KeyStore {
+	pub fn shared_key<'a>(&'a self, uri: &str) -> Option<&'a Vec<u8>> {
+		match self.keys.get(uri) {
+			Some(key) => match &key.secret {
+				Secret::SharedKey(l) => Some(l),
+				_ => None,
+			},
+			None => None,
+		}
+	}
+}
+
 #[no_mangle]
 pub extern "C" fn state() {
 	reduce::<KeyStore>()

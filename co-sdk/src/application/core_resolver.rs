@@ -1,4 +1,4 @@
-use crate::{Cores, CO_CORE_CO};
+use crate::{types::cores::CO_CORE_NAME_CO, Cores, CO_CORE_CO};
 use async_trait::async_trait;
 use co_primitives::ReducerAction;
 use co_runtime::{Core, ExecuteError, RuntimeContext, RuntimePool};
@@ -67,7 +67,7 @@ where
 }
 
 /// Resolve to core to use from
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CoCoreResolver {
 	mapping: HashMap<Cid, Core>,
 }
@@ -82,6 +82,11 @@ impl CoCoreResolver {
 
 	fn root_core(&self) -> Core {
 		self.core(Cores::default().binary(CO_CORE_CO).expect("co core binary"))
+	}
+}
+impl Default for CoCoreResolver {
+	fn default() -> Self {
+		Self::with_mapping(Cores::default().built_in_native_mapping())
 	}
 }
 #[async_trait]
@@ -103,7 +108,7 @@ where
 			.map_err(|e| CoreResolverError::InvalidArgument(e.into()))?;
 
 		// find core
-		let root = reducer_action.core == Cores::to_core_name(CO_CORE_CO);
+		let root = reducer_action.core == CO_CORE_NAME_CO;
 		let (core_state, core) = if root {
 			(state.clone(), self.root_core())
 		} else {
@@ -131,7 +136,7 @@ where
 			// Note: this action must be deterministic so we pass no time otherwise when we retry this could introduce
 			// random values.
 			let action: ReducerAction<co_core_co::CoAction> = ReducerAction {
-				core: Cores::to_core_name(CO_CORE_CO).to_owned(),
+				core: CO_CORE_NAME_CO.to_owned(),
 				from: "did:local:device".to_owned(),
 				payload: co_core_co::CoAction::CoreChange { core: reducer_action.core.clone(), state: result },
 				time: 0,

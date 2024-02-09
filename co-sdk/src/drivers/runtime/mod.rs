@@ -1,5 +1,6 @@
 use co_runtime::RuntimePool;
 
+#[derive(Clone)]
 pub struct Runtime {
 	pool: RuntimePool,
 }

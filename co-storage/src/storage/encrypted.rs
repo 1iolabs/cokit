@@ -174,17 +174,16 @@ where
 	}
 
 	/// Load mapping from CID.
+	/// This will add the mappings to the existing.
 	pub async fn load_mapping(&mut self, map: &Cid) -> Result<(), StorageError> {
-		let mut mapping = BlockMapping::new();
-		mapping.read_mappings(self, &map).await?;
-		self.mapping = Arc::new(RwLock::new(mapping));
+		self.mapping.write().await.read_mappings(self, &map).await?;
 		Ok(())
 	}
 
 	/// Flush mapping to (parent) storage.
 	/// Returns the encrypted mapping CID.
 	/// The mapping tree will also only link to encrypted CIDs.
-	pub async fn flush_mapping(&mut self) -> Result<Cid, StorageError> {
+	pub async fn flush_mapping(&self) -> Result<Cid, StorageError> {
 		// serializer
 		let node_serializer = EncryptedNodeSerializer { algorithm: self.algorithm, key: self.key.clone() };
 
@@ -379,6 +378,7 @@ impl BlockMapping {
 	}
 
 	/// Read block mappings from `cid` via an block storage.
+	/// Idempotency: Yes
 	pub async fn read_mappings<S: BlockStorage>(&mut self, storage: &S, cid: &Cid) -> Result<usize, StorageError> {
 		let mut count = 0;
 		let mut tasks = FuturesOrdered::new();

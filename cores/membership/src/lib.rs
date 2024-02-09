@@ -15,8 +15,9 @@ pub struct Membership {
 	/// The CO Unique Identifier.
 	pub id: String,
 
-	/// The CO state (usually co-core-co).
-	pub co: Cid,
+	/// The CO root state (usually co-core-co).
+	/// Note: This is not an Option so we can not be member of an emtpy CO (which has no id anyway).
+	pub state: Cid,
 
 	/// The CO heads.
 	pub heads: BTreeSet<Cid>,
@@ -24,11 +25,11 @@ pub struct Membership {
 	/// The did used for the membership.
 	pub did: Did,
 
-	/// The encryption key URI.
-	pub key: String,
+	/// Some encryption key URI if the CO is encrypted.
+	pub key: Option<String>,
 
 	/// Membership state.
-	pub state: MembershipState,
+	pub membership_state: MembershipState,
 
 	/// Membership tags.
 	pub tags: Tags,
@@ -45,11 +46,12 @@ pub enum MembershipState {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MembershipsAction {
 	Join(Membership),
-	ChangeState { co: Cid, did: Did, state: MembershipState },
-	ChangeKey { co: Cid, did: Did, key: String },
-	TagsInsert { co: Cid, did: Did, tags: Tags },
-	TagsRemove { co: Cid, did: Did, tags: Tags },
-	Remove { co: Cid, did: Did },
+	Update { id: String, state: Cid, heads: BTreeSet<Cid> },
+	ChangeMembershipState { id: String, did: Did, membership_state: MembershipState },
+	ChangeKey { id: String, did: Did, key: String },
+	TagsInsert { id: String, did: Did, tags: Tags },
+	TagsRemove { id: String, did: Did, tags: Tags },
+	Remove { id: String, did: Did },
 }
 
 impl Reducer for Memberships {
@@ -58,32 +60,39 @@ impl Reducer for Memberships {
 	fn reduce(self, event: &ReducerAction<Self::Action>, _: &mut dyn Context) -> Self {
 		let mut result = self;
 		match &event.payload {
+			MembershipsAction::Update { id, state, heads } =>
+				for membership in result.memberships.iter_mut() {
+					if &membership.id == id {
+						membership.state = state.clone();
+						membership.heads = heads.clone();
+					}
+				},
 			MembershipsAction::Join(membership) =>
-				if find(&mut result, &membership.co, &membership.did).is_none() {
+				if find(&mut result, &membership.id, &membership.did).is_none() {
 					result.memberships.push(membership.clone());
 				},
-			MembershipsAction::ChangeState { co, did, state } =>
-				if let Some(membership) = find(&mut result, co, did) {
-					membership.state = *state;
+			MembershipsAction::ChangeMembershipState { id, did, membership_state } =>
+				if let Some(membership) = find(&mut result, id, did) {
+					membership.membership_state = *membership_state;
 				},
-			MembershipsAction::ChangeKey { co, did, key } =>
-				if let Some(membership) = find(&mut result, co, did) {
-					membership.key = key.to_owned();
+			MembershipsAction::ChangeKey { id, did, key } =>
+				if let Some(membership) = find(&mut result, id, did) {
+					membership.key = Some(key.to_owned());
 				},
-			MembershipsAction::TagsInsert { co, did, tags } =>
-				if let Some(membership) = find(&mut result, co, did) {
+			MembershipsAction::TagsInsert { id, did, tags } =>
+				if let Some(membership) = find(&mut result, id, did) {
 					membership.tags.append(&mut tags.clone());
 				},
-			MembershipsAction::TagsRemove { co, did, tags } =>
-				if let Some(membership) = find(&mut result, co, did) {
+			MembershipsAction::TagsRemove { id, did, tags } =>
+				if let Some(membership) = find(&mut result, id, did) {
 					membership.tags.clear(Some(tags));
 				},
-			MembershipsAction::Remove { co, did } => {
+			MembershipsAction::Remove { id, did } => {
 				if let Some((index, _)) = result
 					.memberships
 					.iter()
 					.enumerate()
-					.find(|(_, item)| &item.co == co && &item.did == did)
+					.find(|(_, item)| &item.id == id && &item.did == did)
 				{
 					result.memberships.remove(index);
 				}
@@ -93,11 +102,11 @@ impl Reducer for Memberships {
 	}
 }
 
-fn find<'a>(memberships: &'a mut Memberships, co: &Cid, did: &str) -> Option<&'a mut Membership> {
+fn find<'a>(memberships: &'a mut Memberships, co: &str, did: &str) -> Option<&'a mut Membership> {
 	memberships
 		.memberships
 		.iter_mut()
-		.find(|item| &item.co == co && &item.did == did)
+		.find(|item| &item.id == co && &item.did == did)
 }
 
 #[no_mangle]

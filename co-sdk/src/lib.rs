@@ -12,7 +12,7 @@ pub use application::{
 	reducer::{Reducer, ReducerBuilder, ReducerChangedHandler},
 };
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
-pub use co_primitives::{tags, BlockSerializer, Tag, Tags};
+pub use co_primitives::{tags, BlockSerializer, MultiCodec, MultiCodecError, Tag, Tags};
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{
 	store_file, unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer, BlockStorage, BlockStorageExt, StorageError,
@@ -25,7 +25,10 @@ pub use library::{
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},
 	co_storage::CoStorage,
-	cores::{Cores, CO_CORE_CO, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_ROOM},
+	cores::{
+		Cores, CO_CORE_CO, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+		CO_CORE_NAME_MEMBERSHIP, CO_CORE_ROOM,
+	},
 	error::{ErrorContext, ErrorKind, IntoAction},
 	reference::{Reference, Request, Response, ResponseError},
 };

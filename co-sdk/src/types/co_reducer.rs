@@ -1,5 +1,5 @@
-use crate::{CoCoreResolver, CoStorage, Cores, Reducer, Runtime, CO_CORE_CO};
-use co_storage::{BlockStorageExt, EncryptedBlockStorage, StorageError};
+use crate::{CoCoreResolver, CoStorage, Reducer, Runtime, CO_CORE_NAME_CO};
+use co_storage::{BlockStorageExt, StorageError};
 use libipld::Cid;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::BTreeSet, sync::Arc};
@@ -7,15 +7,24 @@ use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct CoReducer {
-	pub(crate) reducer: Arc<RwLock<Reducer<EncryptedBlockStorage<CoStorage>, CoCoreResolver>>>,
-	pub(crate) runtime: Arc<Runtime>,
+	pub(crate) reducer: Arc<RwLock<Reducer<CoStorage, CoCoreResolver>>>,
+	pub(crate) storage: CoStorage,
+	pub(crate) runtime: Runtime,
 }
-
 impl CoReducer {
+	pub(crate) fn new(runtime: Runtime, reducer: Reducer<CoStorage, CoCoreResolver>) -> Self {
+		Self { runtime, storage: reducer.log().storage().clone(), reducer: Arc::new(RwLock::new(reducer)) }
+	}
+
 	/// Get current reducer state and heads.
 	pub async fn reducer_state(&self) -> (Option<Cid>, BTreeSet<Cid>) {
 		let reducer = self.reducer.read().await;
 		(reducer.state().clone(), reducer.heads().clone())
+	}
+
+	/// Get storage instance for this CO.
+	pub fn storage(&self) -> CoStorage {
+		self.storage.clone()
 	}
 
 	/// Push event into reducer.
@@ -50,7 +59,7 @@ impl CoReducer {
 		};
 
 		// co?
-		if co == Cores::to_core_name(CO_CORE_CO) {
+		if co == CO_CORE_NAME_CO {
 			if let Some(state_cid) = state {
 				return Ok(storage.get_deserialized(&state_cid).await?)
 			}

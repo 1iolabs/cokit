@@ -27,10 +27,13 @@ async fn main() {
 	if cli.no_log == false {
 		application_builder = application_builder.with_bunyan_logging(cli.log_path);
 	}
+	if cli.no_keychain {
+		application_builder = application_builder.without_keychain();
+	}
 	let application = application_builder.build().await.expect("application");
 
 	// local
-	let local_co = application.create_local_co(!cli.no_keychain).await.expect("local-co");
+	let local_co = application.local_co_reducer().await.expect("local-co");
 
 	// peer-id
 	let network_key = local_keypair_fetch(&local_co, cli.force_new_peer_id).await.expect("peer-id");

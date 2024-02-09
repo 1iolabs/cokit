@@ -1,4 +1,4 @@
-use crate::{CoReducer, Cores, CO_CORE_KEYSTORE};
+use crate::{CoReducer, CO_CORE_NAME_KEYSTORE};
 use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 
 /// Get or create an key.
@@ -10,7 +10,7 @@ pub async fn keystore_fetch<F: FnOnce() -> Key>(
 ) -> Result<Key, anyhow::Error> {
 	// get
 	if !force_create {
-		let keystore: KeyStore = reducer.state(Cores::to_core_name(CO_CORE_KEYSTORE)).await?;
+		let keystore: KeyStore = reducer.state(CO_CORE_NAME_KEYSTORE).await?;
 		if let Some(result) = keystore.keys.get(key) {
 			return Ok(result.to_owned())
 		}
@@ -21,7 +21,7 @@ pub async fn keystore_fetch<F: FnOnce() -> Key>(
 
 	// store
 	reducer
-		.push(Cores::to_core_name(CO_CORE_KEYSTORE), &KeyStoreAction::Set(result.clone()))
+		.push(CO_CORE_NAME_KEYSTORE, &KeyStoreAction::Set(result.clone()))
 		.await?;
 
 	// result

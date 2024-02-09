@@ -1,13 +1,14 @@
 use crate::CoStorage;
 use co_storage::FsStorage;
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
+#[derive(Clone)]
 pub struct Storage {
 	storage: CoStorage,
 }
 impl Storage {
 	pub fn new(storage_path: PathBuf) -> Self {
-		Self { storage: CoStorage::new(Arc::new(FsStorage::new(storage_path))) }
+		Self { storage: CoStorage::new(FsStorage::new(storage_path)) }
 	}
 
 	pub fn storage(&self) -> CoStorage {

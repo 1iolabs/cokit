@@ -1,7 +1,9 @@
 use super::reducer::ReducerChangedHandler;
 use crate::{
 	library::{fs_read::fs_read_option, fs_write::fs_write},
-	CoCoreResolver, Cores, Reducer, ReducerBuilder, CO_CORE_CO, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP,
+	types::cores::CO_CORE_NAME_CO,
+	CoCoreResolver, CoReducer, CoStorage, Cores, Reducer, ReducerBuilder, Runtime, CO_CORE_KEYSTORE,
+	CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE,
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -9,7 +11,8 @@ use co_log::{LocalIdentityResolver, Log};
 use co_primitives::{tags, Did};
 use co_runtime::RuntimePool;
 use co_storage::{Algorithm, BlockStorage, EncryptedBlockStorage, Secret};
-use libipld::Cid;
+use futures::{pin_mut, Stream, StreamExt};
+use libipld::{Cid, DefaultParams};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -17,8 +20,8 @@ use std::{
 	path::PathBuf,
 };
 
-type LocalReducerBuilder<S> = ReducerBuilder<EncryptedBlockStorage<S>, CoCoreResolver>;
-type LocalReducer<S> = Reducer<EncryptedBlockStorage<S>, CoCoreResolver>;
+type LocalReducerBuilder = ReducerBuilder<CoStorage, CoCoreResolver>;
+type LocalReducer = Reducer<CoStorage, CoCoreResolver>;
 
 #[derive(Debug, Clone)]
 pub struct LocalCo {
@@ -39,114 +42,47 @@ impl LocalCo {
 		Self { identifier, application_path, keychain }
 	}
 
+	/// Create LocalCO instance.
+	pub async fn into_reducer<S>(self, storage: S, runtime: Runtime) -> Result<CoReducer, anyhow::Error>
+	where
+		S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
+	{
+		Ok(LocalCoInstance::create(runtime, self, storage).await?.1)
+	}
+
 	/// Read the local co state from disk.
-	/// As we trust all of the local states we use all the states without fuhter checks to continue.
-	///
-	/// Note: This assumes the same encryption key is used by all local applications.
-	pub async fn read<S>(&self, storage: S, runtime: &RuntimePool) -> Result<LocalReducer<S>, anyhow::Error>
-	where
-		S: BlockStorage + Sync + Send + Clone + 'static,
-	{
-		// read applications
-		let mut builder: Option<LocalReducerBuilder<S>> = None;
-		let mut dir = match tokio::fs::read_dir(
-			&self
-				.application_path
+	fn read(&self) -> impl Stream<Item = Result<(PathBuf, ApplicationLocal), anyhow::Error>> {
+		let application_path = self.application_path.clone();
+		async_stream::try_stream! {
+			let config_path = application_path
 				.parent()
-				.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", self.application_path))?,
-		)
-		.await
-		{
-			Err(e) if e.kind() == ErrorKind::NotFound => {
-				// create
-				tokio::fs::create_dir_all(&self.application_path).await?;
+				.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", application_path))?;
 
-				// retry
-				tokio::fs::read_dir(&self.application_path).await
-			},
-			i => i,
-		}?;
-		while let Some(child) = dir.next_entry().await? {
-			// skip non directories
-			if !child.file_type().await?.is_dir() {
-				continue;
-			}
+			// read applications
+			let mut dir = match tokio::fs::read_dir(config_path).await {
+				Err(e) if e.kind() == ErrorKind::NotFound => {
+					// create
+					tokio::fs::create_dir_all(config_path).await?;
 
-			// try to read local.cbor
-			let local_path = child.path().join("local.cbor");
-			let local = ApplicationLocal::read(&local_path).await?;
-			if let Some(local) = local {
-				// trace
-				tracing::trace!(app = ?self.identifier, path = ?local_path, state = ?local.state, heads = ?local.heads, "local-co-read");
+					// retry
+					tokio::fs::read_dir(config_path).await
+				},
+				i => i,
+			}?;
+			while let Some(child) = dir.next_entry().await? {
+				// skip non directories
+				if !child.file_type().await?.is_dir() {
+					continue;
+				}
 
-				// apply to builder as snapshot
-				builder = Some(
-					match builder {
-						Some(builder) => builder,
-						None => local.reducer_builder(storage.clone(), self.key_path()).await?,
-					}
-					.with_snapshot(local.state, local.heads),
-				);
+				// try to read local.cbor
+				let local_path = child.path().join("local.cbor");
+				let local = ApplicationLocal::read(&local_path).await?;
+				if let Some(local) = local {
+					yield (local_path, local);
+				}
 			}
 		}
-
-		// result
-		Ok(match builder {
-			// load
-			Some(builder) => builder.build(runtime).await?,
-			// create empty
-			None => {
-				// create empty reducer
-				let mut reducer = create_reducer_builder(
-					create_local_log(create_encrypted_storage(storage, self.key_path()).await?, Default::default())
-						.await?,
-				)
-				.await?
-				.build(runtime)
-				.await?;
-
-				// setup
-				setup_local_co(runtime, &mut reducer).await?;
-
-				//result
-				reducer
-			},
-		})
-	}
-
-	/// Write state to disk.
-	/// Returns false and does nothing if reducer is empty.
-	pub async fn write<S>(&self, reducer: &LocalReducer<S>) -> Result<bool, anyhow::Error>
-	where
-		S: BlockStorage + Sync + Send + Clone + 'static,
-	{
-		if let Some(state) = reducer.state() {
-			let path = self.application_path.join("local.cbor");
-
-			// trace
-			tracing::trace!(app = ?self.identifier, ?path, ?state, "local-co-write");
-
-			// create format
-			let local = ApplicationLocal::new(
-				reducer.heads().clone(),
-				state.clone(),
-				reducer.log().storage().clone().flush_mapping().await?,
-			);
-
-			// write
-			local.write(&path).await.map(|_| true)
-		} else {
-			Ok(false)
-		}
-	}
-
-	/// Setup auto-write on change for an reducer.
-	pub fn auto_write<S>(self, mut reducer: LocalReducer<S>) -> LocalReducer<S>
-	where
-		S: BlockStorage + Sync + Send + Clone + 'static,
-	{
-		reducer.add_change_handler(Box::new(self));
-		reducer
 	}
 
 	/// Key path if no keychain should be used.
@@ -162,16 +98,97 @@ impl LocalCo {
 		None
 	}
 }
-#[async_trait]
-impl<S> ReducerChangedHandler<EncryptedBlockStorage<S>, CoCoreResolver> for LocalCo
+
+#[derive(Debug, Clone)]
+struct LocalCoInstance<S> {
+	local_co: LocalCo,
+	encrypted_storage: EncryptedBlockStorage<S>,
+}
+impl<S> LocalCoInstance<S>
 where
-	S: BlockStorage + Sync + Send + Clone + 'static,
+	S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
 {
-	async fn on_state_changed(
-		&self,
-		reducer: &Reducer<EncryptedBlockStorage<S>, CoCoreResolver>,
-	) -> Result<(), anyhow::Error> {
-		self.write(reducer).await?;
+	/// Read the local co state from disk.
+	/// As we trust all of the local states we use all the states without fuhter checks to continue.
+	///
+	/// Note: This assumes the same encryption key is used by all local applications.
+	async fn create(runtime: Runtime, local_co: LocalCo, storage: S) -> Result<(Self, CoReducer), anyhow::Error> {
+		// create storage
+		let mut encrypted_storage: EncryptedBlockStorage<S> =
+			create_encrypted_storage(storage, local_co.key_path()).await?;
+
+		// create log
+		let log = create_local_log(CoStorage::new(encrypted_storage.clone()), Default::default())?;
+
+		// create builder
+		let mut builder: LocalReducerBuilder = create_reducer_builder(log)?;
+
+		// create reducer
+		let locals = local_co.read();
+		pin_mut!(locals);
+		while let Some(local_result) = locals.next().await {
+			// get local and log
+			let local = match local_result {
+				Ok((local_path, local)) => {
+					tracing::trace!(app = ?local_co.identifier, path = ?local_path, state = ?local.state, heads = ?local.heads, "local-co-read");
+					local
+				},
+				Err(e) => {
+					tracing::warn!(app = ?local_co.identifier, err = ?e, "local-co-read-failure");
+					continue;
+				},
+			};
+
+			// load additional encryption mappings
+			encrypted_storage.load_mapping(&local.mapping).await?;
+
+			// apply to builder as snapshot
+			builder = builder.with_snapshot(local.state, local.heads);
+		}
+		let mut reducer = builder.build(runtime.runtime()).await?;
+
+		// result
+		let result = Self { encrypted_storage, local_co };
+
+		// write
+		reducer.add_change_handler(Box::new(result.clone()));
+
+		// create empty
+		if reducer.is_empty() {
+			setup_local_co(runtime.runtime(), &mut reducer).await?;
+		}
+
+		// result
+		Ok((result, CoReducer::new(runtime, reducer)))
+	}
+
+	/// Write state to disk.
+	/// Returns false and does nothing if reducer is empty.
+	pub async fn write(&self, reducer: &LocalReducer, mapping: Cid) -> Result<bool, anyhow::Error> {
+		if let Some(state) = reducer.state() {
+			let path = self.local_co.application_path.join("local.cbor");
+
+			// trace
+			tracing::trace!(app = ?self.local_co.identifier, ?path, ?state, "local-co-write");
+
+			// create format
+			let local = ApplicationLocal::new(reducer.heads().clone(), state.clone(), mapping);
+
+			// write
+			local.write(&path).await.map(|_| true)
+		} else {
+			Ok(false)
+		}
+	}
+}
+#[async_trait]
+impl<S> ReducerChangedHandler<CoStorage, CoCoreResolver> for LocalCoInstance<S>
+where
+	S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
+{
+	async fn on_state_changed(&self, reducer: &LocalReducer) -> Result<(), anyhow::Error> {
+		let mapping = self.encrypted_storage.flush_mapping().await?;
+		self.write(reducer, mapping).await?;
 		Ok(())
 	}
 }
@@ -234,41 +251,6 @@ impl ApplicationLocal {
 		// result
 		Ok(())
 	}
-
-	pub async fn storage<S>(
-		&self,
-		storage: S,
-		key_path: Option<PathBuf>,
-	) -> Result<EncryptedBlockStorage<S>, anyhow::Error>
-	where
-		S: BlockStorage + Sync + Send + Clone + 'static,
-	{
-		let mut encrypted_storage = create_encrypted_storage(storage, key_path).await?;
-		encrypted_storage.load_mapping(&self.mapping).await?;
-		Ok(encrypted_storage)
-	}
-
-	pub async fn log<S>(
-		&self,
-		storage: S,
-		key_path: Option<PathBuf>,
-	) -> Result<Log<EncryptedBlockStorage<S>>, anyhow::Error>
-	where
-		S: BlockStorage + Sync + Send + Clone + 'static,
-	{
-		create_local_log(self.storage(storage, key_path).await?, self.heads.clone()).await
-	}
-
-	pub async fn reducer_builder<S>(
-		&self,
-		storage: S,
-		key_path: Option<PathBuf>,
-	) -> Result<LocalReducerBuilder<S>, anyhow::Error>
-	where
-		S: BlockStorage + Sync + Send + Clone + 'static,
-	{
-		create_reducer_builder(self.log(storage, key_path).await?).await
-	}
 }
 
 /// Create encrypted storage by using `storage` as unterlying storage.
@@ -329,10 +311,7 @@ fn fetch_secret_keychain(service: &str, user: &str, allow_create: bool) -> Resul
 	Ok(Secret::new(multibase::decode(key_as_base64)?.1))
 }
 
-async fn create_local_log<S>(
-	encrypted_storage: EncryptedBlockStorage<S>,
-	heads: BTreeSet<Cid>,
-) -> Result<Log<EncryptedBlockStorage<S>>, anyhow::Error>
+fn create_local_log<S>(storage: S, heads: BTreeSet<Cid>) -> Result<Log<S>, anyhow::Error>
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
@@ -340,23 +319,20 @@ where
 		"local".as_bytes().to_vec(),
 		LocalIdentityResolver::default().private_identity("did:local:device")?,
 		Box::new(LocalIdentityResolver::default()),
-		encrypted_storage,
+		storage,
 		heads,
 	))
 }
 
-async fn create_reducer_builder<S>(log: Log<EncryptedBlockStorage<S>>) -> Result<LocalReducerBuilder<S>, anyhow::Error>
+fn create_reducer_builder<S>(log: Log<S>) -> Result<ReducerBuilder<S, CoCoreResolver>, anyhow::Error>
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
-	Ok(ReducerBuilder::new(CoCoreResolver::with_mapping(Cores::default().built_in_native_mapping()), log))
+	Ok(ReducerBuilder::new(CoCoreResolver::default(), log))
 }
 
 /// Setup the Local CO by adding cores.
-async fn setup_local_co<S>(runtime: &RuntimePool, reducer: &mut LocalReducer<S>) -> Result<(), anyhow::Error>
-where
-	S: BlockStorage + Sync + Send + Clone + 'static,
-{
+async fn setup_local_co(runtime: &RuntimePool, reducer: &mut LocalReducer) -> Result<(), anyhow::Error> {
 	// create
 	let mut cores = BTreeMap::<String, co_core_co::Core>::new();
 	cores.insert(
@@ -368,10 +344,10 @@ where
 		},
 	);
 	cores.insert(
-		Cores::to_core_name(CO_CORE_KEYSTORE).to_owned(),
+		CO_CORE_NAME_KEYSTORE.to_owned(),
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_KEYSTORE).expect(CO_CORE_KEYSTORE),
-			tags: tags!( "core": Cores::to_core_name(CO_CORE_KEYSTORE) ),
+			tags: tags!( "core": CO_CORE_NAME_KEYSTORE ),
 			state: None,
 		},
 	);
@@ -385,7 +361,7 @@ where
 		},
 	);
 	let action = co_core_co::CoAction::Create { id: "local".to_owned(), name: "local".to_owned(), cores, participants };
-	reducer.push(runtime, Cores::to_core_name(CO_CORE_CO), &action).await?;
+	reducer.push(runtime, CO_CORE_NAME_CO, &action).await?;
 
 	// done
 	Ok(())
