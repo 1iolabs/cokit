@@ -1,7 +1,7 @@
 use crate::CoreResolver;
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_log::{EntryBlock, Log, LogError};
+use co_log::{EntryBlock, Log, LogError, PrivateIdentity};
 use co_primitives::{Linkable, ReducerAction};
 use co_runtime::RuntimePool;
 use co_storage::BlockStorage;
@@ -185,20 +185,25 @@ where
 	}
 
 	/// Push an event.
-	pub async fn push<T: Serialize + Send + Sync + 'static>(
+	pub async fn push<T, I>(
 		&mut self,
 		runtime: &RuntimePool,
+		identity: &I,
 		co: &str,
 		item: &T,
-	) -> Result<(), anyhow::Error> {
+	) -> Result<(), anyhow::Error>
+	where
+		T: Serialize + Send + Sync,
+		I: PrivateIdentity + Send + Sync,
+	{
 		// apply to log
 		let action = ReducerAction {
 			core: co.to_owned(),
 			payload: item,
-			from: self.log.identity().identity().to_owned(),
+			from: identity.identity().to_owned(),
 			time: SystemTime::now().duration_since(UNIX_EPOCH).expect("Valid time").as_millis(),
 		};
-		let (_, action) = self.log.push_event(&action).await?;
+		let (_, action) = self.log.push_event(identity, &action).await?;
 
 		// // debug
 		// let block = self.log.storage().get(entry.as_ref()).await.unwrap();
@@ -370,23 +375,23 @@ mod tests {
 			.unwrap();
 
 		// logs
+		let identity1 = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
+		let identity2 = LocalIdentityResolver::default().private_identity("did:local:p2").unwrap();
+		let identity3 = LocalIdentityResolver::default().private_identity("did:local:p3").unwrap();
 		let log1 = Log::new(
 			"test".as_bytes().to_vec(),
-			LocalIdentityResolver::default().private_identity("did:local:p1").unwrap(),
 			Box::new(LocalIdentityResolver::default()),
 			storage.clone(),
 			Default::default(),
 		);
 		let log2 = Log::new(
 			"test".as_bytes().to_vec(),
-			LocalIdentityResolver::default().private_identity("did:local:p2").unwrap(),
 			Box::new(LocalIdentityResolver::default()),
 			storage.clone(),
 			Default::default(),
 		);
 		let log3 = Log::new(
 			"test".as_bytes().to_vec(),
-			LocalIdentityResolver::default().private_identity("did:local:p3").unwrap(),
 			Box::new(LocalIdentityResolver::default()),
 			storage.clone(),
 			Default::default(),
@@ -403,12 +408,30 @@ mod tests {
 		let mut reducer3 = ReducerBuilder::new(core_resolver.clone(), log3).build(&runtime).await.unwrap();
 
 		// 1-6
-		reducer1.push(&runtime, "test", &CounterAction::Increment(1)).await.unwrap();
-		reducer1.push(&runtime, "test", &CounterAction::Increment(2)).await.unwrap();
-		reducer1.push(&runtime, "test", &CounterAction::Increment(3)).await.unwrap();
-		reducer1.push(&runtime, "test", &CounterAction::Increment(4)).await.unwrap();
-		reducer1.push(&runtime, "test", &CounterAction::Increment(5)).await.unwrap();
-		reducer1.push(&runtime, "test", &CounterAction::Increment(6)).await.unwrap();
+		reducer1
+			.push(&runtime, &identity1, "test", &CounterAction::Increment(1))
+			.await
+			.unwrap();
+		reducer1
+			.push(&runtime, &identity1, "test", &CounterAction::Increment(2))
+			.await
+			.unwrap();
+		reducer1
+			.push(&runtime, &identity1, "test", &CounterAction::Increment(3))
+			.await
+			.unwrap();
+		reducer1
+			.push(&runtime, &identity1, "test", &CounterAction::Increment(4))
+			.await
+			.unwrap();
+		reducer1
+			.push(&runtime, &identity1, "test", &CounterAction::Increment(5))
+			.await
+			.unwrap();
+		reducer1
+			.push(&runtime, &identity1, "test", &CounterAction::Increment(6))
+			.await
+			.unwrap();
 		reducer2.join(reducer1.heads(), &runtime).await.unwrap();
 		reducer3.join(reducer1.heads(), &runtime).await.unwrap();
 		assert_eq!(21, counter_state(&storage, &reducer1).await.0); // 1 + 2 + 3 + 4 + 5 + 6
@@ -416,7 +439,10 @@ mod tests {
 		assert_eq!(21, counter_state(&storage, &reducer3).await.0);
 
 		// 7
-		reducer2.push(&runtime, "test", &CounterAction::Increment(7)).await.unwrap();
+		reducer2
+			.push(&runtime, &identity2, "test", &CounterAction::Increment(7))
+			.await
+			.unwrap();
 		reducer3.join(reducer2.heads(), &runtime).await.unwrap();
 		reducer1.join(reducer3.heads(), &runtime).await.unwrap();
 		assert_eq!(28, counter_state(&storage, &reducer1).await.0);
@@ -424,7 +450,10 @@ mod tests {
 		assert_eq!(28, counter_state(&storage, &reducer3).await.0);
 
 		// 8
-		reducer3.push(&runtime, "test", &CounterAction::Increment(8)).await.unwrap();
+		reducer3
+			.push(&runtime, &identity3, "test", &CounterAction::Increment(8))
+			.await
+			.unwrap();
 		reducer2.join(reducer3.heads(), &runtime).await.unwrap();
 		reducer1.join(reducer2.heads(), &runtime).await.unwrap();
 		assert_eq!(36, counter_state(&storage, &reducer1).await.0);
@@ -432,7 +461,10 @@ mod tests {
 		assert_eq!(36, counter_state(&storage, &reducer3).await.0);
 
 		// 9
-		reducer3.push(&runtime, "test", &CounterAction::Increment(9)).await.unwrap();
+		reducer3
+			.push(&runtime, &identity3, "test", &CounterAction::Increment(9))
+			.await
+			.unwrap();
 		reducer2.join(reducer3.heads(), &runtime).await.unwrap();
 		reducer1.join(reducer2.heads(), &runtime).await.unwrap();
 		assert_eq!(45, counter_state(&storage, &reducer1).await.0);
@@ -440,7 +472,10 @@ mod tests {
 		assert_eq!(45, counter_state(&storage, &reducer3).await.0);
 
 		// A
-		reducer1.push(&runtime, "test", &CounterAction::Increment(10)).await.unwrap();
+		reducer1
+			.push(&runtime, &identity1, "test", &CounterAction::Increment(10))
+			.await
+			.unwrap();
 		reducer2.join(reducer1.heads(), &runtime).await.unwrap();
 		reducer3.join(reducer2.heads(), &runtime).await.unwrap();
 		assert_eq!(55, counter_state(&storage, &reducer1).await.0);
@@ -448,15 +483,24 @@ mod tests {
 		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
 
 		// B
-		reducer1.push(&runtime, "test", &CounterAction::Set(11)).await.unwrap();
+		reducer1
+			.push(&runtime, &identity1, "test", &CounterAction::Set(11))
+			.await
+			.unwrap();
 		reducer2.join(reducer1.heads(), &runtime).await.unwrap();
 		assert_eq!(11, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(11, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
 
 		// C
-		reducer1.push(&runtime, "test", &CounterAction::Increment(12)).await.unwrap();
-		reducer2.push(&runtime, "test", &CounterAction::Increment(12)).await.unwrap();
+		reducer1
+			.push(&runtime, &identity1, "test", &CounterAction::Increment(12))
+			.await
+			.unwrap();
+		reducer2
+			.push(&runtime, &identity2, "test", &CounterAction::Increment(12))
+			.await
+			.unwrap();
 		reducer2.join(reducer1.heads(), &runtime).await.unwrap();
 		reducer1.join(reducer2.heads(), &runtime).await.unwrap();
 		assert_eq!(35, counter_state(&storage, &reducer1).await.0);
@@ -464,21 +508,30 @@ mod tests {
 		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
 
 		// D
-		reducer1.push(&runtime, "test", &CounterAction::Increment(13)).await.unwrap();
+		reducer1
+			.push(&runtime, &identity1, "test", &CounterAction::Increment(13))
+			.await
+			.unwrap();
 		reducer2.join(reducer1.heads(), &runtime).await.unwrap();
 		assert_eq!(48, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(48, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
 
 		// E
-		reducer2.push(&runtime, "test", &CounterAction::Increment(14)).await.unwrap();
+		reducer2
+			.push(&runtime, &identity2, "test", &CounterAction::Increment(14))
+			.await
+			.unwrap();
 		reducer1.join(reducer2.heads(), &runtime).await.unwrap();
 		assert_eq!(62, counter_state(&storage, &reducer1).await.0);
 		assert_eq!(62, counter_state(&storage, &reducer2).await.0);
 		assert_eq!(55, counter_state(&storage, &reducer3).await.0);
 
 		// B*
-		reducer3.push(&runtime, "test", &CounterAction::Increment(11)).await.unwrap();
+		reducer3
+			.push(&runtime, &identity3, "test", &CounterAction::Increment(11))
+			.await
+			.unwrap();
 		reducer3.join(reducer1.heads(), &runtime).await.unwrap();
 		reducer2.join(reducer3.heads(), &runtime).await.unwrap();
 		reducer1.join(reducer2.heads(), &runtime).await.unwrap();

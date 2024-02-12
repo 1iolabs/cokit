@@ -1,13 +1,13 @@
-use super::reducer::ReducerChangedHandler;
+use super::{identity::create_identity_resolver, reducer::ReducerChangedHandler};
 use crate::{
 	library::{fs_read::fs_read_option, fs_write::fs_write},
 	types::cores::CO_CORE_NAME_CO,
-	CoCoreResolver, CoReducer, CoStorage, Cores, Reducer, ReducerBuilder, Runtime, CO_CORE_KEYSTORE,
+	CoCoreResolver, CoReducer, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, Runtime, CO_CORE_KEYSTORE,
 	CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE,
 };
 use anyhow::Context;
 use async_trait::async_trait;
-use co_log::{LocalIdentityResolver, Log};
+use co_log::{Identity, LocalIdentity, Log};
 use co_primitives::{tags, Did};
 use co_runtime::RuntimePool;
 use co_storage::{Algorithm, BlockStorage, EncryptedBlockStorage, Secret};
@@ -20,11 +20,10 @@ use std::{
 	path::PathBuf,
 };
 
-type LocalReducerBuilder = ReducerBuilder<CoStorage, CoCoreResolver>;
-type LocalReducer = Reducer<CoStorage, CoCoreResolver>;
-
+/// Local CO Builder.
+/// A local co is special because it's root state will be saved locally to an fiel on an device.
 #[derive(Debug, Clone)]
-pub struct LocalCo {
+pub struct LocalCoBuilder {
 	/// Our application identifier.
 	identifier: String,
 
@@ -36,17 +35,17 @@ pub struct LocalCo {
 
 	/// Whether to use the keychain or a file.
 	keychain: bool,
+
+	/// The local identity.
+	identity: LocalIdentity,
 }
-impl LocalCo {
-	pub fn new(identifier: String, application_path: PathBuf, keychain: bool) -> Self {
-		Self { identifier, application_path, keychain }
+impl LocalCoBuilder {
+	pub fn new(identifier: String, application_path: PathBuf, keychain: bool, identity: LocalIdentity) -> Self {
+		Self { identifier, application_path, keychain, identity }
 	}
 
 	/// Create LocalCO instance.
-	pub async fn into_reducer<S>(self, storage: S, runtime: Runtime) -> Result<CoReducer, anyhow::Error>
-	where
-		S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
-	{
+	pub async fn build(self, storage: CoStorage, runtime: Runtime) -> Result<CoReducer, anyhow::Error> {
 		Ok(LocalCoInstance::create(runtime, self, storage).await?.1)
 	}
 
@@ -99,29 +98,31 @@ impl LocalCo {
 	}
 }
 
-#[derive(Debug, Clone)]
-struct LocalCoInstance<S> {
-	local_co: LocalCo,
-	encrypted_storage: EncryptedBlockStorage<S>,
+#[derive(Clone)]
+struct LocalCoInstance {
+	identifier: String,
+	application_path: PathBuf,
+	encrypted_storage: EncryptedBlockStorage<CoStorage>,
 }
-impl<S> LocalCoInstance<S>
-where
-	S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
-{
+impl LocalCoInstance {
 	/// Read the local co state from disk.
 	/// As we trust all of the local states we use all the states without fuhter checks to continue.
 	///
 	/// Note: This assumes the same encryption key is used by all local applications.
-	async fn create(runtime: Runtime, local_co: LocalCo, storage: S) -> Result<(Self, CoReducer), anyhow::Error> {
+	async fn create(
+		runtime: Runtime,
+		local_co: LocalCoBuilder,
+		storage: CoStorage,
+	) -> Result<(Self, CoReducer), anyhow::Error> {
 		// create storage
-		let mut encrypted_storage: EncryptedBlockStorage<S> =
-			create_encrypted_storage(storage, local_co.key_path()).await?;
+		let mut encrypted_storage: EncryptedBlockStorage<CoStorage> =
+			create_encrypted_storage(storage.clone(), &local_co.identity, local_co.key_path()).await?;
 
 		// create log
-		let log = create_local_log(CoStorage::new(encrypted_storage.clone()), Default::default())?;
+		let log = Log::new("local".as_bytes().to_vec(), create_identity_resolver(), storage, Default::default());
 
 		// create builder
-		let mut builder: LocalReducerBuilder = create_reducer_builder(log)?;
+		let mut builder = ReducerBuilder::new(CoCoreResolver::default(), log);
 
 		// create reducer
 		let locals = local_co.read();
@@ -140,7 +141,9 @@ where
 			};
 
 			// load additional encryption mappings
-			encrypted_storage.load_mapping(&local.mapping).await?;
+			if let Some(mapping) = &local.mapping {
+				encrypted_storage.load_mapping(mapping).await?;
+			}
 
 			// apply to builder as snapshot
 			builder = builder.with_snapshot(local.state, local.heads);
@@ -148,14 +151,15 @@ where
 		let mut reducer = builder.build(runtime.runtime()).await?;
 
 		// result
-		let result = Self { encrypted_storage, local_co };
+		let result =
+			Self { encrypted_storage, identifier: local_co.identifier, application_path: local_co.application_path };
 
 		// write
 		reducer.add_change_handler(Box::new(result.clone()));
 
 		// create empty
 		if reducer.is_empty() {
-			setup_local_co(runtime.runtime(), &mut reducer).await?;
+			setup_local_co(runtime.runtime(), &local_co.identity, &mut reducer).await?;
 		}
 
 		// result
@@ -164,12 +168,16 @@ where
 
 	/// Write state to disk.
 	/// Returns false and does nothing if reducer is empty.
-	pub async fn write(&self, reducer: &LocalReducer, mapping: Cid) -> Result<bool, anyhow::Error> {
+	pub async fn write<S, R>(&self, reducer: &Reducer<S, R>, mapping: Option<Cid>) -> Result<bool, anyhow::Error>
+	where
+		S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
+		R: CoreResolver<S> + Send + Sync + 'static,
+	{
 		if let Some(state) = reducer.state() {
-			let path = self.local_co.application_path.join("local.cbor");
+			let path = self.application_path.join("local.cbor");
 
 			// trace
-			tracing::trace!(app = ?self.local_co.identifier, ?path, ?state, "local-co-write");
+			tracing::trace!(app = ?self.identifier, ?path, ?state, "local-co-write");
 
 			// create format
 			let local = ApplicationLocal::new(reducer.heads().clone(), state.clone(), mapping);
@@ -182,11 +190,12 @@ where
 	}
 }
 #[async_trait]
-impl<S> ReducerChangedHandler<CoStorage, CoCoreResolver> for LocalCoInstance<S>
+impl<S, R> ReducerChangedHandler<S, R> for LocalCoInstance
 where
 	S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
+	R: CoreResolver<S> + Send + Sync + 'static,
 {
-	async fn on_state_changed(&self, reducer: &LocalReducer) -> Result<(), anyhow::Error> {
+	async fn on_state_changed(&self, reducer: &Reducer<S, R>) -> Result<(), anyhow::Error> {
 		let mapping = self.encrypted_storage.flush_mapping().await?;
 		self.write(reducer, mapping).await?;
 		Ok(())
@@ -210,14 +219,14 @@ struct ApplicationLocal {
 
 	/// The latest encryption mapping.
 	#[serde(rename = "m")]
-	pub mapping: Cid,
+	pub mapping: Option<Cid>,
 }
 impl ApplicationLocal {
 	pub fn version() -> u8 {
 		1
 	}
 
-	pub fn new(heads: BTreeSet<Cid>, state: Cid, mapping: Cid) -> Self {
+	pub fn new(heads: BTreeSet<Cid>, state: Cid, mapping: Option<Cid>) -> Self {
 		Self { heads, state, version: Self::version(), mapping }
 	}
 
@@ -260,6 +269,7 @@ impl ApplicationLocal {
 /// Todo: What happens if muliple applications try to access the same key?
 async fn create_encrypted_storage<S>(
 	storage: S,
+	identity: &LocalIdentity,
 	key_path: Option<PathBuf>,
 ) -> Result<EncryptedBlockStorage<S>, anyhow::Error>
 where
@@ -267,7 +277,7 @@ where
 {
 	let key = match key_path {
 		Some(key_path) => fetch_secret_cbor(key_path, true).await?,
-		None => fetch_secret_keychain("co.app", "did:local:device", true)?,
+		None => fetch_secret_keychain("co.app", identity.identity(), true)?,
 	};
 	Ok(EncryptedBlockStorage::new(storage.clone(), key, Default::default()))
 }
@@ -311,28 +321,16 @@ fn fetch_secret_keychain(service: &str, user: &str, allow_create: bool) -> Resul
 	Ok(Secret::new(multibase::decode(key_as_base64)?.1))
 }
 
-fn create_local_log<S>(storage: S, heads: BTreeSet<Cid>) -> Result<Log<S>, anyhow::Error>
-where
-	S: BlockStorage + Sync + Send + Clone + 'static,
-{
-	Ok(Log::new(
-		"local".as_bytes().to_vec(),
-		LocalIdentityResolver::default().private_identity("did:local:device")?,
-		Box::new(LocalIdentityResolver::default()),
-		storage,
-		heads,
-	))
-}
-
-fn create_reducer_builder<S>(log: Log<S>) -> Result<ReducerBuilder<S, CoCoreResolver>, anyhow::Error>
-where
-	S: BlockStorage + Sync + Send + Clone + 'static,
-{
-	Ok(ReducerBuilder::new(CoCoreResolver::default(), log))
-}
-
 /// Setup the Local CO by adding cores.
-async fn setup_local_co(runtime: &RuntimePool, reducer: &mut LocalReducer) -> Result<(), anyhow::Error> {
+async fn setup_local_co<S, R>(
+	runtime: &RuntimePool,
+	identity: &LocalIdentity,
+	reducer: &mut Reducer<S, R>,
+) -> Result<(), anyhow::Error>
+where
+	S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
+	R: CoreResolver<S> + Send + Sync + 'static,
+{
 	// create
 	let mut cores = BTreeMap::<String, co_core_co::Core>::new();
 	cores.insert(
@@ -353,15 +351,15 @@ async fn setup_local_co(runtime: &RuntimePool, reducer: &mut LocalReducer) -> Re
 	);
 	let mut participants = BTreeMap::<Did, co_core_co::Participant>::new();
 	participants.insert(
-		"did:local:device".to_owned(),
+		identity.identity().to_owned(),
 		co_core_co::Participant {
-			did: "did:local:device".to_owned(),
+			did: identity.identity().to_owned(),
 			state: co_core_co::ParticipantState::Active,
 			tags: tags!(),
 		},
 	);
 	let action = co_core_co::CoAction::Create { id: "local".to_owned(), name: "local".to_owned(), cores, participants };
-	reducer.push(runtime, CO_CORE_NAME_CO, &action).await?;
+	reducer.push(runtime, identity, CO_CORE_NAME_CO, &action).await?;
 
 	// done
 	Ok(())

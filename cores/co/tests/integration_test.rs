@@ -47,7 +47,7 @@ async fn integration_test() {
 		.unwrap();
 
 	// test
-	assert_eq!(Some(Cid::try_from("bafyr4ibmd6uphrtohimaoreqgl3hkwfsefhc5p65zthxffscar6iuhr4vq").unwrap()), next_state);
+	assert_eq!(Some(Cid::try_from("bafyr4ifl4zo2w5octzjo3xjsecbvurcl5n42fpchbnlec3duopbkcd3k6y").unwrap()), next_state);
 	let block = storage.get(&next_state.unwrap()).await.unwrap();
 	let state: Co = BlockSerializer::default().deserialize(&block).unwrap();
 	// Co { id: [], tags: Tags { hello: String("world") }, name: "", heads: {}, participants: {}, cores: {}, keys: None,

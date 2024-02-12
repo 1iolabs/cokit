@@ -5,7 +5,6 @@ use crate::{
 	},
 	AlgorithmError, BlockStat, BlockStorage, Storage, StorageError,
 };
-use anyhow::anyhow;
 use async_trait::async_trait;
 use co_primitives::{DefaultNodeSerializer, MultiCodec, Node, NodeBuilder, NodeBuilderError, NodeSerializer};
 use futures::{stream::FuturesOrdered, StreamExt};
@@ -74,24 +73,28 @@ where
 	/// Flush mapping to (parent) storage.
 	/// Returns the encrypted mapping CID.
 	/// The mapping tree will also only link to encrypted CIDs.
-	pub fn flush_mapping(&mut self) -> Result<Cid, StorageError> {
+	pub fn flush_mapping(&mut self) -> Result<Option<Cid>, StorageError> {
 		// serializer
 		let node_serializer = EncryptedNodeSerializer { algorithm: self.algorithm, key: self.key.clone() };
 
 		// blocks
-		let (root_cid, blocks) = self.mapping.to_blocks(node_serializer, Default::default())?;
+		let blocks = self.mapping.to_blocks(node_serializer, Default::default())?;
 
 		// store
+		let mut root = None;
 		for block in blocks {
-			self.storage_mut().set(block)?;
+			let result = self.storage_mut().set(block)?;
+			if root.is_none() {
+				root = Some(result);
+			}
 		}
 
 		// result
-		Ok(root_cid)
+		Ok(root)
 	}
 
 	/// This will regenerate and flush the encryption block mapping using supplied CIDs.
-	pub fn regenerate_mapping(&mut self, cids: impl Iterator<Item = Cid>) -> Result<Cid, StorageError> {
+	pub fn regenerate_mapping(&mut self, cids: impl Iterator<Item = Cid>) -> Result<Option<Cid>, StorageError> {
 		self.mapping = BlockMapping::from_cids_storage(self, cids).map_err(|e| StorageError::Internal(e.into()))?;
 		self.flush_mapping()
 	}
@@ -183,25 +186,29 @@ where
 	/// Flush mapping to (parent) storage.
 	/// Returns the encrypted mapping CID.
 	/// The mapping tree will also only link to encrypted CIDs.
-	pub async fn flush_mapping(&self) -> Result<Cid, StorageError> {
+	pub async fn flush_mapping(&self) -> Result<Option<Cid>, StorageError> {
 		// serializer
 		let node_serializer = EncryptedNodeSerializer { algorithm: self.algorithm, key: self.key.clone() };
 
 		// blocks
-		let (root_cid, blocks) = self.mapping.read().await.to_blocks(node_serializer, Default::default())?;
+		let blocks = self.mapping.read().await.to_blocks(node_serializer, Default::default())?;
 
 		// store
+		let mut root = None;
 		for block in blocks {
-			self.next.set(block).await?;
+			let result = self.next.set(block).await?;
+			if root.is_none() {
+				root = Some(result)
+			}
 			// TODO: PIN/UNPIN
 		}
 
 		// result
-		Ok(root_cid)
+		Ok(root)
 	}
 
 	/// This will regenerate and flush the encryption block mapping using supplied CIDs.
-	pub async fn regenerate_mapping(&mut self, cids: impl Iterator<Item = Cid>) -> Result<Cid, StorageError> {
+	pub async fn regenerate_mapping(&mut self, cids: impl Iterator<Item = Cid>) -> Result<Option<Cid>, StorageError> {
 		self.mapping = Arc::new(RwLock::new(
 			BlockMapping::from_cids(self, cids)
 				.await
@@ -419,19 +426,15 @@ impl BlockMapping {
 	/// Encode mapping into blocks.
 	///
 	/// Returns the root cid and all blocks.
+	/// The first block retuned is the root.
 	pub fn to_blocks<S, P: StoreParams>(
 		&self,
 		serializer: S,
 		options: WriteOptions,
-	) -> Result<(Cid, Vec<Block<P>>), StorageError>
+	) -> Result<Vec<Block<P>>, StorageError>
 	where
 		S: NodeSerializer<(Cid, Cid), P>,
 	{
-		// validate
-		if self.map.is_empty() {
-			return Err(StorageError::InvalidArgument(anyhow!("Empty")))
-		}
-
 		// blocks
 		let mut builder = NodeBuilder::<(Cid, Cid), S, P>::new(options.max_children, serializer);
 		for (key, value) in self.map.iter() {
@@ -440,10 +443,9 @@ impl BlockMapping {
 				.map_err(|e| StorageError::Internal(e.into()))?;
 		}
 		let blocks = builder.into_blocks().map_err(|e| StorageError::Internal(e.into()))?;
-		let root_cid = blocks.get(0).expect("at least one block when have items").cid().clone();
 
 		// result
-		Ok((root_cid, blocks))
+		Ok(blocks)
 	}
 }
 impl Default for BlockMapping {
@@ -576,7 +578,7 @@ mod tests {
 		}
 
 		// validate mapping
-		let mapping_cid = encryption.flush_mapping().unwrap();
+		let mapping_cid = encryption.flush_mapping().unwrap().expect("Mappings if we have items");
 		assert_eq!(mapping_cid.codec(), BLOCK_MULTICODEC); // encrypted?
 
 		// validate cids

@@ -1,19 +1,15 @@
-use crate::{Identity, IdentityResolver, IdentityResolverError};
+use crate::{IdentityBox, IdentityResolver, IdentityResolverBox, IdentityResolverError};
 
 pub struct JoinIdentityResolver {
-	resolvers: Vec<Box<dyn IdentityResolver>>,
+	resolvers: Vec<IdentityResolverBox>,
 }
 impl JoinIdentityResolver {
-	pub fn new(resolvers: Vec<Box<dyn IdentityResolver>>) -> Self {
+	pub fn new(resolvers: Vec<IdentityResolverBox>) -> Self {
 		Self { resolvers }
 	}
 }
 impl IdentityResolver for JoinIdentityResolver {
-	fn resolve(
-		&self,
-		identity: &str,
-		public_key: Option<&[u8]>,
-	) -> Result<Box<dyn Identity + Send + Sync>, IdentityResolverError> {
+	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<IdentityBox, IdentityResolverError> {
 		let mut last_error: Option<IdentityResolverError> = None;
 		for resolver in self.resolvers.iter() {
 			match resolver.resolve(identity, public_key) {

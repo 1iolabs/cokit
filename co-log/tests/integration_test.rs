@@ -1,4 +1,4 @@
-use co_log::{DidKeyIdentity, DidKeyIdentityResolver, Entry, Log};
+use co_log::{DidKeyIdentity, DidKeyIdentityResolver, Entry, Log, PrivateIdentity};
 use co_primitives::{BlockSerializer, Link};
 use co_storage::{BlockStorage, MemoryBlockStorage};
 use futures::TryStreamExt;
@@ -18,11 +18,11 @@ async fn smoke() {
 	let block0 = create_event(&mut store, "hello").await;
 
 	// create log
-	let identity = Box::new(DidKeyIdentity::generate(None));
-	let mut log = create_empty_log(&identity, &store).await;
+	let identity = DidKeyIdentity::generate(None);
+	let mut log = create_empty_log(&store).await;
 
 	// populate log
-	log.push(block0.clone()).await.unwrap();
+	log.push(&identity, block0.clone()).await.unwrap();
 
 	// check log
 	let entries: Vec<_> = log.stream().try_collect().await.unwrap();
@@ -44,13 +44,13 @@ async fn traverse_sinlge_user_log() {
 	let block2 = create_event(&mut store, "whats").await;
 
 	// create log
-	let identity = Box::new(DidKeyIdentity::generate(None));
-	let mut log = create_empty_log(&identity, &store).await;
+	let identity = DidKeyIdentity::generate(None);
+	let mut log = create_empty_log(&store).await;
 
 	// populate log
-	log.push(block0.clone()).await.unwrap();
-	log.push(block1.clone()).await.unwrap();
-	log.push(block2.clone()).await.unwrap();
+	log.push(&identity, block0.clone()).await.unwrap();
+	log.push(&identity, block1.clone()).await.unwrap();
+	log.push(&identity, block2.clone()).await.unwrap();
 
 	// check log
 	let entries: Vec<_> = log.stream().try_collect().await.unwrap();
@@ -75,15 +75,15 @@ async fn join_is_associative() {
 	let identity3 = DidKeyIdentity::generate(None);
 
 	// create logs
-	let mut log1 = create_empty_log(&identity1, &store).await;
-	let mut log2 = create_empty_log(&identity2, &store).await;
-	let mut log3 = create_empty_log(&identity3, &store).await;
-	log_push(&mut log1, "helloA1").await;
-	log_push(&mut log1, "helloA2").await;
-	log_push(&mut log2, "helloB1").await;
-	log_push(&mut log2, "helloB2").await;
-	log_push(&mut log3, "helloC1").await;
-	log_push(&mut log3, "helloC2").await;
+	let mut log1 = create_empty_log(&store).await;
+	let mut log2 = create_empty_log(&store).await;
+	let mut log3 = create_empty_log(&store).await;
+	log_push(&mut log1, &identity1, "helloA1").await;
+	log_push(&mut log1, &identity1, "helloA2").await;
+	log_push(&mut log2, &identity2, "helloB1").await;
+	log_push(&mut log2, &identity2, "helloB2").await;
+	log_push(&mut log3, &identity3, "helloC1").await;
+	log_push(&mut log3, &identity3, "helloC2").await;
 
 	// log1 + (log2 + log3)
 	log2.join(&log3).await.unwrap();
@@ -91,15 +91,15 @@ async fn join_is_associative() {
 	let res1: Vec<_> = log1.stream().try_collect().await.unwrap();
 
 	// create logs
-	let mut log1 = create_empty_log(&identity1, &store).await;
-	let mut log2 = create_empty_log(&identity2, &store).await;
-	let mut log3 = create_empty_log(&identity3, &store).await;
-	log_push(&mut log1, "helloA1").await;
-	log_push(&mut log1, "helloA2").await;
-	log_push(&mut log2, "helloB1").await;
-	log_push(&mut log2, "helloB2").await;
-	log_push(&mut log3, "helloC1").await;
-	log_push(&mut log3, "helloC2").await;
+	let mut log1 = create_empty_log(&store).await;
+	let mut log2 = create_empty_log(&store).await;
+	let mut log3 = create_empty_log(&store).await;
+	log_push(&mut log1, &identity1, "helloA1").await;
+	log_push(&mut log1, &identity1, "helloA2").await;
+	log_push(&mut log2, &identity2, "helloB1").await;
+	log_push(&mut log2, &identity2, "helloB2").await;
+	log_push(&mut log3, &identity3, "helloC1").await;
+	log_push(&mut log3, &identity3, "helloC2").await;
 
 	// (log1 + log2) + log3)
 	log1.join(&log2).await.unwrap();
@@ -119,24 +119,24 @@ async fn join_is_commutative() {
 	let identity2 = DidKeyIdentity::generate(None);
 
 	// create logs
-	let mut log1 = create_empty_log(&identity1, &store).await;
-	let mut log2 = create_empty_log(&identity2, &store).await;
-	log_push(&mut log1, "helloA1").await;
-	log_push(&mut log1, "helloA2").await;
-	log_push(&mut log2, "helloB1").await;
-	log_push(&mut log2, "helloB2").await;
+	let mut log1 = create_empty_log(&store).await;
+	let mut log2 = create_empty_log(&store).await;
+	log_push(&mut log1, &identity1, "helloA1").await;
+	log_push(&mut log1, &identity1, "helloA2").await;
+	log_push(&mut log2, &identity2, "helloB1").await;
+	log_push(&mut log2, &identity2, "helloB2").await;
 
 	// log2 + log1
 	log2.join(&log1).await.unwrap();
 	let res1: Vec<_> = log2.stream().try_collect().await.unwrap();
 
 	// create logs
-	let mut log1 = create_empty_log(&identity1, &store).await;
-	let mut log2 = create_empty_log(&identity2, &store).await;
-	log_push(&mut log1, "helloA1").await;
-	log_push(&mut log1, "helloA2").await;
-	log_push(&mut log2, "helloB1").await;
-	log_push(&mut log2, "helloB2").await;
+	let mut log1 = create_empty_log(&store).await;
+	let mut log2 = create_empty_log(&store).await;
+	log_push(&mut log1, &identity1, "helloA1").await;
+	log_push(&mut log1, &identity1, "helloA2").await;
+	log_push(&mut log2, &identity2, "helloB1").await;
+	log_push(&mut log2, &identity2, "helloB2").await;
 
 	// log1 + log2
 	log1.join(&log2).await.unwrap();
@@ -148,22 +148,17 @@ async fn join_is_commutative() {
 	assert_eq!(res2, res1);
 }
 
-async fn create_empty_log<S: BlockStorage + Send + Sync + Clone + 'static>(
-	identity: &DidKeyIdentity,
-	store: &S,
-) -> Log<S> {
-	Log::new(
-		"test".as_bytes().to_vec(),
-		Box::new(identity.clone()),
-		Box::new(DidKeyIdentityResolver::new()),
-		store.clone(),
-		Default::default(),
-	)
+async fn create_empty_log<S: BlockStorage + Send + Sync + Clone + 'static>(store: &S) -> Log<S> {
+	Log::new("test".as_bytes().to_vec(), Box::new(DidKeyIdentityResolver::new()), store.clone(), Default::default())
 }
 
-async fn log_push<S: BlockStorage + Send + Sync + 'static>(log: &mut Log<S>, t: &str) -> (Cid, Link<Entry>) {
+async fn log_push<S, I>(log: &mut Log<S>, identity: &I, t: &str) -> (Cid, Link<Entry>)
+where
+	S: BlockStorage + Send + Sync + 'static,
+	I: PrivateIdentity + Send + Sync,
+{
 	let block = create_event(log.storage(), t).await;
-	let entry = log.push(block.clone()).await.unwrap();
+	let entry = log.push(identity, block.clone()).await.unwrap();
 	(block, entry)
 }
 

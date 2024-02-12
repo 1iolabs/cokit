@@ -15,6 +15,9 @@ pub struct Membership {
 	/// The CO Unique Identifier.
 	pub id: String,
 
+	/// The did used for the membership.
+	pub did: Did,
+
 	/// The CO root state (usually co-core-co).
 	/// Note: This is not an Option so we can not be member of an emtpy CO (which has no id anyway).
 	pub state: Cid,
@@ -22,8 +25,8 @@ pub struct Membership {
 	/// The CO heads.
 	pub heads: BTreeSet<Cid>,
 
-	/// The did used for the membership.
-	pub did: Did,
+	/// The encryption mapping if the CO is encrypted.
+	pub encryption_mapping: Option<Cid>,
 
 	/// Some encryption key URI if the CO is encrypted.
 	pub key: Option<String>,
@@ -46,12 +49,12 @@ pub enum MembershipState {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MembershipsAction {
 	Join(Membership),
-	Update { id: String, state: Cid, heads: BTreeSet<Cid> },
+	Update { id: String, state: Cid, heads: BTreeSet<Cid>, encryption_mapping: Option<Cid> },
 	ChangeMembershipState { id: String, did: Did, membership_state: MembershipState },
 	ChangeKey { id: String, did: Did, key: String },
 	TagsInsert { id: String, did: Did, tags: Tags },
 	TagsRemove { id: String, did: Did, tags: Tags },
-	Remove { id: String, did: Did },
+	Remove { id: String, did: Option<Did> },
 }
 
 impl Reducer for Memberships {
@@ -60,13 +63,20 @@ impl Reducer for Memberships {
 	fn reduce(self, event: &ReducerAction<Self::Action>, _: &mut dyn Context) -> Self {
 		let mut result = self;
 		match &event.payload {
-			MembershipsAction::Update { id, state, heads } =>
+			MembershipsAction::Update { id, state, heads, encryption_mapping } => {
+				// if find(&mut result, &membership.id, &membership.did).is_none() {
+				// 	membership.state = state.clone();
+				// 	membership.heads = heads.clone();
+				// 	membership.encryption_mapping = encryption_mapping.clone();
+				// }
 				for membership in result.memberships.iter_mut() {
 					if &membership.id == id {
 						membership.state = state.clone();
 						membership.heads = heads.clone();
+						membership.encryption_mapping = encryption_mapping.clone();
 					}
-				},
+				}
+			},
 			MembershipsAction::Join(membership) =>
 				if find(&mut result, &membership.id, &membership.did).is_none() {
 					result.memberships.push(membership.clone());
@@ -88,12 +98,9 @@ impl Reducer for Memberships {
 					membership.tags.clear(Some(tags));
 				},
 			MembershipsAction::Remove { id, did } => {
-				if let Some((index, _)) = result
-					.memberships
-					.iter()
-					.enumerate()
-					.find(|(_, item)| &item.id == id && &item.did == did)
-				{
+				if let Some((index, _)) = result.memberships.iter().enumerate().find(|(_, item)| {
+					&item.id == id && (did.is_none() || did.as_ref().is_some_and(|did| &item.did == did))
+				}) {
 					result.memberships.remove(index);
 				}
 			},

@@ -1,4 +1,5 @@
 use crate::{CoCoreResolver, CoStorage, Reducer, Runtime, CO_CORE_NAME_CO};
+use co_log::PrivateIdentity;
 use co_storage::{BlockStorageExt, StorageError};
 use libipld::Cid;
 use serde::{de::DeserializeOwned, Serialize};
@@ -28,12 +29,16 @@ impl CoReducer {
 	}
 
 	/// Push event into reducer.
-	pub async fn push<T: Serialize + Send + Sync + Clone + 'static>(
-		&self,
-		co: &str,
-		item: &T,
-	) -> Result<(), anyhow::Error> {
-		self.reducer.write().await.push(self.runtime.runtime(), co, item).await
+	pub async fn push<T, I>(&self, identity: &I, co: &str, item: &T) -> Result<(), anyhow::Error>
+	where
+		T: Serialize + Send + Sync + Clone + 'static,
+		I: PrivateIdentity + Send + Sync,
+	{
+		self.reducer
+			.write()
+			.await
+			.push(self.runtime.runtime(), identity, co, item)
+			.await
 	}
 
 	/// Read co reducer state.

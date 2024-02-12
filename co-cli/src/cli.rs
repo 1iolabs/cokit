@@ -34,6 +34,14 @@ pub struct Cli {
 	/// Warning: This option is INSECURE only use when you know the implications.
 	#[arg(long, default_value_t = false)]
 	pub no_keychain: bool,
+
+	/// No output.
+	#[arg(short, default_value_t = false)]
+	pub quiet: bool,
+
+	/// Verbose level.
+	#[arg(short, default_value_t = 1)]
+	pub verbose: u8,
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]

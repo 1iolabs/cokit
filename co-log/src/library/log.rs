@@ -1,5 +1,5 @@
 use super::{entry::EntryBlock, get_entry_block::get_entry_blocks, join::JoinEntry, stream::create_stream};
-use crate::{library::clock::max_clock, Clock, Entry, Identity, IdentityResolver, LogError, PrivateIdentity};
+use crate::{library::clock::max_clock, Clock, Entry, IdentityResolverBox, LogError, PrivateIdentity};
 use co_primitives::Link;
 use co_storage::{BlockStorage, BlockStorageExt};
 use futures::Stream;
@@ -11,8 +11,7 @@ pub struct Log<S> {
 	id: Vec<u8>,
 
 	/// Identity.
-	identity: Box<dyn PrivateIdentity + Send + Sync>,
-	identity_resolver: Box<dyn IdentityResolver + Send + Sync>,
+	identity_resolver: IdentityResolverBox,
 
 	/// Current heads.
 	heads: BTreeSet<Cid>,
@@ -36,11 +35,7 @@ impl<S> Log<S> {
 		self.heads.iter()
 	}
 
-	pub fn identity(&self) -> &dyn Identity {
-		self.identity.as_ref()
-	}
-
-	pub fn identity_resolver(&self) -> &Box<dyn IdentityResolver + Send + Sync> {
+	pub fn identity_resolver(&self) -> &IdentityResolverBox {
 		&self.identity_resolver
 	}
 
@@ -63,23 +58,13 @@ impl<S> Log<S>
 where
 	S: BlockStorage + Sync + Send + 'static,
 {
-	pub fn new(
-		id: Vec<u8>,
-		identity: Box<dyn PrivateIdentity + Send + Sync>,
-		identity_resolver: Box<dyn IdentityResolver + Send + Sync>,
-		store: S,
-		heads: BTreeSet<Cid>,
-	) -> Self {
-		Log { id, identity, identity_resolver, heads, entry_store: store, index: Default::default() }
+	pub fn new(id: Vec<u8>, identity_resolver: IdentityResolverBox, store: S, heads: BTreeSet<Cid>) -> Self {
+		Log { id, identity_resolver, heads, entry_store: store, index: Default::default() }
 	}
 
 	/// Create new log with random ID.
-	pub fn create(
-		identity: Box<dyn PrivateIdentity + Send + Sync>,
-		identity_resolver: Box<dyn IdentityResolver + Send + Sync>,
-		store: S,
-	) -> Self {
-		Self::new(uuid::Uuid::new_v4().to_bytes_le().to_vec(), identity, identity_resolver, store, Default::default())
+	pub fn create(identity_resolver: IdentityResolverBox, store: S) -> Self {
+		Self::new(uuid::Uuid::new_v4().to_bytes_le().to_vec(), identity_resolver, store, Default::default())
 	}
 
 	pub async fn get(&self, cid: &Cid) -> Result<EntryBlock<S::StoreParams>, LogError> {
@@ -93,7 +78,11 @@ where
 	}
 
 	/// Push item as new entry.
-	pub async fn push(&mut self, item: Cid) -> Result<Link<Entry>, LogError> {
+	pub async fn push<I: PrivateIdentity + Send + Sync>(
+		&mut self,
+		identity: &I,
+		item: Cid,
+	) -> Result<Link<Entry>, LogError> {
 		// heads
 		let head_entries = get_entry_blocks(&self.entry_store, self.heads.iter()).await?;
 
@@ -101,7 +90,8 @@ where
 		let entry = Entry {
 			id: self.id().to_vec(),
 			clock: Clock::new(
-				self.identity.identity().as_bytes().to_vec(),
+				// todo: use peerid as the identity could be used one more devices?
+				identity.identity().as_bytes().to_vec(),
 				max_clock(head_entries.into_iter().map(|e| e.into())),
 			)
 			.next(),
@@ -109,7 +99,7 @@ where
 			next: self.heads().clone(),
 			refs: Default::default(),
 		};
-		let entry_block = EntryBlock::<S::StoreParams>::from_entry(self.identity.as_ref(), entry)?;
+		let entry_block = EntryBlock::<S::StoreParams>::from_entry(identity, entry)?;
 		let entry_cid = entry_block.cid().clone();
 
 		// set state
@@ -123,12 +113,13 @@ where
 
 	/// Push serializable item as new entry.
 	/// Returns the `Cid` of the `Entry`.
-	pub async fn push_event<T: Serialize + Send + Sync + Clone>(
-		&mut self,
-		item: &T,
-	) -> Result<(Link<Entry>, Link<T>), LogError> {
+	pub async fn push_event<T, I>(&mut self, identity: &I, item: &T) -> Result<(Link<Entry>, Link<T>), LogError>
+	where
+		T: Serialize + Send + Sync + Clone,
+		I: PrivateIdentity + Send + Sync,
+	{
 		let cid = self.entry_store.set_serialized(item).await?;
-		Ok((self.push(cid.clone()).await?.into(), cid.into()))
+		Ok((self.push(identity, cid.clone()).await?.into(), cid.into()))
 	}
 
 	pub async fn join_entry(&mut self, entry: EntryBlock<S::StoreParams>) -> Result<bool, LogError> {

@@ -37,6 +37,7 @@ mod tests {
 		hash::{Hash, Hasher},
 	};
 
+	#[derive(Debug, Clone)]
 	struct TestIdentity {
 		identity: &'static str,
 	}

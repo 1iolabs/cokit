@@ -62,7 +62,7 @@ pub struct EntryBlock<P> {
 	data: SignedEntry,
 }
 impl<P: StoreParams> EntryBlock<P> {
-	pub fn from_entry(identity: &dyn PrivateIdentity, entry: Entry) -> Result<Self, EntryError> {
+	pub fn from_entry<I: PrivateIdentity>(identity: &I, entry: Entry) -> Result<Self, EntryError> {
 		let block = BlockSerializer::<P>::new().serialize(&entry)?;
 		let signature = identity.sign(block.data())?;
 		Self::from_signed_entry(SignedEntry {
@@ -73,7 +73,7 @@ impl<P: StoreParams> EntryBlock<P> {
 		})
 	}
 
-	pub fn from_unsigned_block(identity: &dyn PrivateIdentity, block: Block<P>) -> Result<Self, EntryError> {
+	pub fn from_unsigned_block<I: PrivateIdentity>(identity: &I, block: Block<P>) -> Result<Self, EntryError> {
 		let entry = BlockSerializer::<P>::new().deserialize(&block)?;
 		Self::from_entry(identity, entry)
 	}

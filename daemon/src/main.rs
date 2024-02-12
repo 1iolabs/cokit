@@ -34,9 +34,12 @@ async fn main() {
 
 	// local
 	let local_co = application.local_co_reducer().await.expect("local-co");
+	let local_identity = application.local_identity();
 
 	// peer-id
-	let network_key = local_keypair_fetch(&local_co, cli.force_new_peer_id).await.expect("peer-id");
+	let network_key = local_keypair_fetch(&local_co, &local_identity, cli.force_new_peer_id)
+		.await
+		.expect("peer-id");
 
 	// driver: network
 	let _network = Network::new(network_key);

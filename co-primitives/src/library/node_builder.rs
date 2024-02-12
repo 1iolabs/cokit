@@ -173,6 +173,27 @@ mod tests {
 	}
 
 	#[test]
+	fn single() {
+		// build
+		let mut builder = NodeBuilder::<u8>::new(2, DefaultNodeSerializer::new());
+		builder.push(1).unwrap();
+
+		// blocks
+		let blocks = builder.into_blocks().unwrap();
+		assert_eq!(blocks.len(), 1);
+	}
+
+	#[test]
+	fn empty() {
+		// build
+		let builder = NodeBuilder::<u8>::new(2, DefaultNodeSerializer::new());
+
+		// blocks
+		let blocks = builder.into_blocks().unwrap();
+		assert_eq!(blocks.len(), 0);
+	}
+
+	#[test]
 	fn roundtrip() {
 		// build
 		let mut builder = NodeBuilder::<u8>::new(2, DefaultNodeSerializer::new());
@@ -182,8 +203,8 @@ mod tests {
 		builder.push(4).unwrap();
 		builder.push(5).unwrap();
 		builder.push(6).unwrap();
+		builder.push(7).unwrap();
 		builder.push(8).unwrap();
-		builder.push(9).unwrap();
 
 		// blocks
 		let blocks = builder.into_blocks().unwrap();

@@ -8,8 +8,9 @@ mod types;
 pub use application::{
 	application::{Application, ApplicationBuilder},
 	core_resolver::{CoCoreResolver, CoreResolver, CoreResolverError, SingleCoreResolver},
-	local::LocalCo,
+	local::LocalCoBuilder,
 	reducer::{Reducer, ReducerBuilder, ReducerChangedHandler},
+	shared::CreateCo,
 };
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 pub use co_primitives::{tags, BlockSerializer, MultiCodec, MultiCodecError, Tag, Tags};
@@ -19,8 +20,11 @@ pub use co_storage::{
 };
 pub use drivers::{network::Network, runtime::Runtime, storage::Storage};
 pub use library::{
-	generate_random_name::generate_random_name, keystore_fetch::keystore_fetch,
-	local_keypair_fetch::local_keypair_fetch, memberships::memberships,
+	find_membership::{find_membership, find_memberships},
+	generate_random_name::generate_random_name,
+	keystore_fetch::keystore_fetch,
+	local_keypair_fetch::local_keypair_fetch,
+	memberships::memberships,
 };
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},

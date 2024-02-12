@@ -27,6 +27,10 @@ impl PrivateIdentity for LocalIdentity {
 #[derive(Debug, Clone, Default)]
 pub struct LocalIdentityResolver {}
 impl LocalIdentityResolver {
+	pub fn new() -> Self {
+		Self {}
+	}
+
 	fn into_local_identity(identity: &str) -> Result<LocalIdentity, IdentityResolverError> {
 		if identity.starts_with("did:local:") {
 			return Ok(LocalIdentity { did: identity.to_owned() });
@@ -34,11 +38,8 @@ impl LocalIdentityResolver {
 		return Err(IdentityResolverError::NotFound);
 	}
 
-	pub fn private_identity(
-		&self,
-		identity: &str,
-	) -> Result<Box<dyn PrivateIdentity + Send + Sync>, IdentityResolverError> {
-		Ok(Box::new(Self::into_local_identity(identity)?))
+	pub fn private_identity(&self, identity: &str) -> Result<LocalIdentity, IdentityResolverError> {
+		Ok(Self::into_local_identity(identity)?)
 	}
 }
 impl IdentityResolver for LocalIdentityResolver {

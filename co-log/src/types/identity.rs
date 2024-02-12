@@ -43,9 +43,14 @@ pub enum IdentityResolverError {
 }
 
 pub trait IdentityResolver {
-	fn resolve(
-		&self,
-		identity: &str,
-		public_key: Option<&[u8]>,
-	) -> Result<Box<dyn Identity + Send + Sync>, IdentityResolverError>;
+	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<IdentityBox, IdentityResolverError>;
 }
+
+/// Dynamic Identity.
+pub type IdentityBox = Box<dyn Identity + Send + Sync>;
+
+/// Dynamic Private Identity.
+pub type PrivateIdentityBox = Box<dyn PrivateIdentity + Send + Sync>;
+
+/// Dynamic Identity Resolver.
+pub type IdentityResolverBox = Box<dyn IdentityResolver + Send + Sync>;

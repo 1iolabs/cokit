@@ -15,5 +15,8 @@ pub use library::{
 };
 pub use types::{
 	error::LogError,
-	identity::{Identity, IdentityResolver, IdentityResolverError, PrivateIdentity, SignError},
+	identity::{
+		Identity, IdentityBox, IdentityResolver, IdentityResolverBox, IdentityResolverError, PrivateIdentity,
+		PrivateIdentityBox, SignError,
+	},
 };

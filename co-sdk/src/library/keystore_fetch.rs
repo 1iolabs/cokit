@@ -1,9 +1,11 @@
 use crate::{CoReducer, CO_CORE_NAME_KEYSTORE};
 use co_core_keystore::{Key, KeyStore, KeyStoreAction};
+use co_log::PrivateIdentity;
 
 /// Get or create an key.
-pub async fn keystore_fetch<F: FnOnce() -> Key>(
+pub async fn keystore_fetch<F: FnOnce() -> Key, I: PrivateIdentity + Send + Sync>(
 	reducer: &CoReducer,
+	identity: &I,
 	key: &str,
 	create: F,
 	force_create: bool,
@@ -21,7 +23,7 @@ pub async fn keystore_fetch<F: FnOnce() -> Key>(
 
 	// store
 	reducer
-		.push(CO_CORE_NAME_KEYSTORE, &KeyStoreAction::Set(result.clone()))
+		.push(identity, CO_CORE_NAME_KEYSTORE, &KeyStoreAction::Set(result.clone()))
 		.await?;
 
 	// result

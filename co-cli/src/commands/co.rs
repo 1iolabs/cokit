@@ -1,6 +1,7 @@
 mod cat;
 mod create;
 mod ls;
+mod remove;
 
 use crate::cli::Cli;
 use exitcode::ExitCode;
@@ -22,6 +23,9 @@ pub enum Commands {
 
 	/// Create a new CO.
 	Create(create::Command),
+
+	/// Remove/Leave a CO.
+	Remove(remove::Command),
 }
 
 pub async fn command(cli: &Cli, co_command: &Command) -> Result<ExitCode, anyhow::Error> {
@@ -29,5 +33,6 @@ pub async fn command(cli: &Cli, co_command: &Command) -> Result<ExitCode, anyhow
 		Commands::Ls => ls::command(cli).await,
 		Commands::Cat(command) => cat::command(cli, command).await,
 		Commands::Create(command) => create::command(cli, command).await,
+		Commands::Remove(command) => remove::command(cli, command).await,
 	}
 }

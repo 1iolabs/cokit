@@ -1,15 +1,11 @@
+use super::shared::{CreateCo, SharedCoBuilder, SharedCoCreator};
 use crate::{
-	library::find_membership::find_membership, CoCoreResolver, CoReducer, CoStorage, LocalCo, ReducerBuilder, Runtime,
-	Storage, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	library::find_membership::find_membership, CoReducer, CoStorage, LocalCoBuilder, Runtime, Storage,
+	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
-use co_core_co::CoAction;
-use co_core_keystore::{Key, KeyStoreAction};
-use co_core_membership::{Membership, MembershipsAction};
-use co_log::{LocalIdentityResolver, Log};
-use co_primitives::tags;
+use co_log::{LocalIdentity, LocalIdentityResolver};
 use co_runtime::RuntimePool;
-use co_storage::{Algorithm, EncryptedBlockStorage, Secret};
 use directories::ProjectDirs;
 use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
@@ -73,51 +69,34 @@ impl Application {
 
 	/// Creates a CoReducer instance of the Local CO.
 	async fn create_local_co_instance(&self) -> Result<CoReducer, anyhow::Error> {
-		let local_co = LocalCo::new(self.identifier.clone(), self.application_path.clone(), self.keychain);
-		let local_co_reducer = local_co.into_reducer(self.storage(), self.runtime.clone()).await?;
+		let local_co = LocalCoBuilder::new(
+			self.identifier.clone(),
+			self.application_path.clone(),
+			self.keychain,
+			self.local_identity(),
+		);
+		let local_co_reducer = local_co.build(self.storage(), self.runtime.clone()).await?;
 		Ok(local_co_reducer)
 	}
 
 	/// Creates a CoReducer instance a CO which we have a membership for.
 	///
 	/// Todo: Identity
-	async fn create_co_instance(&self, local: CoReducer, co: &str) -> Result<Option<CoReducer>, anyhow::Error> {
-		let membership = match find_membership(local.clone(), co).await? {
+	async fn create_co_instance(&self, parent: CoReducer, co: &str) -> Result<Option<CoReducer>, anyhow::Error> {
+		let membership = match find_membership(&parent, co).await? {
 			Some(m) => m,
 			None => return Ok(None),
 		};
-
-		// storage
-		let storage: CoStorage = match &membership.key {
-			Some(key_reference) => {
-				let key_store: co_core_keystore::KeyStore = local.state(CO_CORE_NAME_KEYSTORE).await?;
-				let key = key_store
-					.shared_key(key_reference)
-					.ok_or(anyhow!("Shared key not found: {}", key_reference))?;
-				CoStorage::new(EncryptedBlockStorage::new(self.storage(), Secret::new(key.clone()), Default::default()))
-			},
-			None => self.storage(),
-		};
-
-		// log
-		let log = Log::new(
-			co.as_bytes().to_vec(),
-			LocalIdentityResolver::default().private_identity("did:local:device")?,
-			Box::new(LocalIdentityResolver::default()),
-			storage,
-			membership.heads.clone(),
-		);
-
-		// reducer
-		let reducer = ReducerBuilder::new(CoCoreResolver::default(), log)
-			.with_latest_state(membership.state, membership.heads.clone())
-			.build(self.runtime())
+		let reducer = SharedCoBuilder::new(parent, membership)
+			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
+			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
+			.build(self.storage(), self.runtime.clone(), self.local_identity())
 			.await?;
+		Ok(Some(reducer))
+	}
 
-		// todo: setup auto write to local co
-
-		// result
-		Ok(Some(CoReducer::new(self.runtime.clone(), reducer)))
+	pub fn local_identity(&self) -> LocalIdentity {
+		LocalIdentityResolver::default().private_identity("did:local:device").unwrap()
 	}
 
 	/// Get instance of Local CoReducer.
@@ -176,81 +155,23 @@ impl Application {
 	///
 	/// Todo:
 	/// - Identity
-	/// - Public
 	/// - Cleanup when something fails?
-	pub async fn create_co(&self, co: &str, name: &str) -> Result<CoReducer, anyhow::Error> {
+	pub async fn create_co(&self, create: CreateCo) -> Result<CoReducer, anyhow::Error> {
 		// local
 		let local = self.local_co_reducer().await?;
 
-		// storage
-		let secret = Algorithm::default().generate_serect();
-		let storage: CoStorage =
-			CoStorage::new(EncryptedBlockStorage::new(self.storage(), secret.clone(), Default::default()));
+		// identity
+		let identity = self.local_identity();
 
-		// log
-		let log = Log::new(
-			co.as_bytes().to_vec(),
-			LocalIdentityResolver::default().private_identity("did:local:device")?,
-			Box::new(LocalIdentityResolver::default()),
-			storage,
-			Default::default(),
-		);
-
-		// reducer
-		let mut reducer = ReducerBuilder::new(CoCoreResolver::default(), log)
-			.build(self.runtime())
+		// create
+		let co = SharedCoCreator::new(local, create)
+			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
+			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
+			.create(self.storage(), self.runtime.clone(), identity)
 			.await?;
 
-		// initialize
-		reducer
-			.push(
-				self.runtime(),
-				CO_CORE_NAME_CO,
-				&CoAction::Create {
-					id: co.to_owned(),
-					name: name.to_owned(),
-					cores: Default::default(),
-					participants: Default::default(),
-				},
-			)
-			.await?;
-		let state = reducer.state().ok_or(anyhow!("Excpected state after create"))?;
-
-		// store key
-		let key_uri = format!("urn:{}:{}", co, uuid::Uuid::new_v4());
-		let key = Key {
-			uri: key_uri.clone(),
-			name: format!("co ({})", co),
-			description: "".to_owned(),
-			secret: co_core_keystore::Secret::SharedKey(secret.divulge().clone()),
-			tags: tags!(),
-		};
-		local.push(CO_CORE_NAME_KEYSTORE, &KeyStoreAction::Set(key)).await?;
-
-		// add membership to local co
-		let membership: Membership = Membership {
-			did: reducer.log().identity().identity().to_owned(),
-			heads: reducer.heads().clone(),
-			id: co.to_owned(),
-			key: Some(key_uri),
-			membership_state: co_core_membership::MembershipState::Active,
-			state,
-			tags: tags!(),
-		};
-		local
-			.push(CO_CORE_NAME_MEMBERSHIP, &MembershipsAction::Join(membership))
-			.await?;
-
-		// todo: setup auto write to local co
-
-		// co reducer
-		let co_reducer = CoReducer::new(self.runtime.clone(), reducer);
-
-		// store
-		self.reducers.write().await.insert(co.to_owned(), co_reducer.clone());
-
-		// result
-		Ok(co_reducer)
+		// load
+		Ok(self.co_reducer(&co).await?.ok_or(anyhow!("Open CO failed: {}", co))?)
 	}
 
 	/// Initialize application.
@@ -284,14 +205,18 @@ pub struct ApplicationBuilder {
 	keychain: bool,
 }
 impl ApplicationBuilder {
+	pub fn default_path() -> PathBuf {
+		let dirs = ProjectDirs::from("co.app", "1io", "co").expect("home directory");
+		dirs.data_dir().into()
+	}
+
 	/// Create new instance with path.
 	pub fn new_with_path(identifier: String, path: PathBuf) -> Self {
 		Self { identifier, path, log: Logging::None, keychain: true }
 	}
 
 	pub fn new(identifier: String) -> Self {
-		let dirs = ProjectDirs::from("co.app", "1io", "co").expect("home directory");
-		Self::new_with_path(identifier, dirs.data_dir().into())
+		Self::new_with_path(identifier, Self::default_path())
 	}
 
 	/// Enable bunyan logging to log_path.
@@ -304,7 +229,7 @@ impl ApplicationBuilder {
 		let log_path = match log_path {
 			Some(p) => p,
 			//None => self.path.join("log").join(format!("{}.log", &self.identifier)),
-			None => self.path.join("log").join("application.log"),
+			None => self.path.join("log").join("co.log"),
 		};
 		Self { log: Logging::Bunyan(log_path), ..self }
 	}
