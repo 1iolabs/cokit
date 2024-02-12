@@ -164,7 +164,7 @@ impl SharedCoCreator {
 		let state = reducer.state().ok_or(anyhow::anyhow!("Expected state after create"))?;
 
 		// store key in parent co
-		let key = if let Some((_, secret)) = encrypted_storage {
+		let (key, encryption_mapping) = if let Some((encrypted_storage, secret)) = encrypted_storage {
 			let key_uri = format!("urn:co:{}:{}", self.co.id, uuid::Uuid::new_v4());
 			let key = Key {
 				uri: key_uri.clone(),
@@ -176,9 +176,9 @@ impl SharedCoCreator {
 			self.parent
 				.push(&identity, &self.keystore_core_name, &KeyStoreAction::Set(key))
 				.await?;
-			Some(key_uri)
+			(Some(key_uri), encrypted_storage.flush_mapping().await?)
 		} else {
-			None
+			(None, None)
 		};
 
 		// add membership to parent co
@@ -187,7 +187,7 @@ impl SharedCoCreator {
 			did: identity.identity().to_owned(),
 			heads: reducer.heads().clone(),
 			state,
-			encryption_mapping: None,
+			encryption_mapping,
 			key,
 			membership_state: co_core_membership::MembershipState::Active,
 			tags: tags!(),

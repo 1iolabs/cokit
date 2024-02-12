@@ -1,4 +1,5 @@
 use crate::commands::{cbor, co};
+use clap::ArgAction;
 use std::path::PathBuf;
 
 pub const APP_IDENTIFIER: &str = "co-cli";
@@ -40,7 +41,7 @@ pub struct Cli {
 	pub quiet: bool,
 
 	/// Verbose level.
-	#[arg(short, default_value_t = 1)]
+	#[arg(short, default_value_t = 1, action = ArgAction::Count)]
 	pub verbose: u8,
 }
 
