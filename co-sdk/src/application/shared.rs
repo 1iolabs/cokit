@@ -10,6 +10,7 @@ use co_core_membership::{Membership, MembershipsAction};
 use co_log::{Log, PrivateIdentity};
 use co_primitives::tags;
 use co_storage::{Algorithm, EncryptedBlockStorage, Secret};
+use serde::{Deserialize, Serialize};
 
 /// Shared CO Builder.
 /// The Shared CO state is sptrend in an membership of an other CO (typicalle the Local CO).
@@ -92,6 +93,7 @@ impl SharedCoBuilder {
 	}
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateCo {
 	pub id: String,
 	pub name: String,

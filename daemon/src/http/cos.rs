@@ -1,6 +1,6 @@
 use crate::types::http_error::HttpResult;
 use axum::{Extension, Json};
-use co_sdk::{memberships, CoReducer, Tags};
+use co_sdk::{memberships, Application, CoReducer, CreateCo, Tags};
 use futures::StreamExt;
 use hyper::StatusCode;
 use libipld::Cid;
@@ -37,6 +37,12 @@ pub async fn get(local_co: Extension<CoReducer>) -> HttpResult<(StatusCode, Json
 /// Method: POST
 /// Route: /cos
 #[axum_macros::debug_handler]
-pub async fn post(Json(_payload): Json<Value>) -> HttpResult<(StatusCode, Json<Value>)> {
-	unimplemented!()
+pub async fn post(
+	application: Extension<Application>,
+	Json(payload): Json<Value>,
+) -> HttpResult<(StatusCode, Json<Value>)> {
+	let body: CreateCo = serde_json::from_value(payload)?;
+	let id = body.id.clone();
+	application.create_co(body).await?;
+	Ok((StatusCode::OK, Json(id.into())))
 }
