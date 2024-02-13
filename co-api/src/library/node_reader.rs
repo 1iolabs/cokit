@@ -3,14 +3,14 @@ use libipld::{cbor::DagCborCodec, Cid};
 use serde::de::DeserializeOwned;
 use std::collections::VecDeque;
 
-pub fn node_reader<'a, T>(storage: &'a dyn Storage, cid: &'a Cid) -> impl Iterator<Item = Result<T, String>> + 'a
+pub fn node_reader<'a, T>(storage: &'a dyn Storage, cid: Option<Cid>) -> impl Iterator<Item = Result<T, String>> + 'a
 where
 	T: Clone + DeserializeOwned + 'static,
 {
 	NodeIterator::new(storage, cid)
 }
 
-struct NodeIterator<'a, T>
+pub struct NodeIterator<'a, T>
 where
 	T: 'a + Clone + DeserializeOwned,
 {
@@ -23,9 +23,11 @@ impl<'a, T> NodeIterator<'a, T>
 where
 	T: Clone + DeserializeOwned,
 {
-	pub fn new(storage: &'a dyn Storage, cid: &Cid) -> Self {
+	pub fn new(storage: &'a dyn Storage, cid: Option<Cid>) -> Self {
 		let mut stack = VecDeque::new();
-		stack.push_front(cid.clone());
+		if let Some(cid) = cid {
+			stack.push_front(cid.clone());
+		}
 		Self { storage, stack, entries: Default::default() }
 	}
 }

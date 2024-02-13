@@ -16,7 +16,7 @@ pub use library::{
 	storage_ext::{StorageError, StorageExt},
 };
 pub use types::{
-	dag_link::{CreateLink, DagLink, DagMap, DagSet, DagVec, FromLink},
+	dag_link::{CreateLink, DagLink, DagMap, DagSet, DagVec, FromLink, LinkIterator},
 	reducer::{Context, Reducer},
 	storage::Storage,
 };
