@@ -1,4 +1,4 @@
-use co_api::{CreateLink, DagMap, DagSet, FromLink, Reducer, Storage, Tags};
+use co_api::{CreateLink, DagMap, DagSet, FromLink, LinkIterator, Reducer, Storage, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -51,9 +51,8 @@ impl Reducer for Pin {
 			// get current tags for cid
 				if let Some(current_tags) = pin_map.get(cid).cloned() {
 					// remove given tag from array
-					// TODO: use new iter function here
-					let new_tags_tags =
-						DagSet::to_link(current_tags.from_link(s).into_iter().filter(|i| *i != *tags).collect(), s);
+					let resolved_tags = current_tags.iter(s).filter_map(|t| t.ok()).filter(|t| *t != *tags).collect();
+					let new_tags_tags = DagSet::to_link(resolved_tags, s);
 					// TODO: validate if something got removed?
 
 					// update map
