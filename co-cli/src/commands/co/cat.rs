@@ -39,6 +39,7 @@ pub async fn command(cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::E
 	// output
 	if command.pretty {
 		if MultiCodec::CoEncryptedBlock == cid.codec().into() {
+			println!("Codec: {:?} ({})", Into::<MultiCodec>::into(cid.codec()), cid.codec());
 			println!("Cid: {}", block.cid());
 		}
 		let codec = MultiCodec::from(block.cid().codec());
