@@ -9,6 +9,10 @@ pub struct Command {
 
 	/// CO Name
 	pub name: Option<String>,
+
+	/// Public (unencrypted)
+	#[arg(short, default_value_t = false)]
+	pub public: bool,
 }
 
 pub async fn command(cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
@@ -17,7 +21,7 @@ pub async fn command(cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::E
 	// create
 	let create = CreateCo {
 		id: command.co.clone(),
-		algorithm: Some(Default::default()),
+		algorithm: if command.public { None } else { Some(Default::default()) },
 		name: command.name.as_ref().unwrap_or(&command.co).clone(),
 	};
 	let reducer = application.create_co(create).await?;
