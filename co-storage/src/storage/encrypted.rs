@@ -17,11 +17,6 @@ use std::{
 };
 use tokio::sync::RwLock;
 
-pub trait Encryption {
-	fn key(&self) -> &Secret;
-	fn algorithm(&self) -> Algorithm;
-}
-
 #[derive(Debug)]
 pub struct EncryptedStorage<S> {
 	key: Secret,
@@ -47,15 +42,6 @@ impl<S> EncryptedStorage<S> {
 	/// Consume storage and return next layer.
 	pub fn into_storage(self) -> S {
 		self.next
-	}
-}
-impl<S> Encryption for EncryptedStorage<S> {
-	fn key(&self) -> &Secret {
-		&self.key
-	}
-
-	fn algorithm(&self) -> Algorithm {
-		self.algorithm
 	}
 }
 impl<S> EncryptedStorage<S>
@@ -158,15 +144,6 @@ pub struct EncryptedBlockStorage<S> {
 	algorithm: Algorithm,
 	next: S,
 	mapping: Arc<RwLock<BlockMapping>>,
-}
-impl<S> Encryption for EncryptedBlockStorage<S> {
-	fn key(&self) -> &Secret {
-		&self.key
-	}
-
-	fn algorithm(&self) -> Algorithm {
-		self.algorithm
-	}
 }
 impl<S> EncryptedBlockStorage<S>
 where
