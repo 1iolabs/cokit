@@ -1,218 +1,169 @@
-use crate::{library::node_reader::node_reader, Storage};
-use co_primitives::NodeBuilder;
-use libipld::Cid;
+use crate::{library::node_reader::node_reader, NodeReaderError, Storage};
+use co_primitives::{Link, Linkable, NodeBuilder};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
+	cmp::Ord,
 	collections::{BTreeMap, BTreeSet},
-	marker::PhantomData,
 };
 
-/**
- * Simple trait for creating a DagLink type object
- */
-pub trait CreateLink {
-	type IntoIterator;
-	fn to_link(i: Self::IntoIterator, s: &mut dyn Storage) -> Self;
-}
+/// Simple trait for creating a DagLink type object
+pub trait DagCollection: Sized {
+	type Item: Clone + Serialize + DeserializeOwned + 'static;
+	type Collection: Clone + IntoIterator<Item = Self::Item> + FromIterator<Self::Item>;
 
-/**
- * Simple trait for recreating pure data from DagLink type object
- */
-pub trait FromLink {
-	type IntoIterator;
-	fn from_link(&self, s: &dyn Storage) -> Self::IntoIterator;
-}
+	fn link(&self) -> Option<Link<Self::Collection>>;
+	fn set_link(&mut self, link: Option<Link<Self::Collection>>);
 
-/**
- * Simple trait for creating an iterator from a DagLink type
- */
-pub trait LinkIterator {
-	type IteratorItem;
-	fn iter(&self, s: &dyn Storage) -> impl Iterator<Item = Self::IteratorItem>;
-}
-
-/**
- * A wrapper type for DagLink types that use vectors
- */
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DagVec<V>(DagLink<Vec<V>, V>)
-where
-	V: Clone + Serialize;
-
-impl<V> CreateLink for DagVec<V>
-where
-	V: Clone + Serialize,
-{
-	type IntoIterator = Vec<V>;
-	fn to_link(i: Self::IntoIterator, s: &mut dyn Storage) -> Self {
-		Self(DagLink::to_link(i, s))
+	fn set(&mut self, storage: &mut dyn Storage, items: Self::Collection) {
+		self.set_link(Self::to_link(storage, items.into_iter()))
 	}
-}
 
-impl<V> FromLink for DagVec<V>
-where
-	V: Clone + Serialize + DeserializeOwned + 'static,
-{
-	type IntoIterator = Vec<V>;
-	fn from_link(&self, s: &dyn Storage) -> Self::IntoIterator {
-		self.0.from_link(s)
+	fn get(&self, storage: &dyn Storage) -> Self::Collection {
+		self.from_link(storage).expect("Valid serialized data")
 	}
-}
 
-impl<V> LinkIterator for DagVec<V>
-where
-	V: Clone + Serialize + DeserializeOwned + 'static,
-{
-	type IteratorItem = Result<V, String>;
-
-	fn iter(&self, s: &dyn Storage) -> impl Iterator<Item = Self::IteratorItem> {
-		self.0.iter(s)
+	fn iter(&self, storage: &dyn Storage) -> impl Iterator<Item = Self::Item> {
+		node_reader::<Self::Item>(storage, self.link().map(|link| link.cid().clone()))
+			.map(|item| item.expect("Valid serialized data"))
 	}
-}
 
-/**
- * A wrapper for DagLink types that use the BTreeSet type
- */
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DagSet<V>(DagLink<BTreeSet<V>, V>)
-where
-	V: Ord + Clone + Serialize;
-
-impl<V> CreateLink for DagSet<V>
-where
-	V: Ord + Clone + Serialize,
-{
-	type IntoIterator = BTreeSet<V>;
-	fn to_link(i: Self::IntoIterator, s: &mut dyn Storage) -> Self {
-		Self(DagLink::to_link(i, s))
+	fn try_iter(&self, storage: &dyn Storage) -> impl Iterator<Item = Result<Self::Item, NodeReaderError>> {
+		node_reader::<Self::Item>(storage, self.link().map(|link| link.cid().clone()))
 	}
-}
 
-impl<V> FromLink for DagSet<V>
-where
-	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
-{
-	type IntoIterator = BTreeSet<V>;
-	fn from_link(&self, s: &dyn Storage) -> Self::IntoIterator {
-		self.0.from_link(s)
-	}
-}
-
-impl<V> LinkIterator for DagSet<V>
-where
-	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
-{
-	type IteratorItem = Result<V, String>;
-	fn iter(&self, s: &dyn Storage) -> impl Iterator<Item = Self::IteratorItem> {
-		self.0.iter(s)
-	}
-}
-
-/**
- * A wrapper for DagLink types that use the BTreeMap type
- */
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DagMap<K, V>(DagLink<BTreeMap<K, V>, (K, V)>)
-where
-	K: std::cmp::Ord + Clone + Serialize,
-	V: Clone + Serialize;
-
-impl<K, V> CreateLink for DagMap<K, V>
-where
-	K: std::cmp::Ord + Clone + Serialize,
-	V: Clone + Serialize,
-{
-	type IntoIterator = BTreeMap<K, V>;
-	fn to_link(i: Self::IntoIterator, s: &mut dyn Storage) -> Self {
-		Self(DagLink::to_link(i, s))
-	}
-}
-
-impl<K, V> FromLink for DagMap<K, V>
-where
-	K: std::cmp::Ord + Clone + Serialize,
-	V: Clone + Serialize,
-	(K, V): DeserializeOwned + 'static,
-{
-	type IntoIterator = BTreeMap<K, V>;
-	fn from_link(&self, s: &dyn Storage) -> Self::IntoIterator {
-		self.0.from_link(s)
-	}
-}
-
-impl<K, V> LinkIterator for DagMap<K, V>
-where
-	K: Ord + Clone + Serialize,
-	V: Clone + Serialize,
-	(K, V): DeserializeOwned + 'static,
-{
-	type IteratorItem = Result<(K, V), String>;
-	fn iter(&self, s: &dyn Storage) -> impl Iterator<Item = Self::IteratorItem> {
-		self.0.iter(s)
-	}
-}
-
-/**
- * A wrapper type for any iterable data. Will implement FromBlocks and IntoBlocks traits for easy conversion between
- * data and CIDs
- * Types this is mainly used for: Vec, BTreeSet, BTreeMap
- */
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DagLink<I, V>
-where
-	I: IntoIterator<Item = V>,
-{
-	#[serde(skip)]
-	_p_data: PhantomData<I>,
-	pub cid: Option<Cid>,
-}
-
-impl<I, V> CreateLink for DagLink<I, V>
-where
-	I: IntoIterator<Item = V>,
-	V: Clone + Serialize,
-{
-	type IntoIterator = I;
-	fn to_link(items: Self::IntoIterator, s: &mut dyn Storage) -> Self {
-		let mut node_builder = NodeBuilder::<V>::default();
+	fn to_link(
+		storage: &mut dyn Storage,
+		items: impl IntoIterator<Item = Self::Item>,
+	) -> Option<Link<Self::Collection>> {
+		let mut node_builder = NodeBuilder::<Self::Item>::default();
 		for item in items {
 			node_builder.push(item).unwrap();
 		}
 		let blocks = node_builder.into_blocks().unwrap();
-		if let Some(first_block) = blocks.first().cloned() {
-			for block in blocks {
-				s.set(block);
+		let mut result = None;
+		for block in blocks {
+			let cid = storage.set(block);
+			if result.is_none() {
+				result = Some(Link::new(cid));
 			}
-			Self { _p_data: PhantomData::default(), cid: Some(first_block.cid().clone()) }
+		}
+		result
+	}
+
+	fn from_link(&self, storage: &dyn Storage) -> Result<Self::Collection, NodeReaderError> {
+		self.try_iter(storage).collect()
+	}
+}
+
+/// A wrapper type for DagLink types that use vectors
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct DagVec<V>(Option<Link<Vec<V>>>);
+impl<V> DagVec<V>
+where
+	V: Clone + Serialize + DeserializeOwned + 'static,
+{
+	pub fn create(storage: &mut dyn Storage, items: impl IntoIterator<Item = <Self as DagCollection>::Item>) -> Self {
+		Self(Self::to_link(storage, items))
+	}
+}
+impl<V> Clone for DagVec<V> {
+	fn clone(&self) -> Self {
+		Self(self.0.clone())
+	}
+}
+impl<V> Default for DagVec<V> {
+	fn default() -> Self {
+		Self(None)
+	}
+}
+impl<V> DagCollection for DagVec<V>
+where
+	V: Clone + Serialize + DeserializeOwned + 'static,
+{
+	type Item = V;
+	type Collection = Vec<Self::Item>;
+
+	fn link(&self) -> Option<Link<Self::Collection>> {
+		self.0.clone()
+	}
+
+	fn set_link(&mut self, link: Option<Link<Self::Collection>>) {
+		self.0 = link;
+	}
+}
+
+/// A wrapper for DagLink types that use the BTreeSet type
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DagSet<V: Ord>(Option<Link<BTreeSet<V>>>);
+impl<V> DagSet<V>
+where
+	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
+{
+	pub fn create(storage: &mut dyn Storage, items: impl IntoIterator<Item = <Self as DagCollection>::Item>) -> Self {
+		Self(Self::to_link(storage, items))
+	}
+
+	/// Adds a value to the set.
+	pub fn insert(&mut self, storage: &mut dyn Storage, value: V) -> bool {
+		let mut set = self.get(storage);
+		if set.insert(value) {
+			self.set(storage, set);
+			true
 		} else {
-			Self { _p_data: PhantomData::default(), cid: None }
+			false
 		}
 	}
 }
-
-impl<I, V> FromLink for DagLink<I, V>
+impl<V: Ord> Default for DagSet<V> {
+	fn default() -> Self {
+		Self(None)
+	}
+}
+impl<V> DagCollection for DagSet<V>
 where
-	I: IntoIterator<Item = V> + FromIterator<V>,
-	V: Clone + Serialize + DeserializeOwned + 'static,
+	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
 {
-	type IntoIterator = I;
-	fn from_link(&self, s: &dyn Storage) -> Self::IntoIterator {
-		let node_reader = node_reader::<V>(s, self.cid);
-		if let Ok(c) = node_reader.collect() {
-			return I::from_iter::<I>(c);
-		}
-		I::from_iter(std::iter::empty())
+	type Item = V;
+	type Collection = BTreeSet<Self::Item>;
+
+	fn link(&self) -> Option<Link<Self::Collection>> {
+		self.0.clone()
+	}
+
+	fn set_link(&mut self, link: Option<Link<Self::Collection>>) {
+		self.0 = link;
 	}
 }
 
-impl<I, V> LinkIterator for DagLink<I, V>
+/// A wrapper for DagLink types that use the BTreeMap type
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DagMap<K, V>(Option<Link<BTreeMap<K, V>>>)
 where
-	I: IntoIterator<Item = V>,
-	V: Clone + Serialize + DeserializeOwned + 'static,
+	K: Ord + Clone + Serialize,
+	V: Clone + Serialize;
+impl<K, V> DagMap<K, V>
+where
+	K: Ord + Clone + Serialize + DeserializeOwned + 'static,
+	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
 {
-	type IteratorItem = Result<V, String>;
-	fn iter(&self, s: &dyn Storage) -> impl Iterator<Item = Self::IteratorItem> {
-		node_reader(s, self.cid)
+	pub fn create(storage: &mut dyn Storage, items: impl IntoIterator<Item = <Self as DagCollection>::Item>) -> Self {
+		Self(Self::to_link(storage, items))
+	}
+}
+impl<K, V> DagCollection for DagMap<K, V>
+where
+	K: Ord + Clone + Serialize + DeserializeOwned + 'static,
+	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
+{
+	type Item = (K, V);
+	type Collection = BTreeMap<K, V>;
+
+	fn link(&self) -> Option<Link<Self::Collection>> {
+		self.0.clone()
+	}
+
+	fn set_link(&mut self, link: Option<Link<Self::Collection>>) {
+		self.0 = link;
 	}
 }
 
@@ -220,7 +171,7 @@ where
 mod test {
 	use super::DagSet;
 	use crate::{
-		types::dag_link::{CreateLink, DagVec, FromLink},
+		types::dag_link::{DagCollection, DagVec},
 		DagMap,
 	};
 	use co_storage::{MemoryStorage, Storage};
@@ -253,8 +204,8 @@ mod test {
 			"memory".to_owned(),
 			"usage".to_owned(),
 		];
-		let dag_vec = DagVec::to_link(original_vec.clone(), &mut s);
-		let restored_vec = dag_vec.from_link(&s);
+		let dag_vec: DagVec<String> = DagVec::create(&mut s, original_vec.clone());
+		let restored_vec = dag_vec.get(&s);
 		let json = serde_json::to_string_pretty(&dag_vec).unwrap();
 		println!("Serialized: {json}");
 		println!("Original vector: {:?}", original_vec);
@@ -276,8 +227,8 @@ mod test {
 		original_set.insert("zesty".into());
 
 		let mut s = TestStorage { mem_storage: MemoryStorage::new() };
-		let dag_set = DagSet::to_link(original_set.clone(), &mut s);
-		let restored_set = dag_set.from_link(&s);
+		let dag_set = DagSet::create(&mut s, original_set.clone());
+		let restored_set = dag_set.get(&s);
 		let json = serde_json::to_string_pretty(&dag_set).unwrap();
 		println!("Serialized: {json}");
 		assert_eq!(original_set, restored_set);
@@ -293,8 +244,8 @@ mod test {
 		original_map.insert("zesty".into(), "zesty".into());
 
 		let mut s = TestStorage { mem_storage: MemoryStorage::new() };
-		let dag_map = DagMap::to_link(original_map.clone(), &mut s);
-		let restored_map = dag_map.from_link(&s);
+		let dag_map = DagMap::create(&mut s, original_map.clone());
+		let restored_map = dag_map.get(&s);
 		assert_eq!(original_map, restored_map);
 	}
 }

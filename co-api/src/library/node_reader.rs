@@ -3,7 +3,19 @@ use libipld::{cbor::DagCborCodec, Cid};
 use serde::de::DeserializeOwned;
 use std::collections::VecDeque;
 
-pub fn node_reader<'a, T>(storage: &'a dyn Storage, cid: Option<Cid>) -> impl Iterator<Item = Result<T, String>> + 'a
+#[derive(Debug, thiserror::Error)]
+pub enum NodeReaderError {
+	#[error("Invalid argument")]
+	InvalidArgument,
+
+	#[error("Decide failed")]
+	Decode(#[source] anyhow::Error),
+}
+
+pub fn node_reader<'a, T>(
+	storage: &'a dyn Storage,
+	cid: Option<Cid>,
+) -> impl Iterator<Item = Result<T, NodeReaderError>> + 'a
 where
 	T: Clone + DeserializeOwned + 'static,
 {
@@ -36,7 +48,8 @@ impl<'a, T> Iterator for NodeIterator<'a, T>
 where
 	T: 'a + Clone + DeserializeOwned,
 {
-	type Item = Result<T, String>;
+	type Item = Result<T, NodeReaderError>;
+
 	fn next(&mut self) -> Option<Self::Item> {
 		// read node
 		while self.entries.is_empty() && !self.stack.is_empty() {
@@ -59,15 +72,15 @@ where
 	}
 }
 
-fn read_node<T: Clone + DeserializeOwned>(storage: &dyn Storage, cid: &Cid) -> Result<Node<T>, String> {
+fn read_node<T: Clone + DeserializeOwned>(storage: &dyn Storage, cid: &Cid) -> Result<Node<T>, NodeReaderError> {
 	// get block
 	let block = storage.get(cid);
 	if block.cid().codec() != Into::<u64>::into(DagCborCodec) {
-		return Err("Invalid".into())
+		return Err(NodeReaderError::InvalidArgument)
 	}
 
 	// get node
-	let node: Node<T> = serde_ipld_dagcbor::from_slice(block.data()).unwrap();
+	let node: Node<T> = serde_ipld_dagcbor::from_slice(block.data()).map_err(|e| NodeReaderError::Decode(e.into()))?;
 
 	// result
 	Ok(node)
