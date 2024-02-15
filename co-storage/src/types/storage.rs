@@ -20,7 +20,7 @@ pub enum StorageError {
 	/// Block not found error.
 	/// This error is may be temporarily as the block may comes availabvle on the network.
 	#[error("Block not found: {0}")]
-	NotFound(Cid),
+	NotFound(Cid, #[source] anyhow::Error),
 
 	/// Internal storage error.
 	/// This indicates some invalid state and is not be retriable with same parameters.

@@ -2,6 +2,7 @@ use crate::types::{
 	block::{BlockStat, BlockStorage},
 	storage::{Storage, StorageError},
 };
+use anyhow::anyhow;
 use async_trait::async_trait;
 use libipld::{Block, Cid, DefaultParams};
 use std::{collections::BTreeMap, sync::Arc};
@@ -58,7 +59,7 @@ impl Storage for MemoryStorage {
 		self.records
 			.get(cid)
 			.map(|r| r.block.clone())
-			.ok_or(StorageError::NotFound(cid.clone()))
+			.ok_or(StorageError::NotFound(cid.clone(), anyhow!("no record")))
 	}
 
 	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {
@@ -90,7 +91,7 @@ impl BlockStorage for MemoryBlockStorage {
 			.await
 			.get(cid)
 			.map(|r| r.block.clone())
-			.ok_or(StorageError::NotFound(cid.clone()))
+			.ok_or(StorageError::NotFound(cid.clone(), anyhow!("no record")))
 	}
 
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
@@ -115,7 +116,7 @@ impl BlockStorage for MemoryBlockStorage {
 			.await
 			.get(cid)
 			.map(|r| BlockStat { size: r.block.data().len() as u64 })
-			.ok_or(StorageError::NotFound(cid.clone()))
+			.ok_or(StorageError::NotFound(cid.clone(), anyhow!("no record")))
 	}
 }
 

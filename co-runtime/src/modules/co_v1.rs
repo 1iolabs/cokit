@@ -45,7 +45,7 @@ impl CoV1Api {
 	/// Whether is error is retriable with same parameters.
 	fn is_retriable(error: &StorageError) -> bool {
 		match error {
-			StorageError::NotFound(_) => true,
+			StorageError::NotFound(_, _) => true,
 			_ => false,
 		}
 	}

@@ -48,7 +48,7 @@ impl Default for Config {
 	}
 }
 
-pub struct Behavior {
+pub struct Behaviour {
 	/// Pending events to return from `poll`.
 	pending_events: VecDeque<ToSwarm<Event, MessageProtocol>>,
 	/// The currently connected peers, their pending outbound and inbound responses and their known,
@@ -61,7 +61,7 @@ pub struct Behavior {
 	config: Config,
 }
 
-impl Behavior {
+impl Behaviour {
 	pub fn new(config: Config) -> Self {
 		Self { pending_events: VecDeque::new(), connected: HashMap::new(), pending_outbound: HashMap::new(), config }
 	}
@@ -78,7 +78,7 @@ impl Behavior {
 	}
 }
 
-impl Behavior {
+impl Behaviour {
 	/// Tries to send a message by queueing an appropriate event to be
 	/// emitted to the `Swarm`. If the peer is not currently connected,
 	/// the given request is return unchanged.
@@ -198,13 +198,13 @@ impl Behavior {
 	}
 }
 
-impl Default for Behavior {
+impl Default for Behaviour {
 	fn default() -> Self {
 		Self::new(Default::default())
 	}
 }
 
-impl NetworkBehaviour for Behavior {
+impl NetworkBehaviour for Behaviour {
 	type ConnectionHandler = Handler;
 	type ToSwarm = Event;
 

@@ -534,7 +534,7 @@ mod tests {
 		assert_eq!(encryption.get(block.cid()).unwrap(), block);
 
 		// validate that the CID dosn't exist in parent storage layer
-		assert!(matches!(encryption.storage().get(block.cid()), Err(StorageError::NotFound(_))));
+		assert!(matches!(encryption.storage().get(block.cid()), Err(StorageError::NotFound(_, _))));
 	}
 
 	#[tokio::test]
@@ -557,7 +557,7 @@ mod tests {
 		assert_eq!(encryption.get(block.cid()).await.unwrap(), block);
 
 		// validate that the CID dosn't exist in parent storage layer
-		assert!(matches!(memory.get(block.cid()).await, Err(StorageError::NotFound(_))));
+		assert!(matches!(memory.get(block.cid()).await, Err(StorageError::NotFound(_, _))));
 	}
 
 	#[test]

@@ -66,9 +66,9 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.7.7"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a824f2aa7e75a0c98c5a504fceb80649e9c35265d44525b5f94de4771a395cd"
+checksum = "891477e0c6a8957309ee5c45a6368af3ae14bb510732d2684ffa19af310920f9"
 dependencies = [
  "getrandom 0.2.11",
  "once_cell",
@@ -77,9 +77,9 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.8.6"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91429305e9f0a25f6205c5b8e0d2db09e0708a7a6df0f42212bb56c32c8ac97a"
+checksum = "42cd52102d3df161c77a887b608d7a4897d7cc112886a9537b738a887a03aaff"
 dependencies = [
  "cfg-if",
  "getrandom 0.2.11",
@@ -1234,12 +1234,14 @@ dependencies = [
  "async-trait",
  "asynchronous-codec 0.7.0",
  "co-primitives",
+ "co-storage",
  "did-key",
  "did_url",
  "futures",
  "insta",
  "libipld",
  "libp2p",
+ "libp2p-bitswap",
  "rxrust",
  "serde",
  "serde_bytes",
@@ -2725,7 +2727,7 @@ version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 dependencies = [
- "ahash 0.7.7",
+ "ahash 0.7.8",
 ]
 
 [[package]]
@@ -2734,7 +2736,7 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 dependencies = [
- "ahash 0.8.6",
+ "ahash 0.8.8",
  "allocator-api2",
 ]
 
@@ -3369,6 +3371,23 @@ dependencies = [
  "quick-protobuf-codec 0.2.0",
  "rand 0.8.5",
  "tracing",
+]
+
+[[package]]
+name = "libp2p-bitswap"
+version = "0.25.0"
+source = "git+https://github.com/dkuhnert/libp2p-bitswap.git?branch=next#23515951ae8b3af494132dbc4f45b27a3d5cd3bd"
+dependencies = [
+ "async-trait",
+ "fnv",
+ "futures",
+ "lazy_static",
+ "libipld",
+ "libp2p",
+ "prometheus",
+ "thiserror",
+ "tracing",
+ "unsigned-varint 0.7.2",
 ]
 
 [[package]]
@@ -4898,6 +4917,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "prometheus"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "449811d15fbdf5ceb5c1144416066429cf82316e2ec8ce0c1f6f8a02e7bbcf8c"
+dependencies = [
+ "cfg-if",
+ "fnv",
+ "lazy_static",
+ "memchr",
+ "parking_lot",
+ "protobuf",
+ "thiserror",
+]
+
+[[package]]
 name = "prometheus-client"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4919,6 +4953,12 @@ dependencies = [
  "quote",
  "syn 2.0.41",
 ]
+
+[[package]]
+name = "protobuf"
+version = "2.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
 name = "ptr_meta"
@@ -6352,7 +6392,7 @@ version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5c266b9ac83dedf0e0385ad78514949e6d89491269e7065bee51d2bb8ec7373"
 dependencies = [
- "ahash 0.8.6",
+ "ahash 0.8.8",
  "gethostname",
  "log",
  "serde",
@@ -6509,6 +6549,8 @@ checksum = "6889a77d49f1f013504cec6bf97a2c730394adedaeb1deb5ea08949a50541105"
 dependencies = [
  "asynchronous-codec 0.6.2",
  "bytes",
+ "futures-io",
+ "futures-util",
 ]
 
 [[package]]

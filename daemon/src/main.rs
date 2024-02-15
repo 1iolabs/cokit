@@ -42,7 +42,7 @@ async fn main() {
 		.expect("peer-id");
 
 	// driver: network
-	let _network = Network::new(network_key);
+	let _network = Network::new(network_key, application.storage());
 
 	// build routes
 	let app = Router::new()

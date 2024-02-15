@@ -1,5 +1,11 @@
 use super::didcomm;
+use crate::{
+	bitswap::{bitswap::BitswapBlockStorage, provider::BitswapBehaviourProvider},
+	FnOnceNetworkTask, NetworkError, NetworkTaskBox, NetworkTaskSpawner,
+};
+use co_storage::BlockStorage;
 use futures::{channel::oneshot, StreamExt};
+use libipld::DefaultParams;
 use libp2p::{
 	gossipsub, identify,
 	identity::Keypair,
@@ -11,20 +17,23 @@ use libp2p::{
 	swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
 	Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
+use libp2p_bitswap::Bitswap;
 use rxrust::prelude::*;
 use std::sync::Arc;
 
-pub type Task<B> = Box<dyn Fn(&mut Swarm<B>) + Send>;
 pub type EventsSubject<E> = SubjectThreads<Arc<SwarmEvent<E>>, ()>;
 
 pub struct Libp2pNetwork {
 	config: Libp2pNetworkConfig,
 	shutdown: Option<oneshot::Sender<()>>,
-	tasks: tokio::sync::mpsc::UnboundedSender<Task<Behaviour>>,
+	tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<Behaviour>>,
 	events: EventsSubject<BehaviourEvent>,
 }
 impl Libp2pNetwork {
-	pub fn new(config: Libp2pNetworkConfig) -> anyhow::Result<Libp2pNetwork> {
+	pub fn new<S>(config: Libp2pNetworkConfig, storage: S) -> anyhow::Result<Libp2pNetwork>
+	where
+		S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + 'static,
+	{
 		let local_peer_id = PeerId::from(config.keypair.public().clone());
 		let gossipsub_config = gossipsub::ConfigBuilder::default()
 			.max_transmit_size(256 * 1024)
@@ -44,8 +53,15 @@ impl Libp2pNetwork {
 			)),
 			ping: ping::Behaviour::new(ping::Config::new()),
 			mdns: MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?,
-			didcomm: didcomm::Behavior::new(didcomm_config),
+			didcomm: didcomm::Behaviour::new(didcomm_config),
 			kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()), kademlia_config),
+			bitswap: Bitswap::new(
+				Default::default(),
+				BitswapBlockStorage::new(storage),
+				Box::new(|t| {
+					tokio::spawn(t);
+				}),
+			),
 		};
 
 		// kad
@@ -87,6 +103,10 @@ impl Libp2pNetwork {
 		Ok(Self { config, shutdown: Some(shutdown_tx), tasks: tasks_tx, events })
 	}
 
+	pub fn spawner(&self) -> NetworkTaskSpawner<Behaviour> {
+		NetworkTaskSpawner { tasks: self.tasks.clone() }
+	}
+
 	/// Gracefully shutdown the network stack.
 	/// This will stop accepting new connections and waits until established connections are done.
 	pub fn shutdown(&mut self) {
@@ -94,12 +114,6 @@ impl Libp2pNetwork {
 		if let Some(shutdown) = self.shutdown.take() {
 			let _ = shutdown.send(());
 		}
-	}
-
-	/// Sends a task to execute on the behavior to the queue.
-	pub fn queue_behaviour_task(&self, task: Task<Behaviour>) -> Result<(), Libp2pNetworkError> {
-		self.tasks.send(task)?;
-		Ok(())
 	}
 
 	/// Swarm events subject.
@@ -112,12 +126,14 @@ impl Libp2pNetwork {
 	}
 
 	/// Change network mode.
-	pub fn set_network_mode(&mut self, mode: NetworkMode) -> Result<(), Libp2pNetworkError> {
+	pub fn set_network_mode(&mut self, mode: NetworkMode) -> Result<(), NetworkError> {
 		if self.config.mode != mode {
 			self.config.mode = mode;
-			self.queue_behaviour_task(Box::new(move |swarm| {
-				set_network_mode(swarm.behaviour_mut(), mode);
-			}))?;
+			self.spawner()
+				.spawn(FnOnceNetworkTask::new(move |swarm| {
+					set_network_mode(swarm.behaviour_mut(), mode);
+				}))
+				.unwrap();
 		}
 		Ok(())
 	}
@@ -171,10 +187,12 @@ struct Runtime {
 	listener_id: Option<libp2p::core::transport::ListenerId>,
 	events: EventsSubject<BehaviourEvent>,
 	running: bool,
+	/// Tasks which have been executed but waiting for events.
+	pending_tasks: Vec<NetworkTaskBox<Behaviour>>,
 }
 impl Runtime {
 	fn new(config: Libp2pNetworkConfig, events: EventsSubject<BehaviourEvent>) -> Self {
-		Self { _config: config, listener_id: None, events, running: true }
+		Self { _config: config, listener_id: None, events, running: true, pending_tasks: Default::default() }
 	}
 
 	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
@@ -188,22 +206,23 @@ impl Runtime {
 
 #[derive(NetworkBehaviour)]
 pub struct Behaviour {
-	didcomm: didcomm::Behavior,
+	didcomm: didcomm::Behaviour,
 	gossipsub: gossipsub::Behaviour,
 	identify: identify::Behaviour,
 	mdns: MdnsBehaviour,
 	ping: ping::Behaviour,
 	kad: Kademlia<MemoryStore>,
+	bitswap: Bitswap<DefaultParams>,
 }
+impl BitswapBehaviourProvider for Behaviour {
+	type StoreParams = DefaultParams;
 
-#[derive(Debug, thiserror::Error)]
-pub enum Libp2pNetworkError {
-	#[error("Shutdown in progress. Operation canceled.")]
-	Shutdown,
-}
-impl<T> From<tokio::sync::mpsc::error::SendError<T>> for Libp2pNetworkError {
-	fn from(_: tokio::sync::mpsc::error::SendError<T>) -> Self {
-		Self::Shutdown
+	fn bitswap(&self) -> &Bitswap<DefaultParams> {
+		&self.bitswap
+	}
+
+	fn bitswap_mut(&mut self) -> &mut Bitswap<DefaultParams> {
+		&mut self.bitswap
 	}
 }
 
@@ -217,7 +236,7 @@ fn set_network_mode(behaviour: &mut Behaviour, mode: NetworkMode) {
 async fn run(
 	mut swarm: Swarm<Behaviour>,
 	mut runtime: Runtime,
-	mut tasks: tokio::sync::mpsc::UnboundedReceiver<Task<Behaviour>>,
+	mut tasks: tokio::sync::mpsc::UnboundedReceiver<NetworkTaskBox<Behaviour>>,
 	mut shutdown: oneshot::Receiver<()>,
 ) {
 	// log
@@ -235,8 +254,14 @@ async fn run(
 
 			// tasks
 			task = tasks.recv() => {
-				if let Some(task) = task {
-					task(&mut swarm);
+				if let Some(mut task) = task {
+					// execute
+					task.execute(&mut swarm);
+
+					// move to pending if not complete
+					if !task.is_complete() {
+						runtime.pending_tasks.push(task);
+					}
 				}
 			},
 
@@ -267,20 +292,38 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, runtime: &mut Runtime) {
 		},
 	}
 
-	// log
-	match event {
+	// known events
+	match &event {
 		SwarmEvent::Behaviour(BehaviourEvent::Mdns(mdns_event)) => handle_mdns(swarm, runtime, mdns_event),
-		// SwarmEvent::Behaviour(event) => {
-		// 	tracing::info!(?event, "network-behaviour-event");
-		// },
-		event => {
-			tracing::info!(?event, "network-event");
-			runtime.events.next(Arc::new(event));
-		},
+		_ => {},
+	}
+
+	// tasks
+	let mut result_event = Some(event);
+	let mut task_index = 0;
+	while task_index < runtime.pending_tasks.len() {
+		// run
+		result_event = runtime.pending_tasks[task_index].on_swarm_event(result_event.unwrap());
+
+		// done?
+		if runtime.pending_tasks[task_index].is_complete() {
+			runtime.pending_tasks.remove(task_index);
+			task_index = task_index - 1;
+		}
+
+		// event consumed?
+		if result_event.is_none() {
+			return;
+		}
+	}
+
+	// other
+	if let Some(event) = result_event {
+		runtime.events.next(Arc::new(event));
 	}
 }
 
-fn handle_mdns(swarm: &mut Swarm<Behaviour>, _runtime: &mut Runtime, event: mdns::Event) {
+fn handle_mdns(swarm: &mut Swarm<Behaviour>, _runtime: &mut Runtime, event: &mdns::Event) {
 	match event {
 		mdns::Event::Discovered(list) => {
 			tracing::debug!(?list, "mdns::Event::Discovered");

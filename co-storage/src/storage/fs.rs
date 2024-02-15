@@ -140,7 +140,7 @@ impl BlockStorage for FsStorage {
 fn into_storage_result<T>(cid: &Cid, result: std::io::Result<T>) -> Result<T, StorageError> {
 	match result {
 		Ok(data) => Ok(data),
-		Err(e) if e.kind() == ErrorKind::NotFound => Err(StorageError::NotFound(cid.clone())),
+		Err(e) if e.kind() == ErrorKind::NotFound => Err(StorageError::NotFound(cid.clone(), e.into())),
 		Err(e) => Err(StorageError::Internal(e.into())),
 	}
 }
