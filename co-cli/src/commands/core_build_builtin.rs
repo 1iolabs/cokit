@@ -3,7 +3,12 @@ use co_sdk::unixfs_encode_buffer;
 use exitcode::ExitCode;
 use libipld::DefaultParams;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, env::current_exe, process::Command};
+use std::{
+	collections::HashMap,
+	env::current_exe,
+	process::Command,
+	str::{from_utf8, from_utf8_unchecked},
+};
 
 pub async fn command() -> Result<ExitCode, anyhow::Error> {
 	let paths = ["co", "keystore", "membership", "room"];
@@ -23,10 +28,15 @@ pub async fn command() -> Result<ExitCode, anyhow::Error> {
 	for path in paths {
 		let core_path = respository_path.join("cores").join(path);
 		println!("build: {:?}", core_path);
-		Command::new("cargo")
+		let command = Command::new("cargo")
 			.current_dir(respository_path.join("cores").join(path))
 			.args(["build", "--target=wasm32-unknown-unknown", "--release"])
 			.output()?;
+		if !command.status.success() {
+			println!("failed ({}):", command.status);
+			println!("{}", from_utf8(&command.stdout).unwrap());
+			println!("{}", from_utf8(&command.stderr).unwrap());
+		}
 	}
 
 	// create Cids

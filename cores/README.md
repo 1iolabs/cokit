@@ -9,3 +9,21 @@ CO Reducers (COre) runtimes.
 | `co` | CO Runtime. Manages the common CO state like participants, settings, .... |
 | `keystore` | CO Key store |
 | `membership` | CO Memberships. Stores membership information of an CO (counterpart to co.participants). |
+
+## Build
+
+Install wasm target:
+```shell
+rustup target add wasm32-unknown-unknown --toolchain nightly-2024-02-09-aarch64-apple-darwin
+```
+
+Build cores:
+```shell
+cargo run --bin co-cli core-build-builtin
+```
+
+## Add new COre
+
+- Add to: `../co-cli/src/commands/core_build_builtin.rs`
+- Add to `get_native` in: `../co-sdk/src/types/cores.rs`
+- Build cores
