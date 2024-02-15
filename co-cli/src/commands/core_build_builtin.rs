@@ -3,12 +3,7 @@ use co_sdk::unixfs_encode_buffer;
 use exitcode::ExitCode;
 use libipld::DefaultParams;
 use serde::{Deserialize, Serialize};
-use std::{
-	collections::{BTreeMap, HashMap},
-	env::current_exe,
-	process::Command,
-	str::{from_utf8, from_utf8_unchecked},
-};
+use std::{collections::HashMap, env::current_exe, process::Command, str::from_utf8};
 
 pub async fn command() -> Result<ExitCode, anyhow::Error> {
 	let paths = ["co", "keystore", "membership", "room", "pin"];
