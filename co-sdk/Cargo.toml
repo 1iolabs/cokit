@@ -12,6 +12,7 @@ async-trait = { workspace = true }
 co-core-co = { path = "../cores/co" }
 co-core-keystore = { path = "../cores/keystore" }
 co-core-membership = { path = "../cores/membership" }
+co-core-pin = { path = "../cores/pin" }
 co-core-room = { path = "../cores/room" }
 co-log = { path = "../co-log" }
 co-network = { path = "../co-network" }

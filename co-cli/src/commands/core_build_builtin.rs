@@ -4,14 +4,14 @@ use exitcode::ExitCode;
 use libipld::DefaultParams;
 use serde::{Deserialize, Serialize};
 use std::{
-	collections::HashMap,
+	collections::{BTreeMap, HashMap},
 	env::current_exe,
 	process::Command,
 	str::{from_utf8, from_utf8_unchecked},
 };
 
 pub async fn command() -> Result<ExitCode, anyhow::Error> {
-	let paths = ["co", "keystore", "membership", "room"];
+	let paths = ["co", "keystore", "membership", "room", "pin"];
 
 	// get repository root path
 	//  `<respository_path>/target/debug/co-cli`
@@ -82,5 +82,5 @@ struct CargoPackage {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct Cores {
-	cores: HashMap<String, String>,
+	cores: BTreeMap<String, String>,
 }

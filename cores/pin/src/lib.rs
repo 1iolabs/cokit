@@ -1,4 +1,4 @@
-use co_api::{CreateLink, DagMap, DagSet, FromLink, LinkIterator, Reducer, Storage, Tags};
+use co_api::{reduce, CreateLink, DagMap, DagSet, FromLink, LinkIterator, Reducer, Storage, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -78,4 +78,9 @@ impl Reducer for Pin {
 		// TODO: update instead of rewrite?
 		Self { pins: DagMap::to_link(pin_map, s) }
 	}
+}
+
+#[no_mangle]
+pub extern "C" fn state() {
+	reduce::<Pin>()
 }

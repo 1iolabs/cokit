@@ -1,5 +1,6 @@
 [cores]
-co-core-keystore = "QmNQjQvoSZ4qbR8Dfy4ECBkZ7qyq4ygo5NbzPeLgm76LEC"
-co-core-co = "QmQmScb9RemywPFMyKPYZvqCHHRbyQMHW5ePCrWEMSnV2M"
-co-core-membership = "QmPhhbXC7wNm2xmEYu8KLnJuVDwWz3nDd3JKioym7C2crW"
-co-core-room = "QmTsnXxQU7GcCGF3E5v7RrT4jdUHAsPG5bhNU9on1DF5Ez"
+co-core-co = "QmfHdUZ5bpLxUBMFBSkPa3ruxYd45fGpriBf1TXHBCUJev"
+co-core-keystore = "QmSqTJNJ9RHWJqjWQQVkGzR497LGSSCgTRKoYnGZpxyUQT"
+co-core-membership = "QmVjzCYhe6isAE82RPq1xStAV1EvuTcVvE4WXcpQxdnRvH"
+co-core-pin = "QmawgPj7yd4swgJ1AqGa8TrMyuBDuALaf5fc63EnhbWX7M"
+co-core-room = "QmU98crCMBvtQbLYY4umfFSDhV7URNEQ67TvzZoFdCRfMz"

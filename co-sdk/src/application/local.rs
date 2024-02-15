@@ -1,7 +1,7 @@
 use super::{identity::create_identity_resolver, reducer::ReducerChangedHandler};
 use crate::{
 	library::{fs_read::fs_read_option, fs_write::fs_write},
-	types::cores::CO_CORE_NAME_CO,
+	types::cores::{CO_CORE_NAME_CO, CO_CORE_NAME_PIN, CO_CORE_PIN},
 	CoCoreResolver, CoReducer, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, Runtime, CO_CORE_KEYSTORE,
 	CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE,
 };
@@ -346,6 +346,14 @@ where
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_KEYSTORE).expect(CO_CORE_KEYSTORE),
 			tags: tags!( "core": CO_CORE_NAME_KEYSTORE ),
+			state: None,
+		},
+	);
+	cores.insert(
+		CO_CORE_NAME_PIN.to_owned(),
+		co_core_co::Core {
+			binary: Cores::default().binary(CO_CORE_PIN).expect(CO_CORE_PIN),
+			tags: tags!("core": CO_CORE_NAME_PIN),
 			state: None,
 		},
 	);
