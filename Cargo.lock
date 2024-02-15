@@ -1164,6 +1164,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-core-role"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "co-api",
+ "libipld",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "serde_repr",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "co-core-room"
 version = "0.1.0"
 dependencies = [
@@ -1313,6 +1329,7 @@ dependencies = [
  "co-core-co",
  "co-core-keystore",
  "co-core-membership",
+ "co-core-pin",
  "co-core-room",
  "co-log",
  "co-network",
