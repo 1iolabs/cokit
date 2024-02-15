@@ -1,4 +1,4 @@
-use co_api::{DagMap, DagSet, Did, Tags};
+use co_api::{DagMap, DagSet, Did};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ord;
 

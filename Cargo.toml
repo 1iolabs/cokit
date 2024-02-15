@@ -11,6 +11,7 @@ members = [
     "co-sdk",
     "co-storage",
     "cores/co",
+    "cores/file",
     "cores/keystore",
     "cores/membership",
     "cores/pin",

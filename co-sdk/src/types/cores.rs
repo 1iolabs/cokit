@@ -4,10 +4,11 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
 
 pub const CO_CORE_CO: &str = "co-core-co";
+pub const CO_CORE_FILE: &str = "co-core-file";
 pub const CO_CORE_KEYSTORE: &str = "co-core-keystore";
 pub const CO_CORE_MEMBERSHIP: &str = "co-core-membership";
-pub const CO_CORE_ROOM: &str = "co-core-room";
 pub const CO_CORE_PIN: &str = "co-core-pin";
+pub const CO_CORE_ROOM: &str = "co-core-room";
 
 /// CO Core name expected by the SDK implementation (key to `co.cores`).
 pub const CO_CORE_NAME_CO: &str = "co";
@@ -89,10 +90,11 @@ impl Cores {
 fn get_native(name: &str) -> Core {
 	match name {
 		CO_CORE_CO => Core::native::<co_core_co::Co>(),
+		CO_CORE_FILE => Core::native::<co_core_file::File>(),
 		CO_CORE_KEYSTORE => Core::native::<co_core_keystore::KeyStore>(),
 		CO_CORE_MEMBERSHIP => Core::native::<co_core_membership::Memberships>(),
-		CO_CORE_ROOM => Core::native::<co_core_room::Room>(),
 		CO_CORE_PIN => Core::native::<co_core_pin::Pin>(),
+		CO_CORE_ROOM => Core::native::<co_core_room::Room>(),
 		_ => panic!("unknown native core name: {}", name),
 	}
 }
