@@ -81,7 +81,7 @@ impl Application {
 
 	/// Creates a CoReducer instance a CO which we have a membership for.
 	///
-	/// Todo: Identity
+	/// TODO: Identity
 	async fn create_co_instance(&self, parent: CoReducer, co: &str) -> Result<Option<CoReducer>, anyhow::Error> {
 		let membership = match find_membership(&parent, co).await? {
 			Some(m) => m,
@@ -153,7 +153,7 @@ impl Application {
 
 	/// Create a new CO.
 	///
-	/// Todo:
+	/// TODO:
 	/// - Identity
 	/// - Cleanup when something fails?
 	pub async fn create_co(&self, create: CreateCo) -> Result<CoReducer, anyhow::Error> {
