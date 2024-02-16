@@ -1,5 +1,5 @@
 use crate::{library::node_reader::node_reader, NodeReaderError, Storage};
-use co_primitives::{Link, Linkable, NodeBuilder};
+use co_primitives::{Link, Linkable, NodeBuilder, NodeContainer};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
 	cmp::Ord,
@@ -91,6 +91,14 @@ where
 		self.0 = link;
 	}
 }
+impl<V> NodeContainer<V> for DagVec<V>
+where
+	V: Clone + Serialize + DeserializeOwned + 'static,
+{
+	fn node_container_link(&self) -> Option<Link<V>> {
+		self.0.as_ref().map(|l| (*l.cid()).into())
+	}
+}
 
 /// A wrapper for DagLink types that use the BTreeSet type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -114,11 +122,6 @@ where
 		}
 	}
 }
-impl<V: Ord> Default for DagSet<V> {
-	fn default() -> Self {
-		Self(None)
-	}
-}
 impl<V> DagCollection for DagSet<V>
 where
 	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
@@ -134,9 +137,25 @@ where
 		self.0 = link;
 	}
 }
+impl<V> Default for DagSet<V>
+where
+	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
+{
+	fn default() -> Self {
+		Self(None)
+	}
+}
+impl<V> NodeContainer<V> for DagSet<V>
+where
+	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
+{
+	fn node_container_link(&self) -> Option<Link<V>> {
+		self.0.as_ref().map(|l| (*l.cid()).into())
+	}
+}
 
 /// A wrapper for DagLink types that use the BTreeMap type
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DagMap<K, V>(Option<Link<BTreeMap<K, V>>>)
 where
 	K: Ord + Clone + Serialize,
@@ -164,6 +183,24 @@ where
 
 	fn set_link(&mut self, link: Option<Link<Self::Collection>>) {
 		self.0 = link;
+	}
+}
+impl<K, V> Default for DagMap<K, V>
+where
+	K: Ord + Clone + Serialize + DeserializeOwned + 'static,
+	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
+{
+	fn default() -> Self {
+		Self(None)
+	}
+}
+impl<K, V> NodeContainer<(K, V)> for DagMap<K, V>
+where
+	K: Ord + Clone + Serialize + DeserializeOwned + 'static,
+	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
+{
+	fn node_container_link(&self) -> Option<Link<(K, V)>> {
+		self.0.as_ref().map(|l| (*l.cid()).into())
 	}
 }
 

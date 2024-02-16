@@ -4,14 +4,16 @@ use serde::{Deserialize, Serialize};
 use std::mem::take;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Node<T>
-where
-	T: Clone,
-{
+pub enum Node<T> {
 	#[serde(rename = "n")]
 	Node(Vec<Link<Self>>),
 	#[serde(rename = "l")]
 	Leaf(Vec<T>),
+}
+
+/// Trait for containers which stores items of type I.
+pub trait NodeContainer<I> {
+	fn node_container_link(&self) -> Option<Link<I>>;
 }
 
 #[derive(Debug, thiserror::Error)]

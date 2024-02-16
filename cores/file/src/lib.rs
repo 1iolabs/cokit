@@ -1,13 +1,15 @@
-use co_api::{reduce, Context, DagCollection, DagMap, DagSet, Date, Did, Reducer, ReducerAction, Tags};
+use anyhow::anyhow;
+use co_api::{
+	reduce, AbsolutePath, Context, DagCollection, DagMap, DagSet, Date, Did, Path, PathExt, Reducer, ReducerAction,
+	Tags,
+};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
-pub type FilePath = String;
-
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct File {
-	pub nodes: DagMap<FilePath, DagSet<Node>>,
+	pub nodes: DagMap<AbsolutePath, DagSet<Node>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
@@ -52,82 +54,72 @@ pub struct FolderNode {
 pub struct LinkNode {
 	pub name: String,
 	pub tags: Tags,
-	pub contents: FilePath,
+	pub contents: Path,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum FileAction {
-	Create { path: FilePath, node: Node },
-	Remove { path: FilePath },
+	Create { path: AbsolutePath, node: Node },
+	Remove { path: AbsolutePath },
 }
 
 impl Reducer for File {
 	type Action = FileAction;
 
 	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
-		let mut result = self;
 		match &event.payload {
-			FileAction::Create { path, node } => {
-				let path = normalize_path(path);
-				let mut nodes = result.nodes.get(context.storage());
-
-				// insert if name not exists already
-				let mut path_nodes = nodes.get(&path).cloned().unwrap_or_default().get(context.storage());
-				if path_nodes.iter().find(|item| item.name() == node.name()).is_none() {
-					// insert node
-					path_nodes.insert(node.clone());
-
-					// store
-					nodes.insert(path.clone(), DagSet::create(context.storage_mut(), path_nodes));
-					result.nodes.set(context.storage_mut(), nodes);
-				}
-			},
-			FileAction::Remove { path } => {
-				let path = normalize_path(path);
-				let mut nodes = result.nodes.get(context.storage());
-
-				// remove
-				let (node_path, node_name) = path_and_file_name(&path);
-				let path_nodes: BTreeSet<Node> = nodes
-					.get(node_path)
-					.cloned()
-					.unwrap_or_default()
-					.iter(context.storage())
-					.filter(|node| node.name() != node_name)
-					.collect();
-
-				// store
-				nodes.insert(node_path.to_owned(), DagSet::create(context.storage_mut(), path_nodes));
-				result.nodes.set(context.storage_mut(), nodes);
-			},
+			FileAction::Create { path, node } => create(context, self, path, node).unwrap(),
+			FileAction::Remove { path } => remove(context, self, path).unwrap(),
 		}
-		result
 	}
 }
 
-/// Normalize path to connonized form.
-/// Todo: Implement
-fn normalize_path(path: &FilePath) -> FilePath {
-	path.clone()
+fn create(context: &mut dyn Context, mut state: File, path: &AbsolutePath, node: &Node) -> Result<File, anyhow::Error> {
+	let path = path.normalize()?;
+
+	// nodes
+	let mut nodes = state.nodes.get(context.storage());
+
+	// insert if name not exists already
+	let mut path_nodes = nodes
+		.get(&path)
+		.ok_or(anyhow!("No such directory: {}", path))?
+		.get(context.storage());
+	if path_nodes.iter().find(|item| item.name() == node.name()).is_none() {
+		// insert node
+		path_nodes.insert(node.clone());
+
+		// store
+		nodes.insert(path.clone(), DagSet::create(context.storage_mut(), path_nodes));
+		state.nodes.set(context.storage_mut(), nodes);
+	}
+
+	// result
+	Ok(state)
 }
 
-/// Normalize path to connonized form.
-/// Todo: Implement
-fn split_path<'a>(path: &'a FilePath) -> Vec<&'a str> {
-	path.split("/").collect()
-}
+fn remove(context: &mut dyn Context, mut state: File, path: &AbsolutePath) -> Result<File, anyhow::Error> {
+	let path = path.normalize()?;
+	let (parent_path, name) = path.parent_and_file_name_result()?;
 
-/// Normalize path to connonized form.
-/// Todo: Implement
-fn path_and_file_name(path: &FilePath) -> (&str, &str) {
-	let file_name = file_name(path);
-	(path.split_at(path.len() - file_name.len() - 1).0, file_name)
-}
+	// nodes
+	let mut nodes = state.nodes.get(context.storage());
 
-/// Normalize path to connonized form.
-/// Todo: Implement
-fn file_name(path: &FilePath) -> &str {
-	split_path(path).last().unwrap_or(&"")
+	// remove
+	let path_nodes: BTreeSet<Node> = nodes
+		.get(&AbsolutePath::from_str_unchecked(parent_path))
+		.cloned()
+		.unwrap_or_default()
+		.iter(context.storage())
+		.filter(|node| node.name() != name)
+		.collect();
+
+	// store
+	nodes.insert(AbsolutePath::from_str_unchecked(parent_path), DagSet::create(context.storage_mut(), path_nodes));
+	state.nodes.set(context.storage_mut(), nodes);
+
+	// result
+	Ok(state)
 }
 
 #[no_mangle]

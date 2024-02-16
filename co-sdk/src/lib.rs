@@ -25,6 +25,7 @@ pub use library::{
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
 	memberships::memberships,
+	node_stream::NodeStream,
 };
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},

@@ -54,9 +54,5 @@ async fn app_main() -> anyhow::Result<exitcode::ExitCode> {
 		.init();
 
 	// execute
-	std::process::exit(match &cli.command {
-		cli::CliCommand::Co(command) => commands::co::command(&cli, &command).await?,
-		cli::CliCommand::CoreBuildBuiltin => commands::core_build_builtin::command().await?,
-		cli::CliCommand::Cbor(command) => commands::cbor::command(command).await?,
-	})
+	cli::command(&cli).await
 }

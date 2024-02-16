@@ -7,8 +7,10 @@ edition = "2021"
 anyhow = { workspace = true }
 clap = { version = "^4.3.23", features = ["derive"] }
 co-core-co = { path = "../cores/co" }
+co-core-file = { path = "../cores/file" }
 co-core-keystore = { path = "../cores/keystore" }
 co-core-membership = { path = "../cores/membership" }
+co-primitives = { path = "../co-primitives" }
 co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
 exitcode = "1.1.2"
 futures = { workspace = true }

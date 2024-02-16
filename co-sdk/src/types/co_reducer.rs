@@ -56,7 +56,7 @@ impl CoReducer {
 	/// Read a COre state.
 	pub async fn state<T: DeserializeOwned + Send + Sync + Default + Clone + 'static>(
 		&self,
-		co: &str,
+		core: &str,
 	) -> Result<T, CoReducerError> {
 		let (storage, state) = {
 			let reducer = self.reducer.read().await;
@@ -64,7 +64,7 @@ impl CoReducer {
 		};
 
 		// co?
-		if co == CO_CORE_NAME_CO {
+		if core == CO_CORE_NAME_CO {
 			if let Some(state_cid) = state {
 				return Ok(storage.get_deserialized(&state_cid).await?)
 			}
@@ -77,7 +77,7 @@ impl CoReducer {
 		} else {
 			co_core_co::Co::default()
 		};
-		if let Some(core) = co_state.cores.get(co) {
+		if let Some(core) = co_state.cores.get(core) {
 			if let Some(core_state) = &core.state {
 				return Ok(storage.get_deserialized(core_state).await?);
 			} else {
@@ -86,7 +86,7 @@ impl CoReducer {
 		}
 
 		// not found
-		return Err(CoReducerError::CoreNotFound(co.to_owned()));
+		return Err(CoReducerError::CoreNotFound(core.to_owned()));
 	}
 }
 

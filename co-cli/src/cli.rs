@@ -1,5 +1,6 @@
-use crate::commands::{cbor, co};
+use crate::commands::{cbor, co, core_build_builtin, file};
 use clap::ArgAction;
+use exitcode::ExitCode;
 use std::path::PathBuf;
 
 pub const APP_IDENTIFIER: &str = "co-cli";
@@ -55,4 +56,16 @@ pub enum CliCommand {
 
 	/// DAG-CBOR Utilities.
 	Cbor(cbor::Command),
+
+	/// File.
+	File(file::Command),
+}
+
+pub async fn command(cli: &Cli) -> Result<ExitCode, anyhow::Error> {
+	match &cli.command {
+		CliCommand::Co(command) => co::command(&cli, &command).await,
+		CliCommand::CoreBuildBuiltin => core_build_builtin::command().await,
+		CliCommand::Cbor(command) => cbor::command(command).await,
+		CliCommand::File(command) => file::command(cli, command).await,
+	}
 }

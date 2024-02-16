@@ -8,7 +8,7 @@ pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {
 	/// Get value from link.
 	async fn get_value<T, L>(&self, link: &L) -> Result<T, StorageError>
 	where
-		T: Send + Sync + Clone + serde::de::DeserializeOwned,
+		T: Send + Sync + serde::de::DeserializeOwned,
 		L: Linkable<T> + Send + Sync,
 	{
 		Ok(BlockSerializer::new()
@@ -19,7 +19,7 @@ pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {
 	/// Create link for value.
 	async fn set_value<T>(&self, value: &T) -> Result<Link<T>, StorageError>
 	where
-		T: Send + Sync + Clone + serde::Serialize,
+		T: Send + Sync + serde::Serialize,
 	{
 		let block = BlockSerializer::new()
 			.serialize(value)
@@ -30,7 +30,7 @@ pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {
 	/// Get deserialized value.
 	async fn get_deserialized<T>(&self, item: &Cid) -> Result<T, StorageError>
 	where
-		T: Send + Sync + Clone + serde::de::DeserializeOwned,
+		T: Send + Sync + serde::de::DeserializeOwned,
 	{
 		Ok(BlockSerializer::new()
 			.deserialize(&self.get(MultiCodec::dag_cbor(item)?).await?)
@@ -40,7 +40,7 @@ pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {
 	/// Set serialized value.
 	async fn set_serialized<T>(&self, value: &T) -> Result<Cid, StorageError>
 	where
-		T: Send + Sync + Clone + serde::Serialize,
+		T: Send + Sync + serde::Serialize,
 	{
 		let block = BlockSerializer::new()
 			.serialize(value)
@@ -51,7 +51,7 @@ pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {
 	/// Get deserialized value.
 	async fn get_default<T>(&self, item: &Option<Cid>) -> Result<T, StorageError>
 	where
-		T: Send + Default + Sync + Clone + serde::de::DeserializeOwned,
+		T: Send + Default + Sync + serde::de::DeserializeOwned,
 	{
 		Ok(if let Some(item) = item {
 			BlockSerializer::new()
