@@ -13,6 +13,7 @@ pub use application::{
 	shared::CreateCo,
 };
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
+pub use co_log::{Identity, IdentityResolver, IdentityResolverError, PrivateIdentity};
 pub use co_primitives::{tags, BlockSerializer, MultiCodec, MultiCodecError, Tag, Tags};
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{
@@ -31,7 +32,7 @@ pub use types::{
 	co_reducer::{CoReducer, CoReducerError},
 	co_storage::CoStorage,
 	cores::{
-		Cores, CO_CORE_CO, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+		Cores, CO_CORE_CO, CO_CORE_FILE, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
 		CO_CORE_NAME_MEMBERSHIP, CO_CORE_ROOM,
 	},
 	error::{ErrorContext, ErrorKind, IntoAction},

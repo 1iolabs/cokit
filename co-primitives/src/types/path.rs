@@ -1,30 +1,39 @@
 use core::str;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, fmt::Display};
+use std::{borrow::Borrow, fmt::Display, ops::Deref};
 
 /// Path.
 /// Can be relative or absolute.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Path(String);
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct Path(str);
 impl Path {
-	pub fn from_str(buf: &str) -> Result<Self, PathError> {
-		Self::new(buf.to_owned())
+	pub fn new(s: &str) -> Result<&Self, PathError> {
+		Self::from_str(s)
 	}
 
-	pub fn from_str_unchecked(buf: &str) -> Self {
-		Self::new_unchecked(buf.to_owned())
+	pub fn new_unchecked(s: &str) -> &Self {
+		Self::from_str_unchecked(s)
 	}
 }
 impl PathExt for Path {
-	fn new(buf: String) -> Result<Self, PathError> {
+	type PathOwned = PathOwned;
+	type Path = Path;
+
+	fn validate(buf: &str) -> Result<(), PathError> {
 		if buf.is_empty() {
 			return Err(PathError::InvalidArgument);
 		}
-		Ok(Self(buf))
+		Ok(())
 	}
 
-	fn new_unchecked(buf: String) -> Self {
-		Self(buf)
+	fn from_owned_unchecked(buf: String) -> Self::PathOwned {
+		PathOwned(buf)
+	}
+
+	/// See: [`std::path::Path`]
+	fn from_str_unchecked(s: &str) -> &Self::Path {
+		unsafe { &*(s.as_ref() as *const str as *const Path) }
 	}
 
 	fn as_string(&self) -> &'_ str {
@@ -35,9 +44,14 @@ impl PathExt for Path {
 		matches!(self.as_string().as_bytes().first(), Some(b'/'))
 	}
 }
-impl Into<String> for Path {
+impl Into<String> for &Path {
 	fn into(self) -> String {
-		self.0
+		self.0.to_owned()
+	}
+}
+impl Into<PathOwned> for &Path {
+	fn into(self) -> PathOwned {
+		PathOwned(self.0.to_owned())
 	}
 }
 impl<'a> IntoIterator for &'a Path {
@@ -58,32 +72,126 @@ impl Display for Path {
 		f.write_str(self.as_string())
 	}
 }
+impl ToOwned for Path {
+	type Owned = PathOwned;
 
-/// Absolute Path.
+	fn to_owned(&self) -> Self::Owned {
+		PathOwned::from_owned_unchecked(self.as_string().to_owned())
+	}
+}
+
+/// Owned  Path.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct AbsolutePath(String);
-impl AbsolutePath {
-	pub fn from_str(buf: &str) -> Result<Self, PathError> {
-		Self::new(buf.to_owned())
+#[repr(transparent)]
+pub struct PathOwned(String);
+impl PathOwned {
+	pub fn new(s: String) -> Result<Self, PathError> {
+		Self::from_owned(s)
 	}
 
-	pub fn from_str_unchecked(buf: &str) -> Self {
-		Self::new_unchecked(buf.to_owned())
+	pub fn new_unchecked(s: String) -> Self {
+		Self::from_owned_unchecked(s)
+	}
+}
+impl PathExt for PathOwned {
+	type PathOwned = PathOwned;
+	type Path = Path;
+
+	fn validate(buf: &str) -> Result<(), PathError> {
+		Self::Path::validate(buf)
+	}
+
+	fn from_owned_unchecked(buf: String) -> Self::PathOwned {
+		PathOwned(buf)
+	}
+
+	fn from_str_unchecked(buf: &str) -> &Self::Path {
+		Self::Path::from_str_unchecked(buf)
+	}
+
+	fn as_string(&self) -> &'_ str {
+		&self.0
+	}
+
+	fn has_root(&self) -> bool {
+		self.as_path().has_root()
+	}
+}
+impl Deref for PathOwned {
+	type Target = Path;
+
+	fn deref(&self) -> &Self::Target {
+		Path::from_str_unchecked(&self.0)
+	}
+}
+impl AsRef<Path> for PathOwned {
+	fn as_ref(&self) -> &Path {
+		Path::from_str_unchecked(&self.0)
+	}
+}
+impl Borrow<Path> for PathOwned {
+	fn borrow(&self) -> &Path {
+		self
+	}
+}
+impl AsRef<str> for PathOwned {
+	fn as_ref(&self) -> &str {
+		&self.0
+	}
+}
+impl Into<String> for PathOwned {
+	fn into(self) -> String {
+		self.0
+	}
+}
+impl<'a> IntoIterator for &'a PathOwned {
+	type Item = Component<'a>;
+	type IntoIter = Components<'a>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.components()
+	}
+}
+impl Display for PathOwned {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_str(self.as_string())
+	}
+}
+
+/// Absolute Path.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct AbsolutePath(str);
+impl AbsolutePath {
+	pub fn new(s: &str) -> Result<&Self, PathError> {
+		Self::from_str(s)
+	}
+
+	pub fn new_unchecked(s: &str) -> &Self {
+		Self::from_str_unchecked(s)
 	}
 }
 impl PathExt for AbsolutePath {
-	fn new(buf: String) -> Result<Self, PathError> {
+	type PathOwned = AbsolutePathOwned;
+	type Path = AbsolutePath;
+
+	fn validate(buf: &str) -> Result<(), PathError> {
 		if buf.is_empty() {
 			return Err(PathError::InvalidArgument);
 		}
 		if !matches!(buf.as_bytes().first(), Some(b'/')) {
 			return Err(PathError::InvalidArgument);
 		}
-		Ok(Self(buf))
+		Ok(())
 	}
 
-	fn new_unchecked(buf: String) -> Self {
-		Self(buf)
+	fn from_owned_unchecked(buf: String) -> Self::PathOwned {
+		AbsolutePathOwned(buf)
+	}
+
+	/// See: [`std::path::Path`]
+	fn from_str_unchecked(s: &str) -> &Self::Path {
+		unsafe { &*(s.as_ref() as *const str as *const Self::Path) }
 	}
 
 	fn as_string(&self) -> &'_ str {
@@ -94,9 +202,14 @@ impl PathExt for AbsolutePath {
 		true
 	}
 }
-impl Into<String> for AbsolutePath {
+impl Into<String> for &AbsolutePath {
 	fn into(self) -> String {
-		self.0
+		self.0.to_owned()
+	}
+}
+impl Into<AbsolutePathOwned> for &AbsolutePath {
+	fn into(self) -> AbsolutePathOwned {
+		self.to_path()
 	}
 }
 impl<'a> IntoIterator for &'a AbsolutePath {
@@ -107,9 +220,16 @@ impl<'a> IntoIterator for &'a AbsolutePath {
 		self.components()
 	}
 }
+impl ToOwned for AbsolutePath {
+	type Owned = AbsolutePathOwned;
+
+	fn to_owned(&self) -> Self::Owned {
+		AbsolutePathOwned::from_owned_unchecked(self.as_string().to_owned())
+	}
+}
 impl AsRef<str> for AbsolutePath {
 	fn as_ref(&self) -> &str {
-		&self.0
+		self.as_string()
 	}
 }
 impl Display for AbsolutePath {
@@ -118,31 +238,110 @@ impl Display for AbsolutePath {
 	}
 }
 
-/// Relative Path.
+/// Owned Absolute Path.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct RelativePath(String);
-impl RelativePath {
-	pub fn from_str(buf: &str) -> Result<Self, PathError> {
-		Self::new(buf.to_owned())
+#[repr(transparent)]
+pub struct AbsolutePathOwned(String);
+impl AbsolutePathOwned {
+	pub fn new(s: String) -> Result<Self, PathError> {
+		Self::from_owned(s)
 	}
 
-	pub fn from_str_unchecked(buf: &str) -> Self {
-		Self::new_unchecked(buf.to_owned())
+	pub fn new_unchecked(s: String) -> Self {
+		Self::from_owned_unchecked(s)
 	}
 }
+impl PathExt for AbsolutePathOwned {
+	type PathOwned = AbsolutePathOwned;
+	type Path = AbsolutePath;
+
+	fn validate(buf: &str) -> Result<(), PathError> {
+		Self::Path::validate(buf)
+	}
+
+	fn from_owned_unchecked(buf: String) -> Self::PathOwned {
+		AbsolutePathOwned(buf)
+	}
+
+	/// See: [`std::path::Path`]
+	fn from_str_unchecked(buf: &str) -> &Self::Path {
+		Self::Path::from_str_unchecked(buf)
+	}
+
+	fn as_string(&self) -> &'_ str {
+		&self.0
+	}
+
+	fn has_root(&self) -> bool {
+		self.as_path().has_root()
+	}
+}
+impl Deref for AbsolutePathOwned {
+	type Target = AbsolutePath;
+
+	fn deref(&self) -> &Self::Target {
+		AbsolutePath::from_str_unchecked(&self.0)
+	}
+}
+impl AsRef<AbsolutePath> for AbsolutePathOwned {
+	fn as_ref(&self) -> &AbsolutePath {
+		AbsolutePath::from_str_unchecked(&self.0)
+	}
+}
+impl Borrow<AbsolutePath> for AbsolutePathOwned {
+	fn borrow(&self) -> &AbsolutePath {
+		self
+	}
+}
+impl Into<String> for AbsolutePathOwned {
+	fn into(self) -> String {
+		self.0
+	}
+}
+impl<'a> IntoIterator for &'a AbsolutePathOwned {
+	type Item = Component<'a>;
+	type IntoIter = Components<'a>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.components()
+	}
+}
+impl AsRef<str> for AbsolutePathOwned {
+	fn as_ref(&self) -> &str {
+		&self.0
+	}
+}
+impl Display for AbsolutePathOwned {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_str(self.as_string())
+	}
+}
+
+/// Relative Path.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct RelativePath(str);
 impl PathExt for RelativePath {
-	fn new(buf: String) -> Result<Self, PathError> {
+	type PathOwned = RelativePathOwned;
+	type Path = RelativePath;
+
+	fn validate(buf: &str) -> Result<(), PathError> {
 		if buf.is_empty() {
 			return Err(PathError::InvalidArgument);
 		}
 		if matches!(buf.as_bytes().first(), Some(b'/')) {
 			return Err(PathError::InvalidArgument);
 		}
-		Ok(Self(buf))
+		Ok(())
 	}
 
-	fn new_unchecked(buf: String) -> Self {
-		Self(buf)
+	fn from_owned_unchecked(buf: String) -> Self::PathOwned {
+		RelativePathOwned(buf)
+	}
+
+	/// See: [`std::path::Path`]
+	fn from_str_unchecked(s: &str) -> &Self::Path {
+		unsafe { &*(s.as_ref() as *const str as *const Self::Path) }
 	}
 
 	fn as_string(&self) -> &'_ str {
@@ -153,9 +352,14 @@ impl PathExt for RelativePath {
 		false
 	}
 }
-impl Into<String> for RelativePath {
+impl Into<String> for &RelativePath {
 	fn into(self) -> String {
-		self.0
+		self.0.to_owned()
+	}
+}
+impl Into<RelativePathOwned> for &RelativePath {
+	fn into(self) -> RelativePathOwned {
+		self.to_path()
 	}
 }
 impl<'a> IntoIterator for &'a RelativePath {
@@ -176,33 +380,32 @@ impl Display for RelativePath {
 		f.write_str(self.as_string())
 	}
 }
+impl ToOwned for RelativePath {
+	type Owned = RelativePathOwned;
 
-/// Path.
-/// Can be relative or absolute.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct PathRef<'a>(Cow<'a, str>);
-impl<'a> PathRef<'a> {
-	pub fn from_str(buf: &'a str) -> Result<Self, PathError> {
-		if buf.is_empty() {
-			return Err(PathError::InvalidArgument);
-		}
-		Ok(Self(Cow::Borrowed(buf)))
-	}
-
-	pub fn from_str_unchecked(buf: &'a str) -> Self {
-		Self(Cow::Borrowed(buf))
+	fn to_owned(&self) -> Self::Owned {
+		RelativePathOwned::from_owned_unchecked(self.as_string().to_owned())
 	}
 }
-impl<'a> PathExt for PathRef<'a> {
-	fn new(buf: String) -> Result<Self, PathError> {
-		if buf.is_empty() {
-			return Err(PathError::InvalidArgument);
-		}
-		Ok(Self(Cow::Owned(buf)))
+
+/// OWned Relative Path.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[repr(transparent)]
+pub struct RelativePathOwned(String);
+impl PathExt for RelativePathOwned {
+	type PathOwned = RelativePathOwned;
+	type Path = RelativePath;
+
+	fn validate(buf: &str) -> Result<(), PathError> {
+		Self::Path::validate(buf)
 	}
 
-	fn new_unchecked(buf: String) -> Self {
-		Self(Cow::Owned(buf))
+	fn from_owned_unchecked(buf: String) -> Self::PathOwned {
+		RelativePathOwned(buf)
+	}
+
+	fn from_str_unchecked(buf: &str) -> &Self::Path {
+		Self::Path::from_str_unchecked(buf)
 	}
 
 	fn as_string(&self) -> &'_ str {
@@ -210,15 +413,32 @@ impl<'a> PathExt for PathRef<'a> {
 	}
 
 	fn has_root(&self) -> bool {
-		matches!(self.as_string().as_bytes().first(), Some(b'/'))
+		self.as_path().has_root()
 	}
 }
-impl<'a> Into<String> for PathRef<'a> {
+impl Deref for RelativePathOwned {
+	type Target = RelativePath;
+
+	fn deref(&self) -> &Self::Target {
+		RelativePath::from_str_unchecked(&self.0)
+	}
+}
+impl AsRef<RelativePath> for RelativePathOwned {
+	fn as_ref(&self) -> &RelativePath {
+		RelativePath::from_str_unchecked(&self.0)
+	}
+}
+impl Borrow<RelativePath> for RelativePathOwned {
+	fn borrow(&self) -> &RelativePath {
+		self
+	}
+}
+impl Into<String> for RelativePathOwned {
 	fn into(self) -> String {
-		self.0.into_owned()
+		self.0
 	}
 }
-impl<'a> IntoIterator for &'a PathRef<'a> {
+impl<'a> IntoIterator for &'a RelativePathOwned {
 	type Item = Component<'a>;
 	type IntoIter = Components<'a>;
 
@@ -226,138 +446,12 @@ impl<'a> IntoIterator for &'a PathRef<'a> {
 		self.components()
 	}
 }
-impl<'a> AsRef<str> for PathRef<'a> {
+impl AsRef<str> for RelativePathOwned {
 	fn as_ref(&self) -> &str {
 		&self.0
 	}
 }
-impl<'a> Display for PathRef<'a> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str(self.as_string())
-	}
-}
-
-/// Absolute Path.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct AbsolutePathRef<'a>(Cow<'a, str>);
-impl<'a> AbsolutePathRef<'a> {
-	pub fn from_str(buf: &'a str) -> Result<Self, PathError> {
-		if buf.is_empty() {
-			return Err(PathError::InvalidArgument);
-		}
-		if !matches!(buf.as_bytes().first(), Some(b'/')) {
-			return Err(PathError::InvalidArgument);
-		}
-		Ok(Self(Cow::Borrowed(buf)))
-	}
-
-	pub fn from_str_unchecked(buf: &'a str) -> Self {
-		Self(Cow::Borrowed(buf))
-	}
-}
-impl<'a> PathExt for AbsolutePathRef<'a> {
-	fn new(buf: String) -> Result<Self, PathError> {
-		if buf.is_empty() {
-			return Err(PathError::InvalidArgument);
-		}
-		if !matches!(buf.as_bytes().first(), Some(b'/')) {
-			return Err(PathError::InvalidArgument);
-		}
-		Ok(Self(Cow::Owned(buf)))
-	}
-
-	fn new_unchecked(buf: String) -> Self {
-		Self(Cow::Owned(buf))
-	}
-
-	fn as_string(&self) -> &'_ str {
-		&self.0
-	}
-
-	fn has_root(&self) -> bool {
-		true
-	}
-}
-impl<'a> Into<String> for AbsolutePathRef<'a> {
-	fn into(self) -> String {
-		self.0.into_owned()
-	}
-}
-impl<'a> IntoIterator for &'a AbsolutePathRef<'a> {
-	type Item = Component<'a>;
-	type IntoIter = Components<'a>;
-
-	fn into_iter(self) -> Self::IntoIter {
-		self.components()
-	}
-}
-impl<'a> AsRef<str> for AbsolutePathRef<'a> {
-	fn as_ref(&self) -> &str {
-		&self.0
-	}
-}
-impl<'a> Display for AbsolutePathRef<'a> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str(self.as_string())
-	}
-}
-
-/// Relative Path.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct RelativePathRef<'a>(Cow<'a, str>);
-impl<'a> RelativePathRef<'a> {
-	pub fn from_str(buf: &'a str) -> Result<Self, PathError> {
-		if buf.is_empty() {
-			return Err(PathError::InvalidArgument);
-		}
-		if matches!(buf.as_bytes().first(), Some(b'/')) {
-			return Err(PathError::InvalidArgument);
-		}
-		Ok(Self(Cow::Borrowed(buf)))
-	}
-}
-impl<'a> PathExt for RelativePathRef<'a> {
-	fn new(buf: String) -> Result<Self, PathError> {
-		if buf.is_empty() {
-			return Err(PathError::InvalidArgument);
-		}
-		if matches!(buf.as_bytes().first(), Some(b'/')) {
-			return Err(PathError::InvalidArgument);
-		}
-		Ok(Self(Cow::Owned(buf)))
-	}
-
-	fn new_unchecked(buf: String) -> Self {
-		Self(Cow::Owned(buf))
-	}
-
-	fn as_string(&self) -> &'_ str {
-		&self.0
-	}
-
-	fn has_root(&self) -> bool {
-		false
-	}
-}
-impl<'a> Into<String> for RelativePathRef<'a> {
-	fn into(self) -> String {
-		self.0.into_owned()
-	}
-}
-impl<'a> IntoIterator for &'a RelativePathRef<'a> {
-	type Item = Component<'a>;
-	type IntoIter = Components<'a>;
-
-	fn into_iter(self) -> Self::IntoIter {
-		self.components()
-	}
-}
-impl<'a> AsRef<str> for RelativePathRef<'a> {
-	fn as_ref(&self) -> &str {
-		&self.0
-	}
-}
-impl<'a> Display for RelativePathRef<'a> {
+impl Display for RelativePathOwned {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.write_str(self.as_string())
 	}
@@ -440,12 +534,33 @@ pub enum PathError {
 	InvalidArgument,
 }
 
-pub trait PathExt: Clone {
-	fn new(buf: String) -> Result<Self, PathError>;
+pub trait PathExt {
+	type PathOwned: PathExt;
+	type Path: PathExt + ?Sized;
 
-	fn new_unchecked(buf: String) -> Self;
+	fn validate(buf: &str) -> Result<(), PathError>;
+	fn from_owned_unchecked(buf: String) -> Self::PathOwned;
+	fn from_str_unchecked(buf: &str) -> &Self::Path;
 
-	fn as_string(&self) -> &'_ str;
+	fn from_owned(buf: String) -> Result<Self::PathOwned, PathError> {
+		Self::validate(&buf)?;
+		Ok(Self::from_owned_unchecked(buf))
+	}
+
+	fn from_str(buf: &str) -> Result<&Self::Path, PathError> {
+		Self::validate(&buf)?;
+		Ok(Self::from_str_unchecked(buf))
+	}
+
+	fn as_path(&self) -> &Self::Path {
+		Self::from_str_unchecked(self.as_string())
+	}
+
+	fn to_path(&self) -> Self::PathOwned {
+		Self::from_owned_unchecked(self.as_string().to_owned())
+	}
+
+	fn as_string(&self) -> &str;
 
 	fn has_root(&self) -> bool;
 
@@ -455,18 +570,27 @@ pub trait PathExt: Clone {
 	}
 
 	/// Parent directory.
-	fn parent(&self) -> Option<&'_ str> {
-		match self.components().last() {
-			Some(Component::Normal(name)) => {
-				let path = self.as_string();
-				Some(path.split_at(path.len() - name.len() - 1).0)
-			},
-			_ => None,
-		}
+	fn parent(&self) -> Option<&Self::Path> {
+		self.parent_and_file_name().map(|(p, _)| p)
+	}
+
+	/// Parent directory.
+	fn parent_result(&self) -> Result<&Self::Path, PathError> {
+		self.parent().ok_or(PathError::NoParent)
 	}
 
 	/// Parent directories as full path starting at root.
-	fn parents<'a>(&'a self) -> impl Iterator<Item = &'a str> {
+	///
+	/// Example:
+	/// ```rust
+	/// 	let path = PathRef::from_str_unchecked("/hello/world/test.zip");
+	/// 	let mut parents = path.parents();
+	/// 	assert_eq!(Some("/"), parents.next());
+	/// 	assert_eq!(Some("/hello"), parents.next());
+	/// 	assert_eq!(Some("/hello/world"), parents.next());
+	/// 	assert_eq!(None, parents.next());
+	/// ```
+	fn parents(&self) -> impl Iterator<Item = &Self::Path> {
 		self.components()
 			.scan((0 as usize, self.as_string()), |(index, path), component| {
 				let end = *index + component.len();
@@ -475,48 +599,68 @@ pub trait PathExt: Clone {
 				}
 				let result = &path[0..end];
 				*index = if *index > 0 { end + 1 } else { end };
-				Some(result)
+				Some(Self::from_str_unchecked(result))
 			})
 	}
 
 	/// Path and filename.
-	fn parent_and_file_name(&self) -> Option<(&'_ str, &'_ str)> {
+	fn parent_and_file_name(&self) -> Option<(&Self::Path, &'_ str)> {
 		match self.components().last() {
 			Some(Component::Normal(name)) => {
 				let path = self.as_string();
-				Some((path.split_at(path.len() - name.len() - 1).0, name))
+				let parent = match path.split_at(path.len() - name.len()) {
+					("/", _) => "/",
+					(p, _) if p.len() > 1 => &p[0..p.len() - 1],
+					(p, _) => p,
+				};
+				Some((Self::from_str_unchecked(parent), name))
 			},
 			_ => None,
 		}
 	}
 
 	/// Path and filename.
-	fn parent_and_file_name_result(&self) -> Result<(&'_ str, &'_ str), PathError> {
+	fn parent_and_file_name_result(&self) -> Result<(&Self::Path, &str), PathError> {
 		self.parent_and_file_name().ok_or(PathError::NoParent)
 	}
 
 	/// File name.
-	fn file_name(&self) -> Option<&'_ str> {
-		self.components().last().and_then(|f| match f {
-			Component::Normal(name) => Some(name),
-			_ => None,
-		})
+	fn file_name(&self) -> Option<&str> {
+		self.parent_and_file_name().map(|(_, f)| f)
 	}
 
 	/// File name.
-	fn file_name_result(&self) -> Result<&'_ str, PathError> {
+	fn file_name_result(&self) -> Result<&str, PathError> {
 		self.file_name().ok_or(PathError::NoParent)
 	}
 
 	/// Normalize path to connonized form.
-	fn normalize(&self) -> Result<Self, PathError> {
-		Ok(Self::new_unchecked(from_components(normalize_components(self.components())?)))
+	fn normalize(&self) -> Result<Self::PathOwned, PathError> {
+		Ok(Self::from_owned_unchecked(from_components(normalize_components(self.components())?)))
 	}
 
 	/// Join and normalize components into an path.
-	fn join<'a>(&'a self, other: impl IntoIterator<Item = Component<'a>>) -> Result<Self, PathError> {
-		Ok(Self::new_unchecked(from_components::<'a>(normalize_components(self.components().chain(other))?)))
+	fn join<'a: 'b, 'b>(
+		&'a self,
+		other: impl IntoIterator<Item = Component<'b>>,
+	) -> Result<Self::PathOwned, PathError> {
+		Ok(Self::from_owned_unchecked(join(self.components(), other)?))
 	}
+
+	/// Join and normalize other path.
+	fn join_path(&self, other: &str) -> Result<Self::PathOwned, PathError> {
+		let other_path = Path::from_str_unchecked(other);
+		self.join(other_path.into_iter())
+	}
+}
+
+fn join<'a: 'b, 'b: 'a>(
+	a: impl IntoIterator<Item = Component<'a>>,
+	b: impl IntoIterator<Item = Component<'b>>,
+) -> Result<String, PathError> {
+	let components = a.into_iter().chain(b.into_iter());
+	let normalized = normalize_components(components)?;
+	Ok(from_components(normalized))
 }
 
 fn normalize_components<'a>(
@@ -602,11 +746,11 @@ pub fn is_sep_byte(b: u8) -> bool {
 
 #[cfg(test)]
 mod tests {
-	use crate::{AbsolutePath, Component, Path, PathExt, PathRef, RelativePath};
+	use crate::{AbsolutePath, Component, Path, PathExt, RelativePath};
 
 	#[test]
 	fn test_components() {
-		let path = Path::new("/hello/world".to_owned()).unwrap();
+		let path = Path::from_str("/hello/world").unwrap();
 		let mut components = path.components();
 		assert_eq!(Some(Component::RootDir), components.next());
 		assert_eq!(Some(Component::Normal("hello")), components.next());
@@ -616,7 +760,7 @@ mod tests {
 
 	#[test]
 	fn test_components_empty_component() {
-		let path = Path::new("/hello//world".to_owned()).unwrap();
+		let path = Path::from_str("/hello//world").unwrap();
 		let mut components = path.components();
 		assert_eq!(Some(Component::RootDir), components.next());
 		assert_eq!(Some(Component::Normal("hello")), components.next());
@@ -627,14 +771,14 @@ mod tests {
 
 	#[test]
 	fn test_components_empty() {
-		let path = Path::new_unchecked("".to_owned());
+		let path = Path::from_owned_unchecked("".to_owned());
 		let mut components = path.components();
 		assert_eq!(None, components.next());
 	}
 
 	#[test]
 	fn test_relative_components() {
-		let path = RelativePath::new("./hello/world".to_owned()).unwrap();
+		let path = RelativePath::from_str("./hello/world").unwrap();
 		let mut components = path.components();
 		assert_eq!(Some(Component::CurDir), components.next());
 		assert_eq!(Some(Component::Normal("hello")), components.next());
@@ -644,7 +788,7 @@ mod tests {
 
 	#[test]
 	fn test_absolute_components() {
-		let path = AbsolutePath::new("/hello/world".to_owned()).unwrap();
+		let path = AbsolutePath::from_str("/hello/world").unwrap();
 		let mut components = path.components();
 		assert_eq!(Some(Component::RootDir), components.next());
 		assert_eq!(Some(Component::Normal("hello")), components.next());
@@ -654,18 +798,18 @@ mod tests {
 
 	#[test]
 	fn test_parents() {
-		let path = PathRef::from_str_unchecked("/hello/world/test.zip");
+		let path = Path::from_str_unchecked("/hello/world/test.zip");
 		let mut parents = path.parents();
-		assert_eq!(Some("/"), parents.next());
-		assert_eq!(Some("/hello"), parents.next());
-		assert_eq!(Some("/hello/world"), parents.next());
+		assert_eq!(Some(Path::from_str_unchecked("/")), parents.next());
+		assert_eq!(Some(Path::from_str_unchecked("/hello")), parents.next());
+		assert_eq!(Some(Path::from_str_unchecked("/hello/world")), parents.next());
 		assert_eq!(None, parents.next());
 	}
 
 	#[test]
 	fn test_normalize() {
 		fn normalize(s: &str) -> String {
-			Path::new(s.to_owned()).unwrap().normalize().unwrap().into()
+			Path::from_str(s).unwrap().normalize().unwrap().into()
 		}
 		assert_eq!("/hello/test", normalize("/hello/test"));
 		assert_eq!("test", normalize("hello/.././test"));
@@ -682,21 +826,28 @@ mod tests {
 
 	#[test]
 	fn test_file_name() {
-		assert_eq!(Some("test"), Path::new("/hello/test".to_owned()).unwrap().file_name());
-		assert_eq!(Some("test.zip"), Path::new("hello/.././test.zip".to_owned()).unwrap().file_name());
-		assert_eq!(None, Path::new("hello/.././test.zip/..".to_owned()).unwrap().file_name());
-		assert_eq!(None, Path::new("/".to_owned()).unwrap().file_name());
+		assert_eq!(Some("test"), Path::from_str("/hello/test").unwrap().file_name());
+		assert_eq!(Some("test.zip"), Path::from_str("hello/.././test.zip").unwrap().file_name());
+		assert_eq!(None, Path::from_str("hello/.././test.zip/..").unwrap().file_name());
+		assert_eq!(None, Path::from_str("/").unwrap().file_name());
 	}
 
 	#[test]
-	fn test_path_and_file_name() {
-		assert_eq!(Some(("/hello", "test")), Path::new("/hello/test".to_owned()).unwrap().parent_and_file_name());
+	fn test_parent_and_file_name() {
 		assert_eq!(
-			Some(("hello/../.", "test.zip")),
-			Path::new("hello/.././test.zip".to_owned()).unwrap().parent_and_file_name()
+			Some((Path::from_str_unchecked("/hello"), "test")),
+			Path::from_str("/hello/test").unwrap().parent_and_file_name()
 		);
-		assert_eq!(None, Path::new("hello/.././test.zip/..".to_owned()).unwrap().parent_and_file_name());
-		assert_eq!(None, Path::new("/".to_owned()).unwrap().parent_and_file_name());
+		assert_eq!(
+			Some((Path::from_str_unchecked("hello/../."), "test.zip")),
+			Path::from_str("hello/.././test.zip").unwrap().parent_and_file_name()
+		);
+		assert_eq!(None, Path::from_str("hello/.././test.zip/..").unwrap().parent_and_file_name());
+		assert_eq!(None, Path::from_str("/").unwrap().parent_and_file_name());
+		assert_eq!(
+			Some((Path::from_str_unchecked("/"), "test")),
+			Path::from_str("/test").unwrap().parent_and_file_name()
+		);
 	}
 
 	#[test]
@@ -705,7 +856,7 @@ mod tests {
 			"/hello/test/world",
 			Path::from_str("/hello/test")
 				.unwrap()
-				.join(&Path::from_str("world").unwrap())
+				.join(Path::from_str("world").unwrap())
 				.unwrap()
 				.as_string()
 		);
@@ -713,7 +864,7 @@ mod tests {
 			"/world",
 			Path::from_str("/hello/test")
 				.unwrap()
-				.join(&Path::from_str("/world").unwrap())
+				.join(Path::from_str("/world").unwrap())
 				.unwrap()
 				.as_string()
 		);

@@ -3,7 +3,7 @@ use crate::{
 	library::{fs_read::fs_read_option, fs_write::fs_write},
 	types::cores::{CO_CORE_NAME_CO, CO_CORE_NAME_PIN, CO_CORE_PIN},
 	CoCoreResolver, CoReducer, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, Runtime, CO_CORE_KEYSTORE,
-	CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -334,10 +334,10 @@ where
 	// create
 	let mut cores = BTreeMap::<String, co_core_co::Core>::new();
 	cores.insert(
-		Cores::to_core_name(CO_CORE_MEMBERSHIP).to_owned(),
+		CO_CORE_NAME_MEMBERSHIP.to_owned(),
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_MEMBERSHIP).expect(CO_CORE_MEMBERSHIP),
-			tags: tags!( "core": Cores::to_core_name(CO_CORE_MEMBERSHIP) ),
+			tags: tags!( "core": CO_CORE_MEMBERSHIP ),
 			state: None,
 		},
 	);
@@ -345,7 +345,7 @@ where
 		CO_CORE_NAME_KEYSTORE.to_owned(),
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_KEYSTORE).expect(CO_CORE_KEYSTORE),
-			tags: tags!( "core": CO_CORE_NAME_KEYSTORE ),
+			tags: tags!( "core": CO_CORE_KEYSTORE ),
 			state: None,
 		},
 	);
@@ -353,7 +353,7 @@ where
 		CO_CORE_NAME_PIN.to_owned(),
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_PIN).expect(CO_CORE_PIN),
-			tags: tags!("core": CO_CORE_NAME_PIN),
+			tags: tags!("core": CO_CORE_PIN),
 			state: None,
 		},
 	);

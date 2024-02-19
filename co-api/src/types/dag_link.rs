@@ -1,4 +1,4 @@
-use crate::{library::node_reader::node_reader, NodeReaderError, Storage};
+use crate::{library::node_reader::node_reader, Context, NodeReaderError, Storage};
 use co_primitives::{Link, Linkable, NodeBuilder, NodeContainer};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
@@ -20,6 +20,17 @@ pub trait DagCollection: Sized {
 
 	fn get(&self, storage: &dyn Storage) -> Self::Collection {
 		self.from_link(storage).expect("Valid serialized data")
+	}
+
+	fn update<F: FnOnce(&mut dyn Context, &mut Self::Collection) -> Result<(), anyhow::Error>>(
+		&mut self,
+		context: &mut dyn Context,
+		f: F,
+	) -> Result<(), anyhow::Error> {
+		let mut collection = self.get(context.storage());
+		f(context, &mut collection)?;
+		self.set(context.storage_mut(), collection);
+		Ok(())
 	}
 
 	fn iter(&self, storage: &dyn Storage) -> impl Iterator<Item = Self::Item> {

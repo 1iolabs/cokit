@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
+async-stream = { workspace = true }
 clap = { version = "^4.3.23", features = ["derive"] }
 co-core-co = { path = "../cores/co" }
 co-core-file = { path = "../cores/file" }

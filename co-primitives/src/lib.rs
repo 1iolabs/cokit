@@ -13,7 +13,8 @@ pub use types::{
 	link::{Link, Linkable},
 	metadata::{CoMetadata, Metadata, WithCoMetadata},
 	path::{
-		AbsolutePath, AbsolutePathRef, Component, Components, Path, PathExt, PathRef, RelativePath, RelativePathRef,
+		AbsolutePath, AbsolutePathOwned, Component, Components, Path, PathExt, PathOwned, RelativePath,
+		RelativePathOwned,
 	},
 	tags::{Tag, Tags, TagsPattern},
 };
