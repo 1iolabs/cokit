@@ -5,7 +5,7 @@ use co_api::{
 };
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct File {
@@ -26,6 +26,27 @@ impl Node {
 			Node::Link(node) => &node.name,
 		}
 	}
+
+	pub fn is_dir(&self) -> bool {
+		match self {
+			Node::Folder(_) => true,
+			_ => false,
+		}
+	}
+
+	pub fn is_file(&self) -> bool {
+		match self {
+			Node::File(_) => true,
+			_ => false,
+		}
+	}
+
+	pub fn is_link(&self) -> bool {
+		match self {
+			Node::Link(_) => true,
+			_ => false,
+		}
+	}
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
@@ -36,6 +57,7 @@ pub struct FileNode {
 	pub size: u64,
 	pub mode: u32,
 	pub tags: Tags,
+	// #[external]
 	pub contents: Cid,
 	pub owner: Did,
 }
@@ -88,6 +110,11 @@ fn create(
 
 	// nodes
 	state.nodes.update(context, |context, mut paths| {
+		// implicitly create empty root on first create
+		if !paths.contains_key(AbsolutePath::new_unchecked("/")) {
+			paths.insert(AbsolutePath::new_unchecked("/").to_owned(), Default::default());
+		}
+
 		// recursive?
 		if recursive {
 			for parent in path.parents() {
@@ -95,9 +122,6 @@ fn create(
 					create_folder(context, &mut paths, parent, from, time)?;
 				}
 			}
-		} else if !paths.contains_key(AbsolutePath::new_unchecked("/")) {
-			// implicitly create root on first create
-			create_folder(context, &mut paths, AbsolutePath::new_unchecked("/"), from, time)?;
 		}
 
 		// insert if name not exists already
@@ -106,46 +130,6 @@ fn create(
 
 	// result
 	Ok(state)
-}
-
-fn create_node(
-	context: &mut dyn Context,
-	paths: &mut BTreeMap<AbsolutePathOwned, DagSet<Node>>,
-	parent_path: &AbsolutePath,
-	node: Node,
-) -> Result<(), anyhow::Error> {
-	paths
-		.get_mut(parent_path)
-		.ok_or(anyhow!("No such directory: {}", parent_path))?
-		.update(context, |_, nodes| {
-			// insert node if name not exists yet
-			if nodes.iter().find(|item| item.name() == node.name()).is_none() {
-				nodes.insert(node);
-			}
-			Ok(())
-		})
-}
-
-fn create_folder(
-	context: &mut dyn Context,
-	paths: &mut BTreeMap<AbsolutePathOwned, DagSet<Node>>,
-	path: &AbsolutePath,
-	from: &Did,
-	time: Date,
-) -> Result<(), anyhow::Error> {
-	let (parent_path, name) = match path.as_ref() {
-		"/" => (AbsolutePath::new_unchecked("/"), ""),
-		_ => path.parent_and_file_name_result()?,
-	};
-	let node = Node::Folder(FolderNode {
-		name: name.to_owned(),
-		create_time: time,
-		modify_time: time,
-		tags: tags!(),
-		owner: from.to_owned(),
-		mode: 0o665,
-	});
-	create_node(context, paths, parent_path, node)
 }
 
 fn remove(context: &mut dyn Context, mut state: File, path: &AbsolutePath) -> Result<File, anyhow::Error> {
@@ -174,6 +158,70 @@ fn remove(context: &mut dyn Context, mut state: File, path: &AbsolutePath) -> Re
 
 	// result
 	Ok(state)
+}
+
+fn get_node(
+	context: &mut dyn Context,
+	paths: &BTreeMap<AbsolutePathOwned, DagSet<Node>>,
+	path: &AbsolutePath,
+) -> Result<Option<Node>, anyhow::Error> {
+	let (parent_path, name) = path.parent_and_file_name_result()?;
+	let nodes = match paths.get(parent_path) {
+		Some(nodes) => nodes,
+		None => return Ok(None),
+	};
+	Ok(nodes.get(context.storage()).into_iter().find(|node| node.name() == name))
+}
+
+fn create_node(
+	context: &mut dyn Context,
+	paths: &mut BTreeMap<AbsolutePathOwned, DagSet<Node>>,
+	parent_path: &AbsolutePath,
+	node: Node,
+) -> Result<(), anyhow::Error> {
+	// validate parent exists
+	match parent_path.as_ref() {
+		// root always exists
+		"/" => {},
+		// check if node exists
+		_ => {
+			get_node(context, &paths, parent_path)?.ok_or(anyhow!("No such directory: {}", parent_path))?;
+		},
+	}
+
+	// node
+	let nodes = match paths.entry(parent_path.to_owned()) {
+		Entry::Occupied(o) => o.into_mut(),
+		Entry::Vacant(v) => v.insert(Default::default()),
+	};
+	nodes.update(context, |_, nodes| {
+		// insert node if name not exists yet
+		if nodes.iter().find(|item| item.name() == node.name()).is_none() {
+			nodes.insert(node);
+		}
+		Ok(())
+	})?;
+
+	Ok(())
+}
+
+fn create_folder(
+	context: &mut dyn Context,
+	paths: &mut BTreeMap<AbsolutePathOwned, DagSet<Node>>,
+	path: &AbsolutePath,
+	from: &Did,
+	time: Date,
+) -> Result<(), anyhow::Error> {
+	let (parent_path, name) = path.parent_and_file_name_result()?;
+	let node = Node::Folder(FolderNode {
+		name: name.to_owned(),
+		create_time: time,
+		modify_time: time,
+		tags: tags!(),
+		owner: from.to_owned(),
+		mode: 0o665,
+	});
+	create_node(context, paths, parent_path, node)
 }
 
 #[no_mangle]

@@ -44,6 +44,14 @@ where
 	type Item = Result<T, StorageError>;
 
 	fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+		// get next?
+		if self.entries.is_empty() && !self.stack.is_empty() && self.get.is_none() {
+			if let Some(next_cid) = self.stack.pop_front() {
+				let storage = self.storage.clone();
+				self.get = Some(Box::pin(async move { storage.get_deserialized::<Node<T>>(&next_cid).await }));
+			}
+		}
+
 		// waiting?
 		if let Some(mut get) = Pin::new(&mut self).get.take() {
 			match get.poll_unpin(cx) {
@@ -65,15 +73,6 @@ where
 					self.get = Some(get);
 					return Poll::Pending
 				},
-			}
-		}
-
-		// stack=true entries=false
-		if self.entries.is_empty() && !self.stack.is_empty() {
-			if let Some(next_cid) = self.stack.pop_front() {
-				let storage = self.storage.clone();
-				self.get = Some(Box::pin(async move { storage.get_deserialized::<Node<T>>(&next_cid).await }));
-				return Poll::Pending;
 			}
 		}
 

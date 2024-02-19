@@ -35,24 +35,6 @@ pub async fn command(cli: &Cli, file_command: &FileCommand, command: &Command) -
 	let path = AbsolutePath::from_str(&command.path)?.normalize()?;
 	let nodes: Vec<Node> = list_nodes(co_reducer.storage(), file_state, path).try_collect().await?;
 
-	// // directory
-	// let parent_node = NodeStream::from_node_container(co_reducer.storage(), &file_state.nodes)
-	// 	.filter_map(|item| {
-	// 		future::ready(match item {
-	// 			Ok((node_paths, nodes)) if node_paths == path => Some(nodes),
-	// 			_ => None,
-	// 		})
-	// 	})
-	// 	.take(1)
-	// 	.next()
-	// 	.await;
-
-	// // directory nodes
-	// let nodes: Vec<Node> =
-	// 	NodeStream::from_link(co_reducer.storage(), parent_node.as_ref().and_then(|i| i.node_container_link()))
-	// 		.try_collect()
-	// 		.await?;
-
 	// print
 	println!("total {}", nodes.len());
 	fn format_row(size: u64, modify_time: Date, name: &str) -> String {
