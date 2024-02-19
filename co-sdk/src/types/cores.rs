@@ -9,6 +9,7 @@ pub const CO_CORE_KEYSTORE: &str = "co-core-keystore";
 pub const CO_CORE_MEMBERSHIP: &str = "co-core-membership";
 pub const CO_CORE_PIN: &str = "co-core-pin";
 pub const CO_CORE_ROOM: &str = "co-core-room";
+pub const CO_CORE_ROLE: &str = "co-core-role";
 
 /// CO Core name expected by the SDK implementation (key to `co.cores`).
 pub const CO_CORE_NAME_CO: &str = "co";
@@ -95,6 +96,7 @@ fn get_native(name: &str) -> Core {
 		CO_CORE_MEMBERSHIP => Core::native::<co_core_membership::Memberships>(),
 		CO_CORE_PIN => Core::native::<co_core_pin::Pin>(),
 		CO_CORE_ROOM => Core::native::<co_core_room::Room>(),
+		CO_CORE_ROLE => Core::native::<co_core_role::Roles>(),
 		_ => panic!("unknown native core name: {}", name),
 	}
 }

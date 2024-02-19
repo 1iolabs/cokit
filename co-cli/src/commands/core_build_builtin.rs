@@ -1,13 +1,13 @@
 use anyhow::{anyhow, Context};
 use co_sdk::unixfs_encode_buffer;
 use exitcode::ExitCode;
+use futures::{StreamExt, TryStreamExt};
 use libipld::DefaultParams;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, env::current_exe, process::Command, str::from_utf8};
+use std::{collections::BTreeMap, env::current_exe, path::PathBuf, process::Command, str::from_utf8};
+use tokio_stream::wrappers::ReadDirStream;
 
 pub async fn command() -> Result<ExitCode, anyhow::Error> {
-	let paths = ["co", "keystore", "membership", "room", "pin"];
-
 	// get repository root path
 	//  `<respository_path>/target/debug/co-cli`
 	let respository_path = current_exe()?
@@ -19,8 +19,24 @@ pub async fn command() -> Result<ExitCode, anyhow::Error> {
 		.ok_or(anyhow!("no parent"))?
 		.to_owned();
 
+	// paths
+	// let paths = ["co", "keystore", "membership", "room", "pin", "file"];
+	let paths: Vec<PathBuf> = ReadDirStream::new(tokio::fs::read_dir(respository_path.join("cores")).await?)
+		.filter_map(|entry| async move {
+			match entry {
+				Ok(entry) => match entry.file_type().await {
+					Ok(file_type) if file_type.is_dir() => Some(Ok(PathBuf::from(entry.file_name()))),
+					Err(e) => Some(Err(e)),
+					_ => None,
+				},
+				Err(e) => Some(Err(e)),
+			}
+		})
+		.try_collect()
+		.await?;
+
 	// build cores
-	for path in paths {
+	for path in paths.iter() {
 		let core_path = respository_path.join("cores").join(path);
 		println!("build: {:?}", core_path);
 		let command = Command::new("cargo")
@@ -36,7 +52,7 @@ pub async fn command() -> Result<ExitCode, anyhow::Error> {
 
 	// create Cids
 	let mut cores: Cores = Default::default();
-	for path in paths {
+	for path in paths.iter() {
 		let core_path = respository_path.join("cores").join(path);
 
 		// read toml for name

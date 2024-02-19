@@ -22,6 +22,11 @@ Build cores:
 cargo run --bin co-cli core-build-builtin
 ```
 
+Test:
+```shell
+cargo test --package co-sdk --lib -- types::cores::tests --nocapture
+```
+
 ## Add new COre
 
 - Add to: `../co-cli/src/commands/core_build_builtin.rs`

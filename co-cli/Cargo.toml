@@ -22,6 +22,7 @@ serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
+tokio-stream = { workspace = true, features = ["full"] }
 toml = { workspace = true }
 tracing = { workspace = true }
 tracing-bunyan-formatter = "0.3.6"
