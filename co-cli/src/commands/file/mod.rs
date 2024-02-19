@@ -1,3 +1,4 @@
+mod cat;
 mod ls;
 mod mkdir;
 
@@ -25,9 +26,9 @@ pub enum Commands {
 
 	/// Create directory.
 	Mkdir(mkdir::Command),
-	// /// Print file contents.
-	// Cat(cat::Command),
 
+	/// Print file contents.
+	Cat(cat::Command),
 	// /// Create a new CO.
 	// Create(create::Command),
 
@@ -39,7 +40,7 @@ pub async fn command(cli: &Cli, file_command: &Command) -> Result<ExitCode, anyh
 	match &file_command.command {
 		Commands::Ls(command) => ls::command(cli, file_command, command).await,
 		Commands::Mkdir(command) => mkdir::command(cli, file_command, command).await,
-		// Commands::Cat(command) => cat::command(cli, command).await,
+		Commands::Cat(command) => cat::command(cli, file_command, command).await,
 		// Commands::Create(command) => create::command(cli, command).await,
 		// Commands::Remove(command) => remove::command(cli, command).await,
 	}

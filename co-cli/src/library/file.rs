@@ -1,6 +1,6 @@
 use co_core_co::CoAction;
 use co_core_file::{FolderNode, Node};
-use co_primitives::{tags, AbsolutePath, AbsolutePathOwned, PathExt};
+use co_primitives::{tags, AbsolutePath, AbsolutePathOwned, PathError, PathExt};
 use co_sdk::{
 	CoReducer, CoReducerError, CoStorage, Cores, NodeStream, PrivateIdentity, StorageError, CO_CORE_FILE,
 	CO_CORE_NAME_CO,
@@ -8,9 +8,30 @@ use co_sdk::{
 use futures::{pin_mut, Stream, StreamExt};
 use std::collections::{BTreeMap, BTreeSet};
 
+#[derive(Debug, thiserror::Error)]
+pub enum FileError {
+	#[error("No such file or directory: {0}")]
+	NoEntry(String, #[source] anyhow::Error),
+
+	#[error("Not a file: {0}")]
+	NoFile(String, #[source] anyhow::Error),
+
+	#[error("Storage error")]
+	Storage(#[from] StorageError),
+
+	#[error("Reducer error")]
+	Reducer(#[from] CoReducerError),
+
+	#[error("Path error")]
+	Path(#[from] PathError),
+
+	#[error("Other")]
+	Other(#[from] anyhow::Error),
+}
+
 /// Get file core state.
 /// If the core not exists yet create it.
-pub async fn file_core<I>(co_reducer: CoReducer, identity: &I, core: &str) -> Result<co_core_file::File, anyhow::Error>
+pub async fn file_core<I>(co_reducer: CoReducer, identity: &I, core: &str) -> Result<co_core_file::File, FileError>
 where
 	I: PrivateIdentity + Send + Sync,
 {

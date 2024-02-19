@@ -1,9 +1,11 @@
-use crate::{cli::Cli, library::application::application};
+use crate::{
+	cli::Cli,
+	library::{application::application, cat::cat_output},
+};
 use anyhow::anyhow;
-use co_sdk::{BlockStorage, MultiCodec};
 use exitcode::ExitCode;
-use libipld::{cbor::DagCborCodec, codec::Codec, Cid, Ipld};
-use std::{io::Write, str::FromStr};
+use libipld::Cid;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
@@ -33,32 +35,8 @@ pub async fn command(cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::E
 		None => reducer.reducer_state().await.0.ok_or(anyhow!("CO is empty"))?,
 	};
 
-	// block
-	let block = reducer.storage().get(&cid).await?;
-
-	// output
-	if command.pretty {
-		if MultiCodec::CoEncryptedBlock == cid.codec().into() {
-			println!("Codec: {:?} ({})", Into::<MultiCodec>::into(cid.codec()), cid.codec());
-			println!("Cid: {}", block.cid());
-		}
-		let codec = MultiCodec::from(block.cid().codec());
-		println!("Codec: {:?} ({})", codec, block.cid().codec());
-		println!("Size: {}", block.data().len());
-		match codec {
-			MultiCodec::DagCbor => {
-				let ipld: Ipld = DagCborCodec::default().decode(block.data())?;
-				println!("{:#?}", ipld);
-			},
-			_ => {
-				hexdump::hexdump(block.data());
-			},
-		}
-	} else {
-		let mut out = std::io::stdout();
-		out.write_all(block.data())?;
-		out.flush()?;
-	}
+	// print
+	cat_output(reducer.storage(), cid, command.pretty).await?;
 
 	// result
 	Ok(exitcode::OK)
