@@ -30,11 +30,11 @@ pub async fn cat_output(storage: CoStorage, cid: Cid, pretty: bool) -> Result<()
 		};
 
 		// print
-		let mut codec = MultiCodec::from(cid.codec());
+		let codec = MultiCodec::from(cid.codec());
 		let mut out = std::io::stdout();
 		match codec {
 			MultiCodec::DagPb => {
-				unixfs_cat_buffer(&storage, &cid).await;
+				out.write_all(&unixfs_cat_buffer(&storage, &cid).await?)?;
 			},
 			_ => {
 				let block = storage.get(&cid).await?;

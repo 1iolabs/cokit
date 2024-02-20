@@ -4,15 +4,15 @@ use crate::{
 	library::{
 		application::application,
 		cat::cat_output,
-		file::{self, get_nodes, list_nodes, FileError},
+		file::{get_nodes, FileError},
 	},
 };
 use anyhow::anyhow;
 use co_core_file::Node;
-use co_primitives::{AbsolutePath, AbsolutePathOwned, Date, PathExt};
+use co_primitives::{AbsolutePath, AbsolutePathOwned, PathExt};
 use co_sdk::{CoReducerError, CoStorage};
 use exitcode::ExitCode;
-use futures::{future::BoxFuture, FutureExt, TryStreamExt};
+use futures::{future::BoxFuture, FutureExt};
 use libipld::Cid;
 
 #[derive(Debug, Clone, clap::Args)]
