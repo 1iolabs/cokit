@@ -79,7 +79,7 @@ impl Application {
 		// create network
 		let local_identity = self.local_identity();
 		let local_co = self.local_co_reducer().await?;
-		let network_key = local_keypair_fetch(&local_co, &local_identity, force_new_peer_id)
+		let network_key = local_keypair_fetch(&self.identifier, &local_co, &local_identity, force_new_peer_id)
 			.await
 			.expect("peer-id");
 		self.network = Some(Network::new(network_key, self.storage()));
