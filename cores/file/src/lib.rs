@@ -81,7 +81,11 @@ pub struct LinkNode {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum FileAction {
+	/// Create a node.
+	/// Ignored if a node with the same name already exists at path.
 	Create { path: AbsolutePathOwned, node: Node, recursive: bool },
+
+	/// Remove a node.
 	Remove { path: AbsolutePathOwned },
 }
 
@@ -110,6 +114,13 @@ fn create(
 
 	// nodes
 	state.nodes.update(context, |context, mut paths| {
+		// test if node exists
+		let node_path = path.join_path(node.name())?;
+		if get_node(context, paths, &node_path)?.is_some() {
+			// tracing::info(path = ?node_path, "path-exists");
+			return Ok(());
+		}
+
 		// implicitly create empty root on first create
 		if !paths.contains_key(AbsolutePath::new_unchecked("/")) {
 			paths.insert(AbsolutePath::new_unchecked("/").to_owned(), Default::default());
