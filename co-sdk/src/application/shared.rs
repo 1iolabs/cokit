@@ -124,6 +124,7 @@ impl SharedCoCreator {
 		Self { keystore_core_name, ..self }
 	}
 
+	/// TODO: Cleanup when something fails?
 	pub async fn create<I: PrivateIdentity + Send + Sync + 'static>(
 		self,
 		storage: CoStorage,

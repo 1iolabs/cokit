@@ -38,8 +38,11 @@ where
 		let (sender, receiver) = std::sync::mpsc::channel::<Message<S::StoreParams>>();
 		let handle = thread::spawn(move || {
 			fn handle_send_result<T>(t: Result<(), SendError<T>>) {
-				if t.is_err() {
-					// TODO: add log?
+				match t {
+					Err(err) => {
+						tracing::warn!(?err, "send-failed");
+					},
+					_ => {},
 				}
 			}
 			loop {

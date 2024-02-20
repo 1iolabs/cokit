@@ -82,6 +82,7 @@ impl Application {
 	/// Creates a CoReducer instance a CO which we have a membership for.
 	///
 	/// TODO: Identity
+	///   - Which identity should write to the parent co? If its local we are fine.
 	async fn create_co_instance(&self, parent: CoReducer, co: &str) -> Result<Option<CoReducer>, anyhow::Error> {
 		let membership = match find_membership(&parent, co).await? {
 			Some(m) => m,
@@ -153,9 +154,8 @@ impl Application {
 
 	/// Create a new CO.
 	///
-	/// TODO:
-	/// - Identity
-	/// - Cleanup when something fails?
+	/// TODO: Identity
+	///  The crator of the co should be added as first participant.
 	pub async fn create_co(&self, create: CreateCo) -> Result<CoReducer, anyhow::Error> {
 		// local
 		let local = self.local_co_reducer().await?;

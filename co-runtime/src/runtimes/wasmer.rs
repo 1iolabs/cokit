@@ -111,21 +111,6 @@ fn wasmer_storage_block_get(
 		.expect("to not have internal errors")
 		.try_into()
 		.expect("API")
-	// loop {
-	// 	let result = storage_block_get(
-	// 		env.data_mut(),
-	// 		cid_buffer.access().expect("pointer in bounds").as_ref(),
-	// 		buffer.access().expect("pointer in bounds").as_mut(),
-	// 	);
-	// 	return match result {
-	// 		Ok(i) => i,
-	// 		Err(e) if e.is_retriable() => {
-	// 			// TODO: Add some backoff. Maybe via CoV1Api?
-	// 			continue
-	// 		},
-	// 		Err(e) => Err(e).unwrap(),
-	// 	}
-	// }
 }
 
 fn wasmer_storage_block_set(

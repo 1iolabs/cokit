@@ -248,7 +248,6 @@ where
 		let encrypted_cid = self.next.set(encrypted_block).await?;
 
 		// map
-		// TODO: Make Sync?
 		self.mapping.write().await.insert(cid.clone(), encrypted_cid);
 
 		// result
