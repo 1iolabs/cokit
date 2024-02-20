@@ -3,7 +3,7 @@ use crate::{
 		block::{Algorithm, EncryptedBlock, BLOCK_MULTICODEC},
 		secret::Secret,
 	},
-	AlgorithmError, BlockStat, BlockStorage, Storage, StorageError,
+	AlgorithmError, BlockStat, BlockStorage, BlockStorageContentMapping, Storage, StorageContentMapping, StorageError,
 };
 use async_trait::async_trait;
 use co_primitives::{DefaultNodeSerializer, MultiCodec, Node, NodeBuilder, NodeBuilderError, NodeSerializer};
@@ -42,6 +42,19 @@ impl<S> EncryptedStorage<S> {
 	/// Consume storage and return next layer.
 	pub fn into_storage(self) -> S {
 		self.next
+	}
+}
+impl<S> StorageContentMapping for EncryptedStorage<S> {
+	fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
+		if mapped.codec() == BLOCK_MULTICODEC {
+			self.mapping.get(&mapped)
+		} else {
+			None
+		}
+	}
+
+	fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
+		self.mapping.get_first_by_value(plain)
 	}
 }
 impl<S> EncryptedStorage<S>
@@ -193,6 +206,11 @@ where
 		));
 		self.flush_mapping().await
 	}
+
+	// Create BlockStorageContentMapping instance.
+	pub fn content_mapping(&self) -> Box<dyn BlockStorageContentMapping + Send + Sync + 'static> {
+		Box::new(EncryptedBlockStorageMapping { mapping: self.mapping.clone() })
+	}
 }
 #[async_trait]
 impl<S> BlockStorage for EncryptedBlockStorage<S>
@@ -254,6 +272,23 @@ where
 	}
 }
 
+#[derive(Debug, Clone)]
+struct EncryptedBlockStorageMapping {
+	mapping: Arc<RwLock<BlockMapping>>,
+}
+#[async_trait]
+impl BlockStorageContentMapping for EncryptedBlockStorageMapping {
+	/// Convert the mapped [`Cid`] to an plain storage [`Cid`].
+	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
+		self.mapping.read().await.get(mapped)
+	}
+
+	/// Convert the plain storage [`Cid`] to a mapped [`Cid`].
+	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
+		self.mapping.read().await.get_first_by_value(plain)
+	}
+}
+
 #[derive(Debug, thiserror::Error)]
 enum BlockMappingError {
 	#[error("Storage Error")]
@@ -295,6 +330,15 @@ impl BlockMapping {
 
 	pub fn insert(&mut self, key: Cid, value: Cid) -> Option<Cid> {
 		self.map.insert(key, value)
+	}
+
+	pub fn get_first_by_value(&self, value: &Cid) -> Option<Cid> {
+		self.map.iter().find_map(|(k, v)| {
+			if v == value {
+				return Some(k.clone())
+			}
+			None
+		})
 	}
 
 	/// Create new mapping by inspecting supplied CIDs.

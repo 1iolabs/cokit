@@ -1,7 +1,7 @@
 use super::provider::BitswapBehaviourProvider;
 use crate::{NetworkTask, NetworkTaskSpawner};
 use async_trait::async_trait;
-use co_storage::{BlockStat, BlockStorage, StorageError};
+use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
 use futures::channel::oneshot;
 use libipld::{Block, Cid};
 use libp2p::{
@@ -9,12 +9,14 @@ use libp2p::{
 	PeerId, Swarm,
 };
 use libp2p_bitswap::{BitswapEvent, QueryId};
-use std::{collections::BTreeSet, mem::swap};
+use std::{collections::BTreeSet, mem::swap, sync::Arc};
 
+#[derive(Clone)]
 pub struct NetworkBlockStorage<S, B> {
 	next: S,
 	spawner: NetworkTaskSpawner<B>,
 	peers: BTreeSet<PeerId>,
+	mapping: Option<Arc<dyn BlockStorageContentMapping + Send + Sync + 'static>>,
 }
 impl<S, B> NetworkBlockStorage<S, B>
 where
@@ -22,7 +24,11 @@ where
 	B: NetworkBehaviour<ToSwarm = BitswapEvent> + BitswapBehaviourProvider<StoreParams = S::StoreParams>,
 {
 	pub fn new(next: S, spawner: NetworkTaskSpawner<B>, peers: BTreeSet<PeerId>) -> Self {
-		Self { next, spawner, peers }
+		Self { next, spawner, peers, mapping: None }
+	}
+
+	pub fn set_mapping<M: BlockStorageContentMapping + Send + Sync + 'static>(&mut self, mapping: M) {
+		self.mapping = Some(Arc::new(mapping));
 	}
 
 	pub fn set_peers(&mut self, peers: BTreeSet<PeerId>) {
@@ -30,10 +36,19 @@ where
 	}
 
 	async fn get_network(&self, cid: Cid) -> Result<(), StorageError> {
+		let mapped = self.to_network_cid(cid).await;
 		let (tx, rx) = oneshot::channel();
-		let task = GetNetworkTask::new(cid, self.peers.clone(), tx);
+		let task = GetNetworkTask::new(mapped, self.peers.clone(), tx);
 		self.spawner.spawn(task).map_err(|e| StorageError::Internal(e.into()))?;
 		rx.await.map_err(|e| StorageError::Internal(e.into()))?
+	}
+
+	async fn to_network_cid(&self, cid: Cid) -> Cid {
+		if let Some(mapping) = &self.mapping {
+			mapping.to_plain(&cid).await.unwrap_or(cid)
+		} else {
+			cid
+		}
 	}
 }
 #[async_trait]

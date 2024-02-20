@@ -23,6 +23,7 @@ pub use storage::{
 pub use types::{
 	block::{BlockStat, BlockStorage},
 	block_ext::BlockStorageExt,
+	mapping::{BlockStorageContentMapping, StorageContentMapping},
 	pin::{PinApi, PinKind, PinOptions},
 	storage::{Storage, StorageError},
 };
