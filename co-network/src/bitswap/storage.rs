@@ -1,4 +1,4 @@
-use super::provider::BitswapBehaviourProvider;
+use super::provider::{BitswapBehaviourProvider, PeerProvider};
 use crate::{NetworkTask, NetworkTaskSpawner};
 use async_trait::async_trait;
 use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
@@ -11,34 +11,38 @@ use libp2p::{
 use libp2p_bitswap::{BitswapEvent, QueryId};
 use std::{collections::BTreeSet, mem::swap, sync::Arc};
 
-#[derive(Clone)]
 pub struct NetworkBlockStorage<S, B> {
 	next: S,
 	spawner: NetworkTaskSpawner<B>,
-	peers: BTreeSet<PeerId>,
+	peers: Option<Arc<dyn PeerProvider + Send + Sync + 'static>>,
 	mapping: Option<Arc<dyn BlockStorageContentMapping + Send + Sync + 'static>>,
 }
 impl<S, B> NetworkBlockStorage<S, B>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
-	B: NetworkBehaviour<ToSwarm = BitswapEvent> + BitswapBehaviourProvider<StoreParams = S::StoreParams>,
+	B: NetworkBehaviour
+		+ BitswapBehaviourProvider<Event = <B as NetworkBehaviour>::ToSwarm, StoreParams = S::StoreParams>,
 {
-	pub fn new(next: S, spawner: NetworkTaskSpawner<B>, peers: BTreeSet<PeerId>) -> Self {
-		Self { next, spawner, peers, mapping: None }
+	pub fn new(next: S, spawner: NetworkTaskSpawner<B>) -> Self {
+		Self { next, spawner, peers: Default::default(), mapping: None }
 	}
 
 	pub fn set_mapping<M: BlockStorageContentMapping + Send + Sync + 'static>(&mut self, mapping: M) {
 		self.mapping = Some(Arc::new(mapping));
 	}
 
-	pub fn set_peers(&mut self, peers: BTreeSet<PeerId>) {
-		self.peers = peers;
+	pub fn set_peers<P: PeerProvider + Send + Sync + 'static>(&mut self, peers: P) {
+		self.peers = Some(Arc::new(peers));
 	}
 
 	async fn get_network(&self, cid: Cid) -> Result<(), StorageError> {
 		let mapped = self.to_network_cid(cid).await;
+		let peers = match &self.peers {
+			Some(p) => p.peers().await?,
+			None => Default::default(),
+		};
 		let (tx, rx) = oneshot::channel();
-		let task = GetNetworkTask::new(mapped, self.peers.clone(), tx);
+		let task = GetNetworkTask::new(mapped, peers, tx);
 		self.spawner.spawn(task).map_err(|e| StorageError::Internal(e.into()))?;
 		rx.await.map_err(|e| StorageError::Internal(e.into()))?
 	}
@@ -51,11 +55,25 @@ where
 		}
 	}
 }
+impl<S, B> Clone for NetworkBlockStorage<S, B>
+where
+	S: Clone,
+{
+	fn clone(&self) -> Self {
+		Self {
+			next: self.next.clone(),
+			spawner: self.spawner.clone(),
+			peers: self.peers.clone(),
+			mapping: self.mapping.clone(),
+		}
+	}
+}
 #[async_trait]
 impl<S, B> BlockStorage for NetworkBlockStorage<S, B>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
-	B: NetworkBehaviour<ToSwarm = BitswapEvent> + BitswapBehaviourProvider<StoreParams = S::StoreParams>,
+	B: NetworkBehaviour
+		+ BitswapBehaviourProvider<Event = <B as NetworkBehaviour>::ToSwarm, StoreParams = S::StoreParams>,
 {
 	type StoreParams = S::StoreParams;
 
@@ -105,7 +123,7 @@ impl GetNetworkTask {
 }
 impl<B> NetworkTask<B> for GetNetworkTask
 where
-	B: NetworkBehaviour<ToSwarm = BitswapEvent> + BitswapBehaviourProvider,
+	B: NetworkBehaviour + BitswapBehaviourProvider<Event = <B as NetworkBehaviour>::ToSwarm>,
 {
 	fn execute(&mut self, swarm: &mut Swarm<B>) {
 		let bitswap = swarm.behaviour_mut().bitswap_mut();
@@ -120,26 +138,29 @@ where
 		}
 	}
 
-	fn on_swarm_event(&mut self, event: SwarmEvent<B::ToSwarm>) -> Option<SwarmEvent<BitswapEvent>> {
-		match (&self.state, event) {
-			(
-				GetNetworkTaskState::Query(query, _),
-				SwarmEvent::Behaviour(BitswapEvent::Complete(event_query, event_result)),
-			) if query == &event_query => {
-				// state
-				let mut state = GetNetworkTaskState::Complete;
-				swap(&mut self.state, &mut state);
+	fn on_swarm_event(&mut self, event: SwarmEvent<B::ToSwarm>) -> Option<SwarmEvent<B::ToSwarm>> {
+		match (&self.state, B::bitswap_event(&event)) {
+			(GetNetworkTaskState::Query(query, _), Some(BitswapEvent::Complete(event_query, _)))
+				if query == event_query =>
+			{
+				// consume event
+				let bitswap_event = B::into_bitswap_event(event);
+				if let Ok(BitswapEvent::Complete(_, event_result)) = bitswap_event {
+					// state
+					let mut state = GetNetworkTaskState::Complete;
+					swap(&mut self.state, &mut state);
 
-				// result
-				if let GetNetworkTaskState::Query(_, result) = state {
-					match result.send(event_result.map_err(|e| StorageError::NotFound(self.cid, e.into()))) {
-						Ok(_) => {},
-						Err(result) => tracing::warn!(?result, "result-dropped"),
+					// result
+					if let GetNetworkTaskState::Query(_, result) = state {
+						match result.send(event_result.map_err(|e| StorageError::NotFound(self.cid, e.into()))) {
+							Ok(_) => {},
+							Err(result) => tracing::warn!(?result, "result-dropped"),
+						}
 					}
 				}
 				None
 			},
-			(_, event) => Some(event),
+			(_, _) => Some(event),
 		}
 	}
 

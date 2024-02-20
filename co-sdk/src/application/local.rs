@@ -195,7 +195,7 @@ where
 	S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
-	async fn on_state_changed(&self, reducer: &Reducer<S, R>) -> Result<(), anyhow::Error> {
+	async fn on_state_changed(&mut self, reducer: &Reducer<S, R>) -> Result<(), anyhow::Error> {
 		let mapping = self.encrypted_storage.flush_mapping().await?;
 		self.write(reducer, mapping).await?;
 		Ok(())

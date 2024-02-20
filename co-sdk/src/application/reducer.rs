@@ -253,11 +253,16 @@ where
 	/// Notify subscribers about change.
 	async fn on_state_changed(&mut self) -> Result<(), LogError> {
 		// handlers
-		let reducer: &Self = &self;
-		stream::iter(self.change_handlers.iter())
-			.map(Ok)
-			.try_for_each_concurrent(5, |handler| async move { handler.on_state_changed(reducer).await })
-			.await?;
+		let mut change_handlers = Vec::new();
+		change_handlers.append(&mut self.change_handlers);
+		{
+			let reducer: &Self = &self;
+			stream::iter(change_handlers.iter_mut())
+				.map(Ok)
+				.try_for_each_concurrent(5, |handler| async move { handler.on_state_changed(reducer).await })
+				.await?;
+		}
+		self.change_handlers.append(&mut change_handlers);
 
 		// states
 		if let Some(state) = self.state {
@@ -341,9 +346,11 @@ where
 	}
 }
 
+/// Reducer change handler.
+/// Will be executed everytime the state in the reducer changes, including on initialize.
 #[async_trait]
 pub trait ReducerChangedHandler<S, R> {
-	async fn on_state_changed(&self, reducer: &Reducer<S, R>) -> Result<(), anyhow::Error>;
+	async fn on_state_changed(&mut self, reducer: &Reducer<S, R>) -> Result<(), anyhow::Error>;
 }
 
 #[cfg(test)]

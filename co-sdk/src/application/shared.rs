@@ -1,16 +1,20 @@
 use super::identity::create_identity_resolver;
 use crate::{
-	CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerBuilder, ReducerChangedHandler, Runtime, CO_CORE_NAME_CO,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	drivers::network::CoNetworkTaskSpawner, CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerBuilder,
+	ReducerChangedHandler, Runtime, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use async_trait::async_trait;
 use co_core_co::CoAction;
 use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_log::{Log, PrivateIdentity};
+use co_network::{NetworkBlockStorage, PeerProvider};
 use co_primitives::tags;
-use co_storage::{Algorithm, EncryptedBlockStorage, Secret};
+use co_storage::{Algorithm, BlockStorageExt, EncryptedBlockStorage, Secret, StorageError};
+use libipld::Cid;
+use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 /// Shared CO Builder.
 /// The Shared CO state is sptrend in an membership of an other CO (typicalle the Local CO).
@@ -19,6 +23,7 @@ pub struct SharedCoBuilder {
 	keystore_core_name: String,
 	membership_core_name: String,
 	membership: Membership,
+	network: Option<CoNetworkTaskSpawner>,
 }
 impl SharedCoBuilder {
 	pub fn new(parent: CoReducer, membership: Membership) -> Self {
@@ -27,6 +32,7 @@ impl SharedCoBuilder {
 			membership,
 			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_owned(),
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_owned(),
+			network: None,
 		}
 	}
 
@@ -36,6 +42,10 @@ impl SharedCoBuilder {
 
 	pub fn with_keystore_core_name(self, keystore_core_name: String) -> Self {
 		Self { keystore_core_name, ..self }
+	}
+
+	pub fn with_network(self, network: Option<CoNetworkTaskSpawner>) -> Self {
+		Self { network, ..self }
 	}
 
 	pub async fn build<I: PrivateIdentity + Send + Sync + 'static>(
@@ -63,6 +73,18 @@ impl SharedCoBuilder {
 				// plain
 				None => (storage, None),
 			};
+
+		// network
+		let storage = if let Some(network) = self.network {
+			let mut network_storage = NetworkBlockStorage::new(storage.clone(), network);
+			network_storage.set_peers(NetworkPeerProvider { storage, state: None });
+			if let Some(encrypted) = &encrypted_storage {
+				network_storage.set_mapping(encrypted.content_mapping());
+			}
+			CoStorage::new(network_storage)
+		} else {
+			storage
+		};
 
 		// log
 		let log = Log::new(
@@ -222,7 +244,7 @@ impl<I> ReducerChangedHandler<CoStorage, CoCoreResolver> for MembershipWriter<I>
 where
 	I: PrivateIdentity + Send + Sync,
 {
-	async fn on_state_changed(&self, reducer: &Reducer<CoStorage, CoCoreResolver>) -> Result<(), anyhow::Error> {
+	async fn on_state_changed(&mut self, reducer: &Reducer<CoStorage, CoCoreResolver>) -> Result<(), anyhow::Error> {
 		if let Some(state) = reducer.state() {
 			let mapping = match &self.encrypted_storage {
 				Some(storage) => storage.flush_mapping().await?,
@@ -244,5 +266,33 @@ where
 				.await?;
 		}
 		Ok(())
+	}
+}
+
+struct NetworkPeerProvider {
+	storage: CoStorage,
+	state: Option<Cid>,
+}
+#[async_trait]
+impl ReducerChangedHandler<CoStorage, CoCoreResolver> for NetworkPeerProvider {
+	async fn on_state_changed(&mut self, reducer: &Reducer<CoStorage, CoCoreResolver>) -> Result<(), anyhow::Error> {
+		self.state = *reducer.state();
+		Ok(())
+	}
+}
+#[async_trait]
+impl PeerProvider for NetworkPeerProvider {
+	async fn peers(&self) -> Result<BTreeSet<PeerId>, StorageError> {
+		if let Some(state) = self.state {
+			let co: co_core_co::Co = self.storage.get_deserialized(&state).await?;
+			let peers: BTreeSet<PeerId> = co
+				.peers
+				.iter()
+				.map(|p| PeerId::from_bytes(p))
+				.collect::<Result<BTreeSet<_>, _>>()
+				.map_err(|e| StorageError::Internal(e.into()))?;
+			return Ok(peers)
+		}
+		Ok(Default::default())
 	}
 }

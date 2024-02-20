@@ -208,8 +208,8 @@ where
 	}
 
 	// Create BlockStorageContentMapping instance.
-	pub fn content_mapping(&self) -> Box<dyn BlockStorageContentMapping + Send + Sync + 'static> {
-		Box::new(EncryptedBlockStorageMapping { mapping: self.mapping.clone() })
+	pub fn content_mapping(&self) -> EncryptedBlockStorageMapping {
+		EncryptedBlockStorageMapping { mapping: self.mapping.clone() }
 	}
 }
 #[async_trait]
@@ -272,7 +272,7 @@ where
 }
 
 #[derive(Debug, Clone)]
-struct EncryptedBlockStorageMapping {
+pub struct EncryptedBlockStorageMapping {
 	mapping: Arc<RwLock<BlockMapping>>,
 }
 #[async_trait]

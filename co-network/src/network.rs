@@ -17,7 +17,7 @@ use libp2p::{
 	swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
 	Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
-use libp2p_bitswap::Bitswap;
+use libp2p_bitswap::{Bitswap, BitswapEvent};
 use rxrust::prelude::*;
 use std::sync::Arc;
 
@@ -216,6 +216,7 @@ pub struct Behaviour {
 }
 impl BitswapBehaviourProvider for Behaviour {
 	type StoreParams = DefaultParams;
+	type Event = BehaviourEvent;
 
 	fn bitswap(&self) -> &Bitswap<DefaultParams> {
 		&self.bitswap
@@ -223,6 +224,20 @@ impl BitswapBehaviourProvider for Behaviour {
 
 	fn bitswap_mut(&mut self) -> &mut Bitswap<DefaultParams> {
 		&mut self.bitswap
+	}
+
+	fn bitswap_event(event: &SwarmEvent<Self::Event>) -> Option<&BitswapEvent> {
+		match event {
+			SwarmEvent::Behaviour(BehaviourEvent::Bitswap(e)) => Some(e),
+			_ => None,
+		}
+	}
+
+	fn into_bitswap_event(event: SwarmEvent<Self::Event>) -> Result<BitswapEvent, SwarmEvent<Self::Event>> {
+		match event {
+			SwarmEvent::Behaviour(BehaviourEvent::Bitswap(e)) => Ok(e),
+			e => Err(e),
+		}
 	}
 }
 

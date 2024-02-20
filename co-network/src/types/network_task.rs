@@ -25,7 +25,7 @@ where
 }
 pub type NetworkTaskBox<B> = Box<dyn NetworkTask<B> + Send + 'static>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct NetworkTaskSpawner<B> {
 	pub(crate) tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<B>>,
 }
@@ -39,6 +39,11 @@ where
 	{
 		self.tasks.send(Box::new(task))?;
 		Ok(())
+	}
+}
+impl<B> Clone for NetworkTaskSpawner<B> {
+	fn clone(&self) -> Self {
+		Self { tasks: self.tasks.clone() }
 	}
 }
 

@@ -1,13 +1,13 @@
 use super::shared::{CreateCo, SharedCoBuilder, SharedCoCreator};
 use crate::{
-	library::find_membership::find_membership, CoReducer, CoStorage, LocalCoBuilder, Runtime, Storage,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	library::find_membership::find_membership, local_keypair_fetch, CoReducer, CoStorage, LocalCoBuilder, Network,
+	Runtime, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use co_log::{LocalIdentity, LocalIdentityResolver};
 use co_runtime::RuntimePool;
 use directories::ProjectDirs;
-use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, mem::swap, ops::DerefMut, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::{level_filters::LevelFilter, subscriber::set_global_default};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
@@ -40,6 +40,9 @@ pub struct Application {
 	/// CO Runtime Driver.
 	runtime: Runtime,
 
+	/// CO Network Driver.
+	network: Option<Network>,
+
 	/// Loaded reducers.
 	reducers: Arc<RwLock<BTreeMap<String, CoReducer>>>,
 
@@ -63,8 +66,37 @@ impl Application {
 		self.storage.storage().clone()
 	}
 
+	pub fn network(&self) -> Option<Network> {
+		self.network.clone()
+	}
+
 	pub fn runtime(&self) -> &RuntimePool {
 		self.runtime.runtime()
+	}
+
+	/// Create and startup network.
+	pub async fn create_network(&mut self, force_new_peer_id: bool) -> Result<(), anyhow::Error> {
+		// create network
+		let local_identity = self.local_identity();
+		let local_co = self.local_co_reducer().await?;
+		let network_key = local_keypair_fetch(&local_co, &local_identity, force_new_peer_id)
+			.await
+			.expect("peer-id");
+		self.network = Some(Network::new(network_key, self.storage()));
+
+		// clear reducers to rebuild them with network support after this
+		// we only keep local as this has no network
+		{
+			let mut reducers = self.reducers.write().await;
+			let mut next_reducers = BTreeMap::new();
+			if let Some(local) = reducers.remove("local") {
+				next_reducers.insert("local".to_owned(), local);
+			}
+			swap(&mut next_reducers, reducers.deref_mut());
+		}
+
+		// done
+		Ok(())
 	}
 
 	/// Creates a CoReducer instance of the Local CO.
@@ -91,6 +123,7 @@ impl Application {
 		let reducer = SharedCoBuilder::new(parent, membership)
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
+			.with_network(self.network.as_ref().map(|n| n.spawner()))
 			.build(self.storage(), self.runtime.clone(), self.local_identity())
 			.await?;
 		Ok(Some(reducer))
@@ -241,6 +274,7 @@ impl ApplicationBuilder {
 	pub async fn build(self) -> Result<Application, anyhow::Error> {
 		let storage_path = self.path.join("data");
 		let result = Application {
+			network: None,
 			storage: Storage::new(storage_path.clone()),
 			runtime: Runtime::new(),
 			storage_path,

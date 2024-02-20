@@ -14,7 +14,7 @@ pub use library::{
 	unixfs::{unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer},
 };
 pub use storage::{
-	encrypted::{EncryptedBlockStorage, EncryptedStorage},
+	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping, EncryptedStorage},
 	fs::FsStorage,
 	memory::{MemoryBlockStorage, MemoryStorage},
 	store_params::StoreParamsBlockStorage,

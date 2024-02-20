@@ -3,7 +3,7 @@ use axum::{
 	Extension, Router,
 };
 use clap::Parser;
-use co_sdk::{local_keypair_fetch, ApplicationBuilder, Network};
+use co_sdk::ApplicationBuilder;
 use std::net::SocketAddr;
 
 mod error;
@@ -30,19 +30,13 @@ async fn main() {
 	if cli.no_keychain {
 		application_builder = application_builder.without_keychain();
 	}
-	let application = application_builder.build().await.expect("application");
+	let mut application = application_builder.build().await.expect("application");
 
 	// local
 	let local_co = application.local_co_reducer().await.expect("local-co");
-	let local_identity = application.local_identity();
-
-	// peer-id
-	let network_key = local_keypair_fetch(&local_co, &local_identity, cli.force_new_peer_id)
-		.await
-		.expect("peer-id");
 
 	// driver: network
-	let _network = Network::new(network_key, application.storage());
+	application.create_network(cli.force_new_peer_id).await.expect("network");
 
 	// build routes
 	let app = Router::new()

@@ -1,10 +1,14 @@
-use co_network::{Libp2pNetwork, Libp2pNetworkConfig};
+use co_network::{Behaviour, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner};
 use co_storage::BlockStorage;
 use libipld::DefaultParams;
 use libp2p::{identity::Keypair, PeerId};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
+#[derive(Clone)]
 pub struct Network {
-	network: Libp2pNetwork,
+	network: Arc<Mutex<Option<Libp2pNetwork>>>,
+	spawner: CoNetworkTaskSpawner,
 }
 impl Network {
 	/// Create Network driver.
@@ -22,16 +26,18 @@ impl Network {
 		let network_config = Libp2pNetworkConfig::from_keypair(network_key.clone());
 		let network: Libp2pNetwork = Libp2pNetwork::new(network_config, storage).expect("network");
 		tracing::info!(peer_id = ?network_peer_id, "network");
-		Self { network }
+		Self { spawner: network.spawner(), network: Arc::new(Mutex::new(Some(network))) }
 	}
 
-	/// Access the network.
-	pub fn network(&self) -> &Libp2pNetwork {
-		&self.network
+	/// Create network task spawner.
+	pub fn spawner(&self) -> CoNetworkTaskSpawner {
+		self.spawner.clone()
 	}
 
 	/// Convert to libp2p network.
-	pub fn into_network(self) -> Libp2pNetwork {
-		self.network
+	pub async fn into_network(self) -> Option<Libp2pNetwork> {
+		self.network.lock().await.take()
 	}
 }
+
+pub type CoNetworkTaskSpawner = NetworkTaskSpawner<Behaviour>;
