@@ -32,12 +32,13 @@ panic = "unwind"
 anyhow = { version = "1", features = ["backtrace"] }
 async-stream = "0.3.3"
 async-trait = "0.1.57"
+derive_more = "0.99.17"
 futures = "0.3.30"
 futures-util = "0.3.26"
-derive_more = "0.99.17"
 hyper = { version = "0.14.23" }
 libipld = "0.16"
 libp2p = { version = "0.53", features = ["full"] }
+pin-project = "1.1.4"
 rust-unixfs = "0.4.0"
 rxrust = { version = "1.0.0-beta.6", git = "https://github.com/dkuhnert/rxRust.git", branch = "master", features = [
     "tokio-scheduler",

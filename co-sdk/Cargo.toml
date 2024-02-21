@@ -14,8 +14,8 @@ co-core-file = { path = "../cores/file" }
 co-core-keystore = { path = "../cores/keystore" }
 co-core-membership = { path = "../cores/membership" }
 co-core-pin = { path = "../cores/pin" }
-co-core-room = { path = "../cores/room" }
 co-core-role = { path = "../cores/role" }
+co-core-room = { path = "../cores/room" }
 co-log = { path = "../co-log" }
 co-network = { path = "../co-network" }
 co-primitives = { path = "../co-primitives" }
@@ -30,6 +30,7 @@ libipld = { workspace = true, features = ["default", "serde-codec"] }
 libp2p = { workspace = true, features = ["rendezvous", "tokio"] }
 multibase = "0.9.1"
 names = "0.14.0"
+pin-project = { workspace = true }
 rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }

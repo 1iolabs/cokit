@@ -2,6 +2,7 @@ use co_primitives::{Link, Node, NodeContainer};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{Future, FutureExt, Stream};
 use libipld::Cid;
+use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use std::{
 	collections::VecDeque,
@@ -9,16 +10,18 @@ use std::{
 	task::{Context, Poll},
 };
 
+#[pin_project]
 pub struct NodeStream<S, T> {
 	storage: S,
 	stack: VecDeque<Cid>,
 	entries: VecDeque<T>,
+	#[pin]
 	get: Option<Pin<Box<dyn Future<Output = Result<Node<T>, StorageError>> + Send>>>,
 }
 impl<S, T> NodeStream<S, T>
 where
-	S: BlockStorage + Sync + Send + Clone + Unpin + 'static,
-	T: DeserializeOwned + Send + Sync + Unpin + 'static,
+	S: BlockStorage + Sync + Send + Clone + 'static,
+	T: DeserializeOwned + Send + Sync + 'static,
 {
 	pub fn new(storage: S, cid: Option<Cid>) -> Self {
 		let mut stack = VecDeque::new();
@@ -38,8 +41,8 @@ where
 }
 impl<S, T> Stream for NodeStream<S, T>
 where
-	S: BlockStorage + Send + Sync + Clone + Unpin + 'static,
-	T: DeserializeOwned + Send + Sync + Unpin + 'static,
+	S: BlockStorage + Send + Sync + Clone + 'static,
+	T: DeserializeOwned + Send + Sync + 'static,
 {
 	type Item = Result<T, StorageError>;
 
