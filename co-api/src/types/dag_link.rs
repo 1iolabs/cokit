@@ -22,7 +22,13 @@ pub trait DagCollection: Sized {
 		self.from_link(storage).expect("Valid serialized data")
 	}
 
-	fn update<F: FnOnce(&mut dyn Context, &mut Self::Collection) -> Result<(), anyhow::Error>>(
+	fn update<F: FnOnce(&mut dyn Context, &mut Self::Collection)>(&mut self, context: &mut dyn Context, f: F) {
+		let mut collection = self.get(context.storage());
+		f(context, &mut collection);
+		self.set(context.storage_mut(), collection);
+	}
+
+	fn try_update<F: FnOnce(&mut dyn Context, &mut Self::Collection) -> Result<(), anyhow::Error>>(
 		&mut self,
 		context: &mut dyn Context,
 		f: F,

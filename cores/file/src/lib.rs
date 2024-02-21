@@ -113,7 +113,7 @@ fn create(
 	let path = path.normalize()?;
 
 	// nodes
-	state.nodes.update(context, |context, mut paths| {
+	state.nodes.try_update(context, |context, mut paths| {
 		// test if node exists
 		let node_path = path.join_path(node.name())?;
 		if get_node(context, paths, &node_path)?.is_some() {
@@ -205,7 +205,7 @@ fn create_node(
 		Entry::Occupied(o) => o.into_mut(),
 		Entry::Vacant(v) => v.insert(Default::default()),
 	};
-	nodes.update(context, |_, nodes| {
+	nodes.try_update(context, |_, nodes| {
 		// insert node if name not exists yet
 		if nodes.iter().find(|item| item.name() == node.name()).is_none() {
 			nodes.insert(node);

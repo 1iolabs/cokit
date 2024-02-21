@@ -1,4 +1,4 @@
-use co_api::{reduce, Context, Did, Reducer, ReducerAction, Tags};
+use co_api::{reduce, Context, DagCollection, DagSet, Did, Reducer, ReducerAction, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -33,9 +33,9 @@ pub struct Co {
 	pub keys: Option<Vec<Key>>,
 
 	/// CO known peers
-	/// See: libp2p::PeerId
+	/// See: [`libp2p::PeerId`]
 	// #[co_api::Dag]
-	pub peers: BTreeSet<Vec<u8>>,
+	pub peers: DagSet<Vec<u8>>,
 }
 
 // #[co_api::Data]
@@ -107,6 +107,8 @@ pub enum CoAction {
 	ParticipantJoin { participant: Did },
 	ParticipantTagsInsert { participant: Did, tags: Tags },
 	ParticipantTagsRemove { participant: Did, tags: Tags },
+	PeerInsert { peer: Vec<u8> },
+	PeerRemove { peer: Vec<u8> },
 	CoreCreate { core: String, binary: Cid, tags: Tags },
 	CoreRemove { core: String },
 	CoreChange { core: String, state: Option<Cid> },
@@ -117,7 +119,7 @@ pub enum CoAction {
 impl Reducer for Co {
 	type Action = CoAction;
 
-	fn reduce(self, event: &ReducerAction<Self::Action>, _: &mut dyn Context) -> Self {
+	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		let mut result = self;
 		match &event.payload {
 			CoAction::Create { id, name, cores, participants } => {
@@ -180,6 +182,16 @@ impl Reducer for Co {
 			},
 			CoAction::TagsRemove { tags } => {
 				result.tags.clear(Some(tags));
+			},
+			CoAction::PeerInsert { peer } => {
+				result.peers.update(context, |_context, peers| {
+					peers.insert(peer.clone());
+				});
+			},
+			CoAction::PeerRemove { peer } => {
+				result.peers.update(context, |_context, peers| {
+					peers.remove(peer);
+				});
 			},
 		}
 		result

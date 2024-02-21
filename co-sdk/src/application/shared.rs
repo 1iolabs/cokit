@@ -1,6 +1,6 @@
 use super::identity::create_identity_resolver;
 use crate::{
-	drivers::network::CoNetworkTaskSpawner, CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerBuilder,
+	drivers::network::CoNetworkTaskSpawner, CoCoreResolver, CoReducer, CoStorage, NodeStream, Reducer, ReducerBuilder,
 	ReducerChangedHandler, Runtime, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use async_trait::async_trait;
@@ -11,6 +11,7 @@ use co_log::{Log, PrivateIdentity};
 use co_network::{NetworkBlockStorage, PeerProvider};
 use co_primitives::tags;
 use co_storage::{Algorithm, BlockStorageExt, EncryptedBlockStorage, Secret, StorageError};
+use futures::{StreamExt, TryStreamExt};
 use libipld::Cid;
 use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
@@ -285,12 +286,15 @@ impl PeerProvider for NetworkPeerProvider {
 	async fn peers(&self) -> Result<BTreeSet<PeerId>, StorageError> {
 		if let Some(state) = self.state {
 			let co: co_core_co::Co = self.storage.get_deserialized(&state).await?;
-			let peers: BTreeSet<PeerId> = co
-				.peers
-				.iter()
-				.map(|p| PeerId::from_bytes(p))
-				.collect::<Result<BTreeSet<_>, _>>()
-				.map_err(|e| StorageError::Internal(e.into()))?;
+			let peers: BTreeSet<PeerId> = NodeStream::from_node_container(self.storage.clone(), &co.peers)
+				.map_ok(|p| PeerId::from_bytes(&p).map_err(|e| StorageError::Internal(e.into())))
+				.map(|p| match p {
+					Ok(Ok(p)) => Ok(p),
+					Ok(Err(e)) => Err(e),
+					Err(e) => Err(e),
+				})
+				.try_collect()
+				.await?;
 			return Ok(peers)
 		}
 		Ok(Default::default())
