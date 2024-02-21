@@ -1,5 +1,4 @@
-use super::provider::{BitswapBehaviourProvider, PeerProvider};
-use crate::{NetworkTask, NetworkTaskSpawner};
+use crate::{BitswapBehaviourProvider, NetworkTask, NetworkTaskSpawner, PeerProvider};
 use async_trait::async_trait;
 use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
 use futures::channel::oneshot;
