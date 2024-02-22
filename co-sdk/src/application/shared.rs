@@ -103,7 +103,7 @@ impl SharedCoBuilder {
 
 		// setup auto write to parent co
 		let writer = MembershipWriter {
-			id: self.membership.id,
+			id: self.membership.id.clone(),
 			parent: self.parent,
 			membership_core_name: self.membership_core_name,
 			identity,
@@ -112,7 +112,7 @@ impl SharedCoBuilder {
 		reducer.add_change_handler(Box::new(writer));
 
 		// result
-		Ok(CoReducer::new(runtime, reducer))
+		Ok(CoReducer::new(self.membership.id, runtime, reducer))
 	}
 }
 

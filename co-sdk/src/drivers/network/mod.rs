@@ -1,3 +1,7 @@
+pub mod subscribe;
+
+use self::subscribe::Subscription;
+use crate::CoReducer;
 use co_network::{Behaviour, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner};
 use co_storage::BlockStorage;
 use libipld::DefaultParams;
@@ -37,6 +41,15 @@ impl Network {
 	/// Convert to libp2p network.
 	pub async fn into_network(self) -> Option<Libp2pNetwork> {
 		self.network.lock().await.take()
+	}
+
+	/// Sync the CO.
+	/// One time operation.
+	pub async fn sync(co_reducer: CoReducer) -> Result<(), anyhow::Error> {}
+
+	/// Subscribe to CO changes.
+	pub async fn subscribe(&self, co_reducer: CoReducer) -> Result<Subscription, anyhow::Error> {
+		Subscription::subscribe(self.spawner(), co_reducer).await
 	}
 }
 

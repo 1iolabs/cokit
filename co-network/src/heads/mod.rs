@@ -35,13 +35,12 @@ pub struct Heads {
 	handler: Box<dyn HeadsHandler + Send + Sync + 'static>,
 }
 impl Heads {
-	pub fn subscribe<H: HeadsHandler + Send + Sync + 'static>(
-		gossipsub: &mut Behaviour,
-		topic: IdentTopic,
-		handler: H,
-	) -> Result<Heads, anyhow::Error> {
-		gossipsub.subscribe(&topic)?;
-		Ok(Heads { hash: topic.hash(), topic, handler: Box::new(handler), subscriptions: 0, heads: Default::default() })
+	pub fn new<H: HeadsHandler + Send + Sync + 'static>(topic: IdentTopic, heads: BTreeSet<Cid>, handler: H) -> Self {
+		Heads { hash: topic.hash(), topic, handler: Box::new(handler), subscriptions: 0, heads }
+	}
+
+	pub fn subscribe(&self, gossipsub: &mut Behaviour) -> Result<bool, anyhow::Error> {
+		Ok(gossipsub.subscribe(&self.topic)?)
 	}
 
 	pub fn set_heads(&mut self, gossipsub: &mut Behaviour, heads: BTreeSet<Cid>) -> Result<(), anyhow::Error> {
@@ -74,14 +73,17 @@ impl Heads {
 		Ok(())
 	}
 
-	pub fn handle_swarm_event(&mut self, event: Event) -> Option<Event> {
-		let is_our_event = match &event {
+	pub fn is_our_event(&self, event: &Event) -> bool {
+		match &event {
 			Event::Message { propagation_source: _, message_id: _, message } => self.hash == message.topic,
 			Event::Subscribed { peer_id: _, topic } => &self.hash == topic,
 			Event::Unsubscribed { peer_id: _, topic } => &self.hash == topic,
 			Event::GossipsubNotSupported { peer_id: _ } => false,
-		};
-		if is_our_event {
+		}
+	}
+
+	pub fn handle_swarm_event(&mut self, event: Event) -> Option<Event> {
+		if self.is_our_event(&event) {
 			match event {
 				Event::Message { propagation_source: _, message_id: _, message } => {
 					let heads_message: HeadsMessage = match serde_ipld_dagcbor::from_slice(&message.data) {
@@ -240,11 +242,13 @@ mod tests {
 
 		// peer1: subscribe
 		let (handler1, mut receiver1) = Handler::new();
-		let mut heads1 = Heads::subscribe(peer1.swarm().behaviour_mut(), topic.clone(), handler1).unwrap();
+		let mut heads1 = Heads::new(topic.clone(), Default::default(), handler1);
+		heads1.subscribe(peer1.swarm().behaviour_mut()).unwrap();
 
 		// peer2: subscribe
 		let (handler2, mut receiver2) = Handler::new();
-		let mut heads2 = Heads::subscribe(peer2.swarm().behaviour_mut(), topic.clone(), handler2).unwrap();
+		let mut heads2 = Heads::new(topic.clone(), Default::default(), handler2);
+		heads2.subscribe(peer2.swarm().behaviour_mut()).unwrap();
 
 		// wait until both are subscribed
 		join!(peer1.run_once(&mut heads1), peer2.run_once(&mut heads2));
@@ -316,11 +320,13 @@ mod tests {
 
 		// peer1: subscribe
 		let (handler1, mut receiver1) = Handler::new();
-		let mut heads1 = Heads::subscribe(peer1.swarm().behaviour_mut(), topic.clone(), handler1).unwrap();
+		let mut heads1 = Heads::new(topic.clone(), Default::default(), handler1);
+		heads1.subscribe(peer1.swarm().behaviour_mut()).unwrap();
 
 		// peer2: subscribe
 		let (handler2, mut receiver2) = Handler::new();
-		let mut heads2 = Heads::subscribe(peer2.swarm().behaviour_mut(), topic.clone(), handler2).unwrap();
+		let mut heads2 = Heads::new(topic.clone(), Default::default(), handler2);
+		heads2.subscribe(peer2.swarm().behaviour_mut()).unwrap();
 
 		// wait until both are subscribed
 		join!(peer1.run_once(&mut heads1), peer2.run_once(&mut heads2));

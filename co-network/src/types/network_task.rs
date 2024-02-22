@@ -13,13 +13,17 @@ where
 
 	/// Handle swarm events.
 	/// Events can be consumed by this handler or forwarded to next handler.
-	fn on_swarm_event(&mut self, event: SwarmEvent<B::ToSwarm>) -> Option<SwarmEvent<B::ToSwarm>> {
+	fn on_swarm_event(
+		&mut self,
+		_swarm: &mut Swarm<B>,
+		event: SwarmEvent<B::ToSwarm>,
+	) -> Option<SwarmEvent<B::ToSwarm>> {
 		Some(event)
 	}
 
 	/// Test if the task is complete and can be removed from the queue.
 	/// This will be called only after execute has been called.
-	fn is_complete(&self) -> bool {
+	fn is_complete(&mut self) -> bool {
 		true
 	}
 }

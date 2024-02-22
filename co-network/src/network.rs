@@ -1,7 +1,7 @@
 use super::didcomm;
 use crate::{
-	bitswap::{bitswap::BitswapBlockStorage, provider::BitswapBehaviourProvider},
-	FnOnceNetworkTask, NetworkError, NetworkTaskBox, NetworkTaskSpawner,
+	bitswap::bitswap::BitswapBlockStorage, types::provider::BitswapBehaviourProvider, DidcommBehaviourProvider,
+	FnOnceNetworkTask, GossipsubBehaviourProvider, NetworkError, NetworkTaskBox, NetworkTaskSpawner,
 };
 use co_storage::BlockStorage;
 use futures::{channel::oneshot, StreamExt};
@@ -240,6 +240,56 @@ impl BitswapBehaviourProvider for Behaviour {
 		}
 	}
 }
+impl GossipsubBehaviourProvider for Behaviour {
+	type Event = BehaviourEvent;
+
+	fn gossipsub(&self) -> &gossipsub::Behaviour {
+		&self.gossipsub
+	}
+
+	fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour {
+		&mut self.gossipsub
+	}
+
+	fn gossipsub_event(event: &SwarmEvent<Self::Event>) -> Option<&gossipsub::Event> {
+		match event {
+			SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(e)) => Some(e),
+			_ => None,
+		}
+	}
+
+	fn into_gossipsub_event(event: SwarmEvent<Self::Event>) -> Result<gossipsub::Event, SwarmEvent<Self::Event>> {
+		match event {
+			SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(e)) => Ok(e),
+			e => Err(e),
+		}
+	}
+}
+impl DidcommBehaviourProvider for Behaviour {
+	type Event = BehaviourEvent;
+
+	fn didcomm(&self) -> &didcomm::Behaviour {
+		&self.didcomm
+	}
+
+	fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour {
+		&mut self.didcomm
+	}
+
+	fn didcomm_event(event: &SwarmEvent<Self::Event>) -> Option<&didcomm::Event> {
+		match event {
+			SwarmEvent::Behaviour(BehaviourEvent::Didcomm(e)) => Some(e),
+			_ => None,
+		}
+	}
+
+	fn into_didcomm_event(event: SwarmEvent<Self::Event>) -> Result<didcomm::Event, SwarmEvent<Self::Event>> {
+		match event {
+			SwarmEvent::Behaviour(BehaviourEvent::Didcomm(e)) => Ok(e),
+			e => Err(e),
+		}
+	}
+}
 
 fn set_network_mode(behaviour: &mut Behaviour, mode: NetworkMode) {
 	match mode {
@@ -318,7 +368,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, runtime: &mut Runtime) {
 	let mut task_index = 0;
 	while task_index < runtime.pending_tasks.len() {
 		// run
-		result_event = runtime.pending_tasks[task_index].on_swarm_event(result_event.unwrap());
+		result_event = runtime.pending_tasks[task_index].on_swarm_event(swarm, result_event.unwrap());
 
 		// done?
 		if runtime.pending_tasks[task_index].is_complete() {

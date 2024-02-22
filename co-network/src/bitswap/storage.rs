@@ -1,4 +1,4 @@
-use crate::{BitswapBehaviourProvider, NetworkTask, NetworkTaskSpawner, PeerProvider};
+use crate::{BitswapBehaviourProvider, NetworkTask, NetworkTaskSpawner};
 use async_trait::async_trait;
 use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
 use futures::channel::oneshot;
@@ -9,6 +9,11 @@ use libp2p::{
 };
 use libp2p_bitswap::{BitswapEvent, QueryId};
 use std::{collections::BTreeSet, mem::swap, sync::Arc};
+
+#[async_trait]
+pub trait PeerProvider {
+	async fn peers(&self) -> Result<BTreeSet<PeerId>, StorageError>;
+}
 
 pub struct NetworkBlockStorage<S, B> {
 	next: S,
@@ -137,7 +142,11 @@ where
 		}
 	}
 
-	fn on_swarm_event(&mut self, event: SwarmEvent<B::ToSwarm>) -> Option<SwarmEvent<B::ToSwarm>> {
+	fn on_swarm_event(
+		&mut self,
+		_swarm: &mut Swarm<B>,
+		event: SwarmEvent<B::ToSwarm>,
+	) -> Option<SwarmEvent<B::ToSwarm>> {
 		match (&self.state, B::bitswap_event(&event)) {
 			(GetNetworkTaskState::Query(query, _), Some(BitswapEvent::Complete(event_query, _)))
 				if query == event_query =>
@@ -163,7 +172,7 @@ where
 		}
 	}
 
-	fn is_complete(&self) -> bool {
+	fn is_complete(&mut self) -> bool {
 		matches!(self.state, GetNetworkTaskState::Complete)
 	}
 }

@@ -8,13 +8,18 @@ use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct CoReducer {
+	id: String,
 	pub(crate) reducer: Arc<RwLock<Reducer<CoStorage, CoCoreResolver>>>,
 	pub(crate) storage: CoStorage,
 	pub(crate) runtime: Runtime,
 }
 impl CoReducer {
-	pub(crate) fn new(runtime: Runtime, reducer: Reducer<CoStorage, CoCoreResolver>) -> Self {
-		Self { runtime, storage: reducer.log().storage().clone(), reducer: Arc::new(RwLock::new(reducer)) }
+	pub(crate) fn new(id: String, runtime: Runtime, reducer: Reducer<CoStorage, CoCoreResolver>) -> Self {
+		Self { id, runtime, storage: reducer.log().storage().clone(), reducer: Arc::new(RwLock::new(reducer)) }
+	}
+
+	pub fn id(&self) -> &str {
+		&self.id
 	}
 
 	/// Get current reducer state and heads.
@@ -39,6 +44,12 @@ impl CoReducer {
 			.await
 			.push(self.runtime.runtime(), identity, co, item)
 			.await
+	}
+
+	/// Join heads.
+	/// Returns true if state has changed.
+	pub async fn join(&self, heads: BTreeSet<Cid>) -> Result<bool, anyhow::Error> {
+		Ok(self.reducer.write().await.join(&heads, self.runtime.runtime()).await?)
 	}
 
 	/// Read co reducer state.

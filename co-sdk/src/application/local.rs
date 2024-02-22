@@ -20,6 +20,8 @@ use std::{
 	path::PathBuf,
 };
 
+pub const LOCAL_CO_ID: &str = "local";
+
 /// Local CO Builder.
 /// A local co is special because it's root state will be saved locally to an fiel on an device.
 #[derive(Debug, Clone)]
@@ -119,7 +121,7 @@ impl LocalCoInstance {
 			create_encrypted_storage(storage.clone(), &local_co.identity, local_co.key_path()).await?;
 
 		// create log
-		let log = Log::new("local".as_bytes().to_vec(), create_identity_resolver(), storage, Default::default());
+		let log = Log::new(LOCAL_CO_ID.as_bytes().to_vec(), create_identity_resolver(), storage, Default::default());
 
 		// create builder
 		let mut builder = ReducerBuilder::new(CoCoreResolver::default(), log);
@@ -163,7 +165,7 @@ impl LocalCoInstance {
 		}
 
 		// result
-		Ok((result, CoReducer::new(runtime, reducer)))
+		Ok((result, CoReducer::new(LOCAL_CO_ID.to_owned(), runtime, reducer)))
 	}
 
 	/// Write state to disk.
