@@ -1,4 +1,4 @@
-use crate::{didcomm, heads::message::HeadsMessage};
+use crate::{didcomm, heads::message::HeadsMessage, Message};
 use co_primitives::CoId;
 use libipld::Cid;
 use libp2p::{
@@ -11,12 +11,14 @@ use libp2p::{
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	task::{Context, Poll},
+	time::{SystemTime, UNIX_EPOCH},
 };
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum Event {
 	/// Receviced new heads from some peer.
-	ReceivedHeads { co: CoId, heads: BTreeSet<Cid> },
+	ReceivedHeads { co: CoId, heads: BTreeSet<Cid>, peer_id: Option<PeerId>, response: bool },
 
 	/// Subscribed for heads.
 	Subscribed { co: CoId, peer_id: PeerId },
@@ -77,7 +79,7 @@ impl Behaviour {
 	}
 
 	pub fn publish_heads(&mut self, co: &CoId, heads: BTreeSet<Cid>) -> Result<bool, anyhow::Error> {
-		let message = HeadsMessage::Heads(heads);
+		let message = HeadsMessage::Heads(co.clone(), heads);
 		let data = serde_ipld_dagcbor::to_vec(&message)?;
 		match self.inner.gossipsub.publish(self.to_topic(co), data) {
 			Ok(_) => Ok(true),
@@ -86,17 +88,33 @@ impl Behaviour {
 		}
 	}
 
-	pub fn send_heads(
+	/// Send heads to peers.
+	/// Peers will answer with own heads if they are different.
+	/// However the response is not implemented by this protocol but by the caller.
+	/// TODO: identity: need to sign?
+	pub fn heads(
 		&mut self,
-		_co: &CoId,
-		_heads: &BTreeSet<PeerId>,
-		_peers: impl Iterator<Item = PeerId>,
+		co: &CoId,
+		heads: BTreeSet<Cid>,
+		peers: impl Iterator<Item = PeerId>,
 	) -> Result<(), anyhow::Error> {
-		todo!()
-	}
-
-	pub fn request_heads(&mut self, _co: &CoId, _peers: impl Iterator<Item = PeerId>) -> Result<(), anyhow::Error> {
-		todo!()
+		let time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Valid time").as_secs();
+		let message = Message {
+			body: HeadsMessage::Heads(co.clone(), heads),
+			created_time: Some(time),
+			expires_time: Some(time + 120),
+			from: None,
+			id: Uuid::new_v4().into(),
+			message_type: "co/heads".to_owned(),
+			pthid: None,
+			thid: None,
+			to: Default::default(),
+		};
+		let data = message.cbor()?;
+		for peer in peers {
+			self.inner.didcomm.send(&peer, didcomm::Message::Message(data.clone()));
+		}
+		Ok(())
 	}
 
 	fn to_topic(&self, id: &CoId) -> gossipsub::IdentTopic {
@@ -148,7 +166,31 @@ impl NetworkBehaviour for Behaviour {
 
 	fn poll(&mut self, cx: &mut Context<'_>) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
 		match self.inner.poll(cx) {
-			// message
+			// didcomm message
+			Poll::Ready(ToSwarm::GenerateEvent(InnerBehaviourEvent::Didcomm(didcomm::Event::Received {
+				peer_id,
+				message,
+			}))) => match message {
+				didcomm::Message::Message(data) => {
+					let heads_message: HeadsMessage = match serde_ipld_dagcbor::from_slice(&data) {
+						Ok(m) => m,
+						Err(err) => {
+							tracing::warn!(?err, "received-invalid-message");
+							return Poll::Pending;
+						},
+					};
+					match heads_message {
+						HeadsMessage::Heads(co, heads) => Poll::Ready(ToSwarm::GenerateEvent(Event::ReceivedHeads {
+							co,
+							heads,
+							peer_id: Some(peer_id),
+							response: true,
+						})),
+					}
+				},
+			},
+
+			// gossip message
 			Poll::Ready(ToSwarm::GenerateEvent(InnerBehaviourEvent::Gossipsub(gossipsub::Event::Message {
 				propagation_source: _,
 				message_id: _,
@@ -162,9 +204,11 @@ impl NetworkBehaviour for Behaviour {
 					},
 				};
 				match heads_message {
-					HeadsMessage::Heads(heads) => Poll::Ready(ToSwarm::GenerateEvent(Event::ReceivedHeads {
-						co: self.to_co_id(&message.topic),
+					HeadsMessage::Heads(co, heads) => Poll::Ready(ToSwarm::GenerateEvent(Event::ReceivedHeads {
+						co,
 						heads,
+						peer_id: message.source,
+						response: false,
 					})),
 				}
 			},
@@ -323,7 +367,7 @@ mod tests {
 		select! {
 			event = peer1.next() => {
 				match event {
-					Some(heads::Event::ReceivedHeads { co: event_co, heads: event_heads }) if co == event_co && h2 == event_heads => {},
+					Some(heads::Event::ReceivedHeads { co: event_co, heads: event_heads, peer_id: _, response: _ }) if co == event_co && h2 == event_heads => {},
 					event => panic!("unexpected event: {:?}", event),
 				}
 			},

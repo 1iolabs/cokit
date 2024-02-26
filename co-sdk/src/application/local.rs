@@ -1,7 +1,10 @@
 use super::{identity::create_identity_resolver, reducer::ReducerChangedHandler};
 use crate::{
 	library::{fs_read::fs_read_option, fs_write::fs_write},
-	types::cores::{CO_CORE_NAME_CO, CO_CORE_NAME_PIN, CO_CORE_PIN},
+	types::{
+		co_storage::CoBlockStorageContentMapping,
+		cores::{CO_CORE_NAME_CO, CO_CORE_NAME_PIN, CO_CORE_PIN},
+	},
 	CoCoreResolver, CoReducer, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, Runtime, CO_CORE_KEYSTORE,
 	CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
@@ -153,6 +156,9 @@ impl LocalCoInstance {
 		}
 		let mut reducer = builder.build(runtime.runtime()).await?;
 
+		// mapping
+		let mapping = CoBlockStorageContentMapping::new(encrypted_storage.content_mapping());
+
 		// result
 		let result =
 			Self { encrypted_storage, identifier: local_co.identifier, application_path: local_co.application_path };
@@ -166,7 +172,7 @@ impl LocalCoInstance {
 		}
 
 		// result
-		Ok((result, CoReducer::new(LOCAL_CO_ID.into(), runtime, reducer)))
+		Ok((result, CoReducer::new(LOCAL_CO_ID.into(), runtime, reducer, Some(mapping))))
 	}
 
 	/// Write state to disk.

@@ -30,15 +30,20 @@ where
 	) -> Option<SwarmEvent<B::ToSwarm>> {
 		// handle
 		match B::heads_event(&event) {
-			Some(heads::Event::ReceivedHeads { co, heads }) => {
+			Some(heads::Event::ReceivedHeads { co, heads, peer_id, response }) => {
 				let co_id = co.to_owned();
 				let heads = heads.to_owned();
 				let co_factory = self.co_factory.clone();
+				let peer_id = peer_id.clone();
+				let response = *response;
 				tokio::spawn(async move {
 					match co_factory.co_reducer(&co_id).await {
 						Ok(Some(co)) => match co.join(heads).await {
 							Ok(update) => {
 								tracing::debug!(co = ?co_id, update, "co-heads");
+
+								// send response?
+								if response && peer_id.is_some() {}
 							},
 							Err(err) => {
 								tracing::warn!(co = ?co_id, ?err, reason = "join", "co-heads-failure");
@@ -69,7 +74,7 @@ where
 pub enum HeadsRequest {
 	Subscribe { co: CoId },
 	Unsubscribe { co: CoId },
-	RequestHeads { co: CoId, peers: BTreeSet<PeerId> },
+	Heads { co: CoId, heads: BTreeSet<Cid>, peers: BTreeSet<PeerId> },
 	PublishHeads { co: CoId, heads: BTreeSet<Cid> },
 }
 
@@ -106,7 +111,7 @@ where
 					tracing::warn!(?co, ?err, "co-unsubscribe-failed");
 				},
 			},
-			Some(HeadsRequest::RequestHeads { co, peers }) => match behaviour.request_heads(&co, peers.into_iter()) {
+			Some(HeadsRequest::Heads { co, heads, peers }) => match behaviour.heads(&co, heads, peers.into_iter()) {
 				Ok(_) => {
 					tracing::debug!(?co, "co-request-heads");
 				},

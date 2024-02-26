@@ -2,6 +2,7 @@ use super::identity::create_identity_resolver;
 use crate::{
 	drivers::network::{subscribe::Publish, CoNetworkTaskSpawner},
 	library::co_peer_provider::CoPeerProvider,
+	types::co_storage::CoBlockStorageContentMapping,
 	CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerBuilder, ReducerChangedHandler, Runtime, CO_CORE_NAME_CO,
 	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
@@ -101,11 +102,14 @@ impl SharedCoBuilder {
 			.await?;
 
 		// publish changes
-		if let Some(network) = self.network {
+		let mapping = if let Some(network) = self.network {
 			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
-			let publish = Publish::new(network, self.membership.id.clone(), mapping, true);
+			let publish = Publish::new(network, self.membership.id.clone(), mapping.clone(), true);
 			reducer.add_change_handler(Box::new(publish));
-		}
+			mapping.map(CoBlockStorageContentMapping::new)
+		} else {
+			None
+		};
 
 		// setup auto write to parent co
 		let writer = MembershipWriter {
@@ -118,7 +122,7 @@ impl SharedCoBuilder {
 		reducer.add_change_handler(Box::new(writer));
 
 		// result
-		Ok(CoReducer::new(self.membership.id, runtime, reducer))
+		Ok(CoReducer::new(self.membership.id, runtime, reducer, mapping))
 	}
 }
 

@@ -1,9 +1,8 @@
 pub mod heads;
 pub mod subscribe;
-pub mod update;
 
-use self::subscribe::Subscription;
-use crate::{drivers::network::update::Update, CoReducer};
+use self::subscribe::{Publish, Subscription};
+use crate::CoReducer;
 use co_network::{Behaviour, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner};
 use co_storage::BlockStorage;
 use libipld::DefaultParams;
@@ -49,8 +48,8 @@ impl Network {
 	/// One time operation.
 	/// Note: This will not wait for responses.
 	pub async fn update(&self, co_reducer: CoReducer) -> Result<(), anyhow::Error> {
-		let update = Update::new(self.spawner(), co_reducer);
-		update.request().await?;
+		let update = Publish::new(self.spawner(), co_reducer.id().clone(), co_reducer.mapping.clone(), true);
+		update.request(&co_reducer).await?;
 		Ok(())
 	}
 

@@ -2,13 +2,18 @@ use super::{
 	heads::{HeadsRequest, HeadsRequestNetworkTask},
 	CoNetworkTaskSpawner,
 };
-use crate::{CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerChangedHandler};
+use crate::{
+	library::co_peer_provider::CoPeerProvider, CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerChangedHandler,
+};
 use anyhow::anyhow;
 use async_trait::async_trait;
+use co_network::PeerProvider;
 use co_primitives::CoId;
 use co_storage::BlockStorageContentMapping;
 use futures::{StreamExt, TryStreamExt};
 use libipld::Cid;
+use libp2p::PeerId;
+use std::collections::BTreeSet;
 
 /// Subscription for a single CO (`CoReducer`).
 pub struct Subscription {
@@ -28,6 +33,7 @@ impl Subscription {
 	}
 }
 
+#[derive(Clone)]
 pub struct Publish<M> {
 	spawner: CoNetworkTaskSpawner,
 	co: CoId,
@@ -52,6 +58,31 @@ impl<M> Publish<M> {
 			},
 			None => Ok(head),
 		}
+	}
+
+	pub async fn request(&self, reducer: &CoReducer) -> Result<(), anyhow::Error>
+	where
+		M: BlockStorageContentMapping + Send + Sync + 'static,
+	{
+		let peers = CoPeerProvider::from_co_reducer(&reducer).await.peers().await?;
+		let mut heads = reducer.heads().await;
+
+		// map plain heads to encrypted heads
+		if self.mapping.is_some() {
+			heads = futures::stream::iter(heads.into_iter())
+				.then(|head| self.to_plain(head))
+				.try_collect()
+				.await?;
+		}
+
+		// request
+		self.request_peers(heads, peers)
+	}
+
+	pub fn request_peers(&self, heads: BTreeSet<Cid>, peers: BTreeSet<PeerId>) -> Result<(), anyhow::Error> {
+		self.spawner
+			.spawn(HeadsRequestNetworkTask::new(HeadsRequest::Heads { co: self.co.clone(), heads, peers }))?;
+		Ok(())
 	}
 }
 #[async_trait]

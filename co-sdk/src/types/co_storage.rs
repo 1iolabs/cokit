@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use co_storage::{BlockStat, BlockStorage, StorageError};
+use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
 use libipld::{Block, Cid, DefaultParams};
 use std::sync::Arc;
 
@@ -39,5 +39,28 @@ impl BlockStorage for CoStorage {
 	/// Stat a block.
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		self.inner.stat(cid).await
+	}
+}
+
+#[derive(Clone)]
+pub struct CoBlockStorageContentMapping {
+	inner: Arc<dyn BlockStorageContentMapping + Send + Sync + 'static>,
+}
+impl CoBlockStorageContentMapping {
+	pub fn new<M>(mapping: M) -> Self
+	where
+		M: BlockStorageContentMapping + Send + Sync + 'static,
+	{
+		Self { inner: Arc::new(mapping) }
+	}
+}
+#[async_trait]
+impl BlockStorageContentMapping for CoBlockStorageContentMapping {
+	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
+		self.inner.to_plain(mapped).await
+	}
+
+	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
+		self.inner.to_mapped(plain).await
 	}
 }

@@ -14,6 +14,7 @@ pub use heads::heads::{Heads, HeadsHandler};
 pub use library::clone_key_pair::clone_key_pair;
 pub use network::{Behaviour, BehaviourEvent, Libp2pNetwork, Libp2pNetworkConfig, NetworkMode};
 pub use types::{
+	didcomm::Message,
 	error::NetworkError,
 	network_task::{FnOnceNetworkTask, NetworkTask, NetworkTaskBox, NetworkTaskSpawner},
 	provider::{

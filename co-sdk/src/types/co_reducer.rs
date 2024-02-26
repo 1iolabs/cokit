@@ -1,3 +1,4 @@
+use super::co_storage::CoBlockStorageContentMapping;
 use crate::{CoCoreResolver, CoStorage, Reducer, Runtime, CO_CORE_NAME_CO};
 use co_identity::PrivateIdentity;
 use co_primitives::CoId;
@@ -13,14 +14,26 @@ pub struct CoReducer {
 	pub(crate) reducer: Arc<RwLock<Reducer<CoStorage, CoCoreResolver>>>,
 	pub(crate) storage: CoStorage,
 	pub(crate) runtime: Runtime,
+	pub(crate) mapping: Option<CoBlockStorageContentMapping>,
 }
 impl CoReducer {
-	pub(crate) fn new(id: CoId, runtime: Runtime, reducer: Reducer<CoStorage, CoCoreResolver>) -> Self {
-		Self { id, runtime, storage: reducer.log().storage().clone(), reducer: Arc::new(RwLock::new(reducer)) }
+	pub(crate) fn new(
+		id: CoId,
+		runtime: Runtime,
+		reducer: Reducer<CoStorage, CoCoreResolver>,
+		mapping: Option<CoBlockStorageContentMapping>,
+	) -> Self {
+		Self { id, runtime, storage: reducer.log().storage().clone(), reducer: Arc::new(RwLock::new(reducer)), mapping }
 	}
 
 	pub fn id(&self) -> &CoId {
 		&self.id
+	}
+
+	/// Get current reducer heads.
+	pub async fn heads(&self) -> BTreeSet<Cid> {
+		let reducer = self.reducer.read().await;
+		reducer.heads().clone()
 	}
 
 	/// Get current reducer state and heads.
