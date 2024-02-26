@@ -113,6 +113,11 @@ impl CoReducer {
 		// not found
 		return Err(CoReducerError::CoreNotFound(core.to_owned()));
 	}
+
+	/// Try to escape inner data.
+	pub(crate) fn into_inner(self) -> Option<(CoStorage, Reducer<CoStorage, CoCoreResolver>)> {
+		Arc::into_inner(self.reducer).map(|lock| (self.storage, lock.into_inner()))
+	}
 }
 
 #[derive(Debug, thiserror::Error)]

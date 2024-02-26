@@ -25,6 +25,7 @@ pub struct SharedCoBuilder {
 	membership_core_name: String,
 	membership: Membership,
 	network: Option<CoNetworkTaskSpawner>,
+	initialize: bool,
 }
 impl SharedCoBuilder {
 	pub fn new(parent: CoReducer, membership: Membership) -> Self {
@@ -34,6 +35,7 @@ impl SharedCoBuilder {
 			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_owned(),
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_owned(),
 			network: None,
+			initialize: true,
 		}
 	}
 
@@ -47,6 +49,10 @@ impl SharedCoBuilder {
 
 	pub fn with_network(self, network: Option<CoNetworkTaskSpawner>) -> Self {
 		Self { network, ..self }
+	}
+
+	pub fn with_initialize(self, initialize: bool) -> Self {
+		Self { initialize, ..self }
 	}
 
 	pub async fn build<I: PrivateIdentity + Send + Sync + 'static>(
@@ -97,6 +103,7 @@ impl SharedCoBuilder {
 
 		// reducer
 		let mut reducer = ReducerBuilder::new(CoCoreResolver::default(), log)
+			.with_initialize(self.initialize)
 			.with_latest_state(self.membership.state, self.membership.heads.clone())
 			.build(runtime.runtime())
 			.await?;

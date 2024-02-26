@@ -78,6 +78,15 @@ where
 		create_stream(&self.entry_store, self.heads().clone())
 	}
 
+	/// Iterate entries starting at the head.
+	pub fn into_stream(self) -> impl Stream<Item = Result<EntryBlock<S::StoreParams>, LogError>> {
+		async_stream::stream! {
+			for await i in create_stream(&self.entry_store, self.heads().clone()) {
+				yield i;
+			}
+		}
+	}
+
 	/// Push item as new entry.
 	pub async fn push<I: PrivateIdentity + Send + Sync>(
 		&mut self,

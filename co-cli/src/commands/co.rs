@@ -1,5 +1,6 @@
 mod cat;
 mod create;
+mod log;
 mod ls;
 mod remove;
 
@@ -26,6 +27,9 @@ pub enum Commands {
 
 	/// Remove/Leave a CO.
 	Remove(remove::Command),
+
+	/// Print CO Log.
+	Log(log::Command),
 }
 
 pub async fn command(cli: &Cli, co_command: &Command) -> Result<ExitCode, anyhow::Error> {
@@ -34,5 +38,6 @@ pub async fn command(cli: &Cli, co_command: &Command) -> Result<ExitCode, anyhow
 		Commands::Cat(command) => cat::command(cli, command).await,
 		Commands::Create(command) => create::command(cli, command).await,
 		Commands::Remove(command) => remove::command(cli, command).await,
+		Commands::Log(command) => log::command(cli, command).await,
 	}
 }

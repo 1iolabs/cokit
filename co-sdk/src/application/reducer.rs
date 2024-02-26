@@ -27,6 +27,8 @@ pub struct ReducerBuilder<S, R> {
 	heads: BTreeSet<Cid>,
 	/// Avilable historic snapshots.
 	snapshots: HashMap<BTreeSet<Cid>, Cid>,
+	/// Initialize
+	initialize: bool,
 }
 impl<S, R> ReducerBuilder<S, R>
 where
@@ -34,11 +36,22 @@ where
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
 	pub fn new(core_resolver: R, log: Log<S>) -> Self {
-		Self { core_resolver, heads: Default::default(), snapshots: Default::default(), state: None, log }
+		Self {
+			core_resolver,
+			heads: Default::default(),
+			snapshots: Default::default(),
+			state: None,
+			log,
+			initialize: true,
+		}
 	}
 
 	pub fn core_resolver_mut(&mut self) -> &mut R {
 		&mut self.core_resolver
+	}
+
+	pub fn with_initialize(self, initialize: bool) -> Self {
+		Self { initialize, ..self }
 	}
 
 	pub fn with_latest_state(self, state: Cid, heads: BTreeSet<Cid>) -> Self {
@@ -67,7 +80,9 @@ where
 			states: Default::default(),
 			change_handlers: Default::default(),
 		};
-		result.initialize(runtime).await?;
+		if self.initialize {
+			result.initialize(runtime).await?;
+		}
 		Ok(result)
 	}
 }
@@ -126,6 +141,10 @@ where
 
 		// if we have state and heads we are fine
 		Ok(())
+	}
+
+	pub fn into_log(self) -> Log<S> {
+		self.log
 	}
 
 	pub fn is_empty(&self) -> bool {

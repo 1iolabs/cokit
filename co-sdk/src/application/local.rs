@@ -44,10 +44,23 @@ pub struct LocalCoBuilder {
 
 	/// The local identity.
 	identity: LocalIdentity,
+
+	/// Whether to initialize the reducer (compute latest state).
+	initialize: bool,
 }
 impl LocalCoBuilder {
-	pub fn new(identifier: String, application_path: PathBuf, keychain: bool, identity: LocalIdentity) -> Self {
-		Self { identifier, application_path, keychain, identity }
+	pub fn new(
+		identifier: String,
+		application_path: PathBuf,
+		keychain: bool,
+		identity: LocalIdentity,
+		initialize: bool,
+	) -> Self {
+		Self { identifier, application_path, keychain, identity, initialize }
+	}
+
+	pub fn with_initialize(self, initialize: bool) -> Self {
+		Self { initialize, ..self }
 	}
 
 	/// Create LocalCO instance.
@@ -128,7 +141,7 @@ impl LocalCoInstance {
 		let log = Log::new(LOCAL_CO_ID.as_bytes().to_vec(), create_identity_resolver(), storage, Default::default());
 
 		// create builder
-		let mut builder = ReducerBuilder::new(CoCoreResolver::default(), log);
+		let mut builder = ReducerBuilder::new(CoCoreResolver::default(), log).with_initialize(local_co.initialize);
 
 		// create reducer
 		let locals = local_co.read();

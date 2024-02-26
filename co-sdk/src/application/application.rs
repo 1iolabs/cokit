@@ -7,9 +7,12 @@ use crate::{
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_identity::{LocalIdentity, LocalIdentityResolver};
+use co_log::EntryBlock;
 use co_primitives::CoId;
 use co_runtime::RuntimePool;
+use co_storage::BlockStorage;
 use directories::ProjectDirs;
+use futures::{Stream, TryStreamExt};
 use std::{collections::BTreeMap, mem::swap, ops::DerefMut, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::{level_filters::LevelFilter, subscriber::set_global_default};
@@ -110,12 +113,13 @@ impl Application {
 	}
 
 	/// Creates a CoReducer instance of the Local CO.
-	async fn create_local_co_instance(&self) -> Result<CoReducer, anyhow::Error> {
+	async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
 		let local_co = LocalCoBuilder::new(
 			self.identifier.clone(),
 			self.application_path.clone(),
 			self.keychain,
 			self.local_identity(),
+			initialize,
 		);
 		let local_co_reducer = local_co.build(self.storage(), self.runtime.clone()).await?;
 		Ok(local_co_reducer)
@@ -125,7 +129,12 @@ impl Application {
 	///
 	/// TODO: Identity
 	///   - Which identity should write to the parent co? If its local we are fine.
-	async fn create_co_instance(&self, parent: CoReducer, co: &CoId) -> Result<Option<CoReducer>, anyhow::Error> {
+	async fn create_co_instance(
+		&self,
+		parent: CoReducer,
+		co: &CoId,
+		initialize: bool,
+	) -> Result<Option<CoReducer>, anyhow::Error> {
 		let membership = match find_membership(&parent, co).await? {
 			Some(m) => m,
 			None => return Ok(None),
@@ -134,6 +143,7 @@ impl Application {
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
 			.with_network(self.network.as_ref().map(|n| n.spawner()))
+			.with_initialize(initialize)
 			.build(self.storage(), self.runtime.clone(), self.local_identity())
 			.await?;
 		Ok(Some(reducer))
@@ -157,7 +167,7 @@ impl Application {
 		}
 
 		// create
-		let reducer = self.create_local_co_instance().await?;
+		let reducer = self.create_local_co_instance(true).await?;
 
 		// store
 		self.reducers.write().await.insert(co.into(), reducer.clone());
@@ -182,10 +192,10 @@ impl Application {
 
 		// create
 		let reducer = if co.as_str() == "local" {
-			Some(self.create_local_co_instance().await?)
+			Some(self.create_local_co_instance(true).await?)
 		} else {
 			let local = self.local_co_reducer().await?;
-			self.create_co_instance(local, co).await?
+			self.create_co_instance(local, co, true).await?
 		};
 
 		// store
@@ -195,6 +205,36 @@ impl Application {
 
 		// result
 		Ok(reducer)
+	}
+
+	/// Get a stream to the log entries.
+	/// Starting at the latest.
+	pub async fn co_log_entries(
+		&self,
+		co: impl AsRef<CoId>,
+	) -> Result<
+		(CoStorage, impl Stream<Item = Result<EntryBlock<<CoStorage as BlockStorage>::StoreParams>, anyhow::Error>>),
+		anyhow::Error,
+	> {
+		let co = co.as_ref();
+
+		// create
+		let uninitialized_reducer = if co.as_str() == "local" {
+			self.create_local_co_instance(false).await?
+		} else {
+			let local = self.local_co_reducer().await?;
+			self.create_co_instance(local, co, false)
+				.await?
+				.ok_or(anyhow!("Co not found: {}", co))?
+		};
+		let (storage, reducer) = uninitialized_reducer.into_inner().ok_or(anyhow!("Invalid reference"))?;
+		let log = reducer.into_log();
+
+		// stream
+		let stream = log.into_stream().map_err(|e| e.into());
+
+		// result
+		Ok((storage, stream))
 	}
 
 	/// Create a new CO.
