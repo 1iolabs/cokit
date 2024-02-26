@@ -1,10 +1,13 @@
 use super::shared::{CreateCo, SharedCoBuilder, SharedCoCreator};
 use crate::{
-	library::find_membership::find_membership, local_keypair_fetch, CoReducer, CoStorage, LocalCoBuilder, Network,
-	Runtime, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	drivers::network::heads::ReceivedHeadsNetworkTask, library::find_membership::find_membership, local_keypair_fetch,
+	CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
+use async_trait::async_trait;
 use co_log::{LocalIdentity, LocalIdentityResolver};
+use co_primitives::CoId;
 use co_runtime::RuntimePool;
 use directories::ProjectDirs;
 use std::{collections::BTreeMap, mem::swap, ops::DerefMut, path::PathBuf, sync::Arc};
@@ -44,7 +47,7 @@ pub struct Application {
 	network: Option<Network>,
 
 	/// Loaded reducers.
-	reducers: Arc<RwLock<BTreeMap<String, CoReducer>>>,
+	reducers: Arc<RwLock<BTreeMap<CoId, CoReducer>>>,
 
 	/// Use keychain or file for Local CO.
 	keychain: bool,
@@ -90,10 +93,17 @@ impl Application {
 			let mut reducers = self.reducers.write().await;
 			let mut next_reducers = BTreeMap::new();
 			if let Some(local) = reducers.remove("local") {
-				next_reducers.insert("local".to_owned(), local);
+				next_reducers.insert("local".into(), local);
 			}
 			swap(&mut next_reducers, reducers.deref_mut());
 		}
+
+		// to be able to receivce updates anytime we add a static heads handler
+		self.network
+			.as_ref()
+			.unwrap()
+			.spawner()
+			.spawn(ReceivedHeadsNetworkTask::new(self.clone()))?;
 
 		// done
 		Ok(())
@@ -115,7 +125,7 @@ impl Application {
 	///
 	/// TODO: Identity
 	///   - Which identity should write to the parent co? If its local we are fine.
-	async fn create_co_instance(&self, parent: CoReducer, co: &str) -> Result<Option<CoReducer>, anyhow::Error> {
+	async fn create_co_instance(&self, parent: CoReducer, co: &CoId) -> Result<Option<CoReducer>, anyhow::Error> {
 		let membership = match find_membership(&parent, co).await? {
 			Some(m) => m,
 			None => return Ok(None),
@@ -150,7 +160,7 @@ impl Application {
 		let reducer = self.create_local_co_instance().await?;
 
 		// store
-		self.reducers.write().await.insert(co.to_owned(), reducer.clone());
+		self.reducers.write().await.insert(co.into(), reducer.clone());
 
 		// result
 		Ok(reducer)
@@ -158,7 +168,9 @@ impl Application {
 
 	/// Get instance of CoReducer.
 	/// Returns None if `co` membership could not be found.
-	pub async fn co_reducer(&self, co: &str) -> Result<Option<CoReducer>, anyhow::Error> {
+	pub async fn co_reducer(&self, co: impl AsRef<CoId>) -> Result<Option<CoReducer>, anyhow::Error> {
+		let co = co.as_ref();
+
 		// has one?
 		{
 			let reducers = self.reducers.read().await;
@@ -169,7 +181,7 @@ impl Application {
 		}
 
 		// create
-		let reducer = if co == "local" {
+		let reducer = if co.as_str() == "local" {
 			Some(self.create_local_co_instance().await?)
 		} else {
 			let local = self.local_co_reducer().await?;
@@ -228,6 +240,12 @@ impl Application {
 
 		// result
 		Ok(())
+	}
+}
+#[async_trait]
+impl CoReducerFactory for Application {
+	async fn co_reducer(&self, co: &CoId) -> Result<Option<CoReducer>, anyhow::Error> {
+		Application::co_reducer(&self, co).await
 	}
 }
 

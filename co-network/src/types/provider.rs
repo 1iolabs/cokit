@@ -1,7 +1,29 @@
-use crate::didcomm;
+use crate::{didcomm, heads};
 use libipld::store::StoreParams;
 use libp2p::{gossipsub, swarm::SwarmEvent};
 use libp2p_bitswap::{Bitswap, BitswapEvent};
+
+/// Trait which can be implemented on NetworkBehaviours which provide gossipsub.
+pub trait HeadsBehaviourProvider {
+	type Event;
+
+	fn heads(&self) -> &heads::Behaviour;
+	fn heads_mut(&mut self) -> &mut heads::Behaviour;
+
+	/// Extract heads event from event.
+	fn heads_event(event: &SwarmEvent<Self::Event>) -> Option<&heads::Event>;
+	fn into_heads_event(event: SwarmEvent<Self::Event>) -> Result<heads::Event, SwarmEvent<Self::Event>>;
+
+	fn handle_event<F: Fn(&heads::Event) -> bool>(
+		event: SwarmEvent<Self::Event>,
+		predicate: F,
+	) -> Result<heads::Event, SwarmEvent<Self::Event>> {
+		match Self::heads_event(&event) {
+			Some(behaviour_event) if predicate(behaviour_event) => Self::into_heads_event(event),
+			_ => Err(event),
+		}
+	}
+}
 
 /// Trait which can be implemented on NetworkBehaviours which provide gossipsub.
 pub trait GossipsubBehaviourProvider {

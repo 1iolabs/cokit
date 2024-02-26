@@ -5,12 +5,13 @@ mod mkdir;
 mod rm;
 
 use crate::cli::Cli;
+use co_sdk::CoId;
 use exitcode::ExitCode;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
 	/// The CO ID.
-	pub co: String,
+	pub co: CoId,
 
 	/// The File Core Name.
 	#[arg(long, default_value_t = String::from("file"))]

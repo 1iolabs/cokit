@@ -1,4 +1,4 @@
-use co_api::{reduce, Context, Did, Reducer, ReducerAction, Tags};
+use co_api::{reduce, CoId, Context, Did, Reducer, ReducerAction, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -13,7 +13,7 @@ pub struct Memberships {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Membership {
 	/// The CO Unique Identifier.
-	pub id: String,
+	pub id: CoId,
 
 	/// The did used for the membership.
 	pub did: Did,
@@ -49,12 +49,12 @@ pub enum MembershipState {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MembershipsAction {
 	Join(Membership),
-	Update { id: String, state: Cid, heads: BTreeSet<Cid>, encryption_mapping: Option<Cid> },
-	ChangeMembershipState { id: String, did: Did, membership_state: MembershipState },
-	ChangeKey { id: String, did: Did, key: String },
-	TagsInsert { id: String, did: Did, tags: Tags },
-	TagsRemove { id: String, did: Did, tags: Tags },
-	Remove { id: String, did: Option<Did> },
+	Update { id: CoId, state: Cid, heads: BTreeSet<Cid>, encryption_mapping: Option<Cid> },
+	ChangeMembershipState { id: CoId, did: Did, membership_state: MembershipState },
+	ChangeKey { id: CoId, did: Did, key: String },
+	TagsInsert { id: CoId, did: Did, tags: Tags },
+	TagsRemove { id: CoId, did: Did, tags: Tags },
+	Remove { id: CoId, did: Option<Did> },
 }
 
 impl Reducer for Memberships {
@@ -109,7 +109,7 @@ impl Reducer for Memberships {
 	}
 }
 
-fn find<'a>(memberships: &'a mut Memberships, co: &str, did: &str) -> Option<&'a mut Membership> {
+fn find<'a>(memberships: &'a mut Memberships, co: &CoId, did: &str) -> Option<&'a mut Membership> {
 	memberships
 		.memberships
 		.iter_mut()

@@ -1,12 +1,12 @@
 use crate::{cli::Cli, library::application::application};
-use co_sdk::memberships;
+use co_sdk::{memberships, CoId};
 use exitcode::ExitCode;
 use futures::{pin_mut, stream::StreamExt};
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
 	/// CO ID
-	pub co: String,
+	pub co: CoId,
 
 	/// The CID to print.
 	/// If not specified using the root state.

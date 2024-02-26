@@ -23,7 +23,7 @@ pub async fn get(local_co: Extension<CoReducer>) -> HttpResult<(StatusCode, Json
 	let memberships: Vec<GetItem> = memberships(local_co.0.clone())
 		.map(|item| -> GetItem {
 			match item {
-				Ok((id, state, tags)) => GetItem::Ok { id, state, tags },
+				Ok((id, state, tags)) => GetItem::Ok { id: id.into(), state, tags },
 				Err(e) => GetItem::Err { err: format!("{:?}", e) },
 			}
 		})
@@ -42,7 +42,7 @@ pub async fn post(
 	Json(payload): Json<Value>,
 ) -> HttpResult<(StatusCode, Json<Value>)> {
 	let body: CreateCo = serde_json::from_value(payload)?;
-	let id = body.id.clone();
+	let id = body.id.clone().to_string();
 	application.create_co(body).await?;
 	Ok((StatusCode::OK, Json(id.into())))
 }

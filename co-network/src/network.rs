@@ -1,13 +1,12 @@
-use super::didcomm;
 use crate::{
-	bitswap::bitswap::BitswapBlockStorage, types::provider::BitswapBehaviourProvider, DidcommBehaviourProvider,
-	FnOnceNetworkTask, GossipsubBehaviourProvider, NetworkError, NetworkTaskBox, NetworkTaskSpawner,
+	bitswap::bitswap::BitswapBlockStorage, heads, types::provider::BitswapBehaviourProvider, FnOnceNetworkTask,
+	HeadsBehaviourProvider, NetworkError, NetworkTaskBox, NetworkTaskSpawner,
 };
 use co_storage::BlockStorage;
 use futures::{channel::oneshot, StreamExt};
 use libipld::DefaultParams;
 use libp2p::{
-	gossipsub, identify,
+	identify,
 	identity::Keypair,
 	kad::{store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig},
 	mdns,
@@ -35,25 +34,14 @@ impl Libp2pNetwork {
 		S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + 'static,
 	{
 		let local_peer_id = PeerId::from(config.keypair.public().clone());
-		let gossipsub_config = gossipsub::ConfigBuilder::default()
-			.max_transmit_size(256 * 1024)
-			.build()
-			.expect("valid config");
-		let didcomm_config: didcomm::Config = didcomm::Config { auto_dail: false, ..Default::default() };
 		let kademlia_config: KademliaConfig = Default::default();
 		let mut behaviour = Behaviour {
-			gossipsub: gossipsub::Behaviour::new(
-				gossipsub::MessageAuthenticity::Signed(config.keypair.clone()),
-				gossipsub_config,
-			)
-			.expect("Valid configuration"),
 			identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
 				"/ipfs/0.1.0".into(),
 				config.keypair.public(),
 			)),
 			ping: ping::Behaviour::new(ping::Config::new()),
 			mdns: MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?,
-			didcomm: didcomm::Behaviour::new(didcomm_config),
 			kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()), kademlia_config),
 			bitswap: Bitswap::new(
 				Default::default(),
@@ -62,6 +50,7 @@ impl Libp2pNetwork {
 					tokio::spawn(t);
 				}),
 			),
+			heads: heads::Behaviour::new(config.keypair.clone()),
 		};
 
 		// kad
@@ -206,13 +195,14 @@ impl Runtime {
 
 #[derive(NetworkBehaviour)]
 pub struct Behaviour {
-	didcomm: didcomm::Behaviour,
-	gossipsub: gossipsub::Behaviour,
+	// didcomm: didcomm::Behaviour,
+	// gossipsub: gossipsub::Behaviour,
 	identify: identify::Behaviour,
 	mdns: MdnsBehaviour,
 	ping: ping::Behaviour,
 	kad: Kademlia<MemoryStore>,
 	bitswap: Bitswap<DefaultParams>,
+	heads: heads::Behaviour,
 }
 impl BitswapBehaviourProvider for Behaviour {
 	type StoreParams = DefaultParams;
@@ -240,52 +230,27 @@ impl BitswapBehaviourProvider for Behaviour {
 		}
 	}
 }
-impl GossipsubBehaviourProvider for Behaviour {
+impl HeadsBehaviourProvider for Behaviour {
 	type Event = BehaviourEvent;
 
-	fn gossipsub(&self) -> &gossipsub::Behaviour {
-		&self.gossipsub
+	fn heads(&self) -> &heads::Behaviour {
+		&self.heads
 	}
 
-	fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour {
-		&mut self.gossipsub
+	fn heads_mut(&mut self) -> &mut heads::Behaviour {
+		&mut self.heads
 	}
 
-	fn gossipsub_event(event: &SwarmEvent<Self::Event>) -> Option<&gossipsub::Event> {
+	fn heads_event(event: &SwarmEvent<Self::Event>) -> Option<&heads::Event> {
 		match event {
-			SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(e)) => Some(e),
+			SwarmEvent::Behaviour(BehaviourEvent::Heads(e)) => Some(e),
 			_ => None,
 		}
 	}
 
-	fn into_gossipsub_event(event: SwarmEvent<Self::Event>) -> Result<gossipsub::Event, SwarmEvent<Self::Event>> {
+	fn into_heads_event(event: SwarmEvent<Self::Event>) -> Result<heads::Event, SwarmEvent<Self::Event>> {
 		match event {
-			SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(e)) => Ok(e),
-			e => Err(e),
-		}
-	}
-}
-impl DidcommBehaviourProvider for Behaviour {
-	type Event = BehaviourEvent;
-
-	fn didcomm(&self) -> &didcomm::Behaviour {
-		&self.didcomm
-	}
-
-	fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour {
-		&mut self.didcomm
-	}
-
-	fn didcomm_event(event: &SwarmEvent<Self::Event>) -> Option<&didcomm::Event> {
-		match event {
-			SwarmEvent::Behaviour(BehaviourEvent::Didcomm(e)) => Some(e),
-			_ => None,
-		}
-	}
-
-	fn into_didcomm_event(event: SwarmEvent<Self::Event>) -> Result<didcomm::Event, SwarmEvent<Self::Event>> {
-		match event {
-			SwarmEvent::Behaviour(BehaviourEvent::Didcomm(e)) => Ok(e),
+			SwarmEvent::Behaviour(BehaviourEvent::Heads(e)) => Ok(e),
 			e => Err(e),
 		}
 	}

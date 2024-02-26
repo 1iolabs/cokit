@@ -7,6 +7,7 @@ pub use library::{
 };
 pub use types::{
 	action::ReducerAction,
+	co::CoId,
 	codec::{MultiCodec, MultiCodecError},
 	date::Date,
 	did::Did,

@@ -136,7 +136,8 @@ where
 		self.states.clone()
 	}
 
-	/// Get state observable.
+	/// Add change handler which will be called when state changed.
+	/// All change handlers will be called in parallel.
 	pub fn add_change_handler(&mut self, handler: Box<dyn ReducerChangedHandler<S, R> + Send + Sync>) {
 		self.change_handlers.push(handler);
 	}

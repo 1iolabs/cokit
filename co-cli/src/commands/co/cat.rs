@@ -3,6 +3,7 @@ use crate::{
 	library::{application::application, cat::cat_output},
 };
 use anyhow::anyhow;
+use co_sdk::CoId;
 use exitcode::ExitCode;
 use libipld::Cid;
 use std::str::FromStr;
@@ -10,7 +11,7 @@ use std::str::FromStr;
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
 	/// CO ID
-	pub co: String,
+	pub co: CoId,
 
 	/// The CID to print.
 	/// If not specified using the root state.

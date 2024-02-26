@@ -1,97 +1,81 @@
-use super::CoNetworkTaskSpawner;
-use crate::CoReducer;
-use co_network::{GossipsubBehaviourProvider, Heads, HeadsHandler, NetworkTask};
-use libipld::Cid;
-use libp2p::{
-	gossipsub::IdentTopic,
-	swarm::{NetworkBehaviour, SwarmEvent},
-	PeerId, Swarm,
+use super::{
+	heads::{HeadsRequest, HeadsRequestNetworkTask},
+	CoNetworkTaskSpawner,
 };
-use std::collections::BTreeSet;
-use tokio::sync::oneshot::{self, error::TryRecvError};
+use crate::{CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerChangedHandler};
+use anyhow::anyhow;
+use async_trait::async_trait;
+use co_primitives::CoId;
+use co_storage::BlockStorageContentMapping;
+use futures::{StreamExt, TryStreamExt};
+use libipld::Cid;
 
 /// Subscription for a single CO (`CoReducer`).
 pub struct Subscription {
 	spawner: CoNetworkTaskSpawner,
-	co: CoReducer,
-	shutdown: oneshot::Sender<()>,
+	co: CoId,
 }
 impl Subscription {
 	pub(crate) async fn subscribe(spawner: CoNetworkTaskSpawner, co: CoReducer) -> Result<Self, anyhow::Error> {
-		let (tx, rx) = oneshot::channel();
-		// let state: co_core_co::Co = co.state(CO_CORE_NAME_CO).await?;
-		let (_, heads) = co.reducer_state().await;
-		let heads = Heads::new(IdentTopic::new(co.id()), heads, SubscriptionHandler { co: co.clone() });
-		spawner.spawn(NetworkSubscription { heads, shutdown: rx })?;
-		Ok(Self { shutdown: tx, spawner, co })
+		spawner.spawn(HeadsRequestNetworkTask::new(HeadsRequest::Subscribe { co: co.id().clone() }))?;
+		Ok(Self { spawner, co: co.id().clone() })
 	}
 
 	pub fn unsubscribe(self) {
-		self.shutdown.send(()).ok();
+		self.spawner
+			.spawn(HeadsRequestNetworkTask::new(HeadsRequest::Unsubscribe { co: self.co }))
+			.ok();
 	}
 }
 
-struct SubscriptionHandler {
-	co: CoReducer,
+pub struct Publish<M> {
+	spawner: CoNetworkTaskSpawner,
+	co: CoId,
+	mapping: Option<M>,
+	/// Force the mapping to be applied by returning an error when no mapping is found.
+	force_mapping: bool,
 }
-impl HeadsHandler for SubscriptionHandler {
-	fn on_heads(&mut self, heads: BTreeSet<Cid>) {
-		let co = self.co.clone();
-		tokio::spawn(async move {
-			match co.join(heads).await {
-				Ok(update) => {
-					tracing::debug!(update, "co-subscription");
-				},
-				Err(err) => {
-					tracing::warn!(?err, "co-subscription-failure");
-				},
-			}
-		});
+impl<M> Publish<M> {
+	pub fn new(spawner: CoNetworkTaskSpawner, co: CoId, mapping: Option<M>, force_mapping: bool) -> Self {
+		Self { co, spawner, mapping, force_mapping }
 	}
 
-	fn on_subscribe(&mut self, _peer: PeerId) {}
-
-	fn on_unsubscribe(&mut self, _peer: PeerId) {}
-}
-
-fn topic(co: &co_core_co::Co) -> IdentTopic {
-	IdentTopic::new(&co.id)
-}
-
-struct NetworkSubscription {
-	heads: Heads,
-	shutdown: oneshot::Receiver<()>,
-}
-impl<B> NetworkTask<B> for NetworkSubscription
-where
-	B: NetworkBehaviour + GossipsubBehaviourProvider<Event = B::ToSwarm>,
-{
-	fn execute(&mut self, swarm: &mut Swarm<B>) {
-		let gossipsub = swarm.behaviour_mut().gossipsub_mut();
-		match self.heads.subscribe(gossipsub) {
-			Ok(_) => {},
-			Err(err) => tracing::warn!(?err, "subscription-failed"),
-		};
-	}
-
-	fn on_swarm_event(
-		&mut self,
-		_swarm: &mut Swarm<B>,
-		event: SwarmEvent<B::ToSwarm>,
-	) -> Option<SwarmEvent<B::ToSwarm>> {
-		match B::handle_event(event, |e| self.heads.is_our_event(e)) {
-			Ok(gossip) => {
-				self.heads.handle_swarm_event(gossip);
-				None
+	async fn to_plain(&self, head: Cid) -> Result<Cid, anyhow::Error>
+	where
+		M: BlockStorageContentMapping + Send + Sync + 'static,
+	{
+		match &self.mapping {
+			Some(mapping) => match mapping.to_plain(&head).await {
+				Some(cid) => Ok(cid),
+				None if self.force_mapping => Err(anyhow!("Failed to map: {:?}", head)),
+				None => Ok(head),
 			},
-			Err(event) => Some(event),
+			None => Ok(head),
 		}
 	}
+}
+#[async_trait]
+impl<M> ReducerChangedHandler<CoStorage, CoCoreResolver> for Publish<M>
+where
+	M: BlockStorageContentMapping + Send + Sync + 'static,
+{
+	// TODO: skip publish when have only one peer?
+	async fn on_state_changed(&mut self, reducer: &Reducer<CoStorage, CoCoreResolver>) -> Result<(), anyhow::Error> {
+		let mut heads = reducer.heads().clone();
 
-	fn is_complete(&mut self) -> bool {
-		match self.shutdown.try_recv() {
-			Ok(_) | Err(TryRecvError::Closed) => true,
-			Err(TryRecvError::Empty) => false,
+		// map plain heads to encrypted heads
+		if self.mapping.is_some() {
+			heads = futures::stream::iter(heads.into_iter())
+				.then(|head| self.to_plain(head))
+				.try_collect()
+				.await?;
 		}
+
+		// publish
+		self.spawner
+			.spawn(HeadsRequestNetworkTask::new(HeadsRequest::PublishHeads { co: self.co.clone(), heads }))?;
+
+		// result
+		Ok(())
 	}
 }

@@ -1,15 +1,16 @@
 use crate::{CoReducer, CoReducerError, Cores, CO_CORE_MEMBERSHIP};
 use co_core_membership::{Membership, Memberships};
+use co_primitives::CoId;
 
 /// Find the Membership entry in `reducer` for `co`.
-pub async fn find_membership(reducer: &CoReducer, co: &str) -> Result<Option<Membership>, CoReducerError> {
+pub async fn find_membership(reducer: &CoReducer, co: impl AsRef<CoId>) -> Result<Option<Membership>, CoReducerError> {
 	let memberships: Memberships = match reducer.state(Cores::to_core_name(CO_CORE_MEMBERSHIP)).await {
 		Ok(memberships) => memberships,
 		Err(CoReducerError::CoreNotFound(_)) => Memberships::default(),
 		Err(e) => Err(e)?,
 	};
 	for membership in memberships.memberships {
-		if membership.id == co {
+		if &membership.id == co.as_ref() {
 			return Ok(Some(membership))
 		}
 	}
@@ -17,7 +18,7 @@ pub async fn find_membership(reducer: &CoReducer, co: &str) -> Result<Option<Mem
 }
 
 /// Find the Membership entry in `reducer` for `co`.
-pub async fn find_memberships(reducer: &CoReducer, co: &str) -> Result<Vec<Membership>, CoReducerError> {
+pub async fn find_memberships(reducer: &CoReducer, co: impl AsRef<CoId>) -> Result<Vec<Membership>, CoReducerError> {
 	let memberships: Memberships = match reducer.state(Cores::to_core_name(CO_CORE_MEMBERSHIP)).await {
 		Ok(memberships) => memberships,
 		Err(CoReducerError::CoreNotFound(_)) => Memberships::default(),
@@ -26,6 +27,6 @@ pub async fn find_memberships(reducer: &CoReducer, co: &str) -> Result<Vec<Membe
 	Ok(memberships
 		.memberships
 		.into_iter()
-		.filter(|membership| membership.id == co)
+		.filter(|membership| &membership.id == co.as_ref())
 		.collect())
 }

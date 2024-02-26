@@ -1,11 +1,11 @@
 use crate::{cli::Cli, library::application::application};
-use co_sdk::CreateCo;
+use co_sdk::{CoId, CreateCo};
 use exitcode::ExitCode;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
 	/// CO ID
-	pub co: String,
+	pub co: CoId,
 
 	/// CO Name
 	pub name: Option<String>,
@@ -22,7 +22,7 @@ pub async fn command(cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::E
 	let create = CreateCo {
 		id: command.co.clone(),
 		algorithm: if command.public { None } else { Some(Default::default()) },
-		name: command.name.as_ref().unwrap_or(&command.co).clone(),
+		name: command.name.as_deref().unwrap_or(command.co.as_str()).to_string(),
 	};
 	let reducer = application.create_co(create).await?;
 

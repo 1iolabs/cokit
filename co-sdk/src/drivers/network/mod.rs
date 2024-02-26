@@ -1,7 +1,9 @@
+pub mod heads;
 pub mod subscribe;
+pub mod update;
 
 use self::subscribe::Subscription;
-use crate::CoReducer;
+use crate::{drivers::network::update::Update, CoReducer};
 use co_network::{Behaviour, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner};
 use co_storage::BlockStorage;
 use libipld::DefaultParams;
@@ -43,9 +45,14 @@ impl Network {
 		self.network.lock().await.take()
 	}
 
-	/// Sync the CO.
+	/// Update heads of the CO with known peers.
 	/// One time operation.
-	pub async fn sync(co_reducer: CoReducer) -> Result<(), anyhow::Error> {}
+	/// Note: This will not wait for responses.
+	pub async fn update(&self, co_reducer: CoReducer) -> Result<(), anyhow::Error> {
+		let update = Update::new(self.spawner(), co_reducer);
+		update.request().await?;
+		Ok(())
+	}
 
 	/// Subscribe to CO changes.
 	pub async fn subscribe(&self, co_reducer: CoReducer) -> Result<Subscription, anyhow::Error> {

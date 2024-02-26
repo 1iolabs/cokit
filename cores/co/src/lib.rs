@@ -1,14 +1,14 @@
-use co_api::{reduce, Context, DagCollection, DagSet, Did, Reducer, ReducerAction, Tags};
+use co_api::{reduce, CoId, Context, DagCollection, DagSet, Did, Reducer, ReducerAction, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::{BTreeMap, BTreeSet};
 
 // #[co_api::State]
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Co {
 	/// CO UUID.
-	pub id: String,
+	pub id: CoId,
 
 	/// CO Tags.
 	pub tags: Tags,
@@ -36,6 +36,20 @@ pub struct Co {
 	/// See: [`libp2p::PeerId`]
 	// #[co_api::Dag]
 	pub peers: DagSet<Vec<u8>>,
+}
+impl Default for Co {
+	fn default() -> Self {
+		Self {
+			id: "".into(),
+			tags: Default::default(),
+			name: Default::default(),
+			heads: Default::default(),
+			participants: Default::default(),
+			cores: Default::default(),
+			keys: Default::default(),
+			peers: Default::default(),
+		}
+	}
 }
 
 // #[co_api::Data]
@@ -99,7 +113,7 @@ pub enum KeyState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CoAction {
-	Create { id: String, name: String, cores: BTreeMap<String, Core>, participants: BTreeMap<Did, Participant> },
+	Create { id: CoId, name: String, cores: BTreeMap<String, Core>, participants: BTreeMap<Did, Participant> },
 	Heads { heads: BTreeSet<Cid> },
 	TagsInsert { tags: Tags },
 	TagsRemove { tags: Tags },
@@ -125,7 +139,7 @@ impl Reducer for Co {
 			CoAction::Create { id, name, cores, participants } => {
 				// only allowed for empty COs
 				// id can not be changed afterwards
-				if result.id.is_empty() {
+				if result.id.as_str().is_empty() {
 					result.id = id.to_owned();
 					result.name = name.to_owned();
 					result.cores = cores.to_owned();

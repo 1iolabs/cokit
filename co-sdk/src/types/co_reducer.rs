@@ -1,5 +1,6 @@
 use crate::{CoCoreResolver, CoStorage, Reducer, Runtime, CO_CORE_NAME_CO};
 use co_log::PrivateIdentity;
+use co_primitives::CoId;
 use co_storage::{BlockStorageExt, StorageError};
 use libipld::Cid;
 use serde::{de::DeserializeOwned, Serialize};
@@ -8,17 +9,17 @@ use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct CoReducer {
-	id: String,
+	id: CoId,
 	pub(crate) reducer: Arc<RwLock<Reducer<CoStorage, CoCoreResolver>>>,
 	pub(crate) storage: CoStorage,
 	pub(crate) runtime: Runtime,
 }
 impl CoReducer {
-	pub(crate) fn new(id: String, runtime: Runtime, reducer: Reducer<CoStorage, CoCoreResolver>) -> Self {
+	pub(crate) fn new(id: CoId, runtime: Runtime, reducer: Reducer<CoStorage, CoCoreResolver>) -> Self {
 		Self { id, runtime, storage: reducer.log().storage().clone(), reducer: Arc::new(RwLock::new(reducer)) }
 	}
 
-	pub fn id(&self) -> &str {
+	pub fn id(&self) -> &CoId {
 		&self.id
 	}
 

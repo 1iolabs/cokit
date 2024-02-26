@@ -165,7 +165,7 @@ impl LocalCoInstance {
 		}
 
 		// result
-		Ok((result, CoReducer::new(LOCAL_CO_ID.to_owned(), runtime, reducer)))
+		Ok((result, CoReducer::new(LOCAL_CO_ID.into(), runtime, reducer)))
 	}
 
 	/// Write state to disk.
@@ -368,7 +368,7 @@ where
 			tags: tags!(),
 		},
 	);
-	let action = co_core_co::CoAction::Create { id: "local".to_owned(), name: "local".to_owned(), cores, participants };
+	let action = co_core_co::CoAction::Create { id: "local".into(), name: "local".to_owned(), cores, participants };
 	reducer.push(runtime, identity, CO_CORE_NAME_CO, &action).await?;
 
 	// done
