@@ -1,5 +1,5 @@
 use crate::{CoCoreResolver, CoStorage, Reducer, Runtime, CO_CORE_NAME_CO};
-use co_log::PrivateIdentity;
+use co_identity::PrivateIdentity;
 use co_primitives::CoId;
 use co_storage::{BlockStorageExt, StorageError};
 use libipld::Cid;

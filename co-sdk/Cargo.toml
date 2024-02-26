@@ -16,6 +16,7 @@ co-core-membership = { path = "../cores/membership" }
 co-core-pin = { path = "../cores/pin" }
 co-core-role = { path = "../cores/role" }
 co-core-room = { path = "../cores/room" }
+co-identity = { path = "../co-identity" }
 co-log = { path = "../co-log" }
 co-network = { path = "../co-network" }
 co-primitives = { path = "../co-primitives" }

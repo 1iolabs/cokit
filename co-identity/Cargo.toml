@@ -1,5 +1,5 @@
 [package]
-name = "co-log"
+name = "co-identity"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,11 +8,9 @@ crate-type = ["lib"]
 
 [dependencies]
 anyhow = { workspace = true }
-async-stream = "0.3.5"
 async-trait = { workspace = true }
-co-identity = { path = "../co-identity" }
 co-primitives = { path = "../co-primitives" }
-co-storage = { path = "../co-storage" }
+did-key = "0.2.1"
 futures = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { workspace = true, features = ["derive"] }
@@ -21,6 +19,11 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 uuid = { version = "1.2.2", features = ["default", "v4"] }
+
+# workarounds
+## error: the `alloc` feature must currently be enabled
+##  --> /usr/local/rust/cargo/registry/src/index.crates.io-6f17d22bba15001f/form_urlencoded-1.2.1/src/lib.rs:24:1
+form_urlencoded = "=1.2.0"
 
 [features]
 "default" = []

@@ -1,6 +1,6 @@
 use crate::{CoReducer, CO_CORE_NAME_KEYSTORE};
 use co_core_keystore::{Key, KeyStore, KeyStoreAction};
-use co_log::PrivateIdentity;
+use co_identity::PrivateIdentity;
 
 /// Get or create an key.
 pub async fn keystore_fetch<F: FnOnce() -> Key, I: PrivateIdentity + Send + Sync>(

@@ -1,4 +1,5 @@
-use crate::{Clock, Identity, PrivateIdentity, SignError};
+use crate::Clock;
+use co_identity::{Identity, PrivateIdentity, SignError};
 use co_primitives::{BlockSerializer, BlockSerializerError};
 use libipld::{store::StoreParams, Block, Cid};
 use serde::{Deserialize, Serialize};
@@ -140,7 +141,8 @@ impl<P: StoreParams> Ord for EntryBlock<P> {
 
 #[cfg(test)]
 mod tests {
-	use crate::{Clock, DidKeyIdentity, EntryBlock};
+	use crate::{Clock, EntryBlock};
+	use co_identity::DidKeyIdentity;
 	use co_primitives::BlockSerializer;
 	use libipld::DefaultParams;
 	use serde::{Deserialize, Serialize};

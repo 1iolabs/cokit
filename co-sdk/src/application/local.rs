@@ -7,7 +7,8 @@ use crate::{
 };
 use anyhow::Context;
 use async_trait::async_trait;
-use co_log::{Identity, LocalIdentity, Log};
+use co_identity::{Identity, LocalIdentity};
+use co_log::Log;
 use co_primitives::{tags, Did};
 use co_runtime::RuntimePool;
 use co_storage::{Algorithm, BlockStorage, EncryptedBlockStorage, Secret};

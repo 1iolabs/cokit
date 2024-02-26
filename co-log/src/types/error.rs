@@ -1,4 +1,5 @@
-use crate::{EntryError, IdentityResolverError};
+use crate::EntryError;
+use co_identity::IdentityResolverError;
 use co_storage::StorageError;
 
 #[derive(Debug, thiserror::Error)]

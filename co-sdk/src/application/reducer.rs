@@ -1,7 +1,8 @@
 use crate::CoreResolver;
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_log::{EntryBlock, Log, LogError, PrivateIdentity};
+use co_identity::PrivateIdentity;
+use co_log::{EntryBlock, Log, LogError};
 use co_primitives::{Linkable, ReducerAction};
 use co_runtime::RuntimePool;
 use co_storage::BlockStorage;
@@ -358,7 +359,8 @@ pub trait ReducerChangedHandler<S, R> {
 mod tests {
 	use super::Reducer;
 	use crate::{application::reducer::ReducerBuilder, CoreResolver, SingleCoreResolver};
-	use co_log::{LocalIdentityResolver, Log};
+	use co_identity::LocalIdentityResolver;
+	use co_log::Log;
 	use co_primitives::{BlockSerializer, ReducerAction};
 	use co_runtime::{Core, IdleRuntimePool, RuntimePool};
 	use co_storage::{store_file, BlockStorage, MemoryBlockStorage};

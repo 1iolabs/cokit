@@ -1,4 +1,4 @@
-use co_log::{DidKeyIdentityResolver, IdentityResolverBox, JoinIdentityResolver, LocalIdentityResolver};
+use co_identity::{DidKeyIdentityResolver, IdentityResolverBox, JoinIdentityResolver, LocalIdentityResolver};
 
 /// Create the default identity resolver.
 pub fn create_identity_resolver() -> IdentityResolverBox {

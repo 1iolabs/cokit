@@ -1221,16 +1221,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-identity"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "co-primitives",
+ "did-key",
+ "form_urlencoded",
+ "futures",
+ "libipld",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "co-log"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
+ "co-identity",
  "co-primitives",
  "co-storage",
- "did-key",
- "form_urlencoded",
  "futures",
  "libipld",
  "serde",
@@ -1355,6 +1375,7 @@ dependencies = [
  "co-core-pin",
  "co-core-role",
  "co-core-room",
+ "co-identity",
  "co-log",
  "co-network",
  "co-primitives",

@@ -2,6 +2,7 @@
 members = [
     "co-api",
     "co-cli",
+    "co-identity",
     "co-log",
     "co-macros",
     "co-messaging",

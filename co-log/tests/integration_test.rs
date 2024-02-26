@@ -1,4 +1,5 @@
-use co_log::{DidKeyIdentity, DidKeyIdentityResolver, Entry, Log, PrivateIdentity};
+use co_identity::{DidKeyIdentity, DidKeyIdentityResolver, PrivateIdentity};
+use co_log::{Entry, Log};
 use co_primitives::{BlockSerializer, Link};
 use co_storage::{BlockStorage, MemoryBlockStorage};
 use futures::TryStreamExt;

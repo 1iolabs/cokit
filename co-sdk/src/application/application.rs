@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_log::{LocalIdentity, LocalIdentityResolver};
+use co_identity::{LocalIdentity, LocalIdentityResolver};
 use co_primitives::CoId;
 use co_runtime::RuntimePool;
 use directories::ProjectDirs;
