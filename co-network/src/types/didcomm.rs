@@ -1,5 +1,5 @@
 use co_identity::{PrivateIdentity, SignError};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 /// See: https://identity.foundation/didcomm-messaging/spec/#message-headers
@@ -36,7 +36,7 @@ pub struct Message<T> {
 	/// The to header cannot be used for routing, since it is encrypted at every intermediate point in a route.
 	/// Instead, the forward message contains a next attribute in its body that specifies the target for the next
 	/// routing operation.
-	#[serde(skip_serializing_if = "BTreeSet::is_empty")]
+	#[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
 	pub to: BTreeSet<String>,
 
 	/// OPTIONAL when the message is to be encrypted via anoncrypt; REQUIRED when the message is encrypted via
@@ -47,17 +47,17 @@ pub struct Message<T> {
 	/// authcrypt, it is recommended to use a new DID created for the purpose to avoid correlation with any other
 	/// behavior or identity. Peer DIDs are lightweight and require no ledger writes, and therefore a good method to
 	/// use for this purpose.
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub from: Option<String>,
 
 	/// OPTIONAL. Thread identifier. Uniquely identifies the thread that the message belongs to. If not included, the
 	/// id property of the message MUST be treated as the value of the thid. See Threads for details.
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub thid: Option<String>,
 
 	/// OPTIONAL. Thread identifier. Uniquely identifies the thread that the message belongs to. If not included, the
 	/// id property of the message MUST be treated as the value of the thid. See Threads for details.
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub pthid: Option<String>,
 
 	/// OPTIONAL but recommended. Message Created Time. This attribute is used for the sender to express when they
@@ -65,7 +65,7 @@ pub struct Message<T> {
 	/// allows the recipient to guess about transport latency and clock divergence. The difference between when a
 	/// message is created and when it is sent is assumed to be negligible; this lets timeout logic start from this
 	/// value.
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub created_time: Option<u64>,
 
 	/// OPTIONAL. Message Expires Time. This attribute is used for the sender to express when they will consider the
@@ -74,7 +74,7 @@ pub struct Message<T> {
 	/// this time. However, protocols can nuance this in their formal spec. For example, an online auction protocol
 	/// might specify that timed out bids must be ignored instead of triggering a cancellation of the whole auction.
 	/// When omitted from any given message, the message is considered to have no expiration by the sender.
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub expires_time: Option<u64>,
 
 	/// OPTIONAL. The body attribute contains all the data and structure that are uniquely defined for the schema
@@ -100,5 +100,13 @@ impl<T> Message<T> {
 		T: Serialize,
 	{
 		Ok(serde_ipld_dagcbor::to_vec(&self)?)
+	}
+
+	/// Decode dag-cbor data to message.
+	pub fn from_cbor(data: &[u8]) -> Result<Self, anyhow::Error>
+	where
+		T: DeserializeOwned,
+	{
+		Ok(serde_ipld_dagcbor::from_slice(&data)?)
 	}
 }

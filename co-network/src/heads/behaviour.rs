@@ -20,6 +20,12 @@ pub enum Event {
 	/// Receviced new heads from some peer.
 	ReceivedHeads { co: CoId, heads: BTreeSet<Cid>, peer_id: Option<PeerId>, response: bool },
 
+	/// Sent heads to an peer.
+	SentHeads { co: CoId, heads: BTreeSet<Cid>, peer_id: PeerId },
+
+	/// Received invalid inbound message.
+	InboundFailure { peer_id: PeerId, data: Vec<u8> },
+
 	/// Subscribed for heads.
 	Subscribed { co: CoId, peer_id: PeerId },
 
@@ -96,7 +102,7 @@ impl Behaviour {
 		&mut self,
 		co: &CoId,
 		heads: BTreeSet<Cid>,
-		peers: impl Iterator<Item = PeerId>,
+		peers: impl IntoIterator<Item = PeerId>,
 	) -> Result<(), anyhow::Error> {
 		let time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Valid time").as_secs();
 		let message = Message {
@@ -172,11 +178,11 @@ impl NetworkBehaviour for Behaviour {
 				message,
 			}))) => match message {
 				didcomm::Message::Message(data) => {
-					let heads_message: HeadsMessage = match serde_ipld_dagcbor::from_slice(&data) {
-						Ok(m) => m,
+					let heads_message: HeadsMessage = match Message::<HeadsMessage>::from_cbor(&data) {
+						Ok(m) => m.body,
 						Err(err) => {
-							tracing::warn!(?err, "received-invalid-message");
-							return Poll::Pending;
+							tracing::warn!(?peer_id, ?err, "received-invalid-message");
+							return Poll::Ready(ToSwarm::GenerateEvent(Event::InboundFailure { peer_id, data }));
 						},
 					};
 					match heads_message {
@@ -190,17 +196,39 @@ impl NetworkBehaviour for Behaviour {
 				},
 			},
 
+			// didcomm sent
+			Poll::Ready(ToSwarm::GenerateEvent(InnerBehaviourEvent::Didcomm(didcomm::Event::Sent {
+				peer_id,
+				message,
+			}))) => match message {
+				didcomm::Message::Message(data) => {
+					let heads_message: HeadsMessage = match Message::<HeadsMessage>::from_cbor(&data) {
+						Ok(m) => m.body,
+						Err(err) => {
+							panic!("BUG: can not deserialize just serialized message: {:?}", err);
+						},
+					};
+					match heads_message {
+						HeadsMessage::Heads(co, heads) =>
+							Poll::Ready(ToSwarm::GenerateEvent(Event::SentHeads { co, heads, peer_id })),
+					}
+				},
+			},
+
 			// gossip message
 			Poll::Ready(ToSwarm::GenerateEvent(InnerBehaviourEvent::Gossipsub(gossipsub::Event::Message {
-				propagation_source: _,
+				propagation_source,
 				message_id: _,
 				message,
 			}))) => {
 				let heads_message: HeadsMessage = match serde_ipld_dagcbor::from_slice(&message.data) {
 					Ok(m) => m,
 					Err(err) => {
-						tracing::warn!(?err, ?message.topic, "received-invalid-message");
-						return Poll::Pending;
+						tracing::warn!(peer_id = ?propagation_source, source_peer_id = ?message.source, ?err, ?message.topic, "received-invalid-message");
+						return Poll::Ready(ToSwarm::GenerateEvent(Event::InboundFailure {
+							peer_id: propagation_source,
+							data: message.data,
+						}));
 					},
 				};
 				match heads_message {
@@ -296,7 +324,7 @@ mod tests {
 			Self { peer_id: swarm.local_peer_id().clone(), addr, swarm }
 		}
 
-		fn add_address(&mut self, co: CoId, peer: &Peer) {
+		fn add_address(&mut self, _co: CoId, peer: &Peer) {
 			self.swarm
 				.dial(
 					DialOpts::peer_id(peer.peer_id.clone())
@@ -304,7 +332,8 @@ mod tests {
 						.build(),
 				)
 				.unwrap();
-			self.swarm.behaviour_mut().add_explicit_peer(co, peer.peer_id.clone());
+			// when we dail just the peerid we always get an dail error because we have no addresses
+			// self.swarm.behaviour_mut().add_explicit_peer(co, peer.peer_id.clone());
 		}
 
 		fn swarm(&mut self) -> &mut Swarm<heads::Behaviour> {
@@ -322,7 +351,7 @@ mod tests {
 	}
 
 	#[tokio::test]
-	async fn smoke() {
+	async fn test_subscribe() {
 		let co = CoId::new("test");
 
 		// test data
@@ -375,5 +404,63 @@ mod tests {
 				panic!("expected message event for peer1 got {:?}", event);
 			},
 		};
+	}
+
+	#[tokio::test]
+	async fn test_heads() {
+		let co = CoId::new("test");
+
+		// test data
+		let test = BlockSerializer::default().serialize(&"test").unwrap();
+		let hello = BlockSerializer::default().serialize(&"hello").unwrap();
+
+		// heads
+		let mut h1: BTreeSet<Cid> = BTreeSet::new();
+		h1.insert(test.cid().clone());
+		let mut h2: BTreeSet<Cid> = BTreeSet::new();
+		h2.insert(hello.cid().clone());
+
+		// peers
+		let mut peer1 = Peer::new();
+		let mut peer2 = Peer::new();
+		tracing::info!(peer_id = ?peer1.swarm.local_peer_id(), "peer1");
+		tracing::info!(peer_id = ?peer2.swarm.local_peer_id(), "peer2");
+		peer2.add_address(co.clone(), &peer1);
+
+		// peer2: heads
+		peer2
+			.swarm()
+			.behaviour_mut()
+			.heads(&co, h2.clone(), vec![peer1.peer_id.clone()])
+			.unwrap();
+
+		// wait for sent and received event
+		let peer1_id = peer1.peer_id;
+		let peer2_id = peer2.peer_id;
+		join!(
+			async {
+				let event1 = peer1.next().await;
+				match event1 {
+					Some(heads::Event::ReceivedHeads { co: event_co, peer_id, heads, response }) => {
+						assert_eq!(co, event_co);
+						assert_eq!(Some(peer2_id), peer_id);
+						assert_eq!(h2, heads);
+						assert_eq!(true, response);
+					},
+					event => panic!("unexpected event: {:?}", event),
+				}
+			},
+			async {
+				let event2 = peer2.next().await;
+				match event2 {
+					Some(heads::Event::SentHeads { co: event_co, peer_id, heads }) => {
+						assert_eq!(co, event_co);
+						assert_eq!(peer1_id, peer_id);
+						assert_eq!(h2, heads);
+					},
+					event => panic!("unexpected event: {:?}", event),
+				}
+			}
+		);
 	}
 }
