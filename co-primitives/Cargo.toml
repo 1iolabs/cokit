@@ -4,13 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+co-macros = { path = "../co-macros" }
 derive_more = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { workspace = true, features = ["derive"] }
+serde_bytes = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-co-macros = { path = "../co-macros" }
+zeroize = { workspace = true }
 
 [dev-dependencies]
 insta = { version = "1.34.0", features = ["default", "yaml"] }

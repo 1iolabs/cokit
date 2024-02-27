@@ -121,7 +121,7 @@ impl Algorithm {
 		// encrypt
 		match self {
 			Algorithm::XChaCha20Poly1305 => {
-				let cipher = XChaCha20Poly1305::new(Key::from_slice(secret.divulge().as_slice()));
+				let cipher = XChaCha20Poly1305::new(Key::from_slice(secret.divulge()));
 				let payload = Payload { msg: plaintext, aad };
 				cipher
 					.encrypt(aead::Nonce::<XChaCha20Poly1305>::from_slice(nonce.as_slice()), payload)
@@ -149,7 +149,7 @@ impl Algorithm {
 		// decrypt
 		match self {
 			Algorithm::XChaCha20Poly1305 => {
-				let cipher = XChaCha20Poly1305::new(Key::from_slice(secret.divulge().as_slice()));
+				let cipher = XChaCha20Poly1305::new(Key::from_slice(secret.divulge()));
 				let payload = Payload { msg: ciphertext, aad };
 				cipher
 					.decrypt(aead::Nonce::<XChaCha20Poly1305>::from_slice(nonce.as_slice()), payload)
@@ -508,8 +508,7 @@ impl KeySlot {
 		let salt = algorithm.generate_nonce(); // TODO: needs specific size?
 		let secret_derived = secret.derive_serect_with_salt(BLOCK_KEY_DERIVATION, &salt);
 		let nonce = algorithm.generate_nonce();
-		let block_secret_encrypted =
-			algorithm.encrypt(&secret_derived, &nonce, block_secret.divulge().as_slice(), b"")?;
+		let block_secret_encrypted = algorithm.encrypt(&secret_derived, &nonce, block_secret.divulge(), b"")?;
 		Ok(Self { version: KeySlotVersion::V1, algorithm, key: block_secret_encrypted, nonce, salt })
 	}
 

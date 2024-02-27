@@ -31,9 +31,9 @@ pub struct Key {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Secret {
-	Password(Vec<u8>),
-	PrivateKey(Vec<u8>),
-	SharedKey(Vec<u8>),
+	Password(co_api::Secret),
+	PrivateKey(co_api::Secret),
+	SharedKey(co_api::Secret),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -60,7 +60,7 @@ impl Reducer for KeyStore {
 }
 
 impl KeyStore {
-	pub fn shared_key<'a>(&'a self, uri: &str) -> Option<&'a Vec<u8>> {
+	pub fn shared_key<'a>(&'a self, uri: &str) -> Option<&'a co_api::Secret> {
 		match self.keys.get(uri) {
 			Some(key) => match &key.secret {
 				Secret::SharedKey(l) => Some(l),

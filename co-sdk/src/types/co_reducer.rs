@@ -5,7 +5,7 @@ use co_primitives::CoId;
 use co_storage::{BlockStorageExt, StorageError};
 use libipld::Cid;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::BTreeSet, sync::Arc};
+use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
 use tokio::sync::RwLock;
 
 #[derive(Clone)]
@@ -48,10 +48,11 @@ impl CoReducer {
 	}
 
 	/// Push event into reducer.
+	#[tracing::instrument(err, fields(co = self.id().as_str()), skip(self))]
 	pub async fn push<T, I>(&self, identity: &I, co: &str, item: &T) -> Result<(), anyhow::Error>
 	where
-		T: Serialize + Send + Sync + Clone + 'static,
-		I: PrivateIdentity + Send + Sync,
+		T: Serialize + Debug + Send + Sync + Clone + 'static,
+		I: PrivateIdentity + Debug + Send + Sync,
 	{
 		self.reducer
 			.write()
@@ -62,6 +63,7 @@ impl CoReducer {
 
 	/// Join heads.
 	/// Returns true if state has changed.
+	#[tracing::instrument(err, ret, fields(co = self.id().as_str()), skip(self))]
 	pub async fn join(&self, heads: BTreeSet<Cid>) -> Result<bool, anyhow::Error> {
 		Ok(self.reducer.write().await.join(&heads, self.runtime.runtime()).await?)
 	}
@@ -115,8 +117,21 @@ impl CoReducer {
 	}
 
 	/// Try to escape inner data.
-	pub(crate) fn into_inner(self) -> Option<(CoStorage, Reducer<CoStorage, CoCoreResolver>)> {
-		Arc::into_inner(self.reducer).map(|lock| (self.storage, lock.into_inner()))
+	pub(crate) fn into_inner(
+		self,
+	) -> Option<(CoStorage, Reducer<CoStorage, CoCoreResolver>, Option<CoBlockStorageContentMapping>)> {
+		Arc::into_inner(self.reducer).map(|lock| (self.storage, lock.into_inner(), self.mapping))
+	}
+}
+impl Debug for CoReducer {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("CoReducer")
+			.field("id", &self.id)
+			//.field("reducer", &self.reducer)
+			//.field("storage", &self.storage)
+			//.field("runtime", &self.runtime)
+			//.field("mapping", &self.mapping)
+			.finish()
 	}
 }
 

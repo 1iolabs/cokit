@@ -1,4 +1,5 @@
 use libipld::Cid;
+use std::fmt::Display;
 
 /// MultiCodec matching utility.
 ///
@@ -26,6 +27,18 @@ impl MultiCodec {
 
 	pub fn dag_cbor(cid: &Cid) -> Result<&Cid, MultiCodecError> {
 		Self::codec(Self::DagCbor, cid)
+	}
+}
+impl Display for MultiCodec {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Identity => write!(f, "Identity"),
+			Self::Raw => write!(f, "Raw"),
+			Self::DagPb => write!(f, "DagPb"),
+			Self::DagCbor => write!(f, "DagCbor"),
+			Self::CoEncryptedBlock => write!(f, "CoEncryptedBlock"),
+			Self::Unknown(c) => write!(f, "{:#x}", c),
+		}
 	}
 }
 impl Into<u64> for MultiCodec {

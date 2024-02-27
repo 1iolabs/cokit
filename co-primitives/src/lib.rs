@@ -17,5 +17,6 @@ pub use types::{
 		AbsolutePath, AbsolutePathOwned, Component, Components, Path, PathError, PathExt, PathOwned, RelativePath,
 		RelativePathOwned,
 	},
+	secret::Secret,
 	tags::{Tag, Tags, TagsPattern},
 };

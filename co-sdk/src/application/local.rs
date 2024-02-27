@@ -12,9 +12,9 @@ use anyhow::Context;
 use async_trait::async_trait;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
-use co_primitives::{tags, Did};
+use co_primitives::{tags, Did, Secret};
 use co_runtime::RuntimePool;
-use co_storage::{Algorithm, BlockStorage, EncryptedBlockStorage, Secret};
+use co_storage::{Algorithm, BlockStorage, EncryptedBlockStorage};
 use futures::{pin_mut, Stream, StreamExt};
 use libipld::{Cid, DefaultParams};
 use serde::{Deserialize, Serialize};
@@ -135,10 +135,12 @@ impl LocalCoInstance {
 	) -> Result<(Self, CoReducer), anyhow::Error> {
 		// create storage
 		let mut encrypted_storage: EncryptedBlockStorage<CoStorage> =
-			create_encrypted_storage(storage.clone(), &local_co.identity, local_co.key_path()).await?;
+			create_encrypted_storage(storage, &local_co.identity, local_co.key_path()).await?;
+		let storage = CoStorage::new(encrypted_storage.clone());
 
 		// create log
-		let log = Log::new(LOCAL_CO_ID.as_bytes().to_vec(), create_identity_resolver(), storage, Default::default());
+		let log =
+			Log::new(LOCAL_CO_ID.as_bytes().to_vec(), create_identity_resolver(), storage.clone(), Default::default());
 
 		// create builder
 		let mut builder = ReducerBuilder::new(CoCoreResolver::default(), log).with_initialize(local_co.initialize);
@@ -199,7 +201,7 @@ impl LocalCoInstance {
 			let path = self.application_path.join("local.cbor");
 
 			// trace
-			tracing::trace!(app = ?self.identifier, ?path, ?state, "local-co-write");
+			tracing::trace!(app = ?self.identifier, ?path, ?state, ?mapping, "local-co-write");
 
 			// create format
 			let local = ApplicationLocal::new(reducer.heads().clone(), state.clone(), mapping);
@@ -301,19 +303,19 @@ where
 		Some(key_path) => fetch_secret_cbor(key_path, true).await?,
 		None => fetch_secret_keychain("co.app", identity.identity(), true)?,
 	};
-	Ok(EncryptedBlockStorage::new(storage.clone(), key, Default::default()))
+	Ok(EncryptedBlockStorage::new(storage.clone(), key.into(), Default::default()))
 }
 
 async fn fetch_secret_cbor(key_path: PathBuf, allow_create: bool) -> Result<Secret, anyhow::Error> {
 	match fs_read_option(&key_path).await {
 		Ok(Some(data)) => {
-			let result: Vec<u8> = serde_ipld_dagcbor::from_slice(&data)?;
-			Ok(Secret::new(result))
+			let result: Secret = serde_ipld_dagcbor::from_slice(&data)?;
+			Ok(result)
 		},
 		Ok(None) if allow_create => {
 			// create
-			let secret = Algorithm::default().generate_serect();
-			let contents: Vec<u8> = serde_ipld_dagcbor::to_vec(secret.divulge())?;
+			let secret: Secret = Algorithm::default().generate_serect().into();
+			let contents = serde_ipld_dagcbor::to_vec(&secret)?;
 			fs_write(&key_path, contents, true).await?;
 
 			// result

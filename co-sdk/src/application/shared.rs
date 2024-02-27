@@ -16,6 +16,7 @@ use co_network::NetworkBlockStorage;
 use co_primitives::{tags, CoId};
 use co_storage::{Algorithm, EncryptedBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 /// Shared CO Builder.
 /// The Shared CO state is sptrend in an membership of an other CO (typicalle the Local CO).
@@ -55,12 +56,10 @@ impl SharedCoBuilder {
 		Self { initialize, ..self }
 	}
 
-	pub async fn build<I: PrivateIdentity + Send + Sync + 'static>(
-		self,
-		storage: CoStorage,
-		runtime: Runtime,
-		identity: I,
-	) -> Result<CoReducer, anyhow::Error> {
+	pub async fn build<I>(self, storage: CoStorage, runtime: Runtime, identity: I) -> Result<CoReducer, anyhow::Error>
+	where
+		I: PrivateIdentity + Debug + Send + Sync + 'static,
+	{
 		// storage
 		let (storage, encrypted_storage): (CoStorage, Option<EncryptedBlockStorage<CoStorage>>) =
 			match &self.membership.key {
@@ -71,7 +70,7 @@ impl SharedCoBuilder {
 						.shared_key(key_reference)
 						.ok_or(anyhow::anyhow!("Shared key not found: {}", key_reference))?;
 					let mut result_storage =
-						EncryptedBlockStorage::new(storage, Secret::new(key.clone()), Default::default());
+						EncryptedBlockStorage::new(storage, Secret::new(key.divulge().to_vec()), Default::default());
 					if let Some(mapping) = &self.membership.encryption_mapping {
 						result_storage.load_mapping(mapping).await?;
 					}
@@ -109,14 +108,17 @@ impl SharedCoBuilder {
 			.await?;
 
 		// publish changes
-		let mapping = if let Some(network) = self.network {
+		if let Some(network) = self.network {
 			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
-			let publish = Publish::new(network, self.membership.id.clone(), mapping.clone(), true);
+			let publish = Publish::new(network, self.membership.id.clone(), mapping, true);
 			reducer.add_change_handler(Box::new(publish));
-			mapping.map(CoBlockStorageContentMapping::new)
-		} else {
-			None
-		};
+		}
+
+		// mapping
+		let mapping = encrypted_storage
+			.as_ref()
+			.map(|e| e.content_mapping())
+			.map(CoBlockStorageContentMapping::new);
 
 		// setup auto write to parent co
 		let writer = MembershipWriter {
@@ -165,12 +167,10 @@ impl SharedCoCreator {
 	}
 
 	/// TODO: Cleanup when something fails?
-	pub async fn create<I: PrivateIdentity + Send + Sync + 'static>(
-		self,
-		storage: CoStorage,
-		runtime: Runtime,
-		identity: I,
-	) -> Result<CoId, anyhow::Error> {
+	pub async fn create<I>(self, storage: CoStorage, runtime: Runtime, identity: I) -> Result<CoId, anyhow::Error>
+	where
+		I: PrivateIdentity + Debug + Send + Sync + 'static,
+	{
 		// storage
 		let (storage, encrypted_storage): (CoStorage, Option<(EncryptedBlockStorage<CoStorage>, Secret)>) =
 			match self.co.algorithm {
@@ -214,7 +214,7 @@ impl SharedCoCreator {
 				uri: key_uri.clone(),
 				name: format!("co ({})", self.co.name),
 				description: "".to_owned(),
-				secret: co_core_keystore::Secret::SharedKey(secret.divulge().clone()),
+				secret: co_core_keystore::Secret::SharedKey(secret.into()),
 				tags: tags!(),
 			};
 			self.parent
@@ -245,10 +245,7 @@ impl SharedCoCreator {
 	}
 }
 
-struct MembershipWriter<I>
-where
-	I: PrivateIdentity + Send + Sync,
-{
+struct MembershipWriter<I> {
 	/// The membership CO UUID.
 	id: CoId,
 	/// The membership DID.
@@ -261,7 +258,7 @@ where
 #[async_trait]
 impl<I> ReducerChangedHandler<CoStorage, CoCoreResolver> for MembershipWriter<I>
 where
-	I: PrivateIdentity + Send + Sync,
+	I: PrivateIdentity + Debug + Send + Sync,
 {
 	async fn on_state_changed(&mut self, reducer: &Reducer<CoStorage, CoCoreResolver>) -> Result<(), anyhow::Error> {
 		if let Some(state) = reducer.state() {

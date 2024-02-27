@@ -2,7 +2,7 @@ use crate::{
 	cli::Cli,
 	library::{application::application, cat::cat_output},
 };
-use co_sdk::CoId;
+use co_sdk::{BlockStorageContentMapping, CoId, MultiCodec};
 use exitcode::ExitCode;
 use futures::{pin_mut, StreamExt};
 
@@ -12,17 +12,17 @@ pub struct Command {
 	pub co: CoId,
 
 	/// Entries to print.
-	#[arg(short, default_value_t = 10)]
+	#[arg(short, long, default_value_t = 10)]
 	pub count: usize,
 
 	/// Entries to print.
-	#[arg(default_value_t = 0)]
+	#[arg(short, long, default_value_t = 0)]
 	pub skip: usize,
 }
 
 pub async fn command(cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
 	let application = application(cli).await?;
-	let (storage, stream) = application.co_log_entries(&command.co).await?;
+	let (storage, stream, mapping) = application.co_log_entries(&command.co).await?;
 
 	// stream
 	let mut index = 0;
@@ -31,12 +31,22 @@ pub async fn command(cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::E
 	while let Some(entry) = stream.next().await {
 		match entry {
 			Ok(entry) => {
-				// Event
-				println!("head ({index}) {}", entry.cid());
+				// event
+				print!("head ({index}) {}", entry.cid());
+				if let Some(mapping) = &mapping {
+					let encrypted_cid = mapping.to_plain(entry.cid()).await;
+					if let Some(encrypted_cid) = encrypted_cid {
+						print!(" ({}: {})", MultiCodec::from(encrypted_cid.codec()), encrypted_cid);
+					} else {
+						print!(" (no mapping)");
+					}
+				}
+				println!("");
 				println!("{:?}", entry.entry());
 
 				// payload
 				cat_output(storage.clone(), entry.entry().payload, true).await?;
+				println!("");
 			},
 			Err(err) => println!("head ({index}) error: {:?}", err),
 		}

@@ -1,8 +1,8 @@
 use super::shared::{CreateCo, SharedCoBuilder, SharedCoCreator};
 use crate::{
 	drivers::network::heads::ReceivedHeadsNetworkTask, library::find_membership::find_membership, local_keypair_fetch,
-	CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE,
-	CO_CORE_NAME_MEMBERSHIP,
+	types::co_storage::CoBlockStorageContentMapping, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Network,
+	Runtime, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -213,28 +213,33 @@ impl Application {
 		&self,
 		co: impl AsRef<CoId>,
 	) -> Result<
-		(CoStorage, impl Stream<Item = Result<EntryBlock<<CoStorage as BlockStorage>::StoreParams>, anyhow::Error>>),
+		(
+			CoStorage,
+			impl Stream<Item = Result<EntryBlock<<CoStorage as BlockStorage>::StoreParams>, anyhow::Error>>,
+			Option<CoBlockStorageContentMapping>,
+		),
 		anyhow::Error,
 	> {
 		let co = co.as_ref();
 
 		// create
+		let initialized = true;
 		let uninitialized_reducer = if co.as_str() == "local" {
-			self.create_local_co_instance(false).await?
+			self.create_local_co_instance(initialized).await?
 		} else {
 			let local = self.local_co_reducer().await?;
-			self.create_co_instance(local, co, false)
+			self.create_co_instance(local, co, initialized)
 				.await?
 				.ok_or(anyhow!("Co not found: {}", co))?
 		};
-		let (storage, reducer) = uninitialized_reducer.into_inner().ok_or(anyhow!("Invalid reference"))?;
+		let (storage, reducer, mapping) = uninitialized_reducer.into_inner().ok_or(anyhow!("Invalid reference"))?;
 		let log = reducer.into_log();
 
 		// stream
 		let stream = log.into_stream().map_err(|e| e.into());
 
 		// result
-		Ok((storage, stream))
+		Ok((storage, stream, mapping))
 	}
 
 	/// Create a new CO.
@@ -265,7 +270,7 @@ impl Application {
 		match &self.log {
 			Logging::Bunyan(log_path) => {
 				std::fs::create_dir_all(log_path.parent().ok_or(anyhow!("no parent"))?)?;
-				let log_file = std::fs::File::create(log_path)?;
+				let log_file = std::fs::File::options().append(true).create(true).open(log_path)?;
 				// let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), std::io::stdout);
 				let formatting_layer = BunyanFormattingLayer::new(self.identifier.clone().into(), log_file);
 				let subscriber = Registry::default()

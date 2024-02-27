@@ -1326,9 +1326,11 @@ dependencies = [
  "insta",
  "libipld",
  "serde",
+ "serde_bytes",
  "serde_ipld_dagcbor",
  "serde_json",
  "thiserror",
+ "zeroize",
 ]
 
 [[package]]
@@ -1457,7 +1459,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
- "zeroize",
 ]
 
 [[package]]

@@ -6,7 +6,10 @@ use co_sdk::{
 	CO_CORE_NAME_CO,
 };
 use futures::{pin_mut, Stream, StreamExt};
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	fmt::Debug,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum FileError {
@@ -33,7 +36,7 @@ pub enum FileError {
 /// If the core not exists yet create it.
 pub async fn file_core<I>(co_reducer: CoReducer, identity: &I, core: &str) -> Result<co_core_file::File, FileError>
 where
-	I: PrivateIdentity + Send + Sync,
+	I: PrivateIdentity + Debug + Send + Sync,
 {
 	match co_reducer.state(core).await {
 		Err(CoReducerError::CoreNotFound(_)) => {
