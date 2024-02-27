@@ -246,6 +246,7 @@ impl Application {
 	///
 	/// TODO: Identity
 	///  The crator of the co should be added as first participant.
+	#[tracing::instrument(err, skip(self))]
 	pub async fn create_co(&self, create: CreateCo) -> Result<CoReducer, anyhow::Error> {
 		// local
 		let local = self.local_co_reducer().await?;

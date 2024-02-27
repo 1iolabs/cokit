@@ -7,3 +7,4 @@ pub mod keystore_fetch;
 pub mod local_keypair_fetch;
 pub mod memberships;
 pub mod node_stream;
+pub mod to_plain;

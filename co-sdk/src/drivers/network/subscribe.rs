@@ -3,14 +3,14 @@ use super::{
 	CoNetworkTaskSpawner,
 };
 use crate::{
-	library::co_peer_provider::CoPeerProvider, CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerChangedHandler,
+	library::{co_peer_provider::CoPeerProvider, to_plain::to_plain},
+	CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerChangedHandler,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_network::PeerProvider;
 use co_primitives::CoId;
 use co_storage::BlockStorageContentMapping;
-use futures::{StreamExt, TryStreamExt};
 use libipld::Cid;
 use libp2p::PeerId;
 use std::collections::BTreeSet;
@@ -46,20 +46,6 @@ impl<M> Publish<M> {
 		Self { co, spawner, mapping, force_mapping }
 	}
 
-	async fn to_plain(&self, head: Cid) -> Result<Cid, anyhow::Error>
-	where
-		M: BlockStorageContentMapping + Send + Sync + 'static,
-	{
-		match &self.mapping {
-			Some(mapping) => match mapping.to_plain(&head).await {
-				Some(cid) => Ok(cid),
-				None if self.force_mapping => Err(anyhow!("Failed to map: {:?}", head)),
-				None => Ok(head),
-			},
-			None => Ok(head),
-		}
-	}
-
 	pub async fn request(&self, reducer: &CoReducer) -> Result<(), anyhow::Error>
 	where
 		M: BlockStorageContentMapping + Send + Sync + 'static,
@@ -69,10 +55,9 @@ impl<M> Publish<M> {
 
 		// map plain heads to encrypted heads
 		if self.mapping.is_some() {
-			heads = futures::stream::iter(heads.into_iter())
-				.then(|head| self.to_plain(head))
-				.try_collect()
-				.await?;
+			heads = to_plain(&self.mapping, self.force_mapping, heads)
+				.await
+				.map_err(|err| anyhow!("Failed to map head: {}", err))?;
 		}
 
 		// request
@@ -96,10 +81,9 @@ where
 
 		// map plain heads to encrypted heads
 		if self.mapping.is_some() {
-			heads = futures::stream::iter(heads.into_iter())
-				.then(|head| self.to_plain(head))
-				.try_collect()
-				.await?;
+			heads = to_plain(&self.mapping, self.force_mapping, heads)
+				.await
+				.map_err(|err| anyhow!("Failed to map head: {}", err))?;
 		}
 
 		// publish

@@ -1,6 +1,10 @@
 use super::{identity::create_identity_resolver, reducer::ReducerChangedHandler};
 use crate::{
-	library::{fs_read::fs_read_option, fs_write::fs_write},
+	library::{
+		fs_read::fs_read_option,
+		fs_write::fs_write,
+		to_plain::{to_plain, to_plain_one},
+	},
 	types::{
 		co_storage::CoBlockStorageContentMapping,
 		cores::{CO_CORE_NAME_CO, CO_CORE_NAME_PIN, CO_CORE_PIN},
@@ -8,7 +12,7 @@ use crate::{
 	CoCoreResolver, CoReducer, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, Runtime, CO_CORE_KEYSTORE,
 	CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
@@ -199,12 +203,23 @@ impl LocalCoInstance {
 	{
 		if let Some(state) = reducer.state() {
 			let path = self.application_path.join("local.cbor");
+			let content_mapping = Some(self.encrypted_storage.content_mapping());
 
 			// trace
 			tracing::trace!(app = ?self.identifier, ?path, ?state, ?mapping, "local-co-write");
 
+			// heads
+			let heads = to_plain(&content_mapping, true, reducer.heads().iter().cloned())
+				.await
+				.map_err(|err| anyhow!("Failed to map head: {}", err))?;
+
+			// state
+			let state = to_plain_one(&content_mapping, true, *state)
+				.await
+				.map_err(|err| anyhow!("Failed to map state: {}", err))?;
+
 			// create format
-			let local = ApplicationLocal::new(reducer.heads().clone(), state.clone(), mapping);
+			let local = ApplicationLocal::new(heads, state.clone(), mapping);
 
 			// write
 			local.write(&path).await.map(|_| true)
@@ -346,6 +361,7 @@ fn fetch_secret_keychain(service: &str, user: &str, allow_create: bool) -> Resul
 }
 
 /// Setup the Local CO by adding cores.
+#[tracing::instrument(err, skip(runtime, reducer))]
 async fn setup_local_co<S, R>(
 	runtime: &RuntimePool,
 	identity: &LocalIdentity,
