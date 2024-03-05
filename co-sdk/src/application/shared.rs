@@ -3,8 +3,8 @@ use crate::{
 	drivers::network::{subscribe::Publish, CoNetworkTaskSpawner},
 	library::co_peer_provider::CoPeerProvider,
 	types::co_storage::CoBlockStorageContentMapping,
-	CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerBuilder, ReducerChangedHandler, Runtime, CO_CORE_NAME_CO,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CoCoreResolver, CoReducer, CoStorage, PinAPI, Reducer, ReducerBuilder, ReducerChangedHandler, Runtime,
+	CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use async_trait::async_trait;
 use co_core_co::CoAction;
@@ -15,6 +15,7 @@ use co_log::Log;
 use co_network::NetworkBlockStorage;
 use co_primitives::{tags, CoId};
 use co_storage::{Algorithm, EncryptedBlockStorage, Secret};
+use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -58,7 +59,7 @@ impl SharedCoBuilder {
 
 	pub async fn build<I>(self, storage: CoStorage, runtime: Runtime, identity: I) -> Result<CoReducer, anyhow::Error>
 	where
-		I: PrivateIdentity + Debug + Send + Sync + 'static,
+		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
 	{
 		// storage
 		let (storage, encrypted_storage): (CoStorage, Option<EncryptedBlockStorage<CoStorage>>) =
@@ -123,12 +124,16 @@ impl SharedCoBuilder {
 		// setup auto write to parent co
 		let writer = MembershipWriter {
 			id: self.membership.id.clone(),
-			parent: self.parent,
+			parent: self.parent.clone(),
 			membership_core_name: self.membership_core_name,
-			identity,
+			identity: identity.clone(),
 			encrypted_storage,
 		};
 		reducer.add_change_handler(Box::new(writer));
+
+		// setup auto pinning of new states
+		let pin_writer = PinWriter { identity: identity.clone(), parent: self.parent.clone(), previous_state: None };
+		reducer.add_change_handler(Box::new(pin_writer));
 
 		// result
 		Ok(CoReducer::new(self.membership.id, runtime, reducer, mapping))
@@ -280,6 +285,40 @@ where
 					},
 				)
 				.await?;
+		}
+		Ok(())
+	}
+}
+
+struct PinWriter<I>
+where
+	I: PrivateIdentity + Send + Sync,
+{
+	previous_state: Option<Cid>,
+	parent: CoReducer,
+	identity: I,
+}
+
+#[async_trait]
+impl<I> ReducerChangedHandler<CoStorage, CoCoreResolver> for PinWriter<I>
+where
+	I: PrivateIdentity + Send + Sync + Debug + 'static,
+{
+	async fn on_state_changed(&mut self, reducer: &Reducer<CoStorage, CoCoreResolver>) -> Result<(), anyhow::Error> {
+		// there is no need to check for pinning loops as pinning any core should only ever be used in a local CO and
+		// not a shared CO
+		// we only care when there actually is state to pin
+		if let Some(state) = reducer.state() {
+			// get pin api
+			let api = PinAPI::api(&self.parent, &self.identity);
+			// pin new state
+			api.pin_cid(*state, tags!()).await?;
+			// unpin previous state if any
+			if let Some(previous_state) = self.previous_state {
+				api.unpin_cid(previous_state, tags!()).await?;
+			}
+			// update previous state
+			self.previous_state = Some(*state);
 		}
 		Ok(())
 	}

@@ -3,6 +3,7 @@ mod drivers;
 // mod epics;
 mod errors;
 mod library;
+mod pin;
 mod types;
 
 pub use application::{
@@ -29,6 +30,7 @@ pub use library::{
 	memberships::memberships,
 	node_stream::NodeStream,
 };
+pub use pin::pin::{is_pinned, PinAPI};
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},
 	co_reducer_factory::CoReducerFactory,

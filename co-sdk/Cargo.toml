@@ -9,6 +9,7 @@ edition = "2021"
 anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
+co-api = { path = "../co-api" }
 co-core-co = { path = "../cores/co" }
 co-core-file = { path = "../cores/file" }
 co-core-keystore = { path = "../cores/keystore" }

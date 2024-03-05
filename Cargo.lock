@@ -1371,6 +1371,7 @@ dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
+ "co-api",
  "co-core-co",
  "co-core-file",
  "co-core-keystore",
