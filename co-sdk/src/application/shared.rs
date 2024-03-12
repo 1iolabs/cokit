@@ -7,6 +7,7 @@ use crate::{
 	CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use async_trait::async_trait;
+use co_api::Tags;
 use co_core_co::CoAction;
 use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
@@ -132,7 +133,7 @@ impl SharedCoBuilder {
 		reducer.add_change_handler(Box::new(writer));
 
 		// setup auto pinning of new states
-		let pin_writer = PinWriter { identity: identity.clone(), parent: self.parent.clone(), previous_state: None };
+		let pin_writer = PinWriter::new(identity, self.parent);
 		reducer.add_change_handler(Box::new(pin_writer));
 
 		// result
@@ -294,9 +295,18 @@ struct PinWriter<I>
 where
 	I: PrivateIdentity + Send + Sync,
 {
-	previous_state: Option<Cid>,
+	previous_pin: Option<(Cid, Tags)>,
 	parent: CoReducer,
 	identity: I,
+}
+
+impl<I> PinWriter<I>
+where
+	I: PrivateIdentity + Send + Sync,
+{
+	pub fn new(identity: I, parent: CoReducer) -> Self {
+		Self { identity, parent, previous_pin: None }
+	}
 }
 
 #[async_trait]
@@ -311,14 +321,16 @@ where
 		if let Some(state) = reducer.state() {
 			// get pin api
 			let api = PinAPI::api(&self.parent, &self.identity);
+			// TODO use reasonable tags
+			let tags = tags!();
 			// pin new state
-			api.pin_cid(*state, tags!()).await?;
+			api.pin_cid(*state, tags.clone()).await?;
 			// unpin previous state if any
-			if let Some(previous_state) = self.previous_state {
-				api.unpin_cid(previous_state, tags!()).await?;
+			if let Some(previous_pin) = &self.previous_pin {
+				api.unpin_cid(previous_pin.0.clone(), previous_pin.1.clone()).await?;
 			}
-			// update previous state
-			self.previous_state = Some(*state);
+			// update previous state and the pins that got used
+			self.previous_pin = Some((*state, tags.clone()));
 		}
 		Ok(())
 	}
