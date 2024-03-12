@@ -11,7 +11,9 @@ co-core-co = { path = "../cores/co" }
 co-core-file = { path = "../cores/file" }
 co-core-keystore = { path = "../cores/keystore" }
 co-core-membership = { path = "../cores/membership" }
+co-core-room = { path = "../cores/room" }
 co-primitives = { path = "../co-primitives" }
+co-messaging = { path = "../co-messaging" }
 co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
 exitcode = "1.1.2"
 futures = { workspace = true }

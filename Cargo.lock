@@ -1072,6 +1072,8 @@ dependencies = [
  "co-core-file",
  "co-core-keystore",
  "co-core-membership",
+ "co-core-room",
+ "co-messaging",
  "co-primitives",
  "co-sdk",
  "exitcode",
