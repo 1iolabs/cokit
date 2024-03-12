@@ -24,7 +24,7 @@ pub trait EventType {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MatrixEvent {
 	pub event_id: String,
-	pub timestamp: i64,
+	pub timestamp: u128,
 	pub room_id: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub state_key: Option<String>,
@@ -35,7 +35,7 @@ pub struct MatrixEvent {
 impl MatrixEvent {
 	pub fn new(
 		event_id: impl Into<String>,
-		timestamp: i64,
+		timestamp: u128,
 		room_id: impl Into<String>,
 		content: impl Into<EventContent>,
 	) -> Self {
@@ -48,7 +48,7 @@ impl MatrixEvent {
 		// todo filter for event types that can have a state key
 		self.state_key = Some(state_key);
 	}
-	pub fn set_timestamp(&mut self, ts: i64) {
+	pub fn set_timestamp(&mut self, ts: u128) {
 		self.timestamp = ts;
 	}
 }
