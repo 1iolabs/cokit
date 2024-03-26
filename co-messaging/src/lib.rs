@@ -28,7 +28,9 @@ pub struct MatrixEvent {
 	pub room_id: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub state_key: Option<String>,
-	#[serde(flatten)]
+	// NOTE: this causes serde to write unbounded maps which are indefinite length maps which are not supported in
+	// DAG-CBOR. Look for a way to reconstruct matrix format without using this flatten
+	// #[serde(flatten)]
 	pub content: EventContent,
 }
 
