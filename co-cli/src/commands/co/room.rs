@@ -31,7 +31,7 @@ pub async fn command(cli: &Cli, room_command: &Command) -> Result<ExitCode, anyh
 	match &room_command.command {
 		Commands::Create(command) => create::command(cli, room_command, command).await,
 		Commands::Send(command) => send::command(cli, room_command, command).await,
-		Commands::Get(command) => get::command(cli, command).await,
+		Commands::Get(command) => get::command(cli, room_command, command).await,
 		Commands::Edit(command) => edit::command(cli, room_command, command).await,
 	}
 }
