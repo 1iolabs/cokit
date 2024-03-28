@@ -1,4 +1,4 @@
-use crate::cli::{Cli, APP_IDENTIFIER};
+use crate::cli::Cli;
 use co_sdk::{Application, ApplicationBuilder};
 use std::path::PathBuf;
 
@@ -6,8 +6,8 @@ use std::path::PathBuf;
 pub async fn application(cli: &Cli) -> Result<Application, anyhow::Error> {
 	// application
 	let mut application_builder = match &cli.base_path {
-		None => ApplicationBuilder::new(APP_IDENTIFIER.to_owned()),
-		Some(path) => ApplicationBuilder::new_with_path(APP_IDENTIFIER.to_owned(), path.clone()),
+		None => ApplicationBuilder::new(cli.instance_id.to_owned()),
+		Some(path) => ApplicationBuilder::new_with_path(cli.instance_id.to_owned(), path.clone()),
 	};
 	if cli.no_keychain {
 		application_builder = application_builder.without_keychain();

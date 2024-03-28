@@ -12,8 +12,6 @@ mod library;
 mod service;
 mod types;
 
-const APP_IDENTIFIER: &str = "co-http";
-
 #[tokio::main]
 async fn main() {
 	// cli
@@ -21,8 +19,8 @@ async fn main() {
 
 	// application
 	let mut application_builder = match cli.base_path {
-		None => ApplicationBuilder::new(APP_IDENTIFIER.to_owned()),
-		Some(path) => ApplicationBuilder::new_with_path(APP_IDENTIFIER.to_owned(), path),
+		None => ApplicationBuilder::new(cli.instance_id.to_owned()),
+		Some(path) => ApplicationBuilder::new_with_path(cli.instance_id.to_owned(), path),
 	};
 	if cli.no_log == false {
 		application_builder = application_builder.with_bunyan_logging(cli.log_path);
