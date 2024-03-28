@@ -1,5 +1,4 @@
 use clap::Parser;
-use cli::APP_IDENTIFIER;
 use library::application::log_path;
 use tracing::Level;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
@@ -40,7 +39,7 @@ async fn app_main() -> anyhow::Result<exitcode::ExitCode> {
 		tokio::fs::create_dir_all(log_path.parent().ok_or(anyhow::anyhow!("no parent"))?).await?;
 		let log_file = std::fs::File::create(log_path)?;
 		let formatting_layer =
-			BunyanFormattingLayer::new(APP_IDENTIFIER.to_owned(), log_file.with_max_level(Level::TRACE));
+			BunyanFormattingLayer::new(cli.instance_id.to_owned(), log_file.with_max_level(Level::TRACE));
 		Some(formatting_layer)
 	} else {
 		None

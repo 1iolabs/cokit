@@ -1,11 +1,17 @@
 use std::path::PathBuf;
 
+const APP_IDENTIFIER: &str = "co-http";
+
 /// Run COs via an HTTP Daemon.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct Cli {
 	/// Command.
 	#[command(subcommand)]
 	pub command: CliCommand,
+
+	/// The instance ID of the daemon. Must be uniqure for every instance that runs in parallel.
+	#[arg(long, default_value_t = String::from(APP_IDENTIFIER))]
+	pub instance_id: String,
 
 	/// Extra multi-address(es) to dail.
 	#[arg(short, long)]
