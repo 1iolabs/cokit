@@ -32,6 +32,7 @@ libipld = { workspace = true, features = ["default", "serde-codec"] }
 libp2p = { workspace = true, features = ["rendezvous", "tokio"] }
 multibase = "0.9.1"
 names = "0.14.0"
+notify = "6.1.1"
 pin-project = { workspace = true }
 rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

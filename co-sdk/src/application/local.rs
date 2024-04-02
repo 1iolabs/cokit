@@ -3,6 +3,7 @@ use crate::{
 	library::{
 		fs_read::fs_read_option,
 		fs_write::fs_write,
+		locals::{ApplicationLocal, Locals},
 		to_plain::{to_plain, to_plain_one},
 	},
 	types::{
@@ -12,21 +13,15 @@ use crate::{
 	CoCoreResolver, CoReducer, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, Runtime, CO_CORE_KEYSTORE,
 	CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use async_trait::async_trait;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
 use co_primitives::{tags, Did, Secret};
 use co_runtime::RuntimePool;
 use co_storage::{Algorithm, BlockStorage, EncryptedBlockStorage};
-use futures::{pin_mut, Stream, StreamExt};
 use libipld::{Cid, DefaultParams};
-use serde::{Deserialize, Serialize};
-use std::{
-	collections::{BTreeMap, BTreeSet},
-	io::ErrorKind,
-	path::PathBuf,
-};
+use std::{collections::BTreeMap, io::ErrorKind, path::PathBuf};
 
 pub const LOCAL_CO_ID: &str = "local";
 
@@ -72,41 +67,6 @@ impl LocalCoBuilder {
 		Ok(LocalCoInstance::create(runtime, self, storage).await?.1)
 	}
 
-	/// Read the local co state from disk.
-	fn read(&self) -> impl Stream<Item = Result<(PathBuf, ApplicationLocal), anyhow::Error>> {
-		let application_path = self.application_path.clone();
-		async_stream::try_stream! {
-			let config_path = application_path
-				.parent()
-				.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", application_path))?;
-
-			// read applications
-			let mut dir = match tokio::fs::read_dir(config_path).await {
-				Err(e) if e.kind() == ErrorKind::NotFound => {
-					// create
-					tokio::fs::create_dir_all(config_path).await?;
-
-					// retry
-					tokio::fs::read_dir(config_path).await
-				},
-				i => i,
-			}?;
-			while let Some(child) = dir.next_entry().await? {
-				// skip non directories
-				if !child.file_type().await?.is_dir() {
-					continue;
-				}
-
-				// try to read local.cbor
-				let local_path = child.path().join("local.cbor");
-				let local = ApplicationLocal::read(&local_path).await?;
-				if let Some(local) = local {
-					yield (local_path, local);
-				}
-			}
-		}
-	}
-
 	/// Key path if no keychain should be used.
 	fn key_path(&self) -> Option<PathBuf> {
 		// use file
@@ -150,20 +110,14 @@ impl LocalCoInstance {
 		let mut builder = ReducerBuilder::new(CoCoreResolver::default(), log).with_initialize(local_co.initialize);
 
 		// create reducer
-		let locals = local_co.read();
-		pin_mut!(locals);
-		while let Some(local_result) = locals.next().await {
+		let config_path = local_co
+			.application_path
+			.parent()
+			.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", local_co.application_path))?;
+		let locals = Locals::new(config_path.to_owned()).await?;
+		for (local_path, local) in locals.iter() {
 			// get local and log
-			let local = match local_result {
-				Ok((local_path, local)) => {
-					tracing::trace!(app = ?local_co.identifier, path = ?local_path, state = ?local.state, heads = ?local.heads, "local-co-read");
-					local
-				},
-				Err(e) => {
-					tracing::warn!(app = ?local_co.identifier, err = ?e, "local-co-read-failure");
-					continue;
-				},
-			};
+			tracing::trace!(app = ?local_co.identifier, path = ?local_path, state = ?local.state, heads = ?local.heads, "local-co-read");
 
 			// load additional encryption mappings
 			if let Some(mapping) = &local.mapping {
@@ -171,7 +125,7 @@ impl LocalCoInstance {
 			}
 
 			// apply to builder as snapshot
-			builder = builder.with_snapshot(local.state, local.heads);
+			builder = builder.with_snapshot(local.state, local.heads.clone());
 		}
 		let mut reducer = builder.build(runtime.runtime()).await?;
 
@@ -179,8 +133,11 @@ impl LocalCoInstance {
 		let mapping = CoBlockStorageContentMapping::new(encrypted_storage.content_mapping());
 
 		// result
-		let result =
-			Self { encrypted_storage, identifier: local_co.identifier, application_path: local_co.application_path };
+		let result = Self {
+			encrypted_storage: encrypted_storage.clone(),
+			identifier: local_co.identifier,
+			application_path: local_co.application_path,
+		};
 
 		// write
 		reducer.add_change_handler(Box::new(result.clone()));
@@ -190,8 +147,37 @@ impl LocalCoInstance {
 			setup_local_co(runtime.runtime(), &local_co.identity, &mut reducer).await?;
 		}
 
+		// reducer
+		let co_reducer = CoReducer::new(LOCAL_CO_ID.into(), runtime, reducer, Some(mapping));
+
+		// watch
+		// TODO: when to shut this down?
+		let watch_reducer = co_reducer.clone();
+		let mut watch_encrypted_storage = encrypted_storage.clone();
+		tokio::task::spawn(async move {
+			let mut watcher = locals.watch();
+			while let Some((_, local)) = watcher.recv().await {
+				// mappings
+				if let Some(mapping) = local.mapping {
+					match watch_encrypted_storage.load_mapping(&mapping).await {
+						Ok(_) => {},
+						Err(err) => tracing::warn!(?err, "local-watch-mapping-failed"),
+					}
+				}
+
+				// heads
+				match watch_reducer.join(local.heads).await {
+					Ok(change) =>
+						if change {
+							tracing::trace!("local-watch-join");
+						},
+					Err(err) => tracing::warn!(?err, "local-watch-join-failed"),
+				}
+			}
+		});
+
 		// result
-		Ok((result, CoReducer::new(LOCAL_CO_ID.into(), runtime, reducer, Some(mapping))))
+		Ok((result, co_reducer))
 	}
 
 	/// Write state to disk.
@@ -237,66 +223,6 @@ where
 	async fn on_state_changed(&mut self, reducer: &Reducer<S, R>) -> Result<(), anyhow::Error> {
 		let mapping = self.encrypted_storage.flush_mapping().await?;
 		self.write(reducer, mapping).await?;
-		Ok(())
-	}
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ApplicationLocal {
-	/// The application local version.
-	#[serde(rename = "v")]
-	pub version: u8,
-
-	/// The latest heads.
-	/// Todo: Do we need this as this is encoded in the state anyway?
-	#[serde(rename = "h")]
-	pub heads: BTreeSet<Cid>,
-
-	/// The latest state.
-	#[serde(rename = "s")]
-	pub state: Cid,
-
-	/// The latest encryption mapping.
-	#[serde(rename = "m")]
-	pub mapping: Option<Cid>,
-}
-impl ApplicationLocal {
-	pub fn version() -> u8 {
-		1
-	}
-
-	pub fn new(heads: BTreeSet<Cid>, state: Cid, mapping: Option<Cid>) -> Self {
-		Self { heads, state, version: Self::version(), mapping }
-	}
-
-	async fn read(path: &PathBuf) -> anyhow::Result<Option<ApplicationLocal>> {
-		Ok(
-			match fs_read_option(path)
-				.await
-				.with_context(|| format!("Reading file: {:?}", path))?
-			{
-				Some(data) => {
-					let result: ApplicationLocal = serde_ipld_dagcbor::from_slice(&data)?;
-					if result.version != Self::version() {
-						return Err(anyhow::anyhow!("Invalid file version"));
-					}
-					Some(result)
-				},
-				None => None,
-			},
-		)
-	}
-
-	async fn write(&self, path: &PathBuf) -> anyhow::Result<()> {
-		// serialize
-		let data = serde_ipld_dagcbor::to_vec(self)?;
-
-		// write
-		fs_write(path, data, true)
-			.await
-			.with_context(|| format!("Writing file: {:?}", path))?;
-
-		// result
 		Ok(())
 	}
 }

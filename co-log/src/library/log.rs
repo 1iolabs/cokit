@@ -132,6 +132,10 @@ where
 		Ok((self.push(identity, cid.clone()).await?.into(), cid.into()))
 	}
 
+	/// Join other log heads.
+	///
+	/// Returns true if the other heads are joined or if this call caused to load entries from storage.
+	/// We can not compute if there has been changes without loading the whole log.
 	pub async fn join_entry(&mut self, entry: EntryBlock<S::StoreParams>) -> Result<bool, LogError> {
 		let mut join = JoinEntry::new(self.heads.clone());
 		if join.join_entry(&self, entry).await? {
@@ -141,10 +145,18 @@ where
 		Ok(false)
 	}
 
+	/// Join other log heads.
+	///
+	/// Returns true if the other heads are joined or if this call caused to load entries from storage.
+	/// We can not compute if there has been changes without loading the whole log.
 	pub async fn join(&mut self, other: &Log<S>) -> Result<bool, LogError> {
 		self.join_heads(other.heads.iter()).await
 	}
 
+	/// Join other log heads.
+	///
+	/// Returns true if the other heads are joined or if this call caused to load entries from storage.
+	/// We can not compute if there has been changes without loading the whole log.
 	pub async fn join_heads<'a>(
 		&'a mut self,
 		other_heads: impl Iterator<Item = &'a Cid> + 'a,
