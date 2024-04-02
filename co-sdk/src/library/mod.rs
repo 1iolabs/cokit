@@ -5,6 +5,7 @@ pub mod fs_write;
 pub mod generate_random_name;
 pub mod keystore_fetch;
 pub mod local_keypair_fetch;
+pub mod locals;
 pub mod memberships;
 pub mod node_stream;
 pub mod to_plain;

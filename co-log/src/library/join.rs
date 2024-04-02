@@ -25,6 +25,11 @@ where
 		Self { _storage_type: Default::default(), entries_to_add: Default::default(), heads }
 	}
 
+	/// Join entry.
+	///
+	/// Returns true if the other heads are joined or if this call caused to load entries from storage.
+	/// We can not compute if there has been changes without loading the whole log.
+	///
 	/// TODO: validate entry signatures?
 	pub async fn join_entry(&mut self, log: &'a Log<S>, entry: EntryBlock<S::StoreParams>) -> Result<bool, LogError> {
 		// contains?

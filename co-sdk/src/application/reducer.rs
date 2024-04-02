@@ -258,15 +258,20 @@ where
 	/// Returns true if state has changed.
 	pub async fn join(&mut self, heads: &BTreeSet<Cid>, runtime: &RuntimePool) -> Result<bool, LogError> {
 		let mut result = false;
-		if self.log_mut().join_heads(heads.iter()).await? || &self.heads != self.log.heads() {
-			// sync state
-			let (next_state, next_heads) = self.compute_state(runtime).await?;
-			result = next_state != self.state;
-			self.state = next_state;
-			self.heads = next_heads;
+		if self.log().heads() != heads {
+			if self.log_mut().join_heads(heads.iter()).await? || &self.heads != self.log.heads() {
+				// sync state
+				let (next_state, next_heads) = self.compute_state(runtime).await?;
+				result = next_state != self.state;
+				if next_state != self.state || self.heads != next_heads {
+					// apply
+					self.state = next_state;
+					self.heads = next_heads;
 
-			// notify
-			self.on_state_changed().await?;
+					// notify
+					self.on_state_changed().await?;
+				}
+			}
 		}
 		Ok(result)
 	}
@@ -377,7 +382,8 @@ pub trait ReducerChangedHandler<S, R> {
 #[cfg(test)]
 mod tests {
 	use super::Reducer;
-	use crate::{application::reducer::ReducerBuilder, CoreResolver, SingleCoreResolver};
+	use crate::{application::reducer::ReducerBuilder, CoreResolver, ReducerChangedHandler, SingleCoreResolver};
+	use async_trait::async_trait;
 	use co_identity::LocalIdentityResolver;
 	use co_log::Log;
 	use co_primitives::{BlockSerializer, ReducerAction};
@@ -601,5 +607,43 @@ mod tests {
 		BlockSerializer::new()
 			.deserialize(&storage.get(&reducer.state().unwrap()).await.unwrap())
 			.unwrap()
+	}
+
+	#[tokio::test]
+	async fn test_join_equal_heads() {
+		// reducer
+		let storage = MemoryBlockStorage::new();
+		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
+		let log = Log::new(
+			"test".as_bytes().to_vec(),
+			Box::new(LocalIdentityResolver::default()),
+			storage.clone(),
+			Default::default(),
+		);
+		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let native_core_resolver = SingleCoreResolver::new(Core::native::<Counter>());
+		let mut reducer = ReducerBuilder::new(native_core_resolver, log).build(&runtime).await.unwrap();
+
+		// push
+		reducer
+			.push(&runtime, &identity, "test", &CounterAction::Increment(1))
+			.await
+			.unwrap();
+
+		// add change handler
+		struct Fail {}
+		#[async_trait]
+		impl ReducerChangedHandler<MemoryBlockStorage, SingleCoreResolver> for Fail {
+			async fn on_state_changed(
+				&mut self,
+				_reducer: &Reducer<MemoryBlockStorage, SingleCoreResolver>,
+			) -> Result<(), anyhow::Error> {
+				panic!("expected no state change when join same heads");
+			}
+		}
+		reducer.add_change_handler(Box::new(Fail {}));
+
+		// join
+		assert_eq!(false, reducer.join(&reducer.heads().clone(), &runtime).await.unwrap());
 	}
 }
