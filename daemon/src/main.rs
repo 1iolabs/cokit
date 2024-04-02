@@ -1,7 +1,4 @@
-use axum::{
-	routing::{get, post},
-	Extension, Router,
-};
+use axum::{routing::get, Extension, Router};
 use clap::Parser;
 use co_sdk::ApplicationBuilder;
 use std::net::SocketAddr;
@@ -30,9 +27,6 @@ async fn main() {
 	}
 	let mut application = application_builder.build().await.expect("application");
 
-	// local
-	let local_co = application.local_co_reducer().await.expect("local-co");
-
 	// driver: network
 	application.create_network(cli.force_new_peer_id).await.expect("network");
 
@@ -40,9 +34,10 @@ async fn main() {
 	let app = Router::new()
 		.route("/", get(http::get))
 		.route("/cos", get(http::cos::get).post(http::cos::post))
-		.route("/cos/:id", post(http::co::post))
-		.layer(Extension(local_co))
-		.layer(Extension(application.storage()));
+		.route("/cos/:id", get(http::co::get).post(http::co::post))
+		.route("/cos/:id/cores", get(http::co_cores::get))
+		.route("/cos/:id/cores/:core", get(http::co_core::get))
+		.layer(Extension(application));
 
 	// run it
 	let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

@@ -131,6 +131,11 @@ impl Tags {
 			None => self.0.clear(),
 		}
 	}
+
+	/// Iterate over tags.
+	pub fn iter(&self) -> impl Iterator<Item = &Tag> {
+		self.0.iter()
+	}
 }
 impl Debug for Tags {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

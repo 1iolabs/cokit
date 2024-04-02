@@ -294,6 +294,21 @@ impl CoReducerFactory for Application {
 		Application::co_reducer(&self, co).await
 	}
 }
+impl std::fmt::Debug for Application {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Application")
+			.field("identifier", &self.identifier)
+			.field("storage_path", &self.storage_path)
+			.field("application_path", &self.application_path)
+			.field("log", &self.log)
+			// .field("storage", &self.storage)
+			// .field("runtime", &self.runtime)
+			// .field("network", &self.network)
+			// .field("reducers", &self.reducers)
+			// .field("keychain", &self.keychain)
+			.finish()
+	}
+}
 
 pub struct ApplicationBuilder {
 	identifier: String,

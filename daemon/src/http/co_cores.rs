@@ -4,10 +4,10 @@ use co_sdk::{Application, CoId};
 use hyper::StatusCode;
 use serde_json::{to_value, Value};
 
-/// CO State.
+/// CO Core State.
 ///
 /// Method: GET
-/// Route: /cos/:id
+/// Route: /cos/:id/cores
 pub async fn get(
 	Path(co_id): Path<CoId>,
 	application: Extension<Application>,
@@ -17,14 +17,6 @@ pub async fn get(
 		.await?
 		.ok_or(HttpError::NotFound(anyhow::anyhow!("Co not found: {}", co_id)))?;
 	let state = reducer.co().await?;
-	Ok((StatusCode::OK, Json(to_value(state)?)))
-}
-
-/// Push Event.
-///
-/// Method: POST
-/// Route: /cos/:id
-#[axum_macros::debug_handler]
-pub async fn post(Path(_co_id): Path<String>, Json(_payload): Json<Value>) -> HttpResult<(StatusCode, Json<Value>)> {
-	unimplemented!()
+	let cores: Vec<_> = state.cores.iter().collect();
+	Ok((StatusCode::OK, Json(to_value(cores)?)))
 }
