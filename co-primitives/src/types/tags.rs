@@ -1,8 +1,8 @@
-use derive_more::{From, Into};
+use crate::TotalFloat64;
+use derive_more::From;
 use libipld::{Cid, Ipld};
 use serde::{Deserialize, Serialize};
 use std::{
-	cmp::Ordering,
 	collections::{BTreeMap, BTreeSet},
 	fmt::{Debug, Display},
 };
@@ -40,7 +40,7 @@ pub enum TagValue {
 	#[from(types(i8, i16, i32, i64))]
 	Integer(i128),
 	/// Represents a floating point value.
-	Float(TotalFloat),
+	Float(TotalFloat64),
 	/// Represents an UTF-8 string.
 	#[from]
 	String(String),
@@ -105,6 +105,11 @@ impl Tags {
 		self.0.len()
 	}
 
+	/// No tags?
+	pub fn is_empty(&self) -> bool {
+		self.0.is_empty()
+	}
+
 	/// Insert tag.
 	pub fn insert(&mut self, tag: Tag) {
 		self.0.insert(tag);
@@ -120,6 +125,17 @@ impl Tags {
 		self.0.append(&mut tags.0);
 	}
 
+	/// Insert mutiple tags.
+	pub fn extend(&mut self, tags: impl Iterator<Item = Tag>) {
+		self.0.extend(tags);
+	}
+
+	/// Set tag. By removing all tags with the same key before insert.
+	pub fn set(&mut self, tag: Tag) {
+		self.clear_key(&tag.0);
+		self.insert(tag);
+	}
+
 	/// Remove specified tags.
 	/// If no tags are specified all tags will be removed.
 	pub fn clear(&mut self, tags: Option<&Tags>) {
@@ -132,9 +148,23 @@ impl Tags {
 		}
 	}
 
+	/// Remove tags with key.
+	/// If no tags are specified all tags will be removed.
+	pub fn clear_key(&mut self, key: &str) {
+		let remove: BTreeSet<Tag> = self.0.iter().filter(|tag| tag.0 == key).cloned().collect();
+		for i in remove {
+			self.0.remove(&i);
+		}
+	}
+
 	/// Iterate over tags.
 	pub fn iter(&self) -> impl Iterator<Item = &Tag> {
 		self.0.iter()
+	}
+
+	/// Iterate over tags.
+	pub fn into_iter(self) -> impl Iterator<Item = Tag> {
+		self.0.into_iter()
 	}
 }
 impl Debug for Tags {
@@ -167,26 +197,6 @@ impl Display for Tags {
 /// Todo: implement
 #[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
 pub struct TagsPattern {}
-
-/// f64 float wich uses total order from IEEE 754 (2008 revision).
-#[derive(Debug, Clone, Copy, From, Into)]
-pub struct TotalFloat(f64);
-impl PartialEq for TotalFloat {
-	fn eq(&self, other: &Self) -> bool {
-		self.0.total_cmp(&other.0) == Ordering::Equal
-	}
-}
-impl Eq for TotalFloat {}
-impl PartialOrd for TotalFloat {
-	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-		Some(self.0.total_cmp(&other.0))
-	}
-}
-impl Ord for TotalFloat {
-	fn cmp(&self, other: &Self) -> Ordering {
-		self.0.total_cmp(&other.0)
-	}
-}
 
 #[cfg(test)]
 mod tests {

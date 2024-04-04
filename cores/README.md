@@ -29,6 +29,5 @@ cargo test --package co-sdk --lib -- types::cores::tests --nocapture
 
 ## Add new COre
 
-- Add to: `../co-cli/src/commands/core_build_builtin.rs`
 - Add to `get_native` in: `../co-sdk/src/types/cores.rs`
 - Build cores

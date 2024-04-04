@@ -11,6 +11,7 @@ async-stream = { workspace = true }
 async-trait = { workspace = true }
 co-api = { path = "../co-api" }
 co-core-co = { path = "../cores/co" }
+co-core-data-series = { path = "../cores/data-series" }
 co-core-file = { path = "../cores/file" }
 co-core-keystore = { path = "../cores/keystore" }
 co-core-membership = { path = "../cores/membership" }

@@ -8,3 +8,4 @@ pub mod metadata;
 pub mod path;
 pub mod secret;
 pub mod tags;
+pub mod total_float;

@@ -39,6 +39,16 @@ pub trait DagCollection: Sized {
 		Ok(())
 	}
 
+	fn update_owned<F: FnOnce(&mut dyn Context, Self::Collection) -> Self::Collection>(
+		&mut self,
+		context: &mut dyn Context,
+		f: F,
+	) {
+		let mut collection = self.get(context.storage());
+		collection = f(context, collection);
+		self.set(context.storage_mut(), collection);
+	}
+
 	fn iter(&self, storage: &dyn Storage) -> impl Iterator<Item = Self::Item> {
 		node_reader::<Self::Item>(storage, self.link().map(|link| link.cid().clone()))
 			.map(|item| item.expect("Valid serialized data"))
@@ -73,7 +83,7 @@ pub trait DagCollection: Sized {
 }
 
 /// A wrapper type for DagLink types that use vectors
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DagVec<V>(Option<Link<Vec<V>>>);
 impl<V> DagVec<V>
 where
@@ -172,7 +182,7 @@ where
 }
 
 /// A wrapper for DagLink types that use the BTreeMap type
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DagMap<K, V>(Option<Link<BTreeMap<K, V>>>)
 where
 	K: Ord + Clone + Serialize,

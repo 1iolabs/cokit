@@ -19,4 +19,5 @@ pub use types::{
 	},
 	secret::Secret,
 	tags::{Tag, Tags, TagsPattern},
+	total_float::TotalFloat64,
 };
