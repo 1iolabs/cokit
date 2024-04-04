@@ -1112,6 +1112,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-core-data-series"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "co-api",
+ "co-runtime",
+ "co-storage",
+ "libipld",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "serde_repr",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "co-core-file"
 version = "0.1.0"
 dependencies = [
@@ -1372,6 +1390,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "co-core-co",
+ "co-core-data-series",
  "co-core-file",
  "co-core-keystore",
  "co-core-membership",
