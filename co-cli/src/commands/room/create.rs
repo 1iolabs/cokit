@@ -30,8 +30,8 @@ pub struct Command {
 pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -> Result<ExitCode, anyhow::Error> {
 	let application = application(cli).await?;
 	let identity = application.local_identity();
-	let co = &room_command.co_id;
-	let core = &room_command.room_id;
+	let co = &room_command.co;
+	let core = &room_command.core;
 	let co_reducer = application.co_reducer(co).await?.ok_or(anyhow!("Co not found: {}", co))?;
 	match co_reducer.state::<co_core_room::Room>(core).await {
 		Err(CoReducerError::CoreNotFound(_)) => {

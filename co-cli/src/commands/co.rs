@@ -3,7 +3,6 @@ mod create;
 mod log;
 mod ls;
 mod remove;
-mod room;
 
 use crate::cli::Cli;
 use exitcode::ExitCode;
@@ -31,9 +30,6 @@ pub enum Commands {
 
 	/// Print CO Log.
 	Log(log::Command),
-
-	/// Utils for messaging in a room
-	Room(room::Command),
 }
 
 pub async fn command(cli: &Cli, co_command: &Command) -> Result<ExitCode, anyhow::Error> {
@@ -43,6 +39,5 @@ pub async fn command(cli: &Cli, co_command: &Command) -> Result<ExitCode, anyhow
 		Commands::Create(command) => create::command(cli, command).await,
 		Commands::Remove(command) => remove::command(cli, command).await,
 		Commands::Log(command) => log::command(cli, command).await,
-		Commands::Room(command) => room::command(cli, command).await,
 	}
 }

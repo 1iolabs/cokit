@@ -1,19 +1,20 @@
-use crate::cli::Cli;
-use co_sdk::CoId;
-use exitcode::ExitCode;
-
 mod create;
 mod edit;
 mod get;
 mod send;
 
+use crate::cli::Cli;
+use co_sdk::CoId;
+use exitcode::ExitCode;
+
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
 	/// ID of the co
-	pub co_id: CoId,
+	pub co: CoId,
 
-	/// ID of the room
-	room_id: String,
+	/// The room core name
+	#[arg(long, default_value_t = String::from("room"))]
+	core: String,
 
 	#[command(subcommand)]
 	pub command: Commands,

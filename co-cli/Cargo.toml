@@ -6,12 +6,14 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 async-stream = { workspace = true }
+chrono = "0.4.37"
 clap = { version = "^4.3.23", features = ["derive"] }
 co-core-co = { path = "../cores/co" }
 co-core-file = { path = "../cores/file" }
 co-core-keystore = { path = "../cores/keystore" }
 co-core-membership = { path = "../cores/membership" }
 co-core-room = { path = "../cores/room" }
+co-log = { path = "../co-log" }
 co-primitives = { path = "../co-primitives" }
 co-messaging = { path = "../co-messaging" }
 co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
@@ -22,6 +24,7 @@ libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
+termion = "3.0.0"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true, features = ["full"] }
