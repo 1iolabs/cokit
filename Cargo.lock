@@ -1277,6 +1277,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-dioxus"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "co-core-co",
+ "co-core-membership",
+ "co-sdk",
+ "dioxus",
+ "futures",
+ "libipld",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "co-identity"
 version = "0.1.0"
 dependencies = [
@@ -2111,6 +2128,72 @@ dependencies = [
 ]
 
 [[package]]
+name = "dioxus"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e50735a28b303b0d67e1b5637fb57e4711bf2776266290cbc987c0adfdabb55"
+dependencies = [
+ "dioxus-core",
+ "dioxus-hooks",
+ "dioxus-signals",
+]
+
+[[package]]
+name = "dioxus-core"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "088daa3f45aaa729e9eef32dc0a9393dd709ee906b092089e5839cad1cad7c85"
+dependencies = [
+ "futures-channel",
+ "futures-util",
+ "generational-box",
+ "longest-increasing-subsequence",
+ "rustc-hash",
+ "slab",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "dioxus-debug-cell"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ea539174bb236e0e7dc9c12b19b88eae3cb574dedbd0252a2d43ea7e6de13e2"
+
+[[package]]
+name = "dioxus-hooks"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "198eba79d71119d10b094ce69c5e2f3186359edb54e6b9a3219c9fed3f1990ed"
+dependencies = [
+ "dioxus-core",
+ "dioxus-debug-cell",
+ "dioxus-signals",
+ "futures-channel",
+ "futures-util",
+ "generational-box",
+ "slab",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
+name = "dioxus-signals"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5fa4ec45a13f3c00d30cbbdf967160b43f9a7c774c53fccdec000f9f07e1aaa"
+dependencies = [
+ "dioxus-core",
+ "futures-channel",
+ "futures-util",
+ "generational-box",
+ "once_cell",
+ "parking_lot",
+ "rustc-hash",
+ "tracing",
+]
+
+[[package]]
 name = "directories"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2729,6 +2812,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
 dependencies = [
  "byteorder",
+]
+
+[[package]]
+name = "generational-box"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f132919c96b85c02a067ceae965fd50ace57111e2f55c7384b95ac191f4d966b"
+dependencies = [
+ "parking_lot",
 ]
 
 [[package]]
@@ -4332,6 +4424,12 @@ checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 dependencies = [
  "value-bag",
 ]
+
+[[package]]
+name = "longest-increasing-subsequence"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3bd0dd2cd90571056fdb71f6275fada10131182f84899f4b2a916e565d81d86"
 
 [[package]]
 name = "lru"

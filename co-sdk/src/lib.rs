@@ -16,7 +16,7 @@ pub use application::{
 };
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 pub use co_identity::{Identity, IdentityResolver, IdentityResolverError, PrivateIdentity};
-pub use co_primitives::{tags, BlockSerializer, CoId, MultiCodec, MultiCodecError, Tag, Tags};
+pub use co_primitives::{tags, BlockSerializer, CoId, Link, MultiCodec, MultiCodecError, OptionLink, Tag, Tags};
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{
 	store_file, unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer, BlockStat, BlockStorage,
