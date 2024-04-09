@@ -1,4 +1,4 @@
-use co_primitives::{Link, Node, NodeContainer};
+use co_primitives::{Node, NodeContainer, OptionLink};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{Future, FutureExt, Stream};
 use libipld::Cid;
@@ -31,8 +31,8 @@ where
 		Self { storage, stack, entries: Default::default(), get: None }
 	}
 
-	pub fn from_link(storage: S, link: Option<Link<T>>) -> Self {
-		Self::new(storage, link.map(|inner| inner.into()))
+	pub fn from_link(storage: S, link: OptionLink<Node<T>>) -> Self {
+		Self::new(storage, *link.cid())
 	}
 
 	pub fn from_node_container<N: NodeContainer<T>>(storage: S, container: &N) -> Self {

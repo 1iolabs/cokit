@@ -11,7 +11,7 @@ pub use types::{
 	codec::{MultiCodec, MultiCodecError},
 	date::Date,
 	did::Did,
-	link::{Link, Linkable},
+	link::{Link, Linkable, OptionLink},
 	metadata::{CoMetadata, Metadata, WithCoMetadata},
 	path::{
 		AbsolutePath, AbsolutePathOwned, Component, Components, Path, PathError, PathExt, PathOwned, RelativePath,

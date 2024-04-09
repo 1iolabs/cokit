@@ -1,5 +1,6 @@
 use crate::Storage;
 use co_primitives::{BlockSerializer, Link, Linkable, MultiCodec};
+use either::Either;
 use std::convert::Infallible;
 
 pub trait StorageExt: Storage {
@@ -8,11 +9,14 @@ pub trait StorageExt: Storage {
 	where
 		T: Clone + serde::de::DeserializeOwned,
 	{
-		Ok(BlockSerializer::new()
-			.deserialize(
-				&self.get(MultiCodec::dag_cbor(link.cid()).map_err(|e| StorageError::InvalidArgument(e.into()))?),
-			)
-			.map_err(|e| StorageError::InvalidArgument(e.into()))?)
+		match link.value() {
+			Either::Left(cid) => Ok(BlockSerializer::new()
+				.deserialize(
+					&self.get(MultiCodec::dag_cbor(&cid).map_err(|e| StorageError::InvalidArgument(e.into()))?),
+				)
+				.map_err(|e| StorageError::InvalidArgument(e.into()))?),
+			Either::Right(value) => Ok(value),
+		}
 	}
 
 	/// Create link for value.
