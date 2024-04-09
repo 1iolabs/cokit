@@ -118,12 +118,12 @@ impl Default for RuntimePool {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ExecuteError {
-	#[error("Storage error")]
-	Storage(#[from] StorageError),
+	#[error("Create runtime failed")]
+	Create(#[from] StorageError),
 
-	#[error("Runtime error")]
+	#[error("Execute runtime failed")]
 	Runtime(#[from] RuntimeError),
 
-	#[error("Error")]
+	#[error("Generic runtime error")]
 	Other(#[from] anyhow::Error),
 }
