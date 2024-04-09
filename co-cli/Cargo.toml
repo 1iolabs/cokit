@@ -13,6 +13,7 @@ co-core-keystore = { path = "../cores/keystore" }
 co-core-membership = { path = "../cores/membership" }
 co-primitives = { path = "../co-primitives" }
 co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
+co-storage = { path = "../co-storage" }
 exitcode = "1.1.2"
 futures = { workspace = true }
 hexdump = "0.1.1"
