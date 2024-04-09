@@ -19,6 +19,7 @@ co-log = { path = "../co-log" }
 co-primitives = { path = "../co-primitives" }
 co-messaging = { path = "../co-messaging" }
 co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
+co-storage = { path = "../co-storage" }
 exitcode = "1.1.2"
 futures = { workspace = true }
 hexdump = "0.1.1"

@@ -1,4 +1,4 @@
-use crate::commands::{cbor, co, core_build_builtin, file, pin, room};
+use crate::commands::{cbor, co, core_build_builtin, file, storage, pin, room};
 use clap::ArgAction;
 use exitcode::ExitCode;
 use std::path::PathBuf;
@@ -64,6 +64,9 @@ pub enum CliCommand {
 	/// File.
 	File(file::Command),
 
+	/// Block Storage.
+	Storage(storage::Command),
+
 	/// Room
 	Room(room::Command),
 
@@ -77,6 +80,7 @@ pub async fn command(cli: &Cli) -> Result<ExitCode, anyhow::Error> {
 		CliCommand::CoreBuildBuiltin => core_build_builtin::command().await,
 		CliCommand::Cbor(command) => cbor::command(command).await,
 		CliCommand::File(command) => file::command(cli, command).await,
+		CliCommand::Storage(command) => storage::command(cli, command).await,
 		CliCommand::Room(command) => room::command(cli, command).await,
 		CliCommand::Pin(command) => pin::command(cli, command).await,
 	}
