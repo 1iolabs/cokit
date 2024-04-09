@@ -1,4 +1,5 @@
 use crate::{types::cores::CO_CORE_NAME_CO, Cores, CO_CORE_CO};
+use anyhow::Context;
 use async_trait::async_trait;
 use co_primitives::ReducerAction;
 use co_runtime::{Core, ExecuteError, RuntimeContext, RuntimePool};
@@ -35,7 +36,7 @@ pub enum CoreResolverError {
 
 	/// The core referenced by the action can not be found.
 	#[error("Execute core failed: {0}")]
-	Execute(String, ExecuteError),
+	Execute(String, #[source] ExecuteError),
 }
 
 #[derive(Debug, Clone)]
@@ -105,7 +106,8 @@ where
 		let reducer_action: ReducerAction<IgnoredAny> = storage
 			.get_deserialized(action)
 			.await
-			.map_err(|e| CoreResolverError::InvalidArgument(e.into()))?;
+			.map_err(|e| CoreResolverError::InvalidArgument(e.into()))
+			.context("resolving action")?;
 
 		// find core
 		let root = reducer_action.core == CO_CORE_NAME_CO;
