@@ -1,5 +1,5 @@
 use crate::{library::node_reader::node_reader, Context, NodeReaderError, Storage};
-use co_primitives::{Link, Linkable, NodeBuilder, NodeContainer};
+use co_primitives::{Node, NodeBuilder, NodeContainer, OptionLink};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
 	cmp::Ord,
@@ -9,10 +9,10 @@ use std::{
 /// Simple trait for creating a DagLink type object
 pub trait DagCollection: Sized {
 	type Item: Clone + Serialize + DeserializeOwned + 'static;
-	type Collection: Clone + IntoIterator<Item = Self::Item> + FromIterator<Self::Item>;
+	type Collection: Default + Clone + IntoIterator<Item = Self::Item> + FromIterator<Self::Item>;
 
-	fn link(&self) -> Option<Link<Self::Collection>>;
-	fn set_link(&mut self, link: Option<Link<Self::Collection>>);
+	fn link(&self) -> OptionLink<Self::Collection>;
+	fn set_link(&mut self, link: OptionLink<Self::Collection>);
 
 	fn set(&mut self, storage: &mut dyn Storage, items: Self::Collection) {
 		self.set_link(Self::to_link(storage, items.into_iter()))
@@ -50,28 +50,24 @@ pub trait DagCollection: Sized {
 	}
 
 	fn iter(&self, storage: &dyn Storage) -> impl Iterator<Item = Self::Item> {
-		node_reader::<Self::Item>(storage, self.link().map(|link| link.cid().clone()))
-			.map(|item| item.expect("Valid serialized data"))
+		node_reader::<Self::Item>(storage, *self.link().cid()).map(|item| item.expect("Valid serialized data"))
 	}
 
 	fn try_iter(&self, storage: &dyn Storage) -> impl Iterator<Item = Result<Self::Item, NodeReaderError>> {
-		node_reader::<Self::Item>(storage, self.link().map(|link| link.cid().clone()))
+		node_reader::<Self::Item>(storage, *self.link().cid())
 	}
 
-	fn to_link(
-		storage: &mut dyn Storage,
-		items: impl IntoIterator<Item = Self::Item>,
-	) -> Option<Link<Self::Collection>> {
+	fn to_link(storage: &mut dyn Storage, items: impl IntoIterator<Item = Self::Item>) -> OptionLink<Self::Collection> {
 		let mut node_builder = NodeBuilder::<Self::Item>::default();
 		for item in items {
 			node_builder.push(item).unwrap();
 		}
 		let blocks = node_builder.into_blocks().unwrap();
-		let mut result = None;
+		let mut result = OptionLink::none();
 		for block in blocks {
 			let cid = storage.set(block);
 			if result.is_none() {
-				result = Some(Link::new(cid));
+				result.set(Some(cid));
 			}
 		}
 		result
@@ -84,7 +80,7 @@ pub trait DagCollection: Sized {
 
 /// A wrapper type for DagLink types that use vectors
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct DagVec<V>(Option<Link<Vec<V>>>);
+pub struct DagVec<V>(OptionLink<Vec<V>>);
 impl<V> DagVec<V>
 where
 	V: Clone + Serialize + DeserializeOwned + 'static,
@@ -100,7 +96,7 @@ impl<V> Clone for DagVec<V> {
 }
 impl<V> Default for DagVec<V> {
 	fn default() -> Self {
-		Self(None)
+		Self(OptionLink::none())
 	}
 }
 impl<V> DagCollection for DagVec<V>
@@ -110,11 +106,11 @@ where
 	type Item = V;
 	type Collection = Vec<Self::Item>;
 
-	fn link(&self) -> Option<Link<Self::Collection>> {
+	fn link(&self) -> OptionLink<Self::Collection> {
 		self.0.clone()
 	}
 
-	fn set_link(&mut self, link: Option<Link<Self::Collection>>) {
+	fn set_link(&mut self, link: OptionLink<Self::Collection>) {
 		self.0 = link;
 	}
 }
@@ -122,14 +118,14 @@ impl<V> NodeContainer<V> for DagVec<V>
 where
 	V: Clone + Serialize + DeserializeOwned + 'static,
 {
-	fn node_container_link(&self) -> Option<Link<V>> {
-		self.0.as_ref().map(|l| (*l.cid()).into())
+	fn node_container_link(&self) -> OptionLink<Node<V>> {
+		OptionLink::new(*self.0.cid())
 	}
 }
 
 /// A wrapper for DagLink types that use the BTreeSet type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct DagSet<V: Ord>(Option<Link<BTreeSet<V>>>);
+pub struct DagSet<V: Ord>(OptionLink<BTreeSet<V>>);
 impl<V> DagSet<V>
 where
 	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
@@ -156,11 +152,11 @@ where
 	type Item = V;
 	type Collection = BTreeSet<Self::Item>;
 
-	fn link(&self) -> Option<Link<Self::Collection>> {
+	fn link(&self) -> OptionLink<Self::Collection> {
 		self.0.clone()
 	}
 
-	fn set_link(&mut self, link: Option<Link<Self::Collection>>) {
+	fn set_link(&mut self, link: OptionLink<Self::Collection>) {
 		self.0 = link;
 	}
 }
@@ -169,21 +165,21 @@ where
 	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
 {
 	fn default() -> Self {
-		Self(None)
+		Self(OptionLink::none())
 	}
 }
 impl<V> NodeContainer<V> for DagSet<V>
 where
 	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
 {
-	fn node_container_link(&self) -> Option<Link<V>> {
-		self.0.as_ref().map(|l| (*l.cid()).into())
+	fn node_container_link(&self) -> OptionLink<Node<V>> {
+		OptionLink::new(*self.0.cid())
 	}
 }
 
 /// A wrapper for DagLink types that use the BTreeMap type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct DagMap<K, V>(Option<Link<BTreeMap<K, V>>>)
+pub struct DagMap<K, V>(OptionLink<BTreeMap<K, V>>)
 where
 	K: Ord + Clone + Serialize,
 	V: Clone + Serialize;
@@ -204,11 +200,11 @@ where
 	type Item = (K, V);
 	type Collection = BTreeMap<K, V>;
 
-	fn link(&self) -> Option<Link<Self::Collection>> {
+	fn link(&self) -> OptionLink<Self::Collection> {
 		self.0.clone()
 	}
 
-	fn set_link(&mut self, link: Option<Link<Self::Collection>>) {
+	fn set_link(&mut self, link: OptionLink<Self::Collection>) {
 		self.0 = link;
 	}
 }
@@ -218,7 +214,7 @@ where
 	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
 {
 	fn default() -> Self {
-		Self(None)
+		Self(Default::default())
 	}
 }
 impl<K, V> NodeContainer<(K, V)> for DagMap<K, V>
@@ -226,8 +222,8 @@ where
 	K: Ord + Clone + Serialize + DeserializeOwned + 'static,
 	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
 {
-	fn node_container_link(&self) -> Option<Link<(K, V)>> {
-		self.0.as_ref().map(|l| (*l.cid()).into())
+	fn node_container_link(&self) -> OptionLink<Node<(K, V)>> {
+		OptionLink::new(*self.0.cid())
 	}
 }
 

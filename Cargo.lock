@@ -1053,6 +1053,7 @@ dependencies = [
  "async-trait",
  "co-primitives",
  "co-storage",
+ "either",
  "futures",
  "libipld",
  "serde",
@@ -1342,6 +1343,7 @@ version = "0.1.0"
 dependencies = [
  "co-macros",
  "derive_more",
+ "either",
  "insta",
  "libipld",
  "serde",
@@ -1460,6 +1462,7 @@ dependencies = [
  "blake3",
  "chacha20poly1305",
  "co-primitives",
+ "either",
  "futures",
  "hexdump",
  "insta",

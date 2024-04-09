@@ -1,4 +1,4 @@
-use crate::{BlockSerializer, Link};
+use crate::{BlockSerializer, Link, OptionLink};
 use libipld::{store::StoreParams, Block, DefaultParams};
 use serde::{Deserialize, Serialize};
 use std::mem::take;
@@ -10,10 +10,15 @@ pub enum Node<T> {
 	#[serde(rename = "l")]
 	Leaf(Vec<T>),
 }
+impl<T> Default for Node<T> {
+	fn default() -> Self {
+		Node::Leaf(vec![])
+	}
+}
 
-/// Trait for containers which stores items of type I.
-pub trait NodeContainer<I> {
-	fn node_container_link(&self) -> Option<Link<I>>;
+/// Trait for containers which stores items of type T.
+pub trait NodeContainer<T> {
+	fn node_container_link(&self) -> OptionLink<Node<T>>;
 }
 
 #[derive(Debug, thiserror::Error)]

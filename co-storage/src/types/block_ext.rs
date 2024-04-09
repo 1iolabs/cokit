@@ -1,6 +1,7 @@
 use crate::{BlockStorage, StorageError};
 use async_trait::async_trait;
 use co_primitives::{BlockSerializer, Link, Linkable, MultiCodec};
+use either::Either;
 use libipld::Cid;
 
 #[async_trait]
@@ -11,9 +12,12 @@ pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {
 		T: Send + Sync + serde::de::DeserializeOwned,
 		L: Linkable<T> + Send + Sync,
 	{
-		Ok(BlockSerializer::new()
-			.deserialize(&self.get(MultiCodec::dag_cbor(link.cid())?).await?)
-			.map_err(|e| StorageError::InvalidArgument(e.into()))?)
+		match link.value() {
+			Either::Left(cid) => Ok(BlockSerializer::new()
+				.deserialize(&self.get(MultiCodec::dag_cbor(&cid)?).await?)
+				.map_err(|e| StorageError::InvalidArgument(e.into()))?),
+			Either::Right(value) => Ok(value),
+		}
 	}
 
 	/// Create link for value.

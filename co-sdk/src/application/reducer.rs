@@ -3,7 +3,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use co_identity::PrivateIdentity;
 use co_log::{EntryBlock, Log, LogError};
-use co_primitives::{Linkable, ReducerAction};
+use co_primitives::ReducerAction;
 use co_runtime::RuntimePool;
 use co_storage::BlockStorage;
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
