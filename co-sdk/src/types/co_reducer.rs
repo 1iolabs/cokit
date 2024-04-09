@@ -1,4 +1,4 @@
-use super::co_storage::CoBlockStorageContentMapping;
+use super::{co_storage::CoBlockStorageContentMapping, state_observable::StateObservable};
 use crate::{CoCoreResolver, CoStorage, Reducer, Runtime, CO_CORE_NAME_CO};
 use co_identity::PrivateIdentity;
 use co_primitives::CoId;
@@ -47,6 +47,11 @@ impl CoReducer {
 		self.storage.clone()
 	}
 
+	/// Get reducer observable.
+	pub async fn observable(&self) -> StateObservable {
+		StateObservable { sub: self.reducer.read().await.observable() }
+	}
+
 	/// Push event into reducer.
 	#[tracing::instrument(err, fields(co = self.id().as_str()), skip(self))]
 	pub async fn push<T, I>(&self, identity: &I, co: &str, item: &T) -> Result<(), anyhow::Error>
@@ -85,17 +90,33 @@ impl CoReducer {
 		&self,
 		core: &str,
 	) -> Result<T, CoReducerError> {
+		self.state_ext(core, None).await.map(|r| r.2)
+	}
+
+	/// Read a COre state and also return CIDs.
+	///
+	/// # Arguments
+	/// - `core` - The core name.
+	/// - `co_state` - The co root state. If not specified the newest avilable will be used.
+	///
+	/// # Returns
+	/// (Co Root Cid, Core Root Cid, Core State)
+	pub async fn state_ext<T: DeserializeOwned + Send + Sync + Default + Clone + 'static>(
+		&self,
+		core: &str,
+		co_state: Option<Cid>,
+	) -> Result<(Option<Cid>, Option<Cid>, T), CoReducerError> {
 		let (storage, state) = {
 			let reducer = self.reducer.read().await;
-			(reducer.log().storage().clone(), reducer.state().clone())
+			(reducer.log().storage().clone(), co_state.or(*reducer.state()))
 		};
 
 		// co?
 		if core == CO_CORE_NAME_CO {
 			if let Some(state_cid) = state {
-				return Ok(storage.get_deserialized(&state_cid).await?)
+				return Ok((state, Some(state_cid), storage.get_deserialized(&state_cid).await?))
 			}
-			return Ok(T::default());
+			return Ok((state, None, T::default()));
 		}
 
 		// other
@@ -106,9 +127,9 @@ impl CoReducer {
 		};
 		if let Some(core) = co_state.cores.get(core) {
 			if let Some(core_state) = &core.state {
-				return Ok(storage.get_deserialized(core_state).await?);
+				return Ok((state, Some(*core_state), storage.get_deserialized(core_state).await?));
 			} else {
-				return Ok(T::default());
+				return Ok((state, None, T::default()));
 			}
 		}
 

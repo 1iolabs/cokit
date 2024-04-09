@@ -23,7 +23,6 @@ co-log = { path = "../co-log" }
 co-network = { path = "../co-network" }
 co-primitives = { path = "../co-primitives" }
 co-runtime = { path = "../co-runtime" }
-co-state = { path = "../state" }
 co-storage = { path = "../co-storage" }
 directories = "5.0.1"
 futures = { workspace = true }

@@ -10,7 +10,7 @@ pub const CO_CORE_MEMBERSHIP: &str = "co-core-membership";
 pub const CO_CORE_PIN: &str = "co-core-pin";
 pub const CO_CORE_ROOM: &str = "co-core-room";
 pub const CO_CORE_ROLE: &str = "co-core-role";
-pub const CO_CORE_DATA_SERIES: &str = "cores/data-series/Cargo.toml";
+pub const CO_CORE_DATA_SERIES: &str = "co-core-data-series";
 
 /// CO Core name expected by the SDK implementation (key to `co.cores`).
 pub const CO_CORE_NAME_CO: &str = "co";
