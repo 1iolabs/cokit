@@ -2,9 +2,10 @@ use super::Command as RoomCommand;
 use crate::{cli::Cli, library::application::application};
 use co_messaging::MatrixEvent;
 use co_primitives::ReducerAction;
-use co_sdk::{BlockStorage, MultiCodec};
+use co_sdk::{BlockStorage, BlockStorageExt, MultiCodec};
 use exitcode::ExitCode;
 use futures::{pin_mut, StreamExt};
+use serde::de::IgnoredAny;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
@@ -33,11 +34,13 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 				let codec = MultiCodec::from(block.cid().codec());
 				match codec {
 					MultiCodec::DagCbor => {
-						let result = serde_ipld_dagcbor::from_reader::<ReducerAction<MatrixEvent>, &[u8]>(block.data());
-						match result {
-							Ok(event) => print_message(event),
-							Err(_) => continue, // Not a message => skip
-						};
+						let action: ReducerAction<IgnoredAny> = storage.get_deserialized(&cid).await?;
+						// skip actions from other cores
+						if action.core != room_command.room_id {
+							continue;
+						}
+						let event: ReducerAction<MatrixEvent> = storage.get_deserialized(&cid).await?;
+						print_message(event);
 					},
 					_ => (),
 				}
