@@ -1,5 +1,5 @@
 use super::{co_storage::CoBlockStorageContentMapping, state_observable::StateObservable};
-use crate::{CoCoreResolver, CoStorage, Reducer, Runtime, CO_CORE_NAME_CO};
+use crate::{state::core_state, CoCoreResolver, CoStorage, Reducer, Runtime};
 use co_identity::PrivateIdentity;
 use co_primitives::CoId;
 use co_storage::{BlockStorageExt, StorageError};
@@ -86,55 +86,18 @@ impl CoReducer {
 	}
 
 	/// Read a COre state.
+	///
+	/// # Arguments
+	/// - `core` - The core name.
 	pub async fn state<T: DeserializeOwned + Send + Sync + Default + Clone + 'static>(
 		&self,
 		core: &str,
 	) -> Result<T, CoReducerError> {
-		self.state_ext(core, None).await.map(|r| r.2)
-	}
-
-	/// Read a COre state and also return CIDs.
-	///
-	/// # Arguments
-	/// - `core` - The core name.
-	/// - `co_state` - The co root state. If not specified the newest avilable will be used.
-	///
-	/// # Returns
-	/// (Co Root Cid, Core Root Cid, Core State)
-	pub async fn state_ext<T: DeserializeOwned + Send + Sync + Default + Clone + 'static>(
-		&self,
-		core: &str,
-		co_state: Option<Cid>,
-	) -> Result<(Option<Cid>, Option<Cid>, T), CoReducerError> {
 		let (storage, state) = {
 			let reducer = self.reducer.read().await;
-			(reducer.log().storage().clone(), co_state.or(*reducer.state()))
+			(reducer.log().storage().clone(), *reducer.state())
 		};
-
-		// co?
-		if core == CO_CORE_NAME_CO {
-			if let Some(state_cid) = state {
-				return Ok((state, Some(state_cid), storage.get_deserialized(&state_cid).await?))
-			}
-			return Ok((state, None, T::default()));
-		}
-
-		// other
-		let co_state: co_core_co::Co = if let Some(state_cid) = state {
-			storage.get_deserialized(&state_cid).await?
-		} else {
-			co_core_co::Co::default()
-		};
-		if let Some(core) = co_state.cores.get(core) {
-			if let Some(core_state) = &core.state {
-				return Ok((state, Some(*core_state), storage.get_deserialized(core_state).await?));
-			} else {
-				return Ok((state, None, T::default()));
-			}
-		}
-
-		// not found
-		return Err(CoReducerError::CoreNotFound(core.to_owned()));
+		Ok(core_state(&storage, state.into(), core).await?.1)
 	}
 
 	/// Try to escape inner data.

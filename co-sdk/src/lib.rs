@@ -3,6 +3,7 @@ mod drivers;
 // mod epics;
 mod errors;
 mod library;
+pub mod state;
 mod types;
 
 pub use application::{
