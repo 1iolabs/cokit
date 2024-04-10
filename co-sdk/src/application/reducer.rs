@@ -15,6 +15,7 @@ use std::{
 	convert::Infallible,
 	time::{SystemTime, UNIX_EPOCH},
 };
+use tokio::sync::watch;
 
 pub struct ReducerBuilder<S, R> {
 	/// Storage.
@@ -79,6 +80,7 @@ where
 			log: self.log,
 			states: Default::default(),
 			change_handlers: Default::default(),
+			watch: watch::channel(None),
 		};
 		if self.initialize {
 			result.initialize(runtime).await?;
@@ -101,8 +103,10 @@ pub struct Reducer<S, R> {
 	snapshots: HashMap<BTreeSet<Cid>, Cid>,
 	/// State observable.
 	states: SubjectThreads<(Cid, BTreeSet<Cid>), Infallible>,
-	// Change handlers.
+	/// Change handlers.
 	change_handlers: Vec<Box<dyn ReducerChangedHandler<S, R> + Send + Sync>>,
+	/// State/Heads watcher.
+	watch: (watch::Sender<Option<(Cid, BTreeSet<Cid>)>>, watch::Receiver<Option<(Cid, BTreeSet<Cid>)>>),
 }
 impl<S, R> Reducer<S, R>
 where
@@ -154,6 +158,11 @@ where
 	/// Get state observable.
 	pub fn observable(&self) -> SubjectThreads<(Cid, BTreeSet<Cid>), Infallible> {
 		self.states.clone()
+	}
+
+	/// Get state observable.
+	pub fn watch(&self) -> watch::Receiver<Option<(Cid, BTreeSet<Cid>)>> {
+		self.watch.1.clone()
 	}
 
 	/// Add change handler which will be called when state changed.
@@ -210,7 +219,7 @@ where
 		&mut self,
 		runtime: &RuntimePool,
 		identity: &I,
-		co: &str,
+		core: &str,
 		item: &T,
 	) -> Result<(), anyhow::Error>
 	where
@@ -219,7 +228,7 @@ where
 	{
 		// apply to log
 		let action = ReducerAction {
-			core: co.to_owned(),
+			core: core.to_owned(),
 			payload: item,
 			from: identity.identity().to_owned(),
 			time: SystemTime::now().duration_since(UNIX_EPOCH).expect("Valid time").as_millis(),
@@ -289,6 +298,14 @@ where
 				.await?;
 		}
 		self.change_handlers.append(&mut change_handlers);
+
+		// watch
+		if let Some(state) = self.state {
+			self.watch
+				.0
+				.send(Some((state, self.heads.clone())))
+				.expect("watcher not dropped before reducer");
+		}
 
 		// states
 		if let Some(state) = self.state {
