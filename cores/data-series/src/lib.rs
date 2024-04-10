@@ -10,7 +10,7 @@ pub struct DataSeries {
 	pub aggregates: DagMap<String, Aggregate>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Series {
 	/// Metadata for this series.
 	#[serde(default, skip_serializing_if = "Tags::is_empty")]
@@ -73,9 +73,10 @@ pub struct AggregateValue {
 	value: TotalFloat64,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AggregateBy {
 	/// Sum.
+	#[default]
 	Sum,
 
 	/// Average.
@@ -103,25 +104,59 @@ pub enum AggregateGroup {
 	TimeYear,
 }
 
+/// Create a series.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CreateSeriesPayload {
+	pub series: String,
+	pub tags: Tags,
+	pub time_to_live: Option<u64>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DataPayload {
+	pub series: String,
+	pub pending_id: Option<String>,
+	pub tags: Option<Tags>,
+	pub time: Option<Date>,
+	pub value: Option<i32>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PendingDataPayload {
+	pub series: String,
+	pub id: String,
+	pub tags: Option<Tags>,
+	pub time: Option<Date>,
+	pub value: Option<i32>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CreateAggregatePayload {
+	pub aggregate: String,
+	pub series: String,
+	pub group: Option<AggregateGroup>,
+	pub by: AggregateBy,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum DataSeriesAction {
 	/// Create a series.
-	CreateSeries { series: String, tags: Tags, time_to_live: Option<u64> },
+	CreateSeries(CreateSeriesPayload),
 
 	/// Remove a series.
 	RemoveSeries { series: String },
 
 	/// Insert Data.
-	Data { series: String, pending_id: Option<String>, tags: Option<Tags>, time: Option<Date>, value: Option<i32> },
+	Data(DataPayload),
 
 	/// Insert Pending Data.
-	PendingData { series: String, id: String, tags: Option<Tags>, time: Option<Date>, value: Option<i32> },
+	PendingData(PendingDataPayload),
 
 	/// Cancel Pending Data.
 	PendingCancel { series: String, id: String },
 
 	/// Create Aggregate.
-	CreateAggregate { aggregate: String, series: String, group: Option<AggregateGroup>, by: AggregateBy },
+	CreateAggregate(CreateAggregatePayload),
 
 	/// Remove Aggregate.
 	RemoveAggregate { aggregate: String, series: String },
@@ -132,15 +167,13 @@ impl Reducer for DataSeries {
 
 	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		match &event.payload {
-			DataSeriesAction::CreateSeries { series, tags, time_to_live } =>
-				reduce_create_series(context, self, series, tags, time_to_live),
+			DataSeriesAction::CreateSeries(payload) => reduce_create_series(context, self, payload),
 			DataSeriesAction::RemoveSeries { series } => reduce_remove_series(context, self, series),
-			DataSeriesAction::Data { series, pending_id, tags, time, value } =>
-				reduce_data(context, &event.from, event.time, self, series, pending_id, tags, time, value),
-			DataSeriesAction::PendingData { series, id, tags, time, value } =>
+			DataSeriesAction::Data(payload) => reduce_data(context, &event.from, event.time, self, payload),
+			DataSeriesAction::PendingData(PendingDataPayload { series, id, tags, time, value }) =>
 				reduce_pending_data(context, &event.from, event.time, self, series, id, tags, time, value),
 			DataSeriesAction::PendingCancel { series, id } => reduce_pending_cancel(context, self, series, id),
-			DataSeriesAction::CreateAggregate { aggregate, series, group, by } =>
+			DataSeriesAction::CreateAggregate(CreateAggregatePayload { aggregate, series, group, by }) =>
 				reduce_create_aggregate(context, self, aggregate, series, *group, *by),
 			DataSeriesAction::RemoveAggregate { aggregate, series } =>
 				reduce_remove_aggregate(context, self, series, aggregate),
@@ -148,22 +181,16 @@ impl Reducer for DataSeries {
 	}
 }
 
-fn reduce_create_series(
-	context: &mut dyn Context,
-	mut state: DataSeries,
-	series: &str,
-	tags: &Tags,
-	time_to_live: &Option<u64>,
-) -> DataSeries {
+fn reduce_create_series(context: &mut dyn Context, mut state: DataSeries, payload: &CreateSeriesPayload) -> DataSeries {
 	state.data.update(context, |_context, data| {
-		if !data.contains_key(series) {
+		if !data.contains_key(&payload.series) {
 			let value = Series {
-				tags: tags.clone(),
+				tags: payload.tags.clone(),
 				data: Default::default(),
 				pending_data: Default::default(),
-				time_to_live: *time_to_live,
+				time_to_live: payload.time_to_live,
 			};
-			data.insert(series.to_owned(), value);
+			data.insert(payload.series.to_owned(), value);
 		}
 	});
 	state
@@ -184,44 +211,40 @@ fn reduce_data(
 	did: &Did,
 	action_time: Date,
 	mut state: DataSeries,
-	series_key: &str,
-	pending_id: &Option<String>,
-	tags: &Option<Tags>,
-	time: &Option<Date>,
-	value: &Option<i32>,
+	payload: &DataPayload,
 ) -> DataSeries {
 	state.data.update(context, |context, data| {
-		if let Some(series) = data.get_mut(series_key) {
+		if let Some(series) = data.get_mut(&payload.series) {
 			// pending?
 			let mut pending = None;
-			if let Some(pending_id) = pending_id {
+			if let Some(pending_id) = &payload.pending_id {
 				series
 					.pending_data
 					.update(context, |_context, pending_data| pending = pending_data.remove(pending_id));
 			}
 
 			// data
-			let data_time = time.unwrap_or(action_time);
+			let data_time = payload.time.unwrap_or(action_time);
 			let data = match pending {
 				Some(mut pending) => {
-					if let Some(tags) = tags {
+					if let Some(tags) = &payload.tags {
 						pending.tags.extend(tags.iter().cloned());
 					}
-					pending.tags.set(("completed".to_owned(), (data_time as i128).into()));
+					pending.tags.set(co_api::tags!("completed": data_time as i128));
 					pending
 				},
 				None => Data {
 					did: did.clone(),
-					time: time.unwrap_or(action_time),
-					tags: tags.clone().unwrap_or_default(),
-					value: value.unwrap_or(1),
+					time: payload.time.unwrap_or(action_time),
+					tags: payload.tags.clone().unwrap_or_default(),
+					value: payload.value.unwrap_or(1),
 				},
 			};
 
 			// aggregate
 			state.aggregates.update(context, |context, aggregates| {
 				for (_, value) in aggregates.iter_mut() {
-					if value.series == series_key {
+					if value.series == payload.series {
 						let group = value.group.clone();
 						let by = value.by.clone();
 						value.values.update_owned(context, |_, mut values| {

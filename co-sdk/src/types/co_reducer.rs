@@ -48,13 +48,19 @@ impl CoReducer {
 	}
 
 	/// Get reducer observable.
+	#[deprecated]
 	pub async fn observable(&self) -> StateObservable {
 		StateObservable { sub: self.reducer.read().await.observable() }
 	}
 
+	/// Get reducer watcher.
+	pub async fn watch(&self) -> tokio::sync::watch::Receiver<Option<(Cid, BTreeSet<Cid>)>> {
+		self.reducer.read().await.watch()
+	}
+
 	/// Push event into reducer.
 	#[tracing::instrument(err, fields(co = self.id().as_str()), skip(self))]
-	pub async fn push<T, I>(&self, identity: &I, co: &str, item: &T) -> Result<(), anyhow::Error>
+	pub async fn push<T, I>(&self, identity: &I, core: &str, item: &T) -> Result<(), anyhow::Error>
 	where
 		T: Serialize + Debug + Send + Sync + Clone + 'static,
 		I: PrivateIdentity + Debug + Send + Sync,
@@ -62,7 +68,7 @@ impl CoReducer {
 		self.reducer
 			.write()
 			.await
-			.push(self.runtime.runtime(), identity, co, item)
+			.push(self.runtime.runtime(), identity, core, item)
 			.await
 	}
 

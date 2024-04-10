@@ -1,10 +1,11 @@
 use crate::{CoContext, CoStateResult};
 use co_sdk::{Application, CoId, CoReducer, CoStorage, OptionLink};
 use dioxus::prelude::*;
-use futures::{pin_mut, Future, StreamExt};
+use futures::Future;
 use libipld::Cid;
 use serde::de::DeserializeOwned;
 
+/// Select state from an CO.
 pub fn use_co_selector<T, F, Fut>(co: &str, selector: F) -> Signal<CoStateResult<T>, SyncStorage>
 where
 	T: DeserializeOwned + Send + Sync + Default + Clone + 'static,
@@ -67,21 +68,28 @@ async fn fetch_and_observe_state<T, F, Fut>(
 				.await;
 
 			// watch
-			let stream = reducer.observable().await.stream();
-			pin_mut!(stream);
+			let mut watch = reducer.watch().await;
+			tracing::info!(co = ?co_id, "watch");
 			loop {
 				tokio::select! {
 					_ = &mut drop_rx => {
+						tracing::info!(co = ?co_id, "watch-dropped");
 						return;
 					},
-					item = stream.next() => {
+					item = watch.changed() => {
 						match item {
-							Some((next_state, _)) => {
-								read.read(&reducer, next_state.into(), state, &selector).await;
+							Ok(_) => {
+								tracing::info!(co = ?co_id, "watch-changed");
+								let next = watch.borrow_and_update().clone();
+								if let Some((next_state, _next_heads)) = next {
+									tracing::info!(co = ?co_id, ?next_state, "watch-apply");
+									read.read(&reducer, next_state.into(), state, &selector).await;
+								}
 							},
-							None => {
+							Err(err) => {
+								tracing::info!(co = ?co_id, "watch-failed");
 								// should not happen?
-								*state.write() = CoStateResult::Error(format!("Co has been closed"));
+								*state.write() = CoStateResult::Error(format!("Co has been closed: {}", err));
 								break;
 							}
 						}

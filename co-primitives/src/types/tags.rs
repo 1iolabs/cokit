@@ -58,6 +58,15 @@ pub enum TagValue {
 	#[from]
 	Link(Cid),
 }
+impl TagValue {
+	/// Access the string value.
+	pub fn string(&self) -> Option<&str> {
+		match self {
+			TagValue::String(s) => Some(&s),
+			_ => None,
+		}
+	}
+}
 impl Into<Ipld> for TagValue {
 	fn into(self) -> Ipld {
 		match self {
@@ -130,10 +139,12 @@ impl Tags {
 		self.0.extend(tags);
 	}
 
-	/// Set tag. By removing all tags with the same key before insert.
-	pub fn set(&mut self, tag: Tag) {
-		self.clear_key(&tag.0);
-		self.insert(tag);
+	/// Set tag(s). By removing all tags with the same key before insert.
+	pub fn set(&mut self, tags: impl Into<Tags>) {
+		for tag in tags.into().into_iter() {
+			self.clear_key(&tag.0);
+			self.insert(tag);
+		}
 	}
 
 	/// Remove specified tags.
@@ -166,6 +177,11 @@ impl Tags {
 	pub fn into_iter(self) -> impl Iterator<Item = Tag> {
 		self.0.into_iter()
 	}
+
+	/// Find first tag by key.
+	pub fn find_key(&self, key: &str) -> Option<&Tag> {
+		self.0.iter().find(|tag| tag.0 == key)
+	}
 }
 impl Debug for Tags {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -189,6 +205,13 @@ impl Display for Tags {
 			}
 		}
 		result
+	}
+}
+impl From<Tag> for Tags {
+	fn from(value: Tag) -> Self {
+		let mut tags = Tags::new();
+		tags.insert(value);
+		tags
 	}
 }
 
