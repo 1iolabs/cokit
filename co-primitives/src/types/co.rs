@@ -1,3 +1,4 @@
+use super::tags::TagValue;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, fmt::Display, ops::Deref};
 
@@ -26,6 +27,11 @@ impl From<&str> for CoId {
 impl Into<String> for CoId {
 	fn into(self) -> String {
 		self.0
+	}
+}
+impl Into<TagValue> for CoId {
+	fn into(self) -> TagValue {
+		self.0.into()
 	}
 }
 impl AsRef<str> for CoId {

@@ -7,7 +7,6 @@ use crate::{
 	CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use async_trait::async_trait;
-use co_api::Tags;
 use co_core_co::CoAction;
 use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
@@ -16,7 +15,6 @@ use co_log::Log;
 use co_network::NetworkBlockStorage;
 use co_primitives::{tags, CoId};
 use co_storage::{Algorithm, EncryptedBlockStorage, Secret};
-use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -133,7 +131,7 @@ impl SharedCoBuilder {
 		reducer.add_change_handler(Box::new(writer));
 
 		// setup auto pinning of new states
-		let pin_writer = PinWriter::new(identity, self.parent);
+		let pin_writer = PinWriter::new(identity, self.parent, self.membership.id.clone());
 		reducer.add_change_handler(Box::new(pin_writer));
 
 		// result
@@ -295,17 +293,17 @@ struct PinWriter<I>
 where
 	I: PrivateIdentity + Send + Sync,
 {
-	previous_pin: Option<(Cid, Tags)>,
 	parent: CoReducer,
 	identity: I,
+	co_id: CoId,
 }
 
 impl<I> PinWriter<I>
 where
 	I: PrivateIdentity + Send + Sync,
 {
-	pub fn new(identity: I, parent: CoReducer) -> Self {
-		Self { identity, parent, previous_pin: None }
+	pub fn new(identity: I, parent: CoReducer, co_id: CoId) -> Self {
+		Self { identity, parent, co_id }
 	}
 }
 
@@ -318,20 +316,14 @@ where
 		// there is no need to check for pinning loops as pinning any core should only ever be used in a local CO and
 		// not a shared CO
 		// we only care when there actually is state to pin
-		println!("HEADS: {:?}", reducer.heads());
 		if let Some(state) = reducer.state() {
 			// get pin api
 			let api = PinAPI::api(&self.parent, &self.identity);
-			// TODO use reasonable tags
-			let tags = tags!("type": "auto");
+			// TODO add some kind of security like salt
+			let tags = tags!("type": "state", "co_id": self.co_id, "source": "self");
 			// pin new state
 			api.pin_cid(*state, tags.clone()).await?;
-			// unpin previous state if any
-			if let Some(previous_pin) = &self.previous_pin {
-				api.unpin_cid(previous_pin.0.clone(), previous_pin.1.clone()).await?;
-			}
-			// update previous state and the pins that got used
-			self.previous_pin = Some((*state, tags.clone()));
+			// TODO unpin any previous state pins of this co
 		}
 		Ok(())
 	}
