@@ -1,0 +1,98 @@
+use crate::NodeStream;
+use co_primitives::NodeContainer;
+use co_storage::{BlockStorage, StorageError};
+use futures::{pin_mut, StreamExt};
+use serde::de::DeserializeOwned;
+
+/// Find first element in an [`NodeContainer`] (DagCollection) that matches an predicate.
+/// When an error is encountered it will be ignored and the search for the element continuts until there are no more
+/// elements, then the first error is returned.
+pub async fn find<T, N, F, S>(storage: &S, container: &N, predicate: F) -> Result<Option<T>, StorageError>
+where
+	S: BlockStorage + Sync + Send + Clone + 'static,
+	T: std::fmt::Debug + DeserializeOwned + Send + Sync + 'static,
+	N: NodeContainer<T>,
+	F: Fn(&T) -> bool,
+{
+	let stream = NodeStream::from_node_container(storage.clone(), container);
+	pin_mut!(stream);
+	let mut result = Ok(None);
+	while let Some(item) = stream.next().await {
+		match item {
+			Ok(value) =>
+				if predicate(&value) {
+					// first value
+					result = Ok(Some(value));
+					break;
+				},
+			Err(err) =>
+				if result.is_ok() {
+					// first error
+					result = Err(err);
+				},
+		}
+	}
+	result
+	// NodeStream::from_node_container(storage.clone(), container)
+	// 	.filter(|result| {
+	// 		println!(
+	// 			"filter {:?} - {:?}",
+	// 			result,
+	// 			match result {
+	// 				Ok(value) => predicate(&value),
+	// 				Err(_) => true,
+	// 			}
+	// 		);
+	// 		ready(match result {
+	// 			Ok(value) => predicate(&value),
+	// 			Err(_) => true,
+	// 		})
+	// 	})
+	// 	.take_while_incl(|result| ready(result.is_ok()))
+	// 	.fold(Ok(None), |acc, item| {
+	// 		println!("fold {:?} - {:?}", acc, item);
+	// 		ready(match (&acc, item) {
+	// 			// keep value | first error
+	// 			(Ok(Some(_)), _) | (Err(_), Err(_)) => acc,
+	// 			// use first value
+	// 			(Ok(None), Ok(value)) | (Err(_), Ok(value)) => Ok(Some(value)),
+	// 			// use error when no value
+	// 			(Ok(None), Err(err)) => Err(err),
+	// 		})
+	// 	})
+	// 	.await
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::dag::find;
+	use co_primitives::{DefaultNodeSerializer, Node, NodeBuilder, NodeContainer, OptionLink};
+	use co_storage::{BlockStorage, MemoryBlockStorage};
+	use libipld::Cid;
+
+	#[tokio::test]
+	async fn smoke() {
+		// test data
+		let storage = MemoryBlockStorage::new();
+		let mut builder = NodeBuilder::new(2, DefaultNodeSerializer::new());
+		builder.push(1).unwrap();
+		builder.push(2).unwrap();
+		builder.push(3).unwrap();
+		let blocks = builder.into_blocks().unwrap();
+		let cid = Some(*blocks[0].cid());
+		for block in blocks {
+			storage.set(block).await.unwrap();
+		}
+		struct DagVec {
+			cid: Option<Cid>,
+		}
+		impl NodeContainer<i32> for DagVec {
+			fn node_container_link(&self) -> OptionLink<Node<i32>> {
+				self.cid.into()
+			}
+		}
+
+		// find
+		assert_eq!(Some(2), find(&storage, &DagVec { cid }, |i| *i == 2).await.unwrap());
+	}
+}

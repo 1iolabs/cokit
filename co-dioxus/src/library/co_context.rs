@@ -1,4 +1,4 @@
-use super::co_settings::CoSettings;
+use crate::CoSettings;
 use co_sdk::{Application, ApplicationBuilder};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
@@ -7,7 +7,7 @@ pub struct CoContext {
 	tasks: UnboundedSender<Task>,
 }
 impl CoContext {
-	pub fn new(settings: CoSettings) -> Self {
+	pub(crate) fn new(settings: CoSettings) -> Self {
 		let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Task>();
 		std::thread::Builder::new()
 			.name("co".to_owned())
@@ -16,6 +16,7 @@ impl CoContext {
 		Self { tasks: tx }
 	}
 
+	/// Execute task using CO Application.
 	pub fn execute<F>(&self, f: F)
 	where
 		F: FnOnce(&Application) + Send + 'static,
@@ -41,6 +42,16 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) {
 		.build()
 		.await
 		.expect("application");
+
+	// network
+	if settings.network {
+		application
+			.create_network(settings.network_force_new_peer_id)
+			.await
+			.expect("network");
+	}
+
+	// execute
 	tracing::info!("co-startup");
 	while let Some(task) = tasks.recv().await {
 		tracing::info!("co-task");

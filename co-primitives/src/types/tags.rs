@@ -97,6 +97,45 @@ impl From<Ipld> for TagValue {
 		}
 	}
 }
+impl std::fmt::Display for TagValue {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			TagValue::Null => write!(f, "null"),
+			TagValue::Bool(v) => write!(f, "{}", if *v { "true" } else { "false" }),
+			TagValue::Integer(i) => write!(f, "{}", i),
+			TagValue::Float(v) => write!(f, "{}", v.0),
+			TagValue::String(v) => write!(f, "{}", v),
+			TagValue::Bytes(v) => write!(f, "{:x?}", v),
+			TagValue::List(v) => {
+				let mut result = Ok(());
+				let mut first = true;
+				for value in v.iter() {
+					if first {
+						first = false;
+						result = Ok(write!(f, "{}", value)?)
+					} else {
+						result = Ok(write!(f, ",{}", value)?)
+					}
+				}
+				result
+			},
+			TagValue::Map(v) => {
+				let mut result = Ok(());
+				let mut first = true;
+				for (key, value) in v.iter() {
+					if first {
+						first = false;
+						result = Ok(write!(f, "{}={}", key, value)?)
+					} else {
+						result = Ok(write!(f, ",{}={}", key, value)?)
+					}
+				}
+				result
+			},
+			TagValue::Link(v) => write!(f, "{}", v.to_string()),
+		}
+	}
+}
 
 /// Tag. Represents a generic metadata/configuration key value pair.
 pub type Tag = (String, TagValue);
@@ -199,9 +238,9 @@ impl Display for Tags {
 		for (key, value) in self.0.iter() {
 			if first {
 				first = false;
-				result = write!(f, "{}: {:?}", key, value)
+				result = Ok(write!(f, "{}: {:?}", key, value)?)
 			} else {
-				result = write!(f, ", {}: {:?}", key, value)
+				result = Ok(write!(f, ", {}: {:?}", key, value)?)
 			}
 		}
 		result
