@@ -141,6 +141,15 @@ pub struct CreateCo {
 	pub name: String,
 	pub algorithm: Option<Algorithm>,
 }
+impl CreateCo {
+	pub fn generate(name: String) -> Self {
+		CreateCo { id: uuid::Uuid::new_v4().to_string().into(), name, algorithm: Some(Default::default()) }
+	}
+
+	pub fn with_public(self) -> Self {
+		CreateCo { algorithm: None, ..self }
+	}
+}
 
 pub struct SharedCoCreator {
 	parent: CoReducer,
