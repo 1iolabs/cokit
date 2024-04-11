@@ -318,11 +318,12 @@ where
 		// there is no need to check for pinning loops as pinning any core should only ever be used in a local CO and
 		// not a shared CO
 		// we only care when there actually is state to pin
+		println!("HEADS: {:?}", reducer.heads());
 		if let Some(state) = reducer.state() {
 			// get pin api
 			let api = PinAPI::api(&self.parent, &self.identity);
 			// TODO use reasonable tags
-			let tags = tags!();
+			let tags = tags!("type": "auto");
 			// pin new state
 			api.pin_cid(*state, tags.clone()).await?;
 			// unpin previous state if any

@@ -8,10 +8,12 @@ anyhow = { workspace = true }
 async-stream = { workspace = true }
 chrono = "0.4.37"
 clap = { version = "^4.3.23", features = ["derive"] }
+co-api = { path = "../co-api" }
 co-core-co = { path = "../cores/co" }
 co-core-file = { path = "../cores/file" }
 co-core-keystore = { path = "../cores/keystore" }
 co-core-membership = { path = "../cores/membership" }
+co-core-pin = { path = "../cores/pin" }
 co-core-room = { path = "../cores/room" }
 co-log = { path = "../co-log" }
 co-primitives = { path = "../co-primitives" }
