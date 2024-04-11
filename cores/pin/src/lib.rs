@@ -1,4 +1,4 @@
-use co_api::{reduce, DagCollection, DagMap, DagSet, Reducer, Storage, Tags};
+use co_api::{reduce, DagCollection, DagMap, DagSet, Reducer, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -14,20 +14,6 @@ pub struct Pin {
 	 * that a cid stays pinned as it then cannot be unpinned by other services. To unpin, all tags must match.
 	 */
 	pub pins: DagMap<Cid, DagSet<Tags>>,
-}
-
-impl Pin {
-	/**
-	 * A simple function to check if a specific content id is pinned or not
-	 */
-	pub fn is_pinned(&self, cid: &Cid, s: &dyn Storage) -> bool {
-		let pin_map = self.pins.get(s);
-		if let Some(set) = pin_map.get(cid) {
-			// returns true if the tag set for the cid is not empty
-			return !set.get(s).is_empty();
-		}
-		false
-	}
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

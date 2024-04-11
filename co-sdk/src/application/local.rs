@@ -91,7 +91,7 @@ impl LocalCoInstance {
 	/// Read the local co state from disk.
 	/// As we trust all of the local states we use all the states without fuhter checks to continue.
 	///
-	/// Note: This assumes the same encryption key is used by all local applications.
+	/// NOTE: This assumes the same encryption key is used by all local applications.
 	async fn create(
 		runtime: Runtime,
 		local_co: LocalCoBuilder,

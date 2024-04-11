@@ -24,18 +24,20 @@ pub trait EventType {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MatrixEvent {
 	pub event_id: String,
-	pub timestamp: i64,
+	pub timestamp: u128,
 	pub room_id: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub state_key: Option<String>,
-	#[serde(flatten)]
+	// NOTE: this causes serde to write unbounded maps which are indefinite length maps which are not supported in
+	// DAG-CBOR. Look for a way to reconstruct matrix format without using this flatten
+	// #[serde(flatten)]
 	pub content: EventContent,
 }
 
 impl MatrixEvent {
 	pub fn new(
 		event_id: impl Into<String>,
-		timestamp: i64,
+		timestamp: u128,
 		room_id: impl Into<String>,
 		content: impl Into<EventContent>,
 	) -> Self {
@@ -48,7 +50,7 @@ impl MatrixEvent {
 		// todo filter for event types that can have a state key
 		self.state_key = Some(state_key);
 	}
-	pub fn set_timestamp(&mut self, ts: i64) {
+	pub fn set_timestamp(&mut self, ts: u128) {
 		self.timestamp = ts;
 	}
 }

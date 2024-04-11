@@ -8,9 +8,6 @@ use serde::{Deserialize, Serialize};
  */
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Room {
-	/// Room uuid
-	pub id: String,
-
 	/// Name of the room
 	pub name: String,
 
@@ -31,11 +28,6 @@ impl Reducer for Room {
 
 	fn reduce(self, event: &ReducerAction<Self::Action>, _: &mut dyn Context) -> Self {
 		let matrix_event = &event.payload;
-
-		// validate room id
-		if matrix_event.room_id != self.id {
-			return self;
-		}
 
 		let mut result = self.clone();
 		match &matrix_event.content {
