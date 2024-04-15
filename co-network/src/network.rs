@@ -345,6 +345,9 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, runtime: &mut Runtime) {
 		if result_event.is_none() {
 			return;
 		}
+
+		// next
+		task_index = task_index + 1;
 	}
 
 	// other
