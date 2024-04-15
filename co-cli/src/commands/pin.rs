@@ -1,6 +1,6 @@
 use crate::{cli::Cli, library::application::application};
 use anyhow::Ok;
-use co_api::{Cid, DagCollection, Linkable};
+use co_api::{Cid, DagCollection};
 use co_sdk::{BlockStorage, CO_CORE_NAME_PIN};
 use exitcode::ExitCode;
 use libipld::{cbor::DagCborCodec, codec::Codec, Ipld};
@@ -43,8 +43,8 @@ pub async fn list_pins(cli: &Cli, command: &ListCommand) -> Result<ExitCode, any
 	let local_co_reducer = application.local_co_reducer().await?;
 	let storage = local_co_reducer.storage();
 	let pin_state = local_co_reducer.state::<co_core_pin::Pin>(CO_CORE_NAME_PIN).await?;
-	if let Some(link) = pin_state.pins.link() {
-		let block = storage.get(link.cid()).await?;
+	if let Some(link) = pin_state.pins.link().cid() {
+		let block = storage.get(link).await?;
 
 		let map: BTreeMap<String, Vec<Vec<Cid>>> = DagCborCodec::default().decode(block.data())?;
 		if let Some(inner) = map.get("l") {

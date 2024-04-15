@@ -329,7 +329,7 @@ where
 			// get pin api
 			let api = PinAPI::api(&self.parent, &self.identity);
 			// TODO add some kind of security like salt
-			let tags = tags!("type": "state", "co_id": self.co_id, "source": "self");
+			let tags = tags!("type": "state", "co": self.co_id.to_string(), "source": "self");
 			// pin new state
 			api.pin_cid(*state, tags.clone()).await?;
 			// TODO unpin any previous state pins of this co

@@ -50,7 +50,7 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 	// set name of new room
 	let set_name = MatrixEvent::new(
 		Cid::default(), // TODO: create unique event id
-		timestamp.into(),
+		timestamp as i64,
 		core,
 		RoomNameContent::new(command.room_name.clone().unwrap_or("New room".to_owned())),
 	);
@@ -60,7 +60,7 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 	if let Some(avatar) = &command.avatar {
 		let set_avatar = MatrixEvent::new(
 			Cid::default(), // TODO: create unique event id
-			timestamp.into(),
+			timestamp as i64,
 			core,
 			RoomAvatarContent::new(
 				*avatar,
@@ -81,7 +81,7 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 	if let Some(description) = &command.room_description {
 		let set_description = MatrixEvent::new(
 			Cid::default(), // TODO: create unique event id
-			timestamp.into(),
+			timestamp as i64,
 			core,
 			RoomTopicContent::new(description),
 		);

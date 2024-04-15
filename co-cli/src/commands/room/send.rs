@@ -19,7 +19,7 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 	let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
 	let message_event = MatrixEvent::new(
 		"some_event", // TODO unique event id
-		timestamp,
+		timestamp as i64,
 		core,
 		TextContent::new(command.message.clone()),
 	);

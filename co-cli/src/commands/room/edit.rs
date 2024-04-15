@@ -23,7 +23,7 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 		// set new name of room
 		let set_name = MatrixEvent::new(
 			"event_id", // TODO: create unique event id
-			timestamp.into(),
+			timestamp as i64,
 			core,
 			RoomNameContent::new(name),
 		);
@@ -34,7 +34,7 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 		// set new room description
 		let set_desc = MatrixEvent::new(
 			"event_id", // TODO create unique ID
-			timestamp.into(),
+			timestamp as i64,
 			core,
 			RoomTopicContent::new(desc),
 		);
@@ -45,7 +45,7 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 		// set room avatar
 		let set_avatar = MatrixEvent::new(
 			"event_id", // TODO create unique ID
-			timestamp.into(),
+			timestamp as i64,
 			core,
 			RoomAvatarContent::new(
 				*avatar,
