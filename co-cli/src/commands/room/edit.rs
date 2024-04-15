@@ -21,31 +21,21 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 
 	if let Some(name) = &command.room_name {
 		// set new name of room
-		let set_name = MatrixEvent::new(
-			"event_id", // TODO: create unique event id
-			timestamp as i64,
-			core,
-			RoomNameContent::new(name),
-		);
+		let set_name = MatrixEvent::new(uuid::Uuid::new_v4(), timestamp, core, RoomNameContent::new(name));
 		co_reducer.push(&identity, core, &set_name).await?;
 	}
 
 	if let Some(desc) = &command.room_description {
 		// set new room description
-		let set_desc = MatrixEvent::new(
-			"event_id", // TODO create unique ID
-			timestamp as i64,
-			core,
-			RoomTopicContent::new(desc),
-		);
+		let set_desc = MatrixEvent::new(uuid::Uuid::new_v4(), timestamp, core, RoomTopicContent::new(desc));
 		co_reducer.push(&identity, &core, &set_desc).await?;
 	}
 
 	if let Some(avatar) = &command.avatar {
 		// set room avatar
 		let set_avatar = MatrixEvent::new(
-			"event_id", // TODO create unique ID
-			timestamp as i64,
+			uuid::Uuid::new_v4(),
+			timestamp,
 			core,
 			RoomAvatarContent::new(
 				*avatar,

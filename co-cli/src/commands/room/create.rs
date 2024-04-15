@@ -49,8 +49,8 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 
 	// set name of new room
 	let set_name = MatrixEvent::new(
-		Cid::default(), // TODO: create unique event id
-		timestamp as i64,
+		uuid::Uuid::new_v4(),
+		timestamp,
 		core,
 		RoomNameContent::new(command.room_name.clone().unwrap_or("New room".to_owned())),
 	);
@@ -59,8 +59,8 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 	// set avatar of new room if given
 	if let Some(avatar) = &command.avatar {
 		let set_avatar = MatrixEvent::new(
-			Cid::default(), // TODO: create unique event id
-			timestamp as i64,
+			uuid::Uuid::new_v4(),
+			timestamp,
 			core,
 			RoomAvatarContent::new(
 				*avatar,
@@ -79,12 +79,8 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 	}
 
 	if let Some(description) = &command.room_description {
-		let set_description = MatrixEvent::new(
-			Cid::default(), // TODO: create unique event id
-			timestamp as i64,
-			core,
-			RoomTopicContent::new(description),
-		);
+		let set_description =
+			MatrixEvent::new(uuid::Uuid::new_v4(), timestamp, core, RoomTopicContent::new(description));
 		co_reducer.push(&identity, co, &set_description).await?;
 	}
 

@@ -31,7 +31,7 @@ impl CoContext {
 type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
 
 async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) {
-	let identifier = settings.identifier.unwrap_or("dioxus".to_owned());
+	let identifier = settings.identifier;
 	let builder = match settings.path {
 		Some(path) => ApplicationBuilder::new_with_path(identifier, path),
 		None => ApplicationBuilder::new(identifier),

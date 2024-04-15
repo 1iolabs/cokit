@@ -23,7 +23,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "sync"] }
 tokio-stream = { workspace = true, optional = true }
 tracing = { workspace = true }
-uuid = { version = "1.2.2", features = ["default", "v4"] }
+uuid = { workspace = true }
 wasmer = "4.2.3"
 zeroize = "=1.6.0"
 

@@ -17,12 +17,8 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 	let core = &room_command.core;
 	let co_reducer = application.co_reducer(co).await?.ok_or(anyhow!("Co not found: {}", co))?;
 	let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
-	let message_event = MatrixEvent::new(
-		"some_event", // TODO unique event id
-		timestamp as i64,
-		core,
-		TextContent::new(command.message.clone()),
-	);
+	let message_event =
+		MatrixEvent::new(uuid::Uuid::new_v4(), timestamp, core, TextContent::new(command.message.clone()));
 	co_reducer.push(&identity, core, &message_event).await?;
 	Ok(exitcode::OK)
 }
