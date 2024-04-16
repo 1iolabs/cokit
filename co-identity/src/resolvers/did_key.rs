@@ -46,24 +46,6 @@ impl DidKeyIdentity {
 	}
 
 	pub fn export(&self) -> Result<co_core_keystore::Key, anyhow::Error> {
-		// let did = self
-		// 	.key
-		// 	.get_did_document(did_key::Config { use_jose_format: true, serialize_secrets: true });
-		// let private_key = did
-		// 	.verification_method
-		// 	.iter()
-		// 	.filter_map(|vm| vm.private_key.clone())
-		// 	.next()
-		// 	.ok_or(anyhow!("No private key for {}", self.identity()))?;
-		// let data = serde_json::to_string(&private_key)?;
-		// let secret = co_core_keystore::Secret::PrivateKey(data.as_bytes().to_vec().into());
-		// Ok(co_core_keystore::Key {
-		// 	description: "did:key identitiy".to_owned(),
-		// 	name: self.identity().to_owned(),
-		// 	tags: tags!("type": "co-identity", "format": "did_key::didcore::KeyFormat"),
-		// 	uri: self.identity().to_owned(),
-		// 	secret,
-		// })
 		Ok(co_core_keystore::Key {
 			description: "did:key identitiy".to_owned(),
 			name: self.identity().to_owned(),

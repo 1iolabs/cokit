@@ -343,35 +343,6 @@ pub trait TagsMatches {
 	fn matches(&self, tags: &Tags) -> bool;
 }
 
-// pub enum TagExpr {
-// 	Tag(Tag),
-// 	And(Vec<TagExpr>),
-// 	Or(Vec<TagExpr>),
-// 	Not(TagExpr),
-// }
-
-// pub trait TagExpr {
-// 	fn evaluate(&self, tags: &Tags) -> bool;
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
-// #[serde(transparent)]
-// pub struct TagExprTag(pub Tag);
-// impl TagExpr for TagExprTag {
-// 	fn evaluate(&self, tags: &Tags) -> bool {
-// 		tags.iter().filter(|tag| &&self.0 == tag).next().is_some()
-// 	}
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
-// #[serde(transparent)]
-// pub struct TagExprAnd(pub Vec<Box<TagExpr>>);
-// impl TagExpr for TagExprTag {
-// 	fn evaluate(&self, tags: &Tags) -> bool {
-// 		tags.iter().filter(|tag| &&self.0 == tag).next().is_some()
-// 	}
-// }
-
 #[cfg(test)]
 mod tests {
 	use crate::{types::tags::TagsMatches, Tag, Tags, TagsExpr};

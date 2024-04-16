@@ -12,16 +12,6 @@ impl DidKeyProvider {
 		Self { reducer, keystore_core: keystore_core.into() }
 	}
 
-	// pub async fn from_core(reducer: &CoReducer, core: &str) -> Result<Self, CoReducerError> {
-	// 	let storage = reducer.storage();
-	// 	let co = reducer.co().await?;
-	// 	let core = co
-	// 		.cores
-	// 		.get(core)
-	// 		.ok_or_else(|| CoReducerError::CoreNotFound(core.to_string()))?;
-	// 	Ok(Self { storage, keystore: core.state.into() })
-	// }
-
 	pub async fn store(&self, identity: DidKeyIdentity) -> Result<(), anyhow::Error> {
 		self.reducer
 			.push(&identity, &self.keystore_core, &co_core_keystore::KeyStoreAction::Set(identity.export()?))
@@ -36,11 +26,6 @@ impl PrivateIdentityResolver for DidKeyProvider {
 		identity: &str,
 		_public_key: Option<&[u8]>,
 	) -> Result<PrivateIdentityBox, IdentityResolverError> {
-		// let keystore = self
-		// 	.storage
-		// 	.get_value(&self.keystore)
-		// 	.await
-		// 	.with_context(|| format!("get keystore state: {:?}", self.keystore))?;
 		let keystore: co_core_keystore::KeyStore = self
 			.reducer
 			.state(&self.keystore_core)
