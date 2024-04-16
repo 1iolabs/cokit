@@ -15,7 +15,7 @@ pub struct Room {
 	pub description: String,
 
 	/// Content ID for the room avatar
-	pub avatar: Cid,
+	pub avatar: Option<Cid>,
 
 	/// All currently pinned messages in relevant order
 	pub pinned_messages: Vec<String>,

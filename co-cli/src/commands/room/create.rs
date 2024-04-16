@@ -15,15 +15,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
 	/// Optional name for the room
-	#[arg(long)]
-	pub room_name: Option<String>,
+	#[arg(short, long)]
+	pub name: Option<String>,
 
 	/// Optional description for the room
-	#[arg(long)]
-	pub room_description: Option<String>,
+	#[arg(short, long)]
+	pub description: Option<String>,
 
 	/// Optional avatar for the room in form of a CID of an image file
-	#[arg(long)]
+	#[arg(short, long)]
 	pub avatar: Option<Cid>,
 }
 
@@ -52,7 +52,7 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 		uuid::Uuid::new_v4(),
 		timestamp,
 		core,
-		RoomNameContent::new(command.room_name.clone().unwrap_or("New room".to_owned())),
+		RoomNameContent::new(command.name.clone().unwrap_or("New room".to_owned())),
 	);
 	co_reducer.push(&identity, core, &set_name).await?;
 
@@ -63,7 +63,7 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 			timestamp,
 			core,
 			RoomAvatarContent::new(
-				*avatar,
+				Some(*avatar),
 				// TODO: generate metadata for image
 				ImageInfo {
 					h: 0,
@@ -78,7 +78,7 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 		co_reducer.push(&identity, co, &set_avatar).await?;
 	}
 
-	if let Some(description) = &command.room_description {
+	if let Some(description) = &command.description {
 		let set_description =
 			MatrixEvent::new(uuid::Uuid::new_v4(), timestamp, core, RoomTopicContent::new(description));
 		co_reducer.push(&identity, co, &set_description).await?;

@@ -19,13 +19,13 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 
 	let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
 
-	if let Some(name) = &command.room_name {
+	if let Some(name) = &command.name {
 		// set new name of room
 		let set_name = MatrixEvent::new(uuid::Uuid::new_v4(), timestamp, core, RoomNameContent::new(name));
 		co_reducer.push(&identity, core, &set_name).await?;
 	}
 
-	if let Some(desc) = &command.room_description {
+	if let Some(desc) = &command.description {
 		// set new room description
 		let set_desc = MatrixEvent::new(uuid::Uuid::new_v4(), timestamp, core, RoomTopicContent::new(desc));
 		co_reducer.push(&identity, &core, &set_desc).await?;
@@ -38,7 +38,7 @@ pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -
 			timestamp,
 			core,
 			RoomAvatarContent::new(
-				*avatar,
+				Some(*avatar),
 				// TODO: generate metadata for image
 				ImageInfo {
 					h: 0,

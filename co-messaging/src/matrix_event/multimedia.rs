@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 /**
  * Contains metadata of images
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct ImageInfo {
 	pub h: i64,                        // intended display height in px
 	pub w: i64,                        // intended display width in px
@@ -17,7 +17,7 @@ pub struct ImageInfo {
 /**
  * Contains metadata of images used as a thumbnail
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct ThumbnailInfo {
 	pub h: i64,           // intended display height in px
 	pub w: i64,           // intended display width in px

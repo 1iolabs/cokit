@@ -26,7 +26,7 @@ fn test_story_view() {
 
 #[test]
 fn test_profile_update() {
-	let event_content = UpdateProfileContent::new("Max Mustermann", Cid::default(), "am mustern");
+	let event_content = UpdateProfileContent::new("Max Mustermann", None, "am mustern");
 	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", event_content);
 	assert_eq!(event.generate_event_type(), "m.user.profile.update");
 	let json = serde_json::to_string_pretty(&event).unwrap();

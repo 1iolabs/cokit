@@ -84,12 +84,12 @@ impl Into<EventContent> for RoomTopicContent {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RoomAvatarContent {
-	pub file: Cid,
+	pub file: Option<Cid>,
 	pub info: ImageInfo,
 }
 
 impl RoomAvatarContent {
-	pub fn new(file: Cid, info: ImageInfo) -> Self {
+	pub fn new(file: Option<Cid>, info: ImageInfo) -> Self {
 		Self { file, info }
 	}
 }

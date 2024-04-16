@@ -80,7 +80,7 @@ impl ViewUserStoryContent {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct UpdateProfileContent {
 	pub display_name: String, // The name that the user likes to use as a default
-	pub avatar: Cid,          // Content ID pointing to the avatar of the user
+	pub avatar: Option<Cid>,  // Content ID pointing to the avatar of the user
 	pub status_msg: String,   // The current status of the user
 }
 
@@ -97,7 +97,7 @@ impl Into<EventContent> for UpdateProfileContent {
 }
 
 impl UpdateProfileContent {
-	pub fn new(display_name: impl Into<String>, avatar: Cid, status_msg: impl Into<String>) -> Self {
+	pub fn new(display_name: impl Into<String>, avatar: Option<Cid>, status_msg: impl Into<String>) -> Self {
 		Self { display_name: display_name.into(), avatar, status_msg: status_msg.into() }
 	}
 }
