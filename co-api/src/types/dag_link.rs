@@ -22,21 +22,26 @@ pub trait DagCollection: Sized {
 		self.from_link(storage).expect("Valid serialized data")
 	}
 
-	fn update<F: FnOnce(&mut dyn Context, &mut Self::Collection)>(&mut self, context: &mut dyn Context, f: F) {
-		let mut collection = self.get(context.storage());
-		f(context, &mut collection);
-		self.set(context.storage_mut(), collection);
-	}
-
-	fn try_update<F: FnOnce(&mut dyn Context, &mut Self::Collection) -> Result<(), anyhow::Error>>(
+	fn update<F: FnOnce(&mut dyn Context, &mut Self::Collection) -> R, R>(
 		&mut self,
 		context: &mut dyn Context,
 		f: F,
-	) -> Result<(), anyhow::Error> {
+	) -> R {
 		let mut collection = self.get(context.storage());
-		f(context, &mut collection)?;
+		let result = f(context, &mut collection);
 		self.set(context.storage_mut(), collection);
-		Ok(())
+		result
+	}
+
+	fn try_update<F: FnOnce(&mut dyn Context, &mut Self::Collection) -> Result<R, anyhow::Error>, R>(
+		&mut self,
+		context: &mut dyn Context,
+		f: F,
+	) -> Result<R, anyhow::Error> {
+		let mut collection = self.get(context.storage());
+		let result = f(context, &mut collection)?;
+		self.set(context.storage_mut(), collection);
+		Ok(result)
 	}
 
 	fn update_owned<F: FnOnce(&mut dyn Context, Self::Collection) -> Self::Collection>(
@@ -190,6 +195,28 @@ where
 {
 	pub fn create(storage: &mut dyn Storage, items: impl IntoIterator<Item = <Self as DagCollection>::Item>) -> Self {
 		Self(Self::to_link(storage, items))
+	}
+
+	/// Returns a value corresponding to the key.
+	pub fn get(&mut self, context: &mut dyn Context, key: &K) -> Option<V> {
+		self.iter(context.storage())
+			.find(|(item_key, _item_value)| key == item_key)
+			.map(|(_item_key, item_value)| item_value)
+	}
+
+	/// Inserts a key-value pair into the map.
+	///
+	/// Todo: Do not load whole collection into memory.
+	pub fn insert(&mut self, context: &mut dyn Context, key: K, value: V) -> Option<V> {
+		self.update(context, |_, v| v.insert(key, value))
+	}
+
+	/// Removes a key from the map, returning the value at the key if the key
+	/// was previously in the map.
+	///
+	/// Todo: Do not load whole collection into memory.
+	pub fn remove(&mut self, context: &mut dyn Context, key: &K) -> Option<V> {
+		self.update(context, |_, v| v.remove(key))
 	}
 }
 impl<K, V> DagCollection for DagMap<K, V>

@@ -9,5 +9,6 @@ pub use resolvers::{
 pub use types::{
 	identity::{Identity, IdentityBox},
 	private_identity::{PrivateIdentity, PrivateIdentityBox, SignError},
+	private_resolver::{PrivateIdentityResolver, PrivateIdentityResolverBox},
 	resolver::{IdentityResolver, IdentityResolverBox, IdentityResolverError},
 };

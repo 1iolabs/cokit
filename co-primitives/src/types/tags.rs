@@ -3,6 +3,7 @@ use derive_more::From;
 use libipld::{Cid, Ipld};
 use serde::{Deserialize, Serialize};
 use std::{
+	borrow::Borrow,
 	collections::{BTreeMap, BTreeSet},
 	fmt::{Debug, Display},
 };
@@ -25,6 +26,20 @@ macro_rules! tags{
         )*
         map
     }};
+}
+
+/// Tag inline macro.
+///
+/// ```
+/// use co_primitives::tag;
+/// let tag = tag!("hello": "world");
+/// println!("tag: {:?}", tag);
+/// ```
+#[macro_export]
+macro_rules! tag {
+	($key:tt : $val:expr) => {{
+		($key.to_owned(), $val.to_owned().into())
+	}};
 }
 
 /// Tag Value
@@ -139,6 +154,12 @@ impl std::fmt::Display for TagValue {
 
 /// Tag. Represents a generic metadata/configuration key value pair.
 pub type Tag = (String, TagValue);
+impl TagsMatches for Tag {
+	fn matches(&self, tags: &Tags) -> bool {
+		let expr: TagsExpr = self.clone().into();
+		expr.matches(tags)
+	}
+}
 
 /// Tags.
 #[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
@@ -221,6 +242,26 @@ impl Tags {
 	pub fn find_key(&self, key: &str) -> Option<&Tag> {
 		self.0.iter().find(|tag| tag.0 == key)
 	}
+
+	/// Test against tag expression.
+	pub fn matches<M: TagsMatches>(&self, expr: impl Borrow<M>) -> bool {
+		expr.borrow().matches(self)
+	}
+
+	/// Get first tag value (that is a string) for given key.
+	pub fn string(&self, key: &str) -> Option<&str> {
+		for (tag_key, tag_value) in self.iter() {
+			if key == tag_key {
+				match tag_value {
+					TagValue::String(v) => return Some(v.as_str()),
+					_ => {
+						continue;
+					},
+				}
+			}
+		}
+		None
+	}
 }
 impl Debug for Tags {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -253,22 +294,107 @@ impl From<Tag> for Tags {
 		tags
 	}
 }
+impl TagsMatches for Tags {
+	fn matches(&self, tags: &Tags) -> bool {
+		let expr: TagsExpr = self.clone().into();
+		expr.matches(tags)
+	}
+}
 
 /// Tags match pattern.
-///
-/// Todo: implement
-#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
-pub struct TagsPattern {}
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum TagsExpr {
+	/// Tests if tag exists.
+	#[serde(rename = "$tag")]
+	Tag(Tag),
+	/// Tests if all patterns evaluate to true.
+	#[serde(rename = "$and")]
+	And(Vec<TagsExpr>),
+	/// Tests if some patterns evaluate to true.
+	#[serde(rename = "$or")]
+	Or(Vec<TagsExpr>),
+	/// PErform logical NOT operation in pattern.
+	#[serde(rename = "$not")]
+	Not(Box<TagsExpr>),
+}
+impl TagsMatches for TagsExpr {
+	fn matches(&self, tags: &Tags) -> bool {
+		match self {
+			TagsExpr::Tag(cond_tag) => tags.iter().filter(|tag| &cond_tag == tag).next().is_some(),
+			TagsExpr::And(and) => and.iter().filter(|cond| !cond.matches(tags)).next().is_none(),
+			TagsExpr::Or(or) => or.iter().filter(|cond| cond.matches(tags)).next().is_some(),
+			TagsExpr::Not(not) => !not.matches(tags),
+		}
+	}
+}
+impl From<Tag> for TagsExpr {
+	fn from(value: Tag) -> Self {
+		TagsExpr::Tag(value)
+	}
+}
+impl From<Tags> for TagsExpr {
+	fn from(value: Tags) -> Self {
+		TagsExpr::And(value.into_iter().map(|tag| TagsExpr::Tag(tag)).collect())
+	}
+}
+
+/// Type which can be matched against a list of tags.
+pub trait TagsMatches {
+	fn matches(&self, tags: &Tags) -> bool;
+}
+
+// pub enum TagExpr {
+// 	Tag(Tag),
+// 	And(Vec<TagExpr>),
+// 	Or(Vec<TagExpr>),
+// 	Not(TagExpr),
+// }
+
+// pub trait TagExpr {
+// 	fn evaluate(&self, tags: &Tags) -> bool;
+// }
+
+// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
+// #[serde(transparent)]
+// pub struct TagExprTag(pub Tag);
+// impl TagExpr for TagExprTag {
+// 	fn evaluate(&self, tags: &Tags) -> bool {
+// 		tags.iter().filter(|tag| &&self.0 == tag).next().is_some()
+// 	}
+// }
+
+// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
+// #[serde(transparent)]
+// pub struct TagExprAnd(pub Vec<Box<TagExpr>>);
+// impl TagExpr for TagExprTag {
+// 	fn evaluate(&self, tags: &Tags) -> bool {
+// 		tags.iter().filter(|tag| &&self.0 == tag).next().is_some()
+// 	}
+// }
 
 #[cfg(test)]
 mod tests {
-	use crate::Tags;
+	use crate::{types::tags::TagsMatches, Tag, Tags, TagsExpr};
 
 	#[test]
-	fn test_macro() {
+	fn test_tags_macro() {
 		let mut tags = Tags::new();
 		tags.insert(("hello".to_owned(), "world".to_owned().into()));
 		let tags_macro = tags!( "hello": "world" );
 		assert_eq!(tags, tags_macro);
+	}
+
+	#[test]
+	fn test_tag_macro() {
+		let value: Tag = ("hello".to_owned(), "world".to_owned().into());
+		assert_eq!(value, tag!("hello": "world"));
+	}
+
+	#[test]
+	fn test_expr_not() {
+		let expr = TagsExpr::Not(Box::new(TagsExpr::Tag(tag!("hello": "world"))));
+		assert_eq!(false, expr.matches(&tags!( "hello": "world" )));
+		assert_eq!(false, expr.matches(&tags!( "hello": "world", "five": "ten" )));
+		assert_eq!(true, expr.matches(&tags!( "five": "ten" )));
 	}
 }

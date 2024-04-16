@@ -38,7 +38,7 @@ where
 		}
 
 		// verify
-		verify_entry(log, &entry)?;
+		verify_entry(log, &entry).await?;
 
 		// calculate
 		let mut entries_to_get: BTreeSet<Cid> = Default::default();
@@ -51,7 +51,7 @@ where
 			// self.entry_store.fetch(entries_to_get.iter())
 			while let Some(cid) = entries_to_get.pop_first() {
 				let e = get_entry_block(log.storage(), &cid).await?;
-				verify_entry(log, &e)?;
+				verify_entry(log, &e).await?;
 				self.entries_to_add.insert(e.cid().clone());
 
 				for next in e.entry().next.iter().chain(e.entry().refs.iter()) {

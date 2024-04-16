@@ -1,14 +1,18 @@
 use either::Either;
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
+use std::{
+	any::type_name,
+	fmt::{Debug, Display},
+	marker::PhantomData,
+};
 
 pub trait Linkable<T> {
 	fn value(&self) -> Either<Cid, T>;
 }
 
 /// A (serializable) typed link.
-#[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
 #[serde(into = "Cid", from = "Cid")]
 pub struct Link<T> {
 	#[serde(skip)]
@@ -55,9 +59,19 @@ impl<T> AsRef<Cid> for Link<T> {
 		&self.cid
 	}
 }
+impl<T> Debug for Link<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "Link({}: {})", type_name::<T>(), self.cid)
+	}
+}
+impl<T> Display for Link<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "Link({}: {})", type_name::<T>(), self.cid)
+	}
+}
 
 /// A (serializable) typed link.
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Default, Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
 #[serde(into = "Option<Cid>", from = "Option<Cid>")]
 pub struct OptionLink<T: Default> {
 	#[serde(skip)]
@@ -117,5 +131,18 @@ impl<T: Default> From<Cid> for OptionLink<T> {
 impl<T: Default> AsRef<Option<Cid>> for OptionLink<T> {
 	fn as_ref(&self) -> &Option<Cid> {
 		&self.cid
+	}
+}
+impl<T: Default> Debug for OptionLink<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "Link({}: {:?})", type_name::<T>(), self.cid)
+	}
+}
+impl<T: Default> Display for OptionLink<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self.cid {
+			Some(cid) => write!(f, "{} ({})", cid.to_string(), type_name::<T>()),
+			None => write!(f, "None ({})", type_name::<T>()),
+		}
 	}
 }

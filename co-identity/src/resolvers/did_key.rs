@@ -1,6 +1,8 @@
 use crate::{Identity, IdentityResolver, IdentityResolverError, PrivateIdentity, SignError};
 use anyhow::anyhow;
-use did_key::{generate, resolve, CoreSign, DIDCore, Ed25519KeyPair, KeyMaterial, PatchedKeyPair};
+use async_trait::async_trait;
+use co_primitives::tags;
+use did_key::{from_existing_key, generate, resolve, CoreSign, DIDCore, Ed25519KeyPair, KeyMaterial, PatchedKeyPair};
 use std::{fmt::Debug, sync::Arc};
 
 #[derive(Clone)]
@@ -29,6 +31,46 @@ impl DidKeyIdentity {
 
 	pub fn to_bytes(&self) -> &[u8] {
 		self.identity().as_bytes()
+	}
+
+	pub fn key(&self) -> Arc<PatchedKeyPair> {
+		self.key.clone()
+	}
+
+	pub fn import(key: &co_core_keystore::Key) -> Result<Self, anyhow::Error> {
+		match (key.tags.string("format"), &key.secret) {
+			(Some("Ed25519"), co_core_keystore::Secret::PrivateKey(secret)) =>
+				Ok(Self::from_key(from_existing_key::<Ed25519KeyPair>(&[], Some(secret.divulge())))),
+			_ => Err(anyhow!("Invalid identity format or key")),
+		}
+	}
+
+	pub fn export(&self) -> Result<co_core_keystore::Key, anyhow::Error> {
+		// let did = self
+		// 	.key
+		// 	.get_did_document(did_key::Config { use_jose_format: true, serialize_secrets: true });
+		// let private_key = did
+		// 	.verification_method
+		// 	.iter()
+		// 	.filter_map(|vm| vm.private_key.clone())
+		// 	.next()
+		// 	.ok_or(anyhow!("No private key for {}", self.identity()))?;
+		// let data = serde_json::to_string(&private_key)?;
+		// let secret = co_core_keystore::Secret::PrivateKey(data.as_bytes().to_vec().into());
+		// Ok(co_core_keystore::Key {
+		// 	description: "did:key identitiy".to_owned(),
+		// 	name: self.identity().to_owned(),
+		// 	tags: tags!("type": "co-identity", "format": "did_key::didcore::KeyFormat"),
+		// 	uri: self.identity().to_owned(),
+		// 	secret,
+		// })
+		Ok(co_core_keystore::Key {
+			description: "did:key identitiy".to_owned(),
+			name: self.identity().to_owned(),
+			tags: tags!("type": "co-identity", "format": "Ed25519"),
+			uri: self.identity().to_owned(),
+			secret: co_core_keystore::Secret::PrivateKey(self.key.private_key_bytes().into()),
+		})
 	}
 }
 impl Debug for DidKeyIdentity {
@@ -90,8 +132,9 @@ impl DidKeyIdentityResolver {
 		Self {}
 	}
 }
+#[async_trait]
 impl IdentityResolver for DidKeyIdentityResolver {
-	fn resolve(
+	async fn resolve(
 		&self,
 		identity: &str,
 		public_key: Option<&[u8]>,

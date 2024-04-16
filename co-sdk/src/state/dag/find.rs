@@ -65,7 +65,7 @@ where
 
 #[cfg(test)]
 mod tests {
-	use crate::dag::find;
+	use crate::state::find;
 	use co_primitives::{DefaultNodeSerializer, Node, NodeBuilder, NodeContainer, OptionLink};
 	use co_storage::{BlockStorage, MemoryBlockStorage};
 	use libipld::Cid;

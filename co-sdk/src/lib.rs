@@ -2,9 +2,10 @@ mod application;
 mod drivers;
 // mod epics;
 mod errors;
+pub mod identity;
 mod library;
-pub mod state;
 mod pin;
+pub mod state;
 mod types;
 
 pub use application::{
@@ -15,7 +16,9 @@ pub use application::{
 	shared::CreateCo,
 };
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
-pub use co_identity::{Identity, IdentityResolver, IdentityResolverError, PrivateIdentity};
+pub use co_identity::{
+	DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityResolver, IdentityResolverError, PrivateIdentity,
+};
 pub use co_primitives::{
 	tags, BlockSerializer, CoId, Date, Did, Link, MultiCodec, MultiCodecError, OptionLink, Tag, Tags,
 };
@@ -25,8 +28,8 @@ pub use co_storage::{
 	BlockStorageContentMapping, BlockStorageExt, StorageError,
 };
 pub use drivers::{network::Network, runtime::Runtime, storage::Storage};
+pub use identity::did_key::DidKeyProvider;
 pub use library::{
-	dag,
 	find_membership::{find_membership, find_memberships},
 	generate_random_name::generate_random_name,
 	keystore_fetch::keystore_fetch,

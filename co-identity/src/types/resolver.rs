@@ -1,4 +1,5 @@
 use crate::IdentityBox;
+use async_trait::async_trait;
 
 #[derive(Debug, thiserror::Error)]
 pub enum IdentityResolverError {
@@ -8,14 +9,15 @@ pub enum IdentityResolverError {
 	#[error("Identity not found")]
 	NotFound,
 
-	/// Other error
-	/// This ispossible retryable.
-	#[error("Resolve Identitiy failed: {0}")]
-	Other(String, #[source] anyhow::Error),
+	/// Other error.
+	/// This is possible retryable.
+	#[error("Resolve Identitiy failed")]
+	Other(#[from] anyhow::Error),
 }
 
+#[async_trait]
 pub trait IdentityResolver {
-	fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<IdentityBox, IdentityResolverError>;
+	async fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<IdentityBox, IdentityResolverError>;
 }
 
 /// Dynamic Identity Resolver.

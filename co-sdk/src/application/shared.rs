@@ -2,10 +2,12 @@ use super::identity::create_identity_resolver;
 use crate::{
 	drivers::network::{subscribe::Publish, CoNetworkTaskSpawner},
 	library::co_peer_provider::CoPeerProvider,
+	state::find,
 	types::co_storage::CoBlockStorageContentMapping,
 	CoCoreResolver, CoReducer, CoStorage, PinAPI, Reducer, ReducerBuilder, ReducerChangedHandler, Runtime,
 	CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
+use anyhow::anyhow;
 use async_trait::async_trait;
 use co_core_co::CoAction;
 use co_core_keystore::{Key, KeyStoreAction};
@@ -66,11 +68,15 @@ impl SharedCoBuilder {
 				// encrypted
 				Some(key_reference) => {
 					let key_store: co_core_keystore::KeyStore = self.parent.state(&self.keystore_core_name).await?;
-					let key = key_store
-						.shared_key(key_reference)
+					let (_, key) = find(&self.parent.storage(), &key_store.keys, |(k, _)| k == key_reference)
+						.await?
 						.ok_or(anyhow::anyhow!("Shared key not found: {}", key_reference))?;
+					let secret = match key.secret {
+						co_core_keystore::Secret::PrivateKey(sec) => Ok(sec),
+						_ => Err(anyhow!("Invalid secret")),
+					}?;
 					let mut result_storage =
-						EncryptedBlockStorage::new(storage, Secret::new(key.divulge().to_vec()), Default::default());
+						EncryptedBlockStorage::new(storage, Secret::new(secret.divulge().to_vec()), Default::default());
 					if let Some(mapping) = &self.membership.encryption_mapping {
 						result_storage.load_mapping(mapping).await?;
 					}

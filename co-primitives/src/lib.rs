@@ -18,6 +18,6 @@ pub use types::{
 		RelativePathOwned,
 	},
 	secret::Secret,
-	tags::{Tag, Tags, TagsPattern},
+	tags::{Tag, Tags, TagsExpr},
 	total_float::TotalFloat64,
 };

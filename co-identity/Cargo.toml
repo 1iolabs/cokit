@@ -9,6 +9,7 @@ crate-type = ["lib"]
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+co-core-keystore = { path = "../cores/keystore" }
 co-primitives = { path = "../co-primitives" }
 did-key = "0.2.1"
 futures = { workspace = true }
@@ -17,6 +18,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+tiny-bip39 = "1.0.0"
 tracing = { workspace = true }
 uuid = { workspace = true }
 

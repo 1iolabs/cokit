@@ -1,6 +1,5 @@
-use co_api::{reduce, Context, Reducer, ReducerAction, Tags};
+use co_api::{reduce, Context, DagMap, Reducer, ReducerAction, Tags};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 /// Key Store.
 ///
@@ -8,10 +7,10 @@ use std::collections::BTreeMap;
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct KeyStore {
 	// #[co_api::Map]
-	pub keys: BTreeMap<String, Key>,
+	pub keys: DagMap<String, Key>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Key {
 	/// URI which uniquely identifies this key.
 	pub uri: String,
@@ -29,45 +28,32 @@ pub struct Key {
 	pub tags: Tags,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Secret {
 	Password(co_api::Secret),
 	PrivateKey(co_api::Secret),
 	SharedKey(co_api::Secret),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum KeyStoreAction {
 	Set(Key),
 	Remove(String),
 }
-
 impl Reducer for KeyStore {
 	type Action = KeyStoreAction;
 
-	fn reduce(self, event: &ReducerAction<Self::Action>, _: &mut dyn Context) -> Self {
+	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		let mut result = self;
 		match &event.payload {
 			KeyStoreAction::Set(i) => {
-				result.keys.insert(i.uri.clone(), i.clone());
+				result.keys.insert(context, i.uri.clone(), i.clone());
 			},
 			KeyStoreAction::Remove(uri) => {
-				result.keys.remove(uri);
+				result.keys.remove(context, uri);
 			},
 		}
 		result
-	}
-}
-
-impl KeyStore {
-	pub fn shared_key<'a>(&'a self, uri: &str) -> Option<&'a co_api::Secret> {
-		match self.keys.get(uri) {
-			Some(key) => match &key.secret {
-				Secret::SharedKey(l) => Some(l),
-				_ => None,
-			},
-			None => None,
-		}
 	}
 }
 

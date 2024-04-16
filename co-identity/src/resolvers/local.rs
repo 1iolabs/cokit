@@ -1,4 +1,5 @@
 use crate::{Identity, IdentityResolver, IdentityResolverError, PrivateIdentity};
+use async_trait::async_trait;
 
 /// A local identity without any actual signatures.
 #[derive(Debug, Clone)]
@@ -42,8 +43,9 @@ impl LocalIdentityResolver {
 		Ok(Self::into_local_identity(identity)?)
 	}
 }
+#[async_trait]
 impl IdentityResolver for LocalIdentityResolver {
-	fn resolve(
+	async fn resolve(
 		&self,
 		identity: &str,
 		_public_key: Option<&[u8]>,
