@@ -1,6 +1,6 @@
 use crate::{
 	cli::Cli,
-	library::{application::application, cat::cat_output},
+	library::{cat::cat_output, cli_context::CliContext},
 };
 use co_sdk::{BlockStorageContentMapping, CoId, MultiCodec};
 use exitcode::ExitCode;
@@ -20,8 +20,8 @@ pub struct Command {
 	pub skip: usize,
 }
 
-pub async fn command(cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
-	let application = application(cli).await?;
+pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
+	let application = context.application(cli).await;
 	let (storage, stream, mapping) = application.co_log_entries(&command.co).await?;
 
 	// stream

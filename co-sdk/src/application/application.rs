@@ -15,6 +15,10 @@ use directories::ProjectDirs;
 use futures::{Stream, TryStreamExt};
 use std::{collections::BTreeMap, mem::swap, ops::DerefMut, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
+use tokio_util::{
+	sync::{CancellationToken, DropGuard},
+	task::TaskTracker,
+};
 use tracing::{level_filters::LevelFilter, subscriber::set_global_default};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
@@ -54,6 +58,15 @@ pub struct Application {
 
 	/// Use keychain or file for Local CO.
 	keychain: bool,
+
+	/// Application shutdown token.
+	shutdown: CancellationToken,
+
+	/// Shutdown the application when last reference is dropped.
+	_drop: Arc<DropGuard>,
+
+	// Tasks.
+	tasks: TaskTracker,
 }
 impl Application {
 	pub fn identifier(&self) -> &str {
@@ -76,8 +89,26 @@ impl Application {
 		self.network.clone()
 	}
 
+	pub fn shutdown(&self) -> CancellationToken {
+		self.shutdown.clone()
+	}
+
+	/// Tasks bound to this application.
+	pub fn tasks(&self) -> TaskTracker {
+		self.tasks.clone()
+	}
+
 	pub fn runtime(&self) -> &RuntimePool {
 		self.runtime.runtime()
+	}
+
+	/// Shutdown the applciation gracefully.
+	pub async fn shutdown_application(&self) {
+		// signal
+		self.shutdown.cancel();
+
+		// wait
+		self.tasks.wait().await;
 	}
 
 	/// Create and startup network.
@@ -121,7 +152,9 @@ impl Application {
 			self.local_identity(),
 			initialize,
 		);
-		let local_co_reducer = local_co.build(self.storage(), self.runtime.clone()).await?;
+		let local_co_reducer = local_co
+			.build(self.storage(), self.runtime.clone(), self.shutdown(), self.tasks())
+			.await?;
 		Ok(local_co_reducer)
 	}
 
@@ -284,6 +317,21 @@ impl Application {
 			_ => {},
 		}
 
+		// shutdown
+		let shutdown = self.shutdown.clone();
+		let tasks = self.tasks.clone();
+		tokio::spawn(async move {
+			// shutdown
+			shutdown.cancelled().await;
+			tasks.close();
+
+			// log
+			tracing::trace!("application-shutdown");
+		});
+
+		// log
+		tracing::trace!("application-startup");
+
 		// result
 		Ok(())
 	}
@@ -352,6 +400,7 @@ impl ApplicationBuilder {
 
 	pub async fn build(self) -> Result<Application, anyhow::Error> {
 		let storage_path = self.path.join("data");
+		let shutdown = CancellationToken::new();
 		let result = Application {
 			network: None,
 			storage: Storage::new(storage_path.clone()),
@@ -362,6 +411,9 @@ impl ApplicationBuilder {
 			log: self.log,
 			keychain: self.keychain,
 			reducers: Default::default(),
+			_drop: Arc::new(shutdown.clone().drop_guard()),
+			shutdown: shutdown.clone(),
+			tasks: TaskTracker::new(),
 		};
 		result.init().await?;
 		Ok(result)

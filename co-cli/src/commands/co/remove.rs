@@ -1,4 +1,4 @@
-use crate::{cli::Cli, library::application::application};
+use crate::{cli::Cli, library::cli_context::CliContext};
 use co_core_keystore::KeyStoreAction;
 use co_core_membership::MembershipsAction;
 use co_sdk::{find_memberships, CoId, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP};
@@ -13,8 +13,8 @@ pub struct Command {
 	pub did: Option<String>,
 }
 
-pub async fn command(cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
-	let application = application(cli).await?;
+pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
+	let application = context.application(cli).await;
 	let local = application.local_co_reducer().await?;
 	let identity = application.local_identity();
 

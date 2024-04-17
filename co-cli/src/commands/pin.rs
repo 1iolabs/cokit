@@ -1,4 +1,4 @@
-use crate::{cli::Cli, library::application::application};
+use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::Ok;
 use co_api::{Cid, DagCollection};
 use co_sdk::{BlockStorage, CO_CORE_NAME_PIN};
@@ -31,14 +31,14 @@ pub struct ListCommand {
 	pub list: bool,
 }
 
-pub async fn command(cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
+pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
 	match &command.command {
-		Commands::Ls(list_command) => list_pins(cli, list_command).await,
+		Commands::Ls(list_command) => list_pins(context, cli, list_command).await,
 	}
 }
 
-pub async fn list_pins(cli: &Cli, command: &ListCommand) -> Result<ExitCode, anyhow::Error> {
-	let application = application(cli).await?;
+pub async fn list_pins(context: &CliContext, cli: &Cli, command: &ListCommand) -> Result<ExitCode, anyhow::Error> {
+	let application = context.application(cli).await;
 
 	let local_co_reducer = application.local_co_reducer().await?;
 	let storage = local_co_reducer.storage();

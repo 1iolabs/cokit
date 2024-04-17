@@ -83,6 +83,7 @@ impl BlockStorage for FsStorage {
 		into_block_result(cid, tokio::fs::read(path).await)
 	}
 
+	#[tracing::instrument(err, skip(block), fields(cid = ?block.cid(), path = ?to_cid_path(&self.path, block.cid())))]
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		let path = to_cid_path(&self.path, block.cid());
 

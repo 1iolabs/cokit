@@ -3,7 +3,7 @@ mod edit;
 mod get;
 mod send;
 
-use crate::cli::Cli;
+use crate::{cli::Cli, library::cli_context::CliContext};
 use co_sdk::CoId;
 use exitcode::ExitCode;
 
@@ -28,11 +28,11 @@ pub enum Commands {
 	Edit(create::Command),
 }
 
-pub async fn command(cli: &Cli, room_command: &Command) -> Result<ExitCode, anyhow::Error> {
+pub async fn command(context: &CliContext, cli: &Cli, room_command: &Command) -> Result<ExitCode, anyhow::Error> {
 	match &room_command.command {
-		Commands::Create(command) => create::command(cli, room_command, command).await,
-		Commands::Send(command) => send::command(cli, room_command, command).await,
-		Commands::Get(command) => get::command(cli, room_command, command).await,
-		Commands::Edit(command) => edit::command(cli, room_command, command).await,
+		Commands::Create(command) => create::command(context, cli, room_command, command).await,
+		Commands::Send(command) => send::command(context, cli, room_command, command).await,
+		Commands::Get(command) => get::command(context, cli, room_command, command).await,
+		Commands::Edit(command) => edit::command(context, cli, room_command, command).await,
 	}
 }

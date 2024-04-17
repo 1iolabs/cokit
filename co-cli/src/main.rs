@@ -1,12 +1,21 @@
 use clap::Parser;
-use library::application::log_path;
+use cli::Cli;
+use co_sdk::ApplicationBuilder;
+use opentelemetry::{
+	trace::{TraceError, TracerProvider as _},
+	KeyValue,
+};
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::{runtime, trace as sdktrace, trace::TracerProvider, Resource};
+use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
+use std::path::PathBuf;
 use tracing::Level;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_subscriber::{fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt};
 
 mod cli;
 mod commands;
-pub mod library;
+mod library;
 
 fn main() {
 	let result = tokio::runtime::Builder::new_multi_thread()
@@ -45,13 +54,69 @@ async fn app_main() -> anyhow::Result<exitcode::ExitCode> {
 		None
 	};
 
+	// tracing: open telemetry
+	let (telemetry, _telemetry_flush) = if cli.open_telemetry {
+		struct TracerCleanup {}
+		impl Drop for TracerCleanup {
+			fn drop(&mut self) {
+				opentelemetry::global::shutdown_tracer_provider()
+			}
+		}
+
+		// telemetry
+		let telemetry = if cli.open_telemetry_endpoint == "stdout" {
+			let provider = TracerProvider::builder()
+				.with_simple_exporter(opentelemetry_stdout::SpanExporter::default())
+				.build();
+			tracing_opentelemetry::layer().with_tracer(provider.tracer(cli.instance_id.clone()))
+		} else {
+			tracing_opentelemetry::layer().with_tracer(
+				init_tracer(cli.instance_id.clone(), cli.open_telemetry_endpoint.clone())
+					.expect("open telementry tracer"),
+			)
+		};
+		// opentelemetry::global::set_text_map_propagator(opentelemetry_sdk::propagation::TraceContextPropagator::new());
+		// opentelemetry::global::tracer(cli.instance_id.clone()).in_span("test", |cx| {
+		// 	cx.span().add_event("test", vec![]);
+		// });
+		println!("tracing: {}", cli.open_telemetry_endpoint);
+		(Some(telemetry), Some(TracerCleanup {}))
+	} else {
+		(None, None)
+	};
+
 	// tracing
 	tracing_subscriber::registry()
+		.with(telemetry)
 		.with(JsonStorageLayer)
 		.with(output)
 		.with(log)
 		.init();
 
 	// execute
-	cli::command(&cli).await
+	let result = cli::command(&cli).await;
+
+	// result
+	result
+}
+
+/// See:
+/// - https://github.com/open-telemetry/opentelemetry-rust/blob/main/examples/tracing-jaeger/src/main.rs
+/// - https://quickwit.io/blog/observing-rust-app-with-quickwit-jaeger-grafana
+fn init_tracer(service_name: String, endpoint: String) -> Result<opentelemetry_sdk::trace::Tracer, TraceError> {
+	opentelemetry_otlp::new_pipeline()
+		.tracing()
+		.with_exporter(opentelemetry_otlp::new_exporter().tonic().with_endpoint(endpoint))
+		.with_trace_config(
+			sdktrace::config().with_resource(Resource::new(vec![KeyValue::new(SERVICE_NAME, service_name)])),
+		)
+		.install_batch(runtime::Tokio)
+}
+
+fn log_path(cli: &Cli) -> PathBuf {
+	if let Some(path) = &cli.log_path {
+		return path.clone();
+	}
+	let base_path = if let Some(path) = &cli.base_path { path.clone() } else { ApplicationBuilder::default_path() };
+	base_path.join("log/co.log")
 }

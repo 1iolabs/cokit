@@ -1,6 +1,6 @@
 use crate::{
 	cli::Cli,
-	library::{application::application, cat::cat_output},
+	library::{cat::cat_output, cli_context::CliContext},
 };
 use co_primitives::Secret;
 use co_sdk::CoStorage;
@@ -24,9 +24,9 @@ pub struct Command {
 	pub key_file: Option<PathBuf>,
 }
 
-pub async fn command(cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
+pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
 	// reducer
-	let application = application(cli).await?;
+	let application = context.application(cli).await;
 	let mut storage = application.storage();
 
 	// encryption?

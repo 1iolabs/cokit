@@ -1,6 +1,7 @@
 use super::{identity::create_identity_resolver, reducer::ReducerChangedHandler};
 use crate::{
 	library::{
+		cancel::cancel,
 		fs_read::fs_read_option,
 		fs_write::fs_write,
 		locals::{ApplicationLocal, Locals},
@@ -22,6 +23,7 @@ use co_runtime::RuntimePool;
 use co_storage::{Algorithm, BlockStorage, EncryptedBlockStorage};
 use libipld::{Cid, DefaultParams};
 use std::{collections::BTreeMap, io::ErrorKind, path::PathBuf};
+use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 pub const LOCAL_CO_ID: &str = "local";
 
@@ -63,8 +65,14 @@ impl LocalCoBuilder {
 	}
 
 	/// Create LocalCO instance.
-	pub async fn build(self, storage: CoStorage, runtime: Runtime) -> Result<CoReducer, anyhow::Error> {
-		Ok(LocalCoInstance::create(runtime, self, storage).await?.1)
+	pub async fn build(
+		self,
+		storage: CoStorage,
+		runtime: Runtime,
+		shutdown: CancellationToken,
+		tasks: TaskTracker,
+	) -> Result<CoReducer, anyhow::Error> {
+		Ok(LocalCoInstance::create(runtime, self, storage, shutdown, tasks).await?.1)
 	}
 
 	/// Key path if no keychain should be used.
@@ -96,6 +104,8 @@ impl LocalCoInstance {
 		runtime: Runtime,
 		local_co: LocalCoBuilder,
 		storage: CoStorage,
+		shutdown: CancellationToken,
+		tasks: TaskTracker,
 	) -> Result<(Self, CoReducer), anyhow::Error> {
 		// create storage
 		let mut encrypted_storage: EncryptedBlockStorage<CoStorage> =
@@ -151,12 +161,19 @@ impl LocalCoInstance {
 		let co_reducer = CoReducer::new(LOCAL_CO_ID.into(), runtime, reducer, Some(mapping));
 
 		// watch
-		// TODO: when to shut this down?
 		let watch_reducer = co_reducer.clone();
 		let mut watch_encrypted_storage = encrypted_storage.clone();
-		tokio::task::spawn(async move {
+		tasks.spawn(async move {
 			let mut watcher = locals.watch();
-			while let Some((_, local)) = watcher.recv().await {
+			while let Some((_, local)) = cancel(shutdown.clone(), watcher.recv()).await {
+				// skip?
+				let (_, heads) = watch_reducer.reducer_state().await;
+				if heads == local.heads {
+					tracing::trace!(?local.heads, "local-watch-skip");
+				} else {
+					tracing::trace!(?local.heads, ?local.mapping, "local-watch");
+				}
+
 				// mappings
 				if let Some(mapping) = local.mapping {
 					match watch_encrypted_storage.load_mapping(&mapping).await {
@@ -166,12 +183,12 @@ impl LocalCoInstance {
 				}
 
 				// heads
-				match watch_reducer.join(local.heads).await {
+				match watch_reducer.join(local.heads.clone()).await {
 					Ok(change) =>
 						if change {
 							tracing::trace!("local-watch-join");
 						},
-					Err(err) => tracing::warn!(?err, "local-watch-join-failed"),
+					Err(err) => tracing::warn!(?err, ?local.heads, "local-watch-join-failed"),
 				}
 			}
 		});
@@ -191,21 +208,24 @@ impl LocalCoInstance {
 			let path = self.application_path.join("local.cbor");
 			let content_mapping = Some(self.encrypted_storage.content_mapping());
 
-			// trace
-			tracing::trace!(app = ?self.identifier, ?path, ?state, ?mapping, "local-co-write");
-
 			// heads
-			let heads = to_plain(&content_mapping, true, reducer.heads().iter().cloned())
+			let plain_heads = to_plain(&content_mapping, true, reducer.heads().iter().cloned())
 				.await
 				.map_err(|err| anyhow!("Failed to map head: {}", err))?;
 
 			// state
-			let state = to_plain_one(&content_mapping, true, *state)
+			let plain_state = to_plain_one(&content_mapping, true, *state)
 				.await
 				.map_err(|err| anyhow!("Failed to map state: {}", err))?;
 
 			// create format
-			let local = ApplicationLocal::new(heads, state.clone(), mapping);
+			let local = ApplicationLocal::new(plain_heads, plain_state, mapping);
+
+			// log
+			#[cfg(debug_assertions)]
+			tracing::trace!(app = ?self.identifier, ?path, ?local.state, ?local.heads, ?local.mapping,  "local-co-write");
+			#[cfg(not(debug_assertions))]
+			tracing::trace!(app = ?self.identifier, ?path, ?local.state, ?local.heads, ?local.mapping, "local-co-write");
 
 			// write
 			local.write(&path).await.map(|_| true)

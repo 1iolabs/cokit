@@ -4,7 +4,7 @@ mod log;
 mod ls;
 mod remove;
 
-use crate::cli::Cli;
+use crate::{cli::Cli, library::cli_context::CliContext};
 use exitcode::ExitCode;
 
 #[derive(Debug, Clone, clap::Args)]
@@ -32,12 +32,12 @@ pub enum Commands {
 	Log(log::Command),
 }
 
-pub async fn command(cli: &Cli, co_command: &Command) -> Result<ExitCode, anyhow::Error> {
+pub async fn command(context: &CliContext, cli: &Cli, co_command: &Command) -> Result<ExitCode, anyhow::Error> {
 	match &co_command.command {
-		Commands::Ls => ls::command(cli).await,
-		Commands::Cat(command) => cat::command(cli, command).await,
-		Commands::Create(command) => create::command(cli, command).await,
-		Commands::Remove(command) => remove::command(cli, command).await,
-		Commands::Log(command) => log::command(cli, command).await,
+		Commands::Ls => ls::command(context, cli).await,
+		Commands::Cat(command) => cat::command(context, cli, command).await,
+		Commands::Create(command) => create::command(context, cli, command).await,
+		Commands::Remove(command) => remove::command(context, cli, command).await,
+		Commands::Log(command) => log::command(context, cli, command).await,
 	}
 }

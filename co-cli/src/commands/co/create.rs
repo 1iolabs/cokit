@@ -1,4 +1,4 @@
-use crate::{cli::Cli, library::application::application};
+use crate::{cli::Cli, library::cli_context::CliContext};
 use co_sdk::{CoId, CreateCo};
 use exitcode::ExitCode;
 
@@ -15,8 +15,8 @@ pub struct Command {
 	pub public: bool,
 }
 
-pub async fn command(cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
-	let application = application(cli).await?;
+pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
+	let application = context.application(cli).await;
 
 	// create
 	let create = CreateCo {

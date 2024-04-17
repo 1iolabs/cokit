@@ -1,6 +1,6 @@
 use crate::{
 	cli::Cli,
-	library::{application::application, cat::cat_output},
+	library::{cat::cat_output, cli_context::CliContext},
 };
 use anyhow::anyhow;
 use co_sdk::CoId;
@@ -22,9 +22,9 @@ pub struct Command {
 	pub pretty: bool,
 }
 
-pub async fn command(cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
+pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
 	// reducer
-	let application = application(cli).await?;
+	let application = context.application(cli).await;
 	let reducer = application
 		.co_reducer(&command.co)
 		.await?

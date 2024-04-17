@@ -1,5 +1,5 @@
 use super::Command as RoomCommand;
-use crate::{cli::Cli, library::application::application};
+use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
 use chrono::{DateTime, Local};
 use co_core_room::Room;
@@ -25,8 +25,13 @@ pub struct Command {
 	skip: usize,
 }
 
-pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -> Result<ExitCode, anyhow::Error> {
-	let application = application(cli).await?;
+pub async fn command(
+	context: &CliContext,
+	cli: &Cli,
+	room_command: &RoomCommand,
+	command: &Command,
+) -> Result<ExitCode, anyhow::Error> {
+	let application = context.application(cli).await;
 	let co_reducer = application
 		.co_reducer(&room_command.co)
 		.await?

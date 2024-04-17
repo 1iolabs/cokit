@@ -2,8 +2,8 @@ use super::Command as FileCommand;
 use crate::{
 	cli::Cli,
 	library::{
-		application::application,
 		cat::cat_output,
+		cli_context::CliContext,
 		file::{get_nodes, FileError},
 	},
 };
@@ -25,8 +25,13 @@ pub struct Command {
 	pub pretty: bool,
 }
 
-pub async fn command(cli: &Cli, file_command: &FileCommand, command: &Command) -> Result<ExitCode, anyhow::Error> {
-	let application = application(cli).await?;
+pub async fn command(
+	context: &CliContext,
+	cli: &Cli,
+	file_command: &FileCommand,
+	command: &Command,
+) -> Result<ExitCode, anyhow::Error> {
+	let application = context.application(cli).await;
 	let co_reducer = application
 		.co_reducer(&file_command.co)
 		.await?

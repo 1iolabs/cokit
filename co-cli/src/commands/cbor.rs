@@ -1,3 +1,4 @@
+use crate::library::cli_context::CliContext;
 use exitcode::ExitCode;
 use libipld::Ipld;
 
@@ -24,7 +25,7 @@ pub struct PrintCommand {
 	pub pretty: bool,
 }
 
-pub async fn command(cbor: &Command) -> Result<ExitCode, anyhow::Error> {
+pub async fn command(_context: &CliContext, cbor: &Command) -> Result<ExitCode, anyhow::Error> {
 	match &cbor.command {
 		Commands::Print(command) => print(command).await,
 	}

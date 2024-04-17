@@ -1,4 +1,4 @@
-use crate::{cli::Cli, library::application::application};
+use crate::{cli::Cli, library::cli_context::CliContext};
 use co_sdk::{memberships, CoId};
 use exitcode::ExitCode;
 use futures::{pin_mut, stream::StreamExt};
@@ -17,8 +17,8 @@ pub struct Command {
 	pub pretty: bool,
 }
 
-pub async fn command(cli: &Cli) -> Result<ExitCode, anyhow::Error> {
-	let application = application(cli).await?;
+pub async fn command(context: &CliContext, cli: &Cli) -> Result<ExitCode, anyhow::Error> {
+	let application = context.application(cli).await;
 	let local_co_reducer = application.local_co_reducer().await?;
 
 	// list

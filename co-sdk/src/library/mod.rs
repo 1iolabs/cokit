@@ -1,3 +1,4 @@
+pub mod cancel;
 pub mod co_peer_provider;
 pub mod find_membership;
 pub mod fs_read;

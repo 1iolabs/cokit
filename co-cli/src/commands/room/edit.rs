@@ -1,5 +1,5 @@
 use super::{create::Command, Command as RoomCommand};
-use crate::{cli::Cli, library::application::application};
+use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
 use co_messaging::{
 	multimedia::{ImageInfo, ThumbnailInfo},
@@ -10,8 +10,13 @@ use exitcode::ExitCode;
 use libipld::Cid;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub async fn command(cli: &Cli, room_command: &RoomCommand, command: &Command) -> Result<ExitCode, anyhow::Error> {
-	let application = application(cli).await?;
+pub async fn command(
+	context: &CliContext,
+	cli: &Cli,
+	room_command: &RoomCommand,
+	command: &Command,
+) -> Result<ExitCode, anyhow::Error> {
+	let application = context.application(cli).await;
 	let identity = application.local_identity();
 	let co = &room_command.co;
 	let core = &room_command.core;

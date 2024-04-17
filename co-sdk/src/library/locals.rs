@@ -82,6 +82,9 @@ impl Locals {
 
 													// send update
 													if tx.send((path.clone(), local)).is_err() {
+														// log
+														tracing::trace!("locals-watch-stop");
+
 														// stop thread when rx has been dropped
 														return Ok(());
 													}

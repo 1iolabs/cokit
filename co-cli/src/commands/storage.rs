@@ -1,6 +1,6 @@
 mod cat;
 
-use crate::cli::Cli;
+use crate::{cli::Cli, library::cli_context::CliContext};
 use exitcode::ExitCode;
 
 #[derive(Debug, Clone, clap::Args)]
@@ -16,8 +16,8 @@ pub enum Commands {
 	Cat(cat::Command),
 }
 
-pub async fn command(cli: &Cli, co_command: &Command) -> Result<ExitCode, anyhow::Error> {
+pub async fn command(context: &CliContext, cli: &Cli, co_command: &Command) -> Result<ExitCode, anyhow::Error> {
 	match &co_command.command {
-		Commands::Cat(command) => cat::command(cli, command).await,
+		Commands::Cat(command) => cat::command(context, cli, command).await,
 	}
 }

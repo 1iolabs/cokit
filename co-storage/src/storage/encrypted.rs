@@ -193,6 +193,10 @@ where
 			// TODO: PIN/UNPIN
 		}
 
+		// log
+		#[cfg(debug_assertions)]
+		tracing::trace!(?root, "storage-flush-mapping");
+
 		// result
 		Ok(root)
 	}
@@ -234,6 +238,7 @@ where
 		}
 	}
 
+	#[tracing::instrument(err, skip(self, block), fields(cid = ?block.cid()))]
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		let cid = block.cid().clone();
 
@@ -249,6 +254,10 @@ where
 
 		// map
 		self.mapping.write().await.insert(cid.clone(), encrypted_cid);
+
+		// trace (only in debug because this has security implications)
+		#[cfg(debug_assertions)]
+		tracing::trace!(?cid, ?encrypted_cid, "storage-set");
 
 		// result
 		Ok(cid)
