@@ -16,6 +16,7 @@ use std::{
 	time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::watch;
+use tracing::instrument;
 
 pub struct ReducerBuilder<S, R> {
 	/// Storage.
@@ -114,17 +115,31 @@ where
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
 	/// Initialize this reducer by computing current state if one.
+	#[instrument(skip(self, runtime))]
 	pub async fn initialize(&mut self, runtime: &RuntimePool) -> Result<(), anyhow::Error> {
+		tracing::trace!(?self.snapshots, "reducer-initialize");
+
 		// if we have snapshots but no state/heads join all heads from snapshots
 		// find latest state if we have snapshots but no latest selection
 		if self.state.is_none() && self.heads.is_empty() && !self.snapshots.is_empty() {
 			for (heads, _) in self.snapshots.iter() {
+				// join heads
 				self.log.join_heads(heads.iter()).await?;
+
+				// try to find state for latest heads
+				// do this every iteration so we end up with the latest known state
+				for (snapshot_heads, snapshot_state) in &self.snapshots {
+					if snapshot_heads == self.log.heads() {
+						self.state = Some(snapshot_state.clone());
+						self.heads = snapshot_heads.clone();
+					}
+				}
 			}
 		}
 
-		// if log heads are different from reducer heads compute the state
+		// if log heads are different from reducer heads
 		if &self.heads != self.log.heads() {
+			// compute the state
 			let (state, heads) = self.compute_state(runtime).await?;
 			self.state = state;
 			self.heads = heads;
@@ -142,6 +157,9 @@ where
 
 		// notify
 		self.on_state_changed().await?;
+
+		// log
+		tracing::trace!(?self.state, ?self.heads, "reducer-initialized");
 
 		// if we have state and heads we are fine
 		Ok(())
@@ -323,6 +341,7 @@ where
 
 	/// Compute state for log heads.
 	/// Returns the resulting state if one.
+	#[instrument(skip(self, runtime), fields(co = ?self.log.id()))]
 	async fn compute_state(&self, runtime: &RuntimePool) -> Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error> {
 		// compute stack
 		let (mut state, stack) = self.compute_stack().await?;
