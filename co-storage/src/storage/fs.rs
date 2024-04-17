@@ -141,7 +141,7 @@ fn into_storage_result<T>(cid: &Cid, result: std::io::Result<T>) -> Result<T, St
 	match result {
 		Ok(data) => Ok(data),
 		Err(e) if e.kind() == ErrorKind::NotFound => Err(StorageError::NotFound(cid.clone(), e.into())),
-		Err(e) => Err(StorageError::Internal(e.into())),
+		Err(e) => Err(StorageError::Internal(anyhow::Error::from(e).context(format!("Reading CID: {}", cid)))),
 	}
 }
 

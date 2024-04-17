@@ -583,12 +583,13 @@ pub trait PathExt {
 	///
 	/// Example:
 	/// ```rust
-	/// 	let path = PathRef::from_str_unchecked("/hello/world/test.zip");
-	/// 	let mut parents = path.parents();
-	/// 	assert_eq!(Some("/"), parents.next());
-	/// 	assert_eq!(Some("/hello"), parents.next());
-	/// 	assert_eq!(Some("/hello/world"), parents.next());
-	/// 	assert_eq!(None, parents.next());
+	/// use co_primitives::{Path, PathExt};
+	/// let path = Path::from_str_unchecked("/hello/world/test.zip");
+	/// let mut parents = path.parents();
+	/// assert_eq!(Some(Path::from_str_unchecked("/")), parents.next());
+	/// assert_eq!(Some(Path::from_str_unchecked("/hello")), parents.next());
+	/// assert_eq!(Some(Path::from_str_unchecked("/hello/world")), parents.next());
+	/// assert_eq!(None, parents.next());
 	/// ```
 	fn parents(&self) -> impl Iterator<Item = &Self::Path> {
 		self.components()

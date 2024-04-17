@@ -32,13 +32,14 @@ macro_rules! tags{
 ///
 /// ```
 /// use co_primitives::tag;
-/// let tag = tag!("hello": "world");
-/// println!("tag: {:?}", tag);
+/// let value = tag!("hello": "world");
+/// println!("tag: {:?}", value);
 /// ```
 #[macro_export]
 macro_rules! tag {
 	($key:tt : $val:expr) => {{
-		($key.to_owned(), $val.to_owned().into())
+		let tag: $crate::Tag = ($key.to_owned(), $val.to_owned().into());
+		tag
 	}};
 }
 
@@ -358,7 +359,8 @@ mod tests {
 	#[test]
 	fn test_tag_macro() {
 		let value: Tag = ("hello".to_owned(), "world".to_owned().into());
-		assert_eq!(value, tag!("hello": "world"));
+		let value_macro = tag!("hello": "world");
+		assert_eq!(value, value_macro);
 	}
 
 	#[test]

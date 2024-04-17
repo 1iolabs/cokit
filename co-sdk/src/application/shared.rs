@@ -72,7 +72,7 @@ impl SharedCoBuilder {
 						.await?
 						.ok_or(anyhow::anyhow!("Shared key not found: {}", key_reference))?;
 					let secret = match key.secret {
-						co_core_keystore::Secret::PrivateKey(sec) => Ok(sec),
+						co_core_keystore::Secret::SharedKey(sec) => Ok(sec),
 						_ => Err(anyhow!("Invalid secret")),
 					}?;
 					let mut result_storage =

@@ -1,5 +1,5 @@
 use crate::CoreResolver;
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use co_identity::PrivateIdentity;
 use co_log::{EntryBlock, Log, LogError};
@@ -294,7 +294,12 @@ where
 			let reducer: &Self = &self;
 			stream::iter(change_handlers.iter_mut())
 				.map(Ok)
-				.try_for_each_concurrent(5, |handler| async move { handler.on_state_changed(reducer).await })
+				.try_for_each_concurrent(5, |handler| async move {
+					handler
+						.on_state_changed(reducer)
+						.await
+						.with_context(|| format!("running ReducerChangeHandler"))
+				})
 				.await?;
 		}
 		self.change_handlers.append(&mut change_handlers);
