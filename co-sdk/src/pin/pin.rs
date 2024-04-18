@@ -33,6 +33,12 @@ where
 			.await?;
 		Ok(())
 	}
+	pub async fn unpin_all(&self, tags: Tags) -> Result<(), anyhow::Error> {
+		self.co_reducer
+			.push(self.identity, CO_CORE_NAME_PIN, &PinAction::UnpinAll(tags))
+			.await?;
+		Ok(())
+	}
 	pub async fn clean_storage<S>(&self, _storage: S) -> Result<(), anyhow::Error>
 	where
 		S: Iterator<Item = Cid> + BlockStorage + Clone,
@@ -49,14 +55,6 @@ where
 		Ok(())
 	}
 }
-
-// fn resolve_cids<N, T>(storage: CoStorage, container: N)
-// where
-// 	N: NodeContainer<T>,
-// 	T: DeserializeOwned + Send + Sync + Unpin + 'static,
-// {
-// 	let node_stream = NodeStream::from_node_container(storage, &container);
-// }
 
 /**
  * A simple function to check if a specific content id is pinned or not

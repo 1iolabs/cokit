@@ -1,7 +1,7 @@
 use co_api::{reduce, DagCollection, DagMap, DagSet, Reducer, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /**
  * COre that handles pinning and unpinning
@@ -20,6 +20,7 @@ pub struct Pin {
 pub enum PinAction {
 	Pin(Cid, Tags),
 	Unpin(Cid, Tags),
+	UnpinAll(Tags),
 }
 
 impl Reducer for Pin {
@@ -38,25 +39,52 @@ impl Reducer for Pin {
 					pin_map.insert(*cid, pinned_tags);
 				}
 			},
-			PinAction::Unpin(cid, tags) =>
-			// get current tags for cid
-				if let Some(mut pinned_tags) = pin_map.get(cid).cloned() {
-					// remove given tag from array
-					let filtered_tags: BTreeSet<Tags> =
-						pinned_tags.iter(context.storage()).filter(|t| *t != *tags).collect();
-					if filtered_tags.is_empty() {
-						// last tags removed from set -> remove cid from map
-						pin_map.remove(cid);
-					} else {
-						// update map with filtered tags
-						pinned_tags.set(context.storage_mut(), filtered_tags);
-						pin_map.insert(*cid, pinned_tags);
+			// unpin single cid with tags
+			PinAction::Unpin(cid, tags) => {
+				pin_map = unpin(pin_map, cid, tags, context);
+			},
+			// unpin all cid that match tags using these tags
+			PinAction::UnpinAll(tags) => {
+				// iterate all current pins
+				for (cid, pin_tag_set) in pin_map.clone().iter() {
+					// resolve tags for current cid
+					let pin_tag_set = pin_tag_set.get(context.storage());
+					// check if tag set contains given tags
+					for pin_tags in pin_tag_set {
+						if tags.matches(pin_tags) {
+							// unpin found cid
+							pin_map = unpin(pin_map, cid, tags, context);
+							continue;
+						}
 					}
-				},
+				}
+			},
 		};
 		result.pins.set(context.storage_mut(), pin_map);
 		result
 	}
+}
+
+fn unpin(
+	mut pin_map: BTreeMap<Cid, DagSet<Tags>>,
+	cid: &Cid,
+	tags: &Tags,
+	context: &mut dyn co_api::Context,
+) -> BTreeMap<Cid, DagSet<Tags>> {
+	// get current tags for cid
+	if let Some(mut pinned_tags) = pin_map.get(cid).cloned() {
+		// remove given tag from array
+		let filtered_tags: BTreeSet<Tags> = pinned_tags.iter(context.storage()).filter(|t| *t != *tags).collect();
+		if filtered_tags.is_empty() {
+			// last tags removed from set -> remove cid from map
+			pin_map.remove(cid);
+		} else {
+			// update map with filtered tags
+			pinned_tags.set(context.storage_mut(), filtered_tags);
+			pin_map.insert(*cid, pinned_tags);
+		}
+	}
+	pin_map
 }
 
 #[no_mangle]
