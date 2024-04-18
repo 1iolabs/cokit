@@ -4,8 +4,8 @@ use crate::{
 	library::co_peer_provider::CoPeerProvider,
 	state::find,
 	types::co_storage::CoBlockStorageContentMapping,
-	CoCoreResolver, CoReducer, CoStorage, PinAPI, Reducer, ReducerBuilder, ReducerChangedHandler, Runtime,
-	CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerBuilder, ReducerChangedHandler, Runtime, CO_CORE_NAME_CO,
+	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -135,10 +135,6 @@ impl SharedCoBuilder {
 			encrypted_storage,
 		};
 		reducer.add_change_handler(Box::new(writer));
-
-		// setup auto pinning of new states
-		let pin_writer = PinWriter::new(identity, self.parent, self.membership.id.clone());
-		reducer.add_change_handler(Box::new(pin_writer));
 
 		// result
 		Ok(CoReducer::new(self.membership.id, runtime, reducer, mapping))
@@ -299,46 +295,6 @@ where
 					},
 				)
 				.await?;
-		}
-		Ok(())
-	}
-}
-
-struct PinWriter<I>
-where
-	I: PrivateIdentity + Send + Sync,
-{
-	parent: CoReducer,
-	identity: I,
-	co_id: CoId,
-}
-
-impl<I> PinWriter<I>
-where
-	I: PrivateIdentity + Send + Sync,
-{
-	pub fn new(identity: I, parent: CoReducer, co_id: CoId) -> Self {
-		Self { identity, parent, co_id }
-	}
-}
-
-#[async_trait]
-impl<I> ReducerChangedHandler<CoStorage, CoCoreResolver> for PinWriter<I>
-where
-	I: PrivateIdentity + Send + Sync + Debug + 'static,
-{
-	async fn on_state_changed(&mut self, reducer: &Reducer<CoStorage, CoCoreResolver>) -> Result<(), anyhow::Error> {
-		// there is no need to check for pinning loops as pinning any core should only ever be used in a local CO and
-		// not a shared CO
-		// we only care when there actually is state to pin
-		if let Some(state) = reducer.state() {
-			// get pin api
-			let api = PinAPI::api(&self.parent, &self.identity);
-			// TODO add some kind of security like salt
-			let tags = tags!("type": "state", "co": self.co_id.to_string(), "source": "self");
-			// pin new state
-			api.pin_cid(*state, tags.clone()).await?;
-			// TODO unpin any previous state pins of this co
 		}
 		Ok(())
 	}
