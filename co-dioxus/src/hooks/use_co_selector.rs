@@ -3,12 +3,11 @@ use co_sdk::{Application, CoId, CoReducer, CoStorage, OptionLink};
 use dioxus::prelude::*;
 use futures::Future;
 use libipld::Cid;
-use serde::de::DeserializeOwned;
 
 /// Select state from an CO.
 pub fn use_co_selector<T, F, Fut>(co: &str, selector: F) -> Signal<CoStateResult<T>, SyncStorage>
 where
-	T: DeserializeOwned + Send + Sync + Default + Clone + 'static,
+	T: Send + Sync + Default + Clone + 'static,
 	F: Fn(CoStorage, Option<Cid>) -> Fut + Send + Sync + 'static,
 	Fut: Future<Output = Result<T, anyhow::Error>> + Send + 'static,
 {
@@ -54,7 +53,7 @@ async fn fetch_and_observe_state<T, F, Fut>(
 	mut drop_rx: tokio::sync::oneshot::Receiver<()>,
 	selector: F,
 ) where
-	T: DeserializeOwned + Send + Sync + Default + Clone + 'static,
+	T: Send + Sync + Default + Clone + 'static,
 	F: Fn(CoStorage, Option<Cid>) -> Fut + Send + Sync + 'static,
 	Fut: Future<Output = Result<T, anyhow::Error>> + Send + 'static,
 {
@@ -118,7 +117,7 @@ impl StateReader {
 		mut state: Signal<CoStateResult<T>, SyncStorage>,
 		selector: &F,
 	) where
-		T: DeserializeOwned + Send + Sync + Default + Clone + 'static,
+		T: Send + Sync + Default + Clone + 'static,
 		F: Fn(CoStorage, Option<Cid>) -> Fut + Send + Sync + 'static,
 		Fut: Future<Output = Result<T, anyhow::Error>> + Send + 'static,
 	{

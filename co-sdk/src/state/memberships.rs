@@ -5,7 +5,7 @@ use co_primitives::{CoId, OptionLink, Tags};
 use futures::Stream;
 use libipld::Cid;
 
-/// Returns all memberships.
+/// Returns memberships contained in the CO (`co_state`)`.
 ///
 /// # Arguments
 /// - `storage` - The BlockStorage.

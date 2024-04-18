@@ -7,7 +7,7 @@ use serde::de::DeserializeOwned;
 /// Stream element of an [`NodeContainer`].
 ///
 /// See: [`co_api::DagCollection`]
-pub fn stream<T, N, F, S>(storage: S, container: &N) -> impl Stream<Item = Result<T, StorageError>>
+pub fn stream<T, N, S>(storage: S, container: &N) -> impl Stream<Item = Result<T, StorageError>>
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 	T: DeserializeOwned + Send + Sync + 'static,

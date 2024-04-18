@@ -6,6 +6,9 @@ use serde::de::DeserializeOwned;
 
 /// Return core state (CID and actual state) from an CO assuming the `co_state` points to the root of a `co-core-co`
 /// core.
+///
+/// ## Errors
+/// - `CoReducerError::CoreNotFound` - If the core not exists.
 pub async fn core_state<T: DeserializeOwned + Send + Sync + Default + Clone + 'static>(
 	storage: &CoStorage,
 	co_state: OptionLink<co_core_co::Co>,
@@ -35,4 +38,17 @@ pub async fn core_state<T: DeserializeOwned + Send + Sync + Default + Clone + 's
 
 	// not found
 	return Err(CoReducerError::CoreNotFound(core.to_owned()));
+}
+
+/// Return the core state or default is the core not exists.
+pub async fn core_state_or_default<T: DeserializeOwned + Send + Sync + Default + Clone + 'static>(
+	storage: &CoStorage,
+	co_state: OptionLink<co_core_co::Co>,
+	core: &str,
+) -> Result<T, CoReducerError> {
+	match core_state(&storage, co_state, core).await {
+		Ok((_, core_state)) => Ok(core_state),
+		Err(CoReducerError::CoreNotFound(_)) => Ok(T::default()),
+		Err(e) => Err(e)?,
+	}
 }

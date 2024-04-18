@@ -8,13 +8,17 @@ pub struct DidKeyProvider {
 	keystore_core: String,
 }
 impl DidKeyProvider {
-	pub async fn new(reducer: CoReducer, keystore_core: impl Into<String>) -> Self {
+	pub fn new(reducer: CoReducer, keystore_core: impl Into<String>) -> Self {
 		Self { reducer, keystore_core: keystore_core.into() }
 	}
 
-	pub async fn store(&self, identity: DidKeyIdentity) -> Result<(), anyhow::Error> {
+	pub async fn store(&self, identity: &DidKeyIdentity, name: Option<String>) -> Result<(), anyhow::Error> {
+		let mut key = identity.export()?;
+		if let Some(name) = name {
+			key.name = name;
+		}
 		self.reducer
-			.push(&identity, &self.keystore_core, &co_core_keystore::KeyStoreAction::Set(identity.export()?))
+			.push(identity, &self.keystore_core, &co_core_keystore::KeyStoreAction::Set(key))
 			.await?;
 		Ok(())
 	}
