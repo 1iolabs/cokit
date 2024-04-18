@@ -1,5 +1,7 @@
-use crate::CoSettings;
+use crate::{CoError, CoErrorSignal, CoSettings};
 use co_sdk::{Application, ApplicationBuilder};
+use dioxus::signals::Writable;
+use futures::Future;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[derive(Debug, Clone)]
@@ -24,6 +26,22 @@ impl CoContext {
 		self.tasks
 			.send(Box::new(f))
 			.expect("co thread to run until all senders dropped");
+	}
+
+	pub fn execute_future_with_error<F, Fut>(&self, mut error: CoErrorSignal, f: F)
+	where
+		Fut: Future<Output = Result<(), anyhow::Error>> + Send + 'static,
+		F: FnOnce(Application) -> Fut + Send + 'static,
+	{
+		self.execute(move |application| {
+			let application = application.clone();
+			application.tasks().spawn(async move {
+				match f(application).await {
+					Ok(_) => {},
+					Err(e) => error.write().push(CoError::from_error(e)),
+				}
+			});
+		});
 	}
 }
 
