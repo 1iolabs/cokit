@@ -1,4 +1,7 @@
-use super::shared::{CreateCo, SharedCoBuilder, SharedCoCreator};
+use super::{
+	identity::resolve_private_identity,
+	shared::{CreateCo, SharedCoBuilder, SharedCoCreator},
+};
 use crate::{
 	drivers::network::heads::ReceivedHeadsNetworkTask, library::find_membership::find_membership, local_keypair_fetch,
 	types::co_storage::CoBlockStorageContentMapping, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Network,
@@ -6,7 +9,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_identity::{LocalIdentity, LocalIdentityResolver};
+use co_identity::{LocalIdentity, LocalIdentityResolver, PrivateIdentityBox};
 use co_log::EntryBlock;
 use co_primitives::CoId;
 use co_runtime::RuntimePool;
@@ -182,6 +185,14 @@ impl Application {
 		Ok(Some(reducer))
 	}
 
+	/// Access Identity.
+	///
+	/// Todo: Identity Permissions?
+	pub async fn private_identity(&self, did: &co_primitives::Did) -> Result<PrivateIdentityBox, anyhow::Error> {
+		resolve_private_identity(self, &did).await
+	}
+
+	/// Get unsiged local device identity.
 	pub fn local_identity(&self) -> LocalIdentity {
 		LocalIdentityResolver::default().private_identity("did:local:device").unwrap()
 	}

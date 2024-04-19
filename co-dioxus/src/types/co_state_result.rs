@@ -10,3 +10,15 @@ pub enum CoStateResult<T> {
 	State(Option<Cid>, T),
 	Error(String),
 }
+impl<T> CoStateResult<T> {
+	pub fn state_or_default(&self) -> T
+	where
+		T: Default + Clone,
+	{
+		match self {
+			CoStateResult::Pending => T::default(),
+			CoStateResult::State(_, state) => state.clone(),
+			CoStateResult::Error(_) => T::default(),
+		}
+	}
+}

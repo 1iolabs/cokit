@@ -1,20 +1,24 @@
 use crate::{use_co_context, use_co_error, CoContext, CoErrorSignal};
-use co_sdk::{Application, CoId, CreateCo, DidKeyIdentity, DidKeyProvider, CO_CORE_NAME_KEYSTORE};
+use co_sdk::{
+	state::Identity, Application, CoId, CreateCo, DidKeyIdentity, DidKeyProvider, PrivateIdentityBox,
+	CO_CORE_NAME_KEYSTORE,
+};
 use serde::Serialize;
 use std::fmt::Debug;
 
 /// CO API.
-pub fn use_co_api(co: impl Into<CoId>) -> CoApi {
+pub fn use_co_api(co: impl Into<CoId>, identity: impl Into<Option<Identity>>) -> CoApi {
 	let co: CoId = co.into();
 	let context = use_co_context();
 	let error = use_co_error();
-	CoApi { co, context, error }
+	CoApi { co, context, error, identity: identity.into() }
 }
 
 pub struct CoApi {
 	co: CoId,
 	context: CoContext,
 	error: CoErrorSignal,
+	identity: Option<Identity>,
 }
 impl CoApi {
 	pub fn with_error(self, error: CoErrorSignal) -> Self {
@@ -39,9 +43,10 @@ impl CoApi {
 	{
 		let co = self.co.clone();
 		let core = core.to_owned();
+		let identity = self.identity.clone();
 		self.context
 			.execute_future_with_error(self.error, move |application| async move {
-				dispatch(application, &co, &core, &action).await
+				dispatch(application, identity, &co, &core, &action).await
 			});
 	}
 }
@@ -59,15 +64,24 @@ async fn create_identity(application: Application, seed: Vec<u8>, name: String) 
 	Ok(())
 }
 
-async fn dispatch<T>(application: Application, co: &CoId, core: &str, item: &T) -> Result<(), anyhow::Error>
+async fn dispatch<T>(
+	application: Application,
+	identitiy: Option<Identity>,
+	co: &CoId,
+	core: &str,
+	item: &T,
+) -> Result<(), anyhow::Error>
 where
 	T: Serialize + Debug + Send + Sync + Clone + 'static,
 {
-	let identity = application.local_identity();
+	let private_identity: PrivateIdentityBox = match identitiy {
+		None => Box::new(application.local_identity()),
+		Some(value) => application.private_identity(&value.did).await?,
+	};
 	let reducer = application
 		.co_reducer(co)
 		.await?
 		.ok_or_else(|| anyhow::anyhow!("Co not found: {}", co))?;
-	reducer.push(&identity, &core, item).await?;
+	reducer.push(&private_identity, &core, item).await?;
 	Ok(())
 }

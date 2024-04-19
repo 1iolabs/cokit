@@ -3,7 +3,7 @@ mod types;
 
 pub use resolvers::{
 	did_key::{DidKeyIdentity, DidKeyIdentityResolver},
-	join::JoinIdentityResolver,
+	join::{JoinIdentityResolver, JoinPrivateIdentityResolver},
 	local::{LocalIdentity, LocalIdentityResolver},
 };
 pub use types::{

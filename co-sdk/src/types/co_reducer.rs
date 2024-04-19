@@ -59,11 +59,11 @@ impl CoReducer {
 	}
 
 	/// Push event into reducer.
-	#[tracing::instrument(err, fields(co = self.id().as_str()), skip(self))]
+	#[tracing::instrument(err, fields(co = self.id().as_str(), identity = identity.identity()), skip(self, identity))]
 	pub async fn push<T, I>(&self, identity: &I, core: &str, item: &T) -> Result<(), anyhow::Error>
 	where
 		T: Serialize + Debug + Send + Sync + Clone + 'static,
-		I: PrivateIdentity + Debug + Send + Sync,
+		I: PrivateIdentity + Send + Sync,
 	{
 		self.reducer
 			.write()
