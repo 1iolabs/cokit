@@ -100,6 +100,9 @@ impl LocalCoInstance {
 	/// Read the local co state from disk.
 	/// As we trust all of the local states we use all the states without fuhter checks to continue.
 	///
+	///	We use a explicit shutdown signal for this as the reducer is self referencial (through a box) and will not be
+	/// dropped when a watcher is active.
+	///
 	/// NOTE: This assumes the same encryption key is used by all local applications.
 	async fn create(
 		runtime: Runtime,

@@ -8,6 +8,8 @@ use libp2p::{
 };
 use std::collections::BTreeSet;
 
+/// Handle received heads from the network within the application.
+/// This structure essentially joins the received heads into the repective co reducer.
 pub struct ReceivedHeadsNetworkTask<F> {
 	co_factory: F,
 }
