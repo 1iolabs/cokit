@@ -1,4 +1,4 @@
-use co_api::{reduce, CoId, Context, DagCollection, DagSet, Did, Reducer, ReducerAction, Tags};
+use co_api::{reduce, CoId, Context, DagSet, Did, Network, Reducer, ReducerAction, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -32,10 +32,10 @@ pub struct Co {
 	/// Keys are normally stored in the Local CO.
 	pub keys: Option<Vec<Key>>,
 
-	/// CO known peers
+	/// CO network services.
 	/// See: [`libp2p::PeerId`]
 	// #[co_api::Dag]
-	pub peers: DagSet<Vec<u8>>,
+	pub network: DagSet<Network>,
 }
 impl Default for Co {
 	fn default() -> Self {
@@ -47,7 +47,7 @@ impl Default for Co {
 			participants: Default::default(),
 			cores: Default::default(),
 			keys: Default::default(),
-			peers: Default::default(),
+			network: Default::default(),
 		}
 	}
 }
@@ -121,8 +121,8 @@ pub enum CoAction {
 	ParticipantJoin { participant: Did },
 	ParticipantTagsInsert { participant: Did, tags: Tags },
 	ParticipantTagsRemove { participant: Did, tags: Tags },
-	PeerInsert { peer: Vec<u8> },
-	PeerRemove { peer: Vec<u8> },
+	NetworkInsert { network: Network },
+	NetworkRemove { network: Network },
 	CoreCreate { core: String, binary: Cid, tags: Tags },
 	CoreRemove { core: String },
 	CoreChange { core: String, state: Option<Cid> },
@@ -197,15 +197,11 @@ impl Reducer for Co {
 			CoAction::TagsRemove { tags } => {
 				result.tags.clear(Some(tags));
 			},
-			CoAction::PeerInsert { peer } => {
-				result.peers.update(context, |_context, peers| {
-					peers.insert(peer.clone());
-				});
+			CoAction::NetworkInsert { network } => {
+				result.network.insert(context.storage_mut(), network.clone());
 			},
-			CoAction::PeerRemove { peer } => {
-				result.peers.update(context, |_context, peers| {
-					peers.remove(peer);
-				});
+			CoAction::NetworkRemove { network } => {
+				result.network.remove(context.storage_mut(), network);
 			},
 		}
 		result

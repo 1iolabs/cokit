@@ -139,10 +139,30 @@ where
 		Self(Self::to_link(storage, items))
 	}
 
+	/// Returns `true` if the set contains no elements.
+	pub fn is_empty(&self) -> bool {
+		self.0.is_none()
+	}
+
 	/// Adds a value to the set.
+	///
+	/// TODO: (perf): Do not load whole set into memory
 	pub fn insert(&mut self, storage: &mut dyn Storage, value: V) -> bool {
 		let mut set = self.get(storage);
 		if set.insert(value) {
+			self.set(storage, set);
+			true
+		} else {
+			false
+		}
+	}
+
+	/// Remove a value from the set.
+	///
+	/// TODO: (perf): Do not load whole set into memory
+	pub fn remove(&mut self, storage: &mut dyn Storage, value: &V) -> bool {
+		let mut set = self.get(storage);
+		if set.remove(&value) {
 			self.set(storage, set);
 			true
 		} else {

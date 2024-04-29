@@ -25,6 +25,9 @@ pub trait HeadsHandler {
 	fn on_unsubscribe(&mut self, peer: PeerId);
 }
 
+/// Heads protocol.
+/// Deprecated use heads::Behaviour
+// #[deprecated]
 pub struct Heads {
 	topic: IdentTopic,
 	hash: TopicHash,

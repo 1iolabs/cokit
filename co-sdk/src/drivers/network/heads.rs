@@ -95,7 +95,7 @@ where
 	fn execute(&mut self, swarm: &mut Swarm<B>) {
 		let behaviour = swarm.behaviour_mut().heads_mut();
 		match Option::take(&mut self.request) {
-			Some(HeadsRequest::Subscribe { co }) => match behaviour.subscribe(&co) {
+			Some(HeadsRequest::Subscribe { co }) => match behaviour.co_subscribe(&co) {
 				Ok(true) => {
 					tracing::debug!(?co, "co-subscribe");
 				},
@@ -104,7 +104,7 @@ where
 					tracing::warn!(?co, ?err, "co-subscribe-failed");
 				},
 			},
-			Some(HeadsRequest::Unsubscribe { co }) => match behaviour.unsubscribe(&co) {
+			Some(HeadsRequest::Unsubscribe { co }) => match behaviour.co_unsubscribe(&co) {
 				Ok(true) => {
 					tracing::debug!(?co, "co-unsubscribe");
 				},
@@ -121,7 +121,7 @@ where
 					tracing::warn!(?co, ?err, "co-request-heads-failed");
 				},
 			},
-			Some(HeadsRequest::PublishHeads { co, heads }) => match behaviour.publish_heads(&co, heads) {
+			Some(HeadsRequest::PublishHeads { co, heads }) => match behaviour.co_publish_heads(&co, heads) {
 				Ok(_) => {
 					tracing::debug!(?co, "co-publish-heads");
 				},

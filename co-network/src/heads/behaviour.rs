@@ -1,4 +1,5 @@
-use crate::{didcomm, heads::message::HeadsMessage, Message};
+use crate::{didcomm, heads::message::HeadsMessage, Message, MetadataMessage};
+use co_identity::{Identity, PrivateIdentity};
 use co_primitives::CoId;
 use libipld::Cid;
 use libp2p::{
@@ -8,6 +9,7 @@ use libp2p::{
 	swarm::{ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandlerInEvent, THandlerOutEvent, ToSwarm},
 	Multiaddr, PeerId,
 };
+use serde::Serialize;
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	task::{Context, Poll},
@@ -27,10 +29,13 @@ pub enum Event {
 	InboundFailure { peer_id: PeerId, data: Vec<u8> },
 
 	/// Subscribed for heads.
-	Subscribed { co: CoId, peer_id: PeerId },
+	CoSubscribed { co: CoId, peer_id: PeerId },
 
 	/// Unsubscribed for heads.
-	Unsubscribed { co: CoId, peer_id: PeerId },
+	CoUnsubscribed { co: CoId, peer_id: PeerId },
+
+	/// Received DID discover request.
+	DidReceivedDiscover { message: Vec<u8>, peer_id: PeerId },
 
 	/// Forwarded gossipsub
 	/// Todo: remove?
@@ -76,15 +81,15 @@ impl Behaviour {
 
 	/// Subscribe to CO gossip.
 	/// Returns `true` if a new subscription has been made, `false` is was already subscribed.
-	pub fn subscribe(&mut self, co: &CoId) -> Result<bool, anyhow::Error> {
+	pub fn co_subscribe(&mut self, co: &CoId) -> Result<bool, anyhow::Error> {
 		Ok(self.inner.gossipsub.subscribe(&self.to_topic(co))?)
 	}
 
-	pub fn unsubscribe(&mut self, co: &CoId) -> Result<bool, anyhow::Error> {
+	pub fn co_unsubscribe(&mut self, co: &CoId) -> Result<bool, anyhow::Error> {
 		Ok(self.inner.gossipsub.unsubscribe(&self.to_topic(co))?)
 	}
 
-	pub fn publish_heads(&mut self, co: &CoId, heads: BTreeSet<Cid>) -> Result<bool, anyhow::Error> {
+	pub fn co_publish_heads(&mut self, co: &CoId, heads: BTreeSet<Cid>) -> Result<bool, anyhow::Error> {
 		let message = HeadsMessage::Heads(co.clone(), heads);
 		let data = serde_ipld_dagcbor::to_vec(&message)?;
 		match self.inner.gossipsub.publish(self.to_topic(co), data) {
@@ -92,6 +97,54 @@ impl Behaviour {
 			Err(PublishError::InsufficientPeers) => Ok(false),
 			Err(e) => Err(e.into()),
 		}
+	}
+
+	/// Subscribe to an DID discovery topic.
+	pub fn did_subscribe(&mut self, topic: &str) -> Result<bool, anyhow::Error> {
+		Ok(self.inner.gossipsub.subscribe(&IdentTopic::new(topic))?)
+	}
+
+	/// Unsubscribe from an DID discovery topic.
+	pub fn did_unsubscribe(&mut self, topic: &str) -> Result<bool, anyhow::Error> {
+		Ok(self.inner.gossipsub.unsubscribe(&IdentTopic::new(topic))?)
+	}
+
+	/// Request DID discovery.
+	/// Messages will be encrypted with public key of `to` and signed with `from` (`PublicEncrypt(Sign(PlainText))`).
+	pub fn did_discover<F, T>(
+		&mut self,
+		topic: &str,
+		from: &F,
+		to: &T,
+		message_type: String,
+	) -> Result<bool, anyhow::Error>
+	where
+		F: PrivateIdentity + Send + Sync + 'static,
+		T: Identity + Send + Sync + 'static,
+	{
+		let message = MetadataMessage {
+			from: None,
+			to: BTreeSet::from_iter(vec![to.identity().to_owned()]),
+			id: Uuid::new_v4().into(),
+			message_type,
+			..Default::default()
+		};
+		let data = message.public_encrypt(from)?;
+		match self.inner.gossipsub.publish(IdentTopic::new(topic), data) {
+			Ok(_) => Ok(true),
+			Err(PublishError::InsufficientPeers) => Ok(false),
+			Err(e) => Err(e.into()),
+		}
+	}
+
+	/// Send didcomm message.
+	///
+	/// This will be used likely in response of an did discovery event.
+	pub fn didcomm<T>(&mut self, to: &PeerId, message: &[u8])
+	where
+		T: Serialize,
+	{
+		self.inner.didcomm.send(to, didcomm::Message::Message(message.to_vec()));
 	}
 
 	/// Send heads to peers.
@@ -245,13 +298,13 @@ impl NetworkBehaviour for Behaviour {
 			Poll::Ready(ToSwarm::GenerateEvent(InnerBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed {
 				peer_id,
 				topic,
-			}))) => Poll::Ready(ToSwarm::GenerateEvent(Event::Subscribed { co: self.to_co_id(&topic), peer_id })),
+			}))) => Poll::Ready(ToSwarm::GenerateEvent(Event::CoSubscribed { co: self.to_co_id(&topic), peer_id })),
 
 			// unsubscribed
 			Poll::Ready(ToSwarm::GenerateEvent(InnerBehaviourEvent::Gossipsub(gossipsub::Event::Unsubscribed {
 				peer_id,
 				topic,
-			}))) => Poll::Ready(ToSwarm::GenerateEvent(Event::Unsubscribed { co: self.to_co_id(&topic), peer_id })),
+			}))) => Poll::Ready(ToSwarm::GenerateEvent(Event::CoUnsubscribed { co: self.to_co_id(&topic), peer_id })),
 
 			// forward
 			Poll::Ready(event) => Poll::Ready(event.map_out(|event| event.into())),
@@ -370,26 +423,26 @@ mod tests {
 		peer2.add_address(co.clone(), &peer1);
 
 		// peer1: subscribe
-		peer1.swarm().behaviour_mut().subscribe(&co).unwrap();
+		peer1.swarm().behaviour_mut().co_subscribe(&co).unwrap();
 
 		// peer2: subscribe
-		peer2.swarm().behaviour_mut().subscribe(&co).unwrap();
+		peer2.swarm().behaviour_mut().co_subscribe(&co).unwrap();
 
 		// wait until both are subscribed
 		let (subscribe1, subscribe2) = join!(peer1.next(), peer2.next());
 		match subscribe1 {
-			Some(heads::Event::Subscribed { co: event_co, peer_id }) if co == event_co && peer_id == peer2.peer_id => {
-			},
+			Some(heads::Event::CoSubscribed { co: event_co, peer_id })
+				if co == event_co && peer_id == peer2.peer_id => {},
 			event => panic!("unexpected event: {:?}", event),
 		}
 		match subscribe2 {
-			Some(heads::Event::Subscribed { co: event_co, peer_id }) if co == event_co && peer_id == peer1.peer_id => {
-			},
+			Some(heads::Event::CoSubscribed { co: event_co, peer_id })
+				if co == event_co && peer_id == peer1.peer_id => {},
 			event => panic!("unexpected event: {:?}", event),
 		}
 
 		// peer2: update heads
-		peer2.swarm().behaviour_mut().publish_heads(&co, h2.clone()).unwrap();
+		peer2.swarm().behaviour_mut().co_publish_heads(&co, h2.clone()).unwrap();
 
 		// run
 		// note: we also neeed to run peer1 to advance its state

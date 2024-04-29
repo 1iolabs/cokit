@@ -13,6 +13,7 @@ pub use types::{
 	did::Did,
 	link::{Link, Linkable, OptionLink},
 	metadata::{CoMetadata, Metadata, WithCoMetadata},
+	network::Network,
 	path::{
 		AbsolutePath, AbsolutePathOwned, Component, Components, Path, PathError, PathExt, PathOwned, RelativePath,
 		RelativePathOwned,
