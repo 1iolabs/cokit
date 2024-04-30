@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 async-stream = { workspace = true }
+async-trait = { workspace = true }
 chrono = "0.4.37"
 clap = { version = "^4.3.23", features = ["derive"] }
 co-api = { path = "../co-api" }
@@ -20,6 +21,7 @@ co-messaging = { path = "../co-messaging" }
 co-primitives = { path = "../co-primitives" }
 co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
 co-storage = { path = "../co-storage" }
+co-runtime = { path = "../co-runtime" }
 colored = "2.1.0"
 exitcode = "1.1.2"
 futures = { workspace = true }

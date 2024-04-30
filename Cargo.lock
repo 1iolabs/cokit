@@ -1097,6 +1097,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-stream",
+ "async-trait",
  "chrono",
  "clap 4.4.11",
  "co-api",
@@ -1109,6 +1110,7 @@ dependencies = [
  "co-log",
  "co-messaging",
  "co-primitives",
+ "co-runtime",
  "co-sdk",
  "co-storage",
  "colored",
