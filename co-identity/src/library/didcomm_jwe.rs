@@ -25,9 +25,7 @@ pub fn didcomm_jwe(
 		.body(body)
 		.map_err(|e| SignError::Other(e.into()))?;
 	let signer = DidKeyIdentity::generate(None);
-	// println!("signer: {}", signer.identity());
 	let result = message
-		//.from(signer.identity())
 		.as_flat_jwe(&CryptoAlgorithm::XC20P, Some(to_public_key.clone()))
 		.kid(&hex::encode(signer.public_key_bytes()))
 		.seal_signed(
@@ -36,7 +34,6 @@ pub fn didcomm_jwe(
 			SignatureAlgorithm::EdDsa,
 			signer.private_key_bytes().divulge(),
 		)
-		// .seal(from_private_key.divulge(), Some(vec![Some(to_public_key)]))
 		.map_err(|e| SignError::Other(e.into()))?;
 	Ok(result)
 }
@@ -46,7 +43,6 @@ pub fn didcomm_jwe_receive(to_private_key: Secret, incoming: &str) -> Result<(Di
 
 	// we expect the jwe signed with a one-time key
 	let skid = jwe.get_skid().ok_or_else(|| ReceiveError::MissingSigningKeyId)?;
-	// println!("skid: {}", skid);
 
 	// we only support did:key: as signing key
 	let skid_identity = DidKeyIdentity::from_identity(&skid).map_err(|e| ReceiveError::InvalidSigningKeyId(e))?;
@@ -70,47 +66,9 @@ mod tests {
 
 	#[test]
 	fn smoke() {
-		// let alice_key = did_key::from_existing_key::<did_key::X25519KeyPair>(
-		// 	&[],
-		// 	Some(
-		// 		bs58::decode("6QN8DfuN9hjgHgPvLXqgzqYE3jRRGRrmJQZkd5tL8paR")
-		// 			.into_vec()
-		// 			.unwrap()
-		// 			.as_ref(),
-		// 	),
-		// );
-		// let bob_key = did_key::from_existing_key::<did_key::X25519KeyPair>(
-		// 	&[],
-		// 	Some(
-		// 		bs58::decode("HBTcN2MrXNRj9xF9oi8QqYyuEPv3JLLjQKuEgW9oxVKP")
-		// 			.into_vec()
-		// 			.unwrap()
-		// 			.as_ref(),
-		// 	),
-		// );
-		// println!("bob: {}", bob_key.fingerprint());
-		// println!("bob: {:?}", bob_key.private_key_bytes());
-		// println!("bob-public: {:?}", bob_key.public_key_bytes());
-		// println!("alice: {:?}", alice_key.private_key_bytes());
-		// println!("alice-public: {:?}", alice_key.public_key_bytes());
-		// let f = did_key::from_existing_key::<did_key::X25519KeyPair>(
-		// 	bs58::decode("6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp")
-		// 		.into_vec()
-		// 		.unwrap()
-		// 		.as_ref(),
-		// 	None,
-		// );
-		// let f = did_key::resolve("did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp").unwrap();
-		// println!("f: {}", f.fingerprint());
-		// println!("f: {:?}", f.public_key_bytes());
-
-		// let from = DidKeyIdentity::from_key(alice_key);
-		// let to = DidKeyIdentity::from_key(bob_key);
 		let from = DidKeyIdentity::generate_x25519(Some(&vec![1; 32]));
 		let to = DidKeyIdentity::generate_x25519(Some(&vec![2; 32]));
 		let other = DidKeyIdentity::generate(Some(&vec![3; 32]));
-		// println!("from: {}", from.identity());
-		// println!("to: {}", to.identity());
 
 		// create
 		let header = DidCommHeader {
@@ -121,7 +79,6 @@ mod tests {
 			..Default::default()
 		};
 		let message = didcomm_jwe(from.private_key_bytes(), to.public_key_bytes(), header, "null").unwrap();
-		// println!("message({}): {}", message.len(), message); // 2462
 
 		// receive
 		let (receviced_header, receviced_body) = didcomm_jwe_receive(to.private_key_bytes(), &message).unwrap();

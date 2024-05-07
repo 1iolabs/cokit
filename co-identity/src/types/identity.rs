@@ -13,9 +13,6 @@ pub trait Identity {
 
 	/// Public DIDComm context.
 	fn didcomm_public(&self) -> Option<DidCommPublicContext>;
-
-	///// Encrypt data using public key.
-	//fn public_encrypt(&self, data: &[u8], public_key: Option<&[u8]>) -> Vec<u8>;
 }
 
 /// Dynamic Identity.

@@ -13,42 +13,6 @@ pub struct Message<T> {
 	// pub attachments: Vec<A>;
 }
 impl<T> Message<T> {
-	// /// Sign this message as `application/didcomm-signed+cbor`.
-	// pub fn sign<I>(&self, _identity: &I) -> Result<Vec<u8>, SignError>
-	// where
-	// 	I: PrivateIdentity + Send + Sync + 'static,
-	// 	T: Serialize,
-	// {
-	// 	let data = self.cbor().map_err(|e| SignError::Other(e.into()))?;
-	// 	//let signature = identity.sign(&data)?;
-	// 	// TODO: use JWS instead of append
-	// 	Ok(data)
-	// }
-
-	// /// Sign and encrypt this message as `application/didcomm-encrypted+json`.
-	// pub fn encrypt<I>(&self, _identity: &I) -> Result<Vec<u8>, SignError>
-	// where
-	// 	I: PrivateIdentity + Send + Sync + 'static,
-	// 	T: Serialize,
-	// {
-	// 	let data = self.cbor().map_err(|e| SignError::Other(e.into()))?;
-	// 	//let signature = identity.sign(&data)?;
-	// 	// TODO: use JWS instead of append
-	// 	Ok(data)
-	// }
-
-	// /// Sign and encrypt this message as `application/?`.
-	// pub fn public_encrypt<I>(&self, _identity: &I) -> Result<Vec<u8>, SignError>
-	// where
-	// 	I: Identity + Send + Sync + 'static,
-	// 	T: Serialize,
-	// {
-	// 	let data = self.cbor().map_err(|e| SignError::Other(e.into()))?;
-	// 	//let signature = identity.sign(&data)?;
-	// 	// TODO: use JWS instead of append
-	// 	Ok(data)
-	// }
-
 	/// Encode this message as dag-cbor.
 	pub fn json(&self) -> Result<String, anyhow::Error>
 	where

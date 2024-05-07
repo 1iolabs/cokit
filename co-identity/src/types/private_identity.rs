@@ -9,17 +9,6 @@ pub trait PrivateIdentity: Identity {
 
 	/// Private DIDComm context.
 	fn didcomm_private(&self) -> Option<DidCommPrivateContext>;
-
-	// /// Sign body as JWS retuned as base64_url string.
-	// fn jws(&self, body: &str) -> Result<String, SignError>;
-
-	// /// Create JWE returned as base64_url string.
-	// fn jwe<I: Identity + Send + Sync + 'static>(
-	// 	&self,
-	// 	to: &I,
-	// 	header: DidCommHeader,
-	// 	body: &str,
-	// ) -> Result<String, SignError>;
 }
 
 /// Dynamic Private Identity.
