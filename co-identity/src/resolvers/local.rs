@@ -1,5 +1,6 @@
 use crate::{
-	Identity, IdentityResolver, IdentityResolverError, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver,
+	DidCommPrivateContext, DidCommPublicContext, Identity, IdentityResolver, IdentityResolverError, PrivateIdentity,
+	PrivateIdentityBox, PrivateIdentityResolver,
 };
 use async_trait::async_trait;
 
@@ -20,10 +21,18 @@ impl Identity for LocalIdentity {
 	fn verify(&self, _signature: &[u8], _data: &[u8], _public_key: Option<&[u8]>) -> bool {
 		true
 	}
+
+	fn didcomm_public(&self) -> Option<DidCommPublicContext> {
+		None
+	}
 }
 impl PrivateIdentity for LocalIdentity {
 	fn sign(&self, data: &[u8]) -> Result<Vec<u8>, crate::SignError> {
 		Ok(data.to_vec())
+	}
+
+	fn didcomm_private(&self) -> Option<DidCommPrivateContext> {
+		None
 	}
 }
 

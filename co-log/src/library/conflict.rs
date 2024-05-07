@@ -57,6 +57,9 @@ mod tests {
 		fn verify(&self, signature: &[u8], data: &[u8], _public_key: Option<&[u8]>) -> bool {
 			signature == self.sign(data).unwrap()
 		}
+		fn didcomm_public(&self) -> Option<co_identity::DidCommPublicContext> {
+			None
+		}
 	}
 	impl PrivateIdentity for TestIdentity {
 		fn sign(&self, data: &[u8]) -> Result<Vec<u8>, SignError> {
@@ -64,6 +67,10 @@ mod tests {
 			self.identity().hash(&mut hasher);
 			data.hash(&mut hasher);
 			Ok(hasher.finish().to_be_bytes().to_vec())
+		}
+
+		fn didcomm_private(&self) -> Option<co_identity::DidCommPrivateContext> {
+			None
 		}
 	}
 

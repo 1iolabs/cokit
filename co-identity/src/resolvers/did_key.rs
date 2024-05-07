@@ -1,8 +1,13 @@
-use crate::{Identity, IdentityResolver, IdentityResolverError, PrivateIdentity, SignError};
+use crate::{
+	DidCommPrivateContext, DidCommPublicContext, Identity, IdentityResolver, IdentityResolverError, PrivateIdentity,
+	SignError,
+};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_primitives::tags;
-use did_key::{from_existing_key, generate, resolve, CoreSign, DIDCore, Ed25519KeyPair, KeyMaterial, PatchedKeyPair};
+use co_primitives::{tags, Secret};
+use did_key::{
+	from_existing_key, generate, resolve, CoreSign, DIDCore, Ed25519KeyPair, KeyMaterial, PatchedKeyPair, X25519KeyPair,
+};
 use std::{fmt::Debug, sync::Arc};
 
 #[derive(Clone)]
@@ -12,8 +17,16 @@ pub struct DidKeyIdentity {
 	private: bool,
 }
 impl DidKeyIdentity {
+	/// Generate new identity.
+	///
+	/// # Arguments
+	/// - `seed` - The seed usedt to genreate the identity. If `None` is passed it will be generated using `getrandom`
+	///   crate.
 	pub fn generate(seed: Option<&[u8]>) -> Self {
 		Self::from_key(generate::<Ed25519KeyPair>(seed))
+	}
+	pub fn generate_x25519(seed: Option<&[u8]>) -> Self {
+		Self::from_key(generate::<X25519KeyPair>(seed))
 	}
 
 	pub fn from_identity(identity: &str) -> Result<Self, anyhow::Error> {
@@ -33,14 +46,24 @@ impl DidKeyIdentity {
 		self.identity().as_bytes()
 	}
 
-	pub fn key(&self) -> Arc<PatchedKeyPair> {
-		self.key.clone()
+	// pub fn key(&self) -> Arc<PatchedKeyPair> {
+	// 	self.key.clone()
+	// }
+
+	pub fn public_key_bytes(&self) -> Vec<u8> {
+		self.key.as_ref().public_key_bytes()
+	}
+
+	pub fn private_key_bytes(&self) -> Secret {
+		self.key.as_ref().private_key_bytes().into()
 	}
 
 	pub fn import(key: &co_core_keystore::Key) -> Result<Self, anyhow::Error> {
 		match (key.tags.string("format"), &key.secret) {
 			(Some("Ed25519"), co_core_keystore::Secret::PrivateKey(secret)) =>
 				Ok(Self::from_key(from_existing_key::<Ed25519KeyPair>(&[], Some(secret.divulge())))),
+			(Some("X25519"), co_core_keystore::Secret::PrivateKey(secret)) =>
+				Ok(Self::from_key(from_existing_key::<X25519KeyPair>(&[], Some(secret.divulge())))),
 			_ => Err(anyhow!("Invalid identity format or key")),
 		}
 	}
@@ -49,7 +72,7 @@ impl DidKeyIdentity {
 		Ok(co_core_keystore::Key {
 			description: "did:key identitiy".to_owned(),
 			name: self.identity().to_owned(),
-			tags: tags!("type": "co-identity", "format": "Ed25519"),
+			tags: tags!("type": "co-identity", "format": "Ed25519"), // TODO: detect format alg
 			uri: self.identity().to_owned(),
 			secret: co_core_keystore::Secret::PrivateKey(self.key.private_key_bytes().into()),
 		})
@@ -98,6 +121,10 @@ impl Identity for DidKeyIdentity {
 		// verify signature
 		self.key.verify(data, signature).is_ok()
 	}
+
+	fn didcomm_public(&self) -> Option<DidCommPublicContext> {
+		Some(DidCommPublicContext::new(self.identity().to_owned(), self.key.public_key_bytes()))
+	}
 }
 impl PrivateIdentity for DidKeyIdentity {
 	fn sign(&self, data: &[u8]) -> Result<Vec<u8>, SignError> {
@@ -105,6 +132,10 @@ impl PrivateIdentity for DidKeyIdentity {
 			return Err(SignError::Unauthorized);
 		}
 		Ok(self.key.sign(data))
+	}
+
+	fn didcomm_private(&self) -> Option<DidCommPrivateContext> {
+		Some(DidCommPrivateContext::new(self.identity().to_owned(), self.key.private_key_bytes().into()))
 	}
 }
 
