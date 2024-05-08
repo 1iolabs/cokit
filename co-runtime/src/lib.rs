@@ -11,4 +11,8 @@ pub use library::{
 };
 pub use modules::co_v1;
 pub use runtimes::create_runtime;
-pub use types::{context::RuntimeContext, core::Core};
+pub use types::{
+	cid_resolver::{create_cid_resolver, CidResolver, CidResolverBox, IpldResolver, JoinCidResolver},
+	context::RuntimeContext,
+	core::Core,
+};
