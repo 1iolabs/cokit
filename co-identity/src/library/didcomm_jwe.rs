@@ -1,5 +1,5 @@
 use super::into_didcomm_rs_header::{from_didcomm_rs_header, into_didcomm_rs_header};
-use crate::{DidCommHeader, DidKeyIdentity, ReceiveError, SignError};
+use crate::{DidCommHeader, DidKeyIdentity, IdentityResolver, ReceiveError, SignError};
 use co_primitives::Secret;
 use didcomm_rs::{
 	crypto::{CryptoAlgorithm, SignatureAlgorithm},
@@ -40,18 +40,31 @@ pub fn didcomm_jwe(
 	Ok(result)
 }
 
-pub fn didcomm_jwe_receive(to_private_key: Secret, incoming: &str) -> Result<(DidCommHeader, String), ReceiveError> {
+pub async fn didcomm_jwe_receive<R: IdentityResolver>(
+	to_private_key: Secret,
+	resolver: &R,
+	incoming: &str,
+) -> Result<(DidCommHeader, String), ReceiveError> {
 	let jwe: Jwe = serde_json::from_str(&incoming).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
 
 	// we expect the jwe signed with a one-time key
 	let skid = jwe.get_skid().ok_or_else(|| ReceiveError::MissingSigningKeyId)?;
 
-	// we only support did:key: as signing key
-	let skid_identity = DidKeyIdentity::from_identity(&skid).map_err(|e| ReceiveError::InvalidSigningKeyId(e))?;
+	// resolve
+	let skid_identity = resolver
+		.resolve(&skid, None)
+		.await
+		.map_err(|err| ReceiveError::ResolveDidFailed(skid.clone(), err.into()))?;
+	let skid_context = match skid_identity.didcomm_public() {
+		Some(c) => c,
+		None => {
+			return Err(ReceiveError::BadDid(skid.clone()));
+		},
+	};
 
 	// try recv
 	let message =
-		Message::receive(incoming, Some(to_private_key.divulge()), Some(skid_identity.public_key_bytes()), None)
+		Message::receive(incoming, Some(to_private_key.divulge()), Some(skid_context.public_key_bytes()), None)
 			.map_err(|e| ReceiveError::Decrypt(e.into()))?;
 
 	// result
@@ -64,10 +77,10 @@ pub fn didcomm_jwe_receive(to_private_key: Secret, incoming: &str) -> Result<(Di
 #[cfg(test)]
 mod tests {
 	use super::{didcomm_jwe, didcomm_jwe_receive};
-	use crate::{DidCommHeader, DidKeyIdentity, Identity};
+	use crate::{DidCommHeader, DidKeyIdentity, DidKeyIdentityResolver, Identity};
 
-	#[test]
-	fn smoke() {
+	#[tokio::test]
+	async fn smoke() {
 		let from = DidKeyIdentity::generate_x25519(Some(&vec![1; 32]));
 		let to = DidKeyIdentity::generate_x25519(Some(&vec![2; 32]));
 		let other = DidKeyIdentity::generate(Some(&vec![3; 32]));
@@ -83,12 +96,16 @@ mod tests {
 		let message = didcomm_jwe(from.private_key_bytes(), to.public_key_bytes(), header, "null").unwrap();
 
 		// receive
-		let (receviced_header, receviced_body) = didcomm_jwe_receive(to.private_key_bytes(), &message).unwrap();
+		let (receviced_header, receviced_body) =
+			didcomm_jwe_receive(to.private_key_bytes(), &DidKeyIdentityResolver::new(), &message)
+				.await
+				.unwrap();
 		assert_eq!("test", receviced_header.id);
 		assert_eq!("null", receviced_body);
 
 		// receive other
-		let received_other = didcomm_jwe_receive(other.private_key_bytes(), &message);
+		let received_other =
+			didcomm_jwe_receive(other.private_key_bytes(), &DidKeyIdentityResolver::new(), &message).await;
 		assert!(received_other.is_err());
 	}
 }

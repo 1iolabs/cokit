@@ -34,5 +34,5 @@ form_urlencoded = "=1.2.0"
 "default" = []
 
 [dev-dependencies]
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
 tracing-subscriber = { workspace = true }

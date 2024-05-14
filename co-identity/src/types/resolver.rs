@@ -22,3 +22,10 @@ pub trait IdentityResolver {
 
 /// Dynamic Identity Resolver.
 pub type IdentityResolverBox = Box<dyn IdentityResolver + Send + Sync + 'static>;
+
+#[async_trait]
+impl IdentityResolver for IdentityResolverBox {
+	async fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<IdentityBox, IdentityResolverError> {
+		self.as_ref().resolve(identity, public_key).await
+	}
+}

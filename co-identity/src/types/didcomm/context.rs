@@ -2,19 +2,20 @@ use crate::{
 	library::{
 		didcomm_jwe::{didcomm_jwe, didcomm_jwe_receive},
 		didcomm_jws::didcomm_jws,
+		didcomm_receive::didcomm_receive,
 	},
-	DidCommHeader, ReceiveError, SignError,
+	DidCommHeader, IdentityResolver, ReceiveError, SignError,
 };
-use anyhow::anyhow;
 use co_primitives::{Did, Secret};
 
 pub struct DidCommPrivateContext {
 	did: Did,
 	private_key: Secret,
+	public_key: Vec<u8>,
 }
 impl DidCommPrivateContext {
-	pub fn new(did: Did, private_key: Secret) -> Self {
-		Self { did, private_key }
+	pub fn new(did: Did, private_key: Secret, public_key: Vec<u8>) -> Self {
+		Self { did, private_key, public_key }
 	}
 
 	pub fn did(&self) -> Did {
@@ -30,7 +31,7 @@ impl DidCommPrivateContext {
 	/// # Arguments
 	/// - `body` - JSON String.
 	pub fn jws(&self, header: DidCommHeader, body: &str) -> Result<String, SignError> {
-		didcomm_jws(self.private_key.clone(), header, body)
+		didcomm_jws(self.private_key.clone(), &self.public_key, header, body)
 	}
 
 	/// Create JWE message envelope.
@@ -52,8 +53,20 @@ impl DidCommPrivateContext {
 		didcomm_jwe(self.private_key.clone(), to.public_key.clone(), header, body)
 	}
 
-	pub fn jwe_receive(&self, incoming: &str) -> Result<(DidCommHeader, String), ReceiveError> {
-		didcomm_jwe_receive(self.private_key.clone(), incoming)
+	pub async fn jwe_receive<R: IdentityResolver>(
+		&self,
+		resolver: &R,
+		incoming: &str,
+	) -> Result<(DidCommHeader, String), ReceiveError> {
+		didcomm_jwe_receive(self.private_key.clone(), resolver, incoming).await
+	}
+
+	pub async fn receive<R: IdentityResolver>(
+		&self,
+		resolver: &R,
+		incoming: &str,
+	) -> Result<(DidCommHeader, String), ReceiveError> {
+		didcomm_receive(self.private_key.clone(), resolver, incoming).await
 	}
 }
 
@@ -68,5 +81,9 @@ impl DidCommPublicContext {
 
 	pub fn did(&self) -> Did {
 		self.did.clone()
+	}
+
+	pub fn public_key_bytes(&self) -> Vec<u8> {
+		self.public_key.clone()
 	}
 }

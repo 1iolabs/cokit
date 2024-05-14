@@ -1,10 +1,14 @@
 use super::did_discovery::DidDiscovery;
 use crate::didcomm;
 use anyhow::anyhow;
-use co_identity::{DidCommHeader, DidCommPrivateContext, PrivateIdentity, PrivateIdentityBox};
+use co_identity::{DidCommHeader, DidCommPrivateContext, IdentityResolver, PrivateIdentity, PrivateIdentityBox};
 use co_primitives::{Did, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous};
 use derive_more::From;
-use futures::{stream::FusedStream, Stream};
+use futures::{
+	future::BoxFuture,
+	stream::{FusedStream, FuturesUnordered},
+	FutureExt, Stream, StreamExt,
+};
 use libp2p::{
 	gossipsub::{self, TopicHash},
 	mdns, rendezvous,
@@ -13,6 +17,7 @@ use libp2p::{
 };
 use std::{
 	collections::{BTreeMap, BTreeSet, VecDeque},
+	ops::DerefMut,
 	pin::Pin,
 	str::{from_utf8, FromStr},
 	task::{Context, Poll},
@@ -58,23 +63,6 @@ struct DiscoveryConnectRequest {
 	pub max_peers: Option<u16>,
 	pub connected_peers: BTreeSet<PeerId>,
 }
-impl DiscoveryConnectRequest {
-	/// Test if any did discovery listening to this topic.
-	///
-	/// TODO: (perf) index?
-	pub fn is_did_discovery_topic(&self, topic: &gossipsub::TopicHash) -> bool {
-		for discovery in &self.discovery {
-			match discovery {
-				Discovery::DidDiscovery(item) =>
-					if &did_discovery_topic(&item.network).hash() == topic {
-						return true;
-					},
-				_ => {},
-			}
-		}
-		return false;
-	}
-}
 
 /// Active subscription listening for DID Discovery requests.
 struct DidDiscoverySubscription {
@@ -111,9 +99,12 @@ pub enum DiscoveryEvent {
 
 	/// A discovery request.
 	DidDiscovery { discovery: DidDiscovery },
+
+	/// We received an (validated) DIDComm message.
+	ReceivedDidComm { peer_id: PeerId, header: DidCommHeader, body: String },
 }
 
-pub struct DiscoveryState {
+pub struct DiscoveryState<R> {
 	/// Next discovery request id.
 	next_id: u64,
 
@@ -134,9 +125,18 @@ pub struct DiscoveryState {
 
 	/// Default discovery max peers.
 	max_peers: Option<u16>,
+
+	// DID Identity resolver.
+	resolver: R,
+
+	// Pending events.
+	future_events: FuturesUnordered<BoxFuture<'static, Option<DiscoveryEvent>>>,
 }
-impl DiscoveryState {
-	pub fn new(timeout: Duration, max_peers: Option<u16>) -> Self {
+impl<R> DiscoveryState<R>
+where
+	R: IdentityResolver + Clone + Send + Sync + 'static,
+{
+	pub fn new(resolver: R, timeout: Duration, max_peers: Option<u16>) -> Self {
 		Self {
 			next_id: 1,
 			requests: Default::default(),
@@ -145,6 +145,8 @@ impl DiscoveryState {
 			events: Default::default(),
 			did_subscriptions: Default::default(),
 			pending_discovery: Default::default(),
+			future_events: Default::default(),
+			resolver,
 		}
 	}
 
@@ -167,6 +169,27 @@ impl DiscoveryState {
 						tracing::warn!(?discovery, ?err, "did_discovery-publish-failed")
 					},
 				};
+				None
+			},
+			DiscoveryEvent::ReceivedDidComm { peer_id, header, body: _ } => {
+				if header.message_type == "diddiscovery" {
+					for request_id in self
+						.diddiscovery_requests()
+						.filter(|(_request_id, discovery)| header.thid.as_ref() == Some(&discovery.message_id))
+						.map(|(request_id, _)| request_id)
+						.collect::<Vec<_>>()
+					{
+						if let Some(request) = self.requests.get_mut(&request_id) {
+							if !request.connected_peers.contains(&peer_id) {
+								request.connected_peers.insert(peer_id);
+								self.events.push_back(DiscoveryEvent::Event(Event::Connected {
+									id: request_id,
+									peer: peer_id,
+								}));
+							}
+						}
+					}
+				}
 				None
 			},
 			DiscoveryEvent::Event(event) => Some(event),
@@ -333,12 +356,18 @@ impl DiscoveryState {
 	}
 
 	/// Poll on events.
-	pub fn poll(&mut self, _cx: &mut Context<'_>) -> Poll<DiscoveryEvent> {
+	pub fn poll(&mut self, cx: &mut Context<'_>) -> Poll<DiscoveryEvent> {
 		// TODO: timeouts
 
 		// events
 		if let Some(event) = self.events.pop_front() {
 			return Poll::Ready(event);
+		}
+
+		// pending futures
+		match self.future_events.poll_next_unpin(cx) {
+			Poll::Ready(Some(Some(event))) => return Poll::Ready(event),
+			_ => {},
 		}
 
 		// pending
@@ -452,23 +481,20 @@ impl DiscoveryState {
 							},
 						};
 
-						// try to recevice
-						let result = didcomm_recevice(data, subscriptions.iter().map(|s| &s.identity));
-						if let Some((request_header, _, identity)) = result {
-							if let Some(didcomm_private) = identity.didcomm_private() {
-								match did_discovery_resolve(
-									&mut self.events,
-									&didcomm_private,
-									request_from_peer,
-									request_header,
-								) {
-									Ok(()) => {},
-									Err(err) => {
-										tracing::warn!(?err, "did-discovery-resolve-failed");
-									},
-								}
-							}
-						}
+						// receive
+						self.future_events.push(
+							did_discovery_receive(
+								data.to_owned(),
+								request_from_peer,
+								self.resolver.clone(),
+								subscriptions
+									.iter()
+									.map(|s| s.identity.didcomm_private())
+									.filter_map(|item| item)
+									.collect(),
+							)
+							.boxed(),
+						);
 					}
 				}
 			},
@@ -497,19 +523,24 @@ impl DiscoveryState {
 	///
 	/// Specifically:
 	/// - Handle responses (type=diddiscovery) to DID Discovery messages.
+	///
+	/// Todo:
+	/// - Messages are generally only signed?
+	/// - Validate did message sender / recevier?
 	fn on_didcomm_event(&mut self, event: &didcomm::Event) {
 		match event {
-			didcomm::Event::Received { peer_id: _, message } =>
+			didcomm::Event::Received { peer_id, message } =>
 				if let Some(message) = message.json() {
-					let identities = self
+					let contexts = self
 						.did_subscriptions
 						.iter()
-						.flat_map(|(_, subscriptions)| subscriptions.iter().map(|s| &s.identity));
-					if let Some((header, body, identity)) = didcomm_recevice(message, identities) {
-						if header.message_type == "diddiscovery" {
-							// TODO
-						}
-					}
+						.flat_map(|(_, subscriptions)| {
+							subscriptions.iter().filter_map(|s| s.identity.didcomm_private())
+						})
+						.collect();
+					self.future_events.push(
+						didcomm_receive_event(*peer_id, message.to_owned(), self.resolver.clone(), contexts).boxed(),
+					);
 				},
 			_ => {},
 			// didcomm::Event::Sent { peer_id, message } => todo!(),
@@ -521,13 +552,18 @@ impl DiscoveryState {
 	///
 	/// Specifically:
 	/// - Dail peers which we want to discover.
-	fn on_mdns_event(&mut self, event: &mdns::Event) {}
+	fn on_mdns_event(&mut self, event: &mdns::Event) {
+		// TODO: implement
+	}
 
 	fn on_rendezvous_client_event(&mut self, event: &rendezvous::client::Event) {
-		// TODO
+		// TODO: implement
 	}
 }
-impl Stream for DiscoveryState {
+impl<R> Stream for DiscoveryState<R>
+where
+	R: IdentityResolver + Clone + Send + Sync + Unpin + 'static,
+{
 	type Item = DiscoveryEvent;
 
 	/// Note: This stream is infinite.
@@ -536,7 +572,10 @@ impl Stream for DiscoveryState {
 	}
 }
 /// As we produce the events in an infinite manner the stream will never be terminated.
-impl FusedStream for DiscoveryState {
+impl<R> FusedStream for DiscoveryState<R>
+where
+	R: IdentityResolver + Clone + Send + Sync + Unpin + 'static,
+{
 	fn is_terminated(&self) -> bool {
 		false
 	}
@@ -553,22 +592,59 @@ pub enum ConnectError {
 
 pub trait DiscoveryBehaviour: NetworkBehaviour {
 	fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour;
-	fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour;
-	fn rendezvous_client_mut(&mut self) -> Option<&mut rendezvous::client::Behaviour>;
-	// fn mdns_mut(&mut self) -> Option<&mut mdns::tokio::Behaviour>;
-	// fn kad_mut(&mut self) -> Option<&mut kad::Behaviour<kad::store::MemoryStore>>;
 	fn gossipsub_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&gossipsub::Event>;
+
+	fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour;
 	fn didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&didcomm::Event>;
+
+	fn rendezvous_client_mut(&mut self) -> Option<&mut rendezvous::client::Behaviour>;
 	fn rendezvous_client_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&rendezvous::client::Event>;
+
+	// fn mdns_mut(&mut self) -> Option<&mut mdns::tokio::Behaviour>;
+	// fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&mdns::Event>;
+
+	// fn kad_mut(&mut self) -> Option<&mut kad::Behaviour<kad::store::MemoryStore>>;
+	// fn kad_mut(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&kad::Event>;
+}
+
+async fn didcomm_receive_event<R: IdentityResolver>(
+	peer_id: PeerId,
+	data: String,
+	resolver: R,
+	contexts: Vec<DidCommPrivateContext>,
+) -> Option<DiscoveryEvent> {
+	let result = didcomm_receive(&data, resolver, contexts.into_iter()).await;
+	if let Some((header, body, _didcomm_private)) = result {
+		Some(DiscoveryEvent::ReceivedDidComm { peer_id, header, body })
+	} else {
+		None
+	}
+}
+
+async fn did_discovery_receive<R: IdentityResolver>(
+	data: String,
+	request_from_peer: PeerId,
+	resolver: R,
+	contexts: Vec<DidCommPrivateContext>,
+) -> Option<DiscoveryEvent> {
+	let result = didcomm_receive(&data, resolver, contexts.into_iter()).await;
+	if let Some((request_header, _, didcomm_private)) = result {
+		match did_discovery_resolve(&didcomm_private, request_from_peer, request_header) {
+			Ok(event) => return Some(event),
+			Err(err) => {
+				tracing::warn!(?err, "did-discovery-resolve-failed");
+			},
+		}
+	}
+	None
 }
 
 /// Respond to an did discovery resolve request.
 fn did_discovery_resolve(
-	events: &mut VecDeque<DiscoveryEvent>,
 	identity: &DidCommPrivateContext,
 	request_from_peer: PeerId,
 	request: DidCommHeader,
-) -> Result<(), anyhow::Error> {
+) -> Result<DiscoveryEvent, anyhow::Error> {
 	let request_from = request.from.ok_or(anyhow!("Missing from header field"))?;
 
 	// response
@@ -581,29 +657,25 @@ fn did_discovery_resolve(
 	// message
 	let message = identity.jws(response, "null")?;
 
-	// send
-	events.push_back(DiscoveryEvent::Resolve { from: request_from, from_peer: request_from_peer, response: message });
-
 	// result
-	Ok(())
+	Ok(DiscoveryEvent::Resolve { from: request_from, from_peer: request_from_peer, response: message })
 }
 
-/// Try to recevice a message (data) with one of the supplied identities.
-fn didcomm_recevice<'a>(
+/// Try to receive a message (data) with one of the supplied identities.
+async fn didcomm_receive<R: IdentityResolver>(
 	data: &str,
-	identities: impl Iterator<Item = &'a PrivateIdentityBox>,
-) -> Option<(DidCommHeader, String, &'a PrivateIdentityBox)> {
-	for identity in identities {
-		if let Some(didcomm_private) = identity.didcomm_private() {
-			match didcomm_private.jwe_receive(data) {
-				Ok((header, body)) => return Some((header, body, identity)),
-				Err(err) => {
-					// note: this will happen on purpose because we check the message against all identities and only
-					// one will match.
-					#[cfg(debug_assertions)]
-					tracing::debug!(?err, "jwe-receive-failed");
-				},
-			}
+	resolver: R,
+	contexts: impl Iterator<Item = DidCommPrivateContext>,
+) -> Option<(DidCommHeader, String, DidCommPrivateContext)> {
+	for didcomm_private in contexts {
+		match didcomm_private.receive(&resolver, data).await {
+			Ok((header, body)) => return Some((header, body, didcomm_private)),
+			Err(err) => {
+				// note: this will happen on purpose because we check the message against all identities and only
+				// one will match.
+				#[cfg(debug_assertions)]
+				tracing::debug!(?err, ?data, "jwe-receive-failed");
+			},
 		}
 	}
 	None
@@ -700,14 +772,13 @@ fn peer_disconnected(request: &mut DiscoveryConnectRequest, events: &mut VecDequ
 
 #[cfg(test)]
 mod tests {
-	use super::{Discovery, DiscoveryBehaviour};
-	use crate::{didcomm, discovery::did_discovery::DidDiscovery, heads, DiscoveryState, Event};
-	use co_identity::DidKeyIdentity;
-	use co_primitives::{BlockSerializer, CoId, NetworkDidDiscovery};
-	use futures::{join, select, FutureExt, StreamExt};
-	use libipld::Cid;
+	use super::DiscoveryBehaviour;
+	use crate::{didcomm, discovery::did_discovery::DidDiscovery, DiscoveryState, Event};
+	use co_identity::{DidKeyIdentity, DidKeyIdentityResolver};
+	use co_primitives::NetworkDidDiscovery;
+	use futures::{select, FutureExt, StreamExt};
 	use libp2p::{
-		gossipsub::{self, IdentTopic},
+		gossipsub,
 		identity::Keypair,
 		noise, rendezvous,
 		swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
@@ -838,8 +909,8 @@ mod tests {
 		let did2 = DidKeyIdentity::generate_x25519(Some(&vec![2; 32]));
 
 		// states
-		let mut discovery1 = DiscoveryState::new(Duration::from_secs(10), None);
-		let mut discovery2 = DiscoveryState::new(Duration::from_secs(10), None);
+		let mut discovery1 = DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(10), None);
+		let mut discovery2 = DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(10), None);
 
 		// peer1: subscribe
 		discovery1

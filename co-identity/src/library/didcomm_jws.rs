@@ -11,12 +11,18 @@ use didcomm_rs::{
 /// # DID Comm
 /// - Envelope: `signed(plaintext)`
 /// - Media Type: `application/didcomm-signed+json`
-pub fn didcomm_jws(private_key: Secret, header: DidCommHeader, body: &str) -> Result<String, SignError> {
+pub fn didcomm_jws(
+	private_key: Secret,
+	public_key: &[u8],
+	header: DidCommHeader,
+	body: &str,
+) -> Result<String, SignError> {
 	let result = Message::new()
 		.didcomm_header(into_didcomm_rs_header(header))
+		.kid(&hex::encode(public_key))
 		.body(body)
 		.map_err(|e| SignError::Other(e.into()))?
-		.as_jws(&SignatureAlgorithm::EdDsa)
+		.as_flat_jws(&SignatureAlgorithm::EdDsa)
 		.sign(SignatureAlgorithm::EdDsa.signer(), private_key.divulge())
 		.map_err(|e| SignError::Other(e.into()))?;
 	Ok(result)

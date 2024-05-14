@@ -135,10 +135,15 @@ impl PrivateIdentity for DidKeyIdentity {
 	}
 
 	fn didcomm_private(&self) -> Option<DidCommPrivateContext> {
-		Some(DidCommPrivateContext::new(self.identity().to_owned(), self.key.private_key_bytes().into()))
+		Some(DidCommPrivateContext::new(
+			self.identity().to_owned(),
+			self.key.private_key_bytes().into(),
+			self.key.public_key_bytes(),
+		))
 	}
 }
 
+#[derive(Debug, Clone)]
 pub struct DidKeyIdentityResolver {}
 impl DidKeyIdentityResolver {
 	pub fn new() -> DidKeyIdentityResolver {
