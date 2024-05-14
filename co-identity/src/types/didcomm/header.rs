@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::{
+	collections::BTreeSet,
+	time::{SystemTime, UNIX_EPOCH},
+};
 
 /// See: https://identity.foundation/didcomm-messaging/spec/#message-headers
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -79,6 +82,10 @@ pub struct DidCommHeader {
 impl DidCommHeader {
 	/// Create new DidCommHeader with an
 	pub fn new() -> Self {
-		Self { id: uuid::Uuid::new_v4().to_string(), ..Default::default() }
+		Self {
+			id: uuid::Uuid::new_v4().to_string(),
+			created_time: Some(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()),
+			..Default::default()
+		}
 	}
 }

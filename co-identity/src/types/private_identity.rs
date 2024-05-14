@@ -50,7 +50,7 @@ pub enum SignError {
 
 	/// Invalid argument has been supplied.
 	#[error("Invalid argument")]
-	InvalidArgument,
+	InvalidArgument(#[source] anyhow::Error),
 
 	/// Other error
 	#[error("Signature failed")]

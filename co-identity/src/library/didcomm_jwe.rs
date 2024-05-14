@@ -1,5 +1,5 @@
 use super::into_didcomm_rs_header::{from_didcomm_rs_header, into_didcomm_rs_header};
-use crate::{DidCommHeader, DidKeyIdentity, Identity, ReceiveError, SignError};
+use crate::{DidCommHeader, DidKeyIdentity, ReceiveError, SignError};
 use co_primitives::Secret;
 use didcomm_rs::{
 	crypto::{CryptoAlgorithm, SignatureAlgorithm},
@@ -11,8 +11,10 @@ use didcomm_rs::{
 /// This follows the recommendation to generate a new one-time signing DID just for this single call.
 /// (See didcomm-messaging / message-header / from).
 ///
-/// Envelope: `authcrypt(plaintext)`
-/// Media Type: `application/didcomm-encrypted+json`
+/// # DID Comm
+/// - Envelope: `authcrypt(plaintext)`
+/// - Media Type: `application/didcomm-encrypted+json`
+///
 /// See: https://identity.foundation/didcomm-messaging/spec/#message-headers
 pub fn didcomm_jwe(
 	from_private_key: Secret,
