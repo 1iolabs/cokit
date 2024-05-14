@@ -11,7 +11,7 @@ pub use bitswap::storage::{NetworkBlockStorage, PeerProvider};
 pub use didcontact::{
 	create_gossipsub, publish, resolve, subscribe, unsubscribe, Error, RendezvousPoint, ResolveError, ResolveResult,
 };
-pub use discovery::discovery::{DiscoveryEvent, DiscoveryState};
+pub use discovery::discovery::{DiscoveryState, Event};
 pub use heads::heads::{Heads, HeadsHandler};
 pub use library::clone_key_pair::clone_key_pair;
 pub use network::{Behaviour, BehaviourEvent, Libp2pNetwork, Libp2pNetworkConfig, NetworkMode};

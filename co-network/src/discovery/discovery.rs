@@ -82,8 +82,9 @@ struct DidDiscoverySubscription {
 	identity: PrivateIdentityBox,
 }
 
+/// Event.
 #[derive(Debug, Clone)]
-pub enum DiscoveryEvent {
+pub enum Event {
 	// Resolved { id: u64, request: Discovery, peers: BTreeMap<PeerId, Vec<Multiaddr>> },
 	/// A peer to be discovered has connected.
 	Connected { id: u64, peer: PeerId },
@@ -93,10 +94,23 @@ pub enum DiscoveryEvent {
 
 	/// A discovery connect has timedout.
 	Timeout { id: u64 },
+}
+
+/// Discovery event.
+/// This wrapps events intended for library users and events which involve the swarm.
+/// The events are splitted to not need an mutable swarm handle just to receive events.
+/// The caller is responsible to call on_discovery_event with produced events when appropiate.
+#[derive(Debug, Clone)]
+pub enum DiscoveryEvent {
+	/// Event.
+	Event(Event),
 
 	/// A resolve request to us via did discovery gossip.
 	/// With an pre-computed DIDComm response.
 	Resolve { from: Did, from_peer: PeerId, response: String },
+
+	/// A discovery request.
+	DidDiscovery { discovery: DidDiscovery },
 }
 
 pub struct DiscoveryState {
@@ -111,6 +125,9 @@ pub struct DiscoveryState {
 
 	/// Pending events.
 	events: VecDeque<DiscoveryEvent>,
+
+	/// Pending DID Discovery requests. Insufficent peers.
+	pending_discovery: VecDeque<(u64, TopicHash, DidDiscovery)>,
 
 	/// Default discovery timeout.
 	timeout: Duration,
@@ -127,6 +144,32 @@ impl DiscoveryState {
 			max_peers,
 			events: Default::default(),
 			did_subscriptions: Default::default(),
+			pending_discovery: Default::default(),
+		}
+	}
+
+	/// Handle discovery event which involves the swarm.
+	/// Other events are returned.
+	pub fn on_discovery_event<B: DiscoveryBehaviour>(
+		&mut self,
+		swarm: &mut Swarm<B>,
+		event: DiscoveryEvent,
+	) -> Option<Event> {
+		match event {
+			DiscoveryEvent::Resolve { from: _, from_peer, response } => {
+				swarm.behaviour_mut().didcomm_mut().send(&from_peer, response.into());
+				None
+			},
+			DiscoveryEvent::DidDiscovery { discovery } => {
+				match did_discovery(swarm, &discovery) {
+					Ok(_) => {},
+					Err(err) => {
+						tracing::warn!(?discovery, ?err, "did_discovery-publish-failed")
+					},
+				};
+				None
+			},
+			DiscoveryEvent::Event(event) => Some(event),
 		}
 	}
 
@@ -200,7 +243,7 @@ impl DiscoveryState {
 		&mut self,
 		swarm: &mut Swarm<B>,
 		discovery: impl IntoIterator<Item = Discovery>,
-	) -> Result<(), anyhow::Error>
+	) -> Result<(), ConnectError>
 	where
 		B:,
 	{
@@ -221,20 +264,60 @@ impl DiscoveryState {
 		let request = self.requests.get_mut(&id).unwrap();
 
 		// connect
+		let mut discovery_used = 0;
 		for item in request.discovery.clone().into_iter() {
 			match item {
 				Discovery::DidDiscovery(item) => {
-					did_discovery(swarm, &item)?;
+					// we only use did discovery if the DID is currently subscribed.
+					// this is because gossipsub only can publish messages when subscribed (really?)
+					// note: currently we can only receive requests for DID which we also subscribed to
+					//       so when we may change this we need to keep tract of connection requests for
+					//       dids/identities.
+					if self.did_subscriptions.get(&did_discovery_topic(&item.network).hash()).is_none() {
+						continue;
+					}
+					// let identity = subscriptions.iter().find(|subscription| {
+					// 	println!("id: {}", subscription.identity.identity());
+					// 	println!("item: {}", item.did);
+					//  // todo: we need to amtch from no to
+					// 	subscription.identity.identity() == item.did
+					// });
+					// if identity.is_none() {
+					// 	continue;
+					// }
+
+					// publish
+					match did_discovery(swarm, &item) {
+						Ok(_) => {},
+
+						// we try again when a peer subscribes
+						Err(gossipsub::PublishError::InsufficientPeers) => {
+							self.pending_discovery.push_back((
+								id,
+								did_discovery_topic_hash(&item.network),
+								item.clone(),
+							));
+						},
+
+						// forward other errors
+						Err(e) => return Err(ConnectError::Other(e.into())),
+					};
 				},
 				Discovery::Rendezvous(_item) => {
 					// TODO: implement
+					continue;
 				},
 				Discovery::Peer(item) => {
 					peer(swarm, request, &mut self.events, &item)?;
 				},
 			}
+			discovery_used += 1;
 		}
 
+		// result
+		if discovery_used == 0 {
+			return Err(ConnectError::NoNetwork);
+		}
 		Ok(())
 	}
 
@@ -245,6 +328,7 @@ impl DiscoveryState {
 
 	/// Release (may disconnect) discovered peers.
 	pub fn release(&mut self, id: u64) {
+		self.pending_discovery.retain(|(request, _, _)| *request != id);
 		self.requests.remove(&id);
 	}
 
@@ -281,7 +365,7 @@ impl DiscoveryState {
 					// find all requests looking for this peer id
 					let requests: BTreeSet<u64> = self
 						.peer_requests()
-						.filter(|(_, request_peer, _)| peer_id == request_peer)
+						.filter(|(_, _, request_peer)| peer_id == request_peer)
 						.map(|(request, _, _)| request)
 						.collect();
 					for request_id in requests.into_iter() {
@@ -297,7 +381,7 @@ impl DiscoveryState {
 					// find all requests looking for this peer id
 					let requests: BTreeSet<u64> = self
 						.peer_requests()
-						.filter(|(_, request_peer, _)| peer_id == request_peer)
+						.filter(|(_, _, request_peer)| peer_id == request_peer)
 						.map(|(request, _, _)| request)
 						.collect();
 					for request_id in requests.into_iter() {
@@ -323,14 +407,24 @@ impl DiscoveryState {
 	}
 
 	/// Iterate over all direct peer connection networks.
-	fn peer_requests(&self) -> impl Iterator<Item = (u64, PeerId, &NetworkPeer)> {
+	fn peer_requests(&self) -> impl Iterator<Item = (u64, &NetworkPeer, PeerId)> {
 		self.requests.iter().flat_map(|(request, discovery_request)| {
 			discovery_request.discovery.iter().filter_map(|discovery| match discovery {
 				Discovery::Peer(network) => Some((
 					*request,
-					PeerId::from_bytes(&network.peer).expect("Discovery::requests to only contain only valid peer ids"),
 					network,
+					PeerId::from_bytes(&network.peer).expect("Discovery::requests to only contain only valid peer ids"),
 				)),
+				_ => None,
+			})
+		})
+	}
+
+	/// Iterate over all direct peer connection networks.
+	fn diddiscovery_requests(&self) -> impl Iterator<Item = (u64, &DidDiscovery)> {
+		self.requests.iter().flat_map(|(request, discovery_request)| {
+			discovery_request.discovery.iter().filter_map(|discovery| match discovery {
+				Discovery::DidDiscovery(network) => Some((*request, network)),
 				_ => None,
 			})
 		})
@@ -378,6 +472,23 @@ impl DiscoveryState {
 					}
 				}
 			},
+			gossipsub::Event::Subscribed { peer_id: _, topic } => {
+				// move pending discoveries to events when its topic has subscribed
+				loop {
+					if let Some((index, _)) = self
+						.pending_discovery
+						.iter()
+						.enumerate()
+						.find(|(_, (_, pending_topic, _))| pending_topic == topic)
+					{
+						if let Some((_request, _topic, discovery)) = self.pending_discovery.remove(index) {
+							self.events.push_back(DiscoveryEvent::DidDiscovery { discovery });
+						}
+					} else {
+						break;
+					}
+				}
+			},
 			_ => {},
 		}
 	}
@@ -388,7 +499,7 @@ impl DiscoveryState {
 	/// - Handle responses (type=diddiscovery) to DID Discovery messages.
 	fn on_didcomm_event(&mut self, event: &didcomm::Event) {
 		match event {
-			didcomm::Event::Received { peer_id, message } =>
+			didcomm::Event::Received { peer_id: _, message } =>
 				if let Some(message) = message.json() {
 					let identities = self
 						.did_subscriptions
@@ -429,6 +540,15 @@ impl FusedStream for DiscoveryState {
 	fn is_terminated(&self) -> bool {
 		false
 	}
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ConnectError {
+	#[error("No network is usable to connect")]
+	NoNetwork,
+
+	#[error("Connection error")]
+	Other(#[from] anyhow::Error),
 }
 
 pub trait DiscoveryBehaviour: NetworkBehaviour {
@@ -495,8 +615,13 @@ fn did_discovery_topic(network: &NetworkDidDiscovery) -> gossipsub::IdentTopic {
 }
 
 /// Get did discovery gossipsub topic as string.
-fn did_discovery_topic_str(did_discovery: &NetworkDidDiscovery) -> &str {
-	did_discovery.topic.as_deref().unwrap_or("co-contact")
+fn did_discovery_topic_str(network: &NetworkDidDiscovery) -> &str {
+	network.topic.as_deref().unwrap_or("co-contact")
+}
+
+/// Get did discovery gossipsub topic as TopicHash.
+fn did_discovery_topic_hash(network: &NetworkDidDiscovery) -> TopicHash {
+	did_discovery_topic(network).hash()
 }
 
 /// Subscribe did discovery gossipsub topic.
@@ -565,18 +690,18 @@ fn peer<B: DiscoveryBehaviour>(
 
 fn peer_connected(request: &mut DiscoveryConnectRequest, events: &mut VecDeque<DiscoveryEvent>, peer: PeerId) {
 	request.connected_peers.insert(peer);
-	events.push_back(DiscoveryEvent::Connected { id: request.id, peer });
+	events.push_back(DiscoveryEvent::Event(Event::Connected { id: request.id, peer }));
 }
 
 fn peer_disconnected(request: &mut DiscoveryConnectRequest, events: &mut VecDeque<DiscoveryEvent>, peer: PeerId) {
 	request.connected_peers.remove(&peer);
-	events.push_back(DiscoveryEvent::Disconnected { id: request.id, peer });
+	events.push_back(DiscoveryEvent::Event(Event::Disconnected { id: request.id, peer }));
 }
 
 #[cfg(test)]
 mod tests {
 	use super::{Discovery, DiscoveryBehaviour};
-	use crate::{didcomm, discovery::did_discovery::DidDiscovery, heads, DiscoveryEvent, DiscoveryState};
+	use crate::{didcomm, discovery::did_discovery::DidDiscovery, heads, DiscoveryState, Event};
 	use co_identity::DidKeyIdentity;
 	use co_primitives::{BlockSerializer, CoId, NetworkDidDiscovery};
 	use futures::{join, select, FutureExt, StreamExt};
@@ -689,41 +814,6 @@ mod tests {
 				}
 			}
 		}
-
-		fn on_swarm_event(&self, discovery: &mut DiscoveryState, event: &SwarmEvent<TestBehaviourEvent>) {
-			// foward gossip
-			match event {
-				SwarmEvent::Behaviour(TestBehaviourEvent::Gossipsub(event)) => {
-					discovery.on_gossip_event(&event);
-				},
-				SwarmEvent::Behaviour(TestBehaviourEvent::Didcomm(event)) => {
-					discovery.on_didcomm_event(&event);
-				},
-				// SwarmEvent::Behaviour(TestBehaviourEvent::Mdns(event)) => {
-				// 	discovery1.on_mdns_event(&event);
-				// },
-				_ => {},
-			}
-		}
-
-		fn on_discovery_event(
-			&mut self,
-			discovery: &mut DiscoveryState,
-			event: &DiscoveryEvent,
-		) -> Option<(u64, PeerId)> {
-			match event {
-				DiscoveryEvent::Resolve { from: _, from_peer, response } => {
-					// respond
-					self.swarm()
-						.behaviour_mut()
-						.didcomm_mut()
-						.send(from_peer, response.as_str().into());
-					None
-				},
-				DiscoveryEvent::Connected { id, peer } => Some((*id, *peer)),
-				_ => None,
-			}
-		}
 	}
 
 	//#[tracing_test::traced_test]
@@ -761,18 +851,18 @@ mod tests {
 			.did_discovery_subscribe(peer2.swarm(), NetworkDidDiscovery::default(), did2.clone())
 			.unwrap();
 
-		// wait subscribed
-		let (subscribe1, subscribe2) = join!(peer1.next(), peer2.next());
-		match subscribe1 {
-			Some(TestBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed { peer_id, topic }))
-				if topic == IdentTopic::new("co-contact").hash() && peer_id == peer2.peer_id => {},
-			event => panic!("unexpected event: {:?}", event),
-		}
-		match subscribe2 {
-			Some(TestBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed { peer_id, topic }))
-				if topic == IdentTopic::new("co-contact").hash() && peer_id == peer1.peer_id => {},
-			event => panic!("unexpected event: {:?}", event),
-		}
+		// // wait subscribed
+		// let (subscribe1, subscribe2) = join!(peer1.next(), peer2.next());
+		// match subscribe1 {
+		// 	Some(TestBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed { peer_id, topic }))
+		// 		if topic == IdentTopic::new("co-contact").hash() && peer_id == peer2.peer_id => {},
+		// 	event => panic!("unexpected event: {:?}", event),
+		// }
+		// match subscribe2 {
+		// 	Some(TestBehaviourEvent::Gossipsub(gossipsub::Event::Subscribed { peer_id, topic }))
+		// 		if topic == IdentTopic::new("co-contact").hash() && peer_id == peer1.peer_id => {},
+		// 	event => panic!("unexpected event: {:?}", event),
+		// }
 
 		// peer2: connect
 		discovery2
@@ -809,13 +899,16 @@ mod tests {
 				},
 				event = discovery1.next() => {
 					tracing::info!(?event, "discovery1");
-					peer1.on_discovery_event(&mut discovery1, &event.unwrap());
+					discovery1.on_discovery_event(peer1.swarm(), event.unwrap());
 				},
 				event = discovery2.next() => {
 					tracing::info!(?event, "discovery2");
-					if let Some((id, peer)) = peer2.on_discovery_event(&mut discovery2, &event.unwrap()) {
-						assert_eq!(peer, peer2.peer_id());
-						break;
+					match discovery2.on_discovery_event(peer2.swarm(), event.unwrap()) {
+						Some(Event::Connected {id: _, peer}) => {
+							assert_eq!(peer, peer2.peer_id());
+							break;
+						},
+						_ => {},
 					}
 				},
 			};
