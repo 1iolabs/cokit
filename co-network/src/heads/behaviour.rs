@@ -1,5 +1,6 @@
-use crate::{didcomm, heads::message::HeadsMessage, Message, MetadataMessage};
-use co_identity::{Identity, PrivateIdentity};
+use crate::{didcomm, heads::message::HeadsMessage, Message};
+use anyhow::anyhow;
+use co_identity::{DidCommHeader, Identity, PrivateIdentity};
 use co_primitives::CoId;
 use libipld::Cid;
 use libp2p::{
@@ -111,28 +112,38 @@ impl Behaviour {
 
 	/// Request DID discovery.
 	/// Messages will be encrypted with public key of `to` and signed with `from` (`PublicEncrypt(Sign(PlainText))`).
+	/// Returns the Message ID as string when sent out.
+	/// TODO: Move to anoncrypt to not disclose recipent?
 	pub fn did_discover<F, T>(
 		&mut self,
 		topic: &str,
 		from: &F,
 		to: &T,
 		message_type: String,
-	) -> Result<bool, anyhow::Error>
+	) -> Result<Option<String>, anyhow::Error>
 	where
 		F: PrivateIdentity + Send + Sync + 'static,
 		T: Identity + Send + Sync + 'static,
 	{
-		let message = MetadataMessage {
-			from: None,
+		let id: String = Uuid::new_v4().into();
+		let header = DidCommHeader {
+			from: Some(from.identity().to_owned()),
 			to: BTreeSet::from_iter(vec![to.identity().to_owned()]),
 			id: Uuid::new_v4().into(),
 			message_type,
 			..Default::default()
 		};
-		let data = message.public_encrypt(from)?;
-		match self.inner.gossipsub.publish(IdentTopic::new(topic), data) {
-			Ok(_) => Ok(true),
-			Err(PublishError::InsufficientPeers) => Ok(false),
+		let from_context = from
+			.didcomm_private()
+			.ok_or(anyhow!("unsupported identity: from: no private didcomm context"))?;
+		let to_context = to
+			.didcomm_public()
+			.ok_or(anyhow!("unsupported identity: to: no public didcomm context"))?;
+		let message = from_context.jwe(&to_context, header, "null")?;
+		// let data = message.public_encrypt(from)?;
+		match self.inner.gossipsub.publish(IdentTopic::new(topic), message) {
+			Ok(_) => Ok(Some(id)),
+			Err(PublishError::InsufficientPeers) => Ok(None),
 			Err(e) => Err(e.into()),
 		}
 	}

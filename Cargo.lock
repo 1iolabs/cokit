@@ -1418,6 +1418,7 @@ dependencies = [
  "co-identity",
  "co-primitives",
  "co-storage",
+ "derive_more",
  "did-key 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "did_url",
  "futures",

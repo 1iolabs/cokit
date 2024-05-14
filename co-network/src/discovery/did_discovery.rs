@@ -1,105 +1,43 @@
-use crate::{heads, HeadsBehaviourProvider, NetworkTask};
-use co_identity::{Identity, PrivateIdentity};
-use libp2p::{
-	swarm::{NetworkBehaviour, SwarmEvent},
-	PeerId, Swarm,
-};
-use std::{
-	collections::BTreeSet,
-	time::{Duration, Instant},
-};
+use anyhow::anyhow;
+use co_identity::{DidCommHeader, Identity, PrivateIdentity};
+use co_primitives::{Did, NetworkDidDiscovery};
+use std::collections::BTreeSet;
+use uuid::Uuid;
 
-#[derive(Debug, Clone)]
-struct DidDiscoveryNetworkDiscovery<F, T>
-where
-	F: PrivateIdentity + Send + Sync + 'static,
-	T: Identity + Send + Sync + 'static,
-{
-	topic: String,
-	from: F,
-	to: T,
-	timeout: Duration,
-	state: NetworkDiscoveryState,
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DidDiscovery {
+	pub network: NetworkDidDiscovery,
+	pub did: Did,
+	pub message_id: String,
+	pub message: String,
 }
-impl<F, T> DidDiscoveryNetworkDiscovery<F, T>
-where
-	F: PrivateIdentity + Send + Sync + 'static,
-	T: Identity + Send + Sync + 'static,
-{
-	pub fn new(topic: String, timeout: Duration, from: F, to: T) -> Self {
-		Self { topic, from, to, timeout, state: NetworkDiscoveryState::None }
-	}
-
-	fn is_response(&self, message: &crate::didcomm::Message) -> bool {
-		// TODO: implement
-		false
-	}
-}
-impl<B, F, T> NetworkTask<B> for DidDiscoveryNetworkDiscovery<F, T>
-where
-	B: NetworkBehaviour + HeadsBehaviourProvider<Event = <B as NetworkBehaviour>::ToSwarm>,
-	F: PrivateIdentity + Send + Sync + 'static,
-	T: Identity + Send + Sync + 'static,
-{
-	fn execute(&mut self, swarm: &mut Swarm<B>) {
-		let heads = swarm.behaviour_mut().heads_mut();
-		self.state = match heads.did_discover(&self.topic, &self.from, &self.to, "co/invite".to_string()) {
-			Ok(true) => NetworkDiscoveryState::Pending(Instant::now()),
-			Ok(false) => NetworkDiscoveryState::Connected(Default::default()),
-			Err(e) => NetworkDiscoveryState::Error(format!("{}", e)),
+impl DidDiscovery {
+	/// Create DID Discovery request.
+	pub fn create<F, T>(
+		from: &F,
+		to: &T,
+		network: NetworkDidDiscovery,
+		message_type: String,
+	) -> Result<DidDiscovery, anyhow::Error>
+	where
+		F: PrivateIdentity + Send + Sync + 'static,
+		T: Identity + Send + Sync + 'static,
+	{
+		let id: String = Uuid::new_v4().into();
+		let header = DidCommHeader {
+			from: Some(from.identity().to_owned()),
+			to: BTreeSet::from_iter(vec![to.identity().to_owned()]),
+			id: Uuid::new_v4().into(),
+			message_type,
+			..Default::default()
 		};
-	}
-
-	fn on_swarm_event(
-		&mut self,
-		_swarm: &mut Swarm<B>,
-		event: SwarmEvent<<B as NetworkBehaviour>::ToSwarm>,
-	) -> Option<SwarmEvent<<B as NetworkBehaviour>::ToSwarm>> {
-		match B::heads_event(&event) {
-			Some(heads::Event::Didcomm(crate::didcomm::Event::Received { peer_id, message })) => {
-				if self.is_response(message) {
-					self.state.insert_connected_peer(peer_id.clone());
-				}
-			},
-			_ => {},
-		}
-		Some(event)
-	}
-
-	fn is_complete(&mut self) -> bool {
-		match self.state {
-			NetworkDiscoveryState::Connected(_) | NetworkDiscoveryState::Error(_) => true,
-			NetworkDiscoveryState::Pending(start) =>
-				if start.elapsed() > self.timeout {
-					self.state = NetworkDiscoveryState::Timeout;
-					true
-				} else {
-					false
-				},
-			_ => false,
-		}
-	}
-}
-
-#[derive(Debug, Clone)]
-enum NetworkDiscoveryState {
-	None,
-	Pending(Instant),
-	Connected(BTreeSet<PeerId>),
-	Error(String),
-	Timeout,
-}
-impl NetworkDiscoveryState {
-	pub fn insert_connected_peer(&mut self, peer: PeerId) {
-		match self {
-			NetworkDiscoveryState::Connected(v) => {
-				v.insert(peer);
-			},
-			_ => {
-				let mut v = BTreeSet::new();
-				v.insert(peer);
-				*self = NetworkDiscoveryState::Connected(v)
-			},
-		}
+		let from_context = from
+			.didcomm_private()
+			.ok_or(anyhow!("unsupported identity: from: no private didcomm context"))?;
+		let to_context = to
+			.didcomm_public()
+			.ok_or(anyhow!("unsupported identity: to: no public didcomm context"))?;
+		let message = from_context.jwe(&to_context, header, "null")?;
+		Ok(DidDiscovery { message_id: id, did: to.identity().to_owned(), network, message })
 	}
 }

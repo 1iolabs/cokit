@@ -22,6 +22,7 @@ mod message;
 mod protocol;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Event {
 	Received { peer_id: PeerId, message: Message },
 	Sent { peer_id: PeerId, message: Message },
