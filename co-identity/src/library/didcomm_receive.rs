@@ -4,17 +4,17 @@ use co_primitives::Secret;
 use didcomm_rs::Message;
 
 pub async fn didcomm_receive<R: IdentityResolver>(
-	to_private_key: Secret,
+	to_key_agreement_private_key: Secret,
 	resolver: &R,
 	incoming: &str,
 ) -> Result<(DidCommHeader, String), ReceiveError> {
 	// try receive
-	let message = match Message::receive(incoming, Some(to_private_key.divulge()), None, None) {
+	let message = match Message::receive(incoming, Some(to_key_agreement_private_key.divulge()), None, None) {
 		Ok(message) => message,
 		Err(didcomm_rs::Error::DidResolveFailed) => {
 			// when the message is encrypted we need to resolve the encryptor did so we just forwad this to the special
 			// method
-			return didcomm_jwe_receive(to_private_key, resolver, incoming).await;
+			return didcomm_jwe_receive(to_key_agreement_private_key, resolver, incoming).await;
 		},
 		Err(err) => return Err(ReceiveError::Decrypt(err.into())),
 	};

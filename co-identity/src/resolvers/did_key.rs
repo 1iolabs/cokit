@@ -1,6 +1,7 @@
 use crate::{
-	DidCommPrivateContext, DidCommPublicContext, Identity, IdentityResolver, IdentityResolverError, PrivateIdentity,
-	SignError,
+	library::from_did_key_verification_method::from_did_key_verification_method,
+	types::didcomm::context::DidCommContext, DidCommPrivateContext, DidCommPublicContext, Identity, IdentityResolver,
+	IdentityResolverError, PrivateIdentity, SignError,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -25,6 +26,7 @@ impl DidKeyIdentity {
 	pub fn generate(seed: Option<&[u8]>) -> Self {
 		Self::from_key(generate::<Ed25519KeyPair>(seed))
 	}
+
 	pub fn generate_x25519(seed: Option<&[u8]>) -> Self {
 		Self::from_key(generate::<X25519KeyPair>(seed))
 	}
@@ -123,7 +125,20 @@ impl Identity for DidKeyIdentity {
 	}
 
 	fn didcomm_public(&self) -> Option<DidCommPublicContext> {
-		Some(DidCommPublicContext::new(self.identity().to_owned(), self.key.public_key_bytes()))
+		let doc = self
+			.key
+			.get_did_document(did_key::Config { use_jose_format: false, serialize_secrets: false });
+		let verfication_method = from_did_key_verification_method(doc.verification_method.first()?.clone(), None);
+		let key_aggrements = doc.key_agreement?;
+		let key_aggrement_id = key_aggrements.first()?;
+		let key_agreement = from_did_key_verification_method(
+			doc.verification_method
+				.iter()
+				.find(|item| &item.id == key_aggrement_id)?
+				.clone(),
+			None,
+		);
+		Some(DidCommPublicContext::new(self.identity().to_owned(), verfication_method, key_agreement))
 	}
 }
 impl PrivateIdentity for DidKeyIdentity {
@@ -135,11 +150,29 @@ impl PrivateIdentity for DidKeyIdentity {
 	}
 
 	fn didcomm_private(&self) -> Option<DidCommPrivateContext> {
-		Some(DidCommPrivateContext::new(
-			self.identity().to_owned(),
-			self.key.private_key_bytes().into(),
-			self.key.public_key_bytes(),
-		))
+		let public = self.didcomm_public()?;
+		let doc = self
+			.key
+			.get_did_document(did_key::Config { use_jose_format: false, serialize_secrets: true });
+		let verfication_method_private = doc.verification_method.iter().find_map(|vm| {
+			if vm.id == public.verification_method().id && vm.private_key.is_some() {
+				from_did_key_verification_method(vm.clone(), vm.private_key.clone())
+					.public_key_bytes()
+					.ok()
+			} else {
+				None
+			}
+		})?;
+		let key_agreement_private = doc.verification_method.iter().find_map(|vm| {
+			if vm.id == public.key_agreement().id && vm.private_key.is_some() {
+				from_did_key_verification_method(vm.clone(), vm.private_key.clone())
+					.public_key_bytes()
+					.ok()
+			} else {
+				None
+			}
+		})?;
+		Some(DidCommPrivateContext::new(public, verfication_method_private.into(), key_agreement_private.into()))
 	}
 }
 

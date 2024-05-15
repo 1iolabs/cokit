@@ -1354,6 +1354,7 @@ dependencies = [
  "futures",
  "hex",
  "libipld",
+ "multibase",
  "serde",
  "serde_bytes",
  "serde_ipld_dagcbor",

@@ -1,7 +1,9 @@
 use super::did_discovery::DidDiscovery;
 use crate::didcomm;
 use anyhow::anyhow;
-use co_identity::{DidCommHeader, DidCommPrivateContext, IdentityResolver, PrivateIdentity, PrivateIdentityBox};
+use co_identity::{
+	DidCommContext, DidCommHeader, DidCommPrivateContext, IdentityResolver, PrivateIdentity, PrivateIdentityBox,
+};
 use co_primitives::{Did, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous};
 use derive_more::From;
 use futures::{
@@ -17,7 +19,6 @@ use libp2p::{
 };
 use std::{
 	collections::{BTreeMap, BTreeSet, VecDeque},
-	ops::DerefMut,
 	pin::Pin,
 	str::{from_utf8, FromStr},
 	task::{Context, Poll},
@@ -905,8 +906,8 @@ mod tests {
 		peer2.add_address(&peer1);
 
 		// identities
-		let did1 = DidKeyIdentity::generate_x25519(Some(&vec![1; 32]));
-		let did2 = DidKeyIdentity::generate_x25519(Some(&vec![2; 32]));
+		let did1 = DidKeyIdentity::generate(Some(&vec![1; 32]));
+		let did2 = DidKeyIdentity::generate(Some(&vec![2; 32]));
 
 		// states
 		let mut discovery1 = DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(10), None);

@@ -1,5 +1,7 @@
 use super::into_didcomm_rs_header::{from_didcomm_rs_header, into_didcomm_rs_header};
-use crate::{DidCommHeader, DidKeyIdentity, IdentityResolver, ReceiveError, SignError};
+use crate::{
+	types::didcomm::context::DidCommContext, DidCommHeader, DidKeyIdentity, IdentityResolver, ReceiveError, SignError,
+};
 use co_primitives::Secret;
 use didcomm_rs::{
 	crypto::{CryptoAlgorithm, SignatureAlgorithm},
@@ -17,8 +19,8 @@ use didcomm_rs::{
 ///
 /// See: https://identity.foundation/didcomm-messaging/spec/#message-headers
 pub fn didcomm_jwe(
-	from_private_key: Secret,
-	to_public_key: Vec<u8>,
+	from_key_agreement_private_key: Secret,
+	to_key_agreement_public_key: Vec<u8>,
 	header: DidCommHeader,
 	body: &str,
 ) -> Result<String, SignError> {
@@ -28,11 +30,11 @@ pub fn didcomm_jwe(
 		.map_err(|e| SignError::Other(e.into()))?;
 	let signer = DidKeyIdentity::generate(None);
 	let result = message
-		.as_flat_jwe(&CryptoAlgorithm::XC20P, Some(to_public_key.clone()))
+		.as_flat_jwe(&CryptoAlgorithm::XC20P, Some(to_key_agreement_public_key.clone()))
 		.kid(&hex::encode(signer.public_key_bytes()))
 		.seal_signed(
-			from_private_key.divulge(),
-			Some(vec![Some(to_public_key.clone())]),
+			from_key_agreement_private_key.divulge(),
+			Some(vec![Some(to_key_agreement_public_key.clone())]),
 			SignatureAlgorithm::EdDsa,
 			signer.private_key_bytes().divulge(),
 		)
@@ -41,7 +43,7 @@ pub fn didcomm_jwe(
 }
 
 pub async fn didcomm_jwe_receive<R: IdentityResolver>(
-	to_private_key: Secret,
+	key_agreement_private_key: Secret,
 	resolver: &R,
 	incoming: &str,
 ) -> Result<(DidCommHeader, String), ReceiveError> {
@@ -63,9 +65,18 @@ pub async fn didcomm_jwe_receive<R: IdentityResolver>(
 	};
 
 	// try recv
-	let message =
-		Message::receive(incoming, Some(to_private_key.divulge()), Some(skid_context.public_key_bytes()), None)
-			.map_err(|e| ReceiveError::Decrypt(e.into()))?;
+	let message = Message::receive(
+		incoming,
+		Some(key_agreement_private_key.divulge()),
+		Some(
+			skid_context
+				.key_agreement()
+				.public_key_bytes()
+				.map_err(|e| ReceiveError::InvalidArgument(e))?,
+		),
+		None,
+	)
+	.map_err(|e| ReceiveError::Decrypt(e.into()))?;
 
 	// result
 	Ok((

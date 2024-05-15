@@ -4,22 +4,52 @@ use crate::{
 		didcomm_jws::didcomm_jws,
 		didcomm_receive::didcomm_receive,
 	},
-	DidCommHeader, IdentityResolver, ReceiveError, SignError,
+	DidCommHeader, IdentityResolver, ReceiveError, SignError, VerificationMethod,
 };
 use co_primitives::{Did, Secret};
 
-pub struct DidCommPrivateContext {
-	did: Did,
-	private_key: Secret,
-	public_key: Vec<u8>,
+pub trait DidCommContext {
+	fn did(&self) -> &Did;
+	fn key_agreement(&self) -> &VerificationMethod;
+	fn verification_method(&self) -> &VerificationMethod;
 }
-impl DidCommPrivateContext {
-	pub fn new(did: Did, private_key: Secret, public_key: Vec<u8>) -> Self {
-		Self { did, private_key, public_key }
+
+pub struct DidCommPublicContext {
+	did: Did,
+	verification_method: VerificationMethod,
+	key_agreement: VerificationMethod,
+}
+impl DidCommPublicContext {
+	pub fn new(did: Did, verification_method: VerificationMethod, key_agreement: VerificationMethod) -> Self {
+		Self { did, verification_method, key_agreement }
+	}
+}
+impl DidCommContext for DidCommPublicContext {
+	fn did(&self) -> &Did {
+		&self.did
 	}
 
-	pub fn did(&self) -> Did {
-		self.did.clone()
+	fn key_agreement(&self) -> &VerificationMethod {
+		&self.key_agreement
+	}
+
+	fn verification_method(&self) -> &VerificationMethod {
+		&self.verification_method
+	}
+}
+
+pub struct DidCommPrivateContext {
+	public: DidCommPublicContext,
+	verification_method_private_key: Secret,
+	key_agreement_private_key: Secret,
+}
+impl DidCommPrivateContext {
+	pub fn new(
+		public: DidCommPublicContext,
+		verification_method_private_key: Secret,
+		key_agreement_private_key: Secret,
+	) -> Self {
+		Self { public, verification_method_private_key, key_agreement_private_key }
 	}
 
 	/// Create JWS message envelope.
@@ -31,7 +61,15 @@ impl DidCommPrivateContext {
 	/// # Arguments
 	/// - `body` - JSON String.
 	pub fn jws(&self, header: DidCommHeader, body: &str) -> Result<String, SignError> {
-		didcomm_jws(self.private_key.clone(), &self.public_key, header, body)
+		didcomm_jws(
+			self.verification_method_private_key.clone(),
+			&self
+				.verification_method()
+				.public_key_bytes()
+				.map_err(|e| SignError::InvalidArgument(e))?,
+			header,
+			body,
+		)
 	}
 
 	/// Create JWE message envelope.
@@ -45,12 +83,19 @@ impl DidCommPrivateContext {
 	pub fn jwe(&self, to: &DidCommPublicContext, header: DidCommHeader, body: &str) -> Result<String, SignError> {
 		let mut header = header;
 		if !header.to.contains(&to.did) {
-			header.to.insert(to.did());
+			header.to.insert(to.did().to_owned());
 		}
 		// if !header.to.contains(&to.did) {
 		// 	return Err(SignError::InvalidArgument(anyhow!("header must contain recipent: {}", to.did)));
 		// }
-		didcomm_jwe(self.private_key.clone(), to.public_key.clone(), header, body)
+		didcomm_jwe(
+			self.key_agreement_private_key.clone(),
+			to.key_agreement
+				.public_key_bytes()
+				.map_err(|e| SignError::InvalidArgument(e.into()))?,
+			header,
+			body,
+		)
 	}
 
 	pub async fn jwe_receive<R: IdentityResolver>(
@@ -58,7 +103,7 @@ impl DidCommPrivateContext {
 		resolver: &R,
 		incoming: &str,
 	) -> Result<(DidCommHeader, String), ReceiveError> {
-		didcomm_jwe_receive(self.private_key.clone(), resolver, incoming).await
+		didcomm_jwe_receive(self.key_agreement_private_key.clone(), resolver, incoming).await
 	}
 
 	pub async fn receive<R: IdentityResolver>(
@@ -66,24 +111,19 @@ impl DidCommPrivateContext {
 		resolver: &R,
 		incoming: &str,
 	) -> Result<(DidCommHeader, String), ReceiveError> {
-		didcomm_receive(self.private_key.clone(), resolver, incoming).await
+		didcomm_receive(self.key_agreement_private_key.clone(), resolver, incoming).await
 	}
 }
-
-pub struct DidCommPublicContext {
-	did: Did,
-	public_key: Vec<u8>,
-}
-impl DidCommPublicContext {
-	pub fn new(did: Did, public_key: Vec<u8>) -> Self {
-		Self { did, public_key }
+impl DidCommContext for DidCommPrivateContext {
+	fn did(&self) -> &Did {
+		self.public.did()
 	}
 
-	pub fn did(&self) -> Did {
-		self.did.clone()
+	fn key_agreement(&self) -> &VerificationMethod {
+		self.public.key_agreement()
 	}
 
-	pub fn public_key_bytes(&self) -> Vec<u8> {
-		self.public_key.clone()
+	fn verification_method(&self) -> &VerificationMethod {
+		self.public.verification_method()
 	}
 }

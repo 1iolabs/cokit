@@ -1,3 +1,4 @@
+pub mod did_core;
 pub mod didcomm;
 pub mod identity;
 pub mod private_identity;

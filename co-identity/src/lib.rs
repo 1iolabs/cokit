@@ -8,8 +8,9 @@ pub use resolvers::{
 	local::{LocalIdentity, LocalIdentityResolver},
 };
 pub use types::{
+	did_core::{Jwk, VerificationMethod, VerificationMethodTypes},
 	didcomm::{
-		context::{DidCommPrivateContext, DidCommPublicContext},
+		context::{DidCommContext, DidCommPrivateContext, DidCommPublicContext},
 		header::DidCommHeader,
 	},
 	identity::{Identity, IdentityBox},
