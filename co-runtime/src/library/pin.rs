@@ -1,84 +1,38 @@
+use crate::{CidResolverBox, MultiLayerCidResolver};
 use anyhow::anyhow;
-use co_api::Metadata;
-use co_primitives::{DefaultNodeSerializer, MultiCodec, NodeBuilder};
+use co_primitives::{DefaultNodeSerializer, NodeBuilder};
 use co_storage::{node_reader, Storage, StorageError};
-use libipld::{cbor::DagCborCodec, prelude::Codec, serde::from_ipld, Cid, Ipld};
+use libipld::Cid;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	path::PathBuf,
+};
+use tokio::fs;
 
 #[derive(Debug)]
 pub struct PinMapping {
-	pub pin: Cid,
+	pub pin: BTreeMap<Cid, BTreeSet<Cid>>,
 	pub removed: BTreeSet<Cid>,
 	pub added: BTreeSet<Cid>,
 }
 
 impl PinMapping {
-	/// Create pin mapping from state.
-	///
-	/// # Arguments
-	/// - `state` - The CID of the state we want to pin.
-	/// - `pin` - The CID of the pin mapping of a previous state.
-	pub fn from_state<S: Storage + Sized>(storage: &mut S, state: Cid, pin: Option<Cid>) -> anyhow::Result<PinMapping> {
-		// get current pins
-		let mut pins = if let Some(cid) = pin { PinEntry::read(storage, &cid)? } else { Default::default() };
+	pub async fn from_file(
+		application_path: PathBuf,
+		resolver: &CidResolverBox,
+		state: &Cid,
+	) -> anyhow::Result<PinMapping> {
+		// read old pin map from application path file
+		let content = fs::read(&application_path.with_file_name("pins.cbor")).await?;
+		let old_pins: BTreeMap<Cid, BTreeSet<Cid>> = serde_ipld_dagcbor::from_slice(&content)?;
 
+		// create cid resolver
+		let mut cid_resolver = MultiLayerCidResolver::new().with_previous_cids(old_pins);
 		// compute next pins
-		let mut added = BTreeSet::new();
-		let mut next_pins = BTreeMap::<Cid, BTreeSet<Cid>>::new();
-		compute_entry(&mut pins, &mut next_pins, &mut added, storage, &state)?;
-
-		// all items left in current pins are not used anymore
-		let removed = pins
-			.into_iter()
-			.map(|(k, _)| k)
-			// .flat_map(|(k, v)| [k].into_iter().chain(v.into_iter()))
-			.collect::<BTreeSet<Cid>>();
-
-		// store next pins
-		let next_pin = PinEntry::write(storage, &next_pins)?;
-
-		// result
-		Ok(PinMapping { pin: next_pin, removed, added })
-	}
-}
-
-fn compute_entry<S: Storage>(
-	from: &mut BTreeMap<Cid, BTreeSet<Cid>>,
-	to: &mut BTreeMap<Cid, BTreeSet<Cid>>,
-	added: &mut BTreeSet<Cid>,
-	storage: &S,
-	cid: &Cid,
-) -> anyhow::Result<()> {
-	if !move_entry(from, to, &cid) {
-		// find children
-		let ipld = decode(storage, &cid)?;
-		let mut children = Default::default();
-		find_ipld_cids(&mut children, storage, &ipld);
-
-		// children
-		for child in children.iter() {
-			compute_entry(from, to, added, storage, child)?;
-		}
-
-		// add
-		added.insert(cid.clone());
-		to.insert(cid.clone(), children);
-	}
-	Ok(())
-}
-
-/// Try to move an entry and all its child.
-/// Returns true if cid was moved (and therefore already known in from).
-fn move_entry(from: &mut BTreeMap<Cid, BTreeSet<Cid>>, to: &mut BTreeMap<Cid, BTreeSet<Cid>>, cid: &Cid) -> bool {
-	if let Some((key, value)) = from.remove_entry(cid) {
-		for child_cid in value.iter() {
-			move_entry(from, to, child_cid);
-		}
-		to.insert(key, value);
-		true
-	} else {
-		false
+		cid_resolver.resolve_cid(state, resolver).await?;
+		let (removed, added) = cid_resolver.diff()?;
+		Ok(PinMapping { pin: cid_resolver.new_cids()?, removed, added })
 	}
 }
 
@@ -90,7 +44,7 @@ enum PinEntry {
 	Child(Cid),
 }
 impl PinEntry {
-	fn read<S: Storage>(storage: &S, cid: &Cid) -> anyhow::Result<BTreeMap<Cid, BTreeSet<Cid>>> {
+	fn _read<S: Storage>(storage: &S, cid: &Cid) -> anyhow::Result<BTreeMap<Cid, BTreeSet<Cid>>> {
 		let mut result = BTreeMap::<Cid, BTreeSet<Cid>>::new();
 		let mut root = None;
 		for item in node_reader(storage, cid) {
@@ -114,7 +68,7 @@ impl PinEntry {
 		Ok(result)
 	}
 
-	fn write<S: Storage>(storage: &mut S, map: &BTreeMap<Cid, BTreeSet<Cid>>) -> anyhow::Result<Cid> {
+	fn _write<S: Storage>(storage: &mut S, map: &BTreeMap<Cid, BTreeSet<Cid>>) -> anyhow::Result<Cid> {
 		// validate
 		if map.is_empty() {
 			return Err(StorageError::InvalidArgument(anyhow!("Empty")))?
@@ -145,124 +99,15 @@ impl PinEntry {
 	}
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct PinState {
-	pins: BTreeMap<Cid, BTreeSet<Cid>>,
-}
-
-fn decode<S: Storage>(storage: &S, cid: &Cid) -> Result<Ipld, StorageError> {
-	let block = storage.get(MultiCodec::dag_cbor(cid)?)?;
-	let ipld: Ipld = DagCborCodec
-		.decode(block.data())
-		.map_err(|e| StorageError::InvalidArgument(e.into()))?;
-	Ok(ipld)
-}
-
-/// Recursively find all referenced `Cid`'s in an `Ipld` data structure by calling `found`.
-fn find_ipld_cids<S: Storage>(result: &mut BTreeSet<Cid>, storage: &S, ipld: &Ipld) {
-	match ipld {
-		Ipld::List(v) =>
-			for i in v.iter() {
-				find_ipld_cids(result, storage, i);
-			},
-		Ipld::Map(v) => {
-			let external = get_external(ipld).unwrap_or_default();
-			for (k, i) in v.iter() {
-				if !external.contains(k) {
-					find_ipld_cids(result, storage, i);
-				}
-			}
-		},
-		Ipld::Link(v) => {
-			result.insert(v.clone());
-		},
-		_ => {},
-	}
-}
-
-// pub fn find_external(ipld: &Ipld) -> Vec<String> {
-//     let mut result = Vec::new();
-
-//     let metadata: Vec<Metadata> = from_ipld(ipld.get("$co"));
-
-//     match ipld {
-//         Ipld::Map(v) => match v.get("$co") {
-//             Some(Ipld::List(r)) => {
-//                 for k in r.iter() {
-//                     // {"ext": {"f": ["..."]}}
-//                     match k {
-//                         Ipld::Map(metadata) => {
-//                             match metadata.first_key_value() {
-//                                 Some((k, v)) if k == "ext" => {},
-//                                 _ => {},
-//                             }
-//                         },
-//                         _ => {},
-//                     }
-//                 }
-//             },
-//             _ => {},
-//         }
-//         _ => {},
-//     }
-//     result
-// }
-
-enum GetExternalError {
-	NotFound,
-	Decode,
-}
-
-fn get_external(ipld: &Ipld) -> Result<HashSet<String>, GetExternalError> {
-	Ok(from_ipld::<Vec<Metadata>>(ipld.get("$co").map_err(|_| GetExternalError::NotFound)?.clone())
-		.map_err(|_| GetExternalError::Decode)?
-		.into_iter()
-		.filter_map(|v| match v {
-			Metadata::External(f) => Some(f),
-		})
-		.flatten()
-		.map(|s| s.to_owned())
-		.collect())
-}
-
-// let ext = ipld_field_list(ipld, "$co")
-//         .iter()
-//         .filter_map(|v| ipld_field(v, "ext"))
-//         .map(|ext| ipld_field_list(ext, "f"))
-//         .flatten()
-//         .filter_map(|f| f)
-//         .collect();
-
-// fn ipld_field_string<'a>(ipld: &'a Ipld, name: &str) -> Option<&'a String> {
-//     match ipld_field(ipld, name) {
-//         Some(Ipld::String(r)) => Some(r),
-//         _ => None,
-//     }
-// }
-
-// fn ipld_field_list<'a>(ipld: &'a Ipld, name: &str) -> &'a Vec<Ipld> {
-//     match ipld_field(ipld, name) {
-//         Some(Ipld::List(r)) => r,
-//         _ => &Vec::new(),
-//     }
-// }
-
-// fn ipld_field<'a>(ipld: &'a Ipld, name: &str) -> Option<&'a Ipld> {
-//     match ipld {
-//         Ipld::Map(m) => {
-//             m.get(name)
-//         },
-//         _ => None,
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
 	use super::PinMapping;
+	use crate::create_cid_resolver;
 	use co_primitives::BlockSerializer;
-	use co_storage::{MemoryStorage, Storage};
+	use co_storage::{BlockStorage, MemoryBlockStorage};
 	use libipld::Cid;
 	use serde::{Deserialize, Serialize};
+	use std::path::PathBuf;
 
 	#[derive(Debug, Serialize, Deserialize)]
 	struct TestNode {
@@ -282,7 +127,7 @@ mod tests {
 	/// ┌──▼───┐ ┌──▼───┐
 	/// │ CID3 │ │ CID5 │
 	/// └──────┘ └──────┘
-	fn get_reference_storage() -> (MemoryStorage, Vec<Cid>) {
+	async fn get_reference_storage() -> anyhow::Result<(MemoryBlockStorage, Vec<Cid>)> {
 		let s = BlockSerializer::default();
 		let cid6 = s.serialize(&TestNode { name: "CID6".to_owned(), children: vec![] }).unwrap();
 		let cid5 = s.serialize(&TestNode { name: "CID5".to_owned(), children: vec![] }).unwrap();
@@ -314,15 +159,15 @@ mod tests {
 		// cid5: Cid(bafyr4ih7sbwsz7yu6gcilheb5tnaihph45pouftde7yi7cxqcqjqyrwxey)
 		// cid6: Cid(bafyr4iezz44ryyhzi53oszexkq42ih6ktoxixkh4tjp42gwltngzb2igk4)
 
-		let mut storage = MemoryStorage::new();
-		storage.set(cid6.clone()).unwrap();
-		storage.set(cid5.clone()).unwrap();
-		storage.set(cid4.clone()).unwrap();
-		storage.set(cid3.clone()).unwrap();
-		storage.set(cid2.clone()).unwrap();
-		storage.set(cid1.clone()).unwrap();
+		let storage = MemoryBlockStorage::new();
+		storage.set(cid6.clone()).await?;
+		storage.set(cid5.clone()).await?;
+		storage.set(cid4.clone()).await?;
+		storage.set(cid3.clone()).await?;
+		storage.set(cid2.clone()).await?;
+		storage.set(cid1.clone()).await?;
 
-		(storage, cids)
+		Ok((storage, cids))
 	}
 
 	/// Create test reference model
@@ -337,7 +182,7 @@ mod tests {
 	/// ┌──▼───┐ ┌──▼──────────┐
 	/// │ CID3 │ │ CID5_RENAME │
 	/// └──────┘ └─────────────┘
-	fn get_reference_storage_v2(storage: &mut MemoryStorage) -> Vec<Cid> {
+	async fn get_reference_storage_v2(storage: &mut MemoryBlockStorage) -> anyhow::Result<Vec<Cid>> {
 		let s = BlockSerializer::default();
 		let cid6 = s.serialize(&TestNode { name: "CID6".to_owned(), children: vec![] }).unwrap();
 		let cid5 = s
@@ -371,34 +216,45 @@ mod tests {
 		// cid5: Cid(bafyr4icgsnke4yqo53ve65mw7ctvexn42jsw7xg23ewdfsfdv6lq6eq73e)
 		// cid6: Cid(bafyr4iezz44ryyhzi53oszexkq42ih6ktoxixkh4tjp42gwltngzb2igk4)
 
-		storage.set(cid6.clone()).unwrap();
-		storage.set(cid5.clone()).unwrap();
-		storage.set(cid4.clone()).unwrap();
-		storage.set(cid3.clone()).unwrap();
-		storage.set(cid2.clone()).unwrap();
-		storage.set(cid1.clone()).unwrap();
+		storage.set(cid6.clone()).await?;
+		storage.set(cid5.clone()).await?;
+		storage.set(cid4.clone()).await?;
+		storage.set(cid3.clone()).await?;
+		storage.set(cid2.clone()).await?;
+		storage.set(cid1.clone()).await?;
 
-		cids
+		Ok(cids)
 	}
 
-	#[test]
-	fn new_state() {
-		let (mut storage, cids) = get_reference_storage();
-		let pin = PinMapping::from_state(&mut storage, cids.get(0).unwrap().clone(), None).unwrap();
+	#[tokio::test]
+	async fn new_state() {
+		// TODO create test file
+		let (storage, cids) = get_reference_storage().await.expect("storage");
+		let resolver = create_cid_resolver(vec![storage]).await.expect("resovlers");
+		let pin = PinMapping::from_file(PathBuf::new(), &resolver, &Cid::default())
+			.await
+			.expect("pin");
 		assert_eq!(pin.added.len(), 6);
 		for cid in cids.iter() {
 			assert!(pin.added.contains(cid));
 		}
 	}
 
-	#[test]
-	fn change_cid5_name() {
+	#[tokio::test]
+	async fn change_cid5_name() {
 		// reference
-		let (mut storage, cids) = get_reference_storage();
-		let pin = PinMapping::from_state(&mut storage, cids.get(0).unwrap().clone(), None).unwrap();
+		// TODO create test file
+		let (mut storage, cids) = get_reference_storage().await.expect("storage");
+		let resolver = create_cid_resolver(vec![storage.clone()]).await.expect("resovlers");
+		let _pin = PinMapping::from_file(PathBuf::new(), &resolver, &cids.get(0).unwrap())
+			.await
+			.expect("pin");
 
-		let next_cids = get_reference_storage_v2(&mut storage);
-		let next_pin = PinMapping::from_state(&mut storage, next_cids.get(0).unwrap().clone(), Some(pin.pin)).unwrap();
+		let next_cids = get_reference_storage_v2(&mut storage).await.expect("next cids");
+		let resolver = create_cid_resolver(vec![storage.clone()]).await.expect("resovlers");
+		let next_pin = PinMapping::from_file(PathBuf::new(), &resolver, &next_cids.get(0).unwrap())
+			.await
+			.expect("pin");
 		assert_eq!(next_pin.added.len(), 3);
 		assert!(next_pin.added.contains(next_cids.get(0).unwrap()));
 		assert!(next_pin.added.contains(next_cids.get(3).unwrap()));
