@@ -1,13 +1,12 @@
 use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
-use co_api::{Cid, CoId, DagCollection, DefaultNodeSerializer, NodeBuilder, StorageError};
-use co_runtime::{create_cid_resolver, CidResolverBox};
-use co_sdk::{memberships, Application, BlockStorage, CoStorage, NodeStream, OptionLink, CO_CORE_NAME_PIN};
+use co_api::{Cid, CoId, DagCollection};
+use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
+use co_sdk::{memberships, Application, BlockStorage, CoStorage, CO_CORE_NAME_PIN};
 use colored::Colorize;
 use exitcode::ExitCode;
 use futures::{pin_mut, StreamExt};
 use libipld::{cbor::DagCborCodec, codec::Codec, Ipld};
-use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,
@@ -115,13 +114,13 @@ pub async fn generate_pins(
 
 	if let Some(state) = state {
 		// generate cids up to depth
-		let mut resolver = MultiLayerCidResolver::new(command.depth);
+		let mut resolver = MultiLayerCidResolver::new().with_depth_limit(command.depth);
 		resolver
 			.resolve_cid(&state, &create_cid_resolver(get_all_co_storages(application).await?).await?)
 			.await?;
 
 		// print findings
-		cat_resolver(resolver, true);
+		cat_resolver(resolver, true)?;
 	}
 	Ok(exitcode::OK)
 }
@@ -129,8 +128,16 @@ pub async fn generate_pins(
 async fn update_pins(context: &CliContext, cli: &Cli, _command: &UpdateCommand) -> Result<ExitCode, anyhow::Error> {
 	// application ini
 	let application = context.application(cli).await;
+	// get pinn file path
 	let pins_path = application.application_path().with_file_name("pins.cbor");
-	let mut cid_resolver = MultiLayerCidResolver::new(-1);
+	// read previous pins from file
+	let content = fs::read(&pins_path).await?;
+	// decode cbor
+	let old_pin_map: BTreeMap<Cid, BTreeSet<Cid>> = serde_ipld_dagcbor::from_slice(&content)?;
+
+	// create resolver
+	let mut cid_resolver = MultiLayerCidResolver::new().with_previous_cids(old_pin_map);
+
 	let (state, _) = application.local_co_reducer().await?.reducer_state().await;
 	let resolvers = create_cid_resolver(get_all_co_storages(application).await?).await?;
 	match state {
@@ -139,17 +146,14 @@ async fn update_pins(context: &CliContext, cli: &Cli, _command: &UpdateCommand) 
 		},
 		None => (),
 	}
-	// TODO remove this and write unit test
-	// test reading and printing saved pin map
-	let content = fs::read(&pins_path).await?;
-	let mut old_pin_map: BTreeMap<Cid, BTreeSet<Cid>> = serde_ipld_dagcbor::from_slice(&content)?;
 
-	let mut new_pin_map = cid_resolver.found_cids.clone();
+	let new_pin_map = cid_resolver.new_cids()?;
+
 	// write pin map
 	let data = serde_ipld_dagcbor::to_vec(&new_pin_map)?;
 	fs::write(&pins_path, data).await?;
 
-	let (removed_items, added_items) = pin_map_diff(&mut old_pin_map, &mut new_pin_map);
+	let (removed_items, added_items) = cid_resolver.diff()?;
 	println!("Removed items:");
 	for i in removed_items {
 		println!("{i}");
@@ -158,7 +162,7 @@ async fn update_pins(context: &CliContext, cli: &Cli, _command: &UpdateCommand) 
 	for i in added_items {
 		println!("{i}");
 	}
-	cat_pin_map(old_pin_map, BTreeSet::default());
+	cat_pin_map(cid_resolver.new_cids()?, BTreeSet::default());
 
 	Ok(exitcode::OK)
 }
@@ -180,99 +184,20 @@ async fn get_all_co_storages(application: Application) -> anyhow::Result<Vec<CoS
 	Ok(storages)
 }
 
-/**
- * Resolves a cid. Then Looks for other cids and tries to recursively resolve those as well.
- * Will fail when a cid resolves to another Co as the given storage doesn't have its key.
- */
-pub struct MultiLayerCidResolver {
-	/// Contains all cids that have been found after running
-	pub found_cids: BTreeMap<Cid, BTreeSet<Cid>>,
-	/// Contains all cids that couldn't be resolved further
-	pub failed_cids: BTreeSet<Cid>,
-	/// Defines a depth up to which Links should be resolved. No limit if depth is negtive
-	pub depth: i64,
-	/// Tracks depth. After running, shows how many layers of links got resolved.
-	pub current_depth: i64,
-	new_cids: BTreeSet<Cid>,
-}
-
-impl MultiLayerCidResolver {
-	pub fn new(depth: i64) -> Self {
-		Self {
-			found_cids: BTreeMap::new(),
-			new_cids: BTreeSet::new(),
-			failed_cids: BTreeSet::new(),
-			depth,
-			current_depth: 0,
-		}
-	}
-	pub async fn resolve_cid(&mut self, cid: &Cid, resolver: &CidResolverBox) -> Result<(), anyhow::Error> {
-		self.new_cids.insert(*cid);
-		// resolve cids as long as there are new ones
-		while self.new_cids.len() > 0 {
-			// check if we reached defined depth
-			if self.depth >= 0 && self.depth <= self.current_depth {
-				break;
-			} else {
-				self.current_depth += 1;
-			}
-			// copy new cids for this iteration (to not iterate over a mutable set)
-			let new_cids = self.new_cids.clone();
-			self.new_cids.clear();
-			for new_cid in new_cids.iter() {
-				// try to resolve. This can fail when no given resolver can resolve this Cid
-				if let Ok(mut links) = resolver.resolve(new_cid, &self.found_cids.keys().collect()).await {
-					self.found_cids.insert(new_cid.clone(), links.clone());
-					self.new_cids.append(&mut links);
-					self.failed_cids.remove(&new_cid.clone());
-				} else {
-					self.failed_cids.insert(new_cid.clone());
-				}
-			}
-		}
-		Ok(())
-	}
-}
-
-/// takes two cid maps and returns a tuple (removed_items, added_items)
-/// function is destructive and the 'old' map will only contain removed items and the 'new' map only added items after
-/// running
-pub fn pin_map_diff(
-	old: &mut BTreeMap<Cid, BTreeSet<Cid>>,
-	new: &mut BTreeMap<Cid, BTreeSet<Cid>>,
-) -> (BTreeSet<Cid>, BTreeSet<Cid>) {
-	for new_cid in new.clone().keys() {
-		if old.contains_key(new_cid) {
-			// cid has already been known.
-			// Same cid -> content cannot have changed -> we can remove all children too
-			cull_children(old, new_cid);
-			cull_children(new, new_cid);
-		}
-	}
-	(old.keys().cloned().collect(), new.keys().cloned().collect())
-}
-
-/// recursively removes entry with cid and all entries of it's children
-fn cull_children(map: &mut BTreeMap<Cid, BTreeSet<Cid>>, cid: &Cid) {
-	if let Some((_, children)) = map.remove_entry(cid) {
-		for child in children {
-			cull_children(map, &child);
-		}
-	}
-}
-
-pub fn cat_resolver(resolver: MultiLayerCidResolver, print_depth_info: bool) {
+pub fn cat_resolver(resolver: MultiLayerCidResolver, print_depth_info: bool) -> anyhow::Result<()> {
 	// print information of found cid map
-	cat_pin_map(resolver.found_cids, resolver.failed_cids);
+	cat_pin_map(resolver.new_cids()?, resolver.failed_cids()?);
 
 	if print_depth_info {
 		// print depth info
-		if resolver.depth < 0 {
-			println!("Looked in unlimited depth and got to {}", resolver.current_depth);
+		let (reached_depth, maximum_depth) = resolver.depth()?;
+		if maximum_depth < 0 {
+			println!("Looked in unlimited depth and got to {}", reached_depth);
 		} else {
-			println!("Looked up to depth {} and got to {}", resolver.depth, resolver.current_depth);
+			println!("Looked up to depth {} and got to {}", maximum_depth, reached_depth);
 		}
 	}
+	Ok(())
 }
 
 pub fn cat_pin_map(found_cids: BTreeMap<Cid, BTreeSet<Cid>>, failed_cids: BTreeSet<Cid>) {
