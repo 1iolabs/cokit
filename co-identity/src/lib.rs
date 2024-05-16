@@ -12,6 +12,7 @@ pub use types::{
 	didcomm::{
 		context::{DidCommContext, DidCommPrivateContext, DidCommPublicContext},
 		header::DidCommHeader,
+		message::{Message, MetadataMessage},
 	},
 	identity::{Identity, IdentityBox},
 	private_identity::{PrivateIdentity, PrivateIdentityBox, SignError},

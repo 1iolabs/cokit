@@ -64,6 +64,11 @@ struct DiscoveryConnectRequest {
 	pub max_peers: Option<u16>,
 	pub connected_peers: BTreeSet<PeerId>,
 }
+impl DiscoveryConnectRequest {
+	fn is_timedout(&self, time: Instant) -> bool {
+		time - self.start > self.timeout
+	}
+}
 
 /// Active subscription listening for DID Discovery requests.
 struct DidDiscoverySubscription {
@@ -266,13 +271,13 @@ where
 	}
 
 	/// Connect peers.
-	pub fn connect<B: DiscoveryBehaviour>(
+	pub fn connect<B>(
 		&mut self,
 		swarm: &mut Swarm<B>,
 		discovery: impl IntoIterator<Item = Discovery>,
-	) -> Result<(), ConnectError>
+	) -> Result<u64, ConnectError>
 	where
-		B:,
+		B: DiscoveryBehaviour,
 	{
 		// id
 		let id = self.next_id;
@@ -288,7 +293,22 @@ where
 			connected_peers: Default::default(),
 		};
 		self.requests.insert(id, request);
-		let request = self.requests.get_mut(&id).unwrap();
+
+		// connect
+		match self.try_connect(swarm, id) {
+			Ok(_) => Ok(id),
+			Err(err) => {
+				self.release(id);
+				Err(err)
+			},
+		}
+	}
+
+	fn try_connect<B>(&mut self, swarm: &mut Swarm<B>, request_id: u64) -> Result<(), ConnectError>
+	where
+		B: DiscoveryBehaviour,
+	{
+		let request = self.requests.get_mut(&request_id).ok_or(ConnectError::InvalidArgument)?;
 
 		// connect
 		let mut discovery_used = 0;
@@ -320,7 +340,7 @@ where
 						// we try again when a peer subscribes
 						Err(gossipsub::PublishError::InsufficientPeers) => {
 							self.pending_discovery.push_back((
-								id,
+								request.id,
 								did_discovery_topic_hash(&item.network),
 								item.clone(),
 							));
@@ -361,7 +381,8 @@ where
 
 	/// Poll on events.
 	pub fn poll(&mut self, cx: &mut Context<'_>) -> Poll<DiscoveryEvent> {
-		// TODO: timeouts
+		// timeouts
+		self.timeout();
 
 		// events
 		if let Some(event) = self.events.pop_front() {
@@ -376,6 +397,21 @@ where
 
 		// pending
 		Poll::Pending
+	}
+
+	/// Timout requests and release them.
+	fn timeout(&mut self) {
+		let time = Instant::now();
+		let timeout: BTreeSet<u64> = self
+			.requests
+			.iter()
+			.filter(|(_, request)| request.is_timedout(time))
+			.map(|(request_id, _)| *request_id)
+			.collect();
+		for request_id in timeout.into_iter() {
+			self.release(request_id);
+			self.events.push_back(DiscoveryEvent::Event(Event::Timeout { id: request_id }));
+		}
 	}
 
 	/// Handle swarm events.
@@ -589,6 +625,9 @@ where
 pub enum ConnectError {
 	#[error("No network is usable to connect")]
 	NoNetwork,
+
+	#[error("Invalid argument")]
+	InvalidArgument,
 
 	#[error("Connection error")]
 	Other(#[from] anyhow::Error),
@@ -895,13 +934,13 @@ mod tests {
 	//#[test_log::test(tokio::test)]
 	#[tokio::test]
 	async fn test_did_discovery() {
-		tracing_subscriber::fmt()
-			.with_env_filter(tracing_subscriber::EnvFilter::new(format!(
-				"{}=trace",
-				module_path!().split(":").next().expect("module path")
-			)))
-			.try_init()
-			.ok();
+		// tracing_subscriber::fmt()
+		// 	.with_env_filter(tracing_subscriber::EnvFilter::new(format!(
+		// 		"{}=trace",
+		// 		module_path!().split(":").next().expect("module path")
+		// 	)))
+		// 	.try_init()
+		// 	.ok();
 
 		// peers
 		let mut peer1 = Peer::new();
@@ -913,8 +952,8 @@ mod tests {
 		let did2 = DidKeyIdentity::generate(Some(&vec![2; 32]));
 
 		// states
-		let mut discovery1 = DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(10), None);
-		let mut discovery2 = DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(10), None);
+		let mut discovery1 = DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_millis(100), None);
+		let mut discovery2 = DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_millis(100), None);
 
 		// peer1: subscribe
 		discovery1
@@ -976,6 +1015,9 @@ mod tests {
 							assert_eq!(peer, peer1.peer_id());
 							break;
 						},
+						Some(Event::Timeout { id: _ }) => {
+							panic!("timeout");
+						}
 						_ => {},
 					}
 				},
