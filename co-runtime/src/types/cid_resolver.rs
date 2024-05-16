@@ -47,7 +47,9 @@ where
 			Ipld::Map(map) => {
 				let external = get_external(ipld).unwrap_or_default();
 				for (k, i) in map.iter() {
-					if !external.contains(k) {
+					// don't resolve encryption mapping cids
+					// TODO think of a better way than doing this hard coded
+					if !external.contains(k) && !(k == "encryption_mapping") {
 						IpldResolver::<S>::get_next_cids(i, new_cids, ignorable_cids);
 					}
 				}
