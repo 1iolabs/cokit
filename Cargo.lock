@@ -1429,6 +1429,7 @@ dependencies = [
  "co-api",
  "co-primitives",
  "co-storage",
+ "colored",
  "futures",
  "hexdump",
  "insta",

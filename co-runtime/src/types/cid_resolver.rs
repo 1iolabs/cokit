@@ -2,8 +2,12 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use co_api::{Cid, Metadata};
 use co_storage::BlockStorage;
+use colored::Colorize;
 use libipld::{cbor::DagCborCodec, prelude::Codec, serde::from_ipld, Ipld};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+
+/// A shorthand type for a map that represents the structure of a Cid tree
+pub type CidMap = BTreeMap<Cid, BTreeSet<Cid>>;
 
 #[async_trait]
 pub trait CidResolver {
@@ -12,6 +16,7 @@ pub trait CidResolver {
 
 pub type CidResolverBox = Box<dyn CidResolver + Send + Sync + 'static>;
 
+/// Resolves Cids by trying to get it from all given BlockStorages
 #[derive(Clone)]
 pub struct IpldResolver<S>
 where
@@ -83,6 +88,10 @@ where
 		last_error
 	}
 }
+
+/// Resolver that combines any number of other resolvers.
+/// Calls the resolve functions of each of those and returns the first result that is not an Err.
+/// Fails if all resolvers fail.
 pub struct JoinCidResolver {
 	pub resolvers: Vec<CidResolverBox>,
 }
@@ -130,25 +139,99 @@ fn get_external(ipld: &Ipld) -> Result<HashSet<String>, GetExternalError> {
 		.collect())
 }
 
-/**
- * Resolves a cid. Then Looks for other cids and tries to recursively resolve those as well.
- * Will fail when a cid resolves to another Co as the given storage doesn't have its key.
- */
+/// Contains all relevant data after running the MultiLayerCidResolver.
+/// Diff items will be Option::None if no previous cids were given
+pub struct MultiLayerCidResolverResult {
+	pub new_cid_map: CidMap,
+	pub failed_cids: BTreeSet<Cid>,
+	pub traversed_layers: i64,
+	pub maximum_layers: i64,
+	pub added_cids: BTreeSet<Cid>,
+	pub removed_cids: BTreeSet<Cid>,
+}
+
+impl From<MultiLayerCidResolver> for MultiLayerCidResolverResult {
+	fn from(resolver: MultiLayerCidResolver) -> Self {
+		MultiLayerCidResolverResult {
+			new_cid_map: resolver.new_cids,
+			failed_cids: resolver.failed_cids,
+			traversed_layers: resolver.current_depth,
+			maximum_layers: resolver.depth_limit,
+			added_cids: resolver.added_cids,
+			removed_cids: match resolver.previous_cids {
+				Some(p) => p.keys().cloned().collect(),
+				None => BTreeSet::default(),
+			},
+		}
+	}
+}
+
+impl MultiLayerCidResolverResult {
+	pub fn print_results(&self) {
+		// print information of found cid map
+		self.print_new_cid_map();
+
+		// diff info
+		self.print_diff();
+
+		// depth info
+		self.print_layers_info();
+	}
+
+	pub fn print_new_cid_map(&self) {
+		for (cid, children) in self.new_cid_map.iter() {
+			// print found cid
+			println!("Cid: {}", cid.to_string());
+
+			// print all children
+			for child in children {
+				let mut child_string = child.to_string().bright_white();
+				// mark child if cid could not be resolved
+				if self.failed_cids.contains(&child) {
+					child_string = child_string.red();
+				}
+				println!("\t{}", child_string);
+			}
+		}
+	}
+
+	pub fn print_layers_info(&self) {
+		if self.maximum_layers < 0 {
+			println!("Looked in unlimited depth and got to {}", self.traversed_layers);
+		} else {
+			println!("Looked up to depth {} and got to {}", self.maximum_layers, self.traversed_layers);
+		}
+	}
+
+	pub fn print_diff(&self) {
+		println!("Added items:");
+		for i in self.added_cids.iter() {
+			println!("{i}");
+		}
+		println!("Removed items:");
+		for i in self.removed_cids.iter() {
+			println!("{i}");
+		}
+	}
+}
+
+/// Resolves a cid. Then Looks for other cids and tries to recursively resolve those as well.
+/// When given a previous cid map, will simultaneously compute a diff.
+/// Consumes itself when calling the resolve function to prevent errors caused by multiple executions.
+#[derive(Debug)]
 pub struct MultiLayerCidResolver {
 	/// Contains all cids that have been found after running
-	new_cids: BTreeMap<Cid, BTreeSet<Cid>>,
+	new_cids: CidMap,
 	/// Contains all cids that couldn't be resolved further
 	failed_cids: BTreeSet<Cid>,
 	/// Optional cid map from a previous state. Will simultaneously run a diff when this is set
-	previous_cids: Option<BTreeMap<Cid, BTreeSet<Cid>>>,
+	previous_cids: Option<CidMap>,
 	/// Defines a depth up to which Links should be resolved. No limit if depth is negtive
 	depth_limit: i64,
 	/// Tracks depth. After running, shows how many layers of links got resolved.
 	current_depth: i64,
 	/// After running, contains all cids that were not in the previous map but in the new one
 	added_cids: BTreeSet<Cid>,
-	/// Flag to check if resolver was executed
-	ran: bool,
 	/// Internally used
 	discovered_cids: BTreeSet<Cid>,
 }
@@ -163,7 +246,6 @@ impl MultiLayerCidResolver {
 			previous_cids: None,
 			depth_limit: -1,
 			current_depth: 0,
-			ran: false,
 		}
 	}
 
@@ -173,52 +255,14 @@ impl MultiLayerCidResolver {
 		self
 	}
 	/// additionally calculates which cids are left over from the previous cid map
-	pub fn with_previous_cids(mut self, previous_cids: BTreeMap<Cid, BTreeSet<Cid>>) -> Self {
+	pub fn with_previous_cids(mut self, previous_cids: CidMap) -> Self {
 		self.previous_cids = Some(previous_cids);
 		self
 	}
 
-	/// Returns a tuple (reached_depth, depth_limit) or an error if resolver wasn't executed
-	pub fn depth(&self) -> anyhow::Result<(i64, i64)> {
-		if self.ran {
-			return Ok((self.current_depth, self.depth_limit));
-		}
-		Err(anyhow!("Resolver must be executed before results can be returned"))
-	}
-
-	/// Returns a tuple (removed_cids, added_cids) or an error if resolver wasn't executed
-	pub fn diff(&self) -> anyhow::Result<(BTreeSet<Cid>, BTreeSet<Cid>)> {
-		if self.ran {
-			match &self.previous_cids {
-				Some(p) => return Ok((p.keys().cloned().collect(), self.added_cids.clone())),
-				None => return Err(anyhow!("No previous cids were set so no diff was calculated")),
-			}
-		}
-		Err(anyhow!("Resolver must be executed before results can be returned"))
-	}
-
-	/// Returns the new cid map or an error if the resolver didn't run
-	pub fn new_cids(&self) -> anyhow::Result<BTreeMap<Cid, BTreeSet<Cid>>> {
-		if self.ran {
-			return Ok(self.new_cids.clone());
-		}
-		Err(anyhow!("Resolver must be executed before results can be returned"))
-	}
-
-	/// Returns all failed cids if resolver ran
-	pub fn failed_cids(&self) -> anyhow::Result<BTreeSet<Cid>> {
-		if self.ran {
-			return Ok(self.failed_cids.clone());
-		}
-		Err(anyhow!("Resolver must be executed before results can be returned"))
-	}
-
-	/// resolves a cid using the given resolvers. This will destruct data so you should run this twice
-	pub async fn resolve_cid(&mut self, cid: &Cid, resolver: &CidResolverBox) -> anyhow::Result<()> {
-		// check if first execution
-		if self.ran {
-			return Err(anyhow!("Resolver already ran"));
-		}
+	/// Resolves a cid using the given resolvers. This will consume this resolver as it should not be run multiple
+	/// times. Returns a MultiLayerCidResolverResult
+	pub async fn resolve_cid(mut self, cid: &Cid, resolver: &CidResolverBox) -> MultiLayerCidResolverResult {
 		self.discovered_cids.insert(*cid);
 		// resolve cids as long as there are new ones
 		while self.discovered_cids.len() > 0 {
@@ -230,24 +274,26 @@ impl MultiLayerCidResolver {
 			}
 			// copy new cids for this iteration (to not iterate over a mutable set)
 			let new_cids = self.discovered_cids.clone();
+			self.discovered_cids.clear();
 			// move all new cids to added set
-			self.added_cids.append(&mut self.discovered_cids);
 			for new_cid in new_cids.iter() {
 				match &mut self.previous_cids {
 					Some(p) =>
 						if !move_entry(p, &mut self.new_cids, new_cid) {
+							// cid is new: try to resolve it and insert into added list
 							self.resolve(new_cid, resolver).await;
+							self.added_cids.insert(*new_cid);
 						},
 					None => {
 						self.resolve(new_cid, resolver).await;
+						self.added_cids.insert(*new_cid);
 					},
 				}
 			}
 		}
-		// set that resolver ran successfully
-		self.ran = true;
-		Ok(())
+		self.into()
 	}
+
 	async fn resolve(&mut self, cid: &Cid, resolver: &CidResolverBox) {
 		if let Ok(mut links) = resolver.resolve(cid, &self.new_cids.keys().collect()).await {
 			self.new_cids.insert(cid.clone(), links.clone());
@@ -261,7 +307,7 @@ impl MultiLayerCidResolver {
 
 /// Try to move an entry and all its children.
 /// Returns true if cid was moved (and therefore already known in from).
-fn move_entry(from: &mut BTreeMap<Cid, BTreeSet<Cid>>, to: &mut BTreeMap<Cid, BTreeSet<Cid>>, cid: &Cid) -> bool {
+fn move_entry(from: &mut CidMap, to: &mut CidMap, cid: &Cid) -> bool {
 	if let Some((key, value)) = from.remove_entry(cid) {
 		for child_cid in value.iter() {
 			move_entry(from, to, child_cid);
@@ -270,5 +316,167 @@ fn move_entry(from: &mut BTreeMap<Cid, BTreeSet<Cid>>, to: &mut BTreeMap<Cid, BT
 		true
 	} else {
 		false
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{create_cid_resolver, MultiLayerCidResolver};
+	use co_primitives::BlockSerializer;
+	use co_storage::{BlockStorage, MemoryBlockStorage};
+	use libipld::Cid;
+	use serde::{Deserialize, Serialize};
+
+	#[derive(Debug, Serialize, Deserialize)]
+	struct TestNode {
+		name: String,
+		children: Vec<Cid>,
+	}
+
+	/// Create test reference model
+	/// ┌──────┐
+	/// │ CID1 ├────┬────────┐
+	/// └──┬───┘    │        │
+	///    │        │        │
+	/// ┌──▼───┐ ┌──▼───┐ ┌──▼───┐
+	/// │ CID2 │ │ CID4 │ │ CID6 │
+	/// └──┬───┘ └──┬───┘ └──────┘
+	///    │        │
+	/// ┌──▼───┐ ┌──▼───┐
+	/// │ CID3 │ │ CID5 │
+	/// └──────┘ └──────┘
+	async fn get_reference_storage() -> anyhow::Result<(MemoryBlockStorage, Vec<Cid>)> {
+		let s = BlockSerializer::default();
+		let cid6 = s.serialize(&TestNode { name: "CID6".to_owned(), children: vec![] }).unwrap();
+		let cid5 = s.serialize(&TestNode { name: "CID5".to_owned(), children: vec![] }).unwrap();
+		let cid4 = s
+			.serialize(&TestNode { name: "CID4".to_owned(), children: vec![cid5.cid().clone()] })
+			.unwrap();
+		let cid3 = s.serialize(&TestNode { name: "CID3".to_owned(), children: vec![] }).unwrap();
+		let cid2 = s
+			.serialize(&TestNode { name: "CID2".to_owned(), children: vec![cid3.cid().clone()] })
+			.unwrap();
+		let cid1 = s
+			.serialize(&TestNode {
+				name: "CID1".to_owned(),
+				children: vec![cid2.cid().clone(), cid4.cid().clone(), cid6.cid().clone()],
+			})
+			.unwrap();
+
+		let cids: Vec<Cid> = vec![&cid1, &cid2, &cid3, &cid4, &cid5, &cid6]
+			.into_iter()
+			.map(|block| block.cid().clone())
+			.collect();
+		// for (i, cid) in cids.iter().enumerate() {
+		// 	println!("cid{}: {:?}", i + 1, cid);
+		// }
+		// cid1: Cid(bafyr4ifa6hobpbi3eqe36p6u53pd5u3g5kcdwz5vvyou7p4wqgpnrlbtye)
+		// cid2: Cid(bafyr4idniluineg7wa2gh5y4kcljvwqj4tzdh2ak42j7xrxkbzblsbjdou)
+		// cid3: Cid(bafyr4if2vvjdpqmm3vwbm67rumkbsidwibykyul56iwk56xv3ly6mjhe7u)
+		// cid4: Cid(bafyr4iapuv4ln5dzya5l4y2towoztmenyzcm3tlsvjxruicbcgc2n6jlta)
+		// cid5: Cid(bafyr4ih7sbwsz7yu6gcilheb5tnaihph45pouftde7yi7cxqcqjqyrwxey)
+		// cid6: Cid(bafyr4iezz44ryyhzi53oszexkq42ih6ktoxixkh4tjp42gwltngzb2igk4)
+
+		let storage = MemoryBlockStorage::new();
+		storage.set(cid6.clone()).await?;
+		storage.set(cid5.clone()).await?;
+		storage.set(cid4.clone()).await?;
+		storage.set(cid3.clone()).await?;
+		storage.set(cid2.clone()).await?;
+		storage.set(cid1.clone()).await?;
+
+		Ok((storage, cids))
+	}
+
+	/// Create test reference model
+	/// ┌──────┐
+	/// │ CID1 ├────┬────────┐
+	/// └──┬───┘    │        │
+	///    │        │        │
+	/// ┌──▼───┐ ┌──▼───┐ ┌──▼───┐
+	/// │ CID2 │ │ CID4 │ │ CID6 │
+	/// └──┬───┘ └──┬───┘ └──────┘
+	///    │        │
+	/// ┌──▼───┐ ┌──▼──────────┐
+	/// │ CID3 │ │ CID5_RENAME │
+	/// └──────┘ └─────────────┘
+	async fn get_reference_storage_v2(storage: &mut MemoryBlockStorage) -> anyhow::Result<Vec<Cid>> {
+		let s = BlockSerializer::default();
+		let cid6 = s.serialize(&TestNode { name: "CID6".to_owned(), children: vec![] }).unwrap();
+		let cid5 = s
+			.serialize(&TestNode { name: "CID5_RENAME".to_owned(), children: vec![] })
+			.unwrap();
+		let cid4 = s
+			.serialize(&TestNode { name: "CID4".to_owned(), children: vec![cid5.cid().clone()] })
+			.unwrap();
+		let cid3 = s.serialize(&TestNode { name: "CID3".to_owned(), children: vec![] }).unwrap();
+		let cid2 = s
+			.serialize(&TestNode { name: "CID2".to_owned(), children: vec![cid3.cid().clone()] })
+			.unwrap();
+		let cid1 = s
+			.serialize(&TestNode {
+				name: "CID1".to_owned(),
+				children: vec![cid2.cid().clone(), cid4.cid().clone(), cid6.cid().clone()],
+			})
+			.unwrap();
+
+		let cids: Vec<Cid> = vec![&cid1, &cid2, &cid3, &cid4, &cid5, &cid6]
+			.into_iter()
+			.map(|block| block.cid().clone())
+			.collect();
+		// for (i, cid) in cids.iter().enumerate() {
+		// 	println!("cid{}: {:?}", i + 1, cid);
+		// }
+		// cid1: Cid(bafyr4ia4yy3a6xjapek5c2e4n2lqp2uoidrp6mityqcpyokax5lpbgf4ve)
+		// cid2: Cid(bafyr4idniluineg7wa2gh5y4kcljvwqj4tzdh2ak42j7xrxkbzblsbjdou)
+		// cid3: Cid(bafyr4if2vvjdpqmm3vwbm67rumkbsidwibykyul56iwk56xv3ly6mjhe7u)
+		// cid4: Cid(bafyr4idglh2kqj7pom2k572ikcv5ptgzz4l4ejwuhietdxpdwpbj2z5cxm)
+		// cid5: Cid(bafyr4icgsnke4yqo53ve65mw7ctvexn42jsw7xg23ewdfsfdv6lq6eq73e)
+		// cid6: Cid(bafyr4iezz44ryyhzi53oszexkq42ih6ktoxixkh4tjp42gwltngzb2igk4)
+
+		storage.set(cid6.clone()).await?;
+		storage.set(cid5.clone()).await?;
+		storage.set(cid4.clone()).await?;
+		storage.set(cid3.clone()).await?;
+		storage.set(cid2.clone()).await?;
+		storage.set(cid1.clone()).await?;
+
+		Ok(cids)
+	}
+
+	#[tokio::test]
+	async fn new_state() {
+		let (storage, cids) = get_reference_storage().await.expect("storage");
+		let resolver = create_cid_resolver(vec![storage]).await.expect("resovlers");
+		let result = MultiLayerCidResolver::new().resolve_cid(cids.get(0).unwrap(), &resolver).await;
+		assert_eq!(result.new_cid_map.len(), 6);
+		assert_eq!(result.added_cids.len(), 6);
+		for cid in cids.iter() {
+			assert!(result.added_cids.contains(cid));
+		}
+	}
+
+	#[tokio::test]
+	async fn change_cid5_name() {
+		// reference
+		let (mut storage, cids) = get_reference_storage().await.expect("storage");
+		let resolver = create_cid_resolver(vec![storage.clone()]).await.expect("resovlers");
+		let first_result = MultiLayerCidResolver::new().resolve_cid(cids.get(0).unwrap(), &resolver).await;
+
+		let next_cids = get_reference_storage_v2(&mut storage).await.expect("next cids");
+		let updated_resolver = create_cid_resolver(vec![storage]).await.expect("resovlers");
+		let second_result = MultiLayerCidResolver::new()
+			.with_previous_cids(first_result.new_cid_map)
+			.resolve_cid(next_cids.get(0).unwrap(), &updated_resolver)
+			.await;
+
+		assert_eq!(second_result.added_cids.len(), 3);
+		assert!(second_result.added_cids.contains(next_cids.get(0).unwrap()));
+		assert!(second_result.added_cids.contains(next_cids.get(3).unwrap()));
+		assert!(second_result.added_cids.contains(next_cids.get(4).unwrap()));
+		assert_eq!(second_result.removed_cids.len(), 3);
+		assert!(second_result.removed_cids.contains(cids.get(0).unwrap()));
+		assert!(second_result.removed_cids.contains(cids.get(3).unwrap()));
+		assert!(second_result.removed_cids.contains(cids.get(4).unwrap()));
 	}
 }

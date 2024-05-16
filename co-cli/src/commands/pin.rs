@@ -3,7 +3,6 @@ use anyhow::anyhow;
 use co_api::{Cid, CoId, DagCollection};
 use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
 use co_sdk::{memberships, Application, BlockStorage, CoStorage, CO_CORE_NAME_PIN};
-use colored::Colorize;
 use exitcode::ExitCode;
 use futures::{pin_mut, StreamExt};
 use libipld::{cbor::DagCborCodec, codec::Codec, Ipld};
@@ -114,13 +113,14 @@ pub async fn generate_pins(
 
 	if let Some(state) = state {
 		// generate cids up to depth
-		let mut resolver = MultiLayerCidResolver::new().with_depth_limit(command.depth);
-		resolver
-			.resolve_cid(&state, &create_cid_resolver(get_all_co_storages(application).await?).await?)
-			.await?;
+		let resolver = &create_cid_resolver(get_all_co_storages(application).await?).await?;
+		let result = MultiLayerCidResolver::new()
+			.with_depth_limit(command.depth)
+			.resolve_cid(&state, &resolver)
+			.await;
 
 		// print findings
-		cat_resolver(resolver, true)?;
+		result.print_results();
 	}
 	Ok(exitcode::OK)
 }
@@ -135,34 +135,21 @@ async fn update_pins(context: &CliContext, cli: &Cli, _command: &UpdateCommand) 
 	// decode cbor
 	let old_pin_map: BTreeMap<Cid, BTreeSet<Cid>> = serde_ipld_dagcbor::from_slice(&content)?;
 
-	// create resolver
-	let mut cid_resolver = MultiLayerCidResolver::new().with_previous_cids(old_pin_map);
-
+	// local co state
 	let (state, _) = application.local_co_reducer().await?.reducer_state().await;
-	let resolvers = create_cid_resolver(get_all_co_storages(application).await?).await?;
-	match state {
-		Some(cid) => {
-			cid_resolver.resolve_cid(&cid, &resolvers).await?;
-		},
-		None => (),
-	}
 
-	let new_pin_map = cid_resolver.new_cids()?;
+	// create resolver
+	let resolver = create_cid_resolver(get_all_co_storages(application).await?).await?;
+	let resolver_result = MultiLayerCidResolver::new()
+		.with_previous_cids(old_pin_map)
+		.resolve_cid(&state.unwrap(), &resolver)
+		.await;
 
 	// write pin map
-	let data = serde_ipld_dagcbor::to_vec(&new_pin_map)?;
+	let data = serde_ipld_dagcbor::to_vec(&resolver_result.new_cid_map)?;
 	fs::write(&pins_path, data).await?;
 
-	let (removed_items, added_items) = cid_resolver.diff()?;
-	println!("Removed items:");
-	for i in removed_items {
-		println!("{i}");
-	}
-	println!("Added items:");
-	for i in added_items {
-		println!("{i}");
-	}
-	cat_pin_map(cid_resolver.new_cids()?, BTreeSet::default());
+	resolver_result.print_diff();
 
 	Ok(exitcode::OK)
 }
@@ -182,37 +169,4 @@ async fn get_all_co_storages(application: Application) -> anyhow::Result<Vec<CoS
 		}
 	}
 	Ok(storages)
-}
-
-pub fn cat_resolver(resolver: MultiLayerCidResolver, print_depth_info: bool) -> anyhow::Result<()> {
-	// print information of found cid map
-	cat_pin_map(resolver.new_cids()?, resolver.failed_cids()?);
-
-	if print_depth_info {
-		// print depth info
-		let (reached_depth, maximum_depth) = resolver.depth()?;
-		if maximum_depth < 0 {
-			println!("Looked in unlimited depth and got to {}", reached_depth);
-		} else {
-			println!("Looked up to depth {} and got to {}", maximum_depth, reached_depth);
-		}
-	}
-	Ok(())
-}
-
-pub fn cat_pin_map(found_cids: BTreeMap<Cid, BTreeSet<Cid>>, failed_cids: BTreeSet<Cid>) {
-	for (cid, children) in found_cids {
-		// print found cid
-		println!("Cid: {}", cid.to_string());
-
-		// print all children
-		for child in children {
-			let mut child_string = child.to_string().bright_white();
-			// mark child if cid could not be resolved
-			if failed_cids.contains(&child) {
-				child_string = child_string.red();
-			}
-			println!("\t{}", child_string);
-		}
-	}
 }
