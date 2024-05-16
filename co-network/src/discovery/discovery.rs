@@ -174,6 +174,9 @@ where
 			},
 			DiscoveryEvent::ReceivedDidComm { peer_id, header, body: _ } => {
 				if header.message_type == "diddiscovery" {
+					for (a, b) in self.diddiscovery_requests() {
+						tracing::info!(?b.message_id, "discovery: {:?}", Some(&b.message_id) == header.thid.as_ref());
+					}
 					for request_id in self
 						.diddiscovery_requests()
 						.filter(|(_request_id, discovery)| header.thid.as_ref() == Some(&discovery.message_id))
@@ -891,7 +894,7 @@ mod tests {
 	//#[tracing_test::traced_test]
 	//#[test_log::test(tokio::test)]
 	#[tokio::test]
-	async fn test_subscribe() {
+	async fn test_did_discovery() {
 		tracing_subscriber::fmt()
 			.with_env_filter(tracing_subscriber::EnvFilter::new(format!(
 				"{}=trace",
@@ -952,14 +955,7 @@ mod tests {
 			.unwrap();
 
 		// run
-		let mut max_events = 20;
 		loop {
-			max_events -= 1;
-			if max_events == 0 {
-				break;
-			}
-
-			// let mut discoverd = None;
 			select! {
 				event = peer1.swarm().next() => {
 					tracing::info!(?event, "peer1");
@@ -977,7 +973,7 @@ mod tests {
 					tracing::info!(?event, "discovery2");
 					match discovery2.on_discovery_event(peer2.swarm(), event.unwrap()) {
 						Some(Event::Connected {id: _, peer}) => {
-							assert_eq!(peer, peer2.peer_id());
+							assert_eq!(peer, peer1.peer_id());
 							break;
 						},
 						_ => {},

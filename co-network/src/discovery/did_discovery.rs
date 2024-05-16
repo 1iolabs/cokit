@@ -27,7 +27,7 @@ impl DidDiscovery {
 		let header = DidCommHeader {
 			from: Some(from.identity().to_owned()),
 			to: BTreeSet::from_iter(vec![to.identity().to_owned()]),
-			id: Uuid::new_v4().into(),
+			id: id.clone(),
 			message_type,
 			..Default::default()
 		};

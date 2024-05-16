@@ -91,7 +91,7 @@ impl Behaviour {
 			// let ix = (request.request_id.0 as usize) % connections.len();
 			let conn = &mut connections[0]; // TODO: choose random?
 								// conn.pending_inbound_responses.insert(request.request_id);
-			tracing::trace!(?peer, connection_id = ?conn.id, "try-send");
+								// tracing::trace!(?peer, connection_id = ?conn.id, "try-send");
 			self.pending_events.push_back(ToSwarm::NotifyHandler {
 				peer_id: *peer,
 				handler: NotifyHandler::One(conn.id),
@@ -99,7 +99,7 @@ impl Behaviour {
 			});
 			None
 		} else {
-			tracing::trace!(?peer, deferred = true, "try-send");
+			// tracing::trace!(?peer, deferred = true, "try-send");
 			Some(protocol)
 		}
 	}
@@ -256,7 +256,7 @@ impl NetworkBehaviour for Behaviour {
 		_connection_id: ConnectionId,
 		event: THandlerOutEvent<Self>,
 	) {
-		tracing::debug!(?peer, ?event, "on_connection_handler_event");
+		// tracing::debug!(?peer, ?event, "on_connection_handler_event");
 		match event {
 			handler::Event::Received { message } => {
 				self.pending_events
