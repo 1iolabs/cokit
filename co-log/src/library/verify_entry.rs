@@ -1,4 +1,5 @@
 use crate::{EntryBlock, Log, LogError};
+use co_identity::IdentityResolver;
 use co_storage::BlockStorage;
 
 pub async fn verify_entry<S>(log: &Log<S>, entry: &EntryBlock<S::StoreParams>) -> Result<(), LogError>

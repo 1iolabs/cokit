@@ -4,12 +4,12 @@ use super::{
 };
 use crate::{
 	library::{co_peer_provider::CoPeerProvider, to_plain::to_plain},
-	CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerChangedHandler,
+	state, CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerChangedHandler,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_network::PeerProvider;
-use co_primitives::CoId;
+use co_primitives::{CoId, NetworkCoHeads};
 use co_storage::BlockStorageContentMapping;
 use libipld::Cid;
 use libp2p::PeerId;
@@ -19,16 +19,24 @@ use std::collections::BTreeSet;
 pub struct Subscription {
 	spawner: CoNetworkTaskSpawner,
 	co: CoId,
+	network: NetworkCoHeads,
 }
 impl Subscription {
-	pub(crate) async fn subscribe(spawner: CoNetworkTaskSpawner, co: CoReducer) -> Result<Self, anyhow::Error> {
-		spawner.spawn(HeadsRequestNetworkTask::new(HeadsRequest::Subscribe { co: co.id().clone() }))?;
-		Ok(Self { spawner, co: co.id().clone() })
+	pub(crate) async fn subscribe(
+		spawner: CoNetworkTaskSpawner,
+		co: CoReducer,
+		network: NetworkCoHeads,
+	) -> Result<Self, anyhow::Error> {
+		spawner.spawn(HeadsRequestNetworkTask::new(HeadsRequest::Subscribe {
+			network: network.clone(),
+			co: co.id().clone(),
+		}))?;
+		Ok(Self { spawner, co: co.id().clone(), network })
 	}
 
 	pub fn unsubscribe(self) {
 		self.spawner
-			.spawn(HeadsRequestNetworkTask::new(HeadsRequest::Unsubscribe { co: self.co }))
+			.spawn(HeadsRequestNetworkTask::new(HeadsRequest::Unsubscribe { network: self.network, co: self.co }))
 			.ok();
 	}
 }
@@ -86,9 +94,27 @@ where
 				.map_err(|err| anyhow!("Failed to map head: {}", err))?;
 		}
 
+		// networks
+		let networks = state::networks(reducer.log().storage(), reducer.state().into()).await?;
+
 		// publish
-		self.spawner
-			.spawn(HeadsRequestNetworkTask::new(HeadsRequest::PublishHeads { co: self.co.clone(), heads }))?;
+		for network in networks {
+			match network {
+				co_api::Network::DidDiscovery(_) => todo!(),
+				co_api::Network::CoHeads(network) => {
+					self.spawner.spawn(HeadsRequestNetworkTask::new(HeadsRequest::PublishHeads {
+						network,
+						co: self.co.clone(),
+						heads: heads.clone(),
+					}))?;
+				},
+				co_api::Network::Rendezvous(_) => todo!(),
+				co_api::Network::Peer(_) => todo!(),
+				_ => {
+					// ignore
+				},
+			}
+		}
 
 		// result
 		Ok(())

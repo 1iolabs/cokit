@@ -1,4 +1,4 @@
-use co_identity::{DidKeyIdentity, DidKeyIdentityResolver, PrivateIdentity};
+use co_identity::{DidKeyIdentity, DidKeyIdentityResolver, IdentityResolverBox, PrivateIdentity};
 use co_log::{Entry, Log};
 use co_primitives::{BlockSerializer, Link};
 use co_storage::{BlockStorage, MemoryBlockStorage};
@@ -150,7 +150,12 @@ async fn join_is_commutative() {
 }
 
 async fn create_empty_log<S: BlockStorage + Send + Sync + Clone + 'static>(store: &S) -> Log<S> {
-	Log::new("test".as_bytes().to_vec(), Box::new(DidKeyIdentityResolver::new()), store.clone(), Default::default())
+	Log::new(
+		"test".as_bytes().to_vec(),
+		IdentityResolverBox::new(DidKeyIdentityResolver::new()),
+		store.clone(),
+		Default::default(),
+	)
 }
 
 async fn log_push<S, I>(log: &mut Log<S>, identity: &I, t: &str) -> (Cid, Link<Entry>)

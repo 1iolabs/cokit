@@ -1,5 +1,5 @@
 use super::{
-	identity::resolve_private_identity,
+	identity::{create_identity_resolver, resolve_private_identity},
 	shared::{CreateCo, SharedCoBuilder, SharedCoCreator},
 };
 use crate::{
@@ -105,7 +105,7 @@ impl Application {
 		self.runtime.runtime()
 	}
 
-	/// Shutdown the applciation gracefully.
+	/// Shutdown the application gracefully.
 	pub async fn shutdown_application(&self) {
 		// signal
 		self.shutdown.cancel();
@@ -122,7 +122,7 @@ impl Application {
 		let network_key = local_keypair_fetch(&self.identifier, &local_co, &local_identity, force_new_peer_id)
 			.await
 			.expect("peer-id");
-		self.network = Some(Network::new(network_key, self.storage()));
+		self.network = Some(Network::new(network_key, self.storage(), create_identity_resolver()));
 
 		// clear reducers to rebuild them with network support after this
 		// we only keep local as this has no network

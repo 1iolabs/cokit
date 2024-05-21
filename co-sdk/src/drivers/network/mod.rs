@@ -1,9 +1,10 @@
 pub mod heads;
 pub mod subscribe;
 
-use self::subscribe::{Publish, Subscription};
+use self::subscribe::Publish;
 use crate::CoReducer;
-use co_network::{Behaviour, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner};
+use co_identity::IdentityResolver;
+use co_network::{Behaviour, Context, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner};
 use co_storage::BlockStorage;
 use libipld::DefaultParams;
 use libp2p::{identity::Keypair, PeerId};
@@ -23,13 +24,14 @@ impl Network {
 	///
 	/// Panics:
 	/// - Can not create the network.
-	pub fn new<S>(network_key: Keypair, storage: S) -> Self
+	pub fn new<S, R>(network_key: Keypair, storage: S, resolver: R) -> Self
 	where
 		S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + 'static,
+		R: IdentityResolver + Clone + Send + Sync + 'static,
 	{
 		let network_peer_id = PeerId::from(network_key.public());
 		let network_config = Libp2pNetworkConfig::from_keypair(network_key.clone());
-		let network: Libp2pNetwork = Libp2pNetwork::new(network_config, storage).expect("network");
+		let network: Libp2pNetwork = Libp2pNetwork::new(network_config, storage, resolver).expect("network");
 		tracing::info!(peer_id = ?network_peer_id, "network");
 		Self { spawner: network.spawner(), network: Arc::new(Mutex::new(Some(network))) }
 	}
@@ -53,10 +55,11 @@ impl Network {
 		Ok(())
 	}
 
-	/// Subscribe to CO changes.
-	pub async fn subscribe(&self, co_reducer: CoReducer) -> Result<Subscription, anyhow::Error> {
-		Subscription::subscribe(self.spawner(), co_reducer).await
-	}
+	// /// Subscribe to CO changes.
+	// pub async fn subscribe(&self, co_reducer: CoReducer) -> Result<Subscription, anyhow::Error> {
+	// 	state::networks(&co_reducer.storage(), co_reducer.reducer_state().await.0)
+	// 	Subscription::subscribe(self.spawner(), co_reducer).await
+	// }
 }
 
-pub type CoNetworkTaskSpawner = NetworkTaskSpawner<Behaviour>;
+pub type CoNetworkTaskSpawner = NetworkTaskSpawner<Behaviour, Context>;

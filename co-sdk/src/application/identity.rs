@@ -7,9 +7,9 @@ use co_identity::{
 /// Create the default identity resolver.
 pub fn create_identity_resolver() -> IdentityResolverBox {
 	let mut resolvers: Vec<IdentityResolverBox> = Vec::new();
-	resolvers.push(Box::new(LocalIdentityResolver::new()));
-	resolvers.push(Box::new(DidKeyIdentityResolver::new()));
-	Box::new(JoinIdentityResolver::new(resolvers))
+	resolvers.push(IdentityResolverBox::new(LocalIdentityResolver::new()));
+	resolvers.push(IdentityResolverBox::new(DidKeyIdentityResolver::new()));
+	IdentityResolverBox::new(JoinIdentityResolver::new(resolvers))
 }
 
 /// Create the default private identity resolver.

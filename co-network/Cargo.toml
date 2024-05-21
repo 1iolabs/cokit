@@ -17,6 +17,7 @@ futures = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 libp2p = { workspace = true }
 libp2p-bitswap = { version = "0.25.0", git = "https://github.com/dkuhnert/libp2p-bitswap.git", branch = "next" }
+pin-project = { workspace = true }
 rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }

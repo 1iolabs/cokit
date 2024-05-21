@@ -425,7 +425,7 @@ mod tests {
 	use super::Reducer;
 	use crate::{application::reducer::ReducerBuilder, CoreResolver, ReducerChangedHandler, SingleCoreResolver};
 	use async_trait::async_trait;
-	use co_identity::LocalIdentityResolver;
+	use co_identity::{IdentityResolverBox, LocalIdentityResolver};
 	use co_log::Log;
 	use co_primitives::{BlockSerializer, ReducerAction};
 	use co_runtime::{Core, IdleRuntimePool, RuntimePool};
@@ -456,19 +456,19 @@ mod tests {
 		let identity3 = LocalIdentityResolver::default().private_identity("did:local:p3").unwrap();
 		let log1 = Log::new(
 			"test".as_bytes().to_vec(),
-			Box::new(LocalIdentityResolver::default()),
+			IdentityResolverBox::new(LocalIdentityResolver::default()),
 			storage.clone(),
 			Default::default(),
 		);
 		let log2 = Log::new(
 			"test".as_bytes().to_vec(),
-			Box::new(LocalIdentityResolver::default()),
+			IdentityResolverBox::new(LocalIdentityResolver::default()),
 			storage.clone(),
 			Default::default(),
 		);
 		let log3 = Log::new(
 			"test".as_bytes().to_vec(),
-			Box::new(LocalIdentityResolver::default()),
+			IdentityResolverBox::new(LocalIdentityResolver::default()),
 			storage.clone(),
 			Default::default(),
 		);
@@ -657,7 +657,7 @@ mod tests {
 		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
 		let log = Log::new(
 			"test".as_bytes().to_vec(),
-			Box::new(LocalIdentityResolver::default()),
+			IdentityResolverBox::new(LocalIdentityResolver::default()),
 			storage.clone(),
 			Default::default(),
 		);

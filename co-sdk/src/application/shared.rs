@@ -113,10 +113,10 @@ impl SharedCoBuilder {
 			.build(runtime.runtime())
 			.await?;
 
-		// publish changes
+		// publish changes for every `NetworkCoHeads` setting
 		if let Some(network) = self.network {
 			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
-			let publish = Publish::new(network, self.membership.id.clone(), mapping, true);
+			let publish = Publish::new(network, self.membership.id.clone(), mapping.clone(), true);
 			reducer.add_change_handler(Box::new(publish));
 		}
 

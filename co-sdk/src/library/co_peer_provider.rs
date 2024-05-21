@@ -1,5 +1,4 @@
 use crate::{
-	drivers::network,
 	state::{self, into_collection},
 	CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerChangedHandler,
 };

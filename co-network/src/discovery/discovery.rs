@@ -1,16 +1,12 @@
 use super::did_discovery::DidDiscovery;
-use crate::didcomm;
+use crate::{didcomm, types::layer_behaviour::LayerBehaviour, DidcommBehaviourProvider, GossipsubBehaviourProvider};
 use anyhow::anyhow;
 use co_identity::{
 	DidCommContext, DidCommHeader, DidCommPrivateContext, IdentityResolver, PrivateIdentity, PrivateIdentityBox,
 };
 use co_primitives::{Did, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous};
 use derive_more::From;
-use futures::{
-	future::BoxFuture,
-	stream::{FusedStream, FuturesUnordered},
-	FutureExt, Stream, StreamExt,
-};
+use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, StreamExt};
 use libp2p::{
 	gossipsub::{self, TopicHash},
 	mdns, rendezvous,
@@ -19,7 +15,6 @@ use libp2p::{
 };
 use std::{
 	collections::{BTreeMap, BTreeSet, VecDeque},
-	pin::Pin,
 	str::{from_utf8, FromStr},
 	task::{Context, Poll},
 	time::{Duration, Instant},
@@ -137,7 +132,7 @@ pub enum Event {
 #[derive(Debug, Clone)]
 pub enum DiscoveryEvent {
 	/// Event.
-	Event(Event),
+	GenerateEvent(Event),
 
 	/// A resolve request to us via did discovery gossip.
 	/// With an pre-computed DIDComm response.
@@ -196,67 +191,6 @@ where
 			pending_discovery: Default::default(),
 			future_events: Default::default(),
 			resolver,
-		}
-	}
-
-	/// Handle discovery event which involves the swarm.
-	/// Other events are returned.
-	pub fn on_discovery_event<B: DiscoveryBehaviour>(
-		&mut self,
-		swarm: &mut Swarm<B>,
-		event: DiscoveryEvent,
-	) -> Option<Event> {
-		match event {
-			DiscoveryEvent::DidResolve { from: _, from_peer, response } => {
-				swarm.behaviour_mut().didcomm_mut().send(&from_peer, response.into());
-				None
-			},
-			DiscoveryEvent::DidDiscovery { discovery } => {
-				match did_discovery(swarm, &discovery) {
-					Ok(_) => {},
-					Err(err) => {
-						tracing::warn!(?discovery, ?err, "did_discovery-publish-failed")
-					},
-				};
-				None
-			},
-			DiscoveryEvent::ReceivedDidComm { peer_id, header, body: _ } => {
-				if header.message_type == "diddiscovery" {
-					for request_id in self
-						.all_discovery_diddiscovery()
-						.filter(|(_, discovery)| header.thid.as_ref() == Some(&discovery.message_id))
-						.map(|(request, _)| request.id)
-						.collect::<Vec<_>>()
-					{
-						if let Some(request) = self.requests.get_mut(&request_id) {
-							if !request.connected_peers.contains(&peer_id) {
-								request.connected_peers.insert(peer_id);
-								self.events.push_back(DiscoveryEvent::Event(Event::Connected {
-									id: request_id,
-									peer: peer_id,
-								}));
-							}
-						}
-					}
-				}
-				None
-			},
-			DiscoveryEvent::PeerDiscoverd { peer_id } => {
-				// we discoverd a peer we intreset in though an request
-				// so we jsut dail it. once the connection is made we will be notified by
-				// [`SwarmEvent::ConnectionEstablished`].
-				if !swarm.is_connected(&peer_id) {
-					let opts = DialOpts::peer_id(peer_id).build();
-					match swarm.dial(opts) {
-						Ok(_) => {},
-						Err(err) => {
-							tracing::warn!(?err, ?peer_id, "discovery-peer-dail-failed");
-						},
-					}
-				}
-				None
-			},
-			DiscoveryEvent::Event(event) => Some(event),
 		}
 	}
 
@@ -436,26 +370,6 @@ where
 		self.requests.remove(&id);
 	}
 
-	/// Poll on events.
-	pub fn poll(&mut self, cx: &mut Context<'_>) -> Poll<DiscoveryEvent> {
-		// timeouts
-		self.timeout();
-
-		// events
-		if let Some(event) = self.events.pop_front() {
-			return Poll::Ready(event);
-		}
-
-		// pending futures
-		match self.future_events.poll_next_unpin(cx) {
-			Poll::Ready(Some(Some(event))) => return Poll::Ready(event),
-			_ => {},
-		}
-
-		// pending
-		Poll::Pending
-	}
-
 	/// Timout requests and release them.
 	fn timeout(&mut self) {
 		let time = Instant::now();
@@ -467,71 +381,8 @@ where
 			.collect();
 		for request_id in timeout.into_iter() {
 			self.release(request_id);
-			self.events.push_back(DiscoveryEvent::Event(Event::Timeout { id: request_id }));
-		}
-	}
-
-	/// Handle swarm events.
-	///
-	/// Specifically:
-	/// - Emit events for direct peer connections.
-	/// - Forward behaviour events to handlers.
-	pub fn on_swarm_event<B: DiscoveryBehaviour>(&mut self, event: &SwarmEvent<<B as NetworkBehaviour>::ToSwarm>) {
-		match event {
-			SwarmEvent::ConnectionEstablished {
-				peer_id,
-				connection_id: _,
-				endpoint: _,
-				num_established,
-				concurrent_dial_errors: _,
-				established_in: _,
-			} => {
-				// only for the first connection
-				if num_established.get() == 1 {
-					// find all requests looking for this peer id
-					let requests: BTreeSet<u64> = self
-						.all_discovery_peers()
-						.filter(|(_, request_peer)| peer_id == request_peer)
-						.map(|(request, _)| request.id)
-						.collect();
-					for request_id in requests.into_iter() {
-						if let Some(request) = self.requests.get_mut(&request_id) {
-							peer_connected(request, &mut self.events, *peer_id);
-						}
-					}
-				}
-			},
-			SwarmEvent::ConnectionClosed { peer_id, connection_id: _, endpoint: _, num_established, cause: _ } => {
-				// only for the last connection
-				if *num_established == 0 {
-					// find all requests looking for this peer id
-					let requests: BTreeSet<u64> = self
-						.all_discovery_peers()
-						.filter(|(_, request_peer)| peer_id == request_peer)
-						.map(|(request, _)| request.id)
-						.collect();
-					for request_id in requests.into_iter() {
-						if let Some(request) = self.requests.get_mut(&request_id) {
-							peer_disconnected(request, &mut self.events, *peer_id);
-						}
-					}
-				}
-			},
-			SwarmEvent::Behaviour(behaviour_event) => {
-				if let Some(gossip_event) = B::gossipsub_event(behaviour_event) {
-					self.on_gossip_event(gossip_event);
-				}
-				if let Some(didcomm_event) = B::didcomm_event(behaviour_event) {
-					self.on_didcomm_event(didcomm_event);
-				}
-				if let Some(mdns_event) = B::mdns_event(behaviour_event) {
-					self.on_mdns_event(mdns_event);
-				}
-				if let Some(rendezvous_client_event) = B::rendezvous_client_event(behaviour_event) {
-					self.on_rendezvous_client_event(rendezvous_client_event);
-				}
-			},
-			_ => {},
+			self.events
+				.push_back(DiscoveryEvent::GenerateEvent(Event::Timeout { id: request_id }));
 		}
 	}
 
@@ -669,24 +520,152 @@ where
 		// TODO: implement
 	}
 }
-impl<R> Stream for DiscoveryState<R>
+impl<B, R> LayerBehaviour<B> for DiscoveryState<R>
 where
-	R: IdentityResolver + Clone + Send + Sync + Unpin + 'static,
+	B: DiscoveryBehaviour,
+	R: IdentityResolver + Clone + Send + Sync + 'static,
 {
-	type Item = DiscoveryEvent;
+	type ToSwarm = Event;
+	type ToLayer = DiscoveryEvent;
 
-	/// Note: This stream is infinite.
-	fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-		self.as_mut().poll(cx).map(Some)
+	/// Handle swarm events.
+	///
+	/// Specifically:
+	/// - Emit events for direct peer connections.
+	/// - Forward behaviour events to handlers.
+	fn on_swarm_event(&mut self, event: &SwarmEvent<<B as NetworkBehaviour>::ToSwarm>) {
+		match event {
+			SwarmEvent::ConnectionEstablished {
+				peer_id,
+				connection_id: _,
+				endpoint: _,
+				num_established,
+				concurrent_dial_errors: _,
+				established_in: _,
+			} => {
+				// only for the first connection
+				if num_established.get() == 1 {
+					// find all requests looking for this peer id
+					let requests: BTreeSet<u64> = self
+						.all_discovery_peers()
+						.filter(|(_, request_peer)| peer_id == request_peer)
+						.map(|(request, _)| request.id)
+						.collect();
+					for request_id in requests.into_iter() {
+						if let Some(request) = self.requests.get_mut(&request_id) {
+							peer_connected(request, &mut self.events, *peer_id);
+						}
+					}
+				}
+			},
+			SwarmEvent::ConnectionClosed { peer_id, connection_id: _, endpoint: _, num_established, cause: _ } => {
+				// only for the last connection
+				if *num_established == 0 {
+					// find all requests looking for this peer id
+					let requests: BTreeSet<u64> = self
+						.all_discovery_peers()
+						.filter(|(_, request_peer)| peer_id == request_peer)
+						.map(|(request, _)| request.id)
+						.collect();
+					for request_id in requests.into_iter() {
+						if let Some(request) = self.requests.get_mut(&request_id) {
+							peer_disconnected(request, &mut self.events, *peer_id);
+						}
+					}
+				}
+			},
+			SwarmEvent::Behaviour(behaviour_event) => {
+				if let Some(gossip_event) = B::gossipsub_event(behaviour_event) {
+					self.on_gossip_event(gossip_event);
+				}
+				if let Some(didcomm_event) = B::didcomm_event(behaviour_event) {
+					self.on_didcomm_event(didcomm_event);
+				}
+				if let Some(mdns_event) = B::mdns_event(behaviour_event) {
+					self.on_mdns_event(mdns_event);
+				}
+				if let Some(rendezvous_client_event) = B::rendezvous_client_event(behaviour_event) {
+					self.on_rendezvous_client_event(rendezvous_client_event);
+				}
+			},
+			_ => {},
+		}
 	}
-}
-/// As we produce the events in an infinite manner the stream will never be terminated.
-impl<R> FusedStream for DiscoveryState<R>
-where
-	R: IdentityResolver + Clone + Send + Sync + Unpin + 'static,
-{
-	fn is_terminated(&self) -> bool {
-		false
+
+	/// Handle discovery event which involves the swarm.
+	/// Other events are returned.
+	fn on_layer_event(&mut self, swarm: &mut Swarm<B>, event: Self::ToLayer) -> Option<Self::ToSwarm> {
+		match event {
+			DiscoveryEvent::DidResolve { from: _, from_peer, response } => {
+				swarm.behaviour_mut().didcomm_mut().send(&from_peer, response.into());
+				None
+			},
+			DiscoveryEvent::DidDiscovery { discovery } => {
+				match did_discovery(swarm, &discovery) {
+					Ok(_) => {},
+					Err(err) => {
+						tracing::warn!(?discovery, ?err, "did_discovery-publish-failed")
+					},
+				};
+				None
+			},
+			DiscoveryEvent::ReceivedDidComm { peer_id, header, body: _ } => {
+				if header.message_type == "diddiscovery" {
+					for request_id in self
+						.all_discovery_diddiscovery()
+						.filter(|(_, discovery)| header.thid.as_ref() == Some(&discovery.message_id))
+						.map(|(request, _)| request.id)
+						.collect::<Vec<_>>()
+					{
+						if let Some(request) = self.requests.get_mut(&request_id) {
+							if !request.connected_peers.contains(&peer_id) {
+								request.connected_peers.insert(peer_id);
+								self.events.push_back(DiscoveryEvent::GenerateEvent(Event::Connected {
+									id: request_id,
+									peer: peer_id,
+								}));
+							}
+						}
+					}
+				}
+				None
+			},
+			DiscoveryEvent::PeerDiscoverd { peer_id } => {
+				// we discoverd a peer we intreset in though an request
+				// so we jsut dail it. once the connection is made we will be notified by
+				// [`SwarmEvent::ConnectionEstablished`].
+				if !swarm.is_connected(&peer_id) {
+					let opts = DialOpts::peer_id(peer_id).build();
+					match swarm.dial(opts) {
+						Ok(_) => {},
+						Err(err) => {
+							tracing::warn!(?err, ?peer_id, "discovery-peer-dail-failed");
+						},
+					}
+				}
+				None
+			},
+			DiscoveryEvent::GenerateEvent(event) => Some(event),
+		}
+	}
+
+	fn poll(&mut self, cx: &mut Context<'_>) -> Poll<Self::ToLayer> {
+		// timeouts
+		self.timeout();
+
+		// events
+		if let Some(event) = self.events.pop_front() {
+			return Poll::Ready(event);
+		}
+
+		// pending futures
+		match self.future_events.poll_next_unpin(cx) {
+			Poll::Ready(Some(Some(event))) => return Poll::Ready(event),
+			_ => {},
+		}
+
+		// pending
+		Poll::Pending
 	}
 }
 
@@ -702,13 +681,7 @@ pub enum ConnectError {
 	Other(#[from] anyhow::Error),
 }
 
-pub trait DiscoveryBehaviour: NetworkBehaviour {
-	fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour;
-	fn gossipsub_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&gossipsub::Event>;
-
-	fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour;
-	fn didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&didcomm::Event>;
-
+pub trait DiscoveryBehaviour: NetworkBehaviour + GossipsubBehaviourProvider + DidcommBehaviourProvider {
 	fn rendezvous_client_mut(&mut self) -> Option<&mut rendezvous::client::Behaviour>;
 	fn rendezvous_client_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&rendezvous::client::Event>;
 
@@ -878,12 +851,12 @@ fn peer_to_dial_opts(item: &NetworkPeer) -> Result<DialOpts, anyhow::Error> {
 
 fn peer_connected(request: &mut DiscoveryConnectRequest, events: &mut VecDeque<DiscoveryEvent>, peer: PeerId) {
 	request.connected_peers.insert(peer);
-	events.push_back(DiscoveryEvent::Event(Event::Connected { id: request.id, peer }));
+	events.push_back(DiscoveryEvent::GenerateEvent(Event::Connected { id: request.id, peer }));
 }
 
 fn peer_disconnected(request: &mut DiscoveryConnectRequest, events: &mut VecDeque<DiscoveryEvent>, peer: PeerId) {
 	request.connected_peers.remove(&peer);
-	events.push_back(DiscoveryEvent::Event(Event::Disconnected { id: request.id, peer }));
+	events.push_back(DiscoveryEvent::GenerateEvent(Event::Disconnected { id: request.id, peer }));
 }
 
 #[cfg(test)]
@@ -891,8 +864,8 @@ mod tests {
 	use super::DiscoveryBehaviour;
 	use crate::{
 		didcomm,
-		discovery::{did_discovery::DidDiscovery, discovery::Discovery},
-		DiscoveryState, Event,
+		discovery::{did_discovery::DidDiscovery, discovery::Discovery, DiscoveryState, Event},
+		DidcommBehaviourProvider, GossipsubBehaviourProvider, Layer, LayerBehaviour,
 	};
 	use co_identity::{DidKeyIdentity, DidKeyIdentityResolver};
 	use co_primitives::NetworkDidDiscovery;
@@ -924,17 +897,38 @@ mod tests {
 			TestBehaviour { didcomm: didcomm_behaviour, gossipsub: gossipsub_behaviour }
 		}
 	}
-	impl DiscoveryBehaviour for TestBehaviour {
-		fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour {
-			&mut self.gossipsub
+	impl DidcommBehaviourProvider for TestBehaviour {
+		fn didcomm(&self) -> &didcomm::Behaviour {
+			&self.didcomm
 		}
 
 		fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour {
 			&mut self.didcomm
 		}
 
-		fn rendezvous_client_mut(&mut self) -> Option<&mut rendezvous::client::Behaviour> {
-			None
+		fn didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&didcomm::Event> {
+			match event {
+				TestBehaviourEvent::Didcomm(e) => Some(e),
+				_ => None,
+			}
+		}
+
+		fn into_didcomm_event(
+			event: <Self as NetworkBehaviour>::ToSwarm,
+		) -> Result<didcomm::Event, <Self as NetworkBehaviour>::ToSwarm> {
+			match event {
+				TestBehaviourEvent::Didcomm(e) => Ok(e),
+				e => Err(e),
+			}
+		}
+	}
+	impl GossipsubBehaviourProvider for TestBehaviour {
+		fn gossipsub(&self) -> &gossipsub::Behaviour {
+			&self.gossipsub
+		}
+
+		fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour {
+			&mut self.gossipsub
 		}
 
 		fn gossipsub_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&gossipsub::Event> {
@@ -944,11 +938,18 @@ mod tests {
 			}
 		}
 
-		fn didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&didcomm::Event> {
+		fn into_gossipsub_event(
+			event: <Self as NetworkBehaviour>::ToSwarm,
+		) -> Result<gossipsub::Event, <Self as NetworkBehaviour>::ToSwarm> {
 			match event {
-				TestBehaviourEvent::Didcomm(e) => Some(e),
-				_ => None,
+				TestBehaviourEvent::Gossipsub(e) => Ok(e),
+				e => Err(e),
 			}
+		}
+	}
+	impl DiscoveryBehaviour for TestBehaviour {
+		fn rendezvous_client_mut(&mut self) -> Option<&mut rendezvous::client::Behaviour> {
+			None
 		}
 
 		fn rendezvous_client_event(_event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&rendezvous::client::Event> {
@@ -1021,11 +1022,18 @@ mod tests {
 		let mut peer2 = Peer::new();
 
 		// states
-		let mut discovery1 = DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_millis(100), None);
-		let mut discovery2 = DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_millis(100), None);
+		let mut discovery1 = Layer::new(
+			peer1.swarm().behaviour(),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_millis(100), None),
+		);
+		let mut discovery2 = Layer::new(
+			peer2.swarm().behaviour(),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_millis(100), None),
+		);
 
 		// peer2: connect
 		discovery2
+			.layer_mut()
 			.connect(peer2.swarm(), vec![Discovery::from_peer(peer1.peer_id, std::iter::once(&peer1.addr))])
 			.unwrap();
 
@@ -1034,19 +1042,19 @@ mod tests {
 			select! {
 				event = peer1.swarm().next() => {
 					tracing::info!(?event, "peer1");
-					discovery1.on_swarm_event::<TestBehaviour>(&event.unwrap());
+					discovery1.on_swarm_event(&event.unwrap());
 				},
 				event = peer2.swarm().next() => {
 					tracing::info!(?event, "peer2");
-					discovery2.on_swarm_event::<TestBehaviour>(&event.unwrap());
+					discovery2.on_swarm_event(&event.unwrap());
 				},
 				event = discovery1.next() => {
 					tracing::info!(?event, "discovery1");
-					discovery1.on_discovery_event(peer1.swarm(), event.unwrap());
+					discovery1.on_layer_event(peer1.swarm(), event.unwrap());
 				},
 				event = discovery2.next() => {
 					tracing::info!(?event, "discovery2");
-					match discovery2.on_discovery_event(peer2.swarm(), event.unwrap()) {
+					match discovery2.on_layer_event(peer2.swarm(), event.unwrap()) {
 						Some(Event::Connected {id: _, peer}) => {
 							assert_eq!(peer, peer1.peer_id());
 							break;
@@ -1083,16 +1091,24 @@ mod tests {
 		let did2 = DidKeyIdentity::generate(Some(&vec![2; 32]));
 
 		// states
-		let mut discovery1 = DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_millis(100), None);
-		let mut discovery2 = DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_millis(100), None);
+		let mut discovery1 = Layer::new(
+			peer1.swarm().behaviour(),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_millis(100), None),
+		);
+		let mut discovery2 = Layer::new(
+			peer2.swarm().behaviour(),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_millis(100), None),
+		);
 
 		// peer1: subscribe
 		discovery1
+			.layer_mut()
 			.did_discovery_subscribe(peer1.swarm(), NetworkDidDiscovery::default(), did1.clone())
 			.unwrap();
 
 		// peer2: subscribe
 		discovery2
+			.layer_mut()
 			.did_discovery_subscribe(peer2.swarm(), NetworkDidDiscovery::default(), did2.clone())
 			.unwrap();
 
@@ -1111,6 +1127,7 @@ mod tests {
 
 		// peer2: connect
 		discovery2
+			.layer_mut()
 			.connect(
 				peer2.swarm(),
 				vec![DidDiscovery::create(
@@ -1129,19 +1146,19 @@ mod tests {
 			select! {
 				event = peer1.swarm().next() => {
 					tracing::info!(?event, "peer1");
-					discovery1.on_swarm_event::<TestBehaviour>(&event.unwrap());
+					discovery1.on_swarm_event(&event.unwrap());
 				},
 				event = peer2.swarm().next() => {
 					tracing::info!(?event, "peer2");
-					discovery2.on_swarm_event::<TestBehaviour>(&event.unwrap());
+					discovery2.on_swarm_event(&event.unwrap());
 				},
 				event = discovery1.next() => {
 					tracing::info!(?event, "discovery1");
-					discovery1.on_discovery_event(peer1.swarm(), event.unwrap());
+					discovery1.on_layer_event(peer1.swarm(), event.unwrap());
 				},
 				event = discovery2.next() => {
 					tracing::info!(?event, "discovery2");
-					match discovery2.on_discovery_event(peer2.swarm(), event.unwrap()) {
+					match discovery2.on_layer_event(peer2.swarm(), event.unwrap()) {
 						Some(Event::Connected {id: _, peer}) => {
 							assert_eq!(peer, peer1.peer_id());
 							break;

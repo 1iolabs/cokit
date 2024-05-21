@@ -1,7 +1,7 @@
 mod bitswap;
 pub mod didcomm;
 mod didcontact;
-mod discovery;
+pub mod discovery;
 pub mod heads;
 mod library;
 mod network;
@@ -11,15 +11,15 @@ pub use bitswap::storage::{NetworkBlockStorage, PeerProvider};
 pub use didcontact::{
 	create_gossipsub, publish, resolve, subscribe, unsubscribe, Error, RendezvousPoint, ResolveError, ResolveResult,
 };
-pub use discovery::discovery::{Discovery, DiscoveryBehaviour, DiscoveryState, Event};
-pub use heads::heads::{Heads, HeadsHandler};
 pub use library::clone_key_pair::clone_key_pair;
-pub use network::{Behaviour, BehaviourEvent, Libp2pNetwork, Libp2pNetworkConfig, NetworkMode};
+pub use network::{Behaviour, Context, Libp2pNetwork, Libp2pNetworkConfig, NetworkEvent, NetworkMode};
 pub use types::{
-	didcomm::{Message, MetadataMessage},
 	error::NetworkError,
+	layer_behaviour::{Layer, LayerBehaviour},
+	layer_provider::{DiscoveryLayerBehaviourProvider, HeadsLayerBehaviourProvider},
 	network_task::{FnOnceNetworkTask, NetworkTask, NetworkTaskBox, NetworkTaskSpawner},
 	provider::{
-		BitswapBehaviourProvider, DidcommBehaviourProvider, GossipsubBehaviourProvider, HeadsBehaviourProvider,
+		BitswapBehaviourProvider, DidcommBehaviourProvider, GossipsubBehaviourProvider, MdnsBehaviourProvider,
+		RendezvousClientBehaviourProvider,
 	},
 };

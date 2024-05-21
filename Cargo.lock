@@ -1427,6 +1427,7 @@ dependencies = [
  "libipld",
  "libp2p",
  "libp2p-bitswap",
+ "pin-project",
  "rxrust",
  "serde",
  "serde_bytes",
