@@ -1,53 +1,82 @@
 use crate::{BitswapBehaviourProvider, NetworkTask, NetworkTaskSpawner};
 use async_trait::async_trait;
 use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
-use futures::channel::oneshot;
+use futures::{channel::oneshot, pin_mut, Stream};
 use libipld::{Block, Cid};
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	PeerId, Swarm,
 };
 use libp2p_bitswap::{BitswapEvent, QueryId};
-use std::{collections::BTreeSet, mem::swap, sync::Arc};
+use std::{collections::BTreeSet, mem::swap, sync::Arc, time::Duration};
+use tokio_stream::StreamExt;
 
-#[async_trait]
 pub trait PeerProvider {
-	async fn peers(&self) -> Result<BTreeSet<PeerId>, StorageError>;
+	/// Provider peers as a stream.
+	/// Every time when new peers are discovered a item is emitted.
+	/// The stream may completes when no more peers are discoverable.
+	fn peers(&self) -> impl Stream<Item = BTreeSet<PeerId>> + Send + 'static;
 }
 
-pub struct NetworkBlockStorage<S, B, C> {
+pub struct NetworkBlockStorage<S, B, C, P> {
 	next: S,
 	spawner: NetworkTaskSpawner<B, C>,
-	peers: Option<Arc<dyn PeerProvider + Send + Sync + 'static>>,
+	peer_provider: P,
 	mapping: Option<Arc<dyn BlockStorageContentMapping + Send + Sync + 'static>>,
+	timeout: Duration,
 }
-impl<S, B, C> NetworkBlockStorage<S, B, C>
+impl<S, B, C, P> NetworkBlockStorage<S, B, C, P>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
 	B: NetworkBehaviour + BitswapBehaviourProvider<StoreParams = S::StoreParams>,
+	P: PeerProvider + Send + Sync + 'static,
 {
-	pub fn new(next: S, spawner: NetworkTaskSpawner<B, C>) -> Self {
-		Self { next, spawner, peers: Default::default(), mapping: None }
+	pub fn new(next: S, spawner: NetworkTaskSpawner<B, C>, peer_provider: P, timeout: Duration) -> Self {
+		Self { next, spawner, peer_provider, mapping: None, timeout }
 	}
 
 	pub fn set_mapping<M: BlockStorageContentMapping + Send + Sync + 'static>(&mut self, mapping: M) {
 		self.mapping = Some(Arc::new(mapping));
 	}
 
-	pub fn set_peers<P: PeerProvider + Send + Sync + 'static>(&mut self, peers: P) {
-		self.peers = Some(Arc::new(peers));
+	pub fn set_peers(&mut self, peers: P) {
+		self.peer_provider = peers;
 	}
 
 	async fn get_network(&self, cid: Cid) -> Result<(), StorageError> {
 		let mapped = self.to_network_cid(cid).await;
-		let peers = match &self.peers {
-			Some(p) => p.peers().await?,
-			None => Default::default(),
-		};
-		let (tx, rx) = oneshot::channel();
-		let task = GetNetworkTask::new(mapped, peers, tx);
-		self.spawner.spawn(task).map_err(|e| StorageError::Internal(e.into()))?;
-		rx.await.map_err(|e| StorageError::Internal(e.into()))?
+		let result_stream = self
+			.peer_provider
+			.peers()
+			.filter(|peers| !peers.is_empty())
+			// start network task for every peer(s).
+			.then(|peers| async move {
+				let (tx, rx) = oneshot::channel();
+				let task = GetNetworkTask::new(mapped, peers, tx);
+				self.spawner.spawn(task).map_err(|e| StorageError::Internal(e.into()))?;
+				rx.await.map_err(|e| StorageError::Internal(e.into()))??;
+				Ok::<(), StorageError>(())
+			})
+			.timeout(self.timeout)
+			.filter_map(|result| match result {
+				Ok(network_result) => match network_result {
+					// success - return ok
+					// drop will cancel others
+					Ok(_) => Some(Ok(())),
+					// error - ignore other errors
+					Err(e) => None,
+				},
+				// timeout - return err
+				Err(e) => {
+					return Some(Err(e));
+				},
+			})
+			.take(1);
+		pin_mut!(result_stream);
+		while let Some(result) = result_stream.next().await {
+			return result.map_err(|e| StorageError::NotFound(cid, e.into()));
+		}
+		Err(StorageError::NotFound(cid, anyhow::anyhow!("Insufficent peers")))
 	}
 
 	async fn to_network_cid(&self, cid: Cid) -> Cid {
@@ -58,24 +87,27 @@ where
 		}
 	}
 }
-impl<S, B, C> Clone for NetworkBlockStorage<S, B, C>
+impl<S, B, C, P> Clone for NetworkBlockStorage<S, B, C, P>
 where
 	S: Clone,
+	P: Clone,
 {
 	fn clone(&self) -> Self {
 		Self {
 			next: self.next.clone(),
 			spawner: self.spawner.clone(),
-			peers: self.peers.clone(),
+			peer_provider: self.peer_provider.clone(),
 			mapping: self.mapping.clone(),
+			timeout: self.timeout.clone(),
 		}
 	}
 }
 #[async_trait]
-impl<S, B, C> BlockStorage for NetworkBlockStorage<S, B, C>
+impl<S, B, C, P> BlockStorage for NetworkBlockStorage<S, B, C, P>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
 	B: NetworkBehaviour + BitswapBehaviourProvider<StoreParams = S::StoreParams>,
+	P: PeerProvider + Send + Sync + 'static,
 {
 	type StoreParams = S::StoreParams;
 
@@ -114,6 +146,8 @@ where
 	}
 }
 
+/// Try to get block using specified peers.
+/// Canceled when the result receiver is dropped.
 struct GetNetworkTask {
 	cid: Cid,
 	state: GetNetworkTaskState,
@@ -164,7 +198,9 @@ where
 								match result.send(event_result.map_err(|e| StorageError::NotFound(self.cid, e.into())))
 								{
 									Ok(_) => {},
-									Err(result) => tracing::warn!(?result, "result-dropped"),
+									Err(_) => {
+										// cancelled
+									},
 								}
 							}
 						}
@@ -178,7 +214,11 @@ where
 	}
 
 	fn is_complete(&mut self) -> bool {
-		matches!(self.state, GetNetworkTaskState::Complete)
+		match &self.state {
+			GetNetworkTaskState::Complete => true,
+			GetNetworkTaskState::Query(_, result) => result.is_canceled(),
+			_ => false,
+		}
 	}
 }
 enum GetNetworkTaskState {

@@ -160,10 +160,12 @@ impl HeadsState {
 					}
 				}
 			},
-			gossipsub::Event::Subscribed { peer_id: _, topic } =>
+			gossipsub::Event::Subscribed { peer_id: _, topic } => {
+				// when we have at least on subscriber trigger pending publish events
 				if let Some(pending) = self.pending_heads.remove(topic) {
 					self.events.extend(pending.into_iter().map(|item| HeadsEvent::Publish(item)));
-				},
+				}
+			},
 			_ => {},
 		}
 	}

@@ -148,6 +148,9 @@ pub enum DiscoveryEvent {
 	PeerDiscoverd { peer_id: PeerId },
 }
 
+/// Try to connect Peers using Discovery items.
+///
+/// Peer connections will be managed by the swarm (and its timeout).
 pub struct DiscoveryState<R> {
 	/// Next discovery request id.
 	next_id: u64,

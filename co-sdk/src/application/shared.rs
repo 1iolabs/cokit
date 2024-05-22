@@ -1,7 +1,7 @@
 use super::identity::create_identity_resolver;
 use crate::{
 	drivers::network::{subscribe::Publish, CoNetworkTaskSpawner},
-	library::co_peer_provider::CoPeerProvider,
+	library::{co_peer_provider::CoPeerProvider, co_state::CoState},
 	state::find,
 	types::co_storage::CoBlockStorageContentMapping,
 	CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerBuilder, ReducerChangedHandler, Runtime, CO_CORE_NAME_CO,
@@ -18,7 +18,7 @@ use co_network::NetworkBlockStorage;
 use co_primitives::{tags, CoId};
 use co_storage::{Algorithm, EncryptedBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Duration};
 
 /// Shared CO Builder.
 /// The Shared CO state is sptrend in an membership of an other CO (typicalle the Local CO).
@@ -29,6 +29,7 @@ pub struct SharedCoBuilder {
 	membership: Membership,
 	network: Option<CoNetworkTaskSpawner>,
 	initialize: bool,
+	network_block_timeout: Duration,
 }
 impl SharedCoBuilder {
 	pub fn new(parent: CoReducer, membership: Membership) -> Self {
@@ -39,6 +40,7 @@ impl SharedCoBuilder {
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_owned(),
 			network: None,
 			initialize: true,
+			network_block_timeout: Duration::from_secs(30),
 		}
 	}
 
@@ -87,15 +89,23 @@ impl SharedCoBuilder {
 			};
 
 		// network
-		let storage = if let Some(network) = &self.network {
-			let mut network_storage = NetworkBlockStorage::new(storage.clone(), network.clone());
-			network_storage.set_peers(CoPeerProvider::new(storage, None));
+		let (storage, co_state) = if let Some(network) = &self.network {
+			let co_state = CoState::default();
+			let peer_provider = CoPeerProvider::new(
+				network.clone(),
+				create_identity_resolver(),
+				identity.clone(),
+				storage.clone(),
+				co_state.clone(),
+			);
+			let mut network_storage =
+				NetworkBlockStorage::new(storage.clone(), network.clone(), peer_provider, self.network_block_timeout);
 			if let Some(encrypted) = &encrypted_storage {
 				network_storage.set_mapping(encrypted.content_mapping());
 			}
-			CoStorage::new(network_storage)
+			(CoStorage::new(network_storage), Some(co_state))
 		} else {
-			storage
+			(storage, None)
 		};
 
 		// log
@@ -112,6 +122,11 @@ impl SharedCoBuilder {
 			.with_latest_state(self.membership.state, self.membership.heads.clone())
 			.build(runtime.runtime())
 			.await?;
+
+		// update co state token
+		if let Some(co_state) = co_state {
+			reducer.add_change_handler(Box::new(co_state));
+		}
 
 		// publish changes for every `NetworkCoHeads` setting
 		if let Some(network) = self.network {

@@ -30,7 +30,6 @@ where
 }
 pub type NetworkTaskBox<B, C> = Box<dyn NetworkTask<B, C> + Send + 'static>;
 
-#[derive(Debug)]
 pub struct NetworkTaskSpawner<B, C> {
 	pub(crate) tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<B, C>>,
 }

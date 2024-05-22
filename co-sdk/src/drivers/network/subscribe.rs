@@ -54,29 +54,29 @@ impl<M> Publish<M> {
 		Self { co, spawner, mapping, force_mapping }
 	}
 
-	pub async fn request(&self, reducer: &CoReducer) -> Result<(), anyhow::Error>
-	where
-		M: BlockStorageContentMapping + Send + Sync + 'static,
-	{
-		let peers = CoPeerProvider::from_co_reducer(&reducer).await.peers().await?;
-		let mut heads = reducer.heads().await;
+	// pub async fn request(&self, reducer: &CoReducer) -> Result<(), anyhow::Error>
+	// where
+	// 	M: BlockStorageContentMapping + Send + Sync + 'static,
+	// {
+	// 	let peers = CoPeerProvider::from_co_reducer(&reducer).await.peers().await?;
+	// 	let mut heads = reducer.heads().await;
 
-		// map plain heads to encrypted heads
-		if self.mapping.is_some() {
-			heads = to_plain(&self.mapping, self.force_mapping, heads)
-				.await
-				.map_err(|err| anyhow!("Failed to map head: {}", err))?;
-		}
+	// 	// map plain heads to encrypted heads
+	// 	if self.mapping.is_some() {
+	// 		heads = to_plain(&self.mapping, self.force_mapping, heads)
+	// 			.await
+	// 			.map_err(|err| anyhow!("Failed to map head: {}", err))?;
+	// 	}
 
-		// request
-		self.request_peers(heads, peers)
-	}
+	// 	// request
+	// 	self.request_peers(heads, peers)
+	// }
 
-	pub fn request_peers(&self, heads: BTreeSet<Cid>, peers: BTreeSet<PeerId>) -> Result<(), anyhow::Error> {
-		self.spawner
-			.spawn(HeadsRequestNetworkTask::new(HeadsRequest::Heads { co: self.co.clone(), heads, peers }))?;
-		Ok(())
-	}
+	// pub fn request_peers(&self, heads: BTreeSet<Cid>, peers: BTreeSet<PeerId>) -> Result<(), anyhow::Error> {
+	// 	self.spawner
+	// 		.spawn(HeadsRequestNetworkTask::new(HeadsRequest::Heads { co: self.co.clone(), heads, peers }))?;
+	// 	Ok(())
+	// }
 }
 #[async_trait]
 impl<M> ReducerChangedHandler<CoStorage, CoCoreResolver> for Publish<M>
@@ -100,7 +100,7 @@ where
 		// publish
 		for network in networks {
 			match network {
-				co_api::Network::DidDiscovery(_) => todo!(),
+				// co_api::Network::DidDiscovery(_) => todo!(),
 				co_api::Network::CoHeads(network) => {
 					self.spawner.spawn(HeadsRequestNetworkTask::new(HeadsRequest::PublishHeads {
 						network,
@@ -108,8 +108,8 @@ where
 						heads: heads.clone(),
 					}))?;
 				},
-				co_api::Network::Rendezvous(_) => todo!(),
-				co_api::Network::Peer(_) => todo!(),
+				// co_api::Network::Rendezvous(_) => todo!(),
+				// co_api::Network::Peer(_) => todo!(),
 				_ => {
 					// ignore
 				},

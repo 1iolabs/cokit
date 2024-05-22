@@ -3,9 +3,9 @@ use super::{
 	shared::{CreateCo, SharedCoBuilder, SharedCoCreator},
 };
 use crate::{
-	drivers::network::heads::ReceivedHeadsNetworkTask, library::find_membership::find_membership, local_keypair_fetch,
-	types::co_storage::CoBlockStorageContentMapping, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Network,
-	Runtime, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	drivers::network::tasks::received_heads::ReceivedHeadsNetworkTask, library::find_membership::find_membership,
+	local_keypair_fetch, types::co_storage::CoBlockStorageContentMapping, CoReducer, CoReducerFactory, CoStorage,
+	LocalCoBuilder, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;

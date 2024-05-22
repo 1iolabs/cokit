@@ -30,6 +30,10 @@ impl Identity for PrivateIdentityBox {
 	fn didcomm_public(&self) -> Option<DidCommPublicContext> {
 		self.as_ref().didcomm_public()
 	}
+
+	fn networks(&self) -> std::collections::BTreeSet<co_primitives::Network> {
+		self.as_ref().networks()
+	}
 }
 impl PrivateIdentity for PrivateIdentityBox {
 	fn sign(&self, data: &[u8]) -> Result<Vec<u8>, SignError> {

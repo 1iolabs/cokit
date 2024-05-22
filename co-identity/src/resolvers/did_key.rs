@@ -5,11 +5,11 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_primitives::{tags, Secret};
+use co_primitives::{tags, Network, Secret};
 use did_key::{
 	from_existing_key, generate, resolve, CoreSign, DIDCore, Ed25519KeyPair, KeyMaterial, PatchedKeyPair, X25519KeyPair,
 };
-use std::{fmt::Debug, sync::Arc};
+use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
 
 #[derive(Clone)]
 pub struct DidKeyIdentity {
@@ -139,6 +139,10 @@ impl Identity for DidKeyIdentity {
 			None,
 		);
 		Some(DidCommPublicContext::new(self.identity().to_owned(), verfication_method, key_agreement))
+	}
+
+	fn networks(&self) -> BTreeSet<Network> {
+		Default::default()
 	}
 }
 impl PrivateIdentity for DidKeyIdentity {

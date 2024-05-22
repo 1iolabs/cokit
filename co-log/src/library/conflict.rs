@@ -34,7 +34,7 @@ mod tests {
 	use serde::Serialize;
 	use std::{
 		cmp::Ordering,
-		collections::hash_map::DefaultHasher,
+		collections::{hash_map::DefaultHasher, BTreeSet},
 		hash::{Hash, Hasher},
 	};
 
@@ -59,6 +59,9 @@ mod tests {
 		}
 		fn didcomm_public(&self) -> Option<co_identity::DidCommPublicContext> {
 			None
+		}
+		fn networks(&self) -> BTreeSet<co_primitives::Network> {
+			Default::default()
 		}
 	}
 	impl PrivateIdentity for TestIdentity {

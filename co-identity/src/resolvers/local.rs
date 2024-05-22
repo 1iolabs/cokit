@@ -3,6 +3,8 @@ use crate::{
 	PrivateIdentityBox, PrivateIdentityResolver,
 };
 use async_trait::async_trait;
+use co_primitives::Network;
+use std::collections::BTreeSet;
 
 /// A local identity without any actual signatures.
 #[derive(Debug, Clone)]
@@ -24,6 +26,10 @@ impl Identity for LocalIdentity {
 
 	fn didcomm_public(&self) -> Option<DidCommPublicContext> {
 		None
+	}
+
+	fn networks(&self) -> BTreeSet<Network> {
+		Default::default()
 	}
 }
 impl PrivateIdentity for LocalIdentity {
