@@ -2,14 +2,14 @@ pub mod heads;
 pub mod subscribe;
 pub mod tasks;
 
-use self::subscribe::Publish;
-use crate::CoReducer;
+use self::tasks::did_discovery::{DidDiscoverySubscribe, DidDiscoveryUnsubscribe};
 use co_identity::{IdentityResolver, PrivateIdentity};
 use co_network::{Behaviour, Context, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner};
 use co_storage::BlockStorage;
+use futures::{stream, StreamExt, TryStreamExt};
 use libipld::DefaultParams;
 use libp2p::{identity::Keypair, PeerId};
-use std::sync::Arc;
+use std::{future::ready, sync::Arc};
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
@@ -63,7 +63,50 @@ impl Network {
 	// }
 
 	/// Listen on identity requests (DID Discovery).
-	pub fn listen<I: PrivateIdentity + Clone + Send + Sync + 'static>(identity: I) {}
+	pub async fn did_discovery_subscribe<I: PrivateIdentity + Clone + Send + Sync + 'static>(
+		&self,
+		identity: I,
+	) -> Result<(), anyhow::Error> {
+		// get did discovery networks
+		let mut networks: Vec<_> = identity
+			.networks()
+			.into_iter()
+			.filter_map(|network| match network {
+				co_api::Network::DidDiscovery(item) => Some(item),
+				_ => None,
+			})
+			.collect();
+		if networks.is_empty() {
+			networks.push(Default::default());
+		}
+
+		// subscribe
+		//  by returning on any error happens in between
+		let spwaner = self.spawner();
+		stream::iter(networks)
+			.then(|network| async {
+				let (task, result) = DidDiscoverySubscribe::new(identity.clone(), network);
+				spwaner.spawn(task)?;
+				result.await??;
+				Ok::<(), anyhow::Error>(())
+			})
+			.try_for_each(|_| ready(Ok(())))
+			.await?;
+
+		// result
+		Ok(())
+	}
+
+	/// Listen on identity requests (DID Discovery).
+	pub async fn did_discovery_unsubscribe<I: PrivateIdentity + Clone + Send + Sync + 'static>(
+		&self,
+		identity: I,
+	) -> Result<(), anyhow::Error> {
+		let (task, result) = DidDiscoveryUnsubscribe::new(identity.identity().to_owned());
+		self.spawner().spawn(task)?;
+		result.await??;
+		Ok(())
+	}
 }
 
 pub type CoNetworkTaskSpawner = NetworkTaskSpawner<Behaviour, Context>;

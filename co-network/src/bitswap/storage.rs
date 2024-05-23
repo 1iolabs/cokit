@@ -64,7 +64,7 @@ where
 					// drop will cancel others
 					Ok(_) => Some(Ok(())),
 					// error - ignore other errors
-					Err(e) => None,
+					Err(_) => None,
 				},
 				// timeout - return err
 				Err(e) => {
