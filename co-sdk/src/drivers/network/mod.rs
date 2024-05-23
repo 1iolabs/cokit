@@ -1,5 +1,4 @@
-pub mod heads;
-pub mod subscribe;
+pub mod publish;
 pub mod tasks;
 
 use self::tasks::did_discovery::{DidDiscoverySubscribe, DidDiscoveryUnsubscribe};

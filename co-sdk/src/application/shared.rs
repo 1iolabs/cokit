@@ -1,6 +1,6 @@
 use super::identity::create_identity_resolver;
 use crate::{
-	drivers::network::{subscribe::Publish, CoNetworkTaskSpawner},
+	drivers::network::{publish::CoHeadsPublish, CoNetworkTaskSpawner},
 	library::{co_peer_provider::CoPeerProvider, co_state::CoState},
 	state::find,
 	types::co_storage::CoBlockStorageContentMapping,
@@ -131,7 +131,7 @@ impl SharedCoBuilder {
 		// publish changes for every `NetworkCoHeads` setting
 		if let Some(network) = self.network {
 			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
-			let publish = Publish::new(network, self.membership.id.clone(), mapping.clone(), true);
+			let publish = CoHeadsPublish::new(network, self.membership.id.clone(), mapping.clone(), true);
 			reducer.add_change_handler(Box::new(publish));
 		}
 
