@@ -1,7 +1,7 @@
 use super::co_state::CoState;
 use crate::{
 	drivers::network::{tasks::discovery_connect::DiscoveryConnectNetworkTask, CoNetworkTaskSpawner},
-	state, CoReducer, CoStorage,
+	state, CoStorage,
 };
 use async_trait::async_trait;
 use co_identity::{IdentityResolverBox, PrivateIdentity};
@@ -14,45 +14,31 @@ use futures::Stream;
 use libp2p::PeerId;
 use std::collections::BTreeSet;
 
-pub struct CoPeerProvider<P> {
+pub struct CoPeerProvider<I> {
 	storage: CoStorage,
 	state: CoState,
 	identity_resolver: IdentityResolverBox,
-	identity: P,
+	identity: I,
 	spawner: CoNetworkTaskSpawner,
 }
-impl<P> CoPeerProvider<P>
+impl<I> CoPeerProvider<I>
 where
-	P: PrivateIdentity + Clone + Send + Sync + 'static,
+	I: PrivateIdentity + Clone + Send + Sync + 'static,
 {
 	pub fn new(
 		spawner: CoNetworkTaskSpawner,
 		identity_resolver: IdentityResolverBox,
-		identity: P,
+		identity: I,
 		storage: CoStorage,
 		state: CoState,
 	) -> Self {
 		Self { storage, state, spawner, identity, identity_resolver }
 	}
-
-	pub async fn from_co_reducer(
-		spawner: CoNetworkTaskSpawner,
-		identity_resolver: IdentityResolverBox,
-		identity: P,
-		co: &CoReducer,
-	) -> Self {
-		Self::new(spawner, identity_resolver, identity, co.storage(), CoState::new(co.reducer_state().await.0.into()))
-	}
-
-	pub fn co_state(&self) -> CoState {
-		self.state.clone()
-	}
 }
-
 #[async_trait]
-impl<P> PeerProvider for CoPeerProvider<P>
+impl<I> PeerProvider for CoPeerProvider<I>
 where
-	P: PrivateIdentity + Clone + Send + Sync + 'static,
+	I: PrivateIdentity + Clone + Send + Sync + 'static,
 {
 	fn peers(&self) -> impl Stream<Item = BTreeSet<PeerId>> + Send + 'static {
 		// task

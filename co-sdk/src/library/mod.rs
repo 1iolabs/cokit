@@ -10,4 +10,5 @@ pub mod local_keypair_fetch;
 pub mod locals;
 pub mod memberships;
 pub mod node_stream;
+pub mod push_heads;
 pub mod to_plain;

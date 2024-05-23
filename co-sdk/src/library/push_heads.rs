@@ -1,0 +1,128 @@
+use super::to_plain::to_plain;
+use crate::{
+	drivers::network::{
+		tasks::co_heads::{CoHeadsNetworkTask, CoHeadsRequest},
+		CoNetworkTaskSpawner,
+	},
+	CoCoreResolver, CoStorage, Reducer, ReducerChangedHandler,
+};
+use anyhow::anyhow;
+use async_trait::async_trait;
+use co_api::CoId;
+use co_identity::PrivateIdentity;
+use co_network::PeerProvider;
+use co_storage::BlockStorageContentMapping;
+use futures::{pin_mut, StreamExt};
+use libipld::Cid;
+use libp2p::PeerId;
+use std::collections::BTreeSet;
+use tokio::sync::watch;
+
+pub struct PushHeads<M> {
+	heads: watch::Sender<BTreeSet<Cid>>,
+	mapping: Option<M>,
+	/// Force the mapping to be applied by returning an error when no mapping is found.
+	force_mapping: bool,
+}
+impl<M> PushHeads<M> {
+	pub fn new<I, P>(
+		spawner: CoNetworkTaskSpawner,
+		co: CoId,
+		identity: I,
+		peer_provider: P,
+		mapping: Option<M>,
+		force_mapping: bool,
+	) -> Self
+	where
+		I: PrivateIdentity + Send + Sync + 'static,
+		P: PeerProvider + Send + Sync + 'static,
+	{
+		let (tx, rx) = watch::channel(Default::default());
+		tokio::spawn(worker(spawner, co, rx, identity, peer_provider));
+		Self { heads: tx, mapping, force_mapping }
+	}
+}
+#[async_trait]
+impl<M> ReducerChangedHandler<CoStorage, CoCoreResolver> for PushHeads<M>
+where
+	M: BlockStorageContentMapping + Send + Sync + 'static,
+{
+	async fn on_state_changed(&mut self, reducer: &Reducer<CoStorage, CoCoreResolver>) -> Result<(), anyhow::Error> {
+		let mut heads = reducer.heads().clone();
+
+		// map plain heads to encrypted heads
+		if self.mapping.is_some() {
+			heads = to_plain(&self.mapping, self.force_mapping, heads)
+				.await
+				.map_err(|err| anyhow!("Failed to map head: {}", err))?;
+		}
+
+		// send
+		self.heads.send_replace(heads);
+
+		// done
+		Ok(())
+	}
+}
+
+async fn worker<I, P>(
+	spawner: CoNetworkTaskSpawner,
+	co: CoId,
+	mut heads_watcher: watch::Receiver<BTreeSet<Cid>>,
+	identity: I,
+	peer_provider: P,
+) where
+	I: PrivateIdentity + Send + Sync + 'static,
+	P: PeerProvider + Send + Sync + 'static,
+{
+	let mut peers: BTreeSet<PeerId> = Default::default();
+	let peers_stream = peer_provider.peers().fuse();
+	pin_mut!(peers_stream);
+	loop {
+		// next
+		let heads = heads_watcher.borrow_and_update().clone();
+		let notify: Option<(BTreeSet<Cid>, BTreeSet<PeerId>)> = tokio::select! {
+			// wait for heads changed
+			changed = heads_watcher.changed() => {
+				// shutdown?
+				if changed.is_err() {
+					break;
+				}
+
+				// notify known peers about new heads
+				if !heads.is_empty() && !peers.is_empty() {
+					Some((heads.clone(), peers.clone()))
+				} else {
+					None
+				}
+			},
+
+			// wait for new peers
+			// TODO: remove peers when disconnect them?
+			mut peer = peers_stream.select_next_some() => {
+				let result = if !peer.is_empty() && !heads.is_empty() {
+					Some((heads.clone(), peer.clone()))
+				} else {
+					None
+				};
+
+				// update
+				peers.append(&mut peer);
+
+				// notify the new peer
+				result
+			},
+		};
+
+		// send
+		if let Some(send) = notify {
+			if spawner
+				.spawn(CoHeadsNetworkTask::new(CoHeadsRequest::Heads { co: co.clone(), heads: send.0, peers: send.1 }))
+				.is_err()
+			{
+				// exit loop when we can not spawn new tasks
+				break;
+			}
+		}
+	}
+}

@@ -20,7 +20,22 @@ use uuid::Uuid;
 #[derive(Debug, Clone)]
 pub enum Event {
 	/// Receviced new heads from some peer.
-	ReceivedHeads { co: CoId, heads: BTreeSet<Cid>, peer_id: Option<PeerId>, response: bool },
+	ReceivedHeads {
+		/// The CO ID.
+		co: CoId,
+
+		/// Received Heads.
+		heads: BTreeSet<Cid>,
+
+		/// Received from peer.
+		peer_id: Option<PeerId>,
+
+		/// Protocol requested a response.
+		/// Typically,
+		/// - false when received via co-heads (gossipsub).
+		/// - true when received via direct didcomm.
+		response: bool,
+	},
 	//
 	// /// Sent heads to an peer.
 	// SentHeads { co: CoId, heads: BTreeSet<Cid>, peer_id: PeerId },

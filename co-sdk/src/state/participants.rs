@@ -1,8 +1,8 @@
 use super::core_state_or_default;
-use crate::{state, CoStorage, CO_CORE_NAME_CO};
+use crate::{CoStorage, CO_CORE_NAME_CO};
 use co_core_co::{Co, Participant};
 use co_identity::{IdentityBox, IdentityResolver};
-use co_primitives::{Network, OptionLink};
+use co_primitives::OptionLink;
 use co_storage::StorageError;
 use futures::{stream, StreamExt, TryStreamExt};
 

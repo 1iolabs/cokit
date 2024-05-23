@@ -5,6 +5,7 @@ use co_primitives::OptionLink;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+/// Cloneable CoState token which will be updated by the reducer everytime it changes.
 #[derive(Debug, Clone, Default)]
 pub struct CoState {
 	state: Arc<RwLock<OptionLink<Co>>>,

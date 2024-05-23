@@ -1,7 +1,7 @@
 use super::identity::create_identity_resolver;
 use crate::{
 	drivers::network::{publish::CoHeadsPublish, CoNetworkTaskSpawner},
-	library::{co_peer_provider::CoPeerProvider, co_state::CoState},
+	library::{co_peer_provider::CoPeerProvider, co_state::CoState, push_heads::PushHeads},
 	state::find,
 	types::co_storage::CoBlockStorageContentMapping,
 	CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerBuilder, ReducerChangedHandler, Runtime, CO_CORE_NAME_CO,
@@ -112,7 +112,7 @@ impl SharedCoBuilder {
 		let log = Log::new(
 			self.membership.id.as_str().as_bytes().to_vec(),
 			create_identity_resolver(),
-			storage,
+			storage.clone(),
 			self.membership.heads.clone(),
 		);
 
@@ -123,9 +123,25 @@ impl SharedCoBuilder {
 			.build(runtime.runtime())
 			.await?;
 
-		// update co state token
-		if let Some(co_state) = co_state {
-			reducer.add_change_handler(Box::new(co_state));
+		// publish changes for every `NetworkCoHeads` setting
+		if let Some(network) = &self.network {
+			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
+			let peer_provider = CoPeerProvider::new(
+				network.clone(),
+				create_identity_resolver(),
+				identity.clone(),
+				storage.clone(),
+				co_state.clone().unwrap(),
+			);
+			let publish = PushHeads::new(
+				network.clone(),
+				self.membership.id.clone(),
+				identity.clone(),
+				peer_provider,
+				mapping.clone(),
+				true,
+			);
+			reducer.add_change_handler(Box::new(publish));
 		}
 
 		// publish changes for every `NetworkCoHeads` setting
@@ -133,6 +149,11 @@ impl SharedCoBuilder {
 			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
 			let publish = CoHeadsPublish::new(network, self.membership.id.clone(), mapping.clone(), true);
 			reducer.add_change_handler(Box::new(publish));
+		}
+
+		// update co state token
+		if let Some(co_state) = co_state {
+			reducer.add_change_handler(Box::new(co_state));
 		}
 
 		// mapping

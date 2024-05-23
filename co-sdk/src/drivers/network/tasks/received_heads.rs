@@ -6,7 +6,7 @@ use libp2p::{
 };
 
 /// Handle received heads from the network within the application.
-/// This structure essentially joins the received heads into the repective co reducer.
+/// This structure essentially joins the received heads into the respective co reducer.
 pub struct ReceivedHeadsNetworkTask<F> {
 	co_factory: F,
 }
