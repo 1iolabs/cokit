@@ -18,6 +18,7 @@ use libp2p::PeerId;
 use std::collections::BTreeSet;
 use tokio::sync::watch;
 
+///	Use PeerProvider to discover peers and send heads to them whenever a peer comes online or new heads are produced.
 pub struct PushHeads<M> {
 	heads: watch::Sender<BTreeSet<Cid>>,
 	mapping: Option<M>,
@@ -98,19 +99,18 @@ async fn worker<I, P>(
 			},
 
 			// wait for new peers
-			// TODO: remove peers when disconnect them?
-			mut peer = peers_stream.select_next_some() => {
-				let result = if !peer.is_empty() && !heads.is_empty() {
-					Some((heads.clone(), peer.clone()))
-				} else {
-					None
-				};
+			next_peers = peers_stream.select_next_some() => {
+				let added: BTreeSet<PeerId> = next_peers.difference(&peers).cloned().collect();
 
 				// update
-				peers.append(&mut peer);
+				peers = next_peers;
 
 				// notify the new peer
-				result
+				if !added.is_empty() && !heads.is_empty() {
+					Some((heads.clone(), added))
+				} else {
+					None
+				}
 			},
 		};
 

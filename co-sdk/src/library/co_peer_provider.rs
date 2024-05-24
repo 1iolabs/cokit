@@ -64,7 +64,7 @@ where
 			// yield
 			for await peer in peers {
 				match peer {
-					Ok(value) => yield BTreeSet::from_iter(std::iter::once(value)),
+					Ok(value) => yield value,
 					Err(_) => return
 				}
 			}

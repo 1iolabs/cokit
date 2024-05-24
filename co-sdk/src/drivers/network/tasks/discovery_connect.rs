@@ -14,12 +14,13 @@ use std::collections::BTreeSet;
 pub struct DiscoveryConnectNetworkTask {
 	discovery: BTreeSet<Discovery>,
 	connect_request: Option<u64>,
-	sender: UnboundedSender<Result<PeerId, DiscoveryError>>,
+	sender: UnboundedSender<Result<BTreeSet<PeerId>, DiscoveryError>>,
+	peers: BTreeSet<PeerId>,
 }
 impl DiscoveryConnectNetworkTask {
-	pub fn new(discovery: BTreeSet<Discovery>) -> (Self, UnboundedReceiver<Result<PeerId, DiscoveryError>>) {
+	pub fn new(discovery: BTreeSet<Discovery>) -> (Self, UnboundedReceiver<Result<BTreeSet<PeerId>, DiscoveryError>>) {
 		let (tx, rx) = futures::channel::mpsc::unbounded();
-		(Self { discovery, connect_request: None, sender: tx }, rx)
+		(Self { discovery, connect_request: None, sender: tx, peers: Default::default() }, rx)
 	}
 }
 impl<B, C> NetworkTask<B, C> for DiscoveryConnectNetworkTask
@@ -46,23 +47,30 @@ where
 		event: SwarmEvent<B::ToSwarm>,
 	) -> Option<SwarmEvent<B::ToSwarm>> {
 		// handle
-		match &event {
+		let send = match &event {
 			SwarmEvent::Behaviour(behaviour_event) => match C::discovery_event(behaviour_event) {
-				Some(discovery::Event::Connected { id, peer }) if Some(*id) == self.connect_request => {
-					match self.sender.unbounded_send(Ok(*peer)) {
-						Ok(_) => {},
-						Err(_) => {
-							self.sender.disconnect();
-						},
-					}
-				},
+				Some(discovery::Event::Connected { id, peer }) if Some(*id) == self.connect_request =>
+					self.peers.insert(*peer),
+				Some(discovery::Event::Disconnected { id, peer }) if Some(*id) == self.connect_request =>
+					self.peers.remove(peer),
 				Some(discovery::Event::Timeout { id }) if Some(*id) == self.connect_request => {
 					self.sender.unbounded_send(Err(DiscoveryError::Timeout)).ok();
 					self.sender.disconnect();
+					false
 				},
-				_ => {},
+				_ => false,
 			},
-			_ => {},
+			_ => false,
+		};
+
+		// send
+		if send {
+			match self.sender.unbounded_send(Ok(self.peers.clone())) {
+				Ok(_) => {},
+				Err(_) => {
+					self.sender.disconnect();
+				},
+			}
 		}
 
 		// forward
@@ -74,6 +82,8 @@ where
 	}
 }
 
+/// Discovery has failed.
+/// When receiving this error means the connect attempt (and its network task) has been stopped.
 #[derive(Debug, thiserror::Error)]
 pub enum DiscoveryError {
 	#[error("Discovery connect failed")]

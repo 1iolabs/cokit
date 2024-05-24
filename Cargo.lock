@@ -1414,6 +1414,7 @@ name = "co-network"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "async-trait",
  "asynchronous-codec 0.7.0",
  "co-identity",
