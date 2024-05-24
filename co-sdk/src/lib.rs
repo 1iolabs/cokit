@@ -12,7 +12,7 @@ pub use application::{
 	application::{Application, ApplicationBuilder},
 	core_resolver::{CoCoreResolver, CoreResolver, CoreResolverError, SingleCoreResolver},
 	local::LocalCoBuilder,
-	reducer::{Reducer, ReducerBuilder, ReducerChangedHandler},
+	reducer::{Reducer, ReducerBuilder, ReducerChangedContext, ReducerChangedHandler},
 	shared::CreateCo,
 };
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};

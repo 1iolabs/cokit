@@ -4,8 +4,8 @@ use crate::{
 	library::{co_peer_provider::CoPeerProvider, co_state::CoState, push_heads::PushHeads},
 	state::find,
 	types::co_storage::CoBlockStorageContentMapping,
-	CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerBuilder, ReducerChangedHandler, Runtime, CO_CORE_NAME_CO,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerBuilder, ReducerChangedContext, ReducerChangedHandler,
+	Runtime, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -311,7 +311,11 @@ impl<I> ReducerChangedHandler<CoStorage, CoCoreResolver> for MembershipWriter<I>
 where
 	I: PrivateIdentity + Debug + Send + Sync,
 {
-	async fn on_state_changed(&mut self, reducer: &Reducer<CoStorage, CoCoreResolver>) -> Result<(), anyhow::Error> {
+	async fn on_state_changed(
+		&mut self,
+		reducer: &Reducer<CoStorage, CoCoreResolver>,
+		_context: ReducerChangedContext,
+	) -> Result<(), anyhow::Error> {
 		if let Some(state) = reducer.state() {
 			let mapping = match &self.encrypted_storage {
 				Some(storage) => storage.flush_mapping().await?,

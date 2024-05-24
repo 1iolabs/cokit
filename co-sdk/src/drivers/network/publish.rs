@@ -2,7 +2,10 @@ use super::{
 	tasks::co_heads::{CoHeadsNetworkTask, CoHeadsRequest},
 	CoNetworkTaskSpawner,
 };
-use crate::{library::to_plain::to_plain, state, CoCoreResolver, CoStorage, Reducer, ReducerChangedHandler};
+use crate::{
+	library::to_plain::to_plain, state, CoCoreResolver, CoStorage, Reducer, ReducerChangedContext,
+	ReducerChangedHandler,
+};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_primitives::{CoId, Network, NetworkCoHeads};
@@ -54,7 +57,11 @@ where
 	M: BlockStorageContentMapping + Send + Sync + 'static,
 {
 	// TODO: skip publish when have only one peer?
-	async fn on_state_changed(&mut self, reducer: &Reducer<CoStorage, CoCoreResolver>) -> Result<(), anyhow::Error> {
+	async fn on_state_changed(
+		&mut self,
+		reducer: &Reducer<CoStorage, CoCoreResolver>,
+		_context: ReducerChangedContext,
+	) -> Result<(), anyhow::Error> {
 		let mut heads = reducer.heads().clone();
 
 		// map plain heads to encrypted heads

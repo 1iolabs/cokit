@@ -4,7 +4,7 @@ use crate::{
 		tasks::co_heads::{CoHeadsNetworkTask, CoHeadsRequest},
 		CoNetworkTaskSpawner,
 	},
-	CoCoreResolver, CoStorage, Reducer, ReducerChangedHandler,
+	CoCoreResolver, CoStorage, Reducer, ReducerChangedContext, ReducerChangedHandler,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -48,18 +48,25 @@ impl<M> ReducerChangedHandler<CoStorage, CoCoreResolver> for PushHeads<M>
 where
 	M: BlockStorageContentMapping + Send + Sync + 'static,
 {
-	async fn on_state_changed(&mut self, reducer: &Reducer<CoStorage, CoCoreResolver>) -> Result<(), anyhow::Error> {
-		let mut heads = reducer.heads().clone();
+	async fn on_state_changed(
+		&mut self,
+		reducer: &Reducer<CoStorage, CoCoreResolver>,
+		context: ReducerChangedContext,
+	) -> Result<(), anyhow::Error> {
+		// send local changes
+		if context.is_local() {
+			let mut heads = reducer.heads().clone();
 
-		// map plain heads to encrypted heads
-		if self.mapping.is_some() {
-			heads = to_plain(&self.mapping, self.force_mapping, heads)
-				.await
-				.map_err(|err| anyhow!("Failed to map head: {}", err))?;
+			// map plain heads to encrypted heads
+			if self.mapping.is_some() {
+				heads = to_plain(&self.mapping, self.force_mapping, heads)
+					.await
+					.map_err(|err| anyhow!("Failed to map head: {}", err))?;
+			}
+
+			// send
+			self.heads.send_replace(heads);
 		}
-
-		// send
-		self.heads.send_replace(heads);
 
 		// done
 		Ok(())

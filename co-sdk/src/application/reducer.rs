@@ -156,7 +156,7 @@ where
 		}
 
 		// notify
-		self.on_state_changed().await?;
+		self.on_state_changed(ReducerChangedCause::Initialize).await?;
 
 		// log
 		tracing::trace!(?self.state, ?self.heads, "reducer-initialized");
@@ -274,7 +274,7 @@ where
 		self.heads = self.log.heads_iter().cloned().collect();
 
 		// notify
-		self.on_state_changed().await?;
+		self.on_state_changed(ReducerChangedCause::Push).await?;
 
 		// result
 		Ok(())
@@ -296,7 +296,7 @@ where
 					self.heads = next_heads;
 
 					// notify
-					self.on_state_changed().await?;
+					self.on_state_changed(ReducerChangedCause::Log).await?;
 				}
 			}
 		}
@@ -304,17 +304,20 @@ where
 	}
 
 	/// Notify subscribers about change.
-	async fn on_state_changed(&mut self) -> Result<(), LogError> {
+	async fn on_state_changed(&mut self, cause: ReducerChangedCause) -> Result<(), LogError> {
+		let context = ReducerChangedContext { cause };
+
 		// handlers
 		let mut change_handlers = Vec::new();
 		change_handlers.append(&mut self.change_handlers);
 		{
 			let reducer: &Self = &self;
+			let context: &ReducerChangedContext = &context;
 			stream::iter(change_handlers.iter_mut())
 				.map(Ok)
 				.try_for_each_concurrent(5, |handler| async move {
 					handler
-						.on_state_changed(reducer)
+						.on_state_changed(reducer, context.clone())
 						.await
 						.with_context(|| format!("running ReducerChangeHandler"))
 				})
@@ -417,13 +420,51 @@ where
 /// Will be executed everytime the state in the reducer changes, including on initialize.
 #[async_trait]
 pub trait ReducerChangedHandler<S, R> {
-	async fn on_state_changed(&mut self, reducer: &Reducer<S, R>) -> Result<(), anyhow::Error>;
+	async fn on_state_changed(
+		&mut self,
+		reducer: &Reducer<S, R>,
+		context: ReducerChangedContext,
+	) -> Result<(), anyhow::Error>;
+}
+
+#[derive(Debug, Clone)]
+pub struct ReducerChangedContext {
+	cause: ReducerChangedCause,
+}
+impl ReducerChangedContext {
+	/// Whether this change was caused locally.
+	pub fn is_local(&self) -> bool {
+		self.cause.is_local()
+	}
+}
+
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+enum ReducerChangedCause {
+	/// Change caused by reducer initialization.
+	Initialize,
+	/// Change caused by an log operation.
+	Log,
+	/// Change caused by local push operation.
+	Push,
+}
+impl ReducerChangedCause {
+	/// Whether this change was caused locally.
+	pub fn is_local(&self) -> bool {
+		match self {
+			ReducerChangedCause::Push => true,
+			_ => false,
+		}
+	}
 }
 
 #[cfg(test)]
 mod tests {
 	use super::Reducer;
-	use crate::{application::reducer::ReducerBuilder, CoreResolver, ReducerChangedHandler, SingleCoreResolver};
+	use crate::{
+		application::reducer::ReducerBuilder, CoreResolver, ReducerChangedContext, ReducerChangedHandler,
+		SingleCoreResolver,
+	};
 	use async_trait::async_trait;
 	use co_identity::{IdentityResolverBox, LocalIdentityResolver};
 	use co_log::Log;
@@ -678,6 +719,7 @@ mod tests {
 			async fn on_state_changed(
 				&mut self,
 				_reducer: &Reducer<MemoryBlockStorage, SingleCoreResolver>,
+				_context: ReducerChangedContext,
 			) -> Result<(), anyhow::Error> {
 				panic!("expected no state change when join same heads");
 			}
