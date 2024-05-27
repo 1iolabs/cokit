@@ -1,6 +1,6 @@
 use super::didcomm::context::DidCommPublicContext;
 use crate::{DidCommPrivateContext, Identity};
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 /// Private identity representation.
 pub trait PrivateIdentity: Identity {
@@ -12,36 +12,43 @@ pub trait PrivateIdentity: Identity {
 }
 
 /// Dynamic Private Identity.
-pub type PrivateIdentityBox = Box<dyn PrivateIdentity + Send + Sync>;
-
+#[derive(Clone)]
+pub struct PrivateIdentityBox {
+	identity: Arc<dyn PrivateIdentity + Send + Sync + 'static>,
+}
+impl PrivateIdentityBox {
+	pub fn new<I: PrivateIdentity + Send + Sync + 'static>(identity: I) -> Self {
+		Self { identity: Arc::new(identity) }
+	}
+}
 impl Identity for PrivateIdentityBox {
 	fn identity(&self) -> &str {
-		self.as_ref().identity()
+		self.identity.identity()
 	}
 
 	fn public_key(&self) -> Option<Vec<u8>> {
-		self.as_ref().public_key()
+		self.identity.public_key()
 	}
 
 	fn verify(&self, signature: &[u8], data: &[u8], public_key: Option<&[u8]>) -> bool {
-		self.as_ref().verify(signature, data, public_key)
+		self.identity.verify(signature, data, public_key)
 	}
 
 	fn didcomm_public(&self) -> Option<DidCommPublicContext> {
-		self.as_ref().didcomm_public()
+		self.identity.didcomm_public()
 	}
 
 	fn networks(&self) -> std::collections::BTreeSet<co_primitives::Network> {
-		self.as_ref().networks()
+		self.identity.networks()
 	}
 }
 impl PrivateIdentity for PrivateIdentityBox {
 	fn sign(&self, data: &[u8]) -> Result<Vec<u8>, SignError> {
-		self.as_ref().sign(data)
+		self.identity.sign(data)
 	}
 
 	fn didcomm_private(&self) -> Option<DidCommPrivateContext> {
-		self.as_ref().didcomm_private()
+		self.identity.didcomm_private()
 	}
 }
 

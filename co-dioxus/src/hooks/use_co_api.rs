@@ -75,7 +75,7 @@ where
 	T: Serialize + Debug + Send + Sync + Clone + 'static,
 {
 	let private_identity: PrivateIdentityBox = match identitiy {
-		None => Box::new(application.local_identity()),
+		None => PrivateIdentityBox::new(application.local_identity()),
 		Some(value) => application.private_identity(&value.did).await?,
 	};
 	let reducer = application

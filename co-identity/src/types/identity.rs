@@ -1,6 +1,6 @@
 use crate::DidCommPublicContext;
 use co_primitives::Network;
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, sync::Arc};
 
 /// Identity representation.
 pub trait Identity {
@@ -21,25 +21,33 @@ pub trait Identity {
 }
 
 /// Dynamic Identity.
-pub type IdentityBox = Box<dyn Identity + Send + Sync>;
+#[derive(Clone)]
+pub struct IdentityBox {
+	identity: Arc<dyn Identity + Send + Sync + 'static>,
+}
+impl IdentityBox {
+	pub fn new<I: Identity + Send + Sync + 'static>(identity: I) -> Self {
+		Self { identity: Arc::new(identity) }
+	}
+}
 impl Identity for IdentityBox {
 	fn identity(&self) -> &str {
-		self.as_ref().identity()
+		self.identity.identity()
 	}
 
 	fn public_key(&self) -> Option<Vec<u8>> {
-		self.as_ref().public_key()
+		self.identity.public_key()
 	}
 
 	fn verify(&self, signature: &[u8], data: &[u8], public_key: Option<&[u8]>) -> bool {
-		self.as_ref().verify(signature, data, public_key)
+		self.identity.verify(signature, data, public_key)
 	}
 
 	fn didcomm_public(&self) -> Option<DidCommPublicContext> {
-		self.as_ref().didcomm_public()
+		self.identity.didcomm_public()
 	}
 
 	fn networks(&self) -> BTreeSet<co_primitives::Network> {
-		self.as_ref().networks()
+		self.identity.networks()
 	}
 }

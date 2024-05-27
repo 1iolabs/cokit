@@ -1,6 +1,6 @@
 use crate::{
-	DidCommPrivateContext, DidCommPublicContext, Identity, IdentityResolver, IdentityResolverError, PrivateIdentity,
-	PrivateIdentityBox, PrivateIdentityResolver,
+	DidCommPrivateContext, DidCommPublicContext, Identity, IdentityBox, IdentityResolver, IdentityResolverError,
+	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver,
 };
 use async_trait::async_trait;
 use co_primitives::Network;
@@ -62,12 +62,8 @@ impl LocalIdentityResolver {
 }
 #[async_trait]
 impl IdentityResolver for LocalIdentityResolver {
-	async fn resolve(
-		&self,
-		identity: &str,
-		_public_key: Option<&[u8]>,
-	) -> Result<Box<dyn Identity + Send + Sync>, IdentityResolverError> {
-		Ok(Box::new(Self::into_local_identity(identity)?))
+	async fn resolve(&self, identity: &str, _public_key: Option<&[u8]>) -> Result<IdentityBox, IdentityResolverError> {
+		Ok(IdentityBox::new(Self::into_local_identity(identity)?))
 	}
 }
 #[async_trait]
@@ -77,6 +73,6 @@ impl PrivateIdentityResolver for LocalIdentityResolver {
 		identity: &str,
 		_public_key: Option<&[u8]>,
 	) -> Result<PrivateIdentityBox, IdentityResolverError> {
-		Ok(Box::new(Self::into_local_identity(identity)?))
+		Ok(PrivateIdentityBox::new(Self::into_local_identity(identity)?))
 	}
 }

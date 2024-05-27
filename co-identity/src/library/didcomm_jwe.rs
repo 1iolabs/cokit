@@ -1,6 +1,7 @@
 use super::into_didcomm_rs_header::{from_didcomm_rs_header, into_didcomm_rs_header};
 use crate::{
-	types::didcomm::context::DidCommContext, DidCommHeader, DidKeyIdentity, IdentityResolver, ReceiveError, SignError,
+	types::didcomm::context::DidCommContext, DidCommHeader, DidKeyIdentity, Identity, IdentityResolver, ReceiveError,
+	SignError,
 };
 use co_primitives::Secret;
 use didcomm_rs::{

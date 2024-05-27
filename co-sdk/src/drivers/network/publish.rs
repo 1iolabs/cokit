@@ -12,7 +12,7 @@ use co_primitives::{CoId, Network, NetworkCoHeads};
 use co_storage::BlockStorageContentMapping;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Subscribe, Unsubscribe and Publisch to CoHeads protocol when a reducer changes.
+/// Subscribe, Unsubscribe and Publish to CoHeads protocol when a reducer changes.
 /// Subscriptions will be unsubscribed when dropped (also when the reduer is dropped).
 pub struct CoHeadsPublish<M> {
 	spawner: CoNetworkTaskSpawner,
