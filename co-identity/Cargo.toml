@@ -21,6 +21,7 @@ multibase = "0.9.1"
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
+serde_ipld_dagjson = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

@@ -1,5 +1,8 @@
 use super::did_discovery::DidDiscovery;
-use crate::{didcomm, types::layer_behaviour::LayerBehaviour, DidcommBehaviourProvider, GossipsubBehaviourProvider};
+use crate::{
+	didcomm, types::layer_behaviour::LayerBehaviour, DidDiscoveryMessage, DidcommBehaviourProvider,
+	GossipsubBehaviourProvider,
+};
 use anyhow::anyhow;
 use co_identity::{
 	DidCommContext, DidCommHeader, DidCommPrivateContext, Identity, IdentityResolver, PrivateIdentity,
@@ -472,19 +475,20 @@ where
 	/// Specifically:
 	/// - Handle responses (type=diddiscovery) to DID Discovery messages.
 	///
-	/// Todo:
-	/// - Messages are generally only signed?
-	/// - Validate did message sender / recevier?
+	/// TODO: Validate did message sender / recevier?
 	fn on_didcomm_event(&mut self, event: &didcomm::Event) {
 		match event {
-			didcomm::Event::Received { peer_id, message } =>
-				if &message.header().message_type == "diddiscovery" {
+			didcomm::Event::Received { peer_id, message } => {
+				let message_type: Option<DidDiscoveryMessage> =
+					DidDiscoveryMessage::try_from(message.header().message_type.clone()).ok();
+				if message_type == Some(DidDiscoveryMessage::Resolve) {
 					self.events.push_back(DiscoveryEvent::ReceivedDidComm {
 						peer_id: peer_id.clone(),
 						header: message.header().to_owned(),
 						body: message.body().to_owned(),
 					})
-				},
+				}
+			},
 			_ => {},
 			// didcomm::Event::Sent { peer_id, message } => todo!(),
 			// didcomm::Event::OutboundFailure { peer_id, error, message } => todo!(),
@@ -609,7 +613,8 @@ where
 				None
 			},
 			DiscoveryEvent::ReceivedDidComm { peer_id, header, body: _ } => {
-				if header.message_type == "diddiscovery" {
+				let message_type: Option<DidDiscoveryMessage> = DidDiscoveryMessage::from_str(&header.message_type);
+				if message_type == Some(DidDiscoveryMessage::Resolve) {
 					for request_id in self
 						.all_discovery_diddiscovery()
 						.filter(|(_, discovery)| header.thid.as_ref() == Some(&discovery.message_id))
@@ -691,6 +696,7 @@ pub trait DiscoveryBehaviour: NetworkBehaviour + GossipsubBehaviourProvider + Di
 	// fn kad_mut(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&kad::Event>;
 }
 
+/// Acccept DidDiscoveryMessage::Discover events and respond with DidDiscoveryMessage::Resolve.
 async fn did_discovery_receive<R: IdentityResolver>(
 	data: String,
 	request_from_peer: PeerId,
@@ -699,11 +705,13 @@ async fn did_discovery_receive<R: IdentityResolver>(
 ) -> Option<DiscoveryEvent> {
 	let result = didcomm_receive(&data, resolver, contexts.into_iter()).await;
 	if let Some((request_header, _, didcomm_private)) = result {
-		match did_discovery_resolve(&didcomm_private, request_from_peer, request_header) {
-			Ok(event) => return Some(event),
-			Err(err) => {
-				tracing::warn!(?err, "did-discovery-resolve-failed");
-			},
+		if DidDiscoveryMessage::from_str(&request_header.message_type) == Some(DidDiscoveryMessage::Discover) {
+			match did_discovery_resolve(&didcomm_private, request_from_peer, request_header) {
+				Ok(event) => return Some(event),
+				Err(err) => {
+					tracing::warn!(?err, "did-discovery-resolve-failed");
+				},
+			}
 		}
 	}
 	None
@@ -719,7 +727,7 @@ fn did_discovery_resolve(
 
 	// response
 	let mut response = DidCommHeader::new();
-	response.message_type = "diddiscovery".to_owned();
+	response.message_type = DidDiscoveryMessage::Resolve.to_string();
 	response.thid = Some(request.id);
 	response.from = Some(identity.did().to_owned());
 	response.to.insert(request_from.clone());
@@ -850,11 +858,11 @@ mod tests {
 	use crate::{
 		didcomm,
 		discovery::{did_discovery::DidDiscovery, discovery::Discovery, DiscoveryState, Event},
-		DidcommBehaviourProvider, GossipsubBehaviourProvider, Layer, LayerBehaviour,
+		DidDiscoveryMessage, DidcommBehaviourProvider, GossipsubBehaviourProvider, Layer, LayerBehaviour,
 	};
 	use co_identity::{
-		DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, MemoryPrivateIdentityResolver,
-		PrivateIdentityResolver,
+		DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentity,
+		PrivateIdentityBox, PrivateIdentityResolver,
 	};
 	use co_primitives::NetworkDidDiscovery;
 	use futures::{select, FutureExt, StreamExt};
@@ -873,7 +881,7 @@ mod tests {
 		gossipsub: gossipsub::Behaviour,
 	}
 	impl TestBehaviour {
-		pub fn new(keypair: Keypair) -> Self {
+		pub fn new(keypair: Keypair, identities: Vec<PrivateIdentityBox>) -> Self {
 			let gossipsub_config = gossipsub::ConfigBuilder::default()
 				.max_transmit_size(256 * 1024)
 				.build()
@@ -883,7 +891,7 @@ mod tests {
 					.expect("gossipsub");
 			let didcomm_behaviour = didcomm::Behaviour::new(
 				DidKeyIdentityResolver::new().boxed(),
-				MemoryPrivateIdentityResolver::default().boxed(),
+				MemoryPrivateIdentityResolver::from(identities).boxed(),
 				didcomm::Config { auto_dail: false },
 			);
 			TestBehaviour { didcomm: didcomm_behaviour, gossipsub: gossipsub_behaviour }
@@ -963,12 +971,12 @@ mod tests {
 		swarm: Swarm<TestBehaviour>,
 	}
 	impl Peer {
-		fn new() -> Self {
+		fn new(identities: Vec<PrivateIdentityBox>) -> Self {
 			let mut swarm = SwarmBuilder::with_new_identity()
 				.with_tokio()
 				.with_tcp(tcp::Config::default(), noise::Config::new, yamux::Config::default)
 				.unwrap()
-				.with_behaviour(|k| Ok(TestBehaviour::new(k.clone())))
+				.with_behaviour(|k| Ok(TestBehaviour::new(k.clone(), identities)))
 				.unwrap()
 				.with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(20)))
 				.build();
@@ -1010,8 +1018,8 @@ mod tests {
 		// 	.ok();
 
 		// peers
-		let mut peer1 = Peer::new();
-		let mut peer2 = Peer::new();
+		let mut peer1 = Peer::new(vec![]);
+		let mut peer2 = Peer::new(vec![]);
 
 		// states
 		let mut discovery1 = Layer::new(
@@ -1073,14 +1081,14 @@ mod tests {
 		// 	.try_init()
 		// 	.ok();
 
-		// peers
-		let mut peer1 = Peer::new();
-		let mut peer2 = Peer::new();
-		peer2.add_address(&peer1);
-
 		// identities
 		let did1 = DidKeyIdentity::generate(Some(&vec![1; 32]));
 		let did2 = DidKeyIdentity::generate(Some(&vec![2; 32]));
+
+		// peers
+		let mut peer1 = Peer::new(vec![did1.clone().boxed()]);
+		let mut peer2 = Peer::new(vec![did2.clone().boxed()]);
+		peer2.add_address(&peer1);
 
 		// states
 		let mut discovery1 = Layer::new(
@@ -1126,7 +1134,7 @@ mod tests {
 					&did2,
 					&did1,
 					NetworkDidDiscovery::default(),
-					"diddiscovery-resolve".to_owned(),
+					DidDiscoveryMessage::Discover.to_string(),
 				)
 				.unwrap()
 				.into()],

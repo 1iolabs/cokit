@@ -433,7 +433,7 @@ pub struct ReducerChangedContext {
 }
 impl ReducerChangedContext {
 	/// Whether this change was caused locally.
-	pub fn is_local(&self) -> bool {
+	pub fn is_local_change(&self) -> bool {
 		self.cause.is_local()
 	}
 }
@@ -443,7 +443,7 @@ impl ReducerChangedContext {
 enum ReducerChangedCause {
 	/// Change caused by reducer initialization.
 	Initialize,
-	/// Change caused by an log operation.
+	/// Change caused by an log operation (join).
 	Log,
 	/// Change caused by local push operation.
 	Push,

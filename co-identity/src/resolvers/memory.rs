@@ -32,6 +32,16 @@ pub struct MemoryPrivateIdentityResolver {
 	identites: Arc<Mutex<HashMap<Did, PrivateIdentityBox>>>,
 }
 impl MemoryPrivateIdentityResolver {
+	pub fn from(iter: impl IntoIterator<Item = PrivateIdentityBox>) -> Self {
+		Self {
+			identites: Arc::new(Mutex::new(
+				iter.into_iter()
+					.map(|identity| (identity.identity().to_owned(), identity))
+					.collect(),
+			)),
+		}
+	}
+
 	pub async fn insert(&self, identity: PrivateIdentityBox) {
 		self.identites.lock().await.insert(identity.identity().to_owned(), identity);
 	}

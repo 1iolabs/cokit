@@ -23,7 +23,7 @@ pub async fn didcomm_receive<R: IdentityResolver>(
 				)
 				.await;
 			},
-			Err(err) => return Err(ReceiveError::Decrypt(err.into())),
+			Err(err) => return Err(ReceiveError::UnknownFormat(err.into())),
 		};
 
 	// result
@@ -88,5 +88,15 @@ mod tests {
 				.unwrap();
 		assert_eq!("test", receviced_header.id);
 		assert_eq!("null", receviced_body);
+	}
+
+	#[test]
+	fn test_parse_didcomm_rs_message_without_to_field() {
+		// {"typ":"application/didcomm-plain+json","id":"a66d96f6-4a1f-45dc-842d-b0b9b6096cd5","type":"co-heads/1.0.0","
+		// from":null,"created_time":1716995635,"expires_time":1716995755,"body":{"h":["test",[{"/":"
+		// bafyr4ieq523r6dklo2ff2re6gabvx2377tgxluri4wzy5du4x6vadxp25e"}]]}}
+		let payload = "eyJ0eXAiOiJhcHBsaWNhdGlvbi9kaWRjb21tLXBsYWluK2pzb24iLCJpZCI6ImE2NmQ5NmY2LTRhMWYtNDVkYy04NDJkLWIwYjliNjA5NmNkNSIsInR5cGUiOiJjby1oZWFkcy8xLjAuMCIsImZyb20iOm51bGwsImNyZWF0ZWRfdGltZSI6MTcxNjk5NTYzNSwiZXhwaXJlc190aW1lIjoxNzE2OTk1NzU1LCJib2R5Ijp7ImgiOlsidGVzdCIsW3siLyI6ImJhZnlyNGllcTUyM3I2ZGtsbzJmZjJyZTZnYWJ2eDIzNzd0Z3hsdXJpNHd6eTVkdTR4NnZhZHhwMjVlIn1dXX19";
+		let data = multibase::Base::Base64Url.decode(payload).unwrap();
+		serde_json::from_slice::<didcomm_rs::Message>(&data).unwrap();
 	}
 }

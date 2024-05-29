@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use co_identity::{DidCommHeader, PrivateIdentity};
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::value::RawValue;
 
 /// DIDComm Message
@@ -11,7 +11,7 @@ pub struct EncodedMessage(pub Vec<u8>);
 impl EncodedMessage {
 	/// Create plaintext JSON message.
 	pub fn create_plain_json<T: Serialize>(header: DidCommHeader, body: &T) -> Result<Self, anyhow::Error> {
-		Ok(Self(serde_json::to_vec(&DidCommMessage { header, body })?))
+		Ok(Self(serde_ipld_dagjson::to_vec(&DidCommMessage { header, body })?))
 	}
 
 	/// Create signed JSON message.
@@ -21,7 +21,8 @@ impl EncodedMessage {
 		P: PrivateIdentity + Send + Sync + 'static,
 	{
 		let context = identity.didcomm_private().ok_or(anyhow!("No didcomm context"))?;
-		let jws = context.jws(header, &serde_json::to_string(body)?)?;
+		let body_json = serde_ipld_dagjson::to_vec(body)?;
+		let jws = context.jws(header, std::str::from_utf8(&body_json)?)?;
 		Ok(Self(jws.into_bytes()))
 	}
 
@@ -30,8 +31,48 @@ impl EncodedMessage {
 	where
 		P: PrivateIdentity + Send + Sync + 'static,
 	{
-		let message: DidCommMessage<&RawValue> = serde_json::from_slice(&self.0)?;
+		let message: DidCommMessage<&RawValue> = serde_ipld_dagjson::from_slice(&self.0)?;
 		Self::create_signed_json(identity, message.header, &message.body)
+	}
+
+	/// Get message as JSON string. Returning None if not JSON Object.
+	///
+	/// Note: No verification will be done.
+	pub fn json(&self) -> Option<&str> {
+		let data = &self.0;
+		if !data.is_empty() && data[0] == '{' as u8 {
+			match std::str::from_utf8(&data) {
+				Ok(str) => Some(str),
+				Err(_) => None,
+			}
+		} else {
+			None
+		}
+	}
+
+	/// Get message as CBOR. Returning None if not CBOR Map.
+	///
+	/// Note: No verification will be done.
+	/// See: https://www.rfc-editor.org/rfc/rfc8949.html#section-3.1
+	pub fn cbor(&self) -> Option<&[u8]> {
+		let data = &self.0;
+		// check first 3 bytes are 101 = 5
+		if !data.is_empty() && (data[0] & 7u8 << 5) == (5u8 << 5) {
+			Some(data)
+		} else {
+			None
+		}
+	}
+
+	/// Try to deserialize message to T.
+	pub fn deserialize<T: DeserializeOwned>(&self) -> Result<T, anyhow::Error> {
+		if let Some(data) = self.json() {
+			return Ok(serde_ipld_dagjson::from_slice(data.as_bytes())?)
+		}
+		if let Some(data) = self.cbor() {
+			return Ok(serde_ipld_dagcbor::from_slice(data)?)
+		}
+		return Err(anyhow!("unknown format"));
 	}
 }
 impl From<Vec<u8>> for EncodedMessage {
@@ -57,34 +98,6 @@ impl Into<Vec<u8>> for EncodedMessage {
 impl AsRef<[u8]> for EncodedMessage {
 	fn as_ref(&self) -> &[u8] {
 		&self.0
-	}
-}
-impl EncodedMessage {
-	/// Get message as JSON string. Returning None if not JSON Object.
-	///
-	/// Note: No verification will be done.
-	pub fn json(&self) -> Option<&str> {
-		let data = &self.0;
-		if !data.is_empty() && data[0] == '{' as u8 {
-			match std::str::from_utf8(&data) {
-				Ok(str) => Some(str),
-				Err(_) => None,
-			}
-		} else {
-			None
-		}
-	}
-
-	/// Get message as CBOR. Returning None if not CBOR Map.
-	///
-	/// Note: No verification will be done.
-	pub fn cbor(&self) -> Option<&[u8]> {
-		let data = &self.0;
-		if !data.is_empty() && data[0] == 5 {
-			Some(data)
-		} else {
-			None
-		}
 	}
 }
 

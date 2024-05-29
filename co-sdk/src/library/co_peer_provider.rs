@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use co_identity::{IdentityResolverBox, PrivateIdentity};
 use co_network::{
 	discovery::{self, Discovery},
-	PeerProvider,
+	DidDiscoveryMessage, PeerProvider,
 };
 use co_primitives::{Network, OptionLink};
 use futures::Stream;
@@ -97,8 +97,13 @@ where
 		.flat_map(|participant| {
 			identity.networks().into_iter().filter_map(move |network| match network {
 				Network::DidDiscovery(value) => Some(Discovery::DidDiscovery(
-					discovery::DidDiscovery::create(identity, &participant, value, "diddiscovery-resolve".to_owned())
-						.ok()?,
+					discovery::DidDiscovery::create(
+						identity,
+						&participant,
+						value,
+						DidDiscoveryMessage::Discover.to_string(),
+					)
+					.ok()?,
 				)),
 				Network::Rendezvous(value) => Some(Discovery::Rendezvous(value)),
 				Network::Peer(value) => Some(Discovery::Peer(value)),

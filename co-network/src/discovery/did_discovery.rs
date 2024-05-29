@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use co_identity::{DidCommHeader, Identity, PrivateIdentity};
 use co_primitives::{Did, NetworkDidDiscovery};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use uuid::Uuid;
 
@@ -39,5 +40,40 @@ impl DidDiscovery {
 			.ok_or(anyhow!("unsupported identity: to: no public didcomm context"))?;
 		let message = from_context.jwe(&to_context, header, "null")?;
 		Ok(DidDiscovery { message_id: id, did: to.identity().to_owned(), network, message })
+	}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DidDiscoveryMessage {
+	/// Message type for a did discovery request.
+	#[serde(rename = "diddiscovery")]
+	Discover,
+
+	/// Response message type to an did discovery request.
+	#[serde(rename = "diddiscovery-resolve")]
+	Resolve,
+}
+impl DidDiscoveryMessage {
+	pub fn from_str(value: &str) -> Option<Self> {
+		Self::try_from(value.to_owned()).ok()
+	}
+}
+impl std::fmt::Display for DidDiscoveryMessage {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(
+			f,
+			"{}",
+			serde_json::to_value(self)
+				.expect("DidDiscoveryMessage to serialize")
+				.as_str()
+				.expect("DidDiscoveryMessage to serialize to string")
+		)
+	}
+}
+impl TryFrom<String> for DidDiscoveryMessage {
+	type Error = serde_json::error::Error;
+
+	fn try_from(value: String) -> Result<Self, Self::Error> {
+		serde_json::from_value(serde_json::Value::String(value))
 	}
 }
