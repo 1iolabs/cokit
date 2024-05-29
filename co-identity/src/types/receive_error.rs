@@ -15,5 +15,7 @@ pub enum ReceiveError {
 	#[error("Resolve DID failed: {0}")]
 	ResolveDidFailed(Did, #[source] anyhow::Error),
 	#[error("Bad DID: {0}")]
-	BadDid(Did),
+	BadDid(Did, #[source] anyhow::Error),
+	#[error("No recipent")]
+	NoRecipent,
 }

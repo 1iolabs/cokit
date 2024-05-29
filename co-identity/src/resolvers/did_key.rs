@@ -189,15 +189,10 @@ impl DidKeyIdentityResolver {
 }
 #[async_trait]
 impl IdentityResolver for DidKeyIdentityResolver {
-	async fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<IdentityBox, IdentityResolverError> {
+	async fn resolve(&self, identity: &str) -> Result<IdentityBox, IdentityResolverError> {
 		if identity.starts_with("did:key:") {
 			if let Ok(did_key_identity) = DidKeyIdentity::try_from(identity) {
-				if match (public_key, did_key_identity.public_key()) {
-					(Some(a), Some(b)) => a == b,
-					_ => true,
-				} {
-					return Ok(IdentityBox::new(did_key_identity));
-				}
+				return Ok(IdentityBox::new(did_key_identity));
 			}
 		}
 		Err(IdentityResolverError::NotFound)

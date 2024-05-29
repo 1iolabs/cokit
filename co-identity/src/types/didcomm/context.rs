@@ -111,7 +111,7 @@ impl DidCommPrivateContext {
 		resolver: &R,
 		incoming: &str,
 	) -> Result<(DidCommHeader, String), ReceiveError> {
-		didcomm_receive(self.key_agreement_private_key.clone(), resolver, incoming).await
+		didcomm_receive(Some(self.key_agreement_private_key.clone()), resolver, incoming).await
 	}
 }
 impl DidCommContext for DidCommPrivateContext {

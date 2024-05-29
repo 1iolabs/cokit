@@ -3,13 +3,14 @@ use super::{
 	shared::{CreateCo, SharedCoBuilder, SharedCoCreator},
 };
 use crate::{
-	drivers::network::tasks::received_heads::ReceivedHeadsNetworkTask, library::find_membership::find_membership,
+	drivers::network::tasks::received_heads::ReceivedHeadsNetworkTask,
+	identity::co_private_identity_resolver::CoPrivateIdentityResolver, library::find_membership::find_membership,
 	local_keypair_fetch, types::co_storage::CoBlockStorageContentMapping, CoReducer, CoReducerFactory, CoStorage,
 	LocalCoBuilder, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_identity::{LocalIdentity, LocalIdentityResolver, PrivateIdentityBox};
+use co_identity::{LocalIdentity, LocalIdentityResolver, PrivateIdentityBox, PrivateIdentityResolver};
 use co_log::EntryBlock;
 use co_primitives::CoId;
 use co_runtime::RuntimePool;
@@ -122,7 +123,12 @@ impl Application {
 		let network_key = local_keypair_fetch(&self.identifier, &local_co, &local_identity, force_new_peer_id)
 			.await
 			.expect("peer-id");
-		self.network = Some(Network::new(network_key, self.storage(), create_identity_resolver()));
+		self.network = Some(Network::new(
+			network_key,
+			self.storage(),
+			create_identity_resolver(),
+			CoPrivateIdentityResolver::new(self.clone()).boxed(),
+		));
 
 		// clear reducers to rebuild them with network support after this
 		// we only keep local as this has no network

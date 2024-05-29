@@ -2,7 +2,8 @@ use super::did_discovery::DidDiscovery;
 use crate::{didcomm, types::layer_behaviour::LayerBehaviour, DidcommBehaviourProvider, GossipsubBehaviourProvider};
 use anyhow::anyhow;
 use co_identity::{
-	DidCommContext, DidCommHeader, DidCommPrivateContext, IdentityResolver, PrivateIdentity, PrivateIdentityBox,
+	DidCommContext, DidCommHeader, DidCommPrivateContext, Identity, IdentityResolver, PrivateIdentity,
+	PrivateIdentityBox,
 };
 use co_primitives::{Did, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous};
 use derive_more::From;
@@ -214,7 +215,7 @@ where
 		self.did_subscriptions
 			.entry(topic.hash())
 			.or_insert(Default::default())
-			.push(DidDiscoverySubscription { identity: Box::new(identity), network: network.clone() });
+			.push(DidDiscoverySubscription { identity: PrivateIdentityBox::new(identity), network: network.clone() });
 
 		// subscribe
 		let subscriptions_count = self.did_subscriptions.get(&topic.hash()).map(|v| v.len()).unwrap_or(0);
@@ -477,17 +478,12 @@ where
 	fn on_didcomm_event(&mut self, event: &didcomm::Event) {
 		match event {
 			didcomm::Event::Received { peer_id, message } =>
-				if let Some(message) = message.json() {
-					let contexts = self
-						.did_subscriptions
-						.iter()
-						.flat_map(|(_, subscriptions)| {
-							subscriptions.iter().filter_map(|s| s.identity.didcomm_private())
-						})
-						.collect();
-					self.future_events.push(
-						didcomm_receive_event(*peer_id, message.to_owned(), self.resolver.clone(), contexts).boxed(),
-					);
+				if &message.header().message_type == "diddiscovery" {
+					self.events.push_back(DiscoveryEvent::ReceivedDidComm {
+						peer_id: peer_id.clone(),
+						header: message.header().to_owned(),
+						body: message.body().to_owned(),
+					})
 				},
 			_ => {},
 			// didcomm::Event::Sent { peer_id, message } => todo!(),
@@ -695,20 +691,6 @@ pub trait DiscoveryBehaviour: NetworkBehaviour + GossipsubBehaviourProvider + Di
 	// fn kad_mut(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&kad::Event>;
 }
 
-async fn didcomm_receive_event<R: IdentityResolver>(
-	peer_id: PeerId,
-	data: String,
-	resolver: R,
-	contexts: Vec<DidCommPrivateContext>,
-) -> Option<DiscoveryEvent> {
-	let result = didcomm_receive(&data, resolver, contexts.into_iter()).await;
-	if let Some((header, body, _didcomm_private)) = result {
-		Some(DiscoveryEvent::ReceivedDidComm { peer_id, header, body })
-	} else {
-		None
-	}
-}
-
 async fn did_discovery_receive<R: IdentityResolver>(
 	data: String,
 	request_from_peer: PeerId,
@@ -870,7 +852,10 @@ mod tests {
 		discovery::{did_discovery::DidDiscovery, discovery::Discovery, DiscoveryState, Event},
 		DidcommBehaviourProvider, GossipsubBehaviourProvider, Layer, LayerBehaviour,
 	};
-	use co_identity::{DidKeyIdentity, DidKeyIdentityResolver};
+	use co_identity::{
+		DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, MemoryPrivateIdentityResolver,
+		PrivateIdentityResolver,
+	};
 	use co_primitives::NetworkDidDiscovery;
 	use futures::{select, FutureExt, StreamExt};
 	use libp2p::{
@@ -896,7 +881,11 @@ mod tests {
 			let gossipsub_behaviour =
 				gossipsub::Behaviour::new(gossipsub::MessageAuthenticity::Signed(keypair), gossipsub_config)
 					.expect("gossipsub");
-			let didcomm_behaviour = didcomm::Behaviour::new(didcomm::Config { auto_dail: false });
+			let didcomm_behaviour = didcomm::Behaviour::new(
+				DidKeyIdentityResolver::new().boxed(),
+				MemoryPrivateIdentityResolver::default().boxed(),
+				didcomm::Config { auto_dail: false },
+			);
 			TestBehaviour { didcomm: didcomm_behaviour, gossipsub: gossipsub_behaviour }
 		}
 	}

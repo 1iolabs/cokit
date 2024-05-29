@@ -16,10 +16,7 @@ where
 	}
 
 	// verify signature
-	let identity = log
-		.identity_resolver()
-		.resolve(&entry.signed_entry().identity, entry.signed_entry().public_key.as_ref().map(|v| v.as_slice()))
-		.await?;
+	let identity = log.identity_resolver().resolve(&entry.signed_entry().identity).await?;
 	if !entry.verify(&identity)? {
 		// log
 		tracing::info!(

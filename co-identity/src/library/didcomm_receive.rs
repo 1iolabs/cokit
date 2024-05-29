@@ -4,20 +4,27 @@ use co_primitives::Secret;
 use didcomm_rs::Message;
 
 pub async fn didcomm_receive<R: IdentityResolver>(
-	to_key_agreement_private_key: Secret,
+	to_key_agreement_private_key: Option<Secret>,
 	resolver: &R,
 	incoming: &str,
 ) -> Result<(DidCommHeader, String), ReceiveError> {
 	// try receive
-	let message = match Message::receive(incoming, Some(to_key_agreement_private_key.divulge()), None, None) {
-		Ok(message) => message,
-		Err(didcomm_rs::Error::DidResolveFailed) => {
-			// when the message is encrypted we need to resolve the encryptor did so we just forwad this to the special
-			// method
-			return didcomm_jwe_receive(to_key_agreement_private_key, resolver, incoming).await;
-		},
-		Err(err) => return Err(ReceiveError::Decrypt(err.into())),
-	};
+	let message =
+		match Message::receive(incoming, to_key_agreement_private_key.as_ref().map(|key| key.divulge()), None, None) {
+			Ok(message) => message,
+			Err(didcomm_rs::Error::DidResolveFailed) => {
+				// when the message is encrypted we need to resolve the encryptor did so we just forwad this to the
+				// special method
+				return didcomm_jwe_receive(
+					to_key_agreement_private_key
+						.ok_or(ReceiveError::InvalidArgument(anyhow::anyhow!("No private key")))?,
+					resolver,
+					incoming,
+				)
+				.await;
+			},
+			Err(err) => return Err(ReceiveError::Decrypt(err.into())),
+		};
 
 	// result
 	Ok((
@@ -51,7 +58,7 @@ mod tests {
 
 		// receive
 		let (receviced_header, receviced_body) =
-			didcomm_receive(to.private_key_bytes(), &DidKeyIdentityResolver::new(), &message)
+			didcomm_receive(Some(to.private_key_bytes()), &DidKeyIdentityResolver::new(), &message)
 				.await
 				.unwrap();
 		assert_eq!("test", receviced_header.id);
@@ -76,7 +83,7 @@ mod tests {
 
 		// receive
 		let (receviced_header, receviced_body) =
-			didcomm_receive(to.private_key_bytes(), &DidKeyIdentityResolver::new(), &message)
+			didcomm_receive(Some(to.private_key_bytes()), &DidKeyIdentityResolver::new(), &message)
 				.await
 				.unwrap();
 		assert_eq!("test", receviced_header.id);

@@ -4,7 +4,7 @@ use crate::{
 	HeadsLayerBehaviourProvider, Layer, LayerBehaviour, NetworkError, NetworkTaskBox, NetworkTaskSpawner,
 };
 use anyhow::anyhow;
-use co_identity::{IdentityResolver, IdentityResolverBox};
+use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver, PrivateIdentityResolverBox};
 use co_storage::BlockStorage;
 use futures::{channel::oneshot, StreamExt};
 use libipld::DefaultParams;
@@ -31,11 +31,19 @@ pub struct Libp2pNetwork {
 	events: EventsSubject<NetworkEvent>,
 }
 impl Libp2pNetwork {
-	pub fn new<S, R>(config: Libp2pNetworkConfig, storage: S, resolver: R) -> anyhow::Result<Libp2pNetwork>
+	pub fn new<S, R, P>(
+		config: Libp2pNetworkConfig,
+		storage: S,
+		resolver: R,
+		private_resolver: P,
+	) -> anyhow::Result<Libp2pNetwork>
 	where
 		S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + 'static,
 		R: IdentityResolver + Clone + Send + Sync + 'static,
+		P: PrivateIdentityResolver + Clone + Send + Sync + 'static,
 	{
+		let resolver = IdentityResolverBox::new(resolver);
+		let private_resolver = PrivateIdentityResolverBox::new(private_resolver);
 		let local_peer_id = PeerId::from(config.keypair.public().clone());
 		let kademlia_config: KademliaConfig = Default::default();
 		let gossipsub_config = gossipsub::ConfigBuilder::default()
@@ -62,7 +70,7 @@ impl Libp2pNetwork {
 				gossipsub_config,
 			)
 			.map_err(|err| anyhow!("gossip failed: {}", err))?,
-			didcomm: didcomm::Behaviour::new(didcomm::Config { auto_dail: false }),
+			didcomm: didcomm::Behaviour::new(resolver.clone(), private_resolver, didcomm::Config { auto_dail: false }),
 		};
 
 		// kad
@@ -83,11 +91,7 @@ impl Libp2pNetwork {
 
 		// context
 		let context = Context {
-			discovery: discovery::DiscoveryState::new(
-				IdentityResolverBox::new(resolver),
-				Duration::from_secs(30),
-				None,
-			),
+			discovery: discovery::DiscoveryState::new(resolver.clone(), Duration::from_secs(30), None),
 			heads: heads::HeadsState::new(),
 		};
 

@@ -1,4 +1,4 @@
-use super::{codec, message::Message};
+use super::{codec, message::EncodedMessage};
 use futures::{future::BoxFuture, AsyncWriteExt, FutureExt};
 use libp2p::{core::UpgradeInfo, InboundUpgrade, OutboundUpgrade, Stream};
 use std::iter;
@@ -8,7 +8,7 @@ pub const PROTOCOL_NAME: &'static str = "/didcomm/2";
 #[derive(Debug, Clone)]
 pub struct MessageProtocol {
 	codec: codec::Codec,
-	message: Option<Message>,
+	message: Option<EncodedMessage>,
 }
 
 impl MessageProtocol {
@@ -16,11 +16,11 @@ impl MessageProtocol {
 		MessageProtocol { codec: codec::Codec::default(), message: None }
 	}
 
-	pub fn outbound(message: Message) -> Self {
+	pub fn outbound(message: EncodedMessage) -> Self {
 		MessageProtocol { codec: codec::Codec::default(), message: Some(message) }
 	}
 
-	pub fn into_message(self) -> Option<Message> {
+	pub fn into_message(self) -> Option<EncodedMessage> {
 		return self.message
 	}
 }
@@ -35,7 +35,7 @@ impl UpgradeInfo for MessageProtocol {
 }
 
 impl InboundUpgrade<Stream> for MessageProtocol {
-	type Output = Message;
+	type Output = EncodedMessage;
 	type Error = codec::Error;
 	type Future = BoxFuture<'static, Result<Self::Output, Self::Error>>;
 
@@ -56,7 +56,7 @@ impl InboundUpgrade<Stream> for MessageProtocol {
 }
 
 impl OutboundUpgrade<Stream> for MessageProtocol {
-	type Output = Option<Message>;
+	type Output = Option<EncodedMessage>;
 	type Error = codec::Error;
 	type Future = BoxFuture<'static, Result<Self::Output, Self::Error>>;
 

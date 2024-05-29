@@ -1,6 +1,6 @@
 use crate::DidCommPublicContext;
 use co_primitives::Network;
-use std::{collections::BTreeSet, sync::Arc};
+use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
 
 /// Identity representation.
 pub trait Identity {
@@ -18,6 +18,13 @@ pub trait Identity {
 
 	/// Get Networks where we can (possibly) reach the identity.
 	fn networks(&self) -> BTreeSet<Network>;
+
+	fn boxed(self) -> IdentityBox
+	where
+		Self: Sized + Clone + Send + Sync + 'static,
+	{
+		IdentityBox::new(self)
+	}
 }
 
 /// Dynamic Identity.
@@ -28,6 +35,11 @@ pub struct IdentityBox {
 impl IdentityBox {
 	pub fn new<I: Identity + Send + Sync + 'static>(identity: I) -> Self {
 		Self { identity: Arc::new(identity) }
+	}
+}
+impl Debug for IdentityBox {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Identity").field("did", &self.identity.identity()).finish()
 	}
 }
 impl Identity for IdentityBox {

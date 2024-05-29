@@ -19,7 +19,7 @@ pub async fn participant_identities<R: IdentityResolver + Send + Sync + 'static>
 	co_state: OptionLink<Co>,
 ) -> Result<Vec<IdentityBox>, anyhow::Error> {
 	Ok(stream::iter(participants(storage, co_state).await?)
-		.then(|participant| async move { identity_resolver.resolve(&participant.did, None).await })
+		.then(|participant| async move { identity_resolver.resolve(&participant.did).await })
 		.try_collect()
 		.await?)
 }

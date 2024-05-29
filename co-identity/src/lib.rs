@@ -6,13 +6,14 @@ pub use resolvers::{
 	did_key::{DidKeyIdentity, DidKeyIdentityResolver},
 	join::{JoinIdentityResolver, JoinPrivateIdentityResolver},
 	local::{LocalIdentity, LocalIdentityResolver},
+	memory::{MemoryIdentityResolver, MemoryPrivateIdentityResolver},
 };
 pub use types::{
 	did_core::{Jwk, VerificationMethod, VerificationMethodTypes},
 	didcomm::{
 		context::{DidCommContext, DidCommPrivateContext, DidCommPublicContext},
 		header::DidCommHeader,
-		message::{Message, MetadataMessage},
+		message::Message,
 	},
 	identity::{Identity, IdentityBox},
 	private_identity::{PrivateIdentity, PrivateIdentityBox, SignError},

@@ -9,6 +9,13 @@ pub trait PrivateIdentity: Identity {
 
 	/// Private DIDComm context.
 	fn didcomm_private(&self) -> Option<DidCommPrivateContext>;
+
+	fn boxed(self) -> PrivateIdentityBox
+	where
+		Self: Sized + Clone + Send + Sync + 'static,
+	{
+		PrivateIdentityBox::new(self)
+	}
 }
 
 /// Dynamic Private Identity.
@@ -19,6 +26,13 @@ pub struct PrivateIdentityBox {
 impl PrivateIdentityBox {
 	pub fn new<I: PrivateIdentity + Send + Sync + 'static>(identity: I) -> Self {
 		Self { identity: Arc::new(identity) }
+	}
+}
+impl Debug for PrivateIdentityBox {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("PrivateIdentity")
+			.field("did", &self.identity.identity())
+			.finish()
 	}
 }
 impl Identity for PrivateIdentityBox {

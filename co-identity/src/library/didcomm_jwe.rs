@@ -3,6 +3,7 @@ use crate::{
 	types::didcomm::context::DidCommContext, DidCommHeader, DidKeyIdentity, Identity, IdentityResolver, ReceiveError,
 	SignError,
 };
+use anyhow::anyhow;
 use co_primitives::Secret;
 use didcomm_rs::{
 	crypto::{CryptoAlgorithm, SignatureAlgorithm},
@@ -55,13 +56,13 @@ pub async fn didcomm_jwe_receive<R: IdentityResolver>(
 
 	// resolve
 	let skid_identity = resolver
-		.resolve(&skid, None)
+		.resolve(&skid)
 		.await
 		.map_err(|err| ReceiveError::ResolveDidFailed(skid.clone(), err.into()))?;
 	let skid_context = match skid_identity.didcomm_public() {
 		Some(c) => c,
 		None => {
-			return Err(ReceiveError::BadDid(skid.clone()));
+			return Err(ReceiveError::BadDid(skid.clone(), anyhow!("No didcomm context")));
 		},
 	};
 

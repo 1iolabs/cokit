@@ -35,7 +35,7 @@ impl<M> PushHeads<M> {
 		force_mapping: bool,
 	) -> Self
 	where
-		I: PrivateIdentity + Send + Sync + 'static,
+		I: PrivateIdentity + Clone + Send + Sync + 'static,
 		P: PeerProvider + Send + Sync + 'static,
 	{
 		let (tx, rx) = watch::channel(Default::default());
@@ -80,9 +80,10 @@ async fn worker<I, P>(
 	identity: I,
 	peer_provider: P,
 ) where
-	I: PrivateIdentity + Send + Sync + 'static,
+	I: PrivateIdentity + Clone + Send + Sync + 'static,
 	P: PeerProvider + Send + Sync + 'static,
 {
+	let identity = PrivateIdentity::boxed(identity);
 	let mut peers: BTreeSet<PeerId> = Default::default();
 	let peers_stream = peer_provider.peers().fuse();
 	pin_mut!(peers_stream);
@@ -124,7 +125,12 @@ async fn worker<I, P>(
 		// send
 		if let Some(send) = notify {
 			if spawner
-				.spawn(CoHeadsNetworkTask::new(CoHeadsRequest::Heads { co: co.clone(), heads: send.0, peers: send.1 }))
+				.spawn(CoHeadsNetworkTask::new(CoHeadsRequest::Heads {
+					co: co.clone(),
+					heads: send.0,
+					peers: send.1,
+					identity: identity.clone(),
+				}))
 				.is_err()
 			{
 				// exit loop when we can not spawn new tasks

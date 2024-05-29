@@ -2,7 +2,7 @@ pub mod publish;
 pub mod tasks;
 
 use self::tasks::did_discovery::{DidDiscoverySubscribe, DidDiscoveryUnsubscribe};
-use co_identity::{IdentityResolver, PrivateIdentity};
+use co_identity::{IdentityResolver, PrivateIdentity, PrivateIdentityResolver};
 use co_network::{Behaviour, Context, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner};
 use co_storage::BlockStorage;
 use futures::{stream, StreamExt, TryStreamExt};
@@ -24,14 +24,16 @@ impl Network {
 	///
 	/// Panics:
 	/// - Can not create the network.
-	pub fn new<S, R>(network_key: Keypair, storage: S, resolver: R) -> Self
+	pub fn new<S, I, P>(network_key: Keypair, storage: S, resolver: I, private_resolver: P) -> Self
 	where
 		S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + 'static,
-		R: IdentityResolver + Clone + Send + Sync + 'static,
+		I: IdentityResolver + Clone + Send + Sync + 'static,
+		P: PrivateIdentityResolver + Clone + Send + Sync + 'static,
 	{
 		let network_peer_id = PeerId::from(network_key.public());
 		let network_config = Libp2pNetworkConfig::from_keypair(network_key.clone());
-		let network: Libp2pNetwork = Libp2pNetwork::new(network_config, storage, resolver).expect("network");
+		let network: Libp2pNetwork =
+			Libp2pNetwork::new(network_config, storage, resolver, private_resolver).expect("network");
 		tracing::info!(peer_id = ?network_peer_id, "network");
 		Self { spawner: network.spawner(), network: Arc::new(Mutex::new(Some(network))) }
 	}

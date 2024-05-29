@@ -2,7 +2,7 @@ use crate::{
 	didcomm, heads::heads_message::HeadsMessage, types::layer_behaviour::LayerBehaviour, DidcommBehaviourProvider,
 	GossipsubBehaviourProvider,
 };
-use co_identity::{DidCommHeader, Message};
+use co_identity::PrivateIdentity;
 use co_primitives::{CoId, NetworkCoHeads};
 use libipld::Cid;
 use libp2p::{
@@ -13,9 +13,7 @@ use libp2p::{
 use std::{
 	collections::{BTreeMap, BTreeSet, VecDeque},
 	task::{Context, Poll},
-	time::{SystemTime, UNIX_EPOCH},
 };
-use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub enum Event {
@@ -123,32 +121,17 @@ impl HeadsState {
 	/// Send heads to peers.
 	/// Peers will answer with own heads if they are different.
 	/// However the response is not implemented by this protocol but by the caller.
-	/// TODO: identity: need to sign?
-	pub fn heads<B: NetworkBehaviour + DidcommBehaviourProvider>(
+	pub fn heads<B: NetworkBehaviour + DidcommBehaviourProvider, P: PrivateIdentity + Send + Sync + 'static>(
 		&mut self,
 		swarm: &mut Swarm<B>,
+		identity: &P,
 		co: &CoId,
-		heads: BTreeSet<Cid>,
+		heads: &BTreeSet<Cid>,
 		peers: impl IntoIterator<Item = PeerId>,
 	) -> Result<(), anyhow::Error> {
-		let time = SystemTime::now().duration_since(UNIX_EPOCH).expect("Valid time").as_secs();
-		let header = DidCommHeader {
-			created_time: Some(time),
-			expires_time: Some(time + 120),
-			from: None,
-			id: Uuid::new_v4().into(),
-			message_type: format!("co-heads/1.0.0"),
-			pthid: None,
-			thid: None,
-			to: Default::default(),
-		};
-		let message = Message { header, body: HeadsMessage::Heads(co.clone(), heads) };
-		let data = message.cbor()?;
+		let message = HeadsMessage::Heads(co.clone(), heads.clone()).to_didcomm()?.sign(identity)?;
 		for peer in peers {
-			swarm
-				.behaviour_mut()
-				.didcomm_mut()
-				.send(&peer, didcomm::Message::Message(data.clone()));
+			swarm.behaviour_mut().didcomm_mut().send(&peer, message.clone());
 		}
 		Ok(())
 	}
@@ -188,10 +171,10 @@ impl HeadsState {
 	fn on_didcomm_event(&mut self, event: &didcomm::Event) {
 		match event {
 			didcomm::Event::Received { peer_id, message } =>
-				if let Some(cbor) = message.cbor() {
+				if message.header().message_type == "co-heads/1.0.0" {
 					// TODO(metric): add metrics when receive invalid message?
-					let message = Message::<HeadsMessage>::from_cbor(cbor).ok();
-					match message.map(|message| message.body) {
+					let heads: Option<HeadsMessage> = serde_json::from_str(message.body()).ok();
+					match heads {
 						Some(HeadsMessage::Heads(co, heads)) =>
 							self.events.push_back(HeadsEvent::GenerateEvent(Event::ReceivedHeads {
 								co,
@@ -203,20 +186,6 @@ impl HeadsState {
 					}
 				},
 			_ => {},
-			// didcomm::Event::Sent { peer_id, message } => match message {
-			// didcomm::Message::Message(data) => {
-			// 	let heads_message: HeadsMessage = match Message::<HeadsMessage>::from_cbor(&data) {
-			// 		Ok(m) => m.body,
-			// 		Err(err) => {
-			// 			panic!("BUG: can not deserialize just serialized message: {:?}", err);
-			// 		},
-			// 	};
-			// 	match heads_message {
-			// 		HeadsMessage::Heads(co, heads) =>
-			// 			Poll::Ready(ToSwarm::GenerateEvent(Event::SentHeads { co, heads, peer_id })),
-			// 	}
-			// },
-			// },
 		}
 	}
 }
@@ -275,6 +244,10 @@ mod tests {
 		heads::{self, HeadsState},
 		DidcommBehaviourProvider, GossipsubBehaviourProvider, Layer, LayerBehaviour,
 	};
+	use co_identity::{
+		DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentity,
+		PrivateIdentityResolver,
+	};
 	use co_primitives::{BlockSerializer, CoId, NetworkCoHeads};
 	use futures::{FutureExt, StreamExt};
 	use libipld::Cid;
@@ -302,7 +275,11 @@ mod tests {
 			let gossipsub_behaviour =
 				gossipsub::Behaviour::new(gossipsub::MessageAuthenticity::Signed(keypair), gossipsub_config)
 					.expect("gossipsub");
-			let didcomm_behaviour = didcomm::Behaviour::new(didcomm::Config { auto_dail: false });
+			let didcomm_behaviour = didcomm::Behaviour::new(
+				DidKeyIdentityResolver::new().boxed(),
+				MemoryPrivateIdentityResolver::default().boxed(),
+				didcomm::Config { auto_dail: false },
+			);
 			Self { didcomm: didcomm_behaviour, gossipsub: gossipsub_behaviour }
 		}
 	}
@@ -493,6 +470,10 @@ mod tests {
 		tracing::info!(peer_id = ?peer2.swarm.local_peer_id(), "peer2");
 		peer2.add_address(co.clone(), &peer1);
 
+		// identities
+		let _did1 = DidKeyIdentity::generate(Some(&vec![1; 32]));
+		let did2 = DidKeyIdentity::generate(Some(&vec![2; 32]));
+
 		// layer
 		let mut heads1 = Layer::new(peer1.swarm().behaviour(), HeadsState::new());
 		let mut heads2 = Layer::new(peer2.swarm().behaviour(), HeadsState::new());
@@ -500,7 +481,7 @@ mod tests {
 		// peer2: heads
 		heads2
 			.layer_mut()
-			.heads(peer2.swarm(), &co, h2.clone(), vec![peer1.peer_id.clone()])
+			.heads(peer2.swarm(), &did2.clone().boxed(), &co, &h2, vec![peer1.peer_id.clone()])
 			.unwrap();
 
 		// wait for sent and received event

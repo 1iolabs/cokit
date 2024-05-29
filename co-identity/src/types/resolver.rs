@@ -18,7 +18,14 @@ pub enum IdentityResolverError {
 
 #[async_trait]
 pub trait IdentityResolver {
-	async fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<IdentityBox, IdentityResolverError>;
+	async fn resolve(&self, identity: &str) -> Result<IdentityBox, IdentityResolverError>;
+
+	fn boxed(self) -> IdentityResolverBox
+	where
+		Self: Sized + Clone + Send + Sync + 'static,
+	{
+		IdentityResolverBox::new(self)
+	}
 }
 
 /// Dynamic Identity Resolver.
@@ -32,8 +39,8 @@ impl IdentityResolverBox {
 }
 #[async_trait]
 impl IdentityResolver for IdentityResolverBox {
-	async fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<IdentityBox, IdentityResolverError> {
-		self.resolver.resolve(identity, public_key).await
+	async fn resolve(&self, identity: &str) -> Result<IdentityBox, IdentityResolverError> {
+		self.resolver.resolve(identity).await
 	}
 }
 impl Clone for IdentityResolverBox {

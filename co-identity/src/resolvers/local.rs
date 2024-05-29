@@ -62,17 +62,13 @@ impl LocalIdentityResolver {
 }
 #[async_trait]
 impl IdentityResolver for LocalIdentityResolver {
-	async fn resolve(&self, identity: &str, _public_key: Option<&[u8]>) -> Result<IdentityBox, IdentityResolverError> {
+	async fn resolve(&self, identity: &str) -> Result<IdentityBox, IdentityResolverError> {
 		Ok(IdentityBox::new(Self::into_local_identity(identity)?))
 	}
 }
 #[async_trait]
 impl PrivateIdentityResolver for LocalIdentityResolver {
-	async fn resolve_private(
-		&self,
-		identity: &str,
-		_public_key: Option<&[u8]>,
-	) -> Result<PrivateIdentityBox, IdentityResolverError> {
+	async fn resolve_private(&self, identity: &str) -> Result<PrivateIdentityBox, IdentityResolverError> {
 		Ok(PrivateIdentityBox::new(Self::into_local_identity(identity)?))
 	}
 }

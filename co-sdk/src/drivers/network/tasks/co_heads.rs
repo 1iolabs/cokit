@@ -1,3 +1,4 @@
+use co_identity::PrivateIdentityBox;
 use co_network::{DidcommBehaviourProvider, GossipsubBehaviourProvider, HeadsLayerBehaviourProvider, NetworkTask};
 use co_primitives::{CoId, NetworkCoHeads};
 use libipld::Cid;
@@ -8,7 +9,7 @@ use std::collections::BTreeSet;
 pub enum CoHeadsRequest {
 	Subscribe { network: NetworkCoHeads, co: CoId },
 	Unsubscribe { network: NetworkCoHeads, co: CoId },
-	Heads { co: CoId, heads: BTreeSet<Cid>, peers: BTreeSet<PeerId> },
+	Heads { co: CoId, heads: BTreeSet<Cid>, peers: BTreeSet<PeerId>, identity: PrivateIdentityBox },
 	PublishHeads { network: NetworkCoHeads, co: CoId, heads: BTreeSet<Cid> },
 }
 
@@ -46,8 +47,8 @@ where
 					tracing::warn!(?co, ?err, "co-unsubscribe-failed");
 				},
 			},
-			Some(CoHeadsRequest::Heads { co, heads, peers }) =>
-				match behaviour.heads(swarm, &co, heads, peers.into_iter()) {
+			Some(CoHeadsRequest::Heads { co, heads, peers, identity }) =>
+				match behaviour.heads(swarm, &identity, &co, &heads, peers.into_iter()) {
 					Ok(_) => {
 						tracing::debug!(?co, "co-request-heads");
 					},
