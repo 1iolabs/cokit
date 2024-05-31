@@ -24,6 +24,7 @@ pub struct PushHeads<M> {
 	mapping: Option<M>,
 	/// Force the mapping to be applied by returning an error when no mapping is found.
 	force_mapping: bool,
+	initialized: bool,
 }
 impl<M> PushHeads<M> {
 	pub fn new<I, P>(
@@ -40,7 +41,7 @@ impl<M> PushHeads<M> {
 	{
 		let (tx, rx) = watch::channel(Default::default());
 		tokio::spawn(worker(spawner, co, rx, identity, peer_provider));
-		Self { heads: tx, mapping, force_mapping }
+		Self { heads: tx, mapping, force_mapping, initialized: false }
 	}
 }
 #[async_trait]
@@ -54,10 +55,11 @@ where
 		context: ReducerChangedContext,
 	) -> Result<(), anyhow::Error> {
 		// send local changes
-		if context.is_local_change() {
-			let mut heads = reducer.heads().clone();
+		if context.is_local_change() || self.initialized {
+			self.initialized = false;
 
 			// map plain heads to encrypted heads
+			let mut heads = reducer.heads().clone();
 			if self.mapping.is_some() {
 				heads = to_plain(&self.mapping, self.force_mapping, heads)
 					.await
