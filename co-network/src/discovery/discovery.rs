@@ -27,10 +27,21 @@ use std::{
 /// Single actionable discovery item with all context.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From)]
 pub enum Discovery {
+	/// DID Discovery protocol.
 	#[from]
 	DidDiscovery(DidDiscovery),
+
+	/// Discover subscribed peers from a topic.
+	/// The value is the [`libp2p::gossipsub::TopicHash`] string representation.
+	/// Note: This will not subscribe to an topic which needs to done by the caller.
+	#[from]
+	Topic(String),
+
+	/// Rendezvouz protocol.
 	#[from]
 	Rendezvous(NetworkRendezvous),
+
+	/// Direct peer connection.
 	#[from]
 	Peer(NetworkPeer),
 }
@@ -47,6 +58,9 @@ impl Discovery {
 	pub fn validate(&self) -> Result<(), anyhow::Error> {
 		match self {
 			Discovery::DidDiscovery(_item) => {
+				// none?
+			},
+			Discovery::Topic(_item) => {
 				// none?
 			},
 			Discovery::Rendezvous(item) =>
@@ -348,6 +362,12 @@ where
 						Err(e) => return Err(ConnectError::Other(e.into())),
 					};
 				},
+				Discovery::Topic(item) => {
+					let hash = libp2p::gossipsub::TopicHash::from_raw(item);
+					for peer in swarm.behaviour().gossipsub().mesh_peers(&hash) {
+						peer_connected(request, &mut self.events, *peer);
+					}
+				},
 				Discovery::Rendezvous(_item) => {
 					// TODO: implement
 					continue;
@@ -410,10 +430,21 @@ where
 		})
 	}
 
+	/// Iterate over all direct peer connection networks.
+	fn all_discovery_topics(&self) -> impl Iterator<Item = (&DiscoveryConnectRequest, &str)> {
+		self.requests.iter().flat_map(|(_, discovery_request)| {
+			discovery_request.discovery.iter().filter_map(move |discovery| match discovery {
+				Discovery::Topic(topic) => Some((discovery_request, topic.as_str())),
+				_ => None,
+			})
+		})
+	}
+
 	/// Handle GossipSub events.
 	///
 	/// Specifically:
 	/// - Receiving DID Discovery messages addressed to us.
+	/// - Handle Topic subscriptions.
 	fn on_gossip_event(&mut self, event: &gossipsub::Event) {
 		match event {
 			gossipsub::Event::Message { propagation_source: _, message_id: _, message } => {
@@ -449,8 +480,8 @@ where
 					}
 				}
 			},
-			gossipsub::Event::Subscribed { peer_id: _, topic } => {
-				// move pending discoveries to events when its topic has subscribed
+			gossipsub::Event::Subscribed { peer_id, topic } => {
+				// DidDiscovery: move pending discoveries to events when its topic has subscribed
 				loop {
 					if let Some((index, _)) = self
 						.pending_discovery
@@ -463,6 +494,31 @@ where
 						}
 					} else {
 						break;
+					}
+				}
+
+				// Topic: dispatch connected events for new mesh subscribription peers
+				for request_id in self
+					.all_discovery_topics()
+					.filter(|(_, request_topic)| topic.as_str() == *request_topic)
+					.map(|(request, _)| request.id)
+					.collect::<Vec<_>>()
+				{
+					if let Some(request) = self.requests.get_mut(&request_id) {
+						peer_connected(request, &mut self.events, *peer_id);
+					}
+				}
+			},
+			gossipsub::Event::Unsubscribed { peer_id, topic } => {
+				// Topic: dispatch disconnected events for mesh unsubscribed peers
+				for request_id in self
+					.all_discovery_topics()
+					.filter(|(_, request_topic)| topic.as_str() == *request_topic)
+					.map(|(request, _)| request.id)
+					.collect::<Vec<_>>()
+				{
+					if let Some(request) = self.requests.get_mut(&request_id) {
+						peer_disconnected(request, &mut self.events, *peer_id);
 					}
 				}
 			},
@@ -815,6 +871,11 @@ fn peer<B: DiscoveryBehaviour>(
 	events: &mut VecDeque<DiscoveryEvent>,
 	opts: DialOpts,
 ) -> Result<(), anyhow::Error> {
+	// self?
+	if opts.get_peer_id().as_ref() == Some(swarm.local_peer_id()) {
+		return Ok(());
+	}
+
 	// already connected?
 	if let Some(peer) = opts.get_peer_id() {
 		if swarm.is_connected(&peer) {
@@ -843,13 +904,15 @@ fn peer_to_dial_opts(item: &NetworkPeer) -> Result<DialOpts, anyhow::Error> {
 }
 
 fn peer_connected(request: &mut DiscoveryConnectRequest, events: &mut VecDeque<DiscoveryEvent>, peer: PeerId) {
-	request.connected_peers.insert(peer);
-	events.push_back(DiscoveryEvent::GenerateEvent(Event::Connected { id: request.id, peer }));
+	if request.connected_peers.insert(peer) {
+		events.push_back(DiscoveryEvent::GenerateEvent(Event::Connected { id: request.id, peer }));
+	}
 }
 
 fn peer_disconnected(request: &mut DiscoveryConnectRequest, events: &mut VecDeque<DiscoveryEvent>, peer: PeerId) {
-	request.connected_peers.remove(&peer);
-	events.push_back(DiscoveryEvent::GenerateEvent(Event::Disconnected { id: request.id, peer }));
+	if request.connected_peers.remove(&peer) {
+		events.push_back(DiscoveryEvent::GenerateEvent(Event::Disconnected { id: request.id, peer }));
+	}
 }
 
 #[cfg(test)]

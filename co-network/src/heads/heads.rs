@@ -79,7 +79,7 @@ impl HeadsState {
 	where
 		B: NetworkBehaviour + GossipsubBehaviourProvider,
 	{
-		let topic = self.to_topic(network, co);
+		let topic = Self::to_topic(network, co);
 		self.heads.insert(topic.hash());
 		Ok(swarm.behaviour_mut().gossipsub_mut().subscribe(&topic)?)
 	}
@@ -93,7 +93,7 @@ impl HeadsState {
 	where
 		B: NetworkBehaviour + GossipsubBehaviourProvider,
 	{
-		let topic = self.to_topic(network, co);
+		let topic = Self::to_topic(network, co);
 		self.heads.remove(&topic.hash());
 		Ok(swarm.behaviour_mut().gossipsub_mut().unsubscribe(&topic)?)
 	}
@@ -108,7 +108,7 @@ impl HeadsState {
 	where
 		B: NetworkBehaviour + GossipsubBehaviourProvider,
 	{
-		let topic = self.to_topic(network, co);
+		let topic = Self::to_topic(network, co);
 		let message = HeadsMessage::Heads(co.clone(), heads.clone());
 		let data = serde_ipld_dagcbor::to_vec(&message)?;
 		match swarm.behaviour_mut().gossipsub_mut().publish(topic, data) {
@@ -117,7 +117,7 @@ impl HeadsState {
 				// insert as pending by only keeping latest publish by every co
 				let pending = self
 					.pending_heads
-					.entry(self.to_topic(network, co).hash())
+					.entry(Self::to_topic(network, co).hash())
 					.or_insert(Default::default());
 				pending.retain(|item| &item.co != co);
 				pending.push(PublishHeads { network: network.clone(), co: co.clone(), heads: heads.clone() });
@@ -149,7 +149,11 @@ impl HeadsState {
 		Ok(())
 	}
 
-	fn to_topic(&self, network: &NetworkCoHeads, id: &CoId) -> gossipsub::IdentTopic {
+	pub fn to_topic_hash(network: &NetworkCoHeads, id: &CoId) -> gossipsub::TopicHash {
+		Self::to_topic(network, id).hash()
+	}
+
+	fn to_topic(network: &NetworkCoHeads, id: &CoId) -> gossipsub::IdentTopic {
 		IdentTopic::new(network.topic.clone().unwrap_or_else(|| format!("co-{}", id)))
 	}
 

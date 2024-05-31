@@ -4,9 +4,11 @@ use crate::{
 	state, CoStorage,
 };
 use async_trait::async_trait;
+use co_api::CoId;
 use co_identity::{IdentityResolverBox, PrivateIdentity};
 use co_network::{
 	discovery::{self, Discovery},
+	heads::HeadsState,
 	DidDiscoveryMessage, PeerProvider,
 };
 use co_primitives::{Network, OptionLink};
@@ -16,6 +18,7 @@ use std::collections::BTreeSet;
 
 pub struct CoPeerProvider<I> {
 	storage: CoStorage,
+	id: CoId,
 	state: CoState,
 	identity_resolver: IdentityResolverBox,
 	identity: I,
@@ -30,9 +33,10 @@ where
 		identity_resolver: IdentityResolverBox,
 		identity: I,
 		storage: CoStorage,
+		id: CoId,
 		state: CoState,
 	) -> Self {
-		Self { storage, state, spawner, identity, identity_resolver }
+		Self { storage, id, state, spawner, identity, identity_resolver }
 	}
 }
 #[async_trait]
@@ -47,10 +51,11 @@ where
 		let identity = self.identity.clone();
 		let storage = self.storage.clone();
 		let state = self.state.clone();
+		let id = self.id.clone();
 
 		// stream
 		async_stream::stream! {
-			let discovery = match networks(&identity_resolver, &identity, &storage, state.read().await).await {
+			let discovery = match networks(&identity_resolver, &identity, &storage, &id, state.read().await).await {
 				Ok(value) => value,
 				Err(_) => return,
 			};
@@ -77,6 +82,7 @@ async fn networks<P>(
 	identity_resolver: &IdentityResolverBox,
 	identity: &P,
 	storage: &CoStorage,
+	id: &CoId,
 	state: OptionLink<co_core_co::Co>,
 ) -> Result<BTreeSet<Discovery>, anyhow::Error>
 where
@@ -86,7 +92,7 @@ where
 		.await?
 		.into_iter()
 		.filter_map(|network| match network {
-			// Network::CoHeads(_) => todo!(),
+			Network::CoHeads(value) => Some(Discovery::Topic(HeadsState::to_topic_hash(&value, &id).into_string())),
 			Network::Rendezvous(value) => Some(Discovery::Rendezvous(value)),
 			Network::Peer(value) => Some(Discovery::Peer(value)),
 			_ => None,

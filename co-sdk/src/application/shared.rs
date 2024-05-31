@@ -96,6 +96,7 @@ impl SharedCoBuilder {
 				create_identity_resolver(),
 				identity.clone(),
 				storage.clone(),
+				self.membership.id.clone(),
 				co_state.clone(),
 			);
 			let mut network_storage =
@@ -123,7 +124,7 @@ impl SharedCoBuilder {
 			.build(runtime.runtime())
 			.await?;
 
-		// publish changes for every `NetworkCoHeads` setting
+		// push changes to all connectable peers
 		if let Some(network) = &self.network {
 			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
 			let peer_provider = CoPeerProvider::new(
@@ -131,6 +132,7 @@ impl SharedCoBuilder {
 				create_identity_resolver(),
 				identity.clone(),
 				storage.clone(),
+				self.membership.id.clone(),
 				co_state.clone().unwrap(),
 			);
 			let publish = PushHeads::new(
