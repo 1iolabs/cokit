@@ -38,6 +38,13 @@ impl Network {
 		Self { spawner: network.spawner(), network: Arc::new(Mutex::new(Some(network))) }
 	}
 
+	/// Shutdown the network.
+	pub async fn shutdown(&self) {
+		if let Some(network) = self.network.lock().await.as_mut() {
+			network.shutdown();
+		}
+	}
+
 	/// Create network task spawner.
 	pub fn spawner(&self) -> CoNetworkTaskSpawner {
 		self.spawner.clone()

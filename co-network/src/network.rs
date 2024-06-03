@@ -6,7 +6,7 @@ use crate::{
 use anyhow::anyhow;
 use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver, PrivateIdentityResolverBox};
 use co_storage::BlockStorage;
-use futures::{channel::oneshot, StreamExt};
+use futures::StreamExt;
 use libipld::DefaultParams;
 use libp2p::{
 	gossipsub, identify,
@@ -21,12 +21,13 @@ use libp2p::{
 use libp2p_bitswap::{Bitswap, BitswapEvent};
 use rxrust::prelude::*;
 use std::{sync::Arc, task::Poll, time::Duration};
+use tokio_util::sync::CancellationToken;
 
 pub type EventsSubject<E> = SubjectThreads<Arc<SwarmEvent<E>>, ()>;
 
 pub struct Libp2pNetwork {
 	config: Libp2pNetworkConfig,
-	shutdown: Option<oneshot::Sender<()>>,
+	shutdown: CancellationToken,
 	tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<Behaviour, Context>>,
 	events: EventsSubject<NetworkEvent>,
 }
@@ -102,8 +103,8 @@ impl Libp2pNetwork {
 		let events = SubjectThreads::default();
 
 		// runtime
-		let (shutdown_tx, shutdown_rx) = oneshot::channel();
-		let mut runtime = Runtime::new(config.clone(), events.clone());
+		let shutdown = CancellationToken::new();
+		let mut runtime = Runtime::new(config.clone(), events.clone(), shutdown.child_token());
 
 		// listen
 		runtime.listen(swarm.listen_on(config.addr.clone().unwrap_or("/ip4/0.0.0.0/udp/0/quic-v1".parse()?))?);
@@ -111,11 +112,11 @@ impl Libp2pNetwork {
 		// run
 		let handle = tokio::runtime::Handle::current().clone();
 		tokio::task::spawn_blocking(move || {
-			handle.block_on(run(swarm, context, runtime, tasks_rx, shutdown_rx));
+			handle.block_on(run(swarm, context, runtime, tasks_rx));
 		});
 
 		// result
-		Ok(Self { config, shutdown: Some(shutdown_tx), tasks: tasks_tx, events })
+		Ok(Self { config, shutdown, tasks: tasks_tx, events })
 	}
 
 	pub fn spawner(&self) -> NetworkTaskSpawner<Behaviour, Context> {
@@ -125,10 +126,7 @@ impl Libp2pNetwork {
 	/// Gracefully shutdown the network stack.
 	/// This will stop accepting new connections and waits until established connections are done.
 	pub fn shutdown(&mut self) {
-		// trigger shutdown signal
-		if let Some(shutdown) = self.shutdown.take() {
-			let _ = shutdown.send(());
-		}
+		self.shutdown.cancel();
 	}
 
 	/// Swarm events subject.
@@ -151,6 +149,11 @@ impl Libp2pNetwork {
 				.unwrap();
 		}
 		Ok(())
+	}
+}
+impl Drop for Libp2pNetwork {
+	fn drop(&mut self) {
+		self.shutdown();
 	}
 }
 
@@ -201,13 +204,13 @@ struct Runtime {
 	_config: Libp2pNetworkConfig,
 	listener_id: Option<libp2p::core::transport::ListenerId>,
 	events: EventsSubject<NetworkEvent>,
-	running: bool,
 	/// Tasks which have been executed but waiting for events.
 	pending_tasks: Vec<NetworkTaskBox<Behaviour, Context>>,
+	shutdown: CancellationToken,
 }
 impl Runtime {
-	fn new(config: Libp2pNetworkConfig, events: EventsSubject<NetworkEvent>) -> Self {
-		Self { _config: config, listener_id: None, events, running: true, pending_tasks: Default::default() }
+	fn new(config: Libp2pNetworkConfig, events: EventsSubject<NetworkEvent>, shutdown: CancellationToken) -> Self {
+		Self { _config: config, listener_id: None, events, shutdown, pending_tasks: Default::default() }
 	}
 
 	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
@@ -215,7 +218,7 @@ impl Runtime {
 	}
 
 	fn is_running(&self) -> bool {
-		self.running
+		self.shutdown.is_cancelled()
 	}
 }
 
@@ -476,7 +479,6 @@ async fn run(
 	context: Context,
 	mut runtime: Runtime,
 	mut tasks: tokio::sync::mpsc::UnboundedReceiver<NetworkTaskBox<Behaviour, Context>>,
-	mut shutdown: oneshot::Receiver<()>,
 ) {
 	// log
 	tracing::info!("network-running");
@@ -485,6 +487,7 @@ async fn run(
 	let mut context_layer = Layer::new(swarm.behaviour(), context);
 
 	// handle
+	let shutdown = runtime.shutdown.child_token();
 	while runtime.is_running() || swarm.connected_peers().peekable().peek().is_some() {
 		tokio::select! {
 			// to not stack them up before creating new work
@@ -508,8 +511,7 @@ async fn run(
 			},
 
 			// shutdown
-			_ = &mut shutdown => {
-				runtime.running = false;
+			_ = shutdown.cancelled() => {
 			}
 		}
 	}

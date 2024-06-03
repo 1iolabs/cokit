@@ -10,14 +10,14 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_identity::{LocalIdentity, LocalIdentityResolver, PrivateIdentityBox, PrivateIdentityResolver};
+use co_identity::{LocalIdentity, LocalIdentityResolver, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver};
 use co_log::EntryBlock;
 use co_primitives::CoId;
 use co_runtime::RuntimePool;
 use co_storage::BlockStorage;
 use directories::ProjectDirs;
 use futures::{Stream, TryStreamExt};
-use std::{collections::BTreeMap, mem::swap, ops::DerefMut, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, fmt::Debug, mem::swap, ops::DerefMut, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
 use tokio_util::{
 	sync::{CancellationToken, DropGuard},
@@ -37,13 +37,8 @@ pub struct Application {
 	/// instance.
 	identifier: String,
 
-	/// Shared storage path.
-	/// This path can be shared between different application which use the co-sdk.
-	/// This enables using some shared resources like the storage and the same local CO.
-	storage_path: PathBuf,
-
 	/// Application preferences path.
-	application_path: PathBuf,
+	application_path: Option<PathBuf>,
 
 	/// Path for application logs. If None no logs will be produced.
 	log: Logging,
@@ -63,11 +58,11 @@ pub struct Application {
 	/// Use keychain or file for Local CO.
 	keychain: bool,
 
+	/// Shutdown the application when last reference is dropped.
+	_drop: Option<Arc<DropGuard>>,
+
 	/// Application shutdown token.
 	shutdown: CancellationToken,
-
-	/// Shutdown the application when last reference is dropped.
-	_drop: Arc<DropGuard>,
 
 	// Tasks.
 	tasks: TaskTracker,
@@ -77,12 +72,8 @@ impl Application {
 		&self.identifier
 	}
 
-	pub fn application_path(&self) -> &PathBuf {
+	pub fn application_path(&self) -> &Option<PathBuf> {
 		&self.application_path
-	}
-
-	pub fn storage_path(&self) -> &PathBuf {
-		&self.storage_path
 	}
 
 	pub fn storage(&self) -> CoStorage {
@@ -94,7 +85,7 @@ impl Application {
 	}
 
 	pub fn shutdown(&self) -> CancellationToken {
-		self.shutdown.clone()
+		self.shutdown.child_token()
 	}
 
 	/// Tasks bound to this application.
@@ -127,7 +118,7 @@ impl Application {
 			network_key,
 			self.storage(),
 			create_identity_resolver(),
-			CoPrivateIdentityResolver::new(self.clone()).boxed(),
+			CoPrivateIdentityResolver::new(self.clone_weak()).boxed(),
 		));
 
 		// clear reducers to rebuild them with network support after this
@@ -141,12 +132,22 @@ impl Application {
 			swap(&mut next_reducers, reducers.deref_mut());
 		}
 
-		// to be able to receivce updates anytime we add a static heads handler
+		// to be able to receive updates anytime we add a static heads handler
 		self.network
 			.as_ref()
 			.unwrap()
 			.spawner()
-			.spawn(ReceivedHeadsNetworkTask::new(self.clone()))?;
+			.spawn(ReceivedHeadsNetworkTask::new(self.clone_weak()))?;
+
+		// shutdown
+		//  when the token has been triggered explicitly shutdown the network
+		if let Some(shutdown_network) = self.network.clone() {
+			let shutdown = self.shutdown.child_token().cancelled_owned();
+			self.tasks.spawn(async move {
+				shutdown.await;
+				shutdown_network.shutdown().await;
+			});
+		}
 
 		// done
 		Ok(())
@@ -295,20 +296,20 @@ impl Application {
 	/// Create a new CO.
 	///
 	/// TODO: Identity
-	///  The crator of the co should be added as first participant.
+	/// TODO: The crator of the co should be added as first participant.
 	#[tracing::instrument(err, skip(self))]
-	pub async fn create_co(&self, create: CreateCo) -> Result<CoReducer, anyhow::Error> {
+	pub async fn create_co<I>(&self, creator: I, create: CreateCo) -> Result<CoReducer, anyhow::Error>
+	where
+		I: PrivateIdentity + Debug + Send + Sync + 'static,
+	{
 		// local
 		let local = self.local_co_reducer().await?;
-
-		// identity
-		let identity = self.local_identity();
 
 		// create
 		let co = SharedCoCreator::new(local, create)
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
-			.create(self.storage(), self.runtime.clone(), identity)
+			.create(self.storage(), self.runtime.clone(), creator)
 			.await?;
 
 		// load
@@ -352,6 +353,15 @@ impl Application {
 		// result
 		Ok(())
 	}
+
+	/// Create a clone which will not block the shutdown.
+	/// Only for internal references.
+	/// TODO: Remove and move factory into own struct?
+	fn clone_weak(&self) -> Self {
+		let mut result = self.clone();
+		result._drop = None;
+		result
+	}
 }
 #[async_trait]
 impl CoReducerFactory for Application {
@@ -363,7 +373,6 @@ impl std::fmt::Debug for Application {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Application")
 			.field("identifier", &self.identifier)
-			.field("storage_path", &self.storage_path)
 			.field("application_path", &self.application_path)
 			.field("log", &self.log)
 			// .field("storage", &self.storage)
@@ -377,7 +386,7 @@ impl std::fmt::Debug for Application {
 
 pub struct ApplicationBuilder {
 	identifier: String,
-	path: PathBuf,
+	path: Option<PathBuf>,
 	log: Logging,
 	keychain: bool,
 }
@@ -389,11 +398,16 @@ impl ApplicationBuilder {
 
 	/// Create new instance with path.
 	pub fn new_with_path(identifier: String, path: PathBuf) -> Self {
-		Self { identifier, path, log: Logging::None, keychain: true }
+		Self { identifier, path: Some(path), log: Logging::None, keychain: true }
 	}
 
 	pub fn new(identifier: String) -> Self {
 		Self::new_with_path(identifier, Self::default_path())
+	}
+
+	/// Create new memory only instance.
+	pub fn new_memory(identifier: String) -> Self {
+		Self { identifier, path: None, log: Logging::None, keychain: false }
 	}
 
 	/// Enable bunyan logging to log_path.
@@ -403,12 +417,13 @@ impl ApplicationBuilder {
 	/// tail -0f ~/Application\ Support/co.app/log/application.log | bunyan -c '!/^(libp2p|hickory_proto)/.test(this.target)'
 	/// ```
 	pub fn with_bunyan_logging(self, log_path: Option<PathBuf>) -> Self {
-		let log_path = match log_path {
-			Some(p) => p,
+		let log = match (log_path, &self.path) {
+			(Some(p), _) => Logging::Bunyan(p),
 			//None => self.path.join("log").join(format!("{}.log", &self.identifier)),
-			None => self.path.join("log").join("co.log"),
+			(None, Some(base_path)) => Logging::Bunyan(base_path.join("log").join("co.log")),
+			_ => Logging::None,
 		};
-		Self { log: Logging::Bunyan(log_path), ..self }
+		Self { log, ..self }
 	}
 
 	pub fn without_keychain(self) -> Self {
@@ -416,20 +431,21 @@ impl ApplicationBuilder {
 	}
 
 	pub async fn build(self) -> Result<Application, anyhow::Error> {
-		let storage_path = self.path.join("data");
 		let shutdown = CancellationToken::new();
 		let result = Application {
 			network: None,
-			storage: Storage::new(storage_path.clone()),
+			storage: match &self.path {
+				Some(path) => Storage::new(path.join("data")),
+				None => Storage::new_memory(),
+			},
 			runtime: Runtime::new(),
-			storage_path,
-			application_path: self.path.join("etc").join(&self.identifier),
+			application_path: self.path.map(|path| path.join("etc").join(&self.identifier)),
 			identifier: self.identifier,
 			log: self.log,
 			keychain: self.keychain,
 			reducers: Default::default(),
-			_drop: Arc::new(shutdown.clone().drop_guard()),
-			shutdown: shutdown.clone(),
+			_drop: Some(Arc::new(shutdown.clone().drop_guard())),
+			shutdown,
 			tasks: TaskTracker::new(),
 		};
 		result.init().await?;

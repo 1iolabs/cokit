@@ -109,16 +109,22 @@ async fn worker<I, P>(
 			},
 
 			// wait for new peers
-			next_peers = peers_stream.select_next_some() => {
-				let added: BTreeSet<PeerId> = next_peers.difference(&peers).cloned().collect();
+			next_peers = peers_stream.next() => {
+				if let Some(next_peers) = next_peers {
+					// get added peers
+					let added: BTreeSet<PeerId> = next_peers.difference(&peers).cloned().collect();
 
-				// update
-				peers = next_peers;
+					// update
+					peers = next_peers;
 
-				// notify the new peer
-				if !added.is_empty() && !heads.is_empty() {
-					Some((heads.clone(), added))
-				} else {
+					// notify the new peer
+					if !added.is_empty() && !heads.is_empty() {
+						Some((heads.clone(), added))
+					} else {
+						None
+					}
+				}
+				else {
 					None
 				}
 			},

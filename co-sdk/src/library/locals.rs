@@ -1,6 +1,7 @@
 use super::{fs_read::fs_read_option, fs_write::fs_write};
 use anyhow::Context;
-use futures::{Stream, TryStreamExt};
+use async_trait::async_trait;
+use futures::{future::ready, Stream, StreamExt, TryStreamExt};
 use libipld::Cid;
 use notify::{
 	event::{CreateKind, DataChange, ModifyKind},
@@ -13,18 +14,65 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-pub struct Locals {
+#[async_trait]
+pub trait Locals {
+	/// Get current ApplicationLocal instances.
+	async fn get(&mut self) -> Result<Vec<ApplicationLocal>, anyhow::Error>;
+
+	/// Watch ApplicationLocal instances after last get.
+	fn watch(&self) -> impl Stream<Item = ApplicationLocal> + Send + Sync + 'static;
+
+	/// Set ApplicationLocal for our instance.
+	async fn set(&mut self, local: ApplicationLocal) -> Result<(), anyhow::Error>;
+}
+
+#[derive(Debug, Clone)]
+pub struct MemoryLocals {
+	watcher: tokio::sync::watch::Sender<Option<ApplicationLocal>>,
+}
+impl MemoryLocals {
+	pub fn new(initial: Option<ApplicationLocal>) -> Self {
+		Self { watcher: tokio::sync::watch::channel(initial).0 }
+	}
+}
+#[async_trait]
+impl Locals for MemoryLocals {
+	async fn get(&mut self) -> Result<Vec<ApplicationLocal>, anyhow::Error> {
+		Ok(match self.watcher.borrow().as_ref() {
+			Some(local) => vec![local.clone()],
+			None => Default::default(),
+		})
+	}
+
+	async fn set(&mut self, local: ApplicationLocal) -> Result<(), anyhow::Error> {
+		self.watcher.send_replace(Some(local));
+		Ok(())
+	}
+
+	fn watch(&self) -> impl Stream<Item = ApplicationLocal> + Send + Sync + 'static {
+		tokio_stream::wrappers::WatchStream::new(self.watcher.subscribe()).filter_map(|item| ready(item))
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct FileLocals {
 	config_path: PathBuf,
+	identifier: String,
 	locals: BTreeMap<PathBuf, ApplicationLocal>,
 }
-impl Locals {
+impl FileLocals {
 	/// Create locals by reading all local configurations.
 	///
 	/// # Arguments
 	/// * `config_path` - The local configuratin path. Normally `{base_path}/etc`.
-	pub async fn new(config_path: PathBuf) -> Result<Self, anyhow::Error> {
+	pub fn new(config_path: PathBuf, identifier: String) -> Self {
+		Self { config_path, identifier, locals: Default::default() }
+	}
+
+	/// Update locals from files.
+	pub async fn update(&mut self) -> Result<(), anyhow::Error> {
 		// read
-		let locals: BTreeMap<PathBuf, ApplicationLocal> = Self::read(config_path.clone())
+		self.locals = Self::read(self.config_path.clone())
 			// .filter_map(|item| async move {
 			// 	match item {
 			// 		Ok(r) => Some(r),
@@ -36,9 +84,7 @@ impl Locals {
 			// })
 			.try_collect()
 			.await?;
-
-		// result
-		Ok(Self { config_path, locals })
+		Ok(())
 	}
 
 	/// Iterate over locals.
@@ -146,6 +192,24 @@ impl Locals {
 				}
 			}
 		}
+	}
+}
+#[async_trait]
+impl Locals for FileLocals {
+	async fn get(&mut self) -> Result<Vec<ApplicationLocal>, anyhow::Error> {
+		self.update().await?;
+		Ok(self.iter().map(|(_, local)| local).cloned().collect())
+	}
+
+	async fn set(&mut self, local: ApplicationLocal) -> Result<(), anyhow::Error> {
+		let path = self.config_path.join(&self.identifier).join("local.cbor");
+		local.write(&path).await?;
+		self.locals.insert(path, local);
+		Ok(())
+	}
+
+	fn watch(&self) -> impl Stream<Item = ApplicationLocal> + Send + Sync + 'static {
+		tokio_stream::wrappers::UnboundedReceiverStream::new(self.clone().watch()).map(|item| item.1)
 	}
 }
 
