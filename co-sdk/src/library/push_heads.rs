@@ -8,9 +8,9 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_api::CoId;
 use co_identity::PrivateIdentity;
 use co_network::PeerProvider;
+use co_primitives::CoId;
 use co_storage::BlockStorageContentMapping;
 use futures::{pin_mut, StreamExt};
 use libipld::Cid;

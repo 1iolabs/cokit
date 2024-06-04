@@ -4,14 +4,13 @@ use crate::{
 	state, CoStorage,
 };
 use async_trait::async_trait;
-use co_api::CoId;
 use co_identity::{IdentityResolverBox, PrivateIdentity};
 use co_network::{
 	discovery::{self, Discovery},
 	heads::HeadsState,
 	DidDiscoveryMessage, PeerProvider,
 };
-use co_primitives::{Network, OptionLink};
+use co_primitives::{CoId, Network, OptionLink};
 use futures::Stream;
 use libp2p::PeerId;
 use std::collections::BTreeSet;

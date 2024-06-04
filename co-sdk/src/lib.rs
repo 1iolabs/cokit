@@ -38,7 +38,7 @@ pub use library::{
 	memberships::memberships,
 	node_stream::NodeStream,
 };
-pub use pin::pin::{is_pinned, PinAPI};
+pub use pin::pin::PinAPI;
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},
 	co_reducer_factory::CoReducerFactory,

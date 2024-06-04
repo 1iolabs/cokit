@@ -1514,7 +1514,6 @@ dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
- "co-api",
  "co-core-co",
  "co-core-data-series",
  "co-core-file",

@@ -1,6 +1,5 @@
 use crate::{types::cores::CO_CORE_NAME_PIN, CoReducer};
 use anyhow::Ok;
-use co_api::{DagCollection, DagMap, DagSet, Storage};
 use co_core_pin::PinAction;
 use co_identity::PrivateIdentity;
 use co_primitives::Tags;
@@ -54,16 +53,4 @@ where
 		// }
 		Ok(())
 	}
-}
-
-/**
- * A simple function to check if a specific content id is pinned or not
- */
-pub fn is_pinned(pins: DagMap<Cid, DagSet<Tags>>, cid: &Cid, s: &dyn Storage) -> bool {
-	let pin_map = pins.get(s);
-	if let Some(set) = pin_map.get(cid) {
-		// returns true if the tag set for the cid is not empty
-		return !set.get(s).is_empty();
-	}
-	false
 }

@@ -80,7 +80,7 @@ impl Network {
 			.networks()
 			.into_iter()
 			.filter_map(|network| match network {
-				co_api::Network::DidDiscovery(item) => Some(item),
+				co_primitives::Network::DidDiscovery(item) => Some(item),
 				_ => None,
 			})
 			.collect();
