@@ -12,4 +12,5 @@ pub mod locals;
 pub mod memberships;
 pub mod node_stream;
 pub mod push_heads;
+pub mod shared_co_join;
 pub mod to_plain;

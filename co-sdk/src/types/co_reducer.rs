@@ -59,6 +59,11 @@ impl CoReducer {
 	}
 
 	/// Push event into reducer.
+	///
+	/// # Arguments
+	/// - `identity` - The identity to sign the operation with.
+	/// - `core` - The target core name. The key of [`co_core_co::Co::cores`].
+	/// - `item` - The core action payload.
 	#[tracing::instrument(err, fields(co = self.id().as_str(), identity = identity.identity()), skip(self, identity))]
 	pub async fn push<T, I>(&self, identity: &I, core: &str, item: &T) -> Result<(), anyhow::Error>
 	where

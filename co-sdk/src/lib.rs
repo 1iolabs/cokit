@@ -37,6 +37,7 @@ pub use library::{
 	local_keypair_fetch::local_keypair_fetch,
 	memberships::memberships,
 	node_stream::NodeStream,
+	shared_co_join::{SharedCoJoin, SharedCoJoinError},
 };
 pub use pin::pin::PinAPI;
 pub use types::{

@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 pub struct Network {
 	network: Arc<Mutex<Option<Libp2pNetwork>>>,
 	spawner: CoNetworkTaskSpawner,
+	peer_id: PeerId,
 }
 impl Network {
 	/// Create Network driver.
@@ -35,7 +36,12 @@ impl Network {
 		let network: Libp2pNetwork =
 			Libp2pNetwork::new(network_config, storage, resolver, private_resolver).expect("network");
 		tracing::info!(peer_id = ?network_peer_id, "network");
-		Self { spawner: network.spawner(), network: Arc::new(Mutex::new(Some(network))) }
+		Self { spawner: network.spawner(), peer_id: network_peer_id, network: Arc::new(Mutex::new(Some(network))) }
+	}
+
+	/// Get local peer id.
+	pub fn peer_id(&self) -> PeerId {
+		self.peer_id
 	}
 
 	/// Shutdown the network.
