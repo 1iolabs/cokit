@@ -1,7 +1,7 @@
 use crate::{CoError, CoErrorSignal, CoSettings};
 use co_sdk::{Application, ApplicationBuilder};
 use dioxus::signals::Writable;
-use futures::Future;
+use futures::{future::BoxFuture, Future};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[derive(Debug, Clone)]
@@ -18,35 +18,80 @@ impl CoContext {
 		Self { tasks: tx }
 	}
 
-	/// Execute task using CO Application.
-	pub fn execute<F>(&self, f: F)
+	/// Execute future task using CO Application.
+	/// Futures will be executed in sequence.
+	pub fn execute_future_box<F>(&self, f: F)
 	where
-		F: FnOnce(&Application) + Send + 'static,
+		F: (FnOnce(Application) -> BoxFuture<'static, ()>) + Send + 'static,
 	{
 		self.tasks
 			.send(Box::new(f))
 			.expect("co thread to run until all senders dropped");
 	}
 
+	/// Execute task using CO Application.
+	pub fn execute<F>(&self, f: F)
+	where
+		F: FnOnce(Application) + Send + 'static,
+	{
+		self.execute_future_box(move |application| {
+			Box::pin(async move {
+				f(application);
+			})
+		});
+	}
+
+	/// Execute future task using CO Application.
+	/// Futures will be started in sequence but executed in parallel.
+	pub fn execute_future_parallel<F, Fut>(&self, f: F)
+	where
+		Fut: Future<Output = ()> + Send + 'static,
+		F: FnOnce(Application) -> Fut + Send + 'static,
+	{
+		self.execute_future_box(move |application| {
+			Box::pin(async move {
+				application.tasks().spawn(async move {
+					f(application).await;
+				});
+			})
+		});
+	}
+
+	/// Execute future task using CO Application.
+	/// Futures will be executed in sequence.
+	pub fn execute_future<F, Fut>(&self, f: F)
+	where
+		Fut: Future<Output = ()> + Send + 'static,
+		F: FnOnce(Application) -> Fut + Send + 'static,
+	{
+		self.execute_future_box(move |application| {
+			Box::pin(async move {
+				f(application).await;
+			})
+		});
+	}
+
+	/// Execute future task using CO Application.
+	/// Note: Tasks will be started in sequence but executed in parallel.
 	pub fn execute_future_with_error<F, Fut>(&self, mut error: CoErrorSignal, f: F)
 	where
 		Fut: Future<Output = Result<(), anyhow::Error>> + Send + 'static,
 		F: FnOnce(Application) -> Fut + Send + 'static,
 	{
-		self.execute(move |application| {
-			let application = application.clone();
-			application.tasks().spawn(async move {
+		self.execute_future_box(move |application| {
+			Box::pin(async move {
 				match f(application).await {
 					Ok(_) => {},
 					Err(e) => error.write().push(CoError::from_error(e)),
 				}
-			});
+			})
 		});
 	}
 }
 
-// type Task = Box<dyn FnOnce(&Application) -> futures::BoxFuture<()> + Send + 'static>;
-type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
+type TaskFn = dyn (FnOnce(Application) -> BoxFuture<'static, ()>) + Send + 'static;
+type Task = Box<TaskFn>;
+// type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
 
 async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) {
 	let identifier = settings.identifier;
@@ -73,7 +118,7 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) {
 	tracing::info!("co-startup");
 	while let Some(task) = tasks.recv().await {
 		tracing::info!("co-task");
-		task(&mut application);
+		task(application.clone()).await;
 	}
 	tracing::info!("co-shutdown");
 }

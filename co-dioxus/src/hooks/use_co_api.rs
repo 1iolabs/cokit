@@ -14,6 +14,7 @@ pub fn use_co_api(co: impl Into<CoId>, identity: impl Into<Option<Identity>>) ->
 	CoApi { co, context, error, identity: identity.into() }
 }
 
+/// CO API.
 pub struct CoApi {
 	co: CoId,
 	context: CoContext,

@@ -20,8 +20,8 @@ where
 	let context: CoContext = use_context();
 	use_hook(move || {
 		// run and update until drop_rx dropped
-		context.execute(move |application| {
-			tokio::spawn(fetch_and_observe_state(application.clone(), co_id, state, drop_rx, selector));
+		context.execute_future_parallel(move |application| async move {
+			fetch_and_observe_state(application, co_id, state, drop_rx, selector).await;
 		});
 		CoStateHook { done: Some(drop_tx) }
 	});
