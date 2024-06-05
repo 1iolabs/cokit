@@ -1,0 +1,21 @@
+[package]
+name = "co-tauri"
+version = "0.1.0"
+description = "A Tauri App"
+authors = ["you"]
+edition = "2021"
+
+[dependencies]
+co-primitives = { path = "../co-primitives" }
+co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
+co-core-membership = { path = "../cores/membership" }
+anyhow = { workspace = true }
+futures = { workspace = true }
+tauri = { version = "2.0.0-beta", default-features = false }
+tauri-plugin-shell = "2.0.0-beta"
+tauri-utils = { version = "2.0.0-beta" }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }

@@ -1,4 +1,5 @@
 [workspace]
+
 members = [
     "co-api",
     "co-cli",
@@ -10,6 +11,7 @@ members = [
     "co-network",
     "co-primitives",
     "co-runtime",
+    "co-tauri",
     "co-sdk",
     "co-storage",
     "cores/co",
@@ -24,6 +26,7 @@ members = [
     "did-co",
     "examples/counter",
     "examples/message",
+    "examples/tauri-app/src-tauri",
     "state",
 ]
 resolver = "2"
