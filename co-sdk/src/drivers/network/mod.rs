@@ -174,10 +174,5 @@ impl Network {
 		Ok(())
 	}
 }
-impl Drop for Network {
-	fn drop(&mut self) {
-		tracing::info!(instances = Arc::strong_count(&self.network), "application-network-drop");
-	}
-}
 
 pub type CoNetworkTaskSpawner = NetworkTaskSpawner<Behaviour, Context>;

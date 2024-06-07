@@ -164,7 +164,6 @@ impl Libp2pNetwork {
 }
 impl Drop for Libp2pNetwork {
 	fn drop(&mut self) {
-		tracing::info!("application-libp2p-network-drop");
 		self.shutdown.cancel();
 	}
 }
