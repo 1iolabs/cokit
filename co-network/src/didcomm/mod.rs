@@ -177,11 +177,7 @@ impl Behaviour {
 				Some(v) => v.len(),
 				None => 0,
 			};
-			if message_discard_count > 0 {
-				tracing::warn!(?peer_id, ?connection_id, ?error, ?message_discard_count, "dail-failure");
-			} else {
-				tracing::info!(?peer_id, ?connection_id, ?error, ?message_discard_count, "dail-failure");
-			}
+			tracing::warn!(?peer_id, ?connection_id, ?error, ?message_discard_count, "dail-failure");
 
 			// If there are pending outgoing requests when a dial failure occurs,
 			// it is implied that we are not connected to the peer, since pending

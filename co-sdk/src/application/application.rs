@@ -1,6 +1,7 @@
 use super::{
 	identity::{create_identity_resolver, resolve_private_identity},
 	shared::{CreateCo, SharedCoBuilder, SharedCoCreator},
+	tracing::TracingBuilder,
 };
 use crate::{
 	drivers::network::tasks::received_heads::ReceivedHeadsNetworkTask,
@@ -23,13 +24,11 @@ use tokio_util::{
 	sync::{CancellationToken, DropGuard},
 	task::TaskTracker,
 };
-use tracing::{level_filters::LevelFilter, subscriber::set_global_default};
-use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
-use tracing_log::LogTracer;
-use tracing_subscriber::{layer::SubscriberExt, Registry};
 
-#[derive(Clone)]
 pub struct Application {
+	/// Shutdown the application when last reference is dropped.
+	_drop: Option<Arc<DropGuard>>,
+
 	/// The Unique Application Instance Identifier.
 	/// The Identifier should be hardcoded in the application.
 	///
@@ -39,9 +38,6 @@ pub struct Application {
 
 	/// Application preferences path.
 	application_path: Option<PathBuf>,
-
-	/// Path for application logs. If None no logs will be produced.
-	log: Logging,
 
 	/// CO Storage Driver.
 	storage: Storage,
@@ -57,9 +53,6 @@ pub struct Application {
 
 	/// Use keychain or file for Local CO.
 	keychain: bool,
-
-	/// Shutdown the application when last reference is dropped.
-	_drop: Option<Arc<DropGuard>>,
 
 	/// Application shutdown token.
 	shutdown: CancellationToken,
@@ -114,12 +107,24 @@ impl Application {
 		let network_key = local_keypair_fetch(&self.identifier, &local_co, &local_identity, force_new_peer_id)
 			.await
 			.expect("peer-id");
-		self.network = Some(Network::new(
+		let network = Network::new(
 			network_key,
 			self.storage(),
 			create_identity_resolver(),
 			CoPrivateIdentityResolver::new(self.clone_weak()).boxed(),
-		));
+		);
+
+		// shutdown
+		//  when the token has been triggered explicitly shutdown the network
+		let shutdown_network = network.clone();
+		let shutdown = self.shutdown.child_token().cancelled_owned();
+		self.tasks.spawn(async move {
+			shutdown.await;
+			shutdown_network.shutdown().await;
+		});
+
+		// assign
+		self.network = Some(network);
 
 		// clear reducers to rebuild them with network support after this
 		// we only keep local as this has no network
@@ -138,16 +143,6 @@ impl Application {
 			.unwrap()
 			.spawner()
 			.spawn(ReceivedHeadsNetworkTask::new(self.clone_weak()))?;
-
-		// shutdown
-		//  when the token has been triggered explicitly shutdown the network
-		if let Some(shutdown_network) = self.network.clone() {
-			let shutdown = self.shutdown.child_token().cancelled_owned();
-			self.tasks.spawn(async move {
-				shutdown.await;
-				shutdown_network.shutdown().await;
-			});
-		}
 
 		// done
 		Ok(())
@@ -318,23 +313,6 @@ impl Application {
 
 	/// Initialize application.
 	async fn init(&self) -> Result<(), anyhow::Error> {
-		// log
-		match &self.log {
-			Logging::Bunyan(log_path) => {
-				std::fs::create_dir_all(log_path.parent().ok_or(anyhow!("no parent"))?)?;
-				let log_file = std::fs::File::options().append(true).create(true).open(log_path)?;
-				// let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), std::io::stdout);
-				let formatting_layer = BunyanFormattingLayer::new(self.identifier.clone().into(), log_file);
-				let subscriber = Registry::default()
-					.with(LevelFilter::TRACE)
-					.with(JsonStorageLayer)
-					.with(formatting_layer);
-				set_global_default(subscriber)?;
-				LogTracer::init()?;
-			},
-			_ => {},
-		}
-
 		// shutdown
 		let shutdown = self.shutdown.clone();
 		let tasks = self.tasks.clone();
@@ -358,8 +336,25 @@ impl Application {
 	/// Only for internal references.
 	/// TODO: Remove and move factory into own struct?
 	fn clone_weak(&self) -> Self {
-		let mut result = self.clone();
-		result._drop = None;
+		Self {
+			identifier: self.identifier.clone(),
+			application_path: self.application_path.clone(),
+			storage: self.storage.clone(),
+			runtime: self.runtime.clone(),
+			network: self.network.clone(),
+			reducers: self.reducers.clone(),
+			keychain: self.keychain.clone(),
+			_drop: None,
+			shutdown: self.shutdown.clone(),
+			tasks: self.tasks.clone(),
+		}
+	}
+}
+impl Clone for Application {
+	fn clone(&self) -> Self {
+		tracing::trace!("application-clone");
+		let mut result = self.clone_weak();
+		result._drop = self._drop.clone();
 		result
 	}
 }
@@ -373,8 +368,7 @@ impl std::fmt::Debug for Application {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Application")
 			.field("identifier", &self.identifier)
-			.field("application_path", &self.application_path)
-			.field("log", &self.log)
+			// .field("application_path", &self.application_path)
 			// .field("storage", &self.storage)
 			// .field("runtime", &self.runtime)
 			// .field("network", &self.network)
@@ -387,8 +381,8 @@ impl std::fmt::Debug for Application {
 pub struct ApplicationBuilder {
 	identifier: String,
 	path: Option<PathBuf>,
-	log: Logging,
 	keychain: bool,
+	tracing: TracingBuilder,
 }
 impl ApplicationBuilder {
 	pub fn default_path() -> PathBuf {
@@ -398,7 +392,8 @@ impl ApplicationBuilder {
 
 	/// Create new instance with path.
 	pub fn new_with_path(identifier: String, path: PathBuf) -> Self {
-		Self { identifier, path: Some(path), log: Logging::None, keychain: true }
+		let tracing = TracingBuilder::new(identifier.clone(), Some(path.clone()));
+		Self { identifier, path: Some(path), keychain: true, tracing }
 	}
 
 	pub fn new(identifier: String) -> Self {
@@ -407,7 +402,8 @@ impl ApplicationBuilder {
 
 	/// Create new memory only instance.
 	pub fn new_memory(identifier: String) -> Self {
-		Self { identifier, path: None, log: Logging::None, keychain: false }
+		let tracing = TracingBuilder::new(identifier.clone(), None);
+		Self { identifier, path: None, keychain: false, tracing }
 	}
 
 	/// Enable bunyan logging to log_path.
@@ -417,13 +413,11 @@ impl ApplicationBuilder {
 	/// tail -0f ~/Application\ Support/co.app/log/application.log | bunyan -c '!/^(libp2p|hickory_proto)/.test(this.target)'
 	/// ```
 	pub fn with_bunyan_logging(self, log_path: Option<PathBuf>) -> Self {
-		let log = match (log_path, &self.path) {
-			(Some(p), _) => Logging::Bunyan(p),
-			//None => self.path.join("log").join(format!("{}.log", &self.identifier)),
-			(None, Some(base_path)) => Logging::Bunyan(base_path.join("log").join("co.log")),
-			_ => Logging::None,
-		};
-		Self { log, ..self }
+		Self { tracing: self.tracing.with_bunyan_logging(log_path), ..self }
+	}
+
+	pub fn with_open_telemetry(self, endpoint: impl Into<String>) -> Self {
+		Self { tracing: self.tracing.with_open_telemetry(endpoint), ..self }
 	}
 
 	pub fn without_keychain(self) -> Self {
@@ -431,6 +425,10 @@ impl ApplicationBuilder {
 	}
 
 	pub async fn build(self) -> Result<Application, anyhow::Error> {
+		// log
+		self.tracing.init()?;
+
+		// instance
 		let shutdown = CancellationToken::new();
 		let result = Application {
 			network: None,
@@ -441,20 +439,16 @@ impl ApplicationBuilder {
 			runtime: Runtime::new(),
 			application_path: self.path.map(|path| path.join("etc").join(&self.identifier)),
 			identifier: self.identifier,
-			log: self.log,
 			keychain: self.keychain,
 			reducers: Default::default(),
 			_drop: Some(Arc::new(shutdown.clone().drop_guard())),
 			shutdown,
 			tasks: TaskTracker::new(),
 		};
+
+		// init
 		result.init().await?;
+
 		Ok(result)
 	}
-}
-
-#[derive(Debug, Clone)]
-enum Logging {
-	None,
-	Bunyan(PathBuf),
 }

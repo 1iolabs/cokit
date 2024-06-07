@@ -48,6 +48,14 @@ tracing-log = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { workspace = true }
 
+# opentelemetry
+opentelemetry = "0.22"
+opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.15.0", features = ["tonic"] }
+opentelemetry-semantic-conventions = "0.14.0"
+opentelemetry-stdout = { version = "0.3.0", features = ["trace"] }
+tracing-opentelemetry = "0.23"
+
 [dev-dependencies]
 example-counter = { path = "../examples/counter" }
 

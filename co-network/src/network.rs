@@ -11,7 +11,6 @@ use libipld::DefaultParams;
 use libp2p::{
 	gossipsub, identify,
 	identity::Keypair,
-	kad::{self, store::MemoryStore, Behaviour as Kademlia, Config as KademliaConfig},
 	mdns::{self, tokio::Behaviour as MdnsBehaviour},
 	multiaddr::Protocol,
 	ping,
@@ -46,24 +45,30 @@ impl Libp2pNetwork {
 		let resolver = IdentityResolverBox::new(resolver);
 		let private_resolver = PrivateIdentityResolverBox::new(private_resolver);
 		let local_peer_id = PeerId::from(config.keypair.public().clone());
-		let kademlia_config: KademliaConfig = Default::default();
+		let bitswap_local_peer_id = local_peer_id.clone();
+		// let kademlia_config: KademliaConfig = Default::default();
 		let gossipsub_config = gossipsub::ConfigBuilder::default()
 			.max_transmit_size(256 * 1024)
 			.build()
 			.expect("valid config");
-		let mut behaviour = Behaviour {
+		let behaviour = Behaviour {
 			identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
 				"/ipfs/0.1.0".into(),
 				config.keypair.public(),
 			)),
 			ping: ping::Behaviour::new(ping::Config::new()),
 			mdns: MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?,
-			kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()), kademlia_config),
+			// kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()),
+			// kademlia_config),
 			bitswap: Bitswap::new(
 				Default::default(),
 				BitswapBlockStorage::new(storage),
-				Box::new(|t| {
-					tokio::spawn(t);
+				Box::new(move |t| {
+					tokio::spawn(async move {
+						let span = tracing::trace_span!("bitswap", peer = ?bitswap_local_peer_id);
+						let _span_enter = span.enter();
+						t.await
+					});
 				}),
 			),
 			gossipsub: gossipsub::Behaviour::new(
@@ -74,20 +79,21 @@ impl Libp2pNetwork {
 			didcomm: didcomm::Behaviour::new(resolver.clone(), private_resolver, didcomm::Config { auto_dail: false }),
 		};
 
-		// kad
-		for (peer, address) in config.bootstap.iter() {
-			behaviour.kad.add_address(peer, address.clone());
-		}
-		set_network_mode(&mut behaviour, config.mode);
-		if let Err(err) = behaviour.kad.bootstrap() {
-			tracing::warn!(?err, "kad-bootstrap-failed");
-		}
+		// // kad
+		// for (peer, address) in config.bootstap.iter() {
+		// 	behaviour.kad.add_address(peer, address.clone());
+		// }
+		// set_network_mode(&mut behaviour, config.mode);
+		// if let Err(err) = behaviour.kad.bootstrap() {
+		// 	tracing::warn!(?err, "kad-bootstrap-failed");
+		// }
 
 		// swarm
 		let mut swarm = SwarmBuilder::with_existing_identity(config.keypair.clone())
 			.with_tokio()
 			.with_quic()
 			.with_behaviour(|_| behaviour)?
+			.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
 			.build();
 
 		// context
@@ -218,7 +224,7 @@ impl Runtime {
 	}
 
 	fn is_running(&self) -> bool {
-		self.shutdown.is_cancelled()
+		!self.shutdown.is_cancelled()
 	}
 }
 
@@ -329,7 +335,7 @@ pub enum NetworkEvent {
 	Identify(identify::Event),
 	Mdns(mdns::Event),
 	Ping(ping::Event),
-	Kad(kad::Event),
+	// Kad(kad::Event),
 	Bitswap(BitswapEvent),
 	Discovery(discovery::Event),
 	Heads(heads::Event),
@@ -364,7 +370,7 @@ pub struct Behaviour {
 	pub identify: identify::Behaviour,
 	pub mdns: MdnsBehaviour,
 	pub ping: ping::Behaviour,
-	pub kad: Kademlia<MemoryStore>,
+	// pub kad: Kademlia<MemoryStore>,
 	pub bitswap: Bitswap<DefaultParams>,
 }
 impl discovery::DiscoveryBehaviour for Behaviour {
@@ -467,13 +473,14 @@ impl BitswapBehaviourProvider for Behaviour {
 	}
 }
 
-fn set_network_mode(behaviour: &mut Behaviour, mode: NetworkMode) {
-	match mode {
-		NetworkMode::Full => behaviour.kad.set_mode(Some(libp2p::kad::Mode::Server)),
-		NetworkMode::Light => behaviour.kad.set_mode(Some(libp2p::kad::Mode::Client)),
-	}
+fn set_network_mode(_behaviour: &mut Behaviour, _mode: NetworkMode) {
+	// match mode {
+	// 	NetworkMode::Full => behaviour.kad.set_mode(Some(libp2p::kad::Mode::Server)),
+	// 	NetworkMode::Light => behaviour.kad.set_mode(Some(libp2p::kad::Mode::Client)),
+	// }
 }
 
+#[tracing::instrument(skip(swarm, context, runtime, tasks), fields(peer = ?swarm.local_peer_id()))]
 async fn run(
 	mut swarm: Swarm<Behaviour>,
 	context: Context,

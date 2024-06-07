@@ -3,12 +3,15 @@ pub mod tasks;
 
 use self::tasks::did_discovery::{DidDiscoverySubscribe, DidDiscoveryUnsubscribe};
 use co_identity::{IdentityResolver, PrivateIdentity, PrivateIdentityResolver};
-use co_network::{Behaviour, Context, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner};
+use co_network::{
+	discovery::Discovery, Behaviour, Context, FnOnceNetworkTask, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner,
+};
 use co_storage::BlockStorage;
-use futures::{stream, StreamExt, TryStreamExt};
+use futures::{channel::oneshot, stream, Stream, StreamExt, TryStreamExt};
 use libipld::DefaultParams;
-use libp2p::{identity::Keypair, PeerId};
-use std::{future::ready, sync::Arc};
+use libp2p::{identity::Keypair, Multiaddr, PeerId};
+use std::{collections::BTreeSet, future::ready, sync::Arc};
+use tasks::{dial::DialNetworkTask, discovery_connect::DiscoveryConnectNetworkTask};
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
@@ -44,6 +47,15 @@ impl Network {
 		self.peer_id
 	}
 
+	/// Get local listeners addresses.
+	pub async fn listeners(&self) -> Result<Vec<Multiaddr>, anyhow::Error> {
+		let (tx, rx) = oneshot::channel();
+		self.spawner().spawn(FnOnceNetworkTask::new(|swarm, _| {
+			tx.send(swarm.listeners().cloned().collect::<Vec<_>>()).unwrap();
+		}))?;
+		Ok(rx.await?)
+	}
+
 	/// Shutdown the network.
 	pub async fn shutdown(&self) {
 		if let Some(network) = self.network.lock().await.as_mut() {
@@ -75,6 +87,43 @@ impl Network {
 	// 	state::networks(&co_reducer.storage(), co_reducer.reducer_state().await.0)
 	// 	Subscription::subscribe(self.spawner(), co_reducer).await
 	// }
+
+	pub async fn dail(&self, peer_id: PeerId, addresses: Vec<Multiaddr>) -> Result<(), anyhow::Error> {
+		DialNetworkTask::dial(self.spawner(), peer_id, addresses).await
+	}
+
+	/// Connect networks and return the connect peers.
+	pub fn connect(
+		&self,
+		networks: impl IntoIterator<Item = Discovery>,
+	) -> impl Stream<Item = Result<PeerId, anyhow::Error>> {
+		let (task, peers_stream) = DiscoveryConnectNetworkTask::new(networks.into_iter().collect());
+		let spawner = self.spawner();
+		async_stream::stream! {
+			let mut known_peers = BTreeSet::<PeerId>::new();
+
+			// execute
+			match spawner.spawn(task) {
+				Ok(_) => {},
+				Err(e) => yield Err(e.into()),
+			}
+
+			// process
+			for await peers in peers_stream {
+				match peers {
+					Ok(peers) => {
+						for peer in peers {
+							if !known_peers.contains(&peer) {
+								known_peers.insert(peer);
+								yield Ok(peer);
+							}
+						}
+					},
+					Err(e) => yield Err(e.into()),
+				};
+			}
+		}
+	}
 
 	/// Listen on identity requests (DID Discovery).
 	pub async fn did_discovery_subscribe<I: PrivateIdentity + Clone + Send + Sync + 'static>(
@@ -120,6 +169,11 @@ impl Network {
 		self.spawner().spawn(task)?;
 		result.await??;
 		Ok(())
+	}
+}
+impl Drop for Network {
+	fn drop(&mut self) {
+		tracing::info!(instances = Arc::strong_count(&self.network), "application-network-drop");
 	}
 }
 

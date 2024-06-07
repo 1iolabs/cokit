@@ -1,7 +1,7 @@
 use super::{fs_read::fs_read_option, fs_write::fs_write};
 use anyhow::Context;
 use async_trait::async_trait;
-use futures::{future::ready, Stream, StreamExt, TryStreamExt};
+use futures::{stream, Stream, StreamExt, TryStreamExt};
 use libipld::Cid;
 use notify::{
 	event::{CreateKind, DataChange, ModifyKind},
@@ -50,7 +50,9 @@ impl Locals for MemoryLocals {
 	}
 
 	fn watch(&self) -> impl Stream<Item = ApplicationLocal> + Send + Sync + 'static {
-		tokio_stream::wrappers::WatchStream::new(self.watcher.subscribe()).filter_map(|item| ready(item))
+		// tokio_stream::wrappers::WatchStream::new(self.watcher.subscribe()).filter_map(|item| ready(item))
+		// as we only ever have our local state it can not changed from outside
+		stream::empty()
 	}
 }
 

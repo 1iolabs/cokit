@@ -105,6 +105,7 @@ where
 	type StoreParams = S::StoreParams;
 
 	/// Returns a block from storage.
+	#[tracing::instrument(err, skip(self))]
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		match self.next.get(cid).await {
 			Ok(block) => Ok(block),
@@ -118,16 +119,19 @@ where
 
 	/// Inserts a block into storage.
 	/// Returns the CID of the block (gurranted to be the same as the supplied).
+	#[tracing::instrument(err, skip(self, block), fields(cid = ?block.cid()))]
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		self.next.set(block).await
 	}
 
 	/// Remove a block.
+	#[tracing::instrument(err, skip(self))]
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
 		self.next.remove(cid).await
 	}
 
 	/// Stat a block.
+	#[tracing::instrument(err, skip(self))]
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		match self.next.stat(cid).await {
 			Err(StorageError::NotFound(_, _)) => {
@@ -163,7 +167,9 @@ where
 
 		// execute
 		if let GetNetworkTaskState::Pending(peers, result) = state {
-			self.state = GetNetworkTaskState::Query(bitswap.get(self.cid, peers.into_iter()), result);
+			let query = bitswap.get(self.cid, peers.clone().into_iter());
+			tracing::debug!(?self.cid, ?peers, ?query, "bitswap-get");
+			self.state = GetNetworkTaskState::Query(query, result);
 		}
 	}
 
@@ -182,6 +188,9 @@ where
 						// consume event
 						let bitswap_event = B::into_bitswap_event(behaviour_event);
 						if let Ok(BitswapEvent::Complete(_, event_result)) = bitswap_event {
+							// log
+							tracing::debug!(?self.cid, ?query, result = ?event_result, "bitswap-get-complete");
+
 							// state
 							let mut state = GetNetworkTaskState::Complete;
 							swap(&mut self.state, &mut state);

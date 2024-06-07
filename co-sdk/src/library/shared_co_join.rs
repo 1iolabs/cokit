@@ -11,10 +11,11 @@ use co_log::Log;
 use co_network::{NetworkBlockStorage, StaticPeerProvider};
 use co_primitives::{tags, CoId, Network};
 use co_runtime::RuntimePool;
-use co_storage::{EncryptedBlockStorage, Secret};
+use co_storage::{BlockStorage, EncryptedBlockStorage, Secret};
+use futures::{stream, StreamExt, TryStreamExt};
 use libipld::Cid;
 use libp2p::PeerId;
-use std::{collections::BTreeSet, time::Duration};
+use std::{collections::BTreeSet, fmt::Debug, time::Duration};
 
 /// Join Shared COs that are currently unknown.
 ///
@@ -79,6 +80,7 @@ impl SharedCoJoin {
 		Self { heads, state, ..self }
 	}
 
+	#[tracing::instrument(skip(network, storage, runtime))]
 	pub async fn join<I>(
 		&self,
 		runtime: &RuntimePool,
@@ -88,7 +90,7 @@ impl SharedCoJoin {
 		identity: I,
 	) -> Result<(), SharedCoJoinError>
 	where
-		I: PrivateIdentity + Clone + Send + Sync + 'static,
+		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
 		if self.heads.is_empty() {
 			return Err(SharedCoJoinError::NoHeads);
@@ -111,7 +113,7 @@ impl SharedCoJoin {
 			}
 			let peer_provider = StaticPeerProvider::new(self.peers.clone());
 			let mut network_storage =
-				NetworkBlockStorage::new(storage.clone(), network.clone(), peer_provider, Duration::from_secs(30));
+				NetworkBlockStorage::new(storage.clone(), network.clone(), peer_provider, Duration::from_secs(1));
 			if let Some(encrypted) = &encrypted_storage {
 				network_storage.set_mapping(encrypted.content_mapping());
 			}
@@ -120,18 +122,35 @@ impl SharedCoJoin {
 			storage
 		};
 
+		// fetch state/heads to use mapped cids internally
+		let state = if let Some(state) = self.state {
+			let state_block = storage.get(&state).await.map_err(|e| SharedCoJoinError::Join(e.into()))?;
+			Some(*state_block.cid())
+		} else {
+			self.state
+		};
+		let heads: BTreeSet<_> = stream::iter(self.heads.clone())
+			.then(|cid| {
+				let heads_storage = storage.clone();
+				async move {
+					heads_storage
+						.get(&cid)
+						.await
+						.map_err(|e| SharedCoJoinError::Join(e.into()))
+						.map(|block| *block.cid())
+				}
+			})
+			.try_collect()
+			.await?;
+
 		// log
-		let log = Log::new(
-			self.id.as_str().as_bytes().to_vec(),
-			create_identity_resolver(),
-			storage.clone(),
-			self.heads.clone(),
-		);
+		let log =
+			Log::new(self.id.as_str().as_bytes().to_vec(), create_identity_resolver(), storage.clone(), heads.clone());
 
 		// reducer
 		let mut reducer_builder = ReducerBuilder::new(CoCoreResolver::default(), log);
-		if let Some(state) = self.state {
-			reducer_builder = reducer_builder.with_latest_state(state, self.heads.clone());
+		if let Some(state) = state {
+			reducer_builder = reducer_builder.with_latest_state(state, heads.clone());
 		}
 		let reducer = reducer_builder
 			.build(runtime)
@@ -186,6 +205,7 @@ impl SharedCoJoin {
 			membership_state: co_core_membership::MembershipState::Active,
 			tags: tags!(),
 		};
+		tracing::trace!(?membership, "join-membership");
 		parent
 			.push(&identity, &self.membership_core_name, &MembershipsAction::Join(membership))
 			.await

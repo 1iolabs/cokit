@@ -225,12 +225,13 @@ impl SharedCoCreator {
 		I: PrivateIdentity + Debug + Send + Sync + 'static,
 	{
 		// storage
-		let (storage, encrypted_storage): (CoStorage, Option<(EncryptedBlockStorage<CoStorage>, Secret)>) =
+		let (storage, encrypted_storage): (CoStorage, Option<(EncryptedBlockStorage<CoStorage>, String, Secret)>) =
 			match self.co.algorithm {
 				Some(algorithm) => {
+					let key_uri = format!("urn:co:{}:{}", self.co.id, uuid::Uuid::new_v4());
 					let key = algorithm.generate_serect();
 					let result_storage = EncryptedBlockStorage::new(storage, key.clone(), algorithm);
-					(CoStorage::new(result_storage.clone()), Some((result_storage, key)))
+					(CoStorage::new(result_storage.clone()), Some((result_storage, key_uri, key)))
 				},
 				None => (storage, None),
 			};
@@ -255,14 +256,14 @@ impl SharedCoCreator {
 					name: self.co.name.to_owned(),
 					cores: Default::default(),
 					participants: Default::default(),
+					key: encrypted_storage.as_ref().map(|(_, key_uri, _)| key_uri.clone()),
 				},
 			)
 			.await?;
 		let state = reducer.state().ok_or(anyhow::anyhow!("Expected state after create"))?;
 
 		// store key in parent co
-		let (key, encryption_mapping) = if let Some((encrypted_storage, secret)) = encrypted_storage {
-			let key_uri = format!("urn:co:{}:{}", self.co.id, uuid::Uuid::new_v4());
+		let (key_uri, encryption_mapping) = if let Some((encrypted_storage, key_uri, secret)) = encrypted_storage {
 			let key = Key {
 				uri: key_uri.clone(),
 				name: format!("co ({})", self.co.name),
@@ -285,7 +286,7 @@ impl SharedCoCreator {
 			heads: reducer.heads().clone(),
 			state,
 			encryption_mapping,
-			key,
+			key: key_uri,
 			membership_state: co_core_membership::MembershipState::Active,
 			tags: tags!(),
 		};

@@ -94,40 +94,34 @@ async fn worker<I, P>(
 		let heads = heads_watcher.borrow_and_update().clone();
 		let notify: Option<(BTreeSet<Cid>, BTreeSet<PeerId>)> = tokio::select! {
 			// wait for heads changed
-			changed = heads_watcher.changed() => {
-				// shutdown?
-				if changed.is_err() {
-					break;
-				}
-
+			Ok(_) = heads_watcher.changed() => {
 				// notify known peers about new heads
-				if !heads.is_empty() && !peers.is_empty() {
-					Some((heads.clone(), peers.clone()))
+				let changed_heads = heads_watcher.borrow_and_update().clone();
+				if !changed_heads.is_empty() && !peers.is_empty() && changed_heads != heads {
+					Some((changed_heads.clone(), peers.clone()))
 				} else {
 					None
 				}
 			},
 
 			// wait for new peers
-			next_peers = peers_stream.next() => {
-				if let Some(next_peers) = next_peers {
-					// get added peers
-					let added: BTreeSet<PeerId> = next_peers.difference(&peers).cloned().collect();
+			Some(next_peers) = peers_stream.next(), if !peers_stream.is_done() => {
+				// get added peers
+				let added: BTreeSet<PeerId> = next_peers.difference(&peers).cloned().collect();
 
-					// update
-					peers = next_peers;
+				// update
+				peers = next_peers;
 
-					// notify the new peer
-					if !added.is_empty() && !heads.is_empty() {
-						Some((heads.clone(), added))
-					} else {
-						None
-					}
-				}
-				else {
+				// notify the new peer
+				if !added.is_empty() && !heads.is_empty() {
+					Some((heads.clone(), added))
+				} else {
 					None
 				}
 			},
+
+			// shutdown
+			else => break,
 		};
 
 		// send

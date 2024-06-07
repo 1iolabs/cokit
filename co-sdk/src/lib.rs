@@ -14,6 +14,7 @@ pub use application::{
 	local::LocalCoBuilder,
 	reducer::{Reducer, ReducerBuilder, ReducerChangedContext, ReducerChangedHandler},
 	shared::CreateCo,
+	tracing::TracingBuilder,
 };
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 pub use co_identity::{

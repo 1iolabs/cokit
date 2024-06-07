@@ -1,4 +1,5 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use co_storage::{BlockStorage, StorageError};
 use libipld::{Block, Cid, DefaultParams};
 use libp2p_bitswap::BitswapStore;
@@ -14,13 +15,14 @@ impl<S> BitswapBlockStorage<S> {
 }
 
 /// Handle (external) peer requests.
-#[async_trait::async_trait]
+#[async_trait]
 impl<S> BitswapStore for BitswapBlockStorage<S>
 where
 	S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + 'static,
 {
 	type Params = S::StoreParams;
 
+	#[tracing::instrument(ret, err, skip(self))]
 	async fn contains(&mut self, cid: &Cid) -> Result<bool> {
 		match self.storage.stat(cid).await {
 			Ok(_) => Ok(true),
@@ -29,6 +31,7 @@ where
 		}
 	}
 
+	#[tracing::instrument(err, skip(self))]
 	async fn get(&mut self, cid: &Cid) -> Result<Option<Vec<u8>>> {
 		match self.storage.get(cid).await {
 			Ok(block) => Ok(Some(block.into_inner().1)),
@@ -37,11 +40,13 @@ where
 		}
 	}
 
+	#[tracing::instrument(err, skip(self, block), fields(cid = ?block.cid()))]
 	async fn insert(&mut self, block: &Block<Self::Params>) -> Result<()> {
 		self.storage.set(block.clone()).await?;
 		Ok(())
 	}
 
+	#[tracing::instrument(err, skip(self))]
 	async fn missing_blocks(&mut self, cid: &Cid) -> Result<Vec<Cid>> {
 		let mut stack = vec![*cid];
 		let mut missing = vec![];

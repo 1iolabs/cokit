@@ -142,10 +142,20 @@ impl HeadsState {
 		B: NetworkBehaviour + DidcommBehaviourProvider,
 		P: PrivateIdentity + Send + Sync + 'static,
 	{
+		let peers: BTreeSet<_> = peers.into_iter().collect();
+
+		// log
+		tracing::trace!(?co, ?heads, ?peers, "network-heads-send");
+
+		// message
 		let message = HeadsMessage::Heads(co.clone(), heads.clone()).to_didcomm()?.sign(identity)?;
+
+		// send
 		for peer in peers {
 			swarm.behaviour_mut().didcomm_mut().send(&peer, message.clone());
 		}
+
+		//result
 		Ok(())
 	}
 

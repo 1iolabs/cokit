@@ -113,21 +113,63 @@ pub enum KeyState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CoAction {
-	Create { id: CoId, name: String, cores: BTreeMap<String, Core>, participants: BTreeMap<Did, Participant> },
-	Heads { heads: BTreeSet<Cid> },
-	TagsInsert { tags: Tags },
-	TagsRemove { tags: Tags },
-	ParticipantInvite { participant: Did, tags: Tags },
-	ParticipantJoin { participant: Did },
-	ParticipantTagsInsert { participant: Did, tags: Tags },
-	ParticipantTagsRemove { participant: Did, tags: Tags },
-	NetworkInsert { network: Network },
-	NetworkRemove { network: Network },
-	CoreCreate { core: String, binary: Cid, tags: Tags },
-	CoreRemove { core: String },
-	CoreChange { core: String, state: Option<Cid> },
-	CoreTagsInsert { core: String, tags: Tags },
-	CoreTagsRemove { core: String, tags: Tags },
+	Create {
+		id: CoId,
+		name: String,
+		cores: BTreeMap<String, Core>,
+		participants: BTreeMap<Did, Participant>,
+		key: Option<String>,
+	},
+	Heads {
+		heads: BTreeSet<Cid>,
+	},
+	TagsInsert {
+		tags: Tags,
+	},
+	TagsRemove {
+		tags: Tags,
+	},
+	ParticipantInvite {
+		participant: Did,
+		tags: Tags,
+	},
+	ParticipantJoin {
+		participant: Did,
+	},
+	ParticipantTagsInsert {
+		participant: Did,
+		tags: Tags,
+	},
+	ParticipantTagsRemove {
+		participant: Did,
+		tags: Tags,
+	},
+	NetworkInsert {
+		network: Network,
+	},
+	NetworkRemove {
+		network: Network,
+	},
+	CoreCreate {
+		core: String,
+		binary: Cid,
+		tags: Tags,
+	},
+	CoreRemove {
+		core: String,
+	},
+	CoreChange {
+		core: String,
+		state: Option<Cid>,
+	},
+	CoreTagsInsert {
+		core: String,
+		tags: Tags,
+	},
+	CoreTagsRemove {
+		core: String,
+		tags: Tags,
+	},
 }
 
 impl Reducer for Co {
@@ -136,7 +178,7 @@ impl Reducer for Co {
 	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		let mut result = self;
 		match &event.payload {
-			CoAction::Create { id, name, cores, participants } => {
+			CoAction::Create { id, name, cores, participants, key: key_id } => {
 				// only allowed for empty COs
 				// id can not be changed afterwards
 				if result.id.as_str().is_empty() {
@@ -144,6 +186,9 @@ impl Reducer for Co {
 					result.name = name.to_owned();
 					result.cores = cores.to_owned();
 					result.participants = participants.to_owned();
+					result.keys = key_id
+						.as_ref()
+						.map(|key_id| vec![Key { id: key_id.to_owned(), state: KeyState::Active }]);
 				}
 			},
 			CoAction::ParticipantInvite { participant, tags } =>

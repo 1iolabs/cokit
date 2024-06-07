@@ -2,7 +2,8 @@ use super::{co_storage::CoBlockStorageContentMapping, state_observable::StateObs
 use crate::{state::core_state, CoCoreResolver, CoStorage, Reducer, Runtime};
 use co_identity::PrivateIdentity;
 use co_primitives::CoId;
-use co_storage::{BlockStorageExt, StorageError};
+use co_storage::{BlockStorageContentMapping, BlockStorageExt, StorageError};
+use futures::{stream, StreamExt};
 use libipld::Cid;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
@@ -116,6 +117,29 @@ impl CoReducer {
 		self,
 	) -> Option<(CoStorage, Reducer<CoStorage, CoCoreResolver>, Option<CoBlockStorageContentMapping>)> {
 		Arc::into_inner(self.reducer).map(|lock| (self.storage, lock.into_inner(), self.mapping))
+	}
+
+	/// Convert an CO CID to an external (plain) CID.
+	pub async fn to_external_cid(&self, cid: Cid) -> Cid {
+		match &self.mapping {
+			Some(mapping) => mapping.to_plain(&cid).await.unwrap_or(cid),
+			None => cid,
+		}
+	}
+
+	/// Get current reducer state and heads.
+	pub async fn external_reducer_state(&self) -> (Option<Cid>, BTreeSet<Cid>) {
+		let (state, heads) = self.reducer_state().await;
+		(
+			match state {
+				Some(cid) => Some(self.to_external_cid(cid).await),
+				None => None,
+			},
+			stream::iter(heads.into_iter())
+				.then(|cid| async move { self.to_external_cid(cid).await })
+				.collect()
+				.await,
+		)
 	}
 }
 impl Debug for CoReducer {
