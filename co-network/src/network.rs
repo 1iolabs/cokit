@@ -6,7 +6,7 @@ use crate::{
 use anyhow::anyhow;
 use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver, PrivateIdentityResolverBox};
 use co_storage::BlockStorage;
-use futures::StreamExt;
+use futures::{pin_mut, Stream, StreamExt};
 use libipld::DefaultParams;
 use libp2p::{
 	gossipsub, identify,
@@ -118,7 +118,12 @@ impl Libp2pNetwork {
 		// run
 		let handle = tokio::runtime::Handle::current().clone();
 		tokio::task::spawn_blocking(move || {
-			handle.block_on(run(swarm, context, runtime, tasks_rx));
+			handle.block_on(run(
+				swarm,
+				context,
+				runtime,
+				tokio_stream::wrappers::UnboundedReceiverStream::new(tasks_rx),
+			));
 		});
 
 		// result
@@ -129,10 +134,10 @@ impl Libp2pNetwork {
 		NetworkTaskSpawner { tasks: self.tasks.clone() }
 	}
 
-	/// Gracefully shutdown the network stack.
+	/// Token to gracefully shutdown the network stack.
 	/// This will stop accepting new connections and waits until established connections are done.
-	pub fn shutdown(&mut self) {
-		self.shutdown.cancel();
+	pub fn shutdown(&self) -> Shutdown {
+		Shutdown { shutdown: self.shutdown.clone() }
 	}
 
 	/// Swarm events subject.
@@ -159,7 +164,18 @@ impl Libp2pNetwork {
 }
 impl Drop for Libp2pNetwork {
 	fn drop(&mut self) {
-		self.shutdown();
+		tracing::info!("application-libp2p-network-drop");
+		self.shutdown.cancel();
+	}
+}
+
+#[derive(Clone)]
+pub struct Shutdown {
+	shutdown: CancellationToken,
+}
+impl Shutdown {
+	pub fn shutdown(&self) {
+		self.shutdown.cancel()
 	}
 }
 
@@ -485,7 +501,7 @@ async fn run(
 	mut swarm: Swarm<Behaviour>,
 	context: Context,
 	mut runtime: Runtime,
-	mut tasks: tokio::sync::mpsc::UnboundedReceiver<NetworkTaskBox<Behaviour, Context>>,
+	tasks: impl Stream<Item = NetworkTaskBox<Behaviour, Context>>,
 ) {
 	// log
 	tracing::info!("network-running");
@@ -495,7 +511,9 @@ async fn run(
 
 	// handle
 	let shutdown = runtime.shutdown.child_token();
-	while runtime.is_running() || swarm.connected_peers().peekable().peek().is_some() {
+	let tasks = tasks.fuse();
+	pin_mut!(tasks);
+	while runtime.is_running() {
 		tokio::select! {
 			// to not stack them up before creating new work
 			// use biased as we always want to handle events first
@@ -505,21 +523,18 @@ async fn run(
 			_ = run_once(&mut swarm, &mut context_layer, &mut runtime) => {}
 
 			// tasks
-			task = tasks.recv() => {
-				if let Some(mut task) = task {
-					// execute
-					task.execute(&mut swarm, context_layer.layer_mut());
+			Some(mut task) = tasks.next(), if !tasks.is_done() => {
+				// execute
+				task.execute(&mut swarm, context_layer.layer_mut());
 
-					// move to pending if not complete
-					if !task.is_complete() {
-						runtime.pending_tasks.push(task);
-					}
+				// move to pending if not complete
+				if !task.is_complete() {
+					runtime.pending_tasks.push(task);
 				}
 			},
 
 			// shutdown
-			_ = shutdown.cancelled() => {
-			}
+			_ = shutdown.cancelled(), if !shutdown.is_cancelled() => {}
 		}
 	}
 

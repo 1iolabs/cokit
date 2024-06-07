@@ -1,43 +1,32 @@
 use super::{
+	co_context::{CoContext, CoContextInner},
 	identity::{create_identity_resolver, resolve_private_identity},
-	shared::{CreateCo, SharedCoBuilder, SharedCoCreator},
+	shared::{CreateCo, SharedCoCreator},
 	tracing::TracingBuilder,
 };
 use crate::{
 	drivers::network::tasks::received_heads::ReceivedHeadsNetworkTask,
-	identity::co_private_identity_resolver::CoPrivateIdentityResolver, library::find_membership::find_membership,
-	local_keypair_fetch, types::co_storage::CoBlockStorageContentMapping, CoReducer, CoReducerFactory, CoStorage,
-	LocalCoBuilder, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	identity::co_private_identity_resolver::CoPrivateIdentityResolver, local_keypair_fetch, CoReducer,
+	CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
-use async_trait::async_trait;
 use co_identity::{LocalIdentity, LocalIdentityResolver, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver};
-use co_log::EntryBlock;
 use co_primitives::CoId;
 use co_runtime::RuntimePool;
-use co_storage::BlockStorage;
 use directories::ProjectDirs;
-use futures::{Stream, TryStreamExt};
-use std::{collections::BTreeMap, fmt::Debug, mem::swap, ops::DerefMut, path::PathBuf, sync::Arc};
-use tokio::sync::RwLock;
+use std::{fmt::Debug, path::PathBuf, sync::Arc};
 use tokio_util::{
 	sync::{CancellationToken, DropGuard},
 	task::TaskTracker,
 };
 
+#[derive(Clone)]
 pub struct Application {
 	/// Shutdown the application when last reference is dropped.
 	_drop: Option<Arc<DropGuard>>,
 
-	/// The Unique Application Instance Identifier.
-	/// The Identifier should be hardcoded in the application.
-	///
-	/// Warning: When the application can have mulitple instances you need to pass a different identifier for every
-	/// instance.
-	identifier: String,
-
-	/// Application preferences path.
-	application_path: Option<PathBuf>,
+	/// Settings.
+	settings: ApplicationSettings,
 
 	/// CO Storage Driver.
 	storage: Storage,
@@ -48,25 +37,18 @@ pub struct Application {
 	/// CO Network Driver.
 	network: Option<Network>,
 
-	/// Loaded reducers.
-	reducers: Arc<RwLock<BTreeMap<CoId, CoReducer>>>,
-
-	/// Use keychain or file for Local CO.
-	keychain: bool,
-
 	/// Application shutdown token.
 	shutdown: CancellationToken,
 
 	// Tasks.
 	tasks: TaskTracker,
+
+	// CO Context.
+	co_context: CoContext,
 }
 impl Application {
-	pub fn identifier(&self) -> &str {
-		&self.identifier
-	}
-
-	pub fn application_path(&self) -> &Option<PathBuf> {
-		&self.application_path
+	pub fn settings(&self) -> &ApplicationSettings {
+		&self.settings
 	}
 
 	pub fn storage(&self) -> CoStorage {
@@ -86,8 +68,24 @@ impl Application {
 		self.tasks.clone()
 	}
 
-	pub fn runtime(&self) -> &RuntimePool {
+	pub fn runtime(&self) -> Runtime {
+		self.runtime.clone()
+	}
+
+	pub fn runtime_pool(&self) -> &RuntimePool {
 		self.runtime.runtime()
+	}
+
+	pub fn co(&self) -> &CoContext {
+		&self.co_context
+	}
+
+	pub async fn local_co_reducer(&self) -> Result<CoReducer, anyhow::Error> {
+		self.co().local_co_reducer().await
+	}
+
+	pub async fn co_reducer(&self, co: impl AsRef<CoId>) -> Result<Option<CoReducer>, anyhow::Error> {
+		self.co().co_reducer(co.as_ref()).await
 	}
 
 	/// Shutdown the application gracefully.
@@ -103,88 +101,42 @@ impl Application {
 	pub async fn create_network(&mut self, force_new_peer_id: bool) -> Result<(), anyhow::Error> {
 		// create network
 		let local_identity = self.local_identity();
-		let local_co = self.local_co_reducer().await?;
-		let network_key = local_keypair_fetch(&self.identifier, &local_co, &local_identity, force_new_peer_id)
+		let local_co = self.co_context.local_co_reducer().await?;
+		let network_key = local_keypair_fetch(&self.settings.identifier, &local_co, &local_identity, force_new_peer_id)
 			.await
 			.expect("peer-id");
 		let network = Network::new(
 			network_key,
 			self.storage(),
 			create_identity_resolver(),
-			CoPrivateIdentityResolver::new(self.clone_weak()).boxed(),
+			CoPrivateIdentityResolver::new(self.co().to_owned()).boxed(),
 		);
 
 		// shutdown
 		//  when the token has been triggered explicitly shutdown the network
-		let shutdown_network = network.clone();
-		let shutdown = self.shutdown.child_token().cancelled_owned();
-		self.tasks.spawn(async move {
-			shutdown.await;
-			shutdown_network.shutdown().await;
-		});
+		if let Some(shutdown_network) = network.shutdown().await {
+			let shutdown = self.shutdown.child_token().cancelled_owned();
+			tokio::spawn(async move {
+				shutdown.await;
+				shutdown_network.shutdown();
+			});
+		}
+
+		// replace reducer factory to rebuild them with network support after this
+		self.co_context = self.co_context.inner.with_network(Some(network.spawner())).await.into();
 
 		// assign
 		self.network = Some(network);
-
-		// clear reducers to rebuild them with network support after this
-		// we only keep local as this has no network
-		{
-			let mut reducers = self.reducers.write().await;
-			let mut next_reducers = BTreeMap::new();
-			if let Some(local) = reducers.remove("local") {
-				next_reducers.insert("local".into(), local);
-			}
-			swap(&mut next_reducers, reducers.deref_mut());
-		}
 
 		// to be able to receive updates anytime we add a static heads handler
 		self.network
 			.as_ref()
 			.unwrap()
 			.spawner()
-			.spawn(ReceivedHeadsNetworkTask::new(self.clone_weak()))?;
+			.spawn(ReceivedHeadsNetworkTask::new(self.co().clone()))?;
 
 		// done
 		Ok(())
-	}
-
-	/// Creates a CoReducer instance of the Local CO.
-	async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
-		let local_co = LocalCoBuilder::new(
-			self.identifier.clone(),
-			self.application_path.clone(),
-			self.keychain,
-			self.local_identity(),
-			initialize,
-		);
-		let local_co_reducer = local_co
-			.build(self.storage(), self.runtime.clone(), self.shutdown(), self.tasks())
-			.await?;
-		Ok(local_co_reducer)
-	}
-
-	/// Creates a CoReducer instance a CO which we have a membership for.
-	///
-	/// TODO: Identity
-	///   - Which identity should write to the parent co? If its local we are fine.
-	async fn create_co_instance(
-		&self,
-		parent: CoReducer,
-		co: &CoId,
-		initialize: bool,
-	) -> Result<Option<CoReducer>, anyhow::Error> {
-		let membership = match find_membership(&parent, co).await? {
-			Some(m) => m,
-			None => return Ok(None),
-		};
-		let reducer = SharedCoBuilder::new(parent, membership)
-			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
-			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
-			.with_network(self.network.as_ref().map(|n| n.spawner()))
-			.with_initialize(initialize)
-			.build(self.storage(), self.runtime.clone(), self.local_identity())
-			.await?;
-		Ok(Some(reducer))
 	}
 
 	/// Access Identity.
@@ -199,95 +151,6 @@ impl Application {
 		LocalIdentityResolver::default().private_identity("did:local:device").unwrap()
 	}
 
-	/// Get instance of Local CoReducer.
-	pub async fn local_co_reducer(&self) -> Result<CoReducer, anyhow::Error> {
-		let co = "local";
-
-		// has one?
-		{
-			let reducers = self.reducers.read().await;
-			let reducer = reducers.get(co);
-			if let Some(reducer) = reducer {
-				return Ok(reducer.clone());
-			}
-		}
-
-		// create
-		let reducer = self.create_local_co_instance(true).await?;
-
-		// store
-		self.reducers.write().await.insert(co.into(), reducer.clone());
-
-		// result
-		Ok(reducer)
-	}
-
-	/// Get instance of CoReducer.
-	/// Returns None if `co` membership could not be found.
-	pub async fn co_reducer(&self, co: impl AsRef<CoId>) -> Result<Option<CoReducer>, anyhow::Error> {
-		let co = co.as_ref();
-
-		// has one?
-		{
-			let reducers = self.reducers.read().await;
-			let reducer = reducers.get(co);
-			if let Some(reducer) = reducer {
-				return Ok(Some(reducer.clone()));
-			}
-		}
-
-		// create
-		let reducer = if co.as_str() == "local" {
-			Some(self.create_local_co_instance(true).await?)
-		} else {
-			let local = self.local_co_reducer().await?;
-			self.create_co_instance(local, co, true).await?
-		};
-
-		// store
-		if let Some(reducer_cache) = &reducer {
-			self.reducers.write().await.insert(co.to_owned(), reducer_cache.clone());
-		}
-
-		// result
-		Ok(reducer)
-	}
-
-	/// Get a stream to the log entries.
-	/// Starting at the latest.
-	pub async fn co_log_entries(
-		&self,
-		co: impl AsRef<CoId>,
-	) -> Result<
-		(
-			CoStorage,
-			impl Stream<Item = Result<EntryBlock<<CoStorage as BlockStorage>::StoreParams>, anyhow::Error>>,
-			Option<CoBlockStorageContentMapping>,
-		),
-		anyhow::Error,
-	> {
-		let co = co.as_ref();
-
-		// create
-		let initialized = true;
-		let uninitialized_reducer = if co.as_str() == "local" {
-			self.create_local_co_instance(initialized).await?
-		} else {
-			let local = self.local_co_reducer().await?;
-			self.create_co_instance(local, co, initialized)
-				.await?
-				.ok_or(anyhow!("Co not found: {}", co))?
-		};
-		let (storage, reducer, mapping) = uninitialized_reducer.into_inner().ok_or(anyhow!("Invalid reference"))?;
-		let log = reducer.into_log();
-
-		// stream
-		let stream = log.into_stream().map_err(|e| e.into());
-
-		// result
-		Ok((storage, stream, mapping))
-	}
-
 	/// Create a new CO.
 	///
 	/// TODO: Identity
@@ -298,7 +161,7 @@ impl Application {
 		I: PrivateIdentity + Debug + Send + Sync + 'static,
 	{
 		// local
-		let local = self.local_co_reducer().await?;
+		let local = self.co_context.local_co_reducer().await?;
 
 		// create
 		let co = SharedCoCreator::new(local, create)
@@ -308,7 +171,7 @@ impl Application {
 			.await?;
 
 		// load
-		Ok(self.co_reducer(&co).await?.ok_or(anyhow!("Open CO failed: {}", co))?)
+		Ok(self.co().co_reducer(&co).await?.ok_or(anyhow!("Open CO failed: {}", co))?)
 	}
 
 	/// Initialize application.
@@ -331,43 +194,11 @@ impl Application {
 		// result
 		Ok(())
 	}
-
-	/// Create a clone which will not block the shutdown.
-	/// Only for internal references.
-	/// TODO: Remove and move factory into own struct?
-	fn clone_weak(&self) -> Self {
-		Self {
-			identifier: self.identifier.clone(),
-			application_path: self.application_path.clone(),
-			storage: self.storage.clone(),
-			runtime: self.runtime.clone(),
-			network: self.network.clone(),
-			reducers: self.reducers.clone(),
-			keychain: self.keychain.clone(),
-			_drop: None,
-			shutdown: self.shutdown.clone(),
-			tasks: self.tasks.clone(),
-		}
-	}
-}
-impl Clone for Application {
-	fn clone(&self) -> Self {
-		tracing::trace!("application-clone");
-		let mut result = self.clone_weak();
-		result._drop = self._drop.clone();
-		result
-	}
-}
-#[async_trait]
-impl CoReducerFactory for Application {
-	async fn co_reducer(&self, co: &CoId) -> Result<Option<CoReducer>, anyhow::Error> {
-		Application::co_reducer(&self, co).await
-	}
 }
 impl std::fmt::Debug for Application {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Application")
-			.field("identifier", &self.identifier)
+			.field("identifier", &self.settings.identifier)
 			// .field("application_path", &self.application_path)
 			// .field("storage", &self.storage)
 			// .field("runtime", &self.runtime)
@@ -376,6 +207,26 @@ impl std::fmt::Debug for Application {
 			// .field("keychain", &self.keychain)
 			.finish()
 	}
+}
+
+#[derive(Debug, Clone)]
+pub struct ApplicationSettings {
+	/// The Unique Application Instance Identifier.
+	/// The Identifier should be hardcoded in the application.
+	///
+	/// Warning: When the application can have mulitple instances you need to pass a different identifier for every
+	/// instance.
+	pub identifier: String,
+
+	/// Application preferences path.
+	///
+	/// Normally composed of `{base_path}/etc/{identifier}`.
+	/// The Local CO read method tries to read states of all applications by searching for
+	/// `{application_path}/../*/local.cbor` files.
+	pub application_path: Option<PathBuf>,
+
+	/// Use keychain or file for Local CO.
+	pub keychain: bool,
 }
 
 pub struct ApplicationBuilder {
@@ -425,25 +276,49 @@ impl ApplicationBuilder {
 	}
 
 	pub async fn build(self) -> Result<Application, anyhow::Error> {
+		let shutdown = CancellationToken::new();
+		let tasks = TaskTracker::new();
+		let local_identity = LocalIdentityResolver::default().private_identity("did:local:device").unwrap();
+		let runtime = Runtime::new();
+
 		// log
 		self.tracing.init()?;
 
-		// instance
-		let shutdown = CancellationToken::new();
-		let result = Application {
-			network: None,
-			storage: match &self.path {
-				Some(path) => Storage::new(path.join("data")),
-				None => Storage::new_memory(),
-			},
-			runtime: Runtime::new(),
+		// storage
+		let storage = match &self.path {
+			Some(path) => Storage::new(path.join("data")),
+			None => Storage::new_memory(),
+		};
+
+		// settings
+		let settings = ApplicationSettings {
 			application_path: self.path.map(|path| path.join("etc").join(&self.identifier)),
 			identifier: self.identifier,
 			keychain: self.keychain,
-			reducers: Default::default(),
+		};
+
+		// co
+		let co_context = CoContextInner::new(
+			settings.clone(),
+			shutdown.child_token(),
+			tasks.clone(),
+			local_identity.clone(),
+			None,
+			storage.storage(),
+			runtime.clone(),
+		)
+		.into();
+
+		// instance
+		let result = Application {
+			settings,
+			network: None,
+			storage,
+			runtime: Runtime::new(),
+			co_context,
 			_drop: Some(Arc::new(shutdown.clone().drop_guard())),
 			shutdown,
-			tasks: TaskTracker::new(),
+			tasks,
 		};
 
 		// init

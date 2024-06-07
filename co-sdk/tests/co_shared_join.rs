@@ -78,7 +78,7 @@ async fn test_co_shared_join() {
 				.with_trusted_peer(peer1.application.network().map(|network| network.peer_id()).unwrap())
 				.with_heads(shared_co_heads, shared_co_state)
 				.join(
-					peer2.application.runtime(),
+					peer2.application.runtime_pool(),
 					Some(peer2.application.network().unwrap().spawner()),
 					peer2.application.storage(),
 					peer2.application.local_co_reducer().await.unwrap(),
@@ -191,7 +191,7 @@ async fn test_co_shared_join_encrypted() {
 				.with_encryption(shared_co_secret.into())
 				.with_heads(shared_co_heads, shared_co_state)
 				.join(
-					peer2.application.runtime(),
+					peer2.application.runtime_pool(),
 					Some(peer2.application.network().unwrap().spawner()),
 					peer2.application.storage(),
 					peer2.application.local_co_reducer().await.unwrap(),

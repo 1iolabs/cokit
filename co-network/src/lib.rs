@@ -13,7 +13,7 @@ pub use didcontact::{
 };
 pub use discovery::DidDiscoveryMessage;
 pub use library::{clone_key_pair::clone_key_pair, static_peer_provider::StaticPeerProvider};
-pub use network::{Behaviour, Context, Libp2pNetwork, Libp2pNetworkConfig, NetworkEvent, NetworkMode};
+pub use network::{Behaviour, Context, Libp2pNetwork, Libp2pNetworkConfig, NetworkEvent, NetworkMode, Shutdown};
 pub use types::{
 	error::NetworkError,
 	layer_behaviour::{Layer, LayerBehaviour},

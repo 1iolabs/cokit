@@ -1,4 +1,5 @@
 pub mod application;
+pub mod co_context;
 pub mod core_resolver;
 pub mod identity;
 pub mod local;

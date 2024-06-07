@@ -10,6 +10,7 @@ mod types;
 
 pub use application::{
 	application::{Application, ApplicationBuilder},
+	co_context::CoContext,
 	core_resolver::{CoCoreResolver, CoreResolver, CoreResolverError, SingleCoreResolver},
 	local::LocalCoBuilder,
 	reducer::{Reducer, ReducerBuilder, ReducerChangedContext, ReducerChangedHandler},

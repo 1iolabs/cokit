@@ -1,4 +1,4 @@
-use super::{identity::create_identity_resolver, reducer::ReducerChangedHandler};
+use super::{application::ApplicationSettings, identity::create_identity_resolver, reducer::ReducerChangedHandler};
 use crate::{
 	library::{
 		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
@@ -21,7 +21,7 @@ use co_runtime::RuntimePool;
 use co_storage::{BlockStorage, EncryptedBlockStorage};
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use libipld::{Cid, DefaultParams};
-use std::{collections::BTreeMap, path::PathBuf};
+use std::collections::BTreeMap;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 pub const LOCAL_CO_ID: &str = "local";
@@ -31,16 +31,7 @@ pub const LOCAL_CO_ID: &str = "local";
 #[derive(Debug, Clone)]
 pub struct LocalCoBuilder {
 	/// Our application identifier.
-	identifier: String,
-
-	/// The application base path.
-	/// Normally compused of `{base_path}/etc/{identifier}`.
-	/// The read method tries to read states of all applications by searching for `{application_path}/../*/local.cbor`
-	/// files.
-	application_path: Option<PathBuf>,
-
-	/// Whether to use the keychain or a file.
-	keychain: bool,
+	settings: ApplicationSettings,
 
 	/// The local identity.
 	identity: LocalIdentity,
@@ -49,14 +40,8 @@ pub struct LocalCoBuilder {
 	initialize: bool,
 }
 impl LocalCoBuilder {
-	pub fn new(
-		identifier: String,
-		application_path: Option<PathBuf>,
-		keychain: bool,
-		identity: LocalIdentity,
-		initialize: bool,
-	) -> Self {
-		Self { identifier, application_path, keychain, identity, initialize }
+	pub fn new(settings: ApplicationSettings, identity: LocalIdentity, initialize: bool) -> Self {
+		Self { settings, identity, initialize }
 	}
 
 	pub fn with_initialize(self, initialize: bool) -> Self {
@@ -72,21 +57,21 @@ impl LocalCoBuilder {
 		tasks: TaskTracker,
 	) -> Result<CoReducer, anyhow::Error> {
 		// key
-		let key: Box<dyn LocalSecret + Send + Sync + 'static> = if self.keychain {
+		let key: Box<dyn LocalSecret + Send + Sync + 'static> = if self.settings.keychain {
 			Box::new(KeychainLocalSecret::new("co.app".to_owned(), self.identity.identity().to_owned()))
-		} else if let Some(application_path) = &self.application_path {
+		} else if let Some(application_path) = &self.settings.application_path {
 			Box::new(FileLocalSecret::new(application_path.parent().expect("etc folder").join("key.cbor")))
 		} else {
 			Box::new(MemoryLocalSecret::new())
 		};
 
 		// create
-		match &self.application_path {
+		match &self.settings.application_path {
 			Some(application_path) => {
 				let config_path = application_path
 					.parent()
 					.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", application_path))?;
-				let mut locals = FileLocals::new(config_path.to_owned(), self.identifier.clone());
+				let mut locals = FileLocals::new(config_path.to_owned(), self.settings.identifier.clone());
 				locals.update().await?;
 				Ok(LocalCoInstance::create(runtime, self, storage, shutdown, tasks, locals, key)
 					.await?
@@ -145,7 +130,7 @@ where
 			let mut heads = local.heads.clone();
 
 			// get local and log
-			tracing::trace!(app = ?local_co.identifier, state = ?local.state, heads = ?local.heads, "local-co-read");
+			tracing::trace!(app = ?local_co.settings.identifier, state = ?local.state, heads = ?local.heads, "local-co-read");
 
 			// load additional encryption mappings
 			if let Some(mapping) = &local.mapping {
@@ -175,7 +160,8 @@ where
 		let mapping = CoBlockStorageContentMapping::new(encrypted_storage.content_mapping());
 
 		// result
-		let result = Self { locals, encrypted_storage: encrypted_storage.clone(), identifier: local_co.identifier };
+		let result =
+			Self { locals, encrypted_storage: encrypted_storage.clone(), identifier: local_co.settings.identifier };
 
 		// write
 		reducer.add_change_handler(Box::new(result.clone()));

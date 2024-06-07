@@ -4,7 +4,8 @@ pub mod tasks;
 use self::tasks::did_discovery::{DidDiscoverySubscribe, DidDiscoveryUnsubscribe};
 use co_identity::{IdentityResolver, PrivateIdentity, PrivateIdentityResolver};
 use co_network::{
-	discovery::Discovery, Behaviour, Context, FnOnceNetworkTask, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner,
+	discovery::Discovery, Behaviour, Context, FnOnceNetworkTask, Libp2pNetwork, Libp2pNetworkConfig,
+	NetworkTaskSpawner, Shutdown,
 };
 use co_storage::BlockStorage;
 use futures::{channel::oneshot, stream, Stream, StreamExt, TryStreamExt};
@@ -56,10 +57,12 @@ impl Network {
 		Ok(rx.await?)
 	}
 
-	/// Shutdown the network.
-	pub async fn shutdown(&self) {
+	/// Network shutdown token.
+	pub async fn shutdown(&self) -> Option<Shutdown> {
 		if let Some(network) = self.network.lock().await.as_mut() {
-			network.shutdown();
+			Some(network.shutdown())
+		} else {
+			None
 		}
 	}
 
