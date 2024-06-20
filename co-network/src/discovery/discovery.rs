@@ -63,10 +63,11 @@ impl Discovery {
 			Discovery::Topic(_item) => {
 				// none?
 			},
-			Discovery::Rendezvous(item) =>
+			Discovery::Rendezvous(item) => {
 				for address in item.addresses.iter() {
 					address.parse::<Multiaddr>()?;
-				},
+				}
+			},
 			Discovery::Peer(item) => {
 				PeerId::from_bytes(&item.peer)?;
 			},
@@ -456,9 +457,9 @@ where
 						// parse string
 						let data = match from_utf8(&message.data) {
 							Ok(s) => s,
-							Err(err) => {
+							Err(_err) => {
 								#[cfg(debug_assertions)]
-								tracing::debug!(?err, "recevice-invalid-message");
+								tracing::debug!(err = ?_err, "recevice-invalid-message");
 								return;
 							},
 						};
@@ -804,11 +805,11 @@ async fn didcomm_receive<R: IdentityResolver>(
 	for didcomm_private in contexts {
 		match didcomm_private.receive(&resolver, data).await {
 			Ok((header, body)) => return Some((header, body, didcomm_private)),
-			Err(err) => {
+			Err(_err) => {
 				// note: this will happen on purpose because we check the message against all identities and only
 				// one will match.
 				#[cfg(debug_assertions)]
-				tracing::debug!(?err, ?data, "jwe-receive-failed");
+				tracing::debug!(err = ?_err, ?data, "jwe-receive-failed");
 			},
 		}
 	}

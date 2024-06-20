@@ -1,0 +1,54 @@
+stages:
+  - test
+  - build
+  - publish
+
+test:
+  stage: test
+  image: docker-registry.intranet.1io.com/extern/rust:1.76-alpine
+  script:
+    - cargo test
+
+build:
+  stage: build
+  image: docker-registry.intranet.1io.com/extern/rust:1.76-alpine
+  script:
+    - echo "building binaries"
+    - cargo build --release
+    - echo "building cores"
+    - rustup target add wasm32-unknown-unknown
+    - ./target/release/co-cli core-build-builtin
+    - echo "checking for local changes"
+    - git diff-files --quiet
+  artifacts:
+    paths:
+      - target/release/co-cli
+      - target/release/daemon
+      - target/wasm32-unknown-unknown/release/*.wasm
+
+rustdoc:
+  stage: build
+  image: docker-registry.intranet.1io.com/extern/rust:1.76-alpine
+  script:
+    - cargo doc --no-deps
+  artifacts:
+    paths:
+      - target/doc
+
+pages:
+  stage: publish
+  image: docker-registry.intranet.1io.com/extern/rust:1.76-alpine
+  dependencies:
+    - build
+    - rustdoc
+  script:
+    - mkdir -p public
+    - mv target/doc public/doc
+    - mv target/release/* public/
+    - mv target/wasm32-unknown-unknown/release/* public/
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
+
