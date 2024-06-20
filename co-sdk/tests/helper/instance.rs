@@ -9,7 +9,7 @@ impl Instance {
 		let identifier = format!("network-test-{}", instance);
 
 		// log
-		TracingBuilder::new(identifier.clone(), None)
+		TracingBuilder::new("test".into(), None)
 			.with_bunyan_logging(Some(current_dir().unwrap().join("../data/log/co.log")))
 			//.with_open_telemetry( "http://localhost:4317")
 			.init()

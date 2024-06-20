@@ -25,6 +25,7 @@ co-runtime = { path = "../co-runtime" }
 co-storage = { path = "../co-storage" }
 directories = "5.0.1"
 futures = { workspace = true }
+hmac = "0.12.1"
 hyper = { workspace = true }
 keyring = "2.3.2"
 libipld = { workspace = true, features = ["default", "serde-codec"] }
@@ -37,6 +38,7 @@ rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
+sha2 = "0.10.8"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true, features = ["sync"] }

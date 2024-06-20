@@ -30,9 +30,17 @@ pub use co_storage::{
 	store_file, unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer, BlockStat, BlockStorage,
 	BlockStorageContentMapping, BlockStorageExt, StorageError,
 };
-pub use drivers::{network::Network, runtime::Runtime, storage::Storage};
+pub use drivers::{
+	network::{
+		token::{CoToken, CoTokenParameters},
+		Network,
+	},
+	runtime::Runtime,
+	storage::Storage,
+};
 pub use identity::did_key::DidKeyProvider;
 pub use library::{
+	find_co_secret::find_co_secret,
 	find_membership::{find_membership, find_memberships},
 	generate_random_name::generate_random_name,
 	keystore_fetch::keystore_fetch,
@@ -40,6 +48,7 @@ pub use library::{
 	memberships::memberships,
 	node_stream::NodeStream,
 	shared_co_join::{SharedCoJoin, SharedCoJoinError},
+	task_spawner::TaskSpawner,
 };
 pub use pin::pin::PinAPI;
 pub use types::{

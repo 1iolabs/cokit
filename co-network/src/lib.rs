@@ -1,4 +1,4 @@
-mod bitswap;
+pub mod bitswap;
 pub mod didcomm;
 mod didcontact;
 pub mod discovery;
@@ -7,7 +7,6 @@ mod library;
 mod network;
 mod types;
 
-pub use bitswap::storage::NetworkBlockStorage;
 pub use didcontact::{
 	create_gossipsub, publish, resolve, subscribe, unsubscribe, Error, RendezvousPoint, ResolveError, ResolveResult,
 };
@@ -18,7 +17,7 @@ pub use types::{
 	error::NetworkError,
 	layer_behaviour::{Layer, LayerBehaviour},
 	layer_provider::{DiscoveryLayerBehaviourProvider, HeadsLayerBehaviourProvider},
-	network_task::{FnOnceNetworkTask, NetworkTask, NetworkTaskBox, NetworkTaskSpawner},
+	network_task::{FnOnceNetworkTask, NetworkTask, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner},
 	peer_provider::PeerProvider,
 	provider::{
 		BitswapBehaviourProvider, DidcommBehaviourProvider, GossipsubBehaviourProvider, MdnsBehaviourProvider,

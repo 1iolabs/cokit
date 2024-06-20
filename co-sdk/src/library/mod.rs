@@ -1,6 +1,7 @@
 pub mod cancel;
 pub mod co_peer_provider;
 pub mod co_state;
+pub mod find_co_secret;
 pub mod find_membership;
 pub mod fs_read;
 pub mod fs_write;
@@ -13,4 +14,5 @@ pub mod memberships;
 pub mod node_stream;
 pub mod push_heads;
 pub mod shared_co_join;
+pub mod task_spawner;
 pub mod to_plain;

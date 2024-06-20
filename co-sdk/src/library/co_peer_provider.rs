@@ -8,7 +8,7 @@ use co_identity::{IdentityResolverBox, PrivateIdentity};
 use co_network::{
 	discovery::{self, Discovery},
 	heads::HeadsState,
-	DidDiscoveryMessage, PeerProvider,
+	DidDiscoveryMessage, NetworkTaskSpawner, PeerProvider,
 };
 use co_primitives::{CoId, Network, OptionLink};
 use futures::Stream;

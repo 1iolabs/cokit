@@ -1,19 +1,23 @@
 use super::{application::ApplicationSettings, shared::SharedCoBuilder};
 use crate::{
-	drivers::network::CoNetworkTaskSpawner, library::find_membership::find_membership,
-	types::co_storage::CoBlockStorageContentMapping, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	drivers::network::{token::CoToken, CoNetworkTaskSpawner},
+	library::{find_co_secret::find_co_secret, find_membership::find_membership},
+	types::co_storage::CoBlockStorageContentMapping,
+	CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime, TaskSpawner, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_identity::{LocalIdentity, PrivateIdentity};
 use co_log::EntryBlock;
+use co_network::bitswap;
 use co_primitives::CoId;
 use co_storage::BlockStorage;
 use futures::{Stream, TryStreamExt};
+use libp2p::PeerId;
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 use tokio::sync::RwLock;
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
 pub struct CoContext {
@@ -67,12 +71,50 @@ impl CoReducerFactory for CoContext {
 		self.inner.co_reducer(co).await
 	}
 }
+#[async_trait]
+impl bitswap::StorageResolver<CoStorage> for CoContext {
+	async fn resolve_storage(
+		&self,
+		remote_peer: Option<&PeerId>,
+		tokens: &[bitswap::Token],
+	) -> Result<CoStorage, anyhow::Error> {
+		// use CO from first valid token
+		for token in tokens {
+			if let Some(co_token) = CoToken::from_bitswap_token(token).ok() {
+				// get co
+				if let Some(co) = self.co_reducer(&co_token.body.1).await? {
+					let parent = match co.parent_id() {
+						Some(id) => self.co_reducer(id).await?.ok_or(anyhow!("Unknown CO: {}", id)),
+						None => Err(anyhow!("Unsupported CO: {}", co_token.body.1)),
+					}?;
+					let secret = find_co_secret(&parent, &co).await?;
+
+					// verify remote peer if the CO is encrypted and this is an non local request
+					match (remote_peer, &secret) {
+						(Some(remote_peer), Some(secret)) =>
+							if !co_token.verify(secret, remote_peer) {
+								// check next token
+								continue;
+							},
+						_ => {},
+					};
+
+					// get storage
+					return Ok(co.storage());
+				}
+			}
+		}
+
+		// use the root storage (unencrypted)
+		Ok(self.inner.storage())
+	}
+}
 
 pub(crate) struct CoContextInner {
 	settings: ApplicationSettings,
 
 	shutdown: CancellationToken,
-	tasks: TaskTracker,
+	tasks: TaskSpawner,
 
 	local_identity: LocalIdentity,
 
@@ -87,13 +129,18 @@ impl CoContextInner {
 	pub(crate) fn new(
 		settings: ApplicationSettings,
 		shutdown: CancellationToken,
-		tasks: TaskTracker,
+		tasks: TaskSpawner,
 		local_identity: LocalIdentity,
 		network: Option<CoNetworkTaskSpawner>,
 		storage: CoStorage,
 		runtime: Runtime,
 	) -> Self {
 		Self { settings, shutdown, tasks, local_identity, network, storage, runtime, reducers: Default::default() }
+	}
+
+	/// Get the root storage.
+	pub fn storage(&self) -> CoStorage {
+		self.storage.clone()
 	}
 
 	/// Clone with network.
@@ -204,7 +251,7 @@ impl CoContextInner {
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
 			.with_network(self.network.clone())
 			.with_initialize(initialize)
-			.build(self.storage.clone(), self.runtime.clone(), identity)
+			.build(self.tasks.clone(), self.storage.clone(), self.runtime.clone(), identity)
 			.await?;
 		Ok(Some(reducer))
 	}

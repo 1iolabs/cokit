@@ -10,7 +10,7 @@ use crate::{
 		cores::{CO_CORE_NAME_CO, CO_CORE_NAME_PIN, CO_CORE_PIN},
 	},
 	CoCoreResolver, CoReducer, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, ReducerChangedContext, Runtime,
-	CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -22,7 +22,7 @@ use co_storage::{BlockStorage, EncryptedBlockStorage};
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use libipld::{Cid, DefaultParams};
 use std::collections::BTreeMap;
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio_util::sync::CancellationToken;
 
 pub const LOCAL_CO_ID: &str = "local";
 
@@ -54,7 +54,7 @@ impl LocalCoBuilder {
 		storage: CoStorage,
 		runtime: Runtime,
 		shutdown: CancellationToken,
-		tasks: TaskTracker,
+		tasks: TaskSpawner,
 	) -> Result<CoReducer, anyhow::Error> {
 		// key
 		let key: Box<dyn LocalSecret + Send + Sync + 'static> = if self.settings.keychain {
@@ -109,7 +109,7 @@ where
 		local_co: LocalCoBuilder,
 		storage: CoStorage,
 		shutdown: CancellationToken,
-		tasks: TaskTracker,
+		tasks: TaskSpawner,
 		mut locals: L,
 		key: Box<dyn LocalSecret + Send + Sync + 'static>,
 	) -> Result<(Self, CoReducer), anyhow::Error> {
@@ -172,7 +172,7 @@ where
 		}
 
 		// reducer
-		let co_reducer = CoReducer::new(LOCAL_CO_ID.into(), runtime, reducer, Some(mapping));
+		let co_reducer = CoReducer::new(LOCAL_CO_ID.into(), None, runtime, reducer, Some(mapping));
 
 		// watch
 		let watch_reducer: CoReducer = co_reducer.clone();

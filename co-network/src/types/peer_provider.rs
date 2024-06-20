@@ -9,6 +9,7 @@ pub trait PeerProvider {
 	fn peers(&self) -> impl Stream<Item = BTreeSet<PeerId>> + Send + 'static;
 
 	/// Same as `peers` but only emit added peers.
+	/// Initially all currently connected peers are returned.
 	fn peers_added(&self) -> impl Stream<Item = BTreeSet<PeerId>> + Send + 'static {
 		let peers_stream = self.peers();
 		async_stream::stream! {

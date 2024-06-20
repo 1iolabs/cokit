@@ -1,6 +1,7 @@
 use crate::{
 	application::identity::create_identity_resolver, drivers::network::CoNetworkTaskSpawner, state, CoCoreResolver,
-	CoReducer, CoStorage, ReducerBuilder, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CoReducer, CoStorage, CoToken, CoTokenParameters, ReducerBuilder, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use co_core_co::Co;
@@ -8,10 +9,10 @@ use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_identity::{IdentityBox, PrivateIdentity};
 use co_log::Log;
-use co_network::{NetworkBlockStorage, StaticPeerProvider};
-use co_primitives::{tags, CoId, Network};
+use co_network::{bitswap::NetworkBlockStorage, StaticPeerProvider};
+use co_primitives::{tags, CoId, Network, Secret};
 use co_runtime::RuntimePool;
-use co_storage::{BlockStorage, EncryptedBlockStorage, Secret};
+use co_storage::{BlockStorage, EncryptedBlockStorage};
 use futures::{stream, StreamExt, TryStreamExt};
 use libipld::Cid;
 use libp2p::PeerId;
@@ -99,7 +100,7 @@ impl SharedCoJoin {
 		// storage
 		let (storage, encrypted_storage) = {
 			if let Some(key) = &self.key {
-				let encrypted_storage = EncryptedBlockStorage::new(storage, key.clone(), Default::default());
+				let encrypted_storage = EncryptedBlockStorage::new(storage, key.clone().into(), Default::default());
 				(CoStorage::new(encrypted_storage.clone()), Some(encrypted_storage))
 			} else {
 				(storage, None)
@@ -116,6 +117,13 @@ impl SharedCoJoin {
 				NetworkBlockStorage::new(storage.clone(), network.clone(), peer_provider, Duration::from_secs(1));
 			if let Some(encrypted) = &encrypted_storage {
 				network_storage.set_mapping(encrypted.content_mapping());
+			}
+			if let Some(shared_secret) = &self.key {
+				let token = CoToken::new(shared_secret, CoTokenParameters(network.local_peer_id(), self.id.clone()))
+					.map_err(|e| SharedCoJoinError::Network(e.into()))?
+					.to_bitswp_token()
+					.map_err(|e| SharedCoJoinError::Network(e.into()))?;
+				network_storage.set_tokens(vec![token]);
 			}
 			CoStorage::new(network_storage)
 		} else {
@@ -226,6 +234,10 @@ pub enum SharedCoJoinError {
 
 	#[error("Reducer failed")]
 	Reducer(#[source] anyhow::Error),
+
+	/// Network error.
+	#[error("Network failed")]
+	Network(#[source] anyhow::Error),
 
 	/// No state could be computed. This indicates corruption or an empty CO which can not be joined.
 	#[error("No state")]

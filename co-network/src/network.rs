@@ -1,5 +1,6 @@
 use crate::{
-	bitswap::bitswap::BitswapBlockStorage, didcomm, discovery, heads, types::provider::BitswapBehaviourProvider,
+	bitswap, didcomm, discovery, heads,
+	types::{network_task::TokioNetworkTaskSpawner, provider::BitswapBehaviourProvider},
 	DidcommBehaviourProvider, DiscoveryLayerBehaviourProvider, FnOnceNetworkTask, GossipsubBehaviourProvider,
 	HeadsLayerBehaviourProvider, Layer, LayerBehaviour, NetworkError, NetworkTaskBox, NetworkTaskSpawner,
 };
@@ -21,6 +22,7 @@ use libp2p_bitswap::{Bitswap, BitswapEvent};
 use rxrust::prelude::*;
 use std::{sync::Arc, task::Poll, time::Duration};
 use tokio_util::sync::CancellationToken;
+use tracing::Instrument;
 
 pub type EventsSubject<E> = SubjectThreads<Arc<SwarmEvent<E>>, ()>;
 
@@ -31,26 +33,28 @@ pub struct Libp2pNetwork {
 	events: EventsSubject<NetworkEvent>,
 }
 impl Libp2pNetwork {
-	pub fn new<S, R, P>(
+	pub fn new<S, R, P, T>(
+		identifier: String,
 		config: Libp2pNetworkConfig,
-		storage: S,
+		storage_resolver: T,
 		resolver: R,
 		private_resolver: P,
 	) -> anyhow::Result<Libp2pNetwork>
 	where
 		S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + 'static,
+		T: bitswap::StorageResolver<S> + Send + Sync + 'static,
 		R: IdentityResolver + Clone + Send + Sync + 'static,
 		P: PrivateIdentityResolver + Clone + Send + Sync + 'static,
 	{
 		let resolver = IdentityResolverBox::new(resolver);
 		let private_resolver = PrivateIdentityResolverBox::new(private_resolver);
 		let local_peer_id = PeerId::from(config.keypair.public().clone());
-		let bitswap_local_peer_id = local_peer_id.clone();
 		// let kademlia_config: KademliaConfig = Default::default();
 		let gossipsub_config = gossipsub::ConfigBuilder::default()
 			.max_transmit_size(256 * 1024)
 			.build()
 			.expect("valid config");
+		let bitswap_identifier = identifier.clone();
 		let behaviour = Behaviour {
 			identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
 				"/ipfs/0.1.0".into(),
@@ -62,10 +66,10 @@ impl Libp2pNetwork {
 			// kademlia_config),
 			bitswap: Bitswap::new(
 				Default::default(),
-				BitswapBlockStorage::new(storage),
+				bitswap::BitswapBlockStorage::new(storage_resolver),
 				Box::new(move |t| {
 					tokio::spawn(async move {
-						let span = tracing::trace_span!("bitswap", peer = ?bitswap_local_peer_id);
+						let span = tracing::trace_span!("bitswap", application = bitswap_identifier);
 						let _span_enter = span.enter();
 						t.await
 					});
@@ -118,20 +122,18 @@ impl Libp2pNetwork {
 		// run
 		let handle = tokio::runtime::Handle::current().clone();
 		tokio::task::spawn_blocking(move || {
-			handle.block_on(run(
-				swarm,
-				context,
-				runtime,
-				tokio_stream::wrappers::UnboundedReceiverStream::new(tasks_rx),
-			));
+			handle.block_on(
+				run(swarm, context, runtime, tokio_stream::wrappers::UnboundedReceiverStream::new(tasks_rx))
+					.instrument(tracing::trace_span!("network", application = identifier)),
+			);
 		});
 
 		// result
 		Ok(Self { config, shutdown, tasks: tasks_tx, events })
 	}
 
-	pub fn spawner(&self) -> NetworkTaskSpawner<Behaviour, Context> {
-		NetworkTaskSpawner { tasks: self.tasks.clone() }
+	pub fn spawner(&self) -> TokioNetworkTaskSpawner<Behaviour, Context> {
+		TokioNetworkTaskSpawner { tasks: self.tasks.clone() }
 	}
 
 	/// Token to gracefully shutdown the network stack.
@@ -495,7 +497,6 @@ fn set_network_mode(_behaviour: &mut Behaviour, _mode: NetworkMode) {
 	// }
 }
 
-#[tracing::instrument(skip(swarm, context, runtime, tasks), fields(peer = ?swarm.local_peer_id()))]
 async fn run(
 	mut swarm: Swarm<Behaviour>,
 	context: Context,

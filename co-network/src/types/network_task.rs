@@ -30,14 +30,20 @@ where
 }
 pub type NetworkTaskBox<B, C> = Box<dyn NetworkTask<B, C> + Send + 'static>;
 
-pub struct NetworkTaskSpawner<B, C> {
+pub struct TokioNetworkTaskSpawner<B, C> {
 	pub(crate) tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<B, C>>,
 }
-impl<B, C> NetworkTaskSpawner<B, C>
+
+impl<B, C> Clone for TokioNetworkTaskSpawner<B, C> {
+	fn clone(&self) -> Self {
+		Self { tasks: self.tasks.clone() }
+	}
+}
+impl<B, C> NetworkTaskSpawner<B, C> for TokioNetworkTaskSpawner<B, C>
 where
 	B: NetworkBehaviour,
 {
-	pub fn spawn<T>(&self, task: T) -> Result<(), NetworkError>
+	fn spawn<T>(&self, task: T) -> Result<(), NetworkError>
 	where
 		T: NetworkTask<B, C> + Send + 'static,
 	{
@@ -45,10 +51,14 @@ where
 		Ok(())
 	}
 }
-impl<B, C> Clone for NetworkTaskSpawner<B, C> {
-	fn clone(&self) -> Self {
-		Self { tasks: self.tasks.clone() }
-	}
+
+pub trait NetworkTaskSpawner<B, C>
+where
+	B: NetworkBehaviour,
+{
+	fn spawn<T>(&self, task: T) -> Result<(), NetworkError>
+	where
+		T: NetworkTask<B, C> + Send + 'static;
 }
 
 pub struct FnOnceNetworkTask<F, B, C>

@@ -1,4 +1,4 @@
-use crate::CoReducerFactory;
+use crate::{CoReducerFactory, TaskSpawner};
 use co_network::{heads, HeadsLayerBehaviourProvider, NetworkTask};
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
@@ -9,10 +9,11 @@ use libp2p::{
 /// This structure essentially joins the received heads into the respective co reducer.
 pub struct ReceivedHeadsNetworkTask<F> {
 	co_factory: F,
+	spawner: TaskSpawner,
 }
 impl<F> ReceivedHeadsNetworkTask<F> {
-	pub fn new(co_factory: F) -> Self {
-		Self { co_factory }
+	pub fn new(co_factory: F, spawner: TaskSpawner) -> Self {
+		Self { co_factory, spawner }
 	}
 }
 impl<F, B, C> NetworkTask<B, C> for ReceivedHeadsNetworkTask<F>
@@ -39,7 +40,7 @@ where
 						let co_factory = self.co_factory.clone();
 						let peer_id = peer_id.clone();
 						let response = *response;
-						tokio::spawn(async move {
+						self.spawner.spawn(async move {
 							match co_factory.co_reducer(&co_id).await {
 								Ok(Some(co)) => match co.join(heads).await {
 									Ok(update) => {

@@ -18,12 +18,9 @@ impl DialNetworkTask {
 		(Self { peer_id, addresses, tx: Some(tx) }, rx)
 	}
 
-	pub async fn dial<B, C>(
-		spawner: NetworkTaskSpawner<B, C>,
-		peer_id: PeerId,
-		addresses: Vec<Multiaddr>,
-	) -> Result<(), anyhow::Error>
+	pub async fn dial<B, C, N>(spawner: N, peer_id: PeerId, addresses: Vec<Multiaddr>) -> Result<(), anyhow::Error>
 	where
+		N: NetworkTaskSpawner<B, C>,
 		B: NetworkBehaviour,
 	{
 		let (task, rx) = Self::new(peer_id, addresses);

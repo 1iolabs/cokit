@@ -4,8 +4,8 @@ use crate::{
 	library::{co_peer_provider::CoPeerProvider, co_state::CoState, push_heads::PushHeads},
 	state::find,
 	types::co_storage::CoBlockStorageContentMapping,
-	CoCoreResolver, CoReducer, CoStorage, Reducer, ReducerBuilder, ReducerChangedContext, ReducerChangedHandler,
-	Runtime, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CoCoreResolver, CoReducer, CoStorage, CoToken, CoTokenParameters, Reducer, ReducerBuilder, ReducerChangedContext,
+	ReducerChangedHandler, Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -14,7 +14,7 @@ use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
-use co_network::NetworkBlockStorage;
+use co_network::bitswap::NetworkBlockStorage;
 use co_primitives::{tags, CoId};
 use co_storage::{Algorithm, EncryptedBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
@@ -60,33 +60,42 @@ impl SharedCoBuilder {
 		Self { initialize, ..self }
 	}
 
-	pub async fn build<I>(self, storage: CoStorage, runtime: Runtime, identity: I) -> Result<CoReducer, anyhow::Error>
+	pub async fn build<I>(
+		self,
+		tasks: TaskSpawner,
+		storage: CoStorage,
+		runtime: Runtime,
+		identity: I,
+	) -> Result<CoReducer, anyhow::Error>
 	where
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
 	{
 		// storage
-		let (storage, encrypted_storage): (CoStorage, Option<EncryptedBlockStorage<CoStorage>>) =
-			match &self.membership.key {
-				// encrypted
-				Some(key_reference) => {
-					let key_store: co_core_keystore::KeyStore = self.parent.state(&self.keystore_core_name).await?;
-					let (_, key) = find(&self.parent.storage(), &key_store.keys, |(k, _)| k == key_reference)
-						.await?
-						.ok_or(anyhow::anyhow!("Shared key not found: {}", key_reference))?;
-					let secret = match key.secret {
-						co_core_keystore::Secret::SharedKey(sec) => Ok(sec),
-						_ => Err(anyhow!("Invalid secret")),
-					}?;
-					let mut result_storage =
-						EncryptedBlockStorage::new(storage, Secret::new(secret.divulge().to_vec()), Default::default());
-					if let Some(mapping) = &self.membership.encryption_mapping {
-						result_storage.load_mapping(mapping).await?;
-					}
-					(CoStorage::new(result_storage.clone()), Some(result_storage))
-				},
-				// plain
-				None => (storage, None),
-			};
+		let (storage, encrypted_storage, secret): (
+			CoStorage,
+			Option<EncryptedBlockStorage<CoStorage>>,
+			Option<co_primitives::Secret>,
+		) = match &self.membership.key {
+			// encrypted
+			Some(key_reference) => {
+				let key_store: co_core_keystore::KeyStore = self.parent.state(&self.keystore_core_name).await?;
+				let (_, key) = find(&self.parent.storage(), &key_store.keys, |(k, _)| k == key_reference)
+					.await?
+					.ok_or(anyhow::anyhow!("Shared key not found: {}", key_reference))?;
+				let secret = match key.secret {
+					co_core_keystore::Secret::SharedKey(sec) => Ok(sec),
+					_ => Err(anyhow!("Invalid secret")),
+				}?;
+				let mut result_storage =
+					EncryptedBlockStorage::new(storage, Secret::new(secret.divulge().to_vec()), Default::default());
+				if let Some(mapping) = &self.membership.encryption_mapping {
+					result_storage.load_mapping(mapping).await?;
+				}
+				(CoStorage::new(result_storage.clone()), Some(result_storage), Some(secret.into()))
+			},
+			// plain
+			None => (storage, None, None),
+		};
 
 		// network
 		let (storage, co_state) = if let Some(network) = &self.network {
@@ -103,6 +112,14 @@ impl SharedCoBuilder {
 				NetworkBlockStorage::new(storage.clone(), network.clone(), peer_provider, self.network_block_timeout);
 			if let Some(encrypted) = &encrypted_storage {
 				network_storage.set_mapping(encrypted.content_mapping());
+			}
+			if let Some(shared_secret) = &secret {
+				let token = CoToken::new(
+					shared_secret,
+					CoTokenParameters(network.local_peer_id(), self.membership.id.clone()),
+				)?
+				.to_bitswp_token()?;
+				network_storage.set_tokens(vec![token]);
 			}
 			(CoStorage::new(network_storage), Some(co_state))
 		} else {
@@ -137,6 +154,7 @@ impl SharedCoBuilder {
 			);
 			let publish = PushHeads::new(
 				network.clone(),
+				tasks,
 				self.membership.id.clone(),
 				identity.clone(),
 				peer_provider,
@@ -175,7 +193,7 @@ impl SharedCoBuilder {
 		reducer.add_change_handler(Box::new(writer));
 
 		// result
-		Ok(CoReducer::new(self.membership.id, runtime, reducer, mapping))
+		Ok(CoReducer::new(self.membership.id, Some(self.parent.id().clone()), runtime, reducer, mapping))
 	}
 }
 

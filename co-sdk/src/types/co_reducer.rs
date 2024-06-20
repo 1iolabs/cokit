@@ -12,6 +12,7 @@ use tokio::sync::RwLock;
 #[derive(Clone)]
 pub struct CoReducer {
 	id: CoId,
+	parent: Option<CoId>,
 	pub(crate) reducer: Arc<RwLock<Reducer<CoStorage, CoCoreResolver>>>,
 	pub(crate) storage: CoStorage,
 	pub(crate) runtime: Runtime,
@@ -20,15 +21,27 @@ pub struct CoReducer {
 impl CoReducer {
 	pub(crate) fn new(
 		id: CoId,
+		parent: Option<CoId>,
 		runtime: Runtime,
 		reducer: Reducer<CoStorage, CoCoreResolver>,
 		mapping: Option<CoBlockStorageContentMapping>,
 	) -> Self {
-		Self { id, runtime, storage: reducer.log().storage().clone(), reducer: Arc::new(RwLock::new(reducer)), mapping }
+		Self {
+			id,
+			parent,
+			runtime,
+			storage: reducer.log().storage().clone(),
+			reducer: Arc::new(RwLock::new(reducer)),
+			mapping,
+		}
 	}
 
 	pub fn id(&self) -> &CoId {
 		&self.id
+	}
+
+	pub fn parent_id(&self) -> &Option<CoId> {
+		&self.parent
 	}
 
 	/// Get current reducer heads.

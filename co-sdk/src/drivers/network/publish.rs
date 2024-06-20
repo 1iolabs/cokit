@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
+use co_network::NetworkTaskSpawner;
 use co_primitives::{CoId, Network, NetworkCoHeads};
 use co_storage::BlockStorageContentMapping;
 use std::collections::{BTreeMap, BTreeSet};

@@ -1,30 +1,61 @@
+use crate::bitswap::Token;
 use anyhow::Result;
 use async_trait::async_trait;
 use co_storage::{BlockStorage, StorageError};
 use libipld::{Block, Cid, DefaultParams};
+use libp2p::PeerId;
 use libp2p_bitswap::BitswapStore;
+use std::marker::PhantomData;
 
 /// Wrap BlockStorage as BitswapStore
-pub struct BitswapBlockStorage<S> {
+pub struct BitswapBlockStorage<S, R> {
+	storage_resolver: R,
+	_storage: PhantomData<S>,
+}
+impl<S, R> BitswapBlockStorage<S, R> {
+	pub fn new(storage_resolver: R) -> Self {
+		Self { storage_resolver, _storage: Default::default() }
+	}
+}
+
+#[async_trait]
+pub trait StorageResolver<S> {
+	/// Resolve storage using the token and remote peer address.
+	/// For local operations the remote_peer is None.
+	async fn resolve_storage(&self, remote_peer: Option<&PeerId>, tokens: &[Token]) -> Result<S, anyhow::Error>;
+}
+
+pub struct StaticStorageResolver<S> {
 	storage: S,
 }
-impl<S> BitswapBlockStorage<S> {
-	pub fn new(storage: S) -> Self {
-		Self { storage }
+#[async_trait]
+impl<S> StorageResolver<S> for StaticStorageResolver<S>
+where
+	S: BlockStorage<StoreParams = DefaultParams> + Clone + Send + Sync + 'static,
+{
+	async fn resolve_storage(&self, _remote_peer: Option<&PeerId>, _tokens: &[Token]) -> Result<S, anyhow::Error> {
+		Ok(self.storage.clone())
 	}
 }
 
 /// Handle (external) peer requests.
 #[async_trait]
-impl<S> BitswapStore for BitswapBlockStorage<S>
+impl<S, R> BitswapStore for BitswapBlockStorage<S, R>
 where
 	S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + 'static,
+	R: StorageResolver<S> + Send + Sync + 'static,
 {
 	type Params = S::StoreParams;
 
 	#[tracing::instrument(ret, err, skip(self))]
-	async fn contains(&mut self, cid: &Cid) -> Result<bool> {
-		match self.storage.stat(cid).await {
+	async fn contains(&mut self, cid: &Cid, remote_peer: &PeerId, tokens: &[Token]) -> Result<bool> {
+		match self
+			.storage_resolver
+			.resolve_storage(Some(remote_peer), tokens)
+			.await?
+			.stat(cid)
+			.await
+		{
 			Ok(_) => Ok(true),
 			Err(StorageError::NotFound(_, _)) => Ok(false),
 			Err(e) => Err(e.into()),
@@ -32,8 +63,14 @@ where
 	}
 
 	#[tracing::instrument(err, skip(self))]
-	async fn get(&mut self, cid: &Cid) -> Result<Option<Vec<u8>>> {
-		match self.storage.get(cid).await {
+	async fn get(&mut self, cid: &Cid, remote_peer: &PeerId, tokens: &[Token]) -> Result<Option<Vec<u8>>> {
+		match self
+			.storage_resolver
+			.resolve_storage(Some(remote_peer), tokens)
+			.await?
+			.get(cid)
+			.await
+		{
 			Ok(block) => Ok(Some(block.into_inner().1)),
 			Err(StorageError::NotFound(_, _)) => Ok(None),
 			Err(e) => Err(e.into()),
@@ -41,21 +78,29 @@ where
 	}
 
 	#[tracing::instrument(err, skip(self, block), fields(cid = ?block.cid()))]
-	async fn insert(&mut self, block: &Block<Self::Params>) -> Result<()> {
-		self.storage.set(block.clone()).await?;
+	async fn insert(&mut self, block: &Block<Self::Params>, remote_peer: &PeerId, tokens: &[Token]) -> Result<()> {
+		self.storage_resolver
+			.resolve_storage(Some(remote_peer), tokens)
+			.await?
+			.set(block.clone())
+			.await?;
 		Ok(())
 	}
 
 	#[tracing::instrument(err, skip(self))]
-	async fn missing_blocks(&mut self, cid: &Cid) -> Result<Vec<Cid>> {
+	async fn missing_blocks(&mut self, cid: &Cid, tokens: &[Token]) -> Result<Vec<Cid>> {
+		let storage = self.storage_resolver.resolve_storage(None, tokens).await?;
 		let mut stack = vec![*cid];
 		let mut missing = vec![];
 		while let Some(cid) = stack.pop() {
-			if let Some(data) = self.get(&cid).await? {
-				let block = Block::<Self::Params>::new_unchecked(cid, data);
-				block.references(&mut stack)?;
-			} else {
-				missing.push(cid);
+			match storage.get(&cid).await {
+				Ok(block) => {
+					block.references(&mut stack)?;
+				},
+				Err(StorageError::NotFound(_, _)) => {
+					missing.push(cid);
+				},
+				Err(e) => return Err(e.into()),
 			}
 		}
 		Ok(missing)

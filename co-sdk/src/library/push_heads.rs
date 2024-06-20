@@ -4,12 +4,12 @@ use crate::{
 		tasks::co_heads::{CoHeadsNetworkTask, CoHeadsRequest},
 		CoNetworkTaskSpawner,
 	},
-	CoCoreResolver, CoStorage, Reducer, ReducerChangedContext, ReducerChangedHandler,
+	CoCoreResolver, CoStorage, Reducer, ReducerChangedContext, ReducerChangedHandler, TaskSpawner,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_identity::PrivateIdentity;
-use co_network::PeerProvider;
+use co_network::{NetworkTaskSpawner, PeerProvider};
 use co_primitives::CoId;
 use co_storage::BlockStorageContentMapping;
 use futures::{pin_mut, StreamExt};
@@ -29,6 +29,7 @@ pub struct PushHeads<M> {
 impl<M> PushHeads<M> {
 	pub fn new<I, P>(
 		spawner: CoNetworkTaskSpawner,
+		tasks: TaskSpawner,
 		co: CoId,
 		identity: I,
 		peer_provider: P,
@@ -40,7 +41,7 @@ impl<M> PushHeads<M> {
 		P: PeerProvider + Send + Sync + 'static,
 	{
 		let (tx, rx) = watch::channel(Default::default());
-		tokio::spawn(worker(spawner, co, rx, identity, peer_provider));
+		tasks.spawn(worker(spawner, co, rx, identity, peer_provider));
 		Self { heads: tx, mapping, force_mapping, initialized: false }
 	}
 }

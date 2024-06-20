@@ -6,11 +6,13 @@ use super::{
 };
 use crate::{
 	drivers::network::tasks::received_heads::ReceivedHeadsNetworkTask,
-	identity::co_private_identity_resolver::CoPrivateIdentityResolver, local_keypair_fetch, CoReducer,
-	CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	identity::co_private_identity_resolver::CoPrivateIdentityResolver, library::task_spawner::TaskSpawner,
+	local_keypair_fetch, CoReducer, CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use co_identity::{LocalIdentity, LocalIdentityResolver, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver};
+use co_network::NetworkTaskSpawner;
 use co_primitives::CoId;
 use co_runtime::RuntimePool;
 use directories::ProjectDirs;
@@ -64,7 +66,14 @@ impl Application {
 	}
 
 	/// Tasks bound to this application.
-	pub fn tasks(&self) -> TaskTracker {
+	pub fn tasks(&self) -> TaskSpawner {
+		TaskSpawner { inner: self.tasks.clone(), idenitfier: self.settings.identifier.clone() }
+	}
+
+	/// Tasks bound to this application.
+	/// Internal use only. Use `tasks`.
+	#[doc(hidden)]
+	pub fn task_tracker(&self) -> TaskTracker {
 		self.tasks.clone()
 	}
 
@@ -99,15 +108,21 @@ impl Application {
 
 	/// Create and startup network.
 	pub async fn create_network(&mut self, force_new_peer_id: bool) -> Result<(), anyhow::Error> {
+		// validate
+		if self.network.is_some() {
+			return Err(anyhow!("Network already created"))
+		}
+
 		// create network
 		let local_identity = self.local_identity();
 		let local_co = self.co_context.local_co_reducer().await?;
-		let network_key = local_keypair_fetch(&self.settings.identifier, &local_co, &local_identity, force_new_peer_id)
-			.await
-			.expect("peer-id");
+		let network_key =
+			local_keypair_fetch(&self.settings.identifier, &local_co, &local_identity, force_new_peer_id).await?;
 		let network = Network::new(
+			self.settings.identifier.clone(),
 			network_key,
-			self.storage(),
+			// note: critical to pass the non networked version otherwise we create a loop
+			self.co().to_owned(),
 			create_identity_resolver(),
 			CoPrivateIdentityResolver::new(self.co().to_owned()).boxed(),
 		);
@@ -133,7 +148,7 @@ impl Application {
 			.as_ref()
 			.unwrap()
 			.spawner()
-			.spawn(ReceivedHeadsNetworkTask::new(self.co().clone()))?;
+			.spawn(ReceivedHeadsNetworkTask::new(self.co().clone(), self.tasks()))?;
 
 		// done
 		Ok(())
@@ -301,7 +316,7 @@ impl ApplicationBuilder {
 		let co_context = CoContextInner::new(
 			settings.clone(),
 			shutdown.child_token(),
-			tasks.clone(),
+			TaskSpawner { idenitfier: settings.identifier.clone(), inner: tasks.clone() },
 			local_identity.clone(),
 			None,
 			storage.storage(),
