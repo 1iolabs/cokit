@@ -28,7 +28,6 @@ members = [
     "examples/tauri-app/src-tauri",
 ]
 resolver = "2"
-rust-version = "1.76"
 
 [profile.release]
 panic = "unwind"
