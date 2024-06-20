@@ -9,6 +9,7 @@ async-trait = { workspace = true }
 co-api = { path = "../co-api" }
 co-primitives = { path = "../co-primitives" }
 co-storage = { path = "../co-storage" }
+colored = "2.1.0"
 futures = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 names = "0.14.0"

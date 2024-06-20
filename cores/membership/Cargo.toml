@@ -9,6 +9,7 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 anyhow = { workspace = true }
 co-api = { path = "../../co-api" }
+co-macros = { path = "../../co-macros" }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }

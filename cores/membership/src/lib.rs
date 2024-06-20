@@ -25,6 +25,7 @@ pub struct Membership {
 	/// The CO heads.
 	pub heads: BTreeSet<Cid>,
 
+	// TODO mark as external as this field shouldn't be further resolved when pinning
 	/// The encryption mapping if the CO is encrypted.
 	pub encryption_mapping: Option<Cid>,
 

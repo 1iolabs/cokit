@@ -1,14 +1,16 @@
 use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
 use co_api::{Cid, CoId, DagCollection};
-use co_sdk::{BlockStorage, CoStorage, CO_CORE_NAME_PIN};
-use colored::{ColoredString, Colorize};
+use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
+use co_sdk::{memberships, Application, BlockStorage, CoStorage, CO_CORE_NAME_PIN};
 use exitcode::ExitCode;
+use futures::{pin_mut, StreamExt};
 use libipld::{cbor::DagCborCodec, codec::Codec, Ipld};
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,
 };
+use tokio::fs;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
@@ -23,6 +25,8 @@ pub enum Commands {
 	Ls(ListCommand),
 	/// Generates pins by traversing state
 	Gen(GenerateCommand),
+	/// Updates the pin map for auto state pinning
+	Update(UpdateCommand),
 }
 
 #[derive(Debug, Clone, clap::Args)]
@@ -48,13 +52,18 @@ pub struct GenerateCommand {
 	pub co: CoId,
 }
 
+#[derive(Debug, Clone, clap::Args)]
+pub struct UpdateCommand {}
+
 pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
 	match &command.command {
 		Commands::Ls(list_command) => list_pins(context, cli, list_command).await,
 		Commands::Gen(gen_command) => generate_pins(context, cli, gen_command).await,
+		Commands::Update(update_command) => update_pins(context, cli, update_command).await,
 	}
 }
 
+/// list function for all manual pins
 pub async fn list_pins(context: &CliContext, cli: &Cli, command: &ListCommand) -> Result<ExitCode, anyhow::Error> {
 	let application = context.application(cli).await;
 
@@ -97,105 +106,72 @@ pub async fn generate_pins(
 	cli: &Cli,
 	command: &GenerateCommand,
 ) -> Result<ExitCode, anyhow::Error> {
-	// get state of local co
+	// get state of given co
 	let application = context.application(cli).await;
 	let co_reducer = application.co_reducer(&command.co).await?.ok_or(anyhow!("Co not found"))?;
-	let storage = co_reducer.storage();
-	let local_state = co_reducer.reducer_state().await.0;
-	if let Some(local_state) = local_state {
+	let state = co_reducer.reducer_state().await.0;
+
+	if let Some(state) = state {
 		// generate cids up to depth
-		let mut ipld_resolver = IpldResolver::new(&storage, command.depth);
-		ipld_resolver.resolve_cid(&local_state).await?;
-		for cid in ipld_resolver.found_cids {
-			let mut cid_string: ColoredString = cid.to_string().white();
-			if ipld_resolver.failed_cids.contains(&cid) {
-				cid_string = cid_string.red();
-			}
-			println!("{}", cid_string);
-		}
-		if ipld_resolver.depth < 0 {
-			println!("Looked in unlimited depth and got to {}", ipld_resolver.current_depth);
-		} else {
-			println!("Looked up to depth {} and got to {}", ipld_resolver.depth, ipld_resolver.current_depth);
-		}
+		let resolver = &create_cid_resolver(get_all_co_storages(application).await?).await?;
+		let result = MultiLayerCidResolver::new()
+			.with_depth_limit(command.depth)
+			.resolve_cid(&state, &resolver)
+			.await;
+
+		// print findings
+		result.print_results();
 	}
 	Ok(exitcode::OK)
 }
 
-/**
- * Resolves a cid. Then Looks for other cids and tries to recursively resolve those as well.
- * Will fail when a cid resolves to another Co as the given storage doesn't have its key.
- */
-struct IpldResolver<'a> {
-	/// Contains all cids that have been found after running
-	pub found_cids: BTreeSet<Cid>,
-	/// Contains all cids that couldn't be resolved further
-	pub failed_cids: BTreeSet<Cid>,
-	pub storage: &'a CoStorage,
-	/// Defines a depth up to which Links should be resolved. No limit if depth is negtive
-	pub depth: i64,
-	/// Tracks depth. After running, shows how many layers of links got resolved.
-	pub current_depth: i64,
-	new_cids: BTreeSet<Cid>,
+async fn update_pins(context: &CliContext, cli: &Cli, _command: &UpdateCommand) -> Result<ExitCode, anyhow::Error> {
+	// application ini
+	let application = context.application(cli).await;
+	// get pinn file path
+	let pins_path = application
+		.settings()
+		.application_path
+		.as_ref()
+		.ok_or(anyhow!("expeced filesystem application"))?
+		.with_file_name("pins.cbor");
+	// read previous pins from file
+	let content = fs::read(&pins_path).await?;
+	// decode cbor
+	let old_pin_map: BTreeMap<Cid, BTreeSet<Cid>> = serde_ipld_dagcbor::from_slice(&content)?;
+
+	// local co state
+	let (state, _) = application.local_co_reducer().await?.reducer_state().await;
+
+	// create resolver
+	let resolver = create_cid_resolver(get_all_co_storages(application).await?).await?;
+	let resolver_result = MultiLayerCidResolver::new()
+		.with_previous_cids(old_pin_map)
+		.resolve_cid(&state.unwrap(), &resolver)
+		.await;
+
+	// write pin map
+	let data = serde_ipld_dagcbor::to_vec(&resolver_result.new_cid_map)?;
+	fs::write(&pins_path, data).await?;
+
+	resolver_result.print_diff();
+
+	Ok(exitcode::OK)
 }
 
-impl<'a> IpldResolver<'a> {
-	pub fn new(storage: &'a CoStorage, depth: i64) -> Self {
-		Self {
-			found_cids: BTreeSet::new(),
-			new_cids: BTreeSet::new(),
-			failed_cids: BTreeSet::new(),
-			storage,
-			depth,
-			current_depth: 0,
+async fn get_all_co_storages(application: Application) -> anyhow::Result<Vec<CoStorage>> {
+	let local_co_reducer = application.local_co_reducer().await?;
+	let stream = memberships(local_co_reducer);
+	let mut storages: Vec<CoStorage> = vec![];
+	pin_mut!(stream);
+	while let Some(result) = stream.next().await {
+		match result {
+			Ok((co, _, _)) =>
+				if let Some(reducer) = application.co_reducer(co).await? {
+					storages.push(reducer.storage());
+				},
+			Err(_) => (),
 		}
 	}
-	pub async fn resolve_cid(&mut self, cid: &Cid) -> Result<(), anyhow::Error> {
-		self.new_cids.insert(*cid);
-		while self.new_cids.len() > 0 {
-			// check if we reached defined depth
-			if self.depth >= 0 && self.depth <= self.current_depth {
-				break;
-			} else {
-				self.current_depth += 1;
-			}
-			let new_cids = self.new_cids.clone();
-			self.new_cids.clear();
-			for new_cid in new_cids.iter() {
-				self.found_cids.insert(new_cid.clone());
-				// try to resolve. This can fail when cid is of another CO so we need to catch this error here
-				if let Ok(ipld) = self.get_ipld(&new_cid).await {
-					self.get_next_cids(&ipld);
-				} else {
-					self.failed_cids.insert(new_cid.clone());
-				}
-			}
-		}
-		Ok(())
-	}
-	async fn get_ipld(&self, cid: &Cid) -> Result<Ipld, anyhow::Error> {
-		let block = self.storage.get(cid).await?;
-		let ipld: Ipld = DagCborCodec::default().decode(block.data())?;
-		Ok(ipld)
-	}
-	pub fn get_next_cids(&mut self, ipld: &Ipld) {
-		match ipld {
-			// found cid -> add to list of new cids
-			Ipld::Link(cid) => {
-				self.new_cids.insert(*cid);
-			},
-			// found list -> traverse as links might be contained
-			Ipld::List(list) =>
-				for ipld_inner in list {
-					self.get_next_cids(ipld_inner);
-				},
-			// found map -> traverse as links might be contained
-			Ipld::Map(map) =>
-				for ipld_inner in map.values() {
-					self.get_next_cids(ipld_inner);
-				},
-			// No need to check further as no other types can contain links
-			_ => (),
-		};
-	}
+	Ok(storages)
 }
