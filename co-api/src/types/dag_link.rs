@@ -15,7 +15,7 @@ pub trait DagCollection: Sized {
 	fn set_link(&mut self, link: OptionLink<Self::Collection>);
 
 	fn set(&mut self, storage: &mut dyn Storage, items: Self::Collection) {
-		self.set_link(Self::to_link(storage, items.into_iter()))
+		self.set_link(Self::to_link(storage, items))
 	}
 
 	fn get(&self, storage: &dyn Storage) -> Self::Collection {
@@ -96,7 +96,7 @@ where
 }
 impl<V> Clone for DagVec<V> {
 	fn clone(&self) -> Self {
-		Self(self.0.clone())
+		Self(self.0)
 	}
 }
 impl<V> Default for DagVec<V> {
@@ -112,7 +112,7 @@ where
 	type Collection = Vec<Self::Item>;
 
 	fn link(&self) -> OptionLink<Self::Collection> {
-		self.0.clone()
+		self.0
 	}
 
 	fn set_link(&mut self, link: OptionLink<Self::Collection>) {
@@ -162,7 +162,7 @@ where
 	/// TODO: (perf): Do not load whole set into memory
 	pub fn remove(&mut self, storage: &mut dyn Storage, value: &V) -> bool {
 		let mut set = self.get(storage);
-		if set.remove(&value) {
+		if set.remove(value) {
 			self.set(storage, set);
 			true
 		} else {
@@ -178,7 +178,7 @@ where
 	type Collection = BTreeSet<Self::Item>;
 
 	fn link(&self) -> OptionLink<Self::Collection> {
-		self.0.clone()
+		self.0
 	}
 
 	fn set_link(&mut self, link: OptionLink<Self::Collection>) {
@@ -248,7 +248,7 @@ where
 	type Collection = BTreeMap<K, V>;
 
 	fn link(&self) -> OptionLink<Self::Collection> {
-		self.0.clone()
+		self.0
 	}
 
 	fn set_link(&mut self, link: OptionLink<Self::Collection>) {

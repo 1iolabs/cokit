@@ -66,7 +66,7 @@ impl DidCommPrivateContext {
 			&self
 				.verification_method()
 				.public_key_bytes()
-				.map_err(|e| SignError::InvalidArgument(e))?,
+				.map_err(SignError::InvalidArgument)?,
 			header,
 			body,
 		)
@@ -92,7 +92,7 @@ impl DidCommPrivateContext {
 			self.key_agreement_private_key.clone(),
 			to.key_agreement
 				.public_key_bytes()
-				.map_err(|e| SignError::InvalidArgument(e.into()))?,
+				.map_err(SignError::InvalidArgument)?,
 			header,
 			body,
 		)

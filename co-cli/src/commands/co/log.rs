@@ -41,12 +41,12 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 						print!(" (no mapping)");
 					}
 				}
-				println!("");
+				println!();
 				println!("{:?}", entry.entry());
 
 				// payload
 				cat_output(storage.clone(), entry.entry().payload, true).await?;
-				println!("");
+				println!();
 			},
 			Err(err) => println!("head ({index}) error: {:?}", err),
 		}

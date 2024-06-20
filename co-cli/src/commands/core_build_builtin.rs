@@ -61,13 +61,13 @@ pub async fn command() -> Result<ExitCode, anyhow::Error> {
 		let core_package: Cargo = toml::from_str(std::str::from_utf8(&data)?).context("valid toml")?;
 
 		// read wasm
-		let core_wasm_name = format!("{}.wasm", core_package.package.name.replace("-", "_"));
+		let core_wasm_name = format!("{}.wasm", core_package.package.name.replace('-', "_"));
 		let core_wasm_path = respository_path
 			.join("target/wasm32-unknown-unknown/release")
 			.join(core_wasm_name);
 		let core_wasm = tokio::fs::read(core_wasm_path).await.expect("wasm artifact to exist");
 		let core_blocks = unixfs_encode_buffer::<DefaultParams>(&core_wasm);
-		let core_cid = core_blocks.last().ok_or(anyhow!("at least one block"))?.cid().clone();
+		let core_cid = *core_blocks.last().ok_or(anyhow!("at least one block"))?.cid();
 
 		// add
 		cores.cores.insert(core_package.package.name, core_cid.to_string());

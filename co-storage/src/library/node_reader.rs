@@ -56,7 +56,7 @@ where
 {
 	pub fn new(storage: &'a S, cid: &Cid) -> Self {
 		let mut stack = VecDeque::new();
-		stack.push_front(cid.clone());
+		stack.push_front(*cid);
 		Self { storage, stack, entries: Default::default() }
 	}
 }

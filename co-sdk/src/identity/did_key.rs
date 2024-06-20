@@ -36,7 +36,7 @@ impl PrivateIdentityResolver for DidKeyProvider {
 			.map_err(|err| IdentityResolverError::Other(err.into()))?
 			.ok_or(IdentityResolverError::NotFound)?;
 		Ok(PrivateIdentityBox::new(
-			DidKeyIdentity::import(&key).map_err(|err| IdentityResolverError::Other(err.into()))?,
+			DidKeyIdentity::import(&key).map_err(IdentityResolverError::Other)?,
 		))
 	}
 }

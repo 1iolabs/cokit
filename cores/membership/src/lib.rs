@@ -72,32 +72,37 @@ impl Reducer for Memberships {
 				// }
 				for membership in result.memberships.iter_mut() {
 					if &membership.id == id {
-						membership.state = state.clone();
-						membership.heads = heads.clone();
-						membership.encryption_mapping = encryption_mapping.clone();
+						membership.state = *state;
+						membership.heads.clone_from(heads);
+						membership.encryption_mapping = *encryption_mapping;
 					}
 				}
 			},
-			MembershipsAction::Join(membership) =>
+			MembershipsAction::Join(membership) => {
 				if find(&mut result, &membership.id, &membership.did).is_none() {
 					result.memberships.push(membership.clone());
-				},
-			MembershipsAction::ChangeMembershipState { id, did, membership_state } =>
+				}
+			},
+			MembershipsAction::ChangeMembershipState { id, did, membership_state } => {
 				if let Some(membership) = find(&mut result, id, did) {
 					membership.membership_state = *membership_state;
-				},
-			MembershipsAction::ChangeKey { id, did, key } =>
+				}
+			},
+			MembershipsAction::ChangeKey { id, did, key } => {
 				if let Some(membership) = find(&mut result, id, did) {
 					membership.key = Some(key.to_owned());
-				},
-			MembershipsAction::TagsInsert { id, did, tags } =>
+				}
+			},
+			MembershipsAction::TagsInsert { id, did, tags } => {
 				if let Some(membership) = find(&mut result, id, did) {
 					membership.tags.append(&mut tags.clone());
-				},
-			MembershipsAction::TagsRemove { id, did, tags } =>
+				}
+			},
+			MembershipsAction::TagsRemove { id, did, tags } => {
 				if let Some(membership) = find(&mut result, id, did) {
 					membership.tags.clear(Some(tags));
-				},
+				}
+			},
 			MembershipsAction::Remove { id, did } => {
 				if let Some((index, _)) = result.memberships.iter().enumerate().find(|(_, item)| {
 					&item.id == id && (did.is_none() || did.as_ref().is_some_and(|did| &item.did == did))

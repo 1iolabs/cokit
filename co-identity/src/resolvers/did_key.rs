@@ -182,6 +182,12 @@ impl PrivateIdentity for DidKeyIdentity {
 
 #[derive(Debug, Clone)]
 pub struct DidKeyIdentityResolver {}
+impl Default for DidKeyIdentityResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DidKeyIdentityResolver {
 	pub fn new() -> DidKeyIdentityResolver {
 		Self {}
@@ -217,6 +223,6 @@ mod tests {
 		let identity = DidKeyIdentity::generate(None);
 		let public_key = identity.public_key();
 		let signature = identity.sign(data).unwrap();
-		assert!(identity.verify(signature.as_slice(), data, public_key.as_ref().map(|k| k.as_slice())));
+		assert!(identity.verify(signature.as_slice(), data, public_key.as_deref()));
 	}
 }

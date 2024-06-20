@@ -23,9 +23,9 @@ impl EventType for EphemeralType {
 	}
 }
 
-impl Into<EventContent> for EphemeralType {
-	fn into(self) -> EventContent {
-		EventContent::Ephemeral(self)
+impl From<EphemeralType> for EventContent {
+	fn from(val: EphemeralType) -> Self {
+		EventContent::Ephemeral(val)
 	}
 }
 
@@ -46,9 +46,9 @@ impl EventType for TypingContent {
 	}
 }
 
-impl Into<EventContent> for TypingContent {
-	fn into(self) -> EventContent {
-		EphemeralType::Typing(self).into()
+impl From<TypingContent> for EventContent {
+	fn from(val: TypingContent) -> Self {
+		EphemeralType::Typing(val).into()
 	}
 }
 
@@ -94,9 +94,9 @@ impl EventType for PresenceContent {
 	}
 }
 
-impl Into<EventContent> for PresenceContent {
-	fn into(self) -> EventContent {
-		EphemeralType::Presence(self).into()
+impl From<PresenceContent> for EventContent {
+	fn from(val: PresenceContent) -> Self {
+		EphemeralType::Presence(val).into()
 	}
 }
 

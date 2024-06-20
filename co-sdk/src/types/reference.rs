@@ -7,6 +7,12 @@ pub struct Reference {
 	id: Uuid,
 }
 
+impl Default for Reference {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Reference {
 	pub fn new() -> Self {
 		Self { id: Uuid::new_v4() }
@@ -68,12 +74,12 @@ impl ResponseError {
 	}
 }
 
-impl Into<ResponseError> for anyhow::Error {
-	fn into(self) -> ResponseError {
+impl From<anyhow::Error> for ResponseError {
+	fn from(val: anyhow::Error) -> Self {
 		ResponseError {
-			message: format!("{}", &self),
+			message: format!("{}", &val),
 			status: Some(StatusCode::INTERNAL_SERVER_ERROR),
-			description: Some(format!("{:?}", &self)),
+			description: Some(format!("{:?}", &val)),
 		}
 	}
 }

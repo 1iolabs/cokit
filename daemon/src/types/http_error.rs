@@ -30,9 +30,9 @@ where
 		HttpError::InternalServerError(value.into())
 	}
 }
-impl Into<(StatusCode, Option<anyhow::Error>)> for HttpError {
-	fn into(self) -> (StatusCode, Option<anyhow::Error>) {
-		match self {
+impl From<HttpError> for (StatusCode, Option<anyhow::Error>) {
+	fn from(val: HttpError) -> Self {
+		match val {
 			HttpError::InternalServerError(err) => (StatusCode::INTERNAL_SERVER_ERROR, Some(err)),
 			HttpError::NotFound(err) => (StatusCode::NOT_FOUND, Some(err)),
 		}

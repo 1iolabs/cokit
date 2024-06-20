@@ -120,9 +120,9 @@ impl SharedCoJoin {
 			}
 			if let Some(shared_secret) = &self.key {
 				let token = CoToken::new(shared_secret, CoTokenParameters(network.local_peer_id(), self.id.clone()))
-					.map_err(|e| SharedCoJoinError::Network(e.into()))?
+					.map_err(SharedCoJoinError::Network)?
 					.to_bitswp_token()
-					.map_err(|e| SharedCoJoinError::Network(e.into()))?;
+					.map_err(SharedCoJoinError::Network)?;
 				network_storage.set_tokens(vec![token]);
 			}
 			CoStorage::new(network_storage)
@@ -163,7 +163,7 @@ impl SharedCoJoin {
 		let reducer = reducer_builder
 			.build(runtime)
 			.await
-			.map_err(|e| SharedCoJoinError::Reducer(e))?;
+			.map_err(SharedCoJoinError::Reducer)?;
 		let state = reducer.state().ok_or(SharedCoJoinError::NoState)?;
 
 		// store: key
@@ -178,13 +178,13 @@ impl SharedCoJoin {
 						uri: key_data.id.clone(),
 						name: format!("co ({})", co.name),
 						description: "".to_owned(),
-						secret: co_core_keystore::Secret::SharedKey(key.clone().into()),
+						secret: co_core_keystore::Secret::SharedKey(key.clone()),
 						tags: tags!(),
 					};
 					parent
 						.push(&identity, &self.keystore_core_name, &KeyStoreAction::Set(key_store_key))
 						.await
-						.map_err(|e| SharedCoJoinError::Join(e.into()))?;
+						.map_err(SharedCoJoinError::Join)?;
 					(
 						Some(key_data.id.clone()),
 						encrypted_storage
@@ -217,7 +217,7 @@ impl SharedCoJoin {
 		parent
 			.push(&identity, &self.membership_core_name, &MembershipsAction::Join(membership))
 			.await
-			.map_err(|e| SharedCoJoinError::Join(e.into()))?;
+			.map_err(SharedCoJoinError::Join)?;
 
 		// done
 		Ok(())

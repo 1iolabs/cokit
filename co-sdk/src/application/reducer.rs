@@ -130,7 +130,7 @@ where
 				// do this every iteration so we end up with the latest known state
 				for (snapshot_heads, snapshot_state) in &self.snapshots {
 					if snapshot_heads == self.log.heads() {
-						self.state = Some(snapshot_state.clone());
+						self.state = Some(*snapshot_state);
 						self.heads = snapshot_heads.clone();
 					}
 				}
@@ -285,21 +285,19 @@ where
 	/// Returns true if state has changed.
 	pub async fn join(&mut self, heads: &BTreeSet<Cid>, runtime: &RuntimePool) -> Result<bool, LogError> {
 		let mut result = false;
-		if self.log().heads() != heads {
-			if self.log_mut().join_heads(heads.iter()).await? || &self.heads != self.log.heads() {
-				// sync state
-				let (next_state, next_heads) = self.compute_state(runtime).await?;
-				result = next_state != self.state;
-				if next_state != self.state || self.heads != next_heads {
-					// apply
-					self.state = next_state;
-					self.heads = next_heads;
+		if self.log().heads() != heads && (self.log_mut().join_heads(heads.iter()).await? || &self.heads != self.log.heads()) {
+  				// sync state
+  				let (next_state, next_heads) = self.compute_state(runtime).await?;
+  				result = next_state != self.state;
+  				if next_state != self.state || self.heads != next_heads {
+  					// apply
+  					self.state = next_state;
+  					self.heads = next_heads;
 
-					// notify
-					self.on_state_changed(ReducerChangedCause::Log).await?;
-				}
-			}
-		}
+  					// notify
+  					self.on_state_changed(ReducerChangedCause::Log).await?;
+  				}
+  			}
 		Ok(result)
 	}
 
@@ -311,7 +309,7 @@ where
 		let mut change_handlers = Vec::new();
 		change_handlers.append(&mut self.change_handlers);
 		{
-			let reducer: &Self = &self;
+			let reducer: &Self = self;
 			let context: &ReducerChangedContext = &context;
 			stream::iter(change_handlers.iter_mut())
 				.map(Ok)
@@ -319,7 +317,7 @@ where
 					handler
 						.on_state_changed(reducer, context.clone())
 						.await
-						.with_context(|| format!("running ReducerChangeHandler"))
+						.with_context(|| "running ReducerChangeHandler".to_string())
 				})
 				.await?;
 		}
@@ -727,6 +725,6 @@ mod tests {
 		reducer.add_change_handler(Box::new(Fail {}));
 
 		// join
-		assert_eq!(false, reducer.join(&reducer.heads().clone(), &runtime).await.unwrap());
+		assert!(!reducer.join(&reducer.heads().clone(), &runtime).await.unwrap());
 	}
 }

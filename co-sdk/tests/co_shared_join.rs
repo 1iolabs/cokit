@@ -176,7 +176,7 @@ async fn test_co_shared_join_encrypted() {
 			let (shared_co_state, shared_co_heads) = shared_co.reducer_state().await;
 			SharedCoJoin::new(shared_co.id().clone())
 				.with_trusted_peer(peer1.application.network().map(|network| network.peer_id()).unwrap())
-				.with_encryption(shared_co_secret.into())
+				.with_encryption(shared_co_secret)
 				.with_heads(shared_co_heads, shared_co_state)
 				.join(
 					peer2.application.runtime_pool(),

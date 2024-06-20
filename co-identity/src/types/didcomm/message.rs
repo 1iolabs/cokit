@@ -56,8 +56,8 @@ impl Message {
 		I: IdentityResolver + Send + Sync + 'static,
 		P: PrivateIdentityResolver + Send + Sync + 'static,
 	{
-		let message = std::str::from_utf8(&data).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
-		let message_type = get_message_type(message).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
+		let message = std::str::from_utf8(data).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
+		let message_type = get_message_type(message).map_err(ReceiveError::UnknownFormat)?;
 		tracing::info!(?message, ?message_type, "message-receive");
 		if message_type == MessageType::DidCommJwe {
 			let jwe: Jwe = serde_json::from_str(message).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
@@ -66,7 +66,7 @@ impl Message {
 			let sender_identity = if let Some(sender_kid) = &jwe.get_skid() {
 				Some(
 					sender_resolver
-						.resolve(&sender_kid)
+						.resolve(sender_kid)
 						.await
 						.map_err(|e| ReceiveError::BadDid(sender_kid.to_owned(), e.into()))?,
 				)
@@ -86,7 +86,7 @@ impl Message {
 					Some(kid) => kid,
 					None => continue,
 				};
-				let recipent_identity = match recipent_resolver_ref.resolve_private(&recipent_did).await {
+				let recipent_identity = match recipent_resolver_ref.resolve_private(recipent_did).await {
 					Ok(i) => i,
 					Err(_) => continue,
 				};
@@ -134,7 +134,7 @@ impl Message {
 				body: plain_message.body.map(|r| r.get()).unwrap_or("null").to_owned(),
 			})
 		}
-		return Err(ReceiveError::UnknownFormat(anyhow!("Expected JSON as JWE, JWS or plain DIDComm")));
+		Err(ReceiveError::UnknownFormat(anyhow!("Expected JSON as JWE, JWS or plain DIDComm")))
 	}
 
 	/// Return message header.
@@ -159,7 +159,7 @@ impl Message {
 
 	/// Try to deserialize message to T.
 	pub fn body_deserialize<T: DeserializeOwned>(&self) -> Result<T, anyhow::Error> {
-		return Ok(serde_ipld_dagjson::from_slice(self.body().as_bytes())?)
+		Ok(serde_ipld_dagjson::from_slice(self.body().as_bytes())?)
 	}
 }
 

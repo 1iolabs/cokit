@@ -47,7 +47,7 @@ impl<S> EncryptedStorage<S> {
 impl<S> StorageContentMapping for EncryptedStorage<S> {
 	fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
 		if mapped.codec() == BLOCK_MULTICODEC {
-			self.mapping.get(&mapped)
+			self.mapping.get(mapped)
 		} else {
 			None
 		}
@@ -64,7 +64,7 @@ where
 	/// Load mapping from CID.
 	pub fn load_mapping(&mut self, map: &Cid) -> Result<(), StorageError> {
 		let mut mapping = BlockMapping::new();
-		mapping.read_mappings_storage(self, &map)?;
+		mapping.read_mappings_storage(self, map)?;
 		self.mapping = mapping;
 		Ok(())
 	}
@@ -121,7 +121,7 @@ where
 	///
 	/// Note: As the API is transparent this expects the unencrypted Block and returns the unencrypted CID.
 	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
-		let cid = block.cid().clone();
+		let cid = *block.cid();
 
 		// encrypt
 		let encrypted =
@@ -134,7 +134,7 @@ where
 		let encrypted_cid = self.next.set(encrypted_block)?;
 
 		// map
-		self.mapping.insert(cid.clone(), encrypted_cid);
+		self.mapping.insert(cid, encrypted_cid);
 
 		// result
 		Ok(cid)
@@ -169,7 +169,7 @@ where
 	/// Load mapping from CID.
 	/// This will add the mappings to the existing.
 	pub async fn load_mapping(&mut self, map: &Cid) -> Result<(), StorageError> {
-		self.mapping.write().await.read_mappings(self, &map).await?;
+		self.mapping.write().await.read_mappings(self, map).await?;
 		Ok(())
 	}
 
@@ -240,7 +240,7 @@ where
 
 	#[tracing::instrument(err, skip(self, block), fields(cid = ?block.cid()))]
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
-		let cid = block.cid().clone();
+		let cid = *block.cid();
 
 		// encrypt
 		let encrypted =
@@ -253,7 +253,7 @@ where
 		let encrypted_cid = self.next.set(encrypted_block).await?;
 
 		// map
-		self.mapping.write().await.insert(cid.clone(), encrypted_cid);
+		self.mapping.write().await.insert(cid, encrypted_cid);
 
 		// trace (only in debug because this has security implications)
 		#[cfg(debug_assertions)]
@@ -305,9 +305,9 @@ enum BlockMappingError {
 	#[error("Algorithm Error")]
 	Algorithm(#[from] AlgorithmError),
 }
-impl Into<StorageError> for BlockMappingError {
-	fn into(self) -> StorageError {
-		match self {
+impl From<BlockMappingError> for StorageError {
+	fn from(val: BlockMappingError) -> Self {
+		match val {
 			BlockMappingError::Storage(e) => e,
 			BlockMappingError::Algorithm(e) => match e {
 				AlgorithmError::Cipher => StorageError::InvalidArgument(e.into()), /* likely wrong key supplied for */
@@ -324,6 +324,7 @@ impl Into<StorageError> for BlockMappingError {
 /// Serializeable block mapping.
 /// This is used to store the mapping itself as an block.
 #[derive(Debug, Serialize, Deserialize)]
+#[derive(Default)]
 struct BlockMapping {
 	map: BTreeMap<Cid, Cid>,
 }
@@ -343,7 +344,7 @@ impl BlockMapping {
 	pub fn get_first_by_value(&self, value: &Cid) -> Option<Cid> {
 		self.map.iter().find_map(|(k, v)| {
 			if v == value {
-				return Some(k.clone())
+				return Some(*k)
 			}
 			None
 		})
@@ -421,7 +422,7 @@ impl BlockMapping {
 
 		// first
 		let read = |cid: Cid| async move { storage.get(&cid).await };
-		tasks.push_back(read(cid.clone()));
+		tasks.push_back(read(*cid));
 
 		// work
 		while let Some(block) = tasks.next().await {
@@ -468,18 +469,13 @@ impl BlockMapping {
 		let mut builder = NodeBuilder::<(Cid, Cid), S, P>::new(options.max_children, serializer);
 		for (key, value) in self.map.iter() {
 			builder
-				.push((key.clone(), value.clone()))
+				.push((*key, *value))
 				.map_err(|e| StorageError::Internal(e.into()))?;
 		}
 		let blocks = builder.into_blocks().map_err(|e| StorageError::Internal(e.into()))?;
 
 		// result
 		Ok(blocks)
-	}
-}
-impl Default for BlockMapping {
-	fn default() -> Self {
-		Self { map: Default::default() }
 	}
 }
 
@@ -595,14 +591,14 @@ mod tests {
 		let memory = MemoryStorage::new();
 		let algorithm = Algorithm::default();
 		let key = Secret::new(repeat(42).take(algorithm.key_size()).collect());
-		let mut encryption = EncryptedStorage::new(memory, key.clone(), algorithm.clone());
+		let mut encryption = EncryptedStorage::new(memory, key.clone(), algorithm);
 
 		// blocks
 		let mut cids: Vec<Cid> = Default::default();
 		for i in 0..1024 {
 			let data = Test { hello: format!("Hi {}!", i).to_owned() };
 			let block = BlockSerializer::default().serialize(&data).unwrap();
-			cids.push(block.cid().clone());
+			cids.push(*block.cid());
 			encryption.set(block.clone()).unwrap();
 		}
 

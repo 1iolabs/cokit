@@ -96,7 +96,7 @@ pub async fn command(cli: &Cli) -> Result<ExitCode, anyhow::Error> {
 
 	// execute
 	let result = match &cli.command {
-		CliCommand::Co(command) => co::command(&context, &cli, &command).await,
+		CliCommand::Co(command) => co::command(&context, cli, command).await,
 		CliCommand::CoreBuildBuiltin => core_build_builtin::command().await,
 		CliCommand::Cbor(command) => cbor::command(&context, command).await,
 		CliCommand::File(command) => file::command(&context, cli, command).await,

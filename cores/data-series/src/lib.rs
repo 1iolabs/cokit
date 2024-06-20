@@ -245,8 +245,8 @@ fn reduce_data(
 			state.aggregates.update(context, |context, aggregates| {
 				for (_, value) in aggregates.iter_mut() {
 					if value.series == payload.series {
-						let group = value.group.clone();
-						let by = value.by.clone();
+						let group = value.group;
+						let by = value.by;
 						value.values.update_owned(context, |_, mut values| {
 							// apply
 							aggregate(group, by, &data, &mut values);
@@ -254,8 +254,7 @@ fn reduce_data(
 							// ttl
 							if let Some(time_to_live) = series.time_to_live {
 								let expire = action_time - time_to_live as u128;
-								values =
-									values.into_iter().filter(|item| item.time == 0 || item.time < expire).collect();
+								values.retain(|item| item.time == 0 || item.time < expire);
 							}
 
 							// result
@@ -280,7 +279,7 @@ fn reduce_data(
 				// ttl?
 				if let Some(time_to_live) = series.time_to_live {
 					let expire = action_time - time_to_live as u128;
-					items = items.into_iter().filter(|item| item.time < expire).collect();
+					items.retain(|item| item.time < expire);
 				}
 
 				// result
@@ -339,11 +338,9 @@ fn reduce_create_aggregate(
 	group: Option<AggregateGroup>,
 	by: AggregateBy,
 ) -> DataSeries {
-	if state
+	if !state
 		.aggregates
-		.iter(context.storage())
-		.find(|(key, _)| key == aggregate_key)
-		.is_none()
+		.iter(context.storage()).any(|(key, _)| key == aggregate_key)
 	{
 		let item = state.data.iter(context.storage()).find(|(key, _)| key == series_key);
 		if let Some((_, series)) = item {
@@ -402,7 +399,7 @@ fn aggregate(group: Option<AggregateGroup>, by: AggregateBy, data: &Data, values
 	};
 
 	// get or insert bucket
-	let value = match values.iter_mut().filter(|item| item.time == bucket_time).next() {
+	let value = match values.iter_mut().find(|item| item.time == bucket_time) {
 		Some(value) => value,
 		None => {
 			let result = AggregateValue { count: 0, time: bucket_time, value: 0f64.into() };
@@ -425,12 +422,12 @@ fn aggregate(group: Option<AggregateGroup>, by: AggregateBy, data: &Data, values
 	// apply data
 	match by {
 		AggregateBy::Sum => {
-			value.count = value.count + 1;
+			value.count += 1;
 			value.value = (data.value as f64).into();
 		},
 		AggregateBy::Average => {
 			// See: https://math.stackexchange.com/questions/22348/how-to-add-and-subtract-values-from-an-average
-			value.count = value.count + 1;
+			value.count += 1;
 			value.value = (value.value.0 + ((data.value as f64 - value.value.0) / value.count as f64)).into();
 		},
 	}
@@ -455,6 +452,6 @@ mod tests {
 
 	#[test]
 	fn test_find_next_index() {
-		assert_eq!(Some(2), find_next_index(vec![10, 20, 30].iter(), &21));
+		assert_eq!(Some(2), find_next_index([10, 20, 30].iter(), &21));
 	}
 }

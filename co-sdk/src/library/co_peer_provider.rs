@@ -87,11 +87,11 @@ async fn networks<P>(
 where
 	P: PrivateIdentity + Send + Sync + 'static,
 {
-	let co_networks = state::networks(&storage, state)
+	let co_networks = state::networks(storage, state)
 		.await?
 		.into_iter()
 		.filter_map(|network| match network {
-			Network::CoHeads(value) => Some(Discovery::Topic(HeadsState::to_topic_hash(&value, &id).into_string())),
+			Network::CoHeads(value) => Some(Discovery::Topic(HeadsState::to_topic_hash(&value, id).into_string())),
 			Network::Rendezvous(value) => Some(Discovery::Rendezvous(value)),
 			Network::Peer(value) => Some(Discovery::Peer(value)),
 			_ => None,
@@ -115,5 +115,5 @@ where
 				_ => None,
 			})
 		});
-	Ok(co_networks.chain(participant_networks).into_iter().collect())
+	Ok(co_networks.chain(participant_networks).collect())
 }

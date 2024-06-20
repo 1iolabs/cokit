@@ -141,14 +141,14 @@ impl BlockStorage for FsStorage {
 fn into_storage_result<T>(cid: &Cid, result: std::io::Result<T>) -> Result<T, StorageError> {
 	match result {
 		Ok(data) => Ok(data),
-		Err(e) if e.kind() == ErrorKind::NotFound => Err(StorageError::NotFound(cid.clone(), e.into())),
+		Err(e) if e.kind() == ErrorKind::NotFound => Err(StorageError::NotFound(*cid, e.into())),
 		Err(e) => Err(StorageError::Internal(anyhow::Error::from(e).context(format!("Reading CID: {}", cid)))),
 	}
 }
 
 /// Convert io result to block result.
 fn into_block_result<P: StoreParams>(cid: &Cid, result: std::io::Result<Vec<u8>>) -> Result<Block<P>, StorageError> {
-	into_storage_result(cid, result).map(|data| Block::new_unchecked(cid.clone(), data))
+	into_storage_result(cid, result).map(|data| Block::new_unchecked(*cid, data))
 }
 
 fn to_cid_path(path: &PathBuf, cid: &Cid) -> PathBuf {

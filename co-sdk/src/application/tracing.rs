@@ -54,7 +54,7 @@ impl TracingBuilder {
 				std::fs::create_dir_all(log_path.parent().ok_or(anyhow::anyhow!("no parent"))?)?;
 				let log_file = std::fs::File::options().append(true).create(true).open(log_path)?;
 				// let formatting_layer = BunyanFormattingLayer::new("co-daemon".into(), std::io::stdout);
-				let formatting_layer = BunyanFormattingLayer::new(self.identifier.clone().into(), log_file);
+				let formatting_layer = BunyanFormattingLayer::new(self.identifier.clone(), log_file);
 				let subscriber = Registry::default()
 					.with(open_telemetry)
 					.with(LevelFilter::TRACE)

@@ -267,7 +267,7 @@ where
 			_marker: Default::default(),
 			cid: header
 				.algorithm
-				.encrypt(&block_secret, &header.nonce, cid.to_bytes().as_slice(), aad.as_slice())?,
+				.encrypt(block_secret, &header.nonce, cid.to_bytes().as_slice(), aad.as_slice())?,
 			data: header
 				.algorithm
 				.encrypt(&data_secret, &header.nonce, data.as_slice(), aad.as_slice())?,
@@ -310,8 +310,8 @@ where
 		let cid = self
 			.header
 			.algorithm
-			.decrypt(block_secret, &self.header.nonce, &self.cid, &aad)?;
-		Ok(Cid::try_from(cid).map_err(|_| AlgorithmError::Decoding)?)
+			.decrypt(block_secret, &self.header.nonce, &self.cid, aad)?;
+		Cid::try_from(cid).map_err(|_| AlgorithmError::Decoding)
 	}
 
 	fn decrypt_data(&self, block_secret: &Secret, aad: &[u8]) -> Result<Vec<u8>, AlgorithmError> {
@@ -319,7 +319,7 @@ where
 		let data = self
 			.header
 			.algorithm
-			.decrypt(&data_secret, &self.header.nonce, &self.data, &aad)?;
+			.decrypt(&data_secret, &self.header.nonce, &self.data, aad)?;
 		Ok(data)
 	}
 
@@ -408,7 +408,7 @@ impl Header {
 		// 	"n": self.nonce.clone(),
 		// });
 		// DagCborCodec.encode(&i).unwrap().to_vec()
-		return result
+		result
 	}
 
 	/// Get block secret fot given secret.
@@ -426,7 +426,7 @@ impl Header {
 	pub fn encoded_size(algorithm: Algorithm) -> usize {
 		let field_size = 1;
 		let cbor_size = 1;
-		return cbor_size
+		cbor_size
 			// version
 			+ 1 + field_size + cbor_size
 			// algorithm
@@ -490,7 +490,7 @@ impl KeySlot {
 		let tag_size = algorithm.tag_size();
 		let field_size = 1;
 		let cbor_size = 1;
-		return cbor_size
+		cbor_size
 			// version
 			+ 1 + field_size + cbor_size
 			// algorithm

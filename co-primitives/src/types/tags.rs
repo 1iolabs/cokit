@@ -78,14 +78,14 @@ impl TagValue {
 	/// Access the string value.
 	pub fn string(&self) -> Option<&str> {
 		match self {
-			TagValue::String(s) => Some(&s),
+			TagValue::String(s) => Some(s),
 			_ => None,
 		}
 	}
 }
-impl Into<Ipld> for TagValue {
-	fn into(self) -> Ipld {
-		match self {
+impl From<TagValue> for Ipld {
+	fn from(val: TagValue) -> Self {
+		match val {
 			TagValue::Null => Ipld::Null,
 			TagValue::Bool(i) => Ipld::Bool(i),
 			TagValue::Integer(i) => Ipld::Integer(i),
@@ -148,7 +148,7 @@ impl std::fmt::Display for TagValue {
 				}
 				result
 			},
-			TagValue::Link(v) => write!(f, "{}", v.to_string()),
+			TagValue::Link(v) => write!(f, "{}", v),
 		}
 	}
 }
@@ -212,10 +212,11 @@ impl Tags {
 	/// If no tags are specified all tags will be removed.
 	pub fn clear(&mut self, tags: Option<&Tags>) {
 		match tags {
-			Some(tags) =>
+			Some(tags) => {
 				for tag in tags.0.iter() {
 					self.0.remove(tag);
-				},
+				}
+			},
 			None => self.0.clear(),
 		}
 	}
@@ -321,9 +322,9 @@ pub enum TagsExpr {
 impl TagsMatches for TagsExpr {
 	fn matches(&self, tags: &Tags) -> bool {
 		match self {
-			TagsExpr::Tag(cond_tag) => tags.iter().filter(|tag| &cond_tag == tag).next().is_some(),
-			TagsExpr::And(and) => and.iter().filter(|cond| !cond.matches(tags)).next().is_none(),
-			TagsExpr::Or(or) => or.iter().filter(|cond| cond.matches(tags)).next().is_some(),
+			TagsExpr::Tag(cond_tag) => tags.iter().any(|tag| cond_tag == tag),
+			TagsExpr::And(and) => !and.iter().any(|cond| !cond.matches(tags)),
+			TagsExpr::Or(or) => or.iter().any(|cond| cond.matches(tags)),
 			TagsExpr::Not(not) => !not.matches(tags),
 		}
 	}
@@ -335,7 +336,7 @@ impl From<Tag> for TagsExpr {
 }
 impl From<Tags> for TagsExpr {
 	fn from(value: Tags) -> Self {
-		TagsExpr::And(value.into_iter().map(|tag| TagsExpr::Tag(tag)).collect())
+		TagsExpr::And(value.into_iter().map(TagsExpr::Tag).collect())
 	}
 }
 
@@ -366,8 +367,8 @@ mod tests {
 	#[test]
 	fn test_expr_not() {
 		let expr = TagsExpr::Not(Box::new(TagsExpr::Tag(tag!("hello": "world"))));
-		assert_eq!(false, expr.matches(&tags!( "hello": "world" )));
-		assert_eq!(false, expr.matches(&tags!( "hello": "world", "five": "ten" )));
-		assert_eq!(true, expr.matches(&tags!( "five": "ten" )));
+		assert!(!expr.matches(&tags!( "hello": "world" )));
+		assert!(!expr.matches(&tags!( "hello": "world", "five": "ten" )));
+		assert!(expr.matches(&tags!( "five": "ten" )));
 	}
 }

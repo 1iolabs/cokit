@@ -14,9 +14,9 @@ pub enum ErrorKind {
 	Fatal,
 }
 
-impl Into<ErrorContext> for ErrorKind {
-	fn into(self) -> ErrorContext {
-		ErrorContext { kind: self, ..ErrorContext::default() }
+impl From<ErrorKind> for ErrorContext {
+	fn from(val: ErrorKind) -> Self {
+		ErrorContext { kind: val, ..ErrorContext::default() }
 	}
 }
 

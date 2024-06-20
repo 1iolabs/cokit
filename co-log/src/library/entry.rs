@@ -113,13 +113,13 @@ impl<P: StoreParams> EntryBlock<P> {
 		Ok(identity.verify(
 			&self.data.signature,
 			self.unsigned_block()?.data(),
-			self.signed_entry().public_key.as_ref().map(Vec::as_slice),
+			self.signed_entry().public_key.as_deref(),
 		))
 	}
 }
-impl<P: StoreParams> Into<Entry> for EntryBlock<P> {
-	fn into(self) -> Entry {
-		self.data.entry
+impl<P: StoreParams> From<EntryBlock<P>> for Entry {
+	fn from(val: EntryBlock<P>) -> Self {
+		val.data.entry
 	}
 }
 impl<P: StoreParams> PartialEq for EntryBlock<P> {
@@ -130,12 +130,12 @@ impl<P: StoreParams> PartialEq for EntryBlock<P> {
 impl<P: StoreParams> Eq for EntryBlock<P> {}
 impl<P: StoreParams> PartialOrd for EntryBlock<P> {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		self.cid().partial_cmp(&other.cid())
+		self.cid().partial_cmp(other.cid())
 	}
 }
 impl<P: StoreParams> Ord for EntryBlock<P> {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-		self.cid().cmp(&other.cid())
+		self.cid().cmp(other.cid())
 	}
 }
 
@@ -165,7 +165,7 @@ mod tests {
 			identity.as_ref(),
 			crate::Entry {
 				id: vec![0],
-				payload: block.cid().clone(),
+				payload: *block.cid(),
 				next: Default::default(),
 				refs: Default::default(),
 				clock: Clock::new(vec![1], 0),

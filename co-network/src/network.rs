@@ -276,8 +276,9 @@ impl LayerBehaviour<Behaviour> for Context {
 				.discovery
 				.on_layer_event(swarm, event)
 				.map(|event| ContextEvent::Discovery(event)),
-			ContextLayerEvent::Heads(event) =>
-				self.heads.on_layer_event(swarm, event).map(|event| ContextEvent::Heads(event)),
+			ContextLayerEvent::Heads(event) => {
+				self.heads.on_layer_event(swarm, event).map(|event| ContextEvent::Heads(event))
+			},
 		}
 	}
 
@@ -585,7 +586,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 			// done?
 			if runtime.pending_tasks[task_index].is_complete() {
 				runtime.pending_tasks.remove(task_index);
-				task_index = task_index - 1;
+				task_index -= 1;
 			}
 
 			// event consumed?
@@ -594,7 +595,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 			}
 
 			// next
-			task_index = task_index + 1;
+			task_index += 1;
 		}
 
 		// other

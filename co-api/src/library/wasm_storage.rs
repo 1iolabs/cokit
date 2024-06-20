@@ -47,7 +47,7 @@ impl Storage for WasmStorage {
 		}
 
 		// result
-		Block::new_unchecked(cid.clone(), buffer)
+		Block::new_unchecked(*cid, buffer)
 	}
 
 	fn set(&mut self, block: Block) -> Cid {

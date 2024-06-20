@@ -19,9 +19,9 @@ pub enum StateType {
 	PinnedEvents(PinnedEventsContent),
 }
 
-impl Into<EventContent> for StateType {
-	fn into(self) -> EventContent {
-		EventContent::State(self)
+impl From<StateType> for EventContent {
+	fn from(val: StateType) -> Self {
+		EventContent::State(val)
 	}
 }
 
@@ -53,9 +53,9 @@ impl EventType for RoomNameContent {
 	}
 }
 
-impl Into<EventContent> for RoomNameContent {
-	fn into(self) -> EventContent {
-		StateType::RoomName(self).into()
+impl From<RoomNameContent> for EventContent {
+	fn from(val: RoomNameContent) -> Self {
+		StateType::RoomName(val).into()
 	}
 }
 
@@ -76,9 +76,9 @@ impl EventType for RoomTopicContent {
 	}
 }
 
-impl Into<EventContent> for RoomTopicContent {
-	fn into(self) -> EventContent {
-		StateType::RoomTopic(self).into()
+impl From<RoomTopicContent> for EventContent {
+	fn from(val: RoomTopicContent) -> Self {
+		StateType::RoomTopic(val).into()
 	}
 }
 
@@ -100,9 +100,9 @@ impl EventType for RoomAvatarContent {
 	}
 }
 
-impl Into<EventContent> for RoomAvatarContent {
-	fn into(self) -> EventContent {
-		StateType::RoomAvatar(self).into()
+impl From<RoomAvatarContent> for EventContent {
+	fn from(val: RoomAvatarContent) -> Self {
+		StateType::RoomAvatar(val).into()
 	}
 }
 
@@ -123,8 +123,8 @@ impl EventType for PinnedEventsContent {
 	}
 }
 
-impl Into<EventContent> for PinnedEventsContent {
-	fn into(self) -> EventContent {
-		StateType::PinnedEvents(self).into()
+impl From<PinnedEventsContent> for EventContent {
+	fn from(val: PinnedEventsContent) -> Self {
+		StateType::PinnedEvents(val).into()
 	}
 }

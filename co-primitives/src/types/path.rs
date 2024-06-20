@@ -33,7 +33,7 @@ impl PathExt for Path {
 
 	/// See: [`std::path::Path`]
 	fn from_str_unchecked(s: &str) -> &Self::Path {
-		unsafe { &*(s.as_ref() as *const str as *const Path) }
+		unsafe { &*(s as *const str as *const Path) }
 	}
 
 	fn as_string(&self) -> &'_ str {
@@ -44,14 +44,14 @@ impl PathExt for Path {
 		matches!(self.as_string().as_bytes().first(), Some(b'/'))
 	}
 }
-impl Into<String> for &Path {
-	fn into(self) -> String {
-		self.0.to_owned()
+impl From<&Path> for String {
+	fn from(val: &Path) -> Self {
+		val.0.to_owned()
 	}
 }
-impl Into<PathOwned> for &Path {
-	fn into(self) -> PathOwned {
-		PathOwned(self.0.to_owned())
+impl From<&Path> for PathOwned {
+	fn from(val: &Path) -> Self {
+		PathOwned(val.0.to_owned())
 	}
 }
 impl<'a> IntoIterator for &'a Path {
@@ -139,9 +139,9 @@ impl AsRef<str> for PathOwned {
 		&self.0
 	}
 }
-impl Into<String> for PathOwned {
-	fn into(self) -> String {
-		self.0
+impl From<PathOwned> for String {
+	fn from(val: PathOwned) -> Self {
+		val.0
 	}
 }
 impl<'a> IntoIterator for &'a PathOwned {
@@ -191,7 +191,7 @@ impl PathExt for AbsolutePath {
 
 	/// See: [`std::path::Path`]
 	fn from_str_unchecked(s: &str) -> &Self::Path {
-		unsafe { &*(s.as_ref() as *const str as *const Self::Path) }
+		unsafe { &*(s as *const str as *const Self::Path) }
 	}
 
 	fn as_string(&self) -> &'_ str {
@@ -202,14 +202,14 @@ impl PathExt for AbsolutePath {
 		true
 	}
 }
-impl Into<String> for &AbsolutePath {
-	fn into(self) -> String {
-		self.0.to_owned()
+impl From<&AbsolutePath> for String {
+	fn from(val: &AbsolutePath) -> Self {
+		val.0.to_owned()
 	}
 }
-impl Into<AbsolutePathOwned> for &AbsolutePath {
-	fn into(self) -> AbsolutePathOwned {
-		self.to_path()
+impl From<&AbsolutePath> for AbsolutePathOwned {
+	fn from(val: &AbsolutePath) -> Self {
+		val.to_path()
 	}
 }
 impl<'a> IntoIterator for &'a AbsolutePath {
@@ -293,9 +293,9 @@ impl Borrow<AbsolutePath> for AbsolutePathOwned {
 		self
 	}
 }
-impl Into<String> for AbsolutePathOwned {
-	fn into(self) -> String {
-		self.0
+impl From<AbsolutePathOwned> for String {
+	fn from(val: AbsolutePathOwned) -> Self {
+		val.0
 	}
 }
 impl<'a> IntoIterator for &'a AbsolutePathOwned {
@@ -341,7 +341,7 @@ impl PathExt for RelativePath {
 
 	/// See: [`std::path::Path`]
 	fn from_str_unchecked(s: &str) -> &Self::Path {
-		unsafe { &*(s.as_ref() as *const str as *const Self::Path) }
+		unsafe { &*(s as *const str as *const Self::Path) }
 	}
 
 	fn as_string(&self) -> &'_ str {
@@ -352,14 +352,14 @@ impl PathExt for RelativePath {
 		false
 	}
 }
-impl Into<String> for &RelativePath {
-	fn into(self) -> String {
-		self.0.to_owned()
+impl From<&RelativePath> for String {
+	fn from(val: &RelativePath) -> Self {
+		val.0.to_owned()
 	}
 }
-impl Into<RelativePathOwned> for &RelativePath {
-	fn into(self) -> RelativePathOwned {
-		self.to_path()
+impl From<&RelativePath> for RelativePathOwned {
+	fn from(val: &RelativePath) -> Self {
+		val.to_path()
 	}
 }
 impl<'a> IntoIterator for &'a RelativePath {
@@ -433,9 +433,9 @@ impl Borrow<RelativePath> for RelativePathOwned {
 		self
 	}
 }
-impl Into<String> for RelativePathOwned {
-	fn into(self) -> String {
-		self.0
+impl From<RelativePathOwned> for String {
+	fn from(val: RelativePathOwned) -> Self {
+		val.0
 	}
 }
 impl<'a> IntoIterator for &'a RelativePathOwned {
@@ -548,7 +548,7 @@ pub trait PathExt {
 	}
 
 	fn from_str(buf: &str) -> Result<&Self::Path, PathError> {
-		Self::validate(&buf)?;
+		Self::validate(buf)?;
 		Ok(Self::from_str_unchecked(buf))
 	}
 
@@ -593,7 +593,7 @@ pub trait PathExt {
 	/// ```
 	fn parents(&self) -> impl Iterator<Item = &Self::Path> {
 		self.components()
-			.scan((0 as usize, self.as_string()), |(index, path), component| {
+			.scan((0_usize, self.as_string()), |(index, path), component| {
 				let end = *index + component.len();
 				if end == path.len() {
 					return None
@@ -651,7 +651,7 @@ pub trait PathExt {
 	/// Join and normalize other path.
 	fn join_path(&self, other: &str) -> Result<Self::PathOwned, PathError> {
 		let other_path = Path::from_str_unchecked(other);
-		self.join(other_path.into_iter())
+		self.join(other_path)
 	}
 }
 
@@ -659,7 +659,7 @@ fn join<'a: 'b, 'b: 'a>(
 	a: impl IntoIterator<Item = Component<'a>>,
 	b: impl IntoIterator<Item = Component<'b>>,
 ) -> Result<String, PathError> {
-	let components = a.into_iter().chain(b.into_iter());
+	let components = a.into_iter().chain(b);
 	let normalized = normalize_components(components)?;
 	Ok(from_components(normalized))
 }
@@ -692,7 +692,7 @@ fn normalize_components<'a>(
 						Component::RootDir => return Err(PathError::NoRoot),
 						// keep parent dir if previous is also an parent dir
 						Component::ParentDir => {
-							index = index + 1;
+							index += 1;
 							continue;
 						},
 						_ => {},
@@ -703,14 +703,14 @@ fn normalize_components<'a>(
 					stack.remove(index - 1);
 
 					// continue with next element
-					index = index - 1;
+					index -= 1;
 				} else {
 					// keep parent (..) when on start
-					index = index + 1;
+					index += 1;
 				},
 			_ => {
 				// keep
-				index = index + 1;
+				index += 1;
 			},
 		}
 	}

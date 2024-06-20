@@ -83,7 +83,7 @@ where
 			.collect();
 		for network in networks.iter() {
 			// subscribe
-			if !self.subscriptions.contains_key(&network) {
+			if !self.subscriptions.contains_key(network) {
 				self.subscriptions.insert(
 					network.clone(),
 					CoHeadsSubscription::subscribe(self.spawner.clone(), self.co.clone(), network.clone())?,

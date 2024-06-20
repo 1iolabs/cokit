@@ -88,7 +88,7 @@ impl ConnectionHandler for Handler {
 	}
 
 	fn connection_keep_alive(&self) -> bool {
-		self.pending_outbound > 0 || self.outbound.len() > 0 || self.pending_events.len() > 0
+		self.pending_outbound > 0 || !self.outbound.is_empty() || !self.pending_events.is_empty()
 	}
 
 	fn poll(
@@ -97,7 +97,7 @@ impl ConnectionHandler for Handler {
 	) -> Poll<ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::ToBehaviour>> {
 		// drain pending events
 		if let Some(event) = self.pending_events.pop_front() {
-			return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(event))
+			return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(event));
 		} else if self.pending_events.capacity() > 100 {
 			self.pending_events.shrink_to_fit();
 		}
@@ -107,7 +107,7 @@ impl ConnectionHandler for Handler {
 			self.pending_outbound += 1;
 			return Poll::Ready(ConnectionHandlerEvent::OutboundSubstreamRequest {
 				protocol: SubstreamProtocol::new(message, ()),
-			})
+			});
 		} else if self.outbound.capacity() > 100 {
 			self.outbound.shrink_to_fit();
 		}
@@ -136,8 +136,9 @@ impl ConnectionHandler for Handler {
 				}
 			},
 			ConnectionEvent::DialUpgradeError(dial_upgrade_error) => self.on_dial_upgrade_error(dial_upgrade_error),
-			ConnectionEvent::ListenUpgradeError(listen_upgrade_error) =>
-				self.on_listen_upgrade_error(listen_upgrade_error),
+			ConnectionEvent::ListenUpgradeError(listen_upgrade_error) => {
+				self.on_listen_upgrade_error(listen_upgrade_error)
+			},
 			_ => {},
 		}
 	}

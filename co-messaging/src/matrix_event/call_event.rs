@@ -75,9 +75,9 @@ impl EventType for CallType {
 	}
 }
 
-impl Into<EventContent> for CallType {
-	fn into(self) -> EventContent {
-		EventContent::Call(self)
+impl From<CallType> for EventContent {
+	fn from(val: CallType) -> Self {
+		EventContent::Call(val)
 	}
 }
 
@@ -95,9 +95,9 @@ pub struct CallInviteContent {
 	pub offer: SessionDescription, // Session description object
 }
 
-impl Into<EventContent> for CallInviteContent {
-	fn into(self) -> EventContent {
-		CallType::Invite(self).into()
+impl From<CallInviteContent> for EventContent {
+	fn from(val: CallInviteContent) -> Self {
+		CallType::Invite(val).into()
 	}
 }
 
@@ -137,9 +137,9 @@ pub struct AnswerCallContent {
 	pub answer: SessionDescription,
 }
 
-impl Into<EventContent> for AnswerCallContent {
-	fn into(self) -> EventContent {
-		CallType::Answer(self).into()
+impl From<AnswerCallContent> for EventContent {
+	fn from(val: AnswerCallContent) -> Self {
+		CallType::Answer(val).into()
 	}
 }
 
@@ -171,9 +171,9 @@ pub struct CallCandidatesContent {
 	pub candidates: Vec<ICECandidate>,
 }
 
-impl Into<EventContent> for CallCandidatesContent {
-	fn into(self) -> EventContent {
-		CallType::Candidates(self).into()
+impl From<CallCandidatesContent> for EventContent {
+	fn from(val: CallCandidatesContent) -> Self {
+		CallType::Candidates(val).into()
 	}
 }
 
@@ -200,9 +200,9 @@ pub struct SelectCallAnswerContent {
 	pub selected_party_id: String, // party id of the participant whose answer has been selected
 }
 
-impl Into<EventContent> for SelectCallAnswerContent {
-	fn into(self) -> EventContent {
-		CallType::SelectAnswer(self).into()
+impl From<SelectCallAnswerContent> for EventContent {
+	fn from(val: SelectCallAnswerContent) -> Self {
+		CallType::SelectAnswer(val).into()
 	}
 }
 
@@ -241,9 +241,9 @@ pub struct CallNegotiationContent {
 	lifetime: Option<i64>, // Time in ms before offer timeout
 }
 
-impl Into<EventContent> for CallNegotiationContent {
-	fn into(self) -> EventContent {
-		CallType::Negotioation(self).into()
+impl From<CallNegotiationContent> for EventContent {
+	fn from(val: CallNegotiationContent) -> Self {
+		CallType::Negotioation(val).into()
 	}
 }
 
@@ -310,9 +310,9 @@ pub struct RejectCallContent {
 	pub version: String,
 }
 
-impl Into<EventContent> for RejectCallContent {
-	fn into(self) -> EventContent {
-		CallType::Reject(self).into()
+impl From<RejectCallContent> for EventContent {
+	fn from(val: RejectCallContent) -> Self {
+		CallType::Reject(val).into()
 	}
 }
 
@@ -362,9 +362,9 @@ pub struct HangupCallContent {
 	pub reason: HangupCallReason,
 }
 
-impl Into<EventContent> for HangupCallContent {
-	fn into(self) -> EventContent {
-		CallType::Hangup(self).into()
+impl From<HangupCallContent> for EventContent {
+	fn from(val: HangupCallContent) -> Self {
+		CallType::Hangup(val).into()
 	}
 }
 

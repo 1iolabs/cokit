@@ -9,7 +9,7 @@ pub async fn to_plain<M: BlockStorageContentMapping + Send + Sync + 'static>(
 	mapped: impl IntoIterator<Item = Cid>,
 ) -> Result<BTreeSet<Cid>, Cid> {
 	futures::stream::iter(mapped)
-		.then(|head| to_plain_one(&mapping, force_mapping, head))
+		.then(|head| to_plain_one(mapping, force_mapping, head))
 		.try_collect()
 		.await
 }

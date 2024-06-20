@@ -43,7 +43,7 @@ where
 		// calculate
 		let mut entries_to_get: BTreeSet<Cid> = Default::default();
 		let mut connected_heads: BTreeSet<Cid> = Default::default();
-		self.entries_to_add.insert(entry.cid().clone());
+		self.entries_to_add.insert(*entry.cid());
 		entries_to_get.extend(entry.entry().next.iter());
 		entries_to_get.extend(entry.entry().refs.iter());
 		while !entries_to_get.is_empty() {
@@ -52,13 +52,13 @@ where
 			while let Some(cid) = entries_to_get.pop_first() {
 				let e = get_entry_block(log.storage(), &cid).await?;
 				verify_entry(log, &e).await?;
-				self.entries_to_add.insert(e.cid().clone());
+				self.entries_to_add.insert(*e.cid());
 
 				for next in e.entry().next.iter().chain(e.entry().refs.iter()) {
 					if !log.contains(next) && !self.entries_to_add.contains(next) {
-						entries_to_get.insert(next.clone());
+						entries_to_get.insert(*next);
 					} else if self.heads.contains(next) {
-						connected_heads.insert(next.clone());
+						connected_heads.insert(*next);
 					}
 				}
 			}
@@ -72,10 +72,10 @@ where
 				// skip connected entries
 				.filter(|cid| !connected_heads.contains(cid))
 				// also resolve entry
-				.chain([entry.cid().clone()].iter()),
+				.chain([*entry.cid()].iter()),
 		)
 		.await?;
-		self.heads = find_heads(possible_heads.iter()).iter().map(|e| e.cid().clone()).collect();
+		self.heads = find_heads(possible_heads.iter()).iter().map(|e| *e.cid()).collect();
 
 		// result
 		Ok(true)

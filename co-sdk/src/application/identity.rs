@@ -31,5 +31,5 @@ pub async fn resolve_private_identity(
 	did: &co_primitives::Did,
 ) -> Result<PrivateIdentityBox, anyhow::Error> {
 	let resolver = create_private_identity_resolver(application).await?;
-	Ok(resolver.resolve_private(&did).await?)
+	Ok(resolver.resolve_private(did).await?)
 }

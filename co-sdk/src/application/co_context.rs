@@ -80,7 +80,7 @@ impl bitswap::StorageResolver<CoStorage> for CoContext {
 	) -> Result<CoStorage, anyhow::Error> {
 		// use CO from first valid token
 		for token in tokens {
-			if let Some(co_token) = CoToken::from_bitswap_token(token).ok() {
+			if let Ok(co_token) = CoToken::from_bitswap_token(token) {
 				// get co
 				if let Some(co) = self.co_reducer(&co_token.body.1).await? {
 					let parent = match co.parent_id() {
@@ -256,8 +256,8 @@ impl CoContextInner {
 		Ok(Some(reducer))
 	}
 }
-impl Into<CoContext> for CoContextInner {
-	fn into(self) -> CoContext {
-		CoContext { inner: Arc::new(self) }
+impl From<CoContextInner> for CoContext {
+	fn from(val: CoContextInner) -> Self {
+		CoContext { inner: Arc::new(val) }
 	}
 }

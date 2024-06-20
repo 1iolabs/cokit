@@ -7,10 +7,8 @@ pub trait Relation {
 	fn get_in_reply_to(&self) -> Option<String>;
 }
 
-/**
- * Empty content as the only purpose is holding a relation to another event.
- * Mostly used for annotation events
- */
+/// Empty content as the only purpose is holding a relation to another event.
+/// Mostly used for annotation events
 #[common_event_content]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ReactionContent {}
@@ -21,9 +19,9 @@ impl ReactionContent {
 	}
 }
 
-impl Into<EventContent> for ReactionContent {
-	fn into(self) -> EventContent {
-		EventContent::Reaction(self)
+impl From<ReactionContent> for EventContent {
+	fn from(val: ReactionContent) -> Self {
+		EventContent::Reaction(val)
 	}
 }
 
@@ -69,9 +67,7 @@ pub struct RelatesTo {
 }
 
 impl RelatesTo {
-	/**
-	 * Helper function to create a RelatesTo body used for replies
-	 */
+	/// Helper function to create a RelatesTo body used for replies
 	pub fn in_reply_to(event_id: impl Into<String>) -> Self {
 		Self {
 			event_id: None,
@@ -81,43 +77,37 @@ impl RelatesTo {
 			key: None,
 		}
 	}
-	/**
-	 * Helper function to create a RelatesTo body used for general relations
-	 */
+
+	/// Helper function to create a RelatesTo body used for general relations
 	pub fn relation(event_id: impl Into<String>, rel_type: RelationType) -> Self {
 		Self { event_id: Some(event_id.into()), rel_type: Some(rel_type), in_reply_to: None, room_id: None, key: None }
 	}
-	/**
-	 * Helper function to create a RelatesTo body for annotations
-	 */
+
+	/// Helper function to create a RelatesTo body for annotations
 	pub fn annotation(event_id: impl Into<String>, key: impl Into<String>) -> Self {
 		let mut body = Self::relation(event_id, RelationType::Annotation);
 		body.key = Some(key.into());
 		body
 	}
-	/**
-	 * Helper function to create a RelatesTo body for replacements (edits)
-	 */
+
+	/// Helper function to create a RelatesTo body for replacements (edits)
 	pub fn replacement(event_id: impl Into<String>) -> Self {
 		Self::relation(event_id, RelationType::Replace)
 	}
-	/**
-	 * Helper function to create a RelatesTo body for forwarding
-	 */
+
+	/// Helper function to create a RelatesTo body for forwarding
 	pub fn forward(event_id: impl Into<String>, room_id: impl Into<String>) -> Self {
 		let mut body = Self::relation(event_id, RelationType::Forward);
 		body.room_id = Some(room_id.into());
 		body
 	}
-	/**
-	 * Helper function to create a RelatesTo body for threading
-	 */
+
+	/// Helper function to create a RelatesTo body for threading
 	pub fn thread(event_id: impl Into<String>) -> Self {
 		Self::relation(event_id, RelationType::Thread)
 	}
-	/**
-	 * Helper function to create a RelatesTo body for poll responses
-	 */
+
+	/// Helper function to create a RelatesTo body for poll responses
 	pub fn poll(event_id: impl Into<String>) -> Self {
 		Self::relation(event_id, RelationType::Poll)
 	}
@@ -127,19 +117,19 @@ impl RelatesTo {
 		self.rel_type = Some(rel_type);
 		self.room_id = None;
 	}
+
 	pub fn set_forward(&mut self, event_id: impl Into<String>, room_id: impl Into<String>) {
 		self.event_id = Some(event_id.into());
 		self.rel_type = Some(RelationType::Forward);
 		self.room_id = Some(room_id.into());
 	}
+
 	pub fn set_in_reply_to(&mut self, event_id: String) {
 		self.in_reply_to = Some(ReplyContent { event_id });
 	}
+
 	pub fn get_reply_event(&self) -> Option<String> {
-		match &self.in_reply_to {
-			Some(reply) => Some(reply.event_id.clone()),
-			None => None,
-		}
+		self.in_reply_to.as_ref().map(|reply| reply.event_id.clone())
 	}
 }
 
@@ -151,16 +141,11 @@ impl Relation for RelatesTo {
 		}
 	}
 	fn get_in_reply_to(&self) -> Option<String> {
-		match &self.in_reply_to {
-			Some(content) => Some(content.event_id.clone()),
-			None => None,
-		}
+		self.in_reply_to.as_ref().map(|content| content.event_id.clone())
 	}
 }
 
-/**
- * Simple enum containing all different types of relation that events can have to other events
- */
+/// Simple enum containing all different types of relation that events can have to other events
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum RelationType {
 	#[serde(rename = "m.annotation")]
@@ -195,11 +180,9 @@ pub struct ReplyContent {
 	pub event_id: String,
 }
 
-/**
- * Event content used to redact other events. Sender of this event must be either the same as the sender of the
- * original event or a user with the necessary permissions.
- * Redactions are idempotent and irreversible. They do not use the same relation fields as other events
- */
+/// Event content used to redact other events. Sender of this event must be either the same as the sender of the
+/// original event or a user with the necessary permissions.
+/// Redactions are idempotent and irreversible. They do not use the same relation fields as other events
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RedactionContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -207,9 +190,9 @@ pub struct RedactionContent {
 	pub redacts: String, // Event ID of the redacted event
 }
 
-impl Into<EventContent> for RedactionContent {
-	fn into(self) -> EventContent {
-		EventContent::Redaction(self)
+impl From<RedactionContent> for EventContent {
+	fn from(val: RedactionContent) -> Self {
+		EventContent::Redaction(val)
 	}
 }
 

@@ -12,10 +12,10 @@ pub enum NodeReaderError {
 	Decode(#[source] anyhow::Error),
 }
 
-pub fn node_reader<'a, T>(
-	storage: &'a dyn Storage,
+pub fn node_reader<T>(
+	storage: &dyn Storage,
 	cid: Option<Cid>,
-) -> impl Iterator<Item = Result<T, NodeReaderError>> + 'a
+) -> impl Iterator<Item = Result<T, NodeReaderError>> + '_
 where
 	T: Clone + DeserializeOwned + 'static,
 {
@@ -38,7 +38,7 @@ where
 	pub fn new(storage: &'a dyn Storage, cid: Option<Cid>) -> Self {
 		let mut stack = VecDeque::new();
 		if let Some(cid) = cid {
-			stack.push_front(cid.clone());
+			stack.push_front(cid);
 		}
 		Self { storage, stack, entries: Default::default() }
 	}

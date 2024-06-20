@@ -49,7 +49,7 @@ pub async fn didcomm_jwe_receive<R: IdentityResolver>(
 	resolver: &R,
 	incoming: &str,
 ) -> Result<(DidCommHeader, String), ReceiveError> {
-	let jwe: Jwe = serde_json::from_str(&incoming).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
+	let jwe: Jwe = serde_json::from_str(incoming).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
 
 	// we expect the jwe signed with a one-time key
 	let skid = jwe.get_skid().ok_or_else(|| ReceiveError::MissingSigningKeyId)?;
@@ -74,7 +74,7 @@ pub async fn didcomm_jwe_receive<R: IdentityResolver>(
 			skid_context
 				.key_agreement()
 				.public_key_bytes()
-				.map_err(|e| ReceiveError::InvalidArgument(e))?,
+				.map_err(ReceiveError::InvalidArgument)?,
 		),
 		None,
 	)
@@ -94,9 +94,9 @@ mod tests {
 
 	#[tokio::test]
 	async fn smoke() {
-		let from = DidKeyIdentity::generate_x25519(Some(&vec![1; 32]));
-		let to = DidKeyIdentity::generate_x25519(Some(&vec![2; 32]));
-		let other = DidKeyIdentity::generate(Some(&vec![3; 32]));
+		let from = DidKeyIdentity::generate_x25519(Some(&[1; 32]));
+		let to = DidKeyIdentity::generate_x25519(Some(&[2; 32]));
+		let other = DidKeyIdentity::generate(Some(&[3; 32]));
 
 		// create
 		let header = DidCommHeader {

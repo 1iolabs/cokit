@@ -53,11 +53,11 @@ impl LocalIdentityResolver {
 		if identity.starts_with("did:local:") {
 			return Ok(LocalIdentity { did: identity.to_owned() });
 		}
-		return Err(IdentityResolverError::NotFound);
+		Err(IdentityResolverError::NotFound)
 	}
 
 	pub fn private_identity(&self, identity: &str) -> Result<LocalIdentity, IdentityResolverError> {
-		Ok(Self::into_local_identity(identity)?)
+		Self::into_local_identity(identity)
 	}
 }
 #[async_trait]

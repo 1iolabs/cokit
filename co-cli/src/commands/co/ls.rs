@@ -28,7 +28,7 @@ pub async fn command(context: &CliContext, cli: &Cli) -> Result<ExitCode, anyhow
 	while let Some(item) = stream.next().await {
 		match item {
 			Ok((id, state, tags)) => {
-				println!("{} | {} | {}", id, state.to_string(), tags)
+				println!("{} | {} | {}", id, state, tags)
 			},
 			Err(e) => {
 				result = exitcode::UNAVAILABLE;

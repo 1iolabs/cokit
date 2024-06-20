@@ -72,11 +72,7 @@ impl Network {
 
 	/// Network shutdown token.
 	pub async fn shutdown(&self) -> Option<Shutdown> {
-		if let Some(network) = self.network.lock().await.as_mut() {
-			Some(network.shutdown())
-		} else {
-			None
-		}
+		self.network.lock().await.as_mut().map(|network| network.shutdown())
 	}
 
 	/// Create network task spawner.
@@ -195,7 +191,7 @@ pub struct CoNetworkTaskSpawner {
 
 impl Clone for CoNetworkTaskSpawner {
 	fn clone(&self) -> Self {
-		Self { spawner: self.spawner.clone(), local_peer: self.local_peer.clone() }
+		Self { spawner: self.spawner.clone(), local_peer: self.local_peer }
 	}
 }
 impl CoNetworkTaskSpawner {

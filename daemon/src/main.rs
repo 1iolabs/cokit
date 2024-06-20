@@ -19,7 +19,7 @@ async fn main() {
 		None => ApplicationBuilder::new(cli.instance_id.to_owned()),
 		Some(path) => ApplicationBuilder::new_with_path(cli.instance_id.to_owned(), path),
 	};
-	if cli.no_log == false {
+	if !cli.no_log {
 		application_builder = application_builder.with_bunyan_logging(cli.log_path);
 	}
 	if cli.no_keychain {

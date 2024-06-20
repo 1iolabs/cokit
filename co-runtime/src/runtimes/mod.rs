@@ -68,7 +68,7 @@ impl Runtime for Wasmer {
 
 		// execute
 		runtime.execute()?;
-		let result = runtime.api().state().clone();
+		let result = *runtime.api().state();
 
 		// result
 		Ok(result)

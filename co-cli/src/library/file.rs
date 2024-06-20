@@ -142,7 +142,7 @@ pub fn nodes(
 			// filter?
 			if let Some(paths) = &paths {
 				if paths.contains(&directory_path) {
-					seen_paths = seen_paths - 1;
+					seen_paths -= 1;
 				} else {
 					continue;
 				}

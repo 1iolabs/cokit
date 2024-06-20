@@ -23,9 +23,9 @@ impl EventType for UserType {
 	}
 }
 
-impl Into<EventContent> for UserType {
-	fn into(self) -> EventContent {
-		EventContent::User(self)
+impl From<UserType> for EventContent {
+	fn from(val: UserType) -> Self {
+		EventContent::User(val)
 	}
 }
 
@@ -42,9 +42,9 @@ impl EventType for PostUserStoryContent {
 	}
 }
 
-impl Into<EventContent> for PostUserStoryContent {
-	fn into(self) -> EventContent {
-		UserType::PostStory(self).into()
+impl From<PostUserStoryContent> for EventContent {
+	fn from(val: PostUserStoryContent) -> Self {
+		UserType::PostStory(val).into()
 	}
 }
 
@@ -65,9 +65,9 @@ impl EventType for ViewUserStoryContent {
 	}
 }
 
-impl Into<EventContent> for ViewUserStoryContent {
-	fn into(self) -> EventContent {
-		UserType::ViewStory(self).into()
+impl From<ViewUserStoryContent> for EventContent {
+	fn from(val: ViewUserStoryContent) -> Self {
+		UserType::ViewStory(val).into()
 	}
 }
 
@@ -90,9 +90,9 @@ impl EventType for UpdateProfileContent {
 	}
 }
 
-impl Into<EventContent> for UpdateProfileContent {
-	fn into(self) -> EventContent {
-		UserType::UpdateProfile(self).into()
+impl From<UpdateProfileContent> for EventContent {
+	fn from(val: UpdateProfileContent) -> Self {
+		UserType::UpdateProfile(val).into()
 	}
 }
 

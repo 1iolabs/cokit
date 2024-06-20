@@ -36,7 +36,7 @@ impl Cores {
 	/// - [`CO_CORE_NAME_CO`]
 	/// - [`CO_CORE_NAME_KEYSTORE`]
 	/// - [`CO_CORE_NAME_MEMBERSHIP`]
-	pub fn to_core_name<'a>(crate_name: &'a str) -> &'a str {
+	pub fn to_core_name(crate_name: &str) -> &str {
 		if crate_name.starts_with("co-core-") {
 			return &crate_name["co-core-".len()..];
 		}
@@ -53,7 +53,7 @@ impl Cores {
 
 	/// Get native versions of the built-in cores.
 	pub fn built_in_native(&self) -> HashMap<String, Core> {
-		self.cores.iter().map(|(name, _)| (name.to_owned(), get_native(name))).collect()
+		self.cores.keys().map(|name| (name.to_owned(), get_native(name))).collect()
 	}
 
 	/// Map WASM CIDs to native built-in versions.
@@ -78,8 +78,7 @@ impl Cores {
 			Core::Wasm(cid) => self
 				.cores
 				.iter()
-				.find(|(_, i)| &Cid::from_str(i).expect("valid cid") == cid)
-				.is_some(),
+				.any(|(_, i)| &Cid::from_str(i).expect("valid cid") == cid),
 		}
 	}
 }

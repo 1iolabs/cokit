@@ -19,7 +19,7 @@ impl PinEntry {
 		for item in node_reader(storage, cid) {
 			match item? {
 				PinEntry::Root(cid) => {
-					root = Some(cid.clone());
+					root = Some(cid);
 					result.entry(cid).or_default();
 				},
 				PinEntry::Child(cid) => {
@@ -49,16 +49,16 @@ impl PinEntry {
 			// skip empty sets as their CID's will be added as childs by referencing roots
 			// in case of single root state onyl write the root node
 			if !v.is_empty() || map.len() == 1 {
-				builder.push(PinEntry::Root(k.clone()))?;
-				for c in v.into_iter() {
-					builder.push(PinEntry::Child(c.clone()))?;
+				builder.push(PinEntry::Root(*k))?;
+				for c in v.iter() {
+					builder.push(PinEntry::Child(*c))?;
 				}
 			}
 		}
 
 		// store
 		let blocks = builder.into_blocks()?;
-		let result = blocks.get(0).expect("at leat one block").cid().clone();
+		let result = *blocks.first().expect("at leat one block").cid();
 		for block in blocks.into_iter() {
 			storage.set(block)?;
 		}

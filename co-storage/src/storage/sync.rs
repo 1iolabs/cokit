@@ -26,7 +26,7 @@ where
 	S: Storage,
 {
 	fn clone(&self) -> Self {
-		Self { sender: self.sender.clone(), _handle: self._handle.clone(), _type: self._type.clone() }
+		Self { sender: self.sender.clone(), _handle: self._handle.clone(), _type: self._type }
 	}
 }
 impl<S> SyncStorage<S>
@@ -66,7 +66,7 @@ where
 	fn get(&self, cid: &libipld::Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		let (sender, receiver) = std::sync::mpsc::channel::<Result<Block<Self::StoreParams>, StorageError>>();
 		self.sender
-			.send(Message::Get(cid.clone(), sender))
+			.send(Message::Get(*cid, sender))
 			.map_err(|e| StorageError::Internal(e.into()))?;
 		let result = receiver.recv();
 		match result {
@@ -90,7 +90,7 @@ where
 	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {
 		let (sender, receiver) = std::sync::mpsc::channel::<Result<(), StorageError>>();
 		self.sender
-			.send(Message::Remove(cid.clone(), sender))
+			.send(Message::Remove(*cid, sender))
 			.map_err(|e| StorageError::Internal(e.into()))?;
 		let result = receiver.recv();
 		match result {
@@ -140,18 +140,18 @@ where
 
 	fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		let storage = self.storage.clone();
-		let cid = cid.clone();
+		let cid = *cid;
 		self.execute(async move { storage.get(&cid).await })
 	}
 
 	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		let storage = self.storage.clone();
-		self.execute(async move { Ok(storage.set(block).await?) })
+		self.execute(async move { storage.set(block).await })
 	}
 
 	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {
 		let storage = self.storage.clone();
-		let cid = cid.clone();
+		let cid = *cid;
 		self.execute(async move { storage.remove(&cid).await })
 	}
 }

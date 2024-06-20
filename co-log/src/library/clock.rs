@@ -39,6 +39,6 @@ impl Ord for Clock {
 pub fn max_clock(heads: impl Iterator<Item = Entry>) -> u64 {
 	heads
 		.map(|head| head.clock.time)
-		.reduce(|acc, head| max(acc, head))
+		.reduce(max)
 		.unwrap_or(0)
 }

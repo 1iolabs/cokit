@@ -36,6 +36,12 @@ where
 }
 
 pub struct DefaultNodeSerializer {}
+impl Default for DefaultNodeSerializer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DefaultNodeSerializer {
 	pub fn new() -> Self {
 		Self {}
@@ -131,7 +137,7 @@ where
 					.as_slice()
 					.chunks(max_children)
 					.map(|chunk| -> Node<T> {
-						Node::Node(chunk.iter().map(|block| block.cid().clone().into()).collect())
+						Node::Node(chunk.iter().map(|block| (*block.cid()).into()).collect())
 					})
 					.map(|node| serializer.serialize(&node))
 					.collect();

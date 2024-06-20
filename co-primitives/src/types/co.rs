@@ -29,14 +29,14 @@ impl From<&String> for CoId {
 		Self(value.to_owned())
 	}
 }
-impl Into<String> for CoId {
-	fn into(self) -> String {
-		self.0
+impl From<CoId> for String {
+	fn from(val: CoId) -> Self {
+		val.0
 	}
 }
-impl Into<TagValue> for CoId {
-	fn into(self) -> TagValue {
-		self.0.into()
+impl From<CoId> for TagValue {
+	fn from(val: CoId) -> Self {
+		val.0.into()
 	}
 }
 impl AsRef<str> for CoId {
@@ -46,7 +46,7 @@ impl AsRef<str> for CoId {
 }
 impl AsRef<CoId> for CoId {
 	fn as_ref(&self) -> &CoId {
-		&self
+		self
 	}
 }
 impl Display for CoId {

@@ -21,7 +21,7 @@ impl MultiCodec {
 		if actual_codec == codec {
 			Ok(cid)
 		} else {
-			Err(MultiCodecError(cid.clone(), codec, actual_codec))
+			Err(MultiCodecError(*cid, codec, actual_codec))
 		}
 	}
 
@@ -41,9 +41,9 @@ impl Display for MultiCodec {
 		}
 	}
 }
-impl Into<u64> for MultiCodec {
-	fn into(self) -> u64 {
-		match self {
+impl From<MultiCodec> for u64 {
+	fn from(val: MultiCodec) -> Self {
+		match val {
 			MultiCodec::Identity => 0x0,
 			MultiCodec::Raw => 0x55,
 			MultiCodec::DagPb => 0x70,

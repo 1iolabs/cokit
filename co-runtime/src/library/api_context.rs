@@ -23,11 +23,11 @@ impl Context for ApiContext {
 	}
 
 	fn event(&self) -> Cid {
-		self.api.event().clone()
+		*self.api.event()
 	}
 
 	fn state(&self) -> Option<Cid> {
-		self.api.state().clone()
+		*self.api.state()
 	}
 
 	fn store_state(&mut self, cid: Cid) {

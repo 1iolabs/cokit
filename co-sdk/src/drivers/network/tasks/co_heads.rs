@@ -48,7 +48,7 @@ where
 				},
 			},
 			Some(CoHeadsRequest::Heads { co, heads, peers, identity }) =>
-				match behaviour.heads(swarm, &identity, &co, &heads, peers.into_iter()) {
+				match behaviour.heads(swarm, &identity, &co, &heads, peers) {
 					Ok(_) => {
 						tracing::debug!(?co, "co-request-heads");
 					},

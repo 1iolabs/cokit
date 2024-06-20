@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Default)]
 pub struct MessageState {
 	#[serde(rename = "v")]
 	pub version: MessageVersion,
@@ -21,17 +22,6 @@ pub struct MessageState {
 	pub participants: BTreeMap<Did, Link<Role>>,
 }
 
-impl Default for MessageState {
-	fn default() -> Self {
-		Self {
-			version: Default::default(),
-			name: Default::default(),
-			message_count: Default::default(),
-			pinned: Default::default(),
-			participants: Default::default(),
-		}
-	}
-}
 
 impl CoMetadata for MessageState {
 	fn metadata() -> Vec<co_api::Metadata> {
@@ -40,13 +30,10 @@ impl CoMetadata for MessageState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Default)]
 pub enum MessageVersion {
-	V1 = 1,
-}
-impl Default for MessageVersion {
-	fn default() -> Self {
-		MessageVersion::V1
-	}
+	#[default]
+ V1 = 1,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -128,7 +115,7 @@ impl Reducer for MessageState {
 			},
 			MessageAction::Pin(id) => {
 				let mut pinned = self.pinned.clone();
-				pinned.push(id.clone());
+				pinned.push(*id);
 				MessageState { pinned, ..self }
 			},
 			MessageAction::SetRole(did, role_link) => {
@@ -138,7 +125,7 @@ impl Reducer for MessageState {
 						let role = context.storage().get_value(from_role_link).expect("valid role");
 						if role == Role::Admin {
 							let mut participants = self.participants.clone();
-							participants.insert(did.clone(), role_link.clone());
+							participants.insert(did.clone(), *role_link);
 							MessageState { participants, ..self }
 						} else {
 							self
@@ -163,7 +150,7 @@ pub enum CallError {
 
 impl MessageState {
 	pub fn set_name(&mut self, context: &CallContext, name: String) -> Result<(), CallError> {
-		if !Permission::Name.has(context.storage.as_ref(), &self, &context.from) {
+		if !Permission::Name.has(context.storage.as_ref(), self, &context.from) {
 			return Err(CallError::Permission)
 		}
 		self.name = name;

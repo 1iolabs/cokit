@@ -39,17 +39,18 @@ where
 				}
 			},
 			// found list -> traverse as links might be contained
-			Ipld::List(list) =>
+			Ipld::List(list) => {
 				for ipld_inner in list {
 					IpldResolver::<S>::get_next_cids(ipld_inner, new_cids, ignorable_cids);
-				},
+				}
+			},
 			// found map -> traverse as links might be contained
 			Ipld::Map(map) => {
 				let external = get_external(ipld).unwrap_or_default();
 				for (k, i) in map.iter() {
 					// don't resolve encryption mapping cids
 					// TODO think of a better way than doing this hard coded
-					if !external.contains(k) && !(k == "encryption_mapping") {
+					if !external.contains(k) && k != "encryption_mapping" {
 						IpldResolver::<S>::get_next_cids(i, new_cids, ignorable_cids);
 					}
 				}
@@ -74,7 +75,7 @@ where
 			match block_result {
 				Ok(block) => {
 					// decode to ipld
-					let ipld: Ipld = DagCborCodec::default().decode(block.data())?;
+					let ipld: Ipld = DagCborCodec.decode(block.data())?;
 					let mut links: BTreeSet<Cid> = BTreeSet::new();
 					IpldResolver::<S>::get_next_cids(&ipld, &mut links, ignorable_cids);
 					// returns first successfully resolved cids
@@ -108,9 +109,8 @@ impl JoinCidResolver {
 impl CidResolver for JoinCidResolver {
 	async fn resolve(&self, cid: &Cid, ignorable_cids: &BTreeSet<&Cid>) -> Result<BTreeSet<Cid>, anyhow::Error> {
 		for resolver in self.resolvers.iter() {
-			match resolver.resolve(cid, ignorable_cids).await {
-				Ok(result) => return Ok(result),
-				Err(_) => (),
+			if let Ok(result) = resolver.resolve(cid, ignorable_cids).await {
+				return Ok(result);
 			}
 		}
 		Err(anyhow!("No given resolver worked"))
@@ -183,13 +183,13 @@ impl MultiLayerCidResolverResult {
 	pub fn print_new_cid_map(&self) {
 		for (cid, children) in self.new_cid_map.iter() {
 			// print found cid
-			println!("Cid: {}", cid.to_string());
+			println!("Cid: {}", cid);
 
 			// print all children
 			for child in children {
 				let mut child_string = child.to_string().bright_white();
 				// mark child if cid could not be resolved
-				if self.failed_cids.contains(&child) {
+				if self.failed_cids.contains(child) {
 					child_string = child_string.red();
 				}
 				println!("\t{}", child_string);
@@ -238,6 +238,12 @@ pub struct MultiLayerCidResolver {
 	discovered_cids: BTreeSet<Cid>,
 }
 
+impl Default for MultiLayerCidResolver {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 impl MultiLayerCidResolver {
 	pub fn new() -> Self {
 		Self {
@@ -267,7 +273,7 @@ impl MultiLayerCidResolver {
 	pub async fn resolve_cid(mut self, cid: &Cid, resolver: &CidResolverBox) -> MultiLayerCidResolverResult {
 		self.discovered_cids.insert(*cid);
 		// resolve cids as long as there are new ones
-		while self.discovered_cids.len() > 0 {
+		while !self.discovered_cids.is_empty() {
 			// check if we reached defined depth
 			if self.depth_limit >= 0 && self.depth_limit <= self.current_depth {
 				break;
@@ -280,12 +286,13 @@ impl MultiLayerCidResolver {
 			// move all new cids to added set
 			for new_cid in new_cids.iter() {
 				match &mut self.previous_cids {
-					Some(p) =>
+					Some(p) => {
 						if !move_entry(p, &mut self.new_cids, new_cid) {
 							// cid is new: try to resolve it and insert into added list
 							self.resolve(new_cid, resolver).await;
 							self.added_cids.insert(*new_cid);
-						},
+						}
+					},
 					None => {
 						self.resolve(new_cid, resolver).await;
 						self.added_cids.insert(*new_cid);
@@ -298,11 +305,11 @@ impl MultiLayerCidResolver {
 
 	async fn resolve(&mut self, cid: &Cid, resolver: &CidResolverBox) {
 		if let Ok(mut links) = resolver.resolve(cid, &self.new_cids.keys().collect()).await {
-			self.new_cids.insert(cid.clone(), links.clone());
+			self.new_cids.insert(*cid, links.clone());
 			self.discovered_cids.append(&mut links);
 			self.failed_cids.remove(&cid.clone());
 		} else {
-			self.failed_cids.insert(cid.clone());
+			self.failed_cids.insert(*cid);
 		}
 	}
 }
@@ -352,22 +359,19 @@ mod tests {
 		let cid6 = s.serialize(&TestNode { name: "CID6".to_owned(), children: vec![] }).unwrap();
 		let cid5 = s.serialize(&TestNode { name: "CID5".to_owned(), children: vec![] }).unwrap();
 		let cid4 = s
-			.serialize(&TestNode { name: "CID4".to_owned(), children: vec![cid5.cid().clone()] })
+			.serialize(&TestNode { name: "CID4".to_owned(), children: vec![*cid5.cid()] })
 			.unwrap();
 		let cid3 = s.serialize(&TestNode { name: "CID3".to_owned(), children: vec![] }).unwrap();
 		let cid2 = s
-			.serialize(&TestNode { name: "CID2".to_owned(), children: vec![cid3.cid().clone()] })
+			.serialize(&TestNode { name: "CID2".to_owned(), children: vec![*cid3.cid()] })
 			.unwrap();
 		let cid1 = s
-			.serialize(&TestNode {
-				name: "CID1".to_owned(),
-				children: vec![cid2.cid().clone(), cid4.cid().clone(), cid6.cid().clone()],
-			})
+			.serialize(&TestNode { name: "CID1".to_owned(), children: vec![*cid2.cid(), *cid4.cid(), *cid6.cid()] })
 			.unwrap();
 
 		let cids: Vec<Cid> = vec![&cid1, &cid2, &cid3, &cid4, &cid5, &cid6]
 			.into_iter()
-			.map(|block| block.cid().clone())
+			.map(|block| *block.cid())
 			.collect();
 		// for (i, cid) in cids.iter().enumerate() {
 		// 	println!("cid{}: {:?}", i + 1, cid);
@@ -409,22 +413,19 @@ mod tests {
 			.serialize(&TestNode { name: "CID5_RENAME".to_owned(), children: vec![] })
 			.unwrap();
 		let cid4 = s
-			.serialize(&TestNode { name: "CID4".to_owned(), children: vec![cid5.cid().clone()] })
+			.serialize(&TestNode { name: "CID4".to_owned(), children: vec![*cid5.cid()] })
 			.unwrap();
 		let cid3 = s.serialize(&TestNode { name: "CID3".to_owned(), children: vec![] }).unwrap();
 		let cid2 = s
-			.serialize(&TestNode { name: "CID2".to_owned(), children: vec![cid3.cid().clone()] })
+			.serialize(&TestNode { name: "CID2".to_owned(), children: vec![*cid3.cid()] })
 			.unwrap();
 		let cid1 = s
-			.serialize(&TestNode {
-				name: "CID1".to_owned(),
-				children: vec![cid2.cid().clone(), cid4.cid().clone(), cid6.cid().clone()],
-			})
+			.serialize(&TestNode { name: "CID1".to_owned(), children: vec![*cid2.cid(), *cid4.cid(), *cid6.cid()] })
 			.unwrap();
 
 		let cids: Vec<Cid> = vec![&cid1, &cid2, &cid3, &cid4, &cid5, &cid6]
 			.into_iter()
-			.map(|block| block.cid().clone())
+			.map(|block| *block.cid())
 			.collect();
 		// for (i, cid) in cids.iter().enumerate() {
 		// 	println!("cid{}: {:?}", i + 1, cid);
@@ -450,7 +451,7 @@ mod tests {
 	async fn new_state() {
 		let (storage, cids) = get_reference_storage().await.expect("storage");
 		let resolver = create_cid_resolver(vec![storage]).await.expect("resovlers");
-		let result = MultiLayerCidResolver::new().resolve_cid(cids.get(0).unwrap(), &resolver).await;
+		let result = MultiLayerCidResolver::new().resolve_cid(cids.first().unwrap(), &resolver).await;
 		assert_eq!(result.new_cid_map.len(), 6);
 		assert_eq!(result.added_cids.len(), 6);
 		for cid in cids.iter() {
@@ -463,21 +464,21 @@ mod tests {
 		// reference
 		let (mut storage, cids) = get_reference_storage().await.expect("storage");
 		let resolver = create_cid_resolver(vec![storage.clone()]).await.expect("resovlers");
-		let first_result = MultiLayerCidResolver::new().resolve_cid(cids.get(0).unwrap(), &resolver).await;
+		let first_result = MultiLayerCidResolver::new().resolve_cid(cids.first().unwrap(), &resolver).await;
 
 		let next_cids = get_reference_storage_v2(&mut storage).await.expect("next cids");
 		let updated_resolver = create_cid_resolver(vec![storage]).await.expect("resovlers");
 		let second_result = MultiLayerCidResolver::new()
 			.with_previous_cids(first_result.new_cid_map)
-			.resolve_cid(next_cids.get(0).unwrap(), &updated_resolver)
+			.resolve_cid(next_cids.first().unwrap(), &updated_resolver)
 			.await;
 
 		assert_eq!(second_result.added_cids.len(), 3);
-		assert!(second_result.added_cids.contains(next_cids.get(0).unwrap()));
+		assert!(second_result.added_cids.contains(next_cids.first().unwrap()));
 		assert!(second_result.added_cids.contains(next_cids.get(3).unwrap()));
 		assert!(second_result.added_cids.contains(next_cids.get(4).unwrap()));
 		assert_eq!(second_result.removed_cids.len(), 3);
-		assert!(second_result.removed_cids.contains(cids.get(0).unwrap()));
+		assert!(second_result.removed_cids.contains(cids.first().unwrap()));
 		assert!(second_result.removed_cids.contains(cids.get(3).unwrap()));
 		assert!(second_result.removed_cids.contains(cids.get(4).unwrap()));
 	}

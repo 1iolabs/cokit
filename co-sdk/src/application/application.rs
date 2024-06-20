@@ -158,7 +158,7 @@ impl Application {
 	///
 	/// Todo: Identity Permissions?
 	pub async fn private_identity(&self, did: &co_primitives::Did) -> Result<PrivateIdentityBox, anyhow::Error> {
-		resolve_private_identity(self, &did).await
+		resolve_private_identity(self, did).await
 	}
 
 	/// Get unsiged local device identity.
@@ -186,7 +186,7 @@ impl Application {
 			.await?;
 
 		// load
-		Ok(self.co().co_reducer(&co).await?.ok_or(anyhow!("Open CO failed: {}", co))?)
+		self.co().co_reducer(&co).await?.ok_or(anyhow!("Open CO failed: {}", co))
 	}
 
 	/// Initialize application.

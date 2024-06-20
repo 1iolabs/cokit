@@ -21,7 +21,7 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 	// membership
 	let mut memberships = find_memberships(&local, &command.co).await?;
 	if let Some(did) = &command.did {
-		memberships = memberships.into_iter().filter(|item| &item.did == did).collect();
+		memberships.retain(|item| &item.did == did);
 	}
 
 	// remove

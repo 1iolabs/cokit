@@ -194,7 +194,7 @@ mod tests {
 		}
 
 		let mut store = Store::default();
-		let module = Module::new(&store, &module_wat)?;
+		let module = Module::new(&store, module_wat)?;
 
 		let env = FunctionEnv::new(&mut store, Env { magic: 42 });
 		let func = Function::new_typed_with_env(&mut store, &env, test);

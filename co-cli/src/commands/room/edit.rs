@@ -33,7 +33,7 @@ pub async fn command(
 	if let Some(desc) = &command.description {
 		// set new room description
 		let set_desc = MatrixEvent::new(uuid::Uuid::new_v4(), timestamp, core, RoomTopicContent::new(desc));
-		co_reducer.push(&identity, &core, &set_desc).await?;
+		co_reducer.push(&identity, core, &set_desc).await?;
 	}
 
 	if let Some(avatar) = &command.avatar {
@@ -55,7 +55,7 @@ pub async fn command(
 				},
 			),
 		);
-		co_reducer.push(&identity, &core, &set_avatar).await?;
+		co_reducer.push(&identity, core, &set_avatar).await?;
 	}
 
 	Ok(exitcode::OK)

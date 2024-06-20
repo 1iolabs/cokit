@@ -46,7 +46,7 @@ where
 	let next_cid = Cid::new_v1(DagCborCodec.into(), next_hash);
 	let next_block = Block::new_unchecked(next_cid, next_data);
 	if cid.is_none() || cid.unwrap() != next_cid {
-		let store_cid = next_cid.clone();
+		let store_cid = next_cid;
 		context.storage_mut().set(next_block);
 		context.store_state(store_cid);
 	}

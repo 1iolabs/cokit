@@ -20,7 +20,7 @@ impl IdleRuntimePool {
 		if let Some((index, _)) = self.idle.iter().enumerate().find(|(_, element)| element.cid() == cid) {
 			return self.idle.remove(index);
 		}
-		return None
+		None
 	}
 
 	/// Insert an idle runtime.

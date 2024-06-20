@@ -24,7 +24,7 @@ impl RuntimeInstance {
 		};
 
 		// result
-		Ok(RuntimeInstance { cid: cid.clone(), runtime: create_runtime(wasm_bytes) })
+		Ok(RuntimeInstance { cid: *cid, runtime: create_runtime(wasm_bytes) })
 	}
 
 	pub fn cid(&self) -> &Cid {

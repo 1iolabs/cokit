@@ -90,6 +90,6 @@ where
 		.co_reducer(co)
 		.await?
 		.ok_or_else(|| anyhow::anyhow!("Co not found: {}", co))?;
-	reducer.push(&private_identity, &core, item).await?;
+	reducer.push(&private_identity, core, item).await?;
 	Ok(())
 }

@@ -74,7 +74,7 @@ where
 	}
 
 	/// Iterate entries starting at the head.
-	pub fn stream<'a>(&'a self) -> impl Stream<Item = Result<EntryBlock<S::StoreParams>, LogError>> + 'a {
+	pub fn stream(&self) -> impl Stream<Item = Result<EntryBlock<S::StoreParams>, LogError>> + '_ {
 		create_stream(&self.entry_store, self.heads().clone())
 	}
 
@@ -110,12 +110,12 @@ where
 			refs: Default::default(),
 		};
 		let entry_block = EntryBlock::<S::StoreParams>::from_entry(identity, entry)?;
-		let entry_cid = entry_block.cid().clone();
+		let entry_cid = *entry_block.cid();
 
 		// set state
 		self.entry_store.set(entry_block.block()?).await?; // to be atomic in case of error do this first
-		self.index.insert(entry_cid.clone());
-		self.heads_set([entry_cid.clone()].into_iter());
+		self.index.insert(entry_cid);
+		self.heads_set([entry_cid].into_iter());
 
 		// result
 		Ok(entry_cid.into())
@@ -129,7 +129,7 @@ where
 		I: PrivateIdentity + Send + Sync,
 	{
 		let cid = self.entry_store.set_serialized(item).await?;
-		Ok((self.push(identity, cid.clone()).await?.into(), cid.into()))
+		Ok((self.push(identity, cid).await?, cid.into()))
 	}
 
 	/// Join other log heads.
@@ -138,7 +138,7 @@ where
 	/// We can not compute if there has been changes without loading the whole log.
 	pub async fn join_entry(&mut self, entry: EntryBlock<S::StoreParams>) -> Result<bool, LogError> {
 		let mut join = JoinEntry::new(self.heads.clone());
-		if join.join_entry(&self, entry).await? {
+		if join.join_entry(self, entry).await? {
 			self.join_commit(join).await?;
 			return Ok(true)
 		}

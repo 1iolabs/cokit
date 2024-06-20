@@ -76,9 +76,9 @@ impl Relation for MessageType {
 	}
 }
 
-impl Into<EventContent> for MessageType {
-	fn into(self) -> EventContent {
-		EventContent::Message(self)
+impl From<MessageType> for EventContent {
+	fn from(val: MessageType) -> Self {
+		EventContent::Message(val)
 	}
 }
 
@@ -131,9 +131,9 @@ impl TextContent {
 	}
 }
 
-impl Into<EventContent> for TextContent {
-	fn into(self) -> EventContent {
-		MessageType::Text(self).into()
+impl From<TextContent> for EventContent {
+	fn from(val: TextContent) -> Self {
+		MessageType::Text(val).into()
 	}
 }
 
@@ -197,9 +197,9 @@ impl NoticeContent {
 	}
 }
 
-impl Into<EventContent> for NoticeContent {
-	fn into(self) -> EventContent {
-		MessageType::Notice(self).into()
+impl From<NoticeContent> for EventContent {
+	fn from(val: NoticeContent) -> Self {
+		MessageType::Notice(val).into()
 	}
 }
 
@@ -247,9 +247,9 @@ impl ImageContent {
 	}
 }
 
-impl Into<EventContent> for ImageContent {
-	fn into(self) -> EventContent {
-		MessageType::Image(self).into()
+impl From<ImageContent> for EventContent {
+	fn from(val: ImageContent) -> Self {
+		MessageType::Image(val).into()
 	}
 }
 
@@ -282,9 +282,9 @@ impl AudioContent {
 	}
 }
 
-impl Into<EventContent> for AudioContent {
-	fn into(self) -> EventContent {
-		MessageType::Audio(self).into()
+impl From<AudioContent> for EventContent {
+	fn from(val: AudioContent) -> Self {
+		MessageType::Audio(val).into()
 	}
 }
 
@@ -317,9 +317,9 @@ impl VideoContent {
 	}
 }
 
-impl Into<EventContent> for VideoContent {
-	fn into(self) -> EventContent {
-		MessageType::Video(self).into()
+impl From<VideoContent> for EventContent {
+	fn from(val: VideoContent) -> Self {
+		MessageType::Video(val).into()
 	}
 }
 
@@ -361,9 +361,9 @@ impl FileContent {
 	}
 }
 
-impl Into<EventContent> for FileContent {
-	fn into(self) -> EventContent {
-		MessageType::File(self).into()
+impl From<FileContent> for EventContent {
+	fn from(val: FileContent) -> Self {
+		MessageType::File(val).into()
 	}
 }
 
@@ -396,9 +396,9 @@ impl LocationContent {
 	}
 }
 
-impl Into<EventContent> for LocationContent {
-	fn into(self) -> EventContent {
-		MessageType::Location(self).into()
+impl From<LocationContent> for EventContent {
+	fn from(val: LocationContent) -> Self {
+		MessageType::Location(val).into()
 	}
 }
 

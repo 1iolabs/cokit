@@ -16,9 +16,9 @@ pub enum PollMessageType {
 	End(PollEndContent),
 }
 
-impl Into<EventContent> for PollMessageType {
-	fn into(self) -> EventContent {
-		MessageType::Poll(self).into()
+impl From<PollMessageType> for EventContent {
+	fn from(val: PollMessageType) -> Self {
+		MessageType::Poll(val).into()
 	}
 }
 
@@ -68,9 +68,9 @@ impl PollStartContent {
 	}
 }
 
-impl Into<EventContent> for PollStartContent {
-	fn into(self) -> EventContent {
-		PollMessageType::Start(self).into()
+impl From<PollStartContent> for EventContent {
+	fn from(val: PollStartContent) -> Self {
+		PollMessageType::Start(val).into()
 	}
 }
 
@@ -174,9 +174,9 @@ impl Relation for PollResponseContent {
 	}
 }
 
-impl Into<EventContent> for PollResponseContent {
-	fn into(self) -> EventContent {
-		PollMessageType::Response(self).into()
+impl From<PollResponseContent> for EventContent {
+	fn from(val: PollResponseContent) -> Self {
+		PollMessageType::Response(val).into()
 	}
 }
 
@@ -195,9 +195,9 @@ impl PollEndContent {
 	}
 }
 
-impl Into<EventContent> for PollEndContent {
-	fn into(self) -> EventContent {
-		PollMessageType::End(self).into()
+impl From<PollEndContent> for EventContent {
+	fn from(val: PollEndContent) -> Self {
+		PollMessageType::End(val).into()
 	}
 }
 

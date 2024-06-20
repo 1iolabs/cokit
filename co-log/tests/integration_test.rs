@@ -23,7 +23,7 @@ async fn smoke() {
 	let mut log = create_empty_log(&store).await;
 
 	// populate log
-	log.push(&identity, block0.clone()).await.unwrap();
+	log.push(&identity, block0).await.unwrap();
 
 	// check log
 	let entries: Vec<_> = log.stream().try_collect().await.unwrap();
@@ -49,9 +49,9 @@ async fn traverse_sinlge_user_log() {
 	let mut log = create_empty_log(&store).await;
 
 	// populate log
-	log.push(&identity, block0.clone()).await.unwrap();
-	log.push(&identity, block1.clone()).await.unwrap();
-	log.push(&identity, block2.clone()).await.unwrap();
+	log.push(&identity, block0).await.unwrap();
+	log.push(&identity, block1).await.unwrap();
+	log.push(&identity, block2).await.unwrap();
 
 	// check log
 	let entries: Vec<_> = log.stream().try_collect().await.unwrap();
@@ -63,8 +63,8 @@ async fn traverse_sinlge_user_log() {
 	assert_eq!(entries[2].entry().clock.time, 1);
 
 	// next
-	assert_eq!(entries[0].entry().next, BTreeSet::from([entries[1].cid().clone()]));
-	assert_eq!(entries[1].entry().next, BTreeSet::from([entries[2].cid().clone()]));
+	assert_eq!(entries[0].entry().next, BTreeSet::from([*entries[1].cid()]));
+	assert_eq!(entries[1].entry().next, BTreeSet::from([*entries[2].cid()]));
 	assert_eq!(entries[2].entry().next, BTreeSet::from([]));
 }
 
@@ -164,7 +164,7 @@ where
 	I: PrivateIdentity + Send + Sync,
 {
 	let block = create_event(log.storage(), t).await;
-	let entry = log.push(identity, block.clone()).await.unwrap();
+	let entry = log.push(identity, block).await.unwrap();
 	(block, entry)
 }
 

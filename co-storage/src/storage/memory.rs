@@ -12,6 +12,12 @@ pub struct MemoryStorage {
 	records: BTreeMap<Cid, Record>,
 }
 
+impl Default for MemoryStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryStorage {
 	pub fn new() -> Self {
 		Self { records: BTreeMap::new() }
@@ -39,7 +45,7 @@ impl MemoryStorage {
 
 	/// Iterator over all stored CIDs.
 	pub fn iter(&self) -> impl Iterator<Item = &Cid> {
-		self.records.iter().map(|(cid, _)| cid)
+		self.records.keys()
 	}
 }
 
@@ -49,8 +55,8 @@ impl Storage for MemoryStorage {
 	fn set(&mut self, block: Block<DefaultParams>) -> Result<Cid, StorageError> {
 		// let cid = Cid::new_v1(options.codec, Code::Blake3_256.digest(&data[..]));
 		tracing::debug!(cid = ?block.cid(), "memory-store-set");
-		let result = block.cid().clone();
-		self.records.insert(block.cid().clone(), Record { pin: false, block });
+		let result = *block.cid();
+		self.records.insert(*block.cid(), Record { pin: false, block });
 		Ok(result)
 	}
 
@@ -59,7 +65,7 @@ impl Storage for MemoryStorage {
 		self.records
 			.get(cid)
 			.map(|r| r.block.clone())
-			.ok_or(StorageError::NotFound(cid.clone(), anyhow!("no record")))
+			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")))
 	}
 
 	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {
@@ -72,6 +78,12 @@ impl Storage for MemoryStorage {
 #[derive(Debug, Clone)]
 pub struct MemoryBlockStorage {
 	records: Arc<RwLock<BTreeMap<Cid, Record>>>,
+}
+
+impl Default for MemoryBlockStorage {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MemoryBlockStorage {
@@ -91,16 +103,16 @@ impl BlockStorage for MemoryBlockStorage {
 			.await
 			.get(cid)
 			.map(|r| r.block.clone())
-			.ok_or(StorageError::NotFound(cid.clone(), anyhow!("no record")))
+			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")))
 	}
 
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		tracing::trace!(cid = ?block.cid(), "memory-store-set");
-		let result = block.cid().clone();
+		let result = *block.cid();
 		self.records
 			.write()
 			.await
-			.insert(block.cid().clone(), Record { pin: false, block });
+			.insert(*block.cid(), Record { pin: false, block });
 		Ok(result)
 	}
 
@@ -116,7 +128,7 @@ impl BlockStorage for MemoryBlockStorage {
 			.await
 			.get(cid)
 			.map(|r| BlockStat { size: r.block.data().len() as u64 })
-			.ok_or(StorageError::NotFound(cid.clone(), anyhow!("no record")))
+			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")))
 	}
 }
 

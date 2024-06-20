@@ -28,7 +28,7 @@ where
 			if let Some(entry) = stack.pop() {
 				if !traversed.contains(entry.cid()) {
 					// flag as traversed
-					traversed.insert(entry.cid().clone());
+					traversed.insert(*entry.cid());
 
 					// TODO: (pre) fetch refs
 					// self.storage.fetch(entry.entry().next.iter());
@@ -36,7 +36,7 @@ where
 
 					// read next and add to stack
 					let mut nexts: Vec<EntryBlock<S::StoreParams>> = stream::iter(entry.entry().next.iter())
-						.then(|cid| async move { get_entry_block(storage, &cid).await })
+						.then(|cid| async move { get_entry_block(storage, cid).await })
 						.try_collect()
 						.await?;
 					stack.append(&mut nexts);
@@ -94,7 +94,7 @@ where
 		if let Some(entry) = self.stack.pop() {
 			if !self.traversed.contains(entry.cid()) {
 				// flag as traversed
-				self.traversed.insert(entry.cid().clone());
+				self.traversed.insert(*entry.cid());
 
 				// TODO: (pre) fetch refs
 				// self.storage.fetch(entry.entry().next.iter());

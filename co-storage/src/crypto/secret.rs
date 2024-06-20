@@ -41,7 +41,7 @@ impl Secret {
 
 	/// Divulge the secret.
 	pub fn divulge(&self) -> &[u8] {
-		&self.0.divulge()
+		self.0.divulge()
 	}
 }
 impl Display for Secret {
@@ -49,9 +49,9 @@ impl Display for Secret {
 		write!(f, "{}", self.0)
 	}
 }
-impl Into<co_primitives::Secret> for Secret {
-	fn into(self) -> co_primitives::Secret {
-		self.0
+impl From<Secret> for co_primitives::Secret {
+	fn from(val: Secret) -> Self {
+		val.0
 	}
 }
 impl From<co_primitives::Secret> for Secret {

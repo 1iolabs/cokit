@@ -15,7 +15,7 @@ pub async fn cat_output(storage: CoStorage, cid: Cid, pretty: bool) -> Result<()
 		println!("Size: {}", block.data().len());
 		match codec {
 			MultiCodec::DagCbor => {
-				let ipld: Ipld = DagCborCodec::default().decode(block.data())?;
+				let ipld: Ipld = DagCborCodec.decode(block.data())?;
 				println!("{:#?}", ipld);
 			},
 			_ => {

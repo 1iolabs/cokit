@@ -75,8 +75,8 @@ impl ApiStorage for CoV1Api {
 					// retry
 					continue;
 				},
-				Err(e) => Err(e).expect("get storage"),
-			}
+				Err(e) => panic!("get storage: {:?}", e),
+			};
 		}
 	}
 

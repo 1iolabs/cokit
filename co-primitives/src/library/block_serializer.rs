@@ -62,8 +62,8 @@ where
 	where
 		T: serde::de::Deserialize<'a>,
 	{
-		Ok(serde_ipld_dagcbor::from_slice::<'a, T>(item.data())
-			.map_err(|e| BlockSerializerError::Decode(item.cid().clone(), type_name::<T>().to_owned(), e.into()))?)
+		serde_ipld_dagcbor::from_slice::<'a, T>(item.data())
+			.map_err(|e| BlockSerializerError::Decode(*item.cid(), type_name::<T>().to_owned(), e))
 	}
 }
 

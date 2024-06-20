@@ -21,7 +21,7 @@ impl MessageProtocol {
 	}
 
 	pub fn into_message(self) -> Option<EncodedMessage> {
-		return self.message
+		self.message
 	}
 }
 

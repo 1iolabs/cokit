@@ -6,8 +6,7 @@ pub fn read_cid(f: unsafe extern "C" fn(buffer: *mut u8, buffer_size: u32) -> u3
 	match size {
 		0 => None,
 		_ if size > 256 => {
-			let mut buffer = Vec::<u8>::with_capacity(size as usize);
-			buffer.resize(size as usize, 0);
+			let mut buffer = vec![0u8; size as usize];
 			let size = unsafe { f(buffer.as_mut_ptr(), size) };
 			assert_eq!(buffer.len(), size as usize);
 			Some(Cid::try_from(&buffer[0..size as usize]).expect("valid CID"))

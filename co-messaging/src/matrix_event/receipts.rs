@@ -13,9 +13,9 @@ pub enum ReceiptType {
 	Private(PrivateReceiptContent),
 }
 
-impl Into<EventContent> for ReceiptType {
-	fn into(self) -> EventContent {
-		EventContent::Receipt(self)
+impl From<ReceiptType> for EventContent {
+	fn from(val: ReceiptType) -> Self {
+		EventContent::Receipt(val)
 	}
 }
 
@@ -31,9 +31,9 @@ pub struct PublicReceiptContent {
 	pub thread_id: Option<String>, // The ID of the thread if receipt is threaded
 }
 
-impl Into<EventContent> for PublicReceiptContent {
-	fn into(self) -> EventContent {
-		ReceiptType::Public(self).into()
+impl From<PublicReceiptContent> for EventContent {
+	fn from(val: PublicReceiptContent) -> Self {
+		ReceiptType::Public(val).into()
 	}
 }
 
@@ -57,8 +57,8 @@ pub struct PrivateReceiptContent {
 	pub read: HashMap<String, PrivateReceipt>, // Map of all room IDs to receipts
 }
 
-impl Into<EventContent> for PrivateReceiptContent {
-	fn into(self) -> EventContent {
-		ReceiptType::Private(self).into()
+impl From<PrivateReceiptContent> for EventContent {
+	fn from(val: PrivateReceiptContent) -> Self {
+		ReceiptType::Private(val).into()
 	}
 }

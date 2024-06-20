@@ -209,7 +209,7 @@ impl Reducer for Co {
 				if !result.cores.contains_key(core) {
 					result
 						.cores
-						.insert(core.clone(), Core { binary: binary.clone(), tags: tags.clone(), state: None });
+						.insert(core.clone(), Core { binary: *binary, tags: tags.clone(), state: None });
 				},
 			CoAction::CoreRemove { core } => {
 				result.cores.remove(core);
@@ -226,7 +226,7 @@ impl Reducer for Co {
 			},
 			CoAction::CoreChange { core, state } =>
 				if let Some(core) = result.cores.get_mut(core) {
-					core.state = state.clone();
+					core.state = *state;
 				},
 			CoAction::CoreTagsInsert { core, tags } =>
 				if let Some(core) = result.cores.get_mut(core) {

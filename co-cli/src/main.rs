@@ -94,10 +94,7 @@ async fn app_main() -> anyhow::Result<exitcode::ExitCode> {
 		.init();
 
 	// execute
-	let result = cli::command(&cli).await;
-
-	// result
-	result
+	cli::command(&cli).await
 }
 
 /// See:

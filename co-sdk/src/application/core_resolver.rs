@@ -61,7 +61,7 @@ where
 		action: &Cid,
 	) -> Result<Option<Cid>, CoreResolverError> {
 		Ok(runtime
-			.execute(storage, &self.core, RuntimeContext { state: state.clone(), event: action.into() })
+			.execute(storage, &self.core, RuntimeContext { state: *state, event: action.into() })
 			.await
 			.map_err(|e| CoreResolverError::Execute("root".to_owned(), e))?)
 	}
@@ -112,7 +112,7 @@ where
 		// find core
 		let root = reducer_action.core == CO_CORE_NAME_CO;
 		let (core_state, core) = if root {
-			(state.clone(), self.root_core())
+			(*state, self.root_core())
 		} else {
 			// get root state
 			let state: co_core_co::Co = storage.get_default(state).await?;
@@ -147,7 +147,7 @@ where
 
 			// apply
 			result = runtime
-				.execute(storage, &self.root_core(), RuntimeContext { state: state.clone(), event: action_cid })
+				.execute(storage, &self.root_core(), RuntimeContext { state: *state, event: action_cid })
 				.await
 				.map_err(|e| CoreResolverError::Execute(reducer_action.core.clone(), e))?;
 

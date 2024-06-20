@@ -95,7 +95,7 @@ impl Reducer for File {
 	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		match &event.payload {
 			FileAction::Create { path, node, recursive } =>
-				create(context, self, &path, node, &event.from, event.time, *recursive).unwrap(),
+				create(context, self, path, node, &event.from, event.time, *recursive).unwrap(),
 			FileAction::Remove { path } => remove(context, self, path).unwrap(),
 		}
 	}
@@ -113,7 +113,7 @@ fn create(
 	let path = path.normalize()?;
 
 	// nodes
-	state.nodes.try_update(context, |context, mut paths| {
+	state.nodes.try_update(context, |context, paths| {
 		// test if node exists
 		let node_path = path.join_path(node.name())?;
 		if get_node(context, paths, &node_path)?.is_some() {
@@ -130,13 +130,13 @@ fn create(
 		if recursive {
 			for parent in path.parents() {
 				if !paths.contains_key(parent) {
-					create_folder(context, &mut paths, parent, from, time)?;
+					create_folder(context, paths, parent, from, time)?;
 				}
 			}
 		}
 
 		// insert if name not exists already
-		create_node(context, &mut paths, &path, node.clone())
+		create_node(context, paths, &path, node.clone())
 	})?;
 
 	// result
@@ -196,7 +196,7 @@ fn create_node(
 		"/" => {},
 		// check if node exists
 		_ => {
-			get_node(context, &paths, parent_path)?.ok_or(anyhow!("No such directory: {}", parent_path))?;
+			get_node(context, paths, parent_path)?.ok_or(anyhow!("No such directory: {}", parent_path))?;
 		},
 	}
 
@@ -207,7 +207,7 @@ fn create_node(
 	};
 	nodes.try_update(context, |_, nodes| {
 		// insert node if name not exists yet
-		if nodes.iter().find(|item| item.name() == node.name()).is_none() {
+		if !nodes.iter().any(|item| item.name() == node.name()) {
 			nodes.insert(node);
 		}
 		Ok(())

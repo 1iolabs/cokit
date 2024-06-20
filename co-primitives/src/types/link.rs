@@ -36,17 +36,17 @@ impl<T> Link<T> {
 }
 impl<T> Clone for Link<T> {
 	fn clone(&self) -> Self {
-		Self { _type: self._type.clone(), cid: self.cid.clone() }
+		*self
 	}
 }
-impl<T> Into<Cid> for Link<T> {
-	fn into(self) -> Cid {
-		self.cid
+impl<T> From<Link<T>> for Cid {
+	fn from(val: Link<T>) -> Self {
+		val.cid
 	}
 }
-impl<T> Into<Option<Cid>> for Link<T> {
-	fn into(self) -> Option<Cid> {
-		Some(self.cid)
+impl<T> From<Link<T>> for Option<Cid> {
+	fn from(val: Link<T>) -> Self {
+		Some(val.cid)
 	}
 }
 impl<T> From<Cid> for Link<T> {
@@ -110,12 +110,12 @@ impl<T: Default> OptionLink<T> {
 }
 impl<T: Default> Clone for OptionLink<T> {
 	fn clone(&self) -> Self {
-		Self { _type: self._type.clone(), cid: self.cid.clone() }
+		*self
 	}
 }
-impl<T: Default> Into<Option<Cid>> for OptionLink<T> {
-	fn into(self) -> Option<Cid> {
-		self.cid
+impl<T: Default> From<OptionLink<T>> for Option<Cid> {
+	fn from(val: OptionLink<T>) -> Self {
+		val.cid
 	}
 }
 impl<T: Default> From<Option<Cid>> for OptionLink<T> {
@@ -146,7 +146,7 @@ impl<T: Default> Debug for OptionLink<T> {
 impl<T: Default> Display for OptionLink<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self.cid {
-			Some(cid) => write!(f, "{} ({})", cid.to_string(), type_name::<T>()),
+			Some(cid) => write!(f, "{} ({})", cid, type_name::<T>()),
 			None => write!(f, "None ({})", type_name::<T>()),
 		}
 	}

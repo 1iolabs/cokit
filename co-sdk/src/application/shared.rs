@@ -91,7 +91,7 @@ impl SharedCoBuilder {
 				if let Some(mapping) = &self.membership.encryption_mapping {
 					result_storage.load_mapping(mapping).await?;
 				}
-				(CoStorage::new(result_storage.clone()), Some(result_storage), Some(secret.into()))
+				(CoStorage::new(result_storage.clone()), Some(result_storage), Some(secret))
 			},
 			// plain
 			None => (storage, None, None),
@@ -350,7 +350,7 @@ where
 					&self.membership_core_name,
 					&MembershipsAction::Update {
 						id: self.id.to_owned(),
-						state: state.clone(),
+						state: *state,
 						heads: reducer.heads().clone(),
 						encryption_mapping: mapping,
 					},

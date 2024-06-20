@@ -67,12 +67,12 @@ impl EncodedMessage {
 	/// Try to deserialize message to T.
 	pub fn deserialize<T: DeserializeOwned>(&self) -> Result<T, anyhow::Error> {
 		if let Some(data) = self.json() {
-			return Ok(serde_ipld_dagjson::from_slice(data.as_bytes())?)
+			return Ok(serde_ipld_dagjson::from_slice(data.as_bytes())?);
 		}
 		if let Some(data) = self.cbor() {
-			return Ok(serde_ipld_dagcbor::from_slice(data)?)
+			return Ok(serde_ipld_dagcbor::from_slice(data)?);
 		}
-		return Err(anyhow!("unknown format"));
+		Err(anyhow!("unknown format"))
 	}
 }
 impl From<Vec<u8>> for EncodedMessage {
@@ -90,9 +90,9 @@ impl From<&str> for EncodedMessage {
 		EncodedMessage(value.into())
 	}
 }
-impl Into<Vec<u8>> for EncodedMessage {
-	fn into(self) -> Vec<u8> {
-		self.0
+impl From<EncodedMessage> for Vec<u8> {
+	fn from(val: EncodedMessage) -> Self {
+		val.0
 	}
 }
 impl AsRef<[u8]> for EncodedMessage {

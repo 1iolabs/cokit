@@ -38,7 +38,7 @@ where
 						let co_id = co.to_owned();
 						let heads = heads.to_owned();
 						let co_factory = self.co_factory.clone();
-						let peer_id = peer_id.clone();
+						let peer_id = *peer_id;
 						let response = *response;
 						self.spawner.spawn(async move {
 							match co_factory.co_reducer(&co_id).await {

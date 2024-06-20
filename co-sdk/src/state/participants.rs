@@ -9,7 +9,7 @@ use futures::{stream, StreamExt, TryStreamExt};
 /// Read participants from a CO.
 pub async fn participants(storage: &CoStorage, co_state: OptionLink<Co>) -> Result<Vec<Participant>, StorageError> {
 	let co: Co = core_state_or_default(storage, co_state, CO_CORE_NAME_CO).await?;
-	Ok(co.participants.into_iter().map(|(_, value)| value).collect())
+	Ok(co.participants.into_values().collect())
 }
 
 /// Read participant identities from a CO.

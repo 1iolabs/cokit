@@ -33,7 +33,7 @@ where
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		let (cid, data) = self.next.get(cid).await?.into_inner();
 		match self.checked {
-			true => Ok(Block::new(cid, data).map_err(|e| StorageError::InvalidArgument(e.into()))?),
+			true => Ok(Block::new(cid, data).map_err(StorageError::InvalidArgument)?),
 			false => Ok(Block::new_unchecked(cid, data)),
 		}
 	}
@@ -41,7 +41,7 @@ where
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		let (cid, data) = block.into_inner();
 		let next_block: Block<S::StoreParams> = match self.checked {
-			true => Block::new(cid, data).map_err(|e| StorageError::InvalidArgument(e.into()))?,
+			true => Block::new(cid, data).map_err(StorageError::InvalidArgument)?,
 			false => Block::new_unchecked(cid, data),
 		};
 		self.next.set(next_block).await

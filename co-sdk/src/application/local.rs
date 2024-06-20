@@ -137,13 +137,13 @@ where
 				encrypted_storage.load_mapping(mapping).await?;
 
 				// convert state/heads to unencrypted
-				state = encrypted_storage.get(&state).await?.cid().clone();
+				state = *encrypted_storage.get(&state).await?.cid();
 				heads = stream::iter(heads.into_iter())
 					.then(|cid| {
 						let encrypted_storage = encrypted_storage.clone();
 						async move {
 							Result::<Cid, co_storage::StorageError>::Ok(
-								encrypted_storage.get(&cid).await?.cid().clone(),
+								*encrypted_storage.get(&cid).await?.cid(),
 							)
 						}
 					})

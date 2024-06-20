@@ -61,7 +61,7 @@ impl VerificationMethod {
 				other => Err(anyhow!("Unsupported JWK: kty: {}", other)),
 			}
 		} else if let Some(s) = &self.public_key_multibase {
-			Ok(multibase::decode(&s)?.1)
+			Ok(multibase::decode(s)?.1)
 		} else if let Some(s) = &self.public_key_base58 {
 			Ok(multibase::Base::Base58Btc.decode(s)?)
 		} else if let Some(s) = &self.public_key_hex {
@@ -165,9 +165,9 @@ impl AsRef<str> for VerificationMethodTypes {
 		}
 	}
 }
-impl Into<String> for VerificationMethodTypes {
-	fn into(self) -> String {
-		self.as_ref().to_owned()
+impl From<VerificationMethodTypes> for String {
+	fn from(val: VerificationMethodTypes) -> Self {
+		val.as_ref().to_owned()
 	}
 }
 impl From<String> for VerificationMethodTypes {

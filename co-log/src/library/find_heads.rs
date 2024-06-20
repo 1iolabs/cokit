@@ -8,7 +8,7 @@ pub fn find_heads<'a, P: StoreParams>(entries: impl Iterator<Item = &'a EntryBlo
 	let mut all_entries: BTreeSet<&'a EntryBlock<P>> = Default::default();
 	for entry in entries {
 		for next in entry.entry().next.iter() {
-			all_next_cids.insert(next.clone());
+			all_next_cids.insert(*next);
 		}
 		all_entries.insert(entry);
 	}

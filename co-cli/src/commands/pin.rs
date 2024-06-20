@@ -73,7 +73,7 @@ pub async fn list_pins(context: &CliContext, cli: &Cli, command: &ListCommand) -
 	if let Some(link) = pin_state.pins.link().cid() {
 		let block = storage.get(link).await?;
 
-		let map: BTreeMap<String, Vec<Vec<Cid>>> = DagCborCodec::default().decode(block.data())?;
+		let map: BTreeMap<String, Vec<Vec<Cid>>> = DagCborCodec.decode(block.data())?;
 		if let Some(inner) = map.get("l") {
 			if command.sum {
 				println!("Total number of current pins: {}", inner.len());
@@ -88,11 +88,11 @@ pub async fn list_pins(context: &CliContext, cli: &Cli, command: &ListCommand) -
 				for cid_pair in inner.iter() {
 					if command.all {
 						let block = storage.get(&cid_pair[1]).await?;
-						let tags: BTreeMap<String, Ipld> = DagCborCodec::default().decode(block.data())?;
+						let tags: BTreeMap<String, Ipld> = DagCborCodec.decode(block.data())?;
 						let tags_pretty = tags.get("l").expect("non empty");
-						println!("Cid {} pinned by tags:\n\t {:?}", cid_pair[0].to_string(), tags_pretty);
+						println!("Cid {} pinned by tags:\n\t {:?}", cid_pair[0], tags_pretty);
 					} else {
-						println!("{}", cid_pair[0].to_string());
+						println!("{}", cid_pair[0]);
 					}
 				}
 			}
@@ -116,7 +116,7 @@ pub async fn generate_pins(
 		let resolver = &create_cid_resolver(get_all_co_storages(application).await?).await?;
 		let result = MultiLayerCidResolver::new()
 			.with_depth_limit(command.depth)
-			.resolve_cid(&state, &resolver)
+			.resolve_cid(&state, resolver)
 			.await;
 
 		// print findings

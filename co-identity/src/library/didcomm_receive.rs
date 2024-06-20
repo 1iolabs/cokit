@@ -43,8 +43,8 @@ mod tests {
 	#[tokio::test]
 	async fn jwe() {
 		// create x25519 identities (protocol)
-		let from = DidKeyIdentity::generate_x25519(Some(&vec![1; 32]));
-		let to = DidKeyIdentity::generate_x25519(Some(&vec![2; 32]));
+		let from = DidKeyIdentity::generate_x25519(Some(&[1; 32]));
+		let to = DidKeyIdentity::generate_x25519(Some(&[2; 32]));
 
 		// create
 		let header = DidCommHeader {
@@ -68,8 +68,8 @@ mod tests {
 	#[tokio::test]
 	async fn jws() {
 		// create Ed25519 identities (curve)
-		let from = DidKeyIdentity::generate(Some(&vec![1; 32]));
-		let to = DidKeyIdentity::generate(Some(&vec![2; 32]));
+		let from = DidKeyIdentity::generate(Some(&[1; 32]));
+		let to = DidKeyIdentity::generate(Some(&[2; 32]));
 
 		// create
 		let header = DidCommHeader {

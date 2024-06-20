@@ -33,8 +33,8 @@ where
 		force_new_peer_id,
 	)
 	.await?;
-	Ok(match key.secret {
+	match key.secret {
 		co_core_keystore::Secret::PrivateKey(p) => Ok(Keypair::from_protobuf_encoding(p.divulge())?),
 		_ => Err(anyhow!("Expected private key: {}", key.uri)),
-	}?)
+	}
 }

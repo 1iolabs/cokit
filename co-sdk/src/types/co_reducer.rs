@@ -53,7 +53,7 @@ impl CoReducer {
 	/// Get current reducer state and heads.
 	pub async fn reducer_state(&self) -> (Option<Cid>, BTreeSet<Cid>) {
 		let reducer = self.reducer.read().await;
-		(reducer.state().clone(), reducer.heads().clone())
+		(*reducer.state(), reducer.heads().clone())
 	}
 
 	/// Get storage instance for this CO.
@@ -102,12 +102,12 @@ impl CoReducer {
 	pub async fn co(&self) -> Result<co_core_co::Co, CoReducerError> {
 		let (storage, state) = {
 			let reducer = self.reducer.read().await;
-			(reducer.log().storage().clone(), reducer.state().clone())
+			(reducer.log().storage().clone(), *reducer.state())
 		};
 		if let Some(state_cid) = state {
 			return Ok(storage.get_deserialized(&state_cid).await?)
 		}
-		return Ok(co_core_co::Co::default());
+		Ok(co_core_co::Co::default())
 	}
 
 	/// Read a COre state.

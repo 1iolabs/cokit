@@ -75,7 +75,7 @@ async fn storage(application: &Application, co: &CoId) -> Result<CoStorage, Stor
 	match application.co_reducer(&co).await {
 		Ok(Some(item)) => Ok(item.storage()),
 		Ok(None) => Err(StorageError::InvalidArgument(anyhow!("Co not found: {}", co))),
-		Err(err) => Err(StorageError::InvalidArgument(err.into())),
+		Err(err) => Err(StorageError::InvalidArgument(err)),
 	}
 }
 async fn with_storage<R, F, Fut>(application: &Application, co: &CoId, f: F) -> Result<R, StorageError>

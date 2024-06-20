@@ -28,10 +28,10 @@ pub fn common_event_content(args: TokenStream, input: TokenStream) -> TokenStrea
 		);
 	}
 
-	return quote! {
+	quote! {
 		#s
 	}
-	.into();
+	.into()
 }
 
 /**
@@ -57,7 +57,7 @@ pub fn derive_tagged_fields(item: TokenStream) -> TokenStream {
 				// found tagged attribute
 				for token in attr.clone().tokens.into_iter() {
 					match token {
-						TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis =>
+						TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => {
 							for group_item in g.stream().into_iter() {
 								match group_item {
 									TokenTree::Ident(ident) => {
@@ -69,7 +69,8 @@ pub fn derive_tagged_fields(item: TokenStream) -> TokenStream {
 									},
 									_ => panic!("Invalid attribute usage"),
 								}
-							},
+							}
+						},
 						_ => panic!("Invalid attribute usage"),
 					}
 				}

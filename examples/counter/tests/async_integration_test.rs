@@ -30,7 +30,7 @@ async fn async_integration_test() {
 		time: 0,
 	};
 	let action_block = BlockSerializer::default().serialize(&action).unwrap();
-	let action_cid = action_block.cid().clone();
+	let action_cid = *action_block.cid();
 	storage.set(action_block).await.unwrap();
 
 	// wasm

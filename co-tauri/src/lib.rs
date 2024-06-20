@@ -34,9 +34,9 @@ struct CoTauriError {
 	error: anyhow::Error,
 }
 
-impl Into<InvokeError> for CoTauriError {
-	fn into(self) -> InvokeError {
-		InvokeError::from_anyhow(self.error)
+impl From<CoTauriError> for InvokeError {
+	fn from(val: CoTauriError) -> Self {
+		InvokeError::from_anyhow(val.error)
 	}
 }
 
@@ -74,7 +74,7 @@ async fn get_core_state(
 		.co_reducer(co.clone())
 		.await?
 		.ok_or(anyhow!("Co not found: {}", co.clone()))?;
-	let state = reducer.state(&*core).await?;
+	let state = reducer.state(&core).await?;
 	Ok(state)
 }
 

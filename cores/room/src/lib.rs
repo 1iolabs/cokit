@@ -34,7 +34,7 @@ impl Reducer for Room {
 			EventContent::State(state_content) => match state_content {
 				StateType::RoomName(name_content) => result.name = name_content.name.clone(),
 				StateType::RoomTopic(topic_content) => result.description = topic_content.topic.clone(),
-				StateType::RoomAvatar(avatar_content) => result.avatar = avatar_content.file.clone(),
+				StateType::RoomAvatar(avatar_content) => result.avatar = avatar_content.file,
 				StateType::PinnedEvents(pin_content) => result.pinned_messages = pin_content.pinned.clone(),
 			},
 			_ => (),
