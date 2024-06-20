@@ -1,5 +1,5 @@
-mod behaviour;
-pub mod heads;
-pub mod message;
+mod heads;
+mod heads_message;
 
-pub use behaviour::{Behaviour, Event};
+pub use heads::{Event, HeadsEvent, HeadsState, PublishHeads};
+pub use heads_message::HeadsMessage;

@@ -1,15 +1,15 @@
 use crate::{Application, DidKeyProvider, CO_CORE_NAME_KEYSTORE};
 use co_identity::{
-	DidKeyIdentityResolver, IdentityResolverBox, JoinIdentityResolver, JoinPrivateIdentityResolver,
-	LocalIdentityResolver, PrivateIdentityBox, PrivateIdentityResolverBox,
+	DidKeyIdentityResolver, IdentityResolver, IdentityResolverBox, JoinIdentityResolver, JoinPrivateIdentityResolver,
+	LocalIdentityResolver, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 
 /// Create the default identity resolver.
 pub fn create_identity_resolver() -> IdentityResolverBox {
 	let mut resolvers: Vec<IdentityResolverBox> = Vec::new();
-	resolvers.push(Box::new(LocalIdentityResolver::new()));
-	resolvers.push(Box::new(DidKeyIdentityResolver::new()));
-	Box::new(JoinIdentityResolver::new(resolvers))
+	resolvers.push(IdentityResolver::boxed(LocalIdentityResolver::new()));
+	resolvers.push(DidKeyIdentityResolver::new().boxed());
+	JoinIdentityResolver::new(resolvers).boxed()
 }
 
 /// Create the default private identity resolver.
@@ -18,9 +18,9 @@ pub async fn create_private_identity_resolver(
 ) -> Result<PrivateIdentityResolverBox, anyhow::Error> {
 	let local = application.local_co_reducer().await?;
 	let mut resolvers: Vec<PrivateIdentityResolverBox> = Vec::new();
-	resolvers.push(Box::new(LocalIdentityResolver::default()));
-	resolvers.push(Box::new(DidKeyProvider::new(local, CO_CORE_NAME_KEYSTORE)));
-	Ok(Box::new(JoinPrivateIdentityResolver::new(resolvers)))
+	resolvers.push(PrivateIdentityResolver::boxed(LocalIdentityResolver::default()));
+	resolvers.push(DidKeyProvider::new(local, CO_CORE_NAME_KEYSTORE).boxed());
+	Ok(JoinPrivateIdentityResolver::new(resolvers).boxed())
 }
 
 /// Resolve a private identity.
@@ -31,5 +31,5 @@ pub async fn resolve_private_identity(
 	did: &co_primitives::Did,
 ) -> Result<PrivateIdentityBox, anyhow::Error> {
 	let resolver = create_private_identity_resolver(application).await?;
-	Ok(resolver.resolve_private(&did, None).await?)
+	Ok(resolver.resolve_private(&did).await?)
 }

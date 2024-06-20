@@ -129,7 +129,12 @@ async fn update_pins(context: &CliContext, cli: &Cli, _command: &UpdateCommand) 
 	// application ini
 	let application = context.application(cli).await;
 	// get pinn file path
-	let pins_path = application.application_path().with_file_name("pins.cbor");
+	let pins_path = application
+		.settings()
+		.application_path
+		.as_ref()
+		.ok_or(anyhow!("expeced filesystem application"))?
+		.with_file_name("pins.cbor");
 	// read previous pins from file
 	let content = fs::read(&pins_path).await?;
 	// decode cbor

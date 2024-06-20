@@ -4,6 +4,7 @@ use crate::{
 };
 use async_trait::async_trait;
 
+#[derive(Clone)]
 pub struct JoinIdentityResolver {
 	resolvers: Vec<IdentityResolverBox>,
 }
@@ -14,10 +15,10 @@ impl JoinIdentityResolver {
 }
 #[async_trait]
 impl IdentityResolver for JoinIdentityResolver {
-	async fn resolve(&self, identity: &str, public_key: Option<&[u8]>) -> Result<IdentityBox, IdentityResolverError> {
+	async fn resolve(&self, identity: &str) -> Result<IdentityBox, IdentityResolverError> {
 		let mut last_error: Option<IdentityResolverError> = None;
 		for resolver in self.resolvers.iter() {
-			match resolver.resolve(identity, public_key).await {
+			match resolver.resolve(identity).await {
 				Ok(i) => return Ok(i),
 				Err(IdentityResolverError::NotFound) => {},
 				Err(e) => last_error = Some(e),
@@ -27,6 +28,7 @@ impl IdentityResolver for JoinIdentityResolver {
 	}
 }
 
+#[derive(Clone)]
 pub struct JoinPrivateIdentityResolver {
 	resolvers: Vec<PrivateIdentityResolverBox>,
 }
@@ -37,14 +39,10 @@ impl JoinPrivateIdentityResolver {
 }
 #[async_trait]
 impl PrivateIdentityResolver for JoinPrivateIdentityResolver {
-	async fn resolve_private(
-		&self,
-		identity: &str,
-		public_key: Option<&[u8]>,
-	) -> Result<PrivateIdentityBox, IdentityResolverError> {
+	async fn resolve_private(&self, identity: &str) -> Result<PrivateIdentityBox, IdentityResolverError> {
 		let mut last_error: Option<IdentityResolverError> = None;
 		for resolver in self.resolvers.iter() {
-			match resolver.resolve_private(identity, public_key).await {
+			match resolver.resolve_private(identity).await {
 				Ok(i) => return Ok(i),
 				Err(IdentityResolverError::NotFound) => {},
 				Err(e) => last_error = Some(e),

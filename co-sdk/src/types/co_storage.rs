@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
 use libipld::{Block, Cid, DefaultParams};
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 /// Public storage API.
 #[derive(Clone)]
@@ -14,6 +14,11 @@ impl CoStorage {
 		S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + 'static,
 	{
 		Self { inner: Arc::new(storage) }
+	}
+}
+impl Debug for CoStorage {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("CoStorage").finish()
 	}
 }
 #[async_trait]

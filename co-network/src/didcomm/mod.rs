@@ -1,4 +1,6 @@
 use self::{handler::Handler, protocol::MessageProtocol};
+use co_identity::{IdentityResolverBox, Message, PrivateIdentityResolverBox};
+use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, StreamExt};
 use libp2p::{
 	core::{ConnectedPoint, Endpoint},
 	swarm::{
@@ -9,7 +11,7 @@ use libp2p::{
 	},
 	Multiaddr, PeerId,
 };
-pub use message::Message;
+pub use message::EncodedMessage;
 use smallvec::SmallVec;
 use std::{
 	collections::{HashMap, VecDeque},
@@ -18,14 +20,17 @@ use std::{
 
 mod codec;
 mod handler;
+mod inbound;
 mod message;
 mod protocol;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Event {
 	Received { peer_id: PeerId, message: Message },
-	Sent { peer_id: PeerId, message: Message },
-	OutboundFailure { peer_id: PeerId, error: OutboundFailure, message: Option<Message> },
+	Sent { peer_id: PeerId, message: EncodedMessage },
+	InboundFailure { peer_id: PeerId, error: String, message: Option<EncodedMessage> },
+	OutboundFailure { peer_id: PeerId, error: OutboundFailure, message: Option<EncodedMessage> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,14 +64,33 @@ pub struct Behaviour {
 	pending_outbound: HashMap<PeerId, SmallVec<[MessageProtocol; 10]>>,
 	/// Config.
 	config: Config,
+	/// Identity resolver.
+	/// Used to verify signatures of incomming messages.
+	identity_resolver: IdentityResolverBox,
+	/// Identites which receive encrypted messages.
+	private_identity_resolver: PrivateIdentityResolverBox,
+	/// Pending inbound messages.
+	pending_inbound: FuturesUnordered<BoxFuture<'static, Option<Event>>>,
 }
-
 impl Behaviour {
-	pub fn new(config: Config) -> Self {
-		Self { pending_events: VecDeque::new(), connected: HashMap::new(), pending_outbound: HashMap::new(), config }
+	pub fn new(
+		identity_resolver: IdentityResolverBox,
+		private_identity_resolver: PrivateIdentityResolverBox,
+		config: Config,
+	) -> Self {
+		Self {
+			identity_resolver,
+			pending_events: VecDeque::new(),
+			connected: HashMap::new(),
+			pending_outbound: HashMap::new(),
+			config,
+			pending_inbound: Default::default(),
+			private_identity_resolver,
+		}
 	}
 
-	pub fn send(&mut self, peer: &PeerId, message: Message) {
+	/// Send a encoved message.
+	pub fn send(&mut self, peer: &PeerId, message: EncodedMessage) {
 		let protocol = MessageProtocol::outbound(message);
 		if let Some(protocol) = self.try_send(peer, protocol) {
 			if self.config.auto_dail {
@@ -77,7 +101,6 @@ impl Behaviour {
 		}
 	}
 }
-
 impl Behaviour {
 	/// Tries to send a message by queueing an appropriate event to be
 	/// emitted to the `Swarm`. If the peer is not currently connected,
@@ -90,7 +113,7 @@ impl Behaviour {
 			// let ix = (request.request_id.0 as usize) % connections.len();
 			let conn = &mut connections[0]; // TODO: choose random?
 								// conn.pending_inbound_responses.insert(request.request_id);
-			tracing::trace!(?peer, connection_id = ?conn.id, "try-send");
+								// tracing::trace!(?peer, connection_id = ?conn.id, "try-send");
 			self.pending_events.push_back(ToSwarm::NotifyHandler {
 				peer_id: *peer,
 				handler: NotifyHandler::One(conn.id),
@@ -98,7 +121,7 @@ impl Behaviour {
 			});
 			None
 		} else {
-			tracing::trace!(?peer, deferred = true, "try-send");
+			// tracing::trace!(?peer, deferred = true, "try-send");
 			Some(protocol)
 		}
 	}
@@ -154,11 +177,7 @@ impl Behaviour {
 				Some(v) => v.len(),
 				None => 0,
 			};
-			if message_discard_count > 0 {
-				tracing::warn!(?peer_id, ?connection_id, ?error, ?message_discard_count, "dail-failure");
-			} else {
-				tracing::info!(?peer_id, ?connection_id, ?error, ?message_discard_count, "dail-failure");
-			}
+			tracing::warn!(?peer_id, ?connection_id, ?error, ?message_discard_count, "dail-failure");
 
 			// If there are pending outgoing requests when a dial failure occurs,
 			// it is implied that we are not connected to the peer, since pending
@@ -197,24 +216,25 @@ impl Behaviour {
 		connection.address = new_address;
 	}
 }
-
-impl Default for Behaviour {
-	fn default() -> Self {
-		Self::new(Default::default())
-	}
-}
-
 impl NetworkBehaviour for Behaviour {
 	type ConnectionHandler = Handler;
 	type ToSwarm = Event;
 
-	fn poll(&mut self, _cx: &mut Context<'_>) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
+	fn poll(&mut self, cx: &mut Context<'_>) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
+		// events
 		if let Some(event) = self.pending_events.pop_front() {
 			return Poll::Ready(event)
 		} else if self.pending_events.capacity() > 100 {
 			self.pending_events.shrink_to_fit();
 		}
 
+		// pending inbound
+		match self.pending_inbound.poll_next_unpin(cx) {
+			Poll::Ready(Some(Some(event))) => return Poll::Ready(ToSwarm::GenerateEvent(event)),
+			_ => {},
+		}
+
+		// pending
 		Poll::Pending
 	}
 
@@ -255,11 +275,18 @@ impl NetworkBehaviour for Behaviour {
 		_connection_id: ConnectionId,
 		event: THandlerOutEvent<Self>,
 	) {
-		tracing::debug!(?peer, ?event, "on_connection_handler_event");
+		// tracing::debug!(?peer, ?event, "on_connection_handler_event");
 		match event {
 			handler::Event::Received { message } => {
-				self.pending_events
-					.push_back(ToSwarm::GenerateEvent(Event::Received { peer_id: peer, message }));
+				self.pending_inbound.push(
+					inbound::inbound_message(
+						self.identity_resolver.clone(),
+						self.private_identity_resolver.clone(),
+						peer,
+						message,
+					)
+					.boxed(),
+				);
 			},
 			handler::Event::Sent { message } => {
 				self.pending_events

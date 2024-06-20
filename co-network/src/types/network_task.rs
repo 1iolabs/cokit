@@ -5,17 +5,18 @@ use libp2p::{
 };
 use std::marker::PhantomData;
 
-pub trait NetworkTask<B>
+pub trait NetworkTask<B, C>
 where
 	B: NetworkBehaviour,
 {
-	fn execute(&mut self, swarm: &mut Swarm<B>);
+	fn execute(&mut self, swarm: &mut Swarm<B>, context: &mut C);
 
 	/// Handle swarm events.
 	/// Events can be consumed by this handler or forwarded to next handler.
 	fn on_swarm_event(
 		&mut self,
 		_swarm: &mut Swarm<B>,
+		_context: &mut C,
 		event: SwarmEvent<B::ToSwarm>,
 	) -> Option<SwarmEvent<B::ToSwarm>> {
 		Some(event)
@@ -27,53 +28,63 @@ where
 		true
 	}
 }
-pub type NetworkTaskBox<B> = Box<dyn NetworkTask<B> + Send + 'static>;
+pub type NetworkTaskBox<B, C> = Box<dyn NetworkTask<B, C> + Send + 'static>;
 
-#[derive(Debug)]
-pub struct NetworkTaskSpawner<B> {
-	pub(crate) tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<B>>,
+pub struct TokioNetworkTaskSpawner<B, C> {
+	pub(crate) tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<B, C>>,
 }
-impl<B> NetworkTaskSpawner<B>
+
+impl<B, C> Clone for TokioNetworkTaskSpawner<B, C> {
+	fn clone(&self) -> Self {
+		Self { tasks: self.tasks.clone() }
+	}
+}
+impl<B, C> NetworkTaskSpawner<B, C> for TokioNetworkTaskSpawner<B, C>
 where
 	B: NetworkBehaviour,
 {
-	pub fn spawn<T>(&self, task: T) -> Result<(), NetworkError>
+	fn spawn<T>(&self, task: T) -> Result<(), NetworkError>
 	where
-		T: NetworkTask<B> + Send + 'static,
+		T: NetworkTask<B, C> + Send + 'static,
 	{
 		self.tasks.send(Box::new(task))?;
 		Ok(())
 	}
 }
-impl<B> Clone for NetworkTaskSpawner<B> {
-	fn clone(&self) -> Self {
-		Self { tasks: self.tasks.clone() }
-	}
-}
 
-pub struct FnOnceNetworkTask<F, B>
-where
-	F: FnOnce(&mut Swarm<B>) + Send + 'static,
-{
-	_b: PhantomData<B>,
-	f: Option<F>,
-}
-impl<F, B> FnOnceNetworkTask<F, B>
-where
-	F: FnOnce(&mut Swarm<B>) + Send + 'static,
-{
-	pub fn new(f: F) -> Self {
-		Self { _b: Default::default(), f: Some(f) }
-	}
-}
-impl<B, F> NetworkTask<B> for FnOnceNetworkTask<F, B>
+pub trait NetworkTaskSpawner<B, C>
 where
 	B: NetworkBehaviour,
-	F: FnOnce(&mut Swarm<B>) + Send + 'static,
 {
-	fn execute(&mut self, swarm: &mut Swarm<B>) {
+	fn spawn<T>(&self, task: T) -> Result<(), NetworkError>
+	where
+		T: NetworkTask<B, C> + Send + 'static;
+}
+
+pub struct FnOnceNetworkTask<F, B, C>
+where
+	F: FnOnce(&mut Swarm<B>, &mut C) + Send + 'static,
+{
+	_b: PhantomData<B>,
+	_c: PhantomData<C>,
+	f: Option<F>,
+}
+impl<F, B, C> FnOnceNetworkTask<F, B, C>
+where
+	F: FnOnce(&mut Swarm<B>, &mut C) + Send + 'static,
+{
+	pub fn new(f: F) -> Self {
+		Self { _b: Default::default(), _c: Default::default(), f: Some(f) }
+	}
+}
+impl<B, C, F> NetworkTask<B, C> for FnOnceNetworkTask<F, B, C>
+where
+	B: NetworkBehaviour,
+	F: FnOnce(&mut Swarm<B>, &mut C) + Send + 'static,
+{
+	fn execute(&mut self, swarm: &mut Swarm<B>, context: &mut C) {
 		if let Some(f) = Option::take(&mut self.f) {
-			f(swarm);
+			f(swarm, context);
 		}
 	}
 }

@@ -5,6 +5,7 @@ pub mod date;
 pub mod did;
 pub mod link;
 pub mod metadata;
+pub mod network;
 pub mod path;
 pub mod secret;
 pub mod tags;

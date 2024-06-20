@@ -85,7 +85,7 @@ impl BlockStorage for MemoryBlockStorage {
 	type StoreParams = DefaultParams;
 
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
-		tracing::debug!(?cid, "memory-store-get");
+		tracing::trace!(?cid, "memory-store-get");
 		self.records
 			.read()
 			.await
@@ -95,7 +95,7 @@ impl BlockStorage for MemoryBlockStorage {
 	}
 
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
-		tracing::debug!(cid = ?block.cid(), "memory-store-set");
+		tracing::trace!(cid = ?block.cid(), "memory-store-set");
 		let result = block.cid().clone();
 		self.records
 			.write()
@@ -105,7 +105,7 @@ impl BlockStorage for MemoryBlockStorage {
 	}
 
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
-		tracing::debug!(?cid, "memory-store-remove");
+		tracing::trace!(?cid, "memory-store-remove");
 		self.records.write().await.remove(cid);
 		Ok(())
 	}

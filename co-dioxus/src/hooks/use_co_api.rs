@@ -14,6 +14,7 @@ pub fn use_co_api(co: impl Into<CoId>, identity: impl Into<Option<Identity>>) ->
 	CoApi { co, context, error, identity: identity.into() }
 }
 
+/// CO API.
 pub struct CoApi {
 	co: CoId,
 	context: CoContext,
@@ -33,8 +34,11 @@ impl CoApi {
 	}
 
 	pub fn create_co(&self, co: CreateCo) {
+		let identity = self.identity.clone();
 		self.context
-			.execute_future_with_error(self.error, move |application| async move { create_co(application, co).await });
+			.execute_future_with_error(self.error, move |application| async move {
+				create_co(application, identity, co).await
+			});
 	}
 
 	pub fn dispatch<T>(&self, core: &str, action: T)
@@ -51,8 +55,12 @@ impl CoApi {
 	}
 }
 
-async fn create_co(application: Application, co: CreateCo) -> Result<(), anyhow::Error> {
-	application.create_co(co).await?;
+async fn create_co(application: Application, identitiy: Option<Identity>, co: CreateCo) -> Result<(), anyhow::Error> {
+	let private_identity: PrivateIdentityBox = match identitiy {
+		None => PrivateIdentityBox::new(application.local_identity()),
+		Some(value) => application.private_identity(&value.did).await?,
+	};
+	application.create_co(private_identity, co).await?;
 	Ok(())
 }
 
@@ -75,7 +83,7 @@ where
 	T: Serialize + Debug + Send + Sync + Clone + 'static,
 {
 	let private_identity: PrivateIdentityBox = match identitiy {
-		None => Box::new(application.local_identity()),
+		None => PrivateIdentityBox::new(application.local_identity()),
 		Some(value) => application.private_identity(&value.did).await?,
 	};
 	let reducer = application

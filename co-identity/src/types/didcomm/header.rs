@@ -1,10 +1,12 @@
-use co_identity::{PrivateIdentity, SignError};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::collections::BTreeSet;
+use serde::{Deserialize, Serialize};
+use std::{
+	collections::BTreeSet,
+	time::{SystemTime, UNIX_EPOCH},
+};
 
 /// See: https://identity.foundation/didcomm-messaging/spec/#message-headers
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Message<T> {
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct DidCommHeader {
 	/// REQUIRED. Message ID. The id attribute value MUST be unique to the sender, across all messages they send. See
 	/// Threading > Message IDs for constraints on this value.
 	pub id: String,
@@ -55,8 +57,8 @@ pub struct Message<T> {
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub thid: Option<String>,
 
-	/// OPTIONAL. Thread identifier. Uniquely identifies the thread that the message belongs to. If not included, the
-	/// id property of the message MUST be treated as the value of the thid. See Threads for details.
+	/// OPTIONAL. Parent thread identifier. If the message is a child of a thread the pthid will uniquely identify
+	/// which thread is the parent. See Parent Threads for details.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub pthid: Option<String>,
 
@@ -76,37 +78,14 @@ pub struct Message<T> {
 	/// When omitted from any given message, the message is considered to have no expiration by the sender.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub expires_time: Option<u64>,
-
-	/// OPTIONAL. The body attribute contains all the data and structure that are uniquely defined for the schema
-	/// associated with the type attribute. If present, it MUST be a JSON object that conforms to RFC 7159.
-	pub body: T,
 }
-impl<T> Message<T> {
-	/// Sign this message as `application/didcomm-signed+cbor`.
-	pub fn sign<I>(&self, _identity: &I) -> Result<Vec<u8>, SignError>
-	where
-		I: PrivateIdentity + Send + Sync + 'static,
-		T: Serialize,
-	{
-		let data = self.cbor().map_err(|e| SignError::Other(e.into()))?;
-		//let signature = identity.sign(&data)?;
-		// TODO: use JWS instead of append
-		Ok(data)
-	}
-
-	/// Encode this message as dag-cbor.
-	pub fn cbor(&self) -> Result<Vec<u8>, anyhow::Error>
-	where
-		T: Serialize,
-	{
-		Ok(serde_ipld_dagcbor::to_vec(&self)?)
-	}
-
-	/// Decode dag-cbor data to message.
-	pub fn from_cbor(data: &[u8]) -> Result<Self, anyhow::Error>
-	where
-		T: DeserializeOwned,
-	{
-		Ok(serde_ipld_dagcbor::from_slice(&data)?)
+impl DidCommHeader {
+	/// Create new DidCommHeader with an
+	pub fn new() -> Self {
+		Self {
+			id: uuid::Uuid::new_v4().to_string(),
+			created_time: Some(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()),
+			..Default::default()
+		}
 	}
 }

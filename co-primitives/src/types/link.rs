@@ -123,6 +123,11 @@ impl<T: Default> From<Option<Cid>> for OptionLink<T> {
 		Self::new(value)
 	}
 }
+impl<T: Default> From<&Option<Cid>> for OptionLink<T> {
+	fn from(value: &Option<Cid>) -> Self {
+		Self::new(*value)
+	}
+}
 impl<T: Default> From<Cid> for OptionLink<T> {
 	fn from(value: Cid) -> Self {
 		Self::new(Some(value))

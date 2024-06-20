@@ -24,7 +24,7 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 		algorithm: if command.public { None } else { Some(Default::default()) },
 		name: command.name.as_deref().unwrap_or(command.co.as_str()).to_string(),
 	};
-	let reducer = application.create_co(create).await?;
+	let reducer = application.create_co(application.local_identity(), create).await?;
 
 	// result
 	println!("{} | {}", &command.co, reducer.reducer_state().await.0.expect("state"));

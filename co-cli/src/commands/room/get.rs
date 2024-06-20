@@ -38,7 +38,7 @@ pub async fn command(
 		.ok_or(anyhow!("Co not found: {}", room_command.co))?;
 
 	let state = co_reducer.state::<Room>(&room_command.core).await?;
-	let (storage, stream, _mapping) = application.co_log_entries(&room_command.co).await?;
+	let (storage, stream, _mapping) = application.co().entries(&room_command.co).await?;
 
 	// print header
 	println!("History of room '{}' (core: {})", state.name, room_command.core);

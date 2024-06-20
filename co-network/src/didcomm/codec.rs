@@ -1,4 +1,4 @@
-use super::message::Message;
+use super::message::EncodedMessage;
 use asynchronous_codec::{FramedRead, FramedWrite, LengthCodec};
 use futures::{AsyncRead, AsyncWrite, SinkExt, TryStreamExt};
 
@@ -23,20 +23,21 @@ impl From<std::io::ErrorKind> for Error {
 }
 
 impl Codec {
-	pub async fn receive_message<S: AsyncRead + Unpin>(&self, socket: &mut S) -> Result<Message, Error> {
+	pub async fn receive_message<S: AsyncRead + Unpin>(&self, socket: &mut S) -> Result<EncodedMessage, Error> {
 		let mut framed = FramedRead::new(socket, LengthCodec {});
 		let frame = framed.try_next().await?;
 		match frame {
 			None => Err(Error::Empty),
-			Some(data) => Ok(Message::Message(data.into())),
+			Some(data) => Ok(EncodedMessage(data.into())),
 		}
 	}
 
 	pub async fn send_message<S: AsyncWrite + Unpin>(
 		&self,
 		socket: &mut S,
-		Message::Message(data): Message,
+		message: EncodedMessage,
 	) -> Result<(), Error> {
+		let data: Vec<u8> = message.into();
 		if data.len() > self.max_message_size_bytes {
 			return Err(std::io::ErrorKind::InvalidInput.into())
 		}

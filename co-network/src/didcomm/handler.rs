@@ -1,4 +1,4 @@
-use super::{message::Message, protocol::MessageProtocol};
+use super::{message::EncodedMessage, protocol::MessageProtocol};
 use libp2p::swarm::{
 	handler::{ConnectionEvent, DialUpgradeError, FullyNegotiatedInbound, FullyNegotiatedOutbound, ListenUpgradeError},
 	ConnectionHandler, ConnectionHandlerEvent, StreamUpgradeError, SubstreamProtocol,
@@ -10,8 +10,8 @@ use std::{
 
 #[derive(Debug, Clone)]
 pub enum Event {
-	Sent { message: Message },
-	Received { message: Message },
+	Sent { message: EncodedMessage },
+	Received { message: EncodedMessage },
 	OutboundUnsupportedProtocols,
 	OutboundTimeout,
 }

@@ -10,13 +10,10 @@ use tokio::sync::{mpsc, oneshot};
 pub fn use_co_storage(co: &str) -> CoStorage {
 	let (tx, mut rx) = mpsc::unbounded_channel::<Command<<CoBlockStorage as BlockStorage>::StoreParams>>();
 	let context: CoContext = use_context();
-	context.execute(|application| {
-		let application = application.clone();
-		tokio::spawn(async move {
-			while let Some(command) = rx.recv().await {
-				handle_command(&application, command).await;
-			}
-		});
+	context.execute_future_parallel(|application| async move {
+		while let Some(command) = rx.recv().await {
+			handle_command(&application, command).await;
+		}
 	});
 	CoStorage::new(CoBlockStorage { co: co.into(), tx })
 }

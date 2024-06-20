@@ -1,6 +1,7 @@
 use futures::Future;
 use tokio_util::sync::CancellationToken;
 
+#[allow(dead_code)]
 pub async fn cancel<F, R>(cancel: CancellationToken, fut: F) -> Option<R>
 where
 	F: Future<Output = Option<R>>,

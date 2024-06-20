@@ -10,10 +10,12 @@ mod types;
 
 pub use application::{
 	application::{Application, ApplicationBuilder},
+	co_context::CoContext,
 	core_resolver::{CoCoreResolver, CoreResolver, CoreResolverError, SingleCoreResolver},
 	local::LocalCoBuilder,
-	reducer::{Reducer, ReducerBuilder, ReducerChangedHandler},
+	reducer::{Reducer, ReducerBuilder, ReducerChangedContext, ReducerChangedHandler},
 	shared::CreateCo,
+	tracing::TracingBuilder,
 };
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 pub use co_identity::{
@@ -28,17 +30,27 @@ pub use co_storage::{
 	store_file, unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer, BlockStat, BlockStorage,
 	BlockStorageContentMapping, BlockStorageExt, StorageError,
 };
-pub use drivers::{network::Network, runtime::Runtime, storage::Storage};
+pub use drivers::{
+	network::{
+		token::{CoToken, CoTokenParameters},
+		Network,
+	},
+	runtime::Runtime,
+	storage::Storage,
+};
 pub use identity::did_key::DidKeyProvider;
 pub use library::{
+	find_co_secret::find_co_secret,
 	find_membership::{find_membership, find_memberships},
 	generate_random_name::generate_random_name,
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
 	memberships::memberships,
 	node_stream::NodeStream,
+	shared_co_join::{SharedCoJoin, SharedCoJoinError},
+	task_spawner::TaskSpawner,
 };
-pub use pin::pin::{is_pinned, PinAPI};
+pub use pin::pin::PinAPI;
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},
 	co_reducer_factory::CoReducerFactory,

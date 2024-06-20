@@ -9,7 +9,6 @@ edition = "2021"
 anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
-co-api = { path = "../co-api" }
 co-core-co = { path = "../cores/co" }
 co-core-data-series = { path = "../cores/data-series" }
 co-core-file = { path = "../cores/file" }
@@ -26,6 +25,7 @@ co-runtime = { path = "../co-runtime" }
 co-storage = { path = "../co-storage" }
 directories = "5.0.1"
 futures = { workspace = true }
+hmac = "0.12.1"
 hyper = { workspace = true }
 keyring = "2.3.2"
 libipld = { workspace = true, features = ["default", "serde-codec"] }
@@ -38,9 +38,10 @@ rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
+sha2 = "0.10.8"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
-tokio-stream = { workspace = true }
+tokio-stream = { workspace = true, features = ["sync"] }
 tokio-util = { workspace = true, features = ["rt"] }
 toml = { workspace = true }
 tracing = { workspace = true }
@@ -48,6 +49,14 @@ tracing-bunyan-formatter = "0.3.6"
 tracing-log = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { workspace = true }
+
+# opentelemetry
+opentelemetry = "0.22"
+opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.15.0", features = ["tonic"] }
+opentelemetry-semantic-conventions = "0.14.0"
+opentelemetry-stdout = { version = "0.3.0", features = ["trace"] }
+tracing-opentelemetry = "0.23"
 
 [dev-dependencies]
 example-counter = { path = "../examples/counter" }

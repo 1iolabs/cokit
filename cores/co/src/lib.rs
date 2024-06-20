@@ -1,4 +1,4 @@
-use co_api::{reduce, CoId, Context, DagCollection, DagSet, Did, Reducer, ReducerAction, Tags};
+use co_api::{reduce, CoId, Context, DagSet, Did, Network, Reducer, ReducerAction, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -32,10 +32,10 @@ pub struct Co {
 	/// Keys are normally stored in the Local CO.
 	pub keys: Option<Vec<Key>>,
 
-	/// CO known peers
+	/// CO network services.
 	/// See: [`libp2p::PeerId`]
 	// #[co_api::Dag]
-	pub peers: DagSet<Vec<u8>>,
+	pub network: DagSet<Network>,
 }
 impl Default for Co {
 	fn default() -> Self {
@@ -47,7 +47,7 @@ impl Default for Co {
 			participants: Default::default(),
 			cores: Default::default(),
 			keys: Default::default(),
-			peers: Default::default(),
+			network: Default::default(),
 		}
 	}
 }
@@ -113,21 +113,63 @@ pub enum KeyState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CoAction {
-	Create { id: CoId, name: String, cores: BTreeMap<String, Core>, participants: BTreeMap<Did, Participant> },
-	Heads { heads: BTreeSet<Cid> },
-	TagsInsert { tags: Tags },
-	TagsRemove { tags: Tags },
-	ParticipantInvite { participant: Did, tags: Tags },
-	ParticipantJoin { participant: Did },
-	ParticipantTagsInsert { participant: Did, tags: Tags },
-	ParticipantTagsRemove { participant: Did, tags: Tags },
-	PeerInsert { peer: Vec<u8> },
-	PeerRemove { peer: Vec<u8> },
-	CoreCreate { core: String, binary: Cid, tags: Tags },
-	CoreRemove { core: String },
-	CoreChange { core: String, state: Option<Cid> },
-	CoreTagsInsert { core: String, tags: Tags },
-	CoreTagsRemove { core: String, tags: Tags },
+	Create {
+		id: CoId,
+		name: String,
+		cores: BTreeMap<String, Core>,
+		participants: BTreeMap<Did, Participant>,
+		key: Option<String>,
+	},
+	Heads {
+		heads: BTreeSet<Cid>,
+	},
+	TagsInsert {
+		tags: Tags,
+	},
+	TagsRemove {
+		tags: Tags,
+	},
+	ParticipantInvite {
+		participant: Did,
+		tags: Tags,
+	},
+	ParticipantJoin {
+		participant: Did,
+	},
+	ParticipantTagsInsert {
+		participant: Did,
+		tags: Tags,
+	},
+	ParticipantTagsRemove {
+		participant: Did,
+		tags: Tags,
+	},
+	NetworkInsert {
+		network: Network,
+	},
+	NetworkRemove {
+		network: Network,
+	},
+	CoreCreate {
+		core: String,
+		binary: Cid,
+		tags: Tags,
+	},
+	CoreRemove {
+		core: String,
+	},
+	CoreChange {
+		core: String,
+		state: Option<Cid>,
+	},
+	CoreTagsInsert {
+		core: String,
+		tags: Tags,
+	},
+	CoreTagsRemove {
+		core: String,
+		tags: Tags,
+	},
 }
 
 impl Reducer for Co {
@@ -136,7 +178,7 @@ impl Reducer for Co {
 	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		let mut result = self;
 		match &event.payload {
-			CoAction::Create { id, name, cores, participants } => {
+			CoAction::Create { id, name, cores, participants, key: key_id } => {
 				// only allowed for empty COs
 				// id can not be changed afterwards
 				if result.id.as_str().is_empty() {
@@ -144,6 +186,9 @@ impl Reducer for Co {
 					result.name = name.to_owned();
 					result.cores = cores.to_owned();
 					result.participants = participants.to_owned();
+					result.keys = key_id
+						.as_ref()
+						.map(|key_id| vec![Key { id: key_id.to_owned(), state: KeyState::Active }]);
 				}
 			},
 			CoAction::ParticipantInvite { participant, tags } =>
@@ -197,15 +242,11 @@ impl Reducer for Co {
 			CoAction::TagsRemove { tags } => {
 				result.tags.clear(Some(tags));
 			},
-			CoAction::PeerInsert { peer } => {
-				result.peers.update(context, |_context, peers| {
-					peers.insert(peer.clone());
-				});
+			CoAction::NetworkInsert { network } => {
+				result.network.insert(context.storage_mut(), network.clone());
 			},
-			CoAction::PeerRemove { peer } => {
-				result.peers.update(context, |_context, peers| {
-					peers.remove(peer);
-				});
+			CoAction::NetworkRemove { network } => {
+				result.network.remove(context.storage_mut(), network);
 			},
 		}
 		result

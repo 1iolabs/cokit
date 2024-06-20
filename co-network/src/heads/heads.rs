@@ -1,167 +1,388 @@
+use crate::{
+	didcomm, heads::heads_message::HeadsMessage, types::layer_behaviour::LayerBehaviour, DidcommBehaviourProvider,
+	GossipsubBehaviourProvider,
+};
+use co_identity::PrivateIdentity;
+use co_primitives::{CoId, NetworkCoHeads};
 use libipld::Cid;
 use libp2p::{
-	gossipsub::{Behaviour, Event, IdentTopic, TopicHash},
-	PeerId,
+	gossipsub::{self, IdentTopic, PublishError, TopicHash},
+	swarm::{NetworkBehaviour, SwarmEvent},
+	PeerId, Swarm,
 };
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::{
+	collections::{BTreeMap, BTreeSet, VecDeque},
+	task::{Context, Poll},
+};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum HeadsMessage {
-	#[serde(rename = "h")]
-	Heads(BTreeSet<Cid>),
+#[derive(Debug, Clone)]
+pub enum Event {
+	/// Receviced new heads from some peer.
+	ReceivedHeads {
+		/// The CO ID.
+		co: CoId,
+
+		/// Received Heads.
+		heads: BTreeSet<Cid>,
+
+		/// Received from peer.
+		peer_id: Option<PeerId>,
+
+		/// Protocol requested a response.
+		/// Typically,
+		/// - false when received via co-heads (gossipsub).
+		/// - true when received via direct didcomm.
+		response: bool,
+	},
+	//
+	// /// Sent heads to an peer.
+	// SentHeads { co: CoId, heads: BTreeSet<Cid>, peer_id: PeerId },
+
+	// /// Subscribed for heads.
+	// Subscribed { co: CoId },
+
+	// /// Unsubscribed for heads.
+	// Unsubscribed { co: CoId },
 }
 
-pub trait HeadsHandler {
-	/// Received heads from peers.
-	/// This will executed every time when heads have received.
-	/// The implementation has to choose if they will be used and call `publish_heads` if heads changed.
-	fn on_heads(&mut self, heads: BTreeSet<Cid>);
-
-	/// New peer joined.
-	fn on_subscribe(&mut self, peer: PeerId);
-
-	/// Peer left.
-	fn on_unsubscribe(&mut self, peer: PeerId);
+#[derive(Debug, Clone)]
+pub enum HeadsEvent {
+	GenerateEvent(Event),
+	Publish(PublishHeads),
 }
 
-pub struct Heads {
-	topic: IdentTopic,
-	hash: TopicHash,
+#[derive(Debug, Clone)]
+pub struct PublishHeads {
+	network: NetworkCoHeads,
+	co: CoId,
 	heads: BTreeSet<Cid>,
-	// TODO: do we need to try PeerId's?
-	// TODO: Can we check this using gossipsub itself?
-	subscriptions: i32,
-	handler: Box<dyn HeadsHandler + Send + Sync + 'static>,
 }
-impl Heads {
-	pub fn new<H: HeadsHandler + Send + Sync + 'static>(topic: IdentTopic, heads: BTreeSet<Cid>, handler: H) -> Self {
-		Heads { hash: topic.hash(), topic, handler: Box::new(handler), subscriptions: 0, heads }
+
+pub struct HeadsState {
+	heads: BTreeSet<TopicHash>,
+	events: VecDeque<HeadsEvent>,
+	pending_heads: BTreeMap<TopicHash, Vec<PublishHeads>>,
+}
+impl HeadsState {
+	pub fn new() -> Self {
+		Self { heads: Default::default(), events: Default::default(), pending_heads: Default::default() }
 	}
 
-	pub fn subscribe(&self, gossipsub: &mut Behaviour) -> Result<bool, anyhow::Error> {
-		Ok(gossipsub.subscribe(&self.topic)?)
+	/// Subscribe to CO gossip.
+	/// Returns `true` if a new subscription has been made, `false` is was already subscribed.
+	pub fn subscribe<B>(
+		&mut self,
+		swarm: &mut Swarm<B>,
+		network: &NetworkCoHeads,
+		co: &CoId,
+	) -> Result<bool, anyhow::Error>
+	where
+		B: NetworkBehaviour + GossipsubBehaviourProvider,
+	{
+		let topic = Self::to_topic(network, co);
+		self.heads.insert(topic.hash());
+		Ok(swarm.behaviour_mut().gossipsub_mut().subscribe(&topic)?)
 	}
 
-	pub fn set_heads(&mut self, gossipsub: &mut Behaviour, heads: BTreeSet<Cid>) -> Result<(), anyhow::Error> {
-		// assign
-		if self.heads == heads {
-			return Ok(())
+	pub fn unsubscribe<B>(
+		&mut self,
+		swarm: &mut Swarm<B>,
+		network: &NetworkCoHeads,
+		co: &CoId,
+	) -> Result<bool, anyhow::Error>
+	where
+		B: NetworkBehaviour + GossipsubBehaviourProvider,
+	{
+		let topic = Self::to_topic(network, co);
+		self.heads.remove(&topic.hash());
+		Ok(swarm.behaviour_mut().gossipsub_mut().unsubscribe(&topic)?)
+	}
+
+	pub fn publish<B>(
+		&mut self,
+		swarm: &mut Swarm<B>,
+		network: &NetworkCoHeads,
+		co: &CoId,
+		heads: &BTreeSet<Cid>,
+	) -> Result<(), anyhow::Error>
+	where
+		B: NetworkBehaviour + GossipsubBehaviourProvider,
+	{
+		let topic = Self::to_topic(network, co);
+		let message = HeadsMessage::Heads(co.clone(), heads.clone());
+		let data = serde_ipld_dagcbor::to_vec(&message)?;
+		match swarm.behaviour_mut().gossipsub_mut().publish(topic, data) {
+			Ok(_) => Ok(()),
+			Err(PublishError::InsufficientPeers) => {
+				// insert as pending by only keeping latest publish by every co
+				let pending = self
+					.pending_heads
+					.entry(Self::to_topic(network, co).hash())
+					.or_insert(Default::default());
+				pending.retain(|item| &item.co != co);
+				pending.push(PublishHeads { network: network.clone(), co: co.clone(), heads: heads.clone() });
+				Ok(())
+			},
+			Err(e) => Err(e.into()),
 		}
-		self.heads = heads;
-
-		// publish
-		self.try_publish(gossipsub)
 	}
 
-	fn publish(&self, gossipsub: &mut Behaviour, message: &HeadsMessage) -> Result<(), anyhow::Error> {
-		tracing::info!(?self.topic, ?message, "heads-publish");
-		let message = serde_ipld_dagcbor::to_vec(message)?;
-		gossipsub.publish(self.topic.clone(), message).map(|_| ())?;
+	/// Send heads to peers.
+	/// Peers will answer with own heads if they are different.
+	/// However the response is not implemented by this protocol but by the caller.
+	pub fn heads<B, P>(
+		&mut self,
+		swarm: &mut Swarm<B>,
+		identity: &P,
+		co: &CoId,
+		heads: &BTreeSet<Cid>,
+		peers: impl IntoIterator<Item = PeerId>,
+	) -> Result<(), anyhow::Error>
+	where
+		B: NetworkBehaviour + DidcommBehaviourProvider,
+		P: PrivateIdentity + Send + Sync + 'static,
+	{
+		let peers: BTreeSet<_> = peers.into_iter().collect();
+
+		// log
+		tracing::trace!(?co, ?heads, ?peers, "network-heads-send");
+
+		// message
+		let message = HeadsMessage::Heads(co.clone(), heads.clone()).to_didcomm()?.sign(identity)?;
+
+		// send
+		for peer in peers {
+			swarm.behaviour_mut().didcomm_mut().send(&peer, message.clone());
+		}
+
+		//result
 		Ok(())
 	}
 
-	pub fn unsubscribe(self, gossipsub: &mut Behaviour) -> Result<(), anyhow::Error> {
-		gossipsub.unsubscribe(&self.topic)?;
-		Ok(())
+	pub fn to_topic_hash(network: &NetworkCoHeads, id: &CoId) -> gossipsub::TopicHash {
+		Self::to_topic(network, id).hash()
 	}
 
-	fn try_publish(&mut self, gossipsub: &mut Behaviour) -> Result<(), anyhow::Error> {
-		if !self.heads.is_empty() && self.subscriptions > 0 {
-			self.publish(gossipsub, &HeadsMessage::Heads(self.heads.clone()))?;
-		}
-		Ok(())
+	fn to_topic(network: &NetworkCoHeads, id: &CoId) -> gossipsub::IdentTopic {
+		IdentTopic::new(network.topic.clone().unwrap_or_else(|| format!("co-{}", id)))
 	}
 
-	pub fn is_our_event(&self, event: &Event) -> bool {
-		match &event {
-			Event::Message { propagation_source: _, message_id: _, message } => self.hash == message.topic,
-			Event::Subscribed { peer_id: _, topic } => &self.hash == topic,
-			Event::Unsubscribed { peer_id: _, topic } => &self.hash == topic,
-			Event::GossipsubNotSupported { peer_id: _ } => false,
-		}
-	}
-
-	pub fn handle_swarm_event(&mut self, event: Event) -> Option<Event> {
-		if self.is_our_event(&event) {
-			match event {
-				Event::Message { propagation_source: _, message_id: _, message } => {
-					let heads_message: HeadsMessage = match serde_ipld_dagcbor::from_slice(&message.data) {
-						Ok(m) => m,
-						Err(err) => {
-							tracing::warn!(?err, ?self.topic, "received-invalid-message");
-							return None;
-						},
-					};
+	fn on_gossip_event(&mut self, event: &gossipsub::Event) {
+		match event {
+			gossipsub::Event::Message { propagation_source: _, message_id: _, message } => {
+				if self.heads.contains(&message.topic) {
+					// TODO(metric): add metrics when receive invalid message?
+					let heads_message: Option<HeadsMessage> = serde_ipld_dagcbor::from_slice(&message.data).ok();
 					match heads_message {
-						HeadsMessage::Heads(heads) => {
-							self.handler.on_heads(heads);
-						},
+						Some(HeadsMessage::Heads(co, heads)) =>
+							self.events.push_back(HeadsEvent::GenerateEvent(Event::ReceivedHeads {
+								co,
+								heads,
+								peer_id: message.source,
+								response: false,
+							})),
+						None => {},
+					}
+				}
+			},
+			gossipsub::Event::Subscribed { peer_id: _, topic } => {
+				// when we have at least on subscriber trigger pending publish events
+				if let Some(pending) = self.pending_heads.remove(topic) {
+					self.events.extend(pending.into_iter().map(|item| HeadsEvent::Publish(item)));
+				}
+			},
+			_ => {},
+		}
+	}
+
+	fn on_didcomm_event(&mut self, event: &didcomm::Event) {
+		match event {
+			didcomm::Event::Received { peer_id, message } =>
+				if message.header().message_type == "co-heads/1.0.0" {
+					// TODO(metric): add metrics when receive invalid message?
+					let heads: Option<HeadsMessage> = message.body_deserialize().ok();
+					match heads {
+						Some(HeadsMessage::Heads(co, heads)) =>
+							self.events.push_back(HeadsEvent::GenerateEvent(Event::ReceivedHeads {
+								co,
+								heads,
+								peer_id: Some(*peer_id),
+								response: true,
+							})),
+						_ => {},
 					}
 				},
-				Event::Subscribed { peer_id, topic: _ } => {
-					self.subscriptions += 1;
-					self.handler.on_subscribe(peer_id);
-				},
-				Event::Unsubscribed { peer_id, topic: _ } => {
-					self.subscriptions -= 1;
-					self.handler.on_unsubscribe(peer_id);
-				},
-				_ => {},
-			}
-			None
-		} else {
-			Some(event)
+			_ => {},
 		}
+	}
+}
+impl<B> LayerBehaviour<B> for HeadsState
+where
+	B: NetworkBehaviour + DidcommBehaviourProvider + GossipsubBehaviourProvider,
+{
+	type ToSwarm = Event;
+	type ToLayer = HeadsEvent;
+
+	fn on_swarm_event(&mut self, event: &SwarmEvent<<B as NetworkBehaviour>::ToSwarm>) {
+		match event {
+			SwarmEvent::Behaviour(behaviour_event) => {
+				if let Some(gossip_event) = B::gossipsub_event(behaviour_event) {
+					self.on_gossip_event(gossip_event);
+				}
+				if let Some(didcomm_event) = B::didcomm_event(behaviour_event) {
+					self.on_didcomm_event(didcomm_event);
+				}
+			},
+			_ => {},
+		}
+	}
+
+	fn on_layer_event(&mut self, swarm: &mut Swarm<B>, event: Self::ToLayer) -> Option<Self::ToSwarm> {
+		match event {
+			HeadsEvent::GenerateEvent(event) => Some(event),
+			HeadsEvent::Publish(publish) => {
+				match self.publish(swarm, &publish.network, &publish.co, &publish.heads) {
+					Ok(()) => {},
+					Err(err) => {
+						// todo: generate some error event?
+						tracing::warn!(?err, ?publish, "heads-publish-failed");
+					},
+				}
+				None
+			},
+		}
+	}
+
+	fn poll(&mut self, _cx: &mut Context<'_>) -> Poll<Self::ToLayer> {
+		// events
+		if let Some(event) = self.events.pop_front() {
+			return Poll::Ready(event);
+		}
+
+		// pending
+		Poll::Pending
 	}
 }
 
 #[cfg(test)]
 mod tests {
-	use crate::{Heads, HeadsHandler};
-	use co_primitives::BlockSerializer;
-	use futures::{join, FutureExt, StreamExt};
-	use libipld::{Block, Cid, DefaultParams};
+	use crate::{
+		didcomm,
+		heads::{self, HeadsState},
+		DidcommBehaviourProvider, GossipsubBehaviourProvider, Layer, LayerBehaviour,
+	};
+	use co_identity::{
+		DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentity,
+		PrivateIdentityBox, PrivateIdentityResolver,
+	};
+	use co_primitives::{BlockSerializer, CoId, NetworkCoHeads};
+	use futures::{FutureExt, StreamExt};
+	use libipld::Cid;
 	use libp2p::{
-		gossipsub::{Behaviour, Event, IdentTopic, MessageAuthenticity},
+		gossipsub,
+		identity::Keypair,
 		noise,
-		swarm::{dial_opts::DialOpts, SwarmEvent},
+		swarm::{dial_opts::DialOpts, NetworkBehaviour},
 		tcp, yamux, Multiaddr, PeerId, Swarm, SwarmBuilder,
 	};
-	use std::{
-		collections::{BTreeMap, BTreeSet},
-		str::from_utf8,
-		time::Duration,
-		vec,
-	};
-	use tokio::{
-		select,
-		sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-	};
+	use std::{collections::BTreeSet, time::Duration, vec};
+	use tokio::select;
+
+	#[derive(NetworkBehaviour)]
+	struct TestBehaviour {
+		gossipsub: gossipsub::Behaviour,
+		didcomm: didcomm::Behaviour,
+	}
+	impl TestBehaviour {
+		fn new(keypair: Keypair, identities: Vec<PrivateIdentityBox>) -> Self {
+			let gossipsub_config = gossipsub::ConfigBuilder::default()
+				.max_transmit_size(256 * 1024)
+				.build()
+				.expect("valid config");
+			let gossipsub_behaviour =
+				gossipsub::Behaviour::new(gossipsub::MessageAuthenticity::Signed(keypair), gossipsub_config)
+					.expect("gossipsub");
+			let didcomm_behaviour = didcomm::Behaviour::new(
+				DidKeyIdentityResolver::new().boxed(),
+				MemoryPrivateIdentityResolver::from(identities).boxed(),
+				didcomm::Config { auto_dail: false },
+			);
+			Self { didcomm: didcomm_behaviour, gossipsub: gossipsub_behaviour }
+		}
+	}
+	impl DidcommBehaviourProvider for TestBehaviour {
+		fn didcomm(&self) -> &didcomm::Behaviour {
+			&self.didcomm
+		}
+
+		fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour {
+			&mut self.didcomm
+		}
+
+		fn didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&didcomm::Event> {
+			match event {
+				TestBehaviourEvent::Didcomm(e) => Some(e),
+				_ => None,
+			}
+		}
+
+		fn into_didcomm_event(
+			event: <Self as NetworkBehaviour>::ToSwarm,
+		) -> Result<didcomm::Event, <Self as NetworkBehaviour>::ToSwarm> {
+			match event {
+				TestBehaviourEvent::Didcomm(e) => Ok(e),
+				e => Err(e),
+			}
+		}
+	}
+	impl GossipsubBehaviourProvider for TestBehaviour {
+		fn gossipsub(&self) -> &gossipsub::Behaviour {
+			&self.gossipsub
+		}
+
+		fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour {
+			&mut self.gossipsub
+		}
+
+		fn gossipsub_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&gossipsub::Event> {
+			match event {
+				TestBehaviourEvent::Gossipsub(e) => Some(e),
+				_ => None,
+			}
+		}
+
+		fn into_gossipsub_event(
+			event: <Self as NetworkBehaviour>::ToSwarm,
+		) -> Result<gossipsub::Event, <Self as NetworkBehaviour>::ToSwarm> {
+			match event {
+				TestBehaviourEvent::Gossipsub(e) => Ok(e),
+				e => Err(e),
+			}
+		}
+	}
 
 	struct Peer {
-		name: String,
 		peer_id: PeerId,
 		addr: Multiaddr,
-		swarm: Swarm<Behaviour>,
+		swarm: Swarm<TestBehaviour>,
 	}
 	impl Peer {
-		fn new(name: &str) -> Self {
+		fn new(identities: Vec<PrivateIdentityBox>) -> Self {
 			let mut swarm = SwarmBuilder::with_new_identity()
 				.with_tokio()
 				.with_tcp(tcp::Config::default(), noise::Config::new, yamux::Config::default)
 				.unwrap()
-				.with_behaviour(|k| Ok(Behaviour::new(MessageAuthenticity::Signed(k.clone()), Default::default())?))
+				.with_behaviour(|k| Ok(TestBehaviour::new(k.clone(), identities)))
 				.unwrap()
 				.with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(20)))
 				.build();
 			swarm.listen_on("/ip4/127.0.0.1/tcp/0".parse().unwrap()).unwrap();
 			while swarm.next().now_or_never().is_some() {}
 			let addr = Swarm::listeners(&swarm).next().unwrap().clone();
-			Self { name: name.to_owned(), peer_id: swarm.local_peer_id().clone(), addr, swarm }
+			Self { peer_id: swarm.local_peer_id().clone(), addr, swarm }
 		}
 
-		fn add_address(&mut self, peer: &Peer) {
+		fn add_address(&mut self, _co: CoId, peer: &Peer) {
 			self.swarm
 				.dial(
 					DialOpts::peer_id(peer.peer_id.clone())
@@ -169,61 +390,18 @@ mod tests {
 						.build(),
 				)
 				.unwrap();
-			self.swarm.behaviour_mut().add_explicit_peer(&peer.peer_id);
+			// when we dail just the peerid we always get an dail error because we have no addresses
+			// self.swarm.behaviour_mut().add_explicit_peer(co, peer.peer_id.clone());
 		}
 
-		fn swarm(&mut self) -> &mut Swarm<Behaviour> {
+		fn swarm(&mut self) -> &mut Swarm<TestBehaviour> {
 			&mut self.swarm
-		}
-
-		async fn next(&mut self) -> Option<Event> {
-			loop {
-				let ev = self.swarm.next().await?;
-				if let SwarmEvent::Behaviour(event) = ev {
-					return Some(event);
-				}
-			}
-		}
-
-		async fn run_once(&mut self, heads: &mut Heads) {
-			let event = self.next().await.unwrap();
-			tracing::debug!(peer_name = self.name, ?event, "event");
-			assert!(heads.handle_swarm_event(event).is_none());
-		}
-	}
-
-	#[derive(Debug, Clone, PartialEq)]
-	enum HandlerEvent {
-		Heads(BTreeSet<Cid>),
-		Subscribe(PeerId),
-		Unsubscribe(PeerId),
-	}
-	struct Handler {
-		tx: UnboundedSender<HandlerEvent>,
-	}
-	impl Handler {
-		pub fn new() -> (Self, UnboundedReceiver<HandlerEvent>) {
-			let (tx, rx) = unbounded_channel();
-			(Self { tx }, rx)
-		}
-	}
-	impl HeadsHandler for Handler {
-		fn on_heads(&mut self, heads: BTreeSet<Cid>) {
-			self.tx.send(HandlerEvent::Heads(heads)).unwrap();
-		}
-
-		fn on_subscribe(&mut self, peer: PeerId) {
-			self.tx.send(HandlerEvent::Subscribe(peer)).unwrap();
-		}
-
-		fn on_unsubscribe(&mut self, peer: PeerId) {
-			self.tx.send(HandlerEvent::Unsubscribe(peer)).unwrap();
 		}
 	}
 
 	#[tokio::test]
-	async fn smoke() {
-		let topic = IdentTopic::new("test");
+	async fn test_subscribe() {
+		let co = CoId::new("test");
 
 		// test data
 		let test = BlockSerializer::default().serialize(&"test").unwrap();
@@ -236,114 +414,140 @@ mod tests {
 		h2.insert(hello.cid().clone());
 
 		// peers
-		let mut peer1 = Peer::new("peer1");
-		let mut peer2 = Peer::new("peer2");
-		peer2.add_address(&peer1);
+		let mut peer1 = Peer::new(vec![]);
+		let mut peer2 = Peer::new(vec![]);
+		peer2.add_address(co.clone(), &peer1);
+
+		// layer
+		let mut heads1 = Layer::new(peer1.swarm().behaviour(), HeadsState::new());
+		let mut heads2 = Layer::new(peer2.swarm().behaviour(), HeadsState::new());
 
 		// peer1: subscribe
-		let (handler1, mut receiver1) = Handler::new();
-		let mut heads1 = Heads::new(topic.clone(), Default::default(), handler1);
-		heads1.subscribe(peer1.swarm().behaviour_mut()).unwrap();
+		heads1
+			.layer_mut()
+			.subscribe(peer1.swarm(), &NetworkCoHeads::default(), &co)
+			.unwrap();
 
 		// peer2: subscribe
-		let (handler2, mut receiver2) = Handler::new();
-		let mut heads2 = Heads::new(topic.clone(), Default::default(), handler2);
-		heads2.subscribe(peer2.swarm().behaviour_mut()).unwrap();
+		heads2
+			.layer_mut()
+			.subscribe(peer1.swarm(), &NetworkCoHeads::default(), &co)
+			.unwrap();
 
-		// wait until both are subscribed
-		join!(peer1.run_once(&mut heads1), peer2.run_once(&mut heads2));
-		assert_eq!(Some(HandlerEvent::Subscribe(peer2.peer_id.clone())), receiver1.recv().await);
-		assert_eq!(Some(HandlerEvent::Subscribe(peer1.peer_id.clone())), receiver2.recv().await);
-
-		// peer2: update heads
-		heads2.set_heads(peer2.swarm().behaviour_mut(), h2.clone()).unwrap();
-
-		// run
-		// note: we also neeed to run peer1 to advance its state
-		select! {
-			_ = peer2.run_once(&mut heads2) => {},
-			_ = peer1.run_once(&mut heads1) => {},
-		};
-
-		// peer1: wait for heads
-		assert_eq!(Some(HandlerEvent::Heads(h2.clone())), receiver1.recv().await);
-	}
-
-	// #[tokio::test]
-	async fn _unfinished_test_different_heads() {
-		let topic = IdentTopic::new("test");
-
-		// test data
-		let test = BlockSerializer::default().serialize(&"test").unwrap();
-		let hello = BlockSerializer::default().serialize(&"hello").unwrap();
-		let test_hello = BlockSerializer::default().serialize(&"test hello").unwrap();
-		let mut blocks: BTreeMap<Cid, Block<DefaultParams>> = BTreeMap::new();
-		blocks.insert(test.cid().clone(), test.clone());
-		blocks.insert(hello.cid().clone(), hello.clone());
-		blocks.insert(test_hello.cid().clone(), test_hello.clone());
-		fn merge(blocks: &BTreeMap<Cid, Block<DefaultParams>>, a: &BTreeSet<Cid>, b: &BTreeSet<Cid>) -> BTreeSet<Cid> {
-			let vec: Vec<&str> = a
-				.iter()
-				.chain(b)
-				.map(|cid| from_utf8(blocks.get(cid).unwrap().data()).unwrap())
-				.collect();
-			let merged = vec.join(" ");
-			let merged_cid = BlockSerializer::default().serialize(&merged).unwrap().cid().clone();
-			let mut heads: BTreeSet<Cid> = BTreeSet::new();
-			heads.insert(merged_cid);
-			heads
-		}
-
-		// loop {
-		// 	select! {
-		// 		event1 = peer1.next() => {
-		// 			println!("event1: {:?}", event1);
-		// 		},
-		// 		event2 = peer2.next() => {
-		// 			println!("event2: {:?}", event2);
-		// 		},
-		// 	}
+		// // wait until both are subscribed
+		// let (subscribe1, subscribe2) = join!(peer1.next(), peer2.next());
+		// match subscribe1 {
+		// 	Some(gossipsub::Event::Subscribed { co: event_co, peer_id })
+		// 		if co == event_co && peer_id == peer2.peer_id => {},
+		// 	event => panic!("unexpected event: {:?}", event),
+		// }
+		// match subscribe2 {
+		// 	Some(heads::Event::Subscribed { co: event_co, peer_id }) if co == event_co && peer_id == peer1.peer_id => {
+		// 	},
+		// 	event => panic!("unexpected event: {:?}", event),
 		// }
 
+		// peer2: update heads
+		heads2
+			.layer_mut()
+			.publish(peer2.swarm(), &NetworkCoHeads::default(), &co, &h2)
+			.unwrap();
+
+		// run
+		// note: we also neeed to run peer1 to advance its state
+		select! {
+			event = peer1.swarm().next() => {
+				heads1.on_swarm_event(&event.unwrap());
+			},
+			event = peer2.swarm().next() => {
+				heads2.on_swarm_event(&event.unwrap());
+			},
+			event = heads1.next() => {
+				tracing::info!(?event, "heads1");
+				match heads1.on_layer_event(peer2.swarm(), event.unwrap()) {
+					Some(heads::Event::ReceivedHeads { co: event_co, heads: event_heads, peer_id: _, response: _ }) if co == event_co && h2 == event_heads => {},
+					event => panic!("unexpected event: {:?}", event),
+				}
+			},
+			event = heads2.next() => {
+				tracing::info!(?event, "heads2");
+				heads2.on_layer_event(peer1.swarm(), event.unwrap());
+			},
+		};
+	}
+
+	#[tokio::test]
+	async fn test_heads() {
+		// tracing_subscriber::fmt()
+		// 	.with_env_filter(tracing_subscriber::EnvFilter::new(format!(
+		// 		"{}=trace",
+		// 		module_path!().split(":").next().expect("module path")
+		// 	)))
+		// 	.try_init()
+		// 	.ok();
+
+		let co = CoId::new("test");
+
+		// identities
+		let did1 = DidKeyIdentity::generate(Some(&vec![1; 32]));
+		let did2 = DidKeyIdentity::generate(Some(&vec![2; 32]));
+
+		// test data
+		let test = BlockSerializer::default().serialize(&"test").unwrap();
+		let hello = BlockSerializer::default().serialize(&"hello").unwrap();
+
 		// heads
 		let mut h1: BTreeSet<Cid> = BTreeSet::new();
 		h1.insert(test.cid().clone());
 		let mut h2: BTreeSet<Cid> = BTreeSet::new();
 		h2.insert(hello.cid().clone());
-		let mut _h3: BTreeSet<Cid> = BTreeSet::new();
-		h2.insert(test_hello.cid().clone());
 
 		// peers
-		let mut peer1 = Peer::new("peer1");
-		let mut peer2 = Peer::new("peer2");
-		peer2.add_address(&peer1);
+		let mut peer1 = Peer::new(vec![did1.clone().boxed()]);
+		let mut peer2 = Peer::new(vec![did2.clone().boxed()]);
+		tracing::info!(peer_id = ?peer1.swarm.local_peer_id(), "peer1");
+		tracing::info!(peer_id = ?peer2.swarm.local_peer_id(), "peer2");
+		peer2.add_address(co.clone(), &peer1);
 
-		// peer1: subscribe
-		let (handler1, mut receiver1) = Handler::new();
-		let mut heads1 = Heads::new(topic.clone(), Default::default(), handler1);
-		heads1.subscribe(peer1.swarm().behaviour_mut()).unwrap();
+		// layer
+		let mut heads1 = Layer::new(peer1.swarm().behaviour(), HeadsState::new());
+		let mut heads2 = Layer::new(peer2.swarm().behaviour(), HeadsState::new());
 
-		// peer2: subscribe
-		let (handler2, mut receiver2) = Handler::new();
-		let mut heads2 = Heads::new(topic.clone(), Default::default(), handler2);
-		heads2.subscribe(peer2.swarm().behaviour_mut()).unwrap();
+		// peer2: heads
+		heads2
+			.layer_mut()
+			.heads(peer2.swarm(), &did2.clone().boxed(), &co, &h2, vec![peer1.peer_id.clone()])
+			.unwrap();
 
-		// wait until both are subscribed
-		join!(peer1.run_once(&mut heads1), peer2.run_once(&mut heads2));
-		assert_eq!(Some(HandlerEvent::Subscribe(peer2.peer_id.clone())), receiver1.recv().await);
-		assert_eq!(Some(HandlerEvent::Subscribe(peer1.peer_id.clone())), receiver2.recv().await);
-
-		// peer2: update heads
-		heads2.set_heads(peer2.swarm().behaviour_mut(), h2.clone()).unwrap();
-
-		// run
-		// note: we also neeed to run peer1 to advance its state
-		select! {
-			_ = peer2.run_once(&mut heads2) => {},
-			_ = peer1.run_once(&mut heads1) => {},
-		};
-
-		// peer1: wait for heads
-		assert_eq!(Some(HandlerEvent::Heads(h2.clone())), receiver1.recv().await);
+		// wait for sent and received event
+		loop {
+			select! {
+				event = peer1.swarm().select_next_some() => {
+					tracing::info!(?event, "peer1");
+					heads1.on_swarm_event(&event);
+				},
+				event = peer2.swarm().select_next_some() => {
+					tracing::info!(?event, "peer2");
+					heads2.on_swarm_event(&event);
+				},
+				event = heads1.select_next_some() => {
+					tracing::info!(?event, "heads1");
+					match heads1.on_layer_event(peer2.swarm(), event) {
+						Some(heads::Event::ReceivedHeads { co: event_co, heads, peer_id, response }) => {
+							assert_eq!(co, event_co);
+							assert_eq!(Some(peer2.peer_id), peer_id);
+							assert_eq!(h2, heads);
+							assert_eq!(true, response);
+							break;
+						},
+						event => panic!("unexpected event: {:?}", event),
+					}
+				},
+				event = heads2.select_next_some() => {
+					tracing::info!(?event, "heads2");
+					heads2.on_layer_event(peer1.swarm(), event);
+				},
+			}
+		}
 	}
 }

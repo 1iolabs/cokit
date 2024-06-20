@@ -1,30 +1,28 @@
-use super::{identity::create_identity_resolver, reducer::ReducerChangedHandler};
+use super::{application::ApplicationSettings, identity::create_identity_resolver, reducer::ReducerChangedHandler};
 use crate::{
 	library::{
-		cancel::cancel,
-		fs_read::fs_read_option,
-		fs_write::fs_write,
-		locals::{ApplicationLocal, Locals},
+		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
+		locals::{ApplicationLocal, FileLocals, Locals, MemoryLocals},
 		to_plain::{to_plain, to_plain_one},
 	},
 	types::{
 		co_storage::CoBlockStorageContentMapping,
 		cores::{CO_CORE_NAME_CO, CO_CORE_NAME_PIN, CO_CORE_PIN},
 	},
-	CoCoreResolver, CoReducer, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, Runtime, CO_CORE_KEYSTORE,
-	CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CoCoreResolver, CoReducer, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, ReducerChangedContext, Runtime,
+	TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
-use co_primitives::{tags, Did, Secret};
+use co_primitives::{tags, Did};
 use co_runtime::RuntimePool;
-use co_storage::{Algorithm, BlockStorage, EncryptedBlockStorage};
-use futures::{stream, StreamExt, TryStreamExt};
+use co_storage::{BlockStorage, EncryptedBlockStorage};
+use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use libipld::{Cid, DefaultParams};
-use std::{collections::BTreeMap, io::ErrorKind, path::PathBuf};
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use std::collections::BTreeMap;
+use tokio_util::sync::CancellationToken;
 
 pub const LOCAL_CO_ID: &str = "local";
 
@@ -33,16 +31,7 @@ pub const LOCAL_CO_ID: &str = "local";
 #[derive(Debug, Clone)]
 pub struct LocalCoBuilder {
 	/// Our application identifier.
-	identifier: String,
-
-	/// The application base path.
-	/// Normally compused of `{base_path}/etc/{identifier}`.
-	/// The read method tries to read states of all applications by searching for `{application_path}/../*/local.cbor`
-	/// files.
-	application_path: PathBuf,
-
-	/// Whether to use the keychain or a file.
-	keychain: bool,
+	settings: ApplicationSettings,
 
 	/// The local identity.
 	identity: LocalIdentity,
@@ -51,14 +40,8 @@ pub struct LocalCoBuilder {
 	initialize: bool,
 }
 impl LocalCoBuilder {
-	pub fn new(
-		identifier: String,
-		application_path: PathBuf,
-		keychain: bool,
-		identity: LocalIdentity,
-		initialize: bool,
-	) -> Self {
-		Self { identifier, application_path, keychain, identity, initialize }
+	pub fn new(settings: ApplicationSettings, identity: LocalIdentity, initialize: bool) -> Self {
+		Self { settings, identity, initialize }
 	}
 
 	pub fn with_initialize(self, initialize: bool) -> Self {
@@ -71,32 +54,49 @@ impl LocalCoBuilder {
 		storage: CoStorage,
 		runtime: Runtime,
 		shutdown: CancellationToken,
-		tasks: TaskTracker,
+		tasks: TaskSpawner,
 	) -> Result<CoReducer, anyhow::Error> {
-		Ok(LocalCoInstance::create(runtime, self, storage, shutdown, tasks).await?.1)
-	}
+		// key
+		let key: Box<dyn LocalSecret + Send + Sync + 'static> = if self.settings.keychain {
+			Box::new(KeychainLocalSecret::new("co.app".to_owned(), self.identity.identity().to_owned()))
+		} else if let Some(application_path) = &self.settings.application_path {
+			Box::new(FileLocalSecret::new(application_path.parent().expect("etc folder").join("key.cbor")))
+		} else {
+			Box::new(MemoryLocalSecret::new())
+		};
 
-	/// Key path if no keychain should be used.
-	fn key_path(&self) -> Option<PathBuf> {
-		// use file
-		if !self.keychain {
-			if let Some(parent) = self.application_path.parent() {
-				return Some(parent.join("key.cbor"))
-			}
+		// create
+		match &self.settings.application_path {
+			Some(application_path) => {
+				let config_path = application_path
+					.parent()
+					.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", application_path))?;
+				let mut locals = FileLocals::new(config_path.to_owned(), self.settings.identifier.clone());
+				locals.update().await?;
+				Ok(LocalCoInstance::create(runtime, self, storage, shutdown, tasks, locals, key)
+					.await?
+					.1)
+			},
+			None => {
+				let locals = MemoryLocals::new(None);
+				Ok(LocalCoInstance::create(runtime, self, storage, shutdown, tasks, locals, key)
+					.await?
+					.1)
+			},
 		}
-
-		// use keychain
-		None
 	}
 }
 
 #[derive(Clone)]
-struct LocalCoInstance {
+struct LocalCoInstance<L> {
 	identifier: String,
-	application_path: PathBuf,
 	encrypted_storage: EncryptedBlockStorage<CoStorage>,
+	locals: L,
 }
-impl LocalCoInstance {
+impl<L> LocalCoInstance<L>
+where
+	L: Locals + Clone + Send + Sync + 'static,
+{
 	/// Read the local co state from disk.
 	/// As we trust all of the local states we use all the states without fuhter checks to continue.
 	///
@@ -109,11 +109,12 @@ impl LocalCoInstance {
 		local_co: LocalCoBuilder,
 		storage: CoStorage,
 		shutdown: CancellationToken,
-		tasks: TaskTracker,
+		tasks: TaskSpawner,
+		mut locals: L,
+		key: Box<dyn LocalSecret + Send + Sync + 'static>,
 	) -> Result<(Self, CoReducer), anyhow::Error> {
 		// create storage
-		let mut encrypted_storage: EncryptedBlockStorage<CoStorage> =
-			create_encrypted_storage(storage, &local_co.identity, local_co.key_path()).await?;
+		let mut encrypted_storage: EncryptedBlockStorage<CoStorage> = create_encrypted_storage(storage, key).await?;
 		let storage = CoStorage::new(encrypted_storage.clone());
 
 		// create log
@@ -124,17 +125,12 @@ impl LocalCoInstance {
 		let mut builder = ReducerBuilder::new(CoCoreResolver::default(), log).with_initialize(local_co.initialize);
 
 		// create reducer
-		let config_path = local_co
-			.application_path
-			.parent()
-			.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", local_co.application_path))?;
-		let locals = Locals::new(config_path.to_owned()).await?;
-		for (local_path, local) in locals.iter() {
+		for local in locals.get().await? {
 			let mut state = local.state;
 			let mut heads = local.heads.clone();
 
 			// get local and log
-			tracing::trace!(app = ?local_co.identifier, path = ?local_path, state = ?local.state, heads = ?local.heads, "local-co-read");
+			tracing::trace!(app = ?local_co.settings.identifier, state = ?local.state, heads = ?local.heads, "local-co-read");
 
 			// load additional encryption mappings
 			if let Some(mapping) = &local.mapping {
@@ -164,11 +160,8 @@ impl LocalCoInstance {
 		let mapping = CoBlockStorageContentMapping::new(encrypted_storage.content_mapping());
 
 		// result
-		let result = Self {
-			encrypted_storage: encrypted_storage.clone(),
-			identifier: local_co.identifier,
-			application_path: local_co.application_path,
-		};
+		let result =
+			Self { locals, encrypted_storage: encrypted_storage.clone(), identifier: local_co.settings.identifier };
 
 		// write
 		reducer.add_change_handler(Box::new(result.clone()));
@@ -179,14 +172,16 @@ impl LocalCoInstance {
 		}
 
 		// reducer
-		let co_reducer = CoReducer::new(LOCAL_CO_ID.into(), runtime, reducer, Some(mapping));
+		let co_reducer = CoReducer::new(LOCAL_CO_ID.into(), None, runtime, reducer, Some(mapping));
 
 		// watch
-		let watch_reducer = co_reducer.clone();
+		let watch_reducer: CoReducer = co_reducer.clone();
+		let watch_locals = result.locals.clone();
 		let mut watch_encrypted_storage = encrypted_storage.clone();
 		tasks.spawn(async move {
-			let mut watcher = locals.watch();
-			while let Some((_, local)) = cancel(shutdown.clone(), watcher.recv()).await {
+			let watcher = watch_locals.watch().take_until(shutdown.clone().cancelled_owned());
+			pin_mut!(watcher);
+			while let Some(local) = watcher.next().await {
 				// skip?
 				let (_, heads) = watch_reducer.reducer_state().await;
 				if heads == local.heads {
@@ -220,13 +215,12 @@ impl LocalCoInstance {
 
 	/// Write state to disk.
 	/// Returns false and does nothing if reducer is empty.
-	pub async fn write<S, R>(&self, reducer: &Reducer<S, R>, mapping: Option<Cid>) -> Result<bool, anyhow::Error>
+	pub async fn write<S, R>(&mut self, reducer: &Reducer<S, R>, mapping: Option<Cid>) -> Result<bool, anyhow::Error>
 	where
 		S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
 		R: CoreResolver<S> + Send + Sync + 'static,
 	{
 		if let Some(state) = reducer.state() {
-			let path = self.application_path.join("local.cbor");
 			let content_mapping = Some(self.encrypted_storage.content_mapping());
 
 			// heads
@@ -244,24 +238,29 @@ impl LocalCoInstance {
 
 			// log
 			#[cfg(debug_assertions)]
-			tracing::trace!(app = ?self.identifier, ?path, ?local.state, ?local.heads, ?local.mapping,  "local-co-write");
+			tracing::trace!(app = ?self.identifier, ?local.state, ?local.heads, ?local.mapping,  "local-co-write");
 			#[cfg(not(debug_assertions))]
-			tracing::trace!(app = ?self.identifier, ?path, ?local.state, ?local.heads, ?local.mapping, "local-co-write");
+			tracing::trace!(app = ?self.identifier, ?local.state, ?local.heads, ?local.mapping, "local-co-write");
 
 			// write
-			local.write(&path).await.map(|_| true)
+			self.locals.set(local).await.map(|_| true)
 		} else {
 			Ok(false)
 		}
 	}
 }
 #[async_trait]
-impl<S, R> ReducerChangedHandler<S, R> for LocalCoInstance
+impl<L, S, R> ReducerChangedHandler<S, R> for LocalCoInstance<L>
 where
 	S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
+	L: Locals + Clone + Send + Sync + 'static,
 {
-	async fn on_state_changed(&mut self, reducer: &Reducer<S, R>) -> Result<(), anyhow::Error> {
+	async fn on_state_changed(
+		&mut self,
+		reducer: &Reducer<S, R>,
+		_context: ReducerChangedContext,
+	) -> Result<(), anyhow::Error> {
 		let mapping = self.encrypted_storage.flush_mapping().await?;
 		self.write(reducer, mapping).await?;
 		Ok(())
@@ -275,56 +274,12 @@ where
 /// Todo: What happens if muliple applications try to access the same key?
 async fn create_encrypted_storage<S>(
 	storage: S,
-	identity: &LocalIdentity,
-	key_path: Option<PathBuf>,
+	key: Box<dyn LocalSecret + Send + Sync + 'static>,
 ) -> Result<EncryptedBlockStorage<S>, anyhow::Error>
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
-	let key = match key_path {
-		Some(key_path) => fetch_secret_cbor(key_path, true).await?,
-		None => fetch_secret_keychain("co.app", identity.identity(), true)?,
-	};
-	Ok(EncryptedBlockStorage::new(storage.clone(), key.into(), Default::default()))
-}
-
-async fn fetch_secret_cbor(key_path: PathBuf, allow_create: bool) -> Result<Secret, anyhow::Error> {
-	match fs_read_option(&key_path).await {
-		Ok(Some(data)) => {
-			let result: Secret = serde_ipld_dagcbor::from_slice(&data)?;
-			Ok(result)
-		},
-		Ok(None) if allow_create => {
-			// create
-			let secret: Secret = Algorithm::default().generate_serect().into();
-			let contents = serde_ipld_dagcbor::to_vec(&secret)?;
-			fs_write(&key_path, contents, true).await?;
-
-			// result
-			Ok(secret)
-		},
-		Ok(None) => Err(Into::<std::io::Error>::into(ErrorKind::NotFound).into()),
-		Err(e) => Err(e.into()),
-	}
-}
-
-/// Get or create encryption key in OS Keychain.
-fn fetch_secret_keychain(service: &str, user: &str, allow_create: bool) -> Result<Secret, anyhow::Error> {
-	let entry = keyring::Entry::new(service, user)?;
-	let key_as_base64 = match entry.get_password() {
-		Ok(p) => p,
-		Err(keyring::Error::NoEntry) if allow_create => {
-			// generate and set key
-			let secret = Algorithm::default().generate_serect();
-			let secret_base64 = multibase::encode(multibase::Base::Base64, secret.divulge());
-			entry.set_password(&secret_base64)?;
-
-			// fetch again to make sure the key has persisted
-			return fetch_secret_keychain(service, user, false)
-		},
-		Err(e) => return Err(e.into()),
-	};
-	Ok(Secret::new(multibase::decode(key_as_base64)?.1))
+	Ok(EncryptedBlockStorage::new(storage.clone(), key.fetch().await?.into(), Default::default()))
 }
 
 /// Setup the Local CO by adding cores.
@@ -373,7 +328,8 @@ where
 			tags: tags!(),
 		},
 	);
-	let action = co_core_co::CoAction::Create { id: "local".into(), name: "local".to_owned(), cores, participants };
+	let action =
+		co_core_co::CoAction::Create { id: "local".into(), name: "local".to_owned(), cores, participants, key: None };
 	reducer.push(runtime, identity, CO_CORE_NAME_CO, &action).await?;
 
 	// done

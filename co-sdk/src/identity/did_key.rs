@@ -25,11 +25,7 @@ impl DidKeyProvider {
 }
 #[async_trait]
 impl PrivateIdentityResolver for DidKeyProvider {
-	async fn resolve_private(
-		&self,
-		identity: &str,
-		_public_key: Option<&[u8]>,
-	) -> Result<PrivateIdentityBox, IdentityResolverError> {
+	async fn resolve_private(&self, identity: &str) -> Result<PrivateIdentityBox, IdentityResolverError> {
 		let keystore: co_core_keystore::KeyStore = self
 			.reducer
 			.state(&self.keystore_core)
@@ -39,6 +35,8 @@ impl PrivateIdentityResolver for DidKeyProvider {
 			.await
 			.map_err(|err| IdentityResolverError::Other(err.into()))?
 			.ok_or(IdentityResolverError::NotFound)?;
-		Ok(Box::new(DidKeyIdentity::import(&key).map_err(|err| IdentityResolverError::Other(err.into()))?))
+		Ok(PrivateIdentityBox::new(
+			DidKeyIdentity::import(&key).map_err(|err| IdentityResolverError::Other(err.into()))?,
+		))
 	}
 }

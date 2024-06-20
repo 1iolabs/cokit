@@ -47,11 +47,16 @@ async fn integration_test() {
 		.unwrap();
 
 	// test
-	assert_eq!(Some(Cid::try_from("bafyr4ib6qju66lt5hlrewi7rhqtk2ndnmvdrsls4moozdh7qii75y447ui").unwrap()), next_state);
+	assert_eq!(Some(Cid::try_from("bafyr4if3nr4j5don35jvl2wnu5yix5d4jcfcbpasigt6ojw2zgpnvr4o3i").unwrap()), next_state);
 	let block = storage.get(&next_state.unwrap()).await.unwrap();
 	let state: Co = BlockSerializer::default().deserialize(&block).unwrap();
-	// Co { id: [], tags: Tags { hello: String("world") }, name: "", heads: {}, participants: {}, cores: {}, keys: None,
-	// peers: {} }
+
 	// println!("{:?}", state);
+	// Co { id: CoId(""), tags: Tags { hello: String("world") }, name: "", heads: {}, participants: {}, cores: {}, keys:
+	// None, network: DagSet(Link(alloc::collections::btree::set::BTreeSet<co_primitives::types::network::Network>:
+	// None)) }
+
+	// println!("{}", serde_json::to_string(&state).unwrap());
+	// {"id":"","tags":[["hello","world"]],"name":"","heads":[],"participants":{},"cores":{},"keys":null,"network":null}
 	assert_eq!(tags, state.tags);
 }

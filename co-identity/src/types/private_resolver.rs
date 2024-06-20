@@ -1,14 +1,32 @@
 use crate::{IdentityResolverError, PrivateIdentityBox};
 use async_trait::async_trait;
+use std::sync::Arc;
 
 #[async_trait]
 pub trait PrivateIdentityResolver {
-	async fn resolve_private(
-		&self,
-		identity: &str,
-		public_key: Option<&[u8]>,
-	) -> Result<PrivateIdentityBox, IdentityResolverError>;
+	async fn resolve_private(&self, identity: &str) -> Result<PrivateIdentityBox, IdentityResolverError>;
+
+	fn boxed(self) -> PrivateIdentityResolverBox
+	where
+		Self: Sized + Clone + Send + Sync + 'static,
+	{
+		PrivateIdentityResolverBox::new(self)
+	}
 }
 
 /// Dynamic Identity Resolver.
-pub type PrivateIdentityResolverBox = Box<dyn PrivateIdentityResolver + Send + Sync + 'static>;
+#[derive(Clone)]
+pub struct PrivateIdentityResolverBox {
+	resolver: Arc<dyn PrivateIdentityResolver + Send + Sync + 'static>,
+}
+impl PrivateIdentityResolverBox {
+	pub fn new<R: PrivateIdentityResolver + Clone + Send + Sync + 'static>(resolver: R) -> Self {
+		Self { resolver: Arc::new(resolver) }
+	}
+}
+#[async_trait]
+impl PrivateIdentityResolver for PrivateIdentityResolverBox {
+	async fn resolve_private(&self, identity: &str) -> Result<PrivateIdentityBox, IdentityResolverError> {
+		self.resolver.resolve_private(identity).await
+	}
+}

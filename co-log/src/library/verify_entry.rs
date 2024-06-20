@@ -1,4 +1,5 @@
 use crate::{EntryBlock, Log, LogError};
+use co_identity::{Identity, IdentityResolver};
 use co_storage::BlockStorage;
 
 pub async fn verify_entry<S>(log: &Log<S>, entry: &EntryBlock<S::StoreParams>) -> Result<(), LogError>
@@ -15,11 +16,8 @@ where
 	}
 
 	// verify signature
-	let identity = log
-		.identity_resolver()
-		.resolve(&entry.signed_entry().identity, entry.signed_entry().public_key.as_ref().map(|v| v.as_slice()))
-		.await?;
-	if !entry.verify(identity.as_ref())? {
+	let identity = log.identity_resolver().resolve(&entry.signed_entry().identity).await?;
+	if !entry.verify(&identity)? {
 		// log
 		tracing::info!(
 			entry_identity = entry.signed_entry().identity,
