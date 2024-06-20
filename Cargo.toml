@@ -1,5 +1,4 @@
 [workspace]
-
 members = [
     "co-api",
     "co-cli",
@@ -11,9 +10,9 @@ members = [
     "co-network",
     "co-primitives",
     "co-runtime",
-    "co-tauri",
     "co-sdk",
     "co-storage",
+    "co-tauri",
     "cores/co",
     "cores/data-series",
     "cores/file",
@@ -27,9 +26,9 @@ members = [
     "examples/counter",
     "examples/message",
     "examples/tauri-app/src-tauri",
-    "state",
 ]
 resolver = "2"
+rust-version = "1.76"
 
 [profile.release]
 panic = "unwind"

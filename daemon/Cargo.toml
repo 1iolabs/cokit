@@ -13,7 +13,6 @@ co-core-co = { path = "../cores/co" }
 co-core-keystore = { path = "../cores/keystore" }
 co-core-membership = { path = "../cores/membership" }
 co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
-co-state = { path = "../state", features = ["tokio-runtime"] }
 directories = "5.0.1"
 futures = { workspace = true }
 hyper = { workspace = true }

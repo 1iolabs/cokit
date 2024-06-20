@@ -1757,26 +1757,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "co-state"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-stream",
- "async-trait",
- "derive_more",
- "futures",
- "futures-util",
- "quic-rpc",
- "rxrust",
- "serde",
- "serde_json",
- "static_assertions",
- "tokio",
- "tokio-stream",
- "tracing",
-]
-
-[[package]]
 name = "co-storage"
 version = "0.1.0"
 dependencies = [
@@ -2304,7 +2284,6 @@ dependencies = [
  "co-core-keystore",
  "co-core-membership",
  "co-sdk",
- "co-state",
  "directories",
  "futures",
  "hyper 0.14.29",
@@ -3240,19 +3219,6 @@ checksum = "5f54427cfd1c7829e2a139fcefea601bf088ebca651d2bf53ebc600eac295dae"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
-]
-
-[[package]]
-name = "flume"
-version = "0.10.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1657b4441c3403d9f7b3409e47575237dac27b1b5726df654a6ecbf92f0f7577"
-dependencies = [
- "futures-core",
- "futures-sink",
- "nanorand",
- "pin-project",
- "spin 0.9.8",
 ]
 
 [[package]]
@@ -6061,15 +6027,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nanorand"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a51313c5820b0b02bd422f4b44776fbf47961755c74ce64afc73bfad10226c3"
-dependencies = [
- "getrandom 0.2.15",
-]
-
-[[package]]
 name = "ndk"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7270,20 +7227,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "quic-rpc"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26426ee18cda93ddaf265f73715d90cbf8259d943e13438f89beb093286688b6"
-dependencies = [
- "flume",
- "futures",
- "pin-project",
- "serde",
- "tokio",
- "tracing",
 ]
 
 [[package]]
