@@ -1,4 +1,4 @@
-use co_api::{reduce, CoId, Context, Did, Reducer, ReducerAction, Tags};
+use co_api::{CoId, Context, Did, Reducer, ReducerAction, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -122,7 +122,8 @@ fn find<'a>(memberships: &'a mut Memberships, co: &CoId, did: &str) -> Option<&'
 		.find(|item| &item.id == co && &item.did == did)
 }
 
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	reduce::<Memberships>()
+	co_api::reduce::<Memberships>()
 }

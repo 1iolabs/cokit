@@ -1,4 +1,4 @@
-use co_api::{reduce, CoMetadata, Context, Date, Did, Link, Metadata, Reducer, ReducerAction, Storage, StorageExt};
+use co_api::{CoMetadata, Context, Date, Did, Link, Metadata, Reducer, ReducerAction, Storage, StorageExt};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -161,7 +161,8 @@ impl MessageState {
 // 	pub fn set_name(name: String) -> SetNameEvent {}
 // }
 
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	reduce::<MessageState>()
+	co_api::reduce::<MessageState>()
 }

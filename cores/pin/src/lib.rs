@@ -1,4 +1,4 @@
-use co_api::{reduce, DagCollection, DagMap, DagSet, Reducer, Tags};
+use co_api::{DagCollection, DagMap, DagSet, Reducer, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -87,7 +87,8 @@ fn unpin(
 	pin_map
 }
 
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	reduce::<Pin>()
+	co_api::reduce::<Pin>()
 }

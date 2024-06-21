@@ -1,4 +1,4 @@
-use co_api::{reduce, Context, DagCollection, DagMap, DagVec, Date, Did, Reducer, ReducerAction, Tags, TotalFloat64};
+use co_api::{Context, DagCollection, DagMap, DagVec, Date, Did, Reducer, ReducerAction, Tags, TotalFloat64};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
@@ -441,9 +441,10 @@ fn find_next_index<T: PartialOrd>(values: impl Iterator<Item = T>, value: T) -> 
 		.map(|(index, _)| index + 1)
 }
 
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	reduce::<DataSeries>()
+	co_api::reduce::<DataSeries>()
 }
 
 #[cfg(test)]

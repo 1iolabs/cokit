@@ -1,4 +1,4 @@
-use co_api::{reduce, Context, DagMap, Reducer, ReducerAction, Tags};
+use co_api::{Context, DagMap, Reducer, ReducerAction, Tags};
 use serde::{Deserialize, Serialize};
 
 /// Key Store.
@@ -57,7 +57,8 @@ impl Reducer for KeyStore {
 	}
 }
 
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	reduce::<KeyStore>()
+	co_api::reduce::<KeyStore>()
 }

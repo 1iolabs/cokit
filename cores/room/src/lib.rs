@@ -1,4 +1,4 @@
-use co_api::{reduce, Context, Reducer, ReducerAction, Tags};
+use co_api::{Context, Reducer, ReducerAction, Tags};
 use co_messaging::{state_event::StateType, EventContent, MatrixEvent};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
@@ -43,7 +43,8 @@ impl Reducer for Room {
 	}
 }
 
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	reduce::<Room>()
+	co_api::reduce::<Room>()
 }

@@ -1,4 +1,4 @@
-use co_api::{reduce, CoId, Context, DagSet, Did, Network, Reducer, ReducerAction, Tags};
+use co_api::{CoId, Context, DagSet, Did, Network, Reducer, ReducerAction, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -261,7 +261,8 @@ impl Reducer for Co {
 
 // pub extern "C" fn permission() -> bool {}
 
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	reduce::<Co>()
+	co_api::reduce::<Co>()
 }
