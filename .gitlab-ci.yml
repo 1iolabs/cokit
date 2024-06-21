@@ -1,3 +1,5 @@
+include: "ci/build.yml"
+
 stages:
   - test
   - build
@@ -17,7 +19,7 @@ cache: &global_cache
 
 test:
   stage: test
-  image: docker-registry.intranet.1io.com/extern/rust:${RUST_VERSION}
+  image: ${DOCKERFILE_IMAGE}
   cache:
     <<: *global_cache
   script:
@@ -25,7 +27,7 @@ test:
 
 fmt:
   stage: test
-  image: docker-registry.intranet.1io.com/extern/rust:${RUST_VERSION}
+  image: ${DOCKERFILE_IMAGE}
   cache:
     <<: *global_cache
   script:
@@ -33,14 +35,13 @@ fmt:
 
 build:
   stage: build
-  image: docker-registry.intranet.1io.com/extern/rust:${RUST_VERSION}
+  image: ${DOCKERFILE_IMAGE}
   cache:
     <<: *global_cache
   script:
     - echo "> building binaries"
     - cargo build --release
     - echo "> building cores"
-    - rustup target add wasm32-unknown-unknown
     - ./target/release/co-cli core-build-builtin
     - echo "> checking for local changes"
     - git diff-files --quiet
@@ -52,7 +53,7 @@ build:
 
 rustdoc:
   stage: build
-  image: docker-registry.intranet.1io.com/extern/rust:${RUST_VERSION}
+  image: ${DOCKERFILE_IMAGE}
   cache:
     <<: *global_cache
   script:
@@ -63,7 +64,7 @@ rustdoc:
 
 pages:
   stage: publish
-  image: docker-registry.intranet.1io.com/extern/rust:${RUST_VERSION}
+  image: ${DOCKERFILE_IMAGE}
   dependencies:
     - build
     - rustdoc
