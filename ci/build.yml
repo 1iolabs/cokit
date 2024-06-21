@@ -1,3 +1,3 @@
 variables:
-  DOCKERFILE_HASH: dff1d494ccac2f21c0e4fa2326321d488f0d1b90dcccd7a55acc143724d11c4e
-  DOCKERFILE_IMAGE: docker-registry.intranet.1io.com/build/co:dff1d494ccac2f21c0e4fa2326321d488f0d1b90dcccd7a55acc143724d11c4e
+  DOCKERFILE_HASH: a34ba22f483a383d60caa29cca6707f0a25b76715abfe6a59f06cc5fddf50aa7
+  DOCKERFILE_IMAGE: docker-registry.intranet.1io.com/build/co:a34ba22f483a383d60caa29cca6707f0a25b76715abfe6a59f06cc5fddf50aa7
