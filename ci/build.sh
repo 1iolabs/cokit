@@ -1,3 +1,5 @@
+#!/bin/bash
+set -e
 
 BASE_PATH="$(dirname "$0")/.."
 DOCKERFILE_HASH="$(sha256sum Dockerfile | cut -d' ' -f1)"
