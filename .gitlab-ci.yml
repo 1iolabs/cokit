@@ -10,7 +10,7 @@ variables:
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
 
 cache: &global_cache
-  key: rust-${RUST_VERSION}
+  key: ${DOCKERFILE_HASH}
   paths:
     - .cargo/bin
     - .cargo/registry/index
