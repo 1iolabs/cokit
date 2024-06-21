@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use co_api::{
-	reduce, tags, AbsolutePath, AbsolutePathOwned, Context, DagCollection, DagMap, DagSet, Date, Did, PathExt,
-	PathOwned, Reducer, ReducerAction, Tags,
+	tags, AbsolutePath, AbsolutePathOwned, Context, DagCollection, DagMap, DagSet, Date, Did, PathExt, PathOwned,
+	Reducer, ReducerAction, Tags,
 };
 use libipld::Cid;
 use serde::{Deserialize, Serialize};

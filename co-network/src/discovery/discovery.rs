@@ -1088,11 +1088,11 @@ mod tests {
 		// states
 		let mut discovery1 = Layer::new(
 			peer1.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_millis(100), None),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(5), None),
 		);
 		let mut discovery2 = Layer::new(
 			peer2.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_millis(100), None),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(5), None),
 		);
 
 		// peer2: connect
