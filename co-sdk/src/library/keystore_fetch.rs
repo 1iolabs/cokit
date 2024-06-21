@@ -19,7 +19,7 @@ where
 	if !force_create {
 		let keystore: KeyStore = reducer.state(CO_CORE_NAME_KEYSTORE).await?;
 		if let Some((_, result)) = find(&reducer.storage(), &keystore.keys, |(k, _)| k == key).await? {
-			return Ok(result.to_owned())
+			return Ok(result.to_owned());
 		}
 	}
 

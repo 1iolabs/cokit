@@ -17,7 +17,7 @@ pub async fn core_state<T: DeserializeOwned + Send + Sync + Default + Clone + 's
 	// co?
 	if core_name == CO_CORE_NAME_CO {
 		if let Some(state_cid) = co_state.cid() {
-			return Ok((Some(*state_cid), storage.get_deserialized(state_cid).await?))
+			return Ok((Some(*state_cid), storage.get_deserialized(state_cid).await?));
 		}
 		return Ok((None, T::default()));
 	}

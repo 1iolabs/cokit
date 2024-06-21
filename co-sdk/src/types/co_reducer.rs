@@ -105,7 +105,7 @@ impl CoReducer {
 			(reducer.log().storage().clone(), *reducer.state())
 		};
 		if let Some(state_cid) = state {
-			return Ok(storage.get_deserialized(&state_cid).await?)
+			return Ok(storage.get_deserialized(&state_cid).await?);
 		}
 		Ok(co_core_co::Co::default())
 	}

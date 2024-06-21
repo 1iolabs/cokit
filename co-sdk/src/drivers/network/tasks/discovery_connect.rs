@@ -49,10 +49,12 @@ where
 		// handle
 		let send = match &event {
 			SwarmEvent::Behaviour(behaviour_event) => match C::discovery_event(behaviour_event) {
-				Some(discovery::Event::Connected { id, peer }) if Some(*id) == self.connect_request =>
-					self.peers.insert(*peer),
-				Some(discovery::Event::Disconnected { id, peer }) if Some(*id) == self.connect_request =>
-					self.peers.remove(peer),
+				Some(discovery::Event::Connected { id, peer }) if Some(*id) == self.connect_request => {
+					self.peers.insert(*peer)
+				},
+				Some(discovery::Event::Disconnected { id, peer }) if Some(*id) == self.connect_request => {
+					self.peers.remove(peer)
+				},
 				Some(discovery::Event::Timeout { id }) if Some(*id) == self.connect_request => {
 					self.sender.unbounded_send(Err(DiscoveryError::Timeout)).ok();
 					self.sender.disconnect();

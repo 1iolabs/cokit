@@ -91,11 +91,12 @@ impl bitswap::StorageResolver<CoStorage> for CoContext {
 
 					// verify remote peer if the CO is encrypted and this is an non local request
 					match (remote_peer, &secret) {
-						(Some(remote_peer), Some(secret)) =>
+						(Some(remote_peer), Some(secret)) => {
 							if !co_token.verify(secret, remote_peer) {
 								// check next token
 								continue;
-							},
+							}
+						},
 						_ => {},
 					};
 

@@ -5,9 +5,9 @@ pub struct Runtime {
 	pool: RuntimePool,
 }
 impl Default for Runtime {
-    fn default() -> Self {
-        Self::new()
-    }
+	fn default() -> Self {
+		Self::new()
+	}
 }
 
 impl Runtime {

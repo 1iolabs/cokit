@@ -39,7 +39,7 @@ impl Codec {
 	) -> Result<(), Error> {
 		let data: Vec<u8> = message.into();
 		if data.len() > self.max_message_size_bytes {
-			return Err(std::io::ErrorKind::InvalidInput.into())
+			return Err(std::io::ErrorKind::InvalidInput.into());
 		}
 		let mut framed = FramedWrite::new(socket, LengthCodec {});
 		framed.send(data.into()).await?;

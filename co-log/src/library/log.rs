@@ -140,7 +140,7 @@ where
 		let mut join = JoinEntry::new(self.heads.clone());
 		if join.join_entry(self, entry).await? {
 			self.join_commit(join).await?;
-			return Ok(true)
+			return Ok(true);
 		}
 		Ok(false)
 	}

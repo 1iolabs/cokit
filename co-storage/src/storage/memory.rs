@@ -13,9 +13,9 @@ pub struct MemoryStorage {
 }
 
 impl Default for MemoryStorage {
-    fn default() -> Self {
-        Self::new()
-    }
+	fn default() -> Self {
+		Self::new()
+	}
 }
 
 impl MemoryStorage {
@@ -81,9 +81,9 @@ pub struct MemoryBlockStorage {
 }
 
 impl Default for MemoryBlockStorage {
-    fn default() -> Self {
-        Self::new()
-    }
+	fn default() -> Self {
+		Self::new()
+	}
 }
 
 impl MemoryBlockStorage {
@@ -109,10 +109,7 @@ impl BlockStorage for MemoryBlockStorage {
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		tracing::trace!(cid = ?block.cid(), "memory-store-set");
 		let result = *block.cid();
-		self.records
-			.write()
-			.await
-			.insert(*block.cid(), Record { pin: false, block });
+		self.records.write().await.insert(*block.cid(), Record { pin: false, block });
 		Ok(result)
 	}
 

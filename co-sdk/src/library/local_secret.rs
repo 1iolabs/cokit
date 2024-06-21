@@ -45,7 +45,7 @@ impl KeychainLocalSecret {
 				entry.set_password(&secret_base64)?;
 
 				// fetch again to make sure the key has persisted
-				return Self::fetch_secret_keychain(service, user, false)
+				return Self::fetch_secret_keychain(service, user, false);
 			},
 			Err(e) => return Err(e.into()),
 		};

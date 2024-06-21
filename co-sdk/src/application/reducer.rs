@@ -285,19 +285,21 @@ where
 	/// Returns true if state has changed.
 	pub async fn join(&mut self, heads: &BTreeSet<Cid>, runtime: &RuntimePool) -> Result<bool, LogError> {
 		let mut result = false;
-		if self.log().heads() != heads && (self.log_mut().join_heads(heads.iter()).await? || &self.heads != self.log.heads()) {
-  				// sync state
-  				let (next_state, next_heads) = self.compute_state(runtime).await?;
-  				result = next_state != self.state;
-  				if next_state != self.state || self.heads != next_heads {
-  					// apply
-  					self.state = next_state;
-  					self.heads = next_heads;
+		if self.log().heads() != heads
+			&& (self.log_mut().join_heads(heads.iter()).await? || &self.heads != self.log.heads())
+		{
+			// sync state
+			let (next_state, next_heads) = self.compute_state(runtime).await?;
+			result = next_state != self.state;
+			if next_state != self.state || self.heads != next_heads {
+				// apply
+				self.state = next_state;
+				self.heads = next_heads;
 
-  					// notify
-  					self.on_state_changed(ReducerChangedCause::Log).await?;
-  				}
-  			}
+				// notify
+				self.on_state_changed(ReducerChangedCause::Log).await?;
+			}
+		}
 		Ok(result)
 	}
 

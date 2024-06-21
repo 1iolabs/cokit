@@ -83,7 +83,7 @@ where
 			self.stack.clear();
 
 			// return error
-			return Some(Err(e))
+			return Some(Err(e));
 		}
 
 		// sort stack
@@ -118,7 +118,7 @@ where
 				}
 
 				// result
-				return Some(Ok(entry))
+				return Some(Ok(entry));
 			}
 		}
 

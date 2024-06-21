@@ -78,7 +78,7 @@ where
 					},
 					Poll::Pending => {
 						self.get = Some(get);
-						return Poll::Pending
+						return Poll::Pending;
 					},
 				}
 			}

@@ -110,7 +110,7 @@ impl Application {
 	pub async fn create_network(&mut self, force_new_peer_id: bool) -> Result<(), anyhow::Error> {
 		// validate
 		if self.network.is_some() {
-			return Err(anyhow!("Network already created"))
+			return Err(anyhow!("Network already created"));
 		}
 
 		// create network

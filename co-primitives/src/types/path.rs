@@ -592,16 +592,15 @@ pub trait PathExt {
 	/// assert_eq!(None, parents.next());
 	/// ```
 	fn parents(&self) -> impl Iterator<Item = &Self::Path> {
-		self.components()
-			.scan((0_usize, self.as_string()), |(index, path), component| {
-				let end = *index + component.len();
-				if end == path.len() {
-					return None
-				}
-				let result = &path[0..end];
-				*index = if *index > 0 { end + 1 } else { end };
-				Some(Self::from_str_unchecked(result))
-			})
+		self.components().scan((0_usize, self.as_string()), |(index, path), component| {
+			let end = *index + component.len();
+			if end == path.len() {
+				return None;
+			}
+			let result = &path[0..end];
+			*index = if *index > 0 { end + 1 } else { end };
+			Some(Self::from_str_unchecked(result))
+		})
 	}
 
 	/// Path and filename.
@@ -684,7 +683,7 @@ fn normalize_components<'a>(
 				// continue with elements after root
 				index = 1;
 			},
-			Component::ParentDir =>
+			Component::ParentDir => {
 				if index > 0 {
 					// check component before
 					match stack[index - 1] {
@@ -707,7 +706,8 @@ fn normalize_components<'a>(
 				} else {
 					// keep parent (..) when on start
 					index += 1;
-				},
+				}
+			},
 			_ => {
 				// keep
 				index += 1;

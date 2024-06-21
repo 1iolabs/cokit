@@ -37,9 +37,9 @@ where
 
 pub struct DefaultNodeSerializer {}
 impl Default for DefaultNodeSerializer {
-    fn default() -> Self {
-        Self::new()
-    }
+	fn default() -> Self {
+		Self::new()
+	}
 }
 
 impl DefaultNodeSerializer {
@@ -136,9 +136,7 @@ where
 				let level_link_blocks: Result<Vec<Block<P>>, NodeBuilderError> = blocks
 					.as_slice()
 					.chunks(max_children)
-					.map(|chunk| -> Node<T> {
-						Node::Node(chunk.iter().map(|block| (*block.cid()).into()).collect())
-					})
+					.map(|chunk| -> Node<T> { Node::Node(chunk.iter().map(|block| (*block.cid()).into()).collect()) })
 					.map(|node| serializer.serialize(&node))
 					.collect();
 				Self::create_balanced_links(serializer, level_link_blocks?, max_children)?

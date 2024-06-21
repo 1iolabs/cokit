@@ -40,7 +40,7 @@ impl PinEntry {
 	fn _write<S: Storage>(storage: &mut S, map: &BTreeMap<Cid, BTreeSet<Cid>>) -> anyhow::Result<Cid> {
 		// validate
 		if map.is_empty() {
-			return Err(StorageError::InvalidArgument(anyhow!("Empty")))?
+			return Err(StorageError::InvalidArgument(anyhow!("Empty")))?;
 		}
 
 		// build

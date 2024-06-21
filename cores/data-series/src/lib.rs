@@ -170,13 +170,16 @@ impl Reducer for DataSeries {
 			DataSeriesAction::CreateSeries(payload) => reduce_create_series(context, self, payload),
 			DataSeriesAction::RemoveSeries { series } => reduce_remove_series(context, self, series),
 			DataSeriesAction::Data(payload) => reduce_data(context, &event.from, event.time, self, payload),
-			DataSeriesAction::PendingData(PendingDataPayload { series, id, tags, time, value }) =>
-				reduce_pending_data(context, &event.from, event.time, self, series, id, tags, time, value),
+			DataSeriesAction::PendingData(PendingDataPayload { series, id, tags, time, value }) => {
+				reduce_pending_data(context, &event.from, event.time, self, series, id, tags, time, value)
+			},
 			DataSeriesAction::PendingCancel { series, id } => reduce_pending_cancel(context, self, series, id),
-			DataSeriesAction::CreateAggregate(CreateAggregatePayload { aggregate, series, group, by }) =>
-				reduce_create_aggregate(context, self, aggregate, series, *group, *by),
-			DataSeriesAction::RemoveAggregate { aggregate, series } =>
-				reduce_remove_aggregate(context, self, series, aggregate),
+			DataSeriesAction::CreateAggregate(CreateAggregatePayload { aggregate, series, group, by }) => {
+				reduce_create_aggregate(context, self, aggregate, series, *group, *by)
+			},
+			DataSeriesAction::RemoveAggregate { aggregate, series } => {
+				reduce_remove_aggregate(context, self, series, aggregate)
+			},
 		}
 	}
 }
@@ -338,10 +341,7 @@ fn reduce_create_aggregate(
 	group: Option<AggregateGroup>,
 	by: AggregateBy,
 ) -> DataSeries {
-	if !state
-		.aggregates
-		.iter(context.storage()).any(|(key, _)| key == aggregate_key)
-	{
+	if !state.aggregates.iter(context.storage()).any(|(key, _)| key == aggregate_key) {
 		let item = state.data.iter(context.storage()).find(|(key, _)| key == series_key);
 		if let Some((_, series)) = item {
 			// calculate

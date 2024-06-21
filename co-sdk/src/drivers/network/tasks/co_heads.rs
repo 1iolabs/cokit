@@ -47,7 +47,7 @@ where
 					tracing::warn!(?co, ?err, "co-unsubscribe-failed");
 				},
 			},
-			Some(CoHeadsRequest::Heads { co, heads, peers, identity }) =>
+			Some(CoHeadsRequest::Heads { co, heads, peers, identity }) => {
 				match behaviour.heads(swarm, &identity, &co, &heads, peers) {
 					Ok(_) => {
 						tracing::debug!(?co, "co-request-heads");
@@ -55,8 +55,9 @@ where
 					Err(err) => {
 						tracing::warn!(?co, ?err, "co-request-heads-failed");
 					},
-				},
-			Some(CoHeadsRequest::PublishHeads { network, co, heads }) =>
+				}
+			},
+			Some(CoHeadsRequest::PublishHeads { network, co, heads }) => {
 				match behaviour.publish(swarm, &network, &co, &heads) {
 					Ok(_) => {
 						tracing::debug!(?co, "co-publish-heads");
@@ -64,7 +65,8 @@ where
 					Err(err) => {
 						tracing::warn!(?co, ?err, "co-publish-heads-failed");
 					},
-				},
+				}
+			},
 			None => {},
 		}
 	}

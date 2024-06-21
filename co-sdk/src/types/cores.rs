@@ -75,10 +75,7 @@ impl Cores {
 	pub fn is_built_in(&self, core: Core) -> bool {
 		match &core {
 			Core::Native(_) => true,
-			Core::Wasm(cid) => self
-				.cores
-				.iter()
-				.any(|(_, i)| &Cid::from_str(i).expect("valid cid") == cid),
+			Core::Wasm(cid) => self.cores.iter().any(|(_, i)| &Cid::from_str(i).expect("valid cid") == cid),
 		}
 	}
 }

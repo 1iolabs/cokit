@@ -34,7 +34,7 @@ where
 	pub async fn join_entry(&mut self, log: &'a Log<S>, entry: EntryBlock<S::StoreParams>) -> Result<bool, LogError> {
 		// contains?
 		if log.contains(entry.cid()) && self.entries_to_add.contains(entry.cid()) {
-			return Ok(!self.entries_to_add.is_empty())
+			return Ok(!self.entries_to_add.is_empty());
 		}
 
 		// verify

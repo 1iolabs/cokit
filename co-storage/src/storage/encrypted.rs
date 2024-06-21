@@ -323,8 +323,7 @@ impl From<BlockMappingError> for StorageError {
 
 /// Serializeable block mapping.
 /// This is used to store the mapping itself as an block.
-#[derive(Debug, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 struct BlockMapping {
 	map: BTreeMap<Cid, Cid>,
 }
@@ -344,7 +343,7 @@ impl BlockMapping {
 	pub fn get_first_by_value(&self, value: &Cid) -> Option<Cid> {
 		self.map.iter().find_map(|(k, v)| {
 			if v == value {
-				return Some(*k)
+				return Some(*k);
 			}
 			None
 		})
@@ -399,15 +398,17 @@ impl BlockMapping {
 
 		// read
 		match node {
-			Node::Node(links) =>
+			Node::Node(links) => {
 				for link in links {
 					count += self.read_mappings_storage(storage, link.as_ref())?;
-				},
-			Node::Leaf(entries) =>
+				}
+			},
+			Node::Leaf(entries) => {
 				for (key, value) in entries.into_iter() {
 					self.insert(key, value);
 					count += 1;
-				},
+				}
+			},
 		}
 
 		// result
@@ -437,15 +438,17 @@ impl BlockMapping {
 
 			// read
 			match node {
-				Node::Node(links) =>
+				Node::Node(links) => {
 					for link in links {
 						tasks.push_back(read(link.into()));
-					},
-				Node::Leaf(entries) =>
+					}
+				},
+				Node::Leaf(entries) => {
 					for (key, value) in entries.into_iter() {
 						self.insert(key, value);
 						count += 1;
-					},
+					}
+				},
 			}
 		}
 
@@ -468,9 +471,7 @@ impl BlockMapping {
 		// blocks
 		let mut builder = NodeBuilder::<(Cid, Cid), S, P>::new(options.max_children, serializer);
 		for (key, value) in self.map.iter() {
-			builder
-				.push((*key, *value))
-				.map_err(|e| StorageError::Internal(e.into()))?;
+			builder.push((*key, *value)).map_err(|e| StorageError::Internal(e.into()))?;
 		}
 		let blocks = builder.into_blocks().map_err(|e| StorageError::Internal(e.into()))?;
 

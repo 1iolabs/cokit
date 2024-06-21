@@ -11,7 +11,7 @@ pub async fn find_membership(reducer: &CoReducer, co: impl AsRef<CoId>) -> Resul
 	};
 	for membership in memberships.memberships {
 		if &membership.id == co.as_ref() {
-			return Ok(Some(membership))
+			return Ok(Some(membership));
 		}
 	}
 	Ok(None)

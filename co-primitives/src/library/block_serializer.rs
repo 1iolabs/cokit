@@ -50,7 +50,7 @@ where
 	{
 		let data = serde_ipld_dagcbor::to_vec(item)?;
 		if S::MAX_BLOCK_SIZE < data.len() {
-			return Err(BlockSerializerError::BlockToLarge(S::MAX_BLOCK_SIZE, data.len()))
+			return Err(BlockSerializerError::BlockToLarge(S::MAX_BLOCK_SIZE, data.len()));
 		}
 		let mh = Code::Blake3_256.digest(&data);
 		let cid = Cid::new_v1(self.codec, mh);

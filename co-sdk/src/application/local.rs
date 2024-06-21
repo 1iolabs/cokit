@@ -141,11 +141,7 @@ where
 				heads = stream::iter(heads.into_iter())
 					.then(|cid| {
 						let encrypted_storage = encrypted_storage.clone();
-						async move {
-							Result::<Cid, co_storage::StorageError>::Ok(
-								*encrypted_storage.get(&cid).await?.cid(),
-							)
-						}
+						async move { Result::<Cid, co_storage::StorageError>::Ok(*encrypted_storage.get(&cid).await?.cid()) }
 					})
 					.try_collect()
 					.await?;
@@ -200,10 +196,11 @@ where
 
 				// heads
 				match watch_reducer.join(local.heads.clone()).await {
-					Ok(change) =>
+					Ok(change) => {
 						if change {
 							tracing::trace!("local-watch-join");
-						},
+						}
+					},
 					Err(err) => tracing::warn!(?err, ?local.heads, "local-watch-join-failed"),
 				}
 			}

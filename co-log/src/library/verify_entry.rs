@@ -12,7 +12,7 @@ where
 			"Invalid log: {:02X?} != {:02X?}",
 			&entry.entry().id,
 			log.id()
-		)))
+		)));
 	}
 
 	// verify signature

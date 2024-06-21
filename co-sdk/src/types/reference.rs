@@ -8,9 +8,9 @@ pub struct Reference {
 }
 
 impl Default for Reference {
-    fn default() -> Self {
-        Self::new()
-    }
+	fn default() -> Self {
+		Self::new()
+	}
 }
 
 impl Reference {

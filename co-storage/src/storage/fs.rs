@@ -48,7 +48,7 @@ impl Storage for FsStorage {
 						path,
 					)));
 				}
-				return Ok(block.into_inner().0)
+				return Ok(block.into_inner().0);
 			},
 			// continue with write
 			Err(e) if e.kind() == ErrorKind::NotFound => {},
@@ -102,7 +102,7 @@ impl BlockStorage for FsStorage {
 						path,
 					)));
 				}
-				return Ok(block.into_inner().0)
+				return Ok(block.into_inner().0);
 			},
 			// continue with write
 			Err(e) if e.kind() == ErrorKind::NotFound => {},

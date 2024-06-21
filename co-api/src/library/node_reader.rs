@@ -12,10 +12,7 @@ pub enum NodeReaderError {
 	Decode(#[source] anyhow::Error),
 }
 
-pub fn node_reader<T>(
-	storage: &dyn Storage,
-	cid: Option<Cid>,
-) -> impl Iterator<Item = Result<T, NodeReaderError>> + '_
+pub fn node_reader<T>(storage: &dyn Storage, cid: Option<Cid>) -> impl Iterator<Item = Result<T, NodeReaderError>> + '_
 where
 	T: Clone + DeserializeOwned + 'static,
 {
@@ -76,7 +73,7 @@ fn read_node<T: Clone + DeserializeOwned>(storage: &dyn Storage, cid: &Cid) -> R
 	// get block
 	let block = storage.get(cid);
 	if block.cid().codec() != Into::<u64>::into(DagCborCodec) {
-		return Err(NodeReaderError::InvalidArgument)
+		return Err(NodeReaderError::InvalidArgument);
 	}
 
 	// get node

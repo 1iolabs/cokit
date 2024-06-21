@@ -106,18 +106,18 @@ impl Message {
 								sender: sender_identity.identity().to_owned(),
 								header,
 								body,
-							})
+							});
 						}
 					}
 				}
-				return Ok(Message::AnonCryptJson { header, body })
+				return Ok(Message::AnonCryptJson { header, body });
 			}
 			return Err(ReceiveError::NoRecipent);
 		}
 		if message_type == MessageType::DidCommJws {
 			let (header, body) = didcomm_receive(None, &sender_resolver, message).await?;
 			// TODO: resolve sender
-			return Ok(Message::SignedJson { sender: "".to_owned(), header, body })
+			return Ok(Message::SignedJson { sender: "".to_owned(), header, body });
 		}
 		if message_type == MessageType::DidCommRaw {
 			#[derive(Debug, Serialize, Deserialize)]
@@ -132,7 +132,7 @@ impl Message {
 			return Ok(Message::PlainJson {
 				header: plain_message.header,
 				body: plain_message.body.map(|r| r.get()).unwrap_or("null").to_owned(),
-			})
+			});
 		}
 		Err(ReceiveError::UnknownFormat(anyhow!("Expected JSON as JWE, JWS or plain DIDComm")))
 	}

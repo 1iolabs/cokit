@@ -191,26 +191,29 @@ impl Reducer for Co {
 						.map(|key_id| vec![Key { id: key_id.to_owned(), state: KeyState::Active }]);
 				}
 			},
-			CoAction::ParticipantInvite { participant, tags } =>
+			CoAction::ParticipantInvite { participant, tags } => {
 				if !result.participants.contains_key(participant) {
 					result.participants.insert(
 						participant.clone(),
 						Participant { did: participant.clone(), state: ParticipantState::Invite, tags: tags.clone() },
 					);
-				},
-			CoAction::ParticipantJoin { participant } =>
+				}
+			},
+			CoAction::ParticipantJoin { participant } => {
 				if let Some(participant) = result.participants.get_mut(participant) {
 					participant.state = ParticipantState::Active;
-				},
+				}
+			},
 			CoAction::Heads { heads } => {
 				result.heads = heads.clone();
 			},
-			CoAction::CoreCreate { core, binary, tags } =>
+			CoAction::CoreCreate { core, binary, tags } => {
 				if !result.cores.contains_key(core) {
 					result
 						.cores
 						.insert(core.clone(), Core { binary: *binary, tags: tags.clone(), state: None });
-				},
+				}
+			},
 			CoAction::CoreRemove { core } => {
 				result.cores.remove(core);
 			},
@@ -224,18 +227,21 @@ impl Reducer for Co {
 					participant.tags.clear(Some(tags));
 				}
 			},
-			CoAction::CoreChange { core, state } =>
+			CoAction::CoreChange { core, state } => {
 				if let Some(core) = result.cores.get_mut(core) {
 					core.state = *state;
-				},
-			CoAction::CoreTagsInsert { core, tags } =>
+				}
+			},
+			CoAction::CoreTagsInsert { core, tags } => {
 				if let Some(core) = result.cores.get_mut(core) {
 					core.tags.append(&mut tags.clone());
-				},
-			CoAction::CoreTagsRemove { core, tags } =>
+				}
+			},
+			CoAction::CoreTagsRemove { core, tags } => {
 				if let Some(core) = result.cores.get_mut(core) {
 					core.tags.clear(Some(tags));
-				},
+				}
+			},
 			CoAction::TagsInsert { tags } => {
 				result.tags.append(&mut tags.clone());
 			},

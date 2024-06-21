@@ -3,8 +3,7 @@ use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct MessageState {
 	#[serde(rename = "v")]
 	pub version: MessageVersion,
@@ -22,18 +21,16 @@ pub struct MessageState {
 	pub participants: BTreeMap<Did, Link<Role>>,
 }
 
-
 impl CoMetadata for MessageState {
 	fn metadata() -> Vec<co_api::Metadata> {
 		vec![Metadata::External(vec!["pinned".to_string()])]
 	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum MessageVersion {
 	#[default]
- V1 = 1,
+	V1 = 1,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -96,12 +93,13 @@ impl Reducer for MessageState {
 
 	fn reduce(self, action: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		match &action.payload {
-			MessageAction::SetName(name) =>
+			MessageAction::SetName(name) => {
 				if Permission::Name.has(context.storage(), &self, &action.from) {
 					MessageState { name: name.clone(), ..self }
 				} else {
 					self
-				},
+				}
+			},
 			MessageAction::Message => {
 				let participants = match self.participants.get(&action.from) {
 					Some(_) => self.participants,
@@ -151,7 +149,7 @@ pub enum CallError {
 impl MessageState {
 	pub fn set_name(&mut self, context: &CallContext, name: String) -> Result<(), CallError> {
 		if !Permission::Name.has(context.storage.as_ref(), self, &context.from) {
-			return Err(CallError::Permission)
+			return Err(CallError::Permission);
 		}
 		self.name = name;
 		Ok(())

@@ -49,7 +49,7 @@ impl VerificationMethod {
 		if let Some(jwk) = &self.public_key_jwk {
 			match jwk.kty.as_str() {
 				// See: https://datatracker.ietf.org/doc/html/draft-ietf-jose-cfrg-curves-06#section-2
-				"OKP" =>
+				"OKP" => {
 					if let Some(public_key) = &jwk.x {
 						Ok(multibase::Base::Base64Url.decode(public_key)?)
 					} else if let Some(_private_key) = &jwk.d {
@@ -57,7 +57,8 @@ impl VerificationMethod {
 						Err(anyhow!("Unsupported JWK: no public key found."))
 					} else {
 						Err(anyhow!("Unsupported JWK: no keys found."))
-					},
+					}
+				},
 				other => Err(anyhow!("Unsupported JWK: kty: {}", other)),
 			}
 		} else if let Some(s) = &self.public_key_multibase {

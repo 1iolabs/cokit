@@ -64,18 +64,20 @@ where
 				num_established: _,
 				concurrent_dial_errors: _,
 				established_in: _,
-			} =>
+			} => {
 				if peer_id == &self.peer_id {
 					if let Some(tx) = self.tx.take() {
 						tx.send(Ok(())).ok();
 					}
-				},
-			SwarmEvent::OutgoingConnectionError { connection_id: _, peer_id, error } =>
+				}
+			},
+			SwarmEvent::OutgoingConnectionError { connection_id: _, peer_id, error } => {
 				if peer_id == &Some(self.peer_id) {
 					if let Some(tx) = self.tx.take() {
 						tx.send(Err(anyhow!("{:?}", error))).ok();
 					}
-				},
+				}
+			},
 			_ => {},
 		}
 		Some(event)

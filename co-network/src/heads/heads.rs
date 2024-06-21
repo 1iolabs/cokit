@@ -174,13 +174,14 @@ impl HeadsState {
 					// TODO(metric): add metrics when receive invalid message?
 					let heads_message: Option<HeadsMessage> = serde_ipld_dagcbor::from_slice(&message.data).ok();
 					match heads_message {
-						Some(HeadsMessage::Heads(co, heads)) =>
+						Some(HeadsMessage::Heads(co, heads)) => {
 							self.events.push_back(HeadsEvent::GenerateEvent(Event::ReceivedHeads {
 								co,
 								heads,
 								peer_id: message.source,
 								response: false,
-							})),
+							}))
+						},
 						None => {},
 					}
 				}
@@ -197,21 +198,23 @@ impl HeadsState {
 
 	fn on_didcomm_event(&mut self, event: &didcomm::Event) {
 		match event {
-			didcomm::Event::Received { peer_id, message } =>
+			didcomm::Event::Received { peer_id, message } => {
 				if message.header().message_type == "co-heads/1.0.0" {
 					// TODO(metric): add metrics when receive invalid message?
 					let heads: Option<HeadsMessage> = message.body_deserialize().ok();
 					match heads {
-						Some(HeadsMessage::Heads(co, heads)) =>
+						Some(HeadsMessage::Heads(co, heads)) => {
 							self.events.push_back(HeadsEvent::GenerateEvent(Event::ReceivedHeads {
 								co,
 								heads,
 								peer_id: Some(*peer_id),
 								response: true,
-							})),
+							}))
+						},
 						_ => {},
 					}
-				},
+				}
+			},
 			_ => {},
 		}
 	}

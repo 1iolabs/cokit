@@ -62,10 +62,12 @@ impl DidKeyIdentity {
 
 	pub fn import(key: &co_core_keystore::Key) -> Result<Self, anyhow::Error> {
 		match (key.tags.string("format"), &key.secret) {
-			(Some("Ed25519"), co_core_keystore::Secret::PrivateKey(secret)) =>
-				Ok(Self::from_key(from_existing_key::<Ed25519KeyPair>(&[], Some(secret.divulge())))),
-			(Some("X25519"), co_core_keystore::Secret::PrivateKey(secret)) =>
-				Ok(Self::from_key(from_existing_key::<X25519KeyPair>(&[], Some(secret.divulge())))),
+			(Some("Ed25519"), co_core_keystore::Secret::PrivateKey(secret)) => {
+				Ok(Self::from_key(from_existing_key::<Ed25519KeyPair>(&[], Some(secret.divulge()))))
+			},
+			(Some("X25519"), co_core_keystore::Secret::PrivateKey(secret)) => {
+				Ok(Self::from_key(from_existing_key::<X25519KeyPair>(&[], Some(secret.divulge()))))
+			},
 			_ => Err(anyhow!("Invalid identity format or key")),
 		}
 	}
@@ -116,7 +118,7 @@ impl Identity for DidKeyIdentity {
 		// if key is provided verify its our key
 		if let Some(key) = public_key {
 			if key != &self.key.public_key_bytes() {
-				return false
+				return false;
 			}
 		}
 
@@ -183,11 +185,10 @@ impl PrivateIdentity for DidKeyIdentity {
 #[derive(Debug, Clone)]
 pub struct DidKeyIdentityResolver {}
 impl Default for DidKeyIdentityResolver {
-    fn default() -> Self {
-        Self::new()
-    }
+	fn default() -> Self {
+		Self::new()
+	}
 }
-
 impl DidKeyIdentityResolver {
 	pub fn new() -> DidKeyIdentityResolver {
 		Self {}

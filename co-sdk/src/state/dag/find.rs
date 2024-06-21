@@ -19,17 +19,19 @@ where
 	let mut result = Ok(None);
 	while let Some(item) = stream.next().await {
 		match item {
-			Ok(value) =>
+			Ok(value) => {
 				if predicate(&value) {
 					// first value
 					result = Ok(Some(value));
 					break;
-				},
-			Err(err) =>
+				}
+			},
+			Err(err) => {
 				if result.is_ok() {
 					// first error
 					result = Err(err);
-				},
+				}
+			},
 		}
 	}
 	result

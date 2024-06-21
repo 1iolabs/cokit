@@ -112,11 +112,11 @@ impl FileLocals {
 				loop {
 					match watcher_rx.recv()? {
 						Ok(event) => match &event.kind {
-							notify::EventKind::Create(CreateKind::File) |
-							notify::EventKind::Modify(ModifyKind::Data(DataChange::Content)) => {
+							notify::EventKind::Create(CreateKind::File)
+							| notify::EventKind::Modify(ModifyKind::Data(DataChange::Content)) => {
 								for path in &event.paths {
-									if path.parent().and_then(|f| f.parent()) == Some(config_path.as_ref()) &&
-										path.file_name().and_then(|f| f.to_str()) == Some("local.cbor")
+									if path.parent().and_then(|f| f.parent()) == Some(config_path.as_ref())
+										&& path.file_name().and_then(|f| f.to_str()) == Some("local.cbor")
 									{
 										tracing::trace!(?path, ?event, "locals-watch-test");
 										match ApplicationLocal::read_sync(path) {

@@ -112,10 +112,10 @@ impl Algorithm {
 	) -> Result<Vec<u8>, AlgorithmError> {
 		// validate
 		if self.nonce_size() != nonce.len() {
-			return Err(AlgorithmError::InvalidArguments(anyhow::anyhow!("nonce size")))
+			return Err(AlgorithmError::InvalidArguments(anyhow::anyhow!("nonce size")));
 		}
 		if self.key_size() != secret.divulge().len() {
-			return Err(AlgorithmError::InvalidArguments(anyhow::anyhow!("key size")))
+			return Err(AlgorithmError::InvalidArguments(anyhow::anyhow!("key size")));
 		}
 
 		// encrypt
@@ -140,10 +140,10 @@ impl Algorithm {
 	) -> Result<Vec<u8>, AlgorithmError> {
 		// validate
 		if self.nonce_size() != nonce.len() {
-			return Err(AlgorithmError::InvalidArguments(anyhow::anyhow!("nonce size")))
+			return Err(AlgorithmError::InvalidArguments(anyhow::anyhow!("nonce size")));
 		}
 		if self.key_size() != secret.divulge().len() {
-			return Err(AlgorithmError::InvalidArguments(anyhow::anyhow!("key size")))
+			return Err(AlgorithmError::InvalidArguments(anyhow::anyhow!("key size")));
 		}
 
 		// decrypt
@@ -247,10 +247,10 @@ where
 		block: Block<S>,
 	) -> Result<EncryptedBlock<S>, AlgorithmError> {
 		// validate that we not overflow the block size
-		if block.data().len() >
-			S::MAX_BLOCK_SIZE - Header::encoded_size(algorithm) - 64 - algorithm.tag_size() - algorithm.tag_size()
+		if block.data().len()
+			> S::MAX_BLOCK_SIZE - Header::encoded_size(algorithm) - 64 - algorithm.tag_size() - algorithm.tag_size()
 		{
-			return Err(AlgorithmError::Size)
+			return Err(AlgorithmError::Size);
 		}
 
 		// dervice data key
@@ -359,7 +359,7 @@ where
 
 		// validate
 		if !block.is_valid() {
-			return Err(AlgorithmError::Decoding)
+			return Err(AlgorithmError::Decoding);
 		}
 
 		// result
@@ -392,9 +392,9 @@ impl Header {
 
 	/// Test if header is valid.
 	pub fn is_valid(&self) -> bool {
-		self.version == EncryptionVersion::V1 &&
-			self.nonce.len() == self.algorithm.nonce_size() &&
-			self.key_slots.iter().all(KeySlot::is_valid)
+		self.version == EncryptionVersion::V1
+			&& self.nonce.len() == self.algorithm.nonce_size()
+			&& self.key_slots.iter().all(KeySlot::is_valid)
 	}
 
 	/// Get AAD bytes for this header.
@@ -514,9 +514,9 @@ impl KeySlot {
 
 	/// Test if is keyslot is valid.
 	pub fn is_valid(&self) -> bool {
-		self.version == KeySlotVersion::V1 &&
-			self.key.len() == self.algorithm.key_size() + self.algorithm.tag_size() &&
-			self.nonce.len() == self.algorithm.nonce_size()
+		self.version == KeySlotVersion::V1
+			&& self.key.len() == self.algorithm.key_size() + self.algorithm.tag_size()
+			&& self.nonce.len() == self.algorithm.nonce_size()
 	}
 
 	/// Get block secret from key slot.

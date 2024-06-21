@@ -90,9 +90,7 @@ impl DidCommPrivateContext {
 		// }
 		didcomm_jwe(
 			self.key_agreement_private_key.clone(),
-			to.key_agreement
-				.public_key_bytes()
-				.map_err(SignError::InvalidArgument)?,
+			to.key_agreement.public_key_bytes().map_err(SignError::InvalidArgument)?,
 			header,
 			body,
 		)

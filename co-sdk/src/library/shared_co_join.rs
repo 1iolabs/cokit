@@ -160,10 +160,7 @@ impl SharedCoJoin {
 		if let Some(state) = state {
 			reducer_builder = reducer_builder.with_latest_state(state, heads.clone());
 		}
-		let reducer = reducer_builder
-			.build(runtime)
-			.await
-			.map_err(SharedCoJoinError::Reducer)?;
+		let reducer = reducer_builder.build(runtime).await.map_err(SharedCoJoinError::Reducer)?;
 		let state = reducer.state().ok_or(SharedCoJoinError::NoState)?;
 
 		// store: key

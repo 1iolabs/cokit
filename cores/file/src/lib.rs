@@ -94,8 +94,9 @@ impl Reducer for File {
 
 	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		match &event.payload {
-			FileAction::Create { path, node, recursive } =>
-				create(context, self, path, node, &event.from, event.time, *recursive).unwrap(),
+			FileAction::Create { path, node, recursive } => {
+				create(context, self, path, node, &event.from, event.time, *recursive).unwrap()
+			},
 			FileAction::Remove { path } => remove(context, self, path).unwrap(),
 		}
 	}
