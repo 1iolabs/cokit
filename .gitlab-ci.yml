@@ -17,11 +17,11 @@ cache: &global_cache
     - .cargo/registry/cache
   policy: pull-push
 
-image:
+dockerfile:
   stage: test
   image: ${DOCKERFILE_IMAGE}
   script:
-    - echo "> test if docker image is in sync with Dockerfile (See `ci/build.sh`)"
+    - echo "> test if docker image is in sync with Dockerfile (ci/build.sh)"
     - echo "${DOCKERFILE_HASH}  ci/Dockerfile" | sha256sum --check --status
 
 test:
