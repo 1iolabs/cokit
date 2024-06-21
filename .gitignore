@@ -1,3 +1,4 @@
 /target
 /.vscode/tasks.json
 /data
+/.cargo

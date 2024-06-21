@@ -3,22 +3,46 @@ stages:
   - build
   - publish
 
+variables:
+  RUST_VERSION: "1.76"
+  CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
+
+cache: &global_cache
+  key: rust-${RUST_VERSION}
+  paths:
+    - .cargo/bin
+    - .cargo/registry/index
+    - .cargo/registry/cache
+  policy: pull-push
+
 test:
   stage: test
-  image: docker-registry.intranet.1io.com/extern/rust:1.76-alpine
+  image: docker-registry.intranet.1io.com/extern/rust:${RUST_VERSION}
+  cache:
+    <<: *global_cache
   script:
     - cargo test
 
+fmt:
+  stage: test
+  image: docker-registry.intranet.1io.com/extern/rust:${RUST_VERSION}
+  cache:
+    <<: *global_cache
+  script:
+    - cargo +nightly fmt --check
+
 build:
   stage: build
-  image: docker-registry.intranet.1io.com/extern/rust:1.76-alpine
+  image: docker-registry.intranet.1io.com/extern/rust:${RUST_VERSION}
+  cache:
+    <<: *global_cache
   script:
-    - echo "building binaries"
+    - echo "> building binaries"
     - cargo build --release
-    - echo "building cores"
+    - echo "> building cores"
     - rustup target add wasm32-unknown-unknown
     - ./target/release/co-cli core-build-builtin
-    - echo "checking for local changes"
+    - echo "> checking for local changes"
     - git diff-files --quiet
   artifacts:
     paths:
@@ -28,7 +52,9 @@ build:
 
 rustdoc:
   stage: build
-  image: docker-registry.intranet.1io.com/extern/rust:1.76-alpine
+  image: docker-registry.intranet.1io.com/extern/rust:${RUST_VERSION}
+  cache:
+    <<: *global_cache
   script:
     - cargo doc --no-deps
   artifacts:
@@ -37,10 +63,12 @@ rustdoc:
 
 pages:
   stage: publish
-  image: docker-registry.intranet.1io.com/extern/rust:1.76-alpine
+  image: docker-registry.intranet.1io.com/extern/rust:${RUST_VERSION}
   dependencies:
     - build
     - rustdoc
+  cache:
+    <<: *global_cache
   script:
     - mkdir -p public
     - mv target/doc public/doc
