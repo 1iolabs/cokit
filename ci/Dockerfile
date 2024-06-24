@@ -1,4 +1,4 @@
-FROM docker-registry.intranet.1io.com/extern/rust:1.76
+FROM rust:1.79
 RUN apt-get update
 RUN apt-get install -y \
     build-essential \

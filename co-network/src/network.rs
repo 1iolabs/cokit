@@ -176,6 +176,7 @@ pub struct Shutdown {
 }
 impl Shutdown {
 	pub fn shutdown(&self) {
+		tracing::info!("network-shutingdown");
 		self.shutdown.cancel()
 	}
 }
@@ -512,6 +513,7 @@ async fn run(
 
 	// handle
 	let shutdown = runtime.shutdown.child_token();
+	let mut shutdown_timeout = None;
 	let tasks = tasks.fuse();
 	pin_mut!(tasks);
 	while runtime.is_running() {
@@ -535,7 +537,9 @@ async fn run(
 			},
 
 			// shutdown
-			_ = shutdown.cancelled(), if !shutdown.is_cancelled() => {}
+			_ = shutdown.cancelled(), if shutdown_timeout.is_none() => {
+				shutdown_timeout = Some(Duration::from_millis(1000));
+			}
 		}
 	}
 
