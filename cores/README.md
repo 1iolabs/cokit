@@ -27,6 +27,8 @@ Test:
 cargo test --package co-sdk --lib -- types::cores::tests --nocapture
 ```
 
+Note: Different compiler/OS may generate different assemblies. So the values in Cores.toml could change.
+
 ## Add new COre
 
 - Add to `get_native` in: `../co-sdk/src/types/cores.rs`

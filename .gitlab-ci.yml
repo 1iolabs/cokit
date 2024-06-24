@@ -50,8 +50,6 @@ build:
     - cargo build --release
     - echo "> building cores"
     - ./target/release/co-cli core-build-builtin
-    - echo "> checking for local changes"
-    - git diff --exit-code
   artifacts:
     paths:
       - target/release/co-cli
