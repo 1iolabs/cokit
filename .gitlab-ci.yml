@@ -51,7 +51,7 @@ build:
     - echo "> building cores"
     - ./target/release/co-cli core-build-builtin
     - echo "> checking for local changes"
-    - git diff-files --quiet
+    - git diff --exit-code
   artifacts:
     paths:
       - target/release/co-cli
