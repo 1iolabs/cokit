@@ -89,6 +89,8 @@ where
 pub fn unixfs_encode_buffer<P: StoreParams>(buf: &[u8]) -> Vec<Block<P>> {
 	let mut result = Vec::new();
 	let mut adder = FileAdder::default();
+
+	// push
 	let mut total = 0;
 	while total < buf.len() {
 		let (blocks, consumed) = adder.push(&buf[total..]);
@@ -97,6 +99,13 @@ pub fn unixfs_encode_buffer<P: StoreParams>(buf: &[u8]) -> Vec<Block<P>> {
 		}
 		total += consumed;
 	}
+
+	// finish
+	for (cid, data) in adder.finish() {
+		result.push(Block::new_unchecked(cid, data));
+	}
+
+	// result
 	result
 }
 

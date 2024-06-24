@@ -6,7 +6,7 @@ pub mod helper;
 
 #[tokio::test]
 async fn test_co_shared_create() {
-	let mut peer1 = Instance::new(1).await;
+	let peer1 = Instance::new(1).await;
 
 	// create identity
 	let identity = peer1.create_identity().await;
