@@ -329,7 +329,8 @@ where
 			match item {
 				Discovery::DidDiscovery(item) => {
 					// we only use did discovery if the DID is currently subscribed.
-					// this is because gossipsub only can publish messages when subscribed (really?)
+					// this is because gossipsub only can publish messages when subscribed
+					// todo: really?
 					// note: currently we can only receive requests for DID which we also subscribed to
 					//       so when we may change this we need to keep tract of connection requests for
 					//       dids/identities.

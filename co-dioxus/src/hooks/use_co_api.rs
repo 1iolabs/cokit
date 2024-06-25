@@ -65,10 +65,18 @@ async fn create_co(application: Application, identitiy: Option<Identity>, co: Cr
 }
 
 async fn create_identity(application: Application, seed: Vec<u8>, name: String) -> Result<(), anyhow::Error> {
+	// create
 	let identity = DidKeyIdentity::generate(Some(&seed));
 	let co = application.local_co_reducer().await?;
 	let provider = DidKeyProvider::new(co, CO_CORE_NAME_KEYSTORE);
 	provider.store(&identity, Some(name)).await?;
+
+	// network: subscribe
+	if let Some(network) = application.network() {
+		network.did_discovery_subscribe(identity).await?;
+	}
+
+	// result
 	Ok(())
 }
 

@@ -1,17 +1,19 @@
 use super::{
 	co_context::{CoContext, CoContextInner},
-	identity::{create_identity_resolver, resolve_private_identity},
+	identity::{create_identity_resolver, create_private_identity_resolver, resolve_private_identity},
 	shared::{CreateCo, SharedCoCreator},
 	tracing::TracingBuilder,
 };
 use crate::{
-	drivers::network::tasks::received_heads::ReceivedHeadsNetworkTask,
-	identity::co_private_identity_resolver::CoPrivateIdentityResolver, library::task_spawner::TaskSpawner,
+	drivers::network::tasks::received_heads::ReceivedHeadsNetworkTask, library::task_spawner::TaskSpawner,
 	local_keypair_fetch, CoReducer, CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE,
 	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
-use co_identity::{LocalIdentity, LocalIdentityResolver, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver};
+use co_identity::{
+	IdentityResolverBox, LocalIdentity, LocalIdentityResolver, PrivateIdentity, PrivateIdentityBox,
+	PrivateIdentityResolverBox,
+};
 use co_network::NetworkTaskSpawner;
 use co_primitives::CoId;
 use co_runtime::RuntimePool;
@@ -124,7 +126,7 @@ impl Application {
 			// note: critical to pass the non networked version otherwise we create a loop
 			self.co().to_owned(),
 			create_identity_resolver(),
-			CoPrivateIdentityResolver::new(self.co().to_owned()).boxed(),
+			self.private_identity_resolver().await?,
 		);
 
 		// shutdown
@@ -158,7 +160,21 @@ impl Application {
 	///
 	/// Todo: Identity Permissions?
 	pub async fn private_identity(&self, did: &co_primitives::Did) -> Result<PrivateIdentityBox, anyhow::Error> {
-		resolve_private_identity(self, did).await
+		resolve_private_identity(&self.co_context, did).await
+	}
+
+	/// Access Private Identities.
+	///
+	/// Todo: Identity Permissions?
+	pub async fn identity_resolver(&self) -> Result<IdentityResolverBox, anyhow::Error> {
+		Ok(create_identity_resolver())
+	}
+
+	/// Access Private Identities.
+	///
+	/// Todo: Identity Permissions?
+	pub async fn private_identity_resolver(&self) -> Result<PrivateIdentityResolverBox, anyhow::Error> {
+		create_private_identity_resolver(&self.co_context).await
 	}
 
 	/// Get unsiged local device identity.

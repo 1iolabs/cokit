@@ -1,4 +1,4 @@
-use crate::{Application, DidKeyProvider, CO_CORE_NAME_KEYSTORE};
+use crate::{CoContext, DidKeyProvider, CO_CORE_NAME_KEYSTORE};
 use co_identity::{
 	DidKeyIdentityResolver, IdentityResolver, IdentityResolverBox, JoinIdentityResolver, JoinPrivateIdentityResolver,
 	LocalIdentityResolver, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
@@ -14,9 +14,9 @@ pub fn create_identity_resolver() -> IdentityResolverBox {
 
 /// Create the default private identity resolver.
 pub async fn create_private_identity_resolver(
-	application: &Application,
+	context: &CoContext,
 ) -> Result<PrivateIdentityResolverBox, anyhow::Error> {
-	let local = application.local_co_reducer().await?;
+	let local = context.local_co_reducer().await?;
 	let mut resolvers: Vec<PrivateIdentityResolverBox> = Vec::new();
 	resolvers.push(PrivateIdentityResolver::boxed(LocalIdentityResolver::default()));
 	resolvers.push(DidKeyProvider::new(local, CO_CORE_NAME_KEYSTORE).boxed());
@@ -27,9 +27,9 @@ pub async fn create_private_identity_resolver(
 ///
 /// Todo: Identity Permissions?
 pub async fn resolve_private_identity(
-	application: &Application,
+	context: &CoContext,
 	did: &co_primitives::Did,
 ) -> Result<PrivateIdentityBox, anyhow::Error> {
-	let resolver = create_private_identity_resolver(application).await?;
+	let resolver = create_private_identity_resolver(context).await?;
 	Ok(resolver.resolve_private(did).await?)
 }

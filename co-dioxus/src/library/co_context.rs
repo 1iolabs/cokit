@@ -1,7 +1,8 @@
 use crate::{CoError, CoErrorSignal, CoSettings};
-use co_sdk::{Application, ApplicationBuilder};
+use anyhow::Result;
+use co_sdk::{state, Application, ApplicationBuilder, Network, PrivateIdentityResolver, PrivateIdentityResolverBox};
 use dioxus::signals::Writable;
-use futures::{future::BoxFuture, Future};
+use futures::{future::BoxFuture, pin_mut, Future, StreamExt};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[derive(Debug, Clone)]
@@ -93,25 +94,23 @@ type TaskFn = dyn (FnOnce(Application) -> BoxFuture<'static, ()>) + Send + 'stat
 type Task = Box<TaskFn>;
 // type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
 
-async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) {
+async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Result<(), anyhow::Error> {
 	let identifier = settings.identifier;
 	let builder = match settings.path {
 		Some(path) => ApplicationBuilder::new_with_path(identifier, path),
 		None => ApplicationBuilder::new(identifier),
 	};
-	let mut application = builder
-		.without_keychain()
-		.with_bunyan_logging(None)
-		.build()
-		.await
-		.expect("application");
+	let mut application = builder.without_keychain().with_bunyan_logging(None).build().await?;
 
 	// network
 	if settings.network {
-		application
-			.create_network(settings.network_force_new_peer_id)
-			.await
-			.expect("network");
+		application.create_network(settings.network_force_new_peer_id).await?;
+	}
+
+	// network: listen known identities
+	if let Some(network) = application.network() {
+		did_discovery_subscribe_all(application.co(), &network, &application.private_identity_resolver().await?)
+			.await?;
 	}
 
 	// execute
@@ -121,6 +120,9 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) {
 		task(application.clone()).await;
 	}
 	tracing::info!("co-shutdown");
+
+	// result
+	Ok(())
 }
 
 fn co_main(settings: CoSettings, tasks: UnboundedReceiver<Task>) {
@@ -128,5 +130,21 @@ fn co_main(settings: CoSettings, tasks: UnboundedReceiver<Task>) {
 		.enable_all()
 		.build()
 		.unwrap()
-		.block_on(async move { co_app(settings, tasks).await })
+		.block_on(async move { co_app(settings, tasks).await.expect("app to run") })
+}
+
+#[tracing::instrument(skip(context, network, identity_resolver))]
+async fn did_discovery_subscribe_all(
+	context: &co_sdk::CoContext,
+	network: &Network,
+	identity_resolver: &PrivateIdentityResolverBox,
+) -> Result<()> {
+	let local_co = context.local_co_reducer().await?;
+	let identities = state::identities(local_co.storage(), local_co.reducer_state().await.0.into());
+	pin_mut!(identities);
+	while let Some(identity) = identities.next().await {
+		let private_identity = identity_resolver.resolve_private(&identity?.did).await?;
+		network.did_discovery_subscribe(private_identity).await?;
+	}
+	Ok(())
 }

@@ -20,7 +20,7 @@ pub use application::{
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 pub use co_identity::{
 	DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver, IdentityResolverError,
-	PrivateIdentity, PrivateIdentityBox,
+	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 pub use co_primitives::{
 	tags, BlockSerializer, CoId, Date, Did, Link, MultiCodec, MultiCodecError, OptionLink, Tag, Tags,
