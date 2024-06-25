@@ -1,11 +1,11 @@
 use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
-use co_api::{Cid, CoId, DagCollection};
+use co_primitives::CoId;
 use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
-use co_sdk::{memberships, Application, BlockStorage, CoStorage, CO_CORE_NAME_PIN};
+use co_sdk::{memberships, Application, CoStorage, NodeStream, CO_CORE_NAME_PIN};
 use exitcode::ExitCode;
-use futures::{pin_mut, StreamExt};
-use libipld::{cbor::DagCborCodec, codec::Codec, Ipld};
+use futures::{pin_mut, StreamExt, TryStreamExt};
+use libipld::Cid;
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,
@@ -70,31 +70,24 @@ pub async fn list_pins(context: &CliContext, cli: &Cli, command: &ListCommand) -
 	let local_co_reducer = application.local_co_reducer().await?;
 	let storage = local_co_reducer.storage();
 	let pin_state = local_co_reducer.state::<co_core_pin::Pin>(CO_CORE_NAME_PIN).await?;
-	if let Some(link) = pin_state.pins.link().cid() {
-		let block = storage.get(link).await?;
-
-		let map: BTreeMap<String, Vec<Vec<Cid>>> = DagCborCodec.decode(block.data())?;
-		if let Some(inner) = map.get("l") {
-			if command.sum {
-				println!("Total number of current pins: {}", inner.len());
-			}
-			if command.sum && command.list {
-				// get terminal width
-				let (x, _y) = termion::terminal_size().unwrap();
-				// hline
-				println!("{:-<width$}", "-", width = x as usize);
-			}
-			if command.list {
-				for cid_pair in inner.iter() {
-					if command.all {
-						let block = storage.get(&cid_pair[1]).await?;
-						let tags: BTreeMap<String, Ipld> = DagCborCodec.decode(block.data())?;
-						let tags_pretty = tags.get("l").expect("non empty");
-						println!("Cid {} pinned by tags:\n\t {:?}", cid_pair[0], tags_pretty);
-					} else {
-						println!("{}", cid_pair[0]);
-					}
-				}
+	let pins = NodeStream::from_node_container(storage.clone(), &pin_state.pins);
+	let inner: Vec<_> = pins.try_collect().await?;
+	if command.sum {
+		println!("Total number of current pins: {}", inner.len());
+	}
+	if command.sum && command.list {
+		// get terminal width
+		let (x, _y) = termion::terminal_size().unwrap();
+		// hline
+		println!("{:-<width$}", "-", width = x as usize);
+	}
+	if command.list {
+		for (cid, tags) in inner.iter() {
+			if command.all {
+				let tags: Vec<_> = NodeStream::from_node_container(storage.clone(), tags).try_collect().await?;
+				println!("Cid {} pinned by tags:\n\t {:?}", cid, tags);
+			} else {
+				println!("{}", cid);
 			}
 		}
 	}

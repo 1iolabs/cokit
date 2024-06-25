@@ -1338,7 +1338,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap 4.5.7",
- "co-api",
  "co-core-co",
  "co-core-file",
  "co-core-keystore",

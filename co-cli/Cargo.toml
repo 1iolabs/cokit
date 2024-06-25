@@ -10,7 +10,6 @@ async-stream = { workspace = true }
 async-trait = { workspace = true }
 chrono = "0.4.37"
 clap = { version = "^4.3.23", features = ["derive"] }
-co-api = { path = "../co-api" }
 co-core-co = { path = "../cores/co" }
 co-core-file = { path = "../cores/file" }
 co-core-keystore = { path = "../cores/keystore" }
