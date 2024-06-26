@@ -9,7 +9,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_core_co::CoAction;
+use co_core_co::{CoAction, Participant};
 use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
@@ -18,7 +18,7 @@ use co_network::bitswap::NetworkBlockStorage;
 use co_primitives::{tags, CoId};
 use co_storage::{Algorithm, EncryptedBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, time::Duration};
+use std::{collections::BTreeMap, fmt::Debug, time::Duration};
 
 /// Shared CO Builder.
 /// The Shared CO state is sptrend in an membership of an other CO (typicalle the Local CO).
@@ -264,6 +264,15 @@ impl SharedCoCreator {
 			.await?;
 
 		// initialize
+		let mut participants = BTreeMap::new();
+		participants.insert(
+			identity.identity().to_owned(),
+			Participant {
+				did: identity.identity().to_owned(),
+				state: co_core_co::ParticipantState::Active,
+				tags: tags!(),
+			},
+		);
 		reducer
 			.push(
 				runtime.runtime(),
@@ -273,7 +282,7 @@ impl SharedCoCreator {
 					id: self.co.id.to_owned(),
 					name: self.co.name.to_owned(),
 					cores: Default::default(),
-					participants: Default::default(),
+					participants,
 					key: encrypted_storage.as_ref().map(|(_, key_uri, _)| key_uri.clone()),
 				},
 			)
