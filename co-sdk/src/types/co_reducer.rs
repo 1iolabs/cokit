@@ -1,7 +1,7 @@
 use super::{co_storage::CoBlockStorageContentMapping, state_observable::StateObservable};
 use crate::{state::core_state, CoCoreResolver, CoStorage, Reducer, Runtime};
 use co_identity::PrivateIdentity;
-use co_primitives::CoId;
+use co_primitives::{CoId, OptionLink};
 use co_storage::{BlockStorageContentMapping, BlockStorageExt, StorageError};
 use futures::{stream, StreamExt};
 use libipld::Cid;
@@ -108,6 +108,12 @@ impl CoReducer {
 			return Ok(storage.get_deserialized(&state_cid).await?);
 		}
 		Ok(co_core_co::Co::default())
+	}
+
+	/// Read co reducer state reference.
+	pub async fn co_state(&self) -> OptionLink<co_core_co::Co> {
+		let reducer = self.reducer.read().await;
+		reducer.state().into()
 	}
 
 	/// Read a COre state.

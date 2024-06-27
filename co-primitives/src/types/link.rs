@@ -71,12 +71,28 @@ impl<T> Display for Link<T> {
 }
 
 /// A (serializable) typed link.
-#[derive(Default, Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Default, Serialize, Deserialize)]
 #[serde(into = "Option<Cid>", from = "Option<Cid>")]
 pub struct OptionLink<T: Default> {
 	#[serde(skip)]
 	_type: PhantomData<T>,
 	cid: Option<Cid>,
+}
+impl<T: Default> PartialEq for OptionLink<T> {
+	fn eq(&self, other: &Self) -> bool {
+		self.cid == other.cid
+	}
+}
+impl<T: Default> Ord for OptionLink<T> {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		self.cid.cmp(&other.cid)
+	}
+}
+impl<T: Default> Eq for OptionLink<T> {}
+impl<T: Default> PartialOrd for OptionLink<T> {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		self.cid.partial_cmp(&other.cid)
+	}
 }
 impl<T: Default> Linkable<T> for OptionLink<T> {
 	fn value(&self) -> Either<Cid, T> {

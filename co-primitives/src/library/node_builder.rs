@@ -20,6 +20,11 @@ impl<T> Default for Node<T> {
 pub trait NodeContainer<T> {
 	fn node_container_link(&self) -> OptionLink<Node<T>>;
 }
+impl<T> NodeContainer<T> for OptionLink<Node<T>> {
+	fn node_container_link(&self) -> OptionLink<Node<T>> {
+		self.clone()
+	}
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum NodeBuilderError {

@@ -23,7 +23,7 @@ pub use co_identity::{
 	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 pub use co_primitives::{
-	tags, BlockSerializer, CoId, Date, Did, Link, MultiCodec, MultiCodecError, OptionLink, Tag, Tags,
+	tag, tags, BlockSerializer, CoId, Date, Did, Link, MultiCodec, MultiCodecError, OptionLink, Tag, Tags,
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{

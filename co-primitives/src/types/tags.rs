@@ -75,6 +75,21 @@ pub enum TagValue {
 	Link(Cid),
 }
 impl TagValue {
+	/// Test if the default value is assigned.
+	pub fn is_empty(&self) -> bool {
+		match self {
+			TagValue::Null => true,
+			TagValue::Bool(v) => v == &bool::default(),
+			TagValue::Integer(v) => v == &Default::default(),
+			TagValue::Float(v) => *v == TotalFloat64(0f64),
+			TagValue::String(v) => v == "",
+			TagValue::Bytes(v) => v.is_empty(),
+			TagValue::List(v) => v.is_empty(),
+			TagValue::Map(v) => v.is_empty(),
+			TagValue::Link(_) => false,
+		}
+	}
+
 	/// Access the string value.
 	pub fn string(&self) -> Option<&str> {
 		match self {
@@ -263,6 +278,11 @@ impl Tags {
 			}
 		}
 		None
+	}
+}
+impl FromIterator<Tag> for Tags {
+	fn from_iter<T: IntoIterator<Item = Tag>>(iter: T) -> Self {
+		Self(BTreeSet::from_iter(iter))
 	}
 }
 impl Debug for Tags {

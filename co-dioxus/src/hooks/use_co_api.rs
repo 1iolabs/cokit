@@ -15,6 +15,7 @@ pub fn use_co_api(co: impl Into<CoId>, identity: impl Into<Option<Identity>>) ->
 }
 
 /// CO API.
+#[derive(Debug, Clone)]
 pub struct CoApi {
 	co: CoId,
 	context: CoContext,

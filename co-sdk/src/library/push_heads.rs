@@ -56,8 +56,8 @@ where
 		context: ReducerChangedContext,
 	) -> Result<(), anyhow::Error> {
 		// send local changes
-		if context.is_local_change() || self.initialized {
-			self.initialized = false;
+		if context.is_local_change() || !self.initialized {
+			self.initialized = true;
 
 			// map plain heads to encrypted heads
 			let mut heads = reducer.heads().clone();

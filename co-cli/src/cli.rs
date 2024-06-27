@@ -1,5 +1,5 @@
 use crate::{
-	commands::{cbor, co, core_build_builtin, file, pin, room, storage},
+	commands::{cbor, co, core_build_builtin, file, network, pin, room, storage},
 	library::cli_context::CliContext,
 };
 use clap::ArgAction;
@@ -64,8 +64,11 @@ pub struct Cli {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum CliCommand {
-	/// DAG-CBOR Utilities.
+	/// CO.
 	Co(co::Command),
+
+	/// Network Utilities.
+	Network(network::Command),
 
 	/// Build the build-in cores.
 	CoreBuildBuiltin,
@@ -97,6 +100,7 @@ pub async fn command(cli: &Cli) -> Result<ExitCode, anyhow::Error> {
 	// execute
 	let result = match &cli.command {
 		CliCommand::Co(command) => co::command(&context, cli, command).await,
+		CliCommand::Network(command) => network::command(&context, cli, command).await,
 		CliCommand::CoreBuildBuiltin => core_build_builtin::command().await,
 		CliCommand::Cbor(command) => cbor::command(&context, command).await,
 		CliCommand::File(command) => file::command(&context, cli, command).await,

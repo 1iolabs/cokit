@@ -52,6 +52,7 @@ impl Cores {
 	}
 
 	/// Get native versions of the built-in cores.
+	/// Mapps from CrateName to Core,
 	pub fn built_in_native(&self) -> HashMap<String, Core> {
 		self.cores.keys().map(|name| (name.to_owned(), get_native(name))).collect()
 	}

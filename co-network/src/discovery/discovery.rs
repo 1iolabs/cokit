@@ -573,7 +573,7 @@ where
 						.collect::<Vec<_>>(),
 				);
 			},
-			mdns::Event::Expired(_) => todo!(),
+			mdns::Event::Expired(_) => {},
 		}
 	}
 
