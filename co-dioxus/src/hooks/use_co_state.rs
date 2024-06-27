@@ -8,8 +8,7 @@ where
 	T: DeserializeOwned + Send + Sync + Default + Clone + 'static,
 {
 	let core = core.to_owned();
-	use_co_selector(co, move |storage, co_state| {
-		let core = core.clone();
-		async move { Ok(core_state::<T>(&storage, co_state.into(), &core).await?.1) }
+	use_co_selector(co, core, |storage, co_state, core| async move {
+		Ok(core_state::<T>(&storage, co_state.into(), &core).await?.1)
 	})
 }
