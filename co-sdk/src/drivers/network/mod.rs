@@ -85,21 +85,6 @@ impl Network {
 		self.network.lock().await.take()
 	}
 
-	// /// Update heads of the CO with known peers.
-	// /// One time operation.
-	// /// Note: This will not wait for responses.
-	// pub async fn update(&self, co_reducer: CoReducer) -> Result<(), anyhow::Error> {
-	// 	let update = Publish::new(self.spawner(), co_reducer.id().clone(), co_reducer.mapping.clone(), true);
-	// 	update.request(&co_reducer).await?;
-	// 	Ok(())
-	// }
-
-	// /// Subscribe to CO changes.
-	// pub async fn subscribe(&self, co_reducer: CoReducer) -> Result<Subscription, anyhow::Error> {
-	// 	state::networks(&co_reducer.storage(), co_reducer.reducer_state().await.0)
-	// 	Subscription::subscribe(self.spawner(), co_reducer).await
-	// }
-
 	pub async fn dail(&self, peer_id: PeerId, addresses: Vec<Multiaddr>) -> Result<(), anyhow::Error> {
 		DialNetworkTask::dial(self.spawner(), peer_id, addresses).await
 	}
