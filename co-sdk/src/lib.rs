@@ -5,13 +5,13 @@ mod errors;
 pub mod identity;
 mod library;
 mod pin;
+pub mod reducer;
 pub mod state;
 mod types;
 
 pub use application::{
 	application::{Application, ApplicationBuilder},
 	co_context::CoContext,
-	core_resolver::{CoCoreResolver, CoreResolver, CoreResolverError, SingleCoreResolver},
 	local::LocalCoBuilder,
 	reducer::{Reducer, ReducerBuilder, ReducerChangedContext, ReducerChangedHandler},
 	shared::CreateCo,
@@ -51,6 +51,7 @@ pub use library::{
 	task_spawner::TaskSpawner,
 };
 pub use pin::pin::PinAPI;
+pub use reducer::core_resolver::{co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverError};
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},
 	co_reducer_factory::CoReducerFactory,

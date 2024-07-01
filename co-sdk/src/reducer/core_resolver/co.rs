@@ -1,71 +1,12 @@
-use crate::{types::cores::CO_CORE_NAME_CO, Cores, CO_CORE_CO};
+use crate::{CoreResolver, CoreResolverError, Cores, CO_CORE_CO, CO_CORE_NAME_CO};
 use anyhow::Context;
 use async_trait::async_trait;
 use co_primitives::ReducerAction;
-use co_runtime::{Core, ExecuteError, RuntimeContext, RuntimePool};
-use co_storage::{BlockStorage, BlockStorageExt, StorageError};
+use co_runtime::{Core, RuntimeContext, RuntimePool};
+use co_storage::{BlockStorage, BlockStorageExt};
 use libipld::Cid;
 use serde::de::IgnoredAny;
 use std::collections::HashMap;
-
-#[async_trait]
-pub trait CoreResolver<S> {
-	/// Apply action to root state.
-	async fn execute(
-		&self,
-		storage: &S,
-		runtime: &RuntimePool,
-		state: &Option<Cid>,
-		action: &Cid,
-	) -> Result<Option<Cid>, CoreResolverError>;
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum CoreResolverError {
-	/// Storage error.
-	#[error("Storage error")]
-	Storage(#[from] StorageError),
-
-	/// Invalid arguemnt (action) supplied to the resolver.
-	#[error("Invalid argument")]
-	InvalidArgument(#[from] anyhow::Error),
-
-	/// The core referenced by the action can not be found.
-	#[error("Core not found: {0}")]
-	CoreNotFound(String),
-
-	/// The core referenced by the action can not be found.
-	#[error("Execute core failed: {0}")]
-	Execute(String, #[source] ExecuteError),
-}
-
-#[derive(Debug, Clone)]
-pub struct SingleCoreResolver {
-	core: Core,
-}
-impl SingleCoreResolver {
-	pub fn new(core: Core) -> Self {
-		Self { core }
-	}
-}
-#[async_trait]
-impl<S> CoreResolver<S> for SingleCoreResolver
-where
-	S: BlockStorage + Send + Sync + Clone + 'static,
-{
-	async fn execute(
-		&self,
-		storage: &S,
-		runtime: &RuntimePool,
-		state: &Option<Cid>,
-		action: &Cid,
-	) -> Result<Option<Cid>, CoreResolverError> {
-		Ok(runtime
-			.execute(storage, &self.core, RuntimeContext { state: *state, event: action.into() })
-			.await
-			.map_err(|e| CoreResolverError::Execute("root".to_owned(), e))?)
-	}
-}
 
 /// Resolve to core to use from
 #[derive(Debug, Clone)]
