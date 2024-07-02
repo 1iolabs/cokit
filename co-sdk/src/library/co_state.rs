@@ -1,4 +1,7 @@
-use crate::{CoCoreResolver, CoStorage, Reducer, ReducerChangedContext, ReducerChangedHandler};
+use crate::{
+	reducer::core_resolver::dynamic::DynamicCoreResolver, CoStorage, Reducer, ReducerChangeContext,
+	ReducerChangedHandler,
+};
 use async_trait::async_trait;
 use co_core_co::Co;
 use co_primitives::OptionLink;
@@ -29,11 +32,11 @@ impl From<OptionLink<Co>> for CoState {
 	}
 }
 #[async_trait]
-impl ReducerChangedHandler<CoStorage, CoCoreResolver> for CoState {
+impl ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for CoState {
 	async fn on_state_changed(
 		&mut self,
-		reducer: &Reducer<CoStorage, CoCoreResolver>,
-		_context: ReducerChangedContext,
+		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
 		self.write(reducer.state().into()).await;
 		Ok(())

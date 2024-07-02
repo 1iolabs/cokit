@@ -3,8 +3,8 @@ use super::{
 	CoNetworkTaskSpawner,
 };
 use crate::{
-	library::to_plain::to_plain, state, CoCoreResolver, CoStorage, Reducer, ReducerChangedContext,
-	ReducerChangedHandler,
+	library::to_plain::to_plain, reducer::core_resolver::dynamic::DynamicCoreResolver, state, CoStorage, Reducer,
+	ReducerChangeContext, ReducerChangedHandler,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -53,15 +53,15 @@ impl<M> CoHeadsPublish<M> {
 	// }
 }
 #[async_trait]
-impl<M> ReducerChangedHandler<CoStorage, CoCoreResolver> for CoHeadsPublish<M>
+impl<M> ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for CoHeadsPublish<M>
 where
 	M: BlockStorageContentMapping + Send + Sync + 'static,
 {
 	// TODO: skip publish when have only one peer?
 	async fn on_state_changed(
 		&mut self,
-		reducer: &Reducer<CoStorage, CoCoreResolver>,
-		_context: ReducerChangedContext,
+		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
 		let mut heads = reducer.heads().clone();
 

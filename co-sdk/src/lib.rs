@@ -12,8 +12,8 @@ mod types;
 pub use application::{
 	application::{Application, ApplicationBuilder},
 	co_context::CoContext,
-	local::LocalCoBuilder,
-	reducer::{Reducer, ReducerBuilder, ReducerChangedContext, ReducerChangedHandler},
+	local::{LocalCoBuilder, CO_ID_LOCAL},
+	reducer::{Reducer, ReducerBuilder, ReducerChangeContext, ReducerChangedHandler},
 	shared::CreateCo,
 	tracing::TracingBuilder,
 };

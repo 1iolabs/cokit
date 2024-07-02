@@ -139,8 +139,8 @@ impl Application {
 			});
 		}
 
-		// replace reducer factory to rebuild them with network support after this
-		self.co_context = self.co_context.inner.with_network(Some(network.spawner())).await.into();
+		// set network to reducers
+		self.co_context.inner.set_network(Some(network.spawner())).await;
 
 		// assign
 		self.network = Some(network);

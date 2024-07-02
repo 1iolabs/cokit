@@ -2,7 +2,7 @@ use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
 use co_primitives::CoId;
 use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
-use co_sdk::{memberships, Application, CoStorage, NodeStream, CO_CORE_NAME_PIN};
+use co_sdk::{memberships, Application, CoStorage, NodeStream, CO_CORE_NAME_PIN, CO_ID_LOCAL};
 use exitcode::ExitCode;
 use futures::{pin_mut, StreamExt, TryStreamExt};
 use libipld::Cid;
@@ -48,7 +48,7 @@ pub struct GenerateCommand {
 	#[arg(short, long, default_value_t = -1)]
 	pub depth: i64,
 	/// co id
-	#[arg(short, long, default_value_t = CoId::new("local"))]
+	#[arg(short, long, default_value_t = CoId::new(CO_ID_LOCAL))]
 	pub co: CoId,
 }
 

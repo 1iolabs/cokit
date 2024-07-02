@@ -1,4 +1,4 @@
-use crate::{CoreResolver, CoreResolverError, Cores, CO_CORE_CO, CO_CORE_NAME_CO};
+use crate::{CoreResolver, CoreResolverError, Cores, ReducerChangeContext, CO_CORE_CO, CO_CORE_NAME_CO};
 use anyhow::Context;
 use async_trait::async_trait;
 use co_primitives::ReducerAction;
@@ -8,7 +8,7 @@ use libipld::Cid;
 use serde::de::IgnoredAny;
 use std::collections::HashMap;
 
-/// Resolve to core to use from
+/// Resolve action core assuming the Co root state is to `co_core_co::Co`.
 #[derive(Debug, Clone)]
 pub struct CoCoreResolver {
 	mapping: HashMap<Cid, Core>,
@@ -40,6 +40,7 @@ where
 		&self,
 		storage: &S,
 		runtime: &RuntimePool,
+		_context: &ReducerChangeContext,
 		state: &Option<Cid>,
 		action: &Cid,
 	) -> Result<Option<Cid>, CoreResolverError> {

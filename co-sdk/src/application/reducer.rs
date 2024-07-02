@@ -118,6 +118,7 @@ where
 	#[instrument(skip(self, runtime))]
 	pub async fn initialize(&mut self, runtime: &RuntimePool) -> Result<(), anyhow::Error> {
 		tracing::trace!(?self.snapshots, "reducer-initialize");
+		let context = ReducerChangeContext { cause: ReducerChangeCause::Initialize };
 
 		// if we have snapshots but no state/heads join all heads from snapshots
 		// find latest state if we have snapshots but no latest selection
@@ -140,7 +141,7 @@ where
 		// if log heads are different from reducer heads
 		if &self.heads != self.log.heads() {
 			// compute the state
-			let (state, heads) = self.compute_state(runtime).await?;
+			let (state, heads) = self.compute_state(runtime, &context).await?;
 			self.state = state;
 			self.heads = heads;
 		}
@@ -156,7 +157,7 @@ where
 		}
 
 		// notify
-		self.on_state_changed(ReducerChangedCause::Initialize).await?;
+		self.on_state_changed(&context).await?;
 
 		// log
 		tracing::trace!(?self.state, ?self.heads, "reducer-initialized");
@@ -259,9 +260,10 @@ where
 		// println!("entry = {:?}", ipld);
 
 		// apply to state
+		let context = ReducerChangeContext { cause: ReducerChangeCause::Push };
 		let state = self
 			.core_resolver
-			.execute(self.log.storage(), runtime, &self.state, action.cid())
+			.execute(self.log.storage(), runtime, &context, &self.state, action.cid())
 			.await?;
 
 		// snapshot
@@ -274,7 +276,7 @@ where
 		self.heads = self.log.heads_iter().cloned().collect();
 
 		// notify
-		self.on_state_changed(ReducerChangedCause::Push).await?;
+		self.on_state_changed(&context).await?;
 
 		// result
 		Ok(())
@@ -289,7 +291,8 @@ where
 			&& (self.log_mut().join_heads(heads.iter()).await? || &self.heads != self.log.heads())
 		{
 			// sync state
-			let (next_state, next_heads) = self.compute_state(runtime).await?;
+			let context = ReducerChangeContext { cause: ReducerChangeCause::Log };
+			let (next_state, next_heads) = self.compute_state(runtime, &context).await?;
 			result = next_state != self.state;
 			if next_state != self.state || self.heads != next_heads {
 				// apply
@@ -297,22 +300,23 @@ where
 				self.heads = next_heads;
 
 				// notify
-				self.on_state_changed(ReducerChangedCause::Log).await?;
+				self.on_state_changed(&context).await?;
 			}
 		}
 		Ok(result)
 	}
 
 	/// Notify subscribers about change.
-	async fn on_state_changed(&mut self, cause: ReducerChangedCause) -> Result<(), LogError> {
-		let context = ReducerChangedContext { cause };
-
+	async fn on_state_changed(&mut self, context: &ReducerChangeContext) -> Result<(), LogError> {
 		// handlers
+		// note:
+		//  we use try_for_each_concurrent which spawns each item on a new task this is required
+		//  to prevent deadlocks because the on_state_changed handler is called within an outer RwLock.
 		let mut change_handlers = Vec::new();
 		change_handlers.append(&mut self.change_handlers);
 		{
 			let reducer: &Self = self;
-			let context: &ReducerChangedContext = &context;
+			let context: &ReducerChangeContext = &context;
 			stream::iter(change_handlers.iter_mut())
 				.map(Ok)
 				.try_for_each_concurrent(5, |handler| async move {
@@ -345,7 +349,11 @@ where
 	/// Compute state for log heads.
 	/// Returns the resulting state if one.
 	#[instrument(skip(self, runtime), fields(co = ?self.log.id()))]
-	async fn compute_state(&self, runtime: &RuntimePool) -> Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error> {
+	async fn compute_state(
+		&self,
+		runtime: &RuntimePool,
+		context: &ReducerChangeContext,
+	) -> Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error> {
 		// compute stack
 		let (mut state, stack) = self.compute_stack().await?;
 
@@ -353,7 +361,7 @@ where
 		for entry in stack {
 			state = self
 				.core_resolver
-				.execute(self.log.storage(), runtime, &state, &entry.entry().payload)
+				.execute(self.log.storage(), runtime, context, &state, &entry.entry().payload)
 				.await?;
 		}
 
@@ -423,15 +431,15 @@ pub trait ReducerChangedHandler<S, R> {
 	async fn on_state_changed(
 		&mut self,
 		reducer: &Reducer<S, R>,
-		context: ReducerChangedContext,
+		context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error>;
 }
 
 #[derive(Debug, Clone)]
-pub struct ReducerChangedContext {
-	cause: ReducerChangedCause,
+pub struct ReducerChangeContext {
+	cause: ReducerChangeCause,
 }
-impl ReducerChangedContext {
+impl ReducerChangeContext {
 	/// Whether this change was caused locally.
 	pub fn is_local_change(&self) -> bool {
 		self.cause.is_local()
@@ -440,7 +448,7 @@ impl ReducerChangedContext {
 
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
-enum ReducerChangedCause {
+enum ReducerChangeCause {
 	/// Change caused by reducer initialization.
 	Initialize,
 	/// Change caused by an log operation (join).
@@ -448,11 +456,11 @@ enum ReducerChangedCause {
 	/// Change caused by local push operation.
 	Push,
 }
-impl ReducerChangedCause {
+impl ReducerChangeCause {
 	/// Whether this change was caused locally.
 	pub fn is_local(&self) -> bool {
 		match self {
-			ReducerChangedCause::Push => true,
+			ReducerChangeCause::Push => true,
 			_ => false,
 		}
 	}
@@ -462,7 +470,7 @@ impl ReducerChangedCause {
 mod tests {
 	use super::Reducer;
 	use crate::{
-		application::reducer::ReducerBuilder, CoreResolver, ReducerChangedContext, ReducerChangedHandler,
+		application::reducer::ReducerBuilder, CoreResolver, ReducerChangeContext, ReducerChangedHandler,
 		SingleCoreResolver,
 	};
 	use async_trait::async_trait;
@@ -719,7 +727,7 @@ mod tests {
 			async fn on_state_changed(
 				&mut self,
 				_reducer: &Reducer<MemoryBlockStorage, SingleCoreResolver>,
-				_context: ReducerChangedContext,
+				_context: ReducerChangeContext,
 			) -> Result<(), anyhow::Error> {
 				panic!("expected no state change when join same heads");
 			}

@@ -2,9 +2,10 @@ use super::{application::ApplicationSettings, shared::SharedCoBuilder};
 use crate::{
 	drivers::network::{token::CoToken, CoNetworkTaskSpawner},
 	library::{find_co_secret::find_co_secret, find_membership::find_membership},
-	types::co_storage::CoBlockStorageContentMapping,
-	CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime, TaskSpawner, CO_CORE_NAME_KEYSTORE,
-	CO_CORE_NAME_MEMBERSHIP,
+	reducer::core_resolver::membership::{MembershipCoreResolver, MembershipInstanceRegistry},
+	types::co_reducer::CoReducerContext,
+	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime, TaskSpawner,
+	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -30,7 +31,8 @@ impl CoContext {
 	}
 
 	/// Get a stream to the log entries.
-	/// Starting at the latest.
+	/// Starting at the latest (reverse chronological).
+	/// The stream is read with snapshot isolation (not watching changes).
 	pub async fn entries(
 		&self,
 		co: impl AsRef<CoId>,
@@ -38,7 +40,7 @@ impl CoContext {
 		(
 			CoStorage,
 			impl Stream<Item = Result<EntryBlock<<CoStorage as BlockStorage>::StoreParams>, anyhow::Error>>,
-			Option<CoBlockStorageContentMapping>,
+			Arc<dyn CoReducerContext + Send + Sync + 'static>,
 		),
 		anyhow::Error,
 	> {
@@ -46,7 +48,7 @@ impl CoContext {
 
 		// create
 		let initialized = true;
-		let uninitialized_reducer = if co.as_str() == "local" {
+		let uninitialized_reducer = if co.as_str() == CO_ID_LOCAL {
 			self.inner.create_local_co_instance(initialized).await?
 		} else {
 			let local = self.local_co_reducer().await?;
@@ -55,14 +57,14 @@ impl CoContext {
 				.await?
 				.ok_or(anyhow!("Co not found: {}", co))?
 		};
-		let (storage, reducer, mapping) = uninitialized_reducer.into_inner().ok_or(anyhow!("Invalid reference"))?;
+		let (storage, reducer, context) = uninitialized_reducer.into_inner().ok_or(anyhow!("Invalid reference"))?;
 		let log = reducer.into_log();
 
 		// stream
 		let stream = log.into_stream().map_err(|e| e.into());
 
 		// result
-		Ok((storage, stream, mapping))
+		Ok((storage, stream, context))
 	}
 }
 #[async_trait]
@@ -111,6 +113,7 @@ impl bitswap::StorageResolver<CoStorage> for CoContext {
 	}
 }
 
+#[derive(Clone)]
 pub(crate) struct CoContextInner {
 	settings: ApplicationSettings,
 
@@ -119,12 +122,12 @@ pub(crate) struct CoContextInner {
 
 	local_identity: LocalIdentity,
 
-	network: Option<CoNetworkTaskSpawner>,
+	network: Arc<RwLock<Option<CoNetworkTaskSpawner>>>,
 	storage: CoStorage,
 	runtime: Runtime,
 
 	/// Loaded reducers.
-	reducers: RwLock<BTreeMap<CoId, CoReducer>>,
+	reducers: Arc<RwLock<BTreeMap<CoId, CoReducer>>>,
 }
 impl CoContextInner {
 	pub(crate) fn new(
@@ -136,7 +139,16 @@ impl CoContextInner {
 		storage: CoStorage,
 		runtime: Runtime,
 	) -> Self {
-		Self { settings, shutdown, tasks, local_identity, network, storage, runtime, reducers: Default::default() }
+		Self {
+			settings,
+			shutdown,
+			tasks,
+			local_identity,
+			network: Arc::new(RwLock::new(network)),
+			storage,
+			runtime,
+			reducers: Default::default(),
+		}
 	}
 
 	/// Get the root storage.
@@ -145,30 +157,17 @@ impl CoContextInner {
 	}
 
 	/// Clone with network.
-	pub async fn with_network(&self, network: Option<CoNetworkTaskSpawner>) -> Self {
-		Self {
-			settings: self.settings.clone(),
-			shutdown: self.shutdown.clone(),
-			tasks: self.tasks.clone(),
-			local_identity: self.local_identity.clone(),
-			network,
-			storage: self.storage.clone(),
-			runtime: self.runtime.clone(),
-			reducers: {
-				// we only keep local as this has no network
-				let mut next_reducers = BTreeMap::new();
-				let reducers = self.reducers.read().await;
-				if let Some(local) = reducers.get("local") {
-					next_reducers.insert("local".into(), local.clone());
-				}
-				RwLock::new(next_reducers)
-			},
-		}
+	pub async fn set_network(&self, network: Option<CoNetworkTaskSpawner>) {
+		// assign
+		*self.network.write().await = network;
+
+		// clear reducers
+		self.reducers.write().await.retain(|id, _reducer| id.as_str() == CO_ID_LOCAL);
 	}
 
 	/// Get instance of Local CoReducer.
 	pub async fn local_co_reducer(&self) -> Result<CoReducer, anyhow::Error> {
-		let co = "local";
+		let co = CO_ID_LOCAL;
 
 		// has one?
 		{
@@ -191,9 +190,21 @@ impl CoContextInner {
 
 	/// Creates a CoReducer instance of the Local CO.
 	async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
+		let core_resolver = MembershipCoreResolver::new(
+			self.tasks.clone(),
+			CoCoreResolver::default(),
+			CoContextMembershipInstanceRegistry { reducers: self.reducers.clone() },
+			CO_CORE_NAME_MEMBERSHIP.to_owned(),
+		);
 		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize);
 		let local_co_reducer = local_co
-			.build(self.storage.clone(), self.runtime.clone(), self.shutdown.child_token(), self.tasks.clone())
+			.build(
+				self.storage.clone(),
+				self.runtime.clone(),
+				self.shutdown.child_token(),
+				self.tasks.clone(),
+				core_resolver,
+			)
 			.await?;
 		Ok(local_co_reducer)
 	}
@@ -216,7 +227,7 @@ impl CoContextInner {
 		}
 
 		// create
-		let reducer = if co.as_str() == "local" {
+		let reducer = if co.as_str() == CO_ID_LOCAL {
 			Some(self.create_local_co_instance(true).await?)
 		} else {
 			let local = self.local_co_reducer().await?;
@@ -250,7 +261,7 @@ impl CoContextInner {
 		let reducer = SharedCoBuilder::new(parent, membership)
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
-			.with_network(self.network.clone())
+			.with_network(self.network.read().await.clone())
 			.with_initialize(initialize)
 			.build(self.tasks.clone(), self.storage.clone(), self.runtime.clone(), identity)
 			.await?;
@@ -260,5 +271,29 @@ impl CoContextInner {
 impl From<CoContextInner> for CoContext {
 	fn from(val: CoContextInner) -> Self {
 		CoContext { inner: Arc::new(val) }
+	}
+}
+
+#[derive(Clone)]
+struct CoContextMembershipInstanceRegistry {
+	reducers: Arc<RwLock<BTreeMap<CoId, CoReducer>>>,
+}
+#[async_trait]
+impl MembershipInstanceRegistry for CoContextMembershipInstanceRegistry {
+	async fn update(&self, co: CoId) -> Result<(), anyhow::Error> {
+		if let Some(co_reducer) = self.reducers.read().await.get(&co).cloned() {
+			if let Some(parent) = co_reducer.parent_id() {
+				if let Some(parent_co_reducer) = self.reducers.read().await.get(parent).cloned() {
+					let context = co_reducer.context.clone();
+					context.refresh(parent_co_reducer, co_reducer).await?;
+				}
+			}
+		}
+		Ok(())
+	}
+
+	async fn remove(&self, co: CoId) -> Result<(), anyhow::Error> {
+		self.reducers.write().await.remove(&co);
+		Ok(())
 	}
 }

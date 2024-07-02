@@ -1,4 +1,4 @@
-use crate::{CoreResolver, CoreResolverError};
+use crate::{CoreResolver, CoreResolverError, ReducerChangeContext};
 use async_trait::async_trait;
 use co_runtime::{Core, RuntimeContext, RuntimePool};
 use co_storage::BlockStorage;
@@ -22,6 +22,7 @@ where
 		&self,
 		storage: &S,
 		runtime: &RuntimePool,
+		_context: &ReducerChangeContext,
 		state: &Option<Cid>,
 		action: &Cid,
 	) -> Result<Option<Cid>, CoreResolverError> {

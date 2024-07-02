@@ -284,6 +284,14 @@ where
 pub struct EncryptedBlockStorageMapping {
 	mapping: Arc<RwLock<BlockMapping>>,
 }
+impl EncryptedBlockStorageMapping {
+	/// Load mapping from CID.
+	/// This will add the mappings to the existing.
+	pub async fn load_mapping<S: BlockStorage>(&self, storage: &S, map: &Cid) -> Result<(), StorageError> {
+		self.mapping.write().await.read_mappings(storage, map).await?;
+		Ok(())
+	}
+}
 #[async_trait]
 impl BlockStorageContentMapping for EncryptedBlockStorageMapping {
 	/// Convert the mapped [`Cid`] to an plain storage [`Cid`].

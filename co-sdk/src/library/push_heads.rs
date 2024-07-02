@@ -4,7 +4,8 @@ use crate::{
 		tasks::co_heads::{CoHeadsNetworkTask, CoHeadsRequest},
 		CoNetworkTaskSpawner,
 	},
-	CoCoreResolver, CoStorage, Reducer, ReducerChangedContext, ReducerChangedHandler, TaskSpawner,
+	reducer::core_resolver::dynamic::DynamicCoreResolver,
+	CoStorage, Reducer, ReducerChangeContext, ReducerChangedHandler, TaskSpawner,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -46,14 +47,14 @@ impl<M> PushHeads<M> {
 	}
 }
 #[async_trait]
-impl<M> ReducerChangedHandler<CoStorage, CoCoreResolver> for PushHeads<M>
+impl<M> ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for PushHeads<M>
 where
 	M: BlockStorageContentMapping + Send + Sync + 'static,
 {
 	async fn on_state_changed(
 		&mut self,
-		reducer: &Reducer<CoStorage, CoCoreResolver>,
-		context: ReducerChangedContext,
+		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+		context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
 		// send local changes
 		if context.is_local_change() || !self.initialized {

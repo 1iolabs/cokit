@@ -1,4 +1,4 @@
-use crate::{CoReducerFactory, DidKeyProvider, CO_CORE_NAME_KEYSTORE};
+use crate::{CoReducerFactory, DidKeyProvider, CO_CORE_NAME_KEYSTORE, CO_ID_LOCAL};
 use async_trait::async_trait;
 use co_identity::{IdentityResolverError, PrivateIdentityBox, PrivateIdentityResolver};
 
@@ -22,7 +22,7 @@ where
 	async fn resolve_private(&self, identity: &str) -> Result<PrivateIdentityBox, IdentityResolverError> {
 		let local_co = self
 			.factory
-			.co_reducer(&"local".into())
+			.co_reducer(&CO_ID_LOCAL.into())
 			.await?
 			.ok_or(IdentityResolverError::NotFound)?;
 		DidKeyProvider::new(local_co, CO_CORE_NAME_KEYSTORE)

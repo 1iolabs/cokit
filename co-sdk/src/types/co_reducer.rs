@@ -1,5 +1,6 @@
 use super::{co_storage::CoBlockStorageContentMapping, state_observable::StateObservable};
-use crate::{state::core_state, CoCoreResolver, CoStorage, Reducer, Runtime};
+use crate::{reducer::core_resolver::dynamic::DynamicCoreResolver, state::core_state, CoStorage, Reducer, Runtime};
+use async_trait::async_trait;
 use co_identity::PrivateIdentity;
 use co_primitives::{CoId, OptionLink};
 use co_storage::{BlockStorageContentMapping, BlockStorageExt, StorageError};
@@ -13,18 +14,18 @@ use tokio::sync::RwLock;
 pub struct CoReducer {
 	id: CoId,
 	parent: Option<CoId>,
-	pub(crate) reducer: Arc<RwLock<Reducer<CoStorage, CoCoreResolver>>>,
+	pub(crate) reducer: Arc<RwLock<Reducer<CoStorage, DynamicCoreResolver<CoStorage>>>>,
 	pub(crate) storage: CoStorage,
 	pub(crate) runtime: Runtime,
-	pub(crate) mapping: Option<CoBlockStorageContentMapping>,
+	pub(crate) context: Arc<dyn CoReducerContext + Send + Sync + 'static>,
 }
 impl CoReducer {
 	pub(crate) fn new(
 		id: CoId,
 		parent: Option<CoId>,
 		runtime: Runtime,
-		reducer: Reducer<CoStorage, CoCoreResolver>,
-		mapping: Option<CoBlockStorageContentMapping>,
+		reducer: Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+		context: Arc<dyn CoReducerContext + Send + Sync + 'static>,
 	) -> Self {
 		Self {
 			id,
@@ -32,7 +33,7 @@ impl CoReducer {
 			runtime,
 			storage: reducer.log().storage().clone(),
 			reducer: Arc::new(RwLock::new(reducer)),
-			mapping,
+			context,
 		}
 	}
 
@@ -40,8 +41,8 @@ impl CoReducer {
 		&self.id
 	}
 
-	pub fn parent_id(&self) -> &Option<CoId> {
-		&self.parent
+	pub fn parent_id(&self) -> Option<&CoId> {
+		self.parent.as_ref()
 	}
 
 	/// Get current reducer heads.
@@ -98,6 +99,11 @@ impl CoReducer {
 		Ok(self.reducer.write().await.join(&heads, self.runtime.runtime()).await?)
 	}
 
+	/// Insert a previous (trusted) snapshot into histroy which may can used as a starting point.
+	pub async fn insert_snapshot(&self, state: Cid, heads: BTreeSet<Cid>) {
+		self.reducer.write().await.insert_snapshot(state, heads);
+	}
+
 	/// Read co reducer state.
 	pub async fn co(&self) -> Result<co_core_co::Co, CoReducerError> {
 		let (storage, state) = {
@@ -134,13 +140,17 @@ impl CoReducer {
 	/// Try to escape inner data.
 	pub(crate) fn into_inner(
 		self,
-	) -> Option<(CoStorage, Reducer<CoStorage, CoCoreResolver>, Option<CoBlockStorageContentMapping>)> {
-		Arc::into_inner(self.reducer).map(|lock| (self.storage, lock.into_inner(), self.mapping))
+	) -> Option<(
+		CoStorage,
+		Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+		Arc<dyn CoReducerContext + Send + Sync + 'static>,
+	)> {
+		Arc::into_inner(self.reducer).map(|lock| (self.storage, lock.into_inner(), self.context))
 	}
 
 	/// Convert an CO CID to an external (plain) CID.
 	pub async fn to_external_cid(&self, cid: Cid) -> Cid {
-		match &self.mapping {
+		match &self.context.content_mapping() {
 			Some(mapping) => mapping.to_plain(&cid).await.unwrap_or(cid),
 			None => cid,
 		}
@@ -159,6 +169,11 @@ impl CoReducer {
 				.collect()
 				.await,
 		)
+	}
+
+	/// Refresh the reducer instance parent state.
+	pub async fn refresh(&self, parent: CoReducer) -> anyhow::Result<()> {
+		self.context.refresh(parent, self.clone()).await
 	}
 }
 impl Debug for CoReducer {
@@ -182,4 +197,11 @@ pub enum CoReducerError {
 	CoreNotFound(String),
 }
 
-// pub type CoReducer = Reducer<EncryptedBlockStorage<CoStorage>, CoCoreResolver<EncryptedBlockStorage<CoStorage>>>;
+#[async_trait]
+pub trait CoReducerContext {
+	/// Get encryption mapping instance.
+	fn content_mapping(&self) -> Option<CoBlockStorageContentMapping>;
+
+	/// Refresh reducer instance state from source.
+	async fn refresh(&self, parent: CoReducer, co: CoReducer) -> anyhow::Result<()>;
+}

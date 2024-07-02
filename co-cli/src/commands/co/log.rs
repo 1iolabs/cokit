@@ -22,7 +22,7 @@ pub struct Command {
 
 pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
 	let application = context.application(cli).await;
-	let (storage, stream, mapping) = application.co().entries(&command.co).await?;
+	let (storage, stream, context) = application.co().entries(&command.co).await?;
 
 	// stream
 	let mut index = 0;
@@ -33,7 +33,7 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 			Ok(entry) => {
 				// event
 				print!("head ({index}) {}", entry.cid());
-				if let Some(mapping) = &mapping {
+				if let Some(mapping) = context.content_mapping() {
 					let encrypted_cid = mapping.to_plain(entry.cid()).await;
 					if let Some(encrypted_cid) = encrypted_cid {
 						print!(" ({}: {})", MultiCodec::from(encrypted_cid.codec()), encrypted_cid);
