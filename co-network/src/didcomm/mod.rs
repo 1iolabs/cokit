@@ -17,6 +17,7 @@ use std::{
 	collections::{HashMap, VecDeque},
 	task::{Context, Poll},
 };
+use thiserror::Error;
 
 mod codec;
 mod handler;
@@ -33,13 +34,16 @@ pub enum Event {
 	OutboundFailure { peer_id: PeerId, error: OutboundFailure, message: Option<EncodedMessage> },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum OutboundFailure {
-	/// Conenction timeout.
+	/// Connection timeout.
+	#[error("Connection timeout")]
 	Timeout,
 	/// The message could not be sent because a dialing attempt failed.
+	#[error("The message could not be sent because a dialing attempt failed")]
 	DialFailure,
 	/// The remote supports none of the requested protocols.
+	#[error("The remote supports none of the requested protocols")]
 	UnsupportedProtocols,
 }
 

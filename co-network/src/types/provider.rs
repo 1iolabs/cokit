@@ -1,6 +1,9 @@
 use crate::didcomm;
 use libipld::store::StoreParams;
-use libp2p::{gossipsub, mdns, rendezvous, swarm::NetworkBehaviour};
+use libp2p::{
+	gossipsub, mdns, rendezvous,
+	swarm::{NetworkBehaviour, SwarmEvent},
+};
 use libp2p_bitswap::{Bitswap, BitswapEvent};
 
 /// Trait which can be implemented on NetworkBehaviours which provide gossipsub.
@@ -81,6 +84,26 @@ pub trait DidcommBehaviourProvider: NetworkBehaviour {
 	fn into_didcomm_event(
 		event: <Self as NetworkBehaviour>::ToSwarm,
 	) -> Result<didcomm::Event, <Self as NetworkBehaviour>::ToSwarm>;
+
+	fn clone_didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<didcomm::Event> {
+		Self::didcomm_event(event).cloned()
+	}
+
+	fn swarm_didcomm_event(event: &SwarmEvent<<Self as NetworkBehaviour>::ToSwarm>) -> Option<&didcomm::Event> {
+		if let SwarmEvent::Behaviour(event) = event {
+			Self::didcomm_event(event)
+		} else {
+			None
+		}
+	}
+
+	fn swarm_clone_didcomm_event(event: &SwarmEvent<<Self as NetworkBehaviour>::ToSwarm>) -> Option<didcomm::Event> {
+		if let SwarmEvent::Behaviour(event) = event {
+			Self::clone_didcomm_event(event)
+		} else {
+			None
+		}
+	}
 
 	fn handle_event<F: Fn(&didcomm::Event) -> bool>(
 		event: <Self as NetworkBehaviour>::ToSwarm,
