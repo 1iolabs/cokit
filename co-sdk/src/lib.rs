@@ -45,7 +45,6 @@ pub use library::{
 	generate_random_name::generate_random_name,
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
-	memberships::memberships,
 	node_stream::NodeStream,
 	shared_co_join::{SharedCoJoin, SharedCoJoinError},
 	task_spawner::TaskSpawner,

@@ -10,7 +10,6 @@ pub mod keystore_fetch;
 pub mod local_keypair_fetch;
 pub mod local_secret;
 pub mod locals;
-pub mod memberships;
 pub mod node_stream;
 pub mod push_heads;
 pub mod shared_co_join;

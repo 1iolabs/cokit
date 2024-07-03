@@ -2,7 +2,7 @@ use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
 use co_primitives::CoId;
 use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
-use co_sdk::{memberships, Application, CoStorage, NodeStream, CO_CORE_NAME_PIN, CO_ID_LOCAL};
+use co_sdk::{state::memberships, Application, CoStorage, NodeStream, CO_CORE_NAME_PIN, CO_ID_LOCAL};
 use exitcode::ExitCode;
 use futures::{pin_mut, StreamExt, TryStreamExt};
 use libipld::Cid;
@@ -154,12 +154,12 @@ async fn update_pins(context: &CliContext, cli: &Cli, _command: &UpdateCommand) 
 
 async fn get_all_co_storages(application: Application) -> anyhow::Result<Vec<CoStorage>> {
 	let local_co_reducer = application.local_co_reducer().await?;
-	let stream = memberships(local_co_reducer);
+	let stream = memberships(local_co_reducer.storage(), local_co_reducer.co_state().await);
 	let mut storages: Vec<CoStorage> = vec![];
 	pin_mut!(stream);
 	while let Some(result) = stream.next().await {
 		match result {
-			Ok((co, _, _)) => {
+			Ok((co, _, _, _)) => {
 				if let Some(reducer) = application.co_reducer(co).await? {
 					storages.push(reducer.storage());
 				}

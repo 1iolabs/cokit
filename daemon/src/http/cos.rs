@@ -1,6 +1,6 @@
 use crate::types::http_error::HttpResult;
 use axum::{Extension, Json};
-use co_sdk::{memberships, Application, CreateCo, Tags};
+use co_sdk::{state::memberships, Application, CreateCo, Tags};
 use futures::StreamExt;
 use hyper::StatusCode;
 use libipld::Cid;
@@ -21,10 +21,10 @@ pub enum GetItem {
 #[axum_macros::debug_handler]
 pub async fn get(application: Extension<Application>) -> HttpResult<(StatusCode, Json<Vec<GetItem>>)> {
 	let local_co = application.local_co_reducer().await?;
-	let memberships: Vec<GetItem> = memberships(local_co)
+	let memberships: Vec<GetItem> = memberships(local_co.storage(), local_co.co_state().await)
 		.map(|item| -> GetItem {
 			match item {
-				Ok((id, state, tags)) => GetItem::Ok { id: id.into(), state, tags },
+				Ok((id, state, tags, _membership_state)) => GetItem::Ok { id: id.into(), state, tags },
 				Err(e) => GetItem::Err { err: format!("{:?}", e) },
 			}
 		})

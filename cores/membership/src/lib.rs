@@ -1,6 +1,7 @@
 use co_api::{CoId, Context, Did, Reducer, ReducerAction, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::BTreeSet;
 
 /// Membership COre.
@@ -26,6 +27,7 @@ pub struct Membership {
 	pub heads: BTreeSet<Cid>,
 
 	// TODO mark as external as this field shouldn't be further resolved when pinning
+	// TODO https://gitlab.1io.com/1io/co-sdk/-/issues/47
 	/// The encryption mapping if the CO is encrypted.
 	pub encryption_mapping: Option<Cid>,
 
@@ -39,13 +41,29 @@ pub struct Membership {
 	pub tags: Tags,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq)]
 #[non_exhaustive]
+#[repr(u8)]
 pub enum MembershipState {
-	PendingInvite,
-	PendingJoin,
-	Active,
-	Closed,
+	/// Active membership.
+	Active = 0,
+
+	/// Inactive membership.
+	Inactive = 1,
+
+	/// Pending invite by some participant of the CO.
+	///
+	/// Related membership Tags:
+	///  `invite-from: Did`
+	///  `invite-id: String`
+	///  `invite-date: Date`
+	Invite = 2,
+
+	/// Pending join by us.
+	///
+	/// Related membership Tags:
+	///  `join-date: Date`
+	Join = 3,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

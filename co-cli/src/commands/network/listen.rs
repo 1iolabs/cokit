@@ -1,6 +1,7 @@
 use super::Command as NetworkCommand;
 use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::{anyhow, Result};
+use co_core_membership::MembershipState;
 use co_primitives::Did;
 use co_sdk::{state, CoId, CoReducerFactory, PrivateIdentityResolver};
 use exitcode::ExitCode;
@@ -54,7 +55,8 @@ pub async fn command(
 			let local_co = application.local_co_reducer().await?;
 			let co_context = application.co();
 			state::memberships(local_co.storage(), local_co.co_state().await)
-				.map(|membership| membership.map(|membership| membership.0))
+				.try_filter(|(_, _, _, membership_state)| ready(*membership_state == MembershipState::Active))
+				.map_ok(|membership| membership.0)
 				.then(move |id| async move {
 					match id {
 						Ok(id) => {

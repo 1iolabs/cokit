@@ -1,5 +1,5 @@
 use crate::{cli::Cli, library::cli_context::CliContext};
-use co_sdk::{memberships, CoId};
+use co_sdk::{state::memberships, CoId};
 use exitcode::ExitCode;
 use futures::{pin_mut, stream::StreamExt};
 
@@ -23,12 +23,12 @@ pub async fn command(context: &CliContext, cli: &Cli) -> Result<ExitCode, anyhow
 
 	// list
 	let mut result = exitcode::OK;
-	let stream = memberships(local_co_reducer.clone());
+	let stream = memberships(local_co_reducer.storage(), local_co_reducer.co_state().await);
 	pin_mut!(stream);
 	while let Some(item) = stream.next().await {
 		match item {
-			Ok((id, state, tags)) => {
-				println!("{} | {} | {}", id, state, tags)
+			Ok((id, state, tags, membership_state)) => {
+				println!("{id} | {state} | {tags} | {membership_state:?}")
 			},
 			Err(e) => {
 				result = exitcode::UNAVAILABLE;

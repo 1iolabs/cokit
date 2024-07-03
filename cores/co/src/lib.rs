@@ -91,11 +91,11 @@ pub enum ParticipantState {
 	/// Active participant.
 	Active = 0,
 
-	/// Invited participant.
-	Invite = 1,
-
 	/// Inactive (Removed, Resigned, Banned, ...) participant.
-	Inactive = 2,
+	Inactive = 1,
+
+	/// Invited participant.
+	Invite = 2,
 
 	/// Pending participant.
 	///
@@ -141,6 +141,14 @@ pub enum CoAction {
 	},
 	ParticipantJoin {
 		participant: Did,
+	},
+	ParticipantPending {
+		participant: Did,
+		tags: Tags,
+	},
+	ParticipantRemove {
+		participant: Did,
+		tags: Tags,
 	},
 	ParticipantTagsInsert {
 		participant: Did,
@@ -198,7 +206,17 @@ impl Reducer for Co {
 				}
 			},
 			CoAction::ParticipantInvite { participant, tags } => {
-				if !result.participants.contains_key(participant) {
+				if let Some(item) = result.participants.get_mut(participant) {
+					match item.state {
+						ParticipantState::Pending | ParticipantState::Inactive => {
+							item.state = ParticipantState::Invite;
+							item.tags.append(&mut tags.clone());
+						},
+						_ => {
+							// we don't go back from active to invite
+						},
+					}
+				} else {
 					result.participants.insert(
 						participant.clone(),
 						Participant { did: participant.clone(), state: ParticipantState::Invite, tags: tags.clone() },
@@ -208,6 +226,31 @@ impl Reducer for Co {
 			CoAction::ParticipantJoin { participant } => {
 				if let Some(participant) = result.participants.get_mut(participant) {
 					participant.state = ParticipantState::Active;
+				}
+			},
+			CoAction::ParticipantPending { participant, tags } => {
+				if !result.participants.contains_key(participant) {
+					result.participants.insert(
+						participant.clone(),
+						Participant { did: participant.clone(), state: ParticipantState::Pending, tags: tags.clone() },
+					);
+				}
+			},
+			CoAction::ParticipantRemove { participant, tags } => {
+				let remove = if let Some(item) = result.participants.get_mut(participant) {
+					match item.state {
+						ParticipantState::Pending => true,
+						_ => {
+							item.state = ParticipantState::Inactive;
+							item.tags.append(&mut tags.clone());
+							false
+						},
+					}
+				} else {
+					false
+				};
+				if remove {
+					result.participants.remove(participant);
 				}
 			},
 			CoAction::Heads { heads } => {
