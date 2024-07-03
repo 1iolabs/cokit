@@ -42,7 +42,8 @@ pub struct Membership {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[non_exhaustive]
 pub enum MembershipState {
-	Invited,
+	PendingInvite,
+	PendingJoin,
 	Active,
 	Closed,
 }

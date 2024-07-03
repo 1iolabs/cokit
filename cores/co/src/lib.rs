@@ -96,6 +96,12 @@ pub enum ParticipantState {
 
 	/// Inactive (Removed, Resigned, Banned, ...) participant.
 	Inactive = 2,
+
+	/// Pending participant.
+	///
+	/// Usually this is a manual Join request.
+	/// Pending participants need to be moved into Invite state by a participant.
+	Pending = 3,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
