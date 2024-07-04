@@ -50,7 +50,7 @@ rxrust = { version = "1.0.0-beta.6", git = "https://github.com/dkuhnert/rxRust.g
 ] }
 serde = "1"
 serde_bytes = "0.11.12"
-serde_ipld_dagcbor = "0.4.2"
+serde_ipld_dagcbor = "0.6.1"
 serde_ipld_dagjson = "0.1.0"
 serde_json = "1"
 serde_repr = "0.1"
