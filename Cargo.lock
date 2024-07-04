@@ -1792,10 +1792,15 @@ name = "co-tauri"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "co-api",
+ "co-core-co",
  "co-core-membership",
+ "co-core-room",
+ "co-messaging",
  "co-primitives",
  "co-sdk",
  "futures",
+ "libipld",
  "serde",
  "serde_json",
  "tauri",
@@ -1803,6 +1808,7 @@ dependencies = [
  "tauri-utils",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "tracing",
 ]
 
