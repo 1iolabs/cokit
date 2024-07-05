@@ -4,6 +4,8 @@ use std::{
 	time::{SystemTime, UNIX_EPOCH},
 };
 
+use crate::{DidCommPrivateContext, DidCommPublicContext, Identity, PrivateIdentity};
+
 /// See: https://identity.foundation/didcomm-messaging/spec/#message-headers
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct DidCommHeader {
@@ -81,11 +83,36 @@ pub struct DidCommHeader {
 }
 impl DidCommHeader {
 	/// Create new DidCommHeader with an
-	pub fn new() -> Self {
+	pub fn new(message_type: impl Into<String>) -> Self {
 		Self {
 			id: uuid::Uuid::new_v4().to_string(),
 			created_time: Some(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()),
+			message_type: message_type.into(),
 			..Default::default()
 		}
+	}
+
+	/// Create new DidCommHeader for a message with sender `from` and single recipent `to`.
+	pub fn create<F, T>(
+		from: &F,
+		to: &T,
+		message_type: impl Into<String>,
+	) -> anyhow::Result<(DidCommPrivateContext, DidCommPublicContext, Self)>
+	where
+		F: PrivateIdentity + Send + Sync + 'static,
+		T: Identity + Send + Sync + 'static,
+	{
+		let from_didcomm = from
+			.didcomm_private()
+			.ok_or(anyhow::anyhow!("unsupported identity: from: no private didcomm context"))?;
+		let to_didcomm = from
+			.didcomm_public()
+			.ok_or(anyhow::anyhow!("unsupported identity: to: no public didcomm context"))?;
+
+		let mut header = DidCommHeader::new(message_type.into());
+		header.from = Some(from.identity().to_owned());
+		header.to = BTreeSet::from_iter(vec![to.identity().to_owned()]);
+
+		Ok((from_didcomm, to_didcomm, header))
 	}
 }

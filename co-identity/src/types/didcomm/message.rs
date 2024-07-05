@@ -161,6 +161,24 @@ impl Message {
 	pub fn body_deserialize<T: DeserializeOwned>(&self) -> Result<T, anyhow::Error> {
 		Ok(serde_ipld_dagjson::from_slice(self.body().as_bytes())?)
 	}
+
+	/// Test is message is validated.
+	pub fn is_validated_sender(&self) -> bool {
+		match self {
+			Message::AuthCryptJson { sender, header, body: _ } => Some(sender) == header.from.as_ref(),
+			Message::SignedJson { sender, header, body: _ } => Some(sender) == header.from.as_ref(),
+			_ => false,
+		}
+	}
+
+	/// Get validated sender.
+	pub fn sender(&self) -> Option<&Did> {
+		match self {
+			Message::AuthCryptJson { sender, header, body: _ } if Some(sender) == header.from.as_ref() => Some(sender),
+			Message::SignedJson { sender, header, body: _ } if Some(sender) == header.from.as_ref() => Some(sender),
+			_ => None,
+		}
+	}
 }
 
 /// Helper type to check if received message is plain, signed or encrypted

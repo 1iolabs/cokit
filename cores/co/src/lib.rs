@@ -141,6 +141,7 @@ pub enum CoAction {
 	},
 	ParticipantJoin {
 		participant: Did,
+		tags: Tags,
 	},
 	ParticipantPending {
 		participant: Did,
@@ -223,9 +224,10 @@ impl Reducer for Co {
 					);
 				}
 			},
-			CoAction::ParticipantJoin { participant } => {
+			CoAction::ParticipantJoin { participant, tags } => {
 				if let Some(participant) = result.participants.get_mut(participant) {
 					participant.state = ParticipantState::Active;
+					participant.tags.append(&mut tags.clone());
 				}
 			},
 			CoAction::ParticipantPending { participant, tags } => {

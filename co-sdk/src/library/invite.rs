@@ -1,0 +1,30 @@
+use co_identity::{DidCommHeader, Identity, PrivateIdentity};
+use co_network::didcomm::EncodedMessage;
+use co_primitives::{CoId, Tags};
+use serde::{Deserialize, Serialize};
+
+pub const CO_DIDCOMM_INVITE: &str = "co-invite";
+
+/// Create an encoded invite message.
+pub fn create_invite_message<F, T>(
+	from: &F,
+	to: &T,
+	co: CoInvitePayload,
+	thid: Option<String>,
+) -> anyhow::Result<EncodedMessage>
+where
+	F: PrivateIdentity + Send + Sync + 'static,
+	T: Identity + Send + Sync + 'static,
+{
+	let (from_didcomm, to_didcomm, mut header) = DidCommHeader::create(from, to, CO_DIDCOMM_INVITE)?;
+	header.thid = thid;
+	let body = serde_json::to_string(&co)?;
+	let message = from_didcomm.jwe(&to_didcomm, header, &body)?;
+	Ok(EncodedMessage(message.into_bytes()))
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CoInvitePayload {
+	pub id: CoId,
+	pub tags: Tags,
+}

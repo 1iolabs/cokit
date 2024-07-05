@@ -784,8 +784,7 @@ fn did_discovery_resolve(
 	let request_from = request.from.ok_or(anyhow!("Missing from header field"))?;
 
 	// response
-	let mut response = DidCommHeader::new();
-	response.message_type = DidDiscoveryMessage::Resolve.to_string();
+	let mut response = DidCommHeader::new(DidDiscoveryMessage::Resolve.to_string());
 	response.thid = Some(request.id);
 	response.from = Some(identity.did().to_owned());
 	response.to.insert(request_from.clone());

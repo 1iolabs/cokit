@@ -62,7 +62,10 @@ async fn test_co_shared_join() {
 				.push(
 					&identity1,
 					CO_CORE_NAME_CO,
-					&CoAction::ParticipantJoin { participant: identity2.identity().to_owned() },
+					&CoAction::ParticipantJoin {
+						participant: identity2.identity().to_owned(),
+						tags: Default::default(),
+					},
 				)
 				.await
 				.unwrap();
@@ -159,7 +162,10 @@ async fn test_co_shared_join_encrypted() {
 				.push(
 					&identity1,
 					CO_CORE_NAME_CO,
-					&CoAction::ParticipantJoin { participant: identity2.identity().to_owned() },
+					&CoAction::ParticipantJoin {
+						participant: identity2.identity().to_owned(),
+						tags: Default::default(),
+					},
 				)
 				.await
 				.unwrap();
