@@ -4,6 +4,6 @@ import { MessengerPluginState } from "../state";
 
 export type MessengerEpicType = PluginEpicType<MessengerPlugin>;
 
-export type MessengerPlugin = Plugin<MessengerPluginState, MessengerActions> & RenderPlugin & EpicPlugin<{}> & ContextPlugin<MessengerPluginContext>;
+export type MessengerPlugin = Plugin<MessengerPluginState, MessengerActions> & RenderPlugin & EpicPlugin<MessengerPluginState> & ContextPlugin<MessengerPluginContext>;
 
 export interface MessengerPluginContext extends PluginContext { }

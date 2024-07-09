@@ -1,5 +1,7 @@
 use anyhow::anyhow;
-use co_sdk::{Application, ApplicationBuilder, CoId};
+use co_log::SignedEntry;
+use co_primitives::ReducerAction;
+use co_sdk::{Application, ApplicationBuilder, BlockStorageExt, CoId};
 use libipld::{cbor::DagCborCodec, codec::Codec, Cid, Ipld};
 use library::co_settings::CoSettings;
 use serde::Deserialize;
@@ -46,12 +48,6 @@ impl From<anyhow::Error> for CoTauriError {
 	fn from(error: anyhow::Error) -> Self {
 		Self { error }
 	}
-}
-
-#[tauri::command]
-fn tmp_test_command(application: tauri::State<'_, Application>, name: String) -> String {
-	let identifier = &application.settings().identifier;
-	format!("Hello, {}! You've been greeted from Rust! App id: {:#?}", name, identifier)
 }
 
 #[tauri::command]
@@ -130,7 +126,7 @@ async fn push(application: tauri::State<'_, Application>, body: Vec<u8>) -> Resu
 		.await?
 		.ok_or(anyhow!("Co not found: {}", body.co))?;
 	let identity = application.local_identity();
-	reducer.push(&identity, &*body.core, &body.action).await?;
+	reducer.push(&identity, &body.core, &body.action).await?;
 	Ok(())
 }
 
@@ -139,6 +135,8 @@ async fn subscribe(
 	application: tauri::State<'_, Application>,
 	app: tauri::AppHandle,
 	co: CoId,
+	event: &str,
+	core: Option<&str>,
 ) -> Result<(), CoTauriError> {
 	tracing::info!("tauri command subscribe: {:#?}", co);
 	let co_reducer = application
@@ -149,8 +147,18 @@ async fn subscribe(
 	let mut watcher = WatchStream::from_changes(co_reducer.watch().await);
 	while let Some(item) = watcher.next().await {
 		match item {
-			Some((cid, heads)) => {
-				app.emit("test", (cid, heads)).unwrap();
+			Some((_, heads)) => {
+				let head: SignedEntry = co_reducer.storage().get_deserialized(heads.first().unwrap()).await.unwrap();
+				let payload: ReducerAction<Ipld> =
+					co_reducer.storage().get_deserialized(&head.entry.payload).await.unwrap();
+				// filter actions from other cores if a core is given
+				if let Some(core) = core {
+					if payload.core != core {
+						continue;
+					}
+				}
+				tracing::info!("tauri event payload: {:#?} head: {:#?}", payload, head);
+				app.emit(event, payload).unwrap();
 			},
 			None => (),
 		};
@@ -166,5 +174,5 @@ pub async fn tauri_builder(co_settings: CoSettings) -> tauri::Builder<Wry> {
 	tauri::Builder::default()
 		.plugin(tauri_plugin_shell::init())
 		.manage(application)
-		.invoke_handler(tauri::generate_handler![tmp_test_command, get_core_state, push, subscribe])
+		.invoke_handler(tauri::generate_handler![get_core_state, push, subscribe])
 }

@@ -13,6 +13,7 @@ co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
 co-core-membership = { path = "../cores/membership" }
 co-core-co = { path = "../cores/co" }
 co-core-room = { path = "../cores/room" }
+co-log = { path = "../co-log" }
 anyhow = { workspace = true }
 futures = { workspace = true }
 libipld = { workspace = true }
