@@ -1,6 +1,5 @@
 pub mod cancel;
 pub mod co_peer_provider;
-pub mod co_private_identity_resolver;
 pub mod co_state;
 pub mod did_key_provider;
 pub mod find_co_secret;
