@@ -7,7 +7,6 @@ edition = "2021"
 rust-version = "1.76"
 
 [dependencies]
-co-api = { path = "../co-api" }
 co-primitives = { path = "../co-primitives" }
 co-messaging = { path = "../co-messaging" }
 co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }

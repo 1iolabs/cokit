@@ -1,7 +1,6 @@
 use anyhow::anyhow;
-use co_api::Cid;
 use co_sdk::{Application, ApplicationBuilder, CoId};
-use libipld::{cbor::DagCborCodec, codec::Codec, Ipld};
+use libipld::{cbor::DagCborCodec, codec::Codec, Cid, Ipld};
 use library::co_settings::CoSettings;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
