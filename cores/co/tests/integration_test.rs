@@ -47,7 +47,7 @@ async fn integration_test() {
 		.unwrap();
 
 	// test
-	assert_eq!(Some(Cid::try_from("bafyr4if3nr4j5don35jvl2wnu5yix5d4jcfcbpasigt6ojw2zgpnvr4o3i").unwrap()), next_state);
+	assert_eq!(Some(Cid::try_from("bafyr4if64njukhvumpace5uiighisucjnbbsdxgxoyhbig3bvnjck5sh5q").unwrap()), next_state);
 	let block = storage.get(&next_state.unwrap()).await.unwrap();
 	let state: Co = BlockSerializer::default().deserialize(&block).unwrap();
 
