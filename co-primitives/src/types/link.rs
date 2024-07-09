@@ -54,6 +54,11 @@ impl<T> From<Cid> for Link<T> {
 		Self::new(value)
 	}
 }
+impl<T> From<&Cid> for Link<T> {
+	fn from(value: &Cid) -> Self {
+		Self::new(*value)
+	}
+}
 impl<T> AsRef<Cid> for Link<T> {
 	fn as_ref(&self) -> &Cid {
 		&self.cid
@@ -142,6 +147,11 @@ impl<T> From<OptionLink<T>> for Option<Cid> {
 impl<T> From<Option<Cid>> for OptionLink<T> {
 	fn from(value: Option<Cid>) -> Self {
 		Self::new(value)
+	}
+}
+impl<T> From<Link<T>> for OptionLink<T> {
+	fn from(value: Link<T>) -> Self {
+		Self::new(Some(value.into()))
 	}
 }
 impl<T> From<&Option<Cid>> for OptionLink<T> {

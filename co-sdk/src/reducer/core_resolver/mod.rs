@@ -7,6 +7,7 @@ use crate::ReducerChangeContext;
 
 pub mod co;
 pub mod dynamic;
+pub mod epic;
 pub mod log;
 pub mod membership;
 pub mod single;
@@ -46,4 +47,8 @@ pub enum CoreResolverError {
 	/// The core reported an error while executing.
 	#[error("Execute core failed: {0}")]
 	Execute(String, #[source] ExecuteError),
+
+	/// A core resolver middleware reported an error (usually before or after executing).
+	#[error("Execute core failed: {0}")]
+	Middleware(#[source] anyhow::Error),
 }

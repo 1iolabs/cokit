@@ -2,9 +2,9 @@ mod application;
 mod drivers;
 // mod epics;
 mod errors;
-pub mod identity;
 mod library;
 mod pin;
+mod reactive;
 pub mod reducer;
 pub mod state;
 mod types;
@@ -38,8 +38,8 @@ pub use drivers::{
 	runtime::Runtime,
 	storage::Storage,
 };
-pub use identity::did_key::DidKeyProvider;
 pub use library::{
+	did_key_provider::DidKeyProvider,
 	find_co_secret::find_co_secret,
 	find_membership::{find_membership, find_memberships},
 	generate_random_name::generate_random_name,
@@ -50,6 +50,7 @@ pub use library::{
 	task_spawner::TaskSpawner,
 };
 pub use pin::pin::PinAPI;
+pub use reactive::{action::Action, epic::Epic, observable::Observable};
 pub use reducer::core_resolver::{co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverError};
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},

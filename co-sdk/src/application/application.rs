@@ -1,13 +1,15 @@
 use super::{
 	co_context::{CoContext, CoContextInner},
-	identity::{create_identity_resolver, create_private_identity_resolver, resolve_private_identity},
+	identity::{create_identity_resolver, resolve_private_identity},
 	shared::{CreateCo, SharedCoCreator},
 	tracing::TracingBuilder,
 };
 use crate::{
-	drivers::network::tasks::received_heads::ReceivedHeadsNetworkTask, library::task_spawner::TaskSpawner,
-	local_keypair_fetch, CoReducer, CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE,
-	CO_CORE_NAME_MEMBERSHIP,
+	drivers::network::tasks::received_heads::ReceivedHeadsNetworkTask,
+	library::task_spawner::TaskSpawner,
+	local_keypair_fetch,
+	reactive::{context::ReactiveContext, epics::epic},
+	CoReducer, CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use co_identity::{
@@ -39,6 +41,7 @@ pub struct Application {
 	runtime: Runtime,
 
 	/// CO Network Driver.
+	/// TODO: When applciation is cloned before create_network this will cause issues.
 	network: Option<Network>,
 
 	/// Application shutdown token.
@@ -49,6 +52,9 @@ pub struct Application {
 
 	// CO Context.
 	co_context: CoContext,
+
+	/// Global Reactive Context.
+	reactive: ReactiveContext,
 }
 impl Application {
 	pub fn settings(&self) -> &ApplicationSettings {
@@ -163,18 +169,18 @@ impl Application {
 		resolve_private_identity(&self.co_context, did).await
 	}
 
-	/// Access Private Identities.
+	/// Identities.
 	///
 	/// Todo: Identity Permissions?
 	pub async fn identity_resolver(&self) -> Result<IdentityResolverBox, anyhow::Error> {
-		Ok(create_identity_resolver())
+		self.co_context.identity_resolver().await
 	}
 
-	/// Access Private Identities.
+	/// Private Identities.
 	///
 	/// Todo: Identity Permissions?
 	pub async fn private_identity_resolver(&self) -> Result<PrivateIdentityResolverBox, anyhow::Error> {
-		create_private_identity_resolver(&self.co_context).await
+		self.co_context.private_identity_resolver().await
 	}
 
 	/// Get unsiged local device identity.
@@ -210,9 +216,11 @@ impl Application {
 		// shutdown
 		let shutdown = self.shutdown.clone();
 		let tasks = self.tasks.clone();
+		let reactive = self.reactive.clone();
 		tokio::spawn(async move {
 			// shutdown
 			shutdown.cancelled().await;
+			reactive.shutdown();
 			tasks.close();
 
 			// log
@@ -329,7 +337,8 @@ impl ApplicationBuilder {
 		};
 
 		// co
-		let co_context = CoContextInner::new(
+		let reactive = ReactiveContext::default();
+		let co_context: CoContext = CoContextInner::new(
 			settings.clone(),
 			shutdown.child_token(),
 			TaskSpawner { idenitfier: settings.identifier.clone(), inner: tasks.clone() },
@@ -337,8 +346,16 @@ impl ApplicationBuilder {
 			None,
 			storage.storage(),
 			runtime.clone(),
+			reactive.clone(),
 		)
 		.into();
+
+		// reactive
+		tasks.spawn({
+			let reactive = reactive.clone();
+			let context = co_context.clone();
+			async move { reactive.execute(context, epic()).await }
+		});
 
 		// instance
 		let result = Application {
@@ -350,6 +367,7 @@ impl ApplicationBuilder {
 			_drop: Some(Arc::new(shutdown.clone().drop_guard())),
 			shutdown,
 			tasks,
+			reactive,
 		};
 
 		// init

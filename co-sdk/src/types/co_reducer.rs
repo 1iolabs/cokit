@@ -2,7 +2,7 @@ use super::{co_storage::CoBlockStorageContentMapping, state_observable::StateObs
 use crate::{reducer::core_resolver::dynamic::DynamicCoreResolver, state::core_state, CoStorage, Reducer, Runtime};
 use async_trait::async_trait;
 use co_identity::PrivateIdentity;
-use co_primitives::{CoId, OptionLink};
+use co_primitives::{CoId, OptionLink, ReducerAction};
 use co_storage::{BlockStorageContentMapping, BlockStorageExt, StorageError};
 use futures::{stream, StreamExt};
 use libipld::Cid;
@@ -79,7 +79,7 @@ impl CoReducer {
 	/// - `identity` - The identity to sign the operation with.
 	/// - `core` - The target core name. The key of [`co_core_co::Co::cores`].
 	/// - `item` - The core action payload.
-	#[tracing::instrument(err, fields(co = self.id().as_str(), identity = identity.identity()), skip(self, identity))]
+	#[tracing::instrument(err, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, identity))]
 	pub async fn push<T, I>(&self, identity: &I, core: &str, item: &T) -> Result<(), anyhow::Error>
 	where
 		T: Serialize + Debug + Send + Sync + Clone + 'static,
@@ -89,6 +89,20 @@ impl CoReducer {
 			.write()
 			.await
 			.push(self.runtime.runtime(), identity, core, item)
+			.await
+	}
+
+	/// Push event into reducer.
+	#[tracing::instrument(err, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, identity))]
+	pub async fn push_action<T, I>(&self, identity: &I, action: &ReducerAction<T>) -> Result<(), anyhow::Error>
+	where
+		T: Serialize + Debug + Send + Sync + Clone + 'static,
+		I: PrivateIdentity + Send + Sync,
+	{
+		self.reducer
+			.write()
+			.await
+			.push_action(self.runtime.runtime(), identity, action)
 			.await
 	}
 

@@ -3,7 +3,7 @@ use crate::{
 	drivers::network::{publish::CoHeadsPublish, CoNetworkTaskSpawner},
 	find_membership,
 	library::{co_peer_provider::CoPeerProvider, co_state::CoState, push_heads::PushHeads},
-	reducer::core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
+	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	state::find,
 	types::{co_reducer::CoReducerContext, co_storage::CoBlockStorageContentMapping},
 	CoCoreResolver, CoReducer, CoStorage, CoToken, CoTokenParameters, Reducer, ReducerBuilder, ReducerChangeContext,
@@ -68,6 +68,7 @@ impl SharedCoBuilder {
 		storage: CoStorage,
 		runtime: Runtime,
 		identity: I,
+		core_resolver: DynamicCoreResolver<CoStorage>,
 	) -> Result<CoReducer, anyhow::Error>
 	where
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
@@ -137,14 +138,11 @@ impl SharedCoBuilder {
 		);
 
 		// reducer
-		let mut reducer = ReducerBuilder::new(
-			DynamicCoreResolver::new(LogCoreResolver::new::<CoStorage>(CoCoreResolver::default())),
-			log,
-		)
-		.with_initialize(self.initialize)
-		.with_latest_state(self.membership.state, self.membership.heads.clone())
-		.build(runtime.runtime())
-		.await?;
+		let mut reducer = ReducerBuilder::new(core_resolver, log)
+			.with_initialize(self.initialize)
+			.with_latest_state(self.membership.state, self.membership.heads.clone())
+			.build(runtime.runtime())
+			.await?;
 
 		// push changes to all connectable peers
 		if let Some(network) = &self.network {
