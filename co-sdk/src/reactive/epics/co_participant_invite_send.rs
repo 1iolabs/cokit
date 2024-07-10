@@ -19,6 +19,7 @@ use futures::{Stream, StreamExt};
 use std::{collections::BTreeSet, time::Duration};
 
 /// When a participant is invited into an CO, try to connect and send the invite message via didcomm.
+/// TODO: consensus finalization?
 pub fn co_participant_invite_send(
 	actions: ActionObservable,
 	_states: StateObservable,
@@ -87,13 +88,14 @@ fn invite_discovery(
 
 async fn invite(
 	context: &CoContext,
-	co: &CoId,
+	co_id: &CoId,
 	from: &Did,
 	to: &Did,
 	_participant_tags: &Tags,
 ) -> anyhow::Result<(EncodedMessage, BTreeSet<Discovery>)> {
-	let co_reducer = context.co_reducer(co).await?.ok_or(anyhow!("Co not found: {}", co))?;
-	let co_state = co_reducer.co().await?;
+	let co_reducer = context.co_reducer(co_id).await?.ok_or(anyhow!("Co not found: {}", co_id))?;
+	let co = co_reducer.co().await?;
+	let (state, heads) = co_reducer.reducer_state().await;
 	let from_identity = context.private_identity_resolver().await?.resolve_private(from).await?;
 	let to_identity = context.identity_resolver().await?.resolve(to).await?;
 
@@ -101,7 +103,12 @@ async fn invite(
 	let invite_message = create_invite_message(
 		&from_identity,
 		&to_identity,
-		CoInvitePayload { id: co.to_owned(), tags: co_state.tags.clone() },
+		CoInvitePayload {
+			id: co_id.to_owned(),
+			tags: co.tags.clone(),
+			state: state.ok_or(anyhow!("Can not invite to empty CO"))?,
+			heads,
+		},
 		None,
 	)?;
 

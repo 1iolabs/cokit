@@ -1,7 +1,9 @@
 use std::{ops::Deref, sync::Arc};
 
+use co_identity::Message;
 use co_primitives::{CoId, Did, Link, OptionLink, ReducerAction};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
+use futures::Stream;
 use libipld::Ipld;
 use libp2p::PeerId;
 
@@ -28,6 +30,12 @@ pub enum Action {
 
 	/// Invite request has been sent to a peer.
 	Invited { co: CoId, participant: Did, peer: PeerId },
+
+	/// Network has been started.
+	NetworkStarted,
+
+	/// Received a DIDComm message.
+	DidCommReceive { peer: PeerId, message: Message },
 }
 impl Action {
 	pub async fn core_action<S>(
@@ -42,6 +50,7 @@ impl Action {
 		Ok(Self::CoreAction { co, context, action: storage.get_value(&cid).await?, cid: cid.into() })
 	}
 
+	/// Map result to action.
 	pub fn map_error<E>(item: Result<Action, E>) -> Self
 	where
 		E: Into<anyhow::Error>,
@@ -49,6 +58,23 @@ impl Action {
 		match item {
 			Ok(item) => item,
 			Err(err) => err.into().into(),
+		}
+	}
+
+	/// Map result of vec of actions into action stream.
+	pub fn map_error_stream<E>(item: Result<impl IntoIterator<Item = Action>, E>) -> impl Stream<Item = Action>
+	where
+		E: Into<anyhow::Error>,
+	{
+		async_stream::stream! {
+			match item {
+				Ok(items) => {
+					for item in items {
+						yield item;
+					}
+				},
+				Err(err) => yield err.into().into(),
+			}
 		}
 	}
 }

@@ -9,7 +9,8 @@ use crate::{
 	library::task_spawner::TaskSpawner,
 	local_keypair_fetch,
 	reactive::{context::ReactiveContext, epics::epic},
-	CoReducer, CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	Action, CoReducer, CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use co_identity::{
@@ -158,6 +159,9 @@ impl Application {
 			.spawner()
 			.spawn(ReceivedHeadsNetworkTask::new(self.co().clone(), self.tasks()))?;
 
+		// reactive
+		self.reactive.actions().dispatch(Action::NetworkStarted);
+
 		// done
 		Ok(())
 	}
@@ -185,7 +189,7 @@ impl Application {
 
 	/// Get unsiged local device identity.
 	pub fn local_identity(&self) -> LocalIdentity {
-		LocalIdentityResolver::default().private_identity("did:local:device").unwrap()
+		self.co_context.local_identity()
 	}
 
 	/// Create a new CO.

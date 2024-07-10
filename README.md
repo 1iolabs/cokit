@@ -3,6 +3,15 @@
 ## Abstract
 CO implementation using the rust progamming language.
 
+## Development
+
+### Setup
+
+```
+rustup target add wasm32-unknown-unknown
+
+```
+
 
 ## Log
 

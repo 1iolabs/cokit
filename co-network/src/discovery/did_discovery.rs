@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use co_identity::{DidCommHeader, Identity, PrivateIdentity};
-use co_primitives::{Did, NetworkDidDiscovery};
+use co_primitives::{serde_string_enum, Did, NetworkDidDiscovery};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use uuid::Uuid;
@@ -58,22 +58,4 @@ impl DidDiscoveryMessage {
 		Self::try_from(value.to_owned()).ok()
 	}
 }
-impl std::fmt::Display for DidDiscoveryMessage {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(
-			f,
-			"{}",
-			serde_json::to_value(self)
-				.expect("DidDiscoveryMessage to serialize")
-				.as_str()
-				.expect("DidDiscoveryMessage to serialize to string")
-		)
-	}
-}
-impl TryFrom<String> for DidDiscoveryMessage {
-	type Error = serde_json::error::Error;
-
-	fn try_from(value: String) -> Result<Self, Self::Error> {
-		serde_json::from_value(serde_json::Value::String(value))
-	}
-}
+serde_string_enum!(DidDiscoveryMessage);

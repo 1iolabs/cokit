@@ -1,4 +1,5 @@
 mod library;
+mod macros;
 mod types;
 
 pub use library::{

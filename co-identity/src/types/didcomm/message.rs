@@ -162,13 +162,9 @@ impl Message {
 		Ok(serde_ipld_dagjson::from_slice(self.body().as_bytes())?)
 	}
 
-	/// Test is message is validated.
+	/// Test if message is validated.
 	pub fn is_validated_sender(&self) -> bool {
-		match self {
-			Message::AuthCryptJson { sender, header, body: _ } => Some(sender) == header.from.as_ref(),
-			Message::SignedJson { sender, header, body: _ } => Some(sender) == header.from.as_ref(),
-			_ => false,
-		}
+		self.sender().is_some()
 	}
 
 	/// Get validated sender.
@@ -177,6 +173,16 @@ impl Message {
 			Message::AuthCryptJson { sender, header, body: _ } if Some(sender) == header.from.as_ref() => Some(sender),
 			Message::SignedJson { sender, header, body: _ } if Some(sender) == header.from.as_ref() => Some(sender),
 			_ => None,
+		}
+	}
+
+	// Convert into inner.
+	pub fn into_inner(self) -> (DidCommHeader, String) {
+		match self {
+			Message::PlainJson { header, body } => (header, body),
+			Message::SignedJson { sender: _, header, body } => (header, body),
+			Message::AnonCryptJson { header, body } => (header, body),
+			Message::AuthCryptJson { sender: _, header, body } => (header, body),
 		}
 	}
 }

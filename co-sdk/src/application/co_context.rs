@@ -19,7 +19,9 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_identity::{IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolverBox};
+use co_identity::{
+	IdentityResolverBox, LocalIdentity, LocalIdentityResolver, PrivateIdentity, PrivateIdentityResolverBox,
+};
 use co_log::EntryBlock;
 use co_network::bitswap;
 use co_primitives::CoId;
@@ -96,6 +98,11 @@ impl CoContext {
 	/// Todo: Identity Permissions?
 	pub async fn private_identity_resolver(&self) -> Result<PrivateIdentityResolverBox, anyhow::Error> {
 		create_private_identity_resolver(&self).await
+	}
+
+	/// Get unsiged local device identity.
+	pub fn local_identity(&self) -> LocalIdentity {
+		LocalIdentityResolver::default().private_identity("did:local:device").unwrap()
 	}
 
 	/// Network.

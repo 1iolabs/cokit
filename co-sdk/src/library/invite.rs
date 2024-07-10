@@ -1,6 +1,9 @@
+use std::collections::BTreeSet;
+
 use co_identity::{DidCommHeader, Identity, PrivateIdentity};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoId, Tags};
+use libipld::Cid;
 use serde::{Deserialize, Serialize};
 
 pub const CO_DIDCOMM_INVITE: &str = "co-invite";
@@ -27,4 +30,6 @@ where
 pub struct CoInvitePayload {
 	pub id: CoId,
 	pub tags: Tags,
+	pub state: Cid,
+	pub heads: BTreeSet<Cid>,
 }

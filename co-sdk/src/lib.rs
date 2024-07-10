@@ -52,6 +52,7 @@ pub use library::{
 pub use pin::pin::PinAPI;
 pub use reactive::{action::Action, epic::Epic, observable::Observable};
 pub use reducer::core_resolver::{co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverError};
+pub use types::known_tags::{CoInvite, KnownTags};
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},
 	co_reducer_factory::CoReducerFactory,
