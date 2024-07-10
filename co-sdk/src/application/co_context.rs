@@ -77,6 +77,13 @@ impl CoContext {
 		Ok((storage, stream, context))
 	}
 
+	/// Test if `co` is a shared CO.
+	pub async fn is_shared(&self, co: &CoId) -> bool {
+		// currently on the local co is not shared
+		// the call is async to be future proof when we may need to check some state
+		co.as_str() != CO_ID_LOCAL
+	}
+
 	/// Identities.
 	///
 	/// Todo: Identity Permissions?

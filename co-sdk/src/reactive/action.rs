@@ -1,8 +1,9 @@
 use std::{ops::Deref, sync::Arc};
 
-use co_primitives::{CoId, Link, OptionLink, ReducerAction};
+use co_primitives::{CoId, Did, Link, OptionLink, ReducerAction};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use libipld::Ipld;
+use libp2p::PeerId;
 
 use crate::ReducerChangeContext;
 
@@ -21,6 +22,12 @@ pub enum Action {
 
 	/// Core action has been failed.
 	CoreActionFailure { co: CoId, context: ReducerChangeContext, action: ReducerAction<Ipld>, err: ActionError },
+
+	/// Generic Error.
+	Error { err: ActionError },
+
+	/// Invite request has been sent to a peer.
+	Invited { co: CoId, participant: Did, peer: PeerId },
 }
 impl Action {
 	pub async fn core_action<S>(
@@ -33,6 +40,21 @@ impl Action {
 		S: BlockStorage + Send + Sync + 'static,
 	{
 		Ok(Self::CoreAction { co, context, action: storage.get_value(&cid).await?, cid: cid.into() })
+	}
+
+	pub fn map_error<E>(item: Result<Action, E>) -> Self
+	where
+		E: Into<anyhow::Error>,
+	{
+		match item {
+			Ok(item) => item,
+			Err(err) => err.into().into(),
+		}
+	}
+}
+impl From<anyhow::Error> for Action {
+	fn from(value: anyhow::Error) -> Self {
+		Action::Error { err: value.into() }
 	}
 }
 

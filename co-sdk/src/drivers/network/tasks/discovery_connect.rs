@@ -1,14 +1,20 @@
 use co_identity::IdentityResolverBox;
 use co_network::{
 	discovery::{self, Discovery, DiscoveryBehaviour},
-	DiscoveryLayerBehaviourProvider, NetworkTask,
+	DiscoveryLayerBehaviourProvider, NetworkTask, NetworkTaskSpawner,
 };
-use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::{
+	channel::mpsc::{UnboundedReceiver, UnboundedSender},
+	Stream,
+};
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	PeerId, Swarm,
 };
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, time::Duration};
+use tokio_stream::StreamExt;
+
+use crate::drivers::network::CoNetworkTaskSpawner;
 
 /// Connect peers using discovery.
 pub struct DiscoveryConnectNetworkTask {
@@ -21,6 +27,51 @@ impl DiscoveryConnectNetworkTask {
 	pub fn new(discovery: BTreeSet<Discovery>) -> (Self, UnboundedReceiver<Result<BTreeSet<PeerId>, DiscoveryError>>) {
 		let (tx, rx) = futures::channel::mpsc::unbounded();
 		(Self { discovery, connect_request: None, sender: tx, peers: Default::default() }, rx)
+	}
+
+	/// Try to connect networks. Returns every peer which has been discovered.
+	pub fn connect(
+		spawner: CoNetworkTaskSpawner,
+		networks: impl IntoIterator<Item = Discovery>,
+	) -> impl Stream<Item = Result<PeerId, anyhow::Error>> + Send + 'static {
+		let (task, peers_stream) = DiscoveryConnectNetworkTask::new(networks.into_iter().collect());
+		async_stream::stream! {
+			let mut known_peers = BTreeSet::<PeerId>::new();
+
+			// execute
+			match spawner.spawn(task) {
+				Ok(_) => {},
+				Err(e) => yield Err(e.into()),
+			}
+
+			// process
+			for await peers in peers_stream {
+				match peers {
+					Ok(peers) => {
+						for peer in peers {
+							if !known_peers.contains(&peer) {
+								known_peers.insert(peer);
+								yield Ok(peer);
+							}
+						}
+					},
+					Err(e) => yield Err(e.into()),
+				};
+			}
+		}
+	}
+
+	/// Try to connect networks. Returns every peer which has been discovered.
+	/// Timeout is restarted after every returned peer.
+	pub fn connect_with_timeout(
+		spawner: CoNetworkTaskSpawner,
+		networks: impl IntoIterator<Item = Discovery>,
+		timeout: Duration,
+	) -> impl Stream<Item = Result<PeerId, anyhow::Error>> + Send + 'static {
+		Self::connect(spawner, networks).timeout(timeout).map(|item| match item {
+			Ok(result) => result,
+			Err(err) => Err(err.into()),
+		})
 	}
 }
 impl<B, C> NetworkTask<B, C> for DiscoveryConnectNetworkTask

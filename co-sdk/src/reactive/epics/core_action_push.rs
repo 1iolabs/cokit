@@ -8,6 +8,7 @@ use co_primitives::{CoId, ReducerAction};
 use futures::{Stream, StreamExt};
 use libipld::Ipld;
 
+/// Apply `Action::CoreActionPush` to reducer.
 pub fn core_action_push(
 	actions: ActionObservable,
 	_states: StateObservable,
