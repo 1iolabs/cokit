@@ -1,15 +1,25 @@
-use super::{application::ApplicationSettings, shared::SharedCoBuilder};
+use super::{
+	application::ApplicationSettings,
+	identity::{create_identity_resolver, create_private_identity_resolver},
+	shared::SharedCoBuilder,
+};
 use crate::{
 	drivers::network::{token::CoToken, CoNetworkTaskSpawner},
 	library::{find_co_secret::find_co_secret, find_membership::find_membership},
-	reducer::core_resolver::membership::{MembershipCoreResolver, MembershipInstanceRegistry},
+	reactive::context::ReactiveContext,
+	reducer::core_resolver::{
+		dynamic::DynamicCoreResolver,
+		epic::ReactiveCoreResolver,
+		log::LogCoreResolver,
+		membership::{MembershipCoreResolver, MembershipInstanceRegistry},
+	},
 	types::co_reducer::CoReducerContext,
 	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime, TaskSpawner,
 	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_identity::{LocalIdentity, PrivateIdentity};
+use co_identity::{IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolverBox};
 use co_log::EntryBlock;
 use co_network::bitswap;
 use co_primitives::CoId;
@@ -65,6 +75,25 @@ impl CoContext {
 
 		// result
 		Ok((storage, stream, context))
+	}
+
+	/// Identities.
+	///
+	/// Todo: Identity Permissions?
+	pub async fn identity_resolver(&self) -> Result<IdentityResolverBox, anyhow::Error> {
+		Ok(create_identity_resolver())
+	}
+
+	/// Access Private Identities.
+	///
+	/// Todo: Identity Permissions?
+	pub async fn private_identity_resolver(&self) -> Result<PrivateIdentityResolverBox, anyhow::Error> {
+		create_private_identity_resolver(&self).await
+	}
+
+	/// Network.
+	pub async fn network(&self) -> Option<CoNetworkTaskSpawner> {
+		self.inner.network.read().await.clone()
 	}
 }
 #[async_trait]
@@ -125,6 +154,7 @@ pub(crate) struct CoContextInner {
 	network: Arc<RwLock<Option<CoNetworkTaskSpawner>>>,
 	storage: CoStorage,
 	runtime: Runtime,
+	reactive_context: ReactiveContext,
 
 	/// Loaded reducers.
 	reducers: Arc<RwLock<BTreeMap<CoId, CoReducer>>>,
@@ -138,6 +168,7 @@ impl CoContextInner {
 		network: Option<CoNetworkTaskSpawner>,
 		storage: CoStorage,
 		runtime: Runtime,
+		reactive_context: ReactiveContext,
 	) -> Self {
 		Self {
 			settings,
@@ -147,6 +178,7 @@ impl CoContextInner {
 			network: Arc::new(RwLock::new(network)),
 			storage,
 			runtime,
+			reactive_context,
 			reducers: Default::default(),
 		}
 	}
@@ -190,9 +222,15 @@ impl CoContextInner {
 
 	/// Creates a CoReducer instance of the Local CO.
 	async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
+		let core_resolver = CoCoreResolver::default();
+		let core_resolver = ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(
+			core_resolver,
+			CO_ID_LOCAL.into(),
+			&self.reactive_context,
+		);
 		let core_resolver = MembershipCoreResolver::new(
 			self.tasks.clone(),
-			CoCoreResolver::default(),
+			core_resolver,
 			CoContextMembershipInstanceRegistry { reducers: self.reducers.clone() },
 			CO_CORE_NAME_MEMBERSHIP.to_owned(),
 		);
@@ -258,13 +296,27 @@ impl CoContextInner {
 			Some(m) => m,
 			None => return Ok(None),
 		};
+
+		// resolver
+		let core_resolver = CoCoreResolver::default();
+		let core_resolver = ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(
+			core_resolver,
+			CO_ID_LOCAL.into(),
+			&self.reactive_context,
+		);
+		let core_resolver = LogCoreResolver::new(core_resolver);
+		let core_resolver = DynamicCoreResolver::new(core_resolver);
+
+		// reducer
 		let reducer = SharedCoBuilder::new(parent, membership)
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
 			.with_network(self.network.read().await.clone())
 			.with_initialize(initialize)
-			.build(self.tasks.clone(), self.storage.clone(), self.runtime.clone(), identity)
+			.build(self.tasks.clone(), self.storage.clone(), self.runtime.clone(), identity, core_resolver)
 			.await?;
+
+		// result
 		Ok(Some(reducer))
 	}
 }

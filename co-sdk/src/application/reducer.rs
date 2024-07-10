@@ -245,13 +245,32 @@ where
 		T: Serialize + Send + Sync,
 		I: PrivateIdentity + Send + Sync,
 	{
-		// apply to log
 		let action = ReducerAction {
 			core: core.to_owned(),
 			payload: item,
 			from: identity.identity().to_owned(),
 			time: SystemTime::now().duration_since(UNIX_EPOCH).expect("Valid time").as_millis(),
 		};
+		self.push_action(runtime, identity, &action).await
+	}
+
+	/// Push an event.
+	pub async fn push_action<T, I>(
+		&mut self,
+		runtime: &RuntimePool,
+		identity: &I,
+		action: &ReducerAction<T>,
+	) -> Result<(), anyhow::Error>
+	where
+		T: Serialize + Send + Sync,
+		I: PrivateIdentity + Send + Sync,
+	{
+		// validate
+		if identity.identity() != action.from {
+			return Err(anyhow!("Invalid argument: identity"));
+		}
+
+		// apply to log
 		let (_, action) = self.log.push_event(identity, &action).await?;
 
 		// // debug
@@ -281,7 +300,6 @@ where
 		// result
 		Ok(())
 	}
-
 	/// Join heads (from other log).
 	/// This is used to join logs from other peers.
 	/// Returns true if state has changed.
@@ -440,6 +458,11 @@ pub struct ReducerChangeContext {
 	cause: ReducerChangeCause,
 }
 impl ReducerChangeContext {
+	/// Create a new local change context.
+	pub fn new() -> Self {
+		Self { cause: ReducerChangeCause::Push }
+	}
+
 	/// Whether this change was caused locally.
 	pub fn is_local_change(&self) -> bool {
 		self.cause.is_local()

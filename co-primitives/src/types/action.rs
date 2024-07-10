@@ -1,5 +1,9 @@
 use crate::{Date, Did};
-use serde::{Deserialize, Serialize};
+use libipld::{
+	serde::{from_ipld, to_ipld},
+	Ipld,
+};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ReducerAction<T> {
@@ -20,4 +24,14 @@ pub struct ReducerAction<T> {
 	/// Action payload.
 	#[serde(rename = "p")]
 	pub payload: T,
+}
+impl ReducerAction<Ipld> {
+	pub fn set_payload<T: Serialize>(&mut self, value: &T) -> Result<(), String> {
+		self.payload = to_ipld(value).map_err(|e| e.to_string())?;
+		Ok(())
+	}
+
+	pub fn get_payload<T: DeserializeOwned>(&self) -> Result<T, String> {
+		Ok(from_ipld(self.payload.clone()).map_err(|e| e.to_string())?)
+	}
 }

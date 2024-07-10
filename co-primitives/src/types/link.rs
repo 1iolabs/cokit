@@ -54,6 +54,11 @@ impl<T> From<Cid> for Link<T> {
 		Self::new(value)
 	}
 }
+impl<T> From<&Cid> for Link<T> {
+	fn from(value: &Cid) -> Self {
+		Self::new(*value)
+	}
+}
 impl<T> AsRef<Cid> for Link<T> {
 	fn as_ref(&self) -> &Cid {
 		&self.cid
@@ -71,25 +76,30 @@ impl<T> Display for Link<T> {
 }
 
 /// A (serializable) typed link.
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(into = "Option<Cid>", from = "Option<Cid>")]
-pub struct OptionLink<T: Default> {
+pub struct OptionLink<T> {
 	#[serde(skip)]
 	_type: PhantomData<T>,
 	cid: Option<Cid>,
 }
-impl<T: Default> PartialEq for OptionLink<T> {
+impl<T> Default for OptionLink<T> {
+	fn default() -> Self {
+		Self { _type: Default::default(), cid: Default::default() }
+	}
+}
+impl<T> PartialEq for OptionLink<T> {
 	fn eq(&self, other: &Self) -> bool {
 		self.cid == other.cid
 	}
 }
-impl<T: Default> Ord for OptionLink<T> {
+impl<T> Ord for OptionLink<T> {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		self.cid.cmp(&other.cid)
 	}
 }
-impl<T: Default> Eq for OptionLink<T> {}
-impl<T: Default> PartialOrd for OptionLink<T> {
+impl<T> Eq for OptionLink<T> {}
+impl<T> PartialOrd for OptionLink<T> {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
 		self.cid.partial_cmp(&other.cid)
 	}
@@ -102,8 +112,8 @@ impl<T: Default> Linkable<T> for OptionLink<T> {
 		}
 	}
 }
-impl<T: Default> Copy for OptionLink<T> {}
-impl<T: Default> OptionLink<T> {
+impl<T> Copy for OptionLink<T> {}
+impl<T> OptionLink<T> {
 	pub fn new(cid: Option<Cid>) -> Self {
 		Self { cid, _type: Default::default() }
 	}
@@ -124,42 +134,47 @@ impl<T: Default> OptionLink<T> {
 		self.cid = cid;
 	}
 }
-impl<T: Default> Clone for OptionLink<T> {
+impl<T> Clone for OptionLink<T> {
 	fn clone(&self) -> Self {
 		*self
 	}
 }
-impl<T: Default> From<OptionLink<T>> for Option<Cid> {
+impl<T> From<OptionLink<T>> for Option<Cid> {
 	fn from(val: OptionLink<T>) -> Self {
 		val.cid
 	}
 }
-impl<T: Default> From<Option<Cid>> for OptionLink<T> {
+impl<T> From<Option<Cid>> for OptionLink<T> {
 	fn from(value: Option<Cid>) -> Self {
 		Self::new(value)
 	}
 }
-impl<T: Default> From<&Option<Cid>> for OptionLink<T> {
+impl<T> From<Link<T>> for OptionLink<T> {
+	fn from(value: Link<T>) -> Self {
+		Self::new(Some(value.into()))
+	}
+}
+impl<T> From<&Option<Cid>> for OptionLink<T> {
 	fn from(value: &Option<Cid>) -> Self {
 		Self::new(*value)
 	}
 }
-impl<T: Default> From<Cid> for OptionLink<T> {
+impl<T> From<Cid> for OptionLink<T> {
 	fn from(value: Cid) -> Self {
 		Self::new(Some(value))
 	}
 }
-impl<T: Default> AsRef<Option<Cid>> for OptionLink<T> {
+impl<T> AsRef<Option<Cid>> for OptionLink<T> {
 	fn as_ref(&self) -> &Option<Cid> {
 		&self.cid
 	}
 }
-impl<T: Default> Debug for OptionLink<T> {
+impl<T> Debug for OptionLink<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "Link({}: {:?})", type_name::<T>(), self.cid)
 	}
 }
-impl<T: Default> Display for OptionLink<T> {
+impl<T> Display for OptionLink<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self.cid {
 			Some(cid) => write!(f, "{} ({})", cid, type_name::<T>()),

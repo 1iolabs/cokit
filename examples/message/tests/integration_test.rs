@@ -46,7 +46,7 @@ fn integration_test() {
 	let next_state = create_runtime(wasm_bytes).execute(api).unwrap();
 
 	// test
-	assert_eq!(next_state, Some(Cid::try_from("bafyr4icsv74udrd3j5ewaybjf2sfp2frygniduzpf6scuu6ahlpdefdvoi").unwrap()));
+	assert_eq!(next_state, Some(Cid::try_from("bafyr4iaubci6nz2uvpvxj4tyduktwdbcnnff4rbbuq2mfy24a5l6sa3uii").unwrap()));
 
 	// test state
 	let block = storage.get(&next_state.unwrap()).unwrap();
