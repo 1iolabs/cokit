@@ -4,7 +4,6 @@ import { isPluginInitializeAction } from "@1io/kui-application-sdk";
 import { Event, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { MessengerActionType } from "../actions";
-import { event } from "@tauri-apps/api";
 
 interface MessageEvent {
     f: String;
@@ -25,13 +24,17 @@ interface MessageEvent {
 export const subscribeTauriEventEpic: MessengerEpicType = (action$, state$, context) => action$.pipe(
     filter(isPluginInitializeAction),
     mergeMap(() => {
-        console.log("listen");
-        invoke("subscribe", { co: "1io", core: "room", event: "messaging" });
-        const obs = fromEventPattern<Event<MessageEvent>>(
+        console.log("subscribe 1io/room");
+        invoke("subscribe", { co: "1io", core: "room", source: context.plugin });
+        return fromEventPattern<Event<MessageEvent>>(
             async (handler) => {
-                return await listen("messaging", handler);
+                return await listen("1io/room", handler);
             },
-            (_handler, unlisten) => { console.log("remove"); unlisten() },
+            (_handler, unlisten) => {
+                console.log("remove", context.plugin);
+                invoke("unsubscribe", { co: "1io", core: "room", source: context.plugin });
+                unlisten();
+            },
         ).pipe(
             withLatestFrom(state$),
             // dedupe messages
@@ -52,7 +55,5 @@ export const subscribeTauriEventEpic: MessengerEpicType = (action$, state$, cont
                 return a;
             }),
         );
-        console.log("listen start");
-        return obs;
     }),
 );

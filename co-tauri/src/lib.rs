@@ -3,9 +3,12 @@ use co_log::SignedEntry;
 use co_primitives::ReducerAction;
 use co_sdk::{Application, ApplicationBuilder, BlockStorageExt, CoId};
 use libipld::{cbor::DagCborCodec, codec::Codec, Cid, Ipld};
-use library::co_settings::CoSettings;
+use library::{co_settings::CoSettings, subscription::build_event_name};
 use serde::Deserialize;
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	sync::Mutex,
+};
 use tauri::{ipc::InvokeError, Manager, Wry};
 use tokio_stream::{wrappers::WatchStream, StreamExt};
 pub mod library;
@@ -31,6 +34,10 @@ async fn application(settings: CoSettings) -> Application {
 			.expect("network");
 	}
 	application.clone()
+}
+
+struct Subscriptions {
+	active_subscriptions: Mutex<BTreeMap<String, BTreeSet<String>>>,
 }
 
 #[derive(Debug)]
@@ -133,10 +140,11 @@ async fn push(application: tauri::State<'_, Application>, body: Vec<u8>) -> Resu
 #[tauri::command]
 async fn subscribe(
 	application: tauri::State<'_, Application>,
+	subscriptions: tauri::State<'_, Subscriptions>,
 	app: tauri::AppHandle,
 	co: CoId,
-	event: &str,
 	core: Option<&str>,
+	source: &str,
 ) -> Result<(), CoTauriError> {
 	tracing::info!("tauri command subscribe: {:#?}", co);
 	let co_reducer = application
@@ -144,6 +152,23 @@ async fn subscribe(
 		.await?
 		.ok_or(anyhow!("Co not found: {}", co))?;
 
+	let event = build_event_name(co, core);
+
+	// scope to ensure lock gets released
+	{
+		let mut subscriptions = subscriptions.active_subscriptions.lock().unwrap();
+		if let Some(subscribers) = subscriptions.get_mut(&event) {
+			// event is already being emitted by another watcher
+			// -> add as subscriber and return (prevents multiple event emissions)
+			subscribers.insert(source.to_owned());
+			return Ok(());
+		} else {
+			// new event -> create subscribers set and update
+			let mut map: BTreeSet<String> = Default::default();
+			map.insert(source.to_owned());
+			subscriptions.insert(event.to_owned(), map);
+		}
+	}
 	let mut watcher = WatchStream::from_changes(co_reducer.watch().await);
 	while let Some(item) = watcher.next().await {
 		match item {
@@ -157,13 +182,31 @@ async fn subscribe(
 						continue;
 					}
 				}
-				tracing::info!("tauri event payload: {:#?} head: {:#?}", payload, head);
-				app.emit(event, payload).unwrap();
+				app.emit(&event, payload).unwrap();
 			},
 			None => (),
 		};
+		// stop emitting events if no subs left
+		if subscriptions.active_subscriptions.lock().unwrap().get(&event).is_none() {
+			tracing::info!("tauri watch end: {event}");
+			return Ok(());
+		}
 	}
 	Ok(())
+}
+
+#[tauri::command]
+fn unsubscribe(subscriptions: tauri::State<'_, Subscriptions>, co: CoId, core: Option<&str>, source: &str) {
+	let event = build_event_name(co, core);
+	let mut subscriptions = subscriptions.active_subscriptions.lock().unwrap();
+	// remove subscribers for event type
+	if let Some(mut subscribers) = subscriptions.remove(&event) {
+		subscribers.remove(source);
+		// add list back if other subscribers are remaining
+		if subscribers.len() > 0 {
+			subscriptions.insert(event, subscribers);
+		}
+	}
 }
 
 pub async fn tauri_builder(co_settings: CoSettings) -> tauri::Builder<Wry> {
@@ -174,5 +217,6 @@ pub async fn tauri_builder(co_settings: CoSettings) -> tauri::Builder<Wry> {
 	tauri::Builder::default()
 		.plugin(tauri_plugin_shell::init())
 		.manage(application)
-		.invoke_handler(tauri::generate_handler![get_core_state, push, subscribe])
+		.manage(Subscriptions { active_subscriptions: Default::default() })
+		.invoke_handler(tauri::generate_handler![get_core_state, push, subscribe, unsubscribe])
 }
