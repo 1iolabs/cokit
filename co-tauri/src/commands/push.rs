@@ -1,0 +1,86 @@
+use anyhow::anyhow;
+use co_sdk::{Application, CoId};
+use libipld::{cbor::DagCborCodec, codec::Codec, Ipld};
+use serde::Deserialize;
+use std::collections::BTreeMap;
+
+use crate::library::tauri_error::CoTauriError;
+
+/// This is the data structure of the single argument body of the push command. Argument is given as raw data (Vec<u8>)
+/// and then deserialized into this data type. When a tauri command is given a single parameter as Vec<u8>,
+/// tauri skips serialization/deserialization.  We want to ser/de by hand using cbor so possible Cids given in the
+/// action wont get broken by json serialization. We also don't know what type of action is given yet, so we just
+/// deserialize it into Ipld type. Using Ipld types as parameters directly doesn't work well as it doesn't
+/// deserialize Cids correctly.
+#[derive(Deserialize, Debug)]
+struct PushCommandBody {
+	co: CoId,
+	core: String,
+	action: Ipld,
+}
+
+impl TryFrom<Ipld> for PushCommandBody {
+	type Error = anyhow::Error;
+	fn try_from(value: Ipld) -> Result<Self, Self::Error> {
+		// convert Ipld data structure into this type
+		match value {
+			Ipld::Map(map) => {
+				let action = PushCommandBody::resolve_action(&map)?;
+				let co = PushCommandBody::resolve_co_id(&map)?;
+				let core = PushCommandBody::resolve_core(&map)?;
+				Ok(PushCommandBody { action, co, core })
+			},
+			_ => Err(anyhow!("Ipld is not a map")),
+		}
+	}
+}
+
+impl PushCommandBody {
+	fn resolve_action(map: &BTreeMap<String, Ipld>) -> Result<Ipld, anyhow::Error> {
+		if let Some(action) = map.get("action") {
+			Ok(action.clone())
+		} else {
+			Err(anyhow!("Body contains no action"))
+		}
+	}
+	fn resolve_co_id(map: &BTreeMap<String, Ipld>) -> Result<CoId, anyhow::Error> {
+		if let Some(ipld) = map.get("co") {
+			match ipld {
+				Ipld::String(co) => Ok(CoId::new(&*co)),
+				_ => Err(anyhow!("Co is not a string")),
+			}
+		} else {
+			Err(anyhow!("Body contains no co info"))
+		}
+	}
+	fn resolve_core(map: &BTreeMap<String, Ipld>) -> Result<String, anyhow::Error> {
+		if let Some(ipld) = map.get("core") {
+			match ipld {
+				Ipld::String(core) => Ok(core.clone()),
+				_ => Err(anyhow!("core not a string")),
+			}
+		} else {
+			Err(anyhow!("body contains no core info"))
+		}
+	}
+}
+
+#[tauri::command]
+pub async fn push(application: tauri::State<'_, Application>, body: Vec<u8>) -> Result<(), CoTauriError> {
+	// manually deserialize body into PushCommandBody type
+	let body: PushCommandBody = DagCborCodec::default().decode::<Ipld>(&body)?.try_into()?;
+	tracing::info!(
+		"tauri command push: \n\tCo: {:#?}\n\tcore: {:#?}\n\taction: {:#?}",
+		body.co,
+		body.core,
+		body.action
+	);
+	// get reducer and push action
+	let reducer = application
+		.co_reducer(body.co.clone())
+		.await?
+		.ok_or(anyhow!("Co not found: {}", body.co))?;
+	let identity = application.local_identity();
+	reducer.push(&identity, &body.core, &body.action).await?;
+	Ok(())
+}
