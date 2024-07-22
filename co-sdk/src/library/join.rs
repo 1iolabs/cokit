@@ -1,23 +1,35 @@
 use crate::{CoContext, CoReducerFactory, CO_CORE_NAME_CO};
 use anyhow::anyhow;
 use co_core_co::{Co, CoAction, ParticipantState};
-use co_identity::{DidCommHeader, Identity, Message, PrivateIdentity};
+use co_identity::{DidCommHeader, Message, PrivateIdentity};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoId, Did, Tags};
 use serde::{Deserialize, Serialize};
 
 pub const CO_DIDCOMM_JOIN: &str = "co-join";
 
-/// Create an encoded join message.
-pub fn create_join_message<F, T>(from: &F, to: &T, co: CoId, thid: Option<String>) -> anyhow::Result<EncodedMessage>
+// /// Create an encoded (encrypted) join message.
+// pub fn create_join_message<F, T>(from: &F, to: &T, co: CoId, thid: Option<String>) -> anyhow::Result<EncodedMessage>
+// where
+// 	F: PrivateIdentity + Send + Sync + 'static,
+// 	T: Identity + Send + Sync + 'static,
+// {
+// 	let (from_didcomm, to_didcomm, mut header) = DidCommHeader::create(from, to, CO_DIDCOMM_JOIN)?;
+// 	header.thid = thid;
+// 	let body = serde_json::to_string(&co)?;
+// 	let message = from_didcomm.jwe(&to_didcomm, header, &body)?;
+// 	Ok(EncodedMessage(message.into_bytes()))
+// }
+
+/// Create an encoded (signed) join message to unknown receipents.
+pub fn create_join_message_from<F>(from: &F, co: CoId, thid: Option<String>) -> anyhow::Result<EncodedMessage>
 where
 	F: PrivateIdentity + Send + Sync + 'static,
-	T: Identity + Send + Sync + 'static,
 {
-	let (from_didcomm, to_didcomm, mut header) = DidCommHeader::create(from, to, CO_DIDCOMM_JOIN)?;
+	let (from_didcomm, mut header) = DidCommHeader::create_from(from, CO_DIDCOMM_JOIN)?;
 	header.thid = thid;
 	let body = serde_json::to_string(&co)?;
-	let message = from_didcomm.jwe(&to_didcomm, header, &body)?;
+	let message = from_didcomm.jws(header, &body)?;
 	Ok(EncodedMessage(message.into_bytes()))
 }
 

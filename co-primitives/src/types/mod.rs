@@ -3,6 +3,8 @@ pub mod co;
 pub mod codec;
 pub mod date;
 pub mod did;
+pub mod invite;
+pub mod known_tags;
 pub mod link;
 pub mod metadata;
 pub mod network;

@@ -1,12 +1,13 @@
 use crate::{
 	library::invite::{CoInvitePayload, CO_DIDCOMM_INVITE},
 	reactive::context::{ActionObservable, StateObservable},
-	Action, CoContext, CoInvite, CO_CORE_MEMBERSHIP,
+	Action, CoContext, CoInvite, KnownTag, CO_CORE_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use co_core_membership::{Membership, MembershipState, MembershipsAction};
 use co_identity::DidCommHeader;
-use co_primitives::{tags, Did};
+use co_primitives::{tags, CoInviteMetadata, Did, Tags};
+use co_storage::BlockStorageExt;
 use futures::{future::ready, Stream, StreamExt};
 use libp2p::PeerId;
 
@@ -50,6 +51,7 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 	let local = context.local_co_reducer().await?;
 	let co = local.co().await?;
 	let invite = CoInvite::from_tags(&co.tags).unwrap_or_default();
+	let from = header.from.ok_or(anyhow!("invalid header: from"))?.to_string();
 	let did = header.to.first().ok_or(anyhow!("invalid header: to"))?.to_string();
 
 	// state
@@ -64,19 +66,31 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 
 	// apply
 	if let Some(membership_state) = membership_state {
+		// payload
+		let metadata =
+			CoInviteMetadata { id: header.id, from, network: payload.connectivity.clone(), peer: peer.to_bytes() };
+		let membership_tags = tags!(
+			"co-invite-metadata": local.storage().set_serialized(&metadata).await?,
+		);
+
 		// membership
 		local
 			.push(
 				&context.local_identity(),
 				CO_CORE_MEMBERSHIP,
-				&MembershipsAction::Join(membership(did, payload, membership_state)),
+				&MembershipsAction::Join(membership(did, payload, membership_state, membership_tags)),
 			)
 			.await?;
 	}
 	Ok(vec![])
 }
 
-fn membership(did: Did, payload: CoInvitePayload, membership_state: MembershipState) -> Membership {
+fn membership(
+	did: Did,
+	payload: CoInvitePayload,
+	membership_state: MembershipState,
+	membership_tags: Tags,
+) -> Membership {
 	Membership {
 		id: payload.id,
 		did,
@@ -85,6 +99,6 @@ fn membership(did: Did, payload: CoInvitePayload, membership_state: MembershipSt
 		encryption_mapping: None,
 		key: None,
 		membership_state,
-		tags: tags!(),
+		tags: membership_tags,
 	}
 }

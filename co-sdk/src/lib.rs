@@ -23,7 +23,8 @@ pub use co_identity::{
 	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 pub use co_primitives::{
-	tag, tags, BlockSerializer, CoId, Date, Did, Link, MultiCodec, MultiCodecError, OptionLink, Tag, Tags,
+	tag, tags, BlockSerializer, CoId, CoInvite, CoNetwork, Date, Did, KnownTag, KnownTags, Link, MultiCodec,
+	MultiCodecError, OptionLink, Tag, Tags,
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{
@@ -52,7 +53,6 @@ pub use library::{
 pub use pin::pin::PinAPI;
 pub use reactive::{action::Action, epic::Epic, observable::Observable};
 pub use reducer::core_resolver::{co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverError};
-pub use types::known_tags::{CoInvite, KnownTags};
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},
 	co_reducer_factory::CoReducerFactory,

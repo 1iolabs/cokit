@@ -54,9 +54,7 @@ pub enum MembershipState {
 	/// Pending invite by some participant of the CO.
 	///
 	/// Related membership Tags:
-	///  `invite-from: Did`
-	///  `invite-id: String`
-	///  `invite-date: Date`
+	///  `co-invite: CoInviteMetadata`
 	Invite = 2,
 
 	/// Pending join by us.

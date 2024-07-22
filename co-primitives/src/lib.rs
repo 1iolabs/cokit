@@ -12,6 +12,8 @@ pub use types::{
 	codec::{MultiCodec, MultiCodecError},
 	date::Date,
 	did::Did,
+	invite::{CoConnectivity, CoInviteMetadata},
+	known_tags::{CoInvite, CoNetwork, CoTimeout, KnownTag, KnownTags},
 	link::{Link, Linkable, OptionLink},
 	metadata::{CoMetadata, Metadata, WithCoMetadata},
 	network::{Network, NetworkCoHeads, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous},
@@ -20,6 +22,6 @@ pub use types::{
 		RelativePathOwned,
 	},
 	secret::Secret,
-	tags::{Tag, Tags, TagsExpr},
+	tags::{Tag, TagValue, Tags, TagsExpr},
 	total_float::TotalFloat64,
 };

@@ -260,6 +260,11 @@ impl Tags {
 		self.0.iter().find(|tag| tag.0 == key)
 	}
 
+	/// Find first tag value by key.
+	pub fn value(&self, key: &str) -> Option<&TagValue> {
+		self.0.iter().find(|tag| tag.0 == key).map(|(_, v)| v)
+	}
+
 	/// Test against tag expression.
 	pub fn matches<M: TagsMatches>(&self, expr: impl Borrow<M>) -> bool {
 		expr.borrow().matches(self)
@@ -279,10 +284,26 @@ impl Tags {
 		}
 		None
 	}
+
+	/// Find first tag value, that is a link, by key.
+	pub fn link(&self, key: &str) -> Option<&Cid> {
+		self.0.iter().find_map(|tag| match tag {
+			(k, TagValue::Link(link)) if k == key => Some(link),
+			_ => None,
+		})
+	}
 }
 impl FromIterator<Tag> for Tags {
 	fn from_iter<T: IntoIterator<Item = Tag>>(iter: T) -> Self {
 		Self(BTreeSet::from_iter(iter))
+	}
+}
+impl IntoIterator for Tags {
+	type Item = Tag;
+	type IntoIter = <BTreeSet<Tag> as IntoIterator>::IntoIter;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.0.into_iter()
 	}
 }
 impl Debug for Tags {

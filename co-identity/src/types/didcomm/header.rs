@@ -115,4 +115,19 @@ impl DidCommHeader {
 
 		Ok((from_didcomm, to_didcomm, header))
 	}
+
+	/// Create new DidCommHeader for a message with sender `from` and unknown recipent(s).
+	pub fn create_from<F>(from: &F, message_type: impl Into<String>) -> anyhow::Result<(DidCommPrivateContext, Self)>
+	where
+		F: PrivateIdentity + Send + Sync + 'static,
+	{
+		let from_didcomm = from
+			.didcomm_private()
+			.ok_or(anyhow::anyhow!("unsupported identity: from: no private didcomm context"))?;
+
+		let mut header = DidCommHeader::new(message_type.into());
+		header.from = Some(from.identity().to_owned());
+
+		Ok((from_didcomm, header))
+	}
 }

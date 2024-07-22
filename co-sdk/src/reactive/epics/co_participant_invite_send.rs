@@ -1,22 +1,21 @@
 use crate::{
-	drivers::network::{
-		tasks::{didcomm_send::DidCommSendNetworkTask, discovery_connect::DiscoveryConnectNetworkTask},
-		CoNetworkTaskSpawner,
-	},
+	drivers::network::CoNetworkTaskSpawner,
 	library::{
+		connect_and_send::connect_and_send,
 		identity_discovery::identity_discovery,
 		invite::{create_invite_message, CoInvitePayload},
+		settings_timeout::settings_timeout,
 	},
 	reactive::context::{ActionObservable, StateObservable},
-	Action, CoContext, CoReducerFactory, CO_CORE_NAME_CO,
+	state, Action, CoContext, CoNetwork, CoReducerFactory, CoStorage, KnownTag, CO_CORE_NAME_CO,
 };
 use anyhow::anyhow;
-use co_core_co::CoAction;
+use co_core_co::{Co, CoAction};
 use co_identity::{IdentityResolver, PrivateIdentityResolver};
 use co_network::{didcomm::EncodedMessage, discovery::Discovery};
-use co_primitives::{CoId, Did, Tags};
-use futures::{Stream, StreamExt};
-use std::{collections::BTreeSet, time::Duration};
+use co_primitives::{CoConnectivity, CoId, Did, Tags};
+use futures::{Stream, StreamExt, TryStreamExt};
+use std::collections::BTreeSet;
 
 /// When a participant is invited into an CO, try to connect and send the invite message via didcomm.
 /// TODO: consensus finalization?
@@ -58,7 +57,6 @@ pub fn co_participant_invite_send(
 		.map(Action::map_error)
 }
 
-/// TODO: read timeout setting from tags
 fn invite_discovery(
 	context: CoContext,
 	network: CoNetworkTaskSpawner,
@@ -68,19 +66,11 @@ fn invite_discovery(
 	participant_tags: Tags,
 ) -> impl Stream<Item = anyhow::Result<Action>> + Send + 'static {
 	async_stream::try_stream! {
+		let timeout = settings_timeout(&context, &co, Some("invite")).await;
 		let (message, discovery) = invite(&context, &co, &from, &to, &participant_tags).await?;
-		let connect_peers = DiscoveryConnectNetworkTask::connect_with_timeout(network.clone(), discovery, Duration::from_secs(10));
-		for await peer in connect_peers {
+		for await peer in connect_and_send(network, message, discovery, timeout) {
 			if let Ok(peer) = peer {
-				let send = DidCommSendNetworkTask::send(
-					network.clone(),
-					[peer].into_iter().collect(),
-					message.clone(),
-					Duration::from_secs(10),
-				).await;
-				if let Ok(peer) = send {
-					yield Action::Invited { co: co.clone(), participant: to.clone(), peer };
-				}
+				yield Action::Invited { co: co.clone(), participant: to.clone(), peer };
 			}
 		}
 	}
@@ -108,6 +98,7 @@ async fn invite(
 			tags: co.tags.clone(),
 			state: state.ok_or(anyhow!("Can not invite to empty CO"))?,
 			heads,
+			connectivity: connectivity(co_reducer.storage(), &co).await?,
 		},
 		None,
 	)?;
@@ -117,4 +108,26 @@ async fn invite(
 
 	// result
 	Ok((invite_message, discovery))
+}
+
+async fn connectivity(storage: CoStorage, co: &Co) -> anyhow::Result<CoConnectivity> {
+	if !co.network.is_empty() {
+		Ok(CoConnectivity {
+			network: state::stream(storage, &co.network).try_collect().await?,
+			participants: Default::default(),
+		})
+	} else {
+		Ok(CoConnectivity {
+			network: Default::default(),
+			participants: co
+				.participants
+				.iter()
+				.filter(|(_, participant)| {
+					let network = CoNetwork::from_tags(&participant.tags).unwrap_or_default();
+					network.has_feature(CoNetwork::Invite)
+				})
+				.map(|(participant, _)| participant.to_owned())
+				.collect(),
+		})
+	}
 }

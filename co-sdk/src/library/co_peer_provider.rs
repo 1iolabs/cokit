@@ -1,16 +1,12 @@
-use super::co_state::CoState;
+use super::{co_state::CoState, network_discovery::network_discovery};
 use crate::{
 	drivers::network::{tasks::discovery_connect::DiscoveryConnectNetworkTask, CoNetworkTaskSpawner},
 	state, CoStorage,
 };
 use async_trait::async_trait;
 use co_identity::{IdentityResolverBox, PrivateIdentity};
-use co_network::{
-	discovery::{self, Discovery},
-	heads::HeadsState,
-	DidDiscoveryMessage, NetworkTaskSpawner, PeerProvider,
-};
-use co_primitives::{CoId, Network, OptionLink};
+use co_network::{discovery, NetworkTaskSpawner, PeerProvider};
+use co_primitives::{CoId, OptionLink};
 use futures::Stream;
 use libp2p::PeerId;
 use std::collections::BTreeSet;
@@ -83,37 +79,11 @@ async fn networks<P>(
 	storage: &CoStorage,
 	id: &CoId,
 	state: OptionLink<co_core_co::Co>,
-) -> Result<BTreeSet<Discovery>, anyhow::Error>
+) -> Result<BTreeSet<discovery::Discovery>, anyhow::Error>
 where
 	P: PrivateIdentity + Send + Sync + 'static,
 {
-	let co_networks = state::networks(storage, state)
-		.await?
-		.into_iter()
-		.filter_map(|network| match network {
-			Network::CoHeads(value) => Some(Discovery::Topic(HeadsState::to_topic_hash(&value, id).into_string())),
-			Network::Rendezvous(value) => Some(Discovery::Rendezvous(value)),
-			Network::Peer(value) => Some(Discovery::Peer(value)),
-			_ => None,
-		});
-	let participant_networks = state::participant_identities(identity_resolver, storage, state)
-		.await?
-		.into_iter()
-		.flat_map(|participant| {
-			identity.networks().into_iter().filter_map(move |network| match network {
-				Network::DidDiscovery(value) => Some(Discovery::DidDiscovery(
-					discovery::DidDiscovery::create(
-						identity,
-						&participant,
-						value,
-						DidDiscoveryMessage::Discover.to_string(),
-					)
-					.ok()?,
-				)),
-				Network::Rendezvous(value) => Some(Discovery::Rendezvous(value)),
-				Network::Peer(value) => Some(Discovery::Peer(value)),
-				_ => None,
-			})
-		});
-	Ok(co_networks.chain(participant_networks).collect())
+	let networks = state::networks(storage, state).await?;
+	let participants = state::participant_identities(identity_resolver, storage, state).await?;
+	Ok(network_discovery(identity, id, networks, participants).await?)
 }

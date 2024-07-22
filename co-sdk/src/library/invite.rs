@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use co_identity::{DidCommHeader, Identity, PrivateIdentity};
 use co_network::didcomm::EncodedMessage;
-use co_primitives::{CoId, Tags};
+use co_primitives::{CoConnectivity, CoId, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 
@@ -32,4 +32,5 @@ pub struct CoInvitePayload {
 	pub tags: Tags,
 	pub state: Cid,
 	pub heads: BTreeSet<Cid>,
+	pub connectivity: CoConnectivity,
 }

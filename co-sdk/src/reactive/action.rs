@@ -31,6 +31,9 @@ pub enum Action {
 	/// Invite request has been sent to a peer.
 	Invited { co: CoId, participant: Did, peer: PeerId },
 
+	/// Join request has been sent to a peer.
+	Joined { co: CoId, participant: Did, peer: PeerId },
+
 	/// Network has been started.
 	NetworkStarted,
 
