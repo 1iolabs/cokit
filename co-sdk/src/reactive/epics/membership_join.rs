@@ -1,9 +1,8 @@
 use crate::{
 	drivers::network::{tasks::didcomm_send::DidCommSendNetworkTask, CoNetworkTaskSpawner},
 	library::{
-		connect_and_send::connect_and_send,
-		join::{self, create_join_message_from},
-		network_discovery::network_discovery,
+		connect_and_send::connect_and_send, join::create_join_message_from, network_discovery::network_discovery,
+		settings_timeout::settings_timeout,
 	},
 	reactive::context::{ActionObservable, StateObservable},
 	Action, CoContext, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
@@ -72,7 +71,7 @@ pub fn membership_join(
 						Some(n) => n,
 						None => return Ok(None),
 					};
-					join(context, network, membership, Duration::from_secs(10)).await?;
+					join(context, network, membership).await?;
 					Ok(None)
 				}
 			}
@@ -84,10 +83,12 @@ async fn join(
 	context: CoContext,
 	network: CoNetworkTaskSpawner,
 	membership: Membership,
-	timeout: Duration,
 ) -> anyhow::Result<Vec<Action>> {
 	let local_co = context.local_co_reducer().await?;
 	let mut result = Vec::new();
+
+	// timeout
+	let timeout: Duration = settings_timeout(&context, &membership.id, Some("join")).await;
 
 	// metdata
 	let invite_cid = membership
