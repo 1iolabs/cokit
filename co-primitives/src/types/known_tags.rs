@@ -1,7 +1,5 @@
 use super::tags::TagValue;
-use crate::serde_string_enum;
-use crate::Tag;
-use crate::Tags;
+use crate::{serde_string_enum, Tag, Tags};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -11,7 +9,12 @@ pub enum KnownTags {
 	#[serde(rename = "co-invite")]
 	CoInvite,
 
-	/// [`Link<CoInviteMetadata>`]
+	/// [`CoJoin`]
+	#[serde(rename = "co-join")]
+	CoJoin,
+
+	/// [`crate::CoInviteMetadata`]
+	/// [`crate::Link`]
 	#[serde(rename = "co-invite-metdata")]
 	CoInviteMetadata,
 
@@ -19,7 +22,7 @@ pub enum KnownTags {
 	#[serde(rename = "co-network")]
 	CoNetwork,
 
-	/// [`CoNetwork`]
+	/// [`CoTimeout`]
 	#[serde(rename = "co-timeout")]
 	CoTimeout,
 }
@@ -56,11 +59,11 @@ pub enum CoInvite {
 	#[serde(rename = "disable")]
 	Disable,
 
-	// All: Auto accept all Invite requests.
-	#[serde(rename = "all")]
-	All,
+	/// Accept: Auto accept all Invite requests.
+	#[serde(rename = "accept")]
+	Accept,
 
-	/// DID Verification: Only accept join when DID can be verified for certain properties.
+	/// DID Verification: Only accept invite when DID can be verified for certain properties.
 	#[serde(rename = "did")]
 	Did,
 }
@@ -89,6 +92,43 @@ impl Into<Tag> for &CoInvite {
 impl Into<Tags> for &CoInvite {
 	fn into(self) -> Tags {
 		[self.tag()].into_iter().collect()
+	}
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub enum CoJoin {
+	/// Invite: Only accept joins when participant has been invited.
+	#[serde(rename = "invite")]
+	#[default]
+	Invite,
+
+	/// Accept: Auto Accept all Join requests.
+	#[serde(rename = "accept")]
+	Accept,
+
+	/// DID Verification: Only accept join when DID can be verified for certain properties.
+	#[serde(rename = "did")]
+	Did,
+
+	/// Manual: Add "pending" participant.
+	#[serde(rename = "manual")]
+	Manual,
+}
+serde_string_enum!(CoJoin);
+impl KnownTag for CoJoin {
+	fn key() -> KnownTags {
+		KnownTags::CoJoin
+	}
+
+	fn value(&self) -> TagValue {
+		self.to_string().into()
+	}
+
+	fn from_value(value: &TagValue) -> Option<Self>
+	where
+		Self: Sized,
+	{
+		value.string().and_then(|str| Self::try_from(str).ok())
 	}
 }
 

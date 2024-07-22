@@ -13,7 +13,7 @@ pub use types::{
 	date::Date,
 	did::Did,
 	invite::{CoConnectivity, CoInviteMetadata},
-	known_tags::{CoInvite, CoNetwork, CoTimeout, KnownTag, KnownTags},
+	known_tags::{CoInvite, CoJoin, CoNetwork, CoTimeout, KnownTag, KnownTags},
 	link::{Link, Linkable, OptionLink},
 	metadata::{CoMetadata, Metadata, WithCoMetadata},
 	network::{Network, NetworkCoHeads, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous},

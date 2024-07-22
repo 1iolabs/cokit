@@ -100,7 +100,7 @@ pub enum ParticipantState {
 	/// Pending participant.
 	///
 	/// Usually this is a manual Join request.
-	/// Pending participants need to be moved into Invite state by a participant.
+	/// Pending participants need to be moved into [`ParticipantState::Invite`] state by a participant.
 	Pending = 3,
 }
 

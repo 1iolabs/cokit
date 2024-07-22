@@ -18,7 +18,7 @@ use std::{future::ready, time::Duration};
 
 /// When a membership is set to active, try to connect the CO and send the join message via didcomm.
 /// TODO: consensus finalization?
-pub fn membership_join(
+pub fn join_send(
 	actions: ActionObservable,
 	_states: StateObservable,
 	context: CoContext,

@@ -19,7 +19,7 @@ use std::collections::BTreeSet;
 
 /// When a participant is invited into an CO, try to connect and send the invite message via didcomm.
 /// TODO: consensus finalization?
-pub fn co_participant_invite_send(
+pub fn invite_send(
 	actions: ActionObservable,
 	_states: StateObservable,
 	context: CoContext,
