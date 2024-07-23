@@ -13,6 +13,7 @@ export function App(props: AppProps) {
   const dispatch = useDispatch();
   const [message, setMessage] = React.useState("");
   const messages = useSelector((state: MessengerPluginState) => state.messages);
+  const chatName = useSelector((state: MessengerPluginState) => state.chatName);
 
   const onSendMessage = () => {
     dispatch<MessengerSendAction>({
@@ -25,7 +26,7 @@ export function App(props: AppProps) {
   return <LevelStack style={{ width: "100%", height: "100%" }}>
     <MessengerView
       chatInput={message}
-      chatName={"Some test chat"}
+      chatName={chatName}
       onChatInput={setMessage}
       messages={messages}
       onSendMessage={onSendMessage}

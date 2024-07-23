@@ -1,22 +1,23 @@
-import { filter, fromEventPattern, map, mergeMap, withLatestFrom } from "rxjs";
+import { EMPTY, filter, fromEventPattern, identity, mergeMap, withLatestFrom } from "rxjs";
 import { MessengerEpicType } from "../types/plugin";
 import { isPluginInitializeAction } from "@1io/kui-application-sdk";
 import { Event, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { MessengerActionType } from "../actions";
+import { ChatNameChangedAction, MessengerActionType } from "../actions";
 
 interface MessageEvent {
-    f: String;
-    c: String;
+    f: string;
+    c: string;
     t: number;
     p: {
-        event_id: String;
+        event_id: string;
         timestamp: number;
-        room_id: String;
-        type: String;
+        room_id: string;
+        type: string;
         content: {
-            msgtype: String;
-            body: String;
+            msgtype: string;
+            body: string;
+            name: string;
         };
     };
 }
@@ -39,20 +40,39 @@ export const subscribeTauriEventEpic: MessengerEpicType = (action$, state$, cont
             withLatestFrom(state$),
             // dedupe messages
             filter(([event, state]) => state.messages.findIndex((m) => m.key === event.payload.p.event_id) === -1),
-            map(([event]) => {
+            mergeMap(([event]) => {
                 console.log(event);
-                const a = {
-                    payload: {
-                        message: {
-                            key: event.payload.p.event_id,
-                            message: event.payload.p.content.body,
-                            ownMessage: true,
-                            timestamp: new Date(event.payload.t),
+                if (event.payload.c !== "room") {
+                    // not a room event, skip
+                    return EMPTY;
+                }
+                switch (event.payload.p.type) {
+                    case "m.room.message": {
+                        return [{
+                            payload: {
+                                message: {
+                                    key: event.payload.p.event_id,
+                                    message: event.payload.p.content.body,
+                                    ownMessage: true,
+                                    timestamp: new Date(event.payload.t),
+                                }
+                            },
+                            type: MessengerActionType.MessageReceived,
+                        }];
+                    };
+                    case "m.room.name": {
+                        let groupName = event.payload.p.content.name;
+                        if (groupName) {
+
+                            return [identity<ChatNameChangedAction>({
+                                payload: { newName: groupName },
+                                type: MessengerActionType.ChatNameChanged,
+                            })];
                         }
-                    },
-                    type: MessengerActionType.MessageReceived,
-                };
-                return a;
+                    }
+                }
+                // event not handled
+                return EMPTY;
             }),
         );
     }),
