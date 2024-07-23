@@ -12,8 +12,11 @@ impl From<CoTauriError> for InvokeError {
 	}
 }
 
-impl From<anyhow::Error> for CoTauriError {
-	fn from(error: anyhow::Error) -> Self {
-		Self { error }
+impl<T> From<T> for CoTauriError
+where
+	T: Into<anyhow::Error>,
+{
+	fn from(error: T) -> Self {
+		Self { error: error.into() }
 	}
 }

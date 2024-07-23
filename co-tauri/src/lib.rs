@@ -1,6 +1,7 @@
 use commands::{
-	get_core_state::get_core_state,
+	get_state::get_co_state,
 	push::push,
+	resolve_cid::resolve_cid,
 	subscription::{subscribe, unsubscribe},
 };
 use library::{
@@ -21,5 +22,7 @@ pub async fn tauri_builder(co_settings: CoApplicationSettings) -> tauri::Builder
 		.plugin(tauri_plugin_shell::init())
 		.manage(application)
 		.manage(Subscriptions { active_subscriptions: Default::default() })
-		.invoke_handler(tauri::generate_handler![get_core_state, push, subscribe, unsubscribe])
+		// TODO add feature that lets devs add their own commands as well? Maybe they need features
+		// we didn't think about. Calling invoke_handler() again overwrites the already set handlers
+		.invoke_handler(tauri::generate_handler![get_co_state, push, resolve_cid, subscribe, unsubscribe])
 }
