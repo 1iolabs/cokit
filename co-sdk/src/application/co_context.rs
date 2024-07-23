@@ -109,6 +109,11 @@ impl CoContext {
 	pub async fn network(&self) -> Option<CoNetworkTaskSpawner> {
 		self.inner.network.read().await.clone()
 	}
+
+	/// Tasks.
+	pub fn tasks(&self) -> TaskSpawner {
+		self.inner.tasks.clone()
+	}
 }
 #[async_trait]
 impl CoReducerFactory for CoContext {

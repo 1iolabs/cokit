@@ -108,10 +108,11 @@ async fn join(
 		.await
 		.is_ok()
 	{
-		return Ok(vec![Action::Joined {
+		return Ok(vec![Action::JoinSent {
 			co: membership.id.clone(),
 			participant: membership.did.clone(),
 			peer: invite_peer,
+			heads: membership.heads.clone(),
 		}]);
 	}
 
@@ -139,7 +140,12 @@ async fn join(
 	while let Some(item) = join.next().await {
 		match item {
 			Ok(peer) => {
-				result.push(Action::Joined { co: membership.id.clone(), participant: membership.did.clone(), peer });
+				result.push(Action::JoinSent {
+					co: membership.id.clone(),
+					participant: membership.did.clone(),
+					heads: membership.heads.clone(),
+					peer,
+				});
 				break;
 			},
 			Err(err) => {

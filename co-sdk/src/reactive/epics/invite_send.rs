@@ -70,7 +70,7 @@ fn invite_discovery(
 		let (message, discovery) = invite(&context, &co, &from, &to, &participant_tags).await?;
 		for await peer in connect_and_send(network, message, discovery, timeout) {
 			if let Ok(peer) = peer {
-				yield Action::Invited { co: co.clone(), participant: to.clone(), peer };
+				yield Action::InviteSent { co: co.clone(), participant: to.clone(), peer };
 			}
 		}
 	}

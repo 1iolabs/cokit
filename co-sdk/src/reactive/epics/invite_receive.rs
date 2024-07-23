@@ -94,8 +94,8 @@ fn membership(
 	Membership {
 		id: payload.id,
 		did,
-		state: payload.state,
-		heads: payload.heads,
+		state: payload.state, // TODO: consensus validation
+		heads: payload.heads, // TODO: consensus validation
 		encryption_mapping: None,
 		key: None,
 		membership_state,

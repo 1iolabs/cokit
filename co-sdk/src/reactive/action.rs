@@ -1,10 +1,10 @@
-use std::{ops::Deref, sync::Arc};
+use std::{collections::BTreeSet, ops::Deref, sync::Arc};
 
 use co_identity::Message;
 use co_primitives::{CoId, Did, Link, OptionLink, ReducerAction};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::Stream;
-use libipld::Ipld;
+use libipld::{Cid, Ipld};
 use libp2p::PeerId;
 
 use crate::ReducerChangeContext;
@@ -29,10 +29,16 @@ pub enum Action {
 	Error { err: ActionError },
 
 	/// Invite request has been sent to a peer.
-	Invited { co: CoId, participant: Did, peer: PeerId },
+	InviteSent { co: CoId, participant: Did, peer: PeerId },
 
 	/// Join request has been sent to a peer.
-	Joined { co: CoId, participant: Did, peer: PeerId },
+	JoinSent { co: CoId, heads: BTreeSet<Cid>, participant: Did, peer: PeerId },
+
+	/// Join completed.
+	Joined { co: CoId, participant: Did, success: bool },
+
+	/// Send Key Request to co (participants) or specified peer.
+	// KeyRequest { co: CoId, key: Option<String>, peer: Option<PeerId> },
 
 	/// Network has been started.
 	NetworkStarted,

@@ -68,6 +68,11 @@ impl From<u64> for MultiCodec {
 		}
 	}
 }
+impl From<&Cid> for MultiCodec {
+	fn from(value: &Cid) -> MultiCodec {
+		Self::from(value.codec())
+	}
+}
 
 #[derive(Debug, thiserror::Error)]
 #[error("Expected {0} codec to be {1:?} got {2:?}")]
