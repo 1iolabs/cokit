@@ -12,7 +12,7 @@ use futures::TryStreamExt;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
-	/// The path.#
+	/// The path.
 	pub path: String,
 
 	/// Pretty print data.

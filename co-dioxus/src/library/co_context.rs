@@ -140,7 +140,7 @@ async fn did_discovery_subscribe_all(
 	identity_resolver: &PrivateIdentityResolverBox,
 ) -> Result<()> {
 	let local_co = context.local_co_reducer().await?;
-	let identities = state::identities(local_co.storage(), local_co.reducer_state().await.0.into());
+	let identities = state::identities(local_co.storage(), local_co.reducer_state().await.0.into(), None);
 	pin_mut!(identities);
 	while let Some(identity) = identities.next().await {
 		let private_identity = identity_resolver.resolve_private(&identity?.did).await?;

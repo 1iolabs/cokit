@@ -36,7 +36,7 @@ pub async fn command(
 		Some(dids) => dids.clone(),
 		None => {
 			let local_co = application.local_co_reducer().await?;
-			state::identities(local_co.storage(), local_co.co_state().await)
+			state::identities(local_co.storage(), local_co.co_state().await, None)
 				.map(|identity| identity.map(|identity| identity.did))
 				.try_collect()
 				.await?
