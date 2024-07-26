@@ -10,6 +10,7 @@ mod invite_receive;
 mod invite_send;
 mod join_receive;
 mod join_send;
+mod key_request_receive;
 mod key_request_send;
 
 pub fn epic() -> impl Epic<Action, State, Context> + Send + 'static {
@@ -20,4 +21,5 @@ pub fn epic() -> impl Epic<Action, State, Context> + Send + 'static {
 		.with(join_send::join_send)
 		.with(join_receive::join_receive)
 		.with(key_request_send::key_request_send)
+		.with(key_request_receive::key_request_receive)
 }

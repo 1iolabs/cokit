@@ -104,7 +104,7 @@ async fn join(
 	let message = create_join_message_from(&identity, membership.id.clone(), Some(invite.id.clone()))?;
 
 	// try use active connection
-	if DidCommSendNetworkTask::send(network.clone(), [invite_peer].into_iter().collect(), message.clone(), timeout)
+	if DidCommSendNetworkTask::send(network.clone(), [invite_peer], message.clone(), timeout)
 		.await
 		.is_ok()
 	{

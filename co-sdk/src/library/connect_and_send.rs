@@ -20,7 +20,7 @@ pub fn connect_and_send(
 			if let Ok(peer) = peer {
 				let send = DidCommSendNetworkTask::send(
 					network.clone(),
-					[peer].into_iter().collect(),
+					[peer],
 					message.clone(),
 					timeout,
 				).await;

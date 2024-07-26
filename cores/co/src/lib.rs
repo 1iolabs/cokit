@@ -85,7 +85,7 @@ pub struct Participant {
 	pub tags: Tags,
 }
 
-#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq)]
 #[repr(u8)]
 pub enum ParticipantState {
 	/// Active participant.

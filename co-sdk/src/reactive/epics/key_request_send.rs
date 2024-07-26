@@ -69,15 +69,15 @@ async fn key_request(
 		let (message_id, message) = create_key_request_message(
 			&identity,
 			KeyRequestPayload {
-				co: co.clone(),
+				peer: network.local_peer_id(),
+				id: co.clone(),
 				key: None, // latest
 			},
 		)?;
 
 		// send
 		//  note: this expects the connection from join is still opened
-		let send =
-			DidCommSendNetworkTask::send(network.clone(), [peer].into_iter().collect(), message.clone(), timeout);
+		let send = DidCommSendNetworkTask::send(network.clone(), [peer], message.clone(), timeout);
 
 		// receive
 		let receive = wait_response(actions, message_id, timeout);

@@ -1,6 +1,7 @@
 use co_identity::{DidCommHeader, Identity, PrivateIdentity};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::CoId;
+use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 
 pub const CO_DIDCOMM_KEY_REQUEST: &str = "co-key-request";
@@ -38,7 +39,10 @@ where
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KeyRequestPayload {
-	pub co: CoId,
+	/// The requesters PeerId.
+	/// When signed this creates an relation between the DID and the PeerID to enable receiver trust.
+	pub peer: PeerId,
+	pub id: CoId,
 	pub key: Option<String>,
 }
 
