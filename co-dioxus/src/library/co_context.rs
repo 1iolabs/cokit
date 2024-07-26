@@ -108,6 +108,7 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 	}
 
 	// network: listen known identities
+	// TODO: watch
 	if let Some(network) = application.network() {
 		did_discovery_subscribe_all(application.co(), &network, &application.private_identity_resolver().await?)
 			.await?;

@@ -18,6 +18,7 @@ pub fn epic() -> impl Epic<Action, State, Context> + Send + 'static {
 	log::log
 		.with(core_action_push::core_action_push)
 		.with(invite_send::invite_send)
+		.with(invite_send::invite_send_action)
 		.with(didcomm_receive::didcomm_receive)
 		.with(invite_receive::invite_receive)
 		.with(join_send::join_send)

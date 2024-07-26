@@ -28,6 +28,9 @@ pub enum Action {
 	/// Generic Error.
 	Error { err: ActionError },
 
+	/// Send invite request.
+	Invite { co: CoId, from: Did, to: Did },
+
 	/// Invite request has been sent to a peer.
 	InviteSent { co: CoId, participant: Did, peer: PeerId },
 

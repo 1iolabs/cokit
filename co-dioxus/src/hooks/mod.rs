@@ -1,4 +1,5 @@
 pub mod use_co_api;
+pub mod use_co_block;
 pub mod use_co_context;
 pub mod use_co_context_provider;
 pub mod use_co_error;

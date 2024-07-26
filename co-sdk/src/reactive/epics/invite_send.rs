@@ -13,12 +13,13 @@ use anyhow::anyhow;
 use co_core_co::{Co, CoAction};
 use co_identity::{IdentityResolver, PrivateIdentityResolver};
 use co_network::{didcomm::EncodedMessage, discovery::Discovery};
-use co_primitives::{CoConnectivity, CoId, Did, Tags};
+use co_primitives::{CoConnectivity, CoId, Did};
 use futures::{Stream, StreamExt, TryStreamExt};
 use std::collections::BTreeSet;
 
 /// When a participant is invited into an CO, try to connect and send the invite message via didcomm.
 /// TODO: consensus finalization?
+/// TODO: validate state? - action could have no effect in reducer (when already active, ...)
 pub fn invite_send(
 	actions: ActionObservable,
 	_states: StateObservable,
@@ -27,15 +28,7 @@ pub fn invite_send(
 	actions
 		.filter_map(|action| async move {
 			match action {
-				Action::CoreAction { co, context, action, cid: _ }
-					if context.is_local_change() && action.core == CO_CORE_NAME_CO =>
-				{
-					let co_action: CoAction = action.get_payload().ok()?;
-					match co_action {
-						CoAction::ParticipantInvite { participant, tags } => Some((co, action.from, participant, tags)),
-						_ => None,
-					}
-				},
+				Action::Invite { co, from, to } => Some((co, from, to)),
 				_ => None,
 			}
 		})
@@ -51,10 +44,34 @@ pub fn invite_send(
 			let context = context.clone();
 			async move { context.network().await.map(|network| (context, network, data)) }
 		})
-		.flat_map(move |(context, network, (co, from, participant, participant_tags))| {
-			invite_discovery(context, network, co, from, participant, participant_tags)
+		.flat_map(move |(context, network, (co, from, participant))| {
+			invite_discovery(context, network, co, from, participant)
 		})
 		.map(Action::map_error)
+}
+
+/// Dispatch Invite when a participant is invited into an CO.
+pub fn invite_send_action(
+	actions: ActionObservable,
+	_states: StateObservable,
+	_context: CoContext,
+) -> impl Stream<Item = Action> + Send + 'static {
+	actions
+		.filter_map(|action| async move {
+			match action {
+				Action::CoreAction { co, context, action, cid: _ }
+					if context.is_local_change() && action.core == CO_CORE_NAME_CO =>
+				{
+					let co_action: CoAction = action.get_payload().ok()?;
+					match co_action {
+						CoAction::ParticipantInvite { participant, tags: _ } => Some((co, action.from, participant)),
+						_ => None,
+					}
+				},
+				_ => None,
+			}
+		})
+		.map(|(co, from, to)| Action::Invite { co, from, to })
 }
 
 fn invite_discovery(
@@ -63,11 +80,10 @@ fn invite_discovery(
 	co: CoId,
 	from: Did,
 	to: Did,
-	participant_tags: Tags,
 ) -> impl Stream<Item = anyhow::Result<Action>> + Send + 'static {
 	async_stream::try_stream! {
 		let timeout = settings_timeout(&context, &co, Some("invite")).await;
-		let (message, discovery) = invite(&context, &co, &from, &to, &participant_tags).await?;
+		let (message, discovery) = invite(&context, &co, &from, &to).await?;
 		for await peer in connect_and_send(network, message, discovery, timeout) {
 			if let Ok(peer) = peer {
 				yield Action::InviteSent { co: co.clone(), participant: to.clone(), peer };
@@ -81,7 +97,6 @@ async fn invite(
 	co_id: &CoId,
 	from: &Did,
 	to: &Did,
-	_participant_tags: &Tags,
 ) -> anyhow::Result<(EncodedMessage, BTreeSet<Discovery>)> {
 	let co_reducer = context.co_reducer(co_id).await?.ok_or(anyhow!("Co not found: {}", co_id))?;
 	let co = co_reducer.co().await?;
