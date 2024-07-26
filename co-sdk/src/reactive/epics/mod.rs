@@ -12,9 +12,11 @@ mod join_receive;
 mod join_send;
 mod key_request_receive;
 mod key_request_send;
+mod log;
 
 pub fn epic() -> impl Epic<Action, State, Context> + Send + 'static {
-	core_action_push::core_action_push
+	log::log
+		.with(core_action_push::core_action_push)
 		.with(invite_send::invite_send)
 		.with(didcomm_receive::didcomm_receive)
 		.with(invite_receive::invite_receive)

@@ -30,6 +30,17 @@ where
 	pub fn shutdown(&self) {
 		self.sender.send(Message::Shutdown).ok();
 	}
+
+	/// Subscribe to all items send after this call.
+	/// This should be only used for synchronisation purposes.
+	/// When not used the subscribition start with first strem polling.
+	/// Note: This will buffer all stream events until read and may causes the buffer to be full.
+	pub fn subscribe(mut self) -> Self {
+		if self.subscription.is_none() {
+			self.subscription = Some(self.sender.subscribe().into());
+		}
+		self
+	}
 }
 impl<T> Default for Observable<T>
 where
@@ -85,4 +96,56 @@ where
 enum Message<T> {
 	Message(T),
 	Shutdown,
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::Observable;
+	use futures::StreamExt;
+
+	#[derive(Debug, Clone, PartialEq)]
+	enum Action {
+		A,
+		B,
+	}
+
+	#[tokio::test]
+	async fn smoke() {
+		let actions = Observable::new();
+		let (result, _) = futures::future::join(actions.clone().collect::<Vec<Action>>(), async move {
+			actions.dispatch(Action::A);
+			actions.dispatch(Action::B);
+			actions.shutdown();
+		})
+		.await;
+		assert_eq!(result, vec![Action::A, Action::B]);
+	}
+
+	#[tokio::test]
+	async fn test_clone() {
+		let actions = Observable::new();
+		let (result1, result2, _) = futures::future::join3(
+			actions.clone().collect::<Vec<Action>>(),
+			actions.clone().collect::<Vec<Action>>(),
+			async move {
+				actions.dispatch(Action::A);
+				actions.dispatch(Action::B);
+				actions.shutdown();
+			},
+		)
+		.await;
+		assert_eq!(result1, vec![Action::A, Action::B]);
+		assert_eq!(result2, vec![Action::A, Action::B]);
+	}
+
+	#[tokio::test]
+	async fn test_subscribe() {
+		let actions = Observable::new();
+		let output = actions.clone().subscribe();
+		let handle = tokio::spawn(async move { output.collect::<Vec<Action>>().await });
+		actions.dispatch(Action::A);
+		actions.dispatch(Action::B);
+		actions.shutdown();
+		assert_eq!(handle.await.unwrap(), vec![Action::A, Action::B]);
+	}
 }
