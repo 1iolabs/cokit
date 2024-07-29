@@ -5,6 +5,7 @@ pub mod co_state;
 pub mod connect_and_send;
 pub mod create_reducer_action;
 pub mod did_key_provider;
+pub mod find_co_identities;
 pub mod find_co_secret;
 pub mod find_membership;
 pub mod fs_read;

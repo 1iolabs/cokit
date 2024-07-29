@@ -1,7 +1,7 @@
 use crate::{
 	drivers::network::tasks::didcomm_send::DidCommSendNetworkTask,
-	find_membership,
 	library::{
+		find_co_identities::find_co_private_identity,
 		find_co_secret::find_co_key,
 		key_exchange::{create_key_response_message, KeyRequestPayload, KeyResponsePayload, CO_DIDCOMM_KEY_REQUEST},
 		settings_timeout::settings_timeout,
@@ -12,7 +12,7 @@ use crate::{
 use anyhow::anyhow;
 use co_core_co::ParticipantState;
 use co_core_keystore::Key;
-use co_identity::{DidCommHeader, Identity, IdentityResolver, PrivateIdentityResolver};
+use co_identity::{DidCommHeader, Identity, IdentityResolver};
 use futures::{Stream, StreamExt};
 use libp2p::PeerId;
 use std::{future::ready, time::Duration};
@@ -87,17 +87,10 @@ async fn key_request(
 	// membership
 	//  we currently use the identity of the first membership we found for an co to send the response
 	//  it should not metter which identity we use as the receive then knows about all the participants
-	let local_co = context.local_co_reducer().await?;
-	let membership = find_membership(&local_co, &payload.id)
-		.await?
-		.ok_or(anyhow!("Membership not found: {}", payload.id))?;
-	let identity = context
-		.private_identity_resolver()
-		.await?
-		.resolve_private(&membership.did)
-		.await?;
+	let identity = find_co_private_identity(&context, &payload.id).await?;
 
 	// key
+	let local_co = context.local_co_reducer().await?;
 	let key: Key = find_co_key(&local_co, &co).await?.ok_or(anyhow!("No key found"))?;
 
 	// message

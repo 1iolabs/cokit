@@ -41,6 +41,7 @@ pub use drivers::{
 };
 pub use library::{
 	did_key_provider::DidKeyProvider,
+	find_co_identities::{find_co_identities, find_co_private_identity},
 	find_co_secret::find_co_secret,
 	find_membership::{find_membership, find_memberships},
 	generate_random_name::generate_random_name,

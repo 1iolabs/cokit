@@ -8,7 +8,10 @@ use crate::{
 	drivers::network::tasks::received_heads::ReceivedHeadsNetworkTask,
 	library::task_spawner::TaskSpawner,
 	local_keypair_fetch,
-	reactive::{context::ReactiveContext, epics::epic},
+	reactive::{
+		context::{ActionObservable, ReactiveContext},
+		epics::epic,
+	},
 	Action, CoReducer, CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE,
 	CO_CORE_NAME_MEMBERSHIP,
 };
@@ -70,6 +73,10 @@ impl Application {
 		self.network.clone()
 	}
 
+	pub fn actions(&self) -> ActionObservable {
+		self.reactive.actions().clone()
+	}
+
 	pub fn shutdown(&self) -> CancellationToken {
 		self.shutdown.child_token()
 	}
@@ -84,6 +91,10 @@ impl Application {
 	#[doc(hidden)]
 	pub fn task_tracker(&self) -> TaskTracker {
 		self.tasks.clone()
+	}
+
+	pub fn context(&self) -> &CoContext {
+		&self.co_context
 	}
 
 	pub fn runtime(&self) -> Runtime {
