@@ -130,7 +130,7 @@ where
 	}
 
 	fn is_complete(&mut self) -> bool {
-		!self.sender.is_closed()
+		self.sender.is_closed()
 	}
 }
 

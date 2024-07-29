@@ -104,13 +104,13 @@ impl DidCommHeader {
 		let from_didcomm = from
 			.didcomm_private()
 			.ok_or(anyhow::anyhow!("unsupported identity: from: no private didcomm context"))?;
-		let to_didcomm = from
+		let to_didcomm = to
 			.didcomm_public()
 			.ok_or(anyhow::anyhow!("unsupported identity: to: no public didcomm context"))?;
 
 		let mut header = DidCommHeader::new(message_type.into());
 		header.from = Some(from.identity().to_owned());
-		header.to = BTreeSet::from_iter(vec![to.identity().to_owned()]);
+		header.to = [to.identity().to_owned()].into_iter().collect();
 
 		Ok((from_didcomm, to_didcomm, header))
 	}
