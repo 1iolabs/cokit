@@ -1,9 +1,8 @@
+use crate::ReducerChangeContext;
 use async_trait::async_trait;
 use co_runtime::{ExecuteError, RuntimePool};
 use co_storage::StorageError;
 use libipld::Cid;
-
-use crate::ReducerChangeContext;
 
 pub mod co;
 pub mod dynamic;
@@ -16,10 +15,11 @@ pub mod single;
 pub trait CoreResolver<S> {
 	/// Apply action to root state.
 	///
-	/// This execute operation has to be deterministic I.E. is not allowed to introduce nont deterministic values into the core.
-	/// This also implies that usage of `context` parameter is only intendet for side-effects.
+	/// This execute operation has to be deterministic I.E. is not allowed to introduce nont deterministic values into
+	/// the core. This also implies that usage of `context` parameter is only intendet for side-effects.
 	///
-	/// When this method is called the Reducer is write locked, so every side-effect which accesses the reducer has to be executed out-of-band (queued, spawned).
+	/// When this method is called the Reducer is write locked, so every side-effect which accesses the reducer has to
+	/// be executed out-of-band (queued, spawned).
 	async fn execute(
 		&self,
 		storage: &S,

@@ -7,11 +7,23 @@ CO implementation using the rust progamming language.
 
 ### Setup
 
-```
+Dependencies:
+- `rust-1.76` (MSRV)
+- `wasm32-unknown-unknown` to build cores.
+- `toolchain nightly` to use `rustfmt +nightly`
+
+Commands:
+```shell
 rustup target add wasm32-unknown-unknown
-
+rustup toolchain install nightly
 ```
 
+### Utility
+
+fmt:
+```shell
+cargo +nightly fmt --check
+```
 
 ## Log
 

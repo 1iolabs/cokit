@@ -1,13 +1,11 @@
-use std::{collections::BTreeSet, ops::Deref, sync::Arc};
-
+use crate::ReducerChangeContext;
 use co_identity::Message;
 use co_primitives::{CoId, Did, Link, OptionLink, ReducerAction};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::Stream;
 use libipld::{Cid, Ipld};
 use libp2p::PeerId;
-
-use crate::ReducerChangeContext;
+use std::{collections::BTreeSet, ops::Deref, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub enum Action {

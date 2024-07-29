@@ -1,8 +1,6 @@
-use co_identity::IdentityBox;
-use co_identity::PrivateIdentity;
+use co_identity::{IdentityBox, PrivateIdentity};
 use co_network::{discovery, heads};
-use co_primitives::CoId;
-use co_primitives::Network;
+use co_primitives::{CoId, Network};
 use std::collections::BTreeSet;
 
 /// Create Discovery items from networks and participants.

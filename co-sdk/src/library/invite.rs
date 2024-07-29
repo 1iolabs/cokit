@@ -1,10 +1,9 @@
-use std::collections::BTreeSet;
-
 use co_identity::{DidCommHeader, Identity, PrivateIdentity};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoConnectivity, CoId, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 pub const CO_DIDCOMM_INVITE: &str = "co-invite";
 

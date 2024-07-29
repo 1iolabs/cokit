@@ -1,3 +1,4 @@
+use crate::drivers::network::CoNetworkTaskSpawner;
 use co_identity::IdentityResolverBox;
 use co_network::{
 	discovery::{self, Discovery, DiscoveryBehaviour},
@@ -13,8 +14,6 @@ use libp2p::{
 };
 use std::{collections::BTreeSet, time::Duration};
 use tokio_stream::StreamExt;
-
-use crate::drivers::network::CoNetworkTaskSpawner;
 
 /// Connect peers using discovery.
 pub struct DiscoveryConnectNetworkTask {

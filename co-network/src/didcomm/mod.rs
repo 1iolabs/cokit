@@ -116,8 +116,8 @@ impl Behaviour {
 			}
 			// let ix = (request.request_id.0 as usize) % connections.len();
 			let conn = &mut connections[0]; // TODO: choose random?
-								// conn.pending_inbound_responses.insert(request.request_id);
-								// tracing::trace!(?peer, connection_id = ?conn.id, "try-send");
+								   // conn.pending_inbound_responses.insert(request.request_id);
+								   // tracing::trace!(?peer, connection_id = ?conn.id, "try-send");
 			self.pending_events.push_back(ToSwarm::NotifyHandler {
 				peer_id: *peer,
 				handler: NotifyHandler::One(conn.id),

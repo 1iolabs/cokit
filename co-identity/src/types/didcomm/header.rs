@@ -1,10 +1,9 @@
+use crate::{DidCommPrivateContext, DidCommPublicContext, Identity, PrivateIdentity};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::BTreeSet,
 	time::{SystemTime, UNIX_EPOCH},
 };
-
-use crate::{DidCommPrivateContext, DidCommPublicContext, Identity, PrivateIdentity};
 
 /// See: https://identity.foundation/didcomm-messaging/spec/#message-headers
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
