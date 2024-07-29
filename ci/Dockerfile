@@ -8,4 +8,6 @@ RUN apt-get install -y \
     libwebkit2gtk-4.1-dev
 RUN rustup component add rustfmt \
     && rustup target add wasm32-unknown-unknown \
-    && rustup toolchain install nightly
+    && rustup toolchain install nightly \
+    && rustup component add --toolchain nightly rustfmt
+
