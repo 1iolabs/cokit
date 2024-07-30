@@ -8,6 +8,7 @@ use co_network::{
 	bitswap::StorageResolver, discovery::Discovery, Behaviour, Context, FnOnceNetworkTask, Libp2pNetwork,
 	Libp2pNetworkConfig, NetworkError, NetworkTask, NetworkTaskSpawner, Shutdown, TokioNetworkTaskSpawner,
 };
+use co_primitives::NetworkDidDiscovery;
 use co_storage::BlockStorage;
 use futures::{channel::oneshot, stream, Stream, StreamExt, TryStreamExt};
 use libipld::DefaultParams;
@@ -137,7 +138,7 @@ impl Network {
 			})
 			.collect();
 		if networks.is_empty() {
-			networks.push(Default::default());
+			networks.push(NetworkDidDiscovery { did: identity.identity().to_owned(), topic: Default::default() });
 		}
 
 		// subscribe
@@ -145,7 +146,7 @@ impl Network {
 		let spwaner = self.spawner();
 		stream::iter(networks)
 			.then(|network| async {
-				let (task, result) = DidDiscoverySubscribe::new(identity.clone(), network);
+				let (task, result) = DidDiscoverySubscribe::new(identity.clone(), Some(network));
 				spwaner.spawn(task)?;
 				result.await??;
 				Ok::<(), anyhow::Error>(())

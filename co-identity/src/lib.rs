@@ -2,6 +2,7 @@ mod library;
 mod resolvers;
 mod types;
 
+pub use library::network_did_discovery::network_did_discovery;
 pub use resolvers::{
 	did_key::{DidKeyIdentity, DidKeyIdentityResolver},
 	join::{JoinIdentityResolver, JoinPrivateIdentityResolver},

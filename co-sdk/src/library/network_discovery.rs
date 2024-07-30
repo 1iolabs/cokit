@@ -27,7 +27,7 @@ where
 				discovery::DidDiscovery::create(
 					identity,
 					&participant,
-					value,
+					Some(value),
 					discovery::DidDiscoveryMessage::Discover.to_string(),
 				)
 				.ok()?,

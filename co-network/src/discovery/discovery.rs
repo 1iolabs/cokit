@@ -2,8 +2,8 @@ use super::did_discovery::{DidDiscovery, DidDiscoveryMessage};
 use crate::{didcomm, types::layer_behaviour::LayerBehaviour, DidcommBehaviourProvider, GossipsubBehaviourProvider};
 use anyhow::anyhow;
 use co_identity::{
-	DidCommContext, DidCommHeader, DidCommPrivateContext, Identity, IdentityResolver, PrivateIdentity,
-	PrivateIdentityBox,
+	network_did_discovery, DidCommContext, DidCommHeader, DidCommPrivateContext, Identity, IdentityResolver,
+	PrivateIdentity, PrivateIdentityBox,
 };
 use co_primitives::{Did, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous};
 use derive_more::From;
@@ -217,13 +217,17 @@ where
 	pub fn did_discovery_subscribe<B, P>(
 		&mut self,
 		swarm: &mut Swarm<B>,
-		network: NetworkDidDiscovery,
+		network: Option<NetworkDidDiscovery>,
 		identity: P,
 	) -> Result<(), anyhow::Error>
 	where
 		B: DiscoveryBehaviour,
 		P: PrivateIdentity + Send + Sync + 'static,
 	{
+		// network
+		let network = network_did_discovery(&identity, network)?;
+
+		// topic
 		let topic = did_discovery_topic(&network);
 
 		// add
@@ -925,7 +929,6 @@ mod tests {
 		DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentity,
 		PrivateIdentityBox, PrivateIdentityResolver,
 	};
-	use co_primitives::NetworkDidDiscovery;
 	use futures::{select, FutureExt, StreamExt};
 	use libp2p::{
 		gossipsub,
@@ -1164,13 +1167,13 @@ mod tests {
 		// peer1: subscribe
 		discovery1
 			.layer_mut()
-			.did_discovery_subscribe(peer1.swarm(), NetworkDidDiscovery::default(), did1.clone())
+			.did_discovery_subscribe(peer1.swarm(), None, did1.clone())
 			.unwrap();
 
 		// peer2: subscribe
 		discovery2
 			.layer_mut()
-			.did_discovery_subscribe(peer2.swarm(), NetworkDidDiscovery::default(), did2.clone())
+			.did_discovery_subscribe(peer2.swarm(), None, did2.clone())
 			.unwrap();
 
 		// // wait subscribed
@@ -1191,14 +1194,9 @@ mod tests {
 			.layer_mut()
 			.connect(
 				peer2.swarm(),
-				vec![DidDiscovery::create(
-					&did2,
-					&did1,
-					NetworkDidDiscovery::default(),
-					DidDiscoveryMessage::Discover.to_string(),
-				)
-				.unwrap()
-				.into()],
+				vec![DidDiscovery::create(&did2, &did1, None, DidDiscoveryMessage::Discover.to_string())
+					.unwrap()
+					.into()],
 			)
 			.unwrap();
 

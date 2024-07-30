@@ -1,6 +1,6 @@
 use anyhow::anyhow;
-use co_identity::{DidCommHeader, Identity, PrivateIdentity};
-use co_primitives::{serde_string_enum, Did, NetworkDidDiscovery};
+use co_identity::{network_did_discovery, DidCommHeader, Identity, PrivateIdentity};
+use co_primitives::{serde_string_enum, NetworkDidDiscovery};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use uuid::Uuid;
@@ -8,7 +8,6 @@ use uuid::Uuid;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DidDiscovery {
 	pub network: NetworkDidDiscovery,
-	pub did: Did,
 	pub message_id: String,
 	pub message: String,
 }
@@ -17,13 +16,14 @@ impl DidDiscovery {
 	pub fn create<F, T>(
 		from: &F,
 		to: &T,
-		network: NetworkDidDiscovery,
+		network: Option<NetworkDidDiscovery>,
 		message_type: String,
 	) -> Result<DidDiscovery, anyhow::Error>
 	where
 		F: PrivateIdentity + Send + Sync + 'static,
 		T: Identity + Send + Sync + 'static,
 	{
+		let network = network_did_discovery(to, network)?;
 		let id: String = Uuid::new_v4().into();
 		let header = DidCommHeader {
 			from: Some(from.identity().to_owned()),
@@ -39,7 +39,7 @@ impl DidDiscovery {
 			.didcomm_public()
 			.ok_or(anyhow!("unsupported identity: to: no public didcomm context"))?;
 		let message = from_context.jwe(&to_context, header, "null")?;
-		Ok(DidDiscovery { message_id: id, did: to.identity().to_owned(), network, message })
+		Ok(DidDiscovery { message_id: id, network, message })
 	}
 }
 

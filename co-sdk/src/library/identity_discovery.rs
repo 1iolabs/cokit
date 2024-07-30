@@ -1,4 +1,4 @@
-use co_identity::{Identity, PrivateIdentity};
+use co_identity::{network_did_discovery, Identity, PrivateIdentity};
 use co_network::discovery;
 use co_primitives::Network;
 use std::collections::BTreeSet;
@@ -11,15 +11,20 @@ where
 {
 	let mut networks = to.networks();
 	if networks.is_empty() {
-		networks.insert(Network::DidDiscovery(Default::default()));
+		networks.insert(Network::DidDiscovery(network_did_discovery(to, None)?));
 	}
 	Ok(to
 		.networks()
 		.into_iter()
 		.filter_map(|network| match network {
 			Network::DidDiscovery(value) => Some(discovery::Discovery::DidDiscovery(
-				discovery::DidDiscovery::create(from, to, value, discovery::DidDiscoveryMessage::Discover.to_string())
-					.ok()?,
+				discovery::DidDiscovery::create(
+					from,
+					to,
+					Some(value),
+					discovery::DidDiscoveryMessage::Discover.to_string(),
+				)
+				.ok()?,
 			)),
 			Network::Rendezvous(value) => Some(discovery::Discovery::Rendezvous(value)),
 			Network::Peer(value) => Some(discovery::Discovery::Peer(value)),
