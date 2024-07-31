@@ -10,7 +10,7 @@ mod participants;
 
 pub use core_state::{core_state, core_state_or_default};
 pub use dag::{find::find, into_collection::into_collection, is_empty::is_empty, stream::stream};
-pub use identities::{identities, Identity};
+pub use identities::{identities, is_identity, Identity};
 pub use memberships::memberships;
 pub use networks::networks;
 pub use participants::{participant_identities, participants};

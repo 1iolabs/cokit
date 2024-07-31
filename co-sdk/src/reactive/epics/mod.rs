@@ -5,6 +5,7 @@ use super::{
 use crate::{Action, Epic};
 
 mod core_action_push;
+mod did_subscribe;
 mod didcomm_receive;
 mod invite_receive;
 mod invite_send;
@@ -25,4 +26,6 @@ pub fn epic() -> impl Epic<Action, State, Context> + Send + 'static {
 		.with(join_receive::join_receive)
 		.with(key_request_send::key_request_send)
 		.with(key_request_receive::key_request_receive)
+		.with(did_subscribe::network_started)
+		.with(did_subscribe::keystore_changed)
 }

@@ -26,9 +26,14 @@ pub fn identities(
 		let keystore: KeyStore = core_state_or_default(&storage, co_state, core_name).await?;
 		for await key in stream(storage.clone(), &keystore.keys) {
 			let key: Key = key?.1;
-			if key.tags.matches(tags!("type": "co-identity")) {
+			if is_identity(&key) {
 				yield Identity { did: key.uri, name: key.name, description: key.description };
 			}
 		}
 	}
+}
+
+/// Test if the specified key is an CO identity.
+pub fn is_identity(key: &Key) -> bool {
+	key.tags.matches(tags!("type": "co-identity"))
 }
