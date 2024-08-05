@@ -1,4 +1,5 @@
 use crate::{Node, Storage};
+use co_primitives::from_cbor;
 use libipld::{cbor::DagCborCodec, Cid};
 use serde::de::DeserializeOwned;
 use std::collections::VecDeque;
@@ -77,7 +78,7 @@ fn read_node<T: Clone + DeserializeOwned>(storage: &dyn Storage, cid: &Cid) -> R
 	}
 
 	// get node
-	let node: Node<T> = serde_ipld_dagcbor::from_slice(block.data()).map_err(|e| NodeReaderError::Decode(e.into()))?;
+	let node: Node<T> = from_cbor(block.data()).map_err(|e| NodeReaderError::Decode(e.into()))?;
 
 	// result
 	Ok(node)

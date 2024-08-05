@@ -16,7 +16,7 @@ use std::collections::VecDeque;
 // 	}
 
 // 	// get node
-// 	let node: Node<T> = serde_ipld_dagcbor::from_slice(block.data()).map_err(|_| StorageError::InvalidArgument)?;
+// 	let node: Node<T> = from_cbor(block.data()).map_err(|_| StorageError::InvalidArgument)?;
 
 // 	// read
 // 	match node {
@@ -135,7 +135,7 @@ fn read_node<T: Clone + DeserializeOwned, S: Storage>(storage: &S, cid: &Cid) ->
 
 // 				// get node
 // 				let node: Node<T> =
-// 					serde_ipld_dagcbor::from_slice(block.data()).map_err(|_| StorageError::InvalidArgument)?;
+// 					from_cbor(block.data()).map_err(|_| StorageError::InvalidArgument)?;
 
 // 			},
 // 			NodeIteratorState::Node(storage, node) => todo!(),

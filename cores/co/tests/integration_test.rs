@@ -56,7 +56,7 @@ async fn integration_test() {
 	// None, network: DagSet(Link(alloc::collections::btree::set::BTreeSet<co_primitives::types::network::Network>:
 	// None)) }
 
-	// println!("{}", serde_json::to_string(&state).unwrap());
+	// println!("{}", to_json_string(&state).unwrap());
 	// {"id":"","tags":[["hello","world"]],"name":"","heads":[],"participants":{},"cores":{},"keys":null,"network":null}
 	assert_eq!(tags, state.tags);
 }

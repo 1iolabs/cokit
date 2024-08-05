@@ -31,7 +31,7 @@ async fn test_co_shared_join() {
 
 	// peer1: create shared co
 	let shared_co =
-		tracing::trace_span!("peer1: created shared co", application = peer2.application.settings().identifier)
+		tracing::trace_span!("peer1: created shared co", application = peer1.application.settings().identifier)
 			.in_scope(|| async {
 				peer1
 					.application
@@ -45,7 +45,7 @@ async fn test_co_shared_join() {
 			.await;
 
 	// peer1: add other peer identity
-	tracing::trace_span!("peer1: added other peer identity", application = peer2.application.settings().identifier)
+	tracing::trace_span!("peer1: added other peer identity", application = peer1.application.settings().identifier)
 		.in_scope(|| async {
 			shared_co
 				.push(

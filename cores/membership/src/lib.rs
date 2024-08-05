@@ -41,7 +41,7 @@ pub struct Membership {
 	pub tags: Tags,
 }
 
-#[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum MembershipState {
@@ -53,13 +53,23 @@ pub enum MembershipState {
 
 	/// Pending invite by some participant of the CO.
 	///
+	/// Use Cases:
+	/// - This is waiting for our acception/rejection.
+	///  - Accept invite by change membership state to [`MembershipState::Join`].
+	///  - Reject invite by removing the membership using [`MembershipsAction::Remove`].
+	///
 	/// Related membership Tags:
 	///  `co-invite: CoInviteMetadata`
 	Invite = 2,
 
 	/// Pending join by us.
 	///
+	/// Use Cases:
+	/// - This is a pending join triggered by an invite waiting for completion.
+	/// - This is waiting for CO participant acception/rejection (remote).
+	///
 	/// Related membership Tags:
+	///  `co-invite: CoInviteMetadata`
 	///  `join-date: Date`
 	Join = 3,
 }
@@ -67,12 +77,37 @@ pub enum MembershipState {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MembershipsAction {
 	Join(Membership),
-	Update { id: CoId, state: Cid, heads: BTreeSet<Cid>, encryption_mapping: Option<Cid> },
-	ChangeMembershipState { id: CoId, did: Did, membership_state: MembershipState },
-	ChangeKey { id: CoId, did: Did, key: String },
-	TagsInsert { id: CoId, did: Did, tags: Tags },
-	TagsRemove { id: CoId, did: Did, tags: Tags },
-	Remove { id: CoId, did: Option<Did> },
+	Update {
+		id: CoId,
+		state: Cid,
+		heads: BTreeSet<Cid>,
+		encryption_mapping: Option<Cid>,
+	},
+	ChangeMembershipState {
+		id: CoId,
+		did: Did,
+		membership_state: MembershipState,
+	},
+	/// Change the active encryption key reference which is used the read the current heads/state.
+	ChangeKey {
+		id: CoId,
+		did: Did,
+		key: String,
+	},
+	TagsInsert {
+		id: CoId,
+		did: Did,
+		tags: Tags,
+	},
+	TagsRemove {
+		id: CoId,
+		did: Did,
+		tags: Tags,
+	},
+	Remove {
+		id: CoId,
+		did: Option<Did>,
+	},
 }
 
 impl Reducer for Memberships {

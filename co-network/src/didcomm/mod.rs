@@ -93,7 +93,7 @@ impl Behaviour {
 		}
 	}
 
-	/// Send a encoved message.
+	/// Send a encoded message to peer.
 	pub fn send(&mut self, peer: &PeerId, message: EncodedMessage) {
 		let protocol = MessageProtocol::outbound(message);
 		if let Some(protocol) = self.try_send(peer, protocol) {

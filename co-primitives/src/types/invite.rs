@@ -12,7 +12,7 @@ pub struct CoInviteMetadata {
 
 	/// Invite remote peer.
 	#[serde(with = "serde_bytes")]
-	pub peer: Vec<u8>,
+	pub peer: Option<Vec<u8>>,
 
 	/// CO Connectivity
 	pub network: CoConnectivity,

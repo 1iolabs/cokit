@@ -84,6 +84,7 @@ struct DiscoveryConnectRequest {
 	pub timeout: Duration,
 	pub max_peers: Option<u16>,
 	pub connected_peers: BTreeSet<PeerId>,
+	pub span: tracing::Span,
 }
 impl DiscoveryConnectRequest {
 	/// Hit timeout using time?
@@ -295,6 +296,10 @@ where
 		let id = self.next_id;
 		self.next_id += 1;
 
+		// tracing
+		let span = tracing::trace_span!("discovery", discovery_id = id);
+		let _enter = span.enter();
+
 		// request
 		let mut request = DiscoveryConnectRequest {
 			id,
@@ -304,14 +309,21 @@ where
 			timeout: self.timeout,
 			discovery_peers: Default::default(),
 			connected_peers: Default::default(),
+			span: span.clone(),
 		};
 		request.build()?;
+
+		// log
+		tracing::trace!(timeout = ?request.timeout, discovery = ?request.discovery, "discovery");
+
+		// add
 		self.requests.insert(id, request);
 
 		// connect
 		match self.try_connect(swarm, id) {
 			Ok(_) => Ok(id),
 			Err(err) => {
+				tracing::trace!(?err, "discovery-failure");
 				self.release(id);
 				Err(err)
 			},
@@ -333,9 +345,10 @@ where
 					// this is because gossipsub only can publish messages when subscribed
 					// todo: really?
 					// note: currently we can only receive requests for DID which we also subscribed to
-					//       so when we may change this we need to keep tract of connection requests for
+					//       so when we may change this we need to keep track of connection requests for
 					//       dids/identities.
 					if self.did_subscriptions.get(&did_discovery_topic(&item.network).hash()).is_none() {
+						tracing::trace!("discovery-unsubscribed");
 						continue;
 					}
 					// let identity = subscriptions.iter().find(|subscription| {
@@ -350,10 +363,13 @@ where
 
 					// publish
 					match did_discovery(swarm, &item) {
-						Ok(_) => {},
+						Ok(_) => {
+							tracing::trace!("discovery-published");
+						},
 
 						// we try again when a peer subscribes
 						Err(gossipsub::PublishError::InsufficientPeers) => {
+							tracing::trace!("discovery-pending-insufficient-peers");
 							self.pending_discovery.push_back((
 								request.id,
 								did_discovery_topic_hash(&item.network),
@@ -362,7 +378,9 @@ where
 						},
 
 						// forward other errors
-						Err(e) => return Err(ConnectError::Other(e.into())),
+						Err(err) => {
+							return Err(ConnectError::Other(err.into()));
+						},
 					};
 				},
 				Discovery::Topic(item) => {
@@ -396,6 +414,7 @@ where
 
 	/// Release (may disconnect) discovered peers.
 	pub fn release(&mut self, id: u64) {
+		tracing::trace!(parent: self.requests.get(&id).and_then(|s| s.span.id()), "discovery-release");
 		self.pending_discovery.retain(|(request, _, _)| *request != id);
 		self.requests.remove(&id);
 	}
@@ -768,7 +787,7 @@ async fn did_discovery_receive<R: IdentityResolver>(
 			match did_discovery_resolve(&didcomm_private, request_from_peer, request_header) {
 				Ok(event) => return Some(event),
 				Err(err) => {
-					tracing::warn!(?err, "did-discovery-resolve-failed");
+					tracing::warn!(?err, "discovery-did-resolve-failed");
 				},
 			}
 		}
@@ -907,12 +926,14 @@ fn peer_to_dial_opts(item: &NetworkPeer) -> Result<DialOpts, anyhow::Error> {
 
 fn peer_connected(request: &mut DiscoveryConnectRequest, events: &mut VecDeque<DiscoveryEvent>, peer: PeerId) {
 	if request.connected_peers.insert(peer) {
+		tracing::trace!(parent: request.span.id(), ?peer, "discovery-connected");
 		events.push_back(DiscoveryEvent::GenerateEvent(Event::Connected { id: request.id, peer }));
 	}
 }
 
 fn peer_disconnected(request: &mut DiscoveryConnectRequest, events: &mut VecDeque<DiscoveryEvent>, peer: PeerId) {
 	if request.connected_peers.remove(&peer) {
+		tracing::trace!(parent: request.span.id(), ?peer, "discovery-disconnected");
 		events.push_back(DiscoveryEvent::GenerateEvent(Event::Disconnected { id: request.id, peer }));
 	}
 }

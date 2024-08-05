@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use co_identity::{DidCommHeader, PrivateIdentity};
+use co_primitives::{from_cbor, from_json, from_json_string, to_json, to_json_string};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::value::RawValue;
 
@@ -11,7 +12,7 @@ pub struct EncodedMessage(pub Vec<u8>);
 impl EncodedMessage {
 	/// Create plaintext JSON message.
 	pub fn create_plain_json<T: Serialize>(header: DidCommHeader, body: &T) -> Result<Self, anyhow::Error> {
-		Ok(Self(serde_ipld_dagjson::to_vec(&DidCommMessage { header, body })?))
+		Ok(Self(to_json(&DidCommMessage { header, body })?))
 	}
 
 	/// Create signed JSON message.
@@ -21,8 +22,8 @@ impl EncodedMessage {
 		P: PrivateIdentity + Send + Sync + 'static,
 	{
 		let context = identity.didcomm_private().ok_or(anyhow!("No didcomm context"))?;
-		let body_json = serde_ipld_dagjson::to_vec(body)?;
-		let jws = context.jws(header, std::str::from_utf8(&body_json)?)?;
+		let body_json = to_json_string(body)?;
+		let jws = context.jws(header, &body_json)?;
 		Ok(Self(jws.into_bytes()))
 	}
 
@@ -31,7 +32,7 @@ impl EncodedMessage {
 	where
 		P: PrivateIdentity + Send + Sync + 'static,
 	{
-		let message: DidCommMessage<&RawValue> = serde_ipld_dagjson::from_slice(&self.0)?;
+		let message: DidCommMessage<&RawValue> = from_json(&self.0)?;
 		Self::create_signed_json(identity, message.header, &message.body)
 	}
 
@@ -67,10 +68,10 @@ impl EncodedMessage {
 	/// Try to deserialize message to T.
 	pub fn deserialize<T: DeserializeOwned>(&self) -> Result<T, anyhow::Error> {
 		if let Some(data) = self.json() {
-			return Ok(serde_ipld_dagjson::from_slice(data.as_bytes())?);
+			return Ok(from_json_string(data)?);
 		}
 		if let Some(data) = self.cbor() {
-			return Ok(serde_ipld_dagcbor::from_slice(data)?);
+			return Ok(from_cbor(data)?);
 		}
 		Err(anyhow!("unknown format"))
 	}
@@ -111,6 +112,7 @@ struct DidCommMessage<T> {
 #[cfg(test)]
 mod tests {
 	use super::EncodedMessage;
+	use co_primitives::{to_cbor, to_json};
 	use serde::Serialize;
 
 	#[derive(Debug, Serialize)]
@@ -121,17 +123,17 @@ mod tests {
 	#[test]
 	fn test_json() {
 		let data = Test { count: 10 };
-		let json = serde_json::to_string(&data).unwrap();
-		let message: EncodedMessage = json.clone().into();
-		assert_eq!(Some(json.as_str()), message.json());
+		let json = to_json(&data).unwrap();
+		let message: EncodedMessage = json.into();
+		assert_eq!(message.json(), Some("{\"count\":10}"));
 	}
 
 	#[test]
 	fn test_cbor() {
 		let data = Test { count: 10 };
-		let cbor = serde_ipld_dagcbor::to_vec(&data).unwrap();
+		let cbor = to_cbor(&data).unwrap();
 		let message: EncodedMessage = cbor.clone().into();
 		// println!("f: {}", cbor[0] as u8);
-		assert_eq!(Some(&cbor[..]), message.cbor());
+		assert_eq!(message.cbor(), Some(&cbor[..]));
 	}
 }

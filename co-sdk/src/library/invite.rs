@@ -1,6 +1,6 @@
 use co_identity::{DidCommHeader, Identity, PrivateIdentity};
 use co_network::didcomm::EncodedMessage;
-use co_primitives::{CoConnectivity, CoId, Tags};
+use co_primitives::{to_json_string, CoConnectivity, CoId, Tags};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -20,7 +20,7 @@ where
 {
 	let (from_didcomm, to_didcomm, mut header) = DidCommHeader::create(from, to, CO_DIDCOMM_INVITE)?;
 	header.thid = thid;
-	let body = serde_json::to_string(&co)?;
+	let body = to_json_string(&co)?;
 	let message = from_didcomm.jwe(&to_didcomm, header, &body)?;
 	Ok(EncodedMessage(message.into_bytes()))
 }

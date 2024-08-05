@@ -1,12 +1,12 @@
 use crate::{
 	library::join::{CoJoinPayload, CO_DIDCOMM_JOIN},
 	reactive::context::{ActionObservable, StateObservable},
-	Action, CoContext, CoReducerFactory, KnownTag, CO_CORE_CO,
+	Action, CoContext, CoReducerFactory, KnownTag, CO_CORE_NAME_CO,
 };
 use anyhow::anyhow;
 use co_core_co::{CoAction, ParticipantState};
 use co_identity::DidCommHeader;
-use co_primitives::CoJoin;
+use co_primitives::{from_json_string, CoJoin};
 use futures::{future::ready, Stream, StreamExt};
 use libp2p::PeerId;
 
@@ -45,7 +45,7 @@ pub fn join_receive(
 }
 
 async fn joined(context: CoContext, _peer: PeerId, header: DidCommHeader, body: String) -> anyhow::Result<Vec<Action>> {
-	let payload: CoJoinPayload = serde_json::from_str(&body)?;
+	let payload: CoJoinPayload = from_json_string(&body)?;
 	let co = context
 		.co_reducer(&payload.id)
 		.await?
@@ -76,7 +76,7 @@ async fn joined(context: CoContext, _peer: PeerId, header: DidCommHeader, body: 
 			_ => None,
 		};
 		if let Some(action) = action {
-			co.push(&context.local_identity(), CO_CORE_CO, &action).await?;
+			co.push(&context.local_identity(), CO_CORE_NAME_CO, &action).await?;
 		}
 	}
 	Ok(vec![])

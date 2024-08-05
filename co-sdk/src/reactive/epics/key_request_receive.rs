@@ -13,6 +13,7 @@ use anyhow::anyhow;
 use co_core_co::ParticipantState;
 use co_core_keystore::Key;
 use co_identity::{DidCommHeader, Identity, IdentityResolver};
+use co_primitives::from_json_string;
 use futures::{Stream, StreamExt};
 use libp2p::PeerId;
 use std::{future::ready, time::Duration};
@@ -56,7 +57,7 @@ async fn key_request(
 	let network = context.network().await.ok_or(anyhow!("Expected network"))?;
 
 	// payload
-	let payload: KeyRequestPayload = serde_json::from_str(&body)?;
+	let payload: KeyRequestPayload = from_json_string(&body)?;
 	if payload.peer != peer {
 		return Err(anyhow!("invalid payload"));
 	}

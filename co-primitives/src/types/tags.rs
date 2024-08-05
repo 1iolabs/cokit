@@ -22,7 +22,7 @@ macro_rules! tags{
         let mut map = $crate::Tags::new();
         $(
             #[allow(unused_parens)]
-            let _ = map.insert(($key.to_owned(), $val.to_owned().into()));
+            let _ = map.insert(($key.to_string(), $val.to_owned().into()));
         )*
         map
     }};

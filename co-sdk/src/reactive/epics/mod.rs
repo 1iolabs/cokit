@@ -11,6 +11,7 @@ mod invite_receive;
 mod invite_send;
 mod join_receive;
 mod join_send;
+mod joined;
 mod key_request_receive;
 mod key_request_send;
 mod log;
@@ -18,14 +19,15 @@ mod log;
 pub fn epic() -> impl Epic<Action, State, Context> + Send + 'static {
 	log::log
 		.with(core_action_push::core_action_push)
-		.with(invite_send::invite_send)
-		.with(invite_send::invite_send_action)
+		.with(did_subscribe::keystore_changed)
+		.with(did_subscribe::network_started)
 		.with(didcomm_receive::didcomm_receive)
 		.with(invite_receive::invite_receive)
-		.with(join_send::join_send)
+		.with(invite_send::invite_send_action)
+		.with(invite_send::invite_send)
 		.with(join_receive::join_receive)
-		.with(key_request_send::key_request_send)
+		.with(join_send::join_send)
+		.with(joined::joined)
 		.with(key_request_receive::key_request_receive)
-		.with(did_subscribe::network_started)
-		.with(did_subscribe::keystore_changed)
+		.with(key_request_send::key_request_send)
 }

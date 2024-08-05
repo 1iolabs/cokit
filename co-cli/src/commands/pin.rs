@@ -1,6 +1,6 @@
 use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
-use co_primitives::CoId;
+use co_primitives::{from_cbor, CoId};
 use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
 use co_sdk::{state::memberships, Application, CoStorage, NodeStream, CO_CORE_NAME_PIN, CO_ID_LOCAL};
 use exitcode::ExitCode;
@@ -131,7 +131,7 @@ async fn update_pins(context: &CliContext, cli: &Cli, _command: &UpdateCommand) 
 	// read previous pins from file
 	let content = fs::read(&pins_path).await?;
 	// decode cbor
-	let old_pin_map: BTreeMap<Cid, BTreeSet<Cid>> = serde_ipld_dagcbor::from_slice(&content)?;
+	let old_pin_map: BTreeMap<Cid, BTreeSet<Cid>> = from_cbor(&content)?;
 
 	// local co state
 	let (state, _) = application.local_co_reducer().await?.reducer_state().await;

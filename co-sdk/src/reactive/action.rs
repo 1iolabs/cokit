@@ -1,10 +1,11 @@
-use crate::ReducerChangeContext;
+use crate::{library::create_reducer_action::create_reducer_action, ReducerChangeContext};
 use co_identity::Message;
 use co_primitives::{CoId, Did, Link, OptionLink, ReducerAction};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::Stream;
 use libipld::{Cid, Ipld};
 use libp2p::PeerId;
+use serde::Serialize;
 use std::{collections::BTreeSet, ops::Deref, sync::Arc};
 
 #[derive(Debug, Clone)]
@@ -86,6 +87,17 @@ impl Action {
 				Err(err) => yield err.into().into(),
 			}
 		}
+	}
+
+	/// Utilit to create [`Action::CoreActionPush`] actions.
+	pub fn push(co: impl Into<CoId>, from: impl Into<Did>, core: impl Into<String>, payload: impl Serialize) -> Action {
+		let reducer_action = match create_reducer_action(from, core.into(), payload) {
+			Ok(a) => a,
+			Err(err) => {
+				return Action::Error { err: err.into() };
+			},
+		};
+		Action::CoreActionPush { co: co.into(), action: reducer_action }
 	}
 }
 impl From<anyhow::Error> for Action {

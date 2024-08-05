@@ -1,12 +1,12 @@
 use crate::{
 	library::invite::{CoInvitePayload, CO_DIDCOMM_INVITE},
 	reactive::context::{ActionObservable, StateObservable},
-	Action, CoContext, CoInvite, KnownTag, CO_CORE_MEMBERSHIP,
+	Action, CoContext, CoInvite, KnownTag, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use co_core_membership::{Membership, MembershipState, MembershipsAction};
 use co_identity::DidCommHeader;
-use co_primitives::{tags, CoInviteMetadata, Did, Tags};
+use co_primitives::{from_json_string, tags, CoInviteMetadata, Did, KnownTags, Tags};
 use co_storage::BlockStorageExt;
 use futures::{future::ready, Stream, StreamExt};
 use libp2p::PeerId;
@@ -47,7 +47,7 @@ pub fn invite_receive(
 }
 
 async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: String) -> anyhow::Result<Vec<Action>> {
-	let payload: CoInvitePayload = serde_json::from_str(&body)?;
+	let payload: CoInvitePayload = from_json_string(&body)?;
 	let local = context.local_co_reducer().await?;
 	let co = local.co().await?;
 	let invite = CoInvite::from_tags(&co.tags).unwrap_or_default();
@@ -67,17 +67,21 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 	// apply
 	if let Some(membership_state) = membership_state {
 		// payload
-		let metadata =
-			CoInviteMetadata { id: header.id, from, network: payload.connectivity.clone(), peer: peer.to_bytes() };
+		let metadata = CoInviteMetadata {
+			id: header.id,
+			from,
+			network: payload.connectivity.clone(),
+			peer: Some(peer.to_bytes()),
+		};
 		let membership_tags = tags!(
-			"co-invite-metadata": local.storage().set_serialized(&metadata).await?,
+			{KnownTags::CoInviteMetadata}: local.storage().set_serialized(&metadata).await?,
 		);
 
 		// membership
 		local
 			.push(
 				&context.local_identity(),
-				CO_CORE_MEMBERSHIP,
+				CO_CORE_NAME_MEMBERSHIP,
 				&MembershipsAction::Join(membership(did, payload, membership_state, membership_tags)),
 			)
 			.await?;

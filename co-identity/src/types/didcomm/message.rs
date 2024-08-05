@@ -3,7 +3,7 @@ use crate::{
 	PrivateIdentityResolver, ReceiveError,
 };
 use anyhow::anyhow;
-use co_primitives::Did;
+use co_primitives::{from_json_string, Did};
 use didcomm_rs::{Jwe, MessageType};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::value::RawValue;
@@ -159,7 +159,7 @@ impl Message {
 
 	/// Try to deserialize message to T.
 	pub fn body_deserialize<T: DeserializeOwned>(&self) -> Result<T, anyhow::Error> {
-		Ok(serde_ipld_dagjson::from_slice(self.body().as_bytes())?)
+		Ok(from_json_string(self.body())?)
 	}
 
 	/// Test if message is validated.

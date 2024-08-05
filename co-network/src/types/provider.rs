@@ -127,6 +127,14 @@ pub trait MdnsBehaviourProvider: NetworkBehaviour {
 		event: <Self as NetworkBehaviour>::ToSwarm,
 	) -> Result<mdns::Event, <Self as NetworkBehaviour>::ToSwarm>;
 
+	fn swarm_mdns_event(event: &SwarmEvent<<Self as NetworkBehaviour>::ToSwarm>) -> Option<&mdns::Event> {
+		if let SwarmEvent::Behaviour(event) = event {
+			Self::mdns_event(event)
+		} else {
+			None
+		}
+	}
+
 	fn handle_event<F: Fn(&mdns::Event) -> bool>(
 		event: <Self as NetworkBehaviour>::ToSwarm,
 		predicate: F,

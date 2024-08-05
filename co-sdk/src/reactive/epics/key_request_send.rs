@@ -2,19 +2,19 @@ use crate::{
 	drivers::network::tasks::didcomm_send::DidCommSendNetworkTask,
 	library::{
 		create_reducer_action::create_reducer_action,
+		is_cid_encrypted::is_cid_encrypted,
 		key_exchange::{create_key_request_message, KeyRequestPayload, KeyResponsePayload, CO_DIDCOMM_KEY_RESPONSE},
 		settings_timeout::settings_timeout,
 	},
 	reactive::context::{ActionObservable, StateObservable},
-	Action, CoContext, CO_CORE_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	Action, CoContext, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
 use co_core_keystore::KeyStoreAction;
 use co_core_membership::MembershipsAction;
 use co_identity::{DidCommHeader, PrivateIdentityResolver};
-use co_primitives::{CoId, Did, MultiCodec};
+use co_primitives::{from_json_string, CoId, Did};
 use futures::{future::try_join, pin_mut, Stream, StreamExt};
-use libipld::Cid;
 use libp2p::PeerId;
 use std::{future::ready, time::Duration};
 
@@ -28,7 +28,7 @@ pub fn key_request_send(
 		.clone()
 		.filter_map(|action| {
 			ready(match action {
-				Action::JoinSent { co, heads, participant, peer } if is_encrypted(&heads) => {
+				Action::JoinSent { co, heads, participant, peer } if is_cid_encrypted(&heads) => {
 					Some((co, participant, peer))
 				},
 				_ => None,
@@ -36,18 +36,6 @@ pub fn key_request_send(
 		})
 		.then(move |(co, participant, peer)| key_request(actions.clone(), context.clone(), peer, co, participant))
 		.flat_map(Action::map_error_stream)
-}
-
-fn is_encrypted<'a>(cids: impl IntoIterator<Item = &'a Cid>) -> bool {
-	for cid in cids {
-		match MultiCodec::from(cid) {
-			MultiCodec::CoEncryptedBlock => {
-				return true;
-			},
-			_ => {},
-		}
-	}
-	return false;
 }
 
 /// Send request and wait for response.
@@ -84,7 +72,7 @@ async fn key_request(
 
 		// execute
 		let ((_response_peer, _response_header, body), _) = try_join(receive, send).await?;
-		let payload: KeyResponsePayload = serde_json::from_str(&body)?;
+		let payload: KeyResponsePayload = from_json_string(&body)?;
 		let key = match payload {
 			KeyResponsePayload::Ok(key) => key,
 			KeyResponsePayload::Failure => Err(anyhow!("Key request failed"))?,
@@ -96,7 +84,7 @@ async fn key_request(
 			CO_CORE_NAME_MEMBERSHIP,
 			MembershipsAction::ChangeKey { id: co.clone(), did: did.clone(), key: key.uri.clone() },
 		)?;
-		let set = create_reducer_action(&did, CO_CORE_KEYSTORE, KeyStoreAction::Set(key))?;
+		let set = create_reducer_action(&did, CO_CORE_NAME_KEYSTORE, KeyStoreAction::Set(key))?;
 		Ok(vec![
 			Action::CoreActionPush { co: CO_ID_LOCAL.into(), action: set },
 			Action::CoreActionPush { co: CO_ID_LOCAL.into(), action: change },

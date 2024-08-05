@@ -91,9 +91,9 @@ fn apply_subscribe_actions(
 	actions: impl Stream<Item = SubscribeAction>,
 ) -> impl Stream<Item = Result<Action, anyhow::Error>> {
 	async_stream::try_stream! {
-		if let Some(network) = context.network().await {
-			let private_identity_resolver = context.private_identity_resolver().await?;
-			for await action in actions {
+		let private_identity_resolver = context.private_identity_resolver().await?;
+		for await action in actions {
+			if let Some(network) = context.network().await {
 				let result = match action {
 					SubscribeAction::Subscribe(did) => {
 						subscribe(&private_identity_resolver, &network, &did).await

@@ -2,7 +2,8 @@ use crate::{
 	bitswap, didcomm, discovery, heads,
 	types::{network_task::TokioNetworkTaskSpawner, provider::BitswapBehaviourProvider},
 	DidcommBehaviourProvider, DiscoveryLayerBehaviourProvider, FnOnceNetworkTask, GossipsubBehaviourProvider,
-	HeadsLayerBehaviourProvider, Layer, LayerBehaviour, NetworkError, NetworkTaskBox, NetworkTaskSpawner,
+	HeadsLayerBehaviourProvider, Layer, LayerBehaviour, MdnsBehaviourProvider, NetworkError, NetworkTaskBox,
+	NetworkTaskSpawner,
 };
 use anyhow::anyhow;
 use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver, PrivateIdentityResolverBox};
@@ -69,9 +70,8 @@ impl Libp2pNetwork {
 				bitswap::BitswapBlockStorage::new(storage_resolver),
 				Box::new(move |t| {
 					tokio::spawn(async move {
-						let span = tracing::trace_span!("bitswap", application = bitswap_identifier);
-						let _span_enter = span.enter();
-						t.await
+						t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
+							.await
 					});
 				}),
 			),
@@ -487,6 +487,31 @@ impl BitswapBehaviourProvider for Behaviour {
 	) -> Result<BitswapEvent, <Self as NetworkBehaviour>::ToSwarm> {
 		match event {
 			NetworkEvent::Bitswap(e) => Ok(e),
+			e => Err(e),
+		}
+	}
+}
+impl MdnsBehaviourProvider for Behaviour {
+	fn mdns(&self) -> &mdns::tokio::Behaviour {
+		&self.mdns
+	}
+
+	fn mdns_mut(&mut self) -> &mut mdns::tokio::Behaviour {
+		&mut self.mdns
+	}
+
+	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&mdns::Event> {
+		match event {
+			NetworkEvent::Mdns(e) => Some(e),
+			_ => None,
+		}
+	}
+
+	fn into_mdns_event(
+		event: <Self as NetworkBehaviour>::ToSwarm,
+	) -> Result<mdns::Event, <Self as NetworkBehaviour>::ToSwarm> {
+		match event {
+			NetworkEvent::Mdns(e) => Ok(e),
 			e => Err(e),
 		}
 	}

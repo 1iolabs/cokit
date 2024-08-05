@@ -1,9 +1,6 @@
-use anyhow::anyhow;
 use co_identity::{network_did_discovery, DidCommHeader, Identity, PrivateIdentity};
 use co_primitives::{serde_string_enum, NetworkDidDiscovery};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
-use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DidDiscovery {
@@ -24,22 +21,10 @@ impl DidDiscovery {
 		T: Identity + Send + Sync + 'static,
 	{
 		let network = network_did_discovery(to, network)?;
-		let id: String = Uuid::new_v4().into();
-		let header = DidCommHeader {
-			from: Some(from.identity().to_owned()),
-			to: BTreeSet::from_iter(vec![to.identity().to_owned()]),
-			id: id.clone(),
-			message_type,
-			..Default::default()
-		};
-		let from_context = from
-			.didcomm_private()
-			.ok_or(anyhow!("unsupported identity: from: no private didcomm context"))?;
-		let to_context = to
-			.didcomm_public()
-			.ok_or(anyhow!("unsupported identity: to: no public didcomm context"))?;
+		let (from_context, to_context, header) = DidCommHeader::create(from, to, message_type)?;
+		let message_id = header.id.clone();
 		let message = from_context.jwe(&to_context, header, "null")?;
-		Ok(DidDiscovery { message_id: id, network, message })
+		Ok(DidDiscovery { message_id, network, message })
 	}
 }
 

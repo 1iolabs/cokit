@@ -318,11 +318,8 @@ impl CoContextInner {
 
 		// resolver
 		let core_resolver = CoCoreResolver::default();
-		let core_resolver = ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(
-			core_resolver,
-			CO_ID_LOCAL.into(),
-			&self.reactive_context,
-		);
+		let core_resolver =
+			ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(core_resolver, co.clone(), &self.reactive_context);
 		let core_resolver = LogCoreResolver::new(core_resolver);
 		let core_resolver = DynamicCoreResolver::new(core_resolver);
 

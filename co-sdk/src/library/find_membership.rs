@@ -1,4 +1,4 @@
-use crate::{CoReducer, CoReducerError, Cores, CO_CORE_MEMBERSHIP};
+use crate::{CoReducer, CoReducerError, CO_CORE_NAME_MEMBERSHIP};
 use co_core_membership::{Membership, MembershipState, Memberships};
 use co_primitives::CoId;
 
@@ -17,7 +17,7 @@ async fn memberships_iter<'a>(
 	reducer: &CoReducer,
 	co: impl AsRef<CoId> + 'a,
 ) -> Result<impl Iterator<Item = Membership> + 'a, CoReducerError> {
-	let memberships: Memberships = match reducer.state(Cores::to_core_name(CO_CORE_MEMBERSHIP)).await {
+	let memberships: Memberships = match reducer.state(CO_CORE_NAME_MEMBERSHIP).await {
 		Ok(memberships) => memberships,
 		Err(CoReducerError::CoreNotFound(_)) => Memberships::default(),
 		Err(e) => Err(e)?,

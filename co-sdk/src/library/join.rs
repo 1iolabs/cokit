@@ -1,6 +1,6 @@
 use co_identity::{DidCommHeader, PrivateIdentity};
 use co_network::didcomm::EncodedMessage;
-use co_primitives::CoId;
+use co_primitives::{to_json_string, CoId};
 use serde::{Deserialize, Serialize};
 
 pub const CO_DIDCOMM_JOIN: &str = "co-join";
@@ -13,7 +13,7 @@ pub const CO_DIDCOMM_JOIN: &str = "co-join";
 // {
 // 	let (from_didcomm, to_didcomm, mut header) = DidCommHeader::create(from, to, CO_DIDCOMM_JOIN)?;
 // 	header.thid = thid;
-// 	let body = serde_json::to_string(&co)?;
+// 	let body = to_json_string(&co)?;
 // 	let message = from_didcomm.jwe(&to_didcomm, header, &body)?;
 // 	Ok(EncodedMessage(message.into_bytes()))
 // }
@@ -26,7 +26,7 @@ where
 	let (from_didcomm, mut header) = DidCommHeader::create_from(from, CO_DIDCOMM_JOIN)?;
 	header.thid = thid;
 	let payload = CoJoinPayload { id: co };
-	let body = serde_json::to_string(&payload)?;
+	let body = to_json_string(&payload)?;
 	let message = from_didcomm.jws(header, &body)?;
 	Ok(EncodedMessage(message.into_bytes()))
 }

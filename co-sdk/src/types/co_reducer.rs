@@ -79,12 +79,13 @@ impl CoReducer {
 	/// - `identity` - The identity to sign the operation with.
 	/// - `core` - The target core name. The key of [`co_core_co::Co::cores`].
 	/// - `item` - The core action payload.
-	#[tracing::instrument(err, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, identity))]
+	#[tracing::instrument(err, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, item, identity))]
 	pub async fn push<T, I>(&self, identity: &I, core: &str, item: &T) -> Result<(), anyhow::Error>
 	where
 		T: Serialize + Debug + Send + Sync + Clone + 'static,
 		I: PrivateIdentity + Send + Sync,
 	{
+		tracing::trace!(action = ?item, "push");
 		self.reducer
 			.write()
 			.await
@@ -93,12 +94,13 @@ impl CoReducer {
 	}
 
 	/// Push event into reducer.
-	#[tracing::instrument(err, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, identity))]
+	#[tracing::instrument(err, name = "push", fields(co = self.id().as_str(), identity = identity.identity(), core = action.core), skip(self, action, identity))]
 	pub async fn push_action<T, I>(&self, identity: &I, action: &ReducerAction<T>) -> Result<(), anyhow::Error>
 	where
 		T: Serialize + Debug + Send + Sync + Clone + 'static,
 		I: PrivateIdentity + Send + Sync,
 	{
+		tracing::trace!(action = ?action.payload, "push");
 		self.reducer
 			.write()
 			.await

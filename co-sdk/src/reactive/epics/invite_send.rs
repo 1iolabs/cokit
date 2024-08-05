@@ -2,8 +2,8 @@ use crate::{
 	drivers::network::CoNetworkTaskSpawner,
 	library::{
 		connect_and_send::connect_and_send,
-		identity_discovery::identity_discovery,
 		invite::{create_invite_message, CoInvitePayload},
+		network_discovery::network_discovery,
 		settings_timeout::settings_timeout,
 	},
 	reactive::context::{ActionObservable, StateObservable},
@@ -15,7 +15,7 @@ use co_identity::{IdentityResolver, PrivateIdentityResolver};
 use co_network::{didcomm::EncodedMessage, discovery::Discovery};
 use co_primitives::{CoConnectivity, CoId, Did};
 use futures::{Stream, StreamExt, TryStreamExt};
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, iter::empty};
 
 /// When a participant is invited into an CO, try to connect and send the invite message via didcomm.
 /// TODO: consensus finalization?
@@ -98,6 +98,7 @@ async fn invite(
 	from: &Did,
 	to: &Did,
 ) -> anyhow::Result<(EncodedMessage, BTreeSet<Discovery>)> {
+	let identity_resolver = context.identity_resolver().await?;
 	let co_reducer = context.co_reducer(co_id).await?.ok_or(anyhow!("Co not found: {}", co_id))?;
 	let co = co_reducer.co().await?;
 	let (state, heads) = co_reducer.reducer_state().await;
@@ -119,7 +120,9 @@ async fn invite(
 	)?;
 
 	// discovery
-	let discovery = identity_discovery(&from_identity, &to_identity)?;
+	let discovery = network_discovery(Some(&identity_resolver), &from_identity, None, empty(), [to.to_owned()])
+		.try_collect()
+		.await?;
 
 	// result
 	Ok((invite_message, discovery))

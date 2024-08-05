@@ -3,7 +3,7 @@ use crate::{
 	GossipsubBehaviourProvider,
 };
 use co_identity::PrivateIdentity;
-use co_primitives::{CoId, NetworkCoHeads};
+use co_primitives::{from_cbor, to_cbor, CoId, NetworkCoHeads};
 use libipld::Cid;
 use libp2p::{
 	gossipsub::{self, IdentTopic, PublishError, TopicHash},
@@ -110,7 +110,7 @@ impl HeadsState {
 	{
 		let topic = Self::to_topic(network, co);
 		let message = HeadsMessage::Heads(co.clone(), heads.clone());
-		let data = serde_ipld_dagcbor::to_vec(&message)?;
+		let data = to_cbor(&message)?;
 		match swarm.behaviour_mut().gossipsub_mut().publish(topic, data) {
 			Ok(_) => Ok(()),
 			Err(PublishError::InsufficientPeers) => {
@@ -172,7 +172,7 @@ impl HeadsState {
 			gossipsub::Event::Message { propagation_source: _, message_id: _, message } => {
 				if self.heads.contains(&message.topic) {
 					// TODO(metric): add metrics when receive invalid message?
-					let heads_message: Option<HeadsMessage> = serde_ipld_dagcbor::from_slice(&message.data).ok();
+					let heads_message: Option<HeadsMessage> = from_cbor(&message.data).ok();
 					match heads_message {
 						Some(HeadsMessage::Heads(co, heads)) => {
 							self.events.push_back(HeadsEvent::GenerateEvent(Event::ReceivedHeads {

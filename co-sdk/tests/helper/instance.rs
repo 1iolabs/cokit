@@ -1,5 +1,4 @@
 use co_sdk::{Application, ApplicationBuilder, DidKeyIdentity, DidKeyProvider, TracingBuilder, CO_CORE_NAME_KEYSTORE};
-use std::env::current_dir;
 
 pub struct Instance {
 	pub application: Application,
@@ -10,8 +9,9 @@ impl Instance {
 
 		// log
 		TracingBuilder::new("test".into(), None)
-			.with_bunyan_logging(Some(current_dir().unwrap().join("../data/log/co.log")))
-			//.with_open_telemetry( "http://localhost:4317")
+			//.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+			//.with_open_telemetry("http://localhost:4317")
+			.with_stderr_logging()
 			.init()
 			.ok();
 

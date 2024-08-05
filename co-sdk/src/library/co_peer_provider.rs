@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use co_identity::{IdentityResolverBox, PrivateIdentity};
 use co_network::{discovery, NetworkTaskSpawner, PeerProvider};
 use co_primitives::{CoId, OptionLink};
-use futures::Stream;
+use futures::{Stream, TryStreamExt};
 use libp2p::PeerId;
 use std::collections::BTreeSet;
 
@@ -84,6 +84,8 @@ where
 	P: PrivateIdentity + Send + Sync + 'static,
 {
 	let networks = state::networks(storage, state).await?;
-	let participants = state::participant_identities(identity_resolver, storage, state).await?;
-	Ok(network_discovery(identity, id, networks, participants).await?)
+	let participants = state::participants(storage, state).await?.into_iter().map(|item| item.did);
+	Ok(network_discovery(Some(identity_resolver), identity, Some(id), networks, participants)
+		.try_collect()
+		.await?)
 }

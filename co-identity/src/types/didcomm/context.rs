@@ -81,13 +81,10 @@ impl DidCommPrivateContext {
 	/// # Arguments
 	/// - `body` - JSON String.
 	pub fn jwe(&self, to: &DidCommPublicContext, header: DidCommHeader, body: &str) -> Result<String, SignError> {
-		let mut header = header;
+		let header = header;
 		if !header.to.contains(&to.did) {
-			header.to.insert(to.did().to_owned());
+			return Err(SignError::InvalidArgument(anyhow::anyhow!("header must contain recipent: to: {}", to.did)));
 		}
-		// if !header.to.contains(&to.did) {
-		// 	return Err(SignError::InvalidArgument(anyhow!("header must contain recipent: {}", to.did)));
-		// }
 		didcomm_jwe(
 			self.key_agreement_private_key.clone(),
 			to.key_agreement.public_key_bytes().map_err(SignError::InvalidArgument)?,

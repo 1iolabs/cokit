@@ -5,7 +5,7 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
-	drivers::network::tasks::received_heads::ReceivedHeadsNetworkTask,
+	drivers::network::tasks::{mdns_gossip::MdnsGossipNetworkTask, received_heads::ReceivedHeadsNetworkTask},
 	library::task_spawner::TaskSpawner,
 	local_keypair_fetch,
 	reactive::{
@@ -146,6 +146,7 @@ impl Application {
 			create_identity_resolver(),
 			self.private_identity_resolver().await?,
 		);
+		let spawner = network.spawner();
 
 		// shutdown
 		//  when the token has been triggered explicitly shutdown the network
@@ -158,17 +159,16 @@ impl Application {
 		}
 
 		// set network to reducers
-		self.co_context.inner.set_network(Some(network.spawner())).await;
+		self.co_context.inner.set_network(Some(spawner.clone())).await;
 
 		// assign
 		self.network = Some(network);
 
 		// to be able to receive updates anytime we add a static heads handler
-		self.network
-			.as_ref()
-			.unwrap()
-			.spawner()
-			.spawn(ReceivedHeadsNetworkTask::new(self.co().clone(), self.tasks()))?;
+		spawner.spawn(ReceivedHeadsNetworkTask::new(self.co().clone(), self.tasks()))?;
+
+		// use mdns discoverd peers for gossip discovery
+		spawner.spawn(MdnsGossipNetworkTask::new())?;
 
 		// reactive
 		self.reactive.actions().dispatch(Action::NetworkStarted);

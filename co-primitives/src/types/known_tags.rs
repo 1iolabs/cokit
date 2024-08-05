@@ -15,7 +15,7 @@ pub enum KnownTags {
 
 	/// [`crate::CoInviteMetadata`]
 	/// [`crate::Link`]
-	#[serde(rename = "co-invite-metdata")]
+	#[serde(rename = "co-invite-metadata")]
 	CoInviteMetadata,
 
 	/// [`CoNetwork`]

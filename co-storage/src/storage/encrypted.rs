@@ -6,7 +6,9 @@ use crate::{
 	AlgorithmError, BlockStat, BlockStorage, BlockStorageContentMapping, Storage, StorageContentMapping, StorageError,
 };
 use async_trait::async_trait;
-use co_primitives::{DefaultNodeSerializer, MultiCodec, Node, NodeBuilder, NodeBuilderError, NodeSerializer};
+use co_primitives::{
+	from_cbor, DefaultNodeSerializer, MultiCodec, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
+};
 use futures::{stream::FuturesOrdered, StreamExt};
 use libipld::{store::StoreParams, Block, Cid};
 use serde::{Deserialize, Serialize};
@@ -401,8 +403,7 @@ impl BlockMapping {
 		MultiCodec::dag_cbor(block.cid())?;
 
 		// get node
-		let node: Node<(Cid, Cid)> =
-			serde_ipld_dagcbor::from_slice(block.data()).map_err(|e| StorageError::InvalidArgument(e.into()))?;
+		let node: Node<(Cid, Cid)> = from_cbor(block.data()).map_err(|e| StorageError::InvalidArgument(e.into()))?;
 
 		// read
 		match node {
@@ -442,7 +443,7 @@ impl BlockMapping {
 
 			// get node
 			let node: Node<(Cid, Cid)> =
-				serde_ipld_dagcbor::from_slice(block.data()).map_err(|e| StorageError::InvalidArgument(e.into()))?;
+				from_cbor(block.data()).map_err(|e| StorageError::InvalidArgument(e.into()))?;
 
 			// read
 			match node {

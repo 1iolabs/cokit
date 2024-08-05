@@ -1,6 +1,6 @@
 use co_identity::{DidCommHeader, Identity, PrivateIdentity};
 use co_network::didcomm::EncodedMessage;
-use co_primitives::CoId;
+use co_primitives::{to_json_string, CoId};
 use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 
@@ -14,7 +14,7 @@ where
 {
 	let (from_didcomm, header) = DidCommHeader::create_from(from, CO_DIDCOMM_KEY_REQUEST)?;
 	let id = header.id.clone();
-	let body = serde_json::to_string(&payload)?;
+	let body = to_json_string(&payload)?;
 	let message = from_didcomm.jws(header, &body)?;
 	Ok((id, EncodedMessage(message.into_bytes())))
 }
@@ -32,7 +32,7 @@ where
 {
 	let (from_didcomm, to_didcomm, mut header) = DidCommHeader::create(from, to, CO_DIDCOMM_KEY_RESPONSE)?;
 	header.thid = Some(request_message_id);
-	let body = serde_json::to_string(&payload)?;
+	let body = to_json_string(&payload)?;
 	let message = from_didcomm.jwe(&to_didcomm, header, &body)?;
 	Ok(EncodedMessage(message.into_bytes()))
 }

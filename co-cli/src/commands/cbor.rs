@@ -1,4 +1,5 @@
 use crate::library::cli_context::CliContext;
+use co_primitives::from_cbor;
 use exitcode::ExitCode;
 use libipld::Ipld;
 
@@ -33,7 +34,7 @@ pub async fn command(_context: &CliContext, cbor: &Command) -> Result<ExitCode, 
 
 async fn print(file: &PrintCommand) -> Result<ExitCode, anyhow::Error> {
 	let buf: Vec<u8> = tokio::fs::read(&file.file).await?;
-	let ipld: Ipld = serde_ipld_dagcbor::from_slice(&buf)?;
+	let ipld: Ipld = from_cbor(&buf)?;
 	if file.pretty {
 		println!("{:#?}", ipld);
 	} else {
