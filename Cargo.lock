@@ -1642,6 +1642,7 @@ dependencies = [
  "serde_ipld_dagcbor",
  "serde_ipld_dagjson",
  "serde_json",
+ "serde_repr",
  "thiserror",
  "zeroize",
 ]

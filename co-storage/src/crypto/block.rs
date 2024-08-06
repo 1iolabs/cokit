@@ -4,7 +4,7 @@ use chacha20poly1305::{
 	aead::{Aead, AeadCore, KeyInit, OsRng},
 	Key, XChaCha20Poly1305,
 };
-use co_primitives::{from_cbor, to_cbor, MultiCodec, MultiCodecError};
+use co_primitives::{from_cbor, to_cbor, KnownMultiCodec, MultiCodec, MultiCodecError};
 use libipld::{
 	multihash::{Code, MultihashDigest},
 	store::StoreParams,
@@ -338,7 +338,7 @@ where
 	fn try_into(self) -> Result<Block<S>, Self::Error> {
 		let encrypted_data = to_cbor(&self).map_err(|_| AlgorithmError::Encoding)?;
 		let mh = Code::Blake3_256.digest(&encrypted_data);
-		let cid = Cid::new_v1(MultiCodec::CoEncryptedBlock.into(), mh);
+		let cid = Cid::new_v1(KnownMultiCodec::CoEncryptedBlock.into(), mh);
 		Ok(Block::new_unchecked(cid, encrypted_data))
 	}
 }
@@ -351,7 +351,7 @@ where
 	/// Convert from encrypted Block.
 	fn try_from(value: Block<S>) -> Result<Self, Self::Error> {
 		// validate
-		MultiCodec::codec(MultiCodec::CoEncryptedBlock, value.cid())?;
+		MultiCodec::with_codec(KnownMultiCodec::CoEncryptedBlock, value.cid())?;
 
 		// decode
 		let block: EncryptedBlock<S> = from_cbor(value.data()).map_err(|_| AlgorithmError::Decoding)?;

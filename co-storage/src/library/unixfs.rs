@@ -1,5 +1,5 @@
 use crate::{BlockStorage, StorageError};
-use co_primitives::MultiCodec;
+use co_primitives::{KnownMultiCodec, MultiCodec};
 use futures::{AsyncRead, AsyncReadExt};
 use libipld::{store::StoreParams, Block, Cid};
 use rust_unixfs::file::{adder::FileAdder, visit::IdleFileVisit};
@@ -18,7 +18,13 @@ pub async fn unixfs_cat_buffer<S: BlockStorage + Send>(storage: &S, cid: &Cid) -
 	// possible content gets to be processed, at minimum one step of the walk as shown in this
 	// example.
 	let mut buf = Vec::new();
-	buf.append(&mut storage.get(MultiCodec::codec(MultiCodec::DagPb, cid)?).await?.into_inner().1);
+	buf.append(
+		&mut storage
+			.get(MultiCodec::with_codec(KnownMultiCodec::DagPb, cid)?)
+			.await?
+			.into_inner()
+			.1,
+	);
 
 	// First step of the walk can give content or continued visitation but not both.
 	let (content, _, _metadata, mut step) = IdleFileVisit::default()

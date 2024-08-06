@@ -1,5 +1,5 @@
 use co_network::bitswap::Token;
-use co_primitives::{CoId, MultiCodec, Secret};
+use co_primitives::{CoId, KnownMultiCodec, MultiCodec, Secret};
 use hmac::{Hmac, Mac};
 use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
@@ -49,12 +49,12 @@ impl CoToken {
 	}
 
 	pub fn to_bitswp_token(&self) -> Result<Token, anyhow::Error> {
-		Ok(Token(MultiCodec::DagCbor.into(), self.to_bytes()?))
+		Ok(Token(KnownMultiCodec::DagCbor.into(), self.to_bytes()?))
 	}
 
 	pub fn from_bitswap_token(token: &Token) -> Result<Self, anyhow::Error> {
 		match MultiCodec::from(token.0) {
-			MultiCodec::DagCbor => Ok(Self::from_bytes(&token.1)?),
+			MultiCodec::Known(KnownMultiCodec::DagCbor) => Ok(Self::from_bytes(&token.1)?),
 			_ => Err(anyhow::anyhow!("Unsupported token multicode")),
 		}
 	}

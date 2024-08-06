@@ -400,7 +400,7 @@ impl BlockMapping {
 
 		// get block
 		let block = storage.get(cid)?;
-		MultiCodec::dag_cbor(block.cid())?;
+		MultiCodec::with_dag_cbor(block.cid())?;
 
 		// get node
 		let node: Node<(Cid, Cid)> = from_cbor(block.data()).map_err(|e| StorageError::InvalidArgument(e.into()))?;
@@ -439,7 +439,7 @@ impl BlockMapping {
 			let block = block?;
 
 			// validate
-			MultiCodec::dag_cbor(block.cid())?;
+			MultiCodec::with_dag_cbor(block.cid())?;
 
 			// get node
 			let node: Node<(Cid, Cid)> =

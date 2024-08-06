@@ -1,8 +1,8 @@
-pub mod cbor;
 pub mod co;
 pub mod core_build_builtin;
 pub mod did;
 pub mod file;
+pub mod ipld;
 pub mod network;
 pub mod pin;
 pub mod room;

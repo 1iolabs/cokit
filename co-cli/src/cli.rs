@@ -1,5 +1,5 @@
 use crate::{
-	commands::{cbor, co, core_build_builtin, did, file, network, pin, room, storage},
+	commands::{co, core_build_builtin, did, file, ipld, network, pin, room, storage},
 	library::cli_context::CliContext,
 };
 use clap::ArgAction;
@@ -73,8 +73,8 @@ pub enum CliCommand {
 	/// Build the build-in cores.
 	CoreBuildBuiltin,
 
-	/// DAG-CBOR Utilities.
-	Cbor(cbor::Command),
+	/// IPLD Utilities.
+	Ipld(ipld::Command),
 
 	/// Identities
 	Did(did::Command),
@@ -105,7 +105,7 @@ pub async fn command(cli: &Cli) -> Result<ExitCode, anyhow::Error> {
 		CliCommand::Co(command) => co::command(&context, cli, command).await,
 		CliCommand::Network(command) => network::command(&context, cli, command).await,
 		CliCommand::CoreBuildBuiltin => core_build_builtin::command().await,
-		CliCommand::Cbor(command) => cbor::command(&context, command).await,
+		CliCommand::Ipld(command) => ipld::command(&context, command).await,
 		CliCommand::Did(command) => did::command(&context, cli, command).await,
 		CliCommand::Storage(command) => storage::command(&context, cli, command).await,
 		CliCommand::File(command) => file::command(&context, cli, command).await,

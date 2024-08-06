@@ -91,7 +91,7 @@ where
 
 fn read_node<T: Clone + DeserializeOwned, S: Storage>(storage: &S, cid: &Cid) -> Result<Node<T>, StorageError> {
 	// get block
-	let block = storage.get(MultiCodec::dag_cbor(cid)?)?;
+	let block = storage.get(MultiCodec::with_dag_cbor(cid)?)?;
 
 	// get node
 	let node: Node<T> = BlockSerializer::new()

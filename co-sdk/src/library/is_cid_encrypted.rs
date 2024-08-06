@@ -1,14 +1,11 @@
-use co_primitives::MultiCodec;
+use co_primitives::{KnownMultiCodec, MultiCodec};
 use libipld::Cid;
 
 /// Return `true` if and of `cids` is encrypted.
 pub fn is_cid_encrypted<'a>(cids: impl IntoIterator<Item = &'a Cid>) -> bool {
 	for cid in cids {
-		match MultiCodec::from(cid) {
-			MultiCodec::CoEncryptedBlock => {
-				return true;
-			},
-			_ => {},
+		if MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
+			return true;
 		}
 	}
 	return false;

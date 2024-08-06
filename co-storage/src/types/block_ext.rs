@@ -14,7 +14,7 @@ pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {
 	{
 		match link.value() {
 			Either::Left(cid) => Ok(BlockSerializer::new()
-				.deserialize(&self.get(MultiCodec::dag_cbor(&cid)?).await?)
+				.deserialize(&self.get(MultiCodec::with_dag_cbor(&cid)?).await?)
 				.map_err(|e| StorageError::InvalidArgument(e.into()))?),
 			Either::Right(value) => Ok(value),
 		}
@@ -37,7 +37,7 @@ pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {
 		T: Send + Sync + serde::de::DeserializeOwned,
 	{
 		Ok(BlockSerializer::new()
-			.deserialize(&self.get(MultiCodec::dag_cbor(item)?).await?)
+			.deserialize(&self.get(MultiCodec::with_dag_cbor(item)?).await?)
 			.map_err(|e| StorageError::InvalidArgument(e.into()))?)
 	}
 
@@ -59,7 +59,7 @@ pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {
 	{
 		Ok(if let Some(item) = item {
 			BlockSerializer::new()
-				.deserialize(&self.get(MultiCodec::dag_cbor(item)?).await?)
+				.deserialize(&self.get(MultiCodec::with_dag_cbor(item)?).await?)
 				.map_err(|e| StorageError::InvalidArgument(e.into()))?
 		} else {
 			T::default()
