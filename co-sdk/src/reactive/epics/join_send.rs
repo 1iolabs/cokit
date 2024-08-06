@@ -71,10 +71,10 @@ fn join_with_result(context: CoContext, id: CoId, did: Did) -> impl Stream<Item 
 		.flat_map(move |action| {
 			let joined = match &action {
 				Action::Error { err: _ } => {
-					Some(Action::Joined { co: id.clone(), participant: did.clone(), success: false })
+					Some(Action::Joined { co: id.clone(), participant: did.clone(), success: false, peer: None })
 				},
-				Action::JoinSent { co: _, heads, participant: _, peer: _ } if !is_cid_encrypted(heads.iter()) => {
-					Some(Action::Joined { co: id.clone(), participant: did.clone(), success: true })
+				Action::JoinSent { co: _, heads, participant: _, peer } if !is_cid_encrypted(heads.iter()) => {
+					Some(Action::Joined { co: id.clone(), participant: did.clone(), success: true, peer: Some(*peer) })
 				},
 				_ => None,
 			};

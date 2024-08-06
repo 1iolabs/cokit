@@ -23,8 +23,9 @@ pub use co_identity::{
 	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 pub use co_primitives::{
-	tag, tags, BlockSerializer, CoId, CoInvite, CoNetwork, Date, Did, KnownTag, KnownTags, Link, MultiCodec,
-	MultiCodecError, OptionLink, Tag, Tags,
+	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, BlockSerializer, CoId,
+	CoInvite, CoNetwork, Date, Did, KnownMultiCodec, KnownTag, KnownTags, Link, MultiCodec, MultiCodecError,
+	OptionLink, Tag, Tags,
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{

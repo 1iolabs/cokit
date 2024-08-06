@@ -128,6 +128,9 @@ async fn test_invite() {
 	// peer2: read state
 	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
 	assert_eq!(peer2_shared_co.reducer_state().await, shared_co.reducer_state().await);
+	let co = shared_co.co().await.unwrap();
+	let peer2_co = peer2_shared_co.co().await.unwrap();
+	assert_eq!(peer2_co, co);
 }
 
 async fn wait_membership_state(

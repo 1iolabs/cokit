@@ -88,7 +88,7 @@ async fn key_request(
 		Ok(vec![
 			Action::CoreActionPush { co: CO_ID_LOCAL.into(), action: set },
 			Action::CoreActionPush { co: CO_ID_LOCAL.into(), action: change },
-			Action::Joined { co: co.clone(), participant: did, success: true },
+			Action::Joined { co: co.clone(), participant: did, success: true, peer: Some(peer) },
 		])
 	} else {
 		Ok(Default::default())

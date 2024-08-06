@@ -19,6 +19,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
+use co_core_membership::Membership;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, LocalIdentityResolver, PrivateIdentity, PrivateIdentityResolverBox,
 };
@@ -300,6 +301,51 @@ impl CoContextInner {
 		Ok(reducer)
 	}
 
+	/// Creates a CoReducer instance a CO.
+	pub(crate) async fn create_co_instance_membership<I>(
+		&self,
+		parent: CoReducer,
+		membership: Membership,
+		identity: I,
+		storage: Option<CoStorage>,
+		initialize: bool,
+		network: bool,
+	) -> Result<CoReducer, anyhow::Error>
+	where
+		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
+	{
+		// resolver
+		let core_resolver = CoCoreResolver::default();
+		let core_resolver = ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(
+			core_resolver,
+			membership.id.clone(),
+			&self.reactive_context,
+		);
+		let core_resolver = LogCoreResolver::new(core_resolver);
+		let core_resolver = DynamicCoreResolver::new(core_resolver);
+
+		// network
+		let network = if network { self.network.read().await.clone() } else { None };
+
+		// reducer
+		let reducer = SharedCoBuilder::new(parent, membership)
+			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
+			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
+			.with_network(network)
+			.with_initialize(initialize)
+			.build(
+				self.tasks.clone(),
+				storage.unwrap_or_else(|| self.storage.clone()),
+				self.runtime.clone(),
+				identity,
+				core_resolver,
+			)
+			.await?;
+
+		// result
+		Ok(reducer)
+	}
+
 	/// Creates a CoReducer instance a CO which we have a membership for.
 	async fn create_co_instance<I>(
 		&self,
@@ -315,25 +361,10 @@ impl CoContextInner {
 			Some(m) => m,
 			None => return Ok(None),
 		};
-
-		// resolver
-		let core_resolver = CoCoreResolver::default();
-		let core_resolver =
-			ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(core_resolver, co.clone(), &self.reactive_context);
-		let core_resolver = LogCoreResolver::new(core_resolver);
-		let core_resolver = DynamicCoreResolver::new(core_resolver);
-
-		// reducer
-		let reducer = SharedCoBuilder::new(parent, membership)
-			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
-			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
-			.with_network(self.network.read().await.clone())
-			.with_initialize(initialize)
-			.build(self.tasks.clone(), self.storage.clone(), self.runtime.clone(), identity, core_resolver)
-			.await?;
-
-		// result
-		Ok(Some(reducer))
+		Ok(Some(
+			self.create_co_instance_membership(parent, membership, identity, None, initialize, true)
+				.await?,
+		))
 	}
 }
 impl From<CoContextInner> for CoContext {

@@ -37,7 +37,7 @@ pub enum Action {
 	JoinSent { co: CoId, heads: BTreeSet<Cid>, participant: Did, peer: PeerId },
 
 	/// Join completed.
-	Joined { co: CoId, participant: Did, success: bool },
+	Joined { co: CoId, participant: Did, success: bool, peer: Option<PeerId> },
 
 	/// Send Key Request to co (participants) or specified peer.
 	// KeyRequest { co: CoId, key: Option<String>, peer: Option<PeerId> },
