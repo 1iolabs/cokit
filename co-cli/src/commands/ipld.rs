@@ -1,8 +1,8 @@
 use crate::library::cli_context::CliContext;
-use co_primitives::from_cbor;
+use co_primitives::{from_cbor, KnownMultiCodec};
 use co_sdk::MultiCodec;
 use exitcode::ExitCode;
-use libipld::{Cid, Ipld};
+use libipld::{cid::Version, Cid, Ipld};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, clap::Args)]
@@ -58,6 +58,13 @@ async fn print(command: &PrintCborCommand) -> Result<ExitCode, anyhow::Error> {
 async fn inspect_cid(command: &InspectCidCommand) -> Result<ExitCode, anyhow::Error> {
 	let cid = Cid::from_str(&command.cid)?;
 	println!("Version: {:?}", cid.version());
+	if cid.version() == Version::V1 && KnownMultiCodec::DagPb == cid.codec() {
+		if let Ok(v0) = Cid::new_v0(cid.hash().clone()) {
+			println!("V0: {}", v0.to_string());
+		}
+	} else if cid.version() == Version::V0 {
+		println!("V1: {}", Cid::new_v1(cid.codec(), cid.hash().clone()).to_string());
+	}
 	println!("Codec: {} (code={})", MultiCodec::from(cid.codec()), cid.codec());
 	println!("Hash {} (code={}, size={}):", MultiCodec::from(cid.hash().code()), cid.hash().code(), cid.hash().size());
 	hexdump::hexdump(cid.hash().digest());
