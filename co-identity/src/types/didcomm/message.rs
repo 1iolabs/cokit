@@ -1,10 +1,10 @@
 use crate::{
-	library::didcomm_receive::didcomm_receive, DidCommHeader, Identity, IdentityResolver, PrivateIdentity,
-	PrivateIdentityResolver, ReceiveError,
+	library::didcomm_receive::didcomm_receive, DidCommContext, DidCommHeader, Identity, IdentityResolver,
+	PrivateIdentity, PrivateIdentityResolver, ReceiveError,
 };
 use anyhow::anyhow;
 use co_primitives::{from_json_string, Did};
-use didcomm_rs::{Jwe, MessageType};
+use didcomm_rs::{Jwe, Jws, MessageType};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::value::RawValue;
 
@@ -116,8 +116,12 @@ impl Message {
 		}
 		if message_type == MessageType::DidCommJws {
 			let (header, body) = didcomm_receive(None, &sender_resolver, message).await?;
-			// TODO: resolve sender
-			return Ok(Message::SignedJson { sender: "".to_owned(), header, body });
+
+			// resolve sender
+			let sender = verify_signing_identity(&sender_resolver, &header, message).await?;
+
+			// result
+			return Ok(Message::SignedJson { sender, header, body });
 		}
 		if message_type == MessageType::DidCommRaw {
 			#[derive(Debug, Serialize, Deserialize)]
@@ -216,4 +220,53 @@ fn get_message_type(message: &str) -> Result<MessageType, anyhow::Error> {
 	}
 	let message: didcomm_rs::Message = serde_json::from_str(message)?;
 	Ok(message.get_jwm_header().typ.clone())
+}
+
+/// Verify plain text `from` header matches any signature `kid`.
+/// We accept if:
+/// - the `kid` is a known from public key.
+/// - the `kid` is the same value as the `from` header.
+async fn verify_signing_identity<I>(
+	sender_resolver: &I,
+	header: &DidCommHeader,
+	message: &str,
+) -> Result<Did, ReceiveError>
+where
+	I: IdentityResolver + Send + Sync + 'static,
+{
+	if let Some(from) = &header.from {
+		// from
+		let sender_identity = sender_resolver
+			.resolve(from)
+			.await
+			.map_err(|e| ReceiveError::BadDid(from.to_owned(), e.into()))?;
+		let sender_context = sender_identity
+			.didcomm_public()
+			.ok_or_else(|| ReceiveError::BadDid(from.to_owned(), anyhow!("No didcomm public context.")))?;
+		let sender_public_key = sender_context
+			.verification_method()
+			.public_key_bytes()
+			.map_err(|err| ReceiveError::BadDid(from.to_owned(), err.into()))?;
+		let sender_kid = hex::encode(&sender_public_key);
+
+		// check signature kid
+		let jws: Jws = serde_json::from_str(message).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
+		let signatures = if let Some(signatures) = jws.signatures {
+			signatures
+		} else if let Some(signature) = jws.signature {
+			vec![signature]
+		} else {
+			vec![]
+		};
+		for signature in signatures {
+			if let Some(kid) = &signature.get_kid() {
+				if kid == &sender_kid || kid == sender_identity.identity() {
+					return Ok(from.clone());
+				}
+			}
+		}
+		Err(ReceiveError::InvalidSigningKeyId(anyhow!("Can not match from header")))
+	} else {
+		Err(ReceiveError::UnknownFormat(anyhow!("No from header")))
+	}
 }

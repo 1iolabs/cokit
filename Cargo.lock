@@ -4441,17 +4441,6 @@ dependencies = [
 
 [[package]]
 name = "ipld-core"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f11e58f441b08619fccfa54c237d418b8937e29407e36c57e60ac2bc0bd1c75e"
-dependencies = [
- "cid 0.11.1",
- "serde",
- "serde_bytes",
-]
-
-[[package]]
-name = "ipld-core"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4ede82a79e134f179f4b29b5fdb1eb92bd1b38c4dfea394c539051150a21b9b"
@@ -8100,18 +8089,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ded35fbe4ab8fdec1f1d14b4daff2206b1eada4d6e708cb451d464d2d965f493"
 dependencies = [
  "cbor4ii 0.2.14",
- "ipld-core 0.4.1",
+ "ipld-core",
  "scopeguard",
  "serde",
 ]
 
 [[package]]
 name = "serde_ipld_dagjson"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f40f1176e9b83724e4fe5778dbd7878e2ffd5bce7edbc66e7a76db4e1da51a5"
+checksum = "3359b47ba7f4a306ef5984665e10539e212e97217afa489437d533208eecda36"
 dependencies = [
- "ipld-core 0.3.2",
+ "ipld-core",
  "serde",
  "serde_json",
 ]

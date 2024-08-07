@@ -61,11 +61,12 @@ async fn key_request(
 				id: co.clone(),
 				key: None, // latest
 			},
+			Duration::from_secs(30 * 60),
 		)?;
 
 		// send
 		//  note: this expects the connection from join is still opened
-		let send = DidCommSendNetworkTask::send(network.clone(), [peer], message.clone(), timeout);
+		let send = DidCommSendNetworkTask::send(network.clone(), [peer], message, timeout);
 
 		// receive
 		let receive = wait_response(actions, message_id, timeout);

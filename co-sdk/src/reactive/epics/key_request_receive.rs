@@ -28,10 +28,7 @@ pub fn key_request_receive(
 		.filter_map(|action| {
 			ready(match action {
 				Action::DidCommReceive { peer, message } => {
-					if &message.header().message_type == CO_DIDCOMM_KEY_REQUEST
-						&& message.header().to.len() == 1
-						&& message.is_validated_sender()
-					{
+					if &message.header().message_type == CO_DIDCOMM_KEY_REQUEST && message.is_validated_sender() {
 						let (header, body) = message.into_inner();
 						Some((peer, header, body))
 					} else {
@@ -59,6 +56,8 @@ async fn key_request(
 	// payload
 	let payload: KeyRequestPayload = from_json_string(&body)?;
 	if payload.peer != peer {
+		// SECURITY:
+		//  to mitigate MITM we only accept this request if its from the peer that is has been signed for
 		return Err(anyhow!("invalid payload"));
 	}
 	let from = header.from.ok_or(anyhow!("invalid header: from"))?.to_string();

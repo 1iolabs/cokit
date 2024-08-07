@@ -1,14 +1,20 @@
+use libipld::{serde::to_ipld, Ipld};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Serialize `value` to JSON string (using dag-json).
 pub fn to_json<T: Serialize>(value: &T) -> Result<Vec<u8>, JsonError> {
-	Ok(serde_ipld_dagjson::to_vec(value)
+	let ipld =
+		to_ipld(value).map_err(|err| JsonError::Serialize(std::any::type_name::<T>().to_owned(), err.to_string()))?;
+	Ok(serde_ipld_dagjson::to_vec(&ipld)
 		.map_err(|err| JsonError::Serialize(std::any::type_name::<T>().to_owned(), err.to_string()))?)
 }
 
 /// Deserialize from JSON string (using dag-json).
 pub fn from_json<'a, T: Deserialize<'a>>(value: &'a [u8]) -> Result<T, JsonError> {
-	Ok(serde_ipld_dagjson::from_slice(value)
+	// because of an bug in `serde_ipld_dagjson` we take an extra step via Ipld to make bytes work correctly
+	let ipld: Ipld = serde_ipld_dagjson::from_slice(value)
+		.map_err(|err| JsonError::Deserialize(std::any::type_name::<T>().to_owned(), err.to_string()))?;
+	Ok(T::deserialize(ipld)
 		.map_err(|err| JsonError::Deserialize(std::any::type_name::<T>().to_owned(), err.to_string()))?)
 }
 
@@ -31,4 +37,25 @@ pub enum JsonError {
 
 	#[error("Deserialize {0} from JSON failed: {1}")]
 	Deserialize(String, String),
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{from_json, to_json};
+	use serde::{Deserialize, Serialize};
+
+	#[derive(Debug, Serialize, Deserialize, PartialEq)]
+	struct Test {
+		#[serde(with = "serde_bytes")]
+		hello: Vec<u8>,
+	}
+
+	#[test]
+	fn test_bytes() {
+		let payload = Test { hello: "world".as_bytes().to_vec() };
+		let json = to_json(&payload).unwrap();
+		assert_eq!(std::str::from_utf8(&json).unwrap(), "{\"hello\":{\"/\":{\"bytes\":\"d29ybGQ\"}}}");
+		let deserialized: Test = from_json(&json).unwrap();
+		assert_eq!(deserialized, payload);
+	}
 }

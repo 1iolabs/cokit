@@ -24,10 +24,7 @@ pub fn join_receive(
 		.filter_map(|action| {
 			ready(match action {
 				Action::DidCommReceive { peer, message } => {
-					if &message.header().message_type == CO_DIDCOMM_JOIN
-						&& message.header().to.len() == 1
-						&& message.is_validated_sender()
-					{
+					if &message.header().message_type == CO_DIDCOMM_JOIN && message.is_validated_sender() {
 						let (header, body) = message.into_inner();
 						Some((peer, header, body))
 					} else {
