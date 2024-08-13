@@ -124,13 +124,6 @@ impl Message {
 			return Ok(Message::SignedJson { sender, header, body });
 		}
 		if message_type == MessageType::DidCommRaw {
-			#[derive(Debug, Serialize, Deserialize)]
-			struct DidCommMessage<'a> {
-				#[serde(flatten)]
-				header: DidCommHeader,
-				#[serde(borrow)]
-				body: Option<&'a RawValue>,
-			}
 			let plain_message: DidCommMessage =
 				serde_json::from_str(message).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
 			return Ok(Message::PlainJson {
@@ -218,8 +211,12 @@ fn get_message_type(message: &str) -> Result<MessageType, anyhow::Error> {
 	if to_check.signatures.is_some() || to_check.signature.is_some() {
 		return Ok(MessageType::DidCommJws);
 	}
-	let message: didcomm_rs::Message = serde_json::from_str(message)?;
-	Ok(message.get_jwm_header().typ.clone())
+	let didcomm_message: Option<didcomm_rs::Message> = serde_json::from_str(message).ok();
+	if let Some(didcomm_message) = didcomm_message {
+		return Ok(didcomm_message.get_jwm_header().typ.clone());
+	}
+	let _plain_message: DidCommMessage = serde_json::from_str(message)?;
+	Ok(MessageType::DidCommRaw)
 }
 
 /// Verify plain text `from` header matches any signature `kid`.
@@ -269,4 +266,12 @@ where
 	} else {
 		Err(ReceiveError::UnknownFormat(anyhow!("No from header")))
 	}
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct DidCommMessage<'a> {
+	#[serde(flatten)]
+	header: DidCommHeader,
+	#[serde(borrow)]
+	body: Option<&'a RawValue>,
 }
