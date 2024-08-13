@@ -10,7 +10,7 @@ use std::{future::ready, time::Duration};
 /// - [`co_core_co::Co::tags`]
 /// - [`co_primitives::CoTimeout`]
 pub async fn settings_timeout(context: &CoContext, co: &CoId, scope: Option<&str>) -> Duration {
-	all_tags(&context, &co)
+	all_tags(&context, co)
 		.fold(CoTimeout::default_duration(), |result, tag| {
 			ready(if let Ok(tag) = tag { CoTimeout::get_timeout([&tag], scope, Some(result)) } else { result })
 		})

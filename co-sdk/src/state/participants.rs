@@ -2,7 +2,7 @@ use super::core_state_or_default;
 use crate::{CoStorage, CO_CORE_NAME_CO};
 use co_core_co::{Co, Participant};
 use co_identity::{IdentityBox, IdentityResolver};
-use co_primitives::OptionLink;
+use co_primitives::{Did, OptionLink};
 use co_storage::StorageError;
 use futures::{stream, StreamExt, TryStreamExt};
 
@@ -22,4 +22,22 @@ pub async fn participant_identities<R: IdentityResolver + Send + Sync + 'static>
 		.then(|participant| async move { identity_resolver.resolve(&participant.did).await })
 		.try_collect()
 		.await?)
+}
+
+/// Test if `participant` is a CO participant.
+/// If the CO is public this is always true.
+pub async fn is_participant(
+	storage: &CoStorage,
+	co_state: OptionLink<Co>,
+	participant: &Option<Did>,
+) -> anyhow::Result<bool> {
+	let co: Co = core_state_or_default(storage, co_state, CO_CORE_NAME_CO).await?;
+	if co.keys.is_none() {
+		return Ok(true);
+	}
+	if let Some(participant) = participant {
+		Ok(co.participants.iter().any(|item| item.0 == participant))
+	} else {
+		Ok(false)
+	}
 }

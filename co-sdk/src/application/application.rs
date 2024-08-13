@@ -5,7 +5,7 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
-	drivers::network::tasks::{mdns_gossip::MdnsGossipNetworkTask, received_heads::ReceivedHeadsNetworkTask},
+	drivers::network::tasks::{co_heads_received::ReceivedHeadsNetworkTask, mdns_gossip::MdnsGossipNetworkTask},
 	library::task_spawner::TaskSpawner,
 	local_keypair_fetch,
 	reactive::{

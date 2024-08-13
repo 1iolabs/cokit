@@ -6,7 +6,10 @@ use crate::{
 		key_exchange::{create_key_request_message, KeyRequestPayload, KeyResponsePayload, CO_DIDCOMM_KEY_RESPONSE},
 		settings_timeout::settings_timeout,
 	},
-	reactive::context::{ActionObservable, StateObservable},
+	reactive::{
+		context::{ActionObservable, StateObservable},
+		wait_response::wait_response,
+	},
 	Action, CoContext, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
@@ -14,7 +17,7 @@ use co_core_keystore::KeyStoreAction;
 use co_core_membership::MembershipsAction;
 use co_identity::{DidCommHeader, PrivateIdentityResolver};
 use co_primitives::{from_json_string, CoId, Did};
-use futures::{future::try_join, pin_mut, Stream, StreamExt};
+use futures::{future::try_join, Stream, StreamExt};
 use libp2p::PeerId;
 use std::{future::ready, time::Duration};
 
@@ -69,7 +72,7 @@ async fn key_request(
 		let send = DidCommSendNetworkTask::send(network.clone(), [peer], message, timeout);
 
 		// receive
-		let receive = wait_response(actions, message_id, timeout);
+		let receive = wait_response_message(actions, message_id, timeout);
 
 		// execute
 		let ((_response_peer, _response_header, body), _) = try_join(receive, send).await?;
@@ -96,29 +99,25 @@ async fn key_request(
 	}
 }
 
-async fn wait_response(
+async fn wait_response_message(
 	actions: ActionObservable,
 	message_id: String,
 	timeout: Duration,
 ) -> anyhow::Result<(PeerId, DidCommHeader, String)> {
-	let stream = actions.filter_map(|action| {
-		ready(match action {
-			Action::DidCommReceive { peer, message } => {
-				if &message.header().message_type == CO_DIDCOMM_KEY_RESPONSE
-					&& message.header().to.len() == 1
-					&& message.is_validated_sender()
-					&& message.header().thid.as_ref() == Some(&message_id)
-				{
-					let (header, body) = message.into_inner();
-					Some((peer, header, body))
-				} else {
-					None
-				}
-			},
-			_ => None,
-		})
-	});
-	let stream = tokio_stream::StreamExt::timeout(stream, timeout);
-	pin_mut!(stream);
-	Ok(stream.next().await.ok_or(anyhow!("No response"))??)
+	wait_response(actions, timeout, |action| match action {
+		Action::DidCommReceive { peer, message } => {
+			if &message.header().message_type == CO_DIDCOMM_KEY_RESPONSE
+				&& message.header().to.len() == 1
+				&& message.is_validated_sender()
+				&& message.header().thid.as_ref() == Some(&message_id)
+			{
+				let (header, body) = message.clone().into_inner();
+				Some((*peer, header, body))
+			} else {
+				None
+			}
+		},
+		_ => None,
+	})
+	.await
 }

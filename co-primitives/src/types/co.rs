@@ -6,8 +6,8 @@ use std::{borrow::Borrow, fmt::Display, ops::Deref};
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct CoId(String);
 impl CoId {
-	pub fn new(co: &str) -> Self {
-		Self(co.to_owned())
+	pub fn new(co: impl Into<String>) -> Self {
+		Self(co.into())
 	}
 
 	pub fn as_str(&self) -> &str {

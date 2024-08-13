@@ -1,5 +1,8 @@
-use crate::{library::create_reducer_action::create_reducer_action, ReducerChangeContext};
+use crate::{
+	library::create_reducer_action::create_reducer_action, types::message::heads::HeadsMessage, ReducerChangeContext,
+};
 use co_identity::Message;
+use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoId, Did, Link, OptionLink, ReducerAction};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::Stream;
@@ -11,7 +14,10 @@ use std::{collections::BTreeSet, ops::Deref, sync::Arc};
 #[derive(Debug, Clone)]
 pub enum Action {
 	/// Push core action.
-	CoreActionPush { co: CoId, action: ReducerAction<Ipld> },
+	CoreActionPush {
+		co: CoId,
+		action: ReducerAction<Ipld>,
+	},
 
 	/// Core action has been succesfully processed.
 	CoreAction {
@@ -22,22 +28,47 @@ pub enum Action {
 	},
 
 	/// Core action has been failed.
-	CoreActionFailure { co: CoId, context: ReducerChangeContext, action: ReducerAction<Ipld>, err: ActionError },
+	CoreActionFailure {
+		co: CoId,
+		context: ReducerChangeContext,
+		action: ReducerAction<Ipld>,
+		err: ActionError,
+	},
 
 	/// Generic Error.
-	Error { err: ActionError },
+	Error {
+		err: ActionError,
+	},
 
 	/// Send invite request.
-	Invite { co: CoId, from: Did, to: Did },
+	Invite {
+		co: CoId,
+		from: Did,
+		to: Did,
+	},
 
 	/// Invite request has been sent to a peer.
-	InviteSent { co: CoId, participant: Did, peer: PeerId },
+	InviteSent {
+		co: CoId,
+		participant: Did,
+		peer: PeerId,
+	},
 
 	/// Join request has been sent to a peer.
-	JoinSent { co: CoId, heads: BTreeSet<Cid>, participant: Did, peer: PeerId },
+	JoinSent {
+		co: CoId,
+		heads: BTreeSet<Cid>,
+		participant: Did,
+		peer: PeerId,
+	},
 
 	/// Join completed.
-	Joined { co: CoId, participant: Did, success: bool, peer: Option<PeerId> },
+	Joined {
+		co: CoId,
+		participant: Did,
+		success: bool,
+		peer: Option<PeerId>,
+	},
 
 	/// Send Key Request to co (participants) or specified peer.
 	// KeyRequest { co: CoId, key: Option<String>, peer: Option<PeerId> },
@@ -45,8 +76,34 @@ pub enum Action {
 	/// Network has been started.
 	NetworkStarted,
 
+	/// Send a DIDComm message.
+	DidCommSend {
+		/// The message id for reference.
+		message_id: String,
+		/// Peer to send the message to.
+		peer: PeerId,
+		/// The message.
+		message: EncodedMessage,
+	},
+	DidCommSent {
+		message_id: String,
+		peer: PeerId,
+		result: Result<(), ActionError>,
+	},
+
 	/// Received a DIDComm message.
-	DidCommReceive { peer: PeerId, message: Message },
+	DidCommReceive {
+		peer: PeerId,
+		message: Message,
+	},
+
+	/// Received a HeadsMessage.
+	HeadsMessageReceived {
+		from: Option<Did>,
+		peer: PeerId,
+		message_id: String,
+		message: HeadsMessage,
+	},
 }
 impl Action {
 	pub async fn core_action<S>(

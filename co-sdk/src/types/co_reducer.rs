@@ -111,7 +111,7 @@ impl CoReducer {
 	/// Join heads.
 	/// Returns true if state has changed.
 	#[tracing::instrument(err, ret, fields(co = self.id().as_str()), skip(self))]
-	pub async fn join(&self, heads: BTreeSet<Cid>) -> Result<bool, anyhow::Error> {
+	pub async fn join(&self, heads: &BTreeSet<Cid>) -> Result<bool, anyhow::Error> {
 		Ok(self.reducer.write().await.join(&heads, self.runtime.runtime()).await?)
 	}
 

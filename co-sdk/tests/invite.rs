@@ -1,11 +1,12 @@
 use co_core_co::CoAction;
 use co_core_membership::{MembershipState, MembershipsAction};
 use co_sdk::{
-	Action, CoId, CreateCo, Did, Identity, Observable, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	update_co, Action, CoId, CreateCo, Did, Identity, Observable, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
+use co_storage::Algorithm;
 use futures::{join, StreamExt};
 use helper::instance::Instance;
-use std::{collections::BTreeSet, future::ready};
+use std::{collections::BTreeSet, future::ready, time::Duration};
 
 pub mod helper;
 
@@ -24,7 +25,7 @@ async fn test_invite() {
 	peer2.application.create_network(false).await.unwrap();
 
 	// networks
-	let _network1 = peer1.application.network().unwrap();
+	let network1 = peer1.application.network().unwrap();
 	let network2 = peer2.application.network().unwrap();
 
 	// // connect
@@ -125,8 +126,13 @@ async fn test_invite() {
 		(MembershipState::Active, CoId::from("shared"), identity2.identity().to_owned())
 	);
 
-	// peer2: read state
+	// peer2: force sync (needed because of the paricipant state update)
 	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
+	update_co(peer2.application.actions(), &peer2_shared_co, &identity2, network1.peer_id(), Duration::from_secs(10))
+		.await
+		.unwrap();
+
+	// peer2: read state
 	assert_eq!(peer2_shared_co.reducer_state().await, shared_co.reducer_state().await);
 	let co = shared_co.co().await.unwrap();
 	let peer2_co = peer2_shared_co.co().await.unwrap();

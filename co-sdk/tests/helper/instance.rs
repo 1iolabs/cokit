@@ -12,6 +12,7 @@ impl Instance {
 			//.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
 			//.with_open_telemetry("http://localhost:4317")
 			.with_stderr_logging()
+			.with_env_filter(None)
 			.init()
 			.ok();
 

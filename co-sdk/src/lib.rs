@@ -51,6 +51,7 @@ pub use library::{
 	node_stream::NodeStream,
 	shared_co_join::{SharedCoJoin, SharedCoJoinError},
 	task_spawner::TaskSpawner,
+	update_co::update_co,
 };
 pub use pin::pin::PinAPI;
 pub use reactive::{action::Action, epic::Epic, observable::Observable};

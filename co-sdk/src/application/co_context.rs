@@ -39,6 +39,7 @@ pub struct CoContext {
 }
 impl CoContext {
 	/// Get instance of Local CoReducer.
+	#[tracing::instrument(skip(self), fields(application = self.inner.settings.identifier))]
 	pub async fn local_co_reducer(&self) -> Result<CoReducer, anyhow::Error> {
 		self.inner.local_co_reducer().await
 	}
@@ -115,9 +116,15 @@ impl CoContext {
 	pub fn tasks(&self) -> TaskSpawner {
 		self.inner.tasks.clone()
 	}
+
+	/// Applciation identifier.
+	pub fn identifier(&self) -> &str {
+		&self.inner.settings.identifier
+	}
 }
 #[async_trait]
 impl CoReducerFactory for CoContext {
+	#[tracing::instrument(skip(self), fields(application = self.inner.settings.identifier))]
 	async fn co_reducer(&self, co: &CoId) -> Result<Option<CoReducer>, anyhow::Error> {
 		self.inner.co_reducer(co).await
 	}
@@ -159,6 +166,13 @@ impl bitswap::StorageResolver<CoStorage> for CoContext {
 
 		// use the root storage (unencrypted)
 		Ok(self.inner.storage())
+	}
+}
+impl Debug for CoContext {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("CoContext")
+			.field("application", &self.inner.settings.identifier)
+			.finish()
 	}
 }
 

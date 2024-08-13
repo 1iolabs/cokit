@@ -85,7 +85,12 @@ impl DidCommHeader {
 	pub fn new(message_type: impl Into<String>) -> Self {
 		Self {
 			id: uuid::Uuid::new_v4().to_string(),
-			created_time: Some(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()),
+			created_time: Some(
+				SystemTime::now()
+					.duration_since(UNIX_EPOCH)
+					.expect("valid system time")
+					.as_secs(),
+			),
 			message_type: message_type.into(),
 			..Default::default()
 		}

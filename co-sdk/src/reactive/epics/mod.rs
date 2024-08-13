@@ -7,6 +7,8 @@ use crate::{Action, Epic};
 mod core_action_push;
 mod did_subscribe;
 mod didcomm_receive;
+mod didcomm_send;
+mod heads_message;
 mod invite_receive;
 mod invite_send;
 mod join_receive;
@@ -30,4 +32,8 @@ pub fn epic() -> impl Epic<Action, State, Context> + Send + 'static {
 		.with(joined::joined)
 		.with(key_request_receive::key_request_receive)
 		.with(key_request_send::key_request_send)
+		.with(heads_message::heads_message_receive)
+		.with(heads_message::heads_message_heads)
+		.with(heads_message::heads_message_heads_request)
+		.with(didcomm_send::didcomm_send)
 }

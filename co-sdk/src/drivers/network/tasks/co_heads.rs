@@ -9,8 +9,8 @@ use std::collections::BTreeSet;
 pub enum CoHeadsRequest {
 	Subscribe { network: NetworkCoHeads, co: CoId },
 	Unsubscribe { network: NetworkCoHeads, co: CoId },
-	Heads { co: CoId, heads: BTreeSet<Cid>, peers: BTreeSet<PeerId>, identity: PrivateIdentityBox },
 	PublishHeads { network: NetworkCoHeads, co: CoId, heads: BTreeSet<Cid> },
+	Heads { co: CoId, heads: BTreeSet<Cid>, peers: BTreeSet<PeerId>, identity: PrivateIdentityBox },
 }
 
 pub struct CoHeadsNetworkTask {
@@ -47,16 +47,6 @@ where
 					tracing::warn!(?co, ?err, "co-unsubscribe-failed");
 				},
 			},
-			Some(CoHeadsRequest::Heads { co, heads, peers, identity }) => {
-				match behaviour.heads(swarm, &identity, &co, &heads, peers) {
-					Ok(_) => {
-						tracing::debug!(?co, "co-request-heads");
-					},
-					Err(err) => {
-						tracing::warn!(?co, ?err, "co-request-heads-failed");
-					},
-				}
-			},
 			Some(CoHeadsRequest::PublishHeads { network, co, heads }) => {
 				match behaviour.publish(swarm, &network, &co, &heads) {
 					Ok(_) => {
@@ -64,6 +54,16 @@ where
 					},
 					Err(err) => {
 						tracing::warn!(?co, ?err, "co-publish-heads-failed");
+					},
+				}
+			},
+			Some(CoHeadsRequest::Heads { co, heads, peers, identity }) => {
+				match behaviour.heads(swarm, &identity, &co, &heads, peers) {
+					Ok(_) => {
+						tracing::debug!(?co, "co-heads");
+					},
+					Err(err) => {
+						tracing::warn!(?co, ?err, "co-heads-failed");
 					},
 				}
 			},

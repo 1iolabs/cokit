@@ -584,7 +584,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		},
 	};
 
-	// // log
+	// log
 	// match &event {
 	// 	SwarmEvent::NewListenAddr { address, .. } => {
 	// 		tracing::info!(?address, "network-listening");
@@ -605,6 +605,12 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 
 	// tasks
 	if let Some(event) = network_event {
+		// log
+		if is_log(&event) {
+			tracing::trace!(?event, "network-event");
+		}
+
+		// tasks
 		let mut result_event = Some(event);
 		let mut task_index = 0;
 		while task_index < runtime.pending_tasks.len() {
@@ -631,5 +637,12 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		if let Some(event) = result_event {
 			runtime.events.next(Arc::new(event));
 		}
+	}
+}
+
+fn is_log(event: &SwarmEvent<NetworkEvent>) -> bool {
+	match event {
+		SwarmEvent::Behaviour(NetworkEvent::Ping(_)) => false,
+		_ => true,
 	}
 }

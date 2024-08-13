@@ -19,7 +19,7 @@ use std::{fmt::Debug, marker::PhantomData};
 /// [application] [commit timestamp] [purpose]", e.g., "example.com 2019-12-25 16:18:03 session tokens v1
 pub const BLOCK_KEY_DERIVATION: &str = "co 2023-10-24T10:25:23Z block key derivation v1";
 pub const BLOCK_DERIVATION: &str = "co 2023-10-26T14:31:38Z block derivation v1";
-pub const BLOCK_MULTICODEC: u64 = 0x301000;
+pub const BLOCK_MULTICODEC: u64 = KnownMultiCodec::CoEncryptedBlock as u64;
 
 /// Nonce.
 pub type Nonce = Vec<u8>;

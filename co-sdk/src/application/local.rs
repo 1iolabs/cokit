@@ -209,7 +209,7 @@ where
 				}
 
 				// heads
-				match watch_reducer.join(local.heads.clone()).await {
+				match watch_reducer.join(&local.heads).await {
 					Ok(change) => {
 						if change {
 							tracing::trace!("local-watch-join");

@@ -225,6 +225,10 @@ where
 {
 	type StoreParams = S::StoreParams;
 
+	/// Get block.
+	///
+	/// This decrypts transparently. If an encrypted CID is specified the unencrypted block will be returned.
+	/// If an unencrypted CID is specified that could not be mapped it will be forwarded to next layer.
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		let mapped_cid: Option<Cow<'_, Cid>> = if cid.codec() == BLOCK_MULTICODEC {
 			Some(cid.into())

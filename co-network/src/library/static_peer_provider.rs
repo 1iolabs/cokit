@@ -3,6 +3,7 @@ use futures::{future::ready, prelude::Stream, stream};
 use libp2p::PeerId;
 use std::collections::BTreeSet;
 
+#[derive(Debug, Clone)]
 pub struct StaticPeerProvider {
 	peers: BTreeSet<PeerId>,
 }

@@ -48,7 +48,7 @@ impl CoToken {
 		Ok(serde_ipld_dagcbor::from_slice(bytes)?)
 	}
 
-	pub fn to_bitswp_token(&self) -> Result<Token, anyhow::Error> {
+	pub fn to_bitswap_token(&self) -> Result<Token, anyhow::Error> {
 		Ok(Token(KnownMultiCodec::DagCbor.into(), self.to_bytes()?))
 	}
 

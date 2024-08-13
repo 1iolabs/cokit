@@ -16,7 +16,7 @@ use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
-use co_network::bitswap::NetworkBlockStorage;
+use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
 use co_primitives::{tags, CoId};
 use co_storage::{Algorithm, EncryptedBlockStorage, EncryptedBlockStorageMapping, Secret};
 use serde::{Deserialize, Serialize};
@@ -62,6 +62,56 @@ impl SharedCoBuilder {
 		Self { initialize, ..self }
 	}
 
+	/// Read (latest) secret from parent CO.
+	pub async fn secret(&self) -> anyhow::Result<Option<co_primitives::Secret>> {
+		if let Some(key_reference) = &self.membership.key {
+			let key_store: co_core_keystore::KeyStore = self.parent.state(&self.keystore_core_name).await?;
+			let (_, key) = find(&self.parent.storage(), &key_store.keys, |(k, _)| k == key_reference)
+				.await?
+				.ok_or(anyhow::anyhow!("Shared key not found: {}", key_reference))?;
+			let secret = match key.secret {
+				co_core_keystore::Secret::SharedKey(sec) => Ok(sec),
+				_ => Err(anyhow!("Invalid secret")),
+			}?;
+			Ok(Some(secret))
+		} else {
+			Ok(None)
+		}
+	}
+
+	pub fn build_network_storage<P>(
+		&self,
+		peer_provider: P,
+		network: CoNetworkTaskSpawner,
+		secret: Option<&co_primitives::Secret>,
+		storage: CoStorage,
+	) -> anyhow::Result<CoStorage>
+	where
+		P: PeerProvider + Send + Sync + Clone + 'static,
+	{
+		let local_peer_id = network.local_peer_id();
+		let mut network_storage = NetworkBlockStorage::new(storage, network, peer_provider, self.network_block_timeout);
+		if let Some(shared_secret) = secret {
+			let token = CoToken::new(shared_secret, CoTokenParameters(local_peer_id, self.membership.id.clone()))?
+				.to_bitswap_token()?;
+			network_storage.set_tokens(vec![token]);
+		}
+		Ok(CoStorage::new(network_storage))
+	}
+
+	pub async fn build_encrypted_storage(
+		&self,
+		secret: &co_primitives::Secret,
+		storage: CoStorage,
+	) -> anyhow::Result<EncryptedBlockStorage<CoStorage>> {
+		let mut result_storage =
+			EncryptedBlockStorage::new(storage, Secret::new(secret.divulge().to_vec()), Default::default());
+		if let Some(mapping) = &self.membership.encryption_mapping {
+			result_storage.load_mapping(mapping).await?;
+		}
+		Ok(result_storage)
+	}
+
 	pub async fn build<I>(
 		self,
 		tasks: TaskSpawner,
@@ -73,32 +123,8 @@ impl SharedCoBuilder {
 	where
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
 	{
-		// storage
-		let (storage, encrypted_storage, secret): (
-			CoStorage,
-			Option<EncryptedBlockStorage<CoStorage>>,
-			Option<co_primitives::Secret>,
-		) = match &self.membership.key {
-			// encrypted
-			Some(key_reference) => {
-				let key_store: co_core_keystore::KeyStore = self.parent.state(&self.keystore_core_name).await?;
-				let (_, key) = find(&self.parent.storage(), &key_store.keys, |(k, _)| k == key_reference)
-					.await?
-					.ok_or(anyhow::anyhow!("Shared key not found: {}", key_reference))?;
-				let secret = match key.secret {
-					co_core_keystore::Secret::SharedKey(sec) => Ok(sec),
-					_ => Err(anyhow!("Invalid secret")),
-				}?;
-				let mut result_storage =
-					EncryptedBlockStorage::new(storage, Secret::new(secret.divulge().to_vec()), Default::default());
-				if let Some(mapping) = &self.membership.encryption_mapping {
-					result_storage.load_mapping(mapping).await?;
-				}
-				(CoStorage::new(result_storage.clone()), Some(result_storage), Some(secret))
-			},
-			// plain
-			None => (storage, None, None),
-		};
+		// secret
+		let secret = self.secret().await?;
 
 		// network
 		let (storage, co_state) = if let Some(network) = &self.network {
@@ -107,26 +133,26 @@ impl SharedCoBuilder {
 				network.clone(),
 				create_identity_resolver(),
 				identity.clone(),
-				storage.clone(),
 				self.membership.id.clone(),
 				co_state.clone(),
 			);
-			let mut network_storage =
-				NetworkBlockStorage::new(storage.clone(), network.clone(), peer_provider, self.network_block_timeout);
-			if let Some(encrypted) = &encrypted_storage {
-				network_storage.set_mapping(encrypted.content_mapping());
-			}
-			if let Some(shared_secret) = &secret {
-				let token = CoToken::new(
-					shared_secret,
-					CoTokenParameters(network.local_peer_id(), self.membership.id.clone()),
-				)?
-				.to_bitswp_token()?;
-				network_storage.set_tokens(vec![token]);
-			}
-			(CoStorage::new(network_storage), Some(co_state))
+			(
+				self.build_network_storage(peer_provider, network.clone(), secret.as_ref(), storage.clone())?,
+				Some(co_state),
+			)
 		} else {
 			(storage, None)
+		};
+
+		// encryption
+		let (storage, encrypted_storage) = match &secret {
+			// encrypted
+			Some(secret) => {
+				let encrypted_storage = self.build_encrypted_storage(secret, storage).await?;
+				(CoStorage::new(encrypted_storage.clone()), Some(encrypted_storage))
+			},
+			// plain
+			None => (storage, None),
 		};
 
 		// log
@@ -151,7 +177,6 @@ impl SharedCoBuilder {
 				network.clone(),
 				create_identity_resolver(),
 				identity.clone(),
-				storage.clone(),
 				self.membership.id.clone(),
 				co_state.clone().unwrap(),
 			);
@@ -237,7 +262,7 @@ impl SharedContext {
 				co.insert_snapshot(membership.state, membership.heads.clone()).await;
 
 				// load snapshot
-				co.join(membership.heads).await?;
+				co.join(&membership.heads).await?;
 			}
 		}
 		Ok(())

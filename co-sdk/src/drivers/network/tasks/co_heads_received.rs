@@ -42,7 +42,7 @@ where
 						let response = *response;
 						self.spawner.spawn(async move {
 							match co_factory.co_reducer(&co_id).await {
-								Ok(Some(co)) => match co.join(heads).await {
+								Ok(Some(co)) => match co.join(&heads).await {
 									Ok(update) => {
 										tracing::debug!(co = ?co_id, update, "co-heads");
 

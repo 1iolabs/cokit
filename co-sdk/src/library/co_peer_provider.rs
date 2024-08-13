@@ -11,8 +11,8 @@ use futures::{Stream, TryStreamExt};
 use libp2p::PeerId;
 use std::collections::BTreeSet;
 
+#[derive(Clone)]
 pub struct CoPeerProvider<I> {
-	storage: CoStorage,
 	id: CoId,
 	state: CoState,
 	identity_resolver: IdentityResolverBox,
@@ -27,11 +27,10 @@ where
 		spawner: CoNetworkTaskSpawner,
 		identity_resolver: IdentityResolverBox,
 		identity: I,
-		storage: CoStorage,
 		id: CoId,
 		state: CoState,
 	) -> Self {
-		Self { storage, id, state, spawner, identity, identity_resolver }
+		Self { id, state, spawner, identity, identity_resolver }
 	}
 }
 #[async_trait]
@@ -44,28 +43,30 @@ where
 		let spawner = self.spawner.clone();
 		let identity_resolver = self.identity_resolver.clone();
 		let identity = self.identity.clone();
-		let storage = self.storage.clone();
 		let state = self.state.clone();
 		let id = self.id.clone();
 
 		// stream
 		async_stream::stream! {
-			let discovery = match networks(&identity_resolver, &identity, &storage, &id, state.read().await).await {
-				Ok(value) => value,
-				Err(_) => return,
-			};
-			let (task, peers) = DiscoveryConnectNetworkTask::new(discovery);
+			let (storage, co_state) = state.read().await;
+			if let Some(storage) = storage {
+				let discovery = match networks(&identity_resolver, &identity, &storage, &id, co_state).await {
+					Ok(value) => value,
+					Err(_) => return,
+				};
+				let (task, peers) = DiscoveryConnectNetworkTask::new(discovery);
 
-			// spawn
-			if spawner.spawn(task).is_err() {
-				return
-			}
+				// spawn
+				if spawner.spawn(task).is_err() {
+					return
+				}
 
-			// yield
-			for await peer in peers {
-				match peer {
-					Ok(value) => yield value,
-					Err(_) => return
+				// yield
+				for await peer in peers {
+					match peer {
+						Ok(value) => yield value,
+						Err(_) => return
+					}
 				}
 			}
 		}

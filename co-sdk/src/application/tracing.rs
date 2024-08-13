@@ -3,22 +3,23 @@ use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{runtime, trace as sdktrace, Resource};
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 use std::path::PathBuf;
-use tracing::{level_filters::LevelFilter, subscriber::set_global_default, Level};
+use tracing::{subscriber::set_global_default, Level};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
-use tracing_subscriber::{fmt::writer::MakeWriterExt, layer::SubscriberExt, Registry};
+use tracing_subscriber::{fmt::writer::MakeWriterExt, layer::SubscriberExt, EnvFilter, Registry};
 
 pub struct TracingBuilder {
 	identifier: String,
 	base_path: Option<PathBuf>,
 	bunyan: Option<PathBuf>,
 	stderr: bool,
+	env_filter: Option<Option<String>>,
 	/// Trace to open telemetry endpoint.
 	open_telemetry: Option<String>,
 }
 impl TracingBuilder {
 	pub fn new(identifier: String, base_path: Option<PathBuf>) -> Self {
-		Self { identifier, base_path, bunyan: None, stderr: false, open_telemetry: None }
+		Self { identifier, base_path, bunyan: None, stderr: false, open_telemetry: None, env_filter: None }
 	}
 
 	/// Enable bunyan logging to log_path.
@@ -45,7 +46,26 @@ impl TracingBuilder {
 		Self { stderr: true, ..self }
 	}
 
+	pub fn with_env_filter(self, env: Option<String>) -> Self {
+		Self { env_filter: Some(env), ..self }
+	}
+
 	pub fn init(self) -> Result<(), anyhow::Error> {
+		// env_filter
+		let env_filter = self.env_filter.map(|env| match env {
+			Some(env) => EnvFilter::from_env(env),
+			None => EnvFilter::from_default_env(),
+		});
+		let env_filter = match env_filter {
+			Some(env_filter) => Some(
+				env_filter
+					.add_directive("co_sdk=trace".parse()?)
+					.add_directive("co_network=trace".parse()?)
+					.add_directive("info".parse()?),
+			),
+			None => None,
+		};
+
 		// open telemetry
 		let open_telemetry = if let Some(endpoint) = &self.open_telemetry {
 			Some(open_telemetry_endpoint(self.identifier.clone(), endpoint.clone())?)
@@ -73,7 +93,7 @@ impl TracingBuilder {
 		if open_telemetry.is_some() || bunyan.is_some() || stderr.is_some() {
 			let subscriber = Registry::default()
 				.with(open_telemetry)
-				.with(LevelFilter::TRACE)
+				.with(env_filter)
 				.with(JsonStorageLayer)
 				.with(bunyan)
 				.with(stderr);

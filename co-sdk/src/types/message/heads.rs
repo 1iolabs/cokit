@@ -6,6 +6,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum HeadsMessage {
 	/// Heads notifictaion.
 	#[serde(rename = "h")]
@@ -24,9 +25,14 @@ pub enum HeadsMessage {
 	Error { code: HeadsErrorCode, message: String },
 }
 impl HeadsMessage {
+	/// Message type
+	pub fn message_type() -> String {
+		format!("co-heads/1.0.0")
+	}
+
 	/// DIDComm message header.
 	pub fn create_header() -> DidCommHeader {
-		let mut header = DidCommHeader::new(format!("co-heads/1.0.0"));
+		let mut header = DidCommHeader::new(Self::message_type());
 		header.expires_time = header.created_time.map(|t| t + 120);
 		header
 	}
@@ -37,5 +43,6 @@ impl HeadsMessage {
 #[repr(u16)]
 pub enum HeadsErrorCode {
 	Forbidden = 403,
+	InternalServerError = 500,
 	ServiceUnavailable = 503,
 }
