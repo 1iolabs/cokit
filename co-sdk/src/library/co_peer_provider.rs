@@ -3,13 +3,14 @@ use crate::{
 	drivers::network::{tasks::discovery_connect::DiscoveryConnectNetworkTask, CoNetworkTaskSpawner},
 	state, CoStorage,
 };
+use anyhow::anyhow;
 use async_trait::async_trait;
 use co_identity::{IdentityResolverBox, PrivateIdentity};
 use co_network::{discovery, NetworkTaskSpawner, PeerProvider};
 use co_primitives::{CoId, OptionLink};
-use futures::{Stream, TryStreamExt};
+use futures::{Stream, StreamExt, TryStreamExt};
 use libp2p::PeerId;
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, future::ready};
 
 #[derive(Clone)]
 pub struct CoPeerProvider<I> {
@@ -39,6 +40,21 @@ where
 	I: PrivateIdentity + Clone + Send + Sync + 'static,
 {
 	fn peers(&self) -> impl Stream<Item = BTreeSet<PeerId>> + Send + 'static {
+		self.try_peers().filter_map({
+			let id = self.id.clone();
+			move |result| {
+				ready(match result {
+					Ok(p) => Some(p),
+					Err(err) => {
+						tracing::warn!(?err, co = ?id, "co-peer-discovery-error");
+						None
+					},
+				})
+			}
+		})
+	}
+
+	fn try_peers(&self) -> impl Stream<Item = Result<BTreeSet<PeerId>, anyhow::Error>> + Send + 'static {
 		// task
 		let spawner = self.spawner.clone();
 		let identity_resolver = self.identity_resolver.clone();
@@ -48,25 +64,46 @@ where
 
 		// stream
 		async_stream::stream! {
+			// storage/state
 			let (storage, co_state) = state.read().await;
-			if let Some(storage) = storage {
-				let discovery = match networks(&identity_resolver, &identity, &storage, &id, co_state).await {
-					Ok(value) => value,
-					Err(_) => return,
-				};
-				let (task, peers) = DiscoveryConnectNetworkTask::new(discovery);
+			let storage = match storage {
+				Some(s) => s,
+				None => {
+					yield Err(anyhow!("No storage"));
+					return;
+				},
+			};
 
-				// spawn
-				if spawner.spawn(task).is_err() {
-					return
-				}
-
-				// yield
-				for await peer in peers {
-					match peer {
-						Ok(value) => yield value,
-						Err(_) => return
+			// discovery
+			let discovery = match networks(&identity_resolver, &identity, &storage, &id, co_state).await {
+				Ok(value) => {
+					if value.is_empty() {
+						yield Err(anyhow!("No networks"));
+						return;
 					}
+					value
+				},
+				Err(err) => {
+					yield Err(err);
+					return;
+				},
+			};
+			let (task, peers) = DiscoveryConnectNetworkTask::new(discovery);
+
+			// spawn
+			match spawner.spawn(task) {
+				Ok(_) => {},
+				Err(err) => {
+					yield Err(err.into());
+					return;
+				},
+			}
+
+			// yield
+			for await peer in peers {
+				match peer {
+					Ok(value) => yield Ok(value),
+					Err(err) => yield Err(err.into()),
 				}
 			}
 		}

@@ -106,18 +106,10 @@ impl DidCommHeader {
 		F: PrivateIdentity + Send + Sync + 'static,
 		T: Identity + Send + Sync + 'static,
 	{
-		let from_didcomm = from
-			.didcomm_private()
-			.ok_or(anyhow::anyhow!("unsupported identity: from: no private didcomm context"))?;
-		let to_didcomm = to
-			.didcomm_public()
-			.ok_or(anyhow::anyhow!("unsupported identity: to: no public didcomm context"))?;
-
 		let mut header = DidCommHeader::new(message_type.into());
 		header.from = Some(from.identity().to_owned());
 		header.to = [to.identity().to_owned()].into_iter().collect();
-
-		Ok((from_didcomm, to_didcomm, header))
+		Ok((from.try_didcomm_private()?, to.try_didcomm_public()?, header))
 	}
 
 	/// Create new DidCommHeader for a message with sender `from` and unknown recipent(s).
@@ -125,13 +117,8 @@ impl DidCommHeader {
 	where
 		F: PrivateIdentity + Send + Sync + 'static,
 	{
-		let from_didcomm = from
-			.didcomm_private()
-			.ok_or(anyhow::anyhow!("unsupported identity: from: no private didcomm context"))?;
-
 		let mut header = DidCommHeader::new(message_type.into());
 		header.from = Some(from.identity().to_owned());
-
-		Ok((from_didcomm, header))
+		Ok((from.try_didcomm_private()?, header))
 	}
 }

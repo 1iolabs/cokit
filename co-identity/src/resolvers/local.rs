@@ -11,6 +11,12 @@ use std::collections::BTreeSet;
 pub struct LocalIdentity {
 	did: String,
 }
+impl LocalIdentity {
+	/// Device local identity. Owner of the local CO.
+	pub fn device() -> Self {
+		LocalIdentity { did: "did:local:device".to_owned() }
+	}
+}
 impl Identity for LocalIdentity {
 	fn identity(&self) -> &str {
 		self.did.as_str()

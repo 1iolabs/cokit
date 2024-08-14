@@ -169,6 +169,9 @@ pub enum DiscoveryEvent {
 ///
 /// Peer connections will be managed by the swarm (and its timeout).
 pub struct DiscoveryState<R> {
+	/// Our PeerId
+	local_peer_id: PeerId,
+
 	/// Next discovery request id.
 	next_id: u64,
 
@@ -200,8 +203,9 @@ impl<R> DiscoveryState<R>
 where
 	R: IdentityResolver + Clone + Send + Sync + 'static,
 {
-	pub fn new(resolver: R, timeout: Duration, max_peers: Option<u16>) -> Self {
+	pub fn new(resolver: R, local_peer_id: PeerId, timeout: Duration, max_peers: Option<u16>) -> Self {
 		Self {
+			local_peer_id,
 			next_id: 1,
 			requests: Default::default(),
 			timeout,
@@ -503,6 +507,11 @@ where
 				}
 			},
 			gossipsub::Event::Subscribed { peer_id, topic } => {
+				// filter out self subscribe
+				if peer_id == &self.local_peer_id {
+					return;
+				}
+
 				// DidDiscovery: move pending discoveries to events when its topic has subscribed
 				loop {
 					if let Some((index, _)) = self
@@ -532,6 +541,11 @@ where
 				}
 			},
 			gossipsub::Event::Unsubscribed { peer_id, topic } => {
+				// filter out self subscribe
+				if peer_id == &self.local_peer_id {
+					return;
+				}
+
 				// Topic: dispatch disconnected events for mesh unsubscribed peers
 				for request_id in self
 					.all_discovery_topics()
@@ -1105,15 +1119,17 @@ mod tests {
 		// peers
 		let mut peer1 = Peer::new(vec![]);
 		let mut peer2 = Peer::new(vec![]);
+		let peer1_id = peer1.peer_id();
+		let peer2_id = peer2.peer_id();
 
 		// states
 		let mut discovery1 = Layer::new(
 			peer1.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(10), None),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), peer1_id, Duration::from_secs(10), None),
 		);
 		let mut discovery2 = Layer::new(
 			peer2.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(10), None),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), peer2_id, Duration::from_secs(10), None),
 		);
 
 		// peer2: connect
@@ -1174,15 +1190,17 @@ mod tests {
 		let mut peer1 = Peer::new(vec![did1.clone().boxed()]);
 		let mut peer2 = Peer::new(vec![did2.clone().boxed()]);
 		peer2.add_address(&peer1);
+		let peer1_id = peer1.peer_id();
+		let peer2_id = peer2.peer_id();
 
 		// states
 		let mut discovery1 = Layer::new(
 			peer1.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(10), None),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), peer1_id, Duration::from_secs(10), None),
 		);
 		let mut discovery2 = Layer::new(
 			peer2.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(10), None),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), peer2_id, Duration::from_secs(10), None),
 		);
 
 		// peer1: subscribe

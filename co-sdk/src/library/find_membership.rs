@@ -4,16 +4,16 @@ use co_primitives::CoId;
 
 /// Find the first active [`Membership`] entry in `reducer` for `co`.
 pub async fn find_membership(reducer: &CoReducer, co: impl AsRef<CoId>) -> Result<Option<Membership>, CoReducerError> {
-	Ok(memberships_iter(reducer, co).await?.next())
+	Ok(memberships(reducer, co).await?.next())
 }
 
 /// Find the active [`Membership`] entries in `reducer` for `co`.
 pub async fn find_memberships(reducer: &CoReducer, co: impl AsRef<CoId>) -> Result<Vec<Membership>, CoReducerError> {
-	Ok(memberships_iter(reducer, co).await?.collect())
+	Ok(memberships(reducer, co).await?.collect())
 }
 
 /// Find the active [`Membership`] entries in `reducer` for `co`.
-async fn memberships_iter<'a>(
+pub async fn memberships<'a>(
 	reducer: &CoReducer,
 	co: impl AsRef<CoId> + 'a,
 ) -> Result<impl Iterator<Item = Membership> + 'a, CoReducerError> {

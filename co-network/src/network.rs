@@ -102,7 +102,7 @@ impl Libp2pNetwork {
 
 		// context
 		let context = Context {
-			discovery: discovery::DiscoveryState::new(resolver.clone(), Duration::from_secs(30), None),
+			discovery: discovery::DiscoveryState::new(resolver.clone(), local_peer_id, Duration::from_secs(30), None),
 			heads: heads::HeadsState::new(),
 		};
 

@@ -29,9 +29,7 @@ impl EncodedMessage {
 		T: Serialize,
 		P: PrivateIdentity + Send + Sync + 'static,
 	{
-		let from_didcomm = from
-			.didcomm_private()
-			.ok_or(anyhow::anyhow!("unsupported identity: from: no private didcomm context"))?;
+		let from_didcomm = from.try_didcomm_private()?;
 		header.from = Some(from.identity().to_owned());
 		let message_id = header.id.clone();
 		let body_json = to_json_string(body)?;
@@ -53,12 +51,8 @@ impl EncodedMessage {
 		P: PrivateIdentity + Send + Sync + 'static,
 		I: Identity + Send + Sync + 'static,
 	{
-		let from_didcomm = from
-			.didcomm_private()
-			.ok_or(anyhow::anyhow!("unsupported identity: from: no private didcomm context"))?;
-		let to_didcomm = to
-			.didcomm_public()
-			.ok_or(anyhow::anyhow!("unsupported identity: to: no public didcomm context"))?;
+		let from_didcomm = from.try_didcomm_private()?;
+		let to_didcomm = to.try_didcomm_public()?;
 		header.from = Some(from.identity().to_owned());
 		header.to = [to.identity().to_owned()].into_iter().collect();
 		let message_id = header.id.clone();

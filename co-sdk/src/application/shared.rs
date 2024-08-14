@@ -155,6 +155,11 @@ impl SharedCoBuilder {
 			None => (storage, None),
 		};
 
+		// explicitly update co state so the network has it available when initialize
+		if let Some(co_state) = &co_state {
+			co_state.write(&storage, self.membership.state.into(), true).await;
+		}
+
 		// log
 		let log = Log::new(
 			self.membership.id.as_str().as_bytes().to_vec(),

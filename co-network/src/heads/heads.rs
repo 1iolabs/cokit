@@ -15,7 +15,7 @@ use libp2p::{
 use std::{
 	collections::{BTreeMap, BTreeSet, VecDeque},
 	task::{Context, Poll},
-	time::Instant,
+	time::{Duration, Instant},
 };
 
 #[derive(Debug, Clone)]
@@ -313,7 +313,10 @@ impl HeadsState {
 							if !self.pending_requests.contains_key(&request_id) {
 								self.pending_requests.insert(
 									request_id.clone(),
-									PendingRequest { peer: *peer_id, expire: Instant::now() },
+									PendingRequest {
+										peer: *peer_id,
+										expire: Instant::now() + Duration::from_secs(120),
+									},
 								);
 								self.events.push_back(HeadsEvent::GenerateEvent(Event::RequestHeads {
 									request_id,

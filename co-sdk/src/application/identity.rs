@@ -1,4 +1,4 @@
-use crate::{CoContext, DidKeyProvider, CO_CORE_NAME_KEYSTORE};
+use crate::{CoContext, CoReducer, DidKeyProvider, CO_CORE_NAME_KEYSTORE};
 use co_identity::{
 	DidKeyIdentityResolver, IdentityResolver, IdentityResolverBox, JoinIdentityResolver, JoinPrivateIdentityResolver,
 	LocalIdentityResolver, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
@@ -13,10 +13,7 @@ pub fn create_identity_resolver() -> IdentityResolverBox {
 }
 
 /// Create the default private identity resolver.
-pub async fn create_private_identity_resolver(
-	context: &CoContext,
-) -> Result<PrivateIdentityResolverBox, anyhow::Error> {
-	let local = context.local_co_reducer().await?;
+pub async fn create_private_identity_resolver(local: CoReducer) -> Result<PrivateIdentityResolverBox, anyhow::Error> {
 	let mut resolvers: Vec<PrivateIdentityResolverBox> = Vec::new();
 	resolvers.push(PrivateIdentityResolver::boxed(LocalIdentityResolver::default()));
 	resolvers.push(DidKeyProvider::new(local, CO_CORE_NAME_KEYSTORE).boxed());
@@ -30,6 +27,6 @@ pub async fn resolve_private_identity(
 	context: &CoContext,
 	did: &co_primitives::Did,
 ) -> Result<PrivateIdentityBox, anyhow::Error> {
-	let resolver = create_private_identity_resolver(context).await?;
+	let resolver = create_private_identity_resolver(context.local_co_reducer().await?).await?;
 	Ok(resolver.resolve_private(did).await?)
 }

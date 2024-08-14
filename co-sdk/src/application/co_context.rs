@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
 	drivers::network::{token::CoToken, CoNetworkTaskSpawner},
-	library::{find_co_secret::find_co_secret, find_membership::find_membership},
+	library::{find_co_secret::find_co_secret, find_membership::memberships},
 	reactive::context::ReactiveContext,
 	reducer::core_resolver::{
 		dynamic::DynamicCoreResolver,
@@ -21,11 +21,11 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use co_core_membership::Membership;
 use co_identity::{
-	IdentityResolverBox, LocalIdentity, LocalIdentityResolver, PrivateIdentity, PrivateIdentityResolverBox,
+	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 use co_log::EntryBlock;
 use co_network::bitswap;
-use co_primitives::CoId;
+use co_primitives::{CoId, Did};
 use co_storage::BlockStorage;
 use futures::{Stream, TryStreamExt};
 use libp2p::PeerId;
@@ -67,7 +67,7 @@ impl CoContext {
 		} else {
 			let local = self.local_co_reducer().await?;
 			self.inner
-				.create_co_instance(local, co, initialized, self.inner.local_identity.clone())
+				.create_co_instance(local, co, initialized, None)
 				.await?
 				.ok_or(anyhow!("Co not found: {}", co))?
 		};
@@ -92,19 +92,19 @@ impl CoContext {
 	///
 	/// Todo: Identity Permissions?
 	pub async fn identity_resolver(&self) -> Result<IdentityResolverBox, anyhow::Error> {
-		Ok(create_identity_resolver())
+		self.inner.identity_resolver().await
 	}
 
 	/// Access Private Identities.
 	///
 	/// Todo: Identity Permissions?
 	pub async fn private_identity_resolver(&self) -> Result<PrivateIdentityResolverBox, anyhow::Error> {
-		create_private_identity_resolver(&self).await
+		self.inner.private_identity_resolver().await
 	}
 
 	/// Get unsiged local device identity.
 	pub fn local_identity(&self) -> LocalIdentity {
-		LocalIdentityResolver::default().private_identity("did:local:device").unwrap()
+		LocalIdentity::device()
 	}
 
 	/// Network.
@@ -217,6 +217,20 @@ impl CoContextInner {
 		}
 	}
 
+	/// Identities.
+	///
+	/// Todo: Identity Permissions?
+	pub async fn identity_resolver(&self) -> Result<IdentityResolverBox, anyhow::Error> {
+		Ok(create_identity_resolver())
+	}
+
+	/// Access Private Identities.
+	///
+	/// Todo: Identity Permissions?
+	pub async fn private_identity_resolver(&self) -> Result<PrivateIdentityResolverBox, anyhow::Error> {
+		create_private_identity_resolver(self.local_co_reducer().await?).await
+	}
+
 	/// Get the root storage.
 	pub fn storage(&self) -> CoStorage {
 		self.storage.clone()
@@ -303,7 +317,7 @@ impl CoContextInner {
 			Some(self.create_local_co_instance(true).await?)
 		} else {
 			let local = self.local_co_reducer().await?;
-			self.create_co_instance(local, co, true, self.local_identity.clone()).await?
+			self.create_co_instance(local, co, true, None).await?
 		};
 
 		// store
@@ -361,20 +375,30 @@ impl CoContextInner {
 	}
 
 	/// Creates a CoReducer instance a CO which we have a membership for.
-	async fn create_co_instance<I>(
+	async fn create_co_instance(
 		&self,
 		parent: CoReducer,
 		co: &CoId,
 		initialize: bool,
-		identity: I,
-	) -> Result<Option<CoReducer>, anyhow::Error>
-	where
-		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
-	{
-		let membership = match find_membership(&parent, co).await? {
+		identity: Option<Did>,
+	) -> Result<Option<CoReducer>, anyhow::Error> {
+		// find first active membership
+		let membership = memberships(&parent, &co)
+			.await?
+			.filter(move |membership| match &identity {
+				Some(value) => value == &membership.did,
+				None => true,
+			})
+			.next();
+		let membership = match membership {
 			Some(m) => m,
 			None => return Ok(None),
 		};
+
+		// resolve identity
+		let identity = self.private_identity_resolver().await?.resolve_private(&membership.did).await?;
+
+		// instance
 		Ok(Some(
 			self.create_co_instance_membership(parent, membership, identity, None, initialize, true)
 				.await?,

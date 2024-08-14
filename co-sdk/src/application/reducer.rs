@@ -366,7 +366,7 @@ where
 
 	/// Compute state for log heads.
 	/// Returns the resulting state if one.
-	#[instrument(skip(self, runtime), fields(co = ?self.log.id()))]
+	#[instrument(err, skip(self, runtime))]
 	async fn compute_state(
 		&self,
 		runtime: &RuntimePool,
@@ -391,6 +391,7 @@ where
 	/// The computed start position is self.heads.
 	/// The computed end position is self.log.heads.
 	/// Algorithm: We search for the lowest known ancestors of the heads while walking the log backwards.
+	#[instrument(skip(self))]
 	async fn compute_stack(&self) -> Result<(Option<Cid>, VecDeque<EntryBlock<S::StoreParams>>), anyhow::Error> {
 		let heads: BTreeSet<Cid> = self.log.heads().clone();
 		let mut state = self.state;

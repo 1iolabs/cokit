@@ -56,7 +56,7 @@ pub fn joined(
 /// Initialize the joined CO using the already connected peer.
 ///
 /// We fetch at least the co state with networks and participants so we can reconnect later.
-/// Also we resolve the state and heads to the actual CIS as the invite contains the encrypted versions.
+/// Also we resolve the state and heads to the actual CID as the invite contains the encrypted versions.
 #[tracing::instrument(err, skip(context))]
 async fn joined_initialize(context: CoContext, id: CoId, did: Did, peer: PeerId) -> anyhow::Result<()> {
 	let local_co = context.local_co_reducer().await?;
