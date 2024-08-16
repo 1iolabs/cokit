@@ -61,11 +61,13 @@ impl Storage for MemoryStorage {
 	}
 
 	fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError> {
-		tracing::debug!(?cid, "memory-store-get");
-		self.records
+		let result = self
+			.records
 			.get(cid)
 			.map(|r| r.block.clone())
-			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")))
+			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")));
+		tracing::debug!(?cid, return = ?result.as_ref().map(|_| ()), "memory-store-get");
+		result
 	}
 
 	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {
@@ -97,13 +99,15 @@ impl BlockStorage for MemoryBlockStorage {
 	type StoreParams = DefaultParams;
 
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
-		tracing::trace!(?cid, "memory-store-get");
-		self.records
+		let result = self
+			.records
 			.read()
 			.await
 			.get(cid)
 			.map(|r| r.block.clone())
-			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")))
+			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")));
+		tracing::debug!(?cid, return = ?result.as_ref().map(|_| ()), "memory-store-get");
+		result
 	}
 
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {

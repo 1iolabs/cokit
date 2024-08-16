@@ -2,8 +2,8 @@ use super::{co_storage::CoBlockStorageContentMapping, state_observable::StateObs
 use crate::{reducer::core_resolver::dynamic::DynamicCoreResolver, state::core_state, CoStorage, Reducer, Runtime};
 use async_trait::async_trait;
 use co_identity::PrivateIdentity;
-use co_primitives::{CoId, OptionLink, ReducerAction};
-use co_storage::{BlockStorageContentMapping, BlockStorageExt, StorageError};
+use co_primitives::{CoId, KnownMultiCodec, OptionLink, ReducerAction};
+use co_storage::{BlockStorageContentMapping, BlockStorageExt, MappedBlockStorage, StorageError};
 use futures::{stream, StreamExt};
 use libipld::Cid;
 use serde::{de::DeserializeOwned, Serialize};
@@ -62,6 +62,20 @@ impl CoReducer {
 		self.storage.clone()
 	}
 
+	/// Get mapped storage instance for this CO.
+	pub fn mapped_storage(&self) -> CoStorage {
+		let storage = self.storage();
+		if let Some(mapping) = self.context.content_mapping() {
+			CoStorage::new(MappedBlockStorage::new(
+				storage,
+				mapping,
+				[KnownMultiCodec::CoEncryptedBlock.into()].into_iter().collect(),
+			))
+		} else {
+			storage
+		}
+	}
+
 	/// Get reducer observable.
 	#[deprecated]
 	pub async fn observable(&self) -> StateObservable {
@@ -79,8 +93,8 @@ impl CoReducer {
 	/// - `identity` - The identity to sign the operation with.
 	/// - `core` - The target core name. The key of [`co_core_co::Co::cores`].
 	/// - `item` - The core action payload.
-	#[tracing::instrument(err, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, item, identity))]
-	pub async fn push<T, I>(&self, identity: &I, core: &str, item: &T) -> Result<(), anyhow::Error>
+	#[tracing::instrument(err, ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, item, identity))]
+	pub async fn push<T, I>(&self, identity: &I, core: &str, item: &T) -> Result<Option<Cid>, anyhow::Error>
 	where
 		T: Serialize + Debug + Send + Sync + Clone + 'static,
 		I: PrivateIdentity + Send + Sync,
@@ -94,8 +108,8 @@ impl CoReducer {
 	}
 
 	/// Push event into reducer.
-	#[tracing::instrument(err, name = "push", fields(co = self.id().as_str(), identity = identity.identity(), core = action.core), skip(self, action, identity))]
-	pub async fn push_action<T, I>(&self, identity: &I, action: &ReducerAction<T>) -> Result<(), anyhow::Error>
+	#[tracing::instrument(err, ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity(), core = action.core), skip(self, action, identity))]
+	pub async fn push_action<T, I>(&self, identity: &I, action: &ReducerAction<T>) -> Result<Option<Cid>, anyhow::Error>
 	where
 		T: Serialize + Debug + Send + Sync + Clone + 'static,
 		I: PrivateIdentity + Send + Sync,

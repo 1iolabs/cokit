@@ -7,16 +7,12 @@ use crate::{
 };
 use async_trait::async_trait;
 use co_primitives::{
-	from_cbor, DefaultNodeSerializer, MultiCodec, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
+	from_cbor, DefaultNodeSerializer, KnownMultiCodec, MultiCodec, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
 };
 use futures::{stream::FuturesOrdered, StreamExt};
 use libipld::{store::StoreParams, Block, Cid};
 use serde::{Deserialize, Serialize};
-use std::{
-	borrow::{Borrow, Cow},
-	collections::BTreeMap,
-	sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
 
 #[derive(Debug)]
@@ -26,7 +22,10 @@ pub struct EncryptedStorage<S> {
 	next: S,
 	mapping: BlockMapping,
 }
-impl<S> EncryptedStorage<S> {
+impl<S> EncryptedStorage<S>
+where
+	S: Storage,
+{
 	pub fn new(next: S, key: Secret, algorithm: Algorithm) -> Self {
 		Self { algorithm, key, mapping: BlockMapping::new(), next }
 	}
@@ -44,6 +43,18 @@ impl<S> EncryptedStorage<S> {
 	/// Consume storage and return next layer.
 	pub fn into_storage(self) -> S {
 		self.next
+	}
+
+	/// Get encrypted cid as unencrypted block.
+	pub fn get_unencrypted(&self, cid: &Cid) -> Result<Block<S::StoreParams>, StorageError> {
+		Ok(if MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
+			EncryptedBlock::try_from(self.next.get(&cid)?)
+				.map_err(|e| StorageError::Internal(e.into()))?
+				.block(&self.key)
+				.map_err(|e| StorageError::Internal(e.into()))?
+		} else {
+			self.next.get(cid)?
+		})
 	}
 }
 impl<S> StorageContentMapping for EncryptedStorage<S> {
@@ -162,7 +173,7 @@ pub struct EncryptedBlockStorage<S> {
 }
 impl<S> EncryptedBlockStorage<S>
 where
-	S: BlockStorage + Send + Sync,
+	S: BlockStorage + Send + Sync + 'static,
 {
 	pub fn new(next: S, key: Secret, algorithm: Algorithm) -> Self {
 		Self { algorithm, key, mapping: Default::default(), next }
@@ -170,7 +181,7 @@ where
 
 	/// Load mapping from CID.
 	/// This will add the mappings to the existing.
-	pub async fn load_mapping(&mut self, map: &Cid) -> Result<(), StorageError> {
+	pub async fn load_mapping(&self, map: &Cid) -> Result<(), StorageError> {
 		self.mapping.write().await.read_mappings(self, map).await?;
 		Ok(())
 	}
@@ -217,29 +228,43 @@ where
 	pub fn content_mapping(&self) -> EncryptedBlockStorageMapping {
 		EncryptedBlockStorageMapping { mapping: self.mapping.clone() }
 	}
+
+	/// Get encrypted cid as unencrypted block.
+	/// This will also record the mapping if not known yet.
+	pub async fn get_unencrypted(
+		&self,
+		cid: &Cid,
+		update_mapping: bool,
+	) -> Result<Block<S::StoreParams>, StorageError> {
+		Ok(if MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
+			let plain = EncryptedBlock::try_from(self.next.get(&cid).await?)
+				.map_err(|e| StorageError::Internal(e.into()))?
+				.block(&self.key)
+				.map_err(|e| StorageError::Internal(e.into()))?;
+
+			// map
+			if update_mapping {
+				self.mapping.write().await.insert(*plain.cid(), *cid);
+			}
+
+			// result
+			plain
+		} else {
+			self.next.get(cid).await?
+		})
+	}
 }
 #[async_trait]
 impl<S> BlockStorage for EncryptedBlockStorage<S>
 where
-	S: BlockStorage + Send + Sync,
+	S: BlockStorage + Send + Sync + 'static,
 {
 	type StoreParams = S::StoreParams;
 
 	/// Get block.
-	///
-	/// This decrypts transparently. If an encrypted CID is specified the unencrypted block will be returned.
-	/// If an unencrypted CID is specified that could not be mapped it will be forwarded to next layer.
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
-		let mapped_cid: Option<Cow<'_, Cid>> = if cid.codec() == BLOCK_MULTICODEC {
-			Some(cid.into())
-		} else {
-			self.mapping.read().await.get(cid).map(|e| e.into())
-		};
-		match mapped_cid.borrow() {
-			Some(encrypted_cid) => EncryptedBlock::try_from(self.next.get(encrypted_cid).await?)
-				.map_err(|e| StorageError::Internal(e.into()))?
-				.block(&self.key)
-				.map_err(|e| StorageError::Internal(e.into())),
+		match self.mapping.read().await.get(cid) {
+			Some(encrypted_cid) => self.get_unencrypted(&encrypted_cid, false).await,
 			None => self.next.get(cid).await,
 		}
 	}
@@ -270,13 +295,8 @@ where
 	}
 
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
-		let mapped_cid: Option<Cow<'_, Cid>> = if cid.codec() == BLOCK_MULTICODEC {
-			Some(cid.into())
-		} else {
-			self.mapping.read().await.get(cid).map(|e| e.into())
-		};
-		match mapped_cid.borrow() {
-			Some(encrypted_cid) => self.next.remove(encrypted_cid).await,
+		match self.mapping.read().await.get(cid) {
+			Some(encrypted_cid) => self.next.remove(&encrypted_cid).await,
 			None => self.next.remove(cid).await,
 		}
 	}
@@ -293,8 +313,12 @@ pub struct EncryptedBlockStorageMapping {
 impl EncryptedBlockStorageMapping {
 	/// Load mapping from CID.
 	/// This will add the mappings to the existing.
-	pub async fn load_mapping<S: BlockStorage>(&self, storage: &S, map: &Cid) -> Result<(), StorageError> {
-		self.mapping.write().await.read_mappings(storage, map).await?;
+	pub async fn load_mapping<S: BlockStorage + Send + Sync + 'static>(
+		&self,
+		storage: &EncryptedBlockStorage<S>,
+		map: &Cid,
+	) -> Result<(), StorageError> {
+		self.mapping.write().await.read_mappings(&storage, map).await?;
 		Ok(())
 	}
 }
@@ -399,11 +423,15 @@ impl BlockMapping {
 	}
 
 	/// Read block mappings from `cid` via an block storage.
-	pub fn read_mappings_storage<S: Storage>(&mut self, storage: &S, cid: &Cid) -> Result<usize, StorageError> {
+	pub fn read_mappings_storage<S: Storage>(
+		&mut self,
+		storage: &EncryptedStorage<S>,
+		cid: &Cid,
+	) -> Result<usize, StorageError> {
 		let mut count = 0;
 
 		// get block
-		let block = storage.get(cid)?;
+		let block = storage.get_unencrypted(cid)?;
 		MultiCodec::with_dag_cbor(block.cid())?;
 
 		// get node
@@ -430,12 +458,16 @@ impl BlockMapping {
 
 	/// Read block mappings from `cid` via an block storage.
 	/// Idempotency: Yes
-	pub async fn read_mappings<S: BlockStorage>(&mut self, storage: &S, cid: &Cid) -> Result<usize, StorageError> {
+	pub async fn read_mappings<S: BlockStorage + Send + Sync + 'static>(
+		&mut self,
+		storage: &EncryptedBlockStorage<S>,
+		cid: &Cid,
+	) -> Result<usize, StorageError> {
 		let mut count = 0;
 		let mut tasks = FuturesOrdered::new();
 
 		// first
-		let read = |cid: Cid| async move { storage.get(&cid).await };
+		let read = |cid: Cid| async move { storage.get_unencrypted(&cid, false).await };
 		tasks.push_back(read(*cid));
 
 		// work

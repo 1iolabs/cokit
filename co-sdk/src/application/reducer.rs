@@ -240,7 +240,7 @@ where
 		identity: &I,
 		core: &str,
 		item: &T,
-	) -> Result<(), anyhow::Error>
+	) -> Result<Option<Cid>, anyhow::Error>
 	where
 		T: Serialize + Send + Sync,
 		I: PrivateIdentity + Send + Sync,
@@ -260,7 +260,7 @@ where
 		runtime: &RuntimePool,
 		identity: &I,
 		action: &ReducerAction<T>,
-	) -> Result<(), anyhow::Error>
+	) -> Result<Option<Cid>, anyhow::Error>
 	where
 		T: Serialize + Send + Sync,
 		I: PrivateIdentity + Send + Sync,
@@ -298,7 +298,7 @@ where
 		self.on_state_changed(&context).await?;
 
 		// result
-		Ok(())
+		Ok(state)
 	}
 	/// Join heads (from other log).
 	/// This is used to join logs from other peers.

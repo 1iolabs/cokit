@@ -124,7 +124,7 @@ where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
 	{
 		// create storage
-		let mut encrypted_storage: EncryptedBlockStorage<CoStorage> = create_encrypted_storage(storage, key).await?;
+		let encrypted_storage: EncryptedBlockStorage<CoStorage> = create_encrypted_storage(storage, key).await?;
 		let storage = CoStorage::new(encrypted_storage.clone());
 
 		// create log
@@ -148,11 +148,15 @@ where
 				encrypted_storage.load_mapping(mapping).await?;
 
 				// convert state/heads to unencrypted
-				state = *encrypted_storage.get(&state).await?.cid();
+				state = *encrypted_storage.get_unencrypted(&state, false).await?.cid();
 				heads = stream::iter(heads.into_iter())
 					.then(|cid| {
 						let encrypted_storage = encrypted_storage.clone();
-						async move { Result::<Cid, co_storage::StorageError>::Ok(*encrypted_storage.get(&cid).await?.cid()) }
+						async move {
+							Result::<Cid, co_storage::StorageError>::Ok(
+								*encrypted_storage.get_unencrypted(&cid, false).await?.cid(),
+							)
+						}
 					})
 					.try_collect()
 					.await?;
@@ -187,17 +191,37 @@ where
 		// watch
 		let watch_reducer: CoReducer = co_reducer.clone();
 		let watch_locals = result.locals.clone();
-		let mut watch_encrypted_storage = encrypted_storage.clone();
+		let watch_encrypted_storage = encrypted_storage.clone();
 		tasks.spawn(async move {
 			let watcher = watch_locals.watch().take_until(shutdown.clone().cancelled_owned());
 			pin_mut!(watcher);
 			while let Some(local) = watcher.next().await {
+				// convert heads to unencrypted
+				let local_heads = match stream::iter(local.heads.iter())
+					.then(|cid| {
+						let encrypted_storage = encrypted_storage.clone();
+						async move {
+							Result::<Cid, co_storage::StorageError>::Ok(
+								*encrypted_storage.get_unencrypted(&cid, false).await?.cid(),
+							)
+						}
+					})
+					.try_collect()
+					.await
+				{
+					Ok(local_heads) => local_heads,
+					Err(err) => {
+						tracing::trace!(?err, ?local.heads, "local-watch-cids-failed");
+						continue;
+					},
+				};
+
 				// skip?
 				let (_, heads) = watch_reducer.reducer_state().await;
-				if heads == local.heads {
-					tracing::trace!(?local.heads, "local-watch-skip");
+				if heads == local_heads {
+					tracing::trace!(?local_heads, "local-watch-skip");
 				} else {
-					tracing::trace!(?local.heads, ?local.mapping, "local-watch");
+					tracing::trace!(?local_heads, ?local.mapping, "local-watch");
 				}
 
 				// mappings
@@ -209,13 +233,13 @@ where
 				}
 
 				// heads
-				match watch_reducer.join(&local.heads).await {
+				match watch_reducer.join(&local_heads).await {
 					Ok(change) => {
 						if change {
 							tracing::trace!("local-watch-join");
 						}
 					},
-					Err(err) => tracing::warn!(?err, ?local.heads, "local-watch-join-failed"),
+					Err(err) => tracing::warn!(?err, ?local_heads, "local-watch-join-failed"),
 				}
 			}
 		});

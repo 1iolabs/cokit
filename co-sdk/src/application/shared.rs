@@ -18,7 +18,7 @@ use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
 use co_primitives::{tags, CoId};
-use co_storage::{Algorithm, EncryptedBlockStorage, EncryptedBlockStorageMapping, Secret};
+use co_storage::{Algorithm, EncryptedBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc, time::Duration};
 
@@ -104,7 +104,7 @@ impl SharedCoBuilder {
 		secret: &co_primitives::Secret,
 		storage: CoStorage,
 	) -> anyhow::Result<EncryptedBlockStorage<CoStorage>> {
-		let mut result_storage =
+		let result_storage =
 			EncryptedBlockStorage::new(storage, Secret::new(secret.divulge().to_vec()), Default::default());
 		if let Some(mapping) = &self.membership.encryption_mapping {
 			result_storage.load_mapping(mapping).await?;
@@ -209,9 +209,6 @@ impl SharedCoBuilder {
 			reducer.add_change_handler(Box::new(co_state));
 		}
 
-		// mapping
-		let mapping: Option<EncryptedBlockStorageMapping> = encrypted_storage.as_ref().map(|e| e.content_mapping());
-
 		// setup auto write to parent co
 		let writer = MembershipWriter {
 			id: self.membership.id.clone(),
@@ -223,7 +220,7 @@ impl SharedCoBuilder {
 		reducer.add_change_handler(Box::new(writer));
 
 		// context
-		let context = SharedContext { mapping, id: self.membership.id.clone() };
+		let context = SharedContext { encrypted_storage, id: self.membership.id.clone() };
 
 		// result
 		Ok(CoReducer::new(self.membership.id, Some(self.parent.id().clone()), runtime, reducer, Arc::new(context)))
@@ -248,7 +245,7 @@ impl CreateCo {
 
 struct SharedContext {
 	id: CoId,
-	mapping: Option<EncryptedBlockStorageMapping>,
+	encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
 }
 impl SharedContext {
 	/// Update `co` membership if necessary.
@@ -259,8 +256,8 @@ impl SharedContext {
 				tracing::info!(co = ?co.id(), from = ?co_heads, to = ?membership, "membership-update");
 
 				// encryption mapping
-				if let (Some(mapping), Some(cid)) = (&self.mapping, &membership.encryption_mapping) {
-					mapping.load_mapping(&co.storage(), &cid).await?;
+				if let (Some(storage), Some(cid)) = (&self.encrypted_storage, &membership.encryption_mapping) {
+					storage.load_mapping(&cid).await?;
 				}
 
 				// snapshot
@@ -276,7 +273,10 @@ impl SharedContext {
 #[async_trait]
 impl CoReducerContext for SharedContext {
 	fn content_mapping(&self) -> Option<CoBlockStorageContentMapping> {
-		self.mapping.clone().map(CoBlockStorageContentMapping::new)
+		self.encrypted_storage
+			.as_ref()
+			.map(|storage| storage.content_mapping())
+			.map(CoBlockStorageContentMapping::new)
 	}
 
 	async fn refresh(&self, parent: CoReducer, co: CoReducer) -> anyhow::Result<()> {

@@ -1,3 +1,4 @@
+use core::fmt::Debug;
 use libipld::Cid;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::fmt::Display;
@@ -108,7 +109,7 @@ impl PartialEq<u64> for KnownMultiCodec {
 /// MultiCodec matching utility.
 ///
 /// See: https://github.com/multiformats/multicodec/blob/master/table.csv
-#[derive(Debug, Copy, Clone, Eq, Ord)]
+#[derive(Copy, Clone, Eq, Ord)]
 #[non_exhaustive]
 #[repr(u64)]
 pub enum MultiCodec {
@@ -183,6 +184,14 @@ impl Display for MultiCodec {
 		}
 	}
 }
+impl Debug for MultiCodec {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Known(m) => write!(f, "{:?} ({:#x})", m, self.codec()),
+			Self::Unknown(c) => write!(f, "{:#x}", c),
+		}
+	}
+}
 impl From<KnownMultiCodec> for MultiCodec {
 	fn from(value: KnownMultiCodec) -> Self {
 		MultiCodec::Known(value)
@@ -216,7 +225,7 @@ impl From<Cid> for MultiCodec {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("Expected {0} codec to be {1:?} got {2:?}")]
+#[error("Expected {0} codec to be {1} got {2}")]
 pub struct MultiCodecError(Cid, MultiCodec, MultiCodec);
 
 #[cfg(test)]
