@@ -247,28 +247,14 @@ impl CoContextInner {
 
 	/// Get instance of Local CoReducer.
 	pub async fn local_co_reducer(&self) -> Result<CoReducer, anyhow::Error> {
-		let co = CO_ID_LOCAL;
-
-		// has one?
-		{
-			let reducers = self.reducers.read().await;
-			let reducer = reducers.get(co);
-			if let Some(reducer) = reducer {
-				return Ok(reducer.clone());
-			}
-		}
-
-		// create
-		let reducer = self.create_local_co_instance(true).await?;
-
-		// store
-		self.reducers.write().await.insert(co.into(), reducer.clone());
-
-		// result
-		Ok(reducer)
+		Ok(self
+			.co_reducer(CoId::from(CO_ID_LOCAL))
+			.await?
+			.ok_or(anyhow!("Local Co should always exist"))?)
 	}
 
 	/// Creates a CoReducer instance of the Local CO.
+	#[tracing::instrument(skip(self))]
 	async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
 		let core_resolver = CoCoreResolver::default();
 		let core_resolver = ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(
@@ -312,21 +298,48 @@ impl CoContextInner {
 			}
 		}
 
-		// create
-		let reducer = if co.as_str() == CO_ID_LOCAL {
-			Some(self.create_local_co_instance(true).await?)
-		} else {
-			let local = self.local_co_reducer().await?;
-			self.create_co_instance(local, co, true, None).await?
+		// TODO: optimize this to allow to still read reducers while new ones are created?
+		let reducer = {
+			let mut reducers = self.reducers.write().await;
+			match reducers.get(co) {
+				Some(reducer) => Some(reducer.clone()),
+				None => self.create_co_reducer(&mut reducers, &co).await?,
+			}
 		};
-
-		// store
-		if let Some(reducer_cache) = &reducer {
-			self.reducers.write().await.insert(co.to_owned(), reducer_cache.clone());
-		}
 
 		// result
 		Ok(reducer)
+	}
+
+	async fn create_co_reducer(
+		&self,
+		reducers: &mut BTreeMap<CoId, CoReducer>,
+		co: impl AsRef<CoId>,
+	) -> Result<Option<CoReducer>, anyhow::Error> {
+		let co = co.as_ref();
+		Ok(match reducers.get(co) {
+			Some(reducer) => Some(reducer.clone()),
+			None => {
+				let local_id = CoId::from(CO_ID_LOCAL);
+				let local = match reducers.get(&local_id) {
+					Some(local) => local.clone(),
+					None => {
+						let local = self.create_local_co_instance(true).await?;
+						reducers.insert(local_id, local.clone());
+						local
+					},
+				};
+				if co.as_str() == CO_ID_LOCAL {
+					Some(local)
+				} else {
+					let reducer = self.create_co_instance(local, co, true, None).await?;
+					if let Some(reducer) = &reducer {
+						reducers.insert(co.clone(), reducer.clone());
+					}
+					reducer
+				}
+			},
+		})
 	}
 
 	/// Creates a CoReducer instance a CO.
@@ -396,7 +409,10 @@ impl CoContextInner {
 		};
 
 		// resolve identity
-		let identity = self.private_identity_resolver().await?.resolve_private(&membership.did).await?;
+		let identity = create_private_identity_resolver(parent.clone())
+			.await?
+			.resolve_private(&membership.did)
+			.await?;
 
 		// instance
 		Ok(Some(
