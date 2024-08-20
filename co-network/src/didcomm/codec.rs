@@ -43,7 +43,6 @@ impl Codec {
 		}
 		let mut framed = FramedWrite::new(socket, LengthCodec {});
 		framed.send(data.into()).await?;
-		framed.flush().await?;
 		Ok(())
 	}
 }

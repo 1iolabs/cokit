@@ -1,5 +1,5 @@
 use super::{codec, message::EncodedMessage};
-use futures::{future::BoxFuture, AsyncWriteExt, FutureExt};
+use futures::{future::BoxFuture, AsyncWriteExt};
 use libp2p::{core::UpgradeInfo, InboundUpgrade, OutboundUpgrade, Stream};
 use std::iter;
 
@@ -40,18 +40,27 @@ impl InboundUpgrade<Stream> for MessageProtocol {
 	type Future = BoxFuture<'static, Result<Self::Output, Self::Error>>;
 
 	fn upgrade_inbound(self, mut socket: Stream, _info: Self::Info) -> Self::Future {
-		async move {
+		Box::pin(async move {
 			// read
+			tracing::trace!("didcomm-upgrade-inbound-read");
 			let read = self.codec.receive_message(&mut socket);
-			let message = read.await?;
+			let result = read.await;
+			if let Err(err) = &result {
+				tracing::error!(?err, "didcomm-upgrade-inbound-read-failed");
+			}
 
 			// close substream
-			socket.close().await?;
+			tracing::trace!("didcomm-upgrade-inbound-close");
+			match socket.close().await {
+				Ok(_) => {},
+				Err(err) => {
+					tracing::warn!(?err, "didcomm-upgrade-inbound-close-failed");
+				},
+			}
 
 			// result
-			Ok(message)
-		}
-		.boxed()
+			result
+		})
 	}
 }
 
@@ -61,22 +70,32 @@ impl OutboundUpgrade<Stream> for MessageProtocol {
 	type Future = BoxFuture<'static, Result<Self::Output, Self::Error>>;
 
 	fn upgrade_outbound(mut self, mut socket: Stream, _info: Self::Info) -> Self::Future {
-		async move {
+		Box::pin(async move {
 			let mut result = None;
 
 			// write
 			if let Some(message) = self.message.take() {
+				tracing::trace!("didcomm-upgrade-outbound-write");
 				result = Some(message.clone());
 				let write = self.codec.send_message(&mut socket, message);
-				write.await?;
+				let write_result = write.await;
+				if let Err(err) = &write_result {
+					tracing::error!(?err, "didcomm-upgrade-outbound-write-failed");
+					write_result?;
+				}
 			}
 
 			// close substream
-			socket.close().await?;
+			tracing::trace!("didcomm-upgrade-outbound-close");
+			match socket.close().await {
+				Ok(_) => {},
+				Err(err) => {
+					tracing::warn!(?err, "didcomm-upgrade-outbound-close-failed");
+				},
+			}
 
 			// done
 			Ok(result)
-		}
-		.boxed()
+		})
 	}
 }

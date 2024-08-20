@@ -12,7 +12,11 @@ use std::fmt::Debug;
 pub struct EncodedMessage(pub Vec<u8>);
 impl EncodedMessage {
 	/// Create plaintext JSON message.
-	pub fn create_plain_json<T: Serialize>(header: DidCommHeader, body: &T) -> Result<(String, Self), anyhow::Error> {
+	pub fn create_plain_json<T>(header: DidCommHeader, body: &T) -> Result<(String, Self), anyhow::Error>
+	where
+		T: Serialize + Debug,
+	{
+		tracing::trace!(?header, ?body, "didcomm-message-plain");
 		let message_id = header.id.clone();
 		Ok((message_id, Self(to_json(&DidCommMessage { header, body })?)))
 	}
@@ -26,9 +30,10 @@ impl EncodedMessage {
 		body: &T,
 	) -> Result<(String, Self), anyhow::Error>
 	where
-		T: Serialize,
+		T: Serialize + Debug,
 		P: PrivateIdentity + Send + Sync + 'static,
 	{
+		tracing::trace!(?header, ?body, from = from.identity(), "didcomm-message-signed");
 		let from_didcomm = from.try_didcomm_private()?;
 		header.from = Some(from.identity().to_owned());
 		let message_id = header.id.clone();
@@ -47,10 +52,11 @@ impl EncodedMessage {
 		body: &T,
 	) -> Result<(String, Self), anyhow::Error>
 	where
-		T: Serialize,
+		T: Serialize + Debug,
 		P: PrivateIdentity + Send + Sync + 'static,
 		I: Identity + Send + Sync + 'static,
 	{
+		tracing::trace!(?header, ?body, from = from.identity(), to = to.identity(), "didcomm-message-encrypted");
 		let from_didcomm = from.try_didcomm_private()?;
 		let to_didcomm = to.try_didcomm_public()?;
 		header.from = Some(from.identity().to_owned());
