@@ -3,7 +3,7 @@ use crate::{
 	library::{cat::cat_output, cli_context::CliContext},
 };
 use anyhow::anyhow;
-use co_sdk::CoId;
+use co_sdk::{CoId, CoReducerFactory};
 use exitcode::ExitCode;
 use libipld::Cid;
 use std::str::FromStr;
@@ -25,10 +25,7 @@ pub struct Command {
 pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
 	// reducer
 	let application = context.application(cli).await;
-	let reducer = application
-		.co_reducer(&command.co)
-		.await?
-		.ok_or(anyhow!("Co not found: {}", command.co))?;
+	let reducer = application.context().try_co_reducer(&command.co).await?;
 
 	// cid
 	let cid = match &command.cid {

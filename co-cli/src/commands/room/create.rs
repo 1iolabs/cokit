@@ -7,7 +7,7 @@ use co_messaging::{
 	state_event::{RoomAvatarContent, RoomNameContent, RoomTopicContent},
 	MatrixEvent,
 };
-use co_sdk::{tags, CoReducerError, Cores, CO_CORE_NAME_CO, CO_CORE_ROOM};
+use co_sdk::{tags, CoReducerError, CoReducerFactory, Cores, CO_CORE_NAME_CO, CO_CORE_ROOM};
 use exitcode::ExitCode;
 use libipld::Cid;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -37,7 +37,7 @@ pub async fn command(
 	let identity = application.local_identity();
 	let co = &room_command.co;
 	let core = &room_command.core;
-	let co_reducer = application.co_reducer(co).await?.ok_or(anyhow!("Co not found: {}", co))?;
+	let co_reducer = application.context().try_co_reducer(co).await?;
 	match co_reducer.state::<co_core_room::Room>(core).await {
 		Err(CoReducerError::CoreNotFound(_)) => {
 			let create = CoAction::CoreCreate {

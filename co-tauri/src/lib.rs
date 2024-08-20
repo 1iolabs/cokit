@@ -1,10 +1,10 @@
 use anyhow::anyhow;
-use co_sdk::{Application, ApplicationBuilder, CoId};
+use co_sdk::{Application, ApplicationBuilder, CoId, CoReducerFactory};
 use libipld::{cbor::DagCborCodec, codec::Codec, Cid, Ipld};
 use library::co_settings::CoSettings;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
-use tauri::{ipc::InvokeError, Manager, Wry};
+use tauri::{ipc::InvokeError, Emitter, Wry};
 use tokio_stream::{wrappers::WatchStream, StreamExt};
 pub mod library;
 
@@ -61,9 +61,10 @@ async fn get_core_state(
 	_core: String,
 ) -> Result<(Option<Cid>, BTreeSet<Cid>), CoTauriError> {
 	let reducer = application
-		.co_reducer(co.clone())
-		.await?
-		.ok_or(anyhow!("Co not found: {}", co.clone()))?;
+		.context()
+		.try_co_reducer(&co)
+		.await
+		.map_err(|err| anyhow::Error::from(err))?;
 	let (state, heads) = reducer.reducer_state().await;
 	// TODO resolve state up to declared core
 	Ok((state, heads))
@@ -126,9 +127,10 @@ async fn push(application: tauri::State<'_, Application>, body: Vec<u8>) -> Resu
 	let body: PushCommandBody = DagCborCodec::default().decode::<Ipld>(&body)?.try_into()?;
 	tracing::info!("tauri command push: {:#?}", body);
 	let reducer = application
-		.co_reducer(body.co.clone())
-		.await?
-		.ok_or(anyhow!("Co not found: {}", body.co))?;
+		.context()
+		.try_co_reducer(&body.co)
+		.await
+		.map_err(|err| anyhow::Error::from(err))?;
 	let identity = application.local_identity();
 	reducer.push(&identity, &*body.core, &body.action).await?;
 	Ok(())
@@ -142,9 +144,10 @@ async fn subscribe(
 ) -> Result<(), CoTauriError> {
 	tracing::info!("tauri command subscribe: {:#?}", co);
 	let co_reducer = application
-		.co_reducer(co.clone())
-		.await?
-		.ok_or(anyhow!("Co not found: {}", co))?;
+		.context()
+		.try_co_reducer(&co)
+		.await
+		.map_err(|err| anyhow::Error::from(err))?;
 
 	let mut watcher = WatchStream::from_changes(co_reducer.watch().await);
 	while let Some(item) = watcher.next().await {

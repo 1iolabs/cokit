@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use co_identity::PrivateIdentity;
 use co_primitives::{CoId, KnownMultiCodec, OptionLink, ReducerAction};
 use co_storage::{BlockStorageContentMapping, BlockStorageExt, MappedBlockStorage, StorageError};
-use futures::{stream, StreamExt};
+use futures::{stream, StreamExt, TryStreamExt};
 use libipld::Cid;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
@@ -126,12 +126,30 @@ impl CoReducer {
 	/// Returns true if state has changed.
 	#[tracing::instrument(err, ret, fields(co = self.id().as_str()), skip(self))]
 	pub async fn join(&self, heads: &BTreeSet<Cid>) -> Result<bool, anyhow::Error> {
-		Ok(self.reducer.write().await.join(&heads, self.runtime.runtime()).await?)
+		// to internal cids
+		let internal_heads: BTreeSet<Cid> = stream::iter(heads.iter())
+			.then(|cid| async { self.context.to_internal_cid(*cid).await })
+			.try_collect()
+			.await?;
+
+		// join
+		Ok(self.reducer.write().await.join(&internal_heads, self.runtime.runtime()).await?)
 	}
 
 	/// Insert a previous (trusted) snapshot into histroy which may can used as a starting point.
-	pub async fn insert_snapshot(&self, state: Cid, heads: BTreeSet<Cid>) {
-		self.reducer.write().await.insert_snapshot(state, heads);
+	pub async fn insert_snapshot(&self, state: Cid, heads: BTreeSet<Cid>) -> Result<(), StorageError> {
+		// to internal cids
+		let internal_state = self.context.to_internal_cid(state).await?;
+		let internal_heads: BTreeSet<Cid> = stream::iter(heads.iter())
+			.then(|cid| async { self.context.to_internal_cid(*cid).await })
+			.try_collect()
+			.await?;
+
+		// insert
+		self.reducer.write().await.insert_snapshot(internal_state, internal_heads);
+
+		// result
+		Ok(())
 	}
 
 	/// Read co reducer state.
@@ -234,4 +252,10 @@ pub trait CoReducerContext {
 
 	/// Refresh reducer instance state from source.
 	async fn refresh(&self, parent: CoReducer, co: CoReducer) -> anyhow::Result<()>;
+
+	/// Map external [`Cid`] to internal [`Cid`].
+	async fn to_internal_cid(&self, cid: Cid) -> Result<Cid, StorageError>;
+
+	/// Map internal [`Cid`] to external [`Cid`].
+	async fn to_external_cid(&self, cid: Cid) -> Result<Cid, StorageError>;
 }

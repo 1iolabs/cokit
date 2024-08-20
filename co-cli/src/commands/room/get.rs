@@ -1,11 +1,10 @@
 use super::Command as RoomCommand;
 use crate::{cli::Cli, library::cli_context::CliContext};
-use anyhow::anyhow;
 use chrono::{DateTime, Local};
 use co_core_room::Room;
 use co_messaging::MatrixEvent;
 use co_primitives::ReducerAction;
-use co_sdk::BlockStorageExt;
+use co_sdk::{BlockStorageExt, CoReducerFactory};
 use exitcode::ExitCode;
 use futures::pin_mut;
 use serde::de::IgnoredAny;
@@ -32,10 +31,7 @@ pub async fn command(
 	command: &Command,
 ) -> Result<ExitCode, anyhow::Error> {
 	let application = context.application(cli).await;
-	let co_reducer = application
-		.co_reducer(&room_command.co)
-		.await?
-		.ok_or(anyhow!("Co not found: {}", room_command.co))?;
+	let co_reducer = application.context().try_co_reducer(&room_command.co).await?;
 
 	let state = co_reducer.state::<Room>(&room_command.core).await?;
 	let (storage, stream, _mapping) = application.co().entries(&room_command.co).await?;

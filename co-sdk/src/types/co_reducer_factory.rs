@@ -8,4 +8,18 @@ pub trait CoReducerFactory {
 	/// Returns None if `co` membership could not be found.
 	/// TODO: Refactor to own error type and remove option.
 	async fn co_reducer(&self, co: &CoId) -> Result<Option<CoReducer>, anyhow::Error>;
+
+	async fn try_co_reducer(&self, co: &CoId) -> Result<CoReducer, CoReducerFactoryError>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CoReducerFactoryError {
+	#[error("CO not found: {0:?}")]
+	CoNotFound(CoId),
+
+	#[error("Create CO failed: {0:?}")]
+	Create(CoId, #[source] anyhow::Error),
+
+	#[error("Create CO failed")]
+	Other(#[from] anyhow::Error),
 }

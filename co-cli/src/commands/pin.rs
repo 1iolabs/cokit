@@ -2,7 +2,7 @@ use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
 use co_primitives::{from_cbor, CoId};
 use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
-use co_sdk::{state::memberships, Application, CoStorage, NodeStream, CO_CORE_NAME_PIN, CO_ID_LOCAL};
+use co_sdk::{state::memberships, Application, CoReducerFactory, CoStorage, NodeStream, CO_CORE_NAME_PIN, CO_ID_LOCAL};
 use exitcode::ExitCode;
 use futures::{pin_mut, StreamExt, TryStreamExt};
 use libipld::Cid;
@@ -101,7 +101,7 @@ pub async fn generate_pins(
 ) -> Result<ExitCode, anyhow::Error> {
 	// get state of given co
 	let application = context.application(cli).await;
-	let co_reducer = application.co_reducer(&command.co).await?.ok_or(anyhow!("Co not found"))?;
+	let co_reducer = application.context().try_co_reducer(&command.co).await?;
 	let state = co_reducer.reducer_state().await.0;
 
 	if let Some(state) = state {

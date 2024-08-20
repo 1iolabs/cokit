@@ -1,6 +1,6 @@
 use super::Command as NetworkCommand;
 use crate::{cli::Cli, library::cli_context::CliContext};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use co_core_membership::MembershipState;
 use co_primitives::Did;
 use co_sdk::{state, CoId, CoReducerFactory};
@@ -42,7 +42,7 @@ pub async fn command(
 				.then(move |id| async move {
 					match id {
 						Ok(id) => {
-							let co = co_context.co_reducer(&id).await?.ok_or(anyhow!("Co not found"))?;
+							let co = co_context.try_co_reducer(&id).await?;
 							let co_state = co.co().await?;
 							if co_state.network.is_empty() {
 								Ok(None)

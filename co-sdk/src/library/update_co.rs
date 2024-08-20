@@ -48,6 +48,7 @@ where
 			if &received_co != co_reducer.id() {
 				return Err(anyhow!("Received heads for different CO"));
 			}
+
 			// note:
 			//  the heads will be also merged by heads_message_heads epic
 			//  whichever is faster but this makes sure that the heads are merged after this call

@@ -9,7 +9,7 @@ use crate::{
 use anyhow::anyhow;
 use co_core_file::{FileAction, FolderNode, Node};
 use co_primitives::{tags, AbsolutePath, PathExt};
-use co_sdk::Identity;
+use co_sdk::{CoReducerFactory, Identity};
 use exitcode::ExitCode;
 
 #[derive(Debug, Clone, clap::Args)]
@@ -29,10 +29,7 @@ pub async fn command(
 	command: &Command,
 ) -> Result<ExitCode, anyhow::Error> {
 	let application = context.application(cli).await;
-	let co_reducer = application
-		.co_reducer(&file_command.co)
-		.await?
-		.ok_or(anyhow!("Co not found: {}", file_command.co))?;
+	let co_reducer = application.context().try_co_reducer(&file_command.co).await?;
 	let identity = application.local_identity();
 
 	// state

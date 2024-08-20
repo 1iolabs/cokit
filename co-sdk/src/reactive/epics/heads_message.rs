@@ -94,7 +94,7 @@ async fn join_heads(
 	heads: BTreeSet<Cid>,
 ) -> anyhow::Result<Vec<Action>> {
 	let mut actions = Vec::new();
-	let co_reducer = context.co_reducer(&co).await?.ok_or(anyhow!("Co not found: {}", co))?;
+	let co_reducer = context.try_co_reducer(&co).await?;
 	if co_reducer.join(&heads).await? {
 		let next_heads = co_reducer.heads().await;
 		if next_heads != heads {
@@ -131,7 +131,7 @@ async fn request_heads(
 }
 
 async fn get_heads(context: &CoContext, from: &Option<Did>, co: &CoId) -> anyhow::Result<BTreeSet<Cid>> {
-	let co_reducer = context.co_reducer(&co).await?.ok_or(anyhow!("Co not found: {}", co))?;
+	let co_reducer = context.try_co_reducer(&co).await?;
 
 	// verify
 	if !state::is_participant(&co_reducer.storage(), co_reducer.co_state().await, from).await? {

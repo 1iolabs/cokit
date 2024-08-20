@@ -3,10 +3,9 @@ use crate::{
 	cli::Cli,
 	library::{cli_context::CliContext, file::list_nodes},
 };
-use anyhow::anyhow;
 use co_core_file::Node;
 use co_primitives::{AbsolutePath, Date, PathExt};
-use co_sdk::CoReducerError;
+use co_sdk::{CoReducerError, CoReducerFactory};
 use exitcode::ExitCode;
 use futures::TryStreamExt;
 
@@ -27,10 +26,7 @@ pub async fn command(
 	command: &Command,
 ) -> Result<ExitCode, anyhow::Error> {
 	let application = context.application(cli).await;
-	let co_reducer = application
-		.co_reducer(&file_command.co)
-		.await?
-		.ok_or(anyhow!("Co not found: {}", file_command.co))?;
+	let co_reducer = application.context().try_co_reducer(&file_command.co).await?;
 	let file_state = match co_reducer.state(&file_command.core).await {
 		Err(CoReducerError::CoreNotFound(_)) => Ok(co_core_file::File::default()),
 		result => result,

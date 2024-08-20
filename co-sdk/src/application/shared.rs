@@ -22,10 +22,17 @@ use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
-use co_primitives::{tags, CoId};
-use co_storage::{Algorithm, EncryptedBlockStorage, Secret};
+use co_primitives::{tags, CoId, KnownMultiCodec, MultiCodec};
+use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, Secret, StorageError};
+use futures::{stream, StreamExt, TryStreamExt};
+use libipld::Cid;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt::Debug, sync::Arc, time::Duration};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	fmt::Debug,
+	sync::Arc,
+	time::Duration,
+};
 
 /// Shared CO Builder.
 /// The Shared CO state is sptrend in an membership of an other CO (typicalle the Local CO).
@@ -139,6 +146,13 @@ impl SharedCoBuilder {
 		)
 	}
 
+	pub async fn build_storage(&self, storage: CoStorage) -> Result<CoStorage, anyhow::Error> {
+		match self.secret().await? {
+			Some(secret) => Ok(CoStorage::new(self.build_encrypted_storage(&secret, storage).await?)),
+			None => Ok(storage),
+		}
+	}
+
 	pub async fn build<I>(
 		self,
 		tasks: TaskSpawner,
@@ -176,9 +190,19 @@ impl SharedCoBuilder {
 			None => (storage, None),
 		};
 
+		// context
+		let context = SharedContext { encrypted_storage: encrypted_storage.clone(), id: self.membership.id.clone() };
+
+		// get (unencrypted) state/heads
+		let state = context.to_internal_cid(self.membership.state).await?;
+		let heads: BTreeSet<Cid> = stream::iter(self.membership.heads.iter())
+			.then(|cid| async { context.to_internal_cid(*cid).await })
+			.try_collect()
+			.await?;
+
 		// explicitly update co state so the network has it available when initialize
 		if let Some(co_state) = &co_state {
-			co_state.write(&storage, self.membership.state.into(), true).await;
+			co_state.write(&storage, state.into(), true).await;
 		}
 
 		// log
@@ -186,13 +210,13 @@ impl SharedCoBuilder {
 			self.membership.id.as_str().as_bytes().to_vec(),
 			create_identity_resolver(),
 			storage.clone(),
-			self.membership.heads.clone(),
+			heads.clone(),
 		);
 
 		// reducer
 		let mut reducer = ReducerBuilder::new(core_resolver, log)
 			.with_initialize(self.initialize)
-			.with_latest_state(self.membership.state, self.membership.heads.clone())
+			.with_latest_state(state, heads.clone())
 			.build(runtime.runtime())
 			.await?;
 
@@ -238,9 +262,6 @@ impl SharedCoBuilder {
 		};
 		reducer.add_change_handler(Box::new(writer));
 
-		// context
-		let context = SharedContext { encrypted_storage, id: self.membership.id.clone() };
-
 		// result
 		Ok(CoReducer::new(self.membership.id, Some(self.parent.id().clone()), runtime, reducer, Arc::new(context)))
 	}
@@ -280,7 +301,7 @@ impl SharedContext {
 				}
 
 				// snapshot
-				co.insert_snapshot(membership.state, membership.heads.clone()).await;
+				co.insert_snapshot(membership.state, membership.heads.clone()).await?;
 
 				// load snapshot
 				co.join(&membership.heads).await?;
@@ -306,6 +327,29 @@ impl CoReducerContext for SharedContext {
 			return Err(anyhow!("Invalid parent co {} for {}", parent.id(), co.id()));
 		}
 		self.update_membership(parent, co).await
+	}
+
+	/// Map external [`Cid`] to internal [`Cid`].
+	/// Internal means in context of the CO.
+	/// If no mapping is needed/available return the original [`Cid`].
+	async fn to_internal_cid(&self, cid: Cid) -> Result<Cid, StorageError> {
+		match (&self.encrypted_storage, MultiCodec::from(&cid)) {
+			(Some(storage), MultiCodec::Known(KnownMultiCodec::CoEncryptedBlock)) => {
+				Ok(*storage.get_unencrypted(&cid, false).await?.cid())
+			},
+			_ => Ok(cid),
+		}
+	}
+
+	/// Map internal [`Cid`] to external [`Cid`].
+	/// External means NOT in context of the CO.
+	/// If no mapping is needed/available return the original [`Cid`].
+	async fn to_external_cid(&self, cid: Cid) -> Result<Cid, StorageError> {
+		if let Some(encrypted_storage) = &self.encrypted_storage {
+			Ok(encrypted_storage.content_mapping().to_plain(&cid).await.unwrap_or(cid))
+		} else {
+			Ok(cid)
+		}
 	}
 }
 

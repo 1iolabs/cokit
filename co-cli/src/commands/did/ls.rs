@@ -1,9 +1,8 @@
 use super::Command as DidCommand;
 use crate::{cli::Cli, library::cli_context::CliContext};
-use anyhow::anyhow;
 use co_sdk::{
 	state::{self, Identity},
-	CoId, CO_CORE_NAME_KEYSTORE, CO_ID_LOCAL,
+	CoId, CoReducerFactory, CO_CORE_NAME_KEYSTORE, CO_ID_LOCAL,
 };
 use exitcode::ExitCode;
 use futures::TryStreamExt;
@@ -26,10 +25,7 @@ pub async fn command(
 	command: &Command,
 ) -> Result<ExitCode, anyhow::Error> {
 	let application = context.application(cli).await;
-	let co_reducer = application
-		.co_reducer(&command.co)
-		.await?
-		.ok_or(anyhow!("Co not found: {}", command.co))?;
+	let co_reducer = application.context().try_co_reducer(&command.co).await?;
 	let identities: Vec<Identity> =
 		state::identities(co_reducer.storage(), co_reducer.co_state().await, Some(&command.core))
 			.try_collect()

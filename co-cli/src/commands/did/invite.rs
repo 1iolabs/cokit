@@ -1,8 +1,9 @@
 use super::Command as DidCommand;
 use crate::{cli::Cli, library::cli_context::CliContext};
-use anyhow::anyhow;
 use co_core_co::{CoAction, ParticipantState};
-use co_sdk::{find_co_private_identity, Action, CoId, Did, Identity, PrivateIdentityResolver, CO_CORE_NAME_CO};
+use co_sdk::{
+	find_co_private_identity, Action, CoId, CoReducerFactory, Did, Identity, PrivateIdentityResolver, CO_CORE_NAME_CO,
+};
 use exitcode::ExitCode;
 use futures::StreamExt;
 use std::future::ready;
@@ -28,10 +29,7 @@ pub async fn command(
 ) -> Result<ExitCode, anyhow::Error> {
 	let mut application = context.application(cli).await;
 	application.create_network(false).await?;
-	let co_reducer = application
-		.co_reducer(&command.co)
-		.await?
-		.ok_or(anyhow!("Co not found: {}", command.co))?;
+	let co_reducer = application.context().try_co_reducer(&command.co).await?;
 	let co = co_reducer.co().await?;
 	let participant = co.participants.get(&command.did);
 	let only_network = if let Some(participant) = participant {

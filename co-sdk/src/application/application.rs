@@ -1,5 +1,5 @@
 use super::{
-	co_context::{CoContext, CoContextInner},
+	co_context::{CoContext, CoContextInner, Reducers},
 	identity::{create_identity_resolver, resolve_private_identity},
 	shared::{CreateCo, SharedCoCreator},
 	tracing::TracingBuilder,
@@ -159,7 +159,7 @@ impl Application {
 		}
 
 		// set network to reducers
-		self.co_context.inner.set_network(Some(spawner.clone())).await;
+		self.co_context.inner.set_network(Some(spawner.clone())).await?;
 
 		// assign
 		self.network = Some(network);
@@ -351,6 +351,9 @@ impl ApplicationBuilder {
 			keychain: self.keychain,
 		};
 
+		// reducers
+		let (reducers, reducers_control) = Reducers::new();
+
 		// co
 		let reactive = ReactiveContext::default();
 		let co_context: CoContext = CoContextInner::new(
@@ -362,8 +365,12 @@ impl ApplicationBuilder {
 			storage.storage(),
 			runtime.clone(),
 			reactive.clone(),
+			reducers_control,
 		)
 		.into();
+
+		// reducers
+		tasks.spawn(reducers.worker(co_context.inner.clone()));
 
 		// reactive
 		tasks.spawn({
