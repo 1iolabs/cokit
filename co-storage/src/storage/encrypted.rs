@@ -45,35 +45,6 @@ where
 		self.next
 	}
 
-	/// Get encrypted cid as unencrypted block.
-	pub fn get_unencrypted(&self, cid: &Cid) -> Result<Block<S::StoreParams>, StorageError> {
-		Ok(if MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
-			EncryptedBlock::try_from(self.next.get(&cid)?)
-				.map_err(|e| StorageError::Internal(e.into()))?
-				.block(&self.key)
-				.map_err(|e| StorageError::Internal(e.into()))?
-		} else {
-			self.next.get(cid)?
-		})
-	}
-}
-impl<S> StorageContentMapping for EncryptedStorage<S> {
-	fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
-		if mapped.codec() == BLOCK_MULTICODEC {
-			self.mapping.get(mapped)
-		} else {
-			None
-		}
-	}
-
-	fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
-		self.mapping.get_first_by_value(plain)
-	}
-}
-impl<S> EncryptedStorage<S>
-where
-	S: Storage,
-{
 	/// Load mapping from CID.
 	pub fn load_mapping(&mut self, map: &Cid) -> Result<(), StorageError> {
 		let mut mapping = BlockMapping::new();
@@ -110,6 +81,31 @@ where
 		self.mapping = BlockMapping::from_cids_storage(self, cids).map_err(|e| StorageError::Internal(e.into()))?;
 		self.flush_mapping()
 	}
+
+	/// Get encrypted cid as unencrypted block.
+	pub fn get_unencrypted(&self, cid: &Cid) -> Result<Block<S::StoreParams>, StorageError> {
+		Ok(if MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
+			EncryptedBlock::try_from(self.next.get(&cid)?)
+				.map_err(|e| StorageError::Internal(e.into()))?
+				.block(&self.key)
+				.map_err(|e| StorageError::Internal(e.into()))?
+		} else {
+			self.next.get(cid)?
+		})
+	}
+}
+impl<S> StorageContentMapping for EncryptedStorage<S> {
+	fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
+		if mapped.codec() == BLOCK_MULTICODEC {
+			self.mapping.get(mapped)
+		} else {
+			None
+		}
+	}
+
+	fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
+		self.mapping.get_first_by_value(plain)
+	}
 }
 impl<S> Storage for EncryptedStorage<S>
 where
@@ -118,14 +114,9 @@ where
 	type StoreParams = S::StoreParams;
 
 	/// Returns a block from storage.
-	///
-	/// Note: This expects the unencrypted CID.
 	fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
-		match if cid.codec() == BLOCK_MULTICODEC { Some(cid) } else { self.mapping.map.get(cid) } {
-			Some(encrypted_cid) => EncryptedBlock::try_from(self.next.get(encrypted_cid)?)
-				.map_err(|e| StorageError::Internal(e.into()))?
-				.block(&self.key)
-				.map_err(|e| StorageError::Internal(e.into())),
+		match self.mapping.map.get(cid) {
+			Some(encrypted_cid) => self.get_unencrypted(&encrypted_cid),
 			None => self.next.get(cid),
 		}
 	}

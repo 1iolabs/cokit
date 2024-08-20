@@ -55,8 +55,8 @@ pub enum MembershipState {
 	///
 	/// Use Cases:
 	/// - This is waiting for our acception/rejection.
-	///  - Accept invite by change membership state to [`MembershipState::Join`].
-	///  - Reject invite by removing the membership using [`MembershipsAction::Remove`].
+	/// - Accept invite by change membership state to [`MembershipState::Join`].
+	/// - Reject invite by removing the membership using [`MembershipsAction::Remove`].
 	///
 	/// Related membership Tags:
 	///  `co-invite: CoInviteMetadata`

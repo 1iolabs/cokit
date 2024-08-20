@@ -58,7 +58,7 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 	let membership_state = match invite {
 		CoInvite::Manual => Some(MembershipState::Invite),
 		CoInvite::Disable => None,
-		CoInvite::Accept => Some(MembershipState::Active),
+		CoInvite::Accept => Some(MembershipState::Join),
 		CoInvite::Did => {
 			todo!()
 		},

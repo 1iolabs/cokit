@@ -1,7 +1,6 @@
 use crate::{
 	drivers::network::tasks::didcomm_send::DidCommSendNetworkTask,
 	library::{
-		create_reducer_action::create_reducer_action,
 		is_cid_encrypted::is_cid_encrypted,
 		key_exchange::{create_key_request_message, KeyRequestPayload, KeyResponsePayload, CO_DIDCOMM_KEY_RESPONSE},
 		settings_timeout::settings_timeout,
@@ -10,7 +9,7 @@ use crate::{
 		context::{ActionObservable, StateObservable},
 		wait_response::wait_response,
 	},
-	Action, CoContext, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	Action, CoContext, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use co_core_keystore::KeyStoreAction;
@@ -81,19 +80,23 @@ async fn key_request(
 			KeyResponsePayload::Ok(key) => key,
 			KeyResponsePayload::Failure => Err(anyhow!("Key request failed"))?,
 		};
+		let key_uri = key.uri.clone();
 
-		// process
-		let change = create_reducer_action(
-			&did,
-			CO_CORE_NAME_MEMBERSHIP,
-			MembershipsAction::ChangeKey { id: co.clone(), did: did.clone(), key: key.uri.clone() },
-		)?;
-		let set = create_reducer_action(&did, CO_CORE_NAME_KEYSTORE, KeyStoreAction::Set(key))?;
-		Ok(vec![
-			Action::CoreActionPush { co: CO_ID_LOCAL.into(), action: set },
-			Action::CoreActionPush { co: CO_ID_LOCAL.into(), action: change },
-			Action::Joined { co: co.clone(), participant: did, success: true, peer: Some(peer) },
-		])
+		// apply
+		let local_co = context.local_co_reducer().await?;
+		local_co
+			.push(&identity, CO_CORE_NAME_KEYSTORE, &KeyStoreAction::Set(key))
+			.await?;
+		local_co
+			.push(
+				&identity,
+				CO_CORE_NAME_MEMBERSHIP,
+				&MembershipsAction::ChangeKey { id: co.clone(), did: did.clone(), key: key_uri },
+			)
+			.await?;
+
+		// join
+		Ok(vec![Action::Joined { co: co.clone(), participant: did, success: true, peer: Some(peer) }])
 	} else {
 		Ok(Default::default())
 	}

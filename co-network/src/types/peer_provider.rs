@@ -12,6 +12,7 @@ pub trait PeerProvider {
 	/// Provide peers as a stream.
 	/// Every time when new peers are discovered a item with all currently connected peers is emitted.
 	/// The stream may completes when no more peers are discoverable.
+	/// This method is maybe lossy and is usually ignoring errors.
 	fn peers(&self) -> impl Stream<Item = BTreeSet<PeerId>> + Send + 'static;
 
 	/// Same as `peers` but only emit added peers.

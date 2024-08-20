@@ -5,14 +5,20 @@ use std::time::Duration;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum KnownTags {
+	/// Local invite settings.
+	/// Usually stored in Local CO tags.
 	/// [`CoInvite`]
 	#[serde(rename = "co-invite")]
 	CoInvite,
 
+	/// Join settings of an CO.
+	/// Usually stored in CO tags.
 	/// [`CoJoin`]
 	#[serde(rename = "co-join")]
 	CoJoin,
 
+	/// Invite metadata.
+	/// Usually stored in Membership tags in the Local CO.
 	/// [`crate::CoInviteMetadata`]
 	/// [`crate::Link`]
 	#[serde(rename = "co-invite-metadata")]
@@ -22,6 +28,7 @@ pub enum KnownTags {
 	#[serde(rename = "co-network")]
 	CoNetwork,
 
+	/// Timeout settings.
 	/// [`CoTimeout`]
 	#[serde(rename = "co-timeout")]
 	CoTimeout,
@@ -140,7 +147,7 @@ pub enum CoNetwork {
 	#[default]
 	All,
 
-	/// Use this
+	/// Use this.
 	#[serde(rename = "invite")]
 	Invite,
 }

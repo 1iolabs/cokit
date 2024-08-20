@@ -2,7 +2,12 @@ use super::identity::create_identity_resolver;
 use crate::{
 	drivers::network::{publish::CoHeadsPublish, CoNetworkTaskSpawner},
 	find_membership,
-	library::{co_peer_provider::CoPeerProvider, co_state::CoState, push_heads::PushHeads},
+	library::{
+		co_peer_provider::CoPeerProvider,
+		co_state::CoState,
+		override_peer_provider::{OverridePeerProvider, Overrides},
+		push_heads::PushHeads,
+	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	state::find,
 	types::{co_reducer::CoReducerContext, co_storage::CoBlockStorageContentMapping},
@@ -32,6 +37,7 @@ pub struct SharedCoBuilder {
 	network: Option<CoNetworkTaskSpawner>,
 	initialize: bool,
 	network_block_timeout: Duration,
+	network_overrides: Option<Overrides>,
 }
 impl SharedCoBuilder {
 	pub fn new(parent: CoReducer, membership: Membership) -> Self {
@@ -43,6 +49,7 @@ impl SharedCoBuilder {
 			network: None,
 			initialize: true,
 			network_block_timeout: Duration::from_secs(30),
+			network_overrides: Default::default(),
 		}
 	}
 
@@ -60,6 +67,10 @@ impl SharedCoBuilder {
 
 	pub fn with_initialize(self, initialize: bool) -> Self {
 		Self { initialize, ..self }
+	}
+
+	pub fn with_network_overrides(self, network_overrides: Option<Overrides>) -> Self {
+		Self { network_overrides, ..self }
 	}
 
 	/// Read (latest) secret from parent CO.
@@ -87,7 +98,7 @@ impl SharedCoBuilder {
 		storage: CoStorage,
 	) -> anyhow::Result<CoStorage>
 	where
-		P: PeerProvider + Send + Sync + Clone + 'static,
+		P: PeerProvider + Send + Sync + 'static,
 	{
 		let local_peer_id = network.local_peer_id();
 		let mut network_storage = NetworkBlockStorage::new(storage, network, peer_provider, self.network_block_timeout);
@@ -112,6 +123,22 @@ impl SharedCoBuilder {
 		Ok(result_storage)
 	}
 
+	pub fn build_peer_provider<I>(
+		&self,
+		network: CoNetworkTaskSpawner,
+		identity: I,
+		co_state: CoState,
+	) -> impl PeerProvider + Send + Sync + 'static
+	where
+		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
+	{
+		OverridePeerProvider::new(
+			self.network_overrides.clone().unwrap_or_default(),
+			CoPeerProvider::new(network, create_identity_resolver(), identity, self.membership.id.clone(), co_state),
+			self.membership.id.clone(),
+		)
+	}
+
 	pub async fn build<I>(
 		self,
 		tasks: TaskSpawner,
@@ -129,13 +156,7 @@ impl SharedCoBuilder {
 		// network
 		let (storage, co_state) = if let Some(network) = &self.network {
 			let co_state = CoState::default();
-			let peer_provider = CoPeerProvider::new(
-				network.clone(),
-				create_identity_resolver(),
-				identity.clone(),
-				self.membership.id.clone(),
-				co_state.clone(),
-			);
+			let peer_provider = self.build_peer_provider(network.clone(), identity.clone(), co_state.clone());
 			(
 				self.build_network_storage(peer_provider, network.clone(), secret.as_ref(), storage.clone())?,
 				Some(co_state),
@@ -176,15 +197,10 @@ impl SharedCoBuilder {
 			.await?;
 
 		// push changes to all connectable peers
-		if let Some(network) = &self.network {
+		let co_state = if let Some(network) = &self.network {
+			let co_state = co_state.unwrap_or_default();
 			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
-			let peer_provider = CoPeerProvider::new(
-				network.clone(),
-				create_identity_resolver(),
-				identity.clone(),
-				self.membership.id.clone(),
-				co_state.clone().unwrap(),
-			);
+			let peer_provider = self.build_peer_provider(network.clone(), identity.clone(), co_state.clone());
 			let publish = PushHeads::new(
 				network.clone(),
 				tasks,
@@ -195,7 +211,10 @@ impl SharedCoBuilder {
 				true,
 			);
 			reducer.add_change_handler(Box::new(publish));
-		}
+			Some(co_state)
+		} else {
+			None
+		};
 
 		// publish changes for every `NetworkCoHeads` setting
 		if let Some(network) = self.network {

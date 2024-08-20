@@ -106,7 +106,7 @@ impl BlockStorage for MemoryBlockStorage {
 			.get(cid)
 			.map(|r| r.block.clone())
 			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")));
-		tracing::debug!(?cid, return = ?result.as_ref().map(|_| ()), "memory-store-get");
+		tracing::trace!(?cid, return = ?result.as_ref().map(|_| ()), "memory-store-get");
 		result
 	}
 

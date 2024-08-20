@@ -13,7 +13,7 @@ pub struct TracingBuilder {
 	base_path: Option<PathBuf>,
 	bunyan: Option<PathBuf>,
 	stderr: bool,
-	env_filter: Option<Option<String>>,
+	env_filter: Option<EnvFilter>,
 	/// Trace to open telemetry endpoint.
 	open_telemetry: Option<String>,
 }
@@ -46,26 +46,19 @@ impl TracingBuilder {
 		Self { stderr: true, ..self }
 	}
 
-	pub fn with_env_filter(self, env: Option<String>) -> Self {
-		Self { env_filter: Some(env), ..self }
+	pub fn with_env_filter(self) -> Self {
+		Self { env_filter: Some(EnvFilter::from_default_env()), ..self }
+	}
+
+	pub fn with_env_filter_env(self, env: String) -> Self {
+		Self { env_filter: Some(EnvFilter::from_env(env)), ..self }
+	}
+
+	pub fn with_env_filter_directives(self, directives: &str) -> Result<Self, anyhow::Error> {
+		Ok(Self { env_filter: Some(EnvFilter::try_new(directives)?), ..self })
 	}
 
 	pub fn init(self) -> Result<(), anyhow::Error> {
-		// env_filter
-		let env_filter = self.env_filter.map(|env| match env {
-			Some(env) => EnvFilter::from_env(env),
-			None => EnvFilter::from_default_env(),
-		});
-		let env_filter = match env_filter {
-			Some(env_filter) => Some(
-				env_filter
-					.add_directive("co_sdk=trace".parse()?)
-					.add_directive("co_network=trace".parse()?)
-					.add_directive("info".parse()?),
-			),
-			None => None,
-		};
-
 		// open telemetry
 		let open_telemetry = if let Some(endpoint) = &self.open_telemetry {
 			Some(open_telemetry_endpoint(self.identifier.clone(), endpoint.clone())?)
@@ -93,7 +86,7 @@ impl TracingBuilder {
 		if open_telemetry.is_some() || bunyan.is_some() || stderr.is_some() {
 			let subscriber = Registry::default()
 				.with(open_telemetry)
-				.with(env_filter)
+				.with(self.env_filter)
 				.with(JsonStorageLayer)
 				.with(bunyan)
 				.with(stderr);

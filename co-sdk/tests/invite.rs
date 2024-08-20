@@ -7,6 +7,7 @@ use co_storage::Algorithm;
 use futures::{join, StreamExt};
 use helper::instance::Instance;
 use std::{collections::BTreeSet, future::ready, time::Duration};
+use tracing::{info_span, Instrument};
 
 pub mod helper;
 
@@ -43,36 +44,28 @@ async fn test_invite() {
 	let identity2 = peer2.create_identity().await;
 
 	// peer1: create shared co
-	let shared_co =
-		tracing::trace_span!("peer1: created shared co", application = peer1.application.settings().identifier)
-			.in_scope(|| async {
-				peer1
-					.application
-					.create_co(
-						identity1.clone(),
-						CreateCo { id: "shared".into(), algorithm: None, name: "shared".to_owned() },
-					)
-					.await
-					.unwrap()
-			})
-			.await;
+	let shared_co = async {
+		peer1
+			.application
+			.create_co(identity1.clone(), CreateCo { id: "shared".into(), algorithm: None, name: "shared".to_owned() })
+			.await
+			.unwrap()
+	}
+	.instrument(info_span!("peer1: created shared co", application = peer1.application.settings().identifier))
+	.await;
 
 	// peer1: invite peer2
-	let peer1_invite =
-		tracing::trace_span!("peer1: added other peer identity", application = peer1.application.settings().identifier)
-			.in_scope(|| async {
-				shared_co
-					.push(
-						&identity1,
-						CO_CORE_NAME_CO,
-						&CoAction::ParticipantInvite {
-							participant: identity2.identity().to_owned(),
-							tags: Default::default(),
-						},
-					)
-					.await
-					.unwrap();
-			});
+	let peer1_invite = async {
+		shared_co
+			.push(
+				&identity1,
+				CO_CORE_NAME_CO,
+				&CoAction::ParticipantInvite { participant: identity2.identity().to_owned(), tags: Default::default() },
+			)
+			.await
+			.unwrap();
+	}
+	.instrument(info_span!("peer1: added other peer identity", application = peer1.application.settings().identifier));
 
 	// peer1: invite-sent/error
 	let peer1_invite_sent = peer1
@@ -110,27 +103,41 @@ async fn test_invite() {
 
 	// peer2: join
 	//  set membership to join and wait for membership set to active when join is complete
-	let local_co = peer2.application.local_co_reducer().await.unwrap();
-	let payload = MembershipsAction::ChangeMembershipState {
-		id: "shared".into(),
-		did: identity2.identity().to_owned(),
-		membership_state: MembershipState::Join,
-	};
-	let (push, membership_state) = join!(
-		local_co.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &payload),
-		wait_membership_state(peer2.application.actions(), [MembershipState::Active, MembershipState::Invite]),
-	);
-	push.unwrap();
-	assert_eq!(
-		membership_state.unwrap(),
-		(MembershipState::Active, CoId::from("shared"), identity2.identity().to_owned())
-	);
+	async {
+		let local_co = peer2.application.local_co_reducer().await.unwrap();
+		let payload = MembershipsAction::ChangeMembershipState {
+			id: "shared".into(),
+			did: identity2.identity().to_owned(),
+			membership_state: MembershipState::Join,
+		};
+		let (push, membership_state) = join!(
+			local_co.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &payload),
+			wait_membership_state(peer2.application.actions(), [MembershipState::Active, MembershipState::Invite]),
+		);
+		push.unwrap();
+		assert_eq!(
+			membership_state.unwrap(),
+			(MembershipState::Active, CoId::from("shared"), identity2.identity().to_owned())
+		);
+	}
+	.instrument(info_span!("peer2: join", application = peer2.application.settings().identifier))
+	.await;
 
 	// peer2: force sync (needed because of the paricipant state update)
 	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
-	update_co(peer2.application.actions(), &peer2_shared_co, &identity2, network1.peer_id(), Duration::from_secs(10))
+	async {
+		update_co(
+			peer2.application.actions(),
+			&peer2_shared_co,
+			&identity2,
+			network1.peer_id(),
+			Duration::from_secs(10),
+		)
 		.await
 		.unwrap();
+	}
+	.instrument(info_span!("peer2: force sync", application = peer2.application.settings().identifier))
+	.await;
 
 	// peer2: read state
 	assert_eq!(peer2_shared_co.reducer_state().await, shared_co.reducer_state().await);

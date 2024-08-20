@@ -64,7 +64,7 @@ async fn joined(context: CoContext, _peer: PeerId, header: DidCommHeader, body: 
 	};
 
 	// apply
-	if let Some(participant_state) = participant_state {
+	if let Some(participant_state) = &participant_state {
 		let action = match participant_state {
 			ParticipantState::Active => Some(CoAction::ParticipantJoin { participant: from, tags: Default::default() }),
 			ParticipantState::Pending => {
@@ -76,5 +76,17 @@ async fn joined(context: CoContext, _peer: PeerId, header: DidCommHeader, body: 
 			co.push(&context.local_identity(), CO_CORE_NAME_CO, &action).await?;
 		}
 	}
+
+	// // answer with new heads if participant is active
+	// let mut result = vec![];
+	// if participant_state == Some(ParticipantState::Active) {
+	// 	let body = HeadsMessage::Heads(co.id().to_owned(), co.heads().await);
+	// 	let mut header = HeadsMessage::create_header();
+	// 	header.thid = Some(header.id.clone());
+	// 	let (message_id, message) = EncodedMessage::create_signed_json(from, header, body)?;
+	// 	result.push(Action::DidCommSend { message_id, peer, message });
+	// }
+	// Ok(result)
+
 	Ok(vec![])
 }

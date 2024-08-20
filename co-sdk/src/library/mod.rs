@@ -21,6 +21,7 @@ pub mod local_secret;
 pub mod locals;
 pub mod network_discovery;
 pub mod node_stream;
+pub mod override_peer_provider;
 pub mod push_heads;
 pub mod settings_timeout;
 pub mod shared_co_join;

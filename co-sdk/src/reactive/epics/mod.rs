@@ -30,6 +30,7 @@ pub fn epic() -> impl Epic<Action, State, Context> + Send + 'static {
 		.with(join_receive::join_receive)
 		.with(join_send::join_send)
 		.with(joined::joined)
+		.with(joined::joined_fetch)
 		.with(key_request_receive::key_request_receive)
 		.with(key_request_send::key_request_send)
 		.with(heads_message::heads_message_receive)

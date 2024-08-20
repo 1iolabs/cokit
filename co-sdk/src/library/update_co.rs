@@ -46,7 +46,7 @@ where
 	match heads_message {
 		HeadsMessage::Heads(received_co, received_heads) => {
 			if &received_co != co_reducer.id() {
-				return Err(anyhow!("Received heads fot different CO"));
+				return Err(anyhow!("Received heads for different CO"));
 			}
 			// note:
 			//  the heads will be also merged by heads_message_heads epic

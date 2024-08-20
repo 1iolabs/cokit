@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
 	drivers::network::{token::CoToken, CoNetworkTaskSpawner},
-	library::{find_co_secret::find_co_secret, find_membership::memberships},
+	library::{find_co_secret::find_co_secret, find_membership::memberships, override_peer_provider::Overrides},
 	reactive::context::ReactiveContext,
 	reducer::core_resolver::{
 		dynamic::DynamicCoreResolver,
@@ -138,33 +138,43 @@ impl bitswap::StorageResolver<CoStorage> for CoContext {
 	) -> Result<CoStorage, anyhow::Error> {
 		// use CO from first valid token
 		for token in tokens {
-			if let Ok(co_token) = CoToken::from_bitswap_token(token) {
-				// get co
-				if let Some(co) = self.co_reducer(&co_token.body.1).await? {
-					let parent = match co.parent_id() {
-						Some(id) => self.co_reducer(id).await?.ok_or(anyhow!("Unknown CO: {}", id)),
-						None => Err(anyhow!("Unsupported CO: {}", co_token.body.1)),
-					}?;
-					let secret = find_co_secret(&parent, &co).await?;
+			match CoToken::from_bitswap_token(token) {
+				Ok(co_token) => {
+					// get co
+					if let Some(co) = self.co_reducer(&co_token.body.1).await? {
+						let parent = match co.parent_id() {
+							Some(id) => self.co_reducer(id).await?.ok_or(anyhow!("Unknown CO: {}", id)),
+							None => Err(anyhow!("Unsupported CO: {}", co_token.body.1)),
+						}?;
+						let secret = find_co_secret(&parent, &co).await?;
 
-					// verify remote peer if the CO is encrypted and this is an non local request
-					match (remote_peer, &secret) {
-						(Some(remote_peer), Some(secret)) => {
-							if !co_token.verify(secret, remote_peer) {
-								// check next token
-								continue;
-							}
-						},
-						_ => {},
-					};
+						// verify remote peer if the CO is encrypted and this is an non local request
+						match (remote_peer, &secret) {
+							(Some(remote_peer), Some(secret)) => {
+								if !co_token.verify(secret, remote_peer) {
+									// check next token
+									tracing::trace!(co = ?co.id(), "bitswap-resolve-storage-invalid");
+									continue;
+								}
+							},
+							_ => {},
+						};
 
-					// get storage
-					return Ok(co.storage());
-				}
+						// get storage
+						tracing::trace!(co = ?co.id(), "bitswap-resolve-storage-co");
+						return Ok(co.storage());
+					} else {
+						tracing::trace!(co = ?co_token.body.1, "bitswap-resolve-storage-unknown-co");
+					}
+				},
+				Err(err) => {
+					tracing::trace!(?err, "bitswap-resolve-storage-parse-failed");
+				},
 			}
 		}
 
 		// use the root storage (unencrypted)
+		tracing::trace!("bitswap-resolve-storage-root");
 		Ok(self.inner.storage())
 	}
 }
@@ -186,6 +196,8 @@ pub(crate) struct CoContextInner {
 	local_identity: LocalIdentity,
 
 	network: Arc<RwLock<Option<CoNetworkTaskSpawner>>>,
+	network_overrides: Overrides,
+
 	storage: CoStorage,
 	runtime: Runtime,
 	reactive_context: ReactiveContext,
@@ -210,6 +222,7 @@ impl CoContextInner {
 			tasks,
 			local_identity,
 			network: Arc::new(RwLock::new(network)),
+			network_overrides: Default::default(),
 			storage,
 			runtime,
 			reactive_context,
@@ -251,6 +264,11 @@ impl CoContextInner {
 			.co_reducer(CoId::from(CO_ID_LOCAL))
 			.await?
 			.ok_or(anyhow!("Local Co should always exist"))?)
+	}
+
+	/// Networking overrides.
+	pub fn network_overrides(&self) -> Overrides {
+		self.network_overrides.clone()
 	}
 
 	/// Creates a CoReducer instance of the Local CO.
@@ -342,6 +360,16 @@ impl CoContextInner {
 		})
 	}
 
+	/// Creates the Core Resolver for a shared CO.
+	pub(crate) fn create_co_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
+		let core_resolver = CoCoreResolver::default();
+		let core_resolver =
+			ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(core_resolver, id, &self.reactive_context);
+		let core_resolver = LogCoreResolver::new(core_resolver);
+		let core_resolver = DynamicCoreResolver::new(core_resolver);
+		core_resolver
+	}
+
 	/// Creates a CoReducer instance a CO.
 	pub(crate) async fn create_co_instance_membership<I>(
 		&self,
@@ -356,14 +384,7 @@ impl CoContextInner {
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
 	{
 		// resolver
-		let core_resolver = CoCoreResolver::default();
-		let core_resolver = ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(
-			core_resolver,
-			membership.id.clone(),
-			&self.reactive_context,
-		);
-		let core_resolver = LogCoreResolver::new(core_resolver);
-		let core_resolver = DynamicCoreResolver::new(core_resolver);
+		let core_resolver = self.create_co_core_resolver(membership.id.clone());
 
 		// network
 		let network = if network { self.network.read().await.clone() } else { None };
@@ -374,6 +395,7 @@ impl CoContextInner {
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
 			.with_network(network)
 			.with_initialize(initialize)
+			.with_network_overrides(Some(self.network_overrides.clone()))
 			.build(
 				self.tasks.clone(),
 				storage.unwrap_or_else(|| self.storage.clone()),

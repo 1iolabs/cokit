@@ -79,6 +79,7 @@ where
 
 	#[tracing::instrument(err, skip(self, block), fields(cid = ?block.cid()))]
 	async fn insert(&mut self, block: &Block<Self::Params>, remote_peer: &PeerId, tokens: &[Token]) -> Result<()> {
+		tracing::info!(cid = ?block.cid(), "bitswap-insert");
 		self.storage_resolver
 			.resolve_storage(Some(remote_peer), tokens)
 			.await?
