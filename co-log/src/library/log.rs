@@ -28,6 +28,12 @@ impl<S> Log<S> {
 		&self.id
 	}
 
+	pub fn id_string(&self) -> String {
+		std::str::from_utf8(&self.id)
+			.map(|s| s.to_owned())
+			.unwrap_or_else(|_| format!("{:02X?}", &self.id))
+	}
+
 	pub fn heads(&self) -> &BTreeSet<Cid> {
 		&self.heads
 	}

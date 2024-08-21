@@ -25,3 +25,37 @@ where
 		self(actions, state, context)
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use crate::{Epic, Observable};
+	use futures::{Stream, StreamExt};
+	use std::future::ready;
+
+	#[derive(Debug, Clone, PartialEq)]
+	enum Action {
+		A,
+		B,
+	}
+	fn test_epic(actions: Observable<Action>, _state: Observable<()>, _context: ()) -> impl Stream<Item = Action> {
+		actions.filter(|a| ready(matches!(a, Action::A))).map(|_| Action::B)
+	}
+
+	#[tokio::test]
+	async fn smoke() {
+		let actions = Observable::new();
+		let states = Observable::new();
+		let context = ();
+		let (result, _) = futures::future::join(
+			test_epic
+				.execute(actions.clone(), states.clone(), context)
+				.collect::<Vec<Action>>(),
+			async move {
+				actions.dispatch(Action::A);
+				actions.shutdown();
+			},
+		)
+		.await;
+		assert_eq!(result, vec![Action::B]);
+	}
+}

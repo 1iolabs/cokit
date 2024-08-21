@@ -27,8 +27,8 @@ pub async fn command(context: &CliContext, cli: &Cli) -> Result<ExitCode, anyhow
 	pin_mut!(stream);
 	while let Some(item) = stream.next().await {
 		match item {
-			Ok((id, state, tags, membership_state)) => {
-				println!("{id} | {state} | {tags} | {membership_state:?}")
+			Ok((id, did, state, tags, membership_state)) => {
+				println!("{id} | {did} | {state} | {tags} | {membership_state:?}")
 			},
 			Err(e) => {
 				result = exitcode::UNAVAILABLE;

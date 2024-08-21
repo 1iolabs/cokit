@@ -1,15 +1,19 @@
 use super::{
-	co_context::{CoContext, CoContextInner},
+	co_context::{CoContext, CoContextInner, Reducers},
 	identity::{create_identity_resolver, resolve_private_identity},
 	shared::{CreateCo, SharedCoCreator},
 	tracing::TracingBuilder,
 };
 use crate::{
-	drivers::network::tasks::received_heads::ReceivedHeadsNetworkTask,
+	drivers::network::tasks::{co_heads_received::ReceivedHeadsNetworkTask, mdns_gossip::MdnsGossipNetworkTask},
 	library::task_spawner::TaskSpawner,
 	local_keypair_fetch,
-	reactive::{context::ReactiveContext, epics::epic},
-	CoReducer, CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	reactive::{
+		context::{ActionObservable, ReactiveContext},
+		epics::epic,
+	},
+	Action, CoReducer, CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use co_identity::{
@@ -69,6 +73,10 @@ impl Application {
 		self.network.clone()
 	}
 
+	pub fn actions(&self) -> ActionObservable {
+		self.reactive.actions().clone()
+	}
+
 	pub fn shutdown(&self) -> CancellationToken {
 		self.shutdown.child_token()
 	}
@@ -83,6 +91,10 @@ impl Application {
 	#[doc(hidden)]
 	pub fn task_tracker(&self) -> TaskTracker {
 		self.tasks.clone()
+	}
+
+	pub fn context(&self) -> &CoContext {
+		&self.co_context
 	}
 
 	pub fn runtime(&self) -> Runtime {
@@ -134,6 +146,7 @@ impl Application {
 			create_identity_resolver(),
 			self.private_identity_resolver().await?,
 		);
+		let spawner = network.spawner();
 
 		// shutdown
 		//  when the token has been triggered explicitly shutdown the network
@@ -146,17 +159,19 @@ impl Application {
 		}
 
 		// set network to reducers
-		self.co_context.inner.set_network(Some(network.spawner())).await;
+		self.co_context.inner.set_network(Some(spawner.clone())).await?;
 
 		// assign
 		self.network = Some(network);
 
 		// to be able to receive updates anytime we add a static heads handler
-		self.network
-			.as_ref()
-			.unwrap()
-			.spawner()
-			.spawn(ReceivedHeadsNetworkTask::new(self.co().clone(), self.tasks()))?;
+		spawner.spawn(ReceivedHeadsNetworkTask::new(self.co().clone(), self.tasks()))?;
+
+		// use mdns discoverd peers for gossip discovery
+		spawner.spawn(MdnsGossipNetworkTask::new())?;
+
+		// reactive
+		self.reactive.actions().dispatch(Action::NetworkStarted);
 
 		// done
 		Ok(())
@@ -185,7 +200,7 @@ impl Application {
 
 	/// Get unsiged local device identity.
 	pub fn local_identity(&self) -> LocalIdentity {
-		LocalIdentityResolver::default().private_identity("did:local:device").unwrap()
+		self.co_context.local_identity()
 	}
 
 	/// Create a new CO.
@@ -336,6 +351,9 @@ impl ApplicationBuilder {
 			keychain: self.keychain,
 		};
 
+		// reducers
+		let (reducers, reducers_control) = Reducers::new();
+
 		// co
 		let reactive = ReactiveContext::default();
 		let co_context: CoContext = CoContextInner::new(
@@ -347,8 +365,12 @@ impl ApplicationBuilder {
 			storage.storage(),
 			runtime.clone(),
 			reactive.clone(),
+			reducers_control,
 		)
 		.into();
+
+		// reducers
+		tasks.spawn(reducers.worker(co_context.inner.clone()));
 
 		// reactive
 		tasks.spawn({

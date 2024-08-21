@@ -34,7 +34,6 @@ opentelemetry-semantic-conventions = "0.14.0"
 opentelemetry-stdout = { version = "0.3.0", features = ["trace"] }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
-serde_json = { workspace = true }
 termion = "3.0.0"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }

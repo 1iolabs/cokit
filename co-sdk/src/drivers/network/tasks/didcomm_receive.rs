@@ -11,15 +11,21 @@ pub struct DidCommReceiveNetworkTask {
 	receive: tokio::sync::mpsc::UnboundedSender<(PeerId, Message)>,
 }
 impl DidCommReceiveNetworkTask {
-	pub fn receive<B, C, S>(spawner: S) -> anyhow::Result<impl Stream<Item = (PeerId, Message)> + Send + 'static>
+	pub fn receive<B, C, S>(spawner: S) -> impl Stream<Item = (PeerId, Message)> + Send + 'static
 	where
 		S: NetworkTaskSpawner<B, C> + Send + Sync + 'static,
 		B: NetworkBehaviour + DidcommBehaviourProvider,
 	{
 		let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 		let task = Self { receive: tx };
-		spawner.spawn(task)?;
-		Ok(tokio_stream::wrappers::UnboundedReceiverStream::new(rx))
+
+		// spawn
+		//  note: we intentionally ignoring the result as it only can be shutdown
+		//   but in case of shutdown `tx` will be dropped and so `rx` will be closed and the stream is empty.
+		spawner.spawn(task).ok();
+
+		// result
+		tokio_stream::wrappers::UnboundedReceiverStream::new(rx)
 	}
 }
 impl<B, C> NetworkTask<B, C> for DidCommReceiveNetworkTask

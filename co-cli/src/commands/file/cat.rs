@@ -10,7 +10,7 @@ use crate::{
 use anyhow::anyhow;
 use co_core_file::Node;
 use co_primitives::{AbsolutePath, AbsolutePathOwned, PathExt};
-use co_sdk::{CoReducerError, CoStorage};
+use co_sdk::{CoReducerError, CoReducerFactory, CoStorage};
 use exitcode::ExitCode;
 use futures::{future::BoxFuture, FutureExt};
 use libipld::Cid;
@@ -32,10 +32,7 @@ pub async fn command(
 	command: &Command,
 ) -> Result<ExitCode, anyhow::Error> {
 	let application = context.application(cli).await;
-	let co_reducer = application
-		.co_reducer(&file_command.co)
-		.await?
-		.ok_or(anyhow!("Co not found: {}", file_command.co))?;
+	let co_reducer = application.context().try_co_reducer(&file_command.co).await?;
 	let file_state = match co_reducer.state(&file_command.core).await {
 		Err(CoReducerError::CoreNotFound(_)) => Ok(co_core_file::File::default()),
 		result => result,

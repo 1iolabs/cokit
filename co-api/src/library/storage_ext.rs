@@ -1,7 +1,6 @@
 use crate::Storage;
-use co_primitives::{BlockSerializer, Link, Linkable, MultiCodec};
+use co_primitives::{BlockSerializer, CborError, JsonError, Link, Linkable, MultiCodec};
 use either::Either;
-use std::convert::Infallible;
 
 pub trait StorageExt: Storage {
 	/// Get value from link.
@@ -12,7 +11,7 @@ pub trait StorageExt: Storage {
 		match link.value() {
 			Either::Left(cid) => Ok(BlockSerializer::new()
 				.deserialize(
-					&self.get(MultiCodec::dag_cbor(&cid).map_err(|e| StorageError::InvalidArgument(e.into()))?),
+					&self.get(MultiCodec::with_dag_cbor(&cid).map_err(|e| StorageError::InvalidArgument(e.into()))?),
 				)
 				.map_err(|e| StorageError::InvalidArgument(e.into()))?),
 			Either::Right(value) => Ok(value),
@@ -35,8 +34,13 @@ pub enum StorageError {
 	#[error("Invalid argument")]
 	InvalidArgument(#[source] anyhow::Error),
 }
-impl From<serde_ipld_dagcbor::DecodeError<Infallible>> for StorageError {
-	fn from(value: serde_ipld_dagcbor::DecodeError<Infallible>) -> Self {
+impl From<CborError> for StorageError {
+	fn from(value: CborError) -> Self {
+		StorageError::InvalidArgument(value.into())
+	}
+}
+impl From<JsonError> for StorageError {
+	fn from(value: JsonError) -> Self {
 		StorageError::InvalidArgument(value.into())
 	}
 }

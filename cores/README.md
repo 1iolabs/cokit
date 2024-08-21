@@ -14,7 +14,7 @@ CO Reducers (COre) runtimes.
 
 Install wasm target:
 ```shell
-rustup target add wasm32-unknown-unknown --toolchain nightly-2024-02-09-aarch64-apple-darwin
+rustup target add wasm32-unknown-unknown
 ```
 
 Build cores:

@@ -85,7 +85,7 @@ pub struct Participant {
 	pub tags: Tags,
 }
 
-#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq)]
 #[repr(u8)]
 pub enum ParticipantState {
 	/// Active participant.
@@ -100,7 +100,7 @@ pub enum ParticipantState {
 	/// Pending participant.
 	///
 	/// Usually this is a manual Join request.
-	/// Pending participants need to be moved into Invite state by a participant.
+	/// Pending participants need to be moved into [`ParticipantState::Invite`] state by a participant.
 	Pending = 3,
 }
 

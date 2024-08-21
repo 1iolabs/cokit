@@ -1,8 +1,8 @@
 use crate::{CoError, CoErrorSignal, CoSettings};
 use anyhow::Result;
-use co_sdk::{state, Application, ApplicationBuilder, Network, PrivateIdentityResolver, PrivateIdentityResolverBox};
+use co_sdk::{Application, ApplicationBuilder};
 use dioxus::signals::Writable;
-use futures::{future::BoxFuture, pin_mut, Future, StreamExt};
+use futures::{future::BoxFuture, Future};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[derive(Debug, Clone)]
@@ -107,12 +107,6 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 		application.create_network(settings.network_force_new_peer_id).await?;
 	}
 
-	// network: listen known identities
-	if let Some(network) = application.network() {
-		did_discovery_subscribe_all(application.co(), &network, &application.private_identity_resolver().await?)
-			.await?;
-	}
-
 	// execute
 	tracing::info!("co-startup");
 	while let Some(task) = tasks.recv().await {
@@ -131,20 +125,4 @@ fn co_main(settings: CoSettings, tasks: UnboundedReceiver<Task>) {
 		.build()
 		.unwrap()
 		.block_on(async move { co_app(settings, tasks).await.expect("app to run") })
-}
-
-#[tracing::instrument(skip(context, network, identity_resolver))]
-async fn did_discovery_subscribe_all(
-	context: &co_sdk::CoContext,
-	network: &Network,
-	identity_resolver: &PrivateIdentityResolverBox,
-) -> Result<()> {
-	let local_co = context.local_co_reducer().await?;
-	let identities = state::identities(local_co.storage(), local_co.reducer_state().await.0.into());
-	pin_mut!(identities);
-	while let Some(identity) = identities.next().await {
-		let private_identity = identity_resolver.resolve_private(&identity?.did).await?;
-		network.did_discovery_subscribe(private_identity).await?;
-	}
-	Ok(())
 }

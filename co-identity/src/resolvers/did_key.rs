@@ -208,7 +208,7 @@ impl IdentityResolver for DidKeyIdentityResolver {
 
 #[cfg(test)]
 mod tests {
-	use crate::{DidKeyIdentity, Identity, PrivateIdentity};
+	use crate::{DidCommHeader, DidKeyIdentity, Identity, IdentityBox, MemoryIdentityResolver, PrivateIdentity};
 
 	#[test]
 	fn it_should_sign_and_verfiy() {
@@ -225,5 +225,49 @@ mod tests {
 		let public_key = identity.public_key();
 		let signature = identity.sign(data).unwrap();
 		assert!(identity.verify(signature.as_slice(), data, public_key.as_deref()));
+	}
+
+	#[test]
+	fn it_should_have_public_context() {
+		let identity = DidKeyIdentity::generate(None);
+		identity.try_didcomm_public().unwrap();
+	}
+
+	#[test]
+	fn it_should_have_private_context() {
+		let identity = DidKeyIdentity::generate(None);
+		identity.try_didcomm_private().unwrap();
+	}
+
+	#[test]
+	fn test_import_export() {
+		let identity = DidKeyIdentity::generate(None);
+		let export = identity.export().unwrap();
+		let import = DidKeyIdentity::import(&export).unwrap();
+		import.try_didcomm_public().unwrap();
+		import.try_didcomm_private().unwrap();
+	}
+
+	#[tokio::test]
+	async fn test_jwe_roundtrip() {
+		// let from = DidKeyIdentity::generate(None);
+		// let to = DidKeyIdentity::generate(None);
+		let from = DidKeyIdentity::import(&DidKeyIdentity::generate(None).export().unwrap()).unwrap();
+		let to = DidKeyIdentity::import(&DidKeyIdentity::generate(None).export().unwrap()).unwrap();
+
+		// resolver
+		let mut resolver = MemoryIdentityResolver::default();
+		resolver.insert(IdentityBox::new(from.clone())).await;
+		resolver.insert(IdentityBox::new(to.clone())).await;
+
+		// "send"
+		let (from_private, to_public, header) = DidCommHeader::create(&from, &to, "test").unwrap();
+		let message = from_private.jwe(&to_public, header.clone(), "null").unwrap();
+
+		// "recv"
+		let to_private = to.try_didcomm_private().unwrap();
+		let (received_header, received_body) = to_private.receive(&resolver, &message).await.unwrap();
+		assert_eq!(received_header, header);
+		assert_eq!(received_body, "null");
 	}
 }

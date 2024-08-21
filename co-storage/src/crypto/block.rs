@@ -4,7 +4,7 @@ use chacha20poly1305::{
 	aead::{Aead, AeadCore, KeyInit, OsRng},
 	Key, XChaCha20Poly1305,
 };
-use co_primitives::{MultiCodec, MultiCodecError};
+use co_primitives::{from_cbor, to_cbor, KnownMultiCodec, MultiCodec, MultiCodecError};
 use libipld::{
 	multihash::{Code, MultihashDigest},
 	store::StoreParams,
@@ -19,7 +19,7 @@ use std::{fmt::Debug, marker::PhantomData};
 /// [application] [commit timestamp] [purpose]", e.g., "example.com 2019-12-25 16:18:03 session tokens v1
 pub const BLOCK_KEY_DERIVATION: &str = "co 2023-10-24T10:25:23Z block key derivation v1";
 pub const BLOCK_DERIVATION: &str = "co 2023-10-26T14:31:38Z block derivation v1";
-pub const BLOCK_MULTICODEC: u64 = 0x301000;
+pub const BLOCK_MULTICODEC: u64 = KnownMultiCodec::CoEncryptedBlock as u64;
 
 /// Nonce.
 pub type Nonce = Vec<u8>;
@@ -336,9 +336,9 @@ where
 
 	/// Convert to encrypted Block.
 	fn try_into(self) -> Result<Block<S>, Self::Error> {
-		let encrypted_data = serde_ipld_dagcbor::to_vec(&self).map_err(|_| AlgorithmError::Encoding)?;
+		let encrypted_data = to_cbor(&self).map_err(|_| AlgorithmError::Encoding)?;
 		let mh = Code::Blake3_256.digest(&encrypted_data);
-		let cid = Cid::new_v1(MultiCodec::CoEncryptedBlock.into(), mh);
+		let cid = Cid::new_v1(KnownMultiCodec::CoEncryptedBlock.into(), mh);
 		Ok(Block::new_unchecked(cid, encrypted_data))
 	}
 }
@@ -351,11 +351,10 @@ where
 	/// Convert from encrypted Block.
 	fn try_from(value: Block<S>) -> Result<Self, Self::Error> {
 		// validate
-		MultiCodec::codec(MultiCodec::CoEncryptedBlock, value.cid())?;
+		MultiCodec::with_codec(KnownMultiCodec::CoEncryptedBlock, value.cid())?;
 
 		// decode
-		let block: EncryptedBlock<S> =
-			serde_ipld_dagcbor::from_slice(value.data()).map_err(|_| AlgorithmError::Decoding)?;
+		let block: EncryptedBlock<S> = from_cbor(value.data()).map_err(|_| AlgorithmError::Decoding)?;
 
 		// validate
 		if !block.is_valid() {
@@ -544,6 +543,7 @@ impl KeySlot {
 mod tests {
 	use super::{Algorithm, EncryptedBlock, Header, KeySlot};
 	use crate::crypto::secret::Secret;
+	use co_primitives::{from_cbor, to_cbor};
 	use libipld::{cbor::DagCborCodec, multihash::Code, Block, DefaultParams};
 	use std::iter::repeat;
 
@@ -574,7 +574,7 @@ mod tests {
 		let header = Header::new(Algorithm::default(), vec![key_slot]);
 
 		// serialize header
-		let bytes = serde_ipld_dagcbor::to_vec(&header).unwrap();
+		let bytes = to_cbor(&header).unwrap();
 		// println!("{:?}", header);
 		// let raw_bytes = Into::<Vec<u8>>::into(header.clone());
 		// println!("raw_bytes: {}", raw_bytes.len()); // 129
@@ -593,7 +593,7 @@ mod tests {
 		assert_eq!(bytes.len(), 153);
 
 		// deserialize
-		let header_deserialized: Header = serde_ipld_dagcbor::from_slice(bytes.as_slice()).unwrap();
+		let header_deserialized: Header = from_cbor(bytes.as_slice()).unwrap();
 		assert_eq!(header_deserialized, header);
 		assert!(header.is_valid());
 	}
@@ -605,7 +605,7 @@ mod tests {
 		let key_slot = KeySlot::new(Algorithm::default(), &secret, &block_secret).unwrap();
 
 		// serialize header
-		let bytes = serde_ipld_dagcbor::to_vec(&key_slot).unwrap();
+		let bytes = to_cbor(&key_slot).unwrap();
 		//hexdump::hexdump(bytes.as_slice());
 		assert_eq!(bytes.len(), KeySlot::encoded_size(Algorithm::default()));
 	}
@@ -618,7 +618,7 @@ mod tests {
 		let header = Header::new(Algorithm::default(), vec![key_slot]);
 
 		// serialize header
-		let bytes = serde_ipld_dagcbor::to_vec(&header).unwrap();
+		let bytes = to_cbor(&header).unwrap();
 		//hexdump::hexdump(bytes.as_slice());
 		assert_eq!(bytes.len(), Header::encoded_size(Algorithm::default()));
 	}
@@ -638,15 +638,14 @@ mod tests {
 		//println!("data: ({}): {:?}", encrypted_block.data.len(), encrypted_block.data); // 29 = 13 + 16
 
 		// serialize
-		let encrypted_block_bytes = serde_ipld_dagcbor::to_vec(&encrypted_block).unwrap();
+		let encrypted_block_bytes = to_cbor(&encrypted_block).unwrap();
 		// cbor (11), header (153), cid+tag (52), data+tag (29)
 		assert_eq!(encrypted_block_bytes.len(), 245);
 		//println!("length: {}", encrypted_block_bytes.len());
 		//hexdump::hexdump(&encrypted_block_bytes);
 
 		// deserialize
-		let encrypted_block_deserialized: EncryptedBlock<DefaultParams> =
-			serde_ipld_dagcbor::from_slice(&encrypted_block_bytes).unwrap();
+		let encrypted_block_deserialized: EncryptedBlock<DefaultParams> = from_cbor(&encrypted_block_bytes).unwrap();
 
 		// decrypt
 		let decrypted_block = encrypted_block_deserialized.block(&secret).unwrap();

@@ -1,9 +1,11 @@
 use crate::{
-	didcomm, heads::heads_message::HeadsMessage, types::layer_behaviour::LayerBehaviour, DidcommBehaviourProvider,
-	GossipsubBehaviourProvider,
+	didcomm::{self, EncodedMessage},
+	heads::{HeadsErrorCode, HeadsMessage},
+	types::layer_behaviour::LayerBehaviour,
+	DidcommBehaviourProvider, GossipsubBehaviourProvider,
 };
 use co_identity::PrivateIdentity;
-use co_primitives::{CoId, NetworkCoHeads};
+use co_primitives::{from_cbor, to_cbor, CoId, Did, NetworkCoHeads};
 use libipld::Cid;
 use libp2p::{
 	gossipsub::{self, IdentTopic, PublishError, TopicHash},
@@ -13,6 +15,7 @@ use libp2p::{
 use std::{
 	collections::{BTreeMap, BTreeSet, VecDeque},
 	task::{Context, Poll},
+	time::{Duration, Instant},
 };
 
 #[derive(Debug, Clone)]
@@ -34,13 +37,27 @@ pub enum Event {
 		/// - true when received via direct didcomm.
 		response: bool,
 	},
+
+	/// Received an heads request.
+	/// This will be responded with on of:
+	/// - [`Event::`]
+	RequestHeads {
+		/// The request ID supplied by the caller.
+		request_id: String,
+		/// The CO ID.
+		co: CoId,
+		/// Received from peer.
+		peer: PeerId,
+		/// Received from participant.
+		from: Option<Did>,
+	},
 	//
 	// /// Sent heads to an peer.
 	// SentHeads { co: CoId, heads: BTreeSet<Cid>, peer_id: PeerId },
-
+	//
 	// /// Subscribed for heads.
 	// Subscribed { co: CoId },
-
+	//
 	// /// Unsubscribed for heads.
 	// Unsubscribed { co: CoId },
 }
@@ -49,6 +66,7 @@ pub enum Event {
 pub enum HeadsEvent {
 	GenerateEvent(Event),
 	Publish(PublishHeads),
+	Send(PeerId, EncodedMessage),
 }
 
 #[derive(Debug, Clone)]
@@ -58,14 +76,26 @@ pub struct PublishHeads {
 	heads: BTreeSet<Cid>,
 }
 
+#[derive(Debug, Clone)]
+struct PendingRequest {
+	peer: PeerId,
+	expire: Instant,
+}
+
 pub struct HeadsState {
 	heads: BTreeSet<TopicHash>,
 	events: VecDeque<HeadsEvent>,
 	pending_heads: BTreeMap<TopicHash, Vec<PublishHeads>>,
+	pending_requests: BTreeMap<String, PendingRequest>,
 }
 impl HeadsState {
 	pub fn new() -> Self {
-		Self { heads: Default::default(), events: Default::default(), pending_heads: Default::default() }
+		Self {
+			heads: Default::default(),
+			events: Default::default(),
+			pending_heads: Default::default(),
+			pending_requests: Default::default(),
+		}
 	}
 
 	/// Subscribe to CO gossip.
@@ -110,7 +140,7 @@ impl HeadsState {
 	{
 		let topic = Self::to_topic(network, co);
 		let message = HeadsMessage::Heads(co.clone(), heads.clone());
-		let data = serde_ipld_dagcbor::to_vec(&message)?;
+		let data = to_cbor(&message)?;
 		match swarm.behaviour_mut().gossipsub_mut().publish(topic, data) {
 			Ok(_) => Ok(()),
 			Err(PublishError::InsufficientPeers) => {
@@ -133,7 +163,7 @@ impl HeadsState {
 	pub fn heads<B, P>(
 		&mut self,
 		swarm: &mut Swarm<B>,
-		identity: &P,
+		from: &P,
 		co: &CoId,
 		heads: &BTreeSet<Cid>,
 		peers: impl IntoIterator<Item = PeerId>,
@@ -148,7 +178,9 @@ impl HeadsState {
 		tracing::trace!(?co, ?heads, ?peers, "network-heads-send");
 
 		// message
-		let message = HeadsMessage::Heads(co.clone(), heads.clone()).to_didcomm()?.sign(identity)?;
+		let header = HeadsMessage::create_header();
+		let body = HeadsMessage::Heads(co.clone(), heads.clone());
+		let (_, message) = EncodedMessage::create_signed_json(from, header, &body)?;
 
 		// send
 		for peer in peers {
@@ -156,6 +188,70 @@ impl HeadsState {
 		}
 
 		//result
+		Ok(())
+	}
+
+	/// Request heads from peer.
+	/// Peers will answer with own heads if they are different.
+	/// However the response is not implemented by this protocol but by the caller.
+	#[deprecated]
+	pub fn request<B, P>(
+		&mut self,
+		swarm: &mut Swarm<B>,
+		from: &P,
+		co: CoId,
+		peer: PeerId,
+	) -> Result<String, anyhow::Error>
+	where
+		B: NetworkBehaviour + DidcommBehaviourProvider,
+		P: PrivateIdentity + Send + Sync + 'static,
+	{
+		// message
+		let header = HeadsMessage::create_header();
+		let body = HeadsMessage::HeadsRequest(co.clone());
+		let message_id = header.id.clone();
+		let (_, message) = EncodedMessage::create_signed_json(from, header, &body)?;
+
+		// log
+		tracing::trace!(request_id = message_id, ?co, ?peer, "network-heads-request");
+
+		// send
+		swarm.behaviour_mut().didcomm_mut().send(&peer, message.clone());
+
+		// result
+		Ok(message_id)
+	}
+
+	/// Send response for an [`Event::RequestHeads`] request.
+	#[deprecated]
+	pub fn response<B, P>(
+		&mut self,
+		swarm: &mut Swarm<B>,
+		from: &P,
+		request_id: String,
+		response: HeadsMessage,
+	) -> Result<(), anyhow::Error>
+	where
+		B: NetworkBehaviour + DidcommBehaviourProvider,
+		P: PrivateIdentity + Send + Sync + 'static,
+	{
+		let request = self
+			.pending_requests
+			.remove(&request_id)
+			.ok_or(anyhow::anyhow!("unknown request"))?;
+
+		// log
+		tracing::trace!(?request_id, ?response, "network-heads-response");
+
+		// message
+		let mut header = HeadsMessage::create_header();
+		header.thid = Some(request_id);
+		let (_, message) = EncodedMessage::create_signed_json(from, header, &response)?;
+
+		// send
+		swarm.behaviour_mut().didcomm_mut().send(&request.peer, message.clone());
+
+		// result
 		Ok(())
 	}
 
@@ -172,7 +268,7 @@ impl HeadsState {
 			gossipsub::Event::Message { propagation_source: _, message_id: _, message } => {
 				if self.heads.contains(&message.topic) {
 					// TODO(metric): add metrics when receive invalid message?
-					let heads_message: Option<HeadsMessage> = serde_ipld_dagcbor::from_slice(&message.data).ok();
+					let heads_message: Option<HeadsMessage> = from_cbor(&message.data).ok();
 					match heads_message {
 						Some(HeadsMessage::Heads(co, heads)) => {
 							self.events.push_back(HeadsEvent::GenerateEvent(Event::ReceivedHeads {
@@ -182,7 +278,7 @@ impl HeadsState {
 								response: false,
 							}))
 						},
-						None => {},
+						_ => {},
 					}
 				}
 			},
@@ -211,11 +307,51 @@ impl HeadsState {
 								response: true,
 							}))
 						},
+						Some(HeadsMessage::HeadsRequest(co)) => {
+							// ignore request if request_id is already known.
+							let request_id = message.header().id.clone();
+							if !self.pending_requests.contains_key(&request_id) {
+								self.pending_requests.insert(
+									request_id.clone(),
+									PendingRequest {
+										peer: *peer_id,
+										expire: Instant::now() + Duration::from_secs(120),
+									},
+								);
+								self.events.push_back(HeadsEvent::GenerateEvent(Event::RequestHeads {
+									request_id,
+									co: co.clone(),
+									peer: *peer_id,
+									from: message.sender().cloned(),
+								}));
+							}
+						},
 						_ => {},
 					}
 				}
 			},
 			_ => {},
+		}
+	}
+
+	/// Timeout `pending_requests` after expire time.
+	fn timeout(&mut self) {
+		let time = Instant::now();
+		let timedout: Vec<String> = self
+			.pending_requests
+			.iter()
+			.filter(|(_, request)| request.expire < time)
+			.map(|(id, _)| id.clone())
+			.collect();
+		for request_id in timedout {
+			if let Some(request) = self.pending_requests.remove(&request_id) {
+				let message =
+					HeadsMessage::Error { code: HeadsErrorCode::ServiceUnavailable, message: "timeout".to_owned() };
+				let message = EncodedMessage::create_plain_json(HeadsMessage::create_header(), &message).ok();
+				if let Some((_, message)) = message {
+					self.events.push_back(HeadsEvent::Send(request.peer, message));
+				}
+			}
 		}
 	}
 }
@@ -253,10 +389,17 @@ where
 				}
 				None
 			},
+			HeadsEvent::Send(peer, message) => {
+				swarm.behaviour_mut().didcomm_mut().send(&peer, message);
+				None
+			},
 		}
 	}
 
 	fn poll(&mut self, _cx: &mut Context<'_>) -> Poll<Self::ToLayer> {
+		// timeout
+		self.timeout();
+
 		// events
 		if let Some(event) = self.events.pop_front() {
 			return Poll::Ready(event);

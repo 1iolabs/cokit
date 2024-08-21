@@ -2,7 +2,8 @@ use crate::{
 	bitswap, didcomm, discovery, heads,
 	types::{network_task::TokioNetworkTaskSpawner, provider::BitswapBehaviourProvider},
 	DidcommBehaviourProvider, DiscoveryLayerBehaviourProvider, FnOnceNetworkTask, GossipsubBehaviourProvider,
-	HeadsLayerBehaviourProvider, Layer, LayerBehaviour, NetworkError, NetworkTaskBox, NetworkTaskSpawner,
+	HeadsLayerBehaviourProvider, Layer, LayerBehaviour, MdnsBehaviourProvider, NetworkError, NetworkTaskBox,
+	NetworkTaskSpawner,
 };
 use anyhow::anyhow;
 use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver, PrivateIdentityResolverBox};
@@ -69,9 +70,8 @@ impl Libp2pNetwork {
 				bitswap::BitswapBlockStorage::new(storage_resolver),
 				Box::new(move |t| {
 					tokio::spawn(async move {
-						let span = tracing::trace_span!("bitswap", application = bitswap_identifier);
-						let _span_enter = span.enter();
-						t.await
+						t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
+							.await
 					});
 				}),
 			),
@@ -102,7 +102,7 @@ impl Libp2pNetwork {
 
 		// context
 		let context = Context {
-			discovery: discovery::DiscoveryState::new(resolver.clone(), Duration::from_secs(30), None),
+			discovery: discovery::DiscoveryState::new(resolver.clone(), local_peer_id, Duration::from_secs(30), None),
 			heads: heads::HeadsState::new(),
 		};
 
@@ -491,6 +491,31 @@ impl BitswapBehaviourProvider for Behaviour {
 		}
 	}
 }
+impl MdnsBehaviourProvider for Behaviour {
+	fn mdns(&self) -> &mdns::tokio::Behaviour {
+		&self.mdns
+	}
+
+	fn mdns_mut(&mut self) -> &mut mdns::tokio::Behaviour {
+		&mut self.mdns
+	}
+
+	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&mdns::Event> {
+		match event {
+			NetworkEvent::Mdns(e) => Some(e),
+			_ => None,
+		}
+	}
+
+	fn into_mdns_event(
+		event: <Self as NetworkBehaviour>::ToSwarm,
+	) -> Result<mdns::Event, <Self as NetworkBehaviour>::ToSwarm> {
+		match event {
+			NetworkEvent::Mdns(e) => Ok(e),
+			e => Err(e),
+		}
+	}
+}
 
 fn set_network_mode(_behaviour: &mut Behaviour, _mode: NetworkMode) {
 	// match mode {
@@ -559,7 +584,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		},
 	};
 
-	// // log
+	// log
 	// match &event {
 	// 	SwarmEvent::NewListenAddr { address, .. } => {
 	// 		tracing::info!(?address, "network-listening");
@@ -580,6 +605,12 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 
 	// tasks
 	if let Some(event) = network_event {
+		// log
+		if is_log(&event) {
+			tracing::trace!(?event, "network-event");
+		}
+
+		// tasks
 		let mut result_event = Some(event);
 		let mut task_index = 0;
 		while task_index < runtime.pending_tasks.len() {
@@ -606,5 +637,12 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		if let Some(event) = result_event {
 			runtime.events.next(Arc::new(event));
 		}
+	}
+}
+
+fn is_log(event: &SwarmEvent<NetworkEvent>) -> bool {
+	match event {
+		SwarmEvent::Behaviour(NetworkEvent::Ping(_)) => false,
+		_ => true,
 	}
 }

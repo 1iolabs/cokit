@@ -38,7 +38,7 @@ fmt:
   cache:
     <<: *global_cache
   script:
-    - cargo fmt --check
+    - cargo +nightly fmt --check
 
 build:
   stage: build

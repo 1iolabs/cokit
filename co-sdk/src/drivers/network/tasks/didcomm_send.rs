@@ -17,7 +17,7 @@ impl DidCommSendNetworkTask {
 	/// Resolves as soon the message could be sent to one of the specified peers.
 	pub async fn send<B, C, S>(
 		spawner: S,
-		peers: BTreeSet<PeerId>,
+		peers: impl IntoIterator<Item = PeerId>,
 		message: didcomm::EncodedMessage,
 		timeout: Duration,
 	) -> anyhow::Result<PeerId>
@@ -26,7 +26,7 @@ impl DidCommSendNetworkTask {
 		B: NetworkBehaviour + DidcommBehaviourProvider,
 	{
 		let (tx, rx) = tokio::sync::oneshot::channel();
-		let task = Self { message, peers, sent: Some(tx) };
+		let task = Self { message, peers: peers.into_iter().collect(), sent: Some(tx) };
 		spawner.spawn(task)?;
 		Ok(tokio::time::timeout(timeout, rx).await???)
 	}

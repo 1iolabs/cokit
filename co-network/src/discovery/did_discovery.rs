@@ -1,14 +1,10 @@
-use anyhow::anyhow;
-use co_identity::{DidCommHeader, Identity, PrivateIdentity};
-use co_primitives::{Did, NetworkDidDiscovery};
+use co_identity::{network_did_discovery, DidCommHeader, Identity, PrivateIdentity};
+use co_primitives::{serde_string_enum, NetworkDidDiscovery};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
-use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DidDiscovery {
 	pub network: NetworkDidDiscovery,
-	pub did: Did,
 	pub message_id: String,
 	pub message: String,
 }
@@ -17,29 +13,18 @@ impl DidDiscovery {
 	pub fn create<F, T>(
 		from: &F,
 		to: &T,
-		network: NetworkDidDiscovery,
+		network: Option<NetworkDidDiscovery>,
 		message_type: String,
 	) -> Result<DidDiscovery, anyhow::Error>
 	where
 		F: PrivateIdentity + Send + Sync + 'static,
 		T: Identity + Send + Sync + 'static,
 	{
-		let id: String = Uuid::new_v4().into();
-		let header = DidCommHeader {
-			from: Some(from.identity().to_owned()),
-			to: BTreeSet::from_iter(vec![to.identity().to_owned()]),
-			id: id.clone(),
-			message_type,
-			..Default::default()
-		};
-		let from_context = from
-			.didcomm_private()
-			.ok_or(anyhow!("unsupported identity: from: no private didcomm context"))?;
-		let to_context = to
-			.didcomm_public()
-			.ok_or(anyhow!("unsupported identity: to: no public didcomm context"))?;
+		let network = network_did_discovery(to, network)?;
+		let (from_context, to_context, header) = DidCommHeader::create(from, to, message_type)?;
+		let message_id = header.id.clone();
 		let message = from_context.jwe(&to_context, header, "null")?;
-		Ok(DidDiscovery { message_id: id, did: to.identity().to_owned(), network, message })
+		Ok(DidDiscovery { message_id, network, message })
 	}
 }
 
@@ -58,22 +43,4 @@ impl DidDiscoveryMessage {
 		Self::try_from(value.to_owned()).ok()
 	}
 }
-impl std::fmt::Display for DidDiscoveryMessage {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(
-			f,
-			"{}",
-			serde_json::to_value(self)
-				.expect("DidDiscoveryMessage to serialize")
-				.as_str()
-				.expect("DidDiscoveryMessage to serialize to string")
-		)
-	}
-}
-impl TryFrom<String> for DidDiscoveryMessage {
-	type Error = serde_json::error::Error;
-
-	fn try_from(value: String) -> Result<Self, Self::Error> {
-		serde_json::from_value(serde_json::Value::String(value))
-	}
-}
+serde_string_enum!(DidDiscoveryMessage);

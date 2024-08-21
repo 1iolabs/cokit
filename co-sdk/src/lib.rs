@@ -23,7 +23,9 @@ pub use co_identity::{
 	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 pub use co_primitives::{
-	tag, tags, BlockSerializer, CoId, Date, Did, Link, MultiCodec, MultiCodecError, OptionLink, Tag, Tags,
+	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, BlockSerializer, CoId,
+	CoInvite, CoNetwork, Date, Did, KnownMultiCodec, KnownTag, KnownTags, Link, MultiCodec, MultiCodecError,
+	OptionLink, Tag, Tags,
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{
@@ -40,6 +42,7 @@ pub use drivers::{
 };
 pub use library::{
 	did_key_provider::DidKeyProvider,
+	find_co_identities::{find_co_identities, find_co_private_identity},
 	find_co_secret::find_co_secret,
 	find_membership::{find_membership, find_memberships},
 	generate_random_name::generate_random_name,
@@ -48,6 +51,7 @@ pub use library::{
 	node_stream::NodeStream,
 	shared_co_join::{SharedCoJoin, SharedCoJoinError},
 	task_spawner::TaskSpawner,
+	update_co::update_co,
 };
 pub use pin::pin::PinAPI;
 pub use reactive::{action::Action, epic::Epic, observable::Observable};

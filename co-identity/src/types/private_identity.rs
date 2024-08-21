@@ -10,6 +10,12 @@ pub trait PrivateIdentity: Identity {
 	/// Private DIDComm context.
 	fn didcomm_private(&self) -> Option<DidCommPrivateContext>;
 
+	fn try_didcomm_private(&self) -> Result<DidCommPrivateContext, anyhow::Error> {
+		Ok(self
+			.didcomm_private()
+			.ok_or(anyhow::anyhow!("unsupported identity: no private didcomm context: {}", self.identity()))?)
+	}
+
 	fn boxed(self) -> PrivateIdentityBox
 	where
 		Self: Sized + Clone + Send + Sync + 'static,

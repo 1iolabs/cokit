@@ -1,9 +1,9 @@
 use super::Command as NetworkCommand;
 use crate::{cli::Cli, library::cli_context::CliContext};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use co_core_membership::MembershipState;
 use co_primitives::Did;
-use co_sdk::{state, CoId, CoReducerFactory, PrivateIdentityResolver};
+use co_sdk::{state, CoId, CoReducerFactory};
 use exitcode::ExitCode;
 use futures::{stream, StreamExt, TryStreamExt};
 use std::future::ready;
@@ -27,40 +27,22 @@ pub async fn command(
 ) -> Result<ExitCode, anyhow::Error> {
 	let mut application = context.application(cli).await;
 	application.create_network(network_command.force_new_peer_id).await?;
-	let network = application.network().unwrap();
-	let private_identity_resolver = application.private_identity_resolver().await?;
-
-	// identities
-	// TODO: watch local co
-	let dids = match &command.identity {
-		Some(dids) => dids.clone(),
-		None => {
-			let local_co = application.local_co_reducer().await?;
-			state::identities(local_co.storage(), local_co.co_state().await)
-				.map(|identity| identity.map(|identity| identity.did))
-				.try_collect()
-				.await?
-		},
-	};
-	for did in dids {
-		let identity = private_identity_resolver.resolve_private(&did).await?;
-		network.did_discovery_subscribe(identity).await?;
-	}
 
 	// COs
 	// TODO: watch local co
+	// TODO: https://gitlab.1io.com/1io/co-sdk/-/issues/52
 	let cos: Vec<CoId> = match &command.identity {
 		Some(dids) => dids.iter().map(|id| CoId::from(id)).collect(),
 		None => {
 			let local_co = application.local_co_reducer().await?;
 			let co_context = application.co();
 			state::memberships(local_co.storage(), local_co.co_state().await)
-				.try_filter(|(_, _, _, membership_state)| ready(*membership_state == MembershipState::Active))
+				.try_filter(|(_, _, _, _, membership_state)| ready(*membership_state == MembershipState::Active))
 				.map_ok(|membership| membership.0)
 				.then(move |id| async move {
 					match id {
 						Ok(id) => {
-							let co = co_context.co_reducer(&id).await?.ok_or(anyhow!("Co not found"))?;
+							let co = co_context.try_co_reducer(&id).await?;
 							let co_state = co.co().await?;
 							if co_state.network.is_empty() {
 								Ok(None)

@@ -16,6 +16,7 @@ pub use library::{
 pub use storage::{
 	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping, EncryptedStorage},
 	fs::FsStorage,
+	mapped::MappedBlockStorage,
 	memory::{MemoryBlockStorage, MemoryStorage},
 	store_params::StoreParamsBlockStorage,
 	sync::{SyncBlockStorage, SyncStorage},

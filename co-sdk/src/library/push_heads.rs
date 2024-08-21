@@ -18,8 +18,10 @@ use libipld::Cid;
 use libp2p::PeerId;
 use std::collections::BTreeSet;
 use tokio::sync::watch;
+use tracing::Instrument;
 
 ///	Use PeerProvider to discover peers and send heads to them whenever a peer comes online or new heads are produced.
+/// TODO: This will stop working when peers stream completes, dispite the networks may change.
 pub struct PushHeads<M> {
 	heads: watch::Sender<BTreeSet<Cid>>,
 	mapping: Option<M>,
@@ -42,7 +44,8 @@ impl<M> PushHeads<M> {
 		P: PeerProvider + Send + Sync + 'static,
 	{
 		let (tx, rx) = watch::channel(Default::default());
-		tasks.spawn(worker(spawner, co, rx, identity, peer_provider));
+		let span = tracing::trace_span!("push-heads", ?co);
+		tasks.spawn(worker(spawner, co, rx, identity, peer_provider).instrument(span));
 		Self { heads: tx, mapping, force_mapping, initialized: false }
 	}
 }

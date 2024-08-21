@@ -1,6 +1,5 @@
-use exitcode::ExitCode;
-
 use crate::{cli::Cli, library::cli_context::CliContext};
+use exitcode::ExitCode;
 
 mod listen;
 

@@ -1,5 +1,6 @@
 use super::wasm_context::WasmContext;
 use crate::{Block, Cid, Context, Reducer, ReducerAction};
+use co_primitives::{from_cbor, to_cbor};
 use libipld::{
 	cbor::DagCborCodec,
 	multihash::{Code, MultihashDigest},
@@ -26,7 +27,7 @@ where
 		None => S::default(),
 		Some(cid) => {
 			let block = context.storage().get(&cid);
-			let state: S = serde_ipld_dagcbor::from_slice(block.data()).expect("state to be dag-cbor");
+			let state: S = from_cbor(block.data()).expect("state to be dag-cbor");
 			state
 		},
 	};
@@ -34,14 +35,13 @@ where
 	// event
 	let event_cid = context.event();
 	let event_block = context.storage().get(&event_cid);
-	let event: ReducerAction<S::Action> =
-		serde_ipld_dagcbor::from_slice(event_block.data()).expect("event to be dag-cbor");
+	let event: ReducerAction<S::Action> = from_cbor(event_block.data()).expect("event to be dag-cbor");
 
 	// reduce
 	let next_state = state.reduce(&event, context);
 
 	// store
-	let next_data = serde_ipld_dagcbor::to_vec(&next_state).unwrap();
+	let next_data = to_cbor(&next_state).unwrap();
 	let next_hash = Code::Blake3_256.digest(&next_data);
 	let next_cid = Cid::new_v1(DagCborCodec.into(), next_hash);
 	let next_block = Block::new_unchecked(next_cid, next_data);

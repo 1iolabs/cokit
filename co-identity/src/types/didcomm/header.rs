@@ -1,10 +1,9 @@
+use crate::{DidCommPrivateContext, DidCommPublicContext, Identity, PrivateIdentity};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::BTreeSet,
 	time::{SystemTime, UNIX_EPOCH},
 };
-
-use crate::{DidCommPrivateContext, DidCommPublicContext, Identity, PrivateIdentity};
 
 /// See: https://identity.foundation/didcomm-messaging/spec/#message-headers
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -86,7 +85,12 @@ impl DidCommHeader {
 	pub fn new(message_type: impl Into<String>) -> Self {
 		Self {
 			id: uuid::Uuid::new_v4().to_string(),
-			created_time: Some(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()),
+			created_time: Some(
+				SystemTime::now()
+					.duration_since(UNIX_EPOCH)
+					.expect("valid system time")
+					.as_secs(),
+			),
 			message_type: message_type.into(),
 			..Default::default()
 		}
@@ -102,17 +106,19 @@ impl DidCommHeader {
 		F: PrivateIdentity + Send + Sync + 'static,
 		T: Identity + Send + Sync + 'static,
 	{
-		let from_didcomm = from
-			.didcomm_private()
-			.ok_or(anyhow::anyhow!("unsupported identity: from: no private didcomm context"))?;
-		let to_didcomm = from
-			.didcomm_public()
-			.ok_or(anyhow::anyhow!("unsupported identity: to: no public didcomm context"))?;
-
 		let mut header = DidCommHeader::new(message_type.into());
 		header.from = Some(from.identity().to_owned());
-		header.to = BTreeSet::from_iter(vec![to.identity().to_owned()]);
+		header.to = [to.identity().to_owned()].into_iter().collect();
+		Ok((from.try_didcomm_private()?, to.try_didcomm_public()?, header))
+	}
 
-		Ok((from_didcomm, to_didcomm, header))
+	/// Create new DidCommHeader for a message with sender `from` and unknown recipent(s).
+	pub fn create_from<F>(from: &F, message_type: impl Into<String>) -> anyhow::Result<(DidCommPrivateContext, Self)>
+	where
+		F: PrivateIdentity + Send + Sync + 'static,
+	{
+		let mut header = DidCommHeader::new(message_type.into());
+		header.from = Some(from.identity().to_owned());
+		Ok((from.try_didcomm_private()?, header))
 	}
 }

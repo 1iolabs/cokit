@@ -34,7 +34,7 @@ impl Handler {
 impl Handler {
 	fn on_dial_upgrade_error(
 		&mut self,
-		DialUpgradeError { error, .. }: DialUpgradeError<
+		DialUpgradeError { error, info }: DialUpgradeError<
 			<Self as ConnectionHandler>::OutboundOpenInfo,
 			<Self as ConnectionHandler>::OutboundProtocol,
 		>,
@@ -51,22 +51,25 @@ impl Handler {
 				// the remote peer does not support the requested protocol(s).
 				self.pending_events.push_back(Event::OutboundUnsupportedProtocols);
 			},
-			StreamUpgradeError::Apply(_e) => {
+			StreamUpgradeError::Apply(err) => {
 				// log::debug!("outbound stream {info} failed: {e}");
+				tracing::trace!(?err, ?info, "didcomm-outbound-stream-apply-failed");
 			},
-			StreamUpgradeError::Io(_e) => {
+			StreamUpgradeError::Io(err) => {
 				// log::debug!("outbound stream {info} failed: {e}");
+				tracing::trace!(?err, ?info, "didcomm-outbound-stream-io-failed");
 			},
 		}
 	}
 
 	fn on_listen_upgrade_error(
 		&mut self,
-		ListenUpgradeError { .. }: ListenUpgradeError<
+		ListenUpgradeError { error, info }: ListenUpgradeError<
 			<Self as ConnectionHandler>::InboundOpenInfo,
 			<Self as ConnectionHandler>::InboundProtocol,
 		>,
 	) {
+		tracing::trace!(err = ?error, ?info, "didcomm-inbound-stream-failed");
 		// log::debug!("inbound stream {info} failed: {error}");
 	}
 }

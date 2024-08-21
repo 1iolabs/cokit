@@ -1,12 +1,9 @@
-use super::did_discovery::DidDiscovery;
-use crate::{
-	didcomm, types::layer_behaviour::LayerBehaviour, DidDiscoveryMessage, DidcommBehaviourProvider,
-	GossipsubBehaviourProvider,
-};
+use super::did_discovery::{DidDiscovery, DidDiscoveryMessage};
+use crate::{didcomm, types::layer_behaviour::LayerBehaviour, DidcommBehaviourProvider, GossipsubBehaviourProvider};
 use anyhow::anyhow;
 use co_identity::{
-	DidCommContext, DidCommHeader, DidCommPrivateContext, Identity, IdentityResolver, PrivateIdentity,
-	PrivateIdentityBox,
+	network_did_discovery, DidCommContext, DidCommHeader, DidCommPrivateContext, Identity, IdentityResolver,
+	PrivateIdentity, PrivateIdentityBox,
 };
 use co_primitives::{Did, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous};
 use derive_more::From;
@@ -87,6 +84,7 @@ struct DiscoveryConnectRequest {
 	pub timeout: Duration,
 	pub max_peers: Option<u16>,
 	pub connected_peers: BTreeSet<PeerId>,
+	pub span: tracing::Span,
 }
 impl DiscoveryConnectRequest {
 	/// Hit timeout using time?
@@ -171,6 +169,9 @@ pub enum DiscoveryEvent {
 ///
 /// Peer connections will be managed by the swarm (and its timeout).
 pub struct DiscoveryState<R> {
+	/// Our PeerId
+	local_peer_id: PeerId,
+
 	/// Next discovery request id.
 	next_id: u64,
 
@@ -202,8 +203,9 @@ impl<R> DiscoveryState<R>
 where
 	R: IdentityResolver + Clone + Send + Sync + 'static,
 {
-	pub fn new(resolver: R, timeout: Duration, max_peers: Option<u16>) -> Self {
+	pub fn new(resolver: R, local_peer_id: PeerId, timeout: Duration, max_peers: Option<u16>) -> Self {
 		Self {
+			local_peer_id,
 			next_id: 1,
 			requests: Default::default(),
 			timeout,
@@ -220,13 +222,17 @@ where
 	pub fn did_discovery_subscribe<B, P>(
 		&mut self,
 		swarm: &mut Swarm<B>,
-		network: NetworkDidDiscovery,
+		network: Option<NetworkDidDiscovery>,
 		identity: P,
 	) -> Result<(), anyhow::Error>
 	where
 		B: DiscoveryBehaviour,
 		P: PrivateIdentity + Send + Sync + 'static,
 	{
+		// network
+		let network = network_did_discovery(&identity, network)?;
+
+		// topic
 		let topic = did_discovery_topic(&network);
 
 		// add
@@ -294,6 +300,10 @@ where
 		let id = self.next_id;
 		self.next_id += 1;
 
+		// tracing
+		let span = tracing::trace_span!("discovery", discovery_id = id);
+		let _enter = span.enter();
+
 		// request
 		let mut request = DiscoveryConnectRequest {
 			id,
@@ -303,14 +313,21 @@ where
 			timeout: self.timeout,
 			discovery_peers: Default::default(),
 			connected_peers: Default::default(),
+			span: span.clone(),
 		};
 		request.build()?;
+
+		// log
+		tracing::trace!(timeout = ?request.timeout, discovery = ?request.discovery, "discovery");
+
+		// add
 		self.requests.insert(id, request);
 
 		// connect
 		match self.try_connect(swarm, id) {
 			Ok(_) => Ok(id),
 			Err(err) => {
+				tracing::trace!(?err, "discovery-failure");
 				self.release(id);
 				Err(err)
 			},
@@ -332,9 +349,10 @@ where
 					// this is because gossipsub only can publish messages when subscribed
 					// todo: really?
 					// note: currently we can only receive requests for DID which we also subscribed to
-					//       so when we may change this we need to keep tract of connection requests for
+					//       so when we may change this we need to keep track of connection requests for
 					//       dids/identities.
 					if self.did_subscriptions.get(&did_discovery_topic(&item.network).hash()).is_none() {
+						tracing::trace!("discovery-unsubscribed");
 						continue;
 					}
 					// let identity = subscriptions.iter().find(|subscription| {
@@ -349,10 +367,13 @@ where
 
 					// publish
 					match did_discovery(swarm, &item) {
-						Ok(_) => {},
+						Ok(_) => {
+							tracing::trace!("discovery-published");
+						},
 
 						// we try again when a peer subscribes
 						Err(gossipsub::PublishError::InsufficientPeers) => {
+							tracing::trace!("discovery-pending-insufficient-peers");
 							self.pending_discovery.push_back((
 								request.id,
 								did_discovery_topic_hash(&item.network),
@@ -361,7 +382,9 @@ where
 						},
 
 						// forward other errors
-						Err(e) => return Err(ConnectError::Other(e.into())),
+						Err(err) => {
+							return Err(ConnectError::Other(err.into()));
+						},
 					};
 				},
 				Discovery::Topic(item) => {
@@ -395,6 +418,7 @@ where
 
 	/// Release (may disconnect) discovered peers.
 	pub fn release(&mut self, id: u64) {
+		tracing::trace!(parent: self.requests.get(&id).and_then(|s| s.span.id()), "discovery-release");
 		self.pending_discovery.retain(|(request, _, _)| *request != id);
 		self.requests.remove(&id);
 	}
@@ -483,6 +507,11 @@ where
 				}
 			},
 			gossipsub::Event::Subscribed { peer_id, topic } => {
+				// filter out self subscribe
+				if peer_id == &self.local_peer_id {
+					return;
+				}
+
 				// DidDiscovery: move pending discoveries to events when its topic has subscribed
 				loop {
 					if let Some((index, _)) = self
@@ -512,6 +541,11 @@ where
 				}
 			},
 			gossipsub::Event::Unsubscribed { peer_id, topic } => {
+				// filter out self subscribe
+				if peer_id == &self.local_peer_id {
+					return;
+				}
+
 				// Topic: dispatch disconnected events for mesh unsubscribed peers
 				for request_id in self
 					.all_discovery_topics()
@@ -767,7 +801,7 @@ async fn did_discovery_receive<R: IdentityResolver>(
 			match did_discovery_resolve(&didcomm_private, request_from_peer, request_header) {
 				Ok(event) => return Some(event),
 				Err(err) => {
-					tracing::warn!(?err, "did-discovery-resolve-failed");
+					tracing::warn!(?err, "discovery-did-resolve-failed");
 				},
 			}
 		}
@@ -906,12 +940,14 @@ fn peer_to_dial_opts(item: &NetworkPeer) -> Result<DialOpts, anyhow::Error> {
 
 fn peer_connected(request: &mut DiscoveryConnectRequest, events: &mut VecDeque<DiscoveryEvent>, peer: PeerId) {
 	if request.connected_peers.insert(peer) {
+		tracing::trace!(parent: request.span.id(), ?peer, "discovery-connected");
 		events.push_back(DiscoveryEvent::GenerateEvent(Event::Connected { id: request.id, peer }));
 	}
 }
 
 fn peer_disconnected(request: &mut DiscoveryConnectRequest, events: &mut VecDeque<DiscoveryEvent>, peer: PeerId) {
 	if request.connected_peers.remove(&peer) {
+		tracing::trace!(parent: request.span.id(), ?peer, "discovery-disconnected");
 		events.push_back(DiscoveryEvent::GenerateEvent(Event::Disconnected { id: request.id, peer }));
 	}
 }
@@ -921,14 +957,13 @@ mod tests {
 	use super::DiscoveryBehaviour;
 	use crate::{
 		didcomm,
-		discovery::{did_discovery::DidDiscovery, discovery::Discovery, DiscoveryState, Event},
-		DidDiscoveryMessage, DidcommBehaviourProvider, GossipsubBehaviourProvider, Layer, LayerBehaviour,
+		discovery::{DidDiscovery, DidDiscoveryMessage, Discovery, DiscoveryState, Event},
+		DidcommBehaviourProvider, GossipsubBehaviourProvider, Layer, LayerBehaviour,
 	};
 	use co_identity::{
 		DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentity,
 		PrivateIdentityBox, PrivateIdentityResolver,
 	};
-	use co_primitives::NetworkDidDiscovery;
 	use futures::{select, FutureExt, StreamExt};
 	use libp2p::{
 		gossipsub,
@@ -1084,15 +1119,17 @@ mod tests {
 		// peers
 		let mut peer1 = Peer::new(vec![]);
 		let mut peer2 = Peer::new(vec![]);
+		let peer1_id = peer1.peer_id();
+		let peer2_id = peer2.peer_id();
 
 		// states
 		let mut discovery1 = Layer::new(
 			peer1.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(10), None),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), peer1_id, Duration::from_secs(10), None),
 		);
 		let mut discovery2 = Layer::new(
 			peer2.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(10), None),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), peer2_id, Duration::from_secs(10), None),
 		);
 
 		// peer2: connect
@@ -1153,27 +1190,29 @@ mod tests {
 		let mut peer1 = Peer::new(vec![did1.clone().boxed()]);
 		let mut peer2 = Peer::new(vec![did2.clone().boxed()]);
 		peer2.add_address(&peer1);
+		let peer1_id = peer1.peer_id();
+		let peer2_id = peer2.peer_id();
 
 		// states
 		let mut discovery1 = Layer::new(
 			peer1.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(10), None),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), peer1_id, Duration::from_secs(10), None),
 		);
 		let mut discovery2 = Layer::new(
 			peer2.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), Duration::from_secs(10), None),
+			DiscoveryState::new(DidKeyIdentityResolver::new(), peer2_id, Duration::from_secs(10), None),
 		);
 
 		// peer1: subscribe
 		discovery1
 			.layer_mut()
-			.did_discovery_subscribe(peer1.swarm(), NetworkDidDiscovery::default(), did1.clone())
+			.did_discovery_subscribe(peer1.swarm(), None, did1.clone())
 			.unwrap();
 
 		// peer2: subscribe
 		discovery2
 			.layer_mut()
-			.did_discovery_subscribe(peer2.swarm(), NetworkDidDiscovery::default(), did2.clone())
+			.did_discovery_subscribe(peer2.swarm(), None, did2.clone())
 			.unwrap();
 
 		// // wait subscribed
@@ -1194,14 +1233,9 @@ mod tests {
 			.layer_mut()
 			.connect(
 				peer2.swarm(),
-				vec![DidDiscovery::create(
-					&did2,
-					&did1,
-					NetworkDidDiscovery::default(),
-					DidDiscoveryMessage::Discover.to_string(),
-				)
-				.unwrap()
-				.into()],
+				vec![DidDiscovery::create(&did2, &did1, None, DidDiscoveryMessage::Discover.to_string())
+					.unwrap()
+					.into()],
 			)
 			.unwrap();
 

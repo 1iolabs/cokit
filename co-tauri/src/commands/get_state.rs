@@ -1,12 +1,8 @@
-use std::collections::BTreeSet;
-
-use anyhow::anyhow;
-use co_sdk::CoId;
-
-use co_sdk::Application;
-use libipld::Cid;
-
 use crate::library::tauri_error::CoTauriError;
+use anyhow::anyhow;
+use co_sdk::{Application, CoId, CoReducerFactory};
+use libipld::Cid;
+use std::collections::BTreeSet;
 
 #[tauri::command]
 pub(crate) async fn get_co_state(
@@ -14,9 +10,10 @@ pub(crate) async fn get_co_state(
 	co: CoId,
 ) -> Result<(Option<Cid>, BTreeSet<Cid>), CoTauriError> {
 	let reducer = application
-		.co_reducer(co.clone())
-		.await?
-		.ok_or(anyhow!("Co not found: {}", co.clone()))?;
+		.context()
+		.try_co_reducer(&co)
+		.await
+		.map_err(|err| anyhow::Error::from(err))?;
 	let (state, heads) = reducer.reducer_state().await;
 	Ok((state, heads))
 }

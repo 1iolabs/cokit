@@ -1,38 +1,89 @@
 use anyhow::anyhow;
-use co_identity::{DidCommHeader, PrivateIdentity};
+use co_identity::{DidCommHeader, Identity, PrivateIdentity};
+use co_primitives::{from_cbor, from_json, from_json_string, to_json, to_json_string};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::value::RawValue;
+use std::fmt::Debug;
 
 /// DIDComm Message
 ///
 /// See: https://identity.foundation/didcomm-messaging/spec/v2.1/#iana-media-types
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct EncodedMessage(pub Vec<u8>);
 impl EncodedMessage {
 	/// Create plaintext JSON message.
-	pub fn create_plain_json<T: Serialize>(header: DidCommHeader, body: &T) -> Result<Self, anyhow::Error> {
-		Ok(Self(serde_ipld_dagjson::to_vec(&DidCommMessage { header, body })?))
+	pub fn create_plain_json<T>(header: DidCommHeader, body: &T) -> Result<(String, Self), anyhow::Error>
+	where
+		T: Serialize + Debug,
+	{
+		tracing::trace!(?header, ?body, "didcomm-message-plain");
+		let message_id = header.id.clone();
+		Ok((message_id, Self(to_json(&DidCommMessage { header, body })?)))
 	}
 
 	/// Create signed JSON message.
-	pub fn create_signed_json<T, P>(identity: &P, header: DidCommHeader, body: &T) -> Result<Self, anyhow::Error>
+	///
+	/// Note: This will overwrite from header.
+	pub fn create_signed_json<T, P>(
+		from: &P,
+		mut header: DidCommHeader,
+		body: &T,
+	) -> Result<(String, Self), anyhow::Error>
 	where
-		T: Serialize,
+		T: Serialize + Debug,
 		P: PrivateIdentity + Send + Sync + 'static,
 	{
-		let context = identity.didcomm_private().ok_or(anyhow!("No didcomm context"))?;
-		let body_json = serde_ipld_dagjson::to_vec(body)?;
-		let jws = context.jws(header, std::str::from_utf8(&body_json)?)?;
-		Ok(Self(jws.into_bytes()))
+		tracing::trace!(?header, ?body, from = from.identity(), "didcomm-message-signed");
+		let from_didcomm = from.try_didcomm_private()?;
+		header.from = Some(from.identity().to_owned());
+		let message_id = header.id.clone();
+		let body_json = to_json_string(body)?;
+		let envelope = from_didcomm.jws(header, &body_json)?;
+		Ok((message_id, Self(envelope.into_bytes())))
+	}
+
+	/// Create encrypted JSON message.
+	///
+	/// Note: This will overwrite from and to header.
+	pub fn create_encrypted_json<T, P, I>(
+		from: &P,
+		to: &I,
+		mut header: DidCommHeader,
+		body: &T,
+	) -> Result<(String, Self), anyhow::Error>
+	where
+		T: Serialize + Debug,
+		P: PrivateIdentity + Send + Sync + 'static,
+		I: Identity + Send + Sync + 'static,
+	{
+		tracing::trace!(?header, ?body, from = from.identity(), to = to.identity(), "didcomm-message-encrypted");
+		let from_didcomm = from.try_didcomm_private()?;
+		let to_didcomm = to.try_didcomm_public()?;
+		header.from = Some(from.identity().to_owned());
+		header.to = [to.identity().to_owned()].into_iter().collect();
+		let message_id = header.id.clone();
+		let body_json = to_json_string(body)?;
+		let envelope = from_didcomm.jwe(&to_didcomm, header, &body_json)?;
+		Ok((message_id, Self(envelope.into_bytes())))
 	}
 
 	/// Sign message. Assuming we currently hold a plain text JSON message.
-	pub fn sign<P>(self, identity: &P) -> Result<Self, anyhow::Error>
+	pub fn sign<P>(self, from: &P) -> Result<Self, anyhow::Error>
 	where
 		P: PrivateIdentity + Send + Sync + 'static,
 	{
-		let message: DidCommMessage<&RawValue> = serde_ipld_dagjson::from_slice(&self.0)?;
-		Self::create_signed_json(identity, message.header, &message.body)
+		let message: DidCommMessage<&RawValue> = from_json(&self.0)?;
+		Ok(Self::create_signed_json(from, message.header, &message.body)?.1)
+	}
+
+	/// Encrypt message. Assuming we currently hold a plain text JSON message.
+	pub fn encrypt<P, I>(self, from: &P, to: &I) -> Result<Self, anyhow::Error>
+	where
+		P: PrivateIdentity + Send + Sync + 'static,
+		I: Identity + Send + Sync + 'static,
+	{
+		let message: DidCommMessage<&RawValue> = from_json(&self.0)?;
+		Ok(Self::create_encrypted_json(from, to, message.header, &message.body)?.1)
 	}
 
 	/// Get message as JSON string. Returning None if not JSON Object.
@@ -67,10 +118,10 @@ impl EncodedMessage {
 	/// Try to deserialize message to T.
 	pub fn deserialize<T: DeserializeOwned>(&self) -> Result<T, anyhow::Error> {
 		if let Some(data) = self.json() {
-			return Ok(serde_ipld_dagjson::from_slice(data.as_bytes())?);
+			return Ok(from_json_string(data)?);
 		}
 		if let Some(data) = self.cbor() {
-			return Ok(serde_ipld_dagcbor::from_slice(data)?);
+			return Ok(from_cbor(data)?);
 		}
 		Err(anyhow!("unknown format"))
 	}
@@ -100,6 +151,15 @@ impl AsRef<[u8]> for EncodedMessage {
 		&self.0
 	}
 }
+impl Debug for EncodedMessage {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		if let Some(json) = self.json() {
+			f.debug_tuple("EncodedMessage").field(&json).finish()
+		} else {
+			f.debug_tuple("EncodedMessage").field(&self.0).finish()
+		}
+	}
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DidCommMessage<T> {
@@ -111,6 +171,7 @@ struct DidCommMessage<T> {
 #[cfg(test)]
 mod tests {
 	use super::EncodedMessage;
+	use co_primitives::{to_cbor, to_json};
 	use serde::Serialize;
 
 	#[derive(Debug, Serialize)]
@@ -121,17 +182,17 @@ mod tests {
 	#[test]
 	fn test_json() {
 		let data = Test { count: 10 };
-		let json = serde_json::to_string(&data).unwrap();
-		let message: EncodedMessage = json.clone().into();
-		assert_eq!(Some(json.as_str()), message.json());
+		let json = to_json(&data).unwrap();
+		let message: EncodedMessage = json.into();
+		assert_eq!(message.json(), Some("{\"count\":10}"));
 	}
 
 	#[test]
 	fn test_cbor() {
 		let data = Test { count: 10 };
-		let cbor = serde_ipld_dagcbor::to_vec(&data).unwrap();
+		let cbor = to_cbor(&data).unwrap();
 		let message: EncodedMessage = cbor.clone().into();
 		// println!("f: {}", cbor[0] as u8);
-		assert_eq!(Some(&cbor[..]), message.cbor());
+		assert_eq!(message.cbor(), Some(&cbor[..]));
 	}
 }

@@ -1,6 +1,7 @@
 use super::{fs_read::fs_read_option, fs_write::fs_write};
 use anyhow::Context;
 use async_trait::async_trait;
+use co_primitives::{from_cbor, to_cbor};
 use futures::{stream, Stream, StreamExt, TryStreamExt};
 use libipld::Cid;
 use notify::{
@@ -252,7 +253,7 @@ impl ApplicationLocal {
 				.with_context(|| format!("Reading file: {:?}", path))?
 			{
 				Some(data) => {
-					let result: ApplicationLocal = serde_ipld_dagcbor::from_slice(&data)?;
+					let result: ApplicationLocal = from_cbor(&data)?;
 					if result.version != Self::version() {
 						return Err(anyhow::anyhow!("Invalid file version"));
 					}
@@ -265,7 +266,7 @@ impl ApplicationLocal {
 
 	fn read_sync(path: impl AsRef<Path>) -> anyhow::Result<ApplicationLocal> {
 		let data = std::fs::read(&path).with_context(|| format!("Reading file: {:?}", path.as_ref().display()))?;
-		let result: ApplicationLocal = serde_ipld_dagcbor::from_slice(&data)?;
+		let result: ApplicationLocal = from_cbor(&data)?;
 		if result.version != Self::version() {
 			return Err(anyhow::anyhow!("Invalid file version"));
 		}
@@ -274,7 +275,7 @@ impl ApplicationLocal {
 
 	pub async fn write(&self, path: &PathBuf) -> anyhow::Result<()> {
 		// serialize
-		let data = serde_ipld_dagcbor::to_vec(self)?;
+		let data = to_cbor(self)?;
 
 		// write
 		fs_write(path, data, true)

@@ -15,6 +15,9 @@ where
 {
 	match Message::receive(identity_resolver, private_identity_resolver, encoded_message.as_ref()).await {
 		Ok(message) => Some(Event::Received { peer_id, message }),
-		Err(e) => Some(Event::InboundFailure { peer_id, error: e.to_string(), message: Some(encoded_message) }),
+		Err(err) => {
+			tracing::warn!(?err, message = ?encoded_message, ?peer_id, "didcomm-receive-failure");
+			Some(Event::InboundFailure { peer_id, error: err.to_string(), message: Some(encoded_message) })
+		},
 	}
 }

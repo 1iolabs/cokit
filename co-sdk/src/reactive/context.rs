@@ -27,6 +27,7 @@ impl ReactiveContext {
 		self.states.shutdown();
 	}
 
+	#[tracing::instrument(name = "reactive", skip(self, context, epic), fields(application = context.identifier()))]
 	pub async fn execute<E>(&self, context: Context, epic: E)
 	where
 		E: Epic<Action, State, Context>,

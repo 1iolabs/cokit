@@ -13,8 +13,6 @@ co-api = { path = "../../co-api" }
 co-messaging = { path = "../../co-messaging" }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { workspace = true, features = ["derive"] }
-serde_ipld_dagcbor = { workspace = true }
-serde_json = { workspace = true }
 serde_repr = { workspace = true }
 thiserror = { workspace = true }
 

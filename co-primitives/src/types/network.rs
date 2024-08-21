@@ -22,11 +22,14 @@ pub enum Network {
 }
 
 /// DID Discovery protocol.
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NetworkDidDiscovery {
 	/// The GossipSub topic used for DidDiscovery messages.
 	/// If not specified the default topic will be used: `"co-contact"`.
 	pub topic: Option<String>,
+
+	/// The DID to be discovered.
+	pub did: String,
 }
 
 /// CO Heads protocol.

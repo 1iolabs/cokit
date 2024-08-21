@@ -1,10 +1,10 @@
 use crate::{
-	library::didcomm_receive::didcomm_receive, DidCommHeader, Identity, IdentityResolver, PrivateIdentity,
-	PrivateIdentityResolver, ReceiveError,
+	library::didcomm_receive::didcomm_receive, DidCommContext, DidCommHeader, Identity, IdentityResolver,
+	PrivateIdentity, PrivateIdentityResolver, ReceiveError,
 };
 use anyhow::anyhow;
-use co_primitives::Did;
-use didcomm_rs::{Jwe, MessageType};
+use co_primitives::{from_json_string, Did};
+use didcomm_rs::{Jwe, Jws, MessageType};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::value::RawValue;
 
@@ -116,17 +116,14 @@ impl Message {
 		}
 		if message_type == MessageType::DidCommJws {
 			let (header, body) = didcomm_receive(None, &sender_resolver, message).await?;
-			// TODO: resolve sender
-			return Ok(Message::SignedJson { sender: "".to_owned(), header, body });
+
+			// resolve sender
+			let sender = verify_signing_identity(&sender_resolver, &header, message).await?;
+
+			// result
+			return Ok(Message::SignedJson { sender, header, body });
 		}
 		if message_type == MessageType::DidCommRaw {
-			#[derive(Debug, Serialize, Deserialize)]
-			struct DidCommMessage<'a> {
-				#[serde(flatten)]
-				header: DidCommHeader,
-				#[serde(borrow)]
-				body: Option<&'a RawValue>,
-			}
 			let plain_message: DidCommMessage =
 				serde_json::from_str(message).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
 			return Ok(Message::PlainJson {
@@ -159,16 +156,12 @@ impl Message {
 
 	/// Try to deserialize message to T.
 	pub fn body_deserialize<T: DeserializeOwned>(&self) -> Result<T, anyhow::Error> {
-		Ok(serde_ipld_dagjson::from_slice(self.body().as_bytes())?)
+		Ok(from_json_string(self.body())?)
 	}
 
-	/// Test is message is validated.
+	/// Test if message is validated.
 	pub fn is_validated_sender(&self) -> bool {
-		match self {
-			Message::AuthCryptJson { sender, header, body: _ } => Some(sender) == header.from.as_ref(),
-			Message::SignedJson { sender, header, body: _ } => Some(sender) == header.from.as_ref(),
-			_ => false,
-		}
+		self.sender().is_some()
 	}
 
 	/// Get validated sender.
@@ -177,6 +170,16 @@ impl Message {
 			Message::AuthCryptJson { sender, header, body: _ } if Some(sender) == header.from.as_ref() => Some(sender),
 			Message::SignedJson { sender, header, body: _ } if Some(sender) == header.from.as_ref() => Some(sender),
 			_ => None,
+		}
+	}
+
+	// Convert into inner.
+	pub fn into_inner(self) -> (DidCommHeader, String) {
+		match self {
+			Message::PlainJson { header, body } => (header, body),
+			Message::SignedJson { sender: _, header, body } => (header, body),
+			Message::AnonCryptJson { header, body } => (header, body),
+			Message::AuthCryptJson { sender: _, header, body } => (header, body),
 		}
 	}
 }
@@ -208,6 +211,67 @@ fn get_message_type(message: &str) -> Result<MessageType, anyhow::Error> {
 	if to_check.signatures.is_some() || to_check.signature.is_some() {
 		return Ok(MessageType::DidCommJws);
 	}
-	let message: didcomm_rs::Message = serde_json::from_str(message)?;
-	Ok(message.get_jwm_header().typ.clone())
+	let didcomm_message: Option<didcomm_rs::Message> = serde_json::from_str(message).ok();
+	if let Some(didcomm_message) = didcomm_message {
+		return Ok(didcomm_message.get_jwm_header().typ.clone());
+	}
+	let _plain_message: DidCommMessage = serde_json::from_str(message)?;
+	Ok(MessageType::DidCommRaw)
+}
+
+/// Verify plain text `from` header matches any signature `kid`.
+/// We accept if:
+/// - the `kid` is a known from public key.
+/// - the `kid` is the same value as the `from` header.
+async fn verify_signing_identity<I>(
+	sender_resolver: &I,
+	header: &DidCommHeader,
+	message: &str,
+) -> Result<Did, ReceiveError>
+where
+	I: IdentityResolver + Send + Sync + 'static,
+{
+	if let Some(from) = &header.from {
+		// from
+		let sender_identity = sender_resolver
+			.resolve(from)
+			.await
+			.map_err(|e| ReceiveError::BadDid(from.to_owned(), e.into()))?;
+		let sender_context = sender_identity
+			.didcomm_public()
+			.ok_or_else(|| ReceiveError::BadDid(from.to_owned(), anyhow!("No didcomm public context.")))?;
+		let sender_public_key = sender_context
+			.verification_method()
+			.public_key_bytes()
+			.map_err(|err| ReceiveError::BadDid(from.to_owned(), err.into()))?;
+		let sender_kid = hex::encode(&sender_public_key);
+
+		// check signature kid
+		let jws: Jws = serde_json::from_str(message).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
+		let signatures = if let Some(signatures) = jws.signatures {
+			signatures
+		} else if let Some(signature) = jws.signature {
+			vec![signature]
+		} else {
+			vec![]
+		};
+		for signature in signatures {
+			if let Some(kid) = &signature.get_kid() {
+				if kid == &sender_kid || kid == sender_identity.identity() {
+					return Ok(from.clone());
+				}
+			}
+		}
+		Err(ReceiveError::InvalidSigningKeyId(anyhow!("Can not match from header")))
+	} else {
+		Err(ReceiveError::UnknownFormat(anyhow!("No from header")))
+	}
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct DidCommMessage<'a> {
+	#[serde(flatten)]
+	header: DidCommHeader,
+	#[serde(borrow)]
+	body: Option<&'a RawValue>,
 }

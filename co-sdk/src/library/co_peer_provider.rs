@@ -1,22 +1,19 @@
-use super::co_state::CoState;
+use super::{co_state::CoState, network_discovery::network_discovery};
 use crate::{
 	drivers::network::{tasks::discovery_connect::DiscoveryConnectNetworkTask, CoNetworkTaskSpawner},
 	state, CoStorage,
 };
+use anyhow::anyhow;
 use async_trait::async_trait;
 use co_identity::{IdentityResolverBox, PrivateIdentity};
-use co_network::{
-	discovery::{self, Discovery},
-	heads::HeadsState,
-	DidDiscoveryMessage, NetworkTaskSpawner, PeerProvider,
-};
-use co_primitives::{CoId, Network, OptionLink};
-use futures::Stream;
+use co_network::{discovery, NetworkTaskSpawner, PeerProvider};
+use co_primitives::{CoId, OptionLink};
+use futures::{Stream, StreamExt, TryStreamExt};
 use libp2p::PeerId;
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, future::ready};
 
+#[derive(Clone)]
 pub struct CoPeerProvider<I> {
-	storage: CoStorage,
 	id: CoId,
 	state: CoState,
 	identity_resolver: IdentityResolverBox,
@@ -31,11 +28,10 @@ where
 		spawner: CoNetworkTaskSpawner,
 		identity_resolver: IdentityResolverBox,
 		identity: I,
-		storage: CoStorage,
 		id: CoId,
 		state: CoState,
 	) -> Self {
-		Self { storage, id, state, spawner, identity, identity_resolver }
+		Self { id, state, spawner, identity, identity_resolver }
 	}
 }
 #[async_trait]
@@ -44,32 +40,70 @@ where
 	I: PrivateIdentity + Clone + Send + Sync + 'static,
 {
 	fn peers(&self) -> impl Stream<Item = BTreeSet<PeerId>> + Send + 'static {
+		self.try_peers().filter_map({
+			let id = self.id.clone();
+			move |result| {
+				ready(match result {
+					Ok(p) => Some(p),
+					Err(err) => {
+						tracing::warn!(?err, co = ?id, "co-peer-discovery-error");
+						None
+					},
+				})
+			}
+		})
+	}
+
+	fn try_peers(&self) -> impl Stream<Item = Result<BTreeSet<PeerId>, anyhow::Error>> + Send + 'static {
 		// task
 		let spawner = self.spawner.clone();
 		let identity_resolver = self.identity_resolver.clone();
 		let identity = self.identity.clone();
-		let storage = self.storage.clone();
 		let state = self.state.clone();
 		let id = self.id.clone();
 
 		// stream
 		async_stream::stream! {
-			let discovery = match networks(&identity_resolver, &identity, &storage, &id, state.read().await).await {
-				Ok(value) => value,
-				Err(_) => return,
+			// storage/state
+			let (storage, co_state) = state.read().await;
+			let storage = match storage {
+				Some(s) => s,
+				None => {
+					yield Err(anyhow!("No storage"));
+					return;
+				},
+			};
+
+			// discovery
+			let discovery = match networks(&identity_resolver, &identity, &storage, &id, co_state).await {
+				Ok(value) => {
+					if value.is_empty() {
+						yield Err(anyhow!("No networks"));
+						return;
+					}
+					value
+				},
+				Err(err) => {
+					yield Err(err);
+					return;
+				},
 			};
 			let (task, peers) = DiscoveryConnectNetworkTask::new(discovery);
 
 			// spawn
-			if spawner.spawn(task).is_err() {
-				return
+			match spawner.spawn(task) {
+				Ok(_) => {},
+				Err(err) => {
+					yield Err(err.into());
+					return;
+				},
 			}
 
 			// yield
 			for await peer in peers {
 				match peer {
-					Ok(value) => yield value,
-					Err(_) => return
+					Ok(value) => yield Ok(value),
+					Err(err) => yield Err(err.into()),
 				}
 			}
 		}
@@ -83,37 +117,13 @@ async fn networks<P>(
 	storage: &CoStorage,
 	id: &CoId,
 	state: OptionLink<co_core_co::Co>,
-) -> Result<BTreeSet<Discovery>, anyhow::Error>
+) -> Result<BTreeSet<discovery::Discovery>, anyhow::Error>
 where
 	P: PrivateIdentity + Send + Sync + 'static,
 {
-	let co_networks = state::networks(storage, state)
-		.await?
-		.into_iter()
-		.filter_map(|network| match network {
-			Network::CoHeads(value) => Some(Discovery::Topic(HeadsState::to_topic_hash(&value, id).into_string())),
-			Network::Rendezvous(value) => Some(Discovery::Rendezvous(value)),
-			Network::Peer(value) => Some(Discovery::Peer(value)),
-			_ => None,
-		});
-	let participant_networks = state::participant_identities(identity_resolver, storage, state)
-		.await?
-		.into_iter()
-		.flat_map(|participant| {
-			identity.networks().into_iter().filter_map(move |network| match network {
-				Network::DidDiscovery(value) => Some(Discovery::DidDiscovery(
-					discovery::DidDiscovery::create(
-						identity,
-						&participant,
-						value,
-						DidDiscoveryMessage::Discover.to_string(),
-					)
-					.ok()?,
-				)),
-				Network::Rendezvous(value) => Some(Discovery::Rendezvous(value)),
-				Network::Peer(value) => Some(Discovery::Peer(value)),
-				_ => None,
-			})
-		});
-	Ok(co_networks.chain(participant_networks).collect())
+	let networks = state::networks(storage, state).await?;
+	let participants = state::participants(storage, state).await?.into_iter().map(|item| item.did);
+	Ok(network_discovery(Some(identity_resolver), identity, Some(id), networks, participants)
+		.try_collect()
+		.await?)
 }

@@ -1,18 +1,19 @@
 pub mod publish;
+pub mod subscribe;
 pub mod tasks;
 pub mod token;
 
-use self::tasks::did_discovery::{DidDiscoverySubscribe, DidDiscoveryUnsubscribe};
 use co_identity::{IdentityResolver, PrivateIdentity, PrivateIdentityResolver};
 use co_network::{
 	bitswap::StorageResolver, discovery::Discovery, Behaviour, Context, FnOnceNetworkTask, Libp2pNetwork,
 	Libp2pNetworkConfig, NetworkError, NetworkTask, NetworkTaskSpawner, Shutdown, TokioNetworkTaskSpawner,
 };
 use co_storage::BlockStorage;
-use futures::{channel::oneshot, stream, Stream, StreamExt, TryStreamExt};
+use futures::{channel::oneshot, Stream};
 use libipld::DefaultParams;
 use libp2p::{identity::Keypair, Multiaddr, PeerId};
-use std::{collections::BTreeSet, future::ready, sync::Arc};
+use std::sync::Arc;
+use subscribe::{subscribe_identity, unsubscribe_identity};
 use tasks::{dial::DialNetworkTask, discovery_connect::DiscoveryConnectNetworkTask};
 use tokio::sync::Mutex;
 
@@ -85,87 +86,38 @@ impl Network {
 		self.network.lock().await.take()
 	}
 
+	/// Dail a peer directly.
 	pub async fn dail(&self, peer_id: PeerId, addresses: Vec<Multiaddr>) -> Result<(), anyhow::Error> {
 		DialNetworkTask::dial(self.spawner(), peer_id, addresses).await
 	}
 
 	/// Connect networks and return the connect peers.
+	#[deprecated]
 	pub fn connect(
 		&self,
 		networks: impl IntoIterator<Item = Discovery>,
 	) -> impl Stream<Item = Result<PeerId, anyhow::Error>> {
-		let (task, peers_stream) = DiscoveryConnectNetworkTask::new(networks.into_iter().collect());
-		let spawner = self.spawner();
-		async_stream::stream! {
-			let mut known_peers = BTreeSet::<PeerId>::new();
-
-			// execute
-			match spawner.spawn(task) {
-				Ok(_) => {},
-				Err(e) => yield Err(e.into()),
-			}
-
-			// process
-			for await peers in peers_stream {
-				match peers {
-					Ok(peers) => {
-						for peer in peers {
-							if !known_peers.contains(&peer) {
-								known_peers.insert(peer);
-								yield Ok(peer);
-							}
-						}
-					},
-					Err(e) => yield Err(e.into()),
-				};
-			}
-		}
+		DiscoveryConnectNetworkTask::connect(self.spawner(), networks)
 	}
 
 	/// Listen on identity requests (DID Discovery).
+	#[deprecated]
 	pub async fn did_discovery_subscribe<I: PrivateIdentity + Clone + Send + Sync + 'static>(
 		&self,
 		identity: I,
 	) -> Result<(), anyhow::Error> {
-		// get did discovery networks
-		let mut networks: Vec<_> = identity
-			.networks()
-			.into_iter()
-			.filter_map(|network| match network {
-				co_primitives::Network::DidDiscovery(item) => Some(item),
-				_ => None,
-			})
-			.collect();
-		if networks.is_empty() {
-			networks.push(Default::default());
-		}
-
-		// subscribe
-		//  by returning on any error happens in between
-		let spwaner = self.spawner();
-		stream::iter(networks)
-			.then(|network| async {
-				let (task, result) = DidDiscoverySubscribe::new(identity.clone(), network);
-				spwaner.spawn(task)?;
-				result.await??;
-				Ok::<(), anyhow::Error>(())
-			})
-			.try_for_each(|_| ready(Ok(())))
-			.await?;
-
-		// result
-		Ok(())
+		let spawner = self.spawner();
+		Ok(subscribe_identity(&spawner, &identity).await?)
 	}
 
 	/// Listen on identity requests (DID Discovery).
+	#[deprecated]
 	pub async fn did_discovery_unsubscribe<I: PrivateIdentity + Clone + Send + Sync + 'static>(
 		&self,
 		identity: I,
 	) -> Result<(), anyhow::Error> {
-		let (task, result) = DidDiscoveryUnsubscribe::new(identity.identity().to_owned());
-		self.spawner().spawn(task)?;
-		result.await??;
-		Ok(())
+		let spawner = self.spawner();
+		Ok(unsubscribe_identity(&spawner, identity.identity().to_owned()).await?)
 	}
 }
 

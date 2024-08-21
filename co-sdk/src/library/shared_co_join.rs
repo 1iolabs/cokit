@@ -121,7 +121,7 @@ impl SharedCoJoin {
 			if let Some(shared_secret) = &self.key {
 				let token = CoToken::new(shared_secret, CoTokenParameters(network.local_peer_id(), self.id.clone()))
 					.map_err(SharedCoJoinError::Network)?
-					.to_bitswp_token()
+					.to_bitswap_token()
 					.map_err(SharedCoJoinError::Network)?;
 				network_storage.set_tokens(vec![token]);
 			}

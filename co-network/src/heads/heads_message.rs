@@ -1,33 +1,41 @@
-use crate::didcomm::EncodedMessage;
 use co_identity::DidCommHeader;
 use co_primitives::CoId;
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
-use std::{
-	collections::BTreeSet,
-	time::{SystemTime, UNIX_EPOCH},
-};
-use uuid::Uuid;
+use serde_repr::{Deserialize_repr, Serialize_repr};
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum HeadsMessage {
+	/// Heads notifictaion.
 	#[serde(rename = "h")]
 	Heads(CoId, BTreeSet<Cid>),
+
+	/// Request heads from peer.
+	/// This message must be signed.
+	/// Will be responded with one of:
+	/// - [`HeadsMessage::Heads`].
+	/// - [`HeadsMessage::Error`].
+	#[serde(rename = "r")]
+	HeadsRequest(CoId),
+
+	/// Error notification.
+	#[serde(rename = "e")]
+	Error { code: HeadsErrorCode, message: String },
 }
 impl HeadsMessage {
-	/// Encode as DIDComm message.
-	pub fn to_didcomm(&self) -> Result<EncodedMessage, anyhow::Error> {
-		let time = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-		let header = DidCommHeader {
-			created_time: Some(time),
-			expires_time: Some(time + 120),
-			from: None,
-			id: Uuid::new_v4().into(),
-			message_type: format!("co-heads/1.0.0"),
-			pthid: None,
-			thid: None,
-			to: Default::default(),
-		};
-		Ok(EncodedMessage::create_plain_json(header, self)?)
+	/// DIDComm message header.
+	pub fn create_header() -> DidCommHeader {
+		let mut header = DidCommHeader::new(format!("co-heads/1.0.0"));
+		header.expires_time = header.created_time.map(|t| t + 120);
+		header
 	}
+}
+
+#[derive(Debug, Clone, Serialize_repr, Deserialize_repr)]
+#[non_exhaustive]
+#[repr(u16)]
+pub enum HeadsErrorCode {
+	Forbidden = 403,
+	ServiceUnavailable = 503,
 }

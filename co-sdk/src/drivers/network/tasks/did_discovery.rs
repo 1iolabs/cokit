@@ -6,13 +6,16 @@ use tokio::sync::oneshot;
 
 /// Subscribe identity for DID Discovery.
 pub struct DidDiscoverySubscribe<I> {
-	task: Option<(I, NetworkDidDiscovery, oneshot::Sender<Result<(), anyhow::Error>>)>,
+	task: Option<(I, Option<NetworkDidDiscovery>, oneshot::Sender<Result<(), anyhow::Error>>)>,
 }
 impl<I> DidDiscoverySubscribe<I>
 where
 	I: PrivateIdentity + Clone + Send + Sync + 'static,
 {
-	pub fn new(identity: I, network: NetworkDidDiscovery) -> (Self, oneshot::Receiver<Result<(), anyhow::Error>>) {
+	pub fn new(
+		identity: I,
+		network: Option<NetworkDidDiscovery>,
+	) -> (Self, oneshot::Receiver<Result<(), anyhow::Error>>) {
 		let (tx, rx) = oneshot::channel();
 		(Self { task: Some((identity, network, tx)) }, rx)
 	}
@@ -24,7 +27,7 @@ where
 	I: PrivateIdentity + Clone + Send + Sync + 'static,
 {
 	fn execute(&mut self, swarm: &mut Swarm<B>, context: &mut C) {
-		if let Some((identity, network, result)) = self.task.take() {
+		if let Some((identity, network, result)) = Option::take(&mut self.task) {
 			result
 				.send(context.discovery_mut().did_discovery_subscribe(swarm, network, identity))
 				.ok();
@@ -48,7 +51,7 @@ where
 	C: DiscoveryLayerBehaviourProvider<IdentityResolverBox, Event = <B as NetworkBehaviour>::ToSwarm>,
 {
 	fn execute(&mut self, swarm: &mut Swarm<B>, context: &mut C) {
-		if let Some((identity, result)) = self.task.take() {
+		if let Some((identity, result)) = Option::take(&mut self.task) {
 			result
 				.send(context.discovery_mut().did_discovery_unsubscribe(swarm, &identity))
 				.ok();

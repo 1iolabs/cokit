@@ -1,11 +1,11 @@
 use super::{create::Command, Command as RoomCommand};
 use crate::{cli::Cli, library::cli_context::CliContext};
-use anyhow::anyhow;
 use co_messaging::{
 	multimedia::{ImageInfo, ThumbnailInfo},
 	state_event::{RoomAvatarContent, RoomNameContent, RoomTopicContent},
 	MatrixEvent,
 };
+use co_sdk::CoReducerFactory;
 use exitcode::ExitCode;
 use libipld::Cid;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -20,7 +20,7 @@ pub async fn command(
 	let identity = application.local_identity();
 	let co = &room_command.co;
 	let core = &room_command.core;
-	let co_reducer = application.co_reducer(co).await?.ok_or(anyhow!("Co not found: {}", co))?;
+	let co_reducer = application.context().try_co_reducer(co).await?;
 
 	let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
 

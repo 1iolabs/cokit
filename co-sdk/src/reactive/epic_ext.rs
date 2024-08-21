@@ -36,8 +36,8 @@ where
 	type Output = BoxStream<'static, A>;
 
 	fn execute(&self, actions: crate::Observable<A>, state: crate::Observable<S>, context: C) -> Self::Output {
-		let s1 = self.0.execute(actions.clone(), state.clone(), context.clone());
-		let s2 = self.0.execute(actions, state, context);
+		let s1: <E1 as Epic<A, S, C>>::Output = self.0.execute(actions.clone(), state.clone(), context.clone());
+		let s2 = self.1.execute(actions, state, context);
 		Box::pin(s1.merge(s2))
 	}
 }

@@ -2,7 +2,12 @@ use super::identity::create_identity_resolver;
 use crate::{
 	drivers::network::{publish::CoHeadsPublish, CoNetworkTaskSpawner},
 	find_membership,
-	library::{co_peer_provider::CoPeerProvider, co_state::CoState, push_heads::PushHeads},
+	library::{
+		co_peer_provider::CoPeerProvider,
+		co_state::CoState,
+		override_peer_provider::{OverridePeerProvider, Overrides},
+		push_heads::PushHeads,
+	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	state::find,
 	types::{co_reducer::CoReducerContext, co_storage::CoBlockStorageContentMapping},
@@ -16,11 +21,18 @@ use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
-use co_network::bitswap::NetworkBlockStorage;
-use co_primitives::{tags, CoId};
-use co_storage::{Algorithm, EncryptedBlockStorage, EncryptedBlockStorageMapping, Secret};
+use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
+use co_primitives::{tags, CoId, KnownMultiCodec, MultiCodec};
+use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, Secret, StorageError};
+use futures::{stream, StreamExt, TryStreamExt};
+use libipld::Cid;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fmt::Debug, sync::Arc, time::Duration};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	fmt::Debug,
+	sync::Arc,
+	time::Duration,
+};
 
 /// Shared CO Builder.
 /// The Shared CO state is sptrend in an membership of an other CO (typicalle the Local CO).
@@ -32,6 +44,7 @@ pub struct SharedCoBuilder {
 	network: Option<CoNetworkTaskSpawner>,
 	initialize: bool,
 	network_block_timeout: Duration,
+	network_overrides: Option<Overrides>,
 }
 impl SharedCoBuilder {
 	pub fn new(parent: CoReducer, membership: Membership) -> Self {
@@ -43,6 +56,7 @@ impl SharedCoBuilder {
 			network: None,
 			initialize: true,
 			network_block_timeout: Duration::from_secs(30),
+			network_overrides: Default::default(),
 		}
 	}
 
@@ -62,6 +76,83 @@ impl SharedCoBuilder {
 		Self { initialize, ..self }
 	}
 
+	pub fn with_network_overrides(self, network_overrides: Option<Overrides>) -> Self {
+		Self { network_overrides, ..self }
+	}
+
+	/// Read (latest) secret from parent CO.
+	pub async fn secret(&self) -> anyhow::Result<Option<co_primitives::Secret>> {
+		if let Some(key_reference) = &self.membership.key {
+			let key_store: co_core_keystore::KeyStore = self.parent.state(&self.keystore_core_name).await?;
+			let (_, key) = find(&self.parent.storage(), &key_store.keys, |(k, _)| k == key_reference)
+				.await?
+				.ok_or(anyhow::anyhow!("Shared key not found: {}", key_reference))?;
+			let secret = match key.secret {
+				co_core_keystore::Secret::SharedKey(sec) => Ok(sec),
+				_ => Err(anyhow!("Invalid secret")),
+			}?;
+			Ok(Some(secret))
+		} else {
+			Ok(None)
+		}
+	}
+
+	pub fn build_network_storage<P>(
+		&self,
+		peer_provider: P,
+		network: CoNetworkTaskSpawner,
+		secret: Option<&co_primitives::Secret>,
+		storage: CoStorage,
+	) -> anyhow::Result<CoStorage>
+	where
+		P: PeerProvider + Send + Sync + 'static,
+	{
+		let local_peer_id = network.local_peer_id();
+		let mut network_storage = NetworkBlockStorage::new(storage, network, peer_provider, self.network_block_timeout);
+		if let Some(shared_secret) = secret {
+			let token = CoToken::new(shared_secret, CoTokenParameters(local_peer_id, self.membership.id.clone()))?
+				.to_bitswap_token()?;
+			network_storage.set_tokens(vec![token]);
+		}
+		Ok(CoStorage::new(network_storage))
+	}
+
+	pub async fn build_encrypted_storage(
+		&self,
+		secret: &co_primitives::Secret,
+		storage: CoStorage,
+	) -> anyhow::Result<EncryptedBlockStorage<CoStorage>> {
+		let result_storage =
+			EncryptedBlockStorage::new(storage, Secret::new(secret.divulge().to_vec()), Default::default());
+		if let Some(mapping) = &self.membership.encryption_mapping {
+			result_storage.load_mapping(mapping).await?;
+		}
+		Ok(result_storage)
+	}
+
+	pub fn build_peer_provider<I>(
+		&self,
+		network: CoNetworkTaskSpawner,
+		identity: I,
+		co_state: CoState,
+	) -> impl PeerProvider + Send + Sync + 'static
+	where
+		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
+	{
+		OverridePeerProvider::new(
+			self.network_overrides.clone().unwrap_or_default(),
+			CoPeerProvider::new(network, create_identity_resolver(), identity, self.membership.id.clone(), co_state),
+			self.membership.id.clone(),
+		)
+	}
+
+	pub async fn build_storage(&self, storage: CoStorage) -> Result<CoStorage, anyhow::Error> {
+		match self.secret().await? {
+			Some(secret) => Ok(CoStorage::new(self.build_encrypted_storage(&secret, storage).await?)),
+			None => Ok(storage),
+		}
+	}
+
 	pub async fn build<I>(
 		self,
 		tasks: TaskSpawner,
@@ -73,88 +164,67 @@ impl SharedCoBuilder {
 	where
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
 	{
-		// storage
-		let (storage, encrypted_storage, secret): (
-			CoStorage,
-			Option<EncryptedBlockStorage<CoStorage>>,
-			Option<co_primitives::Secret>,
-		) = match &self.membership.key {
-			// encrypted
-			Some(key_reference) => {
-				let key_store: co_core_keystore::KeyStore = self.parent.state(&self.keystore_core_name).await?;
-				let (_, key) = find(&self.parent.storage(), &key_store.keys, |(k, _)| k == key_reference)
-					.await?
-					.ok_or(anyhow::anyhow!("Shared key not found: {}", key_reference))?;
-				let secret = match key.secret {
-					co_core_keystore::Secret::SharedKey(sec) => Ok(sec),
-					_ => Err(anyhow!("Invalid secret")),
-				}?;
-				let mut result_storage =
-					EncryptedBlockStorage::new(storage, Secret::new(secret.divulge().to_vec()), Default::default());
-				if let Some(mapping) = &self.membership.encryption_mapping {
-					result_storage.load_mapping(mapping).await?;
-				}
-				(CoStorage::new(result_storage.clone()), Some(result_storage), Some(secret))
-			},
-			// plain
-			None => (storage, None, None),
-		};
+		// secret
+		let secret = self.secret().await?;
 
 		// network
 		let (storage, co_state) = if let Some(network) = &self.network {
 			let co_state = CoState::default();
-			let peer_provider = CoPeerProvider::new(
-				network.clone(),
-				create_identity_resolver(),
-				identity.clone(),
-				storage.clone(),
-				self.membership.id.clone(),
-				co_state.clone(),
-			);
-			let mut network_storage =
-				NetworkBlockStorage::new(storage.clone(), network.clone(), peer_provider, self.network_block_timeout);
-			if let Some(encrypted) = &encrypted_storage {
-				network_storage.set_mapping(encrypted.content_mapping());
-			}
-			if let Some(shared_secret) = &secret {
-				let token = CoToken::new(
-					shared_secret,
-					CoTokenParameters(network.local_peer_id(), self.membership.id.clone()),
-				)?
-				.to_bitswp_token()?;
-				network_storage.set_tokens(vec![token]);
-			}
-			(CoStorage::new(network_storage), Some(co_state))
+			let peer_provider = self.build_peer_provider(network.clone(), identity.clone(), co_state.clone());
+			(
+				self.build_network_storage(peer_provider, network.clone(), secret.as_ref(), storage.clone())?,
+				Some(co_state),
+			)
 		} else {
 			(storage, None)
 		};
+
+		// encryption
+		let (storage, encrypted_storage) = match &secret {
+			// encrypted
+			Some(secret) => {
+				let encrypted_storage = self.build_encrypted_storage(secret, storage).await?;
+				(CoStorage::new(encrypted_storage.clone()), Some(encrypted_storage))
+			},
+			// plain
+			None => (storage, None),
+		};
+
+		// context
+		let context = SharedContext { encrypted_storage: encrypted_storage.clone(), id: self.membership.id.clone() };
+
+		// get (unencrypted) state/heads
+		let state = context.to_internal_cid(self.membership.state).await?;
+		let heads: BTreeSet<Cid> = stream::iter(self.membership.heads.iter())
+			.then(|cid| async { context.to_internal_cid(*cid).await })
+			.try_collect()
+			.await?;
+
+		// explicitly update co state so the network has it available when initialize
+		if let Some(co_state) = &co_state {
+			co_state.write(&storage, state.into(), true).await;
+		}
 
 		// log
 		let log = Log::new(
 			self.membership.id.as_str().as_bytes().to_vec(),
 			create_identity_resolver(),
 			storage.clone(),
-			self.membership.heads.clone(),
+			heads.clone(),
 		);
 
 		// reducer
 		let mut reducer = ReducerBuilder::new(core_resolver, log)
 			.with_initialize(self.initialize)
-			.with_latest_state(self.membership.state, self.membership.heads.clone())
+			.with_latest_state(state, heads.clone())
 			.build(runtime.runtime())
 			.await?;
 
 		// push changes to all connectable peers
-		if let Some(network) = &self.network {
+		let co_state = if let Some(network) = &self.network {
+			let co_state = co_state.unwrap_or_default();
 			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
-			let peer_provider = CoPeerProvider::new(
-				network.clone(),
-				create_identity_resolver(),
-				identity.clone(),
-				storage.clone(),
-				self.membership.id.clone(),
-				co_state.clone().unwrap(),
-			);
+			let peer_provider = self.build_peer_provider(network.clone(), identity.clone(), co_state.clone());
 			let publish = PushHeads::new(
 				network.clone(),
 				tasks,
@@ -165,7 +235,10 @@ impl SharedCoBuilder {
 				true,
 			);
 			reducer.add_change_handler(Box::new(publish));
-		}
+			Some(co_state)
+		} else {
+			None
+		};
 
 		// publish changes for every `NetworkCoHeads` setting
 		if let Some(network) = self.network {
@@ -179,9 +252,6 @@ impl SharedCoBuilder {
 			reducer.add_change_handler(Box::new(co_state));
 		}
 
-		// mapping
-		let mapping: Option<EncryptedBlockStorageMapping> = encrypted_storage.as_ref().map(|e| e.content_mapping());
-
 		// setup auto write to parent co
 		let writer = MembershipWriter {
 			id: self.membership.id.clone(),
@@ -191,9 +261,6 @@ impl SharedCoBuilder {
 			encrypted_storage: encrypted_storage.clone(),
 		};
 		reducer.add_change_handler(Box::new(writer));
-
-		// context
-		let context = SharedContext { mapping, id: self.membership.id.clone() };
 
 		// result
 		Ok(CoReducer::new(self.membership.id, Some(self.parent.id().clone()), runtime, reducer, Arc::new(context)))
@@ -218,7 +285,7 @@ impl CreateCo {
 
 struct SharedContext {
 	id: CoId,
-	mapping: Option<EncryptedBlockStorageMapping>,
+	encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
 }
 impl SharedContext {
 	/// Update `co` membership if necessary.
@@ -229,15 +296,15 @@ impl SharedContext {
 				tracing::info!(co = ?co.id(), from = ?co_heads, to = ?membership, "membership-update");
 
 				// encryption mapping
-				if let (Some(mapping), Some(cid)) = (&self.mapping, &membership.encryption_mapping) {
-					mapping.load_mapping(&co.storage(), &cid).await?;
+				if let (Some(storage), Some(cid)) = (&self.encrypted_storage, &membership.encryption_mapping) {
+					storage.load_mapping(&cid).await?;
 				}
 
 				// snapshot
-				co.insert_snapshot(membership.state, membership.heads.clone()).await;
+				co.insert_snapshot(membership.state, membership.heads.clone()).await?;
 
 				// load snapshot
-				co.join(membership.heads).await?;
+				co.join(&membership.heads).await?;
 			}
 		}
 		Ok(())
@@ -246,7 +313,10 @@ impl SharedContext {
 #[async_trait]
 impl CoReducerContext for SharedContext {
 	fn content_mapping(&self) -> Option<CoBlockStorageContentMapping> {
-		self.mapping.clone().map(CoBlockStorageContentMapping::new)
+		self.encrypted_storage
+			.as_ref()
+			.map(|storage| storage.content_mapping())
+			.map(CoBlockStorageContentMapping::new)
 	}
 
 	async fn refresh(&self, parent: CoReducer, co: CoReducer) -> anyhow::Result<()> {
@@ -257,6 +327,29 @@ impl CoReducerContext for SharedContext {
 			return Err(anyhow!("Invalid parent co {} for {}", parent.id(), co.id()));
 		}
 		self.update_membership(parent, co).await
+	}
+
+	/// Map external [`Cid`] to internal [`Cid`].
+	/// Internal means in context of the CO.
+	/// If no mapping is needed/available return the original [`Cid`].
+	async fn to_internal_cid(&self, cid: Cid) -> Result<Cid, StorageError> {
+		match (&self.encrypted_storage, MultiCodec::from(&cid)) {
+			(Some(storage), MultiCodec::Known(KnownMultiCodec::CoEncryptedBlock)) => {
+				Ok(*storage.get_unencrypted(&cid, false).await?.cid())
+			},
+			_ => Ok(cid),
+		}
+	}
+
+	/// Map internal [`Cid`] to external [`Cid`].
+	/// External means NOT in context of the CO.
+	/// If no mapping is needed/available return the original [`Cid`].
+	async fn to_external_cid(&self, cid: Cid) -> Result<Cid, StorageError> {
+		if let Some(encrypted_storage) = &self.encrypted_storage {
+			Ok(encrypted_storage.content_mapping().to_plain(&cid).await.unwrap_or(cid))
+		} else {
+			Ok(cid)
+		}
 	}
 }
 

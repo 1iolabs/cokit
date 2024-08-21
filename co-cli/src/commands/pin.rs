@@ -1,8 +1,8 @@
 use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
-use co_primitives::CoId;
+use co_primitives::{from_cbor, CoId};
 use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
-use co_sdk::{state::memberships, Application, CoStorage, NodeStream, CO_CORE_NAME_PIN, CO_ID_LOCAL};
+use co_sdk::{state::memberships, Application, CoReducerFactory, CoStorage, NodeStream, CO_CORE_NAME_PIN, CO_ID_LOCAL};
 use exitcode::ExitCode;
 use futures::{pin_mut, StreamExt, TryStreamExt};
 use libipld::Cid;
@@ -101,7 +101,7 @@ pub async fn generate_pins(
 ) -> Result<ExitCode, anyhow::Error> {
 	// get state of given co
 	let application = context.application(cli).await;
-	let co_reducer = application.co_reducer(&command.co).await?.ok_or(anyhow!("Co not found"))?;
+	let co_reducer = application.context().try_co_reducer(&command.co).await?;
 	let state = co_reducer.reducer_state().await.0;
 
 	if let Some(state) = state {
@@ -131,7 +131,7 @@ async fn update_pins(context: &CliContext, cli: &Cli, _command: &UpdateCommand) 
 	// read previous pins from file
 	let content = fs::read(&pins_path).await?;
 	// decode cbor
-	let old_pin_map: BTreeMap<Cid, BTreeSet<Cid>> = serde_ipld_dagcbor::from_slice(&content)?;
+	let old_pin_map: BTreeMap<Cid, BTreeSet<Cid>> = from_cbor(&content)?;
 
 	// local co state
 	let (state, _) = application.local_co_reducer().await?.reducer_state().await;
@@ -159,7 +159,7 @@ async fn get_all_co_storages(application: Application) -> anyhow::Result<Vec<CoS
 	pin_mut!(stream);
 	while let Some(result) = stream.next().await {
 		match result {
-			Ok((co, _, _, _)) => {
+			Ok((co, _, _, _, _)) => {
 				if let Some(reducer) = application.co_reducer(co).await? {
 					storages.push(reducer.storage());
 				}

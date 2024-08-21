@@ -19,6 +19,12 @@ pub trait Identity {
 	/// Get Networks where we can (possibly) reach the identity.
 	fn networks(&self) -> BTreeSet<Network>;
 
+	fn try_didcomm_public(&self) -> Result<DidCommPublicContext, anyhow::Error> {
+		Ok(self
+			.didcomm_public()
+			.ok_or(anyhow::anyhow!("unsupported identity: no public didcomm context: {}", self.identity()))?)
+	}
+
 	fn boxed(self) -> IdentityBox
 	where
 		Self: Sized + Clone + Send + Sync + 'static,
