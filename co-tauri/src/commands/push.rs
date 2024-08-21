@@ -1,10 +1,9 @@
+use crate::library::tauri_error::CoTauriError;
 use anyhow::anyhow;
-use co_sdk::{Application, CoId};
+use co_sdk::{Application, CoId, CoReducerFactory};
 use libipld::{cbor::DagCborCodec, codec::Codec, Ipld};
 use serde::Deserialize;
 use std::collections::BTreeMap;
-
-use crate::library::tauri_error::CoTauriError;
 
 /// This is the data structure of the single argument body of the push command. Argument is given as raw data (Vec<u8>)
 /// and then deserialized into this data type. When a tauri command is given a single parameter as Vec<u8>,
@@ -77,9 +76,10 @@ pub async fn push(application: tauri::State<'_, Application>, body: Vec<u8>) -> 
 	);
 	// get reducer and push action
 	let reducer = application
-		.co_reducer(body.co.clone())
-		.await?
-		.ok_or(anyhow!("Co not found: {}", body.co))?;
+		.context()
+		.try_co_reducer(&body.co)
+		.await
+		.map_err(|err| anyhow::Error::from(err))?;
 	let identity = application.local_identity();
 	reducer.push(&identity, &body.core, &body.action).await?;
 	Ok(())

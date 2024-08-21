@@ -1,5 +1,4 @@
 use crate::library::tauri_error::CoTauriError;
-use anyhow::anyhow;
 use co_sdk::{Application, CoId, CoReducerFactory};
 use libipld::Cid;
 use std::collections::BTreeSet;

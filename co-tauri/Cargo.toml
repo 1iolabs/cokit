@@ -17,9 +17,9 @@ co-log = { path = "../co-log" }
 anyhow = { workspace = true }
 futures = { workspace = true }
 libipld = { workspace = true }
-tauri = { version = "2.0.0-beta", default-features = false }
-tauri-plugin-shell = "2.0.0-beta"
-tauri-utils = { version = "2.0.0-beta" }
+tauri = { version = "=2.0.0-beta.25", default-features = false }
+tauri-plugin-shell = "=2.0.0-beta.10"
+tauri-utils = { version = "=2.0.0-beta.19" }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true, features = ["sync"] }

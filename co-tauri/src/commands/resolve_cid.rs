@@ -1,8 +1,6 @@
-use anyhow::anyhow;
-use co_sdk::{Application, BlockStorageExt, CoId};
-use libipld::{Cid, Ipld};
-
 use crate::library::tauri_error::CoTauriError;
+use co_sdk::{Application, BlockStorageExt, CoId, CoReducerFactory};
+use libipld::{Cid, Ipld};
 
 #[tauri::command]
 pub(crate) async fn resolve_cid(
@@ -11,9 +9,10 @@ pub(crate) async fn resolve_cid(
 	co: CoId,
 ) -> Result<Ipld, CoTauriError> {
 	let storage = application
-		.co_reducer(co.clone())
-		.await?
-		.ok_or(anyhow!("Co not found: {:#?}", co.clone()))?
+		.context()
+		.try_co_reducer(&co)
+		.await
+		.map_err(|err| anyhow::Error::from(err))?
 		.storage();
 	let ipld: Ipld = storage.get_deserialized::<Ipld>(&cid).await?;
 	Ok(ipld)

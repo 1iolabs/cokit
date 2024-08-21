@@ -1,18 +1,16 @@
-use std::collections::BTreeSet;
-
+use crate::library::{
+	subscription::{build_event_name, Subscriptions},
+	tauri_error::CoTauriError,
+};
 use anyhow::anyhow;
 use co_log::SignedEntry;
 use co_primitives::ReducerAction;
 use co_sdk::{Application, BlockStorageExt, CoId};
 use futures::StreamExt;
 use libipld::Ipld;
-use tauri::Manager;
+use std::collections::BTreeSet;
+use tauri::Emitter;
 use tokio_stream::wrappers::WatchStream;
-
-use crate::library::{
-	subscription::{build_event_name, Subscriptions},
-	tauri_error::CoTauriError,
-};
 
 #[tauri::command]
 pub async fn subscribe(

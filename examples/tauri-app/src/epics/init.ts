@@ -1,5 +1,5 @@
 import { isPluginInitializeAction, BaseApi } from "@1io/kui-application-sdk";
-import { filter, identity, map, mergeAll, mergeMap } from "rxjs";
+import { filter, identity, mergeAll, mergeMap } from "rxjs";
 import { MessengerEpicType } from "../types/plugin";
 import { invoke_get } from "../library/invoke-get";
 import { ChatNameChangedAction, MessengerActionType } from "../actions";
