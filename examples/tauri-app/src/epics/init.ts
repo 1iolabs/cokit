@@ -1,11 +1,9 @@
-import { isPluginInitializeAction, BaseApi } from "@1io/kui-application-sdk";
-import { filter, identity, mergeAll, mergeMap } from "rxjs";
-import { MessengerEpicType } from "../types/plugin";
-import { invoke_get } from "../library/invoke-get";
-import { ChatNameChangedAction, MessengerActionType } from "../actions";
+import { BaseApi, isPluginInitializeAction } from "@1io/kui-application-sdk";
 import { AnyAction } from "redux";
+import { filter, mergeAll, mergeMap } from "rxjs";
+import { ChatsListEpicType } from "../types/plugin";
 
-export const initEpic: MessengerEpicType = (action$, state$, context) => action$.pipe(
+export const initEpic: ChatsListEpicType = (action$, state$, context) => action$.pipe(
     filter(isPluginInitializeAction),
     mergeMap(async () => {
         const actions: AnyAction[] = [];
@@ -16,14 +14,7 @@ export const initEpic: MessengerEpicType = (action$, state$, context) => action$
                 { key: "coapp-messenger", value: context.plugin },
             ],
         ));
-        const roomCoreState = await invoke_get("1io", "room");
-        const chatName = roomCoreState?.name;
-        if (chatName) {
-            actions.push(identity<ChatNameChangedAction>({
-                payload: { newName: chatName },
-                type: MessengerActionType.ChatNameChanged,
-            }));
-        }
+        // TODO get all chats
         return actions;
     }),
     mergeAll(),

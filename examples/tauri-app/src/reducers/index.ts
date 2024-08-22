@@ -1,17 +1,11 @@
-import { MessengerActions, MessengerActionType } from "../actions";
-import { MessengerPluginState } from "../state";
+import { ChatsListActions } from "../actions";
+import { ChatsListPluginState } from "../state";
 
-export function messengerReducer(state: MessengerPluginState | undefined, action: MessengerActions): MessengerPluginState {
+export function chatsListReducer(state: ChatsListPluginState | undefined, action: ChatsListActions): ChatsListPluginState {
     if (state === undefined) {
-        return { messages: [], chatName: "" };
+        return { chats: [] };
     }
     switch (action.type) {
-        case MessengerActionType.MessageReceived: {
-            return { ...state, messages: [...state.messages, action.payload.message] };
-        }
-        case MessengerActionType.ChatNameChanged: {
-            return { ...state, chatName: action.payload.newName };
-        }
     }
     return state;
 }

@@ -1,9 +1,9 @@
 import { ContextPlugin, EpicPlugin, Plugin, PluginContext, PluginEpicType, RenderPlugin } from "@1io/kui-application-sdk";
-import { MessengerActions } from "../actions";
-import { MessengerPluginState } from "../state";
+import { ChatsListActions } from "../actions";
+import { ChatsListPluginState } from "../state";
 
-export type MessengerEpicType = PluginEpicType<MessengerPlugin>;
+export type ChatsListEpicType = PluginEpicType<ChatsListPlugin>;
 
-export type MessengerPlugin = Plugin<MessengerPluginState, MessengerActions> & RenderPlugin & EpicPlugin<MessengerPluginState> & ContextPlugin<MessengerPluginContext>;
+export type ChatsListPlugin = Plugin<ChatsListPluginState, ChatsListActions> & RenderPlugin & EpicPlugin<ChatsListPluginState> & ContextPlugin<ChatsListPluginContext>;
 
-export interface MessengerPluginContext extends PluginContext { }
+export interface ChatsListPluginContext extends PluginContext { }

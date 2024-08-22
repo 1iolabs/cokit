@@ -1,9 +1,9 @@
 import { EMPTY, filter, fromEventPattern, identity, mergeMap, withLatestFrom } from "rxjs";
-import { MessengerEpicType } from "../types/plugin";
+import { MessengerViewEpicType } from "../types/plugin";
 import { isPluginInitializeAction } from "@1io/kui-application-sdk";
 import { Event, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { ChatNameChangedAction, MessengerActionType } from "../actions";
+import { MessengerViewNameChangedAction, MessengerViewActionType } from "../actions";
 
 interface MessageEvent {
     f: string;
@@ -22,7 +22,7 @@ interface MessageEvent {
     };
 }
 
-export const subscribeTauriEventEpic: MessengerEpicType = (action$, state$, context) => action$.pipe(
+export const subscribeTauriEventEpic: MessengerViewEpicType = (action$, state$, context) => action$.pipe(
     filter(isPluginInitializeAction),
     mergeMap(() => {
         console.log("subscribe 1io/room");
@@ -57,16 +57,16 @@ export const subscribeTauriEventEpic: MessengerEpicType = (action$, state$, cont
                                     timestamp: new Date(event.payload.t),
                                 }
                             },
-                            type: MessengerActionType.MessageReceived,
+                            type: MessengerViewActionType.MessageReceived,
                         }];
                     };
                     case "m.room.name": {
                         let groupName = event.payload.p.content.name;
                         if (groupName) {
 
-                            return [identity<ChatNameChangedAction>({
+                            return [identity<MessengerViewNameChangedAction>({
                                 payload: { newName: groupName },
-                                type: MessengerActionType.ChatNameChanged,
+                                type: MessengerViewActionType.NameChanged,
                             })];
                         }
                     }

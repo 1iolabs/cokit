@@ -1,7 +1,6 @@
 import { combineEpics } from "@1io/kui-application-sdk";
-import { MessengerEpicType } from "../types/plugin";
+import { ChatsListEpicType } from "../types/plugin";
 import { initEpic } from "./init";
-import { sendEpic } from "./send";
-import { subscribeTauriEventEpic } from "./subscribe-tauri-events";
+import { openChatEpic } from "./open-chat";
 
-export const messengerEpic: MessengerEpicType = combineEpics<MessengerEpicType>(initEpic, sendEpic, subscribeTauriEventEpic);
+export const chatsListEpic: ChatsListEpicType = combineEpics<ChatsListEpicType>(initEpic, openChatEpic);

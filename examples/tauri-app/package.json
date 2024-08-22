@@ -12,7 +12,8 @@
     "lint": "npx tslint --project . && npx nplint",
     "tauri": "tauri",
     "clean": "npx rimraf -rf ./dist",
-    "rollup": "npx cross-env NODE_ENV=development kui-application build -o ./dist/ui"
+    "rollup": "npx cross-env NODE_ENV=development kui-application build -o ./dist/ui",
+    "rollup-watch": "npm run rollup -- -w"
   },
   "files": [
     "**/*.css",
@@ -26,8 +27,15 @@
   ],
   "kui": {
     "plugin": {
-      "coapp-messenger": {
+      "coapp-chats-list": {
         "main": "./src/plugin.tsx",
+        "runtime": [
+          "node",
+          "browser"
+        ]
+      },
+      "coapp-messenger-view": {
+        "main": "./src/plugins/coapp-messenger-view-plugin/plugin.tsx",
         "runtime": [
           "node",
           "browser"
@@ -36,7 +44,7 @@
     }
   },
   "dependencies": {
-    "@1io/coapp-messenger-view": "^0.2.0",
+    "@1io/coapp-messenger-view": "file:../../../../IdeaProjects/coapp-messenger-view/1io-coapp-messenger-view-0.2.0.tgz",
     "@1io/kui-application": "^0.5.0",
     "@1io/kui-application-sdk": "^5.0.1",
     "@1io/kui-button": "^0.25.0",
@@ -60,7 +68,7 @@
   "devDependencies": {
     "@1io/kui-form-common": "^0.20.6",
     "@1io/kui-form-context": "^0.2.0",
-    "@1io/kui-icons": "^0.4.4",
+    "@1io/kui-icons": "^0.4.11",
     "@1io/kui-style": "^0.2.39",
     "@1io/nplint": "^0.2.21",
     "@1io/packaging-utils": "^0.1.4",

@@ -22,7 +22,7 @@
     function create(parentElement) {
       const params = new URLSearchParams(window.location.search);
       window.application = document.createElement("kui-application");
-      window.application.plugin = "coapp-messenger";
+      window.application.plugin = "coapp-chats-list";
       window.application.tags = createPluginTags(params);
       window.application.options = {
         debug: params.has("debug"),
