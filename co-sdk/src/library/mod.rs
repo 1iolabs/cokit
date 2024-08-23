@@ -24,7 +24,6 @@ pub mod node_stream;
 pub mod override_peer_provider;
 pub mod push_heads;
 pub mod settings_timeout;
-pub mod shared_co_join;
 pub mod task_spawner;
 pub mod to_plain;
 pub mod update_co;

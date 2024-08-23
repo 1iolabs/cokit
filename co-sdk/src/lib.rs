@@ -49,7 +49,6 @@ pub use library::{
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
 	node_stream::NodeStream,
-	shared_co_join::{SharedCoJoin, SharedCoJoinError},
 	task_spawner::TaskSpawner,
 	update_co::update_co,
 };
