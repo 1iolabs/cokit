@@ -303,7 +303,7 @@ impl CoReducerContext for LocalContext {
 	async fn to_internal_cid(&self, cid: Cid) -> Result<Cid, StorageError> {
 		match MultiCodec::from(&cid) {
 			MultiCodec::Known(KnownMultiCodec::CoEncryptedBlock) => {
-				Ok(*self.encrypted_storage.get_unencrypted(&cid, false).await?.cid())
+				Ok(*self.encrypted_storage.get_unencrypted(&cid).await?.cid())
 			},
 			_ => Ok(cid),
 		}
@@ -328,7 +328,7 @@ async fn create_encrypted_storage<S>(
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
-	Ok(EncryptedBlockStorage::new(storage.clone(), key.fetch().await?.into(), Default::default()))
+	Ok(EncryptedBlockStorage::new(storage.clone(), key.fetch().await?.into(), Default::default(), Default::default()))
 }
 
 /// Setup the Local CO by adding cores.

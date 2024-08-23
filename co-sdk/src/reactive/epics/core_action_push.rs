@@ -2,7 +2,6 @@ use crate::{
 	reactive::context::{ActionObservable, StateObservable},
 	Action, CoContext, CoReducerFactory, ReducerChangeContext,
 };
-use anyhow::anyhow;
 use co_identity::PrivateIdentityResolver;
 use co_primitives::{CoId, ReducerAction};
 use futures::{Stream, StreamExt};

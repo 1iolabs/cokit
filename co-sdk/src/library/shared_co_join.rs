@@ -100,7 +100,8 @@ impl SharedCoJoin {
 		// storage
 		let (storage, encrypted_storage) = {
 			if let Some(key) = &self.key {
-				let encrypted_storage = EncryptedBlockStorage::new(storage, key.clone().into(), Default::default());
+				let encrypted_storage =
+					EncryptedBlockStorage::new(storage, key.clone().into(), Default::default(), Default::default());
 				(CoStorage::new(encrypted_storage.clone()), Some(encrypted_storage))
 			} else {
 				(storage, None)

@@ -1,3 +1,4 @@
+pub mod bitswap;
 pub mod publish;
 pub mod subscribe;
 pub mod tasks;
@@ -5,11 +6,13 @@ pub mod token;
 
 use co_identity::{IdentityResolver, PrivateIdentity, PrivateIdentityResolver};
 use co_network::{
-	bitswap::StorageResolver, discovery::Discovery, Behaviour, Context, FnOnceNetworkTask, Libp2pNetwork,
+	bitswap::BitswapRequest, discovery::Discovery, Behaviour, Context, FnOnceNetworkTask, Libp2pNetwork,
 	Libp2pNetworkConfig, NetworkError, NetworkTask, NetworkTaskSpawner, Shutdown, TokioNetworkTaskSpawner,
 };
-use co_storage::BlockStorage;
-use futures::{channel::oneshot, Stream};
+use futures::{
+	channel::{mpsc, oneshot},
+	Stream,
+};
 use libipld::DefaultParams;
 use libp2p::{identity::Keypair, Multiaddr, PeerId};
 use std::sync::Arc;
@@ -31,30 +34,29 @@ impl Network {
 	///
 	/// Panics:
 	/// - Can not create the network.
-	pub fn new<S, I, P, T>(
+	pub fn new<I, P>(
 		identifier: String,
 		network_key: Keypair,
-		storage_resolver: T,
 		resolver: I,
 		private_resolver: P,
-	) -> Self
+	) -> (Self, mpsc::Receiver<BitswapRequest<DefaultParams>>)
 	where
-		S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + 'static,
-		T: StorageResolver<S> + Send + Sync + 'static,
 		I: IdentityResolver + Clone + Send + Sync + 'static,
 		P: PrivateIdentityResolver + Clone + Send + Sync + 'static,
 	{
 		let network_peer_id = PeerId::from(network_key.public());
 		let network_config = Libp2pNetworkConfig::from_keypair(network_key.clone());
-		let network: Libp2pNetwork =
-			Libp2pNetwork::new(identifier, network_config, storage_resolver, resolver, private_resolver)
-				.expect("network");
-		tracing::info!(peer_id = ?network_peer_id, "network");
-		Self {
-			spawner: CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id },
-			peer_id: network_peer_id,
-			network: Arc::new(Mutex::new(Some(network))),
-		}
+		let (network, bitswap_requests) =
+			Libp2pNetwork::new(identifier.clone(), network_config, resolver, private_resolver).expect("network");
+		tracing::info!(application = &identifier, peer_id = ?network_peer_id, "network");
+		(
+			Self {
+				spawner: CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id },
+				peer_id: network_peer_id,
+				network: Arc::new(Mutex::new(Some(network))),
+			},
+			bitswap_requests,
+		)
 	}
 
 	/// Get local peer id.

@@ -25,7 +25,7 @@ pub enum StorageError {
 	/// Internal storage error.
 	/// This indicates some invalid state and is not be retriable with same parameters.
 	#[error("Internal storage error")]
-	Internal(#[source] anyhow::Error),
+	Internal(#[from] anyhow::Error),
 
 	/// Invalid argument passes to call or storage configuration.
 	/// This is not be retriable with same parameters.

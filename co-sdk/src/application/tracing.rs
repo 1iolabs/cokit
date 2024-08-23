@@ -3,7 +3,10 @@ use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{runtime, trace as sdktrace, Resource};
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 use std::path::PathBuf;
-use tracing::{subscriber::set_global_default, Level};
+use tracing::{
+	subscriber::{set_default, set_global_default, DefaultGuard},
+	Level,
+};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt::writer::MakeWriterExt, layer::SubscriberExt, EnvFilter, Registry};
@@ -58,7 +61,7 @@ impl TracingBuilder {
 		Ok(Self { env_filter: Some(EnvFilter::try_new(directives)?), ..self })
 	}
 
-	pub fn init(self) -> Result<(), anyhow::Error> {
+	fn build_subscriber(self) -> Result<Option<impl tracing::Subscriber + Send + Sync + 'static>, anyhow::Error> {
 		// open telemetry
 		let open_telemetry = if let Some(endpoint) = &self.open_telemetry {
 			Some(open_telemetry_endpoint(self.identifier.clone(), endpoint.clone())?)
@@ -82,20 +85,41 @@ impl TracingBuilder {
 			None
 		};
 
-		// init
 		if open_telemetry.is_some() || bunyan.is_some() || stderr.is_some() {
-			let subscriber = Registry::default()
-				.with(open_telemetry)
-				.with(self.env_filter)
-				.with(JsonStorageLayer)
-				.with(bunyan)
-				.with(stderr);
+			Ok(Some(
+				Registry::default()
+					.with(open_telemetry)
+					.with(self.env_filter)
+					.with(JsonStorageLayer)
+					.with(bunyan)
+					.with(stderr),
+			))
+		} else {
+			Ok(None)
+		}
+	}
+
+	pub fn init(self) -> Result<(), anyhow::Error> {
+		// init
+		if let Some(subscriber) = self.build_subscriber()? {
 			set_global_default(subscriber)?;
 			LogTracer::init()?;
 		}
 
 		// result
 		Ok(())
+	}
+
+	pub fn init_scope(self) -> Result<Option<DefaultGuard>, anyhow::Error> {
+		// init
+		if let Some(subscriber) = self.build_subscriber()? {
+			let result = set_default(subscriber);
+			LogTracer::init()?;
+			Ok(Some(result))
+		} else {
+			// result
+			Ok(None)
+		}
 	}
 }
 
@@ -113,11 +137,16 @@ fn init_tracer(
 	service_name: impl Into<String>,
 	endpoint: impl Into<String>,
 ) -> Result<opentelemetry_sdk::trace::Tracer, TraceError> {
-	opentelemetry_otlp::new_pipeline()
+	let pipeline = opentelemetry_otlp::new_pipeline()
 		.tracing()
 		.with_exporter(opentelemetry_otlp::new_exporter().tonic().with_endpoint(endpoint.into()))
 		.with_trace_config(
 			sdktrace::config().with_resource(Resource::new(vec![KeyValue::new(SERVICE_NAME, service_name.into())])),
-		)
-		.install_batch(runtime::Tokio)
+		);
+	if cfg!(test) {
+		// we can not reliably detect when the test is finshed so flush every span
+		pipeline.install_simple()
+	} else {
+		pipeline.install_batch(runtime::Tokio)
+	}
 }

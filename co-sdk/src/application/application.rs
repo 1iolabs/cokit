@@ -5,7 +5,10 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
-	drivers::network::tasks::{co_heads_received::ReceivedHeadsNetworkTask, mdns_gossip::MdnsGossipNetworkTask},
+	drivers::network::{
+		bitswap::handle_bitswap,
+		tasks::{co_heads_received::ReceivedHeadsNetworkTask, mdns_gossip::MdnsGossipNetworkTask},
+	},
 	library::task_spawner::TaskSpawner,
 	local_keypair_fetch,
 	reactive::{
@@ -138,11 +141,9 @@ impl Application {
 		let local_co = self.co_context.local_co_reducer().await?;
 		let network_key =
 			local_keypair_fetch(&self.settings.identifier, &local_co, &local_identity, force_new_peer_id).await?;
-		let network = Network::new(
+		let (network, bitswap_requests) = Network::new(
 			self.settings.identifier.clone(),
 			network_key,
-			// note: critical to pass the non networked version otherwise we create a loop
-			self.co().to_owned(),
 			create_identity_resolver(),
 			self.private_identity_resolver().await?,
 		);
@@ -169,6 +170,12 @@ impl Application {
 
 		// use mdns discoverd peers for gossip discovery
 		spawner.spawn(MdnsGossipNetworkTask::new())?;
+
+		// handle bitswap
+		self.co()
+			.clone()
+			.tasks()
+			.spawn(handle_bitswap(self.co().clone(), bitswap_requests));
 
 		// reactive
 		self.reactive.actions().dispatch(Action::NetworkStarted);
@@ -370,10 +377,10 @@ impl ApplicationBuilder {
 		.into();
 
 		// reducers
-		tasks.spawn(reducers.worker(co_context.inner.clone()));
+		co_context.tasks().spawn(reducers.worker(co_context.inner.clone()));
 
 		// reactive
-		tasks.spawn({
+		co_context.tasks().spawn({
 			let reactive = reactive.clone();
 			let context = co_context.clone();
 			async move { reactive.execute(context, epic()).await }

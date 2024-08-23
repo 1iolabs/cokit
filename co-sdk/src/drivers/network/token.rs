@@ -27,13 +27,24 @@ impl CoToken {
 		Ok(Self { body, signature: result.into_bytes().to_vec(), algorithm: "HS256".to_owned() })
 	}
 
-	pub fn verify(&self, secret: &Secret, remote_peer: &PeerId) -> bool {
-		// speedup: fail immediately if the token peer is nor the remote peer
-		if remote_peer != &self.body.0 {
+	pub fn new_unsigned(body: CoTokenParameters) -> Self {
+		Self { body, signature: [].to_vec(), algorithm: "".to_owned() }
+	}
+
+	/// Verify token.
+	/// If local_peer is supplied we also allow our token.
+	pub fn verify(&self, secret: &Secret, remote_peer: &PeerId, local_peer: Option<&PeerId>) -> bool {
+		// speedup: fail immediately if the token peer is not the remote peer
+		let token_peer = if &self.body.0 == remote_peer {
+			remote_peer
+		} else if local_peer == Some(&self.body.0) {
+			local_peer.unwrap()
+		} else {
+			tracing::trace!(?remote_peer, ?local_peer, token_peer = ?self.body.0, "bitswap-token-peer-invalid");
 			return false;
-		}
+		};
 		match self.algorithm.as_str() {
-			"HS256" => Self::new(secret, CoTokenParameters(*remote_peer, self.body.1.clone()))
+			"HS256" => Self::new(secret, CoTokenParameters(*token_peer, self.body.1.clone()))
 				.map(|token| &token.signature == &self.signature)
 				.unwrap_or(false),
 			_ => false,
@@ -71,6 +82,6 @@ mod tests {
 		let peer = PeerId::random();
 		let secret: Secret = co_storage::Secret::generate(32).into();
 		let token = CoToken::new(&secret, crate::CoTokenParameters(peer, "test".into())).unwrap();
-		assert!(token.verify(&secret, &peer));
+		assert!(token.verify(&secret, &peer, None));
 	}
 }

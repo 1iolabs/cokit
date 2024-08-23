@@ -18,6 +18,7 @@ pub use storage::{
 	fs::FsStorage,
 	mapped::MappedBlockStorage,
 	memory::{MemoryBlockStorage, MemoryStorage},
+	request,
 	store_params::StoreParamsBlockStorage,
 	sync::{SyncBlockStorage, SyncStorage},
 };

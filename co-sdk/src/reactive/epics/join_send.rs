@@ -106,7 +106,7 @@ async fn join(
 	let mut result = Vec::new();
 
 	// timeout
-	let timeout: Duration = settings_timeout(&context, &membership.id, Some("join")).await;
+	let timeout: Duration = settings_timeout(&context, &CoId::from(CO_ID_LOCAL), Some("join")).await;
 
 	// metdata
 	let invite_cid = membership

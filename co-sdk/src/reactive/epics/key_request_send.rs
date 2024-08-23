@@ -9,7 +9,7 @@ use crate::{
 		context::{ActionObservable, StateObservable},
 		wait_response::wait_response,
 	},
-	Action, CoContext, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	Action, CoContext, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
 use co_core_keystore::KeyStoreAction;
@@ -50,7 +50,7 @@ async fn key_request(
 	did: Did,
 ) -> anyhow::Result<Vec<Action>> {
 	if let Some(network) = context.network().await {
-		let timeout = settings_timeout(&context, &co, Some("key-exchange")).await;
+		let timeout = settings_timeout(&context, &CoId::from(CO_ID_LOCAL), Some("key-exchange")).await;
 
 		// from
 		let identity = context.private_identity_resolver().await?.resolve_private(&did).await?;

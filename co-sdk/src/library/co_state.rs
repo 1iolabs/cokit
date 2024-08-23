@@ -36,9 +36,9 @@ impl CoState {
 	// 	self.state.read().await.1
 	// }
 
-	// pub async fn write_state(&self, state: OptionLink<Co>) {
-	// 	self.state.write().await.1 = state;
-	// }
+	pub async fn write_state(&self, state: OptionLink<Co>) {
+		self.state.write().await.1 = state;
+	}
 }
 impl From<OptionLink<Co>> for CoState {
 	fn from(value: OptionLink<Co>) -> Self {

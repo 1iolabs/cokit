@@ -7,8 +7,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver, PrivateIdentityResolverBox};
-use co_storage::BlockStorage;
-use futures::{pin_mut, Stream, StreamExt};
+use futures::{channel::mpsc, pin_mut, Stream, StreamExt};
 use libipld::DefaultParams;
 use libp2p::{
 	gossipsub, identify,
@@ -34,16 +33,13 @@ pub struct Libp2pNetwork {
 	events: EventsSubject<NetworkEvent>,
 }
 impl Libp2pNetwork {
-	pub fn new<S, R, P, T>(
+	pub fn new<R, P>(
 		identifier: String,
 		config: Libp2pNetworkConfig,
-		storage_resolver: T,
 		resolver: R,
 		private_resolver: P,
-	) -> anyhow::Result<Libp2pNetwork>
+	) -> anyhow::Result<(Libp2pNetwork, mpsc::Receiver<bitswap::BitswapRequest<DefaultParams>>)>
 	where
-		S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + 'static,
-		T: bitswap::StorageResolver<S> + Send + Sync + 'static,
 		R: IdentityResolver + Clone + Send + Sync + 'static,
 		P: PrivateIdentityResolver + Clone + Send + Sync + 'static,
 	{
@@ -55,7 +51,8 @@ impl Libp2pNetwork {
 			.max_transmit_size(256 * 1024)
 			.build()
 			.expect("valid config");
-		let bitswap_identifier = identifier.clone();
+
+		let (bitswap_store, bitswap_requests) = bitswap::BitswapRequestBlockStorage::<DefaultParams>::new(1024);
 		let behaviour = Behaviour {
 			identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
 				"/ipfs/0.1.0".into(),
@@ -65,16 +62,15 @@ impl Libp2pNetwork {
 			mdns: MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?,
 			// kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()),
 			// kademlia_config),
-			bitswap: Bitswap::new(
-				Default::default(),
-				bitswap::BitswapBlockStorage::new(storage_resolver),
+			bitswap: Bitswap::new(Default::default(), bitswap_store, {
+				let bitswap_identifier = identifier.clone();
 				Box::new(move |t| {
 					tokio::spawn(async move {
 						t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
 							.await
 					});
-				}),
-			),
+				})
+			}),
 			gossipsub: gossipsub::Behaviour::new(
 				gossipsub::MessageAuthenticity::Signed(config.keypair.clone()),
 				gossipsub_config,
@@ -129,7 +125,7 @@ impl Libp2pNetwork {
 		});
 
 		// result
-		Ok(Self { config, shutdown, tasks: tasks_tx, events })
+		Ok((Self { config, shutdown, tasks: tasks_tx, events }, bitswap_requests))
 	}
 
 	pub fn spawner(&self) -> TokioNetworkTaskSpawner<Behaviour, Context> {
