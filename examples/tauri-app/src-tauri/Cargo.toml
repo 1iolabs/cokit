@@ -7,12 +7,12 @@ edition = "2021"
 rust-version = "1.76"
 
 [build-dependencies]
-tauri-build = { version = "2.0.0-beta", features = [] }
+tauri-build = { version = "2.0.0-beta.19", features = [] }
 
 [dependencies]
-tauri = { version = "2.0.0-beta", features = [] }
-tauri-plugin-shell = "2.0.0-beta"
-tauri-utils = { version = "2.0.0-beta" }
+tauri = { version = "=2.0.0-beta.25", features = [] }
+tauri-plugin-shell = "=2.0.0-beta.10"
+tauri-utils = { version = "=2.0.0-beta.19" }
 tokio = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
