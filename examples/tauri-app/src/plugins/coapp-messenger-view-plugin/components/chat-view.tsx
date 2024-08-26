@@ -1,8 +1,8 @@
-import * as React from "react";
-import { LevelStack } from "@1io/kui-level-stack";
 import { MessengerView } from "@1io/coapp-messenger-view";
-import { MessengerViewActionType, MessengerViewSendAction } from "../actions";
+import { LevelStack } from "@1io/kui-level-stack";
+import * as React from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { MessengerViewActionType, MessengerViewSendAction } from "../actions";
 import { MessengerViewPluginState } from "../state";
 
 interface MessengerViewProps { }
@@ -29,6 +29,7 @@ export function MessengerViewContainer(props: MessengerViewProps) {
       onChatInput={setMessage}
       messages={messages}
       onSendMessage={onSendMessage}
+      onBack={() => undefined}
     />
   </ LevelStack>;
 

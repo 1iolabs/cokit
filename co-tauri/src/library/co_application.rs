@@ -1,6 +1,5 @@
-use std::path::PathBuf;
-
 use co_sdk::{Application, ApplicationBuilder};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default)]
 pub struct CoApplicationSettings {
