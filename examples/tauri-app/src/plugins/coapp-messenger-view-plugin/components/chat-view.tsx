@@ -5,9 +5,11 @@ import { useDispatch, useSelector } from "react-redux";
 import { MessengerViewActionType, MessengerViewSendAction } from "../actions";
 import { MessengerViewPluginState } from "../state";
 
-interface MessengerViewProps { }
+export interface MessengerViewContainerProps {
+  onBack: () => void;
+}
 
-export function MessengerViewContainer(props: MessengerViewProps) {
+export function MessengerViewContainer(props: MessengerViewContainerProps) {
 
   const dispatch = useDispatch();
   const [message, setMessage] = React.useState("");
@@ -29,7 +31,7 @@ export function MessengerViewContainer(props: MessengerViewProps) {
       onChatInput={setMessage}
       messages={messages}
       onSendMessage={onSendMessage}
-      onBack={() => undefined}
+      onBack={props.onBack}
     />
   </ LevelStack>;
 

@@ -1,15 +1,18 @@
 import { isPluginInitializeAction } from "@1io/kui-application-sdk";
-import { filter, identity, mergeAll, mergeMap } from "rxjs";
-import { MessengerViewEpicType } from "../types/plugin.js";
-import { invoke_get } from "../../../library/invoke-get.js";
-import { MessengerViewNameChangedAction, MessengerViewActionType } from "../actions/index.js";
 import { AnyAction } from "redux";
+import { filter, identity, mergeAll, mergeMap, withLatestFrom } from "rxjs";
+import { invokeGetCoreState } from "../../../library/invoke-get.js";
+import { MessengerViewActionType, MessengerViewNameChangedAction } from "../actions/index.js";
+import { MessengerViewEpicType } from "../types/plugin.js";
 
 export const initEpic: MessengerViewEpicType = (action$, state$, context) => action$.pipe(
     filter(isPluginInitializeAction),
-    mergeMap(async () => {
+    withLatestFrom(state$),
+    mergeMap(async ([, state]) => {
+        console.log("plugin loaded:", context.plugin);
         const actions: AnyAction[] = [];
-        const roomCoreState = await invoke_get("1io", "room");
+        // load core state of room
+        const roomCoreState = await invokeGetCoreState(state.co, state.core);
         const chatName = roomCoreState?.name;
         if (chatName) {
             actions.push(identity<MessengerViewNameChangedAction>({

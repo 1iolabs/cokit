@@ -7,10 +7,16 @@ export function chatsListReducer(state: ChatsListPluginState | undefined, action
     }
     switch (action.type) {
         case ChatsListActionType.MessengerPluginLoaded: {
-            return { ...state, loadedPlugins: [...state.loadedPlugins, action.payload.pluginId] };
+            return {
+                ...state,
+                loadedPlugins: [...state.loadedPlugins, action.payload.loadedPlugin]
+            };
         }
         case ChatsListActionType.ActivatePlugin: {
-            return { ...state, activePlugin: action.payload.pluginId }
+            return { ...state, activePlugin: action.payload.pluginId };
+        }
+        case ChatsListActionType.SetChats: {
+            return { ...state, chats: action.payload.chats };
         }
     }
     return state;

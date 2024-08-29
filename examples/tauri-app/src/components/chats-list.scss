@@ -1,0 +1,25 @@
+.chatsList {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-items: center;
+    background: #6e6e6e;
+    color: white;
+    height: 100%;
+
+    >.listButton {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: black;
+        height: 60px;
+        border: none;
+        border-bottom: 1px solid #3e3e3e;
+        border-top-left-radius: 0%;
+
+        &:hover {
+            background: #2e2e2e;
+        }
+    }
+}
