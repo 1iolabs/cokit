@@ -1,8 +1,6 @@
 import { isPluginInitializeAction } from "@1io/kui-application-sdk";
-import { invoke } from "@tauri-apps/api/core";
-import { Event, listen } from "@tauri-apps/api/event";
-import { EMPTY, filter, fromEventPattern, identity, mergeMap, withLatestFrom } from "rxjs";
-import { buildCoCoreId } from "../../../library/core-id.js";
+import { EMPTY, filter, identity, mergeMap, withLatestFrom } from "rxjs";
+import { createTauriSubscription } from "../../../library/create-tauri-subscribe.js";
 import { MessengerViewActionType, MessengerViewNameChangedAction } from "../actions";
 import { MessengerViewEpicType } from "../types/plugin";
 
@@ -29,27 +27,11 @@ export const subscribeTauriEventEpic: MessengerViewEpicType = (action$, state$, 
     mergeMap(([, state]) => {
         const co = state.co;
         const core = state.core;
-        console.log("subscribe co/core", co, core);
-        invoke("subscribe", { co, core, source: context.plugin });
-        return fromEventPattern<Event<MessageEvent>>(
-            async (handler) => {
-                return await listen(buildCoCoreId(co, core), handler);
-            },
-            (_handler, unlisten) => {
-                console.log("remove", context.plugin);
-                invoke("unsubscribe", { co, core, source: context.plugin });
-                unlisten();
-            },
-        ).pipe(
+        return createTauriSubscription<MessageEvent>(context.plugin, co, core).pipe(
             withLatestFrom(state$),
             // dedupe messages
-            filter(([event, state]) => state.messages.findIndex((m) => m.key === event.payload.p.event_id) === -1),
+            filter(([event, s]) => s.messages.findIndex((m) => m.key === event.payload.p.event_id) === -1),
             mergeMap(([event]) => {
-                console.log(event);
-                if (event.payload.c !== core) {
-                    // not an event of this core, skip
-                    return EMPTY;
-                }
                 switch (event.payload.p.type) {
                     case "m.room.message": {
                         return [{
