@@ -1,25 +1,10 @@
 import { isPluginInitializeAction } from "@1io/kui-application-sdk";
 import { EMPTY, filter, identity, mergeMap, withLatestFrom } from "rxjs";
+import { buildCoCoreId } from "../../../library/core-id.js";
 import { createTauriSubscription } from "../../../library/create-tauri-subscribe.js";
+import { RoomCoreEvent } from "../../../types/message-event.js";
 import { MessengerViewActionType, MessengerViewNameChangedAction } from "../actions";
 import { MessengerViewEpicType } from "../types/plugin";
-
-interface MessageEvent {
-    f: string;
-    c: string;
-    t: number;
-    p: {
-        event_id: string;
-        timestamp: number;
-        room_id: string;
-        type: string;
-        content: {
-            msgtype: string;
-            body: string;
-            name: string;
-        };
-    };
-}
 
 export const subscribeTauriEventEpic: MessengerViewEpicType = (action$, state$, context) => action$.pipe(
     filter(isPluginInitializeAction),
@@ -27,7 +12,7 @@ export const subscribeTauriEventEpic: MessengerViewEpicType = (action$, state$, 
     mergeMap(([, state]) => {
         const co = state.co;
         const core = state.core;
-        return createTauriSubscription<MessageEvent>(context.plugin, co, core).pipe(
+        return createTauriSubscription<RoomCoreEvent>(context.plugin, buildCoCoreId(co, core)).pipe(
             withLatestFrom(state$),
             // dedupe messages
             filter(([event, s]) => s.messages.findIndex((m) => m.key === event.payload.p.event_id) === -1),

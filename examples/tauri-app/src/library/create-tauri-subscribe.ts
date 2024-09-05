@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Event, listen } from "@tauri-apps/api/event";
 import { Action } from "redux";
 import { fromEventPattern, Observable } from "rxjs";
-import { buildCoCoreId } from "./core-id";
+import { buildCoCoreId, splitCoCoreId } from "./core-id";
 
 export type SubscriptionEventHandler<E> = (event: Event<E>) => Action[];
 
@@ -18,9 +18,9 @@ export type SubscriptionEventHandler<E> = (event: Event<E>) => Action[];
  */
 export function createTauriSubscription<E>(
     source: string,
-    co: string,
-    core?: string,
+    coCoreId: string,
 ): Observable<Event<E>> {
+    const [co, core] = splitCoCoreId(coCoreId);
     // subscribe to "co/core" event
     invoke("subscribe", { co, core, source });
     const retObservable = fromEventPattern<Event<E>>(

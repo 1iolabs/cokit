@@ -5,6 +5,7 @@ import { identity } from "rxjs";
 import { ChatsListActionType, ChatsListActivatePluginAction, ChatsListOpenChatAction } from "../actions";
 import { Chat, ChatsListPluginState } from "../state";
 import "./chats-list.css";
+import { ListItem } from "./list-item";
 
 export interface ListViewProps { }
 
@@ -22,12 +23,6 @@ export function ListView(props: ListViewProps) {
     return pluginId
         ? <PluginView plugin={pluginId} props={{ onBack }} />
         : <div className="chatsList">
-            {chats.map((chat) =>
-                <div
-                    key={chat.roomCoreId}
-                    onClick={() => onOpenChat(chat)}
-                    className={"listButton"}>{chat.name}
-                </div>
-            )}
+            {chats.map((chat) => <ListItem key={chat.roomCoreId} chat={chat} openChat={() => onOpenChat(chat)} />)}
         </div>
 }

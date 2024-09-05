@@ -11,6 +11,7 @@ export const initEpic: ChatsListEpicType = (action$, state$, context) => action$
     filter(isPluginInitializeAction),
     mergeMap(async () => {
         const actions: AnyAction[] = [];
+        // register plugin as base plugin with kui application
         const baseApi = context.api.getApi<BaseApi>([{ key: "type", value: "base" }]);
         actions.push(baseApi.set(
             context.plugin,
@@ -18,17 +19,16 @@ export const initEpic: ChatsListEpicType = (action$, state$, context) => action$
                 { key: "coapp-chats-list", value: context.plugin },
             ],
         ));
+        // load all chat states
         const chats: Chat[] = [];
         const coreIds = await invokeGetFilteredCores(["core", "co-core-room"]);
         for (const coreId of coreIds) {
-            try {
-                const [co, core] = splitCoCoreId(coreId);
+            const [co, core] = splitCoCoreId(coreId);
+            if (core) {
                 const coreState = await invokeGetCoreState(co, core);
                 if (coreState?.name) {
-                    chats.push({ name: coreState.name, roomCoreId: coreId });
+                    chats.push({ name: coreState.name, roomCoreId: coreId, newMessages: 0 });
                 }
-            } catch (err) {
-                console.log(err);
             }
         }
         actions.push(identity<ChatsListSetChatsAction>({

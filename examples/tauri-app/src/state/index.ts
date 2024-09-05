@@ -3,6 +3,8 @@ import { PluginId } from "@1io/kui-application-sdk";
 export interface Chat {
     readonly roomCoreId: string;
     readonly name: string;
+    readonly lastMessage?: string;
+    readonly newMessages: number;
 }
 
 export interface LoadedCorePlugin {

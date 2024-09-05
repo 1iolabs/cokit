@@ -18,6 +18,16 @@ export function chatsListReducer(state: ChatsListPluginState | undefined, action
         case ChatsListActionType.SetChats: {
             return { ...state, chats: action.payload.chats };
         }
+        case ChatsListActionType.UpdateChat: {
+            return {
+                ...state, chats: state.chats.map((chat) => {
+                    if (chat.roomCoreId === action.payload.roomCoreId) {
+                        return { ...chat, ...action.payload.chat };
+                    }
+                    return chat;
+                })
+            }
+        }
     }
     return state;
 }

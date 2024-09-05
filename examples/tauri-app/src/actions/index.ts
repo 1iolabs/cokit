@@ -6,10 +6,12 @@ export enum ChatsListActionType {
     OpenChat = "coapp/chats-list/openChat",
     MessengerPluginLoaded = "coapp/chats-list/messengerPluginLoaded",
     ActivatePlugin = "coapp/chats-list/activatePlugin",
+    UpdateChat = "coapp/chats-list/updateChat",
+    RemoveChat = "coapp/chats-list/removeChat",
 }
 
 export type ChatsListActions = ChatsListOpenChatAction | ChatsListMessengerPluginLoadedAction
-    | ChatsListActivatePluginAction | ChatsListSetChatsAction;
+    | ChatsListActivatePluginAction | ChatsListSetChatsAction | ChatsListUpdateChatAction;
 
 export interface ChatsListSetChatsAction {
     readonly payload: { chats: Chat[] };
@@ -30,4 +32,12 @@ export interface ChatsListMessengerPluginLoadedAction {
 export interface ChatsListActivatePluginAction {
     readonly payload: { pluginId?: PluginId };
     readonly type: ChatsListActionType.ActivatePlugin;
+}
+
+export interface ChatsListUpdateChatAction {
+    readonly payload: {
+        chat: Partial<Chat>;
+        roomCoreId: string;
+    };
+    readonly type: ChatsListActionType.UpdateChat;
 }
