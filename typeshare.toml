@@ -1,0 +1,23 @@
+[swift]
+prefix = ""
+default_decorators = []
+default_generic_constraints = []
+codablevoid_constraints = []
+
+[swift.type_mappings]
+
+[typescript.type_mappings]
+"Cid" = "CID"
+
+[kotlin]
+package = ""
+module_name = ""
+prefix = ""
+
+[kotlin.type_mappings]
+
+[scala]
+package = ""
+module_name = ""
+
+[scala.type_mappings]

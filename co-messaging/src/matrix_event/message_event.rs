@@ -3,16 +3,17 @@ use super::{
 	poll_event::PollMessageType,
 };
 use crate::{matrix_event::relation::RelatesTo, multimedia::VideoInfo, relation::Relation, EventContent};
-use co_macros::common_event_content;
 use co_primitives::Did;
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 /**
  * Events that sent actual messages that can be seen by all participants in a room.
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-#[serde(tag = "msgtype")]
+#[serde(tag = "type")]
 pub enum MessageType {
 	#[serde(rename = "m.text")]
 	Text(TextContent),
@@ -96,6 +97,7 @@ pub trait Formattable {
 /**
  * Used to describe which users got mentioned in the body of a message
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Mentions {
 	pub user_ids: Vec<Did>,
@@ -105,7 +107,7 @@ pub struct Mentions {
  * Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
  * also given.
  */
-#[common_event_content]
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TextContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -113,8 +115,14 @@ pub struct TextContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	format: Option<String>, // The format used in formatted body
 	pub body: String, // The body of the message
-	#[serde(skip_serializing_if = "Option::is_none", rename = "m.mentions")]
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub mentions: Option<Mentions>, // Users that are mentioned in the body
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl TextContent {
@@ -171,7 +179,7 @@ impl Relation for TextContent {
  * formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
  * also given
  */
-#[common_event_content]
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct NoticeContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -179,8 +187,14 @@ pub struct NoticeContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	format: Option<String>, // The format used in formatted body
 	pub body: String, // The body of the message
-	#[serde(skip_serializing_if = "Option::is_none", rename = "m.mentions")]
+	#[serde(skip_serializing_if = "Option::is_none")]
 	pub mentions: Option<Mentions>, // Users that are mentioned in the body
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl NoticeContent {
@@ -233,12 +247,18 @@ impl Relation for NoticeContent {
 	}
 }
 
-#[common_event_content]
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ImageContent {
 	pub body: String,    // a text representing the image in some way
 	pub file: Cid,       // CID to the image file
 	pub info: ImageInfo, // image metadata
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl ImageContent {
@@ -268,12 +288,18 @@ impl Relation for ImageContent {
 	}
 }
 
-#[common_event_content]
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct AudioContent {
 	pub body: String,    // a text representing the audio in same way
 	pub file: Cid,       // CID to the audio file
 	pub info: AudioInfo, // audio metadata
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl AudioContent {
@@ -303,12 +329,18 @@ impl Relation for AudioContent {
 	}
 }
 
-#[common_event_content]
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct VideoContent {
 	pub body: String,    // textual representation of the video
 	pub file: Cid,       // CID to the video
 	pub info: VideoInfo, // video metadata
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl VideoContent {
@@ -338,13 +370,19 @@ impl Relation for VideoContent {
 	}
 }
 
-#[common_event_content]
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct FileContent {
 	pub body: String,     // a text representing the file in some way
 	pub file: Cid,        // CID to the file
 	pub filename: String, // the name of the file
 	pub info: FileInfo,   // file metadata
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl FileContent {
@@ -382,12 +420,18 @@ impl Relation for FileContent {
 	}
 }
 
-#[common_event_content]
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct LocationContent {
 	pub body: String,       // textual representation of the location
 	pub geo_uri: String,    // a geo uri by definition of https://datatracker.ietf.org/doc/html/rfc5870
 	pub info: LocationInfo, // location metadata
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl LocationContent {

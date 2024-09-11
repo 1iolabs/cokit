@@ -1,9 +1,11 @@
 use crate::{EventContent, EventType};
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 /**
  * Session description object for sdp offers and answers
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SessionDescription {
 	pub sdp: String,
@@ -20,17 +22,18 @@ impl SessionDescription {
 /**
  * ICE candidate for WebRTC exchange protocol
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ICECandidate {
 	pub candidate: String, // SDP 'a' line of the candidate
 	#[serde(rename = "sdpMLineIndex")]
-	pub sdp_m_line_index: i64, // index of the SDP 'm' line this candidate is intended for
+	pub sdp_m_line_index: u32, // index of the SDP 'm' line this candidate is intended for
 	#[serde(rename = "sdpMid")]
 	pub sdp_m_id: String, // the SDP media type this candidate is intended for
 }
 
 impl ICECandidate {
-	pub fn new(candidate: impl Into<String>, sdp_m_id: impl Into<String>, sdp_m_line_index: i64) -> Self {
+	pub fn new(candidate: impl Into<String>, sdp_m_id: impl Into<String>, sdp_m_line_index: u32) -> Self {
 		Self { candidate: candidate.into(), sdp_m_id: sdp_m_id.into(), sdp_m_line_index }
 	}
 }
@@ -42,6 +45,7 @@ impl ICECandidate {
  * across all participants. version: The version of the VoIP specs used for the message. This version is "1". A
  * string is used for experimental versions.
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type", content = "content")]
 pub enum CallType {
@@ -84,6 +88,7 @@ impl From<CallType> for EventContent {
 /**
  * Initial event to invite other parties to a call
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CallInviteContent {
 	pub call_id: String,
@@ -91,7 +96,7 @@ pub struct CallInviteContent {
 	pub version: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub invitee: Option<String>, // DID of the called user. Any user in room may answer if omitted
-	pub lifetime: i64,             // Time in ms during which invite is valid after sending this event
+	pub lifetime: u32,             // Time in ms during which invite is valid after sending this event
 	pub offer: SessionDescription, // Session description object
 }
 
@@ -112,7 +117,7 @@ impl CallInviteContent {
 		call_id: impl Into<String>,
 		party_id: impl Into<String>,
 		invitee: Option<String>,
-		lifetime: i64,
+		lifetime: u32,
 		offer_sdp: impl Into<String>,
 	) -> Self {
 		Self {
@@ -129,6 +134,7 @@ impl CallInviteContent {
 /**
  * Event used when answering an invite event
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct AnswerCallContent {
 	pub call_id: String,
@@ -163,6 +169,7 @@ impl AnswerCallContent {
 /**
  * Event used to exchange viable ICE candidates with the other party upon answering a call
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CallCandidatesContent {
 	pub call_id: String,
@@ -192,6 +199,7 @@ impl CallCandidatesContent {
 /**
  * Event used to select one of possibly multiple call answers
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SelectCallAnswerContent {
 	pub call_id: String,
@@ -228,6 +236,7 @@ impl SelectCallAnswerContent {
  * then send an answer. Offer and answer should never both be set. To ensure this they are not public to force the
  * users to use the setters.
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CallNegotiationContent {
 	pub call_id: String,
@@ -238,7 +247,7 @@ pub struct CallNegotiationContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	offer: Option<SessionDescription>, // Session description object for negotioation offers
 	#[serde(skip_serializing_if = "Option::is_none")]
-	lifetime: Option<i64>, // Time in ms before offer timeout
+	lifetime: Option<u32>, // Time in ms before offer timeout
 }
 
 impl From<CallNegotiationContent> for EventContent {
@@ -258,7 +267,7 @@ impl CallNegotiationContent {
 		call_id: impl Into<String>,
 		party_id: impl Into<String>,
 		offer_sdp: impl Into<String>,
-		lifetime: i64,
+		lifetime: u32,
 	) -> Self {
 		Self {
 			call_id: call_id.into(),
@@ -279,7 +288,7 @@ impl CallNegotiationContent {
 			lifetime: None,
 		}
 	}
-	pub fn set_offer(&mut self, offer_sdp: impl Into<String>, lifetime: i64) {
+	pub fn set_offer(&mut self, offer_sdp: impl Into<String>, lifetime: u32) {
 		self.offer = Some(SessionDescription::new(offer_sdp, "offer"));
 		self.lifetime = Some(lifetime);
 		self.answer = None;
@@ -295,7 +304,7 @@ impl CallNegotiationContent {
 	pub fn get_answer(&self) -> Option<SessionDescription> {
 		self.answer.clone()
 	}
-	pub fn get_lifetime(&self) -> Option<i64> {
+	pub fn get_lifetime(&self) -> Option<u32> {
 		self.lifetime
 	}
 }
@@ -303,6 +312,7 @@ impl CallNegotiationContent {
 /**
  * Event sent if call was rejected by a user.
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RejectCallContent {
 	pub call_id: String,
@@ -331,6 +341,7 @@ impl RejectCallContent {
 /**
  * Enum containg possible reasons for a hangup event
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum HangupCallReason {
 	#[serde(rename = "ice_failed")]

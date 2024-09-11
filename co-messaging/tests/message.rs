@@ -18,8 +18,8 @@ fn test_text_content() {
 	// todo test formatting
 	let buf = serde_ipld_dagcbor::to_vec(&event).expect("vector");
 	let restored_event = serde_ipld_dagcbor::from_slice::<MatrixEvent>(&buf).expect("decoded event");
-	// let json = serde_json::to_string_pretty(&event).unwrap();
-	// println!("JSON: {}", json);
+	let json = serde_json::to_string_pretty(&event).unwrap();
+	println!("JSON: {}", json);
 	// let serded_event: MatrixEvent = serde_json::from_str(&json).unwrap();
 	assert_eq!(event, restored_event);
 }

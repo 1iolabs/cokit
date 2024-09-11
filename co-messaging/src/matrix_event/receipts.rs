@@ -1,10 +1,12 @@
 use crate::EventContent;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use typeshare::typeshare;
 
 /**
  * Receipt events are used to indicate that all messages up to a specific event have been read by a user.
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum ReceiptType {
 	#[serde(untagged)]
@@ -24,6 +26,7 @@ impl From<ReceiptType> for EventContent {
  * event were read by the user that sent this receipt event. This becomes public knowledge to all users
  * participating in the CO.
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PublicReceiptContent {
 	#[serde(rename = "m.read")]
@@ -40,6 +43,7 @@ impl From<PublicReceiptContent> for EventContent {
 /**
  * A read receipt for one specific room. Indicates that a user has read all messages up to the given event.
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PrivateReceipt {
 	pub event_id: String,  // The ID of the event the receipt references
@@ -51,6 +55,7 @@ pub struct PrivateReceipt {
  * in this event only needs to contain the delta on the users receipts. This means that there is no need to contain
  * the complete read receipt state in this event but only the changes.
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PrivateReceiptContent {
 	#[serde(rename = "m.read.private")]

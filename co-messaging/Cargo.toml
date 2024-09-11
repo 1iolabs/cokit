@@ -10,4 +10,5 @@ co-primitives = { path = "../co-primitives" }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
+typeshare = { workspace = true }
 serde_json = "1.0.108"

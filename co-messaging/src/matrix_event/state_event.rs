@@ -2,10 +2,12 @@ use super::multimedia::ImageInfo;
 use crate::{EventContent, EventType};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 /**
  * All events that in some way alter the state of a room
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type", content = "content")]
 pub enum StateType {
@@ -36,6 +38,7 @@ impl EventType for StateType {
 	}
 }
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RoomNameContent {
 	pub name: String,
@@ -59,6 +62,7 @@ impl From<RoomNameContent> for EventContent {
 	}
 }
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RoomTopicContent {
 	pub topic: String,
@@ -82,6 +86,7 @@ impl From<RoomTopicContent> for EventContent {
 	}
 }
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RoomAvatarContent {
 	pub file: Option<Cid>,
@@ -106,6 +111,7 @@ impl From<RoomAvatarContent> for EventContent {
 	}
 }
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PinnedEventsContent {
 	pub pinned: Vec<String>,

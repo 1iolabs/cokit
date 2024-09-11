@@ -16,11 +16,13 @@ use matrix_event::{
 	user_events::UserType,
 };
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 pub trait EventType {
 	fn generate_event_type(&self) -> String;
 }
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MatrixEvent {
 	pub event_id: String,
@@ -72,6 +74,7 @@ impl EventType for MatrixEvent {
  * Simple enum to fit the different possible contents.
  * Unique event type string can be generated from this using pattern matching.
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type", content = "content")]
 pub enum EventContent {

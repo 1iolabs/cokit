@@ -1,7 +1,9 @@
 use crate::{EventContent, EventType};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type", content = "content")]
 pub enum UserType {
@@ -29,6 +31,7 @@ impl From<UserType> for EventContent {
 	}
 }
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PostUserStoryContent {
 	pub lifetime: u64,     // How long users can view the story after it was posted in ms
@@ -54,6 +57,7 @@ impl PostUserStoryContent {
 	}
 }
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ViewUserStoryContent {
 	pub story: String, // ID of the event that containes the viewed story
@@ -77,6 +81,7 @@ impl ViewUserStoryContent {
 	}
 }
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct UpdateProfileContent {
 	pub display_name: String, // The name that the user likes to use as a default

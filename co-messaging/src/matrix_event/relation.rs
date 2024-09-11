@@ -1,17 +1,26 @@
 use crate::{EventContent, EventType};
-use co_macros::common_event_content;
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 pub trait Relation {
 	fn generate_relation_type(&self) -> Option<String>;
 	fn get_in_reply_to(&self) -> Option<String>;
 }
 
-/// Empty content as the only purpose is holding a relation to another event.
-/// Mostly used for annotation events
-#[common_event_content]
+/**
+ * Empty content as the only purpose is holding a relation to another event.
+ * Mostly used for annotation events
+ */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct ReactionContent {}
+pub struct ReactionContent {
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
+}
 
 impl ReactionContent {
 	pub fn new(relation: RelatesTo) -> Self {
@@ -49,6 +58,7 @@ impl EventType for ReactionContent {
 /**
  * Used in some event contents to define a relation to other events
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename = "m.relates_to")]
 pub struct RelatesTo {
@@ -145,7 +155,10 @@ impl Relation for RelatesTo {
 	}
 }
 
-/// Simple enum containing all different types of relation that events can have to other events
+/**
+ *Simple enum containing all different types of relation that events can have to other events
+ */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum RelationType {
 	#[serde(rename = "m.annotation")]
@@ -175,14 +188,18 @@ impl Relation for RelationType {
 	}
 }
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ReplyContent {
 	pub event_id: String,
 }
 
-/// Event content used to redact other events. Sender of this event must be either the same as the sender of the
-/// original event or a user with the necessary permissions.
-/// Redactions are idempotent and irreversible. They do not use the same relation fields as other events
+/**
+ * Event content used to redact other events. Sender of this event must be either the same as the sender of the
+ * original event or a user with the necessary permissions.
+ * Redactions are idempotent and irreversible. They do not use the same relation fields as other events
+ */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct RedactionContent {
 	#[serde(skip_serializing_if = "Option::is_none")]

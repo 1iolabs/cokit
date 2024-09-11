@@ -1,10 +1,12 @@
 use crate::{EventContent, EventType};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
 /**
  * Ephemeral events are once-off events that do not need to be saved.
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type", content = "content")]
 pub enum EphemeralType {
@@ -35,6 +37,7 @@ impl From<EphemeralType> for EventContent {
  * participant. Information should be updated regularly and have a timout after which no users should count as
  * typing when no new event was sent.
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TypingContent {
 	pub user_ids: Vec<String>, // List of users currently typing in the room
@@ -61,8 +64,8 @@ impl TypingContent {
 /**
  * Basic enum for possible presence states of a specific user
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-#[serde(tag = "presence")]
 pub enum PresenceType {
 	#[serde(rename = "online")]
 	Online, // Default state when user is connected to an event stream
@@ -77,11 +80,11 @@ pub enum PresenceType {
  * In contrast to typing events, the sender is important here and always corresponds to the user the information is
  * about.
  */
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct PresenceContent {
-	#[serde(flatten)]
 	pub presence: PresenceType,
-	pub last_active: i64,       // Timestampt in milliseconds when the user last performed an action
+	pub last_active: u32,       // Timestampt in milliseconds when the user last performed an action
 	pub currently_active: bool, // Whether the user is currently active
 	pub avatar: Cid,            // Avatar the user is currently using
 	pub display_name: String,   // Display name of the user
@@ -103,7 +106,7 @@ impl From<PresenceContent> for EventContent {
 impl PresenceContent {
 	pub fn new(
 		presence: PresenceType,
-		last_active: i64,
+		last_active: u32,
 		currently_active: bool,
 		avatar: Cid,
 		display_name: impl Into<String>,
