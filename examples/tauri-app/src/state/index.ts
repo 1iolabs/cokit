@@ -5,15 +5,10 @@ export interface Chat {
     readonly name: string;
     readonly lastMessage?: string;
     readonly newMessages: number;
-}
-
-export interface LoadedCorePlugin {
-    readonly pluginId: PluginId;
-    readonly chat: Chat;
+    readonly pluginId?: PluginId;
 }
 
 export interface ChatsListPluginState {
-    readonly loadedPlugins: LoadedCorePlugin[];
     readonly activePlugin?: PluginId;
     readonly chats: Chat[];
 }

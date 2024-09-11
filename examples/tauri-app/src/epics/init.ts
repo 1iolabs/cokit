@@ -3,7 +3,7 @@ import { AnyAction } from "redux";
 import { filter, identity, mergeAll, mergeMap } from "rxjs";
 import { ChatsListActionType, ChatsListSetChatsAction } from "../actions";
 import { splitCoCoreId } from "../library/core-id";
-import { invokeGetCoreState, invokeGetFilteredCores } from "../library/invoke-get";
+import { invokeGetCoHeads, invokeGetCoreState, invokeGetFilteredCores } from "../library/invoke-get";
 import { Chat } from "../state";
 import { ChatsListEpicType } from "../types/plugin";
 
@@ -19,9 +19,12 @@ export const initEpic: ChatsListEpicType = (action$, state$, context) => action$
                 { key: "coapp-chats-list", value: context.plugin },
             ],
         ));
+        const heads = await invokeGetCoHeads("1io");
+        console.log("heads", heads);
         // load all chat states
         const chats: Chat[] = [];
         const coreIds = await invokeGetFilteredCores(["core", "co-core-room"]);
+        console.log("rooms", coreIds);
         for (const coreId of coreIds) {
             const [co, core] = splitCoCoreId(coreId);
             if (core) {

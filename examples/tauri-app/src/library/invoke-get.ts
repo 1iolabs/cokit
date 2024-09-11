@@ -13,6 +13,15 @@ export async function invokeGetCoState(co: string): Promise<any> {
     return state;
 }
 
+export async function invokeGetCoHeads(co: string): Promise<any[]> {
+    let [_, headsCids]: [CID, CID[]] = await invoke("get_co_state", { co });
+    const heads = [];
+    for (const headCid of headsCids) {
+        heads.push(await invokeResolveCid(co, headCid));
+    }
+    return heads;
+}
+
 export async function invokeGetCoreState(co: string, core: string): Promise<any> {
     const state = await invokeGetCoState(co);
     const core_cid = state?.cores?.[core]?.state;

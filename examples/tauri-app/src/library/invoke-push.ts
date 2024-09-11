@@ -13,7 +13,7 @@ export async function createCid<T>(data: T) {
     return cid;
 }
 
-export async function invokePushMessage(message: string, co: string) {
+export async function invokePushMessage(message: string, co: string, core: string) {
     let action = {
         event_id: uuid.v4(),
         timestamp: moment.now(),
@@ -24,7 +24,7 @@ export async function invokePushMessage(message: string, co: string) {
             body: message,
         }
     };
-    await invokePush(action, co, "room");
+    await invokePush(action, co, core);
 }
 
 export async function invokePush(action: object, co: string, core: string) {
