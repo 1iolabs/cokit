@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Network service connectivity description.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum Network {
 	/// DID Discovery protocol.
@@ -22,7 +22,7 @@ pub enum Network {
 }
 
 /// DID Discovery protocol.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NetworkDidDiscovery {
 	/// The GossipSub topic used for DidDiscovery messages.
 	/// If not specified the default topic will be used: `"co-contact"`.
@@ -33,7 +33,7 @@ pub struct NetworkDidDiscovery {
 }
 
 /// CO Heads protocol.
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct NetworkCoHeads {
 	/// The GossipSub topic used for Heads messages.
 	/// If not specified the default topic will be used: `"co-{co.id}"`.
@@ -41,7 +41,7 @@ pub struct NetworkCoHeads {
 }
 
 /// Rendezvouz protocol.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NetworkRendezvous {
 	/// The namespace to register to.
 	pub namespace: String,
@@ -50,7 +50,7 @@ pub struct NetworkRendezvous {
 }
 
 /// Direct peer connection.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NetworkPeer {
 	/// The [`libp2p::PeerId`] as bytes.
 	pub peer: Vec<u8>,
