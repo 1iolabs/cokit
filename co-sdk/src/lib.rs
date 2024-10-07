@@ -1,6 +1,7 @@
 mod application;
 mod drivers;
 // mod epics;
+pub mod actor;
 mod errors;
 mod library;
 mod pin;
