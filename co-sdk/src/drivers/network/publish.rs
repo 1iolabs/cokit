@@ -77,23 +77,20 @@ where
 			.await?
 			.into_iter()
 			.filter_map(|network| match network {
-				Network::CoHeads(network) => Some(network),
+				Network::CoHeads(network) if network.id == self.co => Some(network),
 				_ => None,
 			})
 			.collect();
 		for network in networks.iter() {
 			// subscribe
 			if !self.subscriptions.contains_key(network) {
-				self.subscriptions.insert(
-					network.clone(),
-					CoHeadsSubscription::subscribe(self.spawner.clone(), self.co.clone(), network.clone())?,
-				);
+				self.subscriptions
+					.insert(network.clone(), CoHeadsSubscription::subscribe(self.spawner.clone(), network.clone())?);
 			}
 
 			// publish
 			self.spawner.spawn(CoHeadsNetworkTask::new(CoHeadsRequest::PublishHeads {
 				network: network.clone(),
-				co: self.co.clone(),
 				heads: heads.clone(),
 			}))?;
 		}
@@ -124,10 +121,9 @@ struct CoHeadsSubscription {
 	unsubscribe: Option<CoHeadsNetworkTask>,
 }
 impl CoHeadsSubscription {
-	pub fn subscribe(spawner: CoNetworkTaskSpawner, co: CoId, network: NetworkCoHeads) -> Result<Self, anyhow::Error> {
-		spawner
-			.spawn(CoHeadsNetworkTask::new(CoHeadsRequest::Subscribe { network: network.clone(), co: co.clone() }))?;
-		Ok(Self { spawner, unsubscribe: Some(CoHeadsNetworkTask::new(CoHeadsRequest::Unsubscribe { network, co })) })
+	pub fn subscribe(spawner: CoNetworkTaskSpawner, network: NetworkCoHeads) -> Result<Self, anyhow::Error> {
+		spawner.spawn(CoHeadsNetworkTask::new(CoHeadsRequest::Subscribe { network: network.clone() }))?;
+		Ok(Self { spawner, unsubscribe: Some(CoHeadsNetworkTask::new(CoHeadsRequest::Unsubscribe { network })) })
 	}
 
 	pub fn unsubscribe(self) {

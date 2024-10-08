@@ -139,15 +139,10 @@ async fn join(
 	// use connectivity settings
 	//  send message to discovered peers until one send succedded and return Action::Joined.
 	let resolver = context.identity_resolver().await?;
-	let discovery: BTreeSet<Discovery> = network_discovery(
-		Some(&resolver),
-		&identity,
-		Some(&membership.id),
-		invite.network.network,
-		invite.network.participants,
-	)
-	.try_collect()
-	.await?;
+	let discovery: BTreeSet<Discovery> =
+		network_discovery(Some(&resolver), &identity, invite.network.network, invite.network.participants)
+			.try_collect()
+			.await?;
 	let join = connect_and_send(network, message, discovery, timeout);
 	pin_mut!(join);
 	while let Some(item) = join.next().await {

@@ -120,7 +120,7 @@ async fn invite(
 	)?;
 
 	// discovery
-	let discovery = network_discovery(Some(&identity_resolver), &from_identity, None, empty(), [to.to_owned()])
+	let discovery = network_discovery(Some(&identity_resolver), &from_identity, empty(), [to.to_owned()])
 		.try_collect()
 		.await?;
 

@@ -1,3 +1,4 @@
+use crate::CoId;
 use serde::{Deserialize, Serialize};
 
 /// Network service connectivity description.
@@ -33,11 +34,14 @@ pub struct NetworkDidDiscovery {
 }
 
 /// CO Heads protocol.
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NetworkCoHeads {
 	/// The GossipSub topic used for Heads messages.
 	/// If not specified the default topic will be used: `"co-{co.id}"`.
 	pub topic: Option<String>,
+
+	/// The CO to be discovered.
+	pub id: CoId,
 }
 
 /// Rendezvouz protocol.

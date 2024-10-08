@@ -60,7 +60,6 @@ where
 		let identity_resolver = self.identity_resolver.clone();
 		let identity = self.identity.clone();
 		let state = self.state.clone();
-		let id = self.id.clone();
 
 		// stream
 		async_stream::stream! {
@@ -75,7 +74,7 @@ where
 			};
 
 			// discovery
-			let discovery = match networks(&identity_resolver, &identity, &storage, &id, co_state).await {
+			let discovery = match networks(&identity_resolver, &identity, &storage, co_state).await {
 				Ok(value) => {
 					if value.is_empty() {
 						yield Err(anyhow!("No networks"));
@@ -115,7 +114,6 @@ async fn networks<P>(
 	identity_resolver: &IdentityResolverBox,
 	identity: &P,
 	storage: &CoStorage,
-	id: &CoId,
 	state: OptionLink<co_core_co::Co>,
 ) -> Result<BTreeSet<discovery::Discovery>, anyhow::Error>
 where
@@ -123,7 +121,7 @@ where
 {
 	let networks = state::networks(storage, state).await?;
 	let participants = state::participants(storage, state).await?.into_iter().map(|item| item.did);
-	Ok(network_discovery(Some(identity_resolver), identity, Some(id), networks, participants)
+	Ok(network_discovery(Some(identity_resolver), identity, networks, participants)
 		.try_collect()
 		.await?)
 }

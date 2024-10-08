@@ -1,6 +1,6 @@
 use co_identity::{network_did_discovery, Identity, IdentityResolver, IdentityResolverBox, PrivateIdentity};
 use co_network::{discovery, heads};
-use co_primitives::{CoId, Did, Network};
+use co_primitives::{Did, Network};
 use futures::{stream::iter, Stream};
 use std::collections::BTreeSet;
 use tokio_stream::StreamExt;
@@ -11,7 +11,6 @@ use tokio_stream::StreamExt;
 pub fn network_discovery<'a, P>(
 	identity_resolver: Option<&'a IdentityResolverBox>,
 	from: &'a P,
-	id: Option<&'a CoId>,
 	networks: impl IntoIterator<Item = Network> + 'a,
 	identities: impl IntoIterator<Item = Did> + 'a,
 ) -> impl Stream<Item = Result<discovery::Discovery, anyhow::Error>> + 'a
@@ -25,7 +24,7 @@ where
 		for await network in iter(networks.into_iter().map(Ok)).merge(identities_networks(identity_resolver, identities)) {
 			match network {
 				Ok(network) => {
-					for await discovery_result in network_discovery_one(identity_resolver, from, id, network) {
+					for await discovery_result in network_discovery_one(identity_resolver, from, network) {
 						match discovery_result {
 							Ok(discovery) => {
 								if seen.insert(discovery.clone()) {
@@ -75,7 +74,6 @@ fn identities_networks<'a>(
 fn network_discovery_one<'a, P>(
 	identity_resolver: Option<&'a IdentityResolverBox>,
 	from: &'a P,
-	id: Option<&'a CoId>,
 	network: Network,
 ) -> impl Stream<Item = Result<discovery::Discovery, anyhow::Error>> + 'a
 where
@@ -85,9 +83,7 @@ where
 		match network {
 			Network::CoHeads(value) =>
 			{
-				if let Some(id) = &id {
-					yield Ok(discovery::Discovery::Topic(heads::HeadsState::to_topic_hash(&value, id).into_string()));
-				}
+				yield Ok(discovery::Discovery::Topic(heads::HeadsState::to_topic_hash(&value).into_string()));
 			},
 			Network::Rendezvous(value) => {
 				yield Ok(discovery::Discovery::Rendezvous(value));

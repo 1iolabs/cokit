@@ -7,9 +7,9 @@ use std::collections::BTreeSet;
 
 #[derive(Debug)]
 pub enum CoHeadsRequest {
-	Subscribe { network: NetworkCoHeads, co: CoId },
-	Unsubscribe { network: NetworkCoHeads, co: CoId },
-	PublishHeads { network: NetworkCoHeads, co: CoId, heads: BTreeSet<Cid> },
+	Subscribe { network: NetworkCoHeads },
+	Unsubscribe { network: NetworkCoHeads },
+	PublishHeads { network: NetworkCoHeads, heads: BTreeSet<Cid> },
 	Heads { co: CoId, heads: BTreeSet<Cid>, peers: BTreeSet<PeerId>, identity: PrivateIdentityBox },
 }
 
@@ -29,33 +29,31 @@ where
 	fn execute(&mut self, swarm: &mut Swarm<B>, context: &mut C) {
 		let behaviour = context.heads_mut();
 		match Option::take(&mut self.request) {
-			Some(CoHeadsRequest::Subscribe { network, co }) => match behaviour.subscribe(swarm, &network, &co) {
+			Some(CoHeadsRequest::Subscribe { network }) => match behaviour.subscribe(swarm, &network) {
 				Ok(true) => {
-					tracing::debug!(?co, "co-subscribe");
+					tracing::debug!(co = ?network.id, "co-subscribe");
 				},
 				Ok(_) => {},
 				Err(err) => {
-					tracing::warn!(?co, ?err, "co-subscribe-failed");
+					tracing::warn!(co = ?network.id, ?err, "co-subscribe-failed");
 				},
 			},
-			Some(CoHeadsRequest::Unsubscribe { network, co }) => match behaviour.unsubscribe(swarm, &network, &co) {
+			Some(CoHeadsRequest::Unsubscribe { network }) => match behaviour.unsubscribe(swarm, &network) {
 				Ok(true) => {
-					tracing::debug!(?co, "co-unsubscribe");
+					tracing::debug!(co = ?network.id, "co-unsubscribe");
 				},
 				Ok(_) => {},
 				Err(err) => {
-					tracing::warn!(?co, ?err, "co-unsubscribe-failed");
+					tracing::warn!(co = ?network.id, ?err, "co-unsubscribe-failed");
 				},
 			},
-			Some(CoHeadsRequest::PublishHeads { network, co, heads }) => {
-				match behaviour.publish(swarm, &network, &co, &heads) {
-					Ok(_) => {
-						tracing::debug!(?co, "co-publish-heads");
-					},
-					Err(err) => {
-						tracing::warn!(?co, ?err, "co-publish-heads-failed");
-					},
-				}
+			Some(CoHeadsRequest::PublishHeads { network, heads }) => match behaviour.publish(swarm, &network, &heads) {
+				Ok(_) => {
+					tracing::debug!(co = ?network.id, "co-publish-heads");
+				},
+				Err(err) => {
+					tracing::warn!(co = ?network.id, ?err, "co-publish-heads-failed");
+				},
 			},
 			Some(CoHeadsRequest::Heads { co, heads, peers, identity }) => {
 				match behaviour.heads(swarm, &identity, &co, &heads, peers) {
