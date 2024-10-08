@@ -30,8 +30,13 @@ pub trait Actor: Send + Sync + 'static {
 	type State: Send + 'static;
 	type Initialize: Send + 'static;
 
-	async fn initialize(&mut self, tags: Tags, initialize: Self::Initialize) -> Result<Self::State, ActorError>;
-	async fn handle(&self, message: Self::Message, state: &mut Self::State) -> Result<(), ActorError>;
+	async fn initialize(&self, tags: Tags, initialize: Self::Initialize) -> Result<Self::State, ActorError>;
+	async fn handle(
+		&self,
+		handle: &ActorHandle<Self::Message>,
+		message: Self::Message,
+		state: &mut Self::State,
+	) -> Result<(), ActorError>;
 
 	fn tags(&self, tags: Tags) -> Result<Tags, ActorError> {
 		Ok(tags)
@@ -42,12 +47,13 @@ pub trait Actor: Send + Sync + 'static {
 	where
 		Self: Send + Sized + 'static,
 	{
-		let mut actor = actor;
 		let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 		let (state_tx, state_rx) = watch::channel(ActorState::Starting);
 		let tags = actor.tags(tags)?;
+		let handle = ActorHandle { tx: tx.clone(), state: state_rx.clone() };
 		let join = tokio::spawn({
 			let tags = tags.clone();
+			let handle = handle.clone();
 			async move {
 				// initialize
 				let mut actor_state = actor.initialize(tags, initialize).await?;
@@ -59,7 +65,7 @@ pub trait Actor: Send + Sync + 'static {
 				while let Some(actor_message) = rx.recv().await {
 					match actor_message {
 						ActorMessage::Message(message) => {
-							actor.handle(message, &mut actor_state).await?;
+							actor.handle(&handle, message, &mut actor_state).await?;
 						},
 						ActorMessage::Shutdown => {
 							state_tx
@@ -78,7 +84,7 @@ pub trait Actor: Send + Sync + 'static {
 				Ok(())
 			}
 		});
-		Ok(ActorInstance { join, tx, state: state_rx, tags })
+		Ok(ActorInstance { join, handle, tags })
 	}
 }
 
@@ -112,9 +118,8 @@ pub struct ActorInstance<A>
 where
 	A: Actor,
 {
-	tx: mpsc::UnboundedSender<ActorMessage<A::Message>>,
+	handle: ActorHandle<A::Message>,
 	join: JoinHandle<Result<(), ActorError>>,
-	state: watch::Receiver<ActorState>,
 	tags: Tags,
 }
 impl<A> ActorInstance<A>
@@ -123,7 +128,7 @@ where
 {
 	/// Get actor handle.
 	pub fn handle(&self) -> ActorHandle<A::Message> {
-		ActorHandle { tx: self.tx.clone() }
+		self.handle.clone()
 	}
 
 	/// Get actor tags.
@@ -131,6 +136,37 @@ where
 		self.tags.clone()
 	}
 
+	/// Request shutdown.
+	pub fn shutdown(&self) {
+		self.handle().shutdown();
+	}
+
+	/// Wait until the actor completes.
+	pub async fn join(self) -> Result<(), ActorError> {
+		self.join.await.map_err(|e| ActorError::InvalidState(e.into()))??;
+		Ok(())
+	}
+
+	/// Get actor state.
+	pub fn state(&self) -> ActorState {
+		*self.handle.state.borrow()
+	}
+}
+
+/// Handle into an actor which can be used to send messages.
+pub struct ActorHandle<M> {
+	tx: mpsc::UnboundedSender<ActorMessage<M>>,
+	state: watch::Receiver<ActorState>,
+}
+impl<M> Clone for ActorHandle<M> {
+	fn clone(&self) -> Self {
+		Self { tx: self.tx.clone(), state: self.state.clone() }
+	}
+}
+impl<M> ActorHandle<M>
+where
+	M: Send + 'static,
+{
 	/// Wait for startup to be complete.
 	pub async fn initialized(&self) -> Result<(), ActorError> {
 		let mut state = self.state.clone();
@@ -148,31 +184,23 @@ where
 		Ok(())
 	}
 
-	/// Request shutdown.
-	pub fn shutdown(&self) {
-		self.handle().shutdown();
-	}
-
-	/// Wait until the actor completes.
-	pub async fn join(self) -> Result<(), ActorError> {
-		self.join.await.map_err(|e| ActorError::InvalidState(e.into()))??;
+	/// Wait for actor shutdown.
+	pub async fn closed(&self) -> Result<(), ActorError> {
+		let mut state = self.state.clone();
+		loop {
+			let actor_state = *state.borrow_and_update();
+			match actor_state {
+				ActorState::Starting | ActorState::Running => {
+					state.changed().await.map_err(|e| ActorError::InvalidState(e.into()))?;
+				},
+				_ => {
+					break;
+				},
+			}
+		}
 		Ok(())
 	}
 
-	/// Get actor state.
-	pub fn state(&self) -> ActorState {
-		*self.state.borrow()
-	}
-}
-
-/// Handle into an actor which can be used to send messages.
-pub struct ActorHandle<M> {
-	tx: mpsc::UnboundedSender<ActorMessage<M>>,
-}
-impl<M> ActorHandle<M>
-where
-	M: Send + 'static,
-{
 	/// Request shutdown.
 	pub fn shutdown(&self) {
 		self.tx.send(ActorMessage::Shutdown).ok();
@@ -228,11 +256,22 @@ where
 	}
 }
 
+// pub trait ActorExt: Actor {
+// 	fn with_epic<E, C>(self, epic: E, context: C) -> EpicActor<Self, C>
+// 	where
+// 		E: Epic<Self::Message, Self::State, C>,
+// 	{
+// 		EpicActor { actor: self, context }
+// 	}
+// }
+
 #[cfg(test)]
 mod tests {
-	use crate::actor::{Actor, ActorError, Response, ResponseStream, ResponseStreams};
+	use crate::{
+		actor::{Actor, ActorError, ActorHandle, Response, ResponseStream, ResponseStreams},
+		Tags,
+	};
 	use async_trait::async_trait;
-	use co_primitives::Tags;
 	use futures::{StreamExt, TryStreamExt};
 
 	#[tokio::test]
@@ -250,15 +289,16 @@ mod tests {
 			type State = i32;
 			type Initialize = i32;
 
-			async fn initialize(
-				&mut self,
-				_tags: Tags,
-				initialize: Self::Initialize,
-			) -> Result<Self::State, ActorError> {
+			async fn initialize(&self, _tags: Tags, initialize: Self::Initialize) -> Result<Self::State, ActorError> {
 				Ok(initialize)
 			}
 
-			async fn handle(&self, message: Self::Message, state: &mut Self::State) -> Result<(), ActorError> {
+			async fn handle(
+				&self,
+				_handle: &ActorHandle<Self::Message>,
+				message: Self::Message,
+				state: &mut Self::State,
+			) -> Result<(), ActorError> {
 				match message {
 					TestMessage::Inc(value) => {
 						*state = value + *state;
@@ -303,15 +343,16 @@ mod tests {
 			type State = TestState;
 			type Initialize = i32;
 
-			async fn initialize(
-				&mut self,
-				_tags: Tags,
-				initialize: Self::Initialize,
-			) -> Result<Self::State, ActorError> {
+			async fn initialize(&self, _tags: Tags, initialize: Self::Initialize) -> Result<Self::State, ActorError> {
 				Ok(TestState { watchers: Default::default(), value: initialize })
 			}
 
-			async fn handle(&self, message: Self::Message, state: &mut Self::State) -> Result<(), ActorError> {
+			async fn handle(
+				&self,
+				_handle: &ActorHandle<Self::Message>,
+				message: Self::Message,
+				state: &mut Self::State,
+			) -> Result<(), ActorError> {
 				match message {
 					TestMessage::Inc(value) => {
 						state.value = value + state.value;

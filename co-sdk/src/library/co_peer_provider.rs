@@ -7,14 +7,13 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use co_identity::{IdentityResolverBox, PrivateIdentity};
 use co_network::{discovery, NetworkTaskSpawner, PeerProvider};
-use co_primitives::{CoId, OptionLink};
+use co_primitives::OptionLink;
 use futures::{Stream, StreamExt, TryStreamExt};
 use libp2p::PeerId;
 use std::{collections::BTreeSet, future::ready};
 
 #[derive(Clone)]
 pub struct CoPeerProvider<I> {
-	id: CoId,
 	state: CoState,
 	identity_resolver: IdentityResolverBox,
 	identity: I,
@@ -28,10 +27,9 @@ where
 		spawner: CoNetworkTaskSpawner,
 		identity_resolver: IdentityResolverBox,
 		identity: I,
-		id: CoId,
 		state: CoState,
 	) -> Self {
-		Self { id, state, spawner, identity, identity_resolver }
+		Self { state, spawner, identity, identity_resolver }
 	}
 }
 #[async_trait]
@@ -41,12 +39,11 @@ where
 {
 	fn peers(&self) -> impl Stream<Item = BTreeSet<PeerId>> + Send + 'static {
 		self.try_peers().filter_map({
-			let id = self.id.clone();
 			move |result| {
 				ready(match result {
 					Ok(p) => Some(p),
 					Err(err) => {
-						tracing::warn!(?err, co = ?id, "co-peer-discovery-error");
+						tracing::warn!(?err, "co-peer-discovery-error");
 						None
 					},
 				})

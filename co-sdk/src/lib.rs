@@ -9,6 +9,7 @@ mod reactive;
 pub mod reducer;
 pub mod state;
 mod types;
+mod plugins;
 
 pub use application::{
 	application::{Application, ApplicationBuilder},

@@ -130,7 +130,7 @@ impl SharedCoBuilder {
 	{
 		OverridePeerProvider::new(
 			self.network_overrides.clone().unwrap_or_default(),
-			CoPeerProvider::new(network, create_identity_resolver(), identity, self.membership.id.clone(), co_state),
+			CoPeerProvider::new(network, create_identity_resolver(), identity, co_state),
 			self.membership.id.clone(),
 		)
 	}
