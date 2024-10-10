@@ -1,7 +1,9 @@
 mod actor;
 mod epic;
 mod response;
+mod state;
 
 pub use actor::{Actor, ActorError, ActorHandle, ActorInstance, ActorState};
-pub use epic::{Epic, EpicActor, EpicRuntime, JoinEpic};
+pub use epic::{Epic, EpicRuntime, JoinEpic};
 pub use response::{Response, ResponseReceiver, ResponseStream, ResponseStreamReceiver, ResponseStreams};
+pub use state::Reducer;

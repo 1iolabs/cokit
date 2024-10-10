@@ -208,9 +208,9 @@ where
 
 	/// Dispatch message.
 	/// Will only fail when the actor already has been stopped.
-	pub fn dispatch(&self, message: M) -> Result<(), ActorError> {
+	pub fn dispatch(&self, message: impl Into<M>) -> Result<(), ActorError> {
 		self.tx
-			.send(ActorMessage::Message(message))
+			.send(ActorMessage::Message(message.into()))
 			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running.")))?;
 		Ok(())
 	}

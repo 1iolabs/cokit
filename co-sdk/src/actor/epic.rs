@@ -1,6 +1,4 @@
-use super::{Actor, ActorError, ActorHandle};
-use async_trait::async_trait;
-use co_primitives::Tags;
+use super::ActorHandle;
 use futures::{pin_mut, Stream, StreamExt};
 use std::marker::PhantomData;
 
@@ -8,9 +6,13 @@ use std::marker::PhantomData;
 ///
 /// Defines side effects for actor actions which will produce actor messages over time.
 pub trait Epic<A, S, C> {
+	/// Run the epic.
+	///
+	/// # Arguments
+	/// - `state`: The state before the action has been applied.
 	fn epic(
 		&mut self,
-		message: &A,
+		action: &A,
 		state: &S,
 		context: &C,
 	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + Send + 'static>;
@@ -22,23 +24,24 @@ pub trait Epic<A, S, C> {
 
 /// Epic runtime to be uses as actor state.
 /// Expected to be called after the message has been applied to the state.
-pub struct EpicRuntime<E, A, S, C> {
+pub struct EpicRuntime<E, M, A, S, C> {
 	epic: E,
 	error: fn(anyhow::Error) -> Option<A>,
 	// epics: Vec<Box<dyn BoxEpic<A, S, C>>>,
-	_actor: PhantomData<fn(A, S, C)>,
+	_actor: PhantomData<fn(M, A, S, C)>,
 }
-impl<E, A, S, C> EpicRuntime<E, A, S, C>
+impl<E, M, A, S, C> EpicRuntime<E, M, A, S, C>
 where
 	E: Epic<A, S, C>,
-	A: Send + 'static,
+	A: Send + 'static + Into<M>,
+	M: Send + 'static,
 {
 	pub fn new(epic: E, error: fn(anyhow::Error) -> Option<A>) -> Self {
 		Self { _actor: Default::default(), epic, error }
 	}
 
-	pub fn handle(&mut self, actor: &ActorHandle<A>, message: &A, state: &S, context: &C) {
-		let stream = self.epic.epic(message, state, context);
+	pub fn handle(&mut self, actor: &ActorHandle<M>, action: &A, state: &S, context: &C) {
+		let stream = self.epic.epic(action, state, context);
 		if let Some(stream) = stream {
 			let actor = actor.clone();
 			let error = self.error;
@@ -99,61 +102,61 @@ where
 	}
 }
 
-/// Wrapps an actor with an epic into an new actor.
-pub struct EpicActor<E, P, C> {
-	actor: P,
-	context: C,
-	epic: fn() -> E,
-}
-impl<E, P, C> EpicActor<E, P, C>
-where
-	P: Actor,
-	P::Message: Clone,
-	E: Epic<P::Message, P::State, C> + Send + Sync + 'static,
-	C: Send + Sync + 'static,
-{
-	pub fn new(actor: P, epic: fn() -> E, context: C) -> Self {
-		Self { actor, epic, context }
-	}
-}
-pub struct EpicActorState<E, P, C>
-where
-	P: Actor,
-	E: Epic<P::Message, P::State, C>,
-{
-	state: P::State,
-	epic: EpicRuntime<E, P::Message, P::State, C>,
-}
-#[async_trait]
-impl<E, P, C> Actor for EpicActor<E, P, C>
-where
-	P: Actor,
-	P::Message: Clone,
-	E: Epic<P::Message, P::State, C> + Send + Sync + 'static,
-	C: Send + Sync + 'static,
-{
-	type Message = P::Message;
-	type State = EpicActorState<E, P, C>;
-	type Initialize = P::Initialize;
+// /// Wrapps an actor with an epic into an new actor.
+// pub struct EpicActor<E, P, C> {
+// 	actor: P,
+// 	context: C,
+// 	epic: fn() -> E,
+// }
+// impl<E, P, C> EpicActor<E, P, C>
+// where
+// 	P: Actor,
+// 	P::Message: Clone,
+// 	E: Epic<P::Message, P::State, C> + Send + Sync + 'static,
+// 	C: Send + Sync + 'static,
+// {
+// 	pub fn new(actor: P, epic: fn() -> E, context: C) -> Self {
+// 		Self { actor, epic, context }
+// 	}
+// }
+// pub struct EpicActorState<E, P, C>
+// where
+// 	P: Actor,
+// 	E: Epic<P::Message, P::State, C>,
+// {
+// 	state: P::State,
+// 	epic: EpicRuntime<E, P::Message, P::State, C>,
+// }
+// #[async_trait]
+// impl<E, P, C> Actor for EpicActor<E, P, C>
+// where
+// 	P: Actor,
+// 	P::Message: Clone,
+// 	E: Epic<P::Message, P::State, C> + Send + Sync + 'static,
+// 	C: Send + Sync + 'static,
+// {
+// 	type Message = P::Message;
+// 	type State = EpicActorState<E, P, C>;
+// 	type Initialize = P::Initialize;
 
-	async fn initialize(&self, tags: Tags, initialize: Self::Initialize) -> Result<Self::State, ActorError> {
-		let state = self.actor.initialize(tags, initialize).await?;
-		Ok(EpicActorState { state, epic: EpicRuntime::new((self.epic)(), |_err| None) })
-	}
+// 	async fn initialize(&self, tags: Tags, initialize: Self::Initialize) -> Result<Self::State, ActorError> {
+// 		let state = self.actor.initialize(tags, initialize).await?;
+// 		Ok(EpicActorState { state, epic: EpicRuntime::new((self.epic)(), |_err| None) })
+// 	}
 
-	async fn handle(
-		&self,
-		handle: &ActorHandle<Self::Message>,
-		message: Self::Message,
-		state: &mut Self::State,
-	) -> Result<(), ActorError> {
-		// inner
-		self.actor.handle(handle, message.clone(), &mut state.state).await?;
+// 	async fn handle(
+// 		&self,
+// 		handle: &ActorHandle<Self::Message>,
+// 		message: Self::Message,
+// 		state: &mut Self::State,
+// 	) -> Result<(), ActorError> {
+// 		// epic
+// 		state.epic.handle(handle, &message, &state.state, &self.context);
 
-		// epic
-		state.epic.handle(handle, &message, &state.state, &self.context);
+// 		// inner
+// 		self.actor.handle(handle, message, &mut state.state).await?;
 
-		// result
-		Ok(())
-	}
-}
+// 		// result
+// 		Ok(())
+// 	}
+// }

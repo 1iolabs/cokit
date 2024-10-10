@@ -2,7 +2,9 @@ use crate::{
 	actor::Epic,
 	drivers::network::tasks::discovery_connect::DiscoveryConnectNetworkTask,
 	library::network_discovery::network_discovery,
-	plugins::connections::{ConnectionAction, ConnectionState, DisconnectReason, NetworkWithContext},
+	plugins::connections::{
+		ConnectAction, ConnectedAction, ConnectionAction, ConnectionState, DisconnectReason, DisconnectedAction,
+	},
 	CoContext,
 };
 use co_identity::PrivateIdentityResolver;
@@ -19,12 +21,15 @@ impl Epic<ConnectionAction, ConnectionState, CoContext> for ConnectEpic {
 		context: &CoContext,
 	) -> Option<impl Stream<Item = Result<ConnectionAction, anyhow::Error>> + 'static> {
 		match message {
-			ConnectionAction::Connect(NetworkWithContext { from, network }) => {
+			ConnectionAction::Connect(ConnectAction { from, network }) => {
 				Some(connect(context.clone(), from.clone(), network.clone()).map({
 					let network = network.clone();
 					move |item| match item {
 						Ok(action) => Ok(action),
-						Err(err) => Ok(ConnectionAction::Disconnected(network.clone(), DisconnectReason::Failure(err))),
+						Err(err) => Ok(ConnectionAction::Disconnected(DisconnectedAction {
+							network: network.clone(),
+							reason: DisconnectReason::Failure(err.to_string()),
+						})),
 					}
 				}))
 			},
@@ -43,7 +48,7 @@ fn connect(
 		let spawner = match context.network().await {
 			Some(v) => v,
 			None => {
-				yield ConnectionAction::Disconnected(network.clone(), DisconnectReason::NoNetwork);
+				yield ConnectionAction::Disconnected(DisconnectedAction { network: network.clone(),  reason: DisconnectReason::NoNetwork });
 				return;
 			},
 		};
@@ -61,7 +66,7 @@ fn connect(
 
 		// yield
 		for await peer in peers {
-			yield ConnectionAction::Connected(network.clone(), peer.map_err(Into::into));
+			yield ConnectionAction::Connected(ConnectedAction { network: network.clone(), result: peer.map_err(|err| err.to_string()) });
 		}
 	}
 }

@@ -1706,6 +1706,7 @@ dependencies = [
  "co-primitives",
  "co-runtime",
  "co-storage",
+ "derive_more",
  "directories",
  "example-counter",
  "futures",

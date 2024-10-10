@@ -24,6 +24,7 @@ co-network = { path = "../co-network" }
 co-primitives = { path = "../co-primitives" }
 co-runtime = { path = "../co-runtime" }
 co-storage = { path = "../co-storage" }
+derive_more = { workspace = true }
 directories = "5.0.1"
 futures = { workspace = true }
 hmac = "0.12.1"

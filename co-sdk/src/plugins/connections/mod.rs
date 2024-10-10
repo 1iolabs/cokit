@@ -1,8 +1,10 @@
 mod action;
 mod actor;
 mod epics;
+mod message;
 mod state;
 
-pub use action::{ConnectionAction, DisconnectReason, NetworkWithContext};
+pub use action::*;
 pub use actor::Connections;
-pub use state::{CoConnection, ConnectionState, NetworkConnection};
+pub use message::ConnectionMessage;
+pub use state::*;
