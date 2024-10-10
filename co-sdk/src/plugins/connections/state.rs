@@ -193,7 +193,7 @@ mod tests {
 	};
 	use co_primitives::{Network, NetworkPeer, NetworkRendezvous};
 	use libp2p::PeerId;
-	use std::{time::Instant, vec};
+	use std::{collections::BTreeSet, time::Instant, vec};
 
 	#[test]
 	fn test_use() {
@@ -214,8 +214,8 @@ mod tests {
 			.into(),
 		);
 		assert_eq!(
-			result,
-			vec![
+			BTreeSet::from_iter(result),
+			BTreeSet::from_iter([
 				ConnectionAction::Connect(ConnectAction {
 					network: network1.clone(),
 					from: "did:local:test".to_owned()
@@ -224,7 +224,7 @@ mod tests {
 					network: network2.clone(),
 					from: "did:local:test".to_owned()
 				}),
-			]
+			])
 		);
 		assert_eq!(state.co.len(), 1);
 		assert_eq!(state.networks.len(), 2);

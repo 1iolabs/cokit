@@ -3,7 +3,7 @@ use derive_more::{From, TryInto};
 use libp2p::PeerId;
 use std::{collections::BTreeSet, time::Instant};
 
-#[derive(Debug, Clone, From, TryInto, PartialEq)]
+#[derive(Debug, Clone, From, TryInto, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ConnectionAction {
 	/// Use a CO by utilitsing the specified networks.
 	Use(UseAction),
@@ -28,7 +28,7 @@ pub enum ConnectionAction {
 	Disconnected(DisconnectedAction),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct UseAction {
 	pub id: CoId,
 	pub from: Did,
@@ -36,7 +36,7 @@ pub struct UseAction {
 	pub networks: BTreeSet<Network>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PeersChangedAction {
 	pub id: CoId,
 	pub peers: BTreeSet<PeerId>,
@@ -44,35 +44,35 @@ pub struct PeersChangedAction {
 	pub removed: BTreeSet<PeerId>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ReleaseAction {
 	pub id: CoId,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ReleasedAction {
 	pub id: CoId,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ConnectAction {
 	pub network: Network,
 	pub from: Did,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ConnectedAction {
 	pub network: Network,
 	pub result: Result<BTreeSet<PeerId>, String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DisconnectedAction {
 	pub network: Network,
 	pub reason: DisconnectReason,
 }
 
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, thiserror::Error)]
 pub enum DisconnectReason {
 	#[error("No network available to connect")]
 	NoNetwork,
