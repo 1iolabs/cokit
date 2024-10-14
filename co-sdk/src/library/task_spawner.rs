@@ -20,3 +20,8 @@ impl TaskSpawner {
 			.spawn(task.instrument(tracing::trace_span!("task", application = self.idenitfier)))
 	}
 }
+impl Default for TaskSpawner {
+	fn default() -> Self {
+		Self { idenitfier: "default".to_string(), inner: Default::default() }
+	}
+}

@@ -5,12 +5,14 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
+	actor::{Actor, ActorHandle},
 	drivers::network::{
 		bitswap::handle_bitswap,
 		tasks::{co_heads_received::ReceivedHeadsNetworkTask, mdns_gossip::MdnsGossipNetworkTask},
 	},
 	library::task_spawner::TaskSpawner,
 	local_keypair_fetch,
+	plugins::connections::{ConnectionMessage, Connections},
 	reactive::{
 		context::{ActionObservable, ReactiveContext},
 		epics::epic,
@@ -24,10 +26,10 @@ use co_identity::{
 	PrivateIdentityResolverBox,
 };
 use co_network::NetworkTaskSpawner;
-use co_primitives::CoId;
+use co_primitives::{tags, CoId};
 use co_runtime::RuntimePool;
 use directories::ProjectDirs;
-use std::{fmt::Debug, path::PathBuf, sync::Arc};
+use std::{fmt::Debug, path::PathBuf, sync::Arc, time::Duration};
 use tokio_util::{
 	sync::{CancellationToken, DropGuard},
 	task::TaskTracker,
@@ -50,6 +52,10 @@ pub struct Application {
 	/// CO Network Driver.
 	/// TODO: When applciation is cloned before create_network this will cause issues.
 	network: Option<Network>,
+
+	/// CO Network Connections.
+	/// TODO: When applciation is cloned before create_network this will cause issues.
+	connections: Option<ActorHandle<ConnectionMessage>>,
 
 	/// Application shutdown token.
 	shutdown: CancellationToken,
@@ -176,6 +182,15 @@ impl Application {
 			.clone()
 			.tasks()
 			.spawn(handle_bitswap(self.co().clone(), bitswap_requests));
+
+		// connections
+		let connections = Actor::spawn_with(
+			self.tasks(),
+			tags!("type": "connections", "application": &self.settings.identifier),
+			Connections::new(self.co().clone(), Duration::from_secs(30)),
+			(),
+		)?;
+		self.connections = Some(connections.handle());
 
 		// reactive
 		self.reactive.actions().dispatch(Action::NetworkStarted);
@@ -390,6 +405,7 @@ impl ApplicationBuilder {
 		let result = Application {
 			settings,
 			network: None,
+			connections: None,
 			storage,
 			runtime: Runtime::new(),
 			co_context,

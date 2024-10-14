@@ -1,12 +1,10 @@
-use super::{action::UseAction, ConnectionAction};
+use super::{action::UseAction, ConnectionAction, PeersChangedAction};
 use crate::actor::ResponseStream;
-use libp2p::PeerId;
-use std::collections::BTreeSet;
 
 #[derive(Debug)]
 pub enum ConnectionMessage {
 	/// Use a CO by utilitsing the specified networks.
-	Use(UseAction, ResponseStream<BTreeSet<PeerId>>),
+	Use(UseAction, ResponseStream<PeersChangedAction>),
 
 	/// Action.
 	Action(ConnectionAction),

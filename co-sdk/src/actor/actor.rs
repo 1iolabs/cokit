@@ -1,5 +1,5 @@
 use super::{Response, ResponseReceiver, ResponseStream, ResponseStreamReceiver};
-use crate::Tags;
+use crate::{Tags, TaskSpawner};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::Stream;
@@ -42,8 +42,22 @@ pub trait Actor: Send + Sync + 'static {
 		Ok(tags)
 	}
 
-	/// TODO: to simplyfy lifecycle make async and wait for intitalize?
+	/// Spawn actor.
 	fn spawn(tags: Tags, actor: Self, initialize: Self::Initialize) -> Result<ActorInstance<Self>, ActorError>
+	where
+		Self: Send + Sized + 'static,
+	{
+		Self::spawn_with(Default::default(), tags, actor, initialize)
+	}
+
+	/// Spawn actor using a task spawner.
+	/// TODO: to simplyfy lifecycle make async and wait for intitalize?
+	fn spawn_with(
+		spawner: TaskSpawner,
+		tags: Tags,
+		actor: Self,
+		initialize: Self::Initialize,
+	) -> Result<ActorInstance<Self>, ActorError>
 	where
 		Self: Send + Sized + 'static,
 	{
@@ -51,7 +65,7 @@ pub trait Actor: Send + Sync + 'static {
 		let (state_tx, state_rx) = watch::channel(ActorState::Starting);
 		let tags = actor.tags(tags)?;
 		let handle = ActorHandle { tx: tx.clone(), state: state_rx.clone() };
-		let join = tokio::spawn({
+		let join = spawner.spawn({
 			let tags = tags.clone();
 			let handle = handle.clone();
 			async move {

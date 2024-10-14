@@ -66,9 +66,14 @@ impl<T> Stream for ResponseStreamReceiver<T> {
 	}
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ResponseStreams<T> {
 	streams: Vec<ResponseStream<T>>,
+}
+impl<T> Default for ResponseStreams<T> {
+	fn default() -> Self {
+		Self { streams: Default::default() }
+	}
 }
 impl<T> ResponseStreams<T>
 where

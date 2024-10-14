@@ -1,29 +1,26 @@
-use super::{epics::connect::ConnectEpic, ConnectionAction, ConnectionMessage, ConnectionState};
+use super::{epics::connect::ConnectEpic, ConnectionAction, ConnectionMessage, ConnectionState, PeersChangedAction};
 use crate::{
-	actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer},
+	actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer, ResponseStreams},
 	CoContext,
 };
 use async_trait::async_trait;
-use co_primitives::Tags;
-use std::time::Duration;
-
-// pub fn create_connections(tags: Tags, context: CoContext) -> Result<ActorHandle<ConnectionMessage>, ActorError> {
-// 	Ok(Actor::spawn(
-// 		tags,
-// 		EpicActor::new(Connections { keep_alive: Duration::from_secs(30) }, || ConnectEpic {}, context),
-// 		(),
-// 	)?
-// 	.handle())
-// }
+use co_primitives::{CoId, Tags};
+use std::{collections::BTreeMap, time::Duration};
 
 pub struct State {
 	state: ConnectionState,
 	epic: EpicRuntime<ConnectEpic, ConnectionMessage, ConnectionAction, ConnectionState, CoContext>,
+	peers_changed: BTreeMap<CoId, ResponseStreams<PeersChangedAction>>,
 }
 
 pub struct Connections {
 	context: CoContext,
 	keep_alive: Duration,
+}
+impl Connections {
+	pub fn new(context: CoContext, keep_alive: Duration) -> Self {
+		Self { context, keep_alive }
+	}
 }
 #[async_trait]
 impl Actor for Connections {
@@ -43,6 +40,7 @@ impl Actor for Connections {
 				tracing::error!(?err, "connection-epic-error");
 				None
 			}),
+			peers_changed: Default::default(),
 		})
 	}
 
@@ -54,19 +52,42 @@ impl Actor for Connections {
 	) -> Result<(), ActorError> {
 		// state
 		let action = match message {
-			ConnectionMessage::Use(action, response) => Some(ConnectionAction::Use(action)),
+			ConnectionMessage::Use(action, response) => {
+				// add response
+				state
+					.peers_changed
+					.entry(action.id.clone())
+					.or_insert(Default::default())
+					.push(response);
+
+				// action
+				Some(ConnectionAction::Use(action))
+			},
 			ConnectionMessage::Action(action) => Some(action),
 			_ => None,
 		};
 		if let Some(action) = action {
-			let actions = state.state.reduce(action.clone());
+			let next_actions = state.state.reduce(action.clone());
 
 			// epic
 			state.epic.handle(handle, &action, &state.state, &self.context);
 
+			// responses
+			match &action {
+				ConnectionAction::PeersChanged(peers_changed_action) => {
+					if let Some(responses) = state.peers_changed.get_mut(&peers_changed_action.id) {
+						responses.send(peers_changed_action.clone());
+					}
+				},
+				ConnectionAction::Released(released_action) => {
+					state.peers_changed.remove(&released_action.id);
+				},
+				_ => {},
+			}
+
 			// dispatch
-			for action in actions {
-				handle.dispatch(action)?;
+			for next_action in next_actions {
+				handle.dispatch(next_action)?;
 			}
 		}
 
