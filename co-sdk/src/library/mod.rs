@@ -3,6 +3,7 @@ pub mod cancel;
 pub mod co_peer_provider;
 pub mod co_state;
 pub mod connect_and_send;
+pub mod connections_peer_provider;
 pub mod create_reducer_action;
 pub mod did_key_provider;
 pub mod find_co_identities;

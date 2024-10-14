@@ -5,14 +5,14 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
-	actor::{Actor, ActorHandle},
+	actor::Actor,
 	drivers::network::{
 		bitswap::handle_bitswap,
 		tasks::{co_heads_received::ReceivedHeadsNetworkTask, mdns_gossip::MdnsGossipNetworkTask},
 	},
 	library::task_spawner::TaskSpawner,
 	local_keypair_fetch,
-	plugins::connections::{ConnectionMessage, Connections},
+	plugins::connections::Connections,
 	reactive::{
 		context::{ActionObservable, ReactiveContext},
 		epics::epic,
@@ -52,10 +52,6 @@ pub struct Application {
 	/// CO Network Driver.
 	/// TODO: When applciation is cloned before create_network this will cause issues.
 	network: Option<Network>,
-
-	/// CO Network Connections.
-	/// TODO: When applciation is cloned before create_network this will cause issues.
-	connections: Option<ActorHandle<ConnectionMessage>>,
 
 	/// Application shutdown token.
 	shutdown: CancellationToken,
@@ -165,8 +161,19 @@ impl Application {
 			});
 		}
 
+		// connections
+		let connections = Actor::spawn_with(
+			self.tasks(),
+			tags!("type": "connections", "application": &self.settings.identifier),
+			Connections::new(self.co().clone(), Duration::from_secs(30)),
+			(),
+		)?;
+
 		// set network to reducers
-		self.co_context.inner.set_network(Some(spawner.clone())).await?;
+		self.co_context
+			.inner
+			.set_network(Some((spawner.clone(), connections.handle())))
+			.await?;
 
 		// assign
 		self.network = Some(network);
@@ -182,15 +189,6 @@ impl Application {
 			.clone()
 			.tasks()
 			.spawn(handle_bitswap(self.co().clone(), bitswap_requests));
-
-		// connections
-		let connections = Actor::spawn_with(
-			self.tasks(),
-			tags!("type": "connections", "application": &self.settings.identifier),
-			Connections::new(self.co().clone(), Duration::from_secs(30)),
-			(),
-		)?;
-		self.connections = Some(connections.handle());
 
 		// reactive
 		self.reactive.actions().dispatch(Action::NetworkStarted);
@@ -405,7 +403,6 @@ impl ApplicationBuilder {
 		let result = Application {
 			settings,
 			network: None,
-			connections: None,
 			storage,
 			runtime: Runtime::new(),
 			co_context,

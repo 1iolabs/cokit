@@ -10,39 +10,26 @@ use tokio::sync::RwLock;
 
 /// Cloneable CoState token which will be updated by the reducer everytime it changes.
 #[derive(Debug, Clone, Default)]
+#[deprecated]
 pub struct CoState {
-	state: Arc<RwLock<(Option<CoStorage>, OptionLink<Co>)>>,
+	state: Arc<RwLock<OptionLink<Co>>>,
 }
 impl CoState {
-	pub fn new(storage: Option<CoStorage>, value: OptionLink<Co>) -> Self {
-		Self { state: Arc::new(RwLock::new((storage, value))) }
+	pub fn new(value: OptionLink<Co>) -> Self {
+		Self { state: Arc::new(RwLock::new(value)) }
 	}
 
-	/// Write value and optionally store an clone of stage if not set yet.
-	pub async fn write(&self, storage: &CoStorage, value: OptionLink<Co>, force_update_storage: bool) {
-		let mut guard = self.state.write().await;
-		if guard.0.is_none() || force_update_storage {
-			*guard = (Some(storage.clone()), value);
-		} else {
-			guard.1 = value;
-		}
+	pub async fn read_state(&self) -> OptionLink<Co> {
+		*self.state.read().await
 	}
-
-	pub async fn read(&self) -> (Option<CoStorage>, OptionLink<Co>) {
-		self.state.read().await.clone()
-	}
-
-	// pub async fn read_state(&self) -> OptionLink<Co> {
-	// 	self.state.read().await.1
-	// }
 
 	pub async fn write_state(&self, state: OptionLink<Co>) {
-		self.state.write().await.1 = state;
+		*self.state.write().await = state;
 	}
 }
 impl From<OptionLink<Co>> for CoState {
 	fn from(value: OptionLink<Co>) -> Self {
-		Self::new(None, value)
+		Self::new(value)
 	}
 }
 #[async_trait]
@@ -52,7 +39,7 @@ impl ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for CoStat
 		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
-		self.write(reducer.log().storage(), reducer.state().into(), false).await;
+		self.write_state(reducer.state().into()).await;
 		Ok(())
 	}
 }

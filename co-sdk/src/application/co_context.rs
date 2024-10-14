@@ -4,10 +4,12 @@ use super::{
 	shared::SharedCoBuilder,
 };
 use crate::{
+	actor::ActorHandle,
 	drivers::network::{token::CoToken, CoNetworkTaskSpawner},
 	library::{
 		find_co_secret::find_co_secret_by_membership, find_membership::memberships, override_peer_provider::Overrides,
 	},
+	plugins::connections::ConnectionMessage,
 	reactive::context::ReactiveContext,
 	reducer::core_resolver::{
 		dynamic::DynamicCoreResolver,
@@ -116,8 +118,13 @@ impl CoContext {
 	}
 
 	/// Network.
-	pub async fn network(&self) -> Option<CoNetworkTaskSpawner> {
+	pub async fn networks(&self) -> Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)> {
 		self.inner.network.read().await.clone()
+	}
+
+	/// Network.
+	pub async fn network(&self) -> Option<CoNetworkTaskSpawner> {
+		self.inner.network.read().await.as_ref().map(|(v, _)| v).cloned()
 	}
 
 	/// Tasks.
@@ -517,7 +524,7 @@ pub(crate) struct CoContextInner {
 
 	local_identity: LocalIdentity,
 
-	network: Arc<RwLock<Option<CoNetworkTaskSpawner>>>,
+	network: Arc<RwLock<Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>>>,
 	network_overrides: Overrides,
 
 	storage: CoStorage,
@@ -532,7 +539,7 @@ impl CoContextInner {
 		shutdown: CancellationToken,
 		tasks: TaskSpawner,
 		local_identity: LocalIdentity,
-		network: Option<CoNetworkTaskSpawner>,
+		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
 		storage: CoStorage,
 		runtime: Runtime,
 		reactive_context: ReactiveContext,
@@ -589,7 +596,10 @@ impl CoContextInner {
 	}
 
 	/// Clone with network.
-	pub async fn set_network(&self, network: Option<CoNetworkTaskSpawner>) -> Result<(), anyhow::Error> {
+	pub async fn set_network(
+		&self,
+		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
+	) -> Result<(), anyhow::Error> {
 		// assign
 		*self.network.write().await = network;
 
@@ -660,7 +670,7 @@ impl CoContextInner {
 		let core_resolver = self.create_co_core_resolver(membership.id.clone());
 
 		// network
-		let network: Option<CoNetworkTaskSpawner> = if network { self.network.read().await.clone() } else { None };
+		let network = if network { self.network.read().await.clone() } else { None };
 
 		// reducer
 		let reducer = SharedCoBuilder::new(parent, membership)
@@ -668,7 +678,6 @@ impl CoContextInner {
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
 			.with_network(network)
 			.with_initialize(initialize)
-			.with_network_overrides(Some(self.network_overrides.clone()))
 			.build(self.tasks.clone(), storage, self.runtime.clone(), identity, core_resolver)
 			.await?;
 

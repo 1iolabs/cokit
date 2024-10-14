@@ -12,9 +12,11 @@ use futures::{Stream, StreamExt, TryStreamExt};
 use libp2p::PeerId;
 use std::{collections::BTreeSet, future::ready};
 
+#[deprecated]
 #[derive(Clone)]
 pub struct CoPeerProvider<I> {
 	state: CoState,
+	storage: CoStorage,
 	identity_resolver: IdentityResolverBox,
 	identity: I,
 	spawner: CoNetworkTaskSpawner,
@@ -27,9 +29,10 @@ where
 		spawner: CoNetworkTaskSpawner,
 		identity_resolver: IdentityResolverBox,
 		identity: I,
+		storage: CoStorage,
 		state: CoState,
 	) -> Self {
-		Self { state, spawner, identity, identity_resolver }
+		Self { storage, state, spawner, identity, identity_resolver }
 	}
 }
 #[async_trait]
@@ -57,18 +60,12 @@ where
 		let identity_resolver = self.identity_resolver.clone();
 		let identity = self.identity.clone();
 		let state = self.state.clone();
+		let storage = self.storage.clone();
 
 		// stream
 		async_stream::stream! {
 			// storage/state
-			let (storage, co_state) = state.read().await;
-			let storage = match storage {
-				Some(s) => s,
-				None => {
-					yield Err(anyhow!("No storage"));
-					return;
-				},
-			};
+			let co_state = state.read_state().await;
 
 			// discovery
 			let discovery = match networks(&identity_resolver, &identity, &storage, co_state).await {

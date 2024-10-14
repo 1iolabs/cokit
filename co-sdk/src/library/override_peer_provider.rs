@@ -9,6 +9,7 @@ use std::{
 use tokio::sync::RwLock;
 
 /// Return explicitly overriden peers.
+#[deprecated]
 #[derive(Debug, Clone, Default)]
 pub struct Overrides {
 	peers: Arc<RwLock<BTreeMap<CoId, BTreeSet<PeerId>>>>,
@@ -27,6 +28,7 @@ impl Overrides {
 	}
 }
 
+#[deprecated]
 pub struct OverridePeerProvider<P> {
 	overrides: Overrides,
 	next: P,

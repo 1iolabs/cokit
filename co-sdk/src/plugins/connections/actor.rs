@@ -1,4 +1,4 @@
-use super::{epics::connect::ConnectEpic, ConnectionAction, ConnectionMessage, ConnectionState, PeersChangedAction};
+use super::{epics::epic, ConnectionAction, ConnectionMessage, ConnectionState, PeersChangedAction};
 use crate::{
 	actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer, ResponseStreams},
 	CoContext,
@@ -9,7 +9,7 @@ use std::{collections::BTreeMap, time::Duration};
 
 pub struct State {
 	state: ConnectionState,
-	epic: EpicRuntime<ConnectEpic, ConnectionMessage, ConnectionAction, ConnectionState, CoContext>,
+	epic: EpicRuntime<ConnectionMessage, ConnectionAction, ConnectionState, CoContext>,
 	peers_changed: BTreeMap<CoId, ResponseStreams<PeersChangedAction>>,
 }
 
@@ -36,7 +36,7 @@ impl Actor for Connections {
 				co: Default::default(),
 				networks: Default::default(),
 			},
-			epic: EpicRuntime::new(ConnectEpic {}, |err| {
+			epic: EpicRuntime::new(epic(), |err| {
 				tracing::error!(?err, "connection-epic-error");
 				None
 			}),
@@ -64,7 +64,6 @@ impl Actor for Connections {
 				Some(ConnectionAction::Use(action))
 			},
 			ConnectionMessage::Action(action) => Some(action),
-			_ => None,
 		};
 		if let Some(action) = action {
 			let next_actions = state.state.reduce(action.clone());

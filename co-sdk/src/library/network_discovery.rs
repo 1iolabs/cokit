@@ -45,7 +45,8 @@ where
 	}
 }
 
-fn identities_networks<'a>(
+/// Resolve networks from identities.
+pub fn identities_networks<'a>(
 	identity_resolver: Option<&'a IdentityResolverBox>,
 	identities: impl IntoIterator<Item = Did> + 'a,
 ) -> impl Stream<Item = Result<Network, anyhow::Error>> + 'a {

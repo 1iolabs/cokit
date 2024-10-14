@@ -1,13 +1,10 @@
 use super::{co_context::ReducerStorage, identity::create_identity_resolver};
 use crate::{
+	actor::ActorHandle,
 	drivers::network::{publish::CoHeadsPublish, CoNetworkTaskSpawner},
 	find_membership,
-	library::{
-		co_peer_provider::CoPeerProvider,
-		co_state::CoState,
-		override_peer_provider::{OverridePeerProvider, Overrides},
-		push_heads::PushHeads,
-	},
+	library::{connections_peer_provider::ConnectionsPeerProvider, push_heads::PushHeads},
+	plugins::connections::ConnectionMessage,
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	state::find,
 	types::{co_reducer::CoReducerContext, co_storage::CoBlockStorageContentMapping},
@@ -41,10 +38,9 @@ pub struct SharedCoBuilder {
 	keystore_core_name: String,
 	membership_core_name: String,
 	membership: Membership,
-	network: Option<CoNetworkTaskSpawner>,
+	network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
 	initialize: bool,
 	network_block_timeout: Duration,
-	network_overrides: Option<Overrides>,
 }
 impl SharedCoBuilder {
 	pub fn new(parent: CoReducer, membership: Membership) -> Self {
@@ -56,7 +52,6 @@ impl SharedCoBuilder {
 			network: None,
 			initialize: true,
 			network_block_timeout: Duration::from_secs(30),
-			network_overrides: Default::default(),
 		}
 	}
 
@@ -68,16 +63,12 @@ impl SharedCoBuilder {
 		Self { keystore_core_name, ..self }
 	}
 
-	pub fn with_network(self, network: Option<CoNetworkTaskSpawner>) -> Self {
+	pub fn with_network(self, network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>) -> Self {
 		Self { network, ..self }
 	}
 
 	pub fn with_initialize(self, initialize: bool) -> Self {
 		Self { initialize, ..self }
-	}
-
-	pub fn with_network_overrides(self, network_overrides: Option<Overrides>) -> Self {
-		Self { network_overrides, ..self }
 	}
 
 	/// Read (latest) secret from parent CO.
@@ -100,7 +91,7 @@ impl SharedCoBuilder {
 	pub fn build_network_storage<P>(
 		&self,
 		peer_provider: P,
-		network: CoNetworkTaskSpawner,
+		(network, _): (CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>),
 		secret: Option<&co_primitives::Secret>,
 		storage: CoStorage,
 	) -> anyhow::Result<CoStorage>
@@ -121,18 +112,13 @@ impl SharedCoBuilder {
 
 	pub fn build_peer_provider<I>(
 		&self,
-		network: CoNetworkTaskSpawner,
+		(_, connections): (CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>),
 		identity: I,
-		co_state: CoState,
 	) -> impl PeerProvider + Send + Sync + 'static
 	where
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
 	{
-		OverridePeerProvider::new(
-			self.network_overrides.clone().unwrap_or_default(),
-			CoPeerProvider::new(network, create_identity_resolver(), identity, co_state),
-			self.membership.id.clone(),
-		)
+		ConnectionsPeerProvider::new(self.membership.id.clone(), identity.identity().to_owned(), connections)
 	}
 
 	pub async fn build<I>(
@@ -150,16 +136,12 @@ impl SharedCoBuilder {
 		let storage = storage.storage();
 
 		// network
-		let (storage, co_state) = if let Some(network) = &self.network {
+		let storage = if let Some(network) = &self.network {
 			let secret = self.secret().await?;
-			let co_state = CoState::new(Some(storage.clone()), Default::default());
-			let peer_provider = self.build_peer_provider(network.clone(), identity.clone(), co_state.clone());
-			(
-				self.build_network_storage(peer_provider, network.clone(), secret.as_ref(), storage.clone())?,
-				Some(co_state),
-			)
+			let peer_provider = self.build_peer_provider(network.clone(), identity.clone());
+			self.build_network_storage(peer_provider, network.clone(), secret.as_ref(), storage.clone())?
 		} else {
-			(storage, None)
+			storage
 		};
 
 		// context
@@ -175,11 +157,6 @@ impl SharedCoBuilder {
 			.then(|cid| async { context.to_internal_cid(*cid).await })
 			.try_collect()
 			.await?;
-
-		// explicitly update co state so the network has it available when initialize
-		if let Some(co_state) = &co_state {
-			co_state.write_state(state.into()).await;
-		}
 
 		// log
 		let log = Log::new(
@@ -197,10 +174,9 @@ impl SharedCoBuilder {
 			.await?;
 
 		// push changes to all connectable peers
-		let co_state = if let Some(network) = &self.network {
-			let co_state = co_state.unwrap_or_default();
+		if let Some((network, connections)) = &self.network {
 			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
-			let peer_provider = self.build_peer_provider(network.clone(), identity.clone(), co_state.clone());
+			let peer_provider = self.build_peer_provider((network.clone(), connections.clone()), identity.clone());
 			let publish = PushHeads::new(
 				network.clone(),
 				tasks,
@@ -211,21 +187,13 @@ impl SharedCoBuilder {
 				true,
 			);
 			reducer.add_change_handler(Box::new(publish));
-			Some(co_state)
-		} else {
-			None
-		};
+		}
 
 		// publish changes for every `NetworkCoHeads` setting
-		if let Some(network) = self.network {
+		if let Some((network, _)) = self.network {
 			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
 			let publish = CoHeadsPublish::new(network, self.membership.id.clone(), mapping.clone(), true);
 			reducer.add_change_handler(Box::new(publish));
-		}
-
-		// update co state token
-		if let Some(co_state) = co_state {
-			reducer.add_change_handler(Box::new(co_state));
 		}
 
 		// setup auto write to parent co

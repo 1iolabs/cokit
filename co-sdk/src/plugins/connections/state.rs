@@ -1,6 +1,6 @@
 use super::{
 	action::{ConnectAction, ConnectedAction, ConnectionAction, DisconnectedAction, UseAction},
-	PeersChangedAction,
+	NetworkResolveAction, PeersChangedAction,
 };
 use crate::actor::Reducer;
 use co_primitives::{CoId, Did, Network};
@@ -66,6 +66,11 @@ impl Reducer<ConnectionAction> for ConnectionState {
 								networks: networks.clone(),
 							},
 						);
+
+						// resolve networks if none specified
+						if networks.is_empty() {
+							actions.push(ConnectionAction::NetworkResolve(NetworkResolveAction { id: id.clone() }));
+						}
 					},
 				}
 

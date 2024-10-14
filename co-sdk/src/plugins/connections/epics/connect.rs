@@ -12,7 +12,7 @@ use co_network::NetworkTaskSpawner;
 use co_primitives::{Did, Network};
 use futures::{Stream, StreamExt, TryStreamExt};
 
-pub struct ConnectEpic {}
+pub struct ConnectEpic();
 impl Epic<ConnectionAction, ConnectionState, CoContext> for ConnectEpic {
 	fn epic(
 		&mut self,

@@ -5,7 +5,7 @@ use std::{collections::BTreeSet, time::Instant};
 
 #[derive(Debug, Clone, From, TryInto, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ConnectionAction {
-	/// Use a CO by utilitsing the specified networks.
+	/// Use a CO by utilising the specified networks.
 	Use(UseAction),
 
 	/// CO related peers changed.
@@ -17,7 +17,17 @@ pub enum ConnectionAction {
 	/// CO has been released.
 	Released(ReleasedAction),
 
+	/// Resolve CO networks.
+	NetworkResolve(NetworkResolveAction),
+
+	/// CO networks has been resolved.
+	NetworkResolved(NetworkResolvedAction),
+
 	/// Connect to a network.
+	///
+	/// Possible Responses:
+	/// - [`ConnectionAction::Connected`]
+	/// - [`ConnectionAction::Disconnected`]
 	Connect(ConnectAction),
 
 	/// Network has been connected.
@@ -33,6 +43,9 @@ pub struct UseAction {
 	pub id: CoId,
 	pub from: Did,
 	pub time: Instant,
+
+	/// The networks to use.
+	/// If empty the networks will be resolved using the CO settings.
 	pub networks: BTreeSet<Network>,
 }
 
@@ -52,6 +65,17 @@ pub struct ReleaseAction {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ReleasedAction {
 	pub id: CoId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct NetworkResolveAction {
+	pub id: CoId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct NetworkResolvedAction {
+	pub id: CoId,
+	pub result: Result<BTreeSet<Network>, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
