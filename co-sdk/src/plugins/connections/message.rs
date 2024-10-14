@@ -2,7 +2,7 @@ use super::{action::UseAction, ConnectionAction, PeersChangedAction};
 use crate::actor::{ActorError, ActorHandle, ResponseStream};
 use co_primitives::{CoId, Did, Network};
 use futures::Stream;
-use std::{collections::BTreeSet, time::Instant};
+use std::time::Instant;
 
 #[derive(Debug)]
 pub enum ConnectionMessage {

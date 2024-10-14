@@ -6,9 +6,7 @@ use super::{
 use crate::{
 	actor::ActorHandle,
 	drivers::network::{token::CoToken, CoNetworkTaskSpawner},
-	library::{
-		find_co_secret::find_co_secret_by_membership, find_membership::memberships, override_peer_provider::Overrides,
-	},
+	library::{find_co_secret::find_co_secret_by_membership, find_membership::memberships},
 	plugins::connections::ConnectionMessage,
 	reactive::context::ReactiveContext,
 	reducer::core_resolver::{
@@ -530,7 +528,6 @@ pub(crate) struct CoContextInner {
 	local_identity: LocalIdentity,
 
 	network: Arc<RwLock<Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>>>,
-	network_overrides: Overrides,
 
 	storage: CoStorage,
 	runtime: Runtime,
@@ -556,7 +553,6 @@ impl CoContextInner {
 			tasks,
 			local_identity,
 			network: Arc::new(RwLock::new(network)),
-			network_overrides: Default::default(),
 			storage,
 			runtime,
 			reactive_context,
@@ -613,11 +609,6 @@ impl CoContextInner {
 
 		// result
 		Ok(())
-	}
-
-	/// Networking overrides.
-	pub fn network_overrides(&self) -> Overrides {
-		self.network_overrides.clone()
 	}
 
 	/// Creates a CoReducer instance of the Local CO.

@@ -1,8 +1,5 @@
 pub mod all_tags;
 pub mod cancel;
-pub mod co_peer_provider;
-pub mod co_state;
-pub mod connect_and_send;
 pub mod connections_peer_provider;
 pub mod create_reducer_action;
 pub mod did_key_provider;
@@ -22,7 +19,6 @@ pub mod local_secret;
 pub mod locals;
 pub mod network_discovery;
 pub mod node_stream;
-pub mod override_peer_provider;
 pub mod push_heads;
 pub mod settings_timeout;
 pub mod task_spawner;

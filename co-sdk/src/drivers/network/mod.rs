@@ -6,18 +6,15 @@ pub mod token;
 
 use co_identity::{IdentityResolver, PrivateIdentity, PrivateIdentityResolver};
 use co_network::{
-	bitswap::BitswapRequest, discovery::Discovery, Behaviour, Context, FnOnceNetworkTask, Libp2pNetwork,
-	Libp2pNetworkConfig, NetworkError, NetworkTask, NetworkTaskSpawner, Shutdown, TokioNetworkTaskSpawner,
+	bitswap::BitswapRequest, Behaviour, Context, FnOnceNetworkTask, Libp2pNetwork, Libp2pNetworkConfig, NetworkError,
+	NetworkTask, NetworkTaskSpawner, Shutdown, TokioNetworkTaskSpawner,
 };
-use futures::{
-	channel::{mpsc, oneshot},
-	Stream,
-};
+use futures::channel::{mpsc, oneshot};
 use libipld::DefaultParams;
 use libp2p::{identity::Keypair, Multiaddr, PeerId};
 use std::sync::Arc;
 use subscribe::{subscribe_identity, unsubscribe_identity};
-use tasks::{dial::DialNetworkTask, discovery_connect::DiscoveryConnectNetworkTask};
+use tasks::dial::DialNetworkTask;
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
@@ -91,15 +88,6 @@ impl Network {
 	/// Dail a peer directly.
 	pub async fn dail(&self, peer_id: PeerId, addresses: Vec<Multiaddr>) -> Result<(), anyhow::Error> {
 		DialNetworkTask::dial(self.spawner(), peer_id, addresses).await
-	}
-
-	/// Connect networks and return the connect peers.
-	#[deprecated]
-	pub fn connect(
-		&self,
-		networks: impl IntoIterator<Item = Discovery>,
-	) -> impl Stream<Item = Result<PeerId, anyhow::Error>> {
-		DiscoveryConnectNetworkTask::connect(self.spawner(), networks)
 	}
 
 	/// Listen on identity requests (DID Discovery).

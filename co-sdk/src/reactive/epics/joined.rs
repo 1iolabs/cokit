@@ -12,7 +12,7 @@ use std::future::ready;
 pub fn joined(
 	actions: ActionObservable,
 	_states: StateObservable,
-	context: CoContext,
+	_context: CoContext,
 ) -> impl Stream<Item = Action> + Send + 'static {
 	actions
 		.clone()
@@ -22,18 +22,8 @@ pub fn joined(
 				_ => None,
 			})
 		})
-		.then(move |(id, did, success, peer)| {
-			let context = context.clone();
+		.then(move |(id, did, success, _peer)| {
 			async move {
-				// override peer provider to only use the known peer until we fetched the network settings
-				if let Some(peer) = peer {
-					context
-						.inner
-						.network_overrides()
-						.set(id.clone(), [peer].into_iter().collect())
-						.await;
-				}
-
 				// active
 				let payload = MembershipsAction::ChangeMembershipState {
 					id: id.clone(),
@@ -80,9 +70,6 @@ pub fn joined_fetch(
 			async move {
 				// fetch
 				joined_initialize(&context, &id, did).await?;
-
-				// remove override
-				context.inner.network_overrides().remove(&id).await;
 
 				// done
 				Ok([])

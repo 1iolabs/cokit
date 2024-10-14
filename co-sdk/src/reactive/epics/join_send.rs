@@ -1,6 +1,6 @@
 use crate::{
 	actor::ActorHandle,
-	drivers::network::{self, tasks::didcomm_send::DidCommSendNetworkTask, CoNetworkTaskSpawner},
+	drivers::network::{tasks::didcomm_send::DidCommSendNetworkTask, CoNetworkTaskSpawner},
 	library::{
 		is_cid_encrypted::is_cid_encrypted, join::create_join_message_from, network_discovery::identities_networks,
 		settings_timeout::settings_timeout,
