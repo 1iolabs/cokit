@@ -49,7 +49,7 @@ async fn key_request(
 	co: CoId,
 	did: Did,
 ) -> anyhow::Result<Vec<Action>> {
-	if let Some(network) = context.network().await {
+	if let Some(network) = context.network_tasks().await {
 		let timeout = settings_timeout(&context, &CoId::from(CO_ID_LOCAL), Some("key-exchange")).await;
 
 		// from

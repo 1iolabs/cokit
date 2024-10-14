@@ -51,7 +51,7 @@ async fn key_request(
 	header: DidCommHeader,
 	body: String,
 ) -> anyhow::Result<Vec<Action>> {
-	let network = context.network().await.ok_or(anyhow!("Expected network"))?;
+	let network = context.network_tasks().await.ok_or(anyhow!("Expected network"))?;
 
 	// payload
 	let payload: KeyRequestPayload = from_json_string(&body)?;

@@ -1,5 +1,8 @@
 use super::{action::UseAction, ConnectionAction, PeersChangedAction};
-use crate::actor::ResponseStream;
+use crate::actor::{ActorError, ActorHandle, ResponseStream};
+use co_primitives::{CoId, Did, Network};
+use futures::Stream;
+use std::{collections::BTreeSet, time::Instant};
 
 #[derive(Debug)]
 pub enum ConnectionMessage {
@@ -12,5 +15,16 @@ pub enum ConnectionMessage {
 impl From<ConnectionAction> for ConnectionMessage {
 	fn from(value: ConnectionAction) -> Self {
 		Self::Action(value)
+	}
+}
+impl ConnectionMessage {
+	pub fn co_use(
+		actor: ActorHandle<Self>,
+		id: CoId,
+		from: Did,
+		networks: impl IntoIterator<Item = Network>,
+	) -> impl Stream<Item = Result<PeersChangedAction, ActorError>> {
+		let action = UseAction { id, from, time: Instant::now(), networks: networks.into_iter().collect() };
+		actor.stream(|response| Self::Use(action, response))
 	}
 }

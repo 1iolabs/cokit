@@ -45,7 +45,7 @@ fn connect(
 ) -> impl Stream<Item = Result<ConnectionAction, anyhow::Error>> + 'static {
 	async_stream::try_stream! {
 		// network
-		let spawner = match context.network().await {
+		let spawner = match context.network_tasks().await {
 			Some(v) => v,
 			None => {
 				yield ConnectionAction::Disconnected(DisconnectedAction { network: network.clone(),  reason: DisconnectReason::NoNetwork });

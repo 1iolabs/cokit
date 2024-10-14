@@ -15,7 +15,7 @@ pub fn didcomm_receive(
 		.filter(|action| ready(matches!(action, Action::NetworkStarted)))
 		.filter_map(move |_| {
 			let context = context.clone();
-			async move { context.network().await }
+			async move { context.network_tasks().await }
 		})
 		.flat_map(|network| DidCommReceiveNetworkTask::receive(network))
 		.map(|(peer, message)| Action::DidCommReceive { peer, message })

@@ -23,7 +23,7 @@ pub fn didcomm_send(
 		.filter_map(move |(message_id, peer, message)| {
 			let context = context.clone();
 			async move {
-				let network = context.network().await?;
+				let network = context.network_tasks().await?;
 				let timeout = settings_timeout(&context, &CoId::from(CO_ID_LOCAL), Some("didcomm-send")).await;
 				Some(match DidCommSendNetworkTask::send(network, [peer], message, timeout).await {
 					Ok(peer) => Action::DidCommSent { message_id, peer, result: Ok(()) },

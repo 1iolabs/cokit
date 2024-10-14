@@ -46,6 +46,10 @@ pub struct UseAction {
 
 	/// The networks to use.
 	/// If empty the networks will be resolved using the CO settings.
+	///
+	/// # Guaranties
+	/// - Network resolve will not use networking to prevent loops.
+	/// - If at least one network is passed no automatic resolve will happen.
 	pub networks: BTreeSet<Network>,
 }
 

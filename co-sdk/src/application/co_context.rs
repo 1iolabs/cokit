@@ -118,13 +118,18 @@ impl CoContext {
 	}
 
 	/// Network.
-	pub async fn networks(&self) -> Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)> {
+	pub async fn network(&self) -> Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)> {
 		self.inner.network.read().await.clone()
 	}
 
-	/// Network.
-	pub async fn network(&self) -> Option<CoNetworkTaskSpawner> {
+	/// Network Spawner.
+	pub async fn network_tasks(&self) -> Option<CoNetworkTaskSpawner> {
 		self.inner.network.read().await.as_ref().map(|(v, _)| v).cloned()
+	}
+
+	/// Network Connections.
+	pub async fn network_connections(&self) -> Option<ActorHandle<ConnectionMessage>> {
+		self.inner.network.read().await.as_ref().map(|(_, v)| v).cloned()
 	}
 
 	/// Tasks.
@@ -193,7 +198,7 @@ impl bitswap::StorageResolver<CoStorage> for CoContext {
 							if !co_token.verify(
 								secret,
 								remote_peer,
-								self.network().await.map(|n| n.local_peer_id()).as_ref(),
+								self.network_tasks().await.map(|n| n.local_peer_id()).as_ref(),
 							) {
 								// check next token
 								tracing::trace!(co = ?co_token.body.1, "bitswap-resolve-storage-invalid");

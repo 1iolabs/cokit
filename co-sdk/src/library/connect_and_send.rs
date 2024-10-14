@@ -8,6 +8,7 @@ use libp2p::PeerId;
 use std::time::Duration;
 
 /// Try to connect and send message.
+#[deprecated]
 pub fn connect_and_send(
 	network: CoNetworkTaskSpawner,
 	message: EncodedMessage,

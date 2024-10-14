@@ -30,7 +30,7 @@ pub fn network_started(
 			let context = context.clone();
 			move |_| {
 				let context = context.clone();
-				async move { context.network().await }
+				async move { context.network_tasks().await }
 			}
 		})
 		.flat_map(move |network| subscribe_all(context.clone(), network).map(Action::map_error))
@@ -93,7 +93,7 @@ fn apply_subscribe_actions(
 	async_stream::try_stream! {
 		let private_identity_resolver = context.private_identity_resolver().await?;
 		for await action in actions {
-			if let Some(network) = context.network().await {
+			if let Some(network) = context.network_tasks().await {
 				let result = match action {
 					SubscribeAction::Subscribe(did) => {
 						subscribe(&private_identity_resolver, &network, &did).await

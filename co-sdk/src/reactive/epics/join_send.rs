@@ -1,21 +1,22 @@
 use crate::{
-	drivers::network::{tasks::didcomm_send::DidCommSendNetworkTask, CoNetworkTaskSpawner},
+	actor::ActorHandle,
+	drivers::network::{self, tasks::didcomm_send::DidCommSendNetworkTask, CoNetworkTaskSpawner},
 	library::{
-		connect_and_send::connect_and_send, is_cid_encrypted::is_cid_encrypted, join::create_join_message_from,
-		network_discovery::network_discovery, settings_timeout::settings_timeout,
+		is_cid_encrypted::is_cid_encrypted, join::create_join_message_from, network_discovery::identities_networks,
+		settings_timeout::settings_timeout,
 	},
+	plugins::connections::ConnectionMessage,
 	reactive::context::{ActionObservable, StateObservable},
 	Action, CoContext, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
 use co_core_membership::{Membership, MembershipState, Memberships, MembershipsAction};
-use co_identity::PrivateIdentityResolver;
-use co_network::discovery::Discovery;
+use co_identity::{Identity, PrivateIdentityResolver};
 use co_primitives::{CoId, CoInviteMetadata, Did, KnownTags};
 use co_storage::BlockStorageExt;
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use libp2p::PeerId;
-use std::{collections::BTreeSet, future::ready, time::Duration};
+use std::{future::ready, time::Duration};
 
 /// When a membership is set to active, try to connect the CO and send the join message via didcomm.
 /// TODO: consensus finalization?
@@ -99,7 +100,7 @@ async fn find_membership(context: &CoContext, id: &CoId, did: &Did) -> anyhow::R
 
 async fn join(
 	context: CoContext,
-	network: CoNetworkTaskSpawner,
+	(network, connections): (CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>),
 	membership: Membership,
 ) -> anyhow::Result<Vec<Action>> {
 	let local_co = context.local_co_reducer().await?;
@@ -116,8 +117,8 @@ async fn join(
 	let invite: CoInviteMetadata = local_co.storage().get_deserialized(invite_cid).await?;
 
 	// message
-	let identity_resolver = context.private_identity_resolver().await?;
-	let identity = identity_resolver.resolve_private(&membership.did).await?;
+	let private_identity_resolver = context.private_identity_resolver().await?;
+	let identity = private_identity_resolver.resolve_private(&membership.did).await?;
 	let message = create_join_message_from(&identity, membership.id.clone(), Some(invite.id.clone()))?;
 
 	// try use active connection
@@ -138,23 +139,35 @@ async fn join(
 
 	// use connectivity settings
 	//  send message to discovered peers until one send succedded and return Action::Joined.
-	let resolver = context.identity_resolver().await?;
-	let discovery: BTreeSet<Discovery> =
-		network_discovery(Some(&resolver), &identity, invite.network.network, invite.network.participants)
+	let networks = if !invite.network.network.is_empty() {
+		invite.network.network.clone()
+	} else {
+		let identity_resolver = context.identity_resolver().await?;
+		identities_networks(Some(&identity_resolver), invite.network.participants.iter().cloned())
 			.try_collect()
-			.await?;
-	let join = connect_and_send(network, message, discovery, timeout);
-	pin_mut!(join);
-	while let Some(item) = join.next().await {
-		match item {
-			Ok(peer) => {
-				result.push(Action::JoinSent {
-					co: membership.id.clone(),
-					participant: membership.did.clone(),
-					heads: membership.heads.clone(),
-					peer,
-				});
-				break;
+			.await?
+	};
+	let peers_stream =
+		ConnectionMessage::co_use(connections, membership.id.clone(), identity.identity().to_string(), networks);
+	pin_mut!(peers_stream);
+	while let Some(peers) = peers_stream.next().await {
+		match peers {
+			Ok(peers) => {
+				let send = DidCommSendNetworkTask::send(network.clone(), peers.added, message.clone(), timeout).await;
+				match send {
+					Ok(peer) => {
+						result.push(Action::JoinSent {
+							co: membership.id.clone(),
+							participant: membership.did.clone(),
+							heads: membership.heads.clone(),
+							peer,
+						});
+						break;
+					},
+					Err(err) => {
+						tracing::warn!(?err, "join-send-message-failed");
+					},
+				}
 			},
 			Err(err) => {
 				tracing::warn!(?err, "join-send-failed");
