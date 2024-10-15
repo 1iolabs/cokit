@@ -50,6 +50,7 @@ pub struct Cli {
 	pub quiet: bool,
 
 	/// Verbose level.
+	/// By default prints info and above levels. To precent this use `quiet` option.
 	#[arg(short, default_value_t = 1, action = ArgAction::Count)]
 	pub verbose: u8,
 
@@ -92,10 +93,10 @@ pub enum CliCommand {
 	Pin(pin::Command),
 }
 
-#[instrument(err, ret, skip(cli))]
+#[instrument(err, ret, skip(cli), level = "debug")]
 pub async fn command(cli: &Cli) -> Result<ExitCode, anyhow::Error> {
 	// trace arguments
-	tracing::info!(?cli, "arguments");
+	tracing::debug!(?cli, "arguments");
 
 	// context
 	let context = CliContext::default();

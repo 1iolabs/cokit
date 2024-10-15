@@ -50,17 +50,21 @@ where
 		if let Some(didcomm_event) = B::swarm_didcomm_event(&event) {
 			match &didcomm_event {
 				didcomm::Event::Sent { peer_id, message } => {
-					if self.peers.remove(peer_id) && &self.message == message {
-						if let Some(sent) = Option::take(&mut self.sent) {
-							sent.send(Ok(*peer_id)).ok();
+					// check the message before removing the peer as the peer may sent other message at same time
+					if &self.message == message {
+						if self.peers.remove(peer_id) {
+							if let Some(sent) = Option::take(&mut self.sent) {
+								sent.send(Ok(*peer_id)).ok();
+							}
 						}
 					}
 				},
 				didcomm::Event::OutboundFailure { peer_id, error, message } => {
-					if self.peers.remove(peer_id) && (self.peers.is_empty() || Some(&self.message) == message.as_ref())
-					{
-						if let Some(sent) = Option::take(&mut self.sent) {
-							sent.send(Err(error.clone().into())).ok();
+					if self.peers.is_empty() || Some(&self.message) == message.as_ref() {
+						if self.peers.remove(peer_id) {
+							if let Some(sent) = Option::take(&mut self.sent) {
+								sent.send(Err(error.clone().into())).ok();
+							}
 						}
 					}
 				},

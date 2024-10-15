@@ -67,7 +67,7 @@ impl Reducer<ConnectionAction> for ConnectionState {
 							},
 						);
 
-						// resolve networks if none specified
+						// resolve networks if not specified
 						if networks.is_empty() {
 							actions.push(ConnectionAction::NetworkResolve(NetworkResolveAction { id: id.clone() }));
 						}

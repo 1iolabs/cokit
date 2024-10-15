@@ -85,6 +85,7 @@ fn create_and_send_invite(
 	async_stream::try_stream! {
 		let timeout = settings_timeout(&context, &co, Some("invite")).await;
 		let (message, networks) = create_invite(&context, &co, &from, &to).await?;
+		let mut send_count = 0;
 		for await peers in ConnectionMessage::co_use(connections, co.clone(), from.clone(), networks) {
 			match peers {
 				Ok(peers) => {
@@ -98,17 +99,21 @@ fn create_and_send_invite(
 						match send {
 							Ok(peer) => {
 								yield Action::InviteSent { co: co.clone(), participant: to.clone(), peer };
+								send_count += 1;
 							},
 							Err(err) => {
-								tracing::warn!(?err, ?peers, "invite-send-failed");
+								tracing::warn!(?co, ?to, ?err, ?peers, "invite-send-failed");
 							},
 						}
 					}
 				}
 				Err(err) => {
-					tracing::warn!(?err, "invite-send-failed");
+					tracing::warn!(?co, ?to, ?err, "invite-send-connection-failed");
 				},
 			}
+		}
+		if send_count == 0 {
+			Err(anyhow!("Send invite failed: {co}: {to}"))?;
 		}
 	}
 }

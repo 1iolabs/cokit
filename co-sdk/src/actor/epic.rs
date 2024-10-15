@@ -1,6 +1,11 @@
 use super::ActorHandle;
-use futures::{pin_mut, stream::BoxStream, Stream, StreamExt};
-use std::marker::PhantomData;
+use co_primitives::Tags;
+use futures::{
+	pin_mut,
+	stream::{BoxStream, Empty},
+	Stream, StreamExt,
+};
+use std::{fmt::Debug, marker::PhantomData};
 
 /// Epic.
 ///
@@ -107,12 +112,12 @@ where
 {
 	fn epic(
 		&mut self,
-		message: &A,
+		action: &A,
 		state: &S,
 		context: &C,
 	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + 'static> {
-		let s0 = self.0.epic(message, state, context);
-		let s1 = self.1.epic(message, state, context);
+		let s0 = self.0.epic(action, state, context);
+		let s1 = self.1.epic(action, state, context);
 		let s0 = async_stream::stream! {
 			if let Some(stream) = s0 {
 				for await item in stream {
@@ -128,6 +133,23 @@ where
 			}
 		};
 		Some(tokio_stream::StreamExt::merge(s0, s1))
+	}
+}
+
+pub struct TracingEpic(pub Tags);
+impl<A, S, C> Epic<A, S, C> for TracingEpic
+where
+	A: Debug + Send + 'static,
+	S: Debug + Send + 'static,
+{
+	fn epic(
+		&mut self,
+		action: &A,
+		state: &S,
+		_context: &C,
+	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + 'static> {
+		tracing::debug!(?action, ?state, tags = ?self.0, "action");
+		Option::<Empty<_>>::None
 	}
 }
 

@@ -11,7 +11,7 @@ pub fn log(
 	_context: CoContext,
 ) -> impl Stream<Item = Action> + Send + 'static {
 	actions.filter(|action| {
-		tracing::info!(action = ?action, "action");
+		tracing::debug!(action = ?action, "action");
 		ready(false)
 	})
 }

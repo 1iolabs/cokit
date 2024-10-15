@@ -28,7 +28,7 @@ impl Actor for Connections {
 	type State = State;
 	type Initialize = ();
 
-	async fn initialize(&self, _tags: Tags, _initialize: Self::Initialize) -> Result<Self::State, ActorError> {
+	async fn initialize(&self, tags: Tags, _initialize: Self::Initialize) -> Result<Self::State, ActorError> {
 		Ok(State {
 			state: ConnectionState {
 				keep_alive: self.keep_alive,
@@ -36,7 +36,7 @@ impl Actor for Connections {
 				co: Default::default(),
 				networks: Default::default(),
 			},
-			epic: EpicRuntime::new(epic(), |err| {
+			epic: EpicRuntime::new(epic(tags), |err| {
 				tracing::error!(?err, "connection-epic-error");
 				None
 			}),

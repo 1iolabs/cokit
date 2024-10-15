@@ -2,7 +2,7 @@ use crate::{
 	actor::ActorHandle,
 	drivers::network::{tasks::didcomm_send::DidCommSendNetworkTask, CoNetworkTaskSpawner},
 	library::{
-		is_cid_encrypted::is_cid_encrypted, join::create_join_message_from, network_discovery::identities_networks,
+		invite_networks::invite_networks, is_cid_encrypted::is_cid_encrypted, join::create_join_message_from,
 		settings_timeout::settings_timeout,
 	},
 	plugins::connections::ConnectionMessage,
@@ -14,8 +14,7 @@ use co_core_membership::{Membership, MembershipState, Memberships, MembershipsAc
 use co_identity::{Identity, PrivateIdentityResolver};
 use co_primitives::{CoId, CoInviteMetadata, Did, KnownTags};
 use co_storage::BlockStorageExt;
-use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
-use libp2p::PeerId;
+use futures::{pin_mut, stream, Stream, StreamExt};
 use std::{future::ready, time::Duration};
 
 /// When a membership is set to active, try to connect the CO and send the join message via didcomm.
@@ -121,32 +120,9 @@ async fn join(
 	let identity = private_identity_resolver.resolve_private(&membership.did).await?;
 	let message = create_join_message_from(&identity, membership.id.clone(), Some(invite.id.clone()))?;
 
-	// try use active connection
-	if let Some(invite_peer_vec) = &invite.peer {
-		let invite_peer = PeerId::from_bytes(invite_peer_vec)?;
-		if DidCommSendNetworkTask::send(network.clone(), [invite_peer], message.clone(), timeout)
-			.await
-			.is_ok()
-		{
-			return Ok(vec![Action::JoinSent {
-				co: membership.id.clone(),
-				participant: membership.did.clone(),
-				peer: invite_peer,
-				heads: membership.heads.clone(),
-			}]);
-		}
-	}
-
-	// use connectivity settings
-	//  send message to discovered peers until one send succedded and return Action::Joined.
-	let networks = if !invite.network.network.is_empty() {
-		invite.network.network.clone()
-	} else {
-		let identity_resolver = context.identity_resolver().await?;
-		identities_networks(Some(&identity_resolver), invite.network.participants.iter().cloned())
-			.try_collect()
-			.await?
-	};
+	// send message to discovered peers until one send succedded and return Action::Joined.
+	// this will also use invite.peer if possible.
+	let networks = invite_networks(&context, &invite).await?;
 	let peers_stream =
 		ConnectionMessage::co_use(connections, membership.id.clone(), identity.identity().to_string(), networks);
 	pin_mut!(peers_stream);
