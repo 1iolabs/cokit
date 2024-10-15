@@ -1,6 +1,7 @@
 use super::multimedia::ImageInfo;
 use crate::{EventContent, EventType};
-use libipld::Cid;
+use co_primitives::CoCid;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
@@ -8,16 +9,16 @@ use typeshare::typeshare;
  * All events that in some way alter the state of a room
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(tag = "type", content = "content")]
 pub enum StateType {
-	#[serde(rename = "m.room.name")]
+	#[serde(rename = "room_name")]
 	RoomName(RoomNameContent),
-	#[serde(rename = "m.room.topic")]
+	#[serde(rename = "room_topic")]
 	RoomTopic(RoomTopicContent),
-	#[serde(rename = "m.room.avatar")]
+	#[serde(rename = "room_avatar")]
 	RoomAvatar(RoomAvatarContent),
-	#[serde(rename = "m.room.pinned_events")]
+	#[serde(rename = "room_pinned_events")]
 	PinnedEvents(PinnedEventsContent),
 }
 
@@ -39,7 +40,7 @@ impl EventType for StateType {
 }
 
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct RoomNameContent {
 	pub name: String,
 }
@@ -63,7 +64,7 @@ impl From<RoomNameContent> for EventContent {
 }
 
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct RoomTopicContent {
 	pub topic: String,
 }
@@ -87,15 +88,15 @@ impl From<RoomTopicContent> for EventContent {
 }
 
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct RoomAvatarContent {
-	pub file: Option<Cid>,
+	pub file: Option<CoCid>,
 	pub info: ImageInfo,
 }
 
 impl RoomAvatarContent {
-	pub fn new(file: Option<Cid>, info: ImageInfo) -> Self {
-		Self { file, info }
+	pub fn new(file: Option<impl Into<CoCid>>, info: ImageInfo) -> Self {
+		Self { file: file.map(Into::into), info }
 	}
 }
 
@@ -112,7 +113,7 @@ impl From<RoomAvatarContent> for EventContent {
 }
 
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PinnedEventsContent {
 	pub pinned: Vec<String>,
 }

@@ -18,7 +18,7 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                     mergeMap(([event, state]) => {
                         console.log("EVEEENT", event);
                         switch (event.payload.p.type) {
-                            case "m.room.message": {
+                            case "m_room_message": {
                                 const pluginId = state.chats.find((c) => c.roomCoreId === chat.roomCoreId)?.pluginId;
                                 return [identity<ChatsListUpdateChatAction>({
                                     payload: {
@@ -34,19 +34,21 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                                     type: ChatsListActionType.UpdateChat,
                                 })];
                             };
-                            case "m.room.name": {
-                                let name = event.payload.p.content.name;
-                                if (name) {
-                                    return [identity<ChatsListUpdateChatAction>({
-                                        payload: {
-                                            chat: {
-                                                ...chat,
-                                                name,
+                            case "State": {
+                                if (event.payload.p.content.type === "room_name") {
+                                    let name = event.payload.p.content.content.name;
+                                    if (name) {
+                                        return [identity<ChatsListUpdateChatAction>({
+                                            payload: {
+                                                chat: {
+                                                    ...chat,
+                                                    name,
+                                                },
+                                                roomCoreId: chat.roomCoreId,
                                             },
-                                            roomCoreId: chat.roomCoreId,
-                                        },
-                                        type: ChatsListActionType.UpdateChat,
-                                    })];
+                                            type: ChatsListActionType.UpdateChat,
+                                        })];
+                                    }
                                 }
                             }
                         }

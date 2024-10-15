@@ -18,7 +18,7 @@ export const subscribeTauriEventEpic: MessengerViewEpicType = (action$, state$, 
             filter(([event, s]) => s.messages.findIndex((m) => m.key === event.payload.p.event_id) === -1),
             mergeMap(([event]) => {
                 switch (event.payload.p.type) {
-                    case "m.room.message": {
+                    case "m_room_message": {
                         return [{
                             payload: {
                                 message: {
@@ -31,14 +31,16 @@ export const subscribeTauriEventEpic: MessengerViewEpicType = (action$, state$, 
                             type: MessengerViewActionType.MessageReceived,
                         }];
                     };
-                    case "m.room.name": {
-                        let groupName = event.payload.p.content.name;
-                        if (groupName) {
+                    case "State": {
+                        if (event.payload.p.content.type === "room_name") {
+                            let groupName = event.payload.p.content.content.name;
+                            if (groupName) {
 
-                            return [identity<MessengerViewNameChangedAction>({
-                                payload: { newName: groupName },
-                                type: MessengerViewActionType.NameChanged,
-                            })];
+                                return [identity<MessengerViewNameChangedAction>({
+                                    payload: { newName: groupName },
+                                    type: MessengerViewActionType.NameChanged,
+                                })];
+                            }
                         }
                     }
                 }

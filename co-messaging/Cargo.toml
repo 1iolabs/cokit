@@ -5,10 +5,13 @@ edition = "2021"
 rust-version = "1.76"
 
 [dependencies]
+serde_ipld_dagjson = "0.2.0"
+serde_json = "1.0.108"
 co-macros = { path = "../co-macros" }
 co-primitives = { path = "../co-primitives" }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
+schemars = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
 typeshare = { workspace = true }
-serde_json = "1.0.108"
+serde-big-array = "0.3.3"

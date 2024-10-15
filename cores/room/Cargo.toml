@@ -11,6 +11,7 @@ crate-type = ["lib", "cdylib"]
 anyhow = { workspace = true }
 co-api = { path = "../../co-api" }
 co-messaging = { path = "../../co-messaging" }
+co-primitives = { path = "../../co-primitives" }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 serde = { workspace = true, features = ["derive"] }
 serde_repr = { workspace = true }

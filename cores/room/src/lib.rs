@@ -1,6 +1,6 @@
 use co_api::{Context, Reducer, ReducerAction, Tags};
 use co_messaging::{state_event::StateType, EventContent, MatrixEvent};
-use libipld::Cid;
+use co_primitives::CoCid;
 use serde::{Deserialize, Serialize};
 
 /**
@@ -15,7 +15,7 @@ pub struct Room {
 	pub description: String,
 
 	/// Content ID for the room avatar
-	pub avatar: Option<Cid>,
+	pub avatar: Option<CoCid>,
 
 	/// All currently pinned messages in relevant order
 	pub pinned_messages: Vec<String>,

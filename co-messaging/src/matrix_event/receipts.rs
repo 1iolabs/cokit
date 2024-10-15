@@ -1,4 +1,5 @@
 use crate::EventContent;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use typeshare::typeshare;
@@ -7,7 +8,7 @@ use typeshare::typeshare;
  * Receipt events are used to indicate that all messages up to a specific event have been read by a user.
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub enum ReceiptType {
 	#[serde(untagged)]
 	Public(PublicReceiptContent),
@@ -27,7 +28,7 @@ impl From<ReceiptType> for EventContent {
  * participating in the CO.
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PublicReceiptContent {
 	#[serde(rename = "m.read")]
 	pub read: String, // The ID of the latest event read by the user
@@ -44,7 +45,7 @@ impl From<PublicReceiptContent> for EventContent {
  * A read receipt for one specific room. Indicates that a user has read all messages up to the given event.
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PrivateReceipt {
 	pub event_id: String,  // The ID of the event the receipt references
 	pub thread_id: String, // The ID of the thread if receipt is threaded
@@ -56,7 +57,7 @@ pub struct PrivateReceipt {
  * the complete read receipt state in this event but only the changes.
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PrivateReceiptContent {
 	#[serde(rename = "m.read.private")]
 	pub read: HashMap<String, PrivateReceipt>, // Map of all room IDs to receipts

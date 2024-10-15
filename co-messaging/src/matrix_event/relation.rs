@@ -1,4 +1,5 @@
 use crate::{EventContent, EventType};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
@@ -12,7 +13,7 @@ pub trait Relation {
  * Mostly used for annotation events
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct ReactionContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_silent: Option<bool>,
@@ -59,14 +60,14 @@ impl EventType for ReactionContent {
  * Used in some event contents to define a relation to other events
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-#[serde(rename = "m.relates_to")]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[serde(rename = "relates_to")]
 pub struct RelatesTo {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub rel_type: Option<RelationType>, // The type of the relation
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub event_id: Option<String>, // The ID of the event that is being related to
-	#[serde(rename = "m.in_reply_to")]
+	#[serde(rename = "in_reply_to")]
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub in_reply_to: Option<ReplyContent>, /* Special relation to depict replies. Listed extra as this can happen
 	                                        * with the other relations simultaneously */
@@ -159,17 +160,17 @@ impl Relation for RelatesTo {
  *Simple enum containing all different types of relation that events can have to other events
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub enum RelationType {
-	#[serde(rename = "m.annotation")]
+	#[serde(rename = "annotation")]
 	Annotation,
-	#[serde(rename = "m.replace")]
+	#[serde(rename = "replace")]
 	Replace,
-	#[serde(rename = "m.forward")]
+	#[serde(rename = "forward")]
 	Forward,
-	#[serde(rename = "m.thread")]
+	#[serde(rename = "thread")]
 	Thread,
-	#[serde(rename = "m.poll")]
+	#[serde(rename = "poll")]
 	Poll,
 }
 
@@ -189,7 +190,7 @@ impl Relation for RelationType {
 }
 
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct ReplyContent {
 	pub event_id: String,
 }
@@ -200,7 +201,7 @@ pub struct ReplyContent {
  * Redactions are idempotent and irreversible. They do not use the same relation fields as other events
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct RedactionContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub reason: Option<String>, // An optional reason field mostly used when event got redacted by another user

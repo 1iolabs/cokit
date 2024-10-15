@@ -9,6 +9,7 @@ co-macros = { path = "../co-macros" }
 derive_more = { workspace = true }
 either = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
+schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }

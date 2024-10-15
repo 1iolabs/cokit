@@ -1,4 +1,5 @@
 use crate::{EventContent, EventType};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
@@ -6,7 +7,7 @@ use typeshare::typeshare;
  * Session description object for sdp offers and answers
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct SessionDescription {
 	pub sdp: String,
 	#[serde(rename = "type")]
@@ -23,7 +24,7 @@ impl SessionDescription {
  * ICE candidate for WebRTC exchange protocol
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct ICECandidate {
 	pub candidate: String, // SDP 'a' line of the candidate
 	#[serde(rename = "sdpMLineIndex")]
@@ -46,22 +47,22 @@ impl ICECandidate {
  * string is used for experimental versions.
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(tag = "type", content = "content")]
 pub enum CallType {
-	#[serde(rename = "m.call.invite")]
+	#[serde(rename = "call_invite")]
 	Invite(CallInviteContent),
-	#[serde(rename = "m.call.answer")]
+	#[serde(rename = "call_answer")]
 	Answer(AnswerCallContent),
-	#[serde(rename = "m.call.candidates")]
+	#[serde(rename = "call_candidates")]
 	Candidates(CallCandidatesContent),
-	#[serde(rename = "m.call.select_answer")]
+	#[serde(rename = "call_select_answer")]
 	SelectAnswer(SelectCallAnswerContent),
-	#[serde(rename = "m.call.negotiate")]
+	#[serde(rename = "call_negotiate")]
 	Negotioation(CallNegotiationContent),
-	#[serde(rename = "m.call.reject")]
+	#[serde(rename = "call_reject")]
 	Reject(RejectCallContent),
-	#[serde(rename = "m.call.hangup")]
+	#[serde(rename = "call_hangup")]
 	Hangup(HangupCallContent),
 }
 
@@ -89,7 +90,7 @@ impl From<CallType> for EventContent {
  * Initial event to invite other parties to a call
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct CallInviteContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -135,7 +136,7 @@ impl CallInviteContent {
  * Event used when answering an invite event
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct AnswerCallContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -170,7 +171,7 @@ impl AnswerCallContent {
  * Event used to exchange viable ICE candidates with the other party upon answering a call
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct CallCandidatesContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -200,7 +201,7 @@ impl CallCandidatesContent {
  * Event used to select one of possibly multiple call answers
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct SelectCallAnswerContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -237,7 +238,7 @@ impl SelectCallAnswerContent {
  * users to use the setters.
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct CallNegotiationContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -313,7 +314,7 @@ impl CallNegotiationContent {
  * Event sent if call was rejected by a user.
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct RejectCallContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -342,7 +343,7 @@ impl RejectCallContent {
  * Enum containg possible reasons for a hangup event
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub enum HangupCallReason {
 	#[serde(rename = "ice_failed")]
 	IceFailed, // ICE negotiation has failed and connection could not be established
@@ -365,7 +366,7 @@ pub enum HangupCallReason {
 /**
  * Hangup event used to signal the termination of the call.
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct HangupCallContent {
 	pub call_id: String,
 	pub party_id: String,

@@ -1,5 +1,6 @@
 use crate::{EventContent, EventType};
-use libipld::Cid;
+use co_primitives::CoCid;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
@@ -7,12 +8,12 @@ use typeshare::typeshare;
  * Ephemeral events are once-off events that do not need to be saved.
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(tag = "type", content = "content")]
 pub enum EphemeralType {
-	#[serde(rename = "m.typing")]
+	#[serde(rename = "typing")]
 	Typing(TypingContent),
-	#[serde(rename = "m.presence")]
+	#[serde(rename = "presence")]
 	Presence(PresenceContent),
 }
 
@@ -38,9 +39,10 @@ impl From<EphemeralType> for EventContent {
  * typing when no new event was sent.
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct TypingContent {
-	pub user_ids: Vec<String>, // List of users currently typing in the room
+	/// List of users currently typing in the room
+	pub user_ids: Vec<String>,
 }
 
 impl EventType for TypingContent {
@@ -61,18 +63,21 @@ impl TypingContent {
 	}
 }
 
-/**
- * Basic enum for possible presence states of a specific user
- */
-#[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+/// Basic enum for possible presence states of a specific user
+///
+/// Online: Default state when user is connected to an event stream
+///
+/// Offline: The user is not connected to an event stream or is actively suppressing this information
+///
+/// DnD: As 'Online' but the user doesn't want to be disturbed
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub enum PresenceType {
 	#[serde(rename = "online")]
-	Online, // Default state when user is connected to an event stream
+	Online,
 	#[serde(rename = "offline")]
-	Offline, // The user is not connected to an event stream or is actively suppressing this information
+	Offline,
 	#[serde(rename = "dnd")]
-	Dnd, // As 'Online' but the user doesn't want to be disturbed
+	Dnd,
 }
 
 /**
@@ -81,14 +86,19 @@ pub enum PresenceType {
  * about.
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PresenceContent {
 	pub presence: PresenceType,
-	pub last_active: u32,       // Timestampt in milliseconds when the user last performed an action
-	pub currently_active: bool, // Whether the user is currently active
-	pub avatar: Cid,            // Avatar the user is currently using
-	pub display_name: String,   // Display name of the user
-	pub status_msg: String,     // An optional arbitrary description to accompany the presence
+	/// Timestampt in milliseconds when the user last performed an action
+	pub last_active: u32,
+	/// Whether the user is currently active
+	pub currently_active: bool,
+	/// Avatar the user is currently using
+	pub avatar: CoCid,
+	/// Display name of the user
+	pub display_name: String,
+	/// An optional arbitrary description to accompany the presence
+	pub status_msg: String,
 }
 
 impl EventType for PresenceContent {
@@ -108,7 +118,7 @@ impl PresenceContent {
 		presence: PresenceType,
 		last_active: u32,
 		currently_active: bool,
-		avatar: Cid,
+		avatar: impl Into<CoCid>,
 		display_name: impl Into<String>,
 		status_msg: impl Into<String>,
 	) -> Self {
@@ -116,7 +126,7 @@ impl PresenceContent {
 			presence,
 			last_active,
 			currently_active,
-			avatar,
+			avatar: avatar.into(),
 			display_name: display_name.into(),
 			status_msg: status_msg.into(),
 		}

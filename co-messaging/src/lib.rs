@@ -1,6 +1,6 @@
 mod matrix_event;
 
-// todo
+// TODO
 pub static FORMATTED_BODY_FORMAT: &str = "some.html.standard.format";
 
 pub use crate::matrix_event::{
@@ -15,6 +15,7 @@ use matrix_event::{
 	state_event::StateType,
 	user_events::UserType,
 };
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
@@ -22,8 +23,11 @@ pub trait EventType {
 	fn generate_event_type(&self) -> String;
 }
 
+/**
+ * Collection of all possible actions for the room core
+ */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct MatrixEvent {
 	pub event_id: String,
 	pub timestamp: u128,
@@ -75,16 +79,16 @@ impl EventType for MatrixEvent {
  * Unique event type string can be generated from this using pattern matching.
  */
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(tag = "type", content = "content")]
 pub enum EventContent {
-	#[serde(rename = "m.room.message")]
+	#[serde(rename = "m_room_message")]
 	Message(MessageType),
-	#[serde(rename = "m.reaction")]
+	#[serde(rename = "m_reaction")]
 	Reaction(ReactionContent),
-	#[serde(rename = "m.room.redaction")]
+	#[serde(rename = "m_room_redaction")]
 	Redaction(RedactionContent),
-	#[serde(rename = "m.receipt")]
+	#[serde(rename = "m_receipt")]
 	Receipt(ReceiptType),
 	#[serde(untagged)]
 	State(StateType),
