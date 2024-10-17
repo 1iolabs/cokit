@@ -1,5 +1,4 @@
 pub mod co_heads;
-pub mod co_heads_received;
 pub mod dial;
 pub mod did_discovery;
 pub mod didcomm_receive;

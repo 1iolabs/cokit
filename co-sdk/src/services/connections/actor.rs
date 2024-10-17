@@ -32,7 +32,7 @@ impl Actor for Connections {
 		Ok(State {
 			state: ConnectionState {
 				keep_alive: self.keep_alive,
-				cache: Default::default(),
+				_cache: Default::default(),
 				co: Default::default(),
 				networks: Default::default(),
 			},

@@ -15,7 +15,7 @@ pub struct CoConnection {
 	pub id: CoId,
 	pub from: Did,
 	pub networks: BTreeSet<Network>,
-	pub keep_alive: Instant,
+	// pub keep_alive: Instant,
 }
 
 #[derive(Debug, Clone)]
@@ -23,6 +23,7 @@ pub struct NetworkConnection {
 	pub network: Network,
 	pub references: BTreeSet<CoId>,
 	pub peers: BTreeSet<PeerId>,
+	/// TODO: implement cache
 	pub keep_alive: Instant,
 }
 
@@ -32,7 +33,7 @@ pub struct ConnectionState {
 	pub co: HashMap<CoId, CoConnection>,
 	pub networks: HashMap<Network, NetworkConnection>,
 	/// TODO: implement cache
-	pub cache: HashMap<Network, BTreeSet<Multiaddr>>,
+	pub _cache: HashMap<Network, BTreeSet<Multiaddr>>,
 }
 impl ConnectionState {
 	/// Find all PeerId's for an CO.
@@ -119,7 +120,7 @@ fn reduce_use(
 					CoConnection {
 						id: id.clone(),
 						from: from.clone(),
-						keep_alive: *time + state.keep_alive,
+						// keep_alive: *time + state.keep_alive,
 						networks: networks.clone(),
 					},
 				);
@@ -228,7 +229,7 @@ fn reduce_network_resolved(
 			Ok(networks) => Some((networks, co_connection.from.clone())),
 			Err(_err) => {
 				// when network resolve has been failed just release the co and let subscribers know it didn't work
-				actions.push(ConnectionAction::Release(ReleaseAction { id: id.clone() }));
+				actions.push(ConnectionAction::Release(ReleaseAction { id: co_connection.id.clone() }));
 				None
 			},
 		}

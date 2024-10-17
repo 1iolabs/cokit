@@ -2,8 +2,8 @@ use super::to_plain::to_plain;
 use crate::{
 	actor::{Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, OnceEpic, Reducer, TracingEpic},
 	drivers::network::{tasks::didcomm_send::DidCommSendNetworkTask, CoNetworkTaskSpawner},
-	services::connections::ConnectionMessage,
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
+	services::connections::ConnectionMessage,
 	types::message::heads::HeadsMessage,
 	CoStorage, Reducer as CoreReducer, ReducerChangeContext, ReducerChangedHandler, TaskSpawner,
 };
@@ -126,6 +126,7 @@ impl Actor for PushHeadsActor {
 struct PushHeadsContext(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, PrivateIdentityBox);
 
 #[derive(Debug, Clone)]
+#[allow(unused)] // we want to see Sent in the logs
 enum PushHeadsAction {
 	/// Heads changed.
 	Changed(BTreeSet<Cid>),
