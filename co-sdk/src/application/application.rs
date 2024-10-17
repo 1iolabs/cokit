@@ -6,17 +6,14 @@ use super::{
 };
 use crate::{
 	actor::Actor,
-	drivers::network::{
-		bitswap::handle_bitswap,
-		tasks::{co_heads_received::ReceivedHeadsNetworkTask, mdns_gossip::MdnsGossipNetworkTask},
-	},
+	drivers::network::{bitswap::handle_bitswap, tasks::mdns_gossip::MdnsGossipNetworkTask},
 	library::task_spawner::TaskSpawner,
 	local_keypair_fetch,
-	plugins::connections::Connections,
 	reactive::{
 		context::{ActionObservable, ReactiveContext},
 		epics::epic,
 	},
+	services::connections::Connections,
 	Action, CoReducer, CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE,
 	CO_CORE_NAME_MEMBERSHIP,
 };
@@ -177,9 +174,6 @@ impl Application {
 
 		// assign
 		self.network = Some(network);
-
-		// to be able to receive updates anytime we add a static heads handler
-		spawner.spawn(ReceivedHeadsNetworkTask::new(self.co().clone(), self.tasks()))?;
 
 		// use mdns discoverd peers for gossip discovery
 		spawner.spawn(MdnsGossipNetworkTask::new())?;

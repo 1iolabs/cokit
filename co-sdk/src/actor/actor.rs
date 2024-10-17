@@ -7,6 +7,7 @@ use tokio::{
 	sync::{mpsc, watch},
 	task::JoinHandle,
 };
+use tracing::Instrument;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ActorError {
@@ -61,6 +62,7 @@ pub trait Actor: Send + Sync + 'static {
 	where
 		Self: Send + Sized + 'static,
 	{
+		let span = tracing::trace_span!("actor", ?tags);
 		let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 		let (state_tx, state_rx) = watch::channel(ActorState::Starting);
 		let tags = actor.tags(tags)?;
@@ -97,6 +99,7 @@ pub trait Actor: Send + Sync + 'static {
 					.map_err(|e| ActorError::InvalidState(e.into()))?;
 				Ok(())
 			}
+			.instrument(span)
 		});
 		Ok(ActorInstance { join, handle, tags })
 	}
@@ -168,6 +171,7 @@ where
 }
 
 /// Handle into an actor which can be used to send messages.
+#[derive(Debug)]
 pub struct ActorHandle<M> {
 	tx: mpsc::UnboundedSender<ActorMessage<M>>,
 	state: watch::Receiver<ActorState>,

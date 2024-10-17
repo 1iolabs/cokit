@@ -7,9 +7,9 @@ mod library;
 mod pin;
 mod reactive;
 pub mod reducer;
+mod services;
 pub mod state;
 mod types;
-mod plugins;
 
 pub use application::{
 	application::{Application, ApplicationBuilder},
@@ -57,6 +57,7 @@ pub use library::{
 pub use pin::pin::PinAPI;
 pub use reactive::{action::Action, epic::Epic, observable::Observable};
 pub use reducer::core_resolver::{co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverError};
+pub use services::connections::{ConnectionAction, ConnectionMessage, ReleaseAction};
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},
 	co_reducer_factory::CoReducerFactory,

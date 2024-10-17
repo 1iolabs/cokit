@@ -4,7 +4,7 @@ use crate::{
 	drivers::network::{publish::CoHeadsPublish, CoNetworkTaskSpawner},
 	find_membership,
 	library::{connections_peer_provider::ConnectionsPeerProvider, push_heads::PushHeads},
-	plugins::connections::ConnectionMessage,
+	services::connections::ConnectionMessage,
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	state::find,
 	types::{co_reducer::CoReducerContext, co_storage::CoBlockStorageContentMapping},
@@ -176,16 +176,15 @@ impl SharedCoBuilder {
 		// push changes to all connectable peers
 		if let Some((network, connections)) = &self.network {
 			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
-			let peer_provider = self.build_peer_provider((network.clone(), connections.clone()), identity.clone());
 			let publish = PushHeads::new(
 				network.clone(),
+				connections.clone(),
 				tasks,
 				self.membership.id.clone(),
-				identity.clone(),
-				peer_provider,
+				PrivateIdentity::boxed(identity.clone()),
 				mapping.clone(),
 				true,
-			);
+			)?;
 			reducer.add_change_handler(Box::new(publish));
 		}
 

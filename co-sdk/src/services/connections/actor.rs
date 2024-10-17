@@ -94,10 +94,3 @@ impl Actor for Connections {
 		Ok(())
 	}
 }
-
-#[cfg(test)]
-mod tests {
-
-	#[tokio::test]
-	async fn test_use() {}
-}

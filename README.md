@@ -10,7 +10,6 @@ CO implementation using the rust progamming language.
 ```rust
 #[derive(CoreType)]
 struct Todos {
-    title: String,
     next_todo_id: u64,
     todos: CoreVec<Todo>,
 }
@@ -37,7 +36,7 @@ enum TodosAction {
     DeleteDone,
 }
 
-impl Reducer<TodosAction> for Todos {
+impl CoreReducer<TodosAction> for Todos {
     type Action = TodosAction;
 
 	fn reduce(mut self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
@@ -45,10 +44,11 @@ impl Reducer<TodosAction> for Todos {
             TodosAction::Create { title } => {
                 let id = self.next_todo_id;
                 self.next_todo_id = self.next_todo + 1;
-                self.todos.push(Todo { id, title, done: false })
+                self.todos.push(context, Todo { id, title, done: false })
             },
             TodosAction::SetDone { id, done } => {
                 self.todos.update_one(
+                    context,
                     |todo| todo.id == id,
                     |toto| {
                         todo.done = done;
@@ -56,14 +56,80 @@ impl Reducer<TodosAction> for Todos {
                 );
             },
             TodosAction::Delete { id } => {
-               self.todos.delete_one(|todo| todo.id == id); 
+               self.todos.delete_one(context, |todo| todo.id == id);
             },
             TodosAction::DeleteDone => {
-               self.todos.delete_many(|todo| todo.done);
+               self.todos.delete_many(context, |todo| todo.done);
             },
         }
         self
     }
+}
+```
+
+#### Possible Rust with API style
+```rust
+impl Todos {
+    #[reducer]
+    fn create(&mut self, title: String, context: &mut dyn Context) {
+        let id = self.next_todo_id;
+        self.next_todo_id = self.next_todo + 1;
+        self.todos.push(context, Todo { id, title, done: false })
+    }
+    
+    #[reducer]
+    fn set_done(&mut self, id: u64, done: bool, context: &mut dyn Context) {
+        self.todos.update_one(
+            context,
+            |todo| todo.id == id,
+            |toto| {
+                todo.done = done;
+            }
+        );
+    }
+
+    #[reducer]
+    fn delete(&mut self,  id: u64, context: &mut dyn Context) {
+        self.todos.delete_one(context, |todo| todo.id == id);
+    },
+    
+    #[reducer]
+    fn delete_done(&mut self, context: &mut dyn Context) {
+        self.todos.delete_many(context, |todo| todo.done);
+    }
+}
+```
+
+#### Possible Assembly Script
+```typescript
+interface Todos {
+    next_todo_id: number;
+    todos: CoreVec<Todo>;
+}
+
+interface Todo {
+    id: number;
+    title: String;
+    done: bool;
+}
+
+#[action]
+function create(state: Todos, title: String) {
+    let id = state.next_todo_id;
+    state.next_todo_id = state.next_todo + 1;
+    state.todos.push({id, title, done: false});
+}
+
+#[action]
+function set_done(state: Todos, done: bool) {
+    const id = state.next_todo_id;
+    state.next_todo_id = state.next_todo + 1;
+    state.todos.update_one(
+        (todo) => todo.id == id,
+        (toto) => {
+            todo.done = done;
+        }
+    );
 }
 ```
 
@@ -72,9 +138,9 @@ impl Reducer<TodosAction> for Todos {
 ```typescript
 function Todos({co}) {
     // read
-    const {title, todos} = useCoSelector(co, "todos", (storage, core_state) => {
-        let state = await storage.read<Todos>(core_state);
-        let todos = storage.entries<Todo>(state.todos).limit(100);
+    const {title, todos} = useCoSelector(co, "todos", (storage, core) => {
+        let state = await storage.get<Todos>(core);
+        let todos = storage.entries<Todo>(state.todos);
         return {title: state.title, todos }
     });
 
@@ -92,7 +158,7 @@ function Todos({co}) {
     // render
     return (
         <section>
-            <h2>{title}</h2>
+            <h2>TODOs: {title}</h2>
             {todos.map(todo => (
                 <Todo key={todo.id} todo={todo} />
             ))}

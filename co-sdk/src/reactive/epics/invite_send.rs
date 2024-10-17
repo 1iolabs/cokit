@@ -6,7 +6,7 @@ use crate::{
 		network_discovery::identities_networks,
 		settings_timeout::settings_timeout,
 	},
-	plugins::connections::ConnectionMessage,
+	services::connections::ConnectionMessage,
 	reactive::context::{ActionObservable, StateObservable},
 	state, Action, CoContext, CoNetwork, CoReducerFactory, CoStorage, KnownTag, CO_CORE_NAME_CO,
 };

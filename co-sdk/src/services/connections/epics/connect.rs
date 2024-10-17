@@ -2,7 +2,7 @@ use crate::{
 	actor::Epic,
 	drivers::network::tasks::discovery_connect::DiscoveryConnectNetworkTask,
 	library::network_discovery::network_discovery,
-	plugins::connections::{
+	services::connections::{
 		ConnectAction, ConnectedAction, ConnectionAction, ConnectionState, DisconnectReason, DisconnectedAction,
 	},
 	CoContext,
@@ -13,6 +13,11 @@ use co_primitives::{Did, Network};
 use futures::{Stream, StreamExt, TryStreamExt};
 
 pub struct ConnectEpic();
+impl ConnectEpic {
+	pub fn new() -> Self {
+		Self()
+	}
+}
 impl Epic<ConnectionAction, ConnectionState, CoContext> for ConnectEpic {
 	fn epic(
 		&mut self,

@@ -7,7 +7,7 @@ use crate::{
 	actor::ActorHandle,
 	drivers::network::{token::CoToken, CoNetworkTaskSpawner},
 	library::{find_co_secret::find_co_secret_by_membership, find_membership::memberships},
-	plugins::connections::ConnectionMessage,
+	services::connections::ConnectionMessage,
 	reactive::context::ReactiveContext,
 	reducer::core_resolver::{
 		dynamic::DynamicCoreResolver,

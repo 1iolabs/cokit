@@ -1,7 +1,7 @@
 use co_core_co::CoAction;
 use co_core_file::{FileAction, FolderNode};
 use co_primitives::AbsolutePathOwned;
-use co_sdk::{tags, Cores, Identity, CO_CORE_NAME_CO};
+use co_sdk::{tags, ConnectionAction, ConnectionMessage, Cores, Identity, ReleaseAction, CO_CORE_NAME_CO};
 use futures::StreamExt;
 use helper::{instance::Instances, shared_co::SharedCo};
 use std::{
@@ -18,6 +18,15 @@ pub mod helper;
 async fn test_push() {
 	let mut instances = Instances::new("test_push");
 	let shared_co = SharedCo::create(&mut instances, "shared").await;
+
+	// disconnect
+	let context0 = shared_co.peers.get(0).unwrap().0.application.co();
+	context0
+		.network_connections()
+		.await
+		.unwrap()
+		.dispatch(ConnectionMessage::Action(ConnectionAction::Release(ReleaseAction { id: "shared".into() })))
+		.unwrap();
 
 	// peer0: create a core
 	let (peer0, identity0) = shared_co.reducer(0, "shared").await;
@@ -42,7 +51,7 @@ async fn test_push() {
 		.filter_map(ready)
 		.filter(|(state, _heads)| ready(state == &peer0_state))
 		.take(1);
-	let (peer1_state, peer1_heads) = timeout(Duration::from_secs(1), peer1_state_future.next())
+	let (peer1_state, peer1_heads) = timeout(Duration::from_secs(5), peer1_state_future.next())
 		.await
 		.expect("to sync in time")
 		.expect("state");

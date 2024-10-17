@@ -12,6 +12,7 @@ pub enum ConnectionAction {
 	PeersChanged(PeersChangedAction),
 
 	/// Release CO.
+	/// No active use calls.
 	Release(ReleaseAction),
 
 	/// CO has been released.
@@ -33,6 +34,9 @@ pub enum ConnectionAction {
 	/// Network has been connected.
 	/// May be executed multiple times when connections to a network change.
 	Connected(ConnectedAction),
+
+	/// Disconnect network (entirely).
+	Disconnect(DisconnectAction),
 
 	/// Network has been (entirely) disconnected.
 	Disconnected(DisconnectedAction),
@@ -80,6 +84,7 @@ pub struct NetworkResolveAction {
 pub struct NetworkResolvedAction {
 	pub id: CoId,
 	pub result: Result<BTreeSet<Network>, String>,
+	pub time: Instant,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -92,6 +97,11 @@ pub struct ConnectAction {
 pub struct ConnectedAction {
 	pub network: Network,
 	pub result: Result<BTreeSet<PeerId>, String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DisconnectAction {
+	pub network: Network,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -108,4 +118,6 @@ pub enum DisconnectReason {
 	Failure(String),
 	#[error("Connect Timeout")]
 	Timeout,
+	#[error("Close")]
+	Close,
 }

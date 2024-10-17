@@ -5,7 +5,8 @@ use futures::{
 	stream::{BoxStream, Empty},
 	Stream, StreamExt,
 };
-use std::{fmt::Debug, marker::PhantomData};
+use std::{fmt::Debug, marker::PhantomData, sync::Arc};
+use tokio_util::sync::CancellationToken;
 
 /// Epic.
 ///
@@ -29,6 +30,13 @@ pub trait EpicExt<A, S, C>: Epic<A, S, C> {
 		Self: Sized,
 	{
 		JoinEpic(self, other)
+	}
+
+	fn once(self) -> OnceEpic<Self>
+	where
+		Self: Sized + Send + 'static,
+	{
+		OnceEpic(self, None)
 	}
 
 	fn boxed(self) -> Box<dyn BoxEpic<A, S, C> + Send + 'static>
@@ -64,7 +72,7 @@ where
 /// Expected to be called after the message has been applied to the state.
 pub struct EpicRuntime<M, A, S, C> {
 	epic: Box<dyn BoxEpic<A, S, C> + Send + 'static>,
-	error: fn(anyhow::Error) -> Option<A>,
+	error: Arc<dyn Fn(anyhow::Error) -> Option<A> + Sync + Send + 'static>,
 	// epics: Vec<Box<dyn BoxEpic<A, S, C>>>,
 	_actor: PhantomData<fn(M, A, S, C)>,
 }
@@ -73,15 +81,18 @@ where
 	A: Send + 'static + Into<M>,
 	M: Send + 'static,
 {
-	pub fn new(epic: impl EpicExt<A, S, C> + Send + 'static, error: fn(anyhow::Error) -> Option<A>) -> Self {
-		Self { epic: epic.boxed(), _actor: Default::default(), error }
+	pub fn new(
+		epic: impl EpicExt<A, S, C> + Send + 'static,
+		error: impl Fn(anyhow::Error) -> Option<A> + Sync + Send + 'static,
+	) -> Self {
+		Self { epic: epic.boxed(), _actor: Default::default(), error: Arc::new(error) }
 	}
 
 	pub fn handle(&mut self, actor: &ActorHandle<M>, action: &A, state: &S, context: &C) {
 		let stream = self.epic.box_epic(action, state, context);
 		if let Some(stream) = stream {
 			let actor = actor.clone();
-			let error = self.error;
+			let error = self.error.clone();
 			tokio::spawn(async move {
 				let stream = stream.take_until(actor.closed());
 				pin_mut!(stream);
@@ -136,7 +147,13 @@ where
 	}
 }
 
-pub struct TracingEpic(pub Tags);
+/// Trace actions and state as debug messages.
+pub struct TracingEpic(Tags);
+impl TracingEpic {
+	pub fn new(tags: Tags) -> Self {
+		Self(tags)
+	}
+}
 impl<A, S, C> Epic<A, S, C> for TracingEpic
 where
 	A: Debug + Send + 'static,
@@ -150,6 +167,39 @@ where
 	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + 'static> {
 		tracing::debug!(?action, ?state, tags = ?self.0, "action");
 		Option::<Empty<_>>::None
+	}
+}
+
+/// Only allow to run epic once.
+/// Once the epic returns another stream the previous will be dropped.
+pub struct OnceEpic<E>(E, Option<CancellationToken>);
+impl<E, A, S, C> Epic<A, S, C> for OnceEpic<E>
+where
+	E: Epic<A, S, C>,
+	A: Debug + Send + 'static,
+	S: Debug + Send + 'static,
+{
+	fn epic(
+		&mut self,
+		action: &A,
+		state: &S,
+		context: &C,
+	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + 'static> {
+		let next = self.0.epic(action, state, context);
+		match next {
+			Some(stream) => {
+				// cancel previous
+				if let Some(cancel) = self.1.take() {
+					cancel.cancel();
+				}
+
+				// create next
+				let token = CancellationToken::new();
+				self.1 = Some(token.clone());
+				Some(stream.take_until(token.cancelled_owned()))
+			},
+			None => None,
+		}
 	}
 }
 

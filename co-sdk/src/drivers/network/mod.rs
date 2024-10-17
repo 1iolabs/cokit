@@ -111,19 +111,21 @@ impl Network {
 	}
 }
 
+#[derive(Clone)]
 pub struct CoNetworkTaskSpawner {
 	spawner: TokioNetworkTaskSpawner<Behaviour, Context>,
 	local_peer: PeerId,
 }
-
-impl Clone for CoNetworkTaskSpawner {
-	fn clone(&self) -> Self {
-		Self { spawner: self.spawner.clone(), local_peer: self.local_peer }
-	}
-}
 impl CoNetworkTaskSpawner {
 	pub fn local_peer_id(&self) -> PeerId {
 		self.local_peer
+	}
+}
+impl std::fmt::Debug for CoNetworkTaskSpawner {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("CoNetworkTaskSpawner")
+			.field("local_peer", &self.local_peer)
+			.finish()
 	}
 }
 impl NetworkTaskSpawner<Behaviour, Context> for CoNetworkTaskSpawner {

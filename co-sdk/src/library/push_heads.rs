@@ -1,52 +1,48 @@
 use super::to_plain::to_plain;
 use crate::{
-	drivers::network::{
-		tasks::co_heads::{CoHeadsNetworkTask, CoHeadsRequest},
-		CoNetworkTaskSpawner,
-	},
+	actor::{Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, OnceEpic, Reducer, TracingEpic},
+	drivers::network::{tasks::didcomm_send::DidCommSendNetworkTask, CoNetworkTaskSpawner},
+	services::connections::ConnectionMessage,
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
-	CoStorage, Reducer, ReducerChangeContext, ReducerChangedHandler, TaskSpawner,
+	types::message::heads::HeadsMessage,
+	CoStorage, Reducer as CoreReducer, ReducerChangeContext, ReducerChangedHandler, TaskSpawner,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_identity::PrivateIdentity;
-use co_network::{NetworkTaskSpawner, PeerProvider};
-use co_primitives::CoId;
+use co_identity::{Identity, PrivateIdentityBox};
+use co_network::didcomm::EncodedMessage;
+use co_primitives::{tags, CoId, Tags};
 use co_storage::BlockStorageContentMapping;
-use futures::{pin_mut, StreamExt};
+use futures::{Stream, StreamExt};
 use libipld::Cid;
 use libp2p::PeerId;
-use std::collections::BTreeSet;
-use tokio::sync::watch;
-use tracing::Instrument;
+use std::{collections::BTreeSet, future::ready, time::Duration};
 
 ///	Use PeerProvider to discover peers and send heads to them whenever a peer comes online or new heads are produced.
-/// TODO: This will stop working when peers stream completes, dispite the networks may change.
 pub struct PushHeads<M> {
-	heads: watch::Sender<BTreeSet<Cid>>,
+	handle: ActorHandle<PushHeadsAction>,
 	mapping: Option<M>,
 	/// Force the mapping to be applied by returning an error when no mapping is found.
 	force_mapping: bool,
 	initialized: bool,
 }
 impl<M> PushHeads<M> {
-	pub fn new<I, P>(
+	pub fn new(
 		spawner: CoNetworkTaskSpawner,
+		connections: ActorHandle<ConnectionMessage>,
 		tasks: TaskSpawner,
 		co: CoId,
-		identity: I,
-		peer_provider: P,
+		identity: PrivateIdentityBox,
 		mapping: Option<M>,
 		force_mapping: bool,
-	) -> Self
-	where
-		I: PrivateIdentity + Clone + Send + Sync + 'static,
-		P: PeerProvider + Send + Sync + 'static,
-	{
-		let (tx, rx) = watch::channel(Default::default());
-		let span = tracing::trace_span!("push-heads", ?co);
-		tasks.spawn(worker(spawner, co, rx, identity, peer_provider).instrument(span));
-		Self { heads: tx, mapping, force_mapping, initialized: false }
+	) -> Result<Self, anyhow::Error> {
+		let instance = Actor::spawn_with(
+			tasks,
+			tags!("co": co.as_str()),
+			PushHeadsActor { context: PushHeadsContext(spawner, connections, identity) },
+			PushHeadsState { co: co.clone(), heads: Default::default() },
+		)?;
+		Ok(Self { handle: instance.handle(), mapping, force_mapping, initialized: false })
 	}
 }
 #[async_trait]
@@ -56,7 +52,7 @@ where
 {
 	async fn on_state_changed(
 		&mut self,
-		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+		reducer: &CoreReducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 		context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
 		// send local changes
@@ -72,7 +68,7 @@ where
 			}
 
 			// send
-			self.heads.send_replace(heads);
+			self.handle.dispatch(PushHeadsAction::Changed(heads))?;
 		}
 
 		// done
@@ -80,69 +76,167 @@ where
 	}
 }
 
-async fn worker<I, P>(
-	spawner: CoNetworkTaskSpawner,
-	co: CoId,
-	mut heads_watcher: watch::Receiver<BTreeSet<Cid>>,
-	identity: I,
-	peer_provider: P,
-) where
-	I: PrivateIdentity + Clone + Send + Sync + 'static,
-	P: PeerProvider + Send + Sync + 'static,
-{
-	let identity = PrivateIdentity::boxed(identity);
-	let mut peers: BTreeSet<PeerId> = Default::default();
-	let peers_stream = peer_provider.peers().fuse();
-	pin_mut!(peers_stream);
-	loop {
-		// next
-		let heads = heads_watcher.borrow_and_update().clone();
-		let notify: Option<(BTreeSet<Cid>, BTreeSet<PeerId>)> = tokio::select! {
-			// wait for heads changed
-			Ok(_) = heads_watcher.changed() => {
-				// notify known peers about new heads
-				let changed_heads = heads_watcher.borrow_and_update().clone();
-				if !changed_heads.is_empty() && !peers.is_empty() && changed_heads != heads {
-					Some((changed_heads.clone(), peers.clone()))
-				} else {
+struct PushHeadsActor {
+	context: PushHeadsContext,
+}
+#[async_trait]
+impl Actor for PushHeadsActor {
+	type Message = PushHeadsAction;
+	type State = (PushHeadsState, EpicRuntime<PushHeadsAction, PushHeadsAction, PushHeadsState, PushHeadsContext>);
+	type Initialize = PushHeadsState;
+
+	async fn initialize(&self, tags: Tags, initialize: Self::Initialize) -> Result<Self::State, ActorError> {
+		let co = initialize.co.clone();
+		Ok((
+			initialize,
+			EpicRuntime::new(
+				PushHeadsSendEpic::new()
+					.join(PushHeadsConnectEpic::new())
+					.join(TracingEpic::new(tags)),
+				move |err| {
+					tracing::error!(?err, ?co, "push-heads-error");
 					None
+				},
+			),
+		))
+	}
+
+	async fn handle(
+		&self,
+		handle: &ActorHandle<Self::Message>,
+		action: Self::Message,
+		(state, epic): &mut Self::State,
+	) -> Result<(), ActorError> {
+		let next_actions = state.reduce(action.clone());
+
+		// epic
+		epic.handle(handle, &action, &state, &self.context);
+
+		// dispatch
+		for next_action in next_actions {
+			handle.dispatch(next_action)?;
+		}
+
+		// done
+		Ok(())
+	}
+}
+
+#[derive(Debug, Clone)]
+struct PushHeadsContext(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, PrivateIdentityBox);
+
+#[derive(Debug, Clone)]
+enum PushHeadsAction {
+	/// Heads changed.
+	Changed(BTreeSet<Cid>),
+
+	/// Connect and send heads to peers.
+	Connect(BTreeSet<Cid>),
+
+	/// Send heads to a connected peer.
+	Send(BTreeSet<Cid>, BTreeSet<PeerId>),
+
+	/// Sent heads to a connected peer.
+	Sent(BTreeSet<Cid>, PeerId, Result<(), String>),
+}
+
+#[derive(Debug, Clone)]
+struct PushHeadsState {
+	pub co: CoId,
+	pub heads: BTreeSet<Cid>,
+}
+impl Reducer<PushHeadsAction> for PushHeadsState {
+	fn reduce(&mut self, action: PushHeadsAction) -> Vec<PushHeadsAction> {
+		let mut result = vec![];
+		match action {
+			PushHeadsAction::Changed(heads) => {
+				if self.heads != heads {
+					result.push(PushHeadsAction::Connect(heads.clone()));
+					self.heads = heads;
 				}
 			},
+			_ => {},
+		}
+		result
+	}
+}
 
-			// wait for new peers
-			Some(next_peers) = peers_stream.next(), if !peers_stream.is_done() => {
-				// get added peers
-				let added: BTreeSet<PeerId> = next_peers.difference(&peers).cloned().collect();
+/// Use Send actions, connect the CO and return SendPeers actions.
+struct PushHeadsConnectEpic();
+impl PushHeadsConnectEpic {
+	pub fn new() -> OnceEpic<Self> {
+		Self().once()
+	}
+}
+impl Epic<PushHeadsAction, PushHeadsState, PushHeadsContext> for PushHeadsConnectEpic {
+	fn epic(
+		&mut self,
+		action: &PushHeadsAction,
+		state: &PushHeadsState,
+		context: &PushHeadsContext,
+	) -> Option<impl Stream<Item = Result<PushHeadsAction, anyhow::Error>> + Send + 'static> {
+		match action {
+			PushHeadsAction::Connect(heads) => Some({
+				let id = state.co.clone();
+				let connections = context.1.clone();
+				let from = context.2.identity().to_owned();
+				let heads = heads.clone();
+				ConnectionMessage::co_use(connections, id, from, [])
+					.filter_map(move |changed| {
+						ready(match changed {
+							Ok(change) if !change.added.is_empty() => Some(change.added),
+							_ => None,
+						})
+					})
+					.map(move |peers| PushHeadsAction::Send(heads.clone(), peers))
+					// .flat_map(move |peers| {
+					// 	stream::iter(peers.into_iter().map({
+					// 		let heads = heads.clone();
+					// 		move |peer| PushHeadsAction::Send(heads.clone(), peer)
+					// 	}))
+					// })
+					.map(Ok)
+			}),
+			_ => None,
+		}
+	}
+}
 
-				// update
-				peers = next_peers;
+/// Send heads to peers.
+struct PushHeadsSendEpic();
+impl PushHeadsSendEpic {
+	pub fn new() -> Self {
+		Self()
+	}
+}
+impl Epic<PushHeadsAction, PushHeadsState, PushHeadsContext> for PushHeadsSendEpic {
+	fn epic(
+		&mut self,
+		action: &PushHeadsAction,
+		state: &PushHeadsState,
+		context: &PushHeadsContext,
+	) -> Option<impl Stream<Item = Result<PushHeadsAction, anyhow::Error>> + Send + 'static> {
+		match action {
+			PushHeadsAction::Send(heads, peers) => Some({
+				let id = state.co.clone();
+				let network = context.0.clone();
+				let identity = context.2.clone();
+				let heads = heads.clone();
+				let peers = peers.clone();
+				async_stream::try_stream! {
+					// message
+					let header = HeadsMessage::create_header();
+					let body = HeadsMessage::Heads(id.clone(), heads.clone());
+					let (_, message) = EncodedMessage::create_signed_json(&identity, header, &body)?;
 
-				// notify the new peer
-				if !added.is_empty() && !heads.is_empty() {
-					Some((heads.clone(), added))
-				} else {
-					None
+					// send
+					for peer in peers {
+						let send = DidCommSendNetworkTask::send(network.clone(), [peer], message.clone(), Duration::from_secs(30)).await;
+						yield PushHeadsAction::Sent(heads.clone(), peer, match send { Ok(_) => Ok(()), Err(err) => Err(err.to_string()) });
+					}
 				}
-			},
-
-			// shutdown
-			else => break,
-		};
-
-		// send
-		if let Some(send) = notify {
-			if spawner
-				.spawn(CoHeadsNetworkTask::new(CoHeadsRequest::Heads {
-					co: co.clone(),
-					heads: send.0,
-					peers: send.1,
-					identity: identity.clone(),
-				}))
-				.is_err()
-			{
-				// exit loop when we can not spawn new tasks
-				break;
-			}
+			}),
+			_ => None,
 		}
 	}
 }

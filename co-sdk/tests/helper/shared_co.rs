@@ -73,7 +73,8 @@ impl SharedCo {
 
 		// peer2: membership-invite
 		let peer2_membership_invite = wait_membership_state(peer2.application.actions(), [MembershipState::Invite]);
-		peer2_membership_invite.await.expect("not empty");
+		let peer2_membership_invite = peer2_membership_invite.await.expect("not empty");
+		assert_eq!(peer2_membership_invite, (MembershipState::Invite, CoId::from(id), identity2.identity().to_owned()));
 
 		// peer2: join
 		//  set membership to join and wait for membership set to active when join is complete
@@ -86,7 +87,7 @@ impl SharedCo {
 			};
 			let (push, membership_state) = join!(
 				local_co.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &payload),
-				wait_membership_state(peer2.application.actions(), [MembershipState::Active, MembershipState::Invite]),
+				wait_membership_state(peer2.application.actions(), [MembershipState::Active]),
 			);
 			push.unwrap();
 			assert_eq!(

@@ -5,7 +5,7 @@ use crate::{
 		invite_networks::invite_networks, is_cid_encrypted::is_cid_encrypted, join::create_join_message_from,
 		settings_timeout::settings_timeout,
 	},
-	plugins::connections::ConnectionMessage,
+	services::connections::ConnectionMessage,
 	reactive::context::{ActionObservable, StateObservable},
 	Action, CoContext, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };

@@ -2,16 +2,21 @@ use crate::{
 	actor::Epic,
 	find_membership,
 	library::{invite_networks::invite_networks, network_discovery::identities_networks},
-	plugins::connections::{ConnectionAction, ConnectionState, NetworkResolveAction, NetworkResolvedAction},
+	services::connections::{ConnectionAction, ConnectionState, NetworkResolveAction, NetworkResolvedAction},
 	state, CoContext, CoReducer, CoStorage,
 };
 use anyhow::anyhow;
 use co_primitives::{CoId, CoInviteMetadata, KnownTags, Network};
 use co_storage::BlockStorageExt;
 use futures::{Stream, TryStreamExt};
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, time::Instant};
 
 pub struct NetworkResolveEpic();
+impl NetworkResolveEpic {
+	pub fn new() -> Self {
+		Self()
+	}
+}
 impl Epic<ConnectionAction, ConnectionState, CoContext> for NetworkResolveEpic {
 	fn epic(
 		&mut self,
@@ -25,7 +30,7 @@ impl Epic<ConnectionAction, ConnectionState, CoContext> for NetworkResolveEpic {
 				let id = id.clone();
 				Some(async_stream::try_stream! {
 					let result = network_resolve(context, id.clone()).await.map_err(|err| err.to_string());
-					yield ConnectionAction::NetworkResolved(NetworkResolvedAction { id: id.clone(), result })
+					yield ConnectionAction::NetworkResolved(NetworkResolvedAction { id: id.clone(), result, time: Instant::now() })
 				})
 			},
 			_ => None,

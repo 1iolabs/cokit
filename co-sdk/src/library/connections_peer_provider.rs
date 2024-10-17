@@ -1,6 +1,6 @@
 use crate::{
 	actor::ActorHandle,
-	plugins::connections::{ConnectionMessage, UseAction},
+	services::connections::{ConnectionMessage, UseAction},
 };
 use co_network::PeerProvider;
 use co_primitives::{CoId, Did};
