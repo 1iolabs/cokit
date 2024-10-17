@@ -7,7 +7,6 @@ use crate::{
 	actor::ActorHandle,
 	drivers::network::{token::CoToken, CoNetworkTaskSpawner},
 	library::{find_co_secret::find_co_secret_by_membership, find_membership::memberships},
-	services::connections::ConnectionMessage,
 	reactive::context::ReactiveContext,
 	reducer::core_resolver::{
 		dynamic::DynamicCoreResolver,
@@ -15,6 +14,7 @@ use crate::{
 		log::LogCoreResolver,
 		membership::{MembershipCoreResolver, MembershipInstanceRegistry},
 	},
+	services::connections::ConnectionMessage,
 	types::{co_reducer::CoReducerContext, co_reducer_factory::CoReducerFactoryError},
 	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime, TaskSpawner,
 	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
