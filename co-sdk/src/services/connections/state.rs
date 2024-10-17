@@ -2,7 +2,7 @@ use super::{
 	action::{ConnectAction, ConnectedAction, ConnectionAction, DisconnectedAction, UseAction},
 	DisconnectAction, NetworkResolveAction, NetworkResolvedAction, PeersChangedAction, ReleaseAction, ReleasedAction,
 };
-use crate::actor::Reducer;
+use crate::{actor::Reducer, services::connections::DisconnectReason};
 use co_primitives::{CoId, Did, Network};
 use libp2p::{Multiaddr, PeerId};
 use std::{
@@ -31,7 +31,20 @@ pub struct ConnectionState {
 	pub keep_alive: Duration,
 	pub co: HashMap<CoId, CoConnection>,
 	pub networks: HashMap<Network, NetworkConnection>,
+	/// TODO: implement cache
 	pub cache: HashMap<Network, BTreeSet<Multiaddr>>,
+}
+impl ConnectionState {
+	/// Find all PeerId's for an CO.
+	fn co_peers(&self, id: &CoId) -> BTreeSet<PeerId> {
+		self.co
+			.get(id)
+			.iter()
+			.flat_map(|co_connection| &co_connection.networks)
+			.filter_map(|network| self.networks.get(network))
+			.flat_map(|network_connection| network_connection.peers.clone())
+			.collect()
+	}
 }
 impl Reducer<ConnectionAction> for ConnectionState {
 	fn reduce(&mut self, action: ConnectionAction) -> Vec<ConnectionAction> {
@@ -50,64 +63,13 @@ impl Reducer<ConnectionAction> for ConnectionState {
 				reduce_network_resolved(state, &mut actions, id, result, time);
 			},
 			ConnectionAction::Disconnected(DisconnectedAction { network, reason: _ }) => {
-				if let Some(mut network_connection) = state.networks.remove(network) {
-					// remove references
-					while let Some(co) = network_connection.references.pop_first() {
-						if let Some(co_connection) = state.co.get_mut(&co) {
-							if co_connection.networks.remove(network) {
-								// update co use handles
-								if co_connection.networks.is_empty() {
-									// TODO: reconnect when not timedout yet?
-									actions.push(ConnectionAction::Released(ReleasedAction { id: co.clone() }));
-								} else {
-									actions.push(ConnectionAction::PeersChanged(PeersChangedAction {
-										id: co.clone(),
-										removed: network_connection.peers.clone(),
-										peers: state.co_peers(&co),
-										added: [].into(),
-									}));
-								}
-							}
-						}
-					}
-
-					// remove disconnected
-					state.co.retain(|_, co_connection| !co_connection.networks.is_empty());
-				}
+				reduce_disconnected(state, &mut actions, network);
 			},
 			ConnectionAction::Release(ReleaseAction { id }) => {
-				if let Some(co_connection) = state.co.get_mut(id) {
-					// remove references and disconnect if unused
-					while let Some(network) = co_connection.networks.pop_first() {
-						if let Some(network_connection) = state.networks.get_mut(&network) {
-							if network_connection.references.remove(id) {
-								if network_connection.references.is_empty() {
-									actions.push(ConnectionAction::Disconnect(DisconnectAction { network }));
-								}
-							}
-						}
-					}
-
-					// released
-					if co_connection.networks.is_empty() {
-						actions.push(ConnectionAction::Released(ReleasedAction { id: id.clone() }));
-					}
-				}
+				reduce_release(state, &mut actions, id);
 			},
 			ConnectionAction::Released(ReleasedAction { id }) => {
-				// remove co
-				if let Some(mut co_connection) = state.co.remove(id) {
-					// remove references and disconnect if unused
-					while let Some(network) = co_connection.networks.pop_first() {
-						if let Some(network_connection) = state.networks.get_mut(&network) {
-							if network_connection.references.remove(id) {
-								if network_connection.references.is_empty() {
-									actions.push(ConnectionAction::Disconnect(DisconnectAction { network }));
-								}
-							}
-						}
-					}
-				}
+				reduce_released(state, &mut actions, id);
 			},
 			_ => {},
 		}
@@ -211,31 +173,6 @@ fn reduce_use(
 	}
 }
 
-fn reduce_network_resolved(
-	state: &mut ConnectionState,
-	actions: &mut Vec<ConnectionAction>,
-	id: &CoId,
-	result: &Result<BTreeSet<Network>, String>,
-	time: &Instant,
-) {
-	let networks = if let Some(co_connection) = state.co.get(id) {
-		match result {
-			Ok(networks) => Some((networks, co_connection.from.clone())),
-			Err(_err) => {
-				// when network resolve has been failed just release the co and let subscribers know it didn't work
-				actions.push(ConnectionAction::Release(ReleaseAction { id: id.clone() }));
-				None
-			},
-		}
-	} else {
-		None
-	};
-	if let Some((networks, from)) = networks {
-		// populate networks
-		reduce_use(state, actions, networks, id, &from, time, false);
-	}
-}
-
 fn reduce_connected(
 	state: &mut ConnectionState,
 	actions: &mut Vec<ConnectionAction>,
@@ -263,23 +200,119 @@ fn reduce_connected(
 				}
 			},
 			Err(err) => {
-				tracing::warn!(?err, "connections-failed");
-				// TODO: handle
+				// log
+				tracing::warn!(?err, network = ?network.network, peers_count = network.peers.len(), "connections-failed");
+
+				// disconnected
+				// TODO: retry connection?
+				if network.peers.is_empty() {
+					actions.push(ConnectionAction::Disconnected(DisconnectedAction {
+						network: network.network.clone(),
+						reason: DisconnectReason::Failure(err.to_string()),
+					}));
+				}
 			},
 		}
 	}
 }
 
-impl ConnectionState {
-	/// Find all PeerId's for an CO.
-	fn co_peers(&self, id: &CoId) -> BTreeSet<PeerId> {
-		self.co
-			.get(id)
-			.iter()
-			.flat_map(|co_connection| &co_connection.networks)
-			.filter_map(|network| self.networks.get(network))
-			.flat_map(|network_connection| network_connection.peers.clone())
-			.collect()
+fn reduce_network_resolved(
+	state: &mut ConnectionState,
+	actions: &mut Vec<ConnectionAction>,
+	id: &CoId,
+	result: &Result<BTreeSet<Network>, String>,
+	time: &Instant,
+) {
+	let networks = if let Some(co_connection) = state.co.get(id) {
+		match result {
+			Ok(networks) => Some((networks, co_connection.from.clone())),
+			Err(_err) => {
+				// when network resolve has been failed just release the co and let subscribers know it didn't work
+				actions.push(ConnectionAction::Release(ReleaseAction { id: id.clone() }));
+				None
+			},
+		}
+	} else {
+		None
+	};
+	if let Some((networks, from)) = networks {
+		// populate networks
+		reduce_use(state, actions, networks, id, &from, time, false);
+	}
+}
+
+/// Network has been disconnected.
+///
+/// ## Responsibilities
+/// - Release its references.
+/// - Release Co is no more networks.
+/// - Notify about peer changes.
+fn reduce_disconnected(state: &mut ConnectionState, actions: &mut Vec<ConnectionAction>, network: &Network) {
+	if let Some(mut network_connection) = state.networks.remove(network) {
+		// remove references
+		while let Some(co) = network_connection.references.pop_first() {
+			if let Some(co_connection) = state.co.get_mut(&co) {
+				if co_connection.networks.remove(network) {
+					// update co use handles
+					if co_connection.networks.is_empty() {
+						// TODO: reconnect when not timedout yet?
+						actions.push(ConnectionAction::Released(ReleasedAction { id: co.clone() }));
+					} else {
+						actions.push(ConnectionAction::PeersChanged(PeersChangedAction {
+							id: co.clone(),
+							removed: network_connection.peers.clone(),
+							peers: state.co_peers(&co),
+							added: [].into(),
+						}));
+					}
+				}
+			}
+		}
+
+		// remove disconnected
+		state.co.retain(|_, co_connection| !co_connection.networks.is_empty());
+	}
+}
+
+/// Release a CO connection.
+///
+/// ## Responsibilities
+/// - Disconnect networks which are only references by this CO
+/// - Notify about ReleasedAction if no more networks connected (done by disconnected?)
+fn reduce_release(state: &mut ConnectionState, actions: &mut Vec<ConnectionAction>, id: &CoId) {
+	if let Some(co_connection) = state.co.get_mut(id) {
+		// remove references and disconnect if unused
+		while let Some(network) = co_connection.networks.pop_first() {
+			if let Some(network_connection) = state.networks.get_mut(&network) {
+				if network_connection.references.remove(id) {
+					if network_connection.references.is_empty() {
+						actions.push(ConnectionAction::Disconnect(DisconnectAction { network }));
+					}
+				}
+			}
+		}
+
+		// released
+		if co_connection.networks.is_empty() {
+			actions.push(ConnectionAction::Released(ReleasedAction { id: id.clone() }));
+		}
+	}
+}
+
+fn reduce_released(state: &mut ConnectionState, actions: &mut Vec<ConnectionAction>, id: &CoId) {
+	// remove co
+	if let Some(mut co_connection) = state.co.remove(id) {
+		// remove references and disconnect if unused
+		// normally this should be empty at this point
+		while let Some(network) = co_connection.networks.pop_first() {
+			if let Some(network_connection) = state.networks.get_mut(&network) {
+				if network_connection.references.remove(id) {
+					if network_connection.references.is_empty() {
+						actions.push(ConnectionAction::Disconnect(DisconnectAction { network }));
+					}
+				}
+			}
+		}
 	}
 }
 
