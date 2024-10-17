@@ -261,7 +261,7 @@ async fn test_invite_encrypted() {
 		};
 		let (push, membership_state) = join!(
 			local_co.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &payload),
-			wait_membership_state(peer2.application.actions(), [MembershipState::Active, MembershipState::Invite]),
+			wait_membership_state(peer2.application.actions(), [MembershipState::Active]),
 		);
 		push.unwrap();
 		assert_eq!(
