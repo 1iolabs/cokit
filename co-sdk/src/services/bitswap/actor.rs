@@ -2,52 +2,76 @@ use crate::{
 	application::co_context::ReducerStorage, library::find_co_secret::find_co_secret_by_membership, CoContext, CoToken,
 };
 use anyhow::anyhow;
-use co_network::bitswap::{BitswapRequest, Token};
-use co_primitives::{CoId, KnownMultiCodec, MultiCodec};
+use async_trait::async_trait;
+use co_actor::{Actor, ActorError, ActorHandle};
+use co_network::bitswap::{BitswapMessage, Token};
+use co_primitives::{CoId, KnownMultiCodec, MultiCodec, Tags};
 use co_storage::{BlockStorage, StorageError};
-use futures::{pin_mut, Stream, StreamExt};
 use libipld::{Block, Cid, DefaultParams};
 use libp2p::PeerId;
 
-/// Handle requests from bitswap network behaviour.
-pub async fn handle_bitswap(context: CoContext, bitswap_requests: impl Stream<Item = BitswapRequest<DefaultParams>>) {
-	let requests = bitswap_requests.take_until(context.inner.shutdown().cancelled_owned());
-	pin_mut!(requests);
-	while let Some(request) = requests.next().await {
-		match request {
-			BitswapRequest::Contains(cid, remote_peer, tokens, response) => {
-				context.tasks().spawn({
-					let context = context.clone();
+pub struct Bitswap {
+	context: CoContext,
+}
+impl Bitswap {
+	pub fn new(context: CoContext) -> Self {
+		Self { context }
+	}
+}
+#[async_trait]
+impl Actor for Bitswap {
+	type Message = BitswapMessage<DefaultParams>;
+	type State = ();
+	type Initialize = ();
+
+	async fn initialize(&self, _tags: Tags, _initialize: Self::Initialize) -> Result<Self::State, ActorError> {
+		Ok(())
+	}
+
+	async fn handle(
+		&self,
+		_handle: &ActorHandle<Self::Message>,
+		message: Self::Message,
+		_state: &mut Self::State,
+	) -> Result<(), ActorError> {
+		// handle
+		match message {
+			BitswapMessage::Contains(cid, remote_peer, tokens, response) => {
+				self.context.tasks().spawn({
+					let context = self.context.clone();
 					async move {
 						response.send(contains(context, cid, remote_peer, tokens).await).ok();
 					}
 				});
 			},
-			BitswapRequest::Get(cid, remote_peer, tokens, response) => {
-				context.tasks().spawn({
-					let context = context.clone();
+			BitswapMessage::Get(cid, remote_peer, tokens, response) => {
+				self.context.tasks().spawn({
+					let context = self.context.clone();
 					async move {
 						response.send(get(context, cid, remote_peer, tokens).await).ok();
 					}
 				});
 			},
-			BitswapRequest::Insert(block, remote_peer, tokens, response) => {
-				context.tasks().spawn({
-					let context = context.clone();
+			BitswapMessage::Insert(block, remote_peer, tokens, response) => {
+				self.context.tasks().spawn({
+					let context = self.context.clone();
 					async move {
 						response.send(insert(context, block, remote_peer, tokens).await).ok();
 					}
 				});
 			},
-			BitswapRequest::MissingBlocks(cid, tokens, response) => {
-				context.tasks().spawn({
-					let context = context.clone();
+			BitswapMessage::MissingBlocks(cid, tokens, response) => {
+				self.context.tasks().spawn({
+					let context = self.context.clone();
 					async move {
 						response.send(missing_blocks(context, cid, tokens).await).ok();
 					}
 				});
 			},
 		}
+
+		// result
+		Ok(())
 	}
 }
 

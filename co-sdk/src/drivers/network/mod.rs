@@ -1,15 +1,15 @@
-pub mod bitswap;
 pub mod publish;
 pub mod subscribe;
 pub mod tasks;
 pub mod token;
 
+use co_actor::ActorHandle;
 use co_identity::{IdentityResolver, PrivateIdentity, PrivateIdentityResolver};
 use co_network::{
-	bitswap::BitswapRequest, Behaviour, Context, FnOnceNetworkTask, Libp2pNetwork, Libp2pNetworkConfig, NetworkError,
+	bitswap::BitswapMessage, Behaviour, Context, FnOnceNetworkTask, Libp2pNetwork, Libp2pNetworkConfig, NetworkError,
 	NetworkTask, NetworkTaskSpawner, Shutdown, TokioNetworkTaskSpawner,
 };
-use futures::channel::{mpsc, oneshot};
+use futures::channel::oneshot;
 use libipld::DefaultParams;
 use libp2p::{identity::Keypair, Multiaddr, PeerId};
 use std::sync::Arc;
@@ -36,24 +36,22 @@ impl Network {
 		network_key: Keypair,
 		resolver: I,
 		private_resolver: P,
-	) -> (Self, mpsc::Receiver<BitswapRequest<DefaultParams>>)
+		bitswap: ActorHandle<BitswapMessage<DefaultParams>>,
+	) -> Self
 	where
 		I: IdentityResolver + Clone + Send + Sync + 'static,
 		P: PrivateIdentityResolver + Clone + Send + Sync + 'static,
 	{
 		let network_peer_id = PeerId::from(network_key.public());
 		let network_config = Libp2pNetworkConfig::from_keypair(network_key.clone());
-		let (network, bitswap_requests) =
-			Libp2pNetwork::new(identifier.clone(), network_config, resolver, private_resolver).expect("network");
+		let network = Libp2pNetwork::new(identifier.clone(), network_config, resolver, private_resolver, bitswap)
+			.expect("network");
 		tracing::info!(application = &identifier, peer_id = ?network_peer_id, "network");
-		(
-			Self {
-				spawner: CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id },
-				peer_id: network_peer_id,
-				network: Arc::new(Mutex::new(Some(network))),
-			},
-			bitswap_requests,
-		)
+		Self {
+			spawner: CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id },
+			peer_id: network_peer_id,
+			network: Arc::new(Mutex::new(Some(network))),
+		}
 	}
 
 	/// Get local peer id.

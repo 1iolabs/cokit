@@ -1628,6 +1628,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "asynchronous-codec 0.7.0",
+ "co-actor",
  "co-identity",
  "co-primitives",
  "co-storage",

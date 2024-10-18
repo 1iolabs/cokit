@@ -7,11 +7,17 @@ use std::{
 };
 use tokio::sync::{mpsc, oneshot};
 
+#[derive(Debug)]
 pub struct Response<T> {
 	tx: oneshot::Sender<T>,
 }
 impl<T> Response<T> {
 	pub fn respond(self, value: T) -> Result<(), ActorError> {
+		self.tx.send(value).map_err(|_| ActorError::Canceled)
+	}
+
+	/// Alias to respond.
+	pub fn send(self, value: T) -> Result<(), ActorError> {
 		self.tx.send(value).map_err(|_| ActorError::Canceled)
 	}
 }

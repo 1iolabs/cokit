@@ -5,13 +5,13 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
-	drivers::network::{bitswap::handle_bitswap, tasks::mdns_gossip::MdnsGossipNetworkTask},
+	drivers::network::tasks::mdns_gossip::MdnsGossipNetworkTask,
 	local_keypair_fetch,
 	reactive::{
 		context::{ActionObservable, ReactiveContext},
 		epics::epic,
 	},
-	services::connections::Connections,
+	services::{bitswap::Bitswap, connections::Connections},
 	Action, CoReducer, CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE,
 	CO_CORE_NAME_MEMBERSHIP,
 };
@@ -134,16 +134,25 @@ impl Application {
 			return Err(anyhow!("Network already created"));
 		}
 
+		// bitswap
+		let bitswap = Actor::spawn_with(
+			self.tasks(),
+			tags!("type": "bitswap", "application": &self.settings.identifier),
+			Bitswap::new(self.co().clone()),
+			(),
+		)?;
+
 		// create network
 		let local_identity = self.local_identity();
 		let local_co = self.co_context.local_co_reducer().await?;
 		let network_key =
 			local_keypair_fetch(&self.settings.identifier, &local_co, &local_identity, force_new_peer_id).await?;
-		let (network, bitswap_requests) = Network::new(
+		let network = Network::new(
 			self.settings.identifier.clone(),
 			network_key,
 			create_identity_resolver(),
 			self.private_identity_resolver().await?,
+			bitswap.handle(),
 		);
 		let spawner = network.spawner();
 
@@ -176,12 +185,6 @@ impl Application {
 
 		// use mdns discoverd peers for gossip discovery
 		spawner.spawn(MdnsGossipNetworkTask::new())?;
-
-		// handle bitswap
-		self.co()
-			.clone()
-			.tasks()
-			.spawn(handle_bitswap(self.co().clone(), bitswap_requests));
 
 		// reactive
 		self.reactive.actions().dispatch(Action::NetworkStarted);

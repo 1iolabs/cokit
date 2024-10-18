@@ -1,13 +1,15 @@
 use crate::{
-	bitswap, didcomm, discovery, heads,
+	bitswap::{BitswapMessage, BitswapStoreClient},
+	didcomm, discovery, heads,
 	types::{network_task::TokioNetworkTaskSpawner, provider::BitswapBehaviourProvider},
 	DidcommBehaviourProvider, DiscoveryLayerBehaviourProvider, FnOnceNetworkTask, GossipsubBehaviourProvider,
 	HeadsLayerBehaviourProvider, Layer, LayerBehaviour, MdnsBehaviourProvider, NetworkError, NetworkTaskBox,
 	NetworkTaskSpawner,
 };
 use anyhow::anyhow;
+use co_actor::ActorHandle;
 use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver, PrivateIdentityResolverBox};
-use futures::{channel::mpsc, pin_mut, Stream, StreamExt};
+use futures::{pin_mut, Stream, StreamExt};
 use libipld::DefaultParams;
 use libp2p::{
 	gossipsub, identify,
@@ -38,7 +40,8 @@ impl Libp2pNetwork {
 		config: Libp2pNetworkConfig,
 		resolver: R,
 		private_resolver: P,
-	) -> anyhow::Result<(Libp2pNetwork, mpsc::Receiver<bitswap::BitswapRequest<DefaultParams>>)>
+		bitswap: ActorHandle<BitswapMessage<DefaultParams>>,
+	) -> anyhow::Result<Libp2pNetwork>
 	where
 		R: IdentityResolver + Clone + Send + Sync + 'static,
 		P: PrivateIdentityResolver + Clone + Send + Sync + 'static,
@@ -52,7 +55,6 @@ impl Libp2pNetwork {
 			.build()
 			.expect("valid config");
 
-		let (bitswap_store, bitswap_requests) = bitswap::BitswapRequestBlockStorage::<DefaultParams>::new(1024);
 		let behaviour = Behaviour {
 			identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
 				"/ipfs/0.1.0".into(),
@@ -62,7 +64,7 @@ impl Libp2pNetwork {
 			mdns: MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?,
 			// kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()),
 			// kademlia_config),
-			bitswap: Bitswap::new(Default::default(), bitswap_store, {
+			bitswap: Bitswap::new(Default::default(), BitswapStoreClient::new(bitswap), {
 				let bitswap_identifier = identifier.clone();
 				Box::new(move |t| {
 					tokio::spawn(async move {
@@ -125,7 +127,7 @@ impl Libp2pNetwork {
 		});
 
 		// result
-		Ok((Self { config, shutdown, tasks: tasks_tx, events }, bitswap_requests))
+		Ok(Self { config, shutdown, tasks: tasks_tx, events })
 	}
 
 	pub fn spawner(&self) -> TokioNetworkTaskSpawner<Behaviour, Context> {
