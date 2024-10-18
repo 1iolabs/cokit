@@ -1,10 +1,6 @@
-pub mod actor;
-mod bitswap;
-mod request;
+mod client;
 mod storage;
 
-pub use actor::{BitswapMessage, BitswapStoreClient};
-pub use bitswap::{BitswapBlockStorage, StaticStorageResolver, StorageResolver};
+pub use client::{BitswapMessage, BitswapStoreClient};
 pub use libp2p_bitswap::Token;
-pub use request::{BitswapRequest, BitswapRequestBlockStorage};
 pub use storage::NetworkBlockStorage;

@@ -4,8 +4,8 @@ use super::{
 	shared::SharedCoBuilder,
 };
 use crate::{
-	drivers::network::{token::CoToken, CoNetworkTaskSpawner},
-	library::{find_co_secret::find_co_secret_by_membership, find_membership::memberships},
+	drivers::network::CoNetworkTaskSpawner,
+	library::find_membership::memberships,
 	reactive::context::ReactiveContext,
 	reducer::core_resolver::{
 		dynamic::DynamicCoreResolver,
@@ -26,14 +26,12 @@ use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 use co_log::EntryBlock;
-use co_network::bitswap;
 use co_primitives::{CoId, Did};
 use co_storage::{BlockStorage, EncryptedBlockStorage, StorageError};
 use futures::{
 	channel::{mpsc, oneshot},
 	join, select, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
-use libp2p::PeerId;
 use std::{
 	collections::{BTreeMap, VecDeque},
 	fmt::Debug,
@@ -156,71 +154,6 @@ impl CoReducerFactory for CoContext {
 		self.inner.reducers.clone().reducer(co.clone()).await
 	}
 }
-#[async_trait]
-impl bitswap::StorageResolver<CoStorage> for CoContext {
-	async fn resolve_storage(
-		&self,
-		remote_peer: Option<&PeerId>,
-		tokens: &[bitswap::Token],
-	) -> Result<CoStorage, anyhow::Error> {
-		// use CO from first valid token
-		for token in tokens {
-			match CoToken::from_bitswap_token(token) {
-				Ok(co_token) => {
-					// get co storage
-					//  we only accept networking for Shared CO's
-					//  we get the storage using shared_co_storage and not via the reducer because:
-					//  - performance/privacy: do not initialize our reducer if someone else is requesting blocks
-					//  - to prevent a deadlock in the join process of encrypted COs (initial fetch of state/heads
-					//    blocks)
-					// however, we use the reducer instance if already initialized to make use of the mapping.
-					// it is assumed that the instance exists for insert (otherwise insert would not be possible eh?).
-					// this ensures the mapping is updated when new blocks are inserted.
-					let local = self.local_co_reducer().await?;
-					let co_reducer = self.inner.reducers.clone().reducer_opt(co_token.body.1.clone()).await;
-					let co_storage = match co_reducer {
-						Some(co_reducer) => {
-							tracing::trace!(co = ?co_token.body.1, "bitswap-resolve-storage-reducer");
-							co_reducer.storage()
-						},
-						None => {
-							tracing::trace!(co = ?co_token.body.1, "bitswap-resolve-storage-create");
-							self.inner.reducers.clone().storage(co_token.body.1.clone()).await?.storage()
-						},
-					};
-					let secret = find_co_secret_by_membership(&local, &co_token.body.1).await?;
-
-					// verify remote peer if the CO is encrypted and this is an non local request
-					match (remote_peer, &secret) {
-						(Some(remote_peer), Some(secret)) => {
-							if !co_token.verify(
-								secret,
-								remote_peer,
-								self.network_tasks().await.map(|n| n.local_peer_id()).as_ref(),
-							) {
-								// check next token
-								tracing::trace!(co = ?co_token.body.1, "bitswap-resolve-storage-invalid");
-								continue;
-							}
-						},
-						_ => {},
-					};
-
-					// get storage
-					tracing::trace!(co = ?co_token.body.1, "bitswap-resolve-storage-co");
-					return Ok(co_storage);
-				},
-				Err(err) => {
-					tracing::trace!(?err, "bitswap-resolve-storage-parse-failed");
-				},
-			}
-		}
-
-		// use the root storage (unencrypted)
-		tracing::trace!("bitswap-resolve-storage-root");
-		Ok(self.inner.storage())
-	}
-}
 impl Debug for CoContext {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("CoContext")
@@ -232,9 +165,6 @@ impl Debug for CoContext {
 enum ReducerRequest {
 	/// Request CO reducer instance by creating it if not created yet.
 	Request(CoId, oneshot::Sender<Result<CoReducer, CoReducerFactoryError>>),
-
-	/// Request reducer instance only if already intiialized.
-	RequestOption(CoId, oneshot::Sender<Option<CoReducer>>),
 
 	/// Create reducer instance.
 	Create(CoId, Result<CoReducer, CoReducerFactoryError>),
@@ -271,13 +201,6 @@ impl ReducersControl {
 		let (recv, send) = join!(rx, self.sender.send(ReducerRequest::Request(co, tx)));
 		send.map_err(|err| CoReducerFactoryError::Other(err.into()))?;
 		Ok(recv.map_err(|err| CoReducerFactoryError::Other(err.into()))??)
-	}
-
-	pub async fn reducer_opt(&mut self, co: CoId) -> Option<CoReducer> {
-		let (tx, rx) = oneshot::channel();
-		let (recv, send) = join!(rx, self.sender.send(ReducerRequest::RequestOption(co, tx)));
-		send.ok()?;
-		recv.ok()?
 	}
 
 	pub async fn create(&mut self, co: CoId, reducer: Result<CoReducer, CoReducerFactoryError>) {
@@ -411,9 +334,6 @@ impl Reducers {
 							});
 						}
 					}
-				},
-				ReducerRequest::RequestOption(id, response) => {
-					response.send(self.reducers.get(&id).cloned()).ok();
 				},
 				ReducerRequest::Clear(response) => {
 					self.reducers.retain(|id, _| id.as_str() == CO_ID_LOCAL);

@@ -1,7 +1,5 @@
 mod application;
 mod drivers;
-// mod epics;
-mod errors;
 mod library;
 mod pin;
 mod reactive;

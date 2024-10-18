@@ -228,6 +228,7 @@ impl CreateCo {
 
 struct SharedContext {
 	id: CoId,
+
 	/// The encrypted storage.
 	/// Note: Without networking!
 	encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,

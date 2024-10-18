@@ -156,16 +156,6 @@ impl Application {
 		);
 		let spawner = network.spawner();
 
-		// shutdown
-		//  when the token has been triggered explicitly shutdown the network
-		if let Some(shutdown_network) = network.shutdown().await {
-			let shutdown = self.shutdown.child_token().cancelled_owned();
-			tokio::spawn(async move {
-				shutdown.await;
-				shutdown_network.shutdown();
-			});
-		}
-
 		// connections
 		let connections = Actor::spawn_with(
 			self.tasks(),
@@ -179,6 +169,18 @@ impl Application {
 			.inner
 			.set_network(Some((spawner.clone(), connections.handle())))
 			.await?;
+
+		// shutdown
+		//  when the token has been triggered explicitly shutdown the network
+		if let Some(shutdown_network) = network.shutdown().await {
+			let shutdown = self.shutdown.child_token().cancelled_owned();
+			tokio::spawn(async move {
+				shutdown.await;
+				shutdown_network.shutdown();
+				bitswap.shutdown();
+				connections.shutdown();
+			});
+		}
 
 		// assign
 		self.network = Some(network);
