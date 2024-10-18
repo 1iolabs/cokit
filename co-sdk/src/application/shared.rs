@@ -1,6 +1,5 @@
 use super::{co_context::ReducerStorage, identity::create_identity_resolver};
 use crate::{
-	actor::ActorHandle,
 	drivers::network::{publish::CoHeadsPublish, CoNetworkTaskSpawner},
 	find_membership,
 	library::{connections_peer_provider::ConnectionsPeerProvider, push_heads::PushHeads},
@@ -13,6 +12,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
+use co_actor::ActorHandle;
 use co_core_co::{CoAction, Participant};
 use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};

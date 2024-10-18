@@ -1,11 +1,11 @@
 use crate::{
-	actor::Epic,
 	find_membership,
 	library::{invite_networks::invite_networks, network_discovery::identities_networks},
 	services::connections::{ConnectionAction, ConnectionState, NetworkResolveAction, NetworkResolvedAction},
 	state, CoContext, CoReducer, CoStorage,
 };
 use anyhow::anyhow;
+use co_actor::Epic;
 use co_primitives::{CoId, CoInviteMetadata, KnownTags, Network};
 use co_storage::BlockStorageExt;
 use futures::{Stream, TryStreamExt};

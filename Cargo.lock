@@ -1322,6 +1322,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1462739cb27611015575c0c11df5df7601141071f07518d56fcc1be504cbec97"
 
 [[package]]
+name = "co-actor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "async-trait",
+ "co-primitives",
+ "derive_more",
+ "futures",
+ "insta",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "co-api"
 version = "0.1.0"
 dependencies = [
@@ -1692,6 +1710,7 @@ dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
+ "co-actor",
  "co-core-co",
  "co-core-data-series",
  "co-core-file",

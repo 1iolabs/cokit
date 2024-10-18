@@ -22,6 +22,5 @@ pub mod network_discovery;
 pub mod node_stream;
 pub mod push_heads;
 pub mod settings_timeout;
-pub mod task_spawner;
 pub mod to_plain;
 pub mod update_co;

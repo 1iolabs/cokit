@@ -1,6 +1,5 @@
 use super::to_plain::to_plain;
 use crate::{
-	actor::{Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, OnceEpic, Reducer, TracingEpic},
 	drivers::network::{tasks::didcomm_send::DidCommSendNetworkTask, CoNetworkTaskSpawner},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	services::connections::ConnectionMessage,
@@ -9,6 +8,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
+use co_actor::{Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, OnceEpic, Reducer, TracingEpic};
 use co_identity::{Identity, PrivateIdentityBox};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{tags, CoId, Tags};

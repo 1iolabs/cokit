@@ -1,7 +1,5 @@
-use crate::{
-	actor::ActorHandle,
-	services::connections::{ConnectionMessage, UseAction},
-};
+use crate::services::connections::{ConnectionMessage, UseAction};
+use co_actor::ActorHandle;
 use co_network::PeerProvider;
 use co_primitives::{CoId, Did};
 use futures::{Stream, TryStreamExt};

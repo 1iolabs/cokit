@@ -9,6 +9,11 @@ pub struct TaskSpawner {
 	pub(crate) inner: TaskTracker,
 }
 impl TaskSpawner {
+	pub fn new(idenitfier: String, inner: TaskTracker) -> Self {
+		Self { idenitfier, inner }
+	}
+
+	/// Spawn task.
 	#[inline]
 	#[track_caller]
 	pub fn spawn<F>(&self, task: F) -> JoinHandle<F::Output>
@@ -18,6 +23,10 @@ impl TaskSpawner {
 	{
 		self.inner
 			.spawn(task.instrument(tracing::trace_span!("task", application = self.idenitfier)))
+	}
+
+	pub fn tracker(&self) -> TaskTracker {
+		self.inner.clone()
 	}
 }
 impl Default for TaskSpawner {

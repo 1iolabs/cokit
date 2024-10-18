@@ -1,5 +1,4 @@
 use crate::{
-	actor::Epic,
 	drivers::network::tasks::discovery_connect::DiscoveryConnectNetworkTask,
 	library::network_discovery::network_discovery,
 	services::connections::{
@@ -7,6 +6,7 @@ use crate::{
 	},
 	CoContext,
 };
+use co_actor::Epic;
 use co_identity::PrivateIdentityResolver;
 use co_network::NetworkTaskSpawner;
 use co_primitives::{Did, Network};

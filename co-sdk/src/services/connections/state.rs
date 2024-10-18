@@ -2,7 +2,8 @@ use super::{
 	action::{ConnectAction, ConnectedAction, ConnectionAction, DisconnectedAction, UseAction},
 	DisconnectAction, NetworkResolveAction, NetworkResolvedAction, PeersChangedAction, ReleaseAction, ReleasedAction,
 };
-use crate::{actor::Reducer, services::connections::DisconnectReason};
+use crate::services::connections::DisconnectReason;
+use co_actor::Reducer;
 use co_primitives::{CoId, Did, Network};
 use libp2p::{Multiaddr, PeerId};
 use std::{
@@ -320,10 +321,8 @@ fn reduce_released(state: &mut ConnectionState, actions: &mut Vec<ConnectionActi
 #[cfg(test)]
 mod tests {
 	use super::ConnectionState;
-	use crate::{
-		actor::Reducer,
-		services::connections::{ConnectAction, ConnectionAction, UseAction},
-	};
+	use crate::services::connections::{ConnectAction, ConnectionAction, UseAction};
+	use co_actor::Reducer;
 	use co_primitives::{Network, NetworkPeer, NetworkRendezvous};
 	use libp2p::PeerId;
 	use std::{collections::BTreeSet, time::Instant, vec};

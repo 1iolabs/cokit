@@ -1,9 +1,7 @@
 use super::{epics::epic, ConnectionAction, ConnectionMessage, ConnectionState, PeersChangedAction};
-use crate::{
-	actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer, ResponseStreams},
-	CoContext,
-};
+use crate::CoContext;
 use async_trait::async_trait;
+use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer, ResponseStreams};
 use co_primitives::{CoId, Tags};
 use std::{collections::BTreeMap, time::Duration};
 

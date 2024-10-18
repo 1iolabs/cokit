@@ -1,7 +1,6 @@
 mod application;
 mod drivers;
 // mod epics;
-pub mod actor;
 mod errors;
 mod library;
 mod pin;
@@ -19,6 +18,7 @@ pub use application::{
 	shared::CreateCo,
 	tracing::TracingBuilder,
 };
+pub use co_actor::TaskSpawner;
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 pub use co_identity::{
 	DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver, IdentityResolverError,
@@ -51,7 +51,6 @@ pub use library::{
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
 	node_stream::NodeStream,
-	task_spawner::TaskSpawner,
 	update_co::update_co,
 };
 pub use pin::pin::PinAPI;

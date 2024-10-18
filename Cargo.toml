@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "co-actor",
     "co-api",
     "co-cli",
     "co-dioxus",

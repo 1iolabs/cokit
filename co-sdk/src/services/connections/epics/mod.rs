@@ -1,8 +1,6 @@
 use super::{ConnectionAction, ConnectionState};
-use crate::{
-	actor::{Epic, EpicExt, TracingEpic},
-	CoContext,
-};
+use crate::CoContext;
+use co_actor::{Epic, EpicExt, TracingEpic};
 use co_primitives::Tags;
 
 mod connect;

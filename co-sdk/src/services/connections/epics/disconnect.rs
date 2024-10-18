@@ -1,10 +1,10 @@
 use crate::{
-	actor::Epic,
 	services::connections::{
 		ConnectionAction, ConnectionState, DisconnectAction, DisconnectReason, DisconnectedAction,
 	},
 	CoContext,
 };
+use co_actor::Epic;
 use futures::{stream, Stream};
 
 pub struct DisconnectEpic();

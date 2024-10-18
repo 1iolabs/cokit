@@ -1,5 +1,4 @@
 use crate::{
-	actor::ActorHandle,
 	drivers::network::{tasks::didcomm_send::DidCommSendNetworkTask, CoNetworkTaskSpawner},
 	library::{
 		invite::{create_invite_message, CoInvitePayload},
@@ -11,6 +10,7 @@ use crate::{
 	state, Action, CoContext, CoNetwork, CoReducerFactory, CoStorage, KnownTag, CO_CORE_NAME_CO,
 };
 use anyhow::anyhow;
+use co_actor::ActorHandle;
 use co_core_co::{Co, CoAction};
 use co_identity::{IdentityResolver, PrivateIdentityResolver};
 use co_network::didcomm::EncodedMessage;

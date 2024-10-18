@@ -4,7 +4,6 @@ use super::{
 	shared::SharedCoBuilder,
 };
 use crate::{
-	actor::ActorHandle,
 	drivers::network::{token::CoToken, CoNetworkTaskSpawner},
 	library::{find_co_secret::find_co_secret_by_membership, find_membership::memberships},
 	reactive::context::ReactiveContext,
@@ -21,6 +20,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
+use co_actor::ActorHandle;
 use co_core_membership::Membership;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,

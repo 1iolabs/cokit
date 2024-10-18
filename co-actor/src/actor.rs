@@ -1,7 +1,7 @@
-use super::{Response, ResponseReceiver, ResponseStream, ResponseStreamReceiver};
-use crate::{Tags, TaskSpawner};
+use crate::{Response, ResponseReceiver, ResponseStream, ResponseStreamReceiver, TaskSpawner};
 use anyhow::anyhow;
 use async_trait::async_trait;
+use co_primitives::Tags;
 use futures::Stream;
 use tokio::{
 	sync::{mpsc, watch},
@@ -285,11 +285,9 @@ where
 
 #[cfg(test)]
 mod tests {
-	use crate::{
-		actor::{Actor, ActorError, ActorHandle, Response, ResponseStream, ResponseStreams},
-		Tags,
-	};
+	use crate::{Actor, ActorError, ActorHandle, Response, ResponseStream, ResponseStreams};
 	use async_trait::async_trait;
+	use co_primitives::Tags;
 	use futures::{StreamExt, TryStreamExt};
 
 	#[tokio::test]

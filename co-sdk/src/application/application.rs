@@ -5,9 +5,7 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
-	actor::Actor,
 	drivers::network::{bitswap::handle_bitswap, tasks::mdns_gossip::MdnsGossipNetworkTask},
-	library::task_spawner::TaskSpawner,
 	local_keypair_fetch,
 	reactive::{
 		context::{ActionObservable, ReactiveContext},
@@ -18,6 +16,7 @@ use crate::{
 	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
+use co_actor::{Actor, TaskSpawner};
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, LocalIdentityResolver, PrivateIdentity, PrivateIdentityBox,
 	PrivateIdentityResolverBox,
@@ -85,7 +84,7 @@ impl Application {
 
 	/// Tasks bound to this application.
 	pub fn tasks(&self) -> TaskSpawner {
-		TaskSpawner { inner: self.tasks.clone(), idenitfier: self.settings.identifier.clone() }
+		TaskSpawner::new(self.settings.identifier.clone(), self.tasks.clone())
 	}
 
 	/// Tasks bound to this application.
@@ -373,7 +372,7 @@ impl ApplicationBuilder {
 		let co_context: CoContext = CoContextInner::new(
 			settings.clone(),
 			shutdown.child_token(),
-			TaskSpawner { idenitfier: settings.identifier.clone(), inner: tasks.clone() },
+			TaskSpawner::new(settings.identifier.clone(), tasks.clone()),
 			local_identity.clone(),
 			None,
 			storage.storage(),

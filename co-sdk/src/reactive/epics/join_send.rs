@@ -1,5 +1,4 @@
 use crate::{
-	actor::ActorHandle,
 	drivers::network::{tasks::didcomm_send::DidCommSendNetworkTask, CoNetworkTaskSpawner},
 	library::{
 		invite_networks::invite_networks, is_cid_encrypted::is_cid_encrypted, join::create_join_message_from,
@@ -10,6 +9,7 @@ use crate::{
 	Action, CoContext, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
+use co_actor::ActorHandle;
 use co_core_membership::{Membership, MembershipState, Memberships, MembershipsAction};
 use co_identity::{Identity, PrivateIdentityResolver};
 use co_primitives::{CoId, CoInviteMetadata, Did, KnownTags};
