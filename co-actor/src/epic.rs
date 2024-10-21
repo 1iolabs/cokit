@@ -5,23 +5,46 @@ use futures::{
 	stream::{BoxStream, Empty},
 	Stream, StreamExt,
 };
-use std::{fmt::Debug, marker::PhantomData, sync::Arc};
+use std::{
+	fmt::Debug,
+	marker::{PhantomData, Send},
+	sync::Arc,
+};
 use tokio_util::sync::CancellationToken;
 
 /// Epic.
 ///
-/// Defines side effects for actor actions which will produce actor messages over time.
+/// Defines side effects for actions which will produce other actions over time.
 pub trait Epic<A, S, C> {
 	/// Run the epic.
 	///
 	/// # Arguments
-	/// - `state`: The state before the action has been applied.
+	/// - `state`: The state after the action has been applied.
 	fn epic(
 		&mut self,
 		action: &A,
 		state: &S,
 		context: &C,
 	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + Send + 'static>;
+}
+
+/// Fn impl for epics.
+impl<A, S, C, O, F> Epic<A, S, C> for F
+where
+	A: Send + Clone + 'static,
+	S: Send + Clone + 'static,
+	C: Send + Clone + 'static,
+	O: Stream<Item = Result<A, anyhow::Error>> + Send + 'static,
+	F: FnMut(&A, &S, &C) -> Option<O>,
+{
+	fn epic(
+		&mut self,
+		action: &A,
+		state: &S,
+		context: &C,
+	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + Send + 'static> {
+		self(action, state, context)
+	}
 }
 
 pub trait EpicExt<A, S, C>: Epic<A, S, C> {
@@ -200,6 +223,65 @@ where
 			},
 			None => None,
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::Epic;
+	use futures::{stream, Stream, TryStreamExt};
+
+	#[derive(Debug, Clone, PartialEq)]
+	enum TestAction {
+		Hello,
+		World,
+	}
+	struct Test {}
+	impl Epic<TestAction, (), ()> for Test {
+		fn epic(
+			&mut self,
+			action: &TestAction,
+			_state: &(),
+			_context: &(),
+		) -> Option<impl Stream<Item = Result<TestAction, anyhow::Error>> + Send + 'static> {
+			match action {
+				TestAction::Hello => Some(stream::once(async { Ok(TestAction::World) })),
+				_ => None,
+			}
+		}
+	}
+
+	#[tokio::test]
+	async fn test_hello() {
+		let mut epic = Test {};
+		let result: Vec<TestAction> = epic
+			.epic(&TestAction::Hello, &(), &())
+			.expect("a stream")
+			.try_collect()
+			.await
+			.expect("no error");
+		assert_eq!(result, vec![TestAction::World]);
+	}
+
+	#[tokio::test]
+	async fn test_fn_epic() {
+		fn test(
+			action: &TestAction,
+			_state: &(),
+			_context: &(),
+		) -> Option<impl Stream<Item = Result<TestAction, anyhow::Error>> + Send + 'static> {
+			match action {
+				TestAction::Hello => Some(stream::once(async { Ok(TestAction::World) })),
+				_ => None,
+			}
+		}
+		let result: Vec<TestAction> = test
+			.epic(&TestAction::Hello, &(), &())
+			.expect("a stream")
+			.try_collect()
+			.await
+			.expect("no error");
+		assert_eq!(result, vec![TestAction::World]);
 	}
 }
 
