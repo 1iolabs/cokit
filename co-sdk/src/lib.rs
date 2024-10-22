@@ -12,7 +12,9 @@ pub use application::{
 	co_context::CoContext,
 	local::{LocalCoBuilder, CO_ID_LOCAL},
 	reducer::{Reducer, ReducerBuilder, ReducerChangeContext, ReducerChangedHandler},
+	runtime::Runtime,
 	shared::CreateCo,
+	storage::Storage,
 	tracing::TracingBuilder,
 };
 pub use co_actor::TaskSpawner;
@@ -31,13 +33,9 @@ pub use co_storage::{
 	store_file, unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer, BlockStat, BlockStorage,
 	BlockStorageContentMapping, BlockStorageExt, StorageError,
 };
-pub use drivers::{
-	network::{
-		token::{CoToken, CoTokenParameters},
-		Network,
-	},
-	runtime::Runtime,
-	storage::Storage,
+pub use drivers::network::{
+	token::{CoToken, CoTokenParameters},
+	Network,
 };
 pub use library::{
 	did_key_provider::DidKeyProvider,
