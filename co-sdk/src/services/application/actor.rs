@@ -4,12 +4,13 @@ use crate::{
 		application::ApplicationSettings,
 		co_context::{CoContextInner, Reducers},
 	},
-	CoContext, Runtime, Storage,
+	CoContext, Network, Runtime, Storage,
 };
+use anyhow::anyhow;
 use async_trait::async_trait;
-use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, ResponseStreams, TaskSpawner};
+use co_actor::{Actor, ActorError, ActorHandle, ActorInstance, EpicRuntime, ResponseStreams, TaskSpawner};
 use co_identity::LocalIdentityResolver;
-use co_primitives::Tags;
+use co_primitives::{tags, Tags};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
 pub struct Application {
@@ -64,6 +65,7 @@ impl Actor for Application {
 			}),
 			subscriptions: Default::default(),
 			context: co_context,
+			network: None,
 		})
 	}
 
@@ -75,6 +77,17 @@ impl Actor for Application {
 	) -> Result<(), ActorError> {
 		// handle
 		let action = match message {
+			ApplicationMessage::Dispatch(Action::NetworkStart { force_new_peer_id }) => {
+				if state.network.is_none() {
+					state.network = Some(Actor::spawn_with(
+						state.context.tasks(),
+						tags!("type": "network", "application": &self.settings.identifier),
+						Network::new(state.context.clone(), force_new_peer_id),
+						(),
+					)?);
+				}
+				Some(Action::NetworkStart { force_new_peer_id })
+			},
 			ApplicationMessage::Dispatch(action) => Some(action),
 			ApplicationMessage::Subscribe(response) => {
 				state.subscriptions.push(response);
@@ -82,6 +95,14 @@ impl Actor for Application {
 			},
 			ApplicationMessage::Context(response) => {
 				response.send(state.context.clone()).ok();
+				None
+			},
+			ApplicationMessage::Network(response) => {
+				if let Some(network) = &state.network {
+					response.send(Ok(network.handle())).ok();
+				} else {
+					response.send(Err(anyhow!("Not started"))).ok();
+				}
 				None
 			},
 		};
@@ -105,4 +126,5 @@ pub struct ApplicationState {
 	epic: EpicRuntime<ApplicationMessage, Action, (), CoContext>,
 	context: CoContext,
 	subscriptions: ResponseStreams<Action>,
+	network: Option<ActorInstance<Network>>,
 }

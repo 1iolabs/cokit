@@ -7,6 +7,7 @@ use libp2p::{
 };
 
 /// Dail and wait for connection to be made or fail.
+#[derive(Debug)]
 pub struct DialNetworkTask {
 	peer_id: PeerId,
 	addresses: Vec<Multiaddr>,

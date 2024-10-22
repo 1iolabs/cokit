@@ -7,6 +7,7 @@ use libp2p::{
 };
 
 /// Handle received didcomm messages from network within the application.
+#[derive(Debug)]
 pub struct DidCommReceiveNetworkTask {
 	receive: tokio::sync::mpsc::UnboundedSender<(PeerId, Message)>,
 }

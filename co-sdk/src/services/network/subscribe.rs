@@ -6,10 +6,10 @@ use co_identity::PrivateIdentity;
 use co_network::NetworkTaskSpawner;
 use co_primitives::{Did, NetworkDidDiscovery};
 use futures::{stream, StreamExt, TryStreamExt};
-use std::future::ready;
+use std::{fmt::Debug, future::ready};
 
 /// Listen on identity requests (DID Discovery).
-pub async fn subscribe_identity<I: PrivateIdentity + Clone + Send + Sync + 'static>(
+pub async fn subscribe_identity<I: PrivateIdentity + Debug + Clone + Send + Sync + 'static>(
 	spawner: &CoNetworkTaskSpawner,
 	identity: &I,
 ) -> Result<(), anyhow::Error> {

@@ -1,10 +1,12 @@
 use crate::{
-	drivers::network::{tasks::didcomm_send::DidCommSendNetworkTask, CoNetworkTaskSpawner},
 	library::{
 		invite_networks::invite_networks, is_cid_encrypted::is_cid_encrypted, join::create_join_message_from,
 		settings_timeout::settings_timeout,
 	},
-	services::connections::ConnectionMessage,
+	services::{
+		connections::ConnectionMessage,
+		network::{CoNetworkTaskSpawner, DidCommSendNetworkTask},
+	},
 	Action, CoContext, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;

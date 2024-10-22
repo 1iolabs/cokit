@@ -1,8 +1,5 @@
 use crate::{
-	drivers::network::{
-		subscribe::{subscribe_identity, unsubscribe_identity},
-		CoNetworkTaskSpawner,
-	},
+	services::network::{subscribe_identity, unsubscribe_identity, CoNetworkTaskSpawner},
 	state::{self, core_state_or_default},
 	Action, CoContext, CoStorage, CO_CORE_NAME_KEYSTORE, CO_ID_LOCAL,
 };

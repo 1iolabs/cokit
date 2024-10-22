@@ -3,9 +3,9 @@ use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	Swarm,
 };
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
-pub trait NetworkTask<B, C>
+pub trait NetworkTask<B, C>: Debug
 where
 	B: NetworkBehaviour,
 {
@@ -44,11 +44,8 @@ impl<B, C> NetworkTaskSpawner<B, C> for TokioNetworkTaskSpawner<B, C>
 where
 	B: NetworkBehaviour,
 {
-	fn spawn<T>(&self, task: T) -> Result<(), NetworkError>
-	where
-		T: NetworkTask<B, C> + Send + 'static,
-	{
-		self.tasks.send(Box::new(task))?;
+	fn spawn_box(&self, task: NetworkTaskBox<B, C>) -> Result<(), NetworkError> {
+		self.tasks.send(task)?;
 		Ok(())
 	}
 }
@@ -59,7 +56,12 @@ where
 {
 	fn spawn<T>(&self, task: T) -> Result<(), NetworkError>
 	where
-		T: NetworkTask<B, C> + Send + 'static;
+		T: NetworkTask<B, C> + Send + 'static,
+	{
+		Ok(self.spawn_box(Box::new(task))?)
+	}
+
+	fn spawn_box(&self, task: NetworkTaskBox<B, C>) -> Result<(), NetworkError>;
 }
 
 pub struct FnOnceNetworkTask<F, B, C>
@@ -70,6 +72,7 @@ where
 	_c: PhantomData<C>,
 	f: Option<F>,
 }
+
 impl<F, B, C> FnOnceNetworkTask<F, B, C>
 where
 	F: FnOnce(&mut Swarm<B>, &mut C) + Send + 'static,
@@ -87,5 +90,16 @@ where
 		if let Some(f) = Option::take(&mut self.f) {
 			f(swarm, context);
 		}
+	}
+}
+impl<F, B, C> Debug for FnOnceNetworkTask<F, B, C>
+where
+	F: FnOnce(&mut Swarm<B>, &mut C) + Send + 'static,
+{
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("FnOnceNetworkTask")
+			.field("_b", &self._b)
+			.field("_c", &self._c)
+			.finish()
 	}
 }

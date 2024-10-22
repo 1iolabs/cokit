@@ -4,7 +4,6 @@ use super::{
 	shared::SharedCoBuilder,
 };
 use crate::{
-	drivers::network::CoNetworkTaskSpawner,
 	library::find_membership::memberships,
 	reducer::core_resolver::{
 		dynamic::DynamicCoreResolver,
@@ -12,7 +11,7 @@ use crate::{
 		log::LogCoreResolver,
 		membership::{MembershipCoreResolver, MembershipInstanceRegistry},
 	},
-	services::{application::ApplicationMessage, connections::ConnectionMessage},
+	services::{application::ApplicationMessage, connections::ConnectionMessage, network::CoNetworkTaskSpawner},
 	types::{co_reducer::CoReducerContext, co_reducer_factory::CoReducerFactoryError},
 	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime, TaskSpawner,
 	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
@@ -477,6 +476,10 @@ impl CoContextInner {
 			reactive_context,
 			reducers,
 		}
+	}
+
+	pub fn application(&self) -> ActorHandle<ApplicationMessage> {
+		self.reactive_context.clone()
 	}
 
 	/// Shutdown token.

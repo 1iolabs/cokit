@@ -1,8 +1,10 @@
 use super::to_plain::to_plain;
 use crate::{
-	drivers::network::{tasks::didcomm_send::DidCommSendNetworkTask, CoNetworkTaskSpawner},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
-	services::connections::ConnectionMessage,
+	services::{
+		connections::ConnectionMessage,
+		network::{CoNetworkTaskSpawner, DidCommSendNetworkTask},
+	},
 	types::message::heads::HeadsMessage,
 	CoStorage, Reducer as CoreReducer, ReducerChangeContext, ReducerChangedHandler, TaskSpawner,
 };

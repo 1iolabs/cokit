@@ -11,6 +11,7 @@ pub enum CoHeadsRequest {
 	PublishHeads { network: NetworkCoHeads, heads: BTreeSet<Cid> },
 }
 
+#[derive(Debug)]
 pub struct CoHeadsNetworkTask {
 	request: Option<CoHeadsRequest>,
 }

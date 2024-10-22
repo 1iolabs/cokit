@@ -1,26 +1,22 @@
 use super::{
 	co_context::CoContext,
-	identity::{create_identity_resolver, resolve_private_identity},
+	identity::resolve_private_identity,
 	shared::{CreateCo, SharedCoCreator},
 	tracing::TracingBuilder,
 };
 use crate::{
-	drivers::network::tasks::mdns_gossip::MdnsGossipNetworkTask,
-	local_keypair_fetch,
-	services::{application::ApplicationMessage, bitswap::Bitswap, connections::Connections},
-	Action, CoReducer, CoReducerFactory, CoStorage, Network, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	services::application::ApplicationMessage, Action, CoReducer, CoReducerFactory, CoStorage, Storage,
+	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use co_actor::{Actor, ActorHandle, ActorInstance};
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
-use co_network::NetworkTaskSpawner;
 use co_primitives::{tags, CoId};
 use directories::ProjectDirs;
 use futures::{Stream, StreamExt};
-use std::{fmt::Debug, future::ready, path::PathBuf, sync::Arc, time::Duration};
-use tokio::sync::Mutex;
+use std::{fmt::Debug, future::ready, path::PathBuf, sync::Arc};
 use tokio_util::{
 	sync::{CancellationToken, DropGuard},
 	task::TaskTracker,
@@ -33,9 +29,6 @@ pub struct Application {
 
 	/// Settings.
 	settings: ApplicationSettings,
-
-	/// CO Network Driver.
-	network: Arc<Mutex<Option<Network>>>,
 
 	// Tasks.
 	tasks: TaskTracker,
@@ -104,69 +97,12 @@ impl Application {
 
 	/// Create and startup network.
 	pub async fn create_network(&mut self, force_new_peer_id: bool) -> Result<(), anyhow::Error> {
-		let mut network_ref = self.network.lock().await;
+		// start
+		self.service.handle().dispatch(Action::NetworkStart { force_new_peer_id })?;
 
-		// validate
-		if network_ref.is_some() {
-			return Err(anyhow!("Network already created"));
-		}
-
-		// bitswap
-		let bitswap = Actor::spawn_with(
-			self.context().tasks(),
-			tags!("type": "bitswap", "application": &self.settings.identifier),
-			Bitswap::new(self.co().clone()),
-			(),
-		)?;
-
-		// create network
-		let local_identity = self.local_identity();
-		let local_co = self.co_context.local_co_reducer().await?;
-		let network_key =
-			local_keypair_fetch(&self.settings.identifier, &local_co, &local_identity, force_new_peer_id).await?;
-		let network = Network::new(
-			self.settings.identifier.clone(),
-			network_key,
-			create_identity_resolver(),
-			self.private_identity_resolver().await?,
-			bitswap.handle(),
-		);
-		let spawner = network.spawner();
-
-		// connections
-		let connections = Actor::spawn_with(
-			self.context().tasks(),
-			tags!("type": "connections", "application": &self.settings.identifier),
-			Connections::new(self.co().clone(), Duration::from_secs(30)),
-			(),
-		)?;
-
-		// set network to reducers
-		self.co_context
-			.inner
-			.set_network(Some((spawner.clone(), connections.handle())))
-			.await?;
-
-		// shutdown
-		//  when the token has been triggered explicitly shutdown the network
-		if let Some(shutdown_network) = network.shutdown().await {
-			let shutdown = self.context().inner.shutdown().child_token().cancelled_owned();
-			tokio::spawn(async move {
-				shutdown.await;
-				shutdown_network.shutdown();
-				bitswap.shutdown();
-				connections.shutdown();
-			});
-		}
-
-		// assign
-		*network_ref = Some(network);
-
-		// use mdns discoverd peers for gossip discovery
-		spawner.spawn(MdnsGossipNetworkTask::new())?;
-
-		// reactive
-		self.service.handle().dispatch(Action::NetworkStarted)?;
+		// wait
+		let network = self.service.handle().request(ApplicationMessage::Network).await??;
+		network.initialized().await?;
 
 		// done
 		Ok(())
@@ -357,7 +293,6 @@ impl ApplicationBuilder {
 		let result = Application {
 			_drop: Some(Arc::new(co_context.inner.shutdown().clone().drop_guard())),
 			settings,
-			network: Default::default(),
 			co_context,
 			service: Arc::new(service),
 			tasks,

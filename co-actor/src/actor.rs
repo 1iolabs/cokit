@@ -18,7 +18,7 @@ pub enum ActorError {
 	Canceled,
 
 	#[error("Actor error")]
-	Actor(#[source] anyhow::Error),
+	Actor(#[from] anyhow::Error),
 }
 
 /// Simple actor model implemetation.
@@ -47,6 +47,14 @@ pub trait Actor: Send + Sync + 'static {
 
 	fn tags(&self, tags: Tags) -> Result<Tags, ActorError> {
 		Ok(tags)
+	}
+
+	/// Shutdown the actor.
+	/// This is not cancelable.
+	/// After this call no more message will be received.
+	/// Will not be executed if actor panics.
+	async fn shutdown(&self, _state: Self::State) -> Result<(), ActorError> {
+		Ok(())
 	}
 
 	/// Spawn actor.
@@ -90,10 +98,16 @@ pub trait Actor: Send + Sync + 'static {
 							actor.handle(&handle, message, &mut actor_state).await?;
 						},
 						ActorMessage::Shutdown => {
+							// state
 							state_tx
 								.send(ActorState::Stopping)
 								.map_err(|e| ActorError::InvalidState(e.into()))?;
 							rx.close();
+
+							// shutdown
+							actor.shutdown(actor_state).await?;
+
+							// done
 							break;
 						},
 					}

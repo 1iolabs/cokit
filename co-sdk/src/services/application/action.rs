@@ -73,6 +73,11 @@ pub enum Action {
 	/// Send Key Request to co (participants) or specified peer.
 	// KeyRequest { co: CoId, key: Option<String>, peer: Option<PeerId> },
 
+	/// Start network.
+	NetworkStart {
+		force_new_peer_id: bool,
+	},
+
 	/// Network has been started.
 	NetworkStarted,
 

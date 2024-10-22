@@ -1,4 +1,4 @@
-use crate::{drivers::network::tasks::didcomm_receive::DidCommReceiveNetworkTask, Action, CoContext};
+use crate::{services::network::DidCommReceiveNetworkTask, Action, CoContext};
 use futures::{future::ready, stream, Stream, StreamExt};
 
 /// Receive DIDComm messages after the network has been started.

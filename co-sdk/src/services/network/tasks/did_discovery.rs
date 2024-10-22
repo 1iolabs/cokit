@@ -2,15 +2,17 @@ use co_identity::{IdentityResolverBox, PrivateIdentity};
 use co_network::{discovery, DiscoveryLayerBehaviourProvider, NetworkTask};
 use co_primitives::{Did, NetworkDidDiscovery};
 use libp2p::{swarm::NetworkBehaviour, Swarm};
+use std::fmt::Debug;
 use tokio::sync::oneshot;
 
 /// Subscribe identity for DID Discovery.
-pub struct DidDiscoverySubscribe<I> {
+#[derive(Debug)]
+pub struct DidDiscoverySubscribe<I: Debug> {
 	task: Option<(I, Option<NetworkDidDiscovery>, oneshot::Sender<Result<(), anyhow::Error>>)>,
 }
 impl<I> DidDiscoverySubscribe<I>
 where
-	I: PrivateIdentity + Clone + Send + Sync + 'static,
+	I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 {
 	pub fn new(
 		identity: I,
@@ -24,7 +26,7 @@ impl<B, C, I> NetworkTask<B, C> for DidDiscoverySubscribe<I>
 where
 	B: NetworkBehaviour + discovery::DiscoveryBehaviour,
 	C: DiscoveryLayerBehaviourProvider<IdentityResolverBox, Event = <B as NetworkBehaviour>::ToSwarm>,
-	I: PrivateIdentity + Clone + Send + Sync + 'static,
+	I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 {
 	fn execute(&mut self, swarm: &mut Swarm<B>, context: &mut C) {
 		if let Some((identity, network, result)) = Option::take(&mut self.task) {
@@ -36,6 +38,7 @@ where
 }
 
 /// Subscribe identity for DID Discovery.
+#[derive(Debug)]
 pub struct DidDiscoveryUnsubscribe {
 	task: Option<(Did, oneshot::Sender<Result<(), anyhow::Error>>)>,
 }

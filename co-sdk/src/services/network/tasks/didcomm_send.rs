@@ -7,6 +7,7 @@ use std::{collections::BTreeSet, time::Duration};
 
 /// Handle received heads from the network within the application.
 /// This structure essentially joins the received heads into the respective co reducer.
+#[derive(Debug)]
 pub struct DidCommSendNetworkTask {
 	message: didcomm::EncodedMessage,
 	peers: BTreeSet<PeerId>,

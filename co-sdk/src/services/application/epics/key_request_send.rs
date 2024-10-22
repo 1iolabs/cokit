@@ -1,11 +1,11 @@
 use crate::{
-	drivers::network::tasks::didcomm_send::DidCommSendNetworkTask,
 	library::{
 		is_cid_encrypted::is_cid_encrypted,
 		key_exchange::{create_key_request_message, KeyRequestPayload, KeyResponsePayload, CO_DIDCOMM_KEY_RESPONSE},
 		response_list::ResponseList,
 		settings_timeout::settings_timeout,
 	},
+	services::network::DidCommSendNetworkTask,
 	Action, CoContext, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;

@@ -6,6 +6,7 @@ use libp2p::{
 };
 
 /// Use discovered peers as gossip peers.
+#[derive(Debug)]
 pub struct MdnsGossipNetworkTask {}
 impl MdnsGossipNetworkTask {
 	pub fn new() -> Self {

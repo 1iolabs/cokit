@@ -1,6 +1,6 @@
 use crate::{
-	drivers::network::tasks::didcomm_send::DidCommSendNetworkTask, library::settings_timeout::settings_timeout, Action,
-	CoContext, CO_ID_LOCAL,
+	library::settings_timeout::settings_timeout, services::network::DidCommSendNetworkTask, Action, CoContext,
+	CO_ID_LOCAL,
 };
 use co_primitives::CoId;
 use futures::{future::ready, stream, Stream, StreamExt};

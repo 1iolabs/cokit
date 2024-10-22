@@ -1,5 +1,4 @@
 mod application;
-mod drivers;
 mod library;
 mod pin;
 pub mod reducer;
@@ -33,10 +32,6 @@ pub use co_storage::{
 	store_file, unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer, BlockStat, BlockStorage,
 	BlockStorageContentMapping, BlockStorageExt, StorageError,
 };
-pub use drivers::network::{
-	token::{CoToken, CoTokenParameters},
-	Network,
-};
 pub use library::{
 	did_key_provider::DidKeyProvider,
 	find_co_identities::{find_co_identities, find_co_private_identity},
@@ -54,6 +49,7 @@ pub use reducer::core_resolver::{co::CoCoreResolver, single::SingleCoreResolver,
 pub use services::{
 	application::{Action, ActionError, ApplicationMessage},
 	connections::{ConnectionAction, ConnectionMessage, ReleaseAction},
+	network::{self, CoNetworkTaskSpawner, CoToken, CoTokenParameters, Network, NetworkMessage},
 };
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},

@@ -1,8 +1,10 @@
 use crate::{
-	drivers::network::tasks::discovery_connect::DiscoveryConnectNetworkTask,
 	library::network_discovery::network_discovery,
-	services::connections::{
-		ConnectAction, ConnectedAction, ConnectionAction, ConnectionState, DisconnectReason, DisconnectedAction,
+	services::{
+		connections::{
+			ConnectAction, ConnectedAction, ConnectionAction, ConnectionState, DisconnectReason, DisconnectedAction,
+		},
+		network::DiscoveryConnectNetworkTask,
 	},
 	CoContext,
 };

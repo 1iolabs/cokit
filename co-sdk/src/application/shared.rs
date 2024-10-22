@@ -1,10 +1,12 @@
 use super::{co_context::ReducerStorage, identity::create_identity_resolver};
 use crate::{
-	drivers::network::{publish::CoHeadsPublish, CoNetworkTaskSpawner},
 	find_membership,
 	library::{connections_peer_provider::ConnectionsPeerProvider, push_heads::PushHeads},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
-	services::connections::ConnectionMessage,
+	services::{
+		connections::ConnectionMessage,
+		network::{CoHeadsPublish, CoNetworkTaskSpawner},
+	},
 	state::find,
 	types::{co_reducer::CoReducerContext, co_storage::CoBlockStorageContentMapping},
 	CoCoreResolver, CoReducer, CoStorage, CoToken, CoTokenParameters, Reducer, ReducerBuilder, ReducerChangeContext,

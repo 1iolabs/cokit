@@ -11,6 +11,7 @@ use libp2p::{
 use std::collections::BTreeSet;
 
 /// Connect peers using discovery.
+#[derive(Debug)]
 pub struct DiscoveryConnectNetworkTask {
 	discovery: BTreeSet<Discovery>,
 	connect_request: Option<u64>,

@@ -1,11 +1,11 @@
 use crate::{
-	drivers::network::tasks::didcomm_send::DidCommSendNetworkTask,
 	library::{
 		find_co_identities::find_co_private_identity,
 		find_co_secret::find_co_key,
 		key_exchange::{create_key_response_message, KeyRequestPayload, KeyResponsePayload, CO_DIDCOMM_KEY_REQUEST},
 		settings_timeout::settings_timeout,
 	},
+	services::network::DidCommSendNetworkTask,
 	Action, CoContext, CoReducerFactory,
 };
 use anyhow::anyhow;
