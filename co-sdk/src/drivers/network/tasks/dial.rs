@@ -34,14 +34,14 @@ where
 {
 	fn execute(&mut self, swarm: &mut Swarm<B>, _context: &mut C) {
 		if swarm.is_connected(&self.peer_id) {
-			if let Some(tx) = self.tx.take() {
+			if let Some(tx) = Option::take(&mut self.tx) {
 				tx.send(Ok(())).ok();
 			}
 		} else {
 			let opts = DialOpts::peer_id(self.peer_id).addresses(self.addresses.clone()).build();
 			tracing::trace!(?opts, "network-dial");
 			if let Err(e) = swarm.dial(opts) {
-				if let Some(tx) = self.tx.take() {
+				if let Some(tx) = Option::take(&mut self.tx) {
 					tx.send(Err(e.into())).ok();
 				}
 			}
@@ -66,14 +66,14 @@ where
 				established_in: _,
 			} => {
 				if peer_id == &self.peer_id {
-					if let Some(tx) = self.tx.take() {
+					if let Some(tx) = Option::take(&mut self.tx) {
 						tx.send(Ok(())).ok();
 					}
 				}
 			},
 			SwarmEvent::OutgoingConnectionError { connection_id: _, peer_id, error } => {
 				if peer_id == &Some(self.peer_id) {
-					if let Some(tx) = self.tx.take() {
+					if let Some(tx) = Option::take(&mut self.tx) {
 						tx.send(Err(anyhow!("{:?}", error))).ok();
 					}
 				}

@@ -38,7 +38,7 @@ impl<M> PushHeads<M> {
 	) -> Result<Self, anyhow::Error> {
 		let instance = Actor::spawn_with(
 			tasks,
-			tags!("co": co.as_str()),
+			tags!("type": "co-push-heads", "co": co.as_str()),
 			PushHeadsActor { context: PushHeadsContext(spawner, connections, identity) },
 			PushHeadsState { co: co.clone(), heads: Default::default() },
 		)?;

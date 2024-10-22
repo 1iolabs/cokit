@@ -511,6 +511,10 @@ impl CoContextInner {
 		self.storage.clone()
 	}
 
+	pub fn runtime(&self) -> Runtime {
+		self.runtime.clone()
+	}
+
 	pub fn reducers_control(&self) -> ReducersControl {
 		self.reducers.clone()
 	}

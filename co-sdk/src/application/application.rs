@@ -8,8 +8,7 @@ use crate::{
 	drivers::network::tasks::mdns_gossip::MdnsGossipNetworkTask,
 	local_keypair_fetch,
 	services::{application::ApplicationMessage, bitswap::Bitswap, connections::Connections},
-	Action, CoReducer, CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE,
-	CO_CORE_NAME_MEMBERSHIP,
+	Action, CoReducer, CoReducerFactory, CoStorage, Network, Storage, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use co_actor::{Actor, ActorHandle, ActorInstance};
@@ -18,7 +17,6 @@ use co_identity::{
 };
 use co_network::NetworkTaskSpawner;
 use co_primitives::{tags, CoId};
-use co_runtime::RuntimePool;
 use directories::ProjectDirs;
 use futures::{Stream, StreamExt};
 use std::{fmt::Debug, future::ready, path::PathBuf, sync::Arc, time::Duration};
@@ -35,9 +33,6 @@ pub struct Application {
 
 	/// Settings.
 	settings: ApplicationSettings,
-
-	/// CO Runtime Driver.
-	runtime: Runtime,
 
 	/// CO Network Driver.
 	network: Arc<Mutex<Option<Network>>>,
@@ -84,14 +79,6 @@ impl Application {
 
 	pub fn context(&self) -> &CoContext {
 		&self.co_context
-	}
-
-	pub fn runtime(&self) -> Runtime {
-		self.runtime.clone()
-	}
-
-	pub fn runtime_pool(&self) -> &RuntimePool {
-		self.runtime.runtime()
 	}
 
 	pub fn co(&self) -> &CoContext {
@@ -227,7 +214,7 @@ impl Application {
 		let co = SharedCoCreator::new(local, create)
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
-			.create(self.storage(), self.runtime.clone(), creator)
+			.create(self.storage(), self.context().inner.runtime(), creator)
 			.await?;
 
 		// load
@@ -358,7 +345,7 @@ impl ApplicationBuilder {
 
 		// create
 		let service = Actor::spawn(
-			tags!("application": settings.identifier.clone()),
+			tags!("type": "application", "application": settings.identifier.clone()),
 			crate::services::application::Application::new(settings.clone()),
 			(storage, tasks.clone()),
 		)?;
@@ -371,7 +358,6 @@ impl ApplicationBuilder {
 			_drop: Some(Arc::new(co_context.inner.shutdown().clone().drop_guard())),
 			settings,
 			network: Default::default(),
-			runtime: Runtime::new(),
 			co_context,
 			service: Arc::new(service),
 			tasks,
