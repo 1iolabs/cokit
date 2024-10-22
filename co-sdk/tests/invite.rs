@@ -1,10 +1,8 @@
 use co_core_co::CoAction;
 use co_core_membership::{MembershipState, MembershipsAction};
-use co_sdk::{
-	update_co, Action, CoId, CreateCo, Did, Identity, Observable, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
-};
+use co_sdk::{update_co, Action, CoId, CreateCo, Did, Identity, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL};
 use co_storage::Algorithm;
-use futures::{join, StreamExt};
+use futures::{join, Stream, StreamExt};
 use helper::instance::Instances;
 use std::{collections::BTreeSet, future::ready, time::Duration};
 use tokio::time::timeout;
@@ -30,8 +28,8 @@ async fn test_invite() {
 	peer2.application.create_network(false).await.unwrap();
 
 	// networks
-	let network1 = peer1.application.network().unwrap();
-	let network2 = peer2.application.network().unwrap();
+	let (network1, _) = peer1.application.context().network().await.unwrap();
+	let (network2, _) = peer2.application.context().network().await.unwrap();
 
 	// // connect
 	// network2
@@ -107,7 +105,7 @@ async fn test_invite() {
 	let ((_, membership_co, membership_participant), (_, invited_participant, invited_peer), _) =
 		join!(peer2_membership_invite, peer1_invite_sent, peer1_invite);
 	assert_eq!(invited_participant, identity2.identity());
-	assert_eq!(invited_peer, network2.peer_id());
+	assert_eq!(invited_peer, network2.local_peer_id());
 	assert_eq!(membership_co, CoId::from("shared"));
 	assert_eq!(membership_participant, identity2.identity());
 
@@ -137,10 +135,10 @@ async fn test_invite() {
 	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
 	async {
 		update_co(
-			peer2.application.actions(),
+			peer2.application.handle(),
 			&peer2_shared_co,
 			&identity2,
-			network1.peer_id(),
+			network1.local_peer_id(),
 			Duration::from_secs(10),
 		)
 		.await
@@ -172,8 +170,8 @@ async fn test_invite_encrypted() {
 	peer2.application.create_network(false).await.unwrap();
 
 	// networks
-	let network1 = peer1.application.network().unwrap();
-	let network2 = peer2.application.network().unwrap();
+	let (network1, _) = peer1.application.context().network().await.unwrap();
+	let (network2, _) = peer2.application.context().network().await.unwrap();
 
 	// // connect
 	// network2
@@ -246,7 +244,7 @@ async fn test_invite_encrypted() {
 	let ((_, membership_co, membership_participant), (_, invited_participant, invited_peer), _) =
 		join!(peer2_membership_invite, peer1_invite_sent, peer1_invite);
 	assert_eq!(invited_participant, identity2.identity());
-	assert_eq!(invited_peer, network2.peer_id());
+	assert_eq!(invited_peer, network2.local_peer_id());
 	assert_eq!(membership_co, CoId::from("shared"));
 	assert_eq!(membership_participant, identity2.identity());
 
@@ -276,10 +274,10 @@ async fn test_invite_encrypted() {
 	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
 	async {
 		update_co(
-			peer2.application.actions(),
+			peer2.application.handle(),
 			&peer2_shared_co,
 			&identity2,
-			network1.peer_id(),
+			network1.local_peer_id(),
 			Duration::from_secs(10),
 		)
 		.await
@@ -296,7 +294,7 @@ async fn test_invite_encrypted() {
 }
 
 async fn wait_membership_state(
-	actions: Observable<Action>,
+	actions: impl Stream<Item = Action>,
 	state: impl IntoIterator<Item = MembershipState>,
 ) -> Option<(MembershipState, CoId, Did)> {
 	let state: BTreeSet<MembershipState> = state.into_iter().collect();

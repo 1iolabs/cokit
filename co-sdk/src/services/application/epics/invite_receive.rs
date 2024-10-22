@@ -1,6 +1,5 @@
 use crate::{
 	library::invite::{CoInvitePayload, CO_DIDCOMM_INVITE},
-	reactive::context::{ActionObservable, StateObservable},
 	Action, CoContext, CoInvite, KnownTag, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
@@ -8,7 +7,7 @@ use co_core_membership::{Membership, MembershipState, MembershipsAction};
 use co_identity::DidCommHeader;
 use co_primitives::{from_json_string, tags, CoInviteMetadata, Did, KnownTags, Tags};
 use co_storage::BlockStorageExt;
-use futures::{future::ready, Stream, StreamExt};
+use futures::{future::ready, stream, Stream, StreamExt};
 use libp2p::PeerId;
 
 /// When we receive a invite message:
@@ -18,32 +17,31 @@ use libp2p::PeerId;
 ///
 /// TODO: consensus validation
 pub fn invite_receive(
-	actions: ActionObservable,
-	_states: StateObservable,
-	context: CoContext,
-) -> impl Stream<Item = Action> + Send + 'static {
-	actions
-		.filter_map(|action| {
-			ready(match action {
-				Action::DidCommReceive { peer, message } => {
-					if &message.header().message_type == CO_DIDCOMM_INVITE
-						&& message.header().to.len() == 1
-						&& message.is_validated_sender()
-					{
-						let (header, body) = message.into_inner();
-						Some((peer, header, body))
-					} else {
-						None
-					}
-				},
-				_ => None,
-			})
-		})
-		.then(move |(peer, header, body)| {
-			let context = context.clone();
-			async move { invited(context, peer, header, body).await }
-		})
-		.flat_map(Action::map_error_stream)
+	action: &Action,
+	_state: &(),
+	context: &CoContext,
+) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
+	match action {
+		Action::DidCommReceive { peer, message } => {
+			if &message.header().message_type == CO_DIDCOMM_INVITE
+				&& message.header().to.len() == 1
+				&& message.is_validated_sender()
+			{
+				let (header, body) = message.clone().into_inner();
+				Some(
+					stream::once(ready((context.clone(), *peer, header, body)))
+						.then(
+							move |(context, peer, header, body)| async move { invited(context, peer, header, body).await },
+						)
+						.flat_map(Action::map_error_stream)
+						.map(Ok),
+				)
+			} else {
+				None
+			}
+		},
+		_ => None,
+	}
 }
 
 async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: String) -> anyhow::Result<Vec<Action>> {

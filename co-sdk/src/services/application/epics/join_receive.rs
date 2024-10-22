@@ -1,13 +1,12 @@
 use crate::{
 	library::join::{CoJoinPayload, CO_DIDCOMM_JOIN},
-	reactive::context::{ActionObservable, StateObservable},
 	Action, CoContext, CoReducerFactory, KnownTag, CO_CORE_NAME_CO,
 };
 use anyhow::anyhow;
 use co_core_co::{CoAction, ParticipantState};
 use co_identity::DidCommHeader;
 use co_primitives::{from_json_string, CoJoin};
-use futures::{future::ready, Stream, StreamExt};
+use futures::{future::ready, stream, Stream, StreamExt};
 use libp2p::PeerId;
 
 /// When we receive a join message:
@@ -16,29 +15,28 @@ use libp2p::PeerId;
 ///
 /// TODO: consensus validation
 pub fn join_receive(
-	actions: ActionObservable,
-	_states: StateObservable,
-	context: CoContext,
-) -> impl Stream<Item = Action> + Send + 'static {
-	actions
-		.filter_map(|action| {
-			ready(match action {
-				Action::DidCommReceive { peer, message } => {
-					if &message.header().message_type == CO_DIDCOMM_JOIN && message.is_validated_sender() {
-						let (header, body) = message.into_inner();
-						Some((peer, header, body))
-					} else {
-						None
-					}
-				},
-				_ => None,
-			})
-		})
-		.then(move |(peer, header, body)| {
-			let context = context.clone();
-			async move { joined(context, peer, header, body).await }
-		})
-		.flat_map(Action::map_error_stream)
+	action: &Action,
+	_state: &(),
+	context: &CoContext,
+) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
+	match action {
+		Action::DidCommReceive { peer, message } => {
+			if &message.header().message_type == CO_DIDCOMM_JOIN && message.is_validated_sender() {
+				let (header, body) = message.clone().into_inner();
+				Some(
+					stream::once(ready((context.clone(), *peer, header, body)))
+						.then(
+							move |(context, peer, header, body)| async move { joined(context, peer, header, body).await },
+						)
+						.flat_map(Action::map_error_stream)
+						.map(Ok),
+				)
+			} else {
+				None
+			}
+		},
+		_ => None,
+	}
 }
 
 async fn joined(context: CoContext, _peer: PeerId, header: DidCommHeader, body: String) -> anyhow::Result<Vec<Action>> {

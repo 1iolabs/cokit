@@ -3,47 +3,76 @@ use crate::{
 	library::{
 		is_cid_encrypted::is_cid_encrypted,
 		key_exchange::{create_key_request_message, KeyRequestPayload, KeyResponsePayload, CO_DIDCOMM_KEY_RESPONSE},
+		response_list::ResponseList,
 		settings_timeout::settings_timeout,
-	},
-	reactive::{
-		context::{ActionObservable, StateObservable},
-		wait_response::wait_response,
 	},
 	Action, CoContext, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
+use co_actor::Epic;
 use co_core_keystore::KeyStoreAction;
 use co_core_membership::MembershipsAction;
 use co_identity::{DidCommHeader, PrivateIdentityResolver};
 use co_primitives::{from_json_string, CoId, Did};
-use futures::{future::try_join, Stream, StreamExt};
+use futures::{future::try_join, stream, Stream, StreamExt};
 use libp2p::PeerId;
-use std::{future::ready, time::Duration};
+use std::{
+	future::{ready, Future},
+	time::Duration,
+};
 
 /// When we join an encrypted CO request its key.
-pub fn key_request_send(
-	actions: ActionObservable,
-	_states: StateObservable,
-	context: CoContext,
-) -> impl Stream<Item = Action> + Send + 'static {
-	actions
-		.clone()
-		.filter_map(|action| {
-			ready(match action {
-				Action::JoinSent { co, heads, participant, peer } if is_cid_encrypted(&heads) => {
-					Some((co, participant, peer))
-				},
-				_ => None,
-			})
-		})
-		.then(move |(co, participant, peer)| key_request(actions.clone(), context.clone(), peer, co, participant))
-		.flat_map(Action::map_error_stream)
+/// In: [`Action::JoinSent`]
+pub struct KeyRequestSend {
+	pending_key_requests: ResponseList<Action, ()>,
+}
+impl KeyRequestSend {
+	pub fn new() -> Self {
+		Self { pending_key_requests: Default::default() }
+	}
+}
+impl Epic<Action, (), CoContext> for KeyRequestSend {
+	fn epic(
+		&mut self,
+		action: &Action,
+		state: &(),
+		context: &CoContext,
+	) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
+		// response
+		self.pending_key_requests.handle(action, state);
+
+		// handle
+		match action {
+			Action::JoinSent { co, heads, participant, peer } if is_cid_encrypted(heads) => Some({
+				let message_id = DidCommHeader::create_message_id();
+				let message_response = self.pending_key_requests.create({
+					let message_id = message_id.clone();
+					move |action, _| filter_response(&message_id, action)
+				});
+				stream::once(ready((
+					context.clone(),
+					message_id,
+					message_response,
+					co.clone(),
+					participant.clone(),
+					*peer,
+				)))
+				.then(move |(context, message_id, message_response, co, participant, peer)| {
+					key_request(message_id, message_response, context, peer, co, participant)
+				})
+				.flat_map(Action::map_error_stream)
+				.map(Ok)
+			}),
+			_ => None,
+		}
+	}
 }
 
 /// Send request and wait for response.
 /// TODO: handle error - abort (or set back to invite) the membership?
 async fn key_request(
-	actions: ActionObservable,
+	message_id: String,
+	message_response: impl Future<Output = Result<(PeerId, DidCommHeader, String), anyhow::Error>>,
 	context: CoContext,
 	peer: PeerId,
 	co: CoId,
@@ -56,7 +85,8 @@ async fn key_request(
 		let identity = context.private_identity_resolver().await?.resolve_private(&did).await?;
 
 		// message
-		let (message_id, message) = create_key_request_message(
+		let message = create_key_request_message(
+			message_id,
 			&identity,
 			KeyRequestPayload {
 				peer: network.local_peer_id(),
@@ -71,7 +101,7 @@ async fn key_request(
 		let send = DidCommSendNetworkTask::send(network.clone(), [peer], message, timeout);
 
 		// receive
-		let receive = wait_response_message(actions, message_id, timeout);
+		let receive = async move { Ok(tokio::time::timeout(timeout, message_response).await??) };
 
 		// execute
 		let ((_response_peer, _response_header, body), _) = try_join(receive, send).await?;
@@ -102,17 +132,13 @@ async fn key_request(
 	}
 }
 
-async fn wait_response_message(
-	actions: ActionObservable,
-	message_id: String,
-	timeout: Duration,
-) -> anyhow::Result<(PeerId, DidCommHeader, String)> {
-	wait_response(actions, timeout, |action| match action {
+fn filter_response(message_id: &str, action: &Action) -> Option<(PeerId, DidCommHeader, String)> {
+	match action {
 		Action::DidCommReceive { peer, message } => {
 			if &message.header().message_type == CO_DIDCOMM_KEY_RESPONSE
 				&& message.header().to.len() == 1
 				&& message.is_validated_sender()
-				&& message.header().thid.as_ref() == Some(&message_id)
+				&& message.header().thid.as_deref() == Some(message_id)
 			{
 				let (header, body) = message.clone().into_inner();
 				Some((*peer, header, body))
@@ -121,6 +147,5 @@ async fn wait_response_message(
 			}
 		},
 		_ => None,
-	})
-	.await
+	}
 }

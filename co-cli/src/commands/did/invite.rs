@@ -61,7 +61,6 @@ pub async fn command(
 		let actions = application.actions();
 		async move {
 			actions
-				.clone()
 				.filter_map(|action| {
 					ready(match &action {
 						Action::InviteSent { co, participant, peer }
@@ -85,11 +84,11 @@ pub async fn command(
 
 	// resend/invite
 	if let Some(to) = only_network {
-		application.actions().dispatch(Action::Invite {
+		application.handle().dispatch(Action::Invite {
 			co: co_reducer.id().clone(),
 			from: from.identity().to_owned(),
 			to,
-		})
+		})?;
 	} else {
 		let action = CoAction::ParticipantInvite { participant: command.did.clone(), tags: Default::default() };
 		co_reducer.push(&from, CO_CORE_NAME_CO, &action).await?;

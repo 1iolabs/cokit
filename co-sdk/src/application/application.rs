@@ -1,5 +1,5 @@
 use super::{
-	co_context::{CoContext, CoContextInner, Reducers},
+	co_context::CoContext,
 	identity::{create_identity_resolver, resolve_private_identity},
 	shared::{CreateCo, SharedCoCreator},
 	tracing::TracingBuilder,
@@ -7,25 +7,22 @@ use super::{
 use crate::{
 	drivers::network::tasks::mdns_gossip::MdnsGossipNetworkTask,
 	local_keypair_fetch,
-	reactive::{
-		context::{ActionObservable, ReactiveContext},
-		epics::epic,
-	},
-	services::{bitswap::Bitswap, connections::Connections},
+	services::{application::ApplicationMessage, bitswap::Bitswap, connections::Connections},
 	Action, CoReducer, CoReducerFactory, CoStorage, Network, Runtime, Storage, CO_CORE_NAME_KEYSTORE,
 	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
-use co_actor::{Actor, TaskSpawner};
+use co_actor::{Actor, ActorHandle, ActorInstance};
 use co_identity::{
-	IdentityResolverBox, LocalIdentity, LocalIdentityResolver, PrivateIdentity, PrivateIdentityBox,
-	PrivateIdentityResolverBox,
+	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
 use co_network::NetworkTaskSpawner;
 use co_primitives::{tags, CoId};
 use co_runtime::RuntimePool;
 use directories::ProjectDirs;
-use std::{fmt::Debug, path::PathBuf, sync::Arc, time::Duration};
+use futures::{Stream, StreamExt};
+use std::{fmt::Debug, future::ready, path::PathBuf, sync::Arc, time::Duration};
+use tokio::sync::Mutex;
 use tokio_util::{
 	sync::{CancellationToken, DropGuard},
 	task::TaskTracker,
@@ -39,18 +36,11 @@ pub struct Application {
 	/// Settings.
 	settings: ApplicationSettings,
 
-	/// CO Storage Driver.
-	storage: Storage,
-
 	/// CO Runtime Driver.
 	runtime: Runtime,
 
 	/// CO Network Driver.
-	/// TODO: When applciation is cloned before create_network this will cause issues.
-	network: Option<Network>,
-
-	/// Application shutdown token.
-	shutdown: CancellationToken,
+	network: Arc<Mutex<Option<Network>>>,
 
 	// Tasks.
 	tasks: TaskTracker,
@@ -58,8 +48,8 @@ pub struct Application {
 	// CO Context.
 	co_context: CoContext,
 
-	/// Global Reactive Context.
-	reactive: ReactiveContext,
+	/// The actor runtime.
+	service: Arc<ActorInstance<crate::services::application::Application>>,
 }
 impl Application {
 	pub fn settings(&self) -> &ApplicationSettings {
@@ -67,24 +57,22 @@ impl Application {
 	}
 
 	pub fn storage(&self) -> CoStorage {
-		self.storage.storage().clone()
+		self.context().inner.storage()
 	}
 
-	pub fn network(&self) -> Option<Network> {
-		self.network.clone()
-	}
-
-	pub fn actions(&self) -> ActionObservable {
-		self.reactive.actions().clone()
+	pub fn actions(&self) -> impl Stream<Item = Action> + Send + 'static {
+		self.service
+			.handle()
+			.stream(ApplicationMessage::Subscribe)
+			.filter_map(|item| ready(item.ok()))
 	}
 
 	pub fn shutdown(&self) -> CancellationToken {
-		self.shutdown.child_token()
+		self.context().inner.shutdown().child_token()
 	}
 
-	/// Tasks bound to this application.
-	pub fn tasks(&self) -> TaskSpawner {
-		TaskSpawner::new(self.settings.identifier.clone(), self.tasks.clone())
+	pub fn handle(&self) -> ActorHandle<ApplicationMessage> {
+		self.service.handle()
 	}
 
 	/// Tasks bound to this application.
@@ -121,7 +109,7 @@ impl Application {
 	/// Shutdown the application gracefully.
 	pub async fn shutdown_application(&self) {
 		// signal
-		self.shutdown.cancel();
+		self.context().inner.shutdown().cancel();
 
 		// wait
 		self.tasks.wait().await;
@@ -129,14 +117,16 @@ impl Application {
 
 	/// Create and startup network.
 	pub async fn create_network(&mut self, force_new_peer_id: bool) -> Result<(), anyhow::Error> {
+		let mut network_ref = self.network.lock().await;
+
 		// validate
-		if self.network.is_some() {
+		if network_ref.is_some() {
 			return Err(anyhow!("Network already created"));
 		}
 
 		// bitswap
 		let bitswap = Actor::spawn_with(
-			self.tasks(),
+			self.context().tasks(),
 			tags!("type": "bitswap", "application": &self.settings.identifier),
 			Bitswap::new(self.co().clone()),
 			(),
@@ -158,7 +148,7 @@ impl Application {
 
 		// connections
 		let connections = Actor::spawn_with(
-			self.tasks(),
+			self.context().tasks(),
 			tags!("type": "connections", "application": &self.settings.identifier),
 			Connections::new(self.co().clone(), Duration::from_secs(30)),
 			(),
@@ -173,7 +163,7 @@ impl Application {
 		// shutdown
 		//  when the token has been triggered explicitly shutdown the network
 		if let Some(shutdown_network) = network.shutdown().await {
-			let shutdown = self.shutdown.child_token().cancelled_owned();
+			let shutdown = self.context().inner.shutdown().child_token().cancelled_owned();
 			tokio::spawn(async move {
 				shutdown.await;
 				shutdown_network.shutdown();
@@ -183,13 +173,13 @@ impl Application {
 		}
 
 		// assign
-		self.network = Some(network);
+		*network_ref = Some(network);
 
 		// use mdns discoverd peers for gossip discovery
 		spawner.spawn(MdnsGossipNetworkTask::new())?;
 
 		// reactive
-		self.reactive.actions().dispatch(Action::NetworkStarted);
+		self.service.handle().dispatch(Action::NetworkStarted)?;
 
 		// done
 		Ok(())
@@ -247,9 +237,9 @@ impl Application {
 	/// Initialize application.
 	async fn init(&self) -> Result<(), anyhow::Error> {
 		// shutdown
-		let shutdown = self.shutdown.clone();
+		let shutdown = self.context().inner.shutdown().clone();
 		let tasks = self.tasks.clone();
-		let reactive = self.reactive.clone();
+		let reactive = self.service.handle();
 		tokio::spawn(async move {
 			// shutdown
 			shutdown.cancelled().await;
@@ -348,10 +338,7 @@ impl ApplicationBuilder {
 	}
 
 	pub async fn build(self) -> Result<Application, anyhow::Error> {
-		let shutdown = CancellationToken::new();
 		let tasks = TaskTracker::new();
-		let local_identity = LocalIdentityResolver::default().private_identity("did:local:device").unwrap();
-		let runtime = Runtime::new();
 
 		// log
 		self.tracing.init()?;
@@ -369,45 +356,25 @@ impl ApplicationBuilder {
 			keychain: self.keychain,
 		};
 
-		// reducers
-		let (reducers, reducers_control) = Reducers::new();
+		// create
+		let service = Actor::spawn(
+			tags!("application": settings.identifier.clone()),
+			crate::services::application::Application::new(settings.clone()),
+			(storage, tasks.clone()),
+		)?;
 
-		// co
-		let reactive = ReactiveContext::default();
-		let co_context: CoContext = CoContextInner::new(
-			settings.clone(),
-			shutdown.child_token(),
-			TaskSpawner::new(settings.identifier.clone(), tasks.clone()),
-			local_identity.clone(),
-			None,
-			storage.storage(),
-			runtime.clone(),
-			reactive.clone(),
-			reducers_control,
-		)
-		.into();
-
-		// reducers
-		co_context.tasks().spawn(reducers.worker(co_context.inner.clone()));
-
-		// reactive
-		co_context.tasks().spawn({
-			let reactive = reactive.clone();
-			let context = co_context.clone();
-			async move { reactive.execute(context, epic()).await }
-		});
+		// wait for context
+		let co_context = service.handle().request(ApplicationMessage::Context).await?;
 
 		// instance
 		let result = Application {
+			_drop: Some(Arc::new(co_context.inner.shutdown().clone().drop_guard())),
 			settings,
-			network: None,
-			storage,
+			network: Default::default(),
 			runtime: Runtime::new(),
 			co_context,
-			_drop: Some(Arc::new(shutdown.clone().drop_guard())),
-			shutdown,
+			service: Arc::new(service),
 			tasks,
-			reactive,
 		};
 
 		// init

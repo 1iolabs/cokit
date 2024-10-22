@@ -6,14 +6,13 @@ use super::{
 use crate::{
 	drivers::network::CoNetworkTaskSpawner,
 	library::find_membership::memberships,
-	reactive::context::ReactiveContext,
 	reducer::core_resolver::{
 		dynamic::DynamicCoreResolver,
 		epic::ReactiveCoreResolver,
 		log::LogCoreResolver,
 		membership::{MembershipCoreResolver, MembershipInstanceRegistry},
 	},
-	services::connections::ConnectionMessage,
+	services::{application::ApplicationMessage, connections::ConnectionMessage},
 	types::{co_reducer::CoReducerContext, co_reducer_factory::CoReducerFactoryError},
 	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime, TaskSpawner,
 	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
@@ -451,7 +450,7 @@ pub(crate) struct CoContextInner {
 
 	storage: CoStorage,
 	runtime: Runtime,
-	reactive_context: ReactiveContext,
+	reactive_context: ActorHandle<ApplicationMessage>,
 
 	reducers: ReducersControl,
 }
@@ -464,7 +463,7 @@ impl CoContextInner {
 		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
 		storage: CoStorage,
 		runtime: Runtime,
-		reactive_context: ReactiveContext,
+		reactive_context: ActorHandle<ApplicationMessage>,
 		reducers: ReducersControl,
 	) -> Self {
 		Self {
@@ -538,7 +537,7 @@ impl CoContextInner {
 		let core_resolver = ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(
 			core_resolver,
 			CO_ID_LOCAL.into(),
-			&self.reactive_context,
+			self.reactive_context.clone(),
 		);
 		let core_resolver = MembershipCoreResolver::new(
 			self.tasks.clone(),
@@ -563,7 +562,7 @@ impl CoContextInner {
 	pub(crate) fn create_co_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::default();
 		let core_resolver =
-			ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(core_resolver, id, &self.reactive_context);
+			ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(core_resolver, id, self.reactive_context.clone());
 		let core_resolver = LogCoreResolver::new(core_resolver);
 		let core_resolver = DynamicCoreResolver::new(core_resolver);
 		core_resolver

@@ -31,7 +31,13 @@ pub trait Actor: Send + Sync + 'static {
 	type State: Send + 'static;
 	type Initialize: Send + 'static;
 
-	async fn initialize(&self, tags: Tags, initialize: Self::Initialize) -> Result<Self::State, ActorError>;
+	async fn initialize(
+		&self,
+		handle: &ActorHandle<Self::Message>,
+		tags: Tags,
+		initialize: Self::Initialize,
+	) -> Result<Self::State, ActorError>;
+
 	async fn handle(
 		&self,
 		handle: &ActorHandle<Self::Message>,
@@ -72,7 +78,7 @@ pub trait Actor: Send + Sync + 'static {
 			let handle = handle.clone();
 			async move {
 				// initialize
-				let mut actor_state = actor.initialize(tags, initialize).await?;
+				let mut actor_state = actor.initialize(&handle, tags, initialize).await?;
 				state_tx
 					.send(ActorState::Running)
 					.map_err(|e| ActorError::InvalidState(e.into()))?;
@@ -305,7 +311,12 @@ mod tests {
 			type State = i32;
 			type Initialize = i32;
 
-			async fn initialize(&self, _tags: Tags, initialize: Self::Initialize) -> Result<Self::State, ActorError> {
+			async fn initialize(
+				&self,
+				_handle: &ActorHandle<Self::Message>,
+				_tags: Tags,
+				initialize: Self::Initialize,
+			) -> Result<Self::State, ActorError> {
 				Ok(initialize)
 			}
 
@@ -359,7 +370,12 @@ mod tests {
 			type State = TestState;
 			type Initialize = i32;
 
-			async fn initialize(&self, _tags: Tags, initialize: Self::Initialize) -> Result<Self::State, ActorError> {
+			async fn initialize(
+				&self,
+				_handle: &ActorHandle<Self::Message>,
+				_tags: Tags,
+				initialize: Self::Initialize,
+			) -> Result<Self::State, ActorError> {
 				Ok(TestState { watchers: Default::default(), value: initialize })
 			}
 

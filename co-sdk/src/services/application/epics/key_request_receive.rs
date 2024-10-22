@@ -6,7 +6,6 @@ use crate::{
 		key_exchange::{create_key_response_message, KeyRequestPayload, KeyResponsePayload, CO_DIDCOMM_KEY_REQUEST},
 		settings_timeout::settings_timeout,
 	},
-	reactive::context::{ActionObservable, StateObservable},
 	Action, CoContext, CoReducerFactory,
 };
 use anyhow::anyhow;
@@ -14,35 +13,35 @@ use co_core_co::ParticipantState;
 use co_core_keystore::Key;
 use co_identity::{DidCommHeader, Identity, IdentityResolver};
 use co_primitives::from_json_string;
-use futures::{Stream, StreamExt};
+use futures::{stream, Stream, StreamExt};
 use libp2p::PeerId;
 use std::{future::ready, time::Duration};
 
 /// When we receive an key request send an response.
 pub fn key_request_receive(
-	actions: ActionObservable,
-	_states: StateObservable,
-	context: CoContext,
-) -> impl Stream<Item = Action> + Send + 'static {
-	actions
-		.filter_map(|action| {
-			ready(match action {
-				Action::DidCommReceive { peer, message } => {
-					if &message.header().message_type == CO_DIDCOMM_KEY_REQUEST && message.is_validated_sender() {
-						let (header, body) = message.into_inner();
-						Some((peer, header, body))
-					} else {
-						None
-					}
-				},
-				_ => None,
-			})
-		})
-		.then(move |(peer, header, body)| {
-			let context = context.clone();
-			async move { key_request(context, peer, header, body).await }
-		})
-		.flat_map(Action::map_error_stream)
+	action: &Action,
+	_state: &(),
+	context: &CoContext,
+) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
+	match action {
+		Action::DidCommReceive { peer, message } => {
+			if &message.header().message_type == CO_DIDCOMM_KEY_REQUEST && message.is_validated_sender() {
+				let (header, body) = message.clone().into_inner();
+				let context = context.clone();
+				Some(
+					stream::once(ready((context, *peer, header, body)))
+						.then(move |(context, peer, header, body)| async move {
+							key_request(context, peer, header, body).await
+						})
+						.flat_map(Action::map_error_stream)
+						.map(Ok),
+				)
+			} else {
+				None
+			}
+		},
+		_ => None,
+	}
 }
 
 async fn key_request(

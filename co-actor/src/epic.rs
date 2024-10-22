@@ -2,7 +2,7 @@ use super::ActorHandle;
 use co_primitives::Tags;
 use futures::{
 	pin_mut,
-	stream::{BoxStream, Empty},
+	stream::{self, BoxStream, Empty},
 	Stream, StreamExt,
 };
 use std::{
@@ -31,9 +31,6 @@ pub trait Epic<A, S, C> {
 /// Fn impl for epics.
 impl<A, S, C, O, F> Epic<A, S, C> for F
 where
-	A: Send + Clone + 'static,
-	S: Send + Clone + 'static,
-	C: Send + Clone + 'static,
 	O: Stream<Item = Result<A, anyhow::Error>> + Send + 'static,
 	F: FnMut(&A, &S, &C) -> Option<O>,
 {
@@ -48,9 +45,16 @@ where
 }
 
 pub trait EpicExt<A, S, C>: Epic<A, S, C> {
+	/// Join two Epics.
+	///
+	/// # Notes
+	/// This will join on the stack.
+	/// If you want to join dozens of epics the heap should be used.
+	/// See: [`MergeEpic`].
 	fn join<E>(self, other: E) -> JoinEpic<Self, E>
 	where
 		Self: Sized,
+		A: Send + 'static,
 	{
 		JoinEpic(self, other)
 	}
@@ -62,9 +66,9 @@ pub trait EpicExt<A, S, C>: Epic<A, S, C> {
 		OnceEpic(self, None)
 	}
 
-	fn boxed(self) -> Box<dyn BoxEpic<A, S, C> + Send + 'static>
+	fn boxed(self) -> Box<dyn BoxEpic<A, S, C> + Send + Sync + 'static>
 	where
-		Self: Sized + Send + 'static,
+		Self: Sized + Send + Sync + 'static,
 	{
 		Box::new(self)
 	}
@@ -94,9 +98,8 @@ where
 /// Epic runtime to be uses as actor state.
 /// Expected to be called after the message has been applied to the state.
 pub struct EpicRuntime<M, A, S, C> {
-	epic: Box<dyn BoxEpic<A, S, C> + Send + 'static>,
+	epic: Box<dyn BoxEpic<A, S, C> + Sync + Send + 'static>,
 	error: Arc<dyn Fn(anyhow::Error) -> Option<A> + Sync + Send + 'static>,
-	// epics: Vec<Box<dyn BoxEpic<A, S, C>>>,
 	_actor: PhantomData<fn(M, A, S, C)>,
 }
 impl<M, A, S, C> EpicRuntime<M, A, S, C>
@@ -105,7 +108,7 @@ where
 	M: Send + 'static,
 {
 	pub fn new(
-		epic: impl EpicExt<A, S, C> + Send + 'static,
+		epic: impl EpicExt<A, S, C> + Send + Sync + 'static,
 		error: impl Fn(anyhow::Error) -> Option<A> + Sync + Send + 'static,
 	) -> Self {
 		Self { epic: epic.boxed(), _actor: Default::default(), error: Arc::new(error) }
@@ -149,7 +152,7 @@ where
 		action: &A,
 		state: &S,
 		context: &C,
-	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + 'static> {
+	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + Send + 'static> {
 		let s0 = self.0.epic(action, state, context);
 		let s1 = self.1.epic(action, state, context);
 		let s0 = async_stream::stream! {
@@ -167,6 +170,41 @@ where
 			}
 		};
 		Some(tokio_stream::StreamExt::merge(s0, s1))
+	}
+}
+
+/// Merge BoxEpic into one.
+pub struct MergeEpic<A, S, C>(Vec<Box<dyn BoxEpic<A, S, C> + Send + Sync + 'static>>);
+impl<A, S, C> MergeEpic<A, S, C> {
+	pub fn new() -> Self {
+		Self(Default::default())
+	}
+
+	pub fn join(mut self, epic: impl EpicExt<A, S, C> + Send + Sync + 'static) -> Self {
+		self.0.push(epic.boxed());
+		self
+	}
+}
+impl<A, S, C> Epic<A, S, C> for MergeEpic<A, S, C>
+where
+	A: Send + 'static,
+{
+	fn epic(
+		&mut self,
+		action: &A,
+		state: &S,
+		context: &C,
+	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + Send + 'static> {
+		let streams: Vec<_> = self
+			.0
+			.iter_mut()
+			.filter_map(|epic| epic.box_epic(&action, &state, &context))
+			.collect();
+		if !streams.is_empty() {
+			Some(stream::iter(streams).flatten_unordered(None))
+		} else {
+			None
+		}
 	}
 }
 
@@ -228,7 +266,7 @@ where
 
 #[cfg(test)]
 mod tests {
-	use crate::Epic;
+	use crate::{Epic, EpicExt};
 	use futures::{stream, Stream, TryStreamExt};
 
 	#[derive(Debug, Clone, PartialEq)]
@@ -283,63 +321,16 @@ mod tests {
 			.expect("no error");
 		assert_eq!(result, vec![TestAction::World]);
 	}
+
+	#[tokio::test]
+	async fn test_box_epic() {
+		let mut epic = Test {}.boxed();
+		let result: Vec<TestAction> = epic
+			.box_epic(&TestAction::Hello, &(), &())
+			.expect("a stream")
+			.try_collect()
+			.await
+			.expect("no error");
+		assert_eq!(result, vec![TestAction::World]);
+	}
 }
-
-// /// Wrapps an actor with an epic into an new actor.
-// pub struct EpicActor<E, P, C> {
-// 	actor: P,
-// 	context: C,
-// 	epic: fn() -> E,
-// }
-// impl<E, P, C> EpicActor<E, P, C>
-// where
-// 	P: Actor,
-// 	P::Message: Clone,
-// 	E: Epic<P::Message, P::State, C> + Send + Sync + 'static,
-// 	C: Send + Sync + 'static,
-// {
-// 	pub fn new(actor: P, epic: fn() -> E, context: C) -> Self {
-// 		Self { actor, epic, context }
-// 	}
-// }
-// pub struct EpicActorState<E, P, C>
-// where
-// 	P: Actor,
-// 	E: Epic<P::Message, P::State, C>,
-// {
-// 	state: P::State,
-// 	epic: EpicRuntime<E, P::Message, P::State, C>,
-// }
-// #[async_trait]
-// impl<E, P, C> Actor for EpicActor<E, P, C>
-// where
-// 	P: Actor,
-// 	P::Message: Clone,
-// 	E: Epic<P::Message, P::State, C> + Send + Sync + 'static,
-// 	C: Send + Sync + 'static,
-// {
-// 	type Message = P::Message;
-// 	type State = EpicActorState<E, P, C>;
-// 	type Initialize = P::Initialize;
-
-// 	async fn initialize(&self, tags: Tags, initialize: Self::Initialize) -> Result<Self::State, ActorError> {
-// 		let state = self.actor.initialize(tags, initialize).await?;
-// 		Ok(EpicActorState { state, epic: EpicRuntime::new((self.epic)(), |_err| None) })
-// 	}
-
-// 	async fn handle(
-// 		&self,
-// 		handle: &ActorHandle<Self::Message>,
-// 		message: Self::Message,
-// 		state: &mut Self::State,
-// 	) -> Result<(), ActorError> {
-// 		// epic
-// 		state.epic.handle(handle, &message, &state.state, &self.context);
-
-// 		// inner
-// 		self.actor.handle(handle, message, &mut state.state).await?;
-
-// 		// result
-// 		Ok(())
-// 	}
-// }

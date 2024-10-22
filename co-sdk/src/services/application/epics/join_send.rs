@@ -4,7 +4,6 @@ use crate::{
 		invite_networks::invite_networks, is_cid_encrypted::is_cid_encrypted, join::create_join_message_from,
 		settings_timeout::settings_timeout,
 	},
-	reactive::context::{ActionObservable, StateObservable},
 	services::connections::ConnectionMessage,
 	Action, CoContext, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
@@ -20,33 +19,31 @@ use std::{future::ready, time::Duration};
 /// When a membership is set to active, try to connect the CO and send the join message via didcomm.
 /// TODO: consensus finalization?
 pub fn join_send(
-	actions: ActionObservable,
-	_states: StateObservable,
-	context: CoContext,
-) -> impl Stream<Item = Action> + Send + 'static {
-	actions
-		.filter_map(|action| async move {
-			match action {
-				Action::CoreAction { co, context: _, action, cid: _ }
-					if co.as_str() == CO_ID_LOCAL && action.core == CO_CORE_NAME_MEMBERSHIP =>
-				{
-					let mambership_action: MembershipsAction = action.get_payload().ok()?;
-					match mambership_action {
-						MembershipsAction::Join(membership) if membership.membership_state == MembershipState::Join => {
-							Some((membership.id, membership.did))
-						},
-						MembershipsAction::ChangeMembershipState {
-							id,
-							did,
-							membership_state: MembershipState::Join,
-						} => Some((id, did)),
-						_ => None,
-					}
+	action: &Action,
+	_state: &(),
+	context: &CoContext,
+) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
+	// filter
+	let result = match action {
+		Action::CoreAction { co, context: _, action, cid: _ }
+			if co.as_str() == CO_ID_LOCAL && action.core == CO_CORE_NAME_MEMBERSHIP =>
+		{
+			let mambership_action: MembershipsAction = action.get_payload().ok()?;
+			match mambership_action {
+				MembershipsAction::Join(membership) if membership.membership_state == MembershipState::Join => {
+					Some((context.clone(), membership.id, membership.did))
+				},
+				MembershipsAction::ChangeMembershipState { id, did, membership_state: MembershipState::Join } => {
+					Some((context.clone(), id, did))
 				},
 				_ => None,
 			}
-		})
-		.flat_map(move |(id, did)| join_with_result(context.clone(), id, did))
+		},
+		_ => None,
+	};
+
+	// join
+	result.map(|(context, id, did)| join_with_result(context.clone(), id, did).map(Ok))
 }
 
 fn join_with_result(context: CoContext, id: CoId, did: Did) -> impl Stream<Item = Action> + Send + 'static {

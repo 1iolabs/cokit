@@ -26,7 +26,12 @@ impl Actor for Connections {
 	type State = State;
 	type Initialize = ();
 
-	async fn initialize(&self, tags: Tags, _initialize: Self::Initialize) -> Result<Self::State, ActorError> {
+	async fn initialize(
+		&self,
+		_handle: &ActorHandle<Self::Message>,
+		tags: Tags,
+		_initialize: Self::Initialize,
+	) -> Result<Self::State, ActorError> {
 		Ok(State {
 			state: ConnectionState {
 				keep_alive: self.keep_alive,

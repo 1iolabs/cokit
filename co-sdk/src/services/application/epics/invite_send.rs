@@ -5,7 +5,6 @@ use crate::{
 		network_discovery::identities_networks,
 		settings_timeout::settings_timeout,
 	},
-	reactive::context::{ActionObservable, StateObservable},
 	services::connections::ConnectionMessage,
 	state, Action, CoContext, CoNetwork, CoReducerFactory, CoStorage, KnownTag, CO_CORE_NAME_CO,
 };
@@ -15,64 +14,67 @@ use co_core_co::{Co, CoAction};
 use co_identity::{IdentityResolver, PrivateIdentityResolver};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoConnectivity, CoId, Did, Network};
-use futures::{Stream, StreamExt, TryStreamExt};
-use std::collections::BTreeSet;
+use futures::{stream, Stream, StreamExt, TryStreamExt};
+use std::{collections::BTreeSet, future::ready};
 
 /// When a participant is invited into an CO, try to connect and send the invite message via didcomm.
 /// TODO: consensus finalization?
 /// TODO: validate state? - action could have no effect in reducer (when already active, ...)
 pub fn invite_send(
-	actions: ActionObservable,
-	_states: StateObservable,
-	context: CoContext,
-) -> impl Stream<Item = Action> + Send + 'static {
-	actions
-		.filter_map(|action| async move {
-			match action {
-				Action::Invite { co, from, to } => Some((co, from, to)),
-				_ => None,
-			}
-		})
-		.filter({
-			let context = context.clone();
-			move |(co, ..)| {
-				let co = co.clone();
-				let context = context.clone();
-				async move { context.is_shared(&co).await }
-			}
-		})
-		.filter_map(move |data| {
-			let context = context.clone();
-			async move { context.network().await.map(|network| (context, network, data)) }
-		})
-		.flat_map(move |(context, network, (co, from, participant))| {
-			create_and_send_invite(context, network, co, from, participant)
-		})
-		.map(Action::map_error)
+	action: &Action,
+	_state: &(),
+	context: &CoContext,
+) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
+	match action {
+		Action::Invite { co, from, to } => Some(
+			stream::once(ready((context.clone(), (co.clone(), from.clone(), to.clone()))))
+				.filter({
+					move |(context, (co, ..))| {
+						let co = co.clone();
+						let context = context.clone();
+						async move { context.is_shared(&co).await }
+					}
+				})
+				.filter_map(move |(context, data)| async move {
+					context.network().await.map(|network| (context, network, data))
+				})
+				.flat_map(move |(context, network, (co, from, participant))| {
+					create_and_send_invite(context, network, co, from, participant)
+				})
+				.map(Action::map_error)
+				.map(Ok),
+		),
+		_ => None,
+	}
 }
 
 /// Dispatch Invite when a participant is invited into an CO.
+/// In: [`Action::CoreAction`]
+/// Out: [`Action::Invite`]
 pub fn invite_send_action(
-	actions: ActionObservable,
-	_states: StateObservable,
-	_context: CoContext,
-) -> impl Stream<Item = Action> + Send + 'static {
-	actions
-		.filter_map(|action| async move {
-			match action {
-				Action::CoreAction { co, context, action, cid: _ }
-					if context.is_local_change() && action.core == CO_CORE_NAME_CO =>
-				{
-					let co_action: CoAction = action.get_payload().ok()?;
-					match co_action {
-						CoAction::ParticipantInvite { participant, tags: _ } => Some((co, action.from, participant)),
-						_ => None,
-					}
-				},
+	action: &Action,
+	_state: &(),
+	_context: &CoContext,
+) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
+	match action {
+		Action::CoreAction { co, context, action, cid: _ }
+			if context.is_local_change() && action.core == CO_CORE_NAME_CO =>
+		{
+			let co_action: CoAction = action.get_payload().ok()?;
+			match co_action {
+				CoAction::ParticipantInvite { participant, tags: _ } => Some(
+					stream::iter([Action::Invite {
+						co: co.clone(),
+						from: action.from.clone(),
+						to: participant.clone(),
+					}])
+					.map(Ok),
+				),
 				_ => None,
 			}
-		})
-		.map(|(co, from, to)| Action::Invite { co, from, to })
+		},
+		_ => None,
+	}
 }
 
 fn create_and_send_invite(

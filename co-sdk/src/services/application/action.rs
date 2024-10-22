@@ -146,6 +146,25 @@ impl Action {
 		}
 	}
 
+	/// Map error to action ignoning the result value.
+	pub fn to_error<E>(item: Result<(), E>) -> Option<Self>
+	where
+		E: Into<anyhow::Error>,
+	{
+		match item {
+			Ok(_) => None,
+			Err(err) => Some(err.into().into()),
+		}
+	}
+
+	/// Map error to action ignoning the result value.
+	pub async fn filter_map_error(item: Result<(), anyhow::Error>) -> Option<Self> {
+		match item {
+			Ok(_) => None,
+			Err(err) => Some(err.into()),
+		}
+	}
+
 	/// Utilit to create [`Action::CoreActionPush`] actions.
 	pub fn push(co: impl Into<CoId>, from: impl Into<Did>, core: impl Into<String>, payload: impl Serialize) -> Action {
 		let reducer_action = match create_reducer_action(from, core.into(), payload) {

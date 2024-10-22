@@ -1,9 +1,6 @@
-use crate::{
-	reactive::context::{ActionObservable, ReactiveContext, StateObservable},
-	Action, CoreResolver, CoreResolverError, ReducerChangeContext,
-};
-use anyhow::anyhow;
+use crate::{services::application::ApplicationMessage, Action, CoreResolver, CoreResolverError, ReducerChangeContext};
 use async_trait::async_trait;
+use co_actor::ActorHandle;
 use co_primitives::CoId;
 use co_runtime::RuntimePool;
 use co_storage::BlockStorage;
@@ -15,22 +12,15 @@ pub struct ReactiveCoreResolver<S, N> {
 	_storage: PhantomData<S>,
 	next: N,
 	co: CoId,
-	actions: ActionObservable,
-	states: StateObservable,
+	actions: ActorHandle<ApplicationMessage>,
 }
 impl<S, N> ReactiveCoreResolver<S, N>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
 	N: CoreResolver<S> + Send + Sync + 'static,
 {
-	pub fn new(next: N, co: CoId, context: &ReactiveContext) -> Self {
-		Self {
-			_storage: Default::default(),
-			co,
-			next,
-			actions: context.actions().clone(),
-			states: context.states().clone(),
-		}
+	pub fn new(next: N, co: CoId, actions: ActorHandle<ApplicationMessage>) -> Self {
+		Self { _storage: Default::default(), co, next, actions }
 	}
 }
 #[async_trait]
@@ -51,17 +41,19 @@ where
 		let next_state = self.next.execute(storage, runtime, context, state, action).await?;
 
 		// dispatch
-		self.states.dispatch((
-			self.co.clone(),
-			next_state
-				.ok_or_else(|| CoreResolverError::Middleware(anyhow!("Expected a state after execute the action")))?
-				.into(),
-		));
-		self.actions.dispatch(
-			Action::core_action(storage, self.co.clone(), context.clone(), action.into())
-				.await
-				.map_err(|err| CoreResolverError::Middleware(err.into()))?,
-		);
+		// self.states.dispatch((
+		// 	self.co.clone(),
+		// 	next_state
+		// 		.ok_or_else(|| CoreResolverError::Middleware(anyhow!("Expected a state after execute the action")))?
+		// 		.into(),
+		// ));
+		self.actions
+			.dispatch(
+				Action::core_action(storage, self.co.clone(), context.clone(), action.into())
+					.await
+					.map_err(|err| CoreResolverError::Middleware(err.into()))?,
+			)
+			.map_err(|err| CoreResolverError::Middleware(err.into()))?;
 
 		// result
 		Ok(next_state)

@@ -85,7 +85,12 @@ impl Actor for PushHeadsActor {
 	type State = (PushHeadsState, EpicRuntime<PushHeadsAction, PushHeadsAction, PushHeadsState, PushHeadsContext>);
 	type Initialize = PushHeadsState;
 
-	async fn initialize(&self, tags: Tags, initialize: Self::Initialize) -> Result<Self::State, ActorError> {
+	async fn initialize(
+		&self,
+		_handle: &ActorHandle<Self::Message>,
+		tags: Tags,
+		initialize: Self::Initialize,
+	) -> Result<Self::State, ActorError> {
 		let co = initialize.co.clone();
 		Ok((
 			initialize,

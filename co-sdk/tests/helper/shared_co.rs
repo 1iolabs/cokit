@@ -2,11 +2,11 @@ use super::instance::{Instance, Instances};
 use co_core_co::CoAction;
 use co_core_membership::{MembershipState, MembershipsAction};
 use co_sdk::{
-	update_co, Action, CoId, CoReducer, CoReducerFactory, CreateCo, Did, DidKeyIdentity, Identity, Observable,
-	PrivateIdentity, PrivateIdentityBox, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	update_co, Action, CoId, CoReducer, CoReducerFactory, CreateCo, Did, DidKeyIdentity, Identity, PrivateIdentity,
+	PrivateIdentityBox, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use co_storage::Algorithm;
-use futures::{join, StreamExt};
+use futures::{join, Stream, StreamExt};
 use std::{collections::BTreeSet, time::Duration};
 use tracing::{info_span, Instrument};
 
@@ -30,8 +30,8 @@ impl SharedCo {
 		peer2.application.create_network(false).await.unwrap();
 
 		// networks
-		let network1 = peer1.application.network().unwrap();
-		let _network2 = peer2.application.network().unwrap();
+		let (network1, _) = peer1.application.context().network().await.unwrap();
+		let _network2 = peer2.application.context().network().await.unwrap();
 
 		// create identity
 		let identity1 = peer1.create_identity().await;
@@ -102,10 +102,10 @@ impl SharedCo {
 		let peer2_shared_co = peer2.application.co_reducer(CoId::from(id)).await.unwrap().unwrap();
 		async {
 			update_co(
-				peer2.application.actions(),
+				peer2.application.handle(),
 				&peer2_shared_co,
 				&identity2,
-				network1.peer_id(),
+				network1.local_peer_id(),
 				Duration::from_secs(10),
 			)
 			.await
@@ -126,7 +126,7 @@ impl SharedCo {
 }
 
 async fn wait_membership_state(
-	actions: Observable<Action>,
+	actions: impl Stream<Item = Action>,
 	state: impl IntoIterator<Item = MembershipState>,
 ) -> Option<(MembershipState, CoId, Did)> {
 	let state: BTreeSet<MembershipState> = state.into_iter().collect();

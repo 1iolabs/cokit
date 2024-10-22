@@ -2,7 +2,6 @@ mod application;
 mod drivers;
 mod library;
 mod pin;
-mod reactive;
 pub mod reducer;
 mod services;
 pub mod state;
@@ -49,12 +48,15 @@ pub use library::{
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
 	node_stream::NodeStream,
+	response_list::ResponseList,
 	update_co::update_co,
 };
 pub use pin::pin::PinAPI;
-pub use reactive::{action::Action, epic::Epic, observable::Observable};
 pub use reducer::core_resolver::{co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverError};
-pub use services::connections::{ConnectionAction, ConnectionMessage, ReleaseAction};
+pub use services::{
+	application::{Action, ActionError, ApplicationMessage},
+	connections::{ConnectionAction, ConnectionMessage, ReleaseAction},
+};
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},
 	co_reducer_factory::CoReducerFactory,

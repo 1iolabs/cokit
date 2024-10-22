@@ -3,7 +3,6 @@ use crate::{
 		subscribe::{subscribe_identity, unsubscribe_identity},
 		CoNetworkTaskSpawner,
 	},
-	reactive::context::{ActionObservable, StateObservable},
 	state::{self, core_state_or_default},
 	Action, CoContext, CoStorage, CO_CORE_NAME_KEYSTORE, CO_ID_LOCAL,
 };
@@ -11,104 +10,100 @@ use co_core_co::Co;
 use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 use co_identity::{PrivateIdentityResolver, PrivateIdentityResolverBox};
 use co_primitives::{Did, OptionLink};
-use futures::{pin_mut, Stream, StreamExt};
+use futures::{pin_mut, stream, Stream, StreamExt};
+use std::future::ready;
 
 /// Subscribe DIDs when network is started.
 pub fn network_started(
-	actions: ActionObservable,
-	_states: StateObservable,
-	context: CoContext,
-) -> impl Stream<Item = Action> + Send + 'static {
-	actions
-		.filter_map(|action| async move {
-			match action {
-				Action::NetworkStarted => Some(()),
-				_ => None,
-			}
-		})
-		.filter_map({
+	action: &Action,
+	_state: &(),
+	context: &CoContext,
+) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
+	match action {
+		Action::NetworkStarted => Some({
 			let context = context.clone();
-			move |_| {
+			stream::once({
 				let context = context.clone();
 				async move { context.network_tasks().await }
-			}
-		})
-		.flat_map(move |network| subscribe_all(context.clone(), network).map(Action::map_error))
+			})
+			.filter_map(ready)
+			.flat_map(move |network| subscribe_all(context.clone(), network).map(Action::map_error))
+			.map(Ok)
+		}),
+		_ => None,
+	}
 }
 
 /// Subscribe/Unsubscribe DID when it gets created/removed.
 pub fn keystore_changed(
-	actions: ActionObservable,
-	_states: StateObservable,
-	context: CoContext,
-) -> impl Stream<Item = Action> + Send + 'static {
-	apply_subscribe_actions(
-		context.clone(),
-		actions.filter_map(move |action| {
-			let context = context.clone();
-			async move {
-				match action {
-					Action::CoreAction { co, context: change_context, action, cid: _ }
-						if co.as_str() == CO_ID_LOCAL
-							&& change_context.is_local_change()
-							&& action.core == CO_CORE_NAME_KEYSTORE =>
-					{
-						let keystore_action: KeyStoreAction = action.get_payload().ok()?;
-						match keystore_action {
-							KeyStoreAction::Set(key) if state::is_identity(&key) => {
-								Some(SubscribeAction::Subscribe(key.uri))
-							},
-							KeyStoreAction::Remove(remove_uri) => {
-								let local_co = context.local_co_reducer().await.ok()?;
-								let remove_key =
-									key_by_uri(&local_co.storage(), local_co.co_state().await, &remove_uri)
-										.await
-										.ok()??;
-								if state::is_identity(&remove_key) {
-									Some(SubscribeAction::Unsubscribe(remove_uri))
-								} else {
-									None
+	action: &Action,
+	_state: &(),
+	context: &CoContext,
+) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
+	match action {
+		Action::CoreAction { co, context: change_context, action, cid: _ }
+			if co.as_str() == CO_ID_LOCAL
+				&& change_context.is_local_change()
+				&& action.core == CO_CORE_NAME_KEYSTORE =>
+		{
+			if let Some(keystore_action) = action.get_payload::<KeyStoreAction>().ok() {
+				Some(
+					stream::once({
+						let context = context.clone();
+						async move {
+							if let Some(subscribe_action) =
+								SubscribeAction::from_keystore_action(&context, keystore_action).await
+							{
+								if let Some(network) = context.network_tasks().await {
+									let private_identity_resolver = context.private_identity_resolver().await?;
+									match subscribe_action {
+										SubscribeAction::Subscribe(did) => {
+											subscribe(&private_identity_resolver, &network, &did).await?;
+										},
+										SubscribeAction::Unsubscribe(did) => {
+											unsubscribe_identity(&network, did).await?;
+										},
+									}
 								}
-							},
-							_ => None,
+							}
+							Ok(())
 						}
-					},
-					_ => None,
-				}
+					})
+					.filter_map(|result: Result<(), anyhow::Error>| {
+						ready(match result {
+							Ok(_) => None,
+							Err(err) => Some(Ok(Action::from(err))),
+						})
+					}),
+				)
+			} else {
+				None
 			}
-		}),
-	)
-	.map(Action::map_error)
+		},
+		_ => None,
+	}
 }
 
 enum SubscribeAction {
 	Subscribe(Did),
 	Unsubscribe(Did),
 }
-
-fn apply_subscribe_actions(
-	context: CoContext,
-	actions: impl Stream<Item = SubscribeAction>,
-) -> impl Stream<Item = Result<Action, anyhow::Error>> {
-	async_stream::try_stream! {
-		let private_identity_resolver = context.private_identity_resolver().await?;
-		for await action in actions {
-			if let Some(network) = context.network_tasks().await {
-				let result = match action {
-					SubscribeAction::Subscribe(did) => {
-						subscribe(&private_identity_resolver, &network, &did).await
-					},
-					SubscribeAction::Unsubscribe(did) => {
-						unsubscribe_identity(&network, did).await
-					},
-				};
-				match result {
-					Ok(()) => {},
-					Err(err) => {
-						yield Action::from(err);
-					}
+impl SubscribeAction {
+	async fn from_keystore_action(context: &CoContext, keystore_action: KeyStoreAction) -> Option<SubscribeAction> {
+		match keystore_action {
+			KeyStoreAction::Set(key) if state::is_identity(&key) => Some(SubscribeAction::Subscribe(key.uri)),
+			KeyStoreAction::Remove(remove_uri) => {
+				let local_co = context.local_co_reducer().await.ok()?;
+				let remove_key = key_by_uri(&local_co.storage(), local_co.co_state().await, &remove_uri)
+					.await
+					.ok()??;
+				if state::is_identity(&remove_key) {
+					Some(SubscribeAction::Unsubscribe(remove_uri))
+				} else {
+					None
 				}
-			}
+			},
+			_ => None,
 		}
 	}
 }
