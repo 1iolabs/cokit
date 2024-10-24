@@ -1,3 +1,3 @@
-# CO WASM Runtime
+# CO Runtime
 ## Abstract
-CO WebAssemliy Runtime to execute CO "state reducers".
+CO WebAssembliy Runtime to execute CO state reducers (COre).

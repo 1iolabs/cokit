@@ -11,19 +11,20 @@ pub const CO_DIDCOMM_KEY_RESPONSE: &str = "co-key-response";
 /// Create an signed key request message.
 /// As we may send this request to any CO participant it's only signed by the sender and without an explicit recipent.
 pub fn create_key_request_message<F>(
+	message_id: String,
 	from: &F,
 	payload: KeyRequestPayload,
 	expire: Duration,
-) -> anyhow::Result<(String, EncodedMessage)>
+) -> anyhow::Result<EncodedMessage>
 where
 	F: PrivateIdentity + Send + Sync + 'static,
 {
 	let (from_didcomm, mut header) = DidCommHeader::create_from(from, CO_DIDCOMM_KEY_REQUEST)?;
 	header.expires_time = Some((SystemTime::now().duration_since(UNIX_EPOCH)? + expire).as_secs());
-	let id = header.id.clone();
+	header.id = message_id;
 	let body = to_json_string(&payload)?;
 	let message = from_didcomm.jws(header, &body)?;
-	Ok((id, EncodedMessage(message.into_bytes())))
+	Ok(EncodedMessage(message.into_bytes()))
 }
 
 /// Create an encrypted key response message.

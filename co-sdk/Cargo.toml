@@ -10,6 +10,7 @@ rust-version = "1.76"
 anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
+co-actor = { path = "../co-actor" }
 co-core-co = { path = "../cores/co" }
 co-core-data-series = { path = "../cores/data-series" }
 co-core-file = { path = "../cores/file" }
@@ -24,6 +25,7 @@ co-network = { path = "../co-network" }
 co-primitives = { path = "../co-primitives" }
 co-runtime = { path = "../co-runtime" }
 co-storage = { path = "../co-storage" }
+derive_more = { workspace = true }
 directories = "5.0.1"
 futures = { workspace = true }
 hmac = "0.12.1"

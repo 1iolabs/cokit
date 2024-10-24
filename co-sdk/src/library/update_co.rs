@@ -1,18 +1,18 @@
 use crate::{
-	reactive::{context::ActionObservable, wait_response::wait_response},
-	types::message::heads::HeadsMessage,
-	Action, CoReducer,
+	library::wait_response::wait_response, services::application::ApplicationMessage,
+	types::message::heads::HeadsMessage, Action, CoReducer,
 };
 use anyhow::anyhow;
+use co_actor::ActorHandle;
 use co_identity::PrivateIdentity;
 use co_network::didcomm::EncodedMessage;
-use futures::join;
+use futures::try_join;
 use libp2p::PeerId;
 use std::time::Duration;
 
 /// (Forcibily) request heads from peer and wait for response.
 pub async fn update_co<P>(
-	actions: ActionObservable,
+	actions: ActorHandle<ApplicationMessage>,
 	co_reducer: &CoReducer,
 	from: &P,
 	to: PeerId,
@@ -25,7 +25,7 @@ where
 	let body = HeadsMessage::HeadsRequest(co_reducer.id().clone());
 	let header = HeadsMessage::create_header();
 	let (message_id, message) = EncodedMessage::create_signed_json(from, header, &body)?;
-	let (response, _) = join!(
+	let ((_peer, message), _) = try_join!(
 		wait_response(actions.clone(), timeout, {
 			let message_id = message_id.clone();
 			move |action| match action {
@@ -36,12 +36,13 @@ where
 			}
 		}),
 		async move {
-			actions.dispatch(Action::DidCommSend { message_id, peer: to, message });
+			actions
+				.dispatch(Action::DidCommSend { message_id, peer: to, message })
+				.map_err(anyhow::Error::from)
 		}
-	);
+	)?;
 
 	// response
-	let (_peer, message) = response?;
 	let heads_message: HeadsMessage = message.body_deserialize()?;
 	match heads_message {
 		HeadsMessage::Heads(received_co, received_heads) => {

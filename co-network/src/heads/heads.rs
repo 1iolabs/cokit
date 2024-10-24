@@ -100,30 +100,20 @@ impl HeadsState {
 
 	/// Subscribe to CO gossip.
 	/// Returns `true` if a new subscription has been made, `false` is was already subscribed.
-	pub fn subscribe<B>(
-		&mut self,
-		swarm: &mut Swarm<B>,
-		network: &NetworkCoHeads,
-		co: &CoId,
-	) -> Result<bool, anyhow::Error>
+	pub fn subscribe<B>(&mut self, swarm: &mut Swarm<B>, network: &NetworkCoHeads) -> Result<bool, anyhow::Error>
 	where
 		B: NetworkBehaviour + GossipsubBehaviourProvider,
 	{
-		let topic = Self::to_topic(network, co);
+		let topic = Self::to_topic(network);
 		self.heads.insert(topic.hash());
 		Ok(swarm.behaviour_mut().gossipsub_mut().subscribe(&topic)?)
 	}
 
-	pub fn unsubscribe<B>(
-		&mut self,
-		swarm: &mut Swarm<B>,
-		network: &NetworkCoHeads,
-		co: &CoId,
-	) -> Result<bool, anyhow::Error>
+	pub fn unsubscribe<B>(&mut self, swarm: &mut Swarm<B>, network: &NetworkCoHeads) -> Result<bool, anyhow::Error>
 	where
 		B: NetworkBehaviour + GossipsubBehaviourProvider,
 	{
-		let topic = Self::to_topic(network, co);
+		let topic = Self::to_topic(network);
 		self.heads.remove(&topic.hash());
 		Ok(swarm.behaviour_mut().gossipsub_mut().unsubscribe(&topic)?)
 	}
@@ -132,14 +122,13 @@ impl HeadsState {
 		&mut self,
 		swarm: &mut Swarm<B>,
 		network: &NetworkCoHeads,
-		co: &CoId,
 		heads: &BTreeSet<Cid>,
 	) -> Result<(), anyhow::Error>
 	where
 		B: NetworkBehaviour + GossipsubBehaviourProvider,
 	{
-		let topic = Self::to_topic(network, co);
-		let message = HeadsMessage::Heads(co.clone(), heads.clone());
+		let topic = Self::to_topic(network);
+		let message = HeadsMessage::Heads(network.id.clone(), heads.clone());
 		let data = to_cbor(&message)?;
 		match swarm.behaviour_mut().gossipsub_mut().publish(topic, data) {
 			Ok(_) => Ok(()),
@@ -147,10 +136,10 @@ impl HeadsState {
 				// insert as pending by only keeping latest publish by every co
 				let pending = self
 					.pending_heads
-					.entry(Self::to_topic(network, co).hash())
+					.entry(Self::to_topic(network).hash())
 					.or_insert(Default::default());
-				pending.retain(|item| &item.co != co);
-				pending.push(PublishHeads { network: network.clone(), co: co.clone(), heads: heads.clone() });
+				pending.retain(|item| &item.co != &network.id);
+				pending.push(PublishHeads { network: network.clone(), co: network.id.clone(), heads: heads.clone() });
 				Ok(())
 			},
 			Err(e) => Err(e.into()),
@@ -255,12 +244,12 @@ impl HeadsState {
 		Ok(())
 	}
 
-	pub fn to_topic_hash(network: &NetworkCoHeads, id: &CoId) -> gossipsub::TopicHash {
-		Self::to_topic(network, id).hash()
+	pub fn to_topic_hash(network: &NetworkCoHeads) -> gossipsub::TopicHash {
+		Self::to_topic(network).hash()
 	}
 
-	fn to_topic(network: &NetworkCoHeads, id: &CoId) -> gossipsub::IdentTopic {
-		IdentTopic::new(network.topic.clone().unwrap_or_else(|| format!("co-{}", id)))
+	fn to_topic(network: &NetworkCoHeads) -> gossipsub::IdentTopic {
+		IdentTopic::new(network.topic.clone().unwrap_or_else(|| format!("co-{}", network.id)))
 	}
 
 	fn on_gossip_event(&mut self, event: &gossipsub::Event) {
@@ -380,7 +369,7 @@ where
 		match event {
 			HeadsEvent::GenerateEvent(event) => Some(event),
 			HeadsEvent::Publish(publish) => {
-				match self.publish(swarm, &publish.network, &publish.co, &publish.heads) {
+				match self.publish(swarm, &publish.network, &publish.heads) {
 					Ok(()) => {},
 					Err(err) => {
 						// todo: generate some error event?
@@ -571,13 +560,13 @@ mod tests {
 		// peer1: subscribe
 		heads1
 			.layer_mut()
-			.subscribe(peer1.swarm(), &NetworkCoHeads::default(), &co)
+			.subscribe(peer1.swarm(), &NetworkCoHeads { topic: None, id: co.clone() })
 			.unwrap();
 
 		// peer2: subscribe
 		heads2
 			.layer_mut()
-			.subscribe(peer1.swarm(), &NetworkCoHeads::default(), &co)
+			.subscribe(peer1.swarm(), &NetworkCoHeads { topic: None, id: co.clone() })
 			.unwrap();
 
 		// // wait until both are subscribed
@@ -596,7 +585,7 @@ mod tests {
 		// peer2: update heads
 		heads2
 			.layer_mut()
-			.publish(peer2.swarm(), &NetworkCoHeads::default(), &co, &h2)
+			.publish(peer2.swarm(), &NetworkCoHeads { topic: None, id: co.clone() }, &h2)
 			.unwrap();
 
 		// run

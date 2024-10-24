@@ -1,0 +1,104 @@
+use crate::{
+	library::{
+		find_co_identities::find_co_private_identity,
+		find_co_secret::find_co_key,
+		key_exchange::{create_key_response_message, KeyRequestPayload, KeyResponsePayload, CO_DIDCOMM_KEY_REQUEST},
+		settings_timeout::settings_timeout,
+	},
+	services::network::DidCommSendNetworkTask,
+	Action, CoContext, CoReducerFactory,
+};
+use anyhow::anyhow;
+use co_core_co::ParticipantState;
+use co_core_keystore::Key;
+use co_identity::{DidCommHeader, Identity, IdentityResolver};
+use co_primitives::from_json_string;
+use futures::{stream, Stream, StreamExt};
+use libp2p::PeerId;
+use std::{future::ready, time::Duration};
+
+/// When we receive an key request send an response.
+pub fn key_request_receive(
+	action: &Action,
+	_state: &(),
+	context: &CoContext,
+) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
+	match action {
+		Action::DidCommReceive { peer, message } => {
+			if &message.header().message_type == CO_DIDCOMM_KEY_REQUEST && message.is_validated_sender() {
+				let (header, body) = message.clone().into_inner();
+				let context = context.clone();
+				Some(
+					stream::once(ready((context, *peer, header, body)))
+						.then(move |(context, peer, header, body)| async move {
+							key_request(context, peer, header, body).await
+						})
+						.flat_map(Action::map_error_stream)
+						.map(Ok),
+				)
+			} else {
+				None
+			}
+		},
+		_ => None,
+	}
+}
+
+async fn key_request(
+	context: CoContext,
+	peer: PeerId,
+	header: DidCommHeader,
+	body: String,
+) -> anyhow::Result<Vec<Action>> {
+	let network = context.network_tasks().await.ok_or(anyhow!("Expected network"))?;
+
+	// payload
+	let payload: KeyRequestPayload = from_json_string(&body)?;
+	if payload.peer != peer {
+		// SECURITY:
+		//  to mitigate MITM we only accept this request if its from the peer that is has been signed for
+		return Err(anyhow!("invalid payload"));
+	}
+	let from = header.from.ok_or(anyhow!("invalid header: from"))?.to_string();
+
+	// requester
+	let identity_resolver = context.identity_resolver().await?;
+	let requester_identity = identity_resolver.resolve(&from).await?;
+
+	// get participant state
+	//  we only allow active participants to request keys
+	let co = context.try_co_reducer(&payload.id).await?;
+	let co_state = co.co().await?;
+	let participant_state = co_state
+		.participants
+		.get(requester_identity.identity())
+		.map(|participant| participant.state)
+		.unwrap_or(co_core_co::ParticipantState::Inactive);
+
+	// send response
+	if participant_state != ParticipantState::Active {
+		return Err(anyhow!("Invalid participant state: {:?}", participant_state));
+	}
+
+	// membership
+	//  we currently use the identity of the first membership we found for an co to send the response
+	//  it should not metter which identity we use as the receive then knows about all the participants
+	let identity = find_co_private_identity(&context, &payload.id).await?;
+
+	// key
+	let local_co = context.local_co_reducer().await?;
+	let key: Key = find_co_key(&local_co, &co).await?.ok_or(anyhow!("No key found"))?;
+
+	// message
+	let message =
+		create_key_response_message(&identity, &requester_identity, header.id.clone(), KeyResponsePayload::Ok(key))?;
+
+	// timeout
+	let timeout: Duration = settings_timeout(&context, &payload.id, Some("key-exchange")).await;
+
+	// send
+	DidCommSendNetworkTask::send(network.clone(), [peer], message, timeout).await?;
+
+	// result
+	Ok(vec![])
+}

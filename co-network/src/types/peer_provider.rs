@@ -1,6 +1,6 @@
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use libp2p::PeerId;
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, future::ready};
 
 pub trait PeerProvider {
 	/// Provide peers as a stream.
@@ -13,7 +13,19 @@ pub trait PeerProvider {
 	/// Every time when new peers are discovered a item with all currently connected peers is emitted.
 	/// The stream may completes when no more peers are discoverable.
 	/// This method is maybe lossy and is usually ignoring errors.
-	fn peers(&self) -> impl Stream<Item = BTreeSet<PeerId>> + Send + 'static;
+	fn peers(&self) -> impl Stream<Item = BTreeSet<PeerId>> + Send + 'static {
+		self.try_peers().filter_map({
+			move |result| {
+				ready(match result {
+					Ok(p) => Some(p),
+					Err(err) => {
+						tracing::warn!(?err, "peer-provider-error");
+						None
+					},
+				})
+			}
+		})
+	}
 
 	/// Same as `peers` but only emit added peers.
 	/// Initially all currently connected peers are returned.

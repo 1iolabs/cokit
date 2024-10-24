@@ -1,11 +1,8 @@
 mod application;
-mod drivers;
-// mod epics;
-mod errors;
 mod library;
 mod pin;
-mod reactive;
 pub mod reducer;
+mod services;
 pub mod state;
 mod types;
 
@@ -14,31 +11,27 @@ pub use application::{
 	co_context::CoContext,
 	local::{LocalCoBuilder, CO_ID_LOCAL},
 	reducer::{Reducer, ReducerBuilder, ReducerChangeContext, ReducerChangedHandler},
+	runtime::Runtime,
 	shared::CreateCo,
+	storage::Storage,
 	tracing::TracingBuilder,
 };
+pub use co_actor::TaskSpawner;
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 pub use co_identity::{
 	DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver, IdentityResolverError,
 	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 pub use co_primitives::{
-	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, BlockSerializer, CoId,
-	CoInvite, CoNetwork, Date, Did, KnownMultiCodec, KnownTag, KnownTags, Link, MultiCodec, MultiCodecError,
-	OptionLink, Tag, Tags,
+	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, AbsolutePath,
+	AbsolutePathOwned, BlockSerializer, CoId, CoInvite, CoNetwork, Component, Components, Date, Did, KnownMultiCodec,
+	KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, OptionLink, PathExt, RelativePath, RelativePathOwned, Tag,
+	Tags,
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{
 	store_file, unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer, BlockStat, BlockStorage,
 	BlockStorageContentMapping, BlockStorageExt, StorageError,
-};
-pub use drivers::{
-	network::{
-		token::{CoToken, CoTokenParameters},
-		Network,
-	},
-	runtime::Runtime,
-	storage::Storage,
 };
 pub use library::{
 	did_key_provider::DidKeyProvider,
@@ -49,13 +42,16 @@ pub use library::{
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
 	node_stream::NodeStream,
-	shared_co_join::{SharedCoJoin, SharedCoJoinError},
-	task_spawner::TaskSpawner,
+	response_list::ResponseList,
 	update_co::update_co,
 };
 pub use pin::pin::PinAPI;
-pub use reactive::{action::Action, epic::Epic, observable::Observable};
 pub use reducer::core_resolver::{co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverError};
+pub use services::{
+	application::{Action, ActionError, ApplicationMessage},
+	connections::{ConnectionAction, ConnectionMessage, ReleaseAction},
+	network::{self, CoNetworkTaskSpawner, CoToken, CoTokenParameters, Network, NetworkMessage},
+};
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},
 	co_reducer_factory::CoReducerFactory,

@@ -84,7 +84,7 @@ impl DidCommHeader {
 	/// Create new DidCommHeader with an
 	pub fn new(message_type: impl Into<String>) -> Self {
 		Self {
-			id: uuid::Uuid::new_v4().to_string(),
+			id: Self::create_message_id(),
 			created_time: Some(
 				SystemTime::now()
 					.duration_since(UNIX_EPOCH)
@@ -120,5 +120,10 @@ impl DidCommHeader {
 		let mut header = DidCommHeader::new(message_type.into());
 		header.from = Some(from.identity().to_owned());
 		Ok((from.try_didcomm_private()?, header))
+	}
+
+	/// Create random message id.
+	pub fn create_message_id() -> String {
+		uuid::Uuid::new_v4().to_string()
 	}
 }

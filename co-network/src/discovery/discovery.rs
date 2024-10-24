@@ -139,6 +139,7 @@ pub enum Event {
 	Disconnected { id: u64, peer: PeerId },
 
 	/// A discovery connect has timedout.
+	/// TODO: Does it always mean it has failed?
 	Timeout { id: u64 },
 }
 

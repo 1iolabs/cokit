@@ -11,7 +11,7 @@ async-trait = { workspace = true }
 co-core-co = { path = "../cores/co" }
 co-core-membership = { path = "../cores/membership" }
 co-sdk = { path = "../co-sdk" }
-dioxus = { version = "0.5", default-features = false, features = ["hooks", "signals"] }
+dioxus = { version = "=0.6.0-alpha.3", default-features = false, features = ["hooks", "signals"] }
 futures = { workspace = true }
 libipld = { workspace = true }
 serde = { workspace = true }

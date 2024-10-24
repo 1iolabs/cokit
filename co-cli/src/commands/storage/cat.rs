@@ -33,7 +33,8 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 	if let Some(key_file) = &command.key_file {
 		let key_data: Vec<u8> = tokio::fs::read(key_file).await?;
 		let key: Secret = from_cbor(&key_data)?;
-		storage = CoStorage::new(EncryptedBlockStorage::new(storage, key.into(), Default::default()));
+		storage =
+			CoStorage::new(EncryptedBlockStorage::new(storage, key.into(), Default::default(), Default::default()));
 	}
 
 	// print

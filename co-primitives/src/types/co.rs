@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, fmt::Display, ops::Deref};
 
 /// CO Unique ID.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash)]
 pub struct CoId(String);
 impl CoId {
 	pub fn new(co: impl Into<String>) -> Self {

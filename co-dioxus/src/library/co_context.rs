@@ -51,7 +51,7 @@ impl CoContext {
 	{
 		self.execute_future_box(move |application| {
 			Box::pin(async move {
-				application.tasks().spawn(async move {
+				application.context().tasks().spawn(async move {
 					f(application).await;
 				});
 			})

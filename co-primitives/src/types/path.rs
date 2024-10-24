@@ -481,6 +481,15 @@ impl<'a> Components<'a> {
 		};
 		(comp.len() + extra, self.parse_single_component(comp))
 	}
+
+	/// Convert into vector of all names elements.
+	pub fn into_vec_normal(self) -> Vec<String> {
+		self.filter_map(|component| match component {
+			Component::Normal(name) => Some(name.to_owned()),
+			_ => None,
+		})
+		.collect()
+	}
 }
 impl<'a> Iterator for Components<'a> {
 	type Item = Component<'a>;

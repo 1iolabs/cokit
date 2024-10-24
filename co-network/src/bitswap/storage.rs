@@ -171,6 +171,7 @@ where
 
 /// Try to get block using specified peers.
 /// Canceled when the result receiver is dropped.
+#[derive(Debug)]
 struct GetNetworkTask {
 	cid: Cid,
 	tokens: Vec<Token>,
@@ -255,6 +256,8 @@ where
 		}
 	}
 }
+
+#[derive(Debug)]
 enum GetNetworkTaskState {
 	Pending(BTreeSet<PeerId>, oneshot::Sender<Result<(), StorageError>>),
 	Execute,

@@ -1,0 +1,39 @@
+use crate::{Action, CoContext, CoReducerFactory, ReducerChangeContext};
+use co_identity::PrivateIdentityResolver;
+use co_primitives::{CoId, ReducerAction};
+use futures::{stream, Stream, StreamExt};
+use libipld::Ipld;
+
+/// Apply `Action::CoreActionPush` to reducer.
+pub fn core_action_push(
+	action: &Action,
+	_state: &(),
+	context: &CoContext,
+) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
+	match action {
+		Action::CoreActionPush { co, action } => Some(
+			stream::iter([(context.clone(), co.clone(), action.clone())])
+				.filter_map(move |(context, co, action)| async move {
+					if let Err(err) = push(&context, &co, &action).await {
+						Some(Action::CoreActionFailure {
+							co,
+							context: ReducerChangeContext::new(),
+							action,
+							err: err.into(),
+						})
+					} else {
+						None
+					}
+				})
+				.map(Ok),
+		),
+		_ => None,
+	}
+}
+
+async fn push(context: &CoContext, co: &CoId, action: &ReducerAction<Ipld>) -> anyhow::Result<()> {
+	let reducer = context.try_co_reducer(&co).await?;
+	let identity = context.private_identity_resolver().await?.resolve_private(&action.from).await?;
+	reducer.push_action(&identity, action).await?;
+	Ok(())
+}
