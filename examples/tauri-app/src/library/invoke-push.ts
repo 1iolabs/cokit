@@ -5,6 +5,7 @@ import { CID } from "multiformats";
 import * as json from 'multiformats/codecs/json';
 import { sha256 } from 'multiformats/hashes/sha2';
 import * as uuid from "uuid";
+import { MatrixEvent } from "../types/types";
 
 export async function createCid<T>(data: T) {
     let json_data = json.encode(data);
@@ -14,20 +15,20 @@ export async function createCid<T>(data: T) {
 }
 
 export async function invokePushMessage(message: string, co: string, core: string) {
-    let action = {
+    let action: MatrixEvent = {
         event_id: uuid.v4(),
         timestamp: moment.now(),
         room_id: "@some.room",
-        type: "m.room.message",
+        type: "m_room_message",
         content: {
-            msgtype: "m.text",
+            msgtype: "text",
             body: message,
         }
     };
     await invokePush(action, co, core);
 }
 
-export async function invokePush(action: object, co: string, core: string) {
+export async function invokePush(action: MatrixEvent, co: string, core: string) {
     let body_raw = encode({ action, co, core });
     await invoke("push", { body: Array.from(body_raw) });
 }

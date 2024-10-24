@@ -69,9 +69,9 @@ export type MessageType =
        * Users that are mentioned in the body
        */
       mentions?: Mentions | null;
+      msgtype: "text";
       new_content?: EventContent | null;
       relates_to?: RelatesTo | null;
-      type: "text";
     }
   | {
       /**
@@ -91,9 +91,9 @@ export type MessageType =
        * Users that are mentioned in the body
        */
       mentions?: Mentions | null;
+      msgtype: "notice";
       new_content?: EventContent | null;
       relates_to?: RelatesTo | null;
-      type: "notice";
     }
   | {
       /**
@@ -109,9 +109,9 @@ export type MessageType =
        */
       info: ImageInfo;
       is_silent?: boolean | null;
+      msgtype: "image";
       new_content?: EventContent | null;
       relates_to?: RelatesTo | null;
-      type: "image";
     }
   | {
       /**
@@ -127,9 +127,9 @@ export type MessageType =
        */
       info: AudioInfo;
       is_silent?: boolean | null;
+      msgtype: "audio";
       new_content?: EventContent | null;
       relates_to?: RelatesTo | null;
-      type: "audio";
     }
   | {
       /**
@@ -145,9 +145,9 @@ export type MessageType =
        */
       info: VideoInfo;
       is_silent?: boolean | null;
+      msgtype: "video";
       new_content?: EventContent | null;
       relates_to?: RelatesTo | null;
-      type: "video";
     }
   | {
       /**
@@ -167,9 +167,9 @@ export type MessageType =
        */
       info: FileInfo;
       is_silent?: boolean | null;
+      msgtype: "file";
       new_content?: EventContent | null;
       relates_to?: RelatesTo | null;
-      type: "file";
     }
   | {
       /**
@@ -185,9 +185,9 @@ export type MessageType =
        */
       info: LocationInfo;
       is_silent?: boolean | null;
+      msgtype: "location";
       new_content?: EventContent | null;
       relates_to?: RelatesTo | null;
-      type: "location";
     }
   | (
       | {

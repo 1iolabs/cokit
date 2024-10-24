@@ -858,7 +858,7 @@
           "type": "object",
           "required": [
             "body",
-            "type"
+            "msgtype"
           ],
           "properties": {
             "body": {
@@ -896,6 +896,12 @@
                 }
               ]
             },
+            "msgtype": {
+              "type": "string",
+              "enum": [
+                "text"
+              ]
+            },
             "new_content": {
               "anyOf": [
                 {
@@ -914,12 +920,6 @@
                 {
                   "type": "null"
                 }
-              ]
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "text"
               ]
             }
           }
@@ -929,7 +929,7 @@
           "type": "object",
           "required": [
             "body",
-            "type"
+            "msgtype"
           ],
           "properties": {
             "body": {
@@ -967,6 +967,12 @@
                 }
               ]
             },
+            "msgtype": {
+              "type": "string",
+              "enum": [
+                "notice"
+              ]
+            },
             "new_content": {
               "anyOf": [
                 {
@@ -985,12 +991,6 @@
                 {
                   "type": "null"
                 }
-              ]
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "notice"
               ]
             }
           }
@@ -1001,7 +1001,7 @@
             "body",
             "file",
             "info",
-            "type"
+            "msgtype"
           ],
           "properties": {
             "body": {
@@ -1030,6 +1030,12 @@
                 "null"
               ]
             },
+            "msgtype": {
+              "type": "string",
+              "enum": [
+                "image"
+              ]
+            },
             "new_content": {
               "anyOf": [
                 {
@@ -1049,12 +1055,6 @@
                   "type": "null"
                 }
               ]
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "image"
-              ]
             }
           }
         },
@@ -1064,7 +1064,7 @@
             "body",
             "file",
             "info",
-            "type"
+            "msgtype"
           ],
           "properties": {
             "body": {
@@ -1093,6 +1093,12 @@
                 "null"
               ]
             },
+            "msgtype": {
+              "type": "string",
+              "enum": [
+                "audio"
+              ]
+            },
             "new_content": {
               "anyOf": [
                 {
@@ -1112,12 +1118,6 @@
                   "type": "null"
                 }
               ]
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "audio"
-              ]
             }
           }
         },
@@ -1127,7 +1127,7 @@
             "body",
             "file",
             "info",
-            "type"
+            "msgtype"
           ],
           "properties": {
             "body": {
@@ -1156,6 +1156,12 @@
                 "null"
               ]
             },
+            "msgtype": {
+              "type": "string",
+              "enum": [
+                "video"
+              ]
+            },
             "new_content": {
               "anyOf": [
                 {
@@ -1175,12 +1181,6 @@
                   "type": "null"
                 }
               ]
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "video"
-              ]
             }
           }
         },
@@ -1191,7 +1191,7 @@
             "file",
             "filename",
             "info",
-            "type"
+            "msgtype"
           ],
           "properties": {
             "body": {
@@ -1224,6 +1224,12 @@
                 "null"
               ]
             },
+            "msgtype": {
+              "type": "string",
+              "enum": [
+                "file"
+              ]
+            },
             "new_content": {
               "anyOf": [
                 {
@@ -1243,12 +1249,6 @@
                   "type": "null"
                 }
               ]
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "file"
-              ]
             }
           }
         },
@@ -1258,7 +1258,7 @@
             "body",
             "geo_uri",
             "info",
-            "type"
+            "msgtype"
           ],
           "properties": {
             "body": {
@@ -1283,6 +1283,12 @@
                 "null"
               ]
             },
+            "msgtype": {
+              "type": "string",
+              "enum": [
+                "location"
+              ]
+            },
             "new_content": {
               "anyOf": [
                 {
@@ -1301,12 +1307,6 @@
                 {
                   "type": "null"
                 }
-              ]
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "location"
               ]
             }
           }
@@ -1462,10 +1462,10 @@
             }
           ],
           "required": [
-            "type"
+            "msgtype"
           ],
           "properties": {
-            "type": {
+            "msgtype": {
               "type": "string",
               "enum": [
                 "Poll"

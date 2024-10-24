@@ -13,7 +13,7 @@ use typeshare::typeshare;
  */
 // #[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
-#[serde(tag = "type")]
+#[serde(tag = "msgtype")]
 pub enum MessageType {
 	#[serde(rename = "text")]
 	Text(TextContent),
