@@ -30,16 +30,14 @@ impl CoApplicationSettings {
 
 pub async fn application(settings: CoApplicationSettings) -> Application {
 	let identifier = settings.identifier;
-	let builder = match settings.path {
+	let mut builder = match settings.path {
 		Some(path) => ApplicationBuilder::new_with_path(identifier, path),
 		None => ApplicationBuilder::new(identifier),
 	};
-	let mut application = builder
-		.without_keychain()
-		.with_bunyan_logging(None)
-		.build()
-		.await
-		.expect("application");
+	if settings.no_keychain {
+		builder = builder.without_keychain()
+	}
+	let mut application = builder.with_bunyan_logging(None).build().await.expect("application");
 
 	// network
 	if settings.network {

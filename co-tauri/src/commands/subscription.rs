@@ -1,7 +1,4 @@
-use crate::library::{
-	subscription::{build_event_name, Subscriptions},
-	tauri_error::CoTauriError,
-};
+use crate::library::{co_id::build_core_id, tauri_error::CoTauriError};
 use anyhow::anyhow;
 use co_log::SignedEntry;
 use co_primitives::ReducerAction;
@@ -27,7 +24,7 @@ pub async fn subscribe(
 		.await?
 		.ok_or(anyhow!("Co not found: {}", co))?;
 
-	let event = build_event_name(co, core);
+	let event = build_core_id(co, core);
 
 	// scope to ensure lock gets released
 	{
@@ -77,7 +74,7 @@ pub async fn unsubscribe(
 	core: Option<&str>,
 	source: &str,
 ) -> Result<(), CoTauriError> {
-	let event = build_event_name(co, core);
+	let event = build_core_id(co, core);
 	let mut subscriptions = subscriptions.active_subscriptions.lock().await;
 	// remove subscribers for event type
 	if let Some(mut subscribers) = subscriptions.remove(&event) {

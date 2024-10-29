@@ -1804,6 +1804,8 @@ name = "co-tauri"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "co-actor",
  "co-core-co",
  "co-core-membership",
  "co-core-room",
