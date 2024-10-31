@@ -1,7 +1,8 @@
-use crate::library::tauri_error::CoTauriError;
+use crate::library::{application_actor::ApplicationActorMessage, tauri_error::CoTauriError};
 use anyhow::anyhow;
-use co_sdk::{Application, CoId, CoReducerFactory};
-use libipld::{cbor::DagCborCodec, codec::Codec, Ipld};
+use co_actor::ActorHandle;
+use co_sdk::CoId;
+use libipld::{cbor::DagCborCodec, codec::Codec, Cid, Ipld};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
@@ -65,7 +66,10 @@ impl PushCommandBody {
 }
 
 #[tauri::command]
-pub async fn push(application: tauri::State<'_, Application>, body: Vec<u8>) -> Result<(), CoTauriError> {
+pub async fn push(
+	actor_handle: tauri::State<'_, ActorHandle<ApplicationActorMessage>>,
+	body: Vec<u8>,
+) -> Result<Option<Cid>, CoTauriError> {
 	// manually deserialize body into PushCommandBody type
 	let body: PushCommandBody = DagCborCodec::default().decode::<Ipld>(&body)?.try_into()?;
 	tracing::info!(
@@ -74,13 +78,7 @@ pub async fn push(application: tauri::State<'_, Application>, body: Vec<u8>) -> 
 		body.core,
 		body.action
 	);
-	// get reducer and push action
-	let reducer = application
-		.context()
-		.try_co_reducer(&body.co)
-		.await
-		.map_err(|err| anyhow::Error::from(err))?;
-	let identity = application.local_identity();
-	reducer.push(&identity, &body.core, &body.action).await?;
-	Ok(())
+	Ok(actor_handle
+		.request(|r| ApplicationActorMessage::Push(body.co, body.core, body.action, r))
+		.await??)
 }

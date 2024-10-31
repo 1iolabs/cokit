@@ -1,19 +1,15 @@
-use crate::library::tauri_error::CoTauriError;
-use co_sdk::{Application, BlockStorageExt, CoId, CoReducerFactory};
+use crate::library::{application_actor::ApplicationActorMessage, tauri_error::CoTauriError};
+use co_actor::ActorHandle;
+use co_sdk::CoId;
 use libipld::{Cid, Ipld};
 
 #[tauri::command]
 pub(crate) async fn resolve_cid(
-	application: tauri::State<'_, Application>,
-	cid: Cid,
+	actor_handle: tauri::State<'_, ActorHandle<ApplicationActorMessage>>,
 	co: CoId,
+	cid: Cid,
 ) -> Result<Ipld, CoTauriError> {
-	let storage = application
-		.context()
-		.try_co_reducer(&co)
-		.await
-		.map_err(|err| anyhow::Error::from(err))?
-		.storage();
-	let ipld: Ipld = storage.get_deserialized::<Ipld>(&cid).await?;
-	Ok(ipld)
+	Ok(actor_handle
+		.request(|r| ApplicationActorMessage::ResolveCid(co, cid, r))
+		.await??)
 }
