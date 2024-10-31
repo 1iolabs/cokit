@@ -1,4 +1,5 @@
 use super::ActorError;
+use crate::TaskSpawner;
 use futures::{FutureExt, Stream};
 use std::{
 	future::Future,
@@ -19,6 +20,35 @@ impl<T> Response<T> {
 	/// Alias to respond.
 	pub fn send(self, value: T) -> Result<(), ActorError> {
 		self.tx.send(value).map_err(|_| ActorError::Canceled)
+	}
+
+	/// Executes closure and respond with the result
+	pub async fn execute<Fut, F>(self, value: F) -> Result<(), ActorError>
+	where
+		Fut: Future<Output = T> + Send,
+		F: FnOnce() -> Fut + Send,
+	{
+		self.send(value().await)
+	}
+
+	/// Spawns a new task and executes given closure in it
+	pub fn spawn<Fut, F>(self, value: F)
+	where
+		Fut: Future<Output = T> + Send + 'static,
+		F: FnOnce() -> Fut + Send + 'static,
+		T: Send + 'static,
+	{
+		Self::spawn_with(self, Default::default(), value);
+	}
+
+	/// Spawns a new task using the given spawner and executes given closure in it
+	pub fn spawn_with<Fut, F>(self, spawner: TaskSpawner, value: F)
+	where
+		Fut: Future<Output = T> + Send + 'static,
+		F: FnOnce() -> Fut + Send + 'static,
+		T: Send + 'static,
+	{
+		spawner.spawn(async move { self.send(value().await).ok() });
 	}
 }
 
