@@ -30,7 +30,7 @@ pub use co_primitives::{
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{
-	store_file, unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer, BlockStat, BlockStorage,
+	store_file, unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer, unixfs_stream, BlockStat, BlockStorage,
 	BlockStorageContentMapping, BlockStorageExt, StorageError,
 };
 pub use library::{
@@ -54,7 +54,7 @@ pub use services::{
 };
 pub use types::{
 	co_reducer::{CoReducer, CoReducerError},
-	co_reducer_factory::CoReducerFactory,
+	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError},
 	co_storage::CoStorage,
 	cores::{
 		Cores, CO_CORE_CO, CO_CORE_DATA_SERIES, CO_CORE_FILE, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
