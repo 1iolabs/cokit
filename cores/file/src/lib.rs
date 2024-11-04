@@ -192,7 +192,7 @@ fn create_node(
 	node: Node,
 ) -> Result<(), anyhow::Error> {
 	// validate parent exists
-	match parent_path.as_ref() {
+	match parent_path.as_str() {
 		// root always exists
 		"/" => {},
 		// check if node exists

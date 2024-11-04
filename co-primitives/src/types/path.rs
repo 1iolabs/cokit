@@ -36,12 +36,12 @@ impl PathExt for Path {
 		unsafe { &*(s as *const str as *const Path) }
 	}
 
-	fn as_string(&self) -> &'_ str {
+	fn as_str(&self) -> &'_ str {
 		&self.0
 	}
 
 	fn has_root(&self) -> bool {
-		matches!(self.as_string().as_bytes().first(), Some(b'/'))
+		matches!(self.as_str().as_bytes().first(), Some(b'/'))
 	}
 }
 impl From<&Path> for String {
@@ -67,16 +67,26 @@ impl AsRef<str> for Path {
 		&self.0
 	}
 }
+impl PartialEq<str> for Path {
+	fn eq(&self, other: &str) -> bool {
+		Self::from_str_unchecked(other) == self.as_path()
+	}
+}
 impl Display for Path {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str(self.as_string())
+		f.write_str(self.as_str())
 	}
 }
 impl ToOwned for Path {
 	type Owned = PathOwned;
 
 	fn to_owned(&self) -> Self::Owned {
-		PathOwned::from_owned_unchecked(self.as_string().to_owned())
+		PathOwned::from_owned_unchecked(self.as_str().to_owned())
+	}
+}
+impl PartialEq<PathOwned> for Path {
+	fn eq(&self, other: &PathOwned) -> bool {
+		other.as_path() == self.as_path()
 	}
 }
 
@@ -109,7 +119,7 @@ impl PathExt for PathOwned {
 		Self::Path::from_str_unchecked(buf)
 	}
 
-	fn as_string(&self) -> &'_ str {
+	fn as_str(&self) -> &'_ str {
 		&self.0
 	}
 
@@ -129,6 +139,11 @@ impl AsRef<Path> for PathOwned {
 		Path::from_str_unchecked(&self.0)
 	}
 }
+impl PartialEq<Path> for PathOwned {
+	fn eq(&self, other: &Path) -> bool {
+		other.as_path() == self.as_path()
+	}
+}
 impl Borrow<Path> for PathOwned {
 	fn borrow(&self) -> &Path {
 		self
@@ -137,6 +152,11 @@ impl Borrow<Path> for PathOwned {
 impl AsRef<str> for PathOwned {
 	fn as_ref(&self) -> &str {
 		&self.0
+	}
+}
+impl PartialEq<str> for PathOwned {
+	fn eq(&self, other: &str) -> bool {
+		Self::from_str_unchecked(other) == self.as_path()
 	}
 }
 impl From<PathOwned> for String {
@@ -154,7 +174,7 @@ impl<'a> IntoIterator for &'a PathOwned {
 }
 impl Display for PathOwned {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str(self.as_string())
+		f.write_str(self.as_str())
 	}
 }
 
@@ -194,7 +214,7 @@ impl PathExt for AbsolutePath {
 		unsafe { &*(s as *const str as *const Self::Path) }
 	}
 
-	fn as_string(&self) -> &'_ str {
+	fn as_str(&self) -> &'_ str {
 		&self.0
 	}
 
@@ -224,17 +244,27 @@ impl ToOwned for AbsolutePath {
 	type Owned = AbsolutePathOwned;
 
 	fn to_owned(&self) -> Self::Owned {
-		AbsolutePathOwned::from_owned_unchecked(self.as_string().to_owned())
+		AbsolutePathOwned::from_owned_unchecked(self.as_str().to_owned())
 	}
 }
 impl AsRef<str> for AbsolutePath {
 	fn as_ref(&self) -> &str {
-		self.as_string()
+		self.as_str()
+	}
+}
+impl PartialEq<str> for AbsolutePath {
+	fn eq(&self, other: &str) -> bool {
+		Self::from_str_unchecked(other) == self.as_path()
 	}
 }
 impl Display for AbsolutePath {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str(self.as_string())
+		f.write_str(self.as_str())
+	}
+}
+impl PartialEq<AbsolutePathOwned> for AbsolutePath {
+	fn eq(&self, other: &AbsolutePathOwned) -> bool {
+		other.as_path() == self.as_path()
 	}
 }
 
@@ -268,7 +298,7 @@ impl PathExt for AbsolutePathOwned {
 		Self::Path::from_str_unchecked(buf)
 	}
 
-	fn as_string(&self) -> &'_ str {
+	fn as_str(&self) -> &'_ str {
 		&self.0
 	}
 
@@ -286,6 +316,11 @@ impl Deref for AbsolutePathOwned {
 impl AsRef<AbsolutePath> for AbsolutePathOwned {
 	fn as_ref(&self) -> &AbsolutePath {
 		AbsolutePath::from_str_unchecked(&self.0)
+	}
+}
+impl PartialEq<AbsolutePath> for AbsolutePathOwned {
+	fn eq(&self, other: &AbsolutePath) -> bool {
+		self == other
 	}
 }
 impl Borrow<AbsolutePath> for AbsolutePathOwned {
@@ -311,12 +346,16 @@ impl AsRef<str> for AbsolutePathOwned {
 		&self.0
 	}
 }
-impl Display for AbsolutePathOwned {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str(self.as_string())
+impl PartialEq<str> for AbsolutePathOwned {
+	fn eq(&self, other: &str) -> bool {
+		Self::from_str_unchecked(other) == self.as_path()
 	}
 }
-
+impl Display for AbsolutePathOwned {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_str(self.as_str())
+	}
+}
 /// Relative Path.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
@@ -344,7 +383,7 @@ impl PathExt for RelativePath {
 		unsafe { &*(s as *const str as *const Self::Path) }
 	}
 
-	fn as_string(&self) -> &'_ str {
+	fn as_str(&self) -> &'_ str {
 		&self.0
 	}
 
@@ -375,16 +414,26 @@ impl AsRef<str> for RelativePath {
 		&self.0
 	}
 }
+impl PartialEq<str> for RelativePath {
+	fn eq(&self, other: &str) -> bool {
+		Self::from_str_unchecked(other) == self.as_path()
+	}
+}
 impl Display for RelativePath {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str(self.as_string())
+		f.write_str(self.as_str())
 	}
 }
 impl ToOwned for RelativePath {
 	type Owned = RelativePathOwned;
 
 	fn to_owned(&self) -> Self::Owned {
-		RelativePathOwned::from_owned_unchecked(self.as_string().to_owned())
+		RelativePathOwned::from_owned_unchecked(self.as_str().to_owned())
+	}
+}
+impl PartialEq<RelativePathOwned> for RelativePath {
+	fn eq(&self, other: &RelativePathOwned) -> bool {
+		other.as_path() == self.as_path()
 	}
 }
 
@@ -408,7 +457,7 @@ impl PathExt for RelativePathOwned {
 		Self::Path::from_str_unchecked(buf)
 	}
 
-	fn as_string(&self) -> &'_ str {
+	fn as_str(&self) -> &'_ str {
 		&self.0
 	}
 
@@ -426,6 +475,11 @@ impl Deref for RelativePathOwned {
 impl AsRef<RelativePath> for RelativePathOwned {
 	fn as_ref(&self) -> &RelativePath {
 		RelativePath::from_str_unchecked(&self.0)
+	}
+}
+impl PartialEq<RelativePath> for RelativePathOwned {
+	fn eq(&self, other: &RelativePath) -> bool {
+		other.as_path() == self.as_path()
 	}
 }
 impl Borrow<RelativePath> for RelativePathOwned {
@@ -451,9 +505,14 @@ impl AsRef<str> for RelativePathOwned {
 		&self.0
 	}
 }
+impl PartialEq<str> for RelativePathOwned {
+	fn eq(&self, other: &str) -> bool {
+		Self::from_str_unchecked(other) == self.as_path()
+	}
+}
 impl Display for RelativePathOwned {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str(self.as_string())
+		f.write_str(self.as_str())
 	}
 }
 
@@ -562,20 +621,20 @@ pub trait PathExt {
 	}
 
 	fn as_path(&self) -> &Self::Path {
-		Self::from_str_unchecked(self.as_string())
+		Self::from_str_unchecked(self.as_str())
 	}
 
 	fn to_path(&self) -> Self::PathOwned {
-		Self::from_owned_unchecked(self.as_string().to_owned())
+		Self::from_owned_unchecked(self.as_str().to_owned())
 	}
 
-	fn as_string(&self) -> &str;
+	fn as_str(&self) -> &str;
 
 	fn has_root(&self) -> bool;
 
 	/// Path components.
 	fn components(&self) -> Components<'_> {
-		Components { path: self.as_string(), has_root: self.has_root() }
+		Components { path: self.as_str(), has_root: self.has_root() }
 	}
 
 	/// Parent directory.
@@ -601,7 +660,7 @@ pub trait PathExt {
 	/// assert_eq!(None, parents.next());
 	/// ```
 	fn parents(&self) -> impl Iterator<Item = &Self::Path> {
-		self.components().scan((0_usize, self.as_string()), |(index, path), component| {
+		self.components().scan((0_usize, self.as_str()), |(index, path), component| {
 			let end = *index + component.len();
 			if end == path.len() {
 				return None;
@@ -616,7 +675,7 @@ pub trait PathExt {
 	fn parent_and_file_name(&self) -> Option<(&Self::Path, &'_ str)> {
 		match self.components().last() {
 			Some(Component::Normal(name)) => {
-				let path = self.as_string();
+				let path = self.as_str();
 				let parent = match path.split_at(path.len() - name.len()) {
 					("/", _) => "/",
 					(p, _) if p.len() > 1 => &p[0..p.len() - 1],
@@ -868,7 +927,7 @@ mod tests {
 				.unwrap()
 				.join(Path::from_str("world").unwrap())
 				.unwrap()
-				.as_string()
+				.as_str()
 		);
 		assert_eq!(
 			"/world",
@@ -876,7 +935,7 @@ mod tests {
 				.unwrap()
 				.join(Path::from_str("/world").unwrap())
 				.unwrap()
-				.as_string()
+				.as_str()
 		);
 	}
 }
