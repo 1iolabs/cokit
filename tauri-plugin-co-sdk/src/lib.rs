@@ -1,5 +1,10 @@
 use co_actor::Actor;
-use commands::{get_state::get_co_state, push::push, resolve_cid::resolve_cid};
+use commands::{
+	get_state::get_co_state,
+	push::push,
+	resolve_cid::resolve_cid,
+	storage::{storage_get, storage_set},
+};
 use futures::{pin_mut, StreamExt};
 use library::{
 	application_actor::{ApplicationActor, ApplicationActorMessage},
@@ -14,8 +19,8 @@ pub async fn init<R: Runtime>(co_settings: CoApplicationSettings) -> TauriPlugin
 	// create an actor to handle application tasks
 
 	// create a tauri plugin that acts as an api between frontends and co sdk
-	tauri::plugin::Builder::new("tauri-plugin-co")
-		.invoke_handler(tauri::generate_handler![get_co_state, push, resolve_cid])
+	tauri::plugin::Builder::new("co-sdk")
+		.invoke_handler(tauri::generate_handler![get_co_state, push, resolve_cid, storage_get, storage_set])
 		.setup(|app_handle, _api| {
 			let actor_handle = Actor::spawn(Default::default(), ApplicationActor {}, co_settings)
 				.unwrap()
@@ -27,7 +32,7 @@ pub async fn init<R: Runtime>(co_settings: CoApplicationSettings) -> TauriPlugin
 					let stream = actor_handle.stream(ApplicationActorMessage::WatchState);
 					pin_mut!(stream);
 					while let Some(Ok(result)) = stream.next().await {
-						app_handle.emit("event", "payload").ok();
+						app_handle.emit("co-sdk-new-state", result).ok();
 					}
 				}
 			});

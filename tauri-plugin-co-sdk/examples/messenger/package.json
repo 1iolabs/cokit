@@ -44,7 +44,8 @@
     }
   },
   "dependencies": {
-    "@1io/coapp-messenger-view": "file:../../../../IdeaProjects/coapp-messenger-view/1io-coapp-messenger-view-0.2.0.tgz",
+    "tauri-plugin-co-sdk": "file:../../",
+    "@1io/coapp-messenger-view": "file:../../../../../IdeaProjects/coapp-messenger-view/1io-coapp-messenger-view-0.2.0.tgz",
     "@1io/kui-application": "^0.5.0",
     "@1io/kui-application-sdk": "^5.0.1",
     "@1io/kui-badge": "^0.1.7",

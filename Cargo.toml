@@ -13,7 +13,6 @@ members = [
     "co-runtime",
     "co-sdk",
     "co-storage",
-    "co-tauri",
     "cores/co",
     "cores/data-series",
     "cores/file",
@@ -26,7 +25,8 @@ members = [
     "did-co",
     "examples/counter",
     "examples/message",
-    "examples/tauri-app/src-tauri",
+    "tauri-plugin-co-sdk",
+    "tauri-plugin-co-sdk/examples/messenger/src-tauri",
 ]
 resolver = "2"
 

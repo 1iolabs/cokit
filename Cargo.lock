@@ -1800,33 +1800,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "co-tauri"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "co-actor",
- "co-core-co",
- "co-core-membership",
- "co-core-room",
- "co-log",
- "co-messaging",
- "co-primitives",
- "co-sdk",
- "futures",
- "libipld",
- "serde",
- "serde_json",
- "tauri",
- "tauri-plugin-shell",
- "tauri-utils",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tracing",
-]
-
-[[package]]
 name = "cocoa"
 version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8980,11 +8953,11 @@ dependencies = [
 name = "tauri-app"
 version = "0.1.0"
 dependencies = [
- "co-tauri",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
+ "tauri-plugin-co-sdk",
  "tauri-plugin-shell",
  "tauri-utils",
  "tokio",
@@ -9068,6 +9041,34 @@ dependencies = [
  "tauri-utils",
  "toml 0.8.19",
  "walkdir",
+]
+
+[[package]]
+name = "tauri-plugin-co-sdk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "co-actor",
+ "co-core-co",
+ "co-core-membership",
+ "co-core-room",
+ "co-log",
+ "co-messaging",
+ "co-primitives",
+ "co-sdk",
+ "futures",
+ "libipld",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tauri-plugin-shell",
+ "tauri-utils",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
 ]
 
 [[package]]
