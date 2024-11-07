@@ -3,7 +3,7 @@ import { EMPTY, filter, mergeMap, withLatestFrom } from "rxjs";
 import { createCoSdkStateEventListener } from "../library/co-sdk-state-listener";
 import { ChatsListEpicType } from "../types/plugin";
 
-export const subscribeChatsEpicc: ChatsListEpicType = (action$, state$, context) => action$.pipe(
+export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) => action$.pipe(
     filter(isPluginInitializeAction),
     mergeMap(() => {
         return createCoSdkStateEventListener().pipe(

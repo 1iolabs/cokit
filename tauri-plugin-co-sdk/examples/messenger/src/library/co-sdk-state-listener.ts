@@ -16,6 +16,7 @@ export function createCoSdkStateEventListener(): Observable<CoSdkStateEvent> {
         },
         (_handler, unlisten) => {
             //stop listening
+            console.log("unlisten: ", unlisten);
             unlisten();
         },
     );

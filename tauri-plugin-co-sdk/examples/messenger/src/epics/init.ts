@@ -19,6 +19,7 @@ export const initEpic: ChatsListEpicType = (action$, state$, context) => action$
                 { key: "coapp-chats-list", value: context.plugin },
             ],
         ));
+        console.log("heads get");
         const heads = await invokeGetCoHeads("1io");
         console.log("heads", heads);
         // load all chat states

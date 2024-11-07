@@ -1,20 +1,19 @@
 import { isNonNull } from "@1io/kui-application-sdk";
-import { invoke } from "@tauri-apps/api/core";
 import { CID } from "multiformats";
+import { getCoState, resolveCid } from "tauri-plugin-co-sdk";
 import { buildCoCoreId } from "./core-id";
 
 export async function invokeResolveCid(co: string, cid: CID): Promise<any> {
-    return await invoke("resolve_cid", { co, cid });
+    return await resolveCid(co, cid);
 }
 
-export async function invokeGetCoState(co: string): Promise<any> {
-    let [stateCid]: [CID, CID[]] = await invoke("get_co_state", { co });
-    let state: any = await invokeResolveCid(co, stateCid);
-    return state;
+export async function invokeGetCoState(co: string): Promise<any | undefined> {
+    let [stateCid] = await getCoState(co);
+    return stateCid ? await invokeResolveCid(co, stateCid) : undefined;
 }
 
 export async function invokeGetCoHeads(co: string): Promise<any[]> {
-    let [_, headsCids]: [CID, CID[]] = await invoke("get_co_state", { co });
+    let [_, headsCids] = await getCoState(co);
     const heads = [];
     for (const headCid of headsCids) {
         heads.push(await invokeResolveCid(co, headCid));

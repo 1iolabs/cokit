@@ -1,10 +1,9 @@
-import { encode } from "@ipld/dag-cbor";
-import { invoke } from "@tauri-apps/api/core";
 import moment from "moment";
 import { CID } from "multiformats";
 import * as json from 'multiformats/codecs/json';
 import { sha256 } from 'multiformats/hashes/sha2';
 import * as uuid from "uuid";
+import { pushAction } from "../../../../dist-js";
 import { MatrixEvent } from "../types/types";
 
 export async function createCid<T>(data: T) {
@@ -29,6 +28,5 @@ export async function invokePushMessage(message: string, co: string, core: strin
 }
 
 export async function invokePush(action: MatrixEvent, co: string, core: string) {
-    let body_raw = encode({ action, co, core });
-    await invoke("push", { body: Array.from(body_raw) });
+    await pushAction(co, core, action);
 }

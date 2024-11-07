@@ -1,1 +1,0 @@
-TODO: nice list of all chats and actually show one  when clicked on: kui-router
