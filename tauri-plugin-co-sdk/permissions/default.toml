@@ -1,0 +1,10 @@
+"$schema" = "schemas/schema.json"
+[default]
+description = "Allows usage of co-sdk api"
+permissions = [
+    "allow-get-co-state",
+    "allow-resolve-cid",
+    "allow-storage-get",
+    "allow-storage-set",
+    "allow-push-action",
+]

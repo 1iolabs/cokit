@@ -66,7 +66,7 @@ impl PushCommandBody {
 }
 
 #[tauri::command]
-pub async fn push(
+pub async fn push_action(
 	actor_handle: tauri::State<'_, ActorHandle<ApplicationActorMessage>>,
 	body: Vec<u8>,
 ) -> Result<Option<Cid>, CoTauriError> {

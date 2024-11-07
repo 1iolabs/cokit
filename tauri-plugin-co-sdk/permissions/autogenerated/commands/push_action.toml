@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-push-action"
+description = "Enables the push_action command without any pre-configured scope."
+commands.allow = ["push_action"]
+
+[[permission]]
+identifier = "deny-push-action"
+description = "Denies the push_action command without any pre-configured scope."
+commands.deny = ["push_action"]

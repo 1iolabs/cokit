@@ -6,11 +6,11 @@ use libipld::{Block, Cid, DefaultParams};
 #[tauri::command]
 pub(crate) async fn storage_get(
 	actor_handle: tauri::State<'_, ActorHandle<ApplicationActorMessage>>,
-	co_id: CoId,
+	co: CoId,
 	cid: Cid,
 ) -> Result<Vec<u8>, CoTauriError> {
 	Ok(actor_handle
-		.request(|r| ApplicationActorMessage::StorageGet(co_id, cid, r))
+		.request(|r| ApplicationActorMessage::StorageGet(co, cid, r))
 		.await??
 		.data()
 		.into())
@@ -19,12 +19,12 @@ pub(crate) async fn storage_get(
 #[tauri::command]
 pub(crate) async fn storage_set(
 	actor_handle: tauri::State<'_, ActorHandle<ApplicationActorMessage>>,
-	co_id: CoId,
+	co: CoId,
 	cid: Cid,
 	data: Vec<u8>,
 ) -> Result<Cid, CoTauriError> {
 	let block = Block::<DefaultParams>::new(cid, data)?;
 	Ok(actor_handle
-		.request(|r| ApplicationActorMessage::StorageSet(co_id, block, r))
+		.request(|r| ApplicationActorMessage::StorageSet(co, block, r))
 		.await??)
 }

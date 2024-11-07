@@ -56,11 +56,11 @@ impl Actor for ApplicationActor {
 						.map_err(|err| ActorError::Actor(err.into()))?)
 				});
 			},
-			ApplicationActorMessage::StorageSet(co_id, block, response) => {
+			ApplicationActorMessage::StorageSet(co, block, response) => {
 				let context = state.application.context().clone();
 				response.spawn(move || async move {
 					Ok(context
-						.try_co_reducer(&co_id)
+						.try_co_reducer(&co)
 						.await
 						.map_err(|err| ActorError::Actor(err.into()))?
 						.storage()
@@ -69,13 +69,13 @@ impl Actor for ApplicationActor {
 						.map_err(|err| ActorError::Actor(err.into()))?)
 				});
 			},
-			ApplicationActorMessage::GetCoState(co_id, response) => {
+			ApplicationActorMessage::GetCoState(co, response) => {
 				response
 					.execute(|| async {
 						Ok(state
 							.application
 							.context()
-							.try_co_reducer(&co_id)
+							.try_co_reducer(&co)
 							.await
 							.map_err(|err| ActorError::Actor(err.into()))?
 							.reducer_state()
@@ -107,13 +107,13 @@ impl Actor for ApplicationActor {
 					}
 				});
 			},
-			ApplicationActorMessage::Push(co_id, core, action, response) => {
+			ApplicationActorMessage::Push(co, core, action, response) => {
 				response
 					.execute(|| async {
 						state
 							.application
 							.context()
-							.try_co_reducer(&co_id)
+							.try_co_reducer(&co)
 							.await
 							.map_err(|err| ActorError::Actor(err.into()))?
 							.push(&state.application.local_identity(), &core, &action)
@@ -123,11 +123,11 @@ impl Actor for ApplicationActor {
 					.await
 					.ok();
 			},
-			ApplicationActorMessage::ResolveCid(co_id, cid, response) => {
+			ApplicationActorMessage::ResolveCid(co, cid, response) => {
 				let context = state.application.context().clone();
 				response.spawn(move || async move {
 					Ok(context
-						.try_co_reducer(&co_id)
+						.try_co_reducer(&co)
 						.await
 						.map_err(|err| ActorError::Actor(err.into()))?
 						.storage()

@@ -1,7 +1,7 @@
 use co_actor::Actor;
 use commands::{
 	get_state::get_co_state,
-	push::push,
+	push_action::push_action,
 	resolve_cid::resolve_cid,
 	storage::{storage_get, storage_set},
 };
@@ -20,7 +20,7 @@ pub async fn init<R: Runtime>(co_settings: CoApplicationSettings) -> TauriPlugin
 
 	// create a tauri plugin that acts as an api between frontends and co sdk
 	tauri::plugin::Builder::new("co-sdk")
-		.invoke_handler(tauri::generate_handler![get_co_state, push, resolve_cid, storage_get, storage_set])
+		.invoke_handler(tauri::generate_handler![get_co_state, push_action, resolve_cid, storage_get, storage_set])
 		.setup(|app_handle, _api| {
 			let actor_handle = Actor::spawn(Default::default(), ApplicationActor {}, co_settings)
 				.unwrap()
