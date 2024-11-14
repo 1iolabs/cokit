@@ -30,7 +30,6 @@ export interface ChatsListActivatePluginAction {
 export interface ChatsListUpdateChatAction {
     readonly payload: {
         chat: Partial<Chat>;
-        roomCoreId: string;
     };
     readonly type: ChatsListActionType.UpdateChat;
 }

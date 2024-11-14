@@ -15,7 +15,7 @@ export function chatsListReducer(state: ChatsListPluginState | undefined, action
         case ChatsListActionType.UpdateChat: {
             return {
                 ...state, chats: state.chats.map((chat) => {
-                    if (chat.roomCoreId === action.payload.roomCoreId) {
+                    if (chat.roomCoreId === action.payload.chat.roomCoreId) {
                         return { ...chat, ...action.payload.chat };
                     }
                     return chat;

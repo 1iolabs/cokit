@@ -295,6 +295,34 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "allow-entries -> Enables the entries command without any pre-configured scope.",
+          "type": "string",
+          "enum": [
+            "allow-entries"
+          ]
+        },
+        {
+          "description": "deny-entries -> Denies the entries command without any pre-configured scope.",
+          "type": "string",
+          "enum": [
+            "deny-entries"
+          ]
+        },
+        {
+          "description": "allow-get-actions -> Enables the get_actions command without any pre-configured scope.",
+          "type": "string",
+          "enum": [
+            "allow-get-actions"
+          ]
+        },
+        {
+          "description": "deny-get-actions -> Denies the get_actions command without any pre-configured scope.",
+          "type": "string",
+          "enum": [
+            "deny-get-actions"
+          ]
+        },
+        {
           "description": "allow-get-co-state -> Enables the get_co_state command without any pre-configured scope.",
           "type": "string",
           "enum": [
@@ -306,6 +334,20 @@
           "type": "string",
           "enum": [
             "deny-get-co-state"
+          ]
+        },
+        {
+          "description": "allow-get-log -> Enables the get_log command without any pre-configured scope.",
+          "type": "string",
+          "enum": [
+            "allow-get-log"
+          ]
+        },
+        {
+          "description": "deny-get-log -> Denies the get_log command without any pre-configured scope.",
+          "type": "string",
+          "enum": [
+            "deny-get-log"
           ]
         },
         {

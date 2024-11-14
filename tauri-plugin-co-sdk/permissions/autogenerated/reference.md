@@ -7,6 +7,7 @@ Allows usage of co-sdk api
 - `allow-storage-get`
 - `allow-storage-set`
 - `allow-push-action`
+- `allow-get-actions`
 
 ### Permission Table 
 
@@ -16,6 +17,58 @@ Allows usage of co-sdk api
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`co-sdk:allow-entries`
+
+</td>
+<td>
+
+Enables the entries command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:deny-entries`
+
+</td>
+<td>
+
+Denies the entries command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:allow-get-actions`
+
+</td>
+<td>
+
+Enables the get_actions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:deny-get-actions`
+
+</td>
+<td>
+
+Denies the get_actions command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
@@ -39,6 +92,32 @@ Enables the get_co_state command without any pre-configured scope.
 <td>
 
 Denies the get_co_state command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:allow-get-log`
+
+</td>
+<td>
+
+Enables the get_log command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:deny-get-log`
+
+</td>
+<td>
+
+Denies the get_log command without any pre-configured scope.
 
 </td>
 </tr>
