@@ -93,6 +93,27 @@ where
 	pub fn create(storage: &mut dyn Storage, items: impl IntoIterator<Item = <Self as DagCollection>::Item>) -> Self {
 		Self(Self::to_link(storage, items))
 	}
+
+	/// Update one element that matches the predicate.
+	/// Returns Some result if a item has been updated and None otherwise.
+	///
+	/// TODO: Do not load whole collection into memory.
+	pub fn update_one<R>(
+		&mut self,
+		context: &mut dyn Context,
+		predicate: impl Fn(&mut dyn Context, &V) -> bool,
+		update: impl FnOnce(&mut dyn Context, &mut V) -> R,
+	) -> Option<R> {
+		let mut collection = self.get(context.storage());
+		for item in collection.iter_mut() {
+			if predicate(context, item) {
+				let result = update(context, item);
+				self.set(context.storage_mut(), collection);
+				return Some(result);
+			}
+		}
+		None
+	}
 }
 impl<V> Clone for DagVec<V> {
 	fn clone(&self) -> Self {
@@ -169,6 +190,57 @@ where
 			false
 		}
 	}
+
+	/// Update one element that matches the predicate.
+	/// Returns Some result if a item has been updated and None otherwise.
+	///
+	/// TODO: Do not load whole collection into memory.
+	pub fn update_one<R>(
+		&mut self,
+		context: &mut dyn Context,
+		predicate: impl Fn(&mut dyn Context, &V) -> bool,
+		update: impl FnOnce(&mut dyn Context, &mut V) -> R,
+	) -> Option<R> {
+		let mut collection = self.get(context.storage());
+		if let Some(mut item) = collection.iter().find(|item| predicate(context, item)).cloned() {
+			if collection.remove(&item) {
+				// update
+				let result = update(context, &mut item);
+
+				// insert
+				collection.insert(item);
+				self.set(context.storage_mut(), collection);
+				return Some(result);
+			}
+		}
+		None
+	}
+
+	/// Update one element that matches the predicate.
+	/// Returns Some result if a item has been updated and None otherwise.
+	/// If the update fails it will be not applied.
+	///
+	/// TODO: Do not load whole collection into memory.
+	pub fn try_update_one<R>(
+		&mut self,
+		context: &mut dyn Context,
+		predicate: impl Fn(&mut dyn Context, &V) -> bool,
+		update: impl FnOnce(&mut dyn Context, &mut V) -> Result<R, anyhow::Error>,
+	) -> Result<Option<R>, anyhow::Error> {
+		let mut collection = self.get(context.storage());
+		if let Some(mut item) = collection.iter().find(|item| predicate(context, item)).cloned() {
+			if collection.remove(&item) {
+				// update
+				let result = update(context, &mut item)?;
+
+				// insert
+				collection.insert(item);
+				self.set(context.storage_mut(), collection);
+				return Ok(Some(result));
+			}
+		}
+		Ok(None)
+	}
 }
 impl<V> DagCollection for DagSet<V>
 where
@@ -226,7 +298,7 @@ where
 
 	/// Inserts a key-value pair into the map.
 	///
-	/// Todo: Do not load whole collection into memory.
+	/// TODO: Do not load whole collection into memory.
 	pub fn insert(&mut self, context: &mut dyn Context, key: K, value: V) -> Option<V> {
 		self.update(context, |_, v| v.insert(key, value))
 	}
@@ -234,9 +306,45 @@ where
 	/// Removes a key from the map, returning the value at the key if the key
 	/// was previously in the map.
 	///
-	/// Todo: Do not load whole collection into memory.
+	/// TODO: Do not load whole collection into memory.
 	pub fn remove(&mut self, context: &mut dyn Context, key: &K) -> Option<V> {
 		self.update(context, |_, v| v.remove(key))
+	}
+
+	/// Update element with given key.
+	/// Returns Some result if a item has been updated and None otherwise.
+	pub fn update_key<R>(
+		&mut self,
+		context: &mut dyn Context,
+		key: &K,
+		update: impl FnOnce(&mut dyn Context, &K, &mut V) -> R,
+	) -> Option<R> {
+		self.update(context, move |context, map| {
+			if let Some(mut item) = map.remove(key) {
+				let result = update(context, key, &mut item);
+				map.insert(key.clone(), item);
+				return Some(result);
+			}
+			None
+		})
+	}
+
+	/// Update element with given key.
+	/// Returns Some result if the key was found and modified None otherwise.
+	pub fn try_update_key<R>(
+		&mut self,
+		context: &mut dyn Context,
+		key: &K,
+		update: impl FnOnce(&mut dyn Context, &K, &mut V) -> Result<R, anyhow::Error>,
+	) -> Result<Option<R>, anyhow::Error> {
+		self.try_update(context, move |context, map| {
+			if let Some(mut item) = map.remove(key) {
+				let result = update(context, key, &mut item)?;
+				map.insert(key.clone(), item);
+				return Ok(Some(result));
+			}
+			Ok(None)
+		})
 	}
 }
 impl<K, V> DagCollection for DagMap<K, V>

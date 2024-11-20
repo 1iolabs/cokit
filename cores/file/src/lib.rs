@@ -18,36 +18,6 @@ pub enum Node {
 	File(FileNode),
 	Link(LinkNode),
 }
-impl Node {
-	pub fn name(&self) -> &str {
-		match self {
-			Node::Folder(node) => &node.name,
-			Node::File(node) => &node.name,
-			Node::Link(node) => &node.name,
-		}
-	}
-
-	pub fn is_dir(&self) -> bool {
-		match self {
-			Node::Folder(_) => true,
-			_ => false,
-		}
-	}
-
-	pub fn is_file(&self) -> bool {
-		match self {
-			Node::File(_) => true,
-			_ => false,
-		}
-	}
-
-	pub fn is_link(&self) -> bool {
-		match self {
-			Node::Link(_) => true,
-			_ => false,
-		}
-	}
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
 pub struct FileNode {
@@ -87,6 +57,41 @@ pub enum FileAction {
 
 	/// Remove a node.
 	Remove { path: AbsolutePathOwned },
+
+	/// Modify a node.
+	Modify { path: AbsolutePathOwned, modifications: Vec<FileModification> },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum FileModification {
+	/// Rename node to.
+	Rename(String),
+
+	/// Set create time.
+	SetCreateTime(Date),
+
+	/// Set modify time.
+	SetModifyTime(Date),
+
+	/// Set mode.
+	SetMode(u32),
+
+	/// Set owner.
+	SetOwner(Did),
+
+	/// Insert tags.
+	TagsInsert(Tags),
+
+	/// Remove tags.
+	TagsRemove(Tags),
+
+	/// Set file contents.
+	/// Only applicable to [`Node::File`].
+	SetContents(Cid, u64),
+
+	/// Set link target.
+	/// Only applicable to [`Node::Link`].
+	SetLink(PathOwned),
 }
 
 impl Reducer for File {
@@ -98,7 +103,146 @@ impl Reducer for File {
 				create(context, self, path, node, &event.from, event.time, *recursive).unwrap()
 			},
 			FileAction::Remove { path } => remove(context, self, path).unwrap(),
+			FileAction::Modify { path, modifications } => modify(context, self, path, modifications).unwrap(),
 		}
+	}
+}
+impl Node {
+	pub fn name(&self) -> &str {
+		match self {
+			Node::Folder(node) => &node.name,
+			Node::File(node) => &node.name,
+			Node::Link(node) => &node.name,
+		}
+	}
+
+	pub fn is_dir(&self) -> bool {
+		match self {
+			Node::Folder(_) => true,
+			_ => false,
+		}
+	}
+
+	pub fn is_file(&self) -> bool {
+		match self {
+			Node::File(_) => true,
+			_ => false,
+		}
+	}
+
+	pub fn is_link(&self) -> bool {
+		match self {
+			Node::Link(_) => true,
+			_ => false,
+		}
+	}
+
+	pub fn modify(&mut self, modification: &FileModification) -> anyhow::Result<()> {
+		match self {
+			Node::Folder(folder_node) => folder_node.modify(modification),
+			Node::File(file_node) => file_node.modify(modification),
+			Node::Link(link_node) => link_node.modify(modification),
+		}
+	}
+}
+impl FileNode {
+	pub fn modify(&mut self, modification: &FileModification) -> anyhow::Result<()> {
+		match modification {
+			FileModification::Rename(name) => {
+				self.name = name.to_owned();
+			},
+			FileModification::SetCreateTime(time) => {
+				self.create_time = *time;
+			},
+			FileModification::SetModifyTime(time) => {
+				self.modify_time = *time;
+			},
+			FileModification::SetMode(mode) => {
+				self.mode = *mode;
+			},
+			FileModification::SetOwner(owner) => {
+				self.owner = owner.to_owned();
+			},
+			FileModification::TagsInsert(tags) => {
+				self.tags.append(&mut tags.clone());
+			},
+			FileModification::TagsRemove(tags) => {
+				self.tags.clear(Some(tags));
+			},
+			FileModification::SetContents(cid, size) => {
+				self.contents = *cid;
+				self.size = *size;
+			},
+			m => return Err(anyhow!("Unsupported modification: {:?}", m)),
+		}
+		Ok(())
+	}
+}
+impl FolderNode {
+	pub fn modify(&mut self, modification: &FileModification) -> anyhow::Result<()> {
+		match modification {
+			FileModification::Rename(name) => {
+				self.name = name.to_owned();
+			},
+			FileModification::SetCreateTime(time) => {
+				self.create_time = *time;
+			},
+			FileModification::SetModifyTime(time) => {
+				self.modify_time = *time;
+			},
+			FileModification::SetMode(mode) => {
+				self.mode = *mode;
+			},
+			FileModification::SetOwner(owner) => {
+				self.owner = owner.to_owned();
+			},
+			FileModification::TagsInsert(tags) => {
+				self.tags.append(&mut tags.clone());
+			},
+			FileModification::TagsRemove(tags) => {
+				self.tags.clear(Some(tags));
+			},
+			m => return Err(anyhow!("Unsupported modification: {:?}", m)),
+		}
+		Ok(())
+	}
+}
+impl LinkNode {
+	pub fn modify(&mut self, modification: &FileModification) -> anyhow::Result<()> {
+		match modification {
+			FileModification::Rename(name) => {
+				self.name = name.to_owned();
+			},
+			// TODO: should symlink have own metadata? on posix they have:
+			// A symlink has its own metadata, including:
+			// Mode (permissions, typically lrwxrwxrwx)
+			// (Possibly) a creation time, if supported by the filesystem
+			// A modification time, reflecting changes to the symlink itself
+			// The symlink's metadata is separate from that of the target file it points to.
+			// FileModification::SetCreateTime(time) => {
+			// 	self.create_time = *time;
+			// },
+			// FileModification::SetModifyTime(time) => {
+			// 	self.modify_time = *time;
+			// },
+			// FileModification::SetMode(mode) => {
+			// 	self.mode = *mode;
+			// },
+			// FileModification::SetOwner(owner) => {
+			// 	self.owner = owner.to_owned();
+			// },
+			FileModification::TagsInsert(tags) => {
+				self.tags.append(&mut tags.clone());
+			},
+			FileModification::TagsRemove(tags) => {
+				self.tags.clear(Some(tags));
+			},
+			FileModification::SetLink(path) => {
+				self.contents = path.to_owned();
+			},
+			m => return Err(anyhow!("Unsupported modification: {:?}", m)),
+		}
+		Ok(())
 	}
 }
 
@@ -167,6 +311,37 @@ fn remove(context: &mut dyn Context, mut state: File, path: &AbsolutePath) -> Re
 		nodes.insert(parent_path.to_owned(), DagSet::create(context.storage_mut(), path_nodes));
 	}
 	state.nodes.set(context.storage_mut(), nodes);
+
+	// result
+	Ok(state)
+}
+
+fn modify(
+	context: &mut dyn Context,
+	mut state: File,
+	path: &AbsolutePath,
+	modifications: &Vec<FileModification>,
+) -> Result<File, anyhow::Error> {
+	let path = path.normalize()?;
+	let (parent_path, name) = path.parent_and_file_name_result()?;
+	let parent_path = parent_path.to_owned();
+
+	// update file
+	state
+		.nodes
+		.try_update_key(context, &parent_path, |context, _, item| {
+			item.try_update_one(
+				context,
+				|_, node| node.name() == name && node.is_file(),
+				|_, node| {
+					for modification in modifications {
+						node.modify(modification)?;
+					}
+					Ok(())
+				},
+			)
+		})
+		.ok(); // ignore error as we just do nothing for invalid transactions
 
 	// result
 	Ok(state)
