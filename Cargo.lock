@@ -1558,12 +1558,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "bs58 0.5.1",
  "co-core-keystore",
  "co-primitives",
  "did-key 0.2.1 (git+https://github.com/dkuhnert/did-key.rs.git)",
  "didcomm-rs",
- "form_urlencoded",
  "futures",
  "hex",
  "libipld",
@@ -1769,6 +1767,7 @@ version = "0.1.0"
 dependencies = [
  "aead",
  "anyhow",
+ "async-stream",
  "async-trait",
  "blake3",
  "chacha20poly1305",

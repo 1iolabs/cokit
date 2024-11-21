@@ -10,7 +10,6 @@ crate-type = ["lib"]
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-bs58 = "0.5.1"
 co-core-keystore = { path = "../cores/keystore" }
 co-primitives = { path = "../co-primitives" }
 did-key = { version = "0.2.1", git = "https://github.com/dkuhnert/did-key.rs.git" }
@@ -29,7 +28,7 @@ uuid = { workspace = true }
 # workarounds
 ## error: the `alloc` feature must currently be enabled
 ##  --> /usr/local/rust/cargo/registry/src/index.crates.io-6f17d22bba15001f/form_urlencoded-1.2.1/src/lib.rs:24:1
-form_urlencoded = "=1.2.0"
+#form_urlencoded = "=1.2.0"
 
 [features]
 "default" = []
