@@ -177,6 +177,26 @@ impl Display for PathOwned {
 		f.write_str(self.as_str())
 	}
 }
+impl From<&AbsolutePath> for PathOwned {
+	fn from(value: &AbsolutePath) -> Self {
+		Self::new_unchecked(value.to_string())
+	}
+}
+impl From<AbsolutePathOwned> for PathOwned {
+	fn from(value: AbsolutePathOwned) -> Self {
+		Self::new_unchecked(value.0)
+	}
+}
+impl From<&RelativePath> for PathOwned {
+	fn from(value: &RelativePath) -> Self {
+		Self::new_unchecked(value.to_string())
+	}
+}
+impl From<RelativePathOwned> for PathOwned {
+	fn from(value: RelativePathOwned) -> Self {
+		Self::new_unchecked(value.0)
+	}
+}
 
 /// Absolute Path.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
