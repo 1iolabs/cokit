@@ -9,7 +9,7 @@ use crate::{
 use anyhow::anyhow;
 use co_core_file::{FileAction, FileNode, Node};
 use co_primitives::{tags, AbsolutePath, PathExt};
-use co_sdk::{store_file, CoReducerFactory, Identity};
+use co_sdk::{unixfs_add_file, CoReducerFactory, Identity};
 use exitcode::ExitCode;
 use std::{os::unix::fs::MetadataExt, time::UNIX_EPOCH};
 
@@ -50,7 +50,7 @@ pub async fn command(
 	let stat = tokio::fs::metadata(&command.file_path).await?;
 
 	// content
-	let contents = store_file(&co_reducer.storage(), &command.file_path).await?;
+	let contents = unixfs_add_file(&co_reducer.storage(), &command.file_path).await?;
 
 	// action
 	let action = FileAction::Create {

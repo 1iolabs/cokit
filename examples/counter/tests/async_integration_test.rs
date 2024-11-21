@@ -1,6 +1,6 @@
 use co_api::{BlockSerializer, ReducerAction};
 use co_sdk::{RuntimeContext, RuntimePool};
-use co_storage::{store_file, BlockStorage, MemoryBlockStorage};
+use co_storage::{unixfs_add_file, BlockStorage, MemoryBlockStorage};
 use example_counter::{Counter, CounterAction};
 use libipld::Cid;
 use std::process::Command;
@@ -34,7 +34,7 @@ async fn async_integration_test() {
 	storage.set(action_block).await.unwrap();
 
 	// wasm
-	let wasm = store_file(&storage, "../../target/wasm32-unknown-unknown/release/example_counter.wasm")
+	let wasm = unixfs_add_file(&storage, "../../target/wasm32-unknown-unknown/release/example_counter.wasm")
 		.await
 		.unwrap();
 

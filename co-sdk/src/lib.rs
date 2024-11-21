@@ -25,12 +25,12 @@ pub use co_identity::{
 pub use co_primitives::{
 	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, AbsolutePath,
 	AbsolutePathOwned, BlockSerializer, CoId, CoInvite, CoNetwork, Component, Components, Date, Did, KnownMultiCodec,
-	KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, OptionLink, PathExt, RelativePath, RelativePathOwned, Tag,
-	Tags,
+	KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, OptionLink, Path, PathError, PathExt, PathOwned,
+	RelativePath, RelativePathOwned, Tag, Tags,
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{
-	store_file, unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer, unixfs_stream, BlockStat, BlockStorage,
+	unixfs_add, unixfs_add_file, unixfs_cat_buffer, unixfs_encode_buffer, unixfs_stream, BlockStat, BlockStorage,
 	BlockStorageContentMapping, BlockStorageExt, StorageError,
 };
 pub use library::{

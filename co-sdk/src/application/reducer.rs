@@ -502,7 +502,7 @@ mod tests {
 	use co_log::Log;
 	use co_primitives::{BlockSerializer, ReducerAction};
 	use co_runtime::{Core, IdleRuntimePool, RuntimePool};
-	use co_storage::{store_file, BlockStorage, MemoryBlockStorage};
+	use co_storage::{unixfs_add_file, BlockStorage, MemoryBlockStorage};
 	use example_counter::{Counter, CounterAction};
 	use futures::StreamExt;
 	use tokio::process::Command;
@@ -519,7 +519,7 @@ mod tests {
 			.output()
 			.await
 			.unwrap();
-		let wasm = store_file(&storage, "../target/wasm32-unknown-unknown/release/example_counter.wasm")
+		let wasm = unixfs_add_file(&storage, "../target/wasm32-unknown-unknown/release/example_counter.wasm")
 			.await
 			.unwrap();
 
