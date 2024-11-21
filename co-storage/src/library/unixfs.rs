@@ -136,6 +136,8 @@ where
 mod tests {
 	use crate::{unixfs_add, unixfs_cat_buffer, MemoryBlockStorage};
 	use futures::io::Cursor;
+	use libipld::Cid;
+	use std::str::FromStr;
 
 	#[tokio::test]
 	async fn test_unixfs_add() {
@@ -143,6 +145,15 @@ mod tests {
 		let mut stream = Cursor::new("hello world test".repeat(64).repeat(1024).as_bytes().to_vec()); // 1024KiB
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();
 		assert_eq!(5, cids.len());
+	}
+
+	#[tokio::test]
+	async fn test_unixfs_add_empty() {
+		let storage = MemoryBlockStorage::new();
+		let mut stream = Cursor::new([]);
+		let cids = unixfs_add(&storage, &mut stream).await.unwrap();
+		assert_eq!(1, cids.len());
+		assert_eq!(cids[0], Cid::from_str("QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH").unwrap());
 	}
 
 	#[tokio::test]

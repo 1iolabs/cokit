@@ -13,6 +13,6 @@ where
 	Ok(unixfs_add(storage, &mut handle)
 		.await?
 		.last()
-		.ok_or(StorageError::InvalidArgument(anyhow!("File is empty: {:?}", file.as_ref())))?
+		.ok_or(StorageError::InvalidArgument(anyhow!("No CID generated: {:?}", file.as_ref())))? // we should have at least an empty block
 		.to_owned())
 }
