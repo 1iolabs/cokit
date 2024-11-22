@@ -5,7 +5,7 @@ use co_api::{
 };
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
-use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct File {
@@ -53,10 +53,18 @@ pub struct LinkNode {
 pub enum FileAction {
 	/// Create a node.
 	/// Ignored if a node with the same name already exists at path.
-	Create { path: AbsolutePathOwned, node: Node, recursive: bool },
+	Create {
+		/// The parent to create the node in.
+		path: AbsolutePathOwned,
+		/// The node to create.
+		node: Node,
+		/// Whether to create parents recursively.
+		recursive: bool,
+	},
 
 	/// Remove a node.
-	Remove { path: AbsolutePathOwned },
+	/// If a node has children and recusive is set to false nothing will happen.
+	Remove { path: AbsolutePathOwned, recursive: bool },
 
 	/// Modify a node.
 	Modify { path: AbsolutePathOwned, modifications: Vec<FileModification> },
@@ -102,7 +110,7 @@ impl Reducer for File {
 			FileAction::Create { path, node, recursive } => {
 				create(context, self, path, node, &event.from, event.time, *recursive).unwrap()
 			},
-			FileAction::Remove { path } => remove(context, self, path).unwrap(),
+			FileAction::Remove { path, recursive } => remove(context, self, path, *recursive).unwrap(),
 			FileAction::Modify { path, modifications } => modify(context, self, path, modifications).unwrap(),
 		}
 	}
@@ -273,7 +281,7 @@ fn create(
 
 		// recursive?
 		if recursive {
-			for parent in path.parents() {
+			for parent in path.paths() {
 				if !paths.contains_key(parent) {
 					create_folder(context, paths, parent, from, time)?;
 				}
@@ -288,12 +296,40 @@ fn create(
 	Ok(state)
 }
 
-fn remove(context: &mut dyn Context, mut state: File, path: &AbsolutePath) -> Result<File, anyhow::Error> {
+fn remove(
+	context: &mut dyn Context,
+	mut state: File,
+	path: &AbsolutePath,
+	recursive: bool,
+) -> Result<File, anyhow::Error> {
 	let path = path.normalize()?;
-	let (parent_path, name) = path.parent_and_file_name_result()?;
 
 	// nodes
-	let mut nodes = state.nodes.get(context.storage());
+	let mut nodes = state.nodes.collection(context.storage());
+
+	// apply
+	let (parent_path, name) = path.parent_and_file_name_result()?;
+
+	// children
+	let mut stack = VecDeque::new();
+	stack.push_back(path.clone());
+	while let Some(path) = stack.pop_front() {
+		let children = nodes.get(&path);
+		if let Some(children) = children {
+			// do nothing if we still have children and not delete them
+			if !recursive {
+				return Ok(state);
+			}
+
+			// queue
+			for child in children.iter(context.storage()) {
+				stack.push_back(path.join_path(child.name())?);
+			}
+
+			// remove
+			nodes.remove(&path);
+		}
+	}
 
 	// remove
 	let path_nodes: BTreeSet<Node> = nodes
@@ -305,12 +341,14 @@ fn remove(context: &mut dyn Context, mut state: File, path: &AbsolutePath) -> Re
 		.collect();
 
 	// store
-	if path_nodes.is_empty() {
+	if path_nodes.is_empty() && parent_path != "/" {
 		nodes.remove(parent_path);
 	} else {
 		nodes.insert(parent_path.to_owned(), DagSet::create(context.storage_mut(), path_nodes));
 	}
-	state.nodes.set(context.storage_mut(), nodes);
+
+	// apply to state
+	state.nodes.set_collection(context.storage_mut(), nodes);
 
 	// result
 	Ok(state)
@@ -357,7 +395,7 @@ fn get_node(
 		Some(nodes) => nodes,
 		None => return Ok(None),
 	};
-	Ok(nodes.get(context.storage()).into_iter().find(|node| node.name() == name))
+	Ok(nodes.collection(context.storage()).into_iter().find(|node| node.name() == name))
 }
 
 fn create_node(
@@ -415,4 +453,122 @@ fn create_folder(
 #[no_mangle]
 pub extern "C" fn state() {
 	co_api::reduce::<File>()
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{File, FileAction, FileNode, Node};
+	use co_api::{AbsolutePath, Cid, Context, DagCollection, Reducer, ReducerAction};
+	use co_storage::{MemoryStorage, Storage, StorageError};
+	use libipld::{cbor::DagCborCodec, multihash::Code, Block, DefaultParams};
+	use std::{cell::RefCell, rc::Rc};
+
+	#[derive(Debug, Default)]
+	struct TestContext {
+		storage: Rc<RefCell<MemoryStorage>>,
+	}
+	impl Context for TestContext {
+		fn storage(&self) -> &dyn co_api::Storage {
+			self
+		}
+
+		fn storage_mut(&mut self) -> &mut dyn co_api::Storage {
+			self
+		}
+
+		fn event(&self) -> Cid {
+			unimplemented!()
+		}
+
+		fn state(&self) -> Option<Cid> {
+			unimplemented!()
+		}
+
+		fn store_state(&mut self, _cid: Cid) {
+			unimplemented!()
+		}
+	}
+	impl co_api::Storage for TestContext {
+		fn get(&self, cid: &Cid) -> Block<DefaultParams> {
+			self.storage.borrow().get(cid).unwrap()
+		}
+
+		fn set(&mut self, block: Block<DefaultParams>) -> Cid {
+			self.storage.borrow_mut().set(block).unwrap()
+		}
+	}
+	impl Storage for TestContext {
+		type StoreParams = DefaultParams;
+
+		fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+			self.storage.borrow().get(cid)
+		}
+
+		fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+			self.storage.borrow_mut().set(block)
+		}
+
+		fn remove(&mut self, cid: &Cid) -> Result<(), StorageError> {
+			self.storage.borrow_mut().remove(cid)
+		}
+	}
+
+	#[test]
+	fn test_delete_recursive() {
+		let mut context = TestContext::default();
+		let state = File::default();
+
+		// create
+		let block = Block::encode(DagCborCodec, Code::Blake3_256, "hello world").unwrap();
+		let contents = *block.cid();
+		context.set(block).unwrap();
+		let node = Node::File(FileNode {
+			contents,
+			create_time: 123,
+			modify_time: 123,
+			mode: 0o655,
+			name: "test.txt".to_owned(),
+			owner: "did:local:test".to_owned(),
+			size: 11,
+			tags: Default::default(),
+		});
+		let action = ReducerAction {
+			from: "did:local:test".to_owned(),
+			core: "file".to_owned(),
+			time: 123,
+			payload: FileAction::Create { path: "/hello/world".try_into().unwrap(), node, recursive: true },
+		};
+		let state = state.reduce(&action, &mut context);
+		let paths = state.nodes.collection(&context);
+		assert_eq!(paths.len(), 3); // "/", "/hello", "/hello/world"
+		assert_eq!(paths.get(AbsolutePath::new_unchecked("/")).unwrap().collection(&context).len(), 1); // "hello"
+		assert_eq!(
+			paths
+				.get(AbsolutePath::new_unchecked("/hello"))
+				.unwrap()
+				.collection(&context)
+				.len(),
+			1
+		); // "world"
+		assert_eq!(
+			paths
+				.get(AbsolutePath::new_unchecked("/hello/world"))
+				.unwrap()
+				.collection(&context)
+				.len(),
+			1
+		); // "test.txt"
+
+		// delete
+		let action = ReducerAction {
+			from: "did:local:test".to_owned(),
+			core: "file".to_owned(),
+			time: 456,
+			payload: FileAction::Remove { path: "/hello".try_into().unwrap(), recursive: true },
+		};
+		let state = state.reduce(&action, &mut context);
+		let paths = state.nodes.collection(&context);
+		assert_eq!(paths.len(), 1); // "/"
+		assert_eq!(paths.get(AbsolutePath::new_unchecked("/")).unwrap().collection(&context).len(), 0);
+	}
 }

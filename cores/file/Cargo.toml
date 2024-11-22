@@ -17,6 +17,5 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 co-storage = { path = "../../co-storage" }
-co-runtime = { path = "../../co-runtime" }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

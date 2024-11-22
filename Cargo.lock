@@ -1442,7 +1442,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "co-api",
- "co-runtime",
  "co-storage",
  "libipld",
  "serde",

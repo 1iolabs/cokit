@@ -89,6 +89,31 @@ impl PartialEq<PathOwned> for Path {
 		other.as_path() == self.as_path()
 	}
 }
+impl AsRef<AbsolutePath> for Path {
+	fn as_ref(&self) -> &AbsolutePath {
+		AbsolutePath::from_str_unchecked(&self.0)
+	}
+}
+impl AsRef<RelativePath> for Path {
+	fn as_ref(&self) -> &RelativePath {
+		RelativePath::from_str_unchecked(&self.0)
+	}
+}
+impl AsRef<Path> for str {
+	fn as_ref(&self) -> &Path {
+		Path::from_str_unchecked(&self)
+	}
+}
+impl PartialEq<AbsolutePath> for Path {
+	fn eq(&self, other: &AbsolutePath) -> bool {
+		AsRef::<AbsolutePath>::as_ref(&self) == other
+	}
+}
+impl PartialEq<RelativePath> for Path {
+	fn eq(&self, other: &RelativePath) -> bool {
+		AsRef::<RelativePath>::as_ref(&self) == other
+	}
+}
 
 /// Owned  Path.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -287,6 +312,11 @@ impl PartialEq<AbsolutePathOwned> for AbsolutePath {
 		other.as_path() == self.as_path()
 	}
 }
+impl AsRef<AbsolutePath> for str {
+	fn as_ref(&self) -> &AbsolutePath {
+		AbsolutePath::from_str_unchecked(&self)
+	}
+}
 
 /// Owned Absolute Path.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -348,6 +378,20 @@ impl Borrow<AbsolutePath> for AbsolutePathOwned {
 		self
 	}
 }
+impl TryFrom<String> for AbsolutePathOwned {
+	type Error = PathError;
+
+	fn try_from(value: String) -> Result<Self, Self::Error> {
+		Self::from_owned(value)
+	}
+}
+impl TryFrom<&str> for AbsolutePathOwned {
+	type Error = PathError;
+
+	fn try_from(value: &str) -> Result<Self, Self::Error> {
+		Self::from_str(value).map(|s| s.to_owned())
+	}
+}
 impl From<AbsolutePathOwned> for String {
 	fn from(val: AbsolutePathOwned) -> Self {
 		val.0
@@ -376,6 +420,7 @@ impl Display for AbsolutePathOwned {
 		f.write_str(self.as_str())
 	}
 }
+
 /// Relative Path.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
@@ -454,6 +499,11 @@ impl ToOwned for RelativePath {
 impl PartialEq<RelativePathOwned> for RelativePath {
 	fn eq(&self, other: &RelativePathOwned) -> bool {
 		other.as_path() == self.as_path()
+	}
+}
+impl AsRef<RelativePath> for str {
+	fn as_ref(&self) -> &RelativePath {
+		RelativePath::from_str_unchecked(&self)
 	}
 }
 
@@ -680,11 +730,25 @@ pub trait PathExt {
 	/// assert_eq!(None, parents.next());
 	/// ```
 	fn parents(&self) -> impl Iterator<Item = &Self::Path> {
+		self.paths().take_while(|path| path.as_str().len() < self.as_str().len())
+	}
+
+	/// Components as full path starting at root.
+	///
+	/// Example:
+	/// ```rust
+	/// use co_primitives::{Path, PathExt};
+	/// let path = Path::from_str_unchecked("/hello/world/test.zip");
+	/// let mut paths = path.paths();
+	/// assert_eq!(Some(Path::from_str_unchecked("/")), paths.next());
+	/// assert_eq!(Some(Path::from_str_unchecked("/hello")), paths.next());
+	/// assert_eq!(Some(Path::from_str_unchecked("/hello/world")), paths.next());
+	/// assert_eq!(Some(Path::from_str_unchecked("/hello/world/test.zip")), paths.next());
+	/// assert_eq!(None, paths.next());
+	/// ```
+	fn paths(&self) -> impl Iterator<Item = &Self::Path> {
 		self.components().scan((0_usize, self.as_str()), |(index, path), component| {
 			let end = *index + component.len();
-			if end == path.len() {
-				return None;
-			}
 			let result = &path[0..end];
 			*index = if *index > 0 { end + 1 } else { end };
 			Some(Self::from_str_unchecked(result))
@@ -893,6 +957,17 @@ mod tests {
 		assert_eq!(Some(Path::from_str_unchecked("/hello")), parents.next());
 		assert_eq!(Some(Path::from_str_unchecked("/hello/world")), parents.next());
 		assert_eq!(None, parents.next());
+	}
+
+	#[test]
+	fn test_paths() {
+		let path = Path::from_str_unchecked("/hello/world/test.zip");
+		let mut paths = path.paths();
+		assert_eq!(Some(Path::from_str_unchecked("/")), paths.next());
+		assert_eq!(Some(Path::from_str_unchecked("/hello")), paths.next());
+		assert_eq!(Some(Path::from_str_unchecked("/hello/world")), paths.next());
+		assert_eq!(Some(Path::from_str_unchecked("/hello/world/test.zip")), paths.next());
+		assert_eq!(None, paths.next());
 	}
 
 	#[test]

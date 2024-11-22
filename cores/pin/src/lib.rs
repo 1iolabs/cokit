@@ -27,7 +27,7 @@ impl Reducer for Pin {
 	type Action = PinAction;
 	fn reduce(self, event: &co_api::ReducerAction<Self::Action>, context: &mut dyn co_api::Context) -> Self {
 		let mut result = self;
-		let mut pin_map = result.pins.get(context.storage_mut());
+		let mut pin_map = result.pins.collection(context.storage_mut());
 		match &event.payload {
 			PinAction::Pin(cid, tags) => {
 				// get current or new
@@ -48,7 +48,7 @@ impl Reducer for Pin {
 				// iterate all current pins
 				for (cid, pin_tag_set) in pin_map.clone().iter() {
 					// resolve tags for current cid
-					let pin_tag_set = pin_tag_set.get(context.storage());
+					let pin_tag_set = pin_tag_set.collection(context.storage());
 					// check if tag set contains given tags
 					for pin_tags in pin_tag_set {
 						if tags.matches(pin_tags) {
@@ -60,7 +60,7 @@ impl Reducer for Pin {
 				}
 			},
 		};
-		result.pins.set(context.storage_mut(), pin_map);
+		result.pins.set_collection(context.storage_mut(), pin_map);
 		result
 	}
 }
@@ -80,7 +80,7 @@ fn unpin(
 			pin_map.remove(cid);
 		} else {
 			// update map with filtered tags
-			pinned_tags.set(context.storage_mut(), filtered_tags);
+			pinned_tags.set_collection(context.storage_mut(), filtered_tags);
 			pin_map.insert(*cid, pinned_tags);
 		}
 	}

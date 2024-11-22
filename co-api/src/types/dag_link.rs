@@ -14,11 +14,13 @@ pub trait DagCollection: Sized {
 	fn link(&self) -> OptionLink<Self::Collection>;
 	fn set_link(&mut self, link: OptionLink<Self::Collection>);
 
-	fn set(&mut self, storage: &mut dyn Storage, items: Self::Collection) {
+	/// Replace contents with collection.
+	fn set_collection(&mut self, storage: &mut dyn Storage, items: Self::Collection) {
 		self.set_link(Self::to_link(storage, items))
 	}
 
-	fn get(&self, storage: &dyn Storage) -> Self::Collection {
+	/// Materialize into the collection.
+	fn collection(&self, storage: &dyn Storage) -> Self::Collection {
 		self.from_link(storage).expect("Valid serialized data")
 	}
 
@@ -27,9 +29,9 @@ pub trait DagCollection: Sized {
 		context: &mut dyn Context,
 		f: F,
 	) -> R {
-		let mut collection = self.get(context.storage());
+		let mut collection = self.collection(context.storage());
 		let result = f(context, &mut collection);
-		self.set(context.storage_mut(), collection);
+		self.set_collection(context.storage_mut(), collection);
 		result
 	}
 
@@ -38,9 +40,9 @@ pub trait DagCollection: Sized {
 		context: &mut dyn Context,
 		f: F,
 	) -> Result<R, anyhow::Error> {
-		let mut collection = self.get(context.storage());
+		let mut collection = self.collection(context.storage());
 		let result = f(context, &mut collection)?;
-		self.set(context.storage_mut(), collection);
+		self.set_collection(context.storage_mut(), collection);
 		Ok(result)
 	}
 
@@ -49,9 +51,9 @@ pub trait DagCollection: Sized {
 		context: &mut dyn Context,
 		f: F,
 	) {
-		let mut collection = self.get(context.storage());
+		let mut collection = self.collection(context.storage());
 		collection = f(context, collection);
-		self.set(context.storage_mut(), collection);
+		self.set_collection(context.storage_mut(), collection);
 	}
 
 	fn iter(&self, storage: &dyn Storage) -> impl Iterator<Item = Self::Item> {
@@ -104,11 +106,11 @@ where
 		predicate: impl Fn(&mut dyn Context, &V) -> bool,
 		update: impl FnOnce(&mut dyn Context, &mut V) -> R,
 	) -> Option<R> {
-		let mut collection = self.get(context.storage());
+		let mut collection = self.collection(context.storage());
 		for item in collection.iter_mut() {
 			if predicate(context, item) {
 				let result = update(context, item);
-				self.set(context.storage_mut(), collection);
+				self.set_collection(context.storage_mut(), collection);
 				return Some(result);
 			}
 		}
@@ -169,9 +171,9 @@ where
 	///
 	/// TODO: (perf): Do not load whole set into memory
 	pub fn insert(&mut self, storage: &mut dyn Storage, value: V) -> bool {
-		let mut set = self.get(storage);
+		let mut set = self.collection(storage);
 		if set.insert(value) {
-			self.set(storage, set);
+			self.set_collection(storage, set);
 			true
 		} else {
 			false
@@ -182,9 +184,9 @@ where
 	///
 	/// TODO: (perf): Do not load whole set into memory
 	pub fn remove(&mut self, storage: &mut dyn Storage, value: &V) -> bool {
-		let mut set = self.get(storage);
+		let mut set = self.collection(storage);
 		if set.remove(value) {
-			self.set(storage, set);
+			self.set_collection(storage, set);
 			true
 		} else {
 			false
@@ -201,7 +203,7 @@ where
 		predicate: impl Fn(&mut dyn Context, &V) -> bool,
 		update: impl FnOnce(&mut dyn Context, &mut V) -> R,
 	) -> Option<R> {
-		let mut collection = self.get(context.storage());
+		let mut collection = self.collection(context.storage());
 		if let Some(mut item) = collection.iter().find(|item| predicate(context, item)).cloned() {
 			if collection.remove(&item) {
 				// update
@@ -209,7 +211,7 @@ where
 
 				// insert
 				collection.insert(item);
-				self.set(context.storage_mut(), collection);
+				self.set_collection(context.storage_mut(), collection);
 				return Some(result);
 			}
 		}
@@ -227,7 +229,7 @@ where
 		predicate: impl Fn(&mut dyn Context, &V) -> bool,
 		update: impl FnOnce(&mut dyn Context, &mut V) -> Result<R, anyhow::Error>,
 	) -> Result<Option<R>, anyhow::Error> {
-		let mut collection = self.get(context.storage());
+		let mut collection = self.collection(context.storage());
 		if let Some(mut item) = collection.iter().find(|item| predicate(context, item)).cloned() {
 			if collection.remove(&item) {
 				// update
@@ -235,7 +237,7 @@ where
 
 				// insert
 				collection.insert(item);
-				self.set(context.storage_mut(), collection);
+				self.set_collection(context.storage_mut(), collection);
 				return Ok(Some(result));
 			}
 		}
@@ -420,7 +422,7 @@ mod test {
 			"usage".to_owned(),
 		];
 		let dag_vec: DagVec<String> = DagVec::create(&mut s, original_vec.clone());
-		let restored_vec = dag_vec.get(&s);
+		let restored_vec = dag_vec.collection(&s);
 		let json = serde_json::to_string_pretty(&dag_vec).unwrap();
 		println!("Serialized: {json}");
 		println!("Original vector: {:?}", original_vec);
@@ -443,7 +445,7 @@ mod test {
 
 		let mut s = TestStorage { mem_storage: MemoryStorage::new() };
 		let dag_set = DagSet::create(&mut s, original_set.clone());
-		let restored_set = dag_set.get(&s);
+		let restored_set = dag_set.collection(&s);
 		let json = serde_json::to_string_pretty(&dag_set).unwrap();
 		println!("Serialized: {json}");
 		assert_eq!(original_set, restored_set);
@@ -460,7 +462,7 @@ mod test {
 
 		let mut s = TestStorage { mem_storage: MemoryStorage::new() };
 		let dag_map = DagMap::create(&mut s, original_map.clone());
-		let restored_map = dag_map.get(&s);
+		let restored_map = dag_map.collection(&s);
 		assert_eq!(original_map, restored_map);
 	}
 }
