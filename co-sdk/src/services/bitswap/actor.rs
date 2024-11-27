@@ -27,7 +27,7 @@ impl Actor for Bitswap {
 	async fn initialize(
 		&self,
 		_handle: &ActorHandle<Self::Message>,
-		_tags: Tags,
+		_tags: &Tags,
 		_initialize: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		Ok(())

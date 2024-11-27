@@ -997,6 +997,13 @@ mod tests {
 	}
 
 	#[test]
+	fn test_parent() {
+		assert_eq!(Some(Path::from_str_unchecked("/hello")), Path::from_str("/hello/test").unwrap().parent());
+		assert_eq!(Some(Path::from_str_unchecked("/")), Path::from_str("/hello").unwrap().parent());
+		assert_eq!(None, Path::from_str("/").unwrap().parent());
+	}
+
+	#[test]
 	fn test_parent_and_file_name() {
 		assert_eq!(
 			Some((Path::from_str_unchecked("/hello"), "test")),

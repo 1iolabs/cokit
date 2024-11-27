@@ -90,7 +90,7 @@ impl Actor for PushHeadsActor {
 	async fn initialize(
 		&self,
 		_handle: &ActorHandle<Self::Message>,
-		tags: Tags,
+		tags: &Tags,
 		initialize: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		let co = initialize.co.clone();
@@ -99,7 +99,7 @@ impl Actor for PushHeadsActor {
 			EpicRuntime::new(
 				PushHeadsSendEpic::new()
 					.join(PushHeadsConnectEpic::new())
-					.join(TracingEpic::new(tags)),
+					.join(TracingEpic::new(tags.clone())),
 				move |err| {
 					tracing::error!(?err, ?co, "push-heads-error");
 					None

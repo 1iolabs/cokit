@@ -1,7 +1,7 @@
 use crate::TotalFloat64;
 use derive_more::From;
 use libipld::{Cid, Ipld};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use std::{
 	borrow::Borrow,
 	collections::{BTreeMap, BTreeSet},
@@ -308,26 +308,39 @@ impl IntoIterator for Tags {
 }
 impl Debug for Tags {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		let mut s = f.debug_struct("Tags");
-		for (key, value) in self.0.iter() {
-			s.field(key, value);
-		}
-		s.finish()
+		// let mut s = f.debug_struct("Tags");
+		// for (key, value) in self.0.iter() {
+		// 	s.field(key, value);
+		// }
+		// s.finish()
+		Display::fmt(&self, f)
 	}
 }
 impl Display for Tags {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		let mut result = Ok(());
 		let mut first = true;
+		write!(f, "[")?;
 		for (key, value) in self.0.iter() {
+			// separator
 			if first {
 				first = false;
-				result = Ok(write!(f, "{}: {:?}", key, value)?)
 			} else {
-				result = Ok(write!(f, ", {}: {:?}", key, value)?)
+				if f.is_human_readable() {
+					write!(f, ", ")?;
+				} else {
+					write!(f, ",")?;
+				}
+			}
+
+			// key/value
+			if f.is_human_readable() {
+				write!(f, "{}: {}", key, value)?;
+			} else {
+				write!(f, "{}:{}", key, value)?;
 			}
 		}
-		result
+		write!(f, "]")?;
+		Ok(())
 	}
 }
 impl From<Tag> for Tags {
