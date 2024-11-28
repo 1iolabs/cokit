@@ -13,7 +13,7 @@
     "tauri": "tauri",
     "clean": "npx rimraf -rf ./dist",
     "rollup": "npx cross-env NODE_ENV=development kui-application build -o ./dist/ui",
-    "start-watch-tasks": "npx tsc -w & sass ./src -w & npm run rollup -- -w & npm run tauri dev"
+    "watch-all": "npx tsc -w & sass ./src -w & npm run rollup -- -w & npm run tauri dev"
   },
   "files": [
     "**/*.css",
@@ -44,7 +44,6 @@
     }
   },
   "dependencies": {
-    "tauri-plugin-co-sdk": "file:../../",
     "@1io/coapp-messenger-view": "file:../../../../../IdeaProjects/coapp-messenger-view/1io-coapp-messenger-view-0.2.0.tgz",
     "@1io/kui-application": "^0.5.0",
     "@1io/kui-application-sdk": "^5.0.1",
@@ -52,6 +51,7 @@
     "@1io/kui-button": "^0.25.0",
     "@1io/kui-level-stack": "^0.6.16",
     "@1io/one2edit-default-icons": "^0.6.43",
+    "@1io/redux-utils": "^0.9.3",
     "@babel/core": "^7.24.7",
     "@ipld/dag-cbor": "^9.2.0",
     "@tauri-apps/plugin-shell": ">=2.0.0-beta.0",
@@ -64,6 +64,7 @@
     "redux": "^4.2.1",
     "rxjs": "^7.8.1",
     "sass": "^1.77.6",
+    "tauri-plugin-co-sdk": "file:../../",
     "uuid": "^10.0.0"
   },
   "devDependencies": {

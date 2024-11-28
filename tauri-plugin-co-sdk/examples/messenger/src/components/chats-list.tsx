@@ -2,10 +2,10 @@ import { PluginView } from "@1io/kui-application-sdk";
 import React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { identity } from "rxjs";
-import { ChatsListActionType, ChatsListActivatePluginAction, ChatsListOpenChatAction } from "../actions";
-import { Chat, ChatsListPluginState } from "../state";
+import { ChatsListActionType, ChatsListActivatePluginAction, ChatsListOpenChatAction } from "../actions/index.js";
+import { Chat, ChatsListPluginState } from "../state/index.js";
 import "./chats-list.css";
-import { ListItem } from "./list-item";
+import { ListItem } from "./list-item.js";
 
 export interface ListViewProps { }
 

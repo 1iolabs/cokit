@@ -1,5 +1,5 @@
-import { ChatsListActions, ChatsListActionType } from "../actions";
-import { ChatsListPluginState } from "../state";
+import { ChatsListActions, ChatsListActionType } from "../actions/index.js";
+import { ChatsListPluginState } from "../state/index.js";
 
 export function chatsListReducer(state: ChatsListPluginState | undefined, action: ChatsListActions): ChatsListPluginState {
     if (state === undefined) {

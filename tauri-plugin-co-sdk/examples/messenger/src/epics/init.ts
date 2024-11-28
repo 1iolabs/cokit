@@ -1,11 +1,11 @@
 import { BaseApi, isPluginInitializeAction } from "@1io/kui-application-sdk";
 import { AnyAction } from "redux";
 import { filter, identity, mergeAll, mergeMap } from "rxjs";
-import { ChatsListActionType, ChatsListSetChatsAction } from "../actions";
-import { splitCoCoreId } from "../library/core-id";
-import { invokeGetCoreState, invokeGetFilteredCores } from "../library/invoke-get";
-import { Chat } from "../state";
-import { ChatsListEpicType } from "../types/plugin";
+import { ChatsListActionType, ChatsListSetChatsAction } from "../actions/index.js";
+import { splitCoCoreId } from "../library/core-id.js";
+import { invokeGetCoreState, invokeGetFilteredCores } from "../library/invoke-get.js";
+import { Chat } from "../state/index.js";
+import { ChatsListEpicType } from "../types/plugin.js";
 
 export const initEpic: ChatsListEpicType = (action$, state$, context) => action$.pipe(
     filter(isPluginInitializeAction),

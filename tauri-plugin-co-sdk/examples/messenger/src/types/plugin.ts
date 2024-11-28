@@ -1,6 +1,6 @@
 import { ContextPlugin, EpicPlugin, Plugin, PluginContext, PluginEpicType, RenderPlugin } from "@1io/kui-application-sdk";
-import { ChatsListActions } from "../actions";
-import { ChatsListPluginState } from "../state";
+import { ChatsListActions } from "../actions/index.js";
+import { ChatsListPluginState } from "../state/index.js";
 
 export type ChatsListEpicType = PluginEpicType<ChatsListPlugin>;
 

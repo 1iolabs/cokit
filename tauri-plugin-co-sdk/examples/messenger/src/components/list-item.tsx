@@ -1,6 +1,6 @@
 import { Badge, Color } from "@1io/kui-badge";
 import React, { MouseEventHandler } from "react";
-import { Chat } from "../state";
+import { Chat } from "../state/index.js";
 
 export interface ListItemProps {
     chat: Chat;

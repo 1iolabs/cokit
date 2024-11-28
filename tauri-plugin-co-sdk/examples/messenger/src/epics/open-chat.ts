@@ -1,7 +1,7 @@
 import { ApplicationApi, WellKnownTags } from "@1io/kui-application-sdk";
 import { filter, identity, mergeAll, mergeMap, withLatestFrom } from "rxjs";
-import { ChatsListActionType, ChatsListActivatePluginAction, ChatsListOpenChatAction, ChatsListUpdateChatAction } from "../actions";
-import { ChatsListEpicType } from "../types/plugin";
+import { ChatsListActionType, ChatsListActivatePluginAction, ChatsListOpenChatAction, ChatsListUpdateChatAction } from "../actions/index.js";
+import { ChatsListEpicType } from "../types/plugin.js";
 
 export const openChatEpic: ChatsListEpicType = (action$, state$, context) => action$.pipe(
     filter((action): action is ChatsListOpenChatAction => action.type === ChatsListActionType.OpenChat),
@@ -22,7 +22,7 @@ export const openChatEpic: ChatsListEpicType = (action$, state$, context) => act
                     type: ChatsListActionType.ActivatePlugin,
                 }),
                 identity<ChatsListUpdateChatAction>({
-                    payload: { roomCoreId, chat: { newMessages: 0, pluginId: pluginInfo.id } },
+                    payload: { chat: { roomCoreId, newMessages: 0, pluginId: pluginInfo.id } },
                     type: ChatsListActionType.UpdateChat,
                 }),
             ];
@@ -33,7 +33,7 @@ export const openChatEpic: ChatsListEpicType = (action$, state$, context) => act
                     type: ChatsListActionType.ActivatePlugin,
                 }),
                 identity<ChatsListUpdateChatAction>({
-                    payload: { roomCoreId, chat: { newMessages: 0 } },
+                    payload: { chat: { roomCoreId, newMessages: 0 } },
                     type: ChatsListActionType.UpdateChat,
                 }),
             ];

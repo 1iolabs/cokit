@@ -1,5 +1,5 @@
 import { PluginId } from "@1io/kui-application-sdk";
-import { Chat } from "../state";
+import { Chat } from "../state/index.js";
 
 export enum ChatsListActionType {
     SetChats = "coapp/chatsList/setChats",

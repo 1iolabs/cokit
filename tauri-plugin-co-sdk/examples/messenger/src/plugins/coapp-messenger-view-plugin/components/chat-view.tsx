@@ -2,8 +2,9 @@ import { MessengerView } from "@1io/coapp-messenger-view";
 import { LevelStack } from "@1io/kui-level-stack";
 import * as React from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { MessengerViewActionType, MessengerViewSendAction } from "../actions";
-import { MessengerViewPluginState } from "../state";
+import { identity } from "rxjs";
+import { MessengerViewActionType, MessengerViewLoadMoreEventsAction, MessengerViewSendAction } from "../actions/index.js";
+import { MessengerViewPluginState } from "../state/index.js";
 
 export interface MessengerViewContainerProps {
   onBack: () => void;
@@ -24,6 +25,13 @@ export function MessengerViewContainer(props: MessengerViewContainerProps) {
     setMessage("");
   }
 
+  const onScrollTop = () => {
+    dispatch(identity<MessengerViewLoadMoreEventsAction>({
+      payload: { count: 30 },
+      type: MessengerViewActionType.LoadMoreEvents,
+    }));
+  }
+
   return <LevelStack style={{ width: "100%", height: "100%" }}>
     <MessengerView
       chatInput={message}
@@ -32,6 +40,7 @@ export function MessengerViewContainer(props: MessengerViewContainerProps) {
       messages={messages}
       onSendMessage={onSendMessage}
       onBack={props.onBack}
+      onScrollTop={onScrollTop}
     />
   </ LevelStack>;
 

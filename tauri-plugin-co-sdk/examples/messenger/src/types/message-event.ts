@@ -1,4 +1,4 @@
-import { MatrixEvent } from "./types";
+import { MatrixEvent } from "./matrix-event.js";
 
 export interface RoomCoreEvent {
     f: string;

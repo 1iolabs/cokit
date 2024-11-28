@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "module": "esnext",
+    "module": "Node16",
     "target": "es6",
     "lib": [
       "es6",
@@ -10,9 +10,9 @@
     "declaration": true,
     "sourceMap": true,
     "jsx": "react",
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "outDir": "",
-    "rootDir": "",
+    "rootDir": ".",
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "noImplicitReturns": true,

@@ -1,7 +1,7 @@
 import { isNonNull } from "@1io/kui-application-sdk";
 import { CID } from "multiformats";
 import { getCoState, resolveCid } from "tauri-plugin-co-sdk";
-import { buildCoCoreId } from "./core-id";
+import { buildCoCoreId } from "./core-id.js";
 
 export async function invokeResolveCid(co: string, cid: CID): Promise<any> {
     return await resolveCid(co, cid);

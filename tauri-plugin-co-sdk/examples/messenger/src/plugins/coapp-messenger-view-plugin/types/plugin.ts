@@ -1,7 +1,7 @@
 import { ContextPlugin, EpicPlugin, Plugin, PluginContext, PluginEpicType, RenderPlugin } from "@1io/kui-application-sdk";
-import { MessengerViewActions } from "../actions";
-import { MessengerViewContainerProps } from "../components/chat-view";
-import { MessengerViewPluginState } from "../state";
+import { MessengerViewActions } from "../actions/index.js";
+import { MessengerViewContainerProps } from "../components/chat-view.js";
+import { MessengerViewPluginState } from "../state/index.js";
 
 export type MessengerViewEpicType = PluginEpicType<MessengerViewPlugin>;
 
