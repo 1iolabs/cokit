@@ -1,9 +1,22 @@
 use libipld::Cid;
 use schemars::{schema::SchemaObject, JsonSchema};
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, Copy)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Default, Copy)]
 pub struct CoCid(Cid);
+
+impl CoCid {
+	pub fn inner(&self) -> Cid {
+		self.0
+	}
+}
+
+impl Display for CoCid {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.0.fmt(f)
+	}
+}
 
 impl JsonSchema for CoCid {
 	fn schema_name() -> String {

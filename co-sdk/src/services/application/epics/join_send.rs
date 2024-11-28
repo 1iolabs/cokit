@@ -112,7 +112,7 @@ async fn join(
 		.tags
 		.link(&KnownTags::CoInviteMetadata.to_string())
 		.ok_or(anyhow!("No co-invite-metadata"))?;
-	let invite: CoInviteMetadata = local_co.storage().get_deserialized(invite_cid).await?;
+	let invite: CoInviteMetadata = local_co.storage().get_deserialized(&invite_cid.inner()).await?;
 
 	// message
 	let private_identity_resolver = context.private_identity_resolver().await?;

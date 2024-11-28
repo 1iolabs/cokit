@@ -91,7 +91,7 @@ async fn networks_invite(context: &CoContext, id: &CoId) -> Result<BTreeSet<Netw
 		.tags
 		.link(&KnownTags::CoInviteMetadata.to_string())
 		.ok_or(anyhow!("No co-invite-metadata"))?;
-	let invite: CoInviteMetadata = local_co.storage().get_deserialized(invite_cid).await?;
+	let invite: CoInviteMetadata = local_co.storage().get_deserialized(&invite_cid.inner()).await?;
 
 	// get networks
 	Ok(invite_networks(&context, &invite).await?)
