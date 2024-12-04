@@ -22,7 +22,11 @@ use std::{
 	pin::Pin,
 	task::{Context, Poll},
 };
-use tokio::{fs::File, io::AsyncWriteExt, task::JoinHandle};
+use tokio::{
+	fs::File,
+	io::{AsyncSeekExt, AsyncWriteExt},
+	task::JoinHandle,
+};
 use tokio_util::sync::{CancellationToken, DropGuard};
 
 #[async_trait]
@@ -188,6 +192,7 @@ where
 	}
 }
 
+#[derive(Debug)]
 struct FileLocalsActor {
 	config_path: PathBuf,
 	identifier: String,
@@ -280,11 +285,17 @@ impl Actor for FileLocalsActor {
 	}
 }
 impl FileLocalsActor {
+	#[tracing::instrument(err(Debug))]
 	async fn open_and_lock(&self) -> Result<Flock<TokioFile>, anyhow::Error> {
 		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
+
+		// create parent dir
+		tokio::fs::create_dir_all(path.parent().ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?).await?;
+
+		// create and lock
 		let mut index = 1;
 		loop {
-			let file = TokioFile(tokio::fs::OpenOptions::new().write(true).open(&path).await?);
+			let file = TokioFile(tokio::fs::OpenOptions::new().write(true).create(true).open(&path).await?);
 			match Flock::lock(file, nix::fcntl::FlockArg::LockExclusiveNonblock) {
 				Ok(lock) => {
 					tracing::info!(?path, "local-lock");
@@ -364,9 +375,11 @@ impl FileLocalsState {
 
 		// serialize
 		let data = to_cbor(&local)?;
+		tracing::info!(?data, "write");
 
 		// write
 		file.set_len(0).await?;
+		file.seek(std::io::SeekFrom::Start(0)).await?;
 		file.write_all(&data).await?;
 		file.flush().await?;
 
