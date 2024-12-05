@@ -665,8 +665,8 @@ pub enum PathError {
 	#[error("No root")]
 	NoRoot,
 
-	#[error("No parent")]
-	NoParent,
+	#[error("No parent: {0}")]
+	NoParent(PathOwned),
 
 	#[error("Invalid argument")]
 	InvalidArgument,
@@ -714,7 +714,8 @@ pub trait PathExt {
 
 	/// Parent directory.
 	fn parent_result(&self) -> Result<&Self::Path, PathError> {
-		self.parent().ok_or(PathError::NoParent)
+		self.parent()
+			.ok_or_else(|| PathError::NoParent(PathOwned::new_unchecked(self.as_str().to_owned())))
 	}
 
 	/// Parent directories as full path starting at root.
@@ -773,7 +774,8 @@ pub trait PathExt {
 
 	/// Path and filename.
 	fn parent_and_file_name_result(&self) -> Result<(&Self::Path, &str), PathError> {
-		self.parent_and_file_name().ok_or(PathError::NoParent)
+		self.parent_and_file_name()
+			.ok_or_else(|| PathError::NoParent(PathOwned::new_unchecked(self.as_str().to_owned())))
 	}
 
 	/// File name.
@@ -783,7 +785,8 @@ pub trait PathExt {
 
 	/// File name.
 	fn file_name_result(&self) -> Result<&str, PathError> {
-		self.file_name().ok_or(PathError::NoParent)
+		self.file_name()
+			.ok_or_else(|| PathError::NoParent(PathOwned::new_unchecked(self.as_str().to_owned())))
 	}
 
 	/// Normalize path to connonized form.

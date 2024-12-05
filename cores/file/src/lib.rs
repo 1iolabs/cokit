@@ -75,6 +75,9 @@ pub enum FileModification {
 	/// Rename node to.
 	Rename(String),
 
+	/// Move node into path (as children).
+	Move(AbsolutePathOwned),
+
 	/// Set create time.
 	SetCreateTime(Date),
 
@@ -108,10 +111,10 @@ impl Reducer for File {
 	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		match &event.payload {
 			FileAction::Create { path, node, recursive } => {
-				create(context, self, path, node, &event.from, event.time, *recursive).unwrap()
+				reduce_create(context, self, path, node, &event.from, event.time, *recursive).unwrap()
 			},
-			FileAction::Remove { path, recursive } => remove(context, self, path, *recursive).unwrap(),
-			FileAction::Modify { path, modifications } => modify(context, self, path, modifications).unwrap(),
+			FileAction::Remove { path, recursive } => reduce_remove(context, self, path, *recursive).unwrap(),
+			FileAction::Modify { path, modifications } => reduce_modify(context, self, path, modifications).unwrap(),
 		}
 	}
 }
@@ -145,19 +148,30 @@ impl Node {
 		}
 	}
 
-	pub fn modify(&mut self, modification: &FileModification) -> anyhow::Result<()> {
+	pub fn modify(
+		&mut self,
+		context: &mut FileModificationContext,
+		modification: &FileModification,
+	) -> anyhow::Result<()> {
 		match self {
-			Node::Folder(folder_node) => folder_node.modify(modification),
-			Node::File(file_node) => file_node.modify(modification),
-			Node::Link(link_node) => link_node.modify(modification),
+			Node::Folder(folder_node) => folder_node.modify(context, modification),
+			Node::File(file_node) => file_node.modify(context, modification),
+			Node::Link(link_node) => link_node.modify(context, modification),
 		}
 	}
 }
 impl FileNode {
-	pub fn modify(&mut self, modification: &FileModification) -> anyhow::Result<()> {
+	pub fn modify(
+		&mut self,
+		_context: &mut FileModificationContext,
+		modification: &FileModification,
+	) -> anyhow::Result<()> {
 		match modification {
 			FileModification::Rename(name) => {
 				self.name = name.to_owned();
+			},
+			FileModification::Move(_) => {
+				// nothing todo (files can not have children)
 			},
 			FileModification::SetCreateTime(time) => {
 				self.create_time = *time;
@@ -187,10 +201,27 @@ impl FileNode {
 	}
 }
 impl FolderNode {
-	pub fn modify(&mut self, modification: &FileModification) -> anyhow::Result<()> {
+	pub fn modify(
+		&mut self,
+		context: &mut FileModificationContext,
+		modification: &FileModification,
+	) -> anyhow::Result<()> {
 		match modification {
 			FileModification::Rename(name) => {
+				if &self.name != name {
+					context.reparent(
+						context.path(),
+						context
+							.path()
+							.parent()
+							.ok_or(anyhow!("No parent: {}", context.path()))?
+							.join_path(name)?,
+					)?;
+				}
 				self.name = name.to_owned();
+			},
+			FileModification::Move(_to) => {
+				// nothing todo (handles in `reduce_modify`)
 			},
 			FileModification::SetCreateTime(time) => {
 				self.create_time = *time;
@@ -216,10 +247,18 @@ impl FolderNode {
 	}
 }
 impl LinkNode {
-	pub fn modify(&mut self, modification: &FileModification) -> anyhow::Result<()> {
+	pub fn modify(
+		&mut self,
+		_context: &mut FileModificationContext,
+		modification: &FileModification,
+	) -> anyhow::Result<()> {
 		match modification {
 			FileModification::Rename(name) => {
 				self.name = name.to_owned();
+			},
+			FileModification::Move(_to) => {
+				// TODO: change the symlink target?
+				// nothing todo as links can not have children
 			},
 			// TODO: should symlink have own metadata? on posix they have:
 			// A symlink has its own metadata, including:
@@ -254,7 +293,7 @@ impl LinkNode {
 	}
 }
 
-fn create(
+fn reduce_create(
 	context: &mut dyn Context,
 	mut state: File,
 	path: &AbsolutePath,
@@ -269,7 +308,7 @@ fn create(
 	state.nodes.try_update(context, |context, paths| {
 		// test if node exists
 		let node_path = path.join_path(node.name())?;
-		if get_node(context, paths, &node_path)?.is_some() {
+		if get_node(context, paths, &node_path, true)?.is_some() {
 			// tracing::info(path = ?node_path, "path-exists");
 			return Ok(());
 		}
@@ -296,7 +335,7 @@ fn create(
 	Ok(state)
 }
 
-fn remove(
+fn reduce_remove(
 	context: &mut dyn Context,
 	mut state: File,
 	path: &AbsolutePath,
@@ -332,20 +371,7 @@ fn remove(
 	}
 
 	// remove
-	let path_nodes: BTreeSet<Node> = nodes
-		.get(parent_path)
-		.cloned()
-		.unwrap_or_default()
-		.iter(context.storage())
-		.filter(|node| node.name() != name)
-		.collect();
-
-	// store
-	if path_nodes.is_empty() && parent_path != "/" {
-		nodes.remove(parent_path);
-	} else {
-		nodes.insert(parent_path.to_owned(), DagSet::create(context.storage_mut(), path_nodes));
-	}
+	remove_node_by_name(&mut nodes, context, parent_path, name);
 
 	// apply to state
 	state.nodes.set_collection(context.storage_mut(), nodes);
@@ -354,7 +380,33 @@ fn remove(
 	Ok(state)
 }
 
-fn modify(
+/// Remove node from set.
+fn remove_node_by_name(
+	paths: &mut BTreeMap<AbsolutePathOwned, DagSet<Node>>,
+	context: &mut dyn Context,
+	parent_path: &AbsolutePath,
+	name: &str,
+) -> BTreeSet<Node> {
+	// remove
+	let (nodes, removed_nodes): (BTreeSet<Node>, BTreeSet<Node>) = paths
+		.get(parent_path)
+		.cloned()
+		.unwrap_or_default()
+		.iter(context.storage())
+		.partition(|node| node.name() != name);
+
+	// store
+	if nodes.is_empty() && parent_path != "/" {
+		paths.remove(parent_path);
+	} else {
+		paths.insert(parent_path.to_owned(), DagSet::create(context.storage_mut(), nodes));
+	}
+
+	// result
+	removed_nodes
+}
+
+fn reduce_modify(
 	context: &mut dyn Context,
 	mut state: File,
 	path: &AbsolutePath,
@@ -363,39 +415,179 @@ fn modify(
 	let path = path.normalize()?;
 	let (parent_path, name) = path.parent_and_file_name_result()?;
 	let parent_path = parent_path.to_owned();
+	let mut file_modification_context = FileModificationContext::new(path.clone());
 
-	// update file
-	state
-		.nodes
-		.try_update_key(context, &parent_path, |context, _, item| {
+	// move node
+	for to_parent in modifications.iter().filter_map(|item| match item {
+		FileModification::Move(p) => Some(p),
+		_ => None,
+	}) {
+		state.nodes.try_update(context, |context, paths| {
+			// validate: check `to_parent` exists
+			let validated_to_parent = if to_parent == "/" {
+				to_parent.to_owned()
+			} else if let Some((to_parent, node)) = get_node(context, paths, &to_parent, true)? {
+				if !node.is_dir() {
+					return Err(anyhow!("Can only move into folders: {}", to_parent));
+				}
+				to_parent
+			} else {
+				return Err(anyhow!("Not found: {}", to_parent));
+			};
+
+			// validate: check node `name` dont exists in `to_parent`
+			let to_path = validated_to_parent.join_path(name)?;
+			if get_node(context, paths, &to_path, true)?.is_some() {
+				return Err(anyhow!("Node exists: {}", to_path));
+			}
+
+			// remove
+			let removed = remove_node_by_name(paths, context, &parent_path, name);
+
+			// insert
+			for node in removed {
+				create_node(context, paths, &validated_to_parent, node)?;
+			}
+
+			// reparent
+			file_modification_context.reparent(path.clone(), to_path)?;
+
+			// result
+			Ok(())
+		})?;
+	}
+
+	// update node
+	let modifications: Vec<&FileModification> = modifications
+		.iter()
+		.filter_map(|item| match item {
+			FileModification::Move(_) => None,
+			m => Some(m),
+		})
+		.collect();
+	if !modifications.is_empty() {
+		state.nodes.try_update_key(context, &parent_path, |context, _, item| {
+			// validate
+			for modification in modifications.iter() {
+				match modification {
+					FileModification::Rename(name) => {
+						// check `name` dont exists as sibling
+						if item.iter(context.storage()).find(|node| node.name() == name).is_some() {
+							return Err(anyhow!("File exists: {}", parent_path.join_path(name)?));
+						}
+					},
+					_ => {},
+				}
+			}
+
+			// update item
 			item.try_update_one(
 				context,
-				|_, node| node.name() == name && node.is_file(),
+				|_, node| node.name() == name,
 				|_, node| {
-					for modification in modifications {
-						node.modify(modification)?;
+					for modification in modifications.iter() {
+						node.modify(&mut file_modification_context, modification)?;
 					}
 					Ok(())
 				},
-			)
-		})
-		.ok(); // ignore error as we just do nothing for invalid transactions
+			)?;
+			Ok(())
+		})?;
+	}
+
+	// reparent children nodes
+	if !file_modification_context.reparent.is_empty() {
+		state.nodes.try_update(context, |context, nodes| {
+			for (from, to) in file_modification_context.reparent.iter() {
+				reparent(context, nodes, from, to)?;
+			}
+			Ok(())
+		})?;
+	}
 
 	// result
 	Ok(state)
 }
 
+fn reparent(
+	context: &dyn Context,
+	nodes: &mut BTreeMap<AbsolutePathOwned, DagSet<Node>>,
+	from: &AbsolutePath,
+	to: &AbsolutePath,
+) -> Result<(), anyhow::Error> {
+	if let Some(items) = nodes.remove(from) {
+		// children
+		for child in items.iter(context.storage()) {
+			if child.is_dir() {
+				reparent(context, nodes, &from.join_path(child.name())?, &to.join_path(child.name())?)?;
+			}
+		}
+
+		// self
+		if nodes.insert(to.to_owned(), items).is_some() {
+			return Err(anyhow!("Path exists: {}", to));
+		}
+	}
+	Ok(())
+}
+
+#[derive(Debug)]
+pub struct FileModificationContext {
+	/// Current node path.
+	path: AbsolutePathOwned,
+
+	/// Reparent from -> to.
+	reparent: BTreeMap<AbsolutePathOwned, AbsolutePathOwned>,
+}
+impl FileModificationContext {
+	pub fn new(path: AbsolutePathOwned) -> Self {
+		Self { path, reparent: Default::default() }
+	}
+
+	pub fn path(&self) -> AbsolutePathOwned {
+		self.path.clone()
+	}
+
+	pub fn reparent(&mut self, from: AbsolutePathOwned, to: AbsolutePathOwned) -> Result<(), anyhow::Error> {
+		let from = from.normalize()?;
+		let to = to.normalize()?;
+		if from != to {
+			self.reparent.insert(from, to);
+		}
+		Ok(())
+	}
+}
+
+/// Returns the node and its absoulte path (without links if resolve_link is true).
+/// TODO: Fix links in path
 fn get_node(
 	context: &mut dyn Context,
 	paths: &BTreeMap<AbsolutePathOwned, DagSet<Node>>,
 	path: &AbsolutePath,
-) -> Result<Option<Node>, anyhow::Error> {
+	resolve_link: bool,
+) -> Result<Option<(AbsolutePathOwned, Node)>, anyhow::Error> {
 	let (parent_path, name) = path.parent_and_file_name_result()?;
 	let nodes = match paths.get(parent_path) {
 		Some(nodes) => nodes,
 		None => return Ok(None),
 	};
-	Ok(nodes.collection(context.storage()).into_iter().find(|node| node.name() == name))
+	let node = nodes.collection(context.storage()).into_iter().find(|node| node.name() == name);
+
+	// resolve_link
+	if let Some(node) = &node {
+		if resolve_link {
+			match node {
+				Node::Link(link) => {
+					let target = parent_path.join(&link.contents)?;
+					return get_node(context, paths, &target, resolve_link);
+				},
+				_ => {},
+			}
+		}
+	}
+
+	// result
+	Ok(node.map(|node| (path.to_owned(), node)))
 }
 
 fn create_node(
@@ -405,17 +597,19 @@ fn create_node(
 	node: Node,
 ) -> Result<(), anyhow::Error> {
 	// validate parent exists
-	match parent_path.as_str() {
+	let validated_parent_path = match parent_path.as_str() {
 		// root always exists
-		"/" => {},
+		"/" => parent_path.to_owned(),
 		// check if node exists
 		_ => {
-			get_node(context, paths, parent_path)?.ok_or(anyhow!("No such directory: {}", parent_path))?;
+			get_node(context, paths, parent_path, true)?
+				.ok_or(anyhow!("No such directory: {}", parent_path))?
+				.0
 		},
-	}
+	};
 
 	// node
-	let nodes = match paths.entry(parent_path.to_owned()) {
+	let nodes = match paths.entry(validated_parent_path) {
 		Entry::Occupied(o) => o.into_mut(),
 		Entry::Vacant(v) => v.insert(Default::default()),
 	};
@@ -457,8 +651,8 @@ pub extern "C" fn state() {
 
 #[cfg(test)]
 mod tests {
-	use crate::{File, FileAction, FileNode, Node};
-	use co_api::{AbsolutePath, Cid, Context, DagCollection, Reducer, ReducerAction};
+	use crate::{File, FileAction, FileModification, FileNode, Node};
+	use co_api::{AbsolutePath, Cid, Context, DagCollection, PathExt, Reducer, ReducerAction};
 	use co_storage::{MemoryStorage, Storage, StorageError};
 	use libipld::{cbor::DagCborCodec, multihash::Code, Block, DefaultParams};
 	use std::{cell::RefCell, rc::Rc};
@@ -512,9 +706,11 @@ mod tests {
 			self.storage.borrow_mut().remove(cid)
 		}
 	}
-
-	#[test]
-	fn test_delete_recursive() {
+	/// Create file state with:
+	///  - `/hello` - folder
+	///  - `/hello/world` - folder
+	///  - `/hello/world/text.txt`: file with contents: "hello world"
+	fn create_test_file_state() -> (TestContext, File) {
 		let mut context = TestContext::default();
 		let state = File::default();
 
@@ -559,6 +755,27 @@ mod tests {
 			1
 		); // "test.txt"
 
+		// result
+		(context, state)
+	}
+	fn names(context: &TestContext, state: &File, path: &str) -> Vec<String> {
+		state
+			.nodes
+			.collection(context)
+			.get(AbsolutePath::new_unchecked(path))
+			.cloned()
+			.unwrap_or_default()
+			.collection(context)
+			.iter()
+			.map(Node::name)
+			.map(ToOwned::to_owned)
+			.collect::<Vec<_>>()
+	}
+
+	#[test]
+	fn test_delete_recursive() {
+		let (mut context, state) = create_test_file_state();
+
 		// delete
 		let action = ReducerAction {
 			from: "did:local:test".to_owned(),
@@ -570,5 +787,95 @@ mod tests {
 		let paths = state.nodes.collection(&context);
 		assert_eq!(paths.len(), 1); // "/"
 		assert_eq!(paths.get(AbsolutePath::new_unchecked("/")).unwrap().collection(&context).len(), 0);
+	}
+
+	#[test]
+	fn test_modify_rename() {
+		let (mut context, state) = create_test_file_state();
+
+		// rename
+		let action = ReducerAction {
+			from: "did:local:test".to_owned(),
+			core: "file".to_owned(),
+			time: 456,
+			payload: FileAction::Modify {
+				path: "/hello/world/test.txt".try_into().unwrap(),
+				modifications: vec![FileModification::Rename("welcome.txt".to_owned())],
+			},
+		};
+		let state = state.reduce(&action, &mut context);
+		let paths = state.nodes.collection(&context);
+		let files = paths
+			.get(AbsolutePath::new_unchecked("/hello/world"))
+			.unwrap()
+			.collection(&context);
+		assert_eq!(files.len(), 1);
+		assert_eq!(files.first().unwrap().name(), "welcome.txt");
+	}
+
+	#[test]
+	fn test_modify_rename_with_children() {
+		let (mut context, state) = create_test_file_state();
+
+		// rename with children
+		let action = ReducerAction {
+			from: "did:local:test".to_owned(),
+			core: "file".to_owned(),
+			time: 456,
+			payload: FileAction::Modify {
+				path: "/hello".try_into().unwrap(),
+				modifications: vec![FileModification::Rename("test".to_owned())],
+			},
+		};
+		let state = state.reduce(&action, &mut context);
+		let paths = state.nodes.collection(&context);
+		assert_eq!(paths.iter().map(|(k, _)| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/test", "/test/world"]);
+		assert_eq!(names(&context, &state, "/"), vec!["test"]);
+		assert_eq!(names(&context, &state, "/test"), vec!["world"]);
+		assert_eq!(names(&context, &state, "/test/world"), vec!["test.txt"]);
+	}
+
+	#[test]
+	fn test_modify_move() {
+		let (mut context, state) = create_test_file_state();
+
+		// move
+		let action = ReducerAction {
+			from: "did:local:test".to_owned(),
+			core: "file".to_owned(),
+			time: 456,
+			payload: FileAction::Modify {
+				path: "/hello/world".try_into().unwrap(),
+				modifications: vec![FileModification::Move("/".try_into().unwrap())],
+			},
+		};
+		let state = state.reduce(&action, &mut context);
+		let paths = state.nodes.collection(&context);
+		assert_eq!(paths.iter().map(|(k, _)| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/world"]); // "/hello" is empty now
+		assert_eq!(names(&context, &state, "/"), Vec::<&str>::from(["hello", "world"]));
+		assert_eq!(names(&context, &state, "/hello"), Vec::<&str>::from([]));
+		assert_eq!(names(&context, &state, "/world"), Vec::<&str>::from(["test.txt"]));
+	}
+
+	#[test]
+	fn test_modify_move_file() {
+		let (mut context, state) = create_test_file_state();
+
+		// move
+		let action = ReducerAction {
+			from: "did:local:test".to_owned(),
+			core: "file".to_owned(),
+			time: 456,
+			payload: FileAction::Modify {
+				path: "/hello/world/test.txt".try_into().unwrap(),
+				modifications: vec![FileModification::Move("/hello".try_into().unwrap())],
+			},
+		};
+		let state = state.reduce(&action, &mut context);
+		let paths = state.nodes.collection(&context);
+		assert_eq!(paths.iter().map(|(k, _)| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/hello"]); // "/world" is empty now
+		assert_eq!(names(&context, &state, "/"), Vec::<&str>::from(["hello"]));
+		assert_eq!(names(&context, &state, "/hello"), Vec::<&str>::from(["world", "test.txt"]));
+		assert_eq!(names(&context, &state, "/hello/world"), Vec::<&str>::from([]));
 	}
 }
