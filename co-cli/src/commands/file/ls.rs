@@ -3,6 +3,7 @@ use crate::{
 	cli::Cli,
 	library::{cli_context::CliContext, file::list_nodes},
 };
+use chrono::DateTime;
 use co_core_file::Node;
 use co_primitives::{AbsolutePath, Date, PathExt};
 use co_sdk::{CoReducerError, CoReducerFactory};
@@ -39,7 +40,7 @@ pub async fn command(
 	// print
 	println!("total {}", nodes.len());
 	fn format_row(size: u64, modify_time: Date, name: &str) -> String {
-		format!(" {} {} {}", size, modify_time, name)
+		format!(" {}B {} {}", size, format_date(modify_time), name)
 	}
 	for node in nodes {
 		match node {
@@ -51,4 +52,12 @@ pub async fn command(
 
 	// result
 	Ok(exitcode::OK)
+}
+
+fn format_date(date: Date) -> String {
+	if let Some(time) = DateTime::from_timestamp((date / 1_000) as i64, (date % 1_000 * 1_000_000) as u32) {
+		time.to_rfc3339()
+	} else {
+		format!("[{}]", date)
+	}
 }
