@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { CID } from "multiformats";
 
 
-export async function getCoState(co: string): Promise<[CID | undefined, Set<CID>]> {
+export async function getCoState(co: string): Promise<[CID | undefined, CID[]]> {
     return await invoke("plugin:co-sdk|get_co_state", { co });
 }
 export async function pushAction(co: string, core: string, action: any): Promise<CID | undefined> {
@@ -22,8 +22,8 @@ export async function storageSet(co: string, data: Uint8Array, cid: CID): Promis
 
 export interface GetActionsResponse {
     actions: CID[];
-    next_heads: Set<CID>;
+    next_heads: CID[];
 }
-export async function get_actions(co: string, heads: Set<CID>, count: number, until: CID | undefined): Promise<GetActionsResponse> {
+export async function get_actions(co: string, heads: CID[], count: number, until: CID | undefined): Promise<GetActionsResponse> {
     return await invoke("plugin:co-sdk|get_actions", { co, heads, count, until });
 }

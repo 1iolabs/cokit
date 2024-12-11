@@ -9,7 +9,6 @@ export const initEpic: MessengerViewEpicType = (action$, state$, context) => act
     filter(isPluginInitializeAction),
     withLatestFrom(state$),
     mergeMap(async ([, state]) => {
-        console.log("plugin loaded:", context.plugin);
         const actions: AnyAction[] = [];
         // load core state of room
         const roomCoreState = await invokeGetCoreState(state.co, state.core);

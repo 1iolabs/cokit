@@ -1,11 +1,12 @@
 import { isPluginInitializeAction } from "@1io/kui-application-sdk";
+import { CID } from "multiformats";
 import { Action } from "redux";
 import { filter, identity, mergeAll, mergeMap, observeOn, queueScheduler, withLatestFrom } from "rxjs";
 import { get_actions } from "../../../../../../dist-js/index.js";
 import { createCoSdkStateEventListener } from "../../../library/co-sdk-state-listener.js";
+import { invokeResolveCid } from "../../../library/invoke-get.js";
 import { getRoomState } from "../../../library/room-state.js";
-import { MessengerViewActionType, MessengerViewNameChangedAction } from "../actions/index.js";
-import { handleMatrixEvent } from "../library/handle-matrix-event.js";
+import { MessengerViewActionType, MessengerViewAddMessagesAction, MessengerViewNameChangedAction } from "../actions/index.js";
 import { MessengerViewEpicType } from "../types/plugin.js";
 
 export const subscribeTauriEventEpic: MessengerViewEpicType = (action$, state$, context) => action$.pipe(
@@ -22,7 +23,6 @@ export const subscribeTauriEventEpic: MessengerViewEpicType = (action$, state$, 
                 const actions: Action[] = [];
                 if (stateCid) {
                     const roomState = await getRoomState(state.co, state.core, stateCid);
-                    console.log("core", roomState);
                     if (roomState && roomState.name !== state.chatName) {
                         actions.push(identity<MessengerViewNameChangedAction>({
                             payload: { newName: roomState.name },
@@ -33,20 +33,23 @@ export const subscribeTauriEventEpic: MessengerViewEpicType = (action$, state$, 
                 }
 
                 const latestMessage = state.messages.length > 0 ? state.messages[state.messages.length - 1] : undefined;
-
+                if (!latestMessage) { return actions; }
                 // TODO: if there are over 200 new messages we might still need paging
-                const log = (await get_actions(co, heads, 200, latestMessage?.actionCid)).actions;
-
+                const log = (await get_actions(co, heads, 200, latestMessage)).actions;
+                const messages: CID[] = [];
                 for (const cid of log) {
-                    const roomChangeAction = await handleMatrixEvent(co, state.core, cid);
-                    if (roomChangeAction !== undefined) {
-                        actions.push(roomChangeAction);
-                    }
+                    const payload = await invokeResolveCid(co, cid);
+                    if (payload.c !== state.core) { continue; }
+                    messages.push(cid);
                 }
 
-                // chronologically earliest action comes first from the get_actions() call,
-                // but we save it in reverse order so we can just push the action when a new one comes in
-                return actions.reverse();
+                actions.push(identity<MessengerViewAddMessagesAction>({
+                    // chronologically earliest action comes first from the get_actions() call,
+                    // but we save it in reverse order so we can just push the action when a new one comes in
+                    payload: { messages: messages.reverse() },
+                    type: MessengerViewActionType.AddMessages,
+                }));
+                return actions;
             }),
         );
     }),

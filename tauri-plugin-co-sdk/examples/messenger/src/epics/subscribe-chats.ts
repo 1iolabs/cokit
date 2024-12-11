@@ -20,7 +20,6 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                 const actions: Action[] = [];
                 for (const cid of log) {
                     const payload = await invokeResolveCid(co, cid);
-                    console.log("action", payload);
                     const matrixEvent = payload.p;
 
                     switch (matrixEvent.type) {
@@ -43,7 +42,6 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                             break;
                         };
                         case "room_name": {
-                            console.log("event", matrixEvent);
                             let name = matrixEvent.content.name;
                             const chat = state.chats.find((c) => c.roomCoreId === buildCoCoreId(co, payload.c));
                             if (name && chat) {

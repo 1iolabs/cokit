@@ -26,18 +26,14 @@ export async function invokeGetCoreState(co: string, core: string): Promise<any>
     const core_cid = state?.cores?.[core]?.state;
     if (core_cid) {
         let core_state = await invokeResolveCid(co, core_cid);
-        console.log("bbb", core_state);
         return core_state;
     }
-    console.log("aaa", state);
     return null;
 }
 
 export async function invokeGetCoIds() {
     const memberships = await invokeGetCoreState("local", "membership");
-    console.log("memberships", memberships, Array.isArray(memberships?.memberships));
     if (Array.isArray(memberships?.memberships)) {
-        console.log("isArray");
         return memberships.memberships.map((membership: any) => membership?.id).filter(isNonNull);
     }
     return [];
@@ -50,7 +46,6 @@ export async function invokeGetFilteredCores(tags: string[], co?: string): Promi
     } else {
         coIds.push(...(await invokeGetCoIds()));
     }
-    console.log("checking cores of coIds:", coIds);
     const foundCores: string[] = [];
     for (const coId of coIds) {
         const state = await invokeGetCoState(coId);
@@ -58,7 +53,6 @@ export async function invokeGetFilteredCores(tags: string[], co?: string): Promi
             // TODO remove any cast when js interfaces are done
             const v = value as any;
             if (v?.tags) {
-                console.log("value", v);
                 if (v.tags[0].every((tag: string) => tags.includes(tag))) {
                     foundCores.push(buildCoCoreId(coId, key));
                 }

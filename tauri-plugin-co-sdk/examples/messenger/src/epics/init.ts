@@ -22,7 +22,6 @@ export const initEpic: ChatsListEpicType = (action$, state$, context) => action$
         // load all chat states
         const chats: Chat[] = [];
         const coreIds = await invokeGetFilteredCores(["core", "co-core-room"]);
-        console.log("rooms", coreIds);
         for (const coreId of coreIds) {
             const [co, core] = splitCoCoreId(coreId);
             if (core) {

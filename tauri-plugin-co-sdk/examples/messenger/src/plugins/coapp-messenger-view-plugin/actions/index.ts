@@ -1,10 +1,9 @@
-import { Message } from "@1io/coapp-messenger-view";
 import { PayloadAction } from "@1io/redux-utils";
 import { CID } from "multiformats";
 
 export enum MessengerViewActionType {
     Send = "coapp-messenger/send",
-    MessageReceived = "coapp-messenger/message-received",
+    AddMessages = "coapp-messenger/add-messages",
     NameChanged = "coapp-messenger/chat-name-changed",
     LoadMoreEvents = "coapp-messenger/load-more-events",
     SetLastHeads = "coapp-messenger/set-last-heads",
@@ -12,7 +11,7 @@ export enum MessengerViewActionType {
 
 export type MessengerViewActions =
     MessengerViewSendAction
-    | MessengerViewAddMessageAction
+    | MessengerViewAddMessagesAction
     | MessengerViewNameChangedAction
     | MessengerViewLoadMoreEventsAction
     | MessengerViewSetLastHeadsAction;
@@ -22,8 +21,8 @@ export interface MessengerViewSendAction extends PayloadAction<MessengerViewActi
 }> {
 }
 
-export interface MessengerViewAddMessageAction extends PayloadAction<MessengerViewActionType.MessageReceived, {
-    readonly message: Message;
+export interface MessengerViewAddMessagesAction extends PayloadAction<MessengerViewActionType.AddMessages, {
+    readonly messages: CID[];
     readonly appendTop?: boolean;
 }> {
 }
@@ -39,6 +38,6 @@ export interface MessengerViewLoadMoreEventsAction extends PayloadAction<Messeng
 }
 
 export interface MessengerViewSetLastHeadsAction extends PayloadAction<MessengerViewActionType.SetLastHeads, {
-    readonly lastHeads: Set<CID>;
+    readonly lastHeads: CID[];
 }> {
 }

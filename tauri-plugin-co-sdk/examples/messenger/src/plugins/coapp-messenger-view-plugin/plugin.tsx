@@ -9,7 +9,6 @@ import { CoreIdTag } from "./types/tags.js";
 
 export default function plugin(pluginTags: TagList): MessengerViewPlugin {
     const coreId = tagValue<CoreIdTag>(pluginTags, "coreId")?.split("/");
-    console.log("frwgerw", coreId);
     // default values
     let co = "1io";
     let core = "room";

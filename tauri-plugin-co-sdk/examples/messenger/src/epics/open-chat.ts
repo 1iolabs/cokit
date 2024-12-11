@@ -1,13 +1,11 @@
 import { ApplicationApi, WellKnownTags } from "@1io/kui-application-sdk";
-import { filter, identity, mergeAll, mergeMap, withLatestFrom } from "rxjs";
+import { filter, identity, mergeAll, mergeMap } from "rxjs";
 import { ChatsListActionType, ChatsListActivatePluginAction, ChatsListOpenChatAction, ChatsListUpdateChatAction } from "../actions/index.js";
 import { ChatsListEpicType } from "../types/plugin.js";
 
 export const openChatEpic: ChatsListEpicType = (action$, state$, context) => action$.pipe(
     filter((action): action is ChatsListOpenChatAction => action.type === ChatsListActionType.OpenChat),
-    withLatestFrom(state$),
-    mergeMap(async ([action, state]) => {
-        console.log("testtyy", action.payload.chat);
+    mergeMap(async (action) => {
         const roomCoreId = action.payload.chat.roomCoreId;
         const loadedPlugin = action.payload.chat.pluginId;
         // if plugin not loaded -> load now

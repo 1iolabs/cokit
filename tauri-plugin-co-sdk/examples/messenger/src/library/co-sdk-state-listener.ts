@@ -2,7 +2,7 @@ import { Event, listen } from "@tauri-apps/api/event";
 import { CID } from "multiformats";
 import { fromEventPattern, Observable } from "rxjs";
 
-export type CoSdkStateEvent = Event<[string, CID | undefined, Set<CID>]>;
+export type CoSdkStateEvent = Event<[string, CID | undefined, CID[]]>;
 
 /**
  * Starts listening to the "co-sdk-new-state" event channel and emits all events that are 
@@ -16,7 +16,6 @@ export function createCoSdkStateEventListener(): Observable<CoSdkStateEvent> {
         },
         (_handler, unlisten) => {
             //stop listening
-            console.log("unlisten: ", unlisten);
             unlisten();
         },
     );
