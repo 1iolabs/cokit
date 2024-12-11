@@ -8,6 +8,7 @@ use libipld::{Block, Cid, DefaultParams};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
 
+#[derive(Debug)]
 pub struct MemoryStorage {
 	records: BTreeMap<Cid, Record>,
 }

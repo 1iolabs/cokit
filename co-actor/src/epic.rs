@@ -138,6 +138,11 @@ where
 		}
 	}
 }
+impl<M, A, S, C> Debug for EpicRuntime<M, A, S, C> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("EpicRuntime").field("_actor", &self._actor).finish()
+	}
+}
 
 /// Joins two epics into one.
 pub struct JoinEpic<E1, E2>(E1, E2);

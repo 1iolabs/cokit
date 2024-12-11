@@ -65,7 +65,7 @@ impl<T> Future for ResponseReceiver<T> {
 	type Output = Result<T, ActorError>;
 
 	fn poll(mut self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		self.rx.poll_unpin(cx).map_err(|e| ActorError::InvalidState(e.into()))
+		self.rx.poll_unpin(cx).map_err(|_e| ActorError::Canceled)
 	}
 }
 
@@ -77,6 +77,11 @@ pub struct ResponseStream<T> {
 impl<T> ResponseStream<T> {
 	pub fn send(&mut self, value: T) -> Result<(), ActorError> {
 		self.tx.send(Ok(value)).map_err(|_| ActorError::Canceled)
+	}
+
+	/// Test if the stream has been closed by the caller.
+	pub fn is_closed(&self) -> bool {
+		self.tx.is_closed()
 	}
 
 	pub fn complete(self) -> Result<(), ActorError> {
@@ -124,5 +129,10 @@ where
 			Err(ActorError::Canceled) => false,
 			_ => true,
 		});
+	}
+
+	/// Test if the streams has been closed by the caller.
+	pub fn is_closed(&self) -> bool {
+		self.streams.iter().find(|s| !s.is_closed()).is_none()
 	}
 }

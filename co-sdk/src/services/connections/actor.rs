@@ -29,7 +29,7 @@ impl Actor for Connections {
 	async fn initialize(
 		&self,
 		_handle: &ActorHandle<Self::Message>,
-		tags: Tags,
+		tags: &Tags,
 		_initialize: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		Ok(State {
@@ -39,7 +39,7 @@ impl Actor for Connections {
 				co: Default::default(),
 				networks: Default::default(),
 			},
-			epic: EpicRuntime::new(epic(tags), |err| {
+			epic: EpicRuntime::new(epic(tags.clone()), |err| {
 				tracing::error!(?err, "connection-epic-error");
 				None
 			}),

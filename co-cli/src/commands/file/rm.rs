@@ -16,6 +16,10 @@ use exitcode::ExitCode;
 pub struct Command {
 	/// The path.
 	pub path: String,
+
+	/// Recursively delete.
+	#[arg(short)]
+	pub recursive: bool,
 }
 
 pub async fn command(
@@ -42,7 +46,7 @@ pub async fn command(
 		.ok_or_else(|| FileError::NoEntry(path.clone().into(), anyhow!("rm")))?;
 
 	// action
-	let action = FileAction::Remove { path };
+	let action = FileAction::Remove { path, recursive: command.recursive };
 	co_reducer.push(&identity, &file_command.core, &action).await?;
 
 	// result

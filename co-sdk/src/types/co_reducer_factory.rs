@@ -20,6 +20,6 @@ pub enum CoReducerFactoryError {
 	#[error("Create CO failed: {0:?}")]
 	Create(CoId, #[source] anyhow::Error),
 
-	#[error("Create CO failed")]
+	#[error("CO failed")]
 	Other(#[from] anyhow::Error),
 }

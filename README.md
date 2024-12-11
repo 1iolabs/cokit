@@ -101,7 +101,11 @@ impl Todos {
 ```
 
 #### Possible Assembly Script
+
+#### 1
+
 ```typescript
+@state
 interface Todos {
     next_todo_id: number;
     todos: CoreVec<Todo>;
@@ -113,14 +117,14 @@ interface Todo {
     done: bool;
 }
 
-#[action]
+@action
 function create(state: Todos, title: String) {
     let id = state.next_todo_id;
     state.next_todo_id = state.next_todo + 1;
     state.todos.push({id, title, done: false});
 }
 
-#[action]
+@action
 function set_done(state: Todos, done: bool) {
     const id = state.next_todo_id;
     state.next_todo_id = state.next_todo + 1;
@@ -130,6 +134,43 @@ function set_done(state: Todos, done: bool) {
             todo.done = done;
         }
     );
+}
+```
+
+#### 2
+
+Schema:
+
+```typescript
+import { CoList, Co } from "co/core";
+
+export interface ShoppingListItem {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
+export interface ShoppingList extends Co {
+  items: CoList<ShoppingListItem>;
+}
+```
+
+Reducer:
+
+```typescript
+import { defineReducer } from "co/core";
+import { ShoppingList } from "./schema";
+
+export const actions = {
+  addItem: defineReducer((state: ShoppingList, { id, title }) => {
+    state.items.push({ id, title, done: false });
+  }),
+  markAsDone: defineReducer((state: ShoppingList, { id }) => {
+    state.items.updateOne(
+      (item) => item.id == id,
+      (item) => item.done = true,
+    );
+  })
 }
 ```
 

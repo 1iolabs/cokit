@@ -3,6 +3,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use co_primitives::Tags;
 use futures::Stream;
+use std::sync::Arc;
 use tokio::{
 	sync::{mpsc, watch},
 	task::JoinHandle,
@@ -11,8 +12,8 @@ use tracing::Instrument;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ActorError {
-	#[error("Invalid actor state for that operation.")]
-	InvalidState(#[source] anyhow::Error),
+	#[error("Invalid actor state for that operation ({1}).")]
+	InvalidState(#[source] anyhow::Error, Tags),
 
 	#[error("Operation canceled.")]
 	Canceled,
@@ -34,7 +35,7 @@ pub trait Actor: Send + Sync + 'static {
 	async fn initialize(
 		&self,
 		handle: &ActorHandle<Self::Message>,
-		tags: Tags,
+		tags: &Tags,
 		initialize: Self::Initialize,
 	) -> Result<Self::State, ActorError>;
 
@@ -79,33 +80,48 @@ pub trait Actor: Send + Sync + 'static {
 		let span = tracing::trace_span!("actor", ?tags);
 		let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 		let (state_tx, state_rx) = watch::channel(ActorState::Starting);
-		let tags = actor.tags(tags)?;
-		let handle = ActorHandle { tx: tx.clone(), state: state_rx.clone() };
+		let tags = Arc::new(actor.tags(tags)?);
+		let handle = ActorHandle { tx: tx.clone(), state: state_rx.clone(), tags: tags.clone() };
 		let join = spawner.spawn({
 			let tags = tags.clone();
 			let handle = handle.clone();
 			async move {
+				// log
+				tracing::trace!(?tags, "actor-initialize");
+
 				// initialize
-				let mut actor_state = actor.initialize(&handle, tags, initialize).await?;
+				let mut actor_state = actor.initialize(&handle, &tags, initialize).await.map_err(|err| {
+					tracing::error!(?err, ?tags, "actor-initialize-failed");
+					err
+				})?;
 				state_tx
 					.send(ActorState::Running)
-					.map_err(|e| ActorError::InvalidState(e.into()))?;
+					.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
 
 				// execute
 				while let Some(actor_message) = rx.recv().await {
 					match actor_message {
 						ActorMessage::Message(message) => {
-							actor.handle(&handle, message, &mut actor_state).await?;
+							actor.handle(&handle, message, &mut actor_state).await.map_err(|err| {
+								tracing::error!(?err, ?tags, "actor-handle-failed");
+								err
+							})?;
 						},
 						ActorMessage::Shutdown => {
+							// log
+							tracing::trace!(?tags, "actor-shutdown");
+
 							// state
 							state_tx
 								.send(ActorState::Stopping)
-								.map_err(|e| ActorError::InvalidState(e.into()))?;
+								.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
 							rx.close();
 
 							// shutdown
-							actor.shutdown(actor_state).await?;
+							actor.shutdown(actor_state).await.map_err(|err| {
+								tracing::error!(?err, ?tags, "actor-shutdown-failed");
+								err
+							})?;
 
 							// done
 							break;
@@ -116,12 +132,12 @@ pub trait Actor: Send + Sync + 'static {
 				// done
 				state_tx
 					.send(ActorState::None)
-					.map_err(|e| ActorError::InvalidState(e.into()))?;
+					.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
 				Ok(())
 			}
 			.instrument(span)
 		});
-		Ok(ActorInstance { join, handle, tags })
+		Ok(ActorInstance { join, handle })
 	}
 }
 
@@ -151,13 +167,13 @@ enum ActorMessage<M> {
 }
 
 /// The actual actor instance.
+#[derive(Debug)]
 pub struct ActorInstance<A>
 where
 	A: Actor,
 {
 	handle: ActorHandle<A::Message>,
 	join: JoinHandle<Result<(), ActorError>>,
-	tags: Tags,
 }
 impl<A> ActorInstance<A>
 where
@@ -170,7 +186,7 @@ where
 
 	/// Get actor tags.
 	pub fn tags(&self) -> Tags {
-		self.tags.clone()
+		self.handle.tags.as_ref().clone()
 	}
 
 	/// Request shutdown.
@@ -180,7 +196,10 @@ where
 
 	/// Wait until the actor completes.
 	pub async fn join(self) -> Result<(), ActorError> {
-		self.join.await.map_err(|e| ActorError::InvalidState(e.into()))??;
+		let handle = self.handle;
+		self.join
+			.await
+			.map_err(|e| ActorError::InvalidState(e.into(), handle.tags().clone()))??;
 		Ok(())
 	}
 
@@ -195,16 +214,22 @@ where
 pub struct ActorHandle<M> {
 	tx: mpsc::UnboundedSender<ActorMessage<M>>,
 	state: watch::Receiver<ActorState>,
+	tags: Arc<Tags>,
 }
 impl<M> Clone for ActorHandle<M> {
 	fn clone(&self) -> Self {
-		Self { tx: self.tx.clone(), state: self.state.clone() }
+		Self { tx: self.tx.clone(), state: self.state.clone(), tags: self.tags.clone() }
 	}
 }
 impl<M> ActorHandle<M>
 where
 	M: Send + 'static,
 {
+	/// Get actor tags.
+	pub fn tags(&self) -> &Tags {
+		self.tags.as_ref()
+	}
+
 	/// Wait for startup to be complete.
 	pub async fn initialized(&self) -> Result<(), ActorError> {
 		let mut state = self.state.clone();
@@ -212,7 +237,10 @@ where
 			let actor_state = *state.borrow_and_update();
 			match actor_state {
 				ActorState::Starting => {
-					state.changed().await.map_err(|e| ActorError::InvalidState(e.into()))?;
+					state
+						.changed()
+						.await
+						.map_err(|e| ActorError::InvalidState(e.into(), self.tags().clone()))?;
 				},
 				_ => {
 					break;
@@ -229,7 +257,10 @@ where
 			let actor_state = *state.borrow_and_update();
 			match actor_state {
 				ActorState::Starting | ActorState::Running => {
-					state.changed().await.map_err(|e| ActorError::InvalidState(e.into()))?;
+					state
+						.changed()
+						.await
+						.map_err(|e| ActorError::InvalidState(e.into(), self.tags().clone()))?;
 				},
 				_ => {
 					break;
@@ -249,7 +280,7 @@ where
 	pub fn dispatch(&self, message: impl Into<M>) -> Result<(), ActorError> {
 		self.tx
 			.send(ActorMessage::Message(message.into()))
-			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running.")))?;
+			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running."), self.tags().clone()))?;
 		Ok(())
 	}
 
@@ -258,7 +289,7 @@ where
 		let (responder, response) = ResponseReceiver::new();
 		self.tx
 			.send(ActorMessage::Message(message(responder)))
-			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running.")))?;
+			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running."), self.tags().clone()))?;
 		response.await
 	}
 
@@ -268,7 +299,7 @@ where
 		let send_result = self
 			.tx
 			.send(ActorMessage::Message(message(responder)))
-			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running.")));
+			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running."), self.tags().clone()));
 		async_stream::stream! {
 			// fail if send not worked
 			match send_result {
@@ -328,7 +359,7 @@ mod tests {
 			async fn initialize(
 				&self,
 				_handle: &ActorHandle<Self::Message>,
-				_tags: Tags,
+				_tags: &Tags,
 				initialize: Self::Initialize,
 			) -> Result<Self::State, ActorError> {
 				Ok(initialize)
@@ -387,7 +418,7 @@ mod tests {
 			async fn initialize(
 				&self,
 				_handle: &ActorHandle<Self::Message>,
-				_tags: Tags,
+				_tags: &Tags,
 				initialize: Self::Initialize,
 			) -> Result<Self::State, ActorError> {
 				Ok(TestState { watchers: Default::default(), value: initialize })

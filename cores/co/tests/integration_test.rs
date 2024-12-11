@@ -1,7 +1,7 @@
 use co_api::{BlockSerializer, ReducerAction, Tags};
 use co_core_co::{Co, CoAction};
 use co_runtime::{RuntimeContext, RuntimePool};
-use co_storage::{store_file, BlockStorage, MemoryBlockStorage};
+use co_storage::{unixfs_add_file, BlockStorage, MemoryBlockStorage};
 use libipld::Cid;
 use std::process::Command;
 
@@ -36,7 +36,7 @@ async fn integration_test() {
 	storage.set(action_block).await.unwrap();
 
 	// wasm
-	let wasm = store_file(&storage, "../../target/wasm32-unknown-unknown/release/co_core_co.wasm")
+	let wasm = unixfs_add_file(&storage, "../../target/wasm32-unknown-unknown/release/co_core_co.wasm")
 		.await
 		.unwrap();
 

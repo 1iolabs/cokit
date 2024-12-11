@@ -13,6 +13,7 @@ use co_identity::LocalIdentityResolver;
 use co_primitives::{tags, Tags};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 
+#[derive(Debug)]
 pub struct Application {
 	settings: ApplicationSettings,
 }
@@ -30,9 +31,11 @@ impl Actor for Application {
 	async fn initialize(
 		&self,
 		handle: &ActorHandle<Self::Message>,
-		tags: Tags,
+		tags: &Tags,
 		(storage, tasks): Self::Initialize,
 	) -> Result<Self::State, ActorError> {
+		tracing::trace!(settings = ?self.settings, "application-initialize");
+
 		let shutdown = CancellationToken::new();
 		let local_identity = LocalIdentityResolver::default().private_identity("did:local:device").unwrap();
 		let runtime = Runtime::new();
@@ -59,7 +62,7 @@ impl Actor for Application {
 
 		// reuslt
 		Ok(ApplicationState {
-			epic: EpicRuntime::new(epic(tags), |err| {
+			epic: EpicRuntime::new(epic(tags.clone()), |err| {
 				tracing::error!(?err, "application-epic-error");
 				Some(Action::Error { err: err.into() })
 			}),
@@ -122,6 +125,7 @@ impl Actor for Application {
 	}
 }
 
+#[derive(Debug)]
 pub struct ApplicationState {
 	epic: EpicRuntime<ApplicationMessage, Action, (), CoContext>,
 	context: CoContext,

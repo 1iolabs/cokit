@@ -34,7 +34,7 @@ impl Actor for Network {
 	async fn initialize(
 		&self,
 		_handle: &ActorHandle<Self::Message>,
-		_tags: Tags,
+		_tags: &Tags,
 		_initialize: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		// bitswap
