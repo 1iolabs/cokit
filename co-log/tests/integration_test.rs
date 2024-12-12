@@ -149,7 +149,7 @@ async fn join_is_commutative() {
 	assert_eq!(res2, res1);
 }
 
-async fn create_empty_log<S: BlockStorage + Send + Sync + Clone + 'static>(store: &S) -> Log<S> {
+async fn create_empty_log<S: BlockStorage + Clone + Send + Sync + 'static>(store: &S) -> Log<S> {
 	Log::new(
 		"test".as_bytes().to_vec(),
 		IdentityResolverBox::new(DidKeyIdentityResolver::new()),
@@ -160,7 +160,7 @@ async fn create_empty_log<S: BlockStorage + Send + Sync + Clone + 'static>(store
 
 async fn log_push<S, I>(log: &mut Log<S>, identity: &I, t: &str) -> (Cid, Link<Entry>)
 where
-	S: BlockStorage + Send + Sync + 'static,
+	S: BlockStorage + Clone + Send + Sync + 'static,
 	I: PrivateIdentity + Send + Sync,
 {
 	let block = create_event(log.storage(), t).await;

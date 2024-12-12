@@ -2,7 +2,7 @@ use super::entry::EntryBlock;
 use libipld::{store::StoreParams, Cid};
 use std::collections::BTreeSet;
 
-/// Find heads.
+/// Find heads. Which are the "loose ends" of all items in `entries`.
 pub fn find_heads<'a, P: StoreParams>(entries: impl Iterator<Item = &'a EntryBlock<P>>) -> Vec<&'a EntryBlock<P>> {
 	let mut all_next_cids: BTreeSet<Cid> = Default::default();
 	let mut all_entries: BTreeSet<&'a EntryBlock<P>> = Default::default();

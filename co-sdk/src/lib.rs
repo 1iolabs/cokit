@@ -43,6 +43,7 @@ pub use library::{
 	local_keypair_fetch::local_keypair_fetch,
 	node_stream::NodeStream,
 	response_list::ResponseList,
+	tmp_dir::TmpDir,
 	update_co::update_co,
 };
 pub use pin::pin::PinAPI;

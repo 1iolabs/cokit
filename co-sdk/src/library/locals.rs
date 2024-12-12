@@ -80,10 +80,10 @@ impl FileLocals {
 	///
 	/// # Arguments
 	/// * `config_path` - The local configuratin path. Normally `{base_path}/etc`.
-	pub fn new(config_path: PathBuf, identifier: String) -> Result<Self, anyhow::Error> {
+	pub fn new(config_path: PathBuf, identifier: String, lock: bool) -> Result<Self, anyhow::Error> {
 		let instance = Actor::spawn(
 			tags!("type": "file-locals", "application": &identifier),
-			FileLocalsActor { config_path, identifier },
+			FileLocalsActor { config_path, identifier, lock },
 			(),
 		)?;
 		Ok(Self { handle: instance.handle() })
@@ -196,6 +196,7 @@ where
 struct FileLocalsActor {
 	config_path: PathBuf,
 	identifier: String,
+	lock: bool,
 }
 #[async_trait]
 impl Actor for FileLocalsActor {
@@ -224,7 +225,11 @@ impl Actor for FileLocalsActor {
 					.execute(|| async {
 						// open and lock file
 						if state.file.is_none() {
-							state.file = Some(self.open_and_lock().await?);
+							state.file = if self.lock {
+								FileLocalsFile::Flock(self.open_and_lock().await?)
+							} else {
+								FileLocalsFile::File(self.open().await?)
+							};
 						}
 
 						// write
@@ -286,6 +291,17 @@ impl Actor for FileLocalsActor {
 }
 impl FileLocalsActor {
 	#[tracing::instrument(err(Debug))]
+	async fn open(&self) -> Result<tokio::fs::File, anyhow::Error> {
+		let path = self.config_path.join(&self.identifier).join("local.cbor");
+
+		// create parent dir
+		tokio::fs::create_dir_all(path.parent().ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?).await?;
+
+		// result
+		Ok(tokio::fs::OpenOptions::new().create(true).write(true).open(&path).await?)
+	}
+
+	#[tracing::instrument(err(Debug))]
 	async fn open_and_lock(&self) -> Result<Flock<TokioFile>, anyhow::Error> {
 		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
 
@@ -295,7 +311,14 @@ impl FileLocalsActor {
 		// create and lock
 		let mut index = 1;
 		loop {
-			let file = TokioFile(tokio::fs::OpenOptions::new().write(true).create(true).open(&path).await?);
+			let file = TokioFile(
+				tokio::fs::OpenOptions::new()
+					.read(true)
+					.write(true)
+					.create(true)
+					.open(&path)
+					.await?,
+			);
 			match Flock::lock(file, nix::fcntl::FlockArg::LockExclusiveNonblock) {
 				Ok(lock) => {
 					tracing::info!(?path, "local-lock");
@@ -343,12 +366,36 @@ enum FileLocalsMessage {
 }
 
 #[derive(Debug, Default)]
+enum FileLocalsFile {
+	#[default]
+	None,
+	File(tokio::fs::File),
+	Flock(Flock<TokioFile>),
+}
+impl FileLocalsFile {
+	fn file_mut(&mut self) -> Option<&mut tokio::fs::File> {
+		match self {
+			Self::None => None,
+			Self::File(file) => Some(file),
+			Self::Flock(lock) => Some(&mut lock.deref_mut().0),
+		}
+	}
+
+	fn is_none(&self) -> bool {
+		match self {
+			Self::None => true,
+			_ => false,
+		}
+	}
+}
+
+#[derive(Debug, Default)]
 struct FileLocalsState {
 	/// Loaded locals.
 	locals: BTreeMap<PathBuf, ApplicationLocal>,
 
 	/// Our local.cbor, if already written to, locked.
-	file: Option<Flock<TokioFile>>,
+	file: FileLocalsFile,
 
 	/// Active watchers.
 	watchers: ResponseStreams<(PathBuf, ApplicationLocal)>,
@@ -371,11 +418,13 @@ impl FileLocalsState {
 
 	/// Write local to the locked file.
 	async fn write(&mut self, local: ApplicationLocal) -> Result<(), anyhow::Error> {
-		let file = &mut self.file.as_mut().ok_or(anyhow!("No file."))?.deref_mut().0;
+		let file = self.file.file_mut().ok_or(anyhow!("No file."))?;
 
 		// serialize
 		let data = to_cbor(&local)?;
-		tracing::info!(?data, "write");
+
+		// log
+		tracing::debug!(?local, "locals-write");
 
 		// write
 		file.set_len(0).await?;
@@ -537,4 +586,55 @@ impl ApplicationLocal {
 	// 	// result
 	// 	Ok(())
 	// }
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{
+		library::locals::{ApplicationLocal, FileLocals, Locals},
+		TmpDir,
+	};
+	use co_primitives::BlockSerializer;
+
+	#[tokio::test]
+	async fn test_file_locals_overwrite() {
+		// tracing_subscriber::fmt()
+		// 	.with_env_filter(tracing_subscriber::EnvFilter::new(format!(
+		// 		"{}=trace",
+		// 		module_path!().split(":").next().expect("module path")
+		// 	)))
+		// 	.try_init()
+		// 	.ok();
+
+		let tmp = TmpDir::new("co");
+
+		// read
+		let mut locals = FileLocals::new(tmp.path().into(), "test".to_owned(), true).unwrap();
+		let items = locals.get().await.unwrap();
+		assert_eq!(items.len(), 0);
+
+		// write
+		let v1 = BlockSerializer::default().serialize(&1).unwrap();
+		locals
+			.set(ApplicationLocal::new([*v1.cid()].into(), *v1.cid(), None))
+			.await
+			.unwrap();
+
+		// read
+		let items = locals.get().await.unwrap();
+		assert_eq!(items.len(), 1);
+		assert_eq!(&items.get(0).unwrap().state, v1.cid());
+
+		// write
+		let v2 = BlockSerializer::default().serialize(&2).unwrap();
+		locals
+			.set(ApplicationLocal::new([*v2.cid()].into(), *v2.cid(), None))
+			.await
+			.unwrap();
+
+		// read
+		let items = locals.get().await.unwrap();
+		assert_eq!(items.len(), 1);
+		assert_eq!(&items.get(0).unwrap().state, v2.cid());
+	}
 }

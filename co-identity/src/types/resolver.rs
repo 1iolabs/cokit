@@ -1,6 +1,6 @@
 use crate::IdentityBox;
 use async_trait::async_trait;
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 #[derive(Debug, thiserror::Error)]
 pub enum IdentityResolverError {
@@ -17,7 +17,7 @@ pub enum IdentityResolverError {
 }
 
 #[async_trait]
-pub trait IdentityResolver {
+pub trait IdentityResolver: Debug {
 	async fn resolve(&self, identity: &str) -> Result<IdentityBox, IdentityResolverError>;
 
 	fn boxed(self) -> IdentityResolverBox
@@ -29,6 +29,7 @@ pub trait IdentityResolver {
 }
 
 /// Dynamic Identity Resolver.
+#[derive(Debug)]
 pub struct IdentityResolverBox {
 	resolver: Arc<dyn IdentityResolver + Send + Sync + 'static>,
 }
