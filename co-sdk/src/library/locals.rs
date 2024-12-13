@@ -7,7 +7,7 @@ use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use libipld::Cid;
 use nix::fcntl::{Flock, Flockable};
 use notify::{
-	event::{CreateKind, DataChange, ModifyKind},
+	event::{CreateKind, DataChange, MetadataKind, ModifyKind},
 	RecursiveMode, Watcher,
 };
 use pin_project::{pin_project, pinned_drop};
@@ -464,7 +464,8 @@ fn watch(config_path: PathBuf) -> impl Stream<Item = (PathBuf, ApplicationLocal)
 				match watcher_rx.recv()? {
 					Ok(event) => match &event.kind {
 						notify::EventKind::Create(CreateKind::File)
-						| notify::EventKind::Modify(ModifyKind::Data(DataChange::Content)) => {
+						| notify::EventKind::Modify(ModifyKind::Data(DataChange::Content))
+						| notify::EventKind::Modify(ModifyKind::Metadata(MetadataKind::Any)) => {
 							for path in &event.paths {
 								if path.parent().and_then(|f| f.parent()) == Some(config_path.as_ref())
 									&& path.file_name().and_then(|f| f.to_str()) == Some("local.cbor")
