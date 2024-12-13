@@ -110,7 +110,7 @@ impl From<TagValue> for Ipld {
 			TagValue::Bytes(i) => Ipld::Bytes(i),
 			TagValue::List(i) => Ipld::List(i.into_iter().map(|e| e.into()).collect()),
 			TagValue::Map(i) => Ipld::Map(i.into_iter().map(|(k, v)| (k, v.into())).collect()),
-			TagValue::Link(i) => Ipld::Link(i.inner()),
+			TagValue::Link(i) => Ipld::Link(i.into()),
 		}
 	}
 }
@@ -292,9 +292,9 @@ impl Tags {
 	}
 
 	/// Find first tag value, that is a link, by key.
-	pub fn link(&self, key: &str) -> Option<&CoCid> {
+	pub fn link(&self, key: &str) -> Option<&Cid> {
 		self.0.iter().find_map(|tag| match tag {
-			(k, TagValue::Link(link)) if k == key => Some(link),
+			(k, TagValue::Link(link)) if k == key => Some(link.as_ref()),
 			_ => None,
 		})
 	}
