@@ -136,6 +136,7 @@ where
 					}
 				}
 			}
+			tracing::trace!(state = ?self.state, heads = ?self.heads, log_heads = ?self.log.heads(), "reducer-snapshots");
 		}
 
 		// if log heads are different from reducer heads

@@ -77,7 +77,7 @@ impl LocalCoBuilder {
 				let config_path = application_path
 					.parent()
 					.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", application_path))?;
-				let locals = FileLocals::new(config_path.to_owned(), self.settings.identifier.clone())?;
+				let locals = FileLocals::new(config_path.to_owned(), self.settings.identifier.clone(), true)?;
 				Ok(LocalCoInstance::create(runtime, self, storage, shutdown, tasks, locals, key, core_resolver)
 					.await?
 					.1)
@@ -141,9 +141,6 @@ where
 		for local in locals.get().await? {
 			let mut state = local.state;
 			let mut heads = local.heads.clone();
-
-			// get local and log
-			tracing::trace!(app = ?local_co.settings.identifier, state = ?local.state, heads = ?local.heads, "local-co-read");
 
 			// load additional encryption mappings
 			if let Some(mapping) = &local.mapping {

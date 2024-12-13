@@ -30,19 +30,23 @@ where
 					// flag as traversed
 					traversed.insert(*entry.cid());
 
+					// result
+					// note: we yield before loading the next items as the stream is may dropped so we dont need the next items
+					let next = entry.entry().next.clone();
+					// let refs = entry.entry().refs.clone();
+					yield entry;
+
 					// TODO: (pre) fetch refs
-					// self.storage.fetch(entry.entry().next.iter());
-					// self.storage.fetch(entry.entry().refs.iter());
+					// TODO: read concurrent?
+					// self.storage.fetch(next.iter());
+					// self.storage.fetch(refs.iter());
 
 					// read next and add to stack
-					let mut nexts: Vec<EntryBlock<S::StoreParams>> = stream::iter(entry.entry().next.iter())
-						.then(|cid| async move { get_entry_block(storage, cid).await })
+					let mut nexts: Vec<EntryBlock<S::StoreParams>> = stream::iter(next)
+						.then(|cid| async move { get_entry_block(storage, &cid).await })
 						.try_collect()
 						.await?;
 					stack.append(&mut nexts);
-
-					// result
-					yield entry;
 				}
 			}
 		}

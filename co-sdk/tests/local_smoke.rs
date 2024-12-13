@@ -1,4 +1,4 @@
-use co_sdk::{state, ApplicationBuilder, DidKeyIdentity, Identity, CO_CORE_NAME_KEYSTORE};
+use co_sdk::{state, ApplicationBuilder, DidKeyIdentity, Identity, TmpDir, CO_CORE_NAME_KEYSTORE};
 use std::collections::BTreeMap;
 
 pub mod helper;
@@ -6,7 +6,7 @@ pub mod helper;
 /// Create Local CO in tmpdir and exit.
 #[tokio::test]
 async fn test_local_smoke() {
-	let tmp = helper::tmp_dir::TmpDir::new("co");
+	let tmp = TmpDir::new("co");
 
 	// create
 	let identity = DidKeyIdentity::generate(None);

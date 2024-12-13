@@ -4,7 +4,7 @@ use crate::{
 };
 use async_trait::async_trait;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct JoinIdentityResolver {
 	resolvers: Vec<IdentityResolverBox>,
 }
@@ -28,7 +28,7 @@ impl IdentityResolver for JoinIdentityResolver {
 	}
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct JoinPrivateIdentityResolver {
 	resolvers: Vec<PrivateIdentityResolverBox>,
 }
