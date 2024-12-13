@@ -4,10 +4,11 @@ use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseStream, ResponseStreams};
 use co_primitives::{from_cbor, tags, to_cbor, Tags};
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
+use libc::flock;
 use libipld::Cid;
-use nix::fcntl::{Flock, Flockable};
+use nix::fcntl::{fcntl, FcntlArg, Flock, Flockable};
 use notify::{
-	event::{CreateKind, DataChange, MetadataKind, ModifyKind},
+	event::{CreateKind, ModifyKind},
 	RecursiveMode, Watcher,
 };
 use pin_project::{pin_project, pinned_drop};
@@ -83,7 +84,7 @@ impl FileLocals {
 	pub fn new(config_path: PathBuf, identifier: String, lock: bool) -> Result<Self, anyhow::Error> {
 		let instance = Actor::spawn(
 			tags!("type": "file-locals", "application": &identifier),
-			FileLocalsActor { config_path, identifier, lock },
+			FileLocalsActor { config_path, identifier, lock: if lock { Lock::Fcntl } else { Lock::None } },
 			(),
 		)?;
 		Ok(Self { handle: instance.handle() })
@@ -193,10 +194,17 @@ where
 }
 
 #[derive(Debug)]
+enum Lock {
+	None,
+	Fcntl,
+	_Flock,
+}
+
+#[derive(Debug)]
 struct FileLocalsActor {
 	config_path: PathBuf,
 	identifier: String,
-	lock: bool,
+	lock: Lock,
 }
 #[async_trait]
 impl Actor for FileLocalsActor {
@@ -225,10 +233,10 @@ impl Actor for FileLocalsActor {
 					.execute(|| async {
 						// open and lock file
 						if state.file.is_none() {
-							state.file = if self.lock {
-								FileLocalsFile::Flock(self.open_and_lock().await?)
-							} else {
-								FileLocalsFile::File(self.open().await?)
+							state.file = match self.lock {
+								Lock::_Flock => FileLocalsFile::Flock(self.open_and_flock().await?),
+								Lock::Fcntl => FileLocalsFile::LockedFile(self.open_and_lock().await?),
+								Lock::None => FileLocalsFile::File(self.open().await?),
 							};
 						}
 
@@ -302,15 +310,60 @@ impl FileLocalsActor {
 	}
 
 	#[tracing::instrument(err(Debug))]
-	async fn open_and_lock(&self) -> Result<Flock<TokioFile>, anyhow::Error> {
+	async fn open_and_lock(&self) -> Result<tokio::fs::File, anyhow::Error> {
 		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
-
-		// create parent dir
-		tokio::fs::create_dir_all(path.parent().ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?).await?;
 
 		// create and lock
 		let mut index = 1;
 		loop {
+			// create parent dir
+			tokio::fs::create_dir_all(path.parent().ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?).await?;
+
+			// open
+			let file = tokio::fs::OpenOptions::new()
+				.read(true)
+				.write(true)
+				.create(true)
+				.open(&path)
+				.await?;
+
+			// lock
+			let lock = flock { l_start: 0, l_len: 0, l_pid: 0, l_type: libc::F_WRLCK, l_whence: 0 };
+			match fcntl(file.as_raw_fd(), FcntlArg::F_SETLK(&lock)) {
+				Ok(_) => {
+					tracing::info!(?path, "local-lock");
+					return Ok(file);
+				},
+				Err(errno) => {
+					// close file
+					// note: this should not drop any locks as we exepct we only have one local.cbor per process!
+					drop(file);
+
+					// log
+					tracing::warn!(?path, ?errno, "local-lock-failed");
+
+					// index
+					path = self
+						.config_path
+						.join(format!("{}-{}", self.identifier, index))
+						.join("local.cbor");
+					index += 1;
+				},
+			}
+		}
+	}
+
+	#[tracing::instrument(err(Debug))]
+	async fn open_and_flock(&self) -> Result<Flock<TokioFile>, anyhow::Error> {
+		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
+
+		// create and lock
+		let mut index = 1;
+		loop {
+			// create parent dir
+			tokio::fs::create_dir_all(path.parent().ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?).await?;
+
+			// open
 			let file = TokioFile(
 				tokio::fs::OpenOptions::new()
 					.read(true)
@@ -319,9 +372,11 @@ impl FileLocalsActor {
 					.open(&path)
 					.await?,
 			);
+
+			// lock
 			match Flock::lock(file, nix::fcntl::FlockArg::LockExclusiveNonblock) {
 				Ok(lock) => {
-					tracing::info!(?path, "local-lock");
+					tracing::info!(?path, "local-lock (flock)");
 					return Ok(lock);
 				},
 				Err((file, errno)) => {
@@ -371,6 +426,7 @@ enum FileLocalsFile {
 	None,
 	File(tokio::fs::File),
 	Flock(Flock<TokioFile>),
+	LockedFile(tokio::fs::File),
 }
 impl FileLocalsFile {
 	fn file_mut(&mut self) -> Option<&mut tokio::fs::File> {
@@ -378,6 +434,7 @@ impl FileLocalsFile {
 			Self::None => None,
 			Self::File(file) => Some(file),
 			Self::Flock(lock) => Some(&mut lock.deref_mut().0),
+			Self::LockedFile(file) => Some(file),
 		}
 	}
 
@@ -464,15 +521,16 @@ fn watch(config_path: PathBuf) -> impl Stream<Item = (PathBuf, ApplicationLocal)
 				match watcher_rx.recv()? {
 					Ok(event) => match &event.kind {
 						notify::EventKind::Create(CreateKind::File)
-						| notify::EventKind::Modify(ModifyKind::Data(DataChange::Content))
-						| notify::EventKind::Modify(ModifyKind::Metadata(MetadataKind::Any)) => {
+						| notify::EventKind::Modify(ModifyKind::Data(_)) => {
 							for path in &event.paths {
 								if path.parent().and_then(|f| f.parent()) == Some(config_path.as_ref())
 									&& path.file_name().and_then(|f| f.to_str()) == Some("local.cbor")
 								{
-									tracing::trace!(?path, ?event, "locals-watch-test");
 									match ApplicationLocal::read_sync(path) {
 										Ok(local) => {
+											// log
+											tracing::trace!(?path, ?event, ?local, "locals-watch-send");
+
 											// send change
 											if tx.send((path.clone(), local)).is_err() {
 												// log
