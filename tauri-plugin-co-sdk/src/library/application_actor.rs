@@ -45,7 +45,7 @@ impl Actor for ApplicationActor {
 	async fn initialize(
 		&self,
 		_handle: &ActorHandle<Self::Message>,
-		_tags: Tags,
+		_tags: &Tags,
 		initialize: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		Ok(ApplicytionActorState { application: initialize })

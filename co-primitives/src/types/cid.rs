@@ -23,7 +23,7 @@ impl JsonSchema for CoCid {
 		"Cid".to_owned()
 	}
 
-	fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+	fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
 		let cid_ref = SchemaObject::new_ref("cid.json".to_owned());
 		schemars::schema::Schema::Object(cid_ref)
 	}
