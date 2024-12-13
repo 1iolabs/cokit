@@ -1,7 +1,6 @@
 use co_identity::{IdentityResolver, LocalIdentityResolver};
 use co_log::Log;
 use co_storage::MemoryBlockStorage;
-use std::collections::BTreeSet;
 
 /// Test unseen but already integrated joins.
 ///
