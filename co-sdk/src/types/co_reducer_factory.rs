@@ -1,5 +1,6 @@
 use crate::CoReducer;
 use async_trait::async_trait;
+use co_actor::ActorError;
 use co_primitives::CoId;
 
 #[async_trait]
@@ -22,4 +23,7 @@ pub enum CoReducerFactoryError {
 
 	#[error("CO failed")]
 	Other(#[from] anyhow::Error),
+
+	#[error("CO actor error")]
+	Actor(#[from] ActorError),
 }
