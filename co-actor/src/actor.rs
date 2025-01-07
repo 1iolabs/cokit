@@ -123,29 +123,28 @@ where
 		let span = tracing::trace_span!("actor", ?tags);
 		let join = spawner.spawn({
 			let tags = tags.clone();
-			let handle = handle.clone().downgrade();
+			let handle = handle.clone();
 			async move {
 				// log
 				tracing::trace!(?tags, "actor-initialize");
 
 				// initialize
-				let mut actor_state = {
-					let handle = handle.clone().upgrade().ok_or(ActorError::Canceled)?;
-					let actor_state = actor.initialize(&handle, &tags, initialize).await.map_err(|err| {
-						tracing::error!(?err, ?tags, "actor-initialize-failed");
-						err
-					})?;
-					state_tx
-						.send(ActorState::Running)
-						.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
-					actor_state
-				};
+				let mut actor_state = actor.initialize(&handle, &tags, initialize).await.map_err(|err| {
+					tracing::error!(?err, ?tags, "actor-initialize-failed");
+					err
+				})?;
+				state_tx
+					.send(ActorState::Running)
+					.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
 
 				// execute
+				let weak_handle = handle.downgrade();
 				while let Some(actor_message) = rx.recv().await {
 					match actor_message {
 						ActorMessage::Message(message) => {
-							if let Some(handle) = handle.clone().upgrade() {
+							// get a strong handle to call the handle method - this should never fail as we should not
+							// receive any message when this fails.
+							if let Some(handle) = weak_handle.clone().upgrade() {
 								actor.handle(&handle, message, &mut actor_state).await.map_err(|err| {
 									tracing::error!(?err, ?tags, "actor-handle-failed");
 									err
