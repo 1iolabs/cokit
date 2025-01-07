@@ -328,7 +328,7 @@ impl FileLocalsActor {
 				.await?;
 
 			// lock
-			let lock = flock { l_start: 0, l_len: 0, l_pid: 0, l_type: libc::F_WRLCK as i16, l_whence: 0 };
+			let lock = flock { l_start: 0, l_len: 0, l_pid: 0, l_type: libc::F_WRLCK as libc::c_short, l_whence: 0 };
 			match fcntl(file.as_raw_fd(), FcntlArg::F_SETLK(&lock)) {
 				Ok(_) => {
 					tracing::info!(?path, "local-lock");
