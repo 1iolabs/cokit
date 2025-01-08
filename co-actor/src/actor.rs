@@ -58,6 +58,13 @@ pub trait Actor: Send + Sync + 'static {
 		Ok(())
 	}
 
+	fn spawner(tags: Tags, actor: Self) -> Result<ActorSpawner<Self>, ActorError>
+	where
+		Self: Send + Sized + 'static,
+	{
+		ActorSpawner::new(tags, actor)
+	}
+
 	/// Spawn actor.
 	fn spawn(tags: Tags, actor: Self, initialize: Self::Initialize) -> Result<ActorInstance<Self>, ActorError>
 	where
@@ -77,11 +84,43 @@ pub trait Actor: Send + Sync + 'static {
 	where
 		Self: Send + Sized + 'static,
 	{
-		let span = tracing::trace_span!("actor", ?tags);
-		let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+		Ok(Self::spawner(tags, actor)?.spawn(spawner, initialize))
+	}
+}
+
+/// Actor Spawner with early access to the handle (which allow cyclic references).
+pub struct ActorSpawner<A>
+where
+	A: Actor,
+{
+	handle: ActorHandle<A::Message>,
+	actor: A,
+	rx: tokio::sync::mpsc::UnboundedReceiver<ActorMessage<A::Message>>,
+	state_tx: tokio::sync::watch::Sender<ActorState>,
+}
+impl<A> ActorSpawner<A>
+where
+	A: Actor,
+{
+	pub fn new(tags: Tags, actor: A) -> Result<Self, ActorError> {
+		let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 		let (state_tx, state_rx) = watch::channel(ActorState::Starting);
 		let tags = Arc::new(actor.tags(tags)?);
 		let handle = ActorHandle { tx: tx.clone(), state: state_rx.clone(), tags: tags.clone() };
+		Ok(Self { handle, actor, rx, state_tx })
+	}
+
+	pub fn handle(&self) -> ActorHandle<A::Message> {
+		self.handle.clone()
+	}
+
+	pub fn spawn(self, spawner: TaskSpawner, initialize: A::Initialize) -> ActorInstance<A> {
+		let mut rx = self.rx;
+		let state_tx = self.state_tx;
+		let actor = self.actor;
+		let tags = self.handle.tags.clone();
+		let handle = self.handle;
+		let span = tracing::trace_span!("actor", ?tags);
 		let join = spawner.spawn({
 			let tags = tags.clone();
 			let handle = handle.clone();
@@ -99,35 +138,40 @@ pub trait Actor: Send + Sync + 'static {
 					.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
 
 				// execute
+				let weak_handle = handle.downgrade();
 				while let Some(actor_message) = rx.recv().await {
 					match actor_message {
 						ActorMessage::Message(message) => {
-							actor.handle(&handle, message, &mut actor_state).await.map_err(|err| {
-								tracing::error!(?err, ?tags, "actor-handle-failed");
-								err
-							})?;
+							// get a strong handle to call the handle method - this should never fail as we should not
+							// receive any message when this fails.
+							if let Some(handle) = weak_handle.clone().upgrade() {
+								actor.handle(&handle, message, &mut actor_state).await.map_err(|err| {
+									tracing::error!(?err, ?tags, "actor-handle-failed");
+									err
+								})?;
+							}
 						},
 						ActorMessage::Shutdown => {
 							// log
 							tracing::trace!(?tags, "actor-shutdown");
-
-							// state
-							state_tx
-								.send(ActorState::Stopping)
-								.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
-							rx.close();
-
-							// shutdown
-							actor.shutdown(actor_state).await.map_err(|err| {
-								tracing::error!(?err, ?tags, "actor-shutdown-failed");
-								err
-							})?;
 
 							// done
 							break;
 						},
 					}
 				}
+
+				// state
+				state_tx
+					.send(ActorState::Stopping)
+					.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
+				rx.close();
+
+				// shutdown
+				actor.shutdown(actor_state).await.map_err(|err| {
+					tracing::error!(?err, ?tags, "actor-shutdown-failed");
+					err
+				})?;
 
 				// done
 				state_tx
@@ -137,7 +181,7 @@ pub trait Actor: Send + Sync + 'static {
 			}
 			.instrument(span)
 		});
-		Ok(ActorInstance { join, handle })
+		ActorInstance { join, handle }
 	}
 }
 
@@ -196,10 +240,9 @@ where
 
 	/// Wait until the actor completes.
 	pub async fn join(self) -> Result<(), ActorError> {
-		let handle = self.handle;
-		self.join
-			.await
-			.map_err(|e| ActorError::InvalidState(e.into(), handle.tags().clone()))??;
+		let tags = self.tags();
+		drop(self.handle);
+		self.join.await.map_err(|e| ActorError::InvalidState(e.into(), tags))??;
 		Ok(())
 	}
 
@@ -225,6 +268,11 @@ impl<M> ActorHandle<M>
 where
 	M: Send + 'static,
 {
+	/// Convert to weak actor handle.
+	pub fn downgrade(self) -> WeakActorHandle<M> {
+		WeakActorHandle { state: self.state, tags: self.tags, tx: self.tx.downgrade() }
+	}
+
 	/// Get actor tags.
 	pub fn tags(&self) -> &Tags {
 		self.tags.as_ref()
@@ -325,6 +373,23 @@ where
 	}
 }
 
+#[derive(Debug)]
+pub struct WeakActorHandle<M> {
+	tx: mpsc::WeakUnboundedSender<ActorMessage<M>>,
+	state: watch::Receiver<ActorState>,
+	tags: Arc<Tags>,
+}
+impl<M> Clone for WeakActorHandle<M> {
+	fn clone(&self) -> Self {
+		Self { tx: self.tx.clone(), state: self.state.clone(), tags: self.tags.clone() }
+	}
+}
+impl<M> WeakActorHandle<M> {
+	pub fn upgrade(self) -> Option<ActorHandle<M>> {
+		Some(ActorHandle { state: self.state, tags: self.tags, tx: self.tx.upgrade()? })
+	}
+}
+
 // pub trait ActorExt: Actor {
 // 	fn with_epic<E, C>(self, epic: E, context: C) -> EpicActor<Self, C>
 // 	where
@@ -340,6 +405,8 @@ mod tests {
 	use async_trait::async_trait;
 	use co_primitives::Tags;
 	use futures::{StreamExt, TryStreamExt};
+	use std::time::Duration;
+	use tokio::time::timeout;
 
 	#[tokio::test]
 	async fn smoke() {
@@ -454,5 +521,58 @@ mod tests {
 		handle.dispatch(TestMessage::Inc(37)).unwrap();
 		let result: Vec<i32> = state.take(3).try_collect().await.unwrap();
 		assert_eq!(result, vec![9, 5, 42]);
+	}
+
+	#[tokio::test]
+	async fn test_drop_when_no_handles() {
+		struct Test {}
+		enum TestMessage {
+			Inc(i32),
+			Get(Response<i32>),
+		}
+		#[async_trait]
+		impl Actor for Test {
+			type Message = TestMessage;
+			type State = i32;
+			type Initialize = i32;
+
+			async fn initialize(
+				&self,
+				_handle: &ActorHandle<Self::Message>,
+				_tags: &Tags,
+				initialize: Self::Initialize,
+			) -> Result<Self::State, ActorError> {
+				Ok(initialize)
+			}
+
+			async fn handle(
+				&self,
+				_handle: &ActorHandle<Self::Message>,
+				message: Self::Message,
+				state: &mut Self::State,
+			) -> Result<(), ActorError> {
+				match message {
+					TestMessage::Inc(value) => {
+						*state = value + *state;
+					},
+					TestMessage::Get(response) => {
+						response.send(*state).ok();
+					},
+				}
+				Ok(())
+			}
+		}
+
+		// spawn
+		let actor = Actor::spawn(Default::default(), Test {}, 1).unwrap();
+
+		// do some work
+		let handle = actor.handle();
+		handle.dispatch(TestMessage::Inc(10)).unwrap();
+		assert_eq!(handle.request(TestMessage::Get).await.unwrap(), 11);
+
+		// drop handle and wait for shutdown
+		drop(handle);
+		timeout(Duration::from_millis(100), actor.join()).await.unwrap().unwrap();
 	}
 }

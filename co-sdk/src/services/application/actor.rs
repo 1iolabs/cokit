@@ -2,7 +2,7 @@ use super::{epics::epic, Action, ApplicationMessage};
 use crate::{
 	application::{
 		application::ApplicationSettings,
-		co_context::{CoContextInner, Reducers},
+		co_context::{CoContextInner, ReducersActor},
 	},
 	CoContext, Network, Runtime, Storage,
 };
@@ -41,7 +41,10 @@ impl Actor for Application {
 		let runtime = Runtime::new();
 
 		// reducers
-		let (reducers, reducers_control) = Reducers::new();
+		let reducers = Actor::spawner(
+			tags!("type": "reducers", "application": self.settings.identifier.clone()),
+			ReducersActor::new(),
+		)?;
 
 		// co
 		let co_context: CoContext = CoContextInner::new(
@@ -53,14 +56,14 @@ impl Actor for Application {
 			storage.storage(),
 			runtime.clone(),
 			handle.clone(),
-			reducers_control,
+			reducers.handle().into(),
 		)
 		.into();
 
 		// reducers
-		co_context.tasks().spawn(reducers.worker(co_context.inner.clone()));
+		reducers.spawn(co_context.tasks(), co_context.clone());
 
-		// reuslt
+		// result
 		Ok(ApplicationState {
 			epic: EpicRuntime::new(epic(tags.clone()), |err| {
 				tracing::error!(?err, "application-epic-error");
@@ -121,6 +124,12 @@ impl Actor for Application {
 		}
 
 		// result
+		Ok(())
+	}
+
+	async fn shutdown(&self, state: Self::State) -> Result<(), ActorError> {
+		state.context.inner.shutdown().cancel();
+		state.context.inner.reducers_control().handle.shutdown();
 		Ok(())
 	}
 }
