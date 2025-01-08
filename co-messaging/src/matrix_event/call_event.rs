@@ -1,12 +1,10 @@
 use crate::{EventContent, EventType};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use typeshare::typeshare;
 
 /**
  * Session description object for sdp offers and answers
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct SessionDescription {
 	pub sdp: String,
@@ -23,7 +21,6 @@ impl SessionDescription {
 /**
  * ICE candidate for WebRTC exchange protocol
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct ICECandidate {
 	pub candidate: String, // SDP 'a' line of the candidate
@@ -46,7 +43,6 @@ impl ICECandidate {
  * across all participants. version: The version of the VoIP specs used for the message. This version is "1". A
  * string is used for experimental versions.
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(tag = "type", content = "content")]
 pub enum CallType {
@@ -89,7 +85,6 @@ impl From<CallType> for EventContent {
 /**
  * Initial event to invite other parties to a call
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct CallInviteContent {
 	pub call_id: String,
@@ -135,7 +130,6 @@ impl CallInviteContent {
 /**
  * Event used when answering an invite event
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct AnswerCallContent {
 	pub call_id: String,
@@ -170,7 +164,6 @@ impl AnswerCallContent {
 /**
  * Event used to exchange viable ICE candidates with the other party upon answering a call
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct CallCandidatesContent {
 	pub call_id: String,
@@ -200,7 +193,6 @@ impl CallCandidatesContent {
 /**
  * Event used to select one of possibly multiple call answers
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct SelectCallAnswerContent {
 	pub call_id: String,
@@ -237,7 +229,6 @@ impl SelectCallAnswerContent {
  * then send an answer. Offer and answer should never both be set. To ensure this they are not public to force the
  * users to use the setters.
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct CallNegotiationContent {
 	pub call_id: String,
@@ -313,7 +304,6 @@ impl CallNegotiationContent {
 /**
  * Event sent if call was rejected by a user.
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct RejectCallContent {
 	pub call_id: String,
@@ -342,7 +332,6 @@ impl RejectCallContent {
 /**
  * Enum containg possible reasons for a hangup event
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub enum HangupCallReason {
 	#[serde(rename = "ice_failed")]

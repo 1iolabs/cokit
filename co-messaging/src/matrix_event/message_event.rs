@@ -6,7 +6,6 @@ use crate::{matrix_event::relation::RelatesTo, multimedia::VideoInfo, relation::
 use co_primitives::{CoCid, Did};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use typeshare::typeshare;
 
 /**
  * Events that sent actual messages that can be seen by all participants in a room.
@@ -97,7 +96,6 @@ pub trait Formattable {
 /**
  * Used to describe which users got mentioned in the body of a message
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct Mentions {
 	pub user_ids: Vec<Did>,
@@ -107,7 +105,6 @@ pub struct Mentions {
  * Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
  * also given.
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct TextContent {
 	/// A formatted version of the body
@@ -183,7 +180,6 @@ impl Relation for TextContent {
  * formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
  * also given
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct NoticeContent {
 	/// A formatted version of the body
@@ -255,7 +251,6 @@ impl Relation for NoticeContent {
 	}
 }
 
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct ImageContent {
 	/// a text representing the image in some way
@@ -299,7 +294,6 @@ impl Relation for ImageContent {
 	}
 }
 
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct AudioContent {
 	/// a text representing the audio in same way
@@ -343,7 +337,6 @@ impl Relation for AudioContent {
 	}
 }
 
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct VideoContent {
 	/// textual representation of the video
@@ -387,7 +380,6 @@ impl Relation for VideoContent {
 	}
 }
 
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct FileContent {
 	/// a text representing the file in some way
@@ -441,7 +433,6 @@ impl Relation for FileContent {
 	}
 }
 
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct LocationContent {
 	/// textual representation of the location

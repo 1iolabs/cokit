@@ -1,7 +1,6 @@
 use crate::{EventContent, EventType};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use typeshare::typeshare;
 
 pub trait Relation {
 	fn generate_relation_type(&self) -> Option<String>;
@@ -12,7 +11,6 @@ pub trait Relation {
  * Empty content as the only purpose is holding a relation to another event.
  * Mostly used for annotation events
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct ReactionContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -59,7 +57,6 @@ impl EventType for ReactionContent {
 /**
  * Used in some event contents to define a relation to other events
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(rename = "relates_to")]
 pub struct RelatesTo {
@@ -159,7 +156,6 @@ impl Relation for RelatesTo {
 /**
  *Simple enum containing all different types of relation that events can have to other events
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub enum RelationType {
 	#[serde(rename = "annotation")]
@@ -189,7 +185,6 @@ impl Relation for RelationType {
 	}
 }
 
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct ReplyContent {
 	pub event_id: String,
@@ -200,7 +195,6 @@ pub struct ReplyContent {
  * original event or a user with the necessary permissions.
  * Redactions are idempotent and irreversible. They do not use the same relation fields as other events
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct RedactionContent {
 	#[serde(skip_serializing_if = "Option::is_none")]

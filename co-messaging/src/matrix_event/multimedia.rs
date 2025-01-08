@@ -1,12 +1,10 @@
 use co_primitives::CoCid;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use typeshare::typeshare;
 
 /**
  * Contains metadata of images
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, JsonSchema)]
 pub struct ImageInfo {
 	/// intended display height in px
@@ -26,7 +24,6 @@ pub struct ImageInfo {
 /**
  * Contains metadata of images used as a thumbnail
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, schemars::JsonSchema)]
 pub struct ThumbnailInfo {
 	/// intended display height in px
@@ -42,10 +39,8 @@ pub struct ThumbnailInfo {
 /**
  * Contains metadata of audio files
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct AudioInfo {
-	#[typeshare(retype = "number")]
 	/// duration of the audio clip in ms
 	pub duration: u32,
 	/// mimetype of the audio file
@@ -57,7 +52,6 @@ pub struct AudioInfo {
 /**
  * Contains metadata of video files
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct VideoInfo {
 	/// intended display height in px
@@ -79,7 +73,6 @@ pub struct VideoInfo {
 /**
  * Contains metadata of any other filetypes
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct FileInfo {
 	/// mimetype of the file
@@ -95,7 +88,6 @@ pub struct FileInfo {
 /**
  * Contains metadata of any location based content
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct LocationInfo {
 	/// CID to an image file that is to be used as the thumbnail

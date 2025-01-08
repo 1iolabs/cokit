@@ -1,12 +1,10 @@
 use crate::{matrix_event::relation::RelatesTo, message_event::MessageType, relation::Relation, EventContent};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use typeshare::typeshare;
 
 /**
  * All events that interact with or create a poll
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(tag = "msgtype")]
 pub enum PollMessageType {
@@ -44,7 +42,6 @@ impl Relation for PollMessageType {
 /**
  * Event used to create a poll.
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PollStartContent {
 	pub body: String,           // A textual representation of the poll, i.e. the question
@@ -100,7 +97,6 @@ impl Relation for PollStartContent {
 /**
  * metadata for poll creation event
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PollCreationInfo {
 	pub question: String,         // the question the poll was created for
@@ -126,7 +122,6 @@ impl PollCreationInfo {
 /**
  * One possible answer in a poll. ID should be unique across answers.
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PollAnswer {
 	pub id: String,     // Unique ID to identify an answer
@@ -139,7 +134,6 @@ impl PollAnswer {
 	}
 }
 
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub enum PollKind {
 	#[serde(rename = "disclosed")]
@@ -150,7 +144,6 @@ pub enum PollKind {
 	Anonymous, // As undisclosed but voters will stay hidden even after poll has ended
 }
 
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PollResponseContent {
 	pub body: String,         // Textual representation of the answers
@@ -200,7 +193,6 @@ impl From<PollResponseContent> for EventContent {
 /**
  * Event that closes the poll. For undisclosed and anonymous polls, this is the point where the reults are shown.
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PollEndContent {
 	pub body: String, // Textual representation of the poll ending

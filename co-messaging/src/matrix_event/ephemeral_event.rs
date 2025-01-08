@@ -2,12 +2,10 @@ use crate::{EventContent, EventType};
 use co_primitives::CoCid;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use typeshare::typeshare;
 
 /**
  * Ephemeral events are once-off events that do not need to be saved.
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(tag = "type", content = "content")]
 pub enum EphemeralType {
@@ -38,7 +36,6 @@ impl From<EphemeralType> for EventContent {
  * participant. Information should be updated regularly and have a timout after which no users should count as
  * typing when no new event was sent.
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct TypingContent {
 	/// List of users currently typing in the room
@@ -85,7 +82,6 @@ pub enum PresenceType {
  * In contrast to typing events, the sender is important here and always corresponds to the user the information is
  * about.
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PresenceContent {
 	pub presence: PresenceType,

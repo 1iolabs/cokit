@@ -17,7 +17,6 @@ use matrix_event::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use typeshare::typeshare;
 
 pub trait EventType {
 	fn generate_event_type(&self) -> String;
@@ -26,7 +25,6 @@ pub trait EventType {
 /**
  * Collection of all possible actions for the room core
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct MatrixEvent {
 	pub event_id: String,
@@ -78,7 +76,6 @@ impl EventType for MatrixEvent {
  * Simple enum to fit the different possible contents.
  * Unique event type string can be generated from this using pattern matching.
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(tag = "type", content = "content")]
 pub enum EventContent {

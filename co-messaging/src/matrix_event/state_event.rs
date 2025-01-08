@@ -3,12 +3,10 @@ use crate::{EventContent, EventType};
 use co_primitives::CoCid;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use typeshare::typeshare;
 
 /**
  * All events that in some way alter the state of a room
  */
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(tag = "type", content = "content")]
 pub enum StateType {
@@ -39,7 +37,6 @@ impl EventType for StateType {
 	}
 }
 
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct RoomNameContent {
 	pub name: String,
@@ -63,7 +60,6 @@ impl From<RoomNameContent> for EventContent {
 	}
 }
 
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct RoomTopicContent {
 	pub topic: String,
@@ -87,7 +83,6 @@ impl From<RoomTopicContent> for EventContent {
 	}
 }
 
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct RoomAvatarContent {
 	pub file: Option<CoCid>,
@@ -112,7 +107,6 @@ impl From<RoomAvatarContent> for EventContent {
 	}
 }
 
-#[typeshare]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PinnedEventsContent {
 	pub pinned: Vec<String>,
