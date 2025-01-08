@@ -1,7 +1,7 @@
 use crate::library::{application_actor::ApplicationActorMessage, tauri_error::CoTauriError};
 use anyhow::anyhow;
 use co_actor::ActorHandle;
-use co_sdk::CoId;
+use co_sdk::{CoId, Did};
 use libipld::{cbor::DagCborCodec, codec::Codec, Cid, Ipld};
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -17,6 +17,7 @@ struct PushCommandBody {
 	co: CoId,
 	core: String,
 	action: Ipld,
+	identity: Did,
 }
 
 impl TryFrom<Ipld> for PushCommandBody {
@@ -28,7 +29,8 @@ impl TryFrom<Ipld> for PushCommandBody {
 				let action = PushCommandBody::resolve_action(&map)?;
 				let co = PushCommandBody::resolve_co_id(&map)?;
 				let core = PushCommandBody::resolve_core(&map)?;
-				Ok(PushCommandBody { action, co, core })
+				let identity = PushCommandBody::resolve_identity(&map)?;
+				Ok(PushCommandBody { action, co, core, identity })
 			},
 			_ => Err(anyhow!("Ipld is not a map")),
 		}
@@ -63,6 +65,16 @@ impl PushCommandBody {
 			Err(anyhow!("body contains no core info"))
 		}
 	}
+	fn resolve_identity(map: &BTreeMap<String, Ipld>) -> Result<String, anyhow::Error> {
+		if let Some(ipld) = map.get("identity") {
+			match ipld {
+				Ipld::String(identity) => Ok(identity.clone()),
+				_ => Err(anyhow!("Identity not a string")),
+			}
+		} else {
+			Err(anyhow!("body contains no identity info"))
+		}
+	}
 }
 
 #[tauri::command]
@@ -79,6 +91,6 @@ pub async fn push_action(
 		body.action
 	);
 	Ok(actor_handle
-		.request(|r| ApplicationActorMessage::Push(body.co, body.core, body.action, r))
+		.request(|r| ApplicationActorMessage::Push(body.co, body.core, body.action, body.identity, r))
 		.await??)
 }

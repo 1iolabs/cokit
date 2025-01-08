@@ -6,8 +6,8 @@ import { CID } from "multiformats";
 export async function getCoState(co: string): Promise<[CID | undefined, CID[]]> {
     return await invoke("plugin:co-sdk|get_co_state", { co });
 }
-export async function pushAction(co: string, core: string, action: any): Promise<CID | undefined> {
-    let body_raw = encode({ action, co, core });
+export async function pushAction(co: string, core: string, action: any, identity: string): Promise<CID | undefined> {
+    let body_raw = encode({ action, co, core, identity });
     return await invoke("plugin:co-sdk|push_action", { body: Array.from(body_raw) });
 }
 export async function resolveCid(co: string, cid: CID): Promise<any> {

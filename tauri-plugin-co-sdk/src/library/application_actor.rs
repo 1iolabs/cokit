@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseStream};
-use co_sdk::{Action, Application, ApplicationMessage, BlockStorage, BlockStorageExt, CoId, CoReducerFactory, Tags};
+use co_sdk::{
+	Action, Application, ApplicationMessage, BlockStorage, BlockStorageExt, CoId, CoReducerFactory, Did, Tags,
+};
 use futures::{pin_mut, StreamExt};
 use libipld::{Block, Cid, DefaultParams, Ipld};
 use serde::{Deserialize, Serialize};
@@ -15,7 +17,7 @@ pub enum ApplicationActorMessage {
 	StorageSet(CoId, Block<DefaultParams>, Response<Result<Cid, ActorError>>),
 	GetCoState(CoId, Response<Result<(Option<Cid>, BTreeSet<Cid>), ActorError>>),
 	WatchState(ResponseStream<(CoId, Option<Cid>, BTreeSet<Cid>)>),
-	Push(CoId, String, Ipld, Response<Result<Option<Cid>, ActorError>>),
+	Push(CoId, String, Ipld, Did, Response<Result<Option<Cid>, ActorError>>),
 	ResolveCid(CoId, Cid, Response<Result<Ipld, ActorError>>),
 	GetActions(GetActionsRequest, Response<Result<GetActionsResponse, ActorError>>),
 }
@@ -122,16 +124,21 @@ impl Actor for ApplicationActor {
 					}
 				});
 			},
-			ApplicationActorMessage::Push(co, core, action, response) => {
+			ApplicationActorMessage::Push(co, core, action, identity, response) => {
 				response
 					.execute(|| async {
+						let private_identity = state
+							.application
+							.private_identity(&identity)
+							.await
+							.map_err(|err| ActorError::Actor(err.into()))?;
 						state
 							.application
 							.context()
 							.try_co_reducer(&co)
 							.await
 							.map_err(|err| ActorError::Actor(err.into()))?
-							.push(&state.application.local_identity(), &core, &action)
+							.push(&private_identity, &core, &action)
 							.await
 							.map_err(|err| ActorError::Actor(err.into()))
 					})

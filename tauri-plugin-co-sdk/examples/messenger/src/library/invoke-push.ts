@@ -13,7 +13,7 @@ export async function createCid<T>(data: T) {
     return cid;
 }
 
-export async function invokePushMessage(message: string, co: string, core: string) {
+export async function invokePushMessage(message: string, co: string, core: string, identity: string) {
     let action: MatrixEvent = {
         event_id: uuid.v4(),
         timestamp: moment.now(),
@@ -24,9 +24,5 @@ export async function invokePushMessage(message: string, co: string, core: strin
             body: message,
         }
     };
-    await invokePush(action, co, core);
-}
-
-export async function invokePush(action: MatrixEvent, co: string, core: string) {
-    await pushAction(co, core, action);
+    await pushAction(co, core, action, identity);
 }
