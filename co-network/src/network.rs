@@ -21,18 +21,14 @@ use libp2p::{
 	Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 use libp2p_bitswap::{Bitswap, BitswapEvent};
-use rxrust::prelude::*;
-use std::{sync::Arc, task::Poll, time::Duration};
+use std::{task::Poll, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument;
-
-pub type EventsSubject<E> = SubjectThreads<Arc<SwarmEvent<E>>, ()>;
 
 pub struct Libp2pNetwork {
 	config: Libp2pNetworkConfig,
 	shutdown: CancellationToken,
 	tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<Behaviour, Context>>,
-	events: EventsSubject<NetworkEvent>,
 }
 impl Libp2pNetwork {
 	pub fn new<R, P>(
@@ -107,12 +103,9 @@ impl Libp2pNetwork {
 		// tasks
 		let (tasks_tx, tasks_rx) = tokio::sync::mpsc::unbounded_channel();
 
-		// events
-		let events = SubjectThreads::default();
-
 		// runtime
 		let shutdown = CancellationToken::new();
-		let mut runtime = Runtime::new(config.clone(), events.clone(), shutdown.child_token());
+		let mut runtime = Runtime::new(config.clone(), shutdown.child_token());
 
 		// listen
 		runtime.listen(swarm.listen_on(config.addr.clone().unwrap_or("/ip4/0.0.0.0/udp/0/quic-v1".parse()?))?);
@@ -127,7 +120,7 @@ impl Libp2pNetwork {
 		});
 
 		// result
-		Ok(Self { config, shutdown, tasks: tasks_tx, events })
+		Ok(Self { config, shutdown, tasks: tasks_tx })
 	}
 
 	pub fn spawner(&self) -> TokioNetworkTaskSpawner<Behaviour, Context> {
@@ -138,11 +131,6 @@ impl Libp2pNetwork {
 	/// This will stop accepting new connections and waits until established connections are done.
 	pub fn shutdown(&self) -> Shutdown {
 		Shutdown { shutdown: self.shutdown.clone() }
-	}
-
-	/// Swarm events subject.
-	pub fn events(&self) -> EventsSubject<NetworkEvent> {
-		self.events.clone()
 	}
 
 	pub fn config(&self) -> &Libp2pNetworkConfig {
@@ -225,14 +213,13 @@ pub enum NetworkMode {
 struct Runtime {
 	_config: Libp2pNetworkConfig,
 	listener_id: Option<libp2p::core::transport::ListenerId>,
-	events: EventsSubject<NetworkEvent>,
 	/// Tasks which have been executed but waiting for events.
 	pending_tasks: Vec<NetworkTaskBox<Behaviour, Context>>,
 	shutdown: CancellationToken,
 }
 impl Runtime {
-	fn new(config: Libp2pNetworkConfig, events: EventsSubject<NetworkEvent>, shutdown: CancellationToken) -> Self {
-		Self { _config: config, listener_id: None, events, shutdown, pending_tasks: Default::default() }
+	fn new(config: Libp2pNetworkConfig, shutdown: CancellationToken) -> Self {
+		Self { _config: config, listener_id: None, shutdown, pending_tasks: Default::default() }
 	}
 
 	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
@@ -632,8 +619,8 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		}
 
 		// other
-		if let Some(event) = result_event {
-			runtime.events.next(Arc::new(event));
+		if let Some(_event) = result_event {
+			// ignore
 		}
 	}
 }

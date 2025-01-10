@@ -1639,7 +1639,6 @@ dependencies = [
  "libp2p",
  "libp2p-bitswap",
  "pin-project",
- "rxrust",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -1689,7 +1688,6 @@ dependencies = [
  "libipld",
  "names",
  "rust-unixfs",
- "rxrust",
  "serde",
  "serde_bytes",
  "serde_repr",
@@ -1744,7 +1742,6 @@ dependencies = [
  "opentelemetry-stdout",
  "opentelemetry_sdk",
  "pin-project",
- "rxrust",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",
@@ -1781,7 +1778,6 @@ dependencies = [
  "libipld",
  "names",
  "rust-unixfs",
- "rxrust",
  "serde",
  "serde_bytes",
  "serde_repr",
@@ -2384,7 +2380,6 @@ dependencies = [
  "hyper 0.14.30",
  "libipld",
  "libp2p",
- "rxrust",
  "serde",
  "serde_json",
  "thiserror",
@@ -3486,18 +3481,6 @@ dependencies = [
  "futures",
  "futures-timer",
  "instant",
-]
-
-[[package]]
-name = "futures-time"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6404853a6824881fe5f7d662d147dc4e84ecd2259ba0378f272a71dab600758a"
-dependencies = [
- "async-channel 1.9.0",
- "async-io 1.13.0",
- "futures-core",
- "pin-project-lite",
 ]
 
 [[package]]
@@ -7920,21 +7903,6 @@ dependencies = [
  "futures",
  "pin-project",
  "static_assertions",
-]
-
-[[package]]
-name = "rxrust"
-version = "1.0.0-beta.6"
-source = "git+https://github.com/dkuhnert/rxRust.git?branch=master#b8f7829a280c4244ec40b884bedd04ef75a7bc37"
-dependencies = [
- "futures",
- "futures-time",
- "gloo-timers",
- "once_cell",
- "pin-project-lite",
- "smallvec",
- "tokio",
- "wasm-bindgen-futures",
 ]
 
 [[package]]

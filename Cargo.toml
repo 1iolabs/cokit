@@ -46,9 +46,6 @@ libipld = "0.16"
 libp2p = { version = "0.53", features = ["full"] }
 pin-project = "1.1.4"
 rust-unixfs = "0.4.0"
-rxrust = { version = "1.0.0-beta.6", git = "https://github.com/dkuhnert/rxRust.git", branch = "master", features = [
-    "tokio-scheduler",
-] }
 serde = "1"
 serde_bytes = "0.11.12"
 serde_ipld_dagcbor = "0.6.1"

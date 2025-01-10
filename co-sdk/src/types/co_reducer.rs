@@ -1,4 +1,4 @@
-use super::{co_storage::CoBlockStorageContentMapping, state_observable::StateObservable};
+use super::co_storage::CoBlockStorageContentMapping;
 use crate::{reducer::core_resolver::dynamic::DynamicCoreResolver, state::core_state, CoStorage, Reducer, Runtime};
 use async_trait::async_trait;
 use co_identity::PrivateIdentity;
@@ -74,12 +74,6 @@ impl CoReducer {
 		} else {
 			storage
 		}
-	}
-
-	/// Get reducer observable.
-	#[deprecated]
-	pub async fn observable(&self) -> StateObservable {
-		StateObservable { sub: self.reducer.read().await.observable() }
 	}
 
 	/// Get reducer watcher.

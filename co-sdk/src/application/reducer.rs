@@ -8,11 +8,9 @@ use co_runtime::RuntimePool;
 use co_storage::BlockStorage;
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use libipld::Cid;
-use rxrust::{observer::Observer, subject::SubjectThreads};
 use serde::Serialize;
 use std::{
 	collections::{BTreeSet, HashMap, VecDeque},
-	convert::Infallible,
 	time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::watch;
@@ -79,7 +77,6 @@ where
 			snapshots: self.snapshots,
 			state: self.state,
 			log: self.log,
-			states: Default::default(),
 			change_handlers: Default::default(),
 			watch: watch::channel(None),
 		};
@@ -102,8 +99,6 @@ pub struct Reducer<S, R> {
 	heads: BTreeSet<Cid>,
 	/// Avilable historic snapshots in chronologic order.
 	snapshots: HashMap<BTreeSet<Cid>, Cid>,
-	/// State observable.
-	states: SubjectThreads<(Cid, BTreeSet<Cid>), Infallible>,
 	/// Change handlers.
 	change_handlers: Vec<Box<dyn ReducerChangedHandler<S, R> + Send + Sync>>,
 	/// State/Heads watcher.
@@ -173,11 +168,6 @@ where
 
 	pub fn is_empty(&self) -> bool {
 		self.heads.is_empty() && self.state.is_none()
-	}
-
-	/// Get state observable.
-	pub fn observable(&self) -> SubjectThreads<(Cid, BTreeSet<Cid>), Infallible> {
-		self.states.clone()
 	}
 
 	/// Get state observable.
@@ -354,11 +344,6 @@ where
 				.0
 				.send(Some((state, self.heads.clone())))
 				.expect("watcher not dropped before reducer");
-		}
-
-		// states
-		if let Some(state) = self.state {
-			self.states.next((state, self.heads.clone()));
 		}
 
 		// result

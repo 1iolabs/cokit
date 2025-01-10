@@ -19,7 +19,6 @@ futures = { workspace = true }
 hyper = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 libp2p = { workspace = true, features = ["rendezvous"] }
-rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

@@ -17,7 +17,6 @@ futures = { workspace = true }
 libipld = { workspace = true, features = ["default", "serde-codec"] }
 names = "0.14.0"
 rust-unixfs = { workspace = true }
-rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
 serde_repr = { workspace = true }
