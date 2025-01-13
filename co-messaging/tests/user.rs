@@ -2,7 +2,7 @@ use co_messaging::{
 	user_events::{PostUserStoryContent, UpdateProfileContent, ViewUserStoryContent},
 	EventType, MatrixEvent,
 };
-use libipld::Cid;
+use cid::Cid;
 
 #[test]
 fn test_story_post() {

@@ -1,4 +1,4 @@
-use libipld::Ipld;
+use ipld_core::ipld::Ipld;
 
 pub trait ObjectAPI {
 	/// Returns a block from storage.

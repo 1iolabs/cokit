@@ -16,13 +16,13 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
+use cid::Cid;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
-use co_primitives::{tags, Did, KnownMultiCodec, MultiCodec};
+use co_primitives::{tags, DefaultParams, Did, KnownMultiCodec, MultiCodec};
 use co_runtime::RuntimePool;
 use co_storage::{BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, StorageError};
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
-use libipld::{Cid, DefaultParams};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio_util::sync::CancellationToken;
 

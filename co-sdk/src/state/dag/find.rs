@@ -70,7 +70,7 @@ mod tests {
 	use crate::state::find;
 	use co_primitives::{DefaultNodeSerializer, Node, NodeBuilder, NodeContainer, OptionLink};
 	use co_storage::{BlockStorage, MemoryBlockStorage};
-	use libipld::Cid;
+	use cid::Cid;
 
 	#[tokio::test]
 	async fn smoke() {

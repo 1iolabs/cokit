@@ -1,5 +1,6 @@
 use super::entry::EntryBlock;
-use libipld::{store::StoreParams, Cid};
+use cid::Cid;
+use co_primitives::StoreParams;
 use std::collections::BTreeSet;
 
 /// Find heads. Which are the "loose ends" of all items in `entries`.

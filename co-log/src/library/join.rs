@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{EntryBlock, Log, LogError};
 use co_storage::BlockStorage;
-use libipld::Cid;
+use cid::Cid;
 use std::{collections::BTreeSet, marker::PhantomData};
 
 pub struct JoinEntry<S> {

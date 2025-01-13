@@ -11,14 +11,20 @@ async-stream = { workspace = true }
 async-trait = { workspace = true }
 blake3 = "=1.5.0"
 chacha20poly1305 = "=0.10.1"
+cid = { workspace = true }
 co-primitives = { path = "../co-primitives" }
 either = { workspace = true }
 futures = { workspace = true }
-libipld = { workspace = true, features = ["default", "serde-codec"] }
+ipld-core = { workspace = true }
+ipld-dagpb = { workspace = true }
+multihash = { workspace = true }
+multihash-codetable = { workspace = true }
 names = "0.14.0"
 rust-unixfs = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
+serde_ipld_dagcbor = { workspace = true }
+serde_ipld_dagjson = { workspace = true }
 serde_repr = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "fs", "rt"] }

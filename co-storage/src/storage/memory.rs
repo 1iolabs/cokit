@@ -4,7 +4,8 @@ use crate::types::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use libipld::{Block, Cid, DefaultParams};
+use cid::Cid;
+use co_primitives::{Block, DefaultParams};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
 

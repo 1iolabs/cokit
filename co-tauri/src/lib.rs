@@ -1,11 +1,13 @@
 use anyhow::anyhow;
+use cid::Cid;
 use co_sdk::{Application, ApplicationBuilder, CoId, CoReducerFactory};
-use libipld::{cbor::DagCborCodec, codec::Codec, Cid, Ipld};
+use ipld_core::ipld::Ipld;
 use library::co_settings::CoSettings;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 use tauri::{ipc::InvokeError, Emitter, Wry};
 use tokio_stream::{wrappers::WatchStream, StreamExt};
+
 pub mod library;
 
 async fn application(settings: CoSettings) -> Application {
@@ -124,7 +126,7 @@ impl PushCommandBody {
 
 #[tauri::command]
 async fn push(application: tauri::State<'_, Application>, body: Vec<u8>) -> Result<(), CoTauriError> {
-	let body: PushCommandBody = DagCborCodec::default().decode::<Ipld>(&body)?.try_into()?;
+	let body: PushCommandBody = serde_ipld_dagcbor::from_slice(&body).map_err(|e| anyhow::Error::from(e))?;
 	tracing::info!("tauri command push: {:#?}", body);
 	let reducer = application
 		.context()

@@ -1,7 +1,8 @@
 use crate::{BlockStat, BlockStorage, Storage, StorageError};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use libipld::{store::StoreParams, Block, Cid, DefaultParams};
+use cid::Cid;
+use co_primitives::{Block, DefaultParams, StoreParams};
 use std::{io::ErrorKind, os::unix::fs::MetadataExt, path::PathBuf};
 
 /// Filesystem storage.
@@ -170,7 +171,7 @@ fn to_cid_path(path: &PathBuf, cid: &Cid) -> PathBuf {
 #[cfg(test)]
 mod tests {
 	use super::to_cid_path;
-	use libipld::Cid;
+	use cid::Cid;
 	use std::{path::PathBuf, str::FromStr};
 
 	#[test]

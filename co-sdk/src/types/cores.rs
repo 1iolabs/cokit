@@ -1,5 +1,5 @@
 use co_runtime::Core;
-use libipld::Cid;
+use cid::Cid;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
 

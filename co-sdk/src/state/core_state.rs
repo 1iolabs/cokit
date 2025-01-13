@@ -1,7 +1,7 @@
 use crate::{CoReducerError, CoStorage, CO_CORE_NAME_CO};
 use co_primitives::OptionLink;
 use co_storage::{BlockStorageExt, StorageError};
-use libipld::Cid;
+use cid::Cid;
 use serde::de::DeserializeOwned;
 
 /// Return core state (CID and actual state) from an CO assuming the `co_state` points to the root of a `co-core-co`

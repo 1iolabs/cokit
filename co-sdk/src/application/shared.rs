@@ -24,7 +24,7 @@ use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
 use co_primitives::{tags, CoId, KnownMultiCodec, MultiCodec};
 use co_storage::{Algorithm, BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, Secret, StorageError};
 use futures::{stream, StreamExt, TryStreamExt};
-use libipld::Cid;
+use cid::Cid;
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},

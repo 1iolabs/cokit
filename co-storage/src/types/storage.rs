@@ -1,5 +1,5 @@
-use co_primitives::MultiCodecError;
-use libipld::{store::StoreParams, Block, Cid};
+use cid::Cid;
+use co_primitives::{Block, MultiCodecError, StoreParams};
 
 /// Storage interface.
 pub trait Storage {

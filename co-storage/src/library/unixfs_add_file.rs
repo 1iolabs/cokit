@@ -1,6 +1,6 @@
 use crate::{unixfs_add, BlockStorage, StorageError};
 use anyhow::anyhow;
-use libipld::Cid;
+use cid::Cid;
 use std::path::Path;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 

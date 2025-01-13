@@ -1,6 +1,6 @@
 use self::wasmer::WasmerRuntime;
 use crate::co_v1::CoV1Api;
-use libipld::Cid;
+use cid::Cid;
 
 pub mod wasmer;
 

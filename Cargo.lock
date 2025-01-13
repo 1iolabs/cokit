@@ -1198,7 +1198,6 @@ dependencies = [
  "multibase",
  "multihash 0.18.1",
  "serde",
- "serde_bytes",
  "unsigned-varint 0.7.2",
 ]
 
@@ -1351,7 +1350,7 @@ dependencies = [
  "either",
  "futures",
  "ipld-core",
- "libipld",
+ "multihash-codetable",
  "serde",
  "serde_json",
  "thiserror",
@@ -1384,7 +1383,6 @@ dependencies = [
  "futures",
  "hexdump",
  "ipld-core",
- "libipld",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-semantic-conventions",
@@ -1416,7 +1414,6 @@ dependencies = [
  "co-runtime",
  "co-storage",
  "ipld-core",
- "libipld",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1436,7 +1433,6 @@ dependencies = [
  "co-runtime",
  "co-storage",
  "ipld-core",
- "libipld",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1453,7 +1449,6 @@ dependencies = [
  "co-api",
  "co-storage",
  "ipld-core",
- "libipld",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1471,7 +1466,6 @@ dependencies = [
  "co-runtime",
  "co-storage",
  "ipld-core",
- "libipld",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1490,7 +1484,6 @@ dependencies = [
  "co-runtime",
  "co-storage",
  "ipld-core",
- "libipld",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1510,7 +1503,6 @@ dependencies = [
  "co-runtime",
  "co-storage",
  "ipld-core",
- "libipld",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1526,7 +1518,6 @@ dependencies = [
  "cid 0.11.1",
  "co-api",
  "ipld-core",
- "libipld",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1545,7 +1536,6 @@ dependencies = [
  "co-runtime",
  "co-storage",
  "ipld-core",
- "libipld",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1562,11 +1552,11 @@ dependencies = [
  "cid 0.11.1",
  "co-core-co",
  "co-core-membership",
+ "co-primitives",
  "co-sdk",
  "dioxus",
  "futures",
  "ipld-core",
- "libipld",
  "serde",
  "tokio",
  "tracing",
@@ -1588,7 +1578,6 @@ dependencies = [
  "futures",
  "hex",
  "ipld-core",
- "libipld",
  "multibase",
  "serde",
  "serde_bytes",
@@ -1613,7 +1602,6 @@ dependencies = [
  "co-storage",
  "futures",
  "ipld-core",
- "libipld",
  "serde",
  "serde_bytes",
  "thiserror",
@@ -1640,7 +1628,6 @@ dependencies = [
  "co-macros",
  "co-primitives",
  "ipld-core",
- "libipld",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",
@@ -1694,6 +1681,7 @@ dependencies = [
  "either",
  "insta",
  "ipld-core",
+ "ipld-dagpb",
  "multihash 0.19.3",
  "multihash-codetable",
  "serde",
@@ -1721,7 +1709,6 @@ dependencies = [
  "hexdump",
  "insta",
  "ipld-core",
- "libipld",
  "names",
  "rust-unixfs",
  "serde",
@@ -1768,7 +1755,6 @@ dependencies = [
  "ipld-core",
  "keyring",
  "libc",
- "libipld",
  "libp2p",
  "multibase",
  "names",
@@ -1815,11 +1801,15 @@ dependencies = [
  "hexdump",
  "insta",
  "ipld-core",
- "libipld",
+ "ipld-dagpb",
+ "multihash 0.19.3",
+ "multihash-codetable",
  "names",
  "rust-unixfs",
  "serde",
  "serde_bytes",
+ "serde_ipld_dagcbor",
+ "serde_ipld_dagjson",
  "serde_repr",
  "thiserror",
  "tokio",
@@ -1844,8 +1834,8 @@ dependencies = [
  "co-sdk",
  "futures",
  "ipld-core",
- "libipld",
  "serde",
+ "serde_ipld_dagcbor",
  "serde_json",
  "tauri",
  "tauri-plugin-shell",
@@ -2422,7 +2412,6 @@ dependencies = [
  "futures",
  "hyper 0.14.30",
  "ipld-core",
- "libipld",
  "libp2p",
  "serde",
  "serde_json",
@@ -3205,7 +3194,6 @@ dependencies = [
  "co-sdk",
  "co-storage",
  "ipld-core",
- "libipld",
  "serde",
  "thiserror",
  "tokio",
@@ -3225,7 +3213,6 @@ dependencies = [
  "co-sdk",
  "co-storage",
  "ipld-core",
- "libipld",
  "serde",
  "thiserror",
  "tracing",
@@ -4577,6 +4564,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipld-dagpb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5eb3c08f1508fa62ffe1a805aafa116d2eb034b3542c85596db132f279abc47"
+dependencies = [
+ "bytes",
+ "ipld-core",
+ "quick-protobuf",
+ "thiserror",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4895,7 +4894,6 @@ dependencies = [
  "core2",
  "multibase",
  "multihash 0.18.1",
- "serde",
  "thiserror",
 ]
 
@@ -6066,8 +6064,6 @@ dependencies = [
  "core2",
  "digest 0.10.7",
  "multihash-derive 0.8.0",
- "serde",
- "serde-big-array",
  "sha2 0.10.8",
  "sha3",
  "unsigned-varint 0.7.2",
@@ -7907,13 +7903,17 @@ dependencies = [
 
 [[package]]
 name = "rust-unixfs"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "198604a043cb63265579ed131ea740bc11679fb0e5936489f429f5fec24d9e43"
+checksum = "e1197d36d097a485787a7f314d99a9e1e9f17dd4f10bc7c29bab0b8dc304cc9e"
 dependencies = [
  "either",
  "filetime",
- "libipld",
+ "ipld-core",
+ "ipld-dagpb",
+ "multihash 0.19.3",
+ "multihash-codetable",
+ "multihash-derive 0.9.1",
  "quick-protobuf",
  "sha2 0.10.8",
 ]
@@ -8219,15 +8219,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cff085d2cb684faa248efb494c39b68e522822ac0de72ccf08109abde717cfb2"
 dependencies = [
  "serde_derive",
-]
-
-[[package]]
-name = "serde-big-array"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd31f59f6fe2b0c055371bb2f16d7f0aa7d8881676c04a55b1596d1a17cd10a4"
-dependencies = [
- "serde",
 ]
 
 [[package]]

@@ -1,10 +1,10 @@
 use crate::{CoreResolver, CoreResolverError, ReducerChangeContext, TaskSpawner};
 use anyhow::Context;
 use async_trait::async_trait;
-use co_primitives::{BlockSerializer, CoId, ReducerAction};
+use cid::Cid;
+use co_primitives::{Block, BlockSerializer, CoId, ReducerAction, StoreParams};
 use co_runtime::RuntimePool;
 use co_storage::BlockStorage;
-use libipld::{store::StoreParams, Block, Cid};
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 

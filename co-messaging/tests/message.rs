@@ -5,7 +5,7 @@ use co_messaging::{
 	relation::{ReactionContent, RedactionContent, RelatesTo, Relation},
 	MatrixEvent, FORMATTED_BODY_FORMAT,
 };
-use libipld::Cid;
+use cid::Cid;
 
 #[test]
 fn test_text_content() {

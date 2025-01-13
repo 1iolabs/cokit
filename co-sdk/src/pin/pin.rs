@@ -4,7 +4,7 @@ use co_core_pin::PinAction;
 use co_identity::PrivateIdentity;
 use co_primitives::Tags;
 use co_storage::BlockStorage;
-use libipld::Cid;
+use cid::Cid;
 use std::fmt::Debug;
 
 #[derive(Clone)]

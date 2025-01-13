@@ -1,6 +1,6 @@
 use co_network::{DidcommBehaviourProvider, GossipsubBehaviourProvider, HeadsLayerBehaviourProvider, NetworkTask};
 use co_primitives::NetworkCoHeads;
-use libipld::Cid;
+use cid::Cid;
 use libp2p::{swarm::NetworkBehaviour, Swarm};
 use std::collections::BTreeSet;
 

@@ -4,7 +4,7 @@ use co_actor::ActorHandle;
 use co_primitives::CoId;
 use co_runtime::RuntimePool;
 use co_storage::BlockStorage;
-use libipld::Cid;
+use cid::Cid;
 use std::marker::PhantomData;
 
 /// Epic resolver middleware.

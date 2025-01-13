@@ -9,9 +9,10 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 anyhow = { workspace = true }
+cid = { workspace = true }
 co-api = { path = "../../co-api" }
 co-messaging = { path = "../../co-messaging" }
-libipld = { workspace = true, features = ["default", "serde-codec"] }
+ipld-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_repr = { workspace = true }
 thiserror = { workspace = true }

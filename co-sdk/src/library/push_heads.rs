@@ -16,7 +16,7 @@ use co_network::didcomm::EncodedMessage;
 use co_primitives::{tags, CoId, Tags};
 use co_storage::BlockStorageContentMapping;
 use futures::{Stream, StreamExt};
-use libipld::Cid;
+use cid::Cid;
 use libp2p::PeerId;
 use std::{collections::BTreeSet, future::ready, time::Duration};
 

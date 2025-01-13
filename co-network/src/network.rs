@@ -9,8 +9,8 @@ use crate::{
 use anyhow::anyhow;
 use co_actor::ActorHandle;
 use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver, PrivateIdentityResolverBox};
+use co_primitives::DefaultParams;
 use futures::{pin_mut, Stream, StreamExt};
-use libipld::DefaultParams;
 use libp2p::{
 	gossipsub, identify,
 	identity::Keypair,
@@ -60,15 +60,19 @@ impl Libp2pNetwork {
 			mdns: MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?,
 			// kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()),
 			// kademlia_config),
-			bitswap: Bitswap::new(Default::default(), BitswapStoreClient::new(bitswap), {
-				let bitswap_identifier = identifier.clone();
-				Box::new(move |t| {
-					tokio::spawn(async move {
-						t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
-							.await
-					});
-				})
-			}),
+			bitswap: Bitswap::<libipld::DefaultParams>::new(
+				Default::default(),
+				BitswapStoreClient::<DefaultParams>::new(bitswap),
+				{
+					let bitswap_identifier = identifier.clone();
+					Box::new(move |t| {
+						tokio::spawn(async move {
+							t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
+								.await
+						});
+					})
+				},
+			),
 			gossipsub: gossipsub::Behaviour::new(
 				gossipsub::MessageAuthenticity::Signed(config.keypair.clone()),
 				gossipsub_config,
@@ -375,7 +379,7 @@ pub struct Behaviour {
 	pub mdns: MdnsBehaviour,
 	pub ping: ping::Behaviour,
 	// pub kad: Kademlia<MemoryStore>,
-	pub bitswap: Bitswap<DefaultParams>,
+	pub bitswap: Bitswap<libipld::DefaultParams>,
 }
 impl discovery::DiscoveryBehaviour for Behaviour {
 	fn rendezvous_client_mut(&mut self) -> Option<&mut libp2p::rendezvous::client::Behaviour> {
@@ -450,13 +454,11 @@ impl GossipsubBehaviourProvider for Behaviour {
 	}
 }
 impl BitswapBehaviourProvider for Behaviour {
-	type StoreParams = DefaultParams;
-
-	fn bitswap(&self) -> &Bitswap<DefaultParams> {
+	fn bitswap(&self) -> &Bitswap<libipld::DefaultParams> {
 		&self.bitswap
 	}
 
-	fn bitswap_mut(&mut self) -> &mut Bitswap<DefaultParams> {
+	fn bitswap_mut(&mut self) -> &mut Bitswap<libipld::DefaultParams> {
 		&mut self.bitswap
 	}
 

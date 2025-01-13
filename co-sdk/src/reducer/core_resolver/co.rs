@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use co_primitives::ReducerAction;
 use co_runtime::{Core, RuntimeContext, RuntimePool};
 use co_storage::{BlockStorage, BlockStorageExt};
-use libipld::Cid;
+use cid::Cid;
 use serde::de::IgnoredAny;
 use std::collections::HashMap;
 

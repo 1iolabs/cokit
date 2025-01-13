@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoId, Did};
 use futures::{future::ready, stream, Stream, StreamExt};
-use libipld::Cid;
+use cid::Cid;
 use libp2p::PeerId;
 use std::collections::BTreeSet;
 

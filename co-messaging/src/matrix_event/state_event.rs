@@ -1,6 +1,6 @@
 use super::multimedia::ImageInfo;
 use crate::{EventContent, EventType};
-use libipld::Cid;
+use cid::Cid;
 use serde::{Deserialize, Serialize};
 
 /**

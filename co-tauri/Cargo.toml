@@ -7,15 +7,19 @@ edition = "2021"
 rust-version = "1.76"
 
 [dependencies]
-co-primitives = { path = "../co-primitives" }
-co-messaging = { path = "../co-messaging" }
-co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
-co-core-membership = { path = "../cores/membership" }
-co-core-co = { path = "../cores/co" }
-co-core-room = { path = "../cores/room" }
 anyhow = { workspace = true }
+cid = { workspace = true }
+co-core-co = { path = "../cores/co" }
+co-core-membership = { path = "../cores/membership" }
+co-core-room = { path = "../cores/room" }
+co-messaging = { path = "../co-messaging" }
+co-primitives = { path = "../co-primitives" }
+co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
 futures = { workspace = true }
-libipld = { workspace = true }
+ipld-core = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_ipld_dagcbor = { workspace = true }
+serde_json = { workspace = true }
 tauri = { version = "=2.0.0-beta.25", default-features = false }
 tauri-plugin-shell = "=2.0.0-beta.10"
 tauri-utils = { version = "=2.0.0-beta.19" }
@@ -23,5 +27,3 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true, features = ["sync"] }
 tracing = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true }

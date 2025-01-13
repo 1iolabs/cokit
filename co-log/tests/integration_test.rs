@@ -3,7 +3,7 @@ use co_log::{Entry, Log};
 use co_primitives::{BlockSerializer, Link};
 use co_storage::{BlockStorage, MemoryBlockStorage};
 use futures::TryStreamExt;
-use libipld::Cid;
+use cid::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 

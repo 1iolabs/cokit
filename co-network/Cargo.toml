@@ -9,6 +9,7 @@ anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
 asynchronous-codec = "0.7.0"
+cid = { workspace = true }
 co-actor = { path = "../co-actor" }
 co-identity = { path = "../co-identity" }
 co-primitives = { path = "../co-primitives" }
@@ -17,7 +18,8 @@ derive_more = { workspace = true }
 did_url = "0.1.0"
 did-key = "0.2.1"
 futures = { workspace = true }
-libipld = { workspace = true, features = ["default", "serde-codec"] }
+ipld-core = { workspace = true }
+libipld = "0.16"
 libp2p = { workspace = true }
 libp2p-bitswap = { version = "0.25.0", git = "https://github.com/dkuhnert/libp2p-bitswap.git", branch = "auth", features = [
     "compat",

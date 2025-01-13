@@ -1,4 +1,4 @@
-use libipld::Cid;
+use cid::Cid;
 use serde::{Deserialize, Serialize};
 
 /**

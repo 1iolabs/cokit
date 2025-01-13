@@ -4,7 +4,7 @@ use co_identity::{IdentityResolverBox, PrivateIdentity};
 use co_primitives::Link;
 use co_storage::{BlockStorage, BlockStorageExt};
 use futures::{pin_mut, Stream, TryStreamExt};
-use libipld::Cid;
+use cid::Cid;
 use serde::Serialize;
 use std::collections::{BTreeSet, HashSet};
 

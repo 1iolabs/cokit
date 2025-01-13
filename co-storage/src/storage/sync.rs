@@ -1,7 +1,8 @@
 use crate::{BlockStat, BlockStorage, Storage, StorageError};
 use async_trait::async_trait;
+use cid::Cid;
+use co_primitives::{Block, StoreParams};
 use futures::Future;
-use libipld::{store::StoreParams, Block, Cid};
 use std::{
 	marker::PhantomData,
 	sync::{
@@ -63,7 +64,7 @@ where
 {
 	type StoreParams = S::StoreParams;
 
-	fn get(&self, cid: &libipld::Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		let (sender, receiver) = std::sync::mpsc::channel::<Result<Block<Self::StoreParams>, StorageError>>();
 		self.sender
 			.send(Message::Get(*cid, sender))

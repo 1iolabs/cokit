@@ -1,8 +1,8 @@
+use cid::Cid;
 use co_api::{BlockSerializer, Link, ReducerAction};
 use co_runtime::{co_v1::CoV1Api, create_runtime, RuntimeContext};
 use co_storage::{Algorithm, EncryptedStorage, MemoryStorage, Secret, Storage, SyncStorage};
 use example_message::{MessageAction, MessageState, Role};
-use libipld::Cid;
 use std::{collections::BTreeMap, iter::repeat, process::Command, str::FromStr};
 
 #[test]

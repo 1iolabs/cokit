@@ -6,11 +6,12 @@ use crate::{
 	AlgorithmError, BlockStat, BlockStorage, BlockStorageContentMapping, Storage, StorageContentMapping, StorageError,
 };
 use async_trait::async_trait;
+use cid::Cid;
 use co_primitives::{
-	from_cbor, DefaultNodeSerializer, KnownMultiCodec, MultiCodec, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
+	from_cbor, Block, DefaultNodeSerializer, KnownMultiCodec, MultiCodec, Node, NodeBuilder, NodeBuilderError,
+	NodeSerializer, StoreParams,
 };
 use futures::{stream::FuturesOrdered, StreamExt};
-use libipld::{store::StoreParams, Block, Cid};
 use serde::Serialize;
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
@@ -610,8 +611,8 @@ mod tests {
 		types::storage::{Storage, StorageError},
 		BlockStorage, EncryptedBlockStorage, MemoryBlockStorage,
 	};
-	use co_primitives::BlockSerializer;
-	use libipld::{store::StoreParams, Cid, DefaultParams};
+	use cid::Cid;
+	use co_primitives::{BlockSerializer, DefaultParams, StoreParams};
 	use serde::{Deserialize, Serialize};
 	use std::iter::repeat;
 

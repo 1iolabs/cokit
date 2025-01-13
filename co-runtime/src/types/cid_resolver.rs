@@ -1,9 +1,13 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_api::{Cid, Metadata};
+use cid::Cid;
+use co_api::Metadata;
 use co_storage::BlockStorage;
 use colored::Colorize;
-use libipld::{cbor::DagCborCodec, prelude::Codec, serde::from_ipld, Ipld};
+use ipld_core::{
+	ipld::Ipld,
+	serde::{from_ipld, to_ipld},
+};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 /// A shorthand type for a map that represents the structure of a Cid tree
@@ -75,7 +79,7 @@ where
 			match block_result {
 				Ok(block) => {
 					// decode to ipld
-					let ipld: Ipld = DagCborCodec.decode(block.data())?;
+					let ipld: Ipld = to_ipld(block.data())?;
 					let mut links: BTreeSet<Cid> = BTreeSet::new();
 					IpldResolver::<S>::get_next_cids(&ipld, &mut links, ignorable_cids);
 					// returns first successfully resolved cids
@@ -130,7 +134,11 @@ enum GetExternalError {
 }
 
 fn get_external(ipld: &Ipld) -> Result<HashSet<String>, GetExternalError> {
-	Ok(from_ipld::<Vec<Metadata>>(ipld.get("$co").map_err(|_| GetExternalError::NotFound)?.clone())
+	let ipld_co = ipld
+		.get("$co")
+		.map_err(|_| GetExternalError::NotFound)?
+		.ok_or(GetExternalError::NotFound)?;
+	Ok(from_ipld::<Vec<Metadata>>(ipld_co.clone())
 		.map_err(|_| GetExternalError::Decode)?
 		.into_iter()
 		.filter_map(|v| match v {
@@ -331,9 +339,9 @@ fn move_entry(from: &mut CidMap, to: &mut CidMap, cid: &Cid) -> bool {
 #[cfg(test)]
 mod tests {
 	use crate::{create_cid_resolver, MultiLayerCidResolver};
+	use cid::Cid;
 	use co_primitives::BlockSerializer;
 	use co_storage::{BlockStorage, MemoryBlockStorage};
-	use libipld::Cid;
 	use serde::{Deserialize, Serialize};
 
 	#[derive(Debug, Serialize, Deserialize)]

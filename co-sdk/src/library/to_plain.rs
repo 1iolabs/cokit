@@ -1,6 +1,6 @@
 use co_storage::BlockStorageContentMapping;
 use futures::{StreamExt, TryStreamExt};
-use libipld::Cid;
+use cid::Cid;
 use std::collections::BTreeSet;
 
 pub async fn to_plain<M: BlockStorageContentMapping + Send + Sync + 'static>(

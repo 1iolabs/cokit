@@ -5,7 +5,7 @@ use super::{
 use crate::{matrix_event::relation::RelatesTo, multimedia::VideoInfo, relation::Relation, EventContent};
 use co_macros::common_event_content;
 use co_primitives::Did;
-use libipld::Cid;
+use cid::Cid;
 use serde::{Deserialize, Serialize};
 
 /**

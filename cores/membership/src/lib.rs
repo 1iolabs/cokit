@@ -1,5 +1,5 @@
+use cid::Cid;
 use co_api::{CoId, Context, Did, Reducer, ReducerAction, Tags};
-use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::BTreeSet;

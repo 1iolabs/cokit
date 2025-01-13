@@ -11,6 +11,7 @@ co-macros = { path = "../co-macros" }
 derive_more = { workspace = true }
 either = { workspace = true }
 ipld-core = { workspace = true }
+ipld-dagpb = { workspace = true }
 multihash = { workspace = true }
 multihash-codetable = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

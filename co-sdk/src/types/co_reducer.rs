@@ -5,7 +5,7 @@ use co_identity::PrivateIdentity;
 use co_primitives::{CoId, KnownMultiCodec, OptionLink, ReducerAction};
 use co_storage::{BlockStorageContentMapping, BlockStorageExt, MappedBlockStorage, StorageError};
 use futures::{stream, StreamExt, TryStreamExt};
-use libipld::Cid;
+use cid::Cid;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
 use tokio::sync::RwLock;

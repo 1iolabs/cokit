@@ -6,7 +6,7 @@ use crate::{
 };
 use co_identity::PrivateIdentity;
 use co_primitives::{from_cbor, to_cbor, CoId, Did, NetworkCoHeads};
-use libipld::Cid;
+use cid::Cid;
 use libp2p::{
 	gossipsub::{self, IdentTopic, PublishError, TopicHash},
 	swarm::{NetworkBehaviour, SwarmEvent},
@@ -412,7 +412,7 @@ mod tests {
 	};
 	use co_primitives::{BlockSerializer, CoId, NetworkCoHeads};
 	use futures::{FutureExt, StreamExt};
-	use libipld::Cid;
+	use cid::Cid;
 	use libp2p::{
 		gossipsub,
 		identity::Keypair,

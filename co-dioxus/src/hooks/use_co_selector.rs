@@ -1,8 +1,8 @@
 use crate::{CoContext, CoStateResult};
+use cid::Cid;
 use co_sdk::{Application, CoId, CoReducer, CoStorage, OptionLink};
 use dioxus::prelude::*;
 use futures::Future;
-use libipld::Cid;
 
 /// Select state from an CO.
 pub fn use_co_selector<T, F, Fut, D>(co: &str, dependency: D, selector: F) -> Signal<CoStateResult<T>, SyncStorage>

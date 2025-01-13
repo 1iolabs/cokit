@@ -3,11 +3,11 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
+use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle};
 use co_network::bitswap::{BitswapMessage, Token};
-use co_primitives::{CoId, KnownMultiCodec, MultiCodec, Tags};
+use co_primitives::{Block, BlockLinks, CoId, DefaultParams, KnownMultiCodec, MultiCodec, Tags};
 use co_storage::{BlockStorage, StorageError};
-use libipld::{Block, Cid, DefaultParams};
 use libp2p::PeerId;
 
 pub struct Bitswap {
@@ -237,7 +237,7 @@ async fn missing_blocks(context: CoContext, cid: Cid, tokens: Vec<Token>) -> Res
 	while let Some(cid) = stack.pop() {
 		match storage.get(&cid).await {
 			Ok(block) => {
-				block.references(&mut stack)?;
+				stack.extend(BlockLinks::default().links(&block)?);
 			},
 			Err(StorageError::NotFound(_, _)) => {
 				missing.push(cid);

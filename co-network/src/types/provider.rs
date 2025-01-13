@@ -1,5 +1,5 @@
 use crate::didcomm;
-use libipld::store::StoreParams;
+use libipld::DefaultParams;
 use libp2p::{
 	gossipsub, mdns, rendezvous,
 	swarm::{NetworkBehaviour, SwarmEvent},
@@ -52,10 +52,8 @@ pub trait GossipsubBehaviourProvider: NetworkBehaviour {
 
 /// Trait which can be implemented on NetworkBehaviours which provide bitswap.
 pub trait BitswapBehaviourProvider: NetworkBehaviour {
-	type StoreParams: StoreParams;
-
-	fn bitswap(&self) -> &Bitswap<Self::StoreParams>;
-	fn bitswap_mut(&mut self) -> &mut Bitswap<Self::StoreParams>;
+	fn bitswap(&self) -> &Bitswap<DefaultParams>;
+	fn bitswap_mut(&mut self) -> &mut Bitswap<DefaultParams>;
 
 	/// Extract bitswap event from event.
 	fn bitswap_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&BitswapEvent>;

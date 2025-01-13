@@ -1,6 +1,7 @@
 use crate::StorageError;
 use async_trait::async_trait;
-use libipld::{store::StoreParams, Block, Cid};
+use cid::Cid;
+use co_primitives::{Block, StoreParams};
 
 #[async_trait]
 pub trait BlockStorage {

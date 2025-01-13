@@ -1,6 +1,7 @@
 use crate::{BlockStat, BlockStorage, StorageError};
 use async_trait::async_trait;
-use libipld::{store::StoreParams, Block, Cid};
+use cid::Cid;
+use co_primitives::{Block, StoreParams};
 use std::marker::PhantomData;
 
 /// This storage implementation converts block storeparams.
@@ -33,7 +34,7 @@ where
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		let (cid, data) = self.next.get(cid).await?.into_inner();
 		match self.checked {
-			true => Ok(Block::new(cid, data).map_err(StorageError::InvalidArgument)?),
+			true => Ok(Block::new(cid, data).map_err(|e| StorageError::InvalidArgument(e.into()))?),
 			false => Ok(Block::new_unchecked(cid, data)),
 		}
 	}
@@ -41,7 +42,7 @@ where
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		let (cid, data) = block.into_inner();
 		let next_block: Block<S::StoreParams> = match self.checked {
-			true => Block::new(cid, data).map_err(StorageError::InvalidArgument)?,
+			true => Block::new(cid, data).map_err(|e| StorageError::InvalidArgument(e.into()))?,
 			false => Block::new_unchecked(cid, data),
 		};
 		self.next.set(next_block).await

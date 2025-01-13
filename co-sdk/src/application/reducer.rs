@@ -7,7 +7,7 @@ use co_primitives::ReducerAction;
 use co_runtime::RuntimePool;
 use co_storage::BlockStorage;
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
-use libipld::Cid;
+use cid::Cid;
 use serde::Serialize;
 use std::{
 	collections::{BTreeSet, HashMap, VecDeque},

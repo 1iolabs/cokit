@@ -1,6 +1,7 @@
 use cid::Cid;
 use co_primitives::{KnownMultiCodec, MultiCodec};
-use co_sdk::{unixfs_cat_buffer, BlockStorage, CoStorage};
+use co_sdk::{unixfs_cat_buffer, BlockSerializer, BlockStorage, CoStorage};
+use ipld_core::ipld::Ipld;
 use std::io::Write;
 
 pub async fn cat_output(storage: CoStorage, cid: Cid, pretty: bool) -> Result<(), anyhow::Error> {
@@ -14,7 +15,7 @@ pub async fn cat_output(storage: CoStorage, cid: Cid, pretty: bool) -> Result<()
 		println!("Codec: {:?} ({})", codec, block.cid().codec());
 		println!("Size: {}", block.data().len());
 		if codec == KnownMultiCodec::DagCbor {
-			let ipld: Ipld = DagCborCodec.decode(block.data())?;
+			let ipld: Ipld = BlockSerializer::default().deserialize(&block)?;
 			println!("{:#?}", ipld);
 		} else {
 			hexdump::hexdump(block.data());

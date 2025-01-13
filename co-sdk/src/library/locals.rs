@@ -5,7 +5,7 @@ use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseStream, Respons
 use co_primitives::{from_cbor, tags, to_cbor, Tags};
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use libc::flock;
-use libipld::Cid;
+use cid::Cid;
 use nix::fcntl::{fcntl, FcntlArg, Flock, Flockable};
 use notify::{
 	event::{CreateKind, ModifyKind},

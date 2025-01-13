@@ -1,7 +1,7 @@
 use co_primitives::{Node, NodeContainer, OptionLink};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{Future, FutureExt, Stream};
-use libipld::Cid;
+use cid::Cid;
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use std::{

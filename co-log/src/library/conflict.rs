@@ -1,5 +1,5 @@
 use super::entry::EntryBlock;
-use libipld::store::StoreParams;
+use co_primitives::StoreParams;
 use std::cmp::Ordering;
 
 pub fn last_write_wins<P: StoreParams>(a: &EntryBlock<P>, b: &EntryBlock<P>) -> Ordering {
@@ -29,8 +29,7 @@ mod tests {
 	use super::last_write_wins;
 	use crate::{library::entry::EntryBlock, Clock, Entry};
 	use co_identity::{Identity, PrivateIdentity, SignError};
-	use co_primitives::BlockSerializer;
-	use libipld::DefaultParams;
+	use co_primitives::{BlockSerializer, DefaultParams};
 	use serde::Serialize;
 	use std::{
 		cmp::Ordering,

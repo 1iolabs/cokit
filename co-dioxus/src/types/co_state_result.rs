@@ -1,4 +1,4 @@
-use libipld::Cid;
+use cid::Cid;
 
 /// State result.
 ///

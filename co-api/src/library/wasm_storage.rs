@@ -1,4 +1,4 @@
-use crate::{co_v1, Block, Cid, Storage};
+use crate::{co_v1, Block, Cid, DefaultParams, Storage};
 
 pub struct WasmStorage {}
 
@@ -10,7 +10,7 @@ impl WasmStorage {
 }
 
 impl Storage for WasmStorage {
-	fn get(&self, cid: &Cid) -> Block {
+	fn get(&self, cid: &Cid) -> Block<DefaultParams> {
 		let cid_bytes = cid.to_bytes();
 
 		// try to read block in 1KiB buffer
@@ -50,7 +50,7 @@ impl Storage for WasmStorage {
 		Block::new_unchecked(*cid, buffer)
 	}
 
-	fn set(&mut self, block: Block) -> Cid {
+	fn set(&mut self, block: Block<DefaultParams>) -> Cid {
 		let cid_bytes = block.cid().to_bytes();
 		#[allow(unused_unsafe)]
 		let block_size = unsafe {

@@ -4,7 +4,7 @@ use co_core_membership::{MembershipState, Memberships};
 use co_identity::{Identity, LocalIdentity};
 use co_primitives::{CoId, Did, OptionLink, Tags};
 use futures::Stream;
-use libipld::Cid;
+use cid::Cid;
 
 /// Returns memberships contained in the CO (`co_state`)`.
 ///

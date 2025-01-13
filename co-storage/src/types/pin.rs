@@ -1,6 +1,6 @@
 use crate::StorageError;
 use async_trait::async_trait;
-use libipld::Cid;
+use cid::Cid;
 
 /// Storage Pin API.
 #[async_trait(?Send)]

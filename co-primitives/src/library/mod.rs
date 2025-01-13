@@ -1,3 +1,4 @@
+pub mod block_links;
 pub mod block_serializer;
 pub mod cbor;
 pub mod json;
