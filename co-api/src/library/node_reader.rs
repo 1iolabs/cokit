@@ -1,6 +1,6 @@
 use crate::{Node, Storage};
-use co_primitives::from_cbor;
-use libipld::{cbor::DagCborCodec, Cid};
+use cid::Cid;
+use co_primitives::{from_cbor, KnownMultiCodec};
 use serde::de::DeserializeOwned;
 use std::collections::VecDeque;
 
@@ -73,7 +73,7 @@ where
 fn read_node<T: Clone + DeserializeOwned>(storage: &dyn Storage, cid: &Cid) -> Result<Node<T>, NodeReaderError> {
 	// get block
 	let block = storage.get(cid);
-	if block.cid().codec() != Into::<u64>::into(DagCborCodec) {
+	if block.cid().codec() != Into::<u64>::into(KnownMultiCodec::DagCbor) {
 		return Err(NodeReaderError::InvalidArgument);
 	}
 
