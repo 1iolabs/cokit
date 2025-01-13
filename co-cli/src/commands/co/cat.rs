@@ -3,9 +3,9 @@ use crate::{
 	library::{cat::cat_output, cli_context::CliContext},
 };
 use anyhow::anyhow;
+use cid::Cid;
 use co_sdk::{CoId, CoReducerFactory};
 use exitcode::ExitCode;
-use libipld::Cid;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, clap::Args)]

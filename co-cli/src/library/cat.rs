@@ -1,6 +1,6 @@
+use cid::Cid;
 use co_primitives::{KnownMultiCodec, MultiCodec};
 use co_sdk::{unixfs_cat_buffer, BlockStorage, CoStorage};
-use libipld::{cbor::DagCborCodec, codec::Codec, Cid, Ipld};
 use std::io::Write;
 
 pub async fn cat_output(storage: CoStorage, cid: Cid, pretty: bool) -> Result<(), anyhow::Error> {

@@ -9,6 +9,7 @@ anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
 chrono = "0.4.37"
+cid = { workspace = true }
 clap = { version = "^4.3.23", features = ["derive"] }
 co-core-co = { path = "../cores/co" }
 co-core-file = { path = "../cores/file" }
@@ -19,14 +20,14 @@ co-core-room = { path = "../cores/room" }
 co-log = { path = "../co-log" }
 co-messaging = { path = "../co-messaging" }
 co-primitives = { path = "../co-primitives" }
+co-runtime = { path = "../co-runtime" }
 co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
 co-storage = { path = "../co-storage" }
-co-runtime = { path = "../co-runtime" }
 colored = "2.1.0"
 exitcode = "1.1.2"
 futures = { workspace = true }
 hexdump = "0.1.1"
-libipld = { workspace = true, features = ["default", "serde-codec"] }
+ipld-core = { workspace = true }
 opentelemetry = "0.22"
 opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.15.0", features = ["tonic"] }

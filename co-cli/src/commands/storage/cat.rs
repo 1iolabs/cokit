@@ -2,11 +2,11 @@ use crate::{
 	cli::Cli,
 	library::{cat::cat_output, cli_context::CliContext},
 };
+use cid::Cid;
 use co_primitives::{from_cbor, Secret};
 use co_sdk::CoStorage;
 use co_storage::EncryptedBlockStorage;
 use exitcode::ExitCode;
-use libipld::Cid;
 use std::{path::PathBuf, str::FromStr};
 
 #[derive(Debug, Clone, clap::Args)]
