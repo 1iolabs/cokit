@@ -5,10 +5,14 @@ edition = "2021"
 rust-version = "1.76"
 
 [dependencies]
+anyhow = { workspace = true }
+cid = { workspace = true }
 co-macros = { path = "../co-macros" }
 derive_more = { workspace = true }
 either = { workspace = true }
-libipld = { workspace = true, features = ["default", "serde-codec"] }
+ipld-core = { workspace = true }
+multihash = { workspace = true }
+multihash-codetable = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }

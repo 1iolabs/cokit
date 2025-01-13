@@ -10,6 +10,7 @@ pub use library::{
 };
 pub use types::{
 	action::ReducerAction,
+	block::{Block, BlockError, DefaultParams, StoreParams},
 	co::CoId,
 	codec::{KnownMultiCodec, MultiCodec, MultiCodecError},
 	date::Date,

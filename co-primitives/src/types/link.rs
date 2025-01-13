@@ -1,5 +1,5 @@
 use either::Either;
-use libipld::Cid;
+use cid::Cid;
 use serde::{Deserialize, Serialize};
 use std::{
 	any::type_name,

@@ -58,7 +58,7 @@ mod tests {
 	use super::WithCoMetadata;
 	use crate::{CoMetadata, Metadata};
 	use co_macros::TaggedFields;
-	use libipld::Cid;
+	use cid::Cid;
 	use serde::{Deserialize, Serialize};
 
 	#[test]

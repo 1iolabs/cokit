@@ -1,5 +1,4 @@
-use crate::{BlockSerializer, Link, OptionLink};
-use libipld::{store::StoreParams, Block, DefaultParams};
+use crate::{Block, BlockSerializer, DefaultParams, Link, OptionLink, StoreParams};
 use serde::{Deserialize, Serialize};
 use std::mem::take;
 

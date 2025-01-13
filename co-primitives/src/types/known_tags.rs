@@ -1,5 +1,6 @@
 use super::tags::TagValue;
 use crate::{serde_string_enum, Tag, Tags};
+use ipld_core::serde::from_ipld;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -206,7 +207,7 @@ impl CoTimeout {
 		for timeout in tags
 			.into_iter()
 			.filter(|(key, _)| key == &tag)
-			.filter_map(|(_, value)| libipld::serde::from_ipld::<CoTimeout>(value.clone().into()).ok())
+			.filter_map(|(_, value)| from_ipld::<CoTimeout>(value.clone().into()).ok())
 		{
 			match timeout {
 				CoTimeout::Default => {},

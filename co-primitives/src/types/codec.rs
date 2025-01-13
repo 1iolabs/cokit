@@ -1,5 +1,5 @@
+use cid::Cid;
 use core::fmt::Debug;
-use libipld::Cid;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::fmt::Display;
 

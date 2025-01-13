@@ -1,4 +1,4 @@
-use libipld::{serde::to_ipld, Ipld};
+use ipld_core::{ipld::Ipld, serde::to_ipld};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Serialize `value` to JSON string (using dag-json).

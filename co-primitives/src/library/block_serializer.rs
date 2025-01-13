@@ -1,9 +1,6 @@
-use libipld::{
-	cbor::DagCborCodec,
-	multihash::{Code, MultihashDigest},
-	store::StoreParams,
-	Block, Cid, DefaultParams,
-};
+use crate::{Block, DefaultParams, KnownMultiCodec, StoreParams};
+use cid::Cid;
+use multihash_codetable::{Code, MultihashDigest};
 use serde::Serialize;
 use serde_ipld_dagcbor::{DecodeError, EncodeError};
 use std::{any::type_name, collections::TryReserveError, convert::Infallible, marker::PhantomData};
@@ -27,7 +24,7 @@ pub struct BlockSerializer<S> {
 }
 impl<S> BlockSerializer<S> {
 	pub fn new() -> Self {
-		Self::new_codec(DagCborCodec.into())
+		Self::new_codec(KnownMultiCodec::DagCbor.into())
 	}
 
 	pub fn new_codec(codec: u64) -> Self {
