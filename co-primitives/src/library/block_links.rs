@@ -2,7 +2,7 @@ use crate::{Block, KnownMultiCodec, MultiCodec, StoreParams};
 use cid::Cid;
 use ipld_core::codec::Links;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct BlockLinks {}
 impl BlockLinks {
 	pub fn new() -> Self {

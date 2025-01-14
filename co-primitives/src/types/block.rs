@@ -12,7 +12,7 @@ impl StoreParams for DefaultParams {
 }
 
 /// Block
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Block<S> {
 	_s: PhantomData<S>,
 	cid: Cid,
@@ -49,6 +49,14 @@ impl<S: StoreParams> Block<S> {
 impl<S> PartialEq for Block<S> {
 	fn eq(&self, other: &Self) -> bool {
 		self.cid == other.cid
+	}
+}
+impl<S> std::fmt::Debug for Block<S> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Block")
+			.field("cid", &self.cid)
+			.field("data", &self.data)
+			.finish()
 	}
 }
 
