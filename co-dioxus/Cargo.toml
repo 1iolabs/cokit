@@ -8,12 +8,14 @@ rust-version = "1.76"
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+cid = { workspace = true }
 co-core-co = { path = "../cores/co" }
 co-core-membership = { path = "../cores/membership" }
+co-primitives = { path = "../co-primitives" }
 co-sdk = { path = "../co-sdk" }
 dioxus = { version = "=0.6.0-alpha.3", default-features = false, features = ["hooks", "signals"] }
 futures = { workspace = true }
-libipld = { workspace = true }
+ipld-core = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

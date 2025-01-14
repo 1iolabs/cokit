@@ -1,10 +1,7 @@
 use super::wasm_context::WasmContext;
 use crate::{Block, Cid, Context, Reducer, ReducerAction};
-use co_primitives::{from_cbor, to_cbor};
-use libipld::{
-	cbor::DagCborCodec,
-	multihash::{Code, MultihashDigest},
-};
+use co_primitives::{from_cbor, to_cbor, KnownMultiCodec};
+use multihash_codetable::{Code, MultihashDigest};
 use serde::{de::DeserializeOwned, Serialize};
 
 pub fn reduce<S>()
@@ -43,7 +40,7 @@ where
 	// store
 	let next_data = to_cbor(&next_state).unwrap();
 	let next_hash = Code::Blake3_256.digest(&next_data);
-	let next_cid = Cid::new_v1(DagCborCodec.into(), next_hash);
+	let next_cid = Cid::new_v1(KnownMultiCodec::DagCbor.into(), next_hash);
 	let next_block = Block::new_unchecked(next_cid, next_data);
 	if cid.is_none() || cid.unwrap() != next_cid {
 		let store_cid = next_cid;

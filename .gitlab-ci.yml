@@ -17,6 +17,8 @@ cache: &global_cache
     - .cargo/registry/cache
   policy: pull-push
 
+
+# verfiy the configured in `co/build.yml` (DOCKERFILE_IMAGE) is in sync with `ci/Dockerfile`.
 dockerfile:
   stage: test
   image: ${DOCKERFILE_IMAGE}
@@ -24,6 +26,7 @@ dockerfile:
     - echo "> test if docker image is in sync with Dockerfile (ci/build.sh)"
     - echo "${DOCKERFILE_HASH}  ci/Dockerfile" | sha256sum --check --status
 
+# verify all tests are running to success
 test:
   stage: test
   image: ${DOCKERFILE_IMAGE}
@@ -32,6 +35,7 @@ test:
   script:
     - cargo test
 
+# verfiy all files a re formatted correctly
 fmt:
   stage: test
   image: ${DOCKERFILE_IMAGE}
@@ -40,6 +44,8 @@ fmt:
   script:
     - cargo +nightly fmt --check
 
+
+# generate binaries
 build:
   stage: build
   image: ${DOCKERFILE_IMAGE}
@@ -56,6 +62,7 @@ build:
       - target/release/daemon
       - target/wasm32-unknown-unknown/release/*.wasm
 
+# generate docs
 rustdoc:
   stage: build
   image: ${DOCKERFILE_IMAGE}
@@ -67,6 +74,8 @@ rustdoc:
     paths:
       - target/doc
 
+
+# export pages
 pages:
   stage: publish
   image: ${DOCKERFILE_IMAGE}

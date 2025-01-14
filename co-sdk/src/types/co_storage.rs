@@ -1,6 +1,7 @@
 use async_trait::async_trait;
+use cid::Cid;
+use co_primitives::{Block, DefaultParams};
 use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
-use libipld::{Block, Cid, DefaultParams};
 use std::{fmt::Debug, sync::Arc};
 
 /// Public storage API.

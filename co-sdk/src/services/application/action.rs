@@ -1,12 +1,13 @@
 use crate::{
 	library::create_reducer_action::create_reducer_action, types::message::heads::HeadsMessage, ReducerChangeContext,
 };
+use cid::Cid;
 use co_identity::Message;
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoId, Did, Link, OptionLink, ReducerAction};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::Stream;
-use libipld::{Cid, Ipld};
+use ipld_core::ipld::Ipld;
 use libp2p::PeerId;
 use serde::Serialize;
 use std::{collections::BTreeSet, ops::Deref, sync::Arc};

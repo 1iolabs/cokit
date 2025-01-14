@@ -1,8 +1,12 @@
-use crate::{bitswap::Token, BitswapBehaviourProvider, NetworkTask, NetworkTaskSpawner, PeerProvider};
+use crate::{
+	bitswap::Token, library::libipld_interop::to_libipld_cid, BitswapBehaviourProvider, NetworkTask,
+	NetworkTaskSpawner, PeerProvider,
+};
 use async_trait::async_trait;
+use cid::Cid;
+use co_primitives::Block;
 use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
 use futures::{channel::oneshot, pin_mut};
-use libipld::{Block, Cid};
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	PeerId, Swarm,
@@ -24,7 +28,7 @@ pub struct NetworkBlockStorage<S, B, C, N, P> {
 impl<S, B, C, N, P> NetworkBlockStorage<S, B, C, N, P>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
-	B: NetworkBehaviour + BitswapBehaviourProvider<StoreParams = S::StoreParams>,
+	B: NetworkBehaviour + BitswapBehaviourProvider,
 	P: PeerProvider + Send + Sync + 'static,
 	N: NetworkTaskSpawner<B, C> + Send + Sync + 'static,
 {
@@ -120,7 +124,7 @@ where
 impl<S, B, C, N, P> BlockStorage for NetworkBlockStorage<S, B, C, N, P>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
-	B: NetworkBehaviour + BitswapBehaviourProvider<StoreParams = S::StoreParams>,
+	B: NetworkBehaviour + BitswapBehaviourProvider,
 	P: PeerProvider + Send + Sync + 'static,
 	N: NetworkTaskSpawner<B, C> + Send + Sync + 'static,
 {
@@ -200,7 +204,7 @@ where
 
 		// execute
 		if let GetNetworkTaskState::Pending(peers, result) = state {
-			let query = bitswap.get(self.cid, peers.clone().into_iter(), self.tokens.clone());
+			let query = bitswap.get(to_libipld_cid(self.cid), peers.clone().into_iter(), self.tokens.clone());
 			tracing::debug!(?self.cid, ?peers, ?query, "bitswap-get");
 			self.state = GetNetworkTaskState::Query(query, result);
 		}

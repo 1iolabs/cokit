@@ -1,10 +1,10 @@
 use super::{entry::EntryBlock, get_entry_block::get_entry_blocks, join::JoinEntry, stream::create_stream};
 use crate::{library::clock::max_clock, Clock, Entry, LogError};
+use cid::Cid;
 use co_identity::{IdentityResolverBox, PrivateIdentity};
 use co_primitives::Link;
 use co_storage::{BlockStorage, BlockStorageExt};
 use futures::{pin_mut, Stream, TryStreamExt};
-use libipld::Cid;
 use serde::Serialize;
 use std::collections::{BTreeSet, HashSet};
 

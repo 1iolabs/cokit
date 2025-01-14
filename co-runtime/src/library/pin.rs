@@ -1,7 +1,7 @@
 use anyhow::anyhow;
+use cid::Cid;
 use co_primitives::{DefaultNodeSerializer, NodeBuilder};
 use co_storage::{node_reader, Storage, StorageError};
-use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 

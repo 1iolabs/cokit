@@ -1,8 +1,8 @@
 use crate::{CoreResolver, CoreResolverError, ReducerChangeContext};
 use async_trait::async_trait;
+use cid::Cid;
 use co_runtime::RuntimePool;
 use co_storage::BlockStorage;
-use libipld::Cid;
 
 pub struct DynamicCoreResolver<S> {
 	inner: Box<dyn CoreResolver<S> + Send + Sync + 'static>,

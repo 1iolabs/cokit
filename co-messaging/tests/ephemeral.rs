@@ -1,5 +1,5 @@
+use cid::Cid;
 use co_messaging::{ephemeral_event, EventType, MatrixEvent};
-use libipld::Cid;
 
 #[test]
 fn test_typing() {

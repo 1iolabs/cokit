@@ -1,9 +1,11 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_api::{Cid, Metadata};
+use cid::Cid;
+use co_api::{BlockSerializer, Metadata};
+use co_primitives::{BlockLinks, KnownMultiCodec, MultiCodec};
 use co_storage::BlockStorage;
 use colored::Colorize;
-use libipld::{cbor::DagCborCodec, prelude::Codec, serde::from_ipld, Ipld};
+use ipld_core::{ipld::Ipld, serde::from_ipld};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 /// A shorthand type for a map that represents the structure of a Cid tree
@@ -23,8 +25,8 @@ where
 	S: BlockStorage,
 {
 	pub storages: Vec<S>,
+	pub links: BlockLinks,
 }
-
 impl<S> IpldResolver<S>
 where
 	S: BlockStorage,
@@ -60,7 +62,6 @@ where
 		};
 	}
 }
-
 #[async_trait]
 impl<S> CidResolver for IpldResolver<S>
 where
@@ -69,22 +70,45 @@ where
 	async fn resolve(&self, cid: &Cid, ignorable_cids: &BTreeSet<&Cid>) -> Result<BTreeSet<Cid>, anyhow::Error> {
 		// variable to return last error, initialized value will be returned only if no loop happens
 		let mut last_error = Err(anyhow!("no storages given"));
+		if !self.links.has_links(cid) {
+			return Ok(BTreeSet::new());
+		}
 		for storage in self.storages.iter() {
 			// try to get block with storage
 			let block_result = storage.get(cid).await;
 			match block_result {
 				Ok(block) => {
-					// decode to ipld
-					let ipld: Ipld = DagCborCodec.decode(block.data())?;
-					let mut links: BTreeSet<Cid> = BTreeSet::new();
-					IpldResolver::<S>::get_next_cids(&ipld, &mut links, ignorable_cids);
-					// returns first successfully resolved cids
-					return Ok(links);
+					match MultiCodec::from(cid) {
+						MultiCodec::Known(KnownMultiCodec::DagCbor) => {
+							// ipld: take $co metadata into account
+							match BlockSerializer::new().deserialize::<Ipld>(&block) {
+								Ok(ipld) => {
+									let mut new_cids = BTreeSet::new();
+									Self::get_next_cids(&ipld, &mut new_cids, ignorable_cids);
+									return Ok(new_cids);
+								},
+								Err(err) => {
+									last_error = Err(anyhow!(err));
+								},
+							};
+						},
+						_ => {
+							// read all links
+							match self.links.links(&block) {
+								Ok(links) => {
+									// returns first successfully resolved cids
+									return Ok(links.filter(|cid| !ignorable_cids.contains(cid)).collect());
+								},
+								Err(err) => {
+									last_error = Err(anyhow!(err));
+								},
+							}
+						},
+					}
 				},
 				Err(e) => {
 					// save error and try next storage
 					last_error = Err(anyhow!(e));
-					continue;
 				},
 			}
 		}
@@ -121,7 +145,7 @@ pub async fn create_cid_resolver<S>(storages: Vec<S>) -> anyhow::Result<CidResol
 where
 	S: BlockStorage + Send + Sync + 'static,
 {
-	Ok(Box::new(JoinCidResolver::new(vec![Box::new(IpldResolver { storages })])))
+	Ok(Box::new(JoinCidResolver::new(vec![Box::new(IpldResolver { storages, links: Default::default() })])))
 }
 
 enum GetExternalError {
@@ -130,7 +154,11 @@ enum GetExternalError {
 }
 
 fn get_external(ipld: &Ipld) -> Result<HashSet<String>, GetExternalError> {
-	Ok(from_ipld::<Vec<Metadata>>(ipld.get("$co").map_err(|_| GetExternalError::NotFound)?.clone())
+	let ipld_co = ipld
+		.get("$co")
+		.map_err(|_| GetExternalError::NotFound)?
+		.ok_or(GetExternalError::NotFound)?;
+	Ok(from_ipld::<Vec<Metadata>>(ipld_co.clone())
 		.map_err(|_| GetExternalError::Decode)?
 		.into_iter()
 		.filter_map(|v| match v {
@@ -331,9 +359,9 @@ fn move_entry(from: &mut CidMap, to: &mut CidMap, cid: &Cid) -> bool {
 #[cfg(test)]
 mod tests {
 	use crate::{create_cid_resolver, MultiLayerCidResolver};
+	use cid::Cid;
 	use co_primitives::BlockSerializer;
 	use co_storage::{BlockStorage, MemoryBlockStorage};
-	use libipld::Cid;
 	use serde::{Deserialize, Serialize};
 
 	#[derive(Debug, Serialize, Deserialize)]

@@ -1,8 +1,9 @@
 use crate::{use_co_context, use_co_error, CoContext, CoError, CoErrorSignal};
 use anyhow::anyhow;
+use cid::Cid;
+use co_primitives::{Block, DefaultParams};
 use co_sdk::{BlockStorage, BlockStorageExt, CoId};
 use dioxus::prelude::*;
-use libipld::{Block, Cid, DefaultParams};
 use serde::de::DeserializeOwned;
 
 pub fn use_co_block(co: impl Into<CoId>, cid: Cid) -> Signal<Option<Block<DefaultParams>>, SyncStorage> {

@@ -1,10 +1,10 @@
 use crate::{state::core_state, CoReducerError, CoStorage, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP};
+use cid::Cid;
 use co_core_co::Co;
 use co_core_membership::{MembershipState, Memberships};
 use co_identity::{Identity, LocalIdentity};
 use co_primitives::{CoId, Did, OptionLink, Tags};
 use futures::Stream;
-use libipld::Cid;
 
 /// Returns memberships contained in the CO (`co_state`)`.
 ///

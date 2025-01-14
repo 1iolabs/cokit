@@ -1,11 +1,11 @@
-use super::{co_storage::CoBlockStorageContentMapping, state_observable::StateObservable};
+use super::co_storage::CoBlockStorageContentMapping;
 use crate::{reducer::core_resolver::dynamic::DynamicCoreResolver, state::core_state, CoStorage, Reducer, Runtime};
 use async_trait::async_trait;
+use cid::Cid;
 use co_identity::PrivateIdentity;
 use co_primitives::{CoId, KnownMultiCodec, OptionLink, ReducerAction};
 use co_storage::{BlockStorageContentMapping, BlockStorageExt, MappedBlockStorage, StorageError};
 use futures::{stream, StreamExt, TryStreamExt};
-use libipld::Cid;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
 use tokio::sync::RwLock;
@@ -74,12 +74,6 @@ impl CoReducer {
 		} else {
 			storage
 		}
-	}
-
-	/// Get reducer observable.
-	#[deprecated]
-	pub async fn observable(&self) -> StateObservable {
-		StateObservable { sub: self.reducer.read().await.observable() }
 	}
 
 	/// Get reducer watcher.

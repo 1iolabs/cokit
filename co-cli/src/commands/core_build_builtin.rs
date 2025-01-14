@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Context};
+use co_primitives::DefaultParams;
 use co_sdk::unixfs_encode_buffer;
 use exitcode::ExitCode;
 use futures::{StreamExt, TryStreamExt};
-use libipld::DefaultParams;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, env::current_exe, path::PathBuf, process::Command, str::from_utf8};
 use tokio_stream::wrappers::ReadDirStream;

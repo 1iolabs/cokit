@@ -1,7 +1,7 @@
 use crate::{Date, Did};
-use libipld::{
+use ipld_core::{
+	ipld::Ipld,
 	serde::{from_ipld, to_ipld},
-	Ipld,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 

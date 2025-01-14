@@ -1,6 +1,7 @@
 use super::Command as RoomCommand;
 use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
+use cid::Cid;
 use co_core_co::CoAction;
 use co_messaging::{
 	multimedia::{ImageInfo, ThumbnailInfo},
@@ -10,7 +11,6 @@ use co_messaging::{
 use co_primitives::CoCid;
 use co_sdk::{tags, CoReducerError, CoReducerFactory, Cores, CO_CORE_NAME_CO, CO_CORE_ROOM};
 use exitcode::ExitCode;
-use libipld::Cid;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, clap::Args)]

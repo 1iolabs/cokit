@@ -9,8 +9,8 @@ use crate::{
 use anyhow::anyhow;
 use co_actor::ActorHandle;
 use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver, PrivateIdentityResolverBox};
+use co_primitives::DefaultParams;
 use futures::{pin_mut, Stream, StreamExt};
-use libipld::DefaultParams;
 use libp2p::{
 	gossipsub, identify,
 	identity::Keypair,
@@ -21,18 +21,14 @@ use libp2p::{
 	Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 use libp2p_bitswap::{Bitswap, BitswapEvent};
-use rxrust::prelude::*;
-use std::{sync::Arc, task::Poll, time::Duration};
+use std::{task::Poll, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument;
-
-pub type EventsSubject<E> = SubjectThreads<Arc<SwarmEvent<E>>, ()>;
 
 pub struct Libp2pNetwork {
 	config: Libp2pNetworkConfig,
 	shutdown: CancellationToken,
 	tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<Behaviour, Context>>,
-	events: EventsSubject<NetworkEvent>,
 }
 impl Libp2pNetwork {
 	pub fn new<R, P>(
@@ -64,15 +60,19 @@ impl Libp2pNetwork {
 			mdns: MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?,
 			// kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()),
 			// kademlia_config),
-			bitswap: Bitswap::new(Default::default(), BitswapStoreClient::new(bitswap), {
-				let bitswap_identifier = identifier.clone();
-				Box::new(move |t| {
-					tokio::spawn(async move {
-						t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
-							.await
-					});
-				})
-			}),
+			bitswap: Bitswap::<libipld::DefaultParams>::new(
+				Default::default(),
+				BitswapStoreClient::<DefaultParams>::new(bitswap),
+				{
+					let bitswap_identifier = identifier.clone();
+					Box::new(move |t| {
+						tokio::spawn(async move {
+							t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
+								.await
+						});
+					})
+				},
+			),
 			gossipsub: gossipsub::Behaviour::new(
 				gossipsub::MessageAuthenticity::Signed(config.keypair.clone()),
 				gossipsub_config,
@@ -107,12 +107,9 @@ impl Libp2pNetwork {
 		// tasks
 		let (tasks_tx, tasks_rx) = tokio::sync::mpsc::unbounded_channel();
 
-		// events
-		let events = SubjectThreads::default();
-
 		// runtime
 		let shutdown = CancellationToken::new();
-		let mut runtime = Runtime::new(config.clone(), events.clone(), shutdown.child_token());
+		let mut runtime = Runtime::new(config.clone(), shutdown.child_token());
 
 		// listen
 		runtime.listen(swarm.listen_on(config.addr.clone().unwrap_or("/ip4/0.0.0.0/udp/0/quic-v1".parse()?))?);
@@ -127,7 +124,7 @@ impl Libp2pNetwork {
 		});
 
 		// result
-		Ok(Self { config, shutdown, tasks: tasks_tx, events })
+		Ok(Self { config, shutdown, tasks: tasks_tx })
 	}
 
 	pub fn spawner(&self) -> TokioNetworkTaskSpawner<Behaviour, Context> {
@@ -138,11 +135,6 @@ impl Libp2pNetwork {
 	/// This will stop accepting new connections and waits until established connections are done.
 	pub fn shutdown(&self) -> Shutdown {
 		Shutdown { shutdown: self.shutdown.clone() }
-	}
-
-	/// Swarm events subject.
-	pub fn events(&self) -> EventsSubject<NetworkEvent> {
-		self.events.clone()
 	}
 
 	pub fn config(&self) -> &Libp2pNetworkConfig {
@@ -225,14 +217,13 @@ pub enum NetworkMode {
 struct Runtime {
 	_config: Libp2pNetworkConfig,
 	listener_id: Option<libp2p::core::transport::ListenerId>,
-	events: EventsSubject<NetworkEvent>,
 	/// Tasks which have been executed but waiting for events.
 	pending_tasks: Vec<NetworkTaskBox<Behaviour, Context>>,
 	shutdown: CancellationToken,
 }
 impl Runtime {
-	fn new(config: Libp2pNetworkConfig, events: EventsSubject<NetworkEvent>, shutdown: CancellationToken) -> Self {
-		Self { _config: config, listener_id: None, events, shutdown, pending_tasks: Default::default() }
+	fn new(config: Libp2pNetworkConfig, shutdown: CancellationToken) -> Self {
+		Self { _config: config, listener_id: None, shutdown, pending_tasks: Default::default() }
 	}
 
 	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
@@ -388,7 +379,7 @@ pub struct Behaviour {
 	pub mdns: MdnsBehaviour,
 	pub ping: ping::Behaviour,
 	// pub kad: Kademlia<MemoryStore>,
-	pub bitswap: Bitswap<DefaultParams>,
+	pub bitswap: Bitswap<libipld::DefaultParams>,
 }
 impl discovery::DiscoveryBehaviour for Behaviour {
 	fn rendezvous_client_mut(&mut self) -> Option<&mut libp2p::rendezvous::client::Behaviour> {
@@ -463,13 +454,11 @@ impl GossipsubBehaviourProvider for Behaviour {
 	}
 }
 impl BitswapBehaviourProvider for Behaviour {
-	type StoreParams = DefaultParams;
-
-	fn bitswap(&self) -> &Bitswap<DefaultParams> {
+	fn bitswap(&self) -> &Bitswap<libipld::DefaultParams> {
 		&self.bitswap
 	}
 
-	fn bitswap_mut(&mut self) -> &mut Bitswap<DefaultParams> {
+	fn bitswap_mut(&mut self) -> &mut Bitswap<libipld::DefaultParams> {
 		&mut self.bitswap
 	}
 
@@ -632,8 +621,8 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		}
 
 		// other
-		if let Some(event) = result_event {
-			runtime.events.next(Arc::new(event));
+		if let Some(_event) = result_event {
+			// ignore
 		}
 	}
 }

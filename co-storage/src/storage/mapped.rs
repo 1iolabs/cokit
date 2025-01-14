@@ -1,7 +1,7 @@
 use crate::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
 use async_trait::async_trait;
-use co_primitives::MultiCodec;
-use libipld::{Block, Cid};
+use cid::Cid;
+use co_primitives::{Block, MultiCodec};
 use std::collections::BTreeSet;
 
 /// Mappes certain CID codecs to mapped CIDs using BlockStorageContentMapping.

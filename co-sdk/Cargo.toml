@@ -10,6 +10,7 @@ rust-version = "1.76"
 anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
+cid = { workspace = true }
 co-actor = { path = "../co-actor" }
 co-core-co = { path = "../cores/co" }
 co-core-data-series = { path = "../cores/data-series" }
@@ -30,16 +31,15 @@ directories = "5.0.1"
 futures = { workspace = true }
 hmac = "0.12.1"
 hyper = { workspace = true }
+ipld-core = { workspace = true }
 keyring = "2.3.2"
 libc = "0.2"
-libipld = { workspace = true, features = ["default", "serde-codec"] }
 libp2p = { workspace = true, features = ["rendezvous", "tokio"] }
 multibase = "0.9.1"
 names = "0.14.0"
 nix = { version = "0.29.0", features = ["fs"] }
 notify = { version = "7.0.0", features = ["macos_kqueue"] }
 pin-project = { workspace = true }
-rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }

@@ -1,9 +1,9 @@
 use anyhow::anyhow;
+use cid::Cid;
 use co_api::{
 	tags, AbsolutePath, AbsolutePathOwned, Context, DagCollection, DagMap, DagSet, Date, Did, PathExt, PathOwned,
 	Reducer, ReducerAction, Tags,
 };
-use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque};
 
@@ -652,9 +652,11 @@ pub extern "C" fn state() {
 #[cfg(test)]
 mod tests {
 	use crate::{File, FileAction, FileModification, FileNode, Node};
-	use co_api::{AbsolutePath, Cid, Context, DagCollection, PathExt, Reducer, ReducerAction};
+	use cid::Cid;
+	use co_api::{
+		AbsolutePath, Block, BlockSerializer, Context, DagCollection, DefaultParams, PathExt, Reducer, ReducerAction,
+	};
 	use co_storage::{MemoryStorage, Storage, StorageError};
-	use libipld::{cbor::DagCborCodec, multihash::Code, Block, DefaultParams};
 	use std::{cell::RefCell, rc::Rc};
 
 	#[derive(Debug, Default)]
@@ -715,7 +717,7 @@ mod tests {
 		let state = File::default();
 
 		// create
-		let block = Block::encode(DagCborCodec, Code::Blake3_256, "hello world").unwrap();
+		let block = BlockSerializer::default().serialize(&"hello world").unwrap();
 		let contents = *block.cid();
 		context.set(block).unwrap();
 		let node = Node::File(FileNode {

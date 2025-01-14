@@ -37,18 +37,19 @@ panic = "unwind"
 anyhow = { version = "1", features = ["backtrace"] }
 async-stream = "0.3.3"
 async-trait = "0.1.57"
+cid = "0.11.1"
 derive_more = "0.99.17"
 either = { version = "1" }
 futures = "0.3.30"
 futures-util = "0.3.26"
 hyper = { version = "0.14.23" }
-libipld = "0.16"
+ipld-core = { version = "0.4.1", features = ["serde"] }
+ipld-dagpb = "0.2.1"
 libp2p = { version = "0.53", features = ["full"] }
+multihash = "0.19.3"
+multihash-codetable = { version = "0.1.4", features = ["blake3"] }
 pin-project = "1.1.4"
-rust-unixfs = "0.4.0"
-rxrust = { version = "1.0.0-beta.6", git = "https://github.com/dkuhnert/rxRust.git", branch = "master", features = [
-    "tokio-scheduler",
-] }
+rust-unixfs = "0.5.0"
 schemars = "0.8.21"
 serde = "1"
 serde_bytes = "0.11.12"

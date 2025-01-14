@@ -1,10 +1,11 @@
 use crate::{BlockStat, BlockStorage, StorageError};
 use async_trait::async_trait;
+use cid::Cid;
+use co_primitives::{Block, StoreParams};
 use futures::{
 	channel::{mpsc, oneshot},
 	SinkExt,
 };
-use libipld::{store::StoreParams, Block, Cid};
 
 #[derive(Debug)]
 pub enum Request<P: StoreParams> {

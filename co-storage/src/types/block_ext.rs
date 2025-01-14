@@ -1,8 +1,8 @@
 use crate::{BlockStorage, StorageError};
 use async_trait::async_trait;
+use cid::Cid;
 use co_primitives::{BlockSerializer, Link, Linkable, MultiCodec};
 use either::Either;
-use libipld::Cid;
 
 #[async_trait]
 pub trait BlockStorageExt: BlockStorage + Send + Sync + 'static {

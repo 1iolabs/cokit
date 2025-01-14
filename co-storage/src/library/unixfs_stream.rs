@@ -1,8 +1,8 @@
 use crate::{BlockStorage, StorageError};
+use cid::Cid;
 use co_primitives::{KnownMultiCodec, MultiCodec};
 use core::ops::Range;
 use futures::Stream;
-use libipld::Cid;
 use rust_unixfs::file::visit::IdleFileVisit;
 
 /// Read unixfs file as stream.

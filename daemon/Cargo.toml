@@ -9,6 +9,7 @@ rust-version = "1.76"
 anyhow = { workspace = true }
 axum = "0.6.1"
 axum-macros = "0.3.1"
+cid = { workspace = true }
 clap = { version = "^4.3.23", features = ["derive"] }
 co-core-co = { path = "../cores/co" }
 co-core-keystore = { path = "../cores/keystore" }
@@ -17,9 +18,8 @@ co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
 directories = "5.0.1"
 futures = { workspace = true }
 hyper = { workspace = true }
-libipld = { workspace = true, features = ["default", "serde-codec"] }
+ipld-core = { workspace = true }
 libp2p = { workspace = true, features = ["rendezvous"] }
-rxrust = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

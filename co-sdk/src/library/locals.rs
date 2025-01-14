@@ -1,11 +1,11 @@
 use super::fs_read::fs_read_option;
 use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
+use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseStream, ResponseStreams};
 use co_primitives::{from_cbor, tags, to_cbor, Tags};
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use libc::flock;
-use libipld::Cid;
 use nix::fcntl::{fcntl, FcntlArg, Flock, Flockable};
 use notify::{
 	event::{CreateKind, ModifyKind},

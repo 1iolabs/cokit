@@ -1,7 +1,7 @@
 use crate::{BlockStorage, StorageError};
-use co_primitives::{KnownMultiCodec, MultiCodec};
+use cid::Cid;
+use co_primitives::{Block, KnownMultiCodec, MultiCodec, StoreParams};
 use futures::{AsyncRead, AsyncReadExt};
-use libipld::{store::StoreParams, Block, Cid};
 use rust_unixfs::file::{adder::FileAdder, visit::IdleFileVisit};
 
 /// Read unixfs file into buffer.
@@ -135,8 +135,8 @@ where
 #[cfg(test)]
 mod tests {
 	use crate::{unixfs_add, unixfs_cat_buffer, MemoryBlockStorage};
+	use cid::Cid;
 	use futures::io::Cursor;
-	use libipld::Cid;
 	use std::str::FromStr;
 
 	#[tokio::test]

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use libipld::Cid;
+use cid::Cid;
 
 pub trait StorageContentMapping {
 	/// Convert the mapped [`Cid`] to an plain storage [`Cid`].

@@ -1,7 +1,6 @@
 use crate::RuntimeContext;
-use co_api::{Block, Cid, Storage as ApiStorage};
+use co_api::{Block, Cid, DefaultParams, Storage as ApiStorage};
 use co_storage::{Storage, StorageError};
-use libipld::DefaultParams;
 use std::{cmp::min, fmt::Debug, mem::swap, time::Duration};
 
 pub struct CoV1Api {
@@ -61,7 +60,7 @@ impl Debug for CoV1Api {
 impl ApiStorage for CoV1Api {
 	/// Get block in deterministic fashion.
 	/// Todo: Implement diagnostics.
-	fn get(&self, cid: &libipld::Cid) -> co_api::Block {
+	fn get(&self, cid: &Cid) -> Block<DefaultParams> {
 		let mut tries = 0;
 		loop {
 			return match self.storage.get(cid) {
@@ -83,7 +82,7 @@ impl ApiStorage for CoV1Api {
 	/// Set block in deterministic fashion.
 	/// Todo: Implement diagnostics.
 	/// Todo: implement retries etc.
-	fn set(&mut self, block: co_api::Block) -> Cid {
+	fn set(&mut self, block: Block<DefaultParams>) -> Cid {
 		self.storage.set(block).expect("set storage")
 	}
 }
@@ -93,20 +92,9 @@ pub enum CoV1ApiError {
 	#[error("Invalid argument supplied from WASM")]
 	InvalidArgument,
 }
-impl From<libipld::cid::Error> for CoV1ApiError {
-	fn from(value: libipld::cid::Error) -> Self {
-		match value {
-			libipld::cid::Error::UnknownCodec => CoV1ApiError::InvalidArgument,
-			libipld::cid::Error::InputTooShort => CoV1ApiError::InvalidArgument,
-			libipld::cid::Error::ParsingError => CoV1ApiError::InvalidArgument,
-			libipld::cid::Error::InvalidCidVersion => CoV1ApiError::InvalidArgument,
-			libipld::cid::Error::InvalidCidV0Codec => CoV1ApiError::InvalidArgument,
-			libipld::cid::Error::InvalidCidV0Multihash => CoV1ApiError::InvalidArgument,
-			libipld::cid::Error::InvalidCidV0Base => CoV1ApiError::InvalidArgument,
-			libipld::cid::Error::VarIntDecodeError => CoV1ApiError::InvalidArgument,
-			libipld::cid::Error::Io(_) => CoV1ApiError::InvalidArgument,
-			libipld::cid::Error::InvalidExplicitCidV0 => CoV1ApiError::InvalidArgument,
-		}
+impl From<cid::Error> for CoV1ApiError {
+	fn from(_value: cid::Error) -> Self {
+		CoV1ApiError::InvalidArgument
 	}
 }
 

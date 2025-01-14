@@ -391,6 +391,8 @@ mod test {
 		types::dag_link::{DagCollection, DagVec},
 		DagMap,
 	};
+	use cid::Cid;
+	use co_primitives::{Block, DefaultParams};
 	use co_storage::{MemoryStorage, Storage};
 	use std::collections::{BTreeMap, BTreeSet};
 
@@ -398,11 +400,11 @@ mod test {
 		mem_storage: MemoryStorage,
 	}
 	impl crate::Storage for TestStorage {
-		fn get(&self, cid: &libipld::Cid) -> crate::Block {
+		fn get(&self, cid: &Cid) -> Block<DefaultParams> {
 			self.mem_storage.get(cid).expect("get")
 		}
 
-		fn set(&mut self, block: crate::Block) -> libipld::Cid {
+		fn set(&mut self, block: Block<DefaultParams>) -> Cid {
 			self.mem_storage.set(block).expect("set")
 		}
 	}

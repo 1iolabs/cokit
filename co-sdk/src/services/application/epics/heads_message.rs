@@ -4,10 +4,10 @@ use crate::{
 	Action, CoContext, CoReducerFactory,
 };
 use anyhow::anyhow;
+use cid::Cid;
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoId, Did};
 use futures::{future::ready, stream, Stream, StreamExt};
-use libipld::Cid;
 use libp2p::PeerId;
 use std::collections::BTreeSet;
 

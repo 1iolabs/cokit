@@ -4,12 +4,9 @@ use chacha20poly1305::{
 	aead::{Aead, AeadCore, KeyInit, OsRng},
 	Key, XChaCha20Poly1305,
 };
-use co_primitives::{from_cbor, to_cbor, KnownMultiCodec, MultiCodec, MultiCodecError};
-use libipld::{
-	multihash::{Code, MultihashDigest},
-	store::StoreParams,
-	Block, Cid,
-};
+use cid::Cid;
+use co_primitives::{from_cbor, to_cbor, Block, KnownMultiCodec, MultiCodec, MultiCodecError, StoreParams};
+use multihash_codetable::{Code, MultihashDigest};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{fmt::Debug, marker::PhantomData};
@@ -543,8 +540,7 @@ impl KeySlot {
 mod tests {
 	use super::{Algorithm, EncryptedBlock, Header, KeySlot};
 	use crate::crypto::secret::Secret;
-	use co_primitives::{from_cbor, to_cbor};
-	use libipld::{cbor::DagCborCodec, multihash::Code, Block, DefaultParams};
+	use co_primitives::{from_cbor, to_cbor, BlockSerializer, DefaultParams};
 	use std::iter::repeat;
 
 	#[test]
@@ -626,7 +622,7 @@ mod tests {
 	#[test]
 	fn encrypt_block_roundtrip() {
 		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
-		let block = Block::<DefaultParams>::encode(DagCborCodec, Code::Blake3_256, "Hello World!").unwrap();
+		let block = BlockSerializer::default().serialize(&"Hello World!").unwrap();
 
 		//println!("cid: ({}): {}", block.cid().to_bytes().len(), block.cid()); // 36
 		//println!("data: ({}): {:?}", block.data().len(), block.data()); // 13

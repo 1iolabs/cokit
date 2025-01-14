@@ -4,9 +4,9 @@ use crate::{
 	EntryBlock, LogError,
 };
 use anyhow::Context;
+use cid::Cid;
 use co_storage::{BlockStorage, Storage};
 use futures::{stream, Stream, StreamExt, TryStreamExt};
-use libipld::Cid;
 use std::collections::{BTreeSet, HashSet};
 
 pub fn create_stream<'a, S>(

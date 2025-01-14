@@ -1,9 +1,13 @@
-use crate::bitswap::Token;
+use crate::{
+	bitswap::Token,
+	library::libipld_interop::{from_libipld_block, from_libipld_cid, to_libipld_cid},
+};
 use anyhow::Result;
 use async_trait::async_trait;
+use cid::Cid;
 use co_actor::{ActorHandle, Response};
+use co_primitives::{Block, StoreParams};
 use co_storage::StorageError;
-use libipld::{store::StoreParams, Block, Cid};
 use libp2p::PeerId;
 use libp2p_bitswap::BitswapStore;
 
@@ -38,37 +42,49 @@ impl<P> BitswapStore for BitswapStoreClient<P>
 where
 	P: StoreParams,
 {
-	type Params = P;
+	type Params = libipld::DefaultParams;
 
 	#[tracing::instrument(ret, err, skip(self))]
-	async fn contains(&mut self, cid: &Cid, remote_peer: &PeerId, tokens: &[Token]) -> Result<bool> {
+	async fn contains(&mut self, cid: &libipld::Cid, remote_peer: &PeerId, tokens: &[Token]) -> Result<bool> {
 		Ok(self
 			.handle
-			.request(|response| BitswapMessage::Contains(*cid, *remote_peer, tokens.to_vec(), response))
+			.request(|response| {
+				BitswapMessage::Contains(from_libipld_cid(*cid), *remote_peer, tokens.to_vec(), response)
+			})
 			.await??)
 	}
 
 	#[tracing::instrument(err, skip(self))]
-	async fn get(&mut self, cid: &Cid, remote_peer: &PeerId, tokens: &[Token]) -> Result<Option<Vec<u8>>> {
+	async fn get(&mut self, cid: &libipld::Cid, remote_peer: &PeerId, tokens: &[Token]) -> Result<Option<Vec<u8>>> {
 		Ok(self
 			.handle
-			.request(|response| BitswapMessage::Get(*cid, *remote_peer, tokens.to_vec(), response))
+			.request(|response| BitswapMessage::Get(from_libipld_cid(*cid), *remote_peer, tokens.to_vec(), response))
 			.await??)
 	}
 
 	#[tracing::instrument(err, skip(self, block), fields(cid = ?block.cid()))]
-	async fn insert(&mut self, block: &Block<Self::Params>, remote_peer: &PeerId, tokens: &[Token]) -> Result<()> {
+	async fn insert(
+		&mut self,
+		block: &libipld::Block<Self::Params>,
+		remote_peer: &PeerId,
+		tokens: &[Token],
+	) -> Result<()> {
 		Ok(self
 			.handle
-			.request(|response| BitswapMessage::Insert(block.clone(), *remote_peer, tokens.to_vec(), response))
+			.request(|response| {
+				BitswapMessage::Insert(from_libipld_block(block.clone()), *remote_peer, tokens.to_vec(), response)
+			})
 			.await??)
 	}
 
 	#[tracing::instrument(err, skip(self))]
-	async fn missing_blocks(&mut self, cid: &Cid, tokens: &[Token]) -> Result<Vec<Cid>> {
+	async fn missing_blocks(&mut self, cid: &libipld::Cid, tokens: &[Token]) -> Result<Vec<libipld::Cid>> {
 		Ok(self
 			.handle
-			.request(|response| BitswapMessage::MissingBlocks(*cid, tokens.to_vec(), response))
-			.await??)
+			.request(|response| BitswapMessage::MissingBlocks(from_libipld_cid(*cid), tokens.to_vec(), response))
+			.await??
+			.into_iter()
+			.map(to_libipld_cid)
+			.collect())
 	}
 }

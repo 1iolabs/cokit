@@ -10,13 +10,14 @@ crate-type = ["lib"]
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+cid = { workspace = true }
 co-core-keystore = { path = "../cores/keystore" }
 co-primitives = { path = "../co-primitives" }
 did-key = { version = "0.2.1", git = "https://github.com/dkuhnert/did-key.rs.git" }
 didcomm-rs = { version = "0.7.2", git = "https://github.com/dkuhnert/didcomm-rs.git" }
 futures = { workspace = true }
 hex = { version = "0.4" }
-libipld = { workspace = true, features = ["default", "serde-codec"] }
+ipld-core = { workspace = true }
 multibase = "0.9.1"
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }

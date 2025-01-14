@@ -2,7 +2,7 @@ use crate::{Action, CoContext, CoReducerFactory, ReducerChangeContext};
 use co_identity::PrivateIdentityResolver;
 use co_primitives::{CoId, ReducerAction};
 use futures::{stream, Stream, StreamExt};
-use libipld::Ipld;
+use ipld_core::ipld::Ipld;
 
 /// Apply `Action::CoreActionPush` to reducer.
 pub fn core_action_push(

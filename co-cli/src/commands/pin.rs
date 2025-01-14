@@ -1,11 +1,11 @@
 use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
+use cid::Cid;
 use co_primitives::{from_cbor, CoId};
 use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
 use co_sdk::{state::memberships, Application, CoReducerFactory, CoStorage, NodeStream, CO_CORE_NAME_PIN, CO_ID_LOCAL};
 use exitcode::ExitCode;
 use futures::{pin_mut, StreamExt, TryStreamExt};
-use libipld::Cid;
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,

@@ -1,8 +1,8 @@
+use cid::Cid;
 use co_api::{BlockSerializer, ReducerAction};
 use co_sdk::{RuntimeContext, RuntimePool};
 use co_storage::{unixfs_add_file, BlockStorage, MemoryBlockStorage};
 use example_counter::{Counter, CounterAction};
-use libipld::Cid;
 use std::process::Command;
 
 #[tokio::test]

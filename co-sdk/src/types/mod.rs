@@ -5,4 +5,3 @@ pub mod cores;
 pub mod error;
 pub mod message;
 pub mod reference;
-pub mod state_observable;

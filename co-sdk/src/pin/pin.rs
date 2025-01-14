@@ -1,10 +1,10 @@
 use crate::{types::cores::CO_CORE_NAME_PIN, CoReducer};
 use anyhow::Ok;
+use cid::Cid;
 use co_core_pin::PinAction;
 use co_identity::PrivateIdentity;
 use co_primitives::Tags;
 use co_storage::BlockStorage;
-use libipld::Cid;
 use std::fmt::Debug;
 
 #[derive(Clone)]

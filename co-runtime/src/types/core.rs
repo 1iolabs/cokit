@@ -1,5 +1,5 @@
+use cid::Cid;
 use co_api::{reduce_with_context, Context, Reducer};
-use libipld::Cid;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, sync::Arc};
 

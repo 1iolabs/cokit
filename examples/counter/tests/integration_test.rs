@@ -1,8 +1,8 @@
+use cid::Cid;
 use co_api::{BlockSerializer, ReducerAction};
 use co_runtime::{co_v1::CoV1Api, create_runtime, RuntimeContext};
 use co_storage::{MemoryStorage, Storage, SyncStorage};
 use example_counter::{Counter, CounterAction};
-use libipld::Cid;
 use std::process::Command;
 
 #[test]

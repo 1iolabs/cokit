@@ -1,5 +1,5 @@
 use co_primitives::{Did, ReducerAction};
-use libipld::{serde::to_ipld, Ipld};
+use ipld_core::{ipld::Ipld, serde::to_ipld};
 use serde::Serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 

@@ -237,7 +237,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
- "synstructure",
+ "synstructure 0.12.6",
 ]
 
 [[package]]
@@ -1198,7 +1198,6 @@ dependencies = [
  "multibase",
  "multihash 0.18.1",
  "serde",
- "serde_bytes",
  "unsigned-varint 0.7.2",
 ]
 
@@ -1210,7 +1209,7 @@ checksum = "3147d8272e8fa0ccd29ce51194dd98f79ddfb8191ba9e3409884e751798acf3a"
 dependencies = [
  "core2",
  "multibase",
- "multihash 0.19.1",
+ "multihash 0.19.3",
  "serde",
  "serde_bytes",
  "unsigned-varint 0.8.0",
@@ -1345,11 +1344,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "cid 0.11.1",
  "co-primitives",
  "co-storage",
  "either",
  "futures",
- "libipld",
+ "ipld-core",
+ "multihash-codetable",
  "serde",
  "serde_json",
  "thiserror",
@@ -1363,6 +1364,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
+ "cid 0.11.1",
  "clap 4.5.16",
  "co-core-co",
  "co-core-file",
@@ -1380,7 +1382,7 @@ dependencies = [
  "exitcode",
  "futures",
  "hexdump",
- "libipld",
+ "ipld-core",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-semantic-conventions",
@@ -1407,10 +1409,11 @@ name = "co-core-co"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cid 0.11.1",
  "co-api",
  "co-runtime",
  "co-storage",
- "libipld",
+ "ipld-core",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1425,10 +1428,11 @@ name = "co-core-data-series"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cid 0.11.1",
  "co-api",
  "co-runtime",
  "co-storage",
- "libipld",
+ "ipld-core",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1441,9 +1445,10 @@ name = "co-core-file"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cid 0.11.1",
  "co-api",
  "co-storage",
- "libipld",
+ "ipld-core",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1456,10 +1461,11 @@ name = "co-core-keystore"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cid 0.11.1",
  "co-api",
  "co-runtime",
  "co-storage",
- "libipld",
+ "ipld-core",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1472,11 +1478,12 @@ name = "co-core-membership"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cid 0.11.1",
  "co-api",
  "co-macros",
  "co-runtime",
  "co-storage",
- "libipld",
+ "ipld-core",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1491,10 +1498,11 @@ name = "co-core-pin"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cid 0.11.1",
  "co-api",
  "co-runtime",
  "co-storage",
- "libipld",
+ "ipld-core",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1507,8 +1515,9 @@ name = "co-core-role"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cid 0.11.1",
  "co-api",
- "libipld",
+ "ipld-core",
  "serde",
  "serde_repr",
  "thiserror",
@@ -1521,12 +1530,13 @@ name = "co-core-room"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cid 0.11.1",
  "co-api",
  "co-messaging",
  "co-primitives",
  "co-runtime",
  "co-storage",
- "libipld",
+ "ipld-core",
  "schemars",
  "serde",
  "serde_json",
@@ -1542,12 +1552,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "cid 0.11.1",
  "co-core-co",
  "co-core-membership",
+ "co-primitives",
  "co-sdk",
  "dioxus",
  "futures",
- "libipld",
+ "ipld-core",
  "serde",
  "tokio",
  "tracing",
@@ -1560,6 +1572,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "cid 0.11.1",
  "co-core-keystore",
  "co-primitives",
  "did-key 0.2.1 (git+https://github.com/dkuhnert/did-key.rs.git)",
@@ -1567,7 +1580,7 @@ dependencies = [
  "form_urlencoded",
  "futures",
  "hex",
- "libipld",
+ "ipld-core",
  "multibase",
  "serde",
  "serde_bytes",
@@ -1586,11 +1599,12 @@ dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
+ "cid 0.11.1",
  "co-identity",
  "co-primitives",
  "co-storage",
  "futures",
- "libipld",
+ "ipld-core",
  "serde",
  "serde_bytes",
  "thiserror",
@@ -1613,9 +1627,10 @@ dependencies = [
 name = "co-messaging"
 version = "0.1.0"
 dependencies = [
+ "cid 0.11.1",
  "co-macros",
  "co-primitives",
- "libipld",
+ "ipld-core",
  "schemars",
  "serde",
  "serde-big-array",
@@ -1632,6 +1647,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "asynchronous-codec 0.7.0",
+ "cid 0.11.1",
  "co-actor",
  "co-identity",
  "co-primitives",
@@ -1641,11 +1657,11 @@ dependencies = [
  "did_url",
  "futures",
  "insta",
+ "ipld-core",
  "libipld",
  "libp2p",
  "libp2p-bitswap",
  "pin-project",
- "rxrust",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -1664,11 +1680,16 @@ dependencies = [
 name = "co-primitives"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "cid 0.11.1",
  "co-macros",
  "derive_more",
  "either",
  "insta",
- "libipld",
+ "ipld-core",
+ "ipld-dagpb",
+ "multihash 0.19.3",
+ "multihash-codetable",
  "schemars",
  "serde",
  "serde_bytes",
@@ -1686,6 +1707,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "cid 0.11.1",
  "co-api",
  "co-primitives",
  "co-storage",
@@ -1693,10 +1715,9 @@ dependencies = [
  "futures",
  "hexdump",
  "insta",
- "libipld",
+ "ipld-core",
  "names",
  "rust-unixfs",
- "rxrust",
  "serde",
  "serde_bytes",
  "serde_repr",
@@ -1716,6 +1737,7 @@ dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
+ "cid 0.11.1",
  "co-actor",
  "co-core-co",
  "co-core-data-series",
@@ -1737,9 +1759,9 @@ dependencies = [
  "futures",
  "hmac 0.12.1",
  "hyper 0.14.30",
+ "ipld-core",
  "keyring",
  "libc",
- "libipld",
  "libp2p",
  "multibase",
  "names",
@@ -1751,7 +1773,6 @@ dependencies = [
  "opentelemetry-stdout",
  "opentelemetry_sdk",
  "pin-project",
- "rxrust",
  "serde",
  "serde_ipld_dagcbor",
  "serde_json",
@@ -1780,17 +1801,22 @@ dependencies = [
  "async-trait",
  "blake3",
  "chacha20poly1305",
+ "cid 0.11.1",
  "co-primitives",
  "either",
  "futures",
  "hexdump",
  "insta",
- "libipld",
+ "ipld-core",
+ "ipld-dagpb",
+ "multihash 0.19.3",
+ "multihash-codetable",
  "names",
  "rust-unixfs",
- "rxrust",
  "serde",
  "serde_bytes",
+ "serde_ipld_dagcbor",
+ "serde_ipld_dagjson",
  "serde_repr",
  "thiserror",
  "tokio",
@@ -2245,9 +2271,9 @@ dependencies = [
 
 [[package]]
 name = "crypto-mac"
-version = "0.11.1"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1d1a86f49236c215f271d40892d5fc950490551400b02ef360692c29815c714"
+checksum = "25fab6889090c8133f3deb8f73ba3c65a7f456f66436fc012a1b1e272b1e103e"
 dependencies = [
  "generic-array 0.14.7",
  "subtle",
@@ -2357,6 +2383,7 @@ dependencies = [
  "anyhow",
  "axum",
  "axum-macros",
+ "cid 0.11.1",
  "clap 4.5.16",
  "co-core-co",
  "co-core-keystore",
@@ -2365,9 +2392,8 @@ dependencies = [
  "directories",
  "futures",
  "hyper 0.14.30",
- "libipld",
+ "ipld-core",
  "libp2p",
- "rxrust",
  "serde",
  "serde_json",
  "thiserror",
@@ -3142,12 +3168,13 @@ name = "example-counter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cid 0.11.1",
  "co-api",
  "co-primitives",
  "co-runtime",
  "co-sdk",
  "co-storage",
- "libipld",
+ "ipld-core",
  "serde",
  "thiserror",
  "tokio",
@@ -3160,12 +3187,13 @@ name = "example-message"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cid 0.11.1",
  "co-api",
  "co-primitives",
  "co-runtime",
  "co-sdk",
  "co-storage",
- "libipld",
+ "ipld-core",
  "serde",
  "thiserror",
  "tracing",
@@ -3469,18 +3497,6 @@ dependencies = [
  "futures",
  "futures-timer",
  "instant",
-]
-
-[[package]]
-name = "futures-time"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6404853a6824881fe5f7d662d147dc4e84ecd2259ba0378f272a71dab600758a"
-dependencies = [
- "async-channel 1.9.0",
- "async-io 1.13.0",
- "futures-core",
- "pin-project-lite",
 ]
 
 [[package]]
@@ -4103,7 +4119,7 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a2a2320eb7ec0ebe8da8f744d7812d9fc4cb4d09344ac01898dbcb6a20ae69b"
 dependencies = [
- "crypto-mac 0.11.1",
+ "crypto-mac 0.11.0",
  "digest 0.9.0",
 ]
 
@@ -4529,6 +4545,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipld-dagpb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5eb3c08f1508fa62ffe1a805aafa116d2eb034b3542c85596db132f279abc47"
+dependencies = [
+ "bytes",
+ "ipld-core",
+ "quick-protobuf",
+ "thiserror",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4833,7 +4861,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
- "synstructure",
+ "synstructure 0.12.6",
 ]
 
 [[package]]
@@ -4847,7 +4875,6 @@ dependencies = [
  "core2",
  "multibase",
  "multihash 0.18.1",
- "serde",
  "thiserror",
 ]
 
@@ -5020,7 +5047,7 @@ dependencies = [
  "futures-timer",
  "libp2p-identity",
  "multiaddr",
- "multihash 0.19.1",
+ "multihash 0.19.3",
  "multistream-select",
  "once_cell",
  "parking_lot",
@@ -5165,7 +5192,7 @@ dependencies = [
  "ed25519-dalek 2.1.1",
  "hkdf 0.12.4",
  "libsecp256k1",
- "multihash 0.19.1",
+ "multihash 0.19.3",
  "p256 0.13.2",
  "quick-protobuf",
  "rand 0.8.5",
@@ -5281,7 +5308,7 @@ dependencies = [
  "libp2p-core",
  "libp2p-identity",
  "multiaddr",
- "multihash 0.19.1",
+ "multihash 0.19.3",
  "once_cell",
  "quick-protobuf",
  "rand 0.8.5",
@@ -5592,7 +5619,7 @@ dependencies = [
  "libp2p-identity",
  "libp2p-noise",
  "multiaddr",
- "multihash 0.19.1",
+ "multihash 0.19.3",
  "send_wrapper 0.6.0",
  "thiserror",
  "tracing",
@@ -5987,7 +6014,7 @@ dependencies = [
  "data-encoding",
  "libp2p-identity",
  "multibase",
- "multihash 0.19.1",
+ "multihash 0.19.3",
  "percent-encoding",
  "serde",
  "static_assertions",
@@ -6017,9 +6044,7 @@ dependencies = [
  "blake3",
  "core2",
  "digest 0.10.7",
- "multihash-derive",
- "serde",
- "serde-big-array",
+ "multihash-derive 0.8.0",
  "sha2 0.10.8",
  "sha3",
  "unsigned-varint 0.7.2",
@@ -6027,13 +6052,32 @@ dependencies = [
 
 [[package]]
 name = "multihash"
-version = "0.19.1"
+version = "0.19.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "076d548d76a0e2a0d4ab471d0b1c36c577786dfc4471242035d97a12a735c492"
+checksum = "6b430e7953c29dd6a09afc29ff0bb69c6e306329ee6794700aee27b76a1aea8d"
 dependencies = [
  "core2",
  "serde",
- "unsigned-varint 0.7.2",
+ "unsigned-varint 0.8.0",
+]
+
+[[package]]
+name = "multihash-codetable"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67996849749d25f1da9f238e8ace2ece8f9d6bdf3f9750aaf2ae7de3a5cad8ea"
+dependencies = [
+ "blake2b_simd",
+ "blake2s_simd",
+ "blake3",
+ "core2",
+ "digest 0.10.7",
+ "multihash-derive 0.9.1",
+ "ripemd",
+ "sha1",
+ "sha2 0.10.8",
+ "sha3",
+ "strobe-rs",
 ]
 
 [[package]]
@@ -6047,7 +6091,31 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
- "synstructure",
+ "synstructure 0.12.6",
+]
+
+[[package]]
+name = "multihash-derive"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f1b7edab35d920890b88643a765fc9bd295cf0201f4154dda231bef9b8404eb"
+dependencies = [
+ "core2",
+ "multihash 0.19.3",
+ "multihash-derive-impl",
+]
+
+[[package]]
+name = "multihash-derive-impl"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3dc7141bd06405929948754f0628d247f5ca1865be745099205e5086da957cb"
+dependencies = [
+ "proc-macro-crate 3.2.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.75",
+ "synstructure 0.13.1",
 ]
 
 [[package]]
@@ -7175,6 +7243,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "proc-macro-crate"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ecf48c7ca261d60b74ab1a7b20da18bede46776b2e55535cb958eb595c5fa7b"
+dependencies = [
+ "toml_edit 0.22.20",
+]
+
+[[package]]
 name = "proc-macro-error"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7751,6 +7828,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ripemd"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd124222d17ad93a644ed9d011a40f4fb64aa54275c08cc216524a9ea82fb09f"
+dependencies = [
+ "digest 0.10.7",
+]
+
+[[package]]
 name = "rkyv"
 version = "0.7.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7798,13 +7884,17 @@ dependencies = [
 
 [[package]]
 name = "rust-unixfs"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "198604a043cb63265579ed131ea740bc11679fb0e5936489f429f5fec24d9e43"
+checksum = "e1197d36d097a485787a7f314d99a9e1e9f17dd4f10bc7c29bab0b8dc304cc9e"
 dependencies = [
  "either",
  "filetime",
- "libipld",
+ "ipld-core",
+ "ipld-dagpb",
+ "multihash 0.19.3",
+ "multihash-codetable",
+ "multihash-derive 0.9.1",
  "quick-protobuf",
  "sha2 0.10.8",
 ]
@@ -7903,21 +7993,6 @@ dependencies = [
  "futures",
  "pin-project",
  "static_assertions",
-]
-
-[[package]]
-name = "rxrust"
-version = "1.0.0-beta.6"
-source = "git+https://github.com/dkuhnert/rxRust.git?branch=master#b8f7829a280c4244ec40b884bedd04ef75a7bc37"
-dependencies = [
- "futures",
- "futures-time",
- "gloo-timers",
- "once_cell",
- "pin-project-lite",
- "smallvec",
- "tokio",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -8125,15 +8200,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cff085d2cb684faa248efb494c39b68e522822ac0de72ccf08109abde717cfb2"
 dependencies = [
  "serde_derive",
-]
-
-[[package]]
-name = "serde-big-array"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd31f59f6fe2b0c055371bb2f16d7f0aa7d8881676c04a55b1596d1a17cd10a4"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -8718,6 +8784,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "strobe-rs"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98fe17535ea31344936cc58d29fec9b500b0452ddc4cc24c429c8a921a0e84e5"
+dependencies = [
+ "bitflags 1.3.2",
+ "byteorder",
+ "keccak",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "strsim"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8737,9 +8816,9 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "subtle"
-version = "2.4.1"
+version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
+checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "swift-rs"
@@ -8799,6 +8878,17 @@ dependencies = [
  "quote",
  "syn 1.0.109",
  "unicode-xid",
+]
+
+[[package]]
+name = "synstructure"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8af7666ab7b6390ab78131fb5b0fce11d6b7a6951602017c35fa82800708971"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.75",
 ]
 
 [[package]]

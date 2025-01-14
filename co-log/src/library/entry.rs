@@ -1,7 +1,7 @@
 use crate::Clock;
+use cid::Cid;
 use co_identity::{Identity, PrivateIdentity, SignError};
-use co_primitives::{BlockSerializer, BlockSerializerError};
-use libipld::{store::StoreParams, Block, Cid};
+use co_primitives::{Block, BlockSerializer, BlockSerializerError, StoreParams};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, marker::PhantomData};
 
@@ -143,8 +143,7 @@ impl<P: StoreParams> Ord for EntryBlock<P> {
 mod tests {
 	use crate::{Clock, EntryBlock};
 	use co_identity::DidKeyIdentity;
-	use co_primitives::BlockSerializer;
-	use libipld::DefaultParams;
+	use co_primitives::{BlockSerializer, DefaultParams};
 	use serde::{Deserialize, Serialize};
 
 	#[test]

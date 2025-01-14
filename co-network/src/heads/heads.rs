@@ -4,9 +4,9 @@ use crate::{
 	types::layer_behaviour::LayerBehaviour,
 	DidcommBehaviourProvider, GossipsubBehaviourProvider,
 };
+use cid::Cid;
 use co_identity::PrivateIdentity;
 use co_primitives::{from_cbor, to_cbor, CoId, Did, NetworkCoHeads};
-use libipld::Cid;
 use libp2p::{
 	gossipsub::{self, IdentTopic, PublishError, TopicHash},
 	swarm::{NetworkBehaviour, SwarmEvent},
@@ -406,13 +406,13 @@ mod tests {
 		heads::{self, HeadsState},
 		DidcommBehaviourProvider, GossipsubBehaviourProvider, Layer, LayerBehaviour,
 	};
+	use cid::Cid;
 	use co_identity::{
 		DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentity,
 		PrivateIdentityBox, PrivateIdentityResolver,
 	};
 	use co_primitives::{BlockSerializer, CoId, NetworkCoHeads};
 	use futures::{FutureExt, StreamExt};
-	use libipld::Cid;
 	use libp2p::{
 		gossipsub,
 		identity::Keypair,

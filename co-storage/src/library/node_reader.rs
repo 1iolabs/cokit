@@ -1,6 +1,6 @@
 use crate::{Storage, StorageError};
+use cid::Cid;
 use co_primitives::{BlockSerializer, MultiCodec, Node};
-use libipld::Cid;
 use serde::de::DeserializeOwned;
 use std::collections::VecDeque;
 

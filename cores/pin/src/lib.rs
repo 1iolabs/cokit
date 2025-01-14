@@ -1,5 +1,5 @@
+use cid::Cid;
 use co_api::{DagCollection, DagMap, DagSet, Reducer, Tags};
-use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 

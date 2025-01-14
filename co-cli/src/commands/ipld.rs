@@ -1,8 +1,9 @@
 use crate::library::cli_context::CliContext;
+use cid::{Cid, Version};
 use co_primitives::{from_cbor, KnownMultiCodec};
 use co_sdk::MultiCodec;
 use exitcode::ExitCode;
-use libipld::{cid::Version, Cid, Ipld};
+use ipld_core::ipld::Ipld;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, clap::Args)]

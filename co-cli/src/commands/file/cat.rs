@@ -8,12 +8,12 @@ use crate::{
 	},
 };
 use anyhow::anyhow;
+use cid::Cid;
 use co_core_file::Node;
 use co_primitives::{AbsolutePath, AbsolutePathOwned, PathExt};
 use co_sdk::{CoReducerError, CoReducerFactory, CoStorage};
 use exitcode::ExitCode;
 use futures::{future::BoxFuture, FutureExt};
-use libipld::Cid;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {

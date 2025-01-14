@@ -2,7 +2,7 @@ use crate::types::http_error::{HttpError, HttpResult};
 use axum::{extract::Path, Extension, Json};
 use co_sdk::{Application, BlockStorageExt, CoId};
 use hyper::StatusCode;
-use libipld::Ipld;
+use ipld_core::ipld::Ipld;
 use serde_json::{json, to_value, Value};
 
 /// CO Core State.

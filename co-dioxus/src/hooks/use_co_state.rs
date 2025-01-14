@@ -1,8 +1,8 @@
 use crate::{use_co_error, CoContext, CoError, CoErrorSignal};
 use anyhow::anyhow;
+use cid::Cid;
 use co_sdk::{Application, CoId};
 use dioxus::prelude::*;
-use libipld::Cid;
 use std::collections::BTreeSet;
 
 /// Use state/heads from an CO.

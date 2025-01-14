@@ -1,6 +1,6 @@
+use cid::Cid;
 use co_identity::DidCommHeader;
 use co_primitives::CoId;
-use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::BTreeSet;

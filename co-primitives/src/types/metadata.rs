@@ -57,8 +57,8 @@ impl<T: CoMetadata + Serialize> From<T> for WithCoMetadata<T> {
 mod tests {
 	use super::WithCoMetadata;
 	use crate::{CoMetadata, Metadata};
+	use cid::Cid;
 	use co_macros::TaggedFields;
-	use libipld::Cid;
 	use serde::{Deserialize, Serialize};
 
 	#[test]

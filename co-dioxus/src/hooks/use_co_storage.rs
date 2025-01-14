@@ -1,10 +1,11 @@
 use crate::CoContext;
 use anyhow::anyhow;
 use async_trait::async_trait;
+use cid::Cid;
+use co_primitives::Block;
 use co_sdk::{Application, BlockStat, BlockStorage, CoId, CoStorage, StorageError};
 use dioxus::hooks::use_context;
 use futures::Future;
-use libipld::{Block, Cid};
 use tokio::sync::{mpsc, oneshot};
 
 pub fn use_co_storage(co: &str) -> CoStorage {

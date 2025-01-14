@@ -1,5 +1,6 @@
 use super::{create::Command, Command as RoomCommand};
 use crate::{cli::Cli, library::cli_context::CliContext};
+use cid::Cid;
 use co_messaging::{
 	multimedia::{ImageInfo, ThumbnailInfo},
 	state_event::{RoomAvatarContent, RoomNameContent, RoomTopicContent},

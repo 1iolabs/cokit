@@ -3,6 +3,7 @@ mod macros;
 mod types;
 
 pub use library::{
+	block_links::BlockLinks,
 	block_serializer::{BlockSerializer, BlockSerializerError},
 	cbor::{from_cbor, to_cbor, CborError},
 	json::{from_json, from_json_string, to_json, to_json_string, JsonError},
@@ -11,6 +12,7 @@ pub use library::{
 pub use types::{
 	action::ReducerAction,
 	cid::CoCid,
+	block::{Block, BlockError, DefaultParams, StoreParams},
 	co::CoId,
 	codec::{KnownMultiCodec, MultiCodec, MultiCodecError},
 	date::Date,
