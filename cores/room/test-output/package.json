@@ -1,8 +1,0 @@
-{
-  "scripts": {
-    "json2ts": "json2ts -i schema.json -o types.d.ts --additionalProperties false"
-  },
-  "dependencies": {
-    "json-schema-to-typescript": "^15.0.2"
-  }
-}
