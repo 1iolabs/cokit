@@ -42,7 +42,16 @@
   },
   "definitions": {
     "Cid": {
-      "$ref": "cid.json"
+      "title": "Cid",
+      "type": "object",
+      "required": [
+        "/"
+      ],
+      "properties": {
+        "/": {
+          "type": "string"
+        }
+      }
     },
     "TagValue": {
       "description": "Tag Value",

@@ -468,7 +468,16 @@
       ]
     },
     "Cid": {
-      "$ref": "cid.json"
+      "title": "Cid",
+      "type": "object",
+      "required": [
+        "/"
+      ],
+      "properties": {
+        "/": {
+          "type": "string"
+        }
+      }
     },
     "EphemeralType": {
       "description": "Ephemeral events are once-off events that do not need to be saved.",
