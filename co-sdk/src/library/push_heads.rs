@@ -10,13 +10,13 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
+use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, OnceEpic, Reducer, TracingEpic};
 use co_identity::{Identity, PrivateIdentityBox};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{tags, CoId, Tags};
 use co_storage::BlockStorageContentMapping;
 use futures::{Stream, StreamExt};
-use cid::Cid;
 use libp2p::PeerId;
 use std::{collections::BTreeSet, future::ready, time::Duration};
 

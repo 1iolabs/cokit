@@ -4,8 +4,8 @@ use super::{
 	verify_entry::verify_entry,
 };
 use crate::{EntryBlock, Log, LogError};
-use co_storage::BlockStorage;
 use cid::Cid;
+use co_storage::BlockStorage;
 use std::{collections::BTreeSet, marker::PhantomData};
 
 pub struct JoinEntry<S> {

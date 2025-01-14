@@ -1,8 +1,8 @@
 use crate::{CoreResolver, CoreResolverError, ReducerChangeContext};
 use async_trait::async_trait;
+use cid::Cid;
 use co_runtime::{Core, RuntimeContext, RuntimePool};
 use co_storage::BlockStorage;
-use cid::Cid;
 
 #[derive(Debug, Clone)]
 pub struct SingleCoreResolver {

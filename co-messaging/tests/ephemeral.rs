@@ -1,5 +1,5 @@
-use co_messaging::{ephemeral_event, EventType, MatrixEvent};
 use cid::Cid;
+use co_messaging::{ephemeral_event, EventType, MatrixEvent};
 
 #[test]
 fn test_typing() {

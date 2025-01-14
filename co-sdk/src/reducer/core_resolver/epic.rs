@@ -1,10 +1,10 @@
 use crate::{services::application::ApplicationMessage, Action, CoreResolver, CoreResolverError, ReducerChangeContext};
 use async_trait::async_trait;
+use cid::Cid;
 use co_actor::ActorHandle;
 use co_primitives::CoId;
 use co_runtime::RuntimePool;
 use co_storage::BlockStorage;
-use cid::Cid;
 use std::marker::PhantomData;
 
 /// Epic resolver middleware.

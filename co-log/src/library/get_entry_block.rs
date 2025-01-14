@@ -1,7 +1,7 @@
 use crate::{EntryBlock, LogError};
+use cid::Cid;
 use co_storage::BlockStorage;
 use futures::{stream, StreamExt, TryStreamExt};
-use cid::Cid;
 
 pub async fn get_entry_block<S>(storage: &S, cid: &Cid) -> Result<EntryBlock<S::StoreParams>, LogError>
 where

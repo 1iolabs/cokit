@@ -3,9 +3,9 @@ use super::{
 	poll_event::PollMessageType,
 };
 use crate::{matrix_event::relation::RelatesTo, multimedia::VideoInfo, relation::Relation, EventContent};
+use cid::Cid;
 use co_macros::common_event_content;
 use co_primitives::Did;
-use cid::Cid;
 use serde::{Deserialize, Serialize};
 
 /**

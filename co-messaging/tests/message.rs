@@ -1,3 +1,4 @@
+use cid::Cid;
 use co_messaging::{
 	message_event::{self, Formattable, LocationContent, Mentions, TextContent},
 	multimedia::{AudioInfo, FileInfo, ImageInfo, LocationInfo, ThumbnailInfo, VideoInfo},
@@ -5,7 +6,6 @@ use co_messaging::{
 	relation::{ReactionContent, RedactionContent, RelatesTo, Relation},
 	MatrixEvent, FORMATTED_BODY_FORMAT,
 };
-use cid::Cid;
 
 #[test]
 fn test_text_content() {

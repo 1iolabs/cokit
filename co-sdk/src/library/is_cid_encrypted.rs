@@ -1,5 +1,5 @@
-use co_primitives::{KnownMultiCodec, MultiCodec};
 use cid::Cid;
+use co_primitives::{KnownMultiCodec, MultiCodec};
 
 /// Return `true` if and of `cids` is encrypted.
 pub fn is_cid_encrypted<'a>(cids: impl IntoIterator<Item = &'a Cid>) -> bool {
