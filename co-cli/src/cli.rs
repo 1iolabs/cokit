@@ -1,5 +1,5 @@
 use crate::{
-	commands::{co, core_build_builtin, did, file, ipld, network, pin, room, storage},
+	commands::{co, core_build_builtin, did, file, ipld, network, pin, room, schemars, storage},
 	library::cli_context::CliContext,
 };
 use clap::ArgAction;
@@ -91,6 +91,9 @@ pub enum CliCommand {
 
 	/// Pin
 	Pin(pin::Command),
+
+	/// Json schemas
+	Schemars(schemars::Command),
 }
 
 #[instrument(err, ret, skip(cli), level = "debug")]
@@ -112,6 +115,7 @@ pub async fn command(cli: &Cli) -> Result<ExitCode, anyhow::Error> {
 		CliCommand::File(command) => file::command(&context, cli, command).await,
 		CliCommand::Room(command) => room::command(&context, cli, command).await,
 		CliCommand::Pin(command) => pin::command(&context, cli, command).await,
+		CliCommand::Schemars(command) => schemars::command(&context, cli, command).await,
 	};
 
 	// shutdown and wait for tasks to complete

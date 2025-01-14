@@ -6,4 +6,5 @@ pub mod ipld;
 pub mod network;
 pub mod pin;
 pub mod room;
+pub mod schemars;
 pub mod storage;

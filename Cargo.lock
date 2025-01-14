@@ -1388,8 +1388,10 @@ dependencies = [
  "opentelemetry-semantic-conventions",
  "opentelemetry-stdout",
  "opentelemetry_sdk",
+ "schemars",
  "serde",
  "serde_ipld_dagcbor",
+ "serde_json",
  "termion",
  "thiserror",
  "tokio",
@@ -1633,7 +1635,6 @@ dependencies = [
  "ipld-core",
  "schemars",
  "serde",
- "serde-big-array",
  "serde_ipld_dagcbor",
  "serde_ipld_dagjson",
  "serde_json",
@@ -8200,15 +8201,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cff085d2cb684faa248efb494c39b68e522822ac0de72ccf08109abde717cfb2"
 dependencies = [
  "serde_derive",
-]
-
-[[package]]
-name = "serde-big-array"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd31f59f6fe2b0c055371bb2f16d7f0aa7d8881676c04a55b1596d1a17cd10a4"
-dependencies = [
- "serde",
 ]
 
 [[package]]
