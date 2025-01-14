@@ -1,5 +1,8 @@
 use cid::Cid;
-use schemars::{schema::SchemaObject, JsonSchema};
+use schemars::{
+	schema::{InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SingleOrVec},
+	JsonSchema, Map, Set,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
@@ -16,10 +19,32 @@ impl JsonSchema for CoCid {
 	}
 
 	fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-		let cid_ref = SchemaObject::new_ref("cid.json".to_owned());
-		schemars::schema::Schema::Object(cid_ref)
+		// cid only has one property which is a slash-key string
+		let mut properties = Map::new();
+		properties.insert(
+			"/".to_owned(),
+			Schema::Object(SchemaObject {
+				instance_type: Some(SingleOrVec::Single(Box::new(InstanceType::String))),
+				..Default::default()
+			}),
+		);
+		// set property as required
+		let mut required = Set::new();
+		required.insert("/".to_owned());
+		// create schema
+		let cid_schema = SchemaObject {
+			// metadata containing title
+			metadata: Some(Box::new(Metadata { title: Some("Cid".to_owned()), ..Default::default() })),
+			// sets type to 'object'
+			instance_type: Some(SingleOrVec::Single(Box::new(InstanceType::Object))),
+			// inserts the 'properties' and 'required' props
+			object: Some(Box::new(ObjectValidation { properties, required, ..Default::default() })),
+			..Default::default()
+		};
+		Schema::Object(cid_schema)
 	}
 }
+
 impl From<Cid> for CoCid {
 	fn from(value: Cid) -> Self {
 		CoCid(value)

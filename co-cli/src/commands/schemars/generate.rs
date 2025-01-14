@@ -1,4 +1,3 @@
-use super::external::cid::generate_cid_schema;
 use co_core_room::Room;
 use co_messaging::MatrixEvent;
 use exitcode::ExitCode;
@@ -7,7 +6,6 @@ use std::{fs::File, io::Write};
 
 #[derive(Debug, Clone, clap::ValueEnum)]
 pub enum Module {
-	Cid,
 	Messaging,
 	Room,
 }
@@ -18,17 +16,13 @@ pub struct Command {
 	#[arg(short, long, value_delimiter = ' ', num_args = 1..)]
 	pub modules: Vec<Module>,
 	/// Optional alternate output path
-	#[arg(short, long, default_value = "./json-schemas")]
+	#[arg(short, long, default_value = "./json-schemas/schemas")]
 	pub output: String,
 }
 
 pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 	for module in command.clone().modules {
 		match module {
-			Module::Cid => {
-				let mut file = File::create(command.output.clone())?;
-				file.write_all(generate_cid_schema().as_bytes())?;
-			},
 			Module::Messaging => {
 				let schema = schemars::schema_for!(MatrixEvent);
 				write_schema_file(schema, command.output.clone() + "/matrix-event.json")?;

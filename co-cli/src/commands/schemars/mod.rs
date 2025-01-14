@@ -1,7 +1,6 @@
 use crate::{cli::Cli, library::cli_context::CliContext};
 use exitcode::ExitCode;
 
-mod external;
 mod generate;
 
 #[derive(Debug, Clone, clap::Args)]
