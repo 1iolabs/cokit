@@ -5,6 +5,6 @@ pub use library::{
 	clock::Clock,
 	entry::{Entry, EntryBlock, EntryError, SignedEntry},
 	log::Log,
-	stream::LogIterator,
+	stream::{create_stream, LogIterator},
 };
 pub use types::error::LogError;

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My first messenger</title>
+  <script type="application/javascript" src="./ui/kui-application.js"></script>
+  <script type="application/javascript">
+    function createPluginTags(params) {
+      const tags = window.pluginTags !== undefined
+        ? window.pluginTags.concat()
+        : [];
+      for (const [key, value] of params.entries()) {
+        if (/^pluginTags\./.test(key)) {
+          tags.push({ key: key.substr("pluginTags.".length), value });
+        }
+      }
+      return tags;
+    }
+
+    function create(parentElement) {
+      const params = new URLSearchParams(window.location.search);
+      window.application = document.createElement("kui-application");
+      window.application.plugin = "coapp-chats-list";
+      window.application.tags = createPluginTags(params);
+      window.application.options = {
+        debug: params.has("debug"),
+        enableReduxLogger: params.has("debug"),
+        reduxLoggerVerbose: 2,
+      };
+      parentElement.appendChild(window.application);
+    }
+  </script>
+  <style type="text/css">
+    body {
+      margin: 0;
+    }
+
+    html,
+    body,
+    #main {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="main"></div>
+  <script type="application/javascript">
+    create(document.getElementById("main"));
+  </script>
+</body>
+
+</html>

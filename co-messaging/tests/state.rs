@@ -1,4 +1,5 @@
-use co_messaging::{state_event, MatrixEvent};
+use cid::Cid;
+use co_messaging::{multimedia::ImageInfo, state_event, MatrixEvent};
 
 #[test]
 fn room_name() {
@@ -7,4 +8,6 @@ fn room_name() {
 	let json = serde_json::to_string_pretty(&event).unwrap();
 	println!("{json}");
 	assert_eq!(event, serde_json::from_str(&json).unwrap());
+
+	state_event::RoomAvatarContent::new(Some(Cid::default()), ImageInfo::default());
 }

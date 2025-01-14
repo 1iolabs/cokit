@@ -12,6 +12,7 @@ pub use library::{
 pub use types::{
 	action::ReducerAction,
 	block::{Block, BlockError, DefaultParams, StoreParams},
+	cid::CoCid,
 	co::CoId,
 	codec::{KnownMultiCodec, MultiCodec, MultiCodecError},
 	date::Date,

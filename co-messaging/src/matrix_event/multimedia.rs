@@ -1,70 +1,97 @@
-use cid::Cid;
+use co_primitives::CoCid;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /**
  * Contains metadata of images
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, JsonSchema)]
 pub struct ImageInfo {
-	pub h: i64,                        // intended display height in px
-	pub w: i64,                        // intended display width in px
-	pub mimetype: String,              // mimetype of the file
-	pub size: i64,                     // Size of the image file in bytes
-	pub thumbnail_file: Cid,           // CID to an image file that is to be used as the thumbnail
-	pub thumbnail_info: ThumbnailInfo, // thumbnail metadata
+	/// intended display height in px
+	pub h: u32,
+	/// intended display width in px
+	pub w: u32,
+	/// mimetype of the file
+	pub mimetype: String,
+	/// Size of the image file in bytes
+	pub size: u32,
+	/// CID to an image file that is to be used as the thumbnail
+	pub thumbnail_file: CoCid,
+	/// thumbnail metadata
+	pub thumbnail_info: ThumbnailInfo,
 }
 
 /**
  * Contains metadata of images used as a thumbnail
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, schemars::JsonSchema)]
 pub struct ThumbnailInfo {
-	pub h: i64,           // intended display height in px
-	pub w: i64,           // intended display width in px
-	pub mimetype: String, // mimetype of the file
-	pub size: i64,        // Size of the image file in bytes
+	/// intended display height in px
+	pub h: u32,
+	/// intended display width in px
+	pub w: u32,
+	/// mimetype of the file
+	pub mimetype: String,
+	/// Size of the image file in bytes
+	pub size: u32,
 }
 
 /**
  * Contains metadata of audio files
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct AudioInfo {
-	pub duration: i64,    // duration of the audio clip in ms
-	pub mimetype: String, // mimetype of the audio file
-	pub size: i64,        // size of the audio file in bytes
+	/// duration of the audio clip in ms
+	pub duration: u32,
+	/// mimetype of the audio file
+	pub mimetype: String,
+	/// size of the audio file in bytes
+	pub size: u32,
 }
 
 /**
  * Contains metadata of video files
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct VideoInfo {
-	pub h: i64,                        // intended display height in px
-	pub w: i64,                        // intended display width in px
-	pub duration: i64,                 // duration of the video clip in ms
-	pub mimetype: String,              // mimetype of the file
-	pub size: i64,                     // Size of the image file in bytes
-	pub thumbnail_file: Cid,           // CID to an image file that is to be used as the thumbnail
-	pub thumbnail_info: ThumbnailInfo, // thumbnail metadata
+	/// intended display height in px
+	pub h: u32,
+	/// intended display width in px
+	pub w: u32,
+	/// duration of the video clip in ms
+	pub duration: u32,
+	/// mimetype of the file
+	pub mimetype: String,
+	/// Size of the image file in bytes
+	pub size: u32,
+	/// CID to an image file that is to be used as the thumbnail
+	pub thumbnail_file: CoCid,
+	/// thumbnail metadata
+	pub thumbnail_info: ThumbnailInfo,
 }
 
 /**
  * Contains metadata of any other filetypes
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct FileInfo {
-	pub mimetype: String,              // mimetype of the file
-	pub size: i64,                     // Size of the file in bytes
-	pub thumbnail_file: Cid,           // CID to an image file that is to be used as the thumbnail
-	pub thumbnail_info: ThumbnailInfo, // thumbnail metadata
+	/// mimetype of the file
+	pub mimetype: String,
+	/// Size of the file in bytes
+	pub size: u32,
+	/// CID to an image file that is to be used as the thumbnail
+	pub thumbnail_file: CoCid,
+	/// thumbnail metadata
+	pub thumbnail_info: ThumbnailInfo,
 }
 
 /**
  * Contains metadata of any location based content
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct LocationInfo {
-	pub thumbnail_file: Cid,           // CID to an image file that is to be used as the thumbnail
-	pub thumbnail_info: ThumbnailInfo, // thumbnail metadata
+	/// CID to an image file that is to be used as the thumbnail
+	pub thumbnail_file: CoCid,
+	/// thumbnail metadata
+	pub thumbnail_info: ThumbnailInfo,
 }

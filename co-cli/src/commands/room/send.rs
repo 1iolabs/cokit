@@ -17,13 +17,13 @@ pub async fn command(
 	command: &Command,
 ) -> Result<ExitCode, anyhow::Error> {
 	let application = context.application(cli).await;
-	let identity = application.local_identity();
+	let cli_identity = application.private_identity(&"did:local:cli".to_owned()).await?;
 	let co = &room_command.co;
 	let core = &room_command.core;
 	let co_reducer = application.context().try_co_reducer(co).await?;
 	let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
 	let message_event =
 		MatrixEvent::new(uuid::Uuid::new_v4(), timestamp, core, TextContent::new(command.message.clone()));
-	co_reducer.push(&identity, core, &message_event).await?;
+	co_reducer.push(&cli_identity, core, &message_event).await?;
 	Ok(exitcode::OK)
 }

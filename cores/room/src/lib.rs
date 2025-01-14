@@ -1,12 +1,13 @@
-use cid::Cid;
 use co_api::{Context, Reducer, ReducerAction, Tags};
 use co_messaging::{state_event::StateType, EventContent, MatrixEvent};
+use co_primitives::CoCid;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /**
  * eco Messenger room COre
  */
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct Room {
 	/// Name of the room
 	pub name: String,
@@ -15,7 +16,7 @@ pub struct Room {
 	pub description: String,
 
 	/// Content ID for the room avatar
-	pub avatar: Option<Cid>,
+	pub avatar: Option<CoCid>,
 
 	/// All currently pinned messages in relevant order
 	pub pinned_messages: Vec<String>,
@@ -47,4 +48,19 @@ impl Reducer for Room {
 #[no_mangle]
 pub extern "C" fn state() {
 	co_api::reduce::<Room>()
+}
+
+#[cfg(test)]
+mod test {
+	use crate::Room;
+	use std::{fs::File, io::Write};
+
+	#[test]
+	fn create_schema() {
+		let schema = schemars::schema_for!(Room);
+		let mut file = File::create("test-output/schema.json").expect("new file");
+		file.write_all(serde_json::to_string_pretty(&schema).expect("json").as_bytes())
+			.expect("file written");
+		println!("{}", serde_json::to_string_pretty(&schema).unwrap());
+	}
 }

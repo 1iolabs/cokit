@@ -3,30 +3,30 @@ use super::{
 	poll_event::PollMessageType,
 };
 use crate::{matrix_event::relation::RelatesTo, multimedia::VideoInfo, relation::Relation, EventContent};
-use cid::Cid;
-use co_macros::common_event_content;
-use co_primitives::Did;
+use co_primitives::{CoCid, Did};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /**
  * Events that sent actual messages that can be seen by all participants in a room.
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+// #[typeshare]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(tag = "msgtype")]
 pub enum MessageType {
-	#[serde(rename = "m.text")]
+	#[serde(rename = "text")]
 	Text(TextContent),
-	#[serde(rename = "m.notice")]
+	#[serde(rename = "notice")]
 	Notice(NoticeContent),
-	#[serde(rename = "m.image")]
+	#[serde(rename = "image")]
 	Image(ImageContent),
-	#[serde(rename = "m.audio")]
+	#[serde(rename = "audio")]
 	Audio(AudioContent),
-	#[serde(rename = "m.video")]
+	#[serde(rename = "video")]
 	Video(VideoContent),
-	#[serde(rename = "m.file")]
+	#[serde(rename = "file")]
 	File(FileContent),
-	#[serde(rename = "m.location")]
+	#[serde(rename = "location")]
 	Location(LocationContent),
 	#[serde(untagged)]
 	Poll(PollMessageType),
@@ -96,7 +96,7 @@ pub trait Formattable {
 /**
  * Used to describe which users got mentioned in the body of a message
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct Mentions {
 	pub user_ids: Vec<Did>,
 }
@@ -105,16 +105,25 @@ pub struct Mentions {
  * Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
  * also given.
  */
-#[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct TextContent {
+	/// A formatted version of the body
 	#[serde(skip_serializing_if = "Option::is_none")]
-	formatted_body: Option<String>, // A formatted version of the body
+	formatted_body: Option<String>,
+	/// The format used in formatted body
 	#[serde(skip_serializing_if = "Option::is_none")]
-	format: Option<String>, // The format used in formatted body
-	pub body: String, // The body of the message
-	#[serde(skip_serializing_if = "Option::is_none", rename = "m.mentions")]
-	pub mentions: Option<Mentions>, // Users that are mentioned in the body
+	format: Option<String>,
+	/// The body of the message
+	pub body: String,
+	/// Users that are mentioned in the body
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub mentions: Option<Mentions>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl TextContent {
@@ -171,16 +180,25 @@ impl Relation for TextContent {
  * formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
  * also given
  */
-#[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct NoticeContent {
+	/// A formatted version of the body
 	#[serde(skip_serializing_if = "Option::is_none")]
-	formatted_body: Option<String>, // A formatted version of the body
+	formatted_body: Option<String>,
+	/// The format used in formatted body
 	#[serde(skip_serializing_if = "Option::is_none")]
-	format: Option<String>, // The format used in formatted body
-	pub body: String, // The body of the message
-	#[serde(skip_serializing_if = "Option::is_none", rename = "m.mentions")]
-	pub mentions: Option<Mentions>, // Users that are mentioned in the body
+	format: Option<String>,
+	/// The body of the message
+	pub body: String,
+	/// Users that are mentioned in the body
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub mentions: Option<Mentions>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl NoticeContent {
@@ -233,17 +251,25 @@ impl Relation for NoticeContent {
 	}
 }
 
-#[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct ImageContent {
-	pub body: String,    // a text representing the image in some way
-	pub file: Cid,       // CID to the image file
-	pub info: ImageInfo, // image metadata
+	/// a text representing the image in some way
+	pub body: String,
+	/// CID to the image file
+	pub file: CoCid,
+	/// image metadata
+	pub info: ImageInfo,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl ImageContent {
-	pub fn new(body: impl Into<String>, file: Cid, info: ImageInfo) -> Self {
-		Self { body: body.into(), file, info, is_silent: None, relates_to: None, new_content: None }
+	pub fn new(body: impl Into<String>, file: impl Into<CoCid>, info: ImageInfo) -> Self {
+		Self { body: body.into(), file: file.into(), info, is_silent: None, relates_to: None, new_content: None }
 	}
 }
 
@@ -268,17 +294,25 @@ impl Relation for ImageContent {
 	}
 }
 
-#[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct AudioContent {
-	pub body: String,    // a text representing the audio in same way
-	pub file: Cid,       // CID to the audio file
-	pub info: AudioInfo, // audio metadata
+	/// a text representing the audio in same way
+	pub body: String,
+	/// CID to the audio file
+	pub file: CoCid,
+	/// audio metadata
+	pub info: AudioInfo,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl AudioContent {
-	pub fn new(body: impl Into<String>, file: Cid, info: AudioInfo) -> Self {
-		Self { body: body.into(), file, info, is_silent: None, relates_to: None, new_content: None }
+	pub fn new(body: impl Into<String>, file: impl Into<CoCid>, info: AudioInfo) -> Self {
+		Self { body: body.into(), file: file.into(), info, is_silent: None, relates_to: None, new_content: None }
 	}
 }
 
@@ -303,17 +337,25 @@ impl Relation for AudioContent {
 	}
 }
 
-#[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct VideoContent {
-	pub body: String,    // textual representation of the video
-	pub file: Cid,       // CID to the video
-	pub info: VideoInfo, // video metadata
+	/// textual representation of the video
+	pub body: String,
+	/// CID to the video
+	pub file: CoCid,
+	/// video metadata
+	pub info: VideoInfo,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl VideoContent {
-	pub fn new(body: impl Into<String>, file: Cid, info: VideoInfo) -> Self {
-		Self { body: body.into(), file, info, is_silent: None, relates_to: None, new_content: None }
+	pub fn new(body: impl Into<String>, file: impl Into<CoCid>, info: VideoInfo) -> Self {
+		Self { body: body.into(), file: file.into(), info, is_silent: None, relates_to: None, new_content: None }
 	}
 }
 
@@ -338,20 +380,29 @@ impl Relation for VideoContent {
 	}
 }
 
-#[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct FileContent {
-	pub body: String,     // a text representing the file in some way
-	pub file: Cid,        // CID to the file
-	pub filename: String, // the name of the file
-	pub info: FileInfo,   // file metadata
+	/// a text representing the file in some way
+	pub body: String,
+	/// CID to the file
+	pub file: CoCid,
+	/// the name of the file
+	pub filename: String,
+	/// file metadata
+	pub info: FileInfo,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl FileContent {
-	pub fn new(body: impl Into<String>, file: Cid, filename: impl Into<String>, info: FileInfo) -> Self {
+	pub fn new(body: impl Into<String>, file: impl Into<CoCid>, filename: impl Into<String>, info: FileInfo) -> Self {
 		Self {
 			body: body.into(),
-			file,
+			file: file.into(),
 			filename: filename.into(),
 			info,
 			is_silent: None,
@@ -382,12 +433,20 @@ impl Relation for FileContent {
 	}
 }
 
-#[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct LocationContent {
-	pub body: String,       // textual representation of the location
-	pub geo_uri: String,    // a geo uri by definition of https://datatracker.ietf.org/doc/html/rfc5870
-	pub info: LocationInfo, // location metadata
+	/// textual representation of the location
+	pub body: String,
+	/// a geo uri by definition of https://datatracker.ietf.org/doc/html/rfc5870
+	pub geo_uri: String,
+	/// location metadata
+	pub info: LocationInfo,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl LocationContent {

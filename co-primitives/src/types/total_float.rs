@@ -1,9 +1,10 @@
 use derive_more::{From, Into};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
 /// f64 float wich uses total order from IEEE 754 (2008 revision).
-#[derive(Debug, Clone, Copy, From, Into, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, From, Into, Serialize, Deserialize, JsonSchema)]
 #[serde(transparent)]
 pub struct TotalFloat64(pub f64);
 impl PartialEq for TotalFloat64 {

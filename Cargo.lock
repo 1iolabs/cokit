@@ -1533,10 +1533,13 @@ dependencies = [
  "cid 0.11.1",
  "co-api",
  "co-messaging",
+ "co-primitives",
  "co-runtime",
  "co-storage",
  "ipld-core",
+ "schemars",
  "serde",
+ "serde_json",
  "serde_repr",
  "thiserror",
  "tracing",
@@ -1628,8 +1631,11 @@ dependencies = [
  "co-macros",
  "co-primitives",
  "ipld-core",
+ "schemars",
  "serde",
+ "serde-big-array",
  "serde_ipld_dagcbor",
+ "serde_ipld_dagjson",
  "serde_json",
 ]
 
@@ -1684,6 +1690,7 @@ dependencies = [
  "ipld-dagpb",
  "multihash 0.19.3",
  "multihash-codetable",
+ "schemars",
  "serde",
  "serde_bytes",
  "serde_ipld_dagcbor",
@@ -1818,32 +1825,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
-]
-
-[[package]]
-name = "co-tauri"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cid 0.11.1",
- "co-core-co",
- "co-core-membership",
- "co-core-room",
- "co-messaging",
- "co-primitives",
- "co-sdk",
- "futures",
- "ipld-core",
- "serde",
- "serde_ipld_dagcbor",
- "serde_json",
- "tauri",
- "tauri-plugin-shell",
- "tauri-utils",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tracing",
 ]
 
 [[package]]
@@ -8222,6 +8203,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-big-array"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd31f59f6fe2b0c055371bb2f16d7f0aa7d8881676c04a55b1596d1a17cd10a4"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde-untagged"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9074,11 +9064,11 @@ dependencies = [
 name = "tauri-app"
 version = "0.1.0"
 dependencies = [
- "co-tauri",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
+ "tauri-plugin-co-sdk",
  "tauri-plugin-shell",
  "tauri-utils",
  "tokio",
@@ -9162,6 +9152,36 @@ dependencies = [
  "tauri-utils",
  "toml 0.8.19",
  "walkdir",
+]
+
+[[package]]
+name = "tauri-plugin-co-sdk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cid 0.11.1",
+ "co-actor",
+ "co-core-co",
+ "co-core-membership",
+ "co-core-room",
+ "co-log",
+ "co-messaging",
+ "co-primitives",
+ "co-sdk",
+ "futures",
+ "ipld-core",
+ "serde",
+ "serde_ipld_dagcbor",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tauri-plugin-shell",
+ "tauri-utils",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
 ]
 
 [[package]]

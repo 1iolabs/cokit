@@ -1,0 +1,27 @@
+import { Message } from "@1io/coapp-messenger-view";
+import { MatrixEvent } from "../../../types/matrix-event.js";
+
+/**
+ * Takes data in ipld format and converts it into a message
+ * 
+ * @param ipld Data that has been fetched from a CO using the resolveCid function
+ * @returns The converted message message
+ */
+export function resolveMatrixAction(
+    ipld: any
+): Message | undefined {
+    // handle matrix event
+    const matrixEvent = ipld.p as MatrixEvent;
+    switch (matrixEvent.type) {
+        case "m_room_message": {
+            // handle new message
+            return {
+                key: matrixEvent.event_id,
+                message: matrixEvent.content.body,
+                ownMessage: ipld.f === "did:local:device", // TODO
+                timestamp: new Date(matrixEvent.timestamp),
+            };
+        };
+    }
+    return undefined;
+}

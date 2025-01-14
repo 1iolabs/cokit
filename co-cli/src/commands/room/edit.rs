@@ -1,11 +1,11 @@
 use super::{create::Command, Command as RoomCommand};
 use crate::{cli::Cli, library::cli_context::CliContext};
-use cid::Cid;
 use co_messaging::{
 	multimedia::{ImageInfo, ThumbnailInfo},
 	state_event::{RoomAvatarContent, RoomNameContent, RoomTopicContent},
 	MatrixEvent,
 };
+use co_primitives::CoCid;
 use co_sdk::CoReducerFactory;
 use exitcode::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -50,7 +50,7 @@ pub async fn command(
 					w: 0,
 					mimetype: "".into(),
 					size: 0,
-					thumbnail_file: Cid::default(),
+					thumbnail_file: CoCid::default(),
 					thumbnail_info: ThumbnailInfo { h: 0, w: 0, mimetype: "".into(), size: 0 },
 				},
 			),

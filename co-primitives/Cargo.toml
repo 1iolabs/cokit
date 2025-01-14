@@ -14,6 +14,7 @@ ipld-core = { workspace = true }
 ipld-dagpb = { workspace = true }
 multihash = { workspace = true }
 multihash-codetable = { workspace = true }
+schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }

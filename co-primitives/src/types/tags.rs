@@ -1,7 +1,8 @@
-use crate::TotalFloat64;
+use crate::{CoCid, TotalFloat64};
 use cid::Cid;
 use derive_more::From;
 use ipld_core::ipld::Ipld;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, Serializer};
 use std::{
 	borrow::Borrow,
@@ -45,7 +46,7 @@ macro_rules! tag {
 }
 
 /// Tag Value
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize, JsonSchema)]
 #[serde(into = "Ipld", from = "Ipld")]
 pub enum TagValue {
 	/// Represents the absence of a value or the value undefined.
@@ -73,7 +74,7 @@ pub enum TagValue {
 	/// Represents an IPLD Link structure, implemented with Cid's (Content Identifiers)
 	/// For more information see: https://ipld.io/docs/data-model/kinds/#link-kind
 	#[from]
-	Link(Cid),
+	Link(CoCid),
 }
 impl TagValue {
 	/// Test if the default value is assigned.
@@ -110,7 +111,7 @@ impl From<TagValue> for Ipld {
 			TagValue::Bytes(i) => Ipld::Bytes(i),
 			TagValue::List(i) => Ipld::List(i.into_iter().map(|e| e.into()).collect()),
 			TagValue::Map(i) => Ipld::Map(i.into_iter().map(|(k, v)| (k, v.into())).collect()),
-			TagValue::Link(i) => Ipld::Link(i),
+			TagValue::Link(i) => Ipld::Link(i.into()),
 		}
 	}
 }
@@ -125,8 +126,13 @@ impl From<Ipld> for TagValue {
 			Ipld::Bytes(i) => TagValue::Bytes(i),
 			Ipld::List(i) => TagValue::List(i.into_iter().map(|e| e.into()).collect()),
 			Ipld::Map(i) => TagValue::Map(i.into_iter().map(|(k, v)| (k, v.into())).collect()),
-			Ipld::Link(i) => TagValue::Link(i),
+			Ipld::Link(i) => TagValue::Link(i.into()),
 		}
+	}
+}
+impl From<Cid> for TagValue {
+	fn from(value: Cid) -> Self {
+		Self::Link(value.into())
 	}
 }
 impl std::fmt::Display for TagValue {
@@ -179,7 +185,7 @@ impl TagsMatches for Tag {
 }
 
 /// Tags.
-#[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
+#[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize, JsonSchema)]
 pub struct Tags(BTreeSet<Tag>);
 impl Tags {
 	pub fn new() -> Self {
@@ -289,7 +295,7 @@ impl Tags {
 	/// Find first tag value, that is a link, by key.
 	pub fn link(&self, key: &str) -> Option<&Cid> {
 		self.0.iter().find_map(|tag| match tag {
-			(k, TagValue::Link(link)) if k == key => Some(link),
+			(k, TagValue::Link(link)) if k == key => Some(link.as_ref()),
 			_ => None,
 		})
 	}

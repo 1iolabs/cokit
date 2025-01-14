@@ -1,5 +1,6 @@
 pub mod action;
 pub mod block;
+pub mod cid;
 pub mod co;
 pub mod codec;
 pub mod date;

@@ -6,6 +6,7 @@ use co_messaging::{
 	relation::{ReactionContent, RedactionContent, RelatesTo, Relation},
 	MatrixEvent, FORMATTED_BODY_FORMAT,
 };
+use co_primitives::CoCid;
 
 #[test]
 fn test_text_content() {
@@ -18,8 +19,8 @@ fn test_text_content() {
 	// todo test formatting
 	let buf = serde_ipld_dagcbor::to_vec(&event).expect("vector");
 	let restored_event = serde_ipld_dagcbor::from_slice::<MatrixEvent>(&buf).expect("decoded event");
-	// let json = serde_json::to_string_pretty(&event).unwrap();
-	// println!("JSON: {}", json);
+	let json = serde_json::to_string_pretty(&event).unwrap();
+	println!("JSON: {}", json);
 	// let serded_event: MatrixEvent = serde_json::from_str(&json).unwrap();
 	assert_eq!(event, restored_event);
 }
@@ -45,7 +46,7 @@ fn test_image_content() {
 		w: 20,
 		mimetype: "image/jpeg".to_string(),
 		size: 5000,
-		thumbnail_file: Cid::default(),
+		thumbnail_file: Cid::default().into(),
 		thumbnail_info: ThumbnailInfo { h: 10, w: 10, mimetype: "image/jpeg".to_string(), size: 500 },
 	};
 	let event_content = message_event::ImageContent::new("Some image", Cid::default(), info);
@@ -76,7 +77,7 @@ fn test_video_content() {
 	let info = VideoInfo {
 		h: 1080,
 		w: 1690,
-		thumbnail_file: Cid::default(),
+		thumbnail_file: CoCid::default(),
 		thumbnail_info: ThumbnailInfo { h: 10, w: 10, mimetype: "image/jpeg".to_string(), size: 500 },
 		duration: 50,
 		mimetype: "video/mp4".to_string(),
@@ -95,7 +96,7 @@ fn test_video_content() {
 #[test]
 fn test_file_content() {
 	let info = FileInfo {
-		thumbnail_file: Cid::default(),
+		thumbnail_file: CoCid::default(),
 		thumbnail_info: ThumbnailInfo { h: 10, w: 10, mimetype: "image/jpeg".to_string(), size: 500 },
 		mimetype: "application/msword".to_string(),
 		size: 5000,
@@ -113,7 +114,7 @@ fn test_file_content() {
 #[test]
 fn test_location_content() {
 	let info = LocationInfo {
-		thumbnail_file: Cid::default(),
+		thumbnail_file: CoCid::default(),
 		thumbnail_info: ThumbnailInfo { h: 20, w: 20, mimetype: "image/jpeg".to_string(), size: 500 },
 	};
 	let event_content = LocationContent::new("Eiffeltower", "wherever the eiffeltower is", info);

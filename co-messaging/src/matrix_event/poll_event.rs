@@ -1,18 +1,18 @@
 use crate::{matrix_event::relation::RelatesTo, message_event::MessageType, relation::Relation, EventContent};
-use co_macros::common_event_content;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /**
  * All events that interact with or create a poll
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 #[serde(tag = "msgtype")]
 pub enum PollMessageType {
-	#[serde(rename = "m.poll.start")]
+	#[serde(rename = "poll_start")]
 	Start(PollStartContent),
-	#[serde(rename = "m.poll.response")]
+	#[serde(rename = "poll_response")]
 	Response(PollResponseContent),
-	#[serde(rename = "m.poll.end")]
+	#[serde(rename = "poll_end")]
 	End(PollEndContent),
 }
 
@@ -42,11 +42,16 @@ impl Relation for PollMessageType {
 /**
  * Event used to create a poll.
  */
-#[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PollStartContent {
 	pub body: String,           // A textual representation of the poll, i.e. the question
 	pub info: PollCreationInfo, // Information about the created poll
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl PollStartContent {
@@ -92,7 +97,7 @@ impl Relation for PollStartContent {
 /**
  * metadata for poll creation event
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PollCreationInfo {
 	pub question: String,         // the question the poll was created for
 	pub answers: Vec<PollAnswer>, // vector with possible answers
@@ -117,7 +122,7 @@ impl PollCreationInfo {
 /**
  * One possible answer in a poll. ID should be unique across answers.
  */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PollAnswer {
 	pub id: String,     // Unique ID to identify an answer
 	pub answer: String, // Text of the answer
@@ -129,7 +134,7 @@ impl PollAnswer {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub enum PollKind {
 	#[serde(rename = "disclosed")]
 	Disclosed, // In disclosed polls all participants can see the already cast votes (including who cast them)
@@ -139,11 +144,16 @@ pub enum PollKind {
 	Anonymous, // As undisclosed but voters will stay hidden even after poll has ended
 }
 
-#[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PollResponseContent {
 	pub body: String,         // Textual representation of the answers
 	pub answers: Vec<String>, // List of IDs of the answers the user has responded with
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl PollResponseContent {
@@ -183,10 +193,15 @@ impl From<PollResponseContent> for EventContent {
 /**
  * Event that closes the poll. For undisclosed and anonymous polls, this is the point where the reults are shown.
  */
-#[common_event_content]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PollEndContent {
 	pub body: String, // Textual representation of the poll ending
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub is_silent: Option<bool>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub relates_to: Option<RelatesTo>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub new_content: Option<Box<EventContent>>,
 }
 
 impl PollEndContent {
