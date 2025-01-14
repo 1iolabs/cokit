@@ -8203,6 +8203,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-big-array"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd31f59f6fe2b0c055371bb2f16d7f0aa7d8881676c04a55b1596d1a17cd10a4"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde-untagged"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9151,6 +9160,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "cid 0.11.1",
  "co-actor",
  "co-core-co",
  "co-core-membership",
@@ -9160,8 +9170,9 @@ dependencies = [
  "co-primitives",
  "co-sdk",
  "futures",
- "libipld",
+ "ipld-core",
  "serde",
+ "serde_ipld_dagcbor",
  "serde_json",
  "tauri",
  "tauri-plugin",

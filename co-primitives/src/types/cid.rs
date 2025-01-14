@@ -1,4 +1,4 @@
-use libipld::Cid;
+use cid::Cid;
 use schemars::{schema::SchemaObject, JsonSchema};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;

@@ -1,8 +1,9 @@
 use crate::library::{application_actor::ApplicationActorMessage, tauri_error::CoTauriError};
 use anyhow::anyhow;
+use cid::Cid;
 use co_actor::ActorHandle;
 use co_sdk::{CoId, Did};
-use libipld::{cbor::DagCborCodec, codec::Codec, Cid, Ipld};
+use ipld_core::ipld::Ipld;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
@@ -83,7 +84,7 @@ pub async fn push_action(
 	body: Vec<u8>,
 ) -> Result<Option<Cid>, CoTauriError> {
 	// manually deserialize body into PushCommandBody type
-	let body: PushCommandBody = DagCborCodec::default().decode::<Ipld>(&body)?.try_into()?;
+	let body: PushCommandBody = serde_ipld_dagcbor::from_slice(&body)?;
 	tracing::info!(
 		"tauri command push: \n\tCo: {:#?}\n\tcore: {:#?}\n\taction: {:#?}",
 		body.co,

@@ -1,10 +1,12 @@
 use async_trait::async_trait;
+use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseStream};
+use co_primitives::{Block, DefaultParams};
 use co_sdk::{
 	Action, Application, ApplicationMessage, BlockStorage, BlockStorageExt, CoId, CoReducerFactory, Did, Tags,
 };
 use futures::{pin_mut, StreamExt};
-use libipld::{Block, Cid, DefaultParams, Ipld};
+use ipld_core::ipld::Ipld;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, future::ready};
 

@@ -1,5 +1,5 @@
+use cid::Cid;
 use co_messaging::{multimedia::ImageInfo, state_event, MatrixEvent};
-use libipld::Cid;
 
 #[test]
 fn room_name() {

@@ -1,4 +1,3 @@
-use cid::Cid;
 use co_api::{Context, Reducer, ReducerAction, Tags};
 use co_messaging::{state_event::StateType, EventContent, MatrixEvent};
 use co_primitives::CoCid;
