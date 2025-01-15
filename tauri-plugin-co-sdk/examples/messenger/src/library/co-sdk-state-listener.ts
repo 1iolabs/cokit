@@ -14,9 +14,9 @@ export function createCoSdkStateEventListener(): Observable<CoSdkStateEvent> {
             // start listening to state changes from co sdk
             return await listen<CoSdkStateEvent>("co-sdk-new-state", handler);
         },
-        (_handler, unlisten) => {
+        async (_handler, unlisten) => {
             //stop listening
-            unlisten();
+            (await unlisten)();
         },
     );
     return retObservable;
