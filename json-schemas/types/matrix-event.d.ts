@@ -14,242 +14,242 @@ export type MatrixEvent = {
   state_key?: string | null;
   timestamp: number;
 } & (
-    | {
+  | {
       content: MessageType;
       type: "m_room_message";
     }
-    | {
+  | {
       content: ReactionContent;
       type: "m_reaction";
     }
-    | {
+  | {
       content: RedactionContent;
       type: "m_room_redaction";
     }
-    | {
+  | {
       content: ReceiptType;
       type: "m_receipt";
     }
-    | {
+  | {
       content: StateType;
       type: "State";
     }
-    | {
+  | {
       content: CallType;
       type: "Call";
     }
-    | {
+  | {
       content: EphemeralType;
       type: "Ephemeral";
     }
-    | {
+  | {
       content: UserType;
       type: "User";
     }
-  );
+);
 /**
  * Events that sent actual messages that can be seen by all participants in a room.
  */
 export type MessageType =
   | {
-    /**
-     * The body of the message
-     */
-    body: string;
-    /**
-     * The format used in formatted body
-     */
-    format?: string | null;
-    /**
-     * A formatted version of the body
-     */
-    formatted_body?: string | null;
-    is_silent?: boolean | null;
-    /**
-     * Users that are mentioned in the body
-     */
-    mentions?: Mentions | null;
-    msgtype: "text";
-    new_content?: EventContent | null;
-    relates_to?: RelatesTo | null;
-  }
+      /**
+       * The body of the message
+       */
+      body: string;
+      /**
+       * The format used in formatted body
+       */
+      format?: string | null;
+      /**
+       * A formatted version of the body
+       */
+      formatted_body?: string | null;
+      is_silent?: boolean | null;
+      /**
+       * Users that are mentioned in the body
+       */
+      mentions?: Mentions | null;
+      msgtype: "text";
+      new_content?: EventContent | null;
+      relates_to?: RelatesTo | null;
+    }
   | {
-    /**
-     * The body of the message
-     */
-    body: string;
-    /**
-     * The format used in formatted body
-     */
-    format?: string | null;
-    /**
-     * A formatted version of the body
-     */
-    formatted_body?: string | null;
-    is_silent?: boolean | null;
-    /**
-     * Users that are mentioned in the body
-     */
-    mentions?: Mentions | null;
-    msgtype: "notice";
-    new_content?: EventContent | null;
-    relates_to?: RelatesTo | null;
-  }
+      /**
+       * The body of the message
+       */
+      body: string;
+      /**
+       * The format used in formatted body
+       */
+      format?: string | null;
+      /**
+       * A formatted version of the body
+       */
+      formatted_body?: string | null;
+      is_silent?: boolean | null;
+      /**
+       * Users that are mentioned in the body
+       */
+      mentions?: Mentions | null;
+      msgtype: "notice";
+      new_content?: EventContent | null;
+      relates_to?: RelatesTo | null;
+    }
   | {
-    /**
-     * a text representing the image in some way
-     */
-    body: string;
-    /**
-     * CID to the image file
-     */
-    file: Cid;
-    /**
-     * image metadata
-     */
-    info: ImageInfo;
-    is_silent?: boolean | null;
-    msgtype: "image";
-    new_content?: EventContent | null;
-    relates_to?: RelatesTo | null;
-  }
+      /**
+       * a text representing the image in some way
+       */
+      body: string;
+      /**
+       * CID to the image file
+       */
+      file: Cid;
+      /**
+       * image metadata
+       */
+      info: ImageInfo;
+      is_silent?: boolean | null;
+      msgtype: "image";
+      new_content?: EventContent | null;
+      relates_to?: RelatesTo | null;
+    }
   | {
-    /**
-     * a text representing the audio in same way
-     */
-    body: string;
-    /**
-     * CID to the audio file
-     */
-    file: Cid;
-    /**
-     * audio metadata
-     */
-    info: AudioInfo;
-    is_silent?: boolean | null;
-    msgtype: "audio";
-    new_content?: EventContent | null;
-    relates_to?: RelatesTo | null;
-  }
+      /**
+       * a text representing the audio in same way
+       */
+      body: string;
+      /**
+       * CID to the audio file
+       */
+      file: Cid;
+      /**
+       * audio metadata
+       */
+      info: AudioInfo;
+      is_silent?: boolean | null;
+      msgtype: "audio";
+      new_content?: EventContent | null;
+      relates_to?: RelatesTo | null;
+    }
   | {
-    /**
-     * textual representation of the video
-     */
-    body: string;
-    /**
-     * CID to the video
-     */
-    file: Cid;
-    /**
-     * video metadata
-     */
-    info: VideoInfo;
-    is_silent?: boolean | null;
-    msgtype: "video";
-    new_content?: EventContent | null;
-    relates_to?: RelatesTo | null;
-  }
+      /**
+       * textual representation of the video
+       */
+      body: string;
+      /**
+       * CID to the video
+       */
+      file: Cid;
+      /**
+       * video metadata
+       */
+      info: VideoInfo;
+      is_silent?: boolean | null;
+      msgtype: "video";
+      new_content?: EventContent | null;
+      relates_to?: RelatesTo | null;
+    }
   | {
-    /**
-     * a text representing the file in some way
-     */
-    body: string;
-    /**
-     * CID to the file
-     */
-    file: Cid;
-    /**
-     * the name of the file
-     */
-    filename: string;
-    /**
-     * file metadata
-     */
-    info: FileInfo;
-    is_silent?: boolean | null;
-    msgtype: "file";
-    new_content?: EventContent | null;
-    relates_to?: RelatesTo | null;
-  }
+      /**
+       * a text representing the file in some way
+       */
+      body: string;
+      /**
+       * CID to the file
+       */
+      file: Cid;
+      /**
+       * the name of the file
+       */
+      filename: string;
+      /**
+       * file metadata
+       */
+      info: FileInfo;
+      is_silent?: boolean | null;
+      msgtype: "file";
+      new_content?: EventContent | null;
+      relates_to?: RelatesTo | null;
+    }
   | {
-    /**
-     * textual representation of the location
-     */
-    body: string;
-    /**
-     * a geo uri by definition of https://datatracker.ietf.org/doc/html/rfc5870
-     */
-    geo_uri: string;
-    /**
-     * location metadata
-     */
-    info: LocationInfo;
-    is_silent?: boolean | null;
-    msgtype: "location";
-    new_content?: EventContent | null;
-    relates_to?: RelatesTo | null;
-  }
+      /**
+       * textual representation of the location
+       */
+      body: string;
+      /**
+       * a geo uri by definition of https://datatracker.ietf.org/doc/html/rfc5870
+       */
+      geo_uri: string;
+      /**
+       * location metadata
+       */
+      info: LocationInfo;
+      is_silent?: boolean | null;
+      msgtype: "location";
+      new_content?: EventContent | null;
+      relates_to?: RelatesTo | null;
+    }
   | (
-    | {
-      body: string;
-      info: PollCreationInfo;
-      is_silent?: boolean | null;
-      msgtype: "poll_start";
-      new_content?: EventContent | null;
-      relates_to?: RelatesTo | null;
-    }
-    | {
-      answers: string[];
-      body: string;
-      is_silent?: boolean | null;
-      msgtype: "poll_response";
-      new_content?: EventContent | null;
-      relates_to?: RelatesTo | null;
-    }
-    | {
-      body: string;
-      is_silent?: boolean | null;
-      msgtype: "poll_end";
-      new_content?: EventContent | null;
-      relates_to?: RelatesTo | null;
-    }
-  );
+      | {
+          body: string;
+          info: PollCreationInfo;
+          is_silent?: boolean | null;
+          msgtype: "poll_start";
+          new_content?: EventContent | null;
+          relates_to?: RelatesTo | null;
+        }
+      | {
+          answers: string[];
+          body: string;
+          is_silent?: boolean | null;
+          msgtype: "poll_response";
+          new_content?: EventContent | null;
+          relates_to?: RelatesTo | null;
+        }
+      | {
+          body: string;
+          is_silent?: boolean | null;
+          msgtype: "poll_end";
+          new_content?: EventContent | null;
+          relates_to?: RelatesTo | null;
+        }
+    );
 /**
  * Simple enum to fit the different possible contents. Unique event type string can be generated from this using pattern matching.
  */
 export type EventContent =
   | {
-    content: MessageType;
-    type: "m_room_message";
-  }
+      content: MessageType;
+      type: "m_room_message";
+    }
   | {
-    content: ReactionContent;
-    type: "m_reaction";
-  }
+      content: ReactionContent;
+      type: "m_reaction";
+    }
   | {
-    content: RedactionContent;
-    type: "m_room_redaction";
-  }
+      content: RedactionContent;
+      type: "m_room_redaction";
+    }
   | {
-    content: ReceiptType;
-    type: "m_receipt";
-  }
+      content: ReceiptType;
+      type: "m_receipt";
+    }
   | {
-    content: StateType;
-    type: "State";
-  }
+      content: StateType;
+      type: "State";
+    }
   | {
-    content: CallType;
-    type: "Call";
-  }
+      content: CallType;
+      type: "Call";
+    }
   | {
-    content: EphemeralType;
-    type: "Ephemeral";
-  }
+      content: EphemeralType;
+      type: "Ephemeral";
+    }
   | {
-    content: UserType;
-    type: "User";
-  };
+      content: UserType;
+      type: "User";
+    };
 /**
  * Simple enum containing all different types of relation that events can have to other events
  */
@@ -259,63 +259,63 @@ export type RelationType = "annotation" | "replace" | "forward" | "thread" | "po
  */
 export type ReceiptType =
   | {
-    Public: PublicReceiptContent;
-  }
+      Public: PublicReceiptContent;
+    }
   | {
-    Private: PrivateReceiptContent;
-  };
+      Private: PrivateReceiptContent;
+    };
 /**
  * All events that in some way alter the state of a room
  */
 export type StateType =
   | {
-    content: RoomNameContent;
-    type: "room_name";
-  }
+      content: RoomNameContent;
+      type: "room_name";
+    }
   | {
-    content: RoomTopicContent;
-    type: "room_topic";
-  }
+      content: RoomTopicContent;
+      type: "room_topic";
+    }
   | {
-    content: RoomAvatarContent;
-    type: "room_avatar";
-  }
+      content: RoomAvatarContent;
+      type: "room_avatar";
+    }
   | {
-    content: PinnedEventsContent;
-    type: "room_pinned_events";
-  };
+      content: PinnedEventsContent;
+      type: "room_pinned_events";
+    };
 /**
  * All call events share the call_id, party_id and version fields call_id: A unique ID that that are used to determine which call events correspond to each other party_id: A unique ID to identify a call participant. May but not must be used for multiple calls. Must be unique across all participants. version: The version of the VoIP specs used for the message. This version is "1". A string is used for experimental versions.
  */
 export type CallType =
   | {
-    content: CallInviteContent;
-    type: "call_invite";
-  }
+      content: CallInviteContent;
+      type: "call_invite";
+    }
   | {
-    content: AnswerCallContent;
-    type: "call_answer";
-  }
+      content: AnswerCallContent;
+      type: "call_answer";
+    }
   | {
-    content: CallCandidatesContent;
-    type: "call_candidates";
-  }
+      content: CallCandidatesContent;
+      type: "call_candidates";
+    }
   | {
-    content: SelectCallAnswerContent;
-    type: "call_select_answer";
-  }
+      content: SelectCallAnswerContent;
+      type: "call_select_answer";
+    }
   | {
-    content: CallNegotiationContent;
-    type: "call_negotiate";
-  }
+      content: CallNegotiationContent;
+      type: "call_negotiate";
+    }
   | {
-    content: RejectCallContent;
-    type: "call_reject";
-  }
+      content: RejectCallContent;
+      type: "call_reject";
+    }
   | {
-    content: HangupCallContent;
-    type: "call_hangup";
-  };
+      content: HangupCallContent;
+      type: "call_hangup";
+    };
 /**
  * Enum containg possible reasons for a hangup event
  */
@@ -332,13 +332,13 @@ export type HangupCallReason =
  */
 export type EphemeralType =
   | {
-    content: TypingContent;
-    type: "typing";
-  }
+      content: TypingContent;
+      type: "typing";
+    }
   | {
-    content: PresenceContent;
-    type: "presence";
-  };
+      content: PresenceContent;
+      type: "presence";
+    };
 /**
  * Basic enum for possible presence states of a specific user
  *
@@ -351,17 +351,17 @@ export type EphemeralType =
 export type PresenceType = "online" | "offline" | "dnd";
 export type UserType =
   | {
-    content: PostUserStoryContent;
-    type: "user_story_post";
-  }
+      content: PostUserStoryContent;
+      type: "user_story_post";
+    }
   | {
-    content: ViewUserStoryContent;
-    type: "user_story_view";
-  }
+      content: ViewUserStoryContent;
+      type: "user_story_view";
+    }
   | {
-    content: UpdateProfileContent;
-    type: "user_profile_update";
-  };
+      content: UpdateProfileContent;
+      type: "user_profile_update";
+    };
 export type PollKind = "disclosed" | "undisclosed" | "anonymous";
 
 /**
