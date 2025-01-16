@@ -1,4 +1,5 @@
-const COMMANDS: &[&str] = &["get_co_state", "push_action", "resolve_cid", "storage_get", "storage_set", "get_actions"];
+const COMMANDS: &[&str] =
+	&["get_co_state", "push_action", "resolve_cid", "storage_get", "storage_set", "get_actions", "create_identity"];
 
 fn main() {
 	tauri_plugin::Builder::new(COMMANDS)

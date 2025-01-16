@@ -8,4 +8,5 @@ permissions = [
     "allow-storage-set",
     "allow-push-action",
     "allow-get-actions",
+    "allow-create-identity",
 ]

@@ -8,6 +8,7 @@ Allows usage of co-sdk api
 - `allow-storage-set`
 - `allow-push-action`
 - `allow-get-actions`
+- `allow-create-identity`
 
 ### Permission Table 
 
@@ -17,6 +18,32 @@ Allows usage of co-sdk api
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`co-sdk:allow-create-identity`
+
+</td>
+<td>
+
+Enables the create_identity command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:deny-create-identity`
+
+</td>
+<td>
+
+Denies the create_identity command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
