@@ -72,7 +72,7 @@ fn join_with_result(context: CoContext, id: CoId, did: Did) -> impl Stream<Item 
 				Action::Error { err: _ } => {
 					Some(Action::Joined { co: id.clone(), participant: did.clone(), success: false, peer: None })
 				},
-				Action::JoinSent { co: _, heads, participant: _, peer } if !is_cid_encrypted(heads.iter()) => {
+				Action::JoinSent { co: _, encrypted, participant: _, peer } if !*encrypted => {
 					Some(Action::Joined { co: id.clone(), participant: did.clone(), success: true, peer: Some(*peer) })
 				},
 				_ => None,
@@ -134,7 +134,7 @@ async fn join(
 						result.push(Action::JoinSent {
 							co: membership.id.clone(),
 							participant: membership.did.clone(),
-							heads: membership.heads.clone(),
+							encrypted: membership.state.iter().any(|state| is_cid_encrypted(&state.heads)),
 							peer,
 						});
 						break;

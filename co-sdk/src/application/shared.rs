@@ -18,7 +18,7 @@ use cid::Cid;
 use co_actor::ActorHandle;
 use co_core_co::{CoAction, Participant};
 use co_core_keystore::{Key, KeyStoreAction};
-use co_core_membership::{Membership, MembershipsAction};
+use co_core_membership::{CoState, Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,
+	mem::swap,
 	sync::Arc,
 	time::Duration,
 };
@@ -153,27 +154,53 @@ impl SharedCoBuilder {
 			id: self.membership.id.clone(),
 		};
 
-		// get (unencrypted) state/heads
-		let state = context.to_internal_cid(self.membership.state).await?;
-		let heads: BTreeSet<Cid> = stream::iter(self.membership.heads.iter())
-			.then(|cid| async { context.to_internal_cid(*cid).await })
-			.try_collect()
-			.await?;
+		// // states
+		// let states = stream::iter(self.membership.state.clone())
+		// 	.then(|co_state| {
+		// 		let context = &context;
+		// 		async move {
+		// 			// get (unencrypted) state/heads
+		// 			let state = context.to_internal_cid(co_state.state).await?;
+		// 			let heads: BTreeSet<Cid> = stream::iter(co_state.heads.iter())
+		// 				.then(|cid| async { context.to_internal_cid(*cid).await })
+		// 				.try_collect()
+		// 				.await?;
+		// 			Result::<(Cid, BTreeSet<Cid>), anyhow::Error>::Ok((state, heads))
+		// 		}
+		// 	})
+		// 	.try_collect::<BTreeSet<_>>()
+		// 	.await?;
+		// let latest_state = if states.len() == 1 { states.first().cloned() } else { None };
 
 		// log
 		let log = Log::new(
 			self.membership.id.as_str().as_bytes().to_vec(),
 			create_identity_resolver(),
 			storage.clone(),
-			heads.clone(),
+			// latest_state.map(|(_, heads)| heads).unwrap_or_default(),
+			Default::default(),
 		);
 
 		// reducer
-		let mut reducer = ReducerBuilder::new(core_resolver, log)
-			.with_initialize(self.initialize)
-			.with_latest_state(state, heads.clone())
-			.build(runtime.runtime())
-			.await?;
+		let mut reducer_builder = ReducerBuilder::new(core_resolver, log).with_initialize(self.initialize);
+		for co_state in self.membership.state.iter() {
+			// get (unencrypted) state/heads
+			let state = context.to_internal_cid(co_state.state).await?;
+			let heads: BTreeSet<Cid> = stream::iter(co_state.heads.iter())
+				.then(|cid| async { context.to_internal_cid(*cid).await })
+				.try_collect()
+				.await?;
+
+			// add to builder
+			//  when we only have one state we assume its the latest
+			reducer_builder = reducer_builder.with_snapshot(state, heads);
+			// if self.membership.state.len() == 1 {
+			// 	reducer_builder = reducer_builder.with_latest_state(state, heads);
+			// } else {
+			// 	reducer_builder = reducer_builder.with_snapshot(state, heads);
+			// }
+		}
+		let mut reducer = reducer_builder.build(runtime.runtime()).await?;
 
 		// push changes to all connectable peers
 		if let Some((network, connections)) = &self.network {
@@ -204,6 +231,7 @@ impl SharedCoBuilder {
 			membership_core_name: self.membership_core_name,
 			identity: identity.clone(),
 			encrypted_storage: encrypted_storage.clone(),
+			last_heads: self.membership.state.iter().flat_map(|item| item.heads.clone()).collect(),
 		};
 		reducer.add_change_handler(Box::new(writer));
 
@@ -243,19 +271,26 @@ impl SharedContext {
 	async fn update_membership(&self, parent: CoReducer, co: CoReducer) -> Result<(), anyhow::Error> {
 		if let Some(membership) = find_membership(&parent, co.id()).await? {
 			let co_heads = co.heads().await;
-			if co_heads != membership.heads {
+			if co_heads
+				!= membership
+					.state
+					.iter()
+					.flat_map(|item| item.heads.clone())
+					.collect::<BTreeSet<_>>()
+			{
 				tracing::info!(co = ?co.id(), from = ?co_heads, to = ?membership, "membership-update");
+				for state in membership.state.iter() {
+					// encryption mapping
+					if let (Some(storage), Some(cid)) = (&self.encrypted_storage, &state.encryption_mapping) {
+						storage.load_mapping(&cid).await?;
+					}
 
-				// encryption mapping
-				if let (Some(storage), Some(cid)) = (&self.encrypted_storage, &membership.encryption_mapping) {
-					storage.load_mapping(&cid).await?;
+					// snapshot
+					co.insert_snapshot(state.state, state.heads.clone()).await?;
+
+					// load snapshot
+					co.join(&state.heads).await?;
 				}
-
-				// snapshot
-				co.insert_snapshot(membership.state, membership.heads.clone()).await?;
-
-				// load snapshot
-				co.join(&membership.heads).await?;
 			}
 		}
 		Ok(())
@@ -406,9 +441,7 @@ impl SharedCoCreator {
 		let membership: Membership = Membership {
 			id: self.co.id.to_owned(),
 			did: identity.identity().to_owned(),
-			heads: reducer.heads().clone(),
-			state,
-			encryption_mapping,
+			state: BTreeSet::from([CoState { heads: reducer.heads().clone(), state, encryption_mapping }]),
 			key: key_uri,
 			membership_state: co_core_membership::MembershipState::Active,
 			tags: tags!(),
@@ -431,6 +464,7 @@ struct MembershipWriter<I> {
 	membership_core_name: String,
 	identity: I,
 	encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
+	last_heads: BTreeSet<Cid>,
 }
 #[async_trait]
 impl<I> ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for MembershipWriter<I>
@@ -448,6 +482,10 @@ where
 				None => None,
 			};
 
+			// next last heads
+			let mut last_heads = reducer.heads().clone();
+			swap(&mut self.last_heads, &mut last_heads);
+
 			// update
 			self.parent
 				.push(
@@ -458,6 +496,7 @@ where
 						state: *state,
 						heads: reducer.heads().clone(),
 						encryption_mapping: mapping,
+						remove: last_heads,
 					},
 				)
 				.await?;

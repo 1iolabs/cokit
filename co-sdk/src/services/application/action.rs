@@ -1,7 +1,6 @@
 use crate::{
 	library::create_reducer_action::create_reducer_action, types::message::heads::HeadsMessage, ReducerChangeContext,
 };
-use cid::Cid;
 use co_identity::Message;
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoId, Did, Link, OptionLink, ReducerAction};
@@ -10,7 +9,7 @@ use futures::Stream;
 use ipld_core::ipld::Ipld;
 use libp2p::PeerId;
 use serde::Serialize;
-use std::{collections::BTreeSet, ops::Deref, sync::Arc};
+use std::{ops::Deref, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub enum Action {
@@ -58,7 +57,7 @@ pub enum Action {
 	/// Join request has been sent to a peer.
 	JoinSent {
 		co: CoId,
-		heads: BTreeSet<Cid>,
+		encrypted: bool,
 		participant: Did,
 		peer: PeerId,
 	},

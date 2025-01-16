@@ -33,7 +33,7 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 #[async_trait]
 pub trait Locals {
 	/// Get current ApplicationLocal instances.
-	async fn get(&mut self) -> Result<Vec<ApplicationLocal>, anyhow::Error>;
+	async fn get(&self) -> Result<Vec<ApplicationLocal>, anyhow::Error>;
 
 	/// Watch ApplicationLocal instances after last get.
 	fn watch(&self) -> impl Stream<Item = ApplicationLocal> + Send + Sync + 'static;
@@ -53,7 +53,7 @@ impl MemoryLocals {
 }
 #[async_trait]
 impl Locals for MemoryLocals {
-	async fn get(&mut self) -> Result<Vec<ApplicationLocal>, anyhow::Error> {
+	async fn get(&self) -> Result<Vec<ApplicationLocal>, anyhow::Error> {
 		Ok(match self.watcher.borrow().as_ref() {
 			Some(local) => vec![local.clone()],
 			None => Default::default(),
@@ -124,7 +124,7 @@ impl FileLocals {
 #[async_trait]
 impl Locals for FileLocals {
 	/// Read all available local.cbor files
-	async fn get(&mut self) -> Result<Vec<ApplicationLocal>, anyhow::Error> {
+	async fn get(&self) -> Result<Vec<ApplicationLocal>, anyhow::Error> {
 		Ok(self.handle.request(FileLocalsMessage::Read).await??)
 	}
 

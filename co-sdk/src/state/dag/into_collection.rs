@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 /// - [`Vec`]
 /// - [`std::collections::BTreeSet`]
 /// - [`std::collections::BTreeMap`]
-pub async fn into_collection<T, N, S, C>(storage: &S, container: &N) -> Result<C, StorageError>
+pub async fn into_collection<C, T, N, S>(storage: &S, container: &N) -> Result<C, StorageError>
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 	T: DeserializeOwned + Send + Sync + 'static,

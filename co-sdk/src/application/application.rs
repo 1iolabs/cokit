@@ -13,7 +13,7 @@ use co_actor::{Actor, ActorHandle, ActorInstance};
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
-use co_primitives::{tags, CoId};
+use co_primitives::{tags, CoId, TagValue, Tags};
 use directories::ProjectDirs;
 use futures::{Stream, StreamExt};
 use std::{fmt::Debug, future::ready, path::PathBuf, sync::Arc};
@@ -195,6 +195,7 @@ impl std::fmt::Debug for Application {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ApplicationSettings {
 	/// The Unique Application Instance Identifier.
 	/// The Identifier should be hardcoded in the application.
@@ -212,6 +213,12 @@ pub struct ApplicationSettings {
 
 	/// Use keychain or file for Local CO.
 	pub keychain: bool,
+
+	/// Extra settings.
+	///
+	/// Known Tags:
+	/// - `co-locals-watch: false` - Disable locals watcher.
+	pub settings: Tags,
 }
 
 pub struct ApplicationBuilder {
@@ -219,6 +226,7 @@ pub struct ApplicationBuilder {
 	path: Option<PathBuf>,
 	keychain: bool,
 	tracing: TracingBuilder,
+	settings: Tags,
 }
 impl ApplicationBuilder {
 	pub fn default_path() -> PathBuf {
@@ -229,7 +237,7 @@ impl ApplicationBuilder {
 	/// Create new instance with path.
 	pub fn new_with_path(identifier: String, path: PathBuf) -> Self {
 		let tracing = TracingBuilder::new(identifier.clone(), Some(path.clone()));
-		Self { identifier, path: Some(path), keychain: true, tracing }
+		Self { identifier, path: Some(path), keychain: true, tracing, settings: Default::default() }
 	}
 
 	pub fn new(identifier: String) -> Self {
@@ -239,7 +247,7 @@ impl ApplicationBuilder {
 	/// Create new memory only instance.
 	pub fn new_memory(identifier: String) -> Self {
 		let tracing = TracingBuilder::new(identifier.clone(), None);
-		Self { identifier, path: None, keychain: false, tracing }
+		Self { identifier, path: None, keychain: false, tracing, settings: Default::default() }
 	}
 
 	/// Enable bunyan logging to log_path.
@@ -260,6 +268,13 @@ impl ApplicationBuilder {
 		Self { keychain: false, ..self }
 	}
 
+	/// See: [`ApplicationSettings::settings`]
+	pub fn with_setting(self, name: &str, value: impl Into<TagValue>) -> Self {
+		let mut settings = self.settings;
+		settings.insert((name.to_owned(), value.into()));
+		Self { settings, ..self }
+	}
+
 	pub async fn build(self) -> Result<Application, anyhow::Error> {
 		let tasks = TaskTracker::new();
 
@@ -277,6 +292,7 @@ impl ApplicationBuilder {
 			application_path: self.path.map(|path| path.join("etc").join(&self.identifier)),
 			identifier: self.identifier,
 			keychain: self.keychain,
+			settings: self.settings,
 		};
 
 		// create

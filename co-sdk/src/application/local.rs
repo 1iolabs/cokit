@@ -22,8 +22,11 @@ use co_log::Log;
 use co_primitives::{tags, DefaultParams, Did, KnownMultiCodec, MultiCodec};
 use co_runtime::RuntimePool;
 use co_storage::{BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, StorageError};
-use futures::{pin_mut, stream, StreamExt, TryStreamExt};
-use std::{collections::BTreeMap, sync::Arc};
+use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	sync::Arc,
+};
 use tokio_util::sync::CancellationToken;
 
 pub const CO_ID_LOCAL: &str = "local";
@@ -72,21 +75,42 @@ impl LocalCoBuilder {
 		};
 
 		// create
+		let watcher = !self.settings.settings.matches(tags!("co-locals-watch": false));
 		match &self.settings.application_path {
 			Some(application_path) => {
 				let config_path = application_path
 					.parent()
 					.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", application_path))?;
 				let locals = FileLocals::new(config_path.to_owned(), self.settings.identifier.clone(), true)?;
-				Ok(LocalCoInstance::create(runtime, self, storage, shutdown, tasks, locals, key, core_resolver)
-					.await?
-					.1)
+				Ok(LocalCoInstance::create(
+					runtime,
+					self,
+					storage,
+					shutdown,
+					tasks,
+					locals,
+					key,
+					core_resolver,
+					watcher,
+				)
+				.await?
+				.1)
 			},
 			None => {
 				let locals = MemoryLocals::new(None);
-				Ok(LocalCoInstance::create(runtime, self, storage, shutdown, tasks, locals, key, core_resolver)
-					.await?
-					.1)
+				Ok(LocalCoInstance::create(
+					runtime,
+					self,
+					storage,
+					shutdown,
+					tasks,
+					locals,
+					key,
+					core_resolver,
+					watcher,
+				)
+				.await?
+				.1)
 			},
 		}
 	}
@@ -115,9 +139,10 @@ where
 		storage: CoStorage,
 		shutdown: CancellationToken,
 		tasks: TaskSpawner,
-		mut locals: L,
+		locals: L,
 		key: Box<dyn LocalSecret + Send + Sync + 'static>,
 		core_resolver: R,
+		watcher: bool,
 	) -> Result<(Self, CoReducer), anyhow::Error>
 	where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
@@ -134,34 +159,28 @@ where
 		let mut builder =
 			ReducerBuilder::new(DynamicCoreResolver::new(core_resolver), log).with_initialize(local_co.initialize);
 
-		// context
-		let context = LocalContext { encrypted_storage: encrypted_storage.clone() };
+		// result
+		let result = Self {
+			locals: locals.clone(),
+			encrypted_storage: encrypted_storage.clone(),
+			identifier: local_co.settings.identifier,
+		};
+
+		// load locals as snapshots
+		//  the latest heads will be automatically determined by the reducer
+		{
+			let locals_stream = result.load_locals();
+			pin_mut!(locals_stream);
+			while let Some(next) = locals_stream.next().await {
+				let (state, heads) = next?;
+
+				// apply to builder as snapshot
+				builder = builder.with_snapshot(state, heads);
+			}
+		}
 
 		// create reducer
-		for local in locals.get().await? {
-			let mut state = local.state;
-			let mut heads = local.heads.clone();
-
-			// load additional encryption mappings
-			if let Some(mapping) = &local.mapping {
-				encrypted_storage.load_mapping(mapping).await?;
-
-				// convert state/heads to internal
-				state = context.to_internal_cid(state).await?;
-				heads = stream::iter(heads.iter())
-					.then(|cid| async { context.to_internal_cid(*cid).await })
-					.try_collect()
-					.await?;
-			}
-
-			// apply to builder as snapshot
-			builder = builder.with_snapshot(state, heads);
-		}
 		let mut reducer = builder.build(runtime.runtime()).await?;
-
-		// result
-		let result =
-			Self { locals, encrypted_storage: encrypted_storage.clone(), identifier: local_co.settings.identifier };
 
 		// write
 		reducer.add_change_handler(Box::new(result.clone()));
@@ -172,56 +191,58 @@ where
 		}
 
 		// reducer
-		let co_reducer = CoReducer::new(CO_ID_LOCAL.into(), None, runtime, reducer, Arc::new(context));
+		let co_reducer = CoReducer::new(CO_ID_LOCAL.into(), None, runtime, reducer, Arc::new(result.clone()));
 
 		// watch
-		let watch_reducer: CoReducer = co_reducer.clone();
-		let watch_locals = result.locals.clone();
-		let watch_encrypted_storage = encrypted_storage.clone();
-		tasks.spawn(async move {
-			let watcher = watch_locals.watch().take_until(shutdown.clone().cancelled_owned());
-			pin_mut!(watcher);
-			while let Some(local) = watcher.next().await {
-				// convert heads to unencrypted
-				let local_heads = match stream::iter(local.heads.iter())
-					.then(|cid| async { watch_reducer.context.to_internal_cid(*cid).await })
-					.try_collect()
-					.await
-				{
-					Ok(local_heads) => local_heads,
-					Err(err) => {
-						tracing::trace!(?err, ?local.heads, "local-watch-cids-failed");
-						continue;
-					},
-				};
+		if watcher {
+			let watch_reducer: CoReducer = co_reducer.clone();
+			let watch_locals = result.locals.clone();
+			let watch_encrypted_storage = encrypted_storage.clone();
+			tasks.spawn(async move {
+				let watcher = watch_locals.watch().take_until(shutdown.clone().cancelled_owned());
+				pin_mut!(watcher);
+				while let Some(local) = watcher.next().await {
+					// convert heads to unencrypted
+					let local_heads = match stream::iter(local.heads.iter())
+						.then(|cid| async { watch_reducer.context.to_internal_cid(*cid).await })
+						.try_collect()
+						.await
+					{
+						Ok(local_heads) => local_heads,
+						Err(err) => {
+							tracing::trace!(?err, ?local.heads, "local-watch-cids-failed");
+							continue;
+						},
+					};
 
-				// skip?
-				let (_, heads) = watch_reducer.reducer_state().await;
-				if heads == local_heads {
-					tracing::trace!(?local_heads, "local-watch-skip");
-				} else {
-					tracing::trace!(?local_heads, ?local.mapping, "local-watch");
-				}
+					// skip?
+					let (_, heads) = watch_reducer.reducer_state().await;
+					if heads == local_heads {
+						tracing::trace!(?local_heads, "local-watch-skip");
+					} else {
+						tracing::trace!(?local_heads, ?local.mapping, "local-watch");
+					}
 
-				// mappings
-				if let Some(mapping) = local.mapping {
-					match watch_encrypted_storage.load_mapping(&mapping).await {
-						Ok(_) => {},
-						Err(err) => tracing::warn!(?err, "local-watch-mapping-failed"),
+					// mappings
+					if let Some(mapping) = local.mapping {
+						match watch_encrypted_storage.load_mapping(&mapping).await {
+							Ok(_) => {},
+							Err(err) => tracing::warn!(?err, "local-watch-mapping-failed"),
+						}
+					}
+
+					// heads
+					match watch_reducer.join(&local_heads).await {
+						Ok(change) => {
+							if change {
+								tracing::trace!("local-watch-join");
+							}
+						},
+						Err(err) => tracing::warn!(?err, ?local_heads, "local-watch-join-failed"),
 					}
 				}
-
-				// heads
-				match watch_reducer.join(&local_heads).await {
-					Ok(change) => {
-						if change {
-							tracing::trace!("local-watch-join");
-						}
-					},
-					Err(err) => tracing::warn!(?err, ?local_heads, "local-watch-join-failed"),
-				}
-			}
-		});
+			});
+		}
 
 		// result
 		Ok((result, co_reducer))
@@ -262,6 +283,30 @@ where
 			Ok(false)
 		}
 	}
+
+	fn load_locals(&self) -> impl Stream<Item = Result<(Cid, BTreeSet<Cid>), anyhow::Error>> + '_ {
+		async_stream::try_stream! {
+			for local in self.locals.get().await? {
+				let mut state = local.state;
+				let mut heads = local.heads.clone();
+
+				// load additional encryption mappings
+				if let Some(mapping) = &local.mapping {
+					self.encrypted_storage.load_mapping(mapping).await?;
+
+					// convert state/heads to internal
+					state = self.to_internal_cid(state).await?;
+					heads = stream::iter(heads.iter())
+						.then(|cid| async { self.to_internal_cid(*cid).await })
+						.try_collect()
+						.await?;
+				}
+
+				// apply
+				yield (state, heads)
+			}
+		}
+	}
 }
 #[async_trait]
 impl<L, S, R> ReducerChangedHandler<S, R> for LocalCoInstance<L>
@@ -280,17 +325,30 @@ where
 		Ok(())
 	}
 }
-
-struct LocalContext {
-	encrypted_storage: EncryptedBlockStorage<CoStorage>,
-}
 #[async_trait]
-impl CoReducerContext for LocalContext {
+impl<L> CoReducerContext for LocalCoInstance<L>
+where
+	L: Locals + Clone + Send + Sync + 'static,
+{
 	fn content_mapping(&self) -> Option<CoBlockStorageContentMapping> {
 		Some(CoBlockStorageContentMapping::new(self.encrypted_storage.content_mapping()))
 	}
 
-	async fn refresh(&self, _parent: CoReducer, _co: CoReducer) -> anyhow::Result<()> {
+	async fn refresh(&self, _parent: CoReducer, co: CoReducer) -> anyhow::Result<()> {
+		// read and apply locals
+		//  this will manually re-read all local files
+		self.load_locals()
+			.try_for_each(|(state, heads)| {
+				let co = &co;
+				async move {
+					co.insert_snapshot(state, heads.clone()).await?;
+					co.join(&heads).await?;
+					Ok(())
+				}
+			})
+			.await?;
+
+		// done
 		Ok(())
 	}
 

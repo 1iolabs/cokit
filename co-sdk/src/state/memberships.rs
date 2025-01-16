@@ -1,5 +1,4 @@
 use crate::{state::core_state, CoReducerError, CoStorage, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP};
-use cid::Cid;
 use co_core_co::Co;
 use co_core_membership::{MembershipState, Memberships};
 use co_identity::{Identity, LocalIdentity};
@@ -17,12 +16,12 @@ use futures::Stream;
 pub fn memberships(
 	storage: CoStorage,
 	co_state: OptionLink<co_core_co::Co>,
-) -> impl Stream<Item = Result<(CoId, Did, Cid, Tags, MembershipState), CoReducerError>> {
+) -> impl Stream<Item = Result<(CoId, Did, Tags, MembershipState), CoReducerError>> {
 	async_stream::try_stream! {
 		// root
 		let co: Co = core_state(&storage, co_state, CO_CORE_NAME_CO).await?.1;
-		if let Some(co_state) = co_state.cid() {
-			yield (co.id.clone(), LocalIdentity::device().identity().to_owned(), *co_state, co.tags.clone(), MembershipState::Active);
+		if co_state.cid().is_some() {
+			yield (co.id.clone(), LocalIdentity::device().identity().to_owned(), co.tags.clone(), MembershipState::Active);
 		}
 
 		// memberships
@@ -32,7 +31,7 @@ pub fn memberships(
 			Err(e) => Err(e)?,
 		};
 		for membership in memberships.memberships {
-			yield (membership.id, membership.did, membership.state, membership.tags, membership.membership_state);
+			yield (membership.id, membership.did, membership.tags, membership.membership_state);
 		}
 	}
 }

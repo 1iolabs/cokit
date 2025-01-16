@@ -1,6 +1,5 @@
 use crate::{
 	library::{
-		is_cid_encrypted::is_cid_encrypted,
 		key_exchange::{create_key_request_message, KeyRequestPayload, KeyResponsePayload, CO_DIDCOMM_KEY_RESPONSE},
 		response_list::ResponseList,
 		settings_timeout::settings_timeout,
@@ -43,7 +42,7 @@ impl Epic<Action, (), CoContext> for KeyRequestSend {
 
 		// handle
 		match action {
-			Action::JoinSent { co, heads, participant, peer } if is_cid_encrypted(heads) => Some({
+			Action::JoinSent { co, encrypted, participant, peer } if *encrypted => Some({
 				let message_id = DidCommHeader::create_message_id();
 				let message_response = self.pending_key_requests.create({
 					let message_id = message_id.clone();

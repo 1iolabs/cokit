@@ -66,7 +66,7 @@ where
 
 	pub async fn build(self, runtime: &RuntimePool) -> Result<Reducer<S, R>, anyhow::Error> {
 		// validate heads
-		if self.state.is_some() && !self.log.heads_iter().eq(self.heads.iter()) {
+		if self.state.is_some() && self.log.heads() != &self.heads {
 			return Err(anyhow!("Invalid heads. The log and state heads must be the same"));
 		}
 
@@ -97,7 +97,7 @@ pub struct Reducer<S, R> {
 	state: Option<Cid>,
 	/// Latest heads.
 	heads: BTreeSet<Cid>,
-	/// Avilable historic snapshots in chronologic order.
+	/// Avilable historic snapshots (in chronologic order?).
 	snapshots: HashMap<BTreeSet<Cid>, Cid>,
 	/// Change handlers.
 	change_handlers: Vec<Box<dyn ReducerChangedHandler<S, R> + Send + Sync>>,

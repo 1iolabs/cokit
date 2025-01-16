@@ -3,12 +3,13 @@ use crate::{
 	Action, CoContext, CoInvite, KnownTag, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
-use co_core_membership::{Membership, MembershipState, MembershipsAction};
+use co_core_membership::{CoState, Membership, MembershipState, MembershipsAction};
 use co_identity::DidCommHeader;
 use co_primitives::{from_json_string, tags, CoInviteMetadata, Did, KnownTags, Tags};
 use co_storage::BlockStorageExt;
 use futures::{future::ready, stream, Stream, StreamExt};
 use libp2p::PeerId;
+use std::collections::BTreeSet;
 
 /// When we receive a invite message:
 /// - decide if want to be invited
@@ -96,9 +97,11 @@ fn membership(
 	Membership {
 		id: payload.id,
 		did,
-		state: payload.state, // TODO: consensus validation
-		heads: payload.heads, // TODO: consensus validation
-		encryption_mapping: None,
+		state: BTreeSet::from([CoState {
+			state: payload.state.clone(), // TODO: consensus validation
+			heads: payload.heads,         // TODO: consensus validation
+			encryption_mapping: None,
+		}]),
 		key: None,
 		membership_state,
 		tags: membership_tags,

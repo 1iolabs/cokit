@@ -702,8 +702,10 @@ impl ReducerStorage {
 			Some(secret) => {
 				let encrypted_storage =
 					EncryptedBlockStorage::new(storage.clone(), secret.into(), Default::default(), Default::default());
-				if let Some(encryption_mapping) = &membership.encryption_mapping {
-					encrypted_storage.load_mapping(encryption_mapping).await?;
+				for state in membership.state {
+					if let Some(encryption_mapping) = &state.encryption_mapping {
+						encrypted_storage.load_mapping(encryption_mapping).await?;
+					}
 				}
 				ReducerStorage::Encrypted(CoStorage::new(encrypted_storage.clone()), encrypted_storage)
 			},

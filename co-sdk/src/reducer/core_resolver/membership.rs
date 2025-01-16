@@ -64,6 +64,9 @@ where
 				.context("resolving action")?;
 			if let Some(action_membership) = MinimalMembershipsAction::new(&action_block, &self.membership_core_name) {
 				let registry = self.registry.clone();
+				// spawn the co instance update as task
+				//  this is required because otherwise we would deadlock becaus the update need to access to local co
+				//  which is currently locked
 				self.tasks.spawn(async move {
 					if let Err(err) = Self::try_update_membership(registry, action_membership).await {
 						tracing::warn!(?err, "membership-update-failed");

@@ -11,6 +11,7 @@ pub struct Memberships {
 	pub memberships: Vec<Membership>,
 }
 
+/// Membership entry.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Membership {
 	/// The CO Unique Identifier.
@@ -19,6 +20,23 @@ pub struct Membership {
 	/// The did used for the membership.
 	pub did: Did,
 
+	/// CO States. This can be multiple states if we have heads that are not joined yet.
+	pub state: BTreeSet<CoState>,
+
+	/// Some encryption key URI if the CO is encrypted.
+	pub key: Option<String>,
+
+	/// Membership state.
+	pub membership_state: MembershipState,
+
+	/// Membership tags.
+	pub tags: Tags,
+}
+
+/// A CO State entry.
+/// Contains heads the computed state for the heads and an option encryption mapping.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct CoState {
 	/// The CO root state (usually co-core-co).
 	/// Note: This is not an Option so we can not be member of an emtpy CO (which has no id anyway).
 	pub state: Cid,
@@ -30,15 +48,6 @@ pub struct Membership {
 	// TODO https://gitlab.1io.com/1io/co-sdk/-/issues/47
 	/// The encryption mapping if the CO is encrypted.
 	pub encryption_mapping: Option<Cid>,
-
-	/// Some encryption key URI if the CO is encrypted.
-	pub key: Option<String>,
-
-	/// Membership state.
-	pub membership_state: MembershipState,
-
-	/// Membership tags.
-	pub tags: Tags,
 }
 
 #[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq, Eq, PartialOrd, Ord)]
@@ -82,6 +91,8 @@ pub enum MembershipsAction {
 		state: Cid,
 		heads: BTreeSet<Cid>,
 		encryption_mapping: Option<Cid>,
+		/// Remove all [`CoState`] which heads are fully covered.
+		remove: BTreeSet<Cid>,
 	},
 	ChangeMembershipState {
 		id: CoId,
@@ -116,7 +127,7 @@ impl Reducer for Memberships {
 	fn reduce(self, event: &ReducerAction<Self::Action>, _: &mut dyn Context) -> Self {
 		let mut result = self;
 		match &event.payload {
-			MembershipsAction::Update { id, state, heads, encryption_mapping } => {
+			MembershipsAction::Update { id, state, heads, encryption_mapping, remove } => {
 				// if find(&mut result, &membership.id, &membership.did).is_none() {
 				// 	membership.state = state.clone();
 				// 	membership.heads = heads.clone();
@@ -124,9 +135,12 @@ impl Reducer for Memberships {
 				// }
 				for membership in result.memberships.iter_mut() {
 					if &membership.id == id {
-						membership.state = *state;
-						membership.heads.clone_from(heads);
-						membership.encryption_mapping = *encryption_mapping;
+						membership.state.retain(|item| !remove.is_superset(&item.heads));
+						membership.state.insert(CoState {
+							state: *state,
+							heads: heads.clone(),
+							encryption_mapping: *encryption_mapping,
+						});
 					}
 				}
 			},

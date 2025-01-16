@@ -1,6 +1,5 @@
 use crate::types::http_error::HttpResult;
 use axum::{Extension, Json};
-use cid::Cid;
 use co_sdk::{state::memberships, Application, CreateCo, Did, Tags};
 use futures::StreamExt;
 use hyper::StatusCode;
@@ -10,7 +9,7 @@ use serde_json::Value;
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum GetItem {
-	Ok { id: String, did: Did, state: Cid, tags: Tags },
+	Ok { id: String, did: Did, tags: Tags },
 	Err { err: String },
 }
 
@@ -24,7 +23,7 @@ pub async fn get(application: Extension<Application>) -> HttpResult<(StatusCode,
 	let memberships: Vec<GetItem> = memberships(local_co.storage(), local_co.co_state().await)
 		.map(|item| -> GetItem {
 			match item {
-				Ok((id, did, state, tags, _membership_state)) => GetItem::Ok { id: id.into(), did, state, tags },
+				Ok((id, did, tags, _membership_state)) => GetItem::Ok { id: id.into(), did, tags },
 				Err(e) => GetItem::Err { err: format!("{:?}", e) },
 			}
 		})
