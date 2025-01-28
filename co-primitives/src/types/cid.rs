@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Default, Copy)]
+#[serde(into = "Cid", from = "Cid")]
 pub struct CoCid(Cid);
 impl Display for CoCid {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -58,5 +59,31 @@ impl Into<Cid> for CoCid {
 impl AsRef<Cid> for CoCid {
 	fn as_ref(&self) -> &Cid {
 		&self.0
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::CoCid;
+	use crate::BlockSerializer;
+
+	#[test]
+	fn test_serialize() {
+		let (cid, _block) = BlockSerializer::default().serialize(&"hello world").unwrap().into_inner();
+		let co_cid = CoCid::from(cid);
+		let json = serde_ipld_dagjson::to_vec(&co_cid).unwrap();
+		assert_eq!(
+			std::str::from_utf8(&json).unwrap(),
+			"{\"/\":\"bafyr4idksef7ir3qqvc5ilbddm4s3v3da7uedc6k4odiejquu5q3dh2i7e\"}"
+		);
+	}
+
+	#[test]
+	fn test_deserialize() {
+		let (cid, _block) = BlockSerializer::default().serialize(&"hello world").unwrap().into_inner();
+		let co_cid = CoCid::from(cid);
+		let json = serde_ipld_dagjson::to_vec(&co_cid).unwrap();
+		let co_cid_deserialize: CoCid = serde_ipld_dagjson::from_slice(&json).unwrap();
+		assert_eq!(co_cid_deserialize, co_cid);
 	}
 }
