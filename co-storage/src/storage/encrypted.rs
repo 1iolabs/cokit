@@ -3,13 +3,13 @@ use crate::{
 		block::{Algorithm, EncryptedBlock, BLOCK_MULTICODEC},
 		secret::Secret,
 	},
-	AlgorithmError, BlockStat, BlockStorage, BlockStorageContentMapping, Storage, StorageContentMapping, StorageError,
+	AlgorithmError, BlockStorageContentMapping, Storage, StorageContentMapping, StorageError,
 };
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{
-	from_cbor, Block, DefaultNodeSerializer, KnownMultiCodec, MultiCodec, Node, NodeBuilder, NodeBuilderError,
-	NodeSerializer, StoreParams,
+	from_cbor, Block, BlockStat, BlockStorage, DefaultNodeSerializer, KnownMultiCodec, MultiCodec, Node, NodeBuilder,
+	NodeBuilderError, NodeSerializer, StoreParams,
 };
 use futures::{stream::FuturesOrdered, StreamExt};
 use serde::Serialize;
@@ -608,11 +608,11 @@ mod tests {
 			secret::Secret,
 		},
 		storage::{encrypted::EncryptedStorage, memory::MemoryStorage},
-		types::storage::{Storage, StorageError},
+		types::storage::Storage,
 		BlockStorage, EncryptedBlockStorage, MemoryBlockStorage,
 	};
 	use cid::Cid;
-	use co_primitives::{BlockSerializer, DefaultParams, StoreParams};
+	use co_primitives::{BlockSerializer, DefaultParams, StorageError, StoreParams};
 	use serde::{Deserialize, Serialize};
 	use std::iter::repeat;
 

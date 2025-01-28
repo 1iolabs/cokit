@@ -48,3 +48,68 @@ where
 		context.store_state(store_cid);
 	}
 }
+
+pub mod async_reduce {
+	use crate::{
+		async_api::{Context, Reducer},
+		library::{wasm_context::WasmContext, wasm_storage::WasmStorage},
+	};
+	use anyhow::Context as _;
+	use cid::Cid;
+	use co_primitives::{from_cbor, BlockStorage, ReducerAction};
+	use futures::{executor::LocalPool, task::LocalSpawnExt};
+	use serde::de::DeserializeOwned;
+
+	pub fn reduce<R, A>()
+	where
+		R: Reducer<A, WasmStorage>,
+		A: Clone + DeserializeOwned,
+	{
+		let context = WasmContext::new();
+		reduce_with_context::<R, A, WasmContext, WasmStorage>(context);
+	}
+
+	pub fn reduce_with_context<R, A, C, S>(mut context: C)
+	where
+		R: Reducer<A, S>,
+		A: Clone + DeserializeOwned,
+		S: BlockStorage + 'static,
+		C: Context<S> + 'static,
+	{
+		let mut pool = LocalPool::new();
+		pool.spawner()
+			.spawn_local(async move {
+				match reduce_execute_with_context::<R, A, C, S>(&context).await {
+					Ok(next_state) => {
+						if let Some(next_state) = next_state {
+							context.set_state(next_state);
+						}
+					},
+					Err(err) => {
+						context.set_error(err);
+					},
+				}
+			})
+			.expect("future to execute");
+		pool.run();
+	}
+
+	pub async fn reduce_execute_with_context<R, A, C, S>(context: &C) -> Result<Option<Cid>, anyhow::Error>
+	where
+		R: Reducer<A, S>,
+		A: Clone + DeserializeOwned,
+		S: BlockStorage + 'static,
+		C: Context<S> + 'static,
+	{
+		// event
+		let event_cid = context.event();
+		let event_block = context.storage().get(&event_cid).await?;
+		let event: ReducerAction<A> = from_cbor(event_block.data()).context("deserialize event")?;
+
+		// reduce
+		let next_state = R::reduce(context.state().into(), event, context.storage()).await?;
+
+		// result
+		Ok(next_state.into())
+	}
+}

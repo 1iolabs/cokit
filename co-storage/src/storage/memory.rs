@@ -1,11 +1,8 @@
-use crate::types::{
-	block::{BlockStat, BlockStorage},
-	storage::{Storage, StorageError},
-};
+use crate::types::storage::Storage;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, DefaultParams};
+use co_primitives::{Block, BlockStat, BlockStorage, DefaultParams, StorageError};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
 

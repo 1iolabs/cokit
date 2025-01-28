@@ -1,5 +1,5 @@
 use crate::Storage;
-use co_primitives::{BlockSerializer, CborError, JsonError, Link, Linkable, MultiCodec};
+use co_primitives::{BlockSerializer, Link, Linkable, MultiCodec, StorageError};
 use either::Either;
 
 pub trait StorageExt: Storage {
@@ -28,19 +28,3 @@ pub trait StorageExt: Storage {
 	}
 }
 impl<T> StorageExt for T where T: Storage + ?Sized {}
-
-#[derive(Debug, thiserror::Error)]
-pub enum StorageError {
-	#[error("Invalid argument")]
-	InvalidArgument(#[source] anyhow::Error),
-}
-impl From<CborError> for StorageError {
-	fn from(value: CborError) -> Self {
-		StorageError::InvalidArgument(value.into())
-	}
-}
-impl From<JsonError> for StorageError {
-	fn from(value: JsonError) -> Self {
-		StorageError::InvalidArgument(value.into())
-	}
-}

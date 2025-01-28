@@ -8,13 +8,19 @@ pub use library::{
 	cbor::{from_cbor, to_cbor, CborError},
 	json::{from_json, from_json_string, to_json, to_json_string, JsonError},
 	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeContainer, NodeSerializer},
+	node_reader::{node_reader, NodeReaderError},
+	node_stream::NodeStream,
 };
 pub use types::{
 	action::ReducerAction,
 	block::{Block, BlockError, DefaultParams, StoreParams},
+	block_storage::{BlockStat, BlockStorage, StorageError},
+	block_storage_ext::BlockStorageExt,
 	cid::CoCid,
 	co::CoId,
 	codec::{KnownMultiCodec, MultiCodec, MultiCodecError},
+	dag_collection::{DagCollection, DagMap, DagSet, DagVec},
+	dag_collection_ext::{DagCollectionExt, DagMapExt, DagSetExt, DagVecExt},
 	date::Date,
 	did::Did,
 	invite::{CoConnectivity, CoInviteMetadata},
@@ -27,6 +33,7 @@ pub use types::{
 		RelativePathOwned,
 	},
 	secret::Secret,
+	storage::Storage,
 	tags::{Tag, TagValue, Tags, TagsExpr},
 	total_float::TotalFloat64,
 };

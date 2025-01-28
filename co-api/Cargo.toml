@@ -17,9 +17,6 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 
-[dev-dependencies]
-co-storage = { path = "../co-storage" }
-
 [features]
 default = []
 wasm32 = []

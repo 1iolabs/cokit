@@ -1346,7 +1346,6 @@ dependencies = [
  "async-trait",
  "cid 0.11.1",
  "co-primitives",
- "co-storage",
  "either",
  "futures",
  "ipld-core",
@@ -1549,6 +1548,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-core-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cid 0.11.1",
+ "co-api",
+ "co-runtime",
+ "co-storage",
+ "ipld-core",
+ "serde",
+ "serde_repr",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "co-dioxus"
 version = "0.1.0"
 dependencies = [
@@ -1682,15 +1701,18 @@ name = "co-primitives"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "cid 0.11.1",
  "co-macros",
  "derive_more",
  "either",
+ "futures",
  "insta",
  "ipld-core",
  "ipld-dagpb",
  "multihash 0.19.3",
  "multihash-codetable",
+ "pin-project",
  "schemars",
  "serde",
  "serde_bytes",

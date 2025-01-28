@@ -1,8 +1,8 @@
-use crate::{BlockStat, BlockStorage, Storage, StorageError};
+use crate::Storage;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, DefaultParams, StoreParams};
+use co_primitives::{Block, BlockStat, BlockStorage, DefaultParams, StorageError, StoreParams};
 use std::{io::ErrorKind, os::unix::fs::MetadataExt, path::PathBuf};
 
 /// Filesystem storage.

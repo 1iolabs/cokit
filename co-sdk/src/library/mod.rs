@@ -19,7 +19,6 @@ pub mod local_keypair_fetch;
 pub mod local_secret;
 pub mod locals;
 pub mod network_discovery;
-pub mod node_stream;
 pub mod push_heads;
 pub mod response_list;
 pub mod settings_timeout;

@@ -24,14 +24,13 @@ pub use co_identity::{
 };
 pub use co_primitives::{
 	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, AbsolutePath,
-	AbsolutePathOwned, BlockSerializer, CoId, CoInvite, CoNetwork, Component, Components, Date, Did, KnownMultiCodec,
-	KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, OptionLink, Path, PathError, PathExt, PathOwned,
-	RelativePath, RelativePathOwned, Tag, Tags,
+	AbsolutePathOwned, BlockSerializer, BlockStat, BlockStorage, BlockStorageExt, CoId, CoInvite, CoNetwork, Component,
+	Components, Date, Did, KnownMultiCodec, KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, NodeStream,
+	OptionLink, Path, PathError, PathExt, PathOwned, RelativePath, RelativePathOwned, StorageError, Tag, Tags,
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{
-	unixfs_add, unixfs_add_file, unixfs_cat_buffer, unixfs_encode_buffer, unixfs_stream, BlockStat, BlockStorage,
-	BlockStorageContentMapping, BlockStorageExt, StorageError,
+	unixfs_add, unixfs_add_file, unixfs_cat_buffer, unixfs_encode_buffer, unixfs_stream, BlockStorageContentMapping,
 };
 pub use library::{
 	did_key_provider::DidKeyProvider,
@@ -41,7 +40,6 @@ pub use library::{
 	generate_random_name::generate_random_name,
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
-	node_stream::NodeStream,
 	response_list::ResponseList,
 	tmp_dir::TmpDir,
 	update_co::update_co,

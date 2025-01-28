@@ -1,6 +1,5 @@
+use crate::{BlockStorage, BlockStorageExt, Node, NodeContainer, OptionLink, StorageError};
 use cid::Cid;
-use co_primitives::{Node, NodeContainer, OptionLink};
-use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{Future, FutureExt, Stream};
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
@@ -20,7 +19,7 @@ pub struct NodeStream<S, T> {
 }
 impl<S, T> NodeStream<S, T>
 where
-	S: BlockStorage + Sync + Send + Clone + 'static,
+	S: BlockStorage + Clone + 'static,
 	T: DeserializeOwned + Send + Sync + 'static,
 {
 	pub fn new(storage: S, cid: Option<Cid>) -> Self {
@@ -41,7 +40,7 @@ where
 }
 impl<S, T> Stream for NodeStream<S, T>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
+	S: BlockStorage + Clone + 'static,
 	T: DeserializeOwned + Send + Sync + 'static,
 {
 	type Item = Result<T, StorageError>;

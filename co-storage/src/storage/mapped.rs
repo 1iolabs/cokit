@@ -5,6 +5,7 @@ use co_primitives::{Block, MultiCodec};
 use std::collections::BTreeSet;
 
 /// Mappes certain CID codecs to mapped CIDs using BlockStorageContentMapping.
+#[derive(Debug, Clone)]
 pub struct MappedBlockStorage<S, M> {
 	storage: S,
 	mapping: M,
@@ -35,7 +36,7 @@ where
 impl<S, M> BlockStorage for MappedBlockStorage<S, M>
 where
 	S: BlockStorage + Send + Sync + 'static,
-	M: BlockStorageContentMapping + Send + Sync + 'static,
+	M: BlockStorageContentMapping + Clone + Send + Sync + 'static,
 {
 	type StoreParams = S::StoreParams;
 

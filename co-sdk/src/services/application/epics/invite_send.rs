@@ -15,7 +15,7 @@ use co_actor::ActorHandle;
 use co_core_co::{Co, CoAction};
 use co_identity::{IdentityResolver, PrivateIdentityResolver};
 use co_network::didcomm::EncodedMessage;
-use co_primitives::{CoConnectivity, CoId, Did, Network};
+use co_primitives::{CoConnectivity, CoId, DagSetExt, Did, Network};
 use futures::{stream, Stream, StreamExt, TryStreamExt};
 use std::{collections::BTreeSet, future::ready};
 

@@ -3,6 +3,8 @@ mod library;
 mod storage;
 mod types;
 
+// TODO: remove
+pub use co_primitives::{BlockStat, BlockStorage, BlockStorageExt, StorageError};
 // exports
 pub use crypto::{
 	block::{Algorithm, AlgorithmError},
@@ -24,9 +26,7 @@ pub use storage::{
 	sync::{SyncBlockStorage, SyncStorage},
 };
 pub use types::{
-	block::{BlockStat, BlockStorage},
-	block_ext::BlockStorageExt,
 	mapping::{BlockStorageContentMapping, StorageContentMapping},
 	pin::{PinApi, PinKind, PinOptions},
-	storage::{Storage, StorageError},
+	storage::Storage,
 };
