@@ -6,8 +6,9 @@ use schemars::{
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Default, Copy)]
+#[derive(Serialize, Deserialize, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Default, Copy)]
 #[serde(into = "Cid", from = "Cid")]
+#[repr(transparent)]
 pub struct CoCid(Cid);
 impl Display for CoCid {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

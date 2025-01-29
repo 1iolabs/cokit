@@ -16,6 +16,7 @@ ipld-core = { workspace = true }
 ipld-dagpb = { workspace = true }
 multihash = { workspace = true }
 multihash-codetable = { workspace = true }
+ordered-float = "4.6.0"
 pin-project = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

@@ -429,7 +429,8 @@ fn aggregate(group: Option<AggregateGroup>, by: AggregateBy, data: &Data, values
 		AggregateBy::Average => {
 			// See: https://math.stackexchange.com/questions/22348/how-to-add-and-subtract-values-from-an-average
 			value.count += 1;
-			value.value = (value.value.0 + ((data.value as f64 - value.value.0) / value.count as f64)).into();
+			value.value =
+				(value.value.value() + ((data.value as f64 - value.value.value()) / value.count as f64)).into();
 		},
 	}
 }
