@@ -9,13 +9,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "title": "co-tauri",
-        "width": 1600,
-        "height": 1000
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }

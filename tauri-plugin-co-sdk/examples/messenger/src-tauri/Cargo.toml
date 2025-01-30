@@ -16,5 +16,4 @@ tauri-utils = { version = "=2.0.0-beta.19" }
 tokio = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-
 tauri-plugin-co-sdk = { path = "../../.." }

@@ -13,7 +13,8 @@
     "tauri": "tauri",
     "clean": "npx rimraf -rf ./dist",
     "rollup": "npx cross-env NODE_ENV=development kui-application build -o ./dist/ui",
-    "watch-all": "npx tsc -w & sass ./src -w & npm run rollup -- -w & npm run tauri dev"
+    "sass": "sass ./src/components -w",
+    "rollup-watch": "npm run rollup -- -w"
   },
   "files": [
     "**/*.css",
