@@ -1,6 +1,7 @@
 use crate::{Block, BlockSerializer, DefaultParams, Link, OptionLink, StoreParams};
+use cid::Cid;
 use serde::{Deserialize, Serialize};
-use std::mem::take;
+use std::mem::{swap, take};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Node<T> {
@@ -64,17 +65,20 @@ where
 /// Create a balances merkler tree of Node blocks.
 ///
 /// Note: This implementation requires the data to fit into memory.
-pub struct NodeBuilder<T, S = DefaultNodeSerializer, P = DefaultParams>
+pub struct NodeBuilder<T, P = DefaultParams, S = DefaultNodeSerializer>
 where
 	T: Clone,
-	S: NodeSerializer<T, P>,
 	P: StoreParams,
+	S: NodeSerializer<T, P>,
 {
 	// Current Items.
 	items: Vec<T>,
 
+	/// Leaf block references.
+	blocks: Vec<Cid>,
+
 	/// Computed leaf blocks to store.
-	blocks: Vec<Block<P>>,
+	pending_blocks: Vec<Block<P>>,
 
 	/// Max children for each block.
 	max_children: usize,
@@ -82,14 +86,14 @@ where
 	/// Serializer.
 	serializer: S,
 }
-impl<T, S, P> NodeBuilder<T, S, P>
+impl<T, P, S> NodeBuilder<T, P, S>
 where
 	T: Clone + Serialize,
-	S: NodeSerializer<T, P>,
 	P: StoreParams,
+	S: NodeSerializer<T, P>,
 {
 	pub fn new(max_children: usize, serializer: S) -> Self {
-		Self { items: Vec::new(), blocks: Vec::new(), max_children, serializer }
+		Self { items: Vec::new(), blocks: Vec::new(), pending_blocks: Vec::new(), max_children, serializer }
 	}
 
 	pub fn push(&mut self, item: T) -> Result<(), NodeBuilderError> {
@@ -105,56 +109,70 @@ where
 		Ok(())
 	}
 
+	/// Take blocks from builder that already has been created.
+	pub fn take_blocks(&mut self) -> impl Iterator<Item = Block<P>> {
+		let mut blocks = Vec::new();
+		swap(&mut self.pending_blocks, &mut blocks);
+		blocks.into_iter()
+	}
+
 	/// Flush items into new leaf block.
 	fn flush(&mut self) -> Result<(), NodeBuilderError> {
 		let leaf = Node::Leaf(take(&mut self.items));
 		let block = self.serializer.serialize(&leaf)?;
-		self.blocks.push(block);
+		self.blocks.push(*block.cid());
+		self.pending_blocks.push(block);
 		Ok(())
 	}
 
 	/// Convert builder into blocks.
-	pub fn into_blocks(mut self) -> Result<Vec<Block<P>>, NodeBuilderError> {
+	/// All blocks that are not yet taken using [`NodeBuilder::take_blocks`] are returned.
+	pub fn into_blocks(mut self) -> Result<(Option<Cid>, Vec<Block<P>>), NodeBuilderError> {
 		// flush
 		if !self.items.is_empty() {
 			self.flush()?;
 		}
 
 		// result
-		Self::create_balanced_links(&self.serializer, self.blocks, self.max_children)
+		Ok((
+			Self::create_balanced_links(&self.serializer, self.blocks, self.max_children, &mut self.pending_blocks)?,
+			self.pending_blocks,
+		))
 	}
 
 	/// Create balanced links for all blocks.
-	/// The first block in the result is the root block.
+	/// Returns the [`Cid`] of the root if not empty.
 	fn create_balanced_links(
 		serializer: &S,
-		mut blocks: Vec<Block<P>>,
+		blocks: Vec<Cid>,
 		max_children: usize,
-	) -> Result<Vec<Block<P>>, NodeBuilderError> {
+		pending_blocks: &mut Vec<Block<P>>,
+	) -> Result<Option<Cid>, NodeBuilderError> {
 		// create link blocks (all levels)
-		let mut link_blocks = match blocks.len() {
+		Ok(match blocks.len() {
 			// no links needed
-			0 | 1 => vec![],
+			0 => None,
+			1 => blocks.into_iter().next(),
 			// create link nodes
 			_ => {
-				let level_link_blocks: Result<Vec<Block<P>>, NodeBuilderError> = blocks
+				let mut level_link_blocks = blocks
 					.as_slice()
 					.chunks(max_children)
-					.map(|chunk| -> Node<T> { Node::Node(chunk.iter().map(|block| (*block.cid()).into()).collect()) })
+					.map(|chunk| -> Node<T> { Node::Node(chunk.iter().map(|leaf| leaf.into()).collect()) })
 					.map(|node| serializer.serialize(&node))
-					.collect();
-				Self::create_balanced_links(serializer, level_link_blocks?, max_children)?
+					.collect::<Result<Vec<Block<P>>, NodeBuilderError>>()?;
+				let level_links = level_link_blocks.iter().map(|block| *block.cid()).collect::<Vec<Cid>>();
+
+				// store created link blocks
+				pending_blocks.append(&mut level_link_blocks);
+
+				// create next level
+				Self::create_balanced_links(serializer, level_links, max_children, pending_blocks)?
 			},
-		};
-
-		// append leaf blocks
-		link_blocks.append(&mut blocks);
-
-		// result
-		Ok(link_blocks)
+		})
 	}
 }
-impl<T, P> Default for NodeBuilder<T, DefaultNodeSerializer, P>
+impl<T, P> Default for NodeBuilder<T, P, DefaultNodeSerializer>
 where
 	T: Clone + Serialize,
 	P: StoreParams,
@@ -182,7 +200,7 @@ mod tests {
 		builder.push(8).unwrap();
 
 		// blocks
-		let blocks = builder.into_blocks().unwrap();
+		let (_root, blocks) = builder.into_blocks().unwrap();
 		assert_eq!(blocks.len(), 7);
 		insta::assert_debug_snapshot!(blocks);
 	}
@@ -194,7 +212,7 @@ mod tests {
 		builder.push(1).unwrap();
 
 		// blocks
-		let blocks = builder.into_blocks().unwrap();
+		let (_root, blocks) = builder.into_blocks().unwrap();
 		assert_eq!(blocks.len(), 1);
 	}
 
@@ -204,7 +222,7 @@ mod tests {
 		let builder = NodeBuilder::<u8>::new(2, DefaultNodeSerializer::new());
 
 		// blocks
-		let blocks = builder.into_blocks().unwrap();
+		let (_root, blocks) = builder.into_blocks().unwrap();
 		assert_eq!(blocks.len(), 0);
 	}
 
@@ -222,7 +240,7 @@ mod tests {
 		builder.push(8).unwrap();
 
 		// blocks
-		let blocks = builder.into_blocks().unwrap();
+		let (_root, blocks) = builder.into_blocks().unwrap();
 
 		// nodes
 		let nodes: Vec<Node<u8>> = blocks

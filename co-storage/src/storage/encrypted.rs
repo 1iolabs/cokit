@@ -62,15 +62,11 @@ where
 		let node_serializer = EncryptedNodeSerializer { algorithm: self.algorithm, key: self.key.clone() };
 
 		// blocks
-		let blocks = self.mapping.to_blocks(node_serializer, Default::default())?;
+		let (root, blocks) = self.mapping.to_blocks(node_serializer, Default::default())?;
 
 		// store
-		let mut root = None;
 		for block in blocks {
-			let result = self.storage_mut().set(block)?;
-			if root.is_none() {
-				root = Some(result);
-			}
+			self.storage_mut().set(block)?;
 		}
 
 		// result
@@ -186,7 +182,7 @@ where
 		let node_serializer = EncryptedNodeSerializer { algorithm: self.algorithm, key: self.key.clone() };
 
 		// blocks
-		let blocks = self
+		let (root, blocks) = self
 			.mapping
 			.mapping
 			.read()
@@ -194,12 +190,8 @@ where
 			.to_blocks(node_serializer, Default::default())?;
 
 		// store
-		let mut root = None;
 		for block in blocks {
-			let result = self.next.set(block).await?;
-			if root.is_none() {
-				root = Some(result)
-			}
+			self.next.set(block).await?;
 			// TODO: PIN/UNPIN
 		}
 
@@ -540,17 +532,16 @@ impl BlockMapping {
 	/// Encode mapping into blocks.
 	///
 	/// Returns the root cid and all blocks.
-	/// The first block retuned is the root.
 	pub fn to_blocks<S, P: StoreParams>(
 		&self,
 		serializer: S,
 		options: WriteOptions,
-	) -> Result<Vec<Block<P>>, StorageError>
+	) -> Result<(Option<Cid>, Vec<Block<P>>), StorageError>
 	where
 		S: NodeSerializer<(Cid, Cid), P>,
 	{
 		// blocks
-		let mut builder = NodeBuilder::<(Cid, Cid), S, P>::new(options.max_children, serializer);
+		let mut builder = NodeBuilder::<(Cid, Cid), P, S>::new(options.max_children, serializer);
 		for (key, value) in self.map.iter() {
 			builder.push((*key, *value)).map_err(|e| StorageError::Internal(e.into()))?;
 		}

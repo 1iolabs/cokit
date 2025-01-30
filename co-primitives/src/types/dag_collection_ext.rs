@@ -65,15 +65,11 @@ pub trait DagCollectionExt: DagCollection {
 		for item in items {
 			node_builder.push(item).unwrap();
 		}
-		let blocks = node_builder.into_blocks().unwrap();
-		let mut result = OptionLink::none();
+		let (root, blocks) = node_builder.into_blocks().unwrap();
 		for block in blocks {
-			let cid = storage.set(block);
-			if result.is_none() {
-				result.set(Some(cid));
-			}
+			storage.set(block);
 		}
-		result
+		root.into()
 	}
 
 	fn from_link(&self, storage: &dyn Storage) -> Result<Self::Collection, NodeReaderError> {

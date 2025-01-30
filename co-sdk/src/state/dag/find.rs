@@ -80,8 +80,7 @@ mod tests {
 		builder.push(1).unwrap();
 		builder.push(2).unwrap();
 		builder.push(3).unwrap();
-		let blocks = builder.into_blocks().unwrap();
-		let cid = Some(*blocks[0].cid());
+		let (cid, blocks) = builder.into_blocks().unwrap();
 		for block in blocks {
 			storage.set(block).await.unwrap();
 		}
