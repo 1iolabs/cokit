@@ -23,7 +23,7 @@ pub enum ApplicationActorMessage {
 	Push(CoId, String, Ipld, Did, Response<Result<Option<Cid>, ActorError>>),
 	ResolveCid(CoId, Cid, Response<Result<Ipld, ActorError>>),
 	GetActions(GetActionsRequest, Response<Result<GetActionsResponse, ActorError>>),
-	CreateIdentity(String, Option<&'static [u8]>),
+	CreateIdentity(CreateIdentityRequest),
 }
 
 #[derive(Debug, Clone)]
@@ -38,6 +38,12 @@ pub struct GetActionsRequest {
 pub struct GetActionsResponse {
 	pub actions: Vec<Cid>,
 	pub next_heads: BTreeSet<Cid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateIdentityRequest {
+	pub name: String,
+	pub seed: Option<Vec<u8>>,
 }
 
 #[async_trait]
@@ -192,11 +198,11 @@ impl Actor for ApplicationActor {
 					Ok(GetActionsResponse { actions, next_heads })
 				});
 			},
-			ApplicationActorMessage::CreateIdentity(name, seed) => {
-				let identity = DidKeyIdentity::generate(seed);
+			ApplicationActorMessage::CreateIdentity(request) => {
+				let identity = DidKeyIdentity::generate(request.seed.as_deref());
 				let co = state.application.local_co_reducer().await?;
 				let provider = DidKeyProvider::new(co, CO_CORE_NAME_KEYSTORE);
-				provider.store(&identity, Some(name)).await?;
+				provider.store(&identity, Some(request.name)).await?;
 			},
 		}
 

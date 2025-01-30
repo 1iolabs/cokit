@@ -28,5 +28,5 @@ export async function get_actions(co: string, heads: CID[], count: number, until
     return await invoke("plugin:co-sdk|get_actions", { co, heads, count, until });
 }
 export async function createIdentity(name: string, seed?: Uint8Array): Promise<GetActionsResponse> {
-    return await invoke("plugin:co-sdk|create_identity", { name, seed });
+    return await invoke("plugin:co-sdk|create_identity", { name, seed: seed ? Array.from(seed) : undefined });
 }
