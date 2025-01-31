@@ -140,6 +140,10 @@ impl<T> OptionLink<T> {
 		self.cid = cid;
 	}
 
+	pub fn link(&self) -> Option<Link<T>> {
+		self.cid.map(Link::new)
+	}
+
 	pub fn unwrap(&self) -> Link<T> {
 		Link::new(self.cid.unwrap())
 	}

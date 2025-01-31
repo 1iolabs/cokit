@@ -1,10 +1,9 @@
-use crate::{
-	types::dag_collection_async_ext::DagCollectionAsyncExt, BlockStorage, BlockStorageExt, DagCollection, DagVec, Link,
-	Node, NodeBuilder, NodeStream, OptionLink, StorageError,
-};
-use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+use crate::{BlockStorage, BlockStorageExt, Link, Node, NodeBuilder, NodeStream, OptionLink, StorageError};
+use either::Either;
+use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
+	borrow::Cow,
 	cmp::Ordering,
 	collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque},
 	future::ready,
@@ -26,7 +25,7 @@ where
 
 	/// Active "in memory data".
 	#[serde(rename = "a")]
-	pub active: DagVec<(K, Value<V>)>,
+	pub active: OptionLink<Node<(K, Value<V>)>>,
 
 	/// Tree settings.
 	#[serde(rename = "s")]
@@ -52,7 +51,7 @@ where
 	V: Clone + Send + Sync + 'static,
 {
 	#[serde(rename = "e")]
-	pub entries: DagVec<(K, Value<V>)>,
+	pub entries: OptionLink<Node<(K, Value<V>)>>,
 	#[serde(rename = "i")]
 	pub bloom: Vec<u8>,
 	#[serde(rename = "l")]
@@ -180,9 +179,7 @@ where
 		let mut result = Self { active: Default::default(), settings: Default::default(), root: root.into(), storage };
 		if let Some(root) = result.root().await? {
 			result.settings = root.settings;
-			result.active = NodeStream::from_link(result.storage.clone(), root.active.link())
-				.try_collect()
-				.await?;
+			result.active = NodeStream::from_link(result.storage.clone(), root.active).try_collect().await?;
 		}
 		Ok(result)
 	}
@@ -228,7 +225,7 @@ where
 					if run.may_contains_key(key) {
 						// iterate entries (sorted by key)
 						// TODO: implement binary search (and/or sparse index)
-						let entries = run.entries.stream(&self.storage);
+						let entries = NodeStream::from_link(self.storage.clone(), run.entries);
 						pin_mut!(entries);
 						while let Some(entry) = entries.try_next().await? {
 							if &entry.0 == key {
@@ -288,7 +285,7 @@ where
 					None => true,
 				}))
 				.map(|(index, run)| match run {
-					Ok(run) => Ok((index, NodeStream::from_link(storage.clone(), run.entries.link()))),
+					Ok(run) => Ok((index, NodeStream::from_link(storage.clone(), run.entries))),
 					Err(err) => Err(err),
 				})
 				.try_collect()
@@ -360,7 +357,7 @@ where
 		};
 
 		// store active
-		root.active = DagVec::new(self.store_entries(self.active.iter()).await?);
+		root.active = self.store_entries(stream::iter(self.active.iter()).map(Ok)).await?;
 
 		// store root
 		self.root = self.storage.set_value(&root).await?.into();
@@ -389,15 +386,16 @@ where
 			return Ok(0);
 		}
 
-		// entries
-		let root = self.store_entries(self.active.iter()).await?;
-
 		// run
-		let run = Run {
-			entries: DagVec::new(root),
-			bloom: vec![], // todo
-			min_key,
-			max_key,
+		let run = if let Some(run) = self
+			.store_run(
+				stream::iter(self.active.iter()).map(|(key, value)| Ok((Cow::Borrowed(key), Cow::Borrowed(value)))),
+			)
+			.await?
+		{
+			run
+		} else {
+			return Ok(0);
 		};
 
 		// get/create root
@@ -417,7 +415,8 @@ where
 			.try_collect::<VecDeque<_>>()
 			.await?;
 		runs.push_front(run);
-		level0.runs = self.store_entries(runs.iter()).await?;
+		let runs_count = runs.len();
+		level0.runs = self.store_entries(stream::iter(runs.iter()).map(Ok)).await?;
 		let mut next_level0_link = self.storage.set_value(&level0).await?;
 
 		// store root with next level0
@@ -430,12 +429,21 @@ where
 		// cleanup when everything has succedded
 		self.active.clear();
 
+		// compact?
+		if runs_count > self.settings.max_run_count as usize {
+			self.compact_level(0).await?;
+			// TODO: compact next level
+		}
+
 		// result
 		Ok(0)
 	}
 
 	/// Store `entries` as DAG and return the root [`cid::Cid`].
-	async fn store_entries<T, O>(&self, entries: impl Iterator<Item = T>) -> Result<OptionLink<Node<O>>, StorageError>
+	async fn store_entries<T, O>(
+		&self,
+		entries: impl Stream<Item = Result<T, StorageError>>,
+	) -> Result<OptionLink<Node<O>>, StorageError>
 	where
 		T: Clone + Serialize,
 	{
@@ -446,7 +454,8 @@ where
 				.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
 			Default::default(),
 		);
-		for entry in entries {
+		pin_mut!(entries);
+		while let Some(entry) = entries.try_next().await? {
 			node_builder.push(entry).map_err(|e| StorageError::InvalidArgument(e.into()))?;
 			for block in node_builder.take_blocks() {
 				self.storage.set(block).await?;
@@ -463,9 +472,145 @@ where
 		Ok(root.into())
 	}
 
+	/// Store a new run to storage composed of `entries`.
+	async fn store_run<'a>(
+		&self,
+		entries: impl Stream<Item = Result<(Cow<'_, K>, Cow<'_, Value<V>>), StorageError>>,
+	) -> Result<Option<Run<K, V>>, StorageError> {
+		// entries
+		let mut min_key: Option<K> = None;
+		let mut max_key: Option<K> = None;
+		let entries_link = self
+			.store_entries(entries.inspect_ok(|(key, _)| {
+				if min_key.is_none() || min_key.as_ref().cmp(&Some(key)) == Ordering::Less {
+					min_key = Some(key.as_ref().clone());
+				}
+				if max_key.is_none() || max_key.as_ref().cmp(&Some(key)) == Ordering::Greater {
+					max_key = Some(key.as_ref().clone());
+				}
+			}))
+			.await?;
+		let (min_key, max_key) = match (min_key, max_key) {
+			(Some(min_key), Some(max_key)) => (min_key, max_key),
+			_ => return Ok(None),
+		};
+		let next_run = Run {
+			entries: entries_link,
+			bloom: vec![], // TODO: bloom
+			min_key,
+			max_key,
+		};
+		Ok(Some(next_run))
+	}
+
 	/// Compact `level` to next level.
-	fn compact_level(&mut self, level: usize) -> Result<(), StorageError> {
-		todo!();
+	async fn compact_level(&mut self, level_index: usize) -> Result<(), StorageError> {
+		let next_level_index = level_index + 1;
+
+		// root
+		let mut root = if let Some(root) = self.root().await? { root } else { return Ok(()) };
+
+		// level
+		let mut level = if let Some(level_link) = root.levels.get(level_index) {
+			self.storage.get_value(level_link).await?
+		} else {
+			return Ok(());
+		};
+
+		// next level
+		let mut next_level = if let Some(level_link) = root.levels.get(next_level_index) {
+			self.storage.get_value(level_link).await?
+		} else {
+			Level { runs: OptionLink::none() }
+		};
+
+		// find runs to compact
+		let mut runs = Vec::new();
+		{
+			let levels_and_runs = self.levels_and_runs();
+			pin_mut!(levels_and_runs);
+			let mut current_global_level_index = 0;
+			while let Some(level_or_run) = levels_and_runs.try_next().await? {
+				match level_or_run {
+					Either::Left((global_level_index, _level)) => {
+						current_global_level_index = global_level_index;
+						// stop when hit older levels
+						if current_global_level_index > next_level_index {
+							break;
+						}
+					},
+					Either::Right((global_run_index, run)) => {
+						if current_global_level_index == level_index {
+							// we use all runs from the level
+							runs.push((current_global_level_index, global_run_index, run));
+						} else if current_global_level_index == next_level_index {
+							// test overlap in next level
+							if runs
+								.iter()
+								.any(|(_, _, r)| r.min_key <= run.max_key && run.min_key <= r.max_key)
+							{
+								runs.push((current_global_level_index, global_run_index, run));
+							}
+						}
+					},
+				}
+			}
+		}
+		if runs.is_empty() {
+			return Ok(());
+		}
+
+		// runs
+		let entries = self.create_stream(Some(runs.iter().map(|(_, global_run_index, _)| *global_run_index).collect()));
+		let run = self.store_run(entries.map_ok(|(k, v)| (Cow::Owned(k), Cow::Owned(v)))).await?;
+		let run = if let Some(run) = run {
+			run
+		} else {
+			return Ok(());
+		};
+
+		// replace runs
+		{
+			let mut level_runs = NodeStream::from_link(self.storage.clone(), level.runs)
+				.try_collect::<Vec<_>>()
+				.await?;
+			let mut next_level_runs = NodeStream::from_link(self.storage.clone(), next_level.runs)
+				.try_collect::<Vec<_>>()
+				.await?;
+
+			// remove old
+			for (global_level_index, global_run_index, _) in runs.iter().rev() {
+				let local_run_index = *global_run_index - *global_level_index;
+				if *global_level_index == level_index && level_runs.get(local_run_index).is_some() {
+					level_runs.remove(*global_run_index - *global_level_index);
+				}
+				if *global_level_index == next_level_index && next_level_runs.get(local_run_index).is_some() {
+					next_level_runs.remove(*global_run_index - *global_level_index);
+				}
+			}
+
+			// insert new
+			next_level_runs.insert(0, run);
+
+			// store runs
+			level.runs = self.store_entries(stream::iter(level_runs).map(Ok)).await?;
+			next_level.runs = self.store_entries(stream::iter(next_level_runs).map(Ok)).await?;
+		}
+
+		// replace levels
+		for (i, l) in [(level_index, level), (next_level_index, next_level)] {
+			let mut link = self.storage.set_value(&l).await?;
+			match root.levels.get_mut(i) {
+				Some(level) => swap(level, &mut link),
+				None => root.levels.insert(i, link),
+			}
+		}
+
+		// replace root
+		self.root = self.storage.set_value(&root).await?.into();
+
+		// result
+		Ok(())
 	}
 
 	/// Root.
@@ -496,6 +641,28 @@ where
 				for await run in runs {
 					yield run?;
 				}
+			}
+		}
+	}
+
+	/// All active levels and runs with its (current) global index.
+	/// Sorted by newest to oldest run.
+	fn levels_and_runs(
+		&self,
+	) -> impl Stream<Item = Result<Either<(usize, Level<K, V>), (usize, Run<K, V>)>, StorageError>> + '_ {
+		async_stream::try_stream! {
+			let mut global_level_index = 0;
+			let mut global_run_index = 0;
+			let levels = self.levels();
+			for await level in levels {
+				let level = level?;
+				let runs = NodeStream::from_link(self.storage.clone(), level.runs);
+				yield Either::Left((global_level_index, level));
+				for await run in runs {
+					yield Either::Right((global_run_index, run?));
+					global_run_index += 1;
+				}
+				global_level_index += 1;
 			}
 		}
 	}
