@@ -16,7 +16,9 @@ pub trait DagCollection: Sized + Default {
 
 /// A wrapper type for DagLink types that use vectors
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub struct DagVec<V>(OptionLink<Node<V>>);
+pub struct DagVec<V>(OptionLink<Node<V>>)
+where
+	V: Clone;
 impl<V> DagVec<V>
 where
 	V: Clone + Serialize + DeserializeOwned + 'static,
@@ -25,12 +27,18 @@ where
 		Self(link)
 	}
 }
-impl<V> Clone for DagVec<V> {
+impl<V> Clone for DagVec<V>
+where
+	V: Clone,
+{
 	fn clone(&self) -> Self {
 		Self(self.0)
 	}
 }
-impl<V> Default for DagVec<V> {
+impl<V> Default for DagVec<V>
+where
+	V: Clone,
+{
 	fn default() -> Self {
 		Self(OptionLink::none())
 	}
@@ -98,8 +106,8 @@ where
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DagMap<K, V>(OptionLink<Node<(K, V)>>)
 where
-	K: Ord + Clone + Serialize,
-	V: Clone + Serialize;
+	K: Ord + Clone,
+	V: Clone;
 impl<K, V> DagCollection for DagMap<K, V>
 where
 	K: Ord + Clone + Serialize + DeserializeOwned + 'static,

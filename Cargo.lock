@@ -1701,6 +1701,7 @@ name = "co-primitives"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stream",
  "async-trait",
  "cid 0.11.1",
  "co-macros",

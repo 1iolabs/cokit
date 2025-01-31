@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::{
 	any::type_name,
 	fmt::{Debug, Display},
+	hash::Hash,
 	marker::PhantomData,
 };
 
@@ -91,6 +92,11 @@ impl<T> Default for OptionLink<T> {
 impl<T> PartialEq for OptionLink<T> {
 	fn eq(&self, other: &Self) -> bool {
 		self.cid == other.cid
+	}
+}
+impl<T> Hash for OptionLink<T> {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.cid.hash(state);
 	}
 }
 impl<T> Ord for OptionLink<T> {

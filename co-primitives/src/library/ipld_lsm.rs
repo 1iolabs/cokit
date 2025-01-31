@@ -1,0 +1,607 @@
+use crate::{
+	types::dag_collection_async_ext::DagCollectionAsyncExt, BlockStorage, BlockStorageExt, DagCollection, DagVec, Link,
+	Node, NodeBuilder, NodeStream, OptionLink, StorageError,
+};
+use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{
+	cmp::Ordering,
+	collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque},
+	future::ready,
+	hash::Hash,
+	mem::swap,
+	num::TryFromIntError,
+};
+
+/// LSM Tree Root.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Root<K, V>
+where
+	K: Hash + Ord + Clone + Send + Sync + 'static,
+	V: Clone + Send + Sync + 'static,
+{
+	/// Levels.
+	#[serde(rename = "l")]
+	pub levels: Vec<Link<Level<K, V>>>,
+
+	/// Active "in memory data".
+	#[serde(rename = "a")]
+	pub active: DagVec<(K, Value<V>)>,
+
+	/// Tree settings.
+	#[serde(rename = "s")]
+	pub settings: TreeSettings,
+}
+
+/// LSM Tree Level.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Level<K, V>
+where
+	K: Hash + Ord + Clone + Send + Sync + 'static,
+	V: Clone + Send + Sync + 'static,
+{
+	#[serde(rename = "r")]
+	pub runs: OptionLink<Node<Run<K, V>>>,
+}
+
+/// LSM Tree Run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Run<K, V>
+where
+	K: Hash + Ord + Clone + Send + Sync + 'static,
+	V: Clone + Send + Sync + 'static,
+{
+	#[serde(rename = "e")]
+	pub entries: DagVec<(K, Value<V>)>,
+	#[serde(rename = "i")]
+	pub bloom: Vec<u8>,
+	#[serde(rename = "l")]
+	pub min_key: K,
+	#[serde(rename = "h")]
+	pub max_key: K,
+}
+impl<K, V> Run<K, V>
+where
+	K: Hash + Ord + Clone + Send + Sync + 'static,
+	V: Clone + Send + Sync + 'static,
+{
+	/// Tests if the run possibly contains an key.
+	/// TODO: Add bloom filter
+	fn may_contains_key(&self, key: &K) -> bool {
+		key >= &self.min_key && key <= &self.max_key
+	}
+}
+
+// /// LSM Tree Sorted Data Block Node.
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// pub enum Node<K, V>
+// where
+// 	K: Hash + Ord + Clone + 'static,
+// 	V: Clone + 'static,
+// {
+// 	#[serde(rename = "n")]
+// 	Internal(Vec<Link<Self>>),
+
+// 	#[serde(rename = "l")]
+// 	Leaf(BTreeMap<K, V>),
+// }
+// impl<K, V> Node<K, V>
+// where
+// 	K: Hash + Ord + Clone + 'static,
+// 	V: Clone + 'static,
+// {
+// 	fn may_contains_key(&self, key: &K) -> bool {
+// 		key >= &self.min_key && key <= &self.max_key
+// 	}
+// }
+
+/// LSM Tree Value.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Value<V>
+where
+	V: Clone + 'static,
+{
+	Value(V),
+	Tombstone,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TreeSettings {
+	/// Max entries (K/V pairs) count in a leaf node.
+	#[serde(rename = "n", default = "TreeSettings::default_max_node_entries")]
+	pub max_node_entries: u64,
+
+	/// Limits entries (K/V pairs) in active (in memory) run.
+	/// Overruning this limit will cause a new L0 run gets created.
+	#[serde(rename = "a", default = "TreeSettings::default_max_active_entries")]
+	pub max_active_entries: u64,
+
+	/// Limits runs in a level.
+	/// Overruning this limit will cause a compaction to next level.
+	#[serde(rename = "r", default = "TreeSettings::default_max_run_count")]
+	pub max_run_count: u64,
+}
+impl TreeSettings {
+	pub fn default_max_node_entries() -> u64 {
+		2 ^ 8 // 256
+	}
+	pub fn default_max_active_entries() -> u64 {
+		2 ^ 14 // 16k
+	}
+	pub fn default_max_run_count() -> u64 {
+		2 ^ 4 // 16
+	}
+}
+impl Default for TreeSettings {
+	fn default() -> Self {
+		Self {
+			max_node_entries: Self::default_max_node_entries(),
+			max_active_entries: Self::default_max_active_entries(),
+			max_run_count: Self::default_max_run_count(),
+		}
+	}
+}
+
+/// LSM Tree Instance.
+pub struct Tree<S, K, V>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	/// Storage instance.
+	storage: S,
+
+	/// LSM Root.
+	root: OptionLink<Root<K, V>>,
+
+	/// Active in memory pairs.
+	active: BTreeMap<K, Value<V>>,
+
+	// Limits items in memory run.
+	settings: TreeSettings,
+	// level_cache: Arc<RwLock<BTreeMap<Cid, Level<K, V>>>>,
+	// run_cache: Arc<RwLock<BTreeMap<Cid, Run<K, V>>>>,
+}
+impl<S, K, V> Tree<S, K, V>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	/// Create new empty tree.
+	pub fn new(storage: S, settings: TreeSettings) -> Self {
+		Self { active: Default::default(), settings, root: OptionLink::none(), storage }
+	}
+
+	/// Load Tree from root CID.
+	pub async fn load(storage: S, root: Link<Root<K, V>>) -> Result<Self, StorageError> {
+		let mut result = Self { active: Default::default(), settings: Default::default(), root: root.into(), storage };
+		if let Some(root) = result.root().await? {
+			result.settings = root.settings;
+			result.active = NodeStream::from_link(result.storage.clone(), root.active.link())
+				.try_collect()
+				.await?;
+		}
+		Ok(result)
+	}
+
+	pub async fn insert(&mut self, key: K, value: V) -> Result<(), StorageError> {
+		// insert entry to memory run
+		self.active.insert(key, Value::Value(value));
+
+		// flush?
+		if self.active.len() > self.settings.max_active_entries as usize {
+			self.flush_active().await?;
+		}
+
+		// result
+		Ok(())
+	}
+
+	pub async fn remove(&mut self, key: K) -> Result<(), StorageError> {
+		// insert tombstone to memory run
+		self.active.insert(key, Value::Tombstone);
+
+		// flush?
+		if self.active.len() > self.settings.max_active_entries as usize {
+			self.flush_active().await?;
+		}
+
+		// result
+		Ok(())
+	}
+
+	pub async fn get(&self, key: &K) -> Result<Option<V>, StorageError> {
+		match self.active.get(key) {
+			Some(Value::Value(v)) => Ok(Some(v.clone())),
+			Some(Value::Tombstone) => Ok(None),
+			None => {
+				// iterate runs (most up-to-date is the first)
+				let runs = self.runs();
+				pin_mut!(runs);
+				while let Some(run) = runs.try_next().await? {
+					if run.may_contains_key(key) {
+						// iterate entries (sorted by key)
+						// TODO: implement binary search (and/or sparse index)
+						let entries = run.entries.stream(&self.storage);
+						pin_mut!(entries);
+						while let Some(entry) = entries.try_next().await? {
+							if &entry.0 == key {
+								return match entry.1 {
+									Value::Value(value) => Ok(Some(value)),
+									Value::Tombstone => Ok(None),
+								};
+							}
+						}
+					}
+				}
+				Ok(None)
+			},
+		}
+	}
+
+	pub async fn contains_key(&self, key: &K) -> Result<bool, StorageError> {
+		Ok(self.get(key).await?.is_some())
+	}
+
+	pub fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+		self.create_stream(None)
+	}
+
+	fn create_stream(
+		&self,
+		only_run_indicies: Option<BTreeSet<usize>>,
+	) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+		let storage = self.storage.clone();
+		async_stream::try_stream! {
+			// // record which keys are already seen in "newer" runs and has to be skipped form old runs
+			// // TODO: improve memory usage
+			// let mut seen = BTreeSet::new();
+
+			// heap (max-sorted)
+			let mut heap = match only_run_indicies {
+				Some(_) => BinaryHeap::new(),
+				None => BinaryHeap::<TreeStreamItem<K, V>>::from(
+					self.active
+						.clone()
+						.into_iter()
+						.map(|item| TreeStreamItem { run: None, item })
+						.collect::<Vec<_>>(),
+				),
+			};
+
+			// runs
+			//  filter and pop first item of each run
+			let mut runs: Vec<(usize, NodeStream<S, _>)> = self
+				.runs()
+				.enumerate()
+				.filter(|(index, _)| ready(match &only_run_indicies {
+					Some(run_indicies) => run_indicies.contains(index),
+					None => true,
+				}))
+				.map(|(index, run)| match run {
+					Ok(run) => Ok((index, NodeStream::from_link(storage.clone(), run.entries.link()))),
+					Err(err) => Err(err),
+				})
+				.try_collect()
+				.await?;
+			for (run_index, run) in runs.iter_mut() {
+				if let Some(item) = run.try_next().await? {
+					heap.push(TreeStreamItem { run: Some(*run_index), item });
+				}
+			}
+
+			// walk tree
+			while let Some(item) = heap.pop() {
+				// pop superseded keys
+				//  we sort the TreeStreamItem by key and run index so we receive the next key front the most recent run first
+				while let Some(next_item) = heap.peek() {
+					if next_item.item.0 == item.item.0 {
+						heap.pop();
+					}
+				}
+
+				// fetch next
+				//  every time we take an item from an run we fetch the next one
+				//  so the heap can determine which are the next in sequence
+				//  once a run runs out of items it will not be asked again as all run items poped
+				if let Some(run_index) = item.run {
+					if let Some((_, run)) = runs.get_mut(run_index) {
+						if let Some(item) = run.try_next().await? {
+							heap.push(TreeStreamItem { run: Some(run_index), item });
+						}
+					}
+				}
+
+				// // already seen this key?
+				// if !seen.contains(&item.item.0) {
+				// 	seen.insert(item.item.0.clone());
+				// } else {
+				// 	continue;
+				// }
+
+				// yield values
+				if let Value::Value(value) = item.item.1 {
+					yield (item.item.0, value);
+				}
+			}
+		}
+		// TreeStream::new(self)
+	}
+
+	/// Store active items and return the root link.
+	pub async fn store(&mut self) -> Result<OptionLink<Root<K, V>>, StorageError> {
+		// get root
+		let mut root = match self.root().await? {
+			Some(root) => root,
+			None => {
+				// collection empty?
+				if self.active.is_empty() {
+					return Ok(OptionLink::none());
+				}
+
+				// new root
+				Root { levels: Default::default(), active: Default::default(), settings: self.settings.clone() }
+			},
+		};
+
+		// store active
+		root.active = DagVec::new(self.store_entries(self.active.iter()).await?);
+
+		// store root
+		self.root = self.storage.set_value(&root).await?.into();
+
+		// result
+		Ok(self.root)
+	}
+
+	/// Flush active in memory entries as a new run.
+	async fn flush_active(&mut self) -> Result<usize, StorageError> {
+		// validate
+		if self.active.is_empty() {
+			return Ok(0);
+		}
+		let min_key = if let Some((min_key, _)) = self.active.first_key_value() {
+			min_key.clone()
+		} else {
+			return Ok(0);
+		};
+		let max_key = if let Some((max_key, _)) = self.active.last_key_value() {
+			max_key.clone()
+		} else {
+			return Ok(0);
+		};
+		if min_key == max_key {
+			return Ok(0);
+		}
+
+		// entries
+		let root = self.store_entries(self.active.iter()).await?;
+
+		// run
+		let run = Run {
+			entries: DagVec::new(root),
+			bloom: vec![], // todo
+			min_key,
+			max_key,
+		};
+
+		// get/create root
+		let mut root = match self.root().await? {
+			Some(root) => root,
+			None => Root { levels: Default::default(), active: Default::default(), settings: self.settings.clone() },
+		};
+
+		// add as first run to level 0
+		let mut level0 = match root.levels.get(0) {
+			Some(level_link) => self.storage.get_value(level_link).await?,
+			None => Level { runs: Default::default() },
+		};
+		let mut runs = NodeStream::from_link(self.storage.clone(), level0.runs)
+			.try_collect::<VecDeque<_>>()
+			.await?;
+		runs.push_front(run);
+		level0.runs = self.store_entries(runs.iter()).await?;
+		let mut next_level0_link = self.storage.set_value(&level0).await?;
+
+		// store root with next level0
+		match root.levels.get_mut(0) {
+			Some(level) => swap(level, &mut next_level0_link),
+			None => root.levels.insert(0, next_level0_link),
+		}
+		self.root = self.storage.set_value(&root).await?.into();
+
+		// cleanup when everything has succedded
+		self.active.clear();
+
+		// result
+		Ok(0)
+	}
+
+	/// Store `entries` as DAG and return the root [`Cid`].
+	async fn store_entries<T, O>(&self, entries: impl Iterator<Item = T>) -> Result<OptionLink<Node<O>>, StorageError>
+	where
+		T: Clone + Serialize,
+	{
+		let mut node_builder = NodeBuilder::<_, S::StoreParams>::new(
+			self.settings
+				.max_node_entries
+				.try_into()
+				.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
+			Default::default(),
+		);
+		for entry in entries {
+			node_builder.push(entry).map_err(|e| StorageError::InvalidArgument(e.into()))?;
+			for block in node_builder.take_blocks() {
+				self.storage.set(block).await?;
+			}
+		}
+		let (root, blocks) = node_builder
+			.into_blocks()
+			.map_err(|e| StorageError::InvalidArgument(e.into()))?;
+		for block in blocks.into_iter() {
+			self.storage.set(block).await?;
+		}
+
+		// result
+		Ok(root.into())
+	}
+
+	/// Compact `level` to next level.
+	fn compact_level(&mut self, level: usize) -> Result<(), StorageError> {
+		todo!();
+	}
+
+	/// Root.
+	async fn root(&self) -> Result<Option<Root<K, V>>, StorageError> {
+		Ok(self.storage.get_value_or_none(&self.root).await?)
+	}
+
+	/// All active levels.
+	fn levels(&self) -> impl Stream<Item = Result<Level<K, V>, StorageError>> + '_ {
+		async_stream::try_stream! {
+			if let Some(root) = self.root().await? {
+				for level_link in root.levels.iter() {
+					let level = self.storage.get_value(level_link).await?;
+					yield level;
+				}
+			}
+		}
+	}
+
+	/// All active runs.
+	/// Sorted by newest to oldest run.
+	fn runs(&self) -> impl Stream<Item = Result<Run<K, V>, StorageError>> + '_ {
+		async_stream::try_stream! {
+			let levels = self.levels();
+			for await level in levels {
+				let level = level?;
+				let runs = NodeStream::from_link(self.storage.clone(), level.runs);
+				for await run in runs {
+					yield run?;
+				}
+			}
+		}
+	}
+}
+
+#[derive(Debug)]
+struct TreeStreamItem<K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	run: Option<usize>,
+	item: (K, Value<V>),
+}
+impl<K, V> PartialEq for TreeStreamItem<K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	fn eq(&self, other: &Self) -> bool {
+		self.item.0 == other.item.0
+	}
+}
+impl<K, V> Eq for TreeStreamItem<K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+}
+impl<K, V> PartialOrd for TreeStreamItem<K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.item.0.cmp(&other.item.0))
+	}
+}
+impl<K, V> Ord for TreeStreamItem<K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		// invert the result as the binaryheap always returns the max item first
+		match self.item.0.cmp(&other.item.0) {
+			Ordering::Less => Ordering::Greater,
+			Ordering::Greater => Ordering::Less,
+			Ordering::Equal => {
+				// sort by run index so the most recent run item is the last
+				other.run.cmp(&self.run)
+			},
+		}
+	}
+}
+
+// struct TreeStream<S, K, V>
+// where
+// 	S: BlockStorage + Clone + 'static,
+// 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+// 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+// {
+// 	storage: S,
+// 	runs: Vec<NodeStream<S, (K, Value<V>)>>,
+// 	heap: BinaryHeap<TreeStreamItem<K, V>>,
+// 	pending: Option<TryNext<'static, NodeStream<S, (K, Value<V>)>>>,
+// }
+// impl<S, K, V> TreeStream<S, K, V>
+// where
+// 	S: BlockStorage + Clone + 'static,
+// 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+// 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+// {
+// 	pub async fn new(tree: Tree<S, K, V>) -> Result<Self, StorageError> {
+// 		let mut result = Self {
+// 			storage: tree.storage.clone(),
+// 			runs: tree
+// 				.runs()
+// 				.map_ok(|run| NodeStream::from_link(tree.storage.clone(), run.entries.link()))
+// 				.try_collect()
+// 				.await?,
+// 			heap: BinaryHeap::from(
+// 				tree.active
+// 					.clone()
+// 					.into_iter()
+// 					.map(|item| TreeStreamItem { run: None, item })
+// 					.collect::<Vec<_>>(),
+// 			),
+// 			pending: None,
+// 		};
+// 		for (run_index, run) in result.runs.iter_mut().enumerate() {
+// 			if let Some(item) = run.try_next().await? {
+// 				result.heap.push(TreeStreamItem { run: Some(run_index), item });
+// 			}
+// 		}
+// 		Ok(result)
+// 	}
+// }
+// impl<S, K, V> Stream for TreeStream<S, K, V>
+// where
+// 	S: BlockStorage + Clone + 'static,
+// 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+// 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+// {
+// 	type Item = Result<(K, V), StorageError>;
+
+// 	fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+// 		match self.heap.pop() {
+// 			None => Poll::Ready(None),
+// 			Some(item) => {
+// 				// fetch next
+// 				if let Some(run) = item.run {
+// 					if let Some(run) = self.runs.get_mut(run) {
+// 						run.try_next()
+// 					}
+// 				}
+
+// 				// result
+// 				Poll::Ready(Ok(item.item))
+// 			},
+// 		}
+// 	}
+// }

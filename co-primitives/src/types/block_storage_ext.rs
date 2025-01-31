@@ -8,13 +8,11 @@ pub trait BlockStorageExt: BlockStorage {
 	/// Get value from link.
 	async fn get_value<T, L>(&self, link: &L) -> Result<T, StorageError>
 	where
-		T: Send + Sync + Sync + DeserializeOwned,
+		T: Send + Sync + DeserializeOwned,
 		L: Linkable<T> + Send + Sync,
 	{
 		match link.value() {
-			Either::Left(cid) => {
-				Ok(BlockSerializer::new().deserialize(&self.get(MultiCodec::with_dag_cbor(&cid)?).await?)?)
-			},
+			Either::Left(cid) => Ok(self.get_deserialized(&cid).await?),
 			Either::Right(value) => Ok(value),
 		}
 	}
@@ -24,7 +22,19 @@ pub trait BlockStorageExt: BlockStorage {
 	where
 		T: Send + Sync + DeserializeOwned + Default,
 	{
-		self.get_default(link.as_ref()).await
+		Ok(self.get_value_or_none(link).await?.unwrap_or_default())
+	}
+
+	/// Get value or default from link.
+	async fn get_value_or_none<T>(&self, link: &OptionLink<T>) -> Result<Option<T>, StorageError>
+	where
+		T: Send + Sync + DeserializeOwned,
+	{
+		if let Some(cid) = link.cid() {
+			Ok(self.get_deserialized(cid).await?)
+		} else {
+			Ok(None)
+		}
 	}
 
 	/// Create link for value.
@@ -32,10 +42,7 @@ pub trait BlockStorageExt: BlockStorage {
 	where
 		T: Send + Sync + Serialize,
 	{
-		let block = BlockSerializer::new()
-			.serialize(value)
-			.map_err(|e| StorageError::InvalidArgument(e.into()))?;
-		Ok(self.set(block).await?.into())
+		Ok(self.set_serialized(value).await?.into())
 	}
 
 	/// Get deserialized value.
@@ -43,9 +50,7 @@ pub trait BlockStorageExt: BlockStorage {
 	where
 		T: Send + Sync + DeserializeOwned,
 	{
-		Ok(BlockSerializer::new()
-			.deserialize(&self.get(MultiCodec::with_dag_cbor(item)?).await?)
-			.map_err(|e| StorageError::InvalidArgument(e.into()))?)
+		Ok(BlockSerializer::new().deserialize(&self.get(MultiCodec::with_dag_cbor(item)?).await?)?)
 	}
 
 	/// Set serialized value.
@@ -62,11 +67,7 @@ pub trait BlockStorageExt: BlockStorage {
 	where
 		T: Send + Sync + Default + DeserializeOwned,
 	{
-		Ok(if let Some(item) = item {
-			BlockSerializer::new().deserialize(&self.get(MultiCodec::with_dag_cbor(&item)?).await?)?
-		} else {
-			T::default()
-		})
+		Ok(if let Some(item) = item { self.get_deserialized(item).await? } else { T::default() })
 	}
 }
 impl<T> BlockStorageExt for T where T: BlockStorage + ?Sized {}
