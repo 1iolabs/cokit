@@ -187,6 +187,7 @@ where
 		Ok(result)
 	}
 
+	/// Insert/Replace key.
 	pub async fn insert(&mut self, key: K, value: V) -> Result<(), StorageError> {
 		// insert entry to memory run
 		self.active.insert(key, Value::Value(value));
@@ -200,6 +201,7 @@ where
 		Ok(())
 	}
 
+	/// Remove key.
 	pub async fn remove(&mut self, key: K) -> Result<(), StorageError> {
 		// insert tombstone to memory run
 		self.active.insert(key, Value::Tombstone);
@@ -213,6 +215,7 @@ where
 		Ok(())
 	}
 
+	/// Get value for key.
 	pub async fn get(&self, key: &K) -> Result<Option<V>, StorageError> {
 		match self.active.get(key) {
 			Some(Value::Value(v)) => Ok(Some(v.clone())),
@@ -246,20 +249,23 @@ where
 		Ok(self.get(key).await?.is_some())
 	}
 
+	/// Stream all tree entries.
 	pub fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
-		self.create_stream(None)
+		self.create_stream(None).try_filter_map(|item| {
+			ready(Ok(match item.1 {
+				Value::Value(value) => Some((item.0, value)),
+				Value::Tombstone => None,
+			}))
+		})
 	}
 
+	/// Iterate on runs.
 	fn create_stream(
 		&self,
 		only_run_indicies: Option<BTreeSet<usize>>,
-	) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + '_ {
 		let storage = self.storage.clone();
 		async_stream::try_stream! {
-			// // record which keys are already seen in "newer" runs and has to be skipped form old runs
-			// // TODO: improve memory usage
-			// let mut seen = BTreeSet::new();
-
 			// heap (max-sorted)
 			let mut heap = match only_run_indicies {
 				Some(_) => BinaryHeap::new(),
@@ -294,41 +300,47 @@ where
 			}
 
 			// walk tree
-			while let Some(item) = heap.pop() {
+			while let Some(item) = Self::pop_and_fetch(&mut heap, &mut runs).await? {
 				// pop superseded keys
 				//  we sort the TreeStreamItem by key and run index so we receive the next key front the most recent run first
 				while let Some(next_item) = heap.peek() {
 					if next_item.item.0 == item.item.0 {
-						heap.pop();
+						Self::pop_and_fetch(&mut heap, &mut runs).await?;
+					} else {
+						break;
 					}
 				}
-
-				// fetch next
-				//  every time we take an item from an run we fetch the next one
-				//  so the heap can determine which are the next in sequence
-				//  once a run runs out of items it will not be asked again as all run items poped
-				if let Some(run_index) = item.run {
-					if let Some((_, run)) = runs.get_mut(run_index) {
-						if let Some(item) = run.try_next().await? {
-							heap.push(TreeStreamItem { run: Some(run_index), item });
-						}
-					}
-				}
-
-				// // already seen this key?
-				// if !seen.contains(&item.item.0) {
-				// 	seen.insert(item.item.0.clone());
-				// } else {
-				// 	continue;
-				// }
 
 				// yield values
-				if let Value::Value(value) = item.item.1 {
-					yield (item.item.0, value);
-				}
+				yield item.item;
 			}
 		}
 		// TreeStream::new(self)
+	}
+
+	/// Pop item and continue to read the run.
+	async fn pop_and_fetch(
+		heap: &mut BinaryHeap<TreeStreamItem<K, V>>,
+		runs: &mut Vec<(usize, NodeStream<S, (K, Value<V>)>)>,
+	) -> Result<Option<TreeStreamItem<K, V>>, StorageError> {
+		if let Some(item) = heap.pop() {
+			// fetch next
+			//  every time we take an item from an run we fetch the next one
+			//  so the heap can determine which are the next in sequence
+			//  once a run runs out of items it will not be asked again as all run items poped
+			if let Some(run_index) = item.run {
+				if let Some((_, run)) = runs.get_mut(run_index) {
+					if let Some(item) = run.try_next().await? {
+						heap.push(TreeStreamItem { run: Some(run_index), item });
+					}
+				}
+			}
+
+			// result
+			Ok(Some(item))
+		} else {
+			Ok(None)
+		}
 	}
 
 	/// Store active items and return the root link.
@@ -395,6 +407,8 @@ where
 		};
 
 		// add as first run to level 0
+		//  note: this currently loads all run "metadata" entries into memory however that should be ok because we dont
+		//   expect the run numbers to be very large.
 		let mut level0 = match root.levels.get(0) {
 			Some(level_link) => self.storage.get_value(level_link).await?,
 			None => Level { runs: Default::default() },
@@ -420,7 +434,7 @@ where
 		Ok(0)
 	}
 
-	/// Store `entries` as DAG and return the root [`Cid`].
+	/// Store `entries` as DAG and return the root [`cid::Cid`].
 	async fn store_entries<T, O>(&self, entries: impl Iterator<Item = T>) -> Result<OptionLink<Node<O>>, StorageError>
 	where
 		T: Clone + Serialize,
@@ -517,7 +531,7 @@ where
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.item.0.cmp(&other.item.0))
+		Some(self.cmp(&other))
 	}
 }
 impl<K, V> Ord for TreeStreamItem<K, V>
@@ -538,70 +552,69 @@ where
 	}
 }
 
-// struct TreeStream<S, K, V>
-// where
-// 	S: BlockStorage + Clone + 'static,
-// 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-// 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-// {
-// 	storage: S,
-// 	runs: Vec<NodeStream<S, (K, Value<V>)>>,
-// 	heap: BinaryHeap<TreeStreamItem<K, V>>,
-// 	pending: Option<TryNext<'static, NodeStream<S, (K, Value<V>)>>>,
-// }
-// impl<S, K, V> TreeStream<S, K, V>
-// where
-// 	S: BlockStorage + Clone + 'static,
-// 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-// 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-// {
-// 	pub async fn new(tree: Tree<S, K, V>) -> Result<Self, StorageError> {
-// 		let mut result = Self {
-// 			storage: tree.storage.clone(),
-// 			runs: tree
-// 				.runs()
-// 				.map_ok(|run| NodeStream::from_link(tree.storage.clone(), run.entries.link()))
-// 				.try_collect()
-// 				.await?,
-// 			heap: BinaryHeap::from(
-// 				tree.active
-// 					.clone()
-// 					.into_iter()
-// 					.map(|item| TreeStreamItem { run: None, item })
-// 					.collect::<Vec<_>>(),
-// 			),
-// 			pending: None,
-// 		};
-// 		for (run_index, run) in result.runs.iter_mut().enumerate() {
-// 			if let Some(item) = run.try_next().await? {
-// 				result.heap.push(TreeStreamItem { run: Some(run_index), item });
-// 			}
-// 		}
-// 		Ok(result)
-// 	}
-// }
-// impl<S, K, V> Stream for TreeStream<S, K, V>
-// where
-// 	S: BlockStorage + Clone + 'static,
-// 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-// 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-// {
-// 	type Item = Result<(K, V), StorageError>;
+#[cfg(test)]
+mod tests {
+	use super::Tree;
+	use crate::{Block, BlockStorage, DefaultParams, StorageError};
+	use anyhow::anyhow;
+	use async_trait::async_trait;
+	use cid::Cid;
+	use futures::{lock::Mutex, TryStreamExt};
+	use std::{collections::BTreeMap, sync::Arc};
 
-// 	fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-// 		match self.heap.pop() {
-// 			None => Poll::Ready(None),
-// 			Some(item) => {
-// 				// fetch next
-// 				if let Some(run) = item.run {
-// 					if let Some(run) = self.runs.get_mut(run) {
-// 						run.try_next()
-// 					}
-// 				}
+	#[derive(Debug, Default, Clone)]
+	struct TestStorage {
+		items: Arc<Mutex<BTreeMap<Cid, Block<DefaultParams>>>>,
+	}
+	#[async_trait]
+	impl BlockStorage for TestStorage {
+		type StoreParams = DefaultParams;
 
-// 				// result
-// 				Poll::Ready(Ok(item.item))
-// 			},
-// 		}
-// 	}
-// }
+		async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+			self.items
+				.lock()
+				.await
+				.get(cid)
+				.ok_or_else(|| StorageError::NotFound(*cid, anyhow!("No record")))
+				.cloned()
+		}
+		async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+			let cid = *block.cid();
+			self.items.lock().await.insert(cid, block);
+			Ok(cid)
+		}
+		async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
+			self.items.lock().await.remove(cid);
+			Ok(())
+		}
+	}
+
+	#[tokio::test]
+	async fn smoke() {
+		let storage = TestStorage::default();
+		let mut tree = Tree::new(storage.clone(), Default::default());
+		tree.insert("hello".to_owned(), "world".to_owned()).await.unwrap();
+		tree.insert("1".to_owned(), "2".to_owned()).await.unwrap();
+		tree.insert("3".to_owned(), "4".to_owned()).await.unwrap();
+		assert_eq!(
+			tree.stream().try_collect::<Vec<_>>().await.unwrap(),
+			vec![
+				("1".to_owned(), "2".to_owned()),
+				("3".to_owned(), "4".to_owned()),
+				("hello".to_owned(), "world".to_owned())
+			]
+		);
+
+		// reload
+		let root = tree.store().await.unwrap().unwrap();
+		let tree2 = Tree::load(storage.clone(), root).await.unwrap();
+		assert_eq!(
+			tree2.stream().try_collect::<Vec<_>>().await.unwrap(),
+			vec![
+				("1".to_owned(), "2".to_owned()),
+				("3".to_owned(), "4".to_owned()),
+				("hello".to_owned(), "world".to_owned())
+			]
+		);
+	}
+}

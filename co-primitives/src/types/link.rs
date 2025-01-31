@@ -139,6 +139,14 @@ impl<T> OptionLink<T> {
 	pub fn set(&mut self, cid: Option<Cid>) {
 		self.cid = cid;
 	}
+
+	pub fn unwrap(&self) -> Link<T> {
+		Link::new(self.cid.unwrap())
+	}
+
+	pub fn expect(&self, message: &str) -> Link<T> {
+		Link::new(self.cid.expect(message))
+	}
 }
 impl<T> Clone for OptionLink<T> {
 	fn clone(&self) -> Self {
