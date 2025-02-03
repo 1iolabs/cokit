@@ -1,4 +1,4 @@
-use crate::{Node, NodeContainer, OptionLink};
+use crate::{Node, OptionLink};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
 	cmp::Ord,
@@ -58,14 +58,6 @@ where
 		self.0 = link;
 	}
 }
-impl<V> NodeContainer<V> for DagVec<V>
-where
-	V: Clone + Serialize + DeserializeOwned + 'static,
-{
-	fn node_container_link(&self) -> OptionLink<Node<V>> {
-		OptionLink::new(*self.0.cid())
-	}
-}
 
 /// A wrapper for DagLink types that use the BTreeSet type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -91,14 +83,6 @@ where
 {
 	fn default() -> Self {
 		Self(OptionLink::none())
-	}
-}
-impl<V> NodeContainer<V> for DagSet<V>
-where
-	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
-{
-	fn node_container_link(&self) -> OptionLink<Node<V>> {
-		OptionLink::new(*self.0.cid())
 	}
 }
 
@@ -131,15 +115,6 @@ where
 {
 	fn default() -> Self {
 		Self(Default::default())
-	}
-}
-impl<K, V> NodeContainer<(K, V)> for DagMap<K, V>
-where
-	K: Ord + Clone + Serialize + DeserializeOwned + 'static,
-	V: Ord + Clone + Serialize + DeserializeOwned + 'static,
-{
-	fn node_container_link(&self) -> OptionLink<Node<(K, V)>> {
-		OptionLink::new(*self.0.cid())
 	}
 }
 

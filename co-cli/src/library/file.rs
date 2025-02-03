@@ -1,9 +1,8 @@
 use co_core_co::CoAction;
 use co_core_file::{FolderNode, Node};
-use co_primitives::{tags, AbsolutePath, AbsolutePathOwned, PathError, PathExt};
+use co_primitives::{tags, AbsolutePath, AbsolutePathOwned, DagCollectionAsyncExt, PathError, PathExt};
 use co_sdk::{
-	CoReducer, CoReducerError, CoStorage, Cores, NodeStream, PrivateIdentity, StorageError, CO_CORE_FILE,
-	CO_CORE_NAME_CO,
+	CoReducer, CoReducerError, CoStorage, Cores, PrivateIdentity, StorageError, CO_CORE_FILE, CO_CORE_NAME_CO,
 };
 use futures::{pin_mut, Stream, StreamExt};
 use std::{
@@ -62,11 +61,11 @@ pub fn list_nodes(
 	path: AbsolutePathOwned,
 ) -> impl Stream<Item = Result<Node, StorageError>> {
 	async_stream::try_stream! {
-		let stream = NodeStream::from_node_container(storage.clone(), &file_state.nodes);
+		let stream = file_state.nodes.stream(&storage);
 		for await directory in stream {
 			let (directory_path, children) = directory?;
 			if directory_path == path {
-				let children_stream = NodeStream::from_node_container(storage.clone(), &children);
+				let children_stream = children.stream(&storage);
 				for await node in children_stream {
 					yield node?
 				}
@@ -135,7 +134,7 @@ pub fn nodes(
 ) -> impl Stream<Item = Result<(AbsolutePathOwned, Node), StorageError>> {
 	let mut seen_paths = if let Some(paths) = &paths { paths.len() } else { 0 };
 	async_stream::try_stream! {
-		let stream = NodeStream::from_node_container(storage.clone(), &file_state.nodes);
+		let stream = file_state.nodes.stream(&storage);
 		for await directory in stream {
 			let (directory_path, children) = directory?;
 
@@ -149,7 +148,7 @@ pub fn nodes(
 			}
 
 			// nodes
-			let children_stream = NodeStream::from_node_container(storage.clone(), &children);
+			let children_stream = children.stream(&storage);
 			for await node in children_stream {
 				let node = node?;
 				yield (directory_path.join_path(node.name()).map_err(|e| StorageError::Internal(e.into()))?, node)

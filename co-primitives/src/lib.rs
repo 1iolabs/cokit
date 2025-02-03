@@ -8,7 +8,7 @@ pub use library::{
 	cbor::{from_cbor, to_cbor, CborError},
 	ipld_lsm::{Tree, TreeSettings},
 	json::{from_json, from_json_string, to_json, to_json_string, JsonError},
-	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeContainer, NodeSerializer},
+	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
 	node_reader::{node_reader, NodeReaderError},
 	node_stream::NodeStream,
 };

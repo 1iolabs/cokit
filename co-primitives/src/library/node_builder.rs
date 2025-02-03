@@ -1,4 +1,4 @@
-use crate::{Block, BlockSerializer, DefaultParams, Link, OptionLink, StoreParams};
+use crate::{Block, BlockSerializer, DefaultParams, Link, StoreParams};
 use cid::Cid;
 use serde::{Deserialize, Serialize};
 use std::mem::{swap, take};
@@ -13,16 +13,6 @@ pub enum Node<T> {
 impl<T> Default for Node<T> {
 	fn default() -> Self {
 		Node::Leaf(vec![])
-	}
-}
-
-/// Trait for containers which stores items of type T.
-pub trait NodeContainer<T> {
-	fn node_container_link(&self) -> OptionLink<Node<T>>;
-}
-impl<T> NodeContainer<T> for OptionLink<Node<T>> {
-	fn node_container_link(&self) -> OptionLink<Node<T>> {
-		self.clone()
 	}
 }
 
@@ -46,7 +36,6 @@ impl Default for DefaultNodeSerializer {
 		Self::new()
 	}
 }
-
 impl DefaultNodeSerializer {
 	pub fn new() -> Self {
 		Self {}

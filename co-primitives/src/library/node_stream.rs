@@ -1,4 +1,4 @@
-use crate::{BlockStorage, BlockStorageExt, Node, NodeContainer, OptionLink, StorageError};
+use crate::{BlockStorage, BlockStorageExt, Node, OptionLink, StorageError};
 use cid::Cid;
 use futures::{Future, FutureExt, Stream};
 use pin_project::pin_project;
@@ -32,10 +32,6 @@ where
 
 	pub fn from_link(storage: S, link: OptionLink<Node<T>>) -> Self {
 		Self::new(storage, *link.cid())
-	}
-
-	pub fn from_node_container<N: NodeContainer<T>>(storage: S, container: &N) -> Self {
-		Self::from_link(storage, container.node_container_link())
 	}
 }
 impl<S, T> Stream for NodeStream<S, T>

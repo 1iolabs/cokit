@@ -1,20 +1,19 @@
-use crate::NodeStream;
-use co_primitives::NodeContainer;
+use co_primitives::DagCollectionAsyncExt;
 use co_storage::{BlockStorage, StorageError};
 use futures::{pin_mut, StreamExt};
 use serde::de::DeserializeOwned;
 
-/// Find first element in an [`NodeContainer`] (DagCollection) that matches an predicate.
+/// Find first element in an [`DagCollectionAsyncExt`] that matches an predicate.
 /// When an error is encountered it will be ignored and the search for the element continuts until there are no more
 /// elements, then the first error is returned.
 pub async fn find<T, N, F, S>(storage: &S, container: &N, predicate: F) -> Result<Option<T>, StorageError>
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 	T: std::fmt::Debug + DeserializeOwned + Send + Sync + 'static,
-	N: NodeContainer<T>,
+	N: DagCollectionAsyncExt<Item = T>,
 	F: Fn(&T) -> bool,
 {
-	let stream = NodeStream::from_node_container(storage.clone(), container);
+	let stream = container.stream(storage);
 	pin_mut!(stream);
 	let mut result = Ok(None);
 	while let Some(item) = stream.next().await {
@@ -69,7 +68,7 @@ where
 mod tests {
 	use crate::state::find;
 	use cid::Cid;
-	use co_primitives::{DefaultNodeSerializer, Node, NodeBuilder, NodeContainer, OptionLink};
+	use co_primitives::{DagCollection, DefaultNodeSerializer, Node, NodeBuilder, OptionLink};
 	use co_storage::{BlockStorage, MemoryBlockStorage};
 
 	#[tokio::test]
@@ -84,12 +83,19 @@ mod tests {
 		for block in blocks {
 			storage.set(block).await.unwrap();
 		}
+		#[derive(Debug, Default)]
 		struct DagVec {
 			cid: Option<Cid>,
 		}
-		impl NodeContainer<i32> for DagVec {
-			fn node_container_link(&self) -> OptionLink<Node<i32>> {
+		impl DagCollection for DagVec {
+			type Item = i32;
+			type Collection = Vec<i32>;
+
+			fn link(&self) -> OptionLink<Node<Self::Item>> {
 				self.cid.into()
+			}
+			fn set_link(&mut self, link: OptionLink<Node<Self::Item>>) {
+				self.cid = link.into();
 			}
 		}
 
