@@ -1,4 +1,6 @@
 use crate::{BlockStorage, BlockStorageExt, Link, Node, NodeBuilder, NodeStream, OptionLink, StorageError};
+use anyhow::anyhow;
+use bloomfilter::Bloom;
 use either::Either;
 use futures::{pin_mut, stream, FutureExt, Stream, StreamExt, TryStreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -6,6 +8,7 @@ use std::{
 	borrow::Cow,
 	cmp::Ordering,
 	collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque},
+	fmt::Debug,
 	future::ready,
 	hash::Hash,
 	mem::swap,
@@ -60,7 +63,7 @@ where
 
 	/// Key Bloom Filter.
 	#[serde(rename = "i")]
-	pub bloom: Vec<u8>,
+	pub bloom: BloomFilter,
 
 	/// The lowest key.
 	#[serde(rename = "l")]
@@ -78,7 +81,30 @@ where
 	/// Tests if the run possibly contains an key.
 	/// TODO: Add bloom filter
 	fn may_contains_key(&self, key: &K) -> bool {
-		key >= &self.min_key && key <= &self.max_key
+		key >= &self.min_key && key <= &self.max_key && self.bloom.may_contains_key(key)
+	}
+}
+
+/// Bloom Filter Implementations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum BloomFilter {
+	/// `bloomfilter = "3"`
+	#[serde(rename = "b", with = "serde_bytes")]
+	Bloomfilter(Vec<u8>),
+}
+impl BloomFilter {
+	/// Check if the bloom filter possibly contains an key.
+	pub fn may_contains_key<K: Hash + Ord + Clone + Send + Sync + 'static>(&self, key: &K) -> bool {
+		match self {
+			BloomFilter::Bloomfilter(data) => {
+				if let Ok(bloom) = Bloom::from_slice(&data) {
+					bloom.check(key)
+				} else {
+					true
+				}
+			},
+		}
 	}
 }
 
@@ -177,7 +203,7 @@ where
 impl<S, K, V> Tree<S, K, V>
 where
 	S: BlockStorage + Clone + 'static,
-	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	K: Debug + Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	/// Create new empty tree.
@@ -432,6 +458,7 @@ where
 		let run = if let Some(run) = self
 			.store_run(
 				stream::iter(self.active.iter()).map(|(key, value)| Ok((Cow::Borrowed(key), Cow::Borrowed(value)))),
+				self.active.len(),
 			)
 			.await?
 		{
@@ -517,33 +544,32 @@ where
 	async fn store_run<'a>(
 		&self,
 		entries: impl Stream<Item = Result<(Cow<'_, K>, Cow<'_, Value<V>>), StorageError>>,
+		entries_size_hint: usize,
 	) -> Result<Option<Run<K, V>>, StorageError> {
 		// entries
 		let mut min_key: Option<K> = None;
 		let mut max_key: Option<K> = None;
 		let mut size = 0;
+		let mut bloom = Bloom::<K>::new_for_fp_rate_with_seed(entries_size_hint, 0.001, &[0; 32])
+			.map_err(|e| StorageError::InvalidArgument(anyhow!("bloomfilter: {}", e)))?;
 		let entries_link = self
 			.store_entries(entries.inspect_ok(|(key, _)| {
-				if min_key.is_none() || min_key.as_ref().cmp(&Some(key)) == Ordering::Less {
+				if min_key.is_none() || Some(key.as_ref()).cmp(&min_key.as_ref()) == Ordering::Less {
 					min_key = Some(key.as_ref().clone());
 				}
-				if max_key.is_none() || max_key.as_ref().cmp(&Some(key)) == Ordering::Greater {
+				if max_key.is_none() || Some(key.as_ref()).cmp(&max_key.as_ref()) == Ordering::Greater {
 					max_key = Some(key.as_ref().clone());
 				}
 				size += 1;
+				bloom.set(key);
 			}))
 			.await?;
 		let (min_key, max_key) = match (min_key, max_key) {
 			(Some(min_key), Some(max_key)) => (min_key, max_key),
 			_ => return Ok(None),
 		};
-		let next_run = Run {
-			entries: entries_link,
-			size,
-			bloom: vec![], // TODO: bloom
-			min_key,
-			max_key,
-		};
+		let next_run =
+			Run { entries: entries_link, size, bloom: BloomFilter::Bloomfilter(bloom.to_bytes()), min_key, max_key };
 		Ok(Some(next_run))
 	}
 
@@ -610,7 +636,12 @@ where
 
 		// runs
 		let entries = self.create_stream(Some(runs.iter().map(|(_, global_run_index, _)| *global_run_index).collect()));
-		let run = self.store_run(entries.map_ok(|(k, v)| (Cow::Owned(k), Cow::Owned(v)))).await?;
+		let run = self
+			.store_run(
+				entries.map_ok(|(k, v)| (Cow::Owned(k), Cow::Owned(v))),
+				runs.iter().fold(0, |result, (_, _, run)| result + run.size) as usize,
+			)
+			.await?;
 		let run = if let Some(run) = run {
 			run
 		} else {
@@ -845,7 +876,20 @@ mod tests {
 	}
 
 	#[tokio::test]
-	async fn text_compact_l0() {
+	async fn test_get() {
+		let storage = TestStorage::default();
+		let settings = TreeSettings { max_node_entries: 32, max_active_entries: 2, max_run_count: 2 };
+		let mut tree = Tree::new(storage.clone(), settings);
+		tree.insert(1, 100).await.unwrap();
+		tree.insert(2, 200).await.unwrap();
+		tree.insert(3, 300).await.unwrap();
+		assert_eq!(tree.get(&1).await.unwrap(), Some(100));
+		assert_eq!(tree.get(&2).await.unwrap(), Some(200));
+		assert_eq!(tree.get(&3).await.unwrap(), Some(300));
+	}
+
+	#[tokio::test]
+	async fn test_compact() {
 		let storage = TestStorage::default();
 		let settings = TreeSettings { max_node_entries: 32, max_active_entries: 2, max_run_count: 2 };
 		let mut tree = Tree::new(storage.clone(), settings);
