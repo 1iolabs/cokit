@@ -1,5 +1,7 @@
+use super::node_builder::NodeReader;
 use crate::{BlockStorage, BlockStorageExt, Node, OptionLink, StorageError};
 use cid::Cid;
+use either::Either;
 use futures::{Future, FutureExt, Stream};
 use pin_project::pin_project;
 use serde::de::DeserializeOwned;
@@ -10,17 +12,18 @@ use std::{
 };
 
 #[pin_project]
-pub struct NodeStream<S, T> {
+pub struct NodeStream<S, T, N = Node<T>> {
 	storage: S,
 	stack: VecDeque<Cid>,
 	entries: VecDeque<T>,
 	#[pin]
-	get: Option<Pin<Box<dyn Future<Output = Result<Node<T>, StorageError>> + Send>>>,
+	get: Option<Pin<Box<dyn Future<Output = Result<N, StorageError>> + Send>>>,
 }
-impl<S, T> NodeStream<S, T>
+impl<S, T, N> NodeStream<S, T, N>
 where
 	S: BlockStorage + Clone + 'static,
 	T: DeserializeOwned + Send + Sync + 'static,
+	N: NodeReader<T> + DeserializeOwned + Send + Sync + 'static,
 {
 	pub fn new(storage: S, cid: Option<Cid>) -> Self {
 		let mut stack = VecDeque::new();
@@ -30,14 +33,15 @@ where
 		Self { storage, stack, entries: Default::default(), get: None }
 	}
 
-	pub fn from_link(storage: S, link: OptionLink<Node<T>>) -> Self {
+	pub fn from_link(storage: S, link: OptionLink<N>) -> Self {
 		Self::new(storage, *link.cid())
 	}
 }
-impl<S, T> Stream for NodeStream<S, T>
+impl<S, T, N> Stream for NodeStream<S, T, N>
 where
 	S: BlockStorage + Clone + 'static,
 	T: DeserializeOwned + Send + Sync + 'static,
+	N: NodeReader<T> + DeserializeOwned + Send + Sync + 'static,
 {
 	type Item = Result<T, StorageError>;
 
@@ -47,19 +51,19 @@ where
 			if self.entries.is_empty() && !self.stack.is_empty() && self.get.is_none() {
 				if let Some(next_cid) = self.stack.pop_front() {
 					let storage = self.storage.clone();
-					self.get = Some(Box::pin(async move { storage.get_deserialized::<Node<T>>(&next_cid).await }));
+					self.get = Some(Box::pin(async move { storage.get_deserialized::<N>(&next_cid).await }));
 				}
 			}
 
 			// waiting?
 			if let Some(mut get) = Pin::new(&mut self).get.take() {
 				match get.poll_unpin(cx) {
-					Poll::Ready(Ok(node)) => match node {
-						Node::Node(links) => {
-							self.stack.extend(links.into_iter().map(|link| -> Cid { link.into() }));
+					Poll::Ready(Ok(node)) => match node.read() {
+						Either::Left(links) => {
+							self.stack.extend(links.into_iter());
 							continue;
 						},
-						Node::Leaf(entries) => {
+						Either::Right(entries) => {
 							self.entries = entries.into();
 						},
 					},

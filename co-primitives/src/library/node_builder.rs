@@ -1,7 +1,11 @@
 use crate::{Block, BlockSerializer, DefaultParams, Link, StoreParams};
 use cid::Cid;
+use either::Either;
 use serde::{Deserialize, Serialize};
-use std::mem::{swap, take};
+use std::{
+	marker::PhantomData,
+	mem::{swap, take},
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Node<T> {
@@ -15,19 +19,35 @@ impl<T> Default for Node<T> {
 		Node::Leaf(vec![])
 	}
 }
+impl<T> NodeReader<T> for Node<T> {
+	fn read(self) -> Either<Vec<Cid>, Vec<T>> {
+		match self {
+			Node::Node(links) => Either::Left(links.into_iter().map(Into::into).collect()),
+			Node::Leaf(items) => Either::Right(items),
+		}
+	}
+}
+
+pub trait NodeReader<T> {
+	fn read(self) -> Either<Vec<Cid>, Vec<T>>;
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum NodeBuilderError {
 	#[error("Encoding failed")]
 	Encoding,
+
+	#[error("Invalid argument")]
+	InvalidArgument(#[source] anyhow::Error),
 }
 
-pub trait NodeSerializer<T, P>
+pub trait NodeSerializer<N, T, P>
 where
-	T: Clone,
 	P: StoreParams,
 {
-	fn serialize(&self, node: &Node<T>) -> Result<Block<P>, NodeBuilderError>;
+	fn nodes(&mut self, nodes: Vec<Link<N>>) -> Result<N, NodeBuilderError>;
+	fn leaf(&mut self, entries: Vec<T>) -> Result<N, NodeBuilderError>;
+	fn serialize(&mut self, node: N) -> Result<Block<P>, NodeBuilderError>;
 }
 
 pub struct DefaultNodeSerializer {}
@@ -41,25 +61,35 @@ impl DefaultNodeSerializer {
 		Self {}
 	}
 }
-impl<T, P> NodeSerializer<T, P> for DefaultNodeSerializer
+impl<T, P> NodeSerializer<Node<T>, T, P> for DefaultNodeSerializer
 where
-	T: Clone + Serialize,
+	T: Serialize,
 	P: StoreParams,
 {
-	fn serialize(&self, node: &Node<T>) -> Result<Block<P>, NodeBuilderError> {
-		BlockSerializer::new().serialize(node).map_err(|_| NodeBuilderError::Encoding)
+	fn nodes(&mut self, nodes: Vec<Link<Node<T>>>) -> Result<Node<T>, NodeBuilderError> {
+		Ok(Node::Node(nodes))
+	}
+
+	fn leaf(&mut self, entries: Vec<T>) -> Result<Node<T>, NodeBuilderError> {
+		Ok(Node::Leaf(entries))
+	}
+
+	fn serialize(&mut self, node: Node<T>) -> Result<Block<P>, NodeBuilderError> {
+		BlockSerializer::new().serialize(&node).map_err(|_| NodeBuilderError::Encoding)
 	}
 }
 
-/// Create a balances merkler tree of Node blocks.
+/// Create a balances merkle tree of Node blocks.
 ///
 /// Note: This implementation requires the data to fit into memory.
-pub struct NodeBuilder<T, P = DefaultParams, S = DefaultNodeSerializer>
+pub struct NodeBuilder<T, P = DefaultParams, N = Node<T>, S = DefaultNodeSerializer>
 where
 	T: Clone,
 	P: StoreParams,
-	S: NodeSerializer<T, P>,
+	S: NodeSerializer<N, T, P>,
 {
+	_node: PhantomData<N>,
+
 	// Current Items.
 	items: Vec<T>,
 
@@ -75,14 +105,21 @@ where
 	/// Serializer.
 	serializer: S,
 }
-impl<T, P, S> NodeBuilder<T, P, S>
+impl<T, P, N, S> NodeBuilder<T, P, N, S>
 where
 	T: Clone + Serialize,
 	P: StoreParams,
-	S: NodeSerializer<T, P>,
+	S: NodeSerializer<N, T, P>,
 {
 	pub fn new(max_children: usize, serializer: S) -> Self {
-		Self { items: Vec::new(), blocks: Vec::new(), pending_blocks: Vec::new(), max_children, serializer }
+		Self {
+			_node: Default::default(),
+			items: Vec::new(),
+			blocks: Vec::new(),
+			pending_blocks: Vec::new(),
+			max_children,
+			serializer,
+		}
 	}
 
 	pub fn push(&mut self, item: T) -> Result<(), NodeBuilderError> {
@@ -107,8 +144,8 @@ where
 
 	/// Flush items into new leaf block.
 	fn flush(&mut self) -> Result<(), NodeBuilderError> {
-		let leaf = Node::Leaf(take(&mut self.items));
-		let block = self.serializer.serialize(&leaf)?;
+		let leaf = self.serializer.leaf(take(&mut self.items))?;
+		let block = self.serializer.serialize(leaf)?;
 		self.blocks.push(*block.cid());
 		self.pending_blocks.push(block);
 		Ok(())
@@ -124,7 +161,12 @@ where
 
 		// result
 		Ok((
-			Self::create_balanced_links(&self.serializer, self.blocks, self.max_children, &mut self.pending_blocks)?,
+			Self::create_balanced_links(
+				&mut self.serializer,
+				self.blocks,
+				self.max_children,
+				&mut self.pending_blocks,
+			)?,
 			self.pending_blocks,
 		))
 	}
@@ -132,7 +174,7 @@ where
 	/// Create balanced links for all blocks.
 	/// Returns the [`Cid`] of the root if not empty.
 	fn create_balanced_links(
-		serializer: &S,
+		serializer: &mut S,
 		blocks: Vec<Cid>,
 		max_children: usize,
 		pending_blocks: &mut Vec<Block<P>>,
@@ -147,8 +189,11 @@ where
 				let mut level_link_blocks = blocks
 					.as_slice()
 					.chunks(max_children)
-					.map(|chunk| -> Node<T> { Node::Node(chunk.iter().map(|leaf| leaf.into()).collect()) })
-					.map(|node| serializer.serialize(&node))
+					.map(|chunk| {
+						let node = serializer.nodes(chunk.iter().map(|leaf| leaf.into()).collect())?;
+						let block = serializer.serialize(node)?;
+						Ok(block)
+					})
 					.collect::<Result<Vec<Block<P>>, NodeBuilderError>>()?;
 				let level_links = level_link_blocks.iter().map(|block| *block.cid()).collect::<Vec<Cid>>();
 
@@ -161,7 +206,7 @@ where
 		})
 	}
 }
-impl<T, P> Default for NodeBuilder<T, P, DefaultNodeSerializer>
+impl<T, P> Default for NodeBuilder<T, P, Node<T>, DefaultNodeSerializer>
 where
 	T: Clone + Serialize,
 	P: StoreParams,

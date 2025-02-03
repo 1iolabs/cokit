@@ -1,16 +1,21 @@
-use crate::{BlockStorage, BlockStorageExt, Link, Node, NodeBuilder, NodeStream, OptionLink, StorageError};
+use super::node_builder::NodeReader;
+use crate::{
+	Block, BlockSerializer, BlockStorage, BlockStorageExt, Link, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
+	NodeStream, OptionLink, StorageError, StoreParams,
+};
 use anyhow::anyhow;
 use bloomfilter::Bloom;
+use cid::Cid;
 use either::Either;
 use futures::{pin_mut, stream, FutureExt, Stream, StreamExt, TryStreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
-	borrow::Cow,
 	cmp::Ordering,
 	collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque},
 	fmt::Debug,
 	future::ready,
 	hash::Hash,
+	marker::PhantomData,
 	mem::swap,
 	num::TryFromIntError,
 };
@@ -55,7 +60,7 @@ where
 {
 	/// Entries Root DAG Node.
 	#[serde(rename = "e")]
-	pub entries: OptionLink<Node<(K, Value<V>)>>,
+	pub entries: OptionLink<RunNode<K, V>>,
 
 	/// Count of entries.
 	#[serde(rename = "s")]
@@ -79,7 +84,6 @@ where
 	V: Clone + Send + Sync + 'static,
 {
 	/// Tests if the run possibly contains an key.
-	/// TODO: Add bloom filter
 	fn may_contains_key(&self, key: &K) -> bool {
 		key >= &self.min_key && key <= &self.max_key && self.bloom.may_contains_key(key)
 	}
@@ -140,6 +144,125 @@ where
 {
 	Value(V),
 	Tombstone,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RunNode<K, V>
+where
+	K: Hash + Ord + Clone + Send + Sync + 'static,
+	V: Clone + Send + Sync + 'static,
+{
+	#[serde(rename = "n")]
+	Node {
+		/// The node.
+		#[serde(rename = "n")]
+		nodes: Vec<Link<Self>>,
+
+		/// The lowest key.
+		#[serde(rename = "l")]
+		min_key: K,
+
+		/// The highest key.
+		#[serde(rename = "h")]
+		max_key: K,
+	},
+
+	#[serde(rename = "l")]
+	Leaf(BTreeMap<K, Value<V>>),
+}
+impl<K, V> RunNode<K, V>
+where
+	K: Hash + Ord + Clone + Send + Sync + 'static,
+	V: Clone + Send + Sync + 'static,
+{
+	/// Tests if the run possibly contains an key.
+	fn may_contains_key(&self, key: &K) -> bool {
+		match self {
+			RunNode::Node { nodes: _, min_key, max_key } => key >= min_key && key <= max_key,
+			RunNode::Leaf(items) => items.contains_key(key),
+		}
+	}
+}
+
+impl<K, V> NodeReader<(K, Value<V>)> for RunNode<K, V>
+where
+	K: Hash + Ord + Clone + Send + Sync + 'static,
+	V: Clone + Send + Sync + 'static,
+{
+	fn read(self) -> Either<Vec<Cid>, Vec<(K, Value<V>)>> {
+		match self {
+			RunNode::Node { nodes, min_key: _, max_key: _ } => {
+				Either::Left(nodes.into_iter().map(Into::into).collect())
+			},
+			RunNode::Leaf(items) => Either::Right(items.into_iter().collect()),
+		}
+	}
+}
+
+/// Serializer which records min/max keys while serialize blocks.
+/// This metadata is written to the upper level blocks for fast retrival of values.
+/// Note: This only works if all previous nodes are serialized using the same serialize instance.
+///  But as we always wrote full immutable runs this should be ok.
+#[derive(Debug)]
+pub struct RunNodeSerializer<K, V> {
+	_d: PhantomData<(K, V)>,
+	pending: BTreeMap<Cid, (K, K)>,
+}
+impl<K, V> RunNodeSerializer<K, V> {
+	pub fn new() -> Self {
+		Self { _d: Default::default(), pending: Default::default() }
+	}
+}
+impl<K, V, P> NodeSerializer<RunNode<K, V>, (K, Value<V>), P> for RunNodeSerializer<K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	P: StoreParams,
+{
+	fn nodes(&mut self, nodes: Vec<Link<RunNode<K, V>>>) -> Result<RunNode<K, V>, NodeBuilderError> {
+		let mut min_key = None;
+		let mut max_key = None;
+		for node in nodes.iter() {
+			if let Some((node_min_key, node_max_key)) = self.pending.remove(node.cid()) {
+				if min_key.is_none() || Some(&node_min_key).cmp(&min_key.as_ref()) == Ordering::Less {
+					min_key = Some(node_min_key);
+				}
+				if max_key.is_none() || Some(&node_max_key).cmp(&max_key.as_ref()) == Ordering::Greater {
+					max_key = Some(node_max_key);
+				}
+			}
+		}
+		Ok(RunNode::Node {
+			nodes,
+			min_key: min_key.ok_or(NodeBuilderError::InvalidArgument(anyhow!("Unable to determine min key")))?,
+			max_key: max_key.ok_or(NodeBuilderError::InvalidArgument(anyhow!("Unable to determine max key")))?,
+		})
+	}
+
+	fn leaf(&mut self, entries: Vec<(K, Value<V>)>) -> Result<RunNode<K, V>, NodeBuilderError> {
+		Ok(RunNode::Leaf(entries.into_iter().collect()))
+	}
+
+	fn serialize(&mut self, node: RunNode<K, V>) -> Result<Block<P>, NodeBuilderError> {
+		let block = BlockSerializer::new()
+			.serialize(&node)
+			.map_err(|_| NodeBuilderError::Encoding)?;
+
+		// record min/max for faster insert
+		match &node {
+			RunNode::Node { nodes: _, min_key, max_key } => {
+				self.pending.insert(*block.cid(), (min_key.clone(), max_key.clone()));
+			},
+			RunNode::Leaf(items) => {
+				if let (Some((first, _)), Some((last, _))) = (items.first_key_value(), items.last_key_value()) {
+					self.pending.insert(*block.cid(), (first.clone(), last.clone()));
+				}
+			},
+		}
+
+		// result
+		Ok(block)
+	}
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -261,16 +384,28 @@ where
 				while let Some(item) = runs.try_next().await? {
 					if let Some((_, run)) = item.right() {
 						if run.may_contains_key(key) {
-							// iterate entries (sorted by key)
-							// TODO: implement binary search (and/or sparse index)
-							let entries = NodeStream::from_link(self.storage.clone(), run.entries);
-							pin_mut!(entries);
-							while let Some(entry) = entries.try_next().await? {
-								if &entry.0 == key {
-									return match entry.1 {
-										Value::Value(value) => Ok(Some(value)),
-										Value::Tombstone => Ok(None),
-									};
+							// iterate (DAG) RunNode's from first to last skipping nodes which can not contain the
+							// value
+							let mut stack: VecDeque<Link<RunNode<K, V>>> = Default::default();
+							if let Some(cid) = run.entries.link() {
+								stack.push_back(cid);
+							}
+							while let Some(cid) = stack.pop_front() {
+								let node = self.storage.get_value(&cid).await?;
+								if node.may_contains_key(key) {
+									match node {
+										RunNode::Node { nodes, min_key: _, max_key: _ } => {
+											stack.extend(nodes.into_iter());
+										},
+										RunNode::Leaf(mut items) => {
+											if let Some(value) = items.remove(key) {
+												return match value {
+													Value::Value(value) => Ok(Some(value)),
+													Value::Tombstone => Ok(None),
+												};
+											}
+										},
+									}
 								}
 							}
 						}
@@ -312,7 +447,8 @@ where
 		};
 
 		// store active
-		root.active = self.store_entries(stream::iter(self.active.iter()).map(Ok)).await?;
+		root.active =
+			store_node(&self.storage, self.settings.max_node_entries, stream::iter(self.active.iter()).map(Ok)).await?;
 
 		// store root
 		self.root = self.storage.set_value(&root).await?.into();
@@ -374,7 +510,7 @@ where
 
 			// runs
 			//  filter and pop first item of each run
-			let mut runs: Vec<(usize, NodeStream<S, _>)> = self
+			let mut runs: Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)> = self
 				.levels_and_runs()
 				.try_filter_map(|item| ready(Ok(item.right())))
 				.try_filter(|(index, _)| ready(match &only_run_indicies {
@@ -412,7 +548,7 @@ where
 	/// Pop item and continue to read the run.
 	async fn pop_and_fetch(
 		heap: &mut BinaryHeap<TreeStreamItem<K, V>>,
-		runs: &mut Vec<(usize, NodeStream<S, (K, Value<V>)>)>,
+		runs: &mut Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)>,
 	) -> Result<Option<TreeStreamItem<K, V>>, StorageError> {
 		if let Some(item) = heap.pop() {
 			// fetch next
@@ -455,12 +591,14 @@ where
 		}
 
 		// run
-		let run = if let Some(run) = self
-			.store_run(
-				stream::iter(self.active.iter()).map(|(key, value)| Ok((Cow::Borrowed(key), Cow::Borrowed(value)))),
-				self.active.len(),
-			)
-			.await?
+		//  TODO: remove clone (because of the hardcoded Value<V>?)
+		let run = if let Some(run) = store_run(
+			&self.storage,
+			self.settings.max_node_entries,
+			stream::iter(self.active.clone().into_iter()).map(Ok),
+			self.active.len(),
+		)
+		.await?
 		{
 			run
 		} else {
@@ -485,7 +623,8 @@ where
 			.await?;
 		runs.push_front(run);
 		let runs_count = runs.len();
-		level0.runs = self.store_entries(stream::iter(runs.iter()).map(Ok)).await?;
+		level0.runs =
+			store_items(&self.storage, self.settings.max_node_entries, stream::iter(runs.iter()).map(Ok)).await?;
 		let mut next_level0_link = self.storage.set_value(&level0).await?;
 
 		// store root with next level0
@@ -505,72 +644,6 @@ where
 
 		// result
 		Ok(0)
-	}
-
-	/// Store `entries` as DAG and return the root [`cid::Cid`].
-	async fn store_entries<T, O>(
-		&self,
-		entries: impl Stream<Item = Result<T, StorageError>>,
-	) -> Result<OptionLink<Node<O>>, StorageError>
-	where
-		T: Clone + Serialize,
-	{
-		let mut node_builder = NodeBuilder::<_, S::StoreParams>::new(
-			self.settings
-				.max_node_entries
-				.try_into()
-				.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
-			Default::default(),
-		);
-		pin_mut!(entries);
-		while let Some(entry) = entries.try_next().await? {
-			node_builder.push(entry).map_err(|e| StorageError::InvalidArgument(e.into()))?;
-			for block in node_builder.take_blocks() {
-				self.storage.set(block).await?;
-			}
-		}
-		let (root, blocks) = node_builder
-			.into_blocks()
-			.map_err(|e| StorageError::InvalidArgument(e.into()))?;
-		for block in blocks.into_iter() {
-			self.storage.set(block).await?;
-		}
-
-		// result
-		Ok(root.into())
-	}
-
-	/// Store a new run to storage composed of `entries`.
-	async fn store_run<'a>(
-		&self,
-		entries: impl Stream<Item = Result<(Cow<'_, K>, Cow<'_, Value<V>>), StorageError>>,
-		entries_size_hint: usize,
-	) -> Result<Option<Run<K, V>>, StorageError> {
-		// entries
-		let mut min_key: Option<K> = None;
-		let mut max_key: Option<K> = None;
-		let mut size = 0;
-		let mut bloom = Bloom::<K>::new_for_fp_rate_with_seed(entries_size_hint, 0.001, &[0; 32])
-			.map_err(|e| StorageError::InvalidArgument(anyhow!("bloomfilter: {}", e)))?;
-		let entries_link = self
-			.store_entries(entries.inspect_ok(|(key, _)| {
-				if min_key.is_none() || Some(key.as_ref()).cmp(&min_key.as_ref()) == Ordering::Less {
-					min_key = Some(key.as_ref().clone());
-				}
-				if max_key.is_none() || Some(key.as_ref()).cmp(&max_key.as_ref()) == Ordering::Greater {
-					max_key = Some(key.as_ref().clone());
-				}
-				size += 1;
-				bloom.set(key);
-			}))
-			.await?;
-		let (min_key, max_key) = match (min_key, max_key) {
-			(Some(min_key), Some(max_key)) => (min_key, max_key),
-			_ => return Ok(None),
-		};
-		let next_run =
-			Run { entries: entries_link, size, bloom: BloomFilter::Bloomfilter(bloom.to_bytes()), min_key, max_key };
-		Ok(Some(next_run))
 	}
 
 	/// Compact `level` to next level.
@@ -636,12 +709,13 @@ where
 
 		// runs
 		let entries = self.create_stream(Some(runs.iter().map(|(_, global_run_index, _)| *global_run_index).collect()));
-		let run = self
-			.store_run(
-				entries.map_ok(|(k, v)| (Cow::Owned(k), Cow::Owned(v))),
-				runs.iter().fold(0, |result, (_, _, run)| result + run.size) as usize,
-			)
-			.await?;
+		let run = store_run(
+			&self.storage,
+			self.settings.max_node_entries,
+			entries,
+			runs.iter().fold(0, |result, (_, _, run)| result + run.size) as usize,
+		)
+		.await?;
 		let run = if let Some(run) = run {
 			run
 		} else {
@@ -674,8 +748,11 @@ where
 			// store runs
 			let level_run_count = level_runs.len();
 			let next_level_run_count = next_level_runs.len();
-			level.runs = self.store_entries(stream::iter(level_runs).map(Ok)).await?;
-			next_level.runs = self.store_entries(stream::iter(next_level_runs).map(Ok)).await?;
+			level.runs =
+				store_items(&self.storage, self.settings.max_node_entries, stream::iter(&level_runs).map(Ok)).await?;
+			next_level.runs =
+				store_items(&self.storage, self.settings.max_node_entries, stream::iter(&next_level_runs).map(Ok))
+					.await?;
 
 			// counts
 			(level_run_count, next_level_run_count)
@@ -740,6 +817,152 @@ where
 			}
 		}
 	}
+}
+
+/// Store as DAG Node and return the root [`cid::Cid`].
+async fn store_items<'a, S, T>(
+	storage: &S,
+	max_node_entries: u64,
+	items: impl Stream<Item = Result<&'a T, StorageError>>,
+) -> Result<OptionLink<Node<T>>, StorageError>
+where
+	S: BlockStorage + Clone + 'static,
+	T: Clone + Serialize + 'a,
+{
+	let mut node_builder = NodeBuilder::<_, S::StoreParams>::new(
+		max_node_entries
+			.try_into()
+			.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
+		Default::default(),
+	);
+	pin_mut!(items);
+	while let Some(item) = items.try_next().await? {
+		node_builder.push(item).map_err(|e| StorageError::InvalidArgument(e.into()))?;
+		for block in node_builder.take_blocks() {
+			storage.set(block).await?;
+		}
+	}
+	let (root, blocks) = node_builder
+		.into_blocks()
+		.map_err(|e| StorageError::InvalidArgument(e.into()))?;
+	for block in blocks.into_iter() {
+		storage.set(block).await?;
+	}
+
+	// result
+	Ok(root.into())
+}
+
+/// Store `entries` as DAG Node and return the root [`cid::Cid`].
+async fn store_node<S, K, V>(
+	storage: &S,
+	max_node_entries: u64,
+	entries: impl Stream<Item = Result<(&K, &Value<V>), StorageError>>,
+) -> Result<OptionLink<Node<(K, Value<V>)>>, StorageError>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	let mut node_builder = NodeBuilder::<_, S::StoreParams>::new(
+		max_node_entries
+			.try_into()
+			.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
+		Default::default(),
+	);
+	pin_mut!(entries);
+	while let Some(item) = entries.try_next().await? {
+		node_builder.push(item).map_err(|e| StorageError::InvalidArgument(e.into()))?;
+		for block in node_builder.take_blocks() {
+			storage.set(block).await?;
+		}
+	}
+	let (root, blocks) = node_builder
+		.into_blocks()
+		.map_err(|e| StorageError::InvalidArgument(e.into()))?;
+	for block in blocks.into_iter() {
+		storage.set(block).await?;
+	}
+
+	// result
+	Ok(root.into())
+}
+
+/// Store `entries` as DAG and return the root [`cid::Cid`].
+async fn store_run_node<S, K, V>(
+	storage: &S,
+	max_node_entries: u64,
+	entries: impl Stream<Item = Result<(K, Value<V>), StorageError>>,
+) -> Result<OptionLink<RunNode<K, V>>, StorageError>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	let mut node_builder = NodeBuilder::<(K, Value<V>), S::StoreParams, RunNode<K, V>, RunNodeSerializer<K, V>>::new(
+		max_node_entries
+			.try_into()
+			.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
+		RunNodeSerializer::new(),
+	);
+	pin_mut!(entries);
+	while let Some(item) = entries.try_next().await? {
+		node_builder.push(item).map_err(|e| StorageError::InvalidArgument(e.into()))?;
+		for block in node_builder.take_blocks() {
+			storage.set(block).await?;
+		}
+	}
+	let (root, blocks) = node_builder
+		.into_blocks()
+		.map_err(|e| StorageError::InvalidArgument(e.into()))?;
+	for block in blocks.into_iter() {
+		storage.set(block).await?;
+	}
+
+	// result
+	Ok(root.into())
+}
+
+/// Store a new run to storage composed of `entries`.
+async fn store_run<S, K, V>(
+	storage: &S,
+	max_node_entries: u64,
+	entries: impl Stream<Item = Result<(K, Value<V>), StorageError>>,
+	entries_size_hint: usize,
+) -> Result<Option<Run<K, V>>, StorageError>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	// entries
+	let mut min_key: Option<K> = None;
+	let mut max_key: Option<K> = None;
+	let mut size = 0;
+	let mut bloom = Bloom::<K>::new_for_fp_rate_with_seed(entries_size_hint, 0.001, &[0; 32])
+		.map_err(|e| StorageError::InvalidArgument(anyhow!("bloomfilter: {}", e)))?;
+	let entries_link = store_run_node(
+		storage,
+		max_node_entries,
+		entries.inspect_ok(|(key, _)| {
+			if min_key.is_none() || Some(key).cmp(&min_key.as_ref()) == Ordering::Less {
+				min_key = Some(key.clone());
+			}
+			if max_key.is_none() || Some(key).cmp(&max_key.as_ref()) == Ordering::Greater {
+				max_key = Some(key.clone());
+			}
+			size += 1;
+			bloom.set(key);
+		}),
+	)
+	.await?;
+	let (min_key, max_key) = match (min_key, max_key) {
+		(Some(min_key), Some(max_key)) => (min_key, max_key),
+		_ => return Ok(None),
+	};
+	let next_run =
+		Run { entries: entries_link, size, bloom: BloomFilter::Bloomfilter(bloom.to_bytes()), min_key, max_key };
+	Ok(Some(next_run))
 }
 
 /// Tree stats.
