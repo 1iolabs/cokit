@@ -160,7 +160,7 @@ mod test {
 
 		fn set(&mut self, block: Block<DefaultParams>) -> Cid {
 			let cid = *block.cid();
-			self.records.insert(cid, block).expect("set");
+			self.records.insert(cid, block);
 			cid
 		}
 	}
