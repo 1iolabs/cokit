@@ -37,7 +37,7 @@ where
 
 	/// Tree settings.
 	#[serde(rename = "s")]
-	pub settings: TreeSettings,
+	pub settings: LsmTreeMapSettings,
 }
 
 /// LSM Tree Level.
@@ -266,22 +266,22 @@ where
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TreeSettings {
+pub struct LsmTreeMapSettings {
 	/// Max entries (K/V pairs) count in a leaf node.
-	#[serde(rename = "n", default = "TreeSettings::default_max_node_entries")]
+	#[serde(rename = "n", default = "LsmTreeMapSettings::default_max_node_entries")]
 	pub max_node_entries: u64,
 
 	/// Limits entries (K/V pairs) in active (in memory) run.
 	/// Overruning this limit will cause a new L0 run gets created.
-	#[serde(rename = "a", default = "TreeSettings::default_max_active_entries")]
+	#[serde(rename = "a", default = "LsmTreeMapSettings::default_max_active_entries")]
 	pub max_active_entries: u64,
 
 	/// Limits runs in a level.
 	/// Overruning this limit will cause a compaction to next level.
-	#[serde(rename = "r", default = "TreeSettings::default_max_run_count")]
+	#[serde(rename = "r", default = "LsmTreeMapSettings::default_max_run_count")]
 	pub max_run_count: u64,
 }
-impl TreeSettings {
+impl LsmTreeMapSettings {
 	pub fn default_max_node_entries() -> u64 {
 		2 ^ 8 // 256
 	}
@@ -292,7 +292,7 @@ impl TreeSettings {
 		2 ^ 4 // 16
 	}
 }
-impl Default for TreeSettings {
+impl Default for LsmTreeMapSettings {
 	fn default() -> Self {
 		Self {
 			max_node_entries: Self::default_max_node_entries(),
@@ -303,7 +303,7 @@ impl Default for TreeSettings {
 }
 
 /// LSM Tree Instance.
-pub struct Tree<S, K, V>
+pub struct LsmTreeMap<S, K, V>
 where
 	S: BlockStorage + Clone + 'static,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
@@ -319,18 +319,18 @@ where
 	active: BTreeMap<K, Value<V>>,
 
 	// Limits items in memory run.
-	settings: TreeSettings,
+	settings: LsmTreeMapSettings,
 	// level_cache: Arc<RwLock<BTreeMap<Cid, Level<K, V>>>>,
 	// run_cache: Arc<RwLock<BTreeMap<Cid, Run<K, V>>>>,
 }
-impl<S, K, V> Tree<S, K, V>
+impl<S, K, V> LsmTreeMap<S, K, V>
 where
 	S: BlockStorage + Clone + 'static,
 	K: Debug + Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	/// Create new empty tree.
-	pub fn new(storage: S, settings: TreeSettings) -> Self {
+	pub fn new(storage: S, settings: LsmTreeMapSettings) -> Self {
 		Self { active: Default::default(), settings, root: OptionLink::none(), storage }
 	}
 
@@ -458,11 +458,11 @@ where
 	}
 
 	/// Tree stats.
-	pub async fn stats(&self) -> Result<TreeStats, StorageError> {
+	pub async fn stats(&self) -> Result<LsmTreeStats, StorageError> {
 		Ok(self
 			.levels_and_runs()
 			.try_fold(
-				TreeStats { entries: 0, active_entries: self.active.len(), levels: 0, runs: 0 },
+				LsmTreeStats { entries: 0, active_entries: self.active.len(), levels: 0, runs: 0 },
 				|mut result, item| {
 					match item {
 						Either::Left(_) => result.levels += 1,
@@ -967,7 +967,7 @@ where
 
 /// Tree stats.
 #[derive(Debug, Clone, PartialEq)]
-pub struct TreeStats {
+pub struct LsmTreeStats {
 	/// Approx. entries in tree (upper bound).
 	pub entries: usize,
 
@@ -1034,8 +1034,10 @@ where
 
 #[cfg(test)]
 mod tests {
-	use super::Tree;
-	use crate::{library::ipld_lsm::TreeStats, Block, BlockStorage, DefaultParams, StorageError, TreeSettings};
+	use super::LsmTreeMap;
+	use crate::{
+		library::lsm_tree_map::LsmTreeStats, Block, BlockStorage, DefaultParams, LsmTreeMapSettings, StorageError,
+	};
 	use anyhow::anyhow;
 	use async_trait::async_trait;
 	use cid::Cid;
@@ -1072,7 +1074,7 @@ mod tests {
 	#[tokio::test]
 	async fn smoke() {
 		let storage = TestStorage::default();
-		let mut tree = Tree::new(storage.clone(), Default::default());
+		let mut tree = LsmTreeMap::new(storage.clone(), Default::default());
 		tree.insert("hello".to_owned(), "world".to_owned()).await.unwrap();
 		tree.insert("1".to_owned(), "2".to_owned()).await.unwrap();
 		tree.insert("3".to_owned(), "4".to_owned()).await.unwrap();
@@ -1087,7 +1089,7 @@ mod tests {
 
 		// reload
 		let root = tree.store().await.unwrap().unwrap();
-		let tree2 = Tree::load(storage.clone(), root).await.unwrap();
+		let tree2 = LsmTreeMap::load(storage.clone(), root).await.unwrap();
 		assert_eq!(
 			tree2.stream().try_collect::<Vec<_>>().await.unwrap(),
 			vec![
@@ -1101,8 +1103,8 @@ mod tests {
 	#[tokio::test]
 	async fn test_get() {
 		let storage = TestStorage::default();
-		let settings = TreeSettings { max_node_entries: 32, max_active_entries: 2, max_run_count: 2 };
-		let mut tree = Tree::new(storage.clone(), settings);
+		let settings = LsmTreeMapSettings { max_node_entries: 32, max_active_entries: 2, max_run_count: 2 };
+		let mut tree = LsmTreeMap::new(storage.clone(), settings);
 		tree.insert(1, 100).await.unwrap();
 		tree.insert(2, 200).await.unwrap();
 		tree.insert(3, 300).await.unwrap();
@@ -1114,8 +1116,8 @@ mod tests {
 	#[tokio::test]
 	async fn test_compact() {
 		let storage = TestStorage::default();
-		let settings = TreeSettings { max_node_entries: 32, max_active_entries: 2, max_run_count: 2 };
-		let mut tree = Tree::new(storage.clone(), settings);
+		let settings = LsmTreeMapSettings { max_node_entries: 32, max_active_entries: 2, max_run_count: 2 };
+		let mut tree = LsmTreeMap::new(storage.clone(), settings);
 		for i in 0..10 {
 			tree.insert(i, i).await.unwrap();
 		}
@@ -1124,7 +1126,7 @@ mod tests {
 			vec![(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (9, 9),]
 		);
 		let stats = tree.stats().await.unwrap();
-		assert_eq!(stats, TreeStats { active_entries: 0, entries: 10, levels: 1, runs: 1 });
+		assert_eq!(stats, LsmTreeStats { active_entries: 0, entries: 10, levels: 1, runs: 1 });
 		// somethinf like this should happen:
 		// flush: 2
 		// store run: 2

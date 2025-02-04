@@ -6,7 +6,7 @@ pub use library::{
 	block_links::BlockLinks,
 	block_serializer::{BlockSerializer, BlockSerializerError},
 	cbor::{from_cbor, to_cbor, CborError},
-	ipld_lsm::{Tree, TreeSettings},
+	lsm_tree_map::{LsmTreeMap, LsmTreeMapSettings},
 	json::{from_json, from_json_string, to_json, to_json_string, JsonError},
 	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
 	node_reader::{node_reader, NodeReaderError},
