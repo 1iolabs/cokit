@@ -1,7 +1,7 @@
 use super::node_builder::NodeReader;
 use crate::{
 	Block, BlockSerializer, BlockStorage, BlockStorageExt, Link, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
-	NodeStream, OptionLink, StorageError, StoreParams,
+	NodeStream, OptionLink, ReverseNodeStream, StorageError, StoreParams,
 };
 use anyhow::anyhow;
 use bloomfilter::Bloom;
@@ -430,6 +430,16 @@ where
 		})
 	}
 
+	/// Stream all tree entries in reverse order.
+	pub fn reverse_stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+		self.create_reverse_stream(None).try_filter_map(|item| {
+			ready(Ok(match item.1 {
+				Value::Value(value) => Some((item.0, value)),
+				Value::Tombstone => None,
+			}))
+		})
+	}
+
 	/// Store active items and return the root link.
 	pub async fn store(&mut self) -> Result<OptionLink<Root<K, V>>, StorageError> {
 		// get root
@@ -475,6 +485,22 @@ where
 				},
 			)
 			.await?)
+	}
+
+	/// Find the first (active - not tombstoned) key.
+	pub async fn min_key(&self) -> Result<Option<K>, StorageError> {
+		let stream = self.stream();
+		pin_mut!(stream);
+		let first = stream.try_next().await?;
+		Ok(first.map(|(key, _)| key))
+	}
+
+	/// Find the last (active - not tombstoned) key.
+	pub async fn max_key(&self) -> Result<Option<K>, StorageError> {
+		let stream = self.reverse_stream();
+		pin_mut!(stream);
+		let first = stream.try_next().await?;
+		Ok(first.map(|(key, _)| key))
 	}
 
 	/// Compact tree.
@@ -545,6 +571,62 @@ where
 		// TreeStream::new(self)
 	}
 
+	/// Iterate on runs.
+	fn create_reverse_stream(
+		&self,
+		only_run_indicies: Option<BTreeSet<usize>>,
+	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + '_ {
+		let storage = self.storage.clone();
+		async_stream::try_stream! {
+			// heap (max-sorted)
+			let mut heap = match only_run_indicies {
+				Some(_) => BinaryHeap::new(),
+				None => BinaryHeap::<ReverseTreeStreamItem<K, V>>::from(
+					self.active
+						.clone()
+						.into_iter()
+						.map(|item| ReverseTreeStreamItem { run: None, item })
+						.collect::<Vec<_>>(),
+				),
+			};
+
+			// runs
+			//  filter and pop first item of each run
+			let mut runs: Vec<(usize, ReverseNodeStream<S, (K, Value<V>), RunNode<K, V>>)> = self
+				.levels_and_runs()
+				.try_filter_map(|item| ready(Ok(item.right())))
+				.try_filter(|(index, _)| ready(match &only_run_indicies {
+					Some(run_indicies) => run_indicies.contains(index),
+					None => true,
+				}))
+				.map_ok(|(index, run)| (index, ReverseNodeStream::from_link(storage.clone(), run.entries)))
+				.try_collect()
+				.await?;
+			for (run_index, run) in runs.iter_mut() {
+				if let Some(item) = run.try_next().await? {
+					heap.push(ReverseTreeStreamItem { run: Some(*run_index), item });
+				}
+			}
+
+			// walk tree
+			while let Some(item) = Self::pop_and_fetch_reverse(&mut heap, &mut runs).await? {
+				// pop superseded keys
+				//  we sort the ReverseNodeStream by key and run index so we receive the next key front the most recent run first
+				while let Some(next_item) = heap.peek() {
+					if next_item.item.0 == item.item.0 {
+						Self::pop_and_fetch_reverse(&mut heap, &mut runs).await?;
+					} else {
+						break;
+					}
+				}
+
+				// yield values
+				yield item.item;
+			}
+		}
+		// TreeStream::new(self)
+	}
+
 	/// Pop item and continue to read the run.
 	async fn pop_and_fetch(
 		heap: &mut BinaryHeap<TreeStreamItem<K, V>>,
@@ -559,6 +641,31 @@ where
 				if let Some((_, run)) = runs.get_mut(run_index) {
 					if let Some(item) = run.try_next().await? {
 						heap.push(TreeStreamItem { run: Some(run_index), item });
+					}
+				}
+			}
+
+			// result
+			Ok(Some(item))
+		} else {
+			Ok(None)
+		}
+	}
+
+	/// Pop item and continue to read the run.
+	async fn pop_and_fetch_reverse(
+		heap: &mut BinaryHeap<ReverseTreeStreamItem<K, V>>,
+		runs: &mut Vec<(usize, ReverseNodeStream<S, (K, Value<V>), RunNode<K, V>>)>,
+	) -> Result<Option<ReverseTreeStreamItem<K, V>>, StorageError> {
+		if let Some(item) = heap.pop() {
+			// fetch next
+			//  every time we take an item from an run we fetch the next one
+			//  so the heap can determine which are the next in sequence
+			//  once a run runs out of items it will not be asked again as all run items poped
+			if let Some(run_index) = item.run {
+				if let Some((_, run)) = runs.get_mut(run_index) {
+					if let Some(item) = run.try_next().await? {
+						heap.push(ReverseTreeStreamItem { run: Some(run_index), item });
 					}
 				}
 			}
@@ -1032,6 +1139,56 @@ where
 	}
 }
 
+#[derive(Debug)]
+struct ReverseTreeStreamItem<K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	run: Option<usize>,
+	item: (K, Value<V>),
+}
+impl<K, V> PartialEq for ReverseTreeStreamItem<K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	fn eq(&self, other: &Self) -> bool {
+		self.item.0 == other.item.0
+	}
+}
+impl<K, V> Eq for ReverseTreeStreamItem<K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+}
+impl<K, V> PartialOrd for ReverseTreeStreamItem<K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(&other))
+	}
+}
+impl<K, V> Ord for ReverseTreeStreamItem<K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		match self.item.0.cmp(&other.item.0) {
+			Ordering::Less => Ordering::Less,
+			Ordering::Greater => Ordering::Greater,
+			Ordering::Equal => {
+				// sort by run index so the most recent run item is the last
+				other.run.cmp(&self.run)
+			},
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::LsmTreeMap;
@@ -1150,5 +1307,23 @@ mod tests {
 		// store run: 10
 		// compact: from 0 to 1 with size 10
 		// drop level 0
+	}
+
+	#[tokio::test]
+	async fn test_reverse_stream() {
+		let storage = TestStorage::default();
+		let settings = LsmTreeMapSettings { max_node_entries: 32, max_active_entries: 2, max_run_count: 2 };
+		let mut tree = LsmTreeMap::new(storage.clone(), settings);
+		tree.insert(0, 0).await.unwrap();
+		tree.insert(1, 1).await.unwrap();
+		tree.insert(2, 2).await.unwrap();
+		tree.insert(3, 3).await.unwrap();
+		tree.remove(3).await.unwrap();
+		tree.insert(3, 30).await.unwrap();
+		tree.remove(3).await.unwrap();
+		tree.insert(2, 20).await.unwrap();
+		tree.flush_active().await.unwrap();
+		assert_eq!(tree.stream().try_collect::<Vec<_>>().await.unwrap(), vec![(0, 0), (1, 1), (2, 20),]);
+		assert_eq!(tree.reverse_stream().try_collect::<Vec<_>>().await.unwrap(), vec![(2, 20), (1, 1), (0, 0),]);
 	}
 }
