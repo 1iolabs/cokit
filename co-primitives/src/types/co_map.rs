@@ -92,13 +92,7 @@ where
 	where
 		S: BlockStorage + Clone + 'static,
 	{
-		Ok(CoMapMutTransaction {
-			tree: match self.0.link() {
-				Some(root) => LsmTreeMap::load(storage.clone(), root).await?,
-				None => LsmTreeMap::new(storage.clone(), Default::default()),
-			},
-			container: self,
-		})
+		Ok(CoMapMutTransaction { transaction: self.open(storage).await?, container: self })
 	}
 
 	pub async fn open<S>(&self, storage: &S) -> Result<CoMapTransaction<S, K, V>, StorageError>
@@ -136,41 +130,6 @@ where
 	}
 }
 
-#[allow(async_fn_in_trait)]
-pub trait CoMapRead<S, K, V>
-where
-	S: BlockStorage + Clone + 'static,
-	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-{
-	async fn get(&self, key: &K) -> Result<Option<V>, StorageError>;
-
-	async fn contains_key(&self, key: &K) -> Result<bool, StorageError>;
-
-	fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_;
-}
-
-#[allow(async_fn_in_trait)]
-pub trait CoMapWrite<S, K, V>: CoMapRead<S, K, V>
-where
-	S: BlockStorage + Clone + 'static,
-	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-{
-	async fn insert(&mut self, key: K, value: V) -> Result<(), StorageError>;
-
-	async fn remove(&mut self, key: K) -> Result<(), StorageError>;
-
-	/// Update (or insert default) value.
-	async fn update_key<Fut>(&mut self, key: K, update: impl FnOnce(V) -> Fut) -> Result<(), StorageError>
-	where
-		V: Default,
-		Fut: Future<Output = Result<V, StorageError>>;
-
-	/// Store as new CoMap
-	async fn store(&mut self) -> Result<CoMap<K, V>, StorageError>;
-}
-
 pub struct CoMapMutTransaction<'m, S, K, V>
 where
 	S: BlockStorage + Clone + 'static,
@@ -178,7 +137,7 @@ where
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	container: &'m mut CoMap<K, V>,
-	tree: LsmTreeMap<S, K, V>,
+	transaction: CoMapTransaction<S, K, V>,
 }
 impl<'m, S, K, V> CoMapMutTransaction<'m, S, K, V>
 where
@@ -187,58 +146,8 @@ where
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	pub async fn commit(mut self) -> Result<(), StorageError> {
-		self.container.0 = self.tree.store().await?;
+		self.container.0 = self.transaction.tree.store().await?;
 		Ok(())
-	}
-}
-impl<'m, S, K, V> CoMapRead<S, K, V> for CoMapMutTransaction<'m, S, K, V>
-where
-	S: BlockStorage + Clone + 'static,
-	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-{
-	async fn get(&self, key: &K) -> Result<Option<V>, StorageError> {
-		self.tree.get(key).await
-	}
-
-	async fn contains_key(&self, key: &K) -> Result<bool, StorageError> {
-		self.tree.contains_key(key).await
-	}
-
-	fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
-		self.tree.stream()
-	}
-}
-impl<'m, S, K, V> CoMapWrite<S, K, V> for CoMapMutTransaction<'m, S, K, V>
-where
-	S: BlockStorage + Clone + 'static,
-	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-{
-	async fn insert(&mut self, key: K, value: V) -> Result<(), StorageError> {
-		self.tree.insert(key, value).await
-	}
-
-	async fn remove(&mut self, key: K) -> Result<(), StorageError> {
-		self.tree.remove(key).await
-	}
-
-	/// Update (or insert default) value.
-	async fn update_key<Fut>(&mut self, key: K, update: impl FnOnce(V) -> Fut) -> Result<(), StorageError>
-	where
-		V: Default,
-		Fut: Future<Output = Result<V, StorageError>>,
-	{
-		let item = self.get(&key).await?.unwrap_or_default();
-		let next_item = update(item).await?;
-		self.insert(key, next_item).await?;
-		Ok(())
-	}
-
-	/// Store as new CoMap
-	async fn store(&mut self) -> Result<CoMap<K, V>, StorageError> {
-		let link = self.tree.store().await?;
-		Ok(CoMap(link))
 	}
 }
 impl<'m, S, K, V> CoMapMutTransaction<'m, S, K, V>
@@ -248,23 +157,23 @@ where
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	pub async fn get(&self, key: &K) -> Result<Option<V>, StorageError> {
-		CoMapRead::get(self, key).await
+		self.transaction.get(key).await
 	}
 
 	pub async fn contains_key(&self, key: &K) -> Result<bool, StorageError> {
-		CoMapRead::contains_key(self, key).await
+		self.transaction.contains_key(key).await
 	}
 
 	pub fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
-		CoMapRead::stream(self)
+		self.transaction.stream()
 	}
 
 	pub async fn insert(&mut self, key: K, value: V) -> Result<(), StorageError> {
-		CoMapWrite::insert(self, key, value).await
+		self.transaction.insert(key, value).await
 	}
 
 	pub async fn remove(&mut self, key: K) -> Result<(), StorageError> {
-		CoMapWrite::remove(self, key).await
+		self.transaction.remove(key).await
 	}
 
 	/// Update (or insert default) value.
@@ -273,12 +182,12 @@ where
 		V: Default,
 		Fut: Future<Output = Result<V, StorageError>>,
 	{
-		CoMapWrite::update_key(self, key, update).await
+		self.transaction.update_key(key, update).await
 	}
 
 	/// Store as new CoMap
 	pub async fn store(&mut self) -> Result<CoMap<K, V>, StorageError> {
-		CoMapWrite::store(self).await
+		self.transaction.store().await
 	}
 }
 
@@ -297,73 +206,27 @@ where
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	pub async fn get(&self, key: &K) -> Result<Option<V>, StorageError> {
-		CoMapRead::get(self, key).await
-	}
-
-	pub async fn contains_key(&self, key: &K) -> Result<bool, StorageError> {
-		CoMapRead::contains_key(self, key).await
-	}
-
-	pub fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
-		CoMapRead::stream(self)
-	}
-
-	pub async fn insert(&mut self, key: K, value: V) -> Result<(), StorageError> {
-		CoMapWrite::insert(self, key, value).await
-	}
-
-	pub async fn remove(&mut self, key: K) -> Result<(), StorageError> {
-		CoMapWrite::remove(self, key).await
-	}
-
-	/// Update (or insert default) value.
-	pub async fn update_key<Fut>(&mut self, key: K, update: impl FnOnce(V) -> Fut) -> Result<(), StorageError>
-	where
-		V: Default,
-		Fut: Future<Output = Result<V, StorageError>>,
-	{
-		CoMapWrite::update_key(self, key, update).await
-	}
-
-	/// Store as new CoMap
-	pub async fn store(&mut self) -> Result<CoMap<K, V>, StorageError> {
-		CoMapWrite::store(self).await
-	}
-}
-impl<S, K, V> CoMapRead<S, K, V> for CoMapTransaction<S, K, V>
-where
-	S: BlockStorage + Clone + 'static,
-	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-{
-	async fn get(&self, key: &K) -> Result<Option<V>, StorageError> {
 		self.tree.get(key).await
 	}
 
-	async fn contains_key(&self, key: &K) -> Result<bool, StorageError> {
+	pub async fn contains_key(&self, key: &K) -> Result<bool, StorageError> {
 		self.tree.contains_key(key).await
 	}
 
-	fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+	pub fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
 		self.tree.stream()
 	}
-}
-impl<S, K, V> CoMapWrite<S, K, V> for CoMapTransaction<S, K, V>
-where
-	S: BlockStorage + Clone + 'static,
-	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-{
-	async fn insert(&mut self, key: K, value: V) -> Result<(), StorageError> {
+
+	pub async fn insert(&mut self, key: K, value: V) -> Result<(), StorageError> {
 		self.tree.insert(key, value).await
 	}
 
-	async fn remove(&mut self, key: K) -> Result<(), StorageError> {
+	pub async fn remove(&mut self, key: K) -> Result<(), StorageError> {
 		self.tree.remove(key).await
 	}
 
 	/// Update (or insert default) value.
-	async fn update_key<Fut>(&mut self, key: K, update: impl FnOnce(V) -> Fut) -> Result<(), StorageError>
+	pub async fn update_key<Fut>(&mut self, key: K, update: impl FnOnce(V) -> Fut) -> Result<(), StorageError>
 	where
 		V: Default,
 		Fut: Future<Output = Result<V, StorageError>>,
@@ -375,7 +238,7 @@ where
 	}
 
 	/// Store as new CoMap
-	async fn store(&mut self) -> Result<CoMap<K, V>, StorageError> {
+	pub async fn store(&mut self) -> Result<CoMap<K, V>, StorageError> {
 		let link = self.tree.store().await?;
 		Ok(CoMap(link))
 	}

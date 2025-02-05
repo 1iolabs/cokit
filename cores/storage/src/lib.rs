@@ -99,14 +99,12 @@ impl<S: BlockStorage + Clone + 'static> Reducer<StorageAction, S> for Storage {
 			StorageAction::Unreference(cids) => {
 				let mut blocks = state.blocks.open(storage).await?;
 				for cid in cids {
-					blocks
-						.update_key(cid, |mut block| async move {
-							if block.references > 0 {
-								block.references -= 1;
-							}
-							Ok(block)
-						})
-						.await?;
+					if let Some(mut block) = blocks.get(&cid).await? {
+						if block.references > 0 {
+							block.references -= 1;
+						}
+						blocks.insert(cid, block).await?;
+					}
 				}
 				state.blocks = blocks.store().await?;
 			},
