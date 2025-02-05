@@ -7,10 +7,11 @@ mod types;
 pub use cid::Cid;
 pub use co_primitives::{
 	tags, AbsolutePath, AbsolutePathOwned, Block, BlockSerializer, BlockSerializerError, BlockStorage, BlockStorageExt,
-	CoId, CoMetadata, Component, Components, DagCollection, DagCollectionExt, DagMap, DagMapExt, DagSet, DagSetExt,
-	DagVec, DagVecExt, Date, DefaultNodeSerializer, DefaultParams, Did, Link, Linkable, Metadata, Network, Node,
-	NodeBuilder, NodeBuilderError, NodeSerializer, OptionLink, Path, PathExt, PathOwned, ReducerAction, RelativePath,
-	RelativePathOwned, Secret, Storage, StorageError, StoreParams, Tag, Tags, TagsExpr, TotalFloat64, WithCoMetadata,
+	CoId, CoMap, CoMapTransaction, CoMetadata, Component, Components, DagCollection, DagCollectionExt, DagMap,
+	DagMapExt, DagSet, DagSetExt, DagVec, DagVecExt, Date, DefaultNodeSerializer, DefaultParams, Did, Link, Linkable,
+	Metadata, Network, Node, NodeBuilder, NodeBuilderError, NodeSerializer, OptionLink, Path, PathExt, PathOwned,
+	ReducerAction, RelativePath, RelativePathOwned, Secret, Storage, StorageError, StoreParams, Tag, Tags, TagsExpr,
+	TotalFloat64, WithCoMetadata,
 };
 pub use co_v1::{event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set};
 pub use library::{

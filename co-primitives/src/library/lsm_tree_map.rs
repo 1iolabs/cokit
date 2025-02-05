@@ -326,7 +326,7 @@ where
 impl<S, K, V> LsmTreeMap<S, K, V>
 where
 	S: BlockStorage + Clone + 'static,
-	K: Debug + Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	/// Create new empty tree.
