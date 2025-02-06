@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use cid::Cid;
-use co_primitives::{DefaultNodeSerializer, NodeBuilder};
+use co_primitives::NodeBuilder;
 use co_storage::{node_reader, Storage, StorageError};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -44,7 +44,7 @@ impl PinEntry {
 		}
 
 		// build
-		let mut builder = NodeBuilder::<PinEntry, DefaultNodeSerializer, S::StoreParams>::default();
+		let mut builder = NodeBuilder::<PinEntry, S::StoreParams>::default();
 		for (k, v) in map.iter() {
 			// skip empty sets as their CID's will be added as childs by referencing roots
 			// in case of single root state onyl write the root node
@@ -57,8 +57,8 @@ impl PinEntry {
 		}
 
 		// store
-		let blocks = builder.into_blocks()?;
-		let result = *blocks.first().expect("at leat one block").cid();
+		let (root, blocks) = builder.into_blocks()?;
+		let result = root.expect("at leat one block");
 		for block in blocks.into_iter() {
 			storage.set(block)?;
 		}

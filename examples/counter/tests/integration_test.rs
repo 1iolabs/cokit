@@ -34,12 +34,12 @@ fn integration_test() {
 	storage.set(action_block).unwrap();
 
 	// api
-	let api = CoV1Api::new(Box::new(storage.clone()), RuntimeContext { state: None, event: action_cid });
+	let api = CoV1Api::new(Box::new(storage.clone()), RuntimeContext::new(None, action_cid));
 
 	// wasm
 	let wasm_path = "../../target/wasm32-unknown-unknown/release/example_counter.wasm";
 	let wasm_bytes = std::fs::read(wasm_path).unwrap();
-	let next_state = create_runtime(wasm_bytes).execute(api).unwrap();
+	let next_state = create_runtime(wasm_bytes).execute(api).unwrap().state;
 
 	// test
 	assert_eq!(Some(Cid::try_from("bafyr4ibjkgjouhwikzwvmoy2owd6l4azqwam3piehbbpkcikjqmxyiggpi").unwrap()), next_state);

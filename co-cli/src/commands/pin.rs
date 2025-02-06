@@ -1,9 +1,9 @@
 use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
 use cid::Cid;
-use co_primitives::{from_cbor, CoId};
+use co_primitives::{from_cbor, CoId, DagCollectionAsyncExt};
 use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
-use co_sdk::{state::memberships, Application, CoReducerFactory, CoStorage, NodeStream, CO_CORE_NAME_PIN, CO_ID_LOCAL};
+use co_sdk::{state::memberships, Application, CoReducerFactory, CoStorage, CO_CORE_NAME_PIN, CO_ID_LOCAL};
 use exitcode::ExitCode;
 use futures::{pin_mut, StreamExt, TryStreamExt};
 use std::{
@@ -70,7 +70,7 @@ pub async fn list_pins(context: &CliContext, cli: &Cli, command: &ListCommand) -
 	let local_co_reducer = application.local_co_reducer().await?;
 	let storage = local_co_reducer.storage();
 	let pin_state = local_co_reducer.state::<co_core_pin::Pin>(CO_CORE_NAME_PIN).await?;
-	let pins = NodeStream::from_node_container(storage.clone(), &pin_state.pins);
+	let pins = pin_state.pins.stream(&storage);
 	let inner: Vec<_> = pins.try_collect().await?;
 	if command.sum {
 		println!("Total number of current pins: {}", inner.len());
@@ -84,7 +84,7 @@ pub async fn list_pins(context: &CliContext, cli: &Cli, command: &ListCommand) -
 	if command.list {
 		for (cid, tags) in inner.iter() {
 			if command.all {
-				let tags: Vec<_> = NodeStream::from_node_container(storage.clone(), tags).try_collect().await?;
+				let tags: Vec<_> = tags.stream(&storage).try_collect().await?;
 				println!("Cid {} pinned by tags:\n\t {:?}", cid, tags);
 			} else {
 				println!("{}", cid);

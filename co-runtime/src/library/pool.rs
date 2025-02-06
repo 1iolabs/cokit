@@ -1,6 +1,5 @@
 use crate::{co_v1::CoV1Api, runtimes::RuntimeError, ApiContext, Core, RuntimeContext, RuntimeInstance};
 use cid::Cid;
-use co_api::Context;
 use co_storage::{BlockStorage, StorageError, StoreParamsBlockStorage, SyncBlockStorage};
 use std::{collections::VecDeque, sync::Arc};
 use tokio::{runtime::Handle, sync::Mutex};
@@ -53,7 +52,7 @@ impl RuntimePool {
 		storage: &S,
 		core: &Core,
 		context: RuntimeContext,
-	) -> Result<Option<Cid>, ExecuteError>
+	) -> Result<RuntimeContext, ExecuteError>
 	where
 		S: BlockStorage + Send + Sync + Clone + 'static,
 	{
@@ -79,8 +78,8 @@ impl RuntimePool {
 				};
 
 				// execute
-				let (result, instance): (Option<Cid>, RuntimeInstance) =
-					tokio::task::spawn_blocking(move || -> Result<(Option<Cid>, RuntimeInstance), RuntimeError> {
+				let (result, instance): (RuntimeContext, RuntimeInstance) =
+					tokio::task::spawn_blocking(move || -> Result<(RuntimeContext, RuntimeInstance), RuntimeError> {
 						let result = instance.runtime_mut().execute(api)?;
 						Ok((result, instance))
 					})
@@ -95,11 +94,11 @@ impl RuntimePool {
 			},
 			Core::Native(f) => {
 				let execute = f.clone();
-				tokio::task::spawn_blocking(move || -> Result<Option<Cid>, RuntimeError> {
+				tokio::task::spawn_blocking(move || -> Result<RuntimeContext, RuntimeError> {
 					let mut context = ApiContext::new(api);
 					// Todo: handle panics to not crash the host
 					execute(&mut context);
-					Ok(context.state())
+					Ok(context.context().clone())
 				})
 				.await
 				.map_err(|e| ExecuteError::Other(e.into()))??

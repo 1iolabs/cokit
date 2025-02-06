@@ -99,7 +99,7 @@ impl SharedCoBuilder {
 		storage: CoStorage,
 	) -> anyhow::Result<CoStorage>
 	where
-		P: PeerProvider + Send + Sync + 'static,
+		P: PeerProvider + Clone + Send + Sync + 'static,
 	{
 		let local_peer_id = network.local_peer_id();
 		let mut network_storage = NetworkBlockStorage::new(storage, network, peer_provider, self.network_block_timeout);
@@ -117,7 +117,7 @@ impl SharedCoBuilder {
 		&self,
 		(_, connections): (CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>),
 		identity: I,
-	) -> impl PeerProvider + Send + Sync + 'static
+	) -> impl PeerProvider + Clone + Send + Sync + 'static
 	where
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
 	{

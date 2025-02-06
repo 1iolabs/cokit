@@ -1,6 +1,9 @@
 use cid::Cid;
 use multihash_codetable::MultihashDigest;
-use std::marker::PhantomData;
+use std::{
+	hash::{Hash, Hasher},
+	marker::PhantomData,
+};
 
 pub trait StoreParams: std::fmt::Debug + Clone + Send + Sync + Unpin + 'static {
 	const MAX_BLOCK_SIZE: usize;
@@ -49,6 +52,22 @@ impl<S: StoreParams> Block<S> {
 impl<S> PartialEq for Block<S> {
 	fn eq(&self, other: &Self) -> bool {
 		self.cid == other.cid
+	}
+}
+impl<S> Eq for Block<S> {}
+impl<S> PartialOrd for Block<S> {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		self.cid.partial_cmp(&other.cid)
+	}
+}
+impl<S> Ord for Block<S> {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		self.cid.cmp(&other.cid)
+	}
+}
+impl<S> Hash for Block<S> {
+	fn hash<H: Hasher>(&self, state: &mut H) {
+		Hash::hash(&self, state);
 	}
 }
 impl<S> std::fmt::Debug for Block<S> {

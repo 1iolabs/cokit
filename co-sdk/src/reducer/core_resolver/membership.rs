@@ -3,7 +3,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{Block, BlockSerializer, CoId, ReducerAction, StoreParams};
-use co_runtime::RuntimePool;
+use co_runtime::{RuntimeContext, RuntimePool};
 use co_storage::BlockStorage;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
@@ -51,7 +51,7 @@ where
 		context: &ReducerChangeContext,
 		state: &Option<Cid>,
 		action: &Cid,
-	) -> Result<Option<Cid>, CoreResolverError> {
+	) -> Result<RuntimeContext, CoreResolverError> {
 		// execute
 		let next_state = self.next.execute(storage, runtime, context, state, action).await?;
 

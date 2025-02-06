@@ -270,10 +270,10 @@ where
 		// println!("entry = {:?}", ipld);
 
 		// apply to state
-		let context = ReducerChangeContext { cause: ReducerChangeCause::Push };
-		let state = self
+		let change_context = ReducerChangeContext { cause: ReducerChangeCause::Push };
+		let runtime_context = self
 			.core_resolver
-			.execute(self.log.storage(), runtime, &context, &self.state, action.cid())
+			.execute(self.log.storage(), runtime, &change_context, &self.state, action.cid())
 			.await?;
 
 		// snapshot
@@ -282,14 +282,14 @@ where
 		}
 
 		// update
-		self.state = state;
+		self.state = runtime_context.state;
 		self.heads = self.log.heads_iter().cloned().collect();
 
 		// notify
-		self.on_state_changed(&context).await?;
+		self.on_state_changed(&change_context).await?;
 
 		// result
-		Ok(state)
+		Ok(runtime_context.state)
 	}
 	/// Join heads (from other log).
 	/// This is used to join logs from other peers.
@@ -366,7 +366,8 @@ where
 			state = self
 				.core_resolver
 				.execute(self.log.storage(), runtime, context, &state, &entry.entry().payload)
-				.await?;
+				.await?
+				.state;
 		}
 
 		// result

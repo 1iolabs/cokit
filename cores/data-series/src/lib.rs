@@ -1,4 +1,6 @@
-use co_api::{Context, DagCollection, DagMap, DagVec, Date, Did, Reducer, ReducerAction, Tags, TotalFloat64};
+use co_api::{
+	Context, DagCollectionExt, DagMap, DagVec, Date, Did, Reducer, ReducerAction, Storage, Tags, TotalFloat64,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
@@ -167,24 +169,28 @@ impl Reducer for DataSeries {
 
 	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		match &event.payload {
-			DataSeriesAction::CreateSeries(payload) => reduce_create_series(context, self, payload),
-			DataSeriesAction::RemoveSeries { series } => reduce_remove_series(context, self, series),
-			DataSeriesAction::Data(payload) => reduce_data(context, &event.from, event.time, self, payload),
-			DataSeriesAction::PendingData(PendingDataPayload { series, id, tags, time, value }) => {
-				reduce_pending_data(context, &event.from, event.time, self, series, id, tags, time, value)
+			DataSeriesAction::CreateSeries(payload) => reduce_create_series(context.storage_mut(), self, payload),
+			DataSeriesAction::RemoveSeries { series } => reduce_remove_series(context.storage_mut(), self, series),
+			DataSeriesAction::Data(payload) => {
+				reduce_data(context.storage_mut(), &event.from, event.time, self, payload)
 			},
-			DataSeriesAction::PendingCancel { series, id } => reduce_pending_cancel(context, self, series, id),
+			DataSeriesAction::PendingData(PendingDataPayload { series, id, tags, time, value }) => {
+				reduce_pending_data(context.storage_mut(), &event.from, event.time, self, series, id, tags, time, value)
+			},
+			DataSeriesAction::PendingCancel { series, id } => {
+				reduce_pending_cancel(context.storage_mut(), self, series, id)
+			},
 			DataSeriesAction::CreateAggregate(CreateAggregatePayload { aggregate, series, group, by }) => {
-				reduce_create_aggregate(context, self, aggregate, series, *group, *by)
+				reduce_create_aggregate(context.storage_mut(), self, aggregate, series, *group, *by)
 			},
 			DataSeriesAction::RemoveAggregate { aggregate, series } => {
-				reduce_remove_aggregate(context, self, series, aggregate)
+				reduce_remove_aggregate(context.storage_mut(), self, series, aggregate)
 			},
 		}
 	}
 }
 
-fn reduce_create_series(context: &mut dyn Context, mut state: DataSeries, payload: &CreateSeriesPayload) -> DataSeries {
+fn reduce_create_series(context: &mut dyn Storage, mut state: DataSeries, payload: &CreateSeriesPayload) -> DataSeries {
 	state.data.update(context, |_context, data| {
 		if !data.contains_key(&payload.series) {
 			let value = Series {
@@ -199,31 +205,31 @@ fn reduce_create_series(context: &mut dyn Context, mut state: DataSeries, payloa
 	state
 }
 
-fn reduce_remove_series(context: &mut dyn Context, mut state: DataSeries, series: &str) -> DataSeries {
-	state.data.update(context, |_context, data| {
+fn reduce_remove_series(storage: &mut dyn Storage, mut state: DataSeries, series: &str) -> DataSeries {
+	state.data.update(storage, |_storage, data| {
 		data.remove(series);
 	});
-	state.aggregates.update_owned(context, |_context, aggregates| {
+	state.aggregates.update_owned(storage, |_storage, aggregates| {
 		aggregates.into_iter().filter(|(_key, value)| value.series != series).collect()
 	});
 	state
 }
 
 fn reduce_data(
-	context: &mut dyn Context,
+	storage: &mut dyn Storage,
 	did: &Did,
 	action_time: Date,
 	mut state: DataSeries,
 	payload: &DataPayload,
 ) -> DataSeries {
-	state.data.update(context, |context, data| {
+	state.data.update(storage, |storage, data| {
 		if let Some(series) = data.get_mut(&payload.series) {
 			// pending?
 			let mut pending = None;
 			if let Some(pending_id) = &payload.pending_id {
 				series
 					.pending_data
-					.update(context, |_context, pending_data| pending = pending_data.remove(pending_id));
+					.update(storage, |_context, pending_data| pending = pending_data.remove(pending_id));
 			}
 
 			// data
@@ -245,12 +251,12 @@ fn reduce_data(
 			};
 
 			// aggregate
-			state.aggregates.update(context, |context, aggregates| {
+			state.aggregates.update(storage, |storage, aggregates| {
 				for (_, value) in aggregates.iter_mut() {
 					if value.series == payload.series {
 						let group = value.group;
 						let by = value.by;
-						value.values.update_owned(context, |_, mut values| {
+						value.values.update_owned(storage, |_, mut values| {
 							// apply
 							aggregate(group, by, &data, &mut values);
 
@@ -268,7 +274,7 @@ fn reduce_data(
 			});
 
 			// insert
-			series.data.update_owned(context, |_context, mut items| {
+			series.data.update_owned(storage, |_storage, mut items| {
 				// insert as position
 				match find_next_index(items.iter().map(|item| &item.time), &data.time) {
 					Some(index) => {
@@ -294,7 +300,7 @@ fn reduce_data(
 }
 
 fn reduce_pending_data(
-	context: &mut dyn Context,
+	storage: &mut dyn Storage,
 	did: &Did,
 	action_time: Date,
 	mut state: DataSeries,
@@ -304,9 +310,9 @@ fn reduce_pending_data(
 	time: &Option<Date>,
 	value: &Option<i32>,
 ) -> DataSeries {
-	state.data.update(context, |context, data| {
+	state.data.update(storage, |storage, data| {
 		if let Some(series) = data.get_mut(series_key) {
-			series.pending_data.update(context, |_context, pending_data| {
+			series.pending_data.update(storage, |_context, pending_data| {
 				if !pending_data.contains_key(id) {
 					let data = Data {
 						did: did.clone(),
@@ -322,10 +328,10 @@ fn reduce_pending_data(
 	state
 }
 
-fn reduce_pending_cancel(context: &mut dyn Context, mut state: DataSeries, series_key: &str, id: &str) -> DataSeries {
-	state.data.update(context, |context, data| {
+fn reduce_pending_cancel(storage: &mut dyn Storage, mut state: DataSeries, series_key: &str, id: &str) -> DataSeries {
+	state.data.update(storage, |storage, data| {
 		if let Some(series) = data.get_mut(series_key) {
-			series.pending_data.update(context, |_context, pending_data| {
+			series.pending_data.update(storage, |_context, pending_data| {
 				pending_data.remove(id);
 			});
 		}
@@ -334,32 +340,27 @@ fn reduce_pending_cancel(context: &mut dyn Context, mut state: DataSeries, serie
 }
 
 fn reduce_create_aggregate(
-	context: &mut dyn Context,
+	storage: &mut dyn Storage,
 	mut state: DataSeries,
 	aggregate_key: &str,
 	series_key: &str,
 	group: Option<AggregateGroup>,
 	by: AggregateBy,
 ) -> DataSeries {
-	if !state.aggregates.iter(context.storage()).any(|(key, _)| key == aggregate_key) {
-		let item = state.data.iter(context.storage()).find(|(key, _)| key == series_key);
+	if !state.aggregates.iter(storage).any(|(key, _)| key == aggregate_key) {
+		let item = state.data.iter(storage).find(|(key, _)| key == series_key);
 		if let Some((_, series)) = item {
 			// calculate
 			let mut values = Vec::new();
-			for data in series.data.iter(context.storage()) {
+			for data in series.data.iter(storage) {
 				aggregate(group, by, &data, &mut values);
 			}
 
 			// insert
-			state.aggregates.update(context, |context, aggregates| {
+			state.aggregates.update(storage, |storage, aggregates| {
 				aggregates.insert(
 					aggregate_key.to_owned(),
-					Aggregate {
-						by,
-						group,
-						series: series_key.to_owned(),
-						values: DagVec::create(context.storage_mut(), values),
-					},
+					Aggregate { by, group, series: series_key.to_owned(), values: DagVec::create(storage, values) },
 				);
 			});
 		}
@@ -368,12 +369,12 @@ fn reduce_create_aggregate(
 }
 
 fn reduce_remove_aggregate(
-	context: &mut dyn Context,
+	storage: &mut dyn Storage,
 	mut state: DataSeries,
 	series_key: &str,
 	aggregate_key: &str,
 ) -> DataSeries {
-	state.aggregates.update(context, |_context, aggregates| {
+	state.aggregates.update(storage, |_storage, aggregates| {
 		if aggregates.get(aggregate_key).map_or(false, |item| item.series == series_key) {
 			aggregates.remove(aggregate_key);
 		}
@@ -428,7 +429,8 @@ fn aggregate(group: Option<AggregateGroup>, by: AggregateBy, data: &Data, values
 		AggregateBy::Average => {
 			// See: https://math.stackexchange.com/questions/22348/how-to-add-and-subtract-values-from-an-average
 			value.count += 1;
-			value.value = (value.value.0 + ((data.value as f64 - value.value.0) / value.count as f64)).into();
+			value.value =
+				(value.value.value() + ((data.value as f64 - value.value.value()) / value.count as f64)).into();
 		},
 	}
 }

@@ -3,13 +3,13 @@ use crate::{
 		block::{Algorithm, EncryptedBlock, BLOCK_MULTICODEC},
 		secret::Secret,
 	},
-	AlgorithmError, BlockStat, BlockStorage, BlockStorageContentMapping, Storage, StorageContentMapping, StorageError,
+	AlgorithmError, BlockStorageContentMapping, Storage, StorageContentMapping, StorageError,
 };
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{
-	from_cbor, Block, DefaultNodeSerializer, KnownMultiCodec, MultiCodec, Node, NodeBuilder, NodeBuilderError,
-	NodeSerializer, StoreParams,
+	from_cbor, Block, BlockStat, BlockStorage, DefaultNodeSerializer, KnownMultiCodec, Link, MultiCodec, Node,
+	NodeBuilder, NodeBuilderError, NodeSerializer, StoreParams,
 };
 use futures::{stream::FuturesOrdered, StreamExt};
 use serde::Serialize;
@@ -62,15 +62,11 @@ where
 		let node_serializer = EncryptedNodeSerializer { algorithm: self.algorithm, key: self.key.clone() };
 
 		// blocks
-		let blocks = self.mapping.to_blocks(node_serializer, Default::default())?;
+		let (root, blocks) = self.mapping.to_blocks(node_serializer, Default::default())?;
 
 		// store
-		let mut root = None;
 		for block in blocks {
-			let result = self.storage_mut().set(block)?;
-			if root.is_none() {
-				root = Some(result);
-			}
+			self.storage_mut().set(block)?;
 		}
 
 		// result
@@ -186,7 +182,7 @@ where
 		let node_serializer = EncryptedNodeSerializer { algorithm: self.algorithm, key: self.key.clone() };
 
 		// blocks
-		let blocks = self
+		let (root, blocks) = self
 			.mapping
 			.mapping
 			.read()
@@ -194,12 +190,8 @@ where
 			.to_blocks(node_serializer, Default::default())?;
 
 		// store
-		let mut root = None;
 		for block in blocks {
-			let result = self.next.set(block).await?;
-			if root.is_none() {
-				root = Some(result)
-			}
+			self.next.set(block).await?;
 			// TODO: PIN/UNPIN
 		}
 
@@ -540,17 +532,16 @@ impl BlockMapping {
 	/// Encode mapping into blocks.
 	///
 	/// Returns the root cid and all blocks.
-	/// The first block retuned is the root.
 	pub fn to_blocks<S, P: StoreParams>(
 		&self,
 		serializer: S,
 		options: WriteOptions,
-	) -> Result<Vec<Block<P>>, StorageError>
+	) -> Result<(Option<Cid>, Vec<Block<P>>), StorageError>
 	where
-		S: NodeSerializer<(Cid, Cid), P>,
+		S: NodeSerializer<Node<(Cid, Cid)>, (Cid, Cid), P>,
 	{
 		// blocks
-		let mut builder = NodeBuilder::<(Cid, Cid), S, P>::new(options.max_children, serializer);
+		let mut builder = NodeBuilder::<(Cid, Cid), P, Node<(Cid, Cid)>, S>::new(options.max_children, serializer);
 		for (key, value) in self.map.iter() {
 			builder.push((*key, *value)).map_err(|e| StorageError::Internal(e.into()))?;
 		}
@@ -566,12 +557,20 @@ struct EncryptedNodeSerializer {
 	key: Secret,
 	algorithm: Algorithm,
 }
-impl<T, P> NodeSerializer<T, P> for EncryptedNodeSerializer
+impl<T, P> NodeSerializer<Node<T>, T, P> for EncryptedNodeSerializer
 where
 	T: Clone + Serialize,
 	P: StoreParams,
 {
-	fn serialize(&self, node: &Node<T>) -> Result<Block<P>, NodeBuilderError> {
+	fn nodes(&mut self, nodes: Vec<Link<Node<T>>>) -> Result<Node<T>, NodeBuilderError> {
+		Ok(Node::Node(nodes))
+	}
+
+	fn leaf(&mut self, entries: Vec<T>) -> Result<Node<T>, NodeBuilderError> {
+		Ok(Node::Leaf(entries))
+	}
+
+	fn serialize(&mut self, node: Node<T>) -> Result<Block<P>, NodeBuilderError> {
 		let block = DefaultNodeSerializer::new().serialize(node)?;
 		let encrypted = EncryptedBlock::encrypt(self.algorithm, &self.key, block)?;
 		let encrypted_block: Block<P> = encrypted.try_into()?;
@@ -608,11 +607,11 @@ mod tests {
 			secret::Secret,
 		},
 		storage::{encrypted::EncryptedStorage, memory::MemoryStorage},
-		types::storage::{Storage, StorageError},
+		types::storage::Storage,
 		BlockStorage, EncryptedBlockStorage, MemoryBlockStorage,
 	};
 	use cid::Cid;
-	use co_primitives::{BlockSerializer, DefaultParams, StoreParams};
+	use co_primitives::{BlockSerializer, DefaultParams, StorageError, StoreParams};
 	use serde::{Deserialize, Serialize};
 	use std::iter::repeat;
 

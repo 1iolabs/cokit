@@ -43,7 +43,7 @@ where
 		_context: &ReducerChangeContext,
 		state: &Option<Cid>,
 		action: &Cid,
-	) -> Result<Option<Cid>, CoreResolverError> {
+	) -> Result<RuntimeContext, CoreResolverError> {
 		// get action
 		let reducer_action: ReducerAction<IgnoredAny> = storage
 			.get_deserialized(action)
@@ -71,7 +71,7 @@ where
 
 		// apply to state
 		let mut result = runtime
-			.execute(storage, &core, RuntimeContext { state: core_state, event: action.into() })
+			.execute(storage, &core, RuntimeContext::new(core_state, action.into()))
 			.await
 			.map_err(|e| CoreResolverError::Execute(reducer_action.core.clone(), e))?;
 
@@ -82,14 +82,14 @@ where
 			let action: ReducerAction<co_core_co::CoAction> = ReducerAction {
 				core: CO_CORE_NAME_CO.to_owned(),
 				from: "did:local:device".to_owned(),
-				payload: co_core_co::CoAction::CoreChange { core: reducer_action.core.clone(), state: result },
+				payload: co_core_co::CoAction::CoreChange { core: reducer_action.core.clone(), state: result.state },
 				time: 0,
 			};
 			let action_cid = storage.set_serialized(&action).await?;
 
 			// apply
 			result = runtime
-				.execute(storage, &self.root_core(), RuntimeContext { state: *state, event: action_cid })
+				.execute(storage, &self.root_core(), RuntimeContext::new(*state, action_cid))
 				.await
 				.map_err(|e| CoreResolverError::Execute(reducer_action.core.clone(), e))?;
 

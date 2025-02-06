@@ -2,7 +2,7 @@ use super::Command as NetworkCommand;
 use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::Result;
 use co_core_membership::MembershipState;
-use co_primitives::Did;
+use co_primitives::{DagSetExt, Did};
 use co_sdk::{state, CoId, CoReducerFactory};
 use exitcode::ExitCode;
 use futures::{stream, StreamExt, TryStreamExt};

@@ -46,7 +46,7 @@ macro_rules! tag {
 }
 
 /// Tag Value
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize, JsonSchema)]
 #[serde(into = "Ipld", from = "Ipld")]
 pub enum TagValue {
 	/// Represents the absence of a value or the value undefined.
@@ -83,7 +83,7 @@ impl TagValue {
 			TagValue::Null => true,
 			TagValue::Bool(v) => v == &bool::default(),
 			TagValue::Integer(v) => v == &Default::default(),
-			TagValue::Float(v) => *v == TotalFloat64(0f64),
+			TagValue::Float(v) => *v == TotalFloat64::from(0f64),
 			TagValue::String(v) => v == "",
 			TagValue::Bytes(v) => v.is_empty(),
 			TagValue::List(v) => v.is_empty(),
@@ -106,7 +106,7 @@ impl From<TagValue> for Ipld {
 			TagValue::Null => Ipld::Null,
 			TagValue::Bool(i) => Ipld::Bool(i),
 			TagValue::Integer(i) => Ipld::Integer(i),
-			TagValue::Float(i) => Ipld::Float(i.0),
+			TagValue::Float(i) => Ipld::Float(i.into()),
 			TagValue::String(i) => Ipld::String(i),
 			TagValue::Bytes(i) => Ipld::Bytes(i),
 			TagValue::List(i) => Ipld::List(i.into_iter().map(|e| e.into()).collect()),
@@ -146,7 +146,7 @@ impl std::fmt::Display for TagValue {
 			TagValue::Null => write!(f, "null"),
 			TagValue::Bool(v) => write!(f, "{}", if *v { "true" } else { "false" }),
 			TagValue::Integer(i) => write!(f, "{}", i),
-			TagValue::Float(v) => write!(f, "{}", v.0),
+			TagValue::Float(v) => write!(f, "{}", v),
 			TagValue::String(v) => write!(f, "{}", v),
 			TagValue::Bytes(v) => write!(f, "{:x?}", v),
 			TagValue::List(v) => {

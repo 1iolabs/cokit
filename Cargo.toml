@@ -21,6 +21,7 @@ members = [
     "cores/pin",
     "cores/role",
     "cores/room",
+    "cores/storage",
     "daemon",
     "did-co",
     "examples/counter",

@@ -2,8 +2,7 @@ use super::{entry::EntryBlock, get_entry_block::get_entry_blocks, join::JoinEntr
 use crate::{library::clock::max_clock, Clock, Entry, LogError};
 use cid::Cid;
 use co_identity::{IdentityResolverBox, PrivateIdentity};
-use co_primitives::Link;
-use co_storage::{BlockStorage, BlockStorageExt};
+use co_primitives::{BlockStorage, BlockStorageExt, Link};
 use futures::{pin_mut, Stream, TryStreamExt};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashSet};

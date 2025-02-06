@@ -1,6 +1,5 @@
-use crate::{Node, Storage};
+use crate::{from_cbor, KnownMultiCodec, Node, Storage};
 use cid::Cid;
-use co_primitives::{from_cbor, KnownMultiCodec};
 use serde::de::DeserializeOwned;
 use std::collections::VecDeque;
 

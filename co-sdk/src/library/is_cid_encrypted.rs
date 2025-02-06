@@ -14,9 +14,8 @@ pub fn is_cid_encrypted<'a>(cids: impl IntoIterator<Item = &'a Cid>) -> bool {
 #[cfg(test)]
 mod tests {
 	use crate::library::is_cid_encrypted::is_cid_encrypted;
-	use co_storage::{
-		Algorithm, BlockStorageContentMapping, BlockStorageExt, EncryptedBlockStorage, MemoryBlockStorage,
-	};
+	use co_primitives::BlockStorageExt;
+	use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, MemoryBlockStorage};
 
 	#[tokio::test]
 	async fn test_is_cid_encrypted() {

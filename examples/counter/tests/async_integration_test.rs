@@ -40,9 +40,10 @@ async fn async_integration_test() {
 
 	// execute
 	let next_state = RuntimePool::default()
-		.execute(&storage, &wasm.into(), RuntimeContext { state: None, event: action_cid })
+		.execute(&storage, &wasm.into(), RuntimeContext::new(None, action_cid))
 		.await
-		.unwrap();
+		.unwrap()
+		.state;
 
 	// test
 	assert_eq!(Some(Cid::try_from("bafyr4ibjkgjouhwikzwvmoy2owd6l4azqwam3piehbbpkcikjqmxyiggpi").unwrap()), next_state);

@@ -1,7 +1,7 @@
 use crate::{CoreResolver, CoreResolverError, ReducerChangeContext};
 use async_trait::async_trait;
 use cid::Cid;
-use co_runtime::RuntimePool;
+use co_runtime::{RuntimeContext, RuntimePool};
 use co_storage::BlockStorage;
 
 pub struct DynamicCoreResolver<S> {
@@ -30,7 +30,7 @@ where
 		context: &ReducerChangeContext,
 		state: &Option<Cid>,
 		action: &Cid,
-	) -> Result<Option<Cid>, CoreResolverError> {
+	) -> Result<RuntimeContext, CoreResolverError> {
 		self.inner.execute(storage, runtime, context, state, action).await
 	}
 }
