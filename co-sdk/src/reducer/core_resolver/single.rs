@@ -25,11 +25,10 @@ where
 		_context: &ReducerChangeContext,
 		state: &Option<Cid>,
 		action: &Cid,
-	) -> Result<Option<Cid>, CoreResolverError> {
+	) -> Result<RuntimeContext, CoreResolverError> {
 		Ok(runtime
 			.execute(storage, &self.core, RuntimeContext::new(*state, action.into()))
 			.await
-			.map_err(|e| CoreResolverError::Execute("root".to_owned(), e))?
-			.state)
+			.map_err(|e| CoreResolverError::Execute("root".to_owned(), e))?)
 	}
 }

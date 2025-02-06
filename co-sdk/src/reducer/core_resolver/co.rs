@@ -43,7 +43,7 @@ where
 		_context: &ReducerChangeContext,
 		state: &Option<Cid>,
 		action: &Cid,
-	) -> Result<Option<Cid>, CoreResolverError> {
+	) -> Result<RuntimeContext, CoreResolverError> {
 		// get action
 		let reducer_action: ReducerAction<IgnoredAny> = storage
 			.get_deserialized(action)
@@ -99,6 +99,6 @@ where
 		}
 
 		// result
-		Ok(result.state)
+		Ok(result)
 	}
 }
