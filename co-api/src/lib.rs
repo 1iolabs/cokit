@@ -13,7 +13,9 @@ pub use co_primitives::{
 	ReducerAction, RelativePath, RelativePathOwned, Secret, Storage, StorageError, StoreParams, Tag, Tags, TagsExpr,
 	TotalFloat64, WithCoMetadata,
 };
-pub use co_v1::{event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set};
+pub use co_v1::{
+	diagnostic_cid_write, event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set,
+};
 pub use library::{
 	reduce::{reduce, reduce_with_context},
 	storage_ext::StorageExt,

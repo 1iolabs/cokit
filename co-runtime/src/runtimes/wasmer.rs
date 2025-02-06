@@ -1,4 +1,7 @@
-use crate::co_v1::{event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set, CoV1Api};
+use crate::co_v1::{
+	diagnostic_cid_write, event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set,
+	CoV1Api,
+};
 use std::fmt::Debug;
 use wasmer::{imports, AsStoreMut, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, Store, WasmPtr};
 
@@ -83,6 +86,7 @@ impl WasmerRuntime {
 				"state_cid_read" => Function::new_typed_with_env(store, env, wasmer_state_cid_read),
 				"state_cid_write" => Function::new_typed_with_env(store, env, wasmer_state_cid_write),
 				"event_cid_read" => Function::new_typed_with_env(store, env, wasmer_event_cid_read),
+				"diagnostic_cid_write" => Function::new_typed_with_env(store, env, wasmer_diagnostic_cid_write),
 			}
 		}
 	}
@@ -163,6 +167,16 @@ fn wasmer_event_cid_read(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>
 		.access()
 		.expect("pointer in bounds");
 	event_cid_read(&data.api, buffer_access.as_mut())
+}
+fn wasmer_diagnostic_cid_write(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, buffer_size: u32) -> u32 {
+	let (data, store) = env.data_and_store_mut();
+	let memory = data.memory.as_ref().unwrap().view(&store);
+	let buffer_access = buffer
+		.slice(&memory, buffer_size)
+		.expect("pointer in bounds")
+		.access()
+		.expect("pointer in bounds");
+	diagnostic_cid_write(&mut data.api, buffer_access.as_ref()).expect("API")
 }
 
 #[cfg(test)]

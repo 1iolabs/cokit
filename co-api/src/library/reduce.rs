@@ -56,7 +56,7 @@ pub mod async_reduce {
 	};
 	use anyhow::Context as _;
 	use cid::Cid;
-	use co_primitives::{from_cbor, BlockStorage, ReducerAction};
+	use co_primitives::{from_cbor, BlockStorage, BlockStorageExt, DiagnosticMessage, ReducerAction};
 	use futures::{executor::LocalPool, task::LocalSpawnExt};
 	use serde::de::DeserializeOwned;
 
@@ -73,7 +73,7 @@ pub mod async_reduce {
 	where
 		R: Reducer<A, S>,
 		A: Clone + DeserializeOwned,
-		S: BlockStorage + 'static,
+		S: BlockStorage + Clone + 'static,
 		C: Context<S> + 'static,
 	{
 		let mut pool = LocalPool::new();
@@ -86,7 +86,12 @@ pub mod async_reduce {
 						}
 					},
 					Err(err) => {
-						context.set_error(err);
+						let cid = context
+							.storage()
+							.set_serialized(&DiagnosticMessage::from(err))
+							.await
+							.expect("DiagnosticMessage to serialize");
+						context.write_diagnostic(cid);
 					},
 				}
 			})
@@ -98,7 +103,7 @@ pub mod async_reduce {
 	where
 		R: Reducer<A, S>,
 		A: Clone + DeserializeOwned,
-		S: BlockStorage + 'static,
+		S: BlockStorage + Clone + 'static,
 		C: Context<S> + 'static,
 	{
 		// event

@@ -687,6 +687,10 @@ mod tests {
 		fn store_state(&mut self, _cid: Cid) {
 			unimplemented!()
 		}
+
+		fn write_diagnostic(&mut self, _cid: Cid) {
+			unimplemented!()
+		}
 	}
 	impl co_api::Storage for TestContext {
 		fn get(&self, cid: &Cid) -> Block<DefaultParams> {

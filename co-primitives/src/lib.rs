@@ -25,6 +25,7 @@ pub use types::{
 	dag_collection_async_ext::DagCollectionAsyncExt,
 	dag_collection_ext::{DagCollectionExt, DagMapExt, DagSetExt, DagVecExt},
 	date::Date,
+	diagnostic_message::DiagnosticMessage,
 	did::Did,
 	invite::{CoConnectivity, CoInviteMetadata},
 	known_tags::{CoInvite, CoJoin, CoNetwork, CoTimeout, KnownTag, KnownTags},

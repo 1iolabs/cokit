@@ -16,6 +16,8 @@ pub trait Context {
 	fn state(&self) -> Option<Cid>;
 
 	fn store_state(&mut self, cid: Cid);
+
+	fn write_diagnostic(&mut self, cid: Cid);
 }
 
 pub mod async_reducer {
@@ -23,7 +25,10 @@ pub mod async_reducer {
 	use co_primitives::{BlockStorage, Link, OptionLink, ReducerAction};
 
 	/// COre execution context.
-	pub trait Context<S> {
+	pub trait Context<S>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
 		/// Storage instance.
 		fn storage(&self) -> &S;
 
@@ -37,8 +42,8 @@ pub mod async_reducer {
 		/// Set next COre state.
 		fn set_state(&mut self, cid: Cid);
 
-		/// Signal error.
-		fn set_error(&mut self, error: anyhow::Error);
+		/// Write diagnostic block.
+		fn write_diagnostic(&mut self, cid: Cid);
 	}
 
 	#[allow(async_fn_in_trait)]
@@ -46,7 +51,7 @@ pub mod async_reducer {
 	where
 		Self: Sized,
 		A: Clone,
-		S: BlockStorage,
+		S: BlockStorage + Clone + 'static,
 	{
 		async fn reduce(
 			state: OptionLink<Self>,

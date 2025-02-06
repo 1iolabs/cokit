@@ -1,5 +1,5 @@
 use super::{read_cid::read_cid, wasm_storage::WasmStorage, write_cid::write_cid};
-use crate::{async_api, event_cid_read, state_cid_read, state_cid_write, Cid, Context, Storage};
+use crate::{async_api, diagnostic_cid_write, event_cid_read, state_cid_read, state_cid_write, Cid, Context, Storage};
 
 pub struct WasmContext {
 	storage: WasmStorage,
@@ -29,6 +29,10 @@ impl Context for WasmContext {
 	fn store_state(&mut self, cid: Cid) {
 		write_cid(state_cid_write, &cid);
 	}
+
+	fn write_diagnostic(&mut self, cid: Cid) {
+		write_cid(diagnostic_cid_write, &cid);
+	}
 }
 impl async_api::Context<WasmStorage> for WasmContext {
 	fn storage(&self) -> &WasmStorage {
@@ -47,7 +51,7 @@ impl async_api::Context<WasmStorage> for WasmContext {
 		<Self as Context>::store_state(self, cid)
 	}
 
-	fn set_error(&mut self, error: anyhow::Error) {
-		// TODO: implement
+	fn write_diagnostic(&mut self, cid: Cid) {
+		<Self as Context>::write_diagnostic(self, cid)
 	}
 }

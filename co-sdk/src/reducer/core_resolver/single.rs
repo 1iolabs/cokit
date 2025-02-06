@@ -27,8 +27,9 @@ where
 		action: &Cid,
 	) -> Result<Option<Cid>, CoreResolverError> {
 		Ok(runtime
-			.execute(storage, &self.core, RuntimeContext { state: *state, event: action.into() })
+			.execute(storage, &self.core, RuntimeContext::new(*state, action.into()))
 			.await
-			.map_err(|e| CoreResolverError::Execute("root".to_owned(), e))?)
+			.map_err(|e| CoreResolverError::Execute("root".to_owned(), e))?
+			.state)
 	}
 }
