@@ -59,27 +59,4 @@ pub mod async_reducer {
 			storage: &S,
 		) -> Result<Link<Self>, anyhow::Error>;
 	}
-
-	// #[async_trait]
-	// pub trait Storage {
-	// 	/// Returns a block from storage.
-	// 	async fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError>;
-
-	// 	/// Inserts a block into storage.
-	// 	async fn set(&self, block: Block<DefaultParams>) -> Result<Cid, StorageError>;
-	// }
-
-	// #[async_trait]
-	// pub trait StorageReferences {
-	// 	/// References a block.
-	// 	/// Returns all [`Cid`] which has been references by this call.
-	// 	async fn alloc(&self, alloc: Cid, recursive: bool) -> BTreeSet<Cid>;
-
-	// 	/// Unreference block.
-	// 	/// Returns all [`Cid`] which has been unreferences by this call.
-	// 	async fn free(&self, free: Cid, recursive: bool) -> BTreeSet<Cid>;
-
-	// 	/// Unreference block and reference another.
-	// 	async fn replace(&self, from: Cid, to: Cid) -> BTreeSet<Cid>;
-	// }
 }
