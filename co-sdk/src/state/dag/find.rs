@@ -100,6 +100,6 @@ mod tests {
 		}
 
 		// find
-		assert_eq!(Some(2), find(&storage, &DagVec { cid }, |i| *i == 2).await.unwrap());
+		assert_eq!(Some(2), find(&storage, &DagVec { cid: cid.into() }, |i| *i == 2).await.unwrap());
 	}
 }

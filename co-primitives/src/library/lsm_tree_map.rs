@@ -1,7 +1,7 @@
 use super::node_builder::NodeReader;
 use crate::{
 	Block, BlockSerializer, BlockStorage, BlockStorageExt, Link, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
-	NodeStream, OptionLink, ReverseNodeStream, StorageError, StoreParams,
+	NodeStream, OptionLink, StorageError, StoreParams,
 };
 use anyhow::anyhow;
 use bloomfilter::Bloom;
@@ -189,12 +189,55 @@ where
 	K: Hash + Ord + Clone + Send + Sync + 'static,
 	V: Clone + Send + Sync + 'static,
 {
-	fn read(self) -> Either<Vec<Cid>, Vec<(K, Value<V>)>> {
+	type Filter = RunNodeFilter<K>;
+
+	fn read(self, filter: &Self::Filter) -> Either<Vec<Cid>, Vec<(K, Value<V>)>> {
 		match self {
-			RunNode::Node { nodes, min_key: _, max_key: _ } => {
-				Either::Left(nodes.into_iter().map(Into::into).collect())
+			RunNode::Node { nodes, min_key, max_key } => {
+				if filter.test(&min_key, &max_key) {
+					// println!("- filter {:?} min: {:?} max: {:?}", filter, min_key, max_key);
+					Either::Left(Vec::new())
+				} else {
+					// println!("+ use    {:?} min: {:?} max: {:?}", filter, min_key, max_key);
+					Either::Left(nodes.into_iter().map(Into::into).collect())
+				}
 			},
 			RunNode::Leaf(items) => Either::Right(items.into_iter().collect()),
+		}
+	}
+}
+
+#[derive(Debug, Default)]
+pub enum RunNodeFilter<K> {
+	#[default]
+	None,
+	Max(K),
+	Min(K),
+}
+impl<K> RunNodeFilter<K> {
+	pub fn min(key: Option<K>) -> Self {
+		match key {
+			None => Self::None,
+			Some(key) => Self::Min(key),
+		}
+	}
+
+	pub fn max(key: Option<K>) -> Self {
+		match key {
+			None => Self::None,
+			Some(key) => Self::Max(key),
+		}
+	}
+
+	/// Test if min_key .. max_key should be skipped
+	pub fn test(&self, min_key: &K, max_key: &K) -> bool
+	where
+		K: Ord,
+	{
+		match self {
+			RunNodeFilter::Min(filter_min_key) => min_key > filter_min_key,
+			RunNodeFilter::Max(filter_max_key) => max_key < filter_max_key,
+			RunNodeFilter::None => false,
 		}
 	}
 }
@@ -422,7 +465,12 @@ where
 
 	/// Stream all tree entries.
 	pub fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
-		self.create_stream(None).try_filter_map(|item| {
+		self.stream_query(None)
+	}
+
+	/// Stream tree entries.
+	pub fn stream_query(&self, start_at: Option<K>) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+		self.create_stream(None, start_at).try_filter_map(|item| {
 			ready(Ok(match item.1 {
 				Value::Value(value) => Some((item.0, value)),
 				Value::Tombstone => None,
@@ -432,7 +480,12 @@ where
 
 	/// Stream all tree entries in reverse order.
 	pub fn reverse_stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
-		self.create_reverse_stream(None).try_filter_map(|item| {
+		self.reverse_stream_query(None)
+	}
+
+	/// Stream tree entries in reverse order.
+	pub fn reverse_stream_query(&self, start_at: Option<K>) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+		self.create_reverse_stream(None, start_at).try_filter_map(|item| {
 			ready(Ok(match item.1 {
 				Value::Value(value) => Some((item.0, value)),
 				Value::Tombstone => None,
@@ -516,9 +569,14 @@ where
 	}
 
 	/// Iterate on runs.
+	///
+	/// # Arguments
+	/// - `only_run_indicies` - Only use specified runs specified by global run index.
+	/// - `start_at` - Start streaming at (inclusive) key.
 	fn create_stream(
 		&self,
 		only_run_indicies: Option<BTreeSet<usize>>,
+		start_at: Option<K>,
 	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + '_ {
 		let storage = self.storage.clone();
 		async_stream::try_stream! {
@@ -543,7 +601,7 @@ where
 					Some(run_indicies) => run_indicies.contains(index),
 					None => true,
 				}))
-				.map_ok(|(index, run)| (index, NodeStream::from_link(storage.clone(), run.entries)))
+				.map_ok(|(index, run)| (index, NodeStream::from_link(storage.clone(), run.entries).with_filter(RunNodeFilter::max(start_at.clone()))))
 				.try_collect()
 				.await?;
 			for (run_index, run) in runs.iter_mut() {
@@ -564,6 +622,14 @@ where
 					}
 				}
 
+				// skip items before start at
+				//  we need to filter overlaps as nodes which come before start_at will be skipped
+				if let Some(start_at) = &start_at {
+					if !(start_at <= &item.item.0) {
+						continue;
+					}
+				}
+
 				// yield values
 				yield item.item;
 			}
@@ -575,6 +641,7 @@ where
 	fn create_reverse_stream(
 		&self,
 		only_run_indicies: Option<BTreeSet<usize>>,
+		start_at: Option<K>,
 	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + '_ {
 		let storage = self.storage.clone();
 		async_stream::try_stream! {
@@ -592,14 +659,14 @@ where
 
 			// runs
 			//  filter and pop first item of each run
-			let mut runs: Vec<(usize, ReverseNodeStream<S, (K, Value<V>), RunNode<K, V>>)> = self
+			let mut runs: Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)> = self
 				.levels_and_runs()
 				.try_filter_map(|item| ready(Ok(item.right())))
 				.try_filter(|(index, _)| ready(match &only_run_indicies {
 					Some(run_indicies) => run_indicies.contains(index),
 					None => true,
 				}))
-				.map_ok(|(index, run)| (index, ReverseNodeStream::from_link(storage.clone(), run.entries)))
+				.map_ok(|(index, run)| (index, NodeStream::from_link(storage.clone(), run.entries).with_reverse().with_filter(RunNodeFilter::min(start_at.clone()))))
 				.try_collect()
 				.await?;
 			for (run_index, run) in runs.iter_mut() {
@@ -617,6 +684,14 @@ where
 						Self::pop_and_fetch_reverse(&mut heap, &mut runs).await?;
 					} else {
 						break;
+					}
+				}
+
+				// skip items after start at
+				//  we need to filter overlaps as nodes which come after start_at will be skipped
+				if let Some(start_at) = &start_at {
+					if !(start_at >= &item.item.0) {
+						continue;
 					}
 				}
 
@@ -655,7 +730,7 @@ where
 	/// Pop item and continue to read the run.
 	async fn pop_and_fetch_reverse(
 		heap: &mut BinaryHeap<ReverseTreeStreamItem<K, V>>,
-		runs: &mut Vec<(usize, ReverseNodeStream<S, (K, Value<V>), RunNode<K, V>>)>,
+		runs: &mut Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)>,
 	) -> Result<Option<ReverseTreeStreamItem<K, V>>, StorageError> {
 		if let Some(item) = heap.pop() {
 			// fetch next
@@ -815,7 +890,8 @@ where
 		}
 
 		// runs
-		let entries = self.create_stream(Some(runs.iter().map(|(_, global_run_index, _)| *global_run_index).collect()));
+		let entries =
+			self.create_stream(Some(runs.iter().map(|(_, global_run_index, _)| *global_run_index).collect()), None);
 		let run = store_run(
 			&self.storage,
 			self.settings.max_node_entries,
@@ -957,7 +1033,7 @@ where
 	}
 
 	// result
-	Ok(root.into())
+	Ok(root.cid().into())
 }
 
 /// Store `entries` as DAG Node and return the root [`cid::Cid`].
@@ -992,7 +1068,7 @@ where
 	}
 
 	// result
-	Ok(root.into())
+	Ok(root.cid().into())
 }
 
 /// Store `entries` as DAG and return the root [`cid::Cid`].
@@ -1310,7 +1386,7 @@ mod tests {
 	}
 
 	#[tokio::test]
-	async fn test_reverse_stream() {
+	async fn test_stream() {
 		let storage = TestStorage::default();
 		let settings = LsmTreeMapSettings { max_node_entries: 32, max_active_entries: 2, max_run_count: 2 };
 		let mut tree = LsmTreeMap::new(storage.clone(), settings);
@@ -1325,5 +1401,23 @@ mod tests {
 		tree.flush_active().await.unwrap();
 		assert_eq!(tree.stream().try_collect::<Vec<_>>().await.unwrap(), vec![(0, 0), (1, 1), (2, 20),]);
 		assert_eq!(tree.reverse_stream().try_collect::<Vec<_>>().await.unwrap(), vec![(2, 20), (1, 1), (0, 0),]);
+	}
+
+	#[tokio::test]
+	async fn test_stream_query() {
+		let storage = TestStorage::default();
+		let settings = LsmTreeMapSettings { max_node_entries: 2, max_active_entries: 2, max_run_count: 2 };
+		let mut tree = LsmTreeMap::new(storage.clone(), settings);
+		for i in 0..10 {
+			tree.insert(i, i).await.unwrap();
+		}
+		assert_eq!(
+			tree.stream_query(Some(5)).try_collect::<Vec<_>>().await.unwrap(),
+			vec![(5, 5), (6, 6), (7, 7), (8, 8), (9, 9)]
+		);
+		assert_eq!(
+			tree.reverse_stream_query(Some(5)).try_collect::<Vec<_>>().await.unwrap(),
+			vec![(5, 5), (4, 4), (3, 3), (2, 2), (1, 1), (0, 0)]
+		);
 	}
 }

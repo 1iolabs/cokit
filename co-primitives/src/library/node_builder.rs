@@ -1,4 +1,4 @@
-use crate::{Block, BlockSerializer, DefaultParams, Link, StoreParams};
+use crate::{Block, BlockSerializer, DefaultParams, Link, OptionLink, StoreParams};
 use cid::Cid;
 use either::Either;
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,9 @@ impl<T> Default for Node<T> {
 	}
 }
 impl<T> NodeReader<T> for Node<T> {
-	fn read(self) -> Either<Vec<Cid>, Vec<T>> {
+	type Filter = ();
+
+	fn read(self, _: &Self::Filter) -> Either<Vec<Cid>, Vec<T>> {
 		match self {
 			Node::Node(links) => Either::Left(links.into_iter().map(Into::into).collect()),
 			Node::Leaf(items) => Either::Right(items),
@@ -29,7 +31,9 @@ impl<T> NodeReader<T> for Node<T> {
 }
 
 pub trait NodeReader<T> {
-	fn read(self) -> Either<Vec<Cid>, Vec<T>>;
+	type Filter: Default;
+
+	fn read(self, filter: &Self::Filter) -> Either<Vec<Cid>, Vec<T>>;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -153,7 +157,7 @@ where
 
 	/// Convert builder into blocks.
 	/// All blocks that are not yet taken using [`NodeBuilder::take_blocks`] are returned.
-	pub fn into_blocks(mut self) -> Result<(Option<Cid>, Vec<Block<P>>), NodeBuilderError> {
+	pub fn into_blocks(mut self) -> Result<(OptionLink<N>, Vec<Block<P>>), NodeBuilderError> {
 		// flush
 		if !self.items.is_empty() {
 			self.flush()?;
@@ -166,7 +170,8 @@ where
 				self.blocks,
 				self.max_children,
 				&mut self.pending_blocks,
-			)?,
+			)?
+			.into(),
 			self.pending_blocks,
 		))
 	}

@@ -10,7 +10,7 @@ pub use library::{
 	lsm_tree_map::{LsmTreeMap, LsmTreeMapSettings},
 	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
 	node_reader::{node_reader, NodeReaderError},
-	node_stream::{NodeStream, ReverseNodeStream},
+	node_stream::NodeStream,
 };
 pub use types::{
 	action::ReducerAction,

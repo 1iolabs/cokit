@@ -545,10 +545,10 @@ impl BlockMapping {
 		for (key, value) in self.map.iter() {
 			builder.push((*key, *value)).map_err(|e| StorageError::Internal(e.into()))?;
 		}
-		let blocks = builder.into_blocks().map_err(|e| StorageError::Internal(e.into()))?;
+		let (root, blocks) = builder.into_blocks().map_err(|e| StorageError::Internal(e.into()))?;
 
 		// result
-		Ok(blocks)
+		Ok((*root.cid(), blocks))
 	}
 }
 

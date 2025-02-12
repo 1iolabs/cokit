@@ -64,6 +64,6 @@ impl PinEntry {
 		}
 
 		// result
-		Ok(result)
+		Ok(result.into())
 	}
 }
