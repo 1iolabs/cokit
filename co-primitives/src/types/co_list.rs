@@ -137,12 +137,27 @@ where
 	}
 
 	/// Pop last element.
+	///
+	/// See: [`CoListTransaction::pop`]
 	pub async fn pop<S>(&mut self, storage: &S) -> Result<Option<(CoListIndex, V)>, StorageError>
 	where
 		S: BlockStorage + Clone + 'static,
 	{
 		let mut transaction = self.open(storage).await?;
 		let result = transaction.pop().await?;
+		self.commit(transaction).await?;
+		Ok(result)
+	}
+
+	/// Pop first element.
+	///
+	/// See: [`CoListTransaction::pop_front`]
+	pub async fn pop_front<S>(&mut self, storage: &S) -> Result<Option<(CoListIndex, V)>, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		let mut transaction = self.open(storage).await?;
+		let result = transaction.pop_front().await?;
 		self.commit(transaction).await?;
 		Ok(result)
 	}
@@ -310,6 +325,18 @@ where
 	{
 		if let Some(key) = self.max_key().await? {
 			self.max_key = None;
+			Ok(self.remove(key.clone()).await?.map(|value| (key, value)))
+		} else {
+			Ok(None)
+		}
+	}
+
+	/// Pop first element.
+	pub async fn pop_front(&mut self) -> Result<Option<(CoListIndex, V)>, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		if let Some(key) = self.tree.min_key().await? {
 			Ok(self.remove(key.clone()).await?.map(|value| (key, value)))
 		} else {
 			Ok(None)

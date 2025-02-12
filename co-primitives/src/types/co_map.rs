@@ -53,15 +53,14 @@ where
 		.await
 	}
 
-	pub async fn remove<S>(&mut self, storage: &S, key: K) -> Result<(), StorageError>
+	pub async fn remove<S>(&mut self, storage: &S, key: K) -> Result<Option<V>, StorageError>
 	where
 		S: BlockStorage + Clone + 'static,
 	{
-		self.update(storage, |mut transaction| async move {
-			transaction.remove(key).await?;
-			Ok(transaction)
-		})
-		.await
+		let mut transaction = self.open(storage).await?;
+		let result = transaction.remove(key).await?;
+		self.commit(transaction).await?;
+		Ok(result)
 	}
 
 	/// Update (or insert default) value.
@@ -105,6 +104,15 @@ where
 				None => LsmTreeMap::new(storage.clone(), Default::default()),
 			},
 		})
+	}
+
+	/// Commit transaction to this map.
+	pub async fn commit<S>(&mut self, mut transaction: CoMapTransaction<S, K, V>) -> Result<(), StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		self.0 = transaction.tree.store().await?;
+		Ok(())
 	}
 
 	/// Open transaction and apply `update` and store it.
@@ -172,7 +180,7 @@ where
 		self.transaction.insert(key, value).await
 	}
 
-	pub async fn remove(&mut self, key: K) -> Result<(), StorageError> {
+	pub async fn remove(&mut self, key: K) -> Result<Option<V>, StorageError> {
 		self.transaction.remove(key).await
 	}
 
@@ -221,8 +229,13 @@ where
 		self.tree.insert(key, value).await
 	}
 
-	pub async fn remove(&mut self, key: K) -> Result<(), StorageError> {
-		self.tree.remove(key).await
+	pub async fn remove(&mut self, key: K) -> Result<Option<V>, StorageError> {
+		if let Some(value) = self.tree.get(&key).await? {
+			self.tree.remove(key).await?;
+			Ok(Some(value))
+		} else {
+			Ok(None)
+		}
 	}
 
 	/// Update (or insert default) value.

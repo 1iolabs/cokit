@@ -1566,6 +1566,7 @@ dependencies = [
  "co-api",
  "co-runtime",
  "co-storage",
+ "futures",
  "ipld-core",
  "serde",
  "serde_repr",
