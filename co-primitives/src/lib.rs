@@ -19,6 +19,7 @@ pub use types::{
 	block_storage_ext::BlockStorageExt,
 	cid::CoCid,
 	co::CoId,
+	co_list::{CoList, CoListIndex, CoListTransaction},
 	co_map::{CoMap, CoMapTransaction},
 	codec::{KnownMultiCodec, MultiCodec, MultiCodecError},
 	dag_collection::{DagCollection, DagMap, DagSet, DagVec},

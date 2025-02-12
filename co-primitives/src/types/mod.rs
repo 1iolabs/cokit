@@ -4,6 +4,7 @@ pub mod block_storage;
 pub mod block_storage_ext;
 pub mod cid;
 pub mod co;
+pub mod co_list;
 pub mod co_map;
 pub mod codec;
 pub mod dag_collection;
