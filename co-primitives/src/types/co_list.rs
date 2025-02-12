@@ -26,37 +26,6 @@ impl CoListIndex {
 		Self::mediant(self, other)
 	}
 
-	/// Binary Search in the Stern-Brocot Tree for the next mediate
-	pub(crate) fn intermediate(&self, other: &Self) -> Result<Self, anyhow::Error> {
-		let x = *self;
-		let y = *other;
-		let mut left = Self::new_raw(0, 1);
-		let mut right = Self::new_raw(1, 0);
-
-		// validate
-		if x < left || y < left {
-			return Err(anyhow!("arguments must be non-negative"));
-		}
-		if x >= y {
-			return Err(anyhow!("first argument must be strictly smaller than second"));
-		}
-
-		// walk
-		left = x;
-		right = y;
-		loop {
-			let m = Self::mediant(&left, &right);
-			println!("l: {:?}, h: {:?}, m: {:?}", left, right, m);
-			if m <= x {
-				left = m;
-			} else if m >= y {
-				right = m;
-			} else {
-				return Ok(m);
-			}
-		}
-	}
-
 	pub(crate) fn new_raw(numer: u64, denom: u64) -> Self {
 		Self(Ratio::new_raw(numer, denom))
 	}
@@ -70,11 +39,6 @@ impl CoListIndex {
 	/// $`\text{mediant} = \frac{p_1 + p_2}{q_1 + q_2}`$
 	fn mediant(x: &Self, y: &Self) -> Self {
 		Self::new_raw(x.0.numer() + y.0.numer(), x.0.denom() + y.0.denom())
-	}
-
-	fn mediant_raw(x: &(u64, u64), y: &(u64, u64), m: &mut (u64, u64)) {
-		m.0 = x.0 + y.0;
-		m.1 = x.1 + y.1;
 	}
 }
 impl Default for CoListIndex {
