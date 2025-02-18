@@ -1,4 +1,4 @@
-FROM rust:1.79
+FROM rust:1.82
 RUN apt-get update
 RUN apt-get install -y \
     build-essential \

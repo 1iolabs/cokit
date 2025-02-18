@@ -17,3 +17,11 @@ echo "  DOCKERFILE_IMAGE: $DOCKERFILE_IMAGE" >> "$BASE_PATH/ci/build.yml"
 # docker buildx create --name multiplatform-builder
 # docker buildx use multiplatform-builder
 # docker buildx inspect --bootstrap
+
+## Start buildx service:
+# brew services start colima
+# docker buildx use multiplatform-builder
+# docker buildx inspect --bootstrap
+
+## Run buildx service in foreground:
+# /opt/homebrew/opt/colima/bin/colima start -f
