@@ -85,12 +85,15 @@ pub enum StorageAction {
 	TagsRemove(Vec<Cid>, Tags),
 
 	/// Create a named pin and reference all specified [`Cid`]s.
+	#[serde(rename = "pc")]
 	PinCreate(String, Pin),
 
 	/// Insert references to a named pin and reference all specified [`Cid`]s.
+	#[serde(rename = "pr")]
 	PinReference(String, Vec<Cid>),
 
 	/// Remove a named pin and unreference all [`Cid`]s.
+	#[serde(rename = "pd")]
 	PinRemove(String),
 }
 

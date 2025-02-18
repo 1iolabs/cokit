@@ -9,6 +9,7 @@ pub mod dynamic;
 pub mod epic;
 pub mod log;
 pub mod membership;
+pub mod reference;
 pub mod single;
 
 #[async_trait]

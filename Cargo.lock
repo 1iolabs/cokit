@@ -1786,6 +1786,7 @@ dependencies = [
  "co-core-pin",
  "co-core-role",
  "co-core-room",
+ "co-core-storage",
  "co-identity",
  "co-log",
  "co-network",

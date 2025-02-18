@@ -6,11 +6,13 @@ use std::collections::{BinaryHeap, HashMap, VecDeque};
 /// Find added/removed references in blocks.
 /// If a [`Cid`] is referenced multiple times it will also returnes multiple times.
 /// This diff works recursively - all added/removed [`Cid`] at any depth will be returned.
+/// However there is a look-ahead depth limit, how many nodes are looked down to reuse references (defaults to `1`).
 pub fn block_diff<S>(
 	storage: S,
 	prev: Option<Cid>,
 	next: Cid,
 	block_links: BlockLinks,
+	look_ahead_depth: Option<u8>,
 ) -> impl Stream<Item = Result<BlockDiff, StorageError>>
 where
 	S: BlockStorage + Clone + 'static,
@@ -28,7 +30,7 @@ where
 		// walk next
 		while let Some(next) = stack.pop_front() {
 			// try to reuse a reference
-			let mut allow_resolve_next_levels = 1;
+			let mut allow_resolve_next_levels = look_ahead_depth.unwrap_or(1);
 			loop {
 				match pop_reference(&mut prev_links, &next) {
 					// found deep reference -> (re-)use it
@@ -321,7 +323,7 @@ mod tests {
 			.unwrap();
 
 		// diff
-		let diff = block_diff(storage, Some(node7), node7_change, Default::default())
+		let diff = block_diff(storage, Some(node7), node7_change, Default::default(), Default::default())
 			.try_collect::<Vec<BlockDiff>>()
 			.await
 			.unwrap();
@@ -382,7 +384,7 @@ mod tests {
 		let node8_change = storage.set_serialized(&Node { id: 8, nodes: vec![node7] }).await.unwrap();
 
 		// diff
-		let diff = block_diff(storage, Some(node7), node8_change, Default::default())
+		let diff = block_diff(storage, Some(node7), node8_change, Default::default(), Default::default())
 			.try_collect::<Vec<BlockDiff>>()
 			.await
 			.unwrap();

@@ -27,8 +27,8 @@ impl BlockLinks {
 	pub fn links<'a, P: StoreParams>(
 		&self,
 		block: &'a Block<P>,
-	) -> Result<impl Iterator<Item = Cid> + use<'a, P>, anyhow::Error> {
-		let iter: Box<dyn Iterator<Item = Cid>> = match MultiCodec::from(block.cid()) {
+	) -> Result<impl Iterator<Item = Cid> + Send + Sync + use<'a, P>, anyhow::Error> {
+		let iter: Box<dyn Iterator<Item = Cid> + Send + Sync> = match MultiCodec::from(block.cid()) {
 			MultiCodec::Known(KnownMultiCodec::DagPb) => Box::new(ipld_dagpb::DagPbCodec::links(block.data())?),
 			MultiCodec::Known(KnownMultiCodec::DagCbor) => {
 				Box::new(serde_ipld_dagcbor::codec::DagCborCodec::links(block.data())?)
