@@ -69,7 +69,7 @@ pub mod async_reduce {
 		reduce_with_context::<R, A, WasmContext, WasmStorage>(context);
 	}
 
-	pub fn reduce_with_context<R, A, C, S>(mut context: C)
+	pub fn reduce_with_context<R, A, C, S>(mut context: C) -> C
 	where
 		R: Reducer<A, S>,
 		A: Clone + DeserializeOwned,
@@ -77,8 +77,9 @@ pub mod async_reduce {
 		C: Context<S> + 'static,
 	{
 		let mut pool = LocalPool::new();
-		pool.spawner()
-			.spawn_local(async move {
+		let handle = pool
+			.spawner()
+			.spawn_local_with_handle(async move {
 				match reduce_execute_with_context::<R, A, C, S>(&context).await {
 					Ok(next_state) => {
 						if let Some(next_state) = next_state {
@@ -94,9 +95,10 @@ pub mod async_reduce {
 						context.write_diagnostic(cid);
 					},
 				}
+				context
 			})
 			.expect("future to execute");
-		pool.run();
+		pool.run_until(handle)
 	}
 
 	pub async fn reduce_execute_with_context<R, A, C, S>(context: &C) -> Result<Option<Cid>, anyhow::Error>

@@ -58,7 +58,8 @@ pub use types::{
 	co_storage::CoStorage,
 	cores::{
 		Cores, CO_CORE_CO, CO_CORE_DATA_SERIES, CO_CORE_FILE, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
-		CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_PIN, CO_CORE_PIN, CO_CORE_ROOM,
+		CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_PIN, CO_CORE_NAME_STORAGE, CO_CORE_PIN,
+		CO_CORE_ROOM,
 	},
 	error::{ErrorContext, ErrorKind, IntoAction},
 	reference::{Reference, Request, Response, ResponseError},

@@ -1,4 +1,4 @@
-use crate::{co_v1::CoV1Api, runtimes::RuntimeError, ApiContext, Core, RuntimeContext, RuntimeInstance};
+use crate::{co_v1::CoV1Api, runtimes::RuntimeError, ApiContext, AsyncContext, Core, RuntimeContext, RuntimeInstance};
 use cid::Cid;
 use co_storage::{BlockStorage, StorageError, StoreParamsBlockStorage, SyncBlockStorage};
 use std::{collections::VecDeque, sync::Arc};
@@ -61,12 +61,6 @@ impl RuntimePool {
 		#[cfg(not(debug_assertions))]
 		let checked = false;
 
-		// api
-		let api = CoV1Api::new(
-			Box::new(SyncBlockStorage::new(StoreParamsBlockStorage::new(storage.clone(), checked), Handle::current())),
-			context,
-		);
-
 		// execute
 		let result = match core {
 			Core::Wasm(core) => {
@@ -76,6 +70,9 @@ impl RuntimePool {
 					Some(i) => i,
 					None => RuntimeInstance::create(storage, core).await?,
 				};
+
+				// api
+				let api = create_cov1_api(storage, context, checked);
 
 				// execute
 				let (result, instance): (RuntimeContext, RuntimeInstance) =
@@ -93,12 +90,29 @@ impl RuntimePool {
 				result
 			},
 			Core::Native(f) => {
+				// api
+				let api = create_cov1_api(storage, context, checked);
+
+				// execute
 				let execute = f.clone();
 				tokio::task::spawn_blocking(move || -> Result<RuntimeContext, RuntimeError> {
 					let mut context = ApiContext::new(api);
 					// Todo: handle panics to not crash the host
 					execute(&mut context);
 					Ok(context.context().clone())
+				})
+				.await
+				.map_err(|e| ExecuteError::Other(e.into()))??
+			},
+			Core::NativeAsync(f) => {
+				// api
+				let api = AsyncContext::new(storage.clone(), context, checked);
+
+				// execute
+				let execute = f.clone();
+				tokio::task::spawn_blocking(move || -> Result<RuntimeContext, RuntimeError> {
+					// Todo: handle panics to not crash the host
+					Ok(execute(api).context())
 				})
 				.await
 				.map_err(|e| ExecuteError::Other(e.into()))??
@@ -113,6 +127,13 @@ impl Default for RuntimePool {
 	fn default() -> Self {
 		Self::new(Default::default())
 	}
+}
+
+fn create_cov1_api<S: BlockStorage + Clone + 'static>(storage: &S, context: RuntimeContext, checked: bool) -> CoV1Api {
+	CoV1Api::new(
+		Box::new(SyncBlockStorage::new(StoreParamsBlockStorage::new(storage.clone(), checked), Handle::current())),
+		context,
+	)
 }
 
 #[derive(Debug, thiserror::Error)]

@@ -5,6 +5,7 @@ mod types;
 
 pub use library::{
 	api_context::ApiContext,
+	async_context::{AsyncBlockStorage, AsyncContext},
 	instance::RuntimeInstance,
 	pool::{ExecuteError, IdleRuntimePool, RuntimePool},
 };
