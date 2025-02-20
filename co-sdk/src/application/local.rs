@@ -9,10 +9,10 @@ use crate::{
 	types::{
 		co_reducer::CoReducerContext,
 		co_storage::CoBlockStorageContentMapping,
-		cores::{CO_CORE_NAME_CO, CO_CORE_NAME_PIN, CO_CORE_PIN},
+		cores::{CO_CORE_NAME_CO, CO_CORE_STORAGE},
 	},
 	CoReducer, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, ReducerChangeContext, Runtime, TaskSpawner,
-	CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -415,10 +415,10 @@ where
 		},
 	);
 	cores.insert(
-		CO_CORE_NAME_PIN.to_owned(),
+		CO_CORE_NAME_STORAGE.to_owned(),
 		co_core_co::Core {
-			binary: Cores::default().binary(CO_CORE_PIN).expect(CO_CORE_PIN),
-			tags: tags!("core": CO_CORE_PIN),
+			binary: Cores::default().binary(CO_CORE_STORAGE).expect(CO_CORE_STORAGE),
+			tags: tags!("core": CO_CORE_STORAGE),
 			state: None,
 		},
 	);
