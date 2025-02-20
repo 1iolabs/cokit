@@ -1,11 +1,12 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, BlockStorage, BlockStorageExt, CoList, CoMap, CoMapTransaction, Link, OptionLink,
+	async_api::Reducer, BlockStorage, BlockStorageExt, CoList, CoMap, CoMapTransaction, CoSet, Link, OptionLink,
 	ReducerAction, StorageError, Tags,
 };
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Storage {
@@ -20,9 +21,16 @@ pub struct Storage {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BlockMetadata {
+	/// Current reference count on this node.
 	#[serde(rename = "r")]
 	pub references: u32,
 
+	/// Structural references. Children of this reference.
+	/// Every children listed here increases its respective reference count by one.
+	#[serde(rename = "c")]
+	pub children: CoSet<Cid>,
+
+	/// Additional metadata.
 	#[serde(rename = "t", default, skip_serializing_if = "Tags::is_empty")]
 	pub tags: Tags,
 }
@@ -60,13 +68,19 @@ pub enum PinStrategy {
 pub enum StorageAction {
 	/// Increase [`Cid`] reference count by one.
 	/// A single [`Cid`] is allowed to be contained multiple times (=reference count).
-	/// Non recursive: [`Cid`] links are not added automatically.
+	/// The Shallow: [`Cid`] links are not added automatically (not recusrive).
 	#[serde(rename = "r")]
 	Reference(Vec<Cid>),
 
 	/// Decrease [`Cid`] reference count by one.
 	#[serde(rename = "u")]
 	Unreference(Vec<Cid>),
+
+	/// Structurally reference [`Cid`].
+	/// The first item is the parent the second is the children to be structurally referenced.
+	/// All unique children have their reference count increased by one (idempotent).
+	#[serde(rename = "s")]
+	ReferenceStructure(BTreeMap<Cid, BTreeSet<Cid>>),
 
 	/// Remove [`Cid`] references.
 	///
@@ -105,8 +119,13 @@ impl<S: BlockStorage + Clone + 'static> Reducer<StorageAction, S> for Storage {
 	) -> Result<Link<Self>, anyhow::Error> {
 		let mut state = storage.get_value_or_default(&state).await?;
 		match event.payload {
-			StorageAction::Reference(cids) => reference(storage, &mut state, stream::iter(cids).map(Ok)).await?,
-			StorageAction::Unreference(cids) => unreference(storage, &mut state, stream::iter(cids).map(Ok)).await?,
+			StorageAction::Reference(cids) => reduce_reference(storage, &mut state, stream::iter(cids).map(Ok)).await?,
+			StorageAction::Unreference(cids) => {
+				reduce_unreference(storage, &mut state, stream::iter(cids).map(Ok)).await?
+			},
+			StorageAction::ReferenceStructure(cids) => {
+				reduce_reference_structure(storage, &mut state, stream::iter(cids).map(Ok)).await?
+			},
 			StorageAction::Remove(cids, force) => reduce_remove(storage, &mut state, cids, force).await?,
 			StorageAction::TagsInsert(cids, tags) => reduce_tags_insert(storage, &mut state, cids, tags).await?,
 			StorageAction::TagsRemove(cids, tags) => reduce_tags_remove(storage, &mut state, cids, tags).await?,
@@ -116,6 +135,60 @@ impl<S: BlockStorage + Clone + 'static> Reducer<StorageAction, S> for Storage {
 		}
 		Ok(storage.set_value(&state).await?)
 	}
+}
+
+/// See: [`StorageAction::ReferenceStructure`]
+async fn reduce_reference_structure<S>(
+	storage: &S,
+	state: &mut Storage,
+	cids: impl Stream<Item = Result<(Cid, BTreeSet<Cid>), StorageError>>,
+) -> Result<(), anyhow::Error>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	let mut blocks = state.blocks.open(storage).await?;
+	pin_mut!(cids);
+	while let Some((parent, children)) = cids.try_next().await? {
+		reference_structure_cid(storage, &mut blocks, parent, children).await?;
+	}
+	state.blocks = blocks.store().await?;
+	Ok(())
+}
+
+/// Add unique children to parent block metadata.
+async fn reference_structure_cid<S>(
+	storage: &S,
+	blocks: &mut CoMapTransaction<S, Cid, BlockMetadata>,
+	parent: Cid,
+	children: BTreeSet<Cid>,
+) -> Result<(), anyhow::Error>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	let mut block = blocks.get(&parent).await?.unwrap_or_default();
+
+	// add children
+	let mut transaction = block.children.open(storage).await?;
+	let mut changed = false;
+	for item in children {
+		if !transaction.contains(&item).await? {
+			changed = true;
+
+			// add children
+			transaction.insert(item).await?;
+
+			// reference
+			reference_cid(blocks, item).await?;
+		}
+	}
+
+	// store
+	if changed {
+		block.children = transaction.store().await?;
+		blocks.insert(parent, block).await?;
+	}
+
+	Ok(())
 }
 
 async fn reduce_pin_remove<S>(storage: &S, state: &mut Storage, key: String) -> Result<(), anyhow::Error>
@@ -128,7 +201,7 @@ where
 	let pin = pins.remove(key.clone()).await?.ok_or(anyhow!("Pin not found: {}", key))?;
 
 	// references
-	unreference(storage, state, pin.references.stream(storage).map_ok(|(_key, value)| value)).await?;
+	reduce_unreference(storage, state, pin.references.stream(storage).map_ok(|(_key, value)| value)).await?;
 
 	// store
 	state.pins = pins.store().await?;
@@ -279,7 +352,7 @@ where
 	Ok(())
 }
 
-async fn reference<S>(
+async fn reduce_reference<S>(
 	storage: &S,
 	state: &mut Storage,
 	cids: impl Stream<Item = Result<Cid, StorageError>>,
@@ -309,7 +382,7 @@ where
 	Ok(())
 }
 
-async fn unreference<S>(
+async fn reduce_unreference<S>(
 	storage: &S,
 	state: &mut Storage,
 	cids: impl Stream<Item = Result<Cid, StorageError>>,

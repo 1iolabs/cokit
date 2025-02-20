@@ -4,11 +4,15 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_core_storage::StorageAction;
 use co_identity::PrivateIdentity;
-use co_primitives::{block_diff, BlockDiff, StoreParams};
+use co_primitives::{block_diff_added_with_parent, StoreParams};
 use co_runtime::{RuntimeContext, RuntimePool};
 use co_storage::BlockStorage;
 use futures::{pin_mut, TryStreamExt};
-use std::{marker::PhantomData, mem::swap};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	marker::PhantomData,
+	mem::swap,
+};
 
 /// Reference count state in a [`co_core_storage::Storage`] core.
 pub struct ReferenceCoreResolver<S, C, P> {
@@ -41,53 +45,49 @@ where
 
 		// references
 		if let Some(next_state) = next.state {
-			// diff
-			let diff = block_diff(storage.clone(), *state, next_state, Default::default(), Default::default());
-
 			// calc max references per action
 			let max_references = <S::StoreParams as StoreParams>::MAX_BLOCK_SIZE / 2 / Cid::default().encoded_len();
 
-			// apply references
-			let mut references = Vec::new();
-			let mut unreferences = Vec::new();
-			pin_mut!(diff);
-			while let Some(next) = diff.try_next().await? {
-				// record
-				match next {
-					BlockDiff::Added(cid) => {
-						references.push(cid);
-					},
-					BlockDiff::Removed(cid) => {
-						unreferences.push(cid);
-					},
-				}
+			// diff
+			let diff = block_diff_added_with_parent(
+				storage.clone(),
+				*state,
+				next_state,
+				Default::default(),
+				Default::default(),
+			);
 
-				// flush when we hit max block size
-				if references.len() > max_references {
-					let mut next_references = Vec::new();
-					swap(&mut references, &mut next_references);
-					let action = StorageAction::Reference(next_references);
-					self.parent.push(&self.identity, &self.storage_core_name, &action).await?;
-				}
-				if unreferences.len() > max_references {
-					let mut next_unreferences = Vec::new();
-					swap(&mut unreferences, &mut next_unreferences);
-					let action = StorageAction::Unreference(next_unreferences);
-					self.parent.push(&self.identity, &self.storage_core_name, &action).await?;
+			// apply root reference
+			if let Some(pinning_key) = &self.pinning_key {
+				let action = StorageAction::PinReference(pinning_key.clone(), vec![next_state]);
+				self.parent.push(&self.identity, &self.storage_core_name, &action).await?;
+			}
+
+			// apply structural references
+			let mut references = BTreeMap::<Cid, BTreeSet<Cid>>::new();
+			let mut references_count = 0;
+			pin_mut!(diff);
+			while let Some((next_parent, next)) = diff.try_next().await? {
+				if let Some(next_parent) = next_parent {
+					// record
+					references.entry(next_parent).or_default().insert(next);
+					references_count += 1;
+
+					// flush when we hit max block size
+					if references_count > max_references {
+						// take
+						let mut next_references = Default::default();
+						swap(&mut references, &mut next_references);
+						references_count = 0;
+
+						// apply
+						let action = StorageAction::ReferenceStructure(next_references);
+						self.parent.push(&self.identity, &self.storage_core_name, &action).await?;
+					}
 				}
 			}
 			if !references.is_empty() {
-				let action = StorageAction::Reference(references);
-				self.parent.push(&self.identity, &self.storage_core_name, &action).await?;
-			}
-			if !unreferences.is_empty() {
-				let action = StorageAction::Unreference(unreferences);
-				self.parent.push(&self.identity, &self.storage_core_name, &action).await?;
-			}
-
-			// apply pin
-			if let Some(pinning_key) = &self.pinning_key {
-				let action = StorageAction::PinReference(pinning_key.clone(), vec![next_state]);
+				let action = StorageAction::ReferenceStructure(references);
 				self.parent.push(&self.identity, &self.storage_core_name, &action).await?;
 			}
 		}

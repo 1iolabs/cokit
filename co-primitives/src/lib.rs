@@ -3,7 +3,7 @@ mod macros;
 mod types;
 
 pub use library::{
-	block_diff::{block_diff, BlockDiff},
+	block_diff::{block_diff, block_diff_added_with_parent, BlockDiff},
 	block_links::BlockLinks,
 	block_serializer::{BlockSerializer, BlockSerializerError},
 	cbor::{from_cbor, to_cbor, CborError},

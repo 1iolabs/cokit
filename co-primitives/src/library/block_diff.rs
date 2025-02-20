@@ -18,7 +18,7 @@ where
 	S: BlockStorage + Clone + 'static,
 {
 	async_stream::try_stream! {
-		let mut stack = VecDeque::new();
+		let mut stack = VecDeque::<Cid>::new();
 		stack.push_back(next);
 
 		// collect prev (one level)
@@ -89,6 +89,69 @@ where
 						// ignore not found
 					},
 				}
+			}
+		}
+	}
+}
+
+/// Find added references in blocks with its parent.
+/// This diff works recursively - all added [`Cid`] at any depth will be returned.
+/// However there is a look-ahead depth limit, how many nodes are looked down to reuse references (defaults to `1`).
+pub fn block_diff_added_with_parent<S>(
+	storage: S,
+	prev: Option<Cid>,
+	next: Cid,
+	block_links: BlockLinks,
+	look_ahead_depth: Option<u8>,
+) -> impl Stream<Item = Result<(Option<Cid>, Cid), StorageError>>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	async_stream::try_stream! {
+		let mut stack = VecDeque::<(Option<Cid>, Cid)>::new();
+		stack.push_back((None, next));
+
+		// collect prev (one level)
+		let mut prev_links: HashMap<Cid, BinaryHeap<ReferenceDepth>> = HashMap::new();
+		if let Some(prev) = prev {
+			prev_links.insert(prev, BinaryHeap::from([ReferenceDepth::Deep]));
+		}
+
+		// walk next
+		while let Some((next_parent, next)) = stack.pop_front() {
+			// try to reuse a reference
+			let mut allow_resolve_next_levels = look_ahead_depth.unwrap_or(1);
+			loop {
+				match pop_reference(&mut prev_links, &next) {
+					// found deep reference -> (re-)use it
+					Some(ReferenceDepth::Deep) | Some(ReferenceDepth::DeepNotFound) => {
+						// result.push(Diff::Reuse(*next));
+					},
+					// found shallow reference -> (re-)use it and try to reuse its links
+					Some(ReferenceDepth::Shallow) => {
+						// walk children
+						stack.extend(extract_links_children(&storage, &next, &block_links).await?.into_iter().map(|child| (Some(next), child)));
+						// result.push(Diff::Reuse(*next));
+					},
+					// no previous reference found
+					None => {
+						// resolve one level of deep references
+						make_shallow(&storage, &block_links, &mut prev_links).await?;
+
+						// retry with next level resolved
+						if allow_resolve_next_levels > 0 {
+							allow_resolve_next_levels -= 1;
+							continue;
+						}
+
+						// walk children
+						stack.extend(extract_links_children(&storage, &next, &block_links).await?.into_iter().map(|child| (Some(next), child)));
+
+						// add as added
+						yield (next_parent, next);
+					},
+				}
+				break;
 			}
 		}
 	}
@@ -252,7 +315,7 @@ pub enum BlockDiff {
 mod tests {
 	use crate::{
 		library::{
-			block_diff::{block_diff, BlockDiff},
+			block_diff::{block_diff, block_diff_added_with_parent, BlockDiff},
 			test::TestStorage,
 		},
 		BlockStorageExt,
@@ -323,7 +386,7 @@ mod tests {
 			.unwrap();
 
 		// diff
-		let diff = block_diff(storage, Some(node7), node7_change, Default::default(), Default::default())
+		let diff = block_diff(storage.clone(), Some(node7), node7_change, Default::default(), Default::default())
 			.try_collect::<Vec<BlockDiff>>()
 			.await
 			.unwrap();
@@ -332,6 +395,21 @@ mod tests {
 		assert!(diff.contains(&BlockDiff::Added(node5_change)));
 		assert!(diff.contains(&BlockDiff::Removed(node7)));
 		assert!(diff.contains(&BlockDiff::Removed(node5)));
+
+		// diff added with parent
+		let diff = block_diff_added_with_parent(
+			storage.clone(),
+			Some(node7),
+			node7_change,
+			Default::default(),
+			Default::default(),
+		)
+		.try_collect::<Vec<(Option<Cid>, Cid)>>()
+		.await
+		.unwrap();
+		assert_eq!(diff.len(), 2);
+		assert!(diff.contains(&(None, node7_change)));
+		assert!(diff.contains(&(Some(node7_change), node5_change)));
 	}
 
 	/// Replace a node and its root.
@@ -384,11 +462,25 @@ mod tests {
 		let node8_change = storage.set_serialized(&Node { id: 8, nodes: vec![node7] }).await.unwrap();
 
 		// diff
-		let diff = block_diff(storage, Some(node7), node8_change, Default::default(), Default::default())
+		let diff = block_diff(storage.clone(), Some(node7), node8_change, Default::default(), Default::default())
 			.try_collect::<Vec<BlockDiff>>()
 			.await
 			.unwrap();
 		assert_eq!(diff.len(), 1);
 		assert!(diff.contains(&BlockDiff::Added(node8_change)));
+
+		// diff added with parent
+		let diff = block_diff_added_with_parent(
+			storage.clone(),
+			Some(node7),
+			node8_change,
+			Default::default(),
+			Default::default(),
+		)
+		.try_collect::<Vec<(Option<Cid>, Cid)>>()
+		.await
+		.unwrap();
+		assert_eq!(diff.len(), 1);
+		assert!(diff.contains(&(None, node8_change)));
 	}
 }
