@@ -125,7 +125,7 @@ where
 	}
 
 	pub async fn remove(&mut self, key: K) -> Result<bool, StorageError> {
-		if let Some(value) = self.tree.get(&key).await? {
+		if let Some(_) = self.tree.get(&key).await? {
 			self.tree.remove(key).await?;
 			Ok(true)
 		} else {
