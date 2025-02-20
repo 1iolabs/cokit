@@ -7,7 +7,7 @@ mod types;
 pub use cid::Cid;
 pub use co_primitives::{
 	tags, AbsolutePath, AbsolutePathOwned, Block, BlockSerializer, BlockSerializerError, BlockStorage, BlockStorageExt,
-	CoId, CoList, CoListIndex, CoListTransaction, CoMap, CoMapTransaction, CoMetadata, Component, Components,
+	CoId, CoList, CoListIndex, CoListTransaction, CoMap, CoMapTransaction, CoMetadata, CoSet, Component, Components,
 	DagCollection, DagCollectionExt, DagMap, DagMapExt, DagSet, DagSetExt, DagVec, DagVecExt, Date,
 	DefaultNodeSerializer, DefaultParams, Did, Link, Linkable, Metadata, Network, Node, NodeBuilder, NodeBuilderError,
 	NodeSerializer, OptionLink, Path, PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, Secret,

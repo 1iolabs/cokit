@@ -22,6 +22,7 @@ pub use types::{
 	co::CoId,
 	co_list::{CoList, CoListIndex, CoListTransaction},
 	co_map::{CoMap, CoMapTransaction},
+	co_set::{CoSet, CoSetTransaction},
 	codec::{KnownMultiCodec, MultiCodec, MultiCodecError},
 	dag_collection::{DagCollection, DagMap, DagSet, DagVec},
 	dag_collection_async_ext::DagCollectionAsyncExt,
