@@ -14,7 +14,7 @@ use crate::{
 	services::{application::ApplicationMessage, connections::ConnectionMessage, network::CoNetworkTaskSpawner},
 	types::{co_reducer::CoReducerContext, co_reducer_factory::CoReducerFactoryError},
 	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime, TaskSpawner,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -604,6 +604,7 @@ impl CoContextInner {
 		let reducer = SharedCoBuilder::new(parent, membership)
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
+			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_owned())
 			.with_network(network)
 			.with_initialize(initialize)
 			.build(self.tasks.clone(), storage, self.runtime.clone(), identity, core_resolver)
@@ -661,6 +662,19 @@ async fn shared_membership(
 	}))
 }
 
+pub enum CoPinningKey {
+	State,
+	Log,
+}
+impl CoPinningKey {
+	pub fn to_string(&self, co: &CoId) -> String {
+		match self {
+			CoPinningKey::State => format!("co.{}.state", co.as_str()),
+			CoPinningKey::Log => format!("co.{}.log", co.as_str()),
+		}
+	}
+}
+
 /// Reducer storage implementations.
 #[derive(Debug, Clone)]
 pub enum ReducerStorage {
@@ -668,10 +682,10 @@ pub enum ReducerStorage {
 	Encrypted(CoStorage, EncryptedBlockStorage<CoStorage>),
 }
 impl ReducerStorage {
-	pub fn storage(&self) -> CoStorage {
+	pub fn storage(&self) -> &CoStorage {
 		match self {
-			ReducerStorage::Default(storage) => storage.clone(),
-			ReducerStorage::Encrypted(storage, _encrypted) => storage.clone(),
+			ReducerStorage::Default(storage) => storage,
+			ReducerStorage::Encrypted(storage, _encrypted) => storage,
 		}
 	}
 
@@ -711,6 +725,11 @@ impl ReducerStorage {
 			},
 			None => ReducerStorage::Default(storage.clone()),
 		})
+	}
+}
+impl AsRef<CoStorage> for ReducerStorage {
+	fn as_ref(&self) -> &CoStorage {
+		self.storage()
 	}
 }
 

@@ -6,7 +6,7 @@ use co_api::{
 };
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Storage {
@@ -39,17 +39,17 @@ pub struct BlockMetadata {
 pub struct Pin {
 	/// Free strategy.
 	#[serde(rename = "s")]
-	strategy: PinStrategy,
+	pub strategy: PinStrategy,
 
 	/// Pinned references.
 	/// Sorted by insertion (oldest is first).
 	/// Every pinned item will automatically maintain a reference count.
 	#[serde(rename = "r")]
-	references: CoList<Cid>,
+	pub references: CoList<Cid>,
 
 	/// Pinned references count.
 	#[serde(rename = "c")]
-	references_count: u32,
+	pub references_count: u32,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -80,7 +80,7 @@ pub enum StorageAction {
 	/// The first item is the parent the second is the children to be structurally referenced.
 	/// All unique children have their reference count increased by one (idempotent).
 	#[serde(rename = "s")]
-	ReferenceStructure(BTreeMap<Cid, BTreeSet<Cid>>),
+	ReferenceStructure(Vec<(Cid, BTreeSet<Cid>)>),
 
 	/// Remove [`Cid`] references.
 	///
@@ -423,4 +423,49 @@ where
 #[no_mangle]
 pub extern "C" fn state() {
 	co_api::async_api::reduce::<Storage, StorageAction>()
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::StorageAction;
+	use cid::Cid;
+	use co_api::{BlockSerializer, ReducerAction};
+	use ipld_core::{ipld::Ipld, serde::to_ipld};
+	use std::collections::{BTreeMap, BTreeSet};
+
+	#[test]
+	fn test_serialize_storage_action() {
+		let cid1 = BlockSerializer::default().serialize(&1).unwrap().cid().clone();
+		let cid2 = BlockSerializer::default().serialize(&2).unwrap().cid().clone();
+		let cid3 = BlockSerializer::default().serialize(&2).unwrap().cid().clone();
+		let mut map = BTreeMap::<Cid, BTreeSet<Cid>>::new();
+		map.entry(cid1).or_default().insert(cid2);
+		map.entry(cid1).or_default().insert(cid3);
+
+		// action
+		let action = StorageAction::ReferenceStructure(map.into_iter().collect());
+		let block = BlockSerializer::default().serialize(&action).unwrap();
+		let action_deserialize: StorageAction = BlockSerializer::default().deserialize(&block).unwrap();
+		assert_eq!(action_deserialize, action);
+
+		// reducer action
+		let reducer_action: ReducerAction<StorageAction> =
+			ReducerAction { core: "storage".to_owned(), from: "test".to_owned(), payload: action.clone(), time: 123 };
+		let block = BlockSerializer::default().serialize(&reducer_action).unwrap();
+		let reducer_action_deserialize: ReducerAction<StorageAction> =
+			BlockSerializer::default().deserialize(&block).unwrap();
+		assert_eq!(reducer_action_deserialize, reducer_action);
+
+		// reducer action ipld
+		let reducer_action_ipld: ReducerAction<Ipld> = ReducerAction {
+			core: "storage".to_owned(),
+			from: "test".to_owned(),
+			payload: to_ipld(action).unwrap(),
+			time: 123,
+		};
+		let reducer_action_ipld_deserialize: ReducerAction<Ipld> =
+			BlockSerializer::default().deserialize(&block).unwrap();
+
+		assert_eq!(reducer_action_ipld_deserialize, reducer_action_ipld);
+	}
 }

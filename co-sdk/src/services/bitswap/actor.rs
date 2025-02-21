@@ -229,7 +229,8 @@ async fn missing_blocks(context: CoContext, cid: Cid, tokens: Vec<Token>) -> Res
 		.storage(co)
 		.await
 		.map_err(|err| StorageError::InvalidArgument(err.into()))?
-		.storage();
+		.storage()
+		.clone();
 
 	// build
 	let mut stack = vec![cid];

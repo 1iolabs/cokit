@@ -17,7 +17,7 @@ pub struct CoReducer {
 	pub(crate) reducer: Arc<RwLock<Reducer<CoStorage, DynamicCoreResolver<CoStorage>>>>,
 	pub(crate) storage: CoStorage,
 	pub(crate) runtime: Runtime,
-	pub(crate) context: Arc<dyn CoReducerContext + Send + Sync + 'static>,
+	pub(crate) context: CoReducerContextRef,
 }
 impl CoReducer {
 	pub(crate) fn new(
@@ -25,7 +25,7 @@ impl CoReducer {
 		parent: Option<CoId>,
 		runtime: Runtime,
 		reducer: Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
-		context: Arc<dyn CoReducerContext + Send + Sync + 'static>,
+		context: CoReducerContextRef,
 	) -> Self {
 		Self {
 			id,
@@ -241,6 +241,12 @@ pub enum CoReducerError {
 
 #[async_trait]
 pub trait CoReducerContext {
+	/// Get a new storage instance.
+	///
+	/// # Args
+	/// - `force_local` - If true the new instance should not use networking.
+	fn storage(&self, force_local: bool) -> CoStorage;
+
 	/// Get encryption mapping instance.
 	fn content_mapping(&self) -> Option<CoBlockStorageContentMapping>;
 
@@ -253,3 +259,5 @@ pub trait CoReducerContext {
 	/// Map internal [`Cid`] to external [`Cid`].
 	async fn to_external_cid(&self, cid: Cid) -> Result<Cid, StorageError>;
 }
+
+pub type CoReducerContextRef = Arc<dyn CoReducerContext + Send + Sync + 'static>;

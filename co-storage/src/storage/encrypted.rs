@@ -167,6 +167,10 @@ where
 		Self { algorithm, key, mapping, next }
 	}
 
+	pub fn storage(&self) -> &S {
+		&self.next
+	}
+
 	/// Load mapping from CID.
 	/// This will add the mappings to the existing.
 	pub async fn load_mapping(&self, map: &Cid) -> Result<(), StorageError> {

@@ -1,5 +1,5 @@
 use super::{CoreResolver, CoreResolverError};
-use crate::{CoReducer, ReducerChangeContext};
+use crate::{CoReducer, ReducerChangeContext, CO_CORE_NAME_STORAGE};
 use async_trait::async_trait;
 use cid::Cid;
 use co_core_storage::StorageAction;
@@ -23,7 +23,23 @@ pub struct ReferenceCoreResolver<S, C, P> {
 	storage_core_name: String,
 	_storage: PhantomData<S>,
 }
+impl<S, C, P> ReferenceCoreResolver<S, C, P> {
+	pub fn new(next: C, parent: CoReducer, identity: P, pinning_key: Option<String>) -> Self {
+		Self {
+			pinning_key,
+			next,
+			identity,
+			parent,
+			storage_core_name: CO_CORE_NAME_STORAGE.to_owned(),
+			_storage: Default::default(),
+		}
+	}
 
+	pub fn with_storage_core_name(mut self, name: String) -> Self {
+		self.storage_core_name = name;
+		self
+	}
+}
 #[async_trait]
 impl<S, C, P> CoreResolver<S> for ReferenceCoreResolver<S, C, P>
 where
@@ -81,13 +97,13 @@ where
 						references_count = 0;
 
 						// apply
-						let action = StorageAction::ReferenceStructure(next_references);
+						let action = StorageAction::ReferenceStructure(next_references.into_iter().collect());
 						self.parent.push(&self.identity, &self.storage_core_name, &action).await?;
 					}
 				}
 			}
 			if !references.is_empty() {
-				let action = StorageAction::ReferenceStructure(references);
+				let action = StorageAction::ReferenceStructure(references.into_iter().collect());
 				self.parent.push(&self.identity, &self.storage_core_name, &action).await?;
 			}
 		}

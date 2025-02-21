@@ -55,7 +55,18 @@ where
 						}
 
 						// walk children
-						stack.extend(extract_links_children(&storage, &next, &block_links).await?);
+						match extract_links_children(&storage, &next, &block_links).await {
+							Ok(children) => {
+								stack.extend(children.into_iter());
+							},
+							Err(StorageError::NotFound(_, _)) => {
+								// ignore and just return the reference
+							},
+							Err(err) => {
+								// forward
+								Err(err)?;
+							},
+						}
 
 						// add as added
 						yield BlockDiff::Added(next);
@@ -145,7 +156,18 @@ where
 						}
 
 						// walk children
-						stack.extend(extract_links_children(&storage, &next, &block_links).await?.into_iter().map(|child| (Some(next), child)));
+						match extract_links_children(&storage, &next, &block_links).await {
+							Ok(children) => {
+								stack.extend(children.into_iter().map(|child| (Some(next), child)));
+							},
+							Err(StorageError::NotFound(_, _)) => {
+								// ignore and just return the reference
+							},
+							Err(err) => {
+								// forward
+								Err(err)?;
+							},
+						}
 
 						// add as added
 						yield (next_parent, next);

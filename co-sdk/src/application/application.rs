@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
 	services::application::ApplicationMessage, Action, CoReducer, CoReducerFactory, CoStorage, Storage,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
 use co_actor::{Actor, ActorHandle, ActorInstance};
@@ -150,6 +150,7 @@ impl Application {
 		let co = SharedCoCreator::new(local, create)
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
+			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_owned())
 			.create(self.storage(), self.context().inner.runtime(), creator)
 			.await?;
 

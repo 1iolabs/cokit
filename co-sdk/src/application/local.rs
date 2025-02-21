@@ -330,6 +330,11 @@ impl<L> CoReducerContext for LocalCoInstance<L>
 where
 	L: Locals + Clone + Send + Sync + 'static,
 {
+	fn storage(&self, _force_local: bool) -> CoStorage {
+		// the LocalCo never uses networking and is always encrypted
+		CoStorage::new(self.encrypted_storage.clone())
+	}
+
 	fn content_mapping(&self) -> Option<CoBlockStorageContentMapping> {
 		Some(CoBlockStorageContentMapping::new(self.encrypted_storage.content_mapping()))
 	}

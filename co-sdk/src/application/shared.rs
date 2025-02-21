@@ -1,16 +1,22 @@
-use super::{co_context::ReducerStorage, identity::create_identity_resolver};
+use super::{
+	co_context::{CoPinningKey, ReducerStorage},
+	identity::create_identity_resolver,
+};
 use crate::{
 	find_membership,
 	library::{connections_peer_provider::ConnectionsPeerProvider, push_heads::PushHeads},
-	reducer::core_resolver::dynamic::DynamicCoreResolver,
+	reducer::{
+		change::{membership_writer::MembershipWriter, reference_writer::ReferenceWriter},
+		core_resolver::dynamic::DynamicCoreResolver,
+	},
 	services::{
 		connections::ConnectionMessage,
 		network::{CoHeadsPublish, CoNetworkTaskSpawner},
 	},
 	state::find,
 	types::{co_reducer::CoReducerContext, co_storage::CoBlockStorageContentMapping},
-	CoCoreResolver, CoReducer, CoStorage, CoToken, CoTokenParameters, Reducer, ReducerBuilder, ReducerChangeContext,
-	ReducerChangedHandler, Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CoCoreResolver, CoReducer, CoStorage, CoToken, CoTokenParameters, ReducerBuilder, Runtime, TaskSpawner,
+	CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -29,7 +35,6 @@ use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,
-	mem::swap,
 	sync::Arc,
 	time::Duration,
 };
@@ -40,6 +45,7 @@ pub struct SharedCoBuilder {
 	parent: CoReducer,
 	keystore_core_name: String,
 	membership_core_name: String,
+	storage_core_name: String,
 	membership: Membership,
 	network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
 	initialize: bool,
@@ -52,6 +58,7 @@ impl SharedCoBuilder {
 			membership,
 			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_owned(),
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_owned(),
+			storage_core_name: CO_CORE_NAME_STORAGE.to_owned(),
 			network: None,
 			initialize: true,
 			network_block_timeout: Duration::from_secs(30),
@@ -64,6 +71,10 @@ impl SharedCoBuilder {
 
 	pub fn with_keystore_core_name(self, keystore_core_name: String) -> Self {
 		Self { keystore_core_name, ..self }
+	}
+
+	pub fn with_storage_core_name(self, storage_core_name: String) -> Self {
+		Self { storage_core_name, ..self }
 	}
 
 	pub fn with_network(self, network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>) -> Self {
@@ -136,23 +147,31 @@ impl SharedCoBuilder {
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
 	{
 		let encrypted_storage = storage.encrypted_storage().cloned();
-		let storage = storage.storage();
 
 		// network
-		let storage = if let Some(network) = &self.network {
+		let network_storage = if let Some(network) = &self.network {
 			let secret = self.secret().await?;
 			let peer_provider = self.build_peer_provider(network.clone(), identity.clone());
-			self.build_network_storage(peer_provider, network.clone(), secret.as_ref(), storage.clone())?
+			Some(self.build_network_storage(
+				peer_provider,
+				network.clone(),
+				secret.as_ref(),
+				storage.storage().clone(),
+			)?)
 		} else {
-			storage
+			None
 		};
 
 		// context
-		let context = SharedContext {
-			storage: storage.clone(),
+		let context = Arc::new(SharedContext {
+			storage: match &encrypted_storage {
+				Some(storage) => storage.storage().clone(),
+				None => storage.storage().clone(),
+			},
 			encrypted_storage: encrypted_storage.clone(),
+			network_storage: network_storage.clone(),
 			id: self.membership.id.clone(),
-		};
+		});
 
 		// // states
 		// let states = stream::iter(self.membership.state.clone())
@@ -176,7 +195,7 @@ impl SharedCoBuilder {
 		let log = Log::new(
 			self.membership.id.as_str().as_bytes().to_vec(),
 			create_identity_resolver(),
-			storage.clone(),
+			context.storage(false),
 			// latest_state.map(|(_, heads)| heads).unwrap_or_default(),
 			Default::default(),
 		);
@@ -235,8 +254,19 @@ impl SharedCoBuilder {
 		};
 		reducer.add_change_handler(Box::new(writer));
 
+		// setup auto write references to parent co
+		let writer = ReferenceWriter::new(
+			context.clone(),
+			*reducer.state(),
+			self.parent.clone(),
+			PrivateIdentity::boxed(identity.clone()),
+			Some(CoPinningKey::State.to_string(&self.membership.id)),
+		)
+		.with_storage_core_name(self.storage_core_name);
+		reducer.add_change_handler(Box::new(writer));
+
 		// result
-		Ok(CoReducer::new(self.membership.id, Some(self.parent.id().clone()), runtime, reducer, Arc::new(context)))
+		Ok(CoReducer::new(self.membership.id, Some(self.parent.id().clone()), runtime, reducer, context))
 	}
 }
 
@@ -259,12 +289,17 @@ impl CreateCo {
 struct SharedContext {
 	id: CoId,
 
+	/// The base storage.
+	storage: CoStorage,
+
 	/// The encrypted storage.
+	/// If encryption is enabled.
 	/// Note: Without networking!
 	encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
 
 	/// The networking storage.
-	storage: CoStorage,
+	/// If network is enabled.
+	network_storage: Option<CoStorage>,
 }
 impl SharedContext {
 	/// Update `co` membership if necessary.
@@ -298,6 +333,23 @@ impl SharedContext {
 }
 #[async_trait]
 impl CoReducerContext for SharedContext {
+	fn storage(&self, force_local: bool) -> CoStorage {
+		// network
+		if !force_local {
+			if let Some(network_storage) = &self.network_storage {
+				return network_storage.clone();
+			}
+		}
+
+		// encrypted
+		if let Some(encrypted_storage) = &self.encrypted_storage {
+			return CoStorage::new(encrypted_storage.clone());
+		}
+
+		// base
+		self.storage.clone()
+	}
+
 	fn content_mapping(&self) -> Option<CoBlockStorageContentMapping> {
 		self.encrypted_storage
 			.as_ref()
@@ -322,7 +374,9 @@ impl CoReducerContext for SharedContext {
 		match (&self.encrypted_storage, MultiCodec::from(&cid)) {
 			(Some(storage), MultiCodec::Known(KnownMultiCodec::CoEncryptedBlock)) => {
 				// make sure the block is available (network)
-				self.storage.get(&cid).await?;
+				if let Some(network_storage) = &self.network_storage {
+					network_storage.get(&cid).await?;
+				}
 
 				// get unencrypted
 				Ok(*storage.get_unencrypted(&cid).await?.cid())
@@ -347,6 +401,7 @@ pub struct SharedCoCreator {
 	parent: CoReducer,
 	keystore_core_name: String,
 	membership_core_name: String,
+	storage_core_name: String,
 	co: CreateCo,
 }
 impl SharedCoCreator {
@@ -356,6 +411,7 @@ impl SharedCoCreator {
 			co,
 			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_owned(),
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_owned(),
+			storage_core_name: CO_CORE_NAME_STORAGE.to_owned(),
 		}
 	}
 
@@ -365,6 +421,10 @@ impl SharedCoCreator {
 
 	pub fn with_keystore_core_name(self, keystore_core_name: String) -> Self {
 		Self { keystore_core_name, ..self }
+	}
+
+	pub fn with_storage_core_name(self, storage_core_name: String) -> Self {
+		Self { storage_core_name, ..self }
 	}
 
 	/// TODO: Cleanup when something fails?
@@ -450,57 +510,28 @@ impl SharedCoCreator {
 			.push(&identity, &self.membership_core_name, &MembershipsAction::Join(membership))
 			.await?;
 
+		// add pin to parent co
+		// TODO: states?
+		let pin_state = co_core_storage::StorageAction::PinCreate(
+			CoPinningKey::State.to_string(&self.co.id),
+			co_core_storage::Pin {
+				strategy: co_core_storage::PinStrategy::Unlimited,
+				references: Default::default(),
+				references_count: Default::default(),
+			},
+		);
+		let pin_log = co_core_storage::StorageAction::PinCreate(
+			CoPinningKey::Log.to_string(&self.co.id),
+			co_core_storage::Pin {
+				strategy: co_core_storage::PinStrategy::Unlimited,
+				references: Default::default(),
+				references_count: Default::default(),
+			},
+		);
+		self.parent.push(&identity, &self.storage_core_name, &pin_log).await?;
+		self.parent.push(&identity, &self.storage_core_name, &pin_state).await?;
+
 		// result
 		Ok(self.co.id)
-	}
-}
-
-struct MembershipWriter<I> {
-	/// The membership CO UUID.
-	id: CoId,
-	/// The membership DID.
-	// did: Did,
-	parent: CoReducer,
-	membership_core_name: String,
-	identity: I,
-	encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
-	last_heads: BTreeSet<Cid>,
-}
-#[async_trait]
-impl<I> ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for MembershipWriter<I>
-where
-	I: PrivateIdentity + Debug + Send + Sync,
-{
-	async fn on_state_changed(
-		&mut self,
-		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
-		_context: ReducerChangeContext,
-	) -> Result<(), anyhow::Error> {
-		if let Some(state) = reducer.state() {
-			let mapping = match &self.encrypted_storage {
-				Some(storage) => storage.flush_mapping().await?,
-				None => None,
-			};
-
-			// next last heads
-			let mut last_heads = reducer.heads().clone();
-			swap(&mut self.last_heads, &mut last_heads);
-
-			// update
-			self.parent
-				.push(
-					&self.identity,
-					&self.membership_core_name,
-					&MembershipsAction::Update {
-						id: self.id.to_owned(),
-						state: *state,
-						heads: reducer.heads().clone(),
-						encryption_mapping: mapping,
-						remove: last_heads,
-					},
-				)
-				.await?;
-		}
-		Ok(())
 	}
 }

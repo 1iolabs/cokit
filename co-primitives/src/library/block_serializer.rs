@@ -14,7 +14,7 @@ pub enum BlockSerializerError {
 	Encode(#[from] EncodeError<TryReserveError>),
 
 	#[error("Decode {0:?} to '{1}' failed")]
-	Decode(Cid, String, DecodeError<Infallible>),
+	Decode(Cid, String, #[source] DecodeError<Infallible>),
 }
 
 /// DagCbor Block Serializer/Deserializer.
