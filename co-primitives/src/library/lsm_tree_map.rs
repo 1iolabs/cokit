@@ -28,15 +28,19 @@ where
 	V: Clone + Send + Sync + 'static,
 {
 	/// Levels.
-	#[serde(rename = "l")]
+	#[serde(rename = "l", default = "Vec::new", skip_serializing_if = "Vec::is_empty")]
 	pub levels: Vec<Link<Level<K, V>>>,
 
 	/// Active "in memory data".
-	#[serde(rename = "a")]
+	#[serde(rename = "a", default = "OptionLink::default", skip_serializing_if = "OptionLink::is_none")]
 	pub active: OptionLink<Node<(K, Value<V>)>>,
 
 	/// Tree settings.
-	#[serde(rename = "s")]
+	#[serde(
+		rename = "s",
+		default = "LsmTreeMapSettings::default",
+		skip_serializing_if = "LsmTreeMapSettings::is_default"
+	)]
 	pub settings: LsmTreeMapSettings,
 }
 
@@ -47,7 +51,8 @@ where
 	K: Hash + Ord + Clone + Send + Sync + 'static,
 	V: Clone + Send + Sync + 'static,
 {
-	#[serde(rename = "r")]
+	/// Runs (SSTable) in the level.
+	#[serde(rename = "r", default = "OptionLink::default", skip_serializing_if = "OptionLink::is_none")]
 	pub runs: OptionLink<Node<Run<K, V>>>,
 }
 
@@ -152,6 +157,7 @@ where
 	K: Hash + Ord + Clone + Send + Sync + 'static,
 	V: Clone + Send + Sync + 'static,
 {
+	/// A node which contains sorted children nodes.
 	#[serde(rename = "n")]
 	Node {
 		/// The node.
@@ -167,6 +173,7 @@ where
 		max_key: K,
 	},
 
+	/// A leaf node which contains items sorted by key.
 	#[serde(rename = "l")]
 	Leaf(BTreeMap<K, Value<V>>),
 }
@@ -183,7 +190,6 @@ where
 		}
 	}
 }
-
 impl<K, V> NodeReader<(K, Value<V>)> for RunNode<K, V>
 where
 	K: Hash + Ord + Clone + Send + Sync + 'static,
@@ -308,31 +314,62 @@ where
 	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LsmTreeMapSettings {
 	/// Max entries (K/V pairs) count in a leaf node.
-	#[serde(rename = "n", default = "LsmTreeMapSettings::default_max_node_entries")]
+	#[serde(
+		rename = "n",
+		default = "LsmTreeMapSettings::default_max_node_entries",
+		skip_serializing_if = "LsmTreeMapSettings::is_default_max_node_entries"
+	)]
 	pub max_node_entries: u64,
 
 	/// Limits entries (K/V pairs) in active (in memory) run.
 	/// Overruning this limit will cause a new L0 run gets created.
-	#[serde(rename = "a", default = "LsmTreeMapSettings::default_max_active_entries")]
+	#[serde(
+		rename = "a",
+		default = "LsmTreeMapSettings::default_max_active_entries",
+		skip_serializing_if = "LsmTreeMapSettings::is_default_max_active_entries"
+	)]
 	pub max_active_entries: u64,
 
 	/// Limits runs in a level.
 	/// Overruning this limit will cause a compaction to next level.
-	#[serde(rename = "r", default = "LsmTreeMapSettings::default_max_run_count")]
+	#[serde(
+		rename = "r",
+		default = "LsmTreeMapSettings::default_max_run_count",
+		skip_serializing_if = "LsmTreeMapSettings::is_default_max_run_count"
+	)]
 	pub max_run_count: u64,
 }
 impl LsmTreeMapSettings {
-	pub fn default_max_node_entries() -> u64 {
+	fn default_max_node_entries() -> u64 {
 		2u64.checked_pow(8).unwrap() // 256
 	}
-	pub fn default_max_active_entries() -> u64 {
+
+	fn default_max_active_entries() -> u64 {
 		2u64.checked_pow(14).unwrap() // 16k
 	}
-	pub fn default_max_run_count() -> u64 {
+
+	fn default_max_run_count() -> u64 {
 		2u64.checked_pow(4).unwrap() // 16
+	}
+
+	fn is_default_max_node_entries(value: &u64) -> bool {
+		*value == Self::default_max_node_entries()
+	}
+
+	fn is_default_max_active_entries(value: &u64) -> bool {
+		*value == Self::default_max_active_entries()
+	}
+
+	fn is_default_max_run_count(value: &u64) -> bool {
+		*value == Self::default_max_run_count()
+	}
+
+	/// Wherter this are default settings.
+	pub fn is_default(&self) -> bool {
+		self == &Self::default()
 	}
 }
 impl Default for LsmTreeMapSettings {
@@ -1396,5 +1433,9 @@ mod tests {
 		assert_eq!(LsmTreeMapSettings::default().max_node_entries, 256);
 		assert_eq!(LsmTreeMapSettings::default().max_active_entries, 16384);
 		assert_eq!(LsmTreeMapSettings::default().max_run_count, 16);
+		assert!(LsmTreeMapSettings::default().is_default());
+		let mut not_default = LsmTreeMapSettings::default();
+		not_default.max_node_entries += 1;
+		assert!(!not_default.is_default());
 	}
 }
