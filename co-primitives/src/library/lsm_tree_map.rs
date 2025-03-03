@@ -531,13 +531,24 @@ where
 	}
 
 	/// Store active items and return the root link.
+	///
+	/// # Guarantees
+	/// - The method detects if the collection is empty after this and accordingly returns [`OptionLink::none`].
 	pub async fn store(&mut self) -> Result<OptionLink<Root<K, V>>, StorageError> {
 		// get root
 		let mut root = match self.root().await? {
-			Some(root) => root,
+			Some(root) => {
+				// collection empty (no items or only tombstoned items)?
+				if self.is_empty().await? {
+					return Ok(OptionLink::none());
+				}
+
+				// root
+				root
+			},
 			None => {
-				// collection empty?
-				if self.active.is_empty() {
+				// collection empty (no root and no active)?
+				if self.active.is_empty() || self.is_empty().await? {
 					return Ok(OptionLink::none());
 				}
 
@@ -575,6 +586,11 @@ where
 				},
 			)
 			.await?)
+	}
+
+	/// Whether the collection is empty.
+	pub async fn is_empty(&self) -> Result<bool, StorageError> {
+		Ok(self.min_key().await?.is_none())
 	}
 
 	/// Find the first (active - not tombstoned) key.
@@ -1426,6 +1442,22 @@ mod tests {
 			tree.reverse_stream_query(Some(5)).try_collect::<Vec<_>>().await.unwrap(),
 			vec![(5, 5), (4, 4), (3, 3), (2, 2), (1, 1), (0, 0)]
 		);
+	}
+
+	#[tokio::test]
+	async fn test_store_empty() {
+		for count in [1, 10] {
+			let storage = TestStorage::default();
+			let settings = LsmTreeMapSettings { max_node_entries: 2, max_active_entries: 2, max_run_count: 2 };
+			let mut tree = LsmTreeMap::new(storage.clone(), settings);
+			for i in 0..count {
+				tree.insert(i, i).await.unwrap();
+			}
+			for i in 0..count {
+				tree.remove(i).await.unwrap();
+			}
+			assert!(tree.store().await.unwrap().is_none());
+		}
 	}
 
 	#[test]

@@ -12,6 +12,11 @@ impl<K> CoSet<K>
 where
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
+	/// Whether this collection is empty.
+	pub fn is_empty(&self) -> bool {
+		self.0.is_none()
+	}
+
 	pub async fn contains<S>(&self, storage: &S, key: &K) -> Result<bool, StorageError>
 	where
 		S: BlockStorage + Clone + 'static,

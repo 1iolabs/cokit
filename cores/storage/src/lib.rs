@@ -11,11 +11,11 @@ use std::collections::BTreeSet;
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Storage {
 	/// Named pins.
-	#[serde(rename = "p")]
+	#[serde(rename = "p", default, skip_serializing_if = "CoMap::is_empty")]
 	pub pins: CoMap<String, Pin>,
 
 	/// Block metadata.
-	#[serde(rename = "b")]
+	#[serde(rename = "b", default, skip_serializing_if = "CoMap::is_empty")]
 	pub blocks: CoMap<Cid, BlockMetadata>,
 }
 
@@ -27,7 +27,7 @@ pub struct BlockMetadata {
 
 	/// Structural references. Children of this reference.
 	/// Every children listed here increases its respective reference count by one.
-	#[serde(rename = "c")]
+	#[serde(rename = "c", default, skip_serializing_if = "CoSet::is_empty")]
 	pub children: CoSet<Cid>,
 
 	/// Additional metadata.
@@ -44,7 +44,7 @@ pub struct Pin {
 	/// Pinned references.
 	/// Sorted by insertion (oldest is first).
 	/// Every pinned item will automatically maintain a reference count.
-	#[serde(rename = "r")]
+	#[serde(rename = "r", default, skip_serializing_if = "CoList::is_empty")]
 	pub references: CoList<Cid>,
 
 	/// Pinned references count.

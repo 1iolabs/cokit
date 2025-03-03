@@ -14,6 +14,11 @@ where
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
+	/// Whether this collection is empty.
+	pub fn is_empty(&self) -> bool {
+		self.0.is_none()
+	}
+
 	pub async fn get<S>(&self, storage: &S, key: &K) -> Result<Option<V>, StorageError>
 	where
 		S: BlockStorage + Clone + 'static,
