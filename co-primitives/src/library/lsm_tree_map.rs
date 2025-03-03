@@ -326,13 +326,13 @@ pub struct LsmTreeMapSettings {
 }
 impl LsmTreeMapSettings {
 	pub fn default_max_node_entries() -> u64 {
-		2 ^ 8 // 256
+		2u64.checked_pow(8).unwrap() // 256
 	}
 	pub fn default_max_active_entries() -> u64 {
-		2 ^ 14 // 16k
+		2u64.checked_pow(14).unwrap() // 16k
 	}
 	pub fn default_max_run_count() -> u64 {
-		2 ^ 4 // 16
+		2u64.checked_pow(4).unwrap() // 16
 	}
 }
 impl Default for LsmTreeMapSettings {
@@ -1389,5 +1389,12 @@ mod tests {
 			tree.reverse_stream_query(Some(5)).try_collect::<Vec<_>>().await.unwrap(),
 			vec![(5, 5), (4, 4), (3, 3), (2, 2), (1, 1), (0, 0)]
 		);
+	}
+
+	#[test]
+	fn test_settings_default() {
+		assert_eq!(LsmTreeMapSettings::default().max_node_entries, 256);
+		assert_eq!(LsmTreeMapSettings::default().max_active_entries, 16384);
+		assert_eq!(LsmTreeMapSettings::default().max_run_count, 16);
 	}
 }

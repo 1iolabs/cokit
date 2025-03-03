@@ -597,7 +597,7 @@ pub struct WriteOptions {
 impl Default for WriteOptions {
 	fn default() -> Self {
 		Self {
-			// max_size: 2 ^ 18,
+			// max_size: 2.pow(18),
 			max_children: 174,
 		}
 	}

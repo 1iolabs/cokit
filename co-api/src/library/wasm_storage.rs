@@ -44,7 +44,7 @@ fn wasm_block_get(cid: &Cid) -> Block<DefaultParams> {
 	let cid_bytes = cid.to_bytes();
 
 	// try to read block in 1KiB buffer
-	let buffer_size = 2 ^ 10; // 1024
+	let buffer_size = 2usize.pow(10); // 1024
 	let mut buffer = Vec::with_capacity(buffer_size);
 	buffer.resize(buffer_size, 0);
 	#[allow(unused_unsafe)]
