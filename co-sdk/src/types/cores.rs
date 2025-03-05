@@ -74,6 +74,11 @@ impl Cores {
 			.map(|cid_str| Cid::from_str(cid_str).expect("valid cid"))
 	}
 
+	/// Get the Core for a built-in core.
+	pub fn core(&self, crate_name: &str) -> Option<Core> {
+		self.cores.get(crate_name).map(|_cid_str| get_native(crate_name))
+	}
+
 	/// Test if the core is a built in core.
 	pub fn is_built_in(&self, core: Core) -> bool {
 		match &core {

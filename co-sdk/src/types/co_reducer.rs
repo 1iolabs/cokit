@@ -1,13 +1,13 @@
-use super::co_storage::CoBlockStorageContentMapping;
+use super::{co_dispatch::CoDispatch, co_storage::CoBlockStorageContentMapping};
 use crate::{reducer::core_resolver::dynamic::DynamicCoreResolver, state::core_state, CoStorage, Reducer, Runtime};
 use async_trait::async_trait;
 use cid::Cid;
-use co_identity::PrivateIdentity;
+use co_identity::{PrivateIdentity, PrivateIdentityBox};
 use co_primitives::{CoId, KnownMultiCodec, OptionLink, ReducerAction};
 use co_storage::{BlockStorageContentMapping, BlockStorageExt, MappedBlockStorage, StorageError};
 use futures::{stream, StreamExt, TryStreamExt};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
+use std::{collections::BTreeSet, fmt::Debug, marker::PhantomData, sync::Arc};
 use tokio::sync::RwLock;
 
 #[derive(Clone)]
@@ -87,6 +87,9 @@ impl CoReducer {
 	/// - `identity` - The identity to sign the operation with.
 	/// - `core` - The target core name. The key of [`co_core_co::Co::cores`].
 	/// - `item` - The core action payload.
+	///
+	/// # Returns
+	/// The resulting state.
 	#[tracing::instrument(err, ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, item, identity))]
 	pub async fn push<T, I>(&self, identity: &I, core: &str, item: &T) -> Result<Option<Cid>, anyhow::Error>
 	where
@@ -261,3 +264,24 @@ pub trait CoReducerContext {
 }
 
 pub type CoReducerContextRef = Arc<dyn CoReducerContext + Send + Sync + 'static>;
+
+pub struct CoReducerDispatch<A> {
+	reducer: CoReducer,
+	identity: PrivateIdentityBox,
+	core: String,
+	_action: PhantomData<A>,
+}
+impl<A> CoReducerDispatch<A> {
+	pub fn new(reducer: CoReducer, identity: PrivateIdentityBox, core: String) -> Self {
+		Self { reducer, identity, core, _action: Default::default() }
+	}
+}
+#[async_trait]
+impl<A> CoDispatch<A> for CoReducerDispatch<A>
+where
+	A: Serialize + Debug + Send + Sync + Clone + 'static,
+{
+	async fn dispatch(&self, action: &A) -> Result<Option<Cid>, anyhow::Error> {
+		Ok(self.reducer.push(&self.identity, &self.core, action).await?)
+	}
+}

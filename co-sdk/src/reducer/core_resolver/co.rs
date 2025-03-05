@@ -1,4 +1,7 @@
-use crate::{CoreResolver, CoreResolverError, Cores, ReducerChangeContext, CO_CORE_CO, CO_CORE_NAME_CO};
+use crate::{
+	library::runtime_dispatch::RuntimeDispatch, types::co_dispatch::CoDispatch, CoreResolver, CoreResolverError, Cores,
+	ReducerChangeContext, CO_CORE_CO, CO_CORE_NAME_CO,
+};
 use anyhow::Context;
 use async_trait::async_trait;
 use cid::Cid;
@@ -8,7 +11,7 @@ use co_storage::{BlockStorage, BlockStorageExt};
 use serde::de::IgnoredAny;
 use std::collections::HashMap;
 
-/// Resolve action core assuming the Co root state is to `co_core_co::Co`.
+/// Resolve action core assuming the Co root state is to [`co_core_co::Co`].
 #[derive(Debug, Clone)]
 pub struct CoCoreResolver {
 	mapping: HashMap<Cid, Core>,
@@ -77,25 +80,16 @@ where
 
 		// apply to root
 		if !root {
-			// Note: this action must be deterministic so we pass no time otherwise when we retry this could introduce
-			// random values.
-			let action: ReducerAction<co_core_co::CoAction> = ReducerAction {
-				core: CO_CORE_NAME_CO.to_owned(),
-				from: "did:local:device".to_owned(),
-				payload: co_core_co::CoAction::CoreChange { core: reducer_action.core.clone(), state: result.state },
-				time: 0,
-			};
-			let action_cid = storage.set_serialized(&action).await?;
-
-			// apply
-			result = runtime
-				.execute(storage, &self.root_core(), RuntimeContext::new(*state, action_cid))
-				.await
-				.map_err(|e| CoreResolverError::Execute(reducer_action.core.clone(), e))?;
-
-			// remove action
-			// TODO: put this action into an "overlay storage" which used only memory?
-			storage.remove(&action_cid).await?;
+			result.state = RuntimeDispatch::new(
+				runtime.clone(),
+				storage.clone(),
+				CO_CORE_NAME_CO.to_owned(),
+				self.root_core(),
+				*state, // we assume the root state points to [`co_core_co::Co`].
+			)
+			.dispatch(&co_core_co::CoAction::CoreChange { core: reducer_action.core.clone(), state: result.state })
+			.await
+			.context("apply to root")?;
 		}
 
 		// result

@@ -100,7 +100,7 @@ pub enum StorageAction {
 
 	/// Create a named pin and reference all specified [`Cid`]s.
 	#[serde(rename = "pc")]
-	PinCreate(String, Pin),
+	PinCreate(String, PinStrategy),
 
 	/// Insert references to a named pin and reference all specified [`Cid`]s.
 	#[serde(rename = "pr")]
@@ -129,7 +129,7 @@ impl<S: BlockStorage + Clone + 'static> Reducer<StorageAction, S> for Storage {
 			StorageAction::Remove(cids, force) => reduce_remove(storage, &mut state, cids, force).await?,
 			StorageAction::TagsInsert(cids, tags) => reduce_tags_insert(storage, &mut state, cids, tags).await?,
 			StorageAction::TagsRemove(cids, tags) => reduce_tags_remove(storage, &mut state, cids, tags).await?,
-			StorageAction::PinCreate(key, pin) => reduce_pin_create(storage, &mut state, key, pin).await?,
+			StorageAction::PinCreate(key, strategy) => reduce_pin_create(storage, &mut state, key, strategy).await?,
 			StorageAction::PinReference(key, cids) => reduce_pin_reference(storage, &mut state, key, cids).await?,
 			StorageAction::PinRemove(key) => reduce_pin_remove(storage, &mut state, key).await?,
 		}
@@ -252,7 +252,12 @@ where
 	Ok(())
 }
 
-async fn reduce_pin_create<S>(storage: &S, state: &mut Storage, key: String, mut pin: Pin) -> Result<(), anyhow::Error>
+async fn reduce_pin_create<S>(
+	storage: &S,
+	state: &mut Storage,
+	key: String,
+	strategy: PinStrategy,
+) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
@@ -264,18 +269,8 @@ where
 		return Err(anyhow::anyhow!("Pin already exists: {}", key));
 	}
 
-	// references
-	pin.references_count = 0;
-	{
-		let references = pin.references.stream(storage);
-		pin_mut!(references);
-		while let Some((_, cid)) = references.try_next().await? {
-			reference_cid(&mut blocks, cid).await?;
-			pin.references_count += 1;
-		}
-	}
-
 	// insert pin
+	let pin = Pin { strategy, references: Default::default(), references_count: 0 };
 	pins.insert(key, pin).await?;
 
 	// store

@@ -7,7 +7,7 @@ use crate::{
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{
-		co_reducer::CoReducerContext,
+		co_reducer::{CoReducerContext, CoReducerContextRef},
 		co_storage::CoBlockStorageContentMapping,
 		cores::{CO_CORE_NAME_CO, CO_CORE_STORAGE},
 	},
@@ -60,7 +60,7 @@ impl LocalCoBuilder {
 		runtime: Runtime,
 		shutdown: CancellationToken,
 		tasks: TaskSpawner,
-		core_resolver: R,
+		core_resolver: impl FnOnce(CoReducerContextRef) -> R,
 	) -> Result<CoReducer, anyhow::Error>
 	where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
@@ -141,7 +141,7 @@ where
 		tasks: TaskSpawner,
 		locals: L,
 		key: Box<dyn LocalSecret + Send + Sync + 'static>,
-		core_resolver: R,
+		core_resolver: impl FnOnce(CoReducerContextRef) -> R,
 		watcher: bool,
 	) -> Result<(Self, CoReducer), anyhow::Error>
 	where
@@ -155,16 +155,17 @@ where
 		let log =
 			Log::new(CO_ID_LOCAL.as_bytes().to_vec(), create_identity_resolver(), storage.clone(), Default::default());
 
-		// create builder
-		let mut builder =
-			ReducerBuilder::new(DynamicCoreResolver::new(core_resolver), log).with_initialize(local_co.initialize);
-
 		// result
 		let result = Self {
 			locals: locals.clone(),
 			encrypted_storage: encrypted_storage.clone(),
 			identifier: local_co.settings.identifier,
 		};
+		let context = Arc::new(result.clone());
+
+		// create builder
+		let mut builder = ReducerBuilder::new(DynamicCoreResolver::new(core_resolver(context.clone())), log)
+			.with_initialize(local_co.initialize);
 
 		// load locals as snapshots
 		//  the latest heads will be automatically determined by the reducer
@@ -191,7 +192,7 @@ where
 		}
 
 		// reducer
-		let co_reducer = CoReducer::new(CO_ID_LOCAL.into(), None, runtime, reducer, Arc::new(result.clone()));
+		let co_reducer = CoReducer::new(CO_ID_LOCAL.into(), None, runtime, reducer, context);
 
 		// watch
 		if watcher {

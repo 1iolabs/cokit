@@ -225,6 +225,9 @@ where
 	}
 
 	/// Push an event.
+	///
+	/// # Returns
+	/// The resulting state.
 	pub async fn push<T, I>(
 		&mut self,
 		runtime: &RuntimePool,
@@ -246,6 +249,9 @@ where
 	}
 
 	/// Push an event.
+	///
+	/// # Returns
+	/// The resulting state.
 	pub async fn push_action<T, I>(
 		&mut self,
 		runtime: &RuntimePool,
@@ -262,7 +268,7 @@ where
 		}
 
 		// apply to log
-		let (_, action) = self.log.push_event(identity, &action).await?;
+		let (_, action_link) = self.log.push_event(identity, &action).await.context("push event")?;
 
 		// // debug
 		// let block = self.log.storage().get(entry.as_ref()).await.unwrap();
@@ -273,8 +279,17 @@ where
 		let change_context = ReducerChangeContext { cause: ReducerChangeCause::Push };
 		let runtime_context = self
 			.core_resolver
-			.execute(self.log.storage(), runtime, &change_context, &self.state, action.cid())
-			.await?;
+			.execute(self.log.storage(), runtime, &change_context, &self.state, action_link.cid())
+			.await
+			.with_context(|| {
+				format!(
+					"runtime execute core: {}, state: {:?}, action: {:?}",
+					action.core,
+					self.state,
+					action_link,
+					// to_json_string(&action.payload)
+				)
+			})?;
 
 		// snapshot
 		if self.state.is_some() {

@@ -1,11 +1,10 @@
 use crate::{
-	types::co_reducer::CoReducerContextRef, CoReducer, CoreResolver, Reducer, ReducerChangeContext,
-	ReducerChangedHandler, CO_CORE_NAME_STORAGE,
+	types::{co_dispatch::CoDispatch, co_reducer::CoReducerContextRef},
+	CoreResolver, Reducer, ReducerChangeContext, ReducerChangedHandler,
 };
 use async_trait::async_trait;
 use cid::Cid;
 use co_core_storage::StorageAction;
-use co_identity::PrivateIdentityBox;
 use co_primitives::{block_diff_added_with_parent, StoreParams};
 use co_storage::BlockStorage;
 use futures::{pin_mut, TryStreamExt};
@@ -15,52 +14,104 @@ use std::{
 };
 
 /// Reference count state in a [`co_core_storage::Storage`] core.
-pub struct ReferenceWriter {
+pub struct ReferenceWriter<D> {
 	/// Parent to write the references to.
-	parent: CoReducer,
-
-	/// Identity to use to write the references.
-	identity: PrivateIdentityBox,
-
-	/// The core name in the parent to write the refrecens to.
-	storage_core_name: String,
+	dispatch: D,
 
 	/// If set pin states to this key.
 	pinning_key: Option<String>,
-
-	/// The previous state. Thius is uses as an optimizaztion to not have to walk the whole state.
-	reducer_previous_state: Option<Cid>,
 
 	/// The reducer storage to use.
 	/// Note: This should not use any networking as we only care for local references.
 	reducer_context: CoReducerContextRef,
 }
-impl ReferenceWriter {
-	pub fn new(
-		reducer_context: CoReducerContextRef,
-		reducer_previous_state: Option<Cid>,
-		parent: CoReducer,
-		identity: PrivateIdentityBox,
-		pinning_key: Option<String>,
-	) -> Self {
-		Self {
-			pinning_key,
-			identity,
-			parent,
-			storage_core_name: CO_CORE_NAME_STORAGE.to_owned(),
-			reducer_previous_state,
-			reducer_context,
-		}
+impl<D> ReferenceWriter<D>
+where
+	D: CoDispatch<StorageAction> + 'static,
+{
+	pub fn new(dispatch: D, reducer_context: CoReducerContextRef, pinning_key: Option<String>) -> Self {
+		Self { pinning_key, dispatch, reducer_context }
 	}
 
-	pub fn with_storage_core_name(mut self, name: String) -> Self {
-		self.storage_core_name = name;
-		self
+	/// Update storage core from previous_state to next_state.
+	pub async fn write(
+		&self,
+		previous_state: Option<Cid>,
+		next_state: Cid,
+		max_block_size: usize,
+	) -> Result<(), anyhow::Error> {
+		// external
+		let external_next_state = self.reducer_context.to_external_cid(next_state).await?;
+
+		// calc max references per action
+		let max_references = max_block_size / 2 / Cid::default().encoded_len();
+
+		// diff
+		let diff = block_diff_added_with_parent(
+			self.reducer_context.storage(true),
+			previous_state,
+			next_state,
+			Default::default(),
+			Default::default(),
+		);
+
+		// apply root reference
+		if let Some(pinning_key) = &self.pinning_key {
+			let action = StorageAction::PinReference(pinning_key.clone(), vec![external_next_state]);
+			self.dispatch.dispatch(&action).await?;
+		}
+
+		// apply structural references
+		let mut references = BTreeMap::<Cid, BTreeSet<Cid>>::new();
+		let mut references_count = 0;
+		pin_mut!(diff);
+		while let Some((next_parent, next)) = diff.try_next().await? {
+			if let Some(next_parent) = next_parent {
+				// external
+				let external_next = self.reducer_context.to_external_cid(next).await?;
+				let external_next_parent = self.reducer_context.to_external_cid(next_parent).await?;
+
+				// record
+				references.entry(external_next_parent).or_default().insert(external_next);
+				references_count += 1;
+
+				// flush when we hit max block size
+				if references_count > max_references {
+					// take
+					let mut next_references = Default::default();
+					swap(&mut references, &mut next_references);
+					references_count = 0;
+
+					// apply
+					let action = StorageAction::ReferenceStructure(next_references.into_iter().collect());
+					self.dispatch.dispatch(&action).await?;
+				}
+			}
+		}
+		if !references.is_empty() {
+			let action = StorageAction::ReferenceStructure(references.into_iter().collect());
+			self.dispatch.dispatch(&action).await?;
+		}
+		Ok(())
+	}
+}
+
+pub struct ReferenceWriteReducerChangedHandler<D> {
+	/// The writer.
+	reference_writer: ReferenceWriter<D>,
+
+	/// The previous state. This is used as an optimizaztion to not have to walk the whole state.
+	reducer_previous_state: Option<Cid>,
+}
+impl<D> ReferenceWriteReducerChangedHandler<D> {
+	pub fn new(reference_writer: ReferenceWriter<D>, reducer_previous_state: Option<Cid>) -> Self {
+		Self { reference_writer, reducer_previous_state }
 	}
 }
 #[async_trait]
-impl<S, R> ReducerChangedHandler<S, R> for ReferenceWriter
+impl<D, S, R> ReducerChangedHandler<S, R> for ReferenceWriteReducerChangedHandler<D>
 where
+	D: CoDispatch<StorageAction> + 'static,
 	S: BlockStorage + Send + Sync + Clone + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
@@ -72,60 +123,10 @@ where
 	) -> Result<(), anyhow::Error> {
 		// only if state has changed
 		if &self.reducer_previous_state != reducer.state() {
-			// references
 			if let Some(next_state) = *reducer.state() {
-				// external
-				let external_next_state = self.reducer_context.to_external_cid(next_state).await?;
-
-				// calc max references per action
-				let max_references = <S::StoreParams as StoreParams>::MAX_BLOCK_SIZE / 2 / Cid::default().encoded_len();
-
-				// diff
-				let diff = block_diff_added_with_parent(
-					self.reducer_context.storage(true),
-					self.reducer_previous_state,
-					next_state,
-					Default::default(),
-					Default::default(),
-				);
-
-				// apply root reference
-				if let Some(pinning_key) = &self.pinning_key {
-					let action = StorageAction::PinReference(pinning_key.clone(), vec![external_next_state]);
-					self.parent.push(&self.identity, &self.storage_core_name, &action).await?;
-				}
-
-				// apply structural references
-				let mut references = BTreeMap::<Cid, BTreeSet<Cid>>::new();
-				let mut references_count = 0;
-				pin_mut!(diff);
-				while let Some((next_parent, next)) = diff.try_next().await? {
-					if let Some(next_parent) = next_parent {
-						// external
-						let external_next = self.reducer_context.to_external_cid(next).await?;
-						let external_next_parent = self.reducer_context.to_external_cid(next_parent).await?;
-
-						// record
-						references.entry(external_next_parent).or_default().insert(external_next);
-						references_count += 1;
-
-						// flush when we hit max block size
-						if references_count > max_references {
-							// take
-							let mut next_references = Default::default();
-							swap(&mut references, &mut next_references);
-							references_count = 0;
-
-							// apply
-							let action = StorageAction::ReferenceStructure(next_references.into_iter().collect());
-							self.parent.push(&self.identity, &self.storage_core_name, &action).await?;
-						}
-					}
-				}
-				if !references.is_empty() {
-					let action = StorageAction::ReferenceStructure(references.into_iter().collect());
-					self.parent.push(&self.identity, &self.storage_core_name, &action).await?;
-				}
+				self.reference_writer
+					.write(self.reducer_previous_state, next_state, <S::StoreParams as StoreParams>::MAX_BLOCK_SIZE)
+					.await?;
 			}
 		}
 		Ok(())

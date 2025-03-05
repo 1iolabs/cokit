@@ -21,6 +21,7 @@ pub mod locals;
 pub mod network_discovery;
 pub mod push_heads;
 pub mod response_list;
+pub mod runtime_dispatch;
 pub mod settings_timeout;
 pub mod tmp_dir;
 pub mod to_plain;

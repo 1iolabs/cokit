@@ -10,6 +10,7 @@ use crate::{
 		epic::ReactiveCoreResolver,
 		log::LogCoreResolver,
 		membership::{MembershipCoreResolver, MembershipInstanceRegistry},
+		reference::ReferenceCoreResolver,
 	},
 	services::{application::ApplicationMessage, connections::ConnectionMessage, network::CoNetworkTaskSpawner},
 	types::{co_reducer::CoReducerContext, co_reducer_factory::CoReducerFactoryError},
@@ -546,18 +547,23 @@ impl CoContextInner {
 	/// Creates a CoReducer instance of the Local CO.
 	#[tracing::instrument(skip(self))]
 	async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
-		let core_resolver = CoCoreResolver::default();
-		let core_resolver = ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(
-			core_resolver,
-			CO_ID_LOCAL.into(),
-			self.reactive_context.clone(),
-		);
-		let core_resolver = MembershipCoreResolver::new(
-			self.tasks.clone(),
-			core_resolver,
-			CoContextMembershipInstanceRegistry { reducers: self.reducers.clone() },
-			CO_CORE_NAME_MEMBERSHIP.to_owned(),
-		);
+		let core_resolver = |reducer_context| {
+			let local_id = CoId::new(CO_ID_LOCAL);
+			let core_resolver = CoCoreResolver::default();
+			let core_resolver = ReferenceCoreResolver::new(
+				core_resolver,
+				Some(CoPinningKey::State.to_string(&local_id)),
+				reducer_context,
+			);
+			let core_resolver = ReactiveCoreResolver::new(core_resolver, local_id, self.reactive_context.clone());
+			let core_resolver = MembershipCoreResolver::new(
+				self.tasks.clone(),
+				core_resolver,
+				CoContextMembershipInstanceRegistry { reducers: self.reducers.clone() },
+				CO_CORE_NAME_MEMBERSHIP.to_owned(),
+			);
+			core_resolver
+		};
 		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize);
 		let local_co_reducer = local_co
 			.build(

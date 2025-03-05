@@ -6,7 +6,10 @@ use crate::{
 	find_membership,
 	library::{connections_peer_provider::ConnectionsPeerProvider, push_heads::PushHeads},
 	reducer::{
-		change::{membership_writer::MembershipWriter, reference_writer::ReferenceWriter},
+		change::{
+			membership_writer::MembershipWriter,
+			reference_writer::{ReferenceWriteReducerChangedHandler, ReferenceWriter},
+		},
 		core_resolver::dynamic::DynamicCoreResolver,
 	},
 	services::{
@@ -14,7 +17,10 @@ use crate::{
 		network::{CoHeadsPublish, CoNetworkTaskSpawner},
 	},
 	state::find,
-	types::{co_reducer::CoReducerContext, co_storage::CoBlockStorageContentMapping},
+	types::{
+		co_reducer::{CoReducerContext, CoReducerDispatch},
+		co_storage::CoBlockStorageContentMapping,
+	},
 	CoCoreResolver, CoReducer, CoStorage, CoToken, CoTokenParameters, ReducerBuilder, Runtime, TaskSpawner,
 	CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
@@ -25,6 +31,7 @@ use co_actor::ActorHandle;
 use co_core_co::{CoAction, Participant};
 use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{CoState, Membership, MembershipsAction};
+use co_core_storage::{PinStrategy, StorageAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
@@ -255,14 +262,18 @@ impl SharedCoBuilder {
 		reducer.add_change_handler(Box::new(writer));
 
 		// setup auto write references to parent co
-		let writer = ReferenceWriter::new(
-			context.clone(),
+		let writer = ReferenceWriteReducerChangedHandler::new(
+			ReferenceWriter::new(
+				CoReducerDispatch::new(
+					self.parent.clone(),
+					PrivateIdentity::boxed(identity.clone()),
+					self.storage_core_name,
+				),
+				context.clone(),
+				Some(CoPinningKey::State.to_string(&self.membership.id)),
+			),
 			*reducer.state(),
-			self.parent.clone(),
-			PrivateIdentity::boxed(identity.clone()),
-			Some(CoPinningKey::State.to_string(&self.membership.id)),
-		)
-		.with_storage_core_name(self.storage_core_name);
+		);
 		reducer.add_change_handler(Box::new(writer));
 
 		// result
@@ -511,23 +522,9 @@ impl SharedCoCreator {
 			.await?;
 
 		// add pin to parent co
-		// TODO: states?
-		let pin_state = co_core_storage::StorageAction::PinCreate(
-			CoPinningKey::State.to_string(&self.co.id),
-			co_core_storage::Pin {
-				strategy: co_core_storage::PinStrategy::Unlimited,
-				references: Default::default(),
-				references_count: Default::default(),
-			},
-		);
-		let pin_log = co_core_storage::StorageAction::PinCreate(
-			CoPinningKey::Log.to_string(&self.co.id),
-			co_core_storage::Pin {
-				strategy: co_core_storage::PinStrategy::Unlimited,
-				references: Default::default(),
-				references_count: Default::default(),
-			},
-		);
+		// TODO: initial states?
+		let pin_state = StorageAction::PinCreate(CoPinningKey::State.to_string(&self.co.id), PinStrategy::Unlimited);
+		let pin_log = StorageAction::PinCreate(CoPinningKey::Log.to_string(&self.co.id), PinStrategy::Unlimited);
 		self.parent.push(&identity, &self.storage_core_name, &pin_log).await?;
 		self.parent.push(&identity, &self.storage_core_name, &pin_state).await?;
 
