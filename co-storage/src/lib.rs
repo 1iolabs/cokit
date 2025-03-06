@@ -21,6 +21,7 @@ pub use storage::{
 	fs::FsStorage,
 	mapped::MappedBlockStorage,
 	memory::{MemoryBlockStorage, MemoryStorage},
+	overlay::{OverlayBlockStorage, OverlayChange},
 	request,
 	store_params::StoreParamsBlockStorage,
 	sync::{SyncBlockStorage, SyncStorage},

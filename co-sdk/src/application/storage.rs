@@ -12,7 +12,7 @@ impl Storage {
 	}
 
 	pub fn new_memory() -> Self {
-		Self { storage: CoStorage::new(MemoryBlockStorage::new()) }
+		Self { storage: CoStorage::new(MemoryBlockStorage::default()) }
 	}
 
 	pub fn storage(&self) -> CoStorage {

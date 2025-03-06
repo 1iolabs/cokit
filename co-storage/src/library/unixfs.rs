@@ -141,7 +141,7 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_unixfs_add() {
-		let storage = MemoryBlockStorage::new();
+		let storage = MemoryBlockStorage::default();
 		let mut stream = Cursor::new("hello world test".repeat(64).repeat(1024).as_bytes().to_vec()); // 1024KiB
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();
 		assert_eq!(5, cids.len());
@@ -149,7 +149,7 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_unixfs_add_empty() {
-		let storage = MemoryBlockStorage::new();
+		let storage = MemoryBlockStorage::default();
 		let mut stream = Cursor::new([]);
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();
 		assert_eq!(1, cids.len());
@@ -158,7 +158,7 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_unixfs_cat_buffer() {
-		let storage = MemoryBlockStorage::new();
+		let storage = MemoryBlockStorage::default();
 		let data = "hello world test".repeat(64).repeat(1024); // 1024KiB
 		let mut stream = Cursor::new(data.as_bytes().to_vec());
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();

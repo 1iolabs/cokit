@@ -74,7 +74,7 @@ mod tests {
 	#[tokio::test]
 	async fn smoke() {
 		// test data
-		let storage = MemoryBlockStorage::new();
+		let storage = MemoryBlockStorage::default();
 		let mut builder = NodeBuilder::new(2, DefaultNodeSerializer::new());
 		builder.push(1).unwrap();
 		builder.push(2).unwrap();

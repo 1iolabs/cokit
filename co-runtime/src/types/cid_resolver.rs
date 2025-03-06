@@ -411,7 +411,7 @@ mod tests {
 		// cid5: Cid(bafyr4ih7sbwsz7yu6gcilheb5tnaihph45pouftde7yi7cxqcqjqyrwxey)
 		// cid6: Cid(bafyr4iezz44ryyhzi53oszexkq42ih6ktoxixkh4tjp42gwltngzb2igk4)
 
-		let storage = MemoryBlockStorage::new();
+		let storage = MemoryBlockStorage::default();
 		storage.set(cid6.clone()).await?;
 		storage.set(cid5.clone()).await?;
 		storage.set(cid4.clone()).await?;

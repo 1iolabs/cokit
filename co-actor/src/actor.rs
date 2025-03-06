@@ -1,4 +1,7 @@
-use crate::{Response, ResponseReceiver, ResponseStream, ResponseStreamReceiver, TaskSpawner};
+use crate::{
+	Response, ResponseBackPressureStream, ResponseBackPressureStreamReceiver, ResponseReceiver, ResponseStream,
+	ResponseStreamReceiver, TaskSpawner,
+};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_primitives::Tags;
@@ -348,7 +351,50 @@ where
 			.tx
 			.send(ActorMessage::Message(message(responder)))
 			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running."), self.tags().clone()));
+		let handle = self.clone();
 		async_stream::stream! {
+			// force keep actor alive while stream is running
+			let _handle = handle;
+
+			// fail if send not worked
+			match send_result {
+				Ok(_) => {},
+				Err(err) => {
+					yield Err(err);
+					return;
+				}
+			}
+
+			// forward items
+			for await item in response {
+				match item {
+					Err(ActorError::Canceled) => {
+						break;
+					},
+					item => {
+						yield item;
+					},
+				}
+			}
+		}
+	}
+
+	/// Request with streaming response wtih backpressure.
+	pub fn stream_backpressure<T: std::fmt::Debug>(
+		&self,
+		buffer: usize,
+		message: impl FnOnce(ResponseBackPressureStream<T>) -> M,
+	) -> impl Stream<Item = Result<T, ActorError>> {
+		let (responder, response) = ResponseBackPressureStreamReceiver::new(buffer);
+		let send_result = self
+			.tx
+			.send(ActorMessage::Message(message(responder)))
+			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running."), self.tags().clone()));
+		let handle = self.clone();
+		async_stream::stream! {
+			// force keep actor alive while stream is running
+			let _handle = handle;
+
 			// fail if send not worked
 			match send_result {
 				Ok(_) => {},
@@ -443,11 +489,11 @@ mod tests {
 						*state = value + *state;
 					},
 					TestMessage::Get(response) => {
-						response.respond(*state).ok();
+						response.respond(*state);
 					},
 					TestMessage::IncGet(value, response) => {
 						*state = value + *state;
-						response.respond(*state).ok();
+						response.respond(*state);
 					},
 				}
 				Ok(())

@@ -22,7 +22,7 @@ mod tests {
 		// storage
 		let algorithm = Algorithm::default();
 		let key = algorithm.generate_serect();
-		let storage = EncryptedBlockStorage::new(MemoryBlockStorage::new(), key, algorithm, Default::default());
+		let storage = EncryptedBlockStorage::new(MemoryBlockStorage::default(), key, algorithm, Default::default());
 
 		// set
 		let cid = storage.set_serialized(&42).await.unwrap();

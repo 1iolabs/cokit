@@ -9,7 +9,7 @@ use co_storage::MemoryBlockStorage;
 async fn test_previous_heads() {
 	let identities = LocalIdentityResolver::new();
 	let identity = identities.private_identity("did:local:test").unwrap();
-	let storage = MemoryBlockStorage::new();
+	let storage = MemoryBlockStorage::default();
 
 	// create
 	let mut log = Log::new("test".as_bytes().to_vec(), identities.clone().boxed(), storage.clone(), Default::default());
@@ -33,7 +33,7 @@ async fn test_previous_heads() {
 async fn test_previous_heads_not_load_whole_log_item_hit() {
 	let identities = LocalIdentityResolver::new();
 	let identity = identities.private_identity("did:local:test").unwrap();
-	let storage = MemoryBlockStorage::new();
+	let storage = MemoryBlockStorage::default();
 
 	// create
 	let mut log = Log::new("test".as_bytes().to_vec(), identities.clone().boxed(), storage.clone(), Default::default());
@@ -59,7 +59,7 @@ async fn test_previous_heads_not_load_whole_log_clock_hit() {
 	let identities = LocalIdentityResolver::new();
 	let identity = identities.private_identity("did:local:test").unwrap();
 	let identity2 = identities.private_identity("did:local:test").unwrap();
-	let storage = MemoryBlockStorage::new();
+	let storage = MemoryBlockStorage::default();
 
 	// create
 	let mut log = Log::new("test".as_bytes().to_vec(), identities.clone().boxed(), storage.clone(), Default::default());

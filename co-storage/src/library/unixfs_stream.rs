@@ -75,7 +75,7 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_unixfs_stream() {
-		let storage = MemoryBlockStorage::new();
+		let storage = MemoryBlockStorage::default();
 		let data = "hello world test".repeat(64).repeat(1024); // 1024KiB
 		let mut stream = Cursor::new(data.as_bytes().to_vec());
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();
@@ -89,7 +89,7 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_unixfs_stream_range() {
-		let storage = MemoryBlockStorage::new();
+		let storage = MemoryBlockStorage::default();
 		let data = "hello world test".repeat(64).repeat(1024); // 1024KiB
 		let mut stream = Cursor::new(data.as_bytes().to_vec());
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();
@@ -105,7 +105,7 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_unixfs_stream_range_unaligned() {
-		let storage = MemoryBlockStorage::new();
+		let storage = MemoryBlockStorage::default();
 		let data = "hello world test".repeat(64).repeat(1024); // 1024KiB
 		let mut stream = Cursor::new(data.as_bytes().to_vec());
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();

@@ -512,7 +512,7 @@ mod tests {
 	#[tokio::test]
 	async fn smoke() {
 		// store
-		let storage = MemoryBlockStorage::new();
+		let storage = MemoryBlockStorage::default();
 
 		// wasm
 		Command::new("cargo")
@@ -728,7 +728,7 @@ mod tests {
 	#[tokio::test]
 	async fn test_join_equal_heads() {
 		// reducer
-		let storage = MemoryBlockStorage::new();
+		let storage = MemoryBlockStorage::default();
 		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
 		let log = Log::new(
 			"test".as_bytes().to_vec(),

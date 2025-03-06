@@ -2,13 +2,13 @@ use crate::types::storage::Storage;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStat, BlockStorage, DefaultParams, StorageError};
+use co_primitives::{Block, BlockStat, BlockStorage, DefaultParams, StorageError, StoreParams};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
 
 #[derive(Debug)]
 pub struct MemoryStorage {
-	records: BTreeMap<Cid, Record>,
+	records: BTreeMap<Cid, Record<DefaultParams>>,
 }
 
 impl Default for MemoryStorage {
@@ -77,25 +77,40 @@ impl Storage for MemoryStorage {
 }
 
 #[derive(Debug, Clone)]
-pub struct MemoryBlockStorage {
-	records: Arc<RwLock<BTreeMap<Cid, Record>>>,
+pub struct MemoryBlockStorage<P = DefaultParams>
+where
+	P: StoreParams,
+{
+	records: Arc<RwLock<BTreeMap<Cid, Record<P>>>>,
 }
+impl<P> MemoryBlockStorage<P>
+where
+	P: StoreParams,
+{
+	pub fn new() -> Self {
+		Self { records: Default::default() }
+	}
 
-impl Default for MemoryBlockStorage {
+	pub async fn is_empty(&self) -> bool {
+		self.records.read().await.is_empty()
+	}
+
+	pub async fn entries(&self) -> impl Iterator<Item = Block<P>> + use<P> {
+		let records = { self.records.read().await.clone() };
+		records.into_iter().map(|(_, record)| record.block)
+	}
+}
+impl Default for MemoryBlockStorage<DefaultParams> {
 	fn default() -> Self {
 		Self::new()
 	}
 }
-
-impl MemoryBlockStorage {
-	pub fn new() -> Self {
-		Self { records: Default::default() }
-	}
-}
-
 #[async_trait]
-impl BlockStorage for MemoryBlockStorage {
-	type StoreParams = DefaultParams;
+impl<P> BlockStorage for MemoryBlockStorage<P>
+where
+	P: StoreParams,
+{
+	type StoreParams = P;
 
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		let result = self
@@ -133,7 +148,7 @@ impl BlockStorage for MemoryBlockStorage {
 }
 
 #[derive(Debug, Clone)]
-struct Record {
-	block: Block<DefaultParams>,
+struct Record<P> {
+	block: Block<P>,
 	pin: bool,
 }

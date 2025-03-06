@@ -15,7 +15,7 @@ async fn smoke() {
 	// 	.init();
 
 	// create store
-	let mut store = MemoryBlockStorage::new();
+	let mut store = MemoryBlockStorage::default();
 	let block0 = create_event(&mut store, "hello").await;
 
 	// create log
@@ -39,7 +39,7 @@ async fn smoke() {
 #[tokio::test]
 async fn traverse_sinlge_user_log() {
 	// create store
-	let mut store = MemoryBlockStorage::new();
+	let mut store = MemoryBlockStorage::default();
 	let block0 = create_event(&mut store, "hello").await;
 	let block1 = create_event(&mut store, "world").await;
 	let block2 = create_event(&mut store, "whats").await;
@@ -70,7 +70,7 @@ async fn traverse_sinlge_user_log() {
 
 #[tokio::test]
 async fn join_is_associative() {
-	let store = MemoryBlockStorage::new();
+	let store = MemoryBlockStorage::default();
 	let identity1 = DidKeyIdentity::generate(None);
 	let identity2 = DidKeyIdentity::generate(None);
 	let identity3 = DidKeyIdentity::generate(None);
@@ -115,7 +115,7 @@ async fn join_is_associative() {
 
 #[tokio::test]
 async fn join_is_commutative() {
-	let store = MemoryBlockStorage::new();
+	let store = MemoryBlockStorage::default();
 	let identity1 = DidKeyIdentity::generate(None);
 	let identity2 = DidKeyIdentity::generate(None);
 

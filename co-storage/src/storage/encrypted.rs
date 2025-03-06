@@ -650,7 +650,7 @@ mod tests {
 	#[tokio::test]
 	async fn roundtrip() {
 		// storage
-		let memory = MemoryBlockStorage::new();
+		let memory = MemoryBlockStorage::default();
 		let algorithm = Algorithm::default();
 		let key = Secret::new(repeat(42).take(algorithm.key_size()).collect());
 		let encryption = EncryptedBlockStorage::new(memory.clone(), key, algorithm, Default::default());

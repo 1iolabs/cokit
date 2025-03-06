@@ -20,7 +20,7 @@ async fn async_integration_test() {
 		.unwrap();
 
 	// storage
-	let storage = MemoryBlockStorage::new();
+	let storage = MemoryBlockStorage::default();
 
 	// action
 	let action = ReducerAction {
