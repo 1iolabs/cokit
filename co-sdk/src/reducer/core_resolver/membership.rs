@@ -10,6 +10,7 @@ use std::marker::PhantomData;
 
 /// Update instance when membership changes.
 /// This is implemented as [`CoreResolver`] middleware because we can just check if the action is relevant.
+#[derive(Debug, Clone)]
 pub struct MembershipCoreResolver<S, C, R> {
 	tasks: TaskSpawner,
 	membership_core_name: String,
@@ -19,8 +20,8 @@ pub struct MembershipCoreResolver<S, C, R> {
 }
 impl<S, C, R> MembershipCoreResolver<S, C, R>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
-	C: CoreResolver<S> + Send + Sync + 'static,
+	S: BlockStorage + Clone + Send + Sync + 'static,
+	C: CoreResolver<S> + Clone + Send + Sync + 'static,
 	R: MembershipInstanceRegistry + Clone + Send + Sync + 'static,
 {
 	pub fn new(tasks: TaskSpawner, next: C, registry: R, membership_core_name: String) -> Self {
@@ -40,8 +41,8 @@ where
 #[async_trait]
 impl<S, C, R> CoreResolver<S> for MembershipCoreResolver<S, C, R>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
-	C: CoreResolver<S> + Send + Sync + 'static,
+	S: BlockStorage + Clone + Send + Sync + 'static,
+	C: CoreResolver<S> + Clone + Send + Sync + 'static,
 	R: MembershipInstanceRegistry + Clone + Send + Sync + 'static,
 {
 	async fn execute(

@@ -3,9 +3,20 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_runtime::{RuntimeContext, RuntimePool};
 use co_storage::BlockStorage;
+use std::{
+	fmt::{Debug, Formatter},
+	sync::Arc,
+};
 
+#[derive(Clone)]
 pub struct DynamicCoreResolver<S> {
-	inner: Box<dyn CoreResolver<S> + Send + Sync + 'static>,
+	inner: Arc<dyn CoreResolver<S> + Send + Sync + 'static>,
+}
+
+impl<S> Debug for DynamicCoreResolver<S> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("DynamicCoreResolver").finish()
+	}
 }
 impl<S> DynamicCoreResolver<S>
 where
@@ -15,13 +26,13 @@ where
 	where
 		R: CoreResolver<S> + Send + Sync + 'static,
 	{
-		Self { inner: Box::new(core_resolver) }
+		Self { inner: Arc::new(core_resolver) }
 	}
 }
 #[async_trait]
 impl<S> CoreResolver<S> for DynamicCoreResolver<S>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
+	S: BlockStorage + Clone + Send + Sync + 'static,
 {
 	async fn execute(
 		&self,

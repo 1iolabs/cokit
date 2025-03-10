@@ -8,6 +8,7 @@ use co_storage::BlockStorage;
 use std::marker::PhantomData;
 
 /// Epic resolver middleware.
+#[derive(Debug, Clone)]
 pub struct ReactiveCoreResolver<S, N> {
 	_storage: PhantomData<S>,
 	next: N,
@@ -16,8 +17,8 @@ pub struct ReactiveCoreResolver<S, N> {
 }
 impl<S, N> ReactiveCoreResolver<S, N>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
-	N: CoreResolver<S> + Send + Sync + 'static,
+	S: BlockStorage + Clone + Send + Sync + 'static,
+	N: CoreResolver<S> + Clone + Send + Sync + 'static,
 {
 	pub fn new(next: N, co: CoId, actions: ActorHandle<ApplicationMessage>) -> Self {
 		Self { _storage: Default::default(), co, next, actions }

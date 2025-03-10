@@ -15,6 +15,7 @@ use pin_project::{pin_project, pinned_drop};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
+	fmt::Debug,
 	future::ready,
 	io::ErrorKind,
 	ops::DerefMut,
@@ -31,7 +32,7 @@ use tokio::{
 use tokio_util::sync::{CancellationToken, DropGuard};
 
 #[async_trait]
-pub trait Locals {
+pub trait Locals: Clone + Debug + Send + Sync {
 	/// Get current ApplicationLocal instances.
 	async fn get(&self) -> Result<Vec<ApplicationLocal>, anyhow::Error>;
 

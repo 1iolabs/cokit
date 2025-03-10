@@ -1,29 +1,37 @@
-use crate::{types::co_dispatch::CoDispatch, CoreResolverError};
+use crate::{types::co_dispatch::CoDispatch, CoreResolver, ReducerChangeContext};
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{BlockStorage, BlockStorageExt, ReducerAction};
-use co_runtime::{Core, RuntimeContext, RuntimePool};
+use co_runtime::RuntimePool;
 use serde::Serialize;
 use std::{fmt::Debug, marker::PhantomData};
 
 /// Dispatch for implicit core resolver actions.
-pub struct RuntimeDispatch<S, A> {
+pub struct CoreResolverDispatch<C, S, A> {
+	core_resolver: C,
 	runtime: RuntimePool,
+	context: ReducerChangeContext,
 	storage: S,
 	core_name: String,
-	core: Core,
 	state: Option<Cid>,
 	_action: PhantomData<A>,
 }
-
-impl<S, A> RuntimeDispatch<S, A> {
-	pub fn new(runtime: RuntimePool, storage: S, core_name: String, core: Core, state: Option<Cid>) -> Self {
-		Self { runtime, storage, core_name, core, state, _action: PhantomData }
+impl<'c, C, S, A> CoreResolverDispatch<C, S, A> {
+	pub fn new(
+		core_resolver: C,
+		runtime: RuntimePool,
+		context: ReducerChangeContext,
+		storage: S,
+		core_name: String,
+		state: Option<Cid>,
+	) -> Self {
+		Self { core_resolver, runtime, context, storage, core_name, state, _action: PhantomData }
 	}
 }
 #[async_trait]
-impl<S, A> CoDispatch<A> for RuntimeDispatch<S, A>
+impl<C, S, A> CoDispatch<A> for CoreResolverDispatch<C, S, A>
 where
+	C: CoreResolver<S> + Send + Sync + 'static,
 	S: BlockStorage + Send + Sync + Clone + 'static,
 	A: Serialize + Debug + Send + Sync + Clone + 'static,
 {
@@ -40,10 +48,9 @@ where
 
 		// apply
 		let result = self
-			.runtime
-			.execute(&self.storage, &self.core, RuntimeContext::new(self.state, action_cid))
-			.await
-			.map_err(|e| CoreResolverError::Execute(reducer_action.core.clone(), e))?;
+			.core_resolver
+			.execute(&self.storage, &self.runtime, &self.context, &self.state, &action_cid)
+			.await?;
 
 		// remove action
 		// TODO: put this action into an "overlay storage" which used only memory?

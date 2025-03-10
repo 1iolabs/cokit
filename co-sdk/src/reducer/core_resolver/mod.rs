@@ -7,6 +7,7 @@ use co_storage::StorageError;
 pub mod co;
 pub mod dynamic;
 pub mod epic;
+pub mod flush_overlay;
 pub mod log;
 pub mod membership;
 pub mod reference;

@@ -218,7 +218,9 @@ pub struct ApplicationSettings {
 	/// Extra settings.
 	///
 	/// Known Tags:
-	/// - `co-locals-watch: false` - Disable locals watcher.
+	/// - `co-locals-watch: false` - [`TagValue::Bool`] Disable locals watcher.
+	/// - `co-pending-block-max-memory` - [`TagValue::Integer`] Max to use for pending blocks in memory. Defaults to
+	///   16MiB.
 	pub settings: Tags,
 }
 
@@ -284,7 +286,7 @@ impl ApplicationBuilder {
 
 		// storage
 		let storage = match &self.path {
-			Some(path) => Storage::new(path.join("data")),
+			Some(path) => Storage::new(path.join("data"), path.join("tmp/data")),
 			None => Storage::new_memory(),
 		};
 

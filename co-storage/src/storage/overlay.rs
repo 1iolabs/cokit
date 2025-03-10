@@ -1,105 +1,14 @@
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use cid::Cid;
-use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseBackPressureStream, TaskSpawner};
+use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseBackPressureStream, ResponseStream, TaskSpawner};
 use co_primitives::{Block, BlockStat, BlockStorage, StorageError, StoreParams, Tags};
-use futures::{Stream, StreamExt};
-use std::{collections::HashMap, marker::PhantomData, mem::swap};
-
-// pub struct OverlayBlockStorage<S, T> {
-// 	/// Base storage.
-// 	next: S,
-//
-// 	/// Pending blocks.
-// 	blocks: Arc<RwLock<OverlayBlocks>>,
-//
-// 	/// Temp. storage.
-// 	blocks_tmp: T,
-// }
-// #[async_trait]
-// impl<S, T> BlockStorage for OverlayBlockStorage<S, T>
-// where
-// 	S: BlockStorage + 'static,
-// 	T: BlockStorage<StoreParams = S::StoreParams> + 'static,
-// {
-// 	type StoreParams = S::StoreParams;
-//
-// 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
-// 		let overlay_block = { self.blocks.read().await.blocks.get(cid).cloned() };
-// 		if let Some(overlay_block) = overlay_block {
-// 			match overlay_block {
-// 				OverlayBlock::Memory(data) => Ok(Block::new_unchecked(*cid, data)),
-// 				OverlayBlock::Tmp => Ok(self.blocks_tmp.get(cid).await?),
-// 				OverlayBlock::Remove => Err(StorageError::NotFound(*cid, anyhow!("removed"))),
-// 			}
-// 		} else {
-// 			Ok(self.next.get(cid).await?)
-// 		}
-// 	}
-//
-// 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
-// 		let (cid, data) = block.into_inner();
-// 		self.blocks.write().await.insert(cid, OverlayBlock::Memory(data));
-// 		Ok(cid)
-// 	}
-//
-// 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
-// 		let mut blocks = self.blocks.write().await;
-//
-// 		// effects
-// 		let mark_as_removed = match blocks.blocks.get(cid) {
-// 			Some(OverlayBlock::Memory(data)) => {
-// 				// remove from memory usage
-// 				blocks.blocks_memory -= data.len();
-// 				true
-// 			},
-// 			Some(OverlayBlock::Tmp) => {
-// 				// cleanup from tmp storage
-// 				self.blocks_tmp.remove(cid).await?;
-// 				true
-// 			},
-// 			Some(OverlayBlock::Remove) => {
-// 				// noop: already removed
-// 				false
-// 			},
-// 			None => {
-// 				// noop: we only mark as removed
-// 				true
-// 			},
-// 		};
-//
-// 		// remove
-// 		if mark_as_removed {
-// 			blocks.blocks.insert(*cid, OverlayBlock::Remove);
-// 		}
-//
-// 		// result
-// 		Ok(())
-// 	}
-//
-// 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
-// 		// lock and instance return if possible
-// 		let use_tmp = {
-// 			match self.blocks.read().await.blocks.get(cid) {
-// 				Some(OverlayBlock::Memory(data)) => {
-// 					return Ok(BlockStat { size: data.len() as u64 });
-// 				},
-// 				Some(OverlayBlock::Remove) => {
-// 					return Err(StorageError::NotFound(*cid, anyhow!("removed")));
-// 				},
-// 				Some(OverlayBlock::Tmp) => true,
-// 				None => false,
-// 			}
-// 		};
-//
-// 		// forward
-// 		if use_tmp {
-// 			Ok(self.blocks_tmp.stat(cid).await?)
-// 		} else {
-// 			Ok(self.next.stat(cid).await?)
-// 		}
-// 	}
-// }
+use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+use std::{
+	collections::{BTreeSet, HashMap},
+	marker::PhantomData,
+	mem::swap,
+};
 
 /// Overlay storage which buffers changes into memory or tmp storage if `blocks_max_memory` is hit.
 #[derive(Debug, Clone)]
@@ -127,10 +36,38 @@ where
 		Self { handle: actor.handle(), _tmp: Default::default() }
 	}
 
+	/// Consume and flush all changes to `to`.
+	pub async fn flush(&self, to: S) -> Result<(), StorageError> {
+		let changes = self.changes();
+		pin_mut!(changes);
+		while let Some(change) = changes.try_next().await? {
+			match change {
+				OverlayChange::Set(cid, items) => {
+					to.set(Block::new_unchecked(cid, items)).await?;
+				},
+				OverlayChange::Remove(cid) => {
+					to.remove(&cid).await?;
+				},
+			}
+		}
+		Ok(())
+	}
+
 	/// Consume all changes.
-	pub fn changes(self) -> impl Stream<Item = Result<OverlayChange, StorageError>> {
+	pub fn changes(&self) -> impl Stream<Item = Result<OverlayChange, StorageError>> {
+		// TODO: make sure block are avilable all time...
 		self.handle
 			.stream_backpressure(10, OverlayBlockMessage::ConsumeChanges)
+			.map(|result| match result {
+				Ok(result) => result,
+				Err(err) => Err(StorageError::Internal(err.into())),
+			})
+	}
+
+	/// Consume all changes to base storage and return the changed references.
+	pub fn flush_changes(&self) -> impl Stream<Item = Result<OverlayChangeReference, StorageError>> {
+		self.handle
+			.stream(OverlayBlockMessage::FlushChanges)
 			.map(|result| match result {
 				Ok(result) => result,
 				Err(err) => Err(StorageError::Internal(err.into())),
@@ -415,6 +352,62 @@ where
 					response.complete().ok();
 				});
 			},
+			OverlayBlockMessage::FlushChanges(mut response) => {
+				// TODO: move to background?
+				for (cid, overlay_block) in state.blocks.drain() {
+					if !match overlay_block {
+						OverlayBlock::Memory(data) => {
+							state.blocks_memory -= data.len();
+							let block = Block::new_unchecked(cid, data);
+							match self.next.set(block).await {
+								Ok(cid) => response.send(Ok(OverlayChangeReference::Set(cid))).is_ok(),
+								Err(err) => response.send(Err(err)).is_ok(),
+							}
+						},
+						OverlayBlock::Tmp => {
+							// get block from tmp
+							let block = self.blocks_tmp.get(&cid).await;
+							match block {
+								// remove from tmp as it has been consumed now
+								Ok(block) => {
+									// set
+									match self.next.set(block).await {
+										Ok(cid) => {
+											// clear
+											self.blocks_tmp.remove(&cid).await.ok();
+
+											// result
+											response.send(Ok(OverlayChangeReference::Set(cid))).is_ok()
+										},
+										Err(err) => response.send(Err(err)).is_ok(),
+									}
+								},
+								// when we not find the item in tmp verify if it already has been flushed to next
+								Err(StorageError::NotFound(_, _)) => {
+									match self.next.stat(&cid).await {
+										Ok(_) => {
+											// skip item if it already has been flushed to next
+											true
+										},
+										Err(err) => {
+											// forward tmp error
+											response.send(Err(err)).is_ok()
+										},
+									}
+								},
+								Err(err) => response.send(Err(err)).is_ok(),
+							}
+						},
+						OverlayBlock::Remove => match self.next.remove(&cid).await {
+							Ok(_) => response.send(Ok(OverlayChangeReference::Remove(cid))).is_ok(),
+							Err(err) => response.send(Err(err)).is_ok(),
+						},
+					} {
+						break;
+					}
+				}
+				response.complete().ok();
+			},
 		}
 		Ok(())
 	}
@@ -468,11 +461,20 @@ where
 
 	/// Consume all changes via stream.
 	ConsumeChanges(ResponseBackPressureStream<Result<OverlayChange, StorageError>>),
+
+	/// Flush all changes to base storage and return the changes as stream.
+	FlushChanges(ResponseStream<Result<OverlayChangeReference, StorageError>>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OverlayChange {
 	Set(Cid, Vec<u8>),
+	Remove(Cid),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum OverlayChangeReference {
+	Set(Cid),
 	Remove(Cid),
 }
 

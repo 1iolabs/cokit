@@ -297,6 +297,21 @@ impl Tags {
 		None
 	}
 
+	/// Get first tag value (that is a integer) for given key.
+	pub fn integer(&self, key: &str) -> Option<i128> {
+		for (tag_key, tag_value) in self.iter() {
+			if key == tag_key {
+				match tag_value {
+					TagValue::Integer(v) => return Some(*v),
+					_ => {
+						continue;
+					},
+				}
+			}
+		}
+		None
+	}
+
 	/// Find first tag value, that is a link, by key.
 	pub fn link(&self, key: &str) -> Option<&Cid> {
 		self.0.iter().find_map(|tag| match tag {

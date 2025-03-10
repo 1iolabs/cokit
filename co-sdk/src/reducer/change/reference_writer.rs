@@ -1,4 +1,5 @@
 use crate::{
+	library::max_reference_count::max_reference_count,
 	types::{co_dispatch::CoDispatch, co_reducer::CoReducerContextRef},
 	CoreResolver, Reducer, ReducerChangeContext, ReducerChangedHandler,
 };
@@ -39,12 +40,14 @@ where
 		previous_state: Option<Cid>,
 		next_state: Cid,
 		max_block_size: usize,
-	) -> Result<(), anyhow::Error> {
+	) -> Result<Option<Cid>, anyhow::Error> {
+		let mut dispatch_state = Some(next_state);
+
 		// external
 		let external_next_state = self.reducer_context.to_external_cid(next_state).await?;
 
 		// calc max references per action
-		let max_references = max_block_size / 2 / Cid::default().encoded_len();
+		let max_references = max_reference_count(max_block_size);
 
 		// diff
 		let diff = block_diff_added_with_parent(
@@ -58,7 +61,7 @@ where
 		// apply root reference
 		if let Some(pinning_key) = &self.pinning_key {
 			let action = StorageAction::PinReference(pinning_key.clone(), vec![external_next_state]);
-			self.dispatch.dispatch(&action).await?;
+			dispatch_state = self.dispatch.dispatch(&action).await?;
 		}
 
 		// apply structural references
@@ -84,15 +87,15 @@ where
 
 					// apply
 					let action = StorageAction::ReferenceStructure(next_references.into_iter().collect());
-					self.dispatch.dispatch(&action).await?;
+					dispatch_state = self.dispatch.dispatch(&action).await?;
 				}
 			}
 		}
 		if !references.is_empty() {
 			let action = StorageAction::ReferenceStructure(references.into_iter().collect());
-			self.dispatch.dispatch(&action).await?;
+			dispatch_state = self.dispatch.dispatch(&action).await?;
 		}
-		Ok(())
+		Ok(dispatch_state)
 	}
 }
 

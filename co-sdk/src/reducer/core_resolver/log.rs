@@ -4,14 +4,15 @@ use cid::Cid;
 use co_primitives::{BlockStorage, BlockStorageExt, DiagnosticMessage};
 use co_runtime::{RuntimeContext, RuntimePool};
 
+#[derive(Debug, Clone)]
 pub struct LogCoreResolver<C> {
 	next: C,
 }
 impl<C> LogCoreResolver<C> {
 	pub fn new<S>(core_resolver: C) -> Self
 	where
-		S: BlockStorage + Send + Sync + Clone + 'static,
-		C: CoreResolver<S> + Send + Sync + 'static,
+		S: BlockStorage + Clone + Send + Sync + Clone + 'static,
+		C: CoreResolver<S> + Clone + Send + Sync + 'static,
 	{
 		Self { next: core_resolver }
 	}

@@ -1,6 +1,7 @@
 pub mod all_tags;
 pub mod cancel;
 pub mod connections_peer_provider;
+pub mod core_resolver_dispatch;
 pub mod create_reducer_action;
 pub mod did_key_provider;
 pub mod find_co_identities;
@@ -18,6 +19,7 @@ pub mod keystore_fetch;
 pub mod local_keypair_fetch;
 pub mod local_secret;
 pub mod locals;
+pub mod max_reference_count;
 pub mod network_discovery;
 pub mod push_heads;
 pub mod response_list;

@@ -25,6 +25,7 @@ use co_storage::{BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use std::{
 	collections::{BTreeMap, BTreeSet},
+	fmt::Debug,
 	sync::Arc,
 };
 use tokio_util::sync::CancellationToken;
@@ -116,7 +117,7 @@ impl LocalCoBuilder {
 	}
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct LocalCoInstance<L> {
 	identifier: String,
 	encrypted_storage: EncryptedBlockStorage<CoStorage>,
@@ -124,7 +125,7 @@ struct LocalCoInstance<L> {
 }
 impl<L> LocalCoInstance<L>
 where
-	L: Locals + Clone + Send + Sync + 'static,
+	L: Locals + Clone + Debug + Send + Sync + 'static,
 {
 	/// Read the local co state from disk.
 	/// As we trust all of the local states we use all the states without fuhter checks to continue.
@@ -314,7 +315,7 @@ impl<L, S, R> ReducerChangedHandler<S, R> for LocalCoInstance<L>
 where
 	S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
-	L: Locals + Clone + Send + Sync + 'static,
+	L: Locals + Clone + Debug + Send + Sync + 'static,
 {
 	async fn on_state_changed(
 		&mut self,
@@ -329,7 +330,7 @@ where
 #[async_trait]
 impl<L> CoReducerContext for LocalCoInstance<L>
 where
-	L: Locals + Clone + Send + Sync + 'static,
+	L: Locals + Clone + Debug + Send + Sync + 'static,
 {
 	fn storage(&self, _force_local: bool) -> CoStorage {
 		// the LocalCo never uses networking and is always encrypted

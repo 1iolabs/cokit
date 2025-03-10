@@ -54,6 +54,7 @@ impl Actor for Application {
 			local_identity.clone(),
 			None,
 			storage.storage(),
+			storage.tmp_storage(),
 			runtime.clone(),
 			handle.clone(),
 			reducers.handle().into(),

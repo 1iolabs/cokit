@@ -243,7 +243,7 @@ pub enum CoReducerError {
 }
 
 #[async_trait]
-pub trait CoReducerContext {
+pub trait CoReducerContext: Debug {
 	/// Get a new storage instance.
 	///
 	/// # Args

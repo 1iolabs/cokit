@@ -297,6 +297,7 @@ impl CreateCo {
 	}
 }
 
+#[derive(Debug)]
 struct SharedContext {
 	id: CoId,
 

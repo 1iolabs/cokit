@@ -82,6 +82,14 @@ pub enum StorageAction {
 	#[serde(rename = "s")]
 	ReferenceStructure(Vec<(Cid, BTreeSet<Cid>)>),
 
+	/// Create [`Cid`] references with ref count of zero if the reference not exists yet.
+	/// This is normally used to track newly created blocks.
+	///
+	/// # Arguments
+	/// - `0`: The [`Cid`] of entries to create.
+	#[serde(rename = "c")]
+	ReferenceCreate(BTreeSet<Cid>),
+
 	/// Remove [`Cid`] references.
 	///
 	/// # Arguments
@@ -125,6 +133,9 @@ impl<S: BlockStorage + Clone + 'static> Reducer<StorageAction, S> for Storage {
 			},
 			StorageAction::ReferenceStructure(cids) => {
 				reduce_reference_structure(storage, &mut state, stream::iter(cids).map(Ok)).await?
+			},
+			StorageAction::ReferenceCreate(cids) => {
+				reduce_reference_create(storage, &mut state, stream::iter(cids).map(Ok)).await?
 			},
 			StorageAction::Remove(cids, force) => reduce_remove(storage, &mut state, cids, force).await?,
 			StorageAction::TagsInsert(cids, tags) => reduce_tags_insert(storage, &mut state, cids, tags).await?,
@@ -359,6 +370,25 @@ where
 	pin_mut!(cids);
 	while let Some(cid) = cids.try_next().await? {
 		reference_cid(&mut blocks, cid).await?;
+	}
+	state.blocks = blocks.store().await?;
+	Ok(())
+}
+
+async fn reduce_reference_create<S>(
+	storage: &S,
+	state: &mut Storage,
+	cids: impl Stream<Item = Result<Cid, StorageError>>,
+) -> Result<(), anyhow::Error>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	let mut blocks = state.blocks.open(storage).await?;
+	pin_mut!(cids);
+	while let Some(cid) = cids.try_next().await? {
+		if blocks.get(&cid).await?.is_none() {
+			blocks.insert(cid, BlockMetadata::default()).await?;
+		}
 	}
 	state.blocks = blocks.store().await?;
 	Ok(())
