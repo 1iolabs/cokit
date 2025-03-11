@@ -6,9 +6,9 @@ use super::{
 use crate::{
 	library::find_membership::memberships,
 	reducer::core_resolver::{
+		created::CreatedCoreResolver,
 		dynamic::DynamicCoreResolver,
 		epic::ReactiveCoreResolver,
-		flush_overlay::FlushOverlayCoreResolver,
 		log::LogCoreResolver,
 		membership::{MembershipCoreResolver, MembershipInstanceRegistry},
 		reference::ReferenceCoreResolver,
@@ -27,7 +27,7 @@ use co_identity::{
 };
 use co_log::EntryBlock;
 use co_primitives::{CoId, Did, Tags};
-use co_storage::{BlockStorage, EncryptedBlockStorage, OverlayBlockStorage, StorageError};
+use co_storage::{BlockStorage, CreatedBlockStorage, EncryptedBlockStorage, StorageError};
 use futures::{Stream, TryStreamExt};
 use std::{
 	collections::{BTreeMap, VecDeque},
@@ -455,13 +455,10 @@ pub(crate) struct CoContextInner {
 
 	network: Arc<RwLock<Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>>>,
 
-	storage: CoStorage,
+	_storage: CoStorage,
 
 	/// Used to track all new blocks until we store the LocalCo again.
-	/// Current implementation only contains one but it could be layered for shared COs.
-	/// Downside is that nodes maybe flushed for parallel shared CO operations.
-	/// However the only purpose is that we track all references in the `local.storage` core and this should be fine.
-	overlay_storage: OverlayBlockStorage<CoStorage, CoStorage>,
+	storage_created: CreatedBlockStorage<CoStorage>,
 
 	runtime: Runtime,
 	reactive_context: ActorHandle<ApplicationMessage>,
@@ -476,22 +473,13 @@ impl CoContextInner {
 		local_identity: LocalIdentity,
 		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
 		storage: CoStorage,
-		tmp_storage: CoStorage,
+		_tmp_storage: CoStorage,
 		runtime: Runtime,
 		reactive_context: ActorHandle<ApplicationMessage>,
 		reducers: ReducersControl,
 	) -> Self {
 		Self {
-			overlay_storage: OverlayBlockStorage::new(
-				tasks.clone(),
-				storage.clone(),
-				tmp_storage,
-				settings
-					.settings
-					.integer("co-pending-block-max-memory")
-					.unwrap_or(2i128.pow(24)) as usize, // 16Mib
-				true,
-			),
+			storage_created: CreatedBlockStorage::new(storage.clone()),
 			settings,
 			shutdown,
 			tasks,
@@ -538,7 +526,8 @@ impl CoContextInner {
 	/// Get the root storage.
 	/// The returned storage tracks changes which will be flushed when the local co is written.
 	pub fn storage(&self) -> CoStorage {
-		CoStorage::new(self.overlay_storage.clone())
+		// self.storage.clone()
+		CoStorage::new(self.storage_created.clone())
 	}
 
 	pub fn runtime(&self) -> Runtime {
@@ -570,12 +559,12 @@ impl CoContextInner {
 		let core_resolver = |reducer_context| {
 			let local_id = CoId::new(CO_ID_LOCAL);
 			let core_resolver = CoCoreResolver::default();
+			let core_resolver = CreatedCoreResolver::new(core_resolver, self.storage_created.clone());
 			let core_resolver = ReferenceCoreResolver::new(
 				core_resolver,
 				Some(CoPinningKey::State.to_string(&local_id)),
 				reducer_context,
 			);
-			let core_resolver = FlushOverlayCoreResolver::new(core_resolver, self.overlay_storage.clone());
 			let core_resolver = ReactiveCoreResolver::new(core_resolver, local_id, self.reactive_context.clone());
 			let core_resolver = MembershipCoreResolver::new(
 				self.tasks.clone(),

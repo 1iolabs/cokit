@@ -24,3 +24,4 @@ pub mod secret;
 pub mod storage;
 pub mod tags;
 pub mod total_float;
+pub mod weak_cid;

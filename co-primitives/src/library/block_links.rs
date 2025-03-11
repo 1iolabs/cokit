@@ -9,7 +9,7 @@ impl BlockLinks {
 		Self {}
 	}
 
-	/// Test if the CID codec possible contains links.
+	/// Test if the CID codec possibly contains links.
 	pub fn has_links(&self, cid: impl Into<MultiCodec>) -> bool {
 		match cid.into() {
 			MultiCodec::Known(KnownMultiCodec::DagPb)

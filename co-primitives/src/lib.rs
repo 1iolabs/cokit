@@ -43,4 +43,5 @@ pub use types::{
 	storage::Storage,
 	tags::{Tag, TagValue, Tags, TagsExpr},
 	total_float::TotalFloat64,
+	weak_cid::WeakCid,
 };

@@ -17,6 +17,7 @@ pub use library::{
 	unixfs_stream::unixfs_stream,
 };
 pub use storage::{
+	created::CreatedBlockStorage,
 	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping, EncryptedStorage},
 	fs::FsStorage,
 	mapped::MappedBlockStorage,

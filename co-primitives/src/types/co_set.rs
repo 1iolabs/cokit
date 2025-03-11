@@ -48,13 +48,16 @@ where
 		Ok(result)
 	}
 
+	/// Remove key from set and return `true` if it was present.
 	pub async fn remove<S>(&mut self, storage: &S, key: K) -> Result<bool, StorageError>
 	where
 		S: BlockStorage + Clone + 'static,
 	{
 		let mut transaction = self.open(storage).await?;
 		let result = transaction.remove(key).await?;
-		self.commit(transaction).await?;
+		if result {
+			self.commit(transaction).await?;
+		}
 		Ok(result)
 	}
 }
@@ -129,6 +132,7 @@ where
 		self.tree.insert(key, SetValZST).await
 	}
 
+	/// Remove key from set and return `true` if it was present.
 	pub async fn remove(&mut self, key: K) -> Result<bool, StorageError> {
 		if let Some(_) = self.tree.get(&key).await? {
 			self.tree.remove(key).await?;

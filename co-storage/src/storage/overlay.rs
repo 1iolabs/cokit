@@ -4,11 +4,7 @@ use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseBackPressureStream, ResponseStream, TaskSpawner};
 use co_primitives::{Block, BlockStat, BlockStorage, StorageError, StoreParams, Tags};
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
-use std::{
-	collections::{BTreeSet, HashMap},
-	marker::PhantomData,
-	mem::swap,
-};
+use std::{collections::HashMap, marker::PhantomData, mem::swap};
 
 /// Overlay storage which buffers changes into memory or tmp storage if `blocks_max_memory` is hit.
 #[derive(Debug, Clone)]
