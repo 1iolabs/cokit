@@ -6,7 +6,7 @@ use super::{
 use crate::{
 	library::find_membership::memberships,
 	reducer::core_resolver::{
-		created::CreatedCoreResolver,
+		change::ChangeCoreResolver,
 		dynamic::DynamicCoreResolver,
 		epic::ReactiveCoreResolver,
 		log::LogCoreResolver,
@@ -27,7 +27,7 @@ use co_identity::{
 };
 use co_log::EntryBlock;
 use co_primitives::{CoId, Did, Tags};
-use co_storage::{BlockStorage, CreatedBlockStorage, EncryptedBlockStorage, StorageError};
+use co_storage::{BlockStorage, ChangeBlockStorage, EncryptedBlockStorage, StorageError};
 use futures::{Stream, TryStreamExt};
 use std::{
 	collections::{BTreeMap, VecDeque},
@@ -458,7 +458,7 @@ pub(crate) struct CoContextInner {
 	_storage: CoStorage,
 
 	/// Used to track all new blocks until we store the LocalCo again.
-	storage_created: CreatedBlockStorage<CoStorage>,
+	storage_created: ChangeBlockStorage<CoStorage>,
 
 	runtime: Runtime,
 	reactive_context: ActorHandle<ApplicationMessage>,
@@ -479,7 +479,7 @@ impl CoContextInner {
 		reducers: ReducersControl,
 	) -> Self {
 		Self {
-			storage_created: CreatedBlockStorage::new(storage.clone()),
+			storage_created: ChangeBlockStorage::new(storage.clone()),
 			settings,
 			shutdown,
 			tasks,
@@ -559,7 +559,7 @@ impl CoContextInner {
 		let core_resolver = |reducer_context| {
 			let local_id = CoId::new(CO_ID_LOCAL);
 			let core_resolver = CoCoreResolver::default();
-			let core_resolver = CreatedCoreResolver::new(core_resolver, self.storage_created.clone());
+			let core_resolver = ChangeCoreResolver::new(core_resolver, self.storage_created.clone());
 			let core_resolver = ReferenceCoreResolver::new(
 				core_resolver,
 				Some(CoPinningKey::State.to_string(&local_id)),

@@ -96,7 +96,7 @@ pub enum StorageAction {
 	/// - `0`: The [`Cid`] of entries to remove.
 	/// - `1`: Force removal. If false only references with a zero ref count will be removed.
 	#[serde(rename = "d")]
-	Remove(Vec<Cid>, bool),
+	Remove(BTreeSet<Cid>, bool),
 
 	/// Append tags to references.
 	#[serde(rename = "ti")]
@@ -342,7 +342,12 @@ where
 	Ok(())
 }
 
-async fn reduce_remove<S>(storage: &S, state: &mut Storage, cids: Vec<Cid>, force: bool) -> Result<(), anyhow::Error>
+async fn reduce_remove<S>(
+	storage: &S,
+	state: &mut Storage,
+	cids: impl IntoIterator<Item = Cid>,
+	force: bool,
+) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {

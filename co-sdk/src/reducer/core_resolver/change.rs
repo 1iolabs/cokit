@@ -9,22 +9,22 @@ use cid::Cid;
 use co_core_storage::StorageAction;
 use co_primitives::{BlockStorage, StoreParams};
 use co_runtime::{RuntimeContext, RuntimePool};
-use co_storage::CreatedBlockStorage;
+use co_storage::{BlockStorageChange, ChangeBlockStorage};
 use std::collections::BTreeSet;
 
-/// Reference count state in a [`co_core_storage::Storage`] core.
+/// Track block changes in a [`co_core_storage::Storage`] core.
 #[derive(Debug, Clone)]
-pub struct CreatedCoreResolver<C> {
+pub struct ChangeCoreResolver<C> {
 	next: C,
-	storage: CreatedBlockStorage<CoStorage>,
+	storage: ChangeBlockStorage<CoStorage>,
 }
-impl<C> CreatedCoreResolver<C> {
-	pub fn new(next: C, storage: CreatedBlockStorage<CoStorage>) -> Self {
+impl<C> ChangeCoreResolver<C> {
+	pub fn new(next: C, storage: ChangeBlockStorage<CoStorage>) -> Self {
 		Self { next, storage }
 	}
 }
 #[async_trait]
-impl<S, C> CoreResolver<S> for CreatedCoreResolver<C>
+impl<S, C> CoreResolver<S> for ChangeCoreResolver<C>
 where
 	S: BlockStorage + Clone + Send + Sync + 'static,
 	C: CoreResolver<S> + Clone + Send + Sync + 'static,
@@ -55,17 +55,33 @@ where
 		);
 
 		// flush changes
+		// - for added items make sure they exist in the storage core
+		// - for removed items force remove them from the storage core as the block already has been removed
 		let mut create_references = BTreeSet::new();
+		let mut remove_references = BTreeSet::new();
 		for cid in self.storage.drain().await {
-			// reference
-			create_references.insert(cid);
-			if create_references.len() > max_references {
-				next.state = dispatch.dispatch(&StorageAction::ReferenceCreate(create_references)).await?;
-				create_references = BTreeSet::new();
+			match cid {
+				BlockStorageChange::Set(cid) => {
+					create_references.insert(cid);
+					if create_references.len() > max_references {
+						next.state = dispatch.dispatch(&StorageAction::ReferenceCreate(create_references)).await?;
+						create_references = BTreeSet::new();
+					}
+				},
+				BlockStorageChange::Remove(cid) => {
+					remove_references.insert(cid);
+					if remove_references.len() > max_references {
+						next.state = dispatch.dispatch(&StorageAction::Remove(remove_references, true)).await?;
+						remove_references = BTreeSet::new();
+					}
+				},
 			}
 		}
 		if !create_references.is_empty() {
 			next.state = dispatch.dispatch(&StorageAction::ReferenceCreate(create_references)).await?;
+		}
+		if !remove_references.is_empty() {
+			next.state = dispatch.dispatch(&StorageAction::Remove(remove_references, true)).await?;
 		}
 
 		// result
