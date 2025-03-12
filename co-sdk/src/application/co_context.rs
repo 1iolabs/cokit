@@ -130,9 +130,14 @@ impl CoContext {
 		self.inner.tasks.clone()
 	}
 
-	/// Applciation identifier.
+	/// Application identifier.
 	pub fn identifier(&self) -> &str {
 		&self.inner.settings.identifier
+	}
+
+	/// Application settings.
+	pub fn settings(&self) -> &ApplicationSettings {
+		&self.inner.settings
 	}
 }
 #[async_trait]

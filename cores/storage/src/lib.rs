@@ -108,7 +108,7 @@ pub enum StorageAction {
 
 	/// Create a named pin and reference all specified [`Cid`]s.
 	#[serde(rename = "pc")]
-	PinCreate(String, PinStrategy),
+	PinCreate(String, PinStrategy, Vec<Cid>),
 
 	/// Insert references to a named pin and reference all specified [`Cid`]s.
 	#[serde(rename = "pr")]
@@ -140,7 +140,9 @@ impl<S: BlockStorage + Clone + 'static> Reducer<StorageAction, S> for Storage {
 			StorageAction::Remove(cids, force) => reduce_remove(storage, &mut state, cids, force).await?,
 			StorageAction::TagsInsert(cids, tags) => reduce_tags_insert(storage, &mut state, cids, tags).await?,
 			StorageAction::TagsRemove(cids, tags) => reduce_tags_remove(storage, &mut state, cids, tags).await?,
-			StorageAction::PinCreate(key, strategy) => reduce_pin_create(storage, &mut state, key, strategy).await?,
+			StorageAction::PinCreate(key, strategy, references) => {
+				reduce_pin_create(storage, &mut state, key, strategy, references).await?
+			},
 			StorageAction::PinReference(key, cids) => reduce_pin_reference(storage, &mut state, key, cids).await?,
 			StorageAction::PinRemove(key) => reduce_pin_remove(storage, &mut state, key).await?,
 		}
@@ -271,6 +273,7 @@ async fn reduce_pin_create<S>(
 	state: &mut Storage,
 	key: String,
 	strategy: PinStrategy,
+	references: Vec<Cid>,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
@@ -285,11 +288,16 @@ where
 
 	// insert pin
 	let pin = Pin { strategy, references: Default::default(), references_count: 0 };
-	pins.insert(key, pin).await?;
+	pins.insert(key.clone(), pin).await?;
 
 	// store
 	state.pins = pins.store().await?;
 	state.blocks = blocks.store().await?;
+
+	// initial
+	if !references.is_empty() {
+		reduce_pin_reference(storage, state, key, references).await?;
+	}
 
 	// result
 	Ok(())

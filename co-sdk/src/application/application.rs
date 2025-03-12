@@ -10,6 +10,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use co_actor::{Actor, ActorHandle, ActorInstance};
+use co_core_storage::PinStrategy;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
@@ -218,12 +219,42 @@ pub struct ApplicationSettings {
 	/// Extra settings.
 	///
 	/// Known Tags:
-	/// - `co-local-watch` = `true` - [`TagValue::Bool`] Disable locals watcher.
-	/// - `co-local-max-state` = `100` - [`TagValue::Integer`] Count of states to store for LocalCO. A value of zero
-	///   means unlimited.
-	/// - `co-local-max-log` = `100` - [`TagValue::Integer`] Count of transactions to store for LocalCO. A value of
-	///   zero means unlimited.
+	/// - `co-local-watch` [`TagValue::Bool`] [`ApplicationSettings::setting_co_local_watch`]
+	/// - `co-default-max-state` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_state`]
+	/// - `co-default-max-log` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_log`]
 	pub settings: Tags,
+}
+impl ApplicationSettings {
+	/// Disable locals watcher.
+	pub fn setting_co_local_watch(&self) -> bool {
+		!self.settings.matches(tags!("co-local-watch": false))
+	}
+
+	/// Count of states to store for LocalCO and newly joined COs. A value of zero means unlimited.
+	pub fn setting_co_default_max_state(&self) -> PinStrategy {
+		match self
+			.settings
+			.integer("co-default-max-state")
+			.and_then(|v| v.try_into().ok())
+			.unwrap_or(100)
+		{
+			0 => PinStrategy::Unlimited,
+			max => PinStrategy::MaxCount(max),
+		}
+	}
+
+	/// Count of transactions to store for LocalCO and newly joined. A value of zero means unlimited.
+	pub fn setting_co_default_max_log(&self) -> PinStrategy {
+		match self
+			.settings
+			.integer("co-default-max-log")
+			.and_then(|v| v.try_into().ok())
+			.unwrap_or(100)
+		{
+			0 => PinStrategy::Unlimited,
+			max => PinStrategy::MaxCount(max),
+		}
+	}
 }
 
 pub struct ApplicationBuilder {

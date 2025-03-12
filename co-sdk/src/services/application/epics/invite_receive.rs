@@ -1,9 +1,11 @@
 use crate::{
+	application::co_context::CoPinningKey,
 	library::invite::{CoInvitePayload, CO_DIDCOMM_INVITE},
-	Action, CoContext, CoInvite, KnownTag, CO_CORE_NAME_MEMBERSHIP,
+	Action, CoContext, CoInvite, KnownTag, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
 use co_core_membership::{CoState, Membership, MembershipState, MembershipsAction};
+use co_core_storage::StorageAction;
 use co_identity::DidCommHeader;
 use co_primitives::{from_json_string, tags, CoInviteMetadata, Did, KnownTags, Tags};
 use co_storage::BlockStorageExt;
@@ -75,6 +77,30 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 		let membership_tags = tags!(
 			{KnownTags::CoInviteMetadata}: local.storage().set_serialized(&metadata).await?,
 		);
+
+		// storage
+		local
+			.push(
+				&context.local_identity(),
+				CO_CORE_NAME_STORAGE,
+				&StorageAction::PinCreate(
+					CoPinningKey::State.to_string(&payload.id),
+					context.settings().setting_co_default_max_state(),
+					vec![payload.state],
+				),
+			)
+			.await?;
+		local
+			.push(
+				&context.local_identity(),
+				CO_CORE_NAME_STORAGE,
+				&StorageAction::PinCreate(
+					CoPinningKey::Log.to_string(&payload.id),
+					context.settings().setting_co_default_max_log(),
+					payload.heads.iter().cloned().collect(),
+				),
+			)
+			.await?;
 
 		// membership
 		local

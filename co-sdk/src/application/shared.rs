@@ -521,8 +521,16 @@ impl SharedCoCreator {
 			.await?;
 
 		// add pin to parent co
-		let pin_state = StorageAction::PinCreate(CoPinningKey::State.to_string(&self.co.id), PinStrategy::Unlimited);
-		let pin_log = StorageAction::PinCreate(CoPinningKey::Log.to_string(&self.co.id), PinStrategy::Unlimited);
+		let pin_state = StorageAction::PinCreate(
+			CoPinningKey::State.to_string(&self.co.id),
+			PinStrategy::Unlimited,
+			Default::default(),
+		);
+		let pin_log = StorageAction::PinCreate(
+			CoPinningKey::Log.to_string(&self.co.id),
+			PinStrategy::Unlimited,
+			Default::default(),
+		);
 		self.parent.push(&identity, &self.storage_core_name, &pin_log).await?;
 		self.parent.push(&identity, &self.storage_core_name, &pin_state).await?;
 

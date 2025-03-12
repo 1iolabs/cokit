@@ -80,7 +80,7 @@ impl LocalCoBuilder {
 		};
 
 		// create
-		let watcher = !self.settings.settings.matches(tags!("co-local-watch": false));
+		let watcher = self.settings.setting_co_local_watch();
 		match &self.settings.application_path {
 			Some(application_path) => {
 				let config_path = application_path
@@ -460,9 +460,8 @@ where
 			CO_CORE_NAME_STORAGE,
 			&StorageAction::PinCreate(
 				CoPinningKey::State.to_string(&CO_ID_LOCAL.into()),
-				co_core_storage::PinStrategy::MaxCount(
-					settings.settings.integer("co-local-max-state").unwrap_or(100).try_into()?,
-				),
+				settings.setting_co_default_max_state(),
+				Default::default(),
 			),
 		)
 		.await?;
@@ -473,9 +472,8 @@ where
 			CO_CORE_NAME_STORAGE,
 			&StorageAction::PinCreate(
 				CoPinningKey::Log.to_string(&CO_ID_LOCAL.into()),
-				co_core_storage::PinStrategy::MaxCount(
-					settings.settings.integer("co-local-max-log").unwrap_or(100).try_into()?,
-				),
+				settings.setting_co_default_max_log(),
+				Default::default(),
 			),
 		)
 		.await?;
