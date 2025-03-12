@@ -16,7 +16,7 @@ async fn test_conflicting_membership_update() {
 	// application
 	let application = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
 		.without_keychain()
-		.with_setting("co-locals-watch", false)
+		.with_setting("co-local-watch", false)
 		.build()
 		.await
 		.expect("application");
@@ -50,7 +50,7 @@ async fn test_conflicting_membership_update() {
 	// application instance two
 	let application2 = ApplicationBuilder::new_with_path("test2".to_owned(), tmp.path().to_owned())
 		.without_keychain()
-		.with_setting("co-locals-watch", false)
+		.with_setting("co-local-watch", false)
 		.build()
 		.await
 		.expect("application2");

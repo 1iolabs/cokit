@@ -17,10 +17,7 @@ use crate::{
 		network::{CoHeadsPublish, CoNetworkTaskSpawner},
 	},
 	state::find,
-	types::{
-		co_reducer::{CoReducerContext, CoReducerDispatch},
-		co_storage::CoBlockStorageContentMapping,
-	},
+	types::{co_reducer::CoReducerContext, co_storage::CoBlockStorageContentMapping},
 	CoCoreResolver, CoReducer, CoStorage, CoToken, CoTokenParameters, ReducerBuilder, Runtime, TaskSpawner,
 	CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
@@ -35,7 +32,7 @@ use co_core_storage::{PinStrategy, StorageAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
-use co_primitives::{tags, CoId, KnownMultiCodec, MultiCodec};
+use co_primitives::{tags, CoId, KnownMultiCodec, MultiCodec, StoreParams};
 use co_storage::{Algorithm, BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, Secret, StorageError};
 use futures::{stream, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
@@ -264,11 +261,7 @@ impl SharedCoBuilder {
 		// setup auto write references to parent co
 		let writer = ReferenceWriteReducerChangedHandler::new(
 			ReferenceWriter::new(
-				CoReducerDispatch::new(
-					self.parent.clone(),
-					PrivateIdentity::boxed(identity.clone()),
-					self.storage_core_name,
-				),
+				self.parent.dispatcher(&self.storage_core_name, identity.clone()),
 				context.clone(),
 				Some(CoPinningKey::State.to_string(&self.membership.id)),
 			),
@@ -442,24 +435,28 @@ impl SharedCoCreator {
 	/// TODO: Cleanup when something fails?
 	pub async fn create<I>(self, storage: CoStorage, runtime: Runtime, identity: I) -> Result<CoId, anyhow::Error>
 	where
-		I: PrivateIdentity + Debug + Send + Sync + 'static,
+		I: PrivateIdentity + Clone + Debug + Send + Sync + 'static,
 	{
 		// storage
-		let (storage, encrypted_storage): (CoStorage, Option<(EncryptedBlockStorage<CoStorage>, String, Secret)>) =
+		let (co_storage, encrypted_storage): (CoStorage, Option<(EncryptedBlockStorage<CoStorage>, String, Secret)>) =
 			match self.co.algorithm {
 				Some(algorithm) => {
 					let key_uri = format!("urn:co:{}:{}", self.co.id, uuid::Uuid::new_v4());
 					let key = algorithm.generate_serect();
 					let result_storage =
-						EncryptedBlockStorage::new(storage, key.clone(), algorithm, Default::default());
+						EncryptedBlockStorage::new(storage.clone(), key.clone(), algorithm, Default::default());
 					(CoStorage::new(result_storage.clone()), Some((result_storage, key_uri, key)))
 				},
-				None => (storage, None),
+				None => (storage.clone(), None),
 			};
 
 		// log
-		let log =
-			Log::new(self.co.id.as_str().as_bytes().to_vec(), create_identity_resolver(), storage, Default::default());
+		let log = Log::new(
+			self.co.id.as_str().as_bytes().to_vec(),
+			create_identity_resolver(),
+			co_storage,
+			Default::default(),
+		);
 
 		// reducer
 		let mut reducer = ReducerBuilder::new(CoCoreResolver::default(), log)
@@ -493,21 +490,22 @@ impl SharedCoCreator {
 		let state = reducer.state().ok_or(anyhow::anyhow!("Expected state after create"))?;
 
 		// store key in parent co
-		let (key_uri, encryption_mapping) = if let Some((encrypted_storage, key_uri, secret)) = encrypted_storage {
-			let key = Key {
-				uri: key_uri.clone(),
-				name: format!("co ({})", self.co.name),
-				description: "".to_owned(),
-				secret: co_core_keystore::Secret::SharedKey(secret.into()),
-				tags: tags!(),
+		let (key_uri, encryption_mapping, encrypted_storage) =
+			if let Some((encrypted_storage, key_uri, secret)) = encrypted_storage {
+				let key = Key {
+					uri: key_uri.clone(),
+					name: format!("co ({})", self.co.name),
+					description: "".to_owned(),
+					secret: co_core_keystore::Secret::SharedKey(secret.into()),
+					tags: tags!(),
+				};
+				self.parent
+					.push(&identity, &self.keystore_core_name, &KeyStoreAction::Set(key))
+					.await?;
+				(Some(key_uri), encrypted_storage.flush_mapping().await?, Some(encrypted_storage))
+			} else {
+				(None, None, None)
 			};
-			self.parent
-				.push(&identity, &self.keystore_core_name, &KeyStoreAction::Set(key))
-				.await?;
-			(Some(key_uri), encrypted_storage.flush_mapping().await?)
-		} else {
-			(None, None)
-		};
 
 		// add membership to parent co
 		let membership: Membership = Membership {
@@ -523,11 +521,26 @@ impl SharedCoCreator {
 			.await?;
 
 		// add pin to parent co
-		// TODO: initial states?
 		let pin_state = StorageAction::PinCreate(CoPinningKey::State.to_string(&self.co.id), PinStrategy::Unlimited);
 		let pin_log = StorageAction::PinCreate(CoPinningKey::Log.to_string(&self.co.id), PinStrategy::Unlimited);
 		self.parent.push(&identity, &self.storage_core_name, &pin_log).await?;
 		self.parent.push(&identity, &self.storage_core_name, &pin_state).await?;
+
+		// pin initial state
+		let reducer_context = Arc::new(SharedContext {
+			id: self.co.id.clone(),
+			encrypted_storage: encrypted_storage.clone(),
+			storage: storage.clone(),
+			network_storage: None,
+		});
+		let writer = ReferenceWriter::new(
+			self.parent.dispatcher(&self.storage_core_name, identity.clone()),
+			reducer_context,
+			Some(CoPinningKey::State.to_string(&self.co.id)),
+		);
+		writer
+			.write(None, state, <CoStorage as BlockStorage>::StoreParams::MAX_BLOCK_SIZE)
+			.await?;
 
 		// result
 		Ok(self.co.id)

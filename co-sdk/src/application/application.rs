@@ -141,7 +141,7 @@ impl Application {
 	#[tracing::instrument(err, skip(self))]
 	pub async fn create_co<I>(&self, creator: I, create: CreateCo) -> Result<CoReducer, anyhow::Error>
 	where
-		I: PrivateIdentity + Debug + Send + Sync + 'static,
+		I: PrivateIdentity + Clone + Debug + Send + Sync + 'static,
 	{
 		// local
 		let local = self.co_context.local_co_reducer().await?;
@@ -218,9 +218,11 @@ pub struct ApplicationSettings {
 	/// Extra settings.
 	///
 	/// Known Tags:
-	/// - `co-locals-watch: false` - [`TagValue::Bool`] Disable locals watcher.
-	/// - `co-pending-block-max-memory` - [`TagValue::Integer`] Max to use for pending blocks in memory. Defaults to
-	///   16MiB.
+	/// - `co-local-watch` = `true` - [`TagValue::Bool`] Disable locals watcher.
+	/// - `co-local-max-state` = `100` - [`TagValue::Integer`] Count of states to store for LocalCO. A value of zero
+	///   means unlimited.
+	/// - `co-local-max-log` = `100` - [`TagValue::Integer`] Count of transactions to store for LocalCO. A value of
+	///   zero means unlimited.
 	pub settings: Tags,
 }
 

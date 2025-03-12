@@ -220,6 +220,15 @@ impl CoReducer {
 	pub async fn refresh(&self, parent: CoReducer) -> anyhow::Result<()> {
 		self.context.refresh(parent, self.clone()).await
 	}
+
+	/// Create a action dispatcher.
+	pub fn dispatcher<A, I>(&self, core: &str, identity: I) -> impl CoDispatch<A> + use<A, I>
+	where
+		A: Serialize + Debug + Send + Sync + Clone + 'static,
+		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
+	{
+		CoReducerDispatch::new(self.clone(), PrivateIdentity::boxed(identity), core.to_string())
+	}
 }
 impl Debug for CoReducer {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -265,14 +274,14 @@ pub trait CoReducerContext: Debug {
 
 pub type CoReducerContextRef = Arc<dyn CoReducerContext + Send + Sync + 'static>;
 
-pub struct CoReducerDispatch<A> {
+struct CoReducerDispatch<A> {
 	reducer: CoReducer,
 	identity: PrivateIdentityBox,
 	core: String,
 	_action: PhantomData<A>,
 }
 impl<A> CoReducerDispatch<A> {
-	pub fn new(reducer: CoReducer, identity: PrivateIdentityBox, core: String) -> Self {
+	fn new(reducer: CoReducer, identity: PrivateIdentityBox, core: String) -> Self {
 		Self { reducer, identity, core, _action: Default::default() }
 	}
 }

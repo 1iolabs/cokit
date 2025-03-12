@@ -1,4 +1,7 @@
-use super::{application::ApplicationSettings, identity::create_identity_resolver, reducer::ReducerChangedHandler};
+use super::{
+	application::ApplicationSettings, co_context::CoPinningKey, identity::create_identity_resolver,
+	reducer::ReducerChangedHandler,
+};
 use crate::{
 	library::{
 		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
@@ -17,6 +20,7 @@ use crate::{
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
+use co_core_storage::StorageAction;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
 use co_primitives::{tags, DefaultParams, Did, KnownMultiCodec, MultiCodec};
@@ -76,7 +80,7 @@ impl LocalCoBuilder {
 		};
 
 		// create
-		let watcher = !self.settings.settings.matches(tags!("co-locals-watch": false));
+		let watcher = !self.settings.settings.matches(tags!("co-local-watch": false));
 		match &self.settings.application_path {
 			Some(application_path) => {
 				let config_path = application_path
@@ -160,7 +164,7 @@ where
 		let result = Self {
 			locals: locals.clone(),
 			encrypted_storage: encrypted_storage.clone(),
-			identifier: local_co.settings.identifier,
+			identifier: local_co.settings.identifier.clone(),
 		};
 		let context = Arc::new(result.clone());
 
@@ -189,7 +193,7 @@ where
 
 		// create empty
 		if reducer.is_empty() {
-			setup_local_co(runtime.runtime(), &local_co.identity, &mut reducer).await?;
+			setup_local_co(runtime.runtime(), &local_co.identity, &mut reducer, &local_co.settings).await?;
 		}
 
 		// reducer
@@ -398,6 +402,7 @@ async fn setup_local_co<S, R>(
 	runtime: &RuntimePool,
 	identity: &LocalIdentity,
 	reducer: &mut Reducer<S, R>,
+	settings: &ApplicationSettings,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
@@ -446,6 +451,34 @@ where
 		key: None,
 	};
 	reducer.push(runtime, identity, CO_CORE_NAME_CO, &action).await?;
+
+	// setup storage core
+	reducer
+		.push(
+			runtime,
+			identity,
+			CO_CORE_NAME_STORAGE,
+			&StorageAction::PinCreate(
+				CoPinningKey::State.to_string(&CO_ID_LOCAL.into()),
+				co_core_storage::PinStrategy::MaxCount(
+					settings.settings.integer("co-local-max-state").unwrap_or(100).try_into()?,
+				),
+			),
+		)
+		.await?;
+	reducer
+		.push(
+			runtime,
+			identity,
+			CO_CORE_NAME_STORAGE,
+			&StorageAction::PinCreate(
+				CoPinningKey::Log.to_string(&CO_ID_LOCAL.into()),
+				co_core_storage::PinStrategy::MaxCount(
+					settings.settings.integer("co-local-max-log").unwrap_or(100).try_into()?,
+				),
+			),
+		)
+		.await?;
 
 	// done
 	Ok(())
