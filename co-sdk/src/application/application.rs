@@ -31,10 +31,10 @@ pub struct Application {
 	/// Settings.
 	settings: ApplicationSettings,
 
-	// Tasks.
+	/// Tasks.
 	tasks: TaskTracker,
 
-	// CO Context.
+	/// CO Context.
 	co_context: CoContext,
 
 	/// The actor runtime.
