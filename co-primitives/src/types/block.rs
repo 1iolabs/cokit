@@ -1,5 +1,5 @@
 use cid::Cid;
-use multihash_codetable::MultihashDigest;
+use multihash_codetable::{Code, MultihashDigest};
 use std::{
 	hash::{Hash, Hasher},
 	marker::PhantomData,
@@ -32,6 +32,17 @@ impl<S: StoreParams> Block<S> {
 	/// Creates a new block without verifying the cid.
 	pub fn new_unchecked(cid: Cid, data: Vec<u8>) -> Self {
 		Self { _s: Default::default(), cid, data }
+	}
+
+	/// Create a new block by calculating the [`Cid`] from data using the default hasher.
+	/// Note: The default hasher may changes without notice.
+	pub fn new_data(codec: impl Into<u64>, data: Vec<u8>) -> Self {
+		Self::new_data_digest(Code::Blake3_256, codec, data)
+	}
+
+	/// Create a new block by calculating the [`Cid`] from data.
+	pub fn new_data_digest(digest: impl MultihashDigest<64>, codec: impl Into<u64>, data: Vec<u8>) -> Self {
+		Self::new_unchecked(Cid::new_v1(codec.into(), digest.digest(&data)), data)
 	}
 
 	/// Returns the cid.

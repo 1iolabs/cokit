@@ -1844,6 +1844,7 @@ dependencies = [
  "cid 0.11.1",
  "co-actor",
  "co-primitives",
+ "derive_more",
  "either",
  "futures",
  "hexdump",

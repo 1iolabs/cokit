@@ -6,10 +6,11 @@ use chacha20poly1305::{
 };
 use cid::Cid;
 use co_primitives::{from_cbor, to_cbor, Block, KnownMultiCodec, MultiCodec, MultiCodecError, StoreParams};
+use derive_more::From;
 use multihash_codetable::{Code, MultihashDigest};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use std::{fmt::Debug, marker::PhantomData};
+use std::{cmp::min, collections::BTreeMap, fmt::Debug, mem::take};
 
 /// blake3 KDF context for derive block keys from versioned co encryption key
 ///
@@ -162,76 +163,24 @@ pub enum EncryptionVersion {
 	V1 = 1,
 }
 
+/// Encrypted Block.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncryptedBlock<S> {
-	#[serde(skip)]
-	_marker: PhantomData<S>,
-
+pub struct EncryptedBlock {
 	/// Encryption header for payload.
 	#[serde(rename = "h")]
-	header: Header,
+	pub header: Header,
 
-	// Encrypted binary data.
-	#[serde(rename = "c", with = "serde_bytes")]
-	cid: Vec<CipherU8>,
-
-	/// Encrypted binary data.
-	#[serde(rename = "d", with = "serde_bytes")]
-	data: Vec<CipherU8>,
+	/// Encrypted [`BlockPayload`].
+	#[serde(rename = "d")]
+	pub payload: EncryptedData,
 }
-
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// struct EncryptedBlockRepr {
-// 	/// Encrypted binary data.
-// 	cid: Cid,
-
-// 	/// Binary data.
-// 	data: Vec<u8>,
-// }
-// impl<S> From<Block<S>> for EncryptedBlockRepr
-// where
-// 	S: StoreParams,
-// {
-// 	fn from(value: Block<S>) -> Self {
-// 		let (cid, data) = value.into_inner();
-// 		Self { cid, data }
-// 	}
-// }
-
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// #[serde(remote = "Block")]
-// struct BlockDef<S>
-// where
-// 	S: StoreParams,
-// {
-// 	#[serde(skip_serializing)]
-// 	_marker: PhantomData<S>,
-// 	/// Content identifier.
-// 	#[serde(rename = "c", getter = "Block::cid")]
-// 	cid: Cid,
-// 	/// Binary data.
-// 	#[serde(rename = "d", getter = "Block::data", with = "serde_bytes")]
-// 	data: Vec<u8>,
-// }
-// impl<S> Into<Block<S>> for BlockDef<S>
-// where
-// 	S: StoreParams,
-// {
-// 	fn into(self) -> Block<S> {
-// 		Block::new_unchecked(self.cid, self.data)
-// 	}
-// }
-
-impl<S> EncryptedBlock<S>
-where
-	S: StoreParams,
-{
+impl EncryptedBlock {
 	/// Encrypt block (automatically generate block secret).
 	pub fn encrypt(
 		algorithm: Algorithm,
 		secret: &Secret,
-		block: Block<S>,
-	) -> Result<EncryptedBlock<S>, AlgorithmError> {
+		block: impl Into<BlockPayload>,
+	) -> Result<EncryptedBlock, AlgorithmError> {
 		let block_secret = algorithm.generate_serect();
 		Self::encrypt_with_block_secret(algorithm, secret, &block_secret, block)
 	}
@@ -241,16 +190,11 @@ where
 		algorithm: Algorithm,
 		secret: &Secret,
 		block_secret: &Secret,
-		block: Block<S>,
-	) -> Result<EncryptedBlock<S>, AlgorithmError> {
-		// validate that we not overflow the block size
-		if block.data().len()
-			> S::MAX_BLOCK_SIZE - Header::encoded_size(algorithm) - 64 - algorithm.tag_size() - algorithm.tag_size()
-		{
-			return Err(AlgorithmError::Size);
-		}
+		block: impl Into<BlockPayload>,
+	) -> Result<EncryptedBlock, AlgorithmError> {
+		let block: BlockPayload = block.into();
 
-		// dervice data key
+		// derive data key
 		let data_secret = block_secret.derive_serect(BLOCK_DERIVATION);
 
 		// header
@@ -258,65 +202,39 @@ where
 		let header = Header::new(algorithm, vec![key_slot]);
 
 		// result
-		let (cid, data) = block.into_inner();
 		let aad = header.aad();
+
+		// data
+		let data = block.to_bytes().map_err(|_e| AlgorithmError::Encoding)?;
+
+		// encrypt
 		Ok(Self {
-			_marker: Default::default(),
-			cid: header
+			payload: header
 				.algorithm
-				.encrypt(block_secret, &header.nonce, cid.to_bytes().as_slice(), aad.as_slice())?,
-			data: header
-				.algorithm
-				.encrypt(&data_secret, &header.nonce, data.as_slice(), aad.as_slice())?,
+				.encrypt(&data_secret, &header.nonce, data.as_slice(), aad.as_slice())?
+				.into(),
 			header,
 		})
 	}
 
 	/// Get decrypted block.
-	pub fn block(&self, secret: &Secret) -> Result<Block<S>, AlgorithmError> {
+	pub fn block(&self, secret: &Secret) -> Result<BlockPayload, AlgorithmError> {
 		let block_secret = self
 			.header
 			.block_secret(secret)
 			.ok_or(AlgorithmError::InvalidArguments(anyhow::anyhow!("key")))?;
 		let aad = self.header.aad();
-		Ok(Block::new_unchecked(self.decrypt_cid(&block_secret, &aad)?, self.decrypt_data(&block_secret, &aad)?))
-	}
-
-	/// Get decrypted CID.
-	pub fn cid(&self, secret: &Secret) -> Result<Cid, AlgorithmError> {
-		let block_secret = self
-			.header
-			.block_secret(secret)
-			.ok_or(AlgorithmError::InvalidArguments(anyhow::anyhow!("key")))?;
-		let aad = self.header.aad();
-		self.decrypt_cid(&block_secret, &aad)
-	}
-
-	/// Get decrypted payload.
-	#[allow(dead_code)]
-	pub fn data(&self, secret: &Secret) -> Result<Vec<u8>, AlgorithmError> {
-		let block_secret = self
-			.header
-			.block_secret(secret)
-			.ok_or(AlgorithmError::InvalidArguments(anyhow::anyhow!("key")))?;
-		let aad = self.header.aad();
-		self.decrypt_data(&block_secret, &aad)
-	}
-
-	fn decrypt_cid(&self, block_secret: &Secret, aad: &[u8]) -> Result<Cid, AlgorithmError> {
-		let cid = self
-			.header
-			.algorithm
-			.decrypt(block_secret, &self.header.nonce, &self.cid, aad)?;
-		Cid::try_from(cid).map_err(|_| AlgorithmError::Decoding)
-	}
-
-	fn decrypt_data(&self, block_secret: &Secret, aad: &[u8]) -> Result<Vec<u8>, AlgorithmError> {
-		let data_secret = block_secret.derive_serect(BLOCK_DERIVATION);
 		let data = self
-			.header
-			.algorithm
-			.decrypt(&data_secret, &self.header.nonce, &self.data, aad)?;
+			.payload
+			.inline()
+			.ok_or(AlgorithmError::InvalidArguments(anyhow::anyhow!("Expected inline data")))?;
+		let data_plain = self.decrypt_data(&block_secret, data, &aad)?;
+		Ok(from_cbor(&data_plain).map_err(|err| AlgorithmError::InvalidArguments(err.into()))?)
+	}
+
+	fn decrypt_data(&self, block_secret: &Secret, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, AlgorithmError> {
+		let data_secret = block_secret.derive_serect(BLOCK_DERIVATION);
+		let data = self.header.algorithm.decrypt(&data_secret, &self.header.nonce, data, aad)?;
 		Ok(data)
 	}
 
@@ -325,7 +243,7 @@ where
 		self.header.is_valid()
 	}
 }
-impl<S> TryInto<Block<S>> for EncryptedBlock<S>
+impl<S> TryInto<Block<S>> for EncryptedBlock
 where
 	S: StoreParams,
 {
@@ -339,7 +257,7 @@ where
 		Ok(Block::new_unchecked(cid, encrypted_data))
 	}
 }
-impl<S> TryFrom<Block<S>> for EncryptedBlock<S>
+impl<S> TryFrom<Block<S>> for EncryptedBlock
 where
 	S: StoreParams,
 {
@@ -351,7 +269,7 @@ where
 		MultiCodec::with_codec(KnownMultiCodec::CoEncryptedBlock, value.cid())?;
 
 		// decode
-		let block: EncryptedBlock<S> = from_cbor(value.data()).map_err(|_| AlgorithmError::Decoding)?;
+		let block: EncryptedBlock = from_cbor(value.data()).map_err(|_| AlgorithmError::Decoding)?;
 
 		// validate
 		if !block.is_valid() {
@@ -360,6 +278,109 @@ where
 
 		// result
 		Ok(block)
+	}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, From)]
+#[serde(untagged)]
+pub enum EncryptedData {
+	/// Inline cipher text.
+	#[from]
+	#[serde(with = "serde_bytes")]
+	Inline(Vec<CipherU8>),
+
+	/// Referenced cipher text.
+	/// Expected to be [`KnownMultiCodec::Raw`].
+	#[from]
+	Block(Vec<Cid>),
+}
+impl EncryptedData {
+	pub fn inline(&self) -> Option<&[u8]> {
+		match self {
+			Self::Inline(data) => Some(&data),
+			_ => None,
+		}
+	}
+
+	/// Fit [`EncryptedData`] into blocks.
+	///
+	/// If the [`EncryptedData`] doesn't fit into one block it will we splitted accordingly.
+	/// This method should return at max 3 blocks.
+	///
+	/// # Returns
+	/// The extra blocks or an empty Vec if it fits inline.
+	pub fn fit_into_blocks<P: StoreParams>(&mut self, inline_offset: Option<usize>) -> Vec<Block<P>> {
+		let mut data = match self {
+			Self::Inline(data) => {
+				if P::MAX_BLOCK_SIZE >= data.len() + inline_offset.unwrap_or(0) {
+					return vec![];
+				} else {
+					take(data)
+				}
+			},
+			Self::Block(_) => {
+				return vec![];
+			},
+		};
+		let mut extra_blocks = Vec::new();
+		while !data.is_empty() {
+			let rest = data.split_off(min(data.len(), P::MAX_BLOCK_SIZE));
+			extra_blocks.push(Block::new_data(KnownMultiCodec::Raw, data));
+			data = rest;
+		}
+		*self = Self::Block(extra_blocks.iter().map(|block| *block.cid()).collect());
+		extra_blocks
+	}
+}
+
+/// Combines reference mappings and data into one structure.
+/// The max size of this `MAX_BLOCK_SIZE * 3`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockPayload {
+	/// The block [`Cid`].
+	#[serde(rename = "c")]
+	pub cid: Cid,
+
+	/// Optionally maps block references from unencrypted Cid (key) to encrypted Cid (value).
+	/// When a mapping exists it is assumed to contain all links that are still resolvable.
+	#[serde(rename = "r", default, skip_serializing_if = "BTreeMap::is_empty")]
+	pub references: BTreeMap<Cid, Cid>,
+
+	/// The block data.
+	#[serde(with = "serde_bytes", rename = "d")]
+	pub data: Vec<u8>,
+}
+impl BlockPayload {
+	/// Returns the cid.
+	pub fn cid(&self) -> &Cid {
+		&self.cid
+	}
+
+	/// Returns the payload.
+	pub fn data(&self) -> &[u8] {
+		&self.data
+	}
+
+	/// Create plain bytes which contains the [`BlockPayload`] as DAG-CBOR.
+	pub fn to_bytes(&self) -> Result<Vec<u8>, anyhow::Error> {
+		Ok(to_cbor(self)?)
+	}
+}
+impl<S> From<Block<S>> for BlockPayload
+where
+	S: StoreParams,
+{
+	fn from(value: Block<S>) -> Self {
+		let (cid, data) = value.into_inner();
+		Self { cid, data, references: Default::default() }
+	}
+}
+impl<S> Into<Block<S>> for BlockPayload
+where
+	S: StoreParams,
+{
+	fn into(self) -> Block<S> {
+		Block::new_unchecked(self.cid, self.data)
 	}
 }
 
@@ -540,7 +561,7 @@ impl KeySlot {
 mod tests {
 	use super::{Algorithm, EncryptedBlock, Header, KeySlot};
 	use crate::crypto::secret::Secret;
-	use co_primitives::{from_cbor, to_cbor, BlockSerializer, DefaultParams};
+	use co_primitives::{from_cbor, to_cbor, BlockSerializer};
 	use std::iter::repeat;
 
 	#[test]
@@ -629,19 +650,19 @@ mod tests {
 
 		// encrypt
 		let encrypted_block = EncryptedBlock::encrypt(Algorithm::default(), &secret, block.clone()).unwrap();
-		assert_ne!(encrypted_block.data, block.data());
+		assert_ne!(encrypted_block.payload.inline().unwrap(), block.data());
 		//println!("cid: ({}): {:?}", encrypted_block.cid.len(), encrypted_block.cid); // 52 = 36 + 16
-		//println!("data: ({}): {:?}", encrypted_block.data.len(), encrypted_block.data); // 29 = 13 + 16
+		// println!("data: ({}): {:?}", encrypted_block.payload.inline().unwrap().len(), encrypted_block.payload); // 76
 
 		// serialize
 		let encrypted_block_bytes = to_cbor(&encrypted_block).unwrap();
-		// cbor (11), header (153), cid+tag (52), data+tag (29)
-		assert_eq!(encrypted_block_bytes.len(), 245);
+		// cbor (7), header (153), payload+tag (76)
+		assert_eq!(encrypted_block_bytes.len(), 236);
 		//println!("length: {}", encrypted_block_bytes.len());
 		//hexdump::hexdump(&encrypted_block_bytes);
 
 		// deserialize
-		let encrypted_block_deserialized: EncryptedBlock<DefaultParams> = from_cbor(&encrypted_block_bytes).unwrap();
+		let encrypted_block_deserialized: EncryptedBlock = from_cbor(&encrypted_block_bytes).unwrap();
 
 		// decrypt
 		let decrypted_block = encrypted_block_deserialized.block(&secret).unwrap();
