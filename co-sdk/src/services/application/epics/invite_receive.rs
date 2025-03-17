@@ -124,8 +124,8 @@ fn membership(
 		id: payload.id,
 		did,
 		state: BTreeSet::from([CoState {
-			state: payload.state.clone(), // TODO: consensus validation
-			heads: payload.heads,         // TODO: consensus validation
+			state: payload.state.into(),                           // TODO: consensus validation
+			heads: payload.heads.iter().map(Into::into).collect(), // TODO: consensus validation
 			encryption_mapping: None,
 		}]),
 		key: None,

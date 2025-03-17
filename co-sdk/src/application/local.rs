@@ -6,6 +6,7 @@ use crate::{
 	library::{
 		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
 		locals::{ApplicationLocal, FileLocals, Locals, MemoryLocals},
+		to_external_cid::to_external_cid,
 		to_plain::{to_plain, to_plain_one},
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
@@ -25,7 +26,7 @@ use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
 use co_primitives::{tags, DefaultParams, Did, KnownMultiCodec, MultiCodec};
 use co_runtime::RuntimePool;
-use co_storage::{BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, StorageError};
+use co_storage::{BlockStorage, EncryptedBlockStorage, StorageError};
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -377,7 +378,7 @@ where
 	/// Map internal [`Cid`] to external [`Cid`].
 	/// If no mapping is needed/available return the original [`Cid`].
 	async fn to_external_cid(&self, cid: Cid) -> Result<Cid, StorageError> {
-		Ok(self.encrypted_storage.content_mapping().to_plain(&cid).await.unwrap_or(cid))
+		Ok(to_external_cid(&self.encrypted_storage.content_mapping(), cid).await?)
 	}
 }
 

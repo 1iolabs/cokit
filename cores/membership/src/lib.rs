@@ -1,5 +1,5 @@
 use cid::Cid;
-use co_api::{CoId, Context, Did, Reducer, ReducerAction, Tags};
+use co_api::{CoId, Context, Did, Reducer, ReducerAction, Tags, WeakCid};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::BTreeSet;
@@ -39,10 +39,10 @@ pub struct Membership {
 pub struct CoState {
 	/// The CO root state (usually co-core-co).
 	/// Note: This is not an Option so we can not be member of an emtpy CO (which has no id anyway).
-	pub state: Cid,
+	pub state: WeakCid,
 
 	/// The CO heads.
-	pub heads: BTreeSet<Cid>,
+	pub heads: BTreeSet<WeakCid>,
 
 	// TODO mark as external as this field shouldn't be further resolved when pinning
 	// TODO https://gitlab.1io.com/1io/co-sdk/-/issues/47
@@ -133,12 +133,13 @@ impl Reducer for Memberships {
 				// 	membership.heads = heads.clone();
 				// 	membership.encryption_mapping = encryption_mapping.clone();
 				// }
+				let remove = remove.into_iter().map(WeakCid::from).collect::<BTreeSet<WeakCid>>();
 				for membership in result.memberships.iter_mut() {
 					if &membership.id == id {
 						membership.state.retain(|item| !remove.is_superset(&item.heads));
 						membership.state.insert(CoState {
-							state: *state,
-							heads: heads.clone(),
+							state: state.into(),
+							heads: heads.iter().map(WeakCid::from).collect(),
 							encryption_mapping: *encryption_mapping,
 						});
 					}

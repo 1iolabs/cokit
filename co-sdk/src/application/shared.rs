@@ -4,7 +4,11 @@ use super::{
 };
 use crate::{
 	find_membership,
-	library::{connections_peer_provider::ConnectionsPeerProvider, push_heads::PushHeads},
+	library::{
+		connections_peer_provider::ConnectionsPeerProvider,
+		push_heads::PushHeads,
+		to_external_cid::{to_external_cid, to_external_cids},
+	},
 	reducer::{
 		change::{
 			membership_writer::MembershipWriter,
@@ -32,7 +36,7 @@ use co_core_storage::{PinStrategy, StorageAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
-use co_primitives::{tags, CoId, KnownMultiCodec, MultiCodec, StoreParams};
+use co_primitives::{tags, CoId, KnownMultiCodec, MultiCodec, StoreParams, WeakCid};
 use co_storage::{Algorithm, BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, Secret, StorageError};
 use futures::{stream, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
@@ -208,9 +212,9 @@ impl SharedCoBuilder {
 		let mut reducer_builder = ReducerBuilder::new(core_resolver, log).with_initialize(self.initialize);
 		for co_state in self.membership.state.iter() {
 			// get (unencrypted) state/heads
-			let state = context.to_internal_cid(co_state.state).await?;
+			let state = context.to_internal_cid(co_state.state.into()).await?;
 			let heads: BTreeSet<Cid> = stream::iter(co_state.heads.iter())
-				.then(|cid| async { context.to_internal_cid(*cid).await })
+				.then(|cid| async { context.to_internal_cid(cid.cid()).await })
 				.try_collect()
 				.await?;
 
@@ -248,14 +252,18 @@ impl SharedCoBuilder {
 		}
 
 		// setup auto write to parent co
-		let writer = MembershipWriter {
-			id: self.membership.id.clone(),
-			parent: self.parent.clone(),
-			membership_core_name: self.membership_core_name,
-			identity: identity.clone(),
-			encrypted_storage: encrypted_storage.clone(),
-			last_heads: self.membership.state.iter().flat_map(|item| item.heads.clone()).collect(),
-		};
+		let writer = MembershipWriter::new(
+			self.membership.id.clone(),
+			self.parent.clone(),
+			self.membership_core_name,
+			identity.clone(),
+			encrypted_storage.clone(),
+			self.membership
+				.state
+				.iter()
+				.flat_map(|item| item.heads.iter().map(WeakCid::cid))
+				.collect(),
+		);
 		reducer.add_change_handler(Box::new(writer));
 
 		// setup auto write references to parent co
@@ -315,7 +323,7 @@ impl SharedContext {
 				!= membership
 					.state
 					.iter()
-					.flat_map(|item| item.heads.clone())
+					.flat_map(|item| item.heads.iter().map(WeakCid::cid))
 					.collect::<BTreeSet<_>>()
 			{
 				tracing::info!(co = ?co.id(), from = ?co_heads, to = ?membership, "membership-update");
@@ -326,10 +334,11 @@ impl SharedContext {
 					}
 
 					// snapshot
-					co.insert_snapshot(state.state, state.heads.clone()).await?;
+					let state_heads: BTreeSet<Cid> = state.heads.iter().map(WeakCid::cid).collect();
+					co.insert_snapshot(state.state.into(), state_heads.clone()).await?;
 
 					// load snapshot
-					co.join(&state.heads).await?;
+					co.join(&state_heads).await?;
 				}
 			}
 		}
@@ -487,7 +496,8 @@ impl SharedCoCreator {
 				},
 			)
 			.await?;
-		let state = reducer.state().ok_or(anyhow::anyhow!("Expected state after create"))?;
+		let mut state = reducer.state().ok_or(anyhow::anyhow!("Expected state after create"))?;
+		let mut heads = reducer.heads().clone();
 
 		// store key in parent co
 		let (key_uri, encryption_mapping, encrypted_storage) =
@@ -507,11 +517,22 @@ impl SharedCoCreator {
 				(None, None, None)
 			};
 
+		// store encrypted state/heads
+		if let Some(encrypted_storage) = &encrypted_storage {
+			let mapping = encrypted_storage.content_mapping();
+			state = to_external_cid(&mapping, state).await?;
+			heads = to_external_cids(&mapping, heads).await?;
+		}
+
 		// add membership to parent co
 		let membership: Membership = Membership {
 			id: self.co.id.to_owned(),
 			did: identity.identity().to_owned(),
-			state: BTreeSet::from([CoState { heads: reducer.heads().clone(), state, encryption_mapping }]),
+			state: BTreeSet::from([CoState {
+				heads: heads.iter().map(Into::into).collect(),
+				state: state.into(),
+				encryption_mapping,
+			}]),
 			key: key_uri,
 			membership_state: co_core_membership::MembershipState::Active,
 			tags: tags!(),

@@ -1,6 +1,7 @@
 use crate::{
-	reducer::core_resolver::dynamic::DynamicCoreResolver, CoReducer, CoStorage, Reducer, ReducerChangeContext,
-	ReducerChangedHandler,
+	library::to_external_cid::{to_external_cid, to_external_cids},
+	reducer::core_resolver::dynamic::DynamicCoreResolver,
+	CoReducer, CoStorage, Reducer, ReducerChangeContext, ReducerChangedHandler,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -22,6 +23,19 @@ pub struct MembershipWriter<I> {
 	pub encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
 	pub last_heads: BTreeSet<Cid>,
 }
+
+impl<I> MembershipWriter<I> {
+	pub fn new(
+		id: CoId,
+		parent: CoReducer,
+		membership_core_name: String,
+		identity: I,
+		encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
+		last_heads: BTreeSet<Cid>,
+	) -> Self {
+		Self { id, parent, membership_core_name, identity, encrypted_storage, last_heads }
+	}
+}
 #[async_trait]
 impl<I> ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for MembershipWriter<I>
 where
@@ -38,8 +52,17 @@ where
 				None => None,
 			};
 
+			// next
+			let mut next_state = *state;
+			let mut next_heads = reducer.heads().clone();
+			if let Some(encrypted_storage) = &self.encrypted_storage {
+				let mapping = encrypted_storage.content_mapping();
+				next_state = to_external_cid(&mapping, next_state).await?;
+				next_heads = to_external_cids(&mapping, next_heads).await?;
+			}
+
 			// next last heads
-			let mut last_heads = reducer.heads().clone();
+			let mut last_heads = next_heads.clone();
 			swap(&mut self.last_heads, &mut last_heads);
 
 			// update
@@ -49,8 +72,8 @@ where
 					&self.membership_core_name,
 					&MembershipsAction::Update {
 						id: self.id.to_owned(),
-						state: *state,
-						heads: reducer.heads().clone(),
+						state: next_state,
+						heads: next_heads,
 						encryption_mapping: mapping,
 						remove: last_heads,
 					},
