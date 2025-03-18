@@ -88,11 +88,11 @@ pub enum MembershipsAction {
 	Join(Membership),
 	Update {
 		id: CoId,
-		state: Cid,
-		heads: BTreeSet<Cid>,
+		state: WeakCid,
+		heads: BTreeSet<WeakCid>,
 		encryption_mapping: Option<Cid>,
 		/// Remove all [`CoState`] which heads are fully covered.
-		remove: BTreeSet<Cid>,
+		remove: BTreeSet<WeakCid>,
 	},
 	ChangeMembershipState {
 		id: CoId,
@@ -133,13 +133,12 @@ impl Reducer for Memberships {
 				// 	membership.heads = heads.clone();
 				// 	membership.encryption_mapping = encryption_mapping.clone();
 				// }
-				let remove = remove.into_iter().map(WeakCid::from).collect::<BTreeSet<WeakCid>>();
 				for membership in result.memberships.iter_mut() {
 					if &membership.id == id {
 						membership.state.retain(|item| !remove.is_superset(&item.heads));
 						membership.state.insert(CoState {
-							state: state.into(),
-							heads: heads.iter().map(WeakCid::from).collect(),
+							state: state.clone(),
+							heads: heads.clone(),
 							encryption_mapping: *encryption_mapping,
 						});
 					}

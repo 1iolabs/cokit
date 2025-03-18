@@ -86,7 +86,7 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 				&StorageAction::PinCreate(
 					CoPinningKey::State.to_string(&payload.id),
 					context.settings().setting_co_default_max_state(),
-					vec![payload.state],
+					vec![payload.state.into()],
 				),
 			)
 			.await?;
@@ -97,7 +97,7 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 				&StorageAction::PinCreate(
 					CoPinningKey::Log.to_string(&payload.id),
 					context.settings().setting_co_default_max_log(),
-					payload.heads.iter().cloned().collect(),
+					payload.heads.iter().map(Into::into).collect(),
 				),
 			)
 			.await?;

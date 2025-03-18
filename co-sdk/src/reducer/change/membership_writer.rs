@@ -72,10 +72,10 @@ where
 					&self.membership_core_name,
 					&MembershipsAction::Update {
 						id: self.id.to_owned(),
-						state: next_state,
-						heads: next_heads,
+						state: next_state.into(),
+						heads: next_heads.into_iter().map(Into::into).collect(),
 						encryption_mapping: mapping,
-						remove: last_heads,
+						remove: last_heads.into_iter().map(Into::into).collect(),
 					},
 				)
 				.await?;

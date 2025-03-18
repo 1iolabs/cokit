@@ -62,14 +62,14 @@ where
 		for cid in self.storage.drain().await {
 			match cid {
 				BlockStorageChange::Set(cid) => {
-					create_references.insert(cid);
+					create_references.insert(cid.into());
 					if create_references.len() > max_references {
 						next.state = dispatch.dispatch(&StorageAction::ReferenceCreate(create_references)).await?;
 						create_references = BTreeSet::new();
 					}
 				},
 				BlockStorageChange::Remove(cid) => {
-					remove_references.insert(cid);
+					remove_references.insert(cid.into());
 					if remove_references.len() > max_references {
 						next.state = dispatch.dispatch(&StorageAction::Remove(remove_references, true)).await?;
 						remove_references = BTreeSet::new();

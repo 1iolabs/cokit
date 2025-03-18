@@ -63,7 +63,7 @@ where
 			match change {
 				OverlayChangeReference::Set(cid) => {
 					// reference
-					create_references.insert(cid);
+					create_references.insert(cid.into());
 					if create_references.len() > max_references {
 						next.state = dispatch.dispatch(&StorageAction::ReferenceCreate(create_references)).await?;
 						create_references = BTreeSet::new();

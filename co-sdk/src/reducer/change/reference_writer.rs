@@ -60,7 +60,7 @@ where
 
 		// apply root reference
 		if let Some(pinning_key) = &self.pinning_key {
-			let action = StorageAction::PinReference(pinning_key.clone(), vec![external_next_state]);
+			let action = StorageAction::PinReference(pinning_key.clone(), vec![external_next_state.into()]);
 			dispatch_state = self.dispatch.dispatch(&action).await?;
 		}
 

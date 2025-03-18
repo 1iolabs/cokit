@@ -70,11 +70,11 @@ pub enum StorageAction {
 	/// A single [`Cid`] is allowed to be contained multiple times (=reference count).
 	/// The Shallow: [`Cid`] links are not added automatically (not recusrive).
 	#[serde(rename = "r")]
-	Reference(Vec<Cid>),
+	Reference(Vec<WeakCid>),
 
 	/// Decrease [`Cid`] reference count by one.
 	#[serde(rename = "u")]
-	Unreference(Vec<Cid>),
+	Unreference(Vec<WeakCid>),
 
 	/// Structurally reference [`Cid`].
 	/// The first item is the parent the second is the children to be structurally referenced.
@@ -88,7 +88,7 @@ pub enum StorageAction {
 	/// # Arguments
 	/// - `0`: The [`Cid`] of entries to create.
 	#[serde(rename = "c")]
-	ReferenceCreate(BTreeSet<Cid>),
+	ReferenceCreate(BTreeSet<WeakCid>),
 
 	/// Remove [`Cid`] references.
 	///
@@ -96,23 +96,23 @@ pub enum StorageAction {
 	/// - `0`: The [`Cid`] of entries to remove.
 	/// - `1`: Force removal. If false only references with a zero ref count will be removed.
 	#[serde(rename = "d")]
-	Remove(BTreeSet<Cid>, bool),
+	Remove(BTreeSet<WeakCid>, bool),
 
 	/// Append tags to references.
 	#[serde(rename = "ti")]
-	TagsInsert(Vec<Cid>, Tags),
+	TagsInsert(Vec<WeakCid>, Tags),
 
 	/// Remove tags from references.
 	#[serde(rename = "tr")]
-	TagsRemove(Vec<Cid>, Tags),
+	TagsRemove(Vec<WeakCid>, Tags),
 
 	/// Create a named pin and reference all specified [`Cid`]s.
 	#[serde(rename = "pc")]
-	PinCreate(String, PinStrategy, Vec<Cid>),
+	PinCreate(String, PinStrategy, Vec<WeakCid>),
 
 	/// Insert references to a named pin and reference all specified [`Cid`]s.
 	#[serde(rename = "pr")]
-	PinReference(String, Vec<Cid>),
+	PinReference(String, Vec<WeakCid>),
 
 	/// Remove a named pin and unreference all [`Cid`]s.
 	#[serde(rename = "pd")]
@@ -229,7 +229,7 @@ async fn reduce_pin_reference<S>(
 	storage: &S,
 	state: &mut Storage,
 	key: String,
-	cids: Vec<Cid>,
+	cids: Vec<WeakCid>,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
@@ -273,7 +273,7 @@ async fn reduce_pin_create<S>(
 	state: &mut Storage,
 	key: String,
 	strategy: PinStrategy,
-	references: Vec<Cid>,
+	references: Vec<WeakCid>,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
@@ -306,7 +306,7 @@ where
 async fn reduce_tags_remove<S>(
 	storage: &S,
 	state: &mut Storage,
-	cids: Vec<Cid>,
+	cids: Vec<WeakCid>,
 	tags: Tags,
 ) -> Result<(), anyhow::Error>
 where
@@ -328,7 +328,7 @@ where
 async fn reduce_tags_insert<S>(
 	storage: &S,
 	state: &mut Storage,
-	cids: Vec<Cid>,
+	cids: Vec<WeakCid>,
 	tags: Tags,
 ) -> Result<(), anyhow::Error>
 where
@@ -353,7 +353,7 @@ where
 async fn reduce_remove<S>(
 	storage: &S,
 	state: &mut Storage,
-	cids: impl IntoIterator<Item = Cid>,
+	cids: impl IntoIterator<Item = WeakCid>,
 	force: bool,
 ) -> Result<(), anyhow::Error>
 where
@@ -427,7 +427,7 @@ where
 async fn reduce_reference<S>(
 	storage: &S,
 	state: &mut Storage,
-	cids: impl Stream<Item = Result<Cid, StorageError>>,
+	cids: impl Stream<Item = Result<WeakCid, StorageError>>,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
@@ -444,7 +444,7 @@ where
 async fn reduce_reference_create<S>(
 	storage: &S,
 	state: &mut Storage,
-	cids: impl Stream<Item = Result<Cid, StorageError>>,
+	cids: impl Stream<Item = Result<WeakCid, StorageError>>,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
@@ -480,7 +480,7 @@ where
 async fn reduce_unreference<S>(
 	storage: &S,
 	state: &mut Storage,
-	cids: impl Stream<Item = Result<Cid, StorageError>>,
+	cids: impl Stream<Item = Result<WeakCid, StorageError>>,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
