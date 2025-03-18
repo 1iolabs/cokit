@@ -248,11 +248,7 @@ where
 								true
 							},
 						} {
-							return Err(StorageError::InvalidArgument(anyhow!(
-								"Plain reference found {} while storing {}. Are you sure you stored all children nodes?",
-						plain_cid,
-						cid
-							)));
+							return Err(StorageError::InvalidArgument(anyhow!("Plain reference found {} while storing {}. Are you sure you stored all children nodes?", plain_cid, cid)));
 						}
 					},
 				};

@@ -5,10 +5,11 @@ use cid::Cid;
 use co_identity::{PrivateIdentity, PrivateIdentityBox};
 use co_primitives::{CoId, KnownMultiCodec, OptionLink, ReducerAction};
 use co_storage::{BlockStorageContentMapping, BlockStorageExt, MappedBlockStorage, StorageError};
-use futures::{stream, StreamExt, TryStreamExt};
+use futures::{stream, Stream, StreamExt, TryStreamExt};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::BTreeSet, fmt::Debug, marker::PhantomData, sync::Arc};
 use tokio::sync::RwLock;
+use tokio_stream::wrappers::WatchStream;
 
 #[derive(Clone)]
 pub struct CoReducer {
@@ -79,6 +80,19 @@ impl CoReducer {
 	/// Get reducer watcher.
 	pub async fn watch(&self) -> tokio::sync::watch::Receiver<Option<(Cid, BTreeSet<Cid>)>> {
 		self.reducer.read().await.watch()
+	}
+
+	/// Get reducer change stream.
+	/// Upon start (if the reducer is not empty) the current state is yielded.
+	pub fn reducer_state_stream(&self) -> impl Stream<Item = (Cid, BTreeSet<Cid>)> + use<'_> {
+		async_stream::stream! {
+			let stream = WatchStream::new(self.reducer.read().await.watch());
+			for await change in stream {
+				if let Some(change) = change {
+					yield change;
+				}
+			}
+		}
 	}
 
 	/// Push event into reducer.

@@ -268,7 +268,11 @@ where
 		}
 
 		// apply to log
-		let (_, action_link) = self.log.push_event(identity, &action).await.context("push event")?;
+		let (_, action_link) = self
+			.log
+			.push_event(identity, &action)
+			.await
+			.with_context(|| format!("push event core: {}", action.core))?;
 
 		// // debug
 		// let block = self.log.storage().get(entry.as_ref()).await.unwrap();
@@ -347,7 +351,7 @@ where
 					handler
 						.on_state_changed(reducer, context.clone())
 						.await
-						.with_context(|| "running ReducerChangeHandler".to_string())
+						.with_context(|| format!("running {:?}", handler.type_name()))
 				})
 				.await?;
 		}
@@ -454,6 +458,11 @@ pub trait ReducerChangedHandler<S, R> {
 		reducer: &Reducer<S, R>,
 		context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error>;
+
+	/// Diagnostic.
+	fn type_name(&self) -> String {
+		std::any::type_name::<Self>().to_owned()
+	}
 }
 
 #[derive(Debug, Clone)]

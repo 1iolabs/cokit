@@ -5,7 +5,13 @@ use co_sdk::{
 	state, tags, AbsolutePath, ApplicationBuilder, CoId, CoReducer, CoReducerFactory, Cores, CreateCo, DidKeyIdentity,
 	DidKeyProvider, Identity, TmpDir, CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use futures::StreamExt;
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	future::ready,
+	time::Duration,
+};
+use tokio::time::timeout;
 
 /// See:
 /// - https://gitlab.1io.com/1io/co-sdk/-/issues/59
@@ -58,42 +64,46 @@ async fn test_conflicting_membership_update() {
 	let co2 = application2.co().try_co_reducer(&CoId::new("co")).await.unwrap();
 
 	// write to both
-	co.push(
-		&identity,
-		"file",
-		&FileAction::Create {
-			path: "/".try_into().unwrap(),
-			node: Node::Folder(FolderNode {
-				name: "folder".to_owned(),
-				create_time: 0,
-				modify_time: 0,
-				tags: tags!(),
-				owner: identity.identity().to_owned(),
-				mode: 0o665,
-			}),
-			recursive: false,
-		},
-	)
-	.await
-	.unwrap();
-	co2.push(
-		&identity,
-		"file",
-		&FileAction::Create {
-			path: "/".try_into().unwrap(),
-			node: Node::Folder(FolderNode {
-				name: "folder2".to_owned(),
-				create_time: 0,
-				modify_time: 0,
-				tags: tags!(),
-				owner: identity.identity().to_owned(),
-				mode: 0o665,
-			}),
-			recursive: false,
-		},
-	)
-	.await
-	.unwrap();
+	let co_state = co
+		.push(
+			&identity,
+			"file",
+			&FileAction::Create {
+				path: "/".try_into().unwrap(),
+				node: Node::Folder(FolderNode {
+					name: "folder".to_owned(),
+					create_time: 0,
+					modify_time: 0,
+					tags: tags!(),
+					owner: identity.identity().to_owned(),
+					mode: 0o665,
+				}),
+				recursive: false,
+			},
+		)
+		.await
+		.unwrap()
+		.unwrap();
+	let co2_state = co2
+		.push(
+			&identity,
+			"file",
+			&FileAction::Create {
+				path: "/".try_into().unwrap(),
+				node: Node::Folder(FolderNode {
+					name: "folder2".to_owned(),
+					create_time: 0,
+					modify_time: 0,
+					tags: tags!(),
+					owner: identity.identity().to_owned(),
+					mode: 0o665,
+				}),
+				recursive: false,
+			},
+		)
+		.await
+		.unwrap()
+		.unwrap();
 	// println!("co1: {:?} / {:?}", co.co_state().await, co.heads().await);
 	// println!("co2: {:?} / {:?}", co2.co_state().await, co2.heads().await);
 	// let m: Memberships = local_co.state(CO_CORE_NAME_MEMBERSHIP).await.unwrap();
@@ -120,16 +130,30 @@ async fn test_conflicting_membership_update() {
 		assert_eq!(nodes_root.len(), 2);
 	}
 
-	// check
-	//  note: force update the co instance too and wait for update because of
-	// [`co_sdk::reducer::core_resolver::membership::MembershipCoreResolver`]
+	// check: refresh and wait until state changed
 	local_co.refresh(local_co.clone()).await.unwrap();
-	co.refresh(local_co.clone()).await.unwrap();
+	timeout(
+		Duration::from_secs(5),
+		co.reducer_state_stream()
+			.filter(|(state, _)| ready(state != &co_state))
+			.boxed()
+			.next(),
+	)
+	.await
+	.unwrap();
 	test_folders_exists(&co).await;
 
-	// check2
+	// check2: refresh and wait until state changed
 	local_co2.refresh(local_co2.clone()).await.unwrap();
-	co2.refresh(local_co2.clone()).await.unwrap();
+	timeout(
+		Duration::from_secs(5),
+		co2.reducer_state_stream()
+			.filter(|(state, _)| ready(state != &co2_state))
+			.boxed()
+			.next(),
+	)
+	.await
+	.unwrap();
 	test_folders_exists(&co2).await;
 
 	// write more data and check we only got one CoState with one head left

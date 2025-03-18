@@ -1,5 +1,4 @@
 use anyhow::anyhow;
-use cid::Cid;
 use co_api::{
 	async_api::Reducer, BlockStorage, BlockStorageExt, CoList, CoMap, CoMapTransaction, CoSet, Link, OptionLink,
 	ReducerAction, StorageError, Tags, WeakCid,
@@ -80,7 +79,7 @@ pub enum StorageAction {
 	/// The first item is the parent the second is the children to be structurally referenced.
 	/// All unique children have their reference count increased by one (idempotent).
 	#[serde(rename = "s")]
-	ReferenceStructure(Vec<(Cid, BTreeSet<Cid>)>),
+	ReferenceStructure(Vec<(WeakCid, BTreeSet<WeakCid>)>),
 
 	/// Create [`Cid`] references with ref count of zero if the reference not exists yet.
 	/// This is normally used to track newly created blocks.
@@ -154,7 +153,7 @@ impl<S: BlockStorage + Clone + 'static> Reducer<StorageAction, S> for Storage {
 async fn reduce_reference_structure<S>(
 	storage: &S,
 	state: &mut Storage,
-	cids: impl Stream<Item = Result<(Cid, BTreeSet<Cid>), StorageError>>,
+	cids: impl Stream<Item = Result<(WeakCid, BTreeSet<WeakCid>), StorageError>>,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
@@ -172,8 +171,8 @@ where
 async fn reference_structure_cid<S>(
 	storage: &S,
 	blocks: &mut CoMapTransaction<S, WeakCid, BlockMetadata>,
-	parent: Cid,
-	children: BTreeSet<Cid>,
+	parent: WeakCid,
+	children: BTreeSet<WeakCid>,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
@@ -523,8 +522,7 @@ pub extern "C" fn state() {
 #[cfg(test)]
 mod tests {
 	use crate::StorageAction;
-	use cid::Cid;
-	use co_api::{BlockSerializer, ReducerAction};
+	use co_api::{BlockSerializer, ReducerAction, WeakCid};
 	use ipld_core::{ipld::Ipld, serde::to_ipld};
 	use std::collections::{BTreeMap, BTreeSet};
 
@@ -533,9 +531,9 @@ mod tests {
 		let cid1 = BlockSerializer::default().serialize(&1).unwrap().cid().clone();
 		let cid2 = BlockSerializer::default().serialize(&2).unwrap().cid().clone();
 		let cid3 = BlockSerializer::default().serialize(&2).unwrap().cid().clone();
-		let mut map = BTreeMap::<Cid, BTreeSet<Cid>>::new();
-		map.entry(cid1).or_default().insert(cid2);
-		map.entry(cid1).or_default().insert(cid3);
+		let mut map = BTreeMap::<WeakCid, BTreeSet<WeakCid>>::new();
+		map.entry(cid1.into()).or_default().insert(cid2.into());
+		map.entry(cid1.into()).or_default().insert(cid3.into());
 
 		// action
 		let action = StorageAction::ReferenceStructure(map.into_iter().collect());

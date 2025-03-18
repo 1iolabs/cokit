@@ -6,7 +6,7 @@ use crate::{
 use async_trait::async_trait;
 use cid::Cid;
 use co_core_storage::StorageAction;
-use co_primitives::{block_diff_added_with_parent, StoreParams};
+use co_primitives::{block_diff_added_with_parent, StoreParams, WeakCid};
 use co_storage::BlockStorage;
 use futures::{pin_mut, TryStreamExt};
 use std::{
@@ -65,7 +65,7 @@ where
 		}
 
 		// apply structural references
-		let mut references = BTreeMap::<Cid, BTreeSet<Cid>>::new();
+		let mut references = BTreeMap::<WeakCid, BTreeSet<WeakCid>>::new();
 		let mut references_count = 0;
 		pin_mut!(diff);
 		while let Some((next_parent, next)) = diff.try_next().await? {
@@ -75,7 +75,10 @@ where
 				let external_next_parent = self.reducer_context.to_external_cid(next_parent).await?;
 
 				// record
-				references.entry(external_next_parent).or_default().insert(external_next);
+				references
+					.entry(external_next_parent.into())
+					.or_default()
+					.insert(external_next.into());
 				references_count += 1;
 
 				// flush when we hit max block size
