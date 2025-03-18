@@ -157,15 +157,34 @@ impl SharedCoBuilder {
 		let encrypted_storage = storage.encrypted_storage().cloned();
 
 		// network
+		//  we want to layer the network storage before the encryption to we only send encrypted blocks over network
+		//  `BASE <- NETWORK <- ENCRYPTION``
 		let network_storage = if let Some(network) = &self.network {
+			// get base storage
+			let base_storage = if let Some(encrypted_storage) = storage.encrypted_storage() {
+				encrypted_storage.storage().clone()
+			} else {
+				storage.storage().clone()
+			};
+
+			// create network storage
 			let secret = self.secret().await?;
 			let peer_provider = self.build_peer_provider(network.clone(), identity.clone());
-			Some(self.build_network_storage(
-				peer_provider,
-				network.clone(),
-				secret.as_ref(),
-				storage.storage().clone(),
-			)?)
+			let network_storage =
+				self.build_network_storage(peer_provider, network.clone(), secret.as_ref(), base_storage)?;
+
+			// create encrypted storage which uses the network storage as base
+			// note: it uses the same mapping as the instance itrhout networking
+			let next_storage = if let Some(encrypted_storage) = storage.encrypted_storage() {
+				let mut encrypted_storage = encrypted_storage.clone();
+				encrypted_storage.set_storage(network_storage);
+				CoStorage::new(encrypted_storage)
+			} else {
+				network_storage
+			};
+
+			// result
+			Some(next_storage)
 		} else {
 			None
 		};
@@ -177,7 +196,7 @@ impl SharedCoBuilder {
 				None => storage.storage().clone(),
 			},
 			encrypted_storage: encrypted_storage.clone(),
-			network_storage: network_storage.clone(),
+			network_storage,
 			id: self.membership.id.clone(),
 		});
 
@@ -303,15 +322,24 @@ struct SharedContext {
 	id: CoId,
 
 	/// The base storage.
+	///
+	/// # Layers
+	/// `BASE`
 	storage: CoStorage,
 
 	/// The encrypted storage.
 	/// If encryption is enabled.
 	/// Note: Without networking!
+	///
+	/// # Layers
+	/// `BASE + ENCRYPTION`
 	encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
 
 	/// The networking storage.
 	/// If network is enabled.
+	///
+	/// # Layers
+	/// `BASE + NETWORK + ENCRYPTION`
 	network_storage: Option<CoStorage>,
 }
 impl SharedContext {

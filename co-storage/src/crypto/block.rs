@@ -302,6 +302,13 @@ impl EncryptedData {
 		}
 	}
 
+	pub fn blocks(&self) -> Option<&[Cid]> {
+		match self {
+			Self::Block(data) => Some(&data),
+			_ => None,
+		}
+	}
+
 	/// Fit [`EncryptedData`] into blocks.
 	///
 	/// If the [`EncryptedData`] doesn't fit into one block it will we splitted accordingly.
@@ -331,6 +338,29 @@ impl EncryptedData {
 		*self = Self::Block(extra_blocks.iter().map(|block| *block.cid()).collect());
 		extra_blocks
 	}
+
+	/// Try to inline using blocks. Returns Err if not possible because blocks are missing.
+	pub fn try_inline_blocks(&mut self, blocks: impl IntoIterator<Item = (Cid, Vec<u8>)>) -> Result<(), ()> {
+		match self {
+			Self::Inline(_) => Ok(()),
+			Self::Block(cids) => {
+				let mut blocks: BTreeMap<Cid, Vec<u8>> = blocks.into_iter().collect();
+				if !cids.iter().all(|cid| blocks.contains_key(cid)) {
+					return Err(());
+				}
+				let mut inline = Vec::new();
+				for cid in cids {
+					if let Some(mut block) = blocks.remove(cid) {
+						inline.append(&mut block);
+					} else {
+						return Err(());
+					}
+				}
+				*self = Self::Inline(inline);
+				Ok(())
+			},
+		}
+	}
 }
 
 /// Combines reference mappings and data into one structure.
@@ -356,10 +386,10 @@ impl BlockPayload {
 		&self.cid
 	}
 
-	/// Returns the payload.
-	pub fn data(&self) -> &[u8] {
-		&self.data
-	}
+	// /// Returns the payload.
+	// pub fn data(&self) -> &[u8] {
+	// 	&self.data
+	// }
 
 	/// Create plain bytes which contains the [`BlockPayload`] as DAG-CBOR.
 	pub fn to_bytes(&self) -> Result<Vec<u8>, anyhow::Error> {
@@ -560,8 +590,9 @@ impl KeySlot {
 #[cfg(test)]
 mod tests {
 	use super::{Algorithm, EncryptedBlock, Header, KeySlot};
-	use crate::crypto::secret::Secret;
-	use co_primitives::{from_cbor, to_cbor, BlockSerializer};
+	use crate::crypto::{block::EncryptedData, secret::Secret};
+	use cid::Cid;
+	use co_primitives::{from_cbor, to_cbor, Block, BlockSerializer, DefaultParams, KnownMultiCodec, StoreParams};
 	use std::iter::repeat;
 
 	#[test]
@@ -667,6 +698,41 @@ mod tests {
 		// decrypt
 		let decrypted_block = encrypted_block_deserialized.block(&secret).unwrap();
 		assert_eq!(decrypted_block.cid(), block.cid());
-		assert_eq!(decrypted_block.data(), block.data());
+		assert_eq!(&decrypted_block.data, block.data());
+	}
+
+	#[test]
+	fn test_fit_to_blocks() {
+		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
+		let data: Vec<u8> = repeat(0u8).take(DefaultParams::MAX_BLOCK_SIZE).collect();
+		let block = Block::<DefaultParams>::new_data(KnownMultiCodec::Raw, data);
+
+		//println!("cid: ({}): {}", block.cid().to_bytes().len(), block.cid()); // 36
+		//println!("data: ({}): {:?}", block.data().len(), block.data()); // 13
+
+		// encrypt
+		let mut encrypted_block = EncryptedBlock::encrypt(Algorithm::default(), &secret, block.clone()).unwrap();
+
+		// split
+		let encrypted_extra_blocks = encrypted_block
+			.payload
+			.fit_into_blocks::<DefaultParams>(Some(Header::encoded_size(Algorithm::default())));
+		assert!(match &encrypted_block.payload {
+			EncryptedData::Block(blocks) =>
+				blocks.iter().map(|c| *c).collect::<Vec<Cid>>()
+					== encrypted_extra_blocks.iter().map(|b| *b.cid()).collect::<Vec<Cid>>(),
+			_ => false,
+		});
+
+		// inline
+		encrypted_block
+			.payload
+			.try_inline_blocks(encrypted_extra_blocks.into_iter().map(|v| v.into_inner()))
+			.unwrap();
+
+		// decrypt
+		let decrypted_block = encrypted_block.block(&secret).unwrap();
+		assert_eq!(decrypted_block.cid(), block.cid());
+		assert_eq!(&decrypted_block.data, block.data());
 	}
 }

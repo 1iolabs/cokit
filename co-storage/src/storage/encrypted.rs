@@ -1,6 +1,6 @@
 use crate::{
 	crypto::{
-		block::{Algorithm, BlockPayload, EncryptedBlock, EncryptedData, Header, BLOCK_MULTICODEC},
+		block::{Algorithm, BlockPayload, EncryptedBlock, Header, BLOCK_MULTICODEC},
 		secret::Secret,
 	},
 	AlgorithmError, BlockStorageContentMapping, StorageError,
@@ -17,7 +17,10 @@ use futures::{
 	StreamExt, TryStreamExt,
 };
 use serde::Serialize;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	sync::Arc,
+};
 use tokio::sync::RwLock;
 
 #[derive(Debug, Clone)]
@@ -27,17 +30,29 @@ pub struct EncryptedBlockStorage<S> {
 	next: S,
 	mapping: EncryptedBlockStorageMapping,
 	links: BlockLinks,
+	reference_mode: EncryptionReferenceMode,
 }
 impl<S> EncryptedBlockStorage<S>
 where
 	S: BlockStorage + Clone + Send + Sync + 'static,
 {
 	pub fn new(next: S, key: Secret, algorithm: Algorithm, mapping: EncryptedBlockStorageMapping) -> Self {
-		Self { algorithm, key, mapping, next, links: Default::default() }
+		Self { algorithm, key, mapping, next, links: Default::default(), reference_mode: Default::default() }
 	}
 
+	pub fn with_encryption_reference_mode(mut self, mode: EncryptionReferenceMode) -> Self {
+		self.reference_mode = mode;
+		self
+	}
+
+	/// Get next storage.
 	pub fn storage(&self) -> &S {
 		&self.next
+	}
+
+	/// Set next storage.
+	pub fn set_storage(&mut self, next: S) {
+		self.next = next;
 	}
 
 	/// Load mapping from CID.
@@ -115,24 +130,22 @@ where
 				EncryptedBlock::try_from(self.next.get(&cid).await?).map_err(|e| StorageError::Internal(e.into()))?;
 
 			// make inline
-			block.payload = match block.payload {
-				EncryptedData::Inline(data) => EncryptedData::Inline(data),
-				EncryptedData::Block(cids) => {
-					let data = stream::iter(cids)
-						.map(|cid| {
-							let next = self.next.clone();
-							async move { next.get(&cid).await }
-						})
-						.buffered(10)
-						.try_fold(Vec::new(), |mut result, block| async {
-							let (_, mut partial_data) = block.into_inner();
-							result.append(&mut partial_data);
-							Ok(result)
-						})
-						.await?;
-					EncryptedData::Inline(data)
-				},
-			};
+			if let Some(blocks) = block.payload.blocks() {
+				let blocks = stream::iter(blocks.into_iter().cloned())
+					.map(|cid| {
+						let next = self.next.clone();
+						async move { next.get(&cid).await }
+					})
+					.buffered(10)
+					.try_collect::<Vec<_>>()
+					.await?
+					.into_iter()
+					.map(|block| block.into_inner());
+				block
+					.payload
+					.try_inline_blocks(blocks)
+					.map_err(|_| StorageError::Internal(anyhow!("Inline blocks failed")))?;
+			}
 
 			// decrypt
 			let plain = block.block(&self.key).map_err(|e| StorageError::Internal(e.into()))?;
@@ -206,18 +219,43 @@ where
 		let cid = *block.cid();
 
 		// references
+		//  try to resolve all children references using the mapping
+		//   the node creator has either:
+		//    the mapping from loading the original node before
+		//    all children nodes as he created it from sratch
+		//  as a fallback check if the Cid exists in the parent so we know this is a unencrypted reference
+		//  TODO: are there any valid cases for not unencrypted and not known reference?
 		let references = if self.links.has_links(&cid) {
 			let mapping = self.mapping.mapping.read().await;
 			let mut references = BTreeMap::new();
 			for plain_cid in self.links.links(&block)? {
-				let encrypted_cid = mapping.get(&plain_cid).ok_or_else(|| {
-					StorageError::InvalidArgument(anyhow!(
-						"No mapping found for children {} while storing {}. Are you sure you stored all children nodes?",
+				match mapping.get(&plain_cid) {
+					// reference mapping
+					Some(encrypted_cid) => {
+						references.insert(plain_cid, encrypted_cid);
+					},
+					// encrypted block reference in plain data
+					None if KnownMultiCodec::CoEncryptedBlock == plain_cid.codec() => {},
+					// reference mode
+					None => {
+						if !match &self.reference_mode {
+							EncryptionReferenceMode::DisallowPlain => false,
+							EncryptionReferenceMode::DisallowPlainExcept(allowed) => allowed.contains(&plain_cid),
+							EncryptionReferenceMode::AllowPlain => true,
+							EncryptionReferenceMode::AllowPlainIfExists => self.next.stat(&plain_cid).await.is_ok(),
+							EncryptionReferenceMode::Warning => {
+								tracing::warn!(?plain_cid, ?cid, "encrypted-storage-plain-reference");
+								true
+							},
+						} {
+							return Err(StorageError::InvalidArgument(anyhow!(
+								"Plain reference found {} while storing {}. Are you sure you stored all children nodes?",
 						plain_cid,
 						cid
-					))
-				})?;
-				references.insert(plain_cid, encrypted_cid);
+							)));
+						}
+					},
+				};
 			}
 			references
 		} else {
@@ -265,6 +303,41 @@ where
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		self.get(cid).await.map(|v| BlockStat { size: v.data().len() as u64 })
 	}
+}
+
+#[derive(Debug, Default, Clone)]
+pub enum EncryptionReferenceMode {
+	/// Disallow any references that are not encrypted.
+	/// Allowed references:
+	/// - Plain: NO
+	/// - Unrelated encrypted: YES
+	#[default]
+	DisallowPlain,
+
+	/// Disallow any references that are not encrypted except specific plain references.
+	/// Unrelated encrypted references are allowed.
+	/// Allowed references:
+	/// - Plain: SPECIFIC
+	/// - Unrelated encrypted: YES
+	DisallowPlainExcept(BTreeSet<Cid>),
+
+	/// Allow any plain references.
+	/// Allowed references:
+	/// - Plain: YES
+	/// - Unrelated encrypted: YES
+	AllowPlain,
+
+	/// Allow any plain references if the exists in parent storage.
+	/// Allowed references:
+	/// - Plain: IF EXISTS
+	/// - Unrelated encrypted: YES
+	AllowPlainIfExists,
+
+	/// Allow any plain references but warn (log) about unencrypted references.
+	/// Allowed references:
+	/// - Plain: YES, WITH WARNING
+	/// - Unrelated encrypted: YES
+	Warning,
 }
 
 #[derive(Debug, Clone, Default)]

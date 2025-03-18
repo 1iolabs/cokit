@@ -48,7 +48,7 @@ pub enum StorageError {
 
 	/// Invalid argument passes to call or storage configuration.
 	/// This is not be retriable with same parameters.
-	#[error("Invalid argument")]
+	#[error("Invalid storage argument")]
 	InvalidArgument(#[source] anyhow::Error),
 }
 impl From<MultiCodecError> for StorageError {

@@ -26,7 +26,7 @@ use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
 use co_primitives::{tags, DefaultParams, Did, KnownMultiCodec, MultiCodec};
 use co_runtime::RuntimePool;
-use co_storage::{BlockStorage, EncryptedBlockStorage, StorageError};
+use co_storage::{BlockStorage, EncryptedBlockStorage, EncryptionReferenceMode, StorageError};
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -154,7 +154,7 @@ where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
 	{
 		// create storage
-		let encrypted_storage: EncryptedBlockStorage<CoStorage> = create_encrypted_storage(storage, key).await?;
+		let encrypted_storage: EncryptedBlockStorage<CoStorage> = create_encrypted_storage(storage, key, true).await?;
 		let storage = CoStorage::new(encrypted_storage.clone());
 
 		// create log
@@ -390,11 +390,24 @@ where
 async fn create_encrypted_storage<S>(
 	storage: S,
 	key: Box<dyn LocalSecret + Send + Sync + 'static>,
+	disallow_plain: bool,
 ) -> Result<EncryptedBlockStorage<S>, anyhow::Error>
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
-	Ok(EncryptedBlockStorage::new(storage.clone(), key.fetch().await?.into(), Default::default(), Default::default()))
+	// we have plain references as we may have unencrypted shared COs but all references to it should be Weak.
+	let reference_mode = if disallow_plain {
+		let builtin_cores = Cores::default()
+			.built_in_native_mapping()
+			.into_iter()
+			.map(|(cid, _)| cid)
+			.collect();
+		EncryptionReferenceMode::DisallowPlainExcept(builtin_cores)
+	} else {
+		EncryptionReferenceMode::Warning
+	};
+	Ok(EncryptedBlockStorage::new(storage.clone(), key.fetch().await?.into(), Default::default(), Default::default())
+		.with_encryption_reference_mode(reference_mode))
 }
 
 /// Setup the Local CO by adding cores.

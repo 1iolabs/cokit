@@ -15,7 +15,7 @@ use crate::{
 	},
 	services::{application::ApplicationMessage, connections::ConnectionMessage, network::CoNetworkTaskSpawner},
 	types::{co_reducer::CoReducerContext, co_reducer_factory::CoReducerFactoryError},
-	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime, TaskSpawner,
+	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, LocalCoBuilder, Runtime, TaskSpawner,
 	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
@@ -27,7 +27,7 @@ use co_identity::{
 };
 use co_log::EntryBlock;
 use co_primitives::{CoId, Did, Tags};
-use co_storage::{BlockStorage, ChangeBlockStorage, EncryptedBlockStorage, StorageError};
+use co_storage::{BlockStorage, ChangeBlockStorage, EncryptedBlockStorage, EncryptionReferenceMode, StorageError};
 use futures::{Stream, TryStreamExt};
 use std::{
 	collections::{BTreeMap, VecDeque},
@@ -729,8 +729,14 @@ impl ReducerStorage {
 		let secret = builder.secret().await?;
 		Ok(match secret {
 			Some(secret) => {
+				let builtin_cores = Cores::default()
+					.built_in_native_mapping()
+					.into_iter()
+					.map(|(cid, _)| cid)
+					.collect();
 				let encrypted_storage =
-					EncryptedBlockStorage::new(storage.clone(), secret.into(), Default::default(), Default::default());
+					EncryptedBlockStorage::new(storage.clone(), secret.into(), Default::default(), Default::default())
+						.with_encryption_reference_mode(EncryptionReferenceMode::DisallowPlainExcept(builtin_cores));
 				for state in membership.state {
 					if let Some(encryption_mapping) = &state.encryption_mapping {
 						encrypted_storage.load_mapping(encryption_mapping).await?;

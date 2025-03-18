@@ -18,7 +18,7 @@ pub use library::{
 };
 pub use storage::{
 	change::{BlockStorageChange, ChangeBlockStorage},
-	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping},
+	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping, EncryptionReferenceMode},
 	fs::FsStorage,
 	mapped::MappedBlockStorage,
 	memory::{MemoryBlockStorage, MemoryStorage},
