@@ -12,6 +12,7 @@ pub use crypto::{
 };
 pub use library::{
 	node_reader::node_reader,
+	tmp_dir::TmpDir,
 	unixfs::{unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer},
 	unixfs_add_file::unixfs_add_file,
 	unixfs_stream::unixfs_stream,

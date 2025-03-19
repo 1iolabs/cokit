@@ -650,11 +650,9 @@ impl ApplicationLocal {
 
 #[cfg(test)]
 mod tests {
-	use crate::{
-		library::locals::{ApplicationLocal, FileLocals, Locals},
-		TmpDir,
-	};
+	use crate::library::locals::{ApplicationLocal, FileLocals, Locals};
 	use co_primitives::BlockSerializer;
+	use co_storage::TmpDir;
 
 	#[tokio::test]
 	async fn test_file_locals_overwrite() {

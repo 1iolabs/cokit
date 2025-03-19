@@ -3,8 +3,9 @@ use co_core_file::{File, FileAction, FolderNode, Node};
 use co_core_membership::Memberships;
 use co_sdk::{
 	state, tags, AbsolutePath, ApplicationBuilder, CoId, CoReducer, CoReducerFactory, Cores, CreateCo, DidKeyIdentity,
-	DidKeyProvider, Identity, TmpDir, CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	DidKeyProvider, Identity, CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
+use co_storage::TmpDir;
 use futures::StreamExt;
 use std::{
 	collections::{BTreeMap, BTreeSet},
