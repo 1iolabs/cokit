@@ -1,7 +1,7 @@
 use crate::{BlockStat, BlockStorage, StorageError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, StoreParams};
+use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, StoreParams};
 use std::marker::PhantomData;
 
 /// This storage implementation converts block storeparams.
@@ -54,5 +54,14 @@ where
 
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		self.next.stat(cid).await
+	}
+}
+impl<S, P> CloneWithBlockStorageSettings for StoreParamsBlockStorage<S, P>
+where
+	S: BlockStorage + CloneWithBlockStorageSettings,
+	P: Clone,
+{
+	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+		Self { next: self.next.clone_with_settings(settings), checked: self.checked, _p: Default::default() }
 	}
 }

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStat, BlockStorage, StorageError};
+use co_primitives::{Block, BlockStat, BlockStorage, CloneWithBlockStorageSettings, StorageError};
 use futures::lock::Mutex;
 use std::{collections::HashSet, mem::swap, sync::Arc};
 
@@ -70,6 +70,14 @@ where
 
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		Ok(self.next.stat(cid).await?)
+	}
+}
+impl<S> CloneWithBlockStorageSettings for ChangeBlockStorage<S>
+where
+	S: BlockStorage + CloneWithBlockStorageSettings + 'static,
+{
+	fn clone_with_settings(&self, settings: co_primitives::BlockStorageSettings) -> Self {
+		Self { next: self.next.clone_with_settings(settings), changes: self.changes.clone() }
 	}
 }
 

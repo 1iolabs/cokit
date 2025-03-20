@@ -9,8 +9,9 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{
-	from_cbor, Block, BlockLinks, BlockStat, BlockStorage, DefaultNodeSerializer, KnownMultiCodec, Link, MultiCodec,
-	Node, NodeBuilder, NodeBuilderError, NodeSerializer, StoreParams,
+	from_cbor, Block, BlockLinks, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings,
+	DefaultNodeSerializer, KnownMultiCodec, Link, MultiCodec, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
+	StoreParams,
 };
 use futures::{
 	stream::{self, FuturesOrdered},
@@ -300,6 +301,45 @@ where
 		self.get(cid).await.map(|v| BlockStat { size: v.data().len() as u64 })
 	}
 }
+impl<S> CloneWithBlockStorageSettings for EncryptedBlockStorage<S>
+where
+	S: CloneWithBlockStorageSettings,
+{
+	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+		EncryptedBlockStorage {
+			key: self.key.clone(),
+			algorithm: self.algorithm.clone(),
+			links: self.links.clone(),
+			reference_mode: self.reference_mode.clone(),
+			mapping: if settings.detached { self.mapping.child() } else { self.mapping.clone() },
+			next: self.next.clone_with_settings(settings),
+		}
+	}
+}
+// #[async_trait]
+// impl<S> TransactionBlockStorage for EncryptedBlockStorage<S>
+// where
+// 	S: TransactionBlockStorage + 'static,
+// {
+// 	// async fn flush(&self) -> Result<(), StorageError> {
+// 	// 	self.next.flush().await
+// 	// }
+
+// 	fn transaction(
+// 		&self,
+// 		settings: TransactionBlockStorageSettings,
+// 	) -> Arc<dyn TransactionBlockStorage<StoreParams = S::StoreParams>> {
+// 		let storage = EncryptedBlockStorage {
+// 			key: self.key.clone(),
+// 			algorithm: self.algorithm.clone(),
+// 			next: self.next.transaction(settings),
+// 			mapping: self.mapping.child(),
+// 			links: self.links.clone(),
+// 			reference_mode: self.reference_mode.clone(),
+// 		};
+// 		Arc::new(storage) as Arc<dyn TransactionBlockStorage<StoreParams = Self::StoreParams>>
+// 	}
+// }
 
 #[derive(Debug, Default, Clone)]
 pub enum EncryptionReferenceMode {
@@ -338,9 +378,15 @@ pub enum EncryptionReferenceMode {
 
 #[derive(Debug, Clone, Default)]
 pub struct EncryptedBlockStorageMapping {
+	parent: Option<Arc<RwLock<BlockMapping>>>,
 	mapping: Arc<RwLock<BlockMapping>>,
 }
 impl EncryptedBlockStorageMapping {
+	/// Create a child instance.
+	fn child(&self) -> EncryptedBlockStorageMapping {
+		EncryptedBlockStorageMapping { parent: Some(self.mapping.clone()), mapping: Default::default() }
+	}
+
 	/// Load mapping from CID.
 	/// This will add the mappings to the existing.
 	pub async fn load_mapping<S>(&self, storage: &EncryptedBlockStorage<S>, map: &Cid) -> Result<(), StorageError>
@@ -352,7 +398,29 @@ impl EncryptedBlockStorageMapping {
 	}
 
 	pub async fn get(&self, key: &Cid) -> Option<Cid> {
-		self.mapping.read().await.get(key)
+		match self.mapping.read().await.get(key) {
+			Some(cid) => Some(cid),
+			None => {
+				if let Some(parent) = &self.parent {
+					parent.read().await.get(key)
+				} else {
+					None
+				}
+			},
+		}
+	}
+
+	pub async fn get_first_by_value(&self, key: &Cid) -> Option<Cid> {
+		match self.mapping.read().await.get_first_by_value(key) {
+			Some(cid) => Some(cid),
+			None => {
+				if let Some(parent) = &self.parent {
+					parent.read().await.get_first_by_value(key)
+				} else {
+					None
+				}
+			},
+		}
 	}
 
 	pub async fn insert(&mut self, key: Cid, value: Cid) -> Option<Cid> {
@@ -363,12 +431,12 @@ impl EncryptedBlockStorageMapping {
 impl BlockStorageContentMapping for EncryptedBlockStorageMapping {
 	/// Convert the mapped [`Cid`] to an plain storage [`Cid`].
 	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
-		self.mapping.read().await.get(mapped)
+		self.get(mapped).await
 	}
 
 	/// Convert the plain storage [`Cid`] to a mapped [`Cid`].
 	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
-		self.mapping.read().await.get_first_by_value(plain)
+		self.get_first_by_value(plain).await
 	}
 }
 

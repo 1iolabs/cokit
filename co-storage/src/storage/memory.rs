@@ -2,7 +2,10 @@ use crate::types::storage::Storage;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStat, BlockStorage, DefaultParams, StorageError, StoreParams};
+use co_primitives::{
+	Block, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, DefaultParams, StorageError,
+	StoreParams,
+};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
 
@@ -144,6 +147,14 @@ where
 			.get(cid)
 			.map(|r| BlockStat { size: r.block.data().len() as u64 })
 			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")))
+	}
+}
+impl<P> CloneWithBlockStorageSettings for MemoryBlockStorage<P>
+where
+	P: StoreParams,
+{
+	fn clone_with_settings(&self, _settings: BlockStorageSettings) -> Self {
+		self.clone()
 	}
 }
 

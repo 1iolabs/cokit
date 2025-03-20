@@ -2,9 +2,12 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseBackPressureStream, ResponseStream, TaskSpawner};
-use co_primitives::{Block, BlockStat, BlockStorage, StorageError, StoreParams, Tags};
+use co_primitives::{
+	Block, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, StorageError, StoreParams,
+	Tags,
+};
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
-use std::{collections::HashMap, marker::PhantomData, mem::swap};
+use std::{collections::HashMap, mem::swap};
 
 /// Overlay storage which buffers changes into memory or tmp storage if `blocks_max_memory` is hit.
 #[derive(Debug, Clone)]
@@ -13,7 +16,10 @@ where
 	S: BlockStorage + 'static,
 {
 	handle: ActorHandle<OverlayBlockMessage<S::StoreParams>>,
-	_tmp: PhantomData<T>,
+
+	// remember for clone_with_settings
+	actor: OverlayBlocksActor<S, T>,
+	blocks_max_memory: usize,
 }
 impl<S, T> OverlayBlockStorage<S, T>
 where
@@ -22,14 +28,10 @@ where
 {
 	/// Create overlay storage.
 	pub fn new(spawner: TaskSpawner, next: S, tmp: T, blocks_max_memory: usize, skip_already_existing: bool) -> Self {
-		let actor = Actor::spawn_with(
-			spawner.clone(),
-			Default::default(),
-			OverlayBlocksActor { blocks_tmp: tmp, next, spawner, skip_already_existing },
-			blocks_max_memory,
-		)
-		.expect("OverlayBlocksActor to spwan");
-		Self { handle: actor.handle(), _tmp: Default::default() }
+		let actor = OverlayBlocksActor { blocks_tmp: tmp, next, spawner, skip_already_existing };
+		let instance = Actor::spawn_with(actor.spawner.clone(), Default::default(), actor.clone(), blocks_max_memory)
+			.expect("OverlayBlocksActor to spwan");
+		Self { handle: instance.handle(), actor, blocks_max_memory }
 	}
 
 	/// Consume and flush all changes to `to`.
@@ -110,6 +112,24 @@ where
 			.map_err(|err| StorageError::Internal(err.into()))??)
 	}
 }
+impl<S, T> CloneWithBlockStorageSettings for OverlayBlockStorage<S, T>
+where
+	S: BlockStorage + CloneWithBlockStorageSettings + 'static,
+	T: BlockStorage<StoreParams = S::StoreParams> + Clone + 'static,
+{
+	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+		let actor = OverlayBlocksActor {
+			blocks_tmp: self.actor.blocks_tmp.clone(),
+			next: self.actor.next.clone_with_settings(settings),
+			spawner: self.actor.spawner.clone(),
+			skip_already_existing: self.actor.skip_already_existing,
+		};
+		let instance =
+			Actor::spawn_with(self.actor.spawner.clone(), Default::default(), actor.clone(), self.blocks_max_memory)
+				.expect("OverlayBlocksActor to spawn");
+		Self { handle: instance.handle(), blocks_max_memory: self.blocks_max_memory, actor }
+	}
+}
 
 #[derive(Debug, Default)]
 pub struct OverlayBlocks {
@@ -123,6 +143,7 @@ pub struct OverlayBlocks {
 	blocks_max_memory: usize,
 }
 
+#[derive(Debug, Clone)]
 struct OverlayBlocksActor<S, T> {
 	/// Base storage.
 	next: S,

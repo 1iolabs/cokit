@@ -1,18 +1,18 @@
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, DefaultParams};
+use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, DefaultParams};
 use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
 use std::{fmt::Debug, sync::Arc};
 
 /// Public storage API.
 #[derive(Clone)]
 pub struct CoStorage {
-	inner: Arc<dyn BlockStorage<StoreParams = DefaultParams> + Send + Sync>,
+	inner: Arc<dyn CoStorageBlockStorage<StoreParams = DefaultParams>>,
 }
 impl CoStorage {
 	pub fn new<S>(storage: S) -> Self
 	where
-		S: BlockStorage<StoreParams = DefaultParams> + Send + Sync + 'static,
+		S: BlockStorage<StoreParams = DefaultParams> + CloneWithBlockStorageSettings + 'static,
 	{
 		Self { inner: Arc::new(storage) }
 	}
@@ -47,6 +47,46 @@ impl BlockStorage for CoStorage {
 		self.inner.stat(cid).await
 	}
 }
+impl CloneWithBlockStorageSettings for CoStorage {
+	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+		CoStorage { inner: self.inner.clone_arc_with_settings(settings) }
+	}
+}
+
+trait CoStorageBlockStorage: BlockStorage + CloneArcWithSettings {}
+impl<T> CoStorageBlockStorage for T where T: BlockStorage + CloneArcWithSettings {}
+
+trait CloneArcWithSettings {
+	fn clone_arc_with_settings(
+		&self,
+		settings: BlockStorageSettings,
+	) -> Arc<dyn CoStorageBlockStorage<StoreParams = DefaultParams> + 'static>;
+}
+impl<T> CloneArcWithSettings for T
+where
+	T: BlockStorage<StoreParams = DefaultParams> + CloneWithBlockStorageSettings + 'static,
+{
+	fn clone_arc_with_settings(
+		&self,
+		settings: BlockStorageSettings,
+	) -> Arc<dyn CoStorageBlockStorage<StoreParams = DefaultParams> + 'static> {
+		Arc::new(self.clone_with_settings(settings))
+	}
+}
+
+// #[async_trait]
+// impl TransactionBlockStorage for CoStorage {
+// 	// async fn flush(&self) -> Result<(), StorageError> {
+// 	// 	self.inner.flush().await
+// 	// }
+
+// 	fn transaction(
+// 		&self,
+// 		settings: TransactionBlockStorageSettings,
+// 	) -> Arc<(dyn TransactionBlockStorage<StoreParams = DefaultParams>)> {
+// 		self.inner.transaction(settings)
+// 	}
+// }
 
 #[derive(Clone)]
 pub struct CoBlockStorageContentMapping {

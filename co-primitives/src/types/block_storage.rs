@@ -29,6 +29,72 @@ pub trait BlockStorage: Send + Sync {
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError>;
 }
 
+// /// BlockStorage which supports transactions.
+// /// TODO: rename to session?
+// #[async_trait]
+// pub trait TransactionBlockStorage: BlockStorage {
+// 	/// Start a transaction.
+// 	fn transaction(
+// 		&self,
+// 		settings: TransactionBlockStorageSettings,
+// 	) -> Arc<dyn TransactionBlockStorage<StoreParams = <Self as BlockStorage>::StoreParams>>;
+
+// 	// /// Make sure all changes has been written.
+// 	// async fn flush(&self) -> Result<(), StorageError> {
+// 	// 	Ok(())
+// 	// }
+// }
+
+pub trait CloneWithBlockStorageSettings: Clone {
+	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self;
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct BlockStorageSettings {
+	/// Do not allow to use networking in the clone.
+	pub disallow_networking: bool,
+
+	/// Detach as child instance from the parent.
+	pub detached: bool,
+}
+impl BlockStorageSettings {
+	pub fn new() -> Self {
+		Default::default()
+	}
+
+	pub fn without_networking(mut self) -> Self {
+		self.disallow_networking = true;
+		self
+	}
+
+	pub fn with_detached(mut self) -> Self {
+		self.detached = true;
+		self
+	}
+}
+
+// #[async_trait]
+// pub trait BlockStorageTransaction<S>: Send + Sync
+// where
+// 	S: BlockStorage,
+// {
+// 	/// Returns a block from storage.
+// 	async fn get(&self, cid: &Cid) -> Result<Block<S::StoreParams>, StorageError>;
+
+// 	/// Inserts a block into storage.
+// 	async fn set(&self, block: Block<S::StoreParams>) -> Result<Cid, StorageError>;
+
+// 	/// Stat a block.
+// 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError>;
+
+// 	/// Remove a block.
+// 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError>;
+
+// 	/// Commit the transaction.
+// 	#[must_use]
+// 	async fn commit(self, rollback: bool) -> Result<(), StorageError>;
+// }
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BlockStat {
 	pub size: u64,

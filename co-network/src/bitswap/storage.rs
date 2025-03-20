@@ -4,7 +4,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::Block;
+use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings};
 use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
 use futures::{channel::oneshot, pin_mut};
 use libp2p::{
@@ -125,8 +125,8 @@ impl<S, B, C, N, P> BlockStorage for NetworkBlockStorage<S, B, C, N, P>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
 	B: NetworkBehaviour + BitswapBehaviourProvider,
-	P: PeerProvider + Send + Sync + 'static,
-	N: NetworkTaskSpawner<B, C> + Send + Sync + 'static,
+	P: PeerProvider + Clone + Send + Sync + 'static,
+	N: NetworkTaskSpawner<B, C> + Clone + Send + Sync + 'static,
 {
 	type StoreParams = S::StoreParams;
 
@@ -165,6 +165,25 @@ where
 				self.next.stat(cid).await
 			},
 			result => result,
+		}
+	}
+}
+impl<S, B, C, N, P> CloneWithBlockStorageSettings for NetworkBlockStorage<S, B, C, N, P>
+where
+	S: CloneWithBlockStorageSettings,
+	P: Clone,
+	N: Clone,
+{
+	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+		Self {
+			next: self.next.clone_with_settings(settings),
+			spawner: self.spawner.clone(),
+			peer_provider: self.peer_provider.clone(),
+			mapping: self.mapping.clone(),
+			timeout: self.timeout.clone(),
+			tokens: self.tokens.clone(),
+			_behaviour: Default::default(),
+			_context: Default::default(),
 		}
 	}
 }

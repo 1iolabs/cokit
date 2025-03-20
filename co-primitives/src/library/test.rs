@@ -1,4 +1,4 @@
-use crate::{Block, BlockStorage, DefaultParams, StorageError};
+use crate::{Block, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, DefaultParams, StorageError};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
@@ -29,5 +29,10 @@ impl BlockStorage for TestStorage {
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
 		self.items.lock().await.remove(cid);
 		Ok(())
+	}
+}
+impl CloneWithBlockStorageSettings for TestStorage {
+	fn clone_with_settings(&self, _settings: BlockStorageSettings) -> Self {
+		self.clone()
 	}
 }

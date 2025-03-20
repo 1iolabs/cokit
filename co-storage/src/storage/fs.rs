@@ -2,7 +2,10 @@ use crate::Storage;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStat, BlockStorage, DefaultParams, StorageError, StoreParams};
+use co_primitives::{
+	Block, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, DefaultParams, StorageError,
+	StoreParams,
+};
 use std::{
 	fs::OpenOptions,
 	io::{ErrorKind, Write},
@@ -223,6 +226,11 @@ impl BlockStorage for FsStorage {
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		let path = to_cid_path(&self.path, cid, "");
 		into_storage_result(cid, tokio::fs::metadata(&path).await.map(|v| BlockStat { size: v.size() }))
+	}
+}
+impl CloneWithBlockStorageSettings for FsStorage {
+	fn clone_with_settings(&self, _settings: BlockStorageSettings) -> Self {
+		self.clone()
 	}
 }
 
