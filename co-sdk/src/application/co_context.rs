@@ -736,7 +736,7 @@ impl ReducerStorage {
 					.collect();
 				let encrypted_storage =
 					EncryptedBlockStorage::new(storage.clone(), secret.into(), Default::default(), Default::default())
-						.with_encryption_reference_mode(EncryptionReferenceMode::DisallowPlainExcept(builtin_cores));
+						.with_encryption_reference_mode(EncryptionReferenceMode::DisallowExcept(builtin_cores));
 				for state in membership.state {
 					if let Some(encryption_mapping) = &state.encryption_mapping {
 						encrypted_storage.load_mapping(encryption_mapping).await?;

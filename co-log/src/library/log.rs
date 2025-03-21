@@ -50,6 +50,10 @@ impl<S> Log<S> {
 		&self.entry_store
 	}
 
+	pub fn set_storage(&mut self, storage: S) {
+		self.entry_store = storage;
+	}
+
 	/// Test if the logs currently knowns about the entry id.
 	/// Note: This is not an complete view and only represents loaded/joined entries.
 	pub fn contains(&self, cid: &Cid) -> bool {

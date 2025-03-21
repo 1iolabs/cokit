@@ -235,21 +235,10 @@ where
 					Some(encrypted_cid) => {
 						references.insert(plain_cid, encrypted_cid);
 					},
-					// encrypted block reference in plain data
-					None if KnownMultiCodec::CoEncryptedBlock == plain_cid.codec() => {},
 					// reference mode
 					None => {
-						if !match &self.reference_mode {
-							EncryptionReferenceMode::DisallowPlain => false,
-							EncryptionReferenceMode::DisallowPlainExcept(allowed) => allowed.contains(&plain_cid),
-							EncryptionReferenceMode::AllowPlain => true,
-							EncryptionReferenceMode::AllowPlainIfExists => self.next.stat(&plain_cid).await.is_ok(),
-							EncryptionReferenceMode::Warning => {
-								tracing::warn!(?plain_cid, ?cid, "encrypted-storage-plain-reference");
-								true
-							},
-						} {
-							return Err(StorageError::InvalidArgument(anyhow!("Plain reference found {} while storing {}. Are you sure you stored all children nodes?", plain_cid, cid)));
+						if !self.reference_mode.is_reference_allowed(&self.next, plain_cid, cid).await {
+							return Err(StorageError::InvalidArgument(anyhow!("Unmapped reference found {} while storing {}. Are you sure you stored all children nodes?", plain_cid, cid)));
 						}
 					},
 				};
@@ -316,30 +305,6 @@ where
 		}
 	}
 }
-// #[async_trait]
-// impl<S> TransactionBlockStorage for EncryptedBlockStorage<S>
-// where
-// 	S: TransactionBlockStorage + 'static,
-// {
-// 	// async fn flush(&self) -> Result<(), StorageError> {
-// 	// 	self.next.flush().await
-// 	// }
-
-// 	fn transaction(
-// 		&self,
-// 		settings: TransactionBlockStorageSettings,
-// 	) -> Arc<dyn TransactionBlockStorage<StoreParams = S::StoreParams>> {
-// 		let storage = EncryptedBlockStorage {
-// 			key: self.key.clone(),
-// 			algorithm: self.algorithm.clone(),
-// 			next: self.next.transaction(settings),
-// 			mapping: self.mapping.child(),
-// 			links: self.links.clone(),
-// 			reference_mode: self.reference_mode.clone(),
-// 		};
-// 		Arc::new(storage) as Arc<dyn TransactionBlockStorage<StoreParams = Self::StoreParams>>
-// 	}
-// }
 
 #[derive(Debug, Default, Clone)]
 pub enum EncryptionReferenceMode {
@@ -356,6 +321,12 @@ pub enum EncryptionReferenceMode {
 	/// - Plain: SPECIFIC
 	/// - Unrelated encrypted: YES
 	DisallowPlainExcept(BTreeSet<Cid>),
+
+	/// Disallow any references that are not encrypted except specific references.
+	/// Allowed references:
+	/// - Plain: SPECIFIC
+	/// - Unrelated encrypted: SPECIFIC
+	DisallowExcept(BTreeSet<Cid>),
 
 	/// Allow any plain references.
 	/// Allowed references:
@@ -374,6 +345,32 @@ pub enum EncryptionReferenceMode {
 	/// - Plain: YES, WITH WARNING
 	/// - Unrelated encrypted: YES
 	Warning,
+}
+impl EncryptionReferenceMode {
+	pub async fn is_reference_allowed<S>(&self, next: &S, reference: Cid, parent: Cid) -> bool
+	where
+		S: BlockStorage,
+	{
+		// encrypted block reference in plain data
+		let is_unreleated_encrypted = KnownMultiCodec::CoEncryptedBlock == reference.codec();
+
+		// evaluate
+		match &self {
+			EncryptionReferenceMode::DisallowPlain => is_unreleated_encrypted,
+			EncryptionReferenceMode::DisallowPlainExcept(allowed) => {
+				is_unreleated_encrypted || allowed.contains(&reference)
+			},
+			EncryptionReferenceMode::DisallowExcept(allowed) => allowed.contains(&reference),
+			EncryptionReferenceMode::AllowPlain => true,
+			EncryptionReferenceMode::AllowPlainIfExists => {
+				is_unreleated_encrypted || next.stat(&reference).await.is_ok()
+			},
+			EncryptionReferenceMode::Warning => {
+				tracing::warn!(mapped_cid = ?reference, cid = ?parent, "encrypted-storage-unmapped-reference");
+				true
+			},
+		}
+	}
 }
 
 #[derive(Debug, Clone, Default)]

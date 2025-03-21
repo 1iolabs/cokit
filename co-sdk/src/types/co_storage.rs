@@ -74,20 +74,6 @@ where
 	}
 }
 
-// #[async_trait]
-// impl TransactionBlockStorage for CoStorage {
-// 	// async fn flush(&self) -> Result<(), StorageError> {
-// 	// 	self.inner.flush().await
-// 	// }
-
-// 	fn transaction(
-// 		&self,
-// 		settings: TransactionBlockStorageSettings,
-// 	) -> Arc<(dyn TransactionBlockStorage<StoreParams = DefaultParams>)> {
-// 		self.inner.transaction(settings)
-// 	}
-// }
-
 #[derive(Clone)]
 pub struct CoBlockStorageContentMapping {
 	inner: Arc<dyn BlockStorageContentMapping + Send + Sync + 'static>,

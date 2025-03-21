@@ -24,6 +24,7 @@ pub struct NetworkBlockStorage<S, B, C, N, P> {
 	mapping: Option<Arc<dyn BlockStorageContentMapping + Send + Sync + 'static>>,
 	timeout: Duration,
 	tokens: Vec<Token>,
+	settings: BlockStorageSettings,
 }
 impl<S, B, C, N, P> NetworkBlockStorage<S, B, C, N, P>
 where
@@ -42,6 +43,7 @@ where
 			tokens: Default::default(),
 			_behaviour: Default::default(),
 			_context: Default::default(),
+			settings: Default::default(),
 		}
 	}
 
@@ -115,6 +117,7 @@ where
 			mapping: self.mapping.clone(),
 			timeout: self.timeout.clone(),
 			tokens: self.tokens.clone(),
+			settings: self.settings.clone(),
 			_behaviour: Default::default(),
 			_context: Default::default(),
 		}
@@ -135,7 +138,7 @@ where
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		match self.next.get(cid).await {
 			Ok(block) => Ok(block),
-			Err(StorageError::NotFound(_, _)) => {
+			Err(StorageError::NotFound(_, _)) if !self.settings.disallow_networking => {
 				self.get_network(*cid).await?;
 				self.next.get(cid).await
 			},
@@ -160,7 +163,7 @@ where
 	#[tracing::instrument(err, skip(self))]
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		match self.next.stat(cid).await {
-			Err(StorageError::NotFound(_, _)) => {
+			Err(StorageError::NotFound(_, _)) if !self.settings.disallow_networking => {
 				self.get_network(*cid).await?;
 				self.next.stat(cid).await
 			},
@@ -176,12 +179,13 @@ where
 {
 	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
 		Self {
-			next: self.next.clone_with_settings(settings),
+			next: self.next.clone_with_settings(settings.clone()),
 			spawner: self.spawner.clone(),
 			peer_provider: self.peer_provider.clone(),
 			mapping: self.mapping.clone(),
 			timeout: self.timeout.clone(),
 			tokens: self.tokens.clone(),
+			settings,
 			_behaviour: Default::default(),
 			_context: Default::default(),
 		}
