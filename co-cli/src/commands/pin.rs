@@ -3,7 +3,10 @@ use anyhow::anyhow;
 use cid::Cid;
 use co_primitives::{from_cbor, CoId, DagCollectionAsyncExt};
 use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
-use co_sdk::{state::memberships, Application, CoReducerFactory, CoStorage, CO_CORE_NAME_PIN, CO_ID_LOCAL};
+use co_sdk::{
+	state::{memberships, query_core, QueryExt},
+	Application, CoReducerFactory, CoStorage, CO_CORE_NAME_PIN, CO_ID_LOCAL,
+};
 use exitcode::ExitCode;
 use futures::{pin_mut, StreamExt, TryStreamExt};
 use std::{
@@ -68,8 +71,9 @@ pub async fn list_pins(context: &CliContext, cli: &Cli, command: &ListCommand) -
 	let application = context.application(cli).await;
 
 	let local_co_reducer = application.local_co_reducer().await?;
-	let storage = local_co_reducer.storage();
-	let pin_state = local_co_reducer.state::<co_core_pin::Pin>(CO_CORE_NAME_PIN).await?;
+	let (storage, pin_state) = query_core::<co_core_pin::Pin>(CO_CORE_NAME_PIN)
+		.execute_reducer(&local_co_reducer)
+		.await?;
 	let pins = pin_state.pins.stream(&storage);
 	let inner: Vec<_> = pins.try_collect().await?;
 	if command.sum {

@@ -65,7 +65,7 @@ pub struct BlockStat {
 #[derive(Debug, thiserror::Error)]
 pub enum StorageError {
 	/// Block not found error.
-	/// This error is may be temporarily as the block may comes availabvle on the network.
+	/// This error is may be temporarily as the block may comes available on the network.
 	#[error("Block not found: {0}")]
 	NotFound(Cid, #[source] anyhow::Error),
 

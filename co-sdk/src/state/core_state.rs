@@ -1,7 +1,7 @@
 use crate::{CoReducerError, CoStorage, CO_CORE_NAME_CO};
 use cid::Cid;
 use co_primitives::OptionLink;
-use co_storage::{BlockStorageExt, StorageError};
+use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use serde::de::DeserializeOwned;
 
 /// Return core state (CID and actual state) from an CO assuming the `co_state` points to the root of a `co-core-co`
@@ -9,17 +9,17 @@ use serde::de::DeserializeOwned;
 ///
 /// ## Errors
 /// - `CoReducerError::CoreNotFound` - If the core not exists.
-pub async fn core_state<T: DeserializeOwned + Send + Sync + Default + Clone + 'static>(
-	storage: &CoStorage,
+pub async fn core_state<T: DeserializeOwned + Send + Sync + Default + Clone + 'static, S: BlockStorage + 'static>(
+	storage: &S,
 	co_state: OptionLink<co_core_co::Co>,
 	core_name: &str,
-) -> Result<(Option<Cid>, T), CoReducerError> {
+) -> Result<(OptionLink<T>, T), CoReducerError> {
 	// co?
 	if core_name == CO_CORE_NAME_CO {
 		if let Some(state_cid) = co_state.cid() {
-			return Ok((Some(*state_cid), storage.get_deserialized(state_cid).await?));
+			return Ok((state_cid.into(), storage.get_deserialized(state_cid).await?));
 		}
-		return Ok((None, T::default()));
+		return Ok((None.into(), T::default()));
 	}
 
 	// other
@@ -30,9 +30,9 @@ pub async fn core_state<T: DeserializeOwned + Send + Sync + Default + Clone + 's
 	};
 	if let Some(core) = co_state.cores.get(core_name) {
 		if let Some(core_state) = &core.state {
-			return Ok((Some(*core_state), storage.get_deserialized(core_state).await?));
+			return Ok((core_state.into(), storage.get_deserialized(core_state).await?));
 		} else {
-			return Ok((None, T::default()));
+			return Ok((None.into(), T::default()));
 		}
 	}
 

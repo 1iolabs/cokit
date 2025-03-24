@@ -1797,6 +1797,7 @@ dependencies = [
  "directories",
  "example-counter",
  "futures",
+ "futures-util",
  "hmac 0.12.1",
  "hyper 0.14.30",
  "ipld-core",

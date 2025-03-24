@@ -182,6 +182,11 @@ impl<T> From<Cid> for OptionLink<T> {
 		Self::new(Some(value))
 	}
 }
+impl<T> From<&Cid> for OptionLink<T> {
+	fn from(value: &Cid) -> Self {
+		Self::new(Some(*value))
+	}
+}
 impl<T> AsRef<Option<Cid>> for OptionLink<T> {
 	fn as_ref(&self) -> &Option<Cid> {
 		&self.cid

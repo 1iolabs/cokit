@@ -6,7 +6,10 @@ use crate::{
 use chrono::DateTime;
 use co_core_file::Node;
 use co_primitives::{AbsolutePath, Date, PathExt};
-use co_sdk::{CoReducerError, CoReducerFactory};
+use co_sdk::{
+	state::{query_core, QueryExt},
+	CoReducerFactory,
+};
 use exitcode::ExitCode;
 use futures::TryStreamExt;
 
@@ -28,14 +31,14 @@ pub async fn command(
 ) -> Result<ExitCode, anyhow::Error> {
 	let application = context.application(cli).await;
 	let co_reducer = application.context().try_co_reducer(&file_command.co).await?;
-	let file_state = match co_reducer.state(&file_command.core).await {
-		Err(CoReducerError::CoreNotFound(_)) => Ok(co_core_file::File::default()),
-		result => result,
-	}?;
+	let (storage, file_state) = query_core(&file_command.core)
+		.with_default()
+		.execute_reducer(&co_reducer)
+		.await?;
 
 	// nodes
 	let path = AbsolutePath::from_str(&command.path)?.normalize()?;
-	let nodes: Vec<Node> = list_nodes(co_reducer.storage(), file_state, path).try_collect().await?;
+	let nodes: Vec<Node> = list_nodes(storage, file_state, path).try_collect().await?;
 
 	// print
 	println!("total {}", nodes.len());

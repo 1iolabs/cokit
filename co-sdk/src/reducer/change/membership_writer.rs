@@ -57,8 +57,8 @@ where
 			let mut next_heads = reducer.heads().clone();
 			if let Some(encrypted_storage) = &self.encrypted_storage {
 				let mapping = encrypted_storage.content_mapping();
-				next_state = to_external_cid(&mapping, next_state).await?;
-				next_heads = to_external_cids(&mapping, next_heads).await?;
+				next_state = to_external_cid(&mapping, next_state).await;
+				next_heads = to_external_cids(&mapping, next_heads).await;
 			}
 
 			// next last heads

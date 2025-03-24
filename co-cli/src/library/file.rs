@@ -2,6 +2,7 @@ use co_core_co::CoAction;
 use co_core_file::{FolderNode, Node};
 use co_primitives::{tags, AbsolutePath, AbsolutePathOwned, DagCollectionAsyncExt, PathError, PathExt};
 use co_sdk::{
+	state::{query_core, QueryError, QueryExt},
 	CoReducer, CoReducerError, CoStorage, Cores, PrivateIdentity, StorageError, CO_CORE_FILE, CO_CORE_NAME_CO,
 };
 use futures::{pin_mut, Stream, StreamExt};
@@ -27,6 +28,9 @@ pub enum FileError {
 	#[error("Path error")]
 	Path(#[from] PathError),
 
+	#[error("Query error")]
+	Query(#[from] QueryError),
+
 	#[error("Other")]
 	Other(#[from] anyhow::Error),
 }
@@ -37,8 +41,8 @@ pub async fn file_core<I>(co_reducer: CoReducer, identity: &I, core: &str) -> Re
 where
 	I: PrivateIdentity + Debug + Send + Sync,
 {
-	match co_reducer.state(core).await {
-		Err(CoReducerError::CoreNotFound(_)) => {
+	match query_core(core).execute_reducer(&co_reducer).await {
+		Err(QueryError::NotFound(_)) => {
 			// create core
 			let create = CoAction::CoreCreate {
 				core: core.to_owned(),
@@ -50,7 +54,7 @@ where
 			// assume default state
 			Ok(Default::default())
 		},
-		result => Ok(result?),
+		result => Ok(result?.1),
 	}
 }
 

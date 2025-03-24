@@ -7,6 +7,7 @@ use crate::{
 		connections::ConnectionMessage,
 		network::{CoNetworkTaskSpawner, DidCommSendNetworkTask},
 	},
+	state::{query_core, QueryExt},
 	Action, CoContext, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
@@ -87,7 +88,9 @@ fn join_with_result(context: CoContext, id: CoId, did: Did) -> impl Stream<Item 
 
 async fn find_membership(context: &CoContext, id: &CoId, did: &Did) -> anyhow::Result<Option<Membership>> {
 	let local = context.local_co_reducer().await?;
-	let memberships: Memberships = local.state(CO_CORE_NAME_MEMBERSHIP).await?;
+	let (_, memberships) = query_core::<Memberships>(CO_CORE_NAME_MEMBERSHIP)
+		.execute_reducer(&local)
+		.await?;
 	Ok(memberships.memberships.into_iter().find(|membership| {
 		&membership.id == id && &membership.did == did
 		// // we only handle remote invites

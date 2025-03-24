@@ -20,7 +20,7 @@ use crate::{
 		connections::ConnectionMessage,
 		network::{CoHeadsPublish, CoNetworkTaskSpawner},
 	},
-	state::find,
+	state::{find, query_core, QueryExt},
 	types::{co_reducer::CoReducerContext, co_storage::CoBlockStorageContentMapping},
 	CoCoreResolver, CoReducer, CoStorage, CoToken, CoTokenParameters, ReducerBuilder, Runtime, TaskSpawner,
 	CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
@@ -30,7 +30,7 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_actor::ActorHandle;
 use co_core_co::{CoAction, Participant};
-use co_core_keystore::{Key, KeyStoreAction};
+use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 use co_core_membership::{CoState, Membership, MembershipsAction};
 use co_core_storage::{PinStrategy, StorageAction};
 use co_identity::PrivateIdentity;
@@ -96,8 +96,10 @@ impl SharedCoBuilder {
 	/// Read (latest) secret from parent CO.
 	pub async fn secret(&self) -> anyhow::Result<Option<co_primitives::Secret>> {
 		if let Some(key_reference) = &self.membership.key {
-			let key_store: co_core_keystore::KeyStore = self.parent.state(&self.keystore_core_name).await?;
-			let (_, key) = find(&self.parent.storage(), &key_store.keys, |(k, _)| k == key_reference)
+			let (storage, key_store) = query_core::<KeyStore>(&self.keystore_core_name)
+				.execute_reducer(&self.parent)
+				.await?;
+			let (_, key) = find(&storage, &key_store.keys, |(k, _)| k == key_reference)
 				.await?
 				.ok_or(anyhow::anyhow!("Shared key not found: {}", key_reference))?;
 			let secret = match key.secret {
@@ -548,8 +550,8 @@ impl SharedCoCreator {
 		// store encrypted state/heads
 		if let Some(encrypted_storage) = &encrypted_storage {
 			let mapping = encrypted_storage.content_mapping();
-			state = to_external_cid(&mapping, state).await?;
-			heads = to_external_cids(&mapping, heads).await?;
+			state = to_external_cid(&mapping, state).await;
+			heads = to_external_cids(&mapping, heads).await;
 		}
 
 		// add membership to parent co

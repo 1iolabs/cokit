@@ -2,7 +2,8 @@ use co_core_co::CoAction;
 use co_core_file::{File, FileAction, FolderNode, Node};
 use co_core_membership::Memberships;
 use co_sdk::{
-	state, tags, AbsolutePath, ApplicationBuilder, CoId, CoReducer, CoReducerFactory, Cores, CreateCo, DidKeyIdentity,
+	state::{self, query_core, QueryExt},
+	tags, AbsolutePath, ApplicationBuilder, CoId, CoReducer, CoReducerFactory, Cores, CreateCo, DidKeyIdentity,
 	DidKeyProvider, Identity, CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use co_storage::TmpDir;
@@ -122,8 +123,8 @@ async fn test_conflicting_membership_update() {
 	// println!("u2: {:?}", m2.memberships.iter().find(|i| i.id.as_str() == "co").unwrap().state);
 
 	async fn test_folders_exists(co: &CoReducer) {
-		let files: File = co.state("file").await.unwrap();
-		let nodes = state::into_collection::<BTreeMap<_, _>, _, _, _>(&co.storage(), &files.nodes)
+		let (storage, files) = query_core::<File>("file").execute_reducer(co).await.unwrap();
+		let nodes = state::into_collection::<BTreeMap<_, _>, _, _, _>(&storage, &files.nodes)
 			.await
 			.unwrap();
 		let nodes_root_dag = nodes.get(AbsolutePath::new_unchecked("/")).unwrap();
@@ -176,7 +177,10 @@ async fn test_conflicting_membership_update() {
 	)
 	.await
 	.unwrap();
-	let memberships: Memberships = local_co.state(CO_CORE_NAME_MEMBERSHIP).await.unwrap();
+	let (_, memberships) = query_core::<Memberships>(CO_CORE_NAME_MEMBERSHIP)
+		.execute_reducer(&local_co)
+		.await
+		.unwrap();
 	//println!("memberships: {:?}", memberships.memberships.iter().find(|i| i.id.as_str() == "co").unwrap().state);
 	assert_eq!(
 		memberships

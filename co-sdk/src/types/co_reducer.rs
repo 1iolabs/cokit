@@ -1,10 +1,18 @@
 use super::{co_dispatch::CoDispatch, co_storage::CoBlockStorageContentMapping};
-use crate::{reducer::core_resolver::dynamic::DynamicCoreResolver, state::core_state, CoStorage, Reducer, Runtime};
+use crate::{
+	library::to_external_cid::{to_external_cid, to_external_cid_opt, to_external_cids},
+	reducer::core_resolver::dynamic::DynamicCoreResolver,
+	state::core_state,
+	CoStorage, Reducer, Runtime,
+};
 use async_trait::async_trait;
 use cid::Cid;
+use co_core_co::Co;
 use co_identity::{PrivateIdentity, PrivateIdentityBox};
-use co_primitives::{CoId, KnownMultiCodec, OptionLink, ReducerAction};
-use co_storage::{BlockStorageContentMapping, BlockStorageExt, MappedBlockStorage, StorageError};
+use co_primitives::{
+	BlockStorageSettings, CloneWithBlockStorageSettings, CoId, KnownMultiCodec, OptionLink, ReducerAction,
+};
+use co_storage::{BlockStorageExt, MappedBlockStorage, StorageError};
 use futures::{stream, Stream, StreamExt, TryStreamExt};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::BTreeSet, fmt::Debug, marker::PhantomData, sync::Arc};
@@ -58,12 +66,14 @@ impl CoReducer {
 		(*reducer.state(), reducer.heads().clone())
 	}
 
-	/// Get storage instance for this CO.
+	/// Get a new storage instance for this CO.
+	/// This starts a new session and the same (or cloned) storage instance should be used while traversing the co state.
 	pub fn storage(&self) -> CoStorage {
-		self.storage.clone()
+		self.storage.clone_with_settings(BlockStorageSettings::new().with_detached())
 	}
 
 	/// Get mapped storage instance for this CO.
+	#[deprecated]
 	pub fn mapped_storage(&self) -> CoStorage {
 		let storage = self.storage();
 		if let Some(mapping) = self.context.content_mapping() {
@@ -164,19 +174,12 @@ impl CoReducer {
 	}
 
 	/// Read co reducer state.
-	pub async fn co(&self) -> Result<co_core_co::Co, CoReducerError> {
-		let (storage, state) = {
-			let reducer = self.reducer.read().await;
-			(reducer.log().storage().clone(), *reducer.state())
-		};
-		if let Some(state_cid) = state {
-			return Ok(storage.get_deserialized(&state_cid).await?);
-		}
-		Ok(co_core_co::Co::default())
+	pub async fn co(&self) -> Result<Co, CoReducerError> {
+		Ok(self.storage().get_value(&self.co_state().await).await?)
 	}
 
 	/// Read co reducer state reference.
-	pub async fn co_state(&self) -> OptionLink<co_core_co::Co> {
+	pub async fn co_state(&self) -> OptionLink<Co> {
 		let reducer = self.reducer.read().await;
 		reducer.state().into()
 	}
@@ -185,15 +188,12 @@ impl CoReducer {
 	///
 	/// # Arguments
 	/// - `core` - The core name.
+	#[deprecated(note = "please use `query_core`")]
 	pub async fn state<T: DeserializeOwned + Send + Sync + Default + Clone + 'static>(
 		&self,
 		core: &str,
 	) -> Result<T, CoReducerError> {
-		let (storage, state) = {
-			let reducer = self.reducer.read().await;
-			(reducer.log().storage().clone(), *reducer.state())
-		};
-		Ok(core_state(&storage, state.into(), core).await?.1)
+		Ok(core_state(&self.storage(), self.co_state().await, core).await?.1)
 	}
 
 	/// Try to escape inner data.
@@ -209,8 +209,8 @@ impl CoReducer {
 
 	/// Convert an CO CID to an external (plain) CID.
 	pub async fn to_external_cid(&self, cid: Cid) -> Cid {
-		match &self.context.content_mapping() {
-			Some(mapping) => mapping.to_plain(&cid).await.unwrap_or(cid),
+		match self.context.content_mapping() {
+			Some(mapping) => to_external_cid(&mapping, cid).await,
 			None => cid,
 		}
 	}
@@ -218,16 +218,11 @@ impl CoReducer {
 	/// Get current reducer state and heads.
 	pub async fn external_reducer_state(&self) -> (Option<Cid>, BTreeSet<Cid>) {
 		let (state, heads) = self.reducer_state().await;
-		(
-			match state {
-				Some(cid) => Some(self.to_external_cid(cid).await),
-				None => None,
-			},
-			stream::iter(heads.into_iter())
-				.then(|cid| async move { self.to_external_cid(cid).await })
-				.collect()
-				.await,
-		)
+		if let Some(mapping) = self.context.content_mapping() {
+			(to_external_cid_opt(&mapping, state).await, to_external_cids(&mapping, heads).await)
+		} else {
+			(state, heads)
+		}
 	}
 
 	/// Refresh the reducer instance parent state.

@@ -26,7 +26,7 @@ use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 use co_log::EntryBlock;
-use co_primitives::{CoId, Did, Tags};
+use co_primitives::{BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did, Tags};
 use co_storage::{BlockStorage, ChangeBlockStorage, EncryptedBlockStorage, EncryptionReferenceMode, StorageError};
 use futures::{Stream, TryStreamExt};
 use std::{
@@ -308,7 +308,15 @@ impl Actor for ReducersActor {
 							let context = state.context.clone();
 							let parent = local.clone();
 							async move {
-								let result = ReducerStorage::from_id(context.inner.storage(), parent, id.clone()).await;
+								let result = ReducerStorage::from_id(
+									context
+										.inner
+										.storage()
+										.clone_with_settings(BlockStorageSettings::new().with_detached()),
+									parent,
+									id.clone(),
+								)
+								.await;
 								control.create_storage(id, result).await;
 							}
 						});
@@ -581,7 +589,13 @@ impl CoContextInner {
 		};
 		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize);
 		let local_co_reducer = local_co
-			.build(self.storage(), self.runtime.clone(), self.shutdown.child_token(), self.tasks.clone(), core_resolver)
+			.build(
+				self.storage().clone_with_settings(BlockStorageSettings::new().with_detached()),
+				self.runtime.clone(),
+				self.shutdown.child_token(),
+				self.tasks.clone(),
+				core_resolver,
+			)
 			.await?;
 		Ok(local_co_reducer)
 	}

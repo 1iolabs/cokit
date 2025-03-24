@@ -378,7 +378,7 @@ where
 	/// Map internal [`Cid`] to external [`Cid`].
 	/// If no mapping is needed/available return the original [`Cid`].
 	async fn to_external_cid(&self, cid: Cid) -> Result<Cid, StorageError> {
-		Ok(to_external_cid(&self.encrypted_storage.content_mapping(), cid).await?)
+		Ok(to_external_cid(&self.encrypted_storage.content_mapping(), cid).await)
 	}
 }
 
