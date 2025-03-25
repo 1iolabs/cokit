@@ -327,8 +327,7 @@ where
 		reducer: &Reducer<S, R>,
 		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
-		let mapping = self.encrypted_storage.flush_mapping().await?;
-		self.write(reducer, mapping).await?;
+		self.write(reducer, None).await?;
 		Ok(())
 	}
 }

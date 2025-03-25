@@ -47,6 +47,7 @@ pub struct CoState {
 	// TODO mark as external as this field shouldn't be further resolved when pinning
 	// TODO https://gitlab.1io.com/1io/co-sdk/-/issues/47
 	/// The encryption mapping if the CO is encrypted.
+	#[serde(skip_serializing_if = "Option::is_none", default)]
 	pub encryption_mapping: Option<Cid>,
 }
 

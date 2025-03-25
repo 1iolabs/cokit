@@ -542,7 +542,7 @@ impl SharedCoCreator {
 				self.parent
 					.push(&identity, &self.keystore_core_name, &KeyStoreAction::Set(key))
 					.await?;
-				(Some(key_uri), encrypted_storage.flush_mapping().await?, Some(encrypted_storage))
+				(Some(key_uri), None, Some(encrypted_storage))
 			} else {
 				(None, None, None)
 			};

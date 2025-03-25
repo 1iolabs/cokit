@@ -593,7 +593,7 @@ pub struct ApplicationLocal {
 	pub state: Cid,
 
 	/// The latest encryption mapping.
-	#[serde(rename = "m")]
+	#[serde(rename = "m", skip_serializing_if = "Option::is_none", default)]
 	pub mapping: Option<Cid>,
 }
 impl ApplicationLocal {

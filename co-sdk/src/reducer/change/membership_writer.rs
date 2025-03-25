@@ -47,11 +47,6 @@ where
 		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
 		if let Some(state) = reducer.state() {
-			let mapping = match &self.encrypted_storage {
-				Some(storage) => storage.flush_mapping().await?,
-				None => None,
-			};
-
 			// next
 			let mut next_state = *state;
 			let mut next_heads = reducer.heads().clone();
@@ -74,7 +69,7 @@ where
 						id: self.id.to_owned(),
 						state: next_state.into(),
 						heads: next_heads.into_iter().map(Into::into).collect(),
-						encryption_mapping: mapping,
+						encryption_mapping: None,
 						remove: last_heads.into_iter().map(Into::into).collect(),
 					},
 				)
