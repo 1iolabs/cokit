@@ -25,7 +25,6 @@ pub fn didcomm_anoncrypt(
 		message = message.body(body).map_err(|e| SignError::Other(e.into()))?;
 	}
 	let signer = DidKeyIdentity::generate(None);
-	println!("signer: {}", signer.identity());
 	let result = message
 		.from(signer.identity())
 		.as_jwe(&CryptoAlgorithm::XC20P, Some(to_public_key.clone()))
@@ -49,7 +48,6 @@ pub fn didcomm_anoncrypt_receive(
 
 	// we expect the jwe signed with a one-time key
 	let skid = jwe.get_skid().ok_or_else(|| ReceiveError::MissingSigningKeyId)?;
-	println!("skid: {}", skid);
 
 	// we only support did:key: as signing key
 	let sign_identity = DidKeyIdentity::from_identity(&skid).map_err(|e| ReceiveError::InvalidSigningKeyId(e))?;
