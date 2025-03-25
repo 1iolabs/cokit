@@ -67,8 +67,10 @@ impl CoReducer {
 	}
 
 	/// Get a new storage instance for this CO.
-	/// This starts a new session and the same (or cloned) storage instance should be used while traversing the co state.
+	/// This starts a new session and the same (or cloned) storage instance should be used while traversing the co
+	/// state.
 	pub fn storage(&self) -> CoStorage {
+		// self.storage.clone()
 		self.storage.clone_with_settings(BlockStorageSettings::new().with_detached())
 	}
 
@@ -157,7 +159,7 @@ impl CoReducer {
 		Ok(self.reducer.write().await.join(&internal_heads, self.runtime.runtime()).await?)
 	}
 
-	/// Insert a previous (trusted) snapshot into histroy which may can used as a starting point.
+	/// Insert a previous (trusted) snapshot into history which may can used as a starting point.
 	pub async fn insert_snapshot(&self, state: Cid, heads: BTreeSet<Cid>) -> Result<(), StorageError> {
 		// to internal cids
 		let internal_state = self.context.to_internal_cid(state).await?;
@@ -174,8 +176,10 @@ impl CoReducer {
 	}
 
 	/// Read co reducer state.
-	pub async fn co(&self) -> Result<Co, CoReducerError> {
-		Ok(self.storage().get_value(&self.co_state().await).await?)
+	pub async fn co(&self) -> Result<(CoStorage, Co), CoReducerError> {
+		let storage = self.storage();
+		let co = storage.get_value(&self.co_state().await).await?;
+		Ok((storage, co))
 	}
 
 	/// Read co reducer state reference.

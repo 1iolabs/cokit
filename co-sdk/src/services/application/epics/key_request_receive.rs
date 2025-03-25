@@ -68,7 +68,7 @@ async fn key_request(
 	// get participant state
 	//  we only allow active participants to request keys
 	let co = context.try_co_reducer(&payload.id).await?;
-	let co_state = co.co().await?;
+	let (_storage, co_state) = co.co().await?;
 	let participant_state = co_state
 		.participants
 		.get(requester_identity.identity())

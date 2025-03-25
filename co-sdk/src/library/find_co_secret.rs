@@ -21,7 +21,7 @@ pub async fn find_co_secret(parent: &CoReducer, co: &CoReducer) -> Result<Option
 
 /// Read current CO PSK from keychain core, if the CO is encrypted.
 pub async fn find_co_key(parent: &CoReducer, co: &CoReducer) -> Result<Option<Key>, anyhow::Error> {
-	let co = co.co().await?;
+	let (_storage, co) = co.co().await?;
 	let (parent_storage, key_store) = state::query_core::<KeyStore>(CO_CORE_NAME_KEYSTORE)
 		.execute_reducer(&parent)
 		.await?;

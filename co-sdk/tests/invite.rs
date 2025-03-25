@@ -149,8 +149,8 @@ async fn test_invite() {
 
 	// peer2: read state
 	assert_eq!(peer2_shared_co.reducer_state().await, shared_co.reducer_state().await);
-	let co = shared_co.co().await.unwrap();
-	let peer2_co = peer2_shared_co.co().await.unwrap();
+	let (_, co) = shared_co.co().await.unwrap();
+	let (_, peer2_co) = peer2_shared_co.co().await.unwrap();
 	assert_eq!(peer2_co, co);
 }
 
@@ -296,8 +296,8 @@ async fn test_invite_encrypted() {
 
 	// peer2: read state
 	assert_eq!(peer2_shared_co.reducer_state().await, shared_co.reducer_state().await);
-	let co = shared_co.co().await.unwrap();
-	let peer2_co = peer2_shared_co.co().await.unwrap();
+	let (_, co) = shared_co.co().await.unwrap();
+	let (_, peer2_co) = peer2_shared_co.co().await.unwrap();
 	assert_eq!(peer2_co, co);
 }
 

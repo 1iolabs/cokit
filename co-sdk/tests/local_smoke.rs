@@ -44,7 +44,7 @@ async fn test_local_smoke() {
 		.await
 		.unwrap();
 	let keys: BTreeMap<String, co_core_keystore::Key> =
-		state::into_collection(&local_co.storage(), &keystore.keys).await.unwrap();
+		state::into_collection(&storage, &key_store.keys).await.unwrap();
 	let key = keys.get(identity.identity()).expect("identity");
 	assert_eq!(key, &identity.export().unwrap());
 }

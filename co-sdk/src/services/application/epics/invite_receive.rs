@@ -50,7 +50,7 @@ pub fn invite_receive(
 async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: String) -> anyhow::Result<Vec<Action>> {
 	let payload: CoInvitePayload = from_json_string(&body)?;
 	let local = context.local_co_reducer().await?;
-	let co = local.co().await?;
+	let (_storage, co) = local.co().await?;
 	let invite = CoInvite::from_tags(&co.tags).unwrap_or_default();
 	let from = header.from.ok_or(anyhow!("invalid header: from"))?.to_string();
 	let did = header.to.first().ok_or(anyhow!("invalid header: to"))?.to_string();

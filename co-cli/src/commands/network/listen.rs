@@ -43,7 +43,7 @@ pub async fn command(
 					match id {
 						Ok(id) => {
 							let co = co_context.try_co_reducer(&id).await?;
-							let co_state = co.co().await?;
+							let (_storage, co_state) = co.co().await?;
 							if co_state.network.is_empty() {
 								Ok(None)
 							} else {

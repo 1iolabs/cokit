@@ -16,7 +16,7 @@ pub async fn get(
 		.co_reducer(&co_id)
 		.await?
 		.ok_or(HttpError::NotFound(anyhow::anyhow!("Co not found: {}", co_id)))?;
-	let state = reducer.co().await?;
+	let (_storage, state) = reducer.co().await?;
 	Ok((StatusCode::OK, Json(to_value(state)?)))
 }
 

@@ -59,7 +59,7 @@ where
 	/// Load mapping from CID.
 	/// This will add the mappings to the existing.
 	pub async fn load_mapping(&self, map: &Cid) -> Result<(), StorageError> {
-		self.mapping.mapping.write().await.read_mappings(self, map).await?;
+		self.mapping.load_mapping(self, map).await?;
 		Ok(())
 	}
 
@@ -71,12 +71,7 @@ where
 		let node_serializer = EncryptedNodeSerializer { algorithm: self.algorithm, key: self.key.clone() };
 
 		// blocks
-		let (root, blocks) = self
-			.mapping
-			.mapping
-			.read()
-			.await
-			.to_blocks(node_serializer, Default::default())?;
+		let (root, blocks) = self.mapping.to_blocks(node_serializer, Default::default()).await?;
 
 		// store
 		for block in blocks {
@@ -94,11 +89,13 @@ where
 
 	/// This will regenerate and flush the encryption block mapping using supplied CIDs.
 	pub async fn regenerate_mapping(&mut self, cids: impl Iterator<Item = Cid>) -> Result<Option<Cid>, StorageError> {
-		self.mapping.mapping = Arc::new(RwLock::new(
-			BlockMapping::from_cids(self, cids)
-				.await
-				.map_err(|e| StorageError::Internal(e.into()))?,
-		));
+		self.mapping
+			.set_mapping(
+				BlockMapping::from_cids(self, cids)
+					.await
+					.map_err(|e| StorageError::Internal(e.into()))?,
+			)
+			.await;
 		self.flush_mapping().await
 	}
 
@@ -116,7 +113,7 @@ where
 				Some(plain) => *plain,
 				None => *self.get_unencrypted(encrypted).await?.cid(),
 			};
-			let old = self.mapping.mapping.write().await.insert(plain, *encrypted);
+			let old = self.mapping.insert(plain, *encrypted).await;
 			Ok(old.is_none() || old.as_ref() != Some(encrypted))
 		} else {
 			Ok(false)
@@ -153,10 +150,7 @@ where
 
 			// apply mappings
 			if !plain.references.is_empty() {
-				let mut mapping = self.mapping.mapping.write().await;
-				for (plain_cid, encrypted_cid) in plain.references.iter() {
-					mapping.insert(*plain_cid, *encrypted_cid);
-				}
+				self.mapping.extend(plain.references.iter().map(|(k, v)| (*k, *v))).await;
 			}
 
 			// result
@@ -184,11 +178,9 @@ where
 
 			// map
 			{
-				let mut mapping = self.mapping.mapping.write().await;
-				mapping.insert(*plain.cid(), encrypted_cid);
-				for (plain_cid, encrypted_cid) in plain.references.iter() {
-					mapping.insert(*plain_cid, *encrypted_cid);
-				}
+				self.mapping
+					.extend([(*plain.cid(), encrypted_cid)].into_iter().chain(plain.references.clone()))
+					.await;
 			}
 
 			// result
@@ -207,7 +199,7 @@ where
 
 	/// Get block.
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
-		let encrypted_cid = self.mapping.mapping.read().await.get(cid);
+		let encrypted_cid = self.mapping.get(cid).await;
 		tracing::trace!(?encrypted_cid, ?cid, "encrypted-storage-get");
 		match encrypted_cid {
 			Some(encrypted_cid) => self.get_unencrypted(&encrypted_cid).await,
@@ -227,10 +219,9 @@ where
 		//  as a fallback check if the Cid exists in the parent so we know this is a unencrypted reference
 		//  TODO: are there any valid cases for not unencrypted and not known reference?
 		let references = if self.links.has_links(&cid) {
-			let mapping = self.mapping.mapping.read().await;
 			let mut references = BTreeMap::new();
-			for plain_cid in self.links.links(&block)? {
-				match mapping.get(&plain_cid) {
+			for (plain_cid, encrypted_cid) in self.mapping.get_mapping(self.links.links(&block)?).await {
+				match encrypted_cid {
 					// reference mapping
 					Some(encrypted_cid) => {
 						references.insert(plain_cid, encrypted_cid);
@@ -241,7 +232,7 @@ where
 							return Err(StorageError::InvalidArgument(anyhow!("Unmapped reference found {} while storing {}. Are you sure you stored all children nodes?", plain_cid, cid)));
 						}
 					},
-				};
+				}
 			}
 			references
 		} else {
@@ -269,7 +260,7 @@ where
 		let encrypted_cid = self.next.set(encrypted_block).await?;
 
 		// map
-		self.mapping.mapping.write().await.insert(cid, encrypted_cid);
+		self.mapping.insert(cid, encrypted_cid).await;
 
 		// trace (only in debug because this has security implications)
 		#[cfg(debug_assertions)]
@@ -280,7 +271,7 @@ where
 	}
 
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
-		match self.mapping.mapping.read().await.get(cid) {
+		match self.mapping.get(cid).await {
 			Some(encrypted_cid) => self.next.remove(&encrypted_cid).await,
 			None => self.next.remove(cid).await,
 		}
@@ -394,6 +385,12 @@ impl EncryptedBlockStorageMapping {
 		Ok(())
 	}
 
+	/// Replace the mapping.
+	pub async fn set_mapping(&mut self, mapping: BlockMapping) {
+		self.parent = None;
+		self.mapping = Arc::new(RwLock::new(mapping));
+	}
+
 	pub async fn get(&self, key: &Cid) -> Option<Cid> {
 		match self.mapping.read().await.get(key) {
 			Some(cid) => Some(cid),
@@ -405,6 +402,26 @@ impl EncryptedBlockStorageMapping {
 				}
 			},
 		}
+	}
+
+	pub async fn get_mapping(&self, keys: impl IntoIterator<Item = Cid>) -> BTreeMap<Cid, Option<Cid>> {
+		let mapping = self.mapping.read().await;
+		let parent = if let Some(parent) = &self.parent { Some(parent.read().await) } else { None };
+		keys.into_iter()
+			.map(|key| {
+				let value = match mapping.get(&key) {
+					Some(cid) => Some(cid),
+					None => {
+						if let Some(parent) = &parent {
+							parent.get(&key)
+						} else {
+							None
+						}
+					},
+				};
+				(key, value)
+			})
+			.collect()
 	}
 
 	pub async fn get_first_by_value(&self, key: &Cid) -> Option<Cid> {
@@ -420,8 +437,36 @@ impl EncryptedBlockStorageMapping {
 		}
 	}
 
-	pub async fn insert(&mut self, key: Cid, value: Cid) -> Option<Cid> {
+	pub async fn insert(&self, key: Cid, value: Cid) -> Option<Cid> {
 		self.mapping.write().await.insert(key, value)
+	}
+
+	pub async fn extend(&self, items: impl IntoIterator<Item = (Cid, Cid)>) {
+		self.mapping.write().await.extend(items);
+	}
+
+	pub async fn to_blocks<S, P: StoreParams>(
+		&self,
+		serializer: S,
+		options: WriteOptions,
+	) -> Result<(Option<Cid>, Vec<Block<P>>), StorageError>
+	where
+		S: NodeSerializer<Node<(Cid, Cid)>, (Cid, Cid), P>,
+	{
+		// copy items
+		let mapping = {
+			let mut map = self.mapping.read().await.map.clone();
+			if let Some(parent) = &self.parent {
+				let mut parent_map = parent.read().await.map.clone();
+				map.append(&mut parent_map);
+			};
+			let mut result = BlockMapping::new();
+			result.map = map;
+			result
+		};
+
+		// blocks
+		mapping.to_blocks(serializer, options)
 	}
 }
 #[async_trait]
@@ -463,7 +508,7 @@ impl From<BlockMappingError> for StorageError {
 
 /// Serializeable block mapping.
 /// This is used to store the mapping itself as an block.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct BlockMapping {
 	map: BTreeMap<Cid, Cid>,
 }
@@ -478,6 +523,10 @@ impl BlockMapping {
 
 	pub fn insert(&mut self, key: Cid, value: Cid) -> Option<Cid> {
 		self.map.insert(key, value)
+	}
+
+	pub fn extend(&mut self, items: impl IntoIterator<Item = (Cid, Cid)>) {
+		self.map.extend(items.into_iter().map(|(key, value)| (key, value)));
 	}
 
 	pub fn get_first_by_value(&self, value: &Cid) -> Option<Cid> {
@@ -575,6 +624,11 @@ impl BlockMapping {
 
 		// result
 		Ok((*root.cid(), blocks))
+	}
+}
+impl Default for BlockMapping {
+	fn default() -> Self {
+		Self::new()
 	}
 }
 

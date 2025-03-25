@@ -75,10 +75,10 @@ async fn joined_initialize(context: &CoContext, id: &CoId, did: Did) -> anyhow::
 	let co_reducer = context.co_reducer(&id).await?.ok_or(anyhow::anyhow!("Co not found: {}", id))?;
 
 	// fetch co
-	let co = co_reducer.co().await?;
+	let (storage, co) = co_reducer.co().await?;
 
 	// fetch network settings and participants
-	state::stream(co_reducer.storage(), &co.network).try_collect::<Vec<_>>().await?;
+	state::stream(storage, &co.network).try_collect::<Vec<_>>().await?;
 	// TODO: participants DAG (https://gitlab.1io.com/1io/co-sdk/-/issues/39)
 	// state::stream(co_reducer.storage(), &co.participants).try_collect::<Vec<_>>().await?;
 

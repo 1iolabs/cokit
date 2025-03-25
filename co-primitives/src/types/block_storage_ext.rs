@@ -1,4 +1,5 @@
 use crate::{BlockSerializer, BlockStorage, Link, Linkable, MultiCodec, OptionLink, StorageError};
+use anyhow::Context;
 use cid::Cid;
 use either::Either;
 use serde::{de::DeserializeOwned, Serialize};
@@ -31,7 +32,7 @@ pub trait BlockStorageExt: BlockStorage {
 		T: Send + Sync + DeserializeOwned,
 	{
 		if let Some(cid) = link.cid() {
-			Ok(self.get_deserialized(cid).await?)
+			Ok(Some(self.get_deserialized(cid).await?))
 		} else {
 			Ok(None)
 		}
@@ -50,7 +51,11 @@ pub trait BlockStorageExt: BlockStorage {
 	where
 		T: Send + Sync + DeserializeOwned,
 	{
-		Ok(BlockSerializer::new().deserialize(&self.get(MultiCodec::with_dag_cbor(item)?).await?)?)
+		let block = self
+			.get(MultiCodec::with_dag_cbor(item)?)
+			.await
+			.with_context(|| format!("get_deserialized: {}", std::any::type_name::<T>().to_owned()))?;
+		Ok(BlockSerializer::new().deserialize(&block)?)
 	}
 
 	/// Set serialized value.

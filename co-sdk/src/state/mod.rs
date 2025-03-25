@@ -8,7 +8,6 @@ mod memberships;
 mod networks;
 mod participants;
 mod query;
-mod state_query;
 
 pub use core_state::{core_state, core_state_or_default, core_state_reference};
 pub use dag::{find::find, into_collection::into_collection, is_empty::is_empty, stream::stream};
@@ -17,4 +16,3 @@ pub use memberships::memberships;
 pub use networks::networks;
 pub use participants::{is_participant, participant_identities, participants};
 pub use query::{query, query_core, Query, QueryError, QueryExt};
-pub use state_query::StateQuery;
