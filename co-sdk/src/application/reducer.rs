@@ -211,6 +211,11 @@ where
 		&mut self.log
 	}
 
+	/// Clear all state but latest.
+	pub fn clear(&mut self) {
+		self.snapshots.clear();
+	}
+
 	/// Insert previous snapshots (trusted) of the same log from which we can continue.
 	pub fn insert_snapshot(&mut self, state: Cid, heads: BTreeSet<Cid>) {
 		self.snapshots.insert(heads, state);

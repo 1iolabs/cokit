@@ -8,6 +8,7 @@ use co_sdk::{
 use co_storage::Algorithm;
 use futures::{join, Stream, StreamExt};
 use std::{collections::BTreeSet, time::Duration};
+use tokio::time::timeout;
 use tracing::{info_span, Instrument};
 
 pub struct SharedCo {
@@ -24,6 +25,8 @@ impl SharedCo {
 
 	/// Create two peers with an connected shared co.
 	pub async fn create(instances: &mut Instances, id: &str) -> Self {
+		let timeout_duration = Duration::from_secs(10);
+
 		let mut peer1 = instances.create().await;
 		peer1.application.create_network(false).await.unwrap();
 		let mut peer2 = instances.create().await;
@@ -73,7 +76,10 @@ impl SharedCo {
 
 		// peer2: membership-invite
 		let peer2_membership_invite = wait_membership_state(peer2.application.actions(), [MembershipState::Invite]);
-		let peer2_membership_invite = peer2_membership_invite.await.expect("not empty");
+		let peer2_membership_invite = timeout(timeout_duration, peer2_membership_invite)
+			.await
+			.expect("peer2 to recv invite in time")
+			.expect("not empty");
 		assert_eq!(peer2_membership_invite, (MembershipState::Invite, CoId::from(id), identity2.identity().to_owned()));
 
 		// peer2: join

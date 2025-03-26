@@ -40,6 +40,9 @@ pub struct BlockStorageSettings {
 
 	/// Detach as child instance from the parent.
 	pub detached: bool,
+
+	/// Clone with empty caches.
+	pub clear: bool,
 }
 impl BlockStorageSettings {
 	pub fn new() -> Self {
@@ -53,6 +56,11 @@ impl BlockStorageSettings {
 
 	pub fn with_detached(mut self) -> Self {
 		self.detached = true;
+		self
+	}
+
+	pub fn with_clear(mut self) -> Self {
+		self.clear = true;
 		self
 	}
 }

@@ -379,6 +379,25 @@ where
 	async fn to_external_cid(&self, cid: Cid) -> Result<Cid, StorageError> {
 		Ok(to_external_cid(&self.encrypted_storage.content_mapping(), cid).await)
 	}
+
+	/// Clear reducer caches.
+	async fn clear(&self, co: CoReducer) {
+		let mut reducer = co.reducer.write().await;
+
+		// remember root cids
+		let mut roots = BTreeSet::new();
+		roots.extend(reducer.state().clone().into_iter());
+		roots.extend(reducer.heads().clone().into_iter());
+
+		// clear log
+		reducer.log_mut().clear();
+
+		// clear reducer
+		reducer.clear();
+
+		// clear storage
+		self.encrypted_storage.clear_mapping(roots).await;
+	}
 }
 
 /// Create encrypted storage by using `storage` as unterlying storage.

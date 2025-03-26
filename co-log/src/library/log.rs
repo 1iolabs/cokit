@@ -64,6 +64,11 @@ impl<S> Log<S> {
 	pub fn is_head(&self, cid: &Cid) -> bool {
 		self.heads.contains(cid)
 	}
+
+	/// Clear caches.
+	pub fn clear(&mut self) {
+		self.index.clear();
+	}
 }
 impl<S> Log<S>
 where

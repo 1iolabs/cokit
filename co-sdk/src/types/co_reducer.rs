@@ -283,6 +283,9 @@ pub trait CoReducerContext: Debug {
 
 	/// Map internal [`Cid`] to external [`Cid`].
 	async fn to_external_cid(&self, cid: Cid) -> Result<Cid, StorageError>;
+
+	/// Clear reducer caches.
+	async fn clear(&self, co: CoReducer);
 }
 
 pub type CoReducerContextRef = Arc<dyn CoReducerContext + Send + Sync + 'static>;

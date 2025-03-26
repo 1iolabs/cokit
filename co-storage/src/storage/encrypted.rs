@@ -87,6 +87,19 @@ where
 		Ok(root)
 	}
 
+	/// Clear encryption mapping.
+	pub async fn clear_mapping(&self, keep: impl IntoIterator<Item = Cid>) {
+		let mapping = self.mapping.get_mapping(keep).await;
+
+		// clear
+		self.mapping.clear().await;
+
+		// add
+		self.mapping
+			.extend(mapping.into_iter().filter_map(|(key, value)| value.map(|value| (key, value))))
+			.await;
+	}
+
 	/// This will regenerate and flush the encryption block mapping using supplied CIDs.
 	pub async fn regenerate_mapping(&mut self, cids: impl Iterator<Item = Cid>) -> Result<Option<Cid>, StorageError> {
 		self.mapping
@@ -291,7 +304,13 @@ where
 			algorithm: self.algorithm.clone(),
 			links: self.links.clone(),
 			reference_mode: self.reference_mode.clone(),
-			mapping: if settings.detached { self.mapping.child() } else { self.mapping.clone() },
+			mapping: if settings.clear {
+				Default::default()
+			} else if settings.detached {
+				self.mapping.child()
+			} else {
+				self.mapping.clone()
+			},
 			next: self.next.clone_with_settings(settings),
 		}
 	}
@@ -389,6 +408,10 @@ impl EncryptedBlockStorageMapping {
 	pub async fn set_mapping(&mut self, mapping: BlockMapping) {
 		self.parent = None;
 		self.mapping = Arc::new(RwLock::new(mapping));
+	}
+
+	pub async fn clear(&self) {
+		self.mapping.write().await.map.clear();
 	}
 
 	pub async fn get(&self, key: &Cid) -> Option<Cid> {

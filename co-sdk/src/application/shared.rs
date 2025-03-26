@@ -439,6 +439,27 @@ impl CoReducerContext for SharedContext {
 			Ok(cid)
 		}
 	}
+
+	/// Clear reducer caches.
+	async fn clear(&self, co: CoReducer) {
+		let mut reducer = co.reducer.write().await;
+
+		// remember root cids
+		let mut roots = BTreeSet::new();
+		roots.extend(reducer.state().clone().into_iter());
+		roots.extend(reducer.heads().clone().into_iter());
+
+		// clear log
+		reducer.log_mut().clear();
+
+		// clear reducer
+		reducer.clear();
+
+		// clear storage
+		if let Some(encrypted_storage) = &self.encrypted_storage {
+			encrypted_storage.clear_mapping(roots).await;
+		}
+	}
 }
 
 pub struct SharedCoCreator {
