@@ -300,14 +300,14 @@ where
 				// load additional encryption mappings
 				if let Some(mapping) = &local.mapping {
 					self.encrypted_storage.load_mapping(mapping).await?;
-
-					// convert state/heads to internal
-					state = self.to_internal_cid(state).await?;
-					heads = stream::iter(heads.iter())
-						.then(|cid| async { self.to_internal_cid(*cid).await })
-						.try_collect()
-						.await?;
 				}
+
+				// convert state/heads to internal
+				state = self.to_internal_cid(state).await?;
+				heads = stream::iter(heads.iter())
+					.then(|cid| async { self.to_internal_cid(*cid).await })
+					.try_collect()
+					.await?;
 
 				// apply
 				yield (state, heads)

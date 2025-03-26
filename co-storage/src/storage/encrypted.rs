@@ -162,9 +162,9 @@ where
 			let plain = block.block(&self.key).map_err(|e| StorageError::Internal(e.into()))?;
 
 			// apply mappings
-			if !plain.references.is_empty() {
-				self.mapping.extend(plain.references.iter().map(|(k, v)| (*k, *v))).await;
-			}
+			self.mapping
+				.extend([(plain.cid, *cid)].into_iter().chain(plain.references.clone().into_iter()))
+				.await;
 
 			// result
 			plain.into()
