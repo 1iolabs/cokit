@@ -128,7 +128,7 @@ async fn test_conflicting_membership_update() {
 			.await
 			.unwrap();
 		let nodes_root_dag = nodes.get(AbsolutePath::new_unchecked("/")).unwrap();
-		let nodes_root: BTreeSet<Node> = state::into_collection(&co.storage(), nodes_root_dag).await.unwrap();
+		let nodes_root: BTreeSet<Node> = state::into_collection(&storage, nodes_root_dag).await.unwrap();
 		assert_eq!(nodes_root.len(), 2);
 	}
 

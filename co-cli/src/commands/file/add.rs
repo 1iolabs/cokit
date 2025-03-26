@@ -33,7 +33,7 @@ pub async fn command(
 	let identity = application.local_identity();
 
 	// state
-	let file_state: co_core_file::File = file_core(co_reducer.clone(), &identity, &file_command.core).await?;
+	let (storage, file_state) = file_core(co_reducer.clone(), &identity, &file_command.core).await?;
 
 	// path
 	let path = AbsolutePath::from_str(&command.path)?.normalize()?;
@@ -41,7 +41,7 @@ pub async fn command(
 
 	// validate
 	//  test if parent path exists
-	get_nodes(co_reducer.storage(), file_state, vec![parent_path.to_owned()].into_iter().collect())
+	get_nodes(storage.clone(), file_state, vec![parent_path.to_owned()].into_iter().collect())
 		.await?
 		.get(parent_path)
 		.ok_or_else(|| FileError::NoEntry(parent_path.into(), anyhow!("add")))?;
@@ -50,7 +50,7 @@ pub async fn command(
 	let stat = tokio::fs::metadata(&command.file_path).await?;
 
 	// content
-	let contents = unixfs_add_file(&co_reducer.storage(), &command.file_path).await?;
+	let contents = unixfs_add_file(&storage, &command.file_path).await?;
 
 	// action
 	let action = FileAction::Create {

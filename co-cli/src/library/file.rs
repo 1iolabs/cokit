@@ -37,7 +37,11 @@ pub enum FileError {
 
 /// Get file core state.
 /// If the core not exists yet create it.
-pub async fn file_core<I>(co_reducer: CoReducer, identity: &I, core: &str) -> Result<co_core_file::File, FileError>
+pub async fn file_core<I>(
+	co_reducer: CoReducer,
+	identity: &I,
+	core: &str,
+) -> Result<(CoStorage, co_core_file::File), FileError>
 where
 	I: PrivateIdentity + Debug + Send + Sync,
 {
@@ -52,9 +56,9 @@ where
 			co_reducer.push(identity, CO_CORE_NAME_CO, &create).await?;
 
 			// assume default state
-			Ok(Default::default())
+			Ok((co_reducer.storage(), Default::default()))
 		},
-		result => Ok(result?.1),
+		result => Ok(result?),
 	}
 }
 
