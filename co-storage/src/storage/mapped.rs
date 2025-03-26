@@ -6,24 +6,22 @@ use std::collections::BTreeSet;
 
 /// Mappes certain CID codecs to mapped CIDs using BlockStorageContentMapping.
 #[derive(Debug, Clone)]
-pub struct MappedBlockStorage<S, M> {
+pub struct MappedBlockStorage<S> {
 	storage: S,
-	mapping: M,
 	codecs: BTreeSet<MultiCodec>,
 }
-impl<S, M> MappedBlockStorage<S, M>
+impl<S> MappedBlockStorage<S>
 where
-	S: BlockStorage + Send + Sync + 'static,
-	M: BlockStorageContentMapping + Send + Sync + 'static,
+	S: BlockStorage + BlockStorageContentMapping + Send + Sync + 'static,
 {
-	pub fn new(storage: S, mapping: M, codecs: BTreeSet<MultiCodec>) -> Self {
-		Self { mapping, codecs, storage }
+	pub fn new(storage: S, codecs: BTreeSet<MultiCodec>) -> Self {
+		Self { codecs, storage }
 	}
 
 	pub async fn to_mapped(&self, cid: &Cid) -> Cid {
 		let codec = cid.into();
 		if self.codecs.contains(&codec) {
-			match self.mapping.to_mapped(cid).await {
+			match self.storage.to_mapped(cid).await {
 				Some(mapped) => mapped,
 				None => *cid,
 			}
@@ -33,10 +31,9 @@ where
 	}
 }
 #[async_trait]
-impl<S, M> BlockStorage for MappedBlockStorage<S, M>
+impl<S> BlockStorage for MappedBlockStorage<S>
 where
-	S: BlockStorage + Send + Sync + 'static,
-	M: BlockStorageContentMapping + Clone + Send + Sync + 'static,
+	S: BlockStorage + BlockStorageContentMapping + Send + Sync + 'static,
 {
 	type StoreParams = S::StoreParams;
 
@@ -61,16 +58,28 @@ where
 		Ok(self.storage.stat(&self.to_mapped(cid).await).await?)
 	}
 }
-impl<S, M> CloneWithBlockStorageSettings for MappedBlockStorage<S, M>
+impl<S> CloneWithBlockStorageSettings for MappedBlockStorage<S>
 where
 	S: CloneWithBlockStorageSettings,
-	M: Clone,
 {
 	fn clone_with_settings(&self, settings: co_primitives::BlockStorageSettings) -> Self {
-		MappedBlockStorage {
-			storage: self.storage.clone_with_settings(settings),
-			mapping: self.mapping.clone(),
-			codecs: self.codecs.clone(),
-		}
+		MappedBlockStorage { storage: self.storage.clone_with_settings(settings), codecs: self.codecs.clone() }
+	}
+}
+#[async_trait]
+impl<S> BlockStorageContentMapping for MappedBlockStorage<S>
+where
+	S: BlockStorage + BlockStorageContentMapping + 'static,
+{
+	async fn is_content_mapped(&self) -> bool {
+		self.storage.is_content_mapped().await
+	}
+
+	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
+		self.storage.to_plain(mapped).await
+	}
+
+	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
+		self.storage.to_mapped(plain).await
 	}
 }

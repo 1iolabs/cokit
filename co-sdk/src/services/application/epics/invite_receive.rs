@@ -75,7 +75,7 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 			peer: Some(peer.to_bytes()),
 		};
 		let membership_tags = tags!(
-			{KnownTags::CoInviteMetadata}: local.storage().set_serialized(&metadata).await?,
+			{KnownTags::CoInviteMetadata}: local.storage().set_serialized(&metadata).await?, // TODO: which storage?
 		);
 
 		// storage

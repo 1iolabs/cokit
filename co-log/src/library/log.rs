@@ -8,7 +8,7 @@ use serde::Serialize;
 use std::collections::{BTreeSet, HashSet};
 
 #[derive(Debug, Clone)]
-pub struct Log<S> {
+pub struct Log {
 	id: Vec<u8>,
 
 	/// Identity.
@@ -17,13 +17,10 @@ pub struct Log<S> {
 	/// Current heads.
 	heads: BTreeSet<Cid>,
 
-	/// Storage for entries.
-	entry_store: S,
-
 	// Index of entries.
 	index: HashSet<Cid>,
 }
-impl<S> Log<S> {
+impl Log {
 	pub fn id(&self) -> &[u8] {
 		&self.id
 	}
@@ -46,14 +43,6 @@ impl<S> Log<S> {
 		&self.identity_resolver
 	}
 
-	pub fn storage(&self) -> &S {
-		&self.entry_store
-	}
-
-	pub fn set_storage(&mut self, storage: S) {
-		self.entry_store = storage;
-	}
-
 	/// Test if the logs currently knowns about the entry id.
 	/// Note: This is not an complete view and only represents loaded/joined entries.
 	pub fn contains(&self, cid: &Cid) -> bool {
@@ -70,46 +59,53 @@ impl<S> Log<S> {
 		self.index.clear();
 	}
 }
-impl<S> Log<S>
-where
-	S: BlockStorage + Clone + Sync + Send + 'static,
-{
-	pub fn new(id: Vec<u8>, identity_resolver: IdentityResolverBox, store: S, heads: BTreeSet<Cid>) -> Self {
-		Log { id, identity_resolver, heads, entry_store: store, index: Default::default() }
+impl Log {
+	pub fn new(id: Vec<u8>, identity_resolver: IdentityResolverBox, heads: BTreeSet<Cid>) -> Self {
+		Log { id, identity_resolver, heads, index: Default::default() }
 	}
 
 	/// Create new log with random ID.
-	pub fn create(identity_resolver: IdentityResolverBox, store: S) -> Self {
-		Self::new(uuid::Uuid::new_v4().to_bytes_le().to_vec(), identity_resolver, store, Default::default())
+	pub fn create(identity_resolver: IdentityResolverBox) -> Self {
+		Self::new(uuid::Uuid::new_v4().to_bytes_le().to_vec(), identity_resolver, Default::default())
 	}
 
-	pub async fn get(&self, cid: &Cid) -> Result<EntryBlock<S::StoreParams>, LogError> {
-		let block = self.entry_store.get(cid).await?;
+	pub async fn get<S>(&self, storage: &S, cid: &Cid) -> Result<EntryBlock, LogError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		let block = storage.get(cid).await?;
 		Ok(EntryBlock::from_block(block)?)
 	}
 
 	/// Iterate entries starting at the head.
-	pub fn stream(&self) -> impl Stream<Item = Result<EntryBlock<S::StoreParams>, LogError>> + '_ {
-		create_stream(&self.entry_store, self.heads().clone())
+	pub fn stream<'a, S>(&self, storage: &'a S) -> impl Stream<Item = Result<EntryBlock, LogError>> + use<'a, S>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		create_stream(storage, self.heads().clone())
 	}
 
 	/// Iterate entries starting at the head.
-	pub fn into_stream(self) -> impl Stream<Item = Result<EntryBlock<S::StoreParams>, LogError>> {
+	pub fn into_stream<S>(self, storage: &S) -> impl Stream<Item = Result<EntryBlock, LogError>> + use<S>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		let storage = storage.clone();
 		async_stream::stream! {
-			for await i in create_stream(&self.entry_store, self.heads().clone()) {
+			for await i in create_stream(&storage, self.heads().clone()) {
 				yield i;
 			}
 		}
 	}
 
 	/// Push item as new entry.
-	pub async fn push<I: PrivateIdentity + Send + Sync>(
-		&mut self,
-		identity: &I,
-		item: Cid,
-	) -> Result<Link<Entry>, LogError> {
+	pub async fn push<S, I>(&mut self, storage: &S, identity: &I, item: Cid) -> Result<Link<Entry>, LogError>
+	where
+		S: BlockStorage + Clone + 'static,
+		I: PrivateIdentity + Send + Sync,
+	{
 		// heads
-		let head_entries = get_entry_blocks(&self.entry_store, self.heads.iter()).await?;
+		let head_entries = get_entry_blocks(storage, self.heads.iter()).await?;
 
 		// create entry
 		let entry = Entry {
@@ -124,11 +120,11 @@ where
 			next: self.heads().clone(),
 			refs: Default::default(),
 		};
-		let entry_block = EntryBlock::<S::StoreParams>::from_entry(identity, entry)?;
+		let entry_block = EntryBlock::from_entry::<S::StoreParams, _>(identity, entry)?;
 		let entry_cid = *entry_block.cid();
 
 		// set state
-		self.entry_store.set(entry_block.block()?).await?; // to be atomic in case of error do this first
+		storage.set(entry_block.block()?).await?; // to be atomic in case of error do this first
 		self.index.insert(entry_cid);
 		self.heads_set([entry_cid].into_iter());
 
@@ -138,27 +134,36 @@ where
 
 	/// Push serializable item as new entry.
 	/// Returns the `Cid` of the `Entry`.
-	pub async fn push_event<T, I>(&mut self, identity: &I, item: &T) -> Result<(Link<Entry>, Link<T>), LogError>
+	pub async fn push_event<S, T, I>(
+		&mut self,
+		storage: &S,
+		identity: &I,
+		item: &T,
+	) -> Result<(Link<Entry>, Link<T>), LogError>
 	where
+		S: BlockStorage + Clone + 'static,
 		T: Serialize + Send + Sync + Clone,
 		I: PrivateIdentity + Send + Sync,
 	{
-		let cid = self.entry_store.set_serialized(item).await?;
-		Ok((self.push(identity, cid).await?, cid.into()))
+		let cid = storage.set_serialized(item).await?;
+		Ok((self.push(storage, identity, cid).await?, cid.into()))
 	}
 
 	/// Join other log heads.
 	///
 	/// Returns true if the other heads has been joined.
-	pub async fn join_entry(&mut self, entry: EntryBlock<S::StoreParams>) -> Result<bool, LogError> {
+	pub async fn join_entry<S>(&mut self, storage: &S, entry: EntryBlock) -> Result<bool, LogError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
 		let mut join = JoinEntry::new(self.heads.clone());
 
 		// already in log?
-		if self.load(&entry).await? {
+		if self.load(storage, &entry).await? {
 			return Ok(false);
 		}
 
-		if join.join_entry(self, entry).await? {
+		if join.join_entry(storage, self, entry).await? {
 			self.join_commit(join).await?;
 			return Ok(true);
 		}
@@ -168,28 +173,35 @@ where
 	/// Join other log heads.
 	///
 	/// Returns true if the other heads has been joined.
-	pub async fn join(&mut self, other: &Log<S>) -> Result<bool, LogError> {
-		self.join_heads(other.heads.iter()).await
+	pub async fn join<S>(&mut self, storage: &S, other: &Log) -> Result<bool, LogError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		self.join_heads(storage, other.heads.iter()).await
 	}
 
 	/// Join other log heads.
 	///
 	/// Returns true if the other heads has been joined.
-	pub async fn join_heads<'a>(
+	pub async fn join_heads<'a, S>(
 		&'a mut self,
+		storage: &S,
 		other_heads: impl IntoIterator<Item = &'a Cid> + 'a,
-	) -> Result<bool, LogError> {
+	) -> Result<bool, LogError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
 		let mut result = false;
-		let entries = get_entry_blocks(&self.entry_store, other_heads.into_iter()).await?;
+		let entries = get_entry_blocks(storage, other_heads.into_iter()).await?;
 		for entry in entries {
-			if self.join_entry(entry).await? {
+			if self.join_entry(storage, entry).await? {
 				result = true;
 			}
 		}
 		Ok(result)
 	}
 
-	async fn join_commit(&mut self, join: JoinEntry<S>) -> Result<(), LogError> {
+	async fn join_commit(&mut self, join: JoinEntry) -> Result<(), LogError> {
 		let (heads, entries_to_add) = join.into_inner();
 
 		// mut: index
@@ -225,7 +237,10 @@ where
 	/// Make sure all entries up-to `entry` are loaded (in index).
 	/// This also works with entries there are not joined yet in which case no elements are loaded.
 	/// Returns `true` if the entry is found in the log (already integrated).
-	async fn load(&mut self, entry: &EntryBlock<S::StoreParams>) -> Result<bool, LogError> {
+	async fn load<S>(&mut self, storage: &S, entry: &EntryBlock) -> Result<bool, LogError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
 		let entry_clock_time = entry.entry().clock.time;
 
 		// already loaded?
@@ -234,7 +249,7 @@ where
 		}
 
 		// use the lamport clock to detect if item is in future
-		let heads = get_entry_blocks(&self.entry_store, self.heads_iter()).await?;
+		let heads = get_entry_blocks(storage, self.heads_iter()).await?;
 		let max_clock_time = heads.iter().map(|head| head.entry().clock.time).max().unwrap_or(0);
 		if entry_clock_time > max_clock_time {
 			return Ok(false);
@@ -242,7 +257,7 @@ where
 
 		// go back
 		let self_clone = self.clone();
-		let entries = self_clone.stream();
+		let entries = self_clone.stream(storage);
 		pin_mut!(entries);
 		while let Some(item) = entries.try_next().await? {
 			// index

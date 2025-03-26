@@ -1,4 +1,4 @@
-use crate::types::storage::Storage;
+use crate::{types::storage::Storage, BlockStorageContentMapping};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
@@ -157,6 +157,8 @@ where
 		self.clone()
 	}
 }
+#[async_trait]
+impl BlockStorageContentMapping for MemoryBlockStorage {}
 
 #[derive(Debug, Clone)]
 struct Record<P> {

@@ -30,7 +30,7 @@ mod tests {
 
 		// set
 		let cid = storage.set_serialized(&42).await.unwrap();
-		let encrypted_cid = storage.content_mapping().to_plain(&cid).await.unwrap();
+		let encrypted_cid = storage.to_plain(&cid).await.unwrap();
 		assert_ne!(cid, encrypted_cid);
 		assert_eq!(is_cid_encrypted([&cid]), false);
 		assert_eq!(is_cid_encrypted([&encrypted_cid]), true);

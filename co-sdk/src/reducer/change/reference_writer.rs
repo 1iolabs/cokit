@@ -1,5 +1,5 @@
 use crate::{
-	library::max_reference_count::max_reference_count,
+	library::{max_reference_count::max_reference_count, to_external_cid::to_external_cid},
 	types::{co_dispatch::CoDispatch, co_reducer::CoReducerContextRef},
 	CoreResolver, Reducer, ReducerChangeContext, ReducerChangedHandler,
 };
@@ -42,16 +42,17 @@ where
 		max_block_size: usize,
 	) -> Result<Option<Cid>, anyhow::Error> {
 		let mut dispatch_state = Some(next_state);
+		let storage = self.reducer_context.storage(true);
 
 		// external
-		let external_next_state = self.reducer_context.to_external_cid(next_state).await?;
+		let external_next_state = to_external_cid(&storage, next_state).await;
 
 		// calc max references per action
 		let max_references = max_reference_count(max_block_size);
 
 		// diff
 		let diff = block_diff_added_with_parent(
-			self.reducer_context.storage(true),
+			storage.clone(),
 			previous_state,
 			next_state,
 			Default::default(),
@@ -71,8 +72,8 @@ where
 		while let Some((next_parent, next)) = diff.try_next().await? {
 			if let Some(next_parent) = next_parent {
 				// external
-				let external_next = self.reducer_context.to_external_cid(next).await?;
-				let external_next_parent = self.reducer_context.to_external_cid(next_parent).await?;
+				let external_next = to_external_cid(&storage, next).await;
+				let external_next_parent = to_external_cid(&storage, next_parent).await;
 
 				// record
 				references
@@ -124,6 +125,7 @@ where
 	#[tracing::instrument(err(Debug), skip_all)]
 	async fn on_state_changed(
 		&mut self,
+		_storage: &S,
 		reducer: &Reducer<S, R>,
 		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {

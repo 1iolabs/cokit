@@ -16,6 +16,7 @@ async fn test_local_smoke() {
 	let identity = DidKeyIdentity::generate(None);
 	{
 		let application = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
+			.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
 			.without_keychain()
 			.build()
 			.await

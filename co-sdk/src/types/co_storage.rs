@@ -12,7 +12,10 @@ pub struct CoStorage {
 impl CoStorage {
 	pub fn new<S>(storage: S) -> Self
 	where
-		S: BlockStorage<StoreParams = DefaultParams> + CloneWithBlockStorageSettings + 'static,
+		S: BlockStorage<StoreParams = DefaultParams>
+			+ BlockStorageContentMapping
+			+ CloneWithBlockStorageSettings
+			+ 'static,
 	{
 		Self { inner: Arc::new(storage) }
 	}
@@ -52,9 +55,23 @@ impl CloneWithBlockStorageSettings for CoStorage {
 		CoStorage { inner: self.inner.clone_arc_with_settings(settings) }
 	}
 }
+#[async_trait]
+impl BlockStorageContentMapping for CoStorage {
+	async fn is_content_mapped(&self) -> bool {
+		self.inner.is_content_mapped().await
+	}
 
-trait CoStorageBlockStorage: BlockStorage + CloneArcWithSettings {}
-impl<T> CoStorageBlockStorage for T where T: BlockStorage + CloneArcWithSettings {}
+	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
+		self.inner.to_plain(mapped).await
+	}
+
+	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
+		self.inner.to_mapped(plain).await
+	}
+}
+
+trait CoStorageBlockStorage: BlockStorage + BlockStorageContentMapping + CloneArcWithSettings {}
+impl<T> CoStorageBlockStorage for T where T: BlockStorage + BlockStorageContentMapping + CloneArcWithSettings {}
 
 trait CloneArcWithSettings {
 	fn clone_arc_with_settings(
@@ -64,35 +81,12 @@ trait CloneArcWithSettings {
 }
 impl<T> CloneArcWithSettings for T
 where
-	T: BlockStorage<StoreParams = DefaultParams> + CloneWithBlockStorageSettings + 'static,
+	T: BlockStorage<StoreParams = DefaultParams> + BlockStorageContentMapping + CloneWithBlockStorageSettings + 'static,
 {
 	fn clone_arc_with_settings(
 		&self,
 		settings: BlockStorageSettings,
 	) -> Arc<dyn CoStorageBlockStorage<StoreParams = DefaultParams> + 'static> {
 		Arc::new(self.clone_with_settings(settings))
-	}
-}
-
-#[derive(Clone)]
-pub struct CoBlockStorageContentMapping {
-	inner: Arc<dyn BlockStorageContentMapping + Send + Sync + 'static>,
-}
-impl CoBlockStorageContentMapping {
-	pub fn new<M>(mapping: M) -> Self
-	where
-		M: BlockStorageContentMapping + Send + Sync + 'static,
-	{
-		Self { inner: Arc::new(mapping) }
-	}
-}
-#[async_trait]
-impl BlockStorageContentMapping for CoBlockStorageContentMapping {
-	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
-		self.inner.to_plain(mapped).await
-	}
-
-	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
-		self.inner.to_mapped(plain).await
 	}
 }

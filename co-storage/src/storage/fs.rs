@@ -1,4 +1,4 @@
-use crate::Storage;
+use crate::{BlockStorageContentMapping, Storage};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
@@ -233,6 +233,8 @@ impl CloneWithBlockStorageSettings for FsStorage {
 		self.clone()
 	}
 }
+#[async_trait]
+impl BlockStorageContentMapping for FsStorage {}
 
 /// Convert io result to storage result.
 fn into_storage_result<T>(cid: &Cid, result: std::io::Result<T>) -> Result<T, StorageError> {

@@ -6,13 +6,12 @@ use crate::{
 	library::{
 		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
 		locals::{ApplicationLocal, FileLocals, Locals, MemoryLocals},
-		to_external_cid::to_external_cid,
-		to_plain::{to_plain, to_plain_one},
+		to_external_cid::{to_external_cid_opt, to_external_cids_opt_map},
+		to_internal_cid::{to_internal_cid, to_internal_cids},
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{
 		co_reducer::{CoReducerContext, CoReducerContextRef},
-		co_storage::CoBlockStorageContentMapping,
 		cores::{CO_CORE_NAME_CO, CO_CORE_STORAGE},
 	},
 	CoReducer, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, ReducerChangeContext, Runtime, TaskSpawner,
@@ -24,9 +23,9 @@ use cid::Cid;
 use co_core_storage::StorageAction;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
-use co_primitives::{tags, DefaultParams, Did, KnownMultiCodec, MultiCodec};
+use co_primitives::{tags, Did};
 use co_runtime::RuntimePool;
-use co_storage::{BlockStorage, EncryptedBlockStorage, EncryptionReferenceMode, StorageError};
+use co_storage::{BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode};
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -158,8 +157,7 @@ where
 		let storage = CoStorage::new(encrypted_storage.clone());
 
 		// create log
-		let log =
-			Log::new(CO_ID_LOCAL.as_bytes().to_vec(), create_identity_resolver(), storage.clone(), Default::default());
+		let log = Log::new(CO_ID_LOCAL.as_bytes().to_vec(), create_identity_resolver(), Default::default());
 
 		// result
 		let result = Self {
@@ -187,18 +185,18 @@ where
 		}
 
 		// create reducer
-		let mut reducer = builder.build(runtime.runtime()).await?;
+		let mut reducer = builder.build(&storage, runtime.runtime()).await?;
 
 		// write
 		reducer.add_change_handler(Box::new(result.clone()));
 
 		// create empty
 		if reducer.is_empty() {
-			setup_local_co(runtime.runtime(), &local_co.identity, &mut reducer, &local_co.settings).await?;
+			setup_local_co(&storage, runtime.runtime(), &local_co.identity, &mut reducer, &local_co.settings).await?;
 		}
 
 		// reducer
-		let co_reducer = CoReducer::new(CO_ID_LOCAL.into(), None, runtime, reducer, context);
+		let co_reducer = CoReducer::new(CO_ID_LOCAL.into(), None, storage, runtime, reducer, context);
 
 		// watch
 		if watcher {
@@ -211,7 +209,12 @@ where
 				while let Some(local) = watcher.next().await {
 					// convert heads to unencrypted
 					let local_heads = match stream::iter(local.heads.iter())
-						.then(|cid| async { watch_reducer.context.to_internal_cid(*cid).await })
+						.then(|cid| async {
+							watch_encrypted_storage
+								.to_mapped(cid)
+								.await
+								.ok_or_else(|| anyhow!("Map head failed: {}", *cid))
+						})
 						.try_collect()
 						.await
 					{
@@ -257,26 +260,34 @@ where
 
 	/// Write state to disk.
 	/// Returns false and does nothing if reducer is empty.
-	pub async fn write<S, R>(&mut self, reducer: &Reducer<S, R>, mapping: Option<Cid>) -> Result<bool, anyhow::Error>
+	pub async fn write<S, R>(
+		&mut self,
+		storage: &S,
+		reducer: &Reducer<S, R>,
+		mapping: Option<Cid>,
+	) -> Result<bool, anyhow::Error>
 	where
-		S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
+		S: BlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
 		R: CoreResolver<S> + Send + Sync + 'static,
 	{
 		if let Some(state) = reducer.state() {
-			let content_mapping = Some(self.encrypted_storage.content_mapping());
-
 			// heads
-			let plain_heads = to_plain(&content_mapping, true, reducer.heads().iter().cloned())
+			let plain_heads_map = to_external_cids_opt_map(storage, reducer.heads().clone())
 				.await
-				.map_err(|err| anyhow!("Failed to map head: {}", err))?;
+				.ok_or_else(|| anyhow!("Failed to map heads: {:?}", reducer.heads()))?;
 
 			// state
-			let plain_state = to_plain_one(&content_mapping, true, *state)
+			let plain_state = to_external_cid_opt(storage, Some(*state))
 				.await
-				.map_err(|err| anyhow!("Failed to map state: {}", err))?;
+				.ok_or_else(|| anyhow!("Failed to map state: {:?}", state))?;
+
+			// make sure the root mappings are available in parent storage
+			self.encrypted_storage
+				.insert_mappings([(*state, plain_state)].into_iter().chain(plain_heads_map.clone()))
+				.await;
 
 			// create format
-			let local = ApplicationLocal::new(plain_heads, plain_state, mapping);
+			let local = ApplicationLocal::new(plain_heads_map.values().cloned().collect(), plain_state, mapping);
 
 			// log
 			#[cfg(debug_assertions)]
@@ -303,11 +314,8 @@ where
 				}
 
 				// convert state/heads to internal
-				state = self.to_internal_cid(state).await?;
-				heads = stream::iter(heads.iter())
-					.then(|cid| async { self.to_internal_cid(*cid).await })
-					.try_collect()
-					.await?;
+				state = to_internal_cid(&self.encrypted_storage, state).await;
+				heads = to_internal_cids(&self.encrypted_storage, heads).await;
 
 				// apply
 				yield (state, heads)
@@ -318,16 +326,17 @@ where
 #[async_trait]
 impl<L, S, R> ReducerChangedHandler<S, R> for LocalCoInstance<L>
 where
-	S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
+	S: BlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 	L: Locals + Clone + Debug + Send + Sync + 'static,
 {
 	async fn on_state_changed(
 		&mut self,
+		storage: &S,
 		reducer: &Reducer<S, R>,
 		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
-		self.write(reducer, None).await?;
+		self.write(storage, reducer, None).await?;
 		Ok(())
 	}
 }
@@ -339,10 +348,6 @@ where
 	fn storage(&self, _force_local: bool) -> CoStorage {
 		// the LocalCo never uses networking and is always encrypted
 		CoStorage::new(self.encrypted_storage.clone())
-	}
-
-	fn content_mapping(&self) -> Option<CoBlockStorageContentMapping> {
-		Some(CoBlockStorageContentMapping::new(self.encrypted_storage.content_mapping()))
 	}
 
 	async fn refresh(&self, _parent: CoReducer, co: CoReducer) -> anyhow::Result<()> {
@@ -361,23 +366,6 @@ where
 
 		// done
 		Ok(())
-	}
-
-	/// Map external [`Cid`] to internal [`Cid`].
-	/// If no mapping is needed/available return the original [`Cid`].
-	async fn to_internal_cid(&self, cid: Cid) -> Result<Cid, StorageError> {
-		match MultiCodec::from(&cid) {
-			MultiCodec::Known(KnownMultiCodec::CoEncryptedBlock) => {
-				Ok(*self.encrypted_storage.get_unencrypted(&cid).await?.cid())
-			},
-			_ => Ok(cid),
-		}
-	}
-
-	/// Map internal [`Cid`] to external [`Cid`].
-	/// If no mapping is needed/available return the original [`Cid`].
-	async fn to_external_cid(&self, cid: Cid) -> Result<Cid, StorageError> {
-		Ok(to_external_cid(&self.encrypted_storage.content_mapping(), cid).await)
 	}
 
 	/// Clear reducer caches.
@@ -429,15 +417,16 @@ where
 }
 
 /// Setup the Local CO by adding cores.
-#[tracing::instrument(err, skip(runtime, reducer))]
+#[tracing::instrument(err, skip(runtime, reducer, storage))]
 async fn setup_local_co<S, R>(
+	storage: &S,
 	runtime: &RuntimePool,
 	identity: &LocalIdentity,
 	reducer: &mut Reducer<S, R>,
 	settings: &ApplicationSettings,
 ) -> Result<(), anyhow::Error>
 where
-	S: BlockStorage<StoreParams = DefaultParams> + Sync + Send + Clone + 'static,
+	S: BlockStorage + Sync + Send + Clone + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
 	// create
@@ -482,11 +471,12 @@ where
 		participants,
 		key: None,
 	};
-	reducer.push(runtime, identity, CO_CORE_NAME_CO, &action).await?;
+	reducer.push(storage, runtime, identity, CO_CORE_NAME_CO, &action).await?;
 
 	// setup storage core
 	reducer
 		.push(
+			storage,
 			runtime,
 			identity,
 			CO_CORE_NAME_STORAGE,
@@ -499,6 +489,7 @@ where
 		.await?;
 	reducer
 		.push(
+			storage,
 			runtime,
 			identity,
 			CO_CORE_NAME_STORAGE,

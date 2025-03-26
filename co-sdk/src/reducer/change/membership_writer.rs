@@ -1,5 +1,5 @@
 use crate::{
-	library::to_external_cid::{to_external_cid, to_external_cids},
+	library::to_external_cid::{to_external_cid, to_external_cids_map},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	CoReducer, CoStorage, Reducer, ReducerChangeContext, ReducerChangedHandler,
 };
@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_core_membership::MembershipsAction;
 use co_identity::PrivateIdentity;
-use co_primitives::CoId;
+use co_primitives::{CoId, WeakCid};
 use co_storage::EncryptedBlockStorage;
 use std::{collections::BTreeSet, fmt::Debug, mem::swap};
 
@@ -43,21 +43,24 @@ where
 {
 	async fn on_state_changed(
 		&mut self,
+		storage: &CoStorage,
 		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
 		if let Some(state) = reducer.state() {
 			// next
-			let mut next_state = *state;
-			let mut next_heads = reducer.heads().clone();
+			let next_state = to_external_cid(storage, *state).await;
+			let next_heads_map = to_external_cids_map(storage, reducer.heads().clone()).await;
+
+			// make sure the root mappings are available in parent storage
 			if let Some(encrypted_storage) = &self.encrypted_storage {
-				let mapping = encrypted_storage.content_mapping();
-				next_state = to_external_cid(&mapping, next_state).await;
-				next_heads = to_external_cids(&mapping, next_heads).await;
+				encrypted_storage
+					.insert_mappings([(*state, next_state)].into_iter().chain(next_heads_map.clone()))
+					.await;
 			}
 
 			// next last heads
-			let mut last_heads = next_heads.clone();
+			let mut last_heads: BTreeSet<Cid> = next_heads_map.values().cloned().collect();
 			swap(&mut self.last_heads, &mut last_heads);
 
 			// update
@@ -68,7 +71,7 @@ where
 					&MembershipsAction::Update {
 						id: self.id.to_owned(),
 						state: next_state.into(),
-						heads: next_heads.into_iter().map(Into::into).collect(),
+						heads: next_heads_map.values().map(WeakCid::from).collect(),
 						encryption_mapping: None,
 						remove: last_heads.into_iter().map(Into::into).collect(),
 					},

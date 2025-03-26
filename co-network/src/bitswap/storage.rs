@@ -12,7 +12,7 @@ use libp2p::{
 	PeerId, Swarm,
 };
 use libp2p_bitswap::{BitswapEvent, QueryId};
-use std::{collections::BTreeSet, marker::PhantomData, mem::swap, sync::Arc, time::Duration};
+use std::{collections::BTreeSet, marker::PhantomData, mem::swap, time::Duration};
 use tokio_stream::StreamExt;
 
 pub struct NetworkBlockStorage<S, B, C, N, P> {
@@ -21,14 +21,14 @@ pub struct NetworkBlockStorage<S, B, C, N, P> {
 	peer_provider: P,
 	_behaviour: PhantomData<fn(B)>,
 	_context: PhantomData<fn(C)>,
-	mapping: Option<Arc<dyn BlockStorageContentMapping + Send + Sync + 'static>>,
+	mapping: bool,
 	timeout: Duration,
 	tokens: Vec<Token>,
 	settings: BlockStorageSettings,
 }
 impl<S, B, C, N, P> NetworkBlockStorage<S, B, C, N, P>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
+	S: BlockStorage + BlockStorageContentMapping + Send + Sync + Clone + 'static,
 	B: NetworkBehaviour + BitswapBehaviourProvider,
 	P: PeerProvider + Send + Sync + 'static,
 	N: NetworkTaskSpawner<B, C> + Send + Sync + 'static,
@@ -38,8 +38,8 @@ where
 			next,
 			spawner,
 			peer_provider,
-			mapping: None,
 			timeout,
+			mapping: false,
 			tokens: Default::default(),
 			_behaviour: Default::default(),
 			_context: Default::default(),
@@ -47,8 +47,8 @@ where
 		}
 	}
 
-	pub fn set_mapping<M: BlockStorageContentMapping + Send + Sync + 'static>(&mut self, mapping: M) {
-		self.mapping = Some(Arc::new(mapping));
+	pub fn set_mapping(&mut self, mapping: bool) {
+		self.mapping = mapping;
 	}
 
 	pub fn set_tokens(&mut self, tokens: Vec<Token>) {
@@ -96,8 +96,8 @@ where
 	}
 
 	async fn to_network_cid(&self, cid: Cid) -> Cid {
-		if let Some(mapping) = &self.mapping {
-			mapping.to_plain(&cid).await.unwrap_or(cid)
+		if self.mapping && self.next.is_content_mapped().await {
+			self.next.to_plain(&cid).await.unwrap_or(cid)
 		} else {
 			cid
 		}
@@ -126,7 +126,7 @@ where
 #[async_trait]
 impl<S, B, C, N, P> BlockStorage for NetworkBlockStorage<S, B, C, N, P>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
+	S: BlockStorage + BlockStorageContentMapping + Send + Sync + Clone + 'static,
 	B: NetworkBehaviour + BitswapBehaviourProvider,
 	P: PeerProvider + Clone + Send + Sync + 'static,
 	N: NetworkTaskSpawner<B, C> + Clone + Send + Sync + 'static,
@@ -189,6 +189,26 @@ where
 			_behaviour: Default::default(),
 			_context: Default::default(),
 		}
+	}
+}
+#[async_trait]
+impl<S, B, C, N, P> BlockStorageContentMapping for NetworkBlockStorage<S, B, C, N, P>
+where
+	S: BlockStorage + BlockStorageContentMapping + Send + Sync + Clone + 'static,
+	B: NetworkBehaviour + BitswapBehaviourProvider,
+	P: PeerProvider + Clone + Send + Sync + 'static,
+	N: NetworkTaskSpawner<B, C> + Clone + Send + Sync + 'static,
+{
+	async fn is_content_mapped(&self) -> bool {
+		self.next.is_content_mapped().await
+	}
+
+	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
+		self.next.to_plain(mapped).await
+	}
+
+	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
+		self.next.to_mapped(plain).await
 	}
 }
 

@@ -1,20 +1,14 @@
-use crate::{Block, DefaultParams, KnownMultiCodec, StoreParams};
-use cid::Cid;
-use multihash_codetable::{Code, MultihashDigest};
+use crate::{from_cbor, to_cbor, Block, CborError, DefaultParams, KnownMultiCodec, StoreParams};
 use serde::Serialize;
-use serde_ipld_dagcbor::{DecodeError, EncodeError};
-use std::{any::type_name, collections::TryReserveError, convert::Infallible, marker::PhantomData};
+use std::marker::PhantomData;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BlockSerializerError {
 	#[error("Block size {1} exceeds {0}.")]
 	BlockToLarge(usize, usize),
 
-	#[error("Encode failed.")]
-	Encode(#[from] EncodeError<TryReserveError>),
-
-	#[error("Decode {0:?} to '{1}' failed")]
-	Decode(Cid, String, #[source] DecodeError<Infallible>),
+	#[error("CBOR failed.")]
+	Cbor(#[from] CborError),
 }
 
 /// DagCbor Block Serializer/Deserializer.
@@ -45,13 +39,11 @@ where
 	where
 		T: Serialize,
 	{
-		let data = serde_ipld_dagcbor::to_vec(item)?;
+		let data = to_cbor(item)?;
 		if S::MAX_BLOCK_SIZE < data.len() {
 			return Err(BlockSerializerError::BlockToLarge(S::MAX_BLOCK_SIZE, data.len()));
 		}
-		let mh = Code::Blake3_256.digest(&data);
-		let cid = Cid::new_v1(self.codec, mh);
-		Ok(Block::new_unchecked(cid, data))
+		Ok(Block::new_data(self.codec, data))
 	}
 
 	/// Deserialize block to item.
@@ -59,8 +51,7 @@ where
 	where
 		T: serde::de::Deserialize<'a>,
 	{
-		serde_ipld_dagcbor::from_slice::<'a, T>(item.data())
-			.map_err(|e| BlockSerializerError::Decode(*item.cid(), type_name::<T>().to_owned(), e))
+		Ok(from_cbor(item.data())?)
 	}
 }
 

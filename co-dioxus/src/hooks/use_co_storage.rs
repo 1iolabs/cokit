@@ -3,7 +3,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings};
-use co_sdk::{Application, BlockStat, BlockStorage, CoId, CoStorage, StorageError};
+use co_sdk::{Application, BlockStat, BlockStorage, BlockStorageContentMapping, CoId, CoStorage, StorageError};
 use dioxus::hooks::use_context;
 use futures::Future;
 use tokio::sync::{mpsc, oneshot};
@@ -71,6 +71,7 @@ impl CloneWithBlockStorageSettings for CoBlockStorage {
 		CoBlockStorage { co: self.co.clone(), settings: Some(settings), tx: self.tx.clone() }
 	}
 }
+impl BlockStorageContentMapping for CoBlockStorage {}
 
 enum Command<P> {
 	Get(CoId, Cid, Option<BlockStorageSettings>, oneshot::Sender<Result<Block<P>, StorageError>>),

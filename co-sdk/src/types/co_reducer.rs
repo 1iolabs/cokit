@@ -1,6 +1,9 @@
-use super::{co_dispatch::CoDispatch, co_storage::CoBlockStorageContentMapping};
+use super::co_dispatch::CoDispatch;
 use crate::{
-	library::to_external_cid::{to_external_cid, to_external_cid_opt, to_external_cids},
+	library::{
+		to_external_cid::{to_external_cid_opt, to_external_cids},
+		to_internal_cid::{to_internal_cid, to_internal_cids},
+	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	state::core_state,
 	CoStorage, Reducer, Runtime,
@@ -13,7 +16,7 @@ use co_primitives::{
 	BlockStorageSettings, CloneWithBlockStorageSettings, CoId, KnownMultiCodec, OptionLink, ReducerAction,
 };
 use co_storage::{BlockStorageExt, MappedBlockStorage, StorageError};
-use futures::{stream, Stream, StreamExt, TryStreamExt};
+use futures::Stream;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::BTreeSet, fmt::Debug, marker::PhantomData, sync::Arc};
 use tokio::sync::RwLock;
@@ -32,17 +35,22 @@ impl CoReducer {
 	pub(crate) fn new(
 		id: CoId,
 		parent: Option<CoId>,
+		storage: CoStorage,
 		runtime: Runtime,
 		reducer: Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 		context: CoReducerContextRef,
 	) -> Self {
+		Self { id, parent, runtime, storage, reducer: Arc::new(RwLock::new(reducer)), context }
+	}
+
+	pub(crate) fn clone_with_detached_storage(&self) -> Self {
 		Self {
-			id,
-			parent,
-			runtime,
-			storage: reducer.log().storage().clone(),
-			reducer: Arc::new(RwLock::new(reducer)),
-			context,
+			id: self.id.clone(),
+			parent: self.parent.clone(),
+			runtime: self.runtime.clone(),
+			storage: self.storage.clone_with_settings(BlockStorageSettings::new().with_detached()),
+			reducer: self.reducer.clone(),
+			context: self.context.clone(),
 		}
 	}
 
@@ -67,26 +75,17 @@ impl CoReducer {
 	}
 
 	/// Get a new storage instance for this CO.
-	/// This starts a new session and the same (or cloned) storage instance should be used while traversing the co
-	/// state.
 	pub fn storage(&self) -> CoStorage {
-		// self.storage.clone()
-		self.storage.clone_with_settings(BlockStorageSettings::new().with_detached())
+		self.storage.clone()
 	}
 
 	/// Get mapped storage instance for this CO.
 	#[deprecated]
 	pub fn mapped_storage(&self) -> CoStorage {
-		let storage = self.storage();
-		if let Some(mapping) = self.context.content_mapping() {
-			CoStorage::new(MappedBlockStorage::new(
-				storage,
-				mapping,
-				[KnownMultiCodec::CoEncryptedBlock.into()].into_iter().collect(),
-			))
-		} else {
-			storage
-		}
+		CoStorage::new(MappedBlockStorage::new(
+			self.storage(),
+			[KnownMultiCodec::CoEncryptedBlock.into()].into_iter().collect(),
+		))
 	}
 
 	/// Get reducer watcher.
@@ -126,7 +125,7 @@ impl CoReducer {
 		self.reducer
 			.write()
 			.await
-			.push(self.runtime.runtime(), identity, core, item)
+			.push(&self.storage, self.runtime.runtime(), identity, core, item)
 			.await
 	}
 
@@ -141,7 +140,7 @@ impl CoReducer {
 		self.reducer
 			.write()
 			.await
-			.push_action(self.runtime.runtime(), identity, action)
+			.push_action(&self.storage, self.runtime.runtime(), identity, action)
 			.await
 	}
 
@@ -150,23 +149,26 @@ impl CoReducer {
 	#[tracing::instrument(err, ret, fields(co = self.id().as_str()), skip(self))]
 	pub async fn join(&self, heads: &BTreeSet<Cid>) -> Result<bool, anyhow::Error> {
 		// to internal cids
-		let internal_heads: BTreeSet<Cid> = stream::iter(heads.iter())
-			.then(|cid| async { self.context.to_internal_cid(*cid).await })
-			.try_collect()
-			.await?;
+		let internal_heads: BTreeSet<Cid> = to_internal_cids(&self.storage, heads.clone()).await;
 
 		// join
-		Ok(self.reducer.write().await.join(&internal_heads, self.runtime.runtime()).await?)
+		Ok(self
+			.reducer
+			.write()
+			.await
+			.join(&self.storage, &internal_heads, self.runtime.runtime())
+			.await?)
 	}
 
 	/// Insert a previous (trusted) snapshot into history which may can used as a starting point.
 	pub async fn insert_snapshot(&self, state: Cid, heads: BTreeSet<Cid>) -> Result<(), StorageError> {
+		// we use the context storage here because its the parent of the reducer storage
+		// and we want to have the snapshots mappings in the parent so the reducer has it always available
+		let storage = self.context.storage(false);
+
 		// to internal cids
-		let internal_state = self.context.to_internal_cid(state).await?;
-		let internal_heads: BTreeSet<Cid> = stream::iter(heads.iter())
-			.then(|cid| async { self.context.to_internal_cid(*cid).await })
-			.try_collect()
-			.await?;
+		let internal_state = to_internal_cid(&storage, state).await;
+		let internal_heads = to_internal_cids(&storage, heads).await;
 
 		// insert
 		self.reducer.write().await.insert_snapshot(internal_state, internal_heads);
@@ -211,22 +213,10 @@ impl CoReducer {
 		Arc::into_inner(self.reducer).map(|lock| (self.storage, lock.into_inner(), self.context))
 	}
 
-	/// Convert an CO CID to an external (plain) CID.
-	pub async fn to_external_cid(&self, cid: Cid) -> Cid {
-		match self.context.content_mapping() {
-			Some(mapping) => to_external_cid(&mapping, cid).await,
-			None => cid,
-		}
-	}
-
 	/// Get current reducer state and heads.
 	pub async fn external_reducer_state(&self) -> (Option<Cid>, BTreeSet<Cid>) {
 		let (state, heads) = self.reducer_state().await;
-		if let Some(mapping) = self.context.content_mapping() {
-			(to_external_cid_opt(&mapping, state).await, to_external_cids(&mapping, heads).await)
-		} else {
-			(state, heads)
-		}
+		(to_external_cid_opt(&self.storage, state).await, to_external_cids(&self.storage, heads).await)
 	}
 
 	/// Refresh the reducer instance parent state.
@@ -272,17 +262,8 @@ pub trait CoReducerContext: Debug {
 	/// - `force_local` - If true the new instance should not use networking.
 	fn storage(&self, force_local: bool) -> CoStorage;
 
-	/// Get encryption mapping instance.
-	fn content_mapping(&self) -> Option<CoBlockStorageContentMapping>;
-
 	/// Refresh reducer instance state from source.
 	async fn refresh(&self, parent: CoReducer, co: CoReducer) -> anyhow::Result<()>;
-
-	/// Map external [`Cid`] to internal [`Cid`].
-	async fn to_internal_cid(&self, cid: Cid) -> Result<Cid, StorageError>;
-
-	/// Map internal [`Cid`] to external [`Cid`].
-	async fn to_external_cid(&self, cid: Cid) -> Result<Cid, StorageError>;
 
 	/// Clear reducer caches.
 	async fn clear(&self, co: CoReducer);

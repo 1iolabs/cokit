@@ -1,11 +1,7 @@
 use crate::{EntryBlock, Log, LogError};
 use co_identity::{Identity, IdentityResolver};
-use co_storage::BlockStorage;
 
-pub async fn verify_entry<S>(log: &Log<S>, entry: &EntryBlock<S::StoreParams>) -> Result<(), LogError>
-where
-	S: BlockStorage,
-{
+pub async fn verify_entry(log: &Log, entry: &EntryBlock) -> Result<(), LogError> {
 	// verify log
 	if &entry.entry().id != log.id() {
 		return Err(LogError::InvalidArgument(anyhow::anyhow!(

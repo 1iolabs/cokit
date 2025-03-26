@@ -1,4 +1,4 @@
-use crate::{BlockStat, BlockStorage, StorageError};
+use crate::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, StoreParams};
@@ -63,5 +63,23 @@ where
 {
 	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
 		Self { next: self.next.clone_with_settings(settings), checked: self.checked, _p: Default::default() }
+	}
+}
+#[async_trait]
+impl<S, P> BlockStorageContentMapping for StoreParamsBlockStorage<S, P>
+where
+	S: BlockStorage + CloneWithBlockStorageSettings + BlockStorageContentMapping + 'static,
+	P: StoreParams,
+{
+	async fn is_content_mapped(&self) -> bool {
+		self.next.is_content_mapped().await
+	}
+
+	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
+		self.next.to_plain(mapped).await
+	}
+
+	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
+		self.next.to_mapped(plain).await
 	}
 }

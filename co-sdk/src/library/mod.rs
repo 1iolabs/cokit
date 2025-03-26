@@ -26,6 +26,6 @@ pub mod response_list;
 pub mod runtime_dispatch;
 pub mod settings_timeout;
 pub mod to_external_cid;
-pub mod to_plain;
+pub mod to_internal_cid;
 pub mod update_co;
 pub mod wait_response;

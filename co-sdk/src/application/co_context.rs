@@ -27,7 +27,7 @@ use co_identity::{
 };
 use co_log::EntryBlock;
 use co_primitives::{BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did, Tags};
-use co_storage::{BlockStorage, ChangeBlockStorage, EncryptedBlockStorage, EncryptionReferenceMode, StorageError};
+use co_storage::{ChangeBlockStorage, EncryptedBlockStorage, EncryptionReferenceMode, StorageError};
 use futures::{Stream, TryStreamExt};
 use std::{
 	collections::{BTreeMap, VecDeque},
@@ -57,7 +57,7 @@ impl CoContext {
 	) -> Result<
 		(
 			CoStorage,
-			impl Stream<Item = Result<EntryBlock<<CoStorage as BlockStorage>::StoreParams>, anyhow::Error>>,
+			impl Stream<Item = Result<EntryBlock, anyhow::Error>>,
 			Arc<dyn CoReducerContext + Send + Sync + 'static>,
 		),
 		anyhow::Error,
@@ -80,7 +80,7 @@ impl CoContext {
 		let log = reducer.into_log();
 
 		// stream
-		let stream = log.into_stream().map_err(|e| e.into());
+		let stream = log.into_stream(&storage).map_err(|e| e.into());
 
 		// result
 		Ok((storage, stream, context))
@@ -337,7 +337,7 @@ impl Actor for ReducersActor {
 
 				// get/create
 				if let Some(reducer) = state.reducers.get(&id) {
-					response.send(Ok(reducer.clone())).ok();
+					response.send(Ok(reducer.clone_with_detached_storage())).ok();
 				} else {
 					state.pending_requests.push_back(ReducerRequest::Request(id.clone(), response));
 					if state.pending_request_count(&id) == 1 {
@@ -387,7 +387,7 @@ impl Actor for ReducersActor {
 				}
 
 				// respond pending
-				let remove = state
+				let mut remove = state
 					.pending_requests
 					.iter()
 					.enumerate()
@@ -395,16 +395,26 @@ impl Actor for ReducersActor {
 						ReducerRequest::Request(request_id, _) if request_id == &id => Some(index),
 						_ => None,
 					})
-					.rev()
-					.collect::<Vec<_>>();
-				for index in remove {
+					.collect::<VecDeque<usize>>();
+				while let Some(index) = remove.pop_back() {
 					if let Some(ReducerRequest::Request(_, response)) = state.pending_requests.remove(index) {
-						response
-							.send(match &result {
-								Err(err) => Err(co_reducerfactory_error_clone(err)),
-								Ok(reducer) => Ok(reducer.clone()),
-							})
-							.ok();
+						// for the last element send the original result
+						if remove.is_empty() {
+							response
+								.send(match result {
+									Err(err) => Err(err),
+									Ok(reducer) => Ok(reducer.clone_with_detached_storage()),
+								})
+								.ok();
+							break;
+						} else {
+							response
+								.send(match &result {
+									Err(err) => Err(co_reducerfactory_error_clone(err)),
+									Ok(reducer) => Ok(reducer.clone_with_detached_storage()),
+								})
+								.ok();
+						}
 					}
 				}
 			},

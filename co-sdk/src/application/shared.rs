@@ -8,6 +8,7 @@ use crate::{
 		connections_peer_provider::ConnectionsPeerProvider,
 		push_heads::PushHeads,
 		to_external_cid::{to_external_cid, to_external_cids},
+		to_internal_cid::{to_internal_cid, to_internal_cids},
 	},
 	reducer::{
 		change::{
@@ -21,7 +22,7 @@ use crate::{
 		network::{CoHeadsPublish, CoNetworkTaskSpawner},
 	},
 	state::{find, query_core, QueryExt},
-	types::{co_reducer::CoReducerContext, co_storage::CoBlockStorageContentMapping},
+	types::co_reducer::CoReducerContext,
 	CoCoreResolver, CoReducer, CoStorage, CoToken, CoTokenParameters, ReducerBuilder, Runtime, TaskSpawner,
 	CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
@@ -36,9 +37,8 @@ use co_core_storage::{PinStrategy, StorageAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
-use co_primitives::{tags, CoId, KnownMultiCodec, MultiCodec, StoreParams, WeakCid};
-use co_storage::{Algorithm, BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, Secret, StorageError};
-use futures::{stream, StreamExt, TryStreamExt};
+use co_primitives::{tags, CoId, StoreParams, WeakCid};
+use co_storage::{Algorithm, BlockStorage, EncryptedBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -201,6 +201,7 @@ impl SharedCoBuilder {
 			network_storage,
 			id: self.membership.id.clone(),
 		});
+		let co_storage = context.storage(false);
 
 		// // states
 		// let states = stream::iter(self.membership.state.clone())
@@ -221,23 +222,16 @@ impl SharedCoBuilder {
 		// let latest_state = if states.len() == 1 { states.first().cloned() } else { None };
 
 		// log
-		let log = Log::new(
-			self.membership.id.as_str().as_bytes().to_vec(),
-			create_identity_resolver(),
-			context.storage(false),
-			// latest_state.map(|(_, heads)| heads).unwrap_or_default(),
-			Default::default(),
-		);
+		let log =
+			Log::new(self.membership.id.as_str().as_bytes().to_vec(), create_identity_resolver(), Default::default());
 
 		// reducer
 		let mut reducer_builder = ReducerBuilder::new(core_resolver, log).with_initialize(self.initialize);
 		for co_state in self.membership.state.iter() {
 			// get (unencrypted) state/heads
-			let state = context.to_internal_cid(co_state.state.into()).await?;
-			let heads: BTreeSet<Cid> = stream::iter(co_state.heads.iter())
-				.then(|cid| async { context.to_internal_cid(cid.cid()).await })
-				.try_collect()
-				.await?;
+			let state = to_internal_cid(&co_storage, co_state.state.into()).await;
+			let heads: BTreeSet<Cid> =
+				to_internal_cids(&co_storage, co_state.heads.iter().map(WeakCid::cid).collect()).await;
 
 			// add to builder
 			//  when we only have one state we assume its the latest
@@ -248,18 +242,16 @@ impl SharedCoBuilder {
 			// 	reducer_builder = reducer_builder.with_snapshot(state, heads);
 			// }
 		}
-		let mut reducer = reducer_builder.build(runtime.runtime()).await?;
+		let mut reducer = reducer_builder.build(&co_storage, runtime.runtime()).await?;
 
 		// push changes to all connectable peers
 		if let Some((network, connections)) = &self.network {
-			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
 			let publish = PushHeads::new(
 				network.clone(),
 				connections.clone(),
 				tasks,
 				self.membership.id.clone(),
 				PrivateIdentity::boxed(identity.clone()),
-				mapping.clone(),
 				true,
 			)?;
 			reducer.add_change_handler(Box::new(publish));
@@ -267,8 +259,7 @@ impl SharedCoBuilder {
 
 		// publish changes for every `NetworkCoHeads` setting
 		if let Some((network, _)) = self.network {
-			let mapping = encrypted_storage.as_ref().map(|e| e.content_mapping());
-			let publish = CoHeadsPublish::new(network, self.membership.id.clone(), mapping.clone(), true);
+			let publish = CoHeadsPublish::new(network, self.membership.id.clone(), true);
 			reducer.add_change_handler(Box::new(publish));
 		}
 
@@ -299,7 +290,14 @@ impl SharedCoBuilder {
 		reducer.add_change_handler(Box::new(writer));
 
 		// result
-		Ok(CoReducer::new(self.membership.id, Some(self.parent.id().clone()), runtime, reducer, context))
+		Ok(CoReducer::new(
+			self.membership.id,
+			Some(self.parent.id().clone()),
+			context.storage(false),
+			runtime,
+			reducer,
+			context,
+		))
 	}
 }
 
@@ -394,13 +392,6 @@ impl CoReducerContext for SharedContext {
 		self.storage.clone()
 	}
 
-	fn content_mapping(&self) -> Option<CoBlockStorageContentMapping> {
-		self.encrypted_storage
-			.as_ref()
-			.map(|storage| storage.content_mapping())
-			.map(CoBlockStorageContentMapping::new)
-	}
-
 	async fn refresh(&self, parent: CoReducer, co: CoReducer) -> anyhow::Result<()> {
 		if co.id() != &self.id {
 			return Err(anyhow!("Invalid co {} expected {}", co.id(), &self.id));
@@ -409,35 +400,6 @@ impl CoReducerContext for SharedContext {
 			return Err(anyhow!("Invalid parent co {} for {}", parent.id(), co.id()));
 		}
 		self.update_membership(parent, co).await
-	}
-
-	/// Map external [`Cid`] to internal [`Cid`].
-	/// Internal means in context of the CO.
-	/// If no mapping is needed/available return the original [`Cid`].
-	async fn to_internal_cid(&self, cid: Cid) -> Result<Cid, StorageError> {
-		match (&self.encrypted_storage, MultiCodec::from(&cid)) {
-			(Some(storage), MultiCodec::Known(KnownMultiCodec::CoEncryptedBlock)) => {
-				// make sure the block is available (network)
-				if let Some(network_storage) = &self.network_storage {
-					network_storage.get(&cid).await?;
-				}
-
-				// get unencrypted
-				Ok(*storage.get_unencrypted(&cid).await?.cid())
-			},
-			_ => Ok(cid),
-		}
-	}
-
-	/// Map internal [`Cid`] to external [`Cid`].
-	/// External means NOT in context of the CO.
-	/// If no mapping is needed/available return the original [`Cid`].
-	async fn to_external_cid(&self, cid: Cid) -> Result<Cid, StorageError> {
-		if let Some(encrypted_storage) = &self.encrypted_storage {
-			Ok(encrypted_storage.content_mapping().to_plain(&cid).await.unwrap_or(cid))
-		} else {
-			Ok(cid)
-		}
 	}
 
 	/// Clear reducer caches.
@@ -511,16 +473,11 @@ impl SharedCoCreator {
 			};
 
 		// log
-		let log = Log::new(
-			self.co.id.as_str().as_bytes().to_vec(),
-			create_identity_resolver(),
-			co_storage,
-			Default::default(),
-		);
+		let log = Log::new(self.co.id.as_str().as_bytes().to_vec(), create_identity_resolver(), Default::default());
 
 		// reducer
 		let mut reducer = ReducerBuilder::new(CoCoreResolver::default(), log)
-			.build(runtime.runtime())
+			.build(&co_storage, runtime.runtime())
 			.await?;
 
 		// initialize
@@ -535,6 +492,7 @@ impl SharedCoCreator {
 		);
 		reducer
 			.push(
+				&co_storage,
 				runtime.runtime(),
 				&identity,
 				CO_CORE_NAME_CO,
@@ -569,11 +527,8 @@ impl SharedCoCreator {
 			};
 
 		// store encrypted state/heads
-		if let Some(encrypted_storage) = &encrypted_storage {
-			let mapping = encrypted_storage.content_mapping();
-			state = to_external_cid(&mapping, state).await;
-			heads = to_external_cids(&mapping, heads).await;
-		}
+		state = to_external_cid(&co_storage, state).await;
+		heads = to_external_cids(&co_storage, heads).await;
 
 		// add membership to parent co
 		let membership: Membership = Membership {

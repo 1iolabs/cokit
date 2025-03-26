@@ -56,6 +56,11 @@ where
 		self.next = next;
 	}
 
+	/// Add known mappings.
+	pub async fn insert_mappings(&self, mappings: impl IntoIterator<Item = (Cid, Cid)>) {
+		self.mapping.extend(mappings).await;
+	}
+
 	/// Load mapping from CID.
 	/// This will add the mappings to the existing.
 	pub async fn load_mapping(&self, map: &Cid) -> Result<(), StorageError> {
@@ -110,11 +115,6 @@ where
 			)
 			.await;
 		self.flush_mapping().await
-	}
-
-	// Create BlockStorageContentMapping instance.
-	pub fn content_mapping(&self) -> EncryptedBlockStorageMapping {
-		self.mapping.clone()
 	}
 
 	/// Insert mapping for encrypted block.
@@ -313,6 +313,36 @@ where
 			},
 			next: self.next.clone_with_settings(settings),
 		}
+	}
+}
+#[async_trait]
+impl<S> BlockStorageContentMapping for EncryptedBlockStorage<S>
+where
+	S: BlockStorage + Clone + Send + Sync + 'static,
+{
+	async fn is_content_mapped(&self) -> bool {
+		true
+	}
+
+	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
+		self.mapping.get(mapped).await
+	}
+
+	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
+		// try to read from mapping
+		if let Some(mapped) = self.mapping.get_first_by_value(plain).await {
+			return Some(mapped);
+		}
+
+		// try to decrypt
+		if MultiCodec::is(plain, KnownMultiCodec::CoEncryptedBlock) {
+			if let Some(block) = self.get_unencrypted(plain).await.ok() {
+				return Some(*block.cid());
+			}
+		}
+
+		// none
+		None
 	}
 }
 

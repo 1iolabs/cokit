@@ -225,7 +225,7 @@ pub struct ApplicationSettings {
 	pub settings: Tags,
 }
 impl ApplicationSettings {
-	/// Disable locals watcher.
+	/// Whether to use locals watcher. Defaults to true.
 	pub fn setting_co_local_watch(&self) -> bool {
 		!self.settings.matches(tags!("co-local-watch": false))
 	}

@@ -1,3 +1,4 @@
+use crate::BlockStorageContentMapping;
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use cid::Cid;
@@ -23,7 +24,7 @@ where
 }
 impl<S, T> OverlayBlockStorage<S, T>
 where
-	S: BlockStorage + Clone + 'static,
+	S: BlockStorage + BlockStorageContentMapping + Clone + 'static,
 	T: BlockStorage<StoreParams = S::StoreParams> + Clone + 'static,
 {
 	/// Create overlay storage.
@@ -114,7 +115,7 @@ where
 }
 impl<S, T> CloneWithBlockStorageSettings for OverlayBlockStorage<S, T>
 where
-	S: BlockStorage + CloneWithBlockStorageSettings + 'static,
+	S: BlockStorage + BlockStorageContentMapping + CloneWithBlockStorageSettings + 'static,
 	T: BlockStorage<StoreParams = S::StoreParams> + Clone + 'static,
 {
 	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
@@ -128,6 +129,33 @@ where
 			Actor::spawn_with(self.actor.spawner.clone(), Default::default(), actor.clone(), self.blocks_max_memory)
 				.expect("OverlayBlocksActor to spawn");
 		Self { handle: instance.handle(), blocks_max_memory: self.blocks_max_memory, actor }
+	}
+}
+#[async_trait]
+impl<S, T> BlockStorageContentMapping for OverlayBlockStorage<S, T>
+where
+	S: BlockStorage + BlockStorageContentMapping + 'static,
+	T: BlockStorage<StoreParams = S::StoreParams> + Clone + 'static,
+{
+	async fn is_content_mapped(&self) -> bool {
+		self.handle
+			.request(|r| OverlayBlockMessage::IsContentMapped(r))
+			.await
+			.unwrap_or(false)
+	}
+
+	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
+		self.handle
+			.request(|r| OverlayBlockMessage::ToPlain(*mapped, r))
+			.await
+			.unwrap_or(None)
+	}
+
+	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
+		self.handle
+			.request(|r| OverlayBlockMessage::ToMapped(*plain, r))
+			.await
+			.unwrap_or(None)
 	}
 }
 
@@ -160,7 +188,7 @@ struct OverlayBlocksActor<S, T> {
 #[async_trait]
 impl<S, T> Actor for OverlayBlocksActor<S, T>
 where
-	S: BlockStorage + Clone + 'static,
+	S: BlockStorage + BlockStorageContentMapping + Clone + 'static,
 	T: BlockStorage<StoreParams = S::StoreParams> + Clone + 'static,
 {
 	type State = OverlayBlocks;
@@ -316,6 +344,24 @@ where
 						move || async move { Ok(storage.stat(&cid).await?) }
 					});
 				},
+			},
+			OverlayBlockMessage::ToPlain(cid, response) => {
+				response.spawn_with(self.spawner.clone(), {
+					let storage = self.next.clone();
+					move || async move { storage.to_plain(&cid).await }
+				});
+			},
+			OverlayBlockMessage::ToMapped(cid, response) => {
+				response.spawn_with(self.spawner.clone(), {
+					let storage = self.next.clone();
+					move || async move { storage.to_mapped(&cid).await }
+				});
+			},
+			OverlayBlockMessage::IsContentMapped(response) => {
+				response.spawn_with(self.spawner.clone(), {
+					let storage = self.next.clone();
+					move || async move { storage.is_content_mapped().await }
+				});
 			},
 			OverlayBlockMessage::ConsumeChanges(mut response) => {
 				// take
@@ -475,6 +521,15 @@ where
 
 	/// Stat Block.
 	Stat(Cid, Response<Result<BlockStat, StorageError>>),
+
+	/// [`BlockStorageContentMapping::to_plain`]
+	ToPlain(Cid, Response<Option<Cid>>),
+
+	/// [`BlockStorageContentMapping::to_mapped`]
+	ToMapped(Cid, Response<Option<Cid>>),
+
+	/// Stat Block.
+	IsContentMapped(Response<bool>),
 
 	/// Consume all changes via stream.
 	ConsumeChanges(ResponseBackPressureStream<Result<OverlayChange, StorageError>>),
