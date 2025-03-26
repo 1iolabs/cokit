@@ -49,7 +49,7 @@
           "minimum": 1.0
         },
         "description": {
-          "description": "Human-readable description of what the permission does. Tauri convention is to use <h4> headings in markdown content for Tauri documentation generation purposes.",
+          "description": "Human-readable description of what the permission does. Tauri convention is to use `<h4>` headings in markdown content for Tauri documentation generation purposes.",
           "type": [
             "string",
             "null"
@@ -111,7 +111,7 @@
           "type": "string"
         },
         "description": {
-          "description": "Human-readable description of what the permission does. Tauri internal convention is to use <h4> headings in markdown content for Tauri documentation generation purposes.",
+          "description": "Human-readable description of what the permission does. Tauri internal convention is to use `<h4>` headings in markdown content for Tauri documentation generation purposes.",
           "type": [
             "string",
             "null"
@@ -295,137 +295,99 @@
       "type": "string",
       "oneOf": [
         {
-          "description": "allow-create-identity -> Enables the create_identity command without any pre-configured scope.",
+          "description": "Enables the create_identity command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "allow-create-identity"
-          ]
+          "const": "allow-create-identity"
         },
         {
-          "description": "deny-create-identity -> Denies the create_identity command without any pre-configured scope.",
+          "description": "Denies the create_identity command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "deny-create-identity"
-          ]
+          "const": "deny-create-identity"
         },
         {
-          "description": "allow-entries -> Enables the entries command without any pre-configured scope.",
+          "description": "Enables the entries command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "allow-entries"
-          ]
+          "const": "allow-entries"
         },
         {
-          "description": "deny-entries -> Denies the entries command without any pre-configured scope.",
+          "description": "Denies the entries command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "deny-entries"
-          ]
+          "const": "deny-entries"
         },
         {
-          "description": "allow-get-actions -> Enables the get_actions command without any pre-configured scope.",
+          "description": "Enables the get_actions command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "allow-get-actions"
-          ]
+          "const": "allow-get-actions"
         },
         {
-          "description": "deny-get-actions -> Denies the get_actions command without any pre-configured scope.",
+          "description": "Denies the get_actions command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "deny-get-actions"
-          ]
+          "const": "deny-get-actions"
         },
         {
-          "description": "allow-get-co-state -> Enables the get_co_state command without any pre-configured scope.",
+          "description": "Enables the get_co_state command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "allow-get-co-state"
-          ]
+          "const": "allow-get-co-state"
         },
         {
-          "description": "deny-get-co-state -> Denies the get_co_state command without any pre-configured scope.",
+          "description": "Denies the get_co_state command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "deny-get-co-state"
-          ]
+          "const": "deny-get-co-state"
         },
         {
-          "description": "allow-get-log -> Enables the get_log command without any pre-configured scope.",
+          "description": "Enables the get_log command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "allow-get-log"
-          ]
+          "const": "allow-get-log"
         },
         {
-          "description": "deny-get-log -> Denies the get_log command without any pre-configured scope.",
+          "description": "Denies the get_log command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "deny-get-log"
-          ]
+          "const": "deny-get-log"
         },
         {
-          "description": "allow-push-action -> Enables the push_action command without any pre-configured scope.",
+          "description": "Enables the push_action command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "allow-push-action"
-          ]
+          "const": "allow-push-action"
         },
         {
-          "description": "deny-push-action -> Denies the push_action command without any pre-configured scope.",
+          "description": "Denies the push_action command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "deny-push-action"
-          ]
+          "const": "deny-push-action"
         },
         {
-          "description": "allow-resolve-cid -> Enables the resolve_cid command without any pre-configured scope.",
+          "description": "Enables the resolve_cid command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "allow-resolve-cid"
-          ]
+          "const": "allow-resolve-cid"
         },
         {
-          "description": "deny-resolve-cid -> Denies the resolve_cid command without any pre-configured scope.",
+          "description": "Denies the resolve_cid command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "deny-resolve-cid"
-          ]
+          "const": "deny-resolve-cid"
         },
         {
-          "description": "allow-storage-get -> Enables the storage_get command without any pre-configured scope.",
+          "description": "Enables the storage_get command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "allow-storage-get"
-          ]
+          "const": "allow-storage-get"
         },
         {
-          "description": "deny-storage-get -> Denies the storage_get command without any pre-configured scope.",
+          "description": "Denies the storage_get command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "deny-storage-get"
-          ]
+          "const": "deny-storage-get"
         },
         {
-          "description": "allow-storage-set -> Enables the storage_set command without any pre-configured scope.",
+          "description": "Enables the storage_set command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "allow-storage-set"
-          ]
+          "const": "allow-storage-set"
         },
         {
-          "description": "deny-storage-set -> Denies the storage_set command without any pre-configured scope.",
+          "description": "Denies the storage_set command without any pre-configured scope.",
           "type": "string",
-          "enum": [
-            "deny-storage-set"
-          ]
+          "const": "deny-storage-set"
         },
         {
-          "description": "default -> Allows usage of co-sdk api",
+          "description": "Allows usage of co-sdk api",
           "type": "string",
-          "enum": [
-            "default"
-          ]
+          "const": "default"
         }
       ]
     }

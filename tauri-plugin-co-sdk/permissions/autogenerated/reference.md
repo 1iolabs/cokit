@@ -10,7 +10,7 @@ Allows usage of co-sdk api
 - `allow-get-actions`
 - `allow-create-identity`
 
-### Permission Table 
+## Permission Table
 
 <table>
 <tr>

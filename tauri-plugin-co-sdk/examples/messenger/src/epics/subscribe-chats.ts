@@ -24,17 +24,23 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
 
                     switch (matrixEvent.type) {
                         case "m_room_message": {
-                            const chat = state.chats.find((c) => c.roomCoreId === buildCoCoreId(co, payload.c));
+                            const chat = state.chats.find((c) => c.id === buildCoCoreId(co, payload.c));
                             if (!chat) { continue }
+                            const isActive = state.loadedChats.get(chat.id) === state.activePlugin && state.activePlugin !== undefined;
                             actions.push(identity<ChatsListUpdateChatAction>({
                                 payload: {
                                     chat: {
-                                        lastMessage: matrixEvent.content.body,
+                                        lastMessage: {
+                                            message: matrixEvent.content.body,
+                                            key: matrixEvent.content.body,
+                                            ownMessage: false,
+                                            timestamp: new Date(),
+                                        },
                                         // don't tick up message count if chat is currently shown
-                                        newMessages: chat.pluginId !== undefined && chat.pluginId === state.activePlugin
+                                        newMessages: isActive
                                             ? 0
                                             : chat.newMessages + 1,
-                                        roomCoreId: chat.roomCoreId,
+                                        id: chat.id,
                                     },
                                 },
                                 type: ChatsListActionType.UpdateChat,
@@ -43,7 +49,7 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                         };
                         case "room_name": {
                             let name = matrixEvent.content.name;
-                            const chat = state.chats.find((c) => c.roomCoreId === buildCoCoreId(co, payload.c));
+                            const chat = state.chats.find((c) => c.id === buildCoCoreId(co, payload.c));
                             if (name && chat) {
                                 actions.push(identity<ChatsListUpdateChatAction>({
                                     payload: {

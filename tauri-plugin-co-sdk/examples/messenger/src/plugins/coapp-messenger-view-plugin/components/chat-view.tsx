@@ -1,9 +1,11 @@
 import { Message, MessengerView } from "@1io/coapp-messenger-view";
 import { LevelStack } from "@1io/kui-level-stack";
+import "@1io/packaging-utils/svg";
 import { CID } from "multiformats";
 import * as React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { identity } from "rxjs";
+import DefaultProfilePic from "../../../assets/Users.svg";
 import { invokeResolveCid } from "../../../library/invoke-get.js";
 import { MessengerViewActionType, MessengerViewLoadMoreEventsAction, MessengerViewSendAction } from "../actions/index.js";
 import { resolveMatrixAction } from "../library/handle-matrix-event.js";
@@ -81,6 +83,7 @@ export function MessengerViewContainer(props: MessengerViewContainerProps) {
 
   return <LevelStack style={{ width: "100%", height: "100%" }}>
     <MessengerView
+      tauriWindowDragHeader
       chatInput={message}
       chatName={chatName}
       onChatInput={setMessage}
@@ -88,6 +91,8 @@ export function MessengerViewContainer(props: MessengerViewContainerProps) {
       onSendMessage={onSendMessage}
       onBack={props.onBack}
       onScrollTop={onScrollTop}
+      onInfo={() => undefined} // TODO
+      profilePicture={DefaultProfilePic}
     />
   </ LevelStack>;
 

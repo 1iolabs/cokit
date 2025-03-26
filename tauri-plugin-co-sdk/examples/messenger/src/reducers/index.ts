@@ -3,7 +3,7 @@ import { ChatsListPluginState } from "../state/index.js";
 
 export function chatsListReducer(state: ChatsListPluginState | undefined, action: ChatsListActions): ChatsListPluginState {
     if (state === undefined) {
-        return { chats: [] };
+        return { chats: [], loadedChats: new Map };
     }
     switch (action.type) {
         case ChatsListActionType.ActivatePlugin: {
@@ -15,12 +15,17 @@ export function chatsListReducer(state: ChatsListPluginState | undefined, action
         case ChatsListActionType.UpdateChat: {
             return {
                 ...state, chats: state.chats.map((chat) => {
-                    if (chat.roomCoreId === action.payload.chat.roomCoreId) {
+                    if (chat.id === action.payload.chat.id) {
                         return { ...chat, ...action.payload.chat };
                     }
                     return chat;
                 })
             }
+        }
+        case ChatsListActionType.ChatPluginLoaded: {
+            return {
+                ...state, loadedChats: state.loadedChats.set(action.payload.chatId, action.payload.pluginId),
+            };
         }
     }
     return state;

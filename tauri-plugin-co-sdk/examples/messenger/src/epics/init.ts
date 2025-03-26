@@ -1,10 +1,12 @@
+import { Chat } from "@1io/coapp-chatlist-view";
 import { BaseApi, isPluginInitializeAction } from "@1io/kui-application-sdk";
+import "@1io/packaging-utils/svg";
 import { AnyAction } from "redux";
 import { filter, identity, mergeAll, mergeMap } from "rxjs";
 import { ChatsListActionType, ChatsListSetChatsAction } from "../actions/index.js";
+import GroupDefaultPic from "../assets/Users.svg";
 import { splitCoCoreId } from "../library/core-id.js";
 import { invokeGetCoreState, invokeGetFilteredCores } from "../library/invoke-get.js";
-import { Chat } from "../state/index.js";
 import { ChatsListEpicType } from "../types/plugin.js";
 
 export const initEpic: ChatsListEpicType = (action$, state$, context) => action$.pipe(
@@ -26,11 +28,17 @@ export const initEpic: ChatsListEpicType = (action$, state$, context) => action$
             const [co, core] = splitCoCoreId(coreId);
             if (core) {
                 const coreState = await invokeGetCoreState(co, core);
-                if (coreState?.name) {
-                    chats.push({ name: coreState.name, roomCoreId: coreId, newMessages: 0 });
+                if (coreState) {
+                    chats.push({
+                        name: coreState.name ?? "New room",
+                        id: coreId,
+                        newMessages: 0,
+                        avatar: GroupDefaultPic, // TODO use pic from CORE
+                    });
                 }
             }
         }
+        console.log("cores", chats);
         actions.push(identity<ChatsListSetChatsAction>({
             payload: { chats },
             type: ChatsListActionType.SetChats

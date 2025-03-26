@@ -1,26 +1,31 @@
 import { ApplicationApi, WellKnownTags } from "@1io/kui-application-sdk";
-import { filter, identity, mergeAll, mergeMap } from "rxjs";
-import { ChatsListActionType, ChatsListActivatePluginAction, ChatsListOpenChatAction, ChatsListUpdateChatAction } from "../actions/index.js";
+import { filter, identity, mergeAll, mergeMap, withLatestFrom } from "rxjs";
+import { ChatsListActionType, ChatsListActivatePluginAction, ChatsListChatPluginLoaded, ChatsListOpenChatAction, ChatsListUpdateChatAction } from "../actions/index.js";
 import { ChatsListEpicType } from "../types/plugin.js";
 
 export const openChatEpic: ChatsListEpicType = (action$, state$, context) => action$.pipe(
     filter((action): action is ChatsListOpenChatAction => action.type === ChatsListActionType.OpenChat),
-    mergeMap(async (action) => {
-        const roomCoreId = action.payload.chat.roomCoreId;
-        const loadedPlugin = action.payload.chat.pluginId;
+    withLatestFrom(state$),
+    mergeMap(async ([action, state]) => {
+        const chatId = action.payload.chat.id;
+        const loadedPlugin = state.loadedChats.get(chatId);
         // if plugin not loaded -> load now
         if (loadedPlugin === undefined) {
             const applicationApi = context.api.getApi<ApplicationApi>([{ key: WellKnownTags.Type, value: "application" }]);
             const pluginInfo = await applicationApi.loadPlugin("coapp-messenger-view", [
-                { key: "coreId", value: roomCoreId },
+                { key: "coreId", value: chatId },
             ]);
             return [
+                identity<ChatsListChatPluginLoaded>({
+                    payload: { chatId: chatId, pluginId: pluginInfo.id },
+                    type: ChatsListActionType.ChatPluginLoaded,
+                }),
                 identity<ChatsListActivatePluginAction>({
                     payload: { pluginId: pluginInfo.id },
                     type: ChatsListActionType.ActivatePlugin,
                 }),
                 identity<ChatsListUpdateChatAction>({
-                    payload: { chat: { roomCoreId, newMessages: 0, pluginId: pluginInfo.id } },
+                    payload: { chat: { id: chatId, newMessages: 0 } },
                     type: ChatsListActionType.UpdateChat,
                 }),
             ];
@@ -31,7 +36,7 @@ export const openChatEpic: ChatsListEpicType = (action$, state$, context) => act
                     type: ChatsListActionType.ActivatePlugin,
                 }),
                 identity<ChatsListUpdateChatAction>({
-                    payload: { chat: { roomCoreId, newMessages: 0 } },
+                    payload: { chat: { id: chatId, newMessages: 0 } },
                     type: ChatsListActionType.UpdateChat,
                 }),
             ];
