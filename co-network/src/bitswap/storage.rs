@@ -134,7 +134,7 @@ where
 	type StoreParams = S::StoreParams;
 
 	/// Returns a block from storage.
-	#[tracing::instrument(err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self))]
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		match self.next.get(cid).await {
 			Ok(block) => Ok(block),
@@ -148,19 +148,19 @@ where
 
 	/// Inserts a block into storage.
 	/// Returns the CID of the block (gurranted to be the same as the supplied).
-	#[tracing::instrument(err, skip(self, block), fields(cid = ?block.cid()))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self, block), fields(cid = ?block.cid()))]
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		self.next.set(block).await
 	}
 
 	/// Remove a block.
-	#[tracing::instrument(err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self))]
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
 		self.next.remove(cid).await
 	}
 
 	/// Stat a block.
-	#[tracing::instrument(err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self))]
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		match self.next.stat(cid).await {
 			Err(StorageError::NotFound(_, _)) if !self.settings.disallow_networking => {

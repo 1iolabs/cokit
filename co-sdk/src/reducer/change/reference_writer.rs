@@ -122,7 +122,7 @@ where
 	S: BlockStorage + Send + Sync + Clone + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
-	#[tracing::instrument(err(Debug), skip_all)]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all)]
 	async fn on_state_changed(
 		&mut self,
 		_storage: &S,

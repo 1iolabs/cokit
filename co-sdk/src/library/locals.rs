@@ -300,7 +300,7 @@ impl Actor for FileLocalsActor {
 	}
 }
 impl FileLocalsActor {
-	#[tracing::instrument(err(Debug))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
 	async fn open(&self) -> Result<tokio::fs::File, anyhow::Error> {
 		let path = self.config_path.join(&self.identifier).join("local.cbor");
 
@@ -311,7 +311,7 @@ impl FileLocalsActor {
 		Ok(tokio::fs::OpenOptions::new().create(true).write(true).open(&path).await?)
 	}
 
-	#[tracing::instrument(err(Debug))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
 	async fn open_and_lock(&self) -> Result<tokio::fs::File, anyhow::Error> {
 		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
 
@@ -355,7 +355,7 @@ impl FileLocalsActor {
 		}
 	}
 
-	#[tracing::instrument(err(Debug))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
 	async fn open_and_flock(&self) -> Result<Flock<TokioFile>, anyhow::Error> {
 		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
 

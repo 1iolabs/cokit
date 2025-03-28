@@ -44,7 +44,7 @@ where
 {
 	type Params = libipld::DefaultParams;
 
-	#[tracing::instrument(ret, err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, ret, err, skip(self))]
 	async fn contains(&mut self, cid: &libipld::Cid, remote_peer: &PeerId, tokens: &[Token]) -> Result<bool> {
 		Ok(self
 			.handle
@@ -54,7 +54,7 @@ where
 			.await??)
 	}
 
-	#[tracing::instrument(err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self))]
 	async fn get(&mut self, cid: &libipld::Cid, remote_peer: &PeerId, tokens: &[Token]) -> Result<Option<Vec<u8>>> {
 		Ok(self
 			.handle
@@ -62,7 +62,7 @@ where
 			.await??)
 	}
 
-	#[tracing::instrument(err, skip(self, block), fields(cid = ?block.cid()))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self, block), fields(cid = ?block.cid()))]
 	async fn insert(
 		&mut self,
 		block: &libipld::Block<Self::Params>,
@@ -77,7 +77,7 @@ where
 			.await??)
 	}
 
-	#[tracing::instrument(err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self))]
 	async fn missing_blocks(&mut self, cid: &libipld::Cid, tokens: &[Token]) -> Result<Vec<libipld::Cid>> {
 		Ok(self
 			.handle

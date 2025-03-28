@@ -4,7 +4,6 @@ use crate::{
 		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
 		locals::{ApplicationLocal, FileLocals, Locals, MemoryLocals},
 		to_external_cid::{to_external_cid_opt_force, to_external_cids_opt_map_force},
-		to_internal_cid::{to_internal_cid, to_internal_cids},
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{
@@ -12,8 +11,9 @@ use crate::{
 		co_reducer_context::{CoReducerContext, CoReducerContextRef},
 		cores::{CO_CORE_NAME_CO, CO_CORE_STORAGE},
 	},
-	CoReducer, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, ReducerChangeContext, Runtime, TaskSpawner,
-	CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
+	CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, ReducerChangeContext, Runtime,
+	TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -25,11 +25,7 @@ use co_primitives::{tags, Did};
 use co_runtime::RuntimePool;
 use co_storage::{BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode};
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
-use std::{
-	collections::{BTreeMap, BTreeSet},
-	fmt::Debug,
-	sync::Arc,
-};
+use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 use tokio_util::sync::CancellationToken;
 
 pub const CO_ID_LOCAL: &str = "local";
@@ -174,11 +170,11 @@ where
 		{
 			let locals_stream = result.load_locals();
 			pin_mut!(locals_stream);
-			while let Some(next) = locals_stream.next().await {
-				let (state, heads) = next?;
-
+			while let Some(next) = locals_stream.try_next().await? {
 				// apply to builder as snapshot
-				builder = builder.with_snapshot(state, heads);
+				if let Some((state, heads)) = next.some() {
+					builder = builder.with_snapshot(state, heads);
+				}
 			}
 		}
 
@@ -299,7 +295,7 @@ where
 		}
 	}
 
-	fn load_locals(&self) -> impl Stream<Item = Result<(Cid, BTreeSet<Cid>), anyhow::Error>> + '_ {
+	fn load_locals(&self) -> impl Stream<Item = Result<CoReducerState, anyhow::Error>> + '_ {
 		async_stream::try_stream! {
 			for local in self.locals.get().await? {
 				// load additional encryption mappings
@@ -308,11 +304,10 @@ where
 				}
 
 				// convert state/heads to internal
-				let state = to_internal_cid(&self.encrypted_storage, local.state).await;
-				let heads = to_internal_cids(&self.encrypted_storage, local.heads.clone()).await;
+				let state = local.reducer_state().to_internal_force(&self.encrypted_storage).await?;
 
 				// apply
-				yield (state, heads)
+				yield state
 			}
 		}
 	}
@@ -348,10 +343,10 @@ where
 		// read and apply locals
 		//  this will manually re-read all local files
 		self.load_locals()
-			.try_for_each(|(state, heads)| {
+			.try_for_each(|state| {
 				let co = &co;
 				async move {
-					co.join_state((state, heads).into()).await?;
+					co.join_state(state).await?;
 					Ok(())
 				}
 			})
@@ -400,7 +395,7 @@ where
 }
 
 /// Setup the Local CO by adding cores.
-#[tracing::instrument(err, skip(runtime, reducer, storage))]
+#[tracing::instrument(level = tracing::Level::TRACE, err, skip(runtime, reducer, storage))]
 async fn setup_local_co<S, R>(
 	storage: &S,
 	runtime: &RuntimePool,

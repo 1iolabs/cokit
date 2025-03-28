@@ -1,3 +1,9 @@
+#[cfg(feature = "pinning")]
+use crate::reducer::core_resolver::change::ChangeCoreResolver;
+#[cfg(feature = "pinning")]
+use crate::reducer::core_resolver::reference::ReferenceCoreResolver;
+#[cfg(feature = "pinning")]
+use crate::types::co_pinning_key::CoPinningKey;
 use crate::{
 	application::{
 		application::ApplicationSettings,
@@ -6,12 +12,10 @@ use crate::{
 	},
 	library::shared_membership::shared_membership,
 	reducer::core_resolver::{
-		change::ChangeCoreResolver,
 		dynamic::DynamicCoreResolver,
 		epic::ReactiveCoreResolver,
 		log::LogCoreResolver,
 		membership::{MembershipCoreResolver, MembershipInstanceRegistry},
-		reference::ReferenceCoreResolver,
 	},
 	services::{
 		application::ApplicationMessage,
@@ -19,7 +23,7 @@ use crate::{
 		network::CoNetworkTaskSpawner,
 		reducers::{ReducerStorage, ReducersControl},
 	},
-	types::{co_pinning_key::CoPinningKey, co_reducer_factory::CoReducerFactoryError},
+	types::co_reducer_factory::CoReducerFactoryError,
 	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime, TaskSpawner,
 	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
@@ -31,6 +35,7 @@ use co_identity::{
 };
 use co_log::{EntryBlock, Log};
 use co_primitives::{BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did};
+#[cfg(feature = "pinning")]
 use co_storage::ChangeBlockStorage;
 use futures::{Stream, TryStreamExt};
 use std::{fmt::Debug, sync::Arc};
@@ -136,7 +141,7 @@ impl CoContext {
 }
 #[async_trait]
 impl CoReducerFactory for CoContext {
-	#[tracing::instrument(skip(self), fields(application = self.inner.settings.identifier))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self), fields(application = self.inner.settings.identifier))]
 	async fn co_reducer(&self, co: &CoId) -> Result<Option<CoReducer>, anyhow::Error> {
 		match self.try_co_reducer(co).await {
 			Ok(r) => Ok(Some(r)),
@@ -172,6 +177,7 @@ pub(crate) struct CoContextInner {
 	_storage: CoStorage,
 
 	/// Used to track all new blocks until we store the LocalCo again.
+	#[cfg(feature = "pinning")]
 	storage_created: ChangeBlockStorage<CoStorage>,
 
 	runtime: Runtime,
@@ -193,6 +199,7 @@ impl CoContextInner {
 		reducers: ReducersControl,
 	) -> Self {
 		Self {
+			#[cfg(feature = "pinning")]
 			storage_created: ChangeBlockStorage::new(storage.clone()),
 			settings,
 			shutdown,
@@ -240,8 +247,10 @@ impl CoContextInner {
 	/// Get the root storage.
 	/// The returned storage tracks changes which will be flushed when the local co is written.
 	pub fn storage(&self) -> CoStorage {
-		// self.storage.clone()
-		CoStorage::new(self.storage_created.clone())
+		#[cfg(feature = "pinning")]
+		return CoStorage::new(self.storage_created.clone());
+		#[cfg(not(feature = "pinning"))]
+		return self._storage.clone();
 	}
 
 	pub fn runtime(&self) -> Runtime {
@@ -268,16 +277,18 @@ impl CoContextInner {
 	}
 
 	/// Creates a CoReducer instance of the Local CO.
-	#[tracing::instrument(skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self))]
 	pub(crate) async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
-		let core_resolver = |reducer_context| {
+		let core_resolver = |_reducer_context| {
 			let local_id = CoId::new(CO_ID_LOCAL);
 			let core_resolver = CoCoreResolver::default();
+			#[cfg(feature = "pinning")]
 			let core_resolver = ChangeCoreResolver::new(core_resolver, self.storage_created.clone());
+			#[cfg(feature = "pinning")]
 			let core_resolver = ReferenceCoreResolver::new(
 				core_resolver,
 				Some(CoPinningKey::State.to_string(&local_id)),
-				reducer_context,
+				_reducer_context,
 			);
 			let core_resolver = ReactiveCoreResolver::new(core_resolver, local_id, self.reactive_context.clone());
 			let core_resolver = MembershipCoreResolver::new(
@@ -286,6 +297,7 @@ impl CoContextInner {
 				CoContextMembershipInstanceRegistry { reducers: self.reducers.clone() },
 				CO_CORE_NAME_MEMBERSHIP.to_owned(),
 			);
+			let core_resolver = LogCoreResolver::new(core_resolver);
 			core_resolver
 		};
 		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize);

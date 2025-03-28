@@ -220,9 +220,20 @@ where
 		}
 	}
 
-	#[tracing::instrument(err, skip(self, block), fields(cid = ?block.cid()))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self, block), fields(cid = ?block.cid()))]
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		let cid = *block.cid();
+
+		// log
+		#[cfg(test)]
+		match co_primitives::MultiCodec::from(block.cid()) {
+			co_primitives::MultiCodec::Known(co_primitives::KnownMultiCodec::DagCbor) => {
+				tracing::trace!(cid = ?block.cid(), ipld = ?from_cbor::<ipld_core::ipld::Ipld>(block.data()), "set");
+			},
+			_ => {
+				tracing::trace!(cid = ?block.cid(), "set");
+			},
+		}
 
 		// references
 		//  try to resolve all children references using the mapping

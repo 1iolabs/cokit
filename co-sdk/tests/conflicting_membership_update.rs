@@ -26,6 +26,7 @@ async fn test_conflicting_membership_update() {
 	let application = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
 		.without_keychain()
 		.with_setting("co-local-watch", false)
+		.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
 		.build()
 		.await
 		.expect("application");
@@ -105,30 +106,43 @@ async fn test_conflicting_membership_update() {
 		)
 		.await
 		.unwrap();
-	// println!("co1: {:?} / {:?}", co.co_state().await, co.heads().await);
-	// println!("co2: {:?} / {:?}", co2.co_state().await, co2.heads().await);
-	// let m: Memberships = local_co.state(CO_CORE_NAME_MEMBERSHIP).await.unwrap();
-	// let m2: Memberships = local_co2.state(CO_CORE_NAME_MEMBERSHIP).await.unwrap();
-	// println!("m1: {:?}", m.memberships.iter().find(|i| i.id.as_str() == "co").unwrap().state);
-	// println!("m2: {:?}", m2.memberships.iter().find(|i| i.id.as_str() == "co").unwrap().state);
 
-	// // refresh
-	// local_co.refresh(local_co.clone()).await.unwrap();
-	// // local_co2.refresh(local_co2.clone()).await.unwrap();
+	tracing::info!("co1 count {:?}", count_folders(&co).await);
+	tracing::info!("co2 count {:?}", count_folders(&co2).await);
+	tracing::info!(state1 = ?co.reducer_state().await, state2 = ?co2.reducer_state().await, "conflict");
+	// let (_, m) = query_core::<Memberships>(CO_CORE_NAME_MEMBERSHIP)
+	// 	.execute_reducer(&local_co)
+	// 	.await
+	// 	.unwrap();
+	// let (_, m2) = query_core::<Memberships>(CO_CORE_NAME_MEMBERSHIP)
+	// 	.execute_reducer(&local_co2)
+	// 	.await
+	// 	.unwrap();
+	// tracing::info!("m1: {:?}", m.memberships.iter().find(|i| i.id.as_str() == "co").unwrap().state);
+	// tracing::info!("m2: {:?}", m2.memberships.iter().find(|i| i.id.as_str() == "co").unwrap().state);
+	// application.co().refresh(local_co.clone()).await.unwrap();
+	// application2.co().refresh(local_co2.clone()).await.unwrap();
+	// let (_, m) = query_core::<Memberships>(CO_CORE_NAME_MEMBERSHIP)
+	// 	.execute_reducer(&local_co)
+	// 	.await
+	// 	.unwrap();
+	// let (_, m2) = query_core::<Memberships>(CO_CORE_NAME_MEMBERSHIP)
+	// 	.execute_reducer(&local_co2)
+	// 	.await
+	// 	.unwrap();
+	// tracing::info!("u1: {:?}", m.memberships.iter().find(|i| i.id.as_str() == "co").unwrap().state);
+	// tracing::info!("u2: {:?}", m2.memberships.iter().find(|i| i.id.as_str() == "co").unwrap().state);
+	// tracing::info!("co1 next count {:?}", count_folders(&co).await);
+	// tracing::info!("co2 next count {:?}", count_folders(&co2).await);
 
-	// let m: Memberships = local_co.state(CO_CORE_NAME_MEMBERSHIP).await.unwrap();
-	// let m2: Memberships = local_co2.state(CO_CORE_NAME_MEMBERSHIP).await.unwrap();
-	// println!("u1: {:?}", m.memberships.iter().find(|i| i.id.as_str() == "co").unwrap().state);
-	// println!("u2: {:?}", m2.memberships.iter().find(|i| i.id.as_str() == "co").unwrap().state);
-
-	async fn test_folders_exists(co: &CoReducer) {
+	async fn count_folders(co: &CoReducer) -> usize {
 		let (storage, files) = query_core::<File>("file").execute_reducer(co).await.unwrap();
 		let nodes = state::into_collection::<BTreeMap<_, _>, _, _, _>(&storage, &files.nodes)
 			.await
 			.unwrap();
 		let nodes_root_dag = nodes.get(AbsolutePath::new_unchecked("/")).unwrap();
 		let nodes_root: BTreeSet<Node> = state::into_collection(&storage, nodes_root_dag).await.unwrap();
-		assert_eq!(nodes_root.len(), 2);
+		nodes_root.len()
 	}
 
 	// check: refresh and wait until state changed
@@ -143,7 +157,7 @@ async fn test_conflicting_membership_update() {
 		)
 		.await
 		.unwrap();
-		test_folders_exists(&co).await;
+		assert_eq!(count_folders(&co).await, 2);
 	};
 
 	// check2: refresh and wait until state changed
@@ -158,7 +172,7 @@ async fn test_conflicting_membership_update() {
 		)
 		.await
 		.unwrap();
-		test_folders_exists(&co2).await;
+		assert_eq!(count_folders(&co2).await, 2);
 	};
 	join!(check1, check2);
 

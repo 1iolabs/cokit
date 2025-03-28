@@ -340,6 +340,10 @@ where
 	/// This is used to join logs from other peers.
 	/// Returns true if state has changed.
 	pub async fn join(&mut self, storage: &S, heads: &BTreeSet<Cid>, runtime: &RuntimePool) -> Result<bool, LogError> {
+		// log
+		tracing::trace!(previous_heads = ?self.log().heads(), next_heads = ?heads, "join");
+
+		// join
 		let mut result = false;
 		if self.log().heads() != heads
 			&& (self.log_mut().join_heads(storage, heads.iter()).await? || &self.heads != self.log.heads())

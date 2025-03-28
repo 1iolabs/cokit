@@ -281,7 +281,7 @@ where
 	let mut blocks = state.blocks.open(storage).await?;
 
 	// validate
-	if !pins.contains_key(&key).await? {
+	if pins.contains_key(&key).await? {
 		return Err(anyhow::anyhow!("Pin already exists: {}", key));
 	}
 

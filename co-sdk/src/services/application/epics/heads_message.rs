@@ -79,7 +79,7 @@ pub fn heads_message_heads_request(
 	}
 }
 
-#[tracing::instrument(skip(context, heads))]
+#[tracing::instrument(level = tracing::Level::TRACE, skip(context, heads))]
 async fn join_heads(
 	context: CoContext,
 	message_id: String,

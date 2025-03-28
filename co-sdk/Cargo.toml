@@ -70,6 +70,5 @@ tracing-opentelemetry = "0.23"
 example-counter = { path = "../examples/counter" }
 
 [features]
-"default" = ["tokio-runtime"]
-"tokio-runtime" = []
-"futures-runtime" = []
+"default" = ["pinning"]
+"pinning" = []

@@ -1,4 +1,6 @@
 use super::identity::create_identity_resolver;
+#[cfg(feature = "pinning")]
+use crate::reducer::change::reference_writer::ReferenceWriteReducerChangedHandler;
 use crate::{
 	find_membership,
 	library::{
@@ -8,10 +10,7 @@ use crate::{
 		to_internal_cid::{to_internal_cid, to_internal_cids},
 	},
 	reducer::{
-		change::{
-			membership_writer::MembershipWriter,
-			reference_writer::{ReferenceWriteReducerChangedHandler, ReferenceWriter},
-		},
+		change::{membership_writer::MembershipWriter, reference_writer::ReferenceWriter},
 		core_resolver::dynamic::DynamicCoreResolver,
 	},
 	services::{
@@ -51,6 +50,7 @@ pub struct SharedCoBuilder {
 	parent: CoReducer,
 	keystore_core_name: String,
 	membership_core_name: String,
+	#[cfg(feature = "pinning")]
 	storage_core_name: String,
 	membership: Membership,
 	network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
@@ -64,6 +64,7 @@ impl SharedCoBuilder {
 			membership,
 			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_owned(),
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_owned(),
+			#[cfg(feature = "pinning")]
 			storage_core_name: CO_CORE_NAME_STORAGE.to_owned(),
 			network: None,
 			initialize: true,
@@ -79,8 +80,11 @@ impl SharedCoBuilder {
 		Self { keystore_core_name, ..self }
 	}
 
-	pub fn with_storage_core_name(self, storage_core_name: String) -> Self {
-		Self { storage_core_name, ..self }
+	pub fn with_storage_core_name(self, _storage_core_name: String) -> Self {
+		#[cfg(feature = "pinning")]
+		return Self { storage_core_name: _storage_core_name, ..self };
+		#[cfg(not(feature = "pinning"))]
+		return self;
 	}
 
 	pub fn with_network(self, network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>) -> Self {
@@ -277,15 +281,18 @@ impl SharedCoBuilder {
 		reducer.add_change_handler(Box::new(writer));
 
 		// setup auto write references to parent co
-		let writer = ReferenceWriteReducerChangedHandler::new(
-			ReferenceWriter::new(
-				self.parent.dispatcher(&self.storage_core_name, identity.clone()),
-				context.clone(),
-				Some(CoPinningKey::State.to_string(&self.membership.id)),
-			),
-			*reducer.state(),
-		);
-		reducer.add_change_handler(Box::new(writer));
+		#[cfg(feature = "pinning")]
+		{
+			let writer = ReferenceWriteReducerChangedHandler::new(
+				ReferenceWriter::new(
+					self.parent.dispatcher(&self.storage_core_name, identity.clone()),
+					context.clone(),
+					Some(CoPinningKey::State.to_string(&self.membership.id)),
+				),
+				*reducer.state(),
+			);
+			reducer.add_change_handler(Box::new(writer));
+		}
 
 		// result
 		let application_identifier = self
