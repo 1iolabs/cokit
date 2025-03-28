@@ -1,7 +1,4 @@
-use super::{
-	application::ApplicationSettings, co_context::CoPinningKey, identity::create_identity_resolver,
-	reducer::ReducerChangedHandler,
-};
+use super::{application::ApplicationSettings, identity::create_identity_resolver, reducer::ReducerChangedHandler};
 use crate::{
 	library::{
 		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
@@ -11,6 +8,7 @@ use crate::{
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{
+		co_pinning_key::CoPinningKey,
 		co_reducer::{CoReducerContext, CoReducerContextRef},
 		cores::{CO_CORE_NAME_CO, CO_CORE_STORAGE},
 	},

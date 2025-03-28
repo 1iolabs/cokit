@@ -1,6 +1,6 @@
 use crate::{
-	application::co_context::CoPinningKey,
 	library::invite::{CoInvitePayload, CO_DIDCOMM_INVITE},
+	types::co_pinning_key::CoPinningKey,
 	Action, CoContext, CoInvite, KnownTag, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;

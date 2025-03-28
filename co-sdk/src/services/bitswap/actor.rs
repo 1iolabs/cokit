@@ -1,5 +1,5 @@
 use crate::{
-	application::co_context::ReducerStorage, library::find_co_secret::find_co_secret_by_membership, CoContext, CoToken,
+	library::find_co_secret::find_co_secret_by_membership, services::reducers::ReducerStorage, CoContext, CoToken,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;

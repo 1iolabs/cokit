@@ -1,9 +1,7 @@
 use super::{epics::epic, Action, ApplicationMessage};
 use crate::{
-	application::{
-		application::ApplicationSettings,
-		co_context::{CoContextInner, ReducersActor},
-	},
+	application::{application::ApplicationSettings, co_context::CoContextInner},
+	services::reducers::ReducersActor,
 	CoContext, Network, Runtime, Storage,
 };
 use anyhow::anyhow;

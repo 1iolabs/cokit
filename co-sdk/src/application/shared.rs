@@ -1,7 +1,4 @@
-use super::{
-	co_context::{CoPinningKey, ReducerStorage},
-	identity::create_identity_resolver,
-};
+use super::identity::create_identity_resolver;
 use crate::{
 	find_membership,
 	library::{
@@ -20,9 +17,10 @@ use crate::{
 	services::{
 		connections::ConnectionMessage,
 		network::{CoHeadsPublish, CoNetworkTaskSpawner},
+		reducers::ReducerStorage,
 	},
 	state::{find, query_core, QueryExt},
-	types::co_reducer::CoReducerContext,
+	types::{co_pinning_key::CoPinningKey, co_reducer::CoReducerContext},
 	CoCoreResolver, CoReducer, CoStorage, CoToken, CoTokenParameters, ReducerBuilder, Runtime, TaskSpawner,
 	CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };

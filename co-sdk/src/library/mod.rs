@@ -25,6 +25,7 @@ pub mod push_heads;
 pub mod response_list;
 pub mod runtime_dispatch;
 pub mod settings_timeout;
+pub mod shared_membership;
 pub mod to_external_cid;
 pub mod to_internal_cid;
 pub mod update_co;
