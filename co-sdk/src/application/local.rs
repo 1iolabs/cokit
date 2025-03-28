@@ -305,17 +305,14 @@ where
 	fn load_locals(&self) -> impl Stream<Item = Result<(Cid, BTreeSet<Cid>), anyhow::Error>> + '_ {
 		async_stream::try_stream! {
 			for local in self.locals.get().await? {
-				let mut state = local.state;
-				let mut heads = local.heads.clone();
-
 				// load additional encryption mappings
 				if let Some(mapping) = &local.mapping {
 					self.encrypted_storage.load_mapping(mapping).await?;
 				}
 
 				// convert state/heads to internal
-				state = to_internal_cid(&self.encrypted_storage, state).await;
-				heads = to_internal_cids(&self.encrypted_storage, heads).await;
+				let state = to_internal_cid(&self.encrypted_storage, local.state).await;
+				let heads = to_internal_cids(&self.encrypted_storage, local.heads.clone()).await;
 
 				// apply
 				yield (state, heads)

@@ -1,6 +1,7 @@
 use crate::{CoCid, TotalFloat64};
 use cid::Cid;
 use derive_more::From;
+use derive_more::TryInto;
 use ipld_core::ipld::Ipld;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, Serializer};
@@ -46,7 +47,7 @@ macro_rules! tag {
 }
 
 /// Tag Value
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, From, TryInto, Serialize, Deserialize, JsonSchema)]
 #[serde(into = "Ipld", from = "Ipld")]
 pub enum TagValue {
 	/// Represents the absence of a value or the value undefined.

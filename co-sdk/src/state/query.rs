@@ -12,7 +12,8 @@ pub trait Query: Send + Sync {
 	type Input: Send + Sync + 'static;
 	type Output: Send + Sync + 'static;
 
-	async fn execute<S>(&self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
+	/// Execute the query.
+	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
 	where
 		S: BlockStorage + 'static;
 }
@@ -20,7 +21,7 @@ pub trait Query: Send + Sync {
 #[async_trait]
 pub trait QueryExt: Query {
 	/// Execute query using reducer state.
-	async fn execute_reducer(&self, reducer: &CoReducer) -> Result<(CoStorage, Self::Output), QueryError>
+	async fn execute_reducer(&mut self, reducer: &CoReducer) -> Result<(CoStorage, Self::Output), QueryError>
 	where
 		Self: Query<Input = OptionLink<Co>>,
 	{
@@ -48,6 +49,25 @@ pub trait QueryExt: Query {
 	{
 		OptionLinkQuery::new(self)
 	}
+
+	/// Memoize query by return same output for same input.
+	fn memoize(self) -> MemoizeQuery<Self>
+	where
+		Self: Sized,
+		Self::Input: Eq + Clone,
+		Self::Output: Clone,
+	{
+		MemoizeQuery::new(self)
+	}
+
+	// /// Memoize query by return [`None`] for same input.
+	// fn option_memoize<T>(self) -> OptionMemoizeQuery<Self>
+	// where
+	// 	Self: Sized,
+	// 	Self::Input: Eq + Clone,
+	// {
+	// 	OptionMemoizeQuery::new(self)
+	// }
 
 	/// Map
 	fn map<T, F>(self, map: F) -> MapQuery<Self, F, T>
@@ -78,6 +98,113 @@ pub fn query_core<'a, T>(core_name: &'a str) -> CoreQuery<'a, OptionLinkQuery<Ne
 	query().option_link().core(core_name)
 }
 
+// #[async_trait]
+// pub trait QueryExecutor {
+// 	async fn execute<S, Q>(&mut self, storage: &S, query: &mut Q, source: Q::Input) -> Result<Q::Output, QueryError>
+// 	where
+// 		S: BlockStorage + 'static,
+// 		Q: Query;
+// }
+
+// pub struct DefaultQueryExecutor {}
+// #[async_trait]
+// impl QueryExecutor for DefaultQueryExecutor {
+// 	async fn execute<S, Q>(&mut self, storage: &S, query: &mut Q, source: Q::Input) -> Result<Q::Output, QueryError>
+// 	where
+// 		S: BlockStorage + 'static,
+// 		Q: Query,
+// 	{
+// 		query.execute(storage, source).await
+// 	}
+// }
+
+pub struct MemoizeQuery<Q>
+where
+	Q: Query,
+	Q::Input: Eq + Clone,
+	Q::Output: Clone,
+{
+	next: Q,
+	last: Option<(Q::Input, Q::Output)>,
+}
+impl<Q> MemoizeQuery<Q>
+where
+	Q: Query,
+	Q::Input: Eq + Clone,
+	Q::Output: Clone,
+{
+	pub fn new(next: Q) -> Self {
+		Self { next, last: None }
+	}
+}
+#[async_trait]
+impl<Q> Query for MemoizeQuery<Q>
+where
+	Q: Query,
+	Q::Input: Eq + Clone,
+	Q::Output: Clone,
+{
+	type Input = Q::Input;
+	type Output = Q::Output;
+
+	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
+	where
+		S: BlockStorage + 'static,
+	{
+		if let Some((last_input, last_output)) = &self.last {
+			if last_input == &source {
+				return Ok(last_output.clone());
+			}
+		}
+		let last_source = source.clone();
+		let result = self.next.execute(storage, source).await?;
+		self.last = Some((last_source, result.clone()));
+		Ok(result)
+	}
+}
+
+// pub struct OptionMemoizeQuery<Q>
+// where
+// 	Q: Query,
+// 	Q::Input: Eq + Clone,
+// {
+// 	next: Q,
+// 	last: Option<Q::Input>,
+// }
+// impl<Q> OptionMemoizeQuery<Q>
+// where
+// 	Q: Query,
+// 	Q::Input: Eq + Clone,
+// {
+// 	pub fn new(next: Q) -> Self {
+// 		Self { next, last: None }
+// 	}
+// }
+// #[async_trait]
+// impl<Q> Query for OptionMemoizeQuery<Q>
+// where
+// 	Q: Query,
+// 	Q::Input: Eq + Clone,
+// {
+// 	type Input = Q::Input;
+// 	type Output = Option<Q::Output>;
+
+// 	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
+// 	where
+// 		S: BlockStorage + 'static,
+// 	{
+// 		if let Some(last_input) = &self.last {
+// 			if last_input == &source {
+// 				return Ok(None);
+// 			}
+// 		}
+// 		let last_source = source.clone();
+// 		let result = self.next.execute(storage, source).await?;
+// 		self.last = Some(last_source);
+// 		Ok(Some(result))
+// 	}
+// }
+
 pub struct NewQuery<T> {
 	_t: PhantomData<T>,
 }
@@ -89,7 +216,7 @@ where
 	type Input = T;
 	type Output = T;
 
-	async fn execute<S>(&self, _storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
+	async fn execute<S>(&mut self, _storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
 	where
 		S: BlockStorage + 'static,
 	{
@@ -116,7 +243,7 @@ where
 	type Input = Q::Input;
 	type Output = (OptionLink<T>, Option<T>);
 
-	async fn execute<S>(&self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
+	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
 	where
 		S: BlockStorage + 'static,
 	{
@@ -146,7 +273,7 @@ where
 	type Input = Q::Input;
 	type Output = T;
 
-	async fn execute<S>(&self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
+	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
 	where
 		S: BlockStorage + 'static,
 	{
@@ -177,7 +304,7 @@ where
 	type Input = Q::Input;
 	type Output = T;
 
-	async fn execute<S>(&self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
+	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
 	where
 		S: BlockStorage + 'static,
 	{
@@ -212,7 +339,7 @@ where
 	type Input = Q::Input;
 	type Output = C;
 
-	async fn execute<S>(&self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
+	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
 	where
 		S: BlockStorage + 'static,
 	{

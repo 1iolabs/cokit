@@ -7,6 +7,7 @@ use co_sdk::{
 	DidKeyProvider, Identity, CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use co_storage::TmpDir;
+use futures::join;
 use futures::StreamExt;
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -19,6 +20,7 @@ use tokio::time::timeout;
 /// - https://gitlab.1io.com/1io/co-sdk/-/issues/59
 #[tokio::test]
 async fn test_conflicting_membership_update() {
+	let timeout_duration = Duration::from_secs(5);
 	let tmp = TmpDir::new("co");
 
 	// application
@@ -133,30 +135,43 @@ async fn test_conflicting_membership_update() {
 	}
 
 	// check: refresh and wait until state changed
-	local_co.refresh(local_co.clone()).await.unwrap();
-	timeout(
-		Duration::from_secs(5),
-		co.reducer_state_stream()
-			.filter(|(state, _)| ready(state != &co_state))
-			.boxed()
-			.next(),
-	)
-	.await
-	.unwrap();
-	test_folders_exists(&co).await;
+	let check1 = async {
+		local_co.refresh(local_co.clone()).await.unwrap();
+		timeout(
+			timeout_duration,
+			co.reducer_state_stream()
+				.map(|state| {
+					println!("co1-change: {:?}", state);
+					state
+				})
+				.filter(|(state, _)| ready(state != &co_state))
+				.boxed()
+				.next(),
+		)
+		.await
+		.unwrap();
+		test_folders_exists(&co).await;
+	};
 
 	// check2: refresh and wait until state changed
-	local_co2.refresh(local_co2.clone()).await.unwrap();
-	timeout(
-		Duration::from_secs(5),
-		co2.reducer_state_stream()
-			.filter(|(state, _)| ready(state != &co2_state))
-			.boxed()
-			.next(),
-	)
-	.await
-	.unwrap();
-	test_folders_exists(&co2).await;
+	let check2 = async {
+		local_co2.refresh(local_co2.clone()).await.unwrap();
+		timeout(
+			timeout_duration,
+			co2.reducer_state_stream()
+				.map(|state| {
+					println!("co2-change: {:?}", state);
+					state
+				})
+				.filter(|(state, _)| ready(state != &co2_state))
+				.boxed()
+				.next(),
+		)
+		.await
+		.unwrap();
+		test_folders_exists(&co2).await;
+	};
+	join!(check1, check2);
 
 	// write more data and check we only got one CoState with one head left
 	co.push(
