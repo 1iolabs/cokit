@@ -1,4 +1,4 @@
-use super::to_external_cid::{to_external_cids, to_external_cids_opt};
+use super::to_external_cid::{to_external_cids, to_external_cids_opt_force};
 use crate::{
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	services::{
@@ -58,7 +58,7 @@ impl ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for PushHe
 
 			// map plain heads to encrypted heads
 			let heads = if self.force_mapping {
-				to_external_cids_opt(storage, reducer.heads().clone())
+				to_external_cids_opt_force(storage, reducer.heads().clone())
 					.await
 					.ok_or_else(|| anyhow!("Failed to map heads: {:?}", reducer.heads()))?
 			} else {

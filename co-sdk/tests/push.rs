@@ -41,22 +41,20 @@ async fn test_push() {
 		)
 		.await
 		.unwrap();
-	let (peer0_state, peer0_heads) = peer0.reducer_state().await;
-	let peer0_state = peer0_state.unwrap();
+	let peer0_state = peer0.reducer_state().await;
 
 	// peer1: wait for state/heads to be updated
 	let (peer1, _identity1) = shared_co.reducer(1, "shared").await;
 	let peer1_state_future = peer1
 		.reducer_state_stream()
-		.filter(|(state, _heads)| ready(state == &peer0_state))
+		.filter(|state| ready(state == &peer0_state))
 		.take(1);
 	pin_mut!(peer1_state_future);
-	let (peer1_state, peer1_heads) = timeout(Duration::from_secs(5), peer1_state_future.next())
+	let peer1_state = timeout(Duration::from_secs(5), peer1_state_future.next())
 		.await
 		.expect("to sync in time")
 		.expect("state");
 	assert_eq!(peer1_state, peer0_state);
-	assert_eq!(peer1_heads, peer0_heads);
 
 	// peer0: create file
 	let folder = FolderNode {
@@ -79,20 +77,18 @@ async fn test_push() {
 		)
 		.await
 		.unwrap();
-	let (peer0_state, peer0_heads) = peer0.reducer_state().await;
-	let peer0_state = peer0_state.unwrap();
+	let peer0_state = peer0.reducer_state().await;
 
 	// peer1: wait for state/heads to be updated
 	let (peer1, _identity1) = shared_co.reducer(1, "shared").await;
 	let peer1_state_future = peer1
 		.reducer_state_stream()
-		.filter(|(state, _heads)| ready(state == &peer0_state))
+		.filter(|state| ready(state == &peer0_state))
 		.take(1);
 	pin_mut!(peer1_state_future);
-	let (peer1_state, peer1_heads) = timeout(Duration::from_secs(1), peer1_state_future.next())
+	let peer1_state = timeout(Duration::from_secs(1), peer1_state_future.next())
 		.await
 		.expect("to sync in time")
 		.expect("state");
 	assert_eq!(peer1_state, peer0_state);
-	assert_eq!(peer1_heads, peer0_heads);
 }

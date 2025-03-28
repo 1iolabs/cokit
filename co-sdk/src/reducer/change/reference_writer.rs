@@ -1,6 +1,6 @@
 use crate::{
 	library::{max_reference_count::max_reference_count, to_external_cid::to_external_cid},
-	types::{co_dispatch::CoDispatch, co_reducer::CoReducerContextRef},
+	types::{co_dispatch::CoDispatch, co_reducer_context::CoReducerContextRef},
 	CoreResolver, Reducer, ReducerChangeContext, ReducerChangedHandler,
 };
 use async_trait::async_trait;

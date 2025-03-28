@@ -1,4 +1,5 @@
 use super::fs_read::fs_read_option;
+use crate::CoReducerState;
 use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
 use cid::Cid;
@@ -646,6 +647,10 @@ impl ApplicationLocal {
 	// 	// result
 	// 	Ok(())
 	// }
+
+	pub fn reducer_state(&self) -> CoReducerState {
+		(self.state, self.heads.clone()).into()
+	}
 }
 
 #[cfg(test)]

@@ -70,6 +70,13 @@ impl PrivateIdentity for PrivateIdentityBox {
 	fn didcomm_private(&self) -> Option<DidCommPrivateContext> {
 		self.identity.didcomm_private()
 	}
+
+	fn boxed(self) -> PrivateIdentityBox
+	where
+		Self: Sized + Clone + Send + Sync + 'static,
+	{
+		self.clone()
+	}
 }
 
 #[derive(Debug, thiserror::Error)]

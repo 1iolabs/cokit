@@ -1,6 +1,6 @@
 use crate::{
 	services::network::{subscribe_identity, unsubscribe_identity, CoNetworkTaskSpawner},
-	state::{self, core_state_or_default},
+	state::{self, query_core, Query},
 	Action, CoContext, CoStorage, CO_CORE_NAME_KEYSTORE, CO_ID_LOCAL,
 };
 use co_core_co::Co;
@@ -91,7 +91,7 @@ impl SubscribeAction {
 			KeyStoreAction::Set(key) if state::is_identity(&key) => Some(SubscribeAction::Subscribe(key.uri)),
 			KeyStoreAction::Remove(remove_uri) => {
 				let local_co = context.local_co_reducer().await.ok()?;
-				let remove_key = key_by_uri(&local_co.storage(), local_co.co_state().await, &remove_uri)
+				let remove_key = key_by_uri(&local_co.storage(), local_co.reducer_state().await.co(), &remove_uri)
 					.await
 					.ok()??;
 				if state::is_identity(&remove_key) {
@@ -106,7 +106,10 @@ impl SubscribeAction {
 }
 
 async fn key_by_uri(storage: &CoStorage, co: OptionLink<Co>, uri: &str) -> Result<Option<Key>, anyhow::Error> {
-	let keystore: KeyStore = core_state_or_default(storage, co, CO_CORE_NAME_KEYSTORE).await?;
+	let keystore = query_core::<KeyStore>(CO_CORE_NAME_KEYSTORE)
+		.with_default()
+		.execute(storage, co)
+		.await?;
 	let keys = state::stream(storage.clone(), &keystore.keys);
 	pin_mut!(keys);
 	let mut first_error: Option<anyhow::Error> = None;
@@ -134,7 +137,7 @@ fn subscribe_all(
 	async_stream::try_stream! {
 		let local_co = context.local_co_reducer().await?;
 		let private_identity_resolver = context.private_identity_resolver().await?;
-		for await identity in state::identities(local_co.storage(), local_co.co_state().await, None) {
+		for await identity in state::identities(local_co.storage(), local_co.reducer_state().await.co(), None) {
 			let identity = match identity {
 				Ok(i) => i,
 				Err(err) => {

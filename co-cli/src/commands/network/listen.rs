@@ -36,7 +36,7 @@ pub async fn command(
 		None => {
 			let local_co = application.local_co_reducer().await?;
 			let co_context = application.co();
-			state::memberships(local_co.storage(), local_co.co_state().await)
+			state::memberships(local_co.storage(), local_co.reducer_state().await.co())
 				.try_filter(|(_, _, _, membership_state)| ready(*membership_state == MembershipState::Active))
 				.map_ok(|membership| membership.0)
 				.then(move |id| async move {

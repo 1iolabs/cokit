@@ -1,18 +1,18 @@
-use crate::CoreResolver;
+use crate::{library::create_reducer_action::create_reducer_action, CoreResolver};
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use cid::Cid;
 use co_identity::PrivateIdentity;
 use co_log::{EntryBlock, Log, LogError};
-use co_primitives::ReducerAction;
+use co_primitives::{Link, ReducerAction};
 use co_runtime::RuntimePool;
-use co_storage::BlockStorage;
+use co_storage::{BlockStorage, BlockStorageExt};
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
+use ipld_core::ipld::Ipld;
 use serde::Serialize;
 use std::{
 	collections::{BTreeSet, HashMap, VecDeque},
 	marker::PhantomData,
-	time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::watch;
 use tracing::instrument;
@@ -248,13 +248,8 @@ where
 		T: Serialize + Send + Sync,
 		I: PrivateIdentity + Send + Sync,
 	{
-		let action = ReducerAction {
-			core: core.to_owned(),
-			payload: item,
-			from: identity.identity().to_owned(),
-			time: SystemTime::now().duration_since(UNIX_EPOCH).expect("Valid time").as_millis(),
-		};
-		self.push_action(storage, runtime, identity, &action).await
+		self.push_reference(storage, runtime, identity, create_reducer_action(storage, identity, core, item).await?)
+			.await
 	}
 
 	/// Push an event.
@@ -272,15 +267,35 @@ where
 		T: Serialize + Send + Sync,
 		I: PrivateIdentity + Send + Sync,
 	{
+		let action_link = storage.set_serialized(&action).await?.into();
+		self.push_reference(storage, runtime, identity, action_link).await
+	}
+
+	/// Push an event.
+	///
+	/// # Returns
+	/// The resulting state.
+	pub async fn push_reference<I>(
+		&mut self,
+		storage: &S,
+		runtime: &RuntimePool,
+		identity: &I,
+		action_link: Link<ReducerAction<Ipld>>,
+	) -> Result<Option<Cid>, anyhow::Error>
+	where
+		I: PrivateIdentity + Send + Sync,
+	{
+		let action: ReducerAction<serde::de::IgnoredAny> = storage.get_deserialized(action_link.as_ref()).await?;
+
 		// validate
 		if identity.identity() != action.from {
 			return Err(anyhow!("Invalid argument: identity"));
 		}
 
 		// apply to log
-		let (_, action_link) = self
+		let _entry = self
 			.log
-			.push_event(storage, identity, &action)
+			.push(storage, identity, *action_link.cid())
 			.await
 			.with_context(|| format!("push event core: {}", action.core))?;
 
@@ -320,6 +335,7 @@ where
 		// result
 		Ok(runtime_context.state)
 	}
+
 	/// Join heads (from other log).
 	/// This is used to join logs from other peers.
 	/// Returns true if state has changed.

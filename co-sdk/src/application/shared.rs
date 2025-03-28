@@ -20,9 +20,9 @@ use crate::{
 		reducers::ReducerStorage,
 	},
 	state::{find, query_core, QueryExt},
-	types::{co_pinning_key::CoPinningKey, co_reducer::CoReducerContext},
-	CoCoreResolver, CoReducer, CoStorage, CoToken, CoTokenParameters, ReducerBuilder, Runtime, TaskSpawner,
-	CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
+	types::{co_pinning_key::CoPinningKey, co_reducer_context::CoReducerContext},
+	CoCoreResolver, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters, ReducerBuilder, Runtime,
+	TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -247,7 +247,7 @@ impl SharedCoBuilder {
 			let publish = PushHeads::new(
 				network.clone(),
 				connections.clone(),
-				tasks,
+				tasks.clone(),
 				self.membership.id.clone(),
 				PrivateIdentity::boxed(identity.clone()),
 				true,
@@ -288,14 +288,23 @@ impl SharedCoBuilder {
 		reducer.add_change_handler(Box::new(writer));
 
 		// result
-		Ok(CoReducer::new(
+		let application_identifier = self
+			.parent
+			.handle()
+			.tags()
+			.string("application")
+			.ok_or_else(|| anyhow!("Missing parent tag: application"))?
+			.to_owned();
+		Ok(CoReducer::spawn(
+			application_identifier,
 			self.membership.id,
 			Some(self.parent.id().clone()),
 			context.storage(false),
+			tasks,
 			runtime,
 			reducer,
 			context,
-		))
+		)?)
 	}
 }
 
@@ -359,12 +368,9 @@ impl SharedContext {
 						storage.load_mapping(&cid).await?;
 					}
 
-					// snapshot
-					let state_heads: BTreeSet<Cid> = state.heads.iter().map(WeakCid::cid).collect();
-					co.insert_snapshot(state.state.into(), state_heads.clone()).await?;
-
-					// load snapshot
-					co.join(&state_heads).await?;
+					// join
+					co.join_state(CoReducerState::new_weak(Some(state.state), state.heads.clone()))
+						.await?;
 				}
 			}
 		}
@@ -402,22 +408,12 @@ impl CoReducerContext for SharedContext {
 
 	/// Clear reducer caches.
 	async fn clear(&self, co: CoReducer) {
-		let mut reducer = co.reducer.write().await;
-
-		// remember root cids
-		let mut roots = BTreeSet::new();
-		roots.extend(reducer.state().clone().into_iter());
-		roots.extend(reducer.heads().clone().into_iter());
-
-		// clear log
-		reducer.log_mut().clear();
-
 		// clear reducer
-		reducer.clear();
+		let state = co.clear().await;
 
 		// clear storage
 		if let Some(encrypted_storage) = &self.encrypted_storage {
-			encrypted_storage.clear_mapping(roots).await;
+			encrypted_storage.clear_mapping(state.0.into_iter().chain(state.1)).await;
 		}
 	}
 }

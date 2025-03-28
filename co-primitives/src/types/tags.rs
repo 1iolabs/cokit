@@ -1,7 +1,6 @@
 use crate::{CoCid, TotalFloat64};
 use cid::Cid;
-use derive_more::From;
-use derive_more::TryInto;
+use derive_more::{From, TryInto};
 use ipld_core::ipld::Ipld;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, Serializer};

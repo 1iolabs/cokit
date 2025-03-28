@@ -19,18 +19,17 @@ use crate::{
 		network::CoNetworkTaskSpawner,
 		reducers::{ReducerStorage, ReducersControl},
 	},
-	types::{co_pinning_key::CoPinningKey, co_reducer::CoReducerContext, co_reducer_factory::CoReducerFactoryError},
+	types::{co_pinning_key::CoPinningKey, co_reducer_factory::CoReducerFactoryError},
 	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime, TaskSpawner,
 	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
-use anyhow::anyhow;
 use async_trait::async_trait;
 use co_actor::ActorHandle;
 use co_core_membership::Membership;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
-use co_log::EntryBlock;
+use co_log::{EntryBlock, Log};
 use co_primitives::{BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did};
 use co_storage::ChangeBlockStorage;
 use futures::{Stream, TryStreamExt};
@@ -55,36 +54,20 @@ impl CoContext {
 	pub async fn entries(
 		&self,
 		co: impl AsRef<CoId>,
-	) -> Result<
-		(
-			CoStorage,
-			impl Stream<Item = Result<EntryBlock, anyhow::Error>>,
-			Arc<dyn CoReducerContext + Send + Sync + 'static>,
-		),
-		anyhow::Error,
-	> {
+	) -> Result<(CoStorage, impl Stream<Item = Result<EntryBlock, anyhow::Error>>), anyhow::Error> {
 		let co = co.as_ref();
 
-		// create
-		let initialized = true;
-		let uninitialized_reducer = if co.as_str() == CO_ID_LOCAL {
-			self.inner.create_local_co_instance(initialized).await?
-		} else {
-			let local = self.local_co_reducer().await?;
-			let storage = self.inner.reducers.clone().storage(co.clone()).await?;
-			self.inner
-				.create_co_instance(local, co, storage, initialized, None)
-				.await?
-				.ok_or(anyhow!("Co not found: {}", co))?
-		};
-		let (storage, reducer, context) = uninitialized_reducer.into_inner().ok_or(anyhow!("Invalid reference"))?;
-		let log = reducer.into_log();
+		// log
+		let reducer = self.try_co_reducer(&co).await?;
+		let storage = reducer.storage();
+		let state = reducer.reducer_state().await;
+		let log = Log::new(co.as_bytes().to_vec(), self.inner.identity_resolver().await?, state.heads());
 
 		// stream
 		let stream = log.into_stream(&storage).map_err(|e| e.into());
 
 		// result
-		Ok((storage, stream, context))
+		Ok((storage, stream))
 	}
 
 	/// Test if `co` is a shared CO.
@@ -139,6 +122,16 @@ impl CoContext {
 	/// Application settings.
 	pub fn settings(&self) -> &ApplicationSettings {
 		&self.inner.settings
+	}
+
+	/// Force refresh co instance.
+	pub async fn refresh(&self, co: CoReducer) -> Result<(), anyhow::Error> {
+		let parent = match co.parent_id() {
+			Some(parent) => self.try_co_reducer(&parent).await?,
+			None => co.clone(),
+		};
+		co.context.refresh(parent, co.clone()).await?;
+		Ok(())
 	}
 }
 #[async_trait]

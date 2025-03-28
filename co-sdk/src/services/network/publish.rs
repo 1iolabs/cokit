@@ -3,7 +3,7 @@ use super::{
 	CoNetworkTaskSpawner,
 };
 use crate::{
-	library::to_external_cid::{to_external_cids, to_external_cids_opt},
+	library::to_external_cid::{to_external_cids, to_external_cids_opt_force},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	state, CoStorage, Reducer, ReducerChangeContext, ReducerChangedHandler,
 };
@@ -64,7 +64,7 @@ impl ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for CoHead
 
 		// map plain heads to encrypted heads
 		let external_heads = if self.force_mapping {
-			to_external_cids_opt(storage, heads.clone())
+			to_external_cids_opt_force(storage, heads.clone())
 				.await
 				.ok_or_else(|| anyhow!("Failed to map heads: {:?}", heads))?
 		} else {

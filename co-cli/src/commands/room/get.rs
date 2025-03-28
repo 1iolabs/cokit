@@ -36,7 +36,7 @@ pub async fn command(
 	let application = context.application(cli).await;
 	let co_reducer = application.context().try_co_reducer(&room_command.co).await?;
 	let (_, state) = query_core::<Room>(&room_command.core).execute_reducer(&co_reducer).await?;
-	let (storage, stream, _mapping) = application.co().entries(&room_command.co).await?;
+	let (storage, stream) = application.co().entries(&room_command.co).await?;
 
 	// print header
 	println!("History of room '{}' (core: {})", state.name, room_command.core);

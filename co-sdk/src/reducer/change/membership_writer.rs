@@ -39,7 +39,7 @@ impl<I> MembershipWriter<I> {
 #[async_trait]
 impl<I> ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for MembershipWriter<I>
 where
-	I: PrivateIdentity + Debug + Send + Sync,
+	I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 {
 	async fn on_state_changed(
 		&mut self,

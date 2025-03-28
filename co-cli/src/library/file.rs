@@ -3,7 +3,7 @@ use co_core_file::{FolderNode, Node};
 use co_primitives::{tags, AbsolutePath, AbsolutePathOwned, DagCollectionAsyncExt, PathError, PathExt};
 use co_sdk::{
 	state::{query_core, QueryError, QueryExt},
-	CoReducer, CoReducerError, CoStorage, Cores, PrivateIdentity, StorageError, CO_CORE_FILE, CO_CORE_NAME_CO,
+	CoReducer, CoStorage, Cores, PrivateIdentity, StorageError, CO_CORE_FILE, CO_CORE_NAME_CO,
 };
 use futures::{pin_mut, Stream, StreamExt};
 use std::{
@@ -21,9 +21,6 @@ pub enum FileError {
 
 	#[error("Storage error")]
 	Storage(#[from] StorageError),
-
-	#[error("Reducer error")]
-	Reducer(#[from] CoReducerError),
 
 	#[error("Path error")]
 	Path(#[from] PathError),
@@ -43,7 +40,7 @@ pub async fn file_core<I>(
 	core: &str,
 ) -> Result<(CoStorage, co_core_file::File), FileError>
 where
-	I: PrivateIdentity + Debug + Send + Sync,
+	I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 {
 	match query_core(core).execute_reducer(&co_reducer).await {
 		Err(QueryError::NotFound(_)) => {

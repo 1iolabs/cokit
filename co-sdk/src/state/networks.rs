@@ -1,12 +1,14 @@
-use super::core_state_or_default;
+use super::{query_core, Query, QueryError};
 use crate::{state, CoStorage, CO_CORE_NAME_CO};
 use co_core_co::Co;
 use co_primitives::{Network, OptionLink};
-use co_storage::StorageError;
 use futures::TryStreamExt;
 
 /// Read network settings from an CO.
-pub async fn networks(storage: &CoStorage, co_state: OptionLink<Co>) -> Result<Vec<Network>, StorageError> {
-	let co: Co = core_state_or_default(storage, co_state, CO_CORE_NAME_CO).await?;
-	state::stream(storage.clone(), &co.network).try_collect().await
+pub async fn networks(storage: &CoStorage, co_state: OptionLink<Co>) -> Result<Vec<Network>, QueryError> {
+	let co = query_core::<Co>(CO_CORE_NAME_CO)
+		.with_default()
+		.execute(storage, co_state)
+		.await?;
+	Ok(state::stream(storage.clone(), &co.network).try_collect().await?)
 }

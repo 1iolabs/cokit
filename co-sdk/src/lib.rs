@@ -51,10 +51,11 @@ pub use services::{
 	application::{Action, ActionError, ApplicationMessage},
 	connections::{ConnectionAction, ConnectionMessage, ReleaseAction},
 	network::{self, CoNetworkTaskSpawner, CoToken, CoTokenParameters, Network, NetworkMessage},
+	reducer::CoReducer,
 };
 pub use types::{
-	co_reducer::{CoReducer, CoReducerError},
 	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError},
+	co_reducer_state::CoReducerState,
 	co_storage::CoStorage,
 	cores::{
 		Cores, CO_CORE_CO, CO_CORE_DATA_SERIES, CO_CORE_FILE, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,

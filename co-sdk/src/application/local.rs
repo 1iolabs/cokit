@@ -3,13 +3,13 @@ use crate::{
 	library::{
 		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
 		locals::{ApplicationLocal, FileLocals, Locals, MemoryLocals},
-		to_external_cid::{to_external_cid_opt, to_external_cids_opt_map},
+		to_external_cid::{to_external_cid_opt_force, to_external_cids_opt_map_force},
 		to_internal_cid::{to_internal_cid, to_internal_cids},
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{
 		co_pinning_key::CoPinningKey,
-		co_reducer::{CoReducerContext, CoReducerContextRef},
+		co_reducer_context::{CoReducerContext, CoReducerContextRef},
 		cores::{CO_CORE_NAME_CO, CO_CORE_STORAGE},
 	},
 	CoReducer, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, ReducerChangeContext, Runtime, TaskSpawner,
@@ -24,7 +24,7 @@ use co_log::Log;
 use co_primitives::{tags, Did};
 use co_runtime::RuntimePool;
 use co_storage::{BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode};
-use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
+use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,
@@ -194,7 +194,16 @@ where
 		}
 
 		// reducer
-		let co_reducer = CoReducer::new(CO_ID_LOCAL.into(), None, storage, runtime, reducer, context);
+		let co_reducer = CoReducer::spawn(
+			local_co.settings.identifier.clone(),
+			CO_ID_LOCAL.into(),
+			None,
+			storage,
+			tasks.clone(),
+			runtime,
+			reducer,
+			context,
+		)?;
 
 		// watch
 		if watcher {
@@ -205,30 +214,22 @@ where
 				let watcher = watch_locals.watch().take_until(shutdown.clone().cancelled_owned());
 				pin_mut!(watcher);
 				while let Some(local) = watcher.next().await {
-					// convert heads to unencrypted
-					let local_heads = match stream::iter(local.heads.iter())
-						.then(|cid| async {
-							watch_encrypted_storage
-								.to_mapped(cid)
-								.await
-								.ok_or_else(|| anyhow!("Map head failed: {}", *cid))
-						})
-						.try_collect()
-						.await
-					{
-						Ok(local_heads) => local_heads,
+					// convert to unencrypted
+					let local_state = match local.reducer_state().to_internal_force(&watch_encrypted_storage).await {
+						Ok(local_state) => local_state,
 						Err(err) => {
-							tracing::trace!(?err, ?local.heads, "local-watch-cids-failed");
+							tracing::trace!(?err, ?local, "local-watch-cids-failed");
 							continue;
 						},
 					};
 
 					// skip?
-					let (_, heads) = watch_reducer.reducer_state().await;
-					if heads == local_heads {
-						tracing::trace!(?local_heads, "local-watch-skip");
+					let previous_state = watch_reducer.reducer_state().await;
+					if previous_state == local_state {
+						tracing::trace!(?local_state, "local-watch-skip");
+						continue;
 					} else {
-						tracing::trace!(?local_heads, ?local.mapping, "local-watch");
+						tracing::trace!(?local_state, ?local.mapping, "local-watch");
 					}
 
 					// mappings
@@ -239,14 +240,12 @@ where
 						}
 					}
 
-					// heads
-					match watch_reducer.join(&local_heads).await {
-						Ok(change) => {
-							if change {
-								tracing::trace!("local-watch-join");
-							}
+					// join
+					match watch_reducer.join_state(local_state.clone()).await {
+						Ok(next_state) => {
+							tracing::trace!(?previous_state, ?next_state, ?local_state, "local-watch-join");
 						},
-						Err(err) => tracing::warn!(?err, ?local_heads, "local-watch-join-failed"),
+						Err(err) => tracing::warn!(?err, ?local_state, "local-watch-join-failed"),
 					}
 				}
 			});
@@ -270,12 +269,12 @@ where
 	{
 		if let Some(state) = reducer.state() {
 			// heads
-			let plain_heads_map = to_external_cids_opt_map(storage, reducer.heads().clone())
+			let plain_heads_map = to_external_cids_opt_map_force(storage, reducer.heads().clone())
 				.await
 				.ok_or_else(|| anyhow!("Failed to map heads: {:?}", reducer.heads()))?;
 
 			// state
-			let plain_state = to_external_cid_opt(storage, Some(*state))
+			let plain_state = to_external_cid_opt_force(storage, Some(*state))
 				.await
 				.ok_or_else(|| anyhow!("Failed to map state: {:?}", state))?;
 
@@ -352,8 +351,7 @@ where
 			.try_for_each(|(state, heads)| {
 				let co = &co;
 				async move {
-					co.insert_snapshot(state, heads.clone()).await?;
-					co.join(&heads).await?;
+					co.join_state((state, heads).into()).await?;
 					Ok(())
 				}
 			})
@@ -365,21 +363,11 @@ where
 
 	/// Clear reducer caches.
 	async fn clear(&self, co: CoReducer) {
-		let mut reducer = co.reducer.write().await;
-
-		// remember root cids
-		let mut roots = BTreeSet::new();
-		roots.extend(reducer.state().clone().into_iter());
-		roots.extend(reducer.heads().clone().into_iter());
-
-		// clear log
-		reducer.log_mut().clear();
-
 		// clear reducer
-		reducer.clear();
+		let state = co.clear().await;
 
 		// clear storage
-		self.encrypted_storage.clear_mapping(roots).await;
+		self.encrypted_storage.clear_mapping(state.0.into_iter().chain(state.1)).await;
 	}
 }
 

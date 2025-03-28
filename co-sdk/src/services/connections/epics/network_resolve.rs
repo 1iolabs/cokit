@@ -64,7 +64,7 @@ async fn networks_co(
 	storage: &CoStorage,
 	reducer: &CoReducer,
 ) -> Result<BTreeSet<Network>, anyhow::Error> {
-	let co_state = reducer.co_state().await;
+	let co_state = reducer.reducer_state().await.co();
 	let networks = state::networks(&storage, co_state).await?;
 	if networks.is_empty() {
 		// get participant networks

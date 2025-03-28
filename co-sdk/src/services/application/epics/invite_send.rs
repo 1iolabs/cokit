@@ -131,7 +131,7 @@ async fn create_invite(
 	let identity_resolver = context.identity_resolver().await?;
 	let co_reducer = context.try_co_reducer(co_id).await?;
 	let (storage, co) = co_reducer.co().await?;
-	let (state, heads) = co_reducer.external_reducer_state().await;
+	let (state, heads) = co_reducer.reducer_state().await.to_external(&storage).await.into();
 	let from_identity = context.private_identity_resolver().await?.resolve_private(from).await?;
 	let to_identity = context.identity_resolver().await?.resolve(to).await?;
 

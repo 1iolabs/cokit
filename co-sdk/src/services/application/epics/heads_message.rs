@@ -1,7 +1,7 @@
 use crate::{
 	state,
 	types::message::heads::{HeadsErrorCode, HeadsMessage},
-	Action, CoContext, CoReducerFactory,
+	Action, CoContext, CoReducerFactory, CoReducerState,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -90,18 +90,23 @@ async fn join_heads(
 ) -> anyhow::Result<Vec<Action>> {
 	let mut actions = Vec::new();
 	let co_reducer = context.try_co_reducer(&co).await?;
-	if co_reducer.join(&heads).await? {
-		if let Ok(next_heads) = get_heads(&context, &from, &co).await {
-			if next_heads != heads {
-				let mut header = HeadsMessage::create_header();
-				header.thid = Some(message_id);
-				let body = HeadsMessage::Heads(co, next_heads);
-				// TODO: sign?
-				let (message_id, message) = EncodedMessage::create_plain_json(header, &body)?;
-				actions.push(Action::DidCommSend { message_id, peer, message });
-			}
-		}
+
+	// join
+	let _previous_state = get_heads(&context, &from, &co).await?;
+	co_reducer.join(heads.clone()).await?;
+	let next_state = get_heads(&context, &from, &co).await?;
+
+	// respond if different
+	if &next_state.1 != &heads {
+		let mut header = HeadsMessage::create_header();
+		header.thid = Some(message_id);
+		let body = HeadsMessage::Heads(co, next_state.heads());
+		// TODO: sign?
+		let (message_id, message) = EncodedMessage::create_plain_json(header, &body)?;
+		actions.push(Action::DidCommSend { message_id, peer, message });
 	}
+
+	// result
 	Ok(actions)
 }
 
@@ -113,7 +118,7 @@ async fn request_heads(
 	co: CoId,
 ) -> anyhow::Result<Action> {
 	let body = match get_heads(&context, &from, &co).await {
-		Ok(heads) => HeadsMessage::Heads(co, heads),
+		Ok(state) => HeadsMessage::Heads(co, state.heads()),
 		Err(err) => {
 			tracing::warn!(?err, "co-request-heads-failed");
 			HeadsMessage::Error { code: HeadsErrorCode::Forbidden, message: "Forbidden".to_owned() }
@@ -126,15 +131,16 @@ async fn request_heads(
 	Ok(Action::DidCommSend { message_id, peer, message })
 }
 
-async fn get_heads(context: &CoContext, from: &Option<Did>, co: &CoId) -> anyhow::Result<BTreeSet<Cid>> {
+async fn get_heads(context: &CoContext, from: &Option<Did>, co: &CoId) -> anyhow::Result<CoReducerState> {
 	let co_reducer = context.try_co_reducer(&co).await?;
+	let storage = co_reducer.storage();
+	let state = co_reducer.reducer_state().await;
 
 	// verify
-	if !state::is_participant(&co_reducer.storage(), co_reducer.co_state().await, from).await? {
+	if !state::is_participant(&storage, state.co(), from).await? {
 		return Err(anyhow!("Not a participant {:?} of {}", from, co));
 	}
 
 	// result
-	let (_, heads) = co_reducer.external_reducer_state().await;
-	Ok(heads)
+	Ok(state.to_external(&storage).await)
 }

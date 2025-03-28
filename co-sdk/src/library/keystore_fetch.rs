@@ -16,7 +16,7 @@ pub async fn keystore_fetch<F, I>(
 ) -> Result<Key, anyhow::Error>
 where
 	F: FnOnce() -> Key,
-	I: PrivateIdentity + Debug + Send + Sync,
+	I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 {
 	// get
 	if !force_create {

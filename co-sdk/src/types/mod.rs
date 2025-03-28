@@ -1,7 +1,8 @@
 pub mod co_dispatch;
 pub mod co_pinning_key;
-pub mod co_reducer;
+pub mod co_reducer_context;
 pub mod co_reducer_factory;
+pub mod co_reducer_state;
 pub mod co_storage;
 pub mod cores;
 pub mod error;

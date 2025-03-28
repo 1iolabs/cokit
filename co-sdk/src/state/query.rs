@@ -26,7 +26,7 @@ pub trait QueryExt: Query {
 		Self: Query<Input = OptionLink<Co>>,
 	{
 		let storage = reducer.storage();
-		let source = reducer.co_state().await;
+		let source = reducer.reducer_state().await.co();
 		let result = self.execute(&storage, source).await?;
 		Ok((storage, result))
 	}

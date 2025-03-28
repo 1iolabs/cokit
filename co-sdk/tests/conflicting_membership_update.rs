@@ -7,8 +7,7 @@ use co_sdk::{
 	DidKeyProvider, Identity, CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use co_storage::TmpDir;
-use futures::join;
-use futures::StreamExt;
+use futures::{join, StreamExt};
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	future::ready,
@@ -86,7 +85,6 @@ async fn test_conflicting_membership_update() {
 			},
 		)
 		.await
-		.unwrap()
 		.unwrap();
 	let co2_state = co2
 		.push(
@@ -106,7 +104,6 @@ async fn test_conflicting_membership_update() {
 			},
 		)
 		.await
-		.unwrap()
 		.unwrap();
 	// println!("co1: {:?} / {:?}", co.co_state().await, co.heads().await);
 	// println!("co2: {:?} / {:?}", co2.co_state().await, co2.heads().await);
@@ -136,15 +133,11 @@ async fn test_conflicting_membership_update() {
 
 	// check: refresh and wait until state changed
 	let check1 = async {
-		local_co.refresh(local_co.clone()).await.unwrap();
+		application.co().refresh(local_co.clone()).await.unwrap();
 		timeout(
 			timeout_duration,
 			co.reducer_state_stream()
-				.map(|state| {
-					println!("co1-change: {:?}", state);
-					state
-				})
-				.filter(|(state, _)| ready(state != &co_state))
+				.filter(|state| ready(state != &co_state))
 				.boxed()
 				.next(),
 		)
@@ -155,15 +148,11 @@ async fn test_conflicting_membership_update() {
 
 	// check2: refresh and wait until state changed
 	let check2 = async {
-		local_co2.refresh(local_co2.clone()).await.unwrap();
+		application2.co().refresh(local_co2.clone()).await.unwrap();
 		timeout(
 			timeout_duration,
 			co2.reducer_state_stream()
-				.map(|state| {
-					println!("co2-change: {:?}", state);
-					state
-				})
-				.filter(|(state, _)| ready(state != &co2_state))
+				.filter(|state| ready(state != &co2_state))
 				.boxed()
 				.next(),
 		)

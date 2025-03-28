@@ -138,7 +138,7 @@ async fn update_pins(context: &CliContext, cli: &Cli, _command: &UpdateCommand) 
 	let old_pin_map: BTreeMap<Cid, BTreeSet<Cid>> = from_cbor(&content)?;
 
 	// local co state
-	let (state, _) = application.local_co_reducer().await?.reducer_state().await;
+	let state = application.local_co_reducer().await?.reducer_state().await.state();
 
 	// create resolver
 	let resolver = create_cid_resolver(get_all_co_storages(application).await?).await?;
@@ -158,7 +158,7 @@ async fn update_pins(context: &CliContext, cli: &Cli, _command: &UpdateCommand) 
 
 async fn get_all_co_storages(application: Application) -> anyhow::Result<Vec<CoStorage>> {
 	let local_co_reducer = application.local_co_reducer().await?;
-	let stream = memberships(local_co_reducer.storage(), local_co_reducer.co_state().await);
+	let stream = memberships(local_co_reducer.storage(), local_co_reducer.reducer_state().await.co());
 	let mut storages: Vec<CoStorage> = vec![];
 	pin_mut!(stream);
 	while let Some(result) = stream.next().await {

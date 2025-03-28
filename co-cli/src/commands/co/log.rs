@@ -22,7 +22,7 @@ pub struct Command {
 
 pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
 	let application = context.application(cli).await;
-	let (storage, stream, _context) = application.co().entries(&command.co).await?;
+	let (storage, stream) = application.co().entries(&command.co).await?;
 
 	// stream
 	let mut index = 0;
