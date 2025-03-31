@@ -118,10 +118,14 @@ async fn test_invite() {
 			did: identity2.identity().to_owned(),
 			membership_state: MembershipState::Join,
 		};
-		let (push, membership_state) = join!(
-			local_co.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &payload),
-			wait_membership_state(peer2.application.actions(), [MembershipState::Active, MembershipState::Invite]),
-		);
+		let (push, membership_state) = join!(local_co.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &payload), async {
+			timeout(
+				timeout_duration,
+				wait_membership_state(peer2.application.actions(), [MembershipState::Active, MembershipState::Invite]),
+			)
+			.await
+			.expect("peer2 to join in time")
+		});
 		push.unwrap();
 		assert_eq!(
 			membership_state.unwrap(),
@@ -311,7 +315,7 @@ async fn wait_membership_state(
 			let state = state.clone();
 			async move {
 				match action {
-					Action::CoreAction { co, context: _, action, cid: _ }
+					Action::CoreAction { co, storage: _, context: _, action, cid: _ }
 						if co.as_str() == CO_ID_LOCAL && action.core == CO_CORE_NAME_MEMBERSHIP =>
 					{
 						let mambership_action: MembershipsAction = action.get_payload().ok()?;

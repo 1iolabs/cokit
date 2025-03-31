@@ -39,7 +39,7 @@ pub fn joined_fetch(
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::CoreAction { co, context: _, action, cid: _ }
+		Action::CoreAction { co, storage: _, context: _, action, cid: _ }
 			if co.as_str() == CO_ID_LOCAL && action.core == CO_CORE_NAME_MEMBERSHIP =>
 		{
 			let membership_action: MembershipsAction = action.get_payload().ok()?;

@@ -1,4 +1,6 @@
-use crate::{services::application::ApplicationMessage, Action, CoreResolver, CoreResolverError, ReducerChangeContext};
+use crate::{
+	services::application::ApplicationMessage, Action, CoStorage, CoreResolver, CoreResolverError, ReducerChangeContext,
+};
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::ActorHandle;
@@ -27,7 +29,7 @@ where
 #[async_trait]
 impl<S, N> CoreResolver<S> for ReactiveCoreResolver<S, N>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
+	S: BlockStorage + Into<CoStorage> + Clone + Send + Sync + 'static,
 	N: CoreResolver<S> + Send + Sync + 'static,
 {
 	async fn execute(

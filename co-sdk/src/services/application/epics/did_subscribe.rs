@@ -38,7 +38,7 @@ pub fn keystore_changed(
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::CoreAction { co, context: change_context, action, cid: _ }
+		Action::CoreAction { co, context: change_context, action, cid: _, storage: _ }
 			if co.as_str() == CO_ID_LOCAL
 				&& change_context.is_local_change()
 				&& action.core == CO_CORE_NAME_KEYSTORE =>

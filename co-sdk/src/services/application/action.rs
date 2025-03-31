@@ -1,5 +1,6 @@
 use crate::{
-	library::create_reducer_action::new_reducer_action, types::message::heads::HeadsMessage, ReducerChangeContext,
+	library::create_reducer_action::new_reducer_action, types::message::heads::HeadsMessage, CoStorage,
+	ReducerChangeContext,
 };
 use co_identity::Message;
 use co_network::didcomm::EncodedMessage;
@@ -22,6 +23,7 @@ pub enum Action {
 	/// Core action has been succesfully processed.
 	CoreAction {
 		co: CoId,
+		storage: CoStorage,
 		context: ReducerChangeContext,
 		action: ReducerAction<Ipld>,
 		cid: OptionLink<ReducerAction<Ipld>>,
@@ -118,9 +120,15 @@ impl Action {
 		cid: Link<ReducerAction<Ipld>>,
 	) -> Result<Self, StorageError>
 	where
-		S: BlockStorage + Send + Sync + 'static,
+		S: BlockStorage + Into<CoStorage> + Clone + Send + Sync + 'static,
 	{
-		Ok(Self::CoreAction { co, context, action: storage.get_value(&cid).await?, cid: cid.into() })
+		Ok(Self::CoreAction {
+			co,
+			context,
+			storage: storage.clone().into(),
+			action: storage.get_value(&cid).await?,
+			cid: cid.into(),
+		})
 	}
 
 	/// Map result to action.

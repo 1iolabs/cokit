@@ -59,7 +59,7 @@ pub fn invite_send_action(
 	_context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::CoreAction { co, context, action, cid: _ }
+		Action::CoreAction { co, storage: _, context, action, cid: _ }
 			if context.is_local_change() && action.core == CO_CORE_NAME_CO =>
 		{
 			let co_action: CoAction = action.get_payload().ok()?;
