@@ -2,8 +2,11 @@ use crate::BlockStorageContentMapping;
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{Block, BlockStat, BlockStorage, CloneWithBlockStorageSettings, StorageError};
-use futures::lock::Mutex;
-use std::{collections::HashSet, mem::swap, sync::Arc};
+use std::{
+	collections::HashSet,
+	mem::swap,
+	sync::{Arc, Mutex},
+};
 
 /// Store all [`Cid`] of blocks that have been newly created or removed.
 /// Additionally set calls for blocks which already exists in `next` will be ignored.
@@ -19,7 +22,7 @@ impl<S> ChangeBlockStorage<S> {
 
 	/// Drain all changes and return them as iterator.
 	pub async fn drain(&self) -> impl Iterator<Item = BlockStorageChange> + use<S> {
-		let mut created = self.changes.lock().await;
+		let mut created = self.changes.lock().unwrap();
 		let mut result = HashSet::new();
 		swap(&mut result, &mut created);
 		result.into_iter()
@@ -47,9 +50,11 @@ where
 		let result = self.next.set(block).await?;
 
 		// record
-		let mut changes = self.changes.lock().await;
-		changes.remove(&BlockStorageChange::Remove(result));
-		changes.insert(BlockStorageChange::Set(result));
+		{
+			let mut changes = self.changes.lock().unwrap();
+			changes.remove(&BlockStorageChange::Remove(result));
+			changes.insert(BlockStorageChange::Set(result));
+		}
 
 		// result
 		Ok(result)
@@ -60,9 +65,11 @@ where
 		let result = self.next.remove(cid).await?;
 
 		// record (ignore when it just has been added)
-		let mut changes = self.changes.lock().await;
-		if !changes.remove(&BlockStorageChange::Set(*cid)) {
-			changes.insert(BlockStorageChange::Remove(*cid));
+		{
+			let mut changes = self.changes.lock().unwrap();
+			if !changes.remove(&BlockStorageChange::Set(*cid)) {
+				changes.insert(BlockStorageChange::Remove(*cid));
+			}
 		}
 
 		// result

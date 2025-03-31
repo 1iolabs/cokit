@@ -6,8 +6,10 @@ use co_primitives::{
 	Block, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, DefaultParams, StorageError,
 	StoreParams,
 };
-use std::{collections::BTreeMap, sync::Arc};
-use tokio::sync::RwLock;
+use std::{
+	collections::BTreeMap,
+	sync::{Arc, RwLock},
+};
 
 #[derive(Debug)]
 pub struct MemoryStorage {
@@ -95,11 +97,11 @@ where
 	}
 
 	pub async fn is_empty(&self) -> bool {
-		self.records.read().await.is_empty()
+		self.records.read().unwrap().is_empty()
 	}
 
 	pub async fn entries(&self) -> impl Iterator<Item = Block<P>> + use<P> {
-		let records = { self.records.read().await.clone() };
+		let records = { self.records.read().unwrap().clone() };
 		records.into_iter().map(|(_, record)| record.block)
 	}
 }
@@ -119,7 +121,7 @@ where
 		let result = self
 			.records
 			.read()
-			.await
+			.unwrap()
 			.get(cid)
 			.map(|r| r.block.clone())
 			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")));
@@ -130,20 +132,20 @@ where
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		tracing::trace!(cid = ?block.cid(), "memory-store-set");
 		let result = *block.cid();
-		self.records.write().await.insert(*block.cid(), Record { pin: false, block });
+		self.records.write().unwrap().insert(*block.cid(), Record { pin: false, block });
 		Ok(result)
 	}
 
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
 		tracing::trace!(?cid, "memory-store-remove");
-		self.records.write().await.remove(cid);
+		self.records.write().unwrap().remove(cid);
 		Ok(())
 	}
 
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		self.records
 			.read()
-			.await
+			.unwrap()
 			.get(cid)
 			.map(|r| BlockStat { size: r.block.data().len() as u64 })
 			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")))

@@ -20,9 +20,8 @@ use futures::{
 use serde::Serialize;
 use std::{
 	collections::{BTreeMap, BTreeSet},
-	sync::Arc,
+	sync::{Arc, RwLock},
 };
-use tokio::sync::RwLock;
 
 #[derive(Debug, Clone)]
 pub struct EncryptedBlockStorage<S> {
@@ -426,8 +425,12 @@ impl EncryptionReferenceMode {
 
 #[derive(Debug, Clone, Default)]
 pub struct EncryptedBlockStorageMapping {
-	parent: Option<Arc<RwLock<BlockMapping>>>,
 	mapping: Arc<RwLock<BlockMapping>>,
+
+	/// Parent Mapping.
+	///
+	/// Note: To prevent deadlocks, when lock both always lock mapping first.
+	parent: Option<Arc<RwLock<BlockMapping>>>,
 }
 impl EncryptedBlockStorageMapping {
 	/// Create a child instance.
@@ -441,7 +444,15 @@ impl EncryptedBlockStorageMapping {
 	where
 		S: BlockStorage + Clone + Send + Sync + 'static,
 	{
-		self.mapping.write().await.read_mappings(&storage, map).await?;
+		// load
+		let mut mapping = BlockMapping::new();
+		mapping.read_mappings(&storage, map).await?;
+
+		// insert
+		//  we dont use read_mappings directly because of possible deadlocks and because it involves IO.
+		self.mapping.write().unwrap().append(&mut mapping);
+
+		// done
 		Ok(())
 	}
 
@@ -452,15 +463,15 @@ impl EncryptedBlockStorageMapping {
 	}
 
 	pub async fn clear(&self) {
-		self.mapping.write().await.map.clear();
+		self.mapping.write().unwrap().clear();
 	}
 
 	pub async fn get(&self, key: &Cid) -> Option<Cid> {
-		match self.mapping.read().await.get(key) {
+		match self.mapping.read().unwrap().get(key) {
 			Some(cid) => Some(cid),
 			None => {
 				if let Some(parent) = &self.parent {
-					parent.read().await.get(key)
+					parent.read().unwrap().get(key)
 				} else {
 					None
 				}
@@ -468,9 +479,10 @@ impl EncryptedBlockStorageMapping {
 		}
 	}
 
+	/// Map multiple Cids into an Map.
 	pub async fn get_mapping(&self, keys: impl IntoIterator<Item = Cid>) -> BTreeMap<Cid, Option<Cid>> {
-		let mapping = self.mapping.read().await;
-		let parent = if let Some(parent) = &self.parent { Some(parent.read().await) } else { None };
+		let mapping = self.mapping.read().unwrap();
+		let parent = if let Some(parent) = &self.parent { Some(parent.read().unwrap()) } else { None };
 		keys.into_iter()
 			.map(|key| {
 				let value = match mapping.get(&key) {
@@ -489,11 +501,11 @@ impl EncryptedBlockStorageMapping {
 	}
 
 	pub async fn get_first_by_value(&self, key: &Cid) -> Option<Cid> {
-		match self.mapping.read().await.get_first_by_value(key) {
+		match self.mapping.read().unwrap().get_first_by_value(key) {
 			Some(cid) => Some(cid),
 			None => {
 				if let Some(parent) = &self.parent {
-					parent.read().await.get_first_by_value(key)
+					parent.read().unwrap().get_first_by_value(key)
 				} else {
 					None
 				}
@@ -502,11 +514,11 @@ impl EncryptedBlockStorageMapping {
 	}
 
 	pub async fn insert(&self, key: Cid, value: Cid) -> Option<Cid> {
-		self.mapping.write().await.insert(key, value)
+		self.mapping.write().unwrap().insert(key, value)
 	}
 
 	pub async fn extend(&self, items: impl IntoIterator<Item = (Cid, Cid)>) {
-		self.mapping.write().await.extend(items);
+		self.mapping.write().unwrap().extend(items);
 	}
 
 	pub async fn to_blocks<S, P: StoreParams>(
@@ -519,14 +531,12 @@ impl EncryptedBlockStorageMapping {
 	{
 		// copy items
 		let mapping = {
-			let mut map = self.mapping.read().await.map.clone();
+			let mut map = self.mapping.read().unwrap().clone();
 			if let Some(parent) = &self.parent {
-				let mut parent_map = parent.read().await.map.clone();
+				let mut parent_map = parent.read().unwrap().clone();
 				map.append(&mut parent_map);
 			};
-			let mut result = BlockMapping::new();
-			result.map = map;
-			result
+			map
 		};
 
 		// blocks
@@ -572,7 +582,7 @@ impl From<BlockMappingError> for StorageError {
 
 /// Serializeable block mapping.
 /// This is used to store the mapping itself as an block.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BlockMapping {
 	map: BTreeMap<Cid, Cid>,
 }
@@ -593,6 +603,10 @@ impl BlockMapping {
 		self.map.extend(items.into_iter().map(|(key, value)| (key, value)));
 	}
 
+	pub fn append(&mut self, other: &mut BlockMapping) {
+		self.map.append(&mut other.map);
+	}
+
 	pub fn get_first_by_value(&self, value: &Cid) -> Option<Cid> {
 		self.map.iter().find_map(|(k, v)| {
 			if v == value {
@@ -600,6 +614,18 @@ impl BlockMapping {
 			}
 			None
 		})
+	}
+
+	pub fn clear(&mut self) {
+		self.map.clear();
+	}
+
+	pub fn iter(&self) -> impl Iterator<Item = (&Cid, &Cid)> {
+		self.map.iter()
+	}
+
+	pub fn into_iter(self) -> impl Iterator<Item = (Cid, Cid)> {
+		self.map.into_iter()
 	}
 
 	pub async fn from_cids<S>(

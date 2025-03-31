@@ -38,8 +38,10 @@ use co_primitives::{BlockStorageSettings, CloneWithBlockStorageSettings, CoId, D
 #[cfg(feature = "pinning")]
 use co_storage::ChangeBlockStorage;
 use futures::{Stream, TryStreamExt};
-use std::{fmt::Debug, sync::Arc};
-use tokio::sync::RwLock;
+use std::{
+	fmt::Debug,
+	sync::{Arc, RwLock},
+};
 use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
@@ -101,17 +103,17 @@ impl CoContext {
 
 	/// Network.
 	pub async fn network(&self) -> Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)> {
-		self.inner.network.read().await.clone()
+		self.inner.network.read().unwrap().clone()
 	}
 
 	/// Network Spawner.
 	pub async fn network_tasks(&self) -> Option<CoNetworkTaskSpawner> {
-		self.inner.network.read().await.as_ref().map(|(v, _)| v).cloned()
+		self.inner.network.read().unwrap().as_ref().map(|(v, _)| v).cloned()
 	}
 
 	/// Network Connections.
 	pub async fn network_connections(&self) -> Option<ActorHandle<ConnectionMessage>> {
-		self.inner.network.read().await.as_ref().map(|(_, v)| v).cloned()
+		self.inner.network.read().unwrap().as_ref().map(|(_, v)| v).cloned()
 	}
 
 	/// Tasks.
@@ -267,7 +269,7 @@ impl CoContextInner {
 		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
 	) -> Result<(), anyhow::Error> {
 		// assign
-		*self.network.write().await = network;
+		*self.network.write().unwrap() = network;
 
 		// clear reducers
 		self.reducers.clone().clear().await?;
@@ -340,7 +342,7 @@ impl CoContextInner {
 		let core_resolver = self.create_co_core_resolver(membership.id.clone());
 
 		// network
-		let network = if network { self.network.read().await.clone() } else { None };
+		let network = if network { self.network.read().unwrap().clone() } else { None };
 
 		// reducer
 		let reducer = SharedCoBuilder::new(parent, membership)
