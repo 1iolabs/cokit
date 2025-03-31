@@ -9,6 +9,8 @@ pub enum ReducerRequest {
 	Storage(CoId, Response<Result<ReducerStorage, CoReducerFactoryError>>),
 	/// Request CO reducer instance by creating it if not created yet.
 	Request(CoId, Response<Result<CoReducer, CoReducerFactoryError>>),
+	/// Request CO reducer instance if it already has been created yet.
+	RequestOpt(CoId, Response<Option<CoReducer>>),
 	/// Create reducer instance.
 	Create(CoId, Result<CoReducer, CoReducerFactoryError>),
 	/// Create shared storage instance.
@@ -32,6 +34,13 @@ impl ReducersControl {
 	pub async fn reducer(&self, co: CoId) -> Result<CoReducer, CoReducerFactoryError> {
 		// tracing::trace!(?co, err = ?anyhow::anyhow!("test"), "co-reducer-request");
 		Ok(self.handle.request(|response| ReducerRequest::Request(co, response)).await??)
+	}
+
+	pub async fn reducer_opt(&self, co: CoId) -> Option<CoReducer> {
+		self.handle
+			.request(|response| ReducerRequest::RequestOpt(co, response))
+			.await
+			.ok()?
 	}
 
 	pub async fn create(&self, co: CoId, reducer: Result<CoReducer, CoReducerFactoryError>) {

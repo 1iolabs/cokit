@@ -15,6 +15,7 @@ mod join_send;
 mod joined;
 mod key_request_receive;
 mod key_request_send;
+mod membership_update;
 
 pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 	MergeEpic::new()
@@ -35,5 +36,7 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(didcomm_send::didcomm_send)
 		.join(key_request_receive::key_request_receive)
 		.join(key_request_send::KeyRequestSend::new())
+		.join(membership_update::membership_update)
+		.join(membership_update::membership_remove)
 		.join(TracingEpic::new(tags))
 }

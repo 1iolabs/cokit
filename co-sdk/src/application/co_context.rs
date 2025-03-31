@@ -11,12 +11,7 @@ use crate::{
 		shared::SharedCoBuilder,
 	},
 	library::shared_membership::shared_membership,
-	reducer::core_resolver::{
-		dynamic::DynamicCoreResolver,
-		epic::ReactiveCoreResolver,
-		log::LogCoreResolver,
-		membership::{MembershipCoreResolver, MembershipInstanceRegistry},
-	},
+	reducer::core_resolver::{dynamic::DynamicCoreResolver, epic::ReactiveCoreResolver, log::LogCoreResolver},
 	services::{
 		application::ApplicationMessage,
 		connections::ConnectionMessage,
@@ -293,12 +288,6 @@ impl CoContextInner {
 				_reducer_context,
 			);
 			let core_resolver = ReactiveCoreResolver::new(core_resolver, local_id, self.reactive_context.clone());
-			let core_resolver = MembershipCoreResolver::new(
-				self.tasks.clone(),
-				core_resolver,
-				CoContextMembershipInstanceRegistry { reducers: self.reducers.clone() },
-				CO_CORE_NAME_MEMBERSHIP.to_owned(),
-			);
 			let core_resolver = LogCoreResolver::new(core_resolver);
 			core_resolver
 		};
@@ -390,29 +379,5 @@ impl CoContextInner {
 impl From<CoContextInner> for CoContext {
 	fn from(val: CoContextInner) -> Self {
 		CoContext { inner: Arc::new(val) }
-	}
-}
-
-#[derive(Clone)]
-struct CoContextMembershipInstanceRegistry {
-	reducers: ReducersControl,
-}
-#[async_trait]
-impl MembershipInstanceRegistry for CoContextMembershipInstanceRegistry {
-	async fn update(&self, co: CoId) -> Result<(), anyhow::Error> {
-		if let Some(co_reducer) = self.reducers.reducer(co.clone()).await.ok() {
-			if let Some(parent) = co_reducer.parent_id() {
-				if let Some(parent_co_reducer) = self.reducers.reducer(parent.clone()).await.ok() {
-					let context = co_reducer.context.clone();
-					context.refresh(parent_co_reducer, co_reducer).await?;
-				}
-			}
-		}
-		Ok(())
-	}
-
-	async fn remove(&self, co: CoId) -> Result<(), anyhow::Error> {
-		self.reducers.clone().clear_one(co).await?;
-		Ok(())
 	}
 }

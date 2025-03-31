@@ -156,6 +156,20 @@ impl Actor for ReducersActor {
 					}
 				}
 			},
+			ReducerRequest::RequestOpt(id, response) => {
+				if let Some(reducer) = state.reducers.get(&id) {
+					// use already created
+					response.send(Some(reducer.clone_with_detached_storage())).ok();
+				} else if state.pending_request_count(&id) > 0 {
+					// wait if create is currently pending
+					state
+						.pending_requests
+						.push_back(ReducerRequest::RequestOpt(id.clone(), response));
+				} else {
+					// not created and not peding
+					response.send(None).ok();
+				}
+			},
 			ReducerRequest::Clear(response) => {
 				state.reducers.retain(|id, _| id.as_str() == CO_ID_LOCAL);
 				response.send(Ok(())).ok();
@@ -182,28 +196,39 @@ impl Actor for ReducersActor {
 					.enumerate()
 					.filter_map(|(index, request)| match request {
 						ReducerRequest::Request(request_id, _) if request_id == &id => Some(index),
+						ReducerRequest::RequestOpt(request_id, _) if request_id == &id => Some(index),
 						_ => None,
 					})
 					.collect::<VecDeque<usize>>();
 				while let Some(index) = remove.pop_back() {
-					if let Some(ReducerRequest::Request(_, response)) = state.pending_requests.remove(index) {
-						// for the last element send the original result
-						if remove.is_empty() {
-							response
-								.send(match result {
-									Err(err) => Err(err),
-									Ok(reducer) => Ok(reducer.clone_with_detached_storage()),
-								})
-								.ok();
-							break;
-						} else {
+					match state.pending_requests.remove(index) {
+						Some(ReducerRequest::Request(_, response)) => {
+							if remove.is_empty() {
+								response
+									.send(match result {
+										Err(err) => Err(err),
+										Ok(reducer) => Ok(reducer.clone_with_detached_storage()),
+									})
+									.ok();
+								break;
+							} else {
+								response
+									.send(match &result {
+										Err(err) => Err(co_reducerfactory_error_clone(err)),
+										Ok(reducer) => Ok(reducer.clone_with_detached_storage()),
+									})
+									.ok();
+							}
+						},
+						Some(ReducerRequest::RequestOpt(_, response)) => {
 							response
 								.send(match &result {
-									Err(err) => Err(co_reducerfactory_error_clone(err)),
-									Ok(reducer) => Ok(reducer.clone_with_detached_storage()),
+									Err(_err) => None,
+									Ok(reducer) => Some(reducer.clone_with_detached_storage()),
 								})
 								.ok();
-						}
+						},
+						_ => (),
 					}
 				}
 			},
