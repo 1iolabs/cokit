@@ -16,7 +16,8 @@ pub async fn run() {
 			#[cfg(target_os = "macos")]
 			let win_builder = win_builder
 				.title_bar_style(TitleBarStyle::Overlay)
-				.traffic_light_position(LogicalPosition::new(22, 22));
+				.traffic_light_position(LogicalPosition::new(22, 22))
+				.hidden_title(true);
 
 			win_builder.focused(false).always_on_bottom(false).position(0.0, 0.0).build()?;
 

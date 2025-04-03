@@ -11,7 +11,10 @@ export interface ChatListViewContainerProps { }
 export function ChatListViewContainer(props: ChatListViewContainerProps) {
     const dispatch = useDispatch();
     const chats = useSelector((state: ChatsListPluginState) => state.chats);
-    const pluginId = useSelector((state: ChatsListPluginState) => state.activePlugin);
+    const selectedChatId = useSelector((state: ChatsListPluginState) => state.selectedChat);
+    const selectedChat = selectedChatId ? chats.find((c) => c.id === selectedChatId) : undefined;
+    const loadedChats = useSelector((state: ChatsListPluginState) => state.loadedChats);
+    const pluginId = selectedChatId ? loadedChats.get(selectedChatId) : undefined;
     const onOpenChat = (chat: Chat | undefined) => {
         if (chat) {
             dispatch(identity<ChatsListOpenChatAction>({ payload: { chat }, type: ChatsListActionType.OpenChat }));
@@ -19,7 +22,7 @@ export function ChatListViewContainer(props: ChatListViewContainerProps) {
     };
     return <ChatListView
         chats={chats}
-        selectedChat={undefined}
+        selectedChat={selectedChat}
         viewComponent={
             pluginId
                 ? <PluginView plugin={pluginId} />

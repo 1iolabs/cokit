@@ -5,7 +5,7 @@ import { CID } from "multiformats";
 import * as React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { identity } from "rxjs";
-import DefaultProfilePic from "../../../assets/Users.svg";
+import DefaultProfilePic from "../../../assets/Users_24.svg";
 import { invokeResolveCid } from "../../../library/invoke-get.js";
 import { MessengerViewActionType, MessengerViewLoadMoreEventsAction, MessengerViewSendAction } from "../actions/index.js";
 import { resolveMatrixAction } from "../library/handle-matrix-event.js";
@@ -80,6 +80,8 @@ export function MessengerViewContainer(props: MessengerViewContainerProps) {
       type: MessengerViewActionType.LoadMoreEvents,
     }));
   }
+
+  console.log("trest", messages);
 
   return <LevelStack style={{ width: "100%", height: "100%" }}>
     <MessengerView

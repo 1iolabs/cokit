@@ -26,7 +26,6 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                         case "m_room_message": {
                             const chat = state.chats.find((c) => c.id === buildCoCoreId(co, payload.c));
                             if (!chat) { continue }
-                            const isActive = state.loadedChats.get(chat.id) === state.activePlugin && state.activePlugin !== undefined;
                             actions.push(identity<ChatsListUpdateChatAction>({
                                 payload: {
                                     chat: {
@@ -37,7 +36,7 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                                             timestamp: new Date(),
                                         },
                                         // don't tick up message count if chat is currently shown
-                                        newMessages: isActive
+                                        newMessages: state.selectedChat === chat.id
                                             ? 0
                                             : chat.newMessages + 1,
                                         id: chat.id,

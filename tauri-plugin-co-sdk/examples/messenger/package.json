@@ -46,8 +46,8 @@
     }
   },
   "dependencies": {
-    "@1io/coapp-chatlist-view": "^0.0.1-mr1.3",
-    "@1io/coapp-messenger-view": "^0.4.2",
+    "@1io/coapp-chatlist-view": "^0.0.1-mr1.4",
+    "@1io/coapp-messenger-view": "file:../../../../../IdeaProjects/coapp/coapp-messenger-view/1io-coapp-messenger-view-0.4.4-0.tgz",
     "@1io/coapp-style": "^0.1.1",
     "@1io/kui-application": "^0.5.0",
     "@1io/kui-application-sdk": "^5.0.1",
