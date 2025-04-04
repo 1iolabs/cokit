@@ -1,4 +1,4 @@
-use crate::{library::create_reducer_action::create_reducer_action, CoreResolver};
+use crate::{library::create_reducer_action::create_reducer_action, CoDate, CoreResolver, DynamicCoDate};
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use cid::Cid;
@@ -68,7 +68,12 @@ where
 		Self { snapshots, ..self }
 	}
 
-	pub async fn build(self, storage: &S, runtime: &RuntimePool) -> Result<Reducer<S, R>, anyhow::Error> {
+	pub async fn build(
+		self,
+		storage: &S,
+		runtime: &RuntimePool,
+		date: impl CoDate,
+	) -> Result<Reducer<S, R>, anyhow::Error> {
 		// validate heads
 		if self.state.is_some() && self.log.heads() != &self.heads {
 			return Err(anyhow!("Invalid heads. The log and state heads must be the same"));
@@ -83,6 +88,7 @@ where
 			log: self.log,
 			change_handlers: Default::default(),
 			watch: watch::channel(None),
+			date: date.boxed(),
 		};
 		if self.initialize {
 			result.initialize(storage, runtime).await?;
@@ -107,6 +113,8 @@ pub struct Reducer<S, R> {
 	change_handlers: Vec<Box<dyn ReducerChangedHandler<S, R> + Send + Sync>>,
 	/// State/Heads watcher.
 	watch: (watch::Sender<Option<(Cid, BTreeSet<Cid>)>>, watch::Receiver<Option<(Cid, BTreeSet<Cid>)>>),
+	/// Date.
+	date: DynamicCoDate,
 }
 impl<S, R> Reducer<S, R>
 where
@@ -168,6 +176,10 @@ where
 
 	pub fn into_log(self) -> Log {
 		self.log
+	}
+
+	pub fn date(&self) -> &DynamicCoDate {
+		&self.date
 	}
 
 	pub fn is_empty(&self) -> bool {
@@ -253,7 +265,7 @@ where
 			storage,
 			runtime,
 			identity,
-			create_reducer_action(storage, identity, core, item, Default::default(), None).await?,
+			create_reducer_action(storage, identity, core, item, Default::default(), &self.date).await?,
 		)
 		.await
 	}
@@ -554,8 +566,8 @@ impl ReducerChangeCause {
 mod tests {
 	use super::Reducer;
 	use crate::{
-		application::reducer::ReducerBuilder, CoreResolver, ReducerChangeContext, ReducerChangedHandler,
-		SingleCoreResolver,
+		application::reducer::ReducerBuilder, CoDate, CoreResolver, MonotonicCoDate, ReducerChangeContext,
+		ReducerChangedHandler, SingleCoreResolver,
 	};
 	use async_trait::async_trait;
 	use co_identity::{IdentityResolverBox, LocalIdentityResolver};
@@ -604,21 +616,22 @@ mod tests {
 		);
 
 		// pool
+		let date = MonotonicCoDate::default().boxed();
 		let runtime = RuntimePool::new(IdleRuntimePool::default());
 		let core_resolver = SingleCoreResolver::new(wasm.into());
 		let native_core_resolver = SingleCoreResolver::new(Core::native::<Counter>());
 
 		// reducer
 		let mut reducer1 = ReducerBuilder::new(native_core_resolver, log1)
-			.build(&storage, &runtime)
+			.build(&storage, &runtime, date.clone())
 			.await
 			.unwrap();
 		let mut reducer2 = ReducerBuilder::new(core_resolver.clone(), log2)
-			.build(&storage, &runtime)
+			.build(&storage, &runtime, date.clone())
 			.await
 			.unwrap();
 		let mut reducer3 = ReducerBuilder::new(core_resolver.clone(), log3)
-			.build(&storage, &runtime)
+			.build(&storage, &runtime, date.clone())
 			.await
 			.unwrap();
 
@@ -801,7 +814,7 @@ mod tests {
 		let runtime = RuntimePool::new(IdleRuntimePool::default());
 		let native_core_resolver = SingleCoreResolver::new(Core::native::<Counter>());
 		let mut reducer = ReducerBuilder::new(native_core_resolver, log)
-			.build(&storage, &runtime)
+			.build(&storage, &runtime, MonotonicCoDate::default())
 			.await
 			.unwrap();
 

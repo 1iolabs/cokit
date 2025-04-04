@@ -11,9 +11,9 @@ use crate::{
 		co_reducer_context::{CoReducerContext, CoReducerContextRef},
 		cores::{CO_CORE_NAME_CO, CO_CORE_STORAGE},
 	},
-	CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, ReducerChangeContext, Runtime,
-	TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
-	CO_CORE_NAME_STORAGE,
+	CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, DynamicCoDate, Reducer, ReducerBuilder,
+	ReducerChangeContext, Runtime, TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -62,6 +62,7 @@ impl LocalCoBuilder {
 		shutdown: CancellationToken,
 		tasks: TaskSpawner,
 		core_resolver: impl FnOnce(CoReducerContextRef) -> R,
+		date: DynamicCoDate,
 	) -> Result<CoReducer, anyhow::Error>
 	where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
@@ -93,6 +94,7 @@ impl LocalCoBuilder {
 					key,
 					core_resolver,
 					watcher,
+					date,
 				)
 				.await?
 				.1)
@@ -109,6 +111,7 @@ impl LocalCoBuilder {
 					key,
 					core_resolver,
 					watcher,
+					date,
 				)
 				.await?
 				.1)
@@ -144,6 +147,7 @@ where
 		key: Box<dyn LocalSecret + Send + Sync + 'static>,
 		core_resolver: impl FnOnce(CoReducerContextRef) -> R,
 		watcher: bool,
+		date: DynamicCoDate,
 	) -> Result<(Self, CoReducer), anyhow::Error>
 	where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
@@ -181,7 +185,7 @@ where
 		}
 
 		// create reducer
-		let mut reducer = builder.build(&storage, runtime.runtime()).await?;
+		let mut reducer = builder.build(&storage, runtime.runtime(), date).await?;
 
 		// write
 		reducer.add_change_handler(Box::new(result.clone()));

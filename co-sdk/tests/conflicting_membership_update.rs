@@ -5,8 +5,8 @@ use co_core_membership::Memberships;
 use co_sdk::{
 	state::{self, query_core, QueryExt},
 	tags, AbsolutePath, ApplicationBuilder, BlockStorageExt, CoId, CoReducer, CoReducerFactory, Cores, CreateCo,
-	DidKeyIdentity, DidKeyProvider, Identity, CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
-	CO_CORE_NAME_MEMBERSHIP,
+	DidKeyIdentity, DidKeyProvider, Identity, MonotonicCoDate, MonotonicCoUuid, CO_CORE_FILE, CO_CORE_NAME_CO,
+	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use co_storage::TmpDir;
 use futures::{join, stream, StreamExt, TryStreamExt};
@@ -29,12 +29,14 @@ async fn test_conflicting_membership_update() {
 		.without_keychain()
 		.with_setting("co-local-watch", false)
 		.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+		.with_co_date(MonotonicCoDate::default())
+		.with_co_uuid(MonotonicCoUuid::default())
 		.build()
 		.await
 		.expect("application");
 
 	// create identity
-	let identity = DidKeyIdentity::generate(None);
+	let identity = DidKeyIdentity::generate(Some(&vec![1; 32]));
 	let local_co = application.local_co_reducer().await.unwrap();
 	let provider = DidKeyProvider::new(local_co.clone(), CO_CORE_NAME_KEYSTORE);
 	provider.store(&identity, None).await.unwrap();
@@ -63,6 +65,7 @@ async fn test_conflicting_membership_update() {
 	let application2 = ApplicationBuilder::new_with_path("test2".to_owned(), tmp.path().to_owned())
 		.without_keychain()
 		.with_setting("co-local-watch", false)
+		.with_co_date(MonotonicCoDate::default())
 		.build()
 		.await
 		.expect("application2");

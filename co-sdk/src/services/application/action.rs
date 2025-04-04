@@ -1,5 +1,5 @@
 use crate::{
-	library::create_reducer_action::new_reducer_action, types::message::heads::HeadsMessage, CoStorage,
+	library::create_reducer_action::new_reducer_action, types::message::heads::HeadsMessage, CoDate, CoStorage,
 	ReducerChangeContext,
 };
 use co_identity::Message;
@@ -179,8 +179,14 @@ impl Action {
 	}
 
 	/// Utility to create [`Action::CoreActionPush`] actions.
-	pub fn push(co: impl Into<CoId>, from: impl Into<Did>, core: impl Into<String>, payload: impl Serialize) -> Action {
-		let reducer_action = match new_reducer_action(from, core.into(), payload) {
+	pub fn push(
+		co: impl Into<CoId>,
+		from: impl Into<Did>,
+		core: impl Into<String>,
+		payload: impl Serialize,
+		date: &impl CoDate,
+	) -> Action {
+		let reducer_action = match new_reducer_action(from, core.into(), payload, date) {
 			Ok(a) => a,
 			Err(err) => {
 				return Action::Error { err: err.into() };

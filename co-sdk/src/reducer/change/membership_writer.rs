@@ -1,6 +1,7 @@
 use crate::{
-	library::membership_all_heads::membership_all_heads, reducer::core_resolver::dynamic::DynamicCoreResolver,
-	CoReducer, CoReducerState, CoStorage, Reducer, ReducerChangeContext, ReducerChangedHandler,
+	library::{create_reducer_action::create_reducer_action, membership_all_heads::membership_all_heads},
+	reducer::core_resolver::dynamic::DynamicCoreResolver,
+	CoReducer, CoReducerState, CoStorage, Reducer, ReducerChangeContext, ReducerChangedHandler, StaticCoDate,
 };
 use async_trait::async_trait;
 use co_core_membership::{CoState, MembershipsAction};
@@ -49,6 +50,9 @@ where
 		let parent_storage = self.parent.storage();
 		let reducer_state = CoReducerState::new(*reducer.state(), reducer.heads().clone());
 		if let Some((state, mappings)) = reducer_state.to_co_state(&parent_storage, storage).await? {
+			// log
+			tracing::trace!(?reducer_state, co = ?self.id, "membership-write");
+
 			// apply mappings
 			if let Some(mappings) = mappings {
 				// make sure the root mappings are available in root storage
@@ -67,10 +71,17 @@ where
 
 			// apply to parent
 			self.parent
-				.push(
+				.push_reference(
 					&self.identity,
-					&self.membership_core_name,
-					&MembershipsAction::Update { id: self.id.to_owned(), state: state.clone(), remove },
+					create_reducer_action(
+						&parent_storage,
+						&self.identity,
+						&self.membership_core_name,
+						&MembershipsAction::Update { id: self.id.to_owned(), state: state.clone(), remove },
+						Default::default(),
+						&StaticCoDate(0),
+					)
+					.await?,
 				)
 				.await?;
 

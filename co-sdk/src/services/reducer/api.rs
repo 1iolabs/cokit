@@ -3,7 +3,7 @@ use crate::{
 	library::create_reducer_action::{create_reducer_action, store_reducer_action},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{co_dispatch::CoDispatch, co_reducer_context::CoReducerContextRef, co_reducer_state::CoReducerState},
-	CoStorage, Reducer, Runtime,
+	CoStorage, DynamicCoDate, Reducer, Runtime,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -24,6 +24,7 @@ pub struct CoReducer {
 	handle: ActorHandle<ReducerMessage>,
 	storage: CoStorage,
 	pub(crate) context: CoReducerContextRef,
+	date: DynamicCoDate,
 }
 impl CoReducer {
 	pub(crate) fn spawn(
@@ -36,13 +37,14 @@ impl CoReducer {
 		reducer: Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 		context: CoReducerContextRef,
 	) -> Result<Self, anyhow::Error> {
+		let date = reducer.date().clone();
 		let actor = Actor::spawn_with(
 			tasks.clone(),
 			tags!("application": application_identifier, "co": id.as_str()),
 			ReducerActor::new(tasks, runtime, context.clone()),
 			reducer,
 		)?;
-		Ok(Self { id, parent, storage, handle: actor.handle(), context })
+		Ok(Self { id, parent, storage, handle: actor.handle(), context, date })
 	}
 
 	pub(crate) fn clone_with_detached_storage(&self) -> Self {
@@ -55,6 +57,7 @@ impl CoReducer {
 			parent: self.parent.clone(),
 			handle: self.handle.clone(),
 			context: self.context.clone(),
+			date: self.date.clone(),
 			storage: self.storage.clone_with_settings(settings),
 		}
 	}
@@ -69,6 +72,10 @@ impl CoReducer {
 
 	pub fn id(&self) -> &CoId {
 		&self.id
+	}
+
+	pub fn date(&self) -> &DynamicCoDate {
+		&self.date
 	}
 
 	pub fn parent_id(&self) -> Option<&CoId> {
@@ -118,7 +125,7 @@ impl CoReducer {
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
 		let action_reference =
-			create_reducer_action(&self.storage, identity, core, item, Default::default(), None).await?;
+			create_reducer_action(&self.storage, identity, core, item, Default::default(), &self.date).await?;
 		let result = self
 			.handle
 			.request(|r| {

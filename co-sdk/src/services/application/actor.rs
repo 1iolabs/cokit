@@ -2,7 +2,7 @@ use super::{epics::epic, Action, ApplicationMessage};
 use crate::{
 	application::{application::ApplicationSettings, co_context::CoContextInner},
 	services::reducers::ReducersActor,
-	CoContext, Network, Runtime, Storage,
+	CoContext, DynamicCoDate, DynamicCoUuid, Network, Runtime, Storage,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -24,13 +24,13 @@ impl Application {
 impl Actor for Application {
 	type Message = ApplicationMessage;
 	type State = ApplicationState;
-	type Initialize = (Storage, TaskTracker);
+	type Initialize = (Storage, TaskTracker, DynamicCoDate, DynamicCoUuid);
 
 	async fn initialize(
 		&self,
 		handle: &ActorHandle<Self::Message>,
 		tags: &Tags,
-		(storage, tasks): Self::Initialize,
+		(storage, tasks, date, uuid): Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		tracing::trace!(settings = ?self.settings, "application-initialize");
 
@@ -56,6 +56,8 @@ impl Actor for Application {
 			runtime.clone(),
 			handle.clone(),
 			reducers.handle().into(),
+			date,
+			uuid,
 		)
 		.into();
 

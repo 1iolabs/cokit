@@ -19,8 +19,8 @@ use crate::{
 		reducers::{ReducerStorage, ReducersControl},
 	},
 	types::co_reducer_factory::CoReducerFactoryError,
-	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime, TaskSpawner,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
+	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, DynamicCoDate, DynamicCoUuid, LocalCoBuilder, Runtime,
+	TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
 use co_actor::ActorHandle;
@@ -126,6 +126,16 @@ impl CoContext {
 		&self.inner.settings
 	}
 
+	/// Date Source.
+	pub fn date(&self) -> &DynamicCoDate {
+		&self.inner.date
+	}
+
+	/// UUID Source.
+	pub fn uuid(&self) -> &DynamicCoUuid {
+		&self.inner.uuid
+	}
+
 	/// Force refresh co instance.
 	pub async fn refresh(&self, co: CoReducer) -> Result<(), anyhow::Error> {
 		let parent = match co.parent_id() {
@@ -181,6 +191,8 @@ pub(crate) struct CoContextInner {
 	reactive_context: ActorHandle<ApplicationMessage>,
 
 	reducers: ReducersControl,
+	date: DynamicCoDate,
+	uuid: DynamicCoUuid,
 }
 impl CoContextInner {
 	pub(crate) fn new(
@@ -194,6 +206,8 @@ impl CoContextInner {
 		runtime: Runtime,
 		reactive_context: ActorHandle<ApplicationMessage>,
 		reducers: ReducersControl,
+		date: DynamicCoDate,
+		uuid: DynamicCoUuid,
 	) -> Self {
 		Self {
 			#[cfg(feature = "pinning")]
@@ -207,6 +221,8 @@ impl CoContextInner {
 			runtime,
 			reactive_context,
 			reducers,
+			date,
+			uuid,
 		}
 	}
 
@@ -299,6 +315,7 @@ impl CoContextInner {
 				self.shutdown.child_token(),
 				self.tasks.clone(),
 				core_resolver,
+				self.date.clone(),
 			)
 			.await?;
 		Ok(local_co_reducer)
@@ -340,7 +357,7 @@ impl CoContextInner {
 			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_owned())
 			.with_network(network)
 			.with_initialize(initialize)
-			.build(self.tasks.clone(), storage, self.runtime.clone(), identity, core_resolver)
+			.build(self.tasks.clone(), storage, self.runtime.clone(), identity, core_resolver, self.date.clone())
 			.await?;
 
 		// result

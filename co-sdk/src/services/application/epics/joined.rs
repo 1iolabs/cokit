@@ -11,7 +11,7 @@ use std::future::ready;
 pub fn joined(
 	action: &Action,
 	_state: &(),
-	_context: &CoContext,
+	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
 		Action::Joined { co, participant, success, peer: _ } => Some(stream::once(ready({
@@ -25,7 +25,7 @@ pub fn joined(
 					co_core_membership::MembershipState::Invite
 				},
 			};
-			Ok(Action::push(CO_ID_LOCAL, participant, CO_CORE_NAME_MEMBERSHIP, payload))
+			Ok(Action::push(CO_ID_LOCAL, participant, CO_CORE_NAME_MEMBERSHIP, payload, context.date()))
 		}))),
 		_ => None,
 	}

@@ -13,8 +13,8 @@ use crate::{
 	},
 	state::{find, query_core, QueryExt},
 	types::co_reducer_context::CoReducerContext,
-	CoCoreResolver, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters, ReducerBuilder, Runtime,
-	TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters, CoUuid, ReducerBuilder,
+	Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -145,6 +145,7 @@ impl SharedCoBuilder {
 		runtime: Runtime,
 		identity: I,
 		core_resolver: DynamicCoreResolver<CoStorage>,
+		date: impl CoDate,
 	) -> Result<CoReducer, anyhow::Error>
 	where
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
@@ -243,7 +244,7 @@ impl SharedCoBuilder {
 			// 	reducer_builder = reducer_builder.with_snapshot(state, heads);
 			// }
 		}
-		let mut reducer = reducer_builder.build(&co_storage, runtime.runtime()).await?;
+		let mut reducer = reducer_builder.build(&co_storage, runtime.runtime(), date).await?;
 
 		// push changes to all connectable peers
 		if let Some((network, connections)) = &self.network {
@@ -460,7 +461,14 @@ impl SharedCoCreator {
 	}
 
 	/// TODO: Cleanup when something fails?
-	pub async fn create<I>(self, storage: CoStorage, runtime: Runtime, identity: I) -> Result<CoId, anyhow::Error>
+	pub async fn create<I>(
+		self,
+		storage: CoStorage,
+		runtime: Runtime,
+		identity: I,
+		date: impl CoDate,
+		uuid: impl CoUuid,
+	) -> Result<CoId, anyhow::Error>
 	where
 		I: PrivateIdentity + Clone + Debug + Send + Sync + 'static,
 	{
@@ -468,7 +476,7 @@ impl SharedCoCreator {
 		let (co_storage, encrypted_storage): (CoStorage, Option<(EncryptedBlockStorage<CoStorage>, String, Secret)>) =
 			match self.co.algorithm {
 				Some(algorithm) => {
-					let key_uri = format!("urn:co:{}:{}", self.co.id, uuid::Uuid::new_v4());
+					let key_uri = format!("urn:co:{}:{}", self.co.id, uuid.uuid());
 					let key = algorithm.generate_serect();
 					let result_storage =
 						EncryptedBlockStorage::new(storage.clone(), key.clone(), algorithm, Default::default());
@@ -482,7 +490,7 @@ impl SharedCoCreator {
 
 		// reducer
 		let mut reducer = ReducerBuilder::new(CoCoreResolver::default(), log)
-			.build(&co_storage, runtime.runtime())
+			.build(&co_storage, runtime.runtime(), date)
 			.await?;
 
 		// initialize
