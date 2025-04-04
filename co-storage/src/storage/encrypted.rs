@@ -3,7 +3,7 @@ use crate::{
 		block::{Algorithm, BlockPayload, EncryptedBlock, Header, BLOCK_MULTICODEC},
 		secret::Secret,
 	},
-	AlgorithmError, BlockStorageContentMapping, StorageError,
+	AlgorithmError, BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, StorageError,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -219,19 +219,39 @@ where
 		}
 	}
 
-	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self, block), fields(cid = ?block.cid()))]
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+		self.set_extended(block.into()).await
+	}
+
+	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
+		match self.mapping.get(cid).await {
+			Some(encrypted_cid) => self.next.remove(&encrypted_cid).await,
+			None => self.next.remove(cid).await,
+		}
+	}
+
+	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
+		self.get(cid).await.map(|v| BlockStat { size: v.data().len() as u64 })
+	}
+}
+#[async_trait]
+impl<S> ExtendedBlockStorage for EncryptedBlockStorage<S>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self, extended_block), fields(cid = ?extended_block.block.cid()))]
+	async fn set_extended(&self, extended_block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+		let block = extended_block.block;
 		let cid = *block.cid();
 
 		// log
-		#[cfg(test)]
-		match co_primitives::MultiCodec::from(block.cid()) {
-			co_primitives::MultiCodec::Known(co_primitives::KnownMultiCodec::DagCbor) => {
+		#[cfg(feature = "logging-verbose")]
+		{
+			if co_primitives::MultiCodec::is_cbor(block.cid()) {
 				tracing::trace!(cid = ?block.cid(), ipld = ?from_cbor::<ipld_core::ipld::Ipld>(block.data()), "set");
-			},
-			_ => {
+			} else {
 				tracing::trace!(cid = ?block.cid(), "set");
-			},
+			}
 		}
 
 		// references
@@ -241,9 +261,14 @@ where
 		//    all children nodes as he created it from sratch
 		//  as a fallback check if the Cid exists in the parent so we know this is a unencrypted reference
 		//  TODO: are there any valid cases for not unencrypted and not known reference?
-		let references = if self.links.has_links(&cid) {
-			let mut references = BTreeMap::new();
-			for (plain_cid, encrypted_cid) in self.mapping.get_mapping(self.links.links(&block)?).await {
+		let mut references = extended_block.options.references.unwrap_or_default();
+		if self.links.has_links(&cid) {
+			// links
+			//  filter out already mapped links
+			let links = self.links.links(&block)?.filter(|link| !references.contains_key(link));
+
+			// references
+			for (plain_cid, encrypted_cid) in self.mapping.get_mapping(links).await {
 				match encrypted_cid {
 					// reference mapping
 					Some(encrypted_cid) => {
@@ -257,10 +282,7 @@ where
 					},
 				}
 			}
-			references
-		} else {
-			Default::default()
-		};
+		}
 
 		// encrypt
 		let mut block: BlockPayload = block.into();
@@ -291,17 +313,6 @@ where
 
 		// result
 		Ok(cid)
-	}
-
-	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
-		match self.mapping.get(cid).await {
-			Some(encrypted_cid) => self.next.remove(&encrypted_cid).await,
-			None => self.next.remove(cid).await,
-		}
-	}
-
-	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
-		self.get(cid).await.map(|v| BlockStat { size: v.data().len() as u64 })
 	}
 }
 impl<S> CloneWithBlockStorageSettings for EncryptedBlockStorage<S>
@@ -353,6 +364,10 @@ where
 
 		// none
 		None
+	}
+
+	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+		self.mapping.extend(mappings).await;
 	}
 }
 
@@ -668,7 +683,7 @@ impl BlockMapping {
 			let block = block?;
 
 			// validate
-			MultiCodec::with_dag_cbor(block.cid())?;
+			MultiCodec::with_cbor(block.cid())?;
 
 			// get node
 			let node: Node<(Cid, Cid)> =

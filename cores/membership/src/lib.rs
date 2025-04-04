@@ -1,5 +1,5 @@
 use cid::Cid;
-use co_api::{CoId, Context, Did, Reducer, ReducerAction, Tags, WeakCid};
+use co_api::{CoId, CoReference, Context, Did, Link, Reducer, ReducerAction, StorageExt, Tags, WeakCid};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::BTreeSet;
@@ -37,12 +37,9 @@ pub struct Membership {
 /// Contains heads the computed state for the heads and an option encryption mapping.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct CoState {
-	/// The CO root state (usually co-core-co).
+	/// The CO root state (usually co-core-co) and heads.
 	/// Note: This is not an Option so we can not be member of an emtpy CO (which has no id anyway).
-	pub state: WeakCid,
-
-	/// The CO heads.
-	pub heads: BTreeSet<WeakCid>,
+	pub state: Link<CoReference<(Cid, BTreeSet<Cid>)>>,
 
 	// TODO mark as external as this field shouldn't be further resolved when pinning
 	// TODO https://gitlab.1io.com/1io/co-sdk/-/issues/47
@@ -89,9 +86,7 @@ pub enum MembershipsAction {
 	Join(Membership),
 	Update {
 		id: CoId,
-		state: WeakCid,
-		heads: BTreeSet<WeakCid>,
-		encryption_mapping: Option<Cid>,
+		state: CoState,
 		/// Remove all [`CoState`] which heads are fully covered.
 		remove: BTreeSet<WeakCid>,
 	},
@@ -125,23 +120,27 @@ pub enum MembershipsAction {
 impl Reducer for Memberships {
 	type Action = MembershipsAction;
 
-	fn reduce(self, event: &ReducerAction<Self::Action>, _: &mut dyn Context) -> Self {
+	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		let mut result = self;
 		match &event.payload {
-			MembershipsAction::Update { id, state, heads, encryption_mapping, remove } => {
+			MembershipsAction::Update { id, state, remove } => {
 				// if find(&mut result, &membership.id, &membership.did).is_none() {
 				// 	membership.state = state.clone();
 				// 	membership.heads = heads.clone();
 				// 	membership.encryption_mapping = encryption_mapping.clone();
 				// }
+				let remove = remove.iter().map(WeakCid::cid).collect::<BTreeSet<Cid>>();
 				for membership in result.memberships.iter_mut() {
 					if &membership.id == id {
-						membership.state.retain(|item| !remove.is_superset(&item.heads));
-						membership.state.insert(CoState {
-							state: state.clone(),
-							heads: heads.clone(),
-							encryption_mapping: *encryption_mapping,
+						// remove
+						membership.state.retain(|item| {
+							let (_state, heads) =
+								context.storage().get_value(&item.state).expect("CoReference").into_value();
+							!remove.is_superset(&heads)
 						});
+
+						// add
+						membership.state.insert(state.clone());
 					}
 				}
 			},

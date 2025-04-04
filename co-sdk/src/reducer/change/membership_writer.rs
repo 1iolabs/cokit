@@ -1,15 +1,13 @@
 use crate::{
-	library::to_external_cid::{to_external_cid, to_external_cids_map},
-	reducer::core_resolver::dynamic::DynamicCoreResolver,
-	CoReducer, CoStorage, Reducer, ReducerChangeContext, ReducerChangedHandler,
+	library::membership_all_heads::membership_all_heads, reducer::core_resolver::dynamic::DynamicCoreResolver,
+	CoReducer, CoReducerState, CoStorage, Reducer, ReducerChangeContext, ReducerChangedHandler,
 };
 use async_trait::async_trait;
-use cid::Cid;
-use co_core_membership::MembershipsAction;
+use co_core_membership::{CoState, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_primitives::{CoId, WeakCid};
 use co_storage::EncryptedBlockStorage;
-use std::{collections::BTreeSet, fmt::Debug, mem::swap};
+use std::{collections::BTreeSet, fmt::Debug};
 
 /// Apply reducer state/head changes to the membership core in the parent CO.
 pub struct MembershipWriter<I> {
@@ -21,7 +19,7 @@ pub struct MembershipWriter<I> {
 	pub membership_core_name: String,
 	pub identity: I,
 	pub encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
-	pub last_heads: BTreeSet<Cid>,
+	pub last_state: BTreeSet<CoState>,
 }
 
 impl<I> MembershipWriter<I> {
@@ -31,9 +29,9 @@ impl<I> MembershipWriter<I> {
 		membership_core_name: String,
 		identity: I,
 		encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
-		last_heads: BTreeSet<Cid>,
+		last_state: BTreeSet<CoState>,
 	) -> Self {
-		Self { id, parent, membership_core_name, identity, encrypted_storage, last_heads }
+		Self { id, parent, membership_core_name, identity, encrypted_storage, last_state }
 	}
 }
 #[async_trait]
@@ -47,36 +45,37 @@ where
 		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
-		if let Some(state) = reducer.state() {
-			// next
-			let next_state = to_external_cid(storage, *state).await;
-			let next_heads_map = to_external_cids_map(storage, reducer.heads().clone()).await;
-
-			// make sure the root mappings are available in parent storage
-			if let Some(encrypted_storage) = &self.encrypted_storage {
-				encrypted_storage
-					.insert_mappings([(*state, next_state)].into_iter().chain(next_heads_map.clone()))
-					.await;
+		// action
+		let parent_storage = self.parent.storage();
+		let reducer_state = CoReducerState::new(*reducer.state(), reducer.heads().clone());
+		if let Some((state, mappings)) = reducer_state.to_co_state(&parent_storage, storage).await? {
+			// apply mappings
+			if let Some(mappings) = mappings {
+				// make sure the root mappings are available in root storage
+				// TODO: move this into the reducer? we only need to keep alive what the reducers know (snapshots?)?
+				if let Some(encrypted_storage) = &self.encrypted_storage {
+					encrypted_storage.insert_mappings(mappings).await;
+				}
 			}
 
-			// next last heads
-			let mut last_heads: BTreeSet<Cid> = next_heads_map.values().cloned().collect();
-			swap(&mut self.last_heads, &mut last_heads);
+			// get last heads to remove
+			let remove = membership_all_heads(&parent_storage, self.last_state.iter())
+				.await?
+				.into_iter()
+				.map(WeakCid::from)
+				.collect();
 
-			// update
+			// apply to parent
 			self.parent
 				.push(
 					&self.identity,
 					&self.membership_core_name,
-					&MembershipsAction::Update {
-						id: self.id.to_owned(),
-						state: next_state.into(),
-						heads: next_heads_map.values().map(WeakCid::from).collect(),
-						encryption_mapping: None,
-						remove: last_heads.into_iter().map(Into::into).collect(),
-					},
+					&MembershipsAction::Update { id: self.id.to_owned(), state: state.clone(), remove },
 				)
 				.await?;
+
+			// apply to self
+			self.last_state = [state].into_iter().collect();
 		}
 		Ok(())
 	}

@@ -6,9 +6,12 @@ use crate::{
 use async_trait::async_trait;
 use cid::Cid;
 use co_core_storage::StorageAction;
-use co_primitives::{block_diff_added_with_parent, StoreParams, WeakCid};
-use co_storage::BlockStorage;
+use co_primitives::{
+	block_diff_added_with_parent, BlockDiffFollow, CoReference, KnownMultiCodec, MultiCodec, StoreParams, WeakCid,
+};
+use co_storage::{BlockStorage, BlockStorageExt, ExtendedBlockStorage, StorageError};
 use futures::{pin_mut, TryStreamExt};
+use serde::de::IgnoredAny;
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	mem::swap,
@@ -35,6 +38,7 @@ where
 	}
 
 	/// Update storage core from previous_state to next_state.
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	pub async fn write(
 		&self,
 		previous_state: Option<Cid>,
@@ -57,6 +61,7 @@ where
 			next_state,
 			Default::default(),
 			Default::default(),
+			CoReferenceFollow { storage: storage.clone() },
 		);
 
 		// apply root reference
@@ -103,6 +108,28 @@ where
 	}
 }
 
+/// Follow all except weak references.
+struct CoReferenceFollow<S> {
+	storage: S,
+}
+#[async_trait]
+impl<S> BlockDiffFollow for CoReferenceFollow<S>
+where
+	S: BlockStorage + 'static,
+{
+	async fn follow(&mut self, cid: &Cid) -> Result<bool, StorageError> {
+		if MultiCodec::is(cid, KnownMultiCodec::CoReference) {
+			let reference: CoReference<IgnoredAny> = self.storage.get_deserialized(cid).await?;
+			match reference {
+				CoReference::Weak(_) => Ok(false),
+				_ => Ok(true),
+			}
+		} else {
+			Ok(true)
+		}
+	}
+}
+
 pub struct ReferenceWriteReducerChangedHandler<D> {
 	/// The writer.
 	reference_writer: ReferenceWriter<D>,
@@ -119,7 +146,7 @@ impl<D> ReferenceWriteReducerChangedHandler<D> {
 impl<D, S, R> ReducerChangedHandler<S, R> for ReferenceWriteReducerChangedHandler<D>
 where
 	D: CoDispatch<StorageAction> + 'static,
-	S: BlockStorage + Send + Sync + Clone + 'static,
+	S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all)]

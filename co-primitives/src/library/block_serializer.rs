@@ -18,11 +18,16 @@ pub struct BlockSerializer<S> {
 }
 impl<S> BlockSerializer<S> {
 	pub fn new() -> Self {
-		Self::new_codec(KnownMultiCodec::DagCbor.into())
+		Self::new_codec(KnownMultiCodec::DagCbor)
 	}
 
-	pub fn new_codec(codec: u64) -> Self {
-		Self { _s: Default::default(), codec }
+	pub fn new_codec(codec: impl Into<u64>) -> Self {
+		Self { _s: Default::default(), codec: codec.into() }
+	}
+
+	pub fn with_codec(mut self, codec: impl Into<u64>) -> Self {
+		self.codec = codec.into();
+		self
 	}
 }
 impl Default for BlockSerializer<DefaultParams> {
@@ -51,6 +56,7 @@ where
 	where
 		T: serde::de::Deserialize<'a>,
 	{
+		// MultiCodec::with_cbor(item.cid())?;
 		Ok(from_cbor(item.data())?)
 	}
 }

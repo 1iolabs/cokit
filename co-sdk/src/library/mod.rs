@@ -20,6 +20,7 @@ pub mod local_keypair_fetch;
 pub mod local_secret;
 pub mod locals;
 pub mod max_reference_count;
+pub mod membership_all_heads;
 pub mod network_discovery;
 pub mod push_heads;
 pub mod response_list;

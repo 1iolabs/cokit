@@ -1,13 +1,15 @@
+use cid::Cid;
 use co_core_co::CoAction;
 use co_core_file::{File, FileAction, FolderNode, Node};
 use co_core_membership::Memberships;
 use co_sdk::{
 	state::{self, query_core, QueryExt},
-	tags, AbsolutePath, ApplicationBuilder, CoId, CoReducer, CoReducerFactory, Cores, CreateCo, DidKeyIdentity,
-	DidKeyProvider, Identity, CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	tags, AbsolutePath, ApplicationBuilder, BlockStorageExt, CoId, CoReducer, CoReducerFactory, Cores, CreateCo,
+	DidKeyIdentity, DidKeyProvider, Identity, CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP,
 };
 use co_storage::TmpDir;
-use futures::{join, StreamExt};
+use futures::{join, stream, StreamExt, TryStreamExt};
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	future::ready,
@@ -195,34 +197,28 @@ async fn test_conflicting_membership_update() {
 	)
 	.await
 	.unwrap();
-	let (_, memberships) = query_core::<Memberships>(CO_CORE_NAME_MEMBERSHIP)
+	let (storage, memberships) = query_core::<Memberships>(CO_CORE_NAME_MEMBERSHIP)
 		.execute_reducer(&local_co)
 		.await
 		.unwrap();
+	let heads = stream::iter(
+		memberships
+			.memberships
+			.iter()
+			.find(|i| i.id.as_str() == "co")
+			.unwrap()
+			.state
+			.iter(),
+	)
+	.then(|state| async { storage.get_value(&state.state).await })
+	.map_ok(|state| state.into_value().1)
+	.try_collect::<Vec<BTreeSet<Cid>>>()
+	.await
+	.unwrap();
+
 	//println!("memberships: {:?}", memberships.memberships.iter().find(|i| i.id.as_str() == "co").unwrap().state);
-	assert_eq!(
-		memberships
-			.memberships
-			.iter()
-			.find(|i| i.id.as_str() == "co")
-			.unwrap()
-			.state
-			.len(),
-		1
-	);
-	assert_eq!(
-		memberships
-			.memberships
-			.iter()
-			.find(|i| i.id.as_str() == "co")
-			.unwrap()
-			.state
-			.first()
-			.unwrap()
-			.heads
-			.len(),
-		1
-	);
+	assert_eq!(heads.len(), 1);
+	assert_eq!(heads.first().unwrap().len(), 1);
 	// println!("u1: {:?}", m.memberships.iter().find(|i| i.id.as_str() == "co").unwrap().state);
 	// println!("u2: {:?}", m2.memberships.iter().find(|i| i.id.as_str() == "co").unwrap().state);
 }

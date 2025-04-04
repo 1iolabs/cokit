@@ -1,14 +1,12 @@
 use crate::{
 	library::invite::{CoInvitePayload, CO_DIDCOMM_INVITE},
-	types::co_pinning_key::CoPinningKey,
-	Action, CoContext, CoInvite, KnownTag, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
+	Action, CoContext, CoInvite, CoReducerState, KnownTag, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
-use co_core_membership::{CoState, Membership, MembershipState, MembershipsAction};
-use co_core_storage::StorageAction;
+use co_core_membership::{Membership, MembershipState, MembershipsAction};
 use co_identity::DidCommHeader;
 use co_primitives::{from_json_string, tags, CoInviteMetadata, Did, KnownTags, Tags};
-use co_storage::BlockStorageExt;
+use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{future::ready, stream, Stream, StreamExt};
 use libp2p::PeerId;
 use std::collections::BTreeSet;
@@ -66,6 +64,7 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 	};
 
 	// apply
+	// TODO: do we need to fetch the blocks to store unencrypted state/heads?
 	if let Some(membership_state) = membership_state {
 		// payload
 		let metadata = CoInviteMetadata {
@@ -79,57 +78,59 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 		);
 
 		// storage
-		local
-			.push(
-				&context.local_identity(),
-				CO_CORE_NAME_STORAGE,
-				&StorageAction::PinCreate(
-					CoPinningKey::State.to_string(&payload.id),
-					context.settings().setting_co_default_max_state(),
-					vec![payload.state.into()],
-				),
-			)
-			.await?;
-		local
-			.push(
-				&context.local_identity(),
-				CO_CORE_NAME_STORAGE,
-				&StorageAction::PinCreate(
-					CoPinningKey::Log.to_string(&payload.id),
-					context.settings().setting_co_default_max_log(),
-					payload.heads.iter().map(Into::into).collect(),
-				),
-			)
-			.await?;
+		#[cfg(feature = "pinning")]
+		{
+			local
+				.push(
+					&context.local_identity(),
+					crate::CO_CORE_NAME_STORAGE,
+					&co_core_storage::StorageAction::PinCreate(
+						crate::types::co_pinning_key::CoPinningKey::State.to_string(&payload.id),
+						context.settings().setting_co_default_max_state(),
+						vec![payload.state.into()],
+					),
+				)
+				.await?;
+			local
+				.push(
+					&context.local_identity(),
+					crate::CO_CORE_NAME_STORAGE,
+					&co_core_storage::StorageAction::PinCreate(
+						crate::types::co_pinning_key::CoPinningKey::Log.to_string(&payload.id),
+						context.settings().setting_co_default_max_log(),
+						payload.heads.iter().map(Into::into).collect(),
+					),
+				)
+				.await?;
+		}
 
 		// membership
 		local
 			.push(
 				&context.local_identity(),
 				CO_CORE_NAME_MEMBERSHIP,
-				&MembershipsAction::Join(membership(did, payload, membership_state, membership_tags)),
+				&MembershipsAction::Join(membership(&storage, did, payload, membership_state, membership_tags).await?),
 			)
 			.await?;
 	}
 	Ok(vec![])
 }
 
-fn membership(
+async fn membership(
+	storage: &impl BlockStorage,
 	did: Did,
 	payload: CoInvitePayload,
 	membership_state: MembershipState,
 	membership_tags: Tags,
-) -> Membership {
-	Membership {
+) -> Result<Membership, StorageError> {
+	let reducer_state = CoReducerState::new(Some(payload.state), payload.heads.clone());
+	let co_state = reducer_state.to_external_co_state(storage).await?.unwrap();
+	Ok(Membership {
 		id: payload.id,
 		did,
-		state: BTreeSet::from([CoState {
-			state: payload.state.into(),                           // TODO: consensus validation
-			heads: payload.heads.iter().map(Into::into).collect(), // TODO: consensus validation
-			encryption_mapping: None,
-		}]),
+		state: BTreeSet::from([co_state]),
 		key: None,
 		membership_state,
 		tags: membership_tags,
-	}
+	})
 }

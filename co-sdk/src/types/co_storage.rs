@@ -1,8 +1,10 @@
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, DefaultParams};
-use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
-use std::{fmt::Debug, sync::Arc};
+use co_storage::{
+	BlockStat, BlockStorage, BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, StorageError,
+};
+use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
 /// Public storage API.
 #[derive(Clone)]
@@ -13,6 +15,7 @@ impl CoStorage {
 	pub fn new<S>(storage: S) -> Self
 	where
 		S: BlockStorage<StoreParams = DefaultParams>
+			+ ExtendedBlockStorage
 			+ BlockStorageContentMapping
 			+ CloneWithBlockStorageSettings
 			+ 'static,
@@ -50,6 +53,12 @@ impl BlockStorage for CoStorage {
 		self.inner.stat(cid).await
 	}
 }
+#[async_trait]
+impl ExtendedBlockStorage for CoStorage {
+	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+		self.inner.set_extended(block).await
+	}
+}
 impl CloneWithBlockStorageSettings for CoStorage {
 	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
 		CoStorage { inner: self.inner.clone_arc_with_settings(settings) }
@@ -68,10 +77,20 @@ impl BlockStorageContentMapping for CoStorage {
 	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
 		self.inner.to_mapped(plain).await
 	}
+
+	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+		self.inner.insert_mappings(mappings).await
+	}
 }
 
-trait CoStorageBlockStorage: BlockStorage + BlockStorageContentMapping + CloneArcWithSettings {}
-impl<T> CoStorageBlockStorage for T where T: BlockStorage + BlockStorageContentMapping + CloneArcWithSettings {}
+trait CoStorageBlockStorage:
+	BlockStorage + ExtendedBlockStorage + BlockStorageContentMapping + CloneArcWithSettings
+{
+}
+impl<T> CoStorageBlockStorage for T where
+	T: BlockStorage + ExtendedBlockStorage + BlockStorageContentMapping + CloneArcWithSettings
+{
+}
 
 trait CloneArcWithSettings {
 	fn clone_arc_with_settings(
@@ -81,7 +100,11 @@ trait CloneArcWithSettings {
 }
 impl<T> CloneArcWithSettings for T
 where
-	T: BlockStorage<StoreParams = DefaultParams> + BlockStorageContentMapping + CloneWithBlockStorageSettings + 'static,
+	T: BlockStorage<StoreParams = DefaultParams>
+		+ ExtendedBlockStorage
+		+ BlockStorageContentMapping
+		+ CloneWithBlockStorageSettings
+		+ 'static,
 {
 	fn clone_arc_with_settings(
 		&self,

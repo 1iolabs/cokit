@@ -13,7 +13,7 @@ pub trait Linkable<T> {
 }
 
 /// A (serializable) typed link.
-#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, PartialOrd, Eq, Ord)]
 #[serde(into = "Cid", from = "Cid")]
 pub struct Link<T> {
 	#[serde(skip)]

@@ -1,4 +1,5 @@
 use crate::{BlockLinks, BlockStorage, StorageError};
+use async_trait::async_trait;
 use cid::Cid;
 use futures::Stream;
 use std::collections::{BinaryHeap, HashMap, VecDeque};
@@ -7,15 +8,17 @@ use std::collections::{BinaryHeap, HashMap, VecDeque};
 /// If a [`Cid`] is referenced multiple times it will also returnes multiple times.
 /// This diff works recursively - all added/removed [`Cid`] at any depth will be returned.
 /// However there is a look-ahead depth limit, how many nodes are looked down to reuse references (defaults to `1`).
-pub fn block_diff<S>(
+pub fn block_diff<S, F>(
 	storage: S,
 	prev: Option<Cid>,
 	next: Cid,
 	block_links: BlockLinks,
 	look_ahead_depth: Option<u8>,
+	mut follow: F,
 ) -> impl Stream<Item = Result<BlockDiff, StorageError>>
 where
 	S: BlockStorage + Clone + 'static,
+	F: BlockDiffFollow + 'static,
 {
 	async_stream::try_stream! {
 		let mut stack = VecDeque::<Cid>::new();
@@ -46,7 +49,7 @@ where
 					// no previous reference found
 					None => {
 						// resolve one level of deep references
-						make_shallow(&storage, &block_links, &mut prev_links).await?;
+						make_shallow(&storage, &block_links, &mut prev_links, &mut follow).await?;
 
 						// retry with next level resolved
 						if allow_resolve_next_levels > 0 {
@@ -55,17 +58,19 @@ where
 						}
 
 						// walk children
-						match extract_links_children(&storage, &next, &block_links).await {
-							Ok(children) => {
-								stack.extend(children.into_iter());
-							},
-							Err(StorageError::NotFound(_, _)) => {
-								// ignore and just return the reference
-							},
-							Err(err) => {
-								// forward
-								Err(err)?;
-							},
+						if follow.follow(&next).await? {
+							match extract_links_children(&storage, &next, &block_links).await {
+								Ok(children) => {
+									stack.extend(children.into_iter());
+								},
+								Err(StorageError::NotFound(_, _)) => {
+									// ignore and just return the reference
+								},
+								Err(err) => {
+									// forward
+									Err(err)?;
+								},
+							}
 						}
 
 						// add as added
@@ -82,14 +87,16 @@ where
 				match reference {
 					ReferenceDepth::Deep => {
 						yield BlockDiff::Removed(cid);
-						for await descendant in extract_links_descendants(&storage, &block_links, cid) {
-							match descendant {
-								Ok(descendant) => {
-									yield BlockDiff::Removed(descendant);
-								},
-								Err(_err) => {
-									// ignore not found (others?)
-								},
+						if follow.follow_previous(&cid).await? {
+							for await descendant in extract_links_descendants(&storage, &block_links, cid) {
+								match descendant {
+									Ok(descendant) => {
+										yield BlockDiff::Removed(descendant);
+									},
+									Err(_err) => {
+										// ignore not found (others?)
+									},
+								}
 							}
 						}
 					},
@@ -108,15 +115,20 @@ where
 /// Find added references in blocks with its parent.
 /// This diff works recursively - all added [`Cid`] at any depth will be returned.
 /// However there is a look-ahead depth limit, how many nodes are looked down to reuse references (defaults to `1`).
-pub fn block_diff_added_with_parent<S>(
+///
+/// # Args
+/// - `follow` - Whether to follow this [`Cid`] or not.
+pub fn block_diff_added_with_parent<S, F>(
 	storage: S,
 	prev: Option<Cid>,
 	next: Cid,
 	block_links: BlockLinks,
 	look_ahead_depth: Option<u8>,
+	mut follow: F,
 ) -> impl Stream<Item = Result<(Option<Cid>, Cid), StorageError>>
 where
 	S: BlockStorage + Clone + 'static,
+	F: BlockDiffFollow + 'static,
 {
 	async_stream::try_stream! {
 		let mut stack = VecDeque::<(Option<Cid>, Cid)>::new();
@@ -147,7 +159,7 @@ where
 					// no previous reference found
 					None => {
 						// resolve one level of deep references
-						make_shallow(&storage, &block_links, &mut prev_links).await?;
+						make_shallow(&storage, &block_links, &mut prev_links, &mut follow).await?;
 
 						// retry with next level resolved
 						if allow_resolve_next_levels > 0 {
@@ -156,17 +168,19 @@ where
 						}
 
 						// walk children
-						match extract_links_children(&storage, &next, &block_links).await {
-							Ok(children) => {
-								stack.extend(children.into_iter().map(|child| (Some(next), child)));
-							},
-							Err(StorageError::NotFound(_, _)) => {
-								// ignore and just return the reference
-							},
-							Err(err) => {
-								// forward
-								Err(err)?;
-							},
+						if follow.follow(&next).await? {
+							match extract_links_children(&storage, &next, &block_links).await {
+								Ok(children) => {
+									stack.extend(children.into_iter().map(|child| (Some(next), child)));
+								},
+								Err(StorageError::NotFound(_, _)) => {
+									// ignore and just return the reference
+								},
+								Err(err) => {
+									// forward
+									Err(err)?;
+								},
+							}
 						}
 
 						// add as added
@@ -176,6 +190,17 @@ where
 				break;
 			}
 		}
+	}
+}
+
+#[async_trait]
+pub trait BlockDiffFollow: Send + Sync {
+	/// Test if a next Cid should be followed.
+	async fn follow(&mut self, cid: &Cid) -> Result<bool, StorageError>;
+
+	/// Test if a previous Cid should be followed.
+	async fn follow_previous(&mut self, cid: &Cid) -> Result<bool, StorageError> {
+		self.follow(cid).await
 	}
 }
 
@@ -201,13 +226,15 @@ fn pop_reference(prev_links: &mut HashMap<Cid, BinaryHeap<ReferenceDepth>>, next
 }
 
 /// Make all deep references shallow.
-async fn make_shallow<S>(
+async fn make_shallow<S, F>(
 	storage: &S,
 	links: &BlockLinks,
 	prev_links: &mut HashMap<Cid, BinaryHeap<ReferenceDepth>>,
+	follow: &mut F,
 ) -> Result<(), StorageError>
 where
 	S: BlockStorage + Clone + 'static,
+	F: BlockDiffFollow + 'static,
 {
 	let deep_referencs: Vec<Cid> = prev_links
 		.iter()
@@ -217,7 +244,9 @@ where
 		})
 		.collect();
 	for cid in deep_referencs {
-		make_reference_shallow(storage, links, prev_links, cid).await?;
+		if follow.follow_previous(&cid).await? {
+			make_reference_shallow(storage, links, prev_links, cid).await?;
+		}
 	}
 	Ok(())
 }
@@ -335,16 +364,45 @@ pub enum BlockDiff {
 
 #[cfg(test)]
 mod tests {
+	use super::BlockDiffFollow;
 	use crate::{
 		library::{
 			block_diff::{block_diff, block_diff_added_with_parent, BlockDiff},
 			test::TestStorage,
 		},
-		BlockStorageExt,
+		BlockStorageExt, StorageError,
 	};
+	use async_trait::async_trait;
 	use cid::Cid;
 	use futures::TryStreamExt;
 	use serde::{Deserialize, Serialize};
+	use std::collections::BTreeSet;
+
+	pub struct FollowAll;
+	#[async_trait]
+	impl BlockDiffFollow for FollowAll {
+		async fn follow_previous(&mut self, _cid: &Cid) -> Result<bool, StorageError> {
+			Ok(true)
+		}
+		async fn follow(&mut self, _cid: &Cid) -> Result<bool, StorageError> {
+			Ok(true)
+		}
+	}
+
+	#[derive(Debug, Clone)]
+	struct FollowAllExcept {
+		previous: BTreeSet<Cid>,
+		next: BTreeSet<Cid>,
+	}
+	#[async_trait]
+	impl BlockDiffFollow for FollowAllExcept {
+		async fn follow_previous(&mut self, cid: &Cid) -> Result<bool, StorageError> {
+			Ok(!self.previous.contains(cid))
+		}
+		async fn follow(&mut self, cid: &Cid) -> Result<bool, StorageError> {
+			Ok(!self.next.contains(cid))
+		}
+	}
 
 	#[derive(Debug, Serialize, Deserialize, PartialEq)]
 	struct Node {
@@ -352,7 +410,7 @@ mod tests {
 		nodes: Vec<Cid>,
 	}
 
-	/// Replace a node and its root.
+	/// Replace a node (5) and its root (7).
 	///
 	/// From:
 	/// ```mermaid
@@ -408,10 +466,11 @@ mod tests {
 			.unwrap();
 
 		// diff
-		let diff = block_diff(storage.clone(), Some(node7), node7_change, Default::default(), Default::default())
-			.try_collect::<Vec<BlockDiff>>()
-			.await
-			.unwrap();
+		let diff =
+			block_diff(storage.clone(), Some(node7), node7_change, Default::default(), Default::default(), FollowAll)
+				.try_collect::<Vec<BlockDiff>>()
+				.await
+				.unwrap();
 		assert_eq!(diff.len(), 4);
 		assert!(diff.contains(&BlockDiff::Added(node7_change)));
 		assert!(diff.contains(&BlockDiff::Added(node5_change)));
@@ -425,6 +484,7 @@ mod tests {
 			node7_change,
 			Default::default(),
 			Default::default(),
+			FollowAll,
 		)
 		.try_collect::<Vec<(Option<Cid>, Cid)>>()
 		.await
@@ -434,7 +494,7 @@ mod tests {
 		assert!(diff.contains(&(Some(node7_change), node5_change)));
 	}
 
-	/// Replace a node and its root.
+	/// Reparent a node (7).
 	///
 	/// From:
 	/// ```mermaid
@@ -484,10 +544,11 @@ mod tests {
 		let node8_change = storage.set_serialized(&Node { id: 8, nodes: vec![node7] }).await.unwrap();
 
 		// diff
-		let diff = block_diff(storage.clone(), Some(node7), node8_change, Default::default(), Default::default())
-			.try_collect::<Vec<BlockDiff>>()
-			.await
-			.unwrap();
+		let diff =
+			block_diff(storage.clone(), Some(node7), node8_change, Default::default(), Default::default(), FollowAll)
+				.try_collect::<Vec<BlockDiff>>()
+				.await
+				.unwrap();
 		assert_eq!(diff.len(), 1);
 		assert!(diff.contains(&BlockDiff::Added(node8_change)));
 
@@ -498,11 +559,103 @@ mod tests {
 			node8_change,
 			Default::default(),
 			Default::default(),
+			FollowAll,
 		)
 		.try_collect::<Vec<(Option<Cid>, Cid)>>()
 		.await
 		.unwrap();
 		assert_eq!(diff.len(), 1);
 		assert!(diff.contains(&(None, node8_change)));
+	}
+
+	/// Replace a node (5) and its root (7).
+	///
+	/// From:
+	/// ```mermaid
+	/// flowchart TD
+	///   5 --> 1
+	///   5 --> 2
+	///   6 --> 3
+	///   6 --> 4
+	///   7 --> 5
+	///   7 --> 6
+	/// ```
+	///
+	/// To:
+	/// ```mermaid
+	/// flowchart TD
+	///   5' --> 1
+	///   5' --> 2
+	///   6 --> 3
+	///   6 --> 4
+	///   7' --> 5'
+	///   7' --> 6
+	/// ```
+	#[tokio::test]
+	async fn test_follow() {
+		let storage = TestStorage::default();
+
+		// create
+		let node1 = storage.set_serialized(&Node { id: 1, nodes: vec![] }).await.unwrap();
+		let node2 = storage.set_serialized(&Node { id: 2, nodes: vec![] }).await.unwrap();
+		let node3 = storage.set_serialized(&Node { id: 3, nodes: vec![] }).await.unwrap();
+		let node4 = storage.set_serialized(&Node { id: 4, nodes: vec![] }).await.unwrap();
+		let node5 = storage
+			.set_serialized(&Node { id: 5, nodes: vec![node1, node2] })
+			.await
+			.unwrap();
+		let node6 = storage
+			.set_serialized(&Node { id: 6, nodes: vec![node3, node4] })
+			.await
+			.unwrap();
+		let node7 = storage
+			.set_serialized(&Node { id: 7, nodes: vec![node5, node6] })
+			.await
+			.unwrap();
+
+		// update
+		let node5_change = storage
+			.set_serialized(&Node { id: 50, nodes: vec![node1, node2] })
+			.await
+			.unwrap();
+		let node7_change = storage
+			.set_serialized(&Node { id: 70, nodes: vec![node5_change, node6] })
+			.await
+			.unwrap();
+
+		// follow
+		let do_not_follow_7 =
+			FollowAllExcept { previous: [node7].into_iter().collect(), next: [node7_change].into_iter().collect() };
+
+		// diff
+		let diff = block_diff(
+			storage.clone(),
+			Some(node7),
+			node7_change,
+			Default::default(),
+			Default::default(),
+			do_not_follow_7.clone(),
+		)
+		.try_collect::<Vec<BlockDiff>>()
+		.await
+		.unwrap();
+		assert_eq!(diff.len(), 2);
+		assert!(diff.contains(&BlockDiff::Added(node7_change)));
+		assert!(diff.contains(&BlockDiff::Removed(node7)));
+
+		// diff added with parent
+		let diff = block_diff_added_with_parent(
+			storage.clone(),
+			Some(node7),
+			node7_change,
+			Default::default(),
+			Default::default(),
+			do_not_follow_7.clone(),
+		)
+		.try_collect::<Vec<(Option<Cid>, Cid)>>()
+		.await
+		.unwrap();
+		assert_eq!(diff.len(), 1);
+		assert!(diff.contains(&(None, node7_change)));
 	}
 }

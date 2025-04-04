@@ -2,7 +2,7 @@ use crate::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{Block, CloneWithBlockStorageSettings, MultiCodec};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Mappes certain CID codecs to mapped CIDs using BlockStorageContentMapping.
 #[derive(Debug, Clone)]
@@ -81,5 +81,9 @@ where
 
 	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
 		self.storage.to_mapped(plain).await
+	}
+
+	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+		self.storage.insert_mappings(mappings).await
 	}
 }

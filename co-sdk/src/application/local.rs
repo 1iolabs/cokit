@@ -23,7 +23,9 @@ use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
 use co_primitives::{tags, Did};
 use co_runtime::RuntimePool;
-use co_storage::{BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode};
+use co_storage::{
+	BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, ExtendedBlockStorage,
+};
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 use tokio_util::sync::CancellationToken;
@@ -260,7 +262,7 @@ where
 		mapping: Option<Cid>,
 	) -> Result<bool, anyhow::Error>
 	where
-		S: BlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
+		S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
 		R: CoreResolver<S> + Send + Sync + 'static,
 	{
 		if let Some(state) = reducer.state() {
@@ -315,7 +317,7 @@ where
 #[async_trait]
 impl<L, S, R> ReducerChangedHandler<S, R> for LocalCoInstance<L>
 where
-	S: BlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
+	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 	L: Locals + Clone + Debug + Send + Sync + 'static,
 {
@@ -404,7 +406,7 @@ async fn setup_local_co<S, R>(
 	settings: &ApplicationSettings,
 ) -> Result<(), anyhow::Error>
 where
-	S: BlockStorage + Sync + Send + Clone + 'static,
+	S: ExtendedBlockStorage + Sync + Send + Clone + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
 	// create

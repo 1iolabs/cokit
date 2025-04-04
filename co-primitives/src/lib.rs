@@ -3,7 +3,7 @@ mod macros;
 mod types;
 
 pub use library::{
-	block_diff::{block_diff, block_diff_added_with_parent, BlockDiff},
+	block_diff::{block_diff, block_diff_added_with_parent, BlockDiff, BlockDiffFollow},
 	block_links::BlockLinks,
 	block_serializer::{BlockSerializer, BlockSerializerError},
 	cbor::{from_cbor, to_cbor, CborError},
@@ -22,6 +22,7 @@ pub use types::{
 	co::CoId,
 	co_list::{CoList, CoListIndex, CoListTransaction},
 	co_map::{CoMap, CoMapTransaction},
+	co_reference::CoReference,
 	co_set::{CoSet, CoSetTransaction},
 	codec::{KnownMultiCodec, MultiCodec, MultiCodecError},
 	dag_collection::{DagCollection, DagMap, DagSet, DagVec},

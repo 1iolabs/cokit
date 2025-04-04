@@ -6,6 +6,7 @@ pub mod cid;
 pub mod co;
 pub mod co_list;
 pub mod co_map;
+pub mod co_reference;
 pub mod co_set;
 pub mod codec;
 pub mod dag_collection;

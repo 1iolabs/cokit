@@ -81,7 +81,11 @@ pub enum KnownMultiCodec {
 	/// Status: permanent
 	DagJson = 0x0129,
 
+	/// Co Encrypted Block wrapped in [`KnownMultiCodec::DagCbor`].
 	CoEncryptedBlock = 0x301000,
+
+	/// [`crate::CoReference`] as [`KnownMultiCodec::DagCbor`].
+	CoReference = 0x301001,
 }
 impl KnownMultiCodec {
 	pub fn multi_codec(&self) -> MultiCodec {
@@ -164,8 +168,28 @@ impl MultiCodec {
 		}
 	}
 
-	pub fn with_dag_cbor(cid: &Cid) -> Result<&Cid, MultiCodecError> {
-		Self::with_codec(KnownMultiCodec::DagCbor, cid)
+	/// Expect cid to be of type codec.
+	pub fn is_any_codec<'a, C: Into<MultiCodec>>(codecs: impl IntoIterator<Item = C>, cid: &Cid) -> Option<&Cid> {
+		let actual_codec: MultiCodec = cid.codec().into();
+		if codecs.into_iter().map(Into::into).any(|c| c == actual_codec) {
+			Some(cid)
+		} else {
+			None
+		}
+	}
+
+	/// Error if not DAG-CBOR or a codec that is represented in DAG-CBOR.
+	pub fn with_cbor(cid: &Cid) -> Result<&Cid, MultiCodecError> {
+		Self::is_any_codec([KnownMultiCodec::DagCbor, KnownMultiCodec::CoReference], cid)
+			.ok_or_else(|| MultiCodecError(*cid, MultiCodec::Known(KnownMultiCodec::DagCbor), MultiCodec::from(cid)))
+	}
+
+	/// Is DAG-CBOR or a codec that is represented in DAG-CBOR.
+	pub fn is_cbor(cid: impl Into<MultiCodec>) -> bool {
+		match cid.into() {
+			MultiCodec::Known(KnownMultiCodec::DagCbor) | MultiCodec::Known(KnownMultiCodec::CoReference) => true,
+			_ => false,
+		}
 	}
 
 	pub fn is(actual: impl Into<MultiCodec>, expect: impl Into<MultiCodec>) -> bool {

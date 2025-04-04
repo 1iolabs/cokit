@@ -5,14 +5,21 @@ use crate::{
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings};
-use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
+use co_storage::{
+	BlockStat, BlockStorage, BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, StorageError,
+};
 use futures::{channel::oneshot, pin_mut};
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	PeerId, Swarm,
 };
 use libp2p_bitswap::{BitswapEvent, QueryId};
-use std::{collections::BTreeSet, marker::PhantomData, mem::swap, time::Duration};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	marker::PhantomData,
+	mem::swap,
+	time::Duration,
+};
 use tokio_stream::StreamExt;
 
 pub struct NetworkBlockStorage<S, B, C, N, P> {
@@ -171,6 +178,18 @@ where
 		}
 	}
 }
+#[async_trait]
+impl<S, B, C, N, P> ExtendedBlockStorage for NetworkBlockStorage<S, B, C, N, P>
+where
+	S: BlockStorage + ExtendedBlockStorage + BlockStorageContentMapping + Send + Sync + Clone + 'static,
+	B: NetworkBehaviour + BitswapBehaviourProvider,
+	P: PeerProvider + Clone + Send + Sync + 'static,
+	N: NetworkTaskSpawner<B, C> + Clone + Send + Sync + 'static,
+{
+	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+		self.next.set_extended(block).await
+	}
+}
 impl<S, B, C, N, P> CloneWithBlockStorageSettings for NetworkBlockStorage<S, B, C, N, P>
 where
 	S: CloneWithBlockStorageSettings,
@@ -209,6 +228,10 @@ where
 
 	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
 		self.next.to_mapped(plain).await
+	}
+
+	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+		self.next.insert_mappings(mappings).await
 	}
 }
 

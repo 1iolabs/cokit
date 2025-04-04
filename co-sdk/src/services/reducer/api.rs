@@ -10,9 +10,10 @@ use cid::Cid;
 use co_actor::{Actor, ActorHandle, TaskSpawner};
 use co_core_co::Co;
 use co_identity::{PrivateIdentity, PrivateIdentityBox};
-use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, ReducerAction};
+use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Link, ReducerAction};
 use co_storage::{BlockStorageExt, StorageError};
 use futures::Stream;
+use ipld_core::ipld::Ipld;
 use serde::Serialize;
 use std::{collections::BTreeSet, fmt::Debug, marker::PhantomData};
 
@@ -45,12 +46,16 @@ impl CoReducer {
 	}
 
 	pub(crate) fn clone_with_detached_storage(&self) -> Self {
+		self.clone_with_settings(BlockStorageSettings::new().with_detached())
+	}
+
+	pub(crate) fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
 		Self {
 			id: self.id.clone(),
 			parent: self.parent.clone(),
 			handle: self.handle.clone(),
 			context: self.context.clone(),
-			storage: self.storage.clone_with_settings(BlockStorageSettings::new().with_detached()),
+			storage: self.storage.clone_with_settings(settings),
 		}
 	}
 
@@ -112,7 +117,8 @@ impl CoReducer {
 		T: Serialize + Debug + Clone + Send + Sync + 'static,
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
-		let action_reference = create_reducer_action(&self.storage, identity, core, item).await?;
+		let action_reference =
+			create_reducer_action(&self.storage, identity, core, item, Default::default(), None).await?;
 		let result = self
 			.handle
 			.request(|r| {
@@ -139,7 +145,7 @@ impl CoReducer {
 		T: Serialize + Debug + Send + Sync + Clone + 'static,
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
-		let action_reference = store_reducer_action(&self.storage, action).await?;
+		let action_reference = store_reducer_action(&self.storage, action, Default::default()).await?;
 		let result = self
 			.handle
 			.request(|r| {
@@ -152,6 +158,38 @@ impl CoReducer {
 			})
 			.await??;
 		tracing::trace!(action = ?action.payload, ?action_reference, state = ?result.0, heads = ?result.1, "push");
+		Ok(result)
+	}
+
+	/// Push event into reducer.
+	///
+	/// # Arguments
+	/// - `identity` - The identity to sign the operation with.
+	/// - `action_reference` - The reducer action reference.
+	///
+	/// # Returns
+	/// The resulting state and heads.
+	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, identity))]
+	pub async fn push_reference<I>(
+		&self,
+		identity: &I,
+		action_reference: Link<ReducerAction<Ipld>>,
+	) -> Result<CoReducerState, anyhow::Error>
+	where
+		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
+	{
+		let result = self
+			.handle
+			.request(|r| {
+				ReducerMessage::Push(
+					PrivateIdentity::boxed(identity.clone()),
+					self.storage.clone(),
+					action_reference,
+					r,
+				)
+			})
+			.await??;
+		tracing::trace!(?action_reference, state = ?result.0, heads = ?result.1, "push-reference");
 		Ok(result)
 	}
 

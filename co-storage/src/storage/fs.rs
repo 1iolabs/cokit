@@ -1,4 +1,4 @@
-use crate::{BlockStorageContentMapping, Storage};
+use crate::{BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, Storage};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
@@ -226,6 +226,12 @@ impl BlockStorage for FsStorage {
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		let path = to_cid_path(&self.path, cid, "");
 		into_storage_result(cid, tokio::fs::metadata(&path).await.map(|v| BlockStat { size: v.size() }))
+	}
+}
+#[async_trait]
+impl ExtendedBlockStorage for FsStorage {
+	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+		self.set(block.block).await
 	}
 }
 impl CloneWithBlockStorageSettings for FsStorage {

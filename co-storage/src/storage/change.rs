@@ -1,9 +1,9 @@
-use crate::BlockStorageContentMapping;
+use crate::{BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage};
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{Block, BlockStat, BlockStorage, CloneWithBlockStorageSettings, StorageError};
 use std::{
-	collections::HashSet,
+	collections::{BTreeMap, HashSet},
 	mem::swap,
 	sync::{Arc, Mutex},
 };
@@ -80,6 +80,15 @@ where
 		Ok(self.next.stat(cid).await?)
 	}
 }
+#[async_trait]
+impl<S> ExtendedBlockStorage for ChangeBlockStorage<S>
+where
+	S: ExtendedBlockStorage + 'static,
+{
+	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+		self.next.set_extended(block).await
+	}
+}
 impl<S> CloneWithBlockStorageSettings for ChangeBlockStorage<S>
 where
 	S: BlockStorage + CloneWithBlockStorageSettings + 'static,
@@ -103,6 +112,10 @@ where
 
 	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
 		self.next.to_mapped(plain).await
+	}
+
+	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+		self.next.insert_mappings(mappings).await
 	}
 }
 

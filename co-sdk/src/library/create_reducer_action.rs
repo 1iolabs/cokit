@@ -1,6 +1,6 @@
 use co_identity::PrivateIdentity;
-use co_primitives::{Did, Link, ReducerAction};
-use co_storage::{BlockStorage, BlockStorageExt, StorageError};
+use co_primitives::{BlockSerializer, Date, Did, Link, ReducerAction};
+use co_storage::{ExtendedBlockOptions, ExtendedBlockStorage, StorageError};
 use ipld_core::{ipld::Ipld, serde::to_ipld};
 use serde::Serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -25,30 +25,34 @@ pub async fn create_reducer_action<P, I, S>(
 	from: &I,
 	core: impl Into<String>,
 	payload: P,
+	options: ExtendedBlockOptions,
+	time: Option<Date>,
 ) -> Result<Link<ReducerAction<Ipld>>, StorageError>
 where
 	P: Serialize + Send + Sync,
 	I: PrivateIdentity + Send + Sync,
-	S: BlockStorage,
+	S: ExtendedBlockStorage,
 {
 	let action = ReducerAction {
 		core: core.into(),
 		payload,
 		from: from.identity().to_owned(),
-		time: SystemTime::now().duration_since(UNIX_EPOCH).expect("Valid time").as_millis(),
+		time: time.unwrap_or_else(|| SystemTime::now().duration_since(UNIX_EPOCH).expect("Valid time").as_millis()),
 	};
-	store_reducer_action(storage, &action).await
+	store_reducer_action(storage, &action, options).await
 }
 
 /// Store reducer action.
 pub async fn store_reducer_action<P, S>(
 	storage: &S,
 	action: &ReducerAction<P>,
+	options: ExtendedBlockOptions,
 ) -> Result<Link<ReducerAction<Ipld>>, StorageError>
 where
 	P: Serialize + Send + Sync,
-	S: BlockStorage,
+	S: ExtendedBlockStorage,
 {
-	let cid = storage.set_serialized(&action).await?;
+	let block = BlockSerializer::new().serialize(action)?;
+	let cid = storage.set_extended((block, options).into()).await?;
 	Ok(cid.into())
 }

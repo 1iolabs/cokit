@@ -14,7 +14,8 @@ impl BlockLinks {
 		match cid.into() {
 			MultiCodec::Known(KnownMultiCodec::DagPb)
 			| MultiCodec::Known(KnownMultiCodec::DagCbor)
-			| MultiCodec::Known(KnownMultiCodec::DagJson) => true,
+			| MultiCodec::Known(KnownMultiCodec::DagJson)
+			| MultiCodec::Known(KnownMultiCodec::CoReference) => true,
 			_ => false,
 		}
 	}
@@ -30,7 +31,7 @@ impl BlockLinks {
 	) -> Result<impl Iterator<Item = Cid> + Send + Sync + use<'a, P>, anyhow::Error> {
 		let iter: Box<dyn Iterator<Item = Cid> + Send + Sync> = match MultiCodec::from(block.cid()) {
 			MultiCodec::Known(KnownMultiCodec::DagPb) => Box::new(ipld_dagpb::DagPbCodec::links(block.data())?),
-			MultiCodec::Known(KnownMultiCodec::DagCbor) => {
+			MultiCodec::Known(KnownMultiCodec::DagCbor) | MultiCodec::Known(KnownMultiCodec::CoReference) => {
 				Box::new(serde_ipld_dagcbor::codec::DagCborCodec::links(block.data())?)
 			},
 			MultiCodec::Known(KnownMultiCodec::DagJson) => {

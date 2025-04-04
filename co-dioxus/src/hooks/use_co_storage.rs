@@ -8,7 +8,7 @@ use dioxus::hooks::use_context;
 use futures::Future;
 use tokio::sync::{mpsc, oneshot};
 
-pub fn use_co_storage(co: &str) -> CoStorage {
+pub fn use_co_storage(co: &str) -> CoBlockStorage {
 	let (tx, mut rx) = mpsc::unbounded_channel::<Command<<CoBlockStorage as BlockStorage>::StoreParams>>();
 	let context: CoContext = use_context();
 	context.execute_future_parallel(|application| async move {
@@ -16,7 +16,7 @@ pub fn use_co_storage(co: &str) -> CoStorage {
 			handle_command(&application, command).await;
 		}
 	});
-	CoStorage::new(CoBlockStorage { co: co.into(), tx, settings: None })
+	CoBlockStorage { co: co.into(), tx, settings: None }
 }
 
 #[derive(Debug, Clone)]

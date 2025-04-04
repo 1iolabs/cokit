@@ -6,12 +6,13 @@ use co_identity::PrivateIdentity;
 use co_log::{EntryBlock, Log, LogError};
 use co_primitives::{Link, ReducerAction};
 use co_runtime::RuntimePool;
-use co_storage::{BlockStorage, BlockStorageExt};
+use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use ipld_core::ipld::Ipld;
 use serde::Serialize;
 use std::{
 	collections::{BTreeSet, HashMap, VecDeque},
+	fmt::{Debug, Formatter},
 	marker::PhantomData,
 };
 use tokio::sync::watch;
@@ -34,7 +35,7 @@ pub struct ReducerBuilder<S, R> {
 }
 impl<S, R> ReducerBuilder<S, R>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
+	S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
 	pub fn new(core_resolver: R, log: Log) -> Self {
@@ -109,7 +110,7 @@ pub struct Reducer<S, R> {
 }
 impl<S, R> Reducer<S, R>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
+	S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
 	/// Initialize this reducer by computing current state if one.
@@ -248,8 +249,13 @@ where
 		T: Serialize + Send + Sync,
 		I: PrivateIdentity + Send + Sync,
 	{
-		self.push_reference(storage, runtime, identity, create_reducer_action(storage, identity, core, item).await?)
-			.await
+		self.push_reference(
+			storage,
+			runtime,
+			identity,
+			create_reducer_action(storage, identity, core, item, Default::default(), None).await?,
+		)
+		.await
 	}
 
 	/// Push an event.
@@ -365,6 +371,7 @@ where
 	}
 
 	/// Notify subscribers about change.
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, storage))]
 	async fn on_state_changed(&mut self, storage: &S, context: &ReducerChangeContext) -> Result<(), LogError> {
 		// handlers
 		// note:
@@ -401,7 +408,7 @@ where
 
 	/// Compute state for log heads.
 	/// Returns the resulting state if one.
-	#[instrument(err, skip(self, runtime, storage))]
+	#[instrument(level = tracing::Level::TRACE, err(Debug), skip(self, runtime, storage))]
 	async fn compute_state(
 		&self,
 		storage: &S,
@@ -496,6 +503,16 @@ pub trait ReducerChangedHandler<S, R> {
 		std::any::type_name::<Self>().to_owned()
 	}
 }
+impl<S, R> Debug for Reducer<S, R> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Reducer")
+			.field("id", &self.log.id_string())
+			.field("state", &self.state)
+			.field("heads", &self.heads)
+			.field("snapshots", &self.snapshots)
+			.finish()
+	}
+}
 
 #[derive(Debug, Clone)]
 pub struct ReducerChangeContext {
@@ -545,7 +562,7 @@ mod tests {
 	use co_log::Log;
 	use co_primitives::{BlockSerializer, ReducerAction};
 	use co_runtime::{Core, IdleRuntimePool, RuntimePool};
-	use co_storage::{unixfs_add_file, BlockStorage, MemoryBlockStorage};
+	use co_storage::{unixfs_add_file, ExtendedBlockStorage, MemoryBlockStorage};
 	use example_counter::{Counter, CounterAction};
 	use futures::StreamExt;
 	use tokio::process::Command;
@@ -747,7 +764,7 @@ mod tests {
 
 	async fn actions<S>(storage: &S, log: &Log) -> Vec<ReducerAction<CounterAction>>
 	where
-		S: BlockStorage + Send + Sync + Clone + 'static,
+		S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 	{
 		log.stream(storage)
 			.map(|entry| entry.unwrap().entry().payload)
@@ -763,7 +780,7 @@ mod tests {
 
 	async fn counter_state<S, R>(storage: &S, reducer: &Reducer<S, R>) -> Counter
 	where
-		S: BlockStorage + Send + Sync + Clone + 'static,
+		S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 		R: CoreResolver<S> + Send + Sync + 'static,
 	{
 		BlockSerializer::new()

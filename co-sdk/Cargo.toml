@@ -72,3 +72,4 @@ example-counter = { path = "../examples/counter" }
 [features]
 "default" = ["pinning"]
 "pinning" = []
+"logging-verbose" = ["co-storage/logging-verbose"]

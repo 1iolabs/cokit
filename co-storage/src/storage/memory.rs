@@ -1,4 +1,4 @@
-use crate::{types::storage::Storage, BlockStorageContentMapping};
+use crate::{types::storage::Storage, BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
@@ -125,19 +125,38 @@ where
 			.get(cid)
 			.map(|r| r.block.clone())
 			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")));
+		#[cfg(feature = "logging-verbose")]
 		tracing::trace!(?cid, return = ?result.as_ref().map(|_| ()), "memory-store-get");
 		result
 	}
 
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
-		tracing::trace!(cid = ?block.cid(), "memory-store-set");
+		// log
+		#[cfg(feature = "logging-verbose")]
+		{
+			if co_primitives::MultiCodec::is_cbor(block.cid()) {
+				tracing::trace!(cid = ?block.cid(), ipld = ?co_primitives::from_cbor::<ipld_core::ipld::Ipld>(block.data()), "set");
+			} else {
+				tracing::trace!(cid = ?block.cid(), "set");
+			}
+		}
+
+		// apply
 		let result = *block.cid();
 		self.records.write().unwrap().insert(*block.cid(), Record { pin: false, block });
+
+		// result
 		Ok(result)
 	}
 
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
-		tracing::trace!(?cid, "memory-store-remove");
+		// log
+		#[cfg(feature = "logging-verbose")]
+		{
+			tracing::trace!(?cid, "memory-store-remove");
+		}
+
+		// apply
 		self.records.write().unwrap().remove(cid);
 		Ok(())
 	}
@@ -149,6 +168,15 @@ where
 			.get(cid)
 			.map(|r| BlockStat { size: r.block.data().len() as u64 })
 			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")))
+	}
+}
+#[async_trait]
+impl<P> ExtendedBlockStorage for MemoryBlockStorage<P>
+where
+	P: StoreParams,
+{
+	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+		self.set(block.block).await
 	}
 }
 impl<P> CloneWithBlockStorageSettings for MemoryBlockStorage<P>

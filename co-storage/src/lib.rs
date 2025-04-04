@@ -29,6 +29,7 @@ pub use storage::{
 	sync::{SyncBlockStorage, SyncStorage},
 };
 pub use types::{
+	extended_block_storage::{ExtendedBlock, ExtendedBlockOptions, ExtendedBlockStorage},
 	mapping::{BlockStorageContentMapping, StorageContentMapping},
 	pin::{PinApi, PinKind, PinOptions},
 	storage::Storage,

@@ -8,7 +8,10 @@ use co_primitives::{
 	Tags,
 };
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
-use std::{collections::HashMap, mem::swap};
+use std::{
+	collections::{BTreeMap, HashMap},
+	mem::swap,
+};
 
 /// Overlay storage which buffers changes into memory or tmp storage if `blocks_max_memory` is hit.
 #[derive(Debug, Clone)]
@@ -156,6 +159,13 @@ where
 			.request(|r| OverlayBlockMessage::ToMapped(*plain, r))
 			.await
 			.unwrap_or(None)
+	}
+
+	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+		self.handle
+			.request(|r| OverlayBlockMessage::InsertMappings(mappings, r))
+			.await
+			.ok();
 	}
 }
 
@@ -363,6 +373,12 @@ where
 					move || async move { storage.is_content_mapped().await }
 				});
 			},
+			OverlayBlockMessage::InsertMappings(mapping, response) => {
+				response.spawn_with(self.spawner.clone(), {
+					let storage = self.next.clone();
+					move || async move { storage.insert_mappings(mapping).await }
+				});
+			},
 			OverlayBlockMessage::ConsumeChanges(mut response) => {
 				// take
 				let mut blocks = HashMap::new();
@@ -527,6 +543,9 @@ where
 
 	/// [`BlockStorageContentMapping::to_mapped`]
 	ToMapped(Cid, Response<Option<Cid>>),
+
+	/// [`BlockStorageContentMapping::insert_mappings`]
+	InsertMappings(BTreeMap<Cid, Cid>, Response<()>),
 
 	/// Stat Block.
 	IsContentMapped(Response<bool>),

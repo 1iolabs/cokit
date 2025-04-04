@@ -1,41 +1,32 @@
 use super::identity::create_identity_resolver;
-#[cfg(feature = "pinning")]
-use crate::reducer::change::reference_writer::ReferenceWriteReducerChangedHandler;
 use crate::{
 	find_membership,
 	library::{
-		connections_peer_provider::ConnectionsPeerProvider,
+		connections_peer_provider::ConnectionsPeerProvider, membership_all_heads::membership_all_heads,
 		push_heads::PushHeads,
-		to_external_cid::{to_external_cid, to_external_cids},
-		to_internal_cid::{to_internal_cid, to_internal_cids},
 	},
-	reducer::{
-		change::{membership_writer::MembershipWriter, reference_writer::ReferenceWriter},
-		core_resolver::dynamic::DynamicCoreResolver,
-	},
+	reducer::{change::membership_writer::MembershipWriter, core_resolver::dynamic::DynamicCoreResolver},
 	services::{
 		connections::ConnectionMessage,
 		network::{CoHeadsPublish, CoNetworkTaskSpawner},
 		reducers::ReducerStorage,
 	},
 	state::{find, query_core, QueryExt},
-	types::{co_pinning_key::CoPinningKey, co_reducer_context::CoReducerContext},
+	types::co_reducer_context::CoReducerContext,
 	CoCoreResolver, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters, ReducerBuilder, Runtime,
-	TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
+	TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use cid::Cid;
 use co_actor::ActorHandle;
 use co_core_co::{CoAction, Participant};
 use co_core_keystore::{Key, KeyStore, KeyStoreAction};
-use co_core_membership::{CoState, Membership, MembershipsAction};
-use co_core_storage::{PinStrategy, StorageAction};
+use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
-use co_primitives::{tags, CoId, StoreParams, WeakCid};
-use co_storage::{Algorithm, BlockStorage, EncryptedBlockStorage, Secret};
+use co_primitives::{tags, CoId};
+use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -65,7 +56,7 @@ impl SharedCoBuilder {
 			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_owned(),
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_owned(),
 			#[cfg(feature = "pinning")]
-			storage_core_name: CO_CORE_NAME_STORAGE.to_owned(),
+			storage_core_name: crate::CO_CORE_NAME_STORAGE.to_owned(),
 			network: None,
 			initialize: true,
 			network_block_timeout: Duration::from_secs(30),
@@ -229,15 +220,23 @@ impl SharedCoBuilder {
 
 		// reducer
 		let mut reducer_builder = ReducerBuilder::new(core_resolver, log).with_initialize(self.initialize);
+		let parent_storage = self.parent.storage();
 		for co_state in self.membership.state.iter() {
+			let reducer_state = CoReducerState::from_co_state(&parent_storage, co_state).await?;
+
 			// get (unencrypted) state/heads
-			let state = to_internal_cid(&co_storage, co_state.state.into()).await;
-			let heads: BTreeSet<Cid> =
-				to_internal_cids(&co_storage, co_state.heads.iter().map(WeakCid::cid).collect()).await;
+			let reducer_state = reducer_state.to_internal(&co_storage).await;
+
+			// load state/heads mappings from parent into our mapping
+			if let Some(parent_mappings) = reducer_state.to_external_mapping(&parent_storage).await {
+				co_storage.insert_mappings(parent_mappings).await;
+			}
 
 			// add to builder
 			//  when we only have one state we assume its the latest
-			reducer_builder = reducer_builder.with_snapshot(state, heads);
+			if let Some((state, heads)) = reducer_state.some() {
+				reducer_builder = reducer_builder.with_snapshot(state, heads);
+			}
 			// if self.membership.state.len() == 1 {
 			// 	reducer_builder = reducer_builder.with_latest_state(state, heads);
 			// } else {
@@ -272,22 +271,18 @@ impl SharedCoBuilder {
 			self.membership_core_name,
 			identity.clone(),
 			encrypted_storage.clone(),
-			self.membership
-				.state
-				.iter()
-				.flat_map(|item| item.heads.iter().map(WeakCid::cid))
-				.collect(),
+			self.membership.state.clone(),
 		);
 		reducer.add_change_handler(Box::new(writer));
 
 		// setup auto write references to parent co
 		#[cfg(feature = "pinning")]
 		{
-			let writer = ReferenceWriteReducerChangedHandler::new(
-				ReferenceWriter::new(
+			let writer = crate::reducer::change::reference_writer::ReferenceWriteReducerChangedHandler::new(
+				crate::reducer::change::reference_writer::ReferenceWriter::new(
 					self.parent.dispatcher(&self.storage_core_name, identity.clone()),
 					context.clone(),
-					Some(CoPinningKey::State.to_string(&self.membership.id)),
+					Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.membership.id)),
 				),
 				*reducer.state(),
 			);
@@ -360,14 +355,11 @@ impl SharedContext {
 	/// Update `co` membership if necessary.
 	async fn update_membership(&self, parent: CoReducer, co: CoReducer) -> Result<(), anyhow::Error> {
 		if let Some(membership) = find_membership(&parent, co.id()).await? {
+			let storage = co.storage();
+			let parent_storage = parent.storage();
 			let co_heads = co.heads().await;
-			if co_heads
-				!= membership
-					.state
-					.iter()
-					.flat_map(|item| item.heads.iter().map(WeakCid::cid))
-					.collect::<BTreeSet<_>>()
-			{
+			let membetship_heads = membership_all_heads(&parent_storage, membership.state.iter()).await?;
+			if co_heads != membetship_heads {
 				tracing::info!(co = ?co.id(), from = ?co_heads, to = ?membership, "membership-update");
 				for state in membership.state.iter() {
 					// encryption mapping
@@ -375,9 +367,16 @@ impl SharedContext {
 						storage.load_mapping(&cid).await?;
 					}
 
+					// state
+					let reducer_state = CoReducerState::from_co_state(&parent_storage, state).await?;
+
+					// mappings
+					if let Some(mappings) = reducer_state.to_external_mapping(&parent_storage).await {
+						storage.insert_mappings(mappings).await;
+					}
+
 					// join
-					co.join_state(CoReducerState::new_weak(Some(state.state), state.heads.clone()))
-						.await?;
+					co.join_state(reducer_state).await?;
 				}
 			}
 		}
@@ -429,6 +428,7 @@ pub struct SharedCoCreator {
 	parent: CoReducer,
 	keystore_core_name: String,
 	membership_core_name: String,
+	#[cfg(feature = "pinning")]
 	storage_core_name: String,
 	co: CreateCo,
 }
@@ -439,7 +439,8 @@ impl SharedCoCreator {
 			co,
 			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_owned(),
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_owned(),
-			storage_core_name: CO_CORE_NAME_STORAGE.to_owned(),
+			#[cfg(feature = "pinning")]
+			storage_core_name: crate::CO_CORE_NAME_STORAGE.to_owned(),
 		}
 	}
 
@@ -451,8 +452,11 @@ impl SharedCoCreator {
 		Self { keystore_core_name, ..self }
 	}
 
-	pub fn with_storage_core_name(self, storage_core_name: String) -> Self {
-		Self { storage_core_name, ..self }
+	pub fn with_storage_core_name(self, _storage_core_name: String) -> Self {
+		#[cfg(feature = "pinning")]
+		return Self { storage_core_name: _storage_core_name, ..self };
+		#[cfg(not(feature = "pinning"))]
+		return self;
 	}
 
 	/// TODO: Cleanup when something fails?
@@ -506,77 +510,85 @@ impl SharedCoCreator {
 				},
 			)
 			.await?;
-		let mut state = reducer.state().ok_or(anyhow::anyhow!("Expected state after create"))?;
-		let mut heads = reducer.heads().clone();
+		let reducer_state = CoReducerState::new(reducer.state().clone(), reducer.heads().clone());
 
 		// store key in parent co
-		let (key_uri, encryption_mapping, encrypted_storage) =
-			if let Some((encrypted_storage, key_uri, secret)) = encrypted_storage {
-				let key = Key {
-					uri: key_uri.clone(),
-					name: format!("co ({})", self.co.name),
-					description: "".to_owned(),
-					secret: co_core_keystore::Secret::SharedKey(secret.into()),
-					tags: tags!(),
-				};
-				self.parent
-					.push(&identity, &self.keystore_core_name, &KeyStoreAction::Set(key))
-					.await?;
-				(Some(key_uri), None, Some(encrypted_storage))
-			} else {
-				(None, None, None)
+		let (key_uri, _encrypted_storage) = if let Some((encrypted_storage, key_uri, secret)) = encrypted_storage {
+			let key = Key {
+				uri: key_uri.clone(),
+				name: format!("co ({})", self.co.name),
+				description: "".to_owned(),
+				secret: co_core_keystore::Secret::SharedKey(secret.into()),
+				tags: tags!(),
 			};
+			self.parent
+				.push(&identity, &self.keystore_core_name, &KeyStoreAction::Set(key))
+				.await?;
+			(Some(key_uri), Some(encrypted_storage))
+		} else {
+			(None, None)
+		};
 
-		// store encrypted state/heads
-		state = to_external_cid(&co_storage, state).await;
-		heads = to_external_cids(&co_storage, heads).await;
+		// state
 
 		// add membership to parent co
-		let membership: Membership = Membership {
-			id: self.co.id.to_owned(),
-			did: identity.identity().to_owned(),
-			state: BTreeSet::from([CoState {
-				heads: heads.iter().map(Into::into).collect(),
-				state: state.into(),
-				encryption_mapping,
-			}]),
-			key: key_uri,
-			membership_state: co_core_membership::MembershipState::Active,
-			tags: tags!(),
-		};
+		let parent_storage = self.parent.storage();
+		let (state, _mappings) = reducer_state
+			.to_co_state(&parent_storage, &co_storage)
+			.await?
+			.ok_or(anyhow::anyhow!("Expected state after create"))?;
 		self.parent
-			.push(&identity, &self.membership_core_name, &MembershipsAction::Join(membership))
+			.push(
+				&identity,
+				&self.membership_core_name,
+				&MembershipsAction::Join(Membership {
+					id: self.co.id.to_owned(),
+					did: identity.identity().to_owned(),
+					state: BTreeSet::from([state]),
+					key: key_uri,
+					membership_state: co_core_membership::MembershipState::Active,
+					tags: tags!(),
+				}),
+			)
 			.await?;
 
-		// add pin to parent co
-		let pin_state = StorageAction::PinCreate(
-			CoPinningKey::State.to_string(&self.co.id),
-			PinStrategy::Unlimited,
-			Default::default(),
-		);
-		let pin_log = StorageAction::PinCreate(
-			CoPinningKey::Log.to_string(&self.co.id),
-			PinStrategy::Unlimited,
-			Default::default(),
-		);
-		self.parent.push(&identity, &self.storage_core_name, &pin_log).await?;
-		self.parent.push(&identity, &self.storage_core_name, &pin_state).await?;
+		// pin
+		#[cfg(feature = "pinning")]
+		{
+			// add pin to parent co
+			let pin_state = co_core_storage::StorageAction::PinCreate(
+				crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.co.id),
+				co_core_storage::PinStrategy::Unlimited,
+				Default::default(),
+			);
+			let pin_log = co_core_storage::StorageAction::PinCreate(
+				crate::types::co_pinning_key::CoPinningKey::Log.to_string(&self.co.id),
+				co_core_storage::PinStrategy::Unlimited,
+				Default::default(),
+			);
+			self.parent.push(&identity, &self.storage_core_name, &pin_log).await?;
+			self.parent.push(&identity, &self.storage_core_name, &pin_state).await?;
 
-		// pin initial state
-		let reducer_context = Arc::new(SharedContext {
-			id: self.co.id.clone(),
-			encrypted_storage: encrypted_storage.clone(),
-			storage: storage.clone(),
-			network_storage: None,
-		});
-		let writer = ReferenceWriter::new(
-			self.parent.dispatcher(&self.storage_core_name, identity.clone()),
-			reducer_context,
-			Some(CoPinningKey::State.to_string(&self.co.id)),
-		);
-		writer
-			.write(None, state, <CoStorage as BlockStorage>::StoreParams::MAX_BLOCK_SIZE)
-			.await?;
+			// pin initial state
+			let reducer_context = Arc::new(SharedContext {
+				id: self.co.id.clone(),
+				encrypted_storage: _encrypted_storage.clone(),
+				storage: storage.clone(),
+				network_storage: None,
+			});
+			let writer = crate::reducer::change::reference_writer::ReferenceWriter::new(
+				self.parent.dispatcher(&self.storage_core_name, identity.clone()),
+				reducer_context,
+				Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.co.id)),
+			);
+			writer
+				.write(
+					None,
+					reducer_state.state().ok_or(anyhow::anyhow!("Expected state after create"))?,
+					<<CoStorage as co_primitives::BlockStorage>::StoreParams as co_primitives::StoreParams>::MAX_BLOCK_SIZE,
+				)
+				.await?;
+		}
 
 		// result
 		Ok(self.co.id)

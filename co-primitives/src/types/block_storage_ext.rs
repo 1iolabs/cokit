@@ -52,7 +52,7 @@ pub trait BlockStorageExt: BlockStorage {
 		T: Send + Sync + DeserializeOwned,
 	{
 		let block = self
-			.get(MultiCodec::with_dag_cbor(item)?)
+			.get(MultiCodec::with_cbor(item)?)
 			.await
 			.with_context(|| format!("get_deserialized: {}", std::any::type_name::<T>().to_owned()))?;
 		Ok(BlockSerializer::new().deserialize(&block)?)

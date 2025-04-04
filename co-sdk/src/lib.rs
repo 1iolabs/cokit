@@ -40,6 +40,7 @@ pub use library::{
 	find_co_secret::find_co_secret,
 	find_membership::{find_membership, find_memberships},
 	generate_random_name::generate_random_name,
+	is_cid_encrypted::is_cid_encrypted,
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
 	response_list::ResponseList,

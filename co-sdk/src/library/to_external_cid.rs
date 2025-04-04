@@ -57,19 +57,19 @@ pub async fn to_external_cids(mapping: &impl BlockStorageContentMapping, cids: B
 
 /// Map internal [`Cid`] to external [`Cid`].
 /// If no mapping is needed/available return the original [`Cid`].
-pub async fn to_external_cids_map(
-	mapping: &impl BlockStorageContentMapping,
-	cids: BTreeSet<Cid>,
-) -> BTreeMap<Cid, Cid> {
-	if mapping.is_content_mapped().await {
-		futures::stream::iter(cids)
-			.then(|cid| async move { (cid, to_external_cid(mapping, cid).await) })
-			.collect()
-			.await
-	} else {
-		cids.into_iter().map(|cid| (cid, cid)).collect()
-	}
-}
+// pub async fn to_external_cids_map(
+// 	mapping: &impl BlockStorageContentMapping,
+// 	cids: BTreeSet<Cid>,
+// ) -> BTreeMap<Cid, Cid> {
+// 	if mapping.is_content_mapped().await {
+// 		futures::stream::iter(cids)
+// 			.then(|cid| async move { (cid, to_external_cid(mapping, cid).await) })
+// 			.collect()
+// 			.await
+// 	} else {
+// 		cids.into_iter().map(|cid| (cid, cid)).collect()
+// 	}
+// }
 
 /// Map internal [`Cid`] to external [`Cid`].
 /// If some [`Cid`] could not be mapped return [`None`].

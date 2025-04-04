@@ -1,8 +1,5 @@
 use crate::{
-	library::{
-		invite_networks::invite_networks, is_cid_encrypted::is_cid_encrypted, join::create_join_message_from,
-		settings_timeout::settings_timeout,
-	},
+	library::{invite_networks::invite_networks, join::create_join_message_from, settings_timeout::settings_timeout},
 	services::{
 		connections::ConnectionMessage,
 		network::{CoNetworkTaskSpawner, DidCommSendNetworkTask},
@@ -149,7 +146,7 @@ async fn join(
 						result.push(Action::JoinSent {
 							co: membership.id.clone(),
 							participant: membership.did.clone(),
-							encrypted: membership.state.iter().any(|state| is_cid_encrypted(&state.heads)),
+							encrypted: membership.key.is_some(),
 							peer,
 						});
 						break;

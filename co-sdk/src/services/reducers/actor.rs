@@ -134,7 +134,7 @@ impl Actor for ReducersActor {
 						state.context.tasks().spawn({
 							let control: ReducersControl = handle.clone().into();
 							let context = state.context.clone();
-							let parent = local.clone();
+							let parent = local.clone_with_detached_storage();
 							async move {
 								// get storage
 								let result = match control.clone().storage(id.clone()).await {
