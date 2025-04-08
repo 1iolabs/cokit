@@ -570,6 +570,7 @@ mod tests {
 		ReducerChangedHandler, SingleCoreResolver,
 	};
 	use async_trait::async_trait;
+	use cid::Cid;
 	use co_identity::{IdentityResolverBox, LocalIdentityResolver};
 	use co_log::Log;
 	use co_primitives::{BlockSerializer, ReducerAction};
@@ -577,6 +578,7 @@ mod tests {
 	use co_storage::{unixfs_add_file, ExtendedBlockStorage, MemoryBlockStorage};
 	use example_counter::{Counter, CounterAction};
 	use futures::StreamExt;
+	use std::{collections::BTreeSet, str::FromStr};
 	use tokio::process::Command;
 
 	#[tokio::test]
@@ -842,4 +844,253 @@ mod tests {
 		// join
 		assert!(!reducer.join(&storage, &reducer.heads().clone(), &runtime).await.unwrap());
 	}
+
+	/// Compute State computes wrong result based on the ordering of the new heads when have multiple.
+	/// This test aims to produce a case with both orders and test them to be correct.
+	#[tokio::test]
+	async fn test_compute_state_order_greater() {
+		// // observed with this values:
+		// //  not working
+		// let a0 = Cid::from_str("bafyr4ib4umjz4wj4s7q5gfzrhgvinac5pykzu42uykrizucc236g2mxug4").unwrap();
+		// let a1 = Cid::from_str("bafyr4igrex7fz64sc3yhokm3fqryyeox5s42lzyhjhtlfcwro7pbukeehq").unwrap();
+		// //  working
+		// let b0 = Cid::from_str("bafyr4ico4kfqhl6k3vdnrvwbnu5ozk373gk3u2ksftdymjevsrhill5yk4").unwrap();
+		// let b1 = Cid::from_str("bafyr4iagbmtxiabpl3vgmjnppyse7tvasbeuma77axev5tomdpa642noqq").unwrap();
+		// println!("{} > {} = {:?}", a0, a1, a0.cmp(&a1)); // Less
+		// println!("{} > {} = {:?}", b0, b1, b0.cmp(&b1)); // Greater
+
+		// reducer
+		let storage = MemoryBlockStorage::default();
+		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
+		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let native_core_resolver = SingleCoreResolver::new(Core::native::<Counter>());
+		let co_date = MonotonicCoDate::default().boxed();
+
+		// reducer1
+		let mut reducer1 = ReducerBuilder::new(
+			native_core_resolver.clone(),
+			Log::new(
+				"test".as_bytes().to_vec(),
+				IdentityResolverBox::new(LocalIdentityResolver::default()),
+				Default::default(),
+			),
+		)
+		.build(&storage, &runtime, co_date.clone())
+		.await
+		.unwrap();
+		reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(1))
+			.await
+			.unwrap();
+
+		// reducer2
+		let mut reducer2 = ReducerBuilder::new(
+			native_core_resolver.clone(),
+			Log::new(
+				"test".as_bytes().to_vec(),
+				IdentityResolverBox::new(LocalIdentityResolver::default()),
+				reducer1.heads().clone(),
+			),
+		)
+		.with_snapshot(reducer1.state().unwrap(), reducer1.heads().clone())
+		.build(&storage, &runtime, co_date.clone())
+		.await
+		.unwrap();
+		assert_eq!(reducer1.state(), reducer2.state());
+		assert_eq!(reducer1.heads(), reducer2.heads());
+
+		// conflict
+		reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(1))
+			.await
+			.unwrap();
+		reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(4))
+			.await
+			.unwrap();
+		reducer2
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(1))
+			.await
+			.unwrap();
+		reducer2
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(2))
+			.await
+			.unwrap();
+		let h1 = reducer1.heads().first().unwrap();
+		let h2 = reducer2.heads().first().unwrap();
+		println!("{} cmp {} = {:?}", h1, h2, h1.cmp(&h2));
+		// bafyr4iff65doekq7e6jbbr6lfcaqw4yygr2xwnhcewk5n4x7656xgo3smq
+		// cmp
+		// bafyr4id7kpr5kduefd4j4s4lixevlrkbpbym2daylp7tztnqcdogg6ommq
+		// =
+		// Greater
+		assert!(h1 > h2);
+
+		// transfer state
+		reducer1.insert_snapshot(reducer2.state().unwrap(), reducer2.heads().clone());
+		reducer2.insert_snapshot(reducer1.state().unwrap(), reducer1.heads().clone());
+
+		// join1
+		reducer1.join(&storage, reducer2.heads(), &runtime).await.unwrap();
+		assert_eq!(9, counter_state(&storage, &reducer1).await.0);
+
+		// join2
+		reducer2.join(&storage, reducer1.heads(), &runtime).await.unwrap();
+		assert_eq!(9, counter_state(&storage, &reducer2).await.0);
+
+		// test
+		assert_eq!(reducer1.state(), reducer2.state());
+		assert_eq!(reducer1.heads(), reducer2.heads());
+	}
+
+	/// Compute State computes wrong result based on the ordering of the new heads when have multiple.
+	/// This test aims to produce a case with both orders and test them to be correct.
+	#[tokio::test]
+	async fn test_compute_state_order_less() {
+		// // observed with this values:
+		// //  not working
+		// let a0 = Cid::from_str("bafyr4ib4umjz4wj4s7q5gfzrhgvinac5pykzu42uykrizucc236g2mxug4").unwrap();
+		// let a1 = Cid::from_str("bafyr4igrex7fz64sc3yhokm3fqryyeox5s42lzyhjhtlfcwro7pbukeehq").unwrap();
+		// //  working
+		// let b0 = Cid::from_str("bafyr4ico4kfqhl6k3vdnrvwbnu5ozk373gk3u2ksftdymjevsrhill5yk4").unwrap();
+		// let b1 = Cid::from_str("bafyr4iagbmtxiabpl3vgmjnppyse7tvasbeuma77axev5tomdpa642noqq").unwrap();
+		// println!("{} > {} = {:?}", a0, a1, a0.cmp(&a1)); // Less
+		// println!("{} > {} = {:?}", b0, b1, b0.cmp(&b1)); // Greater
+
+		// reducer
+		let storage = MemoryBlockStorage::default();
+		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
+		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let native_core_resolver = SingleCoreResolver::new(Core::native::<Counter>());
+		let co_date = MonotonicCoDate::default().boxed();
+
+		// reducer1
+		let mut reducer1 = ReducerBuilder::new(
+			native_core_resolver.clone(),
+			Log::new(
+				"test".as_bytes().to_vec(),
+				IdentityResolverBox::new(LocalIdentityResolver::default()),
+				Default::default(),
+			),
+		)
+		.build(&storage, &runtime, co_date.clone())
+		.await
+		.unwrap();
+		reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(1))
+			.await
+			.unwrap();
+
+		// reducer2
+		let mut reducer2 = ReducerBuilder::new(
+			native_core_resolver.clone(),
+			Log::new(
+				"test".as_bytes().to_vec(),
+				IdentityResolverBox::new(LocalIdentityResolver::default()),
+				reducer1.heads().clone(),
+			),
+		)
+		.with_snapshot(reducer1.state().unwrap(), reducer1.heads().clone())
+		.build(&storage, &runtime, co_date.clone())
+		.await
+		.unwrap();
+		assert_eq!(reducer1.state(), reducer2.state());
+		assert_eq!(reducer1.heads(), reducer2.heads());
+
+		// conflict
+		reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(1))
+			.await
+			.unwrap();
+		reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(2))
+			.await
+			.unwrap();
+		reducer2
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(1))
+			.await
+			.unwrap();
+		reducer2
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(2))
+			.await
+			.unwrap();
+		let h1 = reducer1.heads().first().unwrap();
+		let h2 = reducer2.heads().first().unwrap();
+		println!("{} cmp {} = {:?}", h1, h2, h1.cmp(&h2));
+		// bafyr4ib2txm6m2l4kbjghdpotl7tt54fzvwazsqs3lnoelwrbt4odqxzz4
+		// cmp
+		// bafyr4id7kpr5kduefd4j4s4lixevlrkbpbym2daylp7tztnqcdogg6ommq
+		// =
+		// Less
+		assert!(h1 < h2);
+
+		// transfer state
+		reducer1.insert_snapshot(reducer2.state().unwrap(), reducer2.heads().clone());
+		reducer2.insert_snapshot(reducer1.state().unwrap(), reducer1.heads().clone());
+
+		// join1
+		reducer1.join(&storage, reducer2.heads(), &runtime).await.unwrap();
+		assert_eq!(7, counter_state(&storage, &reducer1).await.0);
+
+		// join2
+		reducer2.join(&storage, reducer1.heads(), &runtime).await.unwrap();
+		assert_eq!(7, counter_state(&storage, &reducer2).await.0);
+
+		// test
+		assert_eq!(reducer1.state(), reducer2.state());
+		assert_eq!(reducer1.heads(), reducer2.heads());
+	}
+
+	// // util: find a transaction which entry cid is less
+	// let find = |state: Cid, heads: BTreeSet<Cid>| {
+	// 	let storage = storage.clone();
+	// 	let native_core_resolver = native_core_resolver.clone();
+	// 	let runtime = runtime.clone();
+	// 	let identity = identity.clone();
+	// 	async move {
+	// 		let mut reducer1 = ReducerBuilder::new(
+	// 			native_core_resolver.clone(),
+	// 			Log::new(
+	// 				"test".as_bytes().to_vec(),
+	// 				IdentityResolverBox::new(LocalIdentityResolver::default()),
+	// 				heads.clone(),
+	// 			),
+	// 		)
+	// 		.with_snapshot(state, heads.clone())
+	// 		.build(&storage, &runtime, MonotonicCoDate::default())
+	// 		.await
+	// 		.unwrap();
+	// 		reducer1
+	// 			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(2))
+	// 			.await
+	// 			.unwrap();
+	// 		let head1 = reducer1.heads().first().unwrap();
+	// 		let mut count = 1;
+	// 		loop {
+	// 			let mut reducer2 = ReducerBuilder::new(
+	// 				native_core_resolver.clone(),
+	// 				Log::new(
+	// 					"test".as_bytes().to_vec(),
+	// 					IdentityResolverBox::new(LocalIdentityResolver::default()),
+	// 					heads.clone(),
+	// 				),
+	// 			)
+	// 			.with_snapshot(state, heads.clone())
+	// 			.build(&storage, &runtime, MonotonicCoDate::default())
+	// 			.await
+	// 			.unwrap();
+	// 			reducer2
+	// 				.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(count))
+	// 				.await
+	// 				.unwrap();
+	// 			let head2 = reducer1.heads().first().unwrap();
+	// 			if head1 < head2 {
+	// 				return Result::<i64, anyhow::Error>::Ok(count);
+	// 			}
+	// 			count += 1;
+	// 		}
+	// 	}
+	// };
+	// let count = find(reducer1.state().unwrap(), reducer1.heads().clone()).await.unwrap();
+	// println!("count: {}", count);
 }
