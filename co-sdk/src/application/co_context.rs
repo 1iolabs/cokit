@@ -23,6 +23,7 @@ use crate::{
 	TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
+use cid::Cid;
 use co_actor::ActorHandle;
 use co_core_membership::Membership;
 use co_identity::{
@@ -34,6 +35,7 @@ use co_primitives::{BlockStorageSettings, CloneWithBlockStorageSettings, CoId, D
 use co_storage::ChangeBlockStorage;
 use futures::{Stream, TryStreamExt};
 use std::{
+	collections::BTreeSet,
 	fmt::Debug,
 	sync::{Arc, RwLock},
 };
@@ -57,19 +59,36 @@ impl CoContext {
 		&self,
 		co: impl AsRef<CoId>,
 	) -> Result<(CoStorage, impl Stream<Item = Result<EntryBlock, anyhow::Error>>), anyhow::Error> {
+		// log
+		let reducer = self.try_co_reducer(co.as_ref()).await?;
+		let storage = reducer.storage();
+		let state = reducer.reducer_state().await;
+
+		// stream
+		let stream = self.entries_from_heads(co, storage.clone(), state.1).await?;
+
+		// result
+		Ok((storage, stream))
+	}
+
+	/// Get a stream to the log entries.
+	/// Starting at `heads` (reverse chronological).
+	pub async fn entries_from_heads(
+		&self,
+		co: impl AsRef<CoId>,
+		storage: CoStorage,
+		heads: BTreeSet<Cid>,
+	) -> Result<impl Stream<Item = Result<EntryBlock, anyhow::Error>>, anyhow::Error> {
 		let co = co.as_ref();
 
 		// log
-		let reducer = self.try_co_reducer(&co).await?;
-		let storage = reducer.storage();
-		let state = reducer.reducer_state().await;
-		let log = Log::new(co.as_bytes().to_vec(), self.inner.identity_resolver().await?, state.heads());
+		let log = Log::new(co.as_bytes().to_vec(), self.inner.identity_resolver().await?, heads);
 
 		// stream
 		let stream = log.into_stream(&storage).map_err(|e| e.into());
 
 		// result
-		Ok((storage, stream))
+		Ok(stream)
 	}
 
 	/// Test if `co` is a shared CO.

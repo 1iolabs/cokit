@@ -7,13 +7,14 @@ use co_log::{EntryBlock, Log, LogError};
 use co_primitives::{Link, ReducerAction};
 use co_runtime::RuntimePool;
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
-use futures::{pin_mut, stream, StreamExt, TryStreamExt};
+use futures::{pin_mut, TryStreamExt};
 use ipld_core::ipld::Ipld;
 use serde::Serialize;
 use std::{
 	collections::{BTreeSet, HashMap, VecDeque},
 	fmt::{Debug, Formatter},
 	marker::PhantomData,
+	mem::swap,
 };
 use tokio::sync::watch;
 use tracing::instrument;
@@ -338,6 +339,18 @@ where
 				)
 			})?;
 
+		// log
+		#[cfg(feature = "logging-verbose")]
+		{
+			tracing::trace!(
+				co = self.log.id_string(),
+				previous_state = ?self.state,
+				head = ?_entry.cid(),
+				next_state = ?runtime_context.state,
+				"compute-state-push",
+			);
+		}
+
 		// snapshot
 		if self.state.is_some() {
 			self.insert_snapshot(self.state.unwrap(), self.heads.clone());
@@ -386,25 +399,21 @@ where
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, storage))]
 	async fn on_state_changed(&mut self, storage: &S, context: &ReducerChangeContext) -> Result<(), LogError> {
 		// handlers
-		// note:
-		//  we use try_for_each_concurrent which spawns each item on a new task this is required
-		//  to prevent deadlocks because the on_state_changed handler is called within an outer RwLock.
+		//  run sequencial in same order to not have non deterministic results
 		let mut change_handlers = Vec::new();
-		change_handlers.append(&mut self.change_handlers);
-		{
-			let reducer: &Self = self;
-			let context: &ReducerChangeContext = &context;
-			stream::iter(change_handlers.iter_mut())
-				.map(Ok)
-				.try_for_each_concurrent(5, |handler| async move {
-					handler
-						.on_state_changed(storage, reducer, context.clone())
-						.await
-						.with_context(|| format!("running {:?}", handler.type_name()))
-				})
-				.await?;
+		swap(&mut change_handlers, &mut self.change_handlers);
+		let mut last_result: Result<(), anyhow::Error> = Ok(());
+		for change_handler in change_handlers.iter_mut() {
+			last_result = change_handler
+				.on_state_changed(storage, &self, context.clone())
+				.await
+				.with_context(|| format!("running {:?}", change_handler.type_name()));
+			if last_result.is_err() {
+				break;
+			}
 		}
-		self.change_handlers.append(&mut change_handlers);
+		swap(&mut change_handlers, &mut self.change_handlers);
+		last_result?;
 
 		// watch
 		if let Some(state) = self.state {
@@ -432,11 +441,26 @@ where
 
 		// apply stack
 		for entry in stack {
+			let _previous_state = state;
+
+			// apply
 			state = self
 				.core_resolver
 				.execute(storage, runtime, context, &state, &entry.entry().payload)
 				.await?
 				.state;
+
+			// log
+			#[cfg(feature = "logging-verbose")]
+			{
+				tracing::trace!(
+					co = self.log.id_string(),
+					previous_state = ?_previous_state,
+					head = ?entry.cid(),
+					next_state = ?state,
+					"compute-state-join",
+				);
+			}
 		}
 
 		// result
@@ -458,39 +482,22 @@ where
 			// find latest usable historic state
 			let entries = self.log.stream(storage);
 			pin_mut!(entries);
-			let mut missing_heads = heads.clone();
-			let mut state_events: Option<BTreeSet<Cid>> = None;
-			while let Some(entry) = entries.next().await {
-				let entry = entry?;
-
-				// when we found a state we continue to go back until we see all of its entry heads (entry.next)
-				if let Some(state_events) = &mut state_events {
-					// remove seen elements
-					if state_events.remove(entry.cid()) {
-						// if we have seen all entries which generated the found state the stack is complete
-						// and ready to reapply
-						if state_events.is_empty() {
-							break;
-						}
-						continue;
-					}
-				} else {
-					// remove all seen entries from missing
-					// when we have seen all heads we can search for an known state
-					missing_heads.remove(entry.cid());
-					if missing_heads.is_empty() {
-						// does this entry reference a state we know?
-						// note: this will never match if we have no previous states
-						//  and a new state will be recomputed from scratch
-						if let Some(entry_state) = self.find_state(&entry.entry().next) {
-							state = Some(entry_state);
-							state_events = Some(entry.entry().next.clone());
-						}
-					}
-				}
+			let mut current_heads = heads.clone();
+			while let Some(entry) = entries.try_next().await? {
+				// update current_heads to reflect the heads without this entry
+				current_heads.remove(entry.cid());
+				current_heads.extend(entry.entry().next.iter().cloned());
 
 				// put on stack to reapply
 				stack.push_front(entry);
+
+				// does the current heads reference a state we know?
+				// note: this will never match if we have no previous states
+				//  and a new state will be recomputed from scratch
+				if let Some(entry_state) = self.find_state(&current_heads) {
+					state = Some(entry_state);
+					break;
+				}
 			}
 		}
 
@@ -570,7 +577,6 @@ mod tests {
 		ReducerChangedHandler, SingleCoreResolver,
 	};
 	use async_trait::async_trait;
-	use cid::Cid;
 	use co_identity::{IdentityResolverBox, LocalIdentityResolver};
 	use co_log::Log;
 	use co_primitives::{BlockSerializer, ReducerAction};
@@ -578,7 +584,6 @@ mod tests {
 	use co_storage::{unixfs_add_file, ExtendedBlockStorage, MemoryBlockStorage};
 	use example_counter::{Counter, CounterAction};
 	use futures::StreamExt;
-	use std::{collections::BTreeSet, str::FromStr};
 	use tokio::process::Command;
 
 	#[tokio::test]
