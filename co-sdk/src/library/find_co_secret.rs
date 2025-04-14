@@ -22,14 +22,8 @@ pub async fn find_co_secret(parent: &CoReducer, co: &CoReducer) -> Result<Option
 /// Read current CO PSK from keychain core, if the CO is encrypted.
 pub async fn find_co_key(parent: &CoReducer, co: &CoReducer) -> Result<Option<Key>, anyhow::Error> {
 	let (_storage, co) = co.co().await?;
-	let (parent_storage, key_store) = state::query_core::<KeyStore>(CO_CORE_NAME_KEYSTORE)
-		.execute_reducer(&parent)
-		.await?;
 	if let Some(key_reference) = co.keys.as_ref().and_then(|keys| keys.first().map(|key| &key.id)) {
-		let (_, key) = state::find(&parent_storage, &key_store.keys, |(k, _)| k == key_reference)
-			.await?
-			.ok_or(anyhow!("Key not found"))?;
-		Ok(Some(key))
+		Ok(Some(find_co_key_by_reference(parent, key_reference, None).await?))
 	} else {
 		Ok(None)
 	}
@@ -47,18 +41,43 @@ pub async fn find_co_secret_by_membership(parent: &CoReducer, co: &CoId) -> Resu
 	}
 }
 
-/// Read current CO PSK from keychain core, if the CO is encrypted.
+/// Read current CO PSK from keystore core, if the CO is encrypted.
 pub async fn find_co_key_by_membership(parent: &CoReducer, co: &CoId) -> Result<Option<Key>, anyhow::Error> {
 	let membership = find_membership(parent, co).await?.ok_or(anyhow!("No membership: {}", co))?;
-	let (parent_storage, key_store) = state::query_core::<KeyStore>(CO_CORE_NAME_KEYSTORE)
-		.execute_reducer(&parent)
-		.await?;
 	if let Some(key_reference) = &membership.key {
-		let (_, key) = state::find(&parent_storage, &key_store.keys, |(k, _)| k == key_reference)
-			.await?
-			.ok_or(anyhow!("Key not found"))?;
-		Ok(Some(key))
+		Ok(Some(find_co_key_by_reference(parent, key_reference, None).await?))
 	} else {
 		Ok(None)
+	}
+}
+
+/// Read current CO PSK from keystore core, by using its reference.
+pub async fn find_co_key_by_reference(
+	parent: &CoReducer,
+	key_reference: &str,
+	keystore_core_name: Option<&str>,
+) -> Result<Key, anyhow::Error> {
+	let (parent_storage, key_store) =
+		state::query_core::<KeyStore>(keystore_core_name.unwrap_or(CO_CORE_NAME_KEYSTORE))
+			.execute_reducer(&parent)
+			.await?;
+	let (_, key) = state::find(&parent_storage, &key_store.keys, |(k, _)| k == key_reference)
+		.await?
+		.ok_or(anyhow!("Key not found"))?;
+	Ok(key)
+}
+
+/// Read current CO PSK from keystore core, by using its reference.
+pub async fn find_co_secret_by_reference(
+	parent: &CoReducer,
+	key_reference: &str,
+	keystore_core_name: Option<&str>,
+) -> Result<Secret, anyhow::Error> {
+	match find_co_key_by_reference(parent, key_reference, keystore_core_name)
+		.await?
+		.secret
+	{
+		co_core_keystore::Secret::SharedKey(sec) => Ok(sec),
+		_ => Err(anyhow!("Invalid key")),
 	}
 }

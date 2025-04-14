@@ -2,8 +2,8 @@ use super::identity::create_identity_resolver;
 use crate::{
 	find_membership,
 	library::{
-		connections_peer_provider::ConnectionsPeerProvider, membership_all_heads::membership_all_heads,
-		push_heads::PushHeads,
+		connections_peer_provider::ConnectionsPeerProvider, find_co_secret::find_co_secret_by_reference,
+		membership_all_heads::membership_all_heads, push_heads::PushHeads,
 	},
 	reducer::{change::membership_writer::MembershipWriter, core_resolver::dynamic::DynamicCoreResolver},
 	services::{
@@ -11,7 +11,6 @@ use crate::{
 		network::{CoHeadsPublish, CoNetworkTaskSpawner},
 		reducers::ReducerStorage,
 	},
-	state::{find, query_core, QueryExt},
 	types::co_reducer_context::CoReducerContext,
 	CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters, CoUuid, ReducerBuilder,
 	Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
@@ -20,7 +19,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use co_actor::ActorHandle;
 use co_core_co::{CoAction, Participant};
-use co_core_keystore::{Key, KeyStore, KeyStoreAction};
+use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
@@ -89,17 +88,7 @@ impl SharedCoBuilder {
 	/// Read (latest) secret from parent CO.
 	pub async fn secret(&self) -> anyhow::Result<Option<co_primitives::Secret>> {
 		if let Some(key_reference) = &self.membership.key {
-			let (storage, key_store) = query_core::<KeyStore>(&self.keystore_core_name)
-				.execute_reducer(&self.parent)
-				.await?;
-			let (_, key) = find(&storage, &key_store.keys, |(k, _)| k == key_reference)
-				.await?
-				.ok_or(anyhow::anyhow!("Shared key not found: {}", key_reference))?;
-			let secret = match key.secret {
-				co_core_keystore::Secret::SharedKey(sec) => Ok(sec),
-				_ => Err(anyhow!("Invalid secret")),
-			}?;
-			Ok(Some(secret))
+			Ok(Some(find_co_secret_by_reference(&self.parent, key_reference, Some(&self.keystore_core_name)).await?))
 		} else {
 			Ok(None)
 		}
@@ -536,8 +525,6 @@ impl SharedCoCreator {
 		} else {
 			(None, None)
 		};
-
-		// state
 
 		// add membership to parent co
 		let parent_storage = self.parent.storage();

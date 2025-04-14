@@ -22,7 +22,7 @@ where
 	MissingBlocks(Cid, Vec<Token>, Response<Result<Vec<Cid>, StorageError>>),
 }
 
-/// Handle bitswap request by sendings them to a actor.
+/// Handle bitswap request by sendings them to an actor.
 pub struct BitswapStoreClient<P>
 where
 	P: StoreParams,
