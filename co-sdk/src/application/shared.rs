@@ -25,7 +25,7 @@ use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
-use co_primitives::{tags, CoId};
+use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId};
 use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -482,7 +482,7 @@ impl SharedCoCreator {
 						EncryptedBlockStorage::new(storage.clone(), key.clone(), algorithm, Default::default());
 					(CoStorage::new(result_storage.clone()), Some((result_storage, key_uri, key)))
 				},
-				None => (storage.clone(), None),
+				None => (storage.clone_with_settings(BlockStorageSettings::new().with_detached()), None),
 			};
 
 		// log

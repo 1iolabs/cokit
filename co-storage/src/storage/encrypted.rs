@@ -260,7 +260,8 @@ where
 		//    the mapping from loading the original node before
 		//    all children nodes as he created it from sratch
 		//  as a fallback check if the Cid exists in the parent so we know this is a unencrypted reference
-		//  TODO: are there any valid cases for not unencrypted and not known reference?
+		//  Question: are there any valid cases for not unencrypted and not known reference?
+		// 	  Yes: encrypted local CO stores references to unencrypted shared CO.
 		let mut references = extended_block.options.references.unwrap_or_default();
 		if self.links.has_links(&cid) {
 			// links
@@ -276,6 +277,12 @@ where
 					},
 					// reference mode
 					None => {
+						// log
+						if let EncryptionReferenceMode::Warning = self.reference_mode {
+							tracing::trace!(unmapped_cid = ?plain_cid, ?cid, all_references = ?references, all_links = ?self.links.links(&block).map(|i| i.collect::<Vec<Cid>>()), "unmapped-reference");
+						}
+
+						// error
 						if !self.reference_mode.is_reference_allowed(&self.next, plain_cid, cid).await {
 							return Err(StorageError::InvalidArgument(anyhow!("Unmapped reference found {} while storing {}. Are you sure you stored all children nodes?", plain_cid, cid)));
 						}
@@ -377,6 +384,7 @@ pub enum EncryptionReferenceMode {
 	/// Allowed references:
 	/// - Plain: NO
 	/// - Unrelated encrypted: YES
+	/// - CoReference: YES
 	#[default]
 	DisallowPlain,
 
@@ -385,55 +393,61 @@ pub enum EncryptionReferenceMode {
 	/// Allowed references:
 	/// - Plain: SPECIFIC
 	/// - Unrelated encrypted: YES
+	/// - CoReference: YES
 	DisallowPlainExcept(BTreeSet<Cid>),
 
 	/// Disallow any references that are not encrypted except specific references.
 	/// Allowed references:
 	/// - Plain: SPECIFIC
 	/// - Unrelated encrypted: SPECIFIC
+	/// - CoReference: YES
 	DisallowExcept(BTreeSet<Cid>),
 
 	/// Allow any plain references.
 	/// Allowed references:
 	/// - Plain: YES
 	/// - Unrelated encrypted: YES
+	/// - CoReference: YES
 	AllowPlain,
 
 	/// Allow any plain references if the exists in parent storage.
 	/// Allowed references:
 	/// - Plain: IF EXISTS
 	/// - Unrelated encrypted: YES
+	/// - CoReference: YES
 	AllowPlainIfExists,
 
 	/// Allow any plain references but warn (log) about unencrypted references.
 	/// Allowed references:
 	/// - Plain: YES, WITH WARNING
 	/// - Unrelated encrypted: YES
+	/// - CoReference: YES
 	Warning,
 }
 impl EncryptionReferenceMode {
+	/// Test if reference is allowed in parent.
+	///
+	/// Note: For mode Warning, the caller is responsible for the warning.
 	pub async fn is_reference_allowed<S>(&self, next: &S, reference: Cid, parent: Cid) -> bool
 	where
 		S: BlockStorage,
 	{
 		// encrypted block reference in plain data
-		let is_unreleated_encrypted = KnownMultiCodec::CoEncryptedBlock == reference.codec();
+		let is_unreleated_encrypted = MultiCodec::is(&reference, KnownMultiCodec::CoEncryptedBlock);
+		let is_co_reference = MultiCodec::is(&parent, KnownMultiCodec::CoReference);
 
 		// evaluate
 		match &self {
-			EncryptionReferenceMode::DisallowPlain => is_unreleated_encrypted,
+			EncryptionReferenceMode::DisallowPlain => is_co_reference || is_unreleated_encrypted,
 			EncryptionReferenceMode::DisallowPlainExcept(allowed) => {
-				is_unreleated_encrypted || allowed.contains(&reference)
+				is_co_reference || is_unreleated_encrypted || allowed.contains(&reference)
 			},
-			EncryptionReferenceMode::DisallowExcept(allowed) => allowed.contains(&reference),
+			EncryptionReferenceMode::DisallowExcept(allowed) => is_co_reference || allowed.contains(&reference),
 			EncryptionReferenceMode::AllowPlain => true,
 			EncryptionReferenceMode::AllowPlainIfExists => {
-				is_unreleated_encrypted || next.stat(&reference).await.is_ok()
+				is_co_reference || is_unreleated_encrypted || next.stat(&reference).await.is_ok()
 			},
-			EncryptionReferenceMode::Warning => {
-				tracing::warn!(mapped_cid = ?reference, cid = ?parent, "encrypted-storage-unmapped-reference");
-				true
-			},
+			EncryptionReferenceMode::Warning => true,
 		}
 	}
 }
@@ -560,6 +574,10 @@ impl EncryptedBlockStorageMapping {
 }
 #[async_trait]
 impl BlockStorageContentMapping for EncryptedBlockStorageMapping {
+	async fn is_content_mapped(&self) -> bool {
+		true
+	}
+
 	/// Convert the mapped [`Cid`] to an plain storage [`Cid`].
 	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
 		self.get(mapped).await
@@ -568,6 +586,10 @@ impl BlockStorageContentMapping for EncryptedBlockStorageMapping {
 	/// Convert the plain storage [`Cid`] to a mapped [`Cid`].
 	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
 		self.get_first_by_value(plain).await
+	}
+
+	async fn insert_mappings(&self, _mappings: BTreeMap<Cid, Cid>) {
+		unimplemented!("use storage directly");
 	}
 }
 
