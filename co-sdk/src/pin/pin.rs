@@ -15,7 +15,7 @@ pub struct PinAPI<'a, I> {
 
 impl<'a, I> PinAPI<'a, I>
 where
-	I: PrivateIdentity + Send + Sync + Debug,
+	I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 {
 	pub fn api(co_reducer: &'a CoReducer, identity: &'a I) -> Self {
 		Self { co_reducer, identity }

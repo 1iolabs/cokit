@@ -11,7 +11,7 @@ pub trait StorageExt: Storage {
 		match link.value() {
 			Either::Left(cid) => Ok(BlockSerializer::new()
 				.deserialize(
-					&self.get(MultiCodec::with_dag_cbor(&cid).map_err(|e| StorageError::InvalidArgument(e.into()))?),
+					&self.get(MultiCodec::with_cbor(&cid).map_err(|e| StorageError::InvalidArgument(e.into()))?),
 				)
 				.map_err(|e| StorageError::InvalidArgument(e.into()))?),
 			Either::Right(value) => Ok(value),

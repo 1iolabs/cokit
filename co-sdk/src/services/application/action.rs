@@ -1,5 +1,6 @@
 use crate::{
-	library::create_reducer_action::create_reducer_action, types::message::heads::HeadsMessage, ReducerChangeContext,
+	library::create_reducer_action::new_reducer_action, types::message::heads::HeadsMessage, CoDate, CoStorage,
+	ReducerChangeContext,
 };
 use co_identity::Message;
 use co_network::didcomm::EncodedMessage;
@@ -22,6 +23,7 @@ pub enum Action {
 	/// Core action has been succesfully processed.
 	CoreAction {
 		co: CoId,
+		storage: CoStorage,
 		context: ReducerChangeContext,
 		action: ReducerAction<Ipld>,
 		cid: OptionLink<ReducerAction<Ipld>>,
@@ -118,9 +120,15 @@ impl Action {
 		cid: Link<ReducerAction<Ipld>>,
 	) -> Result<Self, StorageError>
 	where
-		S: BlockStorage + Send + Sync + 'static,
+		S: BlockStorage + Into<CoStorage> + Clone + Send + Sync + 'static,
 	{
-		Ok(Self::CoreAction { co, context, action: storage.get_value(&cid).await?, cid: cid.into() })
+		Ok(Self::CoreAction {
+			co,
+			context,
+			storage: storage.clone().into(),
+			action: storage.get_value(&cid).await?,
+			cid: cid.into(),
+		})
 	}
 
 	/// Map result to action.
@@ -170,9 +178,15 @@ impl Action {
 		}
 	}
 
-	/// Utilit to create [`Action::CoreActionPush`] actions.
-	pub fn push(co: impl Into<CoId>, from: impl Into<Did>, core: impl Into<String>, payload: impl Serialize) -> Action {
-		let reducer_action = match create_reducer_action(from, core.into(), payload) {
+	/// Utility to create [`Action::CoreActionPush`] actions.
+	pub fn push(
+		co: impl Into<CoId>,
+		from: impl Into<Did>,
+		core: impl Into<String>,
+		payload: impl Serialize,
+		date: &impl CoDate,
+	) -> Action {
+		let reducer_action = match new_reducer_action(from, core.into(), payload, date) {
 			Ok(a) => a,
 			Err(err) => {
 				return Action::Error { err: err.into() };

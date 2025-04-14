@@ -12,13 +12,14 @@ pub use crypto::{
 };
 pub use library::{
 	node_reader::node_reader,
+	tmp_dir::TmpDir,
 	unixfs::{unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer},
 	unixfs_add_file::unixfs_add_file,
 	unixfs_stream::unixfs_stream,
 };
 pub use storage::{
 	change::{BlockStorageChange, ChangeBlockStorage},
-	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping, EncryptedStorage},
+	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping, EncryptionReferenceMode},
 	fs::FsStorage,
 	mapped::MappedBlockStorage,
 	memory::{MemoryBlockStorage, MemoryStorage},
@@ -28,6 +29,7 @@ pub use storage::{
 	sync::{SyncBlockStorage, SyncStorage},
 };
 pub use types::{
+	extended_block_storage::{ExtendedBlock, ExtendedBlockOptions, ExtendedBlockStorage},
 	mapping::{BlockStorageContentMapping, StorageContentMapping},
 	pin::{PinApi, PinKind, PinOptions},
 	storage::Storage,

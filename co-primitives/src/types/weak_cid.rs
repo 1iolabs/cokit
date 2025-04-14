@@ -1,6 +1,6 @@
 use cid::{serde::BytesToCidVisitor, Cid};
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
+use std::{borrow::Borrow, ops::Deref};
 
 /// A CID that will be serialized as just bytes and will not be returned by [`crate::BlockLinks`].
 #[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -17,6 +17,11 @@ impl WeakCid {
 impl From<Cid> for WeakCid {
 	fn from(value: Cid) -> Self {
 		Self(value)
+	}
+}
+impl From<&Cid> for WeakCid {
+	fn from(value: &Cid) -> Self {
+		Self(*value)
 	}
 }
 impl From<WeakCid> for Cid {
@@ -47,6 +52,16 @@ impl Serialize for WeakCid {
 }
 impl AsRef<Cid> for WeakCid {
 	fn as_ref(&self) -> &Cid {
+		&self.0
+	}
+}
+impl Borrow<Cid> for WeakCid {
+	fn borrow(&self) -> &Cid {
+		&self.0
+	}
+}
+impl Borrow<Cid> for &WeakCid {
+	fn borrow(&self) -> &Cid {
 		&self.0
 	}
 }

@@ -1,4 +1,8 @@
-use co_sdk::{state, ApplicationBuilder, DidKeyIdentity, Identity, TmpDir, CO_CORE_NAME_KEYSTORE};
+use co_sdk::{
+	state::{self, query_core, QueryExt},
+	ApplicationBuilder, DidKeyIdentity, Identity, CO_CORE_NAME_KEYSTORE,
+};
+use co_storage::TmpDir;
 use std::collections::BTreeMap;
 
 pub mod helper;
@@ -12,6 +16,7 @@ async fn test_local_smoke() {
 	let identity = DidKeyIdentity::generate(None);
 	{
 		let application = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
+			.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
 			.without_keychain()
 			.build()
 			.await
@@ -35,9 +40,12 @@ async fn test_local_smoke() {
 		.await
 		.expect("application");
 	let local_co = application.local_co_reducer().await.unwrap();
-	let keystore: co_core_keystore::KeyStore = local_co.state(CO_CORE_NAME_KEYSTORE).await.unwrap();
+	let (storage, key_store) = query_core::<co_core_keystore::KeyStore>(CO_CORE_NAME_KEYSTORE)
+		.execute_reducer(&local_co)
+		.await
+		.unwrap();
 	let keys: BTreeMap<String, co_core_keystore::Key> =
-		state::into_collection(&local_co.storage(), &keystore.keys).await.unwrap();
+		state::into_collection(&storage, &key_store.keys).await.unwrap();
 	let key = keys.get(identity.identity()).expect("identity");
 	assert_eq!(key, &identity.export().unwrap());
 }

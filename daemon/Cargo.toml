@@ -14,7 +14,7 @@ clap = { version = "^4.3.23", features = ["derive"] }
 co-core-co = { path = "../cores/co" }
 co-core-keystore = { path = "../cores/keystore" }
 co-core-membership = { path = "../cores/membership" }
-co-sdk = { path = "../co-sdk", features = ["tokio-runtime"] }
+co-sdk = { path = "../co-sdk" }
 directories = "5.0.1"
 futures = { workspace = true }
 hyper = { workspace = true }
@@ -23,7 +23,7 @@ libp2p = { workspace = true, features = ["rendezvous"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, optional = true, features = ["full"] }
+tokio = { workspace = true, features = ["full"] }
 tower = { version = "0.4", features = ["util"] }
 tracing = { workspace = true }
 tracing-bunyan-formatter = "0.3.6"
@@ -31,6 +31,4 @@ tracing-log = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [features]
-"default" = ["tokio-runtime"]
-"tokio-runtime" = ["tokio"]
-"futures-runtime" = []
+"default" = []

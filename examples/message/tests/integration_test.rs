@@ -1,9 +1,9 @@
 use cid::Cid;
 use co_api::{BlockSerializer, Link, ReducerAction};
 use co_runtime::{co_v1::CoV1Api, create_runtime, RuntimeContext};
-use co_storage::{Algorithm, EncryptedStorage, MemoryStorage, Secret, Storage, SyncStorage};
+use co_storage::{MemoryStorage, Storage, SyncStorage};
 use example_message::{MessageAction, MessageState, Role};
-use std::{collections::BTreeMap, iter::repeat, process::Command, str::FromStr};
+use std::{collections::BTreeMap, process::Command, str::FromStr};
 
 #[test]
 fn integration_test() {
@@ -21,10 +21,7 @@ fn integration_test() {
 
 	// storage
 	let memory = MemoryStorage::new();
-	let algorithm = Algorithm::default();
-	let key = Secret::new(repeat(42).take(algorithm.key_size()).collect());
-	let encrypted = EncryptedStorage::new(memory, key, algorithm);
-	let mut storage = SyncStorage::new(encrypted);
+	let mut storage = SyncStorage::new(memory);
 
 	// action
 	let action = ReducerAction {

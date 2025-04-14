@@ -53,7 +53,7 @@ where
 			// note:
 			//  the heads will be also merged by heads_message_heads epic
 			//  whichever is faster but this makes sure that the heads are merged after this call
-			co_reducer.join(&received_heads).await?;
+			co_reducer.join(received_heads).await?;
 		},
 		HeadsMessage::Error { code, message } => {
 			return Err(anyhow!("Request failed: {:?}: {}", code, message));

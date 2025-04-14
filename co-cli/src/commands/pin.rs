@@ -3,7 +3,10 @@ use anyhow::anyhow;
 use cid::Cid;
 use co_primitives::{from_cbor, CoId, DagCollectionAsyncExt};
 use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
-use co_sdk::{state::memberships, Application, CoReducerFactory, CoStorage, CO_CORE_NAME_PIN, CO_ID_LOCAL};
+use co_sdk::{
+	state::{memberships, query_core, QueryExt},
+	Application, CoReducerFactory, CoStorage, CO_CORE_NAME_PIN, CO_ID_LOCAL,
+};
 use exitcode::ExitCode;
 use futures::{pin_mut, StreamExt, TryStreamExt};
 use std::{
@@ -68,8 +71,9 @@ pub async fn list_pins(context: &CliContext, cli: &Cli, command: &ListCommand) -
 	let application = context.application(cli).await;
 
 	let local_co_reducer = application.local_co_reducer().await?;
-	let storage = local_co_reducer.storage();
-	let pin_state = local_co_reducer.state::<co_core_pin::Pin>(CO_CORE_NAME_PIN).await?;
+	let (storage, pin_state) = query_core::<co_core_pin::Pin>(CO_CORE_NAME_PIN)
+		.execute_reducer(&local_co_reducer)
+		.await?;
 	let pins = pin_state.pins.stream(&storage);
 	let inner: Vec<_> = pins.try_collect().await?;
 	if command.sum {
@@ -134,7 +138,7 @@ async fn update_pins(context: &CliContext, cli: &Cli, _command: &UpdateCommand) 
 	let old_pin_map: BTreeMap<Cid, BTreeSet<Cid>> = from_cbor(&content)?;
 
 	// local co state
-	let (state, _) = application.local_co_reducer().await?.reducer_state().await;
+	let state = application.local_co_reducer().await?.reducer_state().await.state();
 
 	// create resolver
 	let resolver = create_cid_resolver(get_all_co_storages(application).await?).await?;
@@ -154,7 +158,7 @@ async fn update_pins(context: &CliContext, cli: &Cli, _command: &UpdateCommand) 
 
 async fn get_all_co_storages(application: Application) -> anyhow::Result<Vec<CoStorage>> {
 	let local_co_reducer = application.local_co_reducer().await?;
-	let stream = memberships(local_co_reducer.storage(), local_co_reducer.co_state().await);
+	let stream = memberships(local_co_reducer.storage(), local_co_reducer.reducer_state().await.co());
 	let mut storages: Vec<CoStorage> = vec![];
 	pin_mut!(stream);
 	while let Some(result) = stream.next().await {

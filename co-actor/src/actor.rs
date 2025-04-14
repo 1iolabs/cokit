@@ -5,8 +5,8 @@ use crate::{
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_primitives::Tags;
-use futures::Stream;
-use std::sync::Arc;
+use futures::{Stream, StreamExt};
+use std::{future::ready, sync::Arc};
 use tokio::{
 	sync::{mpsc, watch},
 	task::JoinHandle,
@@ -345,6 +345,10 @@ where
 	}
 
 	/// Request with streaming response.
+	///
+	/// # Errors
+	/// The stream only fails if the stream request could not be sent to the actor because it's not running.
+	/// In this case [`ActorError::InvalidState`] is returned and the stream ends after it.
 	pub fn stream<T>(&self, message: impl FnOnce(ResponseStream<T>) -> M) -> impl Stream<Item = Result<T, ActorError>> {
 		let (responder, response) = ResponseStreamReceiver::new();
 		let send_result = self
@@ -367,16 +371,15 @@ where
 
 			// forward items
 			for await item in response {
-				match item {
-					Err(ActorError::Canceled) => {
-						break;
-					},
-					item => {
-						yield item;
-					},
-				}
+				yield Ok(item);
 			}
 		}
+	}
+
+	/// Request with streaming response.
+	/// Gracefully ends the stream when the actor is not running.
+	pub fn stream_graceful<T>(&self, message: impl FnOnce(ResponseStream<T>) -> M) -> impl Stream<Item = T> {
+		self.stream(message).filter_map(|item| ready(item.ok()))
 	}
 
 	/// Request with streaming response wtih backpressure.

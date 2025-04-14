@@ -5,9 +5,10 @@ use crate::{
 use anyhow::Context;
 use async_trait::async_trait;
 use cid::Cid;
+use co_identity::{LocalIdentity, PrivateIdentity};
 use co_primitives::ReducerAction;
 use co_runtime::{Core, RuntimeContext, RuntimePool};
-use co_storage::{BlockStorage, BlockStorageExt};
+use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use serde::de::IgnoredAny;
 use std::collections::HashMap;
 
@@ -37,7 +38,7 @@ impl Default for CoCoreResolver {
 #[async_trait]
 impl<S> CoreResolver<S> for CoCoreResolver
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
+	S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 {
 	async fn execute(
 		&self,
@@ -81,6 +82,7 @@ where
 		// apply to root
 		if !root {
 			result.state = RuntimeDispatch::new(
+				LocalIdentity::device().boxed(),
 				runtime.clone(),
 				storage.clone(),
 				CO_CORE_NAME_CO.to_owned(),

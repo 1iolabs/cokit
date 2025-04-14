@@ -1,40 +1,44 @@
-use super::{
-	application::ApplicationSettings,
-	identity::{create_identity_resolver, create_private_identity_resolver},
-	shared::SharedCoBuilder,
-};
+#[cfg(feature = "pinning")]
+use crate::reducer::core_resolver::change::ChangeCoreResolver;
+#[cfg(feature = "pinning")]
+use crate::reducer::core_resolver::reference::ReferenceCoreResolver;
+#[cfg(feature = "pinning")]
+use crate::types::co_pinning_key::CoPinningKey;
 use crate::{
-	library::find_membership::memberships,
-	reducer::core_resolver::{
-		change::ChangeCoreResolver,
-		dynamic::DynamicCoreResolver,
-		epic::ReactiveCoreResolver,
-		log::LogCoreResolver,
-		membership::{MembershipCoreResolver, MembershipInstanceRegistry},
-		reference::ReferenceCoreResolver,
+	application::{
+		application::ApplicationSettings,
+		identity::{create_identity_resolver, create_private_identity_resolver},
+		shared::SharedCoBuilder,
 	},
-	services::{application::ApplicationMessage, connections::ConnectionMessage, network::CoNetworkTaskSpawner},
-	types::{co_reducer::CoReducerContext, co_reducer_factory::CoReducerFactoryError},
-	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, LocalCoBuilder, Runtime, TaskSpawner,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
+	library::shared_membership::shared_membership,
+	reducer::core_resolver::{dynamic::DynamicCoreResolver, epic::ReactiveCoreResolver, log::LogCoreResolver},
+	services::{
+		application::ApplicationMessage,
+		connections::ConnectionMessage,
+		network::CoNetworkTaskSpawner,
+		reducers::{ReducerStorage, ReducersControl},
+	},
+	types::co_reducer_factory::CoReducerFactoryError,
+	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, DynamicCoDate, DynamicCoUuid, LocalCoBuilder, Runtime,
+	TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
-use anyhow::anyhow;
 use async_trait::async_trait;
-use co_actor::{Actor, ActorError, ActorHandle, Response};
+use cid::Cid;
+use co_actor::ActorHandle;
 use co_core_membership::Membership;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
-use co_log::EntryBlock;
-use co_primitives::{CoId, Did, Tags};
-use co_storage::{BlockStorage, ChangeBlockStorage, EncryptedBlockStorage, StorageError};
+use co_log::{EntryBlock, Log};
+use co_primitives::{BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did};
+#[cfg(feature = "pinning")]
+use co_storage::ChangeBlockStorage;
 use futures::{Stream, TryStreamExt};
 use std::{
-	collections::{BTreeMap, VecDeque},
+	collections::BTreeSet,
 	fmt::Debug,
-	sync::Arc,
+	sync::{Arc, RwLock},
 };
-use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
@@ -54,36 +58,37 @@ impl CoContext {
 	pub async fn entries(
 		&self,
 		co: impl AsRef<CoId>,
-	) -> Result<
-		(
-			CoStorage,
-			impl Stream<Item = Result<EntryBlock<<CoStorage as BlockStorage>::StoreParams>, anyhow::Error>>,
-			Arc<dyn CoReducerContext + Send + Sync + 'static>,
-		),
-		anyhow::Error,
-	> {
-		let co = co.as_ref();
-
-		// create
-		let initialized = true;
-		let uninitialized_reducer = if co.as_str() == CO_ID_LOCAL {
-			self.inner.create_local_co_instance(initialized).await?
-		} else {
-			let local = self.local_co_reducer().await?;
-			let storage = self.inner.reducers.clone().storage(co.clone()).await?;
-			self.inner
-				.create_co_instance(local, co, storage, initialized, None)
-				.await?
-				.ok_or(anyhow!("Co not found: {}", co))?
-		};
-		let (storage, reducer, context) = uninitialized_reducer.into_inner().ok_or(anyhow!("Invalid reference"))?;
-		let log = reducer.into_log();
+	) -> Result<(CoStorage, impl Stream<Item = Result<EntryBlock, anyhow::Error>>), anyhow::Error> {
+		// log
+		let reducer = self.try_co_reducer(co.as_ref()).await?;
+		let storage = reducer.storage();
+		let state = reducer.reducer_state().await;
 
 		// stream
-		let stream = log.into_stream().map_err(|e| e.into());
+		let stream = self.entries_from_heads(co, storage.clone(), state.1).await?;
 
 		// result
-		Ok((storage, stream, context))
+		Ok((storage, stream))
+	}
+
+	/// Get a stream to the log entries.
+	/// Starting at `heads` (reverse chronological).
+	pub async fn entries_from_heads(
+		&self,
+		co: impl AsRef<CoId>,
+		storage: CoStorage,
+		heads: BTreeSet<Cid>,
+	) -> Result<impl Stream<Item = Result<EntryBlock, anyhow::Error>>, anyhow::Error> {
+		let co = co.as_ref();
+
+		// log
+		let log = Log::new(co.as_bytes().to_vec(), self.inner.identity_resolver().await?, heads);
+
+		// stream
+		let stream = log.into_stream(&storage).map_err(|e| e.into());
+
+		// result
+		Ok(stream)
 	}
 
 	/// Test if `co` is a shared CO.
@@ -112,17 +117,17 @@ impl CoContext {
 
 	/// Network.
 	pub async fn network(&self) -> Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)> {
-		self.inner.network.read().await.clone()
+		self.inner.network.read().unwrap().clone()
 	}
 
 	/// Network Spawner.
 	pub async fn network_tasks(&self) -> Option<CoNetworkTaskSpawner> {
-		self.inner.network.read().await.as_ref().map(|(v, _)| v).cloned()
+		self.inner.network.read().unwrap().as_ref().map(|(v, _)| v).cloned()
 	}
 
 	/// Network Connections.
 	pub async fn network_connections(&self) -> Option<ActorHandle<ConnectionMessage>> {
-		self.inner.network.read().await.as_ref().map(|(_, v)| v).cloned()
+		self.inner.network.read().unwrap().as_ref().map(|(_, v)| v).cloned()
 	}
 
 	/// Tasks.
@@ -139,10 +144,30 @@ impl CoContext {
 	pub fn settings(&self) -> &ApplicationSettings {
 		&self.inner.settings
 	}
+
+	/// Date Source.
+	pub fn date(&self) -> &DynamicCoDate {
+		&self.inner.date
+	}
+
+	/// UUID Source.
+	pub fn uuid(&self) -> &DynamicCoUuid {
+		&self.inner.uuid
+	}
+
+	/// Force refresh co instance.
+	pub async fn refresh(&self, co: CoReducer) -> Result<(), anyhow::Error> {
+		let parent = match co.parent_id() {
+			Some(parent) => self.try_co_reducer(&parent).await?,
+			None => co.clone(),
+		};
+		co.context.refresh(parent, co.clone()).await?;
+		Ok(())
+	}
 }
 #[async_trait]
 impl CoReducerFactory for CoContext {
-	#[tracing::instrument(skip(self), fields(application = self.inner.settings.identifier))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self), fields(application = self.inner.settings.identifier))]
 	async fn co_reducer(&self, co: &CoId) -> Result<Option<CoReducer>, anyhow::Error> {
 		match self.try_co_reducer(co).await {
 			Ok(r) => Ok(Some(r)),
@@ -164,291 +189,6 @@ impl Debug for CoContext {
 	}
 }
 
-#[derive(Debug)]
-pub enum ReducerRequest {
-	/// Request CO storage instance (without networking).
-	Storage(CoId, Response<Result<ReducerStorage, CoReducerFactoryError>>),
-	/// Request CO reducer instance by creating it if not created yet.
-	Request(CoId, Response<Result<CoReducer, CoReducerFactoryError>>),
-	/// Create reducer instance.
-	Create(CoId, Result<CoReducer, CoReducerFactoryError>),
-	/// Create shared storage instance.
-	CreateStorage(CoId, Result<ReducerStorage, CoReducerFactoryError>),
-	/// Clear all reducer instances.
-	Clear(Response<Result<(), CoReducerFactoryError>>),
-	/// Clear a specific reducer instance.
-	ClearOne(CoId, Response<Result<(), CoReducerFactoryError>>),
-}
-
-#[derive(Clone)]
-pub struct ReducersControl {
-	pub(crate) handle: ActorHandle<ReducerRequest>,
-}
-impl ReducersControl {
-	pub async fn storage(&self, co: CoId) -> Result<ReducerStorage, CoReducerFactoryError> {
-		// tracing::trace!(?co, err = ?anyhow::anyhow!("test"), "co-reducer-request");
-		Ok(self.handle.request(|response| ReducerRequest::Storage(co, response)).await??)
-	}
-
-	pub async fn reducer(&self, co: CoId) -> Result<CoReducer, CoReducerFactoryError> {
-		// tracing::trace!(?co, err = ?anyhow::anyhow!("test"), "co-reducer-request");
-		Ok(self.handle.request(|response| ReducerRequest::Request(co, response)).await??)
-	}
-
-	pub async fn create(&self, co: CoId, reducer: Result<CoReducer, CoReducerFactoryError>) {
-		self.handle.dispatch(ReducerRequest::Create(co, reducer)).ok();
-	}
-
-	pub async fn create_storage(&self, co: CoId, storage: Result<ReducerStorage, CoReducerFactoryError>) {
-		self.handle.dispatch(ReducerRequest::CreateStorage(co, storage)).ok();
-	}
-
-	pub async fn clear(&self) -> Result<(), CoReducerFactoryError> {
-		Ok(self.handle.request(|response| ReducerRequest::Clear(response)).await??)
-	}
-
-	pub async fn clear_one(&self, co: CoId) -> Result<(), CoReducerFactoryError> {
-		Ok(self.handle.request(|response| ReducerRequest::ClearOne(co, response)).await??)
-	}
-}
-impl From<ActorHandle<ReducerRequest>> for ReducersControl {
-	fn from(value: ActorHandle<ReducerRequest>) -> Self {
-		Self { handle: value }
-	}
-}
-
-pub struct Reducers {
-	context: CoContext,
-	reducers: BTreeMap<CoId, CoReducer>,
-	storages: BTreeMap<CoId, ReducerStorage>,
-	pending_requests: VecDeque<ReducerRequest>,
-}
-impl Reducers {
-	async fn local(&mut self) -> Result<CoReducer, CoReducerFactoryError> {
-		let local_id = CoId::from(CO_ID_LOCAL);
-		let local = if let Some(local) = self.reducers.get(&local_id) {
-			local.clone()
-		} else {
-			let local = self.context.inner.create_local_co_instance(true).await?;
-			self.reducers.insert(local.id().clone(), local.clone());
-			local
-		};
-		Ok(local)
-	}
-
-	fn pending_request_count(&self, co: &CoId) -> usize {
-		self.pending_requests.iter().fold(0, |a, b| match b {
-			ReducerRequest::Request(id, _) if id == co => a + 1,
-			_ => a,
-		})
-	}
-
-	fn pending_storage_count(&self, co: &CoId) -> usize {
-		self.pending_requests.iter().fold(0, |a, b| match b {
-			ReducerRequest::Storage(id, _) if id == co => a + 1,
-			_ => a,
-		})
-	}
-}
-
-pub struct ReducersActor {}
-impl ReducersActor {
-	pub fn new() -> Self {
-		Self {}
-	}
-}
-#[async_trait]
-impl Actor for ReducersActor {
-	type Message = ReducerRequest;
-	type State = Reducers;
-	type Initialize = CoContext;
-
-	async fn initialize(
-		&self,
-		_handle: &ActorHandle<Self::Message>,
-		_tags: &Tags,
-		initialize: Self::Initialize,
-	) -> Result<Self::State, ActorError> {
-		Ok(Reducers {
-			context: initialize,
-			reducers: Default::default(),
-			storages: Default::default(),
-			pending_requests: Default::default(),
-		})
-	}
-
-	async fn handle(
-		&self,
-		handle: &ActorHandle<Self::Message>,
-		message: Self::Message,
-		state: &mut Self::State,
-	) -> Result<(), ActorError> {
-		match message {
-			ReducerRequest::Storage(id, response) => {
-				// local
-				let local = match state.local().await {
-					Ok(local) => local,
-					Err(err) => {
-						response
-							.send(Err(CoReducerFactoryError::Create(CoId::from(CO_ID_LOCAL), err.into())))
-							.ok();
-						return Ok(());
-					},
-				};
-
-				// get/create
-				if let Some(storage) = state.storages.get(&id) {
-					response.send(Ok(storage.clone())).ok();
-				} else {
-					state.pending_requests.push_back(ReducerRequest::Storage(id.clone(), response));
-					if state.pending_storage_count(&id) == 1 {
-						// create storage
-						state.context.tasks().spawn({
-							let control: ReducersControl = handle.clone().into();
-							let context = state.context.clone();
-							let parent = local.clone();
-							async move {
-								let result = ReducerStorage::from_id(context.inner.storage(), parent, id.clone()).await;
-								control.create_storage(id, result).await;
-							}
-						});
-					}
-				}
-			},
-			ReducerRequest::Request(id, response) => {
-				// local
-				let local = match state.local().await {
-					Ok(local) => local,
-					Err(err) => {
-						response
-							.send(Err(CoReducerFactoryError::Create(CoId::from(CO_ID_LOCAL), err.into())))
-							.ok();
-						return Ok(());
-					},
-				};
-
-				// get/create
-				if let Some(reducer) = state.reducers.get(&id) {
-					response.send(Ok(reducer.clone())).ok();
-				} else {
-					state.pending_requests.push_back(ReducerRequest::Request(id.clone(), response));
-					if state.pending_request_count(&id) == 1 {
-						// create shared co
-						state.context.tasks().spawn({
-							let control: ReducersControl = handle.clone().into();
-							let context = state.context.clone();
-							let parent = local.clone();
-							async move {
-								// get storage
-								let result = match control.clone().storage(id.clone()).await {
-									Ok(storage) => {
-										// create reducer
-										match context.inner.create_co_instance(parent, &id, storage, true, None).await {
-											Ok(Some(reducer)) => Ok(reducer),
-											Ok(None) => Err(CoReducerFactoryError::CoNotFound(id.clone())),
-											Err(err) => Err(CoReducerFactoryError::Create(id.clone(), err)),
-										}
-									},
-									Err(err) => Err(err),
-								};
-
-								// notify
-								control.clone().create(id, result).await;
-							}
-						});
-					}
-				}
-			},
-			ReducerRequest::Clear(response) => {
-				state.reducers.retain(|id, _| id.as_str() == CO_ID_LOCAL);
-				response.send(Ok(())).ok();
-			},
-			ReducerRequest::ClearOne(id, response) => {
-				state.reducers.retain(|retain_id, _| retain_id != &id);
-				response.send(Ok(())).ok();
-			},
-			ReducerRequest::Create(id, result) => {
-				// register
-				match &result {
-					Ok(reducer) => {
-						state.reducers.insert(reducer.id().clone(), reducer.clone());
-					},
-					Err(err) => {
-						tracing::error!(co = ?id, ?err, "co-reducer-failed");
-					},
-				}
-
-				// respond pending
-				let remove = state
-					.pending_requests
-					.iter()
-					.enumerate()
-					.filter_map(|(index, request)| match request {
-						ReducerRequest::Request(request_id, _) if request_id == &id => Some(index),
-						_ => None,
-					})
-					.rev()
-					.collect::<Vec<_>>();
-				for index in remove {
-					if let Some(ReducerRequest::Request(_, response)) = state.pending_requests.remove(index) {
-						response
-							.send(match &result {
-								Err(err) => Err(co_reducerfactory_error_clone(err)),
-								Ok(reducer) => Ok(reducer.clone()),
-							})
-							.ok();
-					}
-				}
-			},
-			ReducerRequest::CreateStorage(id, result) => {
-				// register
-				match &result {
-					Ok(storage) => {
-						state.storages.insert(id.clone(), storage.clone());
-					},
-					Err(err) => {
-						tracing::error!(co = ?id, ?err, "co-storage-failed");
-					},
-				}
-
-				// respond pending
-				let remove = state
-					.pending_requests
-					.iter()
-					.enumerate()
-					.filter_map(|(index, request)| match request {
-						ReducerRequest::Storage(request_id, _) if request_id == &id => Some(index),
-						_ => None,
-					})
-					.rev()
-					.collect::<Vec<_>>();
-				for index in remove {
-					if let Some(ReducerRequest::Storage(_, response)) = state.pending_requests.remove(index) {
-						response
-							.send(match &result {
-								Err(err) => Err(co_reducerfactory_error_clone(err)),
-								Ok(storage) => Ok(storage.clone()),
-							})
-							.ok();
-					}
-				}
-			},
-		}
-		return Ok(());
-	}
-}
-
-fn co_reducerfactory_error_clone(err: &CoReducerFactoryError) -> CoReducerFactoryError {
-	match err {
-		CoReducerFactoryError::CoNotFound(id) => CoReducerFactoryError::CoNotFound(id.clone()),
-		CoReducerFactoryError::Create(id, err) => {
-			CoReducerFactoryError::Create(id.to_owned(), anyhow!(err.to_string()))
-		},
-		CoReducerFactoryError::Other(err) => CoReducerFactoryError::Other(anyhow!(err.to_string())),
-		CoReducerFactoryError::Actor(err) => CoReducerFactoryError::Other(anyhow!(err.to_string())),
-	}
-}
-
 #[derive(Clone)]
 pub(crate) struct CoContextInner {
 	settings: ApplicationSettings,
@@ -463,12 +203,15 @@ pub(crate) struct CoContextInner {
 	_storage: CoStorage,
 
 	/// Used to track all new blocks until we store the LocalCo again.
+	#[cfg(feature = "pinning")]
 	storage_created: ChangeBlockStorage<CoStorage>,
 
 	runtime: Runtime,
 	reactive_context: ActorHandle<ApplicationMessage>,
 
 	reducers: ReducersControl,
+	date: DynamicCoDate,
+	uuid: DynamicCoUuid,
 }
 impl CoContextInner {
 	pub(crate) fn new(
@@ -482,8 +225,11 @@ impl CoContextInner {
 		runtime: Runtime,
 		reactive_context: ActorHandle<ApplicationMessage>,
 		reducers: ReducersControl,
+		date: DynamicCoDate,
+		uuid: DynamicCoUuid,
 	) -> Self {
 		Self {
+			#[cfg(feature = "pinning")]
 			storage_created: ChangeBlockStorage::new(storage.clone()),
 			settings,
 			shutdown,
@@ -494,6 +240,8 @@ impl CoContextInner {
 			runtime,
 			reactive_context,
 			reducers,
+			date,
+			uuid,
 		}
 	}
 
@@ -531,8 +279,10 @@ impl CoContextInner {
 	/// Get the root storage.
 	/// The returned storage tracks changes which will be flushed when the local co is written.
 	pub fn storage(&self) -> CoStorage {
-		// self.storage.clone()
-		CoStorage::new(self.storage_created.clone())
+		#[cfg(feature = "pinning")]
+		return CoStorage::new(self.storage_created.clone());
+		#[cfg(not(feature = "pinning"))]
+		return self._storage.clone();
 	}
 
 	pub fn runtime(&self) -> Runtime {
@@ -549,7 +299,7 @@ impl CoContextInner {
 		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
 	) -> Result<(), anyhow::Error> {
 		// assign
-		*self.network.write().await = network;
+		*self.network.write().unwrap() = network;
 
 		// clear reducers
 		self.reducers.clone().clear().await?;
@@ -559,29 +309,33 @@ impl CoContextInner {
 	}
 
 	/// Creates a CoReducer instance of the Local CO.
-	#[tracing::instrument(skip(self))]
-	async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
-		let core_resolver = |reducer_context| {
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self))]
+	pub(crate) async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
+		let core_resolver = |_reducer_context| {
 			let local_id = CoId::new(CO_ID_LOCAL);
 			let core_resolver = CoCoreResolver::default();
+			#[cfg(feature = "pinning")]
 			let core_resolver = ChangeCoreResolver::new(core_resolver, self.storage_created.clone());
+			#[cfg(feature = "pinning")]
 			let core_resolver = ReferenceCoreResolver::new(
 				core_resolver,
 				Some(CoPinningKey::State.to_string(&local_id)),
-				reducer_context,
+				_reducer_context,
 			);
 			let core_resolver = ReactiveCoreResolver::new(core_resolver, local_id, self.reactive_context.clone());
-			let core_resolver = MembershipCoreResolver::new(
-				self.tasks.clone(),
-				core_resolver,
-				CoContextMembershipInstanceRegistry { reducers: self.reducers.clone() },
-				CO_CORE_NAME_MEMBERSHIP.to_owned(),
-			);
+			let core_resolver = LogCoreResolver::new(core_resolver);
 			core_resolver
 		};
 		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize);
 		let local_co_reducer = local_co
-			.build(self.storage(), self.runtime.clone(), self.shutdown.child_token(), self.tasks.clone(), core_resolver)
+			.build(
+				self.storage().clone_with_settings(BlockStorageSettings::new().with_detached()),
+				self.runtime.clone(),
+				self.shutdown.child_token(),
+				self.tasks.clone(),
+				core_resolver,
+				self.date.clone(),
+			)
 			.await?;
 		Ok(local_co_reducer)
 	}
@@ -613,7 +367,7 @@ impl CoContextInner {
 		let core_resolver = self.create_co_core_resolver(membership.id.clone());
 
 		// network
-		let network = if network { self.network.read().await.clone() } else { None };
+		let network = if network { self.network.read().unwrap().clone() } else { None };
 
 		// reducer
 		let reducer = SharedCoBuilder::new(parent, membership)
@@ -622,7 +376,7 @@ impl CoContextInner {
 			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_owned())
 			.with_network(network)
 			.with_initialize(initialize)
-			.build(self.tasks.clone(), storage, self.runtime.clone(), identity, core_resolver)
+			.build(self.tasks.clone(), storage, self.runtime.clone(), identity, core_resolver, self.date.clone())
 			.await?;
 
 		// result
@@ -630,7 +384,7 @@ impl CoContextInner {
 	}
 
 	/// Creates a CoReducer instance a CO which we have a membership for.
-	async fn create_co_instance(
+	pub(crate) async fn create_co_instance(
 		&self,
 		parent: CoReducer,
 		co: &CoId,
@@ -661,113 +415,5 @@ impl CoContextInner {
 impl From<CoContextInner> for CoContext {
 	fn from(val: CoContextInner) -> Self {
 		CoContext { inner: Arc::new(val) }
-	}
-}
-
-/// Find shared membership.
-async fn shared_membership(
-	parent: &CoReducer,
-	co: &CoId,
-	identity: Option<&Did>,
-) -> Result<Option<Membership>, anyhow::Error> {
-	// find first active membership
-	Ok(memberships(&parent, &co).await?.find(move |membership| match identity {
-		Some(value) => value == &membership.did,
-		None => true,
-	}))
-}
-
-pub enum CoPinningKey {
-	State,
-	Log,
-}
-impl CoPinningKey {
-	pub fn to_string(&self, co: &CoId) -> String {
-		match self {
-			CoPinningKey::State => format!("co.{}.state", co.as_str()),
-			CoPinningKey::Log => format!("co.{}.log", co.as_str()),
-		}
-	}
-}
-
-/// Reducer storage implementations.
-#[derive(Debug, Clone)]
-pub enum ReducerStorage {
-	Default(CoStorage),
-	Encrypted(CoStorage, EncryptedBlockStorage<CoStorage>),
-}
-impl ReducerStorage {
-	pub fn storage(&self) -> &CoStorage {
-		match self {
-			ReducerStorage::Default(storage) => storage,
-			ReducerStorage::Encrypted(storage, _encrypted) => storage,
-		}
-	}
-
-	pub fn encrypted_storage(&self) -> Option<&EncryptedBlockStorage<CoStorage>> {
-		match self {
-			ReducerStorage::Default(_) => None,
-			ReducerStorage::Encrypted(_, encrypted) => Some(encrypted),
-		}
-	}
-
-	async fn from_id(storage: CoStorage, parent: CoReducer, id: CoId) -> Result<ReducerStorage, CoReducerFactoryError> {
-		let membership = shared_membership(&parent, &id, None)
-			.await?
-			.ok_or(CoReducerFactoryError::CoNotFound(id))?;
-		Ok(Self::from_membership(&storage, &parent, membership)
-			.await
-			.map_err(|e| CoReducerFactoryError::Other(e.into()))?)
-	}
-
-	async fn from_membership(
-		storage: &CoStorage,
-		parent: &CoReducer,
-		membership: Membership,
-	) -> Result<ReducerStorage, StorageError> {
-		let builder = SharedCoBuilder::new(parent.clone(), membership.clone());
-		let secret = builder.secret().await?;
-		Ok(match secret {
-			Some(secret) => {
-				let encrypted_storage =
-					EncryptedBlockStorage::new(storage.clone(), secret.into(), Default::default(), Default::default());
-				for state in membership.state {
-					if let Some(encryption_mapping) = &state.encryption_mapping {
-						encrypted_storage.load_mapping(encryption_mapping).await?;
-					}
-				}
-				ReducerStorage::Encrypted(CoStorage::new(encrypted_storage.clone()), encrypted_storage)
-			},
-			None => ReducerStorage::Default(storage.clone()),
-		})
-	}
-}
-impl AsRef<CoStorage> for ReducerStorage {
-	fn as_ref(&self) -> &CoStorage {
-		self.storage()
-	}
-}
-
-#[derive(Clone)]
-struct CoContextMembershipInstanceRegistry {
-	reducers: ReducersControl,
-}
-#[async_trait]
-impl MembershipInstanceRegistry for CoContextMembershipInstanceRegistry {
-	async fn update(&self, co: CoId) -> Result<(), anyhow::Error> {
-		if let Some(co_reducer) = self.reducers.reducer(co.clone()).await.ok() {
-			if let Some(parent) = co_reducer.parent_id() {
-				if let Some(parent_co_reducer) = self.reducers.reducer(parent.clone()).await.ok() {
-					let context = co_reducer.context.clone();
-					context.refresh(parent_co_reducer, co_reducer).await?;
-				}
-			}
-		}
-		Ok(())
-	}
-
-	async fn remove(&self, co: CoId) -> Result<(), anyhow::Error> {
-		self.reducers.clone().clear_one(co).await?;
-		Ok(())
 	}
 }

@@ -29,6 +29,42 @@ pub trait BlockStorage: Send + Sync {
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError>;
 }
 
+pub trait CloneWithBlockStorageSettings: Clone {
+	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self;
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct BlockStorageSettings {
+	/// Do not allow to use networking in the clone.
+	pub disallow_networking: bool,
+
+	/// Detach as child instance from the parent.
+	pub detached: bool,
+
+	/// Clone with empty caches.
+	pub clear: bool,
+}
+impl BlockStorageSettings {
+	pub fn new() -> Self {
+		Default::default()
+	}
+
+	pub fn without_networking(mut self) -> Self {
+		self.disallow_networking = true;
+		self
+	}
+
+	pub fn with_detached(mut self) -> Self {
+		self.detached = true;
+		self
+	}
+
+	pub fn with_clear(mut self) -> Self {
+		self.clear = true;
+		self
+	}
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BlockStat {
 	pub size: u64,
@@ -37,7 +73,7 @@ pub struct BlockStat {
 #[derive(Debug, thiserror::Error)]
 pub enum StorageError {
 	/// Block not found error.
-	/// This error is may be temporarily as the block may comes availabvle on the network.
+	/// This error is may be temporarily as the block may comes available on the network.
 	#[error("Block not found: {0}")]
 	NotFound(Cid, #[source] anyhow::Error),
 
@@ -48,7 +84,7 @@ pub enum StorageError {
 
 	/// Invalid argument passes to call or storage configuration.
 	/// This is not be retriable with same parameters.
-	#[error("Invalid argument")]
+	#[error("Invalid storage argument")]
 	InvalidArgument(#[source] anyhow::Error),
 }
 impl From<MultiCodecError> for StorageError {

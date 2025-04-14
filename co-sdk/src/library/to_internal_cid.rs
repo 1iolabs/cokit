@@ -1,0 +1,74 @@
+use cid::Cid;
+use co_storage::BlockStorageContentMapping;
+use futures::StreamExt;
+use std::collections::BTreeSet;
+
+/// Map external [`Cid`] to internal [`Cid`].
+/// If no mapping is needed/available return the original [`Cid`].
+pub async fn to_internal_cid(mapping: &impl BlockStorageContentMapping, cid: Cid) -> Cid {
+	if mapping.is_content_mapped().await {
+		mapping.to_mapped(&cid).await.unwrap_or(cid)
+	} else {
+		cid
+	}
+}
+
+/// Map external [`Cid`] to internal [`Cid`].
+/// If no mapping is needed/available return the original [`Cid`].
+pub async fn to_internal_cid_opt(mapping: &impl BlockStorageContentMapping, cid: Option<Cid>) -> Option<Cid> {
+	if mapping.is_content_mapped().await {
+		if let Some(cid) = cid {
+			Some(mapping.to_mapped(&cid).await.unwrap_or(cid))
+		} else {
+			cid
+		}
+	} else {
+		cid
+	}
+}
+
+/// Map external [`Cid`] to internal [`Cid`].
+/// If [`Cid`] could not be mapped return [`None`].
+/// If mapping is not enabled return the original Cids.
+pub async fn to_internal_cid_opt_force(mapping: &impl BlockStorageContentMapping, cid: Option<Cid>) -> Option<Cid> {
+	if mapping.is_content_mapped().await {
+		if let Some(cid) = cid {
+			mapping.to_mapped(&cid).await
+		} else {
+			None
+		}
+	} else {
+		cid
+	}
+}
+
+/// Map external [`Cid`] to internal [`Cid`].
+/// If no mapping is needed/available return the original [`Cid`].
+pub async fn to_internal_cids(mapping: &impl BlockStorageContentMapping, cids: BTreeSet<Cid>) -> BTreeSet<Cid> {
+	if mapping.is_content_mapped().await {
+		futures::stream::iter(cids)
+			.then(|cid| to_internal_cid(mapping, cid))
+			.collect()
+			.await
+	} else {
+		cids
+	}
+}
+
+/// Map external [`Cid`] to internal [`Cid`].
+/// If some [`Cid`] could not be mapped return [`None`].
+/// If mapping is not enabled return the original Cids.
+pub async fn to_internal_cids_opt_force(
+	mapping: &impl BlockStorageContentMapping,
+	cids: BTreeSet<Cid>,
+) -> Option<BTreeSet<Cid>> {
+	if mapping.is_content_mapped().await {
+		let mut result = BTreeSet::new();
+		for cid in cids {
+			result.insert(to_internal_cid_opt_force(mapping, Some(cid)).await?);
+		}
+		Some(result)
+	} else {
+		Some(cids)
+	}
+}

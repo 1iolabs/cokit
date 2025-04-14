@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_api::{BlockSerializer, Metadata};
-use co_primitives::{BlockLinks, KnownMultiCodec, MultiCodec};
+use co_primitives::{BlockLinks, MultiCodec};
 use co_storage::BlockStorage;
 use colored::Colorize;
 use ipld_core::{ipld::Ipld, serde::from_ipld};
@@ -78,32 +78,29 @@ where
 			let block_result = storage.get(cid).await;
 			match block_result {
 				Ok(block) => {
-					match MultiCodec::from(cid) {
-						MultiCodec::Known(KnownMultiCodec::DagCbor) => {
-							// ipld: take $co metadata into account
-							match BlockSerializer::new().deserialize::<Ipld>(&block) {
-								Ok(ipld) => {
-									let mut new_cids = BTreeSet::new();
-									Self::get_next_cids(&ipld, &mut new_cids, ignorable_cids);
-									return Ok(new_cids);
-								},
-								Err(err) => {
-									last_error = Err(anyhow!(err));
-								},
-							};
-						},
-						_ => {
-							// read all links
-							match self.links.links(&block) {
-								Ok(links) => {
-									// returns first successfully resolved cids
-									return Ok(links.filter(|cid| !ignorable_cids.contains(cid)).collect());
-								},
-								Err(err) => {
-									last_error = Err(anyhow!(err));
-								},
-							}
-						},
+					if MultiCodec::is_cbor(cid) {
+						// ipld: take $co metadata into account
+						match BlockSerializer::new().deserialize::<Ipld>(&block) {
+							Ok(ipld) => {
+								let mut new_cids = BTreeSet::new();
+								Self::get_next_cids(&ipld, &mut new_cids, ignorable_cids);
+								return Ok(new_cids);
+							},
+							Err(err) => {
+								last_error = Err(anyhow!(err));
+							},
+						};
+					} else {
+						// read all links
+						match self.links.links(&block) {
+							Ok(links) => {
+								// returns first successfully resolved cids
+								return Ok(links.filter(|cid| !ignorable_cids.contains(cid)).collect());
+							},
+							Err(err) => {
+								last_error = Err(anyhow!(err));
+							},
+						}
 					}
 				},
 				Err(e) => {

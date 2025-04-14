@@ -1,8 +1,12 @@
+use crate::{BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStat, BlockStorage, StorageError};
-use futures::lock::Mutex;
-use std::{collections::HashSet, mem::swap, sync::Arc};
+use co_primitives::{Block, BlockStat, BlockStorage, CloneWithBlockStorageSettings, StorageError};
+use std::{
+	collections::{BTreeMap, HashSet},
+	mem::swap,
+	sync::{Arc, Mutex},
+};
 
 /// Store all [`Cid`] of blocks that have been newly created or removed.
 /// Additionally set calls for blocks which already exists in `next` will be ignored.
@@ -18,7 +22,7 @@ impl<S> ChangeBlockStorage<S> {
 
 	/// Drain all changes and return them as iterator.
 	pub async fn drain(&self) -> impl Iterator<Item = BlockStorageChange> + use<S> {
-		let mut created = self.changes.lock().await;
+		let mut created = self.changes.lock().unwrap();
 		let mut result = HashSet::new();
 		swap(&mut result, &mut created);
 		result.into_iter()
@@ -46,9 +50,11 @@ where
 		let result = self.next.set(block).await?;
 
 		// record
-		let mut changes = self.changes.lock().await;
-		changes.remove(&BlockStorageChange::Remove(result));
-		changes.insert(BlockStorageChange::Set(result));
+		{
+			let mut changes = self.changes.lock().unwrap();
+			changes.remove(&BlockStorageChange::Remove(result));
+			changes.insert(BlockStorageChange::Set(result));
+		}
 
 		// result
 		Ok(result)
@@ -59,9 +65,11 @@ where
 		let result = self.next.remove(cid).await?;
 
 		// record (ignore when it just has been added)
-		let mut changes = self.changes.lock().await;
-		if !changes.remove(&BlockStorageChange::Set(*cid)) {
-			changes.insert(BlockStorageChange::Remove(*cid));
+		{
+			let mut changes = self.changes.lock().unwrap();
+			if !changes.remove(&BlockStorageChange::Set(*cid)) {
+				changes.insert(BlockStorageChange::Remove(*cid));
+			}
 		}
 
 		// result
@@ -70,6 +78,44 @@ where
 
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		Ok(self.next.stat(cid).await?)
+	}
+}
+#[async_trait]
+impl<S> ExtendedBlockStorage for ChangeBlockStorage<S>
+where
+	S: ExtendedBlockStorage + 'static,
+{
+	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+		self.next.set_extended(block).await
+	}
+}
+impl<S> CloneWithBlockStorageSettings for ChangeBlockStorage<S>
+where
+	S: BlockStorage + CloneWithBlockStorageSettings + 'static,
+{
+	fn clone_with_settings(&self, settings: co_primitives::BlockStorageSettings) -> Self {
+		Self { next: self.next.clone_with_settings(settings), changes: self.changes.clone() }
+	}
+}
+#[async_trait]
+impl<S> BlockStorageContentMapping for ChangeBlockStorage<S>
+where
+	S: BlockStorage + BlockStorageContentMapping + 'static,
+{
+	async fn is_content_mapped(&self) -> bool {
+		self.next.is_content_mapped().await
+	}
+
+	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
+		self.next.to_plain(mapped).await
+	}
+
+	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
+		self.next.to_mapped(plain).await
+	}
+
+	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+		self.next.insert_mappings(mappings).await
 	}
 }
 

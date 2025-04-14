@@ -14,7 +14,7 @@ pub async fn cat_output(storage: CoStorage, cid: Cid, pretty: bool) -> Result<()
 		}
 		println!("Codec: {:?} ({})", codec, block.cid().codec());
 		println!("Size: {}", block.data().len());
-		if codec == KnownMultiCodec::DagCbor {
+		if MultiCodec::is_cbor(codec) {
 			let ipld: Ipld = BlockSerializer::default().deserialize(&block)?;
 			println!("{:#?}", ipld);
 		} else {

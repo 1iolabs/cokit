@@ -1,5 +1,5 @@
 use crate::{
-	application::co_context::ReducerStorage, library::find_co_secret::find_co_secret_by_membership, CoContext, CoToken,
+	library::find_co_secret::find_co_secret_by_membership, services::reducers::ReducerStorage, CoContext, CoToken,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -132,6 +132,7 @@ async fn contains(context: CoContext, cid: Cid, remote_peer: PeerId, tokens: Vec
 	}
 }
 
+#[tracing::instrument(name = "bitswap-service-get", level = tracing::Level::TRACE, err(Debug), skip(context, tokens))]
 async fn get(
 	context: CoContext,
 	cid: Cid,
@@ -140,6 +141,9 @@ async fn get(
 ) -> Result<Option<Vec<u8>>, StorageError> {
 	// validate token
 	let co = first_valid_token(&context, &remote_peer, &tokens).await?;
+
+	// log
+	tracing::trace!(?cid, ?co, tokens = ?tokens.iter().map(CoToken::from_bitswap_token).collect::<Vec<_>>(), "bitswap-service-get");
 
 	// storage
 	let storage = match co {
@@ -165,7 +169,7 @@ async fn get(
 			.ok_or(StorageError::NotFound(cid, anyhow!("Not allowed")))?;
 
 		// make sure the block belongs to this CO.
-		//  currently we jsut try to decrypt it.
+		//  currently we just try to decrypt it.
 		//  this also ensures we don't allow to get blocks from local co as it is always encrypted.
 		storage.get_unencrypted(&cid).await?;
 

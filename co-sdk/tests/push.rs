@@ -2,14 +2,13 @@ use co_core_co::CoAction;
 use co_core_file::{FileAction, FolderNode};
 use co_primitives::AbsolutePathOwned;
 use co_sdk::{tags, ConnectionAction, ConnectionMessage, Cores, Identity, ReleaseAction, CO_CORE_NAME_CO};
-use futures::StreamExt;
+use futures::{pin_mut, StreamExt};
 use helper::{instance::Instances, shared_co::SharedCo};
 use std::{
 	future::ready,
 	time::{Duration, SystemTime},
 };
 use tokio::time::timeout;
-use tokio_stream::wrappers::WatchStream;
 
 pub mod helper;
 
@@ -42,21 +41,20 @@ async fn test_push() {
 		)
 		.await
 		.unwrap();
-	let (peer0_state, peer0_heads) = peer0.reducer_state().await;
-	let peer0_state = peer0_state.unwrap();
+	let peer0_state = peer0.reducer_state().await;
 
 	// peer1: wait for state/heads to be updated
 	let (peer1, _identity1) = shared_co.reducer(1, "shared").await;
-	let mut peer1_state_future = WatchStream::new(peer1.watch().await)
-		.filter_map(ready)
-		.filter(|(state, _heads)| ready(state == &peer0_state))
+	let peer1_state_future = peer1
+		.reducer_state_stream()
+		.filter(|state| ready(state == &peer0_state))
 		.take(1);
-	let (peer1_state, peer1_heads) = timeout(Duration::from_secs(5), peer1_state_future.next())
+	pin_mut!(peer1_state_future);
+	let peer1_state = timeout(Duration::from_secs(5), peer1_state_future.next())
 		.await
 		.expect("to sync in time")
 		.expect("state");
 	assert_eq!(peer1_state, peer0_state);
-	assert_eq!(peer1_heads, peer0_heads);
 
 	// peer0: create file
 	let folder = FolderNode {
@@ -79,19 +77,18 @@ async fn test_push() {
 		)
 		.await
 		.unwrap();
-	let (peer0_state, peer0_heads) = peer0.reducer_state().await;
-	let peer0_state = peer0_state.unwrap();
+	let peer0_state = peer0.reducer_state().await;
 
 	// peer1: wait for state/heads to be updated
 	let (peer1, _identity1) = shared_co.reducer(1, "shared").await;
-	let mut peer1_state_future = WatchStream::new(peer1.watch().await)
-		.filter_map(ready)
-		.filter(|(state, _heads)| ready(state == &peer0_state))
+	let peer1_state_future = peer1
+		.reducer_state_stream()
+		.filter(|state| ready(state == &peer0_state))
 		.take(1);
-	let (peer1_state, peer1_heads) = timeout(Duration::from_secs(1), peer1_state_future.next())
+	pin_mut!(peer1_state_future);
+	let peer1_state = timeout(Duration::from_secs(1), peer1_state_future.next())
 		.await
 		.expect("to sync in time")
 		.expect("state");
 	assert_eq!(peer1_state, peer0_state);
-	assert_eq!(peer1_heads, peer0_heads);
 }

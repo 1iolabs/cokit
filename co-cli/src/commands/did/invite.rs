@@ -30,7 +30,7 @@ pub async fn command(
 	let mut application = context.application(cli).await;
 	application.create_network(false).await?;
 	let co_reducer = application.context().try_co_reducer(&command.co).await?;
-	let co = co_reducer.co().await?;
+	let (_storage, co) = co_reducer.co().await?;
 	let participant = co.participants.get(&command.did);
 	let only_network = if let Some(participant) = participant {
 		match participant.state {

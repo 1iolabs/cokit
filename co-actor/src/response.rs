@@ -1,6 +1,6 @@
 use super::ActorError;
 use crate::TaskSpawner;
-use futures::{FutureExt, Stream};
+use futures::{FutureExt, Sink, Stream};
 use std::{
 	fmt::Debug,
 	future::Future,
@@ -95,11 +95,11 @@ impl<T> Future for ResponseReceiver<T> {
 #[must_use]
 #[derive(Debug)]
 pub struct ResponseStream<T> {
-	tx: mpsc::UnboundedSender<Result<T, ActorError>>,
+	tx: mpsc::UnboundedSender<T>,
 }
 impl<T> ResponseStream<T> {
 	pub fn send(&mut self, value: T) -> Result<(), ActorError> {
-		self.tx.send(Ok(value)).map_err(|_| ActorError::Canceled)
+		self.tx.send(value).map_err(|_| ActorError::Canceled)
 	}
 
 	/// Test if the stream has been closed by the caller.
@@ -112,9 +112,28 @@ impl<T> ResponseStream<T> {
 		Ok(())
 	}
 }
+impl<T> Sink<T> for ResponseStream<T> {
+	type Error = T;
+
+	fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+		Poll::Ready(Ok(()))
+	}
+
+	fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+		self.get_mut().tx.send(item).map_err(|err| err.0)
+	}
+
+	fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+		Poll::Ready(Ok(()))
+	}
+
+	fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+		Poll::Ready(Ok(()))
+	}
+}
 
 pub struct ResponseStreamReceiver<T> {
-	rx: mpsc::UnboundedReceiver<Result<T, ActorError>>,
+	rx: mpsc::UnboundedReceiver<T>,
 }
 impl<T> ResponseStreamReceiver<T> {
 	pub fn new() -> (ResponseStream<T>, ResponseStreamReceiver<T>) {
@@ -123,7 +142,7 @@ impl<T> ResponseStreamReceiver<T> {
 	}
 }
 impl<T> Stream for ResponseStreamReceiver<T> {
-	type Item = Result<T, ActorError>;
+	type Item = T;
 
 	fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
 		self.rx.poll_recv(cx)

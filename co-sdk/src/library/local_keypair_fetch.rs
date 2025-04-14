@@ -13,7 +13,7 @@ pub async fn local_keypair_fetch<I>(
 	force_new_peer_id: bool,
 ) -> Result<Keypair, anyhow::Error>
 where
-	I: PrivateIdentity + Debug + Send + Sync,
+	I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 {
 	let uri = format!("urn:local:{}:peer-id", identifier);
 	let key = keystore_fetch(

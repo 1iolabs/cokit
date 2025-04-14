@@ -1,4 +1,5 @@
 use super::fs_read::fs_read_option;
+use crate::CoReducerState;
 use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
 use cid::Cid;
@@ -299,7 +300,7 @@ impl Actor for FileLocalsActor {
 	}
 }
 impl FileLocalsActor {
-	#[tracing::instrument(err(Debug))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
 	async fn open(&self) -> Result<tokio::fs::File, anyhow::Error> {
 		let path = self.config_path.join(&self.identifier).join("local.cbor");
 
@@ -310,7 +311,7 @@ impl FileLocalsActor {
 		Ok(tokio::fs::OpenOptions::new().create(true).write(true).open(&path).await?)
 	}
 
-	#[tracing::instrument(err(Debug))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
 	async fn open_and_lock(&self) -> Result<tokio::fs::File, anyhow::Error> {
 		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
 
@@ -354,7 +355,7 @@ impl FileLocalsActor {
 		}
 	}
 
-	#[tracing::instrument(err(Debug))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
 	async fn open_and_flock(&self) -> Result<Flock<TokioFile>, anyhow::Error> {
 		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
 
@@ -593,7 +594,7 @@ pub struct ApplicationLocal {
 	pub state: Cid,
 
 	/// The latest encryption mapping.
-	#[serde(rename = "m")]
+	#[serde(rename = "m", skip_serializing_if = "Option::is_none", default)]
 	pub mapping: Option<Cid>,
 }
 impl ApplicationLocal {
@@ -646,15 +647,17 @@ impl ApplicationLocal {
 	// 	// result
 	// 	Ok(())
 	// }
+
+	pub fn reducer_state(&self) -> CoReducerState {
+		(self.state, self.heads.clone()).into()
+	}
 }
 
 #[cfg(test)]
 mod tests {
-	use crate::{
-		library::locals::{ApplicationLocal, FileLocals, Locals},
-		TmpDir,
-	};
+	use crate::library::locals::{ApplicationLocal, FileLocals, Locals};
 	use co_primitives::BlockSerializer;
+	use co_storage::TmpDir;
 
 	#[tokio::test]
 	async fn test_file_locals_overwrite() {

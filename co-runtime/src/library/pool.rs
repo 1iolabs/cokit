@@ -1,8 +1,11 @@
 use crate::{co_v1::CoV1Api, runtimes::RuntimeError, ApiContext, AsyncContext, Core, RuntimeContext, RuntimeInstance};
 use cid::Cid;
 use co_storage::{BlockStorage, StorageError, StoreParamsBlockStorage, SyncBlockStorage};
-use std::{collections::VecDeque, sync::Arc};
-use tokio::{runtime::Handle, sync::Mutex};
+use std::{
+	collections::VecDeque,
+	sync::{Arc, Mutex},
+};
+use tokio::runtime::Handle;
 
 #[derive(Debug)]
 pub struct IdleRuntimePool {
@@ -47,6 +50,14 @@ impl RuntimePool {
 		Self { pool: Arc::new(Mutex::new(pool)) }
 	}
 
+	fn get_runtime_instance(&self, core: &Cid) -> Option<RuntimeInstance> {
+		self.pool.lock().unwrap().get(core)
+	}
+
+	fn reuse_runtime_instance(&self, runtime_instance: RuntimeInstance) {
+		self.pool.lock().unwrap().insert(runtime_instance);
+	}
+
 	pub async fn execute<S>(
 		&self,
 		storage: &S,
@@ -65,7 +76,7 @@ impl RuntimePool {
 		let result = match core {
 			Core::Wasm(core) => {
 				// get/create instance
-				let pool_instance = self.pool.lock().await.get(core);
+				let pool_instance = self.get_runtime_instance(core);
 				let mut instance = match pool_instance {
 					Some(i) => i,
 					None => RuntimeInstance::create(storage, core).await?,
@@ -84,7 +95,7 @@ impl RuntimePool {
 					.map_err(|e| ExecuteError::Other(e.into()))??;
 
 				// pool instance
-				self.pool.lock().await.insert(instance);
+				self.reuse_runtime_instance(instance);
 
 				// result
 				result

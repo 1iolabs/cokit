@@ -1,14 +1,16 @@
-use super::core_state_or_default;
+use super::{query_core, Query, QueryError};
 use crate::{CoStorage, CO_CORE_NAME_CO};
 use co_core_co::{Co, Participant};
 use co_identity::{IdentityBox, IdentityResolver};
 use co_primitives::{Did, OptionLink};
-use co_storage::StorageError;
 use futures::{stream, StreamExt, TryStreamExt};
 
 /// Read participants from a CO.
-pub async fn participants(storage: &CoStorage, co_state: OptionLink<Co>) -> Result<Vec<Participant>, StorageError> {
-	let co: Co = core_state_or_default(storage, co_state, CO_CORE_NAME_CO).await?;
+pub async fn participants(storage: &CoStorage, co_state: OptionLink<Co>) -> Result<Vec<Participant>, QueryError> {
+	let co = query_core::<Co>(CO_CORE_NAME_CO)
+		.with_default()
+		.execute(storage, co_state)
+		.await?;
 	Ok(co.participants.into_values().collect())
 }
 
@@ -31,7 +33,10 @@ pub async fn is_participant(
 	co_state: OptionLink<Co>,
 	participant: &Option<Did>,
 ) -> anyhow::Result<bool> {
-	let co: Co = core_state_or_default(storage, co_state, CO_CORE_NAME_CO).await?;
+	let co = query_core::<Co>(CO_CORE_NAME_CO)
+		.with_default()
+		.execute(storage, co_state)
+		.await?;
 	if co.keys.is_none() {
 		return Ok(true);
 	}

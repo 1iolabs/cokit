@@ -38,7 +38,7 @@ pub enum WasmerError {
 }
 
 impl WasmerRuntime {
-	#[tracing::instrument(err, ret, skip(bytes), fields(bytes.len = bytes.len()))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, skip(bytes), fields(bytes.len = bytes.len()))]
 	pub fn new(api: CoV1Api, bytes: &Vec<u8>) -> Result<Self, WasmerError> {
 		let mut store = Store::default();
 
@@ -188,7 +188,7 @@ mod tests {
 		let module_wat = r#"
         (module
             (func $test (import "env" "test") (param i32) (result i32))
-            
+
             (type $t0 (func (param i32) (result i32)))
             (func $add (export "add") (type $t0) (param $p0 i32) (result i32)
                 (call $test (local.get $p0))

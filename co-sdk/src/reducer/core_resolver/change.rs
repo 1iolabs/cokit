@@ -29,7 +29,7 @@ where
 	S: BlockStorage + Clone + Send + Sync + 'static,
 	C: CoreResolver<S> + Clone + Send + Sync + 'static,
 {
-	#[tracing::instrument(skip(self, storage, runtime, state, action))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self, storage, runtime, state, action))]
 	async fn execute(
 		&self,
 		storage: &S,
@@ -62,14 +62,14 @@ where
 		for cid in self.storage.drain().await {
 			match cid {
 				BlockStorageChange::Set(cid) => {
-					create_references.insert(cid);
+					create_references.insert(cid.into());
 					if create_references.len() > max_references {
 						next.state = dispatch.dispatch(&StorageAction::ReferenceCreate(create_references)).await?;
 						create_references = BTreeSet::new();
 					}
 				},
 				BlockStorageChange::Remove(cid) => {
-					remove_references.insert(cid);
+					remove_references.insert(cid.into());
 					if remove_references.len() > max_references {
 						next.state = dispatch.dispatch(&StorageAction::Remove(remove_references, true)).await?;
 						remove_references = BTreeSet::new();

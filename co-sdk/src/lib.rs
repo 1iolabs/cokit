@@ -40,10 +40,11 @@ pub use library::{
 	find_co_secret::find_co_secret,
 	find_membership::{find_membership, find_memberships},
 	generate_random_name::generate_random_name,
+	ipld_resolve_recursive::ipld_resolve_recursive,
+	is_cid_encrypted::is_cid_encrypted,
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
 	response_list::ResponseList,
-	tmp_dir::TmpDir,
 	update_co::update_co,
 };
 pub use pin::pin::PinAPI;
@@ -52,11 +53,14 @@ pub use services::{
 	application::{Action, ActionError, ApplicationMessage},
 	connections::{ConnectionAction, ConnectionMessage, ReleaseAction},
 	network::{self, CoNetworkTaskSpawner, CoToken, CoTokenParameters, Network, NetworkMessage},
+	reducer::CoReducer,
 };
 pub use types::{
-	co_reducer::{CoReducer, CoReducerError},
+	co_date::{CoDate, DynamicCoDate, MonotonicCoDate, StaticCoDate, SystemCoDate},
 	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError},
+	co_reducer_state::CoReducerState,
 	co_storage::CoStorage,
+	co_uuid::{CoUuid, DynamicCoUuid, MonotonicCoUuid, RandomCoUuid},
 	cores::{
 		Cores, CO_CORE_CO, CO_CORE_DATA_SERIES, CO_CORE_FILE, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
 		CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_PIN, CO_CORE_NAME_STORAGE, CO_CORE_PIN,

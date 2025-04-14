@@ -30,7 +30,7 @@ where
 	S: BlockStorage + Clone + Send + Sync + 'static,
 	C: CoreResolver<S> + Clone + Send + Sync + 'static,
 {
-	#[tracing::instrument(skip(self, storage, runtime, state, action))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self, storage, runtime, state, action))]
 	async fn execute(
 		&self,
 		storage: &S,
@@ -63,7 +63,7 @@ where
 			match change {
 				OverlayChangeReference::Set(cid) => {
 					// reference
-					create_references.insert(cid);
+					create_references.insert(cid.into());
 					if create_references.len() > max_references {
 						next.state = dispatch.dispatch(&StorageAction::ReferenceCreate(create_references)).await?;
 						create_references = BTreeSet::new();

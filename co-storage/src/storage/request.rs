@@ -1,7 +1,7 @@
 use crate::{BlockStat, BlockStorage, StorageError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, StoreParams};
+use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, StoreParams};
 use futures::{
 	channel::{mpsc, oneshot},
 	SinkExt,
@@ -81,5 +81,13 @@ where
 			.await
 			.map_err(|e| StorageError::Internal(e.into()))?;
 		rx.await.map_err(|e| StorageError::Internal(e.into()))?
+	}
+}
+impl<S> CloneWithBlockStorageSettings for RequestBlockStorage<S>
+where
+	S: BlockStorage + CloneWithBlockStorageSettings + 'static,
+{
+	fn clone_with_settings(&self, _settings: BlockStorageSettings) -> Self {
+		self.clone()
 	}
 }

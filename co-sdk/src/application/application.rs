@@ -5,8 +5,9 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
-	services::application::ApplicationMessage, Action, CoReducer, CoReducerFactory, CoStorage, Storage,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
+	services::application::ApplicationMessage, Action, CoDate, CoReducer, CoReducerFactory, CoStorage, CoUuid,
+	DynamicCoDate, DynamicCoUuid, RandomCoUuid, Storage, SystemCoDate, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
 use co_actor::{Actor, ActorHandle, ActorInstance};
@@ -152,7 +153,13 @@ impl Application {
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
 			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_owned())
-			.create(self.storage(), self.context().inner.runtime(), creator)
+			.create(
+				self.storage(),
+				self.context().inner.runtime(),
+				creator,
+				self.context().date().clone(),
+				self.context().uuid().clone(),
+			)
 			.await?;
 
 		// load
@@ -225,7 +232,7 @@ pub struct ApplicationSettings {
 	pub settings: Tags,
 }
 impl ApplicationSettings {
-	/// Disable locals watcher.
+	/// Whether to use locals watcher. Defaults to true.
 	pub fn setting_co_local_watch(&self) -> bool {
 		!self.settings.matches(tags!("co-local-watch": false))
 	}
@@ -263,6 +270,8 @@ pub struct ApplicationBuilder {
 	keychain: bool,
 	tracing: TracingBuilder,
 	settings: Tags,
+	date: Option<DynamicCoDate>,
+	uuid: Option<DynamicCoUuid>,
 }
 impl ApplicationBuilder {
 	pub fn default_path() -> PathBuf {
@@ -273,7 +282,15 @@ impl ApplicationBuilder {
 	/// Create new instance with path.
 	pub fn new_with_path(identifier: String, path: PathBuf) -> Self {
 		let tracing = TracingBuilder::new(identifier.clone(), Some(path.clone()));
-		Self { identifier, path: Some(path), keychain: true, tracing, settings: Default::default() }
+		Self {
+			identifier,
+			path: Some(path),
+			keychain: true,
+			tracing,
+			settings: Default::default(),
+			date: None,
+			uuid: None,
+		}
 	}
 
 	pub fn new(identifier: String) -> Self {
@@ -283,7 +300,7 @@ impl ApplicationBuilder {
 	/// Create new memory only instance.
 	pub fn new_memory(identifier: String) -> Self {
 		let tracing = TracingBuilder::new(identifier.clone(), None);
-		Self { identifier, path: None, keychain: false, tracing, settings: Default::default() }
+		Self { identifier, path: None, keychain: false, tracing, settings: Default::default(), date: None, uuid: None }
 	}
 
 	/// Enable bunyan logging to log_path.
@@ -302,6 +319,14 @@ impl ApplicationBuilder {
 
 	pub fn without_keychain(self) -> Self {
 		Self { keychain: false, ..self }
+	}
+
+	pub fn with_co_date(self, date: impl CoDate + 'static) -> Self {
+		Self { date: Some(DynamicCoDate::new(date)), ..self }
+	}
+
+	pub fn with_co_uuid(self, uuid: impl CoUuid + 'static) -> Self {
+		Self { uuid: Some(DynamicCoUuid::new(uuid)), ..self }
 	}
 
 	/// See: [`ApplicationSettings::settings`]
@@ -331,11 +356,15 @@ impl ApplicationBuilder {
 			settings: self.settings,
 		};
 
+		// date
+		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(SystemCoDate));
+		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
+
 		// create
 		let service = Actor::spawn(
 			tags!("type": "application", "application": settings.identifier.clone()),
 			crate::services::application::Application::new(settings.clone()),
-			(storage, tasks.clone()),
+			(storage, tasks.clone(), date, uuid),
 		)?;
 
 		// wait for context

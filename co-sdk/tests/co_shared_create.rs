@@ -1,12 +1,12 @@
 use co_core_co::CoAction;
 use co_sdk::{tags, CreateCo, CO_CORE_NAME_CO};
-use helper::instance::Instance;
+use helper::instance::Instances;
 
 pub mod helper;
 
 #[tokio::test]
 async fn test_co_shared_create() {
-	let peer1 = Instance::new(1).await;
+	let peer1 = Instances::new("test").create().await;
 
 	// create identity
 	let identity = peer1.create_identity().await;

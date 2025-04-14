@@ -30,6 +30,7 @@ co-storage = { path = "../co-storage" }
 derive_more = { workspace = true }
 directories = "5.0.1"
 futures = { workspace = true }
+futures-util = { workspace = true }
 hmac = "0.12.1"
 hyper = { workspace = true }
 ipld-core = { workspace = true }
@@ -69,6 +70,6 @@ tracing-opentelemetry = "0.23"
 example-counter = { path = "../examples/counter" }
 
 [features]
-"default" = ["tokio-runtime"]
-"tokio-runtime" = []
-"futures-runtime" = []
+"default" = ["pinning"]
+"pinning" = []
+"logging-verbose" = ["co-storage/logging-verbose"]
