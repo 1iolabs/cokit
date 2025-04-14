@@ -431,12 +431,13 @@ where
 			state: None,
 		},
 	);
+	#[cfg(feature = "pinning")]
 	cores.insert(
 		CO_CORE_NAME_STORAGE.to_owned(),
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_STORAGE).expect(CO_CORE_STORAGE),
 			tags: tags!("core": CO_CORE_STORAGE),
-			state: None,
+			state: create_storage_core_state(storage, settings).await?,
 		},
 	);
 	let mut participants = BTreeMap::<Did, co_core_co::Participant>::new();
@@ -457,34 +458,30 @@ where
 	};
 	reducer.push(storage, runtime, identity, CO_CORE_NAME_CO, &action).await?;
 
-	// setup storage core
-	reducer
-		.push(
-			storage,
-			runtime,
-			identity,
-			CO_CORE_NAME_STORAGE,
-			&StorageAction::PinCreate(
+	// done
+	Ok(())
+}
+
+#[cfg(feature = "pinning")]
+async fn create_storage_core_state<S: BlockStorage + Clone + 'static>(
+	storage: &S,
+	settings: &ApplicationSettings,
+) -> Result<Option<Cid>, anyhow::Error> {
+	Ok(co_core_storage::Storage::initial_state(
+		storage,
+		vec![
+			StorageAction::PinCreate(
 				CoPinningKey::State.to_string(&CO_ID_LOCAL.into()),
 				settings.setting_co_default_max_state(),
 				Default::default(),
 			),
-		)
-		.await?;
-	reducer
-		.push(
-			storage,
-			runtime,
-			identity,
-			CO_CORE_NAME_STORAGE,
-			&StorageAction::PinCreate(
+			StorageAction::PinCreate(
 				CoPinningKey::Log.to_string(&CO_ID_LOCAL.into()),
 				settings.setting_co_default_max_log(),
 				Default::default(),
 			),
-		)
-		.await?;
-
-	// done
-	Ok(())
+		],
+	)
+	.await?
+	.into())
 }

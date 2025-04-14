@@ -9,11 +9,7 @@ pub struct LogCoreResolver<C> {
 	next: C,
 }
 impl<C> LogCoreResolver<C> {
-	pub fn new<S>(core_resolver: C) -> Self
-	where
-		S: BlockStorage + Clone + Send + Sync + Clone + 'static,
-		C: CoreResolver<S> + Clone + Send + Sync + 'static,
-	{
+	pub fn new(core_resolver: C) -> Self {
 		Self { next: core_resolver }
 	}
 }

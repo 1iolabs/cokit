@@ -47,6 +47,22 @@ impl ConnectionState {
 			.flat_map(|network_connection| network_connection.peers.clone())
 			.collect()
 	}
+
+	/// Get initial use action.
+	pub fn use_initial(&self, id: &CoId) -> Option<PeersChangedAction> {
+		// initial
+		let intital_peers = self.co_peers(id);
+		if !intital_peers.is_empty() {
+			Some(PeersChangedAction {
+				id: id.clone(),
+				peers: intital_peers.clone(),
+				added: intital_peers,
+				removed: Default::default(),
+			})
+		} else {
+			None
+		}
+	}
 }
 impl Reducer<ConnectionAction> for ConnectionState {
 	fn reduce(&mut self, action: ConnectionAction) -> Vec<ConnectionAction> {
@@ -87,7 +103,6 @@ impl Reducer<ConnectionAction> for ConnectionState {
 /// - Create CO
 /// - Resolve networks if not specified
 /// - Connect networks that are not connected yet
-/// - Notify about initial connections
 ///
 /// TODO: use did? create new connections when different to existing?
 /// TODO: The initial PeersChanged will be seen by all clients?
@@ -162,17 +177,6 @@ fn reduce_use(
 			},
 		};
 	}
-
-	// initial
-	let intital_peers = state.co_peers(id);
-	if !intital_peers.is_empty() {
-		actions.push(ConnectionAction::PeersChanged(PeersChangedAction {
-			id: id.clone(),
-			peers: intital_peers.clone(),
-			added: intital_peers,
-			removed: Default::default(),
-		}));
-	}
 }
 
 fn reduce_connected(
@@ -181,39 +185,51 @@ fn reduce_connected(
 	network: &Network,
 	result: &Result<BTreeSet<PeerId>, String>,
 ) {
-	if let Some(network) = state.networks.get_mut(network) {
+	// get previous peer map to create diffs
+	let network_co_peers = state.networks.get(network).map(|network| {
+		network
+			.references
+			.iter()
+			.map(|co| (co.clone(), state.co_peers(&co)))
+			.collect::<HashMap<CoId, BTreeSet<PeerId>>>()
+	});
+
+	// apply
+	if let Some(network_connection) = state.networks.get_mut(network) {
 		match result {
 			Ok(peers) => {
-				// diff
-				let added: BTreeSet<PeerId> = peers.difference(&network.peers).cloned().collect();
-				let removed: BTreeSet<PeerId> = network.peers.difference(&peers).cloned().collect();
-
-				// apply
-				network.peers = peers.clone();
-
-				// update co use handles
-				for co in network.references.clone() {
-					actions.push(ConnectionAction::PeersChanged(PeersChangedAction {
-						id: co.clone(),
-						peers: state.co_peers(&co),
-						added: added.clone(),
-						removed: removed.clone(),
-					}));
-				}
+				network_connection.peers = peers.clone();
 			},
 			Err(err) => {
 				// log
-				tracing::warn!(?err, network = ?network.network, peers_count = network.peers.len(), "connections-failed");
+				tracing::warn!(?err, network = ?network_connection.network, peers_count = network_connection.peers.len(), "connections-failed");
 
 				// disconnected
 				// TODO: retry connection?
-				if network.peers.is_empty() {
+				if network_connection.peers.is_empty() {
 					actions.push(ConnectionAction::Disconnected(DisconnectedAction {
-						network: network.network.clone(),
+						network: network_connection.network.clone(),
 						reason: DisconnectReason::Failure(err.to_string()),
 					}));
 				}
 			},
+		}
+	}
+
+	// update co handles
+	if let Some(network_co_peers) = network_co_peers {
+		for (co, previous_co_peers) in network_co_peers {
+			let next_co_peers = state.co_peers(&co);
+			let added: BTreeSet<PeerId> = next_co_peers.difference(&previous_co_peers).cloned().collect();
+			let removed: BTreeSet<PeerId> = previous_co_peers.difference(&next_co_peers).cloned().collect();
+			if !removed.is_empty() || !added.is_empty() {
+				actions.push(ConnectionAction::PeersChanged(PeersChangedAction {
+					id: co.clone(),
+					peers: next_co_peers,
+					added,
+					removed,
+				}));
+			}
 		}
 	}
 }

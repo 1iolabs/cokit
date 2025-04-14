@@ -36,9 +36,9 @@ impl PushHeads {
 		force_mapping: bool,
 	) -> Result<Self, anyhow::Error> {
 		let instance = Actor::spawn_with(
-			tasks,
+			tasks.clone(),
 			tags!("type": "co-push-heads", "co": co.as_str()),
-			PushHeadsActor { context: PushHeadsContext(spawner, connections, identity) },
+			PushHeadsActor { tasks, context: PushHeadsContext(spawner, connections, identity) },
 			PushHeadsState { co: co.clone(), heads: Default::default() },
 		)?;
 		Ok(Self { handle: instance.handle(), force_mapping, initialized: false })
@@ -75,6 +75,7 @@ impl ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for PushHe
 }
 
 struct PushHeadsActor {
+	tasks: TaskSpawner,
 	context: PushHeadsContext,
 }
 #[async_trait]
@@ -113,7 +114,7 @@ impl Actor for PushHeadsActor {
 		let next_actions = state.reduce(action.clone());
 
 		// epic
-		epic.handle(handle, &action, &state, &self.context);
+		epic.handle(&self.tasks, handle, &action, &state, &self.context);
 
 		// dispatch
 		for next_action in next_actions {

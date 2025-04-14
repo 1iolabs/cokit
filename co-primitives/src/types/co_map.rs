@@ -69,15 +69,11 @@ where
 	}
 
 	/// Update (or insert default) value.
-	pub async fn update_key<S, Fut>(
-		&mut self,
-		storage: &S,
-		key: K,
-		update: impl FnOnce(V) -> Fut,
-	) -> Result<(), StorageError>
+	pub async fn update_key<S, F, Fut>(&mut self, storage: &S, key: K, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
-		Fut: Future<Output = Result<V, StorageError>>,
+		F: FnOnce(V) -> Fut + Send,
+		Fut: Future<Output = Result<V, StorageError>> + Send,
 		S: BlockStorage + Clone + 'static,
 	{
 		self.update(storage, |mut transaction| async move {
@@ -124,8 +120,8 @@ where
 	pub async fn update<S, F, Fut>(&mut self, storage: &S, update: F) -> Result<(), StorageError>
 	where
 		S: BlockStorage + Clone + 'static,
-		F: FnOnce(CoMapTransaction<S, K, V>) -> Fut,
-		Fut: Future<Output = Result<CoMapTransaction<S, K, V>, StorageError>>,
+		F: FnOnce(CoMapTransaction<S, K, V>) -> Fut + Send,
+		Fut: Future<Output = Result<CoMapTransaction<S, K, V>, StorageError>> + Send,
 	{
 		let transaction = self.open(storage).await?;
 		let mut result = update(transaction).await?;
@@ -190,10 +186,11 @@ where
 	}
 
 	/// Update (or insert default) value.
-	pub async fn update<Fut>(&mut self, key: K, update: impl FnOnce(V) -> Fut) -> Result<(), StorageError>
+	pub async fn update<F, Fut>(&mut self, key: K, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
-		Fut: Future<Output = Result<V, StorageError>>,
+		F: FnOnce(V) -> Fut + Send,
+		Fut: Future<Output = Result<V, StorageError>> + Send,
 	{
 		self.transaction.update_key(key, update).await
 	}
@@ -244,10 +241,11 @@ where
 	}
 
 	/// Update (or insert default) value.
-	pub async fn update_key<Fut>(&mut self, key: K, update: impl FnOnce(V) -> Fut) -> Result<(), StorageError>
+	pub async fn update_key<F, Fut>(&mut self, key: K, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
-		Fut: Future<Output = Result<V, StorageError>>,
+		F: FnOnce(V) -> Fut + Send,
+		Fut: Future<Output = Result<V, StorageError>> + Send,
 	{
 		let item = self.get(&key).await?.unwrap_or_default();
 		let next_item = update(item).await?;

@@ -90,8 +90,8 @@ where
 	pub async fn update<S, F, Fut>(&mut self, storage: &S, update: F) -> Result<(), StorageError>
 	where
 		S: BlockStorage + Clone + 'static,
-		F: FnOnce(CoSetTransaction<S, K>) -> Fut,
-		Fut: Future<Output = Result<CoSetTransaction<S, K>, StorageError>>,
+		F: FnOnce(CoSetTransaction<S, K>) -> Fut + Send,
+		Fut: Future<Output = Result<CoSetTransaction<S, K>, StorageError>> + Send,
 	{
 		let transaction = self.open(storage).await?;
 		let mut result = update(transaction).await?;

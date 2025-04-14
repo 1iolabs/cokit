@@ -5,7 +5,10 @@ use crate::{
 		connections_peer_provider::ConnectionsPeerProvider, find_co_secret::find_co_secret_by_reference,
 		membership_all_heads::membership_all_heads, push_heads::PushHeads,
 	},
-	reducer::{change::membership_writer::MembershipWriter, core_resolver::dynamic::DynamicCoreResolver},
+	reducer::{
+		change::membership_writer::MembershipWriter,
+		core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
+	},
 	services::{
 		connections::ConnectionMessage,
 		network::{CoHeadsPublish, CoNetworkTaskSpawner},
@@ -478,7 +481,9 @@ impl SharedCoCreator {
 		let log = Log::new(self.co.id.as_str().as_bytes().to_vec(), create_identity_resolver(), Default::default());
 
 		// reducer
-		let mut reducer = ReducerBuilder::new(CoCoreResolver::default(), log)
+		let core_resolver = CoCoreResolver::default();
+		let core_resolver = LogCoreResolver::new(core_resolver);
+		let mut reducer = ReducerBuilder::new(core_resolver, log)
 			.build(&co_storage, runtime.runtime(), date)
 			.await?;
 

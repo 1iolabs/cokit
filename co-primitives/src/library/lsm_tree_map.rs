@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use bloomfilter::Bloom;
 use cid::Cid;
 use either::Either;
-use futures::{pin_mut, stream, FutureExt, Stream, StreamExt, TryStreamExt};
+use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
 	cmp::Ordering,
@@ -630,7 +630,7 @@ where
 		&self,
 		only_run_indicies: Option<BTreeSet<usize>>,
 		start_at: Option<K>,
-	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + '_ {
+	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + Send + '_ {
 		let storage = self.storage.clone();
 		async_stream::try_stream! {
 			// heap (max-sorted)
@@ -1017,7 +1017,7 @@ where
 		// cascade
 		if let Some(max_run_count) = cascade {
 			if next_level_run_count >= max_run_count {
-				self.compact_level(next_level_index, cascade).boxed_local().await?;
+				Box::pin(self.compact_level(next_level_index, cascade)).await?;
 			}
 		}
 
@@ -1035,7 +1035,7 @@ where
 	/// Sorted by newest to oldest run.
 	fn levels_and_runs(
 		&self,
-	) -> impl Stream<Item = Result<Either<(usize, Level<K, V>), (usize, Run<K, V>)>, StorageError>> + '_ {
+	) -> impl Stream<Item = Result<Either<(usize, Level<K, V>), (usize, Run<K, V>)>, StorageError>> + Send + '_ {
 		async_stream::try_stream! {
 			let mut global_level_index = 0;
 			let mut global_run_index = 0;
@@ -1059,7 +1059,7 @@ where
 async fn store_items<'a, S, T>(
 	storage: &S,
 	max_node_entries: u64,
-	items: impl Stream<Item = Result<&'a T, StorageError>>,
+	items: impl Stream<Item = Result<&'a T, StorageError>> + Send,
 ) -> Result<OptionLink<Node<T>>, StorageError>
 where
 	S: BlockStorage + Clone + 'static,

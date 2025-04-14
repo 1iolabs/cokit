@@ -1,4 +1,5 @@
 use crate::{
+	find_membership,
 	library::invite::{CoInvitePayload, CO_DIDCOMM_INVITE},
 	Action, CoContext, CoInvite, CoReducerState, KnownTag, CO_CORE_NAME_MEMBERSHIP,
 };
@@ -53,6 +54,11 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 	let from = header.from.ok_or(anyhow!("invalid header: from"))?.to_string();
 	let did = header.to.first().ok_or(anyhow!("invalid header: to"))?.to_string();
 
+	// already exists?
+	if find_membership(&local, &payload.id).await?.is_some() {
+		return Ok(vec![]);
+	}
+
 	// state
 	let membership_state = match invite {
 		CoInvite::Manual => Some(MembershipState::Invite),
@@ -64,7 +70,6 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 	};
 
 	// apply
-	// TODO: do we need to fetch the blocks to store unencrypted state/heads?
 	if let Some(membership_state) = membership_state {
 		// payload
 		let metadata = CoInviteMetadata {

@@ -117,7 +117,25 @@ pub enum StorageAction {
 	#[serde(rename = "pd")]
 	PinRemove(String),
 }
-
+impl Storage {
+	/// Create inital state.
+	pub async fn initial_state<S: BlockStorage + Clone + 'static>(
+		storage: &S,
+		actions: Vec<StorageAction>,
+	) -> Result<OptionLink<Self>, anyhow::Error> {
+		let mut state = OptionLink::none();
+		for action in actions {
+			state = Self::reduce(
+				state,
+				ReducerAction { from: "".to_owned(), time: 0, core: "".to_owned(), payload: action },
+				storage,
+			)
+			.await?
+			.into();
+		}
+		Ok(state)
+	}
+}
 impl<S: BlockStorage + Clone + 'static> Reducer<StorageAction, S> for Storage {
 	async fn reduce(
 		state: OptionLink<Self>,

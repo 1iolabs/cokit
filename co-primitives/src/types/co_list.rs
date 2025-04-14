@@ -178,16 +178,12 @@ where
 	}
 
 	/// Update (or insert default) value.
-	pub async fn update<S, Fut>(
-		&mut self,
-		storage: &S,
-		key: CoListIndex,
-		update: impl FnOnce(V) -> Fut,
-	) -> Result<(), StorageError>
+	pub async fn update<S, F, Fut>(&mut self, storage: &S, key: CoListIndex, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
-		Fut: Future<Output = Result<V, StorageError>>,
 		S: BlockStorage + Clone + 'static,
+		F: FnOnce(V) -> Fut + Send,
+		Fut: Future<Output = Result<V, StorageError>> + Send,
 	{
 		let mut transaction = self.open(storage).await?;
 		transaction.update(key, update).await?;
@@ -359,10 +355,11 @@ where
 	}
 
 	/// Update (or insert default) value.
-	pub async fn update<Fut>(&mut self, key: CoListIndex, update: impl FnOnce(V) -> Fut) -> Result<(), StorageError>
+	pub async fn update<F, Fut>(&mut self, key: CoListIndex, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
-		Fut: Future<Output = Result<V, StorageError>>,
+		F: FnOnce(V) -> Fut + Send,
+		Fut: Future<Output = Result<V, StorageError>> + Send,
 	{
 		let item = self.get(&key).await?.unwrap_or_default();
 		let next_item = update(item).await?;
