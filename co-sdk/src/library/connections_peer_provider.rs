@@ -6,6 +6,7 @@ use futures::{Stream, TryStreamExt};
 use libp2p::PeerId;
 use std::{collections::BTreeSet, time::Instant};
 
+#[derive(Debug, Clone)]
 pub struct ConnectionsPeerProvider {
 	id: CoId,
 	from: Did,

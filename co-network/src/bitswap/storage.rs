@@ -4,15 +4,22 @@ use crate::{
 };
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::Block;
-use co_storage::{BlockStat, BlockStorage, BlockStorageContentMapping, StorageError};
+use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings};
+use co_storage::{
+	BlockStat, BlockStorage, BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, StorageError,
+};
 use futures::{channel::oneshot, pin_mut};
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	PeerId, Swarm,
 };
 use libp2p_bitswap::{BitswapEvent, QueryId};
-use std::{collections::BTreeSet, marker::PhantomData, mem::swap, sync::Arc, time::Duration};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	marker::PhantomData,
+	mem::swap,
+	time::Duration,
+};
 use tokio_stream::StreamExt;
 
 pub struct NetworkBlockStorage<S, B, C, N, P> {
@@ -21,13 +28,14 @@ pub struct NetworkBlockStorage<S, B, C, N, P> {
 	peer_provider: P,
 	_behaviour: PhantomData<fn(B)>,
 	_context: PhantomData<fn(C)>,
-	mapping: Option<Arc<dyn BlockStorageContentMapping + Send + Sync + 'static>>,
+	mapping: bool,
 	timeout: Duration,
 	tokens: Vec<Token>,
+	settings: BlockStorageSettings,
 }
 impl<S, B, C, N, P> NetworkBlockStorage<S, B, C, N, P>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
+	S: BlockStorage + BlockStorageContentMapping + Send + Sync + Clone + 'static,
 	B: NetworkBehaviour + BitswapBehaviourProvider,
 	P: PeerProvider + Send + Sync + 'static,
 	N: NetworkTaskSpawner<B, C> + Send + Sync + 'static,
@@ -37,16 +45,17 @@ where
 			next,
 			spawner,
 			peer_provider,
-			mapping: None,
 			timeout,
+			mapping: false,
 			tokens: Default::default(),
 			_behaviour: Default::default(),
 			_context: Default::default(),
+			settings: Default::default(),
 		}
 	}
 
-	pub fn set_mapping<M: BlockStorageContentMapping + Send + Sync + 'static>(&mut self, mapping: M) {
-		self.mapping = Some(Arc::new(mapping));
+	pub fn set_mapping(&mut self, mapping: bool) {
+		self.mapping = mapping;
 	}
 
 	pub fn set_tokens(&mut self, tokens: Vec<Token>) {
@@ -94,8 +103,8 @@ where
 	}
 
 	async fn to_network_cid(&self, cid: Cid) -> Cid {
-		if let Some(mapping) = &self.mapping {
-			mapping.to_plain(&cid).await.unwrap_or(cid)
+		if self.mapping && self.next.is_content_mapped().await {
+			self.next.to_plain(&cid).await.unwrap_or(cid)
 		} else {
 			cid
 		}
@@ -115,6 +124,7 @@ where
 			mapping: self.mapping.clone(),
 			timeout: self.timeout.clone(),
 			tokens: self.tokens.clone(),
+			settings: self.settings.clone(),
 			_behaviour: Default::default(),
 			_context: Default::default(),
 		}
@@ -123,19 +133,19 @@ where
 #[async_trait]
 impl<S, B, C, N, P> BlockStorage for NetworkBlockStorage<S, B, C, N, P>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
+	S: BlockStorage + BlockStorageContentMapping + Send + Sync + Clone + 'static,
 	B: NetworkBehaviour + BitswapBehaviourProvider,
-	P: PeerProvider + Send + Sync + 'static,
-	N: NetworkTaskSpawner<B, C> + Send + Sync + 'static,
+	P: PeerProvider + Clone + Send + Sync + 'static,
+	N: NetworkTaskSpawner<B, C> + Clone + Send + Sync + 'static,
 {
 	type StoreParams = S::StoreParams;
 
 	/// Returns a block from storage.
-	#[tracing::instrument(err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self))]
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		match self.next.get(cid).await {
 			Ok(block) => Ok(block),
-			Err(StorageError::NotFound(_, _)) => {
+			Err(StorageError::NotFound(_, _)) if !self.settings.disallow_networking => {
 				self.get_network(*cid).await?;
 				self.next.get(cid).await
 			},
@@ -145,27 +155,83 @@ where
 
 	/// Inserts a block into storage.
 	/// Returns the CID of the block (gurranted to be the same as the supplied).
-	#[tracing::instrument(err, skip(self, block), fields(cid = ?block.cid()))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self, block), fields(cid = ?block.cid()))]
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		self.next.set(block).await
 	}
 
 	/// Remove a block.
-	#[tracing::instrument(err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self))]
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
 		self.next.remove(cid).await
 	}
 
 	/// Stat a block.
-	#[tracing::instrument(err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self))]
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		match self.next.stat(cid).await {
-			Err(StorageError::NotFound(_, _)) => {
+			Err(StorageError::NotFound(_, _)) if !self.settings.disallow_networking => {
 				self.get_network(*cid).await?;
 				self.next.stat(cid).await
 			},
 			result => result,
 		}
+	}
+}
+#[async_trait]
+impl<S, B, C, N, P> ExtendedBlockStorage for NetworkBlockStorage<S, B, C, N, P>
+where
+	S: BlockStorage + ExtendedBlockStorage + BlockStorageContentMapping + Send + Sync + Clone + 'static,
+	B: NetworkBehaviour + BitswapBehaviourProvider,
+	P: PeerProvider + Clone + Send + Sync + 'static,
+	N: NetworkTaskSpawner<B, C> + Clone + Send + Sync + 'static,
+{
+	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+		self.next.set_extended(block).await
+	}
+}
+impl<S, B, C, N, P> CloneWithBlockStorageSettings for NetworkBlockStorage<S, B, C, N, P>
+where
+	S: CloneWithBlockStorageSettings,
+	P: Clone,
+	N: Clone,
+{
+	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+		Self {
+			next: self.next.clone_with_settings(settings.clone()),
+			spawner: self.spawner.clone(),
+			peer_provider: self.peer_provider.clone(),
+			mapping: self.mapping.clone(),
+			timeout: self.timeout.clone(),
+			tokens: self.tokens.clone(),
+			settings,
+			_behaviour: Default::default(),
+			_context: Default::default(),
+		}
+	}
+}
+#[async_trait]
+impl<S, B, C, N, P> BlockStorageContentMapping for NetworkBlockStorage<S, B, C, N, P>
+where
+	S: BlockStorage + BlockStorageContentMapping + Send + Sync + Clone + 'static,
+	B: NetworkBehaviour + BitswapBehaviourProvider,
+	P: PeerProvider + Clone + Send + Sync + 'static,
+	N: NetworkTaskSpawner<B, C> + Clone + Send + Sync + 'static,
+{
+	async fn is_content_mapped(&self) -> bool {
+		self.next.is_content_mapped().await
+	}
+
+	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
+		self.next.to_plain(mapped).await
+	}
+
+	async fn to_mapped(&self, plain: &Cid) -> Option<Cid> {
+		self.next.to_mapped(plain).await
+	}
+
+	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+		self.next.insert_mappings(mappings).await
 	}
 }
 

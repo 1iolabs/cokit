@@ -1,4 +1,5 @@
-use crate::{Block, Cid, DefaultParams};
+use crate::{Block, DefaultParams};
+use cid::Cid;
 
 /// Storage interface.
 pub trait Storage {

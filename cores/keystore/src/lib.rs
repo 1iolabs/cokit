@@ -1,4 +1,4 @@
-use co_api::{Context, DagMap, Reducer, ReducerAction, Tags};
+use co_api::{Context, DagMap, DagMapExt, Reducer, ReducerAction, Tags};
 use serde::{Deserialize, Serialize};
 
 /// Key Store.
@@ -47,10 +47,10 @@ impl Reducer for KeyStore {
 		let mut result = self;
 		match &event.payload {
 			KeyStoreAction::Set(i) => {
-				result.keys.insert(context, i.uri.clone(), i.clone());
+				result.keys.insert(context.storage_mut(), i.uri.clone(), i.clone());
 			},
 			KeyStoreAction::Remove(uri) => {
-				result.keys.remove(context, uri);
+				result.keys.remove(context.storage_mut(), uri);
 			},
 		}
 		result

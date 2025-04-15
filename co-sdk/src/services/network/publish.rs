@@ -3,29 +3,28 @@ use super::{
 	CoNetworkTaskSpawner,
 };
 use crate::{
-	library::to_plain::to_plain, reducer::core_resolver::dynamic::DynamicCoreResolver, state, CoStorage, Reducer,
-	ReducerChangeContext, ReducerChangedHandler,
+	library::to_external_cid::{to_external_cids, to_external_cids_opt_force},
+	reducer::core_resolver::dynamic::DynamicCoreResolver,
+	state, CoStorage, Reducer, ReducerChangeContext, ReducerChangedHandler,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_network::NetworkTaskSpawner;
 use co_primitives::{CoId, Network, NetworkCoHeads};
-use co_storage::BlockStorageContentMapping;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Subscribe, Unsubscribe and Publish to CoHeads protocol when a reducer changes.
 /// Subscriptions will be unsubscribed when dropped (also when the reduer is dropped).
-pub struct CoHeadsPublish<M> {
+pub struct CoHeadsPublish {
 	spawner: CoNetworkTaskSpawner,
 	co: CoId,
-	mapping: Option<M>,
 	/// Force the mapping to be applied by returning an error when no mapping is found.
 	force_mapping: bool,
 	subscriptions: BTreeMap<NetworkCoHeads, CoHeadsSubscription>,
 }
-impl<M> CoHeadsPublish<M> {
-	pub fn new(spawner: CoNetworkTaskSpawner, co: CoId, mapping: Option<M>, force_mapping: bool) -> Self {
-		Self { co, spawner, mapping, force_mapping, subscriptions: Default::default() }
+impl CoHeadsPublish {
+	pub fn new(spawner: CoNetworkTaskSpawner, co: CoId, force_mapping: bool) -> Self {
+		Self { co, spawner, force_mapping, subscriptions: Default::default() }
 	}
 
 	// pub async fn request(&self, reducer: &CoReducer) -> Result<(), anyhow::Error>
@@ -53,27 +52,27 @@ impl<M> CoHeadsPublish<M> {
 	// }
 }
 #[async_trait]
-impl<M> ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for CoHeadsPublish<M>
-where
-	M: BlockStorageContentMapping + Send + Sync + 'static,
-{
+impl ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for CoHeadsPublish {
 	// TODO: skip publish when have only one peer?
 	async fn on_state_changed(
 		&mut self,
+		storage: &CoStorage,
 		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
-		let mut heads = reducer.heads().clone();
+		let heads = reducer.heads();
 
 		// map plain heads to encrypted heads
-		if self.mapping.is_some() {
-			heads = to_plain(&self.mapping, self.force_mapping, heads)
+		let external_heads = if self.force_mapping {
+			to_external_cids_opt_force(storage, heads.clone())
 				.await
-				.map_err(|err| anyhow!("Failed to map head: {}", err))?;
-		}
+				.ok_or_else(|| anyhow!("Failed to map heads: {:?}", heads))?
+		} else {
+			to_external_cids(storage, heads.clone()).await
+		};
 
 		// networks
-		let networks: BTreeSet<_> = state::networks(reducer.log().storage(), reducer.state().into())
+		let networks: BTreeSet<_> = state::networks(storage, reducer.state().into())
 			.await?
 			.into_iter()
 			.filter_map(|network| match network {
@@ -91,7 +90,7 @@ where
 			// publish
 			self.spawner.spawn(CoHeadsNetworkTask::new(CoHeadsRequest::PublishHeads {
 				network: network.clone(),
-				heads: heads.clone(),
+				heads: external_heads.clone(),
 			}))?;
 		}
 

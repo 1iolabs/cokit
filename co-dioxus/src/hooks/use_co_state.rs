@@ -3,6 +3,7 @@ use anyhow::anyhow;
 use cid::Cid;
 use co_sdk::{Application, CoId};
 use dioxus::prelude::*;
+use futures::{pin_mut, StreamExt};
 use std::collections::BTreeSet;
 
 /// Use state/heads from an CO.
@@ -58,22 +59,22 @@ async fn fetch_and_observe_state(
 			Ok(Some(reducer)) => {
 				// watch
 				//  note: watch will immediately fire for initial event
-				let mut watch = reducer.watch().await;
+				let stream = reducer.reducer_state_stream();
+				pin_mut!(stream);
 				tracing::info!(co = ?co_id, "watch");
 				loop {
 					tokio::select! {
-						item = watch.changed() => {
+						item = stream.next() => {
 							match item {
-								Ok(_) => {
+								Some(next) => {
 									tracing::info!(co = ?co_id, "watch-changed");
-									let next = watch.borrow_and_update().clone();
-									if let Some((next_state, next_heads)) = next {
+									if let Some((next_state, next_heads)) = next.some() {
 										tracing::info!(co = ?co_id, ?next_state, ?next_heads, "watch-apply");
 										*state.write() = (Some(next_state), next_heads);
 									}
 								},
-								Err(err) => {
-									tracing::info!(co = ?co_id, ?err, "watch-failed");
+								None => {
+									tracing::info!(co = ?co_id, "watch-failed");
 									*state.write() = (Default::default(), Default::default());
 									error.write().push(CoError::from_error(anyhow!("Co not found: {}", co_id)));
 									break;

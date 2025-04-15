@@ -6,6 +6,9 @@ mod task_spawner;
 
 pub use actor::{Actor, ActorError, ActorHandle, ActorInstance, ActorState};
 pub use epic::{Epic, EpicExt, EpicRuntime, JoinEpic, MergeEpic, OnceEpic, TracingEpic};
-pub use response::{Response, ResponseReceiver, ResponseStream, ResponseStreamReceiver, ResponseStreams};
+pub use response::{
+	Response, ResponseBackPressureStream, ResponseBackPressureStreamReceiver, ResponseReceiver, ResponseStream,
+	ResponseStreamReceiver, ResponseStreams,
+};
 pub use state::Reducer;
 pub use task_spawner::TaskSpawner;

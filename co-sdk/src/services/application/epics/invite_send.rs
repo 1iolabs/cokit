@@ -15,7 +15,7 @@ use co_actor::ActorHandle;
 use co_core_co::{Co, CoAction};
 use co_identity::{IdentityResolver, PrivateIdentityResolver};
 use co_network::didcomm::EncodedMessage;
-use co_primitives::{CoConnectivity, CoId, Did, Network};
+use co_primitives::{CoConnectivity, CoId, DagSetExt, Did, Network};
 use futures::{stream, Stream, StreamExt, TryStreamExt};
 use std::{collections::BTreeSet, future::ready};
 
@@ -59,7 +59,7 @@ pub fn invite_send_action(
 	_context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::CoreAction { co, context, action, cid: _ }
+		Action::CoreAction { co, storage: _, context, action, cid: _ }
 			if context.is_local_change() && action.core == CO_CORE_NAME_CO =>
 		{
 			let co_action: CoAction = action.get_payload().ok()?;
@@ -130,8 +130,8 @@ async fn create_invite(
 ) -> anyhow::Result<(EncodedMessage, BTreeSet<Network>)> {
 	let identity_resolver = context.identity_resolver().await?;
 	let co_reducer = context.try_co_reducer(co_id).await?;
-	let co = co_reducer.co().await?;
-	let (state, heads) = co_reducer.external_reducer_state().await;
+	let (storage, co) = co_reducer.co().await?;
+	let (state, heads) = co_reducer.reducer_state().await.to_external(&storage).await.into();
 	let from_identity = context.private_identity_resolver().await?.resolve_private(from).await?;
 	let to_identity = context.identity_resolver().await?.resolve(to).await?;
 
@@ -144,7 +144,7 @@ async fn create_invite(
 			tags: co.tags.clone(),
 			state: state.ok_or(anyhow!("Can not invite to empty CO"))?,
 			heads,
-			connectivity: connectivity(co_reducer.storage(), &co).await?,
+			connectivity: connectivity(storage, &co).await?,
 		},
 		None,
 	)?;

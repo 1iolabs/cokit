@@ -1,4 +1,5 @@
 use super::ActorHandle;
+use crate::TaskSpawner;
 use co_primitives::Tags;
 use futures::{
 	pin_mut,
@@ -114,12 +115,12 @@ where
 		Self { epic: epic.boxed(), _actor: Default::default(), error: Arc::new(error) }
 	}
 
-	pub fn handle(&mut self, actor: &ActorHandle<M>, action: &A, state: &S, context: &C) {
+	pub fn handle(&mut self, spawner: &TaskSpawner, actor: &ActorHandle<M>, action: &A, state: &S, context: &C) {
 		let stream = self.epic.box_epic(action, state, context);
 		if let Some(stream) = stream {
 			let actor = actor.clone();
 			let error = self.error.clone();
-			tokio::spawn(async move {
+			spawner.spawn(async move {
 				let stream = stream.take_until(actor.closed());
 				pin_mut!(stream);
 				while let Some(action) = stream.next().await {

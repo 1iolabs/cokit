@@ -7,7 +7,8 @@ use crate::{
 		connections::ConnectionMessage,
 		network::{CoNetworkTaskSpawner, DidCommSendNetworkTask},
 	},
-	Action, CoContext, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	state::{query_core, Query},
+	Action, CoContext, CoStorage, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
 use co_actor::ActorHandle;
@@ -27,16 +28,16 @@ pub fn join_send(
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	// filter
 	let result = match action {
-		Action::CoreAction { co, context: _, action, cid: _ }
+		Action::CoreAction { co, storage, context: _, action, cid: _ }
 			if co.as_str() == CO_ID_LOCAL && action.core == CO_CORE_NAME_MEMBERSHIP =>
 		{
 			let mambership_action: MembershipsAction = action.get_payload().ok()?;
 			match mambership_action {
 				MembershipsAction::Join(membership) if membership.membership_state == MembershipState::Join => {
-					Some((context.clone(), membership.id, membership.did))
+					Some((context.clone(), storage, membership.id, membership.did))
 				},
 				MembershipsAction::ChangeMembershipState { id, did, membership_state: MembershipState::Join } => {
-					Some((context.clone(), id, did))
+					Some((context.clone(), storage, id, did))
 				},
 				_ => None,
 			}
@@ -45,19 +46,26 @@ pub fn join_send(
 	};
 
 	// join
-	result.map(|(context, id, did)| join_with_result(context.clone(), id, did).map(Ok))
+	result.map(|(context, storage, id, did)| join_with_result(context.clone(), storage.clone(), id, did).map(Ok))
 }
 
-fn join_with_result(context: CoContext, id: CoId, did: Did) -> impl Stream<Item = Action> + Send + 'static {
+fn join_with_result(
+	context: CoContext,
+	storage: CoStorage,
+	id: CoId,
+	did: Did,
+) -> impl Stream<Item = Action> + Send + 'static {
 	stream::once(ready((id.clone(), did.clone())))
 		.flat_map({
 			let context = context.clone();
+			let storage = storage.clone();
 			move |(id, did)| {
 				let context = context.clone();
+				let storage = storage.clone();
 				async_stream::try_stream! {
 					if let Some(network) = context.network().await {
-						if let Some(membership) = find_membership(&context, &id, &did).await? {
-							for action in join(context, network, membership).await? {
+						if let Some(membership) = find_membership(&context, &storage, &id, &did).await? {
+							for action in join(context, storage, network, membership).await? {
 								yield action;
 							}
 						}
@@ -72,7 +80,7 @@ fn join_with_result(context: CoContext, id: CoId, did: Did) -> impl Stream<Item 
 				Action::Error { err: _ } => {
 					Some(Action::Joined { co: id.clone(), participant: did.clone(), success: false, peer: None })
 				},
-				Action::JoinSent { co: _, heads, participant: _, peer } if !is_cid_encrypted(heads.iter()) => {
+				Action::JoinSent { co: _, encrypted, participant: _, peer } if !*encrypted => {
 					Some(Action::Joined { co: id.clone(), participant: did.clone(), success: true, peer: Some(*peer) })
 				},
 				_ => None,
@@ -85,9 +93,16 @@ fn join_with_result(context: CoContext, id: CoId, did: Did) -> impl Stream<Item 
 		})
 }
 
-async fn find_membership(context: &CoContext, id: &CoId, did: &Did) -> anyhow::Result<Option<Membership>> {
+async fn find_membership(
+	context: &CoContext,
+	storage: &CoStorage,
+	id: &CoId,
+	did: &Did,
+) -> anyhow::Result<Option<Membership>> {
 	let local = context.local_co_reducer().await?;
-	let memberships: Memberships = local.state(CO_CORE_NAME_MEMBERSHIP).await?;
+	let memberships = query_core::<Memberships>(CO_CORE_NAME_MEMBERSHIP)
+		.execute(storage, local.reducer_state().await.co())
+		.await?;
 	Ok(memberships.memberships.into_iter().find(|membership| {
 		&membership.id == id && &membership.did == did
 		// // we only handle remote invites
@@ -98,10 +113,10 @@ async fn find_membership(context: &CoContext, id: &CoId, did: &Did) -> anyhow::R
 
 async fn join(
 	context: CoContext,
+	storage: CoStorage,
 	(network, connections): (CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>),
 	membership: Membership,
 ) -> anyhow::Result<Vec<Action>> {
-	let local_co = context.local_co_reducer().await?;
 	let mut result = Vec::new();
 
 	// timeout
@@ -112,7 +127,7 @@ async fn join(
 		.tags
 		.link(&KnownTags::CoInviteMetadata.to_string())
 		.ok_or(anyhow!("No co-invite-metadata"))?;
-	let invite: CoInviteMetadata = local_co.storage().get_deserialized(invite_cid).await?;
+	let invite: CoInviteMetadata = storage.get_deserialized(invite_cid).await?;
 
 	// message
 	let private_identity_resolver = context.private_identity_resolver().await?;
@@ -134,7 +149,7 @@ async fn join(
 						result.push(Action::JoinSent {
 							co: membership.id.clone(),
 							participant: membership.did.clone(),
-							heads: membership.heads.clone(),
+							encrypted: is_membership_heads_encrypted(&storage, &membership).await?,
 							peer,
 						});
 						break;
@@ -152,4 +167,12 @@ async fn join(
 
 	// result
 	Ok(result)
+}
+
+async fn is_membership_heads_encrypted(storage: &CoStorage, membership: &Membership) -> Result<bool, anyhow::Error> {
+	for co_state in membership.state.iter() {
+		let (_state, heads) = storage.get_value(&co_state.state).await?.into_value();
+		return Ok(is_cid_encrypted(&heads));
+	}
+	Ok(false)
 }

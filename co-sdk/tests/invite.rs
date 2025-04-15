@@ -118,10 +118,14 @@ async fn test_invite() {
 			did: identity2.identity().to_owned(),
 			membership_state: MembershipState::Join,
 		};
-		let (push, membership_state) = join!(
-			local_co.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &payload),
-			wait_membership_state(peer2.application.actions(), [MembershipState::Active, MembershipState::Invite]),
-		);
+		let (push, membership_state) = join!(local_co.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &payload), async {
+			timeout(
+				timeout_duration,
+				wait_membership_state(peer2.application.actions(), [MembershipState::Active, MembershipState::Invite]),
+			)
+			.await
+			.expect("peer2 to join in time")
+		});
 		push.unwrap();
 		assert_eq!(
 			membership_state.unwrap(),
@@ -149,8 +153,8 @@ async fn test_invite() {
 
 	// peer2: read state
 	assert_eq!(peer2_shared_co.reducer_state().await, shared_co.reducer_state().await);
-	let co = shared_co.co().await.unwrap();
-	let peer2_co = peer2_shared_co.co().await.unwrap();
+	let (_, co) = shared_co.co().await.unwrap();
+	let (_, peer2_co) = peer2_shared_co.co().await.unwrap();
 	assert_eq!(peer2_co, co);
 }
 
@@ -163,6 +167,8 @@ async fn test_invite() {
 /// - P2: Read state
 #[tokio::test]
 async fn test_invite_encrypted() {
+	let timeout_duration = Duration::from_secs(10);
+
 	let mut instances = Instances::new("test_invite");
 	let mut peer1 = instances.create().await;
 	peer1.application.create_network(false).await.unwrap();
@@ -228,8 +234,9 @@ async fn test_invite_encrypted() {
 		.take(1)
 		.collect::<Vec<_>>();
 	let peer1_invite_sent = async move {
-		peer1_invite_sent
+		timeout(timeout_duration, peer1_invite_sent)
 			.await
+			.expect("peer1 to send invite in time")
 			.into_iter()
 			.next()
 			.expect("not empty")
@@ -238,7 +245,12 @@ async fn test_invite_encrypted() {
 
 	// peer2: membership-invite
 	let peer2_membership_invite = wait_membership_state(peer2.application.actions(), [MembershipState::Invite]);
-	let peer2_membership_invite = async move { peer2_membership_invite.await.expect("not empty") };
+	let peer2_membership_invite = async move {
+		timeout(timeout_duration, peer2_membership_invite)
+			.await
+			.expect("peer2 to recv invite in time")
+			.expect("not empty")
+	};
 
 	// check
 	let ((_, membership_co, membership_participant), (_, invited_participant, invited_peer), _) =
@@ -288,8 +300,8 @@ async fn test_invite_encrypted() {
 
 	// peer2: read state
 	assert_eq!(peer2_shared_co.reducer_state().await, shared_co.reducer_state().await);
-	let co = shared_co.co().await.unwrap();
-	let peer2_co = peer2_shared_co.co().await.unwrap();
+	let (_, co) = shared_co.co().await.unwrap();
+	let (_, peer2_co) = peer2_shared_co.co().await.unwrap();
 	assert_eq!(peer2_co, co);
 }
 
@@ -303,7 +315,7 @@ async fn wait_membership_state(
 			let state = state.clone();
 			async move {
 				match action {
-					Action::CoreAction { co, context: _, action, cid: _ }
+					Action::CoreAction { co, storage: _, context: _, action, cid: _ }
 						if co.as_str() == CO_ID_LOCAL && action.core == CO_CORE_NAME_MEMBERSHIP =>
 					{
 						let mambership_action: MembershipsAction = action.get_payload().ok()?;

@@ -1,13 +1,16 @@
-use crate::{services::application::ApplicationMessage, Action, CoreResolver, CoreResolverError, ReducerChangeContext};
+use crate::{
+	services::application::ApplicationMessage, Action, CoStorage, CoreResolver, CoreResolverError, ReducerChangeContext,
+};
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::ActorHandle;
 use co_primitives::CoId;
-use co_runtime::RuntimePool;
+use co_runtime::{RuntimeContext, RuntimePool};
 use co_storage::BlockStorage;
 use std::marker::PhantomData;
 
 /// Epic resolver middleware.
+#[derive(Debug, Clone)]
 pub struct ReactiveCoreResolver<S, N> {
 	_storage: PhantomData<S>,
 	next: N,
@@ -16,8 +19,8 @@ pub struct ReactiveCoreResolver<S, N> {
 }
 impl<S, N> ReactiveCoreResolver<S, N>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
-	N: CoreResolver<S> + Send + Sync + 'static,
+	S: BlockStorage + Clone + Send + Sync + 'static,
+	N: CoreResolver<S> + Clone + Send + Sync + 'static,
 {
 	pub fn new(next: N, co: CoId, actions: ActorHandle<ApplicationMessage>) -> Self {
 		Self { _storage: Default::default(), co, next, actions }
@@ -26,7 +29,7 @@ where
 #[async_trait]
 impl<S, N> CoreResolver<S> for ReactiveCoreResolver<S, N>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
+	S: BlockStorage + Into<CoStorage> + Clone + Send + Sync + 'static,
 	N: CoreResolver<S> + Send + Sync + 'static,
 {
 	async fn execute(
@@ -36,7 +39,7 @@ where
 		context: &ReducerChangeContext,
 		state: &Option<Cid>,
 		action: &Cid,
-	) -> Result<Option<Cid>, CoreResolverError> {
+	) -> Result<RuntimeContext, CoreResolverError> {
 		// execute
 		let next_state = self.next.execute(storage, runtime, context, state, action).await?;
 

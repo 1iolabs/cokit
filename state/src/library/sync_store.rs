@@ -4,7 +4,8 @@ use rxrust::{
 	scheduler::{NormalReturn, TaskHandle},
 };
 use std::{convert::Infallible, sync::Arc};
-use tokio::sync::{watch, Mutex};
+use tokio::sync::watch;
+use std::sync::Mutex;
 
 pub struct SyncStore<R>
 where
@@ -53,11 +54,11 @@ where
 	R: Reducer + Send + 'static,
 {
 	async fn dispatch(&self, action: R::Action) {
-		self.store.lock().await.dispatch(action);
+		self.store.lock().unwrap().dispatch(action);
 	}
 
 	async fn state(&self) -> R::State {
-		self.store.lock().await.state()
+		self.store.lock().unwrap().state()
 	}
 }
 

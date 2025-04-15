@@ -27,7 +27,7 @@ pub async fn command(
 	let application = context.application(cli).await;
 	let co_reducer = application.context().try_co_reducer(&command.co).await?;
 	let identities: Vec<Identity> =
-		state::identities(co_reducer.storage(), co_reducer.co_state().await, Some(&command.core))
+		state::identities(co_reducer.storage(), co_reducer.reducer_state().await.co(), Some(&command.core))
 			.try_collect()
 			.await?;
 

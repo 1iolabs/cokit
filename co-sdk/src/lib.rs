@@ -24,14 +24,15 @@ pub use co_identity::{
 };
 pub use co_primitives::{
 	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, AbsolutePath,
-	AbsolutePathOwned, BlockSerializer, CoId, CoInvite, CoNetwork, Component, Components, Date, Did, KnownMultiCodec,
-	KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, OptionLink, Path, PathError, PathExt, PathOwned,
-	RelativePath, RelativePathOwned, Tag, Tags,
+	AbsolutePathOwned, BlockSerializer, BlockStat, BlockStorage, BlockStorageExt, CoId, CoInvite, CoList, CoListIndex,
+	CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, Component, Components,
+	DagCollection, DagCollectionAsyncExt, DagCollectionExt, Date, Did, KnownMultiCodec, KnownTag, KnownTags, Link,
+	MultiCodec, MultiCodecError, NodeStream, OptionLink, Path, PathError, PathExt, PathOwned, RelativePath,
+	RelativePathOwned, StorageError, Tag, Tags,
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{
-	unixfs_add, unixfs_add_file, unixfs_cat_buffer, unixfs_encode_buffer, unixfs_stream, BlockStat, BlockStorage,
-	BlockStorageContentMapping, BlockStorageExt, StorageError,
+	unixfs_add, unixfs_add_file, unixfs_cat_buffer, unixfs_encode_buffer, unixfs_stream, BlockStorageContentMapping,
 };
 pub use library::{
 	did_key_provider::DidKeyProvider,
@@ -39,11 +40,12 @@ pub use library::{
 	find_co_secret::find_co_secret,
 	find_membership::{find_membership, find_memberships},
 	generate_random_name::generate_random_name,
+	ipld_resolve_recursive::ipld_resolve_recursive,
+	is_cid_encrypted::is_cid_encrypted,
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
-	node_stream::NodeStream,
 	response_list::ResponseList,
-	tmp_dir::TmpDir,
+	storage_cleanup::storage_cleanup,
 	update_co::update_co,
 };
 pub use pin::pin::PinAPI;
@@ -52,14 +54,18 @@ pub use services::{
 	application::{Action, ActionError, ApplicationMessage},
 	connections::{ConnectionAction, ConnectionMessage, ReleaseAction},
 	network::{self, CoNetworkTaskSpawner, CoToken, CoTokenParameters, Network, NetworkMessage},
+	reducer::CoReducer,
 };
 pub use types::{
-	co_reducer::{CoReducer, CoReducerError},
+	co_date::{CoDate, DynamicCoDate, MonotonicCoDate, StaticCoDate, SystemCoDate},
 	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError},
+	co_reducer_state::CoReducerState,
 	co_storage::CoStorage,
+	co_uuid::{CoUuid, DynamicCoUuid, MonotonicCoUuid, RandomCoUuid},
 	cores::{
 		Cores, CO_CORE_CO, CO_CORE_DATA_SERIES, CO_CORE_FILE, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
-		CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_PIN, CO_CORE_PIN, CO_CORE_ROOM,
+		CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_PIN, CO_CORE_NAME_STORAGE, CO_CORE_PIN,
+		CO_CORE_ROOM,
 	},
 	error::{ErrorContext, ErrorKind, IntoAction},
 	reference::{Reference, Request, Response, ResponseError},

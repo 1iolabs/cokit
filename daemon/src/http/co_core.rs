@@ -17,14 +17,14 @@ pub async fn get(
 		.co_reducer(&co_id)
 		.await?
 		.ok_or(HttpError::NotFound(anyhow::anyhow!("Co not found: {}", co_id)))?;
-	let state = reducer.co().await?;
+	let (storage, state) = reducer.co().await?;
 	let core = state
 		.cores
 		.get(&core)
 		.ok_or(HttpError::NotFound(anyhow::anyhow!("Core not found: {}", core)))?;
 	let body = match core.state {
 		Some(cid) => {
-			let ipld: Ipld = reducer.storage().get_deserialized(&cid).await?;
+			let ipld: Ipld = storage.get_deserialized(&cid).await?;
 			to_value(ipld)?
 		},
 		None => json!(null),

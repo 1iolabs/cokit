@@ -217,7 +217,7 @@ function Todos({co}) {
 ### Setup
 
 Dependencies:
-- `rust-1.76` (MSRV)
+- `rust-1.82` (MSRV)
 - `rustfmt`
 - `wasm32-unknown-unknown` to build cores.
 - `toolchain nightly` to use `rustfmt +nightly`
@@ -229,6 +229,11 @@ rustup target add wasm32-unknown-unknown
 rustup toolchain install nightly
 rustup component add --toolchain nightly rustfmt
 ```
+
+### Rust
+
+#### Features (MSRV)
+- `1.82`: https://blog.rust-lang.org/2024/10/17/Rust-1.82.0.html#precise-capturing-use-syntax
 
 ### Utility
 

@@ -1,6 +1,6 @@
 use crate::{CoCid, TotalFloat64};
 use cid::Cid;
-use derive_more::From;
+use derive_more::{From, TryInto};
 use ipld_core::ipld::Ipld;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, Serializer};
@@ -46,7 +46,7 @@ macro_rules! tag {
 }
 
 /// Tag Value
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, From, TryInto, Serialize, Deserialize, JsonSchema)]
 #[serde(into = "Ipld", from = "Ipld")]
 pub enum TagValue {
 	/// Represents the absence of a value or the value undefined.
@@ -83,7 +83,7 @@ impl TagValue {
 			TagValue::Null => true,
 			TagValue::Bool(v) => v == &bool::default(),
 			TagValue::Integer(v) => v == &Default::default(),
-			TagValue::Float(v) => *v == TotalFloat64(0f64),
+			TagValue::Float(v) => *v == TotalFloat64::from(0f64),
 			TagValue::String(v) => v == "",
 			TagValue::Bytes(v) => v.is_empty(),
 			TagValue::List(v) => v.is_empty(),
@@ -106,7 +106,7 @@ impl From<TagValue> for Ipld {
 			TagValue::Null => Ipld::Null,
 			TagValue::Bool(i) => Ipld::Bool(i),
 			TagValue::Integer(i) => Ipld::Integer(i),
-			TagValue::Float(i) => Ipld::Float(i.0),
+			TagValue::Float(i) => Ipld::Float(i.into()),
 			TagValue::String(i) => Ipld::String(i),
 			TagValue::Bytes(i) => Ipld::Bytes(i),
 			TagValue::List(i) => Ipld::List(i.into_iter().map(|e| e.into()).collect()),
@@ -130,6 +130,11 @@ impl From<Ipld> for TagValue {
 		}
 	}
 }
+impl From<&str> for TagValue {
+	fn from(value: &str) -> Self {
+		Self::String(value.to_owned())
+	}
+}
 impl From<Cid> for TagValue {
 	fn from(value: Cid) -> Self {
 		Self::Link(value.into())
@@ -141,7 +146,7 @@ impl std::fmt::Display for TagValue {
 			TagValue::Null => write!(f, "null"),
 			TagValue::Bool(v) => write!(f, "{}", if *v { "true" } else { "false" }),
 			TagValue::Integer(i) => write!(f, "{}", i),
-			TagValue::Float(v) => write!(f, "{}", v.0),
+			TagValue::Float(v) => write!(f, "{}", v),
 			TagValue::String(v) => write!(f, "{}", v),
 			TagValue::Bytes(v) => write!(f, "{:x?}", v),
 			TagValue::List(v) => {
@@ -292,6 +297,21 @@ impl Tags {
 		None
 	}
 
+	/// Get first tag value (that is a integer) for given key.
+	pub fn integer(&self, key: &str) -> Option<i128> {
+		for (tag_key, tag_value) in self.iter() {
+			if key == tag_key {
+				match tag_value {
+					TagValue::Integer(v) => return Some(*v),
+					_ => {
+						continue;
+					},
+				}
+			}
+		}
+		None
+	}
+
 	/// Find first tag value, that is a link, by key.
 	pub fn link(&self, key: &str) -> Option<&Cid> {
 		self.0.iter().find_map(|tag| match tag {
@@ -367,7 +387,7 @@ impl TagsMatches for Tags {
 /// Tags match pattern.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum TagsExpr {
-	/// Tests if tag exists.
+	/// Tests if tag exists (with same key and value).
 	#[serde(rename = "$tag")]
 	Tag(Tag),
 	/// Tests if all patterns evaluate to true.
@@ -376,9 +396,38 @@ pub enum TagsExpr {
 	/// Tests if some patterns evaluate to true.
 	#[serde(rename = "$or")]
 	Or(Vec<TagsExpr>),
-	/// PErform logical NOT operation in pattern.
+	/// Perform logical NOT AND operation in pattern.
 	#[serde(rename = "$not")]
 	Not(Box<TagsExpr>),
+}
+impl TagsExpr {
+	pub fn new(key: &str, value: impl Into<TagValue>) -> TagsExpr {
+		TagsExpr::Tag((key.to_owned(), value.into()))
+	}
+
+	pub fn not(self) -> TagsExpr {
+		TagsExpr::Not(Box::new(self))
+	}
+
+	pub fn and(mut self, other: TagsExpr) -> TagsExpr {
+		match &mut self {
+			TagsExpr::And(items) => {
+				items.push(other);
+				return self;
+			},
+			_ => TagsExpr::And(vec![self, other]),
+		}
+	}
+
+	pub fn or(mut self, other: TagsExpr) -> TagsExpr {
+		match &mut self {
+			TagsExpr::Or(items) => {
+				items.push(other);
+				return self;
+			},
+			_ => TagsExpr::Or(vec![self, other]),
+		}
+	}
 }
 impl TagsMatches for TagsExpr {
 	fn matches(&self, tags: &Tags) -> bool {
@@ -430,6 +479,27 @@ mod tests {
 		let expr = TagsExpr::Not(Box::new(TagsExpr::Tag(tag!("hello": "world"))));
 		assert!(!expr.matches(&tags!( "hello": "world" )));
 		assert!(!expr.matches(&tags!( "hello": "world", "five": "ten" )));
+		assert!(expr.matches(&tags!( "hello": "something else" )));
 		assert!(expr.matches(&tags!( "five": "ten" )));
+	}
+
+	#[test]
+	fn test_expr_builder() {
+		let expr = TagsExpr::Not(Box::new(TagsExpr::Tag(tag!("hello": "world"))));
+		let builder_expr = TagsExpr::new("hello", "world").not();
+		assert_eq!(builder_expr, expr)
+	}
+
+	#[test]
+	fn test_expr_builder_and() {
+		let expr = TagsExpr::And(vec![
+			TagsExpr::Tag(tag!("hello": "world")),
+			TagsExpr::Not(Box::new(TagsExpr::Tag(tag!("test": "1")))),
+			TagsExpr::Not(Box::new(TagsExpr::Tag(tag!("test": "2")))),
+		]);
+		let builder_expr = TagsExpr::new("hello", "world")
+			.and(TagsExpr::new("test", "1").not())
+			.and(TagsExpr::new("test", "2").not());
+		assert_eq!(builder_expr, expr)
 	}
 }

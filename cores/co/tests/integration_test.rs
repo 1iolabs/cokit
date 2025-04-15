@@ -20,7 +20,7 @@ async fn integration_test() {
 		.unwrap();
 
 	// storage
-	let storage = MemoryBlockStorage::new();
+	let storage = MemoryBlockStorage::default();
 
 	// action
 	let mut tags = Tags::new();
@@ -42,9 +42,10 @@ async fn integration_test() {
 
 	// execute
 	let next_state = RuntimePool::default()
-		.execute(&storage, &wasm.into(), RuntimeContext { state: None, event: action_cid })
+		.execute(&storage, &wasm.into(), RuntimeContext::new(None, action_cid))
 		.await
-		.unwrap();
+		.unwrap()
+		.state;
 
 	// test
 	assert_eq!(Some(Cid::try_from("bafyr4if64njukhvumpace5uiighisucjnbbsdxgxoyhbig3bvnjck5sh5q").unwrap()), next_state);

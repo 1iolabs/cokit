@@ -23,12 +23,12 @@ pub async fn command(context: &CliContext, cli: &Cli) -> Result<ExitCode, anyhow
 
 	// list
 	let mut result = exitcode::OK;
-	let stream = memberships(local_co_reducer.storage(), local_co_reducer.co_state().await);
+	let stream = memberships(local_co_reducer.storage(), local_co_reducer.reducer_state().await.co());
 	pin_mut!(stream);
 	while let Some(item) = stream.next().await {
 		match item {
-			Ok((id, did, state, tags, membership_state)) => {
-				println!("{id} | {did} | {state} | {tags} | {membership_state:?}")
+			Ok((id, did, tags, membership_state)) => {
+				println!("{id} | {did} | {tags} | {membership_state:?}")
 			},
 			Err(e) => {
 				result = exitcode::UNAVAILABLE;

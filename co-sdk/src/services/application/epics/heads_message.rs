@@ -1,7 +1,7 @@
 use crate::{
 	state,
 	types::message::heads::{HeadsErrorCode, HeadsMessage},
-	Action, CoContext, CoReducerFactory,
+	Action, CoContext, CoReducerFactory, CoReducerState,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -48,10 +48,10 @@ pub fn heads_message_heads(
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::HeadsMessageReceived { from: _, peer, message_id, message: HeadsMessage::Heads(co, heads) } => Some(
-			stream::once(ready((context.clone(), message_id.clone(), *peer, co.clone(), heads.clone())))
-				.then(|(context, message_id, peer, co, heads)| async move {
-					join_heads(context, message_id, peer, co, heads).await
+		Action::HeadsMessageReceived { from, peer, message_id, message: HeadsMessage::Heads(co, heads) } => Some(
+			stream::once(ready((context.clone(), message_id.clone(), from.clone(), *peer, co.clone(), heads.clone())))
+				.then(|(context, message_id, from, peer, co, heads)| async move {
+					join_heads(context, message_id, from, peer, co, heads).await
 				})
 				.flat_map(Action::map_error_stream)
 				.map(Ok),
@@ -79,27 +79,34 @@ pub fn heads_message_heads_request(
 	}
 }
 
-#[tracing::instrument(skip(context, heads))]
+#[tracing::instrument(level = tracing::Level::TRACE, skip(context, heads))]
 async fn join_heads(
 	context: CoContext,
 	message_id: String,
+	from: Option<Did>,
 	peer: PeerId,
 	co: CoId,
 	heads: BTreeSet<Cid>,
 ) -> anyhow::Result<Vec<Action>> {
 	let mut actions = Vec::new();
 	let co_reducer = context.try_co_reducer(&co).await?;
-	if co_reducer.join(&heads).await? {
-		let next_heads = co_reducer.heads().await;
-		if next_heads != heads {
-			let mut header = HeadsMessage::create_header();
-			header.thid = Some(message_id);
-			let body = HeadsMessage::Heads(co, next_heads);
-			// TODO: sign?
-			let (message_id, message) = EncodedMessage::create_plain_json(header, &body)?;
-			actions.push(Action::DidCommSend { message_id, peer, message });
-		}
+
+	// join
+	let _previous_state = get_heads(&context, &from, &co).await?;
+	co_reducer.join(heads.clone()).await?;
+	let next_state = get_heads(&context, &from, &co).await?;
+
+	// respond if different
+	if &next_state.1 != &heads {
+		let mut header = HeadsMessage::create_header();
+		header.thid = Some(message_id);
+		let body = HeadsMessage::Heads(co, next_state.heads());
+		// TODO: sign?
+		let (message_id, message) = EncodedMessage::create_plain_json(header, &body)?;
+		actions.push(Action::DidCommSend { message_id, peer, message });
 	}
+
+	// result
 	Ok(actions)
 }
 
@@ -111,7 +118,7 @@ async fn request_heads(
 	co: CoId,
 ) -> anyhow::Result<Action> {
 	let body = match get_heads(&context, &from, &co).await {
-		Ok(heads) => HeadsMessage::Heads(co, heads),
+		Ok(state) => HeadsMessage::Heads(co, state.heads()),
 		Err(err) => {
 			tracing::warn!(?err, "co-request-heads-failed");
 			HeadsMessage::Error { code: HeadsErrorCode::Forbidden, message: "Forbidden".to_owned() }
@@ -124,14 +131,16 @@ async fn request_heads(
 	Ok(Action::DidCommSend { message_id, peer, message })
 }
 
-async fn get_heads(context: &CoContext, from: &Option<Did>, co: &CoId) -> anyhow::Result<BTreeSet<Cid>> {
+async fn get_heads(context: &CoContext, from: &Option<Did>, co: &CoId) -> anyhow::Result<CoReducerState> {
 	let co_reducer = context.try_co_reducer(&co).await?;
+	let storage = co_reducer.storage();
+	let state = co_reducer.reducer_state().await;
 
 	// verify
-	if !state::is_participant(&co_reducer.storage(), co_reducer.co_state().await, from).await? {
+	if !state::is_participant(&storage, state.co(), from).await? {
 		return Err(anyhow!("Not a participant {:?} of {}", from, co));
 	}
 
 	// result
-	Ok(co_reducer.heads().await)
+	Ok(state.to_external(&storage).await)
 }

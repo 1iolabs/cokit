@@ -55,7 +55,12 @@ impl Actor for Connections {
 	) -> Result<(), ActorError> {
 		// state
 		let action = match message {
-			ConnectionMessage::Use(action, response) => {
+			ConnectionMessage::Use(action, mut response) => {
+				// initial
+				if let Some(initial) = state.state.use_initial(&action.id) {
+					response.send(initial).ok();
+				}
+
 				// add response
 				state
 					.peers_changed
@@ -72,7 +77,9 @@ impl Actor for Connections {
 			let next_actions = state.state.reduce(action.clone());
 
 			// epic
-			state.epic.handle(handle, &action, &state.state, &self.context);
+			state
+				.epic
+				.handle(&self.context.tasks(), handle, &action, &state.state, &self.context);
 
 			// responses
 			match &action {

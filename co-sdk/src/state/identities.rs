@@ -1,6 +1,7 @@
+use super::QueryError;
 use crate::{
-	state::{core_state_or_default, stream},
-	CoReducerError, CoStorage, CO_CORE_NAME_KEYSTORE,
+	state::{query_core, stream, Query},
+	CoStorage, CO_CORE_NAME_KEYSTORE,
 };
 use co_core_keystore::{Key, KeyStore};
 use co_primitives::{tags, Did, OptionLink};
@@ -19,11 +20,14 @@ pub fn identities(
 	storage: CoStorage,
 	co_state: OptionLink<co_core_co::Co>,
 	core_name: Option<&'_ str>,
-) -> impl Stream<Item = Result<Identity, CoReducerError>> + '_ {
+) -> impl Stream<Item = Result<Identity, QueryError>> + '_ {
 	let core_name = core_name.unwrap_or(CO_CORE_NAME_KEYSTORE);
 	async_stream::try_stream! {
 		// root
-		let keystore: KeyStore = core_state_or_default(&storage, co_state, core_name).await?;
+		let keystore = query_core::<KeyStore>(core_name)
+			.with_default()
+			.execute(&storage, co_state)
+			.await?;
 		for await key in stream(storage.clone(), &keystore.keys) {
 			let key: Key = key?.1;
 			if is_identity(&key) {

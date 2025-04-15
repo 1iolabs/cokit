@@ -903,6 +903,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bloomfilter"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f6d7f06817e48ea4e17532fa61bc4e8b9a101437f0623f69d2ea54284f3a817"
+dependencies = [
+ "siphasher 1.0.1",
+]
+
+[[package]]
 name = "bls12_381_plus"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1349,7 +1358,6 @@ dependencies = [
  "async-trait",
  "cid 0.11.1",
  "co-primitives",
- "co-storage",
  "either",
  "futures",
  "ipld-core",
@@ -1552,6 +1560,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-core-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cid 0.11.1",
+ "co-api",
+ "co-runtime",
+ "co-storage",
+ "futures",
+ "ipld-core",
+ "serde",
+ "serde_repr",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "co-core-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cid 0.11.1",
+ "co-api",
+ "co-runtime",
+ "co-storage",
+ "futures",
+ "ipld-core",
+ "serde",
+ "serde_repr",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "co-dioxus"
 version = "0.1.0"
 dependencies = [
@@ -1685,15 +1733,22 @@ name = "co-primitives"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-stream",
+ "async-trait",
+ "bloomfilter",
  "cid 0.11.1",
  "co-macros",
  "derive_more",
  "either",
+ "futures",
  "insta",
  "ipld-core",
  "ipld-dagpb",
  "multihash 0.19.3",
  "multihash-codetable",
+ "num-rational",
+ "ordered-float",
+ "pin-project",
  "schemars",
  "serde",
  "serde_bytes",
@@ -1702,6 +1757,8 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "thiserror 1.0.63",
+ "tokio",
+ "unsigned-varint 0.8.0",
  "zeroize",
 ]
 
@@ -1751,6 +1808,7 @@ dependencies = [
  "co-core-pin",
  "co-core-role",
  "co-core-room",
+ "co-core-storage",
  "co-identity",
  "co-log",
  "co-network",
@@ -1761,6 +1819,7 @@ dependencies = [
  "directories",
  "example-counter",
  "futures",
+ "futures-util",
  "hmac 0.12.1",
  "hyper 0.14.30",
  "ipld-core",
@@ -1806,7 +1865,9 @@ dependencies = [
  "blake3",
  "chacha20poly1305",
  "cid 0.11.1",
+ "co-actor",
  "co-primitives",
+ "derive_more",
  "either",
  "futures",
  "hexdump",
@@ -4221,7 +4282,7 @@ dependencies = [
  "httpdate",
  "itoa 1.0.11",
  "pin-project-lite",
- "socket2 0.5.7",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -4261,9 +4322,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-util"
-version = "0.1.7"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cde7055719c54e36e95e8719f95883f22072a48ede39db7fc17a4e1d5281e9b9"
+checksum = "df2dcfbe0677734ab2f3ffa7fa7bfd4706bfdc1ef393f2ee30184aed67e631b4"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -4274,7 +4335,6 @@ dependencies = [
  "pin-project-lite",
  "socket2 0.5.7",
  "tokio",
- "tower",
  "tower-service",
  "tracing",
 ]
@@ -6949,9 +7009,9 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ordered-float"
-version = "4.2.2"
+version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a91171844676f8c7990ce64959210cd2eaef32c2612c50f9fae9f8aaa6065a6"
+checksum = "7bb71e1b3fa6ca1c61f383464aaf2bb0e2f8e772a1f01d486832464de363b951"
 dependencies = [
  "num-traits",
 ]
@@ -7236,7 +7296,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c00cf8b9eafe68dde5e9eaa2cef8ee84a9336a47d566ec55ca16589633b65af7"
 dependencies = [
- "siphasher",
+ "siphasher 0.3.11",
 ]
 
 [[package]]
@@ -7245,7 +7305,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6796ad771acdc0123d2a88dc428b5e38ef24456743ddb1744ed628f9815c096"
 dependencies = [
- "siphasher",
+ "siphasher 0.3.11",
 ]
 
 [[package]]
@@ -7254,7 +7314,7 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90fcb95eef784c2ac79119d1dd819e162b5da872ce6f3c3abe1e8ca1c082f72b"
 dependencies = [
- "siphasher",
+ "siphasher 0.3.11",
 ]
 
 [[package]]
@@ -8766,6 +8826,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38b58827f4464d87d377d175e90bf58eb00fd8716ff0a62f80356b5e61555d0d"
 
 [[package]]
+name = "siphasher"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56199f7ddabf13fe5074ce809e7d3f42b42ae711800501b5b16ea82ad029c39d"
+
+[[package]]
 name = "slab"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9709,9 +9775,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-stream"
-version = "0.1.15"
+version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "267ac89e0bec6e691e5813911606935d77c476ff49024f98abcea3e7b15e37af"
+checksum = "eca58d7bba4a75707817a2c44174253f9236b2d5fbd055602e9d5c07c139a047"
 dependencies = [
  "futures-core",
  "pin-project-lite",

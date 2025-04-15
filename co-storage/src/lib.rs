@@ -3,6 +3,8 @@ mod library;
 mod storage;
 mod types;
 
+// TODO: remove
+pub use co_primitives::{BlockStat, BlockStorage, BlockStorageExt, StorageError};
 // exports
 pub use crypto::{
 	block::{Algorithm, AlgorithmError},
@@ -10,23 +12,25 @@ pub use crypto::{
 };
 pub use library::{
 	node_reader::node_reader,
+	tmp_dir::TmpDir,
 	unixfs::{unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer},
 	unixfs_add_file::unixfs_add_file,
 	unixfs_stream::unixfs_stream,
 };
 pub use storage::{
-	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping, EncryptedStorage},
+	change::{BlockStorageChange, ChangeBlockStorage},
+	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping, EncryptionReferenceMode},
 	fs::FsStorage,
 	mapped::MappedBlockStorage,
 	memory::{MemoryBlockStorage, MemoryStorage},
+	overlay::{OverlayBlockStorage, OverlayChange, OverlayChangeReference},
 	request,
 	store_params::StoreParamsBlockStorage,
 	sync::{SyncBlockStorage, SyncStorage},
 };
 pub use types::{
-	block::{BlockStat, BlockStorage},
-	block_ext::BlockStorageExt,
+	extended_block_storage::{ExtendedBlock, ExtendedBlockOptions, ExtendedBlockStorage},
 	mapping::{BlockStorageContentMapping, StorageContentMapping},
 	pin::{PinApi, PinKind, PinOptions},
-	storage::{Storage, StorageError},
+	storage::Storage,
 };

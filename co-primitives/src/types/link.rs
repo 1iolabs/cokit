@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::{
 	any::type_name,
 	fmt::{Debug, Display},
+	hash::Hash,
 	marker::PhantomData,
 };
 
@@ -12,7 +13,7 @@ pub trait Linkable<T> {
 }
 
 /// A (serializable) typed link.
-#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, PartialOrd, Eq, Ord)]
 #[serde(into = "Cid", from = "Cid")]
 pub struct Link<T> {
 	#[serde(skip)]
@@ -93,6 +94,11 @@ impl<T> PartialEq for OptionLink<T> {
 		self.cid == other.cid
 	}
 }
+impl<T> Hash for OptionLink<T> {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.cid.hash(state);
+	}
+}
 impl<T> Ord for OptionLink<T> {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		self.cid.cmp(&other.cid)
@@ -133,6 +139,18 @@ impl<T> OptionLink<T> {
 	pub fn set(&mut self, cid: Option<Cid>) {
 		self.cid = cid;
 	}
+
+	pub fn link(&self) -> Option<Link<T>> {
+		self.cid.map(Link::new)
+	}
+
+	pub fn unwrap(&self) -> Link<T> {
+		Link::new(self.cid.unwrap())
+	}
+
+	pub fn expect(&self, message: &str) -> Link<T> {
+		Link::new(self.cid.expect(message))
+	}
 }
 impl<T> Clone for OptionLink<T> {
 	fn clone(&self) -> Self {
@@ -162,6 +180,11 @@ impl<T> From<&Option<Cid>> for OptionLink<T> {
 impl<T> From<Cid> for OptionLink<T> {
 	fn from(value: Cid) -> Self {
 		Self::new(Some(value))
+	}
+}
+impl<T> From<&Cid> for OptionLink<T> {
+	fn from(value: &Cid) -> Self {
+		Self::new(Some(*value))
 	}
 }
 impl<T> AsRef<Option<Cid>> for OptionLink<T> {

@@ -1,4 +1,4 @@
-use super::to_plain::to_plain;
+use super::to_external_cid::{to_external_cids, to_external_cids_opt_force};
 use crate::{
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	services::{
@@ -15,45 +15,40 @@ use co_actor::{Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, OnceE
 use co_identity::{Identity, PrivateIdentityBox};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{tags, CoId, Tags};
-use co_storage::BlockStorageContentMapping;
 use futures::{Stream, StreamExt};
 use libp2p::PeerId;
 use std::{collections::BTreeSet, future::ready, time::Duration};
 
 ///	Use PeerProvider to discover peers and send heads to them whenever a peer comes online or new heads are produced.
-pub struct PushHeads<M> {
+pub struct PushHeads {
 	handle: ActorHandle<PushHeadsAction>,
-	mapping: Option<M>,
 	/// Force the mapping to be applied by returning an error when no mapping is found.
 	force_mapping: bool,
 	initialized: bool,
 }
-impl<M> PushHeads<M> {
+impl PushHeads {
 	pub fn new(
 		spawner: CoNetworkTaskSpawner,
 		connections: ActorHandle<ConnectionMessage>,
 		tasks: TaskSpawner,
 		co: CoId,
 		identity: PrivateIdentityBox,
-		mapping: Option<M>,
 		force_mapping: bool,
 	) -> Result<Self, anyhow::Error> {
 		let instance = Actor::spawn_with(
-			tasks,
+			tasks.clone(),
 			tags!("type": "co-push-heads", "co": co.as_str()),
-			PushHeadsActor { context: PushHeadsContext(spawner, connections, identity) },
+			PushHeadsActor { tasks, context: PushHeadsContext(spawner, connections, identity) },
 			PushHeadsState { co: co.clone(), heads: Default::default() },
 		)?;
-		Ok(Self { handle: instance.handle(), mapping, force_mapping, initialized: false })
+		Ok(Self { handle: instance.handle(), force_mapping, initialized: false })
 	}
 }
 #[async_trait]
-impl<M> ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for PushHeads<M>
-where
-	M: BlockStorageContentMapping + Send + Sync + 'static,
-{
+impl ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for PushHeads {
 	async fn on_state_changed(
 		&mut self,
+		storage: &CoStorage,
 		reducer: &CoreReducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 		context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
@@ -62,12 +57,13 @@ where
 			self.initialized = true;
 
 			// map plain heads to encrypted heads
-			let mut heads = reducer.heads().clone();
-			if self.mapping.is_some() {
-				heads = to_plain(&self.mapping, self.force_mapping, heads)
+			let heads = if self.force_mapping {
+				to_external_cids_opt_force(storage, reducer.heads().clone())
 					.await
-					.map_err(|err| anyhow!("Failed to map head: {}", err))?;
-			}
+					.ok_or_else(|| anyhow!("Failed to map heads: {:?}", reducer.heads()))?
+			} else {
+				to_external_cids(storage, reducer.heads().clone()).await
+			};
 
 			// send
 			self.handle.dispatch(PushHeadsAction::Changed(heads))?;
@@ -79,6 +75,7 @@ where
 }
 
 struct PushHeadsActor {
+	tasks: TaskSpawner,
 	context: PushHeadsContext,
 }
 #[async_trait]
@@ -117,7 +114,7 @@ impl Actor for PushHeadsActor {
 		let next_actions = state.reduce(action.clone());
 
 		// epic
-		epic.handle(handle, &action, &state, &self.context);
+		epic.handle(&self.tasks, handle, &action, &state, &self.context);
 
 		// dispatch
 		for next_action in next_actions {

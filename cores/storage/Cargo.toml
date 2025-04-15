@@ -1,0 +1,28 @@
+[package]
+name = "co-core-storage"
+description = "CO Storage metadata COre. Known metadata: Reference counts."
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.76"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+cid = { workspace = true }
+co-api = { path = "../../co-api" }
+futures = { workspace = true }
+ipld-core = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_repr = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+co-storage = { path = "../../co-storage" }
+co-runtime = { path = "../../co-runtime" }
+tokio = { workspace = true }
+tokio-util = { workspace = true, features = ["compat"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

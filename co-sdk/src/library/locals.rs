@@ -1,4 +1,5 @@
 use super::fs_read::fs_read_option;
+use crate::CoReducerState;
 use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
 use cid::Cid;
@@ -15,6 +16,7 @@ use pin_project::{pin_project, pinned_drop};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
+	fmt::Debug,
 	future::ready,
 	io::ErrorKind,
 	ops::DerefMut,
@@ -31,9 +33,9 @@ use tokio::{
 use tokio_util::sync::{CancellationToken, DropGuard};
 
 #[async_trait]
-pub trait Locals {
+pub trait Locals: Clone + Debug + Send + Sync {
 	/// Get current ApplicationLocal instances.
-	async fn get(&mut self) -> Result<Vec<ApplicationLocal>, anyhow::Error>;
+	async fn get(&self) -> Result<Vec<ApplicationLocal>, anyhow::Error>;
 
 	/// Watch ApplicationLocal instances after last get.
 	fn watch(&self) -> impl Stream<Item = ApplicationLocal> + Send + Sync + 'static;
@@ -53,7 +55,7 @@ impl MemoryLocals {
 }
 #[async_trait]
 impl Locals for MemoryLocals {
-	async fn get(&mut self) -> Result<Vec<ApplicationLocal>, anyhow::Error> {
+	async fn get(&self) -> Result<Vec<ApplicationLocal>, anyhow::Error> {
 		Ok(match self.watcher.borrow().as_ref() {
 			Some(local) => vec![local.clone()],
 			None => Default::default(),
@@ -124,7 +126,7 @@ impl FileLocals {
 #[async_trait]
 impl Locals for FileLocals {
 	/// Read all available local.cbor files
-	async fn get(&mut self) -> Result<Vec<ApplicationLocal>, anyhow::Error> {
+	async fn get(&self) -> Result<Vec<ApplicationLocal>, anyhow::Error> {
 		Ok(self.handle.request(FileLocalsMessage::Read).await??)
 	}
 
@@ -298,7 +300,7 @@ impl Actor for FileLocalsActor {
 	}
 }
 impl FileLocalsActor {
-	#[tracing::instrument(err(Debug))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
 	async fn open(&self) -> Result<tokio::fs::File, anyhow::Error> {
 		let path = self.config_path.join(&self.identifier).join("local.cbor");
 
@@ -309,7 +311,7 @@ impl FileLocalsActor {
 		Ok(tokio::fs::OpenOptions::new().create(true).write(true).open(&path).await?)
 	}
 
-	#[tracing::instrument(err(Debug))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
 	async fn open_and_lock(&self) -> Result<tokio::fs::File, anyhow::Error> {
 		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
 
@@ -353,7 +355,7 @@ impl FileLocalsActor {
 		}
 	}
 
-	#[tracing::instrument(err(Debug))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
 	async fn open_and_flock(&self) -> Result<Flock<TokioFile>, anyhow::Error> {
 		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
 
@@ -592,7 +594,7 @@ pub struct ApplicationLocal {
 	pub state: Cid,
 
 	/// The latest encryption mapping.
-	#[serde(rename = "m")]
+	#[serde(rename = "m", skip_serializing_if = "Option::is_none", default)]
 	pub mapping: Option<Cid>,
 }
 impl ApplicationLocal {
@@ -645,15 +647,17 @@ impl ApplicationLocal {
 	// 	// result
 	// 	Ok(())
 	// }
+
+	pub fn reducer_state(&self) -> CoReducerState {
+		(self.state, self.heads.clone()).into()
+	}
 }
 
 #[cfg(test)]
 mod tests {
-	use crate::{
-		library::locals::{ApplicationLocal, FileLocals, Locals},
-		TmpDir,
-	};
+	use crate::library::locals::{ApplicationLocal, FileLocals, Locals};
 	use co_primitives::BlockSerializer;
+	use co_storage::TmpDir;
 
 	#[tokio::test]
 	async fn test_file_locals_overwrite() {

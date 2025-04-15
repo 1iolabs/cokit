@@ -3,13 +3,14 @@ use anyhow::Context;
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{Block, BlockSerializer, CoId, ReducerAction, StoreParams};
-use co_runtime::RuntimePool;
+use co_runtime::{RuntimeContext, RuntimePool};
 use co_storage::BlockStorage;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
 /// Update instance when membership changes.
 /// This is implemented as [`CoreResolver`] middleware because we can just check if the action is relevant.
+#[derive(Debug, Clone)]
 pub struct MembershipCoreResolver<S, C, R> {
 	tasks: TaskSpawner,
 	membership_core_name: String,
@@ -19,8 +20,8 @@ pub struct MembershipCoreResolver<S, C, R> {
 }
 impl<S, C, R> MembershipCoreResolver<S, C, R>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
-	C: CoreResolver<S> + Send + Sync + 'static,
+	S: BlockStorage + Clone + Send + Sync + 'static,
+	C: CoreResolver<S> + Clone + Send + Sync + 'static,
 	R: MembershipInstanceRegistry + Clone + Send + Sync + 'static,
 {
 	pub fn new(tasks: TaskSpawner, next: C, registry: R, membership_core_name: String) -> Self {
@@ -40,8 +41,8 @@ where
 #[async_trait]
 impl<S, C, R> CoreResolver<S> for MembershipCoreResolver<S, C, R>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
-	C: CoreResolver<S> + Send + Sync + 'static,
+	S: BlockStorage + Clone + Send + Sync + 'static,
+	C: CoreResolver<S> + Clone + Send + Sync + 'static,
 	R: MembershipInstanceRegistry + Clone + Send + Sync + 'static,
 {
 	async fn execute(
@@ -51,7 +52,7 @@ where
 		context: &ReducerChangeContext,
 		state: &Option<Cid>,
 		action: &Cid,
-	) -> Result<Option<Cid>, CoreResolverError> {
+	) -> Result<RuntimeContext, CoreResolverError> {
 		// execute
 		let next_state = self.next.execute(storage, runtime, context, state, action).await?;
 
@@ -64,6 +65,9 @@ where
 				.context("resolving action")?;
 			if let Some(action_membership) = MinimalMembershipsAction::new(&action_block, &self.membership_core_name) {
 				let registry = self.registry.clone();
+				// spawn the co instance update as task
+				//  this is required because otherwise we would deadlock becaus the update need to access to local co
+				//  which is currently locked
 				self.tasks.spawn(async move {
 					if let Err(err) = Self::try_update_membership(registry, action_membership).await {
 						tracing::warn!(?err, "membership-update-failed");

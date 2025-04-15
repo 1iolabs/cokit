@@ -2,7 +2,7 @@ use super::Command as NetworkCommand;
 use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::Result;
 use co_core_membership::MembershipState;
-use co_primitives::Did;
+use co_primitives::{DagSetExt, Did};
 use co_sdk::{state, CoId, CoReducerFactory};
 use exitcode::ExitCode;
 use futures::{stream, StreamExt, TryStreamExt};
@@ -36,14 +36,14 @@ pub async fn command(
 		None => {
 			let local_co = application.local_co_reducer().await?;
 			let co_context = application.co();
-			state::memberships(local_co.storage(), local_co.co_state().await)
-				.try_filter(|(_, _, _, _, membership_state)| ready(*membership_state == MembershipState::Active))
+			state::memberships(local_co.storage(), local_co.reducer_state().await.co())
+				.try_filter(|(_, _, _, membership_state)| ready(*membership_state == MembershipState::Active))
 				.map_ok(|membership| membership.0)
 				.then(move |id| async move {
 					match id {
 						Ok(id) => {
 							let co = co_context.try_co_reducer(&id).await?;
-							let co_state = co.co().await?;
+							let (_storage, co_state) = co.co().await?;
 							if co_state.network.is_empty() {
 								Ok(None)
 							} else {

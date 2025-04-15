@@ -41,7 +41,7 @@ impl Epic<ConnectionAction, ConnectionState, CoContext> for NetworkResolveEpic {
 async fn network_resolve(context: CoContext, id: CoId) -> Result<BTreeSet<Network>, anyhow::Error> {
 	// to prevent deadlocking we want to use the storage without networking
 	let reducers = context.inner.reducers_control();
-	let storage = reducers.storage(id.clone()).await?.storage();
+	let storage = reducers.storage(id.clone()).await?.storage().clone();
 
 	// reducer
 	let reducer = reducers.reducer(id.clone()).await?;
@@ -64,7 +64,7 @@ async fn networks_co(
 	storage: &CoStorage,
 	reducer: &CoReducer,
 ) -> Result<BTreeSet<Network>, anyhow::Error> {
-	let co_state = reducer.co_state().await;
+	let co_state = reducer.reducer_state().await.co();
 	let networks = state::networks(&storage, co_state).await?;
 	if networks.is_empty() {
 		// get participant networks

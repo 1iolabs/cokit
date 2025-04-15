@@ -1,5 +1,5 @@
 use crate::state::stream;
-use co_primitives::NodeContainer;
+use co_primitives::DagCollectionAsyncExt;
 use co_storage::{BlockStorage, StorageError};
 use futures::StreamExt;
 use serde::de::DeserializeOwned;
@@ -9,10 +9,10 @@ pub async fn is_empty<T, N, S>(storage: &S, container: &N) -> Result<bool, Stora
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 	T: DeserializeOwned + Send + Sync + 'static,
-	N: NodeContainer<T>,
+	N: DagCollectionAsyncExt<Item = T>,
 {
 	// its always empty if we have no link
-	if container.node_container_link().is_none() {
+	if container.link().is_none() {
 		return Ok(true);
 	}
 

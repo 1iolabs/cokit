@@ -1,0 +1,261 @@
+use crate::{library::lsm_tree_map::Root, BlockStorage, LsmTreeMap, OptionLink, StorageError};
+use futures::Stream;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{future::Future, hash::Hash};
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(transparent)]
+pub struct CoMap<K, V>(OptionLink<Root<K, V>>)
+where
+	K: Hash + Ord + Clone + Send + Sync + 'static,
+	V: Clone + Send + Sync + 'static;
+impl<K, V> CoMap<K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	/// Whether this collection is empty.
+	pub fn is_empty(&self) -> bool {
+		self.0.is_none()
+	}
+
+	pub async fn get<S>(&self, storage: &S, key: &K) -> Result<Option<V>, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		self.open(storage).await?.get(key).await
+	}
+
+	pub async fn contains_key<S>(&self, storage: &S, key: &K) -> Result<bool, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		self.open(storage).await?.contains_key(key).await
+	}
+
+	pub fn stream<S>(&self, storage: &S) -> impl Stream<Item = Result<(K, V), StorageError>> + '_
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		let storage = storage.clone();
+		async_stream::try_stream! {
+			let tree = self.open(&storage).await?;
+			let stream = tree.stream();
+			for await item in stream {
+				yield item?;
+			}
+		}
+	}
+
+	pub async fn insert<S>(&mut self, storage: &S, key: K, value: V) -> Result<(), StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		self.update(storage, |mut transaction| async move {
+			transaction.insert(key, value).await?;
+			Ok(transaction)
+		})
+		.await
+	}
+
+	pub async fn remove<S>(&mut self, storage: &S, key: K) -> Result<Option<V>, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		let mut transaction = self.open(storage).await?;
+		let result = transaction.remove(key).await?;
+		self.commit(transaction).await?;
+		Ok(result)
+	}
+
+	/// Update (or insert default) value.
+	pub async fn update_key<S, F, Fut>(&mut self, storage: &S, key: K, update: F) -> Result<(), StorageError>
+	where
+		V: Default,
+		F: FnOnce(V) -> Fut + Send,
+		Fut: Future<Output = Result<V, StorageError>> + Send,
+		S: BlockStorage + Clone + 'static,
+	{
+		self.update(storage, |mut transaction| async move {
+			transaction.update_key(key, update).await?;
+			Ok(transaction)
+		})
+		.await
+	}
+}
+impl<K, V> CoMap<K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	pub async fn open_mut<'m, S>(&'m mut self, storage: &S) -> Result<CoMapMutTransaction<'m, S, K, V>, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		Ok(CoMapMutTransaction { transaction: self.open(storage).await?, container: self })
+	}
+
+	pub async fn open<S>(&self, storage: &S) -> Result<CoMapTransaction<S, K, V>, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		Ok(CoMapTransaction {
+			tree: match self.0.link() {
+				Some(root) => LsmTreeMap::load(storage.clone(), root).await?,
+				None => LsmTreeMap::new(storage.clone(), Default::default()),
+			},
+		})
+	}
+
+	/// Commit transaction to this map.
+	pub async fn commit<S>(&mut self, mut transaction: CoMapTransaction<S, K, V>) -> Result<(), StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		self.0 = transaction.tree.store().await?;
+		Ok(())
+	}
+
+	/// Open transaction and apply `update` and store it.
+	pub async fn update<S, F, Fut>(&mut self, storage: &S, update: F) -> Result<(), StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+		F: FnOnce(CoMapTransaction<S, K, V>) -> Fut + Send,
+		Fut: Future<Output = Result<CoMapTransaction<S, K, V>, StorageError>> + Send,
+	{
+		let transaction = self.open(storage).await?;
+		let mut result = update(transaction).await?;
+		self.0 = result.tree.store().await?;
+		Ok(())
+	}
+}
+impl<K, V> Default for CoMap<K, V>
+where
+	K: Hash + Ord + Clone + Send + Sync + 'static,
+	V: Clone + Send + Sync + 'static,
+{
+	fn default() -> Self {
+		Self(Default::default())
+	}
+}
+
+pub struct CoMapMutTransaction<'m, S, K, V>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	container: &'m mut CoMap<K, V>,
+	transaction: CoMapTransaction<S, K, V>,
+}
+impl<'m, S, K, V> CoMapMutTransaction<'m, S, K, V>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	pub async fn commit(mut self) -> Result<(), StorageError> {
+		self.container.0 = self.transaction.tree.store().await?;
+		Ok(())
+	}
+}
+impl<'m, S, K, V> CoMapMutTransaction<'m, S, K, V>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	pub async fn get(&self, key: &K) -> Result<Option<V>, StorageError> {
+		self.transaction.get(key).await
+	}
+
+	pub async fn contains_key(&self, key: &K) -> Result<bool, StorageError> {
+		self.transaction.contains_key(key).await
+	}
+
+	pub fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+		self.transaction.stream()
+	}
+
+	pub async fn insert(&mut self, key: K, value: V) -> Result<(), StorageError> {
+		self.transaction.insert(key, value).await
+	}
+
+	pub async fn remove(&mut self, key: K) -> Result<Option<V>, StorageError> {
+		self.transaction.remove(key).await
+	}
+
+	/// Update (or insert default) value.
+	pub async fn update<F, Fut>(&mut self, key: K, update: F) -> Result<(), StorageError>
+	where
+		V: Default,
+		F: FnOnce(V) -> Fut + Send,
+		Fut: Future<Output = Result<V, StorageError>> + Send,
+	{
+		self.transaction.update_key(key, update).await
+	}
+
+	/// Store as new CoMap
+	pub async fn store(&mut self) -> Result<CoMap<K, V>, StorageError> {
+		self.transaction.store().await
+	}
+}
+
+pub struct CoMapTransaction<S, K, V>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	tree: LsmTreeMap<S, K, V>,
+}
+impl<S, K, V> CoMapTransaction<S, K, V>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	pub async fn get(&self, key: &K) -> Result<Option<V>, StorageError> {
+		self.tree.get(key).await
+	}
+
+	pub async fn contains_key(&self, key: &K) -> Result<bool, StorageError> {
+		self.tree.contains_key(key).await
+	}
+
+	pub fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+		self.tree.stream()
+	}
+
+	pub async fn insert(&mut self, key: K, value: V) -> Result<(), StorageError> {
+		self.tree.insert(key, value).await
+	}
+
+	pub async fn remove(&mut self, key: K) -> Result<Option<V>, StorageError> {
+		if let Some(value) = self.tree.get(&key).await? {
+			self.tree.remove(key).await?;
+			Ok(Some(value))
+		} else {
+			Ok(None)
+		}
+	}
+
+	/// Update (or insert default) value.
+	pub async fn update_key<F, Fut>(&mut self, key: K, update: F) -> Result<(), StorageError>
+	where
+		V: Default,
+		F: FnOnce(V) -> Fut + Send,
+		Fut: Future<Output = Result<V, StorageError>> + Send,
+	{
+		let item = self.get(&key).await?.unwrap_or_default();
+		let next_item = update(item).await?;
+		self.insert(key, next_item).await?;
+		Ok(())
+	}
+
+	/// Store as new CoMap
+	pub async fn store(&mut self) -> Result<CoMap<K, V>, StorageError> {
+		let link = self.tree.store().await?;
+		Ok(CoMap(link))
+	}
+}

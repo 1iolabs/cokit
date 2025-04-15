@@ -5,15 +5,17 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
-	services::application::ApplicationMessage, Action, CoReducer, CoReducerFactory, CoStorage, Storage,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	services::application::ApplicationMessage, Action, CoDate, CoReducer, CoReducerFactory, CoStorage, CoUuid,
+	DynamicCoDate, DynamicCoUuid, RandomCoUuid, Storage, SystemCoDate, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
 use co_actor::{Actor, ActorHandle, ActorInstance};
+use co_core_storage::PinStrategy;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
-use co_primitives::{tags, CoId};
+use co_primitives::{tags, CoId, TagValue, Tags};
 use directories::ProjectDirs;
 use futures::{Stream, StreamExt};
 use std::{fmt::Debug, future::ready, path::PathBuf, sync::Arc};
@@ -30,10 +32,10 @@ pub struct Application {
 	/// Settings.
 	settings: ApplicationSettings,
 
-	// Tasks.
+	/// Tasks.
 	tasks: TaskTracker,
 
-	// CO Context.
+	/// CO Context.
 	co_context: CoContext,
 
 	/// The actor runtime.
@@ -141,7 +143,7 @@ impl Application {
 	#[tracing::instrument(err, skip(self))]
 	pub async fn create_co<I>(&self, creator: I, create: CreateCo) -> Result<CoReducer, anyhow::Error>
 	where
-		I: PrivateIdentity + Debug + Send + Sync + 'static,
+		I: PrivateIdentity + Clone + Debug + Send + Sync + 'static,
 	{
 		// local
 		let local = self.co_context.local_co_reducer().await?;
@@ -150,7 +152,14 @@ impl Application {
 		let co = SharedCoCreator::new(local, create)
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
-			.create(self.storage(), self.context().inner.runtime(), creator)
+			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_owned())
+			.create(
+				self.storage(),
+				self.context().inner.runtime(),
+				creator,
+				self.context().date().clone(),
+				self.context().uuid().clone(),
+			)
 			.await?;
 
 		// load
@@ -195,6 +204,7 @@ impl std::fmt::Debug for Application {
 }
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ApplicationSettings {
 	/// The Unique Application Instance Identifier.
 	/// The Identifier should be hardcoded in the application.
@@ -212,6 +222,46 @@ pub struct ApplicationSettings {
 
 	/// Use keychain or file for Local CO.
 	pub keychain: bool,
+
+	/// Extra settings.
+	///
+	/// Known Tags:
+	/// - `co-local-watch` [`TagValue::Bool`] [`ApplicationSettings::setting_co_local_watch`]
+	/// - `co-default-max-state` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_state`]
+	/// - `co-default-max-log` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_log`]
+	pub settings: Tags,
+}
+impl ApplicationSettings {
+	/// Whether to use locals watcher. Defaults to true.
+	pub fn setting_co_local_watch(&self) -> bool {
+		!self.settings.matches(tags!("co-local-watch": false))
+	}
+
+	/// Count of states to store for LocalCO and newly joined COs. A value of zero means unlimited.
+	pub fn setting_co_default_max_state(&self) -> PinStrategy {
+		match self
+			.settings
+			.integer("co-default-max-state")
+			.and_then(|v| v.try_into().ok())
+			.unwrap_or(100)
+		{
+			0 => PinStrategy::Unlimited,
+			max => PinStrategy::MaxCount(max),
+		}
+	}
+
+	/// Count of transactions to store for LocalCO and newly joined. A value of zero means unlimited.
+	pub fn setting_co_default_max_log(&self) -> PinStrategy {
+		match self
+			.settings
+			.integer("co-default-max-log")
+			.and_then(|v| v.try_into().ok())
+			.unwrap_or(100)
+		{
+			0 => PinStrategy::Unlimited,
+			max => PinStrategy::MaxCount(max),
+		}
+	}
 }
 
 pub struct ApplicationBuilder {
@@ -219,6 +269,9 @@ pub struct ApplicationBuilder {
 	path: Option<PathBuf>,
 	keychain: bool,
 	tracing: TracingBuilder,
+	settings: Tags,
+	date: Option<DynamicCoDate>,
+	uuid: Option<DynamicCoUuid>,
 }
 impl ApplicationBuilder {
 	pub fn default_path() -> PathBuf {
@@ -229,7 +282,15 @@ impl ApplicationBuilder {
 	/// Create new instance with path.
 	pub fn new_with_path(identifier: String, path: PathBuf) -> Self {
 		let tracing = TracingBuilder::new(identifier.clone(), Some(path.clone()));
-		Self { identifier, path: Some(path), keychain: true, tracing }
+		Self {
+			identifier,
+			path: Some(path),
+			keychain: true,
+			tracing,
+			settings: Default::default(),
+			date: None,
+			uuid: None,
+		}
 	}
 
 	pub fn new(identifier: String) -> Self {
@@ -239,7 +300,7 @@ impl ApplicationBuilder {
 	/// Create new memory only instance.
 	pub fn new_memory(identifier: String) -> Self {
 		let tracing = TracingBuilder::new(identifier.clone(), None);
-		Self { identifier, path: None, keychain: false, tracing }
+		Self { identifier, path: None, keychain: false, tracing, settings: Default::default(), date: None, uuid: None }
 	}
 
 	/// Enable bunyan logging to log_path.
@@ -260,6 +321,21 @@ impl ApplicationBuilder {
 		Self { keychain: false, ..self }
 	}
 
+	pub fn with_co_date(self, date: impl CoDate + 'static) -> Self {
+		Self { date: Some(DynamicCoDate::new(date)), ..self }
+	}
+
+	pub fn with_co_uuid(self, uuid: impl CoUuid + 'static) -> Self {
+		Self { uuid: Some(DynamicCoUuid::new(uuid)), ..self }
+	}
+
+	/// See: [`ApplicationSettings::settings`]
+	pub fn with_setting(self, name: &str, value: impl Into<TagValue>) -> Self {
+		let mut settings = self.settings;
+		settings.insert((name.to_owned(), value.into()));
+		Self { settings, ..self }
+	}
+
 	pub async fn build(self) -> Result<Application, anyhow::Error> {
 		let tasks = TaskTracker::new();
 
@@ -268,7 +344,7 @@ impl ApplicationBuilder {
 
 		// storage
 		let storage = match &self.path {
-			Some(path) => Storage::new(path.join("data")),
+			Some(path) => Storage::new(path.join("data"), path.join("tmp/data")),
 			None => Storage::new_memory(),
 		};
 
@@ -277,13 +353,18 @@ impl ApplicationBuilder {
 			application_path: self.path.map(|path| path.join("etc").join(&self.identifier)),
 			identifier: self.identifier,
 			keychain: self.keychain,
+			settings: self.settings,
 		};
+
+		// date
+		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(SystemCoDate));
+		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
 
 		// create
 		let service = Actor::spawn(
 			tags!("type": "application", "application": settings.identifier.clone()),
 			crate::services::application::Application::new(settings.clone()),
-			(storage, tasks.clone()),
+			(storage, tasks.clone(), date, uuid),
 		)?;
 
 		// wait for context

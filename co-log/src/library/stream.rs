@@ -12,9 +12,9 @@ use std::collections::{BTreeSet, HashSet};
 pub fn create_stream<'a, S>(
 	storage: &'a S,
 	heads: BTreeSet<Cid>,
-) -> impl Stream<Item = Result<EntryBlock<S::StoreParams>, LogError>> + 'a
+) -> impl Stream<Item = Result<EntryBlock, LogError>> + use<'a, S>
 where
-	S: BlockStorage + Sync + Send + 'a,
+	S: BlockStorage + Sync + Send + 'static,
 {
 	async_stream::try_stream! {
 		let mut traversed: HashSet<Cid> = Default::default();
@@ -42,7 +42,7 @@ where
 					// self.storage.fetch(refs.iter());
 
 					// read next and add to stack
-					let mut nexts: Vec<EntryBlock<S::StoreParams>> = stream::iter(next)
+					let mut nexts: Vec<EntryBlock> = stream::iter(next)
 						.then(|cid| async move { get_entry_block(storage, &cid).await })
 						.try_collect()
 						.await?;
@@ -58,7 +58,7 @@ where
 	S: Storage,
 {
 	storage: S,
-	stack: Vec<EntryBlock<S::StoreParams>>,
+	stack: Vec<EntryBlock>,
 	error: Option<anyhow::Error>,
 	traversed: HashSet<Cid>,
 }
@@ -66,7 +66,7 @@ impl<S> LogIterator<S>
 where
 	S: Storage,
 {
-	pub fn new(storage: S, stack: Vec<EntryBlock<S::StoreParams>>) -> Self {
+	pub fn new(storage: S, stack: Vec<EntryBlock>) -> Self {
 		LogIterator { storage, stack, error: None, traversed: Default::default() }
 	}
 
@@ -78,7 +78,7 @@ impl<S> Iterator for LogIterator<S>
 where
 	S: Storage,
 {
-	type Item = Result<EntryBlock<S::StoreParams>, anyhow::Error>;
+	type Item = Result<EntryBlock, anyhow::Error>;
 
 	fn next(&mut self) -> Option<Self::Item> {
 		// error?
@@ -105,11 +105,11 @@ where
 				// self.storage.fetch(entry.entry().refs.iter());
 
 				// read next and add to stack
-				let nexts: Result<Vec<EntryBlock<S::StoreParams>>, anyhow::Error> = entry
+				let nexts: Result<Vec<EntryBlock>, anyhow::Error> = entry
 					.entry()
 					.next
 					.iter()
-					.map(|cid| -> Result<EntryBlock<S::StoreParams>, anyhow::Error> {
+					.map(|cid| -> Result<EntryBlock, anyhow::Error> {
 						match self.storage.get(cid).context("Get entry from storage") {
 							Ok(block) => EntryBlock::from_block(block).context("Validate block"),
 							Err(e) => Err(e),

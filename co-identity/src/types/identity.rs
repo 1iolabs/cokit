@@ -25,7 +25,7 @@ pub trait Identity {
 			.ok_or(anyhow::anyhow!("unsupported identity: no public didcomm context: {}", self.identity()))?)
 	}
 
-	fn boxed(self) -> IdentityBox
+	fn boxed_public(self) -> IdentityBox
 	where
 		Self: Sized + Clone + Send + Sync + 'static,
 	{

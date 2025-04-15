@@ -24,6 +24,6 @@ pub fn all_tags<'a, 'b: 'a>(context: &'a CoContext, id: &'b CoId) -> impl Stream
 
 async fn tags(context: &CoContext, id: &CoId) -> anyhow::Result<(Option<CoId>, impl Iterator<Item = Tag>)> {
 	let co = context.co_reducer(id).await?.ok_or(anyhow!("Unknown CO: {id}"))?;
-	let co_state = co.co().await?;
+	let (_storage, co_state) = co.co().await?;
 	Ok((co.parent_id().cloned(), co_state.tags.into_iter()))
 }

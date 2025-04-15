@@ -11,7 +11,7 @@ impl CliContext {
 	///
 	/// Panics:
 	/// - When the application could not be created.
-	#[tracing::instrument(skip(self, cli))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self, cli))]
 	pub async fn application(&self, cli: &Cli) -> Application {
 		let mut application_builder = match &cli.base_path {
 			None => ApplicationBuilder::new(cli.instance_id.to_owned()),

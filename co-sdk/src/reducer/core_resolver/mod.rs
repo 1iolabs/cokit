@@ -1,14 +1,17 @@
 use crate::ReducerChangeContext;
 use async_trait::async_trait;
 use cid::Cid;
-use co_runtime::{ExecuteError, RuntimePool};
+use co_runtime::{ExecuteError, RuntimeContext, RuntimePool};
 use co_storage::StorageError;
 
+pub mod change;
 pub mod co;
 pub mod dynamic;
 pub mod epic;
+pub mod flush_overlay;
 pub mod log;
 pub mod membership;
+pub mod reference;
 pub mod single;
 
 #[async_trait]
@@ -27,7 +30,7 @@ pub trait CoreResolver<S> {
 		context: &ReducerChangeContext,
 		state: &Option<Cid>,
 		action: &Cid,
-	) -> Result<Option<Cid>, CoreResolverError>;
+	) -> Result<RuntimeContext, CoreResolverError>;
 }
 
 #[derive(Debug, thiserror::Error)]

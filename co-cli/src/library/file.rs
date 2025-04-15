@@ -1,9 +1,9 @@
 use co_core_co::CoAction;
 use co_core_file::{FolderNode, Node};
-use co_primitives::{tags, AbsolutePath, AbsolutePathOwned, PathError, PathExt};
+use co_primitives::{tags, AbsolutePath, AbsolutePathOwned, DagCollectionAsyncExt, PathError, PathExt};
 use co_sdk::{
-	CoReducer, CoReducerError, CoStorage, Cores, NodeStream, PrivateIdentity, StorageError, CO_CORE_FILE,
-	CO_CORE_NAME_CO,
+	state::{query_core, QueryError, QueryExt},
+	CoReducer, CoStorage, Cores, PrivateIdentity, StorageError, CO_CORE_FILE, CO_CORE_NAME_CO,
 };
 use futures::{pin_mut, Stream, StreamExt};
 use std::{
@@ -22,11 +22,11 @@ pub enum FileError {
 	#[error("Storage error")]
 	Storage(#[from] StorageError),
 
-	#[error("Reducer error")]
-	Reducer(#[from] CoReducerError),
-
 	#[error("Path error")]
 	Path(#[from] PathError),
+
+	#[error("Query error")]
+	Query(#[from] QueryError),
 
 	#[error("Other")]
 	Other(#[from] anyhow::Error),
@@ -34,12 +34,16 @@ pub enum FileError {
 
 /// Get file core state.
 /// If the core not exists yet create it.
-pub async fn file_core<I>(co_reducer: CoReducer, identity: &I, core: &str) -> Result<co_core_file::File, FileError>
+pub async fn file_core<I>(
+	co_reducer: CoReducer,
+	identity: &I,
+	core: &str,
+) -> Result<(CoStorage, co_core_file::File), FileError>
 where
-	I: PrivateIdentity + Debug + Send + Sync,
+	I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 {
-	match co_reducer.state(core).await {
-		Err(CoReducerError::CoreNotFound(_)) => {
+	match query_core(core).execute_reducer(&co_reducer).await {
+		Err(QueryError::NotFound(_)) => {
 			// create core
 			let create = CoAction::CoreCreate {
 				core: core.to_owned(),
@@ -49,7 +53,7 @@ where
 			co_reducer.push(identity, CO_CORE_NAME_CO, &create).await?;
 
 			// assume default state
-			Ok(Default::default())
+			Ok((co_reducer.storage(), Default::default()))
 		},
 		result => Ok(result?),
 	}
@@ -62,11 +66,11 @@ pub fn list_nodes(
 	path: AbsolutePathOwned,
 ) -> impl Stream<Item = Result<Node, StorageError>> {
 	async_stream::try_stream! {
-		let stream = NodeStream::from_node_container(storage.clone(), &file_state.nodes);
+		let stream = file_state.nodes.stream(&storage);
 		for await directory in stream {
 			let (directory_path, children) = directory?;
 			if directory_path == path {
-				let children_stream = NodeStream::from_node_container(storage.clone(), &children);
+				let children_stream = children.stream(&storage);
 				for await node in children_stream {
 					yield node?
 				}
@@ -135,7 +139,7 @@ pub fn nodes(
 ) -> impl Stream<Item = Result<(AbsolutePathOwned, Node), StorageError>> {
 	let mut seen_paths = if let Some(paths) = &paths { paths.len() } else { 0 };
 	async_stream::try_stream! {
-		let stream = NodeStream::from_node_container(storage.clone(), &file_state.nodes);
+		let stream = file_state.nodes.stream(&storage);
 		for await directory in stream {
 			let (directory_path, children) = directory?;
 
@@ -149,7 +153,7 @@ pub fn nodes(
 			}
 
 			// nodes
-			let children_stream = NodeStream::from_node_container(storage.clone(), &children);
+			let children_stream = children.stream(&storage);
 			for await node in children_stream {
 				let node = node?;
 				yield (directory_path.join_path(node.name()).map_err(|e| StorageError::Internal(e.into()))?, node)

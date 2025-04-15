@@ -3,7 +3,7 @@ use cid::Cid;
 use co_storage::BlockStorage;
 use futures::{stream, StreamExt, TryStreamExt};
 
-pub async fn get_entry_block<S>(storage: &S, cid: &Cid) -> Result<EntryBlock<S::StoreParams>, LogError>
+pub async fn get_entry_block<S>(storage: &S, cid: &Cid) -> Result<EntryBlock, LogError>
 where
 	S: BlockStorage + Send + Sync,
 {
@@ -11,10 +11,7 @@ where
 	Ok(EntryBlock::from_block(block)?)
 }
 
-pub async fn get_entry_blocks<S>(
-	storage: &S,
-	cids: impl Iterator<Item = &Cid>,
-) -> Result<Vec<EntryBlock<S::StoreParams>>, LogError>
+pub async fn get_entry_blocks<S>(storage: &S, cids: impl Iterator<Item = &Cid>) -> Result<Vec<EntryBlock>, LogError>
 where
 	S: BlockStorage + Send + Sync,
 {

@@ -1,6 +1,9 @@
 use cid::Cid;
-use multihash_codetable::MultihashDigest;
-use std::marker::PhantomData;
+use multihash_codetable::{Code, MultihashDigest};
+use std::{
+	hash::{Hash, Hasher},
+	marker::PhantomData,
+};
 
 pub trait StoreParams: std::fmt::Debug + Clone + Send + Sync + Unpin + 'static {
 	const MAX_BLOCK_SIZE: usize;
@@ -31,6 +34,17 @@ impl<S: StoreParams> Block<S> {
 		Self { _s: Default::default(), cid, data }
 	}
 
+	/// Create a new block by calculating the [`Cid`] from data using the default hasher.
+	/// Note: The default hasher may changes without notice.
+	pub fn new_data(codec: impl Into<u64>, data: Vec<u8>) -> Self {
+		Self::new_data_digest(Code::Blake3_256, codec, data)
+	}
+
+	/// Create a new block by calculating the [`Cid`] from data.
+	pub fn new_data_digest(digest: impl MultihashDigest<64>, codec: impl Into<u64>, data: Vec<u8>) -> Self {
+		Self::new_unchecked(Cid::new_v1(codec.into(), digest.digest(&data)), data)
+	}
+
 	/// Returns the cid.
 	pub fn cid(&self) -> &Cid {
 		&self.cid
@@ -49,6 +63,22 @@ impl<S: StoreParams> Block<S> {
 impl<S> PartialEq for Block<S> {
 	fn eq(&self, other: &Self) -> bool {
 		self.cid == other.cid
+	}
+}
+impl<S> Eq for Block<S> {}
+impl<S> PartialOrd for Block<S> {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		self.cid.partial_cmp(&other.cid)
+	}
+}
+impl<S> Ord for Block<S> {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		self.cid.cmp(&other.cid)
+	}
+}
+impl<S> Hash for Block<S> {
+	fn hash<H: Hasher>(&self, state: &mut H) {
+		Hash::hash(&self, state);
 	}
 }
 impl<S> std::fmt::Debug for Block<S> {

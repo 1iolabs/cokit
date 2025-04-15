@@ -16,12 +16,20 @@ impl CoV1Api {
 		&self.context.state
 	}
 
+	pub fn context(&self) -> &RuntimeContext {
+		&self.context
+	}
+
 	pub fn set_state(&mut self, state: Cid) {
 		self.context.state = Some(state);
 	}
 
 	pub fn event(&self) -> &Cid {
 		&self.context.event
+	}
+
+	pub fn write_diagnostic(&mut self, data: Cid) {
+		self.context.diagnostics.push(data);
 	}
 
 	pub fn swap(&mut self, other: &mut CoV1Api) {
@@ -138,4 +146,9 @@ pub fn event_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> u32 {
 	let size = min(buffer.len(), cid_buffer.len());
 	buffer[0..size].copy_from_slice(&cid_buffer.as_slice()[0..size]);
 	cid_buffer.len().try_into().expect("u32")
+}
+
+pub fn diagnostic_cid_write(api: &mut CoV1Api, buffer: &[u8]) -> Result<u32, CoV1ApiError> {
+	api.context.diagnostics.push(Cid::try_from(buffer)?);
+	Ok(buffer.len().try_into().expect("u32"))
 }

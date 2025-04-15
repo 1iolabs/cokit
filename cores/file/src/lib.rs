@@ -1,8 +1,8 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	tags, AbsolutePath, AbsolutePathOwned, Context, DagCollection, DagMap, DagSet, Date, Did, PathExt, PathOwned,
-	Reducer, ReducerAction, Tags,
+	tags, AbsolutePath, AbsolutePathOwned, Context, DagCollectionExt, DagMap, DagMapExt, DagSet, DagSetExt, Date, Did,
+	PathExt, PathOwned, Reducer, ReducerAction, Storage, Tags,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque};
@@ -111,10 +111,14 @@ impl Reducer for File {
 	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		match &event.payload {
 			FileAction::Create { path, node, recursive } => {
-				reduce_create(context, self, path, node, &event.from, event.time, *recursive).unwrap()
+				reduce_create(context.storage_mut(), self, path, node, &event.from, event.time, *recursive).unwrap()
 			},
-			FileAction::Remove { path, recursive } => reduce_remove(context, self, path, *recursive).unwrap(),
-			FileAction::Modify { path, modifications } => reduce_modify(context, self, path, modifications).unwrap(),
+			FileAction::Remove { path, recursive } => {
+				reduce_remove(context.storage_mut(), self, path, *recursive).unwrap()
+			},
+			FileAction::Modify { path, modifications } => {
+				reduce_modify(context.storage_mut(), self, path, modifications).unwrap()
+			},
 		}
 	}
 }
@@ -294,7 +298,7 @@ impl LinkNode {
 }
 
 fn reduce_create(
-	context: &mut dyn Context,
+	context: &mut dyn Storage,
 	mut state: File,
 	path: &AbsolutePath,
 	node: &Node,
@@ -336,7 +340,7 @@ fn reduce_create(
 }
 
 fn reduce_remove(
-	context: &mut dyn Context,
+	storage: &mut dyn Storage,
 	mut state: File,
 	path: &AbsolutePath,
 	recursive: bool,
@@ -344,7 +348,7 @@ fn reduce_remove(
 	let path = path.normalize()?;
 
 	// nodes
-	let mut nodes = state.nodes.collection(context.storage());
+	let mut nodes = state.nodes.collection(storage);
 
 	// apply
 	let (parent_path, name) = path.parent_and_file_name_result()?;
@@ -361,7 +365,7 @@ fn reduce_remove(
 			}
 
 			// queue
-			for child in children.iter(context.storage()) {
+			for child in children.iter(storage) {
 				stack.push_back(path.join_path(child.name())?);
 			}
 
@@ -371,10 +375,10 @@ fn reduce_remove(
 	}
 
 	// remove
-	remove_node_by_name(&mut nodes, context, parent_path, name);
+	remove_node_by_name(&mut nodes, storage, parent_path, name);
 
 	// apply to state
-	state.nodes.set_collection(context.storage_mut(), nodes);
+	state.nodes.set_collection(storage, nodes);
 
 	// result
 	Ok(state)
@@ -383,7 +387,7 @@ fn reduce_remove(
 /// Remove node from set.
 fn remove_node_by_name(
 	paths: &mut BTreeMap<AbsolutePathOwned, DagSet<Node>>,
-	context: &mut dyn Context,
+	storage: &mut dyn Storage,
 	parent_path: &AbsolutePath,
 	name: &str,
 ) -> BTreeSet<Node> {
@@ -392,14 +396,14 @@ fn remove_node_by_name(
 		.get(parent_path)
 		.cloned()
 		.unwrap_or_default()
-		.iter(context.storage())
+		.iter(storage)
 		.partition(|node| node.name() != name);
 
 	// store
 	if nodes.is_empty() && parent_path != "/" {
 		paths.remove(parent_path);
 	} else {
-		paths.insert(parent_path.to_owned(), DagSet::create(context.storage_mut(), nodes));
+		paths.insert(parent_path.to_owned(), DagSet::create(storage, nodes));
 	}
 
 	// result
@@ -407,7 +411,7 @@ fn remove_node_by_name(
 }
 
 fn reduce_modify(
-	context: &mut dyn Context,
+	storage: &mut dyn Storage,
 	mut state: File,
 	path: &AbsolutePath,
 	modifications: &Vec<FileModification>,
@@ -422,7 +426,7 @@ fn reduce_modify(
 		FileModification::Move(p) => Some(p),
 		_ => None,
 	}) {
-		state.nodes.try_update(context, |context, paths| {
+		state.nodes.try_update(storage, |context, paths| {
 			// validate: check `to_parent` exists
 			let validated_to_parent = if to_parent == "/" {
 				to_parent.to_owned()
@@ -466,13 +470,13 @@ fn reduce_modify(
 		})
 		.collect();
 	if !modifications.is_empty() {
-		state.nodes.try_update_key(context, &parent_path, |context, _, item| {
+		state.nodes.try_update_key(storage, &parent_path, |storage, _, item| {
 			// validate
 			for modification in modifications.iter() {
 				match modification {
 					FileModification::Rename(name) => {
 						// check `name` dont exists as sibling
-						if item.iter(context.storage()).find(|node| node.name() == name).is_some() {
+						if item.iter(storage).find(|node| node.name() == name).is_some() {
 							return Err(anyhow!("File exists: {}", parent_path.join_path(name)?));
 						}
 					},
@@ -482,7 +486,7 @@ fn reduce_modify(
 
 			// update item
 			item.try_update_one(
-				context,
+				storage,
 				|_, node| node.name() == name,
 				|_, node| {
 					for modification in modifications.iter() {
@@ -497,7 +501,7 @@ fn reduce_modify(
 
 	// reparent children nodes
 	if !file_modification_context.reparent.is_empty() {
-		state.nodes.try_update(context, |context, nodes| {
+		state.nodes.try_update(storage, |context, nodes| {
 			for (from, to) in file_modification_context.reparent.iter() {
 				reparent(context, nodes, from, to)?;
 			}
@@ -510,16 +514,16 @@ fn reduce_modify(
 }
 
 fn reparent(
-	context: &dyn Context,
+	storage: &dyn Storage,
 	nodes: &mut BTreeMap<AbsolutePathOwned, DagSet<Node>>,
 	from: &AbsolutePath,
 	to: &AbsolutePath,
 ) -> Result<(), anyhow::Error> {
 	if let Some(items) = nodes.remove(from) {
 		// children
-		for child in items.iter(context.storage()) {
+		for child in items.iter(storage) {
 			if child.is_dir() {
-				reparent(context, nodes, &from.join_path(child.name())?, &to.join_path(child.name())?)?;
+				reparent(storage, nodes, &from.join_path(child.name())?, &to.join_path(child.name())?)?;
 			}
 		}
 
@@ -561,7 +565,7 @@ impl FileModificationContext {
 /// Returns the node and its absoulte path (without links if resolve_link is true).
 /// TODO: Fix links in path
 fn get_node(
-	context: &mut dyn Context,
+	storage: &mut dyn Storage,
 	paths: &BTreeMap<AbsolutePathOwned, DagSet<Node>>,
 	path: &AbsolutePath,
 	resolve_link: bool,
@@ -571,7 +575,7 @@ fn get_node(
 		Some(nodes) => nodes,
 		None => return Ok(None),
 	};
-	let node = nodes.collection(context.storage()).into_iter().find(|node| node.name() == name);
+	let node = nodes.collection(storage).into_iter().find(|node| node.name() == name);
 
 	// resolve_link
 	if let Some(node) = &node {
@@ -579,7 +583,7 @@ fn get_node(
 			match node {
 				Node::Link(link) => {
 					let target = parent_path.join(&link.contents)?;
-					return get_node(context, paths, &target, resolve_link);
+					return get_node(storage, paths, &target, resolve_link);
 				},
 				_ => {},
 			}
@@ -591,7 +595,7 @@ fn get_node(
 }
 
 fn create_node(
-	context: &mut dyn Context,
+	storage: &mut dyn Storage,
 	paths: &mut BTreeMap<AbsolutePathOwned, DagSet<Node>>,
 	parent_path: &AbsolutePath,
 	node: Node,
@@ -602,7 +606,7 @@ fn create_node(
 		"/" => parent_path.to_owned(),
 		// check if node exists
 		_ => {
-			get_node(context, paths, parent_path, true)?
+			get_node(storage, paths, parent_path, true)?
 				.ok_or(anyhow!("No such directory: {}", parent_path))?
 				.0
 		},
@@ -613,7 +617,7 @@ fn create_node(
 		Entry::Occupied(o) => o.into_mut(),
 		Entry::Vacant(v) => v.insert(Default::default()),
 	};
-	nodes.try_update(context, |_, nodes| {
+	nodes.try_update(storage, |_, nodes| {
 		// insert node if name not exists yet
 		if !nodes.iter().any(|item| item.name() == node.name()) {
 			nodes.insert(node);
@@ -625,7 +629,7 @@ fn create_node(
 }
 
 fn create_folder(
-	context: &mut dyn Context,
+	context: &mut dyn Storage,
 	paths: &mut BTreeMap<AbsolutePathOwned, DagSet<Node>>,
 	path: &AbsolutePath,
 	from: &Did,
@@ -654,7 +658,7 @@ mod tests {
 	use crate::{File, FileAction, FileModification, FileNode, Node};
 	use cid::Cid;
 	use co_api::{
-		AbsolutePath, Block, BlockSerializer, Context, DagCollection, DefaultParams, PathExt, Reducer, ReducerAction,
+		AbsolutePath, Block, BlockSerializer, Context, DagCollectionExt, DefaultParams, PathExt, Reducer, ReducerAction,
 	};
 	use co_storage::{MemoryStorage, Storage, StorageError};
 	use std::{cell::RefCell, rc::Rc};
@@ -681,6 +685,10 @@ mod tests {
 		}
 
 		fn store_state(&mut self, _cid: Cid) {
+			unimplemented!()
+		}
+
+		fn write_diagnostic(&mut self, _cid: Cid) {
 			unimplemented!()
 		}
 	}

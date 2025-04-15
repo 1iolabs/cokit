@@ -1,15 +1,14 @@
-use crate::{Node, Storage};
+use crate::{from_cbor, MultiCodec, Node, Storage};
 use cid::Cid;
-use co_primitives::{from_cbor, KnownMultiCodec};
 use serde::de::DeserializeOwned;
 use std::collections::VecDeque;
 
 #[derive(Debug, thiserror::Error)]
 pub enum NodeReaderError {
 	#[error("Invalid argument")]
-	InvalidArgument,
+	InvalidArgument(#[source] anyhow::Error),
 
-	#[error("Decide failed")]
+	#[error("Decode failed")]
 	Decode(#[source] anyhow::Error),
 }
 
@@ -72,10 +71,7 @@ where
 
 fn read_node<T: Clone + DeserializeOwned>(storage: &dyn Storage, cid: &Cid) -> Result<Node<T>, NodeReaderError> {
 	// get block
-	let block = storage.get(cid);
-	if block.cid().codec() != Into::<u64>::into(KnownMultiCodec::DagCbor) {
-		return Err(NodeReaderError::InvalidArgument);
-	}
+	let block = storage.get(MultiCodec::with_cbor(cid).map_err(|err| NodeReaderError::InvalidArgument(err.into()))?);
 
 	// get node
 	let node: Node<T> = from_cbor(block.data()).map_err(|e| NodeReaderError::Decode(e.into()))?;

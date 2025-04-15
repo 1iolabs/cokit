@@ -27,9 +27,18 @@ where
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CoInvitePayload {
+	/// The CO ID.
 	pub id: CoId,
+
+	/// The invite tags.
 	pub tags: Tags,
+
+	/// The latest known CO State (encrypted if the CO is not public).
 	pub state: Cid,
+
+	/// The latest known CO Heads (encrypted if the CO is not public).
 	pub heads: BTreeSet<Cid>,
+
+	/// Connectivity settings.
 	pub connectivity: CoConnectivity,
 }

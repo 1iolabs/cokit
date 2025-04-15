@@ -106,7 +106,8 @@ impl Actor for ApplicationActor {
 							.await
 							.map_err(|err| ActorError::Actor(err.into()))?
 							.reducer_state()
-							.await)
+							.await
+							.into())
 					})
 					.await
 					.ok();
@@ -117,7 +118,7 @@ impl Actor for ApplicationActor {
 					async move {
 						let changed = application.handle().stream(ApplicationMessage::Subscribe).filter_map(|action| {
 							ready(match action {
-								Ok(Action::CoreAction { co, context: _, action: _, cid: _ }) => Some(co),
+								Ok(Action::CoreAction { co, storage: _, context: _, action: _, cid: _ }) => Some(co),
 								_ => None,
 							})
 						});
@@ -125,7 +126,7 @@ impl Actor for ApplicationActor {
 						let context = application.context();
 						while let Some(co) = changed.next().await {
 							if let Some(reducer) = context.try_co_reducer(&co).await.ok() {
-								let (state, heads) = reducer.reducer_state().await;
+								let (state, heads) = reducer.reducer_state().await.into();
 								if response.send((co, state, heads)).is_err() {
 									break;
 								}
@@ -151,6 +152,7 @@ impl Actor for ApplicationActor {
 							.push(&private_identity, &core, &action)
 							.await
 							.map_err(|err| ActorError::Actor(err.into()))
+							.map(|state| state.state())
 					})
 					.await
 					.ok();

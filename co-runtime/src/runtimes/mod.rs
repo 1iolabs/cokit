@@ -1,6 +1,5 @@
 use self::wasmer::WasmerRuntime;
-use crate::co_v1::CoV1Api;
-use cid::Cid;
+use crate::{co_v1::CoV1Api, RuntimeContext};
 
 pub mod wasmer;
 
@@ -31,7 +30,7 @@ impl From<wasmer::WasmerError> for RuntimeError {
 
 pub trait Runtime {
 	/// Execute runtime with specified api.
-	fn execute(&mut self, api: CoV1Api) -> Result<Option<Cid>, RuntimeError>;
+	fn execute(&mut self, api: CoV1Api) -> Result<RuntimeContext, RuntimeError>;
 }
 
 enum RuntimeState {
@@ -49,7 +48,7 @@ impl Wasmer {
 }
 impl Runtime for Wasmer {
 	/// Execute runtime with api and return new state `Cid`.
-	fn execute(&mut self, mut api: CoV1Api) -> Result<Option<Cid>, RuntimeError> {
+	fn execute(&mut self, mut api: CoV1Api) -> Result<RuntimeContext, RuntimeError> {
 		// initialize
 		let runtime: &mut WasmerRuntime = match &mut self.state {
 			RuntimeState::Unintialized(bytes) => {
@@ -68,7 +67,7 @@ impl Runtime for Wasmer {
 
 		// execute
 		runtime.execute()?;
-		let result = *runtime.api().state();
+		let result = runtime.api().context().clone();
 
 		// result
 		Ok(result)

@@ -31,6 +31,10 @@ extern "C" {
 	/// If no prior state exists the result is zero.
 	/// Encoding: Binary
 	pub fn event_cid_read(buffer: *mut u8, buffer_size: u32) -> u32;
+
+	/// Write diagnostic CID.
+	/// Encoding: Binary
+	pub fn diagnostic_cid_write(buffer: *const u8, buffer_size: u32) -> u32;
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -55,5 +59,10 @@ pub extern "C" fn state_cid_write(_buffer: *const u8, _buffer_size: u32) -> u32 
 
 #[cfg(not(target_arch = "wasm32"))]
 pub extern "C" fn event_cid_read(_buffer: *mut u8, _buffer_size: u32) -> u32 {
+	panic!("only available for target_arch = \"wasm32\"");
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub extern "C" fn diagnostic_cid_write(_buffer: *const u8, _buffer_size: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }

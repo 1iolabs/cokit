@@ -6,14 +6,21 @@ rust-version = "1.76"
 
 [dependencies]
 anyhow = { workspace = true }
+async-stream = { workspace = true }
+async-trait = { workspace = true }
+bloomfilter = { version = "3.0.1", default-features = false }
 cid = { workspace = true }
 co-macros = { path = "../co-macros" }
 derive_more = { workspace = true }
 either = { workspace = true }
+futures = { workspace = true }
 ipld-core = { workspace = true }
 ipld-dagpb = { workspace = true }
 multihash = { workspace = true }
 multihash-codetable = { workspace = true }
+num-rational = "0.4"
+ordered-float = "4.6.0"
+pin-project = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
@@ -22,7 +29,9 @@ serde_ipld_dagjson = { workspace = true }
 serde_json = { workspace = true }
 serde_repr = { workspace = true }
 thiserror = { workspace = true }
+unsigned-varint = "0.8.0"
 zeroize = { workspace = true }
 
 [dev-dependencies]
 insta = { version = "1.34.0", features = ["default", "yaml"] }
+tokio = { workspace = true, features = ["macros", "rt"] }

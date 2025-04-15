@@ -9,7 +9,10 @@ use co_messaging::{
 	MatrixEvent,
 };
 use co_primitives::CoCid;
-use co_sdk::{tags, CoReducerError, CoReducerFactory, Cores, CO_CORE_NAME_CO, CO_CORE_ROOM};
+use co_sdk::{
+	state::{query_core, QueryError, QueryExt},
+	tags, CoReducerFactory, Cores, CO_CORE_NAME_CO, CO_CORE_ROOM,
+};
 use exitcode::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -39,8 +42,8 @@ pub async fn command(
 	let co = &room_command.co;
 	let core = &room_command.core;
 	let co_reducer = application.context().try_co_reducer(co).await?;
-	match co_reducer.state::<co_core_room::Room>(core).await {
-		Err(CoReducerError::CoreNotFound(_)) => {
+	match query_core::<co_core_room::Room>(core).execute_reducer(&co_reducer).await {
+		Err(QueryError::NotFound(_)) => {
 			let create = CoAction::CoreCreate {
 				core: core.to_owned(),
 				binary: Cores::default().binary(CO_CORE_ROOM).expect(CO_CORE_ROOM),
