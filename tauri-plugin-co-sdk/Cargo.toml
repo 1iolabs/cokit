@@ -25,8 +25,8 @@ ipld-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
-tauri = { version = "2.4.0", default-features = false }
-tauri-plugin-shell = "2.2.0"
+tauri = { version = "2.4.1", default-features = false }
+tauri-plugin-shell = "2.2.1"
 tauri-utils = { version = "2.3.0" }
 thiserror = { workspace = true }
 tokio = { workspace = true }

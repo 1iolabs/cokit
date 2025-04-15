@@ -297,97 +297,116 @@
         {
           "description": "Enables the create_identity command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-create-identity"
+          "const": "allow-create-identity",
+          "markdownDescription": "Enables the create_identity command without any pre-configured scope."
         },
         {
           "description": "Denies the create_identity command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-create-identity"
+          "const": "deny-create-identity",
+          "markdownDescription": "Denies the create_identity command without any pre-configured scope."
         },
         {
           "description": "Enables the entries command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-entries"
+          "const": "allow-entries",
+          "markdownDescription": "Enables the entries command without any pre-configured scope."
         },
         {
           "description": "Denies the entries command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-entries"
+          "const": "deny-entries",
+          "markdownDescription": "Denies the entries command without any pre-configured scope."
         },
         {
           "description": "Enables the get_actions command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-get-actions"
+          "const": "allow-get-actions",
+          "markdownDescription": "Enables the get_actions command without any pre-configured scope."
         },
         {
           "description": "Denies the get_actions command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-get-actions"
+          "const": "deny-get-actions",
+          "markdownDescription": "Denies the get_actions command without any pre-configured scope."
         },
         {
           "description": "Enables the get_co_state command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-get-co-state"
+          "const": "allow-get-co-state",
+          "markdownDescription": "Enables the get_co_state command without any pre-configured scope."
         },
         {
           "description": "Denies the get_co_state command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-get-co-state"
+          "const": "deny-get-co-state",
+          "markdownDescription": "Denies the get_co_state command without any pre-configured scope."
         },
         {
           "description": "Enables the get_log command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-get-log"
+          "const": "allow-get-log",
+          "markdownDescription": "Enables the get_log command without any pre-configured scope."
         },
         {
           "description": "Denies the get_log command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-get-log"
+          "const": "deny-get-log",
+          "markdownDescription": "Denies the get_log command without any pre-configured scope."
         },
         {
           "description": "Enables the push_action command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-push-action"
+          "const": "allow-push-action",
+          "markdownDescription": "Enables the push_action command without any pre-configured scope."
         },
         {
           "description": "Denies the push_action command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-push-action"
+          "const": "deny-push-action",
+          "markdownDescription": "Denies the push_action command without any pre-configured scope."
         },
         {
           "description": "Enables the resolve_cid command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-resolve-cid"
+          "const": "allow-resolve-cid",
+          "markdownDescription": "Enables the resolve_cid command without any pre-configured scope."
         },
         {
           "description": "Denies the resolve_cid command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-resolve-cid"
+          "const": "deny-resolve-cid",
+          "markdownDescription": "Denies the resolve_cid command without any pre-configured scope."
         },
         {
           "description": "Enables the storage_get command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-storage-get"
+          "const": "allow-storage-get",
+          "markdownDescription": "Enables the storage_get command without any pre-configured scope."
         },
         {
           "description": "Denies the storage_get command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-storage-get"
+          "const": "deny-storage-get",
+          "markdownDescription": "Denies the storage_get command without any pre-configured scope."
         },
         {
           "description": "Enables the storage_set command without any pre-configured scope.",
           "type": "string",
-          "const": "allow-storage-set"
+          "const": "allow-storage-set",
+          "markdownDescription": "Enables the storage_set command without any pre-configured scope."
         },
         {
           "description": "Denies the storage_set command without any pre-configured scope.",
           "type": "string",
-          "const": "deny-storage-set"
+          "const": "deny-storage-set",
+          "markdownDescription": "Denies the storage_set command without any pre-configured scope."
         },
         {
-          "description": "Allows usage of co-sdk api",
+          "description": "Allows usage of co-sdk api\n#### This default permission set includes:\n\n- `allow-get-co-state`\n- `allow-resolve-cid`\n- `allow-storage-get`\n- `allow-storage-set`\n- `allow-push-action`\n- `allow-get-actions`\n- `allow-create-identity`",
           "type": "string",
-          "const": "default"
+          "const": "default",
+          "markdownDescription": "Allows usage of co-sdk api\n#### This default permission set includes:\n\n- `allow-get-co-state`\n- `allow-resolve-cid`\n- `allow-storage-get`\n- `allow-storage-set`\n- `allow-push-action`\n- `allow-get-actions`\n- `allow-create-identity`"
         }
       ]
     }

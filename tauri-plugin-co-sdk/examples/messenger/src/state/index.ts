@@ -6,4 +6,5 @@ export interface ChatsListPluginState {
     readonly loadedChats: Map<string, PluginId>;
     readonly selectedChat?: string;
     readonly priorityPluginiId?: PluginId;
+    readonly identity?: string;
 }

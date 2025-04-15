@@ -2,6 +2,8 @@
 
 Allows usage of co-sdk api
 
+#### This default permission set includes the following:
+
 - `allow-get-co-state`
 - `allow-resolve-cid`
 - `allow-storage-get`

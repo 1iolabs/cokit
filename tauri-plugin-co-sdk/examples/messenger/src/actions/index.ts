@@ -10,10 +10,16 @@ export enum ChatsListActionType {
     ChatPluginLoaded = "coapp/chats-list/chatPluginLoaded",
     OpenChatDetails = "coapp/chats-list/openChatDetails",
     SetPriorityPlugin = "coapp/chats-list/setPriorityPlugin",
+    SetIdentity = "coapp/chats-list/setIdentity",
 }
 
-export type ChatsListActions = ChatsListOpenChatAction | ChatsListSetChatsAction | ChatsListUpdateChatAction
-    | ChatsListChatPluginLoaded | ChatsListOpenChatDetailsAction | ChatsListSetPriorityPlugin;
+export type ChatsListActions = ChatsListOpenChatAction
+    | ChatsListSetChatsAction
+    | ChatsListUpdateChatAction
+    | ChatsListChatPluginLoaded
+    | ChatsListOpenChatDetailsAction
+    | ChatsListSetPriorityPlugin
+    | ChatsListSetIdentityAction;
 
 export interface ChatsListSetChatsAction {
     readonly payload: { chats: Chat[] };
@@ -44,4 +50,8 @@ export interface ChatsListOpenChatDetailsAction extends PayloadAction<ChatsListA
 
 export interface ChatsListSetPriorityPlugin extends PayloadAction<ChatsListActionType.SetPriorityPlugin, {
     readonly pluginId?: PluginId;
+}> { }
+
+export interface ChatsListSetIdentityAction extends PayloadAction<ChatsListActionType.SetIdentity, {
+    readonly identity: string;
 }> { }

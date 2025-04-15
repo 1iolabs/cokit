@@ -81,8 +81,6 @@ export function MessengerViewContainer(props: MessengerViewContainerProps) {
     }));
   }
 
-  console.log("trest", messages);
-
   return <LevelStack style={{ width: "100%", height: "100%" }}>
     <MessengerView
       tauriWindowDragHeader

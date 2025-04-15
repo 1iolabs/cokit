@@ -16,6 +16,7 @@
     "core:menu:default",
     "core:tray:default",
     "shell:allow-open",
-    "co-sdk:default"
+    "co-sdk:default",
+    "dialog:default"
   ]
 }

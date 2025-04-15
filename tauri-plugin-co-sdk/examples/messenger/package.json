@@ -11,6 +11,7 @@
     "build-dist": "npm run clean && npm run build-plugins && npm run build && npm run rollup && npm run deploy-self",
     "lint": "npx tslint --project . && npx nplint",
     "tauri": "tauri",
+    "tauri-dev": "npm run tauri dev -- --no-watch",
     "clean": "npx rimraf -rf ./dist",
     "rollup": "npx cross-env NODE_ENV=development kui-application build -o ./dist/ui",
     "sass": "sass ./src/containers -w -q --no-verbose",
@@ -42,11 +43,18 @@
           "node",
           "browser"
         ]
+      },
+      "coapp-group-view": {
+        "main": "./src/plugins/coapp-group-view-plugin/plugin.tsx",
+        "runtime": [
+          "node",
+          "browser"
+        ]
       }
     }
   },
   "dependencies": {
-    "@1io/coapp-chatlist-view": "^0.0.1-mr1.4",
+    "@1io/coapp-chatlist-view": "file:../../../../../IdeaProjects/coapp/coapp-chatlist-view/1io-coapp-chatlist-view-0.0.1-4.tgz",
     "@1io/coapp-messenger-view": "file:../../../../../IdeaProjects/coapp/coapp-messenger-view/1io-coapp-messenger-view-0.4.4-0.tgz",
     "@1io/coapp-style": "^0.1.1",
     "@1io/kui-application": "^0.5.0",
@@ -60,6 +68,7 @@
     "@babel/core": "^7.24.7",
     "@ipld/dag-cbor": "^9.2.0",
     "@tauri-apps/api": "^2.4.0",
+    "@tauri-apps/plugin-dialog": "^2.2.1",
     "@tauri-apps/plugin-shell": "^2.2.0",
     "@types/babel-core": "^6.25.10",
     "clsx": "^2.1.1",

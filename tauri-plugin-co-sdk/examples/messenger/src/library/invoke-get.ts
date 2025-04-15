@@ -1,4 +1,4 @@
-import { isNonNull } from "@1io/kui-application-sdk";
+import { isNonNull } from "@1io/compare";
 import { CID } from "multiformats";
 import { getCoState, resolveCid } from "tauri-plugin-co-sdk";
 import { buildCoCoreId } from "./core-id.js";
