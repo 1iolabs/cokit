@@ -62,6 +62,10 @@ where
 			ExtendedBlock { block: convert_block_store_params(block.block, self.checked)?, options: block.options };
 		self.next.set_extended(next_block).await
 	}
+
+	async fn clear(&self) -> Result<(), StorageError> {
+		self.next.clear().await
+	}
 }
 impl<S, P> CloneWithBlockStorageSettings for StoreParamsBlockStorage<S, P>
 where

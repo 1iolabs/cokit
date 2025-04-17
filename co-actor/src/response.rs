@@ -2,6 +2,7 @@ use super::ActorError;
 use crate::TaskSpawner;
 use futures::{FutureExt, Sink, Stream};
 use std::{
+	borrow::Borrow,
 	fmt::Debug,
 	future::Future,
 	pin::Pin,
@@ -60,17 +61,17 @@ impl<T> Response<T> {
 		F: FnOnce() -> Fut + Send + 'static,
 		T: Send + 'static,
 	{
-		Self::spawn_with(self, Default::default(), value);
+		Self::spawn_with(self, TaskSpawner::default(), value);
 	}
 
 	/// Spawns a new task using the given spawner and executes given closure in it
-	pub fn spawn_with<Fut, F>(self, spawner: TaskSpawner, value: F)
+	pub fn spawn_with<Fut, F>(self, spawner: impl Borrow<TaskSpawner>, value: F)
 	where
 		Fut: Future<Output = T> + Send + 'static,
 		F: FnOnce() -> Fut + Send + 'static,
 		T: Send + 'static,
 	{
-		spawner.spawn(async move { self.send(value().await).ok() });
+		spawner.borrow().spawn(async move { self.send(value().await).ok() });
 	}
 }
 

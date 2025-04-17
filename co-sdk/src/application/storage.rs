@@ -1,32 +1,45 @@
-use crate::CoStorage;
+use crate::{CoStorage, CoUuid, DynamicCoUuid};
 use co_storage::{FsStorage, MemoryBlockStorage};
 use std::path::PathBuf;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Storage {
 	storage: CoStorage,
-	tmp_storage: CoStorage,
+	tmp_storage: TmpStorage,
 }
 impl Storage {
-	pub fn new(storage_path: PathBuf, tmp_storage_path: PathBuf) -> Self {
+	pub fn new(storage_path: PathBuf, tmp_storage_path: PathBuf, tmp_uuid: DynamicCoUuid) -> Self {
+		// to prevent data loss verify the tmp folder is not the actual storage folder
+		assert!(storage_path != tmp_storage_path);
+
+		// result
 		Self {
 			storage: CoStorage::new(FsStorage::new(storage_path)),
-			tmp_storage: CoStorage::new(FsStorage::new(tmp_storage_path)),
+			tmp_storage: TmpStorage::Path(tmp_uuid, tmp_storage_path),
 		}
 	}
 
 	pub fn new_memory() -> Self {
-		Self {
-			storage: CoStorage::new(MemoryBlockStorage::default()),
-			tmp_storage: CoStorage::new(MemoryBlockStorage::default()),
-		}
+		Self { storage: CoStorage::new(MemoryBlockStorage::default()), tmp_storage: TmpStorage::Memory }
 	}
 
 	pub fn storage(&self) -> CoStorage {
 		self.storage.clone()
 	}
 
+	/// Create a new (distinct) tmp storage instance.
 	pub fn tmp_storage(&self) -> CoStorage {
-		self.tmp_storage.clone()
+		match &self.tmp_storage {
+			TmpStorage::Memory => CoStorage::new(MemoryBlockStorage::default()),
+			TmpStorage::Path(uuid, path) => {
+				CoStorage::new(FsStorage::new(path.join(uuid.uuid())).with_allow_clear(true))
+			},
+		}
 	}
+}
+
+#[derive(Debug, Clone)]
+enum TmpStorage {
+	Memory,
+	Path(DynamicCoUuid, PathBuf),
 }

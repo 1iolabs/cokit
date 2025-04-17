@@ -7,6 +7,9 @@ use std::collections::BTreeMap;
 pub trait ExtendedBlockStorage: BlockStorage {
 	/// Inserts a block into storage.
 	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError>;
+
+	/// Clear the storage by removing all entries.
+	async fn clear(&self) -> Result<(), StorageError>;
 }
 
 #[derive(Debug, Clone)]
@@ -40,7 +43,7 @@ impl<P> From<(Block<P>, ExtendedBlockOptions)> for ExtendedBlock<P> {
 	}
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ExtendedBlockOptions {
 	// Extra references.
 	pub references: Option<BTreeMap<Cid, Cid>>,

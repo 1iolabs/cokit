@@ -342,9 +342,13 @@ impl ApplicationBuilder {
 		// log
 		self.tracing.init()?;
 
+		// sources
+		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(SystemCoDate));
+		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
+
 		// storage
 		let storage = match &self.path {
-			Some(path) => Storage::new(path.join("data"), path.join("tmp/data")),
+			Some(path) => Storage::new(path.join("data"), path.join("tmp/data"), uuid.clone()),
 			None => Storage::new_memory(),
 		};
 
@@ -355,10 +359,6 @@ impl ApplicationBuilder {
 			keychain: self.keychain,
 			settings: self.settings,
 		};
-
-		// date
-		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(SystemCoDate));
-		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
 
 		// create
 		let service = Actor::spawn(

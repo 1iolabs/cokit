@@ -118,7 +118,7 @@ impl CoReducer {
 	///
 	/// # Returns
 	/// The resulting state and heads.
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, item, identity))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, item, identity))]
 	pub async fn push<T, I>(&self, identity: &I, core: &str, item: &T) -> Result<CoReducerState, anyhow::Error>
 	where
 		T: Serialize + Debug + Clone + Send + Sync + 'static,
@@ -142,7 +142,7 @@ impl CoReducer {
 	}
 
 	/// Push event into reducer.
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity(), core = action.core), skip(self, action, identity))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity(), core = action.core), skip(self, action, identity))]
 	pub async fn push_action<T, I>(
 		&self,
 		identity: &I,
@@ -176,7 +176,7 @@ impl CoReducer {
 	///
 	/// # Returns
 	/// The resulting state and heads.
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, identity))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, identity))]
 	pub async fn push_reference<I>(
 		&self,
 		identity: &I,
@@ -202,7 +202,7 @@ impl CoReducer {
 
 	/// Join heads.
 	/// Returns true if state has changed.
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, fields(co = self.id().as_str()), skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, fields(co = self.id().as_str()), skip(self))]
 	pub async fn join(&self, heads: BTreeSet<Cid>) -> Result<CoReducerState, anyhow::Error> {
 		Ok(self
 			.handle

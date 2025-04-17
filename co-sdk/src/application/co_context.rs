@@ -1,6 +1,4 @@
 #[cfg(feature = "pinning")]
-use crate::reducer::core_resolver::change::ChangeCoreResolver;
-#[cfg(feature = "pinning")]
 use crate::reducer::core_resolver::reference::ReferenceCoreResolver;
 #[cfg(feature = "pinning")]
 use crate::types::co_pinning_key::CoPinningKey;
@@ -20,7 +18,7 @@ use crate::{
 	},
 	types::co_reducer_factory::CoReducerFactoryError,
 	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, DynamicCoDate, DynamicCoUuid, LocalCoBuilder, Runtime,
-	TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
+	Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -31,8 +29,6 @@ use co_identity::{
 };
 use co_log::{EntryBlock, Log};
 use co_primitives::{BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did};
-#[cfg(feature = "pinning")]
-use co_storage::ChangeBlockStorage;
 use futures::{Stream, TryStreamExt};
 use std::{
 	collections::BTreeSet,
@@ -200,11 +196,7 @@ pub(crate) struct CoContextInner {
 
 	network: Arc<RwLock<Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>>>,
 
-	_storage: CoStorage,
-
-	/// Used to track all new blocks until we store the LocalCo again.
-	#[cfg(feature = "pinning")]
-	storage_created: ChangeBlockStorage<CoStorage>,
+	storage: Storage,
 
 	runtime: Runtime,
 	reactive_context: ActorHandle<ApplicationMessage>,
@@ -220,8 +212,7 @@ impl CoContextInner {
 		tasks: TaskSpawner,
 		local_identity: LocalIdentity,
 		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
-		storage: CoStorage,
-		_tmp_storage: CoStorage,
+		storage: Storage,
 		runtime: Runtime,
 		reactive_context: ActorHandle<ApplicationMessage>,
 		reducers: ReducersControl,
@@ -229,14 +220,12 @@ impl CoContextInner {
 		uuid: DynamicCoUuid,
 	) -> Self {
 		Self {
-			#[cfg(feature = "pinning")]
-			storage_created: ChangeBlockStorage::new(storage.clone()),
 			settings,
 			shutdown,
 			tasks,
 			local_identity,
 			network: Arc::new(RwLock::new(network)),
-			_storage: storage,
+			storage,
 			runtime,
 			reactive_context,
 			reducers,
@@ -277,12 +266,8 @@ impl CoContextInner {
 	}
 
 	/// Get the root storage.
-	/// The returned storage tracks changes which will be flushed when the local co is written.
 	pub fn storage(&self) -> CoStorage {
-		#[cfg(feature = "pinning")]
-		return CoStorage::new(self.storage_created.clone());
-		#[cfg(not(feature = "pinning"))]
-		return self._storage.clone();
+		return self.storage.storage();
 	}
 
 	pub fn runtime(&self) -> Runtime {
@@ -311,16 +296,15 @@ impl CoContextInner {
 	/// Creates a CoReducer instance of the Local CO.
 	#[tracing::instrument(level = tracing::Level::TRACE, skip(self))]
 	pub(crate) async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
-		let core_resolver = |_reducer_context| {
+		let core_resolver = |reducer_context| {
 			let local_id = CoId::new(CO_ID_LOCAL);
 			let core_resolver = CoCoreResolver::default();
 			#[cfg(feature = "pinning")]
-			let core_resolver = ChangeCoreResolver::new(core_resolver, self.storage_created.clone());
-			#[cfg(feature = "pinning")]
 			let core_resolver = ReferenceCoreResolver::new(
 				core_resolver,
+				self.tasks.clone(),
+				self.storage.clone(),
 				Some(CoPinningKey::State.to_string(&local_id)),
-				_reducer_context,
 			);
 			let core_resolver = ReactiveCoreResolver::new(core_resolver, local_id, self.reactive_context.clone());
 			let core_resolver = LogCoreResolver::new(core_resolver);

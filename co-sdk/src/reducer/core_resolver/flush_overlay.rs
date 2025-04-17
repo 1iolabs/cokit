@@ -17,10 +17,10 @@ use std::collections::BTreeSet;
 #[derive(Debug, Clone)]
 pub struct FlushOverlayCoreResolver<C> {
 	next: C,
-	overlay_storage: OverlayBlockStorage<CoStorage, CoStorage>,
+	overlay_storage: OverlayBlockStorage<CoStorage>,
 }
 impl<C> FlushOverlayCoreResolver<C> {
-	pub fn new(next: C, overlay_storage: OverlayBlockStorage<CoStorage, CoStorage>) -> Self {
+	pub fn new(next: C, overlay_storage: OverlayBlockStorage<CoStorage>) -> Self {
 		Self { next, overlay_storage }
 	}
 }

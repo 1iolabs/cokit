@@ -14,10 +14,15 @@ use std::{
 pub struct ChangeBlockStorage<S> {
 	next: S,
 	changes: Arc<Mutex<HashSet<BlockStorageChange>>>,
+	record: bool,
 }
 impl<S> ChangeBlockStorage<S> {
 	pub fn new(next: S) -> Self {
-		Self { next, changes: Default::default() }
+		Self { next, changes: Default::default(), record: true }
+	}
+
+	pub fn set_record(&mut self, record: bool) {
+		self.record = record;
 	}
 
 	/// Drain all changes and return them as iterator.
@@ -50,7 +55,7 @@ where
 		let result = self.next.set(block).await?;
 
 		// record
-		{
+		if self.record {
 			let mut changes = self.changes.lock().unwrap();
 			changes.remove(&BlockStorageChange::Remove(result));
 			changes.insert(BlockStorageChange::Set(result));
@@ -65,7 +70,7 @@ where
 		let result = self.next.remove(cid).await?;
 
 		// record (ignore when it just has been added)
-		{
+		if self.record {
 			let mut changes = self.changes.lock().unwrap();
 			if !changes.remove(&BlockStorageChange::Set(*cid)) {
 				changes.insert(BlockStorageChange::Remove(*cid));
@@ -88,13 +93,17 @@ where
 	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
 		self.next.set_extended(block).await
 	}
+
+	async fn clear(&self) -> Result<(), StorageError> {
+		self.next.clear().await
+	}
 }
 impl<S> CloneWithBlockStorageSettings for ChangeBlockStorage<S>
 where
 	S: BlockStorage + CloneWithBlockStorageSettings + 'static,
 {
 	fn clone_with_settings(&self, settings: co_primitives::BlockStorageSettings) -> Self {
-		Self { next: self.next.clone_with_settings(settings), changes: self.changes.clone() }
+		Self { next: self.next.clone_with_settings(settings), changes: self.changes.clone(), record: self.record }
 	}
 }
 #[async_trait]

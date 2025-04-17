@@ -6,7 +6,7 @@ use crate::{
 		membership_all_heads::membership_all_heads, push_heads::PushHeads,
 	},
 	reducer::{
-		change::membership_writer::MembershipWriter,
+		change::{membership_writer::MembershipWriter, reference_writer::write_storage_references},
 		core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
 	},
 	services::{
@@ -272,11 +272,8 @@ impl SharedCoBuilder {
 		#[cfg(feature = "pinning")]
 		{
 			let writer = crate::reducer::change::reference_writer::ReferenceWriteReducerChangedHandler::new(
-				crate::reducer::change::reference_writer::ReferenceWriter::new(
-					self.parent.dispatcher(&self.storage_core_name, identity.clone()),
-					context.clone(),
-					Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.membership.id)),
-				),
+				self.parent.dispatcher(&self.storage_core_name, identity.clone()),
+				Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.membership.id)),
 				*reducer.state(),
 			);
 			reducer.add_change_handler(Box::new(writer));
@@ -570,24 +567,19 @@ impl SharedCoCreator {
 			self.parent.push(&identity, &self.storage_core_name, &pin_state).await?;
 
 			// pin initial state
-			let reducer_context = Arc::new(SharedContext {
-				id: self.co.id.clone(),
-				encrypted_storage: _encrypted_storage.clone(),
-				storage: storage.clone(),
-				network_storage: None,
-			});
-			let writer = crate::reducer::change::reference_writer::ReferenceWriter::new(
-				self.parent.dispatcher(&self.storage_core_name, identity.clone()),
-				reducer_context,
+			write_storage_references(
+				if let Some(encrypted_storage) = _encrypted_storage {
+					CoStorage::new(encrypted_storage)
+				} else {
+					storage.clone()
+				},
+				&self.parent.dispatcher(&self.storage_core_name, identity.clone()),
 				Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.co.id)),
-			);
-			writer
-				.write(
-					None,
-					reducer_state.state().ok_or(anyhow::anyhow!("Expected state after create"))?,
-					<<CoStorage as co_primitives::BlockStorage>::StoreParams as co_primitives::StoreParams>::MAX_BLOCK_SIZE,
-				)
-				.await?;
+				None,
+				reducer_state.state().ok_or(anyhow::anyhow!("Expected state after create"))?,
+				<<CoStorage as co_primitives::BlockStorage>::StoreParams as co_primitives::StoreParams>::MAX_BLOCK_SIZE,
+			)
+			.await?;
 		}
 
 		// result
