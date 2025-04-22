@@ -34,6 +34,15 @@ test:
   script:
     - cargo test
 
+# run benchmarks
+bench:
+  stage: test
+  image: ${DOCKERFILE_IMAGE}
+  cache:
+    <<: *global_cache
+  script:
+    - cargo bench
+
 # verfiy all files a re formatted correctly
 fmt:
   stage: test
