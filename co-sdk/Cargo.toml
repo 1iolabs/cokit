@@ -68,6 +68,7 @@ opentelemetry-stdout = { version = "0.3.0", features = ["trace"] }
 tracing-opentelemetry = "0.23"
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["async_tokio"] }
 example-counter = { path = "../examples/counter" }
 
 [features]
@@ -78,3 +79,7 @@ example-counter = { path = "../examples/counter" }
 
 # Enable very verbose logging which may has security implications. Only use in development.
 "logging-verbose" = ["co-storage/logging-verbose"]
+
+[[bench]]
+name = "local_push"
+harness = false

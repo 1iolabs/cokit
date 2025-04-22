@@ -17,7 +17,6 @@ cache: &global_cache
     - .cargo/registry/cache
   policy: pull-push
 
-
 # verfiy the configured in `co/build.yml` (DOCKERFILE_IMAGE) is in sync with `ci/Dockerfile`.
 dockerfile:
   stage: test
@@ -44,7 +43,6 @@ fmt:
   script:
     - cargo +nightly fmt --check
 
-
 # generate binaries
 build:
   stage: build
@@ -60,7 +58,7 @@ build:
     paths:
       - target/release/co-cli
       - target/release/daemon
-      - target/wasm32-unknown-unknown/release/*.wasm
+      - target-wasm/wasm32-unknown-unknown/release/*.wasm
 
 # generate docs
 rustdoc:
@@ -73,7 +71,6 @@ rustdoc:
   artifacts:
     paths:
       - target/doc
-
 
 # export pages
 pages:
@@ -88,10 +85,9 @@ pages:
     - mkdir -p public
     - mv target/doc public/doc
     - mv target/release/* public/
-    - mv target/wasm32-unknown-unknown/release/* public/
+    - mv target-wasm/wasm32-unknown-unknown/release/* public/
   artifacts:
     paths:
       - public
   only:
     - main
-

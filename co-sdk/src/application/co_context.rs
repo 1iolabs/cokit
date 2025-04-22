@@ -296,9 +296,22 @@ impl CoContextInner {
 	/// Creates a CoReducer instance of the Local CO.
 	#[tracing::instrument(level = tracing::Level::TRACE, skip(self))]
 	pub(crate) async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
-		let id = CoId::new(CO_ID_LOCAL);
+		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize);
+		let local_co_reducer = local_co
+			.build(
+				self.storage().clone_with_settings(BlockStorageSettings::new().with_detached()),
+				self.runtime.clone(),
+				self.shutdown.child_token(),
+				self.tasks.clone(),
+				self.create_local_core_resolver(CoId::new(CO_ID_LOCAL)),
+				self.date.clone(),
+			)
+			.await?;
+		Ok(local_co_reducer)
+	}
 
-		// core
+	/// Creates the Core Resolver for the local CO.
+	fn create_local_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::default();
 		#[cfg(feature = "pinning")]
 		let core_resolver = ReferenceCoreResolver::new(
@@ -309,27 +322,14 @@ impl CoContextInner {
 		);
 		let core_resolver = ReactiveCoreResolver::new(core_resolver, id, self.reactive_context.clone());
 		let core_resolver = LogCoreResolver::new(core_resolver);
-
-		// build
-		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize);
-		let local_co_reducer = local_co
-			.build(
-				self.storage().clone_with_settings(BlockStorageSettings::new().with_detached()),
-				self.runtime.clone(),
-				self.shutdown.child_token(),
-				self.tasks.clone(),
-				core_resolver,
-				self.date.clone(),
-			)
-			.await?;
-		Ok(local_co_reducer)
+		let core_resolver = DynamicCoreResolver::new(core_resolver);
+		core_resolver
 	}
 
 	/// Creates the Core Resolver for a shared CO.
-	pub(crate) fn create_co_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
+	pub(crate) fn create_shared_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::default();
-		let core_resolver =
-			ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(core_resolver, id, self.reactive_context.clone());
+		let core_resolver = ReactiveCoreResolver::new(core_resolver, id, self.reactive_context.clone());
 		let core_resolver = LogCoreResolver::new(core_resolver);
 		let core_resolver = DynamicCoreResolver::new(core_resolver);
 		core_resolver
@@ -349,7 +349,7 @@ impl CoContextInner {
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
 	{
 		// resolver
-		let core_resolver = self.create_co_core_resolver(membership.id.clone());
+		let core_resolver = self.create_shared_core_resolver(membership.id.clone());
 
 		// network
 		let network = if network { self.network.read().unwrap().clone() } else { None };

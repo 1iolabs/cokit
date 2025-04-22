@@ -385,7 +385,11 @@ async fn create_encrypted_storage<S>(
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
-	// we have plain references as we may have unencrypted shared COs but all references to it should be Weak.
+	// we have plain references:
+	// - buildin core references
+	//   - third party cores are expected to be encrypted
+	// - unencrypted shared COs
+	//   - all references to it should be [`CoReference::Weak`].
 	let reference_mode = if disallow_plain {
 		let builtin_cores = Cores::default()
 			.built_in_native_mapping()
