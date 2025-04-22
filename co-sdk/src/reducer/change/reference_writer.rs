@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_core_storage::StorageAction;
 use co_primitives::{
-	block_diff_added_with_parent, BlockDiffFollow, BlockStorageSettings, CloneWithBlockStorageSettings, CoReference,
-	KnownMultiCodec, MultiCodec, StoreParams, WeakCid,
+	block_diff_added_with_parent, BlockDiffFollow, BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings,
+	CoReference, KnownMultiCodec, MultiCodec, StoreParams, WeakCid,
 };
 use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage, StorageError};
 use futures::{pin_mut, TryStreamExt};
@@ -30,10 +30,10 @@ use std::{
 pub async fn write_storage_references<S, D>(
 	storage: S,
 	dispatch: &D,
+	block_links: BlockLinks,
 	pinning_key: Option<String>,
 	previous_state: Option<Cid>,
 	next_state: Cid,
-	max_block_size: usize,
 ) -> Result<Option<Cid>, anyhow::Error>
 where
 	D: CoDispatch<StorageAction> + 'static,
@@ -45,14 +45,14 @@ where
 	let external_next_state = to_external_cid(&storage, next_state).await;
 
 	// calc max references per action
-	let max_references = max_reference_count(max_block_size);
+	let max_references = max_reference_count(S::StoreParams::MAX_BLOCK_SIZE);
 
 	// diff
 	let diff = block_diff_added_with_parent(
 		storage.clone(),
 		previous_state,
 		next_state,
-		Default::default(),
+		block_links,
 		Default::default(),
 		CoReferenceFollow { storage: storage.clone() },
 	);
@@ -154,10 +154,10 @@ where
 				write_storage_references(
 					storage.clone_with_settings(BlockStorageSettings::new().without_networking()),
 					&self.dispatch,
+					BlockLinks::default(),
 					self.pinning_key.clone(),
 					self.reducer_previous_state,
 					next_state,
-					<S::StoreParams as StoreParams>::MAX_BLOCK_SIZE,
 				)
 				.await?;
 			}

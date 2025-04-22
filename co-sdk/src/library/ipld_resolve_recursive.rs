@@ -34,7 +34,7 @@ pub async fn ipld_resolve_recursive(
 						}
 					},
 					Err(err) => {
-						tracing::warn!(?err, ?cid, "ipld_fetch_recursive");
+						tracing::warn!(%err, ?cid, "ipld_fetch_recursive");
 						Ipld::Link(cid)
 					},
 				}

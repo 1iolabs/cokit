@@ -296,20 +296,21 @@ impl CoContextInner {
 	/// Creates a CoReducer instance of the Local CO.
 	#[tracing::instrument(level = tracing::Level::TRACE, skip(self))]
 	pub(crate) async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
-		let core_resolver = |reducer_context| {
-			let local_id = CoId::new(CO_ID_LOCAL);
-			let core_resolver = CoCoreResolver::default();
-			#[cfg(feature = "pinning")]
-			let core_resolver = ReferenceCoreResolver::new(
-				core_resolver,
-				self.tasks.clone(),
-				self.storage.clone(),
-				Some(CoPinningKey::State.to_string(&local_id)),
-			);
-			let core_resolver = ReactiveCoreResolver::new(core_resolver, local_id, self.reactive_context.clone());
-			let core_resolver = LogCoreResolver::new(core_resolver);
-			core_resolver
-		};
+		let id = CoId::new(CO_ID_LOCAL);
+
+		// core
+		let core_resolver = CoCoreResolver::default();
+		#[cfg(feature = "pinning")]
+		let core_resolver = ReferenceCoreResolver::new(
+			core_resolver,
+			self.tasks.clone(),
+			self.storage.clone(),
+			Some(CoPinningKey::State.to_string(&id)),
+		);
+		let core_resolver = ReactiveCoreResolver::new(core_resolver, id, self.reactive_context.clone());
+		let core_resolver = LogCoreResolver::new(core_resolver);
+
+		// build
 		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize);
 		let local_co_reducer = local_co
 			.build(

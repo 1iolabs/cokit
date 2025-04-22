@@ -4,7 +4,8 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseBackPressureStream, ResponseStream, TaskSpawner};
 use co_primitives::{
-	Block, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, StorageError, Tags,
+	Block, BlockLinks, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, StorageError,
+	StoreParams, Tags,
 };
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
 use std::{
@@ -50,12 +51,16 @@ where
 
 	/// Flush [`Cid`] changes to base storage.
 	/// Returns a [`OverlayChangeReference`] if there was a change.
-	pub async fn flush(&self, cid: Cid) -> Result<Option<OverlayChangeReference>, StorageError> {
+	pub async fn flush(
+		&self,
+		cid: Cid,
+		links: Option<BlockLinks>,
+	) -> Result<Option<OverlayChangeReference>, StorageError> {
 		Ok(self
 			.handle
 			.request({
 				let next = self.next.clone();
-				move |response| OverlayBlockMessage::Flush(next, cid, response)
+				move |response| OverlayBlockMessage::Flush(next, cid, links, response)
 			})
 			.await
 			.map_err(|err| StorageError::Internal(err.into()))??)
@@ -114,7 +119,7 @@ where
 
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		if self.flush_on_the_fly {
-			match self.flush(*cid).await? {
+			match self.flush(*cid, None).await? {
 				Some(OverlayChangeReference::Set(_)) | None => Ok(self.next.get(cid).await?),
 				Some(OverlayChangeReference::Remove(_)) => Err(StorageError::NotFound(*cid, anyhow!("removed"))),
 			}
@@ -146,7 +151,7 @@ where
 
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		if self.flush_on_the_fly {
-			match self.flush(*cid).await? {
+			match self.flush(*cid, None).await? {
 				Some(OverlayChangeReference::Set(_)) | None => Ok(self.next.stat(cid).await?),
 				Some(OverlayChangeReference::Remove(_)) => Err(StorageError::NotFound(*cid, anyhow!("removed"))),
 			}
@@ -183,7 +188,7 @@ where
 
 	async fn to_plain(&self, mapped: &Cid) -> Option<Cid> {
 		if self.flush_on_the_fly {
-			match self.flush(*mapped).await.ok()? {
+			match self.flush(*mapped, None).await.ok()? {
 				Some(OverlayChangeReference::Set(_)) | None => self.next.to_plain(mapped).await,
 				Some(OverlayChangeReference::Remove(_)) => {
 					Err(StorageError::NotFound(*mapped, anyhow!("removed"))).ok()
@@ -278,23 +283,24 @@ where
 
 	async fn handle(
 		&self,
-		_handle: &ActorHandle<Self::Message>,
+		handle: &ActorHandle<Self::Message>,
 		message: Self::Message,
 		state: &mut Self::State,
 	) -> Result<(), ActorError> {
 		match message {
 			OverlayBlockMessage::Get(next, cid, response) => match state.blocks.get(&cid) {
-				Some(OverlayBlock::Memory(data, _options)) => {
-					response.respond(Ok(Block::new_unchecked(cid, data.clone())));
-				},
-				Some(OverlayBlock::Tmp(_)) => {
-					response.spawn_with(self.spawner.clone(), {
-						let blocks_tmp = self.blocks_tmp.clone();
-						move || async move { Ok(blocks_tmp.get(&cid).await?) }
-					});
-				},
-				Some(OverlayBlock::Remove) => {
-					response.send(Err(StorageError::NotFound(cid, anyhow!("removed")))).ok();
+				Some(block) => match get_block_inline(cid, block) {
+					// inline
+					Ok(Some(block)) => response.respond(Ok(block)),
+					Err(err) => response.respond(Err(err)),
+					// background
+					Ok(None) => {
+						response.spawn_with(self.spawner.clone(), {
+							let blocks_tmp = self.blocks_tmp.clone();
+							let block = block.clone();
+							move || async move { Ok(get_block(&blocks_tmp, cid, block).await?) }
+						});
+					},
 				},
 				None => {
 					response.spawn_with(self.spawner.clone(), move || async move { Ok(next.get(&cid).await?) });
@@ -427,7 +433,7 @@ where
 					}
 				});
 			},
-			OverlayBlockMessage::Flush(next, cid, response) => {
+			OverlayBlockMessage::Flush(next, cid, links, response) => {
 				match state.blocks.remove(&cid) {
 					Some(block) => {
 						// state
@@ -436,7 +442,29 @@ where
 						// flush
 						response.spawn_with(&self.spawner, {
 							let blocks_tmp = self.blocks_tmp.clone();
-							move || async move { Ok(Some(flush_block(&next, &blocks_tmp, cid, block).await?)) }
+							let handle = handle.clone();
+							move || async move {
+								// flush links
+								if let Some(links) = links {
+									let block = get_block(&blocks_tmp, cid, block.clone()).await?;
+									for link in links.links(&block)? {
+										handle
+											.request(|response| {
+												OverlayBlockMessage::Flush(
+													next.clone(),
+													link,
+													Some(links.clone()),
+													response,
+												)
+											})
+											.await
+											.map_err(|err| StorageError::Internal(err.into()))??;
+									}
+								}
+
+								// flush block
+								Ok(Some(flush_block(&next, &blocks_tmp, cid, block).await?))
+							}
 						});
 					},
 					None => {
@@ -568,6 +596,26 @@ where
 	}
 }
 
+/// Try to get block inline. Return None if not possible.
+fn get_block_inline<P: StoreParams>(cid: Cid, block: &OverlayBlock) -> Result<Option<Block<P>>, StorageError> {
+	match block {
+		OverlayBlock::Memory(data, _options) => Ok(Some(Block::new_unchecked(cid, data.clone()))),
+		OverlayBlock::Tmp(_) => Ok(None),
+		OverlayBlock::Remove => Err(StorageError::NotFound(cid, anyhow!("removed"))),
+	}
+}
+
+async fn get_block<T>(blocks_tmp: &T, cid: Cid, block: OverlayBlock) -> Result<Block<T::StoreParams>, StorageError>
+where
+	T: BlockStorage + Clone + 'static,
+{
+	match block {
+		OverlayBlock::Memory(data, _options) => Ok(Block::new_unchecked(cid, data)),
+		OverlayBlock::Tmp(_) => Ok(blocks_tmp.get(&cid).await?),
+		OverlayBlock::Remove => Err(StorageError::NotFound(cid, anyhow!("removed"))),
+	}
+}
+
 #[derive(Debug, Clone)]
 enum OverlayBlock {
 	/// In memory data.
@@ -627,8 +675,13 @@ where
 
 	/// Flush block to next storage.
 	///
+	/// # Args
+	/// - `0`: The base storage
+	/// - `1`: The Cid to flush to the base storage
+	/// - `2`: Links to flush recursively.
+	///
 	/// Returns a [`OverlayChangeReference`] if the block was existing in the overlay and has been flushed.
-	Flush(S, Cid, Response<Result<Option<OverlayChangeReference>, StorageError>>),
+	Flush(S, Cid, Option<BlockLinks>, Response<Result<Option<OverlayChangeReference>, StorageError>>),
 
 	/// Consume all changes via stream.
 	ConsumeChanges(S, ResponseBackPressureStream<Result<OverlayChange, StorageError>>),

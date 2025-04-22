@@ -27,7 +27,7 @@ use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
-use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId};
+use co_primitives::{tags, BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId};
 use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -574,10 +574,10 @@ impl SharedCoCreator {
 					storage.clone()
 				},
 				&self.parent.dispatcher(&self.storage_core_name, identity.clone()),
+				BlockLinks::default(),
 				Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.co.id)),
 				None,
 				reducer_state.state().ok_or(anyhow::anyhow!("Expected state after create"))?,
-				<<CoStorage as co_primitives::BlockStorage>::StoreParams as co_primitives::StoreParams>::MAX_BLOCK_SIZE,
 			)
 			.await?;
 		}

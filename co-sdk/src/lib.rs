@@ -58,6 +58,7 @@ pub use services::{
 };
 pub use types::{
 	co_date::{CoDate, DynamicCoDate, MonotonicCoDate, StaticCoDate, SystemCoDate},
+	co_reducer_context::CoReducerContext,
 	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError},
 	co_reducer_state::CoReducerState,
 	co_storage::CoStorage,
