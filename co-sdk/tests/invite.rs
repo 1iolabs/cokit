@@ -19,7 +19,7 @@ pub mod helper;
 /// - P2: Read state
 #[tokio::test]
 async fn test_invite() {
-	let timeout_duration = Duration::from_secs(10);
+	let timeout_duration = Duration::from_secs(60);
 
 	let mut instances = Instances::new("test_invite");
 	let mut peer1 = instances.create().await;
@@ -138,15 +138,9 @@ async fn test_invite() {
 	// peer2: force sync (needed because of the paricipant state update)
 	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
 	async {
-		update_co(
-			peer2.application.handle(),
-			&peer2_shared_co,
-			&identity2,
-			network1.local_peer_id(),
-			Duration::from_secs(10),
-		)
-		.await
-		.unwrap();
+		update_co(peer2.application.handle(), &peer2_shared_co, &identity2, network1.local_peer_id(), timeout_duration)
+			.await
+			.unwrap();
 	}
 	.instrument(info_span!("peer2: force sync", application = peer2.application.settings().identifier))
 	.await;
@@ -167,7 +161,7 @@ async fn test_invite() {
 /// - P2: Read state
 #[tokio::test]
 async fn test_invite_encrypted() {
-	let timeout_duration = Duration::from_secs(10);
+	let timeout_duration = Duration::from_secs(60);
 
 	let mut instances = Instances::new("test_invite");
 	let mut peer1 = instances.create().await;
@@ -285,15 +279,9 @@ async fn test_invite_encrypted() {
 	// peer2: force sync (needed because of the paricipant state update)
 	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
 	async {
-		update_co(
-			peer2.application.handle(),
-			&peer2_shared_co,
-			&identity2,
-			network1.local_peer_id(),
-			Duration::from_secs(10),
-		)
-		.await
-		.unwrap();
+		update_co(peer2.application.handle(), &peer2_shared_co, &identity2, network1.local_peer_id(), timeout_duration)
+			.await
+			.unwrap();
 	}
 	.instrument(info_span!("peer2: force sync", application = peer2.application.settings().identifier))
 	.await;

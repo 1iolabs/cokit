@@ -6,7 +6,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use co_primitives::Tags;
 use futures::{Stream, StreamExt};
-use std::{future::ready, sync::Arc};
+use std::{any::type_name, future::ready, sync::Arc};
 use tokio::{
 	sync::{mpsc, watch},
 	task::JoinHandle,
@@ -124,7 +124,7 @@ where
 		let tags = self.handle.tags.clone();
 		let handle = self.handle;
 		let span = tracing::trace_span!("actor", ?tags);
-		let join = spawner.spawn({
+		let join = spawner.spawn_named(type_name::<A>(), {
 			let tags = tags.clone();
 			let handle = handle.clone();
 			async move {

@@ -94,6 +94,10 @@ where
 		self.next.set_extended(block).await
 	}
 
+	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
+		self.next.exists(cid).await
+	}
+
 	async fn clear(&self) -> Result<(), StorageError> {
 		self.next.clear().await
 	}

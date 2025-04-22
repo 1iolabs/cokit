@@ -8,6 +8,11 @@ pub trait ExtendedBlockStorage: BlockStorage {
 	/// Inserts a block into storage.
 	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError>;
 
+	/// Test if a Cid exists.
+	///
+	/// Note: This is an local operation and will not fetch from network.
+	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError>;
+
 	/// Clear the storage by removing all entries.
 	async fn clear(&self) -> Result<(), StorageError>;
 }

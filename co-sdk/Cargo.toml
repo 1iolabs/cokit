@@ -70,6 +70,8 @@ tracing-opentelemetry = "0.23"
 [dev-dependencies]
 criterion = { version = "0.5", features = ["async_tokio"] }
 example-counter = { path = "../examples/counter" }
+tokio = { workspace = true, features = ["full", "tracing"] }
+console-subscriber = { version = "0.4.1" }
 
 [features]
 "default" = ["pinning"]

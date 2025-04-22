@@ -59,6 +59,10 @@ impl ExtendedBlockStorage for CoStorage {
 		self.inner.set_extended(block).await
 	}
 
+	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
+		self.inner.exists(cid).await
+	}
+
 	async fn clear(&self) -> Result<(), StorageError> {
 		self.inner.clear().await
 	}

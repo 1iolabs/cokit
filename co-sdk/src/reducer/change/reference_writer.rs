@@ -41,9 +41,6 @@ where
 {
 	let mut dispatch_state = Some(next_state);
 
-	// external
-	let external_next_state = to_external_cid(&storage, next_state).await;
-
 	// calc max references per action
 	let max_references = max_reference_count(S::StoreParams::MAX_BLOCK_SIZE);
 
@@ -59,6 +56,7 @@ where
 
 	// apply root reference
 	if let Some(pinning_key) = pinning_key {
+		let external_next_state = to_external_cid(&storage, next_state).await;
 		let action = StorageAction::PinReference(pinning_key, vec![external_next_state.into()]);
 		dispatch_state = dispatch.dispatch(&action).await?;
 	}

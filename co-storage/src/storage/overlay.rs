@@ -226,6 +226,10 @@ where
 			.map_err(|err| StorageError::Internal(err.into()))??)
 	}
 
+	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
+		self.next.exists(cid).await
+	}
+
 	async fn clear(&self) -> Result<(), StorageError> {
 		Ok(self
 			.handle
@@ -320,11 +324,8 @@ where
 							_ => {},
 						}
 						if self.skip_already_existing {
-							match next.stat(&cid).await {
-								Ok(_) => {
-									return Ok(cid);
-								},
-								_ => {},
+							if next.exists(&cid).await.ok().unwrap_or(false) {
+								return Ok(cid);
 							}
 						}
 

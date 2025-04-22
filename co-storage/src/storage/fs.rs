@@ -240,6 +240,11 @@ impl ExtendedBlockStorage for FsStorage {
 		self.set(block.block).await
 	}
 
+	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
+		let path = to_cid_path(&self.path, cid, "");
+		into_storage_result(cid, tokio::fs::try_exists(&path).await)
+	}
+
 	async fn clear(&self) -> Result<(), StorageError> {
 		if self.allow_clear {
 			match tokio::fs::remove_dir_all(&self.path).await {
