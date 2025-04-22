@@ -263,27 +263,7 @@ where
 	let mut blocks_index_unreferenced = state.blocks_index_unreferenced.open(storage).await?;
 
 	// apply
-	let mut pin = pins.get(&key).await?.ok_or(anyhow!("Pin not found: {}", key))?;
-	let mut references = pin.references.open(storage).await?;
-	for cid in cids {
-		let cid = cid.into();
-		references.push(cid).await?;
-		pin.references_count += 1;
-		reference_cid(&mut blocks, &mut blocks_index_unreferenced, cid).await?;
-	}
-	match &pin.strategy {
-		PinStrategy::Unlimited => {},
-		PinStrategy::MaxCount(count) => {
-			while pin.references_count > *count {
-				if let Some((_, remove)) = references.pop_front().await? {
-					unreference_cid(&mut blocks, &mut blocks_index_unreferenced, remove).await?;
-				}
-				pin.references_count -= 1;
-			}
-		},
-	}
-	pin.references = references.store().await?;
-	pins.insert(key, pin).await?;
+	pin_reference(storage, &mut pins, &mut blocks, &mut blocks_index_unreferenced, key, cids).await?;
 
 	// store
 	state.pins = pins.store().await?;
@@ -291,6 +271,41 @@ where
 	state.blocks_index_unreferenced = blocks_index_unreferenced.store().await?;
 
 	// result
+	Ok(())
+}
+
+async fn pin_reference<S>(
+	storage: &S,
+	pins: &mut CoMapTransaction<S, String, Pin>,
+	blocks: &mut CoMapTransaction<S, WeakCid, BlockMetadata>,
+	blocks_index_unreferenced: &mut CoSetTransaction<S, WeakCid>,
+	key: String,
+	cids: Vec<WeakCid>,
+) -> Result<(), anyhow::Error>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	let mut pin = pins.get(&key).await?.ok_or(anyhow!("Pin not found: {}", key))?;
+	let mut references = pin.references.open(storage).await?;
+	for cid in cids {
+		let cid = cid.into();
+		references.push(cid).await?;
+		pin.references_count += 1;
+		reference_cid(blocks, blocks_index_unreferenced, cid).await?;
+	}
+	match &pin.strategy {
+		PinStrategy::Unlimited => {},
+		PinStrategy::MaxCount(count) => {
+			while pin.references_count > *count {
+				if let Some((_, remove)) = references.pop_front().await? {
+					unreference_cid(blocks, blocks_index_unreferenced, remove).await?;
+				}
+				pin.references_count -= 1;
+			}
+		},
+	}
+	pin.references = references.store().await?;
+	pins.insert(key, pin).await?;
 	Ok(())
 }
 
@@ -306,6 +321,7 @@ where
 {
 	let mut pins = state.pins.open(storage).await?;
 	let mut blocks = state.blocks.open(storage).await?;
+	let mut blocks_index_unreferenced = state.blocks_index_unreferenced.open(storage).await?;
 
 	// validate
 	if pins.contains_key(&key).await? {
@@ -316,14 +332,15 @@ where
 	let pin = Pin { strategy, references: Default::default(), references_count: 0 };
 	pins.insert(key.clone(), pin).await?;
 
+	// initial
+	if !references.is_empty() {
+		pin_reference(storage, &mut pins, &mut blocks, &mut blocks_index_unreferenced, key, references).await?;
+	}
+
 	// store
 	state.pins = pins.store().await?;
 	state.blocks = blocks.store().await?;
-
-	// initial
-	if !references.is_empty() {
-		reduce_pin_reference(storage, state, key, references).await?;
-	}
+	state.blocks_index_unreferenced = blocks_index_unreferenced.store().await?;
 
 	// result
 	Ok(())

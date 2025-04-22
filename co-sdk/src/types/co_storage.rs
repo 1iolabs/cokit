@@ -58,6 +58,14 @@ impl ExtendedBlockStorage for CoStorage {
 	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
 		self.inner.set_extended(block).await
 	}
+
+	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
+		self.inner.exists(cid).await
+	}
+
+	async fn clear(&self) -> Result<(), StorageError> {
+		self.inner.clear().await
+	}
 }
 impl CloneWithBlockStorageSettings for CoStorage {
 	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {

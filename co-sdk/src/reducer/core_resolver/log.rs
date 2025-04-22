@@ -19,7 +19,7 @@ where
 	S: BlockStorage + Send + Sync + Clone + 'static,
 	C: CoreResolver<S> + Send + Sync + 'static,
 {
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, skip(self, storage, runtime))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, skip(self, storage, runtime))]
 	async fn execute(
 		&self,
 		storage: &S,

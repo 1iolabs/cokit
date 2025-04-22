@@ -178,6 +178,15 @@ where
 	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
 		self.set(block.block).await
 	}
+
+	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
+		Ok(self.records.read().unwrap().contains_key(cid))
+	}
+
+	async fn clear(&self) -> Result<(), StorageError> {
+		self.records.write().unwrap().clear();
+		Ok(())
+	}
 }
 impl<P> CloneWithBlockStorageSettings for MemoryBlockStorage<P>
 where

@@ -201,46 +201,9 @@ where
 			self.next.set(block).await
 		}
 	}
-}
-#[async_trait]
-impl<S> BlockStorage for EncryptedBlockStorage<S>
-where
-	S: BlockStorage + Clone + Send + Sync + 'static,
-{
-	type StoreParams = S::StoreParams;
 
-	/// Get block.
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
-		let encrypted_cid = self.mapping.get(cid).await;
-		tracing::trace!(?encrypted_cid, ?cid, "encrypted-storage-get");
-		match encrypted_cid {
-			Some(encrypted_cid) => self.get_unencrypted(&encrypted_cid).await,
-			None => self.next.get(cid).await,
-		}
-	}
-
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
-		self.set_extended(block.into()).await
-	}
-
-	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
-		match self.mapping.get(cid).await {
-			Some(encrypted_cid) => self.next.remove(&encrypted_cid).await,
-			None => self.next.remove(cid).await,
-		}
-	}
-
-	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
-		self.get(cid).await.map(|v| BlockStat { size: v.data().len() as u64 })
-	}
-}
-#[async_trait]
-impl<S> ExtendedBlockStorage for EncryptedBlockStorage<S>
-where
-	S: BlockStorage + Clone + 'static,
-{
-	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self, extended_block), fields(cid = ?extended_block.block.cid()))]
-	async fn set_extended(&self, extended_block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, extended_block), fields(cid = ?extended_block.block.cid()))]
+	async fn set_block(&self, extended_block: ExtendedBlock<S::StoreParams>) -> Result<Cid, StorageError> {
 		let block = extended_block.block;
 		let cid = *block.cid();
 
@@ -300,8 +263,8 @@ where
 		// fit into block size limit
 		let extra_encrypted_blocks = encrypted
 			.payload
-			.fit_into_blocks::<Self::StoreParams>(Some(Header::encoded_size(encrypted.header.algorithm)));
-		let encrypted_block: Block<Self::StoreParams> = encrypted
+			.fit_into_blocks::<S::StoreParams>(Some(Header::encoded_size(encrypted.header.algorithm)));
+		let encrypted_block: Block<S::StoreParams> = encrypted
 			.try_into()
 			.map_err(|e: AlgorithmError| StorageError::Internal(e.into()))?;
 
@@ -320,6 +283,55 @@ where
 
 		// result
 		Ok(cid)
+	}
+}
+#[async_trait]
+impl<S> BlockStorage for EncryptedBlockStorage<S>
+where
+	S: BlockStorage + Clone + Send + Sync + 'static,
+{
+	type StoreParams = S::StoreParams;
+
+	/// Get block.
+	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+		let encrypted_cid = self.mapping.get(cid).await;
+		tracing::trace!(?encrypted_cid, ?cid, "encrypted-storage-get");
+		match encrypted_cid {
+			Some(encrypted_cid) => self.get_unencrypted(&encrypted_cid).await,
+			None => self.next.get(cid).await,
+		}
+	}
+
+	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+		self.set_block(block.into()).await
+	}
+
+	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
+		match self.mapping.get(cid).await {
+			Some(encrypted_cid) => self.next.remove(&encrypted_cid).await,
+			None => self.next.remove(cid).await,
+		}
+	}
+
+	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
+		self.get(cid).await.map(|v| BlockStat { size: v.data().len() as u64 })
+	}
+}
+#[async_trait]
+impl<S> ExtendedBlockStorage for EncryptedBlockStorage<S>
+where
+	S: ExtendedBlockStorage + Clone + 'static,
+{
+	async fn set_extended(&self, extended_block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+		self.set_block(extended_block).await
+	}
+
+	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
+		self.next.exists(cid).await
+	}
+
+	async fn clear(&self) -> Result<(), StorageError> {
+		self.next.clear().await
 	}
 }
 impl<S> CloneWithBlockStorageSettings for EncryptedBlockStorage<S>

@@ -11,6 +11,7 @@ pub mod epic;
 pub mod flush_overlay;
 pub mod log;
 pub mod membership;
+pub mod overlay;
 pub mod reference;
 pub mod single;
 

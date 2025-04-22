@@ -24,14 +24,20 @@ use tokio::io::AsyncWriteExt;
 #[derive(Debug, Clone)]
 pub struct FsStorage {
 	path: PathBuf,
+	allow_clear: bool,
 }
 impl FsStorage {
 	pub fn new(path: PathBuf) -> Self {
-		Self { path }
+		Self { path, allow_clear: false }
 	}
 
 	pub fn create(&self) -> std::io::Result<()> {
 		std::fs::create_dir_all(&self.path)
+	}
+
+	pub fn with_allow_clear(mut self, allow_clear: bool) -> Self {
+		self.allow_clear = allow_clear;
+		self
 	}
 }
 impl Storage for FsStorage {
@@ -134,7 +140,7 @@ impl BlockStorage for FsStorage {
 		into_block_result(cid, tokio::fs::read(path).await)
 	}
 
-	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(block), fields(cid = ?block.cid(), path = ?to_cid_path(&self.path, block.cid(), "")))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(block), fields(cid = ?block.cid(), path = ?to_cid_path(&self.path, block.cid(), "")))]
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		let path = to_cid_path(&self.path, block.cid(), "");
 
@@ -232,6 +238,23 @@ impl BlockStorage for FsStorage {
 impl ExtendedBlockStorage for FsStorage {
 	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
 		self.set(block.block).await
+	}
+
+	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
+		let path = to_cid_path(&self.path, cid, "");
+		into_storage_result(cid, tokio::fs::try_exists(&path).await)
+	}
+
+	async fn clear(&self) -> Result<(), StorageError> {
+		if self.allow_clear {
+			match tokio::fs::remove_dir_all(&self.path).await {
+				Ok(_) => Ok(()),
+				Err(err) if err.kind() == ErrorKind::NotFound => Ok(()),
+				Err(err) => Err(StorageError::Internal(err.into())),
+			}
+		} else {
+			Err(StorageError::InvalidArgument(anyhow!("Clear disallowed: {}", self.path.to_string_lossy())))
+		}
 	}
 }
 impl CloneWithBlockStorageSettings for FsStorage {

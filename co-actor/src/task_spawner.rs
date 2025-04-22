@@ -26,6 +26,36 @@ impl TaskSpawner {
 			.spawn(task.instrument(tracing::trace_span!("task", application = self.idenitfier.as_str())))
 	}
 
+	/// Spawn task.
+	#[inline]
+	#[track_caller]
+	#[allow(unexpected_cfgs)]
+	pub fn spawn_named<F>(&self, name: &str, task: F) -> JoinHandle<F::Output>
+	where
+		F: Future + Send + 'static,
+		F::Output: Send + 'static,
+	{
+		#[cfg(tokio_unstable)]
+		{
+			tokio::task::Builder::new()
+				.name(name)
+				.spawn(self.inner.track_future(task.instrument(tracing::trace_span!(
+					"task",
+					task_name = name,
+					application = self.idenitfier.as_str()
+				))))
+				.expect("tokio runtime")
+		}
+		#[cfg(not(tokio_unstable))]
+		{
+			self.inner.spawn(task.instrument(tracing::trace_span!(
+				"task",
+				task_name = name,
+				application = self.idenitfier.as_str()
+			)))
+		}
+	}
+
 	pub fn tracker(&self) -> TaskTracker {
 		self.inner.clone()
 	}

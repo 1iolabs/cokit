@@ -8,7 +8,7 @@ use crate::{
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{
 		co_pinning_key::CoPinningKey,
-		co_reducer_context::{CoReducerContext, CoReducerContextRef},
+		co_reducer_context::CoReducerContext,
 		cores::{CO_CORE_NAME_CO, CO_CORE_STORAGE},
 	},
 	CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, DynamicCoDate, Reducer, ReducerBuilder,
@@ -61,7 +61,7 @@ impl LocalCoBuilder {
 		runtime: Runtime,
 		shutdown: CancellationToken,
 		tasks: TaskSpawner,
-		core_resolver: impl FnOnce(CoReducerContextRef) -> R,
+		core_resolver: R,
 		date: DynamicCoDate,
 	) -> Result<CoReducer, anyhow::Error>
 	where
@@ -145,7 +145,7 @@ where
 		tasks: TaskSpawner,
 		locals: L,
 		key: Box<dyn LocalSecret + Send + Sync + 'static>,
-		core_resolver: impl FnOnce(CoReducerContextRef) -> R,
+		core_resolver: R,
 		watcher: bool,
 		date: DynamicCoDate,
 	) -> Result<(Self, CoReducer), anyhow::Error>
@@ -168,8 +168,8 @@ where
 		let context = Arc::new(result.clone());
 
 		// create builder
-		let mut builder = ReducerBuilder::new(DynamicCoreResolver::new(core_resolver(context.clone())), log)
-			.with_initialize(local_co.initialize);
+		let mut builder =
+			ReducerBuilder::new(DynamicCoreResolver::new(core_resolver), log).with_initialize(local_co.initialize);
 
 		// load locals as snapshots
 		//  the latest heads will be automatically determined by the reducer
@@ -385,7 +385,11 @@ async fn create_encrypted_storage<S>(
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
-	// we have plain references as we may have unencrypted shared COs but all references to it should be Weak.
+	// we have plain references:
+	// - buildin core references
+	//   - third party cores are expected to be encrypted
+	// - unencrypted shared COs
+	//   - all references to it should be [`CoReference::Weak`].
 	let reference_mode = if disallow_plain {
 		let builtin_cores = Cores::default()
 			.built_in_native_mapping()
