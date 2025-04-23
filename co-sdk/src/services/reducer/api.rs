@@ -3,7 +3,7 @@ use crate::{
 	library::create_reducer_action::{create_reducer_action, store_reducer_action},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{co_dispatch::CoDispatch, co_reducer_context::CoReducerContextRef, co_reducer_state::CoReducerState},
-	CoStorage, DynamicCoDate, Reducer, Runtime,
+	CoStorage, DynamicCoDate, Reducer, Runtime, Storage,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -11,7 +11,7 @@ use co_actor::{Actor, ActorHandle, TaskSpawner};
 use co_core_co::Co;
 use co_identity::{PrivateIdentity, PrivateIdentityBox};
 use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Link, ReducerAction};
-use co_storage::{BlockStorageExt, StorageError};
+use co_storage::{BlockStorageExt, OverlayBlockStorage, StorageError};
 use futures::Stream;
 use ipld_core::ipld::Ipld;
 use serde::Serialize;
@@ -23,6 +23,7 @@ pub struct CoReducer {
 	parent: Option<CoId>,
 	handle: ActorHandle<ReducerMessage>,
 	storage: CoStorage,
+	overlay_storage: Option<OverlayBlockStorage<CoStorage>>,
 	pub(crate) context: CoReducerContextRef,
 	date: DynamicCoDate,
 }
@@ -44,7 +45,7 @@ impl CoReducer {
 			ReducerActor::new(tasks, runtime, context.clone()),
 			reducer,
 		)?;
-		Ok(Self { id, parent, storage, handle: actor.handle(), context, date })
+		Ok(Self { id, parent, storage, handle: actor.handle(), context, date, overlay_storage: None })
 	}
 
 	pub(crate) fn clone_with_detached_storage(&self) -> Self {
@@ -52,14 +53,56 @@ impl CoReducer {
 	}
 
 	pub(crate) fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+		let (storage, overlay_storage) = match &self.overlay_storage {
+			Some(overlay_storage) => {
+				// clone the base storage without overlay but with settings
+				let storage = overlay_storage.next_storage().clone_with_settings(settings);
+
+				// clone the overlay and replace next storage with the cloned instance
+				//  this will use the same overlay as the source clone
+				let overlay_storage = overlay_storage.clone().with_next_storage(storage);
+
+				// result
+				(CoStorage::new(overlay_storage.clone()), Some(overlay_storage))
+			},
+			None => (self.storage.clone_with_settings(settings), None),
+		};
 		Self {
 			id: self.id.clone(),
 			parent: self.parent.clone(),
 			handle: self.handle.clone(),
 			context: self.context.clone(),
 			date: self.date.clone(),
-			storage: self.storage.clone_with_settings(settings),
+			storage,
+			overlay_storage,
 		}
+	}
+
+	/// Get the reducer base storage (without overlay).
+	pub(crate) fn base_storage(&self) -> &CoStorage {
+		match &self.overlay_storage {
+			Some(overlay_storage) => overlay_storage.next_storage(),
+			None => &self.storage,
+		}
+	}
+
+	/// Use a new overlay storage for this instance.
+	pub(crate) fn with_overlay_storage(mut self, tasks: TaskSpawner, storage: Storage) -> Self {
+		let overlay_storage =
+			OverlayBlockStorage::new(tasks, self.base_storage().clone(), storage.tmp_storage(), None, true, true);
+		self.storage = CoStorage::new(overlay_storage.clone());
+		self.overlay_storage = Some(overlay_storage);
+		self
+	}
+
+	/// Flush [`Cid`] from overlay to base storage.
+	async fn overlay_flush(&self, cids: impl IntoIterator<Item = Cid>) -> Result<(), StorageError> {
+		if let Some(overlay_storage) = &self.overlay_storage {
+			for cid in cids {
+				overlay_storage.flush(cid, Some(Default::default())).await?;
+			}
+		}
+		Ok(())
 	}
 
 	pub(crate) async fn clear(&self) -> CoReducerState {
@@ -124,14 +167,20 @@ impl CoReducer {
 		T: Serialize + Debug + Clone + Send + Sync + 'static,
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
+		// action
 		let action_reference =
 			create_reducer_action(&self.storage, identity, core, item, Default::default(), &self.date).await?;
+
+		// flush
+		self.overlay_flush([action_reference.into()]).await?;
+
+		// push
 		let result = self
 			.handle
 			.request(|r| {
 				ReducerMessage::Push(
 					PrivateIdentity::boxed(identity.clone()),
-					self.storage.clone(),
+					self.base_storage().clone(),
 					action_reference,
 					r,
 				)
@@ -152,13 +201,19 @@ impl CoReducer {
 		T: Serialize + Debug + Send + Sync + Clone + 'static,
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
+		// action
 		let action_reference = store_reducer_action(&self.storage, action, Default::default()).await?;
+
+		// flush
+		self.overlay_flush([action_reference.into()]).await?;
+
+		// push
 		let result = self
 			.handle
 			.request(|r| {
 				ReducerMessage::Push(
 					PrivateIdentity::boxed(identity.clone()),
-					self.storage.clone(),
+					self.base_storage().clone(),
 					action_reference,
 					r,
 				)
@@ -185,12 +240,16 @@ impl CoReducer {
 	where
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
+		// flush
+		self.overlay_flush([action_reference.into()]).await?;
+
+		// push
 		let result = self
 			.handle
 			.request(|r| {
 				ReducerMessage::Push(
 					PrivateIdentity::boxed(identity.clone()),
-					self.storage.clone(),
+					self.base_storage().clone(),
 					action_reference,
 					r,
 				)
@@ -204,17 +263,25 @@ impl CoReducer {
 	/// Returns true if state has changed.
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, fields(co = self.id().as_str()), skip(self))]
 	pub async fn join(&self, heads: BTreeSet<Cid>) -> Result<CoReducerState, anyhow::Error> {
+		// flush
+		self.overlay_flush(heads.iter().cloned()).await?;
+
+		// join
 		Ok(self
 			.handle
-			.request(|r| ReducerMessage::JoinHeads(self.storage(), heads, r))
+			.request(|r| ReducerMessage::JoinHeads(self.base_storage().clone(), heads, r))
 			.await??)
 	}
 
 	/// Join a previous (trusted) snapshot into history which may can used as a starting point.
 	pub async fn join_state(&self, state: CoReducerState) -> Result<CoReducerState, anyhow::Error> {
+		// flush
+		self.overlay_flush(state.iter()).await?;
+
+		// join
 		Ok(self
 			.handle
-			.request(|r| ReducerMessage::JoinState(self.storage(), state, r))
+			.request(|r| ReducerMessage::JoinState(self.base_storage().clone(), state, r))
 			.await??)
 	}
 

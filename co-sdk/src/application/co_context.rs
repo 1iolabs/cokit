@@ -267,9 +267,14 @@ impl CoContextInner {
 		create_private_identity_resolver(local).await
 	}
 
+	/// Get the application storage.
+	pub fn application_storage(&self) -> &Storage {
+		&self.storage
+	}
+
 	/// Get the root storage.
 	pub fn storage(&self) -> CoStorage {
-		return self.storage.storage();
+		self.storage.storage()
 	}
 
 	pub fn runtime(&self) -> Runtime {

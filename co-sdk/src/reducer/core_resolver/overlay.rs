@@ -12,7 +12,7 @@ use co_actor::TaskSpawner;
 use co_core_storage::StorageAction;
 use co_primitives::{BlockLinks, BlockStorage, StoreParams};
 use co_runtime::{RuntimeContext, RuntimePool};
-use co_storage::{Algorithm, EncryptedBlockStorage, ExtendedBlockStorage, OverlayBlockStorage, OverlayChange};
+use co_storage::{ExtendedBlockStorage, OverlayBlockStorage, OverlayChange};
 use futures::{pin_mut, TryStreamExt};
 use std::collections::BTreeSet;
 use tracing::Instrument;
@@ -46,13 +46,8 @@ where
 		let max_block_size = <<CoStorage as BlockStorage>::StoreParams as StoreParams>::MAX_BLOCK_SIZE;
 
 		// transaction storage
-		let overlay_storage = OverlayBlockStorage::new(
-			self.tasks.clone(),
-			storage.clone(),
-			tmp_storage.clone(),
-			max_block_size * 48,
-			true,
-		);
+		let overlay_storage =
+			OverlayBlockStorage::new(self.tasks.clone(), storage.clone(), tmp_storage.clone(), None, true, false);
 		let transaction_storage = CoStorage::new(overlay_storage.clone());
 
 		// execute
@@ -140,21 +135,14 @@ where
 	) -> Result<RuntimeContext, CoreResolverError> {
 		// transaction storage
 		let tmp_storage = self.storage.tmp_storage();
-		let algorithm = Algorithm::default();
-		let encrypted_tmp_storage = CoStorage::new(EncryptedBlockStorage::new(
-			tmp_storage,
-			algorithm.generate_serect(),
-			algorithm,
-			Default::default(),
-		));
 
 		// execute
 		let result = self
-			.execute_with_tmp_storage(&encrypted_tmp_storage, storage, runtime, context, state, action)
+			.execute_with_tmp_storage(&tmp_storage, storage, runtime, context, state, action)
 			.await;
 
 		// cleanup
-		encrypted_tmp_storage.clear().await?;
+		tmp_storage.clear().await?;
 
 		// result
 		Ok(result?)

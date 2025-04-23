@@ -1,5 +1,5 @@
 use crate::{CoStorage, CoUuid, DynamicCoUuid};
-use co_storage::{FsStorage, MemoryBlockStorage};
+use co_storage::{Algorithm, EncryptedBlockStorage, FsStorage, MemoryBlockStorage};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
@@ -31,9 +31,12 @@ impl Storage {
 	pub fn tmp_storage(&self) -> CoStorage {
 		match &self.tmp_storage {
 			TmpStorage::Memory => CoStorage::new(MemoryBlockStorage::default()),
-			TmpStorage::Path(uuid, path) => {
-				CoStorage::new(FsStorage::new(path.join(uuid.uuid())).with_allow_clear(true))
-			},
+			TmpStorage::Path(uuid, path) => CoStorage::new(EncryptedBlockStorage::new(
+				FsStorage::new(path.join(uuid.uuid())).with_allow_clear(true),
+				Algorithm::default().generate_serect(),
+				Algorithm::default(),
+				Default::default(),
+			)),
 		}
 	}
 }

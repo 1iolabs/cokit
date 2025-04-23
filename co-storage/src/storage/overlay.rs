@@ -34,14 +34,37 @@ where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 {
 	/// Create overlay storage.
-	pub fn new<T>(spawner: TaskSpawner, next: S, tmp: T, blocks_max_memory: usize, skip_already_existing: bool) -> Self
+	pub fn new<T>(
+		spawner: TaskSpawner,
+		next: S,
+		tmp: T,
+		blocks_max_memory: Option<usize>,
+		skip_already_existing: bool,
+		clear_tmp_storage: bool,
+	) -> Self
 	where
-		T: BlockStorage<StoreParams = S::StoreParams> + Clone + 'static,
+		T: ExtendedBlockStorage<StoreParams = S::StoreParams> + Clone + 'static,
 	{
-		let actor = OverlayBlocksActor { _next: PhantomData, blocks_tmp: tmp, spawner, skip_already_existing };
+		let blocks_max_memory = blocks_max_memory.unwrap_or_else(|| S::StoreParams::MAX_BLOCK_SIZE * 48);
+		let actor = OverlayBlocksActor {
+			_next: PhantomData,
+			blocks_tmp: tmp,
+			spawner,
+			skip_already_existing,
+			clear_tmp_storage,
+		};
 		let instance = Actor::spawn_with(actor.spawner.clone(), Default::default(), actor, blocks_max_memory)
 			.expect("OverlayBlocksActor to spwan");
 		Self { handle: instance.handle(), flush_on_the_fly: false, next }
+	}
+
+	pub fn next_storage(&self) -> &S {
+		&self.next
+	}
+
+	pub fn with_next_storage(mut self, storage: S) -> Self {
+		self.next = storage;
+		self
 	}
 
 	pub fn with_flush_on_the_fly(mut self, flush_on_the_fly: bool) -> Self {
@@ -263,12 +286,15 @@ struct OverlayBlocksActor<S, T> {
 
 	/// Skip to create blocks which already exist in next.
 	skip_already_existing: bool,
+
+	/// Clear blocks_tmp on shutdown.
+	clear_tmp_storage: bool,
 }
 #[async_trait]
 impl<S, T> Actor for OverlayBlocksActor<S, T>
 where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
-	T: BlockStorage<StoreParams = S::StoreParams> + Clone + 'static,
+	T: ExtendedBlockStorage<StoreParams = S::StoreParams> + Clone + 'static,
 {
 	type State = OverlayBlocks;
 	type Message = OverlayBlockMessage<S>;
@@ -283,6 +309,13 @@ where
 		let mut result = OverlayBlocks::default();
 		result.blocks_max_memory = blocks_max_memory;
 		Ok(result)
+	}
+
+	async fn shutdown(&self, _state: Self::State) -> Result<(), ActorError> {
+		if self.clear_tmp_storage {
+			self.blocks_tmp.clear().await.map_err(|err| ActorError::Actor(err.into()))?;
+		}
+		Ok(())
 	}
 
 	async fn handle(
@@ -565,7 +598,7 @@ async fn flush_block<S, T>(
 ) -> Result<OverlayChangeReference, StorageError>
 where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
-	T: BlockStorage<StoreParams = S::StoreParams> + Clone + 'static,
+	T: ExtendedBlockStorage<StoreParams = S::StoreParams> + Clone + 'static,
 {
 	match block {
 		OverlayBlock::Memory(data, options) => {
@@ -718,7 +751,7 @@ mod tests {
 	async fn smoke() {
 		let next = MemoryBlockStorage::default();
 		let tmp = MemoryBlockStorage::default();
-		let storage = OverlayBlockStorage::new(Default::default(), next.clone(), tmp.clone(), 8, true);
+		let storage = OverlayBlockStorage::new(Default::default(), next.clone(), tmp.clone(), Some(8), true, false);
 		let block0 = block_from_raw([0, 0, 0, 1].to_vec());
 		let block1 = block_from_raw([0, 0, 1, 1].to_vec());
 		let block2 = block_from_raw([0, 1, 1, 1].to_vec());
