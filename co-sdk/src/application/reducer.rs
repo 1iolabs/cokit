@@ -111,7 +111,7 @@ pub struct Reducer<S, R> {
 	/// Avilable historic snapshots (in chronologic order?).
 	snapshots: HashMap<BTreeSet<Cid>, Cid>,
 	/// Change handlers.
-	change_handlers: Vec<Box<dyn ReducerChangedHandler<S, R> + Send + Sync>>,
+	change_handlers: Vec<Box<dyn ReducerChangedHandler<S, R>>>,
 	/// State/Heads watcher.
 	watch: (watch::Sender<Option<(Cid, BTreeSet<Cid>)>>, watch::Receiver<Option<(Cid, BTreeSet<Cid>)>>),
 	/// Date.
@@ -193,7 +193,7 @@ where
 	}
 
 	/// Add change handler which will be called when state changed.
-	/// All change handlers will be called in parallel.
+	/// Change handlers will be called in the sequence they have been added.
 	pub fn add_change_handler(&mut self, handler: Box<dyn ReducerChangedHandler<S, R> + Send + Sync>) {
 		self.change_handlers.push(handler);
 	}
@@ -509,7 +509,7 @@ where
 /// Reducer change handler.
 /// Will be executed everytime the state in the reducer changes, including on initialize.
 #[async_trait]
-pub trait ReducerChangedHandler<S, R> {
+pub trait ReducerChangedHandler<S, R>: Send + Sync {
 	async fn on_state_changed(
 		&mut self,
 		storage: &S,
