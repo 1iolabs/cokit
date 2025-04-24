@@ -10065,9 +10065,8 @@ dependencies = [
 
 [[package]]
 name = "tracing-bunyan-formatter"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5c266b9ac83dedf0e0385ad78514949e6d89491269e7065bee51d2bb8ec7373"
+version = "0.3.10"
+source = "git+https://github.com/dkuhnert/tracing-bunyan-formatter.git#9d408e002f31f057aa61a5ee6f8f513cd2d879ac"
 dependencies = [
  "ahash 0.8.11",
  "gethostname",

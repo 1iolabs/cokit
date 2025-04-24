@@ -44,7 +44,7 @@ tokio-stream = { workspace = true, features = ["full"] }
 tokio-util = { workspace = true, features = ["rt"] }
 toml = { workspace = true }
 tracing = { workspace = true }
-tracing-bunyan-formatter = "0.3.6"
+tracing-bunyan-formatter = { workspace = true }
 tracing-log = { workspace = true }
 tracing-opentelemetry = "0.23"
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

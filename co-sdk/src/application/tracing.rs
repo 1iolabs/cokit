@@ -7,7 +7,7 @@ use tracing::{
 	subscriber::{set_default, set_global_default, DefaultGuard},
 	Level,
 };
-use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_bunyan_formatter::BunyanFormattingLayer;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt::writer::MakeWriterExt, layer::SubscriberExt, EnvFilter, Registry};
 
@@ -73,7 +73,12 @@ impl TracingBuilder {
 		let bunyan = if let Some(log_path) = &self.bunyan {
 			std::fs::create_dir_all(log_path.parent().ok_or(anyhow::anyhow!("no parent"))?)?;
 			let log_file = std::fs::File::options().append(true).create(true).open(log_path)?;
-			Some(BunyanFormattingLayer::new(self.identifier.clone(), log_file))
+			Some(
+				BunyanFormattingLayer::new(self.identifier.clone(), log_file)
+					.serialize_span_id(true)
+					.serialize_span_type(true)
+					.serialize_span_fields(false),
+			)
 		} else {
 			None
 		};
@@ -90,7 +95,6 @@ impl TracingBuilder {
 				Registry::default()
 					.with(open_telemetry)
 					.with(self.env_filter)
-					.with(JsonStorageLayer)
 					.with(bunyan)
 					.with(stderr),
 			))

@@ -280,7 +280,8 @@ impl ApplicationBuilder {
 	}
 
 	/// Create new instance with path.
-	pub fn new_with_path(identifier: String, path: PathBuf) -> Self {
+	pub fn new_with_path(identifier: impl Into<String>, path: PathBuf) -> Self {
+		let identifier = identifier.into();
 		let tracing = TracingBuilder::new(identifier.clone(), Some(path.clone()));
 		Self {
 			identifier,
@@ -293,12 +294,13 @@ impl ApplicationBuilder {
 		}
 	}
 
-	pub fn new(identifier: String) -> Self {
+	pub fn new(identifier: impl Into<String>) -> Self {
 		Self::new_with_path(identifier, Self::default_path())
 	}
 
 	/// Create new memory only instance.
-	pub fn new_memory(identifier: String) -> Self {
+	pub fn new_memory(identifier: impl Into<String>) -> Self {
+		let identifier = identifier.into();
 		let tracing = TracingBuilder::new(identifier.clone(), None);
 		Self { identifier, path: None, keychain: false, tracing, settings: Default::default(), date: None, uuid: None }
 	}
