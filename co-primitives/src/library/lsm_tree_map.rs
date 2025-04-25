@@ -142,13 +142,26 @@ impl BloomFilter {
 
 /// LSM Tree Value.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
 pub enum Value<V>
 where
 	V: Clone + 'static,
 {
+	#[serde(rename = "v")]
 	Value(V),
+	#[serde(rename = "t")]
 	Tombstone,
+}
+impl<V> PartialEq for Value<V>
+where
+	V: PartialEq + Clone + 'static,
+{
+	fn eq(&self, other: &Self) -> bool {
+		match (self, other) {
+			(Self::Tombstone, Self::Tombstone) => true,
+			(Self::Value(a), Self::Value(b)) => a == b,
+			_ => false,
+		}
+	}
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1320,10 +1333,11 @@ where
 
 #[cfg(test)]
 mod tests {
-	use super::LsmTreeMap;
+	use super::{LsmTreeMap, Value};
 	use crate::{
+		from_cbor,
 		library::{lsm_tree_map::LsmTreeStats, test::TestStorage},
-		LsmTreeMapSettings,
+		to_cbor, LsmTreeMapSettings,
 	};
 	use futures::TryStreamExt;
 
@@ -1469,5 +1483,20 @@ mod tests {
 		let mut not_default = LsmTreeMapSettings::default();
 		not_default.max_node_entries += 1;
 		assert!(!not_default.is_default());
+	}
+
+	#[test]
+	fn test_serialize_value() {
+		let empty_v = Value::<()>::Value(());
+		let v = Value::<u8>::Value(0);
+		let t = Value::<u8>::Tombstone;
+
+		// cbor
+		let v_cbor = to_cbor(&v).unwrap();
+		let empty_v_cbor = to_cbor(&empty_v).unwrap();
+		let t_cbor = to_cbor(&t).unwrap();
+		assert_eq!(from_cbor::<Value::<()>>(&empty_v_cbor).unwrap(), empty_v);
+		assert_eq!(from_cbor::<Value::<u8>>(&v_cbor).unwrap(), v);
+		assert_eq!(from_cbor::<Value::<u8>>(&t_cbor).unwrap(), t);
 	}
 }

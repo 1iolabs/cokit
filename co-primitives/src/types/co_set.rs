@@ -1,7 +1,7 @@
 use crate::{library::lsm_tree_map::Root, BlockStorage, LsmTreeMap, OptionLink, StorageError};
 use futures::{Stream, TryStreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{future::Future, hash::Hash};
+use std::{fmt::Debug, future::Future, hash::Hash};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(transparent)]
@@ -155,3 +155,20 @@ where
 /// * `CoSet<T, SetValZST>` (internal set representation)
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Default, Serialize, Deserialize)]
 struct SetValZST;
+
+#[cfg(test)]
+mod tests {
+	use crate::{library::test::TestStorage, CoSet};
+	use futures::TryStreamExt;
+
+	#[tokio::test]
+	async fn smoke() {
+		let storage = TestStorage::default();
+		let mut set = CoSet::<i32>::default();
+		let mut transaction = set.open(&storage).await.unwrap();
+		transaction.insert(1).await.unwrap();
+		transaction.insert(2).await.unwrap();
+		set.commit(transaction).await.unwrap();
+		assert_eq!(set.stream(&storage).try_collect::<Vec<i32>>().await.unwrap(), vec![1, 2]);
+	}
+}

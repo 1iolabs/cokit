@@ -259,3 +259,20 @@ where
 		Ok(CoMap(link))
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use crate::{library::test::TestStorage, CoMap};
+	use futures::TryStreamExt;
+
+	#[tokio::test]
+	async fn smoke() {
+		let storage = TestStorage::default();
+		let mut set = CoMap::<i32, i32>::default();
+		let mut transaction = set.open(&storage).await.unwrap();
+		transaction.insert(1, 1).await.unwrap();
+		transaction.insert(2, 2).await.unwrap();
+		set.commit(transaction).await.unwrap();
+		assert_eq!(set.stream(&storage).try_collect::<Vec<(i32, i32)>>().await.unwrap(), vec![(1, 1), (2, 2)]);
+	}
+}
