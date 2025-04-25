@@ -35,7 +35,7 @@ where
 	S: BlockStorage + Send + Sync + Clone + 'static,
 	A: Serialize + Debug + Send + Sync + Clone + 'static,
 {
-	async fn dispatch(&self, action: &A) -> Result<Option<Cid>, anyhow::Error> {
+	async fn dispatch(&mut self, action: &A) -> Result<Option<Cid>, anyhow::Error> {
 		// Note: this action must be deterministic so we pass no time otherwise when we retry this could introduce
 		// random values.
 		let reducer_action: ReducerAction<&A> = ReducerAction {
@@ -47,7 +47,7 @@ where
 		let action_cid = self.storage.set_serialized(&reducer_action).await?;
 
 		// apply
-		let result = self
+		let runtime_context = self
 			.core_resolver
 			.execute(&self.storage, &self.runtime, &self.context, &self.state, &action_cid)
 			.await?;
@@ -57,7 +57,10 @@ where
 		// TODO: make sure it not in use by anyone else?
 		self.storage.remove(&action_cid).await?;
 
+		// update
+		self.state = runtime_context.state;
+
 		// result
-		Ok(result.state)
+		Ok(runtime_context.state)
 	}
 }

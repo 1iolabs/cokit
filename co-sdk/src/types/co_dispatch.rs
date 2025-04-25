@@ -5,5 +5,5 @@ use cid::Cid;
 /// Concrete implementations are pre-configured with identity and core informations.
 #[async_trait]
 pub trait CoDispatch<A>: Sync + Send {
-	async fn dispatch(&self, action: &A) -> Result<Option<Cid>, anyhow::Error>;
+	async fn dispatch(&mut self, action: &A) -> Result<Option<Cid>, anyhow::Error>;
 }

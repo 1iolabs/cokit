@@ -63,7 +63,7 @@ where
 
 			// flush removed blocks from `overlay_storage` to `storage`.
 			#[cfg(feature = "pinning")]
-			let dispatch = CoreResolverDispatch::new(
+			let mut dispatch = CoreResolverDispatch::new(
 				self.next.clone(),
 				runtime.clone(),
 				context.clone(),

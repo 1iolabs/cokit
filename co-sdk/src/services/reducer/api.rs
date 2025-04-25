@@ -311,7 +311,7 @@ impl<A> CoDispatch<A> for CoReducerDispatch<A>
 where
 	A: Serialize + Debug + Send + Sync + Clone + 'static,
 {
-	async fn dispatch(&self, action: &A) -> Result<Option<Cid>, anyhow::Error> {
+	async fn dispatch(&mut self, action: &A) -> Result<Option<Cid>, anyhow::Error> {
 		Ok(self.reducer.push(&self.identity, &self.core, action).await?.0)
 	}
 }

@@ -29,7 +29,7 @@ use std::{
 #[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(dispatch, storage))]
 pub async fn write_storage_references<S, D>(
 	storage: S,
-	dispatch: &D,
+	dispatch: &mut D,
 	block_links: BlockLinks,
 	pinning_key: Option<String>,
 	previous_state: Option<Cid>,
@@ -151,7 +151,7 @@ where
 			if let Some(next_state) = *reducer.state() {
 				write_storage_references(
 					storage.clone_with_settings(BlockStorageSettings::new().without_networking()),
-					&self.dispatch,
+					&mut self.dispatch,
 					BlockLinks::default(),
 					self.pinning_key.clone(),
 					self.reducer_previous_state,

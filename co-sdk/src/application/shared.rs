@@ -573,7 +573,7 @@ impl SharedCoCreator {
 				} else {
 					storage.clone()
 				},
-				&self.parent.dispatcher(&self.storage_core_name, identity.clone()),
+				&mut self.parent.dispatcher(&self.storage_core_name, identity.clone()),
 				BlockLinks::default(),
 				Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.co.id)),
 				None,

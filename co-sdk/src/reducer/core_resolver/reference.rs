@@ -39,7 +39,7 @@ where
 
 		// references
 		if let Some(next_state) = next.state {
-			let dispatch = CoreResolverDispatch::new(
+			let mut dispatch = CoreResolverDispatch::new(
 				self.next.clone(),
 				runtime.clone(),
 				context.clone(),
@@ -49,7 +49,7 @@ where
 			);
 			next.state = write_storage_references(
 				storage.clone_with_settings(BlockStorageSettings::new().without_networking()),
-				&dispatch,
+				&mut dispatch,
 				self.block_links.clone(),
 				self.pinning_key.clone(),
 				*state,

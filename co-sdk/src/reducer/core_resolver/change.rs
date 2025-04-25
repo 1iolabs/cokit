@@ -46,7 +46,7 @@ where
 		let max_references = max_reference_count(S::StoreParams::MAX_BLOCK_SIZE);
 
 		// create storage core dispatcher
-		let dispatch = CoreResolverDispatch::<C, S, StorageAction>::new(
+		let mut dispatch = CoreResolverDispatch::<C, S, StorageAction>::new(
 			self.next.clone(),
 			runtime.clone(),
 			context.clone(),
