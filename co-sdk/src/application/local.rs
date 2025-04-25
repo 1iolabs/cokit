@@ -68,16 +68,20 @@ impl LocalCoBuilder {
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
 	{
 		// key
-		let key: Box<dyn LocalSecret + Send + Sync + 'static> = if self.settings.keychain {
-			Box::new(KeychainLocalSecret::new("co.app".to_owned(), self.identity.identity().to_owned()))
-		} else if let Some(application_path) = &self.settings.application_path {
-			Box::new(FileLocalSecret::new(application_path.parent().expect("etc folder").join("key.cbor")))
+		let key: Option<Box<dyn LocalSecret + Send + Sync + 'static>> = if self.settings.feature_co_local_encryption() {
+			Some(if self.settings.keychain {
+				Box::new(KeychainLocalSecret::new("co.app".to_owned(), self.identity.identity().to_owned()))
+			} else if let Some(application_path) = &self.settings.application_path {
+				Box::new(FileLocalSecret::new(application_path.parent().expect("etc folder").join("key.cbor")))
+			} else {
+				Box::new(MemoryLocalSecret::new())
+			})
 		} else {
-			Box::new(MemoryLocalSecret::new())
+			None
 		};
 
 		// create
-		let watcher = self.settings.setting_co_local_watch();
+		let watcher = self.settings.feature_co_local_watch();
 		match &self.settings.application_path {
 			Some(application_path) => {
 				let config_path = application_path
@@ -123,7 +127,8 @@ impl LocalCoBuilder {
 #[derive(Debug, Clone)]
 struct LocalCoInstance<L> {
 	identifier: String,
-	encrypted_storage: EncryptedBlockStorage<CoStorage>,
+	storage: CoStorage,
+	encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
 	locals: L,
 }
 impl<L> LocalCoInstance<L>
@@ -144,7 +149,7 @@ where
 		shutdown: CancellationToken,
 		tasks: TaskSpawner,
 		locals: L,
-		key: Box<dyn LocalSecret + Send + Sync + 'static>,
+		key: Option<Box<dyn LocalSecret + Send + Sync + 'static>>,
 		core_resolver: R,
 		watcher: bool,
 		date: DynamicCoDate,
@@ -153,8 +158,13 @@ where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
 	{
 		// create storage
-		let encrypted_storage: EncryptedBlockStorage<CoStorage> = create_encrypted_storage(storage, key, true).await?;
-		let storage = CoStorage::new(encrypted_storage.clone());
+		let (base_storage, storage, encrypted_storage) = match key {
+			Some(key) => {
+				let encrypted_storage = create_encrypted_storage(storage.clone(), key, true).await?;
+				(storage, CoStorage::new(encrypted_storage.clone()), Some(encrypted_storage))
+			},
+			None => (storage.clone(), storage, None),
+		};
 
 		// create log
 		let log = Log::new(CO_ID_LOCAL.as_bytes().to_vec(), create_identity_resolver(), Default::default());
@@ -162,6 +172,7 @@ where
 		// result
 		let result = Self {
 			locals: locals.clone(),
+			storage: base_storage,
 			encrypted_storage: encrypted_storage.clone(),
 			identifier: local_co.settings.identifier.clone(),
 		};
@@ -217,12 +228,16 @@ where
 				pin_mut!(watcher);
 				while let Some(local) = watcher.next().await {
 					// convert to unencrypted
-					let local_state = match local.reducer_state().to_internal_force(&watch_encrypted_storage).await {
-						Ok(local_state) => local_state,
-						Err(err) => {
-							tracing::trace!(?err, ?local, "local-watch-cids-failed");
-							continue;
-						},
+					let local_state = if let Some(watch_encrypted_storage) = &watch_encrypted_storage {
+						match local.reducer_state().to_internal_force(watch_encrypted_storage).await {
+							Ok(local_state) => local_state,
+							Err(err) => {
+								tracing::trace!(?err, ?local, "local-watch-cids-failed");
+								continue;
+							},
+						}
+					} else {
+						local.reducer_state()
 					};
 
 					// skip?
@@ -235,10 +250,12 @@ where
 					}
 
 					// mappings
-					if let Some(mapping) = local.mapping {
-						match watch_encrypted_storage.load_mapping(&mapping).await {
-							Ok(_) => {},
-							Err(err) => tracing::warn!(?err, "local-watch-mapping-failed"),
+					if let Some(watch_encrypted_storage) = &watch_encrypted_storage {
+						if let Some(mapping) = local.mapping {
+							match watch_encrypted_storage.load_mapping(&mapping).await {
+								Ok(_) => {},
+								Err(err) => tracing::warn!(?err, "local-watch-mapping-failed"),
+							}
 						}
 					}
 
@@ -281,9 +298,11 @@ where
 				.ok_or_else(|| anyhow!("Failed to map state: {:?}", state))?;
 
 			// make sure the root mappings are available in parent storage
-			self.encrypted_storage
-				.insert_mappings([(*state, plain_state)].into_iter().chain(plain_heads_map.clone()))
-				.await;
+			if let Some(encrypted_storage) = &self.encrypted_storage {
+				encrypted_storage
+					.insert_mappings([(*state, plain_state)].into_iter().chain(plain_heads_map.clone()))
+					.await;
+			}
 
 			// create format
 			let local = ApplicationLocal::new(plain_heads_map.values().cloned().collect(), plain_state, mapping);
@@ -304,13 +323,18 @@ where
 	fn load_locals(&self) -> impl Stream<Item = Result<CoReducerState, anyhow::Error>> + '_ {
 		async_stream::try_stream! {
 			for local in self.locals.get().await? {
-				// load additional encryption mappings
-				if let Some(mapping) = &local.mapping {
-					self.encrypted_storage.load_mapping(mapping).await?;
-				}
+				// encryption
+				let state = if let Some(encrypted_storage) = &self.encrypted_storage {
+					// load additional encryption mappings
+					if let Some(mapping) = &local.mapping {
+						encrypted_storage.load_mapping(mapping).await?;
+					}
 
-				// convert state/heads to internal
-				let state = local.reducer_state().to_internal_force(&self.encrypted_storage).await?;
+					// convert state/heads to internal
+					local.reducer_state().to_internal_force(encrypted_storage).await?
+				} else {
+					local.reducer_state()
+				};
 
 				// apply
 				yield state
@@ -340,9 +364,15 @@ impl<L> CoReducerContext for LocalCoInstance<L>
 where
 	L: Locals + Clone + Debug + Send + Sync + 'static,
 {
+	/// The LocalCo never uses networking.
 	fn storage(&self, _force_local: bool) -> CoStorage {
-		// the LocalCo never uses networking and is always encrypted
-		CoStorage::new(self.encrypted_storage.clone())
+		// encrypted
+		if let Some(encrypted_storage) = &self.encrypted_storage {
+			return CoStorage::new(encrypted_storage.clone());
+		}
+
+		// base
+		self.storage.clone()
 	}
 
 	async fn refresh(&self, _parent: CoReducer, co: CoReducer) -> anyhow::Result<()> {
@@ -368,7 +398,9 @@ where
 		let state = co.clear().await;
 
 		// clear storage
-		self.encrypted_storage.clear_mapping(state.0.into_iter().chain(state.1)).await;
+		if let Some(encrypted_storage) = &self.encrypted_storage {
+			encrypted_storage.clear_mapping(state.0.into_iter().chain(state.1)).await;
+		}
 	}
 }
 

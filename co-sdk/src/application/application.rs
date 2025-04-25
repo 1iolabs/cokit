@@ -15,10 +15,10 @@ use co_core_storage::PinStrategy;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
-use co_primitives::{tags, CoId, TagValue, Tags};
+use co_primitives::{tag, tags, CoId, TagValue, Tags};
 use directories::ProjectDirs;
 use futures::{Stream, StreamExt};
-use std::{fmt::Debug, future::ready, path::PathBuf, sync::Arc};
+use std::{collections::BTreeSet, fmt::Debug, future::ready, path::PathBuf, sync::Arc};
 use tokio_util::{
 	sync::{CancellationToken, DropGuard},
 	task::TaskTracker,
@@ -226,15 +226,49 @@ pub struct ApplicationSettings {
 	/// Extra settings.
 	///
 	/// Known Tags:
-	/// - `co-local-watch` [`TagValue::Bool`] [`ApplicationSettings::setting_co_local_watch`]
+	/// - `disable-default-features` [`TagValue::Bool`]
+	/// - `feature` [`TagValue::String`]
 	/// - `co-default-max-state` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_state`]
 	/// - `co-default-max-log` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_log`]
+	///
+	/// Known Features:
+	/// - `co-local-watch` (default)
+	/// - `co-local-encryption` (default)
 	pub settings: Tags,
 }
 impl ApplicationSettings {
-	/// Whether to use locals watcher. Defaults to true.
-	pub fn setting_co_local_watch(&self) -> bool {
-		!self.settings.matches(tags!("co-local-watch": false))
+	/// Get all enabled features from tags.
+	fn features_from_tags(tags: &Tags) -> impl Iterator<Item = &str> + '_ {
+		let default_features = ["co-local-watch", "co-local-encryption"];
+		let disable_default_features = tags.matches(tags!("disable-default-features": true));
+		let features = tags.iter().filter_map(|(key, value)| match key.as_str() {
+			"feature" => value.string(),
+			_ => None,
+		});
+		default_features
+			.into_iter()
+			.filter(move |_| !disable_default_features)
+			.chain(features)
+	}
+
+	/// Get all enabled features.
+	/// Note that feature are always additive and not disable any functionality.
+	pub fn features(&self) -> impl Iterator<Item = &str> + '_ {
+		Self::features_from_tags(&self.settings)
+	}
+
+	pub fn has_feature(&self, feature: &str) -> bool {
+		self.features().any(|i| i == feature)
+	}
+
+	/// Whether to use locals watcher.
+	pub fn feature_co_local_watch(&self) -> bool {
+		self.has_feature("co-local-watch")
+	}
+
+	/// Whether to use encryption for Local CO.
+	pub fn feature_co_local_encryption(&self) -> bool {
+		self.has_feature("co-local-encryption")
 	}
 
 	/// Count of states to store for LocalCO and newly joined COs. A value of zero means unlimited.
@@ -335,6 +369,27 @@ impl ApplicationBuilder {
 	pub fn with_setting(self, name: &str, value: impl Into<TagValue>) -> Self {
 		let mut settings = self.settings;
 		settings.insert((name.to_owned(), value.into()));
+		Self { settings, ..self }
+	}
+
+	/// Disable feature.
+	pub fn with_disabled_feature(self, feature: &str) -> Self {
+		let mut settings = self.settings;
+		let features = ApplicationSettings::features_from_tags(&settings).collect::<BTreeSet<&str>>();
+		if features.contains(feature) {
+			let feature_tag = tag!("feature": feature);
+
+			// expand default features
+			if !settings.contains(&feature_tag) && !settings.contains_key("disable-default-features") {
+				settings.insert(tag!("disable-default-features": true));
+				for default_feature in ApplicationSettings::features_from_tags(&Default::default()) {
+					settings.insert(tag!("feature": default_feature));
+				}
+			}
+
+			// remove
+			settings.remove(&feature_tag);
+		}
 		Self { settings, ..self }
 	}
 
