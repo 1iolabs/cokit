@@ -252,7 +252,7 @@ impl ApplicationSettings {
 	}
 
 	/// Get all enabled features.
-	/// Note that feature are always additive and not disable any functionality.
+	/// Note that features are always additive and not disable any functionality.
 	pub fn features(&self) -> impl Iterator<Item = &str> + '_ {
 		Self::features_from_tags(&self.settings)
 	}

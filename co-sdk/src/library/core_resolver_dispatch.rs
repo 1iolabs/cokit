@@ -52,6 +52,10 @@ where
 			.execute(&self.storage, &self.runtime, &self.context, &self.state, &action_cid)
 			.await?;
 
+		// log
+		#[cfg(feature = "logging-verbose")]
+		tracing::trace!(?action, previous_state = ?self.state, next_state = ?runtime_context.state, "core-dispatch");
+
 		// remove action
 		// TODO: put this action into an "overlay storage" which used only memory?
 		// TODO: make sure it not in use by anyone else?

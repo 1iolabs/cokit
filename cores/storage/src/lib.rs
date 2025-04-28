@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use co_api::{
-	async_api::Reducer, BlockStorage, BlockStorageExt, CoList, CoMap, CoMapTransaction, CoSet, CoSetTransaction, Link,
-	OptionLink, ReducerAction, StorageError, Tags, WeakCid,
+	async_api::Reducer, BlockStorage, BlockStorageExt, CoList, CoListTransaction, CoMap, CoMapTransaction, CoSet,
+	CoSetTransaction, Link, OptionLink, ReducerAction, StorageError, Tags, WeakCid,
 };
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
@@ -113,6 +113,10 @@ pub enum StorageAction {
 	#[serde(rename = "pc")]
 	PinCreate(String, PinStrategy, Vec<WeakCid>),
 
+	/// Update a named pin by setting the [`PinStrategy`].
+	#[serde(rename = "pu")]
+	PinUpdate(String, PinStrategy),
+
 	/// Insert references to a named pin and reference all specified [`Cid`]s.
 	#[serde(rename = "pr")]
 	PinReference(String, Vec<WeakCid>),
@@ -164,6 +168,7 @@ impl<S: BlockStorage + Clone + 'static> Reducer<StorageAction, S> for Storage {
 			StorageAction::PinCreate(key, strategy, references) => {
 				reduce_pin_create(storage, &mut state, key, strategy, references).await?
 			},
+			StorageAction::PinUpdate(key, strategy) => reduce_pin_update(storage, &mut state, key, strategy).await?,
 			StorageAction::PinReference(key, cids) => reduce_pin_reference(storage, &mut state, key, cids).await?,
 			StorageAction::PinRemove(key) => reduce_pin_remove(storage, &mut state, key).await?,
 		}
@@ -202,29 +207,30 @@ async fn reference_structure_cid<S>(
 where
 	S: BlockStorage + Clone + 'static,
 {
-	let weak_parent = parent.into();
-	let mut block = blocks.get(&weak_parent).await?.unwrap_or_default();
+	let mut block = blocks.get(&parent).await?.ok_or(anyhow!("Reference not found: {:?}", parent))?;
 
 	// add children
-	let mut transaction = block.children.open(storage).await?;
-	let mut changed = false;
-	for item in children {
-		let item = item.into();
-		if !transaction.contains(&item).await? {
-			changed = true;
+	if !children.is_empty() {
+		let mut children_transaction = block.children.open(storage).await?;
+		let mut changed = false;
+		for item in children {
+			let item = item.into();
+			if !children_transaction.contains(&item).await? {
+				changed = true;
 
-			// add children
-			transaction.insert(item).await?;
+				// add children
+				children_transaction.insert(item).await?;
 
-			// reference
-			reference_cid(blocks, blocks_index_unreferenced, item).await?;
+				// reference
+				reference_cid(blocks, blocks_index_unreferenced, item).await?;
+			}
 		}
-	}
 
-	// store
-	if changed {
-		block.children = transaction.store().await?;
-		blocks.insert(weak_parent, block).await?;
+		// store
+		if changed {
+			block.children = children_transaction.store().await?;
+			blocks.insert(parent, block).await?;
+		}
 	}
 
 	Ok(())
@@ -287,12 +293,36 @@ where
 {
 	let mut pin = pins.get(&key).await?.ok_or(anyhow!("Pin not found: {}", key))?;
 	let mut references = pin.references.open(storage).await?;
+
+	// insert references
 	for cid in cids {
 		let cid = cid.into();
 		references.push(cid).await?;
 		pin.references_count += 1;
 		reference_cid(blocks, blocks_index_unreferenced, cid).await?;
 	}
+
+	// apply pin strategy
+	apply_pin_strategy(blocks, blocks_index_unreferenced, &mut pin, &mut references).await?;
+
+	// store pin
+	pin.references = references.store().await?;
+	pins.insert(key, pin).await?;
+
+	Ok(())
+}
+
+/// Apply pin strategy on pin.
+async fn apply_pin_strategy<S>(
+	blocks: &mut CoMapTransaction<S, WeakCid, BlockMetadata>,
+	blocks_index_unreferenced: &mut CoSetTransaction<S, WeakCid>,
+	pin: &mut Pin,
+	references: &mut CoListTransaction<S, WeakCid>,
+) -> Result<bool, anyhow::Error>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	let mut changed = false;
 	match &pin.strategy {
 		PinStrategy::Unlimited => {},
 		PinStrategy::MaxCount(count) => {
@@ -301,12 +331,11 @@ where
 					unreference_cid(blocks, blocks_index_unreferenced, remove).await?;
 				}
 				pin.references_count -= 1;
+				changed = true;
 			}
 		},
 	}
-	pin.references = references.store().await?;
-	pins.insert(key, pin).await?;
-	Ok(())
+	Ok(changed)
 }
 
 async fn reduce_pin_create<S>(
@@ -336,6 +365,44 @@ where
 	if !references.is_empty() {
 		pin_reference(storage, &mut pins, &mut blocks, &mut blocks_index_unreferenced, key, references).await?;
 	}
+
+	// store
+	state.pins = pins.store().await?;
+	state.blocks = blocks.store().await?;
+	state.blocks_index_unreferenced = blocks_index_unreferenced.store().await?;
+
+	// result
+	Ok(())
+}
+
+async fn reduce_pin_update<S>(
+	storage: &S,
+	state: &mut Storage,
+	key: String,
+	strategy: PinStrategy,
+) -> Result<(), anyhow::Error>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	let mut pins = state.pins.open(storage).await?;
+	let mut blocks = state.blocks.open(storage).await?;
+	let mut blocks_index_unreferenced = state.blocks_index_unreferenced.open(storage).await?;
+
+	// get
+	let Some(mut pin) = pins.get(&key).await? else {
+		return Err(anyhow::anyhow!("Pin not exists: {}", key));
+	};
+
+	// update pin strategy
+	pin.strategy = strategy;
+
+	// enfore pin strategy
+	let mut references = pin.references.open(storage).await?;
+	apply_pin_strategy(&mut blocks, &mut blocks_index_unreferenced, &mut pin, &mut references).await?;
+
+	// store pin
+	pin.references = references.store().await?;
+	pins.insert(key, pin).await?;
 
 	// store
 	state.pins = pins.store().await?;
@@ -521,20 +588,21 @@ async fn reference_cid<S>(
 where
 	S: BlockStorage + Clone + 'static,
 {
-	blocks
-		.update_key(cid, |mut block| async move {
-			// remove from index as we have references now
-			if block.references == 0 {
-				blocks_index_unreferenced.remove(cid).await?;
-			}
+	let block = blocks.get(&cid).await?;
 
-			// increment
-			block.references += 1;
+	// remove from index as we have references now
+	if let Some(block) = &block {
+		if block.references == 0 {
+			blocks_index_unreferenced.remove(cid).await?;
+		}
+	}
 
-			// result
-			Ok(block)
-		})
-		.await?;
+	// increment
+	let mut block = block.unwrap_or_default();
+	block.references += 1;
+	blocks.insert(cid, block).await?;
+
+	// result
 	Ok(())
 }
 
@@ -593,10 +661,15 @@ pub extern "C" fn state() {
 
 #[cfg(test)]
 mod tests {
-	use crate::StorageAction;
-	use co_api::{BlockSerializer, ReducerAction, WeakCid};
+	use crate::{PinStrategy, Storage, StorageAction};
+	use cid::Cid;
+	use co_api::{async_api::Reducer, BlockSerializer, BlockStorageExt, OptionLink, ReducerAction, WeakCid};
+	use co_storage::MemoryBlockStorage;
 	use ipld_core::{ipld::Ipld, serde::to_ipld};
-	use std::collections::{BTreeMap, BTreeSet};
+	use std::{
+		collections::{BTreeMap, BTreeSet},
+		str::FromStr,
+	};
 
 	#[test]
 	fn test_serialize_storage_action() {
@@ -632,5 +705,151 @@ mod tests {
 			BlockSerializer::default().deserialize(&block).unwrap();
 
 		assert_eq!(reducer_action_ipld_deserialize, reducer_action_ipld);
+	}
+
+	/// This is data gatered from storage_cleanup test which failed.
+	#[tokio::test]
+	async fn test_blocks_index_unreferenced_is_correct() {
+		fn cid(s: &str) -> co_api::WeakCid {
+			Cid::from_str(s).unwrap().into()
+		}
+		let storage = MemoryBlockStorage::default();
+
+		// actions
+		let actions = [
+			ReducerAction {
+				from: "did:local:device".into(),
+				time: 0,
+				core: "storage".into(),
+				payload: StorageAction::PinCreate("co.local.state".into(), PinStrategy::MaxCount(100), [].into()),
+			},
+			ReducerAction {
+				from: "did:local:device".into(),
+				time: 0,
+				core: "storage".into(),
+				payload: StorageAction::PinCreate("co.local.log".into(), PinStrategy::MaxCount(100), [].into()),
+			},
+			ReducerAction {
+				from: "did:local:device".into(),
+				time: 0,
+				core: "storage".into(),
+				payload: StorageAction::PinReference(
+					"co.local.state".into(),
+					[(cid("bagakbqabdyqar5vlsfqd3g4mxngt3yl7nx2na2kb4jybylzn5bktwnihjhih42a"))].into(),
+				),
+			},
+			ReducerAction {
+				from: "did:local:device".into(),
+				time: 0,
+				core: "storage".into(),
+				payload: StorageAction::ReferenceStructure(
+					[
+						(
+							(cid("bagakbqabdyqar5vlsfqd3g4mxngt3yl7nx2na2kb4jybylzn5bktwnihjhih42a")),
+							[
+								(cid("QmUDCqxH2vm9MBb2mLsGmHsoCMXBBnd4iWDruZdcSGaN7d")),
+								(cid("QmY8fStJQWVsfY4ae7KzfgeJQKqcXEbp1THut3Uz4aBBP6")),
+								(cid("QmcS1eGNuBM3a4pf8hw4hEWwdALXEEnimqZBhSBo8aHS7K")),
+								(cid("bagakbqabdyqcgkbe7hbegknbemf73xlnooct2g35zzrbdkus6z342bir46k5zgq")),
+							]
+							.into(),
+						),
+						(
+							(cid("bagakbqabdyqcgkbe7hbegknbemf73xlnooct2g35zzrbdkus6z342bir46k5zgq")),
+							[(cid("bagakbqabdyqfomt5rhne4gqclpbi7t2emjthzcm4frymppcndo27rxum6tugwoi"))].into(),
+						),
+						(
+							(cid("bagakbqabdyqfomt5rhne4gqclpbi7t2emjthzcm4frymppcndo27rxum6tugwoi")),
+							[(cid("bagakbqabdyqdyybl3osmbp4ckybdvmwccje5kxa6bhy6yz7p3ftrsngh4r6lg5a"))].into(),
+						),
+					]
+					.into(),
+				),
+			},
+			ReducerAction {
+				from: "did:local:device".into(),
+				time: 0,
+				core: "storage".into(),
+				payload: StorageAction::PinReference(
+					"co.local.state".into(),
+					[(cid("bagakbqabdyqldyp7kxv6p5wb3edrywc74xfkgauqzlumlxncdlzncbwt36y7iby"))].into(),
+				),
+			},
+			ReducerAction {
+				from: "did:local:device".into(),
+				time: 1745513086640,
+				core: "storage".into(),
+				payload: StorageAction::PinUpdate("co.local.state".into(), PinStrategy::MaxCount(1)),
+			},
+			ReducerAction {
+				from: "did:local:device".into(),
+				time: 0,
+				core: "storage".into(),
+				payload: StorageAction::PinReference(
+					"co.local.state".into(),
+					[(cid("bagakbqabdyqklkdo5hv4smstsuv2t347nnonrdgylyrb3qepc2rh5p2qtntmbba"))].into(),
+				),
+			},
+			ReducerAction {
+				from: "did:local:device".into(),
+				time: 0,
+				core: "storage".into(),
+				payload: StorageAction::ReferenceStructure(
+					[
+						(
+							(cid("bagakbqabdyqklkdo5hv4smstsuv2t347nnonrdgylyrb3qepc2rh5p2qtntmbba")),
+							[(cid("bagakbqabdyqh7c4dgnjexzftz5aethy36hwi4q6iosiwy32e6lortxcp3l6et3a"))].into(),
+						),
+						(
+							(cid("bagakbqabdyqh7c4dgnjexzftz5aethy36hwi4q6iosiwy32e6lortxcp3l6et3a")),
+							[
+								(cid("bagakbqabdyqc63i6iuxec7qgmzor4a554ihpznnbmnonh2l5l2h6w4vcvyn2zia")),
+								(cid("bagakbqabdyqodqxbpakp23ngiqce4hhif2w5n54ujalwomt5lravwfezkdgyica")),
+								(cid("bagakbqabdyqosx7w5aag3uid3tgh6w3g7p5vmtykf4cqefg7zwbpkf27bfvqlby")),
+							]
+							.into(),
+						),
+						(
+							(cid("bagakbqabdyqc63i6iuxec7qgmzor4a554ihpznnbmnonh2l5l2h6w4vcvyn2zia")),
+							[(cid("bagakbqabdyqpr2imdfe2lch4cqf7e4cjd5i26yrjsqai2gbwipxdesgukfupu7q"))].into(),
+						),
+						(
+							(cid("bagakbqabdyqodqxbpakp23ngiqce4hhif2w5n54ujalwomt5lravwfezkdgyica")),
+							[(cid("bagakbqabdyqjf3zpgq5jg7fjnnxo3pybvf63f7n73now5pvnednflv4ezgahadq"))].into(),
+						),
+						(
+							(cid("bagakbqabdyqosx7w5aag3uid3tgh6w3g7p5vmtykf4cqefg7zwbpkf27bfvqlby")),
+							[(cid("bagakbqabdyqebeu7wndmyhr63zfriwlaoddqy3sygd5it7xagora7xreqbbjk3q"))].into(),
+						),
+						(
+							(cid("bagakbqabdyqjf3zpgq5jg7fjnnxo3pybvf63f7n73now5pvnednflv4ezgahadq")),
+							[(cid("bagakbqabdyqocquirj4gdy2vvismgm52awzdgf66sqevvrswwvyalg57pt5bboy"))].into(),
+						),
+						(
+							(cid("bagakbqabdyqocquirj4gdy2vvismgm52awzdgf66sqevvrswwvyalg57pt5bboy")),
+							[(cid("bagakbqabdyqjamecznbm6ninfi5dryyvshenwnzbiunh7v6qrqy2ydlfkobjakq"))].into(),
+						),
+					]
+					.into(),
+				),
+			},
+		];
+		let mut state_reference = OptionLink::none();
+		for action in actions {
+			state_reference = Storage::reduce(state_reference, action, &storage).await.unwrap().into();
+		}
+
+		// validate
+		let state = storage.get_value(&state_reference.unwrap()).await.unwrap();
+		assert!(state
+			.blocks_index_unreferenced
+			.contains(&storage, &cid("bagakbqabdyqar5vlsfqd3g4mxngt3yl7nx2na2kb4jybylzn5bktwnihjhih42a"))
+			.await
+			.unwrap());
+		assert!(state
+			.blocks_index_unreferenced
+			.contains(&storage, &cid("bagakbqabdyqldyp7kxv6p5wb3edrywc74xfkgauqzlumlxncdlzncbwt36y7iby"))
+			.await
+			.unwrap());
 	}
 }

@@ -264,6 +264,10 @@ where
 		self.tree.stream()
 	}
 
+	pub fn reverse_stream(&self) -> impl Stream<Item = Result<(CoListIndex, V), StorageError>> + '_ {
+		self.tree.reverse_stream()
+	}
+
 	/// Insert value at index shifting all elements at or after to the right.
 	pub async fn insert(&mut self, index: CoListIndex, value: V) -> Result<CoListIndex, StorageError> {
 		// find index + 1 items

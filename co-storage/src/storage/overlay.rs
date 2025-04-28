@@ -250,7 +250,11 @@ where
 	}
 
 	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
-		self.next.exists(cid).await
+		Ok(self
+			.handle
+			.request(|response| OverlayBlockMessage::Exists(self.next.clone(), *cid, response))
+			.await
+			.map_err(|err| StorageError::Internal(err.into()))??)
 	}
 
 	async fn clear(&self) -> Result<(), StorageError> {
@@ -450,6 +454,14 @@ where
 				},
 				None => {
 					response.spawn_with(self.spawner.clone(), move || async move { Ok(next.stat(&cid).await?) });
+				},
+			},
+			OverlayBlockMessage::Exists(next, cid, response) => match state.blocks.get(&cid) {
+				Some(block) => {
+					response.respond(Ok(block.exists()));
+				},
+				None => {
+					response.spawn_with(self.spawner.clone(), move || async move { Ok(next.exists(&cid).await?) });
 				},
 			},
 			OverlayBlockMessage::ToPlain(next, cid, response) => {
@@ -662,6 +674,14 @@ enum OverlayBlock {
 	Remove,
 }
 impl OverlayBlock {
+	pub fn exists(&self) -> bool {
+		match self {
+			OverlayBlock::Memory(_, _) => true,
+			OverlayBlock::Tmp(_) => true,
+			OverlayBlock::Remove => false,
+		}
+	}
+
 	pub fn memory_len(&self) -> usize {
 		match self {
 			OverlayBlock::Memory(data, _) => data.len(),
@@ -703,6 +723,9 @@ where
 
 	/// Stat Block.
 	Stat(S, Cid, Response<Result<BlockStat, StorageError>>),
+
+	/// Block exists.
+	Exists(S, Cid, Response<Result<bool, StorageError>>),
 
 	/// [`BlockStorageContentMapping::to_plain`]
 	ToPlain(S, Cid, Response<Result<Option<Cid>, StorageError>>),

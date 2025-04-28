@@ -58,8 +58,16 @@ where
 			// flush `next_state` from `overlay_storage` to `storage`.
 			overlay_storage
 				.flush(next_state, Some(self.block_links.clone()))
-				.instrument(tracing::info_span!("overlay-flush"))
+				.instrument(tracing::info_span!("overlay-flush-state", cid = ?next_state))
 				.await?;
+
+			// flush diagnostics
+			for cid in next.diagnostics.iter() {
+				overlay_storage
+					.flush(*cid, Some(self.block_links.clone()))
+					.instrument(tracing::info_span!("overlay-flush-diagnostics", ?cid))
+					.await?;
+			}
 
 			// flush removed blocks from `overlay_storage` to `storage`.
 			#[cfg(feature = "pinning")]

@@ -279,7 +279,7 @@ where
 
 		// trace (only in debug because this has security implications)
 		#[cfg(debug_assertions)]
-		tracing::trace!(?cid, ?encrypted_cid, "storage-set");
+		tracing::trace!(?cid, ?encrypted_cid, cid_bytes = ?cid.to_bytes(), encrypted_cid_bytes = ?encrypted_cid.to_bytes(), "storage-set");
 
 		// result
 		Ok(cid)
@@ -307,7 +307,7 @@ where
 	}
 
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
-		match self.mapping.get(cid).await {
+		match self.mapping.remove(cid).await {
 			Some(encrypted_cid) => self.next.remove(&encrypted_cid).await,
 			None => self.next.remove(cid).await,
 		}
@@ -327,7 +327,10 @@ where
 	}
 
 	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
-		self.next.exists(cid).await
+		match self.mapping.get(cid).await {
+			Some(encrypted_cid) => self.next.exists(&encrypted_cid).await,
+			None => self.next.exists(cid).await,
+		}
 	}
 
 	async fn clear(&self) -> Result<(), StorageError> {
@@ -520,6 +523,17 @@ impl EncryptedBlockStorageMapping {
 		}
 	}
 
+	pub async fn remove(&self, key: &Cid) -> Option<Cid> {
+		let mut result = self.mapping.write().unwrap().remove(key);
+		if let Some(parent) = &self.parent {
+			let parent_result = parent.write().unwrap().remove(key);
+			if result.is_none() {
+				result = parent_result;
+			}
+		}
+		result
+	}
+
 	/// Map multiple Cids into an Map.
 	pub async fn get_mapping(&self, keys: impl IntoIterator<Item = Cid>) -> BTreeMap<Cid, Option<Cid>> {
 		let mapping = self.mapping.read().unwrap();
@@ -654,6 +668,10 @@ impl BlockMapping {
 
 	pub fn append(&mut self, other: &mut BlockMapping) {
 		self.map.append(&mut other.map);
+	}
+
+	pub fn remove(&mut self, key: &Cid) -> Option<Cid> {
+		self.map.remove(key)
 	}
 
 	pub fn get_first_by_value(&self, value: &Cid) -> Option<Cid> {

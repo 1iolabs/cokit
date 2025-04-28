@@ -126,7 +126,7 @@ where
 			.map(|r| r.block.clone())
 			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")));
 		#[cfg(feature = "logging-verbose")]
-		tracing::trace!(?cid, return = ?result.as_ref().map(|_| ()), "memory-store-get");
+		tracing::trace!(?cid, result = ?result.as_ref().map(|_| ()), "memory-store-get");
 		result
 	}
 
@@ -135,9 +135,9 @@ where
 		#[cfg(feature = "logging-verbose")]
 		{
 			if co_primitives::MultiCodec::is_cbor(block.cid()) {
-				tracing::trace!(cid = ?block.cid(), ipld = ?co_primitives::from_cbor::<ipld_core::ipld::Ipld>(block.data()), "set");
+				tracing::trace!(cid = ?block.cid(), ipld = ?co_primitives::from_cbor::<ipld_core::ipld::Ipld>(block.data()), "memory-store-set");
 			} else {
-				tracing::trace!(cid = ?block.cid(), "set");
+				tracing::trace!(cid = ?block.cid(), "memory-store-set");
 			}
 		}
 
@@ -152,9 +152,7 @@ where
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
 		// log
 		#[cfg(feature = "logging-verbose")]
-		{
-			tracing::trace!(?cid, "memory-store-remove");
-		}
+		tracing::trace!(?cid, "memory-store-remove");
 
 		// apply
 		self.records.write().unwrap().remove(cid);
@@ -162,12 +160,20 @@ where
 	}
 
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
-		self.records
+		let result = self
+			.records
 			.read()
 			.unwrap()
 			.get(cid)
 			.map(|r| BlockStat { size: r.block.data().len() as u64 })
-			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")))
+			.ok_or(StorageError::NotFound(*cid, anyhow!("no record")));
+
+		// log
+		#[cfg(feature = "logging-verbose")]
+		tracing::trace!(?cid, ?result, "memory-store-stat");
+
+		// result
+		result
 	}
 }
 #[async_trait]
@@ -180,7 +186,14 @@ where
 	}
 
 	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
-		Ok(self.records.read().unwrap().contains_key(cid))
+		let result = Ok(self.records.read().unwrap().contains_key(cid));
+
+		// log
+		#[cfg(feature = "logging-verbose")]
+		tracing::trace!(?cid, ?result, "memory-store-exists");
+
+		// result
+		result
 	}
 
 	async fn clear(&self) -> Result<(), StorageError> {

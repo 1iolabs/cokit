@@ -227,6 +227,16 @@ impl Tags {
 		self.0.extend(tags);
 	}
 
+	/// Contains tag.
+	pub fn contains(&self, tag: &Tag) -> bool {
+		self.0.contains(tag)
+	}
+
+	/// Contains tag with key.
+	pub fn contains_key(&self, key: &str) -> bool {
+		self.find_key(key).is_some()
+	}
+
 	/// Set tag(s). By removing all tags with the same key before insert.
 	pub fn set(&mut self, tags: impl Into<Tags>) {
 		for tag in tags.into().into_iter() {
@@ -380,6 +390,12 @@ impl From<Tag> for Tags {
 impl TagsMatches for Tags {
 	fn matches(&self, tags: &Tags) -> bool {
 		let expr: TagsExpr = self.clone().into();
+		expr.matches(tags)
+	}
+}
+impl TagsMatches for &Tags {
+	fn matches(&self, tags: &Tags) -> bool {
+		let expr: TagsExpr = (*self).clone().into();
 		expr.matches(tags)
 	}
 }
