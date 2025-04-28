@@ -61,6 +61,13 @@ where
 		// TODO: make sure it not in use by anyone else?
 		self.storage.remove(&action_cid).await?;
 
+		// propagate failures as this is meant for internal actions which should not fail
+		// - this indicates a bug in sdk internals if it fails
+		// - actions dispatched here will be created for the current state and not expected to fail.
+		// - actions dispatched here are implicit (not in the heads) so they get recomputet every time the head is
+		//   (re-)executed.
+		runtime_context.ok(&self.storage).await?;
+
 		// update
 		self.state = runtime_context.state;
 

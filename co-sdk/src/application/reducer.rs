@@ -351,6 +351,13 @@ where
 			);
 		}
 
+		// fail and ignore result when we got a failure disgnostic
+		//  this is technically optional because its fine to have failing transactions
+		//  which just have no effect to the state
+		//  but in case of push which is always local we can just skip it
+		//  it makes no sense to propagate it to peers etc.
+		runtime_context.ok(storage).await?;
+
 		// snapshot
 		if self.state.is_some() {
 			self.insert_snapshot(self.state.unwrap(), self.heads.clone());
