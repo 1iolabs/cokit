@@ -55,6 +55,8 @@ impl<T> Response<T> {
 	}
 
 	/// Spawns a new task and executes given closure in it
+	#[inline]
+	#[track_caller]
 	pub fn spawn<Fut, F>(self, value: F)
 	where
 		Fut: Future<Output = T> + Send + 'static,
@@ -65,6 +67,8 @@ impl<T> Response<T> {
 	}
 
 	/// Spawns a new task using the given spawner and executes given closure in it
+	#[inline]
+	#[track_caller]
 	pub fn spawn_with<Fut, F>(self, spawner: impl Borrow<TaskSpawner>, value: F)
 	where
 		Fut: Future<Output = T> + Send + 'static,
