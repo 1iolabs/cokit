@@ -1,8 +1,8 @@
 use super::{CoreResolver, CoreResolverError};
 use crate::{
-	library::core_resolver_dispatch::CoreResolverDispatch,
+	library::{core_resolver_dispatch::CoreResolverDispatch, storage_cleanup::storage_cleanup},
 	reducer::change::reference_writer::{lastest_storage_reference, write_storage_references},
-	storage_cleanup, CoStorage, ReducerChangeContext, CO_CORE_NAME_STORAGE,
+	CoStorage, ReducerChangeContext, CO_CORE_NAME_STORAGE,
 };
 use async_trait::async_trait;
 use cid::Cid;

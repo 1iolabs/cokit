@@ -1,4 +1,6 @@
 use super::identity::create_identity_resolver;
+#[cfg(feature = "pinning")]
+use crate::reducer::change::reference_writer::write_storage_references;
 use crate::{
 	find_membership,
 	library::{
@@ -6,7 +8,7 @@ use crate::{
 		membership_all_heads::membership_all_heads, push_heads::PushHeads,
 	},
 	reducer::{
-		change::{membership_writer::MembershipWriter, reference_writer::write_storage_references},
+		change::membership_writer::MembershipWriter,
 		core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
 	},
 	services::{
@@ -27,7 +29,9 @@ use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
-use co_primitives::{tags, BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId};
+#[cfg(feature = "pinning")]
+use co_primitives::BlockLinks;
+use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId};
 use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
 use std::{

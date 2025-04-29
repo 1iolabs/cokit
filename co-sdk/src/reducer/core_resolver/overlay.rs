@@ -1,19 +1,23 @@
 use super::{CoreResolver, CoreResolverError};
 #[cfg(feature = "pinning")]
+use crate::library::max_reference_count::max_reference_count;
+#[cfg(feature = "pinning")]
+use crate::types::co_dispatch::CoDispatch;
+#[cfg(feature = "pinning")]
 use crate::{library::core_resolver_dispatch::CoreResolverDispatch, CO_CORE_NAME_STORAGE};
-use crate::{
-	library::max_reference_count::max_reference_count, types::co_dispatch::CoDispatch, CoStorage, ReducerChangeContext,
-	Storage,
-};
+use crate::{CoStorage, ReducerChangeContext, Storage};
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::TaskSpawner;
 #[cfg(feature = "pinning")]
 use co_core_storage::StorageAction;
-use co_primitives::{BlockLinks, BlockStorage, StoreParams};
+use co_primitives::{BlockLinks, BlockStorage};
+#[cfg(feature = "pinning")]
+use co_primitives::{StoreParams, WeakCid};
 use co_runtime::{RuntimeContext, RuntimePool};
 use co_storage::{ExtendedBlockStorage, OverlayBlockStorage, OverlayChange};
 use futures::{pin_mut, TryStreamExt};
+#[cfg(feature = "pinning")]
 use std::collections::BTreeSet;
 use tracing::Instrument;
 
@@ -43,8 +47,6 @@ where
 		state: &Option<Cid>,
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
-		let max_block_size = <<CoStorage as BlockStorage>::StoreParams as StoreParams>::MAX_BLOCK_SIZE;
-
 		// transaction storage
 		let overlay_storage =
 			OverlayBlockStorage::new(self.tasks.clone(), storage.clone(), tmp_storage.clone(), None, true, false);
@@ -74,8 +76,10 @@ where
 				CO_CORE_NAME_STORAGE.to_owned(),
 				next.state,
 			);
-			let max_references = max_reference_count(max_block_size);
-			let mut remove = BTreeSet::new();
+			#[cfg(feature = "pinning")]
+			let max_references = max_reference_count(<<CoStorage as BlockStorage>::StoreParams as StoreParams>::MAX_BLOCK_SIZE);
+			#[cfg(feature = "pinning")]
+			let mut remove = BTreeSet::<WeakCid>::new();
 			let changes = overlay_storage.changes();
 			pin_mut!(changes);
 			while let Some(change) = changes.try_next().await? {

@@ -1,4 +1,9 @@
 use super::{application::ApplicationSettings, identity::create_identity_resolver, reducer::ReducerChangedHandler};
+#[cfg(feature = "pinning")]
+use crate::types::{
+	co_pinning_key::CoPinningKey,
+	cores::{CO_CORE_NAME_STORAGE, CO_CORE_STORAGE},
+};
 use crate::{
 	library::{
 		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
@@ -6,18 +11,15 @@ use crate::{
 		to_external_cid::{to_external_cid_opt_force, to_external_cids_opt_map_force},
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
-	types::{
-		co_pinning_key::CoPinningKey,
-		co_reducer_context::CoReducerContext,
-		cores::{CO_CORE_NAME_CO, CO_CORE_STORAGE},
-	},
+	types::co_reducer_context::CoReducerContext,
 	CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, DynamicCoDate, Reducer, ReducerBuilder,
-	ReducerChangeContext, Runtime, TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_KEYSTORE,
-	CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
+	ReducerChangeContext, Runtime, TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
+	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
+#[cfg(feature = "pinning")]
 use co_core_storage::StorageAction;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;

@@ -46,7 +46,6 @@ pub use library::{
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
 	response_list::ResponseList,
-	storage_cleanup::storage_cleanup,
 	update_co::update_co,
 };
 pub use pin::pin::PinAPI;
@@ -59,6 +58,7 @@ pub use services::{
 };
 pub use types::{
 	co_date::{CoDate, DynamicCoDate, MonotonicCoDate, StaticCoDate, SystemCoDate},
+	co_pinning_key::CoPinningKey,
 	co_reducer_context::CoReducerContext,
 	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError},
 	co_reducer_state::CoReducerState,
