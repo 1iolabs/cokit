@@ -1837,6 +1837,7 @@ dependencies = [
  "co-primitives",
  "co-storage",
  "colored",
+ "derive_more",
  "futures",
  "hexdump",
  "insta",
