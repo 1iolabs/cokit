@@ -1,6 +1,7 @@
 use super::{CoreResolver, CoreResolverError};
 use crate::{
-	library::core_resolver_dispatch::CoreResolverDispatch, reducer::change::reference_writer::write_storage_references,
+	library::core_resolver_dispatch::CoreResolverDispatch,
+	reducer::change::reference_writer::{lastest_storage_reference, write_storage_references},
 	storage_cleanup, CoStorage, ReducerChangeContext, CO_CORE_NAME_STORAGE,
 };
 use async_trait::async_trait;
@@ -49,13 +50,17 @@ where
 				next_state,
 			);
 
+			// resolve previous
+			let previous_reference_state =
+				lastest_storage_reference(storage, next_state.into(), &self.pinning_key).await?;
+
 			// add
 			next_state = write_storage_references(
 				storage.clone_with_settings(BlockStorageSettings::new().without_networking()),
 				&mut dispatch,
 				self.block_links.clone(),
 				self.pinning_key.clone(),
-				None,
+				previous_reference_state,
 				next_reference_state,
 			)
 			.await?;

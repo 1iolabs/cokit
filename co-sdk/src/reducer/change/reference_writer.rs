@@ -42,13 +42,6 @@ where
 	// calc max references per action
 	let max_references = max_reference_count(S::StoreParams::MAX_BLOCK_SIZE);
 
-	// resolve previous state from pin if not specified
-	let mut previous_state = previous_state;
-	if previous_state.is_none() {
-		previous_state = lastest_storage_reference(&storage, next_state.into(), &pinning_key).await?;
-	}
-	tracing::trace!(?previous_state, ?next_state, ?pinning_key, "storage-write-references");
-
 	// diff
 	let diff = block_diff_added_with_parent(
 		storage.clone(),
@@ -138,7 +131,7 @@ pub async fn lastest_storage_reference<S>(
 	pinning_key: &Option<String>,
 ) -> Result<Option<Cid>, anyhow::Error>
 where
-	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
+	S: BlockStorage + Clone + 'static,
 {
 	let Some(pinning_key) = pinning_key else {
 		return Ok(None);
