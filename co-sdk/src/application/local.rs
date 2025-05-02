@@ -11,6 +11,7 @@ use crate::{
 		to_external_cid::{to_external_cid_opt_force, to_external_cids_opt_map_force},
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
+	services::reducer::ReducerFlush,
 	types::co_reducer_context::CoReducerContext,
 	CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, DynamicCoDate, Reducer, ReducerBuilder,
 	ReducerChangeContext, Runtime, TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
@@ -200,9 +201,6 @@ where
 		// create reducer
 		let mut reducer = builder.build(&storage, runtime.runtime(), date).await?;
 
-		// write
-		reducer.add_change_handler(Box::new(result.clone()));
-
 		// create empty
 		if reducer.is_empty() {
 			setup_local_co(&storage, runtime.runtime(), &local_co.identity, &mut reducer, &local_co.settings).await?;
@@ -218,6 +216,7 @@ where
 			runtime,
 			reducer,
 			context,
+			Box::new(result.clone()),
 		)?;
 
 		// watch
@@ -278,31 +277,30 @@ where
 
 	/// Write state to disk.
 	/// Returns false and does nothing if reducer is empty.
-	pub async fn write<S, R>(
+	pub async fn write<S>(
 		&mut self,
 		storage: &S,
-		reducer: &Reducer<S, R>,
+		reducer_state: CoReducerState,
 		mapping: Option<Cid>,
 	) -> Result<bool, anyhow::Error>
 	where
 		S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
-		R: CoreResolver<S> + Send + Sync + 'static,
 	{
-		if let Some(state) = reducer.state() {
+		if let Some(state) = reducer_state.state() {
 			// heads
-			let plain_heads_map = to_external_cids_opt_map_force(storage, reducer.heads().clone())
+			let plain_heads_map = to_external_cids_opt_map_force(storage, reducer_state.heads())
 				.await
-				.ok_or_else(|| anyhow!("Failed to map heads: {:?}", reducer.heads()))?;
+				.ok_or_else(|| anyhow!("Failed to map heads: {:?}", reducer_state.heads()))?;
 
 			// state
-			let plain_state = to_external_cid_opt_force(storage, Some(*state))
+			let plain_state = to_external_cid_opt_force(storage, Some(state))
 				.await
 				.ok_or_else(|| anyhow!("Failed to map state: {:?}", state))?;
 
 			// make sure the root mappings are available in parent storage
 			if let Some(encrypted_storage) = &self.encrypted_storage {
 				encrypted_storage
-					.insert_mappings([(*state, plain_state)].into_iter().chain(plain_heads_map.clone()))
+					.insert_mappings([(state, plain_state)].into_iter().chain(plain_heads_map.clone()))
 					.await;
 			}
 
@@ -357,7 +355,8 @@ where
 		reducer: &Reducer<S, R>,
 		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
-		self.write(storage, reducer, None).await?;
+		let reducer_state = CoReducerState::new(*reducer.state(), reducer.heads().to_owned());
+		self.write(storage, reducer_state, None).await?;
 		Ok(())
 	}
 }
@@ -403,6 +402,19 @@ where
 		if let Some(encrypted_storage) = &self.encrypted_storage {
 			encrypted_storage.clear_mapping(state.0.into_iter().chain(state.1)).await;
 		}
+	}
+}
+#[async_trait]
+impl<L, S, R> ReducerFlush<S, R> for LocalCoInstance<L>
+where
+	L: Locals + Clone + Debug + Send + Sync + 'static,
+	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
+	R: CoreResolver<S> + Send + Sync + 'static,
+{
+	async fn flush(&mut self, storage: &S, reducer: &Reducer<S, R>) -> anyhow::Result<()> {
+		let reducer_state = CoReducerState::new(*reducer.state(), reducer.heads().to_owned());
+		self.write(storage, reducer_state, None).await?;
+		Ok(())
 	}
 }
 

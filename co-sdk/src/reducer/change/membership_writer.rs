@@ -5,46 +5,39 @@ use crate::{
 };
 use async_trait::async_trait;
 use co_core_membership::{CoState, MembershipsAction};
-use co_identity::PrivateIdentity;
+use co_identity::PrivateIdentityBox;
 use co_primitives::{CoId, WeakCid};
 use co_storage::EncryptedBlockStorage;
-use std::{collections::BTreeSet, fmt::Debug};
+use std::collections::BTreeSet;
 
 /// Apply reducer state/head changes to the membership core in the parent CO.
-pub struct MembershipWriter<I> {
+pub struct MembershipWriter {
 	/// The membership CO UUID.
 	pub id: CoId,
 	/// The membership DID.
 	// did: Did,
 	pub parent: CoReducer,
 	pub membership_core_name: String,
-	pub identity: I,
+	pub identity: PrivateIdentityBox,
 	pub encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
 	pub last_state: BTreeSet<CoState>,
 }
-
-impl<I> MembershipWriter<I> {
+impl MembershipWriter {
 	pub fn new(
 		id: CoId,
 		parent: CoReducer,
 		membership_core_name: String,
-		identity: I,
+		identity: PrivateIdentityBox,
 		encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
 		last_state: BTreeSet<CoState>,
 	) -> Self {
 		Self { id, parent, membership_core_name, identity, encrypted_storage, last_state }
 	}
-}
-#[async_trait]
-impl<I> ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for MembershipWriter<I>
-where
-	I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
-{
-	async fn on_state_changed(
+
+	pub async fn write(
 		&mut self,
 		storage: &CoStorage,
 		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
-		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
 		// action
 		let parent_storage = self.parent.storage();
@@ -89,5 +82,16 @@ where
 			self.last_state = [state].into_iter().collect();
 		}
 		Ok(())
+	}
+}
+#[async_trait]
+impl ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for MembershipWriter {
+	async fn on_state_changed(
+		&mut self,
+		storage: &CoStorage,
+		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+		_context: ReducerChangeContext,
+	) -> Result<(), anyhow::Error> {
+		self.write(storage, reducer).await
 	}
 }

@@ -1,4 +1,4 @@
-use super::{message::ReducerMessage, ReducerActor};
+use super::{flush::CoReducerFlush, message::ReducerMessage, ReducerActor};
 use crate::{
 	library::create_reducer_action::{create_reducer_action, store_reducer_action},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
@@ -37,13 +37,14 @@ impl CoReducer {
 		runtime: Runtime,
 		reducer: Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 		context: CoReducerContextRef,
+		flush: CoReducerFlush,
 	) -> Result<Self, anyhow::Error> {
 		let date = reducer.date().clone();
 		let actor = Actor::spawn_with(
 			tasks.clone(),
 			tags!("application": application_identifier, "co": id.as_str()),
 			ReducerActor::new(tasks, runtime, context.clone()),
-			reducer,
+			(reducer, flush),
 		)?;
 		Ok(Self { id, parent, storage, handle: actor.handle(), context, date, overlay_storage: None })
 	}
@@ -186,6 +187,11 @@ impl CoReducer {
 				)
 			})
 			.await??;
+
+		// flush
+		self.flush().await?;
+
+		// result
 		tracing::trace!(action = ?item, ?action_reference, state = ?result.0, heads = ?result.1, "push");
 		Ok(result)
 	}
@@ -219,6 +225,11 @@ impl CoReducer {
 				)
 			})
 			.await??;
+
+		// flush
+		self.flush().await?;
+
+		// result
 		tracing::trace!(action = ?action.payload, ?action_reference, state = ?result.0, heads = ?result.1, "push");
 		Ok(result)
 	}
@@ -255,6 +266,11 @@ impl CoReducer {
 				)
 			})
 			.await??;
+
+		// flush
+		self.flush().await?;
+
+		// result
 		tracing::trace!(?action_reference, state = ?result.0, heads = ?result.1, "push-reference");
 		Ok(result)
 	}
@@ -267,10 +283,16 @@ impl CoReducer {
 		self.overlay_flush(heads.iter().cloned()).await?;
 
 		// join
-		Ok(self
+		let request = self
 			.handle
 			.request(|r| ReducerMessage::JoinHeads(self.base_storage().clone(), heads, r))
-			.await??)
+			.await??;
+
+		// flush
+		self.flush().await?;
+
+		// result
+		Ok(request)
 	}
 
 	/// Join a previous (trusted) snapshot into history which may can used as a starting point.
@@ -279,10 +301,16 @@ impl CoReducer {
 		self.overlay_flush(state.iter()).await?;
 
 		// join
-		Ok(self
+		let co_reducer_state = self
 			.handle
 			.request(|r| ReducerMessage::JoinState(self.base_storage().clone(), state, r))
-			.await??)
+			.await??;
+
+		// flush
+		self.flush().await?;
+
+		// result
+		Ok(co_reducer_state)
 	}
 
 	/// Create a action dispatcher.
@@ -292,6 +320,14 @@ impl CoReducer {
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
 		CoReducerDispatch::new(self.clone(), PrivateIdentity::boxed(identity), core.to_string())
+	}
+
+	/// Flush staged changes.
+	async fn flush(&self) -> Result<(), anyhow::Error> {
+		Ok(self
+			.handle
+			.request(|r| ReducerMessage::Flush(self.base_storage().clone(), r))
+			.await??)
 	}
 }
 

@@ -1,6 +1,4 @@
 use super::identity::create_identity_resolver;
-#[cfg(feature = "pinning")]
-use crate::reducer::change::reference_writer::write_storage_references;
 use crate::{
 	find_membership,
 	library::{
@@ -14,11 +12,12 @@ use crate::{
 	services::{
 		connections::ConnectionMessage,
 		network::{CoHeadsPublish, CoNetworkTaskSpawner},
+		reducer::ReducerFlush,
 		reducers::ReducerStorage,
 	},
 	types::co_reducer_context::CoReducerContext,
-	CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters, CoUuid, ReducerBuilder,
-	Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters, CoUuid, Reducer,
+	ReducerBuilder, Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -29,8 +28,6 @@ use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
-#[cfg(feature = "pinning")]
-use co_primitives::BlockLinks;
 use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId};
 use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
@@ -262,26 +259,27 @@ impl SharedCoBuilder {
 		}
 
 		// setup auto write to parent co
-		let writer = MembershipWriter::new(
+		let membership_writer = MembershipWriter::new(
 			self.membership.id.clone(),
 			self.parent.clone(),
 			self.membership_core_name,
-			identity.clone(),
+			identity.clone().boxed(),
 			encrypted_storage.clone(),
 			self.membership.state.clone(),
 		);
-		reducer.add_change_handler(Box::new(writer));
 
 		// setup auto write references to parent co
 		#[cfg(feature = "pinning")]
-		{
-			let writer = crate::reducer::change::reference_writer::ReferenceWriteReducerChangedHandler::new(
+		let references_writer = crate::reducer::change::reference_writer::ReferenceWriteReducerChangedHandler::new(
+			crate::types::co_dispatch::DynamicCoDispatch::new(
 				self.parent.dispatcher(&self.storage_core_name, identity.clone()),
-				Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.membership.id)),
-				*reducer.state(),
-			);
-			reducer.add_change_handler(Box::new(writer));
-		}
+			),
+			Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.membership.id)),
+			*reducer.state(),
+		);
+
+		// build flush
+		let flush = SharedFlush { membership_writer, references_writer };
 
 		// result
 		let application_identifier = self
@@ -300,7 +298,33 @@ impl SharedCoBuilder {
 			runtime,
 			reducer,
 			context,
+			Box::new(flush),
 		)?)
+	}
+}
+
+struct SharedFlush {
+	membership_writer: MembershipWriter,
+	#[cfg(feature = "pinning")]
+	references_writer: crate::reducer::change::reference_writer::ReferenceWriteReducerChangedHandler<
+		crate::types::co_dispatch::DynamicCoDispatch<co_core_storage::StorageAction>,
+	>,
+}
+#[async_trait]
+impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
+	async fn flush(
+		&mut self,
+		storage: &CoStorage,
+		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+	) -> anyhow::Result<()> {
+		// membership
+		self.membership_writer.write(storage, reducer).await?;
+
+		// references
+		#[cfg(feature = "pinning")]
+		self.references_writer.write(storage, reducer).await?;
+
+		Ok(())
 	}
 }
 
@@ -571,14 +595,14 @@ impl SharedCoCreator {
 			self.parent.push(&identity, &self.storage_core_name, &pin_state).await?;
 
 			// pin initial state
-			write_storage_references(
+			crate::reducer::change::reference_writer::write_storage_references(
 				if let Some(encrypted_storage) = _encrypted_storage {
 					CoStorage::new(encrypted_storage)
 				} else {
 					storage.clone()
 				},
 				&mut self.parent.dispatcher(&self.storage_core_name, identity.clone()),
-				BlockLinks::default(),
+				co_primitives::BlockLinks::default(),
 				Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.co.id)),
 				None,
 				reducer_state.state().ok_or(anyhow::anyhow!("Expected state after create"))?,

@@ -178,9 +178,39 @@ pub struct ReferenceWriteReducerChangedHandler<D> {
 	/// The previous state. This is used as an optimizaztion to not have to walk the whole state.
 	reducer_previous_state: Option<Cid>,
 }
-impl<D> ReferenceWriteReducerChangedHandler<D> {
+impl<D> ReferenceWriteReducerChangedHandler<D>
+where
+	D: CoDispatch<StorageAction> + 'static,
+{
 	pub fn new(dispatch: D, pinning_key: Option<String>, reducer_previous_state: Option<Cid>) -> Self {
 		Self { dispatch, pinning_key, reducer_previous_state }
+	}
+}
+impl<D> ReferenceWriteReducerChangedHandler<D>
+where
+	D: CoDispatch<StorageAction> + 'static,
+{
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all)]
+	pub async fn write<S, R>(&mut self, storage: &S, reducer: &Reducer<S, R>) -> Result<(), anyhow::Error>
+	where
+		S: ExtendedBlockStorage + CloneWithBlockStorageSettings + BlockStorageContentMapping + Clone + 'static,
+		R: CoreResolver<S> + Send + Sync + 'static,
+	{
+		// only if state has changed
+		if &self.reducer_previous_state != reducer.state() {
+			if let Some(next_state) = *reducer.state() {
+				write_storage_references(
+					storage.clone_with_settings(BlockStorageSettings::new().without_networking()),
+					&mut self.dispatch,
+					BlockLinks::default(),
+					self.pinning_key.clone(),
+					self.reducer_previous_state,
+					next_state,
+				)
+				.await?;
+			}
+		}
+		Ok(())
 	}
 }
 #[async_trait]
@@ -197,20 +227,6 @@ where
 		reducer: &Reducer<S, R>,
 		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
-		// only if state has changed
-		if &self.reducer_previous_state != reducer.state() {
-			if let Some(next_state) = *reducer.state() {
-				write_storage_references(
-					storage.clone_with_settings(BlockStorageSettings::new().without_networking()),
-					&mut self.dispatch,
-					BlockLinks::default(),
-					self.pinning_key.clone(),
-					self.reducer_previous_state,
-					next_state,
-				)
-				.await?;
-			}
-		}
-		Ok(())
+		self.write(storage, reducer).await
 	}
 }

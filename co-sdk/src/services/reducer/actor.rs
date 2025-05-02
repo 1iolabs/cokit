@@ -1,4 +1,4 @@
-use super::message::ReducerMessage;
+use super::{flush::CoReducerFlush, message::ReducerMessage};
 use crate::{
 	library::to_internal_cid::to_internal_cids,
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
@@ -29,15 +29,15 @@ impl ReducerActor {
 impl Actor for ReducerActor {
 	type Message = ReducerMessage;
 	type State = ReducerState;
-	type Initialize = Reducer<CoStorage, DynamicCoreResolver<CoStorage>>;
+	type Initialize = (Reducer<CoStorage, DynamicCoreResolver<CoStorage>>, CoReducerFlush);
 
 	async fn initialize(
 		&self,
 		_handle: &ActorHandle<Self::Message>,
 		_tags: &Tags,
-		reducer: Self::Initialize,
+		(reducer, flush): Self::Initialize,
 	) -> Result<Self::State, ActorError> {
-		Ok(ReducerState { reducer })
+		Ok(ReducerState { reducer, flush, changed: false })
 	}
 
 	async fn handle(
@@ -68,6 +68,9 @@ impl Actor for ReducerActor {
 					handle_join_state(&self.runtime, &self.context.storage(false), state, storage, join_state).await,
 				);
 			},
+			ReducerMessage::Flush(storage, response) => {
+				response.respond(handle_flush(state, storage).await);
+			},
 			ReducerMessage::Clear(response) => {
 				response.respond(handle_clear(state));
 			},
@@ -78,6 +81,8 @@ impl Actor for ReducerActor {
 
 pub struct ReducerState {
 	reducer: Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+	flush: CoReducerFlush,
+	changed: bool,
 }
 
 fn handle_state(state: &ReducerState) -> CoReducerState {
@@ -104,6 +109,9 @@ async fn handle_push(
 		state.reducer.heads().clone(),
 	);
 
+	// changed
+	state.changed = true;
+
 	// result
 	Ok(reducer_state)
 }
@@ -119,7 +127,9 @@ async fn handle_join(
 	let internal_heads = to_internal_cids(internal_storage, heads).await;
 
 	// join
-	state.reducer.join(&storage, &internal_heads, runtime.runtime()).await?;
+	if state.reducer.join(&storage, &internal_heads, runtime.runtime()).await? {
+		state.changed = true;
+	}
 
 	// result
 	Ok(handle_state(state))
@@ -138,11 +148,21 @@ async fn handle_join_state(
 	// join
 	if let Some((state, heads)) = internal_state.some() {
 		reducer_state.reducer.insert_snapshot(state, heads.clone());
-		reducer_state.reducer.join(&storage, &heads, runtime.runtime()).await?;
+		if reducer_state.reducer.join(&storage, &heads, runtime.runtime()).await? {
+			reducer_state.changed = true;
+		}
 	}
 
 	// result
 	Ok(handle_state(reducer_state))
+}
+
+async fn handle_flush(reducer_state: &mut ReducerState, storage: CoStorage) -> Result<(), anyhow::Error> {
+	if reducer_state.changed {
+		reducer_state.flush.flush(&storage, &reducer_state.reducer).await?;
+		reducer_state.changed = false;
+	}
+	Ok(())
 }
 
 fn handle_clear(reducer_state: &mut ReducerState) -> CoReducerState {

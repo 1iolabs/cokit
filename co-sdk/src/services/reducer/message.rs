@@ -15,5 +15,8 @@ pub enum ReducerMessage {
 	JoinHeads(CoStorage, BTreeSet<Cid>, Response<Result<CoReducerState, anyhow::Error>>),
 	JoinState(CoStorage, CoReducerState, Response<Result<CoReducerState, anyhow::Error>>),
 
+	/// Flush staged changes to disk.
+	Flush(CoStorage, Response<Result<(), anyhow::Error>>),
+
 	Clear(Response<CoReducerState>),
 }
