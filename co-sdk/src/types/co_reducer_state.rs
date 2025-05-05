@@ -1,6 +1,13 @@
-use crate::library::{
-	to_external_cid::{to_external_cid_opt, to_external_cid_opt_force, to_external_cids, to_external_cids_opt_force},
-	to_internal_cid::{to_internal_cid_opt, to_internal_cid_opt_force, to_internal_cids, to_internal_cids_opt_force},
+use crate::{
+	library::{
+		to_external_cid::{
+			to_external_cid_opt, to_external_cid_opt_force, to_external_cids, to_external_cids_opt_force,
+		},
+		to_internal_cid::{
+			to_internal_cid_opt, to_internal_cid_opt_force, to_internal_cids, to_internal_cids_opt_force,
+		},
+	},
+	CoreResolver, Reducer,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -21,6 +28,14 @@ impl CoReducerState {
 
 	pub fn new_weak(state: Option<WeakCid>, heads: BTreeSet<WeakCid>) -> Self {
 		Self(state.map(Into::into), heads.into_iter().map(Into::into).collect())
+	}
+
+	pub fn new_reducer<S, R>(reducer: &Reducer<S, R>) -> Self
+	where
+		S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
+		R: CoreResolver<S> + Send + Sync + 'static,
+	{
+		CoReducerState::new(*reducer.state(), reducer.heads().clone())
 	}
 
 	pub async fn from_co_state<S: BlockStorage>(storage: &S, co_state: &CoState) -> Result<Self, StorageError> {

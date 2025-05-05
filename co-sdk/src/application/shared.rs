@@ -3,7 +3,7 @@ use crate::{
 	find_membership,
 	library::{
 		connections_peer_provider::ConnectionsPeerProvider, find_co_secret::find_co_secret_by_reference,
-		membership_all_heads::membership_all_heads, push_heads::PushHeads,
+		membership_all_heads::membership_all_heads,
 	},
 	reducer::{
 		change::membership_writer::MembershipWriter,
@@ -15,9 +15,10 @@ use crate::{
 		reducer::ReducerFlush,
 		reducers::ReducerStorage,
 	},
-	types::co_reducer_context::CoReducerContext,
-	CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters, CoUuid, Reducer,
-	ReducerBuilder, Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
+	ApplicationMessage, CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters,
+	CoUuid, Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -139,6 +140,7 @@ impl SharedCoBuilder {
 		identity: I,
 		core_resolver: DynamicCoreResolver<CoStorage>,
 		date: impl CoDate,
+		application_handle: ActorHandle<ApplicationMessage>,
 	) -> Result<CoReducer, anyhow::Error>
 	where
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
@@ -239,19 +241,6 @@ impl SharedCoBuilder {
 		}
 		let mut reducer = reducer_builder.build(&co_storage, runtime.runtime(), date).await?;
 
-		// push changes to all connectable peers
-		if let Some((network, connections)) = &self.network {
-			let publish = PushHeads::new(
-				network.clone(),
-				connections.clone(),
-				tasks.clone(),
-				self.membership.id.clone(),
-				PrivateIdentity::boxed(identity.clone()),
-				true,
-			)?;
-			reducer.add_change_handler(Box::new(publish));
-		}
-
 		// publish changes for every `NetworkCoHeads` setting
 		if let Some((network, _)) = self.network {
 			let publish = CoHeadsPublish::new(network, self.membership.id.clone(), true);
@@ -290,6 +279,7 @@ impl SharedCoBuilder {
 			.ok_or_else(|| anyhow!("Missing parent tag: application"))?
 			.to_owned();
 		Ok(CoReducer::spawn(
+			application_handle,
 			application_identifier,
 			self.membership.id,
 			Some(self.parent.id().clone()),
@@ -438,6 +428,15 @@ impl CoReducerContext for SharedContext {
 		// clear storage
 		if let Some(encrypted_storage) = &self.encrypted_storage {
 			encrypted_storage.clear_mapping(state.0.into_iter().chain(state.1)).await;
+		}
+	}
+
+	/// Test for reducer feature.
+	fn has_feature(&self, feature: &CoReducerFeature<'_>) -> bool {
+		match feature {
+			CoReducerFeature::Network => self.network_storage.is_some(),
+			CoReducerFeature::Encryption => self.encrypted_storage.is_some(),
+			_ => false,
 		}
 	}
 }

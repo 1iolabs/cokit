@@ -1,3 +1,4 @@
+use super::FlushInfo;
 use crate::{types::co_reducer_state::CoReducerState, CoStorage};
 use cid::Cid;
 use co_actor::{Response, ResponseStream};
@@ -16,7 +17,8 @@ pub enum ReducerMessage {
 	JoinState(CoStorage, CoReducerState, Response<Result<CoReducerState, anyhow::Error>>),
 
 	/// Flush staged changes to disk.
-	Flush(CoStorage, Response<Result<(), anyhow::Error>>),
+	Flush(CoStorage, Response<Result<Option<FlushInfo>, anyhow::Error>>),
 
+	/// Clear reducer caches.
 	Clear(Response<CoReducerState>),
 }

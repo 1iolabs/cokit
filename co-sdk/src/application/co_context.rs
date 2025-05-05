@@ -312,6 +312,7 @@ impl CoContextInner {
 				self.tasks.clone(),
 				self.create_local_core_resolver(CoId::new(CO_ID_LOCAL)),
 				self.date.clone(),
+				self.application(),
 			)
 			.await?;
 		Ok(local_co_reducer)
@@ -365,7 +366,15 @@ impl CoContextInner {
 			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_owned())
 			.with_network(network)
 			.with_initialize(initialize)
-			.build(self.tasks.clone(), storage, self.runtime.clone(), identity, core_resolver, self.date.clone())
+			.build(
+				self.tasks.clone(),
+				storage,
+				self.runtime.clone(),
+				identity,
+				core_resolver,
+				self.date.clone(),
+				self.application(),
+			)
 			.await?;
 
 		// result

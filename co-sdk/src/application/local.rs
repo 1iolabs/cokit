@@ -12,14 +12,15 @@ use crate::{
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	services::reducer::ReducerFlush,
-	types::co_reducer_context::CoReducerContext,
-	CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, DynamicCoDate, Reducer, ReducerBuilder,
-	ReducerChangeContext, Runtime, TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
+	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
+	ApplicationMessage, CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, DynamicCoDate, Reducer,
+	ReducerBuilder, ReducerChangeContext, Runtime, TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
 	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
+use co_actor::ActorHandle;
 #[cfg(feature = "pinning")]
 use co_core_storage::StorageAction;
 use co_identity::{Identity, LocalIdentity};
@@ -66,6 +67,7 @@ impl LocalCoBuilder {
 		tasks: TaskSpawner,
 		core_resolver: R,
 		date: DynamicCoDate,
+		application_handle: ActorHandle<ApplicationMessage>,
 	) -> Result<CoReducer, anyhow::Error>
 	where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
@@ -102,6 +104,7 @@ impl LocalCoBuilder {
 					core_resolver,
 					watcher,
 					date,
+					application_handle,
 				)
 				.await?
 				.1)
@@ -119,6 +122,7 @@ impl LocalCoBuilder {
 					core_resolver,
 					watcher,
 					date,
+					application_handle,
 				)
 				.await?
 				.1)
@@ -156,6 +160,7 @@ where
 		core_resolver: R,
 		watcher: bool,
 		date: DynamicCoDate,
+		application_handle: ActorHandle<ApplicationMessage>,
 	) -> Result<(Self, CoReducer), anyhow::Error>
 	where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
@@ -208,6 +213,7 @@ where
 
 		// reducer
 		let co_reducer = CoReducer::spawn(
+			application_handle,
 			local_co.settings.identifier.clone(),
 			CO_ID_LOCAL.into(),
 			None,
@@ -401,6 +407,14 @@ where
 		// clear storage
 		if let Some(encrypted_storage) = &self.encrypted_storage {
 			encrypted_storage.clear_mapping(state.0.into_iter().chain(state.1)).await;
+		}
+	}
+
+	/// Test for reducer feature.
+	fn has_feature(&self, feature: &CoReducerFeature<'_>) -> bool {
+		match feature {
+			CoReducerFeature::Encryption => true,
+			_ => false,
 		}
 	}
 }

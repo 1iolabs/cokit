@@ -1,14 +1,17 @@
-use super::{flush::CoReducerFlush, message::ReducerMessage};
+use super::{flush::CoReducerFlush, message::ReducerMessage, FlushInfo};
 use crate::{
 	library::to_internal_cid::to_internal_cids,
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
-	types::{co_reducer_context::CoReducerContextRef, co_reducer_state::CoReducerState},
+	types::{
+		co_reducer_context::{CoReducerContextRef, CoReducerFeature},
+		co_reducer_state::CoReducerState,
+	},
 	CoStorage, Reducer, Runtime,
 };
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, TaskSpawner};
-use co_identity::PrivateIdentityBox;
+use co_identity::{Identity, PrivateIdentityBox};
 use co_primitives::{Link, ReducerAction, Tags};
 use futures::{Stream, StreamExt};
 use ipld_core::ipld::Ipld;
@@ -37,7 +40,12 @@ impl Actor for ReducerActor {
 		_tags: &Tags,
 		(reducer, flush): Self::Initialize,
 	) -> Result<Self::State, ActorError> {
-		Ok(ReducerState { reducer, flush, changed: false })
+		Ok(ReducerState {
+			reducer,
+			flush,
+			flush_info: None,
+			network_feature: self.context.has_feature(&CoReducerFeature::Network),
+		})
 	}
 
 	async fn handle(
@@ -82,7 +90,24 @@ impl Actor for ReducerActor {
 pub struct ReducerState {
 	reducer: Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 	flush: CoReducerFlush,
-	changed: bool,
+	flush_info: Option<FlushInfo>,
+	network_feature: bool,
+}
+
+fn changed(reducer_state: &mut ReducerState, local: bool, identity: Option<&str>) {
+	if reducer_state.flush_info.is_none() {
+		let mut flush_info = FlushInfo::default();
+		flush_info.network = reducer_state.network_feature;
+		reducer_state.flush_info = Some(FlushInfo::default());
+	}
+	if local {
+		if let Some(flush_info) = &mut reducer_state.flush_info {
+			flush_info.local = true;
+			if let Some(identity) = identity {
+				flush_info.local_identity = Some(identity.to_owned());
+			}
+		}
+	}
 }
 
 fn handle_state(state: &ReducerState) -> CoReducerState {
@@ -110,7 +135,7 @@ async fn handle_push(
 	);
 
 	// changed
-	state.changed = true;
+	changed(state, true, Some(identity.identity()));
 
 	// result
 	Ok(reducer_state)
@@ -128,7 +153,7 @@ async fn handle_join(
 
 	// join
 	if state.reducer.join(&storage, &internal_heads, runtime.runtime()).await? {
-		state.changed = true;
+		changed(state, false, None);
 	}
 
 	// result
@@ -149,7 +174,7 @@ async fn handle_join_state(
 	if let Some((state, heads)) = internal_state.some() {
 		reducer_state.reducer.insert_snapshot(state, heads.clone());
 		if reducer_state.reducer.join(&storage, &heads, runtime.runtime()).await? {
-			reducer_state.changed = true;
+			changed(reducer_state, false, None);
 		}
 	}
 
@@ -157,12 +182,16 @@ async fn handle_join_state(
 	Ok(handle_state(reducer_state))
 }
 
-async fn handle_flush(reducer_state: &mut ReducerState, storage: CoStorage) -> Result<(), anyhow::Error> {
-	if reducer_state.changed {
+async fn handle_flush(
+	reducer_state: &mut ReducerState,
+	storage: CoStorage,
+) -> Result<Option<FlushInfo>, anyhow::Error> {
+	if let Some(flush_info) = reducer_state.flush_info.take() {
 		reducer_state.flush.flush(&storage, &reducer_state.reducer).await?;
-		reducer_state.changed = false;
+		Ok(Some(flush_info))
+	} else {
+		Ok(None)
 	}
-	Ok(())
 }
 
 fn handle_clear(reducer_state: &mut ReducerState) -> CoReducerState {

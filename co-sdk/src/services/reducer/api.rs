@@ -3,7 +3,7 @@ use crate::{
 	library::create_reducer_action::{create_reducer_action, store_reducer_action},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{co_dispatch::CoDispatch, co_reducer_context::CoReducerContextRef, co_reducer_state::CoReducerState},
-	CoStorage, DynamicCoDate, Reducer, Runtime, Storage,
+	Action, ApplicationMessage, CoStorage, DynamicCoDate, Reducer, Runtime, Storage,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -22,6 +22,7 @@ pub struct CoReducer {
 	id: CoId,
 	parent: Option<CoId>,
 	handle: ActorHandle<ReducerMessage>,
+	application_handle: ActorHandle<ApplicationMessage>,
 	storage: CoStorage,
 	overlay_storage: Option<OverlayBlockStorage<CoStorage>>,
 	pub(crate) context: CoReducerContextRef,
@@ -29,6 +30,7 @@ pub struct CoReducer {
 }
 impl CoReducer {
 	pub(crate) fn spawn(
+		application_handle: ActorHandle<ApplicationMessage>,
 		application_identifier: String,
 		id: CoId,
 		parent: Option<CoId>,
@@ -46,7 +48,16 @@ impl CoReducer {
 			ReducerActor::new(tasks, runtime, context.clone()),
 			(reducer, flush),
 		)?;
-		Ok(Self { id, parent, storage, handle: actor.handle(), context, date, overlay_storage: None })
+		Ok(Self {
+			id,
+			parent,
+			storage,
+			handle: actor.handle(),
+			context,
+			date,
+			overlay_storage: None,
+			application_handle,
+		})
 	}
 
 	pub(crate) fn clone_with_detached_storage(&self) -> Self {
@@ -72,6 +83,7 @@ impl CoReducer {
 			id: self.id.clone(),
 			parent: self.parent.clone(),
 			handle: self.handle.clone(),
+			application_handle: self.application_handle.clone(),
 			context: self.context.clone(),
 			date: self.date.clone(),
 			storage,
@@ -324,10 +336,20 @@ impl CoReducer {
 
 	/// Flush staged changes.
 	async fn flush(&self) -> Result<(), anyhow::Error> {
-		Ok(self
+		// flush
+		let info = self
 			.handle
 			.request(|r| ReducerMessage::Flush(self.base_storage().clone(), r))
-			.await??)
+			.await??;
+
+		// notify
+		if let Some(info) = info {
+			self.application_handle
+				.dispatch(Action::CoFlush { co: self.id.clone(), info })?;
+		}
+
+		// result
+		Ok(())
 	}
 }
 
