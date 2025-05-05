@@ -10,10 +10,7 @@ use crate::{
 		core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
 	},
 	services::{
-		connections::ConnectionMessage,
-		network::{CoHeadsPublish, CoNetworkTaskSpawner},
-		reducer::ReducerFlush,
-		reducers::ReducerStorage,
+		connections::ConnectionMessage, network::CoNetworkTaskSpawner, reducer::ReducerFlush, reducers::ReducerStorage,
 	},
 	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
 	ApplicationMessage, CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters,
@@ -239,13 +236,7 @@ impl SharedCoBuilder {
 			// 	reducer_builder = reducer_builder.with_snapshot(state, heads);
 			// }
 		}
-		let mut reducer = reducer_builder.build(&co_storage, runtime.runtime(), date).await?;
-
-		// publish changes for every `NetworkCoHeads` setting
-		if let Some((network, _)) = self.network {
-			let publish = CoHeadsPublish::new(network, self.membership.id.clone(), true);
-			reducer.add_change_handler(Box::new(publish));
-		}
+		let reducer = reducer_builder.build(&co_storage, runtime.runtime(), date).await?;
 
 		// setup auto write to parent co
 		let membership_writer = MembershipWriter::new(

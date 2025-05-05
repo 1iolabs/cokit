@@ -103,6 +103,21 @@ pub enum Action {
 		/// Flush details.
 		info: FlushInfo,
 	},
+
+	/// Co has been opened.
+	CoOpen {
+		/// The opened CO.
+		co: CoId,
+
+		/// Whether the co has a network feature.
+		network: bool,
+	},
+
+	/// Co has been closed.
+	CoClose {
+		/// The opened CO.
+		co: CoId,
+	},
 }
 impl Action {
 	pub async fn core_action<S>(
