@@ -12,7 +12,10 @@ use crate::{
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	services::reducer::ReducerFlush,
-	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
+	types::{
+		co_dispatch::CoDispatch,
+		co_reducer_context::{CoReducerContext, CoReducerFeature},
+	},
 	ApplicationMessage, CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, DynamicCoDate, Reducer,
 	ReducerBuilder, ReducerChangeContext, Runtime, TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
 	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
@@ -23,14 +26,15 @@ use cid::Cid;
 use co_actor::ActorHandle;
 #[cfg(feature = "pinning")]
 use co_core_storage::StorageAction;
-use co_identity::{Identity, LocalIdentity};
+use co_identity::{Identity, LocalIdentity, PrivateIdentity, PrivateIdentityBox};
 use co_log::Log;
-use co_primitives::{tags, Did};
+use co_primitives::{tags, CloneWithBlockStorageSettings, Did};
 use co_runtime::RuntimePool;
 use co_storage::{
 	BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, ExtendedBlockStorage,
 };
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+use serde::Serialize;
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 use tokio_util::sync::CancellationToken;
 
@@ -137,6 +141,8 @@ struct LocalCoInstance<L> {
 	storage: CoStorage,
 	encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
 	locals: L,
+	#[cfg(feature = "pinning")]
+	reference_writer: Option<(ReducerDispatchContext, crate::reducer::change::reference_writer::ReferenceWriter)>,
 }
 impl<L> LocalCoInstance<L>
 where
@@ -174,17 +180,19 @@ where
 			None => (storage.clone(), storage, None),
 		};
 
-		// create log
-		let log = Log::new(CO_ID_LOCAL.as_bytes().to_vec(), create_identity_resolver(), Default::default());
-
 		// result
 		let result = Self {
 			locals: locals.clone(),
 			storage: base_storage,
 			encrypted_storage: encrypted_storage.clone(),
 			identifier: local_co.settings.identifier.clone(),
+			#[cfg(feature = "pinning")]
+			reference_writer: None,
 		};
 		let context = Arc::new(result.clone());
+
+		// create log
+		let log = Log::new(CO_ID_LOCAL.as_bytes().to_vec(), create_identity_resolver(), Default::default());
 
 		// create builder
 		let mut builder =
@@ -211,6 +219,25 @@ where
 			setup_local_co(&storage, runtime.runtime(), &local_co.identity, &mut reducer, &local_co.settings).await?;
 		}
 
+		// flush
+		let flush = result.clone();
+		#[cfg(feature = "pinning")]
+		let flush = {
+			let mut flush = flush;
+			flush.reference_writer = Some((
+				ReducerDispatchContext {
+					core: CO_CORE_NAME_STORAGE.to_owned(),
+					identity: local_co.identity.clone().boxed(),
+					runtime: runtime.clone(),
+				},
+				crate::reducer::change::reference_writer::ReferenceWriter::new(
+					Some(CO_ID_LOCAL.into()),
+					CoReducerState::new_reducer(&reducer),
+				),
+			));
+			flush
+		};
+
 		// reducer
 		let co_reducer = CoReducer::spawn(
 			application_handle,
@@ -222,7 +249,7 @@ where
 			runtime,
 			reducer,
 			context,
-			Box::new(result.clone()),
+			Box::new(flush),
 		)?;
 
 		// watch
@@ -422,13 +449,59 @@ where
 impl<L, S, R> ReducerFlush<S, R> for LocalCoInstance<L>
 where
 	L: Locals + Clone + Debug + Send + Sync + 'static,
-	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
+	S: ExtendedBlockStorage
+		+ BlockStorageContentMapping
+		+ CloneWithBlockStorageSettings
+		+ Clone
+		+ Sync
+		+ Send
+		+ 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
-	async fn flush(&mut self, storage: &S, reducer: &Reducer<S, R>) -> anyhow::Result<()> {
-		let reducer_state = CoReducerState::new(*reducer.state(), reducer.heads().to_owned());
+	async fn flush(&mut self, storage: &S, reducer: &mut Reducer<S, R>) -> anyhow::Result<()> {
+		let mut reducer_state = CoReducerState::new_reducer(reducer);
+
+		// write references
+		#[cfg(feature = "pinning")]
+		if let Some((context, reference_writer)) = &mut self.reference_writer {
+			// apply
+			let mut dispatch = ReducerDispatch { context, reducer, storage };
+			reference_writer.write(&mut dispatch, storage, reducer_state.clone()).await?;
+
+			// write including the pinning changes
+			reducer_state = CoReducerState::new_reducer(reducer);
+		}
+
+		// write local
 		self.write(storage, reducer_state, None).await?;
+
 		Ok(())
+	}
+}
+
+#[derive(Debug, Clone)]
+struct ReducerDispatchContext {
+	identity: PrivateIdentityBox,
+	runtime: Runtime,
+	core: String,
+}
+struct ReducerDispatch<'a, 'b, 'c, S, R> {
+	context: &'a ReducerDispatchContext,
+	storage: &'b S,
+	reducer: &'c mut Reducer<S, R>,
+}
+#[async_trait]
+impl<'a, 'b, 'c, A, S, R> CoDispatch<A> for ReducerDispatch<'a, 'b, 'c, S, R>
+where
+	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
+	R: CoreResolver<S> + Send + Sync + 'static,
+	A: Serialize + Send + Sync,
+{
+	async fn dispatch(&mut self, action: &A) -> Result<Option<Cid>, anyhow::Error> {
+		Ok(self
+			.reducer
+			.push(&self.storage, self.context.runtime.runtime(), &self.context.identity, &self.context.core, action)
+			.await?)
 	}
 }
 

@@ -62,6 +62,7 @@ where
 				self.pinning_key.clone(),
 				previous_reference_state,
 				next_reference_state,
+				None,
 			)
 			.await?;
 

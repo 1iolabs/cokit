@@ -2,14 +2,15 @@ use crate::{
 	library::{max_reference_count::max_reference_count, to_external_cid::to_external_cid},
 	state::{query_core, Query},
 	types::co_dispatch::CoDispatch,
-	CoreResolver, Reducer, ReducerChangeContext, ReducerChangedHandler, CO_CORE_NAME_STORAGE,
+	CoPinningKey, CoReducerState, CO_CORE_NAME_STORAGE,
 };
 use async_trait::async_trait;
 use cid::Cid;
 use co_core_storage::StorageAction;
+use co_log::EntryBlock;
 use co_primitives::{
 	block_diff_added_with_parent, BlockDiffFollow, BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings,
-	CoReference, KnownMultiCodec, MultiCodec, OptionLink, StoreParams, WeakCid,
+	CoId, CoReference, KnownMultiCodec, MultiCodec, OptionLink, StoreParams, WeakCid,
 };
 use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage, StorageError};
 use futures::{pin_mut, TryStreamExt};
@@ -32,9 +33,10 @@ pub async fn write_storage_references<S, D>(
 	pinning_key: Option<String>,
 	previous_state: Option<Cid>,
 	next_state: Cid,
+	ignore: Option<BTreeSet<Cid>>,
 ) -> Result<Option<Cid>, anyhow::Error>
 where
-	D: CoDispatch<StorageAction> + 'static,
+	D: CoDispatch<StorageAction>,
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 {
 	let mut dispatch_state = Some(next_state);
@@ -49,7 +51,7 @@ where
 		next_state,
 		block_links,
 		Default::default(),
-		CoReferenceFollow { storage: storage.clone() },
+		CoReferenceFollow { storage: storage.clone(), ignore: ignore.unwrap_or_default() },
 	);
 
 	// apply root reference
@@ -152,6 +154,7 @@ where
 /// Follow all except weak references.
 struct CoReferenceFollow<S> {
 	storage: S,
+	ignore: BTreeSet<Cid>,
 }
 #[async_trait]
 impl<S> BlockDiffFollow for CoReferenceFollow<S>
@@ -159,7 +162,9 @@ where
 	S: BlockStorage + 'static,
 {
 	async fn follow(&mut self, cid: &Cid) -> Result<bool, StorageError> {
-		if MultiCodec::is(cid, KnownMultiCodec::CoReference) {
+		if self.ignore.contains(cid) {
+			Ok(false)
+		} else if MultiCodec::is(cid, KnownMultiCodec::CoReference) {
 			let reference: CoReference<IgnoredAny> = self.storage.get_deserialized(cid).await?;
 			match reference {
 				CoReference::Weak(_) => Ok(false),
@@ -171,62 +176,92 @@ where
 	}
 }
 
-pub struct ReferenceWriteReducerChangedHandler<D> {
-	dispatch: D,
-	pinning_key: Option<String>,
+#[derive(Debug, Clone)]
+pub struct ReferenceWriter {
+	/// The CoId to apply a pin to.
+	pin: Option<CoId>,
 
 	/// The previous state. This is used as an optimizaztion to not have to walk the whole state.
-	reducer_previous_state: Option<Cid>,
+	previous_reducer_state: CoReducerState,
 }
-impl<D> ReferenceWriteReducerChangedHandler<D>
-where
-	D: CoDispatch<StorageAction> + 'static,
-{
-	pub fn new(dispatch: D, pinning_key: Option<String>, reducer_previous_state: Option<Cid>) -> Self {
-		Self { dispatch, pinning_key, reducer_previous_state }
+impl ReferenceWriter {
+	pub fn new(pin: Option<CoId>, previous_reducer_state: CoReducerState) -> Self {
+		Self { pin, previous_reducer_state }
 	}
-}
-impl<D> ReferenceWriteReducerChangedHandler<D>
-where
-	D: CoDispatch<StorageAction> + 'static,
-{
+
+	pub fn set_previous_reducer_state(&mut self, previous_reducer_state: CoReducerState) {
+		self.previous_reducer_state = previous_reducer_state;
+	}
+
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all)]
-	pub async fn write<S, R>(&mut self, storage: &S, reducer: &Reducer<S, R>) -> Result<(), anyhow::Error>
+	pub async fn write<S>(
+		&mut self,
+		dispatch: &mut impl CoDispatch<StorageAction>,
+		storage: &S,
+		next_reducer_state: CoReducerState,
+	) -> Result<(), anyhow::Error>
 	where
 		S: ExtendedBlockStorage + CloneWithBlockStorageSettings + BlockStorageContentMapping + Clone + 'static,
-		R: CoreResolver<S> + Send + Sync + 'static,
 	{
-		// only if state has changed
-		if &self.reducer_previous_state != reducer.state() {
-			if let Some(next_state) = *reducer.state() {
+		let local_storage = storage.clone_with_settings(BlockStorageSettings::new().without_networking());
+
+		// heads
+		if self.previous_reducer_state.heads() != next_reducer_state.heads() {
+			let next_heads = next_reducer_state.heads();
+			let ignore = extract_next(storage, &next_heads).await?;
+
+			// apply
+			for next_head in next_heads {
 				write_storage_references(
-					storage.clone_with_settings(BlockStorageSettings::new().without_networking()),
-					&mut self.dispatch,
+					local_storage.clone(),
+					dispatch,
 					BlockLinks::default(),
-					self.pinning_key.clone(),
-					self.reducer_previous_state,
-					next_state,
+					self.pin.as_ref().map(|id| CoPinningKey::Log.to_string(id)),
+					None,
+					next_head,
+					Some(ignore.clone()),
 				)
 				.await?;
 			}
 		}
+
+		// state
+		//  only if state has changed
+		if self.previous_reducer_state.state() != next_reducer_state.state() {
+			if let Some(next_state) = next_reducer_state.state() {
+				// apply
+				write_storage_references(
+					local_storage.clone(),
+					dispatch,
+					BlockLinks::default(),
+					self.pin.as_ref().map(|id| CoPinningKey::State.to_string(id)),
+					self.previous_reducer_state.state(),
+					next_state,
+					None,
+				)
+				.await?;
+			}
+		}
+
+		// remember
+		//  note: we want the state/heads without the latest pinning changes
+		//   because they need to be pinned on next iteration
+		self.previous_reducer_state = next_reducer_state;
+
 		Ok(())
 	}
 }
-#[async_trait]
-impl<D, S, R> ReducerChangedHandler<S, R> for ReferenceWriteReducerChangedHandler<D>
+
+/// Extract all `next` heads from given heads.
+async fn extract_next<S>(storage: &S, heads: &BTreeSet<Cid>) -> Result<BTreeSet<Cid>, anyhow::Error>
 where
-	D: CoDispatch<StorageAction> + 'static,
-	S: ExtendedBlockStorage + CloneWithBlockStorageSettings + BlockStorageContentMapping + Clone + 'static,
-	R: CoreResolver<S> + Send + Sync + 'static,
+	S: BlockStorage,
 {
-	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all)]
-	async fn on_state_changed(
-		&mut self,
-		storage: &S,
-		reducer: &Reducer<S, R>,
-		_context: ReducerChangeContext,
-	) -> Result<(), anyhow::Error> {
-		self.write(storage, reducer).await
+	let mut next = BTreeSet::new();
+	for head in heads {
+		let head_block = storage.get(head).await?;
+		let entry = EntryBlock::from_block(head_block)?;
+		next.extend(entry.entry().next.iter().cloned());
 	}
+	Ok(next)
 }

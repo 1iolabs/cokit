@@ -34,14 +34,9 @@ impl MembershipWriter {
 		Self { id, parent, membership_core_name, identity, encrypted_storage, last_state }
 	}
 
-	pub async fn write(
-		&mut self,
-		storage: &CoStorage,
-		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
-	) -> Result<(), anyhow::Error> {
+	pub async fn write(&mut self, storage: &CoStorage, reducer_state: CoReducerState) -> Result<(), anyhow::Error> {
 		// action
 		let parent_storage = self.parent.storage();
-		let reducer_state = CoReducerState::new(*reducer.state(), reducer.heads().clone());
 		if let Some((state, mappings)) = reducer_state.to_co_state(&parent_storage, storage).await? {
 			// log
 			tracing::trace!(?reducer_state, co = ?self.id, "membership-write");
@@ -92,6 +87,6 @@ impl ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for Member
 		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 		_context: ReducerChangeContext,
 	) -> Result<(), anyhow::Error> {
-		self.write(storage, reducer).await
+		self.write(storage, CoReducerState::new_reducer(reducer)).await
 	}
 }

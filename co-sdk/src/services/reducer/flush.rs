@@ -9,7 +9,7 @@ where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
-	async fn flush(&mut self, storage: &S, reducer: &Reducer<S, R>) -> anyhow::Result<()>;
+	async fn flush(&mut self, storage: &S, reducer: &mut Reducer<S, R>) -> anyhow::Result<()>;
 }
 
 pub type CoReducerFlush = Box<dyn ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> + Send + Sync + 'static>;

@@ -187,7 +187,7 @@ async fn handle_flush(
 	storage: CoStorage,
 ) -> Result<Option<FlushInfo>, anyhow::Error> {
 	if let Some(flush_info) = reducer_state.flush_info.take() {
-		reducer_state.flush.flush(&storage, &reducer_state.reducer).await?;
+		reducer_state.flush.flush(&storage, &mut reducer_state.reducer).await?;
 		Ok(Some(flush_info))
 	} else {
 		Ok(None)

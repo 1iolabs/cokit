@@ -250,12 +250,14 @@ impl SharedCoBuilder {
 
 		// setup auto write references to parent co
 		#[cfg(feature = "pinning")]
-		let references_writer = crate::reducer::change::reference_writer::ReferenceWriteReducerChangedHandler::new(
+		let references_writer = (
 			crate::types::co_dispatch::DynamicCoDispatch::new(
 				self.parent.dispatcher(&self.storage_core_name, identity.clone()),
 			),
-			Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.membership.id)),
-			*reducer.state(),
+			crate::reducer::change::reference_writer::ReferenceWriter::new(
+				Some(self.membership.id.clone()),
+				CoReducerState::new_reducer(&reducer),
+			),
 		);
 
 		// build flush
@@ -287,23 +289,29 @@ impl SharedCoBuilder {
 struct SharedFlush {
 	membership_writer: MembershipWriter,
 	#[cfg(feature = "pinning")]
-	references_writer: crate::reducer::change::reference_writer::ReferenceWriteReducerChangedHandler<
+	references_writer: (
 		crate::types::co_dispatch::DynamicCoDispatch<co_core_storage::StorageAction>,
-	>,
+		crate::reducer::change::reference_writer::ReferenceWriter,
+	),
 }
 #[async_trait]
 impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 	async fn flush(
 		&mut self,
 		storage: &CoStorage,
-		reducer: &Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+		reducer: &mut Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 	) -> anyhow::Result<()> {
+		let reducer_state = CoReducerState::new_reducer(reducer);
+
 		// membership
-		self.membership_writer.write(storage, reducer).await?;
+		self.membership_writer.write(storage, reducer_state.clone()).await?;
 
 		// references
 		#[cfg(feature = "pinning")]
-		self.references_writer.write(storage, reducer).await?;
+		self.references_writer
+			.1
+			.write(&mut self.references_writer.0, storage, reducer_state.clone())
+			.await?;
 
 		Ok(())
 	}
@@ -596,6 +604,7 @@ impl SharedCoCreator {
 				Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.co.id)),
 				None,
 				reducer_state.state().ok_or(anyhow::anyhow!("Expected state after create"))?,
+				None,
 			)
 			.await?;
 		}

@@ -1,7 +1,3 @@
-#[cfg(feature = "pinning")]
-use crate::reducer::core_resolver::reference::ReferenceCoreResolver;
-#[cfg(feature = "pinning")]
-use crate::types::co_pinning_key::CoPinningKey;
 use crate::{
 	application::{
 		application::ApplicationSettings,
@@ -323,7 +319,6 @@ impl CoContextInner {
 		let core_resolver = CoCoreResolver::default();
 		let core_resolver = OverlayCoreResolver::new(core_resolver, self.tasks.clone(), self.storage.clone());
 		#[cfg(feature = "pinning")]
-		let core_resolver = ReferenceCoreResolver::new(core_resolver, Some(CoPinningKey::State.to_string(&id)));
 		let core_resolver = ReactiveCoreResolver::new(core_resolver, id, self.reactive_context.clone());
 		let core_resolver = LogCoreResolver::new(core_resolver);
 		let core_resolver = DynamicCoreResolver::new(core_resolver);
