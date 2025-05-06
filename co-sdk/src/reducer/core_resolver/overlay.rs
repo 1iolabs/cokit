@@ -139,9 +139,9 @@ where
 				// log
 				#[cfg(feature = "logging-verbose")]
 				if co_primitives::MultiCodec::is_cbor(_cid) {
-					tracing::warn!(cid = ?_cid, ?action, ipld = ?co_primitives::from_cbor::<ipld_core::ipld::Ipld>(&_data), "overlay-unreferenced-block");
+					tracing::warn!(cid = ?_cid, ipld = ?co_primitives::from_cbor::<ipld_core::ipld::Ipld>(&_data), "overlay-unreferenced-block");
 				} else {
-					tracing::warn!(cid = ?_cid, ?action, "overlay-unreferenced-block");
+					tracing::warn!(cid = ?_cid, "overlay-unreferenced-block");
 				}
 			},
 			OverlayChange::Remove(cid) => {

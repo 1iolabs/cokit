@@ -189,6 +189,14 @@ impl ReferenceWriter {
 		Self { pin, previous_reducer_state }
 	}
 
+	pub fn pinning_key(&self, key: CoPinningKey) -> Option<String> {
+		self.pin.as_ref().map(|id| key.to_string(id))
+	}
+
+	pub fn previous_reducer_state(&self) -> &CoReducerState {
+		&self.previous_reducer_state
+	}
+
 	pub fn set_previous_reducer_state(&mut self, previous_reducer_state: CoReducerState) {
 		self.previous_reducer_state = previous_reducer_state;
 	}
@@ -199,11 +207,12 @@ impl ReferenceWriter {
 		dispatch: &mut impl CoDispatch<StorageAction>,
 		storage: &S,
 		next_reducer_state: CoReducerState,
-	) -> Result<(), anyhow::Error>
+	) -> Result<Option<Cid>, anyhow::Error>
 	where
 		S: ExtendedBlockStorage + CloneWithBlockStorageSettings + BlockStorageContentMapping + Clone + 'static,
 	{
 		let local_storage = storage.clone_with_settings(BlockStorageSettings::new().without_networking());
+		let mut result_state = next_reducer_state.state();
 
 		// heads
 		if self.previous_reducer_state.heads() != next_reducer_state.heads() {
@@ -216,7 +225,7 @@ impl ReferenceWriter {
 					local_storage.clone(),
 					dispatch,
 					BlockLinks::default(),
-					self.pin.as_ref().map(|id| CoPinningKey::Log.to_string(id)),
+					self.pinning_key(CoPinningKey::Log),
 					None,
 					next_head,
 					Some(ignore.clone()),
@@ -230,11 +239,11 @@ impl ReferenceWriter {
 		if self.previous_reducer_state.state() != next_reducer_state.state() {
 			if let Some(next_state) = next_reducer_state.state() {
 				// apply
-				write_storage_references(
+				result_state = write_storage_references(
 					local_storage.clone(),
 					dispatch,
 					BlockLinks::default(),
-					self.pin.as_ref().map(|id| CoPinningKey::State.to_string(id)),
+					self.pinning_key(CoPinningKey::State),
 					self.previous_reducer_state.state(),
 					next_state,
 					None,
@@ -248,7 +257,7 @@ impl ReferenceWriter {
 		//   because they need to be pinned on next iteration
 		self.previous_reducer_state = next_reducer_state;
 
-		Ok(())
+		Ok(result_state)
 	}
 }
 
