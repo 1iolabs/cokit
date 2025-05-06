@@ -2,6 +2,8 @@ mod library;
 mod macros;
 mod types;
 
+#[cfg(any(test, feature = "benchmarking"))]
+pub use library::test::TestStorage;
 pub use library::{
 	block_diff::{block_diff, block_diff_added_with_parent, BlockDiff, BlockDiffFollow},
 	block_links::BlockLinks,

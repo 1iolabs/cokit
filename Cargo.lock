@@ -1802,6 +1802,7 @@ dependencies = [
  "bloomfilter",
  "cid 0.11.1",
  "co-macros",
+ "criterion",
  "derive_more",
  "either",
  "futures",
