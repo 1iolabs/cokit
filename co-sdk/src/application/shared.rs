@@ -7,7 +7,7 @@ use crate::{
 	},
 	reducer::{
 		change::membership_writer::MembershipWriter,
-		core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
+		core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver, overlay::flush_overlay_changes},
 	},
 	services::{
 		connections::ConnectionMessage, network::CoNetworkTaskSpawner, reducer::ReducerFlush, reducers::ReducerStorage,
@@ -19,6 +19,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
+use cid::Cid;
 use co_actor::ActorHandle;
 use co_core_co::{CoAction, Participant};
 use co_core_keystore::{Key, KeyStoreAction};
@@ -27,7 +28,7 @@ use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
 use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId};
-use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, Secret};
+use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, OverlayBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -312,6 +313,27 @@ impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 			.1
 			.write(&mut self.references_writer.0, storage, reducer_state.clone())
 			.await?;
+
+		Ok(())
+	}
+
+	async fn flush_overlay(
+		&mut self,
+		overlay_storage: &OverlayBlockStorage<CoStorage>,
+		roots: BTreeSet<Cid>,
+		storage: &CoStorage,
+		_reducer: &mut Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+	) -> anyhow::Result<()> {
+		// roots
+		for root in roots {
+			overlay_storage.flush(root, Some(Default::default())).await?;
+		}
+
+		// remove
+		#[cfg(feature = "pinning")]
+		flush_overlay_changes(overlay_storage, storage, &mut self.references_writer.0).await?;
+		#[cfg(not(feature = "pinning"))]
+		flush_overlay_changes(overlay_storage, storage).await?;
 
 		Ok(())
 	}

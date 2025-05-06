@@ -4,6 +4,7 @@ use cid::Cid;
 use co_actor::{Response, ResponseStream};
 use co_identity::PrivateIdentityBox;
 use co_primitives::{Link, ReducerAction};
+use co_storage::OverlayBlockStorage;
 use ipld_core::ipld::Ipld;
 use std::collections::BTreeSet;
 
@@ -17,7 +18,7 @@ pub enum ReducerMessage {
 	JoinState(CoStorage, CoReducerState, Response<Result<CoReducerState, anyhow::Error>>),
 
 	/// Flush staged changes to disk.
-	Flush(CoStorage, Response<Result<Option<FlushInfo>, anyhow::Error>>),
+	Flush(Option<OverlayBlockStorage<CoStorage>>, CoStorage, Response<Result<Option<FlushInfo>, anyhow::Error>>),
 
 	/// Clear reducer caches.
 	Clear(Response<CoReducerState>),

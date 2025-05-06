@@ -5,17 +5,17 @@ use crate::library::max_reference_count::max_reference_count;
 use crate::types::co_dispatch::CoDispatch;
 #[cfg(feature = "pinning")]
 use crate::{library::core_resolver_dispatch::CoreResolverDispatch, CO_CORE_NAME_STORAGE};
-use crate::{CoStorage, ReducerChangeContext, Storage};
+use crate::{library::to_external_cid::to_external_cid, CoStorage, ReducerChangeContext, Storage};
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::TaskSpawner;
 #[cfg(feature = "pinning")]
 use co_core_storage::StorageAction;
-use co_primitives::{BlockLinks, BlockStorage};
+use co_primitives::BlockLinks;
 #[cfg(feature = "pinning")]
 use co_primitives::{StoreParams, WeakCid};
 use co_runtime::{RuntimeContext, RuntimePool};
-use co_storage::{ExtendedBlockStorage, OverlayBlockStorage, OverlayChange};
+use co_storage::{BlockStorageContentMapping, ExtendedBlockStorage, OverlayBlockStorage, OverlayChange};
 use futures::{pin_mut, TryStreamExt};
 #[cfg(feature = "pinning")]
 use std::collections::BTreeSet;
@@ -67,7 +67,6 @@ where
 			next.resolve_diagnostics(&overlay_storage).await?;
 
 			// flush removed blocks from `overlay_storage` to `storage`.
-			#[cfg(feature = "pinning")]
 			let mut dispatch = CoreResolverDispatch::new(
 				self.next.clone(),
 				runtime.clone(),
@@ -76,50 +75,8 @@ where
 				CO_CORE_NAME_STORAGE.to_owned(),
 				next.state,
 			);
-			#[cfg(feature = "pinning")]
-			let max_references = max_reference_count(<<CoStorage as BlockStorage>::StoreParams as StoreParams>::MAX_BLOCK_SIZE);
-			#[cfg(feature = "pinning")]
-			let mut remove = BTreeSet::<WeakCid>::new();
-			let changes = overlay_storage.changes();
-			pin_mut!(changes);
-			while let Some(change) = changes.try_next().await? {
-				match change {
-					OverlayChange::Set(_cid, _data, _) => {
-						// ignore as we only want referenced blocks
-						//  this is not "bad" it just indicates that some block got stored which are not used
-						//  this also could be intermediate computation inside a core that has later been overwritten
-
-						// log
-						#[cfg(feature = "logging-verbose")]
-						if co_primitives::MultiCodec::is_cbor(_cid) {
-							tracing::warn!(cid = ?_cid, ?action, ipld = ?co_primitives::from_cbor::<ipld_core::ipld::Ipld>(&_data), "overlay-unreferenced-block");
-						} else {
-							tracing::warn!(cid = ?_cid, ?action, "overlay-unreferenced-block");
-						}
-					},
-					OverlayChange::Remove(cid) => {
-						// remove
-						storage.remove(&cid).await?;
-
-						// flush
-						#[cfg(feature = "pinning")]
-						{
-							remove.insert(cid.into());
-							if remove.len() > max_references {
-								let mut next_remove = Default::default();
-								std::mem::swap(&mut remove, &mut next_remove);
-								let action = StorageAction::Remove(next_remove, true);
-								next.state = dispatch.dispatch(&action).await?;
-							}
-						}
-					},
-				}
-			}
-			#[cfg(feature = "pinning")]
-			if !remove.is_empty() {
-				let action = StorageAction::Remove(remove, true);
-				next.state = dispatch.dispatch(&action).await?;
-			}
+			flush_overlay_changes(&overlay_storage, &storage, &mut dispatch).await?;
+			next.state = dispatch.state();
 		}
 
 		// result
@@ -154,4 +111,62 @@ where
 		// result
 		Ok(result?)
 	}
+}
+
+/// Apply removes in `overlay_storage` to `storage` and sotage core (`dispatch`).
+/// Discard any remaining [`OverlayChange::Set`].
+pub async fn flush_overlay_changes<S>(
+	overlay_storage: &OverlayBlockStorage<S>,
+	storage: &S,
+	#[cfg(feature = "pinning")] dispatch: &mut impl CoDispatch<StorageAction>,
+) -> Result<(), anyhow::Error>
+where
+	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
+{
+	#[cfg(feature = "pinning")]
+	let max_references = max_reference_count(S::StoreParams::MAX_BLOCK_SIZE);
+	#[cfg(feature = "pinning")]
+	let mut remove = BTreeSet::<WeakCid>::new();
+	let changes = overlay_storage.changes();
+	pin_mut!(changes);
+	while let Some(change) = changes.try_next().await? {
+		match change {
+			OverlayChange::Set(_cid, _data, _) => {
+				// ignore as we only want referenced blocks
+				//  this is not "bad" it just indicates that some block got stored which are not used
+				//  this also could be intermediate computation inside a core that has later been overwritten
+
+				// log
+				#[cfg(feature = "logging-verbose")]
+				if co_primitives::MultiCodec::is_cbor(_cid) {
+					tracing::warn!(cid = ?_cid, ?action, ipld = ?co_primitives::from_cbor::<ipld_core::ipld::Ipld>(&_data), "overlay-unreferenced-block");
+				} else {
+					tracing::warn!(cid = ?_cid, ?action, "overlay-unreferenced-block");
+				}
+			},
+			OverlayChange::Remove(cid) => {
+				// remove
+				storage.remove(&cid).await?;
+
+				// flush
+				#[cfg(feature = "pinning")]
+				{
+					let cid = to_external_cid(overlay_storage, cid).await;
+					remove.insert(cid.into());
+					if remove.len() > max_references {
+						let mut next_remove = Default::default();
+						std::mem::swap(&mut remove, &mut next_remove);
+						let action = StorageAction::Remove(next_remove, true);
+						dispatch.dispatch(&action).await?;
+					}
+				}
+			},
+		}
+	}
+	#[cfg(feature = "pinning")]
+	if !remove.is_empty() {
+		let action = StorageAction::Remove(remove, true);
+		dispatch.dispatch(&action).await?;
+	}
+	Ok(())
 }

@@ -5,9 +5,7 @@ use crate::{
 		shared::SharedCoBuilder,
 	},
 	library::shared_membership::shared_membership,
-	reducer::core_resolver::{
-		dynamic::DynamicCoreResolver, epic::ReactiveCoreResolver, log::LogCoreResolver, overlay::OverlayCoreResolver,
-	},
+	reducer::core_resolver::{dynamic::DynamicCoreResolver, epic::ReactiveCoreResolver, log::LogCoreResolver},
 	services::{
 		application::ApplicationMessage,
 		connections::ConnectionMessage,
@@ -317,8 +315,6 @@ impl CoContextInner {
 	/// Creates the Core Resolver for the local CO.
 	fn create_local_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::default();
-		let core_resolver = OverlayCoreResolver::new(core_resolver, self.tasks.clone(), self.storage.clone());
-		#[cfg(feature = "pinning")]
 		let core_resolver = ReactiveCoreResolver::new(core_resolver, id, self.reactive_context.clone());
 		let core_resolver = LogCoreResolver::new(core_resolver);
 		let core_resolver = DynamicCoreResolver::new(core_resolver);
@@ -328,7 +324,6 @@ impl CoContextInner {
 	/// Creates the Core Resolver for a shared CO.
 	pub(crate) fn create_shared_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::default();
-		let core_resolver = OverlayCoreResolver::new(core_resolver, self.tasks.clone(), self.storage.clone());
 		let core_resolver = ReactiveCoreResolver::new(core_resolver, id, self.reactive_context.clone());
 		let core_resolver = LogCoreResolver::new(core_resolver);
 		let core_resolver = DynamicCoreResolver::new(core_resolver);

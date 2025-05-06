@@ -263,19 +263,11 @@ impl CoReducer {
 	where
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
-		// flush
-		self.overlay_flush([action_reference.into()]).await?;
-
 		// push
 		let result = self
 			.handle
 			.request(|r| {
-				ReducerMessage::Push(
-					PrivateIdentity::boxed(identity.clone()),
-					self.base_storage().clone(),
-					action_reference,
-					r,
-				)
+				ReducerMessage::Push(PrivateIdentity::boxed(identity.clone()), self.storage(), action_reference, r)
 			})
 			.await??;
 
@@ -291,13 +283,10 @@ impl CoReducer {
 	/// Returns true if state has changed.
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, fields(co = self.id().as_str()), skip(self))]
 	pub async fn join(&self, heads: BTreeSet<Cid>) -> Result<CoReducerState, anyhow::Error> {
-		// flush
-		self.overlay_flush(heads.iter().cloned()).await?;
-
 		// join
 		let request = self
 			.handle
-			.request(|r| ReducerMessage::JoinHeads(self.base_storage().clone(), heads, r))
+			.request(|r| ReducerMessage::JoinHeads(self.storage(), heads, r))
 			.await??;
 
 		// flush
@@ -315,7 +304,7 @@ impl CoReducer {
 		// join
 		let co_reducer_state = self
 			.handle
-			.request(|r| ReducerMessage::JoinState(self.base_storage().clone(), state, r))
+			.request(|r| ReducerMessage::JoinState(self.storage(), state, r))
 			.await??;
 
 		// flush
@@ -339,7 +328,7 @@ impl CoReducer {
 		// flush
 		let info = self
 			.handle
-			.request(|r| ReducerMessage::Flush(self.base_storage().clone(), r))
+			.request(|r| ReducerMessage::Flush(self.overlay_storage.clone(), self.base_storage().clone(), r))
 			.await??;
 
 		// notify

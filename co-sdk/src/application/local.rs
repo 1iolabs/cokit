@@ -10,7 +10,7 @@ use crate::{
 		locals::{ApplicationLocal, FileLocals, Locals, MemoryLocals},
 		to_external_cid::{to_external_cid_opt_force, to_external_cids_opt_map_force},
 	},
-	reducer::core_resolver::dynamic::DynamicCoreResolver,
+	reducer::core_resolver::{dynamic::DynamicCoreResolver, overlay::flush_overlay_changes},
 	services::reducer::ReducerFlush,
 	types::{
 		co_dispatch::CoDispatch,
@@ -32,10 +32,15 @@ use co_primitives::{tags, CloneWithBlockStorageSettings, Did};
 use co_runtime::RuntimePool;
 use co_storage::{
 	BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, ExtendedBlockStorage,
+	OverlayBlockStorage,
 };
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
 use serde::Serialize;
-use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	fmt::Debug,
+	sync::Arc,
+};
 use tokio_util::sync::CancellationToken;
 
 pub const CO_ID_LOCAL: &str = "local";
@@ -474,6 +479,30 @@ where
 
 		// write local
 		self.write(storage, reducer_state, None).await?;
+
+		Ok(())
+	}
+
+	async fn flush_overlay(
+		&mut self,
+		overlay_storage: &OverlayBlockStorage<S>,
+		roots: BTreeSet<Cid>,
+		storage: &S,
+		reducer: &mut Reducer<S, R>,
+	) -> anyhow::Result<()> {
+		// roots
+		for root in roots {
+			overlay_storage.flush(root, Some(Default::default())).await?;
+		}
+
+		// remove
+		#[cfg(feature = "pinning")]
+		if let Some((context, _reference_writer)) = &mut self.reference_writer {
+			let mut dispatch = ReducerDispatch { context, reducer, storage };
+			flush_overlay_changes(overlay_storage, storage, &mut dispatch).await?;
+		}
+		#[cfg(not(feature = "pinning"))]
+		flush_overlay_changes(overlay_storage, storage).await?;
 
 		Ok(())
 	}
