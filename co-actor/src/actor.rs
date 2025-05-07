@@ -69,6 +69,7 @@ pub trait Actor: Send + Sync + 'static {
 	}
 
 	/// Spawn actor.
+	#[track_caller]
 	fn spawn(tags: Tags, actor: Self, initialize: Self::Initialize) -> Result<ActorInstance<Self>, ActorError>
 	where
 		Self: Send + Sized + 'static,
@@ -78,6 +79,7 @@ pub trait Actor: Send + Sync + 'static {
 
 	/// Spawn actor using a task spawner.
 	/// TODO: to simplyfy lifecycle make async and wait for intitalize?
+	#[track_caller]
 	fn spawn_with(
 		spawner: TaskSpawner,
 		tags: Tags,
@@ -117,13 +119,13 @@ where
 		self.handle.clone()
 	}
 
+	#[track_caller]
 	pub fn spawn(self, spawner: TaskSpawner, initialize: A::Initialize) -> ActorInstance<A> {
 		let mut rx = self.rx;
 		let state_tx = self.state_tx;
 		let actor = self.actor;
 		let tags = self.handle.tags.clone();
 		let handle = self.handle;
-		let span = tracing::trace_span!("actor", ?tags);
 		let join = spawner.spawn_named(type_name::<A>(), {
 			let tags = tags.clone();
 			let handle = handle.clone();
@@ -182,7 +184,6 @@ where
 					.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
 				Ok(())
 			}
-			.instrument(span)
 		});
 		ActorInstance { join, handle }
 	}

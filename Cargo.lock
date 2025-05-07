@@ -10068,7 +10068,7 @@ dependencies = [
 [[package]]
 name = "tracing-bunyan-formatter"
 version = "0.3.10"
-source = "git+https://github.com/dkuhnert/tracing-bunyan-formatter.git#9d408e002f31f057aa61a5ee6f8f513cd2d879ac"
+source = "git+https://github.com/dkuhnert/tracing-bunyan-formatter.git#ce2e7785e50d21e0f2041be93a1aa30909fbff30"
 dependencies = [
  "ahash 0.8.11",
  "gethostname",
