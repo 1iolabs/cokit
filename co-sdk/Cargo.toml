@@ -33,6 +33,7 @@ futures = { workspace = true }
 futures-util = { workspace = true }
 hmac = "0.12.1"
 hyper = { workspace = true }
+indexmap = "2.9.0"
 ipld-core = { workspace = true }
 keyring = "2.3.2"
 libc = "0.2"

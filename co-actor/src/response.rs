@@ -2,6 +2,7 @@ use super::ActorError;
 use crate::TaskSpawner;
 use futures::{FutureExt, Sink, Stream};
 use std::{
+	any::type_name,
 	borrow::Borrow,
 	fmt::Debug,
 	future::Future,
@@ -15,7 +16,6 @@ use tokio::sync::{mpsc, oneshot};
 /// # Notes
 /// - When the response is dropped inside the actor and has not been used we receive a canceled on the caller side.
 #[must_use]
-#[derive(Debug)]
 pub struct Response<T> {
 	tx: oneshot::Sender<T>,
 }
@@ -78,6 +78,14 @@ impl<T> Response<T> {
 		spawner.borrow().spawn(async move { self.send(value().await).ok() });
 	}
 }
+impl<T> Debug for Response<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Response")
+			.field("response_type", &type_name::<T>())
+			.field("tx_closed", &self.tx.is_closed())
+			.finish()
+	}
+}
 
 pub struct ResponseReceiver<T> {
 	rx: oneshot::Receiver<T>,
@@ -98,7 +106,6 @@ impl<T> Future for ResponseReceiver<T> {
 
 /// A streaming response.
 #[must_use]
-#[derive(Debug)]
 pub struct ResponseStream<T> {
 	tx: mpsc::UnboundedSender<T>,
 }
@@ -136,6 +143,14 @@ impl<T> Sink<T> for ResponseStream<T> {
 		Poll::Ready(Ok(()))
 	}
 }
+impl<T> Debug for ResponseStream<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("ResponseStream")
+			.field("response_type", &type_name::<T>())
+			.field("tx_closed", &self.tx.is_closed())
+			.finish()
+	}
+}
 
 pub struct ResponseStreamReceiver<T> {
 	rx: mpsc::UnboundedReceiver<T>,
@@ -156,7 +171,6 @@ impl<T> Stream for ResponseStreamReceiver<T> {
 
 /// A streaming response with backpressure (bounded).
 #[must_use]
-#[derive(Debug)]
 pub struct ResponseBackPressureStream<T> {
 	tx: mpsc::Sender<Result<T, ActorError>>,
 }
@@ -173,6 +187,14 @@ impl<T> ResponseBackPressureStream<T> {
 	pub fn complete(self) -> Result<(), ActorError> {
 		// will be closed on drop
 		Ok(())
+	}
+}
+impl<T> Debug for ResponseBackPressureStream<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("ResponseBackPressureStream")
+			.field("response_type", &type_name::<T>())
+			.field("tx_closed", &self.tx.is_closed())
+			.finish()
 	}
 }
 

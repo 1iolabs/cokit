@@ -4,7 +4,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings};
+use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, MappedCid};
 use co_storage::{
 	BlockStat, BlockStorage, BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, StorageError,
 };
@@ -14,12 +14,7 @@ use libp2p::{
 	PeerId, Swarm,
 };
 use libp2p_bitswap::{BitswapEvent, QueryId};
-use std::{
-	collections::{BTreeMap, BTreeSet},
-	marker::PhantomData,
-	mem::swap,
-	time::Duration,
-};
+use std::{collections::BTreeSet, marker::PhantomData, mem::swap, time::Duration};
 use tokio_stream::StreamExt;
 
 pub struct NetworkBlockStorage<S, B, C, N, P> {
@@ -238,7 +233,7 @@ where
 		self.next.to_mapped(plain).await
 	}
 
-	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+	async fn insert_mappings(&self, mappings: BTreeSet<MappedCid>) {
 		self.next.insert_mappings(mappings).await
 	}
 }

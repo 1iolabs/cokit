@@ -1,8 +1,7 @@
-use crate::{reducer::core_resolver::dynamic::DynamicCoreResolver, CoStorage, CoreResolver, Reducer};
+use crate::{reducer::core_resolver::dynamic::DynamicCoreResolver, CoReducerState, CoStorage, CoreResolver, Reducer};
 use async_trait::async_trait;
-use cid::Cid;
-use co_primitives::Did;
-use co_storage::{BlockStorageContentMapping, ExtendedBlockStorage, OverlayBlockStorage};
+use co_primitives::{Did, OptionMappedCid};
+use co_storage::{BlockStorageContentMapping, ExtendedBlockStorage};
 use std::collections::BTreeSet;
 
 #[async_trait]
@@ -11,16 +10,12 @@ where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
-	async fn flush(&mut self, storage: &S, reducer: &mut Reducer<S, R>) -> anyhow::Result<()>;
-
-	/// Flush overlay changes.
-	/// Note: This need to be called before flush.
-	async fn flush_overlay(
+	async fn flush(
 		&mut self,
-		overlay_storage: &OverlayBlockStorage<S>,
-		roots: BTreeSet<Cid>,
 		storage: &S,
 		reducer: &mut Reducer<S, R>,
+		new_roots: Vec<CoReducerState>,
+		removed_blocks: BTreeSet<OptionMappedCid>,
 	) -> anyhow::Result<()>;
 }
 

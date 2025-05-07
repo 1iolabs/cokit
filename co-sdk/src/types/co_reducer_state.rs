@@ -13,13 +13,13 @@ use anyhow::anyhow;
 use cid::Cid;
 use co_core_co::Co;
 use co_core_membership::CoState;
-use co_primitives::{CoReference, OptionLink, WeakCid};
+use co_primitives::{CoReference, MappedCid, OptionLink, WeakCid};
 use co_storage::{
 	BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlock, ExtendedBlockStorage, StorageError,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CoReducerState(pub Option<Cid>, pub BTreeSet<Cid>);
 impl CoReducerState {
 	pub fn new(state: Option<Cid>, heads: BTreeSet<Cid>) -> Self {
@@ -131,7 +131,7 @@ impl CoReducerState {
 		&self,
 		parent_storage: &S,
 		storage: &M,
-	) -> Result<Option<(CoState, Option<BTreeMap<Cid, Cid>>)>, StorageError> {
+	) -> Result<Option<(CoState, Option<BTreeSet<MappedCid>>)>, StorageError> {
 		match &self {
 			CoReducerState(Some(state), heads) => {
 				let block = CoReference::Weak((*state, heads.clone())).to_block()?;
@@ -162,13 +162,12 @@ impl CoReducerState {
 	}
 
 	/// Create mapping assuming self is internal.
-	/// The mapping maps from internal (key) to external (value).
-	pub async fn to_external_mapping<S: BlockStorageContentMapping>(&self, storage: &S) -> Option<BTreeMap<Cid, Cid>> {
+	pub async fn to_external_mapping<S: BlockStorageContentMapping>(&self, storage: &S) -> Option<BTreeSet<MappedCid>> {
 		if storage.is_content_mapped().await {
-			let mut map = BTreeMap::new();
+			let mut map = BTreeSet::new();
 			for cid in self.iter() {
 				if let Some(plain) = storage.to_plain(&cid).await {
-					map.insert(cid, plain);
+					map.insert(MappedCid::new(cid, plain));
 				}
 			}
 			if map.is_empty() {

@@ -4,12 +4,12 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseBackPressureStream, ResponseStream, TaskSpawner};
 use co_primitives::{
-	Block, BlockLinks, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, StorageError,
-	StoreParams, Tags,
+	Block, BlockLinks, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, MappedCid,
+	StorageError, StoreParams, Tags,
 };
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
 use std::{
-	collections::{BTreeMap, HashMap},
+	collections::{BTreeSet, HashMap},
 	marker::PhantomData,
 	mem::swap,
 };
@@ -205,7 +205,7 @@ where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 {
 	async fn is_content_mapped(&self) -> bool {
-		// just foward
+		// just forward
 		self.next.is_content_mapped().await
 	}
 
@@ -231,7 +231,7 @@ where
 		self.next.to_mapped(plain).await
 	}
 
-	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+	async fn insert_mappings(&self, mappings: BTreeSet<MappedCid>) {
 		// just foward we do not overlay mappings
 		self.next.insert_mappings(mappings).await;
 	}

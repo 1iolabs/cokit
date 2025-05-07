@@ -18,6 +18,7 @@ pub mod did;
 pub mod invite;
 pub mod known_tags;
 pub mod link;
+pub mod mapped_cid;
 pub mod metadata;
 pub mod network;
 pub mod path;

@@ -1,5 +1,8 @@
 use crate::{
-	library::{max_reference_count::max_reference_count, to_external_cid::to_external_cid},
+	library::{
+		extract_next_heads::extract_next_heads, max_reference_count::max_reference_count,
+		to_external_cid::to_external_cid,
+	},
 	state::{query_core, Query},
 	types::co_dispatch::CoDispatch,
 	CoPinningKey, CoReducerState, CO_CORE_NAME_STORAGE,
@@ -7,7 +10,6 @@ use crate::{
 use async_trait::async_trait;
 use cid::Cid;
 use co_core_storage::StorageAction;
-use co_log::EntryBlock;
 use co_primitives::{
 	block_diff_added_with_parent, BlockDiffFollow, BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings,
 	CoId, CoReference, KnownMultiCodec, MultiCodec, OptionLink, StoreParams, WeakCid,
@@ -24,7 +26,6 @@ use std::collections::{BTreeMap, BTreeSet};
 /// - `storage` - The storage to use for the diff process. The storage should not use any networking as we only care for
 ///   local references.
 /// - `dispatch` - Parent to write the references to.
-/// - `pinning_key` - If set pin states to this key.
 #[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(dispatch, storage))]
 pub async fn write_storage_references<S, D>(
 	storage: S,
@@ -108,18 +109,6 @@ where
 	if !references.is_empty() {
 		let action = StorageAction::ReferenceStructure(references);
 		dispatch_state = dispatch.dispatch(&action).await?;
-	}
-
-	// log
-	#[cfg(feature = "logging-verbose")]
-	if let Some(pinning_key) = &pinning_key {
-		let storage_state = query_core::<co_core_storage::Storage>(CO_CORE_NAME_STORAGE)
-			.execute(&storage, dispatch_state.into())
-			.await?;
-		if let Some(pin) = storage_state.pins.get(&storage, &pinning_key).await? {
-			let references = pin.references.stream(&storage).try_collect::<Vec<_>>().await?;
-			tracing::trace!(?references, ?pinning_key, ?dispatch_state, "storage-pin-references");
-		}
 	}
 
 	// result
@@ -207,6 +196,7 @@ impl ReferenceWriter {
 		dispatch: &mut impl CoDispatch<StorageAction>,
 		storage: &S,
 		next_reducer_state: CoReducerState,
+		pin: bool,
 	) -> Result<Option<Cid>, anyhow::Error>
 	where
 		S: ExtendedBlockStorage + CloneWithBlockStorageSettings + BlockStorageContentMapping + Clone + 'static,
@@ -217,7 +207,7 @@ impl ReferenceWriter {
 		// heads
 		if self.previous_reducer_state.heads() != next_reducer_state.heads() {
 			let next_heads = next_reducer_state.heads();
-			let ignore = extract_next(storage, &next_heads).await?;
+			let ignore = extract_next_heads(storage, next_heads.iter()).await?;
 
 			// apply
 			for next_head in next_heads {
@@ -225,7 +215,7 @@ impl ReferenceWriter {
 					local_storage.clone(),
 					dispatch,
 					BlockLinks::default(),
-					self.pinning_key(CoPinningKey::Log),
+					if pin { self.pinning_key(CoPinningKey::Log) } else { None },
 					None,
 					next_head,
 					Some(ignore.clone()),
@@ -243,7 +233,7 @@ impl ReferenceWriter {
 					local_storage.clone(),
 					dispatch,
 					BlockLinks::default(),
-					self.pinning_key(CoPinningKey::State),
+					if pin { self.pinning_key(CoPinningKey::State) } else { None },
 					self.previous_reducer_state.state(),
 					next_state,
 					None,
@@ -259,18 +249,4 @@ impl ReferenceWriter {
 
 		Ok(result_state)
 	}
-}
-
-/// Extract all `next` heads from given heads.
-async fn extract_next<S>(storage: &S, heads: &BTreeSet<Cid>) -> Result<BTreeSet<Cid>, anyhow::Error>
-where
-	S: BlockStorage,
-{
-	let mut next = BTreeSet::new();
-	for head in heads {
-		let head_block = storage.get(head).await?;
-		let entry = EntryBlock::from_block(head_block)?;
-		next.extend(entry.entry().next.iter().cloned());
-	}
-	Ok(next)
 }

@@ -1,9 +1,9 @@
 use crate::{BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStat, BlockStorage, CloneWithBlockStorageSettings, StorageError};
+use co_primitives::{Block, BlockStat, BlockStorage, CloneWithBlockStorageSettings, MappedCid, StorageError};
 use std::{
-	collections::{BTreeMap, HashSet},
+	collections::{BTreeSet, HashSet},
 	mem::swap,
 	sync::{Arc, Mutex},
 };
@@ -127,7 +127,7 @@ where
 		self.next.to_mapped(plain).await
 	}
 
-	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+	async fn insert_mappings(&self, mappings: BTreeSet<MappedCid>) {
 		self.next.insert_mappings(mappings).await
 	}
 }

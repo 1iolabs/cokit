@@ -11,10 +11,7 @@ use crate::{
 		storage_cleanup::storage_cleanup,
 		to_external_cid::{to_external_cid_opt_force, to_external_cids_opt_map_force},
 	},
-	reducer::{
-		change::reference_writer::lastest_storage_reference,
-		core_resolver::{dynamic::DynamicCoreResolver, overlay::flush_overlay_changes},
-	},
+	reducer::{change::reference_writer::lastest_storage_reference, core_resolver::dynamic::DynamicCoreResolver},
 	services::reducer::ReducerFlush,
 	types::{
 		co_dispatch::CoDispatch,
@@ -32,11 +29,10 @@ use co_actor::ActorHandle;
 use co_core_storage::StorageAction;
 use co_identity::{Identity, LocalIdentity, PrivateIdentity, PrivateIdentityBox};
 use co_log::Log;
-use co_primitives::{tags, CloneWithBlockStorageSettings, Did};
+use co_primitives::{tags, CloneWithBlockStorageSettings, Did, MappedCid, OptionMappedCid};
 use co_runtime::RuntimePool;
 use co_storage::{
 	BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, ExtendedBlockStorage,
-	OverlayBlockStorage,
 };
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
 use serde::Serialize;
@@ -340,9 +336,15 @@ where
 				.ok_or_else(|| anyhow!("Failed to map state: {:?}", state))?;
 
 			// make sure the root mappings are available in parent storage
+			// TODO: remove? not belongs here?
 			if let Some(encrypted_storage) = &self.encrypted_storage {
 				encrypted_storage
-					.insert_mappings([(state, plain_state)].into_iter().chain(plain_heads_map.clone()))
+					.insert_mappings(
+						[(state, plain_state)]
+							.into_iter()
+							.chain(plain_heads_map.clone())
+							.map(MappedCid::from),
+					)
 					.await;
 			}
 
@@ -467,8 +469,17 @@ where
 		+ 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
-	async fn flush(&mut self, storage: &S, reducer: &mut Reducer<S, R>) -> anyhow::Result<()> {
+	async fn flush(
+		&mut self,
+		storage: &S,
+		reducer: &mut Reducer<S, R>,
+		_new_roots: Vec<CoReducerState>,
+		_removed_blocks: BTreeSet<OptionMappedCid>,
+	) -> anyhow::Result<()> {
 		let mut reducer_state = CoReducerState::new_reducer(reducer);
+
+		// TODO: Insert pins for new_roots
+		// TODO: Remove blocks
 
 		// write references
 		//  we execute references for the previous state as the references always one state late
@@ -501,7 +512,7 @@ where
 			// apply
 			let mut dispatch = ReducerDispatch { context, reducer, storage };
 			let next_state = reference_writer
-				.write(&mut dispatch, storage, next_reducer_state.clone())
+				.write(&mut dispatch, storage, next_reducer_state.clone(), true)
 				.await?;
 
 			// cleanup
@@ -514,30 +525,6 @@ where
 
 		// write local
 		self.write(storage, reducer_state, None).await?;
-
-		Ok(())
-	}
-
-	async fn flush_overlay(
-		&mut self,
-		overlay_storage: &OverlayBlockStorage<S>,
-		roots: BTreeSet<Cid>,
-		storage: &S,
-		reducer: &mut Reducer<S, R>,
-	) -> anyhow::Result<()> {
-		// roots
-		for root in roots {
-			overlay_storage.flush(root, Some(Default::default())).await?;
-		}
-
-		// remove
-		#[cfg(feature = "pinning")]
-		if let Some((context, _reference_writer)) = &mut self.reference_writer {
-			let mut dispatch = ReducerDispatch { context, reducer, storage };
-			flush_overlay_changes(overlay_storage, storage, &mut dispatch).await?;
-		}
-		#[cfg(not(feature = "pinning"))]
-		flush_overlay_changes(overlay_storage, storage).await?;
 
 		Ok(())
 	}

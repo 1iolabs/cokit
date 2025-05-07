@@ -21,7 +21,7 @@ pub enum Action {
 	/// Push core action.
 	CoreActionPush { co: CoId, action: ReducerAction<Ipld> },
 
-	/// Core action has been succesfully processed.
+	/// Core action has been succesfully processed (and flushed).
 	CoreAction {
 		co: CoId,
 		storage: CoStorage,
@@ -103,6 +103,9 @@ pub enum Action {
 		/// Flush details.
 		info: FlushInfo,
 	},
+
+	/// Stage a action and dispatch after flush.
+	CoStaged { co: CoId, action: Box<Action> },
 
 	/// Co has been opened.
 	CoOpen {

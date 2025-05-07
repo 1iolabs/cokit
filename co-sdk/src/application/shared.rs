@@ -3,32 +3,39 @@ use crate::{
 	find_membership,
 	library::{
 		connections_peer_provider::ConnectionsPeerProvider, find_co_secret::find_co_secret_by_reference,
-		membership_all_heads::membership_all_heads,
+		membership_all_heads::membership_all_heads, storage_dispatch_remove::storage_dispatch_remove,
 	},
 	reducer::{
 		change::membership_writer::MembershipWriter,
-		core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver, overlay::flush_overlay_changes},
+		core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
 	},
 	services::{
 		connections::ConnectionMessage, network::CoNetworkTaskSpawner, reducer::ReducerFlush, reducers::ReducerStorage,
 	},
-	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
-	ApplicationMessage, CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters,
-	CoUuid, Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+	types::{
+		co_dispatch::CoDispatch,
+		co_reducer_context::{CoReducerContext, CoReducerFeature},
+	},
+	ApplicationMessage, CoCoreResolver, CoDate, CoPinningKey, CoReducer, CoReducerState, CoStorage, CoToken,
+	CoTokenParameters, CoUuid, Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
 	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
-use cid::Cid;
 use co_actor::ActorHandle;
 use co_core_co::{CoAction, Participant};
 use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
+use co_core_storage::StorageAction;
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
-use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId};
-use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, OverlayBlockStorage, Secret};
+use co_primitives::{
+	tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, StoreParams, WeakCid,
+};
+use co_storage::{Algorithm, BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, Secret};
+use futures::stream;
+use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -301,39 +308,61 @@ impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 		&mut self,
 		storage: &CoStorage,
 		reducer: &mut Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+		new_roots: Vec<CoReducerState>,
+		removed_blocks: BTreeSet<OptionMappedCid>,
 	) -> anyhow::Result<()> {
 		let reducer_state = CoReducerState::new_reducer(reducer);
+		tracing::info!(?new_roots, ?reducer_state, "shared-flush");
 
 		// membership
 		self.membership_writer.write(storage, reducer_state.clone()).await?;
 
-		// references
+		// storage: remove
+		#[cfg(feature = "pinning")]
+		storage_dispatch_remove(
+			&mut self.references_writer.0,
+			stream::iter(removed_blocks),
+			<CoStorage as BlockStorage>::StoreParams::MAX_BLOCK_SIZE,
+		)
+		.await?;
+
+		// storage: pins
+		#[cfg(feature = "pinning")]
+		{
+			// collect
+			let mut states = IndexSet::new();
+			let mut heads = IndexSet::new();
+			for root in new_roots {
+				let external_root = root.to_external(storage).await;
+				if let Some(state) = external_root.state() {
+					states.insert(state);
+				}
+				for head in external_root.heads() {
+					heads.insert(head);
+				}
+			}
+
+			// insert
+			let dispatch = &mut self.references_writer.0;
+			if !states.is_empty() {
+				if let Some(pin_state) = self.references_writer.1.pinning_key(CoPinningKey::Log) {
+					let action = StorageAction::PinReference(pin_state, heads.into_iter().map(WeakCid::from).collect());
+					dispatch.dispatch(&action).await?;
+				}
+				if let Some(pin_state) = self.references_writer.1.pinning_key(CoPinningKey::State) {
+					let action =
+						StorageAction::PinReference(pin_state, states.into_iter().map(WeakCid::from).collect());
+					dispatch.dispatch(&action).await?;
+				}
+			}
+		}
+
+		// storage: references
 		#[cfg(feature = "pinning")]
 		self.references_writer
 			.1
-			.write(&mut self.references_writer.0, storage, reducer_state.clone())
+			.write(&mut self.references_writer.0, storage, reducer_state.clone(), false)
 			.await?;
-
-		Ok(())
-	}
-
-	async fn flush_overlay(
-		&mut self,
-		overlay_storage: &OverlayBlockStorage<CoStorage>,
-		roots: BTreeSet<Cid>,
-		storage: &CoStorage,
-		_reducer: &mut Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
-	) -> anyhow::Result<()> {
-		// roots
-		for root in roots {
-			overlay_storage.flush(root, Some(Default::default())).await?;
-		}
-
-		// remove
-		#[cfg(feature = "pinning")]
-		flush_overlay_changes(overlay_storage, storage, &mut self.references_writer.0).await?;
-		#[cfg(not(feature = "pinning"))]
-		flush_overlay_changes(overlay_storage, storage).await?;
 
 		Ok(())
 	}
@@ -616,11 +645,7 @@ impl SharedCoCreator {
 
 			// pin initial state
 			crate::reducer::change::reference_writer::write_storage_references(
-				if let Some(encrypted_storage) = _encrypted_storage {
-					CoStorage::new(encrypted_storage)
-				} else {
-					storage.clone()
-				},
+				co_storage.clone(),
 				&mut self.parent.dispatcher(&self.storage_core_name, identity.clone()),
 				co_primitives::BlockLinks::default(),
 				Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.co.id)),

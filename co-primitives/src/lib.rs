@@ -36,6 +36,7 @@ pub use types::{
 	invite::{CoConnectivity, CoInviteMetadata},
 	known_tags::{CoInvite, CoJoin, CoNetwork, CoTimeout, KnownTag, KnownTags},
 	link::{Link, Linkable, OptionLink},
+	mapped_cid::{MappedCid, OptionMappedCid},
 	metadata::{CoMetadata, Metadata, WithCoMetadata},
 	network::{Network, NetworkCoHeads, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous},
 	path::{

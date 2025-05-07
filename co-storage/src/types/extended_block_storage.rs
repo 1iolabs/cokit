@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStorage, StorageError};
+use co_primitives::{Block, BlockStorage, MappedCid, StorageError};
 use std::collections::BTreeMap;
 
 #[async_trait]
@@ -32,7 +32,7 @@ impl<P> ExtendedBlock<P> {
 		self
 	}
 
-	pub fn with_references(mut self, references: impl IntoIterator<Item = (Cid, Cid)>) -> Self {
+	pub fn with_references(mut self, references: impl IntoIterator<Item = MappedCid>) -> Self {
 		self.options = self.options.with_references(references);
 		self
 	}
@@ -54,8 +54,13 @@ pub struct ExtendedBlockOptions {
 	pub references: Option<BTreeMap<Cid, Cid>>,
 }
 impl ExtendedBlockOptions {
-	pub fn with_references(mut self, references: impl IntoIterator<Item = (Cid, Cid)>) -> Self {
-		self.references = Some(references.into_iter().collect());
+	pub fn with_references(mut self, references: impl IntoIterator<Item = MappedCid>) -> Self {
+		self.references = Some(
+			references
+				.into_iter()
+				.map(|MappedCid(internal, external)| (internal, external))
+				.collect(),
+		);
 		self
 	}
 }

@@ -10,8 +10,8 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{
 	from_cbor, Block, BlockLinks, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings,
-	DefaultNodeSerializer, KnownMultiCodec, Link, MultiCodec, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
-	StoreParams,
+	DefaultNodeSerializer, KnownMultiCodec, Link, MappedCid, MultiCodec, Node, NodeBuilder, NodeBuilderError,
+	NodeSerializer, StoreParams,
 };
 use futures::{
 	stream::{self, FuturesOrdered},
@@ -56,7 +56,7 @@ where
 	}
 
 	/// Add known mappings.
-	pub async fn insert_mappings(&self, mappings: impl IntoIterator<Item = (Cid, Cid)>) {
+	pub async fn insert_mappings(&self, mappings: impl IntoIterator<Item = MappedCid>) {
 		self.mapping.extend(mappings).await;
 	}
 
@@ -100,7 +100,11 @@ where
 
 		// add
 		self.mapping
-			.extend(mapping.into_iter().filter_map(|(key, value)| value.map(|value| (key, value))))
+			.extend(
+				mapping
+					.into_iter()
+					.filter_map(|(key, value)| value.map(|value| MappedCid(key, value))),
+			)
 			.await;
 	}
 
@@ -162,7 +166,12 @@ where
 
 			// apply mappings
 			self.mapping
-				.extend([(plain.cid, *cid)].into_iter().chain(plain.references.clone().into_iter()))
+				.extend(
+					[(plain.cid, *cid)]
+						.into_iter()
+						.chain(plain.references.clone().into_iter())
+						.map(|(internal, external)| MappedCid::new(internal, external)),
+				)
 				.await;
 
 			// result
@@ -191,7 +200,12 @@ where
 			// map
 			{
 				self.mapping
-					.extend([(*plain.cid(), encrypted_cid)].into_iter().chain(plain.references.clone()))
+					.extend(
+						[(*plain.cid(), encrypted_cid)]
+							.into_iter()
+							.chain(plain.references.clone())
+							.map(|(internal, external)| MappedCid::new(internal, external)),
+					)
 					.await;
 			}
 
@@ -298,7 +312,22 @@ where
 		tracing::trace!(?encrypted_cid, ?cid, "encrypted-storage-get");
 		match encrypted_cid {
 			Some(encrypted_cid) => self.get_unencrypted(&encrypted_cid).await,
-			None => self.next.get(cid).await,
+			None => match self.next.get(cid).await {
+				Err(err @ StorageError::NotFound(_, _)) => {
+					// log
+					#[cfg(feature = "logging-verbose")]
+					{
+						let mapping = self.mapping.mapping.read().unwrap().map.clone();
+						let parent_mapping =
+							self.mapping.parent.as_ref().map(|parent| parent.read().unwrap().map.clone());
+						tracing::warn!(?mapping, ?parent_mapping, ?err, ?cid, "encrypted-storage-get-not-found");
+					}
+
+					// forward
+					Err(err)
+				},
+				i => i,
+			},
 		}
 	}
 
@@ -388,7 +417,7 @@ where
 		None
 	}
 
-	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+	async fn insert_mappings(&self, mappings: BTreeSet<MappedCid>) {
 		self.mapping.extend(mappings).await;
 	}
 }
@@ -572,8 +601,11 @@ impl EncryptedBlockStorageMapping {
 		self.mapping.write().unwrap().insert(key, value)
 	}
 
-	pub async fn extend(&self, items: impl IntoIterator<Item = (Cid, Cid)>) {
-		self.mapping.write().unwrap().extend(items);
+	pub async fn extend(&self, items: impl IntoIterator<Item = MappedCid>) {
+		self.mapping
+			.write()
+			.unwrap()
+			.extend(items.into_iter().map(|MappedCid(internal, external)| (internal, external)));
 	}
 
 	pub async fn to_blocks<S, P: StoreParams>(
@@ -614,7 +646,7 @@ impl BlockStorageContentMapping for EncryptedBlockStorageMapping {
 		self.get_first_by_value(plain).await
 	}
 
-	async fn insert_mappings(&self, _mappings: BTreeMap<Cid, Cid>) {
+	async fn insert_mappings(&self, _mappings: BTreeSet<MappedCid>) {
 		unimplemented!("use storage directly");
 	}
 }
@@ -647,6 +679,7 @@ impl From<BlockMappingError> for StorageError {
 /// This is used to store the mapping itself as an block.
 #[derive(Clone, Debug)]
 pub struct BlockMapping {
+	/// Mapping from mapped/internal to plain/external.
 	map: BTreeMap<Cid, Cid>,
 }
 impl BlockMapping {

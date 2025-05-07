@@ -1,12 +1,22 @@
 use crate::{Block, KnownMultiCodec, MultiCodec, StoreParams};
 use cid::Cid;
 use ipld_core::codec::Links;
+use std::collections::BTreeSet;
 
 #[derive(Debug, Default, Clone)]
-pub struct BlockLinks {}
+pub struct BlockLinks {
+	/// Ignore the specified [`Cid`]'Ss when found in links.
+	ignore: BTreeSet<Cid>,
+}
 impl BlockLinks {
 	pub fn new() -> Self {
-		Self {}
+		Self { ignore: Default::default() }
+	}
+
+	/// Add Cid's to ignore.
+	pub fn with_added_ignore(mut self, ignore: impl IntoIterator<Item = Cid>) -> Self {
+		self.ignore.extend(ignore);
+		self
 	}
 
 	/// Test if the CID codec possibly contains links.

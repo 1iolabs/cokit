@@ -6,12 +6,11 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use co_primitives::Tags;
 use futures::{Stream, StreamExt};
-use std::{any::type_name, future::ready, sync::Arc};
+use std::{any::type_name, future::ready, ops::Deref, sync::Arc};
 use tokio::{
 	sync::{mpsc, watch},
 	task::JoinHandle,
 };
-use tracing::Instrument;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ActorError {
@@ -257,11 +256,20 @@ where
 }
 
 /// Handle into an actor which can be used to send messages.
-#[derive(Debug)]
 pub struct ActorHandle<M> {
 	tx: mpsc::UnboundedSender<ActorMessage<M>>,
 	state: watch::Receiver<ActorState>,
 	tags: Arc<Tags>,
+}
+impl<M> std::fmt::Debug for ActorHandle<M> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("ActorHandle")
+			.field("message_type", &type_name::<M>())
+			.field("tx_closed", &self.tx.is_closed())
+			.field("state", &self.state.borrow().deref())
+			.field("tags", &self.tags)
+			.finish()
+	}
 }
 impl<M> Clone for ActorHandle<M> {
 	fn clone(&self) -> Self {

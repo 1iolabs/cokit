@@ -45,7 +45,7 @@ impl CoReducer {
 		let actor = Actor::spawn_with(
 			tasks.clone(),
 			tags!("application": application_identifier, "co": id.as_str()),
-			ReducerActor::new(tasks, runtime, context.clone()),
+			ReducerActor::new(id.clone(), tasks, runtime, context.clone()),
 			(reducer, flush),
 		)?;
 		Ok(Self {
@@ -106,16 +106,6 @@ impl CoReducer {
 		self.storage = CoStorage::new(overlay_storage.clone());
 		self.overlay_storage = Some(overlay_storage);
 		self
-	}
-
-	/// Flush [`Cid`] from overlay to base storage.
-	async fn overlay_flush(&self, cids: impl IntoIterator<Item = Cid>) -> Result<(), StorageError> {
-		if let Some(overlay_storage) = &self.overlay_storage {
-			for cid in cids {
-				overlay_storage.flush(cid, Some(Default::default())).await?;
-			}
-		}
-		Ok(())
 	}
 
 	pub(crate) async fn clear(&self) -> CoReducerState {
@@ -184,19 +174,11 @@ impl CoReducer {
 		let action_reference =
 			create_reducer_action(&self.storage, identity, core, item, Default::default(), &self.date).await?;
 
-		// flush
-		self.overlay_flush([action_reference.into()]).await?;
-
 		// push
 		let result = self
 			.handle
 			.request(|r| {
-				ReducerMessage::Push(
-					PrivateIdentity::boxed(identity.clone()),
-					self.base_storage().clone(),
-					action_reference,
-					r,
-				)
+				ReducerMessage::Push(PrivateIdentity::boxed(identity.clone()), self.storage(), action_reference, r)
 			})
 			.await??;
 
@@ -222,19 +204,11 @@ impl CoReducer {
 		// action
 		let action_reference = store_reducer_action(&self.storage, action, Default::default()).await?;
 
-		// flush
-		self.overlay_flush([action_reference.into()]).await?;
-
 		// push
 		let result = self
 			.handle
 			.request(|r| {
-				ReducerMessage::Push(
-					PrivateIdentity::boxed(identity.clone()),
-					self.base_storage().clone(),
-					action_reference,
-					r,
-				)
+				ReducerMessage::Push(PrivateIdentity::boxed(identity.clone()), self.storage(), action_reference, r)
 			})
 			.await??;
 
@@ -298,9 +272,6 @@ impl CoReducer {
 
 	/// Join a previous (trusted) snapshot into history which may can used as a starting point.
 	pub async fn join_state(&self, state: CoReducerState) -> Result<CoReducerState, anyhow::Error> {
-		// flush
-		self.overlay_flush(state.iter()).await?;
-
 		// join
 		let co_reducer_state = self
 			.handle
