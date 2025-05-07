@@ -1,4 +1,5 @@
 import { CID } from "multiformats";
+import { ChatsListPluginPublicState } from "../../coapp-chatslist-plugin/types/state.js";
 
 export interface MessengerViewPluginState {
     readonly messages: CID[];
@@ -6,4 +7,6 @@ export interface MessengerViewPluginState {
     readonly co: string;
     readonly core: string;
     readonly lastHeads?: CID[];
+    readonly coSessionId?: string;
+    readonly chatsListState?: ChatsListPluginPublicState;
 }

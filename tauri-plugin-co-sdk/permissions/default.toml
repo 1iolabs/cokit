@@ -9,4 +9,6 @@ permissions = [
     "allow-push-action",
     "allow-get-actions",
     "allow-create-identity",
+    "allow-session-open",
+    "allow-session-close",
 ]

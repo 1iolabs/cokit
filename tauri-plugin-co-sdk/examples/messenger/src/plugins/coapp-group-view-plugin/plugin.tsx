@@ -12,8 +12,9 @@ export default function plugin(pluginTags: TagList): GroupViewPlugin {
         epic: groupViewPluginEpic,
         render: (_, props: GroupViewContainerProps) => <GroupViewContainer {...props} />,
         reducer: reducerWithInitialState(groupViewPluginReducer, {
-            isNew: roomCoreId !== undefined,
+            isNew: roomCoreId === undefined,
             name: "New group",
+            participants: [],
         }),
         tags: [groupViewPluginTag, ...pluginTags],
     };

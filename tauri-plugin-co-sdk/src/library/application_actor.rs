@@ -1,34 +1,64 @@
+use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseStream};
 use co_primitives::{Block, DefaultParams};
 use co_sdk::{
-	Action, Application, ApplicationMessage, BlockStorage, BlockStorageExt, CoId, CoReducerFactory, Did,
+	Action, Application, ApplicationMessage, BlockStorage, BlockStorageExt, CoId, CoReducerFactory, CoStorage, Did,
 	DidKeyIdentity, DidKeyProvider, Tags, CO_CORE_NAME_KEYSTORE,
 };
 use futures::{pin_mut, StreamExt};
 use ipld_core::ipld::Ipld;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, future::ready};
+use std::{
+	collections::{BTreeSet, HashMap},
+	fmt::Display,
+	future::ready,
+	hash::Hash,
+};
 
 pub struct ApplicationActor {}
-pub struct ApplicytionActorState {
+
+#[derive(Clone)]
+pub struct Session {
+	storage: CoStorage,
+}
+
+#[derive(PartialEq, Eq, Serialize, Deserialize, Hash, Clone, Debug)]
+pub struct SessionId(String);
+
+impl Display for SessionId {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.0.fmt(f)
+	}
+}
+
+impl SessionId {
+	pub fn new() -> Self {
+		SessionId(uuid::Uuid::new_v4().into())
+	}
+}
+
+pub struct ApplicationActorState {
 	application: Application,
+	sessions: HashMap<SessionId, Session>,
 }
 pub enum ApplicationActorMessage {
-	StorageGet(CoId, Cid, Response<Result<Block<DefaultParams>, ActorError>>),
-	StorageSet(CoId, Block<DefaultParams>, Response<Result<Cid, ActorError>>),
+	SessionOpen(CoId, Response<Result<SessionId, ActorError>>),
+	SessionClose(SessionId),
+	StorageGet(SessionId, Cid, Response<Result<Block<DefaultParams>, ActorError>>),
+	StorageSet(SessionId, Block<DefaultParams>, Response<Result<Cid, ActorError>>),
 	GetCoState(CoId, Response<Result<(Option<Cid>, BTreeSet<Cid>), ActorError>>),
 	WatchState(ResponseStream<(CoId, Option<Cid>, BTreeSet<Cid>)>),
 	Push(CoId, String, Ipld, Did, Response<Result<Option<Cid>, ActorError>>),
-	ResolveCid(CoId, Cid, Response<Result<Ipld, ActorError>>),
+	ResolveCid(SessionId, Cid, Response<Result<Ipld, ActorError>>),
 	GetActions(GetActionsRequest, Response<Result<GetActionsResponse, ActorError>>),
 	CreateIdentity(CreateIdentityRequest),
 }
 
 #[derive(Debug, Clone)]
 pub struct GetActionsRequest {
-	pub co: CoId,
+	pub session_id: SessionId,
 	pub heads: BTreeSet<Cid>,
 	pub count: usize,
 	pub until: Option<Cid>,
@@ -50,7 +80,7 @@ pub struct CreateIdentityRequest {
 impl Actor for ApplicationActor {
 	type Message = ApplicationActorMessage;
 
-	type State = ApplicytionActorState;
+	type State = ApplicationActorState;
 
 	type Initialize = Application;
 
@@ -60,7 +90,7 @@ impl Actor for ApplicationActor {
 		_tags: &Tags,
 		initialize: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
-		Ok(ApplicytionActorState { application: initialize })
+		Ok(ApplicationActorState { application: initialize, sessions: HashMap::new() })
 	}
 
 	async fn handle(
@@ -70,30 +100,43 @@ impl Actor for ApplicationActor {
 		state: &mut Self::State,
 	) -> Result<(), ActorError> {
 		match message {
-			ApplicationActorMessage::StorageGet(co_id, cid, response) => {
-				let context = state.application.context().clone();
+			ApplicationActorMessage::SessionOpen(co_id, response) => {
+				response
+					.respond_execute(|| async {
+						let storage = state
+							.application
+							.context()
+							.try_co_reducer(&co_id)
+							.await
+							.map_err(|err| ActorError::Actor(err.into()))?
+							.storage();
+						let session_id = SessionId::new();
+						state.sessions.insert(session_id.clone(), Session { storage });
+						Ok(session_id)
+					})
+					.await;
+			},
+			ApplicationActorMessage::SessionClose(session_id) => {
+				state.sessions.remove(&session_id);
+			},
+			ApplicationActorMessage::StorageGet(session_id, cid, response) => {
+				let sessions = state.sessions.clone();
 				response.spawn(move || async move {
-					Ok(context
-						.try_co_reducer(&co_id)
-						.await
-						.map_err(|err| ActorError::Actor(err.into()))?
-						.storage()
-						.get(&cid)
-						.await
-						.map_err(|err| ActorError::Actor(err.into()))?)
+					let session = sessions
+						.get(&session_id)
+						.clone()
+						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
+					Ok(session.storage.get(&cid).await.map_err(|err| ActorError::Actor(err.into()))?)
 				});
 			},
-			ApplicationActorMessage::StorageSet(co, block, response) => {
-				let context = state.application.context().clone();
+			ApplicationActorMessage::StorageSet(session_id, block, response) => {
+				let sessions = state.sessions.clone();
 				response.spawn(move || async move {
-					Ok(context
-						.try_co_reducer(&co)
-						.await
-						.map_err(|err| ActorError::Actor(err.into()))?
-						.storage()
-						.set(block)
-						.await
-						.map_err(|err| ActorError::Actor(err.into()))?)
+					let session = sessions
+						.get(&session_id)
+						.clone()
+						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
+					Ok(session.storage.set(block).await.map_err(|err| ActorError::Actor(err.into()))?)
 				});
 			},
 			ApplicationActorMessage::GetCoState(co, response) => {
@@ -157,25 +200,29 @@ impl Actor for ApplicationActor {
 					.await
 					.ok();
 			},
-			ApplicationActorMessage::ResolveCid(co, cid, response) => {
-				let context = state.application.context().clone();
+			ApplicationActorMessage::ResolveCid(session_id, cid, response) => {
+				let sessions = state.sessions.clone();
 				response.spawn(move || async move {
-					Ok(context
-						.try_co_reducer(&co)
-						.await
-						.map_err(|err| ActorError::Actor(err.into()))?
-						.storage()
+					let session = sessions
+						.get(&session_id)
+						.clone()
+						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
+					Ok(session
+						.storage
 						.get_deserialized::<Ipld>(&cid)
 						.await
 						.map_err(|err| ActorError::Actor(err.into()))?)
 				});
 			},
 			ApplicationActorMessage::GetActions(request, response) => {
-				let context = state.application.context().clone();
+				let sessions = state.sessions.clone();
 				let mut next_heads = request.heads.clone();
 				response.spawn(move || async move {
-					let storage = context.co_reducer(&request.co).await?.unwrap().storage();
-					let stream = co_log::create_stream(&storage, request.heads).take(request.count);
+					let session_id = request.session_id;
+					let session = sessions
+						.get(&session_id)
+						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
+					let stream = co_log::create_stream(&session.storage, request.heads).take(request.count);
 					pin_mut!(stream);
 					let mut actions = Vec::new();
 					while let Some(item) = stream.next().await {
@@ -262,9 +309,16 @@ mod tests {
 			.expect("actor")
 			.handle();
 
+		// open a session
+		let session_id = actor_handle
+			.request(|r| ApplicationActorMessage::SessionOpen("local".into(), r))
+			.await
+			.expect("created session")
+			.expect("created session");
+
 		// get 10 actions at once from current heads
 		let heads = reducer.heads().await;
-		let mut request = GetActionsRequest { co, heads, count: 10, until: None };
+		let mut request = GetActionsRequest { session_id: session_id.clone(), heads, count: 10, until: None };
 		let log_a = actor_handle
 			.request(|r| ApplicationActorMessage::GetActions(request.clone(), r))
 			.await
@@ -293,5 +347,21 @@ mod tests {
 		log_response_b.actions.append(&mut log_b_next);
 		// should be the same as if we got all 10 at once
 		assert_eq!(log_a, log_response_b.actions);
+
+		let (local_co_state_cid, _) = actor_handle
+			.request(|r| ApplicationActorMessage::GetCoState("local".into(), r))
+			.await
+			.unwrap()
+			.expect("local co state");
+
+		let local_co_state = actor_handle
+			.request(|r| ApplicationActorMessage::ResolveCid(session_id.clone(), local_co_state_cid.expect("state"), r))
+			.await
+			.expect("local co state")
+			.expect("local co state");
+		println!("{:#?}", local_co_state);
+		actor_handle
+			.dispatch(ApplicationActorMessage::SessionClose(session_id))
+			.expect("close session");
 	}
 }

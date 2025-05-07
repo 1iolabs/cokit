@@ -1,15 +1,20 @@
-import { createPluginErroredAction, isPluginInitializeAction, tagValue } from "@1io/kui-application-sdk";
+import { createPluginErroredAction, isPluginInitializeAction, tagValue, WellKnownTags } from "@1io/kui-application-sdk";
+import { Action } from "redux";
 import { filter, identity, mergeAll, mergeMap } from "rxjs";
 import DefaultAvatar from "../../../assets/Users_48.svg";
 import { splitCoCoreId } from "../../../library/core-id.js";
-import { invokeGetCoreState } from "../../../library/invoke-get.js";
+import { getCoreState } from "../../../library/invoke-get.js";
+import { coappChatsListPluginId } from "../../coapp-chatslist-plugin/types/plugin.js";
 import { GroupViewPluginActionType, GroupViewSetAvatarAction, GroupViewSetNameAction } from "../actions/index.js";
 import { GroupViewEpicType } from "../types/plugin.js";
 import { GroupViewPluginRoomCoreIdTag } from "../types/tag.js";
 
 export const initializeEpic: GroupViewEpicType = (action$, _, context) => action$.pipe(
     filter(isPluginInitializeAction),
-    mergeMap(async (action) => {
+    mergeMap(async () => {
+        const actions: Action[] = [
+            context.api.subscribeState([{ key: WellKnownTags.Type, value: coappChatsListPluginId }], "chatsListState"),
+        ];
         const roomCoreId = tagValue<GroupViewPluginRoomCoreIdTag>(context.pluginTags, "roomCoreId");
         // edit mode => load current data
         if (roomCoreId !== undefined) {
@@ -22,7 +27,7 @@ export const initializeEpic: GroupViewEpicType = (action$, _, context) => action
                 }, context.plugin, context.pluginTags)];
             }
             // get core state and cancel if failed
-            const coreState = await invokeGetCoreState(result.coId, result.coreId);
+            const coreState = await getCoreState(result.coId, result.coreId);
             if (!coreState) {
                 // Error!
                 return [createPluginErroredAction({
@@ -31,7 +36,7 @@ export const initializeEpic: GroupViewEpicType = (action$, _, context) => action
                 }, context.plugin, context.pluginTags)];
             }
             // TODO set information
-            return [
+            actions.push(
                 identity<GroupViewSetNameAction>({
                     payload: { name: coreState.name },
                     type: GroupViewPluginActionType.SetName,
@@ -41,11 +46,11 @@ export const initializeEpic: GroupViewEpicType = (action$, _, context) => action
                     payload: { avatar: DefaultAvatar },
                     type: GroupViewPluginActionType.SetAvatar,
                 }),
-            ];
+            );
         } else {
             // TODO new mode
         }
-        return [];
+        return actions;
     }),
     mergeAll(),
 );

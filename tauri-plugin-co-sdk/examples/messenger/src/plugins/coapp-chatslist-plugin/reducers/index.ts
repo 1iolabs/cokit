@@ -1,5 +1,5 @@
 import { ChatsListActions, ChatsListActionType } from "../actions/index.js";
-import { ChatsListPluginState } from "../state/index.js";
+import { ChatsListPluginState } from "../types/state.js";
 
 export function chatsListReducer(state: ChatsListPluginState | undefined, action: ChatsListActions): ChatsListPluginState {
     if (state === undefined) {
@@ -24,6 +24,11 @@ export function chatsListReducer(state: ChatsListPluginState | undefined, action
             return { ...state, selectedChat: action.payload.chat.id };
         case ChatsListActionType.SetPriorityPlugin:
             return { ...state, priorityPluginiId: action.payload.pluginId };
+        case ChatsListActionType.SetDialog:
+            return { ...state, dialog: action.payload.dialogPluginId };
+        case ChatsListActionType.SetIdentity: {
+            return { ...state, identity: action.payload.identity };
+        }
     }
     return state;
 }

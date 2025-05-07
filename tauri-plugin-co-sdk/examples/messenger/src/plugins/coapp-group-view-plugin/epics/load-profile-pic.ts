@@ -18,7 +18,6 @@ export const loadProfilePicEpic: GroupViewEpicType = (actions$, state$, context)
             return EMPTY;
         }
         avatar = convertFileSrc(avatar);
-        console.log("test file select", avatar);
         return [identity<GroupViewSetAvatarAction>({
             payload: { avatar },
             type: GroupViewPluginActionType.SetAvatar,

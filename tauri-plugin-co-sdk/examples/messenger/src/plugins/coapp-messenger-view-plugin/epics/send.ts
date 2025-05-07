@@ -7,7 +7,11 @@ export const sendEpic: MessengerViewEpicType = (action$, state$, context) => act
     filter((action): action is MessengerViewSendAction => action.type === MessengerViewActionType.Send),
     withLatestFrom(state$),
     mergeMap(async ([action, state]) => {
-        await invokePushMessage(action.payload.message, state.co, state.core, "did:local:device"); // TODO
+        const identity = state.chatsListState?.identity;
+        if (!identity) {
+            return EMPTY;
+        }
+        await invokePushMessage(action.payload.message, state.co, state.core, identity);
         return EMPTY;
     }),
     mergeAll(),

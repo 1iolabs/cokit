@@ -1,6 +1,6 @@
 import { filter, identity, mergeAll, mergeMap, withLatestFrom } from "rxjs";
+import { coappGroupViewPluginId, GroupViewPluginRoomCoreIdTag } from "../../coapp-group-view-plugin/types/tag.js";
 import { ChatsListActionType, ChatsListOpenChatDetailsAction, ChatsListSetPriorityPlugin } from "../actions/index.js";
-import { coappGroupViewPluginId, GroupViewPluginRoomCoreIdTag } from "../plugins/coapp-group-view-plugin/types/tag.js";
 import { ChatsListEpicType } from "../types/plugin.js";
 
 export const groupDetailsEpic: ChatsListEpicType = (action$, state$, context) => action$.pipe(
@@ -11,7 +11,6 @@ export const groupDetailsEpic: ChatsListEpicType = (action$, state$, context) =>
             // unload old plugin
             await context.api.unloadPlugin(state.priorityPluginiId);
         }
-        console.log("afff");
         const tags = [];
         if (action.payload.coCoreId !== undefined) {
             tags.push(identity<GroupViewPluginRoomCoreIdTag>({

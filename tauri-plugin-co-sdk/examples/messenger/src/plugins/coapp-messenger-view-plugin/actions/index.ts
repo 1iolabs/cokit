@@ -3,10 +3,11 @@ import { CID } from "multiformats";
 
 export enum MessengerViewActionType {
     Send = "coapp-messenger/send",
-    AddMessages = "coapp-messenger/add-messages",
-    NameChanged = "coapp-messenger/chat-name-changed",
-    LoadMoreEvents = "coapp-messenger/load-more-events",
-    SetLastHeads = "coapp-messenger/set-last-heads",
+    AddMessages = "coapp/messenger-view/add-messages",
+    NameChanged = "coapp/messenger-view/chat-name-changed",
+    LoadMoreEvents = "coapp/messenger-view/load-more-events",
+    SetLastHeads = "coapp/messenger-view/set-last-heads",
+    SetSession = "coapp/messenger-view/set-session",
 }
 
 export type MessengerViewActions =
@@ -14,7 +15,8 @@ export type MessengerViewActions =
     | MessengerViewAddMessagesAction
     | MessengerViewNameChangedAction
     | MessengerViewLoadMoreEventsAction
-    | MessengerViewSetLastHeadsAction;
+    | MessengerViewSetLastHeadsAction
+    | MessengerViewSetSessionAction;
 
 export interface MessengerViewSendAction extends PayloadAction<MessengerViewActionType.Send, {
     readonly message: string;
@@ -39,5 +41,10 @@ export interface MessengerViewLoadMoreEventsAction extends PayloadAction<Messeng
 
 export interface MessengerViewSetLastHeadsAction extends PayloadAction<MessengerViewActionType.SetLastHeads, {
     readonly lastHeads: CID[];
+}> {
+}
+
+export interface MessengerViewSetSessionAction extends PayloadAction<MessengerViewActionType.SetSession, {
+    readonly sessionId: string;
 }> {
 }

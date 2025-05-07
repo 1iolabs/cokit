@@ -11,6 +11,8 @@ Allows usage of co-sdk api
 - `allow-push-action`
 - `allow-get-actions`
 - `allow-create-identity`
+- `allow-session-open`
+- `allow-session-close`
 
 ## Permission Table
 
@@ -199,6 +201,58 @@ Enables the resolve_cid command without any pre-configured scope.
 <td>
 
 Denies the resolve_cid command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:allow-session-close`
+
+</td>
+<td>
+
+Enables the session_close command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:deny-session-close`
+
+</td>
+<td>
+
+Denies the session_close command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:allow-session-open`
+
+</td>
+<td>
+
+Enables the session_open command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:deny-session-open`
+
+</td>
+<td>
+
+Denies the session_open command without any pre-configured scope.
 
 </td>
 </tr>

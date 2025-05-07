@@ -1,13 +1,22 @@
 import { CID } from "multiformats";
+import { resolveCid, sessionClose, sessionOpen } from "../../../../dist-js/index.js";
 import { Room } from "../types/room.js";
-import { invokeResolveCid } from "./invoke-get.js";
 
-export async function getRoomState(co: string, coreId: string, stateCid: CID): Promise<Room | undefined> {
-
-    const coState = await invokeResolveCid(co, stateCid);
+export async function getRoomState(co: string, coreId: string, stateCid: CID, externalSessionId?: string): Promise<Room | undefined> {
+    const sessionId = externalSessionId ?? await sessionOpen(co);
+    const coState = await resolveCid(sessionId, stateCid);
     const core = coState.cores[coreId];
     if (core) {
-        return await invokeResolveCid(co, core.state);
+        const result = await resolveCid(sessionId, core.state);
+        if (externalSessionId === undefined) {
+            // close session if not given from external
+            await sessionClose(sessionId);
+        }
+        return result;
+    }
+    if (externalSessionId === undefined) {
+        // close session if not given from external
+        await sessionClose(sessionId);
     }
     return undefined;
 }

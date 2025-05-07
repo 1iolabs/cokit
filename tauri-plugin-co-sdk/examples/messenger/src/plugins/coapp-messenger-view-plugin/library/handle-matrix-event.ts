@@ -8,7 +8,8 @@ import { MatrixEvent } from "../../../types/matrix-event.js";
  * @returns The converted message message
  */
 export function resolveMatrixAction(
-    ipld: any
+    ipld: any,
+    ownIdentity: string,
 ): Message | undefined {
     // handle matrix event
     const matrixEvent = ipld.p as MatrixEvent;
@@ -18,7 +19,7 @@ export function resolveMatrixAction(
             return {
                 key: matrixEvent.event_id,
                 message: matrixEvent.content.body,
-                ownMessage: ipld.f === "did:local:device", // TODO
+                ownMessage: ipld.f === ownIdentity,
                 timestamp: new Date(matrixEvent.timestamp),
             };
         };

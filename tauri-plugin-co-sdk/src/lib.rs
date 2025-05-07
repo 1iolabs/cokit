@@ -5,6 +5,7 @@ use commands::{
 	identity::create_identity,
 	push_action::push_action,
 	resolve_cid::resolve_cid,
+	session::{session_close, session_open},
 	storage::{storage_get, storage_set},
 };
 use futures::{pin_mut, StreamExt};
@@ -33,6 +34,8 @@ pub async fn init<R: Runtime>(co_settings: CoApplicationSettings) -> TauriPlugin
 			storage_set,
 			get_actions,
 			create_identity,
+			session_open,
+			session_close,
 		])
 		.setup(|app_handle, _api| {
 			app_handle.manage(actor_handle.clone());

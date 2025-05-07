@@ -1,30 +1,31 @@
 import { isPluginInitializeAction } from "@1io/kui-application-sdk";
 import { Action } from "redux";
 import { filter, identity, mergeAll, mergeMap, withLatestFrom } from "rxjs";
-import { get_actions } from "../../../../dist-js/index.js";
+import { get_actions, resolveCid, sessionClose, sessionOpen } from "../../../../../../dist-js/index.js";
+import { createCoSdkStateEventListener } from "../../../library/co-sdk-state-listener.js";
+import { buildCoCoreId } from "../../../library/core-id.js";
 import { ChatsListActionType, ChatsListUpdateChatAction } from "../actions/index.js";
-import { createCoSdkStateEventListener } from "../library/co-sdk-state-listener.js";
-import { buildCoCoreId } from "../library/core-id.js";
-import { invokeResolveCid } from "../library/invoke-get.js";
 import { ChatsListEpicType } from "../types/plugin.js";
 
 export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) => action$.pipe(
     filter(isPluginInitializeAction),
     mergeMap(() => {
         return createCoSdkStateEventListener().pipe(
-            filter((event) => { const [co] = event.payload; return co !== "local" }),
+            // filter out events for the local co
+            filter((event) => { const [coId] = event.payload; return coId !== "local" }),
             withLatestFrom(state$),
             mergeMap(async ([event, state]) => {
-                const [co, _, heads] = event.payload;
-                const log = (await get_actions(co, heads, 1, undefined)).actions;
+                const [coId, _, heads] = event.payload;
+                let sessionId = await sessionOpen(coId);
+                const log = (await get_actions(sessionId, heads, 1, undefined)).actions;
                 const actions: Action[] = [];
                 for (const cid of log) {
-                    const payload = await invokeResolveCid(co, cid);
+                    const payload = await resolveCid(sessionId, cid);
                     const matrixEvent = payload.p;
 
                     switch (matrixEvent.type) {
                         case "m_room_message": {
-                            const chat = state.chats.find((c) => c.id === buildCoCoreId(co, payload.c));
+                            const chat = state.chats.find((c) => c.id === buildCoCoreId(coId, payload.c));
                             if (!chat) { continue }
                             actions.push(identity<ChatsListUpdateChatAction>({
                                 payload: {
@@ -48,7 +49,7 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                         };
                         case "room_name": {
                             let name = matrixEvent.content.name;
-                            const chat = state.chats.find((c) => c.id === buildCoCoreId(co, payload.c));
+                            const chat = state.chats.find((c) => c.id === buildCoCoreId(coId, payload.c));
                             if (name && chat) {
                                 actions.push(identity<ChatsListUpdateChatAction>({
                                     payload: {
@@ -63,6 +64,7 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                         }
                     }
                 }
+                await sessionClose(sessionId);
                 return actions;
             }),
             mergeAll(),

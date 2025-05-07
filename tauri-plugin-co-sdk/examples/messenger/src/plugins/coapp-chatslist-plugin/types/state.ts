@@ -7,4 +7,7 @@ export interface ChatsListPluginState {
     readonly selectedChat?: string;
     readonly priorityPluginiId?: PluginId;
     readonly identity?: string;
+    readonly dialog?: PluginId;
 }
+
+export interface ChatsListPluginPublicState extends Pick<ChatsListPluginState, "identity"> { }

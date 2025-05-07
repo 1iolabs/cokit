@@ -19,7 +19,7 @@ co-core-room = { path = "../cores/room" }
 co-log = { path = "../co-log" }
 co-messaging = { path = "../co-messaging" }
 co-primitives = { path = "../co-primitives" }
-co-sdk = { path = "../co-sdk" }
+co-sdk = { path = "../co-sdk", default-features = false }
 futures = { workspace = true }
 ipld-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -32,6 +32,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true, features = ["sync"] }
 tracing = { workspace = true }
+uuid = { workspace = true }
 
 [build-dependencies]
 tauri-plugin = { version = "2.1.0", features = ["build"] }
