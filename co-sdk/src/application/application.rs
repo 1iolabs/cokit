@@ -226,7 +226,7 @@ pub struct ApplicationSettings {
 	/// Extra settings.
 	///
 	/// Known Tags:
-	/// - `disable-default-features` [`TagValue::Bool`]
+	/// - `default-features` [`TagValue::Bool`] - (default: `true`)
 	/// - `feature` [`TagValue::String`]
 	/// - `co-default-max-state` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_state`]
 	/// - `co-default-max-log` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_log`]
@@ -240,7 +240,7 @@ impl ApplicationSettings {
 	/// Get all enabled features from tags.
 	fn features_from_tags(tags: &Tags) -> impl Iterator<Item = &str> + '_ {
 		let default_features = ["co-local-watch", "co-local-encryption"];
-		let disable_default_features = tags.matches(tags!("disable-default-features": true));
+		let disable_default_features = tags.matches(tags!("default-features": false));
 		let features = tags.iter().filter_map(|(key, value)| match key.as_str() {
 			"feature" => value.string(),
 			_ => None,
@@ -380,8 +380,8 @@ impl ApplicationBuilder {
 			let feature_tag = tag!("feature": feature);
 
 			// expand default features
-			if !settings.contains(&feature_tag) && !settings.contains_key("disable-default-features") {
-				settings.insert(tag!("disable-default-features": true));
+			if !settings.contains(&feature_tag) && !settings.matches(tags!("default-features": false)) {
+				settings.insert(tag!("default-features": false));
 				for default_feature in ApplicationSettings::features_from_tags(&Default::default()) {
 					settings.insert(tag!("feature": default_feature));
 				}
