@@ -37,3 +37,16 @@ export async function get_actions(sessionId: string, heads: CID[], count: number
 export async function createIdentity(name: string, seed?: Uint8Array) {
     return await invoke("plugin:co-sdk|create_identity", { name, seed: seed ? Array.from(seed) : undefined });
 }
+export async function createCo(
+    creatorDid: string,
+    coName: string,
+    isPublic: boolean,
+    coId?: string,
+) {
+    return await invoke("plugin:co-sdk|create_co", {
+        creatorDid,
+        coId,
+        coName,
+        public: isPublic,
+    });
+}

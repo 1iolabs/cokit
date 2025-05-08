@@ -1,5 +1,6 @@
 use co_actor::Actor;
 use commands::{
+	co::create_co,
 	get_actions::get_actions,
 	get_state::get_co_state,
 	identity::create_identity,
@@ -36,6 +37,7 @@ pub async fn init<R: Runtime>(co_settings: CoApplicationSettings) -> TauriPlugin
 			create_identity,
 			session_open,
 			session_close,
+			create_co,
 		])
 		.setup(|app_handle, _api| {
 			app_handle.manage(actor_handle.clone());

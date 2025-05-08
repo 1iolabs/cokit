@@ -13,6 +13,7 @@ Allows usage of co-sdk api
 - `allow-create-identity`
 - `allow-session-open`
 - `allow-session-close`
+- `allow-create-co`
 
 ## Permission Table
 
@@ -22,6 +23,32 @@ Allows usage of co-sdk api
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`co-sdk:allow-create-co`
+
+</td>
+<td>
+
+Enables the create_co command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:deny-create-co`
+
+</td>
+<td>
+
+Denies the create_co command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>

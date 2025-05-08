@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
 	"create_identity",
 	"session_open",
 	"session_close",
+	"create_co",
 ];
 
 fn main() {

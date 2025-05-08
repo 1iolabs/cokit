@@ -295,6 +295,18 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the create_co command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-create-co",
+          "markdownDescription": "Enables the create_co command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the create_co command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-create-co",
+          "markdownDescription": "Denies the create_co command without any pre-configured scope."
+        },
+        {
           "description": "Enables the create_identity command without any pre-configured scope.",
           "type": "string",
           "const": "allow-create-identity",
@@ -427,10 +439,10 @@
           "markdownDescription": "Denies the storage_set command without any pre-configured scope."
         },
         {
-          "description": "Allows usage of co-sdk api\n#### This default permission set includes:\n\n- `allow-get-co-state`\n- `allow-resolve-cid`\n- `allow-storage-get`\n- `allow-storage-set`\n- `allow-push-action`\n- `allow-get-actions`\n- `allow-create-identity`\n- `allow-session-open`\n- `allow-session-close`",
+          "description": "Allows usage of co-sdk api\n#### This default permission set includes:\n\n- `allow-get-co-state`\n- `allow-resolve-cid`\n- `allow-storage-get`\n- `allow-storage-set`\n- `allow-push-action`\n- `allow-get-actions`\n- `allow-create-identity`\n- `allow-session-open`\n- `allow-session-close`\n- `allow-create-co`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows usage of co-sdk api\n#### This default permission set includes:\n\n- `allow-get-co-state`\n- `allow-resolve-cid`\n- `allow-storage-get`\n- `allow-storage-set`\n- `allow-push-action`\n- `allow-get-actions`\n- `allow-create-identity`\n- `allow-session-open`\n- `allow-session-close`"
+          "markdownDescription": "Allows usage of co-sdk api\n#### This default permission set includes:\n\n- `allow-get-co-state`\n- `allow-resolve-cid`\n- `allow-storage-get`\n- `allow-storage-set`\n- `allow-push-action`\n- `allow-get-actions`\n- `allow-create-identity`\n- `allow-session-open`\n- `allow-session-close`\n- `allow-create-co`"
         }
       ]
     }

@@ -11,4 +11,5 @@ permissions = [
     "allow-create-identity",
     "allow-session-open",
     "allow-session-close",
+    "allow-create-co",
 ]

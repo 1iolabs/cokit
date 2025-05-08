@@ -5,7 +5,7 @@ use crate::library::{
 use co_actor::ActorHandle;
 
 #[tauri::command]
-pub async fn create_identity(
+pub(crate) async fn create_identity(
 	actor_handle: tauri::State<'_, ActorHandle<ApplicationActorMessage>>,
 	name: String,
 	seed: Option<Vec<u8>>,

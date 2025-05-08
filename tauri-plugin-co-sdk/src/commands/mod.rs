@@ -1,3 +1,4 @@
+pub mod co;
 pub mod get_actions;
 pub mod get_state;
 pub mod identity;
