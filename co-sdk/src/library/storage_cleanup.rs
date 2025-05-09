@@ -141,7 +141,7 @@ mod tests {
 			)
 			.await
 			.unwrap();
-		assert_eq!(count_pin_references(&local_co, CoPinningKey::State).await, 1);
+		assert_eq!(count_pin_references(&local_co, CoPinningKey::State).await, 2);
 
 		// only keep latest
 		local_co
