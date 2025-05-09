@@ -3,7 +3,7 @@ use crate::{
 	find_membership,
 	library::{
 		connections_peer_provider::ConnectionsPeerProvider, find_co_secret::find_co_secret_by_reference,
-		membership_all_heads::membership_all_heads, storage_dispatch_remove::storage_dispatch_remove,
+		membership_all_heads::membership_all_heads,
 	},
 	reducer::{
 		change::membership_writer::MembershipWriter,
@@ -12,12 +12,9 @@ use crate::{
 	services::{
 		connections::ConnectionMessage, network::CoNetworkTaskSpawner, reducer::ReducerFlush, reducers::ReducerStorage,
 	},
-	types::{
-		co_dispatch::CoDispatch,
-		co_reducer_context::{CoReducerContext, CoReducerFeature},
-	},
-	ApplicationMessage, CoCoreResolver, CoDate, CoPinningKey, CoReducer, CoReducerState, CoStorage, CoToken,
-	CoTokenParameters, CoUuid, Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
+	ApplicationMessage, CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters,
+	CoUuid, Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
 	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
@@ -26,16 +23,12 @@ use co_actor::ActorHandle;
 use co_core_co::{CoAction, Participant};
 use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
-use co_core_storage::StorageAction;
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
-use co_primitives::{
-	tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, StoreParams, WeakCid,
-};
+use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, StoreParams};
 use co_storage::{Algorithm, BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, Secret};
 use futures::stream;
-use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -312,57 +305,38 @@ impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 		removed_blocks: BTreeSet<OptionMappedCid>,
 	) -> anyhow::Result<()> {
 		let reducer_state = CoReducerState::new_reducer(reducer);
-		tracing::info!(?new_roots, ?reducer_state, "shared-flush");
 
 		// membership
 		self.membership_writer.write(storage, reducer_state.clone()).await?;
 
-		// storage: remove
-		#[cfg(feature = "pinning")]
-		storage_dispatch_remove(
-			&mut self.references_writer.0,
-			stream::iter(removed_blocks),
-			<CoStorage as BlockStorage>::StoreParams::MAX_BLOCK_SIZE,
-		)
-		.await?;
-
-		// storage: pins
+		// pinning
 		#[cfg(feature = "pinning")]
 		{
-			// collect
-			let mut states = IndexSet::new();
-			let mut heads = IndexSet::new();
-			for root in new_roots {
-				let external_root = root.to_external(storage).await;
-				if let Some(state) = external_root.state() {
-					states.insert(state);
-				}
-				for head in external_root.heads() {
-					heads.insert(head);
-				}
-			}
-
-			// insert
-			let dispatch = &mut self.references_writer.0;
-			if !states.is_empty() {
-				if let Some(pin_state) = self.references_writer.1.pinning_key(CoPinningKey::Log) {
-					let action = StorageAction::PinReference(pin_state, heads.into_iter().map(WeakCid::from).collect());
-					dispatch.dispatch(&action).await?;
-				}
-				if let Some(pin_state) = self.references_writer.1.pinning_key(CoPinningKey::State) {
-					let action =
-						StorageAction::PinReference(pin_state, states.into_iter().map(WeakCid::from).collect());
-					dispatch.dispatch(&action).await?;
-				}
-			}
-		}
-
-		// storage: references
-		#[cfg(feature = "pinning")]
-		self.references_writer
-			.1
-			.write(&mut self.references_writer.0, storage, reducer_state.clone(), false)
+			// storage: remove
+			crate::library::storage_dispatch_remove::storage_dispatch_remove(
+				&mut self.references_writer.0,
+				stream::iter(removed_blocks),
+				<CoStorage as BlockStorage>::StoreParams::MAX_BLOCK_SIZE,
+			)
 			.await?;
+
+			// storage: pins
+			if let Some(co) = self.references_writer.1.pin() {
+				crate::library::storage_dispatch_roots::storage_dispatch_roots(
+					storage,
+					&mut self.references_writer.0,
+					co,
+					new_roots,
+				)
+				.await?;
+			}
+
+			// storage: references
+			self.references_writer
+				.1
+				.write(&mut self.references_writer.0, storage, reducer_state.clone(), false)
+				.await?;
+		}
 
 		Ok(())
 	}

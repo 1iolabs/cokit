@@ -170,12 +170,16 @@ pub struct ReferenceWriter {
 	/// The CoId to apply a pin to.
 	pin: Option<CoId>,
 
-	/// The previous state. This is used as an optimizaztion to not have to walk the whole state.
+	/// The previous (internal) state.
 	previous_reducer_state: CoReducerState,
 }
 impl ReferenceWriter {
 	pub fn new(pin: Option<CoId>, previous_reducer_state: CoReducerState) -> Self {
 		Self { pin, previous_reducer_state }
+	}
+
+	pub fn pin(&self) -> &Option<CoId> {
+		&self.pin
 	}
 
 	pub fn pinning_key(&self, key: CoPinningKey) -> Option<String> {

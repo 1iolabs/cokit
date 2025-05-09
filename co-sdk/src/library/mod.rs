@@ -32,6 +32,7 @@ pub mod settings_timeout;
 pub mod shared_membership;
 pub mod storage_cleanup;
 pub mod storage_dispatch_remove;
+pub mod storage_dispatch_roots;
 pub mod to_external_cid;
 pub mod to_internal_cid;
 pub mod update_co;

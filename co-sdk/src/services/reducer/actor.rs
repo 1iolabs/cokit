@@ -223,16 +223,22 @@ async fn handle_flush(
 			}
 		}
 
-		// forward mappings for new roots
+		// forward mappings for new roots to base storage
 		if storage.is_content_mapped().await {
 			let root_storage = reducer_context.storage(true);
 			let mappings = stream::iter(new_roots.iter().flat_map(|item| item.iter()))
 				.filter_map(|cid| to_external_mapped_opt(&storage, cid))
 				.collect::<BTreeSet<MappedCid>>()
 				.await;
+
+			// log
+			#[cfg(feature = "logging-verbose")]
 			tracing::trace!(?mappings, "reducer-flush-mappings");
+
+			// insert
 			root_storage.insert_mappings(mappings).await;
 		} else {
+			#[cfg(feature = "logging-verbose")]
 			tracing::trace!("reducer-flush-no-mappings");
 		}
 

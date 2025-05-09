@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use cid::Cid;
 use derive_more::From;
 
@@ -30,6 +31,13 @@ impl OptionMappedCid {
 		match self {
 			OptionMappedCid::Unmapped(cid) => *cid,
 			OptionMappedCid::Mapped(MappedCid(_internal, external)) => *external,
+		}
+	}
+
+	pub fn force_external(&self) -> Result<Cid, anyhow::Error> {
+		match self {
+			OptionMappedCid::Unmapped(cid) => Err(anyhow!("failed to map: {:?}", cid)),
+			OptionMappedCid::Mapped(MappedCid(_internal, external)) => Ok(*external),
 		}
 	}
 

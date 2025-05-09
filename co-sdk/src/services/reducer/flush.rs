@@ -10,6 +10,11 @@ where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
+	/// Flush.
+	///
+	/// # Args
+	/// - `new_roots` - Staged new (internal) roots that have been generated.
+	/// - `removed_blocks` - Staged removed blocks ([`co_storage::BlockStorage::remove`]).
 	async fn flush(
 		&mut self,
 		storage: &S,

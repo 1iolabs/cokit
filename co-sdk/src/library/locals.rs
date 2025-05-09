@@ -21,7 +21,7 @@ use std::{
 	io::ErrorKind,
 	ops::DerefMut,
 	os::fd::AsRawFd,
-	path::{Path, PathBuf},
+	path::PathBuf,
 	pin::Pin,
 	task::{Context, Poll},
 };
@@ -127,7 +127,7 @@ impl FileLocals {
 impl Locals for FileLocals {
 	/// Read all available local.cbor files
 	async fn get(&self) -> Result<Vec<ApplicationLocal>, anyhow::Error> {
-		Ok(self.handle.request(FileLocalsMessage::Read).await??)
+		Ok(self.handle.request(FileLocalsMessage::ReadAll).await??)
 	}
 
 	async fn set(&mut self, local: ApplicationLocal) -> Result<(), anyhow::Error> {
@@ -251,7 +251,7 @@ impl Actor for FileLocalsActor {
 					.await
 					.ok();
 			},
-			FileLocalsMessage::Read(response) => {
+			FileLocalsMessage::ReadAll(response) => {
 				response
 					.execute(|| async {
 						// read
@@ -281,8 +281,8 @@ impl Actor for FileLocalsActor {
 							async move {
 								let stream = watch(config_path).take_until(cancel.cancelled_owned());
 								pin_mut!(stream);
-								while let Some((path, local)) = stream.next().await {
-									handle.dispatch(FileLocalsMessage::Update(path, local)).ok();
+								while let Some(path) = stream.next().await {
+									handle.dispatch(FileLocalsMessage::Update(path, None)).ok();
 								}
 							}
 						}),
@@ -293,7 +293,19 @@ impl Actor for FileLocalsActor {
 				state.watch = None;
 			},
 			FileLocalsMessage::Update(path, next) => {
-				state.update(path, next);
+				let next = match next {
+					Some(next) => Some(next),
+					None => match ApplicationLocal::read(&path).await {
+						Ok(next) => next,
+						Err(err) => {
+							tracing::warn!(?path, ?err, "locals-read-failed");
+							None
+						},
+					},
+				};
+				if let Some(next) = next {
+					state.update(path, next);
+				}
 			},
 		}
 		Ok(())
@@ -406,11 +418,11 @@ enum FileLocalsMessage {
 	/// Write local.
 	Write(ApplicationLocal, Response<Result<(), anyhow::Error>>),
 
-	/// Read locals.
-	Read(Response<Result<Vec<ApplicationLocal>, anyhow::Error>>),
+	/// Read all locals.
+	ReadAll(Response<Result<Vec<ApplicationLocal>, anyhow::Error>>),
 
 	/// Update locals.
-	Update(PathBuf, ApplicationLocal),
+	Update(PathBuf, Option<ApplicationLocal>),
 
 	/// Watch locals.
 	Watch(ResponseStream<(PathBuf, ApplicationLocal)>),
@@ -507,8 +519,8 @@ impl FileLocalsState {
 }
 
 /// Watch for all local.cbor changes in config_path.
-fn watch(config_path: PathBuf) -> impl Stream<Item = (PathBuf, ApplicationLocal)> {
-	let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<(PathBuf, ApplicationLocal)>();
+fn watch(config_path: PathBuf) -> impl Stream<Item = PathBuf> {
+	let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<PathBuf>();
 
 	// spawn
 	std::thread::spawn(move || {
@@ -528,23 +540,16 @@ fn watch(config_path: PathBuf) -> impl Stream<Item = (PathBuf, ApplicationLocal)
 								if path.parent().and_then(|f| f.parent()) == Some(config_path.as_ref())
 									&& path.file_name().and_then(|f| f.to_str()) == Some("local.cbor")
 								{
-									match ApplicationLocal::read_sync(path) {
-										Ok(local) => {
-											// log
-											tracing::trace!(?path, ?event, ?local, "locals-watch-send");
+									// log
+									tracing::trace!(?path, ?event, "locals-watch-send");
 
-											// send change
-											if tx.send((path.clone(), local)).is_err() {
-												// log
-												tracing::trace!("locals-watch-stop");
+									// send change
+									if tx.send(path.clone()).is_err() {
+										// log
+										tracing::trace!("locals-watch-stop");
 
-												// stop thread when rx has been dropped
-												return Ok(());
-											}
-										},
-										Err(err) => {
-											tracing::trace!(?event, ?path, ?err, "locals-watch-read-failed");
-										},
+										// stop thread when rx has been dropped
+										return Ok(());
 									}
 								}
 							}
@@ -625,28 +630,6 @@ impl ApplicationLocal {
 			},
 		)
 	}
-
-	fn read_sync(path: impl AsRef<Path>) -> anyhow::Result<ApplicationLocal> {
-		let data = std::fs::read(&path).with_context(|| format!("Reading file: {:?}", path.as_ref().display()))?;
-		let result: ApplicationLocal = from_cbor(&data)?;
-		if result.version != Self::version() {
-			return Err(anyhow!("Invalid file version"));
-		}
-		Ok(result)
-	}
-
-	// pub async fn write(&self, path: &PathBuf) -> anyhow::Result<()> {
-	// 	// serialize
-	// 	let data = to_cbor(self)?;
-	//
-	// 	// write
-	// 	fs_write(path, data, true)
-	// 		.await
-	// 		.with_context(|| format!("Writing file: {:?}", path))?;
-	//
-	// 	// result
-	// 	Ok(())
-	// }
 
 	pub fn reducer_state(&self) -> CoReducerState {
 		(self.state, self.heads.clone()).into()

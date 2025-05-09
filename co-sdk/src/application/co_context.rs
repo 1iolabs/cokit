@@ -295,7 +295,7 @@ impl CoContextInner {
 	}
 
 	/// Creates a CoReducer instance of the Local CO.
-	#[tracing::instrument(level = tracing::Level::TRACE, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	pub(crate) async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
 		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize);
 		let local_co_reducer = local_co

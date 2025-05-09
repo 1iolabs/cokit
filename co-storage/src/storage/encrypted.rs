@@ -309,6 +309,7 @@ where
 	/// Get block.
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		let encrypted_cid = self.mapping.get(cid).await;
+		#[cfg(feature = "logging-verbose")]
 		tracing::trace!(?encrypted_cid, ?cid, "encrypted-storage-get");
 		match encrypted_cid {
 			Some(encrypted_cid) => self.get_unencrypted(&encrypted_cid).await,
@@ -337,7 +338,14 @@ where
 
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
 		match self.mapping.remove(cid).await {
-			Some(encrypted_cid) => self.next.remove(&encrypted_cid).await,
+			Some(encrypted_cid) => {
+				// log
+				#[cfg(feature = "logging-verbose")]
+				tracing::trace!(?encrypted_cid, ?cid, "encrypted-storage-remove");
+
+				// remove
+				self.next.remove(&encrypted_cid).await
+			},
 			None => self.next.remove(cid).await,
 		}
 	}

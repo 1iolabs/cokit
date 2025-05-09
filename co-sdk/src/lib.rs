@@ -61,7 +61,7 @@ pub use types::{
 	co_pinning_key::CoPinningKey,
 	co_reducer_context::CoReducerContext,
 	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError},
-	co_reducer_state::CoReducerState,
+	co_reducer_state::{CoReducerState, MappedCoReducerState},
 	co_storage::CoStorage,
 	co_uuid::{CoUuid, DynamicCoUuid, MonotonicCoUuid, RandomCoUuid},
 	cores::{
