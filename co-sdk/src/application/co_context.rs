@@ -14,7 +14,7 @@ use crate::{
 	},
 	types::co_reducer_factory::CoReducerFactoryError,
 	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, DynamicCoDate, DynamicCoUuid, LocalCoBuilder, Runtime,
-	Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
+	Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -24,7 +24,7 @@ use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 use co_log::{EntryBlock, Log};
-use co_primitives::{BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did};
+use co_primitives::{BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did};
 use futures::{Stream, TryStreamExt};
 use std::{
 	collections::BTreeSet,
@@ -147,6 +147,11 @@ impl CoContext {
 		&self.inner.uuid
 	}
 
+	/// Block links reader.
+	pub fn block_links(&self) -> &BlockLinks {
+		&self.inner.block_links
+	}
+
 	/// Force refresh co instance.
 	pub async fn refresh(&self, co: CoReducer) -> Result<(), anyhow::Error> {
 		let parent = match co.parent_id() {
@@ -200,6 +205,7 @@ pub(crate) struct CoContextInner {
 	reducers: ReducersControl,
 	date: DynamicCoDate,
 	uuid: DynamicCoUuid,
+	block_links: BlockLinks,
 }
 impl CoContextInner {
 	pub(crate) fn new(
@@ -227,6 +233,7 @@ impl CoContextInner {
 			reducers,
 			date,
 			uuid,
+			block_links: Default::default(),
 		}
 	}
 
@@ -353,7 +360,6 @@ impl CoContextInner {
 		let reducer = SharedCoBuilder::new(parent, membership)
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
-			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_owned())
 			.with_network(network)
 			.with_initialize(initialize)
 			.build(
@@ -364,6 +370,8 @@ impl CoContextInner {
 				core_resolver,
 				self.date.clone(),
 				self.application(),
+				#[cfg(feature = "pinning")]
+				self.create_pinning_context(),
 			)
 			.await?;
 
@@ -398,6 +406,18 @@ impl CoContextInner {
 			self.create_co_instance_membership(parent, membership, identity, storage, initialize, true)
 				.await?,
 		))
+	}
+
+	#[cfg(feature = "pinning")]
+	fn create_pinning_context(&self) -> crate::library::storage_pinning::StoragePinningContext {
+		crate::library::storage_pinning::StoragePinningContext {
+			identity: self.local_identity.clone().boxed(),
+			storage: self.storage.clone(),
+			runtime: self.runtime(),
+			date: self.date.clone(),
+			tasks: self.tasks.clone(),
+			block_links: self.block_links.clone(),
+		}
 	}
 }
 impl From<CoContextInner> for CoContext {

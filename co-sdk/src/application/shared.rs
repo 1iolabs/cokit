@@ -14,7 +14,7 @@ use crate::{
 	},
 	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
 	ApplicationMessage, CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters,
-	CoUuid, Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+	CoUuid, DynamicCoDate, Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
 	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
@@ -26,9 +26,8 @@ use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
-use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, StoreParams};
-use co_storage::{Algorithm, BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, Secret};
-use futures::stream;
+use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid};
+use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -43,8 +42,6 @@ pub struct SharedCoBuilder {
 	parent: CoReducer,
 	keystore_core_name: String,
 	membership_core_name: String,
-	#[cfg(feature = "pinning")]
-	storage_core_name: String,
 	membership: Membership,
 	network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
 	initialize: bool,
@@ -57,8 +54,6 @@ impl SharedCoBuilder {
 			membership,
 			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_owned(),
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_owned(),
-			#[cfg(feature = "pinning")]
-			storage_core_name: crate::CO_CORE_NAME_STORAGE.to_owned(),
 			network: None,
 			initialize: true,
 			network_block_timeout: Duration::from_secs(30),
@@ -71,13 +66,6 @@ impl SharedCoBuilder {
 
 	pub fn with_keystore_core_name(self, keystore_core_name: String) -> Self {
 		Self { keystore_core_name, ..self }
-	}
-
-	pub fn with_storage_core_name(self, _storage_core_name: String) -> Self {
-		#[cfg(feature = "pinning")]
-		return Self { storage_core_name: _storage_core_name, ..self };
-		#[cfg(not(feature = "pinning"))]
-		return self;
 	}
 
 	pub fn with_network(self, network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>) -> Self {
@@ -137,8 +125,9 @@ impl SharedCoBuilder {
 		runtime: Runtime,
 		identity: I,
 		core_resolver: DynamicCoreResolver<CoStorage>,
-		date: impl CoDate,
+		date: DynamicCoDate,
 		application_handle: ActorHandle<ApplicationMessage>,
+		#[cfg(feature = "pinning")] pinning: crate::library::storage_pinning::StoragePinningContext,
 	) -> Result<CoReducer, anyhow::Error>
 	where
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
@@ -249,20 +238,8 @@ impl SharedCoBuilder {
 			self.membership.state.clone(),
 		);
 
-		// setup auto write references to parent co
-		#[cfg(feature = "pinning")]
-		let references_writer = (
-			crate::types::co_dispatch::DynamicCoDispatch::new(
-				self.parent.dispatcher(&self.storage_core_name, identity.clone()),
-			),
-			crate::reducer::change::reference_writer::ReferenceWriter::new(
-				Some(self.membership.id.clone()),
-				CoReducerState::new_reducer(&reducer),
-			),
-		);
-
 		// build flush
-		let flush = SharedFlush { membership_writer, references_writer };
+		let flush = SharedFlush { membership_writer, pinning };
 
 		// result
 		let application_identifier = self
@@ -290,10 +267,7 @@ impl SharedCoBuilder {
 struct SharedFlush {
 	membership_writer: MembershipWriter,
 	#[cfg(feature = "pinning")]
-	references_writer: (
-		crate::types::co_dispatch::DynamicCoDispatch<co_core_storage::StorageAction>,
-		crate::reducer::change::reference_writer::ReferenceWriter,
-	),
+	pinning: crate::library::storage_pinning::StoragePinningContext,
 }
 #[async_trait]
 impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
@@ -312,30 +286,25 @@ impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 		// pinning
 		#[cfg(feature = "pinning")]
 		{
-			// storage: remove
-			crate::library::storage_dispatch_remove::storage_dispatch_remove(
-				&mut self.references_writer.0,
-				stream::iter(removed_blocks),
-				<CoStorage as BlockStorage>::StoreParams::MAX_BLOCK_SIZE,
+			let parent = &self.membership_writer.parent;
+
+			// compute
+			let parent_pinning_state = crate::library::storage_pinning::storage_pinning(
+				&self.pinning,
+				None,
+				&parent.storage(),
+				parent.reducer_state().await,
+				parent.id(),
+				storage,
+				new_roots,
+				removed_blocks,
 			)
 			.await?;
 
-			// storage: pins
-			if let Some(co) = self.references_writer.1.pin() {
-				crate::library::storage_dispatch_roots::storage_dispatch_roots(
-					storage,
-					&mut self.references_writer.0,
-					co,
-					new_roots,
-				)
-				.await?;
+			// apply
+			if let Some(parent_pinning_state) = parent_pinning_state {
+				parent.join_state(parent_pinning_state).await?;
 			}
-
-			// storage: references
-			self.references_writer
-				.1
-				.write(&mut self.references_writer.0, storage, reducer_state.clone(), false)
-				.await?;
 		}
 
 		Ok(())
