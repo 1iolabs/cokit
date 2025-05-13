@@ -98,8 +98,7 @@
           ],
           "properties": {
             "Float": {
-              "type": "number",
-              "format": "double"
+              "$ref": "#/definitions/double"
             }
           },
           "additionalProperties": false
@@ -199,6 +198,10 @@
         "minItems": 2
       },
       "uniqueItems": true
+    },
+    "double": {
+      "type": "number",
+      "format": "double"
     }
   }
 }

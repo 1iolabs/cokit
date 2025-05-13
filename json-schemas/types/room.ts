@@ -17,7 +17,7 @@ export type TagValue =
       Integer: number;
     }
   | {
-      Float: number;
+      Float: Double;
     }
   | {
       String: string;
@@ -36,6 +36,7 @@ export type TagValue =
   | {
       Link: Cid;
     };
+export type Double = number;
 /**
  * Tags.
  */
