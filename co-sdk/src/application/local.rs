@@ -1,4 +1,4 @@
-use super::{application::ApplicationSettings, identity::create_identity_resolver, reducer::ReducerChangedHandler};
+use super::{application::ApplicationSettings, identity::create_identity_resolver};
 #[cfg(feature = "pinning")]
 use crate::types::{
 	co_pinning_key::CoPinningKey,
@@ -16,8 +16,8 @@ use crate::{
 		co_reducer_state::MappedCoReducerState,
 	},
 	ApplicationMessage, CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, DynamicCoDate, Reducer,
-	ReducerBuilder, ReducerChangeContext, Runtime, TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	ReducerBuilder, Runtime, TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -140,7 +140,6 @@ impl LocalCoBuilder {
 
 #[derive(Debug, Clone)]
 struct LocalCoInstance<L> {
-	identifier: String,
 	storage: CoStorage,
 	encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
 	locals: L,
@@ -189,7 +188,6 @@ where
 			locals: locals.clone(),
 			storage: base_storage,
 			encrypted_storage: encrypted_storage.clone(),
-			identifier: local_co.settings.identifier.clone(),
 			#[cfg(feature = "pinning")]
 			pinning: (Default::default(), pinning),
 		};
@@ -274,7 +272,7 @@ where
 						tracing::trace!(?local_state, "local-watch-skip");
 						continue;
 					} else {
-						tracing::trace!(?local_state, ?local.mapping, "local-watch");
+						tracing::trace!(?previous_state, ?local_state, ?local.mapping, "local-watch");
 					}
 
 					// mappings
@@ -290,9 +288,9 @@ where
 					// join
 					match watch_reducer.join_state(local_state.clone()).await {
 						Ok(next_state) => {
-							tracing::trace!(?previous_state, ?next_state, ?local_state, "local-watch-join");
+							tracing::trace!(?previous_state, ?next_state, ?local_state, "local-watch-joined");
 						},
-						Err(err) => tracing::warn!(?err, ?local_state, "local-watch-join-failed"),
+						Err(err) => tracing::warn!(?err, ?previous_state, ?local_state, "local-watch-join-failed"),
 					}
 				}
 			});
@@ -314,9 +312,7 @@ where
 			let local = ApplicationLocal::new(external_reducer_state.heads(), external_state, mapping);
 
 			// log
-			#[cfg(debug_assertions)]
-			tracing::trace!(app = ?self.identifier, ?local.state, ?local.heads, ?local.mapping,  "local-co-write");
-			#[cfg(not(debug_assertions))]
+			#[cfg(feature = "logging-verbose")]
 			tracing::trace!(app = ?self.identifier, ?local.state, ?local.heads, ?local.mapping, "local-co-write");
 
 			// write
@@ -346,26 +342,6 @@ where
 				yield state
 			}
 		}
-	}
-}
-#[async_trait]
-impl<L, S, R> ReducerChangedHandler<S, R> for LocalCoInstance<L>
-where
-	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + Sync + Send + 'static,
-	R: CoreResolver<S> + Send + Sync + 'static,
-	L: Locals + Clone + Debug + Send + Sync + 'static,
-{
-	async fn on_state_changed(
-		&mut self,
-		storage: &S,
-		reducer: &Reducer<S, R>,
-		_context: ReducerChangeContext,
-	) -> Result<(), anyhow::Error> {
-		let external_reducer_state = CoReducerState::new(*reducer.state(), reducer.heads().to_owned())
-			.to_external_force(storage)
-			.await?;
-		self.write(external_reducer_state, None).await?;
-		Ok(())
 	}
 }
 #[async_trait]

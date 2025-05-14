@@ -236,9 +236,9 @@ impl Actor for FileLocalsActor {
 						// open and lock file
 						if state.file.is_none() {
 							state.file = match self.lock {
-								Lock::_Flock => FileLocalsFile::Flock(self.open_and_flock().await?),
-								Lock::Fcntl => FileLocalsFile::LockedFile(self.open_and_lock().await?),
-								Lock::None => FileLocalsFile::File(self.open().await?),
+								Lock::_Flock => self.open_and_flock().await?,
+								Lock::Fcntl => self.open_and_lock().await?,
+								Lock::None => self.open().await?,
 							};
 						}
 
@@ -313,18 +313,21 @@ impl Actor for FileLocalsActor {
 }
 impl FileLocalsActor {
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
-	async fn open(&self) -> Result<tokio::fs::File, anyhow::Error> {
+	async fn open(&self) -> Result<FileLocalsFile, anyhow::Error> {
 		let path = self.config_path.join(&self.identifier).join("local.cbor");
 
 		// create parent dir
 		tokio::fs::create_dir_all(path.parent().ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?).await?;
 
+		// open
+		let file = tokio::fs::OpenOptions::new().create(true).write(true).open(&path).await?;
+
 		// result
-		Ok(tokio::fs::OpenOptions::new().create(true).write(true).open(&path).await?)
+		Ok(FileLocalsFile::File(path, file))
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
-	async fn open_and_lock(&self) -> Result<tokio::fs::File, anyhow::Error> {
+	async fn open_and_lock(&self) -> Result<FileLocalsFile, anyhow::Error> {
 		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
 
 		// create and lock
@@ -346,7 +349,7 @@ impl FileLocalsActor {
 			match fcntl(file.as_raw_fd(), FcntlArg::F_SETLK(&lock)) {
 				Ok(_) => {
 					tracing::info!(?path, "local-lock");
-					return Ok(file);
+					return Ok(FileLocalsFile::LockedFile(path, file));
 				},
 				Err(errno) => {
 					// close file
@@ -368,7 +371,7 @@ impl FileLocalsActor {
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
-	async fn open_and_flock(&self) -> Result<Flock<TokioFile>, anyhow::Error> {
+	async fn open_and_flock(&self) -> Result<FileLocalsFile, anyhow::Error> {
 		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
 
 		// create and lock
@@ -391,7 +394,7 @@ impl FileLocalsActor {
 			match Flock::lock(file, nix::fcntl::FlockArg::LockExclusiveNonblock) {
 				Ok(lock) => {
 					tracing::info!(?path, "local-lock (flock)");
-					return Ok(lock);
+					return Ok(FileLocalsFile::Flock(path, lock));
 				},
 				Err((file, errno)) => {
 					// close file
@@ -438,17 +441,17 @@ enum FileLocalsMessage {
 enum FileLocalsFile {
 	#[default]
 	None,
-	File(tokio::fs::File),
-	Flock(Flock<TokioFile>),
-	LockedFile(tokio::fs::File),
+	File(PathBuf, tokio::fs::File),
+	Flock(PathBuf, Flock<TokioFile>),
+	LockedFile(PathBuf, tokio::fs::File),
 }
 impl FileLocalsFile {
-	fn file_mut(&mut self) -> Option<&mut tokio::fs::File> {
+	fn file_mut(&mut self) -> Option<(&PathBuf, &mut tokio::fs::File)> {
 		match self {
 			Self::None => None,
-			Self::File(file) => Some(file),
-			Self::Flock(lock) => Some(&mut lock.deref_mut().0),
-			Self::LockedFile(file) => Some(file),
+			Self::File(path, file) => Some((path, file)),
+			Self::Flock(path, lock) => Some((path, &mut lock.deref_mut().0)),
+			Self::LockedFile(path, file) => Some((path, file)),
 		}
 	}
 
@@ -489,13 +492,17 @@ impl FileLocalsState {
 
 	/// Write local to the locked file.
 	async fn write(&mut self, local: ApplicationLocal) -> Result<(), anyhow::Error> {
-		let file = self.file.file_mut().ok_or(anyhow!("No file."))?;
+		// get file
+		let (path, file) = self.file.file_mut().ok_or(anyhow!("No file."))?;
+
+		// apply
+		self.locals.insert(path.clone(), local.clone());
 
 		// serialize
 		let data = to_cbor(&local)?;
 
 		// log
-		tracing::debug!(?local, "locals-write");
+		tracing::debug!(?path, ?local, "locals-write");
 
 		// write
 		file.set_len(0).await?;
@@ -541,6 +548,7 @@ fn watch(config_path: PathBuf) -> impl Stream<Item = PathBuf> {
 									&& path.file_name().and_then(|f| f.to_str()) == Some("local.cbor")
 								{
 									// log
+									#[cfg(feature = "logging-verbose")]
 									tracing::trace!(?path, ?event, "locals-watch-send");
 
 									// send change
@@ -555,6 +563,7 @@ fn watch(config_path: PathBuf) -> impl Stream<Item = PathBuf> {
 							}
 						},
 						_ => {
+							#[cfg(feature = "logging-verbose")]
 							tracing::trace!(?event, "locals-watch-ignore");
 						},
 					},

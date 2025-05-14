@@ -1,4 +1,3 @@
-use super::FlushInfo;
 use crate::{types::co_reducer_state::CoReducerState, CoStorage};
 use cid::Cid;
 use co_actor::{Response, ResponseStream};
@@ -13,12 +12,25 @@ pub enum ReducerMessage {
 	State(Response<CoReducerState>),
 	StateStream(ResponseStream<CoReducerState>),
 
-	Push(PrivateIdentityBox, CoStorage, Link<ReducerAction<Ipld>>, Response<Result<CoReducerState, anyhow::Error>>),
-	JoinHeads(CoStorage, BTreeSet<Cid>, Response<Result<CoReducerState, anyhow::Error>>),
-	JoinState(CoStorage, CoReducerState, Response<Result<CoReducerState, anyhow::Error>>),
-
-	/// Flush staged changes to disk.
-	Flush(Option<OverlayBlockStorage<CoStorage>>, CoStorage, Response<Result<Option<FlushInfo>, anyhow::Error>>),
+	Push(
+		Option<OverlayBlockStorage<CoStorage>>,
+		CoStorage,
+		PrivateIdentityBox,
+		Link<ReducerAction<Ipld>>,
+		Response<Result<CoReducerState, anyhow::Error>>,
+	),
+	JoinHeads(
+		Option<OverlayBlockStorage<CoStorage>>,
+		CoStorage,
+		BTreeSet<Cid>,
+		Response<Result<CoReducerState, anyhow::Error>>,
+	),
+	JoinState(
+		Option<OverlayBlockStorage<CoStorage>>,
+		CoStorage,
+		CoReducerState,
+		Response<Result<CoReducerState, anyhow::Error>>,
+	),
 
 	/// Clear reducer caches.
 	Clear(Response<CoReducerState>),

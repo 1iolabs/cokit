@@ -3,7 +3,7 @@ use crate::{
 	library::create_reducer_action::{create_reducer_action, store_reducer_action},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{co_dispatch::CoDispatch, co_reducer_context::CoReducerContextRef, co_reducer_state::CoReducerState},
-	Action, ApplicationMessage, CoStorage, DynamicCoDate, Reducer, Runtime, Storage,
+	ApplicationMessage, CoStorage, DynamicCoDate, Reducer, Runtime, Storage,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -22,7 +22,6 @@ pub struct CoReducer {
 	id: CoId,
 	parent: Option<CoId>,
 	handle: ActorHandle<ReducerMessage>,
-	application_handle: ActorHandle<ApplicationMessage>,
 	storage: CoStorage,
 	overlay_storage: Option<OverlayBlockStorage<CoStorage>>,
 	pub(crate) context: CoReducerContextRef,
@@ -45,19 +44,10 @@ impl CoReducer {
 		let actor = Actor::spawn_with(
 			tasks.clone(),
 			tags!("application": application_identifier, "co": id.as_str()),
-			ReducerActor::new(id.clone(), tasks, runtime, context.clone()),
+			ReducerActor::new(id.clone(), tasks, runtime, application_handle, context.clone()),
 			(reducer, flush),
 		)?;
-		Ok(Self {
-			id,
-			parent,
-			storage,
-			handle: actor.handle(),
-			context,
-			date,
-			overlay_storage: None,
-			application_handle,
-		})
+		Ok(Self { id, parent, storage, handle: actor.handle(), context, date, overlay_storage: None })
 	}
 
 	pub(crate) fn clone_with_detached_storage(&self) -> Self {
@@ -83,7 +73,6 @@ impl CoReducer {
 			id: self.id.clone(),
 			parent: self.parent.clone(),
 			handle: self.handle.clone(),
-			application_handle: self.application_handle.clone(),
 			context: self.context.clone(),
 			date: self.date.clone(),
 			storage,
@@ -178,12 +167,15 @@ impl CoReducer {
 		let result = self
 			.handle
 			.request(|r| {
-				ReducerMessage::Push(PrivateIdentity::boxed(identity.clone()), self.storage(), action_reference, r)
+				ReducerMessage::Push(
+					self.overlay_storage.clone(),
+					self.storage.clone(),
+					PrivateIdentity::boxed(identity.clone()),
+					action_reference,
+					r,
+				)
 			})
 			.await??;
-
-		// flush
-		self.flush().await?;
 
 		// result
 		tracing::trace!(action = ?item, ?action_reference, state = ?result.0, heads = ?result.1, "push");
@@ -208,12 +200,15 @@ impl CoReducer {
 		let result = self
 			.handle
 			.request(|r| {
-				ReducerMessage::Push(PrivateIdentity::boxed(identity.clone()), self.storage(), action_reference, r)
+				ReducerMessage::Push(
+					self.overlay_storage.clone(),
+					self.storage.clone(),
+					PrivateIdentity::boxed(identity.clone()),
+					action_reference,
+					r,
+				)
 			})
 			.await??;
-
-		// flush
-		self.flush().await?;
 
 		// result
 		tracing::trace!(action = ?action.payload, ?action_reference, state = ?result.0, heads = ?result.1, "push");
@@ -241,12 +236,15 @@ impl CoReducer {
 		let result = self
 			.handle
 			.request(|r| {
-				ReducerMessage::Push(PrivateIdentity::boxed(identity.clone()), self.storage(), action_reference, r)
+				ReducerMessage::Push(
+					self.overlay_storage.clone(),
+					self.storage.clone(),
+					PrivateIdentity::boxed(identity.clone()),
+					action_reference,
+					r,
+				)
 			})
 			.await??;
-
-		// flush
-		self.flush().await?;
 
 		// result
 		tracing::trace!(?action_reference, state = ?result.0, heads = ?result.1, "push-reference");
@@ -260,11 +258,8 @@ impl CoReducer {
 		// join
 		let request = self
 			.handle
-			.request(|r| ReducerMessage::JoinHeads(self.storage(), heads, r))
+			.request(|r| ReducerMessage::JoinHeads(self.overlay_storage.clone(), self.storage(), heads, r))
 			.await??;
-
-		// flush
-		self.flush().await?;
 
 		// result
 		Ok(request)
@@ -275,11 +270,8 @@ impl CoReducer {
 		// join
 		let co_reducer_state = self
 			.handle
-			.request(|r| ReducerMessage::JoinState(self.storage(), state, r))
+			.request(|r| ReducerMessage::JoinState(self.overlay_storage.clone(), self.storage(), state, r))
 			.await??;
-
-		// flush
-		self.flush().await?;
 
 		// result
 		Ok(co_reducer_state)
@@ -292,24 +284,6 @@ impl CoReducer {
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
 		CoReducerDispatch::new(self.clone(), PrivateIdentity::boxed(identity), core.to_string())
-	}
-
-	/// Flush staged changes.
-	async fn flush(&self) -> Result<(), anyhow::Error> {
-		// flush
-		let info = self
-			.handle
-			.request(|r| ReducerMessage::Flush(self.overlay_storage.clone(), self.base_storage().clone(), r))
-			.await??;
-
-		// notify
-		if let Some(info) = info {
-			self.application_handle
-				.dispatch(Action::CoFlush { co: self.id.clone(), info })?;
-		}
-
-		// result
-		Ok(())
 	}
 }
 

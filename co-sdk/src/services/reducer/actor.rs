@@ -10,7 +10,7 @@ use crate::{
 		co_reducer_context::{CoReducerContextRef, CoReducerFeature},
 		co_reducer_state::CoReducerState,
 	},
-	CoStorage, Reducer, Runtime,
+	Action, ApplicationMessage, CoStorage, Reducer, Runtime,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -31,11 +31,18 @@ pub struct ReducerActor {
 	id: CoId,
 	tasks: TaskSpawner,
 	runtime: Runtime,
+	application_handle: ActorHandle<ApplicationMessage>,
 	context: CoReducerContextRef,
 }
 impl ReducerActor {
-	pub fn new(id: CoId, tasks: TaskSpawner, runtime: Runtime, context: CoReducerContextRef) -> Self {
-		Self { id, tasks, runtime, context }
+	pub fn new(
+		id: CoId,
+		tasks: TaskSpawner,
+		runtime: Runtime,
+		application_handle: ActorHandle<ApplicationMessage>,
+		context: CoReducerContextRef,
+	) -> Self {
+		Self { id, tasks, runtime, application_handle, context }
 	}
 }
 #[async_trait]
@@ -77,19 +84,14 @@ impl Actor for ReducerActor {
 					states.map(Ok).forward(response).await.ok();
 				});
 			},
-			ReducerMessage::Push(identity, storage, action_link, response) => {
-				response.respond(handle_push(&self.runtime, state, identity, storage, action_link).await);
+			ReducerMessage::Push(overlay_storage, storage, identity, action_link, response) => {
+				response.respond(handle_push(&self, overlay_storage, state, identity, storage, action_link).await);
 			},
-			ReducerMessage::JoinHeads(storage, heads, response) => {
-				response.respond(handle_join(&self.runtime, &self.context.storage(false), state, storage, heads).await);
+			ReducerMessage::JoinHeads(overlay_storage, storage, heads, response) => {
+				response.respond(handle_join(&self, overlay_storage, state, storage, heads).await);
 			},
-			ReducerMessage::JoinState(storage, join_state, response) => {
-				response.respond(
-					handle_join_state(&self.runtime, &self.context.storage(false), state, storage, join_state).await,
-				);
-			},
-			ReducerMessage::Flush(overlay_storage, storage, response) => {
-				response.respond(handle_flush(&self.context, state, overlay_storage, storage).await);
+			ReducerMessage::JoinState(overlay_storage, storage, join_state, response) => {
+				response.respond(handle_join_state(&self, overlay_storage, state, storage, join_state).await);
 			},
 			ReducerMessage::Clear(response) => {
 				response.respond(handle_clear(state));
@@ -138,73 +140,89 @@ fn handle_state_stream(state: &mut ReducerState) -> impl Stream<Item = CoReducer
 }
 
 async fn handle_push(
-	runtime: &Runtime,
-	state: &mut ReducerState,
+	actor: &ReducerActor,
+	overlay_storage: Option<OverlayBlockStorage<CoStorage>>,
+	reducer_state: &mut ReducerState,
 	identity: PrivateIdentityBox,
 	storage: CoStorage,
 	action_link: Link<ReducerAction<Ipld>>,
 ) -> Result<CoReducerState, anyhow::Error> {
 	// push
-	let reducer_state = CoReducerState(
-		state
+	let result_state = CoReducerState(
+		reducer_state
 			.reducer
-			.push_reference(&storage, runtime.runtime(), &identity, action_link)
+			.push_reference(&storage, actor.runtime.runtime(), &identity, action_link)
 			.await?,
-		state.reducer.heads().clone(),
+		reducer_state.reducer.heads().clone(),
 	);
 
 	// changed
-	changed(state, true, Some(identity.identity()), [reducer_state.clone()]);
+	changed(reducer_state, true, Some(identity.identity()), [result_state.clone()]);
+
+	// flush
+	flush(actor, reducer_state, overlay_storage, storage).await?;
 
 	// result
-	Ok(reducer_state)
+	Ok(result_state)
 }
 
 async fn handle_join(
-	runtime: &Runtime,
-	internal_storage: &CoStorage,
-	state: &mut ReducerState,
+	actor: &ReducerActor,
+	overlay_storage: Option<OverlayBlockStorage<CoStorage>>,
+	reducer_state: &mut ReducerState,
 	storage: CoStorage,
 	heads: BTreeSet<Cid>,
 ) -> Result<CoReducerState, anyhow::Error> {
 	// internal
-	let internal_state = CoReducerState::new(None, to_internal_cids(internal_storage, heads).await);
+	let root_storage = actor.context.storage(false);
+	let internal_state = CoReducerState::new(None, to_internal_cids(&root_storage, heads).await);
 
 	// join
-	apply_join(runtime, state, storage, internal_state).await?;
+	apply_join(&actor.runtime, reducer_state, &storage, internal_state).await?;
 
-	// result
-	Ok(handle_state(state))
-}
-
-/// See: [`handle_join`]
-async fn handle_join_state(
-	runtime: &Runtime,
-	internal_storage: &CoStorage,
-	reducer_state: &mut ReducerState,
-	storage: CoStorage,
-	join_state: CoReducerState,
-) -> Result<CoReducerState, anyhow::Error> {
-	// internal
-	let internal_state = join_state.to_internal(internal_storage).await;
-
-	// join
-	apply_join(runtime, reducer_state, storage, internal_state).await?;
+	// flush
+	flush(actor, reducer_state, overlay_storage, storage).await?;
 
 	// result
 	Ok(handle_state(reducer_state))
 }
 
-async fn handle_flush(
-	reducer_context: &CoReducerContextRef,
+/// See: [`handle_join`]
+async fn handle_join_state(
+	actor: &ReducerActor,
+	overlay_storage: Option<OverlayBlockStorage<CoStorage>>,
+	reducer_state: &mut ReducerState,
+	storage: CoStorage,
+	join_state: CoReducerState,
+) -> Result<CoReducerState, anyhow::Error> {
+	// internal
+	let root_storage = actor.context.storage(false);
+	let internal_state = join_state.to_internal(&root_storage).await;
+
+	// join
+	apply_join(&actor.runtime, reducer_state, &storage, internal_state).await?;
+
+	// flush
+	flush(actor, reducer_state, overlay_storage, storage).await?;
+
+	// result
+	Ok(handle_state(reducer_state))
+}
+
+async fn flush(
+	actor: &ReducerActor,
 	reducer_state: &mut ReducerState,
 	overlay_storage: Option<OverlayBlockStorage<CoStorage>>,
 	storage: CoStorage,
-) -> Result<Option<FlushInfo>, anyhow::Error> {
+) -> Result<(), anyhow::Error> {
 	let new_roots = take(&mut reducer_state.flush_roots);
 
 	// log
 	tracing::trace!(?new_roots, reducer_state = ?CoReducerState::new_reducer(&reducer_state.reducer), "reducer-flush");
+
+	// base storage
+	let base_storage =
+		if let Some(overlay_storage) = &overlay_storage { overlay_storage.next_storage() } else { &storage };
 
 	// flush overlay
 	let mut removed_blocks = BTreeSet::<OptionMappedCid>::new();
@@ -228,10 +246,10 @@ async fn handle_flush(
 		}
 
 		// forward mappings for new roots to base storage
-		if storage.is_content_mapped().await {
-			let root_storage = reducer_context.storage(true);
+		if base_storage.is_content_mapped().await {
+			let root_storage = actor.context.storage(true);
 			let mappings = stream::iter(new_roots.iter().flat_map(|item| item.iter()))
-				.filter_map(|cid| to_external_mapped_opt(&storage, cid))
+				.filter_map(|cid| to_external_mapped_opt(base_storage, cid))
 				.collect::<BTreeSet<MappedCid>>()
 				.await;
 
@@ -266,10 +284,10 @@ async fn handle_flush(
 				},
 				OverlayChange::Remove(cid) => {
 					// record
-					removed_blocks.insert(to_external_mapped(&storage, cid).await);
+					removed_blocks.insert(to_external_mapped(base_storage, cid).await);
 
 					// remove
-					storage.remove(&cid).await?;
+					base_storage.remove(&cid).await?;
 				},
 			}
 		}
@@ -277,19 +295,23 @@ async fn handle_flush(
 
 	// flush
 	if let Some(flush_info) = reducer_state.flush_info.take() {
+		// flush
 		reducer_state
 			.flush
 			.flush(
-				&storage,
+				base_storage,
 				&mut reducer_state.reducer,
 				new_roots.into_iter().filter(|root| !root.is_empty()).collect(),
 				removed_blocks,
 			)
 			.await?;
-		Ok(Some(flush_info))
-	} else {
-		Ok(None)
+
+		// notify
+		actor
+			.application_handle
+			.dispatch(Action::CoFlush { co: actor.id.clone(), info: flush_info })?;
 	}
+	Ok(())
 }
 
 fn handle_clear(reducer_state: &mut ReducerState) -> CoReducerState {
@@ -306,7 +328,7 @@ fn handle_clear(reducer_state: &mut ReducerState) -> CoReducerState {
 async fn apply_join(
 	runtime: &Runtime,
 	reducer_state: &mut ReducerState,
-	storage: CoStorage,
+	storage: &CoStorage,
 	state: CoReducerState,
 ) -> Result<(), anyhow::Error> {
 	// insert snapshot if have state and heads
@@ -315,7 +337,7 @@ async fn apply_join(
 	}
 
 	// join
-	if reducer_state.reducer.join(&storage, &state.1, runtime.runtime()).await? {
+	if reducer_state.reducer.join(storage, &state.1, runtime.runtime()).await? {
 		// roots
 		// - this will include
 		// 	 - the latest state
