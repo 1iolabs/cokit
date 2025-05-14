@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 /// Creats a temporary directory which will be deleted when the instance is dropped.
 pub struct TmpDir {
+	clean: bool,
 	path: PathBuf,
 }
 impl TmpDir {
@@ -17,7 +18,7 @@ impl TmpDir {
 	pub fn try_new(prefix: &str) -> std::io::Result<Self> {
 		let path = std::env::temp_dir().join(prefix).join(uuid::Uuid::new_v4().to_string());
 		std::fs::create_dir_all(&path)?;
-		Ok(Self { path })
+		Ok(Self { path, clean: false })
 	}
 
 	/// Path of the tmp dir.
@@ -26,8 +27,18 @@ impl TmpDir {
 	}
 
 	/// Clear the tmp dir.
-	pub fn clear(&self) -> std::io::Result<()> {
-		std::fs::remove_dir_all(&self.path)
+	pub fn clear(&mut self) -> std::io::Result<()> {
+		if !self.clean {
+			std::fs::remove_dir_all(&self.path)?;
+			self.clean = true;
+		}
+		Ok(())
+	}
+
+	/// Skip clear.
+	pub fn without_clear(mut self) -> Self {
+		self.clean = true;
+		self
 	}
 }
 impl Drop for TmpDir {

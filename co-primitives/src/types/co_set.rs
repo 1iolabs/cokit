@@ -171,4 +171,42 @@ mod tests {
 		set.commit(transaction).await.unwrap();
 		assert_eq!(set.stream(&storage).try_collect::<Vec<i32>>().await.unwrap(), vec![1, 2]);
 	}
+
+	#[tokio::test]
+	async fn test_remove() {
+		let storage = TestStorage::default();
+		let mut set = CoSet::<i32>::default();
+		let mut transaction = set.open(&storage).await.unwrap();
+		transaction.insert(1).await.unwrap();
+		transaction.insert(2).await.unwrap();
+		transaction.insert(3).await.unwrap();
+		transaction.remove(1).await.unwrap();
+		set.commit(transaction).await.unwrap();
+		assert_eq!(set.stream(&storage).try_collect::<Vec<i32>>().await.unwrap(), vec![2, 3]);
+
+		let mut transaction = set.open(&storage).await.unwrap();
+		transaction.remove(3).await.unwrap();
+		set.commit(transaction).await.unwrap();
+		assert_eq!(set.stream(&storage).try_collect::<Vec<i32>>().await.unwrap(), vec![2]);
+	}
+
+	#[tokio::test]
+	async fn test_remove_large() {
+		let storage = TestStorage::default();
+		let mut set = CoSet::<i32>::default();
+		let mut transaction = set.open(&storage).await.unwrap();
+		let range = 0..131072;
+		for i in range.clone() {
+			transaction.insert(i).await.unwrap();
+		}
+		set.commit(transaction).await.unwrap();
+		let mut expect = range.collect::<Vec<i32>>();
+		assert_eq!(set.stream(&storage).try_collect::<Vec<i32>>().await.unwrap(), expect);
+
+		let mut transaction = set.open(&storage).await.unwrap();
+		transaction.remove(10).await.unwrap();
+		set.commit(transaction).await.unwrap();
+		expect.remove(10);
+		assert_eq!(set.stream(&storage).try_collect::<Vec<i32>>().await.unwrap(), expect);
+	}
 }

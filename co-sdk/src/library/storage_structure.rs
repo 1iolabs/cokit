@@ -16,6 +16,7 @@ use std::{
 };
 
 /// Resolve shallow structure.
+/// Returns all children of resolved entries.
 #[tracing::instrument(err(Debug), skip(storage_core_storage, storage_core_dispatcher, storage, links))]
 pub async fn storage_structure<S, D>(
 	storage_core_storage: &S,
@@ -24,12 +25,17 @@ pub async fn storage_structure<S, D>(
 	storage: &D,
 	links: BlockLinks,
 	max_duration: Option<Duration>,
-) -> Result<(), anyhow::Error>
+	filter: Option<BTreeSet<Cid>>,
+) -> Result<(OptionLink<Co>, BTreeSet<Cid>), anyhow::Error>
 where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 	D: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 {
 	let is_content_mapped = storage.is_content_mapped().await;
+	let mut result_state = storage_core_state;
+	let mut result = BTreeSet::new();
+
+	// get shallow references
 	let mut query_blocks_index_shallow = query_core::<co_core_storage::Storage>(CO_CORE_NAME_STORAGE)
 		.with_default()
 		.map(|storage_core| storage_core.blocks_index_shallow);
@@ -46,8 +52,17 @@ where
 	let mut num_skip_exists = 0;
 	let mut num_skip_no_mapping = 0;
 	let mut num_skip_failure = 0;
+	let mut num_skip_filter = 0;
 	while let Some(cid) = shallow.try_next().await? {
 		num_visited += 1;
+		
+		// filter
+		if let Some(filter) = &filter {
+			if !filter.contains(&cid.cid()) {
+				num_skip_filter += 1;
+				continue;
+			}
+		}
 
 		// skip if not exists in this storage
 		if !storage.exists(&cid).await? {
@@ -81,11 +96,14 @@ where
 		// external links
 		let external_links = to_external_cids(storage, internal_links).await;
 
+		// record children for net iteration
+		result.extend(external_links.iter().cloned());
+
 		// dispatch
 		//  TODO: combine actions?
 		let action =
 			StorageAction::ReferenceStructure(vec![(cid, external_links.into_iter().map(WeakCid::from).collect())]);
-		storage_core_dispatcher.dispatch(&action).await?;
+		result_state = storage_core_dispatcher.dispatch(&action).await?.into();
 		num_resolved += 1;
 
 		// deadline?
@@ -102,11 +120,67 @@ where
 		duration_ms = duration_ms.as_millis(),
 		num_resolved,
 		num_visited,
+		num_children = result.len(),
 		num_skip_exists,
 		num_skip_no_mapping,
 		num_skip_failure,
+		num_skip_filter,
 		"storage-structure"
 	);
+
+	// result
+	Ok((result_state, result))
+}
+
+/// Resolve shallow structure.
+/// Continue to descend into children of resolved references.
+#[tracing::instrument(err(Debug), skip(storage_core_storage, storage_core_dispatcher, storage, links))]
+pub async fn storage_structure_recursive<S, D>(
+	storage_core_storage: &S,
+	storage_core_dispatcher: &mut impl CoDispatch<StorageAction>,
+	storage_core_state: OptionLink<Co>,
+	storage: &D,
+	links: BlockLinks,
+	max_duration: Option<Duration>,
+) -> Result<(), anyhow::Error>
+where
+	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
+	D: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
+{
+	let start = Instant::now();
+	let mut filter: Option<BTreeSet<Cid>> = None;
+
+	// apply
+	let mut storage_core_state = storage_core_state;
+	loop {
+		// apply
+		let (next_storage_core_state, children) = storage_structure(
+			storage_core_storage,
+			storage_core_dispatcher,
+			storage_core_state,
+			storage,
+			links.clone(),
+			max_duration.map(|duration| duration - (Instant::now() - start)),
+			filter,
+		)
+		.await?;
+		if children.is_empty() {
+			break;
+		}
+		filter = Some(children);
+		storage_core_state = next_storage_core_state;
+
+		// deadline?
+		if let Some(max_duration) = max_duration {
+			if max_duration < (Instant::now() - start) {
+				break;
+			}
+		}
+	}
+
+	// log
+	let duration_ms: Duration = Instant::now() - start;
+	tracing::trace!(duration_ms = duration_ms.as_millis(), "storage-structure-recursive");
 
 	// result
 	Ok(())

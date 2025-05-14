@@ -316,7 +316,7 @@ where
 			.log
 			.push(storage, identity, *action_link.cid())
 			.await
-			.with_context(|| format!("push event core: {}", action.core))?;
+			.with_context(|| format!("push event core: {}: {:?}", action.core, action_link))?;
 
 		// // debug
 		// let block = self.log.storage().get(entry.as_ref()).await.unwrap();
@@ -580,18 +580,17 @@ impl ReducerChangeCause {
 mod tests {
 	use super::Reducer;
 	use crate::{
-		application::reducer::ReducerBuilder, CoDate, CoreResolver, MonotonicCoDate, ReducerChangeContext,
-		ReducerChangedHandler, SingleCoreResolver,
+		application::reducer::ReducerBuilder, build_core, crate_repository_path, CoDate, CoreResolver, MonotonicCoDate,
+		ReducerChangeContext, ReducerChangedHandler, SingleCoreResolver,
 	};
 	use async_trait::async_trait;
 	use co_identity::{IdentityResolverBox, LocalIdentityResolver};
 	use co_log::Log;
 	use co_primitives::{BlockSerializer, ReducerAction};
 	use co_runtime::{Core, IdleRuntimePool, RuntimePool};
-	use co_storage::{unixfs_add_file, ExtendedBlockStorage, MemoryBlockStorage};
+	use co_storage::{ExtendedBlockStorage, MemoryBlockStorage};
 	use example_counter::{Counter, CounterAction};
 	use futures::StreamExt;
-	use tokio::process::Command;
 
 	#[tokio::test]
 	async fn smoke() {
@@ -599,13 +598,9 @@ mod tests {
 		let storage = MemoryBlockStorage::default();
 
 		// wasm
-		Command::new("cargo")
-			.current_dir("../examples/counter")
-			.args(["build", "--target=wasm32-unknown-unknown", "--release"])
-			.output()
-			.await
-			.unwrap();
-		let wasm = unixfs_add_file(&storage, "../target/wasm32-unknown-unknown/release/example_counter.wasm")
+		let wasm = build_core(crate_repository_path(true).unwrap(), "examples/counter")
+			.unwrap()
+			.store_artifact(&storage)
 			.await
 			.unwrap();
 

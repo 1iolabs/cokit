@@ -314,6 +314,8 @@ impl CoContextInner {
 				self.create_local_core_resolver(CoId::new(CO_ID_LOCAL)),
 				self.date.clone(),
 				self.application(),
+				#[cfg(feature = "pinning")]
+				self.create_pinning_context(),
 			)
 			.await?;
 		Ok(local_co_reducer)

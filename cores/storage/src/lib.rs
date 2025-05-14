@@ -314,7 +314,7 @@ where
 		StorageAction::PinRemove(key) => reduce_pin_remove(transaction, key).await?,
 		StorageAction::Batch(actions) => {
 			for action_reference in actions {
-				reduce(transaction, transaction.storage().get_value(&action_reference).await?).await?;
+				Box::pin(reduce(transaction, transaction.storage().get_value(&action_reference).await?)).await?;
 			}
 		},
 	}

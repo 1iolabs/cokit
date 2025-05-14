@@ -1,13 +1,14 @@
 use super::{
-	create_reducer_action::new_typed_reducer_action, memory_dispatch::MemoryDispatch, storage_cleanup::storage_cleanup,
+	memory_dispatch::MemoryDispatch, storage_cleanup::storage_cleanup, storage_structure::storage_structure_recursive,
 };
 use crate::{
 	library::{
-		storage_dispatch_remove::storage_dispatch_remove, storage_dispatch_roots::storage_dispatch_roots,
-		storage_structure::storage_structure,
+		create_reducer_action::create_reducer_action, storage_dispatch_remove::storage_dispatch_remove,
+		storage_dispatch_roots::storage_dispatch_roots,
 	},
 	CoReducerState, DynamicCoDate, Runtime, Storage, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
+use cid::Cid;
 use co_actor::TaskSpawner;
 use co_core_storage::StorageAction;
 use co_identity::PrivateIdentityBox;
@@ -17,6 +18,7 @@ use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, Exte
 use futures::stream;
 use std::{collections::BTreeSet, time::Duration};
 
+#[derive(Debug, Clone)]
 pub struct StoragePinningContext {
 	pub identity: PrivateIdentityBox,
 	pub storage: Storage,
@@ -70,17 +72,25 @@ where
 
 	// storage: references
 	let state = dispatcher.state().into();
-	storage_structure(&storage, &mut dispatcher, state, co_storage, context.block_links.clone(), max_duration).await?;
+	storage_structure_recursive(
+		&storage,
+		&mut dispatcher,
+		state,
+		co_storage,
+		context.block_links.clone(),
+		max_duration,
+	)
+	.await?;
 
 	// storage: cleanup
 	let state = dispatcher.state().into();
 	storage_cleanup(&mut dispatcher, &storage, state).await?;
 
-	// TODO: commit
+	// result
 	let overlay = dispatcher.storage().clone();
 	let roots = dispatcher.take_new_roots();
 	if let Some(state) = roots.last().and_then(|state| state.state()) {
-		// collapse actions
+		// collapse actions into single batch action
 		let mut actions = Vec::new();
 		for root in roots {
 			for head in &root.1 {
@@ -92,12 +102,22 @@ where
 			}
 		}
 		let batch_action = StorageAction::Batch(actions);
-		let batch_reducer_action =
-			new_typed_reducer_action(&context.identity, CO_CORE_NAME_STORAGE, batch_action, &context.date);
+		let batch_reducer_action: Cid = create_reducer_action(
+			&overlay,
+			&context.identity,
+			CO_CORE_NAME_STORAGE,
+			batch_action,
+			Default::default(),
+			&context.date,
+		)
+		.await?
+		.into();
 
 		// apply
 		dispatcher.reset(local_state).await?;
-		dispatcher.push_with_state(&batch_reducer_action, state, true).await?;
+		dispatcher
+			.push_reference_with_state(batch_reducer_action.into(), state, true)
+			.await?;
 
 		// flush
 		let next_local_state = dispatcher.reducer_state();

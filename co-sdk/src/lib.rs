@@ -45,6 +45,7 @@ pub use library::{
 	is_cid_encrypted::is_cid_encrypted,
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
+	memory_dispatch::MemoryDispatch,
 	response_list::ResponseList,
 	update_co::update_co,
 };
@@ -58,6 +59,7 @@ pub use services::{
 };
 pub use types::{
 	co_date::{CoDate, DynamicCoDate, MonotonicCoDate, StaticCoDate, SystemCoDate},
+	co_dispatch::{CoDispatch, DynamicCoDispatch},
 	co_pinning_key::CoPinningKey,
 	co_reducer_context::CoReducerContext,
 	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError},

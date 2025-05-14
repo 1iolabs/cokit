@@ -19,7 +19,7 @@ pub async fn create_memory_reducer<S>(
 where
 	S: ExtendedBlockStorage + Clone + 'static,
 {
-	let log = Log::new(id.as_bytes().to_vec(), create_identity_resolver(), Default::default());
+	let log = Log::new(id.as_bytes().to_vec(), create_identity_resolver(), reducer_state.heads());
 	let core_resolver = CoCoreResolver::default();
 	let mut builder = ReducerBuilder::new(DynamicCoreResolver::new(core_resolver), log);
 	if let Some((state, heads)) = reducer_state.some() {

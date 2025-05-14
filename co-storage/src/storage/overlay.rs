@@ -9,7 +9,7 @@ use co_primitives::{
 };
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
 use std::{
-	collections::{BTreeSet, HashMap},
+	collections::{BTreeSet, HashMap, VecDeque},
 	marker::PhantomData,
 	mem::swap,
 };
@@ -147,11 +147,15 @@ where
 				Some(OverlayChangeReference::Remove(_)) => Err(StorageError::NotFound(*cid, anyhow!("removed"))),
 			}
 		} else {
-			Ok(self
+			let block = self
 				.handle
-				.request(|response| OverlayBlockMessage::Get(self.next.clone(), *cid, response))
+				.request(|response| OverlayBlockMessage::Get(*cid, response))
 				.await
-				.map_err(|err| StorageError::Internal(err.into()))??)
+				.map_err(|err| StorageError::Internal(err.into()))??;
+			match block {
+				Some(block) => Ok(block),
+				None => Ok(self.next.get(cid).await?),
+			}
 		}
 	}
 
@@ -324,27 +328,28 @@ where
 
 	async fn handle(
 		&self,
-		handle: &ActorHandle<Self::Message>,
+		_handle: &ActorHandle<Self::Message>,
 		message: Self::Message,
 		state: &mut Self::State,
 	) -> Result<(), ActorError> {
 		match message {
-			OverlayBlockMessage::Get(next, cid, response) => match state.blocks.get(&cid) {
+			OverlayBlockMessage::Get(cid, response) => match state.blocks.get(&cid) {
 				Some(block) => match get_block_inline(cid, block) {
 					// inline
-					Ok(Some(block)) => response.respond(Ok(block)),
+					Ok(Some(block)) => response.respond(Ok(Some(block))),
 					Err(err) => response.respond(Err(err)),
 					// background
 					Ok(None) => {
 						response.spawn_with(self.spawner.clone(), {
 							let blocks_tmp = self.blocks_tmp.clone();
 							let block = block.clone();
-							move || async move { Ok(get_block(&blocks_tmp, cid, block).await?) }
+							move || async move { Ok(Some(get_block(&blocks_tmp, cid, block).await?)) }
 						});
 					},
 				},
 				None => {
-					response.spawn_with(self.spawner.clone(), move || async move { Ok(next.get(&cid).await?) });
+					// tell caller to fetch from next
+					response.respond(Ok(None));
 				},
 			},
 			OverlayBlockMessage::Set(next, extended_block, response) => {
@@ -363,6 +368,16 @@ where
 						if self.skip_already_existing {
 							if next.exists(&cid).await.ok().unwrap_or(false) {
 								return Ok(cid);
+							}
+						}
+
+						// log
+						#[cfg(feature = "logging-verbose")]
+						{
+							if co_primitives::MultiCodec::is_cbor(&cid) {
+								tracing::trace!(?cid, ipld = ?co_primitives::from_cbor::<ipld_core::ipld::Ipld>(&data), "set");
+							} else {
+								tracing::trace!(?cid, "set");
 							}
 						}
 
@@ -480,43 +495,7 @@ where
 				});
 			},
 			OverlayBlockMessage::Flush(next, cid, links, response) => {
-				match state.blocks.remove(&cid) {
-					Some(block) => {
-						// state
-						state.blocks_memory -= block.memory_len();
-
-						// flush
-						response.spawn_with(&self.spawner, {
-							let blocks_tmp = self.blocks_tmp.clone();
-							let handle = handle.clone();
-							move || async move {
-								// flush links
-								if let Some(links) = links {
-									let block = get_block(&blocks_tmp, cid, block.clone()).await?;
-									for link in links.links(&block)? {
-										handle
-											.request(|response| {
-												OverlayBlockMessage::Flush(
-													next.clone(),
-													link,
-													Some(links.clone()),
-													response,
-												)
-											})
-											.await
-											.map_err(|err| StorageError::Internal(err.into()))??;
-									}
-								}
-
-								// flush block
-								Ok(Some(flush_block(&next, &blocks_tmp, cid, block).await?))
-							}
-						});
-					},
-					None => {
-						response.respond(Ok(None));
-					},
-				}
+				response.respond(handle_flush(state, &next, &self.blocks_tmp, cid, links).await);
 			},
 			OverlayBlockMessage::ConsumeChanges(next, mut response) => {
 				// take
@@ -600,6 +579,46 @@ where
 		}
 		Ok(())
 	}
+}
+
+/// Handle Flush.
+/// We need to block state because we remove block immediately and there is a delay until its available in next storage.
+async fn handle_flush<S, T>(
+	state: &mut OverlayBlocks,
+	next: &S,
+	blocks_tmp: &T,
+	cid: Cid,
+	links: Option<BlockLinks>,
+) -> Result<Option<OverlayChangeReference>, StorageError>
+where
+	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
+	T: ExtendedBlockStorage<StoreParams = S::StoreParams> + Clone + 'static,
+{
+	let mut stack = VecDeque::new();
+	stack.push_back(cid);
+	let mut result = None;
+	while let Some(cid) = stack.pop_front() {
+		match state.blocks.remove(&cid) {
+			Some(block) => {
+				// state
+				state.blocks_memory -= block.memory_len();
+
+				// flush links
+				if let Some(links) = &links {
+					let block = get_block(blocks_tmp, cid, block.clone()).await?;
+					stack.extend(links.links(&block)?);
+				}
+
+				// flush block
+				let block_result = flush_block(next, blocks_tmp, cid, block).await?;
+				if result.is_none() {
+					result = Some(block_result);
+				}
+			},
+			None => {},
+		}
+	}
+	Ok(result)
 }
 
 async fn flush_block<S, T>(
@@ -713,7 +732,7 @@ where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 {
 	/// Get block.
-	Get(S, Cid, Response<Result<Block<S::StoreParams>, StorageError>>),
+	Get(Cid, Response<Result<Option<Block<S::StoreParams>>, StorageError>>),
 
 	/// Set block.
 	Set(S, ExtendedBlock<S::StoreParams>, Response<Result<Cid, StorageError>>),
