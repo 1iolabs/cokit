@@ -16,7 +16,9 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, TaskSpawner};
 use co_identity::{Identity, PrivateIdentityBox};
-use co_primitives::{BlockLinks, CoId, Link, MappedCid, OptionMappedCid, ReducerAction, Tags};
+use co_primitives::{
+	BlockLinks, CoId, IgnoreFilter, Link, MappedCid, OptionMappedCid, ReducerAction, Tags, WeakCoReferenceFilter,
+};
 use co_storage::{BlockStorage, BlockStorageContentMapping, OverlayBlockStorage, OverlayChange};
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use indexmap::IndexSet;
@@ -210,7 +212,9 @@ async fn handle_flush(
 		// flush roots from `overlay_storage` to `storage`
 		for root in new_roots.iter() {
 			// skip to walk all head only use the latest
-			let links = BlockLinks::default().with_added_ignore(extract_next_heads(overlay_storage, &root.1).await?);
+			let links = BlockLinks::default()
+				.with_filter(IgnoreFilter::new(extract_next_heads(overlay_storage, &root.1).await?))
+				.with_filter(WeakCoReferenceFilter::new());
 
 			// flush state
 			if let Some(state) = root.0 {

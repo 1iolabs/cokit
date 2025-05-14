@@ -13,7 +13,7 @@ use co_actor::TaskSpawner;
 use co_core_storage::StorageAction;
 use co_identity::PrivateIdentityBox;
 use co_log::EntryBlock;
-use co_primitives::{BlockLinks, CoId, Link, OptionMappedCid, ReducerAction, StoreParams};
+use co_primitives::{BlockLinks, CoId, Link, OptionMappedCid, ReducerAction, StoreParams, WeakCoReferenceFilter};
 use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage};
 use futures::stream;
 use std::{collections::BTreeSet, time::Duration};
@@ -77,7 +77,7 @@ where
 		&mut dispatcher,
 		state,
 		co_storage,
-		context.block_links.clone(),
+		context.block_links.clone().with_filter(WeakCoReferenceFilter::new()),
 		max_duration,
 	)
 	.await?;
