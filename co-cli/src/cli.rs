@@ -61,6 +61,14 @@ pub struct Cli {
 	/// Open telemetry endpoint.
 	#[arg(long, default_value_t = String::from("http://localhost:4317"))]
 	pub open_telemetry_endpoint: String,
+
+	/// Disable default features.
+	#[arg(long, default_value_t = false)]
+	pub no_default_features: bool,
+
+	/// Enable feature.
+	#[arg(long, short = 'F')]
+	pub feature: Vec<String>,
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]
