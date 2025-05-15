@@ -1,4 +1,4 @@
-use super::node_builder::NodeReader;
+use super::{dag_cbor_size_serializer::DagCborSizeSerializer, node_builder::NodeReader};
 use crate::{
 	Block, BlockSerializer, BlockStorage, BlockStorageExt, Link, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
 	NodeStream, OptionLink, StorageError, StoreParams,
@@ -32,8 +32,8 @@ where
 	pub levels: Vec<Link<Level<K, V>>>,
 
 	/// Active "in memory data".
-	#[serde(rename = "a", default = "OptionLink::default", skip_serializing_if = "OptionLink::is_none")]
-	pub active: OptionLink<Node<(K, Value<V>)>>,
+	#[serde(rename = "a", default = "Node::default", skip_serializing_if = "Node::is_empty")]
+	pub active: Node<(K, Value<V>)>,
 
 	/// Tree settings.
 	#[serde(
@@ -325,6 +325,12 @@ where
 		// result
 		Ok(block)
 	}
+
+	fn item_size_hint(&self, item: &(K, Value<V>)) -> Option<usize> {
+		let mut serializer = DagCborSizeSerializer::new();
+		item.serialize(&mut serializer).ok()?;
+		Some(serializer.size)
+	}
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -432,7 +438,9 @@ where
 		let mut result = Self { active: Default::default(), settings: Default::default(), root: root.into(), storage };
 		if let Some(root) = result.root().await? {
 			result.settings = root.settings;
-			result.active = NodeStream::from_link(result.storage.clone(), root.active).try_collect().await?;
+			result.active = NodeStream::from_node(result.storage.clone(), root.active, None)
+				.try_collect()
+				.await?;
 		}
 		Ok(result)
 	}
@@ -1107,7 +1115,7 @@ async fn store_node<S, K, V>(
 	storage: &S,
 	max_node_entries: u64,
 	entries: impl Stream<Item = Result<(&K, &Value<V>), StorageError>>,
-) -> Result<OptionLink<Node<(K, Value<V>)>>, StorageError>
+) -> Result<Node<(K, Value<V>)>, StorageError>
 where
 	S: BlockStorage + Clone + 'static,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
@@ -1118,23 +1126,24 @@ where
 			.try_into()
 			.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
 		Default::default(),
-	);
+	)
+	.with_items_size_max(S::StoreParams::MAX_BLOCK_SIZE * 3 / 8);
 	pin_mut!(entries);
 	while let Some(item) = entries.try_next().await? {
-		node_builder.push(item).map_err(|e| StorageError::InvalidArgument(e.into()))?;
+		node_builder
+			.push((item.0.clone(), item.1.clone()))
+			.map_err(|e| StorageError::InvalidArgument(e.into()))?;
 		for block in node_builder.take_blocks() {
 			storage.set(block).await?;
 		}
 	}
-	let (root, blocks) = node_builder
-		.into_blocks()
-		.map_err(|e| StorageError::InvalidArgument(e.into()))?;
+	let (node, blocks) = node_builder.into_node().map_err(|e| StorageError::InvalidArgument(e.into()))?;
 	for block in blocks.into_iter() {
 		storage.set(block).await?;
 	}
 
 	// result
-	Ok(root.cid().into())
+	Ok(node)
 }
 
 /// Store `entries` as DAG and return the root [`cid::Cid`].

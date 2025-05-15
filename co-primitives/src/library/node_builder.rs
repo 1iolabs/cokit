@@ -154,6 +154,11 @@ where
 		}
 	}
 
+	pub fn with_items_size_max(mut self, items_size_max: usize) -> Self {
+		self.items_size_max = items_size_max;
+		self
+	}
+
 	pub fn push(&mut self, item: T) -> Result<(), NodeBuilderError> {
 		// size
 		let item_size = self.serializer.item_size_hint(&item).unwrap_or(0);
