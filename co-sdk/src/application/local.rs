@@ -19,7 +19,6 @@ use crate::{
 	ReducerBuilder, Runtime, TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
 	CO_CORE_NAME_MEMBERSHIP,
 };
-use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::ActorHandle;
@@ -110,6 +109,7 @@ impl LocalCoBuilder {
 					watcher,
 					date,
 					application_handle,
+					#[cfg(feature = "pinning")]
 					pinning,
 				)
 				.await?
@@ -129,6 +129,7 @@ impl LocalCoBuilder {
 					watcher,
 					date,
 					application_handle,
+					#[cfg(feature = "pinning")]
 					pinning,
 				)
 				.await?
@@ -413,12 +414,14 @@ where
 		&mut self,
 		storage: &S,
 		reducer: &mut Reducer<S, R>,
-		new_roots: Vec<CoReducerState>,
-		removed_blocks: BTreeSet<OptionMappedCid>,
+		_new_roots: Vec<CoReducerState>,
+		_removed_blocks: BTreeSet<OptionMappedCid>,
 	) -> anyhow::Result<()> {
 		// write references
 		#[cfg(feature = "pinning")]
 		{
+			let new_roots = _new_roots;
+			let removed_blocks = _removed_blocks;
 			let (last_reducer_state, context) = &self.pinning;
 
 			// add last state from disk
@@ -432,7 +435,7 @@ where
 			}
 			let next_reducer_state = CoReducerState::new_reducer(reducer);
 			if !new_roots.contains(&next_reducer_state) {
-				return Err(anyhow!("Missing current state from roots"));
+				return Err(anyhow::anyhow!("Missing current state from roots"));
 			}
 
 			// compute

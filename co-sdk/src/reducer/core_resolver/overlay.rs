@@ -4,8 +4,11 @@ use crate::library::max_reference_count::max_reference_count;
 #[cfg(feature = "pinning")]
 use crate::types::co_dispatch::CoDispatch;
 #[cfg(feature = "pinning")]
-use crate::{library::core_resolver_dispatch::CoreResolverDispatch, CO_CORE_NAME_STORAGE};
-use crate::{library::to_external_cid::to_external_cid, CoStorage, ReducerChangeContext, Storage};
+use crate::{
+	library::core_resolver_dispatch::CoreResolverDispatch, library::to_external_cid::to_external_cid,
+	CO_CORE_NAME_STORAGE,
+};
+use crate::{CoStorage, ReducerChangeContext, Storage};
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::TaskSpawner;
@@ -67,6 +70,7 @@ where
 			next.resolve_diagnostics(&overlay_storage).await?;
 
 			// flush removed blocks from `overlay_storage` to `storage`.
+			#[cfg(feature = "pinning")]
 			let mut dispatch = CoreResolverDispatch::new(
 				self.next.clone(),
 				runtime.clone(),
@@ -75,8 +79,17 @@ where
 				CO_CORE_NAME_STORAGE.to_owned(),
 				next.state,
 			);
-			flush_overlay_changes(&overlay_storage, &storage, &mut dispatch).await?;
-			next.state = dispatch.state();
+			flush_overlay_changes(
+				&overlay_storage,
+				&storage,
+				#[cfg(feature = "pinning")]
+				&mut dispatch,
+			)
+			.await?;
+			#[cfg(feature = "pinning")]
+			{
+				next.state = dispatch.state();
+			}
 		}
 
 		// result

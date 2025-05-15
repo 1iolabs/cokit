@@ -32,8 +32,11 @@ pub mod runtime_dispatch;
 pub mod settings_timeout;
 pub mod shared_membership;
 pub mod storage_cleanup;
+#[cfg(feature = "pinning")]
 pub mod storage_dispatch_remove;
+#[cfg(feature = "pinning")]
 pub mod storage_dispatch_roots;
+#[cfg(feature = "pinning")]
 pub mod storage_pinning;
 pub mod storage_structure;
 pub mod to_external_cid;

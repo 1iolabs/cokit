@@ -239,7 +239,11 @@ impl SharedCoBuilder {
 		);
 
 		// build flush
-		let flush = SharedFlush { membership_writer, pinning };
+		let flush = SharedFlush {
+			membership_writer,
+			#[cfg(feature = "pinning")]
+			pinning,
+		};
 
 		// result
 		let application_identifier = self
@@ -275,8 +279,8 @@ impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 		&mut self,
 		storage: &CoStorage,
 		reducer: &mut Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
-		new_roots: Vec<CoReducerState>,
-		removed_blocks: BTreeSet<OptionMappedCid>,
+		_new_roots: Vec<CoReducerState>,
+		_removed_blocks: BTreeSet<OptionMappedCid>,
 	) -> anyhow::Result<()> {
 		let reducer_state = CoReducerState::new_reducer(reducer);
 
@@ -286,6 +290,8 @@ impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 		// pinning
 		#[cfg(feature = "pinning")]
 		{
+			let new_roots = _new_roots;
+			let removed_blocks = _removed_blocks;
 			let parent = &self.membership_writer.parent;
 
 			// compute
