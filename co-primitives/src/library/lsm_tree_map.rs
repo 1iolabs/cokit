@@ -308,7 +308,7 @@ where
 	fn serialize(&mut self, node: RunNode<K, V>) -> Result<Block<P>, NodeBuilderError> {
 		let block = BlockSerializer::new()
 			.serialize(&node)
-			.map_err(|_| NodeBuilderError::Encoding)?;
+			.map_err(|err| NodeBuilderError::Encoding(err.into()))?;
 
 		// record min/max for faster insert
 		match &node {

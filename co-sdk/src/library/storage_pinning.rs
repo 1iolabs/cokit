@@ -6,7 +6,6 @@ use crate::{
 		create_reducer_action::create_reducer_action, storage_dispatch_remove::storage_dispatch_remove,
 		storage_dispatch_roots::storage_dispatch_roots,
 	},
-	state::{query_core, Query},
 	CoReducerState, DynamicCoDate, Runtime, Storage, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
 use cid::Cid;
@@ -15,10 +14,10 @@ use co_core_storage::StorageAction;
 use co_identity::PrivateIdentityBox;
 use co_log::EntryBlock;
 use co_primitives::{
-	BlockLinks, CoId, CoList, Link, OptionLink, OptionMappedCid, ReducerAction, StoreParams, WeakCoReferenceFilter,
+	BlockLinks, CoId, CoList, Link, OptionMappedCid, ReducerAction, StoreParams, WeakCoReferenceFilter,
 };
 use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage};
-use futures::{stream, StreamExt};
+use futures::stream;
 use std::{collections::BTreeSet, time::Duration};
 
 #[derive(Debug, Clone)]
