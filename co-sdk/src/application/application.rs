@@ -230,10 +230,12 @@ pub struct ApplicationSettings {
 	/// - `feature` [`TagValue::String`]
 	/// - `co-default-max-state` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_state`]
 	/// - `co-default-max-log` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_log`]
+	/// - `co-storage-mode` - [`TagValue::String`] [`ApplicationSettings::setting_co_storage_mode`]
 	///
 	/// Known Features:
 	/// - `co-local-watch` (default)
 	/// - `co-local-encryption` (default)
+	/// - `co-storage-free` - [`ApplicationSettings::feature_co_storage_free`]
 	pub settings: Tags,
 }
 impl ApplicationSettings {
@@ -269,6 +271,11 @@ impl ApplicationSettings {
 	/// Whether to use encryption for Local CO.
 	pub fn feature_co_local_encryption(&self) -> bool {
 		self.has_feature("co-local-encryption")
+	}
+
+	/// Free unused storage after every flush.
+	pub fn feature_co_storage_free(&self) -> bool {
+		self.has_feature("co-storage-free")
 	}
 
 	/// Count of states to store for LocalCO and newly joined COs. A value of zero means unlimited.

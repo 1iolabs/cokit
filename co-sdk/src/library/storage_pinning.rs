@@ -28,6 +28,7 @@ pub struct StoragePinningContext {
 	pub date: DynamicCoDate,
 	pub tasks: TaskSpawner,
 	pub block_links: BlockLinks,
+	pub free: bool,
 }
 
 /// Apply pinning to storage core.
@@ -72,21 +73,24 @@ where
 	// storage: pins
 	storage_dispatch_roots(&storage, &mut dispatcher, &co_id, co_new_roots).await?;
 
-	// storage: references
-	let state = dispatcher.state().into();
-	storage_structure_recursive(
-		&storage,
-		&mut dispatcher,
-		state,
-		co_storage,
-		context.block_links.clone().with_filter(WeakCoReferenceFilter::new()),
-		max_duration,
-	)
-	.await?;
+	// caluculate and free?
+	if context.free {
+		// storage: references
+		let state = dispatcher.state().into();
+		storage_structure_recursive(
+			&storage,
+			&mut dispatcher,
+			state,
+			co_storage,
+			context.block_links.clone().with_filter(WeakCoReferenceFilter::new()),
+			max_duration,
+		)
+		.await?;
 
-	// storage: cleanup
-	let state = dispatcher.state().into();
-	storage_cleanup(&mut dispatcher, &storage, state).await?;
+		// storage: cleanup
+		let state = dispatcher.state().into();
+		storage_cleanup(&mut dispatcher, &storage, state).await?;
+	}
 
 	// result
 	let overlay = dispatcher.storage().clone();

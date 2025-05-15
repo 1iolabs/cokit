@@ -419,6 +419,7 @@ impl CoContextInner {
 			date: self.date.clone(),
 			tasks: self.tasks.clone(),
 			block_links: self.block_links.clone(),
+			free: self.settings.feature_co_storage_free(),
 		}
 	}
 }
