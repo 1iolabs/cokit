@@ -313,7 +313,7 @@ where
 
 			// log
 			#[cfg(feature = "logging-verbose")]
-			tracing::trace!(app = ?self.identifier, ?local.state, ?local.heads, ?local.mapping, "local-co-write");
+			tracing::trace!(?local.state, ?local.heads, ?local.mapping, "local-co-write");
 
 			// write
 			self.locals.set(local).await.map(|_| true)

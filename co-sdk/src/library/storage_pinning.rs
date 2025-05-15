@@ -6,6 +6,7 @@ use crate::{
 		create_reducer_action::create_reducer_action, storage_dispatch_remove::storage_dispatch_remove,
 		storage_dispatch_roots::storage_dispatch_roots,
 	},
+	state::{query_core, Query},
 	CoReducerState, DynamicCoDate, Runtime, Storage, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
 use cid::Cid;
@@ -13,9 +14,11 @@ use co_actor::TaskSpawner;
 use co_core_storage::StorageAction;
 use co_identity::PrivateIdentityBox;
 use co_log::EntryBlock;
-use co_primitives::{BlockLinks, CoId, Link, OptionMappedCid, ReducerAction, StoreParams, WeakCoReferenceFilter};
+use co_primitives::{
+	BlockLinks, CoId, CoList, Link, OptionLink, OptionMappedCid, ReducerAction, StoreParams, WeakCoReferenceFilter,
+};
 use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage};
-use futures::stream;
+use futures::{stream, StreamExt};
 use std::{collections::BTreeSet, time::Duration};
 
 #[derive(Debug, Clone)]
@@ -91,17 +94,17 @@ where
 	let roots = dispatcher.take_new_roots();
 	if let Some(state) = roots.last().and_then(|state| state.state()) {
 		// collapse actions into single batch action
-		let mut actions = Vec::new();
+		let mut actions = CoList::default().open(&overlay).await?;
 		for root in roots {
 			for head in &root.1 {
 				let block = overlay.get(head).await?;
 				let entry = EntryBlock::from_block(block)?;
 				let action_reference: Link<ReducerAction<StorageAction>> = entry.entry().payload.into();
 				let action = overlay.get_value(&action_reference).await?;
-				actions.push(overlay.set_value(&action.payload).await?);
+				actions.push(action.payload).await?;
 			}
 		}
-		let batch_action = StorageAction::Batch(actions);
+		let batch_action = StorageAction::Batch(actions.store().await?);
 		let batch_reducer_action: Cid = create_reducer_action(
 			&overlay,
 			&context.identity,

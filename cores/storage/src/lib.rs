@@ -162,7 +162,7 @@ pub enum StorageAction {
 
 	/// Batch process actions.
 	#[serde(rename = "b")]
-	Batch(Vec<Link<StorageAction>>),
+	Batch(CoList<StorageAction>),
 }
 impl Storage {
 	/// Create inital state.
@@ -313,8 +313,10 @@ where
 		StorageAction::PinReference(key, cids) => reduce_pin_reference(transaction, key, cids).await?,
 		StorageAction::PinRemove(key) => reduce_pin_remove(transaction, key).await?,
 		StorageAction::Batch(actions) => {
-			for action_reference in actions {
-				Box::pin(reduce(transaction, transaction.storage().get_value(&action_reference).await?)).await?;
+			let actions_stream = actions.stream(transaction.storage());
+			pin_mut!(actions_stream);
+			while let Some((_, action)) = actions_stream.try_next().await? {
+				Box::pin(reduce(transaction, action)).await?;
 			}
 		},
 	}

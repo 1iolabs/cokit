@@ -583,6 +583,7 @@ where
 
 /// Handle Flush.
 /// We need to block state because we remove block immediately and there is a delay until its available in next storage.
+#[tracing::instrument(level = tracing::Level::TRACE, name = "overlay-flush", err(Debug), skip(state, next, blocks_tmp, links))]
 async fn handle_flush<S, T>(
 	state: &mut OverlayBlocks,
 	next: &S,
