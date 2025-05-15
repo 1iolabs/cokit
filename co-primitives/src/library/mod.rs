@@ -2,6 +2,7 @@ pub mod block_diff;
 pub mod block_links;
 pub mod block_serializer;
 pub mod cbor;
+pub mod dag_cbor_size_serializer;
 pub mod json;
 pub mod lsm_tree_map;
 pub mod node_builder;

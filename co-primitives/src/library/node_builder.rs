@@ -1,3 +1,4 @@
+use super::dag_cbor_size_serializer::DagCborSizeSerializer;
 use crate::{Block, BlockSerializer, DefaultParams, Link, OptionLink, StoreParams};
 use cid::Cid;
 use either::Either;
@@ -47,7 +48,7 @@ pub trait NodeReader<T> {
 #[derive(Debug, thiserror::Error)]
 pub enum NodeBuilderError {
 	#[error("Encoding failed")]
-	Encoding,
+	Encoding(#[source] anyhow::Error),
 
 	#[error("Invalid argument")]
 	InvalidArgument(#[source] anyhow::Error),
@@ -58,8 +59,15 @@ where
 	P: StoreParams,
 {
 	fn nodes(&mut self, nodes: Vec<Link<N>>) -> Result<N, NodeBuilderError>;
+
 	fn leaf(&mut self, entries: Vec<T>) -> Result<N, NodeBuilderError>;
+
 	fn serialize(&mut self, node: N) -> Result<Block<P>, NodeBuilderError>;
+
+	fn item_size_hint(&self, item: &T) -> Option<usize> {
+		let _item = item;
+		None
+	}
 }
 
 pub struct DefaultNodeSerializer {}
@@ -87,7 +95,15 @@ where
 	}
 
 	fn serialize(&mut self, node: Node<T>) -> Result<Block<P>, NodeBuilderError> {
-		BlockSerializer::new().serialize(&node).map_err(|_| NodeBuilderError::Encoding)
+		BlockSerializer::new()
+			.serialize(&node)
+			.map_err(|err| NodeBuilderError::Encoding(err.into()))
+	}
+
+	fn item_size_hint(&self, item: &T) -> Option<usize> {
+		let mut serializer = DagCborSizeSerializer::new();
+		item.serialize(&mut serializer).ok()?;
+		Some(serializer.size)
 	}
 }
 
@@ -104,8 +120,10 @@ where
 
 	// Current Items.
 	items: Vec<T>,
+	items_size: usize,
+	items_size_max: usize,
 
-	/// Block references.
+	/// Block leaf references.
 	blocks: Vec<Link<N>>,
 
 	/// Computed leaf blocks to store.
@@ -127,6 +145,8 @@ where
 		Self {
 			_node: Default::default(),
 			items: Vec::new(),
+			items_size: 0,
+			items_size_max: P::MAX_BLOCK_SIZE * 3 / 4,
 			blocks: Vec::new(),
 			pending_blocks: Vec::new(),
 			max_children,
@@ -135,11 +155,18 @@ where
 	}
 
 	pub fn push(&mut self, item: T) -> Result<(), NodeBuilderError> {
+		// size
+		let item_size = self.serializer.item_size_hint(&item).unwrap_or(0);
+		if self.items_size + item_size >= self.items_size_max {
+			self.flush()?;
+		}
+
 		// push item
+		self.items_size += item_size;
 		self.items.push(item);
 
 		// full?
-		if self.items.len() >= self.max_children {
+		if self.items.len() >= self.max_children || self.items_size >= self.items_size_max {
 			self.flush()?;
 		}
 
@@ -158,6 +185,7 @@ where
 	fn flush(&mut self) -> Result<(), NodeBuilderError> {
 		let leaf = self.serializer.leaf(take(&mut self.items))?;
 		let block = self.serializer.serialize(leaf)?;
+		self.items_size = 0;
 		self.blocks.push(block.cid().into());
 		self.pending_blocks.push(block);
 		Ok(())
@@ -248,7 +276,11 @@ where
 
 #[cfg(test)]
 mod tests {
-	use crate::library::node_builder::{DefaultNodeSerializer, Node, NodeBuilder};
+	use crate::{
+		library::node_builder::{DefaultNodeSerializer, Node, NodeBuilder},
+		DefaultParams, StoreParams,
+	};
+	use std::iter::repeat;
 
 	#[test]
 	fn into_blocks() {
@@ -312,5 +344,19 @@ mod tests {
 			.map(|block| serde_ipld_dagcbor::from_slice::<Node<u8>>(block.data()).unwrap())
 			.collect();
 		insta::assert_yaml_snapshot!(nodes);
+	}
+
+	#[test]
+	fn big_blocks() {
+		// build
+		let mut builder = NodeBuilder::<Vec<u8>, DefaultParams>::new(174, DefaultNodeSerializer::new());
+		let block_size = DefaultParams::MAX_BLOCK_SIZE / 10;
+		for _ in 0..11 {
+			builder.push(repeat(0u8).take(block_size).collect()).unwrap();
+		}
+
+		// blocks
+		let (_root, blocks) = builder.into_blocks().unwrap();
+		assert_eq!(blocks.len(), 3);
 	}
 }

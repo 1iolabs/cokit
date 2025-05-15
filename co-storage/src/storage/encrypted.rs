@@ -856,8 +856,8 @@ where
 	}
 }
 impl From<AlgorithmError> for NodeBuilderError {
-	fn from(_: AlgorithmError) -> Self {
-		NodeBuilderError::Encoding
+	fn from(err: AlgorithmError) -> Self {
+		NodeBuilderError::Encoding(err.into())
 	}
 }
 
