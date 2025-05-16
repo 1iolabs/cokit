@@ -17,6 +17,7 @@ pub mod diagnostic_message;
 pub mod did;
 pub mod invite;
 pub mod known_tags;
+pub mod lazy_transaction;
 pub mod link;
 pub mod mapped_cid;
 pub mod metadata;

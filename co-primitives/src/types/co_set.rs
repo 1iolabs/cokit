@@ -1,4 +1,6 @@
-use crate::{library::lsm_tree_map::Root, BlockStorage, LsmTreeMap, OptionLink, StorageError};
+use super::lazy_transaction::Transactionable;
+use crate::{library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError};
+use async_trait::async_trait;
 use futures::{Stream, TryStreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{fmt::Debug, future::Future, hash::Hash};
@@ -77,6 +79,13 @@ where
 		})
 	}
 
+	pub async fn open_lazy<S>(&self, storage: &S) -> Result<LazyTransaction<S, Self>, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		Ok(LazyTransaction::new(storage.clone(), self.clone()))
+	}
+
 	/// Commit transaction to this map.
 	pub async fn commit<S>(&mut self, mut transaction: CoSetTransaction<S, K>) -> Result<(), StorageError>
 	where
@@ -105,6 +114,18 @@ where
 {
 	fn default() -> Self {
 		Self(Default::default())
+	}
+}
+#[async_trait]
+impl<S, K> Transactionable<S> for CoSet<K>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	type Transaction = CoSetTransaction<S, K>;
+
+	async fn open(&self, storage: &S) -> Result<Self::Transaction, StorageError> {
+		CoSet::open(self, storage).await
 	}
 }
 

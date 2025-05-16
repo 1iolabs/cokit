@@ -1,4 +1,6 @@
-use crate::{library::lsm_tree_map::Root, BlockStorage, LsmTreeMap, OptionLink, StorageError};
+use super::lazy_transaction::Transactionable;
+use crate::{library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError};
+use async_trait::async_trait;
 use futures::Stream;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{future::Future, hash::Hash};
@@ -107,6 +109,13 @@ where
 		})
 	}
 
+	pub async fn open_lazy<S>(&self, storage: &S) -> Result<LazyTransaction<S, Self>, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		Ok(LazyTransaction::new(storage.clone(), self.clone()))
+	}
+
 	/// Commit transaction to this map.
 	pub async fn commit<S>(&mut self, mut transaction: CoMapTransaction<S, K, V>) -> Result<(), StorageError>
 	where
@@ -136,6 +145,19 @@ where
 {
 	fn default() -> Self {
 		Self(Default::default())
+	}
+}
+#[async_trait]
+impl<S, K, V> Transactionable<S> for CoMap<K, V>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	type Transaction = CoMapTransaction<S, K, V>;
+
+	async fn open(&self, storage: &S) -> Result<Self::Transaction, StorageError> {
+		CoMap::open(self, storage).await
 	}
 }
 

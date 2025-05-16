@@ -35,6 +35,7 @@ pub use types::{
 	did::Did,
 	invite::{CoConnectivity, CoInviteMetadata},
 	known_tags::{CoInvite, CoJoin, CoNetwork, CoTimeout, KnownTag, KnownTags},
+	lazy_transaction::LazyTransaction,
 	link::{Link, Linkable, OptionLink},
 	mapped_cid::{MappedCid, OptionMappedCid},
 	metadata::{CoMetadata, Metadata, WithCoMetadata},

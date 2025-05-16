@@ -10,9 +10,9 @@ pub use co_primitives::{
 	BlockSerializer, BlockSerializerError, BlockStorage, BlockStorageExt, CoId, CoList, CoListIndex, CoListTransaction,
 	CoMap, CoMapTransaction, CoMetadata, CoReference, CoSet, CoSetTransaction, Component, Components, DagCollection,
 	DagCollectionExt, DagMap, DagMapExt, DagSet, DagSetExt, DagVec, DagVecExt, Date, DefaultNodeSerializer,
-	DefaultParams, Did, Link, Linkable, Metadata, Network, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
-	OptionLink, Path, PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, Secret, Storage,
-	StorageError, StoreParams, Tag, Tags, TagsExpr, TotalFloat64, WeakCid, WithCoMetadata,
+	DefaultParams, Did, LazyTransaction, Link, Linkable, Metadata, Network, Node, NodeBuilder, NodeBuilderError,
+	NodeSerializer, OptionLink, Path, PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, Secret,
+	Storage, StorageError, StoreParams, Tag, Tags, TagsExpr, TotalFloat64, WeakCid, WithCoMetadata,
 };
 pub use co_v1::{
 	diagnostic_cid_write, event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set,

@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use co_api::{
 	async_api::Reducer, BlockStorage, BlockStorageExt, CoList, CoListTransaction, CoMap, CoMapTransaction, CoSet,
-	CoSetTransaction, Link, OptionLink, ReducerAction, StorageError, Tags, WeakCid,
+	CoSetTransaction, LazyTransaction, Link, OptionLink, ReducerAction, StorageError, Tags, WeakCid,
 };
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
@@ -203,13 +203,13 @@ where
 {
 	storage: S,
 	pins_changed: bool,
-	pins: CoMapTransaction<S, String, Pin>,
+	pins: LazyTransaction<S, CoMap<String, Pin>>,
 	blocks_changed: bool,
-	blocks: CoMapTransaction<S, WeakCid, BlockMetadata>,
+	blocks: LazyTransaction<S, CoMap<WeakCid, BlockMetadata>>,
 	blocks_index_unreferenced_changed: bool,
-	blocks_index_unreferenced: CoSetTransaction<S, WeakCid>,
+	blocks_index_unreferenced: LazyTransaction<S, CoSet<WeakCid>>,
 	blocks_index_shallow_changed: bool,
-	blocks_index_shallow: CoSetTransaction<S, WeakCid>,
+	blocks_index_shallow: LazyTransaction<S, CoSet<WeakCid>>,
 }
 impl<S> StorageTransaction<S>
 where
@@ -218,33 +218,41 @@ where
 	async fn open(storage: S, state: &Storage) -> Result<Self, anyhow::Error> {
 		Ok(Self {
 			pins_changed: false,
-			pins: state.pins.open(&storage).await?,
+			pins: state.pins.open_lazy(&storage).await?,
 			blocks_changed: false,
-			blocks: state.blocks.open(&storage).await?,
+			blocks: state.blocks.open_lazy(&storage).await?,
 			blocks_index_unreferenced_changed: false,
-			blocks_index_unreferenced: state.blocks_index_unreferenced.open(&storage).await?,
+			blocks_index_unreferenced: state.blocks_index_unreferenced.open_lazy(&storage).await?,
 			blocks_index_shallow_changed: false,
-			blocks_index_shallow: state.blocks_index_shallow.open(&storage).await?,
+			blocks_index_shallow: state.blocks_index_shallow.open_lazy(&storage).await?,
 			storage,
 		})
 	}
 
 	async fn store(&mut self, state: &mut Storage) -> Result<(), anyhow::Error> {
-		if self.pins_changed {
-			state.pins = self.pins.store().await?;
-			self.pins_changed = false;
+		if let Some(pins) = self.pins.opt_mut() {
+			if self.pins_changed {
+				state.pins = pins.store().await?;
+				self.pins_changed = false;
+			}
 		}
-		if self.blocks_changed {
-			state.blocks = self.blocks.store().await?;
-			self.blocks_changed = false;
+		if let Some(blocks) = self.blocks.opt_mut() {
+			if self.blocks_changed {
+				state.blocks = blocks.store().await?;
+				self.blocks_changed = false;
+			}
 		}
-		if self.blocks_index_unreferenced_changed {
-			state.blocks_index_unreferenced = self.blocks_index_unreferenced.store().await?;
-			self.blocks_index_unreferenced_changed = false;
+		if let Some(blocks_index_unreferenced) = self.blocks_index_unreferenced.opt_mut() {
+			if self.blocks_index_unreferenced_changed {
+				state.blocks_index_unreferenced = blocks_index_unreferenced.store().await?;
+				self.blocks_index_unreferenced_changed = false;
+			}
 		}
-		if self.blocks_index_shallow_changed {
-			state.blocks_index_shallow = self.blocks_index_shallow.store().await?;
-			self.blocks_index_shallow_changed = false;
+		if let Some(blocks_index_shallow) = self.blocks_index_shallow.opt_mut() {
+			if self.blocks_index_shallow_changed {
+				state.blocks_index_shallow = blocks_index_shallow.store().await?;
+				self.blocks_index_shallow_changed = false;
+			}
 		}
 		Ok(())
 	}
@@ -253,40 +261,40 @@ where
 		&self.storage
 	}
 
-	fn pins(&self) -> &CoMapTransaction<S, String, Pin> {
-		&self.pins
+	async fn pins(&mut self) -> Result<&CoMapTransaction<S, String, Pin>, StorageError> {
+		self.pins.get().await
 	}
 
-	fn pins_mut(&mut self) -> &mut CoMapTransaction<S, String, Pin> {
+	async fn pins_mut(&mut self) -> Result<&mut CoMapTransaction<S, String, Pin>, StorageError> {
 		self.pins_changed = true;
-		&mut self.pins
+		self.pins.get_mut().await
 	}
 
-	fn blocks(&self) -> &CoMapTransaction<S, WeakCid, BlockMetadata> {
-		&self.blocks
+	async fn blocks(&mut self) -> Result<&CoMapTransaction<S, WeakCid, BlockMetadata>, StorageError> {
+		self.blocks.get().await
 	}
 
-	fn blocks_mut(&mut self) -> &mut CoMapTransaction<S, WeakCid, BlockMetadata> {
+	async fn blocks_mut(&mut self) -> Result<&mut CoMapTransaction<S, WeakCid, BlockMetadata>, StorageError> {
 		self.blocks_changed = true;
-		&mut self.blocks
+		self.blocks.get_mut().await
 	}
 
-	// fn blocks_index_unreferenced(&self) -> &CoSetTransaction<S, WeakCid> {
-	// 	&self.blocks_index_unreferenced
+	// async fn blocks_index_unreferenced(&mut self) -> Result<&CoSetTransaction<S, WeakCid>, StorageError> {
+	// 	blocks_index_unreferenced.get().await
 	// }
 
-	fn blocks_index_unreferenced_mut(&mut self) -> &mut CoSetTransaction<S, WeakCid> {
+	async fn blocks_index_unreferenced_mut(&mut self) -> Result<&mut CoSetTransaction<S, WeakCid>, StorageError> {
 		self.blocks_index_unreferenced_changed = true;
-		&mut self.blocks_index_unreferenced
+		self.blocks_index_unreferenced.get_mut().await
 	}
 
-	// fn blocks_index_shallow(&self) -> &CoSetTransaction<S, WeakCid> {
-	// 	&self.blocks_index_shallow
+	// async fn blocks_index_shallow(&mut self) -> Result<&CoSetTransaction<S, WeakCid>, StorageError> {
+	// 	blocks_index_shallow.get().await
 	// }
 
-	fn blocks_index_shallow_mut(&mut self) -> &mut CoSetTransaction<S, WeakCid> {
+	async fn blocks_index_shallow_mut(&mut self) -> Result<&mut CoSetTransaction<S, WeakCid>, StorageError> {
 		self.blocks_index_shallow_changed = true;
-		&mut self.blocks_index_shallow
+		self.blocks_index_shallow.get_mut().await
 	}
 }
 
@@ -348,13 +356,14 @@ where
 	S: BlockStorage + Clone + 'static,
 {
 	// remove panding flag and ignore if not pending
-	if !transaction.blocks_index_shallow_mut().remove(parent).await? {
+	if !transaction.blocks_index_shallow_mut().await?.remove(parent).await? {
 		return Ok(());
 	}
 
 	// get block
 	let mut block = transaction
 		.blocks()
+		.await?
 		.get(&parent)
 		.await?
 		.ok_or(anyhow!("Reference not found: {:?}", parent))?;
@@ -376,11 +385,11 @@ where
 
 	// remove
 	if block.is_removable() {
-		transaction.blocks_index_unreferenced_mut().insert(parent).await?;
+		transaction.blocks_index_unreferenced_mut().await?.insert(parent).await?;
 	}
 
 	// store
-	transaction.blocks_mut().insert(parent, block).await?;
+	transaction.blocks_mut().await?.insert(parent, block).await?;
 
 	Ok(())
 }
@@ -392,6 +401,7 @@ where
 	// pin
 	let pin = transaction
 		.pins_mut()
+		.await?
 		.remove(key.clone())
 		.await?
 		.ok_or(anyhow!("Pin not found: {}", key))?;
@@ -432,7 +442,12 @@ async fn pin_reference<S>(
 where
 	S: BlockStorage + Clone + 'static,
 {
-	let mut pin = transaction.pins().get(&key).await?.ok_or(anyhow!("Pin not found: {}", key))?;
+	let mut pin = transaction
+		.pins()
+		.await?
+		.get(&key)
+		.await?
+		.ok_or(anyhow!("Pin not found: {}", key))?;
 	let mut references = pin.references.open(transaction.storage()).await?;
 
 	// insert references
@@ -448,7 +463,7 @@ where
 
 	// store pin
 	pin.references = references.store().await?;
-	transaction.pins_mut().insert(key, pin).await?;
+	transaction.pins_mut().await?.insert(key, pin).await?;
 
 	Ok(())
 }
@@ -488,13 +503,13 @@ where
 	S: BlockStorage + Clone + 'static,
 {
 	// validate
-	if transaction.pins().contains_key(&key).await? {
+	if transaction.pins().await?.contains_key(&key).await? {
 		return Err(anyhow::anyhow!("Pin already exists: {}", key));
 	}
 
 	// insert pin
 	let pin = Pin { strategy, references: Default::default(), references_count: 0 };
-	transaction.pins_mut().insert(key.clone(), pin).await?;
+	transaction.pins_mut().await?.insert(key.clone(), pin).await?;
 
 	// initial
 	if !references.is_empty() {
@@ -514,7 +529,7 @@ where
 	S: BlockStorage + Clone + 'static,
 {
 	// get
-	let Some(mut pin) = transaction.pins().get(&key).await? else {
+	let Some(mut pin) = transaction.pins().await?.get(&key).await? else {
 		return Err(anyhow::anyhow!("Pin not exists: {}", key));
 	};
 
@@ -527,7 +542,7 @@ where
 
 	// store pin
 	pin.references = references.store().await?;
-	transaction.pins_mut().insert(key, pin).await?;
+	transaction.pins_mut().await?.insert(key, pin).await?;
 
 	// result
 	Ok(())
@@ -544,6 +559,7 @@ where
 	for cid in cids {
 		transaction
 			.blocks_mut()
+			.await?
 			.update_key(cid.into(), |mut block| async {
 				block.tags.clear(Some(&tags));
 				Ok(block)
@@ -564,6 +580,7 @@ where
 	for cid in cids {
 		transaction
 			.blocks_mut()
+			.await?
 			.update_key(cid.into(), |mut block| {
 				let mut tags = tags.clone();
 				async move {
@@ -590,21 +607,21 @@ where
 		let cid = cid.into();
 
 		// remove block
-		let block = match transaction.blocks().get(&cid).await? {
-			Some(block) if block.references == 0 => transaction.blocks_mut().remove(cid).await?,
+		let block = match transaction.blocks().await?.get(&cid).await? {
+			Some(block) if block.references == 0 => transaction.blocks_mut().await?.remove(cid).await?,
 			Some(_) if force => {
 				// remove structural references from parents
 				//  this is only the case when force remove blocks as it still has references
 				remove_structural.insert(cid);
 
 				// remove
-				transaction.blocks_mut().remove(cid).await?
+				transaction.blocks_mut().await?.remove(cid).await?
 			},
 			_ => None,
 		};
 		if let Some(block) = block {
 			// index
-			transaction.blocks_index_unreferenced_mut().remove(cid).await?;
+			transaction.blocks_index_unreferenced_mut().await?.remove(cid).await?;
 
 			// unreference children
 			let children = block.children.stream(transaction.storage());
@@ -622,10 +639,11 @@ where
 		// scan all blocks for structural referernces to the removed
 		// Complexity: `BLOCKS = O(n), C = O(m), O(n * m)`
 		{
-			let stream = transaction.blocks().stream();
+			let storage = transaction.storage().clone();
+			let stream = transaction.blocks().await?.stream();
 			pin_mut!(stream);
 			while let Some((cid, mut block)) = stream.try_next().await? {
-				let mut children = block.children.open(transaction.storage()).await?;
+				let mut children = block.children.open(&storage).await?;
 				let mut change = false;
 				for item in &remove_structural {
 					if children.remove(*item).await? {
@@ -641,7 +659,7 @@ where
 
 		// replace changed blocks
 		for (cid, block) in changed_blocks {
-			transaction.blocks_mut().insert(cid, block).await?;
+			transaction.blocks_mut().await?.insert(cid, block).await?;
 		}
 	}
 
@@ -673,8 +691,12 @@ where
 	pin_mut!(cids);
 	while let Some(cid) = cids.try_next().await? {
 		let weak_cid = cid.into();
-		if transaction.blocks().get(&weak_cid).await?.is_none() {
-			transaction.blocks_mut().insert(weak_cid, BlockMetadata::default()).await?;
+		if transaction.blocks().await?.get(&weak_cid).await?.is_none() {
+			transaction
+				.blocks_mut()
+				.await?
+				.insert(weak_cid, BlockMetadata::default())
+				.await?;
 		}
 	}
 	Ok(())
@@ -684,23 +706,23 @@ async fn reference_cid<S>(transaction: &mut StorageTransaction<S>, cid: WeakCid)
 where
 	S: BlockStorage + Clone + 'static,
 {
-	let block = transaction.blocks().get(&cid).await?;
+	let block = transaction.blocks().await?.get(&cid).await?;
 
 	// new block?
 	if let Some(block) = &block {
 		// remove from index as we have references now
 		if block.references == 0 {
-			transaction.blocks_index_unreferenced_mut().remove(cid).await?;
+			transaction.blocks_index_unreferenced_mut().await?.remove(cid).await?;
 		}
 	} else {
 		// add to pending as we are about to create the block
-		transaction.blocks_index_shallow_mut().insert(cid).await?;
+		transaction.blocks_index_shallow_mut().await?.insert(cid).await?;
 	}
 
 	// increment
 	let mut block = block.unwrap_or_default();
 	block.references += 1;
-	transaction.blocks_mut().insert(cid, block).await?;
+	transaction.blocks_mut().await?.insert(cid, block).await?;
 
 	// result
 	Ok(())
@@ -724,18 +746,18 @@ async fn unreference_cid<S>(transaction: &mut StorageTransaction<S>, cid: WeakCi
 where
 	S: BlockStorage + Clone + 'static,
 {
-	Ok(match transaction.blocks().get(&cid).await? {
+	Ok(match transaction.blocks().await?.get(&cid).await? {
 		Some(mut block) if block.references > 0 => {
 			// decrement
 			block.references -= 1;
 
 			// index
 			if block.is_removable() {
-				transaction.blocks_index_unreferenced_mut().insert(cid).await?;
+				transaction.blocks_index_unreferenced_mut().await?.insert(cid).await?;
 			}
 
 			// store
-			transaction.blocks_mut().insert(cid.clone(), block).await?;
+			transaction.blocks_mut().await?.insert(cid.clone(), block).await?;
 
 			// result
 			true
