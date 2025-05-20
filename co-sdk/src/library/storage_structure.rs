@@ -55,7 +55,7 @@ where
 	let mut num_skip_filter = 0;
 	while let Some(cid) = shallow.try_next().await? {
 		num_visited += 1;
-		
+
 		// filter
 		if let Some(filter) = &filter {
 			if !filter.contains(&cid.cid()) {
