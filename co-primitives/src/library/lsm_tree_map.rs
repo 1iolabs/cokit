@@ -461,6 +461,12 @@ where
 
 	/// Remove key.
 	pub async fn remove(&mut self, key: K) -> Result<(), StorageError> {
+		// special case: only active items: directly remove
+		if self.root.is_none() {
+			self.active.remove(&key);
+			return Ok(());
+		}
+
 		// insert tombstone to memory run
 		self.active.insert(key, Value::Tombstone);
 
