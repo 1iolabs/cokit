@@ -156,3 +156,38 @@ async fn test_local_push() {
 			.unwrap();
 	}
 }
+
+/// Create Local CO in tmpdir and exit.
+#[tokio::test]
+async fn test_local_push_encrypted() {
+	// app
+	let application_identifier = format!("test_local_push_encrypted-{}", uuid::Uuid::new_v4().to_string());
+	let tmp = TmpDir::new("co");
+	let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
+		// .with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+		.with_bunyan_logging(None)
+		.without_keychain()
+		.build()
+		.await
+		.expect("application");
+	let local_co = application.local_co_reducer().await.unwrap();
+	let counter = counter_core(&local_co.storage()).await;
+	println!("counter {:?}", counter);
+	let local_identity = application.local_identity();
+	local_co
+		.push(
+			&local_identity,
+			CO_CORE_NAME_CO,
+			&CoAction::CoreCreate { core: "counter".to_owned(), binary: counter, tags: Default::default() },
+		)
+		.await
+		.unwrap();
+
+	// push
+	for i in 0..4 {
+		local_co
+			.push(&application.local_identity(), "counter", &CounterAction::Increment(i))
+			.await
+			.unwrap();
+	}
+}

@@ -597,18 +597,32 @@ where
 {
 	let mut stack = VecDeque::new();
 	stack.push_back(cid);
+
+	// resolve links
+	if let Some(links) = &links {
+		let mut links_stack = VecDeque::new();
+		links_stack.push_back(cid);
+		while let Some(cid) = links_stack.pop_front() {
+			if let Some(overlay_block) = state.blocks.get(&cid) {
+				let block = get_block(blocks_tmp, cid, overlay_block.clone()).await?;
+				for block_link in links.links(&block)? {
+					if state.blocks.contains_key(&block_link) {
+						stack.push_back(block_link);
+						links_stack.push_back(block_link);
+					}
+				}
+			}
+		}
+	}
+
+	// flush
+	//  depest first as some BlockStorage implemtations rely on that all children exists before creating a block
 	let mut result = None;
-	while let Some(cid) = stack.pop_front() {
+	while let Some(cid) = stack.pop_back() {
 		match state.blocks.remove(&cid) {
 			Some(block) => {
 				// state
 				state.blocks_memory -= block.memory_len();
-
-				// flush links
-				if let Some(links) = &links {
-					let block = get_block(blocks_tmp, cid, block.clone()).await?;
-					stack.extend(links.links(&block)?);
-				}
 
 				// flush block
 				let block_result = flush_block(next, blocks_tmp, cid, block).await?;

@@ -234,14 +234,14 @@ async fn flush(
 				.with_filter(IgnoreFilter::new(extract_next_heads(overlay_storage, &root.1).await?))
 				.with_filter(WeakCoReferenceFilter::new());
 
-			// flush state
-			if let Some(state) = root.0 {
-				overlay_storage.flush(state, Some(links.clone())).await?;
-			}
-
 			// flush heads
 			for head in &root.1 {
 				overlay_storage.flush(*head, Some(links.clone())).await?;
+			}
+
+			// flush state
+			if let Some(state) = root.0 {
+				overlay_storage.flush(state, Some(links.clone())).await?;
 			}
 		}
 
