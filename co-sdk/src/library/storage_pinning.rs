@@ -16,8 +16,8 @@ use co_log::EntryBlock;
 use co_primitives::{
 	BlockLinks, CoId, CoList, Link, OptionMappedCid, ReducerAction, StoreParams, WeakCoReferenceFilter,
 };
-use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage};
-use futures::stream;
+use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage, OverlayChange};
+use futures::{pin_mut, stream, TryStreamExt};
 use std::{collections::BTreeSet, time::Duration};
 
 #[derive(Debug, Clone)]
@@ -130,6 +130,19 @@ where
 		for cid in next_local_state.iter() {
 			overlay.flush(cid, Some(context.block_links.clone())).await?;
 		}
+
+		// flush remove
+		let changes = overlay.changes();
+		pin_mut!(changes);
+		while let Some(change) = changes.try_next().await? {
+			match change {
+				OverlayChange::Remove(cid) => {
+					overlay.next_storage().remove(&cid).await?;
+				},
+				_ => {},
+			}
+		}
+
 		Ok(Some(next_local_state))
 	} else {
 		Ok(None)

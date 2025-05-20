@@ -87,7 +87,7 @@ mod tests {
 	use co_core_co::CoAction;
 	use co_core_storage::{PinStrategy, Storage, StorageAction};
 	use co_primitives::tags;
-	use co_storage::ExtendedBlockStorage;
+	use co_storage::{ExtendedBlockStorage, TmpDir};
 	use futures::TryStreamExt;
 
 	async fn count_pin_references(co: &CoReducer, pin: CoPinningKey) -> u32 {
@@ -116,9 +116,13 @@ mod tests {
 	/// Note: The pinned state is always one state late.
 	#[tokio::test]
 	async fn integration_test_storage_cleanup() {
-		let application = ApplicationBuilder::new_memory("test")
-			.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+		let application_identifier = format!("integration_test_storage_cleanup-{}", uuid::Uuid::new_v4().to_string());
+		let tmp = TmpDir::new("co");
+		let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
+			// .with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+			.with_bunyan_logging(None)
 			.with_disabled_feature("co-local-encryption")
+			.with_setting("feature", "co-storage-free")
 			.with_co_date(MonotonicCoDate::default())
 			.with_co_uuid(MonotonicCoUuid::default())
 			.without_keychain()
@@ -152,9 +156,6 @@ mod tests {
 			)
 			.await
 			.unwrap();
-		let next_local_co_state = local_co.reducer_state().await;
-		let external_next_local_co_state = next_local_co_state.to_external_force(&storage).await.unwrap();
-		tracing::trace!(?next_local_co_state, ?external_next_local_co_state, "test-state-next");
 		assert_eq!(count_pin_references(&local_co, CoPinningKey::State).await, 1);
 
 		// push
@@ -163,6 +164,9 @@ mod tests {
 			.push(&application.local_identity(), CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("test": 123) })
 			.await
 			.unwrap();
+		let next_local_co_state = local_co.reducer_state().await;
+		let external_next_local_co_state = next_local_co_state.to_external_force(&storage).await.unwrap();
+		tracing::trace!(?next_local_co_state, ?external_next_local_co_state, "test-state-next");
 		assert_eq!(count_pin_references(&local_co, CoPinningKey::State).await, 1);
 
 		// verify states are removed

@@ -23,7 +23,7 @@ pub struct Storage {
 	pub blocks_index_unreferenced: CoSet<WeakCid>,
 
 	/// Blocks that are recursively added but children has not yet referenced.
-	#[serde(rename = "pr", default, skip_serializing_if = "CoSet::is_empty")]
+	#[serde(rename = "bs", default, skip_serializing_if = "CoSet::is_empty")]
 	pub blocks_index_shallow: CoSet<WeakCid>,
 }
 

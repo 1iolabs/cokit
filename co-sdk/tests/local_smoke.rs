@@ -123,11 +123,13 @@ async fn test_local_smoke_encrypted() {
 #[tokio::test]
 async fn test_local_push() {
 	// app
+	let application_identifier = format!("test_local_push-{}", uuid::Uuid::new_v4().to_string());
 	let tmp = TmpDir::new("co");
-	let application = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
+	let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
 		.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
 		.without_keychain()
 		.with_disabled_feature("co-local-encryption")
+		// .with_setting("feature", "co-storage-free")
 		.with_co_date(MonotonicCoDate::default())
 		.with_co_uuid(MonotonicCoUuid::default())
 		.build()
