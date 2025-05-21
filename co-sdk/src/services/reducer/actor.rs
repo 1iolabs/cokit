@@ -231,7 +231,7 @@ async fn flush(
 		for root in new_roots.iter() {
 			// skip to walk all head only use the latest
 			let links = BlockLinks::default()
-				.with_filter(IgnoreFilter::new(extract_next_heads(overlay_storage, &root.1).await?))
+				.with_filter(IgnoreFilter::new(extract_next_heads(overlay_storage, &root.1, true).await?))
 				.with_filter(WeakCoReferenceFilter::new());
 
 			// flush heads

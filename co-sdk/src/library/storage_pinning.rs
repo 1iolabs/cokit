@@ -1,5 +1,7 @@
 use super::{
-	memory_dispatch::MemoryDispatch, storage_cleanup::storage_cleanup, storage_structure::storage_structure_recursive,
+	memory_dispatch::MemoryDispatch,
+	storage_cleanup::storage_cleanup,
+	storage_structure::{storage_structure_recursive, CoStructureResolver},
 };
 use crate::{
 	library::{
@@ -82,8 +84,8 @@ where
 			&mut dispatcher,
 			state,
 			co_storage,
-			context.block_links.clone().with_filter(WeakCoReferenceFilter::new()),
 			max_duration,
+			&CoStructureResolver::new(co_id, context.block_links.clone().with_filter(WeakCoReferenceFilter::new())),
 		)
 		.await?;
 

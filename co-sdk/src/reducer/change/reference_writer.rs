@@ -211,7 +211,7 @@ impl ReferenceWriter {
 		// heads
 		if self.previous_reducer_state.heads() != next_reducer_state.heads() {
 			let next_heads = next_reducer_state.heads();
-			let ignore = extract_next_heads(storage, next_heads.iter()).await?;
+			let ignore = extract_next_heads(storage, next_heads.iter(), true).await?;
 
 			// apply
 			for next_head in next_heads {

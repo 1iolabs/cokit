@@ -1,14 +1,16 @@
+use super::extract_next_heads::extract_next_heads;
 use crate::{
 	library::to_external_cid::to_external_cids,
 	state::{query_core, Query, QueryExt},
 	types::co_dispatch::CoDispatch,
-	CO_CORE_NAME_STORAGE,
+	CoPinningKey, CO_CORE_NAME_STORAGE,
 };
+use async_trait::async_trait;
 use cid::Cid;
 use co_core_co::Co;
-use co_core_storage::StorageAction;
-use co_primitives::{BlockLinks, OptionLink, WeakCid};
-use co_storage::{BlockStorageContentMapping, ExtendedBlockStorage};
+use co_core_storage::{BlockInfo, StorageAction};
+use co_primitives::{BlockLinks, CoId, IgnoreFilter, OptionLink, WeakCid};
+use co_storage::{BlockStorage, BlockStorageContentMapping, ExtendedBlockStorage};
 use futures::{pin_mut, TryStreamExt};
 use std::{
 	collections::BTreeSet,
@@ -17,15 +19,19 @@ use std::{
 
 /// Resolve shallow structure.
 /// Returns all children of resolved entries.
-#[tracing::instrument(err(Debug), skip(storage_core_storage, storage_core_dispatcher, storage, links))]
+///
+/// # Args
+/// - `filter` - Only include specific Cid's.
+/// - `filter_pins` - Only include if BlockInfo matched any pins.
+#[tracing::instrument(err(Debug), skip(storage_core_storage, storage_core_dispatcher, storage, structure_resolver))]
 pub async fn storage_structure<S, D>(
 	storage_core_storage: &S,
 	storage_core_dispatcher: &mut impl CoDispatch<StorageAction>,
 	storage_core_state: OptionLink<Co>,
 	storage: &D,
-	links: BlockLinks,
 	max_duration: Option<Duration>,
 	filter: Option<BTreeSet<Cid>>,
+	structure_resolver: &impl StructureResolver<S, D>,
 ) -> Result<(OptionLink<Co>, BTreeSet<Cid>), anyhow::Error>
 where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
@@ -53,7 +59,8 @@ where
 	let mut num_skip_no_mapping = 0;
 	let mut num_skip_failure = 0;
 	let mut num_skip_filter = 0;
-	while let Some(cid) = shallow.try_next().await? {
+	let mut num_skip_structure_resolver = 0;
+	while let Some((cid, info)) = shallow.try_next().await? {
 		num_visited += 1;
 
 		// filter
@@ -63,6 +70,14 @@ where
 				continue;
 			}
 		}
+
+		// structure
+		let StructureResolveResult::Include(links) =
+			structure_resolver.resolve(storage_core_storage, &info, storage, &cid).await?
+		else {
+			num_skip_structure_resolver += 1;
+			continue;
+		};
 
 		// skip if not exists in this storage
 		if !storage.exists(&cid).await? {
@@ -125,6 +140,7 @@ where
 		num_skip_no_mapping,
 		num_skip_failure,
 		num_skip_filter,
+		num_skip_structure_resolver,
 		"storage-structure"
 	);
 
@@ -134,14 +150,14 @@ where
 
 /// Resolve shallow structure.
 /// Continue to descend into children of resolved references.
-#[tracing::instrument(err(Debug), skip(storage_core_storage, storage_core_dispatcher, storage, links))]
+#[tracing::instrument(err(Debug), skip(storage_core_storage, storage_core_dispatcher, storage, structure_resolver))]
 pub async fn storage_structure_recursive<S, D>(
 	storage_core_storage: &S,
 	storage_core_dispatcher: &mut impl CoDispatch<StorageAction>,
 	storage_core_state: OptionLink<Co>,
 	storage: &D,
-	links: BlockLinks,
 	max_duration: Option<Duration>,
+	structure_resolver: &impl StructureResolver<S, D>,
 ) -> Result<(), anyhow::Error>
 where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
@@ -159,9 +175,9 @@ where
 			storage_core_dispatcher,
 			storage_core_state,
 			storage,
-			links.clone(),
 			max_duration.map(|duration| duration - (Instant::now() - start)),
 			filter,
+			structure_resolver,
 		)
 		.await?;
 		if children.is_empty() {
@@ -184,4 +200,66 @@ where
 
 	// result
 	Ok(())
+}
+
+pub enum StructureResolveResult {
+	/// Exclude the item.
+	Exclude,
+
+	/// Include the item by using specified links.
+	Include(BlockLinks),
+}
+
+#[async_trait]
+pub trait StructureResolver<S, D>: Send + Sync {
+	async fn resolve(
+		&self,
+		storage_core_storage: &S,
+		info: &BlockInfo,
+		item_storage: &D,
+		item: &Cid,
+	) -> Result<StructureResolveResult, anyhow::Error>;
+}
+
+/// Co specific structure resolver.
+/// - Only follow references related to the Co.
+/// - For heads do not follow [`co_log::Entry::next`] and [`co_log::Entry::refs`].
+pub struct CoStructureResolver {
+	log_pin: String,
+	state_pin: String,
+	block_links: BlockLinks,
+}
+impl CoStructureResolver {
+	pub fn new(co: &CoId, block_links: BlockLinks) -> Self {
+		Self { log_pin: CoPinningKey::Log.to_string(co), state_pin: CoPinningKey::State.to_string(co), block_links }
+	}
+}
+#[async_trait]
+impl<S, D> StructureResolver<S, D> for CoStructureResolver
+where
+	S: BlockStorage + Clone + 'static,
+	D: BlockStorage + Clone + 'static,
+{
+	async fn resolve(
+		&self,
+		storage_core_storage: &S,
+		info: &BlockInfo,
+		item_storage: &D,
+		item: &Cid,
+	) -> Result<StructureResolveResult, anyhow::Error> {
+		let pins: BTreeSet<String> = info.pins.stream(storage_core_storage).try_collect().await?;
+		if pins.contains(&self.log_pin) {
+			let links = if info.root {
+				let next_heads = extract_next_heads(item_storage, [item], true).await?;
+				self.block_links.clone().with_filter(IgnoreFilter::new(next_heads))
+			} else {
+				self.block_links.clone()
+			};
+			Ok(StructureResolveResult::Include(links))
+		} else if pins.contains(&self.state_pin) {
+			Ok(StructureResolveResult::Include(self.block_links.clone()))
+		} else {
+			Ok(StructureResolveResult::Exclude)
+		}
+	}
 }

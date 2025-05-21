@@ -23,8 +23,8 @@ pub struct Storage {
 	pub blocks_index_unreferenced: CoSet<WeakCid>,
 
 	/// Blocks that are recursively added but children has not yet referenced.
-	#[serde(rename = "bs", default, skip_serializing_if = "CoSet::is_empty")]
-	pub blocks_index_shallow: CoSet<WeakCid>,
+	#[serde(rename = "bs", default, skip_serializing_if = "CoMap::is_empty")]
+	pub blocks_index_shallow: CoMap<WeakCid, BlockInfo>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -44,6 +44,32 @@ impl ReferenceMode {
 			ReferenceMode::Shallow => false,
 			ReferenceMode::Recursive => true,
 		}
+	}
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BlockInfo {
+	/// Pinning keys taht reference this block.
+	#[serde(rename = "p", default, skip_serializing_if = "CoSet::is_empty")]
+	pub pins: CoSet<String>,
+
+	/// This is a root reference.
+	#[serde(rename = "r", default, skip_serializing_if = "std::ops::Not::not")]
+	pub root: bool,
+}
+impl BlockInfo {
+	pub async fn new<S>(storage: &S, pin: String, root: bool) -> Result<Self, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		let mut pins = CoSet::default();
+		pins.insert(storage, pin).await?;
+		Ok(Self { pins, root })
+	}
+
+	pub fn without_root(mut self) -> Self {
+		self.root = false;
+		self
 	}
 }
 
@@ -108,7 +134,7 @@ pub enum StorageAction {
 	/// A single [`Cid`] is allowed to be contained multiple times (=reference count).
 	/// Shallow: [`Cid`] links are not added automatically (not recusrive).
 	#[serde(rename = "r")]
-	Reference(Vec<WeakCid>),
+	Reference(BlockInfo, Vec<WeakCid>),
 
 	/// Decrease [`Cid`] reference count by one.
 	#[serde(rename = "u")]
@@ -116,7 +142,8 @@ pub enum StorageAction {
 
 	/// Structurally reference [`Cid`].
 	/// The first item is the parent the second is the children to be structurally referenced.
-	/// All unique children have their reference count increased by one (idempotent).
+	/// All children have their reference count increased by one (idempotent).
+	/// Expects all children references passed for a parent even is they not exist on disk.
 	#[serde(rename = "s")]
 	ReferenceStructure(Vec<(WeakCid, BTreeSet<WeakCid>)>),
 
@@ -209,7 +236,7 @@ where
 	blocks_index_unreferenced_changed: bool,
 	blocks_index_unreferenced: LazyTransaction<S, CoSet<WeakCid>>,
 	blocks_index_shallow_changed: bool,
-	blocks_index_shallow: LazyTransaction<S, CoSet<WeakCid>>,
+	blocks_index_shallow: LazyTransaction<S, CoMap<WeakCid, BlockInfo>>,
 }
 impl<S> StorageTransaction<S>
 where
@@ -292,7 +319,7 @@ where
 	// 	blocks_index_shallow.get().await
 	// }
 
-	async fn blocks_index_shallow_mut(&mut self) -> Result<&mut CoSetTransaction<S, WeakCid>, StorageError> {
+	async fn blocks_index_shallow_mut(&mut self) -> Result<&mut CoMapTransaction<S, WeakCid, BlockInfo>, StorageError> {
 		self.blocks_index_shallow_changed = true;
 		self.blocks_index_shallow.get_mut().await
 	}
@@ -303,7 +330,7 @@ where
 	S: BlockStorage + Clone + 'static,
 {
 	match action {
-		StorageAction::Reference(cids) => reduce_reference(transaction, stream::iter(cids).map(Ok)).await?,
+		StorageAction::Reference(info, cids) => reduce_reference(transaction, stream::iter(cids).map(Ok), info).await?,
 		StorageAction::Unreference(cids) => reduce_unreference(transaction, stream::iter(cids).map(Ok)).await?,
 		StorageAction::ReferenceStructure(cids) => {
 			reduce_reference_structure(transaction, stream::iter(cids).map(Ok)).await?
@@ -355,10 +382,13 @@ async fn reference_structure_cid<S>(
 where
 	S: BlockStorage + Clone + 'static,
 {
-	// remove panding flag and ignore if not pending
-	if !transaction.blocks_index_shallow_mut().await?.remove(parent).await? {
-		return Ok(());
-	}
+	// remove pending flag and ignore if not pending
+	let info = match transaction.blocks_index_shallow_mut().await?.remove(parent).await? {
+		Some(info) => info,
+		None => {
+			return Ok(());
+		},
+	};
 
 	// get block
 	let mut block = transaction
@@ -370,7 +400,7 @@ where
 
 	// reference children
 	for item in children.iter() {
-		reference_cid(transaction, *item).await?;
+		reference_cid(transaction, *item, info.clone().without_root()).await?;
 	}
 
 	// children
@@ -449,13 +479,14 @@ where
 		.await?
 		.ok_or(anyhow!("Pin not found: {}", key))?;
 	let mut references = pin.references.open(transaction.storage()).await?;
+	let info = BlockInfo::new(transaction.storage(), key.clone(), true).await?;
 
 	// insert references
 	for cid in cids {
 		let cid = cid.into();
 		references.push(cid).await?;
 		pin.references_count += 1;
-		reference_cid(transaction, cid).await?;
+		reference_cid(transaction, cid, info.clone()).await?;
 	}
 
 	// apply pin strategy
@@ -670,13 +701,14 @@ where
 async fn reduce_reference<S>(
 	transaction: &mut StorageTransaction<S>,
 	cids: impl Stream<Item = Result<WeakCid, StorageError>>,
+	info: BlockInfo,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
 	pin_mut!(cids);
 	while let Some(cid) = cids.try_next().await? {
-		reference_cid(transaction, cid.into()).await?;
+		reference_cid(transaction, cid.into(), info.clone()).await?;
 	}
 	Ok(())
 }
@@ -702,7 +734,11 @@ where
 	Ok(())
 }
 
-async fn reference_cid<S>(transaction: &mut StorageTransaction<S>, cid: WeakCid) -> Result<(), anyhow::Error>
+async fn reference_cid<S>(
+	transaction: &mut StorageTransaction<S>,
+	cid: WeakCid,
+	info: BlockInfo,
+) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
@@ -716,7 +752,7 @@ where
 		}
 	} else {
 		// add to pending as we are about to create the block
-		transaction.blocks_index_shallow_mut().await?.insert(cid).await?;
+		transaction.blocks_index_shallow_mut().await?.insert(cid, info).await?;
 	}
 
 	// increment
