@@ -4,33 +4,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
-#[serde(tag = "type", content = "content")]
-pub enum UserType {
-	#[serde(rename = "user_story_post")]
-	PostStory(PostUserStoryContent),
-	#[serde(rename = "user_story_view")]
-	ViewStory(ViewUserStoryContent),
-	#[serde(rename = "user_profile_update")]
-	UpdateProfile(UpdateProfileContent),
-}
-
-impl EventType for UserType {
-	fn generate_event_type(&self) -> String {
-		match self {
-			UserType::PostStory(content) => content.generate_event_type(),
-			UserType::ViewStory(content) => content.generate_event_type(),
-			UserType::UpdateProfile(content) => content.generate_event_type(),
-		}
-	}
-}
-
-impl From<UserType> for EventContent {
-	fn from(val: UserType) -> Self {
-		EventContent::User(val)
-	}
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct PostUserStoryContent {
 	/// How long users can view the story after it was posted in ms
 	pub lifetime: u64,
@@ -48,7 +21,7 @@ impl EventType for PostUserStoryContent {
 
 impl From<PostUserStoryContent> for EventContent {
 	fn from(val: PostUserStoryContent) -> Self {
-		UserType::PostStory(val).into()
+		EventContent::PostStory(val).into()
 	}
 }
 
@@ -71,7 +44,7 @@ impl EventType for ViewUserStoryContent {
 
 impl From<ViewUserStoryContent> for EventContent {
 	fn from(val: ViewUserStoryContent) -> Self {
-		UserType::ViewStory(val).into()
+		EventContent::ViewStory(val).into()
 	}
 }
 
@@ -96,7 +69,7 @@ impl EventType for UpdateProfileContent {
 
 impl From<UpdateProfileContent> for EventContent {
 	fn from(val: UpdateProfileContent) -> Self {
-		UserType::UpdateProfile(val).into()
+		EventContent::UpdateProfile(val).into()
 	}
 }
 

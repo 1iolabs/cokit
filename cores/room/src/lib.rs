@@ -1,5 +1,5 @@
 use co_api::{Context, Reducer, ReducerAction, Tags};
-use co_messaging::{state_event::StateType, EventContent, MatrixEvent};
+use co_messaging::{EventContent, MatrixEvent};
 use co_primitives::CoCid;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -32,12 +32,10 @@ impl Reducer for Room {
 
 		let mut result = self.clone();
 		match &matrix_event.content {
-			EventContent::State(state_content) => match state_content {
-				StateType::RoomName(name_content) => result.name = name_content.name.clone(),
-				StateType::RoomTopic(topic_content) => result.description = topic_content.topic.clone(),
-				StateType::RoomAvatar(avatar_content) => result.avatar = avatar_content.file,
-				StateType::PinnedEvents(pin_content) => result.pinned_messages = pin_content.pinned.clone(),
-			},
+			EventContent::RoomName(name_content) => result.name = name_content.name.clone(),
+			EventContent::RoomTopic(topic_content) => result.description = topic_content.topic.clone(),
+			EventContent::RoomAvatar(avatar_content) => result.avatar = avatar_content.file,
+			EventContent::PinnedEvents(pin_content) => result.pinned_messages = pin_content.pinned.clone(),
 			_ => (),
 		};
 		result

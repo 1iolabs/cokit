@@ -3,43 +3,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /**
- * All events that interact with or create a poll
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
-#[serde(tag = "msgtype")]
-pub enum PollMessageType {
-	#[serde(rename = "poll_start")]
-	Start(PollStartContent),
-	#[serde(rename = "poll_response")]
-	Response(PollResponseContent),
-	#[serde(rename = "poll_end")]
-	End(PollEndContent),
-}
-
-impl From<PollMessageType> for EventContent {
-	fn from(val: PollMessageType) -> Self {
-		MessageType::Poll(val).into()
-	}
-}
-
-impl Relation for PollMessageType {
-	fn generate_relation_type(&self) -> Option<String> {
-		match self {
-			PollMessageType::Start(content) => content.generate_relation_type(),
-			PollMessageType::Response(content) => content.generate_relation_type(),
-			PollMessageType::End(content) => content.generate_relation_type(),
-		}
-	}
-	fn get_in_reply_to(&self) -> Option<String> {
-		match self {
-			PollMessageType::Start(content) => content.get_in_reply_to(),
-			PollMessageType::Response(content) => content.get_in_reply_to(),
-			PollMessageType::End(content) => content.get_in_reply_to(),
-		}
-	}
-}
-
-/**
  * Event used to create a poll.
  */
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
@@ -75,7 +38,7 @@ impl PollStartContent {
 
 impl From<PollStartContent> for EventContent {
 	fn from(val: PollStartContent) -> Self {
-		PollMessageType::Start(val).into()
+		MessageType::Start(val).into()
 	}
 }
 
@@ -186,7 +149,7 @@ impl Relation for PollResponseContent {
 
 impl From<PollResponseContent> for EventContent {
 	fn from(val: PollResponseContent) -> Self {
-		PollMessageType::Response(val).into()
+		MessageType::Response(val).into()
 	}
 }
 
@@ -212,7 +175,7 @@ impl PollEndContent {
 
 impl From<PollEndContent> for EventContent {
 	fn from(val: PollEndContent) -> Self {
-		PollMessageType::End(val).into()
+		MessageType::End(val).into()
 	}
 }
 

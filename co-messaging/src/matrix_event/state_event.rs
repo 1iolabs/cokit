@@ -4,39 +4,6 @@ use co_primitives::CoCid;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/**
- * All events that in some way alter the state of a room
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
-#[serde(tag = "type", content = "content")]
-pub enum StateType {
-	#[serde(rename = "room_name")]
-	RoomName(RoomNameContent),
-	#[serde(rename = "room_topic")]
-	RoomTopic(RoomTopicContent),
-	#[serde(rename = "room_avatar")]
-	RoomAvatar(RoomAvatarContent),
-	#[serde(rename = "room_pinned_events")]
-	PinnedEvents(PinnedEventsContent),
-}
-
-impl From<StateType> for EventContent {
-	fn from(val: StateType) -> Self {
-		EventContent::State(val)
-	}
-}
-
-impl EventType for StateType {
-	fn generate_event_type(&self) -> String {
-		match &self {
-			StateType::RoomName(content) => content.generate_event_type(),
-			StateType::RoomTopic(content) => content.generate_event_type(),
-			StateType::RoomAvatar(content) => content.generate_event_type(),
-			StateType::PinnedEvents(content) => content.generate_event_type(),
-		}
-	}
-}
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
 pub struct RoomNameContent {
 	pub name: String,
@@ -56,7 +23,7 @@ impl EventType for RoomNameContent {
 
 impl From<RoomNameContent> for EventContent {
 	fn from(val: RoomNameContent) -> Self {
-		StateType::RoomName(val).into()
+		EventContent::RoomName(val).into()
 	}
 }
 
@@ -79,7 +46,7 @@ impl EventType for RoomTopicContent {
 
 impl From<RoomTopicContent> for EventContent {
 	fn from(val: RoomTopicContent) -> Self {
-		StateType::RoomTopic(val).into()
+		EventContent::RoomTopic(val).into()
 	}
 }
 
@@ -103,7 +70,7 @@ impl EventType for RoomAvatarContent {
 
 impl From<RoomAvatarContent> for EventContent {
 	fn from(val: RoomAvatarContent) -> Self {
-		StateType::RoomAvatar(val).into()
+		EventContent::RoomAvatar(val).into()
 	}
 }
 
@@ -126,6 +93,6 @@ impl EventType for PinnedEventsContent {
 
 impl From<PinnedEventsContent> for EventContent {
 	fn from(val: PinnedEventsContent) -> Self {
-		StateType::PinnedEvents(val).into()
+		EventContent::PinnedEvents(val).into()
 	}
 }

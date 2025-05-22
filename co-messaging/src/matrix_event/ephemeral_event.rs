@@ -4,33 +4,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /**
- * Ephemeral events are once-off events that do not need to be saved.
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
-#[serde(tag = "type", content = "content")]
-pub enum EphemeralType {
-	#[serde(rename = "typing")]
-	Typing(TypingContent),
-	#[serde(rename = "presence")]
-	Presence(PresenceContent),
-}
-
-impl EventType for EphemeralType {
-	fn generate_event_type(&self) -> String {
-		match self {
-			EphemeralType::Typing(c) => c.generate_event_type(),
-			EphemeralType::Presence(c) => c.generate_event_type(),
-		}
-	}
-}
-
-impl From<EphemeralType> for EventContent {
-	fn from(val: EphemeralType) -> Self {
-		EventContent::Ephemeral(val)
-	}
-}
-
-/**
  * Event used to indicate which users in the room are currently typing.
  * Gets sent to all active users. For direct messages this information will only be shared with the other
  * participant. Information should be updated regularly and have a timout after which no users should count as
@@ -50,7 +23,7 @@ impl EventType for TypingContent {
 
 impl From<TypingContent> for EventContent {
 	fn from(val: TypingContent) -> Self {
-		EphemeralType::Typing(val).into()
+		EventContent::Typing(val).into()
 	}
 }
 
@@ -105,7 +78,7 @@ impl EventType for PresenceContent {
 
 impl From<PresenceContent> for EventContent {
 	fn from(val: PresenceContent) -> Self {
-		EphemeralType::Presence(val).into()
+		EventContent::Presence(val).into()
 	}
 }
 

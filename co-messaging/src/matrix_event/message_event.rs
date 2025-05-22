@@ -1,6 +1,6 @@
 use super::{
 	multimedia::{AudioInfo, FileInfo, ImageInfo, LocationInfo},
-	poll_event::PollMessageType,
+	poll_event::{PollEndContent, PollResponseContent, PollStartContent},
 };
 use crate::{matrix_event::relation::RelatesTo, multimedia::VideoInfo, relation::Relation, EventContent};
 use co_primitives::{CoCid, Did};
@@ -28,8 +28,14 @@ pub enum MessageType {
 	File(FileContent),
 	#[serde(rename = "location")]
 	Location(LocationContent),
-	#[serde(untagged)]
-	Poll(PollMessageType),
+
+	/// All events that interact with or create a poll
+	#[serde(rename = "poll_start")]
+	Start(PollStartContent),
+	#[serde(rename = "poll_response")]
+	Response(PollResponseContent),
+	#[serde(rename = "poll_end")]
+	End(PollEndContent),
 }
 
 impl MessageType {
@@ -42,9 +48,9 @@ impl MessageType {
 			MessageType::Video(_) => String::from("m.video"),
 			MessageType::File(_) => String::from("m.file"),
 			MessageType::Location(_) => String::from("m.location"),
-			MessageType::Poll(PollMessageType::Start(_)) => String::from("m.poll.start"),
-			MessageType::Poll(PollMessageType::Response(_)) => String::from("m.poll.response"),
-			MessageType::Poll(PollMessageType::End(_)) => String::from("m.poll.end"),
+			MessageType::Start(_) => String::from("m.poll.start"),
+			MessageType::Response(_) => String::from("m.poll.response"),
+			MessageType::End(_) => String::from("m.poll.end"),
 		}
 	}
 }
@@ -59,7 +65,9 @@ impl Relation for MessageType {
 			MessageType::Video(content) => content.generate_relation_type(),
 			MessageType::File(content) => content.generate_relation_type(),
 			MessageType::Location(content) => content.generate_relation_type(),
-			MessageType::Poll(content) => content.generate_relation_type(),
+			MessageType::Start(content) => content.generate_relation_type(),
+			MessageType::Response(content) => content.generate_relation_type(),
+			MessageType::End(content) => content.generate_relation_type(),
 		}
 	}
 	fn get_in_reply_to(&self) -> Option<String> {
@@ -71,7 +79,9 @@ impl Relation for MessageType {
 			MessageType::Video(content) => content.get_in_reply_to(),
 			MessageType::File(content) => content.get_in_reply_to(),
 			MessageType::Location(content) => content.get_in_reply_to(),
-			MessageType::Poll(content) => content.get_in_reply_to(),
+			MessageType::Start(content) => content.get_in_reply_to(),
+			MessageType::Response(content) => content.get_in_reply_to(),
+			MessageType::End(content) => content.get_in_reply_to(),
 		}
 	}
 }
