@@ -18,3 +18,4 @@ tokio = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tauri-plugin-co-sdk = { path = "../../.." }
+tauri-plugin-fs = "2"

@@ -75,9 +75,9 @@
     }
   },
   "dependencies": {
-    "@1io/coapp-chatlist-view": "file:../../../../../IdeaProjects/coapp/coapp-chatlist-view/1io-coapp-chatlist-view-0.0.1-4.tgz",
-    "@1io/coapp-messenger-view": "file:../../../../../IdeaProjects/coapp/coapp-messenger-view/1io-coapp-messenger-view-0.4.4-0.tgz",
-    "@1io/coapp-style": "file:../../../../../IdeaProjects/coapp/coapp-styles/1io-coapp-style-0.1.2.tgz",
+    "@1io/coapp-chatlist-view": "0.0.1-mr1.5",
+    "@1io/coapp-messenger-view": "0.4.4-mr7.1",
+    "@1io/coapp-style": "^0.1.3",
     "@1io/copy-paste-utils": "^0.3.9",
     "@1io/kui-application": "^0.5.0",
     "@1io/kui-application-sdk": "^5.0.1",
@@ -92,6 +92,7 @@
     "@ipld/dag-cbor": "^9.2.0",
     "@tauri-apps/api": "^2.4.0",
     "@tauri-apps/plugin-dialog": "^2.2.1",
+    "@tauri-apps/plugin-fs": "^2.3.0",
     "@tauri-apps/plugin-shell": "^2.2.0",
     "@types/babel-core": "^6.25.10",
     "clsx": "^2.1.1",

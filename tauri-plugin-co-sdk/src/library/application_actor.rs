@@ -4,7 +4,7 @@ use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseStream};
 use co_primitives::{Block, DefaultParams};
 use co_sdk::{
-	Action, Application, ApplicationMessage, BlockStorage, BlockStorageExt, CoId, CoReducerFactory, CoStorage, Did,
+	Action, Application, ApplicationMessage, BlockStorage, BlockStorageExt, CoId, CoReducer, CoReducerFactory, Did,
 	DidKeyIdentity, DidKeyProvider, PrivateIdentityResolver, Tags, CO_CORE_NAME_KEYSTORE,
 };
 use futures::{pin_mut, StreamExt};
@@ -21,7 +21,7 @@ pub struct ApplicationActor {}
 
 #[derive(Clone)]
 pub struct Session {
-	storage: CoStorage,
+	reducer: CoReducer,
 }
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Hash, Clone, Debug)]
@@ -30,6 +30,12 @@ pub struct SessionId(String);
 impl Display for SessionId {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		self.0.fmt(f)
+	}
+}
+
+impl From<&String> for SessionId {
+	fn from(value: &String) -> Self {
+		SessionId(value.to_string())
 	}
 }
 
@@ -50,7 +56,7 @@ pub enum ApplicationActorMessage {
 	StorageSet(SessionId, Block<DefaultParams>, Response<Result<Cid, ActorError>>),
 	GetCoState(CoId, Response<Result<(Option<Cid>, BTreeSet<Cid>), ActorError>>),
 	WatchState(ResponseStream<(CoId, Option<Cid>, BTreeSet<Cid>)>),
-	Push(CoId, String, Ipld, Did, Response<Result<Option<Cid>, ActorError>>),
+	Push(SessionId, String, Ipld, Did, Response<Result<Option<Cid>, ActorError>>),
 	ResolveCid(SessionId, Cid, Response<Result<Ipld, ActorError>>),
 	GetActions(GetActionsRequest, Response<Result<GetActionsResponse, ActorError>>),
 	CreateIdentity(CreateIdentityRequest),
@@ -111,15 +117,14 @@ impl Actor for ApplicationActor {
 			ApplicationActorMessage::SessionOpen(co_id, response) => {
 				response
 					.respond_execute(|| async {
-						let storage = state
+						let reducer = state
 							.application
 							.context()
 							.try_co_reducer(&co_id)
 							.await
-							.map_err(|err| ActorError::Actor(err.into()))?
-							.storage();
+							.map_err(|err| ActorError::Actor(err.into()))?;
 						let session_id = SessionId::new();
-						state.sessions.insert(session_id.clone(), Session { storage });
+						state.sessions.insert(session_id.clone(), Session { reducer });
 						Ok(session_id)
 					})
 					.await;
@@ -134,7 +139,12 @@ impl Actor for ApplicationActor {
 						.get(&session_id)
 						.clone()
 						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
-					Ok(session.storage.get(&cid).await.map_err(|err| ActorError::Actor(err.into()))?)
+					Ok(session
+						.reducer
+						.storage()
+						.get(&cid)
+						.await
+						.map_err(|err| ActorError::Actor(err.into()))?)
 				});
 			},
 			ApplicationActorMessage::StorageSet(session_id, block, response) => {
@@ -144,7 +154,12 @@ impl Actor for ApplicationActor {
 						.get(&session_id)
 						.clone()
 						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
-					Ok(session.storage.set(block).await.map_err(|err| ActorError::Actor(err.into()))?)
+					Ok(session
+						.reducer
+						.storage()
+						.set(block)
+						.await
+						.map_err(|err| ActorError::Actor(err.into()))?)
 				});
 			},
 			ApplicationActorMessage::GetCoState(co, response) => {
@@ -186,20 +201,21 @@ impl Actor for ApplicationActor {
 					}
 				});
 			},
-			ApplicationActorMessage::Push(co, core, action, identity, response) => {
+			ApplicationActorMessage::Push(session_id, core, action, identity, response) => {
+				let sessions = state.sessions.clone();
 				response
 					.execute(|| async {
+						let session = sessions
+							.get(&session_id)
+							.clone()
+							.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
 						let private_identity = state
 							.application
 							.private_identity(&identity)
 							.await
 							.map_err(|err| ActorError::Actor(err.into()))?;
-						state
-							.application
-							.context()
-							.try_co_reducer(&co)
-							.await
-							.map_err(|err| ActorError::Actor(err.into()))?
+						session
+							.reducer
 							.push(&private_identity, &core, &action)
 							.await
 							.map_err(|err| ActorError::Actor(err.into()))
@@ -216,7 +232,8 @@ impl Actor for ApplicationActor {
 						.clone()
 						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
 					Ok(session
-						.storage
+						.reducer
+						.storage()
 						.get_deserialized::<Ipld>(&cid)
 						.await
 						.map_err(|err| ActorError::Actor(err.into()))?)
@@ -227,10 +244,12 @@ impl Actor for ApplicationActor {
 				let mut next_heads = request.heads.clone();
 				response.spawn(move || async move {
 					let session_id = request.session_id;
-					let session = sessions
+					let storage = sessions
 						.get(&session_id)
-						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
-					let stream = co_log::create_stream(&session.storage, request.heads).take(request.count);
+						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?
+						.reducer
+						.storage();
+					let stream = co_log::create_stream(&storage, request.heads).take(request.count);
 					pin_mut!(stream);
 					let mut actions = Vec::new();
 					while let Some(item) = stream.next().await {

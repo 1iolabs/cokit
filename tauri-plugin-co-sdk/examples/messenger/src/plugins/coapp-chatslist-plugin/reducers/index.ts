@@ -6,8 +6,8 @@ export function chatsListReducer(state: ChatsListPluginState | undefined, action
         return { chats: [], loadedChats: new Map };
     }
     switch (action.type) {
-        case ChatsListActionType.SetChats:
-            return { ...state, chats: action.payload.chats };
+        case ChatsListActionType.AddChat:
+            return { ...state, chats: [...state.chats, action.payload.chat] };
         case ChatsListActionType.UpdateChat:
             return {
                 ...state,

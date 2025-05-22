@@ -7,6 +7,7 @@ pub async fn run() {
 
 	let co_settings = CoApplicationSettings::new("coapp-messenger-demo").without_keychain();
 	tauri::Builder::default()
+		.plugin(tauri_plugin_fs::init())
 		.setup(|app| {
 			let win_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
 				.title("CO Messenger Demo")

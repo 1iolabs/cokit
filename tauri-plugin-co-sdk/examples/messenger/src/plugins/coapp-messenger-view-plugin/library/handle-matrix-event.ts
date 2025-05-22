@@ -1,5 +1,5 @@
 import { Message } from "@1io/coapp-messenger-view";
-import { MatrixEvent } from "../../../types/matrix-event.js";
+import { Messaging } from "../../../../../../dist-js/index.js";
 
 /**
  * Takes data in ipld format and converts it into a message
@@ -12,7 +12,7 @@ export function resolveMatrixAction(
     ownIdentity: string,
 ): Message | undefined {
     // handle matrix event
-    const matrixEvent = ipld.p as MatrixEvent;
+    const matrixEvent = ipld.p as Messaging.MatrixEvent;
     switch (matrixEvent.type) {
         case "m_room_message": {
             // handle new message

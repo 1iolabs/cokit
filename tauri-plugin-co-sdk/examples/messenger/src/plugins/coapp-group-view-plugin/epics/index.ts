@@ -4,6 +4,7 @@ import { addOwnIdentityEpic } from "./add-own-identity.js";
 import { openInviteParticipantDialogEpic, openRemoveParticipantDialogEpic, participantAddedEpic, participantRemovedEpic } from "./dialog.js";
 import { initializeEpic } from "./init.js";
 import { loadProfilePicEpic } from "./load-profile-pic.js";
+import { submitEpic } from "./save.js";
 
 export const groupViewPluginEpic: GroupViewEpicType = combineEpics(
     loadProfilePicEpic,
@@ -13,4 +14,5 @@ export const groupViewPluginEpic: GroupViewEpicType = combineEpics(
     openRemoveParticipantDialogEpic,
     participantRemovedEpic,
     addOwnIdentityEpic,
+    submitEpic,
 );

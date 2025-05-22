@@ -13,12 +13,13 @@ pub(crate) async fn create_co(
 	co_name: String,
 	public: bool,
 	co_id: Option<CoId>,
-) -> Result<(), CoTauriError> {
+) -> Result<CoId, CoTauriError> {
+	let used_co_id = co_id.unwrap_or(Uuid::new_v4().to_string().into());
 	actor_handle.dispatch(ApplicationActorMessage::CreateCo(CreateCoRequest {
 		creator_did,
-		co_id: co_id.unwrap_or(Uuid::new_v4().to_string().into()),
+		co_id: used_co_id.clone(),
 		co_name,
 		public,
 	}))?;
-	Ok(())
+	Ok(used_co_id)
 }

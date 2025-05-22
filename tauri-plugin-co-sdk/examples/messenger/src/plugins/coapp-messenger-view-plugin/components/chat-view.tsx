@@ -50,7 +50,6 @@ function useIpld<T>(
         setIpldMap(newMap);
       }
     };
-    console.log("recalc", ipldMap);
     // call async fetch function
     fetchCids();
     // return deconstructor to cancel ongoing operations
@@ -83,7 +82,6 @@ export function MessengerViewContainer(props: MessengerViewContainerProps) {
     }
     return retVal;
   }, [messageMap]);
-  console.log("render");
 
   const onSendMessage = () => {
     // don't send empty messages

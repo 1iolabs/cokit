@@ -9442,6 +9442,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-co-sdk",
  "tauri-plugin-dialog",
+ "tauri-plugin-fs",
  "tauri-plugin-shell",
  "tauri-utils",
  "tokio",

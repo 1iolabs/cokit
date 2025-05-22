@@ -3,7 +3,7 @@ import React from "react";
 import { useDispatch, useSelector } from "react-redux";
 import ParticipantIcon from "../../../assets/User.svg";
 import DefaultAvatar from "../../../assets/Users_48.svg";
-import { GroupViewInviteParticipantAction, GroupViewLoadProfilePicAction, GroupViewPluginActionType, GroupViewRemoveParticipantAction, GroupViewSetNameAction } from "../actions/index.js";
+import { GroupViewInviteParticipantAction, GroupViewLoadProfilePicAction, GroupViewPluginActionType, GroupViewRemoveParticipantAction, GroupViewSetNameAction, GroupViewSubmitAction } from "../actions/index.js";
 import { GroupViewPluginState } from "../state/index.js";
 export interface GroupViewContainerProps {
     readonly onClose: () => void;
@@ -43,12 +43,16 @@ export function GroupViewContainer(props: GroupViewContainerProps) {
         ],
     }));
 
-
     const onChangeGroupName = (name: string) => {
         dispatch<GroupViewSetNameAction>({ payload: { name }, type: GroupViewPluginActionType.SetName });
     };
     const onChangeAvatar = () => dispatch<GroupViewLoadProfilePicAction>({ type: GroupViewPluginActionType.LoadProfilePicEpic });
     const onInviteParticipant = () => dispatch<GroupViewInviteParticipantAction>({ type: GroupViewPluginActionType.InviteParticipant });
+    const onSubmit = () => {
+        dispatch<GroupViewSubmitAction>({ type: GroupViewPluginActionType.Submit });
+        props.onClose();
+    };
+
     return isNew
         ? <NewGroupView
             noNativeFileBrowser
@@ -57,7 +61,7 @@ export function GroupViewContainer(props: GroupViewContainerProps) {
             canCreate
             onChangeGroupName={onChangeGroupName}
             onChooseImage={onChangeAvatar}
-            onCreate={() => undefined}
+            onCreate={onSubmit}
             onInviteParticipant={onInviteParticipant}
             participants={participants}
             profilePicture={avatar ?? DefaultAvatar}
@@ -72,6 +76,6 @@ export function GroupViewContainer(props: GroupViewContainerProps) {
             participants={participants}
             profilePicture={avatar ?? DefaultAvatar}
             canSave
-            onSave={() => undefined}
+            onSave={onSubmit}
         />;
 }

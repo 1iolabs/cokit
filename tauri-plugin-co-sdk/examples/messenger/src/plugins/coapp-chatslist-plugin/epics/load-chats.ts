@@ -1,11 +1,10 @@
-import { Chat } from "@1io/coapp-chatlist-view";
 import { isPluginInitializeAction } from "@1io/kui-application-sdk";
 import { filter, identity, mergeAll, mergeMap } from "rxjs";
 import { createIdentity, resolveCid, sessionClose, sessionOpen } from "../../../../../../dist-js/index.js";
 import GroupDefaultPic from "../../../assets/Users_48.svg";
 import { splitCoCoreId } from "../../../library/core-id.js";
 import { getCoreState, getFilteredCoreIds } from "../../../library/invoke-get.js";
-import { ChatsListActions, ChatsListActionType, ChatsListSetChatsAction, ChatsListSetIdentityAction } from "../actions/index.js";
+import { ChatsListActions, ChatsListActionType, ChatsListAddChatAction, ChatsListSetIdentityAction } from "../actions/index.js";
 import { ChatsListEpicType } from "../types/plugin.js";
 
 const LOAD_IDENTITY_MAX_TRIES = 10;
@@ -46,7 +45,6 @@ export const loadChatsEpic: ChatsListEpicType = (action$) => action$.pipe(
         }));
 
         // load all chat states
-        const chats: Chat[] = [];
         const coreIds = await getFilteredCoreIds(["core", "co-core-room"]);
         for (const coreId of coreIds) {
             // Split Id to co and core and cancel if failed
@@ -57,18 +55,19 @@ export const loadChatsEpic: ChatsListEpicType = (action$) => action$.pipe(
             const coreState = await getCoreState(coCoreResult.coId, coCoreResult.coreId);
             if (!coreState) { continue }
 
-            // add to chats
-            chats.push({
-                name: coreState.name ?? "New room",
-                id: coreId,
-                newMessages: 0, // TODO check read receipts to know message count since last read
-                avatar: GroupDefaultPic, // TODO use pic from CORE
-            });
+            // add to actions
+            actions.push(identity<ChatsListAddChatAction>({
+                payload: {
+                    chat: {
+                        name: coreState.name ?? "New room",
+                        id: coreId,
+                        newMessages: 0, // TODO check read receipts to know message count since last read
+                        avatar: GroupDefaultPic, // TODO use pic from CORE
+                    }
+                },
+                type: ChatsListActionType.AddChat
+            }));
         }
-        actions.push(identity<ChatsListSetChatsAction>({
-            payload: { chats },
-            type: ChatsListActionType.SetChats
-        }));
         return actions;
     }),
     mergeAll(),

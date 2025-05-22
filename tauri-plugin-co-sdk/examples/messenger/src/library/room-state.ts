@@ -1,8 +1,7 @@
 import { CID } from "multiformats";
-import { resolveCid, sessionClose, sessionOpen } from "../../../../dist-js/index.js";
-import { Room } from "../types/room.js";
+import { Room, resolveCid, sessionClose, sessionOpen } from "../../../../dist-js/index.js";
 
-export async function getRoomState(co: string, coreId: string, stateCid: CID, externalSessionId?: string): Promise<Room | undefined> {
+export async function getRoomState(co: string, coreId: string, stateCid: CID, externalSessionId?: string): Promise<Room.Room | undefined> {
     const sessionId = externalSessionId ?? await sessionOpen(co);
     const coState = await resolveCid(sessionId, stateCid);
     const core = coState.cores[coreId];

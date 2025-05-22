@@ -13,8 +13,8 @@ export async function sessionClose(sessionId: string) {
 export async function getCoState(co: string): Promise<[CID | undefined, CID[]]> {
     return await invoke("plugin:co-sdk|get_co_state", { co });
 }
-export async function pushAction(co: string, core: string, action: any, identity: string): Promise<CID | undefined> {
-    let body_raw = encode({ action, co, core, identity });
+export async function pushAction(session: string, core: string, action: any, identity: string): Promise<CID | undefined> {
+    let body_raw = encode({ session, core, action, identity });
     return await invoke("plugin:co-sdk|push_action", { body: Array.from(body_raw) });
 }
 export async function resolveCid(sessionId: string, cid: CID): Promise<any> {
@@ -42,7 +42,7 @@ export async function createCo(
     coName: string,
     isPublic: boolean,
     coId?: string,
-) {
+): Promise<string> {
     return await invoke("plugin:co-sdk|create_co", {
         creatorDid,
         coId,
@@ -50,3 +50,5 @@ export async function createCo(
         public: isPublic,
     });
 }
+
+export * from "./types/index.js";

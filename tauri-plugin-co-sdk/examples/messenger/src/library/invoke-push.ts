@@ -3,8 +3,7 @@ import { CID } from "multiformats";
 import * as json from 'multiformats/codecs/json';
 import { sha256 } from 'multiformats/hashes/sha2';
 import * as uuid from "uuid";
-import { pushAction } from "../../../../dist-js/index.js";
-import { MatrixEvent } from "../types/matrix-event.js";
+import { Messaging, pushAction, sessionClose, sessionOpen } from "../../../../dist-js/index.js";
 
 export async function createCid<T>(data: T) {
     let json_data = json.encode(data);
@@ -14,7 +13,8 @@ export async function createCid<T>(data: T) {
 }
 
 export async function invokePushMessage(message: string, co: string, core: string, identity: string) {
-    let action: MatrixEvent = {
+    const session = await sessionOpen(co);
+    let action: Messaging.MatrixEvent = {
         event_id: uuid.v4(),
         timestamp: moment.now(),
         room_id: "@some.room",
@@ -24,5 +24,6 @@ export async function invokePushMessage(message: string, co: string, core: strin
             body: message,
         }
     };
-    await pushAction(co, core, action, identity);
+    await pushAction(session, core, action, identity);
+    await sessionClose(session);
 }

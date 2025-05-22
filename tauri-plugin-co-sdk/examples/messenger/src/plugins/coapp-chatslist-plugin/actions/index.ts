@@ -3,7 +3,7 @@ import { PluginId } from "@1io/kui-application-sdk";
 import { NotifyAction, PayloadAction } from "@1io/redux-utils";
 
 export enum ChatsListActionType {
-    SetChats = "coapp/chatsList/set-chats",
+    AddChat = "coapp/chatsList/add-chat",
     OpenChat = "coapp/chats-list/open-chat",
     UpdateChat = "coapp/chats-list/update-chat",
     RemoveChat = "coapp/chats-list/remove-chat",
@@ -16,7 +16,7 @@ export enum ChatsListActionType {
 }
 
 export type ChatsListActions = ChatsListOpenChatAction
-    | ChatsListSetChatsAction
+    | ChatsListAddChatAction
     | ChatsListUpdateChatAction
     | ChatsListChatPluginLoaded
     | ChatsListOpenChatDetailsAction
@@ -25,8 +25,8 @@ export type ChatsListActions = ChatsListOpenChatAction
     | ChatsListCopyIdentityAction
     | ChatsListSetDialogAction;
 
-export interface ChatsListSetChatsAction extends PayloadAction<ChatsListActionType.SetChats, {
-    readonly chats: Chat[];
+export interface ChatsListAddChatAction extends PayloadAction<ChatsListActionType.AddChat, {
+    readonly chat: Chat;
 }
 > { }
 

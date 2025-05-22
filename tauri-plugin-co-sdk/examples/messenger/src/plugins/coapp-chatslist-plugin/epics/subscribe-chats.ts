@@ -2,9 +2,10 @@ import { isPluginInitializeAction } from "@1io/kui-application-sdk";
 import { Action } from "redux";
 import { filter, identity, mergeAll, mergeMap, withLatestFrom } from "rxjs";
 import { get_actions, resolveCid, sessionClose, sessionOpen } from "../../../../../../dist-js/index.js";
+import GroupDefaultPic from "../../../assets/Users_48.svg";
 import { createCoSdkStateEventListener } from "../../../library/co-sdk-state-listener.js";
 import { buildCoCoreId } from "../../../library/core-id.js";
-import { ChatsListActionType, ChatsListUpdateChatAction } from "../actions/index.js";
+import { ChatsListActionType, ChatsListAddChatAction, ChatsListUpdateChatAction } from "../actions/index.js";
 import { ChatsListEpicType } from "../types/plugin.js";
 
 export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) => action$.pipe(
@@ -20,19 +21,36 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                 const log = (await get_actions(sessionId, heads, 1, undefined)).actions;
                 const actions: Action[] = [];
                 for (const cid of log) {
-                    const payload = await resolveCid(sessionId, cid);
-                    const matrixEvent = payload.p;
+                    const action = await resolveCid(sessionId, cid);
+                    const payload = action.p;
+                    console.log(action);
 
-                    switch (matrixEvent.type) {
+                    // create core action
+                    if (payload.CoreCreate !== undefined) {
+                        actions.push(identity<ChatsListAddChatAction>({
+                            payload: {
+                                chat: {
+                                    avatar: GroupDefaultPic,
+                                    id: buildCoCoreId(coId, payload.CoreCreate.core),
+                                    name: "",
+                                    newMessages: 0,
+                                }
+                            },
+                            type: ChatsListActionType.AddChat,
+                        }));
+                    }
+
+                    // matrix events
+                    switch (payload.type) {
                         case "m_room_message": {
-                            const chat = state.chats.find((c) => c.id === buildCoCoreId(coId, payload.c));
+                            const chat = state.chats.find((c) => c.id === buildCoCoreId(coId, action.c));
                             if (!chat) { continue }
                             actions.push(identity<ChatsListUpdateChatAction>({
                                 payload: {
                                     chat: {
                                         lastMessage: {
-                                            message: matrixEvent.content.body,
-                                            key: matrixEvent.content.body,
+                                            message: payload.content.body,
+                                            key: payload.content.body,
                                             ownMessage: false,
                                             timestamp: new Date(),
                                         },
@@ -48,13 +66,12 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                             break;
                         };
                         case "room_name": {
-                            let name = matrixEvent.content.name;
-                            const chat = state.chats.find((c) => c.id === buildCoCoreId(coId, payload.c));
-                            if (name && chat) {
+                            let name = payload.content.name;
+                            if (name) {
                                 actions.push(identity<ChatsListUpdateChatAction>({
                                     payload: {
                                         chat: {
-                                            ...chat,
+                                            id: buildCoCoreId(coId, action.c),
                                             name,
                                         },
                                     },

@@ -28,8 +28,7 @@ export interface GroupViewSetNameAction extends PayloadAction<GroupViewPluginAct
 export interface GroupViewSetAvatarAction extends PayloadAction<GroupViewPluginActionType.SetAvatar, {
     readonly avatar?: string;
 }> { }
-export interface GroupViewSubmitAction extends PayloadAction<GroupViewPluginActionType.Submit, {
-}> { }
+export interface GroupViewSubmitAction extends NotifyAction<GroupViewPluginActionType.Submit> { }
 export interface GroupViewInviteParticipantAction extends NotifyAction<GroupViewPluginActionType.InviteParticipant> { }
 export interface GroupViewRemoveParticipantAction extends PayloadAction<GroupViewPluginActionType.RemoveParticipant, {
     readonly participant: string;
