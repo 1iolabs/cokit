@@ -89,11 +89,8 @@ fn print_message(action: ReducerAction<MatrixEvent>) {
 			},
 			_ => (),
 		},
-		co_messaging::EventContent::State(state) => match state {
-			co_messaging::state_event::StateType::RoomName(name) => {
-				println!("{} changed the room name to: '{}' ({})", action.from, name.name, timestamp_str)
-			},
-			_ => (),
+		co_messaging::EventContent::RoomName(name) => {
+			println!("{} changed the room name to: '{}' ({})", action.from, name.name, timestamp_str)
 		},
 		_ => (),
 	}
