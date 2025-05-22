@@ -71,17 +71,6 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 
 	// apply
 	if let Some(membership_state) = membership_state {
-		// payload
-		let metadata = CoInviteMetadata {
-			id: header.id,
-			from,
-			network: payload.connectivity.clone(),
-			peer: Some(peer.to_bytes()),
-		};
-		let membership_tags = tags!(
-			{KnownTags::CoInviteMetadata}: storage.set_serialized(&metadata).await?,
-		);
-
 		// storage
 		#[cfg(feature = "pinning")]
 		{
@@ -108,6 +97,17 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 				)
 				.await?;
 		}
+
+		// payload
+		let metadata = CoInviteMetadata {
+			id: header.id,
+			from,
+			network: payload.connectivity.clone(),
+			peer: Some(peer.to_bytes()),
+		};
+		let membership_tags = tags!(
+			{KnownTags::CoInviteMetadata}: storage.set_serialized(&metadata).await?,
+		);
 
 		// membership
 		local
