@@ -106,7 +106,7 @@ where
 
 					// flush
 					if remove_references.len() > max_references {
-						next.state = dispatch.dispatch(&StorageAction::Remove(remove_references, true)).await?;
+						next.state = dispatch.dispatch(&StorageAction::Delete(remove_references, true)).await?;
 						remove_references = BTreeSet::new();
 					}
 				},
@@ -116,7 +116,7 @@ where
 			next.state = dispatch.dispatch(&StorageAction::ReferenceCreate(create_references)).await?;
 		}
 		if !remove_references.is_empty() {
-			next.state = dispatch.dispatch(&StorageAction::Remove(remove_references, true)).await?;
+			next.state = dispatch.dispatch(&StorageAction::Delete(remove_references, true)).await?;
 		}
 
 		// result

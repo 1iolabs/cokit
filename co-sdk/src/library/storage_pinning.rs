@@ -133,12 +133,13 @@ where
 			overlay.flush(cid, Some(context.block_links.clone())).await?;
 		}
 
-		// flush remove
-		let changes = overlay.changes();
+		// flush changes
+		let changes = overlay.consume_changes();
 		pin_mut!(changes);
 		while let Some(change) = changes.try_next().await? {
 			match change {
 				OverlayChange::Remove(cid) => {
+					// this will actually delte the blocks from storage_cleanup
 					overlay.next_storage().remove(&cid).await?;
 				},
 				_ => {},

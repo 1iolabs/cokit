@@ -140,7 +140,7 @@ where
 	let max_references = max_reference_count(S::StoreParams::MAX_BLOCK_SIZE);
 	#[cfg(feature = "pinning")]
 	let mut remove = BTreeSet::<WeakCid>::new();
-	let changes = overlay_storage.changes();
+	let changes = overlay_storage.consume_changes();
 	pin_mut!(changes);
 	while let Some(change) = changes.try_next().await? {
 		match change {
@@ -169,7 +169,7 @@ where
 					if remove.len() > max_references {
 						let mut next_remove = Default::default();
 						std::mem::swap(&mut remove, &mut next_remove);
-						let action = StorageAction::Remove(next_remove, true);
+						let action = StorageAction::Delete(next_remove, true);
 						dispatch.dispatch(&action).await?;
 					}
 				}
@@ -178,7 +178,7 @@ where
 	}
 	#[cfg(feature = "pinning")]
 	if !remove.is_empty() {
-		let action = StorageAction::Remove(remove, true);
+		let action = StorageAction::Delete(remove, true);
 		dispatch.dispatch(&action).await?;
 	}
 	Ok(())

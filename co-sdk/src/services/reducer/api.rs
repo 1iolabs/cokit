@@ -98,6 +98,12 @@ impl CoReducer {
 	}
 
 	pub(crate) async fn clear(&self) -> CoReducerState {
+		// clear overlay
+		if let Some(overlay_storage) = &self.overlay_storage {
+			overlay_storage.clear_overlay_changes().await.ok();
+		}
+
+		// clear
 		self.handle.request(ReducerMessage::Clear).await.unwrap_or_default()
 	}
 

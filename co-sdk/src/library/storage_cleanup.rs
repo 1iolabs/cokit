@@ -42,7 +42,7 @@ where
 		}
 
 		// remove from storage core
-		state = dispatcher.dispatch(&StorageAction::Remove(remove.clone(), false)).await?.into();
+		state = dispatcher.dispatch(&StorageAction::Delete(remove.clone(), false)).await?.into();
 
 		// remove from disk
 		//  we double check if it has been removed because we dont use the force flag

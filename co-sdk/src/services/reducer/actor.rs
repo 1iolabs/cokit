@@ -19,7 +19,7 @@ use co_identity::{Identity, PrivateIdentityBox};
 use co_primitives::{
 	BlockLinks, CoId, IgnoreFilter, Link, MappedCid, OptionMappedCid, ReducerAction, Tags, WeakCoReferenceFilter,
 };
-use co_storage::{BlockStorage, BlockStorageContentMapping, OverlayBlockStorage, OverlayChange};
+use co_storage::{BlockStorageContentMapping, OverlayBlockStorage};
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use indexmap::IndexSet;
 use ipld_core::ipld::Ipld;
@@ -264,32 +264,11 @@ async fn flush(
 			tracing::trace!("reducer-flush-no-mappings");
 		}
 
-		// flush changes
-		let changes = overlay_storage.changes();
+		// flush removed
+		let changes = overlay_storage.consume_removes();
 		pin_mut!(changes);
-		while let Some(change) = changes.try_next().await? {
-			match change {
-				OverlayChange::Set(_cid, _data, _) => {
-					// ignore as we only want referenced blocks
-					//  this is not "bad" it just indicates that some block got stored which are not used
-					//  this also could be intermediate computation inside a core that has later been overwritten
-
-					// log
-					#[cfg(feature = "logging-verbose")]
-					if co_primitives::MultiCodec::is_cbor(_cid) {
-						tracing::warn!(cid = ?_cid, ipld = ?co_primitives::from_cbor::<ipld_core::ipld::Ipld>(&_data), "overlay-unreferenced-block");
-					} else {
-						tracing::warn!(cid = ?_cid, "overlay-unreferenced-block");
-					}
-				},
-				OverlayChange::Remove(cid) => {
-					// record
-					removed_blocks.insert(to_external_mapped(base_storage, cid).await);
-
-					// remove
-					base_storage.remove(&cid).await?;
-				},
-			}
+		while let Some(removed_cid) = changes.try_next().await? {
+			removed_blocks.insert(to_external_mapped(base_storage, removed_cid).await);
 		}
 	}
 

@@ -4,8 +4,7 @@ use co_primitives::{OptionMappedCid, WeakCid};
 use futures::{pin_mut, Stream, StreamExt};
 use std::collections::BTreeSet;
 
-/// Apply removes in `overlay_storage` to `storage` and sotage core (`dispatch`).
-/// Discard any remaining [`OverlayChange::Set`].
+/// Apply removes in `overlay_storage` to `storage` and storage core (`dispatch`).
 pub async fn storage_dispatch_remove(
 	dispatch: &mut impl CoDispatch<StorageAction>,
 	removed_blocks: impl Stream<Item = OptionMappedCid>,
@@ -19,12 +18,12 @@ pub async fn storage_dispatch_remove(
 		if remove.len() > max_references {
 			let mut next_remove = Default::default();
 			std::mem::swap(&mut remove, &mut next_remove);
-			let action = StorageAction::Remove(next_remove, true);
+			let action = StorageAction::Remove(next_remove, false);
 			dispatch.dispatch(&action).await?;
 		}
 	}
 	if !remove.is_empty() {
-		let action = StorageAction::Remove(remove, true);
+		let action = StorageAction::Remove(remove, false);
 		dispatch.dispatch(&action).await?;
 	}
 	Ok(())

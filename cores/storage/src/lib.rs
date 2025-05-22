@@ -155,13 +155,25 @@ pub enum StorageAction {
 	#[serde(rename = "c")]
 	ReferenceCreate(BTreeSet<WeakCid>),
 
-	/// Remove [`Cid`] references.
+	/// Mark to remove [`Cid`]. This will make the references shallow again.
+	/// And eventually shedule them to delete.
+	///
+	/// # Note
+	/// This is basically the same as Unreference.
 	///
 	/// # Arguments
 	/// - `0`: The [`Cid`] of entries to remove.
-	/// - `1`: Force removal. If false only references with a zero ref count will be removed.
-	#[serde(rename = "d")]
+	/// - `1`: Remove all instances.
+	#[serde(rename = "ud")]
 	Remove(BTreeSet<WeakCid>, bool),
+
+	/// Delete [`Cid`] references.
+	///
+	/// # Arguments
+	/// - `0`: The [`Cid`] of entries to remove.
+	/// - `1`: Force delete. If false only references with a zero ref count will be removed.
+	#[serde(rename = "d")]
+	Delete(BTreeSet<WeakCid>, bool),
 
 	/// Append tags to references.
 	#[serde(rename = "ti")]
@@ -338,7 +350,8 @@ where
 		StorageAction::ReferenceCreate(cids) => {
 			reduce_reference_create(transaction, stream::iter(cids).map(Ok)).await?
 		},
-		StorageAction::Remove(cids, force) => reduce_remove(transaction, cids, force).await?,
+		StorageAction::Remove(cids, zero) => reduce_remove(transaction, cids, zero).await?,
+		StorageAction::Delete(cids, force) => reduce_delete(transaction, cids, force).await?,
 		StorageAction::TagsInsert(cids, tags) => reduce_tags_insert(transaction, cids, tags).await?,
 		StorageAction::TagsRemove(cids, tags) => reduce_tags_remove(transaction, cids, tags).await?,
 		StorageAction::PinCreate(key, strategy, references) => {
@@ -514,7 +527,7 @@ where
 		PinStrategy::MaxCount(count) => {
 			while pin.references_count > *count {
 				if let Some((_, remove)) = references.pop_front().await? {
-					unreference_cid(transaction, remove).await?;
+					unreference_cid(transaction, remove, false).await?;
 				}
 				pin.references_count -= 1;
 				changed = true;
@@ -627,6 +640,20 @@ where
 async fn reduce_remove<S>(
 	transaction: &mut StorageTransaction<S>,
 	cids: impl IntoIterator<Item = WeakCid>,
+	zero: bool,
+) -> Result<(), anyhow::Error>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	for cid in cids {
+		unreference_cid(transaction, cid, zero).await?;
+	}
+	Ok(())
+}
+
+async fn reduce_delete<S>(
+	transaction: &mut StorageTransaction<S>,
+	cids: impl IntoIterator<Item = WeakCid>,
 	force: bool,
 ) -> Result<(), anyhow::Error>
 where
@@ -658,7 +685,7 @@ where
 			let children = block.children.stream(transaction.storage());
 			pin_mut!(children);
 			while let Some(cid) = children.try_next().await? {
-				unreference_cid(transaction, cid).await?;
+				unreference_cid(transaction, cid, false).await?;
 			}
 		}
 	}
@@ -773,19 +800,27 @@ where
 {
 	pin_mut!(cids);
 	while let Some(cid) = cids.try_next().await? {
-		unreference_cid(transaction, cid.into()).await?;
+		unreference_cid(transaction, cid.into(), false).await?;
 	}
 	Ok(())
 }
 
-async fn unreference_cid<S>(transaction: &mut StorageTransaction<S>, cid: WeakCid) -> Result<bool, anyhow::Error>
+async fn unreference_cid<S>(
+	transaction: &mut StorageTransaction<S>,
+	cid: WeakCid,
+	zero: bool,
+) -> Result<bool, anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
 	Ok(match transaction.blocks().await?.get(&cid).await? {
 		Some(mut block) if block.references > 0 => {
 			// decrement
-			block.references -= 1;
+			if zero {
+				block.references = 0;
+			} else {
+				block.references -= 1;
+			}
 
 			// index
 			if block.is_removable() {
