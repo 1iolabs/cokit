@@ -17,7 +17,6 @@ use std::{
 	mem::swap,
 };
 use tokio::sync::watch;
-use tracing::instrument;
 
 pub struct ReducerBuilder<S, R> {
 	_storage: PhantomData<S>,
@@ -123,7 +122,7 @@ where
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
 	/// Initialize this reducer by computing current state if one.
-	#[instrument(skip(self, storage, runtime))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self, storage, runtime))]
 	pub async fn initialize(&mut self, storage: &S, runtime: &RuntimePool) -> Result<(), anyhow::Error> {
 		tracing::trace!(?self.snapshots, "reducer-initialize");
 		let context = ReducerChangeContext { cause: ReducerChangeCause::Initialize };
@@ -436,7 +435,7 @@ where
 
 	/// Compute state for log heads.
 	/// Returns the resulting state if one.
-	#[instrument(level = tracing::Level::TRACE, err(Debug), skip(self, runtime, storage))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, runtime, storage))]
 	async fn compute_state(
 		&self,
 		storage: &S,
@@ -478,7 +477,7 @@ where
 	/// The computed start position is self.heads.
 	/// The computed end position is self.log.heads.
 	/// Algorithm: We search for the lowest known ancestors of the heads while walking the log backwards.
-	#[instrument(skip(self, storage))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self, storage))]
 	async fn compute_stack(&self, storage: &S) -> Result<(Option<Cid>, VecDeque<EntryBlock>), anyhow::Error> {
 		let heads: BTreeSet<Cid> = self.log.heads().clone();
 		let mut state = self.state;

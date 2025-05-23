@@ -61,7 +61,7 @@ impl WasmerRuntime {
 		Ok(Self { store, instance, env })
 	}
 
-	#[tracing::instrument(err, ret)]
+	#[tracing::instrument(level = tracing::Level::TRACE, err, ret)]
 	pub fn execute(&mut self) -> Result<(), WasmerError> {
 		let state = self.instance.exports.get_function("state").unwrap();
 		state.call(&mut self.store, &[])?;

@@ -152,7 +152,7 @@ impl SharedCoBuilder {
 				self.build_network_storage(peer_provider, network.clone(), secret.as_ref(), base_storage)?;
 
 			// create encrypted storage which uses the network storage as base
-			// note: it uses the same mapping as the instance itrhout networking
+			// note: it uses the same mapping as the instance withput networking
 			let next_storage = if let Some(encrypted_storage) = storage.encrypted_storage() {
 				let mut encrypted_storage = encrypted_storage.clone();
 				encrypted_storage.set_storage(network_storage);

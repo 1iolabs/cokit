@@ -23,7 +23,7 @@ use std::{
 /// # Args
 /// - `filter` - Only include specific Cid's.
 /// - `filter_pins` - Only include if BlockInfo matched any pins.
-#[tracing::instrument(err(Debug), skip(storage_core_storage, storage_core_dispatcher, storage, structure_resolver))]
+#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(storage_core_storage, storage_core_dispatcher, storage, structure_resolver))]
 pub async fn storage_structure<S, D>(
 	storage_core_storage: &S,
 	storage_core_dispatcher: &mut impl CoDispatch<StorageAction>,
@@ -150,7 +150,7 @@ where
 
 /// Resolve shallow structure.
 /// Continue to descend into children of resolved references.
-#[tracing::instrument(err(Debug), skip(storage_core_storage, storage_core_dispatcher, storage, structure_resolver))]
+#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(storage_core_storage, storage_core_dispatcher, storage, structure_resolver))]
 pub async fn storage_structure_recursive<S, D>(
 	storage_core_storage: &S,
 	storage_core_dispatcher: &mut impl CoDispatch<StorageAction>,

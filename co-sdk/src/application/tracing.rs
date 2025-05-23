@@ -19,10 +19,20 @@ pub struct TracingBuilder {
 	env_filter: Option<EnvFilter>,
 	/// Trace to open telemetry endpoint.
 	open_telemetry: Option<String>,
+	/// If true do not fail if a other tracing is already registered.
+	optional: bool,
 }
 impl TracingBuilder {
 	pub fn new(identifier: String, base_path: Option<PathBuf>) -> Self {
-		Self { identifier, base_path, bunyan: None, stderr: false, open_telemetry: None, env_filter: None }
+		Self {
+			identifier,
+			base_path,
+			bunyan: None,
+			stderr: false,
+			open_telemetry: None,
+			env_filter: None,
+			optional: false,
+		}
 	}
 
 	/// Enable bunyan logging to log_path.
@@ -47,6 +57,10 @@ impl TracingBuilder {
 
 	pub fn with_stderr_logging(self) -> Self {
 		Self { stderr: true, ..self }
+	}
+
+	pub fn with_optional_tracing(self) -> Self {
+		Self { optional: true, ..self }
 	}
 
 	pub fn with_env_filter(self) -> Self {
@@ -105,9 +119,20 @@ impl TracingBuilder {
 
 	pub fn init(self) -> Result<(), anyhow::Error> {
 		// init
+		let optional = self.optional;
 		if let Some(subscriber) = self.build_subscriber()? {
-			set_global_default(subscriber)?;
-			LogTracer::init()?;
+			let result = set_global_default(subscriber);
+			match result {
+				Ok(_) => {
+					LogTracer::init()?;
+					Ok(())
+				},
+				Err(err) if optional => {
+					tracing::warn!(?err, "tracing-already-initialized");
+					Ok(())
+				},
+				Err(err) => Err(err),
+			}?;
 		}
 
 		// result

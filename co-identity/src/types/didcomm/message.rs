@@ -58,7 +58,6 @@ impl Message {
 	{
 		let message = std::str::from_utf8(data).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
 		let message_type = get_message_type(message).map_err(ReceiveError::UnknownFormat)?;
-		tracing::info!(?message, ?message_type, "message-receive");
 		if message_type == MessageType::DidCommJwe {
 			let jwe: Jwe = serde_json::from_str(message).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
 

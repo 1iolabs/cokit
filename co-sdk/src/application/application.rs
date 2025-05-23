@@ -140,7 +140,7 @@ impl Application {
 	///
 	/// TODO: Identity
 	/// TODO: The crator of the co should be added as first participant.
-	#[tracing::instrument(err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE,err, skip(self))]
 	pub async fn create_co<I>(&self, creator: I, create: CreateCo) -> Result<CoReducer, anyhow::Error>
 	where
 		I: PrivateIdentity + Clone + Debug + Send + Sync + 'static,
@@ -354,6 +354,10 @@ impl ApplicationBuilder {
 	/// ```
 	pub fn with_bunyan_logging(self, log_path: Option<PathBuf>) -> Self {
 		Self { tracing: self.tracing.with_bunyan_logging(log_path), ..self }
+	}
+
+	pub fn with_optional_tracing(self) -> Self {
+		Self { tracing: self.tracing.with_optional_tracing(), ..self }
 	}
 
 	pub fn with_open_telemetry(self, endpoint: impl Into<String>) -> Self {

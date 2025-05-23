@@ -25,7 +25,6 @@ use indexmap::IndexSet;
 use ipld_core::ipld::Ipld;
 use std::{collections::BTreeSet, future::ready, mem::take};
 use tokio_stream::wrappers::WatchStream;
-use tracing::instrument;
 
 pub struct ReducerActor {
 	id: CoId,
@@ -66,7 +65,7 @@ impl Actor for ReducerActor {
 		})
 	}
 
-	#[instrument(err(Debug), skip(self, _handle, state), fields(co = ?self.id))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, _handle, state), fields(co = ?self.id))]
 	async fn handle(
 		&self,
 		_handle: &ActorHandle<Self::Message>,

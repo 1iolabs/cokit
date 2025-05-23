@@ -39,7 +39,7 @@ pub struct CoContext {
 }
 impl CoContext {
 	/// Get instance of Local CoReducer.
-	#[tracing::instrument(skip(self), fields(application = self.inner.settings.identifier))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self), fields(application = self.inner.settings.identifier))]
 	pub async fn local_co_reducer(&self) -> Result<CoReducer, anyhow::Error> {
 		Ok(self.inner.reducers.clone().reducer(CoId::from(CO_ID_LOCAL)).await?)
 	}
@@ -173,7 +173,7 @@ impl CoReducerFactory for CoContext {
 		}
 	}
 
-	#[tracing::instrument(skip(self), fields(application = self.inner.settings.identifier))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self), fields(application = self.inner.settings.identifier))]
 	async fn try_co_reducer(&self, co: &CoId) -> Result<CoReducer, CoReducerFactoryError> {
 		self.inner.reducers.clone().reducer(co.clone()).await
 	}
