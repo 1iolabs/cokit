@@ -11,7 +11,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, OnceEpic, Reducer, TracingEpic};
-use co_identity::{Identity, PrivateIdentityBox};
+use co_identity::{Identity, PrivateIdentity, PrivateIdentityBox};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{tags, CoId, Tags};
 use futures::{Stream, StreamExt};
@@ -48,6 +48,9 @@ impl PushHeads {
 		state: CoReducerState,
 		identity: PrivateIdentityBox,
 	) -> Result<(), anyhow::Error> {
+		// verify
+		identity.try_didcomm_private()?;
+
 		// map plain heads to encrypted heads
 		let heads = if self.force_mapping {
 			to_external_cids_opt_force(storage, state.heads())

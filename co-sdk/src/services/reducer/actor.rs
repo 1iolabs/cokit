@@ -117,7 +117,7 @@ fn changed(
 	if reducer_state.flush_info.is_none() {
 		let mut flush_info = FlushInfo::default();
 		flush_info.network = reducer_state.network_feature;
-		reducer_state.flush_info = Some(FlushInfo::default());
+		reducer_state.flush_info = Some(flush_info);
 	}
 	if let Some(flush_info) = &mut reducer_state.flush_info {
 		if local {

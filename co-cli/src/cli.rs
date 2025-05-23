@@ -5,7 +5,6 @@ use crate::{
 use clap::ArgAction;
 use exitcode::ExitCode;
 use std::path::PathBuf;
-use tracing::instrument;
 
 const APP_IDENTIFIER: &str = "co-cli";
 
