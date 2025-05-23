@@ -1,13 +1,13 @@
 use crate::{
 	library::{
 		join::{CoJoinPayload, CO_DIDCOMM_JOIN},
-		shared_membership::shared_membership,
+		network_identity::network_identity,
 	},
 	Action, CoContext, CoReducer, CoReducerFactory, CO_CORE_NAME_CO,
 };
 use anyhow::anyhow;
 use co_core_co::{CoAction, ParticipantState};
-use co_identity::{DidCommHeader, PrivateIdentityResolver};
+use co_identity::DidCommHeader;
 use co_primitives::{
 	from_json_string, BlockStorageSettings, CloneWithBlockStorageSettings, CoJoin, Did, KnownTag, ReducerAction,
 };
@@ -55,22 +55,10 @@ async fn joined(context: CoContext, _peer: PeerId, header: DidCommHeader, body: 
 	let join = CoJoin::from_tags(&state.tags).unwrap_or_default();
 	let from = header.from.ok_or(anyhow!("invalid header: from"))?.to_string();
 
-	// find invite identity (if its local)
-	let invite_identity_did = find_inviter(&context, &co, &from).await?;
-
 	// get identity
-	//  note: for now we just use the first membership found (with a preference to the inviter if its us)
-	let parent_co_id = co.parent_id().ok_or(anyhow!("no parent"))?;
-	let parent_co = context.try_co_reducer(&parent_co_id).await?;
-	let identity_did = shared_membership(&parent_co, co.id(), invite_identity_did.as_ref())
-		.await?
-		.ok_or(anyhow!("no membership found"))?
-		.did;
-	let identity = context
-		.private_identity_resolver()
-		.await?
-		.resolve_private(&identity_did)
-		.await?;
+	//  find invite identity (if its local)
+	let invite_identity_did = find_inviter(&context, &co, &from).await?;
+	let identity = network_identity(&context, &co, invite_identity_did.as_ref()).await?;
 
 	// state
 	let participant_state = match join {

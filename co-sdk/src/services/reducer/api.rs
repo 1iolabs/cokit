@@ -44,7 +44,7 @@ impl CoReducer {
 		let actor = Actor::spawn_with(
 			tasks.clone(),
 			tags!("application": application_identifier, "co": id.as_str()),
-			ReducerActor::new(id.clone(), tasks, runtime, application_handle, context.clone()),
+			ReducerActor::new(id.clone(), runtime, application_handle, context.clone()),
 			(reducer, flush),
 		)?;
 		Ok(Self { id, parent, storage, handle: actor.handle(), context, date, overlay_storage: None })

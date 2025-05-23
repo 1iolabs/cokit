@@ -8,7 +8,7 @@ use crate::{
 			to_internal_cid_opt, to_internal_cid_opt_force, to_internal_cids, to_internal_cids_opt_force,
 		},
 	},
-	CoreResolver, Reducer,
+	CoReducer, CoreResolver, Reducer,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -207,6 +207,10 @@ impl MappedCoReducerState {
 			if let Some(state) = &internal.0 { Some(to_external_mapped(storage, *state).await) } else { None },
 			to_external_mapped_set(storage, internal.1.iter()).await,
 		)
+	}
+
+	pub async fn new_co(co: &CoReducer) -> Self {
+		Self::new(&co.storage(), &co.reducer_state().await).await
 	}
 
 	pub async fn new_reducer<M, S, R>(storage: &M, reducer: &Reducer<S, R>) -> Self

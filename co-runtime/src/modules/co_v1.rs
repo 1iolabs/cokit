@@ -76,6 +76,9 @@ impl ApiStorage for CoV1Api {
 				Err(e) if Self::is_retriable(&e) && tries < 10 => {
 					tries += 1;
 
+					// log
+					tracing::warn!(?cid, tries, "runtime-get-block-retry");
+
 					// wait with exponential backoff
 					std::thread::sleep(Duration::from_millis(2u64.pow(tries) * 1000));
 

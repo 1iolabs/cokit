@@ -14,21 +14,19 @@ use crate::{
 };
 use async_trait::async_trait;
 use cid::Cid;
-use co_actor::{Actor, ActorError, ActorHandle, TaskSpawner};
+use co_actor::{Actor, ActorError, ActorHandle, ResponseStreams};
 use co_identity::{Identity, PrivateIdentityBox};
 use co_primitives::{
 	BlockLinks, CoId, IgnoreFilter, Link, MappedCid, OptionMappedCid, ReducerAction, Tags, WeakCoReferenceFilter,
 };
 use co_storage::{BlockStorageContentMapping, OverlayBlockStorage};
-use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
+use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use indexmap::IndexSet;
 use ipld_core::ipld::Ipld;
-use std::{collections::BTreeSet, future::ready, mem::take};
-use tokio_stream::wrappers::WatchStream;
+use std::{collections::BTreeSet, mem::take};
 
 pub struct ReducerActor {
 	id: CoId,
-	tasks: TaskSpawner,
 	runtime: Runtime,
 	application_handle: ActorHandle<ApplicationMessage>,
 	context: CoReducerContextRef,
@@ -36,12 +34,11 @@ pub struct ReducerActor {
 impl ReducerActor {
 	pub fn new(
 		id: CoId,
-		tasks: TaskSpawner,
 		runtime: Runtime,
 		application_handle: ActorHandle<ApplicationMessage>,
 		context: CoReducerContextRef,
 	) -> Self {
-		Self { id, tasks, runtime, application_handle, context }
+		Self { id, runtime, application_handle, context }
 	}
 }
 #[async_trait]
@@ -62,6 +59,7 @@ impl Actor for ReducerActor {
 			flush_info: None,
 			flush_roots: Default::default(),
 			network_feature: self.context.has_feature(&CoReducerFeature::Network),
+			state_streams: Default::default(),
 		})
 	}
 
@@ -76,12 +74,10 @@ impl Actor for ReducerActor {
 			ReducerMessage::State(response) => {
 				response.respond(handle_state(&state));
 			},
-			ReducerMessage::StateStream(response) => {
-				let states = handle_state_stream(state);
-				// TODO: allow ResponseStream to return an stream directly? (as box?)
-				self.tasks.spawn(async move {
-					states.map(Ok).forward(response).await.ok();
-				});
+			ReducerMessage::StateStream(mut response) => {
+				if response.send(CoReducerState::new_reducer(&state.reducer)).is_ok() {
+					state.state_streams.push(response);
+				}
 			},
 			ReducerMessage::Push(overlay_storage, storage, identity, action_link, response) => {
 				response.respond(handle_push(&self, overlay_storage, state, identity, storage, action_link).await);
@@ -106,6 +102,7 @@ pub struct ReducerState {
 	flush_info: Option<FlushInfo>,
 	flush_roots: IndexSet<CoReducerState>,
 	network_feature: bool,
+	state_streams: ResponseStreams<CoReducerState>,
 }
 
 fn changed(
@@ -132,10 +129,6 @@ fn changed(
 
 fn handle_state(state: &ReducerState) -> CoReducerState {
 	CoReducerState(*state.reducer.state(), state.reducer.heads().clone())
-}
-
-fn handle_state_stream(state: &mut ReducerState) -> impl Stream<Item = CoReducerState> {
-	WatchStream::new(state.reducer.watch()).filter_map(|state| ready(state.map(CoReducerState::from)))
 }
 
 async fn handle_push(
@@ -288,6 +281,11 @@ async fn flush(
 		actor
 			.application_handle
 			.dispatch(Action::CoFlush { co: actor.id.clone(), info: flush_info })?;
+
+		// state
+		reducer_state
+			.state_streams
+			.send(CoReducerState::new_reducer(&reducer_state.reducer));
 	}
 	Ok(())
 }

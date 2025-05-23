@@ -9,9 +9,13 @@ use std::collections::BTreeSet;
 
 #[derive(Debug)]
 pub enum ReducerMessage {
+	/// Get current state.
 	State(Response<CoReducerState>),
+
+	/// Subscribe state changes. Upon start the current state is yielded.
 	StateStream(ResponseStream<CoReducerState>),
 
+	/// Push action.
 	Push(
 		Option<OverlayBlockStorage<CoStorage>>,
 		CoStorage,
@@ -19,12 +23,16 @@ pub enum ReducerMessage {
 		Link<ReducerAction<Ipld>>,
 		Response<Result<CoReducerState, anyhow::Error>>,
 	),
+
+	/// Join heads.
 	JoinHeads(
 		Option<OverlayBlockStorage<CoStorage>>,
 		CoStorage,
 		BTreeSet<Cid>,
 		Response<Result<CoReducerState, anyhow::Error>>,
 	),
+
+	/// Join state and heads.
 	JoinState(
 		Option<OverlayBlockStorage<CoStorage>>,
 		CoStorage,
