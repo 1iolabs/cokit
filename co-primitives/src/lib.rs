@@ -9,6 +9,7 @@ pub use library::{
 	block_links::{BlockLinks, BlockLinksFilter, IgnoreFilter, WeakCoReferenceFilter},
 	block_serializer::{BlockSerializer, BlockSerializerError},
 	cbor::{from_cbor, to_cbor, CborError},
+	co_try_stream_ext::CoTryStreamExt,
 	json::{from_json, from_json_string, to_json, to_json_string, JsonError},
 	lsm_tree_map::{LsmTreeMap, LsmTreeMapSettings},
 	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
