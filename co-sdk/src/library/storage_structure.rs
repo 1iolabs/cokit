@@ -80,6 +80,8 @@ where
 		};
 
 		// skip if not exists in this storage
+		//  this also skips blocks that are not yet or will be never available on device
+		//  because tehy are just referenced but not fetched from network.
 		if !storage.exists(&cid).await? {
 			num_skip_exists += 1;
 			continue;
