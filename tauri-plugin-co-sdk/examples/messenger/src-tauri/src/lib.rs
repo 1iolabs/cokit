@@ -1,11 +1,22 @@
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+mod cli;
+
+use crate::cli::Cli;
+use clap::Parser;
+use std::env;
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_co_sdk::library::co_application::CoApplicationSettings;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
 	tauri::async_runtime::set(tokio::runtime::Handle::current());
 
-	let co_settings = CoApplicationSettings::new("coapp-messenger-demo").without_keychain();
+	let mut co_settings: CoApplicationSettings = Cli::parse().with_env().into();
+
+	#[cfg(dev)]
+	{
+		co_settings = co_settings.without_keychain();
+	}
+
 	tauri::Builder::default()
 		.plugin(tauri_plugin_fs::init())
 		.setup(|app| {
@@ -21,6 +32,9 @@ pub async fn run() {
 				.hidden_title(true);
 
 			win_builder.focused(false).always_on_bottom(false).position(0.0, 0.0).build()?;
+
+			// dev
+			app.get_webview_window("main").unwrap().open_devtools();
 
 			Ok(())
 		})

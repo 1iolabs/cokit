@@ -1,6 +1,6 @@
 import { isPluginInitializeAction } from "@1io/kui-application-sdk";
 import { Action } from "redux";
-import { filter, identity, mergeAll, mergeMap, withLatestFrom } from "rxjs";
+import { EMPTY, filter, identity, mergeAll, mergeMap, withLatestFrom } from "rxjs";
 import { get_actions, resolveCid, sessionClose, sessionOpen } from "../../../../../../dist-js/index.js";
 import GroupDefaultPic from "../../../assets/Users_48.svg";
 import { createCoSdkStateEventListener } from "../../../library/co-sdk-state-listener.js";
@@ -13,7 +13,7 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
     mergeMap(() => {
         return createCoSdkStateEventListener().pipe(
             // filter out events for the local co
-            filter((event) => { const [coId] = event.payload; return coId !== "local" }),
+            // filter((event) => { const [coId] = event.payload; return coId !== "local" }),
             withLatestFrom(state$),
             mergeMap(async ([event, state]) => {
                 const [coId, _, heads] = event.payload;
@@ -23,7 +23,10 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                 for (const cid of log) {
                     const action = await resolveCid(sessionId, cid);
                     const payload = action.p;
-                    console.log(action);
+                    console.log(coId, action);
+                    if (coId === "local") {
+                        return EMPTY;
+                    }
 
                     // create core action
                     if (payload.CoreCreate !== undefined) {

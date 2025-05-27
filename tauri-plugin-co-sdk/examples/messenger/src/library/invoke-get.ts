@@ -32,7 +32,11 @@ export async function getCoIds() {
     const memberships = await getCoreState("local", "membership", localCoSessionId);
     sessionClose(localCoSessionId);
     if (Array.isArray(memberships?.memberships)) {
-        return memberships.memberships.map((membership: any) => membership?.id).filter(isNonNull);
+        return memberships.memberships
+            // only get joined COs
+            .filter((membership: any) => membership?.membership_state === 0)
+            .map((membership: any) => membership?.id)
+            .filter(isNonNull);
     }
     return [];
 }

@@ -51,8 +51,13 @@ export const loadChatsEpic: ChatsListEpicType = (action$) => action$.pipe(
             const coCoreResult = splitCoCoreId(coreId);
             if (!coCoreResult) { continue }
 
+            let coreState;
             // get core state and cancel if failed
-            const coreState = await getCoreState(coCoreResult.coId, coCoreResult.coreId);
+            try {
+                coreState = await getCoreState(coCoreResult.coId, coCoreResult.coreId);
+            } catch (e) {
+                console.error("Error while fetching state: ", e);
+            }
             if (!coreState) { continue }
 
             // add to actions
@@ -83,6 +88,6 @@ async function getCoappMessengerIdentity(sessionId: string): Promise<undefined |
     }
     let keyStoreKeys = await resolveCid(sessionId, keystoreState.keys);
     let messengerIdentity = keyStoreKeys.l.find((i: any) => i[1].name === IDENTITY_NAME);
-    return messengerIdentity[0];
+    return messengerIdentity?.[0];
 }
 

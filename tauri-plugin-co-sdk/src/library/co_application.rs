@@ -3,24 +3,24 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default)]
 pub struct CoApplicationSettings {
-	pub identifier: String,
-	pub path: Option<PathBuf>,
-	pub network_force_new_peer_id: bool,
+	pub instance_id: String,
+	pub base_path: Option<PathBuf>,
+	pub force_new_peer_id: bool,
 	pub network: bool,
 	pub no_keychain: bool,
 	pub no_log: bool,
 }
 impl CoApplicationSettings {
 	pub fn new(identifier: &str) -> Self {
-		CoApplicationSettings { identifier: identifier.into(), ..Default::default() }
+		CoApplicationSettings { instance_id: identifier.into(), ..Default::default() }
 	}
 
 	pub fn with_path(self, path: &str) -> Self {
-		Self { path: Some(path.into()), ..self }
+		Self { base_path: Some(path.into()), ..self }
 	}
 
 	pub fn with_network(self, force_new_peer_id: bool) -> Self {
-		Self { network: true, network_force_new_peer_id: force_new_peer_id, ..self }
+		Self { network: true, force_new_peer_id, ..self }
 	}
 
 	pub fn without_keychain(self) -> Self {
@@ -29,8 +29,8 @@ impl CoApplicationSettings {
 }
 
 pub async fn application(settings: CoApplicationSettings) -> Application {
-	let identifier = settings.identifier;
-	let mut builder = match settings.path {
+	let identifier = settings.instance_id;
+	let mut builder = match settings.base_path {
 		Some(path) => ApplicationBuilder::new_with_path(identifier, path),
 		None => ApplicationBuilder::new(identifier),
 	};
@@ -41,10 +41,7 @@ pub async fn application(settings: CoApplicationSettings) -> Application {
 
 	// network
 	if settings.network {
-		application
-			.create_network(settings.network_force_new_peer_id)
-			.await
-			.expect("network");
+		application.create_network(settings.force_new_peer_id).await.expect("network");
 	}
 	application.clone()
 }
