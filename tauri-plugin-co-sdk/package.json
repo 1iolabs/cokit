@@ -1,8 +1,17 @@
 {
-  "name": "tauri-plugin-co-sdk-api",
-  "version": "0.0.0",
-  "author": "You",
-  "description": "",
+  "name": "@1io/tauri-plugin-co-sdk-api",
+  "version": "0.0.1",
+  "description": "Typescript api for using COKit functionality via tauri commands and events",
+  "author": "1io",
+  "publishConfig": {
+    "registry": "http://npm.intranet.1io.com"
+  },
+  "contributors": [
+    {
+      "name": "DH",
+      "email": "50+dh@users.noreply.1io.com"
+    }
+  ],
   "type": "module",
   "types": "./dist-js/index.d.ts",
   "main": "./dist-js/index.cjs",
