@@ -8,6 +8,7 @@ use bloomfilter::Bloom;
 use cid::Cid;
 use either::Either;
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
+use num_rational::Ratio;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
 	cmp::Ordering,
@@ -16,9 +17,11 @@ use std::{
 	future::ready,
 	hash::Hash,
 	marker::PhantomData,
-	mem::swap,
 	num::TryFromIntError,
 };
+
+const INLINE_SIZE_FACTOR_LEVELS: Ratio<usize> = Ratio::new_raw(2, 8);
+const INLINE_SIZE_FACTOR_ACTIVE: Ratio<usize> = Ratio::new_raw(4, 8);
 
 /// LSM Tree Root.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,10 +31,12 @@ where
 	V: Clone + Send + Sync + 'static,
 {
 	/// Levels.
-	#[serde(rename = "l", default = "Vec::new", skip_serializing_if = "Vec::is_empty")]
-	pub levels: Vec<Link<Level<K, V>>>,
+	/// Inline size: `MAX_BLOCK_SIZE * INLINE_SIZE_FACTOR_LEVELS`
+	#[serde(rename = "l", default = "Node::default", skip_serializing_if = "Node::is_empty")]
+	pub levels: Node<Level<K, V>>,
 
 	/// Active "in memory data".
+	/// Inline size: `MAX_BLOCK_SIZE * INLINE_SIZE_FACTOR_ACTIVE`
 	#[serde(rename = "a", default = "Node::default", skip_serializing_if = "Node::is_empty")]
 	pub active: Node<(K, Value<V>)>,
 
@@ -586,7 +591,8 @@ where
 
 		// store active
 		root.active =
-			store_node(&self.storage, self.settings.max_node_entries, stream::iter(self.active.iter()).map(Ok)).await?;
+			store_active(&self.storage, self.settings.max_node_entries, stream::iter(self.active.iter()).map(Ok))
+				.await?;
 
 		// store root
 		self.root = self.storage.set_value(&root).await?.into();
@@ -876,24 +882,20 @@ where
 		// add as first run to level 0
 		//  note: this currently loads all run "metadata" entries into memory however that should be ok because we dont
 		//   expect the run numbers to be very large.
-		let mut level0 = match root.levels.get(0) {
-			Some(level_link) => self.storage.get_value(level_link).await?,
-			None => Level { runs: Default::default() },
-		};
-		let mut runs = NodeStream::from_link(self.storage.clone(), level0.runs)
+		let mut levels = self.levels(root.levels.clone()).await?;
+		if levels.is_empty() {
+			levels.insert(0, Level { runs: Default::default() });
+		}
+		let mut runs = NodeStream::from_link(self.storage.clone(), levels[0].runs)
 			.try_collect::<VecDeque<_>>()
 			.await?;
 		runs.push_front(run);
 		let runs_count = runs.len();
-		level0.runs =
+		levels[0].runs =
 			store_items(&self.storage, self.settings.max_node_entries, stream::iter(runs.iter()).map(Ok)).await?;
-		let mut next_level0_link = self.storage.set_value(&level0).await?;
+		root.levels = self.store_levels(levels).await?;
 
 		// store root with next level0
-		match root.levels.get_mut(0) {
-			Some(level) => swap(level, &mut next_level0_link),
-			None => root.levels.insert(0, next_level0_link),
-		}
 		self.root = self.storage.set_value(&root).await?.into();
 
 		// cleanup when everything has succedded
@@ -918,20 +920,17 @@ where
 
 		// root
 		let mut root = if let Some(root) = self.root().await? { root } else { return Ok(()) };
+		let mut levels = self.levels(root.levels.clone()).await?;
 
 		// level
-		let mut level = if let Some(level_link) = root.levels.get(level_index) {
-			self.storage.get_value(level_link).await?
-		} else {
+		if levels.get(level_index).is_none() {
 			return Ok(());
-		};
+		}
 
 		// next level
-		let mut next_level = if let Some(level_link) = root.levels.get(next_level_index) {
-			self.storage.get_value(level_link).await?
-		} else {
-			Level { runs: OptionLink::none() }
-		};
+		if levels.get(next_level_index).is_none() {
+			levels.insert(next_level_index, Level { runs: OptionLink::none() });
+		}
 
 		// find runs to compact
 		let mut runs = Vec::new();
@@ -987,10 +986,10 @@ where
 
 		// replace runs
 		let (level_run_count, next_level_run_count) = {
-			let mut level_runs = NodeStream::from_link(self.storage.clone(), level.runs)
+			let mut level_runs = NodeStream::from_link(self.storage.clone(), levels[level_index].runs)
 				.try_collect::<Vec<_>>()
 				.await?;
-			let mut next_level_runs = NodeStream::from_link(self.storage.clone(), next_level.runs)
+			let mut next_level_runs = NodeStream::from_link(self.storage.clone(), levels[next_level_index].runs)
 				.try_collect::<Vec<_>>()
 				.await?;
 
@@ -1011,9 +1010,9 @@ where
 			// store runs
 			let level_run_count = level_runs.len();
 			let next_level_run_count = next_level_runs.len();
-			level.runs =
+			levels[level_index].runs =
 				store_items(&self.storage, self.settings.max_node_entries, stream::iter(&level_runs).map(Ok)).await?;
-			next_level.runs =
+			levels[next_level_index].runs =
 				store_items(&self.storage, self.settings.max_node_entries, stream::iter(&next_level_runs).map(Ok))
 					.await?;
 
@@ -1021,24 +1020,18 @@ where
 			(level_run_count, next_level_run_count)
 		};
 
-		// replace levels
-		for (i, l) in [(level_index, level), (next_level_index, next_level)] {
-			let mut link = self.storage.set_value(&l).await?;
-			match root.levels.get_mut(i) {
-				Some(level) => swap(level, &mut link),
-				None => root.levels.insert(i, link),
-			}
-		}
-
 		// clear empty
 		let next_level_index = if level_run_count == 0 {
-			root.levels.remove(level_index);
+			levels.remove(level_index);
 			level_index
 		} else {
 			next_level_index
 		};
 
-		// replace root
+		// store levels
+		root.levels = self.store_levels(levels).await?;
+
+		// store root
 		self.root = self.storage.set_value(&root).await?.into();
 
 		// cascade
@@ -1058,6 +1051,23 @@ where
 		Ok(self.storage.get_value_or_none(&self.root).await?)
 	}
 
+	// Levels.
+	async fn levels(&self, levels: Node<Level<K, V>>) -> Result<Vec<Level<K, V>>, StorageError> {
+		NodeStream::from_node(self.storage.clone(), levels, None).try_collect().await
+	}
+
+	// Store Levels.
+	async fn store_levels(&self, levels: Vec<Level<K, V>>) -> Result<Node<Level<K, V>>, StorageError> {
+		let mut builder = NodeBuilder::default()
+			.with_items_size_max((INLINE_SIZE_FACTOR_LEVELS * S::StoreParams::MAX_BLOCK_SIZE).to_integer());
+		builder.extend(levels).map_err(|e| StorageError::InvalidArgument(e.into()))?;
+		let (node, blocks) = builder.into_node().map_err(|e| StorageError::InvalidArgument(e.into()))?;
+		for block in blocks {
+			self.storage.set(block).await?;
+		}
+		Ok(node)
+	}
+
 	/// All active levels and runs with its (current) global index.
 	/// Sorted by newest to oldest run.
 	fn levels_and_runs(
@@ -1067,8 +1077,7 @@ where
 			let mut global_level_index = 0;
 			let mut global_run_index = 0;
 			if let Some(root) = self.root().await? {
-				for level_link in root.levels.iter() {
-					let level = self.storage.get_value(level_link).await?;
+				for level in self.levels(root.levels).await? {
 					let runs = NodeStream::from_link(self.storage.clone(), level.runs);
 					yield Either::Left((global_level_index, level));
 					for await run in runs {
@@ -1117,7 +1126,7 @@ where
 }
 
 /// Store `entries` as DAG Node and return the root [`cid::Cid`].
-async fn store_node<S, K, V>(
+async fn store_active<S, K, V>(
 	storage: &S,
 	max_node_entries: u64,
 	entries: impl Stream<Item = Result<(&K, &Value<V>), StorageError>>,
@@ -1133,7 +1142,7 @@ where
 			.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
 		Default::default(),
 	)
-	.with_items_size_max(S::StoreParams::MAX_BLOCK_SIZE * 3 / 8);
+	.with_items_size_max((INLINE_SIZE_FACTOR_ACTIVE * S::StoreParams::MAX_BLOCK_SIZE).to_integer());
 	pin_mut!(entries);
 	while let Some(item) = entries.try_next().await? {
 		node_builder
