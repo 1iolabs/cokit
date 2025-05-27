@@ -34,7 +34,10 @@ pub async fn run() {
 			win_builder.focused(false).always_on_bottom(false).position(0.0, 0.0).build()?;
 
 			// dev
-			app.get_webview_window("main").unwrap().open_devtools();
+			#[cfg(any(debug_assertions))]
+			{
+				app.get_webview_window("main").unwrap().open_devtools();
+			}
 
 			Ok(())
 		})
