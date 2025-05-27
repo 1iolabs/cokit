@@ -6,6 +6,7 @@ pub mod core_resolver_dispatch;
 pub mod create_reducer_action;
 pub mod did_key_provider;
 pub mod extract_next_heads;
+pub mod find_co_by_pin;
 pub mod find_co_identities;
 pub mod find_co_secret;
 pub mod find_membership;

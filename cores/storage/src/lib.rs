@@ -1,11 +1,11 @@
 use anyhow::anyhow;
 use co_api::{
 	async_api::Reducer, BlockStorage, BlockStorageExt, CoList, CoListTransaction, CoMap, CoMapTransaction, CoSet,
-	CoSetTransaction, LazyTransaction, Link, OptionLink, ReducerAction, StorageError, Tags, WeakCid,
+	LazyTransaction, Link, OptionLink, ReducerAction, StorageError, Tags, WeakCid,
 };
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Storage {
@@ -19,12 +19,26 @@ pub struct Storage {
 
 	/// Block metadata index to unreferenced (reference count of zero and children resolved) entries.
 	/// See: [`BlockMetadata::is_removable`]
-	#[serde(rename = "bu", default, skip_serializing_if = "CoSet::is_empty")]
-	pub blocks_index_unreferenced: CoSet<WeakCid>,
+	#[serde(rename = "bu", default, skip_serializing_if = "CoMap::is_empty")]
+	pub blocks_index_unreferenced: CoMap<WeakCid, BlockInfo>,
 
-	/// Blocks that are recursively added but children has not yet referenced.
+	/// Blocks that are recursively added but children are pending.
+	/// Blocks that are recursively deleted but children has not yet unreferenced.
 	#[serde(rename = "bs", default, skip_serializing_if = "CoMap::is_empty")]
-	pub blocks_index_shallow: CoMap<WeakCid, BlockInfo>,
+	pub block_structure_pending: CoMap<WeakCid, BlockStructurePending>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum BlockStructurePending {
+	/// recursively added but children has not yet referenced.
+	Reference(BlockInfo),
+}
+impl BlockStructurePending {
+	pub fn info(&self) -> &BlockInfo {
+		match self {
+			BlockStructurePending::Reference(block_info) => block_info,
+		}
+	}
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -47,29 +61,53 @@ impl ReferenceMode {
 	}
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BlockInfo {
-	/// Pinning keys taht reference this block.
+	/// Pinning keys that reference this block.
 	#[serde(rename = "p", default, skip_serializing_if = "CoSet::is_empty")]
 	pub pins: CoSet<String>,
 
 	/// This is a root reference.
-	#[serde(rename = "r", default, skip_serializing_if = "std::ops::Not::not")]
-	pub root: bool,
+	#[serde(rename = "t", default, skip_serializing_if = "BlockType::is_unknown")]
+	pub block_type: BlockType,
 }
 impl BlockInfo {
-	pub async fn new<S>(storage: &S, pin: String, root: bool) -> Result<Self, StorageError>
+	pub async fn new<S>(storage: &S, pin: String, block_type: BlockType) -> Result<Self, StorageError>
 	where
 		S: BlockStorage + Clone + 'static,
 	{
 		let mut pins = CoSet::default();
 		pins.insert(storage, pin).await?;
-		Ok(Self { pins, root })
+		Ok(Self { pins, block_type })
 	}
 
-	pub fn without_root(mut self) -> Self {
-		self.root = false;
+	pub fn with_block_type(mut self, block_type: BlockType) -> Self {
+		self.block_type = block_type;
 		self
+	}
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BlockType {
+	#[default]
+	Unknown,
+
+	/// Block type will be set to root if is caused by a pin operation (create/remove).
+	Root,
+}
+impl BlockType {
+	pub fn is_unknown(&self) -> bool {
+		match self {
+			BlockType::Unknown => true,
+			_ => false,
+		}
+	}
+
+	pub fn is_root(&self) -> bool {
+		match self {
+			BlockType::Root => true,
+			_ => false,
+		}
 	}
 }
 
@@ -82,11 +120,6 @@ pub struct BlockMetadata {
 	/// Reference mode.
 	#[serde(rename = "m")]
 	pub mode: ReferenceMode,
-
-	/// Structural references. Children of this reference.
-	/// Every children listed here increases its respective reference count by one.
-	#[serde(rename = "c", default, skip_serializing_if = "CoSet::is_empty")]
-	pub children: CoSet<WeakCid>,
 
 	/// Additional metadata.
 	#[serde(rename = "t", default, skip_serializing_if = "Tags::is_empty")]
@@ -138,14 +171,16 @@ pub enum StorageAction {
 
 	/// Decrease [`Cid`] reference count by one.
 	#[serde(rename = "u")]
-	Unreference(Vec<WeakCid>),
+	Unreference(BlockInfo, Vec<WeakCid>),
 
-	/// Structurally reference [`Cid`].
-	/// The first item is the parent the second is the children to be structurally referenced.
-	/// All children have their reference count increased by one (idempotent).
+	/// Structurally reference/delete [`Cid`].
 	/// Expects all children references passed for a parent even is they not exist on disk.
+	///
+	/// # Vec Arguments
+	/// - `0`: The parent reference.
+	/// - `1`: The links of the parent reference.
 	#[serde(rename = "s")]
-	ReferenceStructure(Vec<(WeakCid, BTreeSet<WeakCid>)>),
+	Structure(Vec<(WeakCid, BTreeSet<WeakCid>)>),
 
 	/// Create [`Cid`] references with ref count of zero if the reference not exists yet.
 	/// This is normally used to track newly created blocks.
@@ -153,7 +188,7 @@ pub enum StorageAction {
 	/// # Arguments
 	/// - `0`: The [`Cid`] of entries to create.
 	#[serde(rename = "c")]
-	ReferenceCreate(BTreeSet<WeakCid>),
+	ReferenceCreate(BlockInfo, BTreeSet<WeakCid>),
 
 	/// Mark to remove [`Cid`]. This will make the references shallow again.
 	/// And eventually shedule them to delete.
@@ -162,18 +197,19 @@ pub enum StorageAction {
 	/// This is basically the same as Unreference.
 	///
 	/// # Arguments
+	/// - `0`: The BlockInfo of the blocks to remove.
 	/// - `0`: The [`Cid`] of entries to remove.
 	/// - `1`: Remove all instances.
 	#[serde(rename = "ud")]
-	Remove(BTreeSet<WeakCid>, bool),
+	Remove(BlockInfo, BTreeSet<WeakCid>, bool),
 
 	/// Delete [`Cid`] references.
 	///
 	/// # Arguments
-	/// - `0`: The [`Cid`] of entries to remove.
+	/// - `0`: The [`Cid`] of entries to remove with all of its direct children.
 	/// - `1`: Force delete. If false only references with a zero ref count will be removed.
 	#[serde(rename = "d")]
-	Delete(BTreeSet<WeakCid>, bool),
+	Delete(BlockInfo, BTreeMap<WeakCid, BTreeSet<WeakCid>>, bool),
 
 	/// Append tags to references.
 	#[serde(rename = "ti")]
@@ -246,9 +282,9 @@ where
 	blocks_changed: bool,
 	blocks: LazyTransaction<S, CoMap<WeakCid, BlockMetadata>>,
 	blocks_index_unreferenced_changed: bool,
-	blocks_index_unreferenced: LazyTransaction<S, CoSet<WeakCid>>,
-	blocks_index_shallow_changed: bool,
-	blocks_index_shallow: LazyTransaction<S, CoMap<WeakCid, BlockInfo>>,
+	blocks_index_unreferenced: LazyTransaction<S, CoMap<WeakCid, BlockInfo>>,
+	block_structure_pending_changed: bool,
+	block_structure_pending: LazyTransaction<S, CoMap<WeakCid, BlockStructurePending>>,
 }
 impl<S> StorageTransaction<S>
 where
@@ -262,8 +298,8 @@ where
 			blocks: state.blocks.open_lazy(&storage).await?,
 			blocks_index_unreferenced_changed: false,
 			blocks_index_unreferenced: state.blocks_index_unreferenced.open_lazy(&storage).await?,
-			blocks_index_shallow_changed: false,
-			blocks_index_shallow: state.blocks_index_shallow.open_lazy(&storage).await?,
+			block_structure_pending_changed: false,
+			block_structure_pending: state.block_structure_pending.open_lazy(&storage).await?,
 			storage,
 		})
 	}
@@ -287,10 +323,10 @@ where
 				self.blocks_index_unreferenced_changed = false;
 			}
 		}
-		if let Some(blocks_index_shallow) = self.blocks_index_shallow.opt_mut() {
-			if self.blocks_index_shallow_changed {
-				state.blocks_index_shallow = blocks_index_shallow.store().await?;
-				self.blocks_index_shallow_changed = false;
+		if let Some(block_structure_pending) = self.block_structure_pending.opt_mut() {
+			if self.block_structure_pending_changed {
+				state.block_structure_pending = block_structure_pending.store().await?;
+				self.block_structure_pending_changed = false;
 			}
 		}
 		Ok(())
@@ -322,18 +358,18 @@ where
 	// 	blocks_index_unreferenced.get().await
 	// }
 
-	async fn blocks_index_unreferenced_mut(&mut self) -> Result<&mut CoSetTransaction<S, WeakCid>, StorageError> {
+	async fn blocks_index_unreferenced_mut(
+		&mut self,
+	) -> Result<&mut CoMapTransaction<S, WeakCid, BlockInfo>, StorageError> {
 		self.blocks_index_unreferenced_changed = true;
 		self.blocks_index_unreferenced.get_mut().await
 	}
 
-	// async fn blocks_index_shallow(&mut self) -> Result<&CoSetTransaction<S, WeakCid>, StorageError> {
-	// 	blocks_index_shallow.get().await
-	// }
-
-	async fn blocks_index_shallow_mut(&mut self) -> Result<&mut CoMapTransaction<S, WeakCid, BlockInfo>, StorageError> {
-		self.blocks_index_shallow_changed = true;
-		self.blocks_index_shallow.get_mut().await
+	async fn block_structure_pending_mut(
+		&mut self,
+	) -> Result<&mut CoMapTransaction<S, WeakCid, BlockStructurePending>, StorageError> {
+		self.block_structure_pending_changed = true;
+		self.block_structure_pending.get_mut().await
 	}
 }
 
@@ -343,15 +379,15 @@ where
 {
 	match action {
 		StorageAction::Reference(info, cids) => reduce_reference(transaction, stream::iter(cids).map(Ok), info).await?,
-		StorageAction::Unreference(cids) => reduce_unreference(transaction, stream::iter(cids).map(Ok)).await?,
-		StorageAction::ReferenceStructure(cids) => {
-			reduce_reference_structure(transaction, stream::iter(cids).map(Ok)).await?
+		StorageAction::Unreference(info, cids) => {
+			reduce_unreference(transaction, stream::iter(cids).map(Ok), info).await?
 		},
-		StorageAction::ReferenceCreate(cids) => {
-			reduce_reference_create(transaction, stream::iter(cids).map(Ok)).await?
+		StorageAction::Structure(cids) => reduce_structure(transaction, stream::iter(cids).map(Ok)).await?,
+		StorageAction::ReferenceCreate(info, cids) => {
+			reduce_reference_create(transaction, stream::iter(cids).map(Ok), info).await?
 		},
-		StorageAction::Remove(cids, zero) => reduce_remove(transaction, cids, zero).await?,
-		StorageAction::Delete(cids, force) => reduce_delete(transaction, cids, force).await?,
+		StorageAction::Remove(info, cids, zero) => reduce_remove(transaction, cids, zero, info).await?,
+		StorageAction::Delete(info, cids, force) => reduce_delete(transaction, cids, force, info).await?,
 		StorageAction::TagsInsert(cids, tags) => reduce_tags_insert(transaction, cids, tags).await?,
 		StorageAction::TagsRemove(cids, tags) => reduce_tags_remove(transaction, cids, tags).await?,
 		StorageAction::PinCreate(key, strategy, references) => {
@@ -372,7 +408,7 @@ where
 }
 
 /// See: [`StorageAction::ReferenceStructure`]
-async fn reduce_reference_structure<S>(
+async fn reduce_structure<S>(
 	transaction: &mut StorageTransaction<S>,
 	cids: impl Stream<Item = Result<(WeakCid, BTreeSet<WeakCid>), StorageError>>,
 ) -> Result<(), anyhow::Error>
@@ -381,59 +417,59 @@ where
 {
 	pin_mut!(cids);
 	while let Some((parent, children)) = cids.try_next().await? {
-		reference_structure_cid(transaction, parent, children).await?;
+		reference_structure_cid(transaction, parent, &children).await?;
 	}
 	Ok(())
 }
 
-/// Add unique children to parent block metadata.
+/// Reference/Unreference a children of a recursive reference.
+/// When this gets called for Unreference the `parent` block already has been deleted.
 async fn reference_structure_cid<S>(
 	transaction: &mut StorageTransaction<S>,
 	parent: WeakCid,
-	children: BTreeSet<WeakCid>,
+	children: &BTreeSet<WeakCid>,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
 	// remove pending flag and ignore if not pending
-	let info = match transaction.blocks_index_shallow_mut().await?.remove(parent).await? {
+	let pending = match transaction.block_structure_pending_mut().await?.remove(parent).await? {
 		Some(info) => info,
 		None => {
 			return Ok(());
 		},
 	};
+	match pending {
+		BlockStructurePending::Reference(info) => {
+			// get block
+			let mut block = transaction
+				.blocks()
+				.await?
+				.get(&parent)
+				.await?
+				.ok_or(anyhow!("Reference not found: {:?}", parent))?;
 
-	// get block
-	let mut block = transaction
-		.blocks()
-		.await?
-		.get(&parent)
-		.await?
-		.ok_or(anyhow!("Reference not found: {:?}", parent))?;
+			// reference children
+			for item in children.iter() {
+				reference_cid(transaction, *item, info.clone().with_block_type(BlockType::Unknown)).await?;
+			}
 
-	// reference children
-	for item in children.iter() {
-		reference_cid(transaction, *item, info.clone().without_root()).await?;
+			// mode
+			block.mode = ReferenceMode::Recursive;
+
+			// remove
+			if block.is_removable() {
+				transaction
+					.blocks_index_unreferenced_mut()
+					.await?
+					.insert(parent, info.clone())
+					.await?;
+			}
+
+			// store
+			transaction.blocks_mut().await?.insert(parent, block).await?;
+		},
 	}
-
-	// children
-	let mut children_transaction = block.children.open(transaction.storage()).await?;
-	for item in children.iter() {
-		children_transaction.insert(*item).await?;
-	}
-	block.children = children_transaction.store().await?;
-
-	// mode
-	block.mode = ReferenceMode::Recursive;
-
-	// remove
-	if block.is_removable() {
-		transaction.blocks_index_unreferenced_mut().await?.insert(parent).await?;
-	}
-
-	// store
-	transaction.blocks_mut().await?.insert(parent, block).await?;
-
 	Ok(())
 }
 
@@ -448,6 +484,7 @@ where
 		.remove(key.clone())
 		.await?
 		.ok_or(anyhow!("Pin not found: {}", key))?;
+	let info = BlockInfo::new(transaction.storage(), key.clone(), BlockType::Root).await?;
 
 	// references
 	reduce_unreference(
@@ -455,6 +492,7 @@ where
 		pin.references
 			.stream(transaction.storage())
 			.map_ok(|(_key, value)| value.into()),
+		info,
 	)
 	.await?;
 
@@ -492,7 +530,7 @@ where
 		.await?
 		.ok_or(anyhow!("Pin not found: {}", key))?;
 	let mut references = pin.references.open(transaction.storage()).await?;
-	let info = BlockInfo::new(transaction.storage(), key.clone(), true).await?;
+	let info = BlockInfo::new(transaction.storage(), key.clone(), BlockType::Root).await?;
 
 	// insert references
 	for cid in cids {
@@ -503,7 +541,7 @@ where
 	}
 
 	// apply pin strategy
-	apply_pin_strategy(transaction, &mut pin, &mut references).await?;
+	apply_pin_strategy(transaction, &mut pin, &mut references, info.clone()).await?;
 
 	// store pin
 	pin.references = references.store().await?;
@@ -517,6 +555,7 @@ async fn apply_pin_strategy<S>(
 	transaction: &mut StorageTransaction<S>,
 	pin: &mut Pin,
 	references: &mut CoListTransaction<S, WeakCid>,
+	info: BlockInfo,
 ) -> Result<bool, anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
@@ -527,7 +566,7 @@ where
 		PinStrategy::MaxCount(count) => {
 			while pin.references_count > *count {
 				if let Some((_, remove)) = references.pop_front().await? {
-					unreference_cid(transaction, remove, false).await?;
+					unreference_cid(transaction, remove, false, info.clone()).await?;
 				}
 				pin.references_count -= 1;
 				changed = true;
@@ -576,13 +615,14 @@ where
 	let Some(mut pin) = transaction.pins().await?.get(&key).await? else {
 		return Err(anyhow::anyhow!("Pin not exists: {}", key));
 	};
+	let info = BlockInfo::new(transaction.storage(), key.clone(), BlockType::Root).await?;
 
 	// update pin strategy
 	pin.strategy = strategy;
 
 	// enfore pin strategy
 	let mut references = pin.references.open(transaction.storage()).await?;
-	apply_pin_strategy(transaction, &mut pin, &mut references).await?;
+	apply_pin_strategy(transaction, &mut pin, &mut references, info).await?;
 
 	// store pin
 	pin.references = references.store().await?;
@@ -641,83 +681,52 @@ async fn reduce_remove<S>(
 	transaction: &mut StorageTransaction<S>,
 	cids: impl IntoIterator<Item = WeakCid>,
 	zero: bool,
+	info: BlockInfo,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
 	for cid in cids {
-		unreference_cid(transaction, cid, zero).await?;
+		unreference_cid(transaction, cid, zero, info.clone()).await?;
 	}
 	Ok(())
 }
 
+/// Delete block references from storage state.
+/// After this call the parent blocks can be deleted.
 async fn reduce_delete<S>(
 	transaction: &mut StorageTransaction<S>,
-	cids: impl IntoIterator<Item = WeakCid>,
+	cids: impl IntoIterator<Item = (WeakCid, BTreeSet<WeakCid>)>,
 	force: bool,
+	info: BlockInfo,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
 	// remove
-	let mut remove_structural = BTreeSet::new();
-	for cid in cids {
-		let cid = cid.into();
+	for (cid, links) in cids {
+		// structure
+		reference_structure_cid(transaction, cid, &links).await?;
 
 		// remove block
 		let block = match transaction.blocks().await?.get(&cid).await? {
-			Some(block) if block.references == 0 => transaction.blocks_mut().await?.remove(cid).await?,
-			Some(_) if force => {
-				// remove structural references from parents
-				//  this is only the case when force remove blocks as it still has references
-				remove_structural.insert(cid);
-
-				// remove
-				transaction.blocks_mut().await?.remove(cid).await?
-			},
+			Some(block) if (block.references == 0 || force) => transaction.blocks_mut().await?.remove(cid).await?,
 			_ => None,
 		};
 		if let Some(block) = block {
-			// index
+			// remove from index
 			transaction.blocks_index_unreferenced_mut().await?.remove(cid).await?;
 
-			// unreference children
-			let children = block.children.stream(transaction.storage());
-			pin_mut!(children);
-			while let Some(cid) = children.try_next().await? {
-				unreference_cid(transaction, cid, false).await?;
-			}
-		}
-	}
-
-	// remove structural references from parents
-	if !remove_structural.is_empty() {
-		let mut changed_blocks = HashMap::new();
-
-		// scan all blocks for structural referernces to the removed
-		// Complexity: `BLOCKS = O(n), C = O(m), O(n * m)`
-		{
-			let storage = transaction.storage().clone();
-			let stream = transaction.blocks().await?.stream();
-			pin_mut!(stream);
-			while let Some((cid, mut block)) = stream.try_next().await? {
-				let mut children = block.children.open(&storage).await?;
-				let mut change = false;
-				for item in &remove_structural {
-					if children.remove(*item).await? {
-						change = true;
+			// unreference links
+			match block.mode {
+				ReferenceMode::Shallow => {},
+				ReferenceMode::Recursive => {
+					for link in links.iter() {
+						unreference_cid(transaction, *link, false, info.clone().with_block_type(BlockType::Unknown))
+							.await?;
 					}
-				}
-				if change {
-					block.children = children.store().await?;
-					changed_blocks.insert(cid, block);
-				}
+				},
 			}
-		}
-
-		// replace changed blocks
-		for (cid, block) in changed_blocks {
-			transaction.blocks_mut().await?.insert(cid, block).await?;
 		}
 	}
 
@@ -743,6 +752,7 @@ where
 async fn reduce_reference_create<S>(
 	transaction: &mut StorageTransaction<S>,
 	cids: impl Stream<Item = Result<WeakCid, StorageError>>,
+	info: BlockInfo,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
@@ -751,10 +761,18 @@ where
 	while let Some(cid) = cids.try_next().await? {
 		let weak_cid = cid.into();
 		if transaction.blocks().await?.get(&weak_cid).await?.is_none() {
+			// block
 			transaction
 				.blocks_mut()
 				.await?
 				.insert(weak_cid, BlockMetadata::default())
+				.await?;
+
+			// shallow
+			transaction
+				.block_structure_pending_mut()
+				.await?
+				.insert(weak_cid, BlockStructurePending::Reference(info.clone()))
 				.await?;
 		}
 	}
@@ -779,7 +797,11 @@ where
 		}
 	} else {
 		// add to pending as we are about to create the block
-		transaction.blocks_index_shallow_mut().await?.insert(cid, info).await?;
+		transaction
+			.block_structure_pending_mut()
+			.await?
+			.insert(cid, BlockStructurePending::Reference(info))
+			.await?;
 	}
 
 	// increment
@@ -794,13 +816,14 @@ where
 async fn reduce_unreference<S>(
 	transaction: &mut StorageTransaction<S>,
 	cids: impl Stream<Item = Result<WeakCid, StorageError>>,
+	info: BlockInfo,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
 	pin_mut!(cids);
 	while let Some(cid) = cids.try_next().await? {
-		unreference_cid(transaction, cid.into(), false).await?;
+		unreference_cid(transaction, cid.into(), false, info.clone()).await?;
 	}
 	Ok(())
 }
@@ -809,6 +832,7 @@ async fn unreference_cid<S>(
 	transaction: &mut StorageTransaction<S>,
 	cid: WeakCid,
 	zero: bool,
+	info: BlockInfo,
 ) -> Result<bool, anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
@@ -824,7 +848,7 @@ where
 
 			// index
 			if block.is_removable() {
-				transaction.blocks_index_unreferenced_mut().await?.insert(cid).await?;
+				transaction.blocks_index_unreferenced_mut().await?.insert(cid, info).await?;
 			}
 
 			// store
@@ -865,7 +889,7 @@ mod tests {
 		map.entry(cid1.into()).or_default().insert(cid3.into());
 
 		// action
-		let action = StorageAction::ReferenceStructure(map.into_iter().collect());
+		let action = StorageAction::Structure(map.into_iter().collect());
 		let block = BlockSerializer::default().serialize(&action).unwrap();
 		let action_deserialize: StorageAction = BlockSerializer::default().deserialize(&block).unwrap();
 		assert_eq!(action_deserialize, action);
@@ -926,7 +950,7 @@ mod tests {
 				from: "did:local:device".into(),
 				time: 0,
 				core: "storage".into(),
-				payload: StorageAction::ReferenceStructure(
+				payload: StorageAction::Structure(
 					[
 						(
 							(cid("bagakbqabdyqar5vlsfqd3g4mxngt3yl7nx2na2kb4jybylzn5bktwnihjhih42a")),
@@ -978,7 +1002,7 @@ mod tests {
 				from: "did:local:device".into(),
 				time: 0,
 				core: "storage".into(),
-				payload: StorageAction::ReferenceStructure(
+				payload: StorageAction::Structure(
 					[
 						(
 							(cid("bagakbqabdyqklkdo5hv4smstsuv2t347nnonrdgylyrb3qepc2rh5p2qtntmbba")),
@@ -1029,7 +1053,7 @@ mod tests {
 			true,
 			state
 				.blocks_index_unreferenced
-				.contains(&storage, &cid("bagakbqabdyqar5vlsfqd3g4mxngt3yl7nx2na2kb4jybylzn5bktwnihjhih42a"))
+				.contains_key(&storage, &cid("bagakbqabdyqar5vlsfqd3g4mxngt3yl7nx2na2kb4jybylzn5bktwnihjhih42a"))
 				.await
 				.unwrap()
 		);
@@ -1037,7 +1061,7 @@ mod tests {
 			false,
 			state
 				.blocks_index_unreferenced
-				.contains(&storage, &cid("bagakbqabdyqldyp7kxv6p5wb3edrywc74xfkgauqzlumlxncdlzncbwt36y7iby"))
+				.contains_key(&storage, &cid("bagakbqabdyqldyp7kxv6p5wb3edrywc74xfkgauqzlumlxncdlzncbwt36y7iby"))
 				.await
 				.unwrap()
 		);

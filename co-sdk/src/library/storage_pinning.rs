@@ -8,11 +8,11 @@ use crate::{
 		create_reducer_action::create_reducer_action, storage_dispatch_remove::storage_dispatch_remove,
 		storage_dispatch_roots::storage_dispatch_roots,
 	},
-	CoReducerState, DynamicCoDate, Runtime, Storage, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
+	CoPinningKey, CoReducerState, DynamicCoDate, Runtime, Storage, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
 use cid::Cid;
 use co_actor::TaskSpawner;
-use co_core_storage::StorageAction;
+use co_core_storage::{BlockInfo, StorageAction};
 use co_identity::PrivateIdentityBox;
 use co_log::EntryBlock;
 use co_primitives::{
@@ -65,8 +65,10 @@ where
 	let storage = dispatcher.storage().clone();
 
 	// storage: remove
+	//  note: we assume that removed block only belongs to state
 	storage_dispatch_remove(
 		&mut dispatcher,
+		BlockInfo::new(local_storage, CoPinningKey::State.to_string(co_id), Default::default()).await?,
 		stream::iter(co_removed_blocks),
 		<S as BlockStorage>::StoreParams::MAX_BLOCK_SIZE,
 	)
@@ -77,21 +79,17 @@ where
 
 	// caluculate and free?
 	if context.free {
+		let mut structure_filter =
+			CoStructureResolver::new(co_id, context.block_links.clone().with_filter(WeakCoReferenceFilter::new()));
+
 		// storage: references
 		let state = dispatcher.state().into();
-		storage_structure_recursive(
-			&storage,
-			&mut dispatcher,
-			state,
-			co_storage,
-			max_duration,
-			&CoStructureResolver::new(co_id, context.block_links.clone().with_filter(WeakCoReferenceFilter::new())),
-		)
-		.await?;
+		storage_structure_recursive(&storage, &mut dispatcher, state, co_storage, max_duration, &mut structure_filter)
+			.await?;
 
 		// storage: cleanup
 		let state = dispatcher.state().into();
-		storage_cleanup(&mut dispatcher, &storage, state).await?;
+		storage_cleanup(&storage, &mut dispatcher, state, co_storage, &mut structure_filter).await?;
 	}
 
 	// result

@@ -36,7 +36,9 @@ pub use co_storage::{
 };
 pub use library::{
 	build_core::{build_core, crate_repository_path, BuildCoreArtifact},
+	core_resolver_dispatch::CoreResolverDispatch,
 	did_key_provider::DidKeyProvider,
+	find_co_by_pin::find_co_by_pin,
 	find_co_identities::{find_co_identities, find_co_private_identity},
 	find_co_secret::find_co_secret,
 	find_membership::{find_membership, find_memberships},

@@ -1,24 +1,29 @@
+use super::max_reference_count::max_reference_count;
 use crate::{
 	state::{query_core, Query, QueryExt},
 	types::co_dispatch::CoDispatch,
-	CO_CORE_NAME_STORAGE,
+	StructureResolveResult, StructureResolver, CO_CORE_NAME_STORAGE,
 };
 use co_core_co::Co;
-use co_core_storage::StorageAction;
-use co_primitives::{OptionLink, WeakCid};
-use co_storage::BlockStorage;
-use futures::{StreamExt, TryStreamExt};
-use std::collections::BTreeSet;
+use co_core_storage::{BlockInfo, StorageAction};
+use co_primitives::{OptionLink, StoreParams, WeakCid};
+use co_storage::{BlockStorageContentMapping, ExtendedBlockStorage};
+use futures::{pin_mut, TryStreamExt};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 /// Cleanup storage by removing all unreferenced blocks.
-pub async fn storage_cleanup<S>(
-	dispatcher: &mut impl CoDispatch<StorageAction>,
-	storage: &S,
-	state: OptionLink<Co>,
+pub async fn storage_cleanup<S, D>(
+	storage_core_storage: &S,
+	storage_core_dispatcher: &mut impl CoDispatch<StorageAction>,
+	storage_core_state: OptionLink<Co>,
+	storage: &D,
+	structure_resolver: &mut impl StructureResolver<S, D>,
 ) -> Result<(OptionLink<Co>, usize), anyhow::Error>
 where
-	S: BlockStorage + Clone + 'static,
+	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
+	D: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 {
+	let max_references = max_reference_count(<S::StoreParams as StoreParams>::MAX_BLOCK_SIZE);
 	let mut removed_blocks = 0;
 	let mut query_blocks_index_unreferenced = query_core::<co_core_storage::Storage>(CO_CORE_NAME_STORAGE)
 		.with_default()
@@ -26,35 +31,78 @@ where
 	let mut query_blocks = query_core::<co_core_storage::Storage>(CO_CORE_NAME_STORAGE)
 		.with_default()
 		.map(|storage_core| storage_core.blocks);
-	let mut state = state;
+	let mut state = storage_core_state;
 	loop {
-		// get chunk of blocks to remove
-		let blocks_index_unreferenced = query_blocks_index_unreferenced.execute(storage, state).await?;
-		let remove = blocks_index_unreferenced
-			.stream(storage)
-			.take(256)
-			.try_collect::<BTreeSet<WeakCid>>()
-			.await?;
-		#[cfg(feature = "logging-verbose")]
-		tracing::trace!(?remove, ?state, "storage-free-remove");
-		if remove.is_empty() {
+		// open stream
+		let blocks_index_unreferenced = query_blocks_index_unreferenced.execute(storage_core_storage, state).await?;
+		let remove_stream = blocks_index_unreferenced.stream(storage_core_storage);
+		pin_mut!(remove_stream);
+
+		// group by info and resolve links
+		let mut references_count = 0;
+		let mut remove_from_disk = HashSet::<WeakCid>::new();
+		let mut remove_by_info = HashMap::<BlockInfo, BTreeMap<WeakCid, BTreeSet<WeakCid>>>::new();
+		while let Some((cid, info)) = remove_stream.try_next().await? {
+			// filter
+			let block_links = match structure_resolver.resolve(storage_core_storage, &info, storage, &cid).await? {
+				StructureResolveResult::Exclude => {
+					continue;
+				},
+				StructureResolveResult::Include(block_links) => block_links,
+			};
+
+			// add
+			let by_info = remove_by_info.entry(info.clone()).or_insert(Default::default());
+			if !by_info.contains_key(&cid) {
+				let exists = storage.exists(&cid).await?;
+				if exists {
+					remove_from_disk.insert(cid);
+				}
+
+				// links
+				let links = if exists && block_links.has_links(cid.cid()) {
+					let block = storage.get(&cid).await?;
+					let links = block_links.links(&block)?;
+					links.map(WeakCid::from).collect::<BTreeSet<WeakCid>>()
+				} else {
+					Default::default()
+				};
+
+				// count
+				references_count += 1 + links.len();
+				if references_count > max_references {
+					break;
+				}
+
+				// insert
+				by_info.insert(cid, links);
+			}
+		}
+
+		// done?
+		if remove_by_info.is_empty() {
 			break;
 		}
 
 		// remove from storage core
-		state = dispatcher.dispatch(&StorageAction::Delete(remove.clone(), false)).await?.into();
+		for (info, delete) in remove_by_info {
+			state = storage_core_dispatcher
+				.dispatch(&StorageAction::Delete(info, delete, false))
+				.await?
+				.into();
+		}
 
 		// remove from disk
 		//  we double check if it has been removed because we dont use the force flag
 		let mut last_error = Ok(());
-		let blocks = query_blocks.execute(storage, state.into()).await?;
-		let blocks = blocks.open(storage).await?;
-		for cid in remove {
+		let blocks = query_blocks.execute(storage_core_storage, state.into()).await?;
+		let blocks = blocks.open(storage_core_storage).await?;
+		for cid in remove_from_disk {
 			let exists_in_core = blocks.contains_key(&cid).await?;
 			#[cfg(feature = "logging-verbose")]
 			tracing::trace!(?cid, ?exists_in_core, "storage-free-delete");
 			if !exists_in_core {
-				match storage.remove(&cid.cid()).await {
+				match storage_core_storage.remove(&cid.cid()).await {
 					Ok(_) => {
 						removed_blocks += 1;
 					},

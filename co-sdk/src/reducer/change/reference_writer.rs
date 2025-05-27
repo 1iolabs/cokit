@@ -96,7 +96,7 @@ where
 			// flush when we hit max block size
 			if references_count > max_references {
 				// apply
-				let action = StorageAction::ReferenceStructure(references);
+				let action = StorageAction::Structure(references);
 				dispatch_state = dispatch.dispatch(&action).await?;
 
 				// reset
@@ -107,7 +107,7 @@ where
 		}
 	}
 	if !references.is_empty() {
-		let action = StorageAction::ReferenceStructure(references);
+		let action = StorageAction::Structure(references);
 		dispatch_state = dispatch.dispatch(&action).await?;
 	}
 

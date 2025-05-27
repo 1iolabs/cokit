@@ -27,11 +27,6 @@ impl<'c, C, S, A> CoreResolverDispatch<C, S, A> {
 	) -> Self {
 		Self { core_resolver, runtime, context, storage, core_name, state, _action: PhantomData }
 	}
-
-	#[cfg(feature = "pinning")]
-	pub fn state(&self) -> Option<Cid> {
-		self.state
-	}
 }
 #[async_trait]
 impl<C, S, A> CoDispatch<A> for CoreResolverDispatch<C, S, A>
