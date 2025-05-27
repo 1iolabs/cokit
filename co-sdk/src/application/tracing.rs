@@ -7,7 +7,7 @@ use tracing::{
 	subscriber::{set_default, set_global_default, DefaultGuard},
 	Level,
 };
-use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_bunyan_formatter::BunyanFormattingLayer;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt::writer::MakeWriterExt, layer::SubscriberExt, EnvFilter, Registry};
 
@@ -19,10 +19,20 @@ pub struct TracingBuilder {
 	env_filter: Option<EnvFilter>,
 	/// Trace to open telemetry endpoint.
 	open_telemetry: Option<String>,
+	/// If true do not fail if a other tracing is already registered.
+	optional: bool,
 }
 impl TracingBuilder {
 	pub fn new(identifier: String, base_path: Option<PathBuf>) -> Self {
-		Self { identifier, base_path, bunyan: None, stderr: false, open_telemetry: None, env_filter: None }
+		Self {
+			identifier,
+			base_path,
+			bunyan: None,
+			stderr: false,
+			open_telemetry: None,
+			env_filter: None,
+			optional: false,
+		}
 	}
 
 	/// Enable bunyan logging to log_path.
@@ -49,6 +59,10 @@ impl TracingBuilder {
 		Self { stderr: true, ..self }
 	}
 
+	pub fn with_optional_tracing(self) -> Self {
+		Self { optional: true, ..self }
+	}
+
 	pub fn with_env_filter(self) -> Self {
 		Self { env_filter: Some(EnvFilter::from_default_env()), ..self }
 	}
@@ -73,7 +87,12 @@ impl TracingBuilder {
 		let bunyan = if let Some(log_path) = &self.bunyan {
 			std::fs::create_dir_all(log_path.parent().ok_or(anyhow::anyhow!("no parent"))?)?;
 			let log_file = std::fs::File::options().append(true).create(true).open(log_path)?;
-			Some(BunyanFormattingLayer::new(self.identifier.clone(), log_file))
+			Some(
+				BunyanFormattingLayer::new(self.identifier.clone(), log_file)
+					.serialize_span_id(true)
+					.serialize_span_type(true)
+					.serialize_span_fields(false),
+			)
 		} else {
 			None
 		};
@@ -90,7 +109,6 @@ impl TracingBuilder {
 				Registry::default()
 					.with(open_telemetry)
 					.with(self.env_filter)
-					.with(JsonStorageLayer)
 					.with(bunyan)
 					.with(stderr),
 			))
@@ -101,9 +119,20 @@ impl TracingBuilder {
 
 	pub fn init(self) -> Result<(), anyhow::Error> {
 		// init
+		let optional = self.optional;
 		if let Some(subscriber) = self.build_subscriber()? {
-			set_global_default(subscriber)?;
-			LogTracer::init()?;
+			let result = set_global_default(subscriber);
+			match result {
+				Ok(_) => {
+					LogTracer::init()?;
+					Ok(())
+				},
+				Err(err) if optional => {
+					tracing::warn!(?err, "tracing-already-initialized");
+					Ok(())
+				},
+				Err(err) => Err(err),
+			}?;
 		}
 
 		// result

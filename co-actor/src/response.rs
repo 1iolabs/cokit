@@ -2,6 +2,8 @@ use super::ActorError;
 use crate::TaskSpawner;
 use futures::{FutureExt, Sink, Stream};
 use std::{
+	any::type_name,
+	borrow::Borrow,
 	fmt::Debug,
 	future::Future,
 	pin::Pin,
@@ -14,7 +16,6 @@ use tokio::sync::{mpsc, oneshot};
 /// # Notes
 /// - When the response is dropped inside the actor and has not been used we receive a canceled on the caller side.
 #[must_use]
-#[derive(Debug)]
 pub struct Response<T> {
 	tx: oneshot::Sender<T>,
 }
@@ -54,23 +55,35 @@ impl<T> Response<T> {
 	}
 
 	/// Spawns a new task and executes given closure in it
+	#[inline]
+	#[track_caller]
 	pub fn spawn<Fut, F>(self, value: F)
 	where
 		Fut: Future<Output = T> + Send + 'static,
 		F: FnOnce() -> Fut + Send + 'static,
 		T: Send + 'static,
 	{
-		Self::spawn_with(self, Default::default(), value);
+		Self::spawn_with(self, TaskSpawner::default(), value);
 	}
 
 	/// Spawns a new task using the given spawner and executes given closure in it
-	pub fn spawn_with<Fut, F>(self, spawner: TaskSpawner, value: F)
+	#[inline]
+	#[track_caller]
+	pub fn spawn_with<Fut, F>(self, spawner: impl Borrow<TaskSpawner>, value: F)
 	where
 		Fut: Future<Output = T> + Send + 'static,
 		F: FnOnce() -> Fut + Send + 'static,
 		T: Send + 'static,
 	{
-		spawner.spawn(async move { self.send(value().await).ok() });
+		spawner.borrow().spawn(async move { self.send(value().await).ok() });
+	}
+}
+impl<T> Debug for Response<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Response")
+			.field("response_type", &type_name::<T>())
+			.field("tx_closed", &self.tx.is_closed())
+			.finish()
 	}
 }
 
@@ -93,7 +106,6 @@ impl<T> Future for ResponseReceiver<T> {
 
 /// A streaming response.
 #[must_use]
-#[derive(Debug)]
 pub struct ResponseStream<T> {
 	tx: mpsc::UnboundedSender<T>,
 }
@@ -131,6 +143,14 @@ impl<T> Sink<T> for ResponseStream<T> {
 		Poll::Ready(Ok(()))
 	}
 }
+impl<T> Debug for ResponseStream<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("ResponseStream")
+			.field("response_type", &type_name::<T>())
+			.field("tx_closed", &self.tx.is_closed())
+			.finish()
+	}
+}
 
 pub struct ResponseStreamReceiver<T> {
 	rx: mpsc::UnboundedReceiver<T>,
@@ -151,7 +171,6 @@ impl<T> Stream for ResponseStreamReceiver<T> {
 
 /// A streaming response with backpressure (bounded).
 #[must_use]
-#[derive(Debug)]
 pub struct ResponseBackPressureStream<T> {
 	tx: mpsc::Sender<Result<T, ActorError>>,
 }
@@ -168,6 +187,14 @@ impl<T> ResponseBackPressureStream<T> {
 	pub fn complete(self) -> Result<(), ActorError> {
 		// will be closed on drop
 		Ok(())
+	}
+}
+impl<T> Debug for ResponseBackPressureStream<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("ResponseBackPressureStream")
+			.field("response_type", &type_name::<T>())
+			.field("tx_closed", &self.tx.is_closed())
+			.finish()
 	}
 }
 

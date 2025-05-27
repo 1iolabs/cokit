@@ -29,7 +29,7 @@ impl CoV1Api {
 	}
 
 	pub fn write_diagnostic(&mut self, data: Cid) {
-		self.context.diagnostics.push(data);
+		self.context.diagnostics.push(data.into());
 	}
 
 	pub fn swap(&mut self, other: &mut CoV1Api) {
@@ -75,6 +75,9 @@ impl ApiStorage for CoV1Api {
 				Ok(b) => b,
 				Err(e) if Self::is_retriable(&e) && tries < 10 => {
 					tries += 1;
+
+					// log
+					tracing::warn!(?cid, tries, "runtime-get-block-retry");
 
 					// wait with exponential backoff
 					std::thread::sleep(Duration::from_millis(2u64.pow(tries) * 1000));
@@ -149,6 +152,6 @@ pub fn event_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> u32 {
 }
 
 pub fn diagnostic_cid_write(api: &mut CoV1Api, buffer: &[u8]) -> Result<u32, CoV1ApiError> {
-	api.context.diagnostics.push(Cid::try_from(buffer)?);
+	api.context.diagnostics.push(Cid::try_from(buffer)?.into());
 	Ok(buffer.len().try_into().expect("u32"))
 }

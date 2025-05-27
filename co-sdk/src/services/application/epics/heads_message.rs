@@ -1,7 +1,8 @@
 use crate::{
+	library::network_identity::network_identity,
 	state,
 	types::message::heads::{HeadsErrorCode, HeadsMessage},
-	Action, CoContext, CoReducerFactory, CoReducerState,
+	Action, CoContext, CoReducer, CoReducerFactory, MappedCoReducerState,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -51,7 +52,7 @@ pub fn heads_message_heads(
 		Action::HeadsMessageReceived { from, peer, message_id, message: HeadsMessage::Heads(co, heads) } => Some(
 			stream::once(ready((context.clone(), message_id.clone(), from.clone(), *peer, co.clone(), heads.clone())))
 				.then(|(context, message_id, from, peer, co, heads)| async move {
-					join_heads(context, message_id, from, peer, co, heads).await
+					handle_heads(context, message_id, from, peer, co, heads).await
 				})
 				.flat_map(Action::map_error_stream)
 				.map(Ok),
@@ -70,7 +71,7 @@ pub fn heads_message_heads_request(
 		Action::HeadsMessageReceived { from, peer, message_id, message: HeadsMessage::HeadsRequest(co) } => Some(
 			stream::once(ready((context.clone(), message_id.clone(), from.clone(), *peer, co.clone())))
 				.then(move |(context, message_id, from, peer, co)| async move {
-					request_heads(context, message_id, from, peer, co).await
+					handle_request_heads(context, message_id, from, peer, co).await
 				})
 				.map(Action::map_error)
 				.map(Ok),
@@ -79,8 +80,9 @@ pub fn heads_message_heads_request(
 	}
 }
 
+/// See: [`HeadsMessage::Heads`]
 #[tracing::instrument(level = tracing::Level::TRACE, skip(context, heads))]
-async fn join_heads(
+async fn handle_heads(
 	context: CoContext,
 	message_id: String,
 	from: Option<Did>,
@@ -91,56 +93,80 @@ async fn join_heads(
 	let mut actions = Vec::new();
 	let co_reducer = context.try_co_reducer(&co).await?;
 
+	// verify
+	verify_from_participant(&co_reducer, &from).await?;
+
 	// join
-	let _previous_state = get_heads(&context, &from, &co).await?;
-	co_reducer.join(heads.clone()).await?;
-	let next_state = get_heads(&context, &from, &co).await?;
+	let previous_state = co_reducer.reducer_state().await;
+	let next_state = co_reducer.join(heads.clone()).await?;
 
 	// respond if different
-	if &next_state.1 != &heads {
-		let mut header = HeadsMessage::create_header();
-		header.thid = Some(message_id);
-		let body = HeadsMessage::Heads(co, next_state.heads());
-		// TODO: sign?
-		let (message_id, message) = EncodedMessage::create_plain_json(header, &body)?;
-		actions.push(Action::DidCommSend { message_id, peer, message });
+	if previous_state != next_state {
+		let body = create_heads_body(&co_reducer).await;
+		let message = create_heads_message(&context, &co_reducer, body, Some(message_id), peer).await?;
+		actions.push(message);
 	}
 
 	// result
 	Ok(actions)
 }
 
-async fn request_heads(
+/// See: [`HeadsMessage::HeadsRequest`]
+async fn handle_request_heads(
 	context: CoContext,
 	parent_message_id: String,
 	from: Option<Did>,
 	peer: PeerId,
 	co: CoId,
 ) -> anyhow::Result<Action> {
-	let body = match get_heads(&context, &from, &co).await {
-		Ok(state) => HeadsMessage::Heads(co, state.heads()),
+	// identity
+	let co_reducer = context.try_co_reducer(&co).await?;
+
+	// body
+	let body = match verify_from_participant(&co_reducer, &from).await {
+		Ok(_) => create_heads_body(&co_reducer).await,
 		Err(err) => {
 			tracing::warn!(?err, "co-request-heads-failed");
 			HeadsMessage::Error { code: HeadsErrorCode::Forbidden, message: "Forbidden".to_owned() }
 		},
 	};
-	let mut header = HeadsMessage::create_header();
-	header.thid = Some(parent_message_id);
-	// TODO: sign?
-	let (message_id, message) = EncodedMessage::create_plain_json(header, &body)?;
-	Ok(Action::DidCommSend { message_id, peer, message })
+
+	// result
+	Ok(create_heads_message(&context, &co_reducer, body, Some(parent_message_id), peer).await?)
 }
 
-async fn get_heads(context: &CoContext, from: &Option<Did>, co: &CoId) -> anyhow::Result<CoReducerState> {
-	let co_reducer = context.try_co_reducer(&co).await?;
+async fn create_heads_message(
+	context: &CoContext,
+	co_reducer: &CoReducer,
+	body: HeadsMessage,
+	parent_message_id: Option<String>,
+	to: PeerId,
+) -> anyhow::Result<Action> {
+	// identity
+	let identity = network_identity(&context, &co_reducer, None).await?;
+
+	// message
+	let mut header = HeadsMessage::create_header();
+	header.thid = parent_message_id;
+	let (message_id, message) = EncodedMessage::create_signed_json(&identity, header, &body)?;
+
+	// result
+	Ok(Action::DidCommSend { message_id, peer: to, message })
+}
+
+async fn create_heads_body(co: &CoReducer) -> HeadsMessage {
+	HeadsMessage::Heads(co.id().clone(), MappedCoReducerState::new_co(&co).await.external().heads())
+}
+
+async fn verify_from_participant(co_reducer: &CoReducer, from: &Option<Did>) -> anyhow::Result<()> {
 	let storage = co_reducer.storage();
 	let state = co_reducer.reducer_state().await;
 
 	// verify
 	if !state::is_participant(&storage, state.co(), from).await? {
-		return Err(anyhow!("Not a participant {:?} of {}", from, co));
+		return Err(anyhow!("Not a participant {:?} of {}", from, co_reducer.id()));
 	}
 
 	// result
-	Ok(state.to_external(&storage).await)
+	Ok(())
 }

@@ -1,18 +1,17 @@
 use super::to_external_cid::{to_external_cids, to_external_cids_opt_force};
 use crate::{
-	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	services::{
 		connections::ConnectionMessage,
 		network::{CoNetworkTaskSpawner, DidCommSendNetworkTask},
 	},
 	types::message::heads::HeadsMessage,
-	CoStorage, Reducer as CoreReducer, ReducerChangeContext, ReducerChangedHandler, TaskSpawner,
+	CoReducerState, CoStorage, TaskSpawner,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, OnceEpic, Reducer, TracingEpic};
-use co_identity::{Identity, PrivateIdentityBox};
+use co_identity::{Identity, PrivateIdentity, PrivateIdentityBox};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{tags, CoId, Tags};
 use futures::{Stream, StreamExt};
@@ -20,11 +19,11 @@ use libp2p::PeerId;
 use std::{collections::BTreeSet, future::ready, time::Duration};
 
 ///	Use PeerProvider to discover peers and send heads to them whenever a peer comes online or new heads are produced.
+#[derive(Debug, Clone)]
 pub struct PushHeads {
 	handle: ActorHandle<PushHeadsAction>,
 	/// Force the mapping to be applied by returning an error when no mapping is found.
 	force_mapping: bool,
-	initialized: bool,
 }
 impl PushHeads {
 	pub fn new(
@@ -32,44 +31,37 @@ impl PushHeads {
 		connections: ActorHandle<ConnectionMessage>,
 		tasks: TaskSpawner,
 		co: CoId,
-		identity: PrivateIdentityBox,
 		force_mapping: bool,
 	) -> Result<Self, anyhow::Error> {
 		let instance = Actor::spawn_with(
 			tasks.clone(),
 			tags!("type": "co-push-heads", "co": co.as_str()),
-			PushHeadsActor { tasks, context: PushHeadsContext(spawner, connections, identity) },
+			PushHeadsActor { tasks, context: PushHeadsContext(spawner, connections) },
 			PushHeadsState { co: co.clone(), heads: Default::default() },
 		)?;
-		Ok(Self { handle: instance.handle(), force_mapping, initialized: false })
+		Ok(Self { handle: instance.handle(), force_mapping })
 	}
-}
-#[async_trait]
-impl ReducerChangedHandler<CoStorage, DynamicCoreResolver<CoStorage>> for PushHeads {
-	async fn on_state_changed(
-		&mut self,
+
+	pub async fn changed(
+		&self,
 		storage: &CoStorage,
-		reducer: &CoreReducer<CoStorage, DynamicCoreResolver<CoStorage>>,
-		context: ReducerChangeContext,
+		state: CoReducerState,
+		identity: PrivateIdentityBox,
 	) -> Result<(), anyhow::Error> {
-		// send local changes
-		if context.is_local_change() || !self.initialized {
-			self.initialized = true;
+		// verify
+		identity.try_didcomm_private()?;
 
-			// map plain heads to encrypted heads
-			let heads = if self.force_mapping {
-				to_external_cids_opt_force(storage, reducer.heads().clone())
-					.await
-					.ok_or_else(|| anyhow!("Failed to map heads: {:?}", reducer.heads()))?
-			} else {
-				to_external_cids(storage, reducer.heads().clone()).await
-			};
+		// map plain heads to encrypted heads
+		let heads = if self.force_mapping {
+			to_external_cids_opt_force(storage, state.heads())
+				.await
+				.ok_or_else(|| anyhow!("Failed to map heads: {:?}", state.heads()))?
+		} else {
+			to_external_cids(storage, state.heads()).await
+		};
 
-			// send
-			self.handle.dispatch(PushHeadsAction::Changed(heads))?;
-		}
-
-		// done
+		// send
+		self.handle.dispatch(PushHeadsAction::Changed(identity, heads))?;
 		Ok(())
 	}
 }
@@ -127,22 +119,22 @@ impl Actor for PushHeadsActor {
 }
 
 #[derive(Debug, Clone)]
-struct PushHeadsContext(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, PrivateIdentityBox);
+struct PushHeadsContext(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>);
 
 #[derive(Debug, Clone)]
 #[allow(unused)] // we want to see Sent in the logs
 enum PushHeadsAction {
 	/// Heads changed.
-	Changed(BTreeSet<Cid>),
+	Changed(PrivateIdentityBox, BTreeSet<Cid>),
 
 	/// Connect and send heads to peers.
-	Connect(BTreeSet<Cid>),
+	Connect(PrivateIdentityBox, BTreeSet<Cid>),
 
 	/// Send heads to a connected peer.
-	Send(BTreeSet<Cid>, BTreeSet<PeerId>),
+	Send(PrivateIdentityBox, BTreeSet<Cid>, BTreeSet<PeerId>),
 
 	/// Sent heads to a connected peer.
-	Sent(BTreeSet<Cid>, PeerId, Result<(), String>),
+	Sent(PrivateIdentityBox, BTreeSet<Cid>, PeerId, Result<(), String>),
 }
 
 #[derive(Debug, Clone)]
@@ -154,9 +146,9 @@ impl Reducer<PushHeadsAction> for PushHeadsState {
 	fn reduce(&mut self, action: PushHeadsAction) -> Vec<PushHeadsAction> {
 		let mut result = vec![];
 		match action {
-			PushHeadsAction::Changed(heads) => {
+			PushHeadsAction::Changed(identity, heads) => {
 				if self.heads != heads {
-					result.push(PushHeadsAction::Connect(heads.clone()));
+					result.push(PushHeadsAction::Connect(identity, heads.clone()));
 					self.heads = heads;
 				}
 			},
@@ -181,10 +173,11 @@ impl Epic<PushHeadsAction, PushHeadsState, PushHeadsContext> for PushHeadsConnec
 		context: &PushHeadsContext,
 	) -> Option<impl Stream<Item = Result<PushHeadsAction, anyhow::Error>> + Send + 'static> {
 		match action {
-			PushHeadsAction::Connect(heads) => Some({
+			PushHeadsAction::Connect(identity, heads) => Some({
 				let id = state.co.clone();
 				let connections = context.1.clone();
-				let from = context.2.identity().to_owned();
+				let identity = identity.clone();
+				let from = identity.identity().to_owned();
 				let heads = heads.clone();
 				ConnectionMessage::co_use(connections, id, from, [])
 					.filter_map(move |changed| {
@@ -193,7 +186,7 @@ impl Epic<PushHeadsAction, PushHeadsState, PushHeadsContext> for PushHeadsConnec
 							_ => None,
 						})
 					})
-					.map(move |peers| PushHeadsAction::Send(heads.clone(), peers))
+					.map(move |peers| PushHeadsAction::Send(identity.clone(), heads.clone(), peers))
 					// .flat_map(move |peers| {
 					// 	stream::iter(peers.into_iter().map({
 					// 		let heads = heads.clone();
@@ -222,10 +215,10 @@ impl Epic<PushHeadsAction, PushHeadsState, PushHeadsContext> for PushHeadsSendEp
 		context: &PushHeadsContext,
 	) -> Option<impl Stream<Item = Result<PushHeadsAction, anyhow::Error>> + Send + 'static> {
 		match action {
-			PushHeadsAction::Send(heads, peers) => Some({
+			PushHeadsAction::Send(identity, heads, peers) => Some({
 				let id = state.co.clone();
 				let network = context.0.clone();
-				let identity = context.2.clone();
+				let identity = identity.clone();
 				let heads = heads.clone();
 				let peers = peers.clone();
 				async_stream::try_stream! {
@@ -237,7 +230,7 @@ impl Epic<PushHeadsAction, PushHeadsState, PushHeadsContext> for PushHeadsSendEp
 					// send
 					for peer in peers {
 						let send = DidCommSendNetworkTask::send(network.clone(), [peer], message.clone(), Duration::from_secs(30)).await;
-						yield PushHeadsAction::Sent(heads.clone(), peer, match send { Ok(_) => Ok(()), Err(err) => Err(err.to_string()) });
+						yield PushHeadsAction::Sent(identity.clone(), heads.clone(), peer, match send { Ok(_) => Ok(()), Err(err) => Err(err.to_string()) });
 					}
 				}
 			}),

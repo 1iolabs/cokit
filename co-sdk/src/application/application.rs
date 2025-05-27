@@ -15,10 +15,10 @@ use co_core_storage::PinStrategy;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
-use co_primitives::{tags, CoId, TagValue, Tags};
+use co_primitives::{tag, tags, CoId, TagValue, Tags};
 use directories::ProjectDirs;
 use futures::{Stream, StreamExt};
-use std::{fmt::Debug, future::ready, path::PathBuf, sync::Arc};
+use std::{collections::BTreeSet, fmt::Debug, future::ready, path::PathBuf, sync::Arc};
 use tokio_util::{
 	sync::{CancellationToken, DropGuard},
 	task::TaskTracker,
@@ -140,7 +140,7 @@ impl Application {
 	///
 	/// TODO: Identity
 	/// TODO: The crator of the co should be added as first participant.
-	#[tracing::instrument(err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE,err, skip(self))]
 	pub async fn create_co<I>(&self, creator: I, create: CreateCo) -> Result<CoReducer, anyhow::Error>
 	where
 		I: PrivateIdentity + Clone + Debug + Send + Sync + 'static,
@@ -226,15 +226,56 @@ pub struct ApplicationSettings {
 	/// Extra settings.
 	///
 	/// Known Tags:
-	/// - `co-local-watch` [`TagValue::Bool`] [`ApplicationSettings::setting_co_local_watch`]
+	/// - `default-features` [`TagValue::Bool`] - (default: `true`)
+	/// - `feature` [`TagValue::String`]
 	/// - `co-default-max-state` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_state`]
 	/// - `co-default-max-log` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_log`]
+	/// - `co-storage-mode` - [`TagValue::String`] [`ApplicationSettings::setting_co_storage_mode`]
+	///
+	/// Known Features:
+	/// - `co-local-watch` (default)
+	/// - `co-local-encryption` (default)
+	/// - `co-storage-free` - [`ApplicationSettings::feature_co_storage_free`]
 	pub settings: Tags,
 }
 impl ApplicationSettings {
-	/// Whether to use locals watcher. Defaults to true.
-	pub fn setting_co_local_watch(&self) -> bool {
-		!self.settings.matches(tags!("co-local-watch": false))
+	/// Get all enabled features from tags.
+	fn features_from_tags(tags: &Tags) -> impl Iterator<Item = &str> + '_ {
+		let default_features = ["co-local-watch", "co-local-encryption"];
+		let disable_default_features = tags.matches(tags!("default-features": false));
+		let features = tags.iter().filter_map(|(key, value)| match key.as_str() {
+			"feature" => value.string(),
+			_ => None,
+		});
+		default_features
+			.into_iter()
+			.filter(move |_| !disable_default_features)
+			.chain(features)
+	}
+
+	/// Get all enabled features.
+	/// Note that features are always additive and not disable any functionality.
+	pub fn features(&self) -> impl Iterator<Item = &str> + '_ {
+		Self::features_from_tags(&self.settings)
+	}
+
+	pub fn has_feature(&self, feature: &str) -> bool {
+		self.features().any(|i| i == feature)
+	}
+
+	/// Whether to use locals watcher.
+	pub fn feature_co_local_watch(&self) -> bool {
+		self.has_feature("co-local-watch")
+	}
+
+	/// Whether to use encryption for Local CO.
+	pub fn feature_co_local_encryption(&self) -> bool {
+		self.has_feature("co-local-encryption")
+	}
+
+	/// Free unused storage after every flush.
+	pub fn feature_co_storage_free(&self) -> bool {
+		self.has_feature("co-storage-free")
 	}
 
 	/// Count of states to store for LocalCO and newly joined COs. A value of zero means unlimited.
@@ -280,7 +321,8 @@ impl ApplicationBuilder {
 	}
 
 	/// Create new instance with path.
-	pub fn new_with_path(identifier: String, path: PathBuf) -> Self {
+	pub fn new_with_path(identifier: impl Into<String>, path: PathBuf) -> Self {
+		let identifier = identifier.into();
 		let tracing = TracingBuilder::new(identifier.clone(), Some(path.clone()));
 		Self {
 			identifier,
@@ -293,12 +335,13 @@ impl ApplicationBuilder {
 		}
 	}
 
-	pub fn new(identifier: String) -> Self {
+	pub fn new(identifier: impl Into<String>) -> Self {
 		Self::new_with_path(identifier, Self::default_path())
 	}
 
 	/// Create new memory only instance.
-	pub fn new_memory(identifier: String) -> Self {
+	pub fn new_memory(identifier: impl Into<String>) -> Self {
+		let identifier = identifier.into();
 		let tracing = TracingBuilder::new(identifier.clone(), None);
 		Self { identifier, path: None, keychain: false, tracing, settings: Default::default(), date: None, uuid: None }
 	}
@@ -311,6 +354,10 @@ impl ApplicationBuilder {
 	/// ```
 	pub fn with_bunyan_logging(self, log_path: Option<PathBuf>) -> Self {
 		Self { tracing: self.tracing.with_bunyan_logging(log_path), ..self }
+	}
+
+	pub fn with_optional_tracing(self) -> Self {
+		Self { tracing: self.tracing.with_optional_tracing(), ..self }
 	}
 
 	pub fn with_open_telemetry(self, endpoint: impl Into<String>) -> Self {
@@ -336,15 +383,40 @@ impl ApplicationBuilder {
 		Self { settings, ..self }
 	}
 
+	/// Disable feature.
+	pub fn with_disabled_feature(self, feature: &str) -> Self {
+		let mut settings = self.settings;
+		let features = ApplicationSettings::features_from_tags(&settings).collect::<BTreeSet<&str>>();
+		if features.contains(feature) {
+			let feature_tag = tag!("feature": feature);
+
+			// expand default features
+			if !settings.contains(&feature_tag) && !settings.matches(tags!("default-features": false)) {
+				settings.insert(tag!("default-features": false));
+				for default_feature in ApplicationSettings::features_from_tags(&Default::default()) {
+					settings.insert(tag!("feature": default_feature));
+				}
+			}
+
+			// remove
+			settings.remove(&feature_tag);
+		}
+		Self { settings, ..self }
+	}
+
 	pub async fn build(self) -> Result<Application, anyhow::Error> {
 		let tasks = TaskTracker::new();
 
 		// log
 		self.tracing.init()?;
 
+		// sources
+		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(SystemCoDate));
+		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
+
 		// storage
 		let storage = match &self.path {
-			Some(path) => Storage::new(path.join("data"), path.join("tmp/data")),
+			Some(path) => Storage::new(path.join("data"), path.join("tmp/data"), uuid.clone()),
 			None => Storage::new_memory(),
 		};
 
@@ -355,10 +427,6 @@ impl ApplicationBuilder {
 			keychain: self.keychain,
 			settings: self.settings,
 		};
-
-		// date
-		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(SystemCoDate));
-		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
 
 		// create
 		let service = Actor::spawn(

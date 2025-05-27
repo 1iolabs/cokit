@@ -38,7 +38,7 @@ impl CoUuid for RandomCoUuid {
 pub struct DynamicCoUuid(Arc<dyn CoUuid>);
 impl Debug for DynamicCoUuid {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		f.debug_tuple("DynamicCoUuid").field(&self.0.uuid()).finish()
+		f.debug_tuple("DynamicCoUuid").finish()
 	}
 }
 impl DynamicCoUuid {

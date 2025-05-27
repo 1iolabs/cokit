@@ -78,6 +78,11 @@ impl PrivateIdentity for PrivateIdentityBox {
 		self.clone()
 	}
 }
+impl Into<String> for &PrivateIdentityBox {
+	fn into(self) -> String {
+		self.identity().to_string()
+	}
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum SignError {

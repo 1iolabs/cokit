@@ -115,12 +115,10 @@ impl Libp2pNetwork {
 		runtime.listen(swarm.listen_on(config.addr.clone().unwrap_or("/ip4/0.0.0.0/udp/0/quic-v1".parse()?))?);
 
 		// run
-		let handle = tokio::runtime::Handle::current().clone();
-		tokio::task::spawn_blocking(move || {
-			handle.block_on(
-				run(swarm, context, runtime, tokio_stream::wrappers::UnboundedReceiverStream::new(tasks_rx))
-					.instrument(tracing::trace_span!("network", application = identifier)),
-			);
+		tokio::spawn(async move {
+			run(swarm, context, runtime, tokio_stream::wrappers::UnboundedReceiverStream::new(tasks_rx))
+				.instrument(tracing::trace_span!("network", application = identifier))
+				.await;
 		});
 
 		// result

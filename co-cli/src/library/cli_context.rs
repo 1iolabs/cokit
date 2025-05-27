@@ -20,6 +20,12 @@ impl CliContext {
 		if cli.no_keychain {
 			application_builder = application_builder.without_keychain();
 		}
+		if cli.no_default_features {
+			application_builder = application_builder.with_setting("default-features", false);
+		}
+		for feature in &cli.feature {
+			application_builder = application_builder.with_setting("feature", feature.to_owned());
+		}
 		let application = application_builder.build().await.expect("application");
 
 		// add the application to cli task list

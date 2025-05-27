@@ -3,20 +3,19 @@ use crate::{
 	find_membership,
 	library::{
 		connections_peer_provider::ConnectionsPeerProvider, find_co_secret::find_co_secret_by_reference,
-		membership_all_heads::membership_all_heads, push_heads::PushHeads,
+		membership_all_heads::membership_all_heads,
 	},
 	reducer::{
 		change::membership_writer::MembershipWriter,
 		core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
 	},
 	services::{
-		connections::ConnectionMessage,
-		network::{CoHeadsPublish, CoNetworkTaskSpawner},
-		reducers::ReducerStorage,
+		connections::ConnectionMessage, network::CoNetworkTaskSpawner, reducer::ReducerFlush, reducers::ReducerStorage,
 	},
-	types::co_reducer_context::CoReducerContext,
-	CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters, CoUuid, ReducerBuilder,
-	Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
+	ApplicationMessage, CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters,
+	CoUuid, DynamicCoDate, Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -27,7 +26,7 @@ use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
-use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId};
+use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid};
 use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, Secret};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -43,8 +42,6 @@ pub struct SharedCoBuilder {
 	parent: CoReducer,
 	keystore_core_name: String,
 	membership_core_name: String,
-	#[cfg(feature = "pinning")]
-	storage_core_name: String,
 	membership: Membership,
 	network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
 	initialize: bool,
@@ -57,8 +54,6 @@ impl SharedCoBuilder {
 			membership,
 			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_owned(),
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_owned(),
-			#[cfg(feature = "pinning")]
-			storage_core_name: crate::CO_CORE_NAME_STORAGE.to_owned(),
 			network: None,
 			initialize: true,
 			network_block_timeout: Duration::from_secs(30),
@@ -71,13 +66,6 @@ impl SharedCoBuilder {
 
 	pub fn with_keystore_core_name(self, keystore_core_name: String) -> Self {
 		Self { keystore_core_name, ..self }
-	}
-
-	pub fn with_storage_core_name(self, _storage_core_name: String) -> Self {
-		#[cfg(feature = "pinning")]
-		return Self { storage_core_name: _storage_core_name, ..self };
-		#[cfg(not(feature = "pinning"))]
-		return self;
 	}
 
 	pub fn with_network(self, network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>) -> Self {
@@ -137,7 +125,9 @@ impl SharedCoBuilder {
 		runtime: Runtime,
 		identity: I,
 		core_resolver: DynamicCoreResolver<CoStorage>,
-		date: impl CoDate,
+		date: DynamicCoDate,
+		application_handle: ActorHandle<ApplicationMessage>,
+		#[cfg(feature = "pinning")] pinning: crate::library::storage_pinning::StoragePinningContext,
 	) -> Result<CoReducer, anyhow::Error>
 	where
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
@@ -162,7 +152,7 @@ impl SharedCoBuilder {
 				self.build_network_storage(peer_provider, network.clone(), secret.as_ref(), base_storage)?;
 
 			// create encrypted storage which uses the network storage as base
-			// note: it uses the same mapping as the instance itrhout networking
+			// note: it uses the same mapping as the instance withput networking
 			let next_storage = if let Some(encrypted_storage) = storage.encrypted_storage() {
 				let mut encrypted_storage = encrypted_storage.clone();
 				encrypted_storage.set_storage(network_storage);
@@ -236,51 +226,24 @@ impl SharedCoBuilder {
 			// 	reducer_builder = reducer_builder.with_snapshot(state, heads);
 			// }
 		}
-		let mut reducer = reducer_builder.build(&co_storage, runtime.runtime(), date).await?;
-
-		// push changes to all connectable peers
-		if let Some((network, connections)) = &self.network {
-			let publish = PushHeads::new(
-				network.clone(),
-				connections.clone(),
-				tasks.clone(),
-				self.membership.id.clone(),
-				PrivateIdentity::boxed(identity.clone()),
-				true,
-			)?;
-			reducer.add_change_handler(Box::new(publish));
-		}
-
-		// publish changes for every `NetworkCoHeads` setting
-		if let Some((network, _)) = self.network {
-			let publish = CoHeadsPublish::new(network, self.membership.id.clone(), true);
-			reducer.add_change_handler(Box::new(publish));
-		}
+		let reducer = reducer_builder.build(&co_storage, runtime.runtime(), date).await?;
 
 		// setup auto write to parent co
-		let writer = MembershipWriter::new(
+		let membership_writer = MembershipWriter::new(
 			self.membership.id.clone(),
 			self.parent.clone(),
 			self.membership_core_name,
-			identity.clone(),
+			identity.clone().boxed(),
 			encrypted_storage.clone(),
 			self.membership.state.clone(),
 		);
-		reducer.add_change_handler(Box::new(writer));
 
-		// setup auto write references to parent co
-		#[cfg(feature = "pinning")]
-		{
-			let writer = crate::reducer::change::reference_writer::ReferenceWriteReducerChangedHandler::new(
-				crate::reducer::change::reference_writer::ReferenceWriter::new(
-					self.parent.dispatcher(&self.storage_core_name, identity.clone()),
-					context.clone(),
-					Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.membership.id)),
-				),
-				*reducer.state(),
-			);
-			reducer.add_change_handler(Box::new(writer));
-		}
+		// build flush
+		let flush = SharedFlush {
+			membership_writer,
+			#[cfg(feature = "pinning")]
+			pinning,
+		};
 
 		// result
 		let application_identifier = self
@@ -291,6 +254,7 @@ impl SharedCoBuilder {
 			.ok_or_else(|| anyhow!("Missing parent tag: application"))?
 			.to_owned();
 		Ok(CoReducer::spawn(
+			application_handle,
 			application_identifier,
 			self.membership.id,
 			Some(self.parent.id().clone()),
@@ -299,7 +263,57 @@ impl SharedCoBuilder {
 			runtime,
 			reducer,
 			context,
+			Box::new(flush),
 		)?)
+	}
+}
+
+struct SharedFlush {
+	membership_writer: MembershipWriter,
+	#[cfg(feature = "pinning")]
+	pinning: crate::library::storage_pinning::StoragePinningContext,
+}
+#[async_trait]
+impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
+	async fn flush(
+		&mut self,
+		storage: &CoStorage,
+		reducer: &mut Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+		_new_roots: Vec<CoReducerState>,
+		_removed_blocks: BTreeSet<OptionMappedCid>,
+	) -> anyhow::Result<()> {
+		let reducer_state = CoReducerState::new_reducer(reducer);
+
+		// membership
+		self.membership_writer.write(storage, reducer_state.clone()).await?;
+
+		// pinning
+		#[cfg(feature = "pinning")]
+		{
+			let new_roots = _new_roots;
+			let removed_blocks = _removed_blocks;
+			let parent = &self.membership_writer.parent;
+
+			// compute
+			let parent_pinning_state = crate::library::storage_pinning::storage_pinning(
+				&self.pinning,
+				None,
+				&parent.storage(),
+				parent.reducer_state().await,
+				parent.id(),
+				storage,
+				new_roots,
+				removed_blocks,
+			)
+			.await?;
+
+			// apply
+			if let Some(parent_pinning_state) = parent_pinning_state {
+				parent.join_state(parent_pinning_state).await?;
+			}
+		}
+
+		Ok(())
 	}
 }
 
@@ -413,6 +427,15 @@ impl CoReducerContext for SharedContext {
 		// clear storage
 		if let Some(encrypted_storage) = &self.encrypted_storage {
 			encrypted_storage.clear_mapping(state.0.into_iter().chain(state.1)).await;
+		}
+	}
+
+	/// Test for reducer feature.
+	fn has_feature(&self, feature: &CoReducerFeature<'_>) -> bool {
+		match feature {
+			CoReducerFeature::Network => self.network_storage.is_some(),
+			CoReducerFeature::Encryption => self.encrypted_storage.is_some(),
+			_ => false,
 		}
 	}
 }
@@ -570,24 +593,16 @@ impl SharedCoCreator {
 			self.parent.push(&identity, &self.storage_core_name, &pin_state).await?;
 
 			// pin initial state
-			let reducer_context = Arc::new(SharedContext {
-				id: self.co.id.clone(),
-				encrypted_storage: _encrypted_storage.clone(),
-				storage: storage.clone(),
-				network_storage: None,
-			});
-			let writer = crate::reducer::change::reference_writer::ReferenceWriter::new(
-				self.parent.dispatcher(&self.storage_core_name, identity.clone()),
-				reducer_context,
+			crate::reducer::change::reference_writer::write_storage_references(
+				co_storage.clone(),
+				&mut self.parent.dispatcher(&self.storage_core_name, identity.clone()),
+				co_primitives::BlockLinks::default(),
 				Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.co.id)),
-			);
-			writer
-				.write(
-					None,
-					reducer_state.state().ok_or(anyhow::anyhow!("Expected state after create"))?,
-					<<CoStorage as co_primitives::BlockStorage>::StoreParams as co_primitives::StoreParams>::MAX_BLOCK_SIZE,
-				)
-				.await?;
+				None,
+				reducer_state.state().ok_or(anyhow::anyhow!("Expected state after create"))?,
+				None,
+			)
+			.await?;
 		}
 
 		// result

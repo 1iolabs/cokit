@@ -1,8 +1,8 @@
 use crate::{BlockStat, BlockStorage, BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, StorageError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, StoreParams};
-use std::{collections::BTreeMap, marker::PhantomData};
+use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, MappedCid, StoreParams};
+use std::{collections::BTreeSet, marker::PhantomData};
 
 /// This storage implementation converts block storeparams.
 /// If an conversation is not possible `StorageError::InvalidArgument` is retuned.
@@ -62,6 +62,14 @@ where
 			ExtendedBlock { block: convert_block_store_params(block.block, self.checked)?, options: block.options };
 		self.next.set_extended(next_block).await
 	}
+
+	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
+		self.next.exists(cid).await
+	}
+
+	async fn clear(&self) -> Result<(), StorageError> {
+		self.next.clear().await
+	}
 }
 impl<S, P> CloneWithBlockStorageSettings for StoreParamsBlockStorage<S, P>
 where
@@ -90,7 +98,7 @@ where
 		self.next.to_mapped(plain).await
 	}
 
-	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+	async fn insert_mappings(&self, mappings: BTreeSet<MappedCid>) {
 		self.next.insert_mappings(mappings).await
 	}
 }

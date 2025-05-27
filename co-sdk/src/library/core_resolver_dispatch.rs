@@ -27,6 +27,11 @@ impl<'c, C, S, A> CoreResolverDispatch<C, S, A> {
 	) -> Self {
 		Self { core_resolver, runtime, context, storage, core_name, state, _action: PhantomData }
 	}
+
+	#[cfg(feature = "pinning")]
+	pub fn state(&self) -> Option<Cid> {
+		self.state
+	}
 }
 #[async_trait]
 impl<C, S, A> CoDispatch<A> for CoreResolverDispatch<C, S, A>
@@ -35,7 +40,7 @@ where
 	S: BlockStorage + Send + Sync + Clone + 'static,
 	A: Serialize + Debug + Send + Sync + Clone + 'static,
 {
-	async fn dispatch(&self, action: &A) -> Result<Option<Cid>, anyhow::Error> {
+	async fn dispatch(&mut self, action: &A) -> Result<Option<Cid>, anyhow::Error> {
 		// Note: this action must be deterministic so we pass no time otherwise when we retry this could introduce
 		// random values.
 		let reducer_action: ReducerAction<&A> = ReducerAction {
@@ -47,17 +52,31 @@ where
 		let action_cid = self.storage.set_serialized(&reducer_action).await?;
 
 		// apply
-		let result = self
+		let runtime_context = self
 			.core_resolver
 			.execute(&self.storage, &self.runtime, &self.context, &self.state, &action_cid)
 			.await?;
+
+		// log
+		#[cfg(feature = "logging-verbose")]
+		tracing::trace!(?action, previous_state = ?self.state, next_state = ?runtime_context.state, "core-dispatch");
 
 		// remove action
 		// TODO: put this action into an "overlay storage" which used only memory?
 		// TODO: make sure it not in use by anyone else?
 		self.storage.remove(&action_cid).await?;
 
+		// propagate failures as this is meant for internal actions which should not fail
+		// - this indicates a bug in sdk internals if it fails
+		// - actions dispatched here will be created for the current state and not expected to fail.
+		// - actions dispatched here are implicit (not in the heads) so they get recomputet every time the head is
+		//   (re-)executed.
+		runtime_context.ok(&self.storage).await?;
+
+		// update
+		self.state = runtime_context.state;
+
 		// result
-		Ok(result.state)
+		Ok(runtime_context.state)
 	}
 }

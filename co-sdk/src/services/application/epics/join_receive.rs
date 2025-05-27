@@ -1,12 +1,18 @@
 use crate::{
-	library::join::{CoJoinPayload, CO_DIDCOMM_JOIN},
-	Action, CoContext, CoReducerFactory, KnownTag, CO_CORE_NAME_CO,
+	library::{
+		join::{CoJoinPayload, CO_DIDCOMM_JOIN},
+		network_identity::network_identity,
+	},
+	Action, CoContext, CoReducer, CoReducerFactory, CO_CORE_NAME_CO,
 };
 use anyhow::anyhow;
 use co_core_co::{CoAction, ParticipantState};
 use co_identity::DidCommHeader;
-use co_primitives::{from_json_string, CoJoin};
-use futures::{future::ready, stream, Stream, StreamExt};
+use co_primitives::{
+	from_json_string, BlockStorageSettings, CloneWithBlockStorageSettings, CoJoin, Did, KnownTag, ReducerAction,
+};
+use co_storage::BlockStorageExt;
+use futures::{future::ready, stream, Stream, StreamExt, TryStreamExt};
 use libp2p::PeerId;
 
 /// When we receive a join message:
@@ -49,6 +55,11 @@ async fn joined(context: CoContext, _peer: PeerId, header: DidCommHeader, body: 
 	let join = CoJoin::from_tags(&state.tags).unwrap_or_default();
 	let from = header.from.ok_or(anyhow!("invalid header: from"))?.to_string();
 
+	// get identity
+	//  find invite identity (if its local)
+	let invite_identity_did = find_inviter(&context, &co, &from).await?;
+	let identity = network_identity(&context, &co, invite_identity_did.as_ref()).await?;
+
 	// state
 	let participant_state = match join {
 		CoJoin::Invite => state
@@ -71,7 +82,7 @@ async fn joined(context: CoContext, _peer: PeerId, header: DidCommHeader, body: 
 			_ => None,
 		};
 		if let Some(action) = action {
-			co.push(&context.local_identity(), CO_CORE_NAME_CO, &action).await?;
+			co.push(&identity, CO_CORE_NAME_CO, &action).await?;
 		}
 	}
 
@@ -87,4 +98,37 @@ async fn joined(context: CoContext, _peer: PeerId, header: DidCommHeader, body: 
 	// Ok(result)
 
 	Ok(vec![])
+}
+
+/// Find the inviters identity by waling the log until the first invite action
+async fn find_inviter(context: &CoContext, co: &CoReducer, invited_did: &str) -> Result<Option<String>, anyhow::Error> {
+	let storage = co
+		.storage()
+		.clone_with_settings(BlockStorageSettings::new().without_networking());
+	let invite_identity_did = context
+		.entries_from_heads(co.id(), storage.clone(), co.heads().await)
+		.await?
+		.try_filter_map(|entry| {
+			let storage = storage.clone();
+			async move {
+				match storage
+					.get_deserialized::<ReducerAction<CoAction>>(&entry.entry().payload)
+					.await
+				{
+					Ok(action) if action.core == CO_CORE_NAME_CO => match action.payload {
+						CoAction::ParticipantInvite { participant, tags: _ } if participant.as_str() == invited_did => {
+							Ok(Some(action.from))
+						},
+						_ => Ok(None),
+					},
+					_ => Ok(None),
+				}
+			}
+		})
+		.take(1)
+		.try_collect::<Vec<Did>>()
+		.await
+		.ok()
+		.and_then(|mut items| items.pop());
+	Ok(invite_identity_did)
 }

@@ -1,7 +1,7 @@
 use crate::{CoreResolver, CoreResolverError, ReducerChangeContext};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{BlockStorage, BlockStorageExt, DiagnosticMessage};
+use co_primitives::{BlockStorage, DiagnosticMessage};
 use co_runtime::{RuntimeContext, RuntimePool};
 
 #[derive(Debug, Clone)]
@@ -19,7 +19,7 @@ where
 	S: BlockStorage + Send + Sync + Clone + 'static,
 	C: CoreResolver<S> + Send + Sync + 'static,
 {
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, skip(self, storage, runtime))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, skip(self, storage, runtime))]
 	async fn execute(
 		&self,
 		storage: &S,
@@ -28,12 +28,15 @@ where
 		state: &Option<Cid>,
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
-		let runtime_context = self.next.execute(storage, runtime, context, state, action).await?;
+		let mut runtime_context = self.next.execute(storage, runtime, context, state, action).await?;
+
+		// resolve diagnostics
+		runtime_context.resolve_diagnostics(storage).await?;
 
 		// trace diagnostics
-		for diagnostic_cid in runtime_context.diagnostics.iter() {
-			if let Some(diagnostic) = storage.get_deserialized::<DiagnosticMessage>(diagnostic_cid).await.ok() {
-				match diagnostic {
+		for diagnostic in runtime_context.diagnostics.iter() {
+			if let Some(message) = diagnostic.message() {
+				match message {
 					DiagnosticMessage::Failure(err) => {
 						tracing::error!(err, "action-failed");
 					},

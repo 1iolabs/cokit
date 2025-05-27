@@ -7,6 +7,7 @@ use futures::{
 	Stream, StreamExt,
 };
 use std::{
+	any::type_name,
 	fmt::Debug,
 	marker::{PhantomData, Send},
 	sync::Arc,
@@ -120,7 +121,7 @@ where
 		if let Some(stream) = stream {
 			let actor = actor.clone();
 			let error = self.error.clone();
-			spawner.spawn(async move {
+			spawner.spawn_named(type_name::<A>(), async move {
 				let stream = stream.take_until(actor.closed());
 				pin_mut!(stream);
 				while let Some(action) = stream.next().await {

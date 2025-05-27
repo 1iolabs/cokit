@@ -17,7 +17,6 @@ use std::{
 	mem::swap,
 };
 use tokio::sync::watch;
-use tracing::instrument;
 
 pub struct ReducerBuilder<S, R> {
 	_storage: PhantomData<S>,
@@ -111,7 +110,7 @@ pub struct Reducer<S, R> {
 	/// Avilable historic snapshots (in chronologic order?).
 	snapshots: HashMap<BTreeSet<Cid>, Cid>,
 	/// Change handlers.
-	change_handlers: Vec<Box<dyn ReducerChangedHandler<S, R> + Send + Sync>>,
+	change_handlers: Vec<Box<dyn ReducerChangedHandler<S, R>>>,
 	/// State/Heads watcher.
 	watch: (watch::Sender<Option<(Cid, BTreeSet<Cid>)>>, watch::Receiver<Option<(Cid, BTreeSet<Cid>)>>),
 	/// Date.
@@ -123,7 +122,7 @@ where
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
 	/// Initialize this reducer by computing current state if one.
-	#[instrument(skip(self, storage, runtime))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self, storage, runtime))]
 	pub async fn initialize(&mut self, storage: &S, runtime: &RuntimePool) -> Result<(), anyhow::Error> {
 		tracing::trace!(?self.snapshots, "reducer-initialize");
 		let context = ReducerChangeContext { cause: ReducerChangeCause::Initialize };
@@ -193,7 +192,7 @@ where
 	}
 
 	/// Add change handler which will be called when state changed.
-	/// All change handlers will be called in parallel.
+	/// Change handlers will be called in the sequence they have been added.
 	pub fn add_change_handler(&mut self, handler: Box<dyn ReducerChangedHandler<S, R> + Send + Sync>) {
 		self.change_handlers.push(handler);
 	}
@@ -316,7 +315,7 @@ where
 			.log
 			.push(storage, identity, *action_link.cid())
 			.await
-			.with_context(|| format!("push event core: {}", action.core))?;
+			.with_context(|| format!("push event core: {}: {:?}", action.core, action_link))?;
 
 		// // debug
 		// let block = self.log.storage().get(entry.as_ref()).await.unwrap();
@@ -350,6 +349,13 @@ where
 				"compute-state-push",
 			);
 		}
+
+		// fail and ignore result when we got a failure disgnostic
+		//  this is technically optional because its fine to have failing transactions
+		//  which just have no effect to the state
+		//  but in case of push which is always local we can just skip it
+		//  it makes no sense to propagate it to peers etc.
+		runtime_context.ok(storage).await?;
 
 		// snapshot
 		if self.state.is_some() {
@@ -429,7 +435,7 @@ where
 
 	/// Compute state for log heads.
 	/// Returns the resulting state if one.
-	#[instrument(level = tracing::Level::TRACE, err(Debug), skip(self, runtime, storage))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, runtime, storage))]
 	async fn compute_state(
 		&self,
 		storage: &S,
@@ -471,7 +477,7 @@ where
 	/// The computed start position is self.heads.
 	/// The computed end position is self.log.heads.
 	/// Algorithm: We search for the lowest known ancestors of the heads while walking the log backwards.
-	#[instrument(skip(self, storage))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self, storage))]
 	async fn compute_stack(&self, storage: &S) -> Result<(Option<Cid>, VecDeque<EntryBlock>), anyhow::Error> {
 		let heads: BTreeSet<Cid> = self.log.heads().clone();
 		let mut state = self.state;
@@ -509,7 +515,7 @@ where
 /// Reducer change handler.
 /// Will be executed everytime the state in the reducer changes, including on initialize.
 #[async_trait]
-pub trait ReducerChangedHandler<S, R> {
+pub trait ReducerChangedHandler<S, R>: Send + Sync {
 	async fn on_state_changed(
 		&mut self,
 		storage: &S,
@@ -573,18 +579,17 @@ impl ReducerChangeCause {
 mod tests {
 	use super::Reducer;
 	use crate::{
-		application::reducer::ReducerBuilder, CoDate, CoreResolver, MonotonicCoDate, ReducerChangeContext,
-		ReducerChangedHandler, SingleCoreResolver,
+		application::reducer::ReducerBuilder, build_core, crate_repository_path, CoDate, CoreResolver, MonotonicCoDate,
+		ReducerChangeContext, ReducerChangedHandler, SingleCoreResolver,
 	};
 	use async_trait::async_trait;
 	use co_identity::{IdentityResolverBox, LocalIdentityResolver};
 	use co_log::Log;
 	use co_primitives::{BlockSerializer, ReducerAction};
 	use co_runtime::{Core, IdleRuntimePool, RuntimePool};
-	use co_storage::{unixfs_add_file, ExtendedBlockStorage, MemoryBlockStorage};
+	use co_storage::{ExtendedBlockStorage, MemoryBlockStorage};
 	use example_counter::{Counter, CounterAction};
 	use futures::StreamExt;
-	use tokio::process::Command;
 
 	#[tokio::test]
 	async fn smoke() {
@@ -592,13 +597,9 @@ mod tests {
 		let storage = MemoryBlockStorage::default();
 
 		// wasm
-		Command::new("cargo")
-			.current_dir("../examples/counter")
-			.args(["build", "--target=wasm32-unknown-unknown", "--release"])
-			.output()
-			.await
-			.unwrap();
-		let wasm = unixfs_add_file(&storage, "../target/wasm32-unknown-unknown/release/example_counter.wasm")
+		let wasm = build_core(crate_repository_path(true).unwrap(), "examples/counter")
+			.unwrap()
+			.store_artifact(&storage)
 			.await
 			.unwrap();
 

@@ -1,9 +1,9 @@
-use super::{message::ReducerMessage, ReducerActor};
+use super::{flush::CoReducerFlush, message::ReducerMessage, ReducerActor};
 use crate::{
 	library::create_reducer_action::{create_reducer_action, store_reducer_action},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{co_dispatch::CoDispatch, co_reducer_context::CoReducerContextRef, co_reducer_state::CoReducerState},
-	CoStorage, DynamicCoDate, Reducer, Runtime,
+	ApplicationMessage, CoStorage, DynamicCoDate, Reducer, Runtime, Storage,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -11,7 +11,7 @@ use co_actor::{Actor, ActorHandle, TaskSpawner};
 use co_core_co::Co;
 use co_identity::{PrivateIdentity, PrivateIdentityBox};
 use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Link, ReducerAction};
-use co_storage::{BlockStorageExt, StorageError};
+use co_storage::{BlockStorageExt, OverlayBlockStorage, StorageError};
 use futures::Stream;
 use ipld_core::ipld::Ipld;
 use serde::Serialize;
@@ -23,11 +23,13 @@ pub struct CoReducer {
 	parent: Option<CoId>,
 	handle: ActorHandle<ReducerMessage>,
 	storage: CoStorage,
+	overlay_storage: Option<OverlayBlockStorage<CoStorage>>,
 	pub(crate) context: CoReducerContextRef,
 	date: DynamicCoDate,
 }
 impl CoReducer {
 	pub(crate) fn spawn(
+		application_handle: ActorHandle<ApplicationMessage>,
 		application_identifier: String,
 		id: CoId,
 		parent: Option<CoId>,
@@ -36,15 +38,16 @@ impl CoReducer {
 		runtime: Runtime,
 		reducer: Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 		context: CoReducerContextRef,
+		flush: CoReducerFlush,
 	) -> Result<Self, anyhow::Error> {
 		let date = reducer.date().clone();
 		let actor = Actor::spawn_with(
 			tasks.clone(),
 			tags!("application": application_identifier, "co": id.as_str()),
-			ReducerActor::new(tasks, runtime, context.clone()),
-			reducer,
+			ReducerActor::new(id.clone(), runtime, application_handle, context.clone()),
+			(reducer, flush),
 		)?;
-		Ok(Self { id, parent, storage, handle: actor.handle(), context, date })
+		Ok(Self { id, parent, storage, handle: actor.handle(), context, date, overlay_storage: None })
 	}
 
 	pub(crate) fn clone_with_detached_storage(&self) -> Self {
@@ -52,17 +55,55 @@ impl CoReducer {
 	}
 
 	pub(crate) fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+		let (storage, overlay_storage) = match &self.overlay_storage {
+			Some(overlay_storage) => {
+				// clone the base storage without overlay but with settings
+				let storage = overlay_storage.next_storage().clone_with_settings(settings);
+
+				// clone the overlay and replace next storage with the cloned instance
+				//  this will use the same overlay as the source clone
+				let overlay_storage = overlay_storage.clone().with_next_storage(storage);
+
+				// result
+				(CoStorage::new(overlay_storage.clone()), Some(overlay_storage))
+			},
+			None => (self.storage.clone_with_settings(settings), None),
+		};
 		Self {
 			id: self.id.clone(),
 			parent: self.parent.clone(),
 			handle: self.handle.clone(),
 			context: self.context.clone(),
 			date: self.date.clone(),
-			storage: self.storage.clone_with_settings(settings),
+			storage,
+			overlay_storage,
 		}
 	}
 
+	/// Get the reducer base storage (without overlay).
+	pub(crate) fn base_storage(&self) -> &CoStorage {
+		match &self.overlay_storage {
+			Some(overlay_storage) => overlay_storage.next_storage(),
+			None => &self.storage,
+		}
+	}
+
+	/// Use a new overlay storage for this instance.
+	pub(crate) fn with_overlay_storage(mut self, tasks: TaskSpawner, storage: Storage) -> Self {
+		let overlay_storage =
+			OverlayBlockStorage::new(tasks, self.base_storage().clone(), storage.tmp_storage(), None, true, true);
+		self.storage = CoStorage::new(overlay_storage.clone());
+		self.overlay_storage = Some(overlay_storage);
+		self
+	}
+
 	pub(crate) async fn clear(&self) -> CoReducerState {
+		// clear overlay
+		if let Some(overlay_storage) = &self.overlay_storage {
+			overlay_storage.clear_overlay_changes().await.ok();
+		}
+
+		// clear
 		self.handle.request(ReducerMessage::Clear).await.unwrap_or_default()
 	}
 
@@ -118,31 +159,37 @@ impl CoReducer {
 	///
 	/// # Returns
 	/// The resulting state and heads.
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, item, identity))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, item, identity))]
 	pub async fn push<T, I>(&self, identity: &I, core: &str, item: &T) -> Result<CoReducerState, anyhow::Error>
 	where
 		T: Serialize + Debug + Clone + Send + Sync + 'static,
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
+		// action
 		let action_reference =
 			create_reducer_action(&self.storage, identity, core, item, Default::default(), &self.date).await?;
+
+		// push
 		let result = self
 			.handle
 			.request(|r| {
 				ReducerMessage::Push(
-					PrivateIdentity::boxed(identity.clone()),
+					self.overlay_storage.clone(),
 					self.storage.clone(),
+					PrivateIdentity::boxed(identity.clone()),
 					action_reference,
 					r,
 				)
 			})
 			.await??;
+
+		// result
 		tracing::trace!(action = ?item, ?action_reference, state = ?result.0, heads = ?result.1, "push");
 		Ok(result)
 	}
 
 	/// Push event into reducer.
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity(), core = action.core), skip(self, action, identity))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity(), core = action.core), skip(self, action, identity))]
 	pub async fn push_action<T, I>(
 		&self,
 		identity: &I,
@@ -152,18 +199,24 @@ impl CoReducer {
 		T: Serialize + Debug + Send + Sync + Clone + 'static,
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
+		// action
 		let action_reference = store_reducer_action(&self.storage, action, Default::default()).await?;
+
+		// push
 		let result = self
 			.handle
 			.request(|r| {
 				ReducerMessage::Push(
-					PrivateIdentity::boxed(identity.clone()),
+					self.overlay_storage.clone(),
 					self.storage.clone(),
+					PrivateIdentity::boxed(identity.clone()),
 					action_reference,
 					r,
 				)
 			})
 			.await??;
+
+		// result
 		tracing::trace!(action = ?action.payload, ?action_reference, state = ?result.0, heads = ?result.1, "push");
 		Ok(result)
 	}
@@ -176,7 +229,7 @@ impl CoReducer {
 	///
 	/// # Returns
 	/// The resulting state and heads.
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, identity))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, identity))]
 	pub async fn push_reference<I>(
 		&self,
 		identity: &I,
@@ -185,37 +238,49 @@ impl CoReducer {
 	where
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
+		// push
 		let result = self
 			.handle
 			.request(|r| {
 				ReducerMessage::Push(
-					PrivateIdentity::boxed(identity.clone()),
+					self.overlay_storage.clone(),
 					self.storage.clone(),
+					PrivateIdentity::boxed(identity.clone()),
 					action_reference,
 					r,
 				)
 			})
 			.await??;
+
+		// result
 		tracing::trace!(?action_reference, state = ?result.0, heads = ?result.1, "push-reference");
 		Ok(result)
 	}
 
 	/// Join heads.
 	/// Returns true if state has changed.
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, fields(co = self.id().as_str()), skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, fields(co = self.id().as_str()), skip(self))]
 	pub async fn join(&self, heads: BTreeSet<Cid>) -> Result<CoReducerState, anyhow::Error> {
-		Ok(self
+		// join
+		let request = self
 			.handle
-			.request(|r| ReducerMessage::JoinHeads(self.storage(), heads, r))
-			.await??)
+			.request(|r| ReducerMessage::JoinHeads(self.overlay_storage.clone(), self.storage(), heads, r))
+			.await??;
+
+		// result
+		Ok(request)
 	}
 
 	/// Join a previous (trusted) snapshot into history which may can used as a starting point.
 	pub async fn join_state(&self, state: CoReducerState) -> Result<CoReducerState, anyhow::Error> {
-		Ok(self
+		// join
+		let co_reducer_state = self
 			.handle
-			.request(|r| ReducerMessage::JoinState(self.storage(), state, r))
-			.await??)
+			.request(|r| ReducerMessage::JoinState(self.overlay_storage.clone(), self.storage(), state, r))
+			.await??;
+
+		// result
+		Ok(co_reducer_state)
 	}
 
 	/// Create a action dispatcher.
@@ -244,7 +309,7 @@ impl<A> CoDispatch<A> for CoReducerDispatch<A>
 where
 	A: Serialize + Debug + Send + Sync + Clone + 'static,
 {
-	async fn dispatch(&self, action: &A) -> Result<Option<Cid>, anyhow::Error> {
+	async fn dispatch(&mut self, action: &A) -> Result<Option<Cid>, anyhow::Error> {
 		Ok(self.reducer.push(&self.identity, &self.core, action).await?.0)
 	}
 }

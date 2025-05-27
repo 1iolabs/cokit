@@ -95,12 +95,23 @@ type Task = Box<TaskFn>;
 // type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
 
 async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Result<(), anyhow::Error> {
-	let identifier = settings.identifier;
-	let builder = match settings.path {
-		Some(path) => ApplicationBuilder::new_with_path(identifier, path),
-		None => ApplicationBuilder::new(identifier),
+	let mut application_builder = match settings.path {
+		Some(path) => ApplicationBuilder::new_with_path(settings.identifier, path),
+		None => ApplicationBuilder::new(settings.identifier),
 	};
-	let mut application = builder.without_keychain().with_bunyan_logging(None).build().await?;
+	if !settings.no_log {
+		application_builder = application_builder.with_bunyan_logging(None);
+	}
+	if settings.no_keychain {
+		application_builder = application_builder.without_keychain();
+	}
+	if settings.no_default_features {
+		application_builder = application_builder.with_setting("default-features", false);
+	}
+	for feature in &settings.feature {
+		application_builder = application_builder.with_setting("feature", feature.to_owned());
+	}
+	let mut application = application_builder.build().await?;
 
 	// network
 	if settings.network {

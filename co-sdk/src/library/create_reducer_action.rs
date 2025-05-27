@@ -15,6 +15,16 @@ pub fn new_reducer_action(
 	Ok(ReducerAction { core: core.into(), from: from.into(), time: time.now(), payload: to_ipld(payload)? })
 }
 
+/// New reducer action.
+pub fn new_typed_reducer_action<T>(
+	from: impl Into<Did>,
+	core: impl Into<String>,
+	payload: T,
+	time: &impl CoDate,
+) -> ReducerAction<T> {
+	ReducerAction { core: core.into(), from: from.into(), time: time.now(), payload }
+}
+
 /// Create and store reducer action.
 pub async fn create_reducer_action<P, I, S>(
 	storage: &S,
@@ -29,7 +39,7 @@ where
 	I: PrivateIdentity + Send + Sync,
 	S: ExtendedBlockStorage,
 {
-	let action = ReducerAction { core: core.into(), payload, from: from.identity().to_owned(), time: time.now() };
+	let action = new_typed_reducer_action(from.identity(), core, payload, time);
 	store_reducer_action(storage, &action, options).await
 }
 

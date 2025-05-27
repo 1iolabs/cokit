@@ -6,12 +6,11 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use co_primitives::Tags;
 use futures::{Stream, StreamExt};
-use std::{future::ready, sync::Arc};
+use std::{any::type_name, future::ready, ops::Deref, sync::Arc};
 use tokio::{
 	sync::{mpsc, watch},
 	task::JoinHandle,
 };
-use tracing::Instrument;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ActorError {
@@ -69,6 +68,7 @@ pub trait Actor: Send + Sync + 'static {
 	}
 
 	/// Spawn actor.
+	#[track_caller]
 	fn spawn(tags: Tags, actor: Self, initialize: Self::Initialize) -> Result<ActorInstance<Self>, ActorError>
 	where
 		Self: Send + Sized + 'static,
@@ -78,6 +78,7 @@ pub trait Actor: Send + Sync + 'static {
 
 	/// Spawn actor using a task spawner.
 	/// TODO: to simplyfy lifecycle make async and wait for intitalize?
+	#[track_caller]
 	fn spawn_with(
 		spawner: TaskSpawner,
 		tags: Tags,
@@ -117,14 +118,14 @@ where
 		self.handle.clone()
 	}
 
+	#[track_caller]
 	pub fn spawn(self, spawner: TaskSpawner, initialize: A::Initialize) -> ActorInstance<A> {
 		let mut rx = self.rx;
 		let state_tx = self.state_tx;
 		let actor = self.actor;
 		let tags = self.handle.tags.clone();
 		let handle = self.handle;
-		let span = tracing::trace_span!("actor", ?tags);
-		let join = spawner.spawn({
+		let join = spawner.spawn_named(type_name::<A>(), {
 			let tags = tags.clone();
 			let handle = handle.clone();
 			async move {
@@ -182,7 +183,6 @@ where
 					.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
 				Ok(())
 			}
-			.instrument(span)
 		});
 		ActorInstance { join, handle }
 	}
@@ -256,11 +256,20 @@ where
 }
 
 /// Handle into an actor which can be used to send messages.
-#[derive(Debug)]
 pub struct ActorHandle<M> {
 	tx: mpsc::UnboundedSender<ActorMessage<M>>,
 	state: watch::Receiver<ActorState>,
 	tags: Arc<Tags>,
+}
+impl<M> std::fmt::Debug for ActorHandle<M> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("ActorHandle")
+			.field("message_type", &type_name::<M>())
+			.field("tx_closed", &self.tx.is_closed())
+			.field("state", &self.state.borrow().deref())
+			.field("tags", &self.tags)
+			.finish()
+	}
 }
 impl<M> Clone for ActorHandle<M> {
 	fn clone(&self) -> Self {

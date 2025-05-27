@@ -5,7 +5,6 @@ use crate::{
 use clap::ArgAction;
 use exitcode::ExitCode;
 use std::path::PathBuf;
-use tracing::instrument;
 
 const APP_IDENTIFIER: &str = "co-cli";
 
@@ -61,6 +60,14 @@ pub struct Cli {
 	/// Open telemetry endpoint.
 	#[arg(long, default_value_t = String::from("http://localhost:4317"))]
 	pub open_telemetry_endpoint: String,
+
+	/// Disable default features.
+	#[arg(long, default_value_t = false)]
+	pub no_default_features: bool,
+
+	/// Enable feature.
+	#[arg(long, short = 'F')]
+	pub feature: Vec<String>,
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]
@@ -96,7 +103,7 @@ pub enum CliCommand {
 	Schemars(schemars::Command),
 }
 
-#[instrument(err, ret, skip(cli), level = "debug")]
+#[tracing::instrument(level = tracing::Level::INFO, err, ret, skip(cli))]
 pub async fn command(cli: &Cli) -> Result<ExitCode, anyhow::Error> {
 	// trace arguments
 	tracing::debug!(?cli, "arguments");

@@ -33,5 +33,15 @@ unsigned-varint = "0.8.0"
 zeroize = { workspace = true }
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["async_tokio"] }
 insta = { version = "1.34.0", features = ["default", "yaml"] }
-tokio = { workspace = true, features = ["macros", "rt"] }
+tokio = { workspace = true, features = ["full", "tracing"] }
+
+[features]
+default = []
+benchmarking = []
+
+[[bench]]
+name = "lsm_tree_map"
+harness = false
+required-features = ["benchmarking"]

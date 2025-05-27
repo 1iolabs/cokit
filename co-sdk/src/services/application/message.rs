@@ -1,6 +1,7 @@
 use super::Action;
 use crate::{CoContext, NetworkMessage};
 use co_actor::{ActorHandle, Response, ResponseStream};
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub enum ApplicationMessage {

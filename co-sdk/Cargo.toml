@@ -33,6 +33,7 @@ futures = { workspace = true }
 futures-util = { workspace = true }
 hmac = "0.12.1"
 hyper = { workspace = true }
+indexmap = "2.9.0"
 ipld-core = { workspace = true }
 keyring = "2.3.2"
 libc = "0.2"
@@ -42,6 +43,7 @@ names = "0.14.0"
 nix = { version = "0.29.0", features = ["fs"] }
 notify = { version = "7.0.0", features = ["macos_kqueue"] }
 pin-project = { workspace = true }
+scopeguard = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
@@ -53,7 +55,7 @@ tokio-stream = { workspace = true, features = ["sync"] }
 tokio-util = { workspace = true, features = ["rt"] }
 toml = { workspace = true }
 tracing = { workspace = true }
-tracing-bunyan-formatter = "0.3.6"
+tracing-bunyan-formatter = { workspace = true }
 tracing-log = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { workspace = true }
@@ -67,9 +69,20 @@ opentelemetry-stdout = { version = "0.3.0", features = ["trace"] }
 tracing-opentelemetry = "0.23"
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["async_tokio"] }
 example-counter = { path = "../examples/counter" }
+tokio = { workspace = true, features = ["full", "tracing"] }
+console-subscriber = { version = "0.4.1" }
 
 [features]
 "default" = ["pinning"]
+
+# Enable pinning (co-core-storage) feature.
 "pinning" = []
+
+# Enable very verbose logging which may has security implications. Only use in development.
 "logging-verbose" = ["co-storage/logging-verbose"]
+
+[[bench]]
+name = "local_push"
+harness = false

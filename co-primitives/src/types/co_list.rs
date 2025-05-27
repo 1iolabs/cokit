@@ -1,5 +1,7 @@
-use crate::{library::lsm_tree_map::Root, BlockStorage, LsmTreeMap, OptionLink, StorageError};
+use super::lazy_transaction::Transactionable;
+use crate::{library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError};
 use anyhow::anyhow;
+use async_trait::async_trait;
 use futures::{Stream, StreamExt, TryStreamExt};
 use num_rational::Ratio;
 use serde::{
@@ -190,11 +192,7 @@ where
 		self.commit(transaction).await?;
 		Ok(())
 	}
-}
-impl<V> CoList<V>
-where
-	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-{
+
 	pub async fn open<S>(&self, storage: &S) -> Result<CoListTransaction<S, V>, StorageError>
 	where
 		S: BlockStorage + Clone + 'static,
@@ -206,6 +204,13 @@ where
 			},
 			max_key: None,
 		})
+	}
+
+	pub async fn open_lazy<S>(&self, storage: &S) -> Result<LazyTransaction<S, Self>, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		Ok(LazyTransaction::new(storage.clone(), self.clone()))
 	}
 
 	pub async fn commit<S>(&mut self, mut transaction: CoListTransaction<S, V>) -> Result<(), StorageError>
@@ -222,6 +227,18 @@ where
 {
 	fn default() -> Self {
 		Self(Default::default())
+	}
+}
+#[async_trait]
+impl<S, V> Transactionable<S> for CoList<V>
+where
+	S: BlockStorage + Clone + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	type Transaction = CoListTransaction<S, V>;
+
+	async fn open(&self, storage: &S) -> Result<Self::Transaction, StorageError> {
+		CoList::open(self, storage).await
 	}
 }
 
@@ -262,6 +279,10 @@ where
 
 	pub fn stream(&self) -> impl Stream<Item = Result<(CoListIndex, V), StorageError>> + '_ {
 		self.tree.stream()
+	}
+
+	pub fn reverse_stream(&self) -> impl Stream<Item = Result<(CoListIndex, V), StorageError>> + '_ {
+		self.tree.reverse_stream()
 	}
 
 	/// Insert value at index shifting all elements at or after to the right.

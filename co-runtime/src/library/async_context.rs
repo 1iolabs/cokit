@@ -39,7 +39,7 @@ impl async_api::Context<AsyncBlockStorage> for AsyncContext {
 	}
 
 	fn write_diagnostic(&mut self, cid: Cid) {
-		self.context.diagnostics.push(cid);
+		self.context.diagnostics.push(cid.into());
 	}
 }
 

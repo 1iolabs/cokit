@@ -68,7 +68,7 @@ async fn test_conflicting_membership_update() {
 	// application
 	let application = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
 		.without_keychain()
-		.with_setting("co-local-watch", false)
+		.with_disabled_feature("co-local-watch")
 		.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
 		.with_co_date(MonotonicCoDate::default())
 		.with_co_uuid(MonotonicCoUuid::default())
@@ -126,7 +126,7 @@ async fn test_conflicting_membership_update() {
 	// application instance two
 	let application2 = ApplicationBuilder::new_with_path("test2".to_owned(), tmp.path().to_owned())
 		.without_keychain()
-		.with_setting("co-local-watch", false)
+		.with_disabled_feature("co-local-watch")
 		.with_co_date(MonotonicCoDate::default())
 		.build()
 		.await

@@ -1,9 +1,3 @@
-#[cfg(feature = "pinning")]
-use crate::reducer::core_resolver::change::ChangeCoreResolver;
-#[cfg(feature = "pinning")]
-use crate::reducer::core_resolver::reference::ReferenceCoreResolver;
-#[cfg(feature = "pinning")]
-use crate::types::co_pinning_key::CoPinningKey;
 use crate::{
 	application::{
 		application::ApplicationSettings,
@@ -20,7 +14,7 @@ use crate::{
 	},
 	types::co_reducer_factory::CoReducerFactoryError,
 	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, DynamicCoDate, DynamicCoUuid, LocalCoBuilder, Runtime,
-	TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
+	Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -30,9 +24,7 @@ use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 use co_log::{EntryBlock, Log};
-use co_primitives::{BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did};
-#[cfg(feature = "pinning")]
-use co_storage::ChangeBlockStorage;
+use co_primitives::{BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did};
 use futures::{Stream, TryStreamExt};
 use std::{
 	collections::BTreeSet,
@@ -47,7 +39,7 @@ pub struct CoContext {
 }
 impl CoContext {
 	/// Get instance of Local CoReducer.
-	#[tracing::instrument(skip(self), fields(application = self.inner.settings.identifier))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self), fields(application = self.inner.settings.identifier))]
 	pub async fn local_co_reducer(&self) -> Result<CoReducer, anyhow::Error> {
 		Ok(self.inner.reducers.clone().reducer(CoId::from(CO_ID_LOCAL)).await?)
 	}
@@ -155,6 +147,11 @@ impl CoContext {
 		&self.inner.uuid
 	}
 
+	/// Block links reader.
+	pub fn block_links(&self) -> &BlockLinks {
+		&self.inner.block_links
+	}
+
 	/// Force refresh co instance.
 	pub async fn refresh(&self, co: CoReducer) -> Result<(), anyhow::Error> {
 		let parent = match co.parent_id() {
@@ -176,7 +173,7 @@ impl CoReducerFactory for CoContext {
 		}
 	}
 
-	#[tracing::instrument(skip(self), fields(application = self.inner.settings.identifier))]
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(self), fields(application = self.inner.settings.identifier))]
 	async fn try_co_reducer(&self, co: &CoId) -> Result<CoReducer, CoReducerFactoryError> {
 		self.inner.reducers.clone().reducer(co.clone()).await
 	}
@@ -200,11 +197,7 @@ pub(crate) struct CoContextInner {
 
 	network: Arc<RwLock<Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>>>,
 
-	_storage: CoStorage,
-
-	/// Used to track all new blocks until we store the LocalCo again.
-	#[cfg(feature = "pinning")]
-	storage_created: ChangeBlockStorage<CoStorage>,
+	storage: Storage,
 
 	runtime: Runtime,
 	reactive_context: ActorHandle<ApplicationMessage>,
@@ -212,6 +205,7 @@ pub(crate) struct CoContextInner {
 	reducers: ReducersControl,
 	date: DynamicCoDate,
 	uuid: DynamicCoUuid,
+	block_links: BlockLinks,
 }
 impl CoContextInner {
 	pub(crate) fn new(
@@ -220,8 +214,7 @@ impl CoContextInner {
 		tasks: TaskSpawner,
 		local_identity: LocalIdentity,
 		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
-		storage: CoStorage,
-		_tmp_storage: CoStorage,
+		storage: Storage,
 		runtime: Runtime,
 		reactive_context: ActorHandle<ApplicationMessage>,
 		reducers: ReducersControl,
@@ -229,19 +222,18 @@ impl CoContextInner {
 		uuid: DynamicCoUuid,
 	) -> Self {
 		Self {
-			#[cfg(feature = "pinning")]
-			storage_created: ChangeBlockStorage::new(storage.clone()),
 			settings,
 			shutdown,
 			tasks,
 			local_identity,
 			network: Arc::new(RwLock::new(network)),
-			_storage: storage,
+			storage,
 			runtime,
 			reactive_context,
 			reducers,
 			date,
 			uuid,
+			block_links: Default::default(),
 		}
 	}
 
@@ -276,13 +268,14 @@ impl CoContextInner {
 		create_private_identity_resolver(local).await
 	}
 
+	/// Get the application storage.
+	pub fn application_storage(&self) -> &Storage {
+		&self.storage
+	}
+
 	/// Get the root storage.
-	/// The returned storage tracks changes which will be flushed when the local co is written.
 	pub fn storage(&self) -> CoStorage {
-		#[cfg(feature = "pinning")]
-		return CoStorage::new(self.storage_created.clone());
-		#[cfg(not(feature = "pinning"))]
-		return self._storage.clone();
+		self.storage.storage()
 	}
 
 	pub fn runtime(&self) -> Runtime {
@@ -309,23 +302,8 @@ impl CoContextInner {
 	}
 
 	/// Creates a CoReducer instance of the Local CO.
-	#[tracing::instrument(level = tracing::Level::TRACE, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	pub(crate) async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
-		let core_resolver = |_reducer_context| {
-			let local_id = CoId::new(CO_ID_LOCAL);
-			let core_resolver = CoCoreResolver::default();
-			#[cfg(feature = "pinning")]
-			let core_resolver = ChangeCoreResolver::new(core_resolver, self.storage_created.clone());
-			#[cfg(feature = "pinning")]
-			let core_resolver = ReferenceCoreResolver::new(
-				core_resolver,
-				Some(CoPinningKey::State.to_string(&local_id)),
-				_reducer_context,
-			);
-			let core_resolver = ReactiveCoreResolver::new(core_resolver, local_id, self.reactive_context.clone());
-			let core_resolver = LogCoreResolver::new(core_resolver);
-			core_resolver
-		};
 		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize);
 		let local_co_reducer = local_co
 			.build(
@@ -333,18 +311,29 @@ impl CoContextInner {
 				self.runtime.clone(),
 				self.shutdown.child_token(),
 				self.tasks.clone(),
-				core_resolver,
+				self.create_local_core_resolver(CoId::new(CO_ID_LOCAL)),
 				self.date.clone(),
+				self.application(),
+				#[cfg(feature = "pinning")]
+				self.create_pinning_context(),
 			)
 			.await?;
 		Ok(local_co_reducer)
 	}
 
-	/// Creates the Core Resolver for a shared CO.
-	pub(crate) fn create_co_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
+	/// Creates the Core Resolver for the local CO.
+	fn create_local_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::default();
-		let core_resolver =
-			ReactiveCoreResolver::<CoStorage, CoCoreResolver>::new(core_resolver, id, self.reactive_context.clone());
+		let core_resolver = ReactiveCoreResolver::new(core_resolver, id, self.reactive_context.clone());
+		let core_resolver = LogCoreResolver::new(core_resolver);
+		let core_resolver = DynamicCoreResolver::new(core_resolver);
+		core_resolver
+	}
+
+	/// Creates the Core Resolver for a shared CO.
+	pub(crate) fn create_shared_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
+		let core_resolver = CoCoreResolver::default();
+		let core_resolver = ReactiveCoreResolver::new(core_resolver, id, self.reactive_context.clone());
 		let core_resolver = LogCoreResolver::new(core_resolver);
 		let core_resolver = DynamicCoreResolver::new(core_resolver);
 		core_resolver
@@ -364,7 +353,7 @@ impl CoContextInner {
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
 	{
 		// resolver
-		let core_resolver = self.create_co_core_resolver(membership.id.clone());
+		let core_resolver = self.create_shared_core_resolver(membership.id.clone());
 
 		// network
 		let network = if network { self.network.read().unwrap().clone() } else { None };
@@ -373,10 +362,19 @@ impl CoContextInner {
 		let reducer = SharedCoBuilder::new(parent, membership)
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
-			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_owned())
 			.with_network(network)
 			.with_initialize(initialize)
-			.build(self.tasks.clone(), storage, self.runtime.clone(), identity, core_resolver, self.date.clone())
+			.build(
+				self.tasks.clone(),
+				storage,
+				self.runtime.clone(),
+				identity,
+				core_resolver,
+				self.date.clone(),
+				self.application(),
+				#[cfg(feature = "pinning")]
+				self.create_pinning_context(),
+			)
 			.await?;
 
 		// result
@@ -410,6 +408,19 @@ impl CoContextInner {
 			self.create_co_instance_membership(parent, membership, identity, storage, initialize, true)
 				.await?,
 		))
+	}
+
+	#[cfg(feature = "pinning")]
+	fn create_pinning_context(&self) -> crate::library::storage_pinning::StoragePinningContext {
+		crate::library::storage_pinning::StoragePinningContext {
+			identity: self.local_identity.clone().boxed(),
+			storage: self.storage.clone(),
+			runtime: self.runtime(),
+			date: self.date.clone(),
+			tasks: self.tasks.clone(),
+			block_links: self.block_links.clone(),
+			free: self.settings.feature_co_storage_free(),
+		}
 	}
 }
 impl From<CoContextInner> for CoContext {

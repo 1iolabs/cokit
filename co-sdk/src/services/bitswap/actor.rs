@@ -132,7 +132,7 @@ async fn contains(context: CoContext, cid: Cid, remote_peer: PeerId, tokens: Vec
 	}
 }
 
-#[tracing::instrument(name = "bitswap-service-get", level = tracing::Level::TRACE, err(Debug), skip(context, tokens))]
+#[tracing::instrument(level = tracing::Level::TRACE, name = "bitswap-service-get", err(Debug), skip(context, tokens))]
 async fn get(
 	context: CoContext,
 	cid: Cid,

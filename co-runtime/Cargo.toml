@@ -12,6 +12,7 @@ co-api = { path = "../co-api" }
 co-primitives = { path = "../co-primitives" }
 co-storage = { path = "../co-storage" }
 colored = "2.1.0"
+derive_more = { workspace = true }
 futures = { workspace = true }
 ipld-core = { workspace = true }
 names = "0.14.0"

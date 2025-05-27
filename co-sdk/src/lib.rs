@@ -35,6 +35,7 @@ pub use co_storage::{
 	unixfs_add, unixfs_add_file, unixfs_cat_buffer, unixfs_encode_buffer, unixfs_stream, BlockStorageContentMapping,
 };
 pub use library::{
+	build_core::{build_core, crate_repository_path, BuildCoreArtifact},
 	did_key_provider::DidKeyProvider,
 	find_co_identities::{find_co_identities, find_co_private_identity},
 	find_co_secret::find_co_secret,
@@ -44,8 +45,8 @@ pub use library::{
 	is_cid_encrypted::is_cid_encrypted,
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
+	memory_dispatch::MemoryDispatch,
 	response_list::ResponseList,
-	storage_cleanup::storage_cleanup,
 	update_co::update_co,
 };
 pub use pin::pin::PinAPI;
@@ -58,8 +59,11 @@ pub use services::{
 };
 pub use types::{
 	co_date::{CoDate, DynamicCoDate, MonotonicCoDate, StaticCoDate, SystemCoDate},
+	co_dispatch::{CoDispatch, DynamicCoDispatch},
+	co_pinning_key::CoPinningKey,
+	co_reducer_context::CoReducerContext,
 	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError},
-	co_reducer_state::CoReducerState,
+	co_reducer_state::{CoReducerState, MappedCoReducerState},
 	co_storage::CoStorage,
 	co_uuid::{CoUuid, DynamicCoUuid, MonotonicCoUuid, RandomCoUuid},
 	cores::{

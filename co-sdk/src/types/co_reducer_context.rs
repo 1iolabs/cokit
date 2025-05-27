@@ -1,6 +1,6 @@
 use crate::{CoReducer, CoStorage};
 use async_trait::async_trait;
-use std::{fmt::Debug, sync::Arc};
+use std::{borrow::Cow, fmt::Debug, sync::Arc};
 
 #[async_trait]
 pub trait CoReducerContext: Debug {
@@ -15,6 +15,21 @@ pub trait CoReducerContext: Debug {
 
 	/// Clear reducer caches.
 	async fn clear(&self, co: CoReducer);
+
+	/// Test for a reducer feature.
+	/// Features are always additive.
+	///
+	/// Known features:
+	/// - `network` - Networking is enabled.
+	/// - `encryption` - Storage encryption is enabled.
+	fn has_feature(&self, feature: &CoReducerFeature<'_>) -> bool;
 }
 
 pub type CoReducerContextRef = Arc<dyn CoReducerContext + Send + Sync + 'static>;
+
+#[non_exhaustive]
+pub enum CoReducerFeature<'a> {
+	Network,
+	Encryption,
+	Other(Cow<'a, str>),
+}

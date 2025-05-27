@@ -22,7 +22,7 @@ thiserror = { workspace = true }
 [dev-dependencies]
 co-storage = { path = "../../co-storage" }
 co-runtime = { path = "../../co-runtime" }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["full", "tracing"] }
 tokio-util = { workspace = true, features = ["compat"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

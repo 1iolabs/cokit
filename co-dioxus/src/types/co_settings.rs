@@ -8,6 +8,8 @@ pub struct CoSettings {
 	pub network: bool,
 	pub no_keychain: bool,
 	pub no_log: bool,
+	pub no_default_features: bool,
+	pub feature: Vec<String>,
 }
 impl CoSettings {
 	pub fn new(identifier: &str) -> Self {

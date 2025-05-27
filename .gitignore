@@ -1,4 +1,5 @@
 /target
+/target-wasm
 /.vscode/tasks.json
 /.vscode/launch.json
 /data

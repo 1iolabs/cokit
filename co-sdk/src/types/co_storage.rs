@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, DefaultParams};
+use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, DefaultParams, MappedCid};
 use co_storage::{
 	BlockStat, BlockStorage, BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, StorageError,
 };
-use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
+use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
 
 /// Public storage API.
 #[derive(Clone)]
@@ -58,6 +58,14 @@ impl ExtendedBlockStorage for CoStorage {
 	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
 		self.inner.set_extended(block).await
 	}
+
+	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
+		self.inner.exists(cid).await
+	}
+
+	async fn clear(&self) -> Result<(), StorageError> {
+		self.inner.clear().await
+	}
 }
 impl CloneWithBlockStorageSettings for CoStorage {
 	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
@@ -78,7 +86,7 @@ impl BlockStorageContentMapping for CoStorage {
 		self.inner.to_mapped(plain).await
 	}
 
-	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+	async fn insert_mappings(&self, mappings: BTreeSet<MappedCid>) {
 		self.inner.insert_mappings(mappings).await
 	}
 }

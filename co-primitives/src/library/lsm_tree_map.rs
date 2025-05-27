@@ -1,4 +1,4 @@
-use super::node_builder::NodeReader;
+use super::{dag_cbor_size_serializer::DagCborSizeSerializer, node_builder::NodeReader};
 use crate::{
 	Block, BlockSerializer, BlockStorage, BlockStorageExt, Link, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
 	NodeStream, OptionLink, StorageError, StoreParams,
@@ -32,8 +32,8 @@ where
 	pub levels: Vec<Link<Level<K, V>>>,
 
 	/// Active "in memory data".
-	#[serde(rename = "a", default = "OptionLink::default", skip_serializing_if = "OptionLink::is_none")]
-	pub active: OptionLink<Node<(K, Value<V>)>>,
+	#[serde(rename = "a", default = "Node::default", skip_serializing_if = "Node::is_empty")]
+	pub active: Node<(K, Value<V>)>,
 
 	/// Tree settings.
 	#[serde(
@@ -142,13 +142,26 @@ impl BloomFilter {
 
 /// LSM Tree Value.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
 pub enum Value<V>
 where
 	V: Clone + 'static,
 {
+	#[serde(rename = "v")]
 	Value(V),
+	#[serde(rename = "t")]
 	Tombstone,
+}
+impl<V> PartialEq for Value<V>
+where
+	V: PartialEq + Clone + 'static,
+{
+	fn eq(&self, other: &Self) -> bool {
+		match (self, other) {
+			(Self::Tombstone, Self::Tombstone) => true,
+			(Self::Value(a), Self::Value(b)) => a == b,
+			_ => false,
+		}
+	}
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -295,7 +308,7 @@ where
 	fn serialize(&mut self, node: RunNode<K, V>) -> Result<Block<P>, NodeBuilderError> {
 		let block = BlockSerializer::new()
 			.serialize(&node)
-			.map_err(|_| NodeBuilderError::Encoding)?;
+			.map_err(|err| NodeBuilderError::Encoding(err.into()))?;
 
 		// record min/max for faster insert
 		match &node {
@@ -311,6 +324,12 @@ where
 
 		// result
 		Ok(block)
+	}
+
+	fn item_size_hint(&self, item: &(K, Value<V>)) -> Option<usize> {
+		let mut serializer = DagCborSizeSerializer::new();
+		item.serialize(&mut serializer).ok()?;
+		Some(serializer.size)
 	}
 }
 
@@ -419,7 +438,9 @@ where
 		let mut result = Self { active: Default::default(), settings: Default::default(), root: root.into(), storage };
 		if let Some(root) = result.root().await? {
 			result.settings = root.settings;
-			result.active = NodeStream::from_link(result.storage.clone(), root.active).try_collect().await?;
+			result.active = NodeStream::from_node(result.storage.clone(), root.active, None)
+				.try_collect()
+				.await?;
 		}
 		Ok(result)
 	}
@@ -440,6 +461,12 @@ where
 
 	/// Remove key.
 	pub async fn remove(&mut self, key: K) -> Result<(), StorageError> {
+		// special case: only active items: directly remove
+		if self.root.is_none() {
+			self.active.remove(&key);
+			return Ok(());
+		}
+
 		// insert tombstone to memory run
 		self.active.insert(key, Value::Tombstone);
 
@@ -1094,7 +1121,7 @@ async fn store_node<S, K, V>(
 	storage: &S,
 	max_node_entries: u64,
 	entries: impl Stream<Item = Result<(&K, &Value<V>), StorageError>>,
-) -> Result<OptionLink<Node<(K, Value<V>)>>, StorageError>
+) -> Result<Node<(K, Value<V>)>, StorageError>
 where
 	S: BlockStorage + Clone + 'static,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
@@ -1105,23 +1132,24 @@ where
 			.try_into()
 			.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
 		Default::default(),
-	);
+	)
+	.with_items_size_max(S::StoreParams::MAX_BLOCK_SIZE * 3 / 8);
 	pin_mut!(entries);
 	while let Some(item) = entries.try_next().await? {
-		node_builder.push(item).map_err(|e| StorageError::InvalidArgument(e.into()))?;
+		node_builder
+			.push((item.0.clone(), item.1.clone()))
+			.map_err(|e| StorageError::InvalidArgument(e.into()))?;
 		for block in node_builder.take_blocks() {
 			storage.set(block).await?;
 		}
 	}
-	let (root, blocks) = node_builder
-		.into_blocks()
-		.map_err(|e| StorageError::InvalidArgument(e.into()))?;
+	let (node, blocks) = node_builder.into_node().map_err(|e| StorageError::InvalidArgument(e.into()))?;
 	for block in blocks.into_iter() {
 		storage.set(block).await?;
 	}
 
 	// result
-	Ok(root.cid().into())
+	Ok(node)
 }
 
 /// Store `entries` as DAG and return the root [`cid::Cid`].
@@ -1320,10 +1348,11 @@ where
 
 #[cfg(test)]
 mod tests {
-	use super::LsmTreeMap;
+	use super::{LsmTreeMap, Value};
 	use crate::{
+		from_cbor,
 		library::{lsm_tree_map::LsmTreeStats, test::TestStorage},
-		LsmTreeMapSettings,
+		to_cbor, LsmTreeMapSettings,
 	};
 	use futures::TryStreamExt;
 
@@ -1469,5 +1498,20 @@ mod tests {
 		let mut not_default = LsmTreeMapSettings::default();
 		not_default.max_node_entries += 1;
 		assert!(!not_default.is_default());
+	}
+
+	#[test]
+	fn test_serialize_value() {
+		let empty_v = Value::<()>::Value(());
+		let v = Value::<u8>::Value(0);
+		let t = Value::<u8>::Tombstone;
+
+		// cbor
+		let v_cbor = to_cbor(&v).unwrap();
+		let empty_v_cbor = to_cbor(&empty_v).unwrap();
+		let t_cbor = to_cbor(&t).unwrap();
+		assert_eq!(from_cbor::<Value::<()>>(&empty_v_cbor).unwrap(), empty_v);
+		assert_eq!(from_cbor::<Value::<u8>>(&v_cbor).unwrap(), v);
+		assert_eq!(from_cbor::<Value::<u8>>(&t_cbor).unwrap(), t);
 	}
 }

@@ -1,7 +1,9 @@
-use crate::{library::lsm_tree_map::Root, BlockStorage, LsmTreeMap, OptionLink, StorageError};
+use super::lazy_transaction::Transactionable;
+use crate::{library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError};
+use async_trait::async_trait;
 use futures::{Stream, TryStreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{future::Future, hash::Hash};
+use std::{fmt::Debug, future::Future, hash::Hash};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(transparent)]
@@ -77,6 +79,13 @@ where
 		})
 	}
 
+	pub async fn open_lazy<S>(&self, storage: &S) -> Result<LazyTransaction<S, Self>, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		Ok(LazyTransaction::new(storage.clone(), self.clone()))
+	}
+
 	/// Commit transaction to this map.
 	pub async fn commit<S>(&mut self, mut transaction: CoSetTransaction<S, K>) -> Result<(), StorageError>
 	where
@@ -105,6 +114,18 @@ where
 {
 	fn default() -> Self {
 		Self(Default::default())
+	}
+}
+#[async_trait]
+impl<S, K> Transactionable<S> for CoSet<K>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	type Transaction = CoSetTransaction<S, K>;
+
+	async fn open(&self, storage: &S) -> Result<Self::Transaction, StorageError> {
+		CoSet::open(self, storage).await
 	}
 }
 
@@ -155,3 +176,58 @@ where
 /// * `CoSet<T, SetValZST>` (internal set representation)
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Default, Serialize, Deserialize)]
 struct SetValZST;
+
+#[cfg(test)]
+mod tests {
+	use crate::{library::test::TestStorage, CoSet};
+	use futures::TryStreamExt;
+
+	#[tokio::test]
+	async fn smoke() {
+		let storage = TestStorage::default();
+		let mut set = CoSet::<i32>::default();
+		let mut transaction = set.open(&storage).await.unwrap();
+		transaction.insert(1).await.unwrap();
+		transaction.insert(2).await.unwrap();
+		set.commit(transaction).await.unwrap();
+		assert_eq!(set.stream(&storage).try_collect::<Vec<i32>>().await.unwrap(), vec![1, 2]);
+	}
+
+	#[tokio::test]
+	async fn test_remove() {
+		let storage = TestStorage::default();
+		let mut set = CoSet::<i32>::default();
+		let mut transaction = set.open(&storage).await.unwrap();
+		transaction.insert(1).await.unwrap();
+		transaction.insert(2).await.unwrap();
+		transaction.insert(3).await.unwrap();
+		transaction.remove(1).await.unwrap();
+		set.commit(transaction).await.unwrap();
+		assert_eq!(set.stream(&storage).try_collect::<Vec<i32>>().await.unwrap(), vec![2, 3]);
+
+		let mut transaction = set.open(&storage).await.unwrap();
+		transaction.remove(3).await.unwrap();
+		set.commit(transaction).await.unwrap();
+		assert_eq!(set.stream(&storage).try_collect::<Vec<i32>>().await.unwrap(), vec![2]);
+	}
+
+	#[tokio::test]
+	async fn test_remove_large() {
+		let storage = TestStorage::default();
+		let mut set = CoSet::<i32>::default();
+		let mut transaction = set.open(&storage).await.unwrap();
+		let range = 0..131072;
+		for i in range.clone() {
+			transaction.insert(i).await.unwrap();
+		}
+		set.commit(transaction).await.unwrap();
+		let mut expect = range.collect::<Vec<i32>>();
+		assert_eq!(set.stream(&storage).try_collect::<Vec<i32>>().await.unwrap(), expect);
+
+		let mut transaction = set.open(&storage).await.unwrap();
+		transaction.remove(10).await.unwrap();
+		set.commit(transaction).await.unwrap();
+		expect.remove(10);
+		assert_eq!(set.stream(&storage).try_collect::<Vec<i32>>().await.unwrap(), expect);
+	}
+}

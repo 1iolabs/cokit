@@ -79,6 +79,38 @@ where
 			.await
 			.map_err(|e| CoreResolverError::Execute(reducer_action.core.clone(), e))?;
 
+		// log
+		#[cfg(feature = "logging-verbose")]
+		{
+			let previous_ipld = match core_state {
+				Some(core_state) if co_primitives::MultiCodec::is_cbor(core_state) => {
+					crate::ipld_resolve_recursive(storage, ipld_core::ipld::Ipld::Link(core_state), true).await?
+				},
+				_ => ipld_core::ipld::Ipld::Null,
+			};
+			let action_ipld = if co_primitives::MultiCodec::is_cbor(action) {
+				crate::ipld_resolve_recursive(storage, ipld_core::ipld::Ipld::Link(*action), true).await?
+			} else {
+				ipld_core::ipld::Ipld::Null
+			};
+			let next_ipld = match result.state {
+				Some(core_state) if co_primitives::MultiCodec::is_cbor(core_state) => {
+					crate::ipld_resolve_recursive(storage, ipld_core::ipld::Ipld::Link(core_state), true).await?
+				},
+				_ => ipld_core::ipld::Ipld::Null,
+			};
+			tracing::trace!(
+				core = reducer_action.core,
+				previous_cid = ?core_state,
+				?previous_ipld,
+				action_cid = ?action,
+				?action_ipld,
+				next_cid = ?result.state,
+				?next_ipld,
+				"core-execute"
+			);
+		}
+
 		// apply to root
 		if !root {
 			result.state = RuntimeDispatch::new(

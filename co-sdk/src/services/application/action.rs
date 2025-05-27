@@ -1,26 +1,27 @@
 use crate::{
-	library::create_reducer_action::new_reducer_action, types::message::heads::HeadsMessage, CoDate, CoStorage,
-	ReducerChangeContext,
+	library::create_reducer_action::new_reducer_action, services::reducer::FlushInfo,
+	types::message::heads::HeadsMessage, CoDate, CoStorage, ReducerChangeContext,
 };
 use co_identity::Message;
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoId, Did, Link, OptionLink, ReducerAction};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
-use futures::Stream;
+use futures::{stream::once, Stream, StreamExt};
 use ipld_core::ipld::Ipld;
 use libp2p::PeerId;
 use serde::Serialize;
-use std::{ops::Deref, sync::Arc};
+use std::{
+	future::{ready, Future},
+	ops::Deref,
+	sync::Arc,
+};
 
 #[derive(Debug, Clone)]
 pub enum Action {
 	/// Push core action.
-	CoreActionPush {
-		co: CoId,
-		action: ReducerAction<Ipld>,
-	},
+	CoreActionPush { co: CoId, action: ReducerAction<Ipld> },
 
-	/// Core action has been succesfully processed.
+	/// Core action has been succesfully processed (and flushed).
 	CoreAction {
 		co: CoId,
 		storage: CoStorage,
@@ -30,55 +31,28 @@ pub enum Action {
 	},
 
 	/// Core action has been failed.
-	CoreActionFailure {
-		co: CoId,
-		context: ReducerChangeContext,
-		action: ReducerAction<Ipld>,
-		err: ActionError,
-	},
+	CoreActionFailure { co: CoId, context: ReducerChangeContext, action: ReducerAction<Ipld>, err: ActionError },
 
 	/// Generic Error.
-	Error {
-		err: ActionError,
-	},
+	Error { err: ActionError },
 
 	/// Send invite request.
-	Invite {
-		co: CoId,
-		from: Did,
-		to: Did,
-	},
+	Invite { co: CoId, from: Did, to: Did },
 
 	/// Invite request has been sent to a peer.
-	InviteSent {
-		co: CoId,
-		participant: Did,
-		peer: PeerId,
-	},
+	InviteSent { co: CoId, participant: Did, peer: PeerId },
 
 	/// Join request has been sent to a peer.
-	JoinSent {
-		co: CoId,
-		encrypted: bool,
-		participant: Did,
-		peer: PeerId,
-	},
+	JoinSent { co: CoId, encrypted: bool, participant: Did, peer: PeerId },
 
 	/// Join completed.
-	Joined {
-		co: CoId,
-		participant: Did,
-		success: bool,
-		peer: Option<PeerId>,
-	},
+	Joined { co: CoId, participant: Did, success: bool, peer: Option<PeerId> },
 
 	/// Send Key Request to co (participants) or specified peer.
 	// KeyRequest { co: CoId, key: Option<String>, peer: Option<PeerId> },
 
 	/// Start network.
-	NetworkStart {
-		force_new_peer_id: bool,
-	},
+	NetworkStart { force_new_peer_id: bool },
 
 	/// Network has been started.
 	NetworkStarted,
@@ -92,24 +66,60 @@ pub enum Action {
 		/// The message.
 		message: EncodedMessage,
 	},
+
+	/// Sent result of the DIDComm message.
 	DidCommSent {
+		/// The message id for reference.
 		message_id: String,
+		/// Peer to send the message to.
 		peer: PeerId,
+		/// The send result.
 		result: Result<(), ActionError>,
 	},
 
 	/// Received a DIDComm message.
-	DidCommReceive {
-		peer: PeerId,
-		message: Message,
-	},
+	DidCommReceive { peer: PeerId, message: Message },
 
 	/// Received a HeadsMessage.
-	HeadsMessageReceived {
-		from: Option<Did>,
-		peer: PeerId,
+	HeadsMessageReceived { from: Option<Did>, peer: PeerId, message_id: String, message: HeadsMessage },
+
+	/// Send a DIDComm message to all connectable co peers.
+	CoDidCommSend {
+		/// The Co to send the message to.
+		co: CoId,
+
+		/// The message id for reference.
 		message_id: String,
-		message: HeadsMessage,
+
+		/// The message.
+		message: EncodedMessage,
+	},
+
+	/// Staged changes to a CO has been flushed.
+	CoFlush {
+		/// The flushed CO.
+		co: CoId,
+
+		/// Flush details.
+		info: FlushInfo,
+	},
+
+	/// Stage a action and dispatch after flush.
+	CoStaged { co: CoId, action: Box<Action> },
+
+	/// Co has been opened.
+	CoOpen {
+		/// The opened CO.
+		co: CoId,
+
+		/// Whether the co has a network feature.
+		network: bool,
+	},
+
+	/// Co has been closed.
+	CoClose {
+		/// The opened CO.
+		co: CoId,
 	},
 }
 impl Action {
@@ -176,6 +186,25 @@ impl Action {
 			Ok(_) => None,
 			Err(err) => Some(err.into()),
 		}
+	}
+
+	/// Map error to action ignoning the result value.
+	pub fn ignore_elements<T>(
+		stream: impl Stream<Item = Result<T, anyhow::Error>> + 'static,
+	) -> impl Stream<Item = Result<Action, anyhow::Error>> + 'static {
+		stream.filter_map(|item| {
+			ready(match item {
+				Ok(_) => None,
+				Err(err) => Some(Result::<Action, anyhow::Error>::Err(err)),
+			})
+		})
+	}
+
+	/// Map error to action ignoning the result value.
+	pub fn future_ignore_elements<T>(
+		fut: impl Future<Output = Result<T, anyhow::Error>> + 'static,
+	) -> impl Stream<Item = Result<Action, anyhow::Error>> + 'static {
+		Self::ignore_elements(once(fut))
 	}
 
 	/// Utility to create [`Action::CoreActionPush`] actions.

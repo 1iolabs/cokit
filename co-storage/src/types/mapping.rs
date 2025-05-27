@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use cid::Cid;
-use std::collections::BTreeMap;
+use co_primitives::MappedCid;
+use std::collections::BTreeSet;
 
 pub trait StorageContentMapping {
 	/// Convert the mapped [`Cid`] to an plain storage [`Cid`].
@@ -41,7 +42,7 @@ pub trait BlockStorageContentMapping: Send + Sync {
 	}
 
 	/// Insert mappings explicitly into storage.
-	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+	async fn insert_mappings(&self, mappings: BTreeSet<MappedCid>) {
 		let _mappings = mappings; // prevent warning
 	}
 }

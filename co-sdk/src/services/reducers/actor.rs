@@ -1,5 +1,8 @@
 use super::{ReducerRequest, ReducerStorage, ReducersControl};
-use crate::{types::co_reducer_factory::CoReducerFactoryError, CoContext, CoReducer, CO_ID_LOCAL};
+use crate::{
+	types::{co_reducer_context::CoReducerFeature, co_reducer_factory::CoReducerFactoryError},
+	Action, CoContext, CoReducer, CO_ID_LOCAL,
+};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle};
@@ -126,7 +129,7 @@ impl Actor for ReducersActor {
 
 				// get/create
 				if let Some(reducer) = state.reducers.get(&id) {
-					response.send(Ok(reducer.clone_with_detached_storage())).ok();
+					response.send(Ok(co_reducer_instance(&state.context, &reducer))).ok();
 				} else {
 					state.pending_requests.push_back(ReducerRequest::Request(id.clone(), response));
 					if state.pending_request_count(&id) == 1 {
@@ -159,7 +162,7 @@ impl Actor for ReducersActor {
 			ReducerRequest::RequestOpt(id, response) => {
 				if let Some(reducer) = state.reducers.get(&id) {
 					// use already created
-					response.send(Some(reducer.clone_with_detached_storage())).ok();
+					response.send(Some(co_reducer_instance(&state.context, &reducer))).ok();
 				} else if state.pending_request_count(&id) > 0 {
 					// wait if create is currently pending
 					state
@@ -171,23 +174,65 @@ impl Actor for ReducersActor {
 				}
 			},
 			ReducerRequest::Clear(response) => {
-				state.reducers.retain(|id, _| id.as_str() == CO_ID_LOCAL);
+				// remove
+				let mut remove = Vec::new();
+				state.reducers.retain(|retain_id, _| {
+					if retain_id.as_str() == CO_ID_LOCAL {
+						true
+					} else {
+						remove.push(retain_id.clone());
+						false
+					}
+				});
+
+				// notify
+				for id in remove {
+					state.context.inner.application().dispatch(Action::CoClose { co: id }).ok();
+				}
+
+				// response
 				response.send(Ok(())).ok();
 			},
 			ReducerRequest::ClearOne(id, response) => {
-				state.reducers.retain(|retain_id, _| retain_id != &id);
+				// remove
+				let mut remove = Vec::new();
+				state.reducers.retain(|retain_id, _| {
+					if retain_id == &id {
+						remove.push(retain_id.clone());
+						false
+					} else {
+						true
+					}
+				});
+
+				// notify
+				for id in remove {
+					state
+						.context
+						.inner
+						.application()
+						.dispatch(Action::CoClose { co: id.clone() })
+						.ok();
+				}
+
+				// response
 				response.send(Ok(())).ok();
 			},
 			ReducerRequest::Create(id, result) => {
 				// register
-				match &result {
+				let notification = match &result {
 					Ok(reducer) => {
 						state.reducers.insert(reducer.id().clone(), reducer.clone());
+						Some(Action::CoOpen {
+							co: id.clone(),
+							network: reducer.context.has_feature(&CoReducerFeature::Network),
+						})
 					},
 					Err(err) => {
 						tracing::error!(co = ?id, ?err, "co-reducer-failed");
+						None
 					},
-				}
+				};
 
 				// respond pending
 				let mut remove = state
@@ -207,7 +252,7 @@ impl Actor for ReducersActor {
 								response
 									.send(match result {
 										Err(err) => Err(err),
-										Ok(reducer) => Ok(reducer.clone_with_detached_storage()),
+										Ok(reducer) => Ok(co_reducer_instance(&state.context, &reducer)),
 									})
 									.ok();
 								break;
@@ -215,7 +260,7 @@ impl Actor for ReducersActor {
 								response
 									.send(match &result {
 										Err(err) => Err(co_reducerfactory_error_clone(err)),
-										Ok(reducer) => Ok(reducer.clone_with_detached_storage()),
+										Ok(reducer) => Ok(co_reducer_instance(&state.context, &reducer)),
 									})
 									.ok();
 							}
@@ -224,12 +269,17 @@ impl Actor for ReducersActor {
 							response
 								.send(match &result {
 									Err(_err) => None,
-									Ok(reducer) => Some(reducer.clone_with_detached_storage()),
+									Ok(reducer) => Some(co_reducer_instance(&state.context, &reducer)),
 								})
 								.ok();
 						},
 						_ => (),
 					}
+				}
+
+				// notify
+				if let Some(notification) = notification {
+					state.context.inner.application().dispatch(notification).ok();
 				}
 			},
 			ReducerRequest::CreateStorage(id, result) => {
@@ -273,6 +323,12 @@ impl Actor for ReducersActor {
 		}
 		return Ok(());
 	}
+}
+
+fn co_reducer_instance(context: &CoContext, root_instance: &CoReducer) -> CoReducer {
+	root_instance
+		.clone_with_detached_storage()
+		.with_overlay_storage(context.tasks(), context.inner.application_storage().clone())
 }
 
 fn co_reducerfactory_error_clone(err: &CoReducerFactoryError) -> CoReducerFactoryError {

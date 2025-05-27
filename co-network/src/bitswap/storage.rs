@@ -4,7 +4,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings};
+use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, MappedCid};
 use co_storage::{
 	BlockStat, BlockStorage, BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, StorageError,
 };
@@ -14,12 +14,7 @@ use libp2p::{
 	PeerId, Swarm,
 };
 use libp2p_bitswap::{BitswapEvent, QueryId};
-use std::{
-	collections::{BTreeMap, BTreeSet},
-	marker::PhantomData,
-	mem::swap,
-	time::Duration,
-};
+use std::{collections::BTreeSet, marker::PhantomData, mem::swap, time::Duration};
 use tokio_stream::StreamExt;
 
 pub struct NetworkBlockStorage<S, B, C, N, P> {
@@ -141,7 +136,7 @@ where
 	type StoreParams = S::StoreParams;
 
 	/// Returns a block from storage.
-	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		match self.next.get(cid).await {
 			Ok(block) => Ok(block),
@@ -155,19 +150,19 @@ where
 
 	/// Inserts a block into storage.
 	/// Returns the CID of the block (gurranted to be the same as the supplied).
-	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self, block), fields(cid = ?block.cid()))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, block), fields(cid = ?block.cid()))]
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		self.next.set(block).await
 	}
 
 	/// Remove a block.
-	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
 		self.next.remove(cid).await
 	}
 
 	/// Stat a block.
-	#[tracing::instrument(level = tracing::Level::TRACE, err, skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		match self.next.stat(cid).await {
 			Err(StorageError::NotFound(_, _)) if !self.settings.disallow_networking => {
@@ -188,6 +183,14 @@ where
 {
 	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
 		self.next.set_extended(block).await
+	}
+
+	async fn clear(&self) -> Result<(), StorageError> {
+		self.next.clear().await
+	}
+
+	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
+		self.next.exists(cid).await
 	}
 }
 impl<S, B, C, N, P> CloneWithBlockStorageSettings for NetworkBlockStorage<S, B, C, N, P>
@@ -230,7 +233,7 @@ where
 		self.next.to_mapped(plain).await
 	}
 
-	async fn insert_mappings(&self, mappings: BTreeMap<Cid, Cid>) {
+	async fn insert_mappings(&self, mappings: BTreeSet<MappedCid>) {
 		self.next.insert_mappings(mappings).await
 	}
 }

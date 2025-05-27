@@ -43,6 +43,15 @@ where
 		Self::new(storage, *link.cid())
 	}
 
+	pub fn from_node(storage: S, node: N, filter: Option<N::Filter>) -> Self {
+		let filter = filter.unwrap_or_default();
+		let (stack, entries) = match node.read(&filter) {
+			Either::Left(stack) => (stack.into_iter().collect(), Default::default()),
+			Either::Right(entries) => (Default::default(), entries.into_iter().collect()),
+		};
+		Self { storage, stack, entries, get: None, filter, reverse: false }
+	}
+
 	/// Iterate with filter.
 	pub fn with_filter(mut self, filter: N::Filter) -> Self {
 		self.filter = filter;
