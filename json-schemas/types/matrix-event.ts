@@ -31,20 +31,68 @@ export type MatrixEvent = {
       type: "m_receipt";
     }
   | {
-      content: StateType;
-      type: "State";
+      content: RoomNameContent;
+      type: "room_name";
     }
   | {
-      content: CallType;
-      type: "Call";
+      content: RoomTopicContent;
+      type: "room_topic";
     }
   | {
-      content: EphemeralType;
-      type: "Ephemeral";
+      content: RoomAvatarContent;
+      type: "room_avatar";
     }
   | {
-      content: UserType;
-      type: "User";
+      content: PinnedEventsContent;
+      type: "room_pinned_events";
+    }
+  | {
+      content: CallInviteContent;
+      type: "call_invite";
+    }
+  | {
+      content: AnswerCallContent;
+      type: "call_answer";
+    }
+  | {
+      content: CallCandidatesContent;
+      type: "call_candidates";
+    }
+  | {
+      content: SelectCallAnswerContent;
+      type: "call_select_answer";
+    }
+  | {
+      content: CallNegotiationContent;
+      type: "call_negotiate";
+    }
+  | {
+      content: RejectCallContent;
+      type: "call_reject";
+    }
+  | {
+      content: HangupCallContent;
+      type: "call_hangup";
+    }
+  | {
+      content: TypingContent;
+      type: "typing";
+    }
+  | {
+      content: PresenceContent;
+      type: "presence";
+    }
+  | {
+      content: PostUserStoryContent;
+      type: "user_story_post";
+    }
+  | {
+      content: ViewUserStoryContent;
+      type: "user_story_view";
+    }
+  | {
+      content: UpdateProfileContent;
+      type: "user_profile_update";
     }
 );
 /**
@@ -189,33 +237,49 @@ export type MessageType =
       new_content?: EventContent | null;
       relates_to?: RelatesTo | null;
     }
-  | (
-      | {
-          body: string;
-          info: PollCreationInfo;
-          is_silent?: boolean | null;
-          msgtype: "poll_start";
-          new_content?: EventContent | null;
-          relates_to?: RelatesTo | null;
-        }
-      | {
-          answers: string[];
-          body: string;
-          is_silent?: boolean | null;
-          msgtype: "poll_response";
-          new_content?: EventContent | null;
-          relates_to?: RelatesTo | null;
-        }
-      | {
-          body: string;
-          is_silent?: boolean | null;
-          msgtype: "poll_end";
-          new_content?: EventContent | null;
-          relates_to?: RelatesTo | null;
-        }
-    );
+  | {
+      body: string;
+      info: PollCreationInfo;
+      is_silent?: boolean | null;
+      msgtype: "poll_start";
+      new_content?: EventContent | null;
+      relates_to?: RelatesTo | null;
+    }
+  | {
+      answers: string[];
+      body: string;
+      is_silent?: boolean | null;
+      msgtype: "poll_response";
+      new_content?: EventContent | null;
+      relates_to?: RelatesTo | null;
+    }
+  | {
+      body: string;
+      is_silent?: boolean | null;
+      msgtype: "poll_end";
+      new_content?: EventContent | null;
+      relates_to?: RelatesTo | null;
+    };
 /**
  * Simple enum to fit the different possible contents. Unique event type string can be generated from this using pattern matching.
+ *
+ * # State events
+ *
+ * All events that in some way alter the state of a room
+ *
+ * - Room name - Room topic - Room avatar - Pinned events in room
+ *
+ * # Call Events
+ *
+ * All call events share the call_id, party_id and version fields call_id: A unique ID that that are used to determine which call events correspond to each other party_id: A unique ID to identify a call participant. May but not must be used for multiple calls. Must be unique across all participants. version: The version of the VoIP specs used for the message. This version is "1". A string is used for experimental versions.
+ *
+ * # Ephemeral events
+ *
+ * Ephemeral events are once-off events that do not need to be saved.
+ *
+ * # User events
+ *
+ * Events for interacting with users profiles
  */
 export type EventContent =
   | {
@@ -235,40 +299,6 @@ export type EventContent =
       type: "m_receipt";
     }
   | {
-      content: StateType;
-      type: "State";
-    }
-  | {
-      content: CallType;
-      type: "Call";
-    }
-  | {
-      content: EphemeralType;
-      type: "Ephemeral";
-    }
-  | {
-      content: UserType;
-      type: "User";
-    };
-/**
- * Simple enum containing all different types of relation that events can have to other events
- */
-export type RelationType = "annotation" | "replace" | "forward" | "thread" | "poll";
-/**
- * Receipt events are used to indicate that all messages up to a specific event have been read by a user.
- */
-export type ReceiptType =
-  | {
-      Public: PublicReceiptContent;
-    }
-  | {
-      Private: PrivateReceiptContent;
-    };
-/**
- * All events that in some way alter the state of a room
- */
-export type StateType =
-  | {
       content: RoomNameContent;
       type: "room_name";
     }
@@ -283,11 +313,7 @@ export type StateType =
   | {
       content: PinnedEventsContent;
       type: "room_pinned_events";
-    };
-/**
- * All call events share the call_id, party_id and version fields call_id: A unique ID that that are used to determine which call events correspond to each other party_id: A unique ID to identify a call participant. May but not must be used for multiple calls. Must be unique across all participants. version: The version of the VoIP specs used for the message. This version is "1". A string is used for experimental versions.
- */
-export type CallType =
+    }
   | {
       content: CallInviteContent;
       type: "call_invite";
@@ -315,6 +341,40 @@ export type CallType =
   | {
       content: HangupCallContent;
       type: "call_hangup";
+    }
+  | {
+      content: TypingContent;
+      type: "typing";
+    }
+  | {
+      content: PresenceContent;
+      type: "presence";
+    }
+  | {
+      content: PostUserStoryContent;
+      type: "user_story_post";
+    }
+  | {
+      content: ViewUserStoryContent;
+      type: "user_story_view";
+    }
+  | {
+      content: UpdateProfileContent;
+      type: "user_profile_update";
+    };
+/**
+ * Simple enum containing all different types of relation that events can have to other events
+ */
+export type RelationType = "annotation" | "replace" | "forward" | "thread" | "poll";
+/**
+ * Receipt events are used to indicate that all messages up to a specific event have been read by a user.
+ */
+export type ReceiptType =
+  | {
+      Public: PublicReceiptContent;
+    }
+  | {
+      Private: PrivateReceiptContent;
     };
 /**
  * Enum containg possible reasons for a hangup event
@@ -328,18 +388,6 @@ export type HangupCallReason =
   | "user_busy"
   | "unknown_error";
 /**
- * Ephemeral events are once-off events that do not need to be saved.
- */
-export type EphemeralType =
-  | {
-      content: TypingContent;
-      type: "typing";
-    }
-  | {
-      content: PresenceContent;
-      type: "presence";
-    };
-/**
  * Basic enum for possible presence states of a specific user
  *
  * Online: Default state when user is connected to an event stream
@@ -349,19 +397,6 @@ export type EphemeralType =
  * DnD: As 'Online' but the user doesn't want to be disturbed
  */
 export type PresenceType = "online" | "offline" | "dnd";
-export type UserType =
-  | {
-      content: PostUserStoryContent;
-      type: "user_story_post";
-    }
-  | {
-      content: ViewUserStoryContent;
-      type: "user_story_view";
-    }
-  | {
-      content: UpdateProfileContent;
-      type: "user_profile_update";
-    };
 export type PollKind = "disclosed" | "undisclosed" | "anonymous";
 
 /**
@@ -491,8 +526,17 @@ export interface PinnedEventsContent {
  */
 export interface CallInviteContent {
   call_id: string;
+  /**
+   * DID of the called user. Any user in room may answer if omitted
+   */
   invitee?: string | null;
+  /**
+   * Time in ms during which invite is valid after sending this event
+   */
   lifetime: number;
+  /**
+   * Session description object
+   */
   offer: SessionDescription;
   party_id: string;
   version: string;
@@ -536,6 +580,9 @@ export interface ICECandidate {
 export interface SelectCallAnswerContent {
   call_id: string;
   party_id: string;
+  /**
+   * party id of the participant whose answer has been selected
+   */
   selected_party_id: string;
   version: string;
 }
@@ -543,9 +590,18 @@ export interface SelectCallAnswerContent {
  * Event used to renegotiate between participants. First an offer containing a lifetime is sent. Other participants then send an answer. Offer and answer should never both be set. To ensure this they are not public to force the users to use the setters.
  */
 export interface CallNegotiationContent {
+  /**
+   * session description object for negotioation answers
+   */
   answer?: SessionDescription | null;
   call_id: string;
+  /**
+   * Time in ms before offer timeout
+   */
   lifetime?: number | null;
+  /**
+   * Session description object for negotioation offers
+   */
   offer?: SessionDescription | null;
   party_id: string;
   version: string;

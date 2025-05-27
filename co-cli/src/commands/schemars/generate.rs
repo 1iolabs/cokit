@@ -29,7 +29,7 @@ pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 			Module::Messaging => {
 				let schema = schemars::schema_for!(MatrixEvent);
 				write_schema_file(schema, command.output.clone() + "/schemas/matrix-event.json")?;
-				index_ts = format!("{}export * as MatrixEvent from \"./matrix-event.js\"\n", index_ts);
+				index_ts = format!("{}export * as Messaging from \"./matrix-event.js\"\n", index_ts);
 			},
 			Module::Room => {
 				let schema = schemars::schema_for!(Room);

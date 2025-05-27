@@ -2,6 +2,8 @@
 DIR="$( cd "$( dirname "$0" )" && pwd )"
 cd $DIR
 
+echo "==== Generating types script start ===="
+
 # clean folder
 rm -rf ./schemas/*
 rm -rf ./types/*

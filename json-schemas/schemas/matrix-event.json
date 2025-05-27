@@ -84,12 +84,12 @@
       ],
       "properties": {
         "content": {
-          "$ref": "#/definitions/StateType"
+          "$ref": "#/definitions/RoomNameContent"
         },
         "type": {
           "type": "string",
           "enum": [
-            "State"
+            "room_name"
           ]
         }
       }
@@ -102,12 +102,12 @@
       ],
       "properties": {
         "content": {
-          "$ref": "#/definitions/CallType"
+          "$ref": "#/definitions/RoomTopicContent"
         },
         "type": {
           "type": "string",
           "enum": [
-            "Call"
+            "room_topic"
           ]
         }
       }
@@ -120,12 +120,12 @@
       ],
       "properties": {
         "content": {
-          "$ref": "#/definitions/EphemeralType"
+          "$ref": "#/definitions/RoomAvatarContent"
         },
         "type": {
           "type": "string",
           "enum": [
-            "Ephemeral"
+            "room_avatar"
           ]
         }
       }
@@ -138,12 +138,228 @@
       ],
       "properties": {
         "content": {
-          "$ref": "#/definitions/UserType"
+          "$ref": "#/definitions/PinnedEventsContent"
         },
         "type": {
           "type": "string",
           "enum": [
-            "User"
+            "room_pinned_events"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "content",
+        "type"
+      ],
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/CallInviteContent"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "call_invite"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "content",
+        "type"
+      ],
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/AnswerCallContent"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "call_answer"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "content",
+        "type"
+      ],
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/CallCandidatesContent"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "call_candidates"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "content",
+        "type"
+      ],
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/SelectCallAnswerContent"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "call_select_answer"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "content",
+        "type"
+      ],
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/CallNegotiationContent"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "call_negotiate"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "content",
+        "type"
+      ],
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/RejectCallContent"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "call_reject"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "content",
+        "type"
+      ],
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/HangupCallContent"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "call_hangup"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "content",
+        "type"
+      ],
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/TypingContent"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "typing"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "content",
+        "type"
+      ],
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/PresenceContent"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "presence"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "content",
+        "type"
+      ],
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/PostUserStoryContent"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "user_story_post"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "content",
+        "type"
+      ],
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/ViewUserStoryContent"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "user_story_view"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": [
+        "content",
+        "type"
+      ],
+      "properties": {
+        "content": {
+          "$ref": "#/definitions/UpdateProfileContent"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "user_profile_update"
           ]
         }
       }
@@ -267,18 +483,25 @@
           "type": "string"
         },
         "invitee": {
+          "description": "DID of the called user. Any user in room may answer if omitted",
           "type": [
             "string",
             "null"
           ]
         },
         "lifetime": {
+          "description": "Time in ms during which invite is valid after sending this event",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
         },
         "offer": {
-          "$ref": "#/definitions/SessionDescription"
+          "description": "Session description object",
+          "allOf": [
+            {
+              "$ref": "#/definitions/SessionDescription"
+            }
+          ]
         },
         "party_id": {
           "type": "string"
@@ -298,6 +521,7 @@
       ],
       "properties": {
         "answer": {
+          "description": "session description object for negotioation answers",
           "anyOf": [
             {
               "$ref": "#/definitions/SessionDescription"
@@ -311,6 +535,7 @@
           "type": "string"
         },
         "lifetime": {
+          "description": "Time in ms before offer timeout",
           "type": [
             "integer",
             "null"
@@ -319,6 +544,7 @@
           "minimum": 0.0
         },
         "offer": {
+          "description": "Session description object for negotioation offers",
           "anyOf": [
             {
               "$ref": "#/definitions/SessionDescription"
@@ -336,9 +562,165 @@
         }
       }
     },
-    "CallType": {
-      "description": "All call events share the call_id, party_id and version fields call_id: A unique ID that that are used to determine which call events correspond to each other party_id: A unique ID to identify a call participant. May but not must be used for multiple calls. Must be unique across all participants. version: The version of the VoIP specs used for the message. This version is \"1\". A string is used for experimental versions.",
+    "Cid": {
+      "title": "Cid",
+      "type": "object",
+      "required": [
+        "/"
+      ],
+      "properties": {
+        "/": {
+          "type": "string"
+        }
+      }
+    },
+    "EventContent": {
+      "description": "Simple enum to fit the different possible contents. Unique event type string can be generated from this using pattern matching.\n\n# State events\n\nAll events that in some way alter the state of a room\n\n- Room name - Room topic - Room avatar - Pinned events in room\n\n# Call Events\n\nAll call events share the call_id, party_id and version fields call_id: A unique ID that that are used to determine which call events correspond to each other party_id: A unique ID to identify a call participant. May but not must be used for multiple calls. Must be unique across all participants. version: The version of the VoIP specs used for the message. This version is \"1\". A string is used for experimental versions.\n\n# Ephemeral events\n\nEphemeral events are once-off events that do not need to be saved.\n\n# User events\n\nEvents for interacting with users profiles",
       "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "content",
+            "type"
+          ],
+          "properties": {
+            "content": {
+              "$ref": "#/definitions/MessageType"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "m_room_message"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "content",
+            "type"
+          ],
+          "properties": {
+            "content": {
+              "$ref": "#/definitions/ReactionContent"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "m_reaction"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "content",
+            "type"
+          ],
+          "properties": {
+            "content": {
+              "$ref": "#/definitions/RedactionContent"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "m_room_redaction"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "content",
+            "type"
+          ],
+          "properties": {
+            "content": {
+              "$ref": "#/definitions/ReceiptType"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "m_receipt"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "content",
+            "type"
+          ],
+          "properties": {
+            "content": {
+              "$ref": "#/definitions/RoomNameContent"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "room_name"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "content",
+            "type"
+          ],
+          "properties": {
+            "content": {
+              "$ref": "#/definitions/RoomTopicContent"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "room_topic"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "content",
+            "type"
+          ],
+          "properties": {
+            "content": {
+              "$ref": "#/definitions/RoomAvatarContent"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "room_avatar"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "content",
+            "type"
+          ],
+          "properties": {
+            "content": {
+              "$ref": "#/definitions/PinnedEventsContent"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "room_pinned_events"
+              ]
+            }
+          }
+        },
         {
           "type": "object",
           "required": [
@@ -464,24 +846,7 @@
               ]
             }
           }
-        }
-      ]
-    },
-    "Cid": {
-      "title": "Cid",
-      "type": "object",
-      "required": [
-        "/"
-      ],
-      "properties": {
-        "/": {
-          "type": "string"
-        }
-      }
-    },
-    "EphemeralType": {
-      "description": "Ephemeral events are once-off events that do not need to be saved.",
-      "oneOf": [
+        },
         {
           "type": "object",
           "required": [
@@ -517,12 +882,7 @@
               ]
             }
           }
-        }
-      ]
-    },
-    "EventContent": {
-      "description": "Simple enum to fit the different possible contents. Unique event type string can be generated from this using pattern matching.",
-      "oneOf": [
+        },
         {
           "type": "object",
           "required": [
@@ -531,12 +891,12 @@
           ],
           "properties": {
             "content": {
-              "$ref": "#/definitions/MessageType"
+              "$ref": "#/definitions/PostUserStoryContent"
             },
             "type": {
               "type": "string",
               "enum": [
-                "m_room_message"
+                "user_story_post"
               ]
             }
           }
@@ -549,12 +909,12 @@
           ],
           "properties": {
             "content": {
-              "$ref": "#/definitions/ReactionContent"
+              "$ref": "#/definitions/ViewUserStoryContent"
             },
             "type": {
               "type": "string",
               "enum": [
-                "m_reaction"
+                "user_story_view"
               ]
             }
           }
@@ -567,102 +927,12 @@
           ],
           "properties": {
             "content": {
-              "$ref": "#/definitions/RedactionContent"
+              "$ref": "#/definitions/UpdateProfileContent"
             },
             "type": {
               "type": "string",
               "enum": [
-                "m_room_redaction"
-              ]
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "content",
-            "type"
-          ],
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/ReceiptType"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "m_receipt"
-              ]
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "content",
-            "type"
-          ],
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/StateType"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "State"
-              ]
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "content",
-            "type"
-          ],
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/CallType"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "Call"
-              ]
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "content",
-            "type"
-          ],
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/EphemeralType"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "Ephemeral"
-              ]
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "content",
-            "type"
-          ],
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/UserType"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "User"
+                "user_profile_update"
               ]
             }
           }
@@ -733,15 +1003,56 @@
     },
     "HangupCallReason": {
       "description": "Enum containg possible reasons for a hangup event",
-      "type": "string",
-      "enum": [
-        "ice_failed",
-        "ice_timeout",
-        "invite_timeout",
-        "user_hangup",
-        "user_media_failed",
-        "user_busy",
-        "unknown_error"
+      "oneOf": [
+        {
+          "description": "ICE negotiation has failed and connection could not be established",
+          "type": "string",
+          "enum": [
+            "ice_failed"
+          ]
+        },
+        {
+          "description": "Connection failed after some media was exchanged. Includes when renegotiation fails if media was sent prviously",
+          "type": "string",
+          "enum": [
+            "ice_timeout"
+          ]
+        },
+        {
+          "description": "The other party did not answer in time",
+          "type": "string",
+          "enum": [
+            "invite_timeout"
+          ]
+        },
+        {
+          "description": "User actively chooses to end the call",
+          "type": "string",
+          "enum": [
+            "user_hangup"
+          ]
+        },
+        {
+          "description": "Client was unable to start capturing media in such a way that it is unable to continue the call",
+          "type": "string",
+          "enum": [
+            "user_media_failed"
+          ]
+        },
+        {
+          "description": "User is busy. Exists primarily for bridging and does not include when user is in a call already",
+          "type": "string",
+          "enum": [
+            "user_busy"
+          ]
+        },
+        {
+          "description": "Some other error occured that is not described by the above",
+          "type": "string",
+          "enum": [
+            "unknown_error"
+          ]
+        }
       ]
     },
     "ICECandidate": {
@@ -1323,161 +1634,144 @@
         {
           "description": "All events that interact with or create a poll",
           "type": "object",
-          "oneOf": [
-            {
-              "description": "Event used to create a poll.",
-              "type": "object",
-              "required": [
-                "body",
-                "info",
-                "msgtype"
-              ],
-              "properties": {
-                "body": {
-                  "type": "string"
-                },
-                "info": {
-                  "$ref": "#/definitions/PollCreationInfo"
-                },
-                "is_silent": {
-                  "type": [
-                    "boolean",
-                    "null"
-                  ]
-                },
-                "msgtype": {
-                  "type": "string",
-                  "enum": [
-                    "poll_start"
-                  ]
-                },
-                "new_content": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/definitions/EventContent"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "relates_to": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/definitions/relates_to"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              }
-            },
-            {
-              "type": "object",
-              "required": [
-                "answers",
-                "body",
-                "msgtype"
-              ],
-              "properties": {
-                "answers": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "body": {
-                  "type": "string"
-                },
-                "is_silent": {
-                  "type": [
-                    "boolean",
-                    "null"
-                  ]
-                },
-                "msgtype": {
-                  "type": "string",
-                  "enum": [
-                    "poll_response"
-                  ]
-                },
-                "new_content": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/definitions/EventContent"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "relates_to": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/definitions/relates_to"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              }
-            },
-            {
-              "description": "Event that closes the poll. For undisclosed and anonymous polls, this is the point where the reults are shown.",
-              "type": "object",
-              "required": [
-                "body",
-                "msgtype"
-              ],
-              "properties": {
-                "body": {
-                  "type": "string"
-                },
-                "is_silent": {
-                  "type": [
-                    "boolean",
-                    "null"
-                  ]
-                },
-                "msgtype": {
-                  "type": "string",
-                  "enum": [
-                    "poll_end"
-                  ]
-                },
-                "new_content": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/definitions/EventContent"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "relates_to": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/definitions/relates_to"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                }
-              }
-            }
-          ],
           "required": [
+            "body",
+            "info",
             "msgtype"
           ],
           "properties": {
+            "body": {
+              "type": "string"
+            },
+            "info": {
+              "$ref": "#/definitions/PollCreationInfo"
+            },
+            "is_silent": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
             "msgtype": {
               "type": "string",
               "enum": [
-                "Poll"
+                "poll_start"
+              ]
+            },
+            "new_content": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/EventContent"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "relates_to": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/relates_to"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "answers",
+            "body",
+            "msgtype"
+          ],
+          "properties": {
+            "answers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "body": {
+              "type": "string"
+            },
+            "is_silent": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "msgtype": {
+              "type": "string",
+              "enum": [
+                "poll_response"
+              ]
+            },
+            "new_content": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/EventContent"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "relates_to": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/relates_to"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "description": "Event that closes the poll. For undisclosed and anonymous polls, this is the point where the reults are shown.",
+          "type": "object",
+          "required": [
+            "body",
+            "msgtype"
+          ],
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "is_silent": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "msgtype": {
+              "type": "string",
+              "enum": [
+                "poll_end"
+              ]
+            },
+            "new_content": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/EventContent"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "relates_to": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/relates_to"
+                },
+                {
+                  "type": "null"
+                }
               ]
             }
           }
@@ -1863,6 +2157,7 @@
           "type": "string"
         },
         "selected_party_id": {
+          "description": "party id of the participant whose answer has been selected",
           "type": "string"
         },
         "version": {
@@ -1885,83 +2180,6 @@
           "type": "string"
         }
       }
-    },
-    "StateType": {
-      "description": "All events that in some way alter the state of a room",
-      "oneOf": [
-        {
-          "type": "object",
-          "required": [
-            "content",
-            "type"
-          ],
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/RoomNameContent"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "room_name"
-              ]
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "content",
-            "type"
-          ],
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/RoomTopicContent"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "room_topic"
-              ]
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "content",
-            "type"
-          ],
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/RoomAvatarContent"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "room_avatar"
-              ]
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "content",
-            "type"
-          ],
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/PinnedEventsContent"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "room_pinned_events"
-              ]
-            }
-          }
-        }
-      ]
     },
     "ThumbnailInfo": {
       "description": "Contains metadata of images used as a thumbnail",
@@ -2037,64 +2255,6 @@
           "type": "string"
         }
       }
-    },
-    "UserType": {
-      "oneOf": [
-        {
-          "type": "object",
-          "required": [
-            "content",
-            "type"
-          ],
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/PostUserStoryContent"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "user_story_post"
-              ]
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "content",
-            "type"
-          ],
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/ViewUserStoryContent"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "user_story_view"
-              ]
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": [
-            "content",
-            "type"
-          ],
-          "properties": {
-            "content": {
-              "$ref": "#/definitions/UpdateProfileContent"
-            },
-            "type": {
-              "type": "string",
-              "enum": [
-                "user_profile_update"
-              ]
-            }
-          }
-        }
-      ]
     },
     "VideoInfo": {
       "description": "Contains metadata of video files",
