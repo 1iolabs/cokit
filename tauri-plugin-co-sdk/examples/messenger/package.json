@@ -12,10 +12,12 @@
     "lint": "npx tslint --project . && npx nplint",
     "tauri": "tauri",
     "tauri-dev": "npm run tauri dev -- --no-watch",
+    "tauri-build": "npm run tauri -- -v build -b app -d",
     "clean": "npx rimraf -rf ./dist",
     "rollup": "npx cross-env NODE_ENV=development kui-application build -o ./dist/ui",
     "sass": "sass ./src/plugins -w -q --no-verbose",
-    "rollup-watch": "npm run rollup -- -w"
+    "rollup-watch": "npm run rollup -- -w",
+    "start-messenger": "open ../../../target/debug/bundle/macos/CO\\ Messenger\\ Demo.app --args --no-keychain --base-path ~/Library/Application\\ Support/co.app.1io2.co"
   },
   "files": [
     "**/*.css",
@@ -96,6 +98,7 @@
     "@tauri-apps/plugin-shell": "^2.2.0",
     "@types/babel-core": "^6.25.10",
     "clsx": "^2.1.1",
+    "ipfs-unixfs": "^11.2.1",
     "moment": "^2.30.1",
     "multiformats": "^13.1.1",
     "react": "^16.14.0",
