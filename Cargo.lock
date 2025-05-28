@@ -1887,6 +1887,7 @@ dependencies = [
  "derive_more",
  "directories",
  "example-counter",
+ "example-counter-upgraded",
  "futures",
  "futures-util",
  "hmac 0.12.1",
@@ -3389,6 +3390,25 @@ dependencies = [
 [[package]]
 name = "example-counter"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid 0.11.1",
+ "co-api",
+ "co-primitives",
+ "co-runtime",
+ "co-sdk",
+ "co-storage",
+ "ipld-core",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "example-counter-upgraded"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",

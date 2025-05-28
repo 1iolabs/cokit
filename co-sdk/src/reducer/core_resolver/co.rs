@@ -11,7 +11,7 @@ use co_primitives::ReducerAction;
 use co_runtime::{Core, RuntimeContext, RuntimePool};
 use co_storage::{BlockStorage, BlockStorageExt, ExtendedBlockStorage};
 use ipld_core::ipld::Ipld;
-use serde::de::IgnoredAny;
+use serde::Deserialize;
 use std::collections::HashMap;
 
 /// Resolve action core assuming the Co root state is to [`co_core_co::Co`].
@@ -39,7 +39,9 @@ impl CoCoreResolver {
 	where
 		S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 	{
-		let (_, state, core) = self.core_state_binary(storage, state, CO_CORE_NAME_CO).await?;
+		let (_root, _name, state, core) = self
+			.core_state_binary(storage, state, CoreSource::Name(CO_CORE_NAME_CO))
+			.await?;
 		let mut dispatch = RuntimeDispatch::new(
 			LocalIdentity::device().boxed(),
 			runtime.clone(),
@@ -58,29 +60,67 @@ impl CoCoreResolver {
 		&self,
 		storage: &S,
 		state: &Option<Cid>,
-		core: &str,
-	) -> Result<(bool, Option<Cid>, Core), CoreResolverError>
+		core: CoreSource<'_>,
+	) -> Result<(bool, String, Option<Cid>, Core), CoreResolverError>
 	where
 		S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 	{
-		// get root state
-		let co_state: co_core_co::Co = storage.get_default(state).await?;
+		// get core source
+		let core_name = match core {
+			CoreSource::Name(name) => name.to_owned(),
+			CoreSource::Action(action) => {
+				let reducer_action: CoreReducerAction = storage
+					.get_deserialized(&action)
+					.await
+					.map_err(|e| CoreResolverError::InvalidArgument(e.into()))
+					.context("resolving CoreReducerAction")?;
+				reducer_action.core
+			},
+		};
 
-		// get state and binary
-		let root = core == CO_CORE_NAME_CO;
-		let (core_state, core_binary) = if root {
-			(*state, co_state.binary)
+		let root = core_name == CO_CORE_NAME_CO;
+		let (core_name, core_state, core_binary) = if root {
+			let co_binary = if state.is_none() {
+				// in case we have no co state we expect the action is a create
+				// we need to use the binary from the create call because the creator is allowed to create a co with an
+				// older/newer core than the buildin
+				let action = match core {
+					CoreSource::Name(_) => {
+						return Err(CoreResolverError::InvalidArgument(anyhow::anyhow!("No co core binary")))
+					},
+					CoreSource::Action(cid) => cid,
+				};
+				let co_action: ReducerAction<CoAction> = storage
+					.get_deserialized(&action)
+					.await
+					.map_err(|e| CoreResolverError::InvalidArgument(e.into()))
+					.context("resolving CoAction::Create")?;
+				match co_action.payload {
+					CoAction::Create { id: _, name: _, cores: _, participants: _, key: _, binary } => binary,
+					_ => {
+						return Err(CoreResolverError::InvalidArgument(anyhow::anyhow!(
+							"Execute before CoAction::Create"
+						)))
+					},
+				}
+			} else {
+				// get co core binary from state
+				let co_state: co_core_co::Co = storage.get_default(state).await?;
+				co_state.binary
+			};
+			(core_name, *state, co_binary)
 		} else {
-			// get core
+			// get core binary from state
+			let co_state: co_core_co::Co = storage.get_default(state).await?;
 			let core: &co_core_co::Core = co_state
 				.cores
-				.get(core)
-				.ok_or_else(|| CoreResolverError::CoreNotFound(core.to_owned()))?;
-			(core.state, core.binary)
+				.get(&core_name)
+				.ok_or_else(|| CoreResolverError::CoreNotFound(core_name.clone()))?;
+			(core_name, core.state, core.binary)
 		};
 
 		// result
-		Ok((root, core_state, self.core(core_binary)))
+		Ok((root, core_name, core_state, self.core(core_binary)))
 	}
 
 	async fn migrate<S>(
@@ -95,7 +135,7 @@ impl CoCoreResolver {
 		S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 	{
 		// get core
-		let (root, core_state, core) = self.core_state_binary(storage, state, core_name).await?;
+		let (root, _, core_state, core) = self.core_state_binary(storage, state, CoreSource::Name(core_name)).await?;
 
 		// read migrate
 		let migrate: Ipld = storage.get_deserialized(migrate).await?;
@@ -140,21 +180,15 @@ where
 		state: &Option<Cid>,
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
-		// get action
-		let reducer_action: ReducerAction<IgnoredAny> = storage
-			.get_deserialized(action)
-			.await
-			.map_err(|e| CoreResolverError::InvalidArgument(e.into()))
-			.context("resolving action")?;
-
 		// find core
-		let (root, core_state, core) = self.core_state_binary(storage, state, &reducer_action.core).await?;
+		let (root, core_name, core_state, core) =
+			self.core_state_binary(storage, state, CoreSource::Action(*action)).await?;
 
 		// apply to state
 		let mut result = runtime
 			.execute(storage, &core, RuntimeContext::new(core_state, action.into()))
 			.await
-			.map_err(|e| CoreResolverError::Execute(reducer_action.core.clone(), e))?;
+			.map_err(|e| CoreResolverError::Execute(core_name.clone(), e))?;
 
 		// log
 		#[cfg(feature = "logging-verbose")]
@@ -177,7 +211,7 @@ where
 				_ => ipld_core::ipld::Ipld::Null,
 			};
 			tracing::trace!(
-				core = reducer_action.core,
+				core = core_name,
 				previous_cid = ?core_state,
 				?previous_ipld,
 				action_cid = ?action,
@@ -191,7 +225,7 @@ where
 		// apply to root
 		if !root {
 			result.state = self
-				.apply_core_state_to_root(storage, runtime.clone(), state, reducer_action.core, result.state)
+				.apply_core_state_to_root(storage, runtime.clone(), state, core_name, result.state)
 				.await?;
 		}
 
@@ -216,4 +250,17 @@ where
 		// result
 		Ok(result)
 	}
+}
+
+enum CoreSource<'a> {
+	Name(&'a str),
+	Action(Cid),
+}
+
+/// Onyl extracts the core of an reducer action.
+/// See: [`co_primitives::ReducerAction`]
+#[derive(Debug, Deserialize)]
+struct CoreReducerAction {
+	#[serde(rename = "c")]
+	core: String,
 }

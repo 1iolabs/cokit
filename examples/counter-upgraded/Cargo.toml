@@ -1,0 +1,25 @@
+[package]
+name = "example-counter-upgraded"
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.76"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+anyhow = { workspace = true }
+cid = { workspace = true }
+co-api = { path = "../../co-api" }
+ipld-core = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+co-primitives = { path = "../../co-primitives" }
+co-runtime = { path = "../../co-runtime" }
+co-sdk = { path = "../../co-sdk" }
+co-storage = { path = "../../co-storage" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
