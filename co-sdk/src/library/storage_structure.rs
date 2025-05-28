@@ -31,7 +31,7 @@ pub async fn storage_structure<S, D>(
 	storage: &D,
 	max_duration: Option<Duration>,
 	filter: Option<BTreeSet<Cid>>,
-	structure_resolver: &impl StructureResolver<S, D>,
+	structure_resolver: &mut impl StructureResolver<S, D>,
 ) -> Result<(OptionLink<Co>, BTreeSet<Cid>), anyhow::Error>
 where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
@@ -42,14 +42,13 @@ where
 	let mut result = BTreeSet::new();
 
 	// get shallow references
-	let mut query_blocks_index_shallow = query_core::<co_core_storage::Storage>(CO_CORE_NAME_STORAGE)
+	let block_structure_pending = query_core::<co_core_storage::Storage>(CO_CORE_NAME_STORAGE)
 		.with_default()
-		.map(|storage_core| storage_core.blocks_index_shallow);
-	let blocks_index_shallow = query_blocks_index_shallow
+		.map(|storage_core| storage_core.block_structure_pending)
 		.execute(storage_core_storage, storage_core_state)
 		.await?;
-	let shallow = blocks_index_shallow.stream(storage_core_storage);
-	pin_mut!(shallow);
+	let block_structure_pending_stream = block_structure_pending.stream(storage_core_storage);
+	pin_mut!(block_structure_pending_stream);
 
 	// resolve
 	let start = Instant::now();
@@ -60,7 +59,7 @@ where
 	let mut num_skip_failure = 0;
 	let mut num_skip_filter = 0;
 	let mut num_skip_structure_resolver = 0;
-	while let Some((cid, info)) = shallow.try_next().await? {
+	while let Some((cid, pending)) = block_structure_pending_stream.try_next().await? {
 		num_visited += 1;
 
 		// filter
@@ -72,14 +71,17 @@ where
 		}
 
 		// structure
-		let StructureResolveResult::Include(links) =
-			structure_resolver.resolve(storage_core_storage, &info, storage, &cid).await?
+		let StructureResolveResult::Include(links) = structure_resolver
+			.resolve(storage_core_storage, pending.info(), storage, &cid)
+			.await?
 		else {
 			num_skip_structure_resolver += 1;
 			continue;
 		};
 
 		// skip if not exists in this storage
+		//  this also skips blocks that are not yet or will be never available on device
+		//  because tehy are just referenced but not fetched from network.
 		if !storage.exists(&cid).await? {
 			num_skip_exists += 1;
 			continue;
@@ -116,8 +118,7 @@ where
 
 		// dispatch
 		//  TODO: combine actions?
-		let action =
-			StorageAction::ReferenceStructure(vec![(cid, external_links.into_iter().map(WeakCid::from).collect())]);
+		let action = StorageAction::Structure(vec![(cid, external_links.into_iter().map(WeakCid::from).collect())]);
 		result_state = storage_core_dispatcher.dispatch(&action).await?.into();
 		num_resolved += 1;
 
@@ -157,7 +158,7 @@ pub async fn storage_structure_recursive<S, D>(
 	storage_core_state: OptionLink<Co>,
 	storage: &D,
 	max_duration: Option<Duration>,
-	structure_resolver: &impl StructureResolver<S, D>,
+	structure_resolver: &mut impl StructureResolver<S, D>,
 ) -> Result<(), anyhow::Error>
 where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
@@ -213,7 +214,7 @@ pub enum StructureResolveResult {
 #[async_trait]
 pub trait StructureResolver<S, D>: Send + Sync {
 	async fn resolve(
-		&self,
+		&mut self,
 		storage_core_storage: &S,
 		info: &BlockInfo,
 		item_storage: &D,
@@ -241,7 +242,7 @@ where
 	D: BlockStorage + Clone + 'static,
 {
 	async fn resolve(
-		&self,
+		&mut self,
 		storage_core_storage: &S,
 		info: &BlockInfo,
 		item_storage: &D,
@@ -249,7 +250,7 @@ where
 	) -> Result<StructureResolveResult, anyhow::Error> {
 		let pins: BTreeSet<String> = info.pins.stream(storage_core_storage).try_collect().await?;
 		if pins.contains(&self.log_pin) {
-			let links = if info.root {
+			let links = if info.block_type.is_root() {
 				let next_heads = extract_next_heads(item_storage, [item], true).await?;
 				self.block_links.clone().with_filter(IgnoreFilter::new(next_heads))
 			} else {

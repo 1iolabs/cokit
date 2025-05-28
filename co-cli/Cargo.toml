@@ -17,6 +17,7 @@ co-core-keystore = { path = "../cores/keystore" }
 co-core-membership = { path = "../cores/membership" }
 co-core-pin = { path = "../cores/pin" }
 co-core-room = { path = "../cores/room" }
+co-core-storage = { path = "../cores/storage" }
 co-log = { path = "../co-log" }
 co-messaging = { path = "../co-messaging" }
 co-primitives = { path = "../co-primitives" }
@@ -29,10 +30,10 @@ futures = { workspace = true }
 hexdump = "0.1.1"
 ipld-core = { workspace = true }
 opentelemetry = "0.22"
-opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.15.0", features = ["tonic"] }
 opentelemetry-semantic-conventions = "0.14.0"
 opentelemetry-stdout = { version = "0.3.0", features = ["trace"] }
+opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
 schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_ipld_dagcbor = { workspace = true }

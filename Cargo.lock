@@ -1499,6 +1499,7 @@ dependencies = [
  "co-core-membership",
  "co-core-pin",
  "co-core-room",
+ "co-core-storage",
  "co-log",
  "co-messaging",
  "co-primitives",

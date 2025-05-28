@@ -155,6 +155,7 @@ where
 	}
 
 	pub fn with_items_size_max(mut self, items_size_max: usize) -> Self {
+		debug_assert!(items_size_max > 0);
 		self.items_size_max = items_size_max;
 		self
 	}
@@ -176,6 +177,13 @@ where
 		}
 
 		// done
+		Ok(())
+	}
+
+	pub fn extend(&mut self, items: impl IntoIterator<Item = T>) -> Result<(), NodeBuilderError> {
+		for item in items {
+			self.push(item)?;
+		}
 		Ok(())
 	}
 
