@@ -177,6 +177,16 @@ pub enum CoAction {
 		core: String,
 		state: Option<Cid>,
 	},
+	CoreUpgrade {
+		core: String,
+
+		/// The new binary.
+		binary: Cid,
+
+		/// Migrate action.
+		/// Must deserialize to a action using the new `binary`.
+		migrate: Option<Cid>,
+	},
 	CoreTagsInsert {
 		core: String,
 		tags: Tags,
@@ -216,6 +226,7 @@ impl Reducer for Co {
 				reduce_participant_tags_remove(&mut result, participant, tags)
 			},
 			CoAction::CoreChange { core, state } => reduce_core_change(&mut result, core, state),
+			CoAction::CoreUpgrade { core, binary, migrate } => reduce_core_upgrade(&mut result, core, binary, migrate),
 			CoAction::CoreTagsInsert { core, tags } => reduce_core_tags_insert(&mut result, core, tags),
 			CoAction::CoreTagsRemove { core, tags } => reduce_core_tags_remove(&mut result, core, tags),
 			CoAction::TagsInsert { tags } => reduce_tags_insert(&mut result, tags),
@@ -301,11 +312,11 @@ fn reduce_participant_remove(result: &mut Co, participant: &String, tags: &Tags)
 	}
 }
 
-fn reduce_heads(result: &mut Co, heads: &BTreeSet<cid::CidGeneric<64>>) {
+fn reduce_heads(result: &mut Co, heads: &BTreeSet<Cid>) {
 	result.heads = heads.clone();
 }
 
-fn reduce_core_create(result: &mut Co, core: &String, binary: &cid::CidGeneric<64>, tags: &Tags) {
+fn reduce_core_create(result: &mut Co, core: &String, binary: &Cid, tags: &Tags) {
 	if !result.cores.contains_key(core) {
 		result
 			.cores
@@ -329,7 +340,13 @@ fn reduce_participant_tags_remove(result: &mut Co, participant: &String, tags: &
 	}
 }
 
-fn reduce_core_change(result: &mut Co, core: &String, state: &Option<cid::CidGeneric<64>>) {
+fn reduce_core_upgrade(result: &mut Co, core: &String, binary: &Cid, _migrate: &Option<Cid>) {
+	if let Some(core) = result.cores.get_mut(core) {
+		core.binary = *binary;
+	}
+}
+
+fn reduce_core_change(result: &mut Co, core: &String, state: &Option<Cid>) {
 	if let Some(core) = result.cores.get_mut(core) {
 		core.state = *state;
 	}
