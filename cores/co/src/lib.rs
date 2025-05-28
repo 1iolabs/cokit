@@ -194,119 +194,172 @@ impl Reducer for Co {
 		let mut result = self;
 		match &event.payload {
 			CoAction::Create { id, name, cores, participants, key: key_id } => {
-				// only allowed for empty COs
-				// id can not be changed afterwards
-				if result.id.as_str().is_empty() {
-					result.id = id.to_owned();
-					result.name = name.to_owned();
-					result.cores = cores.to_owned();
-					result.participants = participants.to_owned();
-					result.keys = key_id
-						.as_ref()
-						.map(|key_id| vec![Key { id: key_id.to_owned(), state: KeyState::Active }]);
-				}
+				reduce_create(&mut result, id, name, cores, participants, key_id)
 			},
 			CoAction::ParticipantInvite { participant, tags } => {
-				if let Some(item) = result.participants.get_mut(participant) {
-					match item.state {
-						ParticipantState::Pending | ParticipantState::Inactive => {
-							item.state = ParticipantState::Invite;
-							item.tags.append(&mut tags.clone());
-						},
-						_ => {
-							// we don't go back from active to invite
-						},
-					}
-				} else {
-					result.participants.insert(
-						participant.clone(),
-						Participant { did: participant.clone(), state: ParticipantState::Invite, tags: tags.clone() },
-					);
-				}
+				reduce_participant_invite(&mut result, participant, tags)
 			},
-			CoAction::ParticipantJoin { participant, tags } => {
-				if let Some(participant) = result.participants.get_mut(participant) {
-					participant.state = ParticipantState::Active;
-					participant.tags.append(&mut tags.clone());
-				}
-			},
+			CoAction::ParticipantJoin { participant, tags } => reduce_participant_join(&mut result, participant, tags),
 			CoAction::ParticipantPending { participant, tags } => {
-				if !result.participants.contains_key(participant) {
-					result.participants.insert(
-						participant.clone(),
-						Participant { did: participant.clone(), state: ParticipantState::Pending, tags: tags.clone() },
-					);
-				}
+				reduce_participant_pending(&mut result, participant, tags)
 			},
 			CoAction::ParticipantRemove { participant, tags } => {
-				let remove = if let Some(item) = result.participants.get_mut(participant) {
-					match item.state {
-						ParticipantState::Pending => true,
-						_ => {
-							item.state = ParticipantState::Inactive;
-							item.tags.append(&mut tags.clone());
-							false
-						},
-					}
-				} else {
-					false
-				};
-				if remove {
-					result.participants.remove(participant);
-				}
+				reduce_participant_remove(&mut result, participant, tags)
 			},
-			CoAction::Heads { heads } => {
-				result.heads = heads.clone();
-			},
-			CoAction::CoreCreate { core, binary, tags } => {
-				if !result.cores.contains_key(core) {
-					result
-						.cores
-						.insert(core.clone(), Core { binary: *binary, tags: tags.clone(), state: None });
-				}
-			},
-			CoAction::CoreRemove { core } => {
-				result.cores.remove(core);
-			},
+			CoAction::Heads { heads } => reduce_heads(&mut result, heads),
+			CoAction::CoreCreate { core, binary, tags } => reduce_core_create(&mut result, core, binary, tags),
+			CoAction::CoreRemove { core } => reduce_core_remove(&mut result, core),
 			CoAction::ParticipantTagsInsert { participant, tags } => {
-				if let Some(participant) = result.participants.get_mut(participant) {
-					participant.tags.append(&mut tags.clone());
-				}
+				reduce_participant_tags_insert(&mut result, participant, tags)
 			},
 			CoAction::ParticipantTagsRemove { participant, tags } => {
-				if let Some(participant) = result.participants.get_mut(participant) {
-					participant.tags.clear(Some(tags));
-				}
+				reduce_participant_tags_remove(&mut result, participant, tags)
 			},
-			CoAction::CoreChange { core, state } => {
-				if let Some(core) = result.cores.get_mut(core) {
-					core.state = *state;
-				}
-			},
-			CoAction::CoreTagsInsert { core, tags } => {
-				if let Some(core) = result.cores.get_mut(core) {
-					core.tags.append(&mut tags.clone());
-				}
-			},
-			CoAction::CoreTagsRemove { core, tags } => {
-				if let Some(core) = result.cores.get_mut(core) {
-					core.tags.clear(Some(tags));
-				}
-			},
-			CoAction::TagsInsert { tags } => {
-				result.tags.append(&mut tags.clone());
-			},
-			CoAction::TagsRemove { tags } => {
-				result.tags.clear(Some(tags));
-			},
-			CoAction::NetworkInsert { network } => {
-				result.network.insert(context.storage_mut(), network.clone());
-			},
-			CoAction::NetworkRemove { network } => {
-				result.network.remove(context.storage_mut(), network);
-			},
+			CoAction::CoreChange { core, state } => reduce_core_change(&mut result, core, state),
+			CoAction::CoreTagsInsert { core, tags } => reduce_core_tags_insert(&mut result, core, tags),
+			CoAction::CoreTagsRemove { core, tags } => reduce_core_tags_remove(&mut result, core, tags),
+			CoAction::TagsInsert { tags } => reduce_tags_insert(&mut result, tags),
+			CoAction::TagsRemove { tags } => reduce_tags_remove(&mut result, tags),
+			CoAction::NetworkInsert { network } => reduce_network_insert(context, &mut result, network),
+			CoAction::NetworkRemove { network } => reduce_network_remove(context, &mut result, network),
 		}
 		result
+	}
+}
+
+fn reduce_create(
+	result: &mut Co,
+	id: &CoId,
+	name: &String,
+	cores: &BTreeMap<String, Core>,
+	participants: &BTreeMap<String, Participant>,
+	key_id: &Option<String>,
+) {
+	// only allowed for empty COs
+	// id can not be changed afterwards
+	if result.id.as_str().is_empty() {
+		result.id = id.to_owned();
+		result.name = name.to_owned();
+		result.cores = cores.to_owned();
+		result.participants = participants.to_owned();
+		result.keys = key_id
+			.as_ref()
+			.map(|key_id| vec![Key { id: key_id.to_owned(), state: KeyState::Active }]);
+	}
+}
+
+fn reduce_participant_invite(result: &mut Co, participant: &String, tags: &Tags) {
+	if let Some(item) = result.participants.get_mut(participant) {
+		match item.state {
+			ParticipantState::Pending | ParticipantState::Inactive => {
+				item.state = ParticipantState::Invite;
+				item.tags.append(&mut tags.clone());
+			},
+			_ => {
+				// we don't go back from active to invite
+			},
+		}
+	} else {
+		result.participants.insert(
+			participant.clone(),
+			Participant { did: participant.clone(), state: ParticipantState::Invite, tags: tags.clone() },
+		);
+	}
+}
+
+fn reduce_participant_join(result: &mut Co, participant: &String, tags: &Tags) {
+	if let Some(participant) = result.participants.get_mut(participant) {
+		participant.state = ParticipantState::Active;
+		participant.tags.append(&mut tags.clone());
+	}
+}
+
+fn reduce_participant_pending(result: &mut Co, participant: &String, tags: &Tags) {
+	if !result.participants.contains_key(participant) {
+		result.participants.insert(
+			participant.clone(),
+			Participant { did: participant.clone(), state: ParticipantState::Pending, tags: tags.clone() },
+		);
+	}
+}
+
+fn reduce_participant_remove(result: &mut Co, participant: &String, tags: &Tags) {
+	let remove = if let Some(item) = result.participants.get_mut(participant) {
+		match item.state {
+			ParticipantState::Pending => true,
+			_ => {
+				item.state = ParticipantState::Inactive;
+				item.tags.append(&mut tags.clone());
+				false
+			},
+		}
+	} else {
+		false
+	};
+	if remove {
+		result.participants.remove(participant);
+	}
+}
+
+fn reduce_heads(result: &mut Co, heads: &BTreeSet<cid::CidGeneric<64>>) {
+	result.heads = heads.clone();
+}
+
+fn reduce_core_create(result: &mut Co, core: &String, binary: &cid::CidGeneric<64>, tags: &Tags) {
+	if !result.cores.contains_key(core) {
+		result
+			.cores
+			.insert(core.clone(), Core { binary: *binary, tags: tags.clone(), state: None });
+	}
+}
+
+fn reduce_core_remove(result: &mut Co, core: &String) {
+	result.cores.remove(core);
+}
+
+fn reduce_participant_tags_insert(result: &mut Co, participant: &String, tags: &Tags) {
+	if let Some(participant) = result.participants.get_mut(participant) {
+		participant.tags.append(&mut tags.clone());
+	}
+}
+
+fn reduce_participant_tags_remove(result: &mut Co, participant: &String, tags: &Tags) {
+	if let Some(participant) = result.participants.get_mut(participant) {
+		participant.tags.clear(Some(tags));
+	}
+}
+
+fn reduce_core_change(result: &mut Co, core: &String, state: &Option<cid::CidGeneric<64>>) {
+	if let Some(core) = result.cores.get_mut(core) {
+		core.state = *state;
+	}
+}
+
+fn reduce_core_tags_insert(result: &mut Co, core: &String, tags: &Tags) {
+	if let Some(core) = result.cores.get_mut(core) {
+		core.tags.append(&mut tags.clone());
+	}
+}
+
+fn reduce_network_remove(context: &mut dyn Context, result: &mut Co, network: &Network) {
+	result.network.remove(context.storage_mut(), network);
+}
+
+fn reduce_network_insert(context: &mut dyn Context, result: &mut Co, network: &Network) {
+	result.network.insert(context.storage_mut(), network.clone());
+}
+
+fn reduce_tags_remove(result: &mut Co, tags: &Tags) {
+	result.tags.clear(Some(tags));
+}
+
+fn reduce_tags_insert(result: &mut Co, tags: &Tags) {
+	result.tags.append(&mut tags.clone());
+}
+
+fn reduce_core_tags_remove(result: &mut Co, core: &String, tags: &Tags) {
+	if let Some(core) = result.cores.get_mut(core) {
+		core.tags.clear(Some(tags));
 	}
 }
 
