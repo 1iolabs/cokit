@@ -16,6 +16,9 @@ pub struct Co {
 	/// CO Name.
 	pub name: String,
 
+	/// CO Core Binary.
+	pub binary: Cid,
+
 	/// CO Current heads.
 	pub heads: BTreeSet<Cid>,
 
@@ -43,6 +46,7 @@ impl Default for Co {
 			id: "".into(),
 			tags: Default::default(),
 			name: Default::default(),
+			binary: Default::default(),
 			heads: Default::default(),
 			participants: Default::default(),
 			cores: Default::default(),
@@ -125,6 +129,11 @@ pub enum CoAction {
 		cores: BTreeMap<String, Core>,
 		participants: BTreeMap<Did, Participant>,
 		key: Option<String>,
+		binary: Cid,
+	},
+	Upgrade {
+		binary: Cid,
+		migrate: Option<Cid>,
 	},
 	Heads {
 		heads: BTreeSet<Cid>,
@@ -202,39 +211,38 @@ impl Reducer for Co {
 
 	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
 		let mut result = self;
-		match &event.payload {
-			CoAction::Create { id, name, cores, participants, key: key_id } => {
-				reduce_create(&mut result, id, name, cores, participants, key_id)
-			},
-			CoAction::ParticipantInvite { participant, tags } => {
-				reduce_participant_invite(&mut result, participant, tags)
-			},
-			CoAction::ParticipantJoin { participant, tags } => reduce_participant_join(&mut result, participant, tags),
-			CoAction::ParticipantPending { participant, tags } => {
-				reduce_participant_pending(&mut result, participant, tags)
-			},
-			CoAction::ParticipantRemove { participant, tags } => {
-				reduce_participant_remove(&mut result, participant, tags)
-			},
-			CoAction::Heads { heads } => reduce_heads(&mut result, heads),
-			CoAction::CoreCreate { core, binary, tags } => reduce_core_create(&mut result, core, binary, tags),
-			CoAction::CoreRemove { core } => reduce_core_remove(&mut result, core),
-			CoAction::ParticipantTagsInsert { participant, tags } => {
-				reduce_participant_tags_insert(&mut result, participant, tags)
-			},
-			CoAction::ParticipantTagsRemove { participant, tags } => {
-				reduce_participant_tags_remove(&mut result, participant, tags)
-			},
-			CoAction::CoreChange { core, state } => reduce_core_change(&mut result, core, state),
-			CoAction::CoreUpgrade { core, binary, migrate } => reduce_core_upgrade(&mut result, core, binary, migrate),
-			CoAction::CoreTagsInsert { core, tags } => reduce_core_tags_insert(&mut result, core, tags),
-			CoAction::CoreTagsRemove { core, tags } => reduce_core_tags_remove(&mut result, core, tags),
-			CoAction::TagsInsert { tags } => reduce_tags_insert(&mut result, tags),
-			CoAction::TagsRemove { tags } => reduce_tags_remove(&mut result, tags),
-			CoAction::NetworkInsert { network } => reduce_network_insert(context, &mut result, network),
-			CoAction::NetworkRemove { network } => reduce_network_remove(context, &mut result, network),
-		}
+		reduce(context, &mut result, &event.payload);
 		result
+	}
+}
+
+fn reduce(context: &mut dyn Context, result: &mut Co, action: &CoAction) {
+	match &action {
+		CoAction::Create { id, name, cores, participants, key: key_id, binary } => {
+			reduce_create(result, id, name, cores, participants, key_id, binary)
+		},
+		CoAction::Upgrade { binary, migrate } => reduce_upgrade(result, binary, migrate),
+		CoAction::ParticipantInvite { participant, tags } => reduce_participant_invite(result, participant, tags),
+		CoAction::ParticipantJoin { participant, tags } => reduce_participant_join(result, participant, tags),
+		CoAction::ParticipantPending { participant, tags } => reduce_participant_pending(result, participant, tags),
+		CoAction::ParticipantRemove { participant, tags } => reduce_participant_remove(result, participant, tags),
+		CoAction::Heads { heads } => reduce_heads(result, heads),
+		CoAction::CoreCreate { core, binary, tags } => reduce_core_create(result, core, binary, tags),
+		CoAction::CoreRemove { core } => reduce_core_remove(result, core),
+		CoAction::ParticipantTagsInsert { participant, tags } => {
+			reduce_participant_tags_insert(result, participant, tags)
+		},
+		CoAction::ParticipantTagsRemove { participant, tags } => {
+			reduce_participant_tags_remove(result, participant, tags)
+		},
+		CoAction::CoreChange { core, state } => reduce_core_change(result, core, state),
+		CoAction::CoreUpgrade { core, binary, migrate } => reduce_core_upgrade(result, core, binary, migrate),
+		CoAction::CoreTagsInsert { core, tags } => reduce_core_tags_insert(result, core, tags),
+		CoAction::CoreTagsRemove { core, tags } => reduce_core_tags_remove(result, core, tags),
+		CoAction::TagsInsert { tags } => reduce_tags_insert(result, tags),
+		CoAction::TagsRemove { tags } => reduce_tags_remove(result, tags),
+		CoAction::NetworkInsert { network } => reduce_network_insert(context, result, network),
+		CoAction::NetworkRemove { network } => reduce_network_remove(context, result, network),
 	}
 }
 
@@ -245,6 +253,7 @@ fn reduce_create(
 	cores: &BTreeMap<String, Core>,
 	participants: &BTreeMap<String, Participant>,
 	key_id: &Option<String>,
+	binary: &Cid,
 ) {
 	// only allowed for empty COs
 	// id can not be changed afterwards
@@ -256,7 +265,12 @@ fn reduce_create(
 		result.keys = key_id
 			.as_ref()
 			.map(|key_id| vec![Key { id: key_id.to_owned(), state: KeyState::Active }]);
+		result.binary = *binary;
 	}
+}
+
+fn reduce_upgrade(result: &mut Co, binary: &Cid, _migrate: &Option<Cid>) {
+	result.binary = *binary;
 }
 
 fn reduce_participant_invite(result: &mut Co, participant: &String, tags: &Tags) {

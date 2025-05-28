@@ -1,6 +1,6 @@
 use crate::{
 	library::runtime_dispatch::RuntimeDispatch, types::co_dispatch::CoDispatch, CoreResolver, CoreResolverError, Cores,
-	ReducerChangeContext, CO_CORE_CO, CO_CORE_NAME_CO,
+	ReducerChangeContext, CO_CORE_NAME_CO,
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -28,10 +28,6 @@ impl CoCoreResolver {
 		self.mapping.get(&wasm).cloned().unwrap_or(Core::Wasm(wasm))
 	}
 
-	fn root_core(&self) -> Core {
-		self.core(Cores::default().binary(CO_CORE_CO).expect("co core binary"))
-	}
-
 	async fn apply_core_state_to_root<S: BlockStorage + 'static>(
 		&self,
 		storage: &S,
@@ -43,13 +39,14 @@ impl CoCoreResolver {
 	where
 		S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 	{
+		let (_, state, core) = self.core_state_binary(storage, state, CO_CORE_NAME_CO).await?;
 		let mut dispatch = RuntimeDispatch::new(
 			LocalIdentity::device().boxed(),
 			runtime.clone(),
 			storage.clone(),
 			CO_CORE_NAME_CO.to_owned(),
-			self.root_core(),
-			*state, // we assume the root state points to [`co_core_co::Co`].
+			core,
+			state,
 		);
 		dispatch
 			.dispatch(&co_core_co::CoAction::CoreChange { core: core_name.to_owned(), state: core_state })
@@ -66,22 +63,24 @@ impl CoCoreResolver {
 	where
 		S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 	{
-		let root = core == CO_CORE_NAME_CO;
-		if root {
-			Ok((root, *state, self.root_core()))
-		} else {
-			// get root state
-			let state: co_core_co::Co = storage.get_default(state).await?;
+		// get root state
+		let co_state: co_core_co::Co = storage.get_default(state).await?;
 
+		// get state and binary
+		let root = core == CO_CORE_NAME_CO;
+		let (core_state, core_binary) = if root {
+			(*state, co_state.binary)
+		} else {
 			// get core
-			let core: &co_core_co::Core = state
+			let core: &co_core_co::Core = co_state
 				.cores
 				.get(core)
 				.ok_or_else(|| CoreResolverError::CoreNotFound(core.to_owned()))?;
+			(core.state, core.binary)
+		};
 
-			// resolve from known
-			Ok((root, core.state, self.core(core.binary)))
-		}
+		// result
+		Ok((root, core_state, self.core(core_binary)))
 	}
 
 	async fn migrate<S>(
@@ -97,7 +96,6 @@ impl CoCoreResolver {
 	{
 		// get core
 		let (root, core_state, core) = self.core_state_binary(storage, state, core_name).await?;
-		assert!(root == false);
 
 		// read migrate
 		let migrate: Ipld = storage.get_deserialized(migrate).await?;
@@ -111,12 +109,14 @@ impl CoCoreResolver {
 			core,
 			core_state,
 		);
-		let core_state_migrate = core_dispatch.dispatch(&migrate).await?;
+		let mut result = core_dispatch.dispatch(&migrate).await?;
 
 		// apply to root
-		let result = self
-			.apply_core_state_to_root(storage, runtime.clone(), state, core_name.to_owned(), core_state_migrate)
-			.await?;
+		if !root {
+			result = self
+				.apply_core_state_to_root(storage, runtime.clone(), state, core_name.to_owned(), result)
+				.await?;
+		}
 
 		// result
 		Ok(result)
@@ -203,6 +203,9 @@ where
 				.map_err(|e| CoreResolverError::InvalidArgument(e.into()))
 				.context("resolving CoAction")?;
 			match &co_action.payload {
+				CoAction::Upgrade { binary: _, migrate: Some(migrate) } => {
+					result.state = self.migrate(storage, runtime, &result.state, CO_CORE_NAME_CO, migrate).await?;
+				},
 				CoAction::CoreUpgrade { core, binary: _, migrate: Some(migrate) } => {
 					result.state = self.migrate(storage, runtime, &result.state, core, migrate).await?;
 				},
