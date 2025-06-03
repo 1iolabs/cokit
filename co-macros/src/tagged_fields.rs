@@ -3,15 +3,6 @@ use proc_macro2::{Delimiter, TokenTree};
 use quote::quote;
 use syn::{parse_macro_input, ItemStruct};
 
-/**
- * Attribute usage:
- * #[tagged(<tag>)]
- * Currently options for tag consist of:
- * - external
- *
- * More may be added in the future
- */
-#[proc_macro_derive(TaggedFields, attributes(tagged))]
 pub fn derive_tagged_fields(item: TokenStream) -> TokenStream {
 	let s = parse_macro_input!(item as ItemStruct);
 	let ident = s.ident;

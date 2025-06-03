@@ -1440,6 +1440,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
+ "co-macros",
  "co-primitives",
  "either",
  "futures",
