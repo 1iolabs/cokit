@@ -27,7 +27,7 @@ use co_identity::PrivateIdentity;
 use co_log::Log;
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
 use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid};
-use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, Secret};
+use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret};
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -493,8 +493,14 @@ impl SharedCoCreator {
 				Some(algorithm) => {
 					let key_uri = format!("urn:co:{}:{}", self.co.id, uuid.uuid());
 					let key = algorithm.generate_serect();
+					let builtin_cores = Cores::default()
+						.built_in_native_mapping()
+						.into_iter()
+						.map(|(cid, _)| cid)
+						.collect();
 					let result_storage =
-						EncryptedBlockStorage::new(storage.clone(), key.clone(), algorithm, Default::default());
+						EncryptedBlockStorage::new(storage.clone(), key.clone(), algorithm, Default::default())
+							.with_encryption_reference_mode(EncryptionReferenceMode::DisallowExcept(builtin_cores));
 					(CoStorage::new(result_storage.clone()), Some((result_storage, key_uri, key)))
 				},
 				None => (storage.clone_with_settings(BlockStorageSettings::new().with_detached()), None),

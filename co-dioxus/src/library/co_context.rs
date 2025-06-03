@@ -10,7 +10,21 @@ pub struct CoContext {
 	tasks: UnboundedSender<Task>,
 }
 impl CoContext {
-	pub(crate) fn new(settings: CoSettings) -> Self {
+	pub fn new(settings: CoSettings) -> Self {
+		let context = Self::spawn(settings);
+
+		// block until startup is complete
+		let (tx, rx) = tokio::sync::oneshot::channel();
+		context.execute(|_app| {
+			tx.send(()).unwrap();
+		});
+		rx.blocking_recv().unwrap();
+
+		// result
+		context
+	}
+
+	pub(crate) fn spawn(settings: CoSettings) -> Self {
 		let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Task>();
 		std::thread::Builder::new()
 			.name("co".to_owned())

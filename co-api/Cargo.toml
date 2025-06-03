@@ -9,6 +9,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
 co-primitives = { path = "../co-primitives" }
+co-macros = { path = "../co-macros" }
 either = { workspace = true }
 futures = { workspace = true }
 ipld-core = { workspace = true }

@@ -3,8 +3,9 @@ mod co_v1;
 mod library;
 mod types;
 
-// exports
+/// exports
 pub use cid::Cid;
+pub use co_macros::{co_data, co_state};
 pub use co_primitives::{
 	from_cbor, from_json, tags, to_cbor, to_json, to_json_string, AbsolutePath, AbsolutePathOwned, Block,
 	BlockSerializer, BlockSerializerError, BlockStorage, BlockStorageExt, CoId, CoList, CoListIndex, CoListTransaction,
