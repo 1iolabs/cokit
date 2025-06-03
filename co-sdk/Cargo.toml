@@ -18,6 +18,7 @@ co-core-file = { path = "../cores/file" }
 co-core-keystore = { path = "../cores/keystore" }
 co-core-membership = { path = "../cores/membership" }
 co-core-pin = { path = "../cores/pin" }
+co-core-poa = { path = "../cores/poa" }
 co-core-role = { path = "../cores/role" }
 co-core-room = { path = "../cores/room" }
 co-core-storage = { path = "../cores/storage" }

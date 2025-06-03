@@ -54,9 +54,8 @@ pub mod async_reduce {
 		async_api::{Context, Reducer},
 		library::{wasm_context::WasmContext, wasm_storage::WasmStorage},
 	};
-	use anyhow::Context as _;
 	use cid::Cid;
-	use co_primitives::{from_cbor, BlockStorage, BlockStorageExt, DiagnosticMessage, ReducerAction};
+	use co_primitives::{BlockStorage, BlockStorageExt, DiagnosticMessage};
 	use futures::{executor::LocalPool, task::LocalSpawnExt};
 	use serde::de::DeserializeOwned;
 
@@ -108,13 +107,8 @@ pub mod async_reduce {
 		S: BlockStorage + Clone + 'static,
 		C: Context<S> + 'static,
 	{
-		// event
-		let event_cid = context.event();
-		let event_block = context.storage().get(&event_cid).await?;
-		let event: ReducerAction<A> = from_cbor(event_block.data()).context("deserialize event")?;
-
 		// reduce
-		let next_state = R::reduce(context.state().into(), event, context.storage()).await?;
+		let next_state = R::reduce(context.state().into(), context.event().into(), context.storage()).await?;
 
 		// result
 		Ok(next_state.into())

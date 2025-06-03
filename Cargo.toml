@@ -19,6 +19,7 @@ members = [
     "cores/keystore",
     "cores/membership",
     "cores/pin",
+    "cores/poa",
     "cores/role",
     "cores/room",
     "cores/storage",
@@ -50,6 +51,7 @@ ipld-dagpb = "0.2.1"
 libp2p = { version = "0.53", features = ["full"] }
 multihash = "0.19.3"
 multihash-codetable = { version = "0.1.4", features = ["blake3"] }
+num-rational = "0.4"
 pin-project = "1.1.4"
 rust-unixfs = "0.5.0"
 schemars = "0.8.21"

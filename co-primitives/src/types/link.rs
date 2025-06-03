@@ -13,12 +13,33 @@ pub trait Linkable<T> {
 }
 
 /// A (serializable) typed link.
-#[derive(Serialize, Deserialize, Hash, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Serialize, Deserialize)]
 #[serde(into = "Cid", from = "Cid")]
 pub struct Link<T> {
 	#[serde(skip)]
 	_type: PhantomData<T>,
 	cid: Cid,
+}
+impl<T> Ord for Link<T> {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		self.cid.cmp(&other.cid)
+	}
+}
+impl<T> Eq for Link<T> {}
+impl<T> PartialOrd for Link<T> {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		self.cid.partial_cmp(&other.cid)
+	}
+}
+impl<T> PartialEq for Link<T> {
+	fn eq(&self, other: &Self) -> bool {
+		self.cid == other.cid
+	}
+}
+impl<T> Hash for Link<T> {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		std::hash::Hash::hash(&self.cid, state);
+	}
 }
 impl<T> Copy for Link<T> {}
 impl<T> Linkable<T> for Link<T> {

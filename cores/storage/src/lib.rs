@@ -245,25 +245,22 @@ impl Storage {
 		storage: &S,
 		actions: Vec<StorageAction>,
 	) -> Result<OptionLink<Self>, anyhow::Error> {
-		let mut state = OptionLink::none();
+		let mut state = Storage::default();
+		let mut transaction = StorageTransaction::open(storage.clone(), &state).await?;
 		for action in actions {
-			state = Self::reduce(
-				state,
-				ReducerAction { from: "".to_owned(), time: 0, core: "".to_owned(), payload: action },
-				storage,
-			)
-			.await?
-			.into();
+			reduce(&mut transaction, action).await?;
 		}
-		Ok(state)
+		transaction.store(&mut state).await?;
+		Ok(storage.set_value(&state).await?.into())
 	}
 }
 impl<S: BlockStorage + Clone + 'static> Reducer<StorageAction, S> for Storage {
 	async fn reduce(
 		state: OptionLink<Self>,
-		event: ReducerAction<StorageAction>,
+		event: Link<ReducerAction<StorageAction>>,
 		storage: &S,
 	) -> Result<Link<Self>, anyhow::Error> {
+		let event = storage.get_value(&event).await?;
 		let mut state = storage.get_value_or_default(&state).await?;
 		let mut transaction = StorageTransaction::open(storage.clone(), &state).await?;
 		reduce(&mut transaction, event.payload).await?;
@@ -864,7 +861,7 @@ where
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	co_api::async_api::reduce::<Storage, StorageAction>()
+	co_api::async_api::reduce::<Storage, _>()
 }
 
 #[cfg(test)]
@@ -1044,7 +1041,8 @@ mod tests {
 		];
 		let mut state_reference = OptionLink::none();
 		for action in actions {
-			state_reference = Storage::reduce(state_reference, action, &storage).await.unwrap().into();
+			let action_link = storage.set_value(&action).await.unwrap();
+			state_reference = Storage::reduce(state_reference, action_link, &storage).await.unwrap().into();
 		}
 
 		// validate

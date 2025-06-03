@@ -1,0 +1,24 @@
+[package]
+name = "co-core-poa"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.76"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+cid = { workspace = true }
+co-api = { path = "../../co-api" }
+futures = { workspace = true }
+ipld-core = { workspace = true }
+num-rational = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_repr = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
