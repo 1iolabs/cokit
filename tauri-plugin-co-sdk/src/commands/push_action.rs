@@ -89,7 +89,7 @@ pub async fn push_action(
 	// manually deserialize body into PushCommandBody type
 	let body: PushCommandBody = serde_ipld_dagcbor::from_slice(&body)?;
 	tracing::info!(
-		"tauri command push: \n\tCo: {:#?}\n\tcore: {:#?}\n\taction: {:#?}",
+		"tauri command push: \n\tSession: {:#?}\n\tcore: {:#?}\n\taction: {:#?}",
 		body.session,
 		body.core,
 		body.action

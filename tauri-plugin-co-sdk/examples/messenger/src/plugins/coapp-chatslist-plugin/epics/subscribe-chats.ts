@@ -1,7 +1,7 @@
 import { isPluginInitializeAction } from "@1io/kui-application-sdk";
 import { Action } from "redux";
-import { EMPTY, filter, identity, mergeAll, mergeMap, withLatestFrom } from "rxjs";
-import { get_actions, resolveCid, sessionClose, sessionOpen } from "../../../../../../dist-js/index.js";
+import { filter, identity, mergeAll, mergeMap, withLatestFrom } from "rxjs";
+import { get_actions, pushAction, resolveCid, sessionClose, sessionOpen } from "../../../../../../dist-js/index.js";
 import GroupDefaultPic from "../../../assets/Users_48.svg";
 import { createCoSdkStateEventListener } from "../../../library/co-sdk-state-listener.js";
 import { buildCoCoreId } from "../../../library/core-id.js";
@@ -12,8 +12,6 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
     filter(isPluginInitializeAction),
     mergeMap(() => {
         return createCoSdkStateEventListener().pipe(
-            // filter out events for the local co
-            // filter((event) => { const [coId] = event.payload; return coId !== "local" }),
             withLatestFrom(state$),
             mergeMap(async ([event, state]) => {
                 const [coId, _, heads] = event.payload;
@@ -23,9 +21,10 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                 for (const cid of log) {
                     const action = await resolveCid(sessionId, cid);
                     const payload = action.p;
-                    console.log(coId, action);
-                    if (coId === "local") {
-                        return EMPTY;
+                    console.log("Action pushed: ", coId, action);
+                    if (coId === "local" && state.identity !== undefined) {
+                        actions.push(...(await handleLocalCoAction(action, state.identity)))
+                        continue;
                     }
 
                     // create core action
@@ -91,3 +90,24 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
         );
     }),
 );
+
+async function handleLocalCoAction(action: any, ownIdentity: string): Promise<Action[]> {
+    if (action.c === "membership") {
+        if (action.p?.Join !== undefined) {
+            // only continue if the join action is on invite state
+            if (action.p.Join.membership_state !== 2) { return []; }
+            // accept join action
+            const joinAction = {
+                id: action.p.Join.id,
+                did: ownIdentity,
+                membership_state: 0,
+            };
+            console.log("accept action", joinAction);
+            const session = await sessionOpen("local");
+            await pushAction(session, "membership", joinAction, ownIdentity);
+            await sessionClose(session);
+        }
+
+    }
+    return [];
+}

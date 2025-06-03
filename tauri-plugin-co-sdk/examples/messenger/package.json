@@ -17,7 +17,7 @@
     "rollup": "npx cross-env NODE_ENV=development kui-application build -o ./dist/ui",
     "sass": "sass ./src/plugins -w -q --no-verbose",
     "rollup-watch": "npm run rollup -- -w",
-    "start-messenger": "open ../../../target/debug/bundle/macos/CO\\ Messenger\\ Demo.app --args --no-keychain --base-path ~/Library/Application\\ Support/co.app.1io2.co"
+    "start-messenger": "env RUST_BACKTRACE=full open ../../../target/debug/bundle/macos/CO\\ Messenger\\ Demo.app --args --no-keychain --base-path ~/Library/Application\\ Support/co.app.1io2.co"
   },
   "files": [
     "**/*.css",

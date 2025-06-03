@@ -27,7 +27,7 @@ export async function getCoreState(co: string, core: string, externalSessionId?:
     return null;
 }
 
-export async function getCoIds() {
+export async function getCoIds(): Promise<ReadonlyArray<string>> {
     const localCoSessionId = await sessionOpen("local");
     const memberships = await getCoreState("local", "membership", localCoSessionId);
     sessionClose(localCoSessionId);
@@ -35,6 +35,20 @@ export async function getCoIds() {
         return memberships.memberships
             // only get joined COs
             .filter((membership: any) => membership?.membership_state === 0)
+            .map((membership: any) => membership?.id)
+            .filter(isNonNull);
+    }
+    return [];
+}
+
+export async function getInvitedCoIds(): Promise<ReadonlyArray<string>> {
+    const localCoSessionId = await sessionOpen("local");
+    const memberships = await getCoreState("local", "membership", localCoSessionId);
+    sessionClose(localCoSessionId);
+    if (Array.isArray(memberships?.memberships)) {
+        return memberships.memberships
+            // only get joined COs
+            .filter((membership: any) => membership?.membership_state === 2)
             .map((membership: any) => membership?.id)
             .filter(isNonNull);
     }
