@@ -16,8 +16,8 @@ use crate::{
 		co_reducer_state::MappedCoReducerState,
 	},
 	ApplicationMessage, CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, DynamicCoDate, Reducer,
-	ReducerBuilder, Runtime, TaskSpawner, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
-	CO_CORE_NAME_MEMBERSHIP,
+	ReducerBuilder, Runtime, TaskSpawner, CO_CORE_CO, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
+	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -567,6 +567,7 @@ where
 		cores,
 		participants,
 		key: None,
+		binary: Cores::default().binary(CO_CORE_CO).expect(CO_CORE_CO),
 	};
 	reducer.push(storage, runtime, identity, CO_CORE_NAME_CO, &action).await?;
 

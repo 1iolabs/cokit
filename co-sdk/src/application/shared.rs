@@ -14,8 +14,8 @@ use crate::{
 	},
 	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
 	ApplicationMessage, CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters,
-	CoUuid, DynamicCoDate, Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
-	CO_CORE_NAME_MEMBERSHIP,
+	CoUuid, Cores, DynamicCoDate, Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_CO, CO_CORE_NAME_CO,
+	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -532,6 +532,7 @@ impl SharedCoCreator {
 					cores: Default::default(),
 					participants,
 					key: encrypted_storage.as_ref().map(|(_, key_uri, _)| key_uri.clone()),
+					binary: Cores::default().binary(CO_CORE_CO).expect(CO_CORE_CO),
 				},
 			)
 			.await?;
