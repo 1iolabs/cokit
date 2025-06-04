@@ -1,8 +1,10 @@
 use crate::{matrix_event::relation::RelatesTo, message_event::MessageType, relation::Relation, EventContent};
 use co_macros::co_data;
+use schemars::JsonSchema;
 
 /// Event used to create a poll.
 #[co_data]
+#[derive(JsonSchema)]
 pub struct PollStartContent {
 	/// A textual representation of the poll, i.e. the question
 	pub body: String,
@@ -58,6 +60,7 @@ impl Relation for PollStartContent {
 
 /// Metadata for poll creation event
 #[co_data]
+#[derive(JsonSchema)]
 pub struct PollCreationInfo {
 	/// The question the poll was created for
 	pub question: String,
@@ -85,6 +88,7 @@ impl PollCreationInfo {
 
 /// One possible answer in a poll. ID should be unique across answers.
 #[co_data]
+#[derive(JsonSchema)]
 pub struct PollAnswer {
 	/// Unique ID to identify an answer
 	pub id: String,
@@ -99,6 +103,7 @@ impl PollAnswer {
 }
 
 #[co_data]
+#[derive(JsonSchema)]
 pub enum PollKind {
 	/// In disclosed polls all participants can see the already cast votes (including who cast them)
 	#[serde(rename = "disclosed")]
@@ -112,6 +117,7 @@ pub enum PollKind {
 }
 
 #[co_data]
+#[derive(JsonSchema)]
 pub struct PollResponseContent {
 	/// Textual representation of the answers
 	pub body: String,
@@ -161,6 +167,7 @@ impl From<PollResponseContent> for EventContent {
 
 /// Event that closes the poll. For undisclosed and anonymous polls, this is the point where the reults are shown.
 #[co_data]
+#[derive(JsonSchema)]
 pub struct PollEndContent {
 	/// Textual representation of the poll ending
 	pub body: String,

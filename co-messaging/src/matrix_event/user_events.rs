@@ -2,8 +2,10 @@ use crate::{EventContent, EventType};
 use cid::Cid;
 use co_macros::co_data;
 use co_primitives::CoCid;
+use schemars::JsonSchema;
 
 #[co_data]
+#[derive(JsonSchema)]
 pub struct PostUserStoryContent {
 	/// How long users can view the story after it was posted in ms
 	pub lifetime: u64,
@@ -33,6 +35,7 @@ impl PostUserStoryContent {
 }
 
 #[co_data]
+#[derive(JsonSchema)]
 pub struct ViewUserStoryContent {
 	/// ID of the event that containes the viewed story
 	pub story: String,
@@ -57,6 +60,7 @@ impl ViewUserStoryContent {
 }
 
 #[co_data]
+#[derive(JsonSchema)]
 pub struct UpdateProfileContent {
 	/// The name that the user likes to use as a default
 	pub display_name: String,

@@ -2,12 +2,14 @@ use crate::{EventContent, EventType};
 use cid::Cid;
 use co_macros::co_data;
 use co_primitives::CoCid;
+use schemars::JsonSchema;
 
 /// Event used to indicate which users in the room are currently typing.
 /// Gets sent to all active users. For direct messages this information will only be shared with the other
 /// participant. Information should be updated regularly and have a timout after which no users should count as
 /// typing when no new event was sent.
 #[co_data]
+#[derive(JsonSchema)]
 pub struct TypingContent {
 	/// List of users currently typing in the room
 	pub user_ids: Vec<String>,
@@ -39,6 +41,7 @@ impl TypingContent {
 ///
 /// DnD: As 'Online' but the user doesn't want to be disturbed
 #[co_data]
+#[derive(JsonSchema)]
 pub enum PresenceType {
 	#[serde(rename = "online")]
 	Online,
@@ -52,6 +55,7 @@ pub enum PresenceType {
 /// In contrast to typing events, the sender is important here and always corresponds to the user the information is
 /// about.
 #[co_data]
+#[derive(JsonSchema)]
 pub struct PresenceContent {
 	pub presence: PresenceType,
 	/// Timestampt in milliseconds when the user last performed an action

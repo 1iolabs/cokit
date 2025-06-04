@@ -19,6 +19,7 @@ use matrix_event::{
 	state_event::{PinnedEventsContent, RoomAvatarContent, RoomNameContent, RoomTopicContent},
 	user_events::{PostUserStoryContent, UpdateProfileContent, ViewUserStoryContent},
 };
+use schemars::JsonSchema;
 
 pub trait EventType {
 	fn generate_event_type(&self) -> String;
@@ -26,6 +27,7 @@ pub trait EventType {
 
 /// Collection of all possible actions for the room core
 #[co_data]
+#[derive(JsonSchema)]
 pub struct MatrixEvent {
 	pub event_id: String,
 	pub timestamp: u128,
@@ -100,6 +102,7 @@ impl EventType for MatrixEvent {
 ///
 /// Events for interacting with users profiles
 #[co_data]
+#[derive(JsonSchema)]
 #[serde(tag = "type", content = "content")]
 pub enum EventContent {
 	#[serde(rename = "m_room_message")]

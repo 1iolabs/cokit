@@ -1654,7 +1654,7 @@ dependencies = [
  "num-rational",
  "serde",
  "serde_repr",
- "thiserror",
+ "thiserror 1.0.63",
  "tracing",
  "tracing-subscriber",
 ]

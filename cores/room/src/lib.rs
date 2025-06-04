@@ -2,9 +2,11 @@ use cid::Cid;
 use co_api::{co_state, Context, Reducer, ReducerAction, Tags};
 use co_messaging::{EventContent, MatrixEvent};
 use co_primitives::CoCid;
+use schemars::JsonSchema;
 
 /// eCO Messenger room core
 #[co_state]
+#[derive(JsonSchema)]
 pub struct Room {
 	/// Name of the room
 	pub name: String,
