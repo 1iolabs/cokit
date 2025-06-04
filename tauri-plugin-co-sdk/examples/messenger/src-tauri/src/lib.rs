@@ -10,12 +10,7 @@ use tauri_plugin_co_sdk::library::co_application::CoApplicationSettings;
 pub async fn run() {
 	tauri::async_runtime::set(tokio::runtime::Handle::current());
 
-	let mut co_settings: CoApplicationSettings = Cli::parse().with_env().into();
-
-	#[cfg(dev)]
-	{
-		co_settings = co_settings.without_keychain();
-	}
+	let co_settings: CoApplicationSettings = Cli::parse().with_env().into();
 
 	tauri::Builder::default()
 		.plugin(tauri_plugin_fs::init())

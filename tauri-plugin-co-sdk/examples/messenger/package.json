@@ -11,13 +11,13 @@
     "build-dist": "npm run clean && npm run build-plugins && npm run build && npm run rollup && npm run deploy-self",
     "lint": "npx tslint --project . && npx nplint",
     "tauri": "tauri",
-    "tauri-dev": "npm run tauri dev -- --no-watch",
+    "tauri-dev": "npm run tauri dev -- --no-watch -- -- --no-keychain",
     "tauri-build": "npm run tauri -- -v build -b app -d",
     "clean": "npx rimraf -rf ./dist",
     "rollup": "npx cross-env NODE_ENV=development kui-application build -o ./dist/ui",
     "sass": "sass ./src/plugins -w -q --no-verbose",
     "rollup-watch": "npm run rollup -- -w",
-    "start-messenger": "env RUST_BACKTRACE=full open ../../../target/debug/bundle/macos/CO\\ Messenger\\ Demo.app --args --no-keychain --base-path ~/Library/Application\\ Support/co.app.1io2.co"
+    "start-messengers": "env RUST_BACKTRACE=full open -n ../../../target/debug/bundle/macos/CO\\ Messenger\\ Demo.app --args --no-keychain && open -n ../../../target/debug/bundle/macos/CO\\ Messenger\\ Demo.app --args --no-keychain --base-path ~/Library/Application\\ Support/co.app.1io2.co"
   },
   "files": [
     "**/*.css",
