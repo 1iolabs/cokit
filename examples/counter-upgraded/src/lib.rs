@@ -25,9 +25,10 @@ pub enum CounterAction {
 impl<S: BlockStorage + Clone + 'static> Reducer<CounterAction, S> for Counter {
 	async fn reduce(
 		state: OptionLink<Self>,
-		event: ReducerAction<CounterAction>,
+		event: Link<ReducerAction<CounterAction>>,
 		storage: &S,
 	) -> Result<Link<Self>, anyhow::Error> {
+		let event = storage.get_value(&event).await?;
 		match event.payload {
 			CounterAction::Increment(i) => {
 				update(storage, state, |_, mut state| async move {

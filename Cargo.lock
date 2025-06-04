@@ -1642,6 +1642,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-core-poa"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cid 0.11.1",
+ "co-api",
+ "futures",
+ "ipld-core",
+ "num-rational",
+ "serde",
+ "serde_repr",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "co-core-role"
 version = "0.1.0"
 dependencies = [
@@ -1907,6 +1925,7 @@ dependencies = [
  "co-core-keystore",
  "co-core-membership",
  "co-core-pin",
+ "co-core-poa",
  "co-core-role",
  "co-core-room",
  "co-core-storage",

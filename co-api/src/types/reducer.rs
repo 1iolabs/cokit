@@ -55,7 +55,7 @@ pub mod async_reducer {
 	{
 		async fn reduce(
 			state: OptionLink<Self>,
-			event: ReducerAction<A>,
+			event: Link<ReducerAction<A>>,
 			storage: &S,
 		) -> Result<Link<Self>, anyhow::Error>;
 	}

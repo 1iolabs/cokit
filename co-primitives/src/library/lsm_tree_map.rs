@@ -665,13 +665,13 @@ where
 		start_at: Option<K>,
 	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + Send + '_ {
 		let storage = self.storage.clone();
+		let active = self.active.clone();
 		async_stream::try_stream! {
 			// heap (max-sorted)
 			let mut heap = match only_run_indicies {
 				Some(_) => BinaryHeap::new(),
 				None => BinaryHeap::<TreeStreamItem<K, V>>::from(
-					self.active
-						.clone()
+					active
 						.into_iter()
 						.map(|item| TreeStreamItem { run: None, item })
 						.collect::<Vec<_>>(),
