@@ -1,0 +1,620 @@
+use anyhow::anyhow;
+use cid::Cid;
+use co_api::{
+	async_api::Reducer, co_data, co_state, BlockStorage, BlockStorageExt, CoList, CoListIndex, CoMap, CoTryStreamExt,
+	LazyTransaction, Link, OptionLink, ReducerAction, Tags,
+};
+use futures::{pin_mut, TryStreamExt};
+use std::future::ready;
+
+pub type ListName = String;
+pub type TaskId = String;
+
+/// Board actions.
+#[co_data]
+pub enum BoardAction {
+	BoardRename(String),
+	BoardTagsInsert(Tags),
+	BoardTagsRemove(Tags),
+	ListCreate { list: List, after: Option<ListName> },
+	ListArrange { name: ListName, after: Option<ListName> },
+	ListDelete { name: ListName, move_tasks_to_list: Option<ListName> },
+	ListTagsInsert(ListName, Tags),
+	ListTagsRemove(ListName, Tags),
+	// ListTasksDelete(ListName),
+	// ListTasksMove { from: ListName, to: ListName },
+	TaskCreate { list: ListName, task: Task, after: Option<TaskId> },
+	TaskMove { from_list: Option<ListName>, list: ListName, task: TaskId, after: Option<TaskId> },
+	TaskArrange { task: TaskId, after: Option<TaskId> },
+	TaskDelete(TaskId),
+	TaskRename(TaskId, String),
+	TaskPayloadChange(TaskId, Option<Cid>),
+	TaskTagsInsert(TaskId, Tags),
+	TaskTagsRemove(TaskId, Tags),
+}
+
+#[co_state]
+pub struct Board {
+	/// Board name.
+	#[serde(rename = "n", default, skip_serializing_if = "String::is_empty")]
+	pub name: String,
+
+	/// Board lists.
+	#[serde(rename = "i", default, skip_serializing_if = "CoList::is_empty")]
+	pub lists: CoList<List>,
+
+	/// Board tags.
+	#[serde(rename = "t", default, skip_serializing_if = "Tags::is_empty")]
+	pub tags: Tags,
+
+	/// Board tasks.
+	#[serde(rename = "i", default, skip_serializing_if = "CoMap::is_empty")]
+	pub tasks: CoMap<TaskId, Task>,
+}
+impl<S> Reducer<BoardAction, S> for Board
+where
+	S: BlockStorage + Clone + 'static,
+{
+	async fn reduce(
+		state_link: OptionLink<Self>,
+		event_link: Link<ReducerAction<BoardAction>>,
+		storage: &S,
+	) -> Result<Link<Self>, anyhow::Error> {
+		let event = storage.get_value(&event_link).await?;
+		let mut state = storage.get_value_or_default(&state_link).await?;
+		reduce(storage, &mut state, event.payload).await?;
+		Ok(storage.set_value(&state).await?)
+	}
+}
+
+#[co_data]
+pub struct List {
+	/// List name.
+	#[serde(rename = "n")]
+	pub name: ListName,
+
+	/// List tasks.
+	#[serde(rename = "i", default, skip_serializing_if = "CoList::is_empty")]
+	pub tasks: CoList<TaskId>,
+
+	/// List tags.
+	#[serde(rename = "t", default, skip_serializing_if = "Tags::is_empty")]
+	pub tags: Tags,
+}
+
+#[co_data]
+pub struct Task {
+	/// Task unique id.
+	#[serde(rename = "u")]
+	pub id: TaskId,
+
+	/// Task name.
+	#[serde(rename = "n")]
+	pub name: String,
+
+	/// Task tags.
+	#[serde(rename = "t", default, skip_serializing_if = "Tags::is_empty")]
+	pub tags: Tags,
+
+	/// Task payload.
+	#[serde(rename = "p", default, skip_serializing_if = "Option::is_none")]
+	pub payload: Option<Cid>,
+}
+
+async fn reduce<S>(storage: &S, state: &mut Board, action: BoardAction) -> Result<(), anyhow::Error>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	// open
+	let mut transaction = BoardTransaction {
+		storage: storage.clone(),
+		lists: LazyTransaction::new(storage.clone(), state.lists.clone()),
+		tasks: LazyTransaction::new(storage.clone(), state.tasks.clone()),
+	};
+
+	// reduce
+	match action {
+		BoardAction::BoardRename(name) => reduce_board_rename(state, name).await?,
+		BoardAction::BoardTagsInsert(tags) => reduce_board_tags_insert(state, tags).await?,
+		BoardAction::BoardTagsRemove(tags) => reduce_board_tags_remove(state, tags).await?,
+		BoardAction::ListCreate { list, after } => reduce_list_create(&mut transaction, list, after).await?,
+		BoardAction::ListArrange { name, after } => reduce_list_arrange(&mut transaction, name, after).await?,
+		BoardAction::ListDelete { name, move_tasks_to_list } => {
+			reduce_list_delete(&mut transaction, name, move_tasks_to_list).await?
+		},
+		BoardAction::ListTagsInsert(name, tags) => reduce_list_tags_insert(&mut transaction, name, tags).await?,
+		BoardAction::ListTagsRemove(name, tags) => reduce_list_tags_remove(&mut transaction, name, tags).await?,
+		BoardAction::TaskCreate { list, task, after } => {
+			reduce_task_create(&mut transaction, list, task, after).await?
+		},
+		BoardAction::TaskMove { from_list, list, task, after } => {
+			reduce_task_move(&mut transaction, from_list, list, task, after).await?
+		},
+		BoardAction::TaskArrange { task, after } => reduce_task_arrange(&mut transaction, task, after).await?,
+		BoardAction::TaskDelete(task) => reduce_task_delete(&mut transaction, task).await?,
+		BoardAction::TaskRename(task, name) => reduce_task_rename(&mut transaction, task, name).await?,
+		BoardAction::TaskPayloadChange(task, cid) => reduce_task_payload_change(&mut transaction, task, cid).await?,
+		BoardAction::TaskTagsInsert(task, tags) => reduce_task_tags_insert(&mut transaction, task, tags).await?,
+		BoardAction::TaskTagsRemove(task, tags) => reduce_task_tags_remove(&mut transaction, task, tags).await?,
+	}
+
+	// store
+	if transaction.lists.is_mut_access() {
+		state.lists = transaction.lists.get_mut().await?.store().await?;
+	}
+	if transaction.tasks.is_mut_access() {
+		state.tasks = transaction.tasks.get_mut().await?.store().await?;
+	}
+
+	// result
+	Ok(())
+}
+
+struct BoardTransaction<S>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	storage: S,
+	lists: LazyTransaction<S, CoList<List>>,
+	tasks: LazyTransaction<S, CoMap<TaskId, Task>>,
+}
+impl<S> BoardTransaction<S>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	/// Find list by name by scanning lists.
+	async fn find_list_by_name(&mut self, name: &str) -> Result<Option<(CoListIndex, List)>, anyhow::Error> {
+		Ok(self
+			.lists
+			.get()
+			.await?
+			.stream()
+			.try_filter(|item| ready(&item.1.name == &name))
+			.try_first()
+			.await?)
+	}
+
+	/// Fint task's list by scanning all lists.
+	async fn find_task_list(&mut self, id: &TaskId) -> Result<Option<(CoListIndex, List, CoListIndex)>, anyhow::Error> {
+		Ok(self
+			.lists
+			.get()
+			.await?
+			.stream()
+			.try_filter_map(|(index, list)| {
+				let storage = self.storage.clone();
+				async move {
+					Ok(list
+						.tasks
+						.stream(&storage)
+						.try_filter(|(_, task)| ready(task == id))
+						.try_first()
+						.await?
+						.map(|(task_index, _task_id)| (index, list, task_index)))
+				}
+			})
+			.try_first()
+			.await?)
+	}
+}
+
+async fn reduce_task_tags_remove<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	task_id: TaskId,
+	tags: Tags,
+) -> Result<(), anyhow::Error> {
+	let mut task = transaction
+		.tasks
+		.get()
+		.await?
+		.get(&task_id)
+		.await?
+		.ok_or(anyhow!("Task not found: {}", task_id))?;
+
+	// apply
+	task.tags.clear(Some(&tags));
+
+	// store
+	transaction.tasks.get_mut().await?.insert(task_id, task).await?;
+
+	Ok(())
+}
+
+async fn reduce_task_tags_insert<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	task_id: TaskId,
+	mut tags: Tags,
+) -> Result<(), anyhow::Error> {
+	let mut task = transaction
+		.tasks
+		.get()
+		.await?
+		.get(&task_id)
+		.await?
+		.ok_or(anyhow!("Task not found: {}", task_id))?;
+
+	// apply
+	task.tags.append(&mut tags);
+
+	// store
+	transaction.tasks.get_mut().await?.insert(task_id, task).await?;
+
+	Ok(())
+}
+
+async fn reduce_task_payload_change<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	task_id: TaskId,
+	payload: Option<Cid>,
+) -> Result<(), anyhow::Error> {
+	let mut task = transaction
+		.tasks
+		.get()
+		.await?
+		.get(&task_id)
+		.await?
+		.ok_or(anyhow!("Task not found: {}", task_id))?;
+
+	// apply
+	if task.payload != payload {
+		// set
+		task.payload = payload;
+
+		// store
+		transaction.tasks.get_mut().await?.insert(task_id, task).await?;
+	}
+	Ok(())
+}
+
+async fn reduce_task_rename<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	task_id: TaskId,
+	name: String,
+) -> Result<(), anyhow::Error> {
+	let mut task = transaction
+		.tasks
+		.get()
+		.await?
+		.get(&task_id)
+		.await?
+		.ok_or(anyhow!("Task not found: {}", task_id))?;
+
+	// apply
+	if task.name != name {
+		// set
+		task.name = name;
+
+		// store
+		transaction.tasks.get_mut().await?.insert(task_id, task).await?;
+	}
+	Ok(())
+}
+
+async fn reduce_task_delete<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	task_id: TaskId,
+) -> Result<(), anyhow::Error> {
+	// find task list
+	let (list_index, mut list, task_index) = transaction
+		.find_task_list(&task_id)
+		.await?
+		.ok_or(anyhow!("Task list not found: {}", task_id))?;
+
+	// remove
+	transaction
+		.tasks
+		.get_mut()
+		.await?
+		.remove(task_id.clone())
+		.await?
+		.ok_or(anyhow!("Task not found: {}", task_id))?;
+
+	// remove from list
+	list.tasks.remove(&transaction.storage, task_index).await?;
+
+	// store list
+	transaction.lists.get_mut().await?.set(list_index, list).await?;
+
+	Ok(())
+}
+
+async fn reduce_task_arrange<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	task_id: TaskId,
+	after: Option<TaskId>,
+) -> Result<(), anyhow::Error> {
+	// find task list
+	let (list_index, mut list, task_index) = transaction
+		.find_task_list(&task_id)
+		.await?
+		.ok_or(anyhow!("Task list not found: {}", task_id))?;
+
+	// after index
+	let mut list_tasks = list.tasks.open(&transaction.storage).await?;
+	let task_after_index = if let Some(after) = &after {
+		list_tasks
+			.stream()
+			.try_filter(|item| ready(&item.1 == after))
+			.try_first()
+			.await?
+			.map(|(index, _)| index)
+	} else {
+		None
+	};
+
+	// remove
+	list_tasks.remove(task_index).await?;
+
+	// insert
+	if let Some(task_after_index) = task_after_index {
+		list_tasks.insert(task_after_index, task_id).await?;
+	} else {
+		list_tasks.push(task_id).await?;
+	}
+
+	// store list
+	list.tasks = list_tasks.store().await?;
+	transaction.lists.get_mut().await?.set(list_index, list).await?;
+
+	Ok(())
+}
+
+async fn reduce_task_move<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	from_list: Option<ListName>,
+	list_name: ListName,
+	task_id: TaskId,
+	after: Option<TaskId>,
+) -> Result<(), anyhow::Error> {
+	// find task and source list
+	let (source_list_index, mut source_list, mut source_list_tasks, source_task_index) =
+		if let Some(from_list) = &from_list {
+			let (source_list_index, source_list) = transaction
+				.find_list_by_name(from_list)
+				.await?
+				.ok_or(anyhow!("List not found: {}", from_list))?;
+			let list_tasks = source_list.tasks.open(&transaction.storage).await?;
+			let source_task_index = list_tasks
+				.stream()
+				.try_filter(|item| ready(&item.1 == &task_id))
+				.try_first()
+				.await?
+				.map(|(index, _)| index)
+				.ok_or(anyhow!("Task not found: {} in list: {}", task_id, source_list.name))?;
+			(source_list_index, source_list, list_tasks, source_task_index)
+		} else {
+			let (source_list_index, source_list, source_task_index) = transaction
+				.find_task_list(&task_id)
+				.await?
+				.ok_or(anyhow!("Task list not found: {}", task_id))?;
+			let list_tasks = source_list.tasks.open(&transaction.storage).await?;
+			(source_list_index, source_list, list_tasks, source_task_index)
+		};
+
+	// find target list
+	let (list_index, mut list) = transaction
+		.find_list_by_name(&list_name)
+		.await?
+		.ok_or(anyhow!("List not found: {}", list_name))?;
+	let mut list_tasks = list.tasks.open(&transaction.storage).await?;
+
+	// find target lsit index
+	let task_after_index = if let Some(after) = &after {
+		list_tasks
+			.stream()
+			.try_filter(|item| ready(&item.1 == after))
+			.try_first()
+			.await?
+			.map(|(index, _)| index)
+	} else {
+		None
+	};
+
+	// remove task from source list
+	source_list_tasks.remove(source_task_index).await?;
+
+	// add task to target list
+	if let Some(task_after_index) = task_after_index {
+		list_tasks.insert(task_after_index, task_id).await?;
+	} else {
+		list_tasks.push(task_id).await?;
+	}
+
+	// store
+	source_list.tasks = source_list_tasks.store().await?;
+	transaction.lists.get_mut().await?.set(source_list_index, source_list).await?;
+	list.tasks = list_tasks.store().await?;
+	transaction.lists.get_mut().await?.set(list_index, list).await?;
+
+	Ok(())
+}
+
+async fn reduce_task_create<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	list: ListName,
+	task: Task,
+	after: Option<TaskId>,
+) -> Result<(), anyhow::Error> {
+	let task_id = task.id.clone();
+
+	// find list
+	let (list_index, mut list) = transaction
+		.find_list_by_name(&list)
+		.await?
+		.ok_or(anyhow!("List not found: {}", list))?;
+
+	// validate id is unique
+	if transaction.tasks.get().await?.contains_key(&task_id).await? {
+		return Err(anyhow!("Task exists: {}", task_id));
+	}
+
+	// create task
+	transaction.tasks.get_mut().await?.insert(task_id.clone(), task).await?;
+
+	// add to list
+	let mut list_tasks = list.tasks.open(&transaction.storage).await?;
+	let task_after_index = if let Some(after) = &after {
+		list_tasks
+			.stream()
+			.try_filter(|item| ready(&item.1 == after))
+			.try_first()
+			.await?
+			.map(|(index, _)| index)
+	} else {
+		None
+	};
+	if let Some(task_after_index) = task_after_index {
+		list_tasks.insert(task_after_index, task_id).await?;
+	} else {
+		list_tasks.push(task_id).await?;
+	}
+
+	// store list
+	list.tasks = list_tasks.store().await?;
+	transaction.lists.get_mut().await?.set(list_index, list).await?;
+
+	Ok(())
+}
+
+async fn reduce_list_tags_remove<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	name: String,
+	tags: Tags,
+) -> Result<(), anyhow::Error> {
+	// find
+	let (list_index, mut list) = transaction
+		.find_list_by_name(&name)
+		.await?
+		.ok_or(anyhow!("List not found: {}", name))?;
+
+	// insert
+	list.tags.clear(Some(&tags));
+
+	// store
+	transaction.lists.get_mut().await?.set(list_index, list).await?;
+	Ok(())
+}
+
+async fn reduce_list_tags_insert<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	name: String,
+	mut tags: Tags,
+) -> Result<(), anyhow::Error> {
+	// find
+	let (list_index, mut list) = transaction
+		.find_list_by_name(&name)
+		.await?
+		.ok_or(anyhow!("List not found: {}", name))?;
+
+	// insert
+	list.tags.append(&mut tags);
+
+	// store
+	transaction.lists.get_mut().await?.set(list_index, list).await?;
+	Ok(())
+}
+
+async fn reduce_list_delete<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	name: String,
+	move_tasks_to_list: Option<String>,
+) -> Result<(), anyhow::Error> {
+	// find
+	let (list_index, list) = transaction
+		.find_list_by_name(&name)
+		.await?
+		.ok_or(anyhow!("List not found: {}", name))?;
+
+	// move tasks
+	if let Some(move_tasks_to_list) = &move_tasks_to_list {
+		let (_to_list_index, to_list) = transaction
+			.find_list_by_name(move_tasks_to_list)
+			.await?
+			.ok_or(anyhow!("List not found: {}", name))?;
+		if !list.tasks.is_empty() {
+			let storage = transaction.storage.clone();
+			let tasks = list.tasks.clone();
+			let tasks = tasks.stream(&storage);
+			pin_mut!(tasks);
+			while let Some((_, task)) = tasks.try_next().await? {
+				reduce_task_move(transaction, None, to_list.name.clone(), task, None).await?;
+			}
+		}
+	}
+
+	// delete list
+	transaction.lists.get_mut().await?.remove(list_index).await?;
+
+	Ok(())
+}
+
+async fn reduce_list_arrange<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	name: String,
+	after: Option<String>,
+) -> Result<(), anyhow::Error> {
+	// find
+	let (list_index, list) = transaction
+		.find_list_by_name(&name)
+		.await?
+		.ok_or(anyhow!("List not found: {}", name))?;
+
+	// find after
+	let after_index = if let Some(after) = &after {
+		transaction.find_list_by_name(&after).await?.map(|(index, _)| index)
+	} else {
+		None
+	};
+
+	// remove
+	transaction.lists.get_mut().await?.remove(list_index).await?;
+
+	// create
+	if let Some(after_index) = after_index {
+		transaction.lists.get_mut().await?.insert(after_index, list).await?;
+	} else {
+		transaction.lists.get_mut().await?.push(list).await?;
+	}
+	Ok(())
+}
+
+async fn reduce_list_create<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	list: List,
+	after: Option<String>,
+) -> Result<(), anyhow::Error> {
+	// verify name not exists yet
+	if transaction.find_list_by_name(&list.name).await?.is_some() {
+		return Err(anyhow!("List already exists: {}", list.name));
+	}
+
+	// find after
+	let after_index = if let Some(after) = &after {
+		transaction.find_list_by_name(&after).await?.map(|(index, _)| index)
+	} else {
+		None
+	};
+
+	// create
+	if let Some(after_index) = after_index {
+		transaction.lists.get_mut().await?.insert(after_index, list).await?;
+	} else {
+		transaction.lists.get_mut().await?.push(list).await?;
+	}
+	Ok(())
+}
+
+async fn reduce_board_tags_remove(state: &mut Board, tags: Tags) -> Result<(), anyhow::Error> {
+	state.tags.clear(Some(&tags));
+	Ok(())
+}
+
+async fn reduce_board_tags_insert(state: &mut Board, mut tags: Tags) -> Result<(), anyhow::Error> {
+	state.tags.append(&mut tags);
+	Ok(())
+}
+
+async fn reduce_board_rename(state: &mut Board, name: String) -> Result<(), anyhow::Error> {
+	state.name = name;
+	Ok(())
+}

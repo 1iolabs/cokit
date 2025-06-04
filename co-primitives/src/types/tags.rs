@@ -190,7 +190,7 @@ impl TagsMatches for Tag {
 }
 
 /// Tags.
-#[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Default, Hash, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize, JsonSchema)]
 pub struct Tags(BTreeSet<Tag>);
 impl Tags {
 	pub fn new() -> Self {

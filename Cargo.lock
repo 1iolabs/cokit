@@ -1503,6 +1503,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-core-board"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cid 0.11.1",
+ "co-api",
+ "futures",
+ "ipld-core",
+ "num-rational",
+ "serde",
+ "serde_repr",
+ "thiserror",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "co-core-co"
 version = "0.1.0"
 dependencies = [
@@ -1886,6 +1904,7 @@ dependencies = [
  "async-trait",
  "cid 0.11.1",
  "co-actor",
+ "co-core-board",
  "co-core-co",
  "co-core-data-series",
  "co-core-file",
