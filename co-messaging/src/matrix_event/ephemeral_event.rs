@@ -1,15 +1,13 @@
 use crate::{EventContent, EventType};
+use cid::Cid;
+use co_macros::co_data;
 use co_primitives::CoCid;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
-/**
- * Event used to indicate which users in the room are currently typing.
- * Gets sent to all active users. For direct messages this information will only be shared with the other
- * participant. Information should be updated regularly and have a timout after which no users should count as
- * typing when no new event was sent.
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Event used to indicate which users in the room are currently typing.
+/// Gets sent to all active users. For direct messages this information will only be shared with the other
+/// participant. Information should be updated regularly and have a timout after which no users should count as
+/// typing when no new event was sent.
+#[co_data]
 pub struct TypingContent {
 	/// List of users currently typing in the room
 	pub user_ids: Vec<String>,
@@ -40,7 +38,7 @@ impl TypingContent {
 /// Offline: The user is not connected to an event stream or is actively suppressing this information
 ///
 /// DnD: As 'Online' but the user doesn't want to be disturbed
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub enum PresenceType {
 	#[serde(rename = "online")]
 	Online,
@@ -50,12 +48,10 @@ pub enum PresenceType {
 	Dnd,
 }
 
-/**
- * Event content that is used to inform other users of the presence status.
- * In contrast to typing events, the sender is important here and always corresponds to the user the information is
- * about.
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Event content that is used to inform other users of the presence status.
+/// In contrast to typing events, the sender is important here and always corresponds to the user the information is
+/// about.
+#[co_data]
 pub struct PresenceContent {
 	pub presence: PresenceType,
 	/// Timestampt in milliseconds when the user last performed an action
@@ -63,7 +59,8 @@ pub struct PresenceContent {
 	/// Whether the user is currently active
 	pub currently_active: bool,
 	/// Avatar the user is currently using
-	pub avatar: CoCid,
+	#[schemars(with = "CoCid")]
+	pub avatar: Cid,
 	/// Display name of the user
 	pub display_name: String,
 	/// An optional arbitrary description to accompany the presence
@@ -87,7 +84,7 @@ impl PresenceContent {
 		presence: PresenceType,
 		last_active: u32,
 		currently_active: bool,
-		avatar: impl Into<CoCid>,
+		avatar: Cid,
 		display_name: impl Into<String>,
 		status_msg: impl Into<String>,
 	) -> Self {

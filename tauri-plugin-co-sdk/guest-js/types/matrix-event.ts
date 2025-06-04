@@ -145,7 +145,7 @@ export type MessageType =
     }
   | {
       /**
-       * a text representing the image in some way
+       * A text representing the image in some way
        */
       body: string;
       /**
@@ -153,7 +153,7 @@ export type MessageType =
        */
       file: Cid;
       /**
-       * image metadata
+       * Image metadata
        */
       info: ImageInfo;
       is_silent?: boolean | null;
@@ -163,7 +163,7 @@ export type MessageType =
     }
   | {
       /**
-       * a text representing the audio in same way
+       * A text representing the audio in same way
        */
       body: string;
       /**
@@ -171,7 +171,7 @@ export type MessageType =
        */
       file: Cid;
       /**
-       * audio metadata
+       * Audio metadata
        */
       info: AudioInfo;
       is_silent?: boolean | null;
@@ -181,7 +181,7 @@ export type MessageType =
     }
   | {
       /**
-       * textual representation of the video
+       * Textual representation of the video
        */
       body: string;
       /**
@@ -189,7 +189,7 @@ export type MessageType =
        */
       file: Cid;
       /**
-       * video metadata
+       * Video metadata
        */
       info: VideoInfo;
       is_silent?: boolean | null;
@@ -199,7 +199,7 @@ export type MessageType =
     }
   | {
       /**
-       * a text representing the file in some way
+       * A text representing the file in some way
        */
       body: string;
       /**
@@ -207,11 +207,11 @@ export type MessageType =
        */
       file: Cid;
       /**
-       * the name of the file
+       * The name of the file
        */
       filename: string;
       /**
-       * file metadata
+       * File metadata
        */
       info: FileInfo;
       is_silent?: boolean | null;
@@ -221,15 +221,15 @@ export type MessageType =
     }
   | {
       /**
-       * textual representation of the location
+       * Textual representation of the location
        */
       body: string;
       /**
-       * a geo uri by definition of https://datatracker.ietf.org/doc/html/rfc5870
+       * A geo uri by definition of https://datatracker.ietf.org/doc/html/rfc5870
        */
       geo_uri: string;
       /**
-       * location metadata
+       * Location metadata
        */
       info: LocationInfo;
       is_silent?: boolean | null;
@@ -238,7 +238,13 @@ export type MessageType =
       relates_to?: RelatesTo | null;
     }
   | {
+      /**
+       * A textual representation of the poll, i.e. the question
+       */
       body: string;
+      /**
+       * Information about the created poll
+       */
       info: PollCreationInfo;
       is_silent?: boolean | null;
       msgtype: "poll_start";
@@ -246,7 +252,13 @@ export type MessageType =
       relates_to?: RelatesTo | null;
     }
   | {
+      /**
+       * List of IDs of the answers the user has responded with
+       */
       answers: string[];
+      /**
+       * Textual representation of the answers
+       */
       body: string;
       is_silent?: boolean | null;
       msgtype: "poll_response";
@@ -254,6 +266,9 @@ export type MessageType =
       relates_to?: RelatesTo | null;
     }
   | {
+      /**
+       * Textual representation of the poll ending
+       */
       body: string;
       is_silent?: boolean | null;
       msgtype: "poll_end";
@@ -417,10 +432,25 @@ export interface ReactionContent {
  * Used in some event contents to define a relation to other events
  */
 export interface RelatesTo {
+  /**
+   * The ID of the event that is being related to
+   */
   event_id?: string | null;
+  /**
+   * Special relation to depict replies. Listed extra as this can happen with the other relations simultaneously
+   */
   in_reply_to?: ReplyContent | null;
+  /**
+   * Used for annotations. Defines the type of emoji that has been reacted with.
+   */
   key?: string | null;
+  /**
+   * The type of the relation
+   */
   rel_type?: RelationType | null;
+  /**
+   * The ID of the room the related-to event is in. Only needed for forwarding.
+   */
   room_id?: string | null;
 }
 export interface ReplyContent {
@@ -430,20 +460,35 @@ export interface ReplyContent {
  * Event content used to redact other events. Sender of this event must be either the same as the sender of the original event or a user with the necessary permissions. Redactions are idempotent and irreversible. They do not use the same relation fields as other events
  */
 export interface RedactionContent {
+  /**
+   * An optional reason field mostly used when event got redacted by another user
+   */
   reason?: string | null;
+  /**
+   * Event ID of the redacted event
+   */
   redacts: string;
 }
 /**
  * These receipts are always sent into a room and indicate to all users that the messages sent up to the indicated event were read by the user that sent this receipt event. This becomes public knowledge to all users participating in the CO.
  */
 export interface PublicReceiptContent {
+  /**
+   * The ID of the latest event read by the user
+   */
   "m.read": string;
+  /**
+   * The ID of the thread if receipt is threaded
+   */
   thread_id?: string | null;
 }
 /**
  * Private read receipts are saved in a users private CO so other users cannot infer the read status. The read map in this event only needs to contain the delta on the users receipts. This means that there is no need to contain the complete read receipt state in this event but only the changes.
  */
 export interface PrivateReceiptContent {
+  /**
+   * Map of all room IDs to receipts
+   */
   "m.read.private": {
     [k: string]: PrivateReceipt;
   };
@@ -452,7 +497,13 @@ export interface PrivateReceiptContent {
  * A read receipt for one specific room. Indicates that a user has read all messages up to the given event.
  */
 export interface PrivateReceipt {
+  /**
+   * The ID of the event the receipt references
+   */
   event_id: string;
+  /**
+   * The ID of the thread if receipt is threaded
+   */
   thread_id: string;
 }
 export interface RoomNameContent {
@@ -473,11 +524,11 @@ export interface Cid {
  */
 export interface ImageInfo {
   /**
-   * intended display height in px
+   * Intended display height in px
    */
   h: number;
   /**
-   * mimetype of the file
+   * Mimetype of the file
    */
   mimetype: string;
   /**
@@ -489,11 +540,11 @@ export interface ImageInfo {
    */
   thumbnail_file: Cid;
   /**
-   * thumbnail metadata
+   * Thumbnail metadata
    */
   thumbnail_info: ThumbnailInfo;
   /**
-   * intended display width in px
+   * Intended display width in px
    */
   w: number;
 }
@@ -502,11 +553,11 @@ export interface ImageInfo {
  */
 export interface ThumbnailInfo {
   /**
-   * intended display height in px
+   * Intended display height in px
    */
   h: number;
   /**
-   * mimetype of the file
+   * Mimetype of the file
    */
   mimetype: string;
   /**
@@ -514,7 +565,7 @@ export interface ThumbnailInfo {
    */
   size: number;
   /**
-   * intended display width in px
+   * Intended display width in px
    */
   w: number;
 }
@@ -581,7 +632,7 @@ export interface SelectCallAnswerContent {
   call_id: string;
   party_id: string;
   /**
-   * party id of the participant whose answer has been selected
+   * Party id of the participant whose answer has been selected
    */
   selected_party_id: string;
   version: string;
@@ -591,7 +642,7 @@ export interface SelectCallAnswerContent {
  */
 export interface CallNegotiationContent {
   /**
-   * session description object for negotioation answers
+   * Session description object for negotioation answers
    */
   answer?: SessionDescription | null;
   call_id: string;
@@ -673,11 +724,23 @@ export interface PostUserStoryContent {
   lifetime: number;
 }
 export interface ViewUserStoryContent {
+  /**
+   * ID of the event that containes the viewed story
+   */
   story: string;
 }
 export interface UpdateProfileContent {
+  /**
+   * Content ID pointing to the avatar of the user
+   */
   avatar?: Cid | null;
+  /**
+   * The name that the user likes to use as a default
+   */
   display_name: string;
+  /**
+   * The current status of the user
+   */
   status_msg: string;
 }
 /**
@@ -685,15 +748,15 @@ export interface UpdateProfileContent {
  */
 export interface AudioInfo {
   /**
-   * duration of the audio clip in ms
+   * Duration of the audio clip in ms
    */
   duration: number;
   /**
-   * mimetype of the audio file
+   * Mimetype of the audio file
    */
   mimetype: string;
   /**
-   * size of the audio file in bytes
+   * Size of the audio file in bytes
    */
   size: number;
 }
@@ -702,15 +765,15 @@ export interface AudioInfo {
  */
 export interface VideoInfo {
   /**
-   * duration of the video clip in ms
+   * Duration of the video clip in ms
    */
   duration: number;
   /**
-   * intended display height in px
+   * Intended display height in px
    */
   h: number;
   /**
-   * mimetype of the file
+   * Mimetype of the file
    */
   mimetype: string;
   /**
@@ -722,11 +785,11 @@ export interface VideoInfo {
    */
   thumbnail_file: Cid;
   /**
-   * thumbnail metadata
+   * Thumbnail metadata
    */
   thumbnail_info: ThumbnailInfo;
   /**
-   * intended display width in px
+   * Intended display width in px
    */
   w: number;
 }
@@ -735,7 +798,7 @@ export interface VideoInfo {
  */
 export interface FileInfo {
   /**
-   * mimetype of the file
+   * Mimetype of the file
    */
   mimetype: string;
   /**
@@ -747,7 +810,7 @@ export interface FileInfo {
    */
   thumbnail_file: Cid;
   /**
-   * thumbnail metadata
+   * Thumbnail metadata
    */
   thumbnail_info: ThumbnailInfo;
 }
@@ -760,23 +823,41 @@ export interface LocationInfo {
    */
   thumbnail_file: Cid;
   /**
-   * thumbnail metadata
+   * Thumbnail metadata
    */
   thumbnail_info: ThumbnailInfo;
 }
 /**
- * metadata for poll creation event
+ * Metadata for poll creation event
  */
 export interface PollCreationInfo {
+  /**
+   * Vector with possible answers
+   */
   answers: PollAnswer[];
+  /**
+   * What kind of poll this is
+   */
   kind: PollKind;
+  /**
+   * The maximum number of answers users can select. Default is 1 and cannot be less
+   */
   max_selections: number;
+  /**
+   * The question the poll was created for
+   */
   question: string;
 }
 /**
  * One possible answer in a poll. ID should be unique across answers.
  */
 export interface PollAnswer {
+  /**
+   * Text of the answer
+   */
   answer: string;
+  /**
+   * Unique ID to identify an answer
+   */
   id: string;
 }

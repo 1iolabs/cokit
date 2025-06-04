@@ -3433,7 +3433,7 @@ dependencies = [
  "co-storage",
  "ipld-core",
  "serde",
- "thiserror",
+ "thiserror 1.0.63",
  "tokio",
  "tracing",
  "tracing-subscriber",

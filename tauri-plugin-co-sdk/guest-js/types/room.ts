@@ -43,7 +43,7 @@ export type Double = number;
 export type Tags = [string, TagValue][];
 
 /**
- * eco Messenger room COre
+ * eCO Messenger room core
  */
 export interface Room {
   /**

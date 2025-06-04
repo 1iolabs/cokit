@@ -1,9 +1,8 @@
 use crate::{EventContent, EventType};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use co_macros::co_data;
 
 /// Session description object for sdp offers and answers
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct SessionDescription {
 	pub sdp: String,
 	#[serde(rename = "type")]
@@ -17,7 +16,7 @@ impl SessionDescription {
 }
 
 /// ICE candidate for WebRTC exchange protocol
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct ICECandidate {
 	pub candidate: String, // SDP 'a' line of the candidate
 	#[serde(rename = "sdpMLineIndex")]
@@ -33,7 +32,7 @@ impl ICECandidate {
 }
 
 /// Initial event to invite other parties to a call
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct CallInviteContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -79,7 +78,7 @@ impl CallInviteContent {
 }
 
 ///Event used when answering an invite event
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct AnswerCallContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -110,8 +109,8 @@ impl AnswerCallContent {
 	}
 }
 
-///Event used to exchange viable ICE candidates with the other party upon answering a call
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Event used to exchange viable ICE candidates with the other party upon answering a call
+#[co_data]
 pub struct CallCandidatesContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -137,13 +136,13 @@ impl CallCandidatesContent {
 	}
 }
 
-///Event used to select one of possibly multiple call answers
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Event used to select one of possibly multiple call answers
+#[co_data]
 pub struct SelectCallAnswerContent {
 	pub call_id: String,
 	pub party_id: String,
 	pub version: String,
-	/// party id of the participant whose answer has been selected
+	/// Party id of the participant whose answer has been selected
 	pub selected_party_id: String,
 }
 
@@ -170,15 +169,15 @@ impl SelectCallAnswerContent {
 	}
 }
 
-///Event used to renegotiate between participants. First an offer containing a lifetime is sent. Other participants
-///then send an answer. Offer and answer should never both be set. To ensure this they are not public to force the
-///users to use the setters.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Event used to renegotiate between participants. First an offer containing a lifetime is sent. Other participants
+/// then send an answer. Offer and answer should never both be set. To ensure this they are not public to force the
+/// users to use the setters.
+#[co_data]
 pub struct CallNegotiationContent {
 	pub call_id: String,
 	pub party_id: String,
 	pub version: String,
-	/// session description object for negotioation answers
+	/// Session description object for negotioation answers
 	#[serde(skip_serializing_if = "Option::is_none")]
 	answer: Option<SessionDescription>,
 	/// Session description object for negotioation offers
@@ -248,8 +247,8 @@ impl CallNegotiationContent {
 	}
 }
 
-///Event sent if call was rejected by a user.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Event sent if call was rejected by a user.
+#[co_data]
 pub struct RejectCallContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -274,8 +273,8 @@ impl RejectCallContent {
 	}
 }
 
-///Enum containg possible reasons for a hangup event
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Enum containg possible reasons for a hangup event
+#[co_data]
 pub enum HangupCallReason {
 	/// ICE negotiation has failed and connection could not be established
 	#[serde(rename = "ice_failed")]
@@ -300,10 +299,8 @@ pub enum HangupCallReason {
 	UnknownError,
 }
 
-/**
- * Hangup event used to signal the termination of the call.
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Hangup event used to signal the termination of the call.
+#[co_data]
 pub struct HangupCallContent {
 	pub call_id: String,
 	pub party_id: String,

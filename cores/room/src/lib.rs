@@ -1,13 +1,10 @@
-use co_api::{Context, Reducer, ReducerAction, Tags};
+use cid::Cid;
+use co_api::{co_state, Context, Reducer, ReducerAction, Tags};
 use co_messaging::{EventContent, MatrixEvent};
 use co_primitives::CoCid;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
-/**
- * eco Messenger room COre
- */
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
+/// eCO Messenger room core
+#[co_state]
 pub struct Room {
 	/// Name of the room
 	pub name: String,
@@ -16,7 +13,8 @@ pub struct Room {
 	pub description: String,
 
 	/// Content ID for the room avatar
-	pub avatar: Option<CoCid>,
+	#[schemars(with = "Option<CoCid>")]
+	pub avatar: Option<Cid>,
 
 	/// All currently pinned messages in relevant order
 	pub pinned_messages: Vec<String>,

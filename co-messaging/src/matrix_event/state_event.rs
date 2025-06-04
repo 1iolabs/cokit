@@ -1,10 +1,10 @@
 use super::multimedia::ImageInfo;
 use crate::{EventContent, EventType};
+use cid::Cid;
+use co_macros::co_data;
 use co_primitives::CoCid;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct RoomNameContent {
 	pub name: String,
 }
@@ -27,7 +27,7 @@ impl From<RoomNameContent> for EventContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct RoomTopicContent {
 	pub topic: String,
 }
@@ -50,14 +50,15 @@ impl From<RoomTopicContent> for EventContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct RoomAvatarContent {
-	pub file: Option<CoCid>,
+	#[schemars(with = "Option<CoCid>")]
+	pub file: Option<Cid>,
 	pub info: ImageInfo,
 }
 
 impl RoomAvatarContent {
-	pub fn new(file: Option<impl Into<CoCid>>, info: ImageInfo) -> Self {
+	pub fn new(file: Option<Cid>, info: ImageInfo) -> Self {
 		Self { file: file.map(Into::into), info }
 	}
 }
@@ -74,7 +75,7 @@ impl From<RoomAvatarContent> for EventContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct PinnedEventsContent {
 	pub pinned: Vec<String>,
 }

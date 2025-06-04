@@ -74,7 +74,8 @@ pub enum TagValue {
 	/// Represents an IPLD Link structure, implemented with Cid's (Content Identifiers)
 	/// For more information see: https://ipld.io/docs/data-model/kinds/#link-kind
 	#[from]
-	Link(CoCid),
+	#[schemars(with = "CoCid")]
+	Link(Cid),
 }
 impl TagValue {
 	/// Test if the default value is assigned.
@@ -135,11 +136,6 @@ impl From<&str> for TagValue {
 		Self::String(value.to_owned())
 	}
 }
-impl From<Cid> for TagValue {
-	fn from(value: Cid) -> Self {
-		Self::Link(value.into())
-	}
-}
 impl std::fmt::Display for TagValue {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
@@ -190,7 +186,7 @@ impl TagsMatches for Tag {
 }
 
 /// Tags.
-#[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Default, PartialEq, Eq, PartialOrd, Ord, From, Hash, Serialize, Deserialize, JsonSchema)]
 pub struct Tags(BTreeSet<Tag>);
 impl Tags {
 	pub fn new() -> Self {
@@ -325,7 +321,7 @@ impl Tags {
 	/// Find first tag value, that is a link, by key.
 	pub fn link(&self, key: &str) -> Option<&Cid> {
 		self.0.iter().find_map(|tag| match tag {
-			(k, TagValue::Link(link)) if k == key => Some(link.as_ref()),
+			(k, TagValue::Link(link)) if k == key => Some(link),
 			_ => None,
 		})
 	}

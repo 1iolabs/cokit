@@ -3,15 +3,12 @@ use super::{
 	poll_event::{PollEndContent, PollResponseContent, PollStartContent},
 };
 use crate::{matrix_event::relation::RelatesTo, multimedia::VideoInfo, relation::Relation, EventContent};
+use cid::Cid;
+use co_macros::co_data;
 use co_primitives::{CoCid, Did};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
-/**
- * Events that sent actual messages that can be seen by all participants in a room.
- */
-// #[typeshare]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Events that sent actual messages that can be seen by all participants in a room.
+#[co_data]
 #[serde(tag = "msgtype")]
 pub enum MessageType {
 	#[serde(rename = "text")]
@@ -92,30 +89,24 @@ impl From<MessageType> for EventContent {
 	}
 }
 
-/**
- * Simple trait for all events that have text that is formatted in a specific way. Usually these events need to
- * have fields for the format and the formatted text. Provides declaration for simple functions that provide
- * formatting functionality as well as getters and setters.
- */
+/// Simple trait for all events that have text that is formatted in a specific way. Usually these events need to
+/// have fields for the format and the formatted text. Provides declaration for simple functions that provide
+/// formatting functionality as well as getters and setters.
 pub trait Formattable {
 	fn format_body(&self) -> String;
 	fn set_format(&mut self, formatted_body: impl Into<String>, format: impl Into<String>);
 	fn remove_format(&mut self);
 }
 
-/**
- * Used to describe which users got mentioned in the body of a message
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Used to describe which users got mentioned in the body of a message
+#[co_data]
 pub struct Mentions {
 	pub user_ids: Vec<Did>,
 }
 
-/**
- * Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
- * also given.
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
+/// also given.
+#[co_data]
 pub struct TextContent {
 	/// A formatted version of the body
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -158,7 +149,7 @@ impl From<TextContent> for EventContent {
 
 impl Formattable for TextContent {
 	fn set_format(&mut self, formatted_body: impl Into<String>, format: impl Into<String>) {
-		// todo: validate format
+		// TODO: validate format
 		self.formatted_body = Some(formatted_body.into());
 		self.format = Some(format.into());
 	}
@@ -186,11 +177,9 @@ impl Relation for TextContent {
 	}
 }
 
-/**
- * formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
- * also given
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
+/// also given
+#[co_data]
 pub struct NoticeContent {
 	/// A formatted version of the body
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -233,7 +222,7 @@ impl From<NoticeContent> for EventContent {
 
 impl Formattable for NoticeContent {
 	fn set_format(&mut self, formatted_body: impl Into<String>, format: impl Into<String>) {
-		// todo validate format
+		// TODO: validate format
 		self.formatted_body = Some(formatted_body.into());
 		self.format = Some(format.into());
 	}
@@ -261,13 +250,14 @@ impl Relation for NoticeContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct ImageContent {
-	/// a text representing the image in some way
+	/// A text representing the image in some way
 	pub body: String,
 	/// CID to the image file
-	pub file: CoCid,
-	/// image metadata
+	#[schemars(with = "CoCid")]
+	pub file: Cid,
+	/// Image metadata
 	pub info: ImageInfo,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_silent: Option<bool>,
@@ -278,7 +268,7 @@ pub struct ImageContent {
 }
 
 impl ImageContent {
-	pub fn new(body: impl Into<String>, file: impl Into<CoCid>, info: ImageInfo) -> Self {
+	pub fn new(body: impl Into<String>, file: Cid, info: ImageInfo) -> Self {
 		Self { body: body.into(), file: file.into(), info, is_silent: None, relates_to: None, new_content: None }
 	}
 }
@@ -304,13 +294,14 @@ impl Relation for ImageContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct AudioContent {
-	/// a text representing the audio in same way
+	/// A text representing the audio in same way
 	pub body: String,
 	/// CID to the audio file
-	pub file: CoCid,
-	/// audio metadata
+	#[schemars(with = "CoCid")]
+	pub file: Cid,
+	/// Audio metadata
 	pub info: AudioInfo,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_silent: Option<bool>,
@@ -321,7 +312,7 @@ pub struct AudioContent {
 }
 
 impl AudioContent {
-	pub fn new(body: impl Into<String>, file: impl Into<CoCid>, info: AudioInfo) -> Self {
+	pub fn new(body: impl Into<String>, file: Cid, info: AudioInfo) -> Self {
 		Self { body: body.into(), file: file.into(), info, is_silent: None, relates_to: None, new_content: None }
 	}
 }
@@ -347,13 +338,14 @@ impl Relation for AudioContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct VideoContent {
-	/// textual representation of the video
+	/// Textual representation of the video
 	pub body: String,
 	/// CID to the video
-	pub file: CoCid,
-	/// video metadata
+	#[schemars(with = "CoCid")]
+	pub file: Cid,
+	/// Video metadata
 	pub info: VideoInfo,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_silent: Option<bool>,
@@ -364,7 +356,7 @@ pub struct VideoContent {
 }
 
 impl VideoContent {
-	pub fn new(body: impl Into<String>, file: impl Into<CoCid>, info: VideoInfo) -> Self {
+	pub fn new(body: impl Into<String>, file: Cid, info: VideoInfo) -> Self {
 		Self { body: body.into(), file: file.into(), info, is_silent: None, relates_to: None, new_content: None }
 	}
 }
@@ -390,15 +382,16 @@ impl Relation for VideoContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct FileContent {
-	/// a text representing the file in some way
+	/// A text representing the file in some way
 	pub body: String,
 	/// CID to the file
-	pub file: CoCid,
-	/// the name of the file
+	#[schemars(with = "CoCid")]
+	pub file: Cid,
+	/// The name of the file
 	pub filename: String,
-	/// file metadata
+	/// File metadata
 	pub info: FileInfo,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_silent: Option<bool>,
@@ -409,7 +402,7 @@ pub struct FileContent {
 }
 
 impl FileContent {
-	pub fn new(body: impl Into<String>, file: impl Into<CoCid>, filename: impl Into<String>, info: FileInfo) -> Self {
+	pub fn new(body: impl Into<String>, file: Cid, filename: impl Into<String>, info: FileInfo) -> Self {
 		Self {
 			body: body.into(),
 			file: file.into(),
@@ -443,13 +436,13 @@ impl Relation for FileContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct LocationContent {
-	/// textual representation of the location
+	/// Textual representation of the location
 	pub body: String,
-	/// a geo uri by definition of https://datatracker.ietf.org/doc/html/rfc5870
+	/// A geo uri by definition of https://datatracker.ietf.org/doc/html/rfc5870
 	pub geo_uri: String,
-	/// location metadata
+	/// Location metadata
 	pub info: LocationInfo,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_silent: Option<bool>,

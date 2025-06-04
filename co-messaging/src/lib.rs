@@ -6,6 +6,7 @@ pub static FORMATTED_BODY_FORMAT: &str = "some.html.standard.format";
 pub use crate::matrix_event::{
 	call_event, ephemeral_event, message_event, multimedia, poll_event, receipts, relation, state_event, user_events,
 };
+use co_macros::co_data;
 use matrix_event::{
 	call_event::{
 		AnswerCallContent, CallCandidatesContent, CallInviteContent, CallNegotiationContent, HangupCallContent,
@@ -18,15 +19,13 @@ use matrix_event::{
 	state_event::{PinnedEventsContent, RoomAvatarContent, RoomNameContent, RoomTopicContent},
 	user_events::{PostUserStoryContent, UpdateProfileContent, ViewUserStoryContent},
 };
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 pub trait EventType {
 	fn generate_event_type(&self) -> String;
 }
 
 /// Collection of all possible actions for the room core
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct MatrixEvent {
 	pub event_id: String,
 	pub timestamp: u128,
@@ -50,7 +49,7 @@ impl MatrixEvent {
 		self.content.generate_event_type()
 	}
 	pub fn set_state_key(&mut self, state_key: String) {
-		// todo filter for event types that can have a state key
+		// TODO: filter for event types that can have a state key
 		self.state_key = Some(state_key);
 	}
 	pub fn set_timestamp(&mut self, ts: u128) {
@@ -100,7 +99,7 @@ impl EventType for MatrixEvent {
 /// # User events
 ///
 /// Events for interacting with users profiles
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 #[serde(tag = "type", content = "content")]
 pub enum EventContent {
 	#[serde(rename = "m_room_message")]
@@ -150,7 +149,7 @@ pub enum EventContent {
 }
 
 impl EventContent {
-	// will generate the message type if it is a EventContent::Message. Returns an error otherwise
+	/// Will generate the message type if it is a EventContent::Message. Returns an error otherwise
 	pub fn generate_message_type(&self) -> Result<String, String> {
 		match self {
 			EventContent::Message(m) => Ok(m.generate_message_type()),

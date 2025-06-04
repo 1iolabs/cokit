@@ -1,14 +1,13 @@
 use crate::{matrix_event::relation::RelatesTo, message_event::MessageType, relation::Relation, EventContent};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use co_macros::co_data;
 
-/**
- * Event used to create a poll.
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Event used to create a poll.
+#[co_data]
 pub struct PollStartContent {
-	pub body: String,           // A textual representation of the poll, i.e. the question
-	pub info: PollCreationInfo, // Information about the created poll
+	/// A textual representation of the poll, i.e. the question
+	pub body: String,
+	/// Information about the created poll
+	pub info: PollCreationInfo,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_silent: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -57,15 +56,17 @@ impl Relation for PollStartContent {
 	}
 }
 
-/**
- * metadata for poll creation event
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Metadata for poll creation event
+#[co_data]
 pub struct PollCreationInfo {
-	pub question: String,         // the question the poll was created for
-	pub answers: Vec<PollAnswer>, // vector with possible answers
-	pub kind: PollKind,           // what kind of poll this is
-	max_selections: u8,           // the maximum number of answers users can select. Default is 1 and cannot be less
+	/// The question the poll was created for
+	pub question: String,
+	/// Vector with possible answers
+	pub answers: Vec<PollAnswer>,
+	/// What kind of poll this is
+	pub kind: PollKind,
+	/// The maximum number of answers users can select. Default is 1 and cannot be less
+	max_selections: u8,
 }
 
 impl PollCreationInfo {
@@ -82,13 +83,13 @@ impl PollCreationInfo {
 	}
 }
 
-/**
- * One possible answer in a poll. ID should be unique across answers.
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// One possible answer in a poll. ID should be unique across answers.
+#[co_data]
 pub struct PollAnswer {
-	pub id: String,     // Unique ID to identify an answer
-	pub answer: String, // Text of the answer
+	/// Unique ID to identify an answer
+	pub id: String,
+	/// Text of the answer
+	pub answer: String,
 }
 
 impl PollAnswer {
@@ -97,20 +98,25 @@ impl PollAnswer {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub enum PollKind {
+	/// In disclosed polls all participants can see the already cast votes (including who cast them)
 	#[serde(rename = "disclosed")]
-	Disclosed, // In disclosed polls all participants can see the already cast votes (including who cast them)
+	Disclosed,
+	/// In undisclosed polls the votes will only appear when the poll has ended
 	#[serde(rename = "undisclosed")]
-	Undisclosed, // In undisclosed polls the votes will only appear when the poll has ended
+	Undisclosed,
+	/// As undisclosed but voters will stay hidden even after poll has ended
 	#[serde(rename = "anonymous")]
-	Anonymous, // As undisclosed but voters will stay hidden even after poll has ended
+	Anonymous,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct PollResponseContent {
-	pub body: String,         // Textual representation of the answers
-	pub answers: Vec<String>, // List of IDs of the answers the user has responded with
+	/// Textual representation of the answers
+	pub body: String,
+	/// List of IDs of the answers the user has responded with
+	pub answers: Vec<String>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_silent: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -153,12 +159,11 @@ impl From<PollResponseContent> for EventContent {
 	}
 }
 
-/**
- * Event that closes the poll. For undisclosed and anonymous polls, this is the point where the reults are shown.
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Event that closes the poll. For undisclosed and anonymous polls, this is the point where the reults are shown.
+#[co_data]
 pub struct PollEndContent {
-	pub body: String, // Textual representation of the poll ending
+	/// Textual representation of the poll ending
+	pub body: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_silent: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]

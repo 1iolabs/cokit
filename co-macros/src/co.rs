@@ -7,7 +7,7 @@ pub fn macro_co_data(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 	// let input: proc_macro2::TokenStream = input.into();
 
 	let expanded = quote! {
-		#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
+		#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord, schemars::JsonSchema)]
 		#input
 	};
 
@@ -20,7 +20,7 @@ pub fn macro_co_state(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 	let name = &input.ident;
 
 	let expanded = quote! {
-		#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
+		#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord, schemars::JsonSchema)]
 		#input
 
 		#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]

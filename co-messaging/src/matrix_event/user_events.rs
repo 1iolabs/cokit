@@ -1,16 +1,17 @@
 use crate::{EventContent, EventType};
+use cid::Cid;
+use co_macros::co_data;
 use co_primitives::CoCid;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct PostUserStoryContent {
 	/// How long users can view the story after it was posted in ms
 	pub lifetime: u64,
 	/// How long the story will be shown once opened in ms
 	pub display_time: u64,
 	/// Content ID for a json file containing the story data
-	pub content: CoCid,
+	#[schemars(with = "CoCid")]
+	pub content: Cid,
 }
 
 impl EventType for PostUserStoryContent {
@@ -26,14 +27,15 @@ impl From<PostUserStoryContent> for EventContent {
 }
 
 impl PostUserStoryContent {
-	pub fn new(lifetime: u64, display_time: u64, content: impl Into<CoCid>) -> Self {
-		Self { lifetime, display_time, content: content.into() }
+	pub fn new(lifetime: u64, display_time: u64, content: Cid) -> Self {
+		Self { lifetime, display_time, content }
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct ViewUserStoryContent {
-	pub story: String, // ID of the event that containes the viewed story
+	/// ID of the event that containes the viewed story
+	pub story: String,
 }
 
 impl EventType for ViewUserStoryContent {
@@ -54,11 +56,15 @@ impl ViewUserStoryContent {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
 pub struct UpdateProfileContent {
-	pub display_name: String,  // The name that the user likes to use as a default
-	pub avatar: Option<CoCid>, // Content ID pointing to the avatar of the user
-	pub status_msg: String,    // The current status of the user
+	/// The name that the user likes to use as a default
+	pub display_name: String,
+	/// Content ID pointing to the avatar of the user
+	#[schemars(with = "Option<CoCid>")]
+	pub avatar: Option<Cid>,
+	/// The current status of the user
+	pub status_msg: String,
 }
 
 impl EventType for UpdateProfileContent {
@@ -74,11 +80,7 @@ impl From<UpdateProfileContent> for EventContent {
 }
 
 impl UpdateProfileContent {
-	pub fn new(
-		display_name: impl Into<String>,
-		avatar: impl Into<Option<CoCid>>,
-		status_msg: impl Into<String>,
-	) -> Self {
-		Self { display_name: display_name.into(), avatar: avatar.into(), status_msg: status_msg.into() }
+	pub fn new(display_name: impl Into<String>, avatar: Option<Cid>, status_msg: impl Into<String>) -> Self {
+		Self { display_name: display_name.into(), avatar, status_msg: status_msg.into() }
 	}
 }

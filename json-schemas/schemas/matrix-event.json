@@ -424,17 +424,17 @@
       ],
       "properties": {
         "duration": {
-          "description": "duration of the audio clip in ms",
+          "description": "Duration of the audio clip in ms",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
         },
         "mimetype": {
-          "description": "mimetype of the audio file",
+          "description": "Mimetype of the audio file",
           "type": "string"
         },
         "size": {
-          "description": "size of the audio file in bytes",
+          "description": "Size of the audio file in bytes",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
@@ -521,7 +521,7 @@
       ],
       "properties": {
         "answer": {
-          "description": "session description object for negotioation answers",
+          "description": "Session description object for negotioation answers",
           "anyOf": [
             {
               "$ref": "#/definitions/SessionDescription"
@@ -950,7 +950,7 @@
       ],
       "properties": {
         "mimetype": {
-          "description": "mimetype of the file",
+          "description": "Mimetype of the file",
           "type": "string"
         },
         "size": {
@@ -968,7 +968,7 @@
           ]
         },
         "thumbnail_info": {
-          "description": "thumbnail metadata",
+          "description": "Thumbnail metadata",
           "allOf": [
             {
               "$ref": "#/definitions/ThumbnailInfo"
@@ -1090,13 +1090,13 @@
       ],
       "properties": {
         "h": {
-          "description": "intended display height in px",
+          "description": "Intended display height in px",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
         },
         "mimetype": {
-          "description": "mimetype of the file",
+          "description": "Mimetype of the file",
           "type": "string"
         },
         "size": {
@@ -1114,7 +1114,7 @@
           ]
         },
         "thumbnail_info": {
-          "description": "thumbnail metadata",
+          "description": "Thumbnail metadata",
           "allOf": [
             {
               "$ref": "#/definitions/ThumbnailInfo"
@@ -1122,7 +1122,7 @@
           ]
         },
         "w": {
-          "description": "intended display width in px",
+          "description": "Intended display width in px",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
@@ -1146,7 +1146,7 @@
           ]
         },
         "thumbnail_info": {
-          "description": "thumbnail metadata",
+          "description": "Thumbnail metadata",
           "allOf": [
             {
               "$ref": "#/definitions/ThumbnailInfo"
@@ -1245,7 +1245,7 @@
           }
         },
         {
-          "description": "formatted body and format are not pub to ensure with setters that formatted body is only set when a format is also given",
+          "description": "Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is also given",
           "type": "object",
           "required": [
             "body",
@@ -1325,7 +1325,7 @@
           ],
           "properties": {
             "body": {
-              "description": "a text representing the image in some way",
+              "description": "A text representing the image in some way",
               "type": "string"
             },
             "file": {
@@ -1337,7 +1337,7 @@
               ]
             },
             "info": {
-              "description": "image metadata",
+              "description": "Image metadata",
               "allOf": [
                 {
                   "$ref": "#/definitions/ImageInfo"
@@ -1388,7 +1388,7 @@
           ],
           "properties": {
             "body": {
-              "description": "a text representing the audio in same way",
+              "description": "A text representing the audio in same way",
               "type": "string"
             },
             "file": {
@@ -1400,7 +1400,7 @@
               ]
             },
             "info": {
-              "description": "audio metadata",
+              "description": "Audio metadata",
               "allOf": [
                 {
                   "$ref": "#/definitions/AudioInfo"
@@ -1451,7 +1451,7 @@
           ],
           "properties": {
             "body": {
-              "description": "textual representation of the video",
+              "description": "Textual representation of the video",
               "type": "string"
             },
             "file": {
@@ -1463,7 +1463,7 @@
               ]
             },
             "info": {
-              "description": "video metadata",
+              "description": "Video metadata",
               "allOf": [
                 {
                   "$ref": "#/definitions/VideoInfo"
@@ -1515,7 +1515,7 @@
           ],
           "properties": {
             "body": {
-              "description": "a text representing the file in some way",
+              "description": "A text representing the file in some way",
               "type": "string"
             },
             "file": {
@@ -1527,11 +1527,11 @@
               ]
             },
             "filename": {
-              "description": "the name of the file",
+              "description": "The name of the file",
               "type": "string"
             },
             "info": {
-              "description": "file metadata",
+              "description": "File metadata",
               "allOf": [
                 {
                   "$ref": "#/definitions/FileInfo"
@@ -1582,15 +1582,15 @@
           ],
           "properties": {
             "body": {
-              "description": "textual representation of the location",
+              "description": "Textual representation of the location",
               "type": "string"
             },
             "geo_uri": {
-              "description": "a geo uri by definition of https://datatracker.ietf.org/doc/html/rfc5870",
+              "description": "A geo uri by definition of https://datatracker.ietf.org/doc/html/rfc5870",
               "type": "string"
             },
             "info": {
-              "description": "location metadata",
+              "description": "Location metadata",
               "allOf": [
                 {
                   "$ref": "#/definitions/LocationInfo"
@@ -1641,10 +1641,16 @@
           ],
           "properties": {
             "body": {
+              "description": "A textual representation of the poll, i.e. the question",
               "type": "string"
             },
             "info": {
-              "$ref": "#/definitions/PollCreationInfo"
+              "description": "Information about the created poll",
+              "allOf": [
+                {
+                  "$ref": "#/definitions/PollCreationInfo"
+                }
+              ]
             },
             "is_silent": {
               "type": [
@@ -1689,12 +1695,14 @@
           ],
           "properties": {
             "answers": {
+              "description": "List of IDs of the answers the user has responded with",
               "type": "array",
               "items": {
                 "type": "string"
               }
             },
             "body": {
+              "description": "Textual representation of the answers",
               "type": "string"
             },
             "is_silent": {
@@ -1740,6 +1748,7 @@
           ],
           "properties": {
             "body": {
+              "description": "Textual representation of the poll ending",
               "type": "string"
             },
             "is_silent": {
@@ -1801,15 +1810,17 @@
       ],
       "properties": {
         "answer": {
+          "description": "Text of the answer",
           "type": "string"
         },
         "id": {
+          "description": "Unique ID to identify an answer",
           "type": "string"
         }
       }
     },
     "PollCreationInfo": {
-      "description": "metadata for poll creation event",
+      "description": "Metadata for poll creation event",
       "type": "object",
       "required": [
         "answers",
@@ -1819,30 +1830,55 @@
       ],
       "properties": {
         "answers": {
+          "description": "Vector with possible answers",
           "type": "array",
           "items": {
             "$ref": "#/definitions/PollAnswer"
           }
         },
         "kind": {
-          "$ref": "#/definitions/PollKind"
+          "description": "What kind of poll this is",
+          "allOf": [
+            {
+              "$ref": "#/definitions/PollKind"
+            }
+          ]
         },
         "max_selections": {
+          "description": "The maximum number of answers users can select. Default is 1 and cannot be less",
           "type": "integer",
           "format": "uint8",
           "minimum": 0.0
         },
         "question": {
+          "description": "The question the poll was created for",
           "type": "string"
         }
       }
     },
     "PollKind": {
-      "type": "string",
-      "enum": [
-        "disclosed",
-        "undisclosed",
-        "anonymous"
+      "oneOf": [
+        {
+          "description": "In disclosed polls all participants can see the already cast votes (including who cast them)",
+          "type": "string",
+          "enum": [
+            "disclosed"
+          ]
+        },
+        {
+          "description": "In undisclosed polls the votes will only appear when the poll has ended",
+          "type": "string",
+          "enum": [
+            "undisclosed"
+          ]
+        },
+        {
+          "description": "As undisclosed but voters will stay hidden even after poll has ended",
+          "type": "string",
+          "enum": [
+            "anonymous"
+          ]
+        }
       ]
     },
     "PostUserStoryContent": {
@@ -1936,9 +1972,11 @@
       ],
       "properties": {
         "event_id": {
+          "description": "The ID of the event the receipt references",
           "type": "string"
         },
         "thread_id": {
+          "description": "The ID of the thread if receipt is threaded",
           "type": "string"
         }
       }
@@ -1951,6 +1989,7 @@
       ],
       "properties": {
         "m.read.private": {
+          "description": "Map of all room IDs to receipts",
           "type": "object",
           "additionalProperties": {
             "$ref": "#/definitions/PrivateReceipt"
@@ -1966,9 +2005,11 @@
       ],
       "properties": {
         "m.read": {
+          "description": "The ID of the latest event read by the user",
           "type": "string"
         },
         "thread_id": {
+          "description": "The ID of the thread if receipt is threaded",
           "type": [
             "string",
             "null"
@@ -2045,12 +2086,14 @@
       ],
       "properties": {
         "reason": {
+          "description": "An optional reason field mostly used when event got redacted by another user",
           "type": [
             "string",
             "null"
           ]
         },
         "redacts": {
+          "description": "Event ID of the redacted event",
           "type": "string"
         }
       }
@@ -2157,7 +2200,7 @@
           "type": "string"
         },
         "selected_party_id": {
-          "description": "party id of the participant whose answer has been selected",
+          "description": "Party id of the participant whose answer has been selected",
           "type": "string"
         },
         "version": {
@@ -2192,13 +2235,13 @@
       ],
       "properties": {
         "h": {
-          "description": "intended display height in px",
+          "description": "Intended display height in px",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
         },
         "mimetype": {
-          "description": "mimetype of the file",
+          "description": "Mimetype of the file",
           "type": "string"
         },
         "size": {
@@ -2208,7 +2251,7 @@
           "minimum": 0.0
         },
         "w": {
-          "description": "intended display width in px",
+          "description": "Intended display width in px",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
@@ -2239,6 +2282,7 @@
       ],
       "properties": {
         "avatar": {
+          "description": "Content ID pointing to the avatar of the user",
           "anyOf": [
             {
               "$ref": "#/definitions/Cid"
@@ -2249,9 +2293,11 @@
           ]
         },
         "display_name": {
+          "description": "The name that the user likes to use as a default",
           "type": "string"
         },
         "status_msg": {
+          "description": "The current status of the user",
           "type": "string"
         }
       }
@@ -2270,19 +2316,19 @@
       ],
       "properties": {
         "duration": {
-          "description": "duration of the video clip in ms",
+          "description": "Duration of the video clip in ms",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
         },
         "h": {
-          "description": "intended display height in px",
+          "description": "Intended display height in px",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
         },
         "mimetype": {
-          "description": "mimetype of the file",
+          "description": "Mimetype of the file",
           "type": "string"
         },
         "size": {
@@ -2300,7 +2346,7 @@
           ]
         },
         "thumbnail_info": {
-          "description": "thumbnail metadata",
+          "description": "Thumbnail metadata",
           "allOf": [
             {
               "$ref": "#/definitions/ThumbnailInfo"
@@ -2308,7 +2354,7 @@
           ]
         },
         "w": {
-          "description": "intended display width in px",
+          "description": "Intended display width in px",
           "type": "integer",
           "format": "uint32",
           "minimum": 0.0
@@ -2322,6 +2368,7 @@
       ],
       "properties": {
         "story": {
+          "description": "ID of the event that containes the viewed story",
           "type": "string"
         }
       }
@@ -2331,12 +2378,14 @@
       "type": "object",
       "properties": {
         "event_id": {
+          "description": "The ID of the event that is being related to",
           "type": [
             "string",
             "null"
           ]
         },
         "in_reply_to": {
+          "description": "Special relation to depict replies. Listed extra as this can happen with the other relations simultaneously",
           "anyOf": [
             {
               "$ref": "#/definitions/ReplyContent"
@@ -2347,12 +2396,14 @@
           ]
         },
         "key": {
+          "description": "Used for annotations. Defines the type of emoji that has been reacted with.",
           "type": [
             "string",
             "null"
           ]
         },
         "rel_type": {
+          "description": "The type of the relation",
           "anyOf": [
             {
               "$ref": "#/definitions/RelationType"
@@ -2363,6 +2414,7 @@
           ]
         },
         "room_id": {
+          "description": "The ID of the room the related-to event is in. Only needed for forwarding.",
           "type": [
             "string",
             "null"
