@@ -125,6 +125,7 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 	for feature in &settings.feature {
 		application_builder = application_builder.with_setting("feature", feature.to_owned());
 	}
+	application_builder = application_builder.with_setting("feature", "co-open-keep");
 	let mut application = application_builder.build().await?;
 
 	// network

@@ -230,12 +230,12 @@ pub struct ApplicationSettings {
 	/// - `feature` [`TagValue::String`]
 	/// - `co-default-max-state` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_state`]
 	/// - `co-default-max-log` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_log`]
-	/// - `co-storage-mode` - [`TagValue::String`] [`ApplicationSettings::setting_co_storage_mode`]
 	///
 	/// Known Features:
 	/// - `co-local-watch` (default)
 	/// - `co-local-encryption` (default)
 	/// - `co-storage-free` - [`ApplicationSettings::feature_co_storage_free`]
+	/// - `co-open-keep` - [`ApplicationSettings::feature_co_open_keep`]
 	pub settings: Tags,
 }
 impl ApplicationSettings {
@@ -276,6 +276,12 @@ impl ApplicationSettings {
 	/// Free unused storage after every flush.
 	pub fn feature_co_storage_free(&self) -> bool {
 		self.has_feature("co-storage-free")
+	}
+
+	/// Keep same co reducer instance open until it gets closed explcitly.
+	/// This will also keep all blocks mappings in memory.
+	pub fn feature_co_open_keep(&self) -> bool {
+		self.has_feature("co-open-keep")
 	}
 
 	/// Count of states to store for LocalCO and newly joined COs. A value of zero means unlimited.
