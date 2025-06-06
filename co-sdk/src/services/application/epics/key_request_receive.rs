@@ -9,6 +9,7 @@ use crate::{
 	Action, CoContext, CoReducerFactory,
 };
 use anyhow::anyhow;
+use co_actor::Actions;
 use co_core_co::ParticipantState;
 use co_core_keystore::Key;
 use co_identity::{DidCommHeader, Identity, IdentityResolver};
@@ -19,6 +20,7 @@ use std::{future::ready, time::Duration};
 
 /// When we receive an key request send an response.
 pub fn key_request_receive(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,

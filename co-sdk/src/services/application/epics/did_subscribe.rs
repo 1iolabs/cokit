@@ -3,6 +3,7 @@ use crate::{
 	state::{self, query_core, Query},
 	Action, CoContext, CoStorage, CO_CORE_NAME_KEYSTORE, CO_ID_LOCAL,
 };
+use co_actor::Actions;
 use co_core_co::Co;
 use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 use co_identity::{PrivateIdentityResolver, PrivateIdentityResolverBox};
@@ -12,6 +13,7 @@ use std::future::ready;
 
 /// Subscribe DIDs when network is started.
 pub fn network_started(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
@@ -33,6 +35,7 @@ pub fn network_started(
 
 /// Subscribe/Unsubscribe DID when it gets created/removed.
 pub fn keystore_changed(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,

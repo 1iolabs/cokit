@@ -11,6 +11,7 @@ use crate::{
 	state, Action, CoContext, CoNetwork, CoReducerFactory, CoStorage, KnownTag, CO_CORE_NAME_CO,
 };
 use anyhow::anyhow;
+use co_actor::Actions;
 use co_actor::ActorHandle;
 use co_core_co::{Co, CoAction};
 use co_identity::{IdentityResolver, PrivateIdentityResolver};
@@ -23,6 +24,7 @@ use std::{collections::BTreeSet, future::ready};
 /// TODO: consensus finalization?
 /// TODO: validate state? - action could have no effect in reducer (when already active, ...)
 pub fn invite_send(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
@@ -54,6 +56,7 @@ pub fn invite_send(
 /// In: [`Action::CoreAction`]
 /// Out: [`Action::Invite`]
 pub fn invite_send_action(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	_context: &CoContext,

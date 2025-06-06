@@ -6,11 +6,10 @@ use crate::{
 	Action, CoContext, CoReducer, CoReducerFactory, CO_CORE_NAME_CO,
 };
 use anyhow::anyhow;
+use co_actor::Actions;
 use co_core_co::{CoAction, ParticipantState};
 use co_identity::DidCommHeader;
-use co_primitives::{
-	from_json_string, BlockStorageSettings, CloneWithBlockStorageSettings, CoJoin, Did, KnownTag, ReducerAction,
-};
+use co_primitives::{from_json_string, CloneWithBlockStorageSettings, CoJoin, Did, KnownTag, ReducerAction};
 use co_storage::BlockStorageExt;
 use futures::{future::ready, stream, Stream, StreamExt, TryStreamExt};
 use libp2p::PeerId;
@@ -21,6 +20,7 @@ use libp2p::PeerId;
 ///
 /// TODO: consensus validation
 pub fn join_receive(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
@@ -100,11 +100,9 @@ async fn joined(context: CoContext, _peer: PeerId, header: DidCommHeader, body: 
 	Ok(vec![])
 }
 
-/// Find the inviters identity by waling the log until the first invite action
+/// Find the inviters identity by walking the log until the first invite action.
 async fn find_inviter(context: &CoContext, co: &CoReducer, invited_did: &str) -> Result<Option<String>, anyhow::Error> {
-	let storage = co
-		.storage()
-		.clone_with_settings(BlockStorageSettings::new().without_networking());
+	let storage = co.storage().without_networking();
 	let invite_identity_did = context
 		.entries_from_heads(co.id(), storage.clone(), co.heads().await)
 		.await?

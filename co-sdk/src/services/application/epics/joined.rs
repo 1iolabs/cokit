@@ -1,4 +1,5 @@
 use crate::{state, Action, CoContext, CoReducerFactory, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL};
+use co_actor::Actions;
 use co_core_membership::{MembershipState, MembershipsAction};
 use co_primitives::{CoId, Did};
 use futures::{stream, Stream, StreamExt, TryStreamExt};
@@ -9,6 +10,7 @@ use std::future::ready;
 /// In: [`Action::Joined`]
 /// Out: [`Action::CoreActionPush`]
 pub fn joined(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
@@ -34,6 +36,7 @@ pub fn joined(
 /// Fetch participants and network settings when join CO.
 /// In: [`Action::CoreAction`]
 pub fn joined_fetch(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,

@@ -1,5 +1,5 @@
 use super::ActorHandle;
-use crate::TaskSpawner;
+use crate::{epic::actions::ActionsEpic, TaskSpawner};
 use co_primitives::Tags;
 use futures::{
 	pin_mut,
@@ -14,6 +14,10 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
+mod actions;
+
+pub use actions::Actions;
+
 /// Epic.
 ///
 /// Defines side effects for actions which will produce other actions over time.
@@ -24,25 +28,32 @@ pub trait Epic<A, S, C> {
 	/// - `state`: The state after the action has been applied.
 	fn epic(
 		&mut self,
+		actions: &Actions<A, S, C>,
 		action: &A,
 		state: &S,
 		context: &C,
 	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + Send + 'static>;
+
+	/// Whether this epic is terminated and should be not be called futher.
+	fn is_terminated(&self) -> bool {
+		false
+	}
 }
 
 /// Fn impl for epics.
 impl<A, S, C, O, F> Epic<A, S, C> for F
 where
 	O: Stream<Item = Result<A, anyhow::Error>> + Send + 'static,
-	F: FnMut(&A, &S, &C) -> Option<O>,
+	F: FnMut(&Actions<A, S, C>, &A, &S, &C) -> Option<O>,
 {
 	fn epic(
 		&mut self,
+		actions: &Actions<A, S, C>,
 		action: &A,
 		state: &S,
 		context: &C,
 	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + Send + 'static> {
-		self(action, state, context)
+		self(actions, action, state, context)
 	}
 }
 
@@ -61,63 +72,86 @@ pub trait EpicExt<A, S, C>: Epic<A, S, C> {
 		JoinEpic(self, other)
 	}
 
-	fn once(self) -> OnceEpic<Self>
+	fn switch(self) -> SwitchEpic<Self>
 	where
 		Self: Sized + Send + 'static,
 	{
-		OnceEpic(self, None)
+		SwitchEpic(self, None)
 	}
 
-	fn boxed(self) -> Box<dyn BoxEpic<A, S, C> + Send + Sync + 'static>
+	fn boxed(self) -> BoxEpic<'static, A, S, C>
 	where
-		Self: Sized + Send + Sync + 'static,
+		Self: Sized + Send + 'static,
 	{
 		Box::new(self)
 	}
 }
-impl<T, A, S, C> EpicExt<A, S, C> for T
-where
-	T: Epic<A, S, C> + ?Sized + Send + Sync + 'static,
-	A: Send + Clone + 'static,
-	S: Send + Clone + 'static,
-	C: Send + Clone + 'static,
+impl<T, A, S, C> EpicExt<A, S, C> for T where
+	T: Epic<A, S, C> + ?Sized + Send + 'static /* A: Send + Clone + 'static,
+	                                            * S: Send + Clone + 'static,
+	                                            * C: Send + Clone + 'static, */
 {
 }
 
+pub type BoxEpic<'a, A, S, C> = Box<dyn BoxStreamEpic<A, S, C> + Send + 'a>;
+
 /// Dynamic dispatchable epic.
-pub trait BoxEpic<A, S, C> {
-	fn box_epic(&mut self, action: &A, state: &S, context: &C) -> Option<BoxStream<'static, Result<A, anyhow::Error>>>;
+pub trait BoxStreamEpic<A, S, C> {
+	fn box_epic(
+		&mut self,
+		actions: &Actions<A, S, C>,
+		action: &A,
+		state: &S,
+		context: &C,
+	) -> Option<BoxStream<'static, Result<A, anyhow::Error>>>;
+
+	fn box_is_terminated(&self) -> bool;
 }
-impl<T, A, S, C> BoxEpic<A, S, C> for T
+impl<T, A, S, C> BoxStreamEpic<A, S, C> for T
 where
 	T: Epic<A, S, C>,
 {
-	fn box_epic(&mut self, action: &A, state: &S, context: &C) -> Option<BoxStream<'static, Result<A, anyhow::Error>>> {
-		self.epic(action, state, context).map(|stream| stream.boxed())
+	fn box_epic(
+		&mut self,
+		actions: &Actions<A, S, C>,
+		action: &A,
+		state: &S,
+		context: &C,
+	) -> Option<BoxStream<'static, Result<A, anyhow::Error>>> {
+		self.epic(actions, action, state, context).map(|stream| stream.boxed())
+	}
+
+	fn box_is_terminated(&self) -> bool {
+		self.is_terminated()
 	}
 }
 
 /// Epic runtime to be uses as actor state.
 /// Expected to be called after the message has been applied to the state.
 pub struct EpicRuntime<M, A, S, C> {
-	epic: Box<dyn BoxEpic<A, S, C> + Sync + Send + 'static>,
+	actions: Actions<A, S, C>,
+	epic: BoxEpic<'static, A, S, C>,
 	error: Arc<dyn Fn(anyhow::Error) -> Option<A> + Sync + Send + 'static>,
 	_actor: PhantomData<fn(M, A, S, C)>,
 }
 impl<M, A, S, C> EpicRuntime<M, A, S, C>
 where
-	A: Send + 'static + Into<M>,
 	M: Send + 'static,
+	A: Clone + Send + 'static + Into<M>,
+	S: Send + 'static,
+	C: Send + 'static,
 {
 	pub fn new(
-		epic: impl EpicExt<A, S, C> + Send + Sync + 'static,
+		epic: impl EpicExt<A, S, C> + Send + 'static,
 		error: impl Fn(anyhow::Error) -> Option<A> + Sync + Send + 'static,
 	) -> Self {
-		Self { epic: epic.boxed(), _actor: Default::default(), error: Arc::new(error) }
+		let actions_epic = ActionsEpic::default();
+		let actions = actions_epic.actions();
+		Self { actions, epic: epic.join(actions_epic).boxed(), _actor: Default::default(), error: Arc::new(error) }
 	}
 
 	pub fn handle(&mut self, spawner: &TaskSpawner, actor: &ActorHandle<M>, action: &A, state: &S, context: &C) {
-		let stream = self.epic.box_epic(action, state, context);
+		let stream = self.epic.box_epic(&self.actions, action, state, context);
 		if let Some(stream) = stream {
 			let actor = actor.clone();
 			let error = self.error.clone();
@@ -156,12 +190,13 @@ where
 {
 	fn epic(
 		&mut self,
+		actions: &Actions<A, S, C>,
 		action: &A,
 		state: &S,
 		context: &C,
 	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + Send + 'static> {
-		let s0 = self.0.epic(action, state, context);
-		let s1 = self.1.epic(action, state, context);
+		let s0 = self.0.epic(actions, action, state, context);
+		let s1 = self.1.epic(actions, action, state, context);
 		let s0 = async_stream::stream! {
 			if let Some(stream) = s0 {
 				for await item in stream {
@@ -181,15 +216,27 @@ where
 }
 
 /// Merge BoxEpic into one.
-pub struct MergeEpic<A, S, C>(Vec<Box<dyn BoxEpic<A, S, C> + Send + Sync + 'static>>);
+pub struct MergeEpic<A, S, C>(Vec<BoxEpic<'static, A, S, C>>);
 impl<A, S, C> MergeEpic<A, S, C> {
 	pub fn new() -> Self {
 		Self(Default::default())
 	}
 
-	pub fn join(mut self, epic: impl EpicExt<A, S, C> + Send + Sync + 'static) -> Self {
+	pub fn join(mut self, epic: impl EpicExt<A, S, C> + Send + 'static) -> Self {
 		self.0.push(epic.boxed());
 		self
+	}
+
+	pub fn push(&mut self, epic: impl EpicExt<A, S, C> + Send + 'static) {
+		self.0.push(epic.boxed());
+	}
+
+	pub fn box_push(&mut self, epic: BoxEpic<'static, A, S, C>) {
+		self.0.push(epic);
+	}
+
+	pub fn drain_terminated(&mut self) {
+		self.0.retain(|epic| !epic.box_is_terminated());
 	}
 }
 impl<A, S, C> Epic<A, S, C> for MergeEpic<A, S, C>
@@ -198,6 +245,7 @@ where
 {
 	fn epic(
 		&mut self,
+		actions: &Actions<A, S, C>,
 		action: &A,
 		state: &S,
 		context: &C,
@@ -205,7 +253,7 @@ where
 		let streams: Vec<_> = self
 			.0
 			.iter_mut()
-			.filter_map(|epic| epic.box_epic(&action, &state, &context))
+			.filter_map(|epic| epic.box_epic(actions, &action, &state, &context))
 			.collect();
 		if !streams.is_empty() {
 			Some(stream::iter(streams).flatten_unordered(None))
@@ -229,6 +277,7 @@ where
 {
 	fn epic(
 		&mut self,
+		_actions: &Actions<A, S, C>,
 		action: &A,
 		state: &S,
 		_context: &C,
@@ -240,8 +289,8 @@ where
 
 /// Only allow to run epic once.
 /// Once the epic returns another stream the previous will be dropped.
-pub struct OnceEpic<E>(E, Option<CancellationToken>);
-impl<E, A, S, C> Epic<A, S, C> for OnceEpic<E>
+pub struct SwitchEpic<E>(E, Option<CancellationToken>);
+impl<E, A, S, C> Epic<A, S, C> for SwitchEpic<E>
 where
 	E: Epic<A, S, C>,
 	A: Debug + Send + 'static,
@@ -249,11 +298,12 @@ where
 {
 	fn epic(
 		&mut self,
+		actions: &Actions<A, S, C>,
 		action: &A,
 		state: &S,
 		context: &C,
 	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + 'static> {
-		let next = self.0.epic(action, state, context);
+		let next = self.0.epic(actions, action, state, context);
 		match next {
 			Some(stream) => {
 				// cancel previous
@@ -273,7 +323,7 @@ where
 
 #[cfg(test)]
 mod tests {
-	use crate::{Epic, EpicExt};
+	use crate::{epic::Actions, Epic, EpicExt};
 	use futures::{stream, Stream, TryStreamExt};
 
 	#[derive(Debug, Clone, PartialEq)]
@@ -285,6 +335,7 @@ mod tests {
 	impl Epic<TestAction, (), ()> for Test {
 		fn epic(
 			&mut self,
+			_actions: &Actions<TestAction, (), ()>,
 			action: &TestAction,
 			_state: &(),
 			_context: &(),
@@ -298,9 +349,10 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_hello() {
+		let actions = Actions::default();
 		let mut epic = Test {};
 		let result: Vec<TestAction> = epic
-			.epic(&TestAction::Hello, &(), &())
+			.epic(&actions, &TestAction::Hello, &(), &())
 			.expect("a stream")
 			.try_collect()
 			.await
@@ -311,6 +363,7 @@ mod tests {
 	#[tokio::test]
 	async fn test_fn_epic() {
 		fn test(
+			_actions: &Actions<TestAction, (), ()>,
 			action: &TestAction,
 			_state: &(),
 			_context: &(),
@@ -320,8 +373,9 @@ mod tests {
 				_ => None,
 			}
 		}
+		let actions = Actions::default();
 		let result: Vec<TestAction> = test
-			.epic(&TestAction::Hello, &(), &())
+			.epic(&actions, &TestAction::Hello, &(), &())
 			.expect("a stream")
 			.try_collect()
 			.await
@@ -331,9 +385,10 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_box_epic() {
+		let actions = Actions::default();
 		let mut epic = Test {}.boxed();
 		let result: Vec<TestAction> = epic
-			.box_epic(&TestAction::Hello, &(), &())
+			.box_epic(&actions, &TestAction::Hello, &(), &())
 			.expect("a stream")
 			.try_collect()
 			.await

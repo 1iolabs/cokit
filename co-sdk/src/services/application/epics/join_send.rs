@@ -11,17 +11,17 @@ use crate::{
 	Action, CoContext, CoStorage, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
-use co_actor::ActorHandle;
+use co_actor::{Actions, ActorHandle};
 use co_core_membership::{Membership, MembershipState, Memberships, MembershipsAction};
 use co_identity::{Identity, PrivateIdentityResolver};
 use co_primitives::{CoId, CoInviteMetadata, Did, KnownTags};
 use co_storage::BlockStorageExt;
 use futures::{pin_mut, stream, Stream, StreamExt};
 use std::{future::ready, time::Duration};
-
 /// When a membership is set to active, try to connect the CO and send the join message via didcomm.
 /// TODO: consensus finalization?
 pub fn join_send(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,

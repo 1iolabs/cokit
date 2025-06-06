@@ -2,7 +2,7 @@ use crate::{
 	library::push_heads::PushHeads, services::reducer::FlushInfo, types::co_reducer_context::CoReducerFeature, Action,
 	CoContext, CoReducerFactory,
 };
-use co_actor::Epic;
+use co_actor::{Actions, Epic};
 use co_identity::PrivateIdentityResolver;
 use co_primitives::{CoId, Did};
 use futures::Stream;
@@ -19,6 +19,7 @@ pub struct PushHeadsEpic {
 impl Epic<Action, (), CoContext> for PushHeadsEpic {
 	fn epic(
 		&mut self,
+		_actions: &Actions<Action, (), CoContext>,
 		action: &Action,
 		_state: &(),
 		context: &CoContext,

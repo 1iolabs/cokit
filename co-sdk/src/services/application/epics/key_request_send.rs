@@ -8,7 +8,7 @@ use crate::{
 	Action, CoContext, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
-use co_actor::Epic;
+use co_actor::{Actions, Epic};
 use co_core_keystore::KeyStoreAction;
 use co_core_membership::MembershipsAction;
 use co_identity::{DidCommHeader, PrivateIdentityResolver};
@@ -33,6 +33,7 @@ impl KeyRequestSend {
 impl Epic<Action, (), CoContext> for KeyRequestSend {
 	fn epic(
 		&mut self,
+		_actions: &Actions<Action, (), CoContext>,
 		action: &Action,
 		state: &(),
 		context: &CoContext,

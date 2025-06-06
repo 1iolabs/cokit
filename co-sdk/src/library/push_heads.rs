@@ -10,7 +10,7 @@ use crate::{
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
-use co_actor::{Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, OnceEpic, Reducer, TracingEpic};
+use co_actor::{Actions, Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, Reducer, SwitchEpic, TracingEpic};
 use co_identity::{Identity, PrivateIdentity, PrivateIdentityBox};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{tags, CoId, Tags};
@@ -161,13 +161,14 @@ impl Reducer<PushHeadsAction> for PushHeadsState {
 /// Use Send actions, connect the CO and return SendPeers actions.
 struct PushHeadsConnectEpic();
 impl PushHeadsConnectEpic {
-	pub fn new() -> OnceEpic<Self> {
-		Self().once()
+	pub fn new() -> SwitchEpic<Self> {
+		Self().switch()
 	}
 }
 impl Epic<PushHeadsAction, PushHeadsState, PushHeadsContext> for PushHeadsConnectEpic {
 	fn epic(
 		&mut self,
+		_actions: &Actions<PushHeadsAction, PushHeadsState, PushHeadsContext>,
 		action: &PushHeadsAction,
 		state: &PushHeadsState,
 		context: &PushHeadsContext,
@@ -210,6 +211,7 @@ impl PushHeadsSendEpic {
 impl Epic<PushHeadsAction, PushHeadsState, PushHeadsContext> for PushHeadsSendEpic {
 	fn epic(
 		&mut self,
+		_actions: &Actions<PushHeadsAction, PushHeadsState, PushHeadsContext>,
 		action: &PushHeadsAction,
 		state: &PushHeadsState,
 		context: &PushHeadsContext,

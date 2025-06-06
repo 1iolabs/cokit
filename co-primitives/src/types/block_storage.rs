@@ -31,6 +31,10 @@ pub trait BlockStorage: Send + Sync {
 
 pub trait CloneWithBlockStorageSettings: Clone {
 	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self;
+
+	fn without_networking(&self) -> Self {
+		self.clone_with_settings(BlockStorageSettings::new().without_networking())
+	}
 }
 
 #[derive(Debug, Clone, Default)]

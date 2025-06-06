@@ -8,7 +8,7 @@ use crate::{
 	},
 	CoContext,
 };
-use co_actor::Epic;
+use co_actor::{Actions, Epic};
 use co_identity::PrivateIdentityResolver;
 use co_network::NetworkTaskSpawner;
 use co_primitives::{Did, Network};
@@ -23,6 +23,7 @@ impl ConnectEpic {
 impl Epic<ConnectionAction, ConnectionState, CoContext> for ConnectEpic {
 	fn epic(
 		&mut self,
+		_actions: &Actions<ConnectionAction, ConnectionState, CoContext>,
 		message: &ConnectionAction,
 		_state: &ConnectionState,
 		context: &CoContext,

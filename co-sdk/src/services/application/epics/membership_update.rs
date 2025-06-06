@@ -1,10 +1,12 @@
 use crate::{Action, CoContext, CoReducerState, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL};
+use co_actor::Actions;
 use co_core_membership::MembershipsAction;
 use co_storage::BlockStorageContentMapping;
 use futures::{FutureExt, Stream, TryStreamExt};
 
 /// When a membership is updated notify the reducer about it.
 pub fn membership_update(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
@@ -53,6 +55,7 @@ pub fn membership_update(
 
 /// When a membership is removed clear the co_reducer instance.
 pub fn membership_remove(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,

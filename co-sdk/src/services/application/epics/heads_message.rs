@@ -6,6 +6,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use cid::Cid;
+use co_actor::Actions;
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoId, Did};
 use futures::{future::ready, stream, Stream, StreamExt};
@@ -17,6 +18,7 @@ use std::collections::BTreeSet;
 /// In: [`Action::DidCommReceive`]
 /// Out: [`Action::HeadsMessageReceived`]
 pub fn heads_message_receive(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	_context: &CoContext,
@@ -44,6 +46,7 @@ pub fn heads_message_receive(
 /// Update CO when receive [`HeadsMessage::Heads`] message.
 /// TODO: verify sender/heads?
 pub fn heads_message_heads(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
@@ -63,6 +66,7 @@ pub fn heads_message_heads(
 
 /// Respond when receive [`HeadsMessage::HeadsRequest`] message.
 pub fn heads_message_heads_request(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,

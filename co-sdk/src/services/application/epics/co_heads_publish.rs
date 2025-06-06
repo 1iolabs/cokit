@@ -4,6 +4,7 @@ use crate::{
 	types::co_reducer_context::CoReducerFeature,
 	Action, CoContext, CoReducerFactory, CoStorage,
 };
+use co_actor::Actions;
 use co_core_co::Co;
 use co_network::NetworkTaskSpawner;
 use co_primitives::{CoId, Network, NetworkCoHeads, OptionLink};
@@ -11,6 +12,7 @@ use futures::Stream;
 
 /// Publish heads to a gossip sub topic when a network reducer has flushed.
 pub fn co_heads_publish(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
