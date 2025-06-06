@@ -70,7 +70,7 @@ async fn networks_co(
 	if networks.is_empty() {
 		// get participant networks
 		let identity_resolver = context.identity_resolver().await?;
-		let participants = state::participants(&storage, co_state).await?;
+		let participants = state::participants_active(&storage, co_state).await?;
 		Ok(identities_networks(Some(&identity_resolver), participants.into_iter().map(|item| item.did))
 			.try_collect()
 			.await?)

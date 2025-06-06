@@ -107,6 +107,22 @@ pub enum ParticipantState {
 	/// Pending participants need to be moved into [`ParticipantState::Invite`] state by a participant.
 	Pending = 3,
 }
+impl ParticipantState {
+	pub fn is_active(&self) -> bool {
+		match self {
+			ParticipantState::Active => true,
+			_ => false,
+		}
+	}
+
+	pub fn has_access(&self) -> bool {
+		match self {
+			ParticipantState::Active => true,
+			ParticipantState::Invite => true,
+			_ => false,
+		}
+	}
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Key {
