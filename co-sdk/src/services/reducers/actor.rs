@@ -149,7 +149,10 @@ impl Actor for ReducersActor {
 										// create reducer
 										match context.inner.create_co_instance(parent, &id, storage, true, None).await {
 											Ok(Some(reducer)) => Ok(reducer),
-											Ok(None) => Err(CoReducerFactoryError::CoNotFound(id.clone())),
+											Ok(None) => Err(CoReducerFactoryError::CoNotFound(
+												id.clone(),
+												anyhow!("Create retuned None"),
+											)),
 											Err(err) => Err(CoReducerFactoryError::Create(id.clone(), err)),
 										}
 									},
@@ -354,11 +357,13 @@ fn co_reducer_instance(context: &CoContext, root_instance: &CoReducer, keep_open
 
 fn co_reducerfactory_error_clone(err: &CoReducerFactoryError) -> CoReducerFactoryError {
 	match err {
-		CoReducerFactoryError::CoNotFound(id) => CoReducerFactoryError::CoNotFound(id.clone()),
-		CoReducerFactoryError::Create(id, err) => {
-			CoReducerFactoryError::Create(id.to_owned(), anyhow!(err.to_string()))
+		CoReducerFactoryError::CoNotFound(id, err) => {
+			CoReducerFactoryError::CoNotFound(id.clone(), anyhow!("source: {:?}", err))
 		},
-		CoReducerFactoryError::Other(err) => CoReducerFactoryError::Other(anyhow!(err.to_string())),
-		CoReducerFactoryError::Actor(err) => CoReducerFactoryError::Other(anyhow!(err.to_string())),
+		CoReducerFactoryError::Create(id, err) => {
+			CoReducerFactoryError::Create(id.to_owned(), anyhow!("source: {:?}", err))
+		},
+		CoReducerFactoryError::Other(err) => CoReducerFactoryError::Other(anyhow!("source: {:?}", err)),
+		CoReducerFactoryError::Actor(err) => CoReducerFactoryError::Other(anyhow!("source: {:?}", err)),
 	}
 }

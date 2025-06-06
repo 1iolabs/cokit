@@ -164,16 +164,16 @@ impl CoContext {
 }
 #[async_trait]
 impl CoReducerFactory for CoContext {
-	#[tracing::instrument(level = tracing::Level::TRACE, skip(self), fields(application = self.inner.settings.identifier))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self), fields(application = self.inner.settings.identifier))]
 	async fn co_reducer(&self, co: &CoId) -> Result<Option<CoReducer>, anyhow::Error> {
 		match self.try_co_reducer(co).await {
 			Ok(r) => Ok(Some(r)),
-			Err(CoReducerFactoryError::CoNotFound(_)) => Ok(None),
+			Err(CoReducerFactoryError::CoNotFound(_, _)) => Ok(None),
 			Err(err) => Err(err.into()),
 		}
 	}
 
-	#[tracing::instrument(level = tracing::Level::TRACE, skip(self), fields(application = self.inner.settings.identifier))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self), fields(application = self.inner.settings.identifier))]
 	async fn try_co_reducer(&self, co: &CoId) -> Result<CoReducer, CoReducerFactoryError> {
 		self.inner.reducers.clone().reducer(co.clone()).await
 	}
