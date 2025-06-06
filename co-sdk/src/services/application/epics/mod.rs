@@ -3,6 +3,7 @@ use crate::CoContext;
 use co_actor::{Epic, MergeEpic, TracingEpic};
 use co_primitives::Tags;
 
+mod co_didcomm_send;
 mod co_flush_staged;
 mod co_heads_publish;
 mod co_heads_subscribe;
@@ -46,5 +47,6 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(co_heads_publish::co_heads_publish)
 		.join(co_heads_subscribe::CoHeadsSubscribeEpic::default())
 		.join(co_flush_staged::CoFlushStagedEpic::default())
+		.join(co_didcomm_send::co_didcomm_send)
 		.join(TracingEpic::new(tags))
 }

@@ -18,6 +18,7 @@ use co_primitives::{CoId, CoInviteMetadata, Did, KnownTags};
 use co_storage::BlockStorageExt;
 use futures::{pin_mut, stream, Stream, StreamExt};
 use std::{future::ready, time::Duration};
+
 /// When a membership is set to active, try to connect the CO and send the join message via didcomm.
 /// TODO: consensus finalization?
 pub fn join_send(
