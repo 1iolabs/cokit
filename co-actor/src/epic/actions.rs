@@ -7,7 +7,7 @@ use futures::{
 	FutureExt, Stream, StreamExt,
 };
 use std::{
-	future::ready,
+	future::{ready, Future},
 	mem::take,
 	ops::DerefMut,
 	sync::{Arc, Mutex},
@@ -31,7 +31,11 @@ where
 	A: Clone + Send + 'static,
 {
 	/// Wait once the epic emits its first action, remove the epic and return the action.
-	pub async fn once_epic(&self, epic: impl EpicExt<A, S, C> + Send + 'static) -> Result<A, anyhow::Error> {
+	/// This is guarantted to see all actions that are dispatched after this call has returned the future.
+	pub fn once_epic<E>(&self, epic: E) -> impl Future<Output = Result<A, anyhow::Error>> + use<A, S, C, E>
+	where
+		E: EpicExt<A, S, C> + Send + 'static,
+	{
 		let (tx, rx) = oneshot::channel();
 
 		// add
@@ -43,29 +47,32 @@ where
 		}
 
 		// wait
-		rx.await?
+		async move { rx.await? }
 	}
 
 	/// Wait for predicate to match once and return the action it mached.
-	pub async fn once<F>(&self, predicate: F) -> Result<A, anyhow::Error>
+	/// This is guarantted to see all actions that are dispatched after this call has returned the future.
+	pub fn once<F>(&self, predicate: F) -> impl Future<Output = Result<A, anyhow::Error>> + use<A, S, C, F>
 	where
 		F: for<'a> Fn(&'a A) -> bool + Send + 'static,
 	{
-		self.once_epic(FilterEpic(predicate)).await
+		self.once_epic(FilterEpic(predicate))
 	}
 
 	/// Wait for map to match once and return the mapped value of the action.
-	pub async fn once_map<F, O>(&self, map: F) -> Result<O, anyhow::Error>
+	/// This is guarantted to see all actions that are dispatched after this call has returned the future.
+	pub fn once_map<F, O>(&self, map: F) -> impl Future<Output = Result<O, anyhow::Error>> + use<A, S, C, F, O>
 	where
 		F: (for<'a> Fn(&'a A) -> Option<O>) + Clone + Send + 'static,
 	{
-		let action = self
-			.once_epic(FilterEpic({
-				let map = map.clone();
-				move |action: &A| -> bool { map(action).is_some() }
-			}))
-			.await?;
-		map(&action).ok_or(anyhow!("Expected preficate to return some output"))
+		let action = self.once_epic(FilterEpic({
+			let map = map.clone();
+			move |action: &A| -> bool { map(action).is_some() }
+		}));
+		async move {
+			let action = action.await?;
+			map(&action).ok_or(anyhow!("Expected preficate to return some output"))
+		}
 	}
 }
 
@@ -171,5 +178,69 @@ where
 			}
 		}
 		None
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{epic::actions::ActionsEpic, Actions, Epic, EpicExt};
+	use futures::{pin_mut, stream::select, FutureExt, Stream, TryStreamExt};
+
+	#[derive(Debug, Clone, PartialEq)]
+	enum TestAction {
+		Greet,
+		Hello,
+		World,
+	}
+	struct Test {}
+	impl Epic<TestAction, (), ()> for Test {
+		fn epic(
+			&mut self,
+			actions: &Actions<TestAction, (), ()>,
+			action: &TestAction,
+			_state: &(),
+			_context: &(),
+		) -> Option<impl Stream<Item = Result<TestAction, anyhow::Error>> + Send + 'static> {
+			match action {
+				TestAction::Greet => Some({
+					let actions = actions.clone();
+					let answer_with_world = async move {
+						let once_world = actions.once(|a| match a {
+							TestAction::Hello => true,
+							_ => false,
+						});
+
+						// wait for world action
+						once_world.await?;
+
+						// greet
+						Ok(TestAction::World)
+					}
+					.into_stream();
+					let hello = async_stream::stream! { yield Ok(TestAction::Hello);};
+					select(answer_with_world, hello)
+				}),
+				_ => None,
+			}
+		}
+	}
+
+	#[tokio::test]
+	async fn test_once() {
+		let actions_epic = ActionsEpic::default();
+		let actions = actions_epic.actions();
+		let test_epic = Test {};
+		let mut epic = actions_epic.join(test_epic);
+		let stream = epic.epic(&actions, &TestAction::Greet, &(), &()).expect("a stream");
+		let mut result = Vec::new();
+		pin_mut!(stream);
+		while let Some(action) = stream.try_next().await.unwrap() {
+			result.push(action.clone());
+			if let Some(epic_actions) = epic.epic(&actions, &action, &(), &()) {
+				let mut epic_actions = epic_actions.try_collect::<Vec<TestAction>>().await.unwrap();
+				result.append(&mut epic_actions);
+			}
+		}
+		assert_eq!(result, vec![TestAction::Hello, TestAction::World]);
 	}
 }

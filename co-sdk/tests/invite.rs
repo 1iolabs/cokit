@@ -75,7 +75,7 @@ async fn test_invite() {
 		.actions()
 		.filter_map(|action| {
 			ready(match action {
-				Action::InviteSent { co, participant, peer } => Some(Ok((co, participant, peer))),
+				Action::InviteSent { co, to, peer } => Some(Ok((co, to, peer))),
 				Action::Error { err } => Some(Err(err)),
 				_ => None,
 			})
@@ -220,7 +220,7 @@ async fn test_invite_encrypted() {
 		.actions()
 		.filter_map(|action| {
 			ready(match action {
-				Action::InviteSent { co, participant, peer } => Some(Ok((co, participant, peer))),
+				Action::InviteSent { co, to, peer } => Some(Ok((co, to, peer))),
 				Action::Error { err } => Some(Err(err)),
 				_ => None,
 			})

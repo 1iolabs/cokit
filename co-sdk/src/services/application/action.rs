@@ -41,10 +41,10 @@ pub enum Action {
 	Invite { co: CoId, from: Did, to: Did },
 
 	/// Invite request has been sent to a peer.
-	InviteSent { co: CoId, participant: Did, peer: PeerId },
+	InviteSent { co: CoId, to: Did, peer: PeerId },
 
 	/// Join request has been sent to a peer.
-	JoinSent { co: CoId, encrypted: bool, participant: Did, peer: PeerId },
+	JoinKeyRequest { co: CoId, participant: Did, peer: PeerId },
 
 	/// Join completed.
 	Joined { co: CoId, participant: Did, success: bool, peer: Option<PeerId> },
@@ -304,5 +304,16 @@ pub struct CoDidCommSendAction {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NotifyAction {
 	/// A join message has been sent.
-	JoinSent,
+	JoinSent {
+		/// The joined participant (us/from).
+		participant: Did,
+		/// If the joined Co is encrypted.
+		encrypted: bool,
+	},
+
+	/// A invite message has been sent.
+	InviteSent {
+		/// The invited participant.
+		to: Did,
+	},
 }

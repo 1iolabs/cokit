@@ -195,8 +195,8 @@ where
 		state: &S,
 		context: &C,
 	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + Send + 'static> {
-		let s0 = self.0.epic(actions, action, state, context);
-		let s1 = self.1.epic(actions, action, state, context);
+		let s0 = if self.0.is_terminated() { None } else { self.0.epic(actions, action, state, context) };
+		let s1 = if self.1.is_terminated() { None } else { self.1.epic(actions, action, state, context) };
 		let s0 = async_stream::stream! {
 			if let Some(stream) = s0 {
 				for await item in stream {
@@ -211,7 +211,7 @@ where
 				}
 			}
 		};
-		Some(tokio_stream::StreamExt::merge(s0, s1))
+		Some(futures::stream::select(s0, s1))
 	}
 }
 
@@ -253,6 +253,7 @@ where
 		let streams: Vec<_> = self
 			.0
 			.iter_mut()
+			.filter(|epic| !epic.box_is_terminated())
 			.filter_map(|epic| epic.box_epic(actions, &action, &state, &context))
 			.collect();
 		if !streams.is_empty() {

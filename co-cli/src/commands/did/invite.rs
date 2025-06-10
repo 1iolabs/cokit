@@ -63,9 +63,7 @@ pub async fn command(
 			actions
 				.filter_map(|action| {
 					ready(match &action {
-						Action::InviteSent { co, participant, peer }
-							if co == &command_co && participant == &command_did =>
-						{
+						Action::InviteSent { co, to, peer } if co == &command_co && to == &command_did => {
 							println!("invited: {:?}", peer);
 							Some(())
 						},

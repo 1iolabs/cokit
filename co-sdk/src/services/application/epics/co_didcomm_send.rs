@@ -52,15 +52,18 @@ fn co_didcomm_send_message(
 			match peers {
 				Ok(peers) => {
 					for peer in peers.added {
+						// register sent
+						let send_message_id = message.message_id.clone();
+						let sent_peer_fut = actions.clone().once_map(move |action| match action {
+							Action::DidCommSent { message_id, peer, .. } if message_id == &send_message_id => Some(*peer),
+							_ => None,
+						});
+
 						// send
 						yield Ok(Action::DidCommSend { message_id: message.message_id.clone(), peer, message: message.message.clone() });
 
-						// wait
-						let send_message_id = message.message_id.clone();
-						let sent_peer = actions.clone().once_map(move |action| match action {
-							Action::DidCommSent { message_id, peer, .. } if message_id == &send_message_id => Some(*peer),
-							_ => None,
-						}).await;
+						// wait sent
+						let sent_peer = sent_peer_fut.await;
 						match sent_peer {
 							Ok(peer) => {
 								// success
@@ -76,6 +79,11 @@ fn co_didcomm_send_message(
 				Err(err) => {
 					tracing::warn!(?err, "co-didcomm-connect-failed");
 				},
+			}
+
+			// has at least one peer?
+			if !result.is_empty() {
+				break;
 			}
 		}
 

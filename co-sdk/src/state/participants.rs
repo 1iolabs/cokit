@@ -1,6 +1,6 @@
 use super::{query_core, Query, QueryError};
 use crate::{CoStorage, CO_CORE_NAME_CO};
-use co_core_co::{Co, Participant, ParticipantState};
+use co_core_co::{Co, Participant};
 use co_identity::{IdentityBox, IdentityResolver};
 use co_primitives::{Did, OptionLink};
 use futures::{stream, StreamExt, TryStreamExt};

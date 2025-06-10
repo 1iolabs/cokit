@@ -43,7 +43,7 @@ impl Epic<Action, (), CoContext> for KeyRequestSend {
 
 		// handle
 		match action {
-			Action::JoinSent { co, encrypted, participant, peer } if *encrypted => Some({
+			Action::JoinKeyRequest { co, participant, peer } => Some({
 				let message_id = DidCommHeader::create_message_id();
 				let message_response = self.pending_key_requests.create({
 					let message_id = message_id.clone();

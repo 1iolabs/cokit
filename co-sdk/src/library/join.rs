@@ -19,7 +19,7 @@ pub const CO_DIDCOMM_JOIN: &str = "co-join";
 // }
 
 /// Create an encoded (signed) join message to unknown receipents.
-pub fn create_join_message_from<F>(from: &F, co: CoId, thid: Option<String>) -> anyhow::Result<EncodedMessage>
+pub fn create_join_message_from<F>(from: &F, co: CoId, thid: Option<String>) -> anyhow::Result<(String, EncodedMessage)>
 where
 	F: PrivateIdentity + Send + Sync + 'static,
 {
@@ -27,8 +27,9 @@ where
 	header.thid = thid;
 	let payload = CoJoinPayload { id: co };
 	let body = to_json_string(&payload)?;
+	let message_id = header.id.clone();
 	let message = from_didcomm.jws(header, &body)?;
-	Ok(EncodedMessage(message.into_bytes()))
+	Ok((message_id, EncodedMessage(message.into_bytes())))
 }
 
 #[derive(Debug, Serialize, Deserialize)]

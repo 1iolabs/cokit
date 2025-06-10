@@ -2,25 +2,22 @@ use crate::{
 	library::{
 		invite::{create_invite_message, CoInvitePayload},
 		network_discovery::identities_networks,
-		settings_timeout::settings_timeout,
 	},
-	services::{
-		connections::ConnectionMessage,
-		network::{CoNetworkTaskSpawner, DidCommSendNetworkTask},
-	},
+	services::application::action::{CoDidCommSendAction, NotifyAction},
 	state, Action, CoContext, CoNetwork, CoReducerFactory, CoStorage, KnownTag, CO_CORE_NAME_CO,
 };
 use anyhow::anyhow;
 use co_actor::Actions;
-use co_actor::ActorHandle;
 use co_core_co::{Co, CoAction};
 use co_identity::{IdentityResolver, PrivateIdentityResolver};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoConnectivity, CoId, DagSetExt, Did, Network};
-use futures::{stream, Stream, StreamExt, TryStreamExt};
-use std::{collections::BTreeSet, future::ready};
+use futures::{stream, FutureExt, Stream, TryStreamExt};
+use std::collections::BTreeSet;
 
-/// When a participant is invited into an CO, try to connect and send the invite message via didcomm.
+/// Dispatch Invite when a participant is invited into an CO.
+/// In: [`Action::CoreAction`]
+/// Out: [`Action::Invite`]
 /// TODO: consensus finalization?
 /// TODO: validate state? - action could have no effect in reducer (when already active, ...)
 pub fn invite_send(
@@ -30,51 +27,31 @@ pub fn invite_send(
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::Invite { co, from, to } => Some(
-			stream::once(ready((context.clone(), (co.clone(), from.clone(), to.clone()))))
-				.filter({
-					move |(context, (co, ..))| {
-						let co = co.clone();
-						let context = context.clone();
-						async move { context.is_shared(&co).await }
-					}
-				})
-				.filter_map(move |(context, data)| async move {
-					context.network().await.map(|network| (context, network, data))
-				})
-				.flat_map(move |(context, network, (co, from, participant))| {
-					create_and_send_invite(context, network, co, from, participant)
-				})
-				.map(Action::map_error)
-				.map(Ok),
-		),
-		_ => None,
-	}
-}
-
-/// Dispatch Invite when a participant is invited into an CO.
-/// In: [`Action::CoreAction`]
-/// Out: [`Action::Invite`]
-pub fn invite_send_action(
-	_actions: &Actions<Action, (), CoContext>,
-	action: &Action,
-	_state: &(),
-	_context: &CoContext,
-) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
-	match action {
-		Action::CoreAction { co, storage: _, context, action, cid: _ }
-			if context.is_local_change() && action.core == CO_CORE_NAME_CO =>
+		Action::CoreAction { co, storage: _, context: action_context, action, cid: _ }
+			if action_context.is_local_change() && action.core == CO_CORE_NAME_CO =>
 		{
 			let co_action: CoAction = action.get_payload().ok()?;
 			match co_action {
-				CoAction::ParticipantInvite { participant, tags: _ } => Some(
-					stream::iter([Action::Invite {
-						co: co.clone(),
-						from: action.from.clone(),
-						to: participant.clone(),
-					}])
-					.map(Ok),
-				),
+				CoAction::ParticipantInvite { participant, tags: _ } => {
+					let co = co.clone();
+					let context = context.clone();
+					let from = action.from.clone();
+					let to = participant.clone();
+					Some(
+						async move {
+							let (message_id, message, networks) = create_invite(&context, &co, &from, &to).await?;
+							Ok(Action::CoDidCommSend(CoDidCommSendAction {
+								co,
+								networks,
+								notification: Some(NotifyAction::InviteSent { to }),
+								message_from: from,
+								message_id,
+								message,
+							}))
+						}
+						.into_stream(),
+					)
+				},
 				_ => None,
 			}
 		},
@@ -82,46 +59,28 @@ pub fn invite_send_action(
 	}
 }
 
-fn create_and_send_invite(
-	context: CoContext,
-	(network, connections): (CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>),
-	co: CoId,
-	from: Did,
-	to: Did,
-) -> impl Stream<Item = anyhow::Result<Action>> + Send + 'static {
-	async_stream::try_stream! {
-		let timeout = settings_timeout(&context, &co, Some("invite")).await;
-		let (message, networks) = create_invite(&context, &co, &from, &to).await?;
-		let mut send_count = 0;
-		for await peers in ConnectionMessage::co_use(connections, co.clone(), from.clone(), networks) {
-			match peers {
-				Ok(peers) => {
-					if !peers.added.is_empty() {
-						let send = DidCommSendNetworkTask::send(
-							network.clone(),
-							peers.added.clone(),
-							message.clone(),
-							timeout,
-						).await;
-						match send {
-							Ok(peer) => {
-								yield Action::InviteSent { co: co.clone(), participant: to.clone(), peer };
-								send_count += 1;
-							},
-							Err(err) => {
-								tracing::warn!(?co, ?to, ?err, ?peers, "invite-send-failed");
-							},
-						}
-					}
-				}
-				Err(err) => {
-					tracing::warn!(?co, ?to, ?err, "invite-send-connection-failed");
-				},
+/// Dispatch InviteSent when message sent succeeded.
+///
+/// In: [`Action::CoDidCommSent`]
+/// Out: [`Action::InviteSent`]
+pub fn invite_sent(
+	_actions: &Actions<Action, (), CoContext>,
+	action: &Action,
+	_state: &(),
+	_context: &CoContext,
+) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
+	match action {
+		Action::CoDidCommSent {
+			message: CoDidCommSendAction { co, notification: Some(NotifyAction::InviteSent { to }), .. },
+			result: Ok(peers),
+		} => {
+			if let Some(peer) = peers.first() {
+				Some(stream::iter([Ok(Action::InviteSent { co: co.clone(), to: to.clone(), peer: *peer })]))
+			} else {
+				None
 			}
-		}
-		if send_count == 0 {
-			Err(anyhow!("Send invite failed: {co}: {to}"))?;
-		}
+		},
+		_ => None,
 	}
 }
 
@@ -130,7 +89,7 @@ async fn create_invite(
 	co_id: &CoId,
 	from: &Did,
 	to: &Did,
-) -> anyhow::Result<(EncodedMessage, BTreeSet<Network>)> {
+) -> anyhow::Result<(String, EncodedMessage, BTreeSet<Network>)> {
 	let identity_resolver = context.identity_resolver().await?;
 	let co_reducer = context.try_co_reducer(co_id).await?;
 	let (storage, co) = co_reducer.co().await?;
@@ -139,7 +98,7 @@ async fn create_invite(
 	let to_identity = context.identity_resolver().await?.resolve(to).await?;
 
 	// message
-	let invite_message = create_invite_message(
+	let (invite_message_id, invite_message) = create_invite_message(
 		&from_identity,
 		&to_identity,
 		CoInvitePayload {
@@ -158,7 +117,7 @@ async fn create_invite(
 		.await?;
 
 	// result
-	Ok((invite_message, networks))
+	Ok((invite_message_id, invite_message, networks))
 }
 
 async fn connectivity(storage: CoStorage, co: &Co) -> anyhow::Result<CoConnectivity> {
@@ -173,6 +132,7 @@ async fn connectivity(storage: CoStorage, co: &Co) -> anyhow::Result<CoConnectiv
 			participants: co
 				.participants
 				.iter()
+				.filter(|(_, participant)| participant.state.is_active())
 				.filter(|(_, participant)| {
 					let network = CoNetwork::from_tags(&participant.tags).unwrap_or_default();
 					network.has_feature(CoNetwork::Invite)
