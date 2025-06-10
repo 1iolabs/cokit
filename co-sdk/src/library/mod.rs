@@ -29,7 +29,6 @@ pub mod memory_dispatch;
 pub mod network_discovery;
 pub mod network_identity;
 pub mod push_heads;
-pub mod response_list;
 pub mod runtime_dispatch;
 pub mod settings_timeout;
 pub mod shared_membership;

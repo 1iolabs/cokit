@@ -3,9 +3,7 @@ use crate::{
 		find_co_identities::find_co_private_identity,
 		find_co_secret::find_co_key,
 		key_exchange::{create_key_response_message, KeyRequestPayload, KeyResponsePayload, CO_DIDCOMM_KEY_REQUEST},
-		settings_timeout::settings_timeout,
 	},
-	services::network::DidCommSendNetworkTask,
 	Action, CoContext, CoReducerFactory,
 };
 use anyhow::anyhow;
@@ -14,9 +12,8 @@ use co_core_co::ParticipantState;
 use co_core_keystore::Key;
 use co_identity::{DidCommHeader, Identity, IdentityResolver};
 use co_primitives::from_json_string;
-use futures::{stream, Stream, StreamExt};
+use futures::{FutureExt, Stream, StreamExt};
 use libp2p::PeerId;
-use std::{future::ready, time::Duration};
 
 /// When we receive an key request send an response.
 pub fn key_request_receive(
@@ -30,11 +27,10 @@ pub fn key_request_receive(
 			if &message.header().message_type == CO_DIDCOMM_KEY_REQUEST && message.is_validated_sender() {
 				let (header, body) = message.clone().into_inner();
 				let context = context.clone();
+				let peer = *peer;
 				Some(
-					stream::once(ready((context, *peer, header, body)))
-						.then(move |(context, peer, header, body)| async move {
-							key_request(context, peer, header, body).await
-						})
+					async move { key_request(context, peer, header, body).await }
+						.into_stream()
 						.flat_map(Action::map_error_stream)
 						.map(Ok),
 				)
@@ -52,8 +48,6 @@ async fn key_request(
 	header: DidCommHeader,
 	body: String,
 ) -> anyhow::Result<Vec<Action>> {
-	let network = context.network_tasks().await.ok_or(anyhow!("Expected network"))?;
-
 	// payload
 	let payload: KeyRequestPayload = from_json_string(&body)?;
 	if payload.peer != peer {
@@ -92,15 +86,9 @@ async fn key_request(
 	let key: Key = find_co_key(&local_co, &co).await?.ok_or(anyhow!("No key found"))?;
 
 	// message
-	let message =
+	let (message_id, message) =
 		create_key_response_message(&identity, &requester_identity, header.id.clone(), KeyResponsePayload::Ok(key))?;
 
-	// timeout
-	let timeout: Duration = settings_timeout(&context, &payload.id, Some("key-exchange")).await;
-
-	// send
-	DidCommSendNetworkTask::send(network.clone(), [peer], message, timeout).await?;
-
 	// result
-	Ok(vec![])
+	Ok(vec![Action::DidCommSend { message_id, peer, message }])
 }

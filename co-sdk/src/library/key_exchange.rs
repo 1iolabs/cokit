@@ -11,20 +11,19 @@ pub const CO_DIDCOMM_KEY_RESPONSE: &str = "co-key-response";
 /// Create an signed key request message.
 /// As we may send this request to any CO participant it's only signed by the sender and without an explicit recipent.
 pub fn create_key_request_message<F>(
-	message_id: String,
 	from: &F,
 	payload: KeyRequestPayload,
 	expire: Duration,
-) -> anyhow::Result<EncodedMessage>
+) -> anyhow::Result<(String, EncodedMessage)>
 where
 	F: PrivateIdentity + Send + Sync + 'static,
 {
 	let (from_didcomm, mut header) = DidCommHeader::create_from(from, CO_DIDCOMM_KEY_REQUEST)?;
 	header.expires_time = Some((SystemTime::now().duration_since(UNIX_EPOCH)? + expire).as_secs());
-	header.id = message_id;
 	let body = to_json_string(&payload)?;
+	let message_id = header.id.clone();
 	let message = from_didcomm.jws(header, &body)?;
-	Ok(EncodedMessage(message.into_bytes()))
+	Ok((message_id, EncodedMessage(message.into_bytes())))
 }
 
 /// Create an encrypted key response message.
@@ -33,7 +32,7 @@ pub fn create_key_response_message<F, T>(
 	to: &T,
 	request_message_id: String,
 	payload: KeyResponsePayload,
-) -> anyhow::Result<EncodedMessage>
+) -> anyhow::Result<(String, EncodedMessage)>
 where
 	F: PrivateIdentity + Send + Sync + 'static,
 	T: Identity + Send + Sync + 'static,
@@ -41,8 +40,9 @@ where
 	let (from_didcomm, to_didcomm, mut header) = DidCommHeader::create(from, to, CO_DIDCOMM_KEY_RESPONSE)?;
 	header.thid = Some(request_message_id);
 	let body = to_json_string(&payload)?;
+	let message_id = header.id.clone();
 	let message = from_didcomm.jwe(&to_didcomm, header, &body)?;
-	Ok(EncodedMessage(message.into_bytes()))
+	Ok((message_id, EncodedMessage(message.into_bytes())))
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]

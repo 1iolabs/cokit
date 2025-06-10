@@ -11,7 +11,7 @@ use co_core_co::{CoAction, ParticipantState};
 use co_identity::DidCommHeader;
 use co_primitives::{from_json_string, CloneWithBlockStorageSettings, CoJoin, Did, KnownTag, ReducerAction};
 use co_storage::BlockStorageExt;
-use futures::{future::ready, stream, Stream, StreamExt, TryStreamExt};
+use futures::{FutureExt, Stream, StreamExt, TryStreamExt};
 use libp2p::PeerId;
 
 /// When we receive a join message:
@@ -29,11 +29,11 @@ pub fn join_receive(
 		Action::DidCommReceive { peer, message } => {
 			if &message.header().message_type == CO_DIDCOMM_JOIN && message.is_validated_sender() {
 				let (header, body) = message.clone().into_inner();
+				let context = context.clone();
+				let peer = *peer;
 				Some(
-					stream::once(ready((context.clone(), *peer, header, body)))
-						.then(
-							move |(context, peer, header, body)| async move { joined(context, peer, header, body).await },
-						)
+					async move { joined(context, peer, header, body).await }
+						.into_stream()
 						.flat_map(Action::map_error_stream)
 						.map(Ok),
 				)
