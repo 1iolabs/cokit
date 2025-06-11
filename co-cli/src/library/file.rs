@@ -1,6 +1,6 @@
 use co_core_co::CoAction;
 use co_core_file::{FolderNode, Node};
-use co_primitives::{tags, AbsolutePath, AbsolutePathOwned, DagCollectionAsyncExt, PathError, PathExt};
+use co_primitives::{tags, AbsolutePath, AbsolutePathOwned, CoreName, DagCollectionAsyncExt, PathError, PathExt};
 use co_sdk::{
 	state::{query_core, QueryError, QueryExt},
 	CoReducer, CoStorage, Cores, PrivateIdentity, StorageError, CO_CORE_FILE, CO_CORE_NAME_CO,
@@ -42,7 +42,10 @@ pub async fn file_core<I>(
 where
 	I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 {
-	match query_core(core).execute_reducer(&co_reducer).await {
+	match query_core(CoreName::<co_core_file::File>::new(core))
+		.execute_reducer(&co_reducer)
+		.await
+	{
 		Err(QueryError::NotFound(_)) => {
 			// create core
 			let create = CoAction::CoreCreate {

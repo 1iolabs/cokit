@@ -4,7 +4,7 @@ use crate::{
 	CoReducer, CO_CORE_NAME_KEYSTORE,
 };
 use anyhow::anyhow;
-use co_core_keystore::{Key, KeyStore};
+use co_core_keystore::Key;
 use co_primitives::{CoId, Secret};
 
 /// Read current CO PSK from keychain core, if the CO is encrypted.
@@ -57,10 +57,9 @@ pub async fn find_co_key_by_reference(
 	key_reference: &str,
 	keystore_core_name: Option<&str>,
 ) -> Result<Key, anyhow::Error> {
-	let (parent_storage, key_store) =
-		state::query_core::<KeyStore>(keystore_core_name.unwrap_or(CO_CORE_NAME_KEYSTORE))
-			.execute_reducer(&parent)
-			.await?;
+	let (parent_storage, key_store) = state::query_core(CO_CORE_NAME_KEYSTORE.with_name_opt(keystore_core_name))
+		.execute_reducer(&parent)
+		.await?;
 	let (_, key) = state::find(&parent_storage, &key_store.keys, |(k, _)| k == key_reference)
 		.await?
 		.ok_or(anyhow!("Key not found"))?;

@@ -25,10 +25,10 @@ where
 {
 	let max_references = max_reference_count(<S::StoreParams as StoreParams>::MAX_BLOCK_SIZE);
 	let mut removed_blocks = 0;
-	let mut query_blocks_index_unreferenced = query_core::<co_core_storage::Storage>(CO_CORE_NAME_STORAGE)
+	let mut query_blocks_index_unreferenced = query_core(CO_CORE_NAME_STORAGE)
 		.with_default()
 		.map(|storage_core| storage_core.blocks_index_unreferenced);
-	let mut query_blocks = query_core::<co_core_storage::Storage>(CO_CORE_NAME_STORAGE)
+	let mut query_blocks = query_core(CO_CORE_NAME_STORAGE)
 		.with_default()
 		.map(|storage_core| storage_core.blocks);
 	let mut state = storage_core_state;
@@ -133,7 +133,7 @@ mod tests {
 		ApplicationBuilder, CoReducer, MonotonicCoDate, MonotonicCoUuid, CO_CORE_NAME_CO, CO_CORE_NAME_STORAGE,
 	};
 	use co_core_co::CoAction;
-	use co_core_storage::{PinStrategy, Storage, StorageAction};
+	use co_core_storage::{PinStrategy, StorageAction};
 	use co_primitives::tags;
 	use co_storage::{ExtendedBlockStorage, TmpDir};
 	use futures::TryStreamExt;
@@ -141,7 +141,7 @@ mod tests {
 	async fn count_pin_references(co: &CoReducer, pin: CoPinningKey) -> u32 {
 		let storage = co.storage();
 		let co_state = co.reducer_state().await;
-		let storage_core = query_core::<Storage>(CO_CORE_NAME_STORAGE)
+		let storage_core = query_core(CO_CORE_NAME_STORAGE)
 			.execute(&storage, co_state.state().into())
 			.await
 			.unwrap();

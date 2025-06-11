@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use co_actor::Actions;
-use co_core_membership::{Membership, MembershipState, Memberships, MembershipsAction};
+use co_core_membership::{Membership, MembershipState, MembershipsAction};
 use co_identity::{Identity, PrivateIdentityResolver};
 use co_primitives::{CoId, CoInviteMetadata, Did, KnownTags};
 use co_storage::BlockStorageExt;
@@ -23,7 +23,7 @@ pub fn join_send(
 	// filter
 	let result = match action {
 		Action::CoreAction { co, storage, context: _, action, cid: _ }
-			if co.as_str() == CO_ID_LOCAL && action.core == CO_CORE_NAME_MEMBERSHIP =>
+			if co.as_str() == CO_ID_LOCAL && CO_CORE_NAME_MEMBERSHIP == action.core =>
 		{
 			let mambership_action: MembershipsAction = action.get_payload().ok()?;
 			match mambership_action {
@@ -108,7 +108,7 @@ async fn find_membership(
 	did: &Did,
 ) -> anyhow::Result<Option<Membership>> {
 	let local = context.local_co_reducer().await?;
-	let memberships = query_core::<Memberships>(CO_CORE_NAME_MEMBERSHIP)
+	let memberships = query_core(CO_CORE_NAME_MEMBERSHIP)
 		.execute(storage, local.reducer_state().await.co())
 		.await?;
 	Ok(memberships.memberships.into_iter().find(|membership| {

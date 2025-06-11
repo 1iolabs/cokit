@@ -2,20 +2,19 @@ use crate::{CoReducer, CoStorage, CO_CORE_NAME_CO};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_core_co::Co;
-use co_primitives::OptionLink;
+use co_primitives::{CoMap, CoreName, OptionLink, Transactionable};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
-use serde::de::DeserializeOwned;
-use std::{future::Future, marker::PhantomData};
+use serde::{de::DeserializeOwned, Serialize};
+use std::{future::Future, hash::Hash, marker::PhantomData};
 
 #[async_trait]
-pub trait Query: Send + Sync {
-	type Input: Send + Sync + 'static;
-	type Output: Send + Sync + 'static;
+pub trait Query: Send {
+	type Storage: BlockStorage + Clone + 'static;
+	type Input: Send + 'static;
+	type Output: Send + 'static;
 
 	/// Execute the query.
-	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
-	where
-		S: BlockStorage + 'static;
+	async fn execute(&mut self, storage: &Self::Storage, source: Self::Input) -> Result<Self::Output, QueryError>;
 }
 
 #[async_trait]
@@ -23,7 +22,7 @@ pub trait QueryExt: Query {
 	/// Execute query using reducer state.
 	async fn execute_reducer(&mut self, reducer: &CoReducer) -> Result<(CoStorage, Self::Output), QueryError>
 	where
-		Self: Query<Input = OptionLink<Co>>,
+		Self: Query<Storage = CoStorage, Input = OptionLink<Co>>,
 	{
 		let storage = reducer.storage();
 		let source = reducer.reducer_state().await.co();
@@ -35,11 +34,11 @@ pub trait QueryExt: Query {
 	///
 	/// # Errors
 	/// - [`QueryError::NotFound`] - If the core don't exists.
-	fn core<T>(self, core_name: &str) -> CoreQuery<'_, Self, T>
+	fn core<'a, T>(self, core_name: CoreName<'a, T>) -> CoreQuery<'a, Self, T>
 	where
 		Self: Sized + Query<Output = (OptionLink<Co>, Option<Co>)>,
 	{
-		CoreQuery::new(self, core_name)
+		CoreQuery::new(self, core_name.name())
 	}
 
 	/// Resolve [`OptionLink<T>`] to [`Option<T>`].
@@ -82,20 +81,103 @@ pub trait QueryExt: Query {
 	fn then<T, F, Fut>(self, map: F) -> ThenQuery<Self, F, Fut, T>
 	where
 		Self: Sized,
-		F: Fn(Self::Output) -> Fut,
+		F: Fn(&Self::Storage, Self::Output) -> Fut,
 		Fut: Future<Output = T>,
 	{
 		ThenQuery::new(self, map)
 	}
+
+	/// Open transaction.
+	fn open(self) -> OpenQuery<Self>
+	where
+		Self: Sized,
+	{
+		OpenQuery { inner: self }
+	}
+
+	/// Query map value by its key.
+	fn get_value<K, V>(self, key: K) -> CoMapGetQuery<Self, K, V>
+	where
+		K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+		V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+		Self: Sized + Query<Output = CoMap<K, V>>,
+	{
+		CoMapGetQuery::new(self, key)
+	}
 }
 impl<T> QueryExt for T where T: Query {}
 
-pub fn query<T>() -> NewQuery<T> {
-	NewQuery { _t: PhantomData }
+pub fn query<S, T>() -> NewQuery<S, T> {
+	NewQuery { _s: PhantomData, _t: PhantomData }
 }
 
-pub fn query_core<'a, T>(core_name: &'a str) -> CoreQuery<'a, OptionLinkQuery<NewQuery<OptionLink<Co>>, Co>, T> {
+pub fn query_core<'a, S, T>(
+	core_name: CoreName<'a, T>,
+) -> CoreQuery<'a, OptionLinkQuery<NewQuery<S, OptionLink<Co>>, Co>, T>
+where
+	S: BlockStorage + Clone + 'static,
+{
 	query().option_link().core(core_name)
+}
+
+pub struct OpenQuery<Q> {
+	inner: Q,
+}
+impl<Q> OpenQuery<Q>
+where
+	Q: Query,
+	Q::Output: Transactionable<Q::Storage>,
+	<Q::Output as Transactionable<Q::Storage>>::Transaction: Send + 'static,
+{
+	pub fn new(inner: Q) -> Self {
+		Self { inner }
+	}
+}
+#[async_trait]
+impl<Q> Query for OpenQuery<Q>
+where
+	Q: Query,
+	Q::Output: Transactionable<Q::Storage>,
+	<Q::Output as Transactionable<Q::Storage>>::Transaction: Send + 'static,
+{
+	type Storage = Q::Storage;
+	type Input = Q::Input;
+	type Output = <Q::Output as Transactionable<Q::Storage>>::Transaction;
+
+	async fn execute(&mut self, storage: &Self::Storage, source: Self::Input) -> Result<Self::Output, QueryError> {
+		let input = self.inner.execute(storage, source).await?;
+		Ok(input.open(storage).await?)
+	}
+}
+
+pub struct CoMapGetQuery<Q, K, V> {
+	inner: Q,
+	key: K,
+	value: PhantomData<V>,
+}
+impl<Q, K, V> CoMapGetQuery<Q, K, V>
+where
+	Q: Query,
+{
+	pub fn new(inner: Q, key: K) -> Self {
+		Self { inner, key, value: PhantomData }
+	}
+}
+#[async_trait]
+impl<Q, K, V> Query for CoMapGetQuery<Q, K, V>
+where
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+	Q: Query<Output = CoMap<K, V>>,
+{
+	type Storage = Q::Storage;
+	type Input = Q::Input;
+	type Output = Option<V>;
+
+	async fn execute(&mut self, storage: &Self::Storage, source: Self::Input) -> Result<Self::Output, QueryError> {
+		let input = self.inner.execute(storage, source).await?;
+		Ok(input.get(storage, &self.key).await?)
+	}
 }
 
 // #[async_trait]
@@ -144,13 +226,11 @@ where
 	Q::Input: Eq + Clone,
 	Q::Output: Clone,
 {
+	type Storage = Q::Storage;
 	type Input = Q::Input;
 	type Output = Q::Output;
 
-	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
-	where
-		S: BlockStorage + 'static,
-	{
+	async fn execute(&mut self, storage: &Self::Storage, source: Self::Input) -> Result<Self::Output, QueryError> {
 		if let Some((last_input, last_output)) = &self.last {
 			if last_input == &source {
 				return Ok(last_output.clone());
@@ -189,7 +269,7 @@ where
 // 	type Input = Q::Input;
 // 	type Output = Option<Q::Output>;
 
-// 	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
+// 	async fn execute(&mut self, storage: &Self::Storage, source: Self::Input) -> Result<Self::Output, QueryError>
 // 	where
 // 		S: BlockStorage + 'static,
 // 	{
@@ -205,21 +285,21 @@ where
 // 	}
 // }
 
-pub struct NewQuery<T> {
+pub struct NewQuery<S, T> {
+	_s: PhantomData<S>,
 	_t: PhantomData<T>,
 }
 #[async_trait]
-impl<T> Query for NewQuery<T>
+impl<S, T> Query for NewQuery<S, T>
 where
-	T: Send + Sync + 'static,
+	S: BlockStorage + Clone + 'static,
+	T: Send + 'static,
 {
+	type Storage = S;
 	type Input = T;
 	type Output = T;
 
-	async fn execute<S>(&mut self, _storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
-	where
-		S: BlockStorage + 'static,
-	{
+	async fn execute(&mut self, _storage: &Self::Storage, source: Self::Input) -> Result<Self::Output, QueryError> {
 		Ok(source)
 	}
 }
@@ -240,13 +320,11 @@ where
 	Q: Query<Output = OptionLink<T>>,
 	T: DeserializeOwned + Send + Sync + 'static,
 {
+	type Storage = Q::Storage;
 	type Input = Q::Input;
 	type Output = (OptionLink<T>, Option<T>);
 
-	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
-	where
-		S: BlockStorage + 'static,
-	{
+	async fn execute(&mut self, storage: &Self::Storage, source: Self::Input) -> Result<Self::Output, QueryError> {
 		let link = self.query.execute(storage, source).await?;
 		Ok((link, storage.get_value_or_none(&link).await?))
 	}
@@ -270,13 +348,11 @@ where
 	T: Send + Sync + 'static,
 	F: Fn(Q::Output) -> T + Send + Sync,
 {
+	type Storage = Q::Storage;
 	type Input = Q::Input;
 	type Output = T;
 
-	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
-	where
-		S: BlockStorage + 'static,
-	{
+	async fn execute(&mut self, storage: &Self::Storage, source: Self::Input) -> Result<Self::Output, QueryError> {
 		Ok((self.map)(self.query.execute(storage, source).await?))
 	}
 }
@@ -301,13 +377,11 @@ where
 	Fut: Future<Output = T> + Send + Sync,
 	T: Send + Sync + 'static,
 {
+	type Storage = Q::Storage;
 	type Input = Q::Input;
 	type Output = T;
 
-	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
-	where
-		S: BlockStorage + 'static,
-	{
+	async fn execute(&mut self, storage: &Self::Storage, source: Self::Input) -> Result<Self::Output, QueryError> {
 		let next = self.query.execute(storage, source).await?;
 		Ok((self.map)(next).await)
 	}
@@ -336,15 +410,13 @@ where
 	C: Default + DeserializeOwned + Clone + Send + Sync + 'static,
 	Q: Query<Output = (OptionLink<Co>, Option<Co>)>,
 {
+	type Storage = Q::Storage;
 	type Input = Q::Input;
 	type Output = C;
 
-	async fn execute<S>(&mut self, storage: &S, source: Self::Input) -> Result<Self::Output, QueryError>
-	where
-		S: BlockStorage + 'static,
-	{
+	async fn execute(&mut self, storage: &Self::Storage, source: Self::Input) -> Result<Self::Output, QueryError> {
 		let (co_reference, co) = self.query.execute(storage, source).await?;
-		if self.core_name == CO_CORE_NAME_CO {
+		if CO_CORE_NAME_CO == self.core_name {
 			Ok(storage.get_default(co_reference.cid()).await?)
 		} else if let Some(core) = co.unwrap_or_default().cores.get(self.core_name) {
 			if let Some(core_state) = &core.state {

@@ -254,7 +254,7 @@ where
 		storage: &S,
 		runtime: &RuntimePool,
 		identity: &I,
-		core: &str,
+		core: impl Into<String> + Debug,
 		item: &T,
 	) -> Result<Option<Cid>, anyhow::Error>
 	where

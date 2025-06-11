@@ -5,7 +5,7 @@ use crate::{
 };
 use co_actor::Actions;
 use co_core_co::Co;
-use co_core_keystore::{Key, KeyStore, KeyStoreAction};
+use co_core_keystore::{Key, KeyStoreAction};
 use co_identity::{PrivateIdentityResolver, PrivateIdentityResolverBox};
 use co_primitives::{Did, OptionLink};
 use futures::{pin_mut, stream, Stream, StreamExt};
@@ -44,7 +44,7 @@ pub fn keystore_changed(
 		Action::CoreAction { co, context: change_context, action, cid: _, storage: _ }
 			if co.as_str() == CO_ID_LOCAL
 				&& change_context.is_local_change()
-				&& action.core == CO_CORE_NAME_KEYSTORE =>
+				&& CO_CORE_NAME_KEYSTORE == action.core =>
 		{
 			if let Some(keystore_action) = action.get_payload::<KeyStoreAction>().ok() {
 				Some(
@@ -109,10 +109,7 @@ impl SubscribeAction {
 }
 
 async fn key_by_uri(storage: &CoStorage, co: OptionLink<Co>, uri: &str) -> Result<Option<Key>, anyhow::Error> {
-	let keystore = query_core::<KeyStore>(CO_CORE_NAME_KEYSTORE)
-		.with_default()
-		.execute(storage, co)
-		.await?;
+	let keystore = query_core(CO_CORE_NAME_KEYSTORE).with_default().execute(storage, co).await?;
 	let keys = state::stream(storage.clone(), &keystore.keys);
 	pin_mut!(keys);
 	let mut first_error: Option<anyhow::Error> = None;

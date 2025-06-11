@@ -142,7 +142,7 @@ async fn wait_membership_state(
 			async move {
 				match action {
 					Action::CoreAction { co, storage: _, context: _, action, cid: _ }
-						if co.as_str() == CO_ID_LOCAL && action.core == CO_CORE_NAME_MEMBERSHIP =>
+						if co.as_str() == CO_ID_LOCAL && CO_CORE_NAME_MEMBERSHIP == action.core =>
 					{
 						let mambership_action: MembershipsAction = action.get_payload().ok()?;
 						match mambership_action {

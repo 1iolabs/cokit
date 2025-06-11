@@ -113,7 +113,7 @@ async fn find_inviter(context: &CoContext, co: &CoReducer, invited_did: &str) ->
 					.get_deserialized::<ReducerAction<CoAction>>(&entry.entry().payload)
 					.await
 				{
-					Ok(action) if action.core == CO_CORE_NAME_CO => match action.payload {
+					Ok(action) if CO_CORE_NAME_CO == action.core => match action.payload {
 						CoAction::ParticipantInvite { participant, tags: _ } if participant.as_str() == invited_did => {
 							Ok(Some(action.from))
 						},

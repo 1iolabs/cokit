@@ -1,5 +1,6 @@
 use cid::Cid;
 use co_core_co::CoAction;
+use co_primitives::CoreName;
 use co_sdk::{
 	build_core, crate_repository_path,
 	state::{query_core, QueryExt},
@@ -89,6 +90,10 @@ async fn test_core_upgrade() {
 		.unwrap();
 
 	// check
-	let counter: example_counter_upgraded::Counter = query_core("counter").execute_reducer(&local_co).await.unwrap().1;
+	let counter = query_core(CoreName::<example_counter_upgraded::Counter>::new("counter"))
+		.execute_reducer(&local_co)
+		.await
+		.unwrap()
+		.1;
 	assert_eq!(counter, example_counter_upgraded::Counter { count: 100 });
 }

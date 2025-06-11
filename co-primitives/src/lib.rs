@@ -29,6 +29,7 @@ pub use types::{
 	co_reference::CoReference,
 	co_set::{CoSet, CoSetTransaction},
 	codec::{KnownMultiCodec, MultiCodec, MultiCodecError},
+	core_name::CoreName,
 	dag_collection::{DagCollection, DagMap, DagSet, DagVec},
 	dag_collection_async_ext::DagCollectionAsyncExt,
 	dag_collection_ext::{DagCollectionExt, DagMapExt, DagSetExt, DagVecExt},

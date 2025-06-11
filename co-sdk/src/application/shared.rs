@@ -52,8 +52,8 @@ impl SharedCoBuilder {
 		Self {
 			parent,
 			membership,
-			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_owned(),
-			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_owned(),
+			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_string(),
+			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_string(),
 			network: None,
 			initialize: true,
 			network_block_timeout: Duration::from_secs(30),
@@ -453,10 +453,10 @@ impl SharedCoCreator {
 		Self {
 			parent,
 			co,
-			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_owned(),
-			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_owned(),
+			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_string(),
+			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_string(),
 			#[cfg(feature = "pinning")]
-			storage_core_name: crate::CO_CORE_NAME_STORAGE.to_owned(),
+			storage_core_name: crate::CO_CORE_NAME_STORAGE.to_string(),
 		}
 	}
 
@@ -602,7 +602,9 @@ impl SharedCoCreator {
 			// pin initial state
 			crate::reducer::change::reference_writer::write_storage_references(
 				co_storage.clone(),
-				&mut self.parent.dispatcher(&self.storage_core_name, identity.clone()),
+				&mut self
+					.parent
+					.dispatcher(crate::CO_CORE_NAME_STORAGE.with_name(&self.storage_core_name), identity.clone()),
 				co_primitives::BlockLinks::default(),
 				Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.co.id)),
 				None,

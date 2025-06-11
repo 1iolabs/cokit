@@ -1,4 +1,5 @@
 use cid::Cid;
+use co_primitives::CoreName;
 use co_runtime::Core;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
@@ -16,13 +17,13 @@ pub const CO_CORE_POA: &str = "co-core-poa";
 pub const CO_CORE_BOARD: &str = "co-core-board";
 
 /// CO Core name expected by the SDK implementation (key to `co.cores`).
-pub const CO_CORE_NAME_CO: &str = "co";
+pub const CO_CORE_NAME_CO: CoreName<'static, co_core_co::Co> = CoreName::new("co");
 /// keystore core name expected by the SDK implementation (key to `co.cores`).
-pub const CO_CORE_NAME_KEYSTORE: &str = "keystore";
+pub const CO_CORE_NAME_KEYSTORE: CoreName<'static, co_core_keystore::KeyStore> = CoreName::new("keystore");
 /// Membership core names expected by the SDK implementation (key to `co.cores`).
-pub const CO_CORE_NAME_MEMBERSHIP: &str = "membership";
-pub const CO_CORE_NAME_PIN: &str = "pin";
-pub const CO_CORE_NAME_STORAGE: &str = "storage";
+pub const CO_CORE_NAME_MEMBERSHIP: CoreName<'static, co_core_membership::Memberships> = CoreName::new("membership");
+pub const CO_CORE_NAME_PIN: CoreName<'static, co_core_pin::Pin> = CoreName::new("pin");
+pub const CO_CORE_NAME_STORAGE: CoreName<'static, co_core_storage::Storage> = CoreName::new("storage");
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Cores {

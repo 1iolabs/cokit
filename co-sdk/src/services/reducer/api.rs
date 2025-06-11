@@ -160,7 +160,12 @@ impl CoReducer {
 	/// # Returns
 	/// The resulting state and heads.
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, name = "push", fields(co = self.id().as_str(), identity = identity.identity()), skip(self, item, identity))]
-	pub async fn push<T, I>(&self, identity: &I, core: &str, item: &T) -> Result<CoReducerState, anyhow::Error>
+	pub async fn push<T, I>(
+		&self,
+		identity: &I,
+		core: impl Into<String> + Debug,
+		item: &T,
+	) -> Result<CoReducerState, anyhow::Error>
 	where
 		T: Serialize + Debug + Clone + Send + Sync + 'static,
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
@@ -172,7 +177,7 @@ impl CoReducer {
 		// push
 		let result = self
 			.handle
-			.request(|r| {
+			.try_request(|r| {
 				ReducerMessage::Push(
 					self.overlay_storage.clone(),
 					self.storage.clone(),
@@ -181,7 +186,7 @@ impl CoReducer {
 					r,
 				)
 			})
-			.await??;
+			.await?;
 
 		// result
 		tracing::trace!(action = ?item, ?action_reference, state = ?result.0, heads = ?result.1, "push");
@@ -205,7 +210,7 @@ impl CoReducer {
 		// push
 		let result = self
 			.handle
-			.request(|r| {
+			.try_request(|r| {
 				ReducerMessage::Push(
 					self.overlay_storage.clone(),
 					self.storage.clone(),
@@ -214,7 +219,7 @@ impl CoReducer {
 					r,
 				)
 			})
-			.await??;
+			.await?;
 
 		// result
 		tracing::trace!(action = ?action.payload, ?action_reference, state = ?result.0, heads = ?result.1, "push");
@@ -241,7 +246,7 @@ impl CoReducer {
 		// push
 		let result = self
 			.handle
-			.request(|r| {
+			.try_request(|r| {
 				ReducerMessage::Push(
 					self.overlay_storage.clone(),
 					self.storage.clone(),
@@ -250,7 +255,7 @@ impl CoReducer {
 					r,
 				)
 			})
-			.await??;
+			.await?;
 
 		// result
 		tracing::trace!(?action_reference, state = ?result.0, heads = ?result.1, "push-reference");
@@ -264,8 +269,8 @@ impl CoReducer {
 		// join
 		let request = self
 			.handle
-			.request(|r| ReducerMessage::JoinHeads(self.overlay_storage.clone(), self.storage(), heads, r))
-			.await??;
+			.try_request(|r| ReducerMessage::JoinHeads(self.overlay_storage.clone(), self.storage(), heads, r))
+			.await?;
 
 		// result
 		Ok(request)
@@ -276,20 +281,21 @@ impl CoReducer {
 		// join
 		let co_reducer_state = self
 			.handle
-			.request(|r| ReducerMessage::JoinState(self.overlay_storage.clone(), self.storage(), state, r))
-			.await??;
+			.try_request(|r| ReducerMessage::JoinState(self.overlay_storage.clone(), self.storage(), state, r))
+			.await?;
 
 		// result
 		Ok(co_reducer_state)
 	}
 
 	/// Create a action dispatcher.
-	pub fn dispatcher<A, I>(&self, core: &str, identity: I) -> impl CoDispatch<A> + use<A, I>
+	pub fn dispatcher<A, I, C>(&self, core: C, identity: I) -> impl CoDispatch<A> + use<A, I, C>
 	where
 		A: Serialize + Debug + Send + Sync + Clone + 'static,
 		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
+		C: Into<String> + Debug,
 	{
-		CoReducerDispatch::new(self.clone(), PrivateIdentity::boxed(identity), core.to_string())
+		CoReducerDispatch::new(self.clone(), PrivateIdentity::boxed(identity), core.into())
 	}
 }
 

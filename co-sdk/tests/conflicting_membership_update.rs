@@ -1,7 +1,7 @@
 use cid::Cid;
 use co_core_co::CoAction;
 use co_core_file::{File, FileAction, FolderNode, Node};
-use co_core_membership::Memberships;
+use co_primitives::CoreName;
 use co_sdk::{
 	ipld_resolve_recursive,
 	state::{self, query_core, QueryExt},
@@ -219,7 +219,7 @@ async fn test_conflicting_membership_update() {
 	// tracing::info!("co2 next count {:?}", count_folders(&co2).await);
 
 	async fn count_folders(co: &CoReducer) -> usize {
-		let (storage, files) = query_core::<File>("file").execute_reducer(co).await.unwrap();
+		let (storage, files) = query_core(CoreName::<File>::new("file")).execute_reducer(co).await.unwrap();
 		let nodes = state::into_collection::<BTreeMap<_, _>, _, _, _>(&storage, &files.nodes)
 			.await
 			.unwrap();
@@ -288,10 +288,7 @@ async fn test_conflicting_membership_update() {
 	)
 	.await
 	.unwrap();
-	let (storage, memberships) = query_core::<Memberships>(CO_CORE_NAME_MEMBERSHIP)
-		.execute_reducer(&local_co)
-		.await
-		.unwrap();
+	let (storage, memberships) = query_core(CO_CORE_NAME_MEMBERSHIP).execute_reducer(&local_co).await.unwrap();
 	let heads = stream::iter(
 		memberships
 			.memberships

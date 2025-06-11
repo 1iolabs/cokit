@@ -360,8 +360,8 @@ impl CoContextInner {
 
 		// reducer
 		let reducer = SharedCoBuilder::new(parent, membership)
-			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
-			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
+			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_string())
+			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_string())
 			.with_network(network)
 			.with_initialize(initialize)
 			.build(

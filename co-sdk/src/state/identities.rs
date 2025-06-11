@@ -3,7 +3,7 @@ use crate::{
 	state::{query_core, stream, Query},
 	CoStorage, CO_CORE_NAME_KEYSTORE,
 };
-use co_core_keystore::{Key, KeyStore};
+use co_core_keystore::Key;
 use co_primitives::{tags, Did, OptionLink};
 use futures::Stream;
 
@@ -21,10 +21,10 @@ pub fn identities(
 	co_state: OptionLink<co_core_co::Co>,
 	core_name: Option<&'_ str>,
 ) -> impl Stream<Item = Result<Identity, QueryError>> + '_ {
-	let core_name = core_name.unwrap_or(CO_CORE_NAME_KEYSTORE);
+	let core_name = CO_CORE_NAME_KEYSTORE.with_name_opt(core_name);
 	async_stream::try_stream! {
 		// root
-		let keystore = query_core::<KeyStore>(core_name)
+		let keystore = query_core(core_name)
 			.with_default()
 			.execute(&storage, co_state)
 			.await?;

@@ -2,7 +2,7 @@ use crate::{
 	state::{find, query_core, QueryExt},
 	CoReducer, CO_CORE_NAME_KEYSTORE,
 };
-use co_core_keystore::{Key, KeyStore, KeyStoreAction};
+use co_core_keystore::{Key, KeyStoreAction};
 use co_identity::PrivateIdentity;
 use std::fmt::Debug;
 
@@ -20,7 +20,7 @@ where
 {
 	// get
 	if !force_create {
-		let (storage, keystore) = query_core::<KeyStore>(CO_CORE_NAME_KEYSTORE).execute_reducer(&reducer).await?;
+		let (storage, keystore) = query_core(CO_CORE_NAME_KEYSTORE).execute_reducer(&reducer).await?;
 		if let Some((_, result)) = find(&storage, &keystore.keys, |(k, _)| k == key).await? {
 			return Ok(result.to_owned());
 		}

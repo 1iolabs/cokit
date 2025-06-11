@@ -150,9 +150,9 @@ impl Application {
 
 		// create
 		let co = SharedCoCreator::new(local, create)
-			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
-			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
-			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_owned())
+			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_string())
+			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_string())
+			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_string())
 			.create(
 				self.storage(),
 				self.context().inner.runtime(),

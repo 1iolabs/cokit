@@ -3,8 +3,7 @@ use crate::{
 	state::{query_core, Query},
 	CoStorage, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP,
 };
-use co_core_co::Co;
-use co_core_membership::{MembershipState, Memberships};
+use co_core_membership::MembershipState;
 use co_identity::{Identity, LocalIdentity};
 use co_primitives::{CoId, Did, OptionLink, Tags};
 use futures::Stream;
@@ -23,13 +22,13 @@ pub fn memberships(
 ) -> impl Stream<Item = Result<(CoId, Did, Tags, MembershipState), QueryError>> {
 	async_stream::try_stream! {
 		// root
-		let co = query_core::<Co>(CO_CORE_NAME_CO).with_default().execute(&storage, co_state).await?;
+		let co = query_core(CO_CORE_NAME_CO).with_default().execute(&storage, co_state).await?;
 		if co_state.cid().is_some() {
 			yield (co.id.clone(), LocalIdentity::device().identity().to_owned(), co.tags.clone(), MembershipState::Active);
 		}
 
 		// memberships
-		let memberships = query_core::<Memberships>(CO_CORE_NAME_MEMBERSHIP).with_default().execute(&storage, co_state).await?;
+		let memberships = query_core(CO_CORE_NAME_MEMBERSHIP).with_default().execute(&storage, co_state).await?;
 		for membership in memberships.memberships {
 			yield (membership.id, membership.did, membership.tags, membership.membership_state);
 		}

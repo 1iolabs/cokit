@@ -14,7 +14,7 @@ pub struct Command {
 	pub co: CoId,
 
 	/// The COre Name.
-	#[arg(long, default_value_t = String::from(CO_CORE_NAME_KEYSTORE))]
+	#[arg(long, default_value_t = CO_CORE_NAME_KEYSTORE.to_string())]
 	pub core: String,
 }
 
