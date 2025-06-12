@@ -5,7 +5,6 @@ use ipld_core::ipld::Ipld;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize, Serializer};
 use std::{
-	borrow::Borrow,
 	collections::{BTreeMap, BTreeSet},
 	fmt::{Debug, Display},
 };
@@ -183,9 +182,13 @@ impl std::fmt::Display for TagValue {
 /// Tag. Represents a generic metadata/configuration key value pair.
 pub type Tag = (String, TagValue);
 impl TagsMatches for Tag {
-	fn matches(&self, tags: &Tags) -> bool {
-		let expr: TagsExpr = self.clone().into();
-		expr.matches(tags)
+	fn matches_matcher<M: TagMatcher>(&self, matcher: &M) -> bool {
+		matcher.matches_tag(&self.0, &self.1)
+	}
+}
+impl TagMatcher for Tag {
+	fn matches_tag(&self, key: &str, value: &TagValue) -> bool {
+		&self.0 == key && &self.1 == value
 	}
 }
 
@@ -287,9 +290,9 @@ impl Tags {
 		self.0.iter().find(|tag| tag.0 == key).map(|(_, v)| v)
 	}
 
-	/// Test against tag expression.
-	pub fn matches<M: TagsMatches>(&self, expr: impl Borrow<M>) -> bool {
-		expr.borrow().matches(self)
+	// Test against tag matcher.
+	pub fn matches<M: TagMatcher>(&self, matcher: &M) -> bool {
+		self.matches_matcher(matcher)
 	}
 
 	/// Get first tag value (that is a string) for given key.
@@ -388,15 +391,18 @@ impl From<Tag> for Tags {
 	}
 }
 impl TagsMatches for Tags {
-	fn matches(&self, tags: &Tags) -> bool {
-		let expr: TagsExpr = self.clone().into();
-		expr.matches(tags)
+	fn matches_matcher<M: TagMatcher>(&self, matcher: &M) -> bool {
+		self.iter().all(|(key, value)| matcher.matches_tag(key, value))
 	}
 }
-impl TagsMatches for &Tags {
-	fn matches(&self, tags: &Tags) -> bool {
-		let expr: TagsExpr = (*self).clone().into();
-		expr.matches(tags)
+impl TagMatcher for Tags {
+	fn matches_tag(&self, key: &str, value: &TagValue) -> bool {
+		for (tag_key, tag_value) in self.iter() {
+			if key == tag_key && value == tag_value {
+				return true;
+			}
+		}
+		false
 	}
 }
 
@@ -444,15 +450,9 @@ impl TagsExpr {
 			_ => TagsExpr::Or(vec![self, other]),
 		}
 	}
-}
-impl TagsMatches for TagsExpr {
-	fn matches(&self, tags: &Tags) -> bool {
-		match self {
-			TagsExpr::Tag(cond_tag) => tags.iter().any(|tag| cond_tag == tag),
-			TagsExpr::And(and) => !and.iter().any(|cond| !cond.matches(tags)),
-			TagsExpr::Or(or) => or.iter().any(|cond| cond.matches(tags)),
-			TagsExpr::Not(not) => !not.matches(tags),
-		}
+
+	pub fn matches<M: TagMatcher>(&self, matcher: &M) -> bool {
+		self.matches_matcher(matcher)
 	}
 }
 impl From<Tag> for TagsExpr {
@@ -465,10 +465,25 @@ impl From<Tags> for TagsExpr {
 		TagsExpr::And(value.into_iter().map(TagsExpr::Tag).collect())
 	}
 }
+impl TagsMatches for TagsExpr {
+	fn matches_matcher<M: TagMatcher>(&self, matcher: &M) -> bool {
+		match self {
+			TagsExpr::Tag(tag) => tag.matches_matcher(matcher),
+			TagsExpr::And(and) => and.iter().all(|cond| cond.matches_matcher(matcher)),
+			TagsExpr::Or(or) => or.iter().any(|cond| cond.matches_matcher(matcher)),
+			TagsExpr::Not(not) => !not.matches_matcher(matcher),
+		}
+	}
+}
 
-/// Type which can be matched against a list of tags.
+/// A type that can be matched against a TagMatcher.
 pub trait TagsMatches {
-	fn matches(&self, tags: &Tags) -> bool;
+	fn matches_matcher<M: TagMatcher>(&self, matcher: &M) -> bool;
+}
+
+/// A type that can be matched against a tag.
+pub trait TagMatcher {
+	fn matches_tag(&self, key: &str, value: &TagValue) -> bool;
 }
 
 #[cfg(test)]
@@ -497,6 +512,16 @@ mod tests {
 		assert!(!expr.matches(&tags!( "hello": "world", "five": "ten" )));
 		assert!(expr.matches(&tags!( "hello": "something else" )));
 		assert!(expr.matches(&tags!( "five": "ten" )));
+	}
+
+	#[test]
+	fn test_expr_and() {
+		let tags = tags!("hello": "world", "hello": "greet");
+		let expr: TagsExpr = tags.clone().into();
+		assert!(expr.matches(&tags!("hello": "world", "hello": "greet", "test": 123)));
+		assert!(tags.matches_matcher(&tags!("hello": "world", "hello": "greet", "test": 123)));
+		assert!(!expr.matches(&tags!("hello": "world")));
+		assert!(!tags.matches_matcher(&tags!("hello": "world")));
 	}
 
 	#[test]

@@ -38,7 +38,7 @@ pub use types::{
 	did::Did,
 	invite::{CoConnectivity, CoInviteMetadata},
 	known_tags::{CoInvite, CoJoin, CoNetwork, CoTimeout, KnownTag, KnownTags},
-	lazy_transaction::LazyTransaction,
+	lazy_transaction::{LazyTransaction, Transactionable},
 	link::{Link, Linkable, OptionLink},
 	mapped_cid::{MappedCid, OptionMappedCid},
 	metadata::{CoMetadata, Metadata, WithCoMetadata},
@@ -49,7 +49,7 @@ pub use types::{
 	},
 	secret::Secret,
 	storage::Storage,
-	tags::{Tag, TagValue, Tags, TagsExpr},
+	tags::{Tag, TagMatcher, TagValue, Tags, TagsExpr, TagsMatches},
 	total_float::TotalFloat64,
 	weak_cid::WeakCid,
 };

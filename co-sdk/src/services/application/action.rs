@@ -4,7 +4,7 @@ use crate::{
 };
 use co_identity::Message;
 use co_network::didcomm::EncodedMessage;
-use co_primitives::{CoId, Did, Link, Network, ReducerAction};
+use co_primitives::{CoId, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{stream::once, Stream, StreamExt};
 use ipld_core::ipld::Ipld;
@@ -94,6 +94,7 @@ pub enum Action {
 		// The message.
 		message: CoDidCommSendAction,
 		/// Peers the message has sent to or error.
+		/// If the peers list is empty no peer could be connected.
 		result: Result<BTreeSet<PeerId>, ActionError>,
 	},
 
@@ -122,6 +123,12 @@ pub enum Action {
 	CoClose {
 		/// The opened CO.
 		co: CoId,
+	},
+
+	/// Network Queue Process
+	NetworkQueueProcess {
+		/// Only process given co.
+		co: Option<CoId>,
 	},
 
 	/// Notification.
@@ -288,6 +295,9 @@ pub struct CoDidCommSendAction {
 
 	/// Notification when sent has been sucessfully done.
 	pub notification: Option<NotifyAction>,
+
+	/// Message tags. Used for internal tracking.
+	pub tags: Tags,
 
 	/// The message sender for reference.
 	pub message_from: Did,

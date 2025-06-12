@@ -51,7 +51,7 @@ impl Reducer for Pin {
 					let pin_tag_set = pin_tag_set.collection(context.storage());
 					// check if tag set contains given tags
 					for pin_tags in pin_tag_set {
-						if tags.matches(pin_tags) {
+						if tags.matches(&pin_tags) {
 							// unpin found cid
 							pin_map = unpin(pin_map, cid, tags, context);
 							continue;

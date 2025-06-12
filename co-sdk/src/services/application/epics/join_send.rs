@@ -148,6 +148,7 @@ async fn create_join_action(context: CoContext, storage: CoStorage, membership: 
 			participant: membership.did.clone(),
 			encrypted: is_membership_heads_encrypted(&storage, &membership).await?,
 		}),
+		tags: Default::default(),
 	}))
 }
 

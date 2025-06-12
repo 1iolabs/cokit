@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
 	async_api::Reducer, co_data, co_state, BlockStorage, BlockStorageExt, CoList, CoListIndex, CoMap, CoTryStreamExt,
-	LazyTransaction, Link, OptionLink, ReducerAction, Tags,
+	IsDefault, LazyTransaction, Link, OptionLink, ReducerAction, Tags,
 };
 use futures::{pin_mut, TryStreamExt};
 use std::future::ready;
@@ -24,7 +24,7 @@ pub enum BoardAction {
 	// ListTasksDelete(ListName),
 	// ListTasksMove { from: ListName, to: ListName },
 	TaskCreate { list: ListName, task: Task, after: Option<TaskId> },
-	TaskMove { from_list: Option<ListName>, list: ListName, task: TaskId, after: Option<TaskId> },
+	TaskMove { from_list: Option<ListName>, list: ListName, task: TaskId, after: Option<TaskId>, lock: TaskLock },
 	TaskArrange { task: TaskId, after: Option<TaskId> },
 	TaskDelete(TaskId),
 	TaskRename(TaskId, String),
@@ -81,6 +81,11 @@ pub struct List {
 	#[serde(rename = "t", default, skip_serializing_if = "Tags::is_empty")]
 	pub tags: Tags,
 }
+impl List {
+	pub fn new(name: impl Into<ListName>) -> Self {
+		Self { name: name.into(), tags: Default::default(), tasks: Default::default() }
+	}
+}
 
 #[co_data]
 pub struct Task {
@@ -99,6 +104,30 @@ pub struct Task {
 	/// Task payload.
 	#[serde(rename = "p", default, skip_serializing_if = "Option::is_none")]
 	pub payload: Option<Cid>,
+
+	/// Task exclusive lock identifier.
+	#[serde(rename = "l", default, skip_serializing_if = "IsDefault::is_default")]
+	pub lock: Option<String>,
+}
+
+#[co_data]
+#[derive(Default)]
+pub enum TaskLock {
+	/// No lock.
+	/// Fail the operation if the subject is locked.
+	#[default]
+	None,
+
+	/// Force operation if the subject is locked.
+	Force,
+
+	/// Use or apply a lock.
+	/// Fail the operation if the subject is locked with a different lock.
+	Lock(String),
+
+	/// Use and unlock after the operation.
+	/// Fail the operation if the subject is locked with a different lock.
+	Unlock(String),
 }
 
 async fn reduce<S>(storage: &S, state: &mut Board, action: BoardAction) -> Result<(), anyhow::Error>
@@ -127,8 +156,8 @@ where
 		BoardAction::TaskCreate { list, task, after } => {
 			reduce_task_create(&mut transaction, list, task, after).await?
 		},
-		BoardAction::TaskMove { from_list, list, task, after } => {
-			reduce_task_move(&mut transaction, from_list, list, task, after).await?
+		BoardAction::TaskMove { from_list, list, task, after, lock } => {
+			reduce_task_move(&mut transaction, from_list, list, task, after, lock).await?
 		},
 		BoardAction::TaskArrange { task, after } => reduce_task_arrange(&mut transaction, task, after).await?,
 		BoardAction::TaskDelete(task) => reduce_task_delete(&mut transaction, task).await?,
@@ -195,6 +224,17 @@ where
 			})
 			.try_first()
 			.await?)
+	}
+
+	/// Get task by id.
+	async fn task(&mut self, task_id: &TaskId) -> Result<Task, anyhow::Error> {
+		Ok(self
+			.tasks
+			.get()
+			.await?
+			.get(&task_id)
+			.await?
+			.ok_or_else(|| anyhow!("Task not found: {}", task_id))?)
 	}
 }
 
@@ -365,8 +405,12 @@ async fn reduce_task_move<S: BlockStorage + Clone + 'static>(
 	list_name: ListName,
 	task_id: TaskId,
 	after: Option<TaskId>,
+	lock: TaskLock,
 ) -> Result<(), anyhow::Error> {
-	// find task and source list
+	// lock
+	task_lock(transaction, &task_id, &lock).await?;
+
+	// find source list and source list task index
 	let (source_list_index, mut source_list, mut source_list_tasks, source_task_index) =
 		if let Some(from_list) = &from_list {
 			let (source_list_index, source_list) = transaction
@@ -398,7 +442,7 @@ async fn reduce_task_move<S: BlockStorage + Clone + 'static>(
 		.ok_or(anyhow!("List not found: {}", list_name))?;
 	let mut list_tasks = list.tasks.open(&transaction.storage).await?;
 
-	// find target lsit index
+	// find target list index
 	let task_after_index = if let Some(after) = &after {
 		list_tasks
 			.stream()
@@ -415,9 +459,9 @@ async fn reduce_task_move<S: BlockStorage + Clone + 'static>(
 
 	// add task to target list
 	if let Some(task_after_index) = task_after_index {
-		list_tasks.insert(task_after_index, task_id).await?;
+		list_tasks.insert(task_after_index, task_id.clone()).await?;
 	} else {
-		list_tasks.push(task_id).await?;
+		list_tasks.push(task_id.clone()).await?;
 	}
 
 	// store
@@ -426,6 +470,7 @@ async fn reduce_task_move<S: BlockStorage + Clone + 'static>(
 	list.tasks = list_tasks.store().await?;
 	transaction.lists.get_mut().await?.set(list_index, list).await?;
 
+	// result
 	Ok(())
 }
 
@@ -537,7 +582,7 @@ async fn reduce_list_delete<S: BlockStorage + Clone + 'static>(
 			let tasks = tasks.stream(&storage);
 			pin_mut!(tasks);
 			while let Some((_, task)) = tasks.try_next().await? {
-				reduce_task_move(transaction, None, to_list.name.clone(), task, None).await?;
+				reduce_task_move(transaction, None, to_list.name.clone(), task, None, TaskLock::Force).await?;
 			}
 		}
 	}
@@ -617,4 +662,46 @@ async fn reduce_board_tags_insert(state: &mut Board, mut tags: Tags) -> Result<(
 async fn reduce_board_rename(state: &mut Board, name: String) -> Result<(), anyhow::Error> {
 	state.name = name;
 	Ok(())
+}
+
+async fn task_lock<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	task_id: &TaskId,
+	lock: &TaskLock,
+) -> Result<(), anyhow::Error> {
+	match lock {
+		TaskLock::None => {
+			let task = transaction.task(&task_id).await?;
+			if task.lock.is_some() {
+				Err(anyhow!("Task locked"))
+			} else {
+				Ok(())
+			}
+		},
+		TaskLock::Force => Ok(()),
+		TaskLock::Lock(lock) => {
+			let mut task = transaction.task(&task_id).await?;
+			match task.lock {
+				Some(task_lock) if lock == &task_lock => Ok(()),
+				Some(_task_lock) => Err(anyhow!("Task locked")),
+				None => {
+					task.lock = Some(lock.clone());
+					transaction.tasks.get_mut().await?.insert(task_id.clone(), task).await?;
+					Ok(())
+				},
+			}
+		},
+		TaskLock::Unlock(lock) => {
+			let mut task = transaction.task(&task_id).await?;
+			match task.lock {
+				Some(task_lock) if lock == &task_lock => {
+					task.lock = None;
+					transaction.tasks.get_mut().await?.insert(task_id.clone(), task).await?;
+					Ok(())
+				},
+				Some(_task_lock) => Err(anyhow!("Task locked")),
+				None => Ok(()),
+			}
+		},
+	}
 }

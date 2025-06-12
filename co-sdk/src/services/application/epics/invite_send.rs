@@ -47,6 +47,7 @@ pub fn invite_send(
 								message_from: from,
 								message_id,
 								message,
+								tags: Default::default(),
 							}))
 						}
 						.into_stream(),

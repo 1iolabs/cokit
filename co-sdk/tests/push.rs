@@ -8,7 +8,7 @@ use std::{
 	future::ready,
 	time::{Duration, SystemTime},
 };
-use tokio::time::timeout;
+use tokio::time::{sleep, timeout};
 
 pub mod helper;
 
@@ -56,27 +56,30 @@ async fn test_push() {
 		.expect("state");
 	assert_eq!(peer1_state, peer0_state);
 
-	// peer0: create file
-	let folder = FolderNode {
-		name: "test".to_owned(),
-		create_time: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis(),
-		modify_time: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis(),
-		tags: tags!(),
-		owner: identity0.identity().to_owned(),
-		mode: 0o665,
-	};
-	peer0
-		.push(
-			&identity0,
-			"file",
-			&FileAction::Create {
-				path: AbsolutePathOwned::new("/".to_owned()).unwrap(),
-				node: co_core_file::Node::Folder(folder),
-				recursive: false,
-			},
-		)
-		.await
-		.unwrap();
+	// peer0: create folders
+	for i in 0..3 {
+		let folder = FolderNode {
+			name: format!("test-{}", i),
+			create_time: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis(),
+			modify_time: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis(),
+			tags: tags!(),
+			owner: identity0.identity().to_owned(),
+			mode: 0o665,
+		};
+		peer0
+			.push(
+				&identity0,
+				"file",
+				&FileAction::Create {
+					path: AbsolutePathOwned::new("/".to_owned()).unwrap(),
+					node: co_core_file::Node::Folder(folder),
+					recursive: false,
+				},
+			)
+			.await
+			.unwrap();
+		sleep(Duration::from_millis(i)).await;
+	}
 	let peer0_state = peer0.reducer_state().await;
 
 	// peer1: wait for state/heads to be updated

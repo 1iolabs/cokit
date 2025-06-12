@@ -1,6 +1,7 @@
 //! Utilites to work with state managed by an core.
 //! This usually only involves the storage (BlockStorage) and content addresses (CID).
 
+pub mod board;
 mod dag;
 mod identities;
 mod memberships;

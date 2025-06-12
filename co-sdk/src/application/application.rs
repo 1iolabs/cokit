@@ -242,7 +242,7 @@ impl ApplicationSettings {
 	/// Get all enabled features from tags.
 	fn features_from_tags(tags: &Tags) -> impl Iterator<Item = &str> + '_ {
 		let default_features = ["co-local-watch", "co-local-encryption"];
-		let disable_default_features = tags.matches(tags!("default-features": false));
+		let disable_default_features = tags.matches(&tags!("default-features": false));
 		let features = tags.iter().filter_map(|(key, value)| match key.as_str() {
 			"feature" => value.string(),
 			_ => None,
@@ -397,7 +397,7 @@ impl ApplicationBuilder {
 			let feature_tag = tag!("feature": feature);
 
 			// expand default features
-			if !settings.contains(&feature_tag) && !settings.matches(tags!("default-features": false)) {
+			if !settings.contains(&feature_tag) && !settings.matches(&tags!("default-features": false)) {
 				settings.insert(tag!("default-features": false));
 				for default_feature in ApplicationSettings::features_from_tags(&Default::default()) {
 					settings.insert(tag!("feature": default_feature));

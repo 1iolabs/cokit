@@ -20,6 +20,7 @@ mod joined;
 mod key_request_receive;
 mod key_request_send;
 mod membership_update;
+mod network_queue;
 mod push_heads;
 
 pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
@@ -49,5 +50,8 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(co_heads_subscribe::CoHeadsSubscribeEpic::default())
 		.join(co_flush_staged::CoFlushStagedEpic::default())
 		.join(co_didcomm_send::co_didcomm_send)
+		.join(network_queue::network_queue_message_epic)
+		.join(network_queue::network_started_epic)
+		.join(network_queue::network_queue_process_epic)
 		.join(TracingEpic::new(tags))
 }

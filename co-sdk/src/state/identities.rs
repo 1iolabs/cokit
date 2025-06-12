@@ -39,5 +39,5 @@ pub fn identities(
 
 /// Test if the specified key is an CO identity.
 pub fn is_identity(key: &Key) -> bool {
-	key.tags.matches(tags!("type": "co-identity"))
+	key.tags.matches(&tags!("type": "co-identity"))
 }
