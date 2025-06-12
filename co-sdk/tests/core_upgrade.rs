@@ -46,12 +46,12 @@ async fn test_core_upgrade() {
 		.build()
 		.await
 		.expect("application");
-	let counter = counter_core(&application.storage()).await;
-	println!("counter {:?}", counter);
-	let counter_upgraded = counter_upgraded_core(&application.storage()).await;
-	println!("counter_upgraded {:?}", counter_upgraded);
 	let local_identity = application.local_identity();
 	let local_co = application.local_co_reducer().await.unwrap();
+	let counter = counter_core(&local_co.storage()).await;
+	println!("counter {:?}", counter);
+	let counter_upgraded = counter_upgraded_core(&local_co.storage()).await;
+	println!("counter_upgraded {:?}", counter_upgraded);
 
 	// create
 	local_co
