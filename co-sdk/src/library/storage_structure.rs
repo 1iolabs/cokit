@@ -70,15 +70,6 @@ where
 			}
 		}
 
-		// structure
-		let StructureResolveResult::Include(links) = structure_resolver
-			.resolve(storage_core_storage, pending.info(), storage, &cid)
-			.await?
-		else {
-			num_skip_structure_resolver += 1;
-			continue;
-		};
-
 		// skip if not exists in this storage
 		//  this also skips blocks that are not yet or will be never available on device
 		//  because tehy are just referenced but not fetched from network.
@@ -91,6 +82,15 @@ where
 		let internal_cid = if is_content_mapped { storage.to_mapped(&cid).await } else { Some(cid.into()) };
 		let Some(internal_cid) = internal_cid else {
 			num_skip_no_mapping += 1;
+			continue;
+		};
+
+		// structure
+		let StructureResolveResult::Include(links) = structure_resolver
+			.resolve(storage_core_storage, pending.info(), storage, &internal_cid)
+			.await?
+		else {
+			num_skip_structure_resolver += 1;
 			continue;
 		};
 
