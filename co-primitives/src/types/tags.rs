@@ -392,7 +392,7 @@ impl From<Tag> for Tags {
 }
 impl TagsMatches for Tags {
 	fn matches_matcher<M: TagMatcher>(&self, matcher: &M) -> bool {
-		self.iter().all(|(key, value)| matcher.matches_tag(key, value))
+		!self.is_empty() && self.iter().all(|(key, value)| matcher.matches_tag(key, value))
 	}
 }
 impl TagMatcher for Tags {
@@ -469,7 +469,7 @@ impl TagsMatches for TagsExpr {
 	fn matches_matcher<M: TagMatcher>(&self, matcher: &M) -> bool {
 		match self {
 			TagsExpr::Tag(tag) => tag.matches_matcher(matcher),
-			TagsExpr::And(and) => and.iter().all(|cond| cond.matches_matcher(matcher)),
+			TagsExpr::And(and) => !and.is_empty() && and.iter().all(|cond| cond.matches_matcher(matcher)),
 			TagsExpr::Or(or) => or.iter().any(|cond| cond.matches_matcher(matcher)),
 			TagsExpr::Not(not) => !not.matches_matcher(matcher),
 		}
@@ -522,6 +522,19 @@ mod tests {
 		assert!(tags.matches_matcher(&tags!("hello": "world", "hello": "greet", "test": 123)));
 		assert!(!expr.matches(&tags!("hello": "world")));
 		assert!(!tags.matches_matcher(&tags!("hello": "world")));
+	}
+
+	#[test]
+	fn test_matches_empty() {
+		let tags = tags!();
+		assert_eq!(tags.matches(&tags!("hello": "world")), false);
+		assert_eq!(tags.matches(&tags!()), false);
+		let expr: TagsExpr = tags.clone().into();
+		assert_eq!(expr.matches(&tags!("hello": "world")), false);
+		assert_eq!(expr.matches(&tags!()), false);
+		let or = TagsExpr::Or(vec![]);
+		assert_eq!(or.matches(&tags!("hello": "world")), false);
+		assert_eq!(or.matches(&tags!()), false);
 	}
 
 	#[test]

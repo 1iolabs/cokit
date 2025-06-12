@@ -242,14 +242,16 @@ impl ApplicationSettings {
 	/// Get all enabled features from tags.
 	fn features_from_tags(tags: &Tags) -> impl Iterator<Item = &str> + '_ {
 		let default_features = ["co-local-watch", "co-local-encryption"];
-		let disable_default_features = tags.matches(&tags!("default-features": false));
+
+		// result
+		let is_disable_default_features = tags.matches(&tags!("default-features": false));
 		let features = tags.iter().filter_map(|(key, value)| match key.as_str() {
 			"feature" => value.string(),
 			_ => None,
 		});
-		default_features
+		(if is_disable_default_features { None } else { Some(default_features) })
 			.into_iter()
-			.filter(move |_| !disable_default_features)
+			.flatten()
 			.chain(features)
 	}
 
@@ -397,7 +399,9 @@ impl ApplicationBuilder {
 			let feature_tag = tag!("feature": feature);
 
 			// expand default features
-			if !settings.contains(&feature_tag) && !settings.matches(&tags!("default-features": false)) {
+			let is_explicit_feature = settings.contains(&feature_tag);
+			let is_default_features_disabled = settings.matches(&tags!("default-features": false));
+			if !is_explicit_feature && !is_default_features_disabled {
 				settings.insert(tag!("default-features": false));
 				for default_feature in ApplicationSettings::features_from_tags(&Default::default()) {
 					settings.insert(tag!("feature": default_feature));
@@ -457,5 +461,19 @@ impl ApplicationBuilder {
 		result.init().await?;
 
 		Ok(result)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::ApplicationBuilder;
+	use co_primitives::tag;
+
+	#[test]
+	fn test_with_disabled_feature() {
+		let builder = ApplicationBuilder::new_memory("test").with_disabled_feature("co-local-encryption");
+		assert!(builder.settings.contains(&tag!("default-features": false)));
+		assert!(builder.settings.contains(&tag!("feature": "co-local-watch")));
+		assert!(!builder.settings.contains(&tag!("feature": "co-local-encryption")));
 	}
 }
