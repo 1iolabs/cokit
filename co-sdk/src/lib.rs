@@ -57,7 +57,7 @@ pub use reducer::core_resolver::{co::CoCoreResolver, single::SingleCoreResolver,
 pub use services::{
 	application::{Action, ActionError, ApplicationMessage},
 	connections::{ConnectionAction, ConnectionMessage, ReleaseAction},
-	network::{self, CoNetworkTaskSpawner, CoToken, CoTokenParameters, Network, NetworkMessage},
+	network::{self, CoNetworkTaskSpawner, CoToken, CoTokenParameters, Network, NetworkMessage, NetworkSettings},
 	reducer::CoReducer,
 };
 pub use types::{

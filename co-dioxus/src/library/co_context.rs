@@ -130,7 +130,7 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 
 	// network
 	if settings.network {
-		application.create_network(settings.network_force_new_peer_id).await?;
+		application.create_network(settings.network_settings).await?;
 	}
 
 	// execute

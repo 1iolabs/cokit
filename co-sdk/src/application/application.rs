@@ -5,9 +5,9 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
-	services::application::ApplicationMessage, Action, CoDate, CoReducer, CoReducerFactory, CoStorage, CoUuid,
-	DynamicCoDate, DynamicCoUuid, RandomCoUuid, Storage, SystemCoDate, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
-	CO_CORE_NAME_STORAGE,
+	network::NetworkSettings, services::application::ApplicationMessage, Action, CoDate, CoReducer, CoReducerFactory,
+	CoStorage, CoUuid, DynamicCoDate, DynamicCoUuid, RandomCoUuid, Storage, SystemCoDate, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
 use co_actor::{Actor, ActorHandle, ActorInstance};
@@ -98,9 +98,9 @@ impl Application {
 	}
 
 	/// Create and startup network.
-	pub async fn create_network(&mut self, force_new_peer_id: bool) -> Result<(), anyhow::Error> {
+	pub async fn create_network(&mut self, settings: NetworkSettings) -> Result<(), anyhow::Error> {
 		// start
-		self.service.handle().dispatch(Action::NetworkStart { force_new_peer_id })?;
+		self.service.handle().dispatch(Action::NetworkStart(settings))?;
 
 		// wait
 		let network = self.service.handle().request(ApplicationMessage::Network).await??;

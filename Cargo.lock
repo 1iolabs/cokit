@@ -1925,6 +1925,7 @@ dependencies = [
  "criterion",
  "derive_more",
  "directories",
+ "either",
  "example-counter",
  "example-counter-upgraded",
  "futures",

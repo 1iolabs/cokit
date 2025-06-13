@@ -1,5 +1,5 @@
 use crate::{
-	library::create_reducer_action::new_reducer_action, services::reducer::FlushInfo,
+	library::create_reducer_action::new_reducer_action, network::NetworkSettings, services::reducer::FlushInfo,
 	types::message::heads::HeadsMessage, CoDate, CoStorage, ReducerChangeContext,
 };
 use co_identity::Message;
@@ -53,7 +53,7 @@ pub enum Action {
 	// KeyRequest { co: CoId, key: Option<String>, peer: Option<PeerId> },
 
 	/// Start network.
-	NetworkStart { force_new_peer_id: bool },
+	NetworkStart(NetworkSettings),
 
 	/// Network has been started.
 	NetworkStarted,

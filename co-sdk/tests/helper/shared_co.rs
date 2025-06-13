@@ -2,8 +2,8 @@ use super::instance::{Instance, Instances};
 use co_core_co::CoAction;
 use co_core_membership::{MembershipState, MembershipsAction};
 use co_sdk::{
-	update_co, Action, CoId, CoReducer, CoReducerFactory, CreateCo, Did, DidKeyIdentity, Identity, PrivateIdentity,
-	PrivateIdentityBox, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	update_co, Action, CoId, CoReducer, CoReducerFactory, CreateCo, Did, DidKeyIdentity, Identity, NetworkSettings,
+	PrivateIdentity, PrivateIdentityBox, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use co_storage::Algorithm;
 use futures::{join, Stream, StreamExt};
@@ -28,13 +28,10 @@ impl SharedCo {
 		let timeout_duration = Duration::from_secs(10);
 
 		let mut peer1 = instances.create().await;
-		peer1.application.create_network(false).await.unwrap();
 		let mut peer2 = instances.create().await;
-		peer2.application.create_network(false).await.unwrap();
 
-		// networks
-		let (network1, _) = peer1.application.context().network().await.unwrap();
-		let _network2 = peer2.application.context().network().await.unwrap();
+		// network
+		let (network1, _network2) = Instances::networking(&mut peer1, &mut peer2).await;
 
 		// create identity
 		let identity1 = peer1.create_identity().await;

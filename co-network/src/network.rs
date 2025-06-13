@@ -90,13 +90,24 @@ impl Libp2pNetwork {
 		// 	tracing::warn!(?err, "kad-bootstrap-failed");
 		// }
 
+		let listen = config.addr.clone().unwrap_or("/ip4/0.0.0.0/udp/0/quic-v1".parse()?);
+		let is_tcp = listen.protocol_stack().any(|protocol| protocol == "tcp");
+
 		// swarm
-		let mut swarm = SwarmBuilder::with_existing_identity(config.keypair.clone())
-			.with_tokio()
-			.with_quic()
-			.with_behaviour(|_| behaviour)?
-			.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
-			.build();
+		let swarm_builder = SwarmBuilder::with_existing_identity(config.keypair.clone()).with_tokio();
+		let mut swarm = if is_tcp {
+			swarm_builder
+				.with_tcp(libp2p::tcp::Config::default(), libp2p::noise::Config::new, libp2p::yamux::Config::default)?
+				.with_behaviour(|_| behaviour)?
+				.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
+				.build()
+		} else {
+			swarm_builder
+				.with_quic()
+				.with_behaviour(|_| behaviour)?
+				.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
+				.build()
+		};
 
 		// context
 		let context = Context {
@@ -112,7 +123,7 @@ impl Libp2pNetwork {
 		let mut runtime = Runtime::new(config.clone(), shutdown.child_token());
 
 		// listen
-		runtime.listen(swarm.listen_on(config.addr.clone().unwrap_or("/ip4/0.0.0.0/udp/0/quic-v1".parse()?))?);
+		runtime.listen(swarm.listen_on(listen)?);
 
 		// run
 		tokio::spawn(async move {

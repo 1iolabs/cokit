@@ -28,7 +28,7 @@ pub async fn command(
 	command: &Command,
 ) -> Result<ExitCode, anyhow::Error> {
 	let mut application = context.application(cli).await;
-	application.create_network(false).await?;
+	application.create_network(Default::default()).await?;
 	let co_reducer = application.context().try_co_reducer(&command.co).await?;
 	let (_storage, co) = co_reducer.co().await?;
 	let participant = co.participants.get(&command.did);

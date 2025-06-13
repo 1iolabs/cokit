@@ -3,7 +3,7 @@ use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::Result;
 use co_core_membership::MembershipState;
 use co_primitives::{DagSetExt, Did};
-use co_sdk::{state, CoId, CoReducerFactory};
+use co_sdk::{state, CoId, CoReducerFactory, NetworkSettings};
 use exitcode::ExitCode;
 use futures::{stream, StreamExt, TryStreamExt};
 use std::future::ready;
@@ -26,7 +26,9 @@ pub async fn command(
 	command: &Command,
 ) -> Result<ExitCode, anyhow::Error> {
 	let mut application = context.application(cli).await;
-	application.create_network(network_command.force_new_peer_id).await?;
+	application
+		.create_network(NetworkSettings { force_new_peer_id: network_command.force_new_peer_id, ..Default::default() })
+		.await?;
 
 	// COs
 	// TODO: watch local co
