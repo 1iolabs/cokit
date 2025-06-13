@@ -23,7 +23,7 @@ use libp2p::{
 use libp2p_bitswap::{Bitswap, BitswapEvent};
 use std::{task::Poll, time::Duration};
 use tokio_util::sync::CancellationToken;
-use tracing::Instrument;
+use tracing::{Instrument, Span};
 
 pub struct Libp2pNetwork {
 	config: Libp2pNetworkConfig,
@@ -216,7 +216,7 @@ struct Runtime {
 	_config: Libp2pNetworkConfig,
 	listener_id: Option<libp2p::core::transport::ListenerId>,
 	/// Tasks which have been executed but waiting for events.
-	pending_tasks: Vec<NetworkTaskBox<Behaviour, Context>>,
+	pending_tasks: Vec<(NetworkTaskBox<Behaviour, Context>, Span)>,
 	shutdown: CancellationToken,
 }
 impl Runtime {
@@ -537,12 +537,23 @@ async fn run(
 
 			// tasks
 			Some(mut task) = tasks.next(), if !tasks.is_done() => {
+				let task_span = tracing::trace_span!("network-task", ?task);
+
 				// execute
-				task.execute(&mut swarm, context_layer.layer_mut());
+				let task_complete = task_span.in_scope(|| {
+					task.execute(&mut swarm, context_layer.layer_mut());
+					task.is_complete()
+				});
 
 				// move to pending if not complete
-				if !task.is_complete() {
-					runtime.pending_tasks.push(task);
+				if !task_complete {
+					// log
+					task_span.in_scope(|| {
+						tracing::trace!("network-task-pending");
+					});
+
+					// pending
+					runtime.pending_tasks.push((task, task_span));
 				}
 			},
 
@@ -599,14 +610,28 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		let mut result_event = Some(event);
 		let mut task_index = 0;
 		while task_index < runtime.pending_tasks.len() {
-			// run
-			result_event =
-				runtime.pending_tasks[task_index].on_swarm_event(swarm, context.layer_mut(), result_event.unwrap());
+			// handle
+			let task_complete = {
+				let (task, task_span) = &mut runtime.pending_tasks[task_index];
+				let _enter = task_span.enter();
+
+				// run
+				result_event = task.on_swarm_event(swarm, context.layer_mut(), result_event.unwrap());
+
+				// complete?
+				task.is_complete()
+			};
 
 			// done?
-			if runtime.pending_tasks[task_index].is_complete() {
-				runtime.pending_tasks.remove(task_index);
+			if task_complete {
+				// remove
+				let (task, task_span) = runtime.pending_tasks.remove(task_index);
 				task_index -= 1;
+
+				// log
+				task_span.in_scope(|| {
+					tracing::trace!(?task, "network-task-completed");
+				});
 			}
 
 			// event consumed?

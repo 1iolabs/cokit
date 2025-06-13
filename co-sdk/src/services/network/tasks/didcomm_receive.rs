@@ -5,11 +5,18 @@ use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	PeerId, Swarm,
 };
+use std::fmt::Debug;
 
 /// Handle received didcomm messages from network within the application.
-#[derive(Debug)]
 pub struct DidCommReceiveNetworkTask {
 	receive: tokio::sync::mpsc::UnboundedSender<(PeerId, Message)>,
+}
+impl Debug for DidCommReceiveNetworkTask {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("DidCommReceiveNetworkTask")
+			.field("closed", &self.receive.is_closed())
+			.finish()
+	}
 }
 impl DidCommReceiveNetworkTask {
 	pub fn receive<B, C, S>(spawner: S) -> impl Stream<Item = (PeerId, Message)> + Send + 'static

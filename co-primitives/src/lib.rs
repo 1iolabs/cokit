@@ -49,7 +49,7 @@ pub use types::{
 	},
 	secret::Secret,
 	storage::Storage,
-	tags::{Tag, TagMatcher, TagValue, Tags, TagsExpr, TagsMatches},
+	tags::{Tag, TagMatcher, TagPattern, TagValue, Tags, TagsExpr},
 	total_float::TotalFloat64,
 	weak_cid::WeakCid,
 };

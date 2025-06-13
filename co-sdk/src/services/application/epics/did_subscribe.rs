@@ -7,9 +7,8 @@ use co_actor::Actions;
 use co_core_co::Co;
 use co_core_keystore::{Key, KeyStoreAction};
 use co_identity::{PrivateIdentityResolver, PrivateIdentityResolverBox};
-use co_primitives::{Did, OptionLink};
-use futures::{pin_mut, stream, Stream, StreamExt};
-use std::future::ready;
+use co_primitives::{CoTryStreamExt, Did, OptionLink};
+use futures::{future::Either, pin_mut, stream, FutureExt, Stream, StreamExt};
 
 /// Subscribe DIDs when network is started.
 pub fn network_started(
@@ -21,13 +20,15 @@ pub fn network_started(
 	match action {
 		Action::NetworkStarted => Some({
 			let context = context.clone();
-			stream::once({
-				let context = context.clone();
-				async move { context.network_tasks().await }
-			})
-			.filter_map(ready)
-			.flat_map(move |network| subscribe_all(context.clone(), network).map(Action::map_error))
-			.map(Ok)
+			async move {
+				if let Some(network) = context.network_tasks().await {
+					Either::Left(subscribe_all(context.clone(), network))
+				} else {
+					Either::Right(stream::empty())
+				}
+			}
+			.into_stream()
+			.flatten()
 		}),
 		_ => None,
 	}
@@ -47,35 +48,29 @@ pub fn keystore_changed(
 				&& CO_CORE_NAME_KEYSTORE == action.core =>
 		{
 			if let Some(keystore_action) = action.get_payload::<KeyStoreAction>().ok() {
-				Some(
-					stream::once({
-						let context = context.clone();
-						async move {
-							if let Some(subscribe_action) =
-								SubscribeAction::from_keystore_action(&context, keystore_action).await
-							{
-								if let Some(network) = context.network_tasks().await {
-									let private_identity_resolver = context.private_identity_resolver().await?;
-									match subscribe_action {
-										SubscribeAction::Subscribe(did) => {
-											subscribe(&private_identity_resolver, &network, &did).await?;
-										},
-										SubscribeAction::Unsubscribe(did) => {
-											unsubscribe_identity(&network, did).await?;
-										},
-									}
+				Some({
+					let context = context.clone();
+					async move {
+						if let Some(subscribe_action) =
+							SubscribeAction::from_keystore_action(&context, keystore_action).await
+						{
+							if let Some(network) = context.network_tasks().await {
+								let private_identity_resolver = context.private_identity_resolver().await?;
+								match subscribe_action {
+									SubscribeAction::Subscribe(did) => {
+										subscribe(&private_identity_resolver, &network, &did).await?;
+									},
+									SubscribeAction::Unsubscribe(did) => {
+										unsubscribe_identity(&network, did).await?;
+									},
 								}
 							}
-							Ok(())
 						}
-					})
-					.filter_map(|result: Result<(), anyhow::Error>| {
-						ready(match result {
-							Ok(_) => None,
-							Err(err) => Some(Ok(Action::from(err))),
-						})
-					}),
-				)
+						Ok(())
+					}
+					.into_stream()
+					.try_ignore_elements()
+				})
 			} else {
 				None
 			}

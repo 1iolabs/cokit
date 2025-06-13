@@ -5,8 +5,7 @@ use super::{
 use co_identity::PrivateIdentity;
 use co_network::NetworkTaskSpawner;
 use co_primitives::{Did, NetworkDidDiscovery};
-use futures::{stream, StreamExt, TryStreamExt};
-use std::{fmt::Debug, future::ready};
+use std::fmt::Debug;
 
 /// Listen on identity requests (DID Discovery).
 pub async fn subscribe_identity<I: PrivateIdentity + Debug + Clone + Send + Sync + 'static>(
@@ -28,15 +27,11 @@ pub async fn subscribe_identity<I: PrivateIdentity + Debug + Clone + Send + Sync
 
 	// subscribe
 	//  by returning on any error happens in between
-	stream::iter(networks)
-		.then(|network| async {
-			let (task, result) = DidDiscoverySubscribe::new(identity.clone(), Some(network));
-			spawner.spawn(task)?;
-			result.await??;
-			Ok::<(), anyhow::Error>(())
-		})
-		.try_for_each(|_| ready(Ok(())))
-		.await?;
+	for network in networks {
+		let (task, result) = DidDiscoverySubscribe::new(identity.clone(), Some(network));
+		spawner.spawn(task)?;
+		result.await??;
+	}
 
 	// result
 	Ok(())
