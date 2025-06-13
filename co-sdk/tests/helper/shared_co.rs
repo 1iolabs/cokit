@@ -2,8 +2,8 @@ use super::instance::{Instance, Instances};
 use co_core_co::CoAction;
 use co_core_membership::{MembershipState, MembershipsAction};
 use co_sdk::{
-	update_co, Action, CoId, CoReducer, CoReducerFactory, CreateCo, Did, DidKeyIdentity, Identity, NetworkSettings,
-	PrivateIdentity, PrivateIdentityBox, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	update_co, Action, CoId, CoReducer, CoReducerFactory, CreateCo, Did, DidKeyIdentity, Identity, PrivateIdentity,
+	PrivateIdentityBox, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use co_storage::Algorithm;
 use futures::{join, Stream, StreamExt};

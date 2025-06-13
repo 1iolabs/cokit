@@ -9,7 +9,7 @@ use co_sdk::{
 	CoReducerState, CoStorage, Cores, CreateCo, DidKeyIdentity, DidKeyProvider, Identity, MonotonicCoDate,
 	MonotonicCoUuid, CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
-use co_storage::TmpDir;
+use co_storage::{Algorithm, TmpDir};
 use futures::{join, pin_mut, stream, StreamExt, TryStreamExt};
 use ipld_core::ipld::Ipld;
 use std::{
@@ -62,19 +62,31 @@ async fn trace_heads(co: &str, context: &CoContext, storage: &CoStorage, reducer
 /// - https://gitlab.1io.com/1io/co-sdk/-/issues/59
 #[tokio::test]
 async fn test_conflicting_membership_update() {
+	conflicting_membership_update(false).await;
+}
+
+#[tokio::test]
+async fn test_conflicting_membership_update_encrypted() {
+	conflicting_membership_update(true).await;
+}
+
+async fn conflicting_membership_update(encryption: bool) {
 	let timeout_duration = Duration::from_secs(5);
 	let tmp = TmpDir::new("co");
 
 	// application
-	let application = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
+	let mut application_builder = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
 		.without_keychain()
 		.with_disabled_feature("co-local-watch")
 		.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+		.with_optional_tracing()
 		.with_co_date(MonotonicCoDate::default())
-		.with_co_uuid(MonotonicCoUuid::default())
-		.build()
-		.await
-		.expect("application");
+		.with_co_uuid(MonotonicCoUuid::default());
+	if !encryption {
+		application_builder = application_builder.with_disabled_feature("co-local-encryption");
+	}
+	let application = application_builder.build().await.expect("application");
+	tracing::info!(settings = ?application.settings(), encryption, "application-settings");
 
 	// create identity
 	let identity = DidKeyIdentity::generate(Some(&vec![1; 32]));
@@ -86,7 +98,7 @@ async fn test_conflicting_membership_update() {
 	let co = application
 		.create_co(
 			identity.clone(),
-			CreateCo { algorithm: Some(Default::default()), id: "co".into(), name: "co".into() },
+			CreateCo { algorithm: encryption.then(Algorithm::default), id: "co".into(), name: "co".into() },
 		)
 		.await
 		.unwrap();
@@ -124,13 +136,16 @@ async fn test_conflicting_membership_update() {
 	// );
 
 	// application instance two
-	let application2 = ApplicationBuilder::new_with_path("test2".to_owned(), tmp.path().to_owned())
+	let mut application2_builder = ApplicationBuilder::new_with_path("test2".to_owned(), tmp.path().to_owned())
 		.without_keychain()
 		.with_disabled_feature("co-local-watch")
 		.with_co_date(MonotonicCoDate::default())
-		.build()
-		.await
-		.expect("application2");
+		.with_co_uuid(MonotonicCoUuid::default());
+	if !encryption {
+		application2_builder = application2_builder.with_disabled_feature("co-local-encryption");
+	}
+	let application2 = application2_builder.build().await.expect("application2");
+	tracing::info!(settings = ?application2.settings(), encryption, "application-settings");
 	let local_co2 = application2.local_co_reducer().await.unwrap();
 	let co2 = application2.co().try_co_reducer(&CoId::new("co")).await.unwrap();
 
