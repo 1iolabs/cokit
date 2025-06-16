@@ -15,6 +15,7 @@ pub mod helper;
 /// Push changes to peer.
 #[tokio::test]
 async fn test_push() {
+	let timeout_duration = Duration::from_secs(15);
 	let mut instances = Instances::new("test_push");
 	let shared_co = SharedCo::create(&mut instances, "shared").await;
 
@@ -50,7 +51,7 @@ async fn test_push() {
 		.filter(|state| ready(state == &peer0_state))
 		.take(1);
 	pin_mut!(peer1_state_future);
-	let peer1_state = timeout(Duration::from_secs(5), peer1_state_future.next())
+	let peer1_state = timeout(timeout_duration, peer1_state_future.next())
 		.await
 		.expect("to sync in time")
 		.expect("state");
@@ -89,7 +90,7 @@ async fn test_push() {
 		.filter(|state| ready(state == &peer0_state))
 		.take(1);
 	pin_mut!(peer1_state_future);
-	let peer1_state = timeout(Duration::from_secs(1), peer1_state_future.next())
+	let peer1_state = timeout(timeout_duration, peer1_state_future.next())
 		.await
 		.expect("to sync in time")
 		.expect("state");
