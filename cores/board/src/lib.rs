@@ -40,7 +40,7 @@ pub struct Board {
 	pub name: String,
 
 	/// Board lists.
-	#[serde(rename = "i", default, skip_serializing_if = "CoList::is_empty")]
+	#[serde(rename = "l", default, skip_serializing_if = "CoList::is_empty")]
 	pub lists: CoList<List>,
 
 	/// Board tags.
