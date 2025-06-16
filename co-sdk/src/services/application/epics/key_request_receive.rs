@@ -1,14 +1,13 @@
 use crate::{
 	library::{
-		find_co_identities::find_co_private_identity,
 		find_co_secret::find_co_key,
 		key_exchange::{create_key_response_message, KeyRequestPayload, KeyResponsePayload, CO_DIDCOMM_KEY_REQUEST},
+		network_identity::network_identity,
 	},
 	Action, CoContext, CoReducerFactory,
 };
 use anyhow::anyhow;
 use co_actor::Actions;
-use co_core_co::ParticipantState;
 use co_core_keystore::Key;
 use co_identity::{DidCommHeader, Identity, IdentityResolver};
 use co_primitives::from_json_string;
@@ -71,15 +70,14 @@ async fn key_request(
 		.map(|participant| participant.state)
 		.unwrap_or(co_core_co::ParticipantState::Inactive);
 
-	// send response
-	if participant_state != ParticipantState::Active {
+	// validate access
+	if !participant_state.has_access() {
 		return Err(anyhow!("Invalid participant state: {:?}", participant_state));
 	}
 
 	// membership
-	//  we currently use the identity of the first membership we found for an co to send the response
-	//  it should not metter which identity we use as the receive then knows about all the participants
-	let identity = find_co_private_identity(&context, &payload.id).await?;
+	//  we use any network identity for the co as we don't know easliy who is the inviter.
+	let identity = network_identity(&context, &co, None).await?;
 
 	// key
 	let local_co = context.local_co_reducer().await?;

@@ -15,8 +15,14 @@ use libp2p::PeerId;
 use std::time::Duration;
 
 /// When we join an encrypted CO request its key.
+///
 /// In: [`Action::JoinKeyRequest`]
 /// Out: [`Action::CoDidCommSend`]
+///
+/// TODO: Handle DidCommSent without and peers.
+/// TODO: Add timeout?
+/// TODO: When to retry?
+/// TODO: handle error - abort (or set back to invite) the membership?
 pub fn key_request_send(
 	actions: &Actions<Action, (), CoContext>,
 	action: &Action,
@@ -51,7 +57,6 @@ pub fn key_request_send(
 	}
 }
 
-/// TODO: handle error - abort (or set back to invite) the membership?
 async fn key_request_response(
 	context: &CoContext,
 	co: &CoId,
