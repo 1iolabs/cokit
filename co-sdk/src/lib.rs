@@ -25,7 +25,7 @@ pub use co_identity::{
 pub use co_primitives::{
 	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, AbsolutePath,
 	AbsolutePathOwned, BlockSerializer, BlockStat, BlockStorage, BlockStorageExt, CoId, CoInvite, CoList, CoListIndex,
-	CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, Component, Components,
+	CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, Component, Components, CoreName,
 	DagCollection, DagCollectionAsyncExt, DagCollectionExt, Date, Did, KnownMultiCodec, KnownTag, KnownTags, Link,
 	MultiCodec, MultiCodecError, NodeStream, OptionLink, Path, PathError, PathExt, PathOwned, RelativePath,
 	RelativePathOwned, StorageError, Tag, Tags,
