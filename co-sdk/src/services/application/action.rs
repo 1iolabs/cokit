@@ -85,7 +85,6 @@ pub enum Action {
 	HeadsMessageReceived { from: Option<Did>, peer: PeerId, message_id: String, message: HeadsMessage },
 
 	/// Connect to Co and send message (DidCommSent) to the first peer connectable.
-	/// TODO: On failure queue the message.
 	CoDidCommSend(CoDidCommSendAction),
 
 	/// DidComm message send result
@@ -129,6 +128,21 @@ pub enum Action {
 	NetworkQueueProcess {
 		/// Only process given co.
 		co: Option<CoId>,
+
+		/// Retry count.
+		retry: u32,
+	},
+
+	/// Network Queue Process Complte
+	NetworkQueueProcessComplete {
+		/// Only process given co.
+		co: Option<CoId>,
+
+		/// Whether the queue is now empty.
+		is_empty: bool,
+
+		/// Retry count.
+		retry: u32,
 	},
 
 	/// Notification.

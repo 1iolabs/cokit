@@ -52,6 +52,6 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(co_didcomm_send::co_didcomm_send)
 		.join(network_queue::network_queue_message_epic)
 		.join(network_queue::network_started_epic)
-		.join(network_queue::network_queue_process_epic)
+		.join(network_queue::NetworkQueueProcessEpic::default())
 		.join(TracingEpic::new(tags))
 }
