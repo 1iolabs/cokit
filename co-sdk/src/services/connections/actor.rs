@@ -54,50 +54,50 @@ impl Actor for Connections {
 		state: &mut Self::State,
 	) -> Result<(), ActorError> {
 		// state
-		let action = match message {
-			ConnectionMessage::Use(action, mut response) => {
-				// initial
-				if let Some(initial) = state.state.use_initial(&action.id) {
-					response.send(initial).ok();
-				}
-
-				// add response
-				state
-					.peers_changed
-					.entry(action.id.clone())
-					.or_insert(Default::default())
-					.push(response);
-
-				// action
-				Some(ConnectionAction::Use(action))
+		let (action, response) = match message {
+			ConnectionMessage::Use(action, response) => {
+				let co = action.id.clone();
+				(ConnectionAction::Use(action), Some((co, response)))
 			},
-			ConnectionMessage::Action(action) => Some(action),
+			ConnectionMessage::Action(action) => (action, None),
 		};
-		if let Some(action) = action {
-			let next_actions = state.state.reduce(action.clone());
 
-			// epic
-			state
-				.epic
-				.handle(&self.context.tasks(), handle, &action, &state.state, &self.context);
+		// reduce
+		let next_actions = state.state.reduce(action.clone());
 
-			// responses
-			match &action {
-				ConnectionAction::PeersChanged(peers_changed_action) => {
-					if let Some(responses) = state.peers_changed.get_mut(&peers_changed_action.id) {
-						responses.send(peers_changed_action.clone());
-					}
-				},
-				ConnectionAction::Released(released_action) => {
-					state.peers_changed.remove(&released_action.id);
-				},
-				_ => {},
+		// response
+		//  note: must be done after reducer to have use_initial return the correct results
+		if let Some((co, mut response)) = response {
+			// initial
+			if let Some(initial) = state.state.use_initial(&co) {
+				response.send(initial).ok();
 			}
 
-			// dispatch
-			for next_action in next_actions {
-				handle.dispatch(next_action)?;
-			}
+			// add response
+			state.peers_changed.entry(co).or_insert(Default::default()).push(response);
+		}
+
+		// epic
+		state
+			.epic
+			.handle(&self.context.tasks(), handle, &action, &state.state, &self.context);
+
+		// responses
+		match &action {
+			ConnectionAction::PeersChanged(peers_changed_action) => {
+				if let Some(responses) = state.peers_changed.get_mut(&peers_changed_action.id) {
+					responses.send(peers_changed_action.clone());
+				}
+			},
+			ConnectionAction::Released(released_action) => {
+				state.peers_changed.remove(&released_action.id);
+			},
+			_ => {},
+		}
+
+		// dispatch
+		for next_action in next_actions {
+			handle.dispatch(next_action)?;
 		}
 
 		// result
