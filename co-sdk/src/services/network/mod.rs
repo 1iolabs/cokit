@@ -18,5 +18,6 @@ pub use tasks::{
 	discovery_connect::{DiscoveryConnectNetworkTask, DiscoveryError},
 	listeners::ListnersNetworkTask,
 	mdns_gossip::MdnsGossipNetworkTask,
+	peers::PeersNetworkTask,
 };
 pub use token::{CoToken, CoTokenParameters};

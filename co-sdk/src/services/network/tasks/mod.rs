@@ -6,3 +6,4 @@ pub mod didcomm_send;
 pub mod discovery_connect;
 pub mod listeners;
 pub mod mdns_gossip;
+pub mod peers;

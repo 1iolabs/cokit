@@ -3,13 +3,14 @@ use crate::{
 		network_queue_action, network_queue_backlog, network_queue_message, network_queue_task_complete,
 		network_queue_task_doing,
 	},
+	network::PeersNetworkTask,
 	Action, CoContext, CoUuid,
 };
 use co_actor::{Actions, Epic};
 use co_identity::PrivateIdentity;
 use co_primitives::{CoId, CoTryStreamExt};
-use futures::{future::Either, FutureExt, Stream, StreamExt};
-use std::collections::BTreeSet;
+use futures::{future::Either, stream, FutureExt, Stream, StreamExt};
+use std::{collections::BTreeSet, future::ready};
 
 /// If no peers could be found to send a DidComm message to a Co put it in the queue.
 ///
@@ -36,7 +37,7 @@ pub fn network_queue_message_epic(
 	}
 }
 
-/// When network has started try to process pending messages.
+/// When network has started try to process pending messages and listen to new discovered peers.
 ///
 /// In: [`Action::NetworkStarted`]
 /// Out: [`Action::NetworkQueueProcess`]
@@ -44,11 +45,25 @@ pub fn network_started_epic(
 	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
-	_context: &CoContext,
+	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
 		Action::NetworkStarted => {
-			Some(async move { Ok(Action::NetworkQueueProcess { co: Default::default(), retry: 0 }) }.into_stream())
+			let context = context.clone();
+			Some(
+				async move {
+					if let Some(network) = context.network_tasks().await {
+						let initial = stream::once(ready(Ok(Action::NetworkQueueProcess { co: None, retry: 0 })));
+						let peer_discovered = PeersNetworkTask::peers(&network)
+							.map(|_peer_id| Ok(Action::NetworkQueueProcess { co: None, retry: 0 }));
+						Either::Left(initial.chain(peer_discovered))
+					} else {
+						Either::Right(stream::empty())
+					}
+				}
+				.into_stream()
+				.flatten(),
+			)
 		},
 		_ => None,
 	}
