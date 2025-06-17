@@ -186,8 +186,9 @@ impl Actor for ApplicationActor {
 							ready(match action {
 								Ok(Action::CoreAction { co, storage: _, context: _, action: _, cid: _ }) => Some(co),
 								Ok(Action::Invite { co, from: _, to: _ }) => Some(co),
-								Ok(Action::InviteSent { co, participant: _, peer: _ }) => Some(co),
-								Ok(Action::JoinSent { co, encrypted: _, participant: _, peer: _ }) => Some(co),
+								Ok(Action::InviteSent { co, to: _, peer: _ }) => Some(co),
+								Ok(Action::JoinKeyRequest { co, participant: _, peer: _ }) => Some(co),
+								Ok(Action::Joined { co, participant: _, success: _, peer: _ }) => Some(co),
 								_ => None,
 							})
 						});
