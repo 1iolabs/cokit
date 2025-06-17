@@ -2,6 +2,7 @@ use crate::{
 	application::shared::SharedCoBuilder, library::shared_membership::shared_membership,
 	types::co_reducer_factory::CoReducerFactoryError, CoReducer, CoStorage, Cores,
 };
+use anyhow::anyhow;
 use co_core_membership::Membership;
 use co_primitives::CoId;
 use co_storage::{EncryptedBlockStorage, EncryptionReferenceMode, StorageError};
@@ -34,7 +35,7 @@ impl ReducerStorage {
 	) -> Result<ReducerStorage, CoReducerFactoryError> {
 		let membership = shared_membership(&parent, &id, None)
 			.await?
-			.ok_or(CoReducerFactoryError::CoNotFound(id))?;
+			.ok_or(CoReducerFactoryError::CoNotFound(id, anyhow!("No active membership")))?;
 		Ok(Self::from_membership(&storage, &parent, membership)
 			.await
 			.map_err(|e| CoReducerFactoryError::Other(e.into()))?)

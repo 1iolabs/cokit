@@ -9,6 +9,7 @@ pub mod co_map;
 pub mod co_reference;
 pub mod co_set;
 pub mod codec;
+pub mod core_name;
 pub mod dag_collection;
 pub mod dag_collection_async_ext;
 pub mod dag_collection_ext;

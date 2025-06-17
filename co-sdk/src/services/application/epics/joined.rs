@@ -1,4 +1,5 @@
 use crate::{state, Action, CoContext, CoReducerFactory, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL};
+use co_actor::Actions;
 use co_core_membership::{MembershipState, MembershipsAction};
 use co_primitives::{CoId, Did};
 use futures::{stream, Stream, StreamExt, TryStreamExt};
@@ -9,6 +10,7 @@ use std::future::ready;
 /// In: [`Action::Joined`]
 /// Out: [`Action::CoreActionPush`]
 pub fn joined(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
@@ -34,13 +36,14 @@ pub fn joined(
 /// Fetch participants and network settings when join CO.
 /// In: [`Action::CoreAction`]
 pub fn joined_fetch(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
 		Action::CoreAction { co, storage: _, context: _, action, cid: _ }
-			if co.as_str() == CO_ID_LOCAL && action.core == CO_CORE_NAME_MEMBERSHIP =>
+			if co.as_str() == CO_ID_LOCAL && CO_CORE_NAME_MEMBERSHIP == action.core =>
 		{
 			let membership_action: MembershipsAction = action.get_payload().ok()?;
 			match membership_action {

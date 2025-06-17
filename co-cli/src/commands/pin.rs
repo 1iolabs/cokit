@@ -71,9 +71,7 @@ pub async fn list_pins(context: &CliContext, cli: &Cli, command: &ListCommand) -
 	let application = context.application(cli).await;
 
 	let local_co_reducer = application.local_co_reducer().await?;
-	let (storage, pin_state) = query_core::<co_core_pin::Pin>(CO_CORE_NAME_PIN)
-		.execute_reducer(&local_co_reducer)
-		.await?;
+	let (storage, pin_state) = query_core(CO_CORE_NAME_PIN).execute_reducer(&local_co_reducer).await?;
 	let pins = pin_state.pins.stream(&storage);
 	let inner: Vec<_> = pins.try_collect().await?;
 	if command.sum {

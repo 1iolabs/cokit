@@ -254,7 +254,7 @@ where
 		storage: &S,
 		runtime: &RuntimePool,
 		identity: &I,
-		core: &str,
+		core: impl Into<String> + Debug,
 		item: &T,
 	) -> Result<Option<Cid>, anyhow::Error>
 	where
@@ -375,20 +375,18 @@ where
 
 	/// Join heads (from other log).
 	/// This is used to join logs from other peers.
-	/// Returns true if state has changed.
+	/// Returns true if new heads has integrated.
 	pub async fn join(&mut self, storage: &S, heads: &BTreeSet<Cid>, runtime: &RuntimePool) -> Result<bool, LogError> {
 		// log
 		tracing::trace!(previous_heads = ?self.log().heads(), next_heads = ?heads, "join");
 
 		// join
-		let mut result = false;
 		if self.log().heads() != heads
 			&& (self.log_mut().join_heads(storage, heads.iter()).await? || &self.heads != self.log.heads())
 		{
 			// sync state
 			let context = ReducerChangeContext { cause: ReducerChangeCause::Log };
 			let (next_state, next_heads) = self.compute_state(storage, runtime, &context).await?;
-			result = next_state != self.state;
 			if next_state != self.state || self.heads != next_heads {
 				// apply
 				self.state = next_state;
@@ -397,8 +395,10 @@ where
 				// notify
 				self.on_state_changed(storage, &context).await?;
 			}
+			Ok(true)
+		} else {
+			Ok(false)
 		}
-		Ok(result)
 	}
 
 	/// Notify subscribers about change.

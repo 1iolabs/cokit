@@ -4,7 +4,7 @@ use crate::{
 	},
 	CoContext,
 };
-use co_actor::Epic;
+use co_actor::{Actions, Epic};
 use futures::{stream, Stream};
 
 pub struct DisconnectEpic();
@@ -16,6 +16,7 @@ impl DisconnectEpic {
 impl Epic<ConnectionAction, ConnectionState, CoContext> for DisconnectEpic {
 	fn epic(
 		&mut self,
+		_actions: &Actions<ConnectionAction, ConnectionState, CoContext>,
 		message: &ConnectionAction,
 		_state: &ConnectionState,
 		_context: &CoContext,

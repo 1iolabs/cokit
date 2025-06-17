@@ -25,7 +25,7 @@ pub use co_identity::{
 pub use co_primitives::{
 	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, AbsolutePath,
 	AbsolutePathOwned, BlockSerializer, BlockStat, BlockStorage, BlockStorageExt, CoId, CoInvite, CoList, CoListIndex,
-	CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, Component, Components,
+	CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, Component, Components, CoreName,
 	DagCollection, DagCollectionAsyncExt, DagCollectionExt, Date, Did, KnownMultiCodec, KnownTag, KnownTags, Link,
 	MultiCodec, MultiCodecError, NodeStream, OptionLink, Path, PathError, PathExt, PathOwned, RelativePath,
 	RelativePathOwned, StorageError, Tag, Tags,
@@ -48,7 +48,6 @@ pub use library::{
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
 	memory_dispatch::MemoryDispatch,
-	response_list::ResponseList,
 	storage_cleanup::storage_cleanup,
 	storage_structure::{storage_structure_recursive, CoStructureResolver, StructureResolveResult, StructureResolver},
 	update_co::update_co,
@@ -58,7 +57,7 @@ pub use reducer::core_resolver::{co::CoCoreResolver, single::SingleCoreResolver,
 pub use services::{
 	application::{Action, ActionError, ApplicationMessage},
 	connections::{ConnectionAction, ConnectionMessage, ReleaseAction},
-	network::{self, CoNetworkTaskSpawner, CoToken, CoTokenParameters, Network, NetworkMessage},
+	network::{self, CoNetworkTaskSpawner, CoToken, CoTokenParameters, Network, NetworkMessage, NetworkSettings},
 	reducer::CoReducer,
 };
 pub use types::{

@@ -5,7 +5,7 @@ use crate::{
 	state, CoContext, CoReducer, CoStorage,
 };
 use anyhow::anyhow;
-use co_actor::Epic;
+use co_actor::{Actions, Epic};
 use co_primitives::{CoId, CoInviteMetadata, KnownTags, Network};
 use co_storage::BlockStorageExt;
 use futures::{Stream, TryStreamExt};
@@ -20,6 +20,7 @@ impl NetworkResolveEpic {
 impl Epic<ConnectionAction, ConnectionState, CoContext> for NetworkResolveEpic {
 	fn epic(
 		&mut self,
+		_actions: &Actions<ConnectionAction, ConnectionState, CoContext>,
 		message: &ConnectionAction,
 		_state: &ConnectionState,
 		context: &CoContext,
@@ -69,7 +70,7 @@ async fn networks_co(
 	if networks.is_empty() {
 		// get participant networks
 		let identity_resolver = context.identity_resolver().await?;
-		let participants = state::participants(&storage, co_state).await?;
+		let participants = state::participants_active(&storage, co_state).await?;
 		Ok(identities_networks(Some(&identity_resolver), participants.into_iter().map(|item| item.did))
 			.try_collect()
 			.await?)

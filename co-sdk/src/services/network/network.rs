@@ -1,5 +1,6 @@
+use crate::network::{DialNetworkTask, ListnersNetworkTask};
 use co_network::{Behaviour, Context, NetworkError, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner};
-use libp2p::PeerId;
+use libp2p::{Multiaddr, PeerId};
 
 #[derive(Clone)]
 pub struct CoNetworkTaskSpawner {
@@ -9,6 +10,15 @@ pub struct CoNetworkTaskSpawner {
 impl CoNetworkTaskSpawner {
 	pub fn local_peer_id(&self) -> PeerId {
 		self.local_peer
+	}
+
+	pub async fn listeners(&self) -> Result<Vec<Multiaddr>, anyhow::Error> {
+		ListnersNetworkTask::listeners(self).await
+	}
+
+	pub async fn dial(&self, peer_id: Option<PeerId>, address: Vec<Multiaddr>) -> Result<PeerId, anyhow::Error> {
+		// TODO: add to gossipsub?
+		DialNetworkTask::dial(self, peer_id, address).await
 	}
 }
 impl std::fmt::Debug for CoNetworkTaskSpawner {

@@ -5,9 +5,9 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
-	services::application::ApplicationMessage, Action, CoDate, CoReducer, CoReducerFactory, CoStorage, CoUuid,
-	DynamicCoDate, DynamicCoUuid, RandomCoUuid, Storage, SystemCoDate, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
-	CO_CORE_NAME_STORAGE,
+	network::NetworkSettings, services::application::ApplicationMessage, Action, CoDate, CoReducer, CoReducerFactory,
+	CoStorage, CoUuid, DynamicCoDate, DynamicCoUuid, RandomCoUuid, Storage, SystemCoDate, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
 use co_actor::{Actor, ActorHandle, ActorInstance};
@@ -98,9 +98,9 @@ impl Application {
 	}
 
 	/// Create and startup network.
-	pub async fn create_network(&mut self, force_new_peer_id: bool) -> Result<(), anyhow::Error> {
+	pub async fn create_network(&mut self, settings: NetworkSettings) -> Result<(), anyhow::Error> {
 		// start
-		self.service.handle().dispatch(Action::NetworkStart { force_new_peer_id })?;
+		self.service.handle().dispatch(Action::NetworkStart(settings))?;
 
 		// wait
 		let network = self.service.handle().request(ApplicationMessage::Network).await??;
@@ -150,9 +150,9 @@ impl Application {
 
 		// create
 		let co = SharedCoCreator::new(local, create)
-			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
-			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
-			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_owned())
+			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_string())
+			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_string())
+			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_string())
 			.create(
 				self.storage(),
 				self.context().inner.runtime(),
@@ -230,26 +230,28 @@ pub struct ApplicationSettings {
 	/// - `feature` [`TagValue::String`]
 	/// - `co-default-max-state` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_state`]
 	/// - `co-default-max-log` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_log`]
-	/// - `co-storage-mode` - [`TagValue::String`] [`ApplicationSettings::setting_co_storage_mode`]
 	///
 	/// Known Features:
 	/// - `co-local-watch` (default)
 	/// - `co-local-encryption` (default)
 	/// - `co-storage-free` - [`ApplicationSettings::feature_co_storage_free`]
+	/// - `co-open-keep` - [`ApplicationSettings::feature_co_open_keep`]
 	pub settings: Tags,
 }
 impl ApplicationSettings {
 	/// Get all enabled features from tags.
 	fn features_from_tags(tags: &Tags) -> impl Iterator<Item = &str> + '_ {
 		let default_features = ["co-local-watch", "co-local-encryption"];
-		let disable_default_features = tags.matches(tags!("default-features": false));
+
+		// result
+		let is_disable_default_features = tags.matches(&tags!("default-features": false));
 		let features = tags.iter().filter_map(|(key, value)| match key.as_str() {
 			"feature" => value.string(),
 			_ => None,
 		});
-		default_features
+		(if is_disable_default_features { None } else { Some(default_features) })
 			.into_iter()
-			.filter(move |_| !disable_default_features)
+			.flatten()
 			.chain(features)
 	}
 
@@ -276,6 +278,12 @@ impl ApplicationSettings {
 	/// Free unused storage after every flush.
 	pub fn feature_co_storage_free(&self) -> bool {
 		self.has_feature("co-storage-free")
+	}
+
+	/// Keep same co reducer instance open until it gets closed explcitly.
+	/// This will also keep all blocks mappings in memory.
+	pub fn feature_co_open_keep(&self) -> bool {
+		self.has_feature("co-open-keep")
 	}
 
 	/// Count of states to store for LocalCO and newly joined COs. A value of zero means unlimited.
@@ -391,7 +399,9 @@ impl ApplicationBuilder {
 			let feature_tag = tag!("feature": feature);
 
 			// expand default features
-			if !settings.contains(&feature_tag) && !settings.matches(tags!("default-features": false)) {
+			let is_explicit_feature = settings.contains(&feature_tag);
+			let is_default_features_disabled = settings.matches(&tags!("default-features": false));
+			if !is_explicit_feature && !is_default_features_disabled {
 				settings.insert(tag!("default-features": false));
 				for default_feature in ApplicationSettings::features_from_tags(&Default::default()) {
 					settings.insert(tag!("feature": default_feature));
@@ -451,5 +461,19 @@ impl ApplicationBuilder {
 		result.init().await?;
 
 		Ok(result)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::ApplicationBuilder;
+	use co_primitives::tag;
+
+	#[test]
+	fn test_with_disabled_feature() {
+		let builder = ApplicationBuilder::new_memory("test").with_disabled_feature("co-local-encryption");
+		assert!(builder.settings.contains(&tag!("default-features": false)));
+		assert!(builder.settings.contains(&tag!("feature": "co-local-watch")));
+		assert!(!builder.settings.contains(&tag!("feature": "co-local-encryption")));
 	}
 }

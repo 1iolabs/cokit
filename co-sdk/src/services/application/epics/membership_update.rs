@@ -1,10 +1,12 @@
 use crate::{Action, CoContext, CoReducerState, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL};
+use co_actor::Actions;
 use co_core_membership::MembershipsAction;
 use co_storage::BlockStorageContentMapping;
 use futures::{FutureExt, Stream, TryStreamExt};
 
 /// When a membership is updated notify the reducer about it.
 pub fn membership_update(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
@@ -12,7 +14,7 @@ pub fn membership_update(
 	// filter
 	let result = match action {
 		Action::CoreAction { co, storage, context: _, action, cid: _ }
-			if co.as_str() == CO_ID_LOCAL && action.core == CO_CORE_NAME_MEMBERSHIP =>
+			if co.as_str() == CO_ID_LOCAL && CO_CORE_NAME_MEMBERSHIP == action.core =>
 		{
 			let mambership_action: MembershipsAction = action.get_payload().ok()?;
 			match mambership_action {
@@ -53,6 +55,7 @@ pub fn membership_update(
 
 /// When a membership is removed clear the co_reducer instance.
 pub fn membership_remove(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
@@ -60,7 +63,7 @@ pub fn membership_remove(
 	// filter
 	let result = match action {
 		Action::CoreAction { co, storage: _, context: _, action, cid: _ }
-			if co.as_str() == CO_ID_LOCAL && action.core == CO_CORE_NAME_MEMBERSHIP =>
+			if co.as_str() == CO_ID_LOCAL && CO_CORE_NAME_MEMBERSHIP == action.core =>
 		{
 			let mambership_action: MembershipsAction = action.get_payload().ok()?;
 			match mambership_action {

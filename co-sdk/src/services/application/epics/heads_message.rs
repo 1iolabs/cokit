@@ -6,9 +6,10 @@ use crate::{
 };
 use anyhow::anyhow;
 use cid::Cid;
+use co_actor::Actions;
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoId, Did};
-use futures::{future::ready, stream, Stream, StreamExt};
+use futures::{future::ready, stream, FutureExt, Stream, StreamExt};
 use libp2p::PeerId;
 use std::collections::BTreeSet;
 
@@ -17,6 +18,7 @@ use std::collections::BTreeSet;
 /// In: [`Action::DidCommReceive`]
 /// Out: [`Action::HeadsMessageReceived`]
 pub fn heads_message_receive(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	_context: &CoContext,
@@ -44,38 +46,47 @@ pub fn heads_message_receive(
 /// Update CO when receive [`HeadsMessage::Heads`] message.
 /// TODO: verify sender/heads?
 pub fn heads_message_heads(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::HeadsMessageReceived { from, peer, message_id, message: HeadsMessage::Heads(co, heads) } => Some(
-			stream::once(ready((context.clone(), message_id.clone(), from.clone(), *peer, co.clone(), heads.clone())))
-				.then(|(context, message_id, from, peer, co, heads)| async move {
-					handle_heads(context, message_id, from, peer, co, heads).await
-				})
+		Action::HeadsMessageReceived { from, peer, message_id, message: HeadsMessage::Heads(co, heads) } => Some({
+			let context = context.clone();
+			let message_id = message_id.clone();
+			let from = from.clone();
+			let peer = *peer;
+			let co = co.clone();
+			let heads = heads.clone();
+			async move { handle_heads(context, message_id, from, peer, co, heads).await }
+				.into_stream()
 				.flat_map(Action::map_error_stream)
-				.map(Ok),
-		),
+				.map(Ok)
+		}),
 		_ => None,
 	}
 }
 
 /// Respond when receive [`HeadsMessage::HeadsRequest`] message.
 pub fn heads_message_heads_request(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::HeadsMessageReceived { from, peer, message_id, message: HeadsMessage::HeadsRequest(co) } => Some(
-			stream::once(ready((context.clone(), message_id.clone(), from.clone(), *peer, co.clone())))
-				.then(move |(context, message_id, from, peer, co)| async move {
-					handle_request_heads(context, message_id, from, peer, co).await
-				})
+		Action::HeadsMessageReceived { from, peer, message_id, message: HeadsMessage::HeadsRequest(co) } => Some({
+			let context = context.clone();
+			let message_id = message_id.clone();
+			let from = from.clone();
+			let peer = *peer;
+			let co = co.clone();
+			async move { handle_request_heads(context, message_id, from, peer, co).await }
+				.into_stream()
 				.map(Action::map_error)
-				.map(Ok),
-		),
+				.map(Ok)
+		}),
 		_ => None,
 	}
 }

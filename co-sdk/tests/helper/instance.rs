@@ -1,4 +1,7 @@
-use co_sdk::{Application, ApplicationBuilder, DidKeyIdentity, DidKeyProvider, TracingBuilder, CO_CORE_NAME_KEYSTORE};
+use co_sdk::{
+	Application, ApplicationBuilder, CoNetworkTaskSpawner, DidKeyIdentity, DidKeyProvider, NetworkSettings,
+	TracingBuilder, CO_CORE_NAME_KEYSTORE,
+};
 use tracing::subscriber::DefaultGuard;
 
 pub struct Instances {
@@ -26,6 +29,41 @@ impl Instances {
 		let instance_id = self.next_instance_id;
 		self.next_instance_id += 1;
 		Instance::new(instance_id).await
+	}
+
+	pub async fn networking(
+		peer1: &mut Instance,
+		peer2: &mut Instance,
+	) -> (CoNetworkTaskSpawner, CoNetworkTaskSpawner) {
+		// start
+		peer1
+			.application
+			.create_network(NetworkSettings::default().with_localhost())
+			.await
+			.unwrap();
+		peer2
+			.application
+			.create_network(NetworkSettings::default().with_localhost())
+			.await
+			.unwrap();
+
+		// networks
+		let (network1, _) = peer1.application.context().network().await.unwrap();
+		let (network2, _) = peer2.application.context().network().await.unwrap();
+
+		// connect
+		//  because of localhost we need to explicitly dial (no mDNS on localhost).
+		network2
+			.dial(Some(network1.local_peer_id()), network1.listeners().await.unwrap())
+			.await
+			.unwrap();
+		network1
+			.dial(Some(network2.local_peer_id()), network2.listeners().await.unwrap())
+			.await
+			.unwrap();
+
+		// result
+		(network1, network2)
 	}
 }
 

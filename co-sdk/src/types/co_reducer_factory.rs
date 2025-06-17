@@ -16,7 +16,7 @@ pub trait CoReducerFactory {
 #[derive(Debug, thiserror::Error)]
 pub enum CoReducerFactoryError {
 	#[error("CO not found: {0:?}")]
-	CoNotFound(CoId),
+	CoNotFound(CoId, #[source] anyhow::Error),
 
 	#[error("Create CO failed: {0:?}")]
 	Create(CoId, #[source] anyhow::Error),

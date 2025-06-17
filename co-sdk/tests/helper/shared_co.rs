@@ -28,13 +28,10 @@ impl SharedCo {
 		let timeout_duration = Duration::from_secs(10);
 
 		let mut peer1 = instances.create().await;
-		peer1.application.create_network(false).await.unwrap();
 		let mut peer2 = instances.create().await;
-		peer2.application.create_network(false).await.unwrap();
 
-		// networks
-		let (network1, _) = peer1.application.context().network().await.unwrap();
-		let _network2 = peer2.application.context().network().await.unwrap();
+		// network
+		let (network1, _network2) = Instances::networking(&mut peer1, &mut peer2).await;
 
 		// create identity
 		let identity1 = peer1.create_identity().await;
@@ -142,7 +139,7 @@ async fn wait_membership_state(
 			async move {
 				match action {
 					Action::CoreAction { co, storage: _, context: _, action, cid: _ }
-						if co.as_str() == CO_ID_LOCAL && action.core == CO_CORE_NAME_MEMBERSHIP =>
+						if co.as_str() == CO_ID_LOCAL && CO_CORE_NAME_MEMBERSHIP == action.core =>
 					{
 						let mambership_action: MembershipsAction = action.get_payload().ok()?;
 						match mambership_action {

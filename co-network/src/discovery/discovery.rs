@@ -346,14 +346,17 @@ where
 		for item in request.discovery.clone().into_iter() {
 			match item {
 				Discovery::DidDiscovery(item) => {
+					let topic = did_discovery_topic(&item.network);
+					let topic_hash = topic.hash();
+
 					// we only use did discovery if the DID is currently subscribed.
 					// this is because gossipsub only can publish messages when subscribed
 					// todo: really?
 					// note: currently we can only receive requests for DID which we also subscribed to
 					//       so when we may change this we need to keep track of connection requests for
 					//       dids/identities.
-					if self.did_subscriptions.get(&did_discovery_topic(&item.network).hash()).is_none() {
-						tracing::trace!("discovery-unsubscribed");
+					if self.did_subscriptions.get(&topic.hash()).is_none() {
+						tracing::trace!(network = ?item.network, ?topic, "discovery-did-unsubscribed");
 						continue;
 					}
 					// let identity = subscriptions.iter().find(|subscription| {
@@ -369,21 +372,18 @@ where
 					// publish
 					match did_discovery(swarm, &item) {
 						Ok(_) => {
-							tracing::trace!("discovery-published");
+							tracing::trace!(network = ?item.network, ?topic, "discovery-did-published");
 						},
 
 						// we try again when a peer subscribes
 						Err(gossipsub::PublishError::InsufficientPeers) => {
-							tracing::trace!("discovery-pending-insufficient-peers");
-							self.pending_discovery.push_back((
-								request.id,
-								did_discovery_topic_hash(&item.network),
-								item.clone(),
-							));
+							tracing::trace!(network = ?item.network, ?topic, "discovery-did-pending-insufficient-peers");
+							self.pending_discovery.push_back((request.id, topic_hash, item.clone()));
 						},
 
 						// forward other errors
 						Err(err) => {
+							tracing::trace!(?err, network = ?item.network, ?topic, "discovery-did-failed");
 							return Err(ConnectError::Other(err.into()));
 						},
 					};
@@ -859,11 +859,6 @@ fn did_discovery_topic(network: &NetworkDidDiscovery) -> gossipsub::IdentTopic {
 /// Get did discovery gossipsub topic as string.
 fn did_discovery_topic_str(network: &NetworkDidDiscovery) -> &str {
 	network.topic.as_deref().unwrap_or("co-contact")
-}
-
-/// Get did discovery gossipsub topic as TopicHash.
-fn did_discovery_topic_hash(network: &NetworkDidDiscovery) -> TopicHash {
-	did_discovery_topic(network).hash()
 }
 
 /// Subscribe did discovery gossipsub topic.

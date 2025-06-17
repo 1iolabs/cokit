@@ -13,7 +13,7 @@ where
 }
 
 #[derive(Debug)]
-pub struct LazyTransaction<S, T>(Either<(S, T), T::Transaction>)
+pub struct LazyTransaction<S, T>(Either<(S, T), (T::Transaction, bool)>)
 where
 	S: BlockStorage + Clone + 'static,
 	T: Transactionable<S> + 'static;
@@ -27,10 +27,18 @@ where
 		Self(Either::Left((storage, init)))
 	}
 
+	/// Whether this transaction has been accessed mutable yet.
+	pub fn is_mut_access(&self) -> bool {
+		match &self.0 {
+			Either::Left(_) => false,
+			Either::Right((_, is_mut)) => *is_mut,
+		}
+	}
+
 	async fn open(&mut self) -> Result<(), StorageError> {
 		match &self.0 {
 			Either::Left((storage, item)) => {
-				self.0 = Either::Right(item.open(&storage).await?);
+				self.0 = Either::Right((item.open(&storage).await?, false));
 			},
 			Either::Right(_) => {},
 		}
@@ -50,14 +58,17 @@ where
 	pub fn opt(&self) -> Option<&T::Transaction> {
 		match &self.0 {
 			Either::Left(_) => None,
-			Either::Right(transaction) => Some(transaction),
+			Either::Right((transaction, _is_mut_access)) => Some(transaction),
 		}
 	}
 
 	pub fn opt_mut(&mut self) -> Option<&mut T::Transaction> {
 		match &mut self.0 {
 			Either::Left(_) => None,
-			Either::Right(transaction) => Some(transaction),
+			Either::Right((transaction, is_mut_access)) => {
+				*is_mut_access = true;
+				Some(transaction)
+			},
 		}
 	}
 }

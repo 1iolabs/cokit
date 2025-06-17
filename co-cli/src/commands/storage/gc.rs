@@ -91,7 +91,7 @@ async fn first_block_info_pending_blocks<S>(
 where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 {
-	let block_structure_pending = query_core::<co_core_storage::Storage>(CO_CORE_NAME_STORAGE)
+	let block_structure_pending = query_core(CO_CORE_NAME_STORAGE)
 		.with_default()
 		.map(|storage_core| storage_core.block_structure_pending)
 		.execute(storage_core_storage, storage_core_state)

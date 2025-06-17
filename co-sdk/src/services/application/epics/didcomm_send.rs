@@ -2,11 +2,13 @@ use crate::{
 	library::settings_timeout::settings_timeout, services::network::DidCommSendNetworkTask, Action, CoContext,
 	CO_ID_LOCAL,
 };
+use co_actor::Actions;
 use co_primitives::CoId;
 use futures::{future::ready, stream, Stream, StreamExt};
 
 /// Send DIDComm message to peer and respond with
 pub fn didcomm_send(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,

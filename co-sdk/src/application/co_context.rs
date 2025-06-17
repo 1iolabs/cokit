@@ -164,16 +164,16 @@ impl CoContext {
 }
 #[async_trait]
 impl CoReducerFactory for CoContext {
-	#[tracing::instrument(level = tracing::Level::TRACE, skip(self), fields(application = self.inner.settings.identifier))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self), fields(application = self.inner.settings.identifier))]
 	async fn co_reducer(&self, co: &CoId) -> Result<Option<CoReducer>, anyhow::Error> {
 		match self.try_co_reducer(co).await {
 			Ok(r) => Ok(Some(r)),
-			Err(CoReducerFactoryError::CoNotFound(_)) => Ok(None),
+			Err(CoReducerFactoryError::CoNotFound(_, _)) => Ok(None),
 			Err(err) => Err(err.into()),
 		}
 	}
 
-	#[tracing::instrument(level = tracing::Level::TRACE, skip(self), fields(application = self.inner.settings.identifier))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self), fields(application = self.inner.settings.identifier))]
 	async fn try_co_reducer(&self, co: &CoId) -> Result<CoReducer, CoReducerFactoryError> {
 		self.inner.reducers.clone().reducer(co.clone()).await
 	}
@@ -360,8 +360,8 @@ impl CoContextInner {
 
 		// reducer
 		let reducer = SharedCoBuilder::new(parent, membership)
-			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_owned())
-			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_owned())
+			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_string())
+			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_string())
 			.with_network(network)
 			.with_initialize(initialize)
 			.build(

@@ -83,6 +83,7 @@ pub enum MembershipState {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MembershipsAction {
+	/// Join a Co. The membership state indicates if it was an invite from someone.
 	Join(Membership),
 	Update {
 		id: CoId,

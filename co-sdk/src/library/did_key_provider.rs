@@ -1,6 +1,6 @@
 use crate::{
 	state::{self, QueryExt},
-	CoReducer,
+	CoReducer, CO_CORE_NAME_KEYSTORE,
 };
 use async_trait::async_trait;
 use co_identity::{DidKeyIdentity, IdentityResolverError, PrivateIdentityBox, PrivateIdentityResolver};
@@ -29,7 +29,7 @@ impl DidKeyProvider {
 #[async_trait]
 impl PrivateIdentityResolver for DidKeyProvider {
 	async fn resolve_private(&self, identity: &str) -> Result<PrivateIdentityBox, IdentityResolverError> {
-		let (storage, keys) = state::query_core::<co_core_keystore::KeyStore>(&self.keystore_core)
+		let (storage, keys) = state::query_core(CO_CORE_NAME_KEYSTORE.with_name(&self.keystore_core))
 			.map(|keystore| keystore.keys)
 			.execute_reducer(&self.reducer)
 			.await

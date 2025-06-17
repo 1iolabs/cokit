@@ -528,7 +528,7 @@ where
 	// create
 	let mut cores = BTreeMap::<String, co_core_co::Core>::new();
 	cores.insert(
-		CO_CORE_NAME_MEMBERSHIP.to_owned(),
+		CO_CORE_NAME_MEMBERSHIP.to_string(),
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_MEMBERSHIP).expect(CO_CORE_MEMBERSHIP),
 			tags: tags!( "core": CO_CORE_MEMBERSHIP ),
@@ -536,7 +536,7 @@ where
 		},
 	);
 	cores.insert(
-		CO_CORE_NAME_KEYSTORE.to_owned(),
+		CO_CORE_NAME_KEYSTORE.to_string(),
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_KEYSTORE).expect(CO_CORE_KEYSTORE),
 			tags: tags!( "core": CO_CORE_KEYSTORE ),
@@ -545,7 +545,7 @@ where
 	);
 	#[cfg(feature = "pinning")]
 	cores.insert(
-		CO_CORE_NAME_STORAGE.to_owned(),
+		CO_CORE_NAME_STORAGE.to_string(),
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_STORAGE).expect(CO_CORE_STORAGE),
 			tags: tags!("core": CO_CORE_STORAGE),

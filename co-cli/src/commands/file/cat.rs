@@ -9,8 +9,8 @@ use crate::{
 };
 use anyhow::anyhow;
 use cid::Cid;
-use co_core_file::{File, Node};
-use co_primitives::{AbsolutePath, AbsolutePathOwned, PathExt};
+use co_core_file::Node;
+use co_primitives::{AbsolutePath, AbsolutePathOwned, CoreName, PathExt};
 use co_sdk::{
 	state::{query_core, QueryExt},
 	CoReducerFactory, CoStorage,
@@ -36,7 +36,7 @@ pub async fn command(
 ) -> Result<ExitCode, anyhow::Error> {
 	let application = context.application(cli).await;
 	let co_reducer = application.context().try_co_reducer(&file_command.co).await?;
-	let (storage, file_state) = query_core::<File>(&file_command.core)
+	let (storage, file_state) = query_core(CoreName::new(&file_command.core))
 		.with_default()
 		.execute_reducer(&co_reducer)
 		.await?;

@@ -40,13 +40,13 @@ impl CoCoreResolver {
 		S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 	{
 		let (_root, _name, state, core) = self
-			.core_state_binary(storage, state, CoreSource::Name(CO_CORE_NAME_CO))
+			.core_state_binary(storage, state, CoreSource::Name(CO_CORE_NAME_CO.as_ref()))
 			.await?;
 		let mut dispatch = RuntimeDispatch::new(
 			LocalIdentity::device().boxed(),
 			runtime.clone(),
 			storage.clone(),
-			CO_CORE_NAME_CO.to_owned(),
+			CO_CORE_NAME_CO.to_string(),
 			core,
 			state,
 		);
@@ -78,7 +78,7 @@ impl CoCoreResolver {
 			},
 		};
 
-		let root = core_name == CO_CORE_NAME_CO;
+		let root = CO_CORE_NAME_CO == core_name;
 		let (core_name, core_state, core_binary) = if root {
 			let co_binary = if state.is_none() {
 				// in case we have no co state we expect the action is a create
@@ -238,7 +238,9 @@ where
 				.context("resolving CoAction")?;
 			match &co_action.payload {
 				CoAction::Upgrade { binary: _, migrate: Some(migrate) } => {
-					result.state = self.migrate(storage, runtime, &result.state, CO_CORE_NAME_CO, migrate).await?;
+					result.state = self
+						.migrate(storage, runtime, &result.state, CO_CORE_NAME_CO.as_ref(), migrate)
+						.await?;
 				},
 				CoAction::CoreUpgrade { core, binary: _, migrate: Some(migrate) } => {
 					result.state = self.migrate(storage, runtime, &result.state, core, migrate).await?;

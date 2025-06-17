@@ -20,6 +20,11 @@ impl CoListIndex {
 		Self(Ratio::new(1, 1))
 	}
 
+	pub fn prev(&self) -> Self {
+		assert!(*self.0.numer() > 0);
+		Self(Ratio::new(*self.0.numer(), self.0.denom() + 1))
+	}
+
 	pub fn next(&self) -> Self {
 		Self(Ratio::from_integer(self.0.to_integer() + 1))
 	}
@@ -45,7 +50,7 @@ impl CoListIndex {
 }
 impl Default for CoListIndex {
 	fn default() -> Self {
-		Self(Ratio::new(0, 1))
+		Self::first()
 	}
 }
 impl Serialize for CoListIndex {
@@ -285,12 +290,29 @@ where
 		self.tree.reverse_stream()
 	}
 
-	/// Insert value at index shifting all elements at or after to the right.
+	/// Insert value after index shifting all elements after to the right.
 	pub async fn insert(&mut self, index: CoListIndex, value: V) -> Result<CoListIndex, StorageError> {
 		// find index + 1 items
 		let items: Vec<(CoListIndex, V)> = self.tree.stream_query(Some(index)).take(2).try_collect().await?;
 		let result = match (items.get(0), items.get(1)) {
 			(Some(_), None) => index.next(),
+			(Some((first, _)), Some((second, _))) => first.between(second),
+			_ => return Err(StorageError::InvalidArgument(anyhow!("Index not found: {:?}", index))),
+		};
+
+		// set
+		self.tree.insert(result, value).await?;
+
+		// result
+		Ok(result)
+	}
+
+	/// Insert value at index shifting all elements at or after to the right.
+	pub async fn insert_before(&mut self, index: CoListIndex, value: V) -> Result<CoListIndex, StorageError> {
+		// find index - 1 items
+		let items: Vec<(CoListIndex, V)> = self.tree.reverse_stream_query(Some(index)).take(2).try_collect().await?;
+		let result = match (items.get(0), items.get(1)) {
+			(Some(_), None) => index.prev(),
 			(Some((first, _)), Some((second, _))) => first.between(second),
 			_ => return Err(StorageError::InvalidArgument(anyhow!("Index not found: {:?}", index))),
 		};
@@ -463,6 +485,69 @@ mod tests {
 		);
 	}
 
+	#[tokio::test]
+	async fn test_insert_last() {
+		let storage = TestStorage::default();
+		let mut list = CoList::default();
+		let mut transaction = list.open(&storage).await.unwrap();
+		transaction.push(1).await.unwrap();
+		transaction.push(2).await.unwrap();
+		transaction.push(3).await.unwrap();
+		let four = transaction.push(4).await.unwrap();
+		transaction.insert(four, 44).await.unwrap();
+		list.commit(transaction).await.unwrap();
+		assert_eq!(
+			list.stream(&storage)
+				.map_ok(|(_key, value)| value)
+				.try_collect::<Vec<_>>()
+				.await
+				.unwrap(),
+			vec![1, 2, 3, 4, 44]
+		);
+	}
+
+	#[tokio::test]
+	async fn test_insert_before() {
+		let storage = TestStorage::default();
+		let mut list = CoList::default();
+		let mut transaction = list.open(&storage).await.unwrap();
+		transaction.push(1).await.unwrap();
+		let two = transaction.push(2).await.unwrap();
+		transaction.push(3).await.unwrap();
+		transaction.push(4).await.unwrap();
+		transaction.insert_before(two, 22).await.unwrap();
+		list.commit(transaction).await.unwrap();
+		assert_eq!(
+			list.stream(&storage)
+				.map_ok(|(_key, value)| value)
+				.try_collect::<Vec<_>>()
+				.await
+				.unwrap(),
+			vec![1, 22, 2, 3, 4]
+		);
+	}
+
+	#[tokio::test]
+	async fn test_insert_before_first() {
+		let storage = TestStorage::default();
+		let mut list = CoList::default();
+		let mut transaction = list.open(&storage).await.unwrap();
+		let one = transaction.push(1).await.unwrap();
+		transaction.push(2).await.unwrap();
+		transaction.push(3).await.unwrap();
+		transaction.push(4).await.unwrap();
+		transaction.insert_before(one, 11).await.unwrap();
+		list.commit(transaction).await.unwrap();
+		assert_eq!(
+			list.stream(&storage)
+				.map_ok(|(_key, value)| value)
+				.try_collect::<Vec<_>>()
+				.await
+				.unwrap(),
+			vec![11, 1, 2, 3, 4]
+		);
+	}
+
 	#[test]
 	fn test_index_serialize() {
 		let block = BlockSerializer::default().serialize(&CoListIndex::first()).unwrap();
@@ -476,6 +561,15 @@ mod tests {
 		assert_eq!(CoListIndex::first().next(), CoListIndex::new_raw(2, 1));
 		assert_eq!(CoListIndex::new_raw(5, 2).next(), CoListIndex::new_raw(3, 1));
 		assert_eq!(CoListIndex::new_raw(7, 3).next(), CoListIndex::new_raw(3, 1));
+	}
+
+	#[test]
+	fn test_index_prev() {
+		assert_eq!(CoListIndex::default().prev(), CoListIndex::new_raw(1, 2));
+		assert_eq!(CoListIndex::first().prev(), CoListIndex::new_raw(1, 2));
+		assert_eq!(CoListIndex::new_raw(1, 2).prev(), CoListIndex::new_raw(1, 3));
+		assert_eq!(CoListIndex::new_raw(1, 3).prev(), CoListIndex::new_raw(1, 4));
+		assert_eq!(CoListIndex::new_raw(5, 2).prev(), CoListIndex::new_raw(5, 3));
 	}
 
 	#[test]

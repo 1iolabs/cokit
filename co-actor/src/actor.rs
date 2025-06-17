@@ -353,6 +353,21 @@ where
 		response.await
 	}
 
+	/// Request with response result.
+	/// If an error is returned in the result it will be wrapped in ´ActorError::Actor`.
+	pub async fn try_request<T, E>(&self, message: impl FnOnce(Response<Result<T, E>>) -> M) -> Result<T, ActorError>
+	where
+		E: Into<anyhow::Error>,
+	{
+		let (responder, response) = ResponseReceiver::new();
+		self.tx
+			.send(ActorMessage::Message(message(responder)))
+			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running."), self.tags().clone()))?;
+		response
+			.await?
+			.map_err(|err| ActorError::Actor(err.into().context(anyhow!("Actor try request: {}", type_name::<M>()))))
+	}
+
 	/// Request with streaming response.
 	///
 	/// # Errors

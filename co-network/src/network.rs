@@ -23,7 +23,7 @@ use libp2p::{
 use libp2p_bitswap::{Bitswap, BitswapEvent};
 use std::{task::Poll, time::Duration};
 use tokio_util::sync::CancellationToken;
-use tracing::Instrument;
+use tracing::{Instrument, Span};
 
 pub struct Libp2pNetwork {
 	config: Libp2pNetworkConfig,
@@ -90,13 +90,24 @@ impl Libp2pNetwork {
 		// 	tracing::warn!(?err, "kad-bootstrap-failed");
 		// }
 
+		let listen = config.addr.clone().unwrap_or("/ip4/0.0.0.0/udp/0/quic-v1".parse()?);
+		let is_tcp = listen.protocol_stack().any(|protocol| protocol == "tcp");
+
 		// swarm
-		let mut swarm = SwarmBuilder::with_existing_identity(config.keypair.clone())
-			.with_tokio()
-			.with_quic()
-			.with_behaviour(|_| behaviour)?
-			.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
-			.build();
+		let swarm_builder = SwarmBuilder::with_existing_identity(config.keypair.clone()).with_tokio();
+		let mut swarm = if is_tcp {
+			swarm_builder
+				.with_tcp(libp2p::tcp::Config::default(), libp2p::noise::Config::new, libp2p::yamux::Config::default)?
+				.with_behaviour(|_| behaviour)?
+				.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
+				.build()
+		} else {
+			swarm_builder
+				.with_quic()
+				.with_behaviour(|_| behaviour)?
+				.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
+				.build()
+		};
 
 		// context
 		let context = Context {
@@ -112,7 +123,7 @@ impl Libp2pNetwork {
 		let mut runtime = Runtime::new(config.clone(), shutdown.child_token());
 
 		// listen
-		runtime.listen(swarm.listen_on(config.addr.clone().unwrap_or("/ip4/0.0.0.0/udp/0/quic-v1".parse()?))?);
+		runtime.listen(swarm.listen_on(listen)?);
 
 		// run
 		tokio::spawn(async move {
@@ -216,7 +227,7 @@ struct Runtime {
 	_config: Libp2pNetworkConfig,
 	listener_id: Option<libp2p::core::transport::ListenerId>,
 	/// Tasks which have been executed but waiting for events.
-	pending_tasks: Vec<NetworkTaskBox<Behaviour, Context>>,
+	pending_tasks: Vec<(NetworkTaskBox<Behaviour, Context>, Span)>,
 	shutdown: CancellationToken,
 }
 impl Runtime {
@@ -537,12 +548,23 @@ async fn run(
 
 			// tasks
 			Some(mut task) = tasks.next(), if !tasks.is_done() => {
+				let task_span = tracing::trace_span!("network-task", ?task);
+
 				// execute
-				task.execute(&mut swarm, context_layer.layer_mut());
+				let task_complete = task_span.in_scope(|| {
+					task.execute(&mut swarm, context_layer.layer_mut());
+					task.is_complete()
+				});
 
 				// move to pending if not complete
-				if !task.is_complete() {
-					runtime.pending_tasks.push(task);
+				if !task_complete {
+					// log
+					task_span.in_scope(|| {
+						tracing::trace!("network-task-pending");
+					});
+
+					// pending
+					runtime.pending_tasks.push((task, task_span));
 				}
 			},
 
@@ -599,14 +621,28 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		let mut result_event = Some(event);
 		let mut task_index = 0;
 		while task_index < runtime.pending_tasks.len() {
-			// run
-			result_event =
-				runtime.pending_tasks[task_index].on_swarm_event(swarm, context.layer_mut(), result_event.unwrap());
+			// handle
+			let task_complete = {
+				let (task, task_span) = &mut runtime.pending_tasks[task_index];
+				let _enter = task_span.enter();
+
+				// run
+				result_event = task.on_swarm_event(swarm, context.layer_mut(), result_event.unwrap());
+
+				// complete?
+				task.is_complete()
+			};
 
 			// done?
-			if runtime.pending_tasks[task_index].is_complete() {
-				runtime.pending_tasks.remove(task_index);
+			if task_complete {
+				// remove
+				let (task, task_span) = runtime.pending_tasks.remove(task_index);
 				task_index -= 1;
+
+				// log
+				task_span.in_scope(|| {
+					tracing::trace!(?task, "network-task-completed");
+				});
 			}
 
 			// event consumed?

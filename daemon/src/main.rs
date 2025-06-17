@@ -1,6 +1,6 @@
 use axum::{routing::get, Extension, Router};
 use clap::Parser;
-use co_sdk::ApplicationBuilder;
+use co_sdk::{ApplicationBuilder, NetworkSettings};
 use std::net::SocketAddr;
 
 mod error;
@@ -28,7 +28,10 @@ async fn main() {
 	let mut application = application_builder.build().await.expect("application");
 
 	// driver: network
-	application.create_network(cli.force_new_peer_id).await.expect("network");
+	application
+		.create_network(NetworkSettings { force_new_peer_id: cli.force_new_peer_id, ..Default::default() })
+		.await
+		.expect("network");
 
 	// build routes
 	let app = Router::new()

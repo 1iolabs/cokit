@@ -4,6 +4,7 @@ pub mod block_serializer;
 pub mod cbor;
 pub mod co_try_stream_ext;
 pub mod dag_cbor_size_serializer;
+pub mod is_default;
 pub mod json;
 pub mod lsm_tree_map;
 pub mod node_builder;

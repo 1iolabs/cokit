@@ -28,12 +28,18 @@ pub struct ReducersControl {
 impl ReducersControl {
 	pub async fn storage(&self, co: CoId) -> Result<ReducerStorage, CoReducerFactoryError> {
 		// tracing::trace!(?co, err = ?anyhow::anyhow!("test"), "co-reducer-request");
-		Ok(self.handle.request(|response| ReducerRequest::Storage(co, response)).await??)
+		Ok(self
+			.handle
+			.try_request(|response| ReducerRequest::Storage(co, response))
+			.await?)
 	}
 
 	pub async fn reducer(&self, co: CoId) -> Result<CoReducer, CoReducerFactoryError> {
 		// tracing::trace!(?co, err = ?anyhow::anyhow!("test"), "co-reducer-request");
-		Ok(self.handle.request(|response| ReducerRequest::Request(co, response)).await??)
+		Ok(self
+			.handle
+			.try_request(|response| ReducerRequest::Request(co, response))
+			.await?)
 	}
 
 	pub async fn reducer_opt(&self, co: CoId) -> Option<CoReducer> {
@@ -52,11 +58,14 @@ impl ReducersControl {
 	}
 
 	pub async fn clear(&self) -> Result<(), CoReducerFactoryError> {
-		Ok(self.handle.request(|response| ReducerRequest::Clear(response)).await??)
+		Ok(self.handle.try_request(|response| ReducerRequest::Clear(response)).await?)
 	}
 
 	pub async fn clear_one(&self, co: CoId) -> Result<(), CoReducerFactoryError> {
-		Ok(self.handle.request(|response| ReducerRequest::ClearOne(co, response)).await??)
+		Ok(self
+			.handle
+			.try_request(|response| ReducerRequest::ClearOne(co, response))
+			.await?)
 	}
 }
 impl From<ActorHandle<ReducerRequest>> for ReducersControl {

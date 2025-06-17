@@ -2,7 +2,7 @@ use crate::{
 	state::{query_core, QueryExt},
 	CoReducer, CO_CORE_NAME_MEMBERSHIP,
 };
-use co_core_membership::{Membership, MembershipState, Memberships};
+use co_core_membership::{Membership, MembershipState};
 use co_primitives::CoId;
 use co_storage::StorageError;
 
@@ -21,7 +21,7 @@ pub async fn memberships<'a>(
 	reducer: &CoReducer,
 	co: impl AsRef<CoId> + 'a,
 ) -> Result<impl Iterator<Item = Membership> + 'a, StorageError> {
-	let (_, memberships) = query_core::<Memberships>(CO_CORE_NAME_MEMBERSHIP)
+	let (_, memberships) = query_core(CO_CORE_NAME_MEMBERSHIP)
 		.with_default()
 		.execute_reducer(&reducer)
 		.await

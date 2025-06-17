@@ -127,9 +127,7 @@ where
 	let Some(pinning_key) = pinning_key else {
 		return Ok(None);
 	};
-	let storage_state = query_core::<co_core_storage::Storage>(CO_CORE_NAME_STORAGE)
-		.execute(storage, state)
-		.await?;
+	let storage_state = query_core(CO_CORE_NAME_STORAGE).execute(storage, state).await?;
 	let Some(pin) = storage_state.pins.get(storage, pinning_key).await? else {
 		return Ok(None);
 	};

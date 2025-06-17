@@ -1,5 +1,5 @@
 use crate::{Action, CoContext};
-use co_actor::Epic;
+use co_actor::{Actions, Epic};
 use co_primitives::CoId;
 use futures::{stream, Stream, StreamExt};
 use std::collections::HashMap;
@@ -12,6 +12,7 @@ pub struct CoFlushStagedEpic {
 impl Epic<Action, (), CoContext> for CoFlushStagedEpic {
 	fn epic(
 		&mut self,
+		_actions: &Actions<Action, (), CoContext>,
 		action: &Action,
 		_state: &(),
 		_context: &CoContext,

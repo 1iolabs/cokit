@@ -12,6 +12,7 @@ async-stream = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
 co-actor = { path = "../co-actor" }
+co-core-board = { path = "../cores/board" }
 co-core-co = { path = "../cores/co" }
 co-core-data-series = { path = "../cores/data-series" }
 co-core-file = { path = "../cores/file" }
@@ -30,6 +31,7 @@ co-runtime = { path = "../co-runtime" }
 co-storage = { path = "../co-storage" }
 derive_more = { workspace = true }
 directories = "5.0.1"
+either = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
 hmac = "0.12.1"

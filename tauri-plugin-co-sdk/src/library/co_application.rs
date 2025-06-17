@@ -1,4 +1,4 @@
-use co_sdk::{Application, ApplicationBuilder};
+use co_sdk::{Application, ApplicationBuilder, NetworkSettings};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default)]
@@ -41,7 +41,10 @@ pub async fn application(settings: CoApplicationSettings) -> Application {
 
 	// network
 	if settings.network {
-		application.create_network(settings.force_new_peer_id).await.expect("network");
+		application
+			.create_network(NetworkSettings { force_new_peer_id: settings.force_new_peer_id, ..Default::default() })
+			.await
+			.expect("network");
 	}
 	application.clone()
 }

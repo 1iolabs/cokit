@@ -1,16 +1,17 @@
 use crate::{
-	library::create_reducer_action::new_reducer_action, services::reducer::FlushInfo,
+	library::create_reducer_action::new_reducer_action, network::NetworkSettings, services::reducer::FlushInfo,
 	types::message::heads::HeadsMessage, CoDate, CoStorage, ReducerChangeContext,
 };
 use co_identity::Message;
 use co_network::didcomm::EncodedMessage;
-use co_primitives::{CoId, Did, Link, OptionLink, ReducerAction};
+use co_primitives::{CoId, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{stream::once, Stream, StreamExt};
 use ipld_core::ipld::Ipld;
 use libp2p::PeerId;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
+	collections::BTreeSet,
 	future::{ready, Future},
 	ops::Deref,
 	sync::Arc,
@@ -27,7 +28,7 @@ pub enum Action {
 		storage: CoStorage,
 		context: ReducerChangeContext,
 		action: ReducerAction<Ipld>,
-		cid: OptionLink<ReducerAction<Ipld>>,
+		cid: Link<ReducerAction<Ipld>>,
 	},
 
 	/// Core action has been failed.
@@ -40,10 +41,10 @@ pub enum Action {
 	Invite { co: CoId, from: Did, to: Did },
 
 	/// Invite request has been sent to a peer.
-	InviteSent { co: CoId, participant: Did, peer: PeerId },
+	InviteSent { co: CoId, to: Did, peer: PeerId },
 
 	/// Join request has been sent to a peer.
-	JoinSent { co: CoId, encrypted: bool, participant: Did, peer: PeerId },
+	JoinKeyRequest { co: CoId, participant: Did, peer: PeerId },
 
 	/// Join completed.
 	Joined { co: CoId, participant: Did, success: bool, peer: Option<PeerId> },
@@ -52,7 +53,7 @@ pub enum Action {
 	// KeyRequest { co: CoId, key: Option<String>, peer: Option<PeerId> },
 
 	/// Start network.
-	NetworkStart { force_new_peer_id: bool },
+	NetworkStart(NetworkSettings),
 
 	/// Network has been started.
 	NetworkStarted,
@@ -83,16 +84,17 @@ pub enum Action {
 	/// Received a HeadsMessage.
 	HeadsMessageReceived { from: Option<Did>, peer: PeerId, message_id: String, message: HeadsMessage },
 
-	/// Send a DIDComm message to all connectable co peers.
-	CoDidCommSend {
-		/// The Co to send the message to.
-		co: CoId,
+	/// Connect to Co and send message (DidCommSent) to the first peer connectable.
+	CoDidCommSend(CoDidCommSendAction),
 
-		/// The message id for reference.
-		message_id: String,
-
-		/// The message.
-		message: EncodedMessage,
+	/// DidComm message send result
+	/// Emitted once per [`Action::CoDidCommSend`].
+	CoDidCommSent {
+		// The message.
+		message: CoDidCommSendAction,
+		/// Peers the message has sent to or error.
+		/// If the peers list is empty no peer could be connected.
+		result: Result<BTreeSet<PeerId>, ActionError>,
 	},
 
 	/// Staged changes to a CO has been flushed.
@@ -121,6 +123,30 @@ pub enum Action {
 		/// The opened CO.
 		co: CoId,
 	},
+
+	/// Network Queue Process
+	NetworkQueueProcess {
+		/// Only process given co.
+		co: Option<CoId>,
+
+		/// Retry count.
+		retry: u32,
+	},
+
+	/// Network Queue Process Complte
+	NetworkQueueProcessComplete {
+		/// Only process given co.
+		co: Option<CoId>,
+
+		/// Whether the queue is now empty.
+		is_empty: bool,
+
+		/// Retry count.
+		retry: u32,
+	},
+
+	/// Notification.
+	Notify(NotifyAction),
 }
 impl Action {
 	pub async fn core_action<S>(
@@ -137,7 +163,7 @@ impl Action {
 			context,
 			storage: storage.clone().into(),
 			action: storage.get_value(&cid).await?,
-			cid: cid.into(),
+			cid,
 		})
 	}
 
@@ -230,7 +256,8 @@ impl From<anyhow::Error> for Action {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(into = "String", from = "String")]
 pub enum ActionError {
 	Serialized { message: String },
 	Native { err: Arc<anyhow::Error> },
@@ -238,6 +265,19 @@ pub enum ActionError {
 impl From<anyhow::Error> for ActionError {
 	fn from(value: anyhow::Error) -> Self {
 		Self::Native { err: Arc::new(value) }
+	}
+}
+impl From<String> for ActionError {
+	fn from(value: String) -> Self {
+		Self::Serialized { message: value }
+	}
+}
+impl Into<String> for ActionError {
+	fn into(self) -> String {
+		match self {
+			ActionError::Serialized { message } => message,
+			ActionError::Native { err } => err.to_string(),
+		}
 	}
 }
 impl std::error::Error for ActionError {
@@ -255,4 +295,49 @@ impl std::fmt::Display for ActionError {
 			ActionError::Native { err } => write!(f, "{}", err),
 		}
 	}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Send a DIDComm message to all connectable co peers.
+pub struct CoDidCommSendAction {
+	/// The Co to send the message to.
+	pub co: CoId,
+
+	/// Networks to use.
+	/// If no networks are specified tehy are resolved from the Co.
+	pub networks: BTreeSet<Network>,
+
+	/// Notification when sent has been sucessfully done.
+	pub notification: Option<NotifyAction>,
+
+	/// Message tags. Used for internal tracking.
+	pub tags: Tags,
+
+	/// The message sender for reference.
+	pub message_from: Did,
+
+	/// The message id for reference.
+	pub message_id: String,
+
+	/// The message.
+	pub message: EncodedMessage,
+}
+
+/// Notification. This indicates state updates to previous actions.
+/// Serializable to allow to delay them.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum NotifyAction {
+	/// A join message has been sent.
+	JoinSent {
+		/// The joined participant (us/from).
+		participant: Did,
+		/// If the joined Co is encrypted.
+		encrypted: bool,
+	},
+
+	/// A invite message has been sent.
+	InviteSent {
+		/// The invited participant.
+		to: Did,
+	},
 }

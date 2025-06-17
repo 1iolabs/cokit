@@ -13,6 +13,7 @@ members = [
     "co-runtime",
     "co-sdk",
     "co-storage",
+    "cores/board",
     "cores/co",
     "cores/data-series",
     "cores/file",

@@ -83,16 +83,16 @@ impl Actor for Application {
 	) -> Result<(), ActorError> {
 		// handle
 		let action = match message {
-			ApplicationMessage::Dispatch(Action::NetworkStart { force_new_peer_id }) => {
+			ApplicationMessage::Dispatch(Action::NetworkStart(settings)) => {
 				if state.network.is_none() {
 					state.network = Some(Actor::spawn_with(
 						state.context.tasks(),
 						tags!("type": "network", "application": &self.settings.identifier),
-						Network::new(state.context.clone(), force_new_peer_id),
-						(),
+						Network::new(state.context.clone()),
+						settings.clone(),
 					)?);
 				}
-				Some(Action::NetworkStart { force_new_peer_id })
+				Some(Action::NetworkStart(settings))
 			},
 			ApplicationMessage::Dispatch(action) => Some(action),
 			ApplicationMessage::Subscribe(response) => {

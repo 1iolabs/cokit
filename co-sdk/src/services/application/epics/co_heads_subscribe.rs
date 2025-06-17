@@ -4,7 +4,7 @@ use crate::{
 	types::co_reducer_context::CoReducerFeature,
 	Action, CoContext, CoNetworkTaskSpawner, CoReducerFactory,
 };
-use co_actor::Epic;
+use co_actor::{Actions, Epic};
 use co_network::NetworkTaskSpawner;
 use co_primitives::{CoId, NetworkCoHeads};
 use futures::Stream;
@@ -20,6 +20,7 @@ pub struct CoHeadsSubscribeEpic {
 impl Epic<Action, (), CoContext> for CoHeadsSubscribeEpic {
 	fn epic(
 		&mut self,
+		_actions: &Actions<Action, (), CoContext>,
 		action: &Action,
 		_state: &(),
 		context: &CoContext,

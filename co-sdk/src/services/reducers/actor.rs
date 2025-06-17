@@ -14,6 +14,7 @@ pub struct Reducers {
 	reducers: BTreeMap<CoId, CoReducer>,
 	storages: BTreeMap<CoId, ReducerStorage>,
 	pending_requests: VecDeque<ReducerRequest>,
+	keep_open: bool,
 }
 impl Reducers {
 	async fn local(&mut self) -> Result<CoReducer, CoReducerFactoryError> {
@@ -59,10 +60,11 @@ impl Actor for ReducersActor {
 		&self,
 		_handle: &ActorHandle<Self::Message>,
 		_tags: &Tags,
-		initialize: Self::Initialize,
+		context: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		Ok(Reducers {
-			context: initialize,
+			keep_open: context.settings().feature_co_open_keep(),
+			context,
 			reducers: Default::default(),
 			storages: Default::default(),
 			pending_requests: Default::default(),
@@ -129,7 +131,9 @@ impl Actor for ReducersActor {
 
 				// get/create
 				if let Some(reducer) = state.reducers.get(&id) {
-					response.send(Ok(co_reducer_instance(&state.context, &reducer))).ok();
+					response
+						.send(Ok(co_reducer_instance(&state.context, &reducer, state.keep_open)))
+						.ok();
 				} else {
 					state.pending_requests.push_back(ReducerRequest::Request(id.clone(), response));
 					if state.pending_request_count(&id) == 1 {
@@ -145,7 +149,10 @@ impl Actor for ReducersActor {
 										// create reducer
 										match context.inner.create_co_instance(parent, &id, storage, true, None).await {
 											Ok(Some(reducer)) => Ok(reducer),
-											Ok(None) => Err(CoReducerFactoryError::CoNotFound(id.clone())),
+											Ok(None) => Err(CoReducerFactoryError::CoNotFound(
+												id.clone(),
+												anyhow!("Create retuned None"),
+											)),
 											Err(err) => Err(CoReducerFactoryError::Create(id.clone(), err)),
 										}
 									},
@@ -162,7 +169,9 @@ impl Actor for ReducersActor {
 			ReducerRequest::RequestOpt(id, response) => {
 				if let Some(reducer) = state.reducers.get(&id) {
 					// use already created
-					response.send(Some(co_reducer_instance(&state.context, &reducer))).ok();
+					response
+						.send(Some(co_reducer_instance(&state.context, &reducer, state.keep_open)))
+						.ok();
 				} else if state.pending_request_count(&id) > 0 {
 					// wait if create is currently pending
 					state
@@ -222,11 +231,16 @@ impl Actor for ReducersActor {
 				// register
 				let notification = match &result {
 					Ok(reducer) => {
-						state.reducers.insert(reducer.id().clone(), reducer.clone());
-						Some(Action::CoOpen {
-							co: id.clone(),
-							network: reducer.context.has_feature(&CoReducerFeature::Network),
-						})
+						// reducer
+						//  note: we negate keep_open so when it is set we get an instance with the "global" overlay
+						let reducer = co_reducer_instance(&state.context, reducer, !state.keep_open);
+						let network = reducer.context.has_feature(&CoReducerFeature::Network);
+
+						// store
+						state.reducers.insert(reducer.id().clone(), reducer);
+
+						// result
+						Some(Action::CoOpen { co: id.clone(), network })
 					},
 					Err(err) => {
 						tracing::error!(co = ?id, ?err, "co-reducer-failed");
@@ -252,7 +266,9 @@ impl Actor for ReducersActor {
 								response
 									.send(match result {
 										Err(err) => Err(err),
-										Ok(reducer) => Ok(co_reducer_instance(&state.context, &reducer)),
+										Ok(reducer) => {
+											Ok(co_reducer_instance(&state.context, &reducer, state.keep_open))
+										},
 									})
 									.ok();
 								break;
@@ -260,7 +276,9 @@ impl Actor for ReducersActor {
 								response
 									.send(match &result {
 										Err(err) => Err(co_reducerfactory_error_clone(err)),
-										Ok(reducer) => Ok(co_reducer_instance(&state.context, &reducer)),
+										Ok(reducer) => {
+											Ok(co_reducer_instance(&state.context, &reducer, state.keep_open))
+										},
 									})
 									.ok();
 							}
@@ -269,7 +287,7 @@ impl Actor for ReducersActor {
 							response
 								.send(match &result {
 									Err(_err) => None,
-									Ok(reducer) => Some(co_reducer_instance(&state.context, &reducer)),
+									Ok(reducer) => Some(co_reducer_instance(&state.context, &reducer, state.keep_open)),
 								})
 								.ok();
 						},
@@ -325,19 +343,27 @@ impl Actor for ReducersActor {
 	}
 }
 
-fn co_reducer_instance(context: &CoContext, root_instance: &CoReducer) -> CoReducer {
-	root_instance
-		.clone_with_detached_storage()
-		.with_overlay_storage(context.tasks(), context.inner.application_storage().clone())
+fn co_reducer_instance(context: &CoContext, root_instance: &CoReducer, keep_open: bool) -> CoReducer {
+	if keep_open {
+		// return same instance
+		root_instance.clone()
+	} else {
+		// return clean instance
+		root_instance
+			.clone_with_detached_storage()
+			.with_overlay_storage(context.tasks(), context.inner.application_storage().clone())
+	}
 }
 
 fn co_reducerfactory_error_clone(err: &CoReducerFactoryError) -> CoReducerFactoryError {
 	match err {
-		CoReducerFactoryError::CoNotFound(id) => CoReducerFactoryError::CoNotFound(id.clone()),
-		CoReducerFactoryError::Create(id, err) => {
-			CoReducerFactoryError::Create(id.to_owned(), anyhow!(err.to_string()))
+		CoReducerFactoryError::CoNotFound(id, err) => {
+			CoReducerFactoryError::CoNotFound(id.clone(), anyhow!("source: {:?}", err))
 		},
-		CoReducerFactoryError::Other(err) => CoReducerFactoryError::Other(anyhow!(err.to_string())),
-		CoReducerFactoryError::Actor(err) => CoReducerFactoryError::Other(anyhow!(err.to_string())),
+		CoReducerFactoryError::Create(id, err) => {
+			CoReducerFactoryError::Create(id.to_owned(), anyhow!("source: {:?}", err))
+		},
+		CoReducerFactoryError::Other(err) => CoReducerFactoryError::Other(anyhow!("source: {:?}", err)),
+		CoReducerFactoryError::Actor(err) => CoReducerFactoryError::Other(anyhow!("source: {:?}", err)),
 	}
 }

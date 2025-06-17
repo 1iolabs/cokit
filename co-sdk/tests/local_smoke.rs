@@ -65,10 +65,7 @@ async fn test_local_smoke() {
 		.await
 		.expect("application");
 	let local_co = application.local_co_reducer().await.unwrap();
-	let (storage, key_store) = query_core::<co_core_keystore::KeyStore>(CO_CORE_NAME_KEYSTORE)
-		.execute_reducer(&local_co)
-		.await
-		.unwrap();
+	let (storage, key_store) = query_core(CO_CORE_NAME_KEYSTORE).execute_reducer(&local_co).await.unwrap();
 	let keys: BTreeMap<String, co_core_keystore::Key> =
 		state::into_collection(&storage, &key_store.keys).await.unwrap();
 	let key = keys.get(identity.identity()).expect("identity");
@@ -109,10 +106,7 @@ async fn test_local_smoke_encrypted() {
 		.await
 		.expect("application");
 	let local_co = application.local_co_reducer().await.unwrap();
-	let (storage, key_store) = query_core::<co_core_keystore::KeyStore>(CO_CORE_NAME_KEYSTORE)
-		.execute_reducer(&local_co)
-		.await
-		.unwrap();
+	let (storage, key_store) = query_core(CO_CORE_NAME_KEYSTORE).execute_reducer(&local_co).await.unwrap();
 	let keys: BTreeMap<String, co_core_keystore::Key> =
 		state::into_collection(&storage, &key_store.keys).await.unwrap();
 	let key = keys.get(identity.identity()).expect("identity");

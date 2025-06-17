@@ -3,11 +3,13 @@ use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
 use cid::Cid;
 use co_core_co::CoAction;
+use co_core_room::Room;
 use co_messaging::{
 	multimedia::{ImageInfo, ThumbnailInfo},
 	state_event::{RoomAvatarContent, RoomNameContent, RoomTopicContent},
 	MatrixEvent,
 };
+use co_primitives::CoreName;
 use co_sdk::{
 	state::{query_core, QueryError, QueryExt},
 	tags, CoReducerFactory, Cores, CO_CORE_NAME_CO, CO_CORE_ROOM,
@@ -41,7 +43,10 @@ pub async fn command(
 	let co = &room_command.co;
 	let core = &room_command.core;
 	let co_reducer = application.context().try_co_reducer(co).await?;
-	match query_core::<co_core_room::Room>(core).execute_reducer(&co_reducer).await {
+	match query_core(CoreName::<Room>::new(&room_command.core))
+		.execute_reducer(&co_reducer)
+		.await
+	{
 		Err(QueryError::NotFound(_)) => {
 			let create = CoAction::CoreCreate {
 				core: core.to_owned(),
@@ -83,13 +88,13 @@ pub async fn command(
 				},
 			),
 		);
-		co_reducer.push(&identity, co, &set_avatar).await?;
+		co_reducer.push(&identity, core, &set_avatar).await?;
 	}
 
 	if let Some(description) = &command.description {
 		let set_description =
 			MatrixEvent::new(uuid::Uuid::new_v4(), timestamp, core, RoomTopicContent::new(description));
-		co_reducer.push(&identity, co, &set_description).await?;
+		co_reducer.push(&identity, core, &set_description).await?;
 	}
 
 	Ok(exitcode::OK)

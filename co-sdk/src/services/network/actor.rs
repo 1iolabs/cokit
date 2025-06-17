@@ -12,30 +12,46 @@ use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, ActorInstance};
 use co_network::{Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner};
 use co_primitives::{tags, Tags};
-use libp2p::PeerId;
+use libp2p::{Multiaddr, PeerId};
 use std::time::Duration;
+
+#[derive(Debug, Clone, Default)]
+pub struct NetworkSettings {
+	pub force_new_peer_id: bool,
+	pub listen: Option<Multiaddr>,
+}
+impl NetworkSettings {
+	pub fn with_force_new_peer_id(mut self) -> Self {
+		self.force_new_peer_id = true;
+		self
+	}
+
+	pub fn with_localhost(mut self) -> Self {
+		self.listen = Some("/ip4/127.0.0.1/tcp/0".parse().unwrap());
+		self
+	}
+}
 
 #[derive(Debug)]
 pub struct Network {
 	context: CoContext,
-	force_new_peer_id: bool,
 }
 impl Network {
-	pub fn new(context: CoContext, force_new_peer_id: bool) -> Self {
-		Self { context, force_new_peer_id }
+	pub fn new(context: CoContext) -> Self {
+		Self { context }
 	}
 }
 #[async_trait]
 impl Actor for Network {
 	type Message = NetworkMessage;
 	type State = NetworkState;
-	type Initialize = ();
+	type Initialize = NetworkSettings;
 
 	async fn initialize(
 		&self,
 		_handle: &ActorHandle<Self::Message>,
 		_tags: &Tags,
-		_initialize: Self::Initialize,
+		settings: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		// bitswap
 		let bitswap = Actor::spawn_with(
@@ -49,11 +65,13 @@ impl Actor for Network {
 		let local_identity = self.context.local_identity();
 		let local_co = self.context.local_co_reducer().await?;
 		let network_key =
-			local_keypair_fetch(self.context.identifier(), &local_co, &local_identity, self.force_new_peer_id).await?;
+			local_keypair_fetch(self.context.identifier(), &local_co, &local_identity, settings.force_new_peer_id)
+				.await?;
 
 		// network
 		let network_peer_id = PeerId::from(network_key.public());
-		let network_config = Libp2pNetworkConfig::from_keypair(network_key.clone());
+		let mut network_config = Libp2pNetworkConfig::from_keypair(network_key.clone());
+		network_config.addr = settings.listen;
 		let network = Libp2pNetwork::new(
 			self.context.identifier().to_owned(),
 			network_config,

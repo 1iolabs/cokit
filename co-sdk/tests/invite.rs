@@ -23,23 +23,10 @@ async fn test_invite() {
 
 	let mut instances = Instances::new("test_invite");
 	let mut peer1 = instances.create().await;
-	peer1.application.create_network(false).await.unwrap();
 	let mut peer2 = instances.create().await;
-	peer2.application.create_network(false).await.unwrap();
 
-	// networks
-	let (network1, _) = peer1.application.context().network().await.unwrap();
-	let (network2, _) = peer2.application.context().network().await.unwrap();
-
-	// // connect
-	// network2
-	// 	.dail(network1.peer_id(), network1.listeners().await.unwrap())
-	// 	.await
-	// 	.unwrap();
-	// network1
-	// 	.dail(network2.peer_id(), network2.listeners().await.unwrap())
-	// 	.await
-	// 	.unwrap();
+	// network
+	let (network1, network2) = Instances::networking(&mut peer1, &mut peer2).await;
 
 	// create identity
 	let identity1 = peer1.create_identity().await;
@@ -75,7 +62,7 @@ async fn test_invite() {
 		.actions()
 		.filter_map(|action| {
 			ready(match action {
-				Action::InviteSent { co, participant, peer } => Some(Ok((co, participant, peer))),
+				Action::InviteSent { co, to, peer } => Some(Ok((co, to, peer))),
 				Action::Error { err } => Some(Err(err)),
 				_ => None,
 			})
@@ -163,25 +150,13 @@ async fn test_invite() {
 async fn test_invite_encrypted() {
 	let timeout_duration = Duration::from_secs(60);
 
+	// instance
 	let mut instances = Instances::new("test_invite");
 	let mut peer1 = instances.create().await;
-	peer1.application.create_network(false).await.unwrap();
 	let mut peer2 = instances.create().await;
-	peer2.application.create_network(false).await.unwrap();
 
-	// networks
-	let (network1, _) = peer1.application.context().network().await.unwrap();
-	let (network2, _) = peer2.application.context().network().await.unwrap();
-
-	// // connect
-	// network2
-	// 	.dail(network1.peer_id(), network1.listeners().await.unwrap())
-	// 	.await
-	// 	.unwrap();
-	// network1
-	// 	.dail(network2.peer_id(), network2.listeners().await.unwrap())
-	// 	.await
-	// 	.unwrap();
+	// network
+	let (network1, network2) = Instances::networking(&mut peer1, &mut peer2).await;
 
 	// create identity
 	let identity1 = peer1.create_identity().await;
@@ -220,7 +195,7 @@ async fn test_invite_encrypted() {
 		.actions()
 		.filter_map(|action| {
 			ready(match action {
-				Action::InviteSent { co, participant, peer } => Some(Ok((co, participant, peer))),
+				Action::InviteSent { co, to, peer } => Some(Ok((co, to, peer))),
 				Action::Error { err } => Some(Err(err)),
 				_ => None,
 			})
@@ -304,7 +279,7 @@ async fn wait_membership_state(
 			async move {
 				match action {
 					Action::CoreAction { co, storage: _, context: _, action, cid: _ }
-						if co.as_str() == CO_ID_LOCAL && action.core == CO_CORE_NAME_MEMBERSHIP =>
+						if co.as_str() == CO_ID_LOCAL && CO_CORE_NAME_MEMBERSHIP == action.core =>
 					{
 						let mambership_action: MembershipsAction = action.get_payload().ok()?;
 						match mambership_action {

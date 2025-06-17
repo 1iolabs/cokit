@@ -8,8 +8,8 @@ use std::fmt::Debug;
 /// DIDComm Message
 ///
 /// See: https://identity.foundation/didcomm-messaging/spec/v2.1/#iana-media-types
-#[derive(Clone, PartialEq, Eq)]
-pub struct EncodedMessage(pub Vec<u8>);
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EncodedMessage(#[serde(with = "serde_bytes")] pub Vec<u8>);
 impl EncodedMessage {
 	/// Create plaintext JSON message.
 	pub fn create_plain_json<T>(header: DidCommHeader, body: &T) -> Result<(String, Self), anyhow::Error>

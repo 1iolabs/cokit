@@ -5,7 +5,7 @@ use crate::{
 };
 use chrono::DateTime;
 use co_core_file::Node;
-use co_primitives::{AbsolutePath, Date, PathExt};
+use co_primitives::{AbsolutePath, CoreName, Date, PathExt};
 use co_sdk::{
 	state::{query_core, QueryExt},
 	CoReducerFactory,
@@ -31,7 +31,7 @@ pub async fn command(
 ) -> Result<ExitCode, anyhow::Error> {
 	let application = context.application(cli).await;
 	let co_reducer = application.context().try_co_reducer(&file_command.co).await?;
-	let (storage, file_state) = query_core(&file_command.core)
+	let (storage, file_state) = query_core(CoreName::new(&file_command.core))
 		.with_default()
 		.execute_reducer(&co_reducer)
 		.await?;

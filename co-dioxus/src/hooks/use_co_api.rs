@@ -42,12 +42,12 @@ impl CoApi {
 			});
 	}
 
-	pub fn dispatch<T>(&self, core: &str, action: T)
+	pub fn dispatch<T>(&self, core: impl Into<String> + Debug, action: T)
 	where
 		T: Serialize + Debug + Send + Sync + Clone + 'static,
 	{
 		let co = self.co.clone();
-		let core = core.to_owned();
+		let core = core.into();
 		let identity = self.identity.clone();
 		self.context
 			.execute_future_with_error(self.error, move |application| async move {

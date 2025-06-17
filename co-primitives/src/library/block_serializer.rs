@@ -1,4 +1,5 @@
 use crate::{from_cbor, to_cbor, Block, CborError, DefaultParams, KnownMultiCodec, StoreParams};
+use cid::Cid;
 use serde::Serialize;
 use std::marker::PhantomData;
 
@@ -9,6 +10,9 @@ pub enum BlockSerializerError {
 
 	#[error("CBOR failed.")]
 	Cbor(#[from] CborError),
+
+	#[error("Deserialize {0} as CBOR failed")]
+	CborDeserialize(Cid, #[source] CborError),
 }
 
 /// DagCbor Block Serializer/Deserializer.
@@ -57,7 +61,7 @@ where
 		T: serde::de::Deserialize<'a>,
 	{
 		// MultiCodec::with_cbor(item.cid())?;
-		Ok(from_cbor(item.data())?)
+		Ok(from_cbor(item.data()).map_err(|err| BlockSerializerError::CborDeserialize(*item.cid(), err))?)
 	}
 }
 

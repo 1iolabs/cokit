@@ -4,11 +4,12 @@ use crate::{
 	Action, CoContext, CoInvite, CoReducerState, KnownTag, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
+use co_actor::Actions;
 use co_core_membership::{Membership, MembershipState, MembershipsAction};
 use co_identity::DidCommHeader;
 use co_primitives::{from_json_string, tags, CoInviteMetadata, Did, KnownTags, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
-use futures::{future::ready, stream, Stream, StreamExt};
+use futures::{FutureExt, Stream, StreamExt};
 use libp2p::PeerId;
 use std::collections::BTreeSet;
 
@@ -19,6 +20,7 @@ use std::collections::BTreeSet;
 ///
 /// TODO: consensus validation
 pub fn invite_receive(
+	_actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
@@ -30,11 +32,11 @@ pub fn invite_receive(
 				&& message.is_validated_sender()
 			{
 				let (header, body) = message.clone().into_inner();
+				let context = context.clone();
+				let peer = *peer;
 				Some(
-					stream::once(ready((context.clone(), *peer, header, body)))
-						.then(
-							move |(context, peer, header, body)| async move { invited(context, peer, header, body).await },
-						)
+					async move { invited(context, peer, header, body).await }
+						.into_stream()
 						.flat_map(Action::map_error_stream)
 						.map(Ok),
 				)
