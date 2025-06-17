@@ -17,6 +17,10 @@ pub struct Command {
 	/// Identites to listen to.
 	#[arg(long)]
 	pub identity: Option<Vec<Did>>,
+
+	/// Listen address (multiaddr like /ip4/0.0.0.0/udp/0/quic-v1).
+	#[arg(long, value_name = "MULTIADDR")]
+	pub listen: Option<String>,
 }
 
 pub async fn command(
@@ -25,10 +29,31 @@ pub async fn command(
 	network_command: &NetworkCommand,
 	command: &Command,
 ) -> Result<ExitCode, anyhow::Error> {
+	// setting
+	let mut network_settings =
+		NetworkSettings { force_new_peer_id: network_command.force_new_peer_id, ..Default::default() };
+	if let Some(listen) = &command.listen {
+		network_settings = network_settings.with_listen_from_string(listen)?;
+	}
+
+	// application and network
 	let mut application = context.application(cli).await;
-	application
-		.create_network(NetworkSettings { force_new_peer_id: network_command.force_new_peer_id, ..Default::default() })
-		.await?;
+	application.create_network(network_settings).await?;
+
+	// verbose
+	if cli.verbose > 0 {
+		if let Some(network) = application.context().network_tasks().await {
+			// peer-id
+			let peer_id = network.local_peer_id();
+			println!("peer-id: {}", peer_id);
+
+			// listeners
+			let listeners = network.listeners().await?;
+			for listener in listeners {
+				println!("listen: {}", listener);
+			}
+		}
+	}
 
 	// COs
 	// TODO: watch local co

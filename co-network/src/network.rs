@@ -197,7 +197,7 @@ impl Libp2pNetworkConfig {
 	}
 
 	/// Add bootstrap peer.
-	/// The multiaddress is required to inclide an address (protocol) and and peer id (p2p).
+	/// The multiaddress is required to include an address (protocol) and and peer id (p2p).
 	pub fn add_bootstrap<'a>(&mut self, bootstap: impl Iterator<Item = &'a Multiaddr>) -> Result<(), Vec<Multiaddr>> {
 		let mut failed = Vec::new();
 		for multiaddr in bootstap {
