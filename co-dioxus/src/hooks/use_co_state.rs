@@ -1,16 +1,14 @@
 use crate::{use_co_error, CoContext, CoError, CoErrorSignal};
 use anyhow::anyhow;
-use cid::Cid;
-use co_sdk::{Application, CoId};
+use co_sdk::{Application, CoId, CoReducerState};
 use dioxus::prelude::*;
 use futures::{pin_mut, StreamExt};
-use std::collections::BTreeSet;
 
 /// Use state/heads from an CO.
-pub fn use_co_state(co: &str) -> Signal<(Option<Cid>, BTreeSet<Cid>), SyncStorage> {
+pub fn use_co_state(co: &str) -> Signal<CoReducerState, SyncStorage> {
 	// hooks
 	let error = use_co_error();
-	let state = use_signal_sync(|| (Default::default(), Default::default()));
+	let state = use_signal_sync(|| Default::default());
 	let context: CoContext = use_context();
 	let hook = use_hook(|| {
 		// run and update until drop_rx dropped
@@ -49,7 +47,7 @@ impl CoStateHook {
 async fn fetch_and_observe_state(
 	application: Application,
 	mut arguments: tokio::sync::watch::Receiver<CoId>,
-	mut state: Signal<(Option<Cid>, BTreeSet<Cid>), SyncStorage>,
+	mut state: Signal<CoReducerState, SyncStorage>,
 	mut error: CoErrorSignal,
 ) {
 	'arguments: loop {
@@ -68,14 +66,14 @@ async fn fetch_and_observe_state(
 							match item {
 								Some(next) => {
 									tracing::info!(co = ?co_id, "watch-changed");
-									if let Some((next_state, next_heads)) = next.some() {
-										tracing::info!(co = ?co_id, ?next_state, ?next_heads, "watch-apply");
-										*state.write() = (Some(next_state), next_heads);
+									if !next.is_empty() {
+										tracing::info!(co = ?co_id, ?next, "watch-apply");
+										*state.write() = next;
 									}
 								},
 								None => {
 									tracing::info!(co = ?co_id, "watch-failed");
-									*state.write() = (Default::default(), Default::default());
+									*state.write() = Default::default();
 									error.write().push(CoError::from_error(anyhow!("Co not found: {}", co_id)));
 									break;
 								}
@@ -99,11 +97,11 @@ async fn fetch_and_observe_state(
 				}
 			},
 			Ok(None) => {
-				*state.write() = (Default::default(), Default::default());
+				*state.write() = Default::default();
 				error.write().push(CoError::from_error(anyhow!("Co not found: {}", co_id)));
 			},
 			Err(err) => {
-				*state.write() = (Default::default(), Default::default());
+				*state.write() = Default::default();
 				error.write().push(CoError::from_error(err));
 			},
 		}

@@ -4,19 +4,26 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings};
 use co_sdk::{Application, BlockStat, BlockStorage, BlockStorageContentMapping, CoId, CoStorage, StorageError};
-use dioxus::hooks::use_context;
+use dioxus::{
+	hooks::{use_callback, use_context, use_reactive},
+	prelude::use_hook,
+};
 use futures::Future;
 use tokio::sync::{mpsc, oneshot};
 
-pub fn use_co_storage(co: &str) -> CoBlockStorage {
-	let (tx, mut rx) = mpsc::unbounded_channel::<Command<<CoBlockStorage as BlockStorage>::StoreParams>>();
+pub fn use_co_storage(co: &String) -> CoBlockStorage {
+	let mut co_id = use_reactive(co, |co| CoId::from(co));
 	let context: CoContext = use_context();
-	context.execute_future_parallel(|application| async move {
-		while let Some(command) = rx.recv().await {
-			handle_command(&application, command).await;
-		}
+	let storage = use_callback(move |_| {
+		let (tx, mut rx) = mpsc::unbounded_channel::<Command<<CoBlockStorage as BlockStorage>::StoreParams>>();
+		context.execute_future_parallel(|application| async move {
+			while let Some(command) = rx.recv().await {
+				handle_command(&application, command).await;
+			}
+		});
+		CoBlockStorage { co: co_id(), tx, settings: None }
 	});
-	CoBlockStorage { co: co.into(), tx, settings: None }
+	use_hook(|| storage(()))
 }
 
 #[derive(Debug, Clone)]
