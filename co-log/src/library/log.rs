@@ -1,8 +1,8 @@
 use super::{entry::EntryBlock, get_entry_block::get_entry_blocks, join::JoinEntry, stream::create_stream};
-use crate::{library::clock::max_clock, Clock, Entry, LogError};
+use crate::{library::clock::max_clock, LogError};
 use cid::Cid;
 use co_identity::{IdentityResolverBox, PrivateIdentity};
-use co_primitives::{BlockStorage, BlockStorageExt, Link};
+use co_primitives::{BlockStorage, BlockStorageExt, Clock, Entry, Link};
 use futures::{pin_mut, Stream, TryStreamExt};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashSet};
@@ -113,7 +113,7 @@ impl Log {
 			clock: Clock::new(
 				// todo: use peerid as the identity could be used one more devices?
 				identity.identity().as_bytes().to_vec(),
-				max_clock(head_entries.into_iter().map(|e| e.into())),
+				max_clock(head_entries.iter().map(|e| e.entry())),
 			)
 			.next(),
 			payload: item,

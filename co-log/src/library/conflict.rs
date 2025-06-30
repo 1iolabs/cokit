@@ -26,9 +26,9 @@ pub fn sort_by_clock_id(a: &EntryBlock, b: &EntryBlock) -> Ordering {
 #[cfg(test)]
 mod tests {
 	use super::last_write_wins;
-	use crate::{library::entry::EntryBlock, Clock, Entry};
+	use crate::library::entry::EntryBlock;
 	use co_identity::{Identity, PrivateIdentity, SignError};
-	use co_primitives::{BlockSerializer, DefaultParams};
+	use co_primitives::{BlockSerializer, Clock, DefaultParams, Entry};
 	use serde::Serialize;
 	use std::{
 		cmp::Ordering,

@@ -1,7 +1,7 @@
 use cid::Cid;
 use co_identity::{DidKeyIdentity, DidKeyIdentityResolver, IdentityResolverBox, PrivateIdentity};
-use co_log::{Entry, Log};
-use co_primitives::{BlockSerializer, Link};
+use co_log::Log;
+use co_primitives::{BlockSerializer, Entry, Link};
 use co_storage::{BlockStorage, MemoryBlockStorage};
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
