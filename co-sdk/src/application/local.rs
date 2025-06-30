@@ -24,17 +24,13 @@ use cid::Cid;
 use co_actor::ActorHandle;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
-use co_primitives::{tags, CloneWithBlockStorageSettings, Did, OptionMappedCid};
+use co_primitives::{tags, CloneWithBlockStorageSettings, OptionMappedCid};
 use co_runtime::RuntimePool;
 use co_storage::{
 	BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, ExtendedBlockStorage,
 };
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
-use std::{
-	collections::{BTreeMap, BTreeSet},
-	fmt::Debug,
-	sync::Arc,
-};
+use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
 use tokio_util::sync::CancellationToken;
 
 pub const CO_ID_LOCAL: &str = "local";
@@ -526,25 +522,32 @@ where
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
 	// create
-	let mut cores = BTreeMap::<String, co_core_co::Core>::new();
-	cores.insert(
+	let create = co_core_co::CreateAction::new(
+		CO_ID_LOCAL.into(),
+		CO_ID_LOCAL.to_owned(),
+		Cores::default().binary(CO_CORE_CO).expect(CO_CORE_CO),
+	)
+	.with_core(
 		CO_CORE_NAME_MEMBERSHIP.to_string(),
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_MEMBERSHIP).expect(CO_CORE_MEMBERSHIP),
 			tags: tags!( "core": CO_CORE_MEMBERSHIP ),
 			state: None,
 		},
-	);
-	cores.insert(
+	)
+	.with_core(
 		CO_CORE_NAME_KEYSTORE.to_string(),
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_KEYSTORE).expect(CO_CORE_KEYSTORE),
 			tags: tags!( "core": CO_CORE_KEYSTORE ),
 			state: None,
 		},
-	);
+	)
+	.with_participant(identity.identity().to_owned(), tags!());
+
+	// pinning
 	#[cfg(feature = "pinning")]
-	cores.insert(
+	let create = create.with_core(
 		CO_CORE_NAME_STORAGE.to_string(),
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_STORAGE).expect(CO_CORE_STORAGE),
@@ -552,23 +555,9 @@ where
 			state: create_storage_core_state(storage, settings).await?,
 		},
 	);
-	let mut participants = BTreeMap::<Did, co_core_co::Participant>::new();
-	participants.insert(
-		identity.identity().to_owned(),
-		co_core_co::Participant {
-			did: identity.identity().to_owned(),
-			state: co_core_co::ParticipantState::Active,
-			tags: tags!(),
-		},
-	);
-	let action = co_core_co::CoAction::Create {
-		id: CO_ID_LOCAL.into(),
-		name: CO_ID_LOCAL.to_owned(),
-		cores,
-		participants,
-		key: None,
-		binary: Cores::default().binary(CO_CORE_CO).expect(CO_CORE_CO),
-	};
+
+	// create
+	let action = co_core_co::CoAction::Create(create);
 	reducer.push(storage, runtime, identity, CO_CORE_NAME_CO, &action).await?;
 
 	// done

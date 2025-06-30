@@ -5,7 +5,7 @@ use crate::{
 use anyhow::Context;
 use async_trait::async_trait;
 use cid::Cid;
-use co_core_co::CoAction;
+use co_core_co::{CoAction, CreateAction};
 use co_identity::{LocalIdentity, PrivateIdentity};
 use co_primitives::ReducerAction;
 use co_runtime::{Core, RuntimeContext, RuntimePool};
@@ -96,7 +96,7 @@ impl CoCoreResolver {
 					.map_err(|e| CoreResolverError::InvalidArgument(e.into()))
 					.context("resolving CoAction::Create")?;
 				match co_action.payload {
-					CoAction::Create { id: _, name: _, cores: _, participants: _, key: _, binary } => binary,
+					CoAction::Create(CreateAction { binary, .. }) => binary,
 					_ => {
 						return Err(CoreResolverError::InvalidArgument(anyhow::anyhow!(
 							"Execute before CoAction::Create"
