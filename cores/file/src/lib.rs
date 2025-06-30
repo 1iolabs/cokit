@@ -676,6 +676,10 @@ mod tests {
 			self
 		}
 
+		fn payload(&self) -> Vec<u8> {
+			unimplemented!()
+		}
+
 		fn event(&self) -> Cid {
 			unimplemented!()
 		}

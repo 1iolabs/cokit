@@ -11,6 +11,8 @@ pub trait Context {
 
 	fn storage_mut(&mut self) -> &mut dyn Storage;
 
+	fn payload(&self) -> Vec<u8>;
+
 	fn event(&self) -> Cid;
 
 	fn state(&self) -> Option<Cid>;
@@ -31,6 +33,9 @@ pub mod async_reducer {
 	{
 		/// Storage instance.
 		fn storage(&self) -> &S;
+
+		/// Get runtime payload.
+		fn payload(&self) -> Vec<u8>;
 
 		/// Get action to apply to the state.
 		fn event(&self) -> Cid;

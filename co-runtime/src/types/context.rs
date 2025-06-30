@@ -1,8 +1,9 @@
 use cid::Cid;
 use co_primitives::{BlockStorage, BlockStorageExt, DiagnosticMessage};
 use derive_more::From;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeContext {
 	/// The acutual state.
 	pub state: Option<Cid>,
@@ -10,12 +11,15 @@ pub struct RuntimeContext {
 	/// The event to apply to the state.
 	pub event: Cid,
 
+	/// Runtime payload.
+	pub payload: Vec<u8>,
+
 	/// Diagnostics returned from the COre.
 	pub diagnostics: Vec<RuntimeDiagnosic>,
 }
 impl RuntimeContext {
 	pub fn new(state: Option<Cid>, event: Cid) -> Self {
-		Self { state, event, diagnostics: Default::default() }
+		Self { state, event, payload: Default::default(), diagnostics: Default::default() }
 	}
 
 	/// Resolve diagnostics to messages.
@@ -43,7 +47,7 @@ impl RuntimeContext {
 	}
 }
 
-#[derive(Debug, Clone, From)]
+#[derive(Debug, Clone, From, Serialize, Deserialize)]
 pub enum RuntimeDiagnosic {
 	Reference(Cid),
 	Message(DiagnosticMessage),

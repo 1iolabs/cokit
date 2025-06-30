@@ -1,5 +1,8 @@
 use super::{read_cid::read_cid, wasm_storage::WasmStorage, write_cid::write_cid};
-use crate::{async_api, diagnostic_cid_write, event_cid_read, state_cid_read, state_cid_write, Cid, Context, Storage};
+use crate::{
+	async_api, diagnostic_cid_write, event_cid_read, library::read_payload_buffer::read_payload_buffer, state_cid_read,
+	state_cid_write, Cid, Context, Storage,
+};
 
 pub struct WasmContext {
 	storage: WasmStorage,
@@ -16,6 +19,10 @@ impl Context for WasmContext {
 
 	fn storage_mut(&mut self) -> &mut dyn Storage {
 		&mut self.storage
+	}
+
+	fn payload(&self) -> Vec<u8> {
+		read_payload_buffer()
 	}
 
 	fn event(&self) -> Cid {
@@ -37,6 +44,10 @@ impl Context for WasmContext {
 impl async_api::Context<WasmStorage> for WasmContext {
 	fn storage(&self) -> &WasmStorage {
 		&self.storage
+	}
+
+	fn payload(&self) -> Vec<u8> {
+		<Self as Context>::payload(self)
 	}
 
 	fn event(&self) -> Cid {
