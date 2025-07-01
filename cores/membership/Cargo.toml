@@ -10,16 +10,16 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 anyhow = { workspace = true }
 cid = { workspace = true }
-co-api = { path = "../../co-api" }
-co-macros = { path = "../../co-macros" }
+co-api = { workspace = true }
+co-macros = { workspace = true }
 ipld-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_repr = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-co-storage = { path = "../../co-storage" }
-co-runtime = { path = "../../co-runtime" }
+co-storage = { workspace = true }
+co-runtime = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true, features = ["compat"] }
 tracing = { workspace = true }

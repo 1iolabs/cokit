@@ -10,7 +10,7 @@ async-stream = { workspace = true }
 async-trait = { workspace = true }
 bloomfilter = { version = "3.0.1", default-features = false }
 cid = { workspace = true }
-co-macros = { path = "../co-macros" }
+co-macros = { workspace = true }
 derive_more = { workspace = true }
 either = { workspace = true }
 futures = { workspace = true }

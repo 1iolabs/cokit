@@ -6,8 +6,8 @@ rust-version = "1.76"
 
 [dependencies]
 cid = { workspace = true }
-co-macros = { path = "../co-macros" }
-co-primitives = { path = "../co-primitives" }
+co-macros = { workspace = true }
+co-primitives = { workspace = true }
 ipld-core = { workspace = true }
 schemars = { workspace = true }
 serde = { features = ["derive"], workspace = true }

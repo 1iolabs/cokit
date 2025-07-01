@@ -8,9 +8,9 @@ rust-version = "1.76"
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
-co-api = { path = "../co-api" }
-co-primitives = { path = "../co-primitives" }
-co-storage = { path = "../co-storage" }
+co-api = { workspace = true }
+co-primitives = { workspace = true }
+co-storage = { workspace = true }
 colored = "2.1.0"
 derive_more = { workspace = true }
 futures = { workspace = true }

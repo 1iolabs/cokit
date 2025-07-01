@@ -9,10 +9,10 @@ rust-version = "1.76"
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
-co-core-co = { path = "../cores/co" }
-co-core-membership = { path = "../cores/membership" }
-co-primitives = { path = "../co-primitives" }
-co-sdk = { path = "../co-sdk" }
+co-core-co = { workspace = true }
+co-core-membership = { workspace = true }
+co-primitives = { workspace = true }
+co-sdk = { workspace = true }
 dioxus = { version = "^0.6.3", default-features = false, features = [
     "hooks",
     "signals",

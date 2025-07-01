@@ -10,7 +10,7 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 anyhow = { workspace = true }
 cid = { workspace = true }
-co-api = { path = "../../co-api" }
+co-api = { workspace = true }
 ipld-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_repr = { workspace = true }
