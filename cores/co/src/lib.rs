@@ -1,5 +1,8 @@
 use cid::Cid;
-use co_api::{CoId, Context, DagSet, DagSetExt, Did, Network, Reducer, ReducerAction, Tags};
+use co_api::{
+	BlockStorage, BlockStorageExt, CoId, Context, DagSet, DagSetExt, Did, Network, Reducer, ReducerAction, SignedEntry,
+	Tags,
+};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::{BTreeMap, BTreeSet};
@@ -307,6 +310,24 @@ impl Reducer for Co {
 		let mut result = self;
 		reduce(context, &mut result, &event.payload);
 		result
+	}
+}
+impl<S: BlockStorage + Clone + 'static> co_api::async_api::Guard<S> for Co {
+	/// Test if next_head creator is a participant with access.
+	async fn verify(
+		storage: &S,
+		_guard: String,
+		state: Cid,
+		_heads: BTreeSet<Cid>,
+		next_head: Cid,
+	) -> Result<bool, anyhow::Error> {
+		let next_entry: SignedEntry = storage.get_deserialized(&next_head).await?;
+		let participant = next_entry.identity;
+		let co: Co = storage.get_deserialized(&state).await?;
+		Ok(co
+			.participants
+			.iter()
+			.any(|item| item.1.state.has_access() && item.0 == &participant))
 	}
 }
 
