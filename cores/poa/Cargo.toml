@@ -12,6 +12,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
 co-api = { path = "../../co-api" }
+co-core-co = { path = "../co" }
 futures = { workspace = true }
 ipld-core = { workspace = true }
 num-rational = { workspace = true }
