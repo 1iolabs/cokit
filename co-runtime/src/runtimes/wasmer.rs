@@ -62,10 +62,25 @@ impl WasmerRuntime {
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err, ret)]
-	pub fn execute(&mut self) -> Result<(), WasmerError> {
+	pub fn execute_state(&mut self) -> Result<(), WasmerError> {
 		let state = self.instance.exports.get_function("state").unwrap();
 		state.call(&mut self.store, &[])?;
 		Ok(())
+	}
+
+	#[tracing::instrument(level = tracing::Level::TRACE, err, ret)]
+	pub fn execute_guard(&mut self) -> Result<bool, WasmerError> {
+		let state = self.instance.exports.get_function("guard").unwrap();
+		let results = state.call(&mut self.store, &[])?;
+		if results.len() != 1 {
+			return Err(wasmer::ExportError::IncompatibleType.into());
+		}
+		let result = results
+			.first()
+			.ok_or(wasmer::ExportError::IncompatibleType)?
+			.i32()
+			.ok_or(wasmer::ExportError::IncompatibleType)?;
+		Ok(result == 1)
 	}
 
 	/// API Access.

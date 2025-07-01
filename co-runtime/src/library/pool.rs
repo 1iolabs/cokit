@@ -88,7 +88,7 @@ impl RuntimePool {
 				// execute
 				let (result, instance): (RuntimeContext, RuntimeInstance) =
 					tokio::task::spawn_blocking(move || -> Result<(RuntimeContext, RuntimeInstance), RuntimeError> {
-						let result = instance.runtime_mut().execute(api)?;
+						let result = instance.runtime_mut().execute_state(api)?;
 						Ok((result, instance))
 					})
 					.await
