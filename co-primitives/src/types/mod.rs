@@ -18,6 +18,7 @@ pub mod date;
 pub mod diagnostic_message;
 pub mod did;
 pub mod entry;
+pub mod guard;
 pub mod invite;
 pub mod known_tags;
 pub mod lazy_transaction;

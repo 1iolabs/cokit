@@ -1,14 +1,11 @@
 use cid::Cid;
 use co_api::{
-	BlockStorage, BlockStorageExt, CoId, Context, DagSet, DagSetExt, Did, Network, Reducer, ReducerAction, SignedEntry,
-	Tags,
+	co, BlockStorage, BlockStorageExt, CoId, Context, DagSet, DagSetExt, Did, Network, Reducer, ReducerAction,
+	SignedEntry, Tags,
 };
-use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::{BTreeMap, BTreeSet};
 
-// #[co_api::State]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[co(state_sync, guard, no_default)]
 #[non_exhaustive]
 pub struct Co {
 	/// CO UUID.
@@ -64,8 +61,8 @@ impl Default for Co {
 	}
 }
 
-// #[co_api::Data]
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
+#[derive(Default)]
 pub struct Core {
 	/// The CID of the core binary.
 	pub binary: Cid,
@@ -77,8 +74,7 @@ pub struct Core {
 	pub state: Option<Cid>,
 }
 
-// #[co_api::Data]
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
 pub struct Guard {
 	/// The CID of the guard binary.
 	pub binary: Cid,
@@ -87,15 +83,13 @@ pub struct Guard {
 	pub tags: Tags,
 }
 
-// #[co_api::Data]
-#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq)]
+#[co(repr)]
 #[repr(u8)]
 pub enum Architecture {
 	Wasm = 0,
 }
 
-// #[co_api::Data]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
 pub struct Participant {
 	/// The participant DID.
 	pub did: Did,
@@ -107,7 +101,7 @@ pub struct Participant {
 	pub tags: Tags,
 }
 
-#[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq)]
+#[co(repr)]
 #[repr(u8)]
 pub enum ParticipantState {
 	/// Active participant.
@@ -142,20 +136,20 @@ impl ParticipantState {
 	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
 pub struct Key {
 	pub id: String,
 	pub state: KeyState,
 }
 
-#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq)]
+#[co(repr)]
 #[repr(u8)]
 pub enum KeyState {
 	Inactive = 0,
 	Active = 1,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[co]
 #[non_exhaustive]
 pub struct CreateAction {
 	pub id: CoId,
@@ -203,7 +197,7 @@ impl Default for CreateAction {
 	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[co]
 #[non_exhaustive]
 pub enum CoAction {
 	Create(CreateAction),
@@ -312,7 +306,7 @@ impl Reducer for Co {
 		result
 	}
 }
-impl<S: BlockStorage + Clone + 'static> co_api::async_api::Guard<S> for Co {
+impl<S: BlockStorage + Clone + 'static> co_api::Guard<S> for Co {
 	/// Test if next_head creator is a participant with access.
 	async fn verify(
 		storage: &S,
@@ -534,12 +528,4 @@ fn reduce_guard_tags_remove(result: &mut Co, guard_name: &String, tags: &Tags) {
 	if let Some(guard) = result.guards.get_mut(guard_name) {
 		guard.tags.clear(Some(tags));
 	}
-}
-
-// pub extern "C" fn permission() -> bool {}
-
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-#[no_mangle]
-pub extern "C" fn state() {
-	co_api::reduce::<Co>()
 }

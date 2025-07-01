@@ -5,7 +5,7 @@ mod types;
 
 /// exports
 pub use cid::Cid;
-pub use co_macros::{co_data, co_state};
+pub use co_macros::{co, co_data, co_state};
 pub use co_primitives::{
 	from_cbor, from_json, tags, to_cbor, to_json, to_json_string, AbsolutePath, AbsolutePathOwned, Block,
 	BlockSerializer, BlockSerializerError, BlockStorage, BlockStorageExt, Clock, CoId, CoList, CoListIndex,
@@ -20,18 +20,19 @@ pub use co_v1::{
 	diagnostic_cid_write, event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set,
 };
 pub use library::{
+	guard::{guard, guard_with_context},
 	reduce::{reduce, reduce_with_context},
 	storage_ext::StorageExt,
 };
-pub use types::reducer::{Context, Reducer};
+pub use types::{
+	guard::Guard,
+	reducer::{Context, Reducer},
+};
 
 // async export
 pub mod async_api {
 	pub use crate::{
 		library::reduce::async_reduce::{reduce, reduce_execute_with_context, reduce_with_context},
-		types::{
-			guard::Guard,
-			reducer::async_reducer::{Context, Reducer},
-		},
+		types::reducer::async_reducer::{Context, Reducer},
 	};
 }

@@ -1,9 +1,8 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	async_api::{Guard, Reducer},
-	co_data, co_state, BlockStorage, BlockStorageExt, CoMap, CoMapTransaction, CoSet, CoSetTransaction, Did, Link,
-	OptionLink, ReducerAction, SignedEntry, WeakCid,
+	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoMapTransaction, CoSet, CoSetTransaction, Did,
+	Guard, Link, OptionLink, ReducerAction, SignedEntry, WeakCid,
 };
 use co_core_co::Co;
 use futures::{pin_mut, TryStreamExt};
@@ -15,7 +14,7 @@ use std::{
 };
 
 /// Authority actions.
-#[co_data]
+#[co]
 pub enum AuthorityAction {
 	/// Agree on a specific checkpoint.
 	/// The first time the a checkpoint is agreed on marks the start of a consensus round.
@@ -40,7 +39,7 @@ impl AuthorityAction {
 pub type Checkpoint = (WeakCid, BTreeSet<WeakCid>);
 
 /// Update consensus authority settings.
-#[co_data]
+#[co]
 #[derive(Default)]
 pub struct AuthorityUpdate {
 	/// Update/Insert/Remove authorities.
@@ -57,13 +56,13 @@ pub struct AuthorityUpdate {
 }
 
 /// Stores additional informations for authorities.
-#[co_data]
+#[co]
 pub struct AuthorityInfo {
 	/// The authority vote weight.
 	pub weight: u32,
 }
 
-#[co_state]
+#[co(state, guard)]
 pub struct Authority {
 	/// The authority.
 	#[serde(rename = "a", default, skip_serializing_if = "CoMap::is_empty")]

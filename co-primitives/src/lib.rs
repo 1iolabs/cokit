@@ -38,6 +38,7 @@ pub use types::{
 	diagnostic_message::DiagnosticMessage,
 	did::Did,
 	entry::{Entry, SignedEntry},
+	guard::GuardVerifyPayload,
 	invite::{CoConnectivity, CoInviteMetadata},
 	known_tags::{CoInvite, CoJoin, CoNetwork, CoTimeout, KnownTag, KnownTags},
 	lazy_transaction::{LazyTransaction, Transactionable},
