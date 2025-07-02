@@ -7,7 +7,13 @@ pub fn read_payload_buffer() -> Vec<u8> {
 	let mut buffer = [0u8; 1024];
 	let mut offset: usize = 0;
 	loop {
-		let total = payload_read(buffer.as_mut_ptr(), buffer.len() as u32, offset.try_into().expect("u32")) as usize;
+		let total = {
+			let read_buffer = buffer.as_mut_ptr();
+			let read_buffer_len = buffer.len() as u32;
+			let read_offset = offset.try_into().expect("u32");
+			let read_total = unsafe { payload_read(read_buffer, read_buffer_len, read_offset) };
+			read_total as usize
+		};
 		let read = min(total - offset, buffer.len());
 
 		// offset

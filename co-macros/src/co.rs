@@ -108,7 +108,7 @@ pub fn macro_co(input: proc_macro::TokenStream, features: BTreeSet<CoMacroFeatur
 	}
 
 	// feature: state sync
-	if features.contains(&CoMacroFeature::State) {
+	if features.contains(&CoMacroFeature::StateSync) {
 		tokens.push(quote! {
 			#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 			#[no_mangle]

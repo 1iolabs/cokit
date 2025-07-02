@@ -42,36 +42,46 @@ extern "C" {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub extern "C" fn storage_block_get(_cid: *const u8, _cid_size: u32, _buffer: *mut u8, _buffer_size: u32) -> u32 {
+pub unsafe extern "C" fn storage_block_get(
+	_cid: *const u8,
+	_cid_size: u32,
+	_buffer: *mut u8,
+	_buffer_size: u32,
+) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub extern "C" fn storage_block_set(_cid: *const u8, _cid_size: u32, _buffer: *const u8, _buffer_size: u32) -> u32 {
+pub unsafe extern "C" fn storage_block_set(
+	_cid: *const u8,
+	_cid_size: u32,
+	_buffer: *const u8,
+	_buffer_size: u32,
+) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub extern "C" fn payload_read(_buffer: *mut u8, _buffer_size: u32, _offset: u32) -> u32 {
+pub unsafe extern "C" fn payload_read(_buffer: *mut u8, _buffer_size: u32, _offset: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub extern "C" fn state_cid_read(_buffer: *mut u8, _buffer_size: u32) -> u32 {
+pub unsafe extern "C" fn state_cid_read(_buffer: *mut u8, _buffer_size: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub extern "C" fn state_cid_write(_buffer: *const u8, _buffer_size: u32) -> u32 {
+pub unsafe extern "C" fn state_cid_write(_buffer: *const u8, _buffer_size: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub extern "C" fn event_cid_read(_buffer: *mut u8, _buffer_size: u32) -> u32 {
+pub unsafe extern "C" fn event_cid_read(_buffer: *mut u8, _buffer_size: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub extern "C" fn diagnostic_cid_write(_buffer: *const u8, _buffer_size: u32) -> u32 {
+pub unsafe extern "C" fn diagnostic_cid_write(_buffer: *const u8, _buffer_size: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
