@@ -1,3 +1,6 @@
+#!/bin/bash
+set -e
+
 # change directory to where this script is located to ensure script does not depend on where it's called from
 DIR="$( cd "$( dirname "$0" )" && pwd )"
 cd $DIR
@@ -19,13 +22,13 @@ cargo run --bin co-cli -- --no-keychain schemars generate -m room messaging core
 # generate .d.ts files, needs globally installed 'json-schema-to-typescript' npm package
 echo "Calling json2ts command"
 cd $DIR
-json2ts -i schemas -o types --no-additionalProperties
+npx "--package=json-schema-to-typescript@15.0.4" -- json2ts -i schemas -o types --no-additionalProperties
 
 # change all .d.ts files to .ts files
 echo "Renaming .d.ts files to .ts"
 cd ./types
 for file in ./*.d.ts;
-do 
+do
     mv "$file" "${file%.d.ts}.ts"
 done
 
