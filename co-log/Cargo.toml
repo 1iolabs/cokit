@@ -12,9 +12,9 @@ anyhow = { workspace = true }
 async-stream = "0.3.5"
 async-trait = { workspace = true }
 cid = { workspace = true }
-co-identity = { path = "../co-identity" }
-co-primitives = { path = "../co-primitives" }
-co-storage = { path = "../co-storage" }
+co-identity = { workspace = true }
+co-primitives = { workspace = true }
+co-storage = { workspace = true }
 futures = { workspace = true }
 ipld-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

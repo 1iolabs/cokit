@@ -1,4 +1,6 @@
+pub mod guard;
 pub mod read_cid;
+pub mod read_payload_buffer;
 pub mod reduce;
 pub mod storage_ext;
 pub mod wasm_context;

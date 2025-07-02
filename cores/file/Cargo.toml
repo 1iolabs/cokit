@@ -10,13 +10,13 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 anyhow = { workspace = true }
 cid = { workspace = true }
-co-api = { path = "../../co-api" }
+co-api = { workspace = true }
 ipld-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_repr = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-co-storage = { path = "../../co-storage" }
+co-storage = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

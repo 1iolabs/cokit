@@ -103,7 +103,7 @@ pub enum CliCommand {
 	Schemars(schemars::Command),
 }
 
-#[tracing::instrument(level = tracing::Level::INFO, err, ret, skip(cli))]
+#[tracing::instrument(level = tracing::Level::INFO, err(Debug), ret, skip(cli))]
 pub async fn command(cli: &Cli) -> Result<ExitCode, anyhow::Error> {
 	// trace arguments
 	tracing::debug!(?cli, "arguments");

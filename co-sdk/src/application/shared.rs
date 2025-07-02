@@ -20,7 +20,7 @@ use crate::{
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_actor::ActorHandle;
-use co_core_co::{CoAction, Participant};
+use co_core_co::{CoAction, CreateAction};
 use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
@@ -29,12 +29,7 @@ use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
 use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid};
 use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret};
 use serde::{Deserialize, Serialize};
-use std::{
-	collections::{BTreeMap, BTreeSet},
-	fmt::Debug,
-	sync::Arc,
-	time::Duration,
-};
+use std::{collections::BTreeSet, fmt::Debug, sync::Arc, time::Duration};
 
 /// Shared CO Builder.
 /// The Shared CO state is sptrend in an membership of an other CO (typicalle the Local CO).
@@ -517,30 +512,15 @@ impl SharedCoCreator {
 			.await?;
 
 		// initialize
-		let mut participants = BTreeMap::new();
-		participants.insert(
-			identity.identity().to_owned(),
-			Participant {
-				did: identity.identity().to_owned(),
-				state: co_core_co::ParticipantState::Active,
-				tags: tags!(),
-			},
-		);
+		let create = CreateAction::new(
+			self.co.id.to_owned(),
+			self.co.name.to_owned(),
+			Cores::default().binary(CO_CORE_CO).expect(CO_CORE_CO),
+		)
+		.with_participant(identity.identity().to_owned(), tags!())
+		.with_key(encrypted_storage.as_ref().map(|(_, key_uri, _)| key_uri.clone()));
 		reducer
-			.push(
-				&co_storage,
-				runtime.runtime(),
-				&identity,
-				CO_CORE_NAME_CO,
-				&CoAction::Create {
-					id: self.co.id.to_owned(),
-					name: self.co.name.to_owned(),
-					cores: Default::default(),
-					participants,
-					key: encrypted_storage.as_ref().map(|(_, key_uri, _)| key_uri.clone()),
-					binary: Cores::default().binary(CO_CORE_CO).expect(CO_CORE_CO),
-				},
-			)
+			.push(&co_storage, runtime.runtime(), &identity, CO_CORE_NAME_CO, &CoAction::Create(create))
 			.await?;
 		let reducer_state = CoReducerState::new(reducer.state().clone(), reducer.heads().clone());
 

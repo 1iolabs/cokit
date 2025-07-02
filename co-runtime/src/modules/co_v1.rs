@@ -28,6 +28,10 @@ impl CoV1Api {
 		&self.context.event
 	}
 
+	pub fn payload(&self) -> &[u8] {
+		&self.context.payload
+	}
+
 	pub fn write_diagnostic(&mut self, data: Cid) {
 		self.context.diagnostics.push(data.into());
 	}
@@ -125,6 +129,13 @@ pub fn storage_block_set(api: &mut CoV1Api, cid: &[u8], buffer: &[u8]) -> Result
 	let result = block.data().len().try_into().expect("u32");
 	api.set(block);
 	Ok(result)
+}
+
+pub fn payload_read(api: &CoV1Api, buffer: &mut [u8], offset: u32) -> u32 {
+	let len = api.context.payload.len();
+	let size = min(len - (offset as usize), buffer.len());
+	buffer[0..size].copy_from_slice(&api.context.payload[0..size]);
+	len.try_into().expect("u32")
 }
 
 pub fn state_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> u32 {

@@ -1,11 +1,12 @@
 use cid::Cid;
-use co_api::{CoId, Context, DagSet, DagSetExt, Did, Network, Reducer, ReducerAction, Tags};
-use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
+use co_api::{
+	co, BlockStorage, BlockStorageExt, CoId, Context, DagSet, DagSetExt, Did, Network, Reducer, ReducerAction,
+	SignedEntry, Tags,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
-// #[co_api::State]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[co(state_sync, guard, no_default)]
+#[non_exhaustive]
 pub struct Co {
 	/// CO UUID.
 	pub id: CoId,
@@ -30,6 +31,9 @@ pub struct Co {
 	/// Key: Core Instance
 	pub cores: BTreeMap<String, Core>,
 
+	/// Co Guards.
+	pub guards: BTreeMap<String, Guard>,
+
 	/// CO Encryption Keys.
 	/// The first (index: 0) key is the active key.
 	/// Keys are normally stored in the Local CO.
@@ -52,12 +56,13 @@ impl Default for Co {
 			cores: Default::default(),
 			keys: Default::default(),
 			network: Default::default(),
+			guards: Default::default(),
 		}
 	}
 }
 
-// #[co_api::Data]
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
+#[derive(Default)]
 pub struct Core {
 	/// The CID of the core binary.
 	pub binary: Cid,
@@ -69,15 +74,22 @@ pub struct Core {
 	pub state: Option<Cid>,
 }
 
-// #[co_api::Data]
-#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq)]
+#[co]
+pub struct Guard {
+	/// The CID of the guard binary.
+	pub binary: Cid,
+
+	/// Guard Tags.
+	pub tags: Tags,
+}
+
+#[co(repr)]
 #[repr(u8)]
 pub enum Architecture {
 	Wasm = 0,
 }
 
-// #[co_api::Data]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
 pub struct Participant {
 	/// The participant DID.
 	pub did: Did,
@@ -89,7 +101,7 @@ pub struct Participant {
 	pub tags: Tags,
 }
 
-#[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq)]
+#[co(repr)]
 #[repr(u8)]
 pub enum ParticipantState {
 	/// Active participant.
@@ -124,29 +136,71 @@ impl ParticipantState {
 	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
 pub struct Key {
 	pub id: String,
 	pub state: KeyState,
 }
 
-#[derive(Debug, Clone, Serialize_repr, Deserialize_repr, PartialEq)]
+#[co(repr)]
 #[repr(u8)]
 pub enum KeyState {
 	Inactive = 0,
 	Active = 1,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[co]
+#[non_exhaustive]
+pub struct CreateAction {
+	pub id: CoId,
+	pub name: String,
+	pub cores: BTreeMap<String, Core>,
+	pub guards: BTreeMap<String, Guard>,
+	pub participants: BTreeMap<Did, Participant>,
+	pub key: Option<String>,
+	pub binary: Cid,
+}
+impl CreateAction {
+	pub fn new(id: CoId, name: String, binary: Cid) -> Self {
+		Self { id, name, binary, ..Default::default() }
+	}
+
+	pub fn with_core(mut self, core_name: String, core: Core) -> Self {
+		self.cores.insert(core_name, core);
+		self
+	}
+
+	pub fn with_participant(mut self, participant: Did, tags: Tags) -> Self {
+		self.participants.insert(
+			participant.clone(),
+			Participant { did: participant.clone(), state: ParticipantState::Active, tags },
+		);
+		self
+	}
+
+	pub fn with_key(mut self, key: Option<String>) -> Self {
+		self.key = key;
+		self
+	}
+}
+impl Default for CreateAction {
+	fn default() -> Self {
+		Self {
+			id: "".into(),
+			name: Default::default(),
+			cores: Default::default(),
+			guards: Default::default(),
+			participants: Default::default(),
+			key: Default::default(),
+			binary: Default::default(),
+		}
+	}
+}
+
+#[co]
+#[non_exhaustive]
 pub enum CoAction {
-	Create {
-		id: CoId,
-		name: String,
-		cores: BTreeMap<String, Core>,
-		participants: BTreeMap<Did, Participant>,
-		key: Option<String>,
-		binary: Cid,
-	},
+	Create(CreateAction),
 	Upgrade {
 		binary: Cid,
 		migrate: Option<Cid>,
@@ -220,6 +274,27 @@ pub enum CoAction {
 		core: String,
 		tags: Tags,
 	},
+	GuardCreate {
+		guard: String,
+		binary: Cid,
+		tags: Tags,
+	},
+	GuardRemove {
+		guard: String,
+	},
+	GuardUpgrade {
+		guard: String,
+		/// The new binary.
+		binary: Cid,
+	},
+	GuardTagsInsert {
+		guard: String,
+		tags: Tags,
+	},
+	GuardTagsRemove {
+		guard: String,
+		tags: Tags,
+	},
 }
 
 impl Reducer for Co {
@@ -231,12 +306,28 @@ impl Reducer for Co {
 		result
 	}
 }
+impl<S: BlockStorage + Clone + 'static> co_api::Guard<S> for Co {
+	/// Test if next_head creator is a participant with access.
+	async fn verify(
+		storage: &S,
+		_guard: String,
+		state: Cid,
+		_heads: BTreeSet<Cid>,
+		next_head: Cid,
+	) -> Result<bool, anyhow::Error> {
+		let next_entry: SignedEntry = storage.get_deserialized(&next_head).await?;
+		let participant = next_entry.identity;
+		let co: Co = storage.get_deserialized(&state).await?;
+		Ok(co
+			.participants
+			.iter()
+			.any(|item| item.1.state.has_access() && item.0 == &participant))
+	}
+}
 
 fn reduce(context: &mut dyn Context, result: &mut Co, action: &CoAction) {
 	match &action {
-		CoAction::Create { id, name, cores, participants, key: key_id, binary } => {
-			reduce_create(result, id, name, cores, participants, key_id, binary)
-		},
+		CoAction::Create(create) => reduce_create(result, create),
 		CoAction::Upgrade { binary, migrate } => reduce_upgrade(result, binary, migrate),
 		CoAction::ParticipantInvite { participant, tags } => reduce_participant_invite(result, participant, tags),
 		CoAction::ParticipantJoin { participant, tags } => reduce_participant_join(result, participant, tags),
@@ -259,29 +350,28 @@ fn reduce(context: &mut dyn Context, result: &mut Co, action: &CoAction) {
 		CoAction::TagsRemove { tags } => reduce_tags_remove(result, tags),
 		CoAction::NetworkInsert { network } => reduce_network_insert(context, result, network),
 		CoAction::NetworkRemove { network } => reduce_network_remove(context, result, network),
+		CoAction::GuardCreate { guard, binary, tags } => reduce_guard_create(result, guard, binary, tags),
+		CoAction::GuardRemove { guard } => reduce_guard_remove(result, guard),
+		CoAction::GuardUpgrade { guard, binary } => reduce_guard_upgrade(result, guard, binary),
+		CoAction::GuardTagsInsert { guard, tags } => reduce_guard_tags_insert(result, guard, tags),
+		CoAction::GuardTagsRemove { guard, tags } => reduce_guard_tags_remove(result, guard, tags),
 	}
 }
 
-fn reduce_create(
-	result: &mut Co,
-	id: &CoId,
-	name: &String,
-	cores: &BTreeMap<String, Core>,
-	participants: &BTreeMap<String, Participant>,
-	key_id: &Option<String>,
-	binary: &Cid,
-) {
+fn reduce_create(result: &mut Co, create: &CreateAction) {
 	// only allowed for empty COs
 	// id can not be changed afterwards
 	if result.id.as_str().is_empty() {
-		result.id = id.to_owned();
-		result.name = name.to_owned();
-		result.cores = cores.to_owned();
-		result.participants = participants.to_owned();
-		result.keys = key_id
+		result.id = create.id.to_owned();
+		result.name = create.name.to_owned();
+		result.cores = create.cores.to_owned();
+		result.guards = create.guards.to_owned();
+		result.participants = create.participants.to_owned();
+		result.keys = create
+			.key
 			.as_ref()
 			.map(|key_id| vec![Key { id: key_id.to_owned(), state: KeyState::Active }]);
-		result.binary = *binary;
+		result.binary = create.binary;
 	}
 }
 
@@ -410,10 +500,32 @@ fn reduce_core_tags_remove(result: &mut Co, core: &String, tags: &Tags) {
 	}
 }
 
-// pub extern "C" fn permission() -> bool {}
+fn reduce_guard_create(result: &mut Co, guard_name: &String, binary: &Cid, tags: &Tags) {
+	if !result.guards.contains_key(guard_name) {
+		result
+			.guards
+			.insert(guard_name.clone(), Guard { binary: *binary, tags: tags.clone() });
+	}
+}
 
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-#[no_mangle]
-pub extern "C" fn state() {
-	co_api::reduce::<Co>()
+fn reduce_guard_remove(result: &mut Co, guard_name: &String) {
+	result.guards.remove(guard_name);
+}
+
+fn reduce_guard_upgrade(result: &mut Co, guard_name: &String, binary: &Cid) {
+	if let Some(guard) = result.guards.get_mut(guard_name) {
+		guard.binary = *binary;
+	}
+}
+
+fn reduce_guard_tags_insert(result: &mut Co, guard_name: &String, tags: &Tags) {
+	if let Some(guard) = result.guards.get_mut(guard_name) {
+		guard.tags.append(&mut tags.clone());
+	}
+}
+
+fn reduce_guard_tags_remove(result: &mut Co, guard_name: &String, tags: &Tags) {
+	if let Some(guard) = result.guards.get_mut(guard_name) {
+		guard.tags.clear(Some(tags));
+	}
 }

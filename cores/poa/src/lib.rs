@@ -1,16 +1,20 @@
+use anyhow::anyhow;
+use cid::Cid;
 use co_api::{
-	async_api::Reducer, co_data, co_state, BlockStorage, BlockStorageExt, CoMap, CoMapTransaction, CoSet,
-	CoSetTransaction, Did, Link, OptionLink, ReducerAction, WeakCid,
+	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoMapTransaction, CoSet, CoSetTransaction, Did,
+	Guard, Link, OptionLink, ReducerAction, SignedEntry, WeakCid,
 };
+use co_core_co::Co;
 use futures::{pin_mut, TryStreamExt};
 use num_rational::Ratio;
 use std::{
+	cmp::max,
 	collections::{BTreeMap, BTreeSet},
 	future::ready,
 };
 
 /// Authority actions.
-#[co_data]
+#[co]
 pub enum AuthorityAction {
 	/// Agree on a specific checkpoint.
 	/// The first time the a checkpoint is agreed on marks the start of a consensus round.
@@ -35,7 +39,7 @@ impl AuthorityAction {
 pub type Checkpoint = (WeakCid, BTreeSet<WeakCid>);
 
 /// Update consensus authority settings.
-#[co_data]
+#[co]
 #[derive(Default)]
 pub struct AuthorityUpdate {
 	/// Update/Insert/Remove authorities.
@@ -52,13 +56,13 @@ pub struct AuthorityUpdate {
 }
 
 /// Stores additional informations for authorities.
-#[co_data]
+#[co]
 pub struct AuthorityInfo {
 	/// The authority vote weight.
 	pub weight: u32,
 }
 
-#[co_state]
+#[co(state, guard)]
 pub struct Authority {
 	/// The authority.
 	#[serde(rename = "a", default, skip_serializing_if = "CoMap::is_empty")]
@@ -169,6 +173,48 @@ where
 		}
 		state.pending = pending.store().await?;
 		Ok(storage.set_value(&state).await?)
+	}
+}
+impl<S> Guard<S> for Authority
+where
+	S: BlockStorage + Clone + 'static,
+{
+	async fn verify(
+		storage: &S,
+		guard: String,
+		state: Cid,
+		_heads: BTreeSet<Cid>,
+		next_head: Cid,
+	) -> Result<bool, anyhow::Error> {
+		let next_entry: SignedEntry = storage.get_deserialized(&next_head).await?;
+		let co: Co = storage.get_deserialized(&state).await?;
+
+		// find co-core-poa core name
+		let guard = co.guards.get(&guard).ok_or(anyhow!("Guard not found: {}", guard))?;
+		let core_name = guard.tags.string("core").unwrap_or("poa");
+
+		// core
+		let core = co.cores.get(core_name).ok_or(anyhow!("Core not found: {}", core_name))?;
+		if let Some(state) = &core.state {
+			let authority: Authority = storage.get_deserialized(state).await?;
+			if let Some((_consensus_state, consensus_heads)) = authority.consensus {
+				// find the max consensus time (basically the log height without conflicts)
+				let mut consensus_time = 0;
+				for consensus_head in &consensus_heads {
+					let consensus_head_entry: SignedEntry = storage.get_deserialized(consensus_head.as_ref()).await?;
+					consensus_time = max(consensus_time, consensus_head_entry.entry.clock.time);
+				}
+
+				// compare if next head log time if after it
+				Ok(next_entry.entry.clock.time > consensus_time)
+			} else {
+				// no consensus yet
+				Ok(true)
+			}
+		} else {
+			// no votes and consensus yet
+			Ok(true)
+		}
 	}
 }
 

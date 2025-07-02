@@ -1,5 +1,5 @@
 use crate::{
-	services::application::ApplicationMessage, Action, CoStorage, CoreResolver, CoreResolverError, ReducerChangeContext,
+	services::application::ApplicationMessage, Action, CoStorage, CoreResolver, CoreResolverContext, CoreResolverError,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -36,7 +36,7 @@ where
 		&self,
 		storage: &S,
 		runtime: &RuntimePool,
-		context: &ReducerChangeContext,
+		context: &CoreResolverContext,
 		state: &Option<Cid>,
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
@@ -50,7 +50,7 @@ where
 		// 		.ok_or_else(|| CoreResolverError::Middleware(anyhow!("Expected a state after execute the action")))?
 		// 		.into(),
 		// ));
-		let core_action = Action::core_action(storage, self.co.clone(), context.clone(), action.into())
+		let core_action = Action::core_action(storage, self.co.clone(), context.change.clone(), action.into())
 			.await
 			.map_err(|err| CoreResolverError::Middleware(err.into()))?;
 		self.actions

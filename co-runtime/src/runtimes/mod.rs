@@ -29,8 +29,11 @@ impl From<wasmer::WasmerError> for RuntimeError {
 }
 
 pub trait Runtime {
-	/// Execute runtime with specified api.
-	fn execute(&mut self, api: CoV1Api) -> Result<RuntimeContext, RuntimeError>;
+	/// Execute state runtime with specified api.
+	fn execute_state(&mut self, api: CoV1Api) -> Result<RuntimeContext, RuntimeError>;
+
+	/// Execute guard runtime with specified api.
+	fn execute_guard(&mut self, api: CoV1Api) -> Result<bool, RuntimeError>;
 }
 
 enum RuntimeState {
@@ -48,41 +51,47 @@ impl Wasmer {
 }
 impl Runtime for Wasmer {
 	/// Execute runtime with api and return new state `Cid`.
-	fn execute(&mut self, mut api: CoV1Api) -> Result<RuntimeContext, RuntimeError> {
+	fn execute_state(&mut self, api: CoV1Api) -> Result<RuntimeContext, RuntimeError> {
 		// initialize
-		let runtime: &mut WasmerRuntime = match &mut self.state {
-			RuntimeState::Unintialized(bytes) => {
-				self.state = RuntimeState::Intialized(wasmer::WasmerRuntime::new(api, bytes)?);
-				if let RuntimeState::Intialized(runtime) = &mut self.state {
-					runtime
-				} else {
-					unreachable!("invalid state");
-				}
-			},
-			RuntimeState::Intialized(runtime) => {
-				runtime.api_mut().swap(&mut api);
-				runtime
-			},
-		};
+		let runtime: &mut WasmerRuntime = wasmer_runtime_with_api(&mut self.state, api)?;
 
 		// execute
-		runtime.execute()?;
+		runtime.execute_state()?;
 		let result = runtime.api().context().clone();
 
 		// result
 		Ok(result)
 	}
 
-	// fn pin(&mut self, pin: Option<Cid>) -> Result<Cid, RuntimeError> {
-	// 	let api = match &mut self.state {
-	// 		RuntimeState::Unintialized(_) => return Err(RuntimeError::InvalidState(anyhow!("runtime uninitialized"))),
-	// 		RuntimeState::Intialized(runtime) => runtime.api_mut(),
-	// 	};
-	// 	let state = api.state().ok_or(RuntimeError::InvalidState(anyhow!("no state")))?;
-	// 	let mapping =
-	// 		PinMapping::from_state(api.storage_mut(), state, pin).map_err(|e| RuntimeError::Internal(e.into()))?;
-	// 	Ok(mapping.pin)
-	// }
+	fn execute_guard(&mut self, api: CoV1Api) -> Result<bool, RuntimeError> {
+		// initialize
+		let runtime: &mut WasmerRuntime = wasmer_runtime_with_api(&mut self.state, api)?;
+
+		// execute
+		let result = runtime.execute_guard()?;
+
+		// result
+		Ok(result)
+	}
+}
+
+fn wasmer_runtime_with_api(state: &mut RuntimeState, mut api: CoV1Api) -> Result<&mut WasmerRuntime, RuntimeError> {
+	// initialize
+	let runtime: &mut WasmerRuntime = match state {
+		RuntimeState::Unintialized(bytes) => {
+			*state = RuntimeState::Intialized(wasmer::WasmerRuntime::new(api, bytes)?);
+			if let RuntimeState::Intialized(runtime) = state {
+				runtime
+			} else {
+				unreachable!("invalid state");
+			}
+		},
+		RuntimeState::Intialized(runtime) => {
+			runtime.api_mut().swap(&mut api);
+			runtime
+		},
+	};
+	Ok(runtime)
 }
 
 pub fn create_runtime(bytes: Vec<u8>) -> Box<dyn Runtime + Send> {

@@ -10,10 +10,10 @@ async-stream = { workspace = true }
 async-trait = { workspace = true }
 asynchronous-codec = "0.7.0"
 cid = { workspace = true }
-co-actor = { path = "../co-actor" }
-co-identity = { path = "../co-identity" }
-co-primitives = { path = "../co-primitives" }
-co-storage = { path = "../co-storage" }
+co-actor = { workspace = true }
+co-identity = { workspace = true }
+co-primitives = { workspace = true }
+co-storage = { workspace = true }
 derive_more = { workspace = true }
 did_url = "0.1.0"
 did-key = "0.2.1"

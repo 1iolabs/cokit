@@ -1,51 +1,8 @@
-use crate::Clock;
 use cid::Cid;
 use co_identity::{Identity, PrivateIdentity, SignError};
-use co_primitives::{to_cbor, Block, BlockSerializer, BlockSerializerError, CborError, StoreParams};
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Entry {
-	/// The stream id.
-	/// Todo: Do we need this?
-	#[serde(rename = "i", with = "serde_bytes")]
-	pub id: Vec<u8>,
-	#[serde(rename = "p")]
-	pub payload: Cid,
-	#[serde(rename = "n")]
-	pub next: BTreeSet<Cid>,
-	#[serde(rename = "r", default, skip_serializing_if = "BTreeSet::is_empty")]
-	pub refs: BTreeSet<Cid>,
-	#[serde(rename = "c")]
-	pub clock: Clock,
-}
-impl From<EntryBlock> for Entry {
-	fn from(val: EntryBlock) -> Self {
-		val.data.entry
-	}
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SignedEntry {
-	/// The identity.
-	#[serde(rename = "u")]
-	pub identity: String,
-
-	/// Identity public key.
-	#[serde(rename = "k", default, with = "serde_bytes", skip_serializing_if = "Option::is_none")]
-	pub public_key: Option<Vec<u8>>,
-
-	/// The identity.
-	#[serde(rename = "s", with = "serde_bytes")]
-	pub signature: Vec<u8>,
-
-	/// Entry.
-	#[serde(rename = "e")]
-	// note: this causes serde to write unbounded maps which are indefinite length maps which are not supported in
-	// DAG-CBOR. #[serde(flatten)]
-	pub entry: Entry,
-}
+use co_primitives::{
+	to_cbor, Block, BlockSerializer, BlockSerializerError, CborError, Entry, SignedEntry, StoreParams,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum EntryError {
@@ -145,9 +102,9 @@ impl Ord for EntryBlock {
 
 #[cfg(test)]
 mod tests {
-	use crate::{Clock, EntryBlock};
+	use crate::EntryBlock;
 	use co_identity::DidKeyIdentity;
-	use co_primitives::{BlockSerializer, DefaultParams};
+	use co_primitives::{BlockSerializer, Clock, DefaultParams, Entry};
 	use serde::{Deserialize, Serialize};
 
 	#[test]
@@ -166,7 +123,7 @@ mod tests {
 		let identity = Box::new(DidKeyIdentity::generate(None));
 		let entry = EntryBlock::from_entry::<DefaultParams, _>(
 			identity.as_ref(),
-			crate::Entry {
+			Entry {
 				id: vec![0],
 				payload: *block.cid(),
 				next: Default::default(),

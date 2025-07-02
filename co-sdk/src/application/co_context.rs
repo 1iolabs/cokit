@@ -5,7 +5,9 @@ use crate::{
 		shared::SharedCoBuilder,
 	},
 	library::shared_membership::shared_membership,
-	reducer::core_resolver::{dynamic::DynamicCoreResolver, epic::ReactiveCoreResolver, log::LogCoreResolver},
+	reducer::core_resolver::{
+		dynamic::DynamicCoreResolver, epic::ReactiveCoreResolver, guard::CoGuardResolver, log::LogCoreResolver,
+	},
 	services::{
 		application::ApplicationMessage,
 		connections::ConnectionMessage,
@@ -334,6 +336,7 @@ impl CoContextInner {
 	pub(crate) fn create_shared_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::default();
 		let core_resolver = ReactiveCoreResolver::new(core_resolver, id, self.reactive_context.clone());
+		let core_resolver = CoGuardResolver::new(core_resolver);
 		let core_resolver = LogCoreResolver::new(core_resolver);
 		let core_resolver = DynamicCoreResolver::new(core_resolver);
 		core_resolver

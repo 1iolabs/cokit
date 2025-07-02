@@ -11,7 +11,8 @@ crate-type = ["lib", "cdylib"]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
-co-api = { path = "../../co-api" }
+co-api = { workspace = true }
+co-core-co = { workspace = true }
 futures = { workspace = true }
 ipld-core = { workspace = true }
 num-rational = { workspace = true }

@@ -26,6 +26,10 @@ impl async_api::Context<AsyncBlockStorage> for AsyncContext {
 		&self.storage
 	}
 
+	fn payload(&self) -> Vec<u8> {
+		self.context.payload.clone()
+	}
+
 	fn event(&self) -> Cid {
 		self.context.event
 	}

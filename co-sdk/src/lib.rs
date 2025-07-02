@@ -36,7 +36,6 @@ pub use co_storage::{
 };
 pub use library::{
 	build_core::{build_core, crate_repository_path, BuildCoreArtifact},
-	core_resolver_dispatch::CoreResolverDispatch,
 	did_key_provider::DidKeyProvider,
 	find_co_by_pin::find_co_by_pin,
 	find_co_identities::{find_co_identities, find_co_private_identity},
@@ -53,7 +52,9 @@ pub use library::{
 	update_co::update_co,
 };
 pub use pin::pin::PinAPI;
-pub use reducer::core_resolver::{co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverError};
+pub use reducer::core_resolver::{
+	co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverContext, CoreResolverError,
+};
 pub use services::{
 	application::{Action, ActionError, ApplicationMessage},
 	connections::{ConnectionAction, ConnectionMessage, ReleaseAction},
@@ -75,5 +76,6 @@ pub use types::{
 		CO_CORE_ROOM,
 	},
 	error::{ErrorContext, ErrorKind, IntoAction},
+	guards::Guards,
 	reference::{Reference, Request, Response, ResponseError},
 };

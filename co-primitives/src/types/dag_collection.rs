@@ -1,4 +1,5 @@
 use crate::{Node, OptionLink};
+use co_macros::co;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
 	cmp::Ord,
@@ -60,7 +61,7 @@ where
 }
 
 /// A wrapper for DagLink types that use the BTreeSet type
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[co]
 pub struct DagSet<V: Ord>(OptionLink<Node<V>>);
 impl<V> DagCollection for DagSet<V>
 where
@@ -87,7 +88,7 @@ where
 }
 
 /// A wrapper for DagLink types that use the BTreeMap type
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[co]
 pub struct DagMap<K, V>(OptionLink<Node<(K, V)>>)
 where
 	K: Ord + Clone,

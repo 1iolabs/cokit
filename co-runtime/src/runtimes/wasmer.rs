@@ -1,6 +1,6 @@
 use crate::co_v1::{
-	diagnostic_cid_write, event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set,
-	CoV1Api,
+	diagnostic_cid_write, event_cid_read, payload_read, state_cid_read, state_cid_write, storage_block_get,
+	storage_block_set, CoV1Api,
 };
 use std::fmt::Debug;
 use wasmer::{imports, AsStoreMut, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, Store, WasmPtr};
@@ -62,10 +62,25 @@ impl WasmerRuntime {
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err, ret)]
-	pub fn execute(&mut self) -> Result<(), WasmerError> {
+	pub fn execute_state(&mut self) -> Result<(), WasmerError> {
 		let state = self.instance.exports.get_function("state").unwrap();
 		state.call(&mut self.store, &[])?;
 		Ok(())
+	}
+
+	#[tracing::instrument(level = tracing::Level::TRACE, err, ret)]
+	pub fn execute_guard(&mut self) -> Result<bool, WasmerError> {
+		let state = self.instance.exports.get_function("guard").unwrap();
+		let results = state.call(&mut self.store, &[])?;
+		if results.len() != 1 {
+			return Err(wasmer::ExportError::IncompatibleType.into());
+		}
+		let result = results
+			.first()
+			.ok_or(wasmer::ExportError::IncompatibleType)?
+			.i32()
+			.ok_or(wasmer::ExportError::IncompatibleType)?;
+		Ok(result == 1)
 	}
 
 	/// API Access.
@@ -86,6 +101,7 @@ impl WasmerRuntime {
 				"state_cid_read" => Function::new_typed_with_env(store, env, wasmer_state_cid_read),
 				"state_cid_write" => Function::new_typed_with_env(store, env, wasmer_state_cid_write),
 				"event_cid_read" => Function::new_typed_with_env(store, env, wasmer_event_cid_read),
+				"payload_read" => Function::new_typed_with_env(store, env, wasmer_payload_read),
 				"diagnostic_cid_write" => Function::new_typed_with_env(store, env, wasmer_diagnostic_cid_write),
 			}
 		}
@@ -138,6 +154,20 @@ fn wasmer_storage_block_set(
 		.expect("pointer in bounds");
 	storage_block_set(&mut data.api, cid_access.as_ref(), buffer_access.as_ref()).expect("API")
 }
+
+fn wasmer_payload_read(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, buffer_size: u32, offset: u32) -> u32 {
+	let (data, store) = env.data_and_store_mut();
+	let memory = data.memory.as_ref().unwrap().view(&store);
+	let mut buffer_access = buffer
+		.slice(&memory, buffer_size)
+		.expect("pointer in bounds")
+		.access()
+		.expect("pointer in bounds");
+	payload_read(&mut data.api, buffer_access.as_mut(), offset)
+		.try_into()
+		.expect("API")
+}
+
 fn wasmer_state_cid_read(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, buffer_size: u32) -> u32 {
 	let (data, store) = env.data_and_store_mut();
 	let memory = data.memory.as_ref().unwrap().view(&store);
