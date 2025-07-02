@@ -1,12 +1,14 @@
 use crate::ReducerChangeContext;
 use async_trait::async_trait;
 use cid::Cid;
+use co_log::EntryBlock;
 use co_runtime::{ExecuteError, RuntimeContext, RuntimePool};
 use co_storage::StorageError;
 
 pub mod co;
 pub mod dynamic;
 pub mod epic;
+pub mod guard;
 pub mod log;
 pub mod membership;
 pub mod single;
@@ -27,13 +29,14 @@ pub trait CoreResolver<S> {
 		&self,
 		storage: &S,
 		runtime: &RuntimePool,
-		context: &ReducerChangeContext,
+		context: &CoreResolverContext,
 		state: &Option<Cid>,
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError>;
 }
 
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum CoreResolverError {
 	/// Storage error.
 	#[error("Storage error")]
@@ -54,4 +57,17 @@ pub enum CoreResolverError {
 	/// A core resolver middleware reported an error (usually before or after executing).
 	#[error("Execute core failed: {0}")]
 	Middleware(#[source] anyhow::Error),
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct CoreResolverContext {
+	pub entry: EntryBlock,
+	pub change: ReducerChangeContext,
+}
+impl CoreResolverContext {
+	/// Whether this change was caused locally.
+	pub fn is_local_change(&self) -> bool {
+		self.change.is_local_change()
+	}
 }

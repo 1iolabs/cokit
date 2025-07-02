@@ -1,6 +1,6 @@
 use crate::{
-	library::runtime_dispatch::RuntimeDispatch, types::co_dispatch::CoDispatch, CoreResolver, CoreResolverError, Cores,
-	ReducerChangeContext, CO_CORE_NAME_CO,
+	library::runtime_dispatch::RuntimeDispatch, types::co_dispatch::CoDispatch, CoreResolver, CoreResolverContext,
+	CoreResolverError, Cores, CO_CORE_NAME_CO,
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -176,7 +176,7 @@ where
 		&self,
 		storage: &S,
 		runtime: &RuntimePool,
-		_context: &ReducerChangeContext,
+		_context: &CoreResolverContext,
 		state: &Option<Cid>,
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
@@ -186,7 +186,7 @@ where
 
 		// apply to state
 		let mut result = runtime
-			.execute(storage, &core, RuntimeContext::new(core_state, action.into()))
+			.execute_state(storage, &core, RuntimeContext::new(core_state, action.into()))
 			.await
 			.map_err(|e| CoreResolverError::Execute(core_name.clone(), e))?;
 

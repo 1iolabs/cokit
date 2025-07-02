@@ -99,7 +99,7 @@ impl Log {
 	}
 
 	/// Push item as new entry.
-	pub async fn push<S, I>(&mut self, storage: &S, identity: &I, item: Cid) -> Result<Link<Entry>, LogError>
+	pub async fn push<S, I>(&mut self, storage: &S, identity: &I, item: Cid) -> Result<EntryBlock, LogError>
 	where
 		S: BlockStorage + Clone + 'static,
 		I: PrivateIdentity + Send + Sync,
@@ -129,7 +129,7 @@ impl Log {
 		self.heads_set([entry_cid].into_iter());
 
 		// result
-		Ok(entry_cid.into())
+		Ok(entry_block)
 	}
 
 	/// Push serializable item as new entry.
@@ -139,7 +139,7 @@ impl Log {
 		storage: &S,
 		identity: &I,
 		item: &T,
-	) -> Result<(Link<Entry>, Link<T>), LogError>
+	) -> Result<(EntryBlock, Link<T>), LogError>
 	where
 		S: BlockStorage + Clone + 'static,
 		T: Serialize + Send + Sync + Clone,

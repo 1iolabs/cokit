@@ -53,7 +53,7 @@ where
 		// apply
 		let result = self
 			.runtime
-			.execute(&self.storage, &self.core, RuntimeContext::new(self.state, action_cid.into()))
+			.execute_state(&self.storage, &self.core, RuntimeContext::new(self.state, action_cid.into()))
 			.await
 			.map_err(|e| CoreResolverError::Execute(self.core_name.clone(), e))?;
 

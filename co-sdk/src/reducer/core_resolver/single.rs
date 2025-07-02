@@ -1,4 +1,4 @@
-use crate::{CoreResolver, CoreResolverError, ReducerChangeContext};
+use crate::{CoreResolver, CoreResolverContext, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
 use co_runtime::{Core, RuntimeContext, RuntimePool};
@@ -22,12 +22,12 @@ where
 		&self,
 		storage: &S,
 		runtime: &RuntimePool,
-		_context: &ReducerChangeContext,
+		_context: &CoreResolverContext,
 		state: &Option<Cid>,
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
 		Ok(runtime
-			.execute(storage, &self.core, RuntimeContext::new(*state, action.into()))
+			.execute_state(storage, &self.core, RuntimeContext::new(*state, action.into()))
 			.await
 			.map_err(|e| CoreResolverError::Execute("root".to_owned(), e))?)
 	}

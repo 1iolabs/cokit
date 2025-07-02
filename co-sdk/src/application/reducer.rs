@@ -1,4 +1,6 @@
-use crate::{library::create_reducer_action::create_reducer_action, CoDate, CoreResolver, DynamicCoDate};
+use crate::{
+	library::create_reducer_action::create_reducer_action, CoDate, CoreResolver, CoreResolverContext, DynamicCoDate,
+};
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use cid::Cid;
@@ -311,7 +313,7 @@ where
 		}
 
 		// apply to log
-		let _entry = self
+		let entry = self
 			.log
 			.push(storage, identity, *action_link.cid())
 			.await
@@ -323,17 +325,18 @@ where
 		// println!("entry = {:?}", ipld);
 
 		// apply to state
-		let change_context = ReducerChangeContext { cause: ReducerChangeCause::Push };
+		let context = CoreResolverContext { change: ReducerChangeContext { cause: ReducerChangeCause::Push }, entry };
 		let runtime_context = self
 			.core_resolver
-			.execute(storage, runtime, &change_context, &self.state, action_link.cid())
+			.execute(storage, runtime, &context, &self.state, action_link.cid())
 			.await
 			.with_context(|| {
 				format!(
-					"runtime execute core: {}, state: {:?}, action: {:?}",
+					"runtime execute core: {}, state: {:?}, action: {:?}, head: {:?}",
 					action.core,
 					self.state,
 					action_link,
+					context.entry.cid(),
 					// to_json_string(&action.payload)
 				)
 			})?;
@@ -344,7 +347,7 @@ where
 			tracing::trace!(
 				co = self.log.id_string(),
 				previous_state = ?self.state,
-				head = ?_entry.cid(),
+				head = ?context.entry.cid(),
 				next_state = ?runtime_context.state,
 				"compute-state-push",
 			);
@@ -367,7 +370,7 @@ where
 		self.heads = self.log.heads_iter().cloned().collect();
 
 		// notify
-		self.on_state_changed(storage, &change_context).await?;
+		self.on_state_changed(storage, &context.change).await?;
 
 		// result
 		Ok(runtime_context.state)
@@ -449,10 +452,14 @@ where
 		for entry in stack {
 			let _previous_state = state;
 
+			// context
+			let action = entry.entry().payload;
+			let context = CoreResolverContext { change: context.clone(), entry };
+
 			// apply
 			state = self
 				.core_resolver
-				.execute(storage, runtime, context, &state, &entry.entry().payload)
+				.execute(storage, runtime, &context, &state, &action)
 				.await?
 				.state;
 
@@ -462,7 +469,7 @@ where
 				tracing::trace!(
 					co = self.log.id_string(),
 					previous_state = ?_previous_state,
-					head = ?entry.cid(),
+					head = ?context.entry.cid(),
 					next_state = ?state,
 					"compute-state-join",
 				);

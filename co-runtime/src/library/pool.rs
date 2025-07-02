@@ -1,4 +1,7 @@
-use crate::{co_v1::CoV1Api, runtimes::RuntimeError, ApiContext, AsyncContext, Core, RuntimeContext, RuntimeInstance};
+use crate::{
+	co_v1::CoV1Api, runtimes::RuntimeError, types::guard::GuardReference, ApiContext, AsyncContext, Core,
+	RuntimeContext, RuntimeInstance,
+};
 use cid::Cid;
 use co_storage::{BlockStorage, StorageError, StoreParamsBlockStorage, SyncBlockStorage};
 use std::{
@@ -58,7 +61,7 @@ impl RuntimePool {
 		self.pool.lock().unwrap().insert(runtime_instance);
 	}
 
-	pub async fn execute<S>(
+	pub async fn execute_state<S>(
 		&self,
 		storage: &S,
 		core: &Core,
@@ -124,6 +127,68 @@ impl RuntimePool {
 				tokio::task::spawn_blocking(move || -> Result<RuntimeContext, RuntimeError> {
 					// Todo: handle panics to not crash the host
 					Ok(execute(api).context())
+				})
+				.await
+				.map_err(|e| ExecuteError::Other(e.into()))??
+			},
+		};
+
+		// result
+		Ok(result)
+	}
+
+	pub async fn execute_guard<S>(
+		&self,
+		storage: &S,
+		guard: &GuardReference,
+		context: RuntimeContext,
+	) -> Result<bool, ExecuteError>
+	where
+		S: BlockStorage + Send + Sync + Clone + 'static,
+	{
+		#[cfg(debug_assertions)]
+		let checked = false;
+		#[cfg(not(debug_assertions))]
+		let checked = false;
+
+		// execute
+		let result = match guard {
+			GuardReference::Wasm(core) => {
+				// get/create instance
+				let pool_instance = self.get_runtime_instance(core);
+				let mut instance = match pool_instance {
+					Some(i) => i,
+					None => RuntimeInstance::create(storage, core).await?,
+				};
+
+				// api
+				let api = create_cov1_api(storage, context, checked);
+
+				// execute
+				let (result, instance) =
+					tokio::task::spawn_blocking(move || -> Result<(bool, RuntimeInstance), RuntimeError> {
+						let result = instance.runtime_mut().execute_guard(api)?;
+						Ok((result, instance))
+					})
+					.await
+					.map_err(|e| ExecuteError::Other(e.into()))??;
+
+				// pool instance
+				self.reuse_runtime_instance(instance);
+
+				// result
+				result
+			},
+			GuardReference::Native(f) => {
+				// api
+				let api = AsyncContext::new(storage.clone(), context, checked);
+
+				// execute
+				let execute = f.clone();
+				tokio::task::spawn_blocking(move || -> Result<bool, RuntimeError> {
+					// Todo: handle panics to not crash the host
+					let result = execute(api);
+					Ok(result)
 				})
 				.await
 				.map_err(|e| ExecuteError::Other(e.into()))??
