@@ -12,6 +12,10 @@ extern "C" {
 	/// Write block.
 	pub fn storage_block_set(cid: *const u8, cid_size: u32, buffer: *const u8, buffer_size: u32) -> u32;
 
+	/// Read binary runtime payload.
+	/// Returns the total byte length of the payload.
+	pub fn payload_read(buffer: *mut u8, buffer_size: u32, offset: u32) -> u32;
+
 	/// Read state CID.
 	/// Returns the byte length of the cid.
 	/// If the buffer_size is smaller than the returned byte length only the the first bytes until buffer_size are
@@ -38,31 +42,46 @@ extern "C" {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub extern "C" fn storage_block_get(_cid: *const u8, _cid_size: u32, _buffer: *mut u8, _buffer_size: u32) -> u32 {
+pub unsafe extern "C" fn storage_block_get(
+	_cid: *const u8,
+	_cid_size: u32,
+	_buffer: *mut u8,
+	_buffer_size: u32,
+) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub extern "C" fn storage_block_set(_cid: *const u8, _cid_size: u32, _buffer: *const u8, _buffer_size: u32) -> u32 {
+pub unsafe extern "C" fn storage_block_set(
+	_cid: *const u8,
+	_cid_size: u32,
+	_buffer: *const u8,
+	_buffer_size: u32,
+) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub extern "C" fn state_cid_read(_buffer: *mut u8, _buffer_size: u32) -> u32 {
+pub unsafe extern "C" fn payload_read(_buffer: *mut u8, _buffer_size: u32, _offset: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub extern "C" fn state_cid_write(_buffer: *const u8, _buffer_size: u32) -> u32 {
+pub unsafe extern "C" fn state_cid_read(_buffer: *mut u8, _buffer_size: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub extern "C" fn event_cid_read(_buffer: *mut u8, _buffer_size: u32) -> u32 {
+pub unsafe extern "C" fn state_cid_write(_buffer: *const u8, _buffer_size: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub extern "C" fn diagnostic_cid_write(_buffer: *const u8, _buffer_size: u32) -> u32 {
+pub unsafe extern "C" fn event_cid_read(_buffer: *mut u8, _buffer_size: u32) -> u32 {
+	panic!("only available for target_arch = \"wasm32\"");
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub unsafe extern "C" fn diagnostic_cid_write(_buffer: *const u8, _buffer_size: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }

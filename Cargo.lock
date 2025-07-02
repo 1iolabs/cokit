@@ -1667,6 +1667,7 @@ dependencies = [
  "async-trait",
  "cid 0.11.1",
  "co-api",
+ "co-core-co",
  "futures",
  "ipld-core",
  "num-rational",

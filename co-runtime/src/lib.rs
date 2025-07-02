@@ -18,4 +18,5 @@ pub use types::{
 	},
 	context::RuntimeContext,
 	core::Core,
+	guard::GuardReference,
 };

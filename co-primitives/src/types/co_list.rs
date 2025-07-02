@@ -2,7 +2,7 @@ use super::lazy_transaction::Transactionable;
 use crate::{library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures::{future::Either, Stream, StreamExt, TryStreamExt};
 use num_rational::Ratio;
 use serde::{
 	de::{DeserializeOwned, Error},
@@ -116,6 +116,17 @@ where
 				yield item?;
 			}
 		}
+	}
+
+	/// Convenience method to load all or `limit` entries into memory.
+	pub async fn vec<S>(&self, storage: &S, limit: Option<usize>) -> Result<Vec<V>, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		let transaction = self.open(storage).await?;
+		let stream = transaction.stream().map_ok(|(_index, value)| value);
+		let stream = if let Some(limit) = limit { Either::Left(stream.take(limit)) } else { Either::Right(stream) };
+		stream.try_collect().await
 	}
 
 	pub async fn insert<S>(&mut self, storage: &S, index: CoListIndex, value: V) -> Result<CoListIndex, StorageError>

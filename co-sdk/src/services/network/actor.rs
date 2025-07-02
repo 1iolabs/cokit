@@ -26,6 +26,11 @@ impl NetworkSettings {
 		self
 	}
 
+	pub fn with_listen_from_string(mut self, listen: &str) -> Result<Self, anyhow::Error> {
+		self.listen = Some(listen.parse()?);
+		Ok(self)
+	}
+
 	pub fn with_localhost(mut self) -> Self {
 		self.listen = Some("/ip4/127.0.0.1/tcp/0".parse().unwrap());
 		self

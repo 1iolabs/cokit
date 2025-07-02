@@ -2,7 +2,6 @@ pub mod all_tags;
 pub mod build_core;
 pub mod cancel;
 pub mod connections_peer_provider;
-pub mod core_resolver_dispatch;
 pub mod create_reducer_action;
 pub mod did_key_provider;
 pub mod extract_next_heads;

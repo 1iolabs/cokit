@@ -2,8 +2,7 @@ mod library;
 mod types;
 
 pub use library::{
-	clock::Clock,
-	entry::{Entry, EntryBlock, EntryError, SignedEntry},
+	entry::{EntryBlock, EntryError},
 	log::Log,
 	stream::{create_stream, LogIterator},
 };

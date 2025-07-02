@@ -18,6 +18,7 @@ use std::{
 };
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum Action {
 	/// Push core action.
 	CoreActionPush { co: CoId, action: ReducerAction<Ipld> },
@@ -138,7 +139,7 @@ pub enum Action {
 		/// Only process given co.
 		co: Option<CoId>,
 
-		/// Whether the queue is now empty.
+		/// Whether the queue is now empty (if specified for the given `co`).
 		is_empty: bool,
 
 		/// Retry count.
@@ -326,6 +327,7 @@ pub struct CoDidCommSendAction {
 /// Notification. This indicates state updates to previous actions.
 /// Serializable to allow to delay them.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum NotifyAction {
 	/// A join message has been sent.
 	JoinSent {

@@ -1,7 +1,7 @@
 use cid::Cid;
 use co_identity::{DidKeyIdentity, DidKeyIdentityResolver, IdentityResolverBox, PrivateIdentity};
-use co_log::{Entry, Log};
-use co_primitives::{BlockSerializer, Link};
+use co_log::{EntryBlock, Log};
+use co_primitives::BlockSerializer;
 use co_storage::{BlockStorage, MemoryBlockStorage};
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
@@ -153,14 +153,14 @@ async fn create_empty_log() -> Log {
 	Log::new("test".as_bytes().to_vec(), IdentityResolverBox::new(DidKeyIdentityResolver::new()), Default::default())
 }
 
-async fn log_push<S, I>(storage: &S, log: &mut Log, identity: &I, t: &str) -> (Cid, Link<Entry>)
+async fn log_push<S, I>(storage: &S, log: &mut Log, identity: &I, t: &str) -> (Cid, EntryBlock)
 where
 	S: BlockStorage + Clone + Send + Sync + 'static,
 	I: PrivateIdentity + Send + Sync,
 {
-	let block = create_event(storage, t).await;
-	let entry = log.push(storage, identity, block).await.unwrap();
-	(block, entry)
+	let event = create_event(storage, t).await;
+	let entry = log.push(storage, identity, event).await.unwrap();
+	(event, entry)
 }
 
 async fn create_event<S: BlockStorage + Send + Sync>(storage: &S, t: &str) -> Cid {

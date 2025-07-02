@@ -11,8 +11,8 @@ crate-type = ["lib"]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
-co-core-keystore = { path = "../cores/keystore" }
-co-primitives = { path = "../co-primitives" }
+co-core-keystore = { workspace = true }
+co-primitives = { workspace = true }
 did-key = { version = "0.2.1", git = "https://github.com/dkuhnert/did-key.rs.git" }
 didcomm-rs = { version = "0.7.2", git = "https://github.com/dkuhnert/didcomm-rs.git" }
 futures = { workspace = true }

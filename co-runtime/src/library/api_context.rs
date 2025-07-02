@@ -26,6 +26,10 @@ impl Context for ApiContext {
 		&mut self.api
 	}
 
+	fn payload(&self) -> Vec<u8> {
+		self.api.payload().to_vec()
+	}
+
 	fn event(&self) -> Cid {
 		*self.api.event()
 	}

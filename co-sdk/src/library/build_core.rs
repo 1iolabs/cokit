@@ -3,6 +3,7 @@ use cid::Cid;
 use co_storage::{unixfs_add_file, BlockStorage};
 use serde::Deserialize;
 use std::{
+	fmt::{Debug, Display},
 	fs::read,
 	io::ErrorKind,
 	path::{Path, PathBuf},
@@ -136,8 +137,22 @@ struct CargoPackage {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("Build core failed")]
 struct BuildError {
 	core_path: PathBuf,
 	output: Output,
+}
+impl Display for BuildError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let stdout = std::str::from_utf8(&self.output.stdout)
+			.map(|s| s.to_owned())
+			.unwrap_or_else(|_| format!("{:02X?}", &self.output.stdout));
+		let stderr = std::str::from_utf8(&self.output.stderr)
+			.map(|s| s.to_owned())
+			.unwrap_or_else(|_| format!("{:02X?}", &self.output.stderr));
+		let output = format!(
+			"Build core failed.\nstatus: {:?}\ncore: {:?}\nstdout:\n{}\nstderr:\n{}",
+			self.output.status, self.core_path, stdout, stderr
+		);
+		f.write_str(&output)
+	}
 }
