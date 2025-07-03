@@ -25,7 +25,6 @@ use co_actor::ActorHandle;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
 use co_primitives::{tags, CloneWithBlockStorageSettings, OptionMappedCid};
-use co_runtime::RuntimePool;
 use co_storage::{
 	BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, ExtendedBlockStorage,
 };
@@ -211,12 +210,8 @@ where
 		}
 
 		// create reducer
-		let mut reducer = builder.build(&storage, runtime.runtime(), date).await?;
-
-		// create empty
-		if reducer.is_empty() {
-			setup_local_co(&storage, runtime.runtime(), &local_co.identity, &mut reducer, &local_co.settings).await?;
-		}
+		let reducer = builder.build(&storage, runtime.runtime(), date).await?;
+		let initial = reducer.is_empty();
 
 		// flush
 		let flush = result.clone();
@@ -240,6 +235,11 @@ where
 			context,
 			Box::new(flush),
 		)?;
+
+		// setup
+		if initial {
+			setup_local_co(&co_reducer, &local_co.identity, &local_co.settings).await?;
+		}
 
 		// watch
 		if watcher {
@@ -509,18 +509,14 @@ where
 }
 
 /// Setup the Local CO by adding cores.
-#[tracing::instrument(level = tracing::Level::TRACE, err, skip(runtime, reducer, storage))]
-async fn setup_local_co<S, R>(
-	storage: &S,
-	runtime: &RuntimePool,
+#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(reducer))]
+async fn setup_local_co(
+	reducer: &CoReducer,
 	identity: &LocalIdentity,
-	reducer: &mut Reducer<S, R>,
 	settings: &ApplicationSettings,
-) -> Result<(), anyhow::Error>
-where
-	S: ExtendedBlockStorage + Sync + Send + Clone + 'static,
-	R: CoreResolver<S> + Send + Sync + 'static,
-{
+) -> Result<(), anyhow::Error> {
+	let storage = reducer.storage();
+
 	// create
 	let create = co_core_co::CreateAction::new(
 		CO_ID_LOCAL.into(),
@@ -552,13 +548,13 @@ where
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_STORAGE).expect(CO_CORE_STORAGE),
 			tags: tags!("core": CO_CORE_STORAGE),
-			state: create_storage_core_state(storage, settings).await?,
+			state: create_storage_core_state(&storage, settings).await?,
 		},
 	);
 
 	// create
 	let action = co_core_co::CoAction::Create(create);
-	reducer.push(storage, runtime, identity, CO_CORE_NAME_CO, &action).await?;
+	reducer.push(identity, CO_CORE_NAME_CO, &action).await?;
 
 	// done
 	Ok(())

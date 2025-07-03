@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 /// Creats a temporary directory which will be deleted when the instance is dropped.
 pub struct TmpDir {
 	clean: bool,
+	uuid: String,
 	path: PathBuf,
 }
 impl TmpDir {
@@ -16,9 +17,15 @@ impl TmpDir {
 
 	/// Create a tmp dir using a custom prefix.
 	pub fn try_new(prefix: &str) -> std::io::Result<Self> {
-		let path = std::env::temp_dir().join(prefix).join(uuid::Uuid::new_v4().to_string());
+		let uuid = uuid::Uuid::new_v4().to_string();
+		let path = std::env::temp_dir().join(prefix).join(&uuid);
 		std::fs::create_dir_all(&path)?;
-		Ok(Self { path, clean: false })
+		Ok(Self { path, clean: false, uuid })
+	}
+
+	/// The uuid of the tmp dir.
+	pub fn uuid(&self) -> &str {
+		&self.uuid
 	}
 
 	/// Path of the tmp dir.

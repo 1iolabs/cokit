@@ -60,8 +60,10 @@ where
 		Self { initialize, ..self }
 	}
 
+	/// Use state/heads as lastest.
+	/// This will also disable the initialize because we know the latest state already.
 	pub fn with_latest_state(self, state: Cid, heads: BTreeSet<Cid>) -> Self {
-		Self { state: Some(state), heads, ..self }
+		Self { state: Some(state), heads, initialize: false, ..self }
 	}
 
 	pub fn with_snapshot(self, state: Cid, heads: BTreeSet<Cid>) -> Self {
@@ -174,6 +176,13 @@ where
 
 		// if we have state and heads we are fine
 		Ok(())
+	}
+
+	/// (Re)sets the reducer and the log to a given state.
+	pub fn set_reducer_state(&mut self, state: Option<Cid>, heads: BTreeSet<Cid>) {
+		self.log.set_heads(heads.clone());
+		self.state = state;
+		self.heads = heads;
 	}
 
 	pub fn into_log(self) -> Log {
