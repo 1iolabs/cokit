@@ -87,6 +87,8 @@ docs:
   image: ${DOCKERFILE_IMAGE}
   cache:
     <<: *global_cache
+  before_script:
+    - cargo install "mdbook@0.4.51"
   script:
     - mdbook build docs
   artifacts:
