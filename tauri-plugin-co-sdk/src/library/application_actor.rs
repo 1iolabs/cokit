@@ -49,6 +49,8 @@ pub struct ApplicationActorState {
 	application: Application,
 	sessions: HashMap<SessionId, Session>,
 }
+
+#[derive(Debug)]
 pub enum ApplicationActorMessage {
 	SessionOpen(CoId, Response<Result<SessionId, ActorError>>),
 	SessionClose(SessionId),
@@ -83,6 +85,7 @@ pub struct CreateIdentityRequest {
 	pub seed: Option<Vec<u8>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateCoRequest {
 	pub creator_did: String,
 	pub co_id: CoId,
@@ -113,6 +116,7 @@ impl Actor for ApplicationActor {
 		message: Self::Message,
 		state: &mut Self::State,
 	) -> Result<(), ActorError> {
+		tracing::debug!(name: "application_handle", "actor handle function called with message {:#?}", message);
 		match message {
 			ApplicationActorMessage::SessionOpen(co_id, response) => {
 				response

@@ -5,6 +5,7 @@ import { get_actions, pushAction, resolveCid, sessionClose, sessionOpen } from "
 import GroupDefaultPic from "../../../assets/Users_48.svg";
 import { createCoSdkStateEventListener } from "../../../library/co-sdk-state-listener.js";
 import { buildCoCoreId } from "../../../library/core-id.js";
+import { getFilteredCoreIds } from "../../../library/invoke-get.js";
 import { ChatsListActionType, ChatsListAddChatAction, ChatsListUpdateChatAction } from "../actions/index.js";
 import { ChatsListEpicType } from "../types/plugin.js";
 
@@ -15,6 +16,7 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
             withLatestFrom(state$),
             mergeMap(async ([event, state]) => {
                 const [coId, _, heads] = event.payload;
+                // if (coId === "local") { return EMPTY }
                 let sessionId = await sessionOpen(coId);
                 const log = (await get_actions(sessionId, heads, 1, undefined)).actions;
                 const actions: Action[] = [];
@@ -23,7 +25,7 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
                     const payload = action.p;
                     console.log("Action pushed: ", coId, action);
                     if (coId === "local" && state.identity !== undefined) {
-                        actions.push(...(await handleLocalCoAction(action, state.identity)))
+                        actions.push(...(await handleLocalCoAction(action, state.identity)));
                         continue;
                     }
 
@@ -94,20 +96,56 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
 async function handleLocalCoAction(action: any, ownIdentity: string): Promise<Action[]> {
     if (action.c === "membership") {
         if (action.p?.Join !== undefined) {
+            // only continue if we are the invited did
+            if (action.p.Join.did != ownIdentity) { return [] }
             // only continue if the join action is on invite state
-            if (action.p.Join.membership_state !== 2) { return []; }
+            if (action.p.Join.membership_state !== 2) { return [] }
             // accept join action
             const joinAction = {
-                id: action.p.Join.id,
-                did: ownIdentity,
-                membership_state: 0,
+                ChangeMembershipState: {
+                    id: action.p.Join.id,
+                    did: ownIdentity,
+                    membership_state: 3,
+                }
             };
             console.log("accept action", joinAction);
-            const session = await sessionOpen("local");
-            await pushAction(session, "membership", joinAction, ownIdentity);
-            await sessionClose(session);
-        }
+            try {
 
+                const session = await sessionOpen("local");
+                await pushAction(session, "membership", joinAction, ownIdentity);
+                await sessionClose(session);
+            } catch (e) { console.log(e) }
+        }
+        if (action.p?.ChangeMembershipState !== undefined) {
+            const changeMemberAction = action.p?.ChangeMembershipState;
+
+            // only actions that added us are relevant
+            if (changeMemberAction.did !== ownIdentity) { return [] }
+
+            // only continue if join accepted
+            if (changeMemberAction.membership_state !== 0) { return [] }
+
+            // get all room cores of joined co
+            const roomCoreIds = await getFilteredCoreIds(["core", "co-core-room"], changeMemberAction.id);
+
+            // get chats
+            const addChatActions: ChatsListAddChatAction[] = [];
+            for (const roomCoreId of roomCoreIds) {
+                addChatActions.push(identity<ChatsListAddChatAction>({
+                    payload: {
+                        chat: {
+                            avatar: GroupDefaultPic,
+                            id: roomCoreId,
+                            name: "", // TODO
+                            newMessages: 0
+                        }
+                    },
+                    type: ChatsListActionType.AddChat
+                }));
+            }
+            return addChatActions;
+        }
     }
     return [];
 }
+
