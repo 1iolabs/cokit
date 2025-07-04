@@ -272,6 +272,7 @@ async fn flush(
 			.flush(
 				base_storage,
 				&mut reducer_state.reducer,
+				&flush_info,
 				new_roots.into_iter().filter(|root| !root.is_empty()).collect(),
 				removed_blocks,
 			)

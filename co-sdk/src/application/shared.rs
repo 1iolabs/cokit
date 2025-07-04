@@ -10,7 +10,10 @@ use crate::{
 		core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
 	},
 	services::{
-		connections::ConnectionMessage, network::CoNetworkTaskSpawner, reducer::ReducerFlush, reducers::ReducerStorage,
+		connections::ConnectionMessage,
+		network::CoNetworkTaskSpawner,
+		reducer::{FlushInfo, ReducerFlush},
+		reducers::ReducerStorage,
 	},
 	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
 	ApplicationMessage, CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters,
@@ -274,6 +277,7 @@ impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 		&mut self,
 		storage: &CoStorage,
 		reducer: &mut Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
+		_info: &FlushInfo,
 		_new_roots: Vec<CoReducerState>,
 		_removed_blocks: BTreeSet<OptionMappedCid>,
 	) -> anyhow::Result<()> {

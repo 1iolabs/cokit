@@ -10,7 +10,7 @@ use crate::{
 		locals::{ApplicationLocal, FileLocals, Locals, MemoryLocals},
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
-	services::reducer::ReducerFlush,
+	services::reducer::{FlushInfo, ReducerFlush},
 	types::{
 		co_reducer_context::{CoReducerContext, CoReducerFeature},
 		co_reducer_state::MappedCoReducerState,
@@ -415,12 +415,13 @@ where
 		&mut self,
 		storage: &S,
 		reducer: &mut Reducer<S, R>,
+		info: &FlushInfo,
 		_new_roots: Vec<CoReducerState>,
 		_removed_blocks: BTreeSet<OptionMappedCid>,
 	) -> anyhow::Result<()> {
 		// write references
 		#[cfg(feature = "pinning")]
-		{
+		if info.local {
 			let new_roots = _new_roots;
 			let removed_blocks = _removed_blocks;
 			let (last_reducer_state, context) = &self.pinning;
