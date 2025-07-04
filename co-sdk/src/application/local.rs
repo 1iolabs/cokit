@@ -406,6 +406,11 @@ where
 		+ 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
+	/// Flush changed nodes.
+	///
+	/// # Pinning
+	/// We need to write intermediate states/heads to in order to have them recycled eventually.
+	/// When we rect this point they alredy has been flushed to the permananet storage.
 	async fn flush(
 		&mut self,
 		storage: &S,
