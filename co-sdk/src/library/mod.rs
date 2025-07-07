@@ -1,5 +1,4 @@
 pub mod all_tags;
-pub mod backoff;
 pub mod build_core;
 pub mod cancel;
 pub mod connections_peer_provider;

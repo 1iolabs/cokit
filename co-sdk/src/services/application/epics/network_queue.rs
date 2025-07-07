@@ -1,16 +1,14 @@
 use crate::{
-	library::{
-		backoff::backoff_with_jitter,
-		network_queue::{
-			network_queue_action, network_queue_backlog, network_queue_message, network_queue_task_complete,
-			network_queue_task_doing,
-		},
+	library::network_queue::{
+		network_queue_action, network_queue_backlog, network_queue_message, network_queue_task_complete,
+		network_queue_task_doing,
 	},
 	network::PeersNetworkTask,
 	Action, CoContext, CoUuid,
 };
 use co_actor::{Actions, Epic};
 use co_identity::PrivateIdentity;
+use co_network::backoff_with_jitter;
 use co_primitives::{CoId, CoTryStreamExt};
 use futures::{future::Either, stream, FutureExt, Stream, StreamExt};
 use std::{collections::BTreeSet, future::ready};

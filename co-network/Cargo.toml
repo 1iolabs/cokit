@@ -25,6 +25,7 @@ libp2p-bitswap = { version = "0.25.0", git = "https://github.com/dkuhnert/libp2p
     "compat",
 ] }
 pin-project = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
