@@ -110,7 +110,9 @@ impl Actor for ApplicationActor {
 					async move {
 						let changed = application.handle().stream(ApplicationMessage::Subscribe).filter_map(|action| {
 							ready(match action {
-								Ok(Action::CoreAction { co, storage: _, context: _, action: _, cid: _ }) => Some(co),
+								Ok(Action::CoreAction { co, storage: _, context: _, action: _, cid: _, head: _ }) => {
+									Some(co)
+								},
 								_ => None,
 							})
 						});

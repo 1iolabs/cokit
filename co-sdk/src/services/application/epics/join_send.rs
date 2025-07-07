@@ -22,7 +22,7 @@ pub fn join_send(
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	// filter
 	let result = match action {
-		Action::CoreAction { co, storage, context: _, action, cid: _ }
+		Action::CoreAction { co, storage, context: _, action, cid: _, head: _ }
 			if co.as_str() == CO_ID_LOCAL && CO_CORE_NAME_MEMBERSHIP == action.core =>
 		{
 			let mambership_action: MembershipsAction = action.get_payload().ok()?;

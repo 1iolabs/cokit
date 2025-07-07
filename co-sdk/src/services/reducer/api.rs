@@ -1,5 +1,6 @@
 use super::{flush::CoReducerFlush, message::ReducerMessage, ReducerActor};
 use crate::{
+	application::memory::create_memory_reducer,
 	library::create_reducer_action::{create_reducer_action, store_reducer_action},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{co_dispatch::CoDispatch, co_reducer_context::CoReducerContextRef, co_reducer_state::CoReducerState},
@@ -26,6 +27,7 @@ pub struct CoReducer {
 	overlay_storage: Option<OverlayBlockStorage<CoStorage>>,
 	pub(crate) context: CoReducerContextRef,
 	date: DynamicCoDate,
+	runtime: Runtime,
 }
 impl CoReducer {
 	pub(crate) fn spawn(
@@ -44,10 +46,10 @@ impl CoReducer {
 		let actor = Actor::spawn_with(
 			tasks.clone(),
 			tags!("application": application_identifier, "co": id.as_str()),
-			ReducerActor::new(id.clone(), runtime, application_handle, context.clone()),
+			ReducerActor::new(id.clone(), runtime.clone(), application_handle, context.clone()),
 			(reducer, flush),
 		)?;
-		Ok(Self { id, parent, storage, handle: actor.handle(), context, date, overlay_storage: None })
+		Ok(Self { id, parent, storage, handle: actor.handle(), context, date, overlay_storage: None, runtime })
 	}
 
 	pub(crate) fn clone_with_detached_storage(&self) -> Self {
@@ -75,6 +77,7 @@ impl CoReducer {
 			handle: self.handle.clone(),
 			context: self.context.clone(),
 			date: self.date.clone(),
+			runtime: self.runtime.clone(),
 			storage,
 			overlay_storage,
 		}
@@ -263,20 +266,30 @@ impl CoReducer {
 	}
 
 	/// Join heads.
-	/// Returns true if state has changed.
+	///
+	/// # Concurrency
+	/// This call will block the reducer only while the computed state is integrated.
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret, fields(co = self.id().as_str()), skip(self))]
 	pub async fn join(&self, heads: BTreeSet<Cid>) -> Result<CoReducerState, anyhow::Error> {
-		// join
-		let request = self
-			.handle
-			.try_request(|r| ReducerMessage::JoinHeads(self.overlay_storage.clone(), self.storage(), heads, r))
-			.await?;
+		// create reducer
+		let (storage, mut reducer) = self.create_memory_reducer().await?;
 
-		// result
-		Ok(request)
+		// to internal
+		let heads = CoReducerState::new(None, heads).to_internal(&storage).await;
+
+		// join
+		Ok(if reducer.join(&storage, &heads.1, self.runtime.runtime()).await? {
+			// integrate join
+			self.join_state(CoReducerState::new_reducer(&reducer)).await?
+		} else {
+			self.reducer_state().await
+		})
 	}
 
 	/// Join a previous (trusted) snapshot into history which may can used as a starting point.
+	///
+	/// # Concurrency
+	/// This call will block the reducer until the join has been fully processed.
 	pub async fn join_state(&self, state: CoReducerState) -> Result<CoReducerState, anyhow::Error> {
 		// join
 		let co_reducer_state = self
@@ -296,6 +309,21 @@ impl CoReducer {
 		C: Into<String> + Debug,
 	{
 		CoReducerDispatch::new(self.clone(), PrivateIdentity::boxed(identity), core.into())
+	}
+
+	/// Create a memory reducer with detached state/heads to precompute operations.
+	///
+	/// # Notes
+	/// - Uses the same storage instance.
+	/// - Uses the same core resolver and therefore actions are dispatched as usual.
+	async fn create_memory_reducer(
+		&self,
+	) -> Result<(CoStorage, Reducer<CoStorage, DynamicCoreResolver<CoStorage>>), anyhow::Error> {
+		let storage = self.storage();
+		let reducer_state = self.reducer_state().await;
+		let reducer =
+			create_memory_reducer(self.runtime.runtime(), self.date.clone(), &self.id, &storage, reducer_state).await?;
+		Ok((storage, reducer))
 	}
 }
 

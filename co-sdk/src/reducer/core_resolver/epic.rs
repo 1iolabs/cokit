@@ -50,9 +50,11 @@ where
 		// 		.ok_or_else(|| CoreResolverError::Middleware(anyhow!("Expected a state after execute the action")))?
 		// 		.into(),
 		// ));
-		let core_action = Action::core_action(storage, self.co.clone(), context.change.clone(), action.into())
-			.await
-			.map_err(|err| CoreResolverError::Middleware(err.into()))?;
+
+		let core_action =
+			Action::core_action(storage, self.co.clone(), context.change.clone(), action.into(), *context.entry.cid())
+				.await
+				.map_err(|err| CoreResolverError::Middleware(err.into()))?;
 		self.actions
 			.dispatch(Action::CoStaged { co: self.co.clone(), action: Box::new(core_action) })
 			.map_err(|err| CoreResolverError::Middleware(err.into()))?;
