@@ -1,7 +1,10 @@
 use crate::{
-	library::network_queue::{
-		network_queue_action, network_queue_backlog, network_queue_message, network_queue_task_complete,
-		network_queue_task_doing,
+	library::{
+		backoff::backoff_with_jitter,
+		network_queue::{
+			network_queue_action, network_queue_backlog, network_queue_message, network_queue_task_complete,
+			network_queue_task_doing,
+		},
 	},
 	network::PeersNetworkTask,
 	Action, CoContext, CoUuid,
@@ -125,7 +128,7 @@ impl Epic<Action, (), CoContext> for NetworkQueueProcessEpic {
 						{
 							let retry = *retry + 1;
 							async move {
-								tokio::time::sleep(backoff(retry)).await;
+								tokio::time::sleep(backoff_with_jitter(retry)).await;
 								Ok(Action::NetworkQueueProcess { co, retry })
 							}
 						}
@@ -210,13 +213,6 @@ impl Pending {
 			},
 		}
 	}
-}
-
-fn backoff(retry: u32) -> std::time::Duration {
-	let base = std::time::Duration::from_secs(3000);
-	let max = std::time::Duration::from_secs(60);
-	let backoff = base * 2u32.pow(retry.min(10)); // cap to avoid overflow
-	std::cmp::min(backoff, max)
 }
 
 fn process_complete(

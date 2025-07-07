@@ -1948,6 +1948,7 @@ dependencies = [
  "opentelemetry-stdout",
  "opentelemetry_sdk",
  "pin-project",
+ "rand 0.8.5",
  "scopeguard",
  "serde",
  "serde_ipld_dagcbor",
