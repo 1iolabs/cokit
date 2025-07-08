@@ -24,6 +24,7 @@ pub struct Co {
 	pub heads: BTreeSet<Cid>,
 
 	/// CO Participants.
+	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
 	pub participants: BTreeMap<Did, Participant>,
 
 	/// CO Streams with the associated state reference.
@@ -32,16 +33,19 @@ pub struct Co {
 	pub cores: BTreeMap<String, Core>,
 
 	/// Co Guards.
+	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
 	pub guards: BTreeMap<String, Guard>,
 
 	/// CO Encryption Keys.
 	/// The first (index: 0) key is the active key.
 	/// Keys are normally stored in the Local CO.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub keys: Option<Vec<Key>>,
 
 	/// CO network services.
 	/// See: [`libp2p::PeerId`]
 	// #[co_api::Dag]
+	#[serde(default, skip_serializing_if = "DagSet::is_empty")]
 	pub network: DagSet<Network>,
 }
 impl Default for Co {

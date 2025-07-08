@@ -10,7 +10,11 @@ mod types;
 pub use didcontact::{
 	create_gossipsub, publish, resolve, subscribe, unsubscribe, Error, RendezvousPoint, ResolveError, ResolveResult,
 };
-pub use library::{clone_key_pair::clone_key_pair, static_peer_provider::StaticPeerProvider};
+pub use library::{
+	backoff::{backoff, backoff_with_jitter},
+	clone_key_pair::clone_key_pair,
+	static_peer_provider::StaticPeerProvider,
+};
 pub use network::{Behaviour, Context, Libp2pNetwork, Libp2pNetworkConfig, NetworkEvent, NetworkMode, Shutdown};
 pub use types::{
 	error::NetworkError,

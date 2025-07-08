@@ -273,13 +273,12 @@ impl Actor for FileLocalsActor {
 
 					// watch
 					let cancel = CancellationToken::new();
+					let stream = watch(self.config_path.clone())?.take_until(cancel.clone().cancelled_owned());
 					state.watch = Some((
-						cancel.clone().drop_guard(),
+						cancel.drop_guard(),
 						tokio::spawn({
 							let handle = handle.clone();
-							let config_path = self.config_path.clone();
 							async move {
-								let stream = watch(config_path).take_until(cancel.cancelled_owned());
 								pin_mut!(stream);
 								while let Some(path) = stream.next().await {
 									handle.dispatch(FileLocalsMessage::Update(path, None)).ok();
@@ -526,61 +525,78 @@ impl FileLocalsState {
 }
 
 /// Watch for all local.cbor changes in config_path.
-fn watch(config_path: PathBuf) -> impl Stream<Item = PathBuf> {
-	let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<PathBuf>();
+fn watch(config_path: PathBuf) -> Result<impl Stream<Item = PathBuf>, anyhow::Error> {
+	let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Result<notify::Event, notify::Error>>();
 
-	// spawn
-	std::thread::spawn(move || {
-		let result: Result<(), anyhow::Error> = (move || {
-			// watch
-			let (watcher_tx, watcher_rx) = std::sync::mpsc::channel();
-			let mut watcher = notify::recommended_watcher(watcher_tx)?;
-			watcher.watch(&config_path, RecursiveMode::Recursive)?;
+	// watcher
+	let mut watcher = notify::recommended_watcher({
+		let tx = tx.clone();
+		move |event| {
+			tx.send(event).ok();
+		}
+	})?;
+	watcher.watch(&config_path, RecursiveMode::Recursive)?;
 
-			// process
-			loop {
-				match watcher_rx.recv()? {
-					Ok(event) => match &event.kind {
-						notify::EventKind::Create(CreateKind::File)
-						| notify::EventKind::Modify(ModifyKind::Data(_)) => {
-							for path in &event.paths {
-								if path.parent().and_then(|f| f.parent()) == Some(config_path.as_ref())
-									&& path.file_name().and_then(|f| f.to_str()) == Some("local.cbor")
-								{
-									// log
-									#[cfg(feature = "logging-verbose")]
-									tracing::trace!(?path, ?event, "locals-watch-send");
+	// shutdown
+	tokio::spawn({
+		let config_path = config_path.clone();
+		async move {
+			// wait reader is dropped
+			tx.closed().await;
 
-									// send change
-									if tx.send(path.clone()).is_err() {
-										// log
-										tracing::trace!("locals-watch-stop");
-
-										// stop thread when rx has been dropped
-										return Ok(());
-									}
-								}
-							}
-						},
-						_ => {
-							#[cfg(feature = "logging-verbose")]
-							tracing::trace!(?event, "locals-watch-ignore");
-						},
-					},
-					Err(err) => {
-						tracing::warn!(?err, "locals-watch-error");
-					},
-				}
-			}
-		})();
-		match result {
-			Ok(_) => tracing::trace!("locals-watch-end"),
-			Err(err) => tracing::warn!(?err, "locals-watch-failed"),
+			// unwatch
+			watcher.unwatch(&config_path).ok();
 		}
 	});
 
+	// stream
+	let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(rx)
+		.filter_map({
+			let config_path = config_path.clone();
+			move |result| {
+				ready(match result {
+					Ok(event) => Some(event),
+					Err(err) => {
+						tracing::warn!(?err, ?config_path, "locals-watch-error");
+						None
+					},
+				})
+			}
+		})
+		.filter_map(move |event| {
+			ready(match &event.kind {
+				notify::EventKind::Create(CreateKind::File) | notify::EventKind::Modify(ModifyKind::Data(_)) => {
+					let paths = event
+						.paths
+						.iter()
+						.filter(|path| {
+							path.parent().and_then(|f| f.parent()) == Some(config_path.as_ref())
+								&& path.file_name().and_then(|f| f.to_str()) == Some("local.cbor")
+						})
+						.cloned()
+						.collect();
+
+					// log
+					#[cfg(feature = "logging-verbose")]
+					tracing::trace!(?paths, ?event, "locals-watch-send");
+
+					// result
+					Some(paths)
+				},
+				_ => {
+					// log
+					#[cfg(feature = "logging-verbose")]
+					tracing::trace!(?event, "locals-watch-ignore");
+
+					// none
+					None
+				},
+			})
+		})
+		.flat_map(|paths: Vec<PathBuf>| stream::iter(paths));
+
 	// result
-	tokio_stream::wrappers::UnboundedReceiverStream::new(rx)
+	Ok(stream)
 }
 
 #[derive(Debug)]

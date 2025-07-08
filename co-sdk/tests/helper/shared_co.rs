@@ -138,7 +138,7 @@ async fn wait_membership_state(
 			let state = state.clone();
 			async move {
 				match action {
-					Action::CoreAction { co, storage: _, context: _, action, cid: _ }
+					Action::CoreAction { co, storage: _, context: _, action, cid: _, head: _ }
 						if co.as_str() == CO_ID_LOCAL && CO_CORE_NAME_MEMBERSHIP == action.core =>
 					{
 						let mambership_action: MembershipsAction = action.get_payload().ok()?;

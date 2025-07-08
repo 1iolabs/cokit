@@ -54,6 +54,7 @@ multihash = "0.19.3"
 multihash-codetable = { version = "0.1.4", features = ["blake3"] }
 num-rational = "0.4"
 pin-project = "1.1.4"
+rand = "0.8.5"
 rust-unixfs = "0.5.0"
 schemars = "0.8.21"
 scopeguard = "1.2.0"

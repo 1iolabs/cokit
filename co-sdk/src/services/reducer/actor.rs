@@ -3,7 +3,6 @@ use crate::{
 	library::{
 		extract_next_heads::extract_next_heads,
 		to_external_cid::{to_external_mapped, to_external_mapped_opt},
-		to_internal_cid::to_internal_cids,
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{
@@ -13,7 +12,6 @@ use crate::{
 	Action, ApplicationMessage, CoStorage, Reducer, Runtime,
 };
 use async_trait::async_trait;
-use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, ResponseStreams};
 use co_identity::{Identity, PrivateIdentityBox};
 use co_primitives::{
@@ -81,9 +79,6 @@ impl Actor for ReducerActor {
 			},
 			ReducerMessage::Push(overlay_storage, storage, identity, action_link, response) => {
 				response.respond(handle_push(&self, overlay_storage, state, identity, storage, action_link).await);
-			},
-			ReducerMessage::JoinHeads(overlay_storage, storage, heads, response) => {
-				response.respond(handle_join(&self, overlay_storage, state, storage, heads).await);
 			},
 			ReducerMessage::JoinState(overlay_storage, storage, join_state, response) => {
 				response.respond(handle_join_state(&self, overlay_storage, state, storage, join_state).await);
@@ -156,27 +151,6 @@ async fn handle_push(
 
 	// result
 	Ok(result_state)
-}
-
-async fn handle_join(
-	actor: &ReducerActor,
-	overlay_storage: Option<OverlayBlockStorage<CoStorage>>,
-	reducer_state: &mut ReducerState,
-	storage: CoStorage,
-	heads: BTreeSet<Cid>,
-) -> Result<CoReducerState, anyhow::Error> {
-	// internal
-	let root_storage = actor.context.storage(false);
-	let internal_state = CoReducerState::new(None, to_internal_cids(&root_storage, heads).await);
-
-	// join
-	apply_join(&actor.runtime, reducer_state, &storage, internal_state).await?;
-
-	// flush
-	flush(actor, reducer_state, overlay_storage, storage).await?;
-
-	// result
-	Ok(handle_state(reducer_state))
 }
 
 /// See: [`handle_join`]
@@ -272,6 +246,7 @@ async fn flush(
 			.flush(
 				base_storage,
 				&mut reducer_state.reducer,
+				&flush_info,
 				new_roots.into_iter().filter(|root| !root.is_empty()).collect(),
 				removed_blocks,
 			)

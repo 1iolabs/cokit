@@ -64,6 +64,12 @@ impl Log {
 		Log { id, identity_resolver, heads, index: Default::default() }
 	}
 
+	/// (Re)sets the heads of this log.
+	pub fn set_heads(&mut self, heads: BTreeSet<Cid>) {
+		self.heads = heads;
+		self.index.clear();
+	}
+
 	/// Create new log with random ID.
 	pub fn create(identity_resolver: IdentityResolverBox) -> Self {
 		Self::new(uuid::Uuid::new_v4().to_bytes_le().to_vec(), identity_resolver, Default::default())

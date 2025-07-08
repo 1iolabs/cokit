@@ -127,8 +127,7 @@ where
 				.push(&self.reducer_storage, &self.identity, *action_reference.cid())
 				.await?;
 			let heads: BTreeSet<Cid> = [*head.cid()].into_iter().collect();
-			self.reducer.insert_snapshot(state, heads.clone());
-			self.reducer.initialize(&self.reducer_storage, self.runtime.runtime()).await?;
+			self.reducer.set_reducer_state(Some(state), heads.clone());
 		} else {
 			let verify_state = self
 				.reducer

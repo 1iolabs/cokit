@@ -2,6 +2,7 @@ use crate::{
 	library::create_reducer_action::new_reducer_action, network::NetworkSettings, services::reducer::FlushInfo,
 	types::message::heads::HeadsMessage, CoDate, CoStorage, ReducerChangeContext,
 };
+use cid::Cid;
 use co_identity::Message;
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoId, Did, Link, Network, ReducerAction, Tags};
@@ -30,6 +31,7 @@ pub enum Action {
 		context: ReducerChangeContext,
 		action: ReducerAction<Ipld>,
 		cid: Link<ReducerAction<Ipld>>,
+		head: Cid,
 	},
 
 	/// Core action has been failed.
@@ -155,6 +157,7 @@ impl Action {
 		co: CoId,
 		context: ReducerChangeContext,
 		cid: Link<ReducerAction<Ipld>>,
+		head: Cid,
 	) -> Result<Self, StorageError>
 	where
 		S: BlockStorage + Into<CoStorage> + Clone + Send + Sync + 'static,
@@ -165,6 +168,7 @@ impl Action {
 			storage: storage.clone().into(),
 			action: storage.get_value(&cid).await?,
 			cid,
+			head,
 		})
 	}
 

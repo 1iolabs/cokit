@@ -1850,6 +1850,7 @@ dependencies = [
  "libp2p",
  "libp2p-bitswap",
  "pin-project",
+ "rand 0.8.5",
  "serde",
  "serde_bytes",
  "serde_json",

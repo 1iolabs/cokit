@@ -60,8 +60,10 @@ where
 		Self { initialize, ..self }
 	}
 
+	/// Use state/heads as lastest.
+	/// This will also disable the initialize because we know the latest state already.
 	pub fn with_latest_state(self, state: Cid, heads: BTreeSet<Cid>) -> Self {
-		Self { state: Some(state), heads, ..self }
+		Self { state: Some(state), heads, initialize: false, ..self }
 	}
 
 	pub fn with_snapshot(self, state: Cid, heads: BTreeSet<Cid>) -> Self {
@@ -137,12 +139,10 @@ where
 				self.log.join_heads(storage, heads.iter()).await?;
 
 				// try to find state for latest heads
-				// do this every iteration so we end up with the latest known state
-				for (snapshot_heads, snapshot_state) in &self.snapshots {
-					if snapshot_heads == self.log.heads() {
-						self.state = Some(*snapshot_state);
-						self.heads = snapshot_heads.clone();
-					}
+				//  do this every iteration so we end up with the latest known state
+				if let Some(state) = self.find_snapshot_state(self.log.heads()) {
+					self.heads = self.log.heads().clone();
+					self.state = Some(state);
 				}
 			}
 			tracing::trace!(state = ?self.state, heads = ?self.heads, log_heads = ?self.log.heads(), "reducer-snapshots");
@@ -174,6 +174,18 @@ where
 
 		// if we have state and heads we are fine
 		Ok(())
+	}
+
+	/// Find snapshot state which matches `heads`.
+	fn find_snapshot_state(&self, heads: &BTreeSet<Cid>) -> Option<Cid> {
+		self.snapshots.get(heads).cloned()
+	}
+
+	/// (Re)sets the reducer and the log to a given state.
+	pub fn set_reducer_state(&mut self, state: Option<Cid>, heads: BTreeSet<Cid>) {
+		self.log.set_heads(heads.clone());
+		self.state = state;
+		self.heads = heads;
 	}
 
 	pub fn into_log(self) -> Log {
@@ -387,9 +399,18 @@ where
 		if self.log().heads() != heads
 			&& (self.log_mut().join_heads(storage, heads.iter()).await? || &self.heads != self.log.heads())
 		{
-			// sync state
 			let context = ReducerChangeContext { cause: ReducerChangeCause::Log };
-			let (next_state, next_heads) = self.compute_state(storage, runtime, &context).await?;
+
+			// sync state
+			let (next_state, next_heads) = if let Some(state) = self.find_snapshot_state(self.log().heads()) {
+				// use snapshot
+				(Some(state), self.log().heads().clone())
+			} else {
+				// compute state
+				self.compute_state(storage, runtime, &context).await?
+			};
+
+			// apply
 			if next_state != self.state || self.heads != next_heads {
 				// apply
 				self.state = next_state;

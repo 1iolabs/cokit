@@ -8,6 +8,7 @@ use crate::{
 };
 use co_actor::{Actions, Epic};
 use co_identity::PrivateIdentity;
+use co_network::backoff_with_jitter;
 use co_primitives::{CoId, CoTryStreamExt};
 use futures::{future::Either, stream, FutureExt, Stream, StreamExt};
 use std::{collections::BTreeSet, future::ready};
@@ -125,7 +126,7 @@ impl Epic<Action, (), CoContext> for NetworkQueueProcessEpic {
 						{
 							let retry = *retry + 1;
 							async move {
-								tokio::time::sleep(backoff(retry)).await;
+								tokio::time::sleep(backoff_with_jitter(retry)).await;
 								Ok(Action::NetworkQueueProcess { co, retry })
 							}
 						}
@@ -210,13 +211,6 @@ impl Pending {
 			},
 		}
 	}
-}
-
-fn backoff(retry: u32) -> std::time::Duration {
-	let base = std::time::Duration::from_secs(3000);
-	let max = std::time::Duration::from_secs(60);
-	let backoff = base * 2u32.pow(retry.min(10)); // cap to avoid overflow
-	std::cmp::min(backoff, max)
 }
 
 fn process_complete(
