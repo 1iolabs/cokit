@@ -2,9 +2,14 @@ import { isNonNull } from "@1io/compare";
 import { getCoState, resolveCid, sessionClose, sessionOpen } from "tauri-plugin-co-sdk";
 import { buildCoCoreId } from "./core-id.js";
 
-export async function getResolvedCoState(sessionId: string, co: string): Promise<any | undefined> {
+export async function getResolvedCoState(co: string, externalSessionId?: string): Promise<any | undefined> {
+    // open session if no external session given
+    let sessionId = externalSessionId ?? await sessionOpen(co);
     let [stateCid] = await getCoState(co);
-    return stateCid ? await resolveCid(sessionId, stateCid) : undefined;
+    const state = stateCid ? await resolveCid(sessionId, stateCid) : undefined;
+    // close opened session
+    if (externalSessionId === undefined) { sessionClose(sessionId); }
+    return state;
 }
 
 export async function getCoHeads(sessionId: string, co: string): Promise<any[]> {
@@ -18,7 +23,7 @@ export async function getCoHeads(sessionId: string, co: string): Promise<any[]> 
 
 export async function getCoreState(co: string, core: string, externalSessionId?: string): Promise<any> {
     let sessionId = externalSessionId ?? await sessionOpen(co);
-    const state = await getResolvedCoState(sessionId, co);
+    const state = await getResolvedCoState(co, sessionId);
     const core_cid = state?.cores?.[core]?.state;
     if (core_cid) {
         let core_state = await resolveCid(sessionId, core_cid);
@@ -65,7 +70,7 @@ export async function getFilteredCoreIds(tags: string[], co?: string): Promise<s
     const foundCores: string[] = [];
     for (const coId of coIds) {
         let sessionId = await sessionOpen(coId);
-        const state = await getResolvedCoState(sessionId, coId);
+        const state = await getResolvedCoState(coId, sessionId);
         for (let [key, value] of Object.entries(state.cores)) {
             // TODO remove any cast when js interfaces are done
             const v = value as any;

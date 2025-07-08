@@ -1,5 +1,7 @@
-import { isPluginAction, WellKnownTags } from "@1io/kui-application-sdk";
+import { isPluginAction, tagValue, WellKnownTags } from "@1io/kui-application-sdk";
 import { filter, identity, map, mergeAll, mergeMap, withLatestFrom } from "rxjs";
+import { pushAction, sessionClose, sessionOpen } from "../../../../../../dist-js/index.js";
+import { splitCoCoreId } from "../../../library/core-id.js";
 import { COAppChatsListApi } from "../../coapp-chatslist-plugin/api/index.js";
 import { coappChatsListPluginId } from "../../coapp-chatslist-plugin/types/plugin.js";
 import { AddParticipantDialogActionType, AddParticipantDialogSaveAction } from "../../group-view-add-participant-dialog-plugin/actions/index.js";
@@ -8,8 +10,9 @@ import { LeaveGroupDialogActionType, LeaveGroupDialogLeaveAction } from "../../g
 import { LeaveGroupDialogGroupNameTag, leaveGroupDialogPluginId } from "../../group-view-leave-group-dialog-plugin/types/tag.js";
 import { RemoveParticipantDialogActionType, RemoveParticipantDialogRemoveAction } from "../../group-view-remove-participant-dialog-plugin/actions/index.js";
 import { removeParticipantDialogPluginId, RemoveParticipantDialogRequiredTags } from "../../group-view-remove-participant-dialog-plugin/types/plugin.js";
-import { GroupViewParticipantInvitedAction, GroupViewParticipantRemovedAction, GroupViewPluginActionType, GroupViewRemoveParticipantAction } from "../actions/index.js";
+import { GroupViewParticipantAddedAction, GroupViewParticipantRemovedAction, GroupViewPluginActionType, GroupViewRemoveParticipantAction } from "../actions/index.js";
 import { GroupViewEpicType } from "../types/plugin.js";
+import { GroupViewPluginRoomCoreIdTag } from "../types/tag.js";
 
 
 export const openInviteParticipantDialogEpic: GroupViewEpicType = (action$, _, context) => action$.pipe(
@@ -30,9 +33,9 @@ export const participantAddedEpic: GroupViewEpicType = (action$, state$, context
     }),
     filter((action): action is AddParticipantDialogSaveAction => action.type === AddParticipantDialogActionType.Save),
     mergeMap((action) => {
-        return [identity<GroupViewParticipantInvitedAction>({
+        return [identity<GroupViewParticipantAddedAction>({
             payload: { participant: action.payload.did },
-            type: GroupViewPluginActionType.ParticipantInvited,
+            type: GroupViewPluginActionType.ParticipantAdded,
         })];
     }),
 );
@@ -85,10 +88,37 @@ export const participantRemovedEpic: GroupViewEpicType = (action$, state$, conte
         return action.payload;
     }),
     filter((action): action is RemoveParticipantDialogRemoveAction => action.type === RemoveParticipantDialogActionType.Remove),
-    mergeMap((action) => {
+    withLatestFrom(state$),
+    mergeMap(async ([action, state]) => {
+        if (!state.isNew) {
+            // directly remove participant if edit mode
+
+            // need identity
+            if (!state.chatsListState?.identity) {
+                throw new Error("Missing identity");
+            }
+            // get ids from tags
+            const roomCoreId = tagValue<GroupViewPluginRoomCoreIdTag>(context.pluginTags, "roomCoreId");
+            const ids = roomCoreId ? splitCoCoreId(roomCoreId) : undefined;
+            if (ids === undefined) {
+                throw new Error("Cannot resolve id: " + roomCoreId);
+            }
+            // open session
+            const session = await sessionOpen("local");
+            const removeAction = {
+                Remove: {
+                    id: ids.coId,
+                    did: action.payload.did,
+                },
+            };
+            await pushAction(session, "membership", removeAction, state.chatsListState.identity);
+
+            await sessionClose(session);
+        }
         return [identity<GroupViewParticipantRemovedAction>({
             payload: { participant: action.payload.did },
             type: GroupViewPluginActionType.ParticipantRemoved,
         })];
     }),
+    mergeAll(),
 );

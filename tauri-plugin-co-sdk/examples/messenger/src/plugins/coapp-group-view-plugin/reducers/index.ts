@@ -7,8 +7,10 @@ export function groupViewPluginReducer(state: GroupViewPluginState, action: Grou
             return { ...state, name: action.payload.name };
         case GroupViewPluginActionType.SetAvatar:
             return { ...state, avatar: action.payload.avatar };
-        case GroupViewPluginActionType.ParticipantInvited:
-            return { ...state, participants: [...state.participants, action.payload.participant] };
+        case GroupViewPluginActionType.ParticipantAdded:
+            if (!state.participants.includes(action.payload.participant)) {
+                return { ...state, participants: [...state.participants, action.payload.participant] };
+            } else return state;
         case GroupViewPluginActionType.ParticipantRemoved:
             return { ...state, participants: state.participants.filter((p) => p !== action.payload.participant) }
         case GroupViewPluginActionType.Submit:

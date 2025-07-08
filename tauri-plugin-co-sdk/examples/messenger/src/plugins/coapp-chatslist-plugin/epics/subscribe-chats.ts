@@ -4,8 +4,8 @@ import { filter, identity, mergeAll, mergeMap, withLatestFrom } from "rxjs";
 import { get_actions, pushAction, resolveCid, sessionClose, sessionOpen } from "../../../../../../dist-js/index.js";
 import GroupDefaultPic from "../../../assets/Users_48.svg";
 import { createCoSdkStateEventListener } from "../../../library/co-sdk-state-listener.js";
-import { buildCoCoreId } from "../../../library/core-id.js";
-import { getFilteredCoreIds } from "../../../library/invoke-get.js";
+import { buildCoCoreId, splitCoCoreId } from "../../../library/core-id.js";
+import { getCoreState, getFilteredCoreIds } from "../../../library/invoke-get.js";
 import { ChatsListActionType, ChatsListAddChatAction, ChatsListUpdateChatAction } from "../actions/index.js";
 import { ChatsListEpicType } from "../types/plugin.js";
 
@@ -131,12 +131,15 @@ async function handleLocalCoAction(action: any, ownIdentity: string): Promise<Ac
             // get chats
             const addChatActions: ChatsListAddChatAction[] = [];
             for (const roomCoreId of roomCoreIds) {
+                const ids = splitCoCoreId(roomCoreId);
+                if (ids === undefined) { continue; }
+                const state = await getCoreState(ids.coId, ids.coreId);
                 addChatActions.push(identity<ChatsListAddChatAction>({
                     payload: {
                         chat: {
                             avatar: GroupDefaultPic,
                             id: roomCoreId,
-                            name: "", // TODO
+                            name: state.name,
                             newMessages: 0
                         }
                     },

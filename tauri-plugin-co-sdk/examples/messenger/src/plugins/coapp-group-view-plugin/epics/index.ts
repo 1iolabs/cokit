@@ -1,6 +1,5 @@
 import { combineEpics } from "@1io/kui-application-sdk";
 import { GroupViewEpicType } from "../types/plugin.js";
-import { addOwnIdentityEpic } from "./add-own-identity.js";
 import { openInviteParticipantDialogEpic, openRemoveParticipantDialogEpic, participantAddedEpic, participantRemovedEpic } from "./dialog.js";
 import { initializeEpic } from "./init.js";
 import { loadProfilePicEpic } from "./load-profile-pic.js";
@@ -13,6 +12,5 @@ export const groupViewPluginEpic: GroupViewEpicType = combineEpics(
     participantAddedEpic,
     openRemoveParticipantDialogEpic,
     participantRemovedEpic,
-    addOwnIdentityEpic,
     submitEpic,
 );

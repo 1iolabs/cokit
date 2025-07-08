@@ -6,7 +6,7 @@ export enum GroupViewPluginActionType {
     Submit = "coapp/group-view/submit",
     InviteParticipant = "coapp/group-view/inviteParticipant",
     RemoveParticipant = "coapp/group-view/removeParticipant",
-    ParticipantInvited = "coapp/group-view/participantInvited",
+    ParticipantAdded = "coapp/group-view/participantAdded",
     ParticipantRemoved = "coapp/group-view/participantRemoved",
     LoadProfilePicEpic = "coapp/group-view/loadProfilePicEpic",
 }
@@ -17,7 +17,7 @@ export type GroupViewPluginActions =
     | GroupViewSubmitAction
     | GroupViewInviteParticipantAction
     | GroupViewRemoveParticipantAction
-    | GroupViewParticipantInvitedAction
+    | GroupViewParticipantAddedAction
     | GroupViewParticipantRemovedAction
     | GroupViewLoadProfilePicAction
     ;
@@ -34,7 +34,7 @@ export interface GroupViewRemoveParticipantAction extends PayloadAction<GroupVie
     readonly participant: string;
     readonly isYou: boolean;
 }> { }
-export interface GroupViewParticipantInvitedAction extends PayloadAction<GroupViewPluginActionType.ParticipantInvited, {
+export interface GroupViewParticipantAddedAction extends PayloadAction<GroupViewPluginActionType.ParticipantAdded, {
     readonly participant: string;
 }> { }
 export interface GroupViewParticipantRemovedAction extends PayloadAction<GroupViewPluginActionType.ParticipantRemoved, {

@@ -3,9 +3,9 @@ import { Action } from "redux";
 import { filter, identity, mergeAll, mergeMap } from "rxjs";
 import DefaultAvatar from "../../../assets/Users_48.svg";
 import { splitCoCoreId } from "../../../library/core-id.js";
-import { getCoreState } from "../../../library/invoke-get.js";
+import { getCoreState, getResolvedCoState } from "../../../library/invoke-get.js";
 import { coappChatsListPluginId } from "../../coapp-chatslist-plugin/types/plugin.js";
-import { GroupViewPluginActionType, GroupViewSetAvatarAction, GroupViewSetNameAction } from "../actions/index.js";
+import { GroupViewParticipantAddedAction, GroupViewPluginActionType, GroupViewSetAvatarAction, GroupViewSetNameAction } from "../actions/index.js";
 import { GroupViewEpicType } from "../types/plugin.js";
 import { GroupViewPluginRoomCoreIdTag } from "../types/tag.js";
 
@@ -35,7 +35,7 @@ export const initializeEpic: GroupViewEpicType = (action$, _, context) => action
                     message: "Couldn't fetch core state",
                 }, context.plugin, context.pluginTags)];
             }
-            // TODO set information
+            // set information
             actions.push(
                 identity<GroupViewSetNameAction>({
                     payload: { name: coreState.name },
@@ -47,6 +47,18 @@ export const initializeEpic: GroupViewEpicType = (action$, _, context) => action
                     type: GroupViewPluginActionType.SetAvatar,
                 }),
             );
+            // set participants
+            const coState = await getResolvedCoState(result.coId);
+            if (coState?.participants === undefined) {
+                // Error!
+                throw new Error("Couldn't fetch CO core participants state: " + coState);
+            }
+            for (const participant in coState.participants) {
+                actions.push(identity<GroupViewParticipantAddedAction>({
+                    payload: { participant },
+                    type: GroupViewPluginActionType.ParticipantAdded
+                }));
+            }
         } else {
             // TODO new mode
         }
