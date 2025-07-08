@@ -1952,7 +1952,6 @@ dependencies = [
  "co-core-storage",
  "co-identity",
  "co-log",
- "co-messaging",
  "co-network",
  "co-primitives",
  "co-runtime",
