@@ -3,6 +3,7 @@ mod library;
 mod types;
 
 pub use hooks::{
+	use_co_actions::use_co_actions,
 	use_co_api::{use_co_api, CoApi},
 	use_co_block::{use_co_block, use_co_block_deserialized},
 	use_co_context::use_co_context,
