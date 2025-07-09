@@ -27,8 +27,8 @@ pub use co_primitives::{
 	AbsolutePathOwned, BlockSerializer, BlockStat, BlockStorage, BlockStorageExt, CoId, CoInvite, CoList, CoListIndex,
 	CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, Component, Components, CoreName,
 	DagCollection, DagCollectionAsyncExt, DagCollectionExt, Date, Did, KnownMultiCodec, KnownTag, KnownTags, Link,
-	MultiCodec, MultiCodecError, NodeStream, OptionLink, Path, PathError, PathExt, PathOwned, RelativePath,
-	RelativePathOwned, StorageError, Tag, Tags,
+	MultiCodec, MultiCodecError, NodeStream, OptionLink, Path, PathError, PathExt, PathOwned, ReducerAction,
+	RelativePath, RelativePathOwned, StorageError, Tag, Tags,
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{
