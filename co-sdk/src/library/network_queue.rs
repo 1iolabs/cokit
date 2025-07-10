@@ -1,5 +1,5 @@
 use crate::{
-	services::application::CoDidCommSendAction,
+	services::application::{CoDidCommSendAction, HeadsMessageReceivedAction},
 	state::{self, query_core, QueryExt},
 	types::cores::CO_CORE_BOARD,
 	Action, CoContext, CoReducer, Cores, CO_CORE_NAME_CO,
@@ -72,27 +72,90 @@ pub async fn network_queue_message(context: &CoContext, mut message: CoDidCommSe
 	Ok(())
 }
 
+pub async fn network_queue_heads(
+	context: &CoContext,
+	mut message: HeadsMessageReceivedAction,
+) -> Result<(), anyhow::Error> {
+	let local_co = context.local_co_reducer().await?;
+	let identity = context.local_identity();
+
+	// create core
+	let (storage, co) = local_co.co().await?;
+	ensure_network_queue_core(&local_co, &identity, co).await?;
+
+	// setup task id
+	let task_id = message.message_id.clone();
+	message.tags.insert(tag!("task_id": task_id.clone()));
+
+	// insert message
+	let payload = Some(storage.set_serialized(&message).await?);
+	local_co
+		.push(
+			&identity,
+			CO_CORE_NAME_NETWORK_QUEUE,
+			&BoardAction::TaskCreate {
+				list: LIST_NAME_BACKLOG.to_owned(),
+				task: Task {
+					id: task_id,
+					name: format!("Heads message {} to co:{}", message.message_id, &message.co),
+					tags: tags!("co": message.co.to_string(), "type": "co-didcomm", "message_id": message.message_id),
+					payload,
+					lock: None,
+				},
+				after: None,
+			},
+		)
+		.await?;
+
+	// done
+	Ok(())
+}
+
+pub trait ActionComplete: Send + Sync + 'static {
+	fn is_complete(&self, action: &Action) -> Option<TaskState>;
+	fn clone_box(&self) -> Box<dyn ActionComplete>;
+}
+impl<T> ActionComplete for T
+where
+	T: Fn(&Action) -> Option<TaskState> + Clone + Send + Sync + 'static,
+{
+	fn is_complete(&self, action: &Action) -> Option<TaskState> {
+		self(action)
+	}
+
+	fn clone_box(&self) -> Box<dyn ActionComplete> {
+		Box::new(self.clone())
+	}
+}
+impl Clone for Box<dyn ActionComplete> {
+	fn clone(&self) -> Self {
+		self.clone_box()
+	}
+}
+
 /// Get task action and complete trigger.
 pub async fn network_queue_action(
 	local_co: &CoReducer,
 	task: &Task,
 	lock_id: &str,
-) -> Result<(Action, impl Fn(&Action) -> Option<TaskState> + Clone + Send + 'static), anyhow::Error> {
+) -> Result<(Action, Box<dyn ActionComplete>), anyhow::Error> {
 	let storage = local_co.storage();
 	match task.tags.string("type") {
 		Some("co-didcomm") => {
 			// complete
-			let complete_tags = tags!("task_id": task.id.clone(), "lock_id": lock_id);
-			let complete = move |action: &Action| -> Option<TaskState> {
-				match action {
-					Action::CoDidCommSent { message, result } if message.tags.matches(&complete_tags) => {
-						Some(match result {
-							Ok(peers) if peers.is_empty() => TaskState::Backlog,
-							Ok(_) => TaskState::Done,
-							Err(_err) => TaskState::Failed,
-						})
-					},
-					_ => None,
+			let complete = {
+				let complete_tags = tags!("task_id": task.id.clone(), "lock_id": lock_id);
+				move |action: &Action| -> Option<TaskState> {
+					match action {
+						Action::CoDidCommSent { message, result } if message.tags.matches(&complete_tags) => {
+							Some(match result {
+								Ok(peers) if peers.is_empty() => TaskState::Backlog,
+								Ok(_) => TaskState::Done,
+								Err(_err) => TaskState::Failed,
+							})
+						},
+						_ => None,
+					}
 				}
 			};
 
@@ -100,7 +163,31 @@ pub async fn network_queue_action(
 			let payload_reference = task.payload.ok_or(anyhow!("No payload"))?;
 			let mut payload: CoDidCommSendAction = storage.get_deserialized(&payload_reference).await?;
 			payload.tags.insert(tag!("task_lock": lock_id));
-			Ok((Action::CoDidCommSend(payload), complete))
+			Ok((Action::CoDidCommSend(payload), Box::new(complete)))
+		},
+		Some("co-heads/1.0") => {
+			// complete
+			let complete = {
+				let task_message_id = task.id.clone();
+				move |action: &Action| -> Option<TaskState> {
+					match action {
+						Action::HeadsMessageComplete {
+							message: HeadsMessageReceivedAction { message_id, .. },
+							result,
+						} if message_id == &task_message_id => Some(match result {
+							Ok(_) => TaskState::Done,
+							Err(_err) => TaskState::Failed,
+						}),
+						_ => None,
+					}
+				}
+			};
+
+			// send
+			let payload_reference = task.payload.ok_or(anyhow!("No payload"))?;
+			let mut payload: HeadsMessageReceivedAction = storage.get_deserialized(&payload_reference).await?;
+			payload.tags.insert(tag!("task_lock": lock_id));
+			Ok((Action::HeadsMessageReceived(payload), Box::new(complete)))
 		},
 		unknown => Err(anyhow!("Unknown task type: {:?}", unknown)),
 	}

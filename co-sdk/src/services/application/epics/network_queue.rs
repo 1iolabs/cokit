@@ -1,9 +1,11 @@
 use crate::{
 	library::network_queue::{
-		network_queue_action, network_queue_backlog, network_queue_message, network_queue_task_complete,
-		network_queue_task_doing,
+		network_queue_action, network_queue_backlog, network_queue_heads, network_queue_message,
+		network_queue_task_complete, network_queue_task_doing,
 	},
 	network::PeersNetworkTask,
+	services::application::HeadsMessageReceivedAction,
+	types::message::heads::HeadsMessage,
 	Action, CoContext, CoUuid,
 };
 use co_actor::{Actions, Epic};
@@ -31,7 +33,21 @@ pub fn network_queue_message_epic(
 			Some(
 				async move { network_queue_message(&context, message).await }
 					.into_stream()
-					.try_ignore_elements(),
+					.try_ignore_elements()
+					.boxed(),
+			)
+		},
+		Action::HeadsMessageComplete {
+			message: message @ HeadsMessageReceivedAction { message: HeadsMessage::Heads(_co, _heads), .. },
+			result: Err(_),
+		} => {
+			let context = context.clone();
+			let message = message.clone();
+			Some(
+				async move { network_queue_heads(&context, message).await }
+					.into_stream()
+					.try_ignore_elements()
+					.boxed(),
 			)
 		},
 		_ => None,
@@ -269,7 +285,7 @@ fn process(
 			}
 
 			// register complete
-			let complete_fut = actions.once_map(complete);
+			let complete_fut = actions.once_map(move |action| complete.is_complete(action));
 
 			// send
 			yield action;

@@ -1,5 +1,6 @@
 use crate::{
 	library::network_identity::network_identity,
+	services::application::HeadsMessageReceivedAction,
 	state,
 	types::message::heads::{HeadsErrorCode, HeadsMessage},
 	Action, CoContext, CoReducer, CoReducerFactory, MappedCoReducerState,
@@ -39,7 +40,16 @@ pub fn heads_message_receive(
 		},
 		_ => None,
 	}
-	.map(|(from, peer, message_id, message)| Action::HeadsMessageReceived { from, peer, message_id, message })?;
+	.map(|(from, peer, message_id, message)| {
+		Action::HeadsMessageReceived(HeadsMessageReceivedAction {
+			co: message.co().clone(),
+			from,
+			peer,
+			message_id,
+			message,
+			tags: Default::default(),
+		})
+	})?;
 	Some(stream::once(ready(Ok(result))))
 }
 
@@ -52,14 +62,14 @@ pub fn heads_message_heads(
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::HeadsMessageReceived { from, peer, message_id, message: HeadsMessage::Heads(co, heads) } => Some({
+		Action::HeadsMessageReceived(
+			message @ HeadsMessageReceivedAction { message: HeadsMessage::Heads(co, heads), .. },
+		) => Some({
 			let context = context.clone();
-			let message_id = message_id.clone();
-			let from = from.clone();
-			let peer = *peer;
+			let message = message.clone();
 			let co = co.clone();
 			let heads = heads.clone();
-			async move { handle_heads(context, message_id, from, peer, co, heads).await }
+			async move { handle_heads(context, message, co, heads).await }
 				.into_stream()
 				.flat_map(Action::map_error_stream)
 				.map(Ok)
@@ -76,7 +86,13 @@ pub fn heads_message_heads_request(
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::HeadsMessageReceived { from, peer, message_id, message: HeadsMessage::HeadsRequest(co) } => Some({
+		Action::HeadsMessageReceived(HeadsMessageReceivedAction {
+			from,
+			peer,
+			message_id,
+			message: HeadsMessage::HeadsRequest(co),
+			..
+		}) => Some({
 			let context = context.clone();
 			let message_id = message_id.clone();
 			let from = from.clone();
@@ -95,31 +111,33 @@ pub fn heads_message_heads_request(
 #[tracing::instrument(level = tracing::Level::TRACE, skip(context, heads))]
 async fn handle_heads(
 	context: CoContext,
-	message_id: String,
-	from: Option<Did>,
-	peer: PeerId,
+	message: HeadsMessageReceivedAction,
 	co: CoId,
 	heads: BTreeSet<Cid>,
 ) -> anyhow::Result<Vec<Action>> {
-	let mut actions = Vec::new();
 	let co_reducer = context.try_co_reducer(&co).await?;
 
 	// verify
-	verify_from_participant(&co_reducer, &from).await?;
+	verify_from_participant(&co_reducer, &message.from).await?;
 
 	// join
 	let previous_state = co_reducer.reducer_state().await;
-	let next_state = co_reducer.join(heads.clone()).await?;
-
-	// respond if different
-	if previous_state != next_state {
-		let body = create_heads_body(&co_reducer).await;
-		let message = create_heads_message(&context, &co_reducer, body, Some(message_id), peer).await?;
-		actions.push(message);
-	}
+	let next_state = match co_reducer.join(heads.clone()).await {
+		Ok(next_state) => next_state,
+		Err(err) => {
+			return Ok(vec![Action::HeadsMessageComplete { message, result: Err(err.into()) }]);
+		},
+	};
 
 	// result
-	Ok(actions)
+	//  respond if different
+	if previous_state != next_state {
+		let body = create_heads_body(&co_reducer).await;
+		let message = create_heads_message(&context, &co_reducer, body, Some(message.message_id), message.peer).await?;
+		Ok(vec![message])
+	} else {
+		Ok(vec![])
+	}
 }
 
 /// See: [`HeadsMessage::HeadsRequest`]
@@ -137,8 +155,8 @@ async fn handle_request_heads(
 	let body = match verify_from_participant(&co_reducer, &from).await {
 		Ok(_) => create_heads_body(&co_reducer).await,
 		Err(err) => {
-			tracing::warn!(?err, "co-request-heads-failed");
-			HeadsMessage::Error { code: HeadsErrorCode::Forbidden, message: "Forbidden".to_owned() }
+			tracing::warn!(?co, ?peer, ?from, ?err, "co-request-heads-failed");
+			HeadsMessage::Error { co, code: HeadsErrorCode::Forbidden, message: "Forbidden".to_owned() }
 		},
 	};
 
