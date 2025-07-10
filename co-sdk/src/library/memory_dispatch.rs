@@ -60,8 +60,15 @@ where
 	{
 		let tmp = StoreParamsBlockStorage::new(storage.tmp_storage(), false);
 		let reducer_storage = OverlayBlockStorage::new(tasks, reducer_storage.clone(), tmp, None, true, false);
-		let reducer =
-			create_memory_reducer(runtime.runtime(), date.clone(), &id, &reducer_storage, reducer_state).await?;
+		let reducer = create_memory_reducer(
+			runtime.runtime(),
+			date.clone(),
+			&id,
+			&reducer_storage,
+			Default::default(),
+			reducer_state,
+		)
+		.await?;
 		Ok(Self {
 			id,
 			reducer,
@@ -103,6 +110,7 @@ where
 			self.date.clone(),
 			&self.id,
 			&self.reducer_storage,
+			Default::default(),
 			reducer_state,
 		)
 		.await?;
@@ -138,7 +146,7 @@ where
 					action_reference.cid().into(),
 				)
 				.await?;
-			if verify_state != Some(state) {
+			if verify_state.state != Some(state) {
 				return Err(anyhow!("Verify action failed"));
 			}
 		}
@@ -205,7 +213,7 @@ where
 			.push(&self.reducer_storage, self.runtime.runtime(), &self.identity, &self.core, action)
 			.await?;
 		self.new_roots.push(self.reducer_state());
-		Ok(state)
+		Ok(state.state)
 	}
 }
 

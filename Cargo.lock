@@ -1596,6 +1596,7 @@ dependencies = [
  "anyhow",
  "cid 0.11.1",
  "co-api",
+ "co-log",
  "co-macros",
  "co-runtime",
  "co-storage",
@@ -1767,7 +1768,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]

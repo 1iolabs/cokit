@@ -1,6 +1,6 @@
 use cid::Cid;
 use co_identity::{DidKeyIdentity, DidKeyIdentityResolver, IdentityResolverBox, PrivateIdentity};
-use co_log::{EntryBlock, Log};
+use co_log::{EntryBlock, IdentityEntryVerifier, Log};
 use co_primitives::BlockSerializer;
 use co_storage::{BlockStorage, MemoryBlockStorage};
 use futures::TryStreamExt;
@@ -150,7 +150,11 @@ async fn join_is_commutative() {
 }
 
 async fn create_empty_log() -> Log {
-	Log::new("test".as_bytes().to_vec(), IdentityResolverBox::new(DidKeyIdentityResolver::new()), Default::default())
+	Log::new(
+		"test".as_bytes().to_vec(),
+		IdentityEntryVerifier::new(IdentityResolverBox::new(DidKeyIdentityResolver::new())),
+		Default::default(),
+	)
 }
 
 async fn log_push<S, I>(storage: &S, log: &mut Log, identity: &I, t: &str) -> (Cid, EntryBlock)

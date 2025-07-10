@@ -1,4 +1,4 @@
-use super::{application::ApplicationSettings, identity::create_identity_resolver};
+use super::application::ApplicationSettings;
 #[cfg(feature = "pinning")]
 use crate::types::{
 	co_pinning_key::CoPinningKey,
@@ -190,7 +190,7 @@ where
 		let context = Arc::new(result.clone());
 
 		// create log
-		let log = Log::new(CO_ID_LOCAL.as_bytes().to_vec(), create_identity_resolver(), Default::default());
+		let log = Log::new_local(CO_ID_LOCAL.as_bytes().to_vec(), Default::default());
 
 		// create builder
 		let mut builder =
@@ -357,6 +357,7 @@ where
 		self.storage.clone()
 	}
 
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(_parent, co))]
 	async fn refresh(&self, _parent: CoReducer, co: CoReducer) -> anyhow::Result<()> {
 		// read and apply locals
 		//  this will manually re-read all local files
@@ -364,6 +365,7 @@ where
 			.try_for_each(|state| {
 				let co = &co;
 				async move {
+					tracing::info!(?state, "LOAD");
 					co.join_state(state).await?;
 					Ok(())
 				}

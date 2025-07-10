@@ -259,7 +259,7 @@ enum CoreSource<'a> {
 	Action(Cid),
 }
 
-/// Onyl extracts the core of an reducer action.
+/// Only extracts the core of an reducer action.
 /// See: [`co_primitives::ReducerAction`]
 #[derive(Debug, Deserialize)]
 struct CoreReducerAction {

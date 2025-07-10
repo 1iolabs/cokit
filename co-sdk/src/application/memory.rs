@@ -3,7 +3,7 @@ use crate::{
 	reducer::core_resolver::dynamic::DynamicCoreResolver, CoCoreResolver, CoDate, CoReducerState, Reducer,
 	ReducerBuilder,
 };
-use co_log::Log;
+use co_log::{IdentityEntryVerifier, Log};
 use co_primitives::CoId;
 use co_runtime::RuntimePool;
 use co_storage::ExtendedBlockStorage;
@@ -14,14 +14,20 @@ pub async fn create_memory_reducer<S>(
 	date: impl CoDate,
 	id: &CoId,
 	storage: &S,
+	core_resolver: Option<DynamicCoreResolver<S>>,
 	reducer_state: CoReducerState,
 ) -> Result<Reducer<S, DynamicCoreResolver<S>>, anyhow::Error>
 where
 	S: ExtendedBlockStorage + Clone + 'static,
 {
-	let log = Log::new(id.as_bytes().to_vec(), create_identity_resolver(), reducer_state.heads());
-	let core_resolver = CoCoreResolver::default();
-	let mut builder = ReducerBuilder::new(DynamicCoreResolver::new(core_resolver), log);
+	let log =
+		Log::new(id.as_bytes().to_vec(), IdentityEntryVerifier::new(create_identity_resolver()), reducer_state.heads());
+	let core_resolver = core_resolver.unwrap_or_else(|| {
+		let core_resolver = CoCoreResolver::default();
+		let core_resolver = DynamicCoreResolver::new(core_resolver);
+		core_resolver
+	});
+	let mut builder = ReducerBuilder::new(core_resolver, log);
 	if let Some((state, heads)) = reducer_state.some() {
 		builder = builder.with_latest_state(state, heads);
 	}

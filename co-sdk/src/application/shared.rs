@@ -27,7 +27,7 @@ use co_core_co::{CoAction, CreateAction};
 use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
-use co_log::Log;
+use co_log::{IdentityEntryVerifier, Log};
 use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
 use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid};
 use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret};
@@ -196,8 +196,11 @@ impl SharedCoBuilder {
 		// let latest_state = if states.len() == 1 { states.first().cloned() } else { None };
 
 		// log
-		let log =
-			Log::new(self.membership.id.as_str().as_bytes().to_vec(), create_identity_resolver(), Default::default());
+		let log = Log::new(
+			self.membership.id.as_str().as_bytes().to_vec(),
+			IdentityEntryVerifier::new(create_identity_resolver()),
+			Default::default(),
+		);
 
 		// reducer
 		let mut reducer_builder = ReducerBuilder::new(core_resolver, log).with_initialize(self.initialize);
@@ -506,11 +509,15 @@ impl SharedCoCreator {
 			};
 
 		// log
-		let log = Log::new(self.co.id.as_str().as_bytes().to_vec(), create_identity_resolver(), Default::default());
+		let log = Log::new(
+			self.co.id.as_str().as_bytes().to_vec(),
+			IdentityEntryVerifier::new(create_identity_resolver()),
+			Default::default(),
+		);
 
 		// reducer
 		let core_resolver = CoCoreResolver::default();
-		let core_resolver = LogCoreResolver::new(core_resolver);
+		let core_resolver = LogCoreResolver::new(core_resolver, self.co.id.clone());
 		let mut reducer = ReducerBuilder::new(core_resolver, log)
 			.build(&co_storage, runtime.runtime(), date)
 			.await?;

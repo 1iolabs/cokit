@@ -11,6 +11,7 @@ crate-type = ["lib", "cdylib"]
 anyhow = { workspace = true }
 cid = { workspace = true }
 co-api = { workspace = true }
+co-log = { workspace = true }
 co-macros = { workspace = true }
 ipld-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
