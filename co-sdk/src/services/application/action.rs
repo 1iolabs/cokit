@@ -109,9 +109,6 @@ pub enum Action {
 		info: FlushInfo,
 	},
 
-	/// Stage a action and dispatch after flush.
-	CoStaged { co: CoId, action: Box<Action> },
-
 	/// Co has been opened.
 	CoOpen {
 		/// The opened CO.
