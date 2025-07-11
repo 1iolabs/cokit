@@ -72,20 +72,20 @@ async fn fetch_and_observe_state<T, F, Fut, D>(
 				//  note: watch will immediately fire for initial event
 				let stream = reducer.reducer_state_stream();
 				pin_mut!(stream);
-				tracing::info!(co = ?co_id, "watch");
+				tracing::trace!(co = ?co_id, "watch");
 				loop {
 					tokio::select! {
 						item = stream.next() => {
 							match item {
 								Some(next) => {
-									tracing::info!(co = ?co_id, "watch-changed");
+									tracing::trace!(co = ?co_id, "watch-changed");
 									if let Some(next_state) = next.state() {
-										tracing::info!(co = ?co_id, ?next_state, "watch-apply");
+										tracing::trace!(co = ?co_id, ?next_state, "watch-apply");
 										read.read(&reducer, next_state.into(), state, dependency.clone(), &selector).await;
 									}
 								},
 								None => {
-									tracing::info!(co = ?co_id, "watch-failed");
+									tracing::trace!(co = ?co_id, "watch-failed");
 									// should not happen?
 									*state.write() = CoStateResult::Error(format!("Co has been closed"));
 									break;
@@ -96,12 +96,12 @@ async fn fetch_and_observe_state<T, F, Fut, D>(
 							match item {
 								Ok(_) => {
 									// resubscribe
-									tracing::info!(co = ?co_id, "watch-arguments");
+									tracing::trace!(co = ?co_id, "watch-arguments");
 									continue 'arguments;
 								},
 								Err(_) => {
 									// done
-									tracing::info!(co = ?co_id, "watch-dropped");
+									tracing::trace!(co = ?co_id, "watch-dropped");
 									return;
 								},
 							}
