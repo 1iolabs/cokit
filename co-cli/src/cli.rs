@@ -39,8 +39,7 @@ pub struct Cli {
 	pub no_log: bool,
 
 	/// Only log level and above.
-	/// Defaults to info.
-	#[arg(long)]
+	#[arg(long, value_enum, default_value_t)]
 	pub log_level: CliLogLevel,
 
 	/// Read/Write Local CO encryption key to file instead of the OS keychain.
