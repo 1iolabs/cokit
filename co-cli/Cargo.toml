@@ -29,6 +29,7 @@ exitcode = "1.1.2"
 futures = { workspace = true }
 hexdump = "0.1.1"
 ipld-core = { workspace = true }
+multiaddr = { workspace = true }
 opentelemetry = "0.22"
 opentelemetry-otlp = { version = "0.15.0", features = ["tonic"] }
 opentelemetry-semantic-conventions = "0.14.0"

@@ -42,10 +42,7 @@ pub async fn application(settings: CoApplicationSettings) -> Application {
 	// network
 	if settings.network {
 		application
-			.create_network(NetworkSettings {
-				force_new_peer_id: settings.network_force_new_peer_id,
-				..Default::default()
-			})
+			.create_network(NetworkSettings::new().with_force_new_peer_id(settings.network_force_new_peer_id))
 			.await
 			.expect("network");
 	}
