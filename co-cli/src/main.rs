@@ -10,7 +10,7 @@ use opentelemetry_sdk::{runtime, trace as sdktrace, trace::TracerProvider, Resou
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 use std::path::PathBuf;
 use tracing::Level;
-use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+use tracing_bunyan_formatter::BunyanFormattingLayer;
 use tracing_subscriber::{fmt::writer::MakeWriterExt, layer::SubscriberExt, util::SubscriberInitExt};
 
 mod cli;
@@ -48,7 +48,10 @@ async fn app_main() -> anyhow::Result<exitcode::ExitCode> {
 		tokio::fs::create_dir_all(log_path.parent().ok_or(anyhow::anyhow!("no parent"))?).await?;
 		let log_file = std::fs::File::create(log_path)?;
 		let formatting_layer =
-			BunyanFormattingLayer::new(cli.instance_id.to_owned(), log_file.with_max_level(Level::TRACE));
+			BunyanFormattingLayer::new(cli.instance_id.to_owned(), log_file.with_max_level(cli.log_level.to_level()))
+				.serialize_span_id(true)
+				.serialize_span_type(true)
+				.serialize_span_fields(false);
 		Some(formatting_layer)
 	} else {
 		None
@@ -86,12 +89,7 @@ async fn app_main() -> anyhow::Result<exitcode::ExitCode> {
 	};
 
 	// tracing
-	tracing_subscriber::registry()
-		.with(telemetry)
-		.with(JsonStorageLayer)
-		.with(output)
-		.with(log)
-		.init();
+	tracing_subscriber::registry().with(telemetry).with(output).with(log).init();
 
 	// execute
 	cli::command(&cli).await

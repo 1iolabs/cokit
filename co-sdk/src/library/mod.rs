@@ -22,6 +22,7 @@ pub mod keystore_fetch;
 pub mod local_keypair_fetch;
 pub mod local_secret;
 pub mod locals;
+pub mod log_entries_until;
 pub mod max_reference_count;
 pub mod membership_all_heads;
 pub mod memory_dispatch;

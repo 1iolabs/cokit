@@ -2,7 +2,7 @@ use crate::{
 	commands::{co, core_build_builtin, did, file, ipld, network, pin, room, schemars, storage},
 	library::cli_context::CliContext,
 };
-use clap::ArgAction;
+use clap::{ArgAction, ValueEnum};
 use exitcode::ExitCode;
 use std::path::PathBuf;
 
@@ -35,21 +35,25 @@ pub struct Cli {
 	pub log_path: Option<PathBuf>,
 
 	/// Disable logging to file.
-	#[arg(long, default_value_t = false)]
+	#[arg(long)]
 	pub no_log: bool,
+
+	/// Only log level and above.
+	#[arg(long, value_enum, default_value_t)]
+	pub log_level: CliLogLevel,
 
 	/// Read/Write Local CO encryption key to file instead of the OS keychain.
 	///
 	/// Warning: This option is INSECURE only use when you know the implications.
-	#[arg(long, default_value_t = false)]
+	#[arg(long)]
 	pub no_keychain: bool,
 
 	/// No output.
-	#[arg(short, default_value_t = false)]
+	#[arg(short)]
 	pub quiet: bool,
 
 	/// Verbose level.
-	/// By default prints info and above levels. To precent this use `quiet` option.
+	/// By default prints info and above levels. To prevent this use `quiet` option.
 	#[arg(short, default_value_t = 1, action = ArgAction::Count)]
 	pub verbose: u8,
 
@@ -62,12 +66,33 @@ pub struct Cli {
 	pub open_telemetry_endpoint: String,
 
 	/// Disable default features.
-	#[arg(long, default_value_t = false)]
+	#[arg(long)]
 	pub no_default_features: bool,
 
 	/// Enable feature.
 	#[arg(long, short = 'F')]
 	pub feature: Vec<String>,
+}
+
+#[derive(Debug, Default, Clone, ValueEnum)]
+pub enum CliLogLevel {
+	Error,
+	Warn,
+	#[default]
+	Info,
+	Debug,
+	Trace,
+}
+impl CliLogLevel {
+	pub fn to_level(&self) -> tracing::Level {
+		match self {
+			CliLogLevel::Error => tracing::Level::ERROR,
+			CliLogLevel::Warn => tracing::Level::WARN,
+			CliLogLevel::Info => tracing::Level::INFO,
+			CliLogLevel::Debug => tracing::Level::DEBUG,
+			CliLogLevel::Trace => tracing::Level::TRACE,
+		}
+	}
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]

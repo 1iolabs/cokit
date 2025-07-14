@@ -19,16 +19,16 @@ use std::{
 };
 use tokio::time::timeout;
 
-async fn trace_state(co: &str, storage: &CoStorage, reducer_state: &CoReducerState) {
-	tracing::trace!(
-		"state: {}: {:#?}",
-		co,
-		ipld_resolve_recursive(storage, Ipld::Link(reducer_state.state().unwrap()), true)
-			.await
-			.unwrap()
-	);
+#[tracing::instrument(level = tracing::Level::TRACE, skip_all)]
+async fn trace_state(note: &str, co: &str, storage: &CoStorage, reducer_state: &CoReducerState) {
+	let state = ipld_resolve_recursive(storage, Ipld::Link(reducer_state.state().unwrap()), true)
+		.await
+		.unwrap();
+	tracing::trace!(note, ?state, ?co, "trace-state");
 }
-async fn trace_heads(co: &str, context: &CoContext, storage: &CoStorage, reducer_state: &CoReducerState) {
+
+#[tracing::instrument(level = tracing::Level::TRACE, skip_all)]
+async fn trace_heads(note: &str, co: &str, context: &CoContext, storage: &CoStorage, reducer_state: &CoReducerState) {
 	// fn pretty_print_with_indent<T: std::fmt::Debug>(value: &T, indent: usize) {
 	// 	let formatted = format!("{:#?}", value);
 	// 	let indent_str = " ".repeat(indent);
@@ -39,7 +39,7 @@ async fn trace_heads(co: &str, context: &CoContext, storage: &CoStorage, reducer
 	// 		.join("\n");
 	// 	println!("{}", indented);
 	// }
-	tracing::trace!("heads: {}: {:?}", co, reducer_state.heads());
+	tracing::trace!(note, heads = ?reducer_state.heads(), ?co, "trace-heads");
 	let entries = context
 		.entries_from_heads(CoId::from(co), storage.clone(), reducer_state.heads().clone())
 		.await
@@ -48,13 +48,10 @@ async fn trace_heads(co: &str, context: &CoContext, storage: &CoStorage, reducer
 		.map(|(index, result)| result.map(|ok| (index, ok)));
 	pin_mut!(entries);
 	while let Some((index, entry)) = entries.try_next().await.unwrap() {
-		tracing::trace!("{} (#{})", entry.cid(), index);
-		tracing::trace!(
-			"    {:?}",
-			ipld_resolve_recursive(storage, Ipld::Link(entry.entry().payload), true)
-				.await
-				.unwrap()
-		);
+		let action = ipld_resolve_recursive(storage, Ipld::Link(entry.entry().payload), true)
+			.await
+			.unwrap();
+		tracing::trace!(note, ?action, ?co, "{} (#{})", entry.cid(), index);
 	}
 }
 
@@ -72,7 +69,7 @@ async fn test_conflicting_membership_update_encrypted() {
 
 async fn conflicting_membership_update(encryption: bool) {
 	let timeout_duration = Duration::from_secs(5);
-	let tmp = TmpDir::new("co");
+	let tmp = TmpDir::new("co").without_clear();
 
 	// application
 	let mut application_builder = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
@@ -117,10 +114,10 @@ async fn conflicting_membership_update(encryption: bool) {
 	// log
 	let local_state = local_co.reducer_state().await;
 	let co_state = co.reducer_state().await;
-	trace_state("local", &local_co.storage(), &local_state).await;
-	trace_heads("local", application.co(), &local_co.storage(), &local_state).await;
-	trace_state("shared", &co.storage(), &co_state).await;
-	trace_heads("shared", application.co(), &co.storage(), &co_state).await;
+	trace_state("create", "local", &local_co.storage(), &local_state).await;
+	trace_heads("create", "local", application.co(), &local_co.storage(), &local_state).await;
+	trace_state("create", "shared", &co.storage(), &co_state).await;
+	trace_heads("create", "shared", application.co(), &co.storage(), &co_state).await;
 
 	// log heads
 
@@ -151,10 +148,10 @@ async fn conflicting_membership_update(encryption: bool) {
 
 	// validate
 	tracing::info!(
-		co = ?co.reducer_state().await,
+		co1 = ?co.reducer_state().await,
 		co2 = ?co2.reducer_state().await,
-		local_co = ?local_co.reducer_state().await,
-		local_co2 = ?local_co2.reducer_state().await,
+		local1_co = ?local_co.reducer_state().await,
+		local2_co = ?local_co2.reducer_state().await,
 		"test-start"
 	);
 	assert_eq!(co.reducer_state().await, co2.reducer_state().await);
@@ -200,10 +197,10 @@ async fn conflicting_membership_update(encryption: bool) {
 		.await
 		.unwrap();
 	tracing::info!(co = ?co.reducer_state().await, co2 = ?co2.reducer_state().await, "test-conflict");
-	tracing::info!("local-conflict");
-	trace_heads("local", application.co(), &local_co.storage(), &local_co.reducer_state().await).await;
-	tracing::info!("local2-conflict");
-	trace_heads("local", application.co(), &local_co2.storage(), &local_co2.reducer_state().await).await;
+	trace_heads("local1-conflict", "local", application.co(), &local_co.storage(), &local_co.reducer_state().await)
+		.await;
+	trace_heads("local2-conflict", "local", application.co(), &local_co2.storage(), &local_co2.reducer_state().await)
+		.await;
 
 	// tracing::info!("co1 count {:?}", count_folders(&co).await);
 	// tracing::info!("co2 count {:?}", count_folders(&co2).await);
@@ -244,17 +241,25 @@ async fn conflicting_membership_update(encryption: bool) {
 	}
 
 	// refresh
-	tracing::info!("local-refresh");
+	tracing::info!("local1-refresh");
 	application.co().refresh(local_co.clone()).await.unwrap();
-	trace_state("local", &local_co.storage(), &local_co.reducer_state().await).await;
-	trace_heads("local", application.co(), &local_co.storage(), &local_co.reducer_state().await).await;
+	trace_state("local1-refresh", "local", &local_co.storage(), &local_co.reducer_state().await).await;
+	trace_heads("local1-refresh", "local", application.co(), &local_co.storage(), &local_co.reducer_state().await)
+		.await;
 	tracing::info!("local2-refresh");
 	application2.co().refresh(local_co2.clone()).await.unwrap();
-	trace_state("local", &local_co2.storage(), &local_co2.reducer_state().await).await;
-	trace_heads("local", application2.co(), &local_co2.storage(), &local_co2.reducer_state().await).await;
+	trace_state("local2-refresh", "local", &local_co2.storage(), &local_co2.reducer_state().await).await;
+	trace_heads("local2-refresh", "local", application2.co(), &local_co2.storage(), &local_co2.reducer_state().await)
+		.await;
+
+	// trace cos
+	trace_state("co1-refresh", "shared", &co.storage(), &co.reducer_state().await).await;
+	trace_heads("co1-refresh", "shared", application.co(), &co.storage(), &co.reducer_state().await).await;
+	trace_state("co2-refresh", "shared", &co2.storage(), &co2.reducer_state().await).await;
+	trace_heads("co2-refresh", "shared", application.co(), &co2.storage(), &co2.reducer_state().await).await;
 
 	// check: refresh and wait until state changed
-	tracing::info!(co = ?co.reducer_state().await, co2 = ?co2.reducer_state().await, "test-refresh");
+	tracing::info!(co1 = ?co.reducer_state().await, co2 = ?co2.reducer_state().await, "test-refresh");
 	let check1 = async {
 		timeout(
 			timeout_duration,

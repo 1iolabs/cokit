@@ -1,4 +1,4 @@
-use super::{application::ApplicationSettings, identity::create_identity_resolver};
+use super::application::ApplicationSettings;
 #[cfg(feature = "pinning")]
 use crate::types::{
 	co_pinning_key::CoPinningKey,
@@ -10,7 +10,7 @@ use crate::{
 		locals::{ApplicationLocal, FileLocals, Locals, MemoryLocals},
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
-	services::reducer::ReducerFlush,
+	services::reducer::{FlushInfo, ReducerFlush},
 	types::{
 		co_reducer_context::{CoReducerContext, CoReducerFeature},
 		co_reducer_state::MappedCoReducerState,
@@ -25,7 +25,6 @@ use co_actor::ActorHandle;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
 use co_primitives::{tags, CloneWithBlockStorageSettings, OptionMappedCid};
-use co_runtime::RuntimePool;
 use co_storage::{
 	BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, ExtendedBlockStorage,
 };
@@ -191,7 +190,7 @@ where
 		let context = Arc::new(result.clone());
 
 		// create log
-		let log = Log::new(CO_ID_LOCAL.as_bytes().to_vec(), create_identity_resolver(), Default::default());
+		let log = Log::new_local(CO_ID_LOCAL.as_bytes().to_vec(), Default::default());
 
 		// create builder
 		let mut builder =
@@ -211,12 +210,8 @@ where
 		}
 
 		// create reducer
-		let mut reducer = builder.build(&storage, runtime.runtime(), date).await?;
-
-		// create empty
-		if reducer.is_empty() {
-			setup_local_co(&storage, runtime.runtime(), &local_co.identity, &mut reducer, &local_co.settings).await?;
-		}
+		let reducer = builder.build(&storage, runtime.runtime(), date).await?;
+		let initial = reducer.is_empty();
 
 		// flush
 		let flush = result.clone();
@@ -240,6 +235,11 @@ where
 			context,
 			Box::new(flush),
 		)?;
+
+		// setup
+		if initial {
+			setup_local_co(&co_reducer, &local_co.identity, &local_co.settings).await?;
+		}
 
 		// watch
 		if watcher {
@@ -357,6 +357,7 @@ where
 		self.storage.clone()
 	}
 
+	#[tracing::instrument(level = tracing::Level::TRACE, skip(_parent, co))]
 	async fn refresh(&self, _parent: CoReducer, co: CoReducer) -> anyhow::Result<()> {
 		// read and apply locals
 		//  this will manually re-read all local files
@@ -364,6 +365,7 @@ where
 			.try_for_each(|state| {
 				let co = &co;
 				async move {
+					tracing::info!(?state, "LOAD");
 					co.join_state(state).await?;
 					Ok(())
 				}
@@ -406,16 +408,22 @@ where
 		+ 'static,
 	R: CoreResolver<S> + Send + Sync + 'static,
 {
+	/// Flush changed nodes.
+	///
+	/// # Pinning
+	/// We need to write intermediate states/heads to in order to have them recycled eventually.
+	/// When we rect this point they alredy has been flushed to the permananet storage.
 	async fn flush(
 		&mut self,
 		storage: &S,
 		reducer: &mut Reducer<S, R>,
+		info: &FlushInfo,
 		_new_roots: Vec<CoReducerState>,
 		_removed_blocks: BTreeSet<OptionMappedCid>,
 	) -> anyhow::Result<()> {
 		// write references
 		#[cfg(feature = "pinning")]
-		{
+		if info.local {
 			let new_roots = _new_roots;
 			let removed_blocks = _removed_blocks;
 			let (last_reducer_state, context) = &self.pinning;
@@ -509,18 +517,14 @@ where
 }
 
 /// Setup the Local CO by adding cores.
-#[tracing::instrument(level = tracing::Level::TRACE, err, skip(runtime, reducer, storage))]
-async fn setup_local_co<S, R>(
-	storage: &S,
-	runtime: &RuntimePool,
+#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(reducer))]
+async fn setup_local_co(
+	reducer: &CoReducer,
 	identity: &LocalIdentity,
-	reducer: &mut Reducer<S, R>,
 	settings: &ApplicationSettings,
-) -> Result<(), anyhow::Error>
-where
-	S: ExtendedBlockStorage + Sync + Send + Clone + 'static,
-	R: CoreResolver<S> + Send + Sync + 'static,
-{
+) -> Result<(), anyhow::Error> {
+	let storage = reducer.storage();
+
 	// create
 	let create = co_core_co::CreateAction::new(
 		CO_ID_LOCAL.into(),
@@ -552,13 +556,13 @@ where
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_STORAGE).expect(CO_CORE_STORAGE),
 			tags: tags!("core": CO_CORE_STORAGE),
-			state: create_storage_core_state(storage, settings).await?,
+			state: create_storage_core_state(&storage, settings).await?,
 		},
 	);
 
 	// create
 	let action = co_core_co::CoAction::Create(create);
-	reducer.push(storage, runtime, identity, CO_CORE_NAME_CO, &action).await?;
+	reducer.push(identity, CO_CORE_NAME_CO, &action).await?;
 
 	// done
 	Ok(())

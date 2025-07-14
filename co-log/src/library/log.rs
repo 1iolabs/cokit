@@ -1,22 +1,24 @@
 use super::{entry::EntryBlock, get_entry_block::get_entry_blocks, join::JoinEntry, stream::create_stream};
-use crate::{library::clock::max_clock, LogError};
+use crate::{
+	library::{clock::max_clock, verify_entry::ReadOnlyEntryVerifier},
+	EntryVerifier, LogError, NoEntryVerifier,
+};
 use cid::Cid;
-use co_identity::{IdentityResolverBox, PrivateIdentity};
+use co_identity::PrivateIdentity;
 use co_primitives::{BlockStorage, BlockStorageExt, Clock, Entry, Link};
 use futures::{pin_mut, Stream, TryStreamExt};
 use serde::Serialize;
-use std::collections::{BTreeSet, HashSet};
+use std::{
+	collections::{BTreeSet, HashSet},
+	sync::Arc,
+};
 
 #[derive(Debug, Clone)]
 pub struct Log {
 	id: Vec<u8>,
-
-	/// Identity.
-	identity_resolver: IdentityResolverBox,
-
+	entry_verifier: Arc<dyn EntryVerifier>,
 	/// Current heads.
 	heads: BTreeSet<Cid>,
-
 	// Index of entries.
 	index: HashSet<Cid>,
 }
@@ -39,8 +41,8 @@ impl Log {
 		self.heads.iter()
 	}
 
-	pub fn identity_resolver(&self) -> &IdentityResolverBox {
-		&self.identity_resolver
+	pub fn entry_verifier(&self) -> &dyn EntryVerifier {
+		self.entry_verifier.as_ref()
 	}
 
 	/// Test if the logs currently knowns about the entry id.
@@ -60,13 +62,22 @@ impl Log {
 	}
 }
 impl Log {
-	pub fn new(id: Vec<u8>, identity_resolver: IdentityResolverBox, heads: BTreeSet<Cid>) -> Self {
-		Log { id, identity_resolver, heads, index: Default::default() }
+	pub fn new(id: Vec<u8>, entry_verifier: impl EntryVerifier, heads: BTreeSet<Cid>) -> Self {
+		Log { id, entry_verifier: Arc::new(entry_verifier), heads, index: Default::default() }
 	}
 
-	/// Create new log with random ID.
-	pub fn create(identity_resolver: IdentityResolverBox) -> Self {
-		Self::new(uuid::Uuid::new_v4().to_bytes_le().to_vec(), identity_resolver, Default::default())
+	pub fn new_local(id: Vec<u8>, heads: BTreeSet<Cid>) -> Self {
+		Log { id, entry_verifier: Arc::new(NoEntryVerifier::default()), heads, index: Default::default() }
+	}
+
+	pub fn new_readonly(id: Vec<u8>, heads: BTreeSet<Cid>) -> Self {
+		Log { id, entry_verifier: Arc::new(ReadOnlyEntryVerifier::default()), heads, index: Default::default() }
+	}
+
+	/// (Re)sets the heads of this log.
+	pub fn set_heads(&mut self, heads: BTreeSet<Cid>) {
+		self.heads = heads;
+		self.index.clear();
 	}
 
 	pub async fn get<S>(&self, storage: &S, cid: &Cid) -> Result<EntryBlock, LogError>

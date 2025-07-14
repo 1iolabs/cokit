@@ -102,6 +102,28 @@ impl CoContext {
 			})
 		});
 	}
+
+	/// Execute future task using CO Application and return its result when done.
+	/// Note: Tasks will be started in sequence but executed in parallel.
+	pub async fn result<F, Fut, T>(&self, mut error: CoErrorSignal, f: F) -> Option<T>
+	where
+		Fut: Future<Output = Result<T, anyhow::Error>> + Send + 'static,
+		F: FnOnce(Application) -> Fut + Send + 'static,
+		T: Send + 'static,
+	{
+		let (tx, rx) = futures::channel::oneshot::channel();
+		self.execute_future_box(move |application| {
+			Box::pin(async move {
+				match f(application).await {
+					Ok(result) => {
+						tx.send(result).ok();
+					},
+					Err(e) => error.write().push(CoError::from_error(e)),
+				}
+			})
+		});
+		rx.await.ok()
+	}
 }
 
 type TaskFn = dyn (FnOnce(Application) -> BoxFuture<'static, ()>) + Send + 'static;

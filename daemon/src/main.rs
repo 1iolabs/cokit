@@ -29,7 +29,7 @@ async fn main() {
 
 	// driver: network
 	application
-		.create_network(NetworkSettings { force_new_peer_id: cli.force_new_peer_id, ..Default::default() })
+		.create_network(NetworkSettings::new().with_force_new_peer_id(cli.force_new_peer_id))
 		.await
 		.expect("network");
 

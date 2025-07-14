@@ -19,6 +19,7 @@ where
 		&mut self,
 		storage: &S,
 		reducer: &mut Reducer<S, R>,
+		info: &FlushInfo,
 		new_roots: Vec<CoReducerState>,
 		removed_blocks: BTreeSet<OptionMappedCid>,
 	) -> anyhow::Result<()>;

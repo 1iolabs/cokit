@@ -1,5 +1,5 @@
 use co_identity::{IdentityResolver, LocalIdentityResolver};
-use co_log::Log;
+use co_log::{IdentityEntryVerifier, Log};
 use co_storage::MemoryBlockStorage;
 
 /// Test unseen but already integrated joins.
@@ -8,11 +8,12 @@ use co_storage::MemoryBlockStorage;
 #[tokio::test]
 async fn test_previous_heads() {
 	let identities = LocalIdentityResolver::new();
+	let entry_verifier = IdentityEntryVerifier::new(identities.clone().boxed());
 	let identity = identities.private_identity("did:local:test").unwrap();
 	let storage = MemoryBlockStorage::default();
 
 	// create
-	let mut log = Log::new("test".as_bytes().to_vec(), identities.clone().boxed(), Default::default());
+	let mut log = Log::new("test".as_bytes().to_vec(), entry_verifier.clone(), Default::default());
 	log.push_event(&storage, &identity, &0).await.unwrap();
 	log.push_event(&storage, &identity, &1).await.unwrap();
 	log.push_event(&storage, &identity, &2).await.unwrap();
@@ -22,7 +23,7 @@ async fn test_previous_heads() {
 	let heads4 = log.heads().clone();
 
 	// join
-	let mut log = Log::new("test".as_bytes().to_vec(), identities.clone().boxed(), Default::default());
+	let mut log = Log::new("test".as_bytes().to_vec(), entry_verifier.clone(), Default::default());
 	assert_eq!(log.join_heads(&storage, heads4.iter()).await.unwrap(), true);
 	assert_eq!(log.heads(), &heads4);
 	assert_eq!(log.join_heads(&storage, heads2.iter()).await.unwrap(), false); // should have no effect as its already integrated
@@ -32,11 +33,12 @@ async fn test_previous_heads() {
 #[tokio::test]
 async fn test_previous_heads_not_load_whole_log_item_hit() {
 	let identities = LocalIdentityResolver::new();
+	let entry_verifier = IdentityEntryVerifier::new(identities.clone().boxed());
 	let identity = identities.private_identity("did:local:test").unwrap();
 	let storage = MemoryBlockStorage::default();
 
 	// create
-	let mut log = Log::new("test".as_bytes().to_vec(), identities.clone().boxed(), Default::default());
+	let mut log = Log::new("test".as_bytes().to_vec(), entry_verifier.clone(), Default::default());
 	let (entry0, _) = log.push_event(&storage, &identity, &0).await.unwrap();
 	let (entry1, _) = log.push_event(&storage, &identity, &1).await.unwrap();
 	let (entry2, _) = log.push_event(&storage, &identity, &2).await.unwrap();
@@ -46,7 +48,7 @@ async fn test_previous_heads_not_load_whole_log_item_hit() {
 	let heads4 = log.heads().clone();
 
 	// validate to not the whole log has been loaded
-	let mut log = Log::new("test".as_bytes().to_vec(), identities.clone().boxed(), heads4.clone());
+	let mut log = Log::new("test".as_bytes().to_vec(), entry_verifier.clone(), heads4.clone());
 	assert_eq!(log.join_heads(&storage, heads2.iter()).await.unwrap(), false);
 	assert_eq!(log.heads(), &heads4);
 	assert_eq!(log.contains(entry2.cid()), true);
@@ -57,12 +59,13 @@ async fn test_previous_heads_not_load_whole_log_item_hit() {
 #[tokio::test]
 async fn test_previous_heads_not_load_whole_log_clock_hit() {
 	let identities = LocalIdentityResolver::new();
+	let entry_verifier = IdentityEntryVerifier::new(identities.clone().boxed());
 	let identity = identities.private_identity("did:local:test").unwrap();
 	let identity2 = identities.private_identity("did:local:test").unwrap();
 	let storage = MemoryBlockStorage::default();
 
 	// create
-	let mut log = Log::new("test".as_bytes().to_vec(), identities.clone().boxed(), Default::default());
+	let mut log = Log::new("test".as_bytes().to_vec(), entry_verifier.clone(), Default::default());
 	let (entry0, _) = log.push_event(&storage, &identity, &0).await.unwrap();
 	let (entry1, _) = log.push_event(&storage, &identity, &1).await.unwrap();
 	let (entry2, _) = log.push_event(&storage, &identity, &2).await.unwrap();
@@ -72,12 +75,12 @@ async fn test_previous_heads_not_load_whole_log_clock_hit() {
 	let heads4 = log.heads().clone();
 
 	// create item after `2`
-	let mut log2 = Log::new("test".as_bytes().to_vec(), identities.clone().boxed(), heads2.clone());
+	let mut log2 = Log::new("test".as_bytes().to_vec(), entry_verifier.clone(), heads2.clone());
 	let (entry30, _) = log2.push_event(&storage, &identity2, &30).await.unwrap();
 	let log2_heads = log2.heads().clone();
 
 	// validate to not the whole log has been loaded and stop after clock has seen
-	let mut log = Log::new("test".as_bytes().to_vec(), identities.clone().boxed(), heads4.clone());
+	let mut log = Log::new("test".as_bytes().to_vec(), entry_verifier.clone(), heads4.clone());
 	assert_eq!(log.join_heads(&storage, log2_heads.iter()).await.unwrap(), true);
 	let mut expected_heads = heads4.clone();
 	expected_heads.insert(*entry30.cid());

@@ -179,7 +179,7 @@ mod tests {
 			.unwrap();
 		let local_co = application.local_co_reducer().await.unwrap();
 		let storage = local_co.storage();
-		assert_eq!(count_pin_references(&local_co, CoPinningKey::State).await, 0);
+		assert_eq!(count_pin_references(&local_co, CoPinningKey::State).await, 1); // this contains the intermediate point before pinning
 
 		// push
 		let local_co_state = local_co.reducer_state().await;
@@ -193,7 +193,7 @@ mod tests {
 			)
 			.await
 			.unwrap();
-		assert_eq!(count_pin_references(&local_co, CoPinningKey::State).await, 2);
+		assert_eq!(count_pin_references(&local_co, CoPinningKey::State).await, 3); // this contains the intermediate point before pinning, the actual state before and the next intermediate point.
 
 		// only keep latest
 		local_co

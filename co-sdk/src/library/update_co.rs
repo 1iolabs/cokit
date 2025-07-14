@@ -55,8 +55,8 @@ where
 			//  whichever is faster but this makes sure that the heads are merged after this call
 			co_reducer.join(received_heads).await?;
 		},
-		HeadsMessage::Error { code, message } => {
-			return Err(anyhow!("Request failed: {:?}: {}", code, message));
+		HeadsMessage::Error { co, code, message } => {
+			return Err(anyhow!("Request failed ({:?}): {}: {}", code, co, message));
 		},
 		_ => {},
 	}

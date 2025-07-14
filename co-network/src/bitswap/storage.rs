@@ -1,6 +1,6 @@
 use crate::{
-	bitswap::Token, library::libipld_interop::to_libipld_cid, BitswapBehaviourProvider, NetworkTask,
-	NetworkTaskSpawner, PeerProvider,
+	backoff_with_jitter, bitswap::Token, library::libipld_interop::to_libipld_cid, BitswapBehaviourProvider,
+	NetworkTask, NetworkTaskSpawner, PeerProvider,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -8,14 +8,14 @@ use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, 
 use co_storage::{
 	BlockStat, BlockStorage, BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, StorageError,
 };
-use futures::{channel::oneshot, pin_mut};
+use futures::{channel::oneshot, pin_mut, stream, StreamExt};
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	PeerId, Swarm,
 };
 use libp2p_bitswap::{BitswapEvent, QueryId};
 use std::{collections::BTreeSet, marker::PhantomData, mem::swap, time::Duration};
-use tokio_stream::StreamExt;
+use tokio::time::{sleep, timeout_at};
 
 pub struct NetworkBlockStorage<S, B, C, N, P> {
 	next: S,
@@ -25,6 +25,7 @@ pub struct NetworkBlockStorage<S, B, C, N, P> {
 	_context: PhantomData<fn(C)>,
 	mapping: bool,
 	timeout: Duration,
+	concurrent: usize,
 	tokens: Vec<Token>,
 	settings: BlockStorageSettings,
 }
@@ -41,6 +42,7 @@ where
 			spawner,
 			peer_provider,
 			timeout,
+			concurrent: 4,
 			mapping: false,
 			tokens: Default::default(),
 			_behaviour: Default::default(),
@@ -61,38 +63,85 @@ where
 		self.peer_provider = peers;
 	}
 
+	/// Get block from co network.
+	/// Ask `concurrent` peers in parallel for a block.
+	/// Use the first block that will be received.
+	///
+	/// ```mermaid
+	/// sequenceDiagram
+	/// 		participant A as Caller
+	/// 		participant S as Storage
+	/// 		participant C as Connections
+	/// 		participant B as Bitswap
+	/// 		A ->> S: get(cid_a)
+	/// 		activate A
+	/// 		loop
+	/// 			S ->>+ C: connect (use via peers_added)
+	/// 			loop with concurrency
+	/// 				C -->+ S: peer
+	/// 				S ->>+ B: get `cid_a` from `peer`
+	/// 				B -->- S: Result<(), Error>
+	/// 				alt ok
+	/// 					S ->> A: Ok
+	/// 					deactivate A
+	/// 				else
+	/// 					S -->- S: Error
+	/// 				end
+	/// 			end
+	/// 			C --x- S: close
+	/// 			opt timeout
+	/// 				S --x A: Err(Insufficient peers)
+	/// 			end
+	/// 		end
+	/// ```
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	async fn get_network(&self, cid: Cid) -> Result<(), StorageError> {
 		let mapped = self.to_network_cid(cid).await;
-		let result_stream = self
-			.peer_provider
-			.peers_added()
-			.filter(|peers| !peers.is_empty())
-			// start network task for every peer(s).
-			.then(|peers| async move {
-				let (tx, rx) = oneshot::channel();
-				let task = GetNetworkTask::new(mapped, self.tokens.clone(), peers, tx);
-				self.spawner.spawn(task).map_err(|e| StorageError::Internal(e.into()))?;
-				rx.await.map_err(|e| StorageError::Internal(e.into()))??;
-				Ok::<(), StorageError>(())
-			})
-			.timeout(self.timeout)
-			.filter_map(|result| match result {
-				Ok(network_result) => match network_result {
-					// success - return ok
-					// drop will cancel others
-					Ok(_) => Some(Ok(())),
-					// error - ignore other errors
-					Err(_) => None,
-				},
-				// timeout - return err
-				Err(e) => {
-					return Some(Err(e));
-				},
-			})
-			.take(1);
-		pin_mut!(result_stream);
-		while let Some(result) = result_stream.next().await {
-			return result.map_err(|e| StorageError::NotFound(cid, e.into()));
+		let deadline = tokio::time::Instant::now() + self.timeout;
+		let mut retry = 1;
+		loop {
+			// start network task for every peer.
+			let get_stream = self
+				.peer_provider
+				.peers_added()
+				.flat_map(stream::iter)
+				.map(|peer| GetNetworkTask::get(&self.spawner, mapped, self.tokens.clone(), [peer].into()))
+				.buffer_unordered(self.concurrent);
+			pin_mut!(get_stream);
+			loop {
+				let result = timeout_at(deadline, get_stream.next()).await;
+				match result {
+					// no more peers
+					Ok(None) => {
+						break;
+					},
+					// some `GetNetworkTask` reported ok
+					Ok(Some(Ok(()))) => {
+						// done
+						return Ok(());
+					},
+					// some `GetNetworkTask` reported a error
+					Ok(Some(Err(err))) => {
+						// log
+						tracing::warn!(?err, ?cid, "get-network-failed");
+					},
+					// timeout
+					Err(err) => {
+						return Err(StorageError::NotFound(cid, err.into()));
+					},
+				}
+			}
+
+			// backoff
+			sleep(backoff_with_jitter(retry)).await;
+
+			// timeout?
+			if tokio::time::Instant::now() > deadline {
+				break;
+			}
+
+			// retry
+			retry += 1;
 		}
 		Err(StorageError::NotFound(cid, anyhow::anyhow!("Insufficent peers")))
 	}
@@ -122,6 +171,7 @@ where
 			settings: self.settings.clone(),
 			_behaviour: Default::default(),
 			_context: Default::default(),
+			concurrent: self.concurrent,
 		}
 	}
 }
@@ -136,7 +186,6 @@ where
 	type StoreParams = S::StoreParams;
 
 	/// Returns a block from storage.
-	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		match self.next.get(cid).await {
 			Ok(block) => Ok(block),
@@ -150,19 +199,16 @@ where
 
 	/// Inserts a block into storage.
 	/// Returns the CID of the block (gurranted to be the same as the supplied).
-	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, block), fields(cid = ?block.cid()))]
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		self.next.set(block).await
 	}
 
 	/// Remove a block.
-	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
 		self.next.remove(cid).await
 	}
 
 	/// Stat a block.
-	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		match self.next.stat(cid).await {
 			Err(StorageError::NotFound(_, _)) if !self.settings.disallow_networking => {
@@ -206,6 +252,7 @@ where
 			peer_provider: self.peer_provider.clone(),
 			mapping: self.mapping.clone(),
 			timeout: self.timeout.clone(),
+			concurrent: self.concurrent,
 			tokens: self.tokens.clone(),
 			settings,
 			_behaviour: Default::default(),
@@ -258,6 +305,24 @@ impl GetNetworkTask {
 		result: oneshot::Sender<Result<(), StorageError>>,
 	) -> Self {
 		Self { cid, tokens, state: GetNetworkTaskState::Pending(peers, result) }
+	}
+
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(spawner, tokens))]
+	pub async fn get<B, C, N>(
+		spawner: &N,
+		cid: Cid,
+		tokens: Vec<Token>,
+		peers: BTreeSet<PeerId>,
+	) -> Result<(), StorageError>
+	where
+		N: NetworkTaskSpawner<B, C>,
+		B: NetworkBehaviour + BitswapBehaviourProvider,
+	{
+		let (tx, rx) = oneshot::channel();
+		let task = GetNetworkTask::new(cid, tokens, peers, tx);
+		spawner.spawn(task).map_err(|e| StorageError::Internal(e.into()))?;
+		rx.await.map_err(|e| StorageError::Internal(e.into()))??;
+		Ok::<(), StorageError>(())
 	}
 }
 impl<B, C> NetworkTask<B, C> for GetNetworkTask

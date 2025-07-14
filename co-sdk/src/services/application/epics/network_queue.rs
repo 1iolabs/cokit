@@ -1,13 +1,16 @@
 use crate::{
 	library::network_queue::{
-		network_queue_action, network_queue_backlog, network_queue_message, network_queue_task_complete,
-		network_queue_task_doing,
+		network_queue_action, network_queue_backlog, network_queue_heads, network_queue_message,
+		network_queue_task_complete, network_queue_task_doing,
 	},
 	network::PeersNetworkTask,
+	services::application::HeadsMessageReceivedAction,
+	types::message::heads::HeadsMessage,
 	Action, CoContext, CoUuid,
 };
 use co_actor::{Actions, Epic};
 use co_identity::PrivateIdentity;
+use co_network::backoff_with_jitter;
 use co_primitives::{CoId, CoTryStreamExt};
 use futures::{future::Either, stream, FutureExt, Stream, StreamExt};
 use std::{collections::BTreeSet, future::ready};
@@ -30,7 +33,21 @@ pub fn network_queue_message_epic(
 			Some(
 				async move { network_queue_message(&context, message).await }
 					.into_stream()
-					.try_ignore_elements(),
+					.try_ignore_elements()
+					.boxed(),
+			)
+		},
+		Action::HeadsMessageComplete {
+			message: message @ HeadsMessageReceivedAction { message: HeadsMessage::Heads(_co, _heads), .. },
+			result: Err(_),
+		} => {
+			let context = context.clone();
+			let message = message.clone();
+			Some(
+				async move { network_queue_heads(&context, message).await }
+					.into_stream()
+					.try_ignore_elements()
+					.boxed(),
 			)
 		},
 		_ => None,
@@ -125,7 +142,7 @@ impl Epic<Action, (), CoContext> for NetworkQueueProcessEpic {
 						{
 							let retry = *retry + 1;
 							async move {
-								tokio::time::sleep(backoff(retry)).await;
+								tokio::time::sleep(backoff_with_jitter(retry)).await;
 								Ok(Action::NetworkQueueProcess { co, retry })
 							}
 						}
@@ -212,13 +229,6 @@ impl Pending {
 	}
 }
 
-fn backoff(retry: u32) -> std::time::Duration {
-	let base = std::time::Duration::from_secs(3000);
-	let max = std::time::Duration::from_secs(60);
-	let backoff = base * 2u32.pow(retry.min(10)); // cap to avoid overflow
-	std::cmp::min(backoff, max)
-}
-
 fn process_complete(
 	context: &CoContext,
 	co: &Option<CoId>,
@@ -275,7 +285,7 @@ fn process(
 			}
 
 			// register complete
-			let complete_fut = actions.once_map(complete);
+			let complete_fut = actions.once_map(move |action| complete.is_complete(action));
 
 			// send
 			yield action;

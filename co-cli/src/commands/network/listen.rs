@@ -6,6 +6,7 @@ use co_primitives::{DagSetExt, Did};
 use co_sdk::{state, CoId, CoReducerFactory, NetworkSettings};
 use exitcode::ExitCode;
 use futures::{stream, StreamExt, TryStreamExt};
+use multiaddr::Multiaddr;
 use std::future::ready;
 
 #[derive(Debug, Clone, clap::Args)]
@@ -18,9 +19,27 @@ pub struct Command {
 	#[arg(long)]
 	pub identity: Option<Vec<Did>>,
 
-	/// Listen address (multiaddr like /ip4/0.0.0.0/udp/0/quic-v1).
-	#[arg(long, value_name = "MULTIADDR")]
-	pub listen: Option<String>,
+	/// Listen address.
+	#[arg(long, value_name = "MULTIADDR", default_value_t = default_listen())]
+	pub listen: Multiaddr,
+
+	/// Bootstap addresses.
+	#[arg(long, value_name = "MULTIADDR", value_parser = parse_bootstrap, default_values_t = default_bootstrap())]
+	pub bootstrap: Vec<Multiaddr>,
+}
+
+fn default_bootstrap() -> Vec<Multiaddr> {
+	NetworkSettings::default().bootstrap.into_iter().collect()
+}
+
+fn default_listen() -> Multiaddr {
+	NetworkSettings::default().listen
+}
+
+fn parse_bootstrap(str: &str) -> Result<Multiaddr, anyhow::Error> {
+	let addr: Multiaddr = str.parse()?;
+	NetworkSettings::default().with_bootstrap(addr.clone()).build()?;
+	Ok(addr)
 }
 
 pub async fn command(
@@ -30,11 +49,11 @@ pub async fn command(
 	command: &Command,
 ) -> Result<ExitCode, anyhow::Error> {
 	// setting
-	let mut network_settings =
-		NetworkSettings { force_new_peer_id: network_command.force_new_peer_id, ..Default::default() };
-	if let Some(listen) = &command.listen {
-		network_settings = network_settings.with_listen_from_string(listen)?;
-	}
+	let network_settings = NetworkSettings::new()
+		.with_force_new_peer_id(network_command.force_new_peer_id)
+		.with_listen(command.listen.clone())
+		.with_bootstraps(command.bootstrap.iter().cloned())
+		.build()?;
 
 	// application and network
 	let mut application = context.application(cli).await;
