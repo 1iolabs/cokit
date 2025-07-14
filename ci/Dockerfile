@@ -1,4 +1,4 @@
-FROM rust:1.82
+FROM rust:1.88
 
 # OS
 RUN apt-get update \
@@ -10,7 +10,7 @@ RUN rustup component add rustfmt \
  && rustup toolchain install nightly \
  && rustup component add --toolchain nightly rustfmt
 
-# MDBOOK
+ # MDBOOK
 COPY scripts/docs-setup.sh /usr/local/bin/docs-setup.sh
 RUN /usr/local/bin/docs-setup.sh \
  && rm -f /usr/local/bin/docs-setup.sh
