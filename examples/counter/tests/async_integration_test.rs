@@ -15,7 +15,15 @@ async fn async_integration_test() {
 
 	// build
 	Command::new("cargo")
-		.args(["build", "--target=wasm32-unknown-unknown", "--release"])
+		.args([
+			"build",
+			"--features",
+			"core",
+			"--target=wasm32-unknown-unknown",
+			"--target-dir",
+			"../../target-wasm",
+			"--release",
+		])
 		.output()
 		.unwrap();
 
@@ -34,7 +42,7 @@ async fn async_integration_test() {
 	storage.set(action_block).await.unwrap();
 
 	// wasm
-	let wasm = unixfs_add_file(&storage, "../../target/wasm32-unknown-unknown/release/example_counter.wasm")
+	let wasm = unixfs_add_file(&storage, "../../target-wasm/wasm32-unknown-unknown/release/example_counter.wasm")
 		.await
 		.unwrap();
 

@@ -24,7 +24,7 @@ pub fn macro_co_state(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 		#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 		#input
 
-		#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+		#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 		#[no_mangle]
 		pub extern "C" fn state() {
 			co_api::async_api::reduce::<#name, _>()
@@ -99,7 +99,7 @@ pub fn macro_co(input: proc_macro::TokenStream, features: BTreeSet<CoMacroFeatur
 	let mut tokens = Vec::new();
 	if features.contains(&CoMacroFeature::State) {
 		tokens.push(quote! {
-			#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+			#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 			#[no_mangle]
 			pub extern "C" fn state() {
 				co_api::async_api::reduce::<#name, _>()
@@ -110,7 +110,7 @@ pub fn macro_co(input: proc_macro::TokenStream, features: BTreeSet<CoMacroFeatur
 	// feature: state sync
 	if features.contains(&CoMacroFeature::StateSync) {
 		tokens.push(quote! {
-			#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+			#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 			#[no_mangle]
 			pub extern "C" fn state() {
 				co_api::reduce::<#name>()
@@ -121,7 +121,7 @@ pub fn macro_co(input: proc_macro::TokenStream, features: BTreeSet<CoMacroFeatur
 	// feature: guard
 	if features.contains(&CoMacroFeature::Guard) {
 		tokens.push(quote! {
-			#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+			#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 			#[no_mangle]
 			pub extern "C" fn guard() -> bool {
 				co_api::guard::<#name>()

@@ -62,7 +62,8 @@ pub struct AuthorityInfo {
 	pub weight: u32,
 }
 
-#[co(state, guard)]
+#[co(state, guard, no_default)]
+#[derive(Default)]
 pub struct Authority {
 	/// The authority.
 	#[serde(rename = "a", default, skip_serializing_if = "CoMap::is_empty")]

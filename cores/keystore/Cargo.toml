@@ -21,3 +21,6 @@ co-storage = { workspace = true }
 co-runtime = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+[features]
+"core" = []

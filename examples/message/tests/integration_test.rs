@@ -15,7 +15,15 @@ fn integration_test() {
 
 	// build
 	Command::new("cargo")
-		.args(["build", "--target=wasm32-unknown-unknown", "--release"])
+		.args([
+			"build",
+			"--features",
+			"core",
+			"--target=wasm32-unknown-unknown",
+			"--target-dir",
+			"../../target-wasm",
+			"--release",
+		])
 		.output()
 		.unwrap();
 
@@ -38,7 +46,7 @@ fn integration_test() {
 	let api = CoV1Api::new(Box::new(storage.clone()), RuntimeContext::new(None, action_cid));
 
 	// wasm
-	let wasm_path = "../../target/wasm32-unknown-unknown/release/example_message.wasm";
+	let wasm_path = "../../target-wasm/wasm32-unknown-unknown/release/example_message.wasm";
 	let wasm_bytes = std::fs::read(wasm_path).unwrap();
 	let next_state = create_runtime(wasm_bytes).execute_state(api).unwrap().state;
 
