@@ -9,7 +9,6 @@ pub mod co;
 pub mod dynamic;
 pub mod guard;
 pub mod log;
-pub mod membership;
 pub mod single;
 
 #[async_trait]
