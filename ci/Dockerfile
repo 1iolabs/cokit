@@ -2,7 +2,12 @@ FROM rust:1.88
 
 # OS
 RUN apt-get update \
- && apt-get install --no-install-recommends -y musl-tools
+ && apt-get install --no-install-recommends -y \
+    musl-tools \
+    libgtk-3-dev \
+    libsoup-3.0-dev \
+    libjavascriptcoregtk-4.1-dev \
+    libwebkit2gtk-4.1-dev
 
 # RUST
 RUN rustup component add rustfmt \
