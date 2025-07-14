@@ -87,10 +87,8 @@ docs:
   image: ${DOCKERFILE_IMAGE}
   cache:
     <<: *global_cache
-  before_script:
-    - cargo install "mdbook@0.4.51"
   script:
-    - mdbook build docs
+    - ./scripts/ci/docs-build.sh
   artifacts:
     paths:
       - docs/book
@@ -108,7 +106,7 @@ pages:
   script:
     - mkdir -p public
     - mv target/doc public/crate
-    - mv docs/book public/docs
+    - mv docs/book public/book
     - mv target/release/* public/
     - mv target-wasm/wasm32-unknown-unknown/release/* public/
   artifacts:
