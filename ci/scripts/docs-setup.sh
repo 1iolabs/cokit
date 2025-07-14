@@ -11,9 +11,9 @@ cargo_install_package () {
     PACKAGE_NAME="$1"
     PACKAGE_VERSION="$2"
     if [ -n "$HAVE_CARGO_BINSTALL" ]; then
-        echo cargo binstall "$PACKAGE_NAME" --version "$PACKAGE_VERSION" -y
+        cargo binstall "$PACKAGE_NAME" --version "$PACKAGE_VERSION" -y
     else
-        echo cargo install "$PACKAGE_NAME" --version "$PACKAGE_VERSION" --locked
+        cargo install "$PACKAGE_NAME" --version "$PACKAGE_VERSION" --locked
     fi
 }
 
