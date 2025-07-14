@@ -1,4 +1,4 @@
-FROM rust:1.82
+FROM rust:1.88
 RUN apt-get update
 RUN apt-get install -y \
     build-essential \
@@ -10,4 +10,3 @@ RUN rustup component add rustfmt \
     && rustup target add wasm32-unknown-unknown \
     && rustup toolchain install nightly \
     && rustup component add --toolchain nightly rustfmt
-

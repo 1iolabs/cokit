@@ -6,7 +6,7 @@ stages:
   - publish
 
 variables:
-  RUST_VERSION: "1.82"
+  RUST_VERSION: "1.88"
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
 
 cache: &global_cache
