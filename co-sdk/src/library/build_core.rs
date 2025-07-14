@@ -70,6 +70,8 @@ pub fn build_core(
 		.current_dir(&core_path)
 		.args([
 			"build",
+			"--features",
+			"core",
 			"--target",
 			"wasm32-unknown-unknown",
 			"--target-dir",

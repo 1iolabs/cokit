@@ -88,7 +88,7 @@ docs:
   cache:
     <<: *global_cache
   script:
-    - ./scripts/ci/docs-build.sh
+    - ./ci/scripts/docs-build.sh
   artifacts:
     paths:
       - docs/book

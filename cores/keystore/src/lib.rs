@@ -57,7 +57,7 @@ impl Reducer for KeyStore {
 	}
 }
 
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
 	co_api::reduce::<KeyStore>()

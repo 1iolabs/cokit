@@ -1,6 +1,11 @@
 use crate::co::CoMacroFeature;
 use proc_macro::TokenStream;
 use std::collections::BTreeSet;
+use syn::{
+	parse::{Parse, ParseStream},
+	punctuated::Punctuated,
+	Meta, Token,
+};
 
 mod co;
 mod tagged_fields;
@@ -15,34 +20,50 @@ pub fn co_state(_metadata: TokenStream, input: TokenStream) -> TokenStream {
 	co::macro_co_state(input)
 }
 
+struct CoArgs {
+	features: BTreeSet<CoMacroFeature>,
+}
+impl Parse for CoArgs {
+	fn parse(input: ParseStream) -> syn::Result<Self> {
+		let args = Punctuated::<Meta, Token![,]>::parse_terminated(input)?;
+		let mut features = BTreeSet::new();
+		for arg in &args {
+			let flag = match arg {
+				Meta::Path(path) => path.get_ident().map(|id| id.to_string()),
+				other => {
+					return Err(syn::Error::new_spanned(other, "Expected flag-style identifiers"));
+				},
+			};
+			if let Some(flag) = flag {
+				match CoMacroFeature::try_from(flag.as_str()) {
+					Ok(flag) => {
+						features.insert(flag);
+
+						// verfiy
+						if features.contains(&CoMacroFeature::State) && features.contains(&CoMacroFeature::StateSync) {
+							return Err(syn::Error::new_spanned(
+								arg,
+								"Flags state and state_sync can not be used together",
+							));
+						}
+					},
+					Err(err) => {
+						return Err(err);
+					},
+				}
+			}
+		}
+		Ok(Self { features })
+	}
+}
+
 #[proc_macro_attribute]
 pub fn co(metadata: TokenStream, input: TokenStream) -> TokenStream {
 	// flags
-	let mut features = BTreeSet::new();
-	let args: syn::AttributeArgs = syn::parse_macro_input!(metadata as syn::AttributeArgs);
-	for arg in &args {
-		let flag = match arg {
-			syn::NestedMeta::Meta(syn::Meta::Path(path)) => path.get_ident().map(|id| id.to_string()),
-			other => {
-				return syn::Error::new_spanned(other, "Expected flag-style identifiers")
-					.to_compile_error()
-					.into();
-			},
-		};
-		if let Some(flag) = flag {
-			match CoMacroFeature::try_from(flag.as_str()) {
-				Ok(flag) => {
-					features.insert(flag);
-				},
-				Err(err) => {
-					return err.to_compile_error().into();
-				},
-			}
-		}
-	}
+	let args = syn::parse_macro_input!(metadata as CoArgs);
 
 	// generate
-	co::macro_co(input, features)
+	co::macro_co(input, args.features)
 }
 
 // #[proc_macro_derive(CoData)]

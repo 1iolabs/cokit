@@ -7,6 +7,7 @@ pub use library::{
 	api_context::ApiContext,
 	async_context::{AsyncBlockStorage, AsyncContext},
 	instance::RuntimeInstance,
+	module_description::ModuleDescription,
 	pool::{ExecuteError, IdleRuntimePool, RuntimePool},
 };
 pub use modules::co_v1;

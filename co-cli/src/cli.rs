@@ -1,5 +1,5 @@
 use crate::{
-	commands::{co, core_build_builtin, did, file, ipld, network, pin, room, schemars, storage},
+	commands::{co, core, core_build_builtin, did, file, ipld, network, pin, room, schemars, storage},
 	library::cli_context::CliContext,
 };
 use clap::{ArgAction, ValueEnum};
@@ -103,8 +103,11 @@ pub enum CliCommand {
 	/// Network Utilities.
 	Network(network::Command),
 
+	/// COre related commands.
+	Core(core::Command),
+
 	/// Build the build-in cores.
-	CoreBuildBuiltin,
+	CoreBuildBuiltin(core_build_builtin::Command),
 
 	/// IPLD Utilities.
 	Ipld(ipld::Command),
@@ -140,7 +143,8 @@ pub async fn command(cli: &Cli) -> Result<ExitCode, anyhow::Error> {
 	let result = match &cli.command {
 		CliCommand::Co(command) => co::command(&context, cli, command).await,
 		CliCommand::Network(command) => network::command(&context, cli, command).await,
-		CliCommand::CoreBuildBuiltin => core_build_builtin::command().await,
+		CliCommand::CoreBuildBuiltin(command) => core_build_builtin::command(command).await,
+		CliCommand::Core(command) => core::command(&context, cli, command).await,
 		CliCommand::Ipld(command) => ipld::command(&context, command).await,
 		CliCommand::Did(command) => did::command(&context, cli, command).await,
 		CliCommand::Storage(command) => storage::command(&context, cli, command).await,
