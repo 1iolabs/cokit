@@ -507,7 +507,7 @@ where
 
 /// Insert `create_run` before `run`.
 ///
-/// ```
+/// ```text
 /// `[A][C] + [B] = [A][B][C]`
 ///      ^
 /// ```
@@ -552,7 +552,7 @@ where
 
 /// Insert `create_run` after `run`.
 ///
-/// ```
+/// ```text
 /// `[A][B][D] + [C] = [A][B][C][D]`
 ///      ^
 /// ```
