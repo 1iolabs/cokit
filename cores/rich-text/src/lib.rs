@@ -363,12 +363,13 @@ where
 	}
 
 	// attributes
-	let attributes_value =
-		attributes_operation(storage, state, transaction, &insertion_point, &action.attributes).await?;
-	let attributes = storage.set_value(&attributes_value).await?.into();
+	let attributes =
+		attributes_insertion_point(storage, state, transaction, &insertion_point, &action.attributes).await?;
+	let attributes_link = storage.set_value(&attributes).await?.into();
 
 	// create
-	let create_run = Run { id, text: action.text, attributes, left: None, right: None, deleted: false };
+	let create_run =
+		Run { id, text: action.text, attributes: attributes_link, left: None, right: None, deleted: false };
 
 	// find
 	match insertion_point {
@@ -484,15 +485,7 @@ where
 	let mut run = transaction.get_run(at).await?;
 
 	// attributes
-	let attributes = match action.attributes {
-		AttributesOperation::Merge(attributes) => {
-			let mut run_attributes = storage.get_value_or_default(&run.attributes).await?;
-			run_attributes.values.extend(attributes.values.clone());
-			run_attributes
-		},
-		AttributesOperation::Replace(attributes) => attributes,
-		AttributesOperation::Remove => Attributes::default(),
-	};
+	let attributes = attributes_run(storage, Some(&run), &action.attributes).await?;
 	let attributes_link = storage.set_value(&attributes).await?.into();
 
 	// last
@@ -697,7 +690,7 @@ fn normalize_insertion_point(state: &RichText, at: InsertionPoint) -> InsertionP
 }
 
 /// Get attributes for `AttributesOperation` at `insertion_point`.
-async fn attributes_operation<S>(
+async fn attributes_insertion_point<S>(
 	storage: &S,
 	state: &RichText,
 	transaction: &mut Transaction<S>,
@@ -708,14 +701,36 @@ where
 	S: BlockStorage + Clone + 'static,
 {
 	Ok(match attributes {
+		AttributesOperation::Merge(_) => {
+			let run = if let Some(position) = insertion_point.position(state) {
+				Some(transaction.get_run(position).await?)
+			} else {
+				None
+			};
+			attributes_run(storage, run.as_ref(), attributes).await?
+		},
+		AttributesOperation::Replace(attributes) => attributes.clone(),
+		AttributesOperation::Remove => Default::default(),
+	})
+}
+
+/// Get attributes for `AttributesOperation` at `insertion_point`.
+async fn attributes_run<S>(
+	storage: &S,
+	run: Option<&Run>,
+	attributes: &AttributesOperation,
+) -> anyhow::Result<Attributes>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	Ok(match attributes {
 		AttributesOperation::Merge(attributes) => {
-			if let Some(position) = insertion_point.position(state) {
-				let run = transaction.get_run(position).await?;
+			if let Some(run) = run {
 				let mut run_attributes = storage.get_value_or_default(&run.attributes).await?;
 				run_attributes.values.extend(attributes.values.clone());
 				run_attributes
 			} else {
-				Default::default()
+				attributes.clone()
 			}
 		},
 		AttributesOperation::Replace(attributes) => attributes.clone(),
@@ -931,7 +946,7 @@ where
 					} else {
 						0
 					};
-					let attributes = attributes_operation(
+					let attributes = attributes_insertion_point(
 						&self.storage,
 						&state,
 						&mut transaction,
@@ -950,7 +965,7 @@ where
 				RichTextAction::Format(action) => {
 					let range = self.range(&action.at, &action.last).await?;
 					if !range.is_empty() {
-						let attributes = attributes_operation(
+						let attributes = attributes_insertion_point(
 							&self.storage,
 							&state,
 							&mut transaction,
@@ -1149,6 +1164,9 @@ mod tests {
 			.try_collect::<Vec<_>>()
 			.await
 			.unwrap();
+		// println!("attributes0_link: {:?}", storage.get_value_or_default(&attributes0_link).await.unwrap());
+		// println!("characters[0].1: {:?}", storage.get_value_or_default(&characters[0].1).await.unwrap());
+		// println!("characters: {:?}", characters);
 		assert_eq!(characters.len(), 10);
 		assert_eq!(characters[0], ('h', attributes0_link));
 		assert_eq!(characters[1], ('e', attributes0_link));
