@@ -1,11 +1,11 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, IsDefault, LazyTransaction, Link, OptionLink,
-	ReducerAction, TagValue, WeakCid,
+	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoTryStreamExt, IsDefault, LazyTransaction, Link,
+	OptionLink, ReducerAction, TagValue, WeakCid,
 };
-use futures::{Stream, TryStreamExt};
-use std::{collections::BTreeMap, ops::Range};
+use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+use std::{collections::BTreeMap, future::ready, ops::Range};
 
 /// Rich text actions.
 #[co]
@@ -19,42 +19,53 @@ pub enum RichTextAction {
 #[co]
 pub struct InsertAction {
 	/// The position to insert.
+	#[serde(rename = "l")]
 	pub at: InsertionPoint,
 
 	/// The text to insert.
+	#[serde(rename = "t")]
 	pub text: String,
 
 	/// The attributes.
+	#[serde(rename = "a", default, skip_serializing_if = "IsDefault::is_default")]
 	pub attributes: AttributesOperation,
 }
 
 #[co]
 pub struct DeleteAction {
 	/// The position to delete.
+	#[serde(rename = "l")]
 	pub at: Position,
 
 	/// The last position to deleted.
 	/// If omited only `at` is deleted.
+	#[serde(rename = "r", default, skip_serializing_if = "IsDefault::is_default")]
 	pub last: Option<Position>,
 }
 
 #[co]
 pub struct FormatAction {
 	/// The position to format.
+	#[serde(rename = "l")]
 	pub at: Position,
 
 	/// The last position to formatted.
 	/// If omited only `at` is formatted.
+	#[serde(rename = "r", default, skip_serializing_if = "IsDefault::is_default")]
 	pub last: Option<Position>,
 
 	/// The attributes.
+	#[serde(rename = "a", default, skip_serializing_if = "IsDefault::is_default")]
 	pub attributes: AttributesOperation,
 }
 
 #[co]
 pub enum AttributesOperation {
+	#[serde(rename = "m")]
 	Merge(Attributes),
+	#[serde(rename = "r")]
 	Replace(Attributes),
+	#[serde(rename = "d")]
 	Remove,
 }
 impl Default for AttributesOperation {
@@ -66,10 +77,13 @@ impl Default for AttributesOperation {
 #[co]
 pub enum InsertionPoint {
 	/// First position.
+	#[serde(rename = "l")]
 	Start,
 	/// Last position.
+	#[serde(rename = "r")]
 	End,
 	/// Before position.
+	#[serde(rename = "b")]
 	Before(Position),
 }
 impl InsertionPoint {
@@ -128,14 +142,46 @@ where
 	) -> Result<Link<Self>, anyhow::Error> {
 		let event = storage.get_value(&event_link).await?;
 		let mut state = storage.get_value_or_default(&state_link).await?;
-		// TODO: replace event_link with actual head cid event_link has the risk of duplucates
+		// TODO: replace event_link with actual head cid event_link has the risk of duplicates
 		reduce(storage, &mut state, event_link.into(), event.payload).await?;
 		Ok(storage.set_value(&state).await?)
 	}
 }
 impl RichText {
+	// Stream runs.
+	pub fn runs<S>(&self, storage: S) -> impl Stream<Item = anyhow::Result<Run>> + use<'_, S>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		async_stream::try_stream! {
+			let runs = self.runs.open(&storage).await?;
+			let mut position = match self.left {
+				Some(position) => position,
+				None => {
+					// empty
+					return;
+				}
+			};
+			loop {
+				let run = runs.get(&position).await?.ok_or(anyhow!("Position not found: {:?}", position))?;
+				let run_right = run.right;
+
+				// run
+				yield run;
+
+				// next run
+				position = match run_right {
+					Some(position) => position,
+					None => {
+						break;
+					}
+				}
+			}
+		}
+	}
+
 	/// Stream characters with position and formatting.
-	pub fn stream<S>(
+	pub fn chars<S>(
 		&self,
 		storage: S,
 	) -> impl Stream<Item = anyhow::Result<(char, Position, OptionLink<Attributes>)>> + use<'_, S>
@@ -179,7 +225,7 @@ impl RichText {
 		S: BlockStorage + Clone + 'static,
 	{
 		Ok(self
-			.stream(storage.clone())
+			.chars(storage.clone())
 			.map_ok(|(char, _, _)| char)
 			.try_collect::<String>()
 			.await?)
@@ -246,7 +292,7 @@ async fn reduce<S>(storage: &S, state: &mut RichText, head: Cid, action: RichTex
 where
 	S: BlockStorage + Clone + 'static,
 {
-	let mut transaction = Transaction { runs: state.runs.open_lazy(storage).await? };
+	let mut transaction = Transaction::open(storage, state).await?;
 	match action {
 		RichTextAction::Insert(action) => reduce_text_insert(storage, state, &mut transaction, head, action).await?,
 		RichTextAction::Delete(action) => reduce_text_delete(storage, state, &mut transaction, head, action).await?,
@@ -268,6 +314,10 @@ impl<S> Transaction<S>
 where
 	S: BlockStorage + Clone + 'static,
 {
+	async fn open(storage: &S, state: &RichText) -> anyhow::Result<Self> {
+		Ok(Self { runs: state.runs.open_lazy(storage).await? })
+	}
+
 	/// Find the run at position.
 	pub async fn find_run(&mut self, at: Position) -> anyhow::Result<Option<Run>> {
 		let mut position = at;
@@ -313,20 +363,9 @@ where
 	}
 
 	// attributes
-	let attributes = match &action.attributes {
-		AttributesOperation::Merge(attributes) => {
-			if let Some(position) = insertion_point.position(state) {
-				let run = transaction.get_run(position).await?;
-				let mut run_attributes = storage.get_value_or_default(&run.attributes).await?;
-				run_attributes.values.extend(attributes.values.clone());
-				storage.set_value(&run_attributes).await?.into()
-			} else {
-				storage.set_value(attributes).await?.into()
-			}
-		},
-		AttributesOperation::Replace(attributes) => storage.set_value(attributes).await?.into(),
-		AttributesOperation::Remove => OptionLink::none(),
-	};
+	let attributes_value =
+		attributes_operation(storage, state, transaction, &insertion_point, &action.attributes).await?;
+	let attributes = storage.set_value(&attributes_value).await?.into();
 
 	// create
 	let create_run = Run { id, text: action.text, attributes, left: None, right: None, deleted: false };
@@ -334,8 +373,8 @@ where
 	// find
 	match insertion_point {
 		InsertionPoint::Start => {
-			// is empty?
 			match state.left {
+				// is empty?
 				None => {
 					// `[]` + [C] = [C]`
 					//  ^
@@ -657,6 +696,284 @@ fn normalize_insertion_point(state: &RichText, at: InsertionPoint) -> InsertionP
 	}
 }
 
+/// Get attributes for `AttributesOperation` at `insertion_point`.
+async fn attributes_operation<S>(
+	storage: &S,
+	state: &RichText,
+	transaction: &mut Transaction<S>,
+	insertion_point: &InsertionPoint,
+	attributes: &AttributesOperation,
+) -> anyhow::Result<Attributes>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	Ok(match attributes {
+		AttributesOperation::Merge(attributes) => {
+			if let Some(position) = insertion_point.position(state) {
+				let run = transaction.get_run(position).await?;
+				let mut run_attributes = storage.get_value_or_default(&run.attributes).await?;
+				run_attributes.values.extend(attributes.values.clone());
+				run_attributes
+			} else {
+				Default::default()
+			}
+		},
+		AttributesOperation::Replace(attributes) => attributes.clone(),
+		AttributesOperation::Remove => Default::default(),
+	})
+}
+
+pub struct TextModel<S> {
+	storage: S,
+	state: OptionLink<RichText>,
+}
+impl<S> TextModel<S>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	pub async fn plain_text(&self) -> anyhow::Result<String> {
+		if let Some(state) = self.storage.get_value_or_none(&self.state).await? {
+			Ok(state.plain_text(&self.storage).await?)
+		} else {
+			Ok(String::new())
+		}
+	}
+
+	pub fn runs(&self) -> impl Stream<Item = Result<(String, Attributes), anyhow::Error>> + use<S> {
+		let storage = self.storage.clone();
+		let state = self.state;
+		async_stream::try_stream! {
+			if let Some(state) = storage.get_value_or_none(&state).await? {
+				let mut last_attributes = OptionLink::none();
+				let mut text = String::new();
+
+				// characters
+				for await item in state.chars(storage.clone()) {
+					let (char, _position, attributes) = item?;
+
+					// next run?
+					if last_attributes != attributes {
+						if !text.is_empty() {
+							let run_text = text;
+							let run_attributes = storage.get_value_or_default(&last_attributes).await?;
+							yield (run_text, run_attributes);
+							text = String::new();
+						}
+						last_attributes = attributes;
+					}
+
+					// append
+					text.push(char);
+				}
+
+				// last run?
+				if !text.is_empty() {
+					let run_text = text;
+					let run_attributes = storage.get_value_or_default(&last_attributes).await?;
+					yield (run_text, run_attributes);
+				}
+			}
+		}
+	}
+
+	/// Index for position.
+	pub async fn index(&self, at: &Position) -> anyhow::Result<usize> {
+		let state = self.storage.get_value_or_default(&self.state).await?;
+
+		// walk runs
+		let mut index = 0;
+		let runs = state.runs(self.storage.clone());
+		pin_mut!(runs);
+		while let Some(run) = runs.try_next().await? {
+			// done?
+			if run.contains(*at) {
+				return Ok(if !run.deleted { index + at.1 - run.id.1 } else { index });
+			}
+
+			// index
+			if !run.deleted {
+				index += run.text.len();
+			}
+		}
+		return Err(anyhow!("Position not found: {:?}", at));
+	}
+
+	/// Range for positions.
+	pub async fn range(&self, at: &Position, last: &Option<Position>) -> anyhow::Result<Range<usize>> {
+		let state = self.storage.get_value_or_default(&self.state).await?;
+
+		// walk runs
+		let mut index = 0;
+		let mut start_found = false;
+		let mut start = 0;
+		let mut start_deleted = false;
+		let runs = state.runs(self.storage.clone());
+		pin_mut!(runs);
+		while let Some(run) = runs.try_next().await? {
+			// done?
+			if !start_found {
+				if run.contains(*at) {
+					start = if !run.deleted { index + at.1 - run.id.1 } else { index };
+					start_found = true;
+					start_deleted = run.deleted;
+				}
+			}
+			if start_found {
+				if let Some(last) = last {
+					if run.contains(*last) {
+						return Ok(Range { start, end: if !run.deleted { index + at.1 - run.id.1 } else { index } });
+					}
+				} else {
+					if run.deleted && start_deleted {
+						// return a empty range as the range is fully deleted
+						return Ok(Range { start, end: start });
+					} else {
+						return Ok(Range { start, end: start + 1 });
+					}
+				}
+			}
+
+			// index
+			if !run.deleted {
+				index += run.text.len();
+			}
+		}
+		if !start_found {
+			return Err(anyhow!("Position not found: {:?}", at));
+		}
+		return Err(anyhow!("Position not found: {:?}", last));
+	}
+
+	/// Position for index.
+	pub async fn position(&self, index: usize) -> anyhow::Result<Option<Position>> {
+		let state = self.storage.get_value_or_default(&self.state).await?;
+		let at = state
+			.chars(self.storage.clone())
+			.skip(index)
+			.map_ok(|(_char, position, _attributes)| position)
+			.try_first()
+			.await?;
+		Ok(at)
+	}
+
+	/// Positions for range.
+	pub async fn position_range(&self, range: &Range<usize>) -> anyhow::Result<(Option<Position>, Option<Position>)> {
+		// validate
+		if range.len() == 0 {
+			return Err(anyhow!("Invalid range: {:?}", range));
+		}
+
+		// find indicies
+		let state = self.storage.get_value_or_default(&self.state).await?;
+		let (at, last) = state
+			.chars(self.storage.clone())
+			.enumerate()
+			.skip(range.start)
+			.take(range.len())
+			.map(|(i, result)| result.map(|(_char, position, _attributes)| (i, position)))
+			.try_fold((None, None), |(mut at, mut last), (i, position)| {
+				if i == range.start {
+					at = Some(position);
+				}
+				if i == range.end {
+					last = Some(position);
+				}
+				ready(Result::<_, anyhow::Error>::Ok((at, last)))
+			})
+			.await?;
+
+		// result
+		Ok((at, if range.len() == 1 { None } else { last }))
+	}
+
+	pub async fn insert(
+		&self,
+		index: usize,
+		text: String,
+		attributes: AttributesOperation,
+	) -> anyhow::Result<RichTextAction> {
+		let at = self
+			.position(index)
+			.await?
+			.map(InsertionPoint::Before)
+			.unwrap_or(InsertionPoint::End);
+		Ok(InsertAction { at, text, attributes }.into())
+	}
+
+	pub async fn delete(&self, range: Range<usize>) -> anyhow::Result<RichTextAction> {
+		// range
+		let (at, last) = self.position_range(&range).await?;
+		let at = at.ok_or_else(|| anyhow!("Index not found: {}", range.start))?;
+
+		// result
+		Ok(DeleteAction { at, last }.into())
+	}
+
+	pub async fn format(&self, range: Range<usize>, attributes: AttributesOperation) -> anyhow::Result<RichTextAction> {
+		// range
+		let (at, last) = self.position_range(&range).await?;
+		let at = at.ok_or_else(|| anyhow!("Index not found: {}", range.start))?;
+
+		// result
+		Ok(FormatAction { at, last, attributes }.into())
+	}
+
+	pub async fn text_change(&self, actions: &[RichTextAction]) -> anyhow::Result<Vec<TextModelChange>> {
+		let mut result = Vec::new();
+		let state = self.storage.get_value_or_default(&self.state).await?;
+		let mut transaction = Transaction::open(&self.storage, &state).await?;
+		for action in actions {
+			match action {
+				RichTextAction::Insert(action) => {
+					let insertion_point = normalize_insertion_point(&state, action.at.clone());
+					let index = if let Some(position) = insertion_point.position(&state) {
+						self.index(&position).await?
+					} else {
+						0
+					};
+					let attributes = attributes_operation(
+						&self.storage,
+						&state,
+						&mut transaction,
+						&insertion_point,
+						&action.attributes,
+					)
+					.await?;
+					result.push(TextModelChange::Insert { index, text: action.text.clone(), attributes });
+				},
+				RichTextAction::Delete(action) => {
+					let range = self.range(&action.at, &action.last).await?;
+					if !range.is_empty() {
+						result.push(TextModelChange::Delete { range });
+					}
+				},
+				RichTextAction::Format(action) => {
+					let range = self.range(&action.at, &action.last).await?;
+					if !range.is_empty() {
+						let attributes = attributes_operation(
+							&self.storage,
+							&state,
+							&mut transaction,
+							&InsertionPoint::Before(action.at),
+							&action.attributes,
+						)
+						.await?;
+						result.push(TextModelChange::Format { range, attributes });
+					}
+				},
+			}
+		}
+		Ok(result)
+	}
+}
+
+#[derive(Debug, Clone)]
+pub enum TextModelChange {
+	Insert { index: usize, text: String, attributes: Attributes },
+	Delete { range: Range<usize> },
+	Format { range: Range<usize>, attributes: Attributes },
+}
+
 #[cfg(test)]
 mod tests {
 	use crate::{
@@ -731,7 +1048,7 @@ mod tests {
 		assert_eq!(state.plain_text(&storage).await.unwrap().as_str(), "helloworld");
 
 		// insert between two runs
-		let (_char, position, _attributes) = state.stream(storage.clone()).skip(5).try_first().await.unwrap().unwrap();
+		let (_char, position, _attributes) = state.chars(storage.clone()).skip(5).try_first().await.unwrap().unwrap();
 		let state = dispatch(
 			&storage,
 			&mut time,
@@ -761,7 +1078,7 @@ mod tests {
 		assert_eq!(state.plain_text(&storage).await.unwrap().as_str(), "helloworld");
 
 		// split runs
-		let (_char, position, _attributes) = state.stream(storage.clone()).skip(5).try_first().await.unwrap().unwrap();
+		let (_char, position, _attributes) = state.chars(storage.clone()).skip(5).try_first().await.unwrap().unwrap();
 		let state = dispatch(
 			&storage,
 			&mut time,
@@ -807,7 +1124,7 @@ mod tests {
 
 		// split runs
 		let characters = state
-			.stream(storage.clone())
+			.chars(storage.clone())
 			.map_ok(|(_, p, _)| p)
 			.skip(3)
 			.take(2)
@@ -827,7 +1144,7 @@ mod tests {
 		// println!("state: {:?}", state);
 		// println!("runs: {:?}", state.runs.stream(&storage).map_ok(|(_, run)| run).try_collect::<Vec<_>>().await);
 		let characters = state
-			.stream(storage.clone())
+			.chars(storage.clone())
 			.map_ok(|(char, _position, attributes)| (char, attributes))
 			.try_collect::<Vec<_>>()
 			.await
@@ -872,7 +1189,7 @@ mod tests {
 
 		// split runs
 		let characters = state
-			.stream(storage.clone())
+			.chars(storage.clone())
 			.map_ok(|(_, p, _)| p)
 			.skip(4)
 			.take(2)
