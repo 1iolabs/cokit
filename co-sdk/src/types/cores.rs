@@ -15,6 +15,7 @@ pub const CO_CORE_DATA_SERIES: &str = "co-core-data-series";
 pub const CO_CORE_STORAGE: &str = "co-core-storage";
 pub const CO_CORE_POA: &str = "co-core-poa";
 pub const CO_CORE_BOARD: &str = "co-core-board";
+pub const CO_CORE_RICH_TEXT: &str = "co-core-rich-text";
 
 /// CO Core name expected by the SDK implementation (key to `co.cores`).
 pub const CO_CORE_NAME_CO: CoreName<'static, co_core_co::Co> = CoreName::new("co");
@@ -110,6 +111,7 @@ fn get_native(name: &str) -> Core {
 		CO_CORE_STORAGE => Core::native_async::<co_core_storage::Storage, co_core_storage::StorageAction>(),
 		CO_CORE_POA => Core::native_async::<co_core_poa::Authority, co_core_poa::AuthorityAction>(),
 		CO_CORE_BOARD => Core::native_async::<co_core_board::Board, co_core_board::BoardAction>(),
+		CO_CORE_RICH_TEXT => Core::native_async::<co_core_rich_text::RichText, co_core_rich_text::RichTextAction>(),
 		_ => panic!("unknown native core name: {}", name),
 	}
 }

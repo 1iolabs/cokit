@@ -1937,6 +1937,7 @@ dependencies = [
  "co-core-membership",
  "co-core-pin",
  "co-core-poa",
+ "co-core-rich-text",
  "co-core-role",
  "co-core-room",
  "co-core-storage",
