@@ -1,8 +1,10 @@
 use super::lazy_transaction::Transactionable;
-use crate::{library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError};
+use crate::{
+	library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError, Streamable,
+};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use futures::{future::Either, Stream, StreamExt, TryStreamExt};
+use futures::{future::Either, stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use num_rational::Ratio;
 use serde::{
 	de::{DeserializeOwned, Error},
@@ -255,6 +257,26 @@ where
 
 	async fn open(&self, storage: &S) -> Result<Self::Transaction, StorageError> {
 		CoList::open(self, storage).await
+	}
+}
+impl<S, V> Streamable<S> for CoList<V>
+where
+	S: BlockStorage + Clone + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	type Item = Result<(CoListIndex, V), StorageError>;
+	type Stream = BoxStream<'static, Self::Item>;
+
+	fn stream(&self, storage: S) -> Self::Stream {
+		let collection = self.clone();
+		async_stream::try_stream! {
+			let transaction = collection.open(&storage).await?;
+			let stream = transaction.stream();
+			for await item in stream {
+				yield item?;
+			}
+		}
+		.boxed()
 	}
 }
 

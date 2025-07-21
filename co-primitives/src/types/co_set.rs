@@ -1,7 +1,9 @@
 use super::lazy_transaction::Transactionable;
-use crate::{library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError};
+use crate::{
+	library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError, Streamable,
+};
 use async_trait::async_trait;
-use futures::{Stream, TryStreamExt};
+use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{fmt::Debug, future::Future, hash::Hash};
 
@@ -126,6 +128,26 @@ where
 
 	async fn open(&self, storage: &S) -> Result<Self::Transaction, StorageError> {
 		CoSet::open(self, storage).await
+	}
+}
+impl<S, K> Streamable<S> for CoSet<K>
+where
+	S: BlockStorage + Clone + 'static,
+	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	type Item = Result<K, StorageError>;
+	type Stream = BoxStream<'static, Self::Item>;
+
+	fn stream(&self, storage: S) -> Self::Stream {
+		let collection = self.clone();
+		async_stream::try_stream! {
+			let transaction = collection.open(&storage).await?;
+			let stream = transaction.stream();
+			for await item in stream {
+				yield item?;
+			}
+		}
+		.boxed()
 	}
 }
 

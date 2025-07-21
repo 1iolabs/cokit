@@ -1,4 +1,4 @@
-use co_primitives::DagCollectionAsyncExt;
+use co_primitives::Streamable;
 use co_storage::{BlockStorage, StorageError};
 use futures::{pin_mut, StreamExt};
 use serde::de::DeserializeOwned;
@@ -10,10 +10,10 @@ pub async fn find<T, N, F, S>(storage: &S, container: &N, predicate: F) -> Resul
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 	T: std::fmt::Debug + DeserializeOwned + Send + Sync + 'static,
-	N: DagCollectionAsyncExt<Item = T>,
+	N: Streamable<S, Item = Result<T, StorageError>>,
 	F: Fn(&T) -> bool,
 {
-	let stream = container.stream(storage);
+	let stream = container.stream(storage.clone());
 	pin_mut!(stream);
 	let mut result = Ok(None);
 	while let Some(item) = stream.next().await {
