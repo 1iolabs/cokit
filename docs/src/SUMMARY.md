@@ -14,7 +14,7 @@
 - [Installation](./getting-started/installation.md)
 - [Minimal Coding Example](./getting-started/minimal-coding-example.md)
 - [Next Steps](./getting-started/next-steps.md)
-  
+
 # Reference
 - [cokit](./reference/cokit.md)
 - [CO](./reference/co.md)
@@ -39,11 +39,10 @@
 - [Testing](./development/testing.md)
 - [How to contribute](./development/how-to-contribute.md)
 - [Bug report](./development/bug-report.md)
-- [Feature request](./develompent/feature-request.md)
+- [Feature request](./development/feature-request.md)
 
 # FAQ
 - [FAQ](./faq/faq.md)
 
 # License
 - [Legal notice](./license/legal-notice.md)
-
