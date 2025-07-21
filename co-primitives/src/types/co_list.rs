@@ -87,6 +87,18 @@ impl<V> CoList<V>
 where
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
+	/// Create collection from iterator.
+	pub async fn from_iter<S>(storage: &S, iter: impl IntoIterator<Item = V>) -> Result<Self, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		let mut transaction = Self::default().open(storage).await?;
+		for value in iter.into_iter() {
+			transaction.push(value).await?;
+		}
+		Ok(transaction.store().await?)
+	}
+
 	/// Whether this collection is empty.
 	pub fn is_empty(&self) -> bool {
 		self.0.is_none()

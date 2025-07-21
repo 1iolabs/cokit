@@ -51,7 +51,7 @@ async fn joined(context: CoContext, _peer: PeerId, header: DidCommHeader, body: 
 		.co_reducer(&payload.id)
 		.await?
 		.ok_or(anyhow!("Unknown CO: {}", payload.id))?;
-	let (_storage, state) = co.co().await?;
+	let (storage, state) = co.co().await?;
 	let join = CoJoin::from_tags(&state.tags).unwrap_or_default();
 	let from = header.from.ok_or(anyhow!("invalid header: from"))?.to_string();
 
@@ -64,7 +64,8 @@ async fn joined(context: CoContext, _peer: PeerId, header: DidCommHeader, body: 
 	let participant_state = match join {
 		CoJoin::Invite => state
 			.participants
-			.get(&from)
+			.get(&storage, &from)
+			.await?
 			.filter(|participant| participant.state == ParticipantState::Invite)
 			.map(|_| ParticipantState::Active),
 		CoJoin::Accept => Some(ParticipantState::Active),
