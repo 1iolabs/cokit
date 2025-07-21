@@ -14,7 +14,7 @@ async fn async_integration_test() {
 		.init();
 
 	// build
-	Command::new("cargo")
+	assert!(Command::new("cargo")
 		.args([
 			"build",
 			"--features",
@@ -24,8 +24,9 @@ async fn async_integration_test() {
 			"../../target-wasm",
 			"--release",
 		])
-		.output()
-		.unwrap();
+		.status()
+		.unwrap()
+		.success());
 
 	// storage
 	let storage = MemoryBlockStorage::default();

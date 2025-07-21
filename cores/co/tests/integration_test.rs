@@ -13,7 +13,7 @@ async fn integration_test() {
 	// 	.init();
 
 	// build
-	Command::new("cargo")
+	assert!(Command::new("cargo")
 		.args([
 			"build",
 			"--features",
@@ -23,8 +23,9 @@ async fn integration_test() {
 			"../../target-wasm",
 			"--release",
 		])
-		.output()
-		.unwrap();
+		.status()
+		.unwrap()
+		.success());
 
 	// storage
 	let storage = MemoryBlockStorage::default();
@@ -56,6 +57,7 @@ async fn integration_test() {
 
 	// test
 	let block = storage.get(&next_state.unwrap()).await.unwrap();
+	let state: ipld_core::ipld::Ipld = BlockSerializer::default().deserialize(&block).unwrap();
 	let state: Co = BlockSerializer::default().deserialize(&block).unwrap();
 
 	// println!("{:?}", state);

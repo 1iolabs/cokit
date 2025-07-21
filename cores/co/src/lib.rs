@@ -5,7 +5,7 @@ use co_api::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
-#[co(state_sync, guard, no_default)]
+#[co(state, guard, no_default)]
 #[non_exhaustive]
 pub struct Co {
 	/// CO UUID.
