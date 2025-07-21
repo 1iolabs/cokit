@@ -1,4 +1,49 @@
 # Summary
 
-- [Introduction](./introduction.md)
-- [Chapter 1](./chapter_1.md)
+[CO-KIT](./co-kit.md)
+
+# Introduction
+- [About CO-SDK](./introduction/about-co-sdk.md)
+- [Why](./introduction/why.md)
+- [Key Principles](./introduction/key-principles.md)
+- [Features](./introduction/feautres.md)
+
+# Getting Started
+- [Requirements](./getting-started/requirements.md)
+- [OS-specifics](./getting-started/os-specifics.md)
+- [Installation](./getting-started/installation.md)
+- [Minimal Coding Example](./getting-started/minimal-coding-example.md)
+- [Next Steps](./getting-started/next-steps.md)
+  
+# Reference
+- [cokit](./reference/cokit.md)
+- [CO](./reference/co.md)
+- [core](./reference/core.md)
+- [Guards](./reference/guards.md)
+- [SDK Components](./reference/sdk-components.md)
+	- [Storage](./reference/sdk-components/storage.md)
+	- [Log](./reference/sdk-components/log.md)
+	- [Network](./reference/sdk-components/network.md)
+	- [Identity](./reference/sdk-components/identity.md)
+	- [Permissions](./reference/sdk-components/permissions.md)
+- [Architecture](./reference/architecture.md)
+
+# Usage
+- [Best Practices](./usage/best-practices.md)
+- [API Overview core (co-api)](./usage/api-overview-core.md)
+- [API Overview apps (co-sdk)](./usage/api-overview-apps.md)
+- [Configuration](./usage/configuration.md)
+
+# Development
+- [Clone & Build](./development/clone-and-build.md)
+- [Testing](./development/testing.md)
+- [How to contribute](./development/how-to-contribute.md)
+- [Bug report](./development/bug-report.md)
+- [Feature request](./develompent/feature-request.md)
+
+# FAQ
+- [FAQ](./faq/faq.md)
+
+# License
+- [Legal notice](./license/legal-notice.md)
+
