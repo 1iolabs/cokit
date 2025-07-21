@@ -1,7 +1,7 @@
 use cid::Cid;
 use co_api::{
-	co, BlockStorage, BlockStorageExt, CoId, Context, DagSet, DagSetExt, Did, Network, Reducer, ReducerAction,
-	SignedEntry, Tags,
+	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoId, CoSet, Did, Link, Network, OptionLink, ReducerAction,
+	SignedEntry, StorageError, Tags,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -45,8 +45,8 @@ pub struct Co {
 	/// CO network services.
 	/// See: [`libp2p::PeerId`]
 	// #[co_api::Dag]
-	#[serde(default, skip_serializing_if = "DagSet::is_empty")]
-	pub network: DagSet<Network>,
+	#[serde(default, skip_serializing_if = "CoSet::is_empty")]
+	pub network: CoSet<Network>,
 }
 impl Default for Co {
 	fn default() -> Self {
@@ -62,6 +62,40 @@ impl Default for Co {
 			network: Default::default(),
 			guards: Default::default(),
 		}
+	}
+}
+impl<S> Reducer<CoAction, S> for Co
+where
+	S: BlockStorage + Clone + 'static,
+{
+	async fn reduce(
+		state: OptionLink<Self>,
+		event: Link<ReducerAction<CoAction>>,
+		storage: &S,
+	) -> Result<Link<Self>, anyhow::Error> {
+		let mut result = storage.get_value_or_default(&state).await?;
+		let event = storage.get_value(&event).await?;
+		reduce(storage, &mut result, &event.payload).await?;
+		let state = storage.set_value(&result).await?;
+		Ok(state)
+	}
+}
+impl<S: BlockStorage + Clone + 'static> co_api::Guard<S> for Co {
+	/// Test if next_head creator is a participant with access.
+	async fn verify(
+		storage: &S,
+		_guard: String,
+		state: Cid,
+		_heads: BTreeSet<Cid>,
+		next_head: Cid,
+	) -> Result<bool, anyhow::Error> {
+		let next_entry: SignedEntry = storage.get_deserialized(&next_head).await?;
+		let participant = next_entry.identity;
+		let co: Co = storage.get_deserialized(&state).await?;
+		Ok(co
+			.participants
+			.iter()
+			.any(|item| item.1.state.has_access() && item.0 == &participant))
 	}
 }
 
@@ -301,35 +335,10 @@ pub enum CoAction {
 	},
 }
 
-impl Reducer for Co {
-	type Action = CoAction;
-
-	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
-		let mut result = self;
-		reduce(context, &mut result, &event.payload);
-		result
-	}
-}
-impl<S: BlockStorage + Clone + 'static> co_api::Guard<S> for Co {
-	/// Test if next_head creator is a participant with access.
-	async fn verify(
-		storage: &S,
-		_guard: String,
-		state: Cid,
-		_heads: BTreeSet<Cid>,
-		next_head: Cid,
-	) -> Result<bool, anyhow::Error> {
-		let next_entry: SignedEntry = storage.get_deserialized(&next_head).await?;
-		let participant = next_entry.identity;
-		let co: Co = storage.get_deserialized(&state).await?;
-		Ok(co
-			.participants
-			.iter()
-			.any(|item| item.1.state.has_access() && item.0 == &participant))
-	}
-}
-
-fn reduce(context: &mut dyn Context, result: &mut Co, action: &CoAction) {
+async fn reduce<S>(storage: &S, result: &mut Co, action: &CoAction) -> Result<(), anyhow::Error>
+where
+	S: BlockStorage + Clone + 'static,
+{
 	match &action {
 		CoAction::Create(create) => reduce_create(result, create),
 		CoAction::Upgrade { binary, migrate } => reduce_upgrade(result, binary, migrate),
@@ -352,14 +361,17 @@ fn reduce(context: &mut dyn Context, result: &mut Co, action: &CoAction) {
 		CoAction::CoreTagsRemove { core, tags } => reduce_core_tags_remove(result, core, tags),
 		CoAction::TagsInsert { tags } => reduce_tags_insert(result, tags),
 		CoAction::TagsRemove { tags } => reduce_tags_remove(result, tags),
-		CoAction::NetworkInsert { network } => reduce_network_insert(context, result, network),
-		CoAction::NetworkRemove { network } => reduce_network_remove(context, result, network),
+		CoAction::NetworkInsert { network } => {
+			reduce_network_insert(storage, result, network).await?;
+		},
+		CoAction::NetworkRemove { network } => reduce_network_remove(storage, result, network).await?,
 		CoAction::GuardCreate { guard, binary, tags } => reduce_guard_create(result, guard, binary, tags),
 		CoAction::GuardRemove { guard } => reduce_guard_remove(result, guard),
 		CoAction::GuardUpgrade { guard, binary } => reduce_guard_upgrade(result, guard, binary),
 		CoAction::GuardTagsInsert { guard, tags } => reduce_guard_tags_insert(result, guard, tags),
 		CoAction::GuardTagsRemove { guard, tags } => reduce_guard_tags_remove(result, guard, tags),
 	}
+	Ok(())
 }
 
 fn reduce_create(result: &mut Co, create: &CreateAction) {
@@ -482,12 +494,20 @@ fn reduce_core_tags_insert(result: &mut Co, core: &String, tags: &Tags) {
 	}
 }
 
-fn reduce_network_remove(context: &mut dyn Context, result: &mut Co, network: &Network) {
-	result.network.remove(context.storage_mut(), network);
+async fn reduce_network_remove<S>(storage: &S, result: &mut Co, network: &Network) -> Result<(), StorageError>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	result.network.remove(storage, network.clone()).await?;
+	Ok(())
 }
 
-fn reduce_network_insert(context: &mut dyn Context, result: &mut Co, network: &Network) {
-	result.network.insert(context.storage_mut(), network.clone());
+async fn reduce_network_insert<S>(storage: &S, result: &mut Co, network: &Network) -> Result<(), StorageError>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	result.network.insert(storage, network.clone()).await?;
+	Ok(())
 }
 
 fn reduce_tags_remove(result: &mut Co, tags: &Tags) {

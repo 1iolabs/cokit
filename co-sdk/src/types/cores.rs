@@ -100,7 +100,7 @@ impl Cores {
 /// Note: When changing this you have to run `co core build builtin` to get ``
 fn get_native(name: &str) -> Core {
 	match name {
-		CO_CORE_CO => Core::native::<co_core_co::Co>(),
+		CO_CORE_CO => Core::native_async::<co_core_co::Co, co_core_co::CoAction>(),
 		CO_CORE_FILE => Core::native::<co_core_file::File>(),
 		CO_CORE_KEYSTORE => Core::native_async::<co_core_keystore::KeyStore, co_core_keystore::KeyStoreAction>(),
 		CO_CORE_MEMBERSHIP => Core::native::<co_core_membership::Memberships>(),
