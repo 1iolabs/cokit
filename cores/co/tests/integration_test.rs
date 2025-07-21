@@ -57,7 +57,6 @@ async fn integration_test() {
 
 	// test
 	let block = storage.get(&next_state.unwrap()).await.unwrap();
-	let state: ipld_core::ipld::Ipld = BlockSerializer::default().deserialize(&block).unwrap();
 	let state: Co = BlockSerializer::default().deserialize(&block).unwrap();
 
 	// println!("{:?}", state);
