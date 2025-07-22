@@ -1741,7 +1741,9 @@ dependencies = [
  "futures",
  "ipld-core",
  "serde",
+ "thiserror",
  "tokio",
+ "tokio-util",
  "tracing",
  "uuid",
 ]
