@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_identity::PrivateIdentity;
 use co_log::{EntryBlock, Log, LogError};
-use co_primitives::{Link, ReducerAction};
+use co_primitives::{Link, ReducerAction, SignedEntry};
 use co_runtime::RuntimePool;
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use futures::{pin_mut, TryStreamExt};
@@ -140,9 +140,9 @@ where
 
 				// try to find state for latest heads
 				//  do this every iteration so we end up with the latest known state
-				if let Some(state) = self.find_snapshot_state(self.log.heads()) {
-					self.heads = self.log.heads().clone();
-					self.state = Some(state);
+				if let Some((state, heads)) = self.find_snapshot_state(self.log.heads()) {
+					self.state = state;
+					self.heads = heads;
 				}
 			}
 			tracing::trace!(state = ?self.state, heads = ?self.heads, log_heads = ?self.log.heads(), "reducer-snapshots");
@@ -177,8 +177,12 @@ where
 	}
 
 	/// Find snapshot state which matches `heads`.
-	fn find_snapshot_state(&self, heads: &BTreeSet<Cid>) -> Option<Cid> {
-		self.snapshots.get(heads).cloned()
+	fn find_snapshot_state(&self, heads: &BTreeSet<Cid>) -> Option<(Option<Cid>, BTreeSet<Cid>)> {
+		if let Some(state) = self.snapshots.get(heads) {
+			Some((Some(*state), heads.clone()))
+		} else {
+			None
+		}
 	}
 
 	/// (Re)sets the reducer and the log to a given state.
@@ -270,7 +274,7 @@ where
 		identity: &I,
 		core: impl Into<String> + Debug,
 		item: &T,
-	) -> Result<Option<Cid>, anyhow::Error>
+	) -> Result<PushResult, anyhow::Error>
 	where
 		T: Serialize + Send + Sync,
 		I: PrivateIdentity + Send + Sync,
@@ -294,7 +298,7 @@ where
 		runtime: &RuntimePool,
 		identity: &I,
 		action: &ReducerAction<T>,
-	) -> Result<Option<Cid>, anyhow::Error>
+	) -> Result<PushResult, anyhow::Error>
 	where
 		T: Serialize + Send + Sync,
 		I: PrivateIdentity + Send + Sync,
@@ -313,7 +317,7 @@ where
 		runtime: &RuntimePool,
 		identity: &I,
 		action_link: Link<ReducerAction<Ipld>>,
-	) -> Result<Option<Cid>, anyhow::Error>
+	) -> Result<PushResult, anyhow::Error>
 	where
 		I: PrivateIdentity + Send + Sync,
 	{
@@ -385,34 +389,58 @@ where
 		self.on_state_changed(storage, &context.change).await?;
 
 		// result
-		Ok(runtime_context.state)
+		Ok(PushResult {
+			entry: context.entry.cid().into(),
+			context: context.change,
+			head: runtime_context.event,
+			state: runtime_context.state,
+		})
 	}
 
 	/// Join heads (from other log).
 	/// This is used to join logs from other peers.
-	/// Returns true if new heads has integrated.
-	pub async fn join(&mut self, storage: &S, heads: &BTreeSet<Cid>, runtime: &RuntimePool) -> Result<bool, LogError> {
-		// log
-		tracing::trace!(previous_heads = ?self.log().heads(), next_heads = ?heads, "join");
-
+	/// Returns `Some(JoinResult)` if new heads has integrated.
+	pub async fn join(
+		&mut self,
+		storage: &S,
+		heads: &BTreeSet<Cid>,
+		runtime: &RuntimePool,
+	) -> Result<Option<JoinResult>, LogError> {
 		// join
-		if self.log().heads() != heads
-			&& (self.log_mut().join_heads(storage, heads.iter()).await? || &self.heads != self.log.heads())
-		{
+		let log_heads = self.log().heads().clone();
+		if &log_heads != heads && (self.log_mut().join_heads(storage, heads.iter()).await? || self.heads != log_heads) {
 			let context = ReducerChangeContext { cause: ReducerChangeCause::Log };
 
-			// // sync state
-			// let (next_state, next_heads) = if let Some(state) = self.find_snapshot_state(self.log().heads()) {
-			// 	// use snapshot
-			// 	(Some(state), self.log().heads().clone())
-			// } else {
-			// 	// compute state
-			// 	self.compute_state(storage, runtime, &context).await?
-			// };
-			let (next_state, next_heads) = self.compute_state(storage, runtime, &context).await?;
+			// sync state
+			let (next_state, next_heads) = if let Some((state, heads)) = self.find_snapshot_state(self.log().heads()) {
+				// use snapshot
+				(state, heads)
+			} else {
+				// compute state
+				self.compute_state(storage, runtime, &context).await?
+			};
+
+			// result
+			let result = JoinResult {
+				context: context.clone(),
+				heads: next_heads.clone(),
+				previous_heads: self.heads.clone(),
+				state: next_state,
+				previous_state: self.state,
+			};
 
 			// apply
 			if next_state != self.state || self.heads != next_heads {
+				// log
+				tracing::trace!(
+					co = self.log().id_string(),
+					log_heads = ?if log_heads == self.heads { None } else { Some(&log_heads) },
+					join_heads = ?heads,
+					?result,
+					has_snapshot = self.find_snapshot_state(&result.heads).is_some(),
+					"joined"
+				);
+
 				// apply
 				self.state = next_state;
 				self.heads = next_heads;
@@ -420,9 +448,9 @@ where
 				// notify
 				self.on_state_changed(storage, &context).await?;
 			}
-			Ok(true)
+			Ok(Some(result))
 		} else {
-			Ok(false)
+			Ok(None)
 		}
 	}
 
@@ -541,6 +569,34 @@ where
 	}
 }
 
+#[derive(Debug, Clone)]
+pub struct PushResult {
+	/// The resuting state.
+	pub state: Option<Cid>,
+	/// The latest head after the push operation.
+	pub head: Cid,
+	/// The entry reference. Normally the same as the head (if not changed by an CoreResolver).
+	pub entry: Link<SignedEntry>,
+	/// The change context.
+	pub context: ReducerChangeContext,
+}
+
+#[derive(Debug, Clone)]
+pub struct JoinResult {
+	/// The change context.
+	pub context: ReducerChangeContext,
+
+	/// The resuting state.
+	pub state: Option<Cid>,
+	/// The latest head after the join operation.
+	pub heads: BTreeSet<Cid>,
+
+	/// The state before the join operation.
+	pub previous_state: Option<Cid>,
+	/// The heads before the join operation.
+	pub previous_heads: BTreeSet<Cid>,
+}
+
 /// Reducer change handler.
 /// Will be executed everytime the state in the reducer changes, including on initialize.
 #[async_trait]
@@ -578,6 +634,11 @@ impl ReducerChangeContext {
 		Self { cause: ReducerChangeCause::Push }
 	}
 
+	/// Create a new local change context.
+	pub fn new_join() -> Self {
+		Self { cause: ReducerChangeCause::Log }
+	}
+
 	/// Whether this change was caused locally.
 	pub fn is_local_change(&self) -> bool {
 		self.cause.is_local()
@@ -613,7 +674,7 @@ mod tests {
 	};
 	use async_trait::async_trait;
 	use co_identity::{IdentityResolverBox, LocalIdentityResolver};
-	use co_log::Log;
+	use co_log::{IdentityEntryVerifier, Log};
 	use co_primitives::{BlockSerializer, ReducerAction};
 	use co_runtime::{Core, IdleRuntimePool, RuntimePool};
 	use co_storage::{ExtendedBlockStorage, MemoryBlockStorage};
@@ -638,17 +699,17 @@ mod tests {
 		let identity3 = LocalIdentityResolver::default().private_identity("did:local:p3").unwrap();
 		let log1 = Log::new(
 			"test".as_bytes().to_vec(),
-			IdentityResolverBox::new(LocalIdentityResolver::default()),
+			IdentityEntryVerifier::new(IdentityResolverBox::new(LocalIdentityResolver::default())),
 			Default::default(),
 		);
 		let log2 = Log::new(
 			"test".as_bytes().to_vec(),
-			IdentityResolverBox::new(LocalIdentityResolver::default()),
+			IdentityEntryVerifier::new(IdentityResolverBox::new(LocalIdentityResolver::default())),
 			Default::default(),
 		);
 		let log3 = Log::new(
 			"test".as_bytes().to_vec(),
-			IdentityResolverBox::new(LocalIdentityResolver::default()),
+			IdentityEntryVerifier::new(IdentityResolverBox::new(LocalIdentityResolver::default())),
 			Default::default(),
 		);
 
@@ -845,7 +906,7 @@ mod tests {
 		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
 		let log = Log::new(
 			"test".as_bytes().to_vec(),
-			IdentityResolverBox::new(LocalIdentityResolver::default()),
+			IdentityEntryVerifier::new(IdentityResolverBox::new(LocalIdentityResolver::default())),
 			Default::default(),
 		);
 		let runtime = RuntimePool::new(IdleRuntimePool::default());
@@ -877,7 +938,11 @@ mod tests {
 		reducer.add_change_handler(Box::new(Fail {}));
 
 		// join
-		assert!(!reducer.join(&storage, &reducer.heads().clone(), &runtime).await.unwrap());
+		assert!(reducer
+			.join(&storage, &reducer.heads().clone(), &runtime)
+			.await
+			.unwrap()
+			.is_none());
 	}
 
 	/// Compute State computes wrong result based on the ordering of the new heads when have multiple.
@@ -906,7 +971,7 @@ mod tests {
 			native_core_resolver.clone(),
 			Log::new(
 				"test".as_bytes().to_vec(),
-				IdentityResolverBox::new(LocalIdentityResolver::default()),
+				IdentityEntryVerifier::new(IdentityResolverBox::new(LocalIdentityResolver::default())),
 				Default::default(),
 			),
 		)
@@ -923,7 +988,7 @@ mod tests {
 			native_core_resolver.clone(),
 			Log::new(
 				"test".as_bytes().to_vec(),
-				IdentityResolverBox::new(LocalIdentityResolver::default()),
+				IdentityEntryVerifier::new(IdentityResolverBox::new(LocalIdentityResolver::default())),
 				reducer1.heads().clone(),
 			),
 		)
@@ -1004,7 +1069,7 @@ mod tests {
 			native_core_resolver.clone(),
 			Log::new(
 				"test".as_bytes().to_vec(),
-				IdentityResolverBox::new(LocalIdentityResolver::default()),
+				IdentityEntryVerifier::new(IdentityResolverBox::new(LocalIdentityResolver::default())),
 				Default::default(),
 			),
 		)
@@ -1021,7 +1086,7 @@ mod tests {
 			native_core_resolver.clone(),
 			Log::new(
 				"test".as_bytes().to_vec(),
-				IdentityResolverBox::new(LocalIdentityResolver::default()),
+				IdentityEntryVerifier::new(IdentityResolverBox::new(LocalIdentityResolver::default())),
 				reducer1.heads().clone(),
 			),
 		)

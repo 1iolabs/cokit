@@ -15,6 +15,7 @@ pub const CO_CORE_DATA_SERIES: &str = "co-core-data-series";
 pub const CO_CORE_STORAGE: &str = "co-core-storage";
 pub const CO_CORE_POA: &str = "co-core-poa";
 pub const CO_CORE_BOARD: &str = "co-core-board";
+pub const CO_CORE_RICH_TEXT: &str = "co-core-rich-text";
 
 /// CO Core name expected by the SDK implementation (key to `co.cores`).
 pub const CO_CORE_NAME_CO: CoreName<'static, co_core_co::Co> = CoreName::new("co");
@@ -99,9 +100,9 @@ impl Cores {
 /// Note: When changing this you have to run `co core build builtin` to get ``
 fn get_native(name: &str) -> Core {
 	match name {
-		CO_CORE_CO => Core::native::<co_core_co::Co>(),
+		CO_CORE_CO => Core::native_async::<co_core_co::Co, co_core_co::CoAction>(),
 		CO_CORE_FILE => Core::native::<co_core_file::File>(),
-		CO_CORE_KEYSTORE => Core::native::<co_core_keystore::KeyStore>(),
+		CO_CORE_KEYSTORE => Core::native_async::<co_core_keystore::KeyStore, co_core_keystore::KeyStoreAction>(),
 		CO_CORE_MEMBERSHIP => Core::native::<co_core_membership::Memberships>(),
 		CO_CORE_PIN => Core::native::<co_core_pin::Pin>(),
 		CO_CORE_ROOM => Core::native::<co_core_room::Room>(),
@@ -110,6 +111,7 @@ fn get_native(name: &str) -> Core {
 		CO_CORE_STORAGE => Core::native_async::<co_core_storage::Storage, co_core_storage::StorageAction>(),
 		CO_CORE_POA => Core::native_async::<co_core_poa::Authority, co_core_poa::AuthorityAction>(),
 		CO_CORE_BOARD => Core::native_async::<co_core_board::Board, co_core_board::BoardAction>(),
+		CO_CORE_RICH_TEXT => Core::native_async::<co_core_rich_text::RichText, co_core_rich_text::RichTextAction>(),
 		_ => panic!("unknown native core name: {}", name),
 	}
 }

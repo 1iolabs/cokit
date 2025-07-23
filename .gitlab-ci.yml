@@ -6,7 +6,7 @@ stages:
   - publish
 
 variables:
-  RUST_VERSION: "1.82"
+  RUST_VERSION: "1.88"
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
 
 cache: &global_cache
@@ -81,6 +81,18 @@ rustdoc:
     paths:
       - target/doc
 
+# generate docs
+docs:
+  stage: build
+  image: ${DOCKERFILE_IMAGE}
+  cache:
+    <<: *global_cache
+  script:
+    - ./ci/scripts/docs-build.sh
+  artifacts:
+    paths:
+      - docs/book
+
 # export pages
 pages:
   stage: publish
@@ -88,11 +100,13 @@ pages:
   dependencies:
     - build
     - rustdoc
+    - docs
   cache:
     <<: *global_cache
   script:
     - mkdir -p public
-    - mv target/doc public/doc
+    - mv target/doc public/crate
+    - mv docs/book public/book
     - mv target/release/* public/
     - mv target-wasm/wasm32-unknown-unknown/release/* public/
   artifacts:

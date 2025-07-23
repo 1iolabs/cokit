@@ -3,5 +3,5 @@
 ## Build
 
 ```shell
-cargo build --target=wasm32-unknown-unknown --release
+cargo build --features core --target=wasm32-unknown-unknown --target-dir ../../target-wasm --release
 ```

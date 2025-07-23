@@ -39,6 +39,8 @@ pub struct Membership {
 pub struct CoState {
 	/// The CO root state (usually co-core-co) and heads.
 	/// Note: This is not an Option so we can not be member of an emtpy CO (which has no id anyway).
+	/// Note: We want to use `CoReference::Weak` instead of `WeakCid` here because we need to have mappings generated
+	/// for it.
 	pub state: Link<CoReference<(Cid, BTreeSet<Cid>)>>,
 
 	// TODO mark as external as this field shouldn't be further resolved when pinning
@@ -189,7 +191,7 @@ fn find<'a>(memberships: &'a mut Memberships, co: &CoId, did: &str) -> Option<&'
 		.find(|item| &item.id == co && &item.did == did)
 }
 
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
 	co_api::reduce::<Memberships>()

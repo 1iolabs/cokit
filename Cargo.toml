@@ -21,6 +21,7 @@ members = [
     "cores/membership",
     "cores/pin",
     "cores/poa",
+    "cores/rich-text",
     "cores/role",
     "cores/room",
     "cores/storage",
@@ -50,6 +51,7 @@ hyper = { version = "0.14.23" }
 ipld-core = { version = "0.4.1", features = ["serde"] }
 ipld-dagpb = "0.2.1"
 libp2p = { version = "0.53", features = ["full"] }
+multiaddr = "0.18.2"
 multihash = "0.19.3"
 multihash-codetable = { version = "0.1.4", features = ["blake3"] }
 num-rational = "0.4"
@@ -84,6 +86,18 @@ zeroize = "1.7.0"
 co-actor = { path = "co-actor" }
 co-api = { path = "co-api" }
 co-cli = { path = "co-cli" }
+co-core-board = { path = "cores/board" }
+co-core-co = { path = "cores/co" }
+co-core-data-series = { path = "cores/data-series" }
+co-core-file = { path = "cores/file" }
+co-core-keystore = { path = "cores/keystore" }
+co-core-membership = { path = "cores/membership" }
+co-core-pin = { path = "cores/pin" }
+co-core-poa = { path = "cores/poa" }
+co-core-rich-text = { path = "cores/rich-text" }
+co-core-role = { path = "cores/role" }
+co-core-room = { path = "cores/room" }
+co-core-storage = { path = "cores/storage" }
 co-dioxus = { path = "co-dioxus" }
 co-identity = { path = "co-identity" }
 co-log = { path = "co-log" }
@@ -94,14 +108,3 @@ co-primitives = { path = "co-primitives" }
 co-runtime = { path = "co-runtime" }
 co-sdk = { path = "co-sdk" }
 co-storage = { path = "co-storage" }
-co-core-board = { path = "cores/board" }
-co-core-co = { path = "cores/co" }
-co-core-data-series = { path = "cores/data-series" }
-co-core-file = { path = "cores/file" }
-co-core-keystore = { path = "cores/keystore" }
-co-core-membership = { path = "cores/membership" }
-co-core-pin = { path = "cores/pin" }
-co-core-poa = { path = "cores/poa" }
-co-core-role = { path = "cores/role" }
-co-core-room = { path = "cores/room" }
-co-core-storage = { path = "cores/storage" }

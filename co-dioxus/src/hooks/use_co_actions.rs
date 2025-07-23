@@ -6,8 +6,8 @@ use futures::{StreamExt, TryStreamExt};
 use serde::de::{DeserializeOwned, IgnoredAny};
 
 pub fn use_co_actions<T>(
-	co: CoId,
-	state: SyncSignal<CoReducerState>,
+	co: ReadOnlySignal<CoId>,
+	state: ReadOnlySignal<CoReducerState, SyncStorage>,
 	core: Option<String>,
 	skip: usize,
 	limit: usize,
@@ -17,10 +17,11 @@ where
 {
 	let context: CoContext = use_context();
 	let error = use_co_error();
-	use_resource(use_reactive!(|(co, core, skip, limit)| {
+	use_resource(use_reactive!(|(core, skip, limit)| {
 		let context = context.clone();
 		async move {
 			let state = state.cloned();
+			let co = co();
 			context
 				.result(error, move |application| async move {
 					read_actions(&application, &co, state, &core, skip, limit).await

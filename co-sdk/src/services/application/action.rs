@@ -85,7 +85,10 @@ pub enum Action {
 	DidCommReceive { peer: PeerId, message: Message },
 
 	/// Received a HeadsMessage.
-	HeadsMessageReceived { from: Option<Did>, peer: PeerId, message_id: String, message: HeadsMessage },
+	HeadsMessageReceived(HeadsMessageReceivedAction),
+
+	/// HeadsMessage has been processed.
+	HeadsMessageComplete { message: HeadsMessageReceivedAction, result: Result<(), ActionError> },
 
 	/// Connect to Co and send message (DidCommSent) to the first peer connectable.
 	CoDidCommSend(CoDidCommSendAction),
@@ -108,9 +111,6 @@ pub enum Action {
 		/// Flush details.
 		info: FlushInfo,
 	},
-
-	/// Stage a action and dispatch after flush.
-	CoStaged { co: CoId, action: Box<Action> },
 
 	/// Co has been opened.
 	CoOpen {
@@ -346,4 +346,20 @@ pub enum NotifyAction {
 		/// The invited participant.
 		to: Did,
 	},
+}
+
+/// Received a HeadsMessage.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct HeadsMessageReceivedAction {
+	/// The Co to send the message to.
+	pub co: CoId,
+
+	pub from: Option<Did>,
+	pub peer: PeerId,
+	pub message_id: String,
+	pub message: HeadsMessage,
+
+	/// Message tags. Used for internal tracking.
+	pub tags: Tags,
 }

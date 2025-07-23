@@ -13,8 +13,8 @@ pub use co_primitives::{
 	Component, Components, DagCollection, DagCollectionExt, DagMap, DagMapExt, DagSet, DagSetExt, DagVec, DagVecExt,
 	Date, DefaultNodeSerializer, DefaultParams, Did, Entry, IsDefault, LazyTransaction, Link, Linkable, Metadata,
 	Network, Node, NodeBuilder, NodeBuilderError, NodeSerializer, OptionLink, Path, PathExt, PathOwned, ReducerAction,
-	RelativePath, RelativePathOwned, Secret, SignedEntry, Storage, StorageError, StoreParams, Tag, Tags, TagsExpr,
-	TotalFloat64, WeakCid, WithCoMetadata,
+	RelativePath, RelativePathOwned, Secret, SignedEntry, Storage, StorageError, StoreParams, Tag, TagValue, Tags,
+	TagsExpr, TotalFloat64, WeakCid, WithCoMetadata,
 };
 pub use co_v1::{
 	diagnostic_cid_write, event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set,

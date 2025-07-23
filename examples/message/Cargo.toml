@@ -22,3 +22,6 @@ co-runtime = { workspace = true }
 co-primitives = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+[features]
+"core" = []

@@ -13,10 +13,19 @@ async fn integration_test() {
 	// 	.init();
 
 	// build
-	Command::new("cargo")
-		.args(["build", "--target=wasm32-unknown-unknown", "--release"])
-		.output()
-		.unwrap();
+	assert!(Command::new("cargo")
+		.args([
+			"build",
+			"--features",
+			"core",
+			"--target=wasm32-unknown-unknown",
+			"--target-dir",
+			"../../target-wasm",
+			"--release",
+		])
+		.status()
+		.unwrap()
+		.success());
 
 	// storage
 	let storage = MemoryBlockStorage::default();
@@ -35,7 +44,7 @@ async fn integration_test() {
 	storage.set(action_block).await.unwrap();
 
 	// wasm
-	let wasm = unixfs_add_file(&storage, "../../target/wasm32-unknown-unknown/release/co_core_co.wasm")
+	let wasm = unixfs_add_file(&storage, "../../target-wasm/wasm32-unknown-unknown/release/co_core_co.wasm")
 		.await
 		.unwrap();
 

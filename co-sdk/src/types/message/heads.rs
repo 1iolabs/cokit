@@ -22,7 +22,7 @@ pub enum HeadsMessage {
 
 	/// Error notification.
 	#[serde(rename = "e")]
-	Error { code: HeadsErrorCode, message: String },
+	Error { co: CoId, code: HeadsErrorCode, message: String },
 }
 impl HeadsMessage {
 	/// Message type
@@ -35,6 +35,14 @@ impl HeadsMessage {
 		let mut header = DidCommHeader::new(Self::message_type());
 		header.expires_time = header.created_time.map(|t| t + 120);
 		header
+	}
+
+	pub fn co(&self) -> &CoId {
+		match self {
+			HeadsMessage::Heads(co_id, ..) => co_id,
+			HeadsMessage::HeadsRequest(co_id) => co_id,
+			HeadsMessage::Error { co, .. } => co,
+		}
 	}
 }
 

@@ -4,10 +4,16 @@ use co_sdk::{build_core, crate_repository_path, unixfs_encode_buffer};
 use exitcode::ExitCode;
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{collections::BTreeMap, future::ready, os::unix::ffi::OsStrExt, path::PathBuf};
 use tokio_stream::wrappers::ReadDirStream;
 
-pub async fn command() -> Result<ExitCode, anyhow::Error> {
+#[derive(Debug, Clone, clap::Args)]
+pub struct Command {
+	/// Only compile specific cores (folder name).
+	pub core: Vec<String>,
+}
+
+pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 	// get repository root path
 	let repository_path = crate_repository_path(true).unwrap();
 
@@ -23,6 +29,18 @@ pub async fn command() -> Result<ExitCode, anyhow::Error> {
 				},
 				Err(e) => Some(Err(e)),
 			}
+		})
+		.try_filter(|entry| {
+			ready({
+				if command.core.is_empty() {
+					true
+				} else if let Some(name) = entry.file_name().and_then(|name| std::str::from_utf8(name.as_bytes()).ok())
+				{
+					command.core.iter().find(|filter| filter.as_str() == name).is_some()
+				} else {
+					true
+				}
+			})
 		})
 		.try_collect()
 		.await?;

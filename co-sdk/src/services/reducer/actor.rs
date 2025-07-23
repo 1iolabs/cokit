@@ -1,7 +1,9 @@
 use super::{flush::CoReducerFlush, message::ReducerMessage, FlushInfo};
 use crate::{
+	application::reducer::JoinResult,
 	library::{
 		extract_next_heads::extract_next_heads,
+		log_entries_until::log_entries_until,
 		to_external_cid::{to_external_mapped, to_external_mapped_opt},
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
@@ -9,7 +11,7 @@ use crate::{
 		co_reducer_context::{CoReducerContextRef, CoReducerFeature},
 		co_reducer_state::CoReducerState,
 	},
-	Action, ApplicationMessage, CoStorage, Reducer, Runtime,
+	Action, ApplicationMessage, CoStorage, Reducer, ReducerChangeContext, Runtime,
 };
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, ResponseStreams};
@@ -17,7 +19,7 @@ use co_identity::{Identity, PrivateIdentityBox};
 use co_primitives::{
 	BlockLinks, CoId, IgnoreFilter, Link, MappedCid, OptionMappedCid, ReducerAction, Tags, WeakCoReferenceFilter,
 };
-use co_storage::{BlockStorageContentMapping, OverlayBlockStorage};
+use co_storage::{BlockStorageContentMapping, BlockStorageExt, OverlayBlockStorage};
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use indexmap::IndexSet;
 use ipld_core::ipld::Ipld;
@@ -135,19 +137,27 @@ async fn handle_push(
 	action_link: Link<ReducerAction<Ipld>>,
 ) -> Result<CoReducerState, anyhow::Error> {
 	// push
-	let result_state = CoReducerState(
-		reducer_state
-			.reducer
-			.push_reference(&storage, actor.runtime.runtime(), &identity, action_link)
-			.await?,
-		reducer_state.reducer.heads().clone(),
-	);
+	let push = reducer_state
+		.reducer
+		.push_reference(&storage, actor.runtime.runtime(), &identity, action_link)
+		.await?;
+	let result_state = CoReducerState(push.state, reducer_state.reducer.heads().clone());
 
 	// changed
 	changed(reducer_state, true, Some(identity.identity()), [result_state.clone()]);
 
 	// flush
-	flush(actor, reducer_state, overlay_storage, storage).await?;
+	flush(actor, reducer_state, overlay_storage, &storage).await?;
+
+	// reactive
+	actor.application_handle.dispatch(Action::CoreAction {
+		co: actor.id.clone(),
+		action: storage.get_value(&action_link).await?,
+		storage,
+		context: push.context,
+		cid: action_link,
+		head: push.head,
+	})?;
 
 	// result
 	Ok(result_state)
@@ -166,10 +176,42 @@ async fn handle_join_state(
 	let internal_state = join_state.to_internal(&root_storage).await;
 
 	// join
-	apply_join(&actor.runtime, reducer_state, &storage, internal_state).await?;
+	let join_result = apply_join(&actor.runtime, reducer_state, &storage, internal_state).await?;
 
 	// flush
-	flush(actor, reducer_state, overlay_storage, storage).await?;
+	flush(actor, reducer_state, overlay_storage, &storage).await?;
+
+	// reactive
+	//  walk all actions from previous state to new state and dispatch the actions
+	//  we reverse the actions so they arrive with push order (oldest first)
+	if let Some(join_result) = &join_result {
+		// we use the current heads as the flush may applied more actions
+		let heads = reducer_state.reducer.heads().clone();
+		let previous_heads = join_result.previous_heads.clone();
+		let mut actions = log_entries_until(storage.clone(), heads, previous_heads)
+			.map(|entry| {
+				let storage = storage.clone();
+				async move {
+					let entry = entry?;
+					let link = entry.entry().payload.into();
+					Result::<Action, anyhow::Error>::Ok(Action::CoreAction {
+						co: actor.id.clone(),
+						action: storage.get_value(&link).await?,
+						storage,
+						context: ReducerChangeContext::new_join(),
+						cid: link,
+						head: *entry.cid(),
+					})
+				}
+			})
+			.buffered(10)
+			.try_collect::<Vec<Action>>()
+			.await?;
+		actions.reverse();
+		for action in actions {
+			actor.application_handle.dispatch(action)?;
+		}
+	}
 
 	// result
 	Ok(handle_state(reducer_state))
@@ -179,7 +221,7 @@ async fn flush(
 	actor: &ReducerActor,
 	reducer_state: &mut ReducerState,
 	overlay_storage: Option<OverlayBlockStorage<CoStorage>>,
-	storage: CoStorage,
+	storage: &CoStorage,
 ) -> Result<(), anyhow::Error> {
 	let new_roots = take(&mut reducer_state.flush_roots);
 
@@ -188,7 +230,7 @@ async fn flush(
 
 	// base storage
 	let base_storage =
-		if let Some(overlay_storage) = &overlay_storage { overlay_storage.next_storage() } else { &storage };
+		if let Some(overlay_storage) = &overlay_storage { overlay_storage.next_storage() } else { storage };
 
 	// flush overlay
 	let mut removed_blocks = BTreeSet::<OptionMappedCid>::new();
@@ -281,14 +323,15 @@ async fn apply_join(
 	reducer_state: &mut ReducerState,
 	storage: &CoStorage,
 	state: CoReducerState,
-) -> Result<(), anyhow::Error> {
+) -> Result<Option<JoinResult>, anyhow::Error> {
 	// insert snapshot if have state and heads
 	if let Some((state, heads)) = state.some() {
 		reducer_state.reducer.insert_snapshot(state, heads);
 	}
 
 	// join
-	if reducer_state.reducer.join(storage, &state.1, runtime.runtime()).await? {
+	let result = reducer_state.reducer.join(storage, &state.1, runtime.runtime()).await?;
+	if let Some(_join_result) = &result {
 		// roots
 		// - this will include
 		// 	 - the latest state
@@ -299,5 +342,5 @@ async fn apply_join(
 		// change
 		changed(reducer_state, false, None, roots);
 	}
-	Ok(())
+	Ok(result)
 }

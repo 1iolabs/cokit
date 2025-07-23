@@ -28,6 +28,7 @@ pub struct CoReducer {
 	pub(crate) context: CoReducerContextRef,
 	date: DynamicCoDate,
 	runtime: Runtime,
+	core_resolver: DynamicCoreResolver<CoStorage>,
 }
 impl CoReducer {
 	pub(crate) fn spawn(
@@ -43,13 +44,24 @@ impl CoReducer {
 		flush: CoReducerFlush,
 	) -> Result<Self, anyhow::Error> {
 		let date = reducer.date().clone();
+		let core_resolver = reducer.core_resolver().clone();
 		let actor = Actor::spawn_with(
 			tasks.clone(),
 			tags!("application": application_identifier, "co": id.as_str()),
 			ReducerActor::new(id.clone(), runtime.clone(), application_handle, context.clone()),
 			(reducer, flush),
 		)?;
-		Ok(Self { id, parent, storage, handle: actor.handle(), context, date, overlay_storage: None, runtime })
+		Ok(Self {
+			id,
+			parent,
+			storage,
+			handle: actor.handle(),
+			context,
+			date,
+			overlay_storage: None,
+			runtime,
+			core_resolver,
+		})
 	}
 
 	pub(crate) fn clone_with_detached_storage(&self) -> Self {
@@ -78,6 +90,7 @@ impl CoReducer {
 			context: self.context.clone(),
 			date: self.date.clone(),
 			runtime: self.runtime.clone(),
+			core_resolver: self.core_resolver.clone(),
 			storage,
 			overlay_storage,
 		}
@@ -278,10 +291,11 @@ impl CoReducer {
 		let heads = CoReducerState::new(None, heads).to_internal(&storage).await;
 
 		// join
-		Ok(if reducer.join(&storage, &heads.1, self.runtime.runtime()).await? {
+		Ok(if reducer.join(&storage, &heads.1, self.runtime.runtime()).await?.is_some() {
 			// integrate join
 			self.join_state(CoReducerState::new_reducer(&reducer)).await?
 		} else {
+			// no change
 			self.reducer_state().await
 		})
 	}
@@ -315,14 +329,21 @@ impl CoReducer {
 	///
 	/// # Notes
 	/// - Uses the same storage instance.
-	/// - Uses the same core resolver and therefore actions are dispatched as usual.
+	/// - Uses the same core resolver instance.
 	async fn create_memory_reducer(
 		&self,
 	) -> Result<(CoStorage, Reducer<CoStorage, DynamicCoreResolver<CoStorage>>), anyhow::Error> {
 		let storage = self.storage();
 		let reducer_state = self.reducer_state().await;
-		let reducer =
-			create_memory_reducer(self.runtime.runtime(), self.date.clone(), &self.id, &storage, reducer_state).await?;
+		let reducer = create_memory_reducer(
+			self.runtime.runtime(),
+			self.date.clone(),
+			&self.id,
+			&storage,
+			Some(self.core_resolver.clone()),
+			reducer_state,
+		)
+		.await?;
 		Ok((storage, reducer))
 	}
 }

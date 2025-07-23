@@ -52,6 +52,7 @@ pub use types::{
 	},
 	secret::Secret,
 	storage::Storage,
+	streamable::Streamable,
 	tags::{Tag, TagMatcher, TagPattern, TagValue, Tags, TagsExpr},
 	total_float::TotalFloat64,
 	weak_cid::WeakCid,

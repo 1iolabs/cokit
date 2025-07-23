@@ -1,6 +1,7 @@
 use crate::{
 	bitswap::{BitswapMessage, BitswapStoreClient},
 	didcomm, discovery, heads,
+	library::find_peer_id::try_peer_id,
 	types::{network_task::TokioNetworkTaskSpawner, provider::BitswapBehaviourProvider},
 	DidcommBehaviourProvider, DiscoveryLayerBehaviourProvider, FnOnceNetworkTask, GossipsubBehaviourProvider,
 	HeadsLayerBehaviourProvider, Layer, LayerBehaviour, MdnsBehaviourProvider, NetworkError, NetworkTaskBox,
@@ -15,13 +16,12 @@ use libp2p::{
 	gossipsub, identify,
 	identity::Keypair,
 	mdns::{self, tokio::Behaviour as MdnsBehaviour},
-	multiaddr::Protocol,
 	ping,
-	swarm::{NetworkBehaviour, SwarmEvent},
+	swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
 	Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 use libp2p_bitswap::{Bitswap, BitswapEvent};
-use std::{task::Poll, time::Duration};
+use std::{collections::BTreeSet, task::Poll, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
 
@@ -90,7 +90,7 @@ impl Libp2pNetwork {
 		// 	tracing::warn!(?err, "kad-bootstrap-failed");
 		// }
 
-		let listen = config.addr.clone().unwrap_or("/ip4/0.0.0.0/udp/0/quic-v1".parse()?);
+		let listen = config.addr.clone();
 		let is_tcp = listen.protocol_stack().any(|protocol| protocol == "tcp");
 
 		// swarm
@@ -98,16 +98,28 @@ impl Libp2pNetwork {
 		let mut swarm = if is_tcp {
 			swarm_builder
 				.with_tcp(libp2p::tcp::Config::default(), libp2p::noise::Config::new, libp2p::yamux::Config::default)?
+				.with_dns()?
 				.with_behaviour(|_| behaviour)?
 				.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
 				.build()
 		} else {
 			swarm_builder
 				.with_quic()
+				.with_dns()?
 				.with_behaviour(|_| behaviour)?
 				.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
 				.build()
 		};
+
+		// bootstrap
+		for bootstrap in config.bootstrap.iter() {
+			let peer_id = try_peer_id(bootstrap)?;
+			if local_peer_id == peer_id {
+				continue;
+			}
+			swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![bootstrap.clone()]).build())?;
+			swarm.behaviour_mut().gossipsub_mut().add_explicit_peer(&peer_id);
+		}
 
 		// context
 		let context = Context {
@@ -183,8 +195,11 @@ impl Shutdown {
 #[derive(Clone, Debug)]
 pub struct Libp2pNetworkConfig {
 	pub keypair: Keypair,
-	pub addr: Option<Multiaddr>,
-	pub bootstap: Vec<(PeerId, Multiaddr)>,
+	pub addr: Multiaddr,
+
+	// Nodes to initialiy dial.
+	/// The multiaddress is required to include an address (protocol) and and peer id (p2p).
+	pub bootstrap: BTreeSet<Multiaddr>,
 
 	/// Network mode to optimize for.
 	/// This may change dynamically.
@@ -192,27 +207,8 @@ pub struct Libp2pNetworkConfig {
 	pub mode: NetworkMode,
 }
 impl Libp2pNetworkConfig {
-	pub fn from_keypair(keypair: Keypair) -> Self {
-		Self { keypair, addr: Default::default(), bootstap: Default::default(), mode: Default::default() }
-	}
-
-	/// Add bootstrap peer.
-	/// The multiaddress is required to include an address (protocol) and and peer id (p2p).
-	pub fn add_bootstrap<'a>(&mut self, bootstap: impl Iterator<Item = &'a Multiaddr>) -> Result<(), Vec<Multiaddr>> {
-		let mut failed = Vec::new();
-		for multiaddr in bootstap {
-			let mut addr = multiaddr.to_owned();
-			if let Some(Protocol::P2p(peer_id)) = addr.pop() {
-				// let peer_id = PeerId::from_multihash(mh).unwrap();
-				self.bootstap.push((peer_id, addr));
-			} else {
-				failed.push(multiaddr.clone());
-			}
-		}
-		match failed.len() {
-			0 => Ok(()),
-			_ => Err(failed),
-		}
+	pub fn from_keypair(listen: Multiaddr, keypair: Keypair) -> Self {
+		Self { keypair, addr: listen, bootstrap: Default::default(), mode: Default::default() }
 	}
 }
 
