@@ -52,22 +52,22 @@ pub struct ApplicationActorState {
 
 #[derive(Debug)]
 pub enum ApplicationActorMessage {
-	SessionOpen(CoId, Response<Result<SessionId, ActorError>>),
+	SessionOpen(CoId, Response<Result<SessionId, anyhow::Error>>),
 	SessionClose(SessionId),
-	StorageGet(SessionId, Cid, Response<Result<Block<DefaultParams>, ActorError>>),
-	StorageSet(SessionId, Block<DefaultParams>, Response<Result<Cid, ActorError>>),
-	GetCoState(CoId, Response<Result<(Option<Cid>, BTreeSet<Cid>), ActorError>>),
+	StorageGet(SessionId, Cid, Response<Result<Block<DefaultParams>, anyhow::Error>>),
+	StorageSet(SessionId, Block<DefaultParams>, Response<Result<Cid, anyhow::Error>>),
+	GetCoState(CoId, Response<Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>),
 	WatchState(ResponseStream<(CoId, Option<Cid>, BTreeSet<Cid>)>),
-	Push(SessionId, String, Ipld, Did, Response<Result<Option<Cid>, ActorError>>),
-	ResolveCid(SessionId, Cid, Response<Result<Ipld, ActorError>>),
-	GetActions(GetActionsRequest, Response<Result<GetActionsResponse, ActorError>>),
+	Push(SessionId, String, Ipld, Did, Response<Result<Option<Cid>, anyhow::Error>>),
+	ResolveCid(SessionId, Cid, Response<Result<Ipld, anyhow::Error>>),
+	GetActions(GetActionsRequest, Response<Result<GetActionsResponse, anyhow::Error>>),
 	CreateIdentity(CreateIdentityRequest),
 	CreateCo(CreateCoRequest),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct GetActionsRequest {
-	pub session_id: SessionId,
+	pub session: SessionId,
 	pub heads: BTreeSet<Cid>,
 	pub count: usize,
 	pub until: Option<Cid>,
@@ -188,13 +188,14 @@ impl Actor for ApplicationActor {
 					async move {
 						let changed = application.handle().stream(ApplicationMessage::Subscribe).filter_map(|action| {
 							ready(match action {
-								Ok(Action::CoreAction { co, storage: _, context: _, action: _, cid: _, head: _ }) => {
-									Some(co)
-								},
-								Ok(Action::Invite { co, from: _, to: _ }) => Some(co),
-								Ok(Action::InviteSent { co, to: _, peer: _ }) => Some(co),
-								Ok(Action::JoinKeyRequest { co, participant: _, peer: _ }) => Some(co),
-								Ok(Action::Joined { co, participant: _, success: _, peer: _ }) => Some(co),
+								// Ok(Action::CoreAction { co, storage: _, context: _, action: _, cid: _, head: _ }) =>
+								// { 	Some(co)
+								// },
+								// Ok(Action::Invite { co, from: _, to: _ }) => Some(co),
+								// Ok(Action::InviteSent { co, to: _, peer: _ }) => Some(co),
+								// Ok(Action::JoinKeyRequest { co, participant: _, peer: _ }) => Some(co),
+								// Ok(Action::Joined { co, participant: _, success: _, peer: _ }) => Some(co),
+								Ok(Action::CoFlush { co, info: _ }) => Some(co),
 								_ => None,
 							})
 						});
@@ -203,6 +204,7 @@ impl Actor for ApplicationActor {
 						while let Some(co) = changed.next().await {
 							if let Some(reducer) = context.try_co_reducer(&co).await.ok() {
 								let (state, heads) = reducer.reducer_state().await.into();
+								tracing::debug!("tauri watch: new state: {:?}, {:?}", co, state);
 								if response.send((co, state, heads)).is_err() {
 									break;
 								}
@@ -218,17 +220,12 @@ impl Actor for ApplicationActor {
 						let session = sessions
 							.get(&session_id)
 							.clone()
-							.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
-						let private_identity = state
-							.application
-							.private_identity(&identity)
-							.await
-							.map_err(|err| ActorError::Actor(err.into()))?;
+							.ok_or(anyhow!("Session not found: No session for ID {session_id}"))?;
+						let private_identity = state.application.private_identity(&identity).await?;
 						session
 							.reducer
 							.push(&private_identity, &core, &action)
 							.await
-							.map_err(|err| ActorError::Actor(err.into()))
 							.map(|state| state.state())
 					})
 					.await
@@ -252,14 +249,22 @@ impl Actor for ApplicationActor {
 			ApplicationActorMessage::GetActions(request, response) => {
 				let sessions = state.sessions.clone();
 				let mut next_heads = request.heads.clone();
+				let co_context = state.application.context().clone();
 				response.spawn(move || async move {
-					let session_id = request.session_id;
+					let session_id = request.session;
+					let session = sessions
+						.get(&session_id)
+						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
 					let storage = sessions
 						.get(&session_id)
 						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?
 						.reducer
 						.storage();
-					let stream = co_log::create_stream(&storage, request.heads).take(request.count);
+
+					let stream = co_context
+						.entries_from_heads(session.reducer.id(), storage, request.heads)
+						.await?
+						.take(request.count);
 					pin_mut!(stream);
 					let mut actions = Vec::new();
 					while let Some(item) = stream.next().await {
@@ -375,7 +380,7 @@ mod tests {
 
 		// get 10 actions at once from current heads
 		let heads = reducer.heads().await;
-		let mut request = GetActionsRequest { session_id: session_id.clone(), heads, count: 10, until: None };
+		let mut request = GetActionsRequest { session: session_id.clone(), heads, count: 10, until: None };
 		let log_a = actor_handle
 			.request(|r| ApplicationActorMessage::GetActions(request.clone(), r))
 			.await

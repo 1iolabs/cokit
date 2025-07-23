@@ -4,90 +4,103 @@ import { createIdentity, resolveCid, sessionClose, sessionOpen } from "../../../
 import GroupDefaultPic from "../../../assets/Users_48.svg";
 import { splitCoCoreId } from "../../../library/core-id.js";
 import { getCoreState, getFilteredCoreIds } from "../../../library/invoke-get.js";
-import { ChatsListActions, ChatsListActionType, ChatsListAddChatAction, ChatsListSetIdentityAction } from "../actions/index.js";
+import {
+  ChatsListActions,
+  ChatsListActionType,
+  ChatsListAddChatAction,
+  ChatsListSetIdentityAction,
+} from "../actions/index.js";
 import { ChatsListEpicType } from "../types/plugin.js";
 
 const LOAD_IDENTITY_MAX_TRIES = 10;
 const IDENTITY_NAME = "coapp_messenger";
 
-export const loadChatsEpic: ChatsListEpicType = (action$) => action$.pipe(
+export const loadChatsEpic: ChatsListEpicType = (action$) =>
+  action$.pipe(
     filter(isPluginInitializeAction),
     mergeMap(async () => {
-        const actions: ChatsListActions[] = [];
-        // create co application session
-        let sessionId = await sessionOpen("local");
+      const actions: ChatsListActions[] = [];
+      // create co application session
+      const sessionId = await sessionOpen("local");
 
-        // check identity
-        let messengerIdentity: string | undefined = undefined;
-        let tries = 0;
-        do {
-            // get identity
-            messengerIdentity = await getCoappMessengerIdentity(sessionId);
-            if (messengerIdentity === undefined) {
-                // try to create identity
-                await createIdentity(IDENTITY_NAME);
-                tries++;
-            }
-        } while (messengerIdentity === undefined && tries < LOAD_IDENTITY_MAX_TRIES);
-
-        // close active session to free up memory
-        await sessionClose(sessionId);
-
+      // check identity
+      let messengerIdentity: string | undefined = undefined;
+      let tries = 0;
+      do {
+        // get identity
+        messengerIdentity = await getCoappMessengerIdentity(sessionId);
         if (messengerIdentity === undefined) {
-            // could not resolve identity error
-            throw "Identity error: couldn't resolve messenger identity";
+          // try to create identity
+          await createIdentity(IDENTITY_NAME);
+          tries++;
+        }
+      } while (messengerIdentity === undefined && tries < LOAD_IDENTITY_MAX_TRIES);
+
+      // close active session to free up memory
+      await sessionClose(sessionId);
+
+      if (messengerIdentity === undefined) {
+        // could not resolve identity error
+        throw new Error("Identity error: couldn't resolve messenger identity");
+      }
+
+      // save identity to state action
+      actions.push(
+        identity<ChatsListSetIdentityAction>({
+          payload: { identity: messengerIdentity },
+          type: ChatsListActionType.SetIdentity,
+        }),
+      );
+
+      // load all chat states
+      const coreIds = await getFilteredCoreIds(["core", "co-core-room"]);
+      for (const coreId of coreIds) {
+        // Split Id to co and core and cancel if failed
+        const coCoreResult = splitCoCoreId(coreId);
+        if (coCoreResult === undefined) {
+          continue;
         }
 
-        // save identity to state action
-        actions.push(identity<ChatsListSetIdentityAction>({
-            payload: { identity: messengerIdentity },
-            type: ChatsListActionType.SetIdentity,
-        }));
-
-        // load all chat states
-        const coreIds = await getFilteredCoreIds(["core", "co-core-room"]);
-        for (const coreId of coreIds) {
-            // Split Id to co and core and cancel if failed
-            const coCoreResult = splitCoCoreId(coreId);
-            if (!coCoreResult) { continue }
-
-            let coreState;
-            // get core state and cancel if failed
-            try {
-                coreState = await getCoreState(coCoreResult.coId, coCoreResult.coreId);
-            } catch (e) {
-                console.error("Error while fetching state: ", e);
-            }
-            if (!coreState) { continue }
-
-            // add to actions
-            actions.push(identity<ChatsListAddChatAction>({
-                payload: {
-                    chat: {
-                        name: coreState.name ?? "New room",
-                        id: coreId,
-                        newMessages: 0, // TODO check read receipts to know message count since last read
-                        avatar: GroupDefaultPic, // TODO use pic from CORE
-                    }
-                },
-                type: ChatsListActionType.AddChat
-            }));
+        let coreState;
+        // get core state and cancel if failed
+        try {
+          coreState = await getCoreState(coCoreResult.coId, coCoreResult.coreId);
+        } catch (e) {
+          console.error("Error while fetching state: ", e);
         }
-        return actions;
+        if (coreState === undefined) {
+          continue;
+        }
+
+        // add to actions
+        actions.push(
+          identity<ChatsListAddChatAction>({
+            payload: {
+              chat: {
+                avatar: GroupDefaultPic, // TODO use pic from CORE
+                id: coreId,
+                name: coreState.name ?? "New room",
+                newMessages: 0, // TODO check read receipts to know message count since last read
+              },
+            },
+            type: ChatsListActionType.AddChat,
+          }),
+        );
+      }
+      return actions;
     }),
     mergeAll(),
-);
+  );
 
 /**
  * tries to resolve the IDENTITY_NAME identity from the CO kit
  */
 async function getCoappMessengerIdentity(sessionId: string): Promise<undefined | string> {
-    let keystoreState = await getCoreState("local", "keystore", sessionId);
-    if (keystoreState === undefined || keystoreState === null) {
-        return undefined;
-    }
-    let keyStoreKeys = await resolveCid(sessionId, keystoreState.keys);
-    let messengerIdentity = keyStoreKeys.l.find((i: any) => i[1].name === IDENTITY_NAME);
-    return messengerIdentity?.[0];
+  const keystoreState = await getCoreState("local", "keystore", sessionId);
+  if (keystoreState === undefined || keystoreState === null) {
+    return undefined;
+  }
+  const keyStoreKeys = await resolveCid(sessionId, keystoreState.keys);
+  const messengerIdentity = keyStoreKeys.l.find((i: any) => i[1].name === IDENTITY_NAME);
+  return messengerIdentity?.[0];
 }
-

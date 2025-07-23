@@ -5,4 +5,5 @@ import { AddParticipantDialogPluginState } from "./state.js";
 
 export const addParticipantDialogPluginId = "coapp-add-participant";
 
-export type AddParticipantDialogPlugin = Plugin<AddParticipantDialogPluginState, AddParticipantDialogActions> & RenderPlugin<DialogProps>;
+export type AddParticipantDialogPlugin = Plugin<AddParticipantDialogPluginState, AddParticipantDialogActions> &
+  RenderPlugin<DialogProps>;

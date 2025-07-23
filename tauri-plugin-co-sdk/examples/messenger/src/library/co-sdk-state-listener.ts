@@ -5,19 +5,20 @@ import { fromEventPattern, Observable } from "rxjs";
 export type CoSdkStateEvent = Event<[string, CID | undefined, CID[]]>;
 
 /**
- * Starts listening to the "co-sdk-new-state" event channel and emits all events that are 
+ * Starts listening to the "co-sdk-new-state" event channel and emits all events that are
  * received this way in the returned observable.
  */
 export function createCoSdkStateEventListener(): Observable<CoSdkStateEvent> {
-    const retObservable = fromEventPattern<CoSdkStateEvent>(
-        async (handler) => {
-            // start listening to state changes from co sdk
-            return await listen<CoSdkStateEvent>("co-sdk-new-state", handler);
-        },
-        async (_handler, unlisten) => {
-            //stop listening
-            (await unlisten)();
-        },
-    );
-    return retObservable;
+  const retObservable = fromEventPattern<CoSdkStateEvent>(
+    async (handler) => {
+      // start listening to state changes from co sdk
+      return await listen<CoSdkStateEvent>("co-sdk-new-state", handler);
+    },
+    async (_handler, unlistenPromise) => {
+      // stop listening
+      const unlisten = await unlistenPromise;
+      unlisten();
+    },
+  );
+  return retObservable;
 }

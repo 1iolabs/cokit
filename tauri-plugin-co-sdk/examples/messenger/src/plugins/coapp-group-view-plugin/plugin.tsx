@@ -7,15 +7,15 @@ import { GroupViewPlugin } from "./types/plugin.js";
 import { GroupViewPluginRoomCoreIdTag, groupViewPluginTag } from "./types/tag.js";
 
 export default function plugin(pluginTags: TagList): GroupViewPlugin {
-    const roomCoreId = tagValue<GroupViewPluginRoomCoreIdTag>(pluginTags, "roomCoreId");
-    return {
-        epic: groupViewPluginEpic,
-        render: (_, props: GroupViewContainerProps) => <GroupViewContainer {...props} />,
-        reducer: reducerWithInitialState(groupViewPluginReducer, {
-            isNew: roomCoreId === undefined,
-            name: "New group",
-            participants: [],
-        }),
-        tags: [groupViewPluginTag, ...pluginTags],
-    };
+  const roomCoreId = tagValue<GroupViewPluginRoomCoreIdTag>(pluginTags, "roomCoreId");
+  return {
+    epic: groupViewPluginEpic,
+    reducer: reducerWithInitialState(groupViewPluginReducer, {
+      isNew: roomCoreId === undefined,
+      name: "New group",
+      participants: [],
+    }),
+    render: (_, props: GroupViewContainerProps) => <GroupViewContainer {...props} />,
+    tags: [groupViewPluginTag, ...pluginTags],
+  };
 }

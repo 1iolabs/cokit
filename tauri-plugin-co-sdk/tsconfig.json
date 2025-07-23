@@ -4,16 +4,16 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
     "strict": true,
+    "noImplicitReturns": true,
     "noUnusedLocals": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
     "noImplicitAny": true,
-    "noEmit": true
+    "noEmit": true,
+    "allowArbitraryExtensions": true
   },
-  "include": [
-    "guest-js/*.ts"
-  ],
-  "exclude": [
-    "dist-js",
-    "node_modules"
-  ]
+  "include": ["guest-js/*.ts"],
+  "exclude": ["dist-js", "node_modules"]
 }

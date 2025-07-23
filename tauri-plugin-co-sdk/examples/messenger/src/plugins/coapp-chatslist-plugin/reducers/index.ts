@@ -1,34 +1,37 @@
 import { ChatsListActions, ChatsListActionType } from "../actions/index.js";
 import { ChatsListPluginState } from "../types/state.js";
 
-export function chatsListReducer(state: ChatsListPluginState | undefined, action: ChatsListActions): ChatsListPluginState {
-    if (state === undefined) {
-        return { chats: [], loadedChats: new Map };
+export function chatsListReducer(
+  state: ChatsListPluginState | undefined,
+  action: ChatsListActions,
+): ChatsListPluginState {
+  if (state === undefined) {
+    return { chats: [], loadedChats: new Map() };
+  }
+  switch (action.type) {
+    case ChatsListActionType.AddChat:
+      return { ...state, chats: [...state.chats, action.payload.chat] };
+    case ChatsListActionType.UpdateChat:
+      return {
+        ...state,
+        chats: state.chats.map((chat) => {
+          if (chat.id === action.payload.chat.id) {
+            return { ...chat, ...action.payload.chat };
+          }
+          return chat;
+        }),
+      };
+    case ChatsListActionType.ChatPluginLoaded:
+      return { ...state, loadedChats: state.loadedChats.set(action.payload.chatId, action.payload.pluginId) };
+    case ChatsListActionType.OpenChat:
+      return { ...state, selectedChat: action.payload.chat.id };
+    case ChatsListActionType.SetPriorityPlugin:
+      return { ...state, priorityPluginiId: action.payload.pluginId };
+    case ChatsListActionType.SetDialog:
+      return { ...state, dialog: action.payload.dialogPluginId };
+    case ChatsListActionType.SetIdentity: {
+      return { ...state, identity: action.payload.identity };
     }
-    switch (action.type) {
-        case ChatsListActionType.AddChat:
-            return { ...state, chats: [...state.chats, action.payload.chat] };
-        case ChatsListActionType.UpdateChat:
-            return {
-                ...state,
-                chats: state.chats.map((chat) => {
-                    if (chat.id === action.payload.chat.id) {
-                        return { ...chat, ...action.payload.chat };
-                    }
-                    return chat;
-                }),
-            }
-        case ChatsListActionType.ChatPluginLoaded:
-            return { ...state, loadedChats: state.loadedChats.set(action.payload.chatId, action.payload.pluginId) };
-        case ChatsListActionType.OpenChat:
-            return { ...state, selectedChat: action.payload.chat.id };
-        case ChatsListActionType.SetPriorityPlugin:
-            return { ...state, priorityPluginiId: action.payload.pluginId };
-        case ChatsListActionType.SetDialog:
-            return { ...state, dialog: action.payload.dialogPluginId };
-        case ChatsListActionType.SetIdentity: {
-            return { ...state, identity: action.payload.identity };
-        }
-    }
-    return state;
+  }
+  return state;
 }

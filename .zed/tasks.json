@@ -1,0 +1,32 @@
+// Project tasks configuration. See https://zed.dev/docs/tasks for documentation.
+[
+  {
+    "label": "Npm install tauri",
+    "command": "cd ./tauri-plugin-co-sdk; npm install",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "reveal_target": "dock"
+  },
+  {
+    "label": "build tauri dist-js",
+    "command": "cd ./tauri-plugin-co-sdk; npm run build",
+    "hide": "on_success"
+  },
+  {
+    "label": "Npm install messenger",
+    "command": "cd ./tauri-plugin-co-sdk/examples/messenger; npm install",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "reveal_target": "dock"
+  },
+  {
+    "label": "Start rollup watcher",
+    "command": "cd ./tauri-plugin-co-sdk/examples/messenger; npm run rollup-watch"
+  },
+  {
+    "label": "Start tsc watcher",
+    "command": "cd ./tauri-plugin-co-sdk/examples/messenger; npx tsc -w"
+  }
+]

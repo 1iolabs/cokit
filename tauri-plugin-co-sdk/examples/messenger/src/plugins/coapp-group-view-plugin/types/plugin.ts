@@ -5,4 +5,6 @@ import { GroupViewPluginState } from "../state/index.js";
 
 export type GroupViewEpicType = PluginEpicType<GroupViewPlugin>;
 
-export type GroupViewPlugin = Plugin<GroupViewPluginState, GroupViewPluginActions> & RenderPlugin<GroupViewContainerProps> & EpicPlugin<GroupViewPluginState>;
+export type GroupViewPlugin = Plugin<GroupViewPluginState, GroupViewPluginActions> &
+  RenderPlugin<GroupViewContainerProps> &
+  EpicPlugin<GroupViewPluginState>;

@@ -4,24 +4,27 @@ import { EMPTY, filter, identity, mergeAll, mergeMap } from "rxjs";
 import { GroupViewPluginActionType, GroupViewSetAvatarAction } from "../actions/index.js";
 import { GroupViewEpicType } from "../types/plugin.js";
 
-export const loadProfilePicEpic: GroupViewEpicType = (actions$, state$, context) => actions$.pipe(
+export const loadProfilePicEpic: GroupViewEpicType = (actions$, state$, context) =>
+  actions$.pipe(
     filter((action) => action.type === GroupViewPluginActionType.LoadProfilePicEpic),
     mergeMap(async () => {
-        let avatar = await open({
-            directory: false,
-            multiple: false,
-            title: "Choose new profile picture",
-            filters: [{ name: "Images only", extensions: ["png", "svg", "jpg"] }],
-        });
-        if (avatar === null) {
-            // Selection canceled
-            return EMPTY;
-        }
-        avatar = convertFileSrc(avatar);
-        return [identity<GroupViewSetAvatarAction>({
-            payload: { avatar },
-            type: GroupViewPluginActionType.SetAvatar,
-        })];
+      let avatar = await open({
+        directory: false,
+        filters: [{ name: "Images only", extensions: ["png", "svg", "jpg"] }],
+        multiple: false,
+        title: "Choose new profile picture",
+      });
+      if (avatar === null) {
+        // Selection canceled
+        return EMPTY;
+      }
+      avatar = convertFileSrc(avatar);
+      return [
+        identity<GroupViewSetAvatarAction>({
+          payload: { avatar },
+          type: GroupViewPluginActionType.SetAvatar,
+        }),
+      ];
     }),
     mergeAll(),
-);
+  );

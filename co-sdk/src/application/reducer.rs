@@ -401,14 +401,15 @@ where
 		{
 			let context = ReducerChangeContext { cause: ReducerChangeCause::Log };
 
-			// sync state
-			let (next_state, next_heads) = if let Some(state) = self.find_snapshot_state(self.log().heads()) {
-				// use snapshot
-				(Some(state), self.log().heads().clone())
-			} else {
-				// compute state
-				self.compute_state(storage, runtime, &context).await?
-			};
+			// // sync state
+			// let (next_state, next_heads) = if let Some(state) = self.find_snapshot_state(self.log().heads()) {
+			// 	// use snapshot
+			// 	(Some(state), self.log().heads().clone())
+			// } else {
+			// 	// compute state
+			// 	self.compute_state(storage, runtime, &context).await?
+			// };
+			let (next_state, next_heads) = self.compute_state(storage, runtime, &context).await?;
 
 			// apply
 			if next_state != self.state || self.heads != next_heads {

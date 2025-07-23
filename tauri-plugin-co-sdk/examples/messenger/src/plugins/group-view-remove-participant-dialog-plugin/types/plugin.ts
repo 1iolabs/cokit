@@ -8,4 +8,6 @@ export type RemoveParticipantDialogPlugin = Plugin<{}, RemoveParticipantDialogAc
 
 export type RemoveParticipantDialogDidTag = Tag<"did">;
 export type RemoveParticipantDialogGroupNameTag = Tag<"groupName">;
-export type RemoveParticipantDialogRequiredTags = TagList<RemoveParticipantDialogDidTag | RemoveParticipantDialogGroupNameTag>;
+export type RemoveParticipantDialogRequiredTags = TagList<
+  RemoveParticipantDialogDidTag | RemoveParticipantDialogGroupNameTag
+>;

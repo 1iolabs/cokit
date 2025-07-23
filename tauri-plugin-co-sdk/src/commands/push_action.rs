@@ -1,19 +1,16 @@
-use crate::library::{
-	application_actor::{ApplicationActorMessage, SessionId},
-	tauri_error::CoTauriError,
-};
+use crate::library::application_actor::{ApplicationActorMessage, SessionId};
 use anyhow::anyhow;
-use cid::Cid;
 use co_actor::ActorHandle;
-use co_sdk::Did;
+use co_sdk::{from_cbor, to_cbor, Did};
 use ipld_core::ipld::Ipld;
 use serde::Deserialize;
 use std::collections::BTreeMap;
+use tauri::ipc::{InvokeError, Response};
 
 /// This is the data structure of the single argument body of the push command. Argument is given as raw data (Vec<u8>)
 /// and then deserialized into this data type. When a tauri command is given a single parameter as Vec<u8>,
 /// tauri skips serialization/deserialization.  We want to ser/de by hand using cbor so possible Cids given in the
-/// action wont get broken by json serialization. We also don't know what type of action is given yet, so we just
+/// action won't get broken by json serialization. We also don't know what type of action is given yet, so we just
 /// deserialize it into Ipld type. Using Ipld types as parameters directly doesn't work well as it doesn't
 /// deserialize Cids correctly.
 #[derive(Deserialize, Debug)]
@@ -85,16 +82,19 @@ impl PushCommandBody {
 pub async fn push_action(
 	actor_handle: tauri::State<'_, ActorHandle<ApplicationActorMessage>>,
 	body: Vec<u8>,
-) -> Result<Option<Cid>, CoTauriError> {
+) -> Result<Response, InvokeError> {
 	// manually deserialize body into PushCommandBody type
-	let body: PushCommandBody = serde_ipld_dagcbor::from_slice(&body)?;
+	let body: PushCommandBody = from_cbor(&body).map_err(InvokeError::from_error)?;
 	tracing::info!(
 		"tauri command push: \n\tSession: {:#?}\n\tcore: {:#?}\n\taction: {:#?}",
 		body.session,
 		body.core,
 		body.action
 	);
-	Ok(actor_handle
+	let cid = actor_handle
 		.request(|r| ApplicationActorMessage::Push(body.session, body.core, body.action, body.identity, r))
-		.await??)
+		.await
+		.map_err(InvokeError::from_error)?
+		.map_err(InvokeError::from_anyhow)?;
+	Ok(Response::new(to_cbor(&cid).map_err(InvokeError::from_error)?))
 }

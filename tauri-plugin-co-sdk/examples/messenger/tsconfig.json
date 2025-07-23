@@ -2,17 +2,14 @@
   "compilerOptions": {
     "module": "Node16",
     "target": "es6",
-    "lib": [
-      "es6",
-      "dom",
-      "dom.iterable"
-    ],
+    "lib": ["es6", "dom", "dom.iterable"],
     "declaration": true,
     "sourceMap": true,
     "jsx": "react",
     "moduleResolution": "nodenext",
     "outDir": "",
     "rootDir": ".",
+    "allowJs": false,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "noImplicitReturns": true,
@@ -20,12 +17,8 @@
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
     "noImplicitOverride": true,
-    "noUncheckedIndexedAccess": true
+    "noUncheckedIndexedAccess": true,
+    "strictNullChecks": true
   },
-  "include": [
-    "src"
-  ],
-  "exclude": [
-    "src-tauri"
-  ]
+  "exclude": ["src-tauri", "**/**.d.ts"]
 }

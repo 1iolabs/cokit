@@ -1,14 +1,6 @@
 import { combineEpics } from "@1io/kui-application-sdk";
 import { MessengerViewEpicType } from "../types/plugin.js";
-import { initEpic, shutdownEpic } from "./init.js";
-import { loadMoreEventsEpic } from "./load-more-events.js";
+import { initEpic } from "./init.js";
 import { sendEpic } from "./send.js";
-import { subscribeTauriEventEpic } from "./subscribe-tauri-events.js";
 
-export const messengerViewEpic: MessengerViewEpicType = combineEpics<MessengerViewEpicType>(
-    initEpic,
-    shutdownEpic,
-    subscribeTauriEventEpic,
-    sendEpic,
-    loadMoreEventsEpic,
-);
+export const messengerViewEpic: MessengerViewEpicType = combineEpics<MessengerViewEpicType>(initEpic, sendEpic);
