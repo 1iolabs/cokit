@@ -5,10 +5,11 @@
 ## General
 ### What is CoKit and what are its primary use cases?
 #todo
-
+- Collaborative Applications with focus on usability and data-ownership for the users.
+- 
 ### Is CoKit open-source? Under what license is it distributed?
 #todo
-
+- Yes, we use APLGv3 [see](/license/legal-notice.md)
 ### What platforms does CoKit support? (e.g., Linux, Windows, macOS, etc.)
 #todo
 

@@ -18,3 +18,7 @@ Directly connected via peer-to-peer, you’re not dependent on centralized cloud
 ### Pioneer new standards
 Establish data ownership and app interoperability as the standard for every digital user.
 
+### Build like never before
+
+
+
