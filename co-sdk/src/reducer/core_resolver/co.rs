@@ -266,3 +266,23 @@ struct CoreReducerAction {
 	#[serde(rename = "c")]
 	core: String,
 }
+
+#[cfg(test)]
+mod tests {
+	use crate::reducer::core_resolver::co::CoreReducerAction;
+	use co_core_co::CoAction;
+	use co_primitives::{from_cbor, tags, to_cbor, ReducerAction};
+
+	#[test]
+	fn test_core_reducer_action() {
+		let reducer_action = ReducerAction {
+			core: "test-core".into(),
+			from: "did:test".into(),
+			payload: CoAction::TagsInsert { tags: tags!("hello": "world") },
+			time: 1,
+		};
+		let reducer_action_cbor = to_cbor(&reducer_action).unwrap();
+		let core_reducer_action: CoreReducerAction = from_cbor(&reducer_action_cbor).unwrap();
+		assert_eq!(core_reducer_action.core.as_str(), "test-core");
+	}
+}
