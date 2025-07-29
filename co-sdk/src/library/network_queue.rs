@@ -8,8 +8,8 @@ use anyhow::anyhow;
 use co_core_board::{Board, BoardAction, List, Task, TaskLock};
 use co_core_co::{Co, CoAction};
 use co_identity::{LocalIdentity, PrivateIdentityBox};
-use co_primitives::{tag, tags, CoreName};
-use co_storage::BlockStorageExt;
+use co_primitives::{tag, tags, Block, CoId, CoreName, DefaultParams};
+use co_storage::{BlockStorage, BlockStorageExt};
 use futures::{pin_mut, Stream, TryStreamExt};
 
 pub const CO_CORE_NAME_NETWORK_QUEUE: CoreName<'static, Board> = CoreName::new("network_queue");
@@ -84,6 +84,7 @@ pub async fn network_queue_heads(
 	ensure_network_queue_core(&local_co, &identity, co).await?;
 
 	// setup task id
+	//  TODO: SECURITY: we should not trust the task_id is random as is supplied from the network participant
 	let task_id = message.message_id.clone();
 	message.tags.insert(tag!("task_id": task_id.clone()));
 
@@ -99,6 +100,45 @@ pub async fn network_queue_heads(
 					id: task_id,
 					name: format!("Heads message {} to co:{}", message.message_id, &message.co),
 					tags: tags!("co": message.co.to_string(), "type": "co-didcomm", "message_id": message.message_id),
+					payload,
+					lock: None,
+				},
+				after: None,
+			},
+		)
+		.await?;
+
+	// done
+	Ok(())
+}
+
+pub async fn network_queue_task(
+	context: &CoContext,
+	co_id: CoId,
+	task_id: String,
+	task_type: String,
+	task_name: String,
+	task: Block<DefaultParams>,
+) -> Result<(), anyhow::Error> {
+	let local_co = context.local_co_reducer().await?;
+	let identity = context.local_identity();
+
+	// create core
+	let (storage, co) = local_co.co().await?;
+	ensure_network_queue_core(&local_co, &identity, co).await?;
+
+	// insert message
+	let payload = Some(storage.set(task).await?);
+	local_co
+		.push(
+			&identity,
+			CO_CORE_NAME_NETWORK_QUEUE,
+			&BoardAction::TaskCreate {
+				list: LIST_NAME_BACKLOG.to_owned(),
+				task: Task {
+					id: task_id,
+					name: task_name,
+					tags: tags!("co": co_id.to_string(), "task-type": task_type),
 					payload,
 					lock: None,
 				},
@@ -140,6 +180,42 @@ pub async fn network_queue_action(
 	lock_id: &str,
 ) -> Result<(Action, Box<dyn ActionComplete>), anyhow::Error> {
 	let storage = local_co.storage();
+
+	// execute
+	match (task.tags.string("co"), task.tags.string("task-type")) {
+		(Some(co), Some(task_type)) => {
+			// complete
+			let complete = {
+				let complete_task_id = task.id.clone();
+				move |action: &Action| -> Option<TaskState> {
+					match action {
+						Action::NetworkTaskExecuteComplete { co: _, task_id, task_state }
+							if task_id == &complete_task_id =>
+						{
+							Some(*task_state)
+						},
+						_ => None,
+					}
+				}
+			};
+
+			// send
+			let payload_reference = task.payload.ok_or(anyhow!("No payload"))?;
+			let payload = storage.get(&payload_reference).await?;
+			return Ok((
+				Action::NetworkTaskExecute {
+					co: CoId::new(co),
+					task: payload,
+					task_id: task.id.clone(),
+					task_type: task_type.to_owned(),
+				},
+				Box::new(complete),
+			));
+		},
+		_ => {},
+	}
+
+	// legacy
 	match task.tags.string("type") {
 		Some("co-didcomm") => {
 			// complete

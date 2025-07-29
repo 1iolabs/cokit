@@ -35,7 +35,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, fmt::Debug, sync::Arc, time::Duration};
 
 /// Shared CO Builder.
-/// The Shared CO state is sptrend in an membership of an other CO (typicalle the Local CO).
+/// The Shared CO state is stored in a membership of an other CO (typically the Local CO).
 pub struct SharedCoBuilder {
 	parent: CoReducer,
 	keystore_core_name: String,

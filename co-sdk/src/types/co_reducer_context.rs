@@ -1,4 +1,4 @@
-use crate::{CoReducer, CoStorage};
+use crate::{CoReducer, CoStorage, CoToken};
 use async_trait::async_trait;
 use std::{borrow::Cow, fmt::Debug, sync::Arc};
 

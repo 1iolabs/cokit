@@ -19,6 +19,7 @@ mod joined;
 mod key_request_receive;
 mod key_request_send;
 mod membership_update;
+mod network_block_get;
 mod network_queue;
 mod push_heads;
 
@@ -51,5 +52,7 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(network_queue::network_queue_message_epic)
 		.join(network_queue::network_started_epic)
 		.join(network_queue::NetworkQueueProcessEpic::default())
+		.join(network_block_get::network_block_get)
+		.join(network_block_get::network_task_execute)
 		.join(TracingEpic::new(tags))
 }

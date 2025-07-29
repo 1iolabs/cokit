@@ -91,6 +91,17 @@ pub enum StorageError {
 	#[error("Invalid storage argument")]
 	InvalidArgument(#[source] anyhow::Error),
 }
+impl Clone for StorageError {
+	/// Clone the StorageError.
+	/// Note: The clone will only clone a Debug representation of the source error.
+	fn clone(&self) -> Self {
+		match self {
+			StorageError::NotFound(cid, error) => StorageError::NotFound(*cid, anyhow::anyhow!("{:?}", error)),
+			StorageError::Internal(error) => StorageError::Internal(anyhow::anyhow!("{:?}", error)),
+			StorageError::InvalidArgument(error) => StorageError::InvalidArgument(anyhow::anyhow!("{:?}", error)),
+		}
+	}
+}
 impl From<MultiCodecError> for StorageError {
 	fn from(value: MultiCodecError) -> Self {
 		StorageError::InvalidArgument(value.into())
