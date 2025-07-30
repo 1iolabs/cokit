@@ -188,6 +188,15 @@ impl Application {
 		// result
 		Ok(())
 	}
+
+	/// Clear local state from memory.
+	/// The goal of this method is that the application behaves like a new one which loads everthing from storage.
+	///
+	/// ## Components
+	/// - Reducers
+	pub async fn clear(&self) -> Result<(), anyhow::Error> {
+		Ok(self.context().inner.reducers_control().clear().await?)
+	}
 }
 impl std::fmt::Debug for Application {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

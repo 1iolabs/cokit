@@ -5,14 +5,13 @@ use crate::{
 		extract_next_heads::extract_next_heads,
 		log_entries_until::log_entries_until,
 		to_external_cid::{to_external_mapped, to_external_mapped_opt},
-		to_internal_cid::to_internal_cid_opt,
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{
 		co_reducer_context::{CoReducerContextRef, CoReducerFeature},
 		co_reducer_state::CoReducerState,
 	},
-	Action, ApplicationMessage, CoStorage, MappedCoReducerState, Reducer, ReducerChangeContext, Runtime,
+	Action, ApplicationMessage, CoStorage, Reducer, ReducerChangeContext, Runtime,
 };
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, ResponseStreams};
