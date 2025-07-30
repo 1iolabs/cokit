@@ -405,6 +405,9 @@ pub struct NetworkBlockGetAction {
 	/// The Co to send the message to.
 	pub co: CoId,
 
+	/// The parent co of the `co`.
+	pub parent_co: CoId,
+
 	/// The Cid of the block to get.
 	pub cid: Cid,
 }

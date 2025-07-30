@@ -294,9 +294,6 @@ impl CoContextInner {
 		// assign
 		*self.network.write().unwrap() = network;
 
-		// clear reducers
-		self.reducers.clone().clear().await?;
-
 		// result
 		Ok(())
 	}
@@ -346,7 +343,6 @@ impl CoContextInner {
 		identity: I,
 		storage: ReducerStorage,
 		initialize: bool,
-		network: bool,
 	) -> Result<CoReducer, anyhow::Error>
 	where
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
@@ -354,14 +350,10 @@ impl CoContextInner {
 		// resolver
 		let core_resolver = self.create_shared_core_resolver(membership.id.clone());
 
-		// network
-		let network = if network { self.network.read().unwrap().clone() } else { None };
-
 		// reducer
 		let reducer = SharedCoBuilder::new(parent, membership)
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_string())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_string())
-			.with_network(network)
 			.with_initialize(initialize)
 			.build(
 				self.tasks.clone(),
@@ -404,7 +396,7 @@ impl CoContextInner {
 
 		// instance
 		Ok(Some(
-			self.create_co_instance_membership(parent, membership, identity, storage, initialize, true)
+			self.create_co_instance_membership(parent, membership, identity, storage, initialize)
 				.await?,
 		))
 	}

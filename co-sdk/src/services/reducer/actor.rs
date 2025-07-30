@@ -5,19 +5,21 @@ use crate::{
 		extract_next_heads::extract_next_heads,
 		log_entries_until::log_entries_until,
 		to_external_cid::{to_external_mapped, to_external_mapped_opt},
+		to_internal_cid::to_internal_cid_opt,
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	types::{
 		co_reducer_context::{CoReducerContextRef, CoReducerFeature},
 		co_reducer_state::CoReducerState,
 	},
-	Action, ApplicationMessage, CoStorage, Reducer, ReducerChangeContext, Runtime,
+	Action, ApplicationMessage, CoStorage, MappedCoReducerState, Reducer, ReducerChangeContext, Runtime,
 };
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, ResponseStreams};
 use co_identity::{Identity, PrivateIdentityBox};
 use co_primitives::{
-	BlockLinks, CoId, IgnoreFilter, Link, MappedCid, OptionMappedCid, ReducerAction, Tags, WeakCoReferenceFilter,
+	BlockLinks, CoId, IgnoreFilter, KnownMultiCodec, Link, MappedCid, MultiCodec, OptionMappedCid, ReducerAction, Tags,
+	WeakCoReferenceFilter,
 };
 use co_storage::{BlockStorageContentMapping, BlockStorageExt, OverlayBlockStorage};
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
@@ -45,22 +47,52 @@ impl ReducerActor {
 impl Actor for ReducerActor {
 	type Message = ReducerMessage;
 	type State = ReducerState;
-	type Initialize = (Reducer<CoStorage, DynamicCoreResolver<CoStorage>>, CoReducerFlush);
+	type Initialize = (bool, CoStorage, Reducer<CoStorage, DynamicCoreResolver<CoStorage>>, CoReducerFlush);
 
 	async fn initialize(
 		&self,
 		_handle: &ActorHandle<Self::Message>,
 		_tags: &Tags,
-		(reducer, flush): Self::Initialize,
+		(initialize, storage, mut reducer, flush): Self::Initialize,
 	) -> Result<Self::State, ActorError> {
-		Ok(ReducerState {
+		// initialize
+		if initialize {
+			// check all snapshots are internal
+			// note: this will fetch the block from network if neccesarry. To prevent reducer init deadlocks we do this
+			//  here to have the actor instance available for caller while doing the network stuff.
+			let has_encrypted = reducer
+				.snapshots_iter()
+				.flat_map(|(state, heads)| [state].into_iter().chain(heads.iter()))
+				.any(|cid| MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock));
+			if has_encrypted {
+				let mut internal = Vec::new();
+				for (state, heads) in reducer.snapshots_iter() {
+					internal.push(CoReducerState::new(Some(*state), heads.clone()).to_internal(&storage).await);
+				}
+				reducer.clear_snapshots();
+				for CoReducerState(state, heads) in internal {
+					if let Some(state) = state {
+						reducer.insert_snapshot(state, heads);
+					}
+				}
+			}
+
+			// initialize
+			reducer.initialize(&storage, self.runtime.runtime()).await?;
+		}
+
+		// state
+		let state = ReducerState {
 			reducer,
 			flush,
 			flush_info: None,
 			flush_roots: Default::default(),
 			network_feature: self.context.has_feature(&CoReducerFeature::Network),
 			state_streams: Default::default(),
-		})
+		};
+
+		// result
+		Ok(state)
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, _handle, state), fields(co = ?self.id))]

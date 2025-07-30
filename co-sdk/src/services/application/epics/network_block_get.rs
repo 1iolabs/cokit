@@ -1,13 +1,13 @@
 use crate::{
-	find_co_secret,
 	library::{
-		connections_peer_provider::ConnectionsPeerProvider, network_identity::network_identity,
-		network_queue::TaskState, settings_timeout::settings_timeout, to_external_cid::to_external_mapped,
+		connections_peer_provider::ConnectionsPeerProvider, find_co_secret::find_co_secret_by_membership,
+		network_identity::network_identity_by_id, network_queue::TaskState, settings_timeout::settings_timeout,
 	},
 	services::application::NetworkBlockGetAction,
-	Action, CoContext, CoNetworkTaskSpawner, CoReducer, CoReducerFactory, CoToken, CoTokenParameters,
-	ConnectionMessage,
+	Action, CoContext, CoNetworkTaskSpawner, CoReducerFactory, CoToken, CoTokenParameters, ConnectionMessage,
+	CO_ID_LOCAL,
 };
+use cid::Cid;
 use co_actor::{Actions, ActorHandle};
 use co_identity::Identity;
 use co_network::{
@@ -15,7 +15,7 @@ use co_network::{
 	bitswap::{GetNetworkTask, Token},
 	PeerProvider,
 };
-use co_primitives::{BlockSerializer, OptionMappedCid};
+use co_primitives::{BlockSerializer, CoId};
 use co_storage::StorageError;
 use futures::{future::Either, pin_mut, stream, FutureExt, Stream, StreamExt};
 use std::time::Duration;
@@ -127,6 +127,11 @@ pub fn network_task_execute(
 	}
 }
 
+/// Handle `NetworkBlockGetAction`.
+///
+/// Note:
+/// - We are not allowed to access the reducer state here because of deadlocks.
+/// - When the reducer is initially loaded but has no blocks locally it will fetch them from network.
 fn handle_network_block_get(
 	context: CoContext,
 	network: CoNetworkTaskSpawner,
@@ -134,19 +139,16 @@ fn handle_network_block_get(
 	action: NetworkBlockGetAction,
 ) -> impl Stream<Item = Result<Action, anyhow::Error>> {
 	async move {
-		let co = context.try_co_reducer(&action.co).await?;
-		let storage = co.storage();
-		let identity = network_identity(&context, &co, None).await?;
+		let identity = network_identity_by_id(&context, &action.parent_co, &action.co, None).await?;
 		let peer_provider =
 			ConnectionsPeerProvider::new(action.co.clone(), identity.identity().to_owned(), connections);
-		let token = network_token(&context, &network, &co).await?;
-		let timeout = settings_timeout(&context, co.id(), Some("block-get")).await;
+		let token = network_token(&context, &network, &action.parent_co, &action.co).await?;
+		let timeout = settings_timeout(&context, &CoId::from(CO_ID_LOCAL), Some("block-get")).await;
 		let concurrent = 10;
-		let mapped = to_external_mapped(&storage, action.cid).await;
 
 		// execute
 		let result =
-			get_network(network, peer_provider, vec![token.to_bitswap_token()?], timeout, concurrent, mapped).await;
+			get_network(network, peer_provider, vec![token.to_bitswap_token()?], timeout, concurrent, action.cid).await;
 
 		// result
 		Ok(Action::NetworkBlockGetComplete(action, result))
@@ -158,15 +160,15 @@ fn handle_network_block_get(
 async fn network_token(
 	context: &CoContext,
 	network: &CoNetworkTaskSpawner,
-	co: &CoReducer,
+	parent_co_id: &CoId,
+	co_id: &CoId,
 ) -> Result<CoToken, anyhow::Error> {
-	let parent_id = co.parent_id().ok_or_else(|| anyhow::anyhow!("No parent co: {}", co.id()))?;
-	let parent = context.try_co_reducer(parent_id).await?;
-	let secret = find_co_secret(&parent, co).await?;
+	let parent = context.try_co_reducer(parent_co_id).await?;
+	let secret = find_co_secret_by_membership(&parent, co_id).await?;
 	let token = if let Some(shared_secret) = secret {
-		CoToken::new(&shared_secret, CoTokenParameters(network.local_peer_id(), co.id().clone()))?
+		CoToken::new(&shared_secret, CoTokenParameters(network.local_peer_id(), co_id.clone()))?
 	} else {
-		CoToken::new_unsigned(CoTokenParameters(network.local_peer_id(), co.id().clone()))
+		CoToken::new_unsigned(CoTokenParameters(network.local_peer_id(), co_id.clone()))
 	};
 	Ok(token)
 }
@@ -209,7 +211,7 @@ async fn get_network(
 	tokens: Vec<Token>,
 	timeout: Duration,
 	concurrent: usize,
-	mapped: OptionMappedCid,
+	cid: Cid,
 ) -> Result<(), StorageError> {
 	let deadline = tokio::time::Instant::now() + timeout;
 	let mut retry = 1;
@@ -218,7 +220,7 @@ async fn get_network(
 		let get_stream = peer_provider
 			.peers_added()
 			.flat_map(stream::iter)
-			.map(|peer| GetNetworkTask::get(&spawner, mapped.external(), tokens.clone(), [peer].into()))
+			.map(|peer| GetNetworkTask::get(&spawner, cid, tokens.clone(), [peer].into()))
 			.buffer_unordered(concurrent);
 		pin_mut!(get_stream);
 		loop {
@@ -236,11 +238,11 @@ async fn get_network(
 				// some `GetNetworkTask` reported a error
 				Ok(Some(Err(err))) => {
 					// log
-					tracing::warn!(?err, ?mapped, "get-network-failed");
+					tracing::warn!(?err, ?cid, "get-network-failed");
 				},
 				// timeout
 				Err(err) => {
-					return Err(StorageError::NotFound(mapped.internal(), err.into()));
+					return Err(StorageError::NotFound(cid, err.into()));
 				},
 			}
 		}
@@ -256,5 +258,5 @@ async fn get_network(
 		// retry
 		retry += 1;
 	}
-	Err(StorageError::NotFound(mapped.internal(), anyhow::anyhow!("Insufficent peers")))
+	Err(StorageError::NotFound(cid, anyhow::anyhow!("Insufficent peers")))
 }
