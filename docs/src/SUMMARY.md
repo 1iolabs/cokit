@@ -35,14 +35,13 @@
 - [Configuration](./usage/configuration.md)
 
 # Development
-- [Clone & Build](./development/clone-and-build.md)
-- [Testing](./development/testing.md)
 - [How to contribute](./development/how-to-contribute.md)
-- [Bug report](./development/bug-report.md)
-- [Feature request](./development/feature-request.md)
 
 # FAQ
 - [FAQ](./faq/faq.md)
 
 # License
 - [Legal notice](./license/legal-notice.md)
+
+# Glossary
+- [Glossary](./glossary/glossary.md)

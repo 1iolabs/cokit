@@ -1,6 +1,9 @@
 # Installation
 #todo 
-Install via `cargo add co-sdk`
+- Install via `cargo add co-sdk`
+- install dioxus `dx (vielleicht heist es auch kaka saas) init`
+- 
+- 
 
 https://docs.rs/dioxus/latest/dioxus/#at-a-glance
 

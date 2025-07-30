@@ -1,3 +1,9 @@
+No Backend. 
+
+No Cloud-Dependencies. 
+
+No Bullshit.
+
 ## Fuck Big Tech
 Big tech owns your online life. We've traded privacy for convenience, entrusting our personal data to closed systems that don't work together.  We are turning the tables and giving all power back to the user with a new technological foundation for truly decentralized collaboration.
 
@@ -18,7 +24,7 @@ Directly connected via peer-to-peer, you’re not dependent on centralized cloud
 ### Pioneer new standards
 Establish data ownership and app interoperability as the standard for every digital user.
 
-### Build like never before
+No Backend. No Cloud-Dependencies. No Bullshit.
 
 
 
