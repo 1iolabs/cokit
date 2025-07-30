@@ -10,11 +10,15 @@
 ### Is CoKit open-source? Under what license is it distributed?
 #todo
 - Yes, we use APLGv3 [see](/license/legal-notice.md)
+
 ### What platforms does CoKit support? (e.g., Linux, Windows, macOS, etc.)
+
+
 #todo
 
 ### How does CoKit differ from other CRDT or P2P-based frameworks?
 #todo
+- 
 
 ### Can CoKit be used offline and sync later?
 Yes.
@@ -47,13 +51,20 @@ Yes.
 ## Networking & Synchronization
 ### How does peer discovery work in CoKit's networking model?
 #todo
+Local peer discovery is done by utilising mDNS.
+Co-Kit got built in GossipSub protocol for peer discovery.
+However the networking is entire optional and one could just use HTTP for transferring blocks.
+
 
 ### What networking mode should I use for LAN-only collaboration?
 #todo
 
 ### Is it possible to run CoKit without any network connectivity?
-Yes.
-#todo
+Yes. 
+It is possible to use CO-KIT only with files.
+We also require no strong feature set for file systems - just files.
+As each file is Content addressed using its CID we just need to read and write them.
+This even makes is possible to just use any cloud storage drive to share the co-kit managed files.
 
 ### How does CoKit handle NAT traversal and firewalls in P2P mode?
 #todo
@@ -64,16 +75,24 @@ Yes.
 
 ## Data & Consensus
 ### How are conflicts resolved using Merkle-CRDTs in CoKit?
-#todo
+Conflicts are resolved by sorting by the event's logical clock.
+See more at the [Log](/reference/sdk-components/log.md).
 
 ### What are the trade-offs between different consensus modes (none, PoA, manual, shared)?
 #todo
+See more at [Consensus](/reference/sdk-components/consensus.md).
 
 ### Can I define custom consensus logic for my application?
-#todo
+Yes. A consensus is implemented as a core with an additional guard.
 
 ### What level of schema validation or migration support does CoKit offer?
-#todo
+Schema validation is up to the developer of core and can be implemented as desired.
+Cores can be migrated between versions. The migration itself is just another event which can be implemented in code.
+See more at [Core](/reference/core.md).
 
 ### How does CoKit manage partial data availability across distributed nodes?
-#todo
+As all data is represented as a graph more precisely as a DAG (directed acyclic graph) the data is always accessed, top-down meaning we could fetch more data as we walk the graph down.
+In addition, content, addressing ensure validity of the data.
+So distribution happens organically, but you can always, for example just fetch all the data.
+
+

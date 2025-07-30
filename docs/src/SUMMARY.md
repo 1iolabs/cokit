@@ -26,6 +26,7 @@
 	- [Network](./reference/sdk-components/network.md)
 	- [Identity](./reference/sdk-components/identity.md)
 	- [Permissions](./reference/sdk-components/permissions.md)
+	- [Consensus](./reference/sdk-components/consensus.md)
 - [Architecture](./reference/architecture.md)
 
 # Usage

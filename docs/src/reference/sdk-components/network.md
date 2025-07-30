@@ -1,5 +1,11 @@
 # Network
 
+## Abstract
+Co-kit got an build in network stack utilising libp2p.
+The actual networking protocols used can be configured for every CO.
+The p2p networking is optional and possibly any other protocols like http or file protocols like NFS can be used with some effort.
+There is no lock-in to a single networking strategy. Just describe your data using an core and  easily adapt co-kit to your infrastructure.
+
 ## libp2p Protocols
 libp2p, (short for “library peer-to-peer”) is a peer-to-peer (P2P) networking framework that enables the development of P2P applications. It consists of a collection of protocols, specifications, and libraries that facilitate P2P communication between network participants or, in other words, peers.
 

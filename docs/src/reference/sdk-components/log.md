@@ -26,6 +26,7 @@ In this example the number represents the logical clock.
 2. Second the resulting sorted list without the heads `9'` and thus `C5'`.
 3. Third the resulting sorted list with the heads `9'` and thus `C5'`.
 
+Whenever there is a causal "conflict" we got two or more heads for a logical clock.
 
 ### 1. Graph
 ```mermaid
