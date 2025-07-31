@@ -1,4 +1,4 @@
-# core
+# Core
 A core (**CO** **re**ducer) is a piece of data that acts like a state. Cores can be directly added to COs and they work like an in-code database. They implement a reducer function that take actions which have been pushed to a CO. The reducer then changes the cores data accordingly.
 
 ### Technical Notes
@@ -49,4 +49,3 @@ Stores data series, counters and aggregations on the data.
 
 #### co-core-pin
 #todo
-

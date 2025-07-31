@@ -18,9 +18,9 @@ for example:
 |**Extend to URL**|`join(...)` creates DID URLs with valid components.|
 
 ### Example
-use `did_toolkit::did::DID;`
-
 ```rust
+use did_toolkit::did::DID;
+
 // Parse and inspect
 let did = DID::parse("did:example:foo%20bar").unwrap();
 println!("Method: {}", String::from_utf8_lossy(&did.method));

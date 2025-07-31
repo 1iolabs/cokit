@@ -1,17 +1,19 @@
 # Log
-#todo 
+#todo
 
 The Log is an conflict-free replicated event stream which is immutable and cryptographically verifiable.
 
 ## TLDR
-This can be thought of like a git graph where each commit is a operation. The heads represent the end of the log and also a specific state of the data.
+This can be thought of like a git graph where each commit is a operation.
+The heads represent the end of the log and also a specific state of the data.
 
 ## Abstract
 The log is (eventually consistent) sorted using a Merkle-DAG based logical clock.
-Arbitrary heads can be joined together at any time. Whenever the same heads are joined the resulting log is guaranteed to be equal.
+Arbitrary heads can be joined together at any time.
+Whenever the same heads are joined the resulting log is guaranteed to be equal.
 
-## CO-KIT
-Each [CO](/co.md) is represented by a Log.
+## CO-kit
+Each [CO](./co.md) is represented by a Log.
 
 ## Implementation
 The Log is implemented in the `co-log` crate.
@@ -37,13 +39,13 @@ columns 3
 	Charlie
 	space 1     space
 	space:3
-	space space 2    
+	space space 2
 	space:3
 	space 3     space
 	space:3
 	4     space space
 	space:3
-	A5    space C5["C5'"]  
+	A5    space C5["C5'"]
 	space:3
 	A6    B6    space
 	space:3
@@ -52,7 +54,7 @@ columns 3
 	space 8     space
 	space:3
 	9["9'"] space space
-	
+
 	2 --> 1
 	3 --> 2
 	4 --> 3
@@ -96,7 +98,7 @@ columns 1
 	7
 	space
 	8
-	
+
 	2 --> 1
 	3 --> 2
 	4 --> 3
@@ -135,7 +137,7 @@ columns 1
 	8
 	space
 	9["9'"]
-	
+
 	2 --> 1
 	3 --> 2
 	4 --> 3
@@ -151,4 +153,3 @@ columns 1
 	style 9 fill:#faa
 	style C5 fill:#faa
 ```
-

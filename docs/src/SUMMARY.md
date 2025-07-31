@@ -1,12 +1,12 @@
 # Summary
 
-[CO-KIT](./co-kit.md)
+# CO-kit
 
 # Introduction
 - [About CO-SDK](./introduction/about-co-sdk.md)
 - [Why](./introduction/why.md)
 - [Key Principles](./introduction/key-principles.md)
-- [Features](./introduction/feautres.md)
+- [Features](./introduction/features.md)
 
 # Getting Started
 - [Requirements](./getting-started/requirements.md)
@@ -16,7 +16,7 @@
 - [Next Steps](./getting-started/next-steps.md)
 
 # Reference
-- [cokit](./reference/cokit.md)
+- [CO-kit](./reference/CO-kit.md)
 - [CO](./reference/co.md)
 - [core](./reference/core.md)
 - [Guards](./reference/guards.md)

@@ -1,3 +1,3 @@
-# CO-KIT
+# CO-kit
 
-Hi this is co-kit!
+Hi this is CO-kit!

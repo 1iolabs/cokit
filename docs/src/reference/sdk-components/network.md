@@ -1,17 +1,17 @@
 # Network
 
 ## Abstract
-Co-kit got an build in network stack utilising libp2p.
+CO-kit got a build in network stack utilising libp2p.
 The actual networking protocols used can be configured for every CO.
 The p2p networking is optional and possibly any other protocols like http or file protocols like NFS can be used with some effort.
-There is no lock-in to a single networking strategy. Just describe your data using an core and  easily adapt co-kit to your infrastructure.
+There is no lock-in to a single networking strategy. Just describe your data using an core and  easily adapt CO-kit to your infrastructure.
 
 ## libp2p Protocols
 libp2p, (short for “library peer-to-peer”) is a peer-to-peer (P2P) networking framework that enables the development of P2P applications. It consists of a collection of protocols, specifications, and libraries that facilitate P2P communication between network participants or, in other words, peers.
 
 ### Protocol: mDNS (libp2p)
 - Used for **local peer discovery** via multicast DNS (RFC 6762).
-- Peers broadcast `_p2p._udp.local` PTR queries, and libp2p-capable nodes respond with their multiaddresses.    
+- Peers broadcast `_p2p._udp.local` PTR queries, and libp2p-capable nodes respond with their multiaddresses.
 - In Rust, the `libp2p::mdns` crate offers a `NetworkBehaviour` (e.g., `TokioMdns`) to integrate mDNS discovery.
 
 ### Protocol: Noise (libp2p transport)
@@ -104,7 +104,7 @@ struct JoinRequestPayload
 {
   // Sender.
   from: DID,
-  
+
   // Recipent.
   to: DID,
   /// Subject.
@@ -118,7 +118,7 @@ struct JoinResponsePayload
 {
   // Sender.
   from: DID,
-  
+
   // Recipent.
   to: DID,
   // Subject. JoinRequest Hash.
@@ -133,7 +133,7 @@ sequenceDiagram
   participant AO as Alice Outbound (Client)
   participant BI as Bob Inbound (Server)
   participant BO as Bob Outbound (Client)
-  
+
   AO-->>BI: Open substream
   AO->>BI: MessageProtocol
   AO--xBI: Close substream
@@ -142,7 +142,7 @@ sequenceDiagram
 
 
 ### Protocol: bitswap (IPFS)
-Bitswap is a core module of IPFS for exchanging blocks of data. It directs the requesting and sending of blocks to and from other peers in the network. Bitswap is a _message-based protocol_ where all messages contain want-lists or blocks. 
+Bitswap is a core module of IPFS for exchanging blocks of data. It directs the requesting and sending of blocks to and from other peers in the network. Bitswap is a _message-based protocol_ where all messages contain want-lists or blocks.
 
 [IPFS](https://docs.ipfs.tech/) breaks up files into chunks of data called blocks. These blocks are identified by a content identifier (CID).
 
@@ -153,4 +153,3 @@ A _content identifier_, or CID, is a label used to point to material in IPFS. I
 
 #### Refs
 https://docs.ipfs.tech/concepts/bitswap/
-

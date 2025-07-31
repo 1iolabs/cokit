@@ -1,11 +1,11 @@
 # Next Steps
 
-Now that you know the basics of working with cokit, here are some expamples of the cool things you can build with it:
+Now that you know the basics of working with CO-kit, here are some expamples of the cool things you can build with it:
 
 ### Messenger?
 
 ### Real-time counter with shared state
-This example shows how a simple counter can be shared and synchronized across peers using CoKit:
+This example shows how a simple counter can be shared and synchronized across peers using CO-kit:
 
 ```js
 import { useCo } from "co";
@@ -83,4 +83,3 @@ const ProfileForm = () => {
 };
 ```
 The schema ensures the email format is correct, and optional constraints like uniqueness or required fields can be enforced at runtime through WASM-based validation.
-
