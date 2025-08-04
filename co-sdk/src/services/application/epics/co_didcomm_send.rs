@@ -20,6 +20,7 @@ pub fn co_didcomm_send(
 					.flat_map(move |connections| {
 						// network
 						let Some(connections) = connections else {
+							// this will queue the message for later
 							return Either::Left(stream::iter([Ok(Action::CoDidCommSent {
 								message: message.clone(),
 								result: Ok(Default::default()),

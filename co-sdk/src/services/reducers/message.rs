@@ -10,7 +10,7 @@ pub enum ReducerRequest {
 	/// Request CO reducer instance by creating it if not created yet.
 	Request(CoId, Response<Result<CoReducer, CoReducerFactoryError>>),
 	/// Request CO reducer instance if it already has been created yet.
-	RequestOpt(CoId, Response<Option<CoReducer>>),
+	RequestOpt(CoId, bool, Response<Option<CoReducer>>),
 	/// Create reducer instance.
 	Create(CoId, Result<CoReducer, CoReducerFactoryError>),
 	/// Create shared storage instance.
@@ -42,9 +42,9 @@ impl ReducersControl {
 			.await?)
 	}
 
-	pub async fn reducer_opt(&self, co: CoId) -> Option<CoReducer> {
+	pub async fn reducer_opt(&self, co: CoId, wait_on_pending_create: bool) -> Option<CoReducer> {
 		self.handle
-			.request(|response| ReducerRequest::RequestOpt(co, response))
+			.request(|response| ReducerRequest::RequestOpt(co, wait_on_pending_create, response))
 			.await
 			.ok()?
 	}

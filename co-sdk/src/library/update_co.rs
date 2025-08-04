@@ -1,5 +1,5 @@
 use crate::{
-	library::wait_response::wait_response, services::application::ApplicationMessage,
+	library::wait_response::wait_response_timeout, services::application::ApplicationMessage,
 	types::message::heads::HeadsMessage, Action, CoReducer,
 };
 use anyhow::anyhow;
@@ -26,7 +26,7 @@ where
 	let header = HeadsMessage::create_header();
 	let (message_id, message) = EncodedMessage::create_signed_json(from, header, &body)?;
 	let ((_peer, message), _) = try_join!(
-		wait_response(actions.clone(), timeout, {
+		wait_response_timeout(actions.clone(), timeout, {
 			let message_id = message_id.clone();
 			move |action| match action {
 				Action::DidCommReceive { peer, message } if message.header().thid.as_ref() == Some(&message_id) => {

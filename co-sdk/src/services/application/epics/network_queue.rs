@@ -1,6 +1,6 @@
 use crate::{
 	library::network_queue::{
-		network_queue_action, network_queue_backlog, network_queue_heads, network_queue_message,
+		network_queue_action, network_queue_backlog, network_queue_heads, network_queue_message, network_queue_task,
 		network_queue_task_complete, network_queue_task_doing,
 	},
 	network::PeersNetworkTask,
@@ -45,6 +45,20 @@ pub fn network_queue_message_epic(
 			let message = message.clone();
 			Some(
 				async move { network_queue_heads(&context, message).await }
+					.into_stream()
+					.try_ignore_elements()
+					.boxed(),
+			)
+		},
+		Action::NetworkTaskQueue { co, task_id, task_type, task_name, task } => {
+			let context = context.clone();
+			let co = co.clone();
+			let task_id = task_id.clone();
+			let task_type = task_type.clone();
+			let task_name = task_name.clone();
+			let task = task.clone();
+			Some(
+				async move { network_queue_task(&context, co, task_id, task_type, task_name, task).await }
 					.into_stream()
 					.try_ignore_elements()
 					.boxed(),

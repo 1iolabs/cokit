@@ -1,4 +1,4 @@
-use co_primitives::DagCollectionAsyncExt;
+use co_primitives::Streamable;
 use co_storage::{BlockStorage, StorageError};
 use futures::Stream;
 use serde::de::DeserializeOwned;
@@ -10,7 +10,7 @@ pub fn stream<T, N, S>(storage: S, container: &N) -> impl Stream<Item = Result<T
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 	T: DeserializeOwned + Send + Sync + 'static,
-	N: DagCollectionAsyncExt<Item = T>,
+	N: Streamable<S, Item = Result<T, StorageError>>,
 {
-	container.stream(&storage)
+	container.stream(storage)
 }

@@ -166,17 +166,19 @@ impl Actor for ReducersActor {
 					}
 				}
 			},
-			ReducerRequest::RequestOpt(id, response) => {
+			ReducerRequest::RequestOpt(id, wait_on_pending_create, response) => {
 				if let Some(reducer) = state.reducers.get(&id) {
 					// use already created
 					response
 						.send(Some(co_reducer_instance(&state.context, &reducer, state.keep_open)))
 						.ok();
-				} else if state.pending_request_count(&id) > 0 {
+				} else if wait_on_pending_create && state.pending_request_count(&id) > 0 {
 					// wait if create is currently pending
-					state
-						.pending_requests
-						.push_back(ReducerRequest::RequestOpt(id.clone(), response));
+					state.pending_requests.push_back(ReducerRequest::RequestOpt(
+						id.clone(),
+						wait_on_pending_create,
+						response,
+					));
 				} else {
 					// not created and not peding
 					response.send(None).ok();
@@ -255,7 +257,7 @@ impl Actor for ReducersActor {
 					.enumerate()
 					.filter_map(|(index, request)| match request {
 						ReducerRequest::Request(request_id, _) if request_id == &id => Some(index),
-						ReducerRequest::RequestOpt(request_id, _) if request_id == &id => Some(index),
+						ReducerRequest::RequestOpt(request_id, _, _) if request_id == &id => Some(index),
 						_ => None,
 					})
 					.collect::<VecDeque<usize>>();
@@ -283,7 +285,7 @@ impl Actor for ReducersActor {
 									.ok();
 							}
 						},
-						Some(ReducerRequest::RequestOpt(_, response)) => {
+						Some(ReducerRequest::RequestOpt(_, _, response)) => {
 							response
 								.send(match &result {
 									Err(_err) => None,

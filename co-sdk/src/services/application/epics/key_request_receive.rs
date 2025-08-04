@@ -63,10 +63,11 @@ async fn key_request(
 	// get participant state
 	//  we only allow active participants to request keys
 	let co = context.try_co_reducer(&payload.id).await?;
-	let (_storage, co_state) = co.co().await?;
+	let (storage, co_state) = co.co().await?;
 	let participant_state = co_state
 		.participants
-		.get(requester_identity.identity())
+		.get(&storage, &requester_identity.identity().to_owned())
+		.await?
 		.map(|participant| participant.state)
 		.unwrap_or(co_core_co::ParticipantState::Inactive);
 

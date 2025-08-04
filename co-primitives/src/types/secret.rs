@@ -3,7 +3,7 @@ use std::fmt::{Debug, Display};
 use zeroize::Zeroize;
 
 /// Simple wrapper type for secrents to not escape them.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Secret(#[serde(with = "serde_bytes")] Vec<u8>);
 impl Secret {
 	/// Create secret from vec.

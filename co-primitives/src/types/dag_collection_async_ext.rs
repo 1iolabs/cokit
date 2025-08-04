@@ -1,4 +1,6 @@
-use crate::{BlockStorage, DagCollection, Node, NodeBuilder, NodeStream, OptionLink, StorageError};
+use crate::{
+	types::streamable::Streamable, BlockStorage, DagCollection, Node, NodeBuilder, NodeStream, OptionLink, StorageError,
+};
 use futures::TryStreamExt;
 
 #[allow(async_fn_in_trait)]
@@ -40,6 +42,19 @@ pub trait DagCollectionAsyncExt: DagCollection {
 	}
 }
 impl<T> DagCollectionAsyncExt for T where T: DagCollection {}
+impl<T, S> Streamable<S> for T
+where
+	T: DagCollectionAsyncExt,
+	T::Item: Send + Sync + 'static,
+	S: BlockStorage + Clone + 'static,
+{
+	type Item = Result<T::Item, StorageError>;
+	type Stream = NodeStream<S, T::Item, Node<T::Item>>;
+
+	fn stream(&self, storage: S) -> Self::Stream {
+		NodeStream::from_link(storage, self.link())
+	}
+}
 
 // pub trait DagMapAsyncExt<K, V>: DagCollectionExt
 // where

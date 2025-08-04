@@ -1,11 +1,14 @@
 use crate::{
-	library::create_reducer_action::new_reducer_action, network::NetworkSettings, services::reducer::FlushInfo,
-	types::message::heads::HeadsMessage, CoDate, CoStorage, ReducerChangeContext,
+	library::{create_reducer_action::new_reducer_action, network_queue::TaskState},
+	network::NetworkSettings,
+	services::reducer::FlushInfo,
+	types::message::heads::HeadsMessage,
+	CoDate, CoStorage, ReducerChangeContext,
 };
 use cid::Cid;
 use co_identity::Message;
 use co_network::didcomm::EncodedMessage;
-use co_primitives::{CoId, Did, Link, Network, ReducerAction, Tags};
+use co_primitives::{Block, BlockSerializer, CoId, DefaultParams, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{stream::once, Stream, StreamExt};
 use ipld_core::ipld::Ipld;
@@ -127,6 +130,15 @@ pub enum Action {
 		co: CoId,
 	},
 
+	/// Add task to network queue.
+	NetworkTaskQueue { co: CoId, task_id: String, task_type: String, task_name: String, task: Block<DefaultParams> },
+
+	/// Execute network queue task.
+	NetworkTaskExecute { co: CoId, task_id: String, task_type: String, task: Block<DefaultParams> },
+
+	/// Execute network queue task has been completed.
+	NetworkTaskExecuteComplete { co: CoId, task_id: String, task_state: TaskState },
+
 	/// Network Queue Process
 	NetworkQueueProcess {
 		/// Only process given co.
@@ -147,6 +159,12 @@ pub enum Action {
 		/// Retry count.
 		retry: u32,
 	},
+
+	/// Request a block from network.
+	NetworkBlockGet(NetworkBlockGetAction),
+
+	/// Request a block from network complete.
+	NetworkBlockGetComplete(NetworkBlockGetAction, Result<(), StorageError>),
 
 	/// Notification.
 	Notify(NotifyAction),
@@ -253,6 +271,22 @@ impl Action {
 			},
 		};
 		Action::CoreActionPush { co: co.into(), action: reducer_action }
+	}
+
+	pub fn network_task_queue(
+		co: CoId,
+		task_id: impl Into<String>,
+		task_type: impl Into<String>,
+		task_name: impl Into<String>,
+		task: &impl Serialize,
+	) -> Result<Action, anyhow::Error> {
+		Ok(Action::NetworkTaskQueue {
+			co,
+			task_id: task_id.into(),
+			task_type: task_type.into(),
+			task_name: task_name.into(),
+			task: BlockSerializer::default().serialize(task)?,
+		})
 	}
 }
 impl From<anyhow::Error> for Action {
@@ -362,4 +396,18 @@ pub struct HeadsMessageReceivedAction {
 
 	/// Message tags. Used for internal tracking.
 	pub tags: Tags,
+}
+
+/// Request a block from network .
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
+pub struct NetworkBlockGetAction {
+	/// The Co to send the message to.
+	pub co: CoId,
+
+	/// The parent co of the `co`.
+	pub parent_co: CoId,
+
+	/// The Cid of the block to get.
+	pub cid: Cid,
 }

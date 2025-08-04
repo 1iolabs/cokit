@@ -234,6 +234,7 @@ where
 			reducer,
 			context,
 			Box::new(flush),
+			false,
 		)?;
 
 		// setup

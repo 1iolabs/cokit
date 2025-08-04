@@ -42,6 +42,7 @@ impl CoReducer {
 		reducer: Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 		context: CoReducerContextRef,
 		flush: CoReducerFlush,
+		initialize: bool,
 	) -> Result<Self, anyhow::Error> {
 		let date = reducer.date().clone();
 		let core_resolver = reducer.core_resolver().clone();
@@ -49,7 +50,7 @@ impl CoReducer {
 			tasks.clone(),
 			tags!("application": application_identifier, "co": id.as_str()),
 			ReducerActor::new(id.clone(), runtime.clone(), application_handle, context.clone()),
-			(reducer, flush),
+			(initialize, storage.clone(), reducer, flush),
 		)?;
 		Ok(Self {
 			id,

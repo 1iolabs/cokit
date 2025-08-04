@@ -407,6 +407,7 @@ impl Default for LsmTreeMapSettings {
 }
 
 /// LSM Tree Instance.
+#[derive(Clone)]
 pub struct LsmTreeMap<S, K, V>
 where
 	S: BlockStorage + Clone + 'static,
@@ -491,7 +492,7 @@ where
 			Some(Value::Tombstone) => Ok(None),
 			None => {
 				// iterate runs (most up-to-date is the first)
-				let runs = self.levels_and_runs();
+				let runs = Self::load_levels_and_runs(self.storage.clone(), self.root);
 				pin_mut!(runs);
 				while let Some(item) = runs.try_next().await? {
 					if let Some((_, run)) = item.right() {
@@ -533,12 +534,12 @@ where
 	}
 
 	/// Stream all tree entries.
-	pub fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+	pub fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + use<S, K, V> {
 		self.stream_query(None)
 	}
 
 	/// Stream tree entries.
-	pub fn stream_query(&self, start_at: Option<K>) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+	pub fn stream_query(&self, start_at: Option<K>) -> impl Stream<Item = Result<(K, V), StorageError>> + use<S, K, V> {
 		self.create_stream(None, start_at).try_filter_map(|item| {
 			ready(Ok(match item.1 {
 				Value::Value(value) => Some((item.0, value)),
@@ -548,12 +549,15 @@ where
 	}
 
 	/// Stream all tree entries in reverse order.
-	pub fn reverse_stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+	pub fn reverse_stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + use<S, K, V> {
 		self.reverse_stream_query(None)
 	}
 
 	/// Stream tree entries in reverse order.
-	pub fn reverse_stream_query(&self, start_at: Option<K>) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+	pub fn reverse_stream_query(
+		&self,
+		start_at: Option<K>,
+	) -> impl Stream<Item = Result<(K, V), StorageError>> + use<S, K, V> {
 		self.create_reverse_stream(None, start_at).try_filter_map(|item| {
 			ready(Ok(match item.1 {
 				Value::Value(value) => Some((item.0, value)),
@@ -603,8 +607,7 @@ where
 
 	/// Tree stats.
 	pub async fn stats(&self) -> Result<LsmTreeStats, StorageError> {
-		Ok(self
-			.levels_and_runs()
+		Ok(Self::load_levels_and_runs(self.storage.clone(), self.root)
 			.try_fold(
 				LsmTreeStats { entries: 0, active_entries: self.active.len(), levels: 0, runs: 0 },
 				|mut result, item| {
@@ -663,9 +666,10 @@ where
 		&self,
 		only_run_indicies: Option<BTreeSet<usize>>,
 		start_at: Option<K>,
-	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + Send + '_ {
+	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + Send + use<S, K, V> {
 		let storage = self.storage.clone();
 		let active = self.active.clone();
+		let root = self.root.clone();
 		async_stream::try_stream! {
 			// heap (max-sorted)
 			let mut heap = match only_run_indicies {
@@ -680,8 +684,7 @@ where
 
 			// runs
 			//  filter and pop first item of each run
-			let mut runs: Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)> = self
-				.levels_and_runs()
+			let mut runs: Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)> = Self::load_levels_and_runs(storage.clone(), root)
 				.try_filter_map(|item| ready(Ok(item.right())))
 				.try_filter(|(index, _)| ready(match &only_run_indicies {
 					Some(run_indicies) => run_indicies.contains(index),
@@ -728,15 +731,16 @@ where
 		&self,
 		only_run_indicies: Option<BTreeSet<usize>>,
 		start_at: Option<K>,
-	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + '_ {
+	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + use<S, K, V> {
 		let storage = self.storage.clone();
+		let active = self.active.clone();
+		let root = self.root.clone();
 		async_stream::try_stream! {
 			// heap (max-sorted)
 			let mut heap = match only_run_indicies {
 				Some(_) => BinaryHeap::new(),
 				None => BinaryHeap::<ReverseTreeStreamItem<K, V>>::from(
-					self.active
-						.clone()
+					active
 						.into_iter()
 						.map(|item| ReverseTreeStreamItem { run: None, item })
 						.collect::<Vec<_>>(),
@@ -745,8 +749,7 @@ where
 
 			// runs
 			//  filter and pop first item of each run
-			let mut runs: Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)> = self
-				.levels_and_runs()
+			let mut runs: Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)> = Self::load_levels_and_runs(storage.clone(), root)
 				.try_filter_map(|item| ready(Ok(item.right())))
 				.try_filter(|(index, _)| ready(match &only_run_indicies {
 					Some(run_indicies) => run_indicies.contains(index),
@@ -882,7 +885,7 @@ where
 		// add as first run to level 0
 		//  note: this currently loads all run "metadata" entries into memory however that should be ok because we dont
 		//   expect the run numbers to be very large.
-		let mut levels = self.levels(root.levels.clone()).await?;
+		let mut levels = Self::load_levels(self.storage.clone(), root.levels.clone()).await?;
 		if levels.is_empty() {
 			levels.insert(0, Level { runs: Default::default() });
 		}
@@ -920,7 +923,7 @@ where
 
 		// root
 		let mut root = if let Some(root) = self.root().await? { root } else { return Ok(()) };
-		let mut levels = self.levels(root.levels.clone()).await?;
+		let mut levels = Self::load_levels(self.storage.clone(), root.levels.clone()).await?;
 
 		// level
 		if levels.get(level_index).is_none() {
@@ -935,7 +938,7 @@ where
 		// find runs to compact
 		let mut runs = Vec::new();
 		{
-			let levels_and_runs = self.levels_and_runs();
+			let levels_and_runs = Self::load_levels_and_runs(self.storage.clone(), self.root);
 			pin_mut!(levels_and_runs);
 			let mut current_global_level_index = 0;
 			while let Some(level_or_run) = levels_and_runs.try_next().await? {
@@ -1048,15 +1051,10 @@ where
 
 	/// Root.
 	async fn root(&self) -> Result<Option<Root<K, V>>, StorageError> {
-		Ok(self.storage.get_value_or_none(&self.root).await?)
+		Self::load_root(&self.storage, self.root).await
 	}
 
-	// Levels.
-	async fn levels(&self, levels: Node<Level<K, V>>) -> Result<Vec<Level<K, V>>, StorageError> {
-		NodeStream::from_node(self.storage.clone(), levels, None).try_collect().await
-	}
-
-	// Store Levels.
+	/// Store Levels.
 	async fn store_levels(&self, levels: Vec<Level<K, V>>) -> Result<Node<Level<K, V>>, StorageError> {
 		let mut builder = NodeBuilder::default()
 			.with_items_size_max((INLINE_SIZE_FACTOR_LEVELS * S::StoreParams::MAX_BLOCK_SIZE).to_integer());
@@ -1068,17 +1066,28 @@ where
 		Ok(node)
 	}
 
+	/// Root.
+	async fn load_root(storage: &S, root: OptionLink<Root<K, V>>) -> Result<Option<Root<K, V>>, StorageError> {
+		Ok(storage.get_value_or_none(&root).await?)
+	}
+
+	/// Levels.
+	async fn load_levels(storage: S, levels: Node<Level<K, V>>) -> Result<Vec<Level<K, V>>, StorageError> {
+		NodeStream::from_node(storage, levels, None).try_collect().await
+	}
+
 	/// All active levels and runs with its (current) global index.
 	/// Sorted by newest to oldest run.
-	fn levels_and_runs(
-		&self,
-	) -> impl Stream<Item = Result<Either<(usize, Level<K, V>), (usize, Run<K, V>)>, StorageError>> + Send + '_ {
+	fn load_levels_and_runs(
+		storage: S,
+		root: OptionLink<Root<K, V>>,
+	) -> impl Stream<Item = Result<Either<(usize, Level<K, V>), (usize, Run<K, V>)>, StorageError>> + Send {
 		async_stream::try_stream! {
 			let mut global_level_index = 0;
 			let mut global_run_index = 0;
-			if let Some(root) = self.root().await? {
-				for level in self.levels(root.levels).await? {
-					let runs = NodeStream::from_link(self.storage.clone(), level.runs);
+			if let Some(root) = Self::load_root(&storage, root).await? {
+				for level in  Self::load_levels(storage.clone(), root.levels).await? {
+					let runs = NodeStream::from_link(storage.clone(), level.runs);
 					yield Either::Left((global_level_index, level));
 					for await run in runs {
 						yield Either::Right((global_run_index, run?));

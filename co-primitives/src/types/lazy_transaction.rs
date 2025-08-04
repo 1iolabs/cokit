@@ -2,6 +2,7 @@ use crate::{BlockStorage, StorageError};
 use async_trait::async_trait;
 use either::Either;
 
+/// Collection which supports transactions.
 #[async_trait]
 pub trait Transactionable<S>
 where
@@ -12,12 +13,12 @@ where
 	async fn open(&self, storage: &S) -> Result<Self::Transaction, StorageError>;
 }
 
+/// Lazy transaction that only opens the transaction when used.
 #[derive(Debug)]
 pub struct LazyTransaction<S, T>(Either<(S, T), (T::Transaction, bool)>)
 where
 	S: BlockStorage + Clone + 'static,
 	T: Transactionable<S> + 'static;
-
 impl<S, T> LazyTransaction<S, T>
 where
 	S: BlockStorage + Clone + 'static,

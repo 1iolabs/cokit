@@ -1,8 +1,10 @@
 use super::lazy_transaction::Transactionable;
-use crate::{library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError};
+use crate::{
+	library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError, Streamable,
+};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use futures::{future::Either, Stream, StreamExt, TryStreamExt};
+use futures::{future::Either, stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use num_rational::Ratio;
 use serde::{
 	de::{DeserializeOwned, Error},
@@ -85,6 +87,18 @@ impl<V> CoList<V>
 where
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
+	/// Create collection from iterator.
+	pub async fn from_iter<S>(storage: &S, iter: impl IntoIterator<Item = V>) -> Result<Self, StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		let mut transaction = Self::default().open(storage).await?;
+		for value in iter.into_iter() {
+			transaction.push(value).await?;
+		}
+		Ok(transaction.store().await?)
+	}
+
 	/// Whether this collection is empty.
 	pub fn is_empty(&self) -> bool {
 		self.0.is_none()
@@ -196,17 +210,69 @@ where
 	}
 
 	/// Update (or insert default) value.
-	pub async fn update<S, F, Fut>(&mut self, storage: &S, key: CoListIndex, update: F) -> Result<(), StorageError>
+	pub async fn update_or_insert<S, F>(&mut self, storage: &S, key: CoListIndex, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
+		F: FnOnce(&mut V) -> () + Send,
 		S: BlockStorage + Clone + 'static,
+	{
+		self.with_transaction(storage, |mut transaction| async move {
+			transaction.update_or_insert(key, update).await?;
+			Ok(transaction)
+		})
+		.await
+	}
+
+	/// Update (or insert default) value.
+	pub async fn try_update_or_insert_async<S, F, Fut>(
+		&mut self,
+		storage: &S,
+		key: CoListIndex,
+		update: F,
+	) -> Result<(), StorageError>
+	where
+		V: Default,
 		F: FnOnce(V) -> Fut + Send,
 		Fut: Future<Output = Result<V, StorageError>> + Send,
+		S: BlockStorage + Clone + 'static,
 	{
-		let mut transaction = self.open(storage).await?;
-		transaction.update(key, update).await?;
-		self.commit(transaction).await?;
-		Ok(())
+		self.with_transaction(storage, |mut transaction| async move {
+			transaction.try_update_or_insert_async(key, update).await?;
+			Ok(transaction)
+		})
+		.await
+	}
+
+	/// Update value ignore if key not exists.
+	pub async fn update<S, F>(&mut self, storage: &S, key: CoListIndex, update: F) -> Result<(), StorageError>
+	where
+		F: FnOnce(&mut V) -> () + Send,
+		S: BlockStorage + Clone + 'static,
+	{
+		self.with_transaction(storage, |mut transaction| async move {
+			transaction.update(key, update).await?;
+			Ok(transaction)
+		})
+		.await
+	}
+
+	/// Update (or insert default) value.
+	pub async fn try_update_async<S, F, Fut>(
+		&mut self,
+		storage: &S,
+		key: CoListIndex,
+		update: F,
+	) -> Result<(), StorageError>
+	where
+		F: FnOnce(V) -> Fut + Send,
+		Fut: Future<Output = Result<V, StorageError>> + Send,
+		S: BlockStorage + Clone + 'static,
+	{
+		self.with_transaction(storage, |mut transaction| async move {
+			transaction.try_update_async(key, update).await?;
+			Ok(transaction)
+		})
+		.await
 	}
 
 	pub async fn open<S>(&self, storage: &S) -> Result<CoListTransaction<S, V>, StorageError>
@@ -236,6 +302,19 @@ where
 		self.0 = transaction.tree.store().await?;
 		Ok(())
 	}
+
+	/// Open transaction, apply `update` and store it.
+	pub async fn with_transaction<S, F, Fut>(&mut self, storage: &S, update: F) -> Result<(), StorageError>
+	where
+		S: BlockStorage + Clone + 'static,
+		F: FnOnce(CoListTransaction<S, V>) -> Fut + Send,
+		Fut: Future<Output = Result<CoListTransaction<S, V>, StorageError>> + Send,
+	{
+		let transaction = self.open(storage).await?;
+		let mut result = update(transaction).await?;
+		self.0 = result.tree.store().await?;
+		Ok(())
+	}
 }
 impl<V> Default for CoList<V>
 where
@@ -257,7 +336,28 @@ where
 		CoList::open(self, storage).await
 	}
 }
+impl<S, V> Streamable<S> for CoList<V>
+where
+	S: BlockStorage + Clone + 'static,
+	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+	type Item = Result<(CoListIndex, V), StorageError>;
+	type Stream = BoxStream<'static, Self::Item>;
 
+	fn stream(&self, storage: S) -> Self::Stream {
+		let collection = self.clone();
+		async_stream::try_stream! {
+			let transaction = collection.open(&storage).await?;
+			let stream = transaction.stream();
+			for await item in stream {
+				yield item?;
+			}
+		}
+		.boxed()
+	}
+}
+
+#[derive(Clone)]
 pub struct CoListTransaction<S, V>
 where
 	S: BlockStorage + Clone + 'static,
@@ -409,7 +509,19 @@ where
 	}
 
 	/// Update (or insert default) value.
-	pub async fn update<F, Fut>(&mut self, key: CoListIndex, update: F) -> Result<(), StorageError>
+	pub async fn update_or_insert<F>(&mut self, key: CoListIndex, update: F) -> Result<(), StorageError>
+	where
+		V: Default,
+		F: FnOnce(&mut V) -> () + Send,
+	{
+		let mut item = self.get(&key).await?.unwrap_or_default();
+		update(&mut item);
+		self.insert(key, item).await?;
+		Ok(())
+	}
+
+	/// Update (or insert default) value.
+	pub async fn try_update_or_insert_async<F, Fut>(&mut self, key: CoListIndex, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
 		F: FnOnce(V) -> Fut + Send,
@@ -418,6 +530,31 @@ where
 		let item = self.get(&key).await?.unwrap_or_default();
 		let next_item = update(item).await?;
 		self.set(key, next_item).await?;
+		Ok(())
+	}
+
+	/// Update value, ignore if key not exists.
+	pub async fn update<F>(&mut self, key: CoListIndex, update: F) -> Result<(), StorageError>
+	where
+		F: FnOnce(&mut V) -> () + Send,
+	{
+		if let Some(mut item) = self.get(&key).await? {
+			update(&mut item);
+			self.insert(key, item).await?;
+		}
+		Ok(())
+	}
+
+	/// Update value, ignore if key not exists.
+	pub async fn try_update_async<F, Fut>(&mut self, key: CoListIndex, update: F) -> Result<(), StorageError>
+	where
+		F: FnOnce(V) -> Fut + Send,
+		Fut: Future<Output = Result<V, StorageError>> + Send,
+	{
+		if let Some(item) = self.get(&key).await? {
+			let next_item = update(item).await?;
+			self.insert(key, next_item).await?;
+		}
 		Ok(())
 	}
 

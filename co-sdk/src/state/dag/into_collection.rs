@@ -1,4 +1,4 @@
-use co_primitives::DagCollectionAsyncExt;
+use co_primitives::Streamable;
 use co_storage::{BlockStorage, StorageError};
 use futures::TryStreamExt;
 use serde::de::DeserializeOwned;
@@ -14,8 +14,8 @@ pub async fn into_collection<C, T, N, S>(storage: &S, container: &N) -> Result<C
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 	T: DeserializeOwned + Send + Sync + 'static,
-	N: DagCollectionAsyncExt<Item = T>,
+	N: Streamable<S, Item = Result<T, StorageError>>,
 	C: Default + Extend<T>,
 {
-	container.stream(storage).try_collect().await
+	container.stream(storage.clone()).try_collect().await
 }

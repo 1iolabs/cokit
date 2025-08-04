@@ -1,16 +1,15 @@
-use co_api::{Context, DagMap, DagMapExt, Reducer, ReducerAction, Tags};
-use serde::{Deserialize, Serialize};
+use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, Link, OptionLink, ReducerAction, Tags};
 
 /// Key Store.
 ///
 /// This COre should only be used in encrypted COs.
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[co(state)]
 pub struct KeyStore {
-	// #[co_api::Map]
-	pub keys: DagMap<String, Key>,
+	/// Keys by URI.
+	pub keys: CoMap<String, Key>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[co]
 pub struct Key {
 	/// URI which uniquely identifies this key.
 	pub uri: String,
@@ -28,37 +27,38 @@ pub struct Key {
 	pub tags: Tags,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[co]
 pub enum Secret {
 	Password(co_api::Secret),
 	PrivateKey(co_api::Secret),
 	SharedKey(co_api::Secret),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[co]
 pub enum KeyStoreAction {
 	Set(Key),
 	Remove(String),
 }
-impl Reducer for KeyStore {
-	type Action = KeyStoreAction;
 
-	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
-		let mut result = self;
-		match &event.payload {
+impl<S> Reducer<KeyStoreAction, S> for KeyStore
+where
+	S: BlockStorage + Clone + 'static,
+{
+	async fn reduce(
+		state_link: OptionLink<Self>,
+		event_link: Link<ReducerAction<KeyStoreAction>>,
+		storage: &S,
+	) -> Result<Link<Self>, anyhow::Error> {
+		let mut state = storage.get_value_or_default(&state_link).await?;
+		let action = storage.get_value(&event_link).await?;
+		match &action.payload {
 			KeyStoreAction::Set(i) => {
-				result.keys.insert(context.storage_mut(), i.uri.clone(), i.clone());
+				state.keys.insert(storage, i.uri.clone(), i.clone()).await?;
 			},
 			KeyStoreAction::Remove(uri) => {
-				result.keys.remove(context.storage_mut(), uri);
+				state.keys.remove(storage, uri.clone()).await?;
 			},
 		}
-		result
+		Ok(storage.set_value(&state).await?.into())
 	}
-}
-
-#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
-#[no_mangle]
-pub extern "C" fn state() {
-	co_api::reduce::<KeyStore>()
 }

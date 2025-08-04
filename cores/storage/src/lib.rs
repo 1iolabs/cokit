@@ -641,7 +641,7 @@ where
 		transaction
 			.blocks_mut()
 			.await?
-			.update_key(cid.into(), |mut block| async {
+			.try_update_or_insert_async(cid.into(), |mut block| async {
 				block.tags.clear(Some(&tags));
 				Ok(block)
 			})
@@ -662,7 +662,7 @@ where
 		transaction
 			.blocks_mut()
 			.await?
-			.update_key(cid.into(), |mut block| {
+			.try_update_or_insert_async(cid.into(), |mut block| {
 				let mut tags = tags.clone();
 				async move {
 					block.tags.append(&mut tags);
@@ -1051,7 +1051,7 @@ mod tests {
 			true,
 			state
 				.blocks_index_unreferenced
-				.contains_key(&storage, &cid("bagakbqabdyqar5vlsfqd3g4mxngt3yl7nx2na2kb4jybylzn5bktwnihjhih42a"))
+				.contains(&storage, &cid("bagakbqabdyqar5vlsfqd3g4mxngt3yl7nx2na2kb4jybylzn5bktwnihjhih42a"))
 				.await
 				.unwrap()
 		);
@@ -1059,7 +1059,7 @@ mod tests {
 			false,
 			state
 				.blocks_index_unreferenced
-				.contains_key(&storage, &cid("bagakbqabdyqldyp7kxv6p5wb3edrywc74xfkgauqzlumlxncdlzncbwt36y7iby"))
+				.contains(&storage, &cid("bagakbqabdyqldyp7kxv6p5wb3edrywc74xfkgauqzlumlxncdlzncbwt36y7iby"))
 				.await
 				.unwrap()
 		);

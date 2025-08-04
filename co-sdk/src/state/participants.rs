@@ -8,7 +8,12 @@ use futures::{stream, StreamExt, TryStreamExt};
 /// Read participants from a CO.
 pub async fn participants(storage: &CoStorage, co_state: OptionLink<Co>) -> Result<Vec<Participant>, QueryError> {
 	let co = query_core(CO_CORE_NAME_CO).with_default().execute(storage, co_state).await?;
-	Ok(co.participants.into_values().collect())
+	Ok(co
+		.participants
+		.stream(storage)
+		.map_ok(|(_key, particiant)| particiant)
+		.try_collect()
+		.await?)
 }
 
 /// Read active participants from a CO.
@@ -50,8 +55,10 @@ pub async fn is_participant(
 	if let Some(participant) = participant {
 		Ok(co
 			.participants
-			.iter()
-			.any(|item| item.1.state.has_access() && item.0 == participant))
+			.get(storage, participant)
+			.await?
+			.map(|item| item.state.has_access())
+			.unwrap_or(false))
 	} else {
 		Ok(false)
 	}

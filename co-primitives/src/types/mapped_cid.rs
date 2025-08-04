@@ -1,9 +1,11 @@
 use anyhow::anyhow;
 use cid::Cid;
 use derive_more::From;
+use serde::{Deserialize, Serialize};
 
 /// Simple type to make mapped Cid's clear.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, From)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, From, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum OptionMappedCid {
 	/// Unmapped Cid (Internal/Mapped is the same as External/Plain).
 	Unmapped(Cid),
@@ -54,7 +56,7 @@ impl OptionMappedCid {
 /// # Args
 /// - 0: Internal/Mapped.
 /// - 1: External/Plain.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct MappedCid(pub Cid, pub Cid);
 impl MappedCid {
 	pub fn new(internal: Cid, external: Cid) -> Self {

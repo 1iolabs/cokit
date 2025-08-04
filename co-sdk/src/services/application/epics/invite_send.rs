@@ -11,9 +11,9 @@ use co_actor::Actions;
 use co_core_co::{Co, CoAction};
 use co_identity::{IdentityResolver, PrivateIdentityResolver};
 use co_network::didcomm::EncodedMessage;
-use co_primitives::{CoConnectivity, CoId, DagSetExt, Did, Network};
+use co_primitives::{CoConnectivity, CoId, Did, Network};
 use futures::{stream, FutureExt, Stream, TryStreamExt};
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, future::ready};
 
 /// Dispatch Invite when a participant is invited into an CO.
 /// In: [`Action::CoreAction`]
@@ -132,14 +132,15 @@ async fn connectivity(storage: CoStorage, co: &Co) -> anyhow::Result<CoConnectiv
 			network: Default::default(),
 			participants: co
 				.participants
-				.iter()
-				.filter(|(_, participant)| participant.state.is_active())
-				.filter(|(_, participant)| {
+				.stream(&storage)
+				.try_filter(|(_, participant)| ready(participant.state.is_active()))
+				.try_filter(|(_, participant)| {
 					let network = CoNetwork::from_tags(&participant.tags).unwrap_or_default();
-					network.has_feature(CoNetwork::Invite)
+					ready(network.has_feature(CoNetwork::Invite))
 				})
-				.map(|(participant, _)| participant.to_owned())
-				.collect(),
+				.map_ok(|(participant, _)| participant.to_owned())
+				.try_collect()
+				.await?,
 		})
 	}
 }

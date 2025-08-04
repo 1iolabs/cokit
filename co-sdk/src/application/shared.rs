@@ -1,24 +1,19 @@
 use super::identity::create_identity_resolver;
 use crate::{
 	find_membership,
-	library::{
-		connections_peer_provider::ConnectionsPeerProvider, find_co_secret::find_co_secret_by_reference,
-		membership_all_heads::membership_all_heads,
-	},
+	library::{find_co_secret::find_co_secret_by_reference, membership_all_heads::membership_all_heads},
 	reducer::{
 		change::membership_writer::MembershipWriter,
 		core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
 	},
 	services::{
-		connections::ConnectionMessage,
-		network::CoNetworkTaskSpawner,
-		reducer::{FlushInfo, ReducerFlush},
+		reducer::{FlushInfo, ReducerBlockStorage, ReducerFlush},
 		reducers::ReducerStorage,
 	},
 	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
-	ApplicationMessage, CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoToken, CoTokenParameters,
-	CoUuid, Cores, DynamicCoDate, Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_CO, CO_CORE_NAME_CO,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	ApplicationMessage, CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoUuid, Cores, DynamicCoDate,
+	Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_CO, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -28,22 +23,19 @@ use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::{IdentityEntryVerifier, Log};
-use co_network::{bitswap::NetworkBlockStorage, PeerProvider};
 use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid};
 use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, fmt::Debug, sync::Arc, time::Duration};
+use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
 
 /// Shared CO Builder.
-/// The Shared CO state is sptrend in an membership of an other CO (typicalle the Local CO).
+/// The Shared CO state is stored in a membership of an other CO (typically the Local CO).
 pub struct SharedCoBuilder {
 	parent: CoReducer,
 	keystore_core_name: String,
 	membership_core_name: String,
 	membership: Membership,
-	network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
 	initialize: bool,
-	network_block_timeout: Duration,
 }
 impl SharedCoBuilder {
 	pub fn new(parent: CoReducer, membership: Membership) -> Self {
@@ -52,9 +44,7 @@ impl SharedCoBuilder {
 			membership,
 			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_string(),
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_string(),
-			network: None,
 			initialize: true,
-			network_block_timeout: Duration::from_secs(30),
 		}
 	}
 
@@ -64,10 +54,6 @@ impl SharedCoBuilder {
 
 	pub fn with_keystore_core_name(self, keystore_core_name: String) -> Self {
 		Self { keystore_core_name, ..self }
-	}
-
-	pub fn with_network(self, network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>) -> Self {
-		Self { network, ..self }
 	}
 
 	pub fn with_initialize(self, initialize: bool) -> Self {
@@ -81,39 +67,6 @@ impl SharedCoBuilder {
 		} else {
 			Ok(None)
 		}
-	}
-
-	pub fn build_network_storage<P>(
-		&self,
-		peer_provider: P,
-		(network, _): (CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>),
-		secret: Option<&co_primitives::Secret>,
-		storage: CoStorage,
-	) -> anyhow::Result<CoStorage>
-	where
-		P: PeerProvider + Clone + Send + Sync + 'static,
-	{
-		let local_peer_id = network.local_peer_id();
-		let mut network_storage = NetworkBlockStorage::new(storage, network, peer_provider, self.network_block_timeout);
-		let token = if let Some(shared_secret) = secret {
-			CoToken::new(shared_secret, CoTokenParameters(local_peer_id, self.membership.id.clone()))?
-				.to_bitswap_token()?
-		} else {
-			CoToken::new_unsigned(CoTokenParameters(local_peer_id, self.membership.id.clone())).to_bitswap_token()?
-		};
-		network_storage.set_tokens(vec![token]);
-		Ok(CoStorage::new(network_storage))
-	}
-
-	pub fn build_peer_provider<I>(
-		&self,
-		(_, connections): (CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>),
-		identity: I,
-	) -> impl PeerProvider + Clone + Send + Sync + 'static
-	where
-		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
-	{
-		ConnectionsPeerProvider::new(self.membership.id.clone(), identity.identity().to_owned(), connections)
 	}
 
 	pub async fn build<I>(
@@ -135,7 +88,7 @@ impl SharedCoBuilder {
 		// network
 		//  we want to layer the network storage before the encryption to we only send encrypted blocks over network
 		//  `BASE <- NETWORK <- ENCRYPTION``
-		let network_storage = if let Some(network) = &self.network {
+		let network_storage = {
 			// get base storage
 			let base_storage = if let Some(encrypted_storage) = storage.encrypted_storage() {
 				encrypted_storage.storage().clone()
@@ -144,25 +97,26 @@ impl SharedCoBuilder {
 			};
 
 			// create network storage
-			let secret = self.secret().await?;
-			let peer_provider = self.build_peer_provider(network.clone(), identity.clone());
-			let network_storage =
-				self.build_network_storage(peer_provider, network.clone(), secret.as_ref(), base_storage)?;
+			let network_storage = ReducerBlockStorage::new(
+				self.parent.id().clone(),
+				self.membership.id.clone(),
+				base_storage,
+				application_handle.clone(),
+				Default::default(),
+			);
 
 			// create encrypted storage which uses the network storage as base
 			// note: it uses the same mapping as the instance withput networking
 			let next_storage = if let Some(encrypted_storage) = storage.encrypted_storage() {
 				let mut encrypted_storage = encrypted_storage.clone();
-				encrypted_storage.set_storage(network_storage);
+				encrypted_storage.set_storage(CoStorage::new(network_storage));
 				CoStorage::new(encrypted_storage)
 			} else {
-				network_storage
+				CoStorage::new(network_storage)
 			};
 
 			// result
-			Some(next_storage)
-		} else {
-			None
+			next_storage
 		};
 
 		// context
@@ -203,13 +157,13 @@ impl SharedCoBuilder {
 		);
 
 		// reducer
-		let mut reducer_builder = ReducerBuilder::new(core_resolver, log).with_initialize(self.initialize);
+		let mut reducer_builder = ReducerBuilder::new(core_resolver, log).with_initialize(false);
 		let parent_storage = self.parent.storage();
 		for co_state in self.membership.state.iter() {
+			// reducer state
+			//  note: external states (from invite) get mapped in the reducer initialize to not have network request
+			//   before the reducer actor is spawned.
 			let reducer_state = CoReducerState::from_co_state(&parent_storage, co_state).await?;
-
-			// get (unencrypted) state/heads
-			let reducer_state = reducer_state.to_internal(&co_storage).await;
 
 			// load state/heads mappings from parent into our mapping
 			if let Some(parent_mappings) = reducer_state.to_external_mapping(&parent_storage).await {
@@ -217,15 +171,9 @@ impl SharedCoBuilder {
 			}
 
 			// add to builder
-			//  when we only have one state we assume its the latest
 			if let Some((state, heads)) = reducer_state.some() {
 				reducer_builder = reducer_builder.with_snapshot(state, heads);
 			}
-			// if self.membership.state.len() == 1 {
-			// 	reducer_builder = reducer_builder.with_latest_state(state, heads);
-			// } else {
-			// 	reducer_builder = reducer_builder.with_snapshot(state, heads);
-			// }
 		}
 		let reducer = reducer_builder.build(&co_storage, runtime.runtime(), date).await?;
 
@@ -265,6 +213,7 @@ impl SharedCoBuilder {
 			reducer,
 			context,
 			Box::new(flush),
+			self.initialize,
 		)?)
 	}
 }
@@ -358,7 +307,7 @@ struct SharedContext {
 	///
 	/// # Layers
 	/// `BASE + NETWORK + ENCRYPTION`
-	network_storage: Option<CoStorage>,
+	network_storage: CoStorage,
 }
 impl SharedContext {
 	/// Update `co` membership if necessary.
@@ -397,9 +346,7 @@ impl CoReducerContext for SharedContext {
 	fn storage(&self, force_local: bool) -> CoStorage {
 		// network
 		if !force_local {
-			if let Some(network_storage) = &self.network_storage {
-				return network_storage.clone();
-			}
+			return self.network_storage.clone();
 		}
 
 		// encrypted
@@ -435,7 +382,7 @@ impl CoReducerContext for SharedContext {
 	/// Test for reducer feature.
 	fn has_feature(&self, feature: &CoReducerFeature<'_>) -> bool {
 		match feature {
-			CoReducerFeature::Network => self.network_storage.is_some(),
+			CoReducerFeature::Network => true,
 			CoReducerFeature::Encryption => self.encrypted_storage.is_some(),
 			_ => false,
 		}
