@@ -206,6 +206,9 @@ In CO-kit, each `CO` or node may generate or be assigned a Peer ID, which then a
 - Uses Rust-based crates—like **TAO** (for window management) and **WRY** (for WebView integration)—to power the native shell and system interactions
 - Your frontend app (React, Vue, Svelte, or vanilla HTML/JS) runs inside a WebView shell that communicates securely with Rust backend via IPC commands (`#[tauri::command]` / `invoke`)
 
+## Tokio
+#todo 
+
 ### WASM
 WebAssembly. 
 #todo

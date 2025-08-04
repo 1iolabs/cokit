@@ -2,7 +2,7 @@
 #todo
 
 ## Abstract
-One base building block of CO-kit is the content addressed storage.
+One of the base building blocks of CO-kit is the content addressed storage.
 The storage is represented as a very simple interface which writes and reads CID/BLOB pairs called Blocks.
 The recommended serialization format (also used throughout CO-kit) is DAG-CBOR which is a subset of CBOR with links to CIDs.
 A core is not restricted to DAG-CBOR and may use any given structure.
