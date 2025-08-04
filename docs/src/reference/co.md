@@ -2,7 +2,7 @@
 ## Abstract 
 A CO is a virtual room for collaboration.
 
-CO (virtual data room) is a distributed database whose data is encrypted and is only available to the participants (unique via DID) of the data room. The CO stores references (unique via CID) of the data. The data itself is stored on the participants' devices. The DIDs, permissions and the identities of the participants (PrivateKeys) are stored in a data structure (data structure for states) “Core”. Each CO contains at least one Core. They act as “in-code databases” that store details such as the DIDs of the participants in a CO, their roles (admin, reader, etc.), permissions and status information (states) of systems such as chat rooms.
+CO (virtual data room) is a distributed database whose data is encrypted and is only available to the participants (unique via DID) of the data room. The CO stores references (unique via CID) of the data. The data itself is stored on the participants' devices. The DIDs, permissions and the identities of the participants (PrivateKeys) are stored in a data structure (data structure for states) “Core”. Each CO contains at least one Core. They act as “in-code databases” that store details such as the DIDs of the participants in a CO, permissions, and status information (states) of systems such as chat rooms.
 
 ## Features
 - Stores references

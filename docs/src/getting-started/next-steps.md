@@ -1,19 +1,28 @@
 # Next Steps
 
-Now that you know the basics of working with CO-kit, here are some examples of the cool things you can build with it:
+Now that you know the basics of working with CO-kit, we introduce a few more concepts and show you some examples of the cool things you can build with it:
+
+## Introducing CO
+A [CO](/reference/co.md) is a virtual room for collaboration.
+It organizes a set of Cores and allows participants to access and modify them.
+
+## Introducing Core
+A [Core](/reference/core.md) is a data model used within an [CO](/reference/co.md).
+It models data, business logic and permissions.
 
 ## Permissions
-As an example we could change the todo list core to only allow todo task deletion for the creator of the todo task.
-We need to store the creator of a task and in the delete just compare it.
+A Core contains [permissions](/reference/sdk-components/permissions.md) as logic in the data model.
+As an example we change the [todo list core](/getting-started/rust-core-quick-start.md) to only allow todo task deletion for the creator of the todo task.
+We need to store the creator of a task and compare it in the `TaskDelete` against each other.
 
-Add creator to state: 
+Add `creator` to state: 
 ```rust
 #[co]
 pub struct TodoTask {
-  pub id: String,
-  pub title: String,
-  pub done: bool,
-  pub creator: Did,
+	pub id: String,
+	pub title: String,
+	pub done: bool,
+	pub creator: Did,
 }
 ```
 
@@ -28,88 +37,106 @@ TodoAction::TaskDelete { id } => {
 },
 ```
 
-CO-kit then makes sure and verifies everyone got the same state.
+CO-kit then verifies everyone got the same state.
 
 ## More examples
-### Real-time counter with shared state
+### Real-time counter
 This example shows how a simple counter can be shared and synchronized across peers using CO-kit:
 
 ```js
-import { useCo } from "co";
+import { useCo, useSelector } from "co";
 
 const Counter = () => {
-  const [state, actions] = useCo("counter-uuid");
-
-  return (
-    <div>
-      <p>Count: {state.value}</p>
-      <button onClick={actions.increment}>+</button>
-      <button onClick={actions.decrement}>-</button>
-    </div>
-  );
+	const co = useCo("co-uuid");
+	const count = useSelector(
+		co,
+		"counter",
+		(_storage, counter_state) => counter_state.counter
+	);
+	return (
+	<div>
+		<p>Count: {count}</p>
+		<button onClick={() => co.dispatch("counter", {increment: 1})}>+</button>
+		<button onClick={() => co.dispatch("counter", {decrement: 1})}>-</button>
+	</div>
+	);
 };
 ```
-Here, `value`, `increment`, and `decrement` are defined in the CO schema. The state updates are CRDT-backed and instantly reflect across all connected users.
+Here, `count`, `increment`, and `decrement` are defined in the Core. The state updates are CRDT-backed and instantly reflect across all connected users.
 
-### Nested collaborative objects
-This example showcases using multiple COs — such as a project list, where each project has its own shared object:
+### Nested COs
+This example showcases using multiple [COs](/reference/co.md) — such as a project list, where each project has its own [CO](/reference/co.md):
 
 ```js
-const ProjectsDashboard = () => {
-  const [projectList] = useCo("project-list");
+import { useCo, useSelector } from "co";
 
-  return (
-    <div>
-      {projectList.projects.map(({ coId, title }) => (
-        <ProjectView key={coId} title={title} coId={coId} />
-      ))}
-    </div>
-  );
+const ProjectsDashboard = () => {
+	const co = useCo("project-list");
+	const projects = useSelector(
+		co,
+		"projects",
+		(_storage, state) => state.projects
+	);
+	return (
+	    <div>
+			{projects.map(({ coId, title }) => (
+				<ProjectView key={coId} title={title} coId={coId} />
+			))}
+	    </div>
+	);
 };
 
 const ProjectView = ({ coId, title }) => {
-  const [state, actions] = useCo(coId);
-
-  return (
-    <section>
-      <h3>{title}</h3>
-      <ul>
-        {state.tasks.map(t => <li>{t.name}</li>)}
-      </ul>
-    </section>
-  );
+	const co = useCo(coId);
+	const todos = useSelector(
+		co,
+		"todo",
+		(_storage, state) => state.todos
+	);
+	return (
+		<section>
+			<h3>{title}</h3>
+			<ul>
+				{todos.map((todo) => <li>{todo.name}</li>)}
+			</ul>
+		</section>
+	);
 };
 ```
-Each project lives as a **standalone CO**, making the structure scalable and naturally modular.
+Each project lives as a standalone [CO](/reference/co.md), making the structure scalable and naturally modular.
 
 ### Schema-based form editing
-Here we bind a form to a CO that holds user profile data. Changes propagate live, but validation logic is handled by the schema compiled to WASM:
+Here we bind a form to a [CO](/reference/co.md) that holds user profile data. Changes propagate live, but validation logic is handled by the [Core](/reference/core.md) (data model compiled to WASM):
 
 ```js
 const ProfileForm = () => {
-  const [state, actions] = useCo("user-profile");
-
-  return (
-    <form>
-      <label>
-        Name:
-        <input
-          value={state.name}
-          onChange={e => actions.setName(e.target.value)}
-        />
-      </label>
-      <label>
-        Email:
-        <input
-          value={state.email}
-          onChange={e => actions.setEmail(e.target.value)}
-        />
-      </label>
-    </form>
-  );
+	const co = useCo(coId);
+	const state = useSelector(
+		co,
+		"user-profile",
+		(_storage, state) => {name: state.name, email: state.email},
+	);
+	return (
+		<form>
+			<label>
+				Name:
+				<input
+					value={state.name}
+					onChange={(e) => co.dispatch("user-profile", {setName: e.target.value}})
+				/>
+			</label>
+			<label>
+				Email:
+				<input
+					value={state.email}
+					onChange={(e) => co.dispatch("user-profile", {setEmail: e.target.value}})
+				/>
+			</label>
+		</form>
+	);
 };
 ```
-The schema ensures the email format is correct, and optional constraints like uniqueness or required fields can be enforced at runtime through WASM-based validation.
+The [Core](/reference/core.md) ensures the email format is correct, and optional constraints like uniqueness or required fields can be enforced at runtime through WASM-based validation.
 
 ### Peer-to-Peer Messaging Application
 One obvious, cool thing that you can use CO-kit for is building a messaging application. We have already built a demo for such a use case that you can check out here: https://gitlab.1io.com/1io/co-sdk/-/tree/tauri-messenger-demo/tauri-plugin-co-sdk/examples/messenger

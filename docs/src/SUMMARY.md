@@ -17,7 +17,7 @@
 # Reference
 - [CO-kit](/reference/CO-kit.md)
 - [CO](/reference/co.md)
-- [core](/reference/core.md)
+- [Core](/reference/core.md)
 - [Guards](/reference/guards.md)
 - [SDK Components](/reference/sdk-components.md)
 	- [Storage](/reference/sdk-components/storage.md)
