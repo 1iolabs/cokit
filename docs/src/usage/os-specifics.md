@@ -4,8 +4,10 @@ While CO-kit is designed to be platform-independent and operates uniformly acros
 
 This section highlights key differences, workarounds, and best practices for using CO-kit on:
 
-- **Linux**
-- **macOS**
-- **Windows**
+- Linux
+- macOS
+- Windows
+- iOS
+- Andoid
 
 Refer to the subsections below to ensure optimal setup and compatibility for your platform.

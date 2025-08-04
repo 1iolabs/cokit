@@ -6,6 +6,24 @@ No Cloud-Dependencies.
 
 No Bullshit.
 
+## Save time. Here's how.
+To make the benefits of decentralized, local first apps clear, we outline a quick comparison.
+
+### Classical App
+1. Choose a tech stack (Database, Backend, Cloud, ...).
+2. Model your data and create databases and tables or collections.
+3. Connect data to your backend using a database client and data layer (ORM, ...).
+4. Implement business logic in your backend.
+5. Implement permissions in your backend.
+6. Implement an API to allow to access it from the outside (RPC, REST, ...).
+7. Implement a "syncing frontend data model" which is slightly or completely off the backend version.
+8. Implement your frontend.
+9. Provision and deploy the backend to a server or cloud.
+
+### CO-kit App
+1. Model data in a core which combines data, business logic and permissions.
+2. Implement your frontend and use the data directly.
+
 ## Ain't no better DevX
 
 ### Ship faster today
@@ -21,6 +39,7 @@ Establish data ownership and app interoperability as the standard for every digi
 No Backend. No Cloud-Dependencies. No Bullshit.
 
 ### Fuck Big Tech
+First of all - if you are big tech - Hi! You're welcome to use CO-kit as well.
 Big tech owns your online life. We've traded privacy for convenience, entrusting our personal data to closed systems that don't work together.  We are turning the tables and giving all power back to the user with a new technological foundation for truly decentralized collaboration.
 
 ### Kill the Middleman
