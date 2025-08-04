@@ -12,7 +12,6 @@
 - [Installation](/getting-started/installation.md)
 - [Core Quick Start](/getting-started/rust-core-quick-start.md)
 - [App Quick Start](/getting-started/rust-app-quick-start.md)
-- [Minimal Coding Example](/getting-started/minimal-coding-example.md)
 - [Next Steps](/getting-started/next-steps.md)
 
 # Reference

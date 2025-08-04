@@ -12,7 +12,7 @@ cargo add co-api
 
 ## Implementation
 Now we implement the core in `src/lib.rs`:
-1. Define your data model in a core
+#### 1. Define your data model in a core
 ```rust
 #[co]
 pub struct TodoTask {
@@ -26,7 +26,11 @@ pub struct Todo {
   pub tasks: CoMap<String, TodoTask>,
 }
 ```
-2. Define how the state can be modified:
+Here we defined a simple Todo task data model:
+- `TodoTask` → single task (id, title, done flag)
+- `Todo` → state container with a map of tasks
+
+#### 2. Define how the state can be modified:
 ```rust
 #[co]
 pub enum TodoAction {
@@ -38,7 +42,11 @@ pub enum TodoAction {
   DeleteAllDoneTasks,
 }
 ```
-3. Define how the modifications are applied:
+Here we enumerate all state-changing events:
+- Create, complete, un-complete, rename, delete tasks
+- Bulk-delete completed tasks
+
+#### 3. Define how the modifications are applied:
 ```rust
 impl<S> Reducer<TodoAction, S> for Todo
 where
@@ -77,12 +85,16 @@ where
 	}
 }
 ```
-4. Add the imports:
+Here we implement how the events are applied to the existing state:
+- Loads state + event → modifies task map → stores updated state
+- Each TodoAction maps directly to a state change
+
+#### 4. For completeness here are the imports:
 ```rust
 use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, Link, OptionLink, ReducerAction};
 ```
 
-#### Build as WebAssembly
+## Build as WebAssembly
 To compile to WebAssembly use the following command:
 ```sh
 co core build

@@ -1,11 +1,36 @@
 # Next Steps
 
-Now that you know the basics of working with CO-kit, here are some expamples of the cool things you can build with it:
+Now that you know the basics of working with CO-kit, here are some examples of the cool things you can build with it:
 
+## Permissions
+As an example we could change the todo list core to only allow todo task deletion for the creator of the todo task.
+We need to store the creator of a task and in the delete just compare it.
 
+Add creator to state: 
+```rust
+#[co]
+pub struct TodoTask {
+  pub id: String,
+  pub title: String,
+  pub done: bool,
+  pub creator: Did,
+}
+```
 
-### Messenger?
+Check if our condition is fulfilled:
+```rust
+TodoAction::TaskDelete { id } => {
+	let task = tasks.get(id).await?.ok_or(anyhow!("Task not found"))?;
+	if event.from != task.creator {
+		return Err(anyhow("Only the creator is allowed to delete tasks"));
+	}
+	tasks.remove(id).await?;
+},
+```
 
+CO-kit then makes sure and verifies everyone got the same state.
+
+## More examples
 ### Real-time counter with shared state
 This example shows how a simple counter can be shared and synchronized across peers using CO-kit:
 
@@ -85,3 +110,7 @@ const ProfileForm = () => {
 };
 ```
 The schema ensures the email format is correct, and optional constraints like uniqueness or required fields can be enforced at runtime through WASM-based validation.
+
+### Peer-to-Peer Messaging Application
+One obvious, cool thing that you can use CO-kit for is building a messaging application. We have already built a demo for such a use case that you can check out here: https://gitlab.1io.com/1io/co-sdk/-/tree/tauri-messenger-demo/tauri-plugin-co-sdk/examples/messenger
+

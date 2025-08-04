@@ -1,4 +1,5 @@
-# Minimal Coding Example
+#todo
+
 The example below demonstrates how to connect a React component to a **Collaborative Object (CO)** using the `useCo` hook provided by the CO-kit SDK:
 
 ```rust
