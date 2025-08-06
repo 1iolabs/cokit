@@ -30,6 +30,7 @@
 
 # Usage
 - [Best Practices](/usage/best-practices.md)
+- [Security](/usage/security.md)
 - [API Overview core (co-api)](/usage/api-overview-core.md)
 - [API Overview apps (co-sdk)](/usage/api-overview-apps.md)
 - [Configuration](/usage/configuration.md)

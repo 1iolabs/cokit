@@ -17,7 +17,7 @@ Utilities to accelerate development and integrations.
 - [co-cli](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-cli): `co` command line to interact with COs from command line.
 - [daemon](https://gitlab.1io.com/1io/co-sdk/-/tree/main/daemon): HTTP daemon which exposes COs as HTTP API.
 
-### Framwork integrations
+### Framework integrations
 
 Ready-to-use CO-kit integrations for different platforms and frameworks.
 

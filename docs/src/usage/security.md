@@ -1,0 +1,4 @@
+# Security
+
+## Notes
+All security mechanics in CO-kit assume that the host machine it is running on is safe and can be trusted. If that is not the case you will have much bigger problems to worry about as no piece of software will be secure.
