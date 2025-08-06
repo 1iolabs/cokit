@@ -15,13 +15,18 @@ A *strong copyleft* license created by the Free Software Foundation to ensure th
 
 - **Linking Exception**: An optional addendum that allows proprietary or differently-licensed software to link to AGPLv3 code without forcing the entire application to adopt AGPLv3, granted you don’t modify the interface itself.
 ---
-### cbor
+### CBOR
 (Concise Binary Object Representation)
 **CBOR** is a compact, binary data serialization format based on the JSON data model. It was designed to support extremely small code size, efficient message encoding, and extensibility without requiring version negotiation. Defined by IETF in **RFC 8949**, CBOR excels in scenarios where performance, compactness, and flexibility matter.
 
 - **Binary Format**: Unlike human-readable JSON, CBOR encodes data in binary form, making it faster to parse and more space-efficient.
 
 - **Extensible**: CBOR supports “tags” that identify special data types (e.g., dates, binary blobs), enabling schema-free evolution and custom data additions.
+
+## DAG-CBOR
+#todo
+See: https://ipld.io/specs/codecs/dag-cbor/spec/
+
 ---
 ### CLA
 A **Contributor License Agreement (CLA)** is a legal contract between a contributor and a project that grants the project the necessary permissions to use, distribute, and sublicense the contributor’s code or other contributions.

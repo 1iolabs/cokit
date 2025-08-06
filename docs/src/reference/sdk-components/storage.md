@@ -11,7 +11,7 @@ A core is not restricted to DAG-CBOR and may use any given structure.
 Storages can be layered to add functionality.
 
 ### Encryption
-The encryption layer encrypts blocks before writing them to disk through a configureable encryption algorithm.
+The encryption layer encrypts blocks before writing them to disk through a configurable encryption algorithm.
 The default encryption algorithm is [XChaCha20-Poly1305](https://datatracker.ietf.org/doc/html/rfc8439).
 
 ### Network

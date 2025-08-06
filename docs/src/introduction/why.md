@@ -35,6 +35,7 @@ Directly connected via peer-to-peer, you’re not dependent on centralized cloud
 ### Pioneer new standards
 Establish data ownership and app interoperability as the standard for every digital user.
 
+
 ## Our Philosophy
 No Backend. No Cloud-Dependencies. No Bullshit.
 

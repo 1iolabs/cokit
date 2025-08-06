@@ -1,19 +1,53 @@
 # Core
-A core (**CO** **re**ducer) is a piece of data that acts like a state. Cores can be directly added to COs and they work like an in-code database. They implement a reducer function that take actions which have been pushed to a CO. The reducer then changes the cores data accordingly.
+Core stands for CO Reducer.
+A reducer is a function that takes the current state and an action as input.
+It figures out how the state should change based on that action.
+It returns a new state without directly modifying the old one.
+Core reducers are pure functions, meaning it always gives the same output for the same state and action.
+This pureness is necessary to make distributed state and validation possible.
+For that reason they will be compiled to WebAssembly and executed in a sandbox.
 
-## Technical Notes
-- A core can be easily serialized (we use cbor) and saved
-- Serialization yields a CID which can then be used to reference that data (via a log or in other states for example)
-- The serialized data can then be stored on the hard drive or sent to other participants
+## Design choices
+Cores are reducer-based to allow easy reasoning and observability. They are predictable and easily testable.
+Their clear interface allows for composition.
+All changes are automatically atomic, meaning each reduce operation guarantees that it is treated as a single "unit".
+As Cores provide strict separation of concerns, they are executed in isolation which allows for verifiability and parallel execution.
 
-## Migrations
-#todo
+## Characteristics
+## Passive
+As cores are reducers they only materialise/calculate new state based on inputs.
+They have no facilities to react to state changes of preform any side effects.
 
-## WASM
-#todo
+## Serialization
+The core is the description of how state will be serialized to a persistable format.
+CO-kit uses content addressed blocks through [IPLD](https://ipld.io/) with a default block size limit of 1MiB.
+We recommend to use the [DAG-CBOR](/glossary/glossary.md#DAG-CBOR) format because it is optimized for content addressed data and directly supports content addressed links (via [CIDs](/glossary/glossary.md#CID)).
+However, any format, even plain binary, is usable as long as it can be adapted to the block size.
+
+## Validatability
+The pure, deterministic reducer is compiled to WebAssembly so that all peers can compute the same state transition, enabling a mechanism where everyone reaches the same result.
+In addition, [Consensus](/reference/sdk-components/consensus.md) cores allow to finalize a state and therefore produce trust among all CO participants.
+
+## Atomicity
+Each reducer operation is one "unit" and either, by design, succeeds completely or fails completely.
+
+## Features
+
+### Compiled to WebAssembly
+To provide maximum flexibility to developers, cores are compiled to WebAssembly, allowing custom logic and supporting arbitrarily complex data models so cores can be structured in any way needed.
+
+### Migrations
+A migration of a state (for example from version 1.0 to version 2.0) is just another operation which can be supplied when updating a core binary.
+Therefore it can be programmed just like any other reducer operation.
+This approach is highly flexible and leverages the simple yet effective characteristics of cores.
+These migrations can be used for schema and data alike.
 
 ## Higher order cores
-#todo
+Existing cores can by easily composed into a new core enabling more complex data models.
+In other words don’t mutate the original Core, rather use Composition since it got a well specified interface.
+You can either pass relevant data on outwards or specifically handle it the way you need it.
+This is maximising composability of Cores.
+For example it is easily possible to create a Markdown document management core which uses multiple rich-text states, one for each document.
 
 ## Builtin cores
 We provide a set of cores. They are the following:
@@ -50,8 +84,9 @@ Stores hierarchical file structures like a file system.
 #### co-core-data-series
 Stores data series, counters and aggregations on the data.
 
-#### co-core-role
-#todo
+#### co-core-rich-text
+Stores conflict free rich text.
 
-#### co-core-pin
-#todo
+#### co-core-role
+Basic role-based access rules. As a goto data model for daily permission management.
+
