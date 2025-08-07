@@ -3,6 +3,12 @@ A CO is a virtual room for collaboration.
 CO stands for collaborative object and is a fundamentally new concept of distributed collaboration, because a CO is not just another group chat of sorts.
 It rather serves a multitude of functionalities in a distributed network while running locally on each participants device.
 
+## What makes a CO
+A CO is like a bucket or project for digital data, which can be used for collaboration and communication.
+COs can serve for various digital processes without the requirement for expensive setups.
+COs are designed to be lightweight, ad-hoc usable and cheap to create, enabling the use of thousands or even millions of them.
+Each container is unique, much like a receipt, making it ideal for granular, trackable, and disposable data operations at scale.
+
 ## Structure
 
 ### Cores
@@ -30,6 +36,15 @@ This allows advanced sharing patterns, like, allowing new participants to only s
 
 ## Types
 
+Overview:
+
+| CO           | Local                             | Private                           | Public                            | Personal                          |
+| ------------ | --------------------------------- | --------------------------------- | --------------------------------- | --------------------------------- |
+| Encryption   | <input type="checkbox" checked /> | <input type="checkbox" checked /> | <input type="checkbox" />         | <input type="checkbox" checked /> |
+| Networking   | <input type="checkbox" />         | <input type="checkbox" checked /> | <input type="checkbox" checked /> | <input type="checkbox" checked /> |
+| Syncing      | <input type="checkbox" />         | <input type="checkbox" checked /> | <input type="checkbox" checked /> | <input type="checkbox" checked /> |
+| Participants | <input type="checkbox" />         | <input type="checkbox" checked /> | <input type="checkbox" checked /> | <input type="checkbox" />         |
+
 ### Local CO
 The Local CO is the the device's local-only CO.
 It manages the device's or application's local state which forms the root entry point.
@@ -45,14 +60,18 @@ The application's local state include:
 ### Private CO
 A CO which can only accessed by participants.
 While setting up a Private CO, the initiator decides about permissions, cores and who can access it by adding the DIDs of the desired participants.
+All participants with the permissions can do that at a later stage as well.
 Like a private chat between two participants.
 
 ### Public CO
-#todo
-A CO that runs unencrypted on the participants devices. As with private COs the runtime defines the participant permissions (read, write, ...). The participants are responsible for possible backups and edge computing services, meaning they decide for themselves how much storage/bandwidth to buy. (if necessary) Public COs can be resolved via a Public CO Registry
+A CO that is unencrypted and open to be read by anyone.
+While setting up a Public CO, the initiator decides about permissions and cores.
+All participants with the permissions can do that at a later stage as well.
+Like a public group chat.
 
 ### Personal CO
-#todo
-Stores identities and settings of one actual user (may spanning over multiple DIDs) in a Private CO so it can be synced between devices.
-- Personal CO can be used to save settings that should be shared privately over all devices
-- Settings are synced between all devices
+Acts like a private CO but usually once accessible by the creator.
+Stores creators, identities and settings, so those can be synced between devices[^issue-82].
+
+
+[^issue-82]: https://gitlab.1io.com/1io/co-sdk/-/issues/82

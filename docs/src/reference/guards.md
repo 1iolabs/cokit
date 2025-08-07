@@ -1,5 +1,5 @@
 # Guards
-Guards are permission checks for transactions. Transactions without [permissions] will be rejected.
+Guards are permission checks for transactions. Transactions without permissions will be rejected.
 
 ### Checks
 #### Is Participant
