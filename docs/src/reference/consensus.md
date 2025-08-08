@@ -2,6 +2,7 @@
 
 #todo
 
+Consensus is the validated state of a CO.
 ## Abstract
 When heads from different participants are joined the event order in the [Log](./log.md#Example) may change.
 This is necessary to make the Merkle-CRDT work technically.
@@ -37,6 +38,5 @@ The built-in consensus mechanism used in CO-kit.
 An authority is defined using DIDs and for example, a majority of votes needed to have a state validated on.
 
 See: 
-- [co-core-poa](/reference/core.md#co-core-poa)
-- [guards](/reference/guards.md)
-
+- [co-core-poa](../reference/core.md#co-core-poa)
+- [guards](../reference/guards.md)

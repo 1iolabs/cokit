@@ -28,7 +28,7 @@ CO-kit provides a pluggable networking layer with optional components:
 - Conflict-Free Collaboration
 - Merkle-CRDT Log-Based Sync: Built-in Conflict-Free Replicated Data Types (CRDTs) using Merkle trees and append-only logs.
 - Ensures deterministic merges and high traceability across replicas.
-- [Content addressing](/glossary/glossary.md#CID) which ensures validity of data.
+- [Content addressing](../glossary/glossary.md#CID) which ensures validity of data.
 
 ## Flexible Consensus
 Each CO can define its own consensus mechanism:
@@ -38,7 +38,7 @@ Each CO can define its own consensus mechanism:
 - Shared: All participants share responsibility; quorum or similar models.
 
 ## Flexible Data
-Each CO may contain multiple [cores](/reference/core.md). A core defines a data model:
+Each CO may contain multiple [cores](../reference/core.md). A core defines a data model:
 - Cores are compiled to WebAssembly (WASM) for safe, fast, and portable execution.
 - Cores can be versioned, sandboxed, and upgraded.
 - Cores may contain any data depending on your individual requirements.

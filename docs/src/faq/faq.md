@@ -9,7 +9,7 @@
 -
 ### Is CO-kit open-source? Under what license is it distributed?
 #todo
-- Yes, we use APLGv3 [see](/license/legal-notice.md)
+- Yes, we use APLGv3 [see](../license/legal-notice.md)
 
 ### What platforms does CO-kit support? (e.g., Linux, Windows, macOS, etc.)
 
@@ -76,11 +76,11 @@ This even makes is possible to just use any cloud storage drive to share the CO-
 ## Data & Consensus
 ### How are conflicts resolved using Merkle-CRDTs in CO-kit?
 Conflicts are resolved by sorting by the event's logical clock.
-See more at the [Log](/reference/sdk-components/log.md).
+See more at the [Log](../reference/log.md).
 
 ### What are the trade-offs between different consensus modes (none, PoA, manual, shared)?
 #todo
-See more at [Consensus](/reference/sdk-components/consensus.md).
+See more at [Consensus](../reference/consensus.md).
 
 ### Can I define custom consensus logic for my application?
 Yes. A consensus is implemented as a core with an additional guard.
@@ -88,7 +88,7 @@ Yes. A consensus is implemented as a core with an additional guard.
 ### What level of schema validation or migration support does CO-kit offer?
 Schema validation is up to the developer of core and can be implemented as desired.
 Cores can be migrated between versions. The migration itself is just another event which can be implemented in code.
-See more at [Core](/reference/core.md).
+See more at [Core](../reference/core.md).
 
 ### How does CO-kit manage partial data availability across distributed nodes?
 As all data is represented as a graph, more precisely as a DAG (directed acyclic graph) the data is always accessed top-down, meaning we can fetch more data as we walk down the graph.

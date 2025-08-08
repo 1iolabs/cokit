@@ -3,47 +3,46 @@
 # CO-kit
 
 # Introduction
-- [About CO-SDK](/introduction/about-co-sdk.md)
-- [Why](/introduction/why.md)
-- [Key Principles](/introduction/key-principles.md)
-- [Features](/introduction/features.md)
+- [About CO-SDK](./introduction/about-co-sdk.md)
+- [Why](./introduction/why.md)
+- [Key Principles](./introduction/key-principles.md)
+- [Features](./introduction/features.md)
 
 # Getting Started
-- [Installation](/getting-started/installation.md)
-- [Core Quick Start](/getting-started/rust-core-quick-start.md)
-- [App Quick Start](/getting-started/rust-app-quick-start.md)
-- [Next Steps](/getting-started/next-steps.md)
+- [Installation](./getting-started/installation.md)
+- [Core Quick Start](./getting-started/rust-core-quick-start.md)
+- [App Quick Start](./getting-started/rust-app-quick-start.md)
+- [Next Steps](./getting-started/next-steps.md)
 
 # Reference
-- [CO-kit](/reference/CO-kit.md)
-- [CO](/reference/co.md)
-- [Core](/reference/core.md)
-- [Guards](/reference/guards.md)
-- [SDK Components](/reference/sdk-components.md)
-	- [Storage](/reference/sdk-components/storage.md)
-	- [Log](/reference/sdk-components/log.md)
-	- [Network](/reference/sdk-components/network.md)
-	- [Identity](/reference/sdk-components/identity.md)
-	- [Permissions](/reference/sdk-components/permissions.md)
-	- [Consensus](/reference/sdk-components/consensus.md)
-- [Architecture](/reference/architecture.md)
+- [CO-kit](./reference/CO-kit.md)
+- [CO](./reference/co.md)
+- [Core](./reference/core.md)
+- [Guards](./reference/guards.md)
+- [Storage](./reference/storage.md)
+- [Log](./reference/log.md)
+- [Network](./reference/network.md)
+- [Identity](./reference/identity.md)
+- [Permissions](./reference/permissions.md)
+- [Consensus](./reference/consensus.md)
+- [Architecture](./reference/architecture.md)
 
 # Usage
-- [Best Practices](/usage/best-practices.md)
-- [Security](/usage/security.md)
-- [API Overview core (co-api)](/usage/api-overview-core.md)
-- [API Overview apps (co-sdk)](/usage/api-overview-apps.md)
-- [Configuration](/usage/configuration.md)
-- [OS-specifics](/usage/os-specifics.md)
+- [Best Practices](./usage/best-practices.md)
+- [Security](./usage/security.md)
+- [API Overview core (co-api)](./usage/api-overview-core.md)
+- [API Overview apps (co-sdk)](./usage/api-overview-apps.md)
+- [Configuration](./usage/configuration.md)
+- [OS-specifics](./usage/os-specifics.md)
 
 # Development
-- [How to contribute](/development/how-to-contribute.md)
+- [How to contribute](./development/how-to-contribute.md)
 
 # FAQ
-- [FAQ](/faq/faq.md)
+- [FAQ](./faq/faq.md)
 
 # License
-- [Legal notice](/license/legal-notice.md)
+- [Legal notice](./license/legal-notice.md)
 
 # Glossary
-- [Glossary](/glossary/glossary.md)
+- [Glossary](./glossary/glossary.md)

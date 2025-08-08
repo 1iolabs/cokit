@@ -1,6 +1,6 @@
 # Identity
 
-co-sdk uses a Decentralized Identifier (DID) as the fundamental identifier for identities. A DID is structured to align with the [W3C DID Core specification](/https://www.w3.org/TR/did-1.0/), typically of the form: 
+co-sdk uses a Decentralized Identifier (DID) as the fundamental identifier for identities. A DID is structured to align with the [W3C DID Core specification](../https://www.w3.org/TR/did-1.0/), typically of the form: 
 
 `did:<method>:<method-specific-identifier>`
 
@@ -56,14 +56,3 @@ flowchart TD
 	CO_CREATE_RENVZ --> CO_CREATED
 	CO_CREATED --> CO_USE
 ```
-
-
-
-
-
-
-
-
-
-
-

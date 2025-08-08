@@ -12,7 +12,7 @@ Each container is unique, much like a receipt, making it ideal for granular, tra
 ## Structure
 
 ### Cores
-Each CO contains at least one [Core](/reference/core.md).
+Each CO contains at least one [Core](../reference/core.md).
 Cores are the data model of which COs are composed.
 
 ### Participants
@@ -24,7 +24,7 @@ The CO initiator is by default, equipped with all permissions
 ### Network settings
 Each CO may contain networking settings.
 With there settings the connectivity of the CO can be configured.
-As a default [didcontact](/glossary/glossary.md#didcontact) with any of the participants are used.
+As a default [didcontact](../glossary/glossary.md#didcontact) with any of the participants are used.
 
 ### Encryption settings
 Each CO can be encrypted.
