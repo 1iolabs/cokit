@@ -8,6 +8,7 @@ A CO is like a bucket or project for digital data, which can be used for collabo
 COs can serve for various digital processes without the requirement for expensive setups.
 COs are designed to be lightweight, ad-hoc usable and cheap to create, enabling the use of thousands or even millions of them.
 Each container is unique, much like a receipt, making it ideal for granular, trackable, and disposable data operations at scale.
+Like a database that runs for every participant but locally.
 
 ## Structure
 
@@ -19,7 +20,6 @@ Cores are the data model of which COs are composed.
 Each CO contains participants.
 They are identified through their DID.
 It is important to notice that a CO can contain zero participants as well as millions of participants.
-The CO initiator is by default, equipped with all permissions
 
 ### Network settings
 Each CO may contain networking settings.
@@ -40,10 +40,10 @@ Overview:
 
 | CO           | Local                             | Private                           | Public                            | Personal                          |
 | ------------ | --------------------------------- | --------------------------------- | --------------------------------- | --------------------------------- |
-| Encryption   | <input type="checkbox" checked /> | <input type="checkbox" checked /> | <input type="checkbox" />         | <input type="checkbox" checked /> |
-| Networking   | <input type="checkbox" />         | <input type="checkbox" checked /> | <input type="checkbox" checked /> | <input type="checkbox" checked /> |
-| Syncing      | <input type="checkbox" />         | <input type="checkbox" checked /> | <input type="checkbox" checked /> | <input type="checkbox" checked /> |
-| Participants | <input type="checkbox" />         | <input type="checkbox" checked /> | <input type="checkbox" checked /> | <input type="checkbox" />         |
+| Encryption   | <input type="checkbox" style="pointer-events: none;" checked /> | <input type="checkbox" style="pointer-events: none;" checked /> | <input type="checkbox" style="pointer-events: none;" />         | <input type="checkbox" style="pointer-events: none;" checked /> |
+| Networking   | <input type="checkbox" style="pointer-events: none;" />         | <input type="checkbox" style="pointer-events: none;" checked /> | <input type="checkbox" style="pointer-events: none;" checked /> | <input type="checkbox" style="pointer-events: none;" checked /> |
+| Syncing      | <input type="checkbox" style="pointer-events: none;" />         | <input type="checkbox" style="pointer-events: none;" checked /> | <input type="checkbox" style="pointer-events: none;" checked /> | <input type="checkbox" style="pointer-events: none;" checked /> |
+| Participants | <input type="checkbox" style="pointer-events: none;" />         | <input type="checkbox" style="pointer-events: none;" checked /> | <input type="checkbox" style="pointer-events: none;" checked /> | <input type="checkbox" style="pointer-events: none;" />         |
 
 ### Local CO
 The Local CO is the the device's local-only CO.

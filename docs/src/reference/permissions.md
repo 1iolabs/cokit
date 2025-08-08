@@ -16,10 +16,10 @@ A quick comparison of Permissions and Guards:
 
 |                                          | Guard                             | Permission                        |
 | ---------------------------------------- | --------------------------------- | --------------------------------- |
-| Instant (Evaluated once)                 | <input type="checkbox" checked /> | <input type="checkbox" />         |
-| Permanent (Re-evaluated after conflicts) | <input type="checkbox" />         | <input type="checkbox" checked /> |
-| Applies to Transactions                  | <input type="checkbox" checked /> | <input type="checkbox" />         |
-| Applies to State                         | <input type="checkbox" />         | <input type="checkbox" checked /> |
+| Instant (Evaluated once)                 | <input type="checkbox" style="pointer-events: none;" checked /> | <input type="checkbox" style="pointer-events: none;" />         |
+| Permanent (Re-evaluated after conflicts) | <input type="checkbox" style="pointer-events: none;" />         | <input type="checkbox" style="pointer-events: none;" checked /> |
+| Applies to Transactions                  | <input type="checkbox" style="pointer-events: none;" checked /> | <input type="checkbox" style="pointer-events: none;" />         |
+| Applies to State                         | <input type="checkbox" style="pointer-events: none;" />         | <input type="checkbox" style="pointer-events: none;" checked /> |
 
 ## See more
 - [Guards](../reference/guards.md)
