@@ -29,5 +29,8 @@ Tools that build on co-sdk should be compatible with each other, even if the bui
 ## Accessibility
 We want everyone to be able to take full advantage of the platform and derive value from it, not just devs. Not only shall the applications built with CO-kit be easy to use, but we also hope for the best dx possible.
 
+## Self-Sovereign
+#todo
+
 ## Open & Democratic
 No one should ever own a platform and exploit others and their data. We see CO-kit and public property. Everything is open-source. Go and build a better digital future with it. -> See more in the chapter [Licensing](./license/lega-notice.md)

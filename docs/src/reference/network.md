@@ -41,3 +41,10 @@ See more:
 - https://docs.ipfs.tech/concepts/bitswap/
 - [IPIP-270: Bitswap 1.3.0 - Tokens (and auth) support #270](https://github.com/ipfs/specs/pull/270)
 - https://github.com/dkuhnert/libp2p-bitswap/tree/auth
+
+### Protocol: didcontact
+Discovery protocol which gossips encrypted didcomm messages using the GossipSub protocol from libp2p.
+The didcomm messages denotes a connection request from one CO participant to another one.
+The receivicer can choose whether to respond to it or not, so no (potentially private) connection information must be shared beforehand.
+
+#todo sequence diagram
