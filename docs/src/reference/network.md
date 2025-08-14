@@ -14,7 +14,7 @@ CO-kit uses the [rust implementation of libp2p](https://github.com/libp2p/rust-l
 ## Protocols
 ### Protocol: mDNS
 Used for **local peer discovery** via multicast DNS ([RFC 6762](https://datatracker.ietf.org/doc/html/rfc6762)).
-Peers broadcast `_p2p._udp.local` PTR queries, and libp2p-capable nodes respond with their multiaddresses.
+Peers broadcast `_p2p._udp.local` PTR queries, and libp2p-capable nodes respond with their multi-addresses.
 CO-kit uses the libp2p mDNS client.
 
 ### Protocol: Noise

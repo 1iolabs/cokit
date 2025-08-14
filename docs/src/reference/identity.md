@@ -43,7 +43,7 @@ In the [Log](../reference/log.md), each event in the conflict-free replicated ev
 This example shows how to create a new `did:key:` identity using CO-kit:
 
 ```rust
-use co_sdk::{Application, DidKeyIdentity, DidKeyProvider};
+use co_sdk::{Application, DidKeyIdentity, DidKeyProvider, CO_CORE_NAME_KEYSTORE};
 
 async fn create_identity(application: Application, name: String) -> Result<DidKeyIdentity, anyhow::Error> {
     let identity = DidKeyIdentity::generate(Default::default());

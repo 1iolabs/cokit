@@ -170,6 +170,9 @@ IPLD is a single namespace for all hash-inspired protocols. Through IPLD, links 
 ### mDNS in CO-kit
 CO-kit uses mDNS as an optional networking mode to automatically discover peer nodes and COs on a local subnet - simplifying setup and fostering seamless peer-to-peer collaboration without manual endpoint configuration.
 
+## Merkle-CRDT
+#todo
+
 ## Merkle Dags
 A **Merkle DAG** is a content-addressed directed acyclic data structure where each node is cryptographically hashed based on its payload and its links to child nodes. This creates a self-verifying graph ideal for the distributed system of CO-kit.
 

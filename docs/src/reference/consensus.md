@@ -1,9 +1,9 @@
 # Consensus
 
-#todo
-
 Consensus is the validated state of a CO.
-## Abstract
+
+## What makes Consensus in CO-kit
+Consensus in CO-kit provides finality.
 When heads from different participants are joined the event order in the [Log](./log.md#Example) may change.
 This is necessary to make the Merkle-CRDT work technically.
 The consensus on the other hand is used to allow the network of participants of an CO to commit to an known state/heads combination.
@@ -18,25 +18,44 @@ For example:
 
 ## Consensus on demand (CoD)
 A consensus round can be triggered manually on demand.
-One participant can start a validation at any given time.
-Other participants that received the initial validation, then collaborate and sign the validation.
+One participant can request finality at any given time.
+Other participants that received the initial request, then collaborate and sign the checkpoint.
 
 ## Finality
-Finality means a certain checkpoint is agreed upon and no events can be inserted before it.
+Finality means a certain checkpoint is agreed upon and no events can be inserted by the conflict resolution algorithm before it.
 
 ## Trust
-Finality is cryptographically verifiable once reached and therefore can be trusted to be immutable.
+Finality is cryptographically verifiable once reached and therefore can be trusted to be immutable among CO participants.
 
 ## Optional
-Consensus algorithm in a CO are completely optional.
-The Merkle-CRDT solves the technical part of syncing, conflict handling and validation.
+Consensus algorithms in a CO are completely optional.
+The [Log](./log.md) with the [Merkle-CRDT](../glossary/glossary.md#merkle-crdt) solves the technical part of syncing, conflict handling and validation.
 If no other mechanism is applied (proof of authority, etc.), the Merkle-CRDT serves as a single source of truth.
 Depending on your project requirements, you can implement any other consensus mechanism.
 
-##  Proof of authority
-The built-in consensus mechanism used in CO-kit.
-An authority is defined using DIDs and for example, a majority of votes needed to have a state validated on.
+## Asynchronous
+In CO-kit consensus is asynchronous and on-demand, meaning users only have to wait for it if it is really needed.
+While classical databases normally provide finality by default (when a change is written it's final) this comes at the cost that every change losses time by having a lot of overhead (latency, routing, compute, ...).
 
-See: 
+## Proof of authority
+The built-in consensus mechanism used in CO-kit.
+It is implemented in the `co-core-poa` Core.
+When the creator of a CO adds this Core the authority can be specified as a list of DIDs.
+This authority is then responsible for voting and once a majority is reached on a checkpoint, it is finalized.
+The POA allows for Byzantine Fault Tolerance (BFT) when configured with a majority of at least two-thirds of the authority.
+
+### Use Cases
+With this mechanism new and classical use cases can be supported.
+
+#### Client / Server
+Just define the Server (or Servers) as the authority then clients can be sure that the finalized state is known by the server.
+
+#### Receipts
+When two parties buy/sell something from each other, a CO can be used as a receipt between them. After all data has been captured, both can sign and therefore finalize the CO and receive a verifiable proof that a transaction took place.
+
+#### Multi Region Cloud Service
+When collaborating globally, even across continents (e.g. Europe, North America, Asia), the majority can be formed by two of the continents and thus making sure a change has been globally replicated/accepted upon.
+
+See more:
 - [co-core-poa](../reference/core.md#co-core-poa)
 - [guards](../reference/guards.md)
