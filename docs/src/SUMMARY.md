@@ -16,6 +16,7 @@
 
 # Reference
 - [CO-kit](./reference/CO-kit.md)
+- [Architecture](./reference/architecture.md)
 - [CO](./reference/co.md)
 - [Core](./reference/core.md)
 - [Guards](./reference/guards.md)
@@ -25,7 +26,6 @@
 - [Identity](./reference/identity.md)
 - [Permissions](./reference/permissions.md)
 - [Consensus](./reference/consensus.md)
-- [Architecture](./reference/architecture.md)
 
 # Usage
 - [Best Practices](./usage/best-practices.md)
