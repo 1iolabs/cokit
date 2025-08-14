@@ -33,4 +33,5 @@ We want everyone to be able to take full advantage of the platform and derive va
 #todo
 
 ## Open & Democratic
-No one should ever own a platform and exploit others and their data. We see CO-kit and public property. Everything is open-source. Go and build a better digital future with it. -> See more in the chapter [Licensing](./license/lega-notice.md)
+No one should ever own a platform and exploit others and their data. We see CO-kit and public property. Everything is open-source. Go and build a better digital future with it. 
+See more in the chapter [Licensing](./license/lega-notice.md).

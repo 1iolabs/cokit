@@ -56,6 +56,6 @@ When two parties buy/sell something from each other, a CO can be used as a recei
 #### Multi Region Cloud Service
 When collaborating globally, even across continents (e.g. Europe, North America, Asia), the majority can be formed by two of the continents and thus making sure a change has been globally replicated/accepted upon.
 
-See more:
+## See also
 - [co-core-poa](../reference/core.md#co-core-poa)
 - [guards](../reference/guards.md)

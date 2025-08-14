@@ -1,5 +1,26 @@
 # Architecture
 #todo
+
+To ensure interoperability, efficiency and performance, we have made a set of architecture choices that could differ from conventional architectures that you might know from other projects. In this chapter, we explain the system scope and take a closer look at the aforementioned choices.
+
+
+## System Scope
+The system is an SDK built in Rust named CO-kit.
+Meant to run on a device and expose APIs for an application.
+
+It manages device resources - filesystem (`F`), network (`N`), internal storage (`S`), logging (`Log`), and a WASM runtime performing logic (`Core`, `Action`, `State`)
+
+**Actors:**
+- Device (D): Hosts SDK; has physical access to filesystem, network, internal storage
+- APP (B): Higher level client logic using the SDK.
+
+**External Interfaces:**
+- File (`F`), network (`N`), internal storage (`S`), logging (`Log`)
+
+
+## Building Block Overview
+### High-Level Components
+
 ```mermaid
 flowchart TD
 	subgraph CO-kit
@@ -17,7 +38,7 @@ flowchart TD
 					L["Log"]
 					H["Head"]
 				end
-				subgraph WASM
+				subgraph WebAssembly
 					R["Core"]
 					A["Action"]
 					M["State"]
@@ -43,48 +64,18 @@ flowchart TD
 	A --> M
 	B --> S
 ```
-
-## System Scope
-System is an sdk built in Rust named CO-kit. Meant to run on a device and expose APIs for an application. It manages device resources - filesystem (`F`), network (`N`), internal storage (`S`), logging (`Log`), and a WASM runtime performing logic (`Core`, `Action`, `State`)
-
-**Actors:**
-- Device (D): Hosts SDK; has physical access to filesystem, network, internal storage
-- APP (B): Higher level client logic using the SDK.
-
-**External Interfaces:**
-- File (`F`), network (`N`), internal storage (`S`), logging (`Log`)
-
----
-
-## Building Block view
-### High-Level Components
-```scss
-CO‑KIT
-└─ Device (D)
-   ├─ Filesystem (F)
-   ├─ Network (N)
-   └─ APP (B)
-       └─ CO
-           ├─ Core (WASM Engine)
-           ├─ Action
-           ├─ State
-           ├─ Storage (S)
-           ├─ Log
-           └─ Head
-```
-
-|Component|Responsibility|
-|---|---|
-|**Device (D)**|Host runtime; mediates HW resources access|
-|**Filesystem (F)**|Persistent I/O: load/save state or WASM modules|
-|**Network (N)**|External data transmission|
-|**APP (B)**|Consumer-facing interface to drive SDK|
-|**CO**|Core orchestration engine of SDK|
-|**Storage (S)**|Central persistent store for logs, state, device data|
-|**Log + Head**|Log manager (`L`) and index (`H`) for fast retrieval|
-|**WASM (R/A/M)**|WASM runtime executes business logic (core, actions, state)|
-
----
+### Components
+- [Device](./usage/os-specifics.md): The platform host.
+	- [Network](../reference/network.md): The platform network interface.
+	- Filesystem: File based persistence.
+	- App: An Application using CO-kit.
+		- [Storage](../reference/storage.md): Content addressed storage.
+		- [CO](../reference/co.md): Virtual room for collaboration.
+		- [Log](../reference/log.md): Conflict-free replicated event stream.
+			- Head: Specific point in the Log.
+		- [Core](../reference/core.md): Actions to State Reducer.
+			- Action: A change operation.
+			- State: A materialized state based on the actions.
 
 ## Runtime & Development View
 **Initialization Flow**:
@@ -152,3 +143,4 @@ CO updates Head
 CO → WASM(R): acknowledge commit
 CO → APP: return action outcome
 ```
+

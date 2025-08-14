@@ -21,6 +21,6 @@ A quick comparison of Permissions and Guards:
 | Applies to Transactions                  | <input type="checkbox" style="pointer-events: none;" checked /> | <input type="checkbox" style="pointer-events: none;" />         |
 | Applies to State                         | <input type="checkbox" style="pointer-events: none;" />         | <input type="checkbox" style="pointer-events: none;" checked /> |
 
-## See more
+## See also
 - [Guards](../reference/guards.md)
 - [Core](../reference/core.md)

@@ -146,9 +146,7 @@ CO-kit leverages CRDTs to implement its **built-in Merkle log-based CRDT sync**,
 #todo
 
 ## IPLD
-IPLD is a single namespace for all hash-inspired protocols. Through IPLD, links can be traversed across protocols, allowing you to explore data regardless of the underlying protocol.
-
-[see more](https://ipld.io/)
+[IPLD](https://ipld.io/) is a single namespace for all hash-inspired protocols. Through IPLD, links can be traversed across protocols, allowing you to explore data regardless of the underlying protocol.
 
 ## Logs
 #todo
@@ -171,10 +169,14 @@ IPLD is a single namespace for all hash-inspired protocols. Through IPLD, links 
 CO-kit uses mDNS as an optional networking mode to automatically discover peer nodes and COs on a local subnet - simplifying setup and fostering seamless peer-to-peer collaboration without manual endpoint configuration.
 
 ## Merkle-CRDT
-#todo
+A **Merkle‑CRDT** combines the strengths of **Merkle‑DAGs (Directed Acyclic Graphs)** and **Conflict‑Free Replicated Data Types (CRDTs)** to create a robust, decentralized synchronization layer. In this design, CRDT payloads are embedded within Merkle‑DAG nodes, allowing each update to serve as a self-verifying event in a content-addressed history, simplifying causality tracking and state merging without relying on messaging guarantees.  
 
-## Merkle Dags
-A **Merkle DAG** is a content-addressed directed acyclic data structure where each node is cryptographically hashed based on its payload and its links to child nodes. This creates a self-verifying graph ideal for the distributed system of CO-kit.
+The Merkle‑DAG provides **Merkle‑Clocks**, which function as logical clocks for capturing causality and ordering. Coupled with a DAG‑Syncer and Broadcaster, this approach enables **per‑object causal consistency**, allowing replicas to synchronize efficiently even in unreliable networks with dynamic replica sets.
+
+Merkle‑CRDTs shine in highly distributed and ad‑hoc environments (e.g., mobile, browser, or IoT networks) because they eliminate the need for consensus mechanisms or strict messaging protocols. Instead, convergence is ensured through immutable, verifiable DAG history and CRDT semantics embedded within each node.
+
+## Merkle-DAG
+A **Merkle-DAG** is a content-addressed directed acyclic data structure where each node is cryptographically hashed based on its payload and its links to child nodes. This creates a self-verifying graph ideal for the distributed system of CO-kit.
 
 ### Features
 - **Immutable and self-verifying**: Each node's identifier uniquely represents its content and all descendants. Any change produces a new [CID](./) and a new graph branch.
@@ -184,15 +186,13 @@ A **Merkle DAG** is a content-addressed directed acyclic data structure where ea
 In CO-kit, we use Merkle DAGs as the foundation for the built-in Merkle log-based CRDT-syncing, especially to enable lightweight storage and content deduplication across COs.
 
 ## PeerID
-A Peer Identity (often written `PeerID`) is a unique reference to a specific peer within the overall p2p-network.
+A [Peer](https://docs.libp2p.io/concepts/fundamentals/peers/) Identity (often written `PeerID`) is a unique reference to a specific peer within the overall p2p-network.
 
 - A Peer ID is derived by hashing a node’s **public key**, and the corresponding **private key** remains secret and is used to sign messages and authenticate the identity of the peer.
 - Typically represented as a **base58‑encoded multihash** (CIDv0)
 - More modern encodings (CIDv1, Base32) are emerging—but the legacy base58 multihash remains widely supported.
 
 In CO-kit, each `CO` or node may generate or be assigned a Peer ID, which then acts as a verifiable handle across the decentralised syncing and networking layers.
-
-[See more](https://docs.libp2p.io/concepts/fundamentals/peers/)
 
 ## Storage
 #todo
