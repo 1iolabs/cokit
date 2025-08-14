@@ -9,11 +9,13 @@ You'll find some handy best practices and we'll also hand you some do's and don'
 ### Core: Use stable identifiers
 Use stable identifiers for example UUID's when referencing data.
 Monotonic counters may change when some conflict resolution takes place.
-
-
+### Core: Design actions to be task based
+Ideally design actions to be task based, meaning not to split a single logical task over multiple actions 
 
 ## Don'ts
-
+### Proof-of-Authority Misconfiguration
+#todo
+We could prevent this technologically but it would make the Core less flexible.
 
 # WIP
 - Purpose: Ease the start of development with CO-kit
