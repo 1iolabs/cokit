@@ -21,10 +21,12 @@ pub use storage::{
 	change::{BlockStorageChange, ChangeBlockStorage},
 	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping, EncryptionReferenceMode},
 	fs::FsStorage,
+	join::JoinBlockStorage,
 	mapped::MappedBlockStorage,
 	memory::{MemoryBlockStorage, MemoryStorage},
 	overlay::{OverlayBlockStorage, OverlayChange, OverlayChangeReference},
 	request,
+	static_storage::StaticBlockStorage,
 	store_params::StoreParamsBlockStorage,
 	sync::{SyncBlockStorage, SyncStorage},
 };

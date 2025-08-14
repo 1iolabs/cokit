@@ -1,9 +1,11 @@
 pub mod change;
 pub mod encrypted;
 pub mod fs;
+pub mod join;
 pub mod mapped;
 pub mod memory;
 pub mod overlay;
 pub mod request;
+pub mod static_storage;
 pub mod store_params;
 pub mod sync;

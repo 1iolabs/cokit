@@ -1,5 +1,9 @@
 use crate::{CoStorage, CoUuid, DynamicCoUuid};
-use co_storage::{Algorithm, EncryptedBlockStorage, EncryptionReferenceMode, FsStorage, MemoryBlockStorage};
+use co_primitives::DefaultParams;
+use co_storage::{
+	Algorithm, EncryptedBlockStorage, EncryptionReferenceMode, FsStorage, JoinBlockStorage, MemoryBlockStorage,
+	StaticBlockStorage,
+};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
@@ -21,6 +25,11 @@ impl Storage {
 
 	pub fn new_memory() -> Self {
 		Self { storage: CoStorage::new(MemoryBlockStorage::default()), tmp_storage: TmpStorage::Memory }
+	}
+
+	pub fn with_static(mut self, storages: Vec<StaticBlockStorage<'static, DefaultParams>>) -> Self {
+		self.storage = CoStorage::new(JoinBlockStorage::new(self.storage, storages));
+		self
 	}
 
 	pub fn storage(&self) -> CoStorage {

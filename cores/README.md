@@ -19,7 +19,7 @@ rustup target add wasm32-unknown-unknown
 
 Build cores:
 ```shell
-cargo run --bin co-cli core-build-builtin
+cargo run --bin co-cli core build-builtin
 ```
 
 Test:

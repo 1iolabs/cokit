@@ -42,7 +42,6 @@ pub async fn post(
 	Json(payload): Json<Value>,
 ) -> HttpResult<(StatusCode, Json<Value>)> {
 	let body: CreateCo = serde_json::from_value(payload)?;
-	let id = body.id.clone().to_string();
-	application.create_co(application.local_identity(), body).await?;
-	Ok((StatusCode::OK, Json(id.into())))
+	let reducer = application.create_co(application.local_identity(), body).await?;
+	Ok((StatusCode::OK, Json(reducer.id().to_string().into())))
 }

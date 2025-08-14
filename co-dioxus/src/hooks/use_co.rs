@@ -1,5 +1,6 @@
 use crate::{use_co_context, use_co_storage, CoBlockStorage, CoContext};
-use co_sdk::{state::Identity, Application, CoId, CoReducerFactory, CoReducerState};
+use anyhow::anyhow;
+use co_sdk::{state::Identity, Application, CoId, CoReducerFactory, CoReducerState, CreateCo, CO_ID_LOCAL};
 use dioxus::prelude::*;
 use futures::{future::Either, pin_mut, StreamExt};
 use serde::Serialize;
@@ -142,6 +143,26 @@ impl Co {
 			}
 		});
 	}
+
+	pub fn create_co(&self, identity: Identity, co: CreateCo) {
+		let mut last_error = self.last_error;
+
+		// check
+		if self.co_id.as_str() != CO_ID_LOCAL {
+			last_error.set(Err(anyhow!("Create COs only support for local").into()));
+			return;
+		}
+
+		// create
+		self.context.execute_future(move |application| async move {
+			match create_co(application, identity, co).await {
+				Ok(()) => {},
+				Err(err) => {
+					last_error.set(Err(err.into()));
+				},
+			}
+		});
+	}
 }
 
 #[derive(Clone, thiserror::Error)]
@@ -174,5 +195,11 @@ where
 		.await?
 		.ok_or_else(|| anyhow::anyhow!("Co not found: {}", co))?;
 	reducer.push(&private_identity, core, item).await?;
+	Ok(())
+}
+
+async fn create_co(application: Application, identitiy: Identity, co: CreateCo) -> Result<(), anyhow::Error> {
+	let private_identity = application.private_identity(&identitiy.did).await?;
+	application.create_co(private_identity, co).await?;
 	Ok(())
 }
