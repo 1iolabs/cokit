@@ -37,12 +37,20 @@ impl<S: StoreParams> Block<S> {
 	/// Create a new block by calculating the [`Cid`] from data using the default hasher.
 	/// Note: The default hasher may changes without notice.
 	pub fn new_data(codec: impl Into<u64>, data: Vec<u8>) -> Self {
-		Self::new_data_digest(Code::Blake3_256, codec, data)
+		Self::new_unchecked(Self::cid_data(codec, &data), data)
 	}
 
 	/// Create a new block by calculating the [`Cid`] from data.
 	pub fn new_data_digest(digest: impl MultihashDigest<64>, codec: impl Into<u64>, data: Vec<u8>) -> Self {
-		Self::new_unchecked(Cid::new_v1(codec.into(), digest.digest(&data)), data)
+		Self::new_unchecked(Self::cid_data_digest(digest, codec, &data), data)
+	}
+
+	pub fn cid_data(codec: impl Into<u64>, data: &[u8]) -> Cid {
+		Self::cid_data_digest(Code::Blake3_256, codec, data)
+	}
+
+	pub fn cid_data_digest(digest: impl MultihashDigest<64>, codec: impl Into<u64>, data: &[u8]) -> Cid {
+		Cid::new_v1(codec.into(), digest.digest(&data))
 	}
 
 	/// Returns the cid.
@@ -58,6 +66,17 @@ impl<S: StoreParams> Block<S> {
 	/// Returns the inner cid and data.
 	pub fn into_inner(self) -> (Cid, Vec<u8>) {
 		(self.cid, self.data)
+	}
+
+	/// Block with specific store params.
+	pub fn with_store_params<P>(self) -> Result<Block<P>, BlockError>
+	where
+		P: StoreParams,
+	{
+		if self.data.len() > P::MAX_BLOCK_SIZE {
+			return Err(BlockError::SizeOverflow(self.data.len(), P::MAX_BLOCK_SIZE));
+		}
+		Ok(Block::new_unchecked(self.cid, self.data))
 	}
 }
 impl<S> PartialEq for Block<S> {
@@ -102,6 +121,8 @@ pub enum BlockError {
 	InvalidMultihash(Vec<u8>, Cid),
 	// #[error("Serialize failed: {0:?}: {1}")]
 	// Serialize(MultiCodec, #[source] anyhow::Error),
+	#[error("Max block size overflow ({0} > {1})")]
+	SizeOverflow(usize, usize),
 }
 
 fn verify_cid<M: MultihashDigest<S>, const S: usize>(cid: &Cid, payload: &[u8]) -> Result<(), BlockError> {

@@ -1,11 +1,12 @@
 use super::QueryError;
 use crate::{
 	state::{query_core, Query},
-	CoStorage, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP,
+	CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP,
 };
 use co_core_membership::MembershipState;
 use co_identity::{Identity, LocalIdentity};
 use co_primitives::{CoId, Did, OptionLink, Tags};
+use co_storage::BlockStorage;
 use futures::Stream;
 
 /// Returns memberships contained in the CO (`co_state`)`.
@@ -16,8 +17,8 @@ use futures::Stream;
 /// # Arguments
 /// - `storage` - The BlockStorage.
 /// - `co_state` - Co Core State (`co-core-co`).
-pub fn memberships(
-	storage: CoStorage,
+pub fn memberships<S: BlockStorage + Clone + 'static>(
+	storage: S,
 	co_state: OptionLink<co_core_co::Co>,
 ) -> impl Stream<Item = Result<(CoId, Did, Tags, MembershipState), QueryError>> {
 	async_stream::try_stream! {

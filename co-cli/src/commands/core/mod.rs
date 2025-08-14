@@ -1,7 +1,9 @@
 use crate::{cli::Cli, library::cli_context::CliContext};
 use exitcode::ExitCode;
 
-mod check;
+mod build;
+mod build_builtin;
+mod inspect;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
@@ -12,12 +14,20 @@ pub struct Command {
 
 #[derive(Debug, Clone, clap::Subcommand)]
 pub enum Commands {
-	/// Check COre binary.
-	Check(check::Command),
+	/// Build COre binary.
+	Build(build::Command),
+
+	/// Build built-on COre binaries.
+	BuildBuiltin(build_builtin::Command),
+
+	/// Inspect COre binary.
+	Inspect(inspect::Command),
 }
 
 pub async fn command(context: &CliContext, cli: &Cli, core_command: &Command) -> Result<ExitCode, anyhow::Error> {
 	match &core_command.command {
-		Commands::Check(command) => check::command(context, cli, core_command, command).await,
+		Commands::Build(command) => build::command(context, cli, core_command, command).await,
+		Commands::BuildBuiltin(command) => build_builtin::command(command).await,
+		Commands::Inspect(command) => inspect::command(context, cli, core_command, command).await,
 	}
 }

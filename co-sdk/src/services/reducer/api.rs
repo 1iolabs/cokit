@@ -11,7 +11,7 @@ use cid::Cid;
 use co_actor::{Actor, ActorHandle, TaskSpawner};
 use co_core_co::Co;
 use co_identity::{PrivateIdentity, PrivateIdentityBox};
-use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Link, ReducerAction};
+use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Link, OptionLink, ReducerAction};
 use co_storage::{BlockStorageExt, OverlayBlockStorage, StorageError};
 use futures::Stream;
 use ipld_core::ipld::Ipld;
@@ -150,6 +150,11 @@ impl CoReducer {
 		let storage = self.storage();
 		let co = storage.get_value(&self.reducer_state().await.co()).await?;
 		Ok((storage, co))
+	}
+
+	/// Read co core state link.
+	pub async fn co_state(&self) -> OptionLink<Co> {
+		self.reducer_state().await.co()
 	}
 
 	/// Get current reducer state and heads.

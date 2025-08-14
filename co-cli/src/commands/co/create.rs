@@ -19,11 +19,7 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 	let application = context.application(cli).await;
 
 	// create
-	let create = CreateCo {
-		id: command.co.clone(),
-		algorithm: if command.public { None } else { Some(Default::default()) },
-		name: command.name.as_deref().unwrap_or(command.co.as_str()).to_string(),
-	};
+	let create = CreateCo::new(&command.co, command.name.clone()).with_public(command.public);
 	let reducer = application.create_co(application.local_identity(), create).await?;
 
 	// result

@@ -19,6 +19,7 @@ pub use library::{
 };
 pub use types::{
 	action::ReducerAction,
+	any_block_storage::AnyBlockStorage,
 	block::{Block, BlockError, DefaultParams, StoreParams},
 	block_storage::{BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, StorageError},
 	block_storage_ext::BlockStorageExt,

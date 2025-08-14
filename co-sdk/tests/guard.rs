@@ -14,10 +14,7 @@ async fn test_guard() {
 	// create shared co
 	let shared_co = peer1
 		.application
-		.create_co(
-			identity.clone(),
-			CreateCo { id: "shared".into(), algorithm: Some(Default::default()), name: "shared".to_owned() },
-		)
+		.create_co(identity.clone(), CreateCo::new("shared", None))
 		.await
 		.unwrap();
 

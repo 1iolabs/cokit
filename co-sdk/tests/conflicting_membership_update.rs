@@ -9,7 +9,7 @@ use co_sdk::{
 	CoReducerState, CoStorage, Cores, CreateCo, DidKeyIdentity, DidKeyProvider, Identity, MonotonicCoDate,
 	MonotonicCoUuid, CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
-use co_storage::{Algorithm, TmpDir};
+use co_storage::TmpDir;
 use futures::{join, pin_mut, stream, StreamExt, TryStreamExt};
 use ipld_core::ipld::Ipld;
 use std::{
@@ -93,10 +93,7 @@ async fn conflicting_membership_update(encryption: bool) {
 
 	// create co
 	let co = application
-		.create_co(
-			identity.clone(),
-			CreateCo { algorithm: encryption.then(Algorithm::default), id: "co".into(), name: "co".into() },
-		)
+		.create_co(identity.clone(), CreateCo::new("co", None).with_public(!encryption))
 		.await
 		.unwrap();
 	co.push(

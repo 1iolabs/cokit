@@ -17,16 +17,24 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
+use cid::Cid;
 use co_actor::ActorHandle;
-use co_core_co::{CoAction, CreateAction};
+use co_core_co::{CoAction, Core, CreateAction};
 use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::{IdentityEntryVerifier, Log};
-use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid};
-use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret};
+use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, Tags};
+use co_storage::{
+	unixfs_add, Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret,
+};
+use futures::io::Cursor;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	fmt::Debug,
+	sync::Arc,
+};
 
 /// Shared CO Builder.
 /// The Shared CO state is stored in a membership of an other CO (typically the Local CO).
@@ -270,18 +278,53 @@ impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateCo {
-	pub id: CoId,
-	pub name: String,
-	pub algorithm: Option<Algorithm>,
+	id: CoId,
+	name: String,
+	algorithm: Option<Algorithm>,
+	cores: BTreeMap<String, CoreSource>,
 }
 impl CreateCo {
-	pub fn generate(name: String) -> Self {
-		CreateCo { id: uuid::Uuid::new_v4().to_string().into(), name, algorithm: Some(Default::default()) }
+	pub fn new(id: impl Into<CoId>, name: Option<String>) -> Self {
+		let id = id.into();
+		let name = name.unwrap_or_else(|| id.to_string());
+		CreateCo { id, name, algorithm: Some(Default::default()), cores: Default::default() }
 	}
 
-	pub fn with_public(self) -> Self {
-		CreateCo { algorithm: None, ..self }
+	pub fn generate(name: String) -> Self {
+		CreateCo {
+			id: uuid::Uuid::new_v4().to_string().into(),
+			name,
+			algorithm: Some(Default::default()),
+			cores: Default::default(),
+		}
 	}
+
+	pub fn with_core(mut self, core_name: &str, core_type: &str, core_binary: Cid) -> Self {
+		self.cores
+			.insert(core_name.to_owned(), CoreSource::Reference(tags!("type": core_type), core_binary));
+		self
+	}
+
+	pub fn with_core_bytes(mut self, core_name: &str, core_type: &str, core_binary: impl Into<Vec<u8>>) -> Self {
+		self.cores
+			.insert(core_name.to_owned(), CoreSource::Bytes(tags!("type": core_type), core_binary.into()));
+		self
+	}
+
+	pub fn with_algorithm(mut self, algorithm: Option<Algorithm>) -> Self {
+		self.algorithm = algorithm;
+		self
+	}
+
+	pub fn with_public(self, public: bool) -> Self {
+		self.with_algorithm(if public { None } else { Some(Algorithm::default()) })
+	}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+enum CoreSource {
+	Reference(Tags, Cid),
+	Bytes(Tags, Vec<u8>),
 }
 
 #[derive(Debug)]
@@ -470,13 +513,27 @@ impl SharedCoCreator {
 			.await?;
 
 		// initialize
-		let create = CreateAction::new(
+		let mut create = CreateAction::new(
 			self.co.id.to_owned(),
 			self.co.name.to_owned(),
 			Cores::default().binary(CO_CORE_CO).expect(CO_CORE_CO),
 		)
 		.with_participant(identity.identity().to_owned(), tags!())
 		.with_key(encrypted_storage.as_ref().map(|(_, key_uri, _)| key_uri.clone()));
+		for (core_name, core_source) in self.co.cores {
+			let core = match core_source {
+				CoreSource::Reference(tags, binary) => Core { binary, tags, state: None },
+				CoreSource::Bytes(tags, binary_bytes) => {
+					let mut binary_stream = Cursor::new(&binary_bytes);
+					let binary = unixfs_add(&co_storage, &mut binary_stream)
+						.await?
+						.pop()
+						.ok_or(anyhow!("Add Core binary failed {}", binary_bytes.len()))?;
+					Core { binary, tags, state: None }
+				},
+			};
+			create = create.with_core(core_name, core);
+		}
 		reducer
 			.push(&co_storage, runtime.runtime(), &identity, CO_CORE_NAME_CO, &CoAction::Create(create))
 			.await?;

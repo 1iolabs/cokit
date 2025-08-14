@@ -15,7 +15,8 @@ use co_core_storage::PinStrategy;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
-use co_primitives::{tag, tags, CoId, TagValue, Tags};
+use co_primitives::{tag, tags, CoId, DefaultParams, TagValue, Tags};
+use co_storage::StaticBlockStorage;
 use directories::ProjectDirs;
 use futures::{Stream, StreamExt};
 use std::{collections::BTreeSet, fmt::Debug, future::ready, path::PathBuf, sync::Arc};
@@ -330,6 +331,7 @@ pub struct ApplicationBuilder {
 	settings: Tags,
 	date: Option<DynamicCoDate>,
 	uuid: Option<DynamicCoUuid>,
+	static_blocks: Vec<StaticBlockStorage<'static, DefaultParams>>,
 }
 impl ApplicationBuilder {
 	pub fn default_path() -> PathBuf {
@@ -349,6 +351,7 @@ impl ApplicationBuilder {
 			settings: Default::default(),
 			date: None,
 			uuid: None,
+			static_blocks: Default::default(),
 		}
 	}
 
@@ -360,7 +363,16 @@ impl ApplicationBuilder {
 	pub fn new_memory(identifier: impl Into<String>) -> Self {
 		let identifier = identifier.into();
 		let tracing = TracingBuilder::new(identifier.clone(), None);
-		Self { identifier, path: None, keychain: false, tracing, settings: Default::default(), date: None, uuid: None }
+		Self {
+			identifier,
+			path: None,
+			keychain: false,
+			tracing,
+			settings: Default::default(),
+			date: None,
+			uuid: None,
+			static_blocks: Default::default(),
+		}
 	}
 
 	/// Enable bunyan logging to log_path.
@@ -391,6 +403,11 @@ impl ApplicationBuilder {
 
 	pub fn with_co_uuid(self, uuid: impl CoUuid + 'static) -> Self {
 		Self { uuid: Some(DynamicCoUuid::new(uuid)), ..self }
+	}
+
+	pub fn with_static_blocks(mut self, storage: StaticBlockStorage<'static, DefaultParams>) -> Self {
+		self.static_blocks.push(storage);
+		self
 	}
 
 	/// See: [`ApplicationSettings::settings`]
@@ -434,10 +451,13 @@ impl ApplicationBuilder {
 		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
 
 		// storage
-		let storage = match &self.path {
+		let mut storage = match &self.path {
 			Some(path) => Storage::new(path.join("data"), path.join("tmp/data"), uuid.clone()),
 			None => Storage::new_memory(),
 		};
+		if !self.static_blocks.is_empty() {
+			storage = storage.with_static(self.static_blocks);
+		}
 
 		// settings
 		let settings = ApplicationSettings {
