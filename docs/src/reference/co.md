@@ -1,30 +1,31 @@
 # CO
 A CO is a virtual room for collaboration.
-CO stands for collaborative object and is a fundamentally new concept of distributed collaboration, because a CO is not just another group chat of sorts.
+CO stands for Collaborative Object and is a fundamentally new concept of distributed collaboration, because a CO is not just another group chat of sorts.
 It rather serves a multitude of functionalities in a distributed network while running locally on each participants device.
 
 ## What makes a CO
 A CO is like a bucket or project for digital data, which can be used for collaboration and communication.
-COs can serve for various digital processes without the requirement for expensive setups.
-COs are designed to be lightweight, ad-hoc usable and cheap to create, enabling the use of thousands or even millions of them.
-Each container is unique, much like a receipt, making it ideal for granular, trackable, and disposable data operations at scale.
-Like a database that runs for every participant but locally.
+COs can serve a multitude of digital processes without the requirement for expensive setups.
+They are designed to be lightweight, ad-hoc-usable and cheap to create, enabling the use of thousands or even millions of them.
+
+Each COntainer is unique, much like a receipt, making it ideal for granular, trackable, and disposable data operations at scale.
+Imagine it like a database that runs for every participant but locally.
 
 ## Structure
 
 ### Cores
 Each CO contains at least one [Core](../reference/core.md).
-Cores are the data model of which COs are composed.
+Cores are the data model of which COs are composed and are explained in the following chapter.
 
 ### Participants
-Each CO contains participants.
-They are identified through their DID.
+Each CO can contain participants.
+They are identified through their DID - whether they are humans or machines (like an IoT device).
 It is important to notice that a CO can contain zero participants as well as millions of participants.
 
 ### Network settings
 Each CO may contain networking settings.
-With there settings the connectivity of the CO can be configured.
-As a default [didcontact](../glossary/glossary.md#didcontact) with any of the participants are used.
+With these settings the connectivity of the CO can be configured.
+As a default the [didcontact](../glossary/glossary.md#didcontact) protocol is used with any of the participants.
 
 ### Encryption settings
 Each CO can be encrypted.
@@ -32,7 +33,7 @@ The encryption can be set while creating a CO, making it either unencrypted or s
 Encryption keys are stored in the Local COs Key-Store core.
 The encryption keys can be versioned.
 Once a new version is created that key is used for new data.
-This allows advanced sharing patterns, like, allowing new participants to only see data produced after they joined the CO.
+This allows advanced sharing patterns, like allowing new participants to only see data produced _after_ they joined the CO.
 
 ## Types
 
@@ -70,8 +71,8 @@ All participants with the permissions can do that at a later stage as well.
 Like a public group chat.
 
 ### Personal CO
-Acts like a private CO but usually once accessible by the creator.
+Acts like a private CO but usually only accessible by the creator.
 Stores creators, identities and settings, so those can be synced between devices[^issue-82].
-
+Similar to a wallet.
 
 [^issue-82]: https://gitlab.1io.com/1io/co-sdk/-/issues/82
