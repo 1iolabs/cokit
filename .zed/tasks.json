@@ -2,31 +2,47 @@
 [
   {
     "label": "Npm install tauri",
-    "command": "cd ./tauri-plugin-co-sdk; npm install",
+    "command": "cd $ZED_WORKTREE_ROOT/tauri-plugin-co-sdk; npm install",
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
     "reveal": "always",
-    "reveal_target": "dock"
+    "reveal_target": "dock",
+    "hide": "on_success"
   },
   {
-    "label": "build tauri dist-js",
-    "command": "cd ./tauri-plugin-co-sdk; npm run build",
+    "label": "Build tauri dist-js",
+    "command": "cd $ZED_WORKTREE_ROOT/tauri-plugin-co-sdk; npm run build",
     "hide": "on_success"
   },
   {
     "label": "Npm install messenger",
-    "command": "cd ./tauri-plugin-co-sdk/examples/messenger; npm install",
+    "command": "cd $ZED_WORKTREE_ROOT/tauri-plugin-co-sdk/examples/messenger; npm install",
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
-    "reveal": "always",
-    "reveal_target": "dock"
+    "reveal": "no_focus",
+    "reveal_target": "dock",
+    "hide": "on_success"
   },
   {
     "label": "Start rollup watcher",
-    "command": "cd ./tauri-plugin-co-sdk/examples/messenger; npm run rollup-watch"
+    "command": "cd $ZED_WORKTREE_ROOT/tauri-plugin-co-sdk/examples/messenger; npm run rollup-watch",
+    "use_new_terminal": false,
+    "reveal": "never",
+    "tags": ["watcher"]
   },
   {
     "label": "Start tsc watcher",
-    "command": "cd ./tauri-plugin-co-sdk/examples/messenger; npx tsc -w"
+    "command": "cd $ZED_WORKTREE_ROOT/tauri-plugin-co-sdk/examples/messenger; npx tsc -w",
+    "use_new_terminal": false,
+    "reveal": "never",
+    "tags": ["watcher"]
+  },
+  {
+    "label": "Generate json schemas and ts interfaces",
+    "command": "$ZED_WORKTREE_ROOT/json-schemas/generate-ts.sh",
+    "use_new_terminal": false,
+    "reveal": "always",
+    "hide": "on_success",
+    "tags": ["watcher"]
   }
 ]

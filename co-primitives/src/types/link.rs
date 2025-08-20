@@ -1,5 +1,7 @@
+use crate::CoCid;
 use cid::Cid;
 use either::Either;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{
 	any::type_name,
@@ -98,11 +100,12 @@ impl<T> Display for Link<T> {
 }
 
 /// A (serializable) typed link.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, JsonSchema)]
 #[serde(into = "Option<Cid>", from = "Option<Cid>")]
 pub struct OptionLink<T> {
 	#[serde(skip)]
 	_type: PhantomData<T>,
+	#[schemars(with = "CoCid")]
 	cid: Option<Cid>,
 }
 impl<T> Default for OptionLink<T> {

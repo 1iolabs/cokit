@@ -17,7 +17,7 @@ cd ..
 
 # run co-cli command to generate json schemas for room core, messaging and cores
 echo "Calling co cli schema generate command"
-cargo run --bin co-cli -- --no-keychain schemars generate -m room messaging cores
+cargo run --bin co-cli -- --no-keychain schemars generate -m room messaging cores key
 
 # generate .d.ts files, needs globally installed 'json-schema-to-typescript' npm package
 echo "Calling json2ts command"

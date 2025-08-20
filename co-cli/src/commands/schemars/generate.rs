@@ -1,3 +1,4 @@
+use co_core_keystore::Key;
 use co_core_room::Room;
 use co_messaging::MatrixEvent;
 use co_sdk::Cores;
@@ -9,6 +10,7 @@ use std::{fs::File, io::Write};
 pub enum Module {
 	Messaging,
 	Room,
+	Key,
 	Cores,
 }
 
@@ -50,6 +52,11 @@ pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 				let mut file = File::create(command.output.clone() + "/types/cores.ts")?;
 				file.write_all(ts_enum.as_bytes())?;
 				index_ts = format!("{}export * as Cores from \"./cores.js\"\n", index_ts);
+			},
+			Module::Key => {
+				let schema = schemars::schema_for!(Key);
+				write_schema_file(schema, command.output.clone() + "/schemas/keystore-key.json")?;
+				index_ts = format!("{}export * as Keystore from \"./keystore-key.js\"\n", index_ts);
 			},
 		};
 		let mut file = File::create(command.output.clone() + "/types/index.ts")?;
