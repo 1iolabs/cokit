@@ -15,7 +15,7 @@
 - [Next Steps](./getting-started/next-steps.md)
 
 # Reference
-- [CO-kit](./reference/CO-kit.md)
+- [CO-kit](./reference/co-kit.md)
 - [Architecture](./reference/architecture.md)
 - [CO](./reference/co.md)
 - [Core](./reference/core.md)

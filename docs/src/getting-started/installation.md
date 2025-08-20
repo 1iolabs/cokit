@@ -1,7 +1,8 @@
 # Installation
 To get the fun started, you'll need to install rust and the `co` command.
-In this chapter will briefly guide you through the process step-by-step.
-Starting off with the installation, then we start right into building your first app.
+In this chapter we will briefly guide you through the process step-by-step.
+
+We're starting off with the installation, then we'll delve right into building your first app.
 
 ## Requirements
 - `rust-1.88` or greater.
@@ -18,7 +19,7 @@ We use this to speed-up the installation for the `co` and `dx` (used in the [App
 Head over to https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#installation for further instructions.
 
 ### Runtimes
-Later in this documentation you will hear about [cores](../reference/core.md) which are data models. They will be compiled to [WebAssembly (WASM)](/glossary/glossary.md#WASM). We need the compiler toolchain for it which can be installed with:
+Later in this documentation you will hear about [cores](../reference/core.md) which are data models. They will be compiled to [WebAssembly (WASM)](/glossary/glossary.md#WASM). We need the compiler toolchain for it which can be installed through:
 ```sh
 rustup target add wasm32-unknown-unknown
 ```
@@ -29,7 +30,7 @@ CO-kit ships prebuilt binaries for its `co` CLI using [`cargo-binstall`](https:/
 cargo binstall co-cli
 ```
 
-Or you can build it from source:
+Of course, you can build it from source, too:
 ```sh
 cargo install co-cli
 ```
@@ -42,3 +43,5 @@ For any app you build you need these two major ingredients:
 	- [Core Quick Start](../getting-started/rust-core-quick-start.md)
 2. Setup an Application which uses the core:
 	- [App Quick Start](../getting-started/rust-app-quick-start.md)
+
+We'll take a closer look at these in the following two chapters.

@@ -1,9 +1,10 @@
 # Core Quick Start 
-Let's take a look at how to start things off with with the setup process and then the implementation.
+Let's take a look at how to start things off with with the setup process, followed by the implementation.
+
 In this quick start we implement a basic Todo List data model.
 
 ## Setup
-First we need to setup a new rust crate and add `co-api` dependency:
+First, we need to setup a new rust crate and add `co-api` dependency:
 ```sh
 cargo init --lib ./my-todo-core
 cd ./my-todo-core
@@ -26,7 +27,7 @@ pub struct Todo {
   pub tasks: CoMap<String, TodoTask>,
 }
 ```
-Here we defined a simple Todo task data model:
+Here we define a simple Todo task data model:
 - `TodoTask` → single task (id, title, done flag)
 - `Todo` → state container with a map of tasks
 
@@ -89,7 +90,7 @@ Here we implement how the events are applied to the existing state:
 - Loads state + event → modifies task map → stores updated state
 - Each TodoAction maps directly to a state change
 
-#### 4. For completeness here are the imports:
+#### 4. For completeness, here are the imports:
 ```rust
 use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, Link, OptionLink, ReducerAction};
 ```

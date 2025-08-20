@@ -1,6 +1,6 @@
 # Next Steps
 
-Now that you know the basics of working with CO-kit, we introduce a few more concepts and show you some examples of the cool things you can build with it:
+Now that you know the basics of working with CO-kit, we introduce a few more concepts and show you some examples of the cool things you can build with it.
 
 ## Introducing CO
 A [CO](../reference/co.md) is a virtual room for collaboration.
@@ -37,7 +37,7 @@ TodoAction::TaskDelete { id } => {
 },
 ```
 
-CO-kit then verifies everyone got the same state.
+CO-kit then verifies if everyone got the same state.
 
 ## More examples
 ### Real-time counter
@@ -62,10 +62,10 @@ const Counter = () => {
 	);
 };
 ```
-Here, `count`, `increment`, and `decrement` are defined in the Core. The state updates are CRDT-backed and instantly reflect across all connected users.
+Here, `count`, `increment`, and `decrement` are defined in the Core. The state updates are [CRDT-backed](../glossary/glossary.md##CRDT) and instantly reflect across all connected users.
 
 ### Nested COs
-This example showcases using multiple [COs](../reference/co.md) — such as a project list, where each project has its own [CO](../reference/co.md):
+This example showcases using multiple [COs](../reference/co.md) — e.g. in a project list, where each project has its own [CO](../reference/co.md):
 
 ```js
 import { useCo, useSelector } from "co";
@@ -139,4 +139,4 @@ const ProfileForm = () => {
 The [Core](../reference/core.md) ensures the email format is correct, and optional constraints like uniqueness or required fields can be enforced at runtime through WASM-based validation.
 
 ### Peer-to-Peer Messaging Application
-One obvious, cool thing that you can use CO-kit for is building a messaging application. We have already built a demo for such a use case that you can check out here: https://gitlab.1io.com/1io/co-sdk/-/tree/tauri-messenger-demo/tauri-plugin-co-sdk/examples/messenger
+One obvious, cool thing that you can use CO-kit for is building a messaging application. We have already built a demo for such a use case that you can check out here: [Gitlab](https://gitlab.1io.com/1io/co-sdk/-/tree/tauri-messenger-demo/tauri-plugin-co-sdk/examples/messenger)

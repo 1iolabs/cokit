@@ -1,13 +1,13 @@
 # App Quick Start
-As a very simple UI building tool, we use [dioxus](https://dioxuslabs.com/) for this quick start tutorial.
-We will use TailwindCSS for styling the application.
+As a very simple UI building tool, we use [dioxus](https://dioxuslabs.com/) in this tutorial.
+We also use TailwindCSS for styling the application.
 
 ## Requirements
 - `dioxus-0.6`
 - `npm`
 
 ## Setup
-Here we install dioxus and setup the empty application crate.
+Install dioxus and setup the empty application crate.
 
 ### Setup Dioxus
 Install the precompiled `dx` tool:
@@ -15,10 +15,10 @@ Install the precompiled `dx` tool:
 cargo binstall dioxus-cli
 ```
 
-You can also head over to dioxus for further instructions: https://dioxuslabs.com/learn/0.6/getting_started/#install-the-dioxus-cli.
+You can also head over to [Dioxus]( https://dioxuslabs.com/learn/0.6/getting_started/#install-the-dioxus-cli) for further instructions.
 
 ### Setup NodeJS
-Head over to: https://nodejs.org/en/download
+Head over to [NodeJS](https://nodejs.org/en/download)
 We need it to use TailwindCSS within our app.
 
 ### Application
