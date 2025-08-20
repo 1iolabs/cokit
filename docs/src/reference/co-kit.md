@@ -80,26 +80,26 @@ Ready-to-use CO-kit integrations for different platforms and frameworks.
 
 ### Network and Sync
 
-Necessary components to enable distributed use of COs.
+These are the necessary components to enable distributed use of COs.
 
 - [co-network](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-network): Peer-to-Peer networking implementation.
 - [co-log](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-log): Merkle-CRDT log (event stream) implementation. 
 
 ### Storage and Encryption
 
-Content addressed storage.
+Storage in CO-kit is content-addressed.
 
 - [co-storage](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-storage): BlockStorage implementations. Including filesystem, memory and encryption.
 
 ### Identity
 
-Decentralized identity.
+Identities in CO-kit are fully decentralized.
 
 - [co-identity](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-identity): [DID](../glossary/glossary.md#DID) Integration, didcomm primitives and [DID](../glossary/glossary.md#DID) methods supported by default.
 
 ### Built-in Cores
 
-CO-kit ships with built-in cores that are either used to build CO-kit itself or are useful in general to build applications.
+CO-kit ships with built-in cores that are either used to build/further develop CO-kit itself, or which are useful in general to build applications.
 
 - [cores](https://gitlab.1io.com/1io/co-sdk/-/tree/main/cores): The built-in cores with an description file of the current CIDs.
 
@@ -115,5 +115,5 @@ Packages for internals of CO-kit. These are used by contributors of CO-kit.
 
 ### Documentation
 
-- [docs](https://gitlab.1io.com/1io/co-sdk/-/tree/main/docs): The [mdBook](https://rust-lang.github.io/mdBook/) sources for this documentation.
+- [docs](https://gitlab.1io.com/1io/co-sdk/-/tree/main/docs): We used the [mdBook](https://rust-lang.github.io/mdBook/) sources for this documentation.
 
