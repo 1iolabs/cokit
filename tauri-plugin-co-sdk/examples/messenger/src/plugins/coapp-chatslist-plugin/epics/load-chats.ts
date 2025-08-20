@@ -1,6 +1,6 @@
 import { isPluginInitializeAction } from "@1io/kui-application-sdk";
 import { filter, identity, mergeAll, mergeMap } from "rxjs";
-import { createIdentity, resolveCid, sessionClose, sessionOpen } from "../../../../../../dist-js/index.js";
+import { createIdentity, Keystore, resolveCid, sessionClose, sessionOpen } from "../../../../../../dist-js/index.js";
 import GroupDefaultPic from "../../../assets/Users_48.svg";
 import { splitCoCoreId } from "../../../library/core-id.js";
 import { getCoreState, getFilteredCoreIds } from "../../../library/invoke-get.js";
@@ -11,8 +11,9 @@ import {
   ChatsListSetIdentityAction,
 } from "../actions/index.js";
 import { ChatsListEpicType } from "../types/plugin.js";
+import { DagList } from "../../../library/dag-list.js";
 
-const LOAD_IDENTITY_MAX_TRIES = 10;
+const LOAD_IDENTITY_MAX_TRIES = 2;
 const IDENTITY_NAME = "coapp_messenger";
 
 export const loadChatsEpic: ChatsListEpicType = (action$) =>
@@ -97,10 +98,13 @@ export const loadChatsEpic: ChatsListEpicType = (action$) =>
  */
 async function getCoappMessengerIdentity(sessionId: string): Promise<undefined | string> {
   const keystoreState = await getCoreState("local", "keystore", sessionId);
-  if (keystoreState === undefined || keystoreState === null) {
+  if (keystoreState?.keys === undefined || keystoreState === null) {
     return undefined;
   }
   const keyStoreKeys = await resolveCid(sessionId, keystoreState.keys);
-  const messengerIdentity = keyStoreKeys.l.find((i: any) => i[1].name === IDENTITY_NAME);
+  // TODO use wasm isntead
+  // rust map is lsm tree so this might not always work
+  const dagList = new DagList<[string, { v?: Keystore.Key; t?: undefined }]>(keyStoreKeys.a, sessionId);
+  const messengerIdentity = await dagList.find((i) => i[1].v?.name === IDENTITY_NAME);
   return messengerIdentity?.[0];
 }

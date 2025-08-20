@@ -52,7 +52,7 @@ export async function getActions(
   if (until !== undefined) {
     body = encode({ session, heads, count, until });
   } else {
-    body = encode({ session, heads, count });
+    body = encode({ session, heads, count, until: null });
   }
   const result = await invoke<Uint8Array>("plugin:co-sdk|get_actions", { body });
   return decode(result);

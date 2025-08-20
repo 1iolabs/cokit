@@ -1,4 +1,5 @@
 use co_actor::Actor;
+use co_sdk::to_cbor;
 use commands::{
 	co::create_co,
 	get_actions::get_actions,
@@ -47,7 +48,12 @@ pub async fn init<R: Runtime>(co_settings: CoApplicationSettings) -> TauriPlugin
 					let stream = actor_handle.stream(ApplicationActorMessage::WatchState);
 					pin_mut!(stream);
 					while let Some(Ok(result)) = stream.next().await {
-						app_handle.emit("co-sdk-new-state", result).ok();
+						match to_cbor(&result) {
+							Ok(cbor) => {
+								app_handle.emit("co-sdk-new-state", cbor).ok();
+							},
+							Err(err) => tracing::error!(?err, "Couldn't serialize to cbor:"),
+						}
 					}
 				}
 			});

@@ -1,8 +1,8 @@
 import { Event, listen } from "@tauri-apps/api/event";
 import { CID } from "multiformats";
 import { fromEventPattern, Observable } from "rxjs";
-
-export type CoSdkStateEvent = Event<[string, CID | undefined, CID[]]>;
+import { decode } from "@ipld/dag-cbor";
+export type CoSdkStateEvent = [string, CID | undefined, CID[]];
 
 /**
  * Starts listening to the "co-sdk-new-state" event channel and emits all events that are
@@ -12,7 +12,12 @@ export function createCoSdkStateEventListener(): Observable<CoSdkStateEvent> {
   const retObservable = fromEventPattern<CoSdkStateEvent>(
     async (handler) => {
       // start listening to state changes from co sdk
-      return await listen<CoSdkStateEvent>("co-sdk-new-state", handler);
+      const decodeAndCall = (event: Event<number[]>) => {
+        console.log("event", event.payload);
+        const data: [string, CID | undefined, CID[]] = decode(Uint8Array.from(event.payload));
+        handler(data);
+      };
+      return await listen("co-sdk-new-state", decodeAndCall);
     },
     async (_handler, unlistenPromise) => {
       // stop listening

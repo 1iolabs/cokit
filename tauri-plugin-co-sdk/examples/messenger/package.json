@@ -90,7 +90,7 @@
     "@1io/packaging-utils": "^0.1.4",
     "@1io/redux-utils": "^0.9.3",
     "@babel/core": "^7.24.7",
-    "@ipld/dag-cbor": "^9.2.0",
+    "@ipld/dag-cbor": "9.2.0",
     "@tauri-apps/api": "^2.4.0",
     "@tauri-apps/plugin-dialog": "^2.2.1",
     "@tauri-apps/plugin-fs": "^2.3.0",
@@ -128,7 +128,7 @@
     "internal-ip": "^7.0.0",
     "servor": "^4.0.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.2"
   },
   "engines": {
     "npm": "^8.0.0"

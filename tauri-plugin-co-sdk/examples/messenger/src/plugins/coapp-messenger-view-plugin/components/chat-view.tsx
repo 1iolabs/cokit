@@ -12,7 +12,6 @@ import {
   resolveCid,
   sessionClose,
   sessionOpen,
-  storageSet,
 } from "../../../../../../dist-js/index.js";
 import DefaultProfilePic from "../../../assets/Users_24.svg";
 import { createCoSdkStateEventListener } from "../../../library/co-sdk-state-listener.js";
@@ -44,7 +43,7 @@ function useCoState(co: string): [CID | undefined, CID[] | undefined] {
     // get updated state when new event is triggered
     const coSdkEventSubscription = createCoSdkStateEventListener().subscribe({
       next: (event) => {
-        const [coId, state, heads] = event.payload;
+        const [coId, state, heads] = event;
         if (co === coId) {
           setCoState([state, heads]);
         }
@@ -66,15 +65,11 @@ function useCoreState(coCid: CID | undefined, coreId: string, session: string | 
     async function resolveCoreState() {
       if (session !== undefined && coCid !== undefined) {
         const resolvedCoState = await resolveCid(session, coCid);
-        const coreCid = resolvedCoState?.cores?.[coreId]?.state;
+        const coreCid = resolvedCoState?.c?.[coreId]?.state;
         if (coreCid !== undefined) {
           const state = await resolveCid(session, coreCid);
           setCoreState(state);
         }
-
-        const randomData = Uint8Array.from([5]);
-        const response = await storageSet(session, randomData);
-        console.log("cid dunno kp", response);
       }
     }
     resolveCoreState();
@@ -94,7 +89,6 @@ function useSession(co: string): string | undefined {
       },
       async (_, sessionPromise) => {
         const s = await sessionPromise;
-        console.log("unsub sesh", s);
         await sessionClose(s);
       },
     ).subscribe({
@@ -172,7 +166,7 @@ function useIpld<T>(
     return () => {
       canceled = true;
     };
-  }, [cids, sessionId]);
+  }, [cids.length, sessionId]);
   return ipldMap;
 }
 
@@ -188,13 +182,11 @@ export function MessengerViewContainer(props: MessengerViewContainerProps) {
 
   // get co state
   const [coStateCid, coHeads] = useCoState(coId);
-  console.log("co state cid", coStateCid);
 
   const session = useSession(coId);
 
   // get room core state
   const roomCoreState = useCoreState(coStateCid, coreId, session);
-  console.log("core state", roomCoreState);
 
   // how many actions should be loaded
   const [actionCount, setActionCount] = React.useState(0);

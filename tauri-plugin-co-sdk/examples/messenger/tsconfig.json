@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
-    "module": "Node16",
+    "module": "ESNext",
     "target": "es6",
     "lib": ["es6", "dom", "dom.iterable"],
     "declaration": true,
     "sourceMap": true,
     "jsx": "react",
-    "moduleResolution": "nodenext",
+    "moduleResolution": "bundler",
     "outDir": "",
     "rootDir": ".",
     "allowJs": false,
@@ -20,5 +20,6 @@
     "noUncheckedIndexedAccess": true,
     "strictNullChecks": true
   },
+  "include": ["src"],
   "exclude": ["src-tauri", "**/**.d.ts"]
 }

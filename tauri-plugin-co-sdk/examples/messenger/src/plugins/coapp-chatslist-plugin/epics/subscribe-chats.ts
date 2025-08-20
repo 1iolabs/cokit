@@ -16,9 +16,9 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
       return createCoSdkStateEventListener().pipe(
         withLatestFrom(state$),
         mergeMap(async ([event, state]) => {
-          const [coId, _, heads] = event.payload;
+          const [coId, _, heads] = event;
           // if (coId === "local") { return EMPTY }
-          console.log(coId);
+          console.log(coId, heads);
           const sessionId = await sessionOpen(coId);
           const log = (await getActions(sessionId, heads, 1, undefined)).actions;
           const actions: Action[] = [];

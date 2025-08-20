@@ -26,7 +26,7 @@ export async function getCoHeads(sessionId: string, co: string): Promise<any[]> 
 export async function getCoreState(co: string, core: string, externalSessionId?: string): Promise<any> {
   const sessionId = externalSessionId ?? (await sessionOpen(co));
   const state = await getResolvedCoState(co, sessionId);
-  const coreCid = state?.cores?.[core]?.state;
+  const coreCid = state?.c?.[core]?.state;
   if (coreCid) {
     return await resolveCid(sessionId, coreCid);
   }
@@ -76,7 +76,7 @@ export async function getFilteredCoreIds(tags: string[], co?: string): Promise<s
   for (const coId of coIds) {
     const sessionId = await sessionOpen(coId);
     const state = await getResolvedCoState(coId, sessionId);
-    for (const [key, value] of Object.entries(state.cores)) {
+    for (const [key, value] of Object.entries(state.c)) {
       // TODO remove any cast when js interfaces are done
       const v = value as any;
       if (v?.tags) {
