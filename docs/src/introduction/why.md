@@ -49,6 +49,6 @@ Big tech owns your online life. We've traded privacy for convenience, entrustin
 We eliminate intermediaries. You individually decide with whom you want to share your data and under what conditions. CO lives on your local device and is directly synced only with your peers over the network. All apps are built on this fundamental concept.
 
 ### Take back what's yours
-Local-first, always in sync via peer-to-peer and fully open source. Start developing decentralized apps with Data, Identity, AI and Payments on CO-kit – No servers required.
+Local-first, always in sync via peer-to-peer and fully open source. Start developing decentralized apps with Data, Identity, AI and Payments all worked out for you on CO-kit – No servers required.
 
 

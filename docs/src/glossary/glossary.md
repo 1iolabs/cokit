@@ -194,6 +194,10 @@ A [Peer](https://docs.libp2p.io/concepts/fundamentals/peers/) Identity (often wr
 
 In CO-kit, each `CO` or node may generate or be assigned a Peer ID, which then acts as a verifiable handle across the decentralised syncing and networking layers.
 
+## Proof‑of‑Authority (PoA) Consensus Mechanism
+
+**Proof‑of‑Authority (PoA)** is a reputation-based consensus mechanism where only a small, pre-approved set of trusted validators—known entities with verifiable identities—are empowered to produce and validate transactions. 
+
 ## Storage
 #todo
 
