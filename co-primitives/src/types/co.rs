@@ -29,6 +29,11 @@ impl From<&String> for CoId {
 		Self(value.to_owned())
 	}
 }
+impl From<&CoId> for CoId {
+	fn from(value: &CoId) -> Self {
+		value.to_owned()
+	}
+}
 impl From<CoId> for String {
 	fn from(val: CoId) -> Self {
 		val.0

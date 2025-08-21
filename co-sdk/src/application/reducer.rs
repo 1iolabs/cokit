@@ -247,6 +247,16 @@ where
 
 	/// Clear all state but latest.
 	pub fn clear(&mut self) {
+		self.clear_snapshots();
+	}
+
+	/// Iterator over avilable snapshots.
+	pub fn snapshots_iter(&self) -> impl Iterator<Item = (&Cid, &BTreeSet<Cid>)> {
+		self.snapshots.iter().map(|(heads, state)| (state, heads))
+	}
+
+	/// Clear all state but latest.
+	pub fn clear_snapshots(&mut self) {
 		self.snapshots.clear();
 	}
 

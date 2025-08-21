@@ -338,7 +338,7 @@ mod tests {
 			.build()
 			.await
 			.expect("app built");
-		app.create_co(app.local_identity(), CreateCo { id: co.clone(), name: co.clone().into(), algorithm: None })
+		app.create_co(app.local_identity(), CreateCo::new(co.clone(), Some(co.clone().into())).with_public(true))
 			.await
 			.expect("co created");
 		let reducer = app.co().co_reducer(&co.clone()).await.expect("reducer").unwrap();

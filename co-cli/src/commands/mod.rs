@@ -1,6 +1,5 @@
 pub mod co;
 pub mod core;
-pub mod core_build_builtin;
 pub mod did;
 pub mod file;
 pub mod ipld;

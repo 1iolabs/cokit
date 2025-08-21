@@ -124,6 +124,36 @@ impl CoContext {
 		});
 		rx.await.ok()
 	}
+
+	/// Execute future task using CO Application and return its result when done.
+	pub async fn try_with_application<F, Fut, T, E>(&self, f: F) -> Result<T, CoContextError<E>>
+	where
+		Fut: Future<Output = Result<T, E>> + Send + 'static,
+		F: FnOnce(Application) -> Fut + Send + 'static,
+		T: Send + 'static,
+		E: Send + 'static,
+	{
+		let (tx, rx) = futures::channel::oneshot::channel();
+		self.execute_future_box(move |application| {
+			Box::pin(async move {
+				let result = f(application).await;
+				tx.send(result).ok();
+			})
+		});
+		Ok(rx
+			.await
+			.map_err(|_err| CoContextError::Shutdown)?
+			.map_err(|err| CoContextError::Execute(err))?)
+	}
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CoContextError<E> {
+	#[error("Execute error")]
+	Execute(E),
+
+	#[error("Application has shutdown")]
+	Shutdown,
 }
 
 type TaskFn = dyn (FnOnce(Application) -> BoxFuture<'static, ()>) + Send + 'static;

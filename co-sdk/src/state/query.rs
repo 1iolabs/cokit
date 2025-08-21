@@ -104,6 +104,15 @@ pub trait QueryExt: Query {
 	{
 		CoMapGetQuery::new(self, key)
 	}
+
+	/// Query default.
+	fn with_default<T>(self) -> DefaultQuery<Self, T>
+	where
+		Self: Sized + Query<Output = Option<T>>,
+		T: Default + DeserializeOwned + Send + Sync + 'static,
+	{
+		DefaultQuery::new(self)
+	}
 }
 impl<T> QueryExt for T where T: Query {}
 
@@ -327,6 +336,31 @@ where
 	async fn execute(&mut self, storage: &Self::Storage, source: Self::Input) -> Result<Self::Output, QueryError> {
 		let link = self.query.execute(storage, source).await?;
 		Ok((link, storage.get_value_or_none(&link).await?))
+	}
+}
+
+/// Use default if value is None.
+pub struct DefaultQuery<Q, T> {
+	query: Q,
+	_t: PhantomData<T>,
+}
+impl<Q, T> DefaultQuery<Q, T> {
+	pub fn new(query: Q) -> Self {
+		Self { query, _t: PhantomData }
+	}
+}
+#[async_trait]
+impl<Q, T> Query for DefaultQuery<Q, T>
+where
+	Q: Query<Output = Option<T>>,
+	T: Default + DeserializeOwned + Send + Sync + 'static,
+{
+	type Storage = Q::Storage;
+	type Input = Q::Input;
+	type Output = T;
+
+	async fn execute(&mut self, storage: &Self::Storage, source: Self::Input) -> Result<Self::Output, QueryError> {
+		Ok(self.query.execute(storage, source).await?.unwrap_or_default())
 	}
 }
 

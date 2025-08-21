@@ -31,7 +31,7 @@ pub fn membership_update(
 		async move {
 			if let Some((parent_storage, id, co_state)) = result {
 				let control = context.inner.reducers_control();
-				if let Some(reducer) = control.reducer_opt(id).await {
+				if let Some(reducer) = control.reducer_opt(id, true).await {
 					let reducer_state = CoReducerState::from_co_state(&parent_storage, &co_state).await?;
 					let next_reducer_state = reducer_state.to_internal(&parent_storage).await;
 					let current_reducer_state = reducer.reducer_state().await;

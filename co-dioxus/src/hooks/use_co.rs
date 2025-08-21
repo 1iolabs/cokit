@@ -1,15 +1,10 @@
 use crate::{use_co_context, use_co_storage, CoBlockStorage, CoContext};
-use co_sdk::{state::Identity, Application, CoId, CoReducerFactory, CoReducerState};
+use anyhow::anyhow;
+use co_sdk::{state::Identity, Application, CoId, CoReducerFactory, CoReducerState, CreateCo, CO_ID_LOCAL};
 use dioxus::prelude::*;
 use futures::{future::Either, pin_mut, StreamExt};
 use serde::Serialize;
-use std::{
-	fmt::Debug,
-	future::{ready, Future},
-	rc::Rc,
-	sync::Arc,
-};
-use tokio_util::sync::{CancellationToken, DropGuard};
+use std::{fmt::Debug, future::Future, sync::Arc};
 
 pub fn use_co(co: ReadOnlySignal<CoId>) -> Co {
 	// TODO: port storage
@@ -19,8 +14,7 @@ pub fn use_co(co: ReadOnlySignal<CoId>) -> Co {
 	let context = use_co_context();
 	use_hook(move || {
 		let co_id = co();
-		let cancel = CancellationToken::new();
-		let task = cancel.clone().drop_guard();
+		let (tx, rx) = tokio::sync::watch::channel(None);
 		context.execute_future_parallel({
 			let co_id = co_id.clone();
 			move |application| async move {
@@ -28,6 +22,7 @@ pub fn use_co(co: ReadOnlySignal<CoId>) -> Co {
 					Ok(reducer) => reducer,
 					Err(err) => {
 						reducer_state.set(Some(Err(anyhow::Error::from(err).into())));
+						tx.send(reducer_state.cloned()).ok();
 						return;
 					},
 				};
@@ -37,8 +32,9 @@ pub fn use_co(co: ReadOnlySignal<CoId>) -> Co {
 					tokio::select! {
 						Some(next_state) = reducer_states.next() => {
 							reducer_state.set(Some(Ok(next_state)));
+							tx.send(reducer_state.cloned()).ok();
 						},
-						_ = cancel.cancelled() => {
+						_ = tx.closed() => {
 							break;
 						},
 						else => {
@@ -48,29 +44,53 @@ pub fn use_co(co: ReadOnlySignal<CoId>) -> Co {
 				}
 			}
 		});
-		Co { co_id, last_error, context, _task: Rc::new(task), reducer_state, storage }
+		Co { co_id, last_error, context, reducer_state, reducer_state_watch: rx, storage }
 	})
 }
 
 pub fn use_selector<F, Fut, T>(co: &Co, f: F) -> Result<T, RenderError>
 where
-	F: Fn(CoBlockStorage, CoReducerState) -> Fut + 'static,
+	F: Fn(CoBlockStorage, CoReducerState) -> Fut + Clone + 'static,
 	Fut: Future<Output = Result<T, anyhow::Error>> + 'static,
 	T: Clone + 'static,
 {
-	let co = co.clone();
-	let result = use_resource(move || {
-		let fut = match co.try_reducer_state() {
-			Ok(reducer_state) => {
-				let fut = f(co.storage.clone(), reducer_state);
-				Either::Left(async move { Ok(fut.await.map_err(CoError::from)?) })
-			},
-			Err(err) => Either::Right(ready(Err(err))),
-		};
-		async move { fut.await }
+	let result = use_resource({
+		let co = co.clone();
+		move || {
+			let storage = co.storage.clone();
+			let reducer_state = match co.reducer_state.cloned() {
+				Some(reducer_state) => Either::Left(reducer_state),
+				None => Either::Right(co.reducer_state_watch.clone()),
+			};
+			let f = f.clone();
+			async move {
+				let reducer_state = match reducer_state {
+					Either::Left(reducer_state) => reducer_state?,
+					Either::Right(reducer_state_watch) => lastest_reducer_state(reducer_state_watch).await?,
+				};
+				Result::<T, CoError>::Ok(f(storage, reducer_state).await?)
+			}
+		}
 	})
 	.suspend()?;
-	result.cloned()
+	Ok(result.cloned()?)
+}
+
+async fn lastest_reducer_state(
+	mut reducer_state: tokio::sync::watch::Receiver<Option<Result<CoReducerState, CoError>>>,
+) -> Result<CoReducerState, CoError> {
+	loop {
+		// done?
+		match &*reducer_state.borrow_and_update() {
+			Some(result) => {
+				return result.clone();
+			},
+			None => {},
+		}
+
+		// wait for next change
+		reducer_state.changed().await.map_err(anyhow::Error::from)?;
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -78,9 +98,9 @@ pub struct Co {
 	co_id: CoId,
 	context: CoContext,
 	reducer_state: SyncSignal<Option<Result<CoReducerState, CoError>>>,
+	reducer_state_watch: tokio::sync::watch::Receiver<Option<Result<CoReducerState, CoError>>>,
 	last_error: SyncSignal<Result<(), CoError>>,
 	storage: CoBlockStorage,
-	_task: Rc<DropGuard>,
 }
 impl Co {
 	pub fn co(&self) -> CoId {
@@ -91,11 +111,11 @@ impl Co {
 		self.storage.clone()
 	}
 
-	pub fn try_reducer_state(&self) -> Result<CoReducerState, RenderError> {
+	pub fn reducer_state(&self) -> Option<Result<CoReducerState, RenderError>> {
 		match self.reducer_state.cloned() {
-			None => Err(RenderError::default()),
-			Some(Ok(reducer_state)) => Ok(reducer_state),
-			Some(Err(err)) => Err(err.into()),
+			None => None,
+			Some(Ok(reducer_state)) => Some(Ok(reducer_state)),
+			Some(Err(err)) => Some(Err(err.into())),
 		}
 	}
 
@@ -116,6 +136,26 @@ impl Co {
 		let mut last_error = self.last_error;
 		self.context.execute_future(move |application| async move {
 			match dispatch(application, identity, &co, &core, &action).await {
+				Ok(()) => {},
+				Err(err) => {
+					last_error.set(Err(err.into()));
+				},
+			}
+		});
+	}
+
+	pub fn create_co(&self, identity: Identity, co: CreateCo) {
+		let mut last_error = self.last_error;
+
+		// check
+		if self.co_id.as_str() != CO_ID_LOCAL {
+			last_error.set(Err(anyhow!("Create COs only support for local").into()));
+			return;
+		}
+
+		// create
+		self.context.execute_future(move |application| async move {
+			match create_co(application, identity, co).await {
 				Ok(()) => {},
 				Err(err) => {
 					last_error.set(Err(err.into()));
@@ -155,5 +195,11 @@ where
 		.await?
 		.ok_or_else(|| anyhow::anyhow!("Co not found: {}", co))?;
 	reducer.push(&private_identity, core, item).await?;
+	Ok(())
+}
+
+async fn create_co(application: Application, identitiy: Identity, co: CreateCo) -> Result<(), anyhow::Error> {
+	let private_identity = application.private_identity(&identitiy.did).await?;
+	application.create_co(private_identity, co).await?;
 	Ok(())
 }

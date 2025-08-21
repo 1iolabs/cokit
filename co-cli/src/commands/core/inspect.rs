@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
-	/// The WASM binary to check.
+	/// The WASM binary to inspect.
 	pub wasm_path: PathBuf,
 }
 

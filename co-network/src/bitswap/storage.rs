@@ -292,7 +292,7 @@ where
 /// Try to get block using specified peers.
 /// Canceled when the result receiver is dropped.
 #[derive(Debug)]
-struct GetNetworkTask {
+pub struct GetNetworkTask {
 	cid: Cid,
 	tokens: Vec<Token>,
 	state: GetNetworkTaskState,

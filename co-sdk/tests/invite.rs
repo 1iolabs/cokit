@@ -1,7 +1,6 @@
 use co_core_co::CoAction;
 use co_core_membership::{MembershipState, MembershipsAction};
 use co_sdk::{update_co, Action, CoId, CreateCo, Did, Identity, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL};
-use co_storage::Algorithm;
 use futures::{join, Stream, StreamExt};
 use helper::instance::Instances;
 use std::{collections::BTreeSet, future::ready, time::Duration};
@@ -36,7 +35,7 @@ async fn test_invite() {
 	let shared_co = async {
 		peer1
 			.application
-			.create_co(identity1.clone(), CreateCo { id: "shared".into(), algorithm: None, name: "shared".to_owned() })
+			.create_co(identity1.clone(), CreateCo::new("shared", None).with_public(true))
 			.await
 			.unwrap()
 	}
@@ -166,10 +165,7 @@ async fn test_invite_encrypted() {
 	let shared_co = async {
 		peer1
 			.application
-			.create_co(
-				identity1.clone(),
-				CreateCo { id: "shared".into(), algorithm: Some(Algorithm::default()), name: "shared".to_owned() },
-			)
+			.create_co(identity1.clone(), CreateCo::new("shared", None))
 			.await
 			.unwrap()
 	}

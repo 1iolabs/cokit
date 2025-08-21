@@ -5,7 +5,6 @@ use co_sdk::{
 	update_co, Action, CoId, CoReducer, CoReducerFactory, CreateCo, Did, DidKeyIdentity, Identity, PrivateIdentity,
 	PrivateIdentityBox, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
-use co_storage::Algorithm;
 use futures::{join, Stream, StreamExt};
 use std::{collections::BTreeSet, time::Duration};
 use tokio::time::timeout;
@@ -41,10 +40,7 @@ impl SharedCo {
 		let shared_co = async {
 			peer1
 				.application
-				.create_co(
-					identity1.clone(),
-					CreateCo { id: id.into(), algorithm: Some(Algorithm::default()), name: id.to_owned() },
-				)
+				.create_co(identity1.clone(), CreateCo::new(id, None))
 				.await
 				.unwrap()
 		}

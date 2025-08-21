@@ -2,6 +2,7 @@
 //! This usually only involves the storage (BlockStorage) and content addresses (CID).
 
 pub mod board;
+mod co;
 mod dag;
 mod identities;
 mod memberships;
@@ -9,6 +10,10 @@ mod networks;
 mod participants;
 mod query;
 
+pub use co::{
+	core::{core, core_or_default},
+	info::{co, co_info},
+};
 pub use dag::{find::find, into_collection::into_collection, is_empty::is_empty, stream::stream};
 pub use identities::{identities, is_identity, Identity};
 pub use memberships::memberships;

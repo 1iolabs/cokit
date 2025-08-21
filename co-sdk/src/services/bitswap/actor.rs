@@ -10,6 +10,7 @@ use co_primitives::{Block, BlockLinks, CoId, DefaultParams, KnownMultiCodec, Mul
 use co_storage::{BlockStorage, StorageError};
 use libp2p::PeerId;
 
+/// Bitswap service that responds to bitswap protocol requests.
 pub struct Bitswap {
 	context: CoContext,
 }

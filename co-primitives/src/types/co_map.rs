@@ -3,9 +3,12 @@ use crate::{
 	library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError, Streamable,
 };
 use async_trait::async_trait;
-use futures::{stream::BoxStream, Stream, StreamExt};
+use futures::{pin_mut, stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{future::Future, hash::Hash};
+use std::{
+	future::{ready, Future},
+	hash::Hash,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(transparent)]
@@ -42,7 +45,7 @@ where
 		self.open(storage).await?.get(key).await
 	}
 
-	pub async fn contains_key<S>(&self, storage: &S, key: &K) -> Result<bool, StorageError>
+	pub async fn contains<S>(&self, storage: &S, key: &K) -> Result<bool, StorageError>
 	where
 		S: BlockStorage + Clone + 'static,
 	{
@@ -67,7 +70,7 @@ where
 	where
 		S: BlockStorage + Clone + 'static,
 	{
-		self.update(storage, |mut transaction| async move {
+		self.with_transaction(storage, |mut transaction| async move {
 			transaction.insert(key, value).await?;
 			Ok(transaction)
 		})
@@ -85,25 +88,66 @@ where
 	}
 
 	/// Update (or insert default) value.
-	pub async fn update_key<S, F, Fut>(&mut self, storage: &S, key: K, update: F) -> Result<(), StorageError>
+	pub async fn update_or_insert<S, F>(&mut self, storage: &S, key: K, update: F) -> Result<(), StorageError>
+	where
+		V: Default,
+		F: FnOnce(&mut V) -> () + Send,
+		S: BlockStorage + Clone + 'static,
+	{
+		self.with_transaction(storage, |mut transaction| async move {
+			transaction.update_or_insert(key, update).await?;
+			Ok(transaction)
+		})
+		.await
+	}
+
+	/// Update (or insert default) value.
+	pub async fn try_update_or_insert_async<S, F, Fut>(
+		&mut self,
+		storage: &S,
+		key: K,
+		update: F,
+	) -> Result<(), StorageError>
 	where
 		V: Default,
 		F: FnOnce(V) -> Fut + Send,
 		Fut: Future<Output = Result<V, StorageError>> + Send,
 		S: BlockStorage + Clone + 'static,
 	{
-		self.update(storage, |mut transaction| async move {
-			transaction.update_key(key, update).await?;
+		self.with_transaction(storage, |mut transaction| async move {
+			transaction.try_update_or_insert_async(key, update).await?;
 			Ok(transaction)
 		})
 		.await
 	}
-}
-impl<K, V> CoMap<K, V>
-where
-	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-{
+
+	/// Update value ignore if key not exists.
+	pub async fn update<S, F>(&mut self, storage: &S, key: K, update: F) -> Result<(), StorageError>
+	where
+		F: FnOnce(&mut V) -> () + Send,
+		S: BlockStorage + Clone + 'static,
+	{
+		self.with_transaction(storage, |mut transaction| async move {
+			transaction.update(key, update).await?;
+			Ok(transaction)
+		})
+		.await
+	}
+
+	/// Update (or insert default) value.
+	pub async fn try_update_async<S, F, Fut>(&mut self, storage: &S, key: K, update: F) -> Result<(), StorageError>
+	where
+		F: FnOnce(V) -> Fut + Send,
+		Fut: Future<Output = Result<V, StorageError>> + Send,
+		S: BlockStorage + Clone + 'static,
+	{
+		self.with_transaction(storage, |mut transaction| async move {
+			transaction.try_update_async(key, update).await?;
+			Ok(transaction)
+		})
+		.await
+	}
+
 	pub async fn open_mut<'m, S>(&'m mut self, storage: &S) -> Result<CoMapMutTransaction<'m, S, K, V>, StorageError>
 	where
 		S: BlockStorage + Clone + 'static,
@@ -139,8 +183,8 @@ where
 		Ok(())
 	}
 
-	/// Open transaction and apply `update` and store it.
-	pub async fn update<S, F, Fut>(&mut self, storage: &S, update: F) -> Result<(), StorageError>
+	/// Open transaction, apply `update` and store it.
+	pub async fn with_transaction<S, F, Fut>(&mut self, storage: &S, update: F) -> Result<(), StorageError>
 	where
 		S: BlockStorage + Clone + 'static,
 		F: FnOnce(CoMapTransaction<S, K, V>) -> Fut + Send,
@@ -243,13 +287,13 @@ where
 	}
 
 	/// Update (or insert default) value.
-	pub async fn update<F, Fut>(&mut self, key: K, update: F) -> Result<(), StorageError>
+	pub async fn try_update_or_insert_async<F, Fut>(&mut self, key: K, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
 		F: FnOnce(V) -> Fut + Send,
 		Fut: Future<Output = Result<V, StorageError>> + Send,
 	{
-		self.transaction.update_key(key, update).await
+		self.transaction.try_update_or_insert_async(key, update).await
 	}
 
 	/// Store as new CoMap
@@ -258,6 +302,7 @@ where
 	}
 }
 
+#[derive(Clone)]
 pub struct CoMapTransaction<S, K, V>
 where
 	S: BlockStorage + Clone + 'static,
@@ -280,8 +325,16 @@ where
 		self.tree.contains_key(key).await
 	}
 
-	pub fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + '_ {
+	pub fn stream(&self) -> impl Stream<Item = Result<(K, V), StorageError>> + use<S, K, V> {
 		self.tree.stream()
+	}
+
+	pub fn stream_filter<F: FnMut(&V) -> bool>(
+		&self,
+		mut predicate: F,
+	) -> impl Stream<Item = Result<K, StorageError>> + use<S, K, V, F> {
+		self.stream()
+			.try_filter_map(move |(key, value)| ready(Ok(if predicate(&value) { Some(key) } else { None })))
 	}
 
 	pub async fn insert(&mut self, key: K, value: V) -> Result<(), StorageError> {
@@ -298,7 +351,19 @@ where
 	}
 
 	/// Update (or insert default) value.
-	pub async fn update_key<F, Fut>(&mut self, key: K, update: F) -> Result<(), StorageError>
+	pub async fn update_or_insert<F>(&mut self, key: K, update: F) -> Result<(), StorageError>
+	where
+		V: Default,
+		F: FnOnce(&mut V) -> () + Send,
+	{
+		let mut item = self.get(&key).await?.unwrap_or_default();
+		update(&mut item);
+		self.insert(key, item).await?;
+		Ok(())
+	}
+
+	/// Update (or insert default) value.
+	pub async fn try_update_or_insert_async<F, Fut>(&mut self, key: K, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
 		F: FnOnce(V) -> Fut + Send,
@@ -307,6 +372,57 @@ where
 		let item = self.get(&key).await?.unwrap_or_default();
 		let next_item = update(item).await?;
 		self.insert(key, next_item).await?;
+		Ok(())
+	}
+
+	/// Update value, ignore if key not exists.
+	pub async fn update<F>(&mut self, key: K, update: F) -> Result<(), StorageError>
+	where
+		F: FnOnce(&mut V) -> () + Send,
+	{
+		if let Some(mut item) = self.get(&key).await? {
+			update(&mut item);
+			self.insert(key, item).await?;
+		}
+		Ok(())
+	}
+
+	/// Update value, ignore if key not exists.
+	pub async fn try_update_async<F, Fut>(&mut self, key: K, update: F) -> Result<(), StorageError>
+	where
+		F: FnOnce(V) -> Fut + Send,
+		Fut: Future<Output = Result<V, StorageError>> + Send,
+	{
+		if let Some(item) = self.get(&key).await? {
+			let next_item = update(item).await?;
+			self.insert(key, next_item).await?;
+		}
+		Ok(())
+	}
+
+	pub async fn update_stream(
+		&mut self,
+		keys_to_update: impl Stream<Item = Result<K, StorageError>>,
+		mut update: impl FnMut(&K, &mut V) -> () + Send,
+	) -> Result<(), StorageError> {
+		pin_mut!(keys_to_update);
+		while let Some(key) = keys_to_update.try_next().await? {
+			if let Some(mut value) = self.get(&key).await? {
+				(update)(&key, &mut value);
+				self.insert(key, value).await?;
+			}
+		}
+		Ok(())
+	}
+
+	pub async fn remove_stream(
+		&mut self,
+		keys_to_remove: impl Stream<Item = Result<K, StorageError>>,
+	) -> Result<(), StorageError> {
+		pin_mut!(keys_to_remove);
+		while let Some(key) = keys_to_remove.try_next().await? {
+			self.remove(key).await?;
+		}
 		Ok(())
 	}
 

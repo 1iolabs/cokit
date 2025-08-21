@@ -76,11 +76,7 @@ where
 		}
 		Ok(result)
 	}
-}
-impl<K> CoSet<K>
-where
-	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-{
+
 	pub async fn open<S>(&self, storage: &S) -> Result<CoSetTransaction<S, K>, StorageError>
 	where
 		S: BlockStorage + Clone + 'static,
@@ -109,8 +105,8 @@ where
 		Ok(())
 	}
 
-	/// Open transaction and apply `update` and store it.
-	pub async fn update<S, F, Fut>(&mut self, storage: &S, update: F) -> Result<(), StorageError>
+	/// Open transaction, apply `update` and store it.
+	pub async fn with_transaction<S, F, Fut>(&mut self, storage: &S, update: F) -> Result<(), StorageError>
 	where
 		S: BlockStorage + Clone + 'static,
 		F: FnOnce(CoSetTransaction<S, K>) -> Fut + Send,
@@ -163,6 +159,7 @@ where
 	}
 }
 
+#[derive(Clone)]
 pub struct CoSetTransaction<S, K>
 where
 	S: BlockStorage + Clone + 'static,
