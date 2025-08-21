@@ -306,11 +306,7 @@ impl Actor for ApplicationActor {
 					.map_err(|err| ActorError::Actor(err.into()))?;
 
 				// create co options
-				let create_co = co_sdk::CreateCo {
-					id: request.co_id,
-					name: request.co_name,
-					algorithm: if request.public { None } else { Some(Default::default()) },
-				};
+				let create_co = co_sdk::CreateCo::new(request.co_id, Some(request.co_name));
 
 				// create co
 				state.application.create_co(identity, create_co).await?;
