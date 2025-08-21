@@ -1,5 +1,6 @@
 # Core
 Core stands for CO Reducer.
+
 A reducer is a function that takes the current state and an action as input.
 It figures out how the state should change based on that action.
 It returns a new state without directly modifying the old one.
@@ -8,15 +9,15 @@ This pureness is necessary to make distributed state and validation possible.
 For that reason they will be compiled to WebAssembly and executed in a sandbox.
 
 ## Design choices
-Cores are reducer-based to allow easy reasoning and observability. They are predictable and easily testable.
+Cores are reducer-based to allow for easy reasoning and observability. They are predictable and easily testable.
 Their clear interface allows for composition.
 All changes are automatically atomic, meaning each reduce operation guarantees that it is treated as a single "unit".
 As Cores provide strict separation of concerns, they are executed in isolation which allows for verifiability and parallel execution.
 
 ## Characteristics
 ## Passive
-As cores are reducers they only materialise/calculate new state based on inputs.
-They have no facilities to react to state changes of preform any side effects.
+As cores are reducers, they only materialize/calculate new states based on inputs.
+They have no facilities to react to state changes or perform any side effects.
 
 ## Serialization
 The core is the description of how state will be serialized to a persistable format.
@@ -24,7 +25,7 @@ CO-kit uses content addressed blocks through [IPLD](https://ipld.io/) with a def
 We recommend to use the [DAG-CBOR](../glossary/glossary.md#DAG-CBOR) format because it is optimized for content addressed data and directly supports content addressed links (via [CIDs](../glossary/glossary.md#CID)).
 However, any format, even plain binary, is usable as long as it can be adapted to the block size.
 
-## Validatability
+## Validateability
 The pure, deterministic reducer is compiled to WebAssembly so that all peers can compute the same state transition, enabling a mechanism where everyone reaches the same result.
 In addition, [Consensus](../reference/consensus.md) cores allow to finalize a state and therefore produce trust among all CO participants.
 
@@ -39,7 +40,7 @@ Some examples:
 - Someone is allowed to post new messages but not to delete them.
 These checks are implemented as simple checks or conditions in the Core.
 
-For an implementation example see [here](../getting-started/next-steps.md#Permissions).
+For an implementation example click [here](../getting-started/next-steps.md#Permissions).
 
 ## Features
 
@@ -54,11 +55,12 @@ These migrations can be used for schema and data alike.
 
 
 ## Higher order cores
-Existing cores can by easily composed into a new core enabling more complex data models.
-In other words don’t mutate the original Core, rather use Composition since it got a well specified interface.
+Existing cores can be easily composed into a new core making more complex data models possible.
+In other words: Don’t mutate the original Core, rather use composition since it's got a well-specified interface.
 You can either pass relevant data on outwards or specifically handle it the way you need it.
-This is maximising composability of Cores.
-For example it is easily possible to create a Markdown document management core which uses multiple rich-text states, one for each document.
+This is maximizing composability of Cores.
+
+For example: It is easily possible to create a Markdown document management-core which uses multiple rich-text states; one for each document.
 
 ## Built-in cores
 We provide a set of cores. They are the following:
@@ -100,3 +102,6 @@ Stores conflict free rich text.
 
 #### co-core-role
 Basic role-based access rules. As a goto data model for daily permission management.
+
+
+We are constantly working on bringing you even more built-in cores. 
