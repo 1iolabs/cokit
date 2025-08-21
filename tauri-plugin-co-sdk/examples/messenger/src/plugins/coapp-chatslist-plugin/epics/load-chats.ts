@@ -37,10 +37,10 @@ export const loadChatsEpic: ChatsListEpicType = (action$) =>
         }
       } while (messengerIdentity === undefined && tries < LOAD_IDENTITY_MAX_TRIES);
 
-      // close active session to free up memory
-      await sessionClose(sessionId);
-
       if (messengerIdentity === undefined) {
+        // close active session to free up memory
+        await sessionClose(sessionId);
+
         // could not resolve identity error
         throw new Error("Identity error: couldn't resolve messenger identity");
       }
@@ -52,7 +52,6 @@ export const loadChatsEpic: ChatsListEpicType = (action$) =>
           type: ChatsListActionType.SetIdentity,
         }),
       );
-
       // load all chat states
       const coreIds = await getFilteredCoreIds(["core", "co-core-room"]);
       for (const coreId of coreIds) {
@@ -65,7 +64,7 @@ export const loadChatsEpic: ChatsListEpicType = (action$) =>
         let coreState;
         // get core state and cancel if failed
         try {
-          coreState = await getCoreState(coCoreResult.coId, coCoreResult.coreId);
+          coreState = await getCoreState(coCoreResult.coId, coCoreResult.coreId, sessionId);
         } catch (e) {
           console.error("Error while fetching state: ", e);
         }
@@ -88,6 +87,10 @@ export const loadChatsEpic: ChatsListEpicType = (action$) =>
           }),
         );
       }
+
+      // close active session to free up memory
+      await sessionClose(sessionId);
+
       return actions;
     }),
     mergeAll(),

@@ -53,8 +53,7 @@ export const submitEpic: GroupViewEpicType = (action$, state$, context) =>
             tags: [["core", "co-core-room"]],
           },
         };
-        const cid = await pushAction(session, "co", createRoomCoreAction, state.chatsListState.identity);
-        console.log("pushed", cid);
+        await pushAction(session, "co", createRoomCoreAction, state.chatsListState.identity);
 
         // save room core name
         const setNameAction: Messaging.MatrixEvent = {

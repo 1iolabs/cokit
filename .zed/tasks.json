@@ -42,7 +42,13 @@
     "command": "$ZED_WORKTREE_ROOT/json-schemas/generate-ts.sh",
     "use_new_terminal": false,
     "reveal": "always",
-    "hide": "on_success",
-    "tags": ["watcher"]
+    "hide": "on_success"
+  },
+  {
+    "label": "Build builtin cores",
+    "command": "cargo run --bin co-cli -- --no-keychain core-build-builtin",
+    "use_new_terminal": false,
+    "reveal": "always",
+    "hide": "on_success"
   }
 ]

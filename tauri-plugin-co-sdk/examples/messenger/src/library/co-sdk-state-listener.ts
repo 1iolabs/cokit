@@ -13,7 +13,6 @@ export function createCoSdkStateEventListener(): Observable<CoSdkStateEvent> {
     async (handler) => {
       // start listening to state changes from co sdk
       const decodeAndCall = (event: Event<number[]>) => {
-        console.log("event", event.payload);
         const data: [string, CID | undefined, CID[]] = decode(Uint8Array.from(event.payload));
         handler(data);
       };

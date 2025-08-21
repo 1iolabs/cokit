@@ -18,14 +18,12 @@ export const subscribeChatsEpic: ChatsListEpicType = (action$, state$, context) 
         mergeMap(async ([event, state]) => {
           const [coId, _, heads] = event;
           // if (coId === "local") { return EMPTY }
-          console.log(coId, heads);
           const sessionId = await sessionOpen(coId);
           const log = (await getActions(sessionId, heads, 1, undefined)).actions;
           const actions: Action[] = [];
           for (const cid of log) {
             const action = await resolveCid(sessionId, cid);
             const payload = action.p;
-            console.log("Action pushed: ", coId, action);
             if (coId === "local" && state.identity !== undefined) {
               actions.push(...(await handleLocalCoAction(action, state.identity)));
               continue;
