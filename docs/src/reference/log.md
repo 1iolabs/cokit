@@ -1,8 +1,8 @@
 # Log
-The Log is a conflict-free replicated event stream which is immutable and cryptographically verifiable.
+The Log is a conflict-free replicated event stream. It is immutable and cryptographically verifiable.
 It is (eventually consistent) sorted using a Merkle-DAG-based logical clock.
 Arbitrary heads can be joined together at any time.
-Whenever the same heads are joined the resulting log is guaranteed to be equal.
+Whenever the same heads are joined, the resulting log is guaranteed to be equal.
 
 ## What makes a Log
 This can be thought of like a git graph where each commit is an operation.
@@ -14,7 +14,7 @@ The CO state is materialized from the log through its set of cores.
 The Log is implemented in the `co-log` project.
 
 ## References
-- https://arxiv.org/abs/2004.00107
+- [More on Merkle-CRDTs](https://arxiv.org/abs/2004.00107)
 
 ## Example
 This example shows how sorting works with sample data.
