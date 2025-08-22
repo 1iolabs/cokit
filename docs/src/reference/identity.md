@@ -7,17 +7,19 @@ They provide a foundation of trust as an entirely new layer of decentralized dig
 
 It doesn't rely on a centralized authority and can be enriched with verifiable credentials like a government-issued ID.
 
-DIDs are typically of the form:  `did:<method>:<method-specific-identifier>` for example: `did:example:alice123`.
+DIDs are typically of the form:  `did:<method>:<method-specific-identifier>` 
+
+for example: `did:example:alice123`.
 
 ## Why CO-kit uses DID
-In CO-kit every interaction is signed by a DID, to make everything verifiable.
+In CO-kit, every interaction is signed by a DID to make everything verifiable.
 
 Because a DID is decentralized, self-sovereign, flexible, cryptographically verifiable and self-administered, we don't need any other identity mechanism.
-When building an application developers can extend supported DID methods.
+When building an application, developers can extend supported DID methods.
 
 DIDs can be created on a per-relationship or per-service basis, giving you potentially thousands of pairwise-unique identifiers that cannot be correlated without your consent.
-This approach, makes it harder for services and participants to track you across contexts, since each one sees a different identifier.
-So rather than a participant having a single DID, like a cell phone number or national ID number, participants can have thousands of DIDs, yet can still manage them easily using CO-kit.
+This approach makes it harder for services and participants to track you across contexts, since each one sees a different identifier.
+So rather than a participant having only a single DID (like a cell number, or national ID number), participants may have thousands of DIDs, yet can still manage them easily using CO-kit.
 
 ## How CO-kit uses DID
 DIDs appear in almost every area of CO-kit since every interaction is signed by a DID. Here's how DIDs are handled in all of CO-kit.
@@ -25,7 +27,7 @@ DIDs appear in almost every area of CO-kit since every interaction is signed by 
 ### CO Participants
 Every participant has at least one DID. A participant can be human or machine (service, device, IOT-device, AI-agent, ...).
 Within a CO participants are represented by their DID.
-This relation can be extended with attributes for permission-related settings or to distingiush between particpants.
+This relation can be extended with attributes for permission-related settings or to distinguish between participants.
 
 ### Wallet
 You can save your DID's in a wallet.
@@ -86,7 +88,7 @@ DID is serves as the solution to amplify future identity management needs.
 | Usability | <input type="checkbox" style="pointer-events: none;" /> | <input type="checkbox" style="pointer-events: none;" checked /> | <input type="checkbox" style="pointer-events: none;" checked /> |
 
 ### Security
-DID security is based on public–private key cryptography controlled by the user.
+DID security is based on public/private key cryptography controlled by the user.
 With centralized or federated identities, security depends on provider’s authentication systems and centralized storage.
 
 ### Privacy
@@ -97,7 +99,7 @@ Federated identites allow for more selective information sharing, but also enabl
 ### Self-sovereign
 DIDs can be created and controlled directly by the individual. 
 Centralized and federated identity is issued and managed by a central authority or service provider and not owned by the participant.
-However when using the DIDs in a corporate context, issuance can also be controlled by a single entity, e.g. HR.
+However when using the DIDs in a corporate context, issuance can also be controlled by a single entity, e.g. HR, or IT.
 
 ### Portability
 DID Identities are portable and can be moved or used across systems without losing control.
