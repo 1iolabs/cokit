@@ -2,19 +2,20 @@
 
 Consensus is the validated state of a CO.
 
-## What makes Consensus in CO-kit
+## What makes a Consensus in CO-kit
 Consensus in CO-kit provides finality.
-When heads from different participants are joined the event order in the [Log](./log.md#Example) may change.
+When heads from different participants are joined, the event order in the [Log](./log.md#Example) may change.
 This is necessary to make the Merkle-CRDT work technically.
-The consensus on the other hand is used to allow the network of participants of an CO to commit to an known state/heads combination.
-After a successful consensus round (depending on the consensus algorithm) there are no more heads accepted that would alter the sorting of events before this point.
+
+The consensus, on the other hand, is used to allow the network of participants of an CO to commit to an known state/heads combination.
+After a successful consensus round (depending on the consensus algorithm), there are no more heads accepted that would alter the sorting of events before this point.
 
 ## Checkpoint
-For each set of heads a materialized state is calculated.
+For each set of heads, a materialized state is calculated.
 A checkpoint (or snapshot) is the combination of this state and heads.
 Each successful consensus round produces a checkpoint.
 For example:
-- a checkpoint functions like a block in a Blockchain, but it's more versatile because it is not dependent on a predefined mining period - but rather on demand.
+- a checkpoint functions like a block in a Blockchain, but it's more versatile because it is not dependent on a predefined mining period - but rather works on demand.
 
 ## Consensus on demand (CoD)
 A consensus round can be triggered manually on demand.
@@ -34,12 +35,14 @@ If no other mechanism is applied (proof of authority, etc.), the Merkle-CRDT ser
 Depending on your project requirements, you can implement any other consensus mechanism.
 
 ## Asynchronous
-In CO-kit consensus is asynchronous and on-demand, meaning users only have to wait for it if it is really needed.
-While classical databases normally provide finality by default (when a change is written it's final) this comes at the cost that every change losses time by having a lot of overhead (latency, routing, compute, ...).
+In CO-kit consensus is asynchronous and on-demand, meaning users only have to wait for it, if it is really needed.
+While conventional databases normally provide finality by default (when a change is written it's final) this comes at the cost that every change losses time by having a lot of overhead (latency, routing, compute, ...).
 
 ## Proof of authority
-The built-in consensus mechanism used in CO-kit.
+... is the built-in consensus mechanism used in CO-kit.
+
 It is implemented in the `co-core-poa` Core.
+
 When the creator of a CO adds this Core the authority can be specified as a list of DIDs.
 This authority is then responsible for voting and once a majority is reached on a checkpoint, it is finalized.
 The POA allows for Byzantine Fault Tolerance (BFT) when configured with a majority of at least two-thirds of the authority.
