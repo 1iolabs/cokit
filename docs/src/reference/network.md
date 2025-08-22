@@ -1,8 +1,9 @@
 # Network
 
-CO-kit got a built-in network stack utilising libp2p.
+CO-kit has got a built-in network stack utilizing [libp2p](https://libp2p.io/).
+
 The actual networking protocols used can be configured for every CO.
-The peer-to-peer networking is optional and possibly any other protocols like http or file protocols like NFS can be used with some effort.
+The peer-to-peer networking is optional and possibly any other protocol like http or file protocols like NFS can be used (with some effort).
 There is no lock-in to a single networking strategy.
 Just describe your data using a core and easily adapt CO-kit to your infrastructure.
 
@@ -21,6 +22,7 @@ CO-kit uses the [rust implementation of libp2p](https://github.com/libp2p/rust-l
 ### Protocol: mDNS
 Used for **local peer discovery** via multicast DNS ([RFC 6762](https://datatracker.ietf.org/doc/html/rfc6762)).
 Peers broadcast `_p2p._udp.local` PTR queries, and libp2p-capable nodes respond with their multi-addresses.
+
 CO-kit uses the libp2p mDNS client.
 
 ### Protocol: Noise
@@ -45,7 +47,7 @@ CO-kit uses this to send discovery, join and invite messages directly to peers.
 ### Protocol: bitswap
 Bitswap is a protocol for exchanging blocks of data.
 It is a message-based protocol where all messages contain want-lists or blocks.
-CO-kit uses a extended version of Bitswap which includes token based authorization.
+CO-kit uses an extended version of Bitswap which includes token based authorization.
 
 #### See also
 - https://docs.ipfs.tech/concepts/bitswap/
@@ -53,8 +55,8 @@ CO-kit uses a extended version of Bitswap which includes token based authorizati
 - https://github.com/dkuhnert/libp2p-bitswap/tree/auth
 
 ### Protocol: didcontact
-Discovery protocol which gossips encrypted didcomm messages using the GossipSub protocol from libp2p.
-The didcomm messages denotes a connection request from one CO participant to another one.
-The receivicer can choose whether to respond to it or not, so no (potentially private) connection information must be shared beforehand.
+A discovery protocol which gossips encrypted didcomm messages using the GossipSub protocol from libp2p.
+The didcomm messages denote a connection request from one CO participant to another one.
+The receiver can choose whether to respond to it or not, so no (potentially private) connection information must be shared beforehand.
 
 #todo sequence diagram
