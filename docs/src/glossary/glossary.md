@@ -143,13 +143,26 @@ CO-kit leverages CRDTs to implement its **built-in Merkle log-based CRDT sync**,
 **Why CO-kit docs reference Dioxus**: It exemplifies how Rust can power reactive, real-time, decentralized UIs—making it a natural companion for illustrating CO-kit integrations.
 
 ## Guards
-#todo
+Guards are checks for transactions.
+They serve as a sort of "Police" for transactions and decide which transactions will make it into the [Log](../reference/log.md) and which don't.
+New transactions will be checked by the configured guards of a CO and will be rejected if not all guards succeed.
+Just like [Cores](../reference/core.md), Guards are pure functions, are compiled to WebAssembly, and registered to COs.
+
+Important notice: Guards are not permissions.
 
 ## IPLD
 [IPLD](https://ipld.io/) is a single namespace for all hash-inspired protocols. Through IPLD, links can be traversed across protocols, allowing you to explore data regardless of the underlying protocol.
 
 ## Logs
-#todo
+The Log is a conflict-free replicated event stream. It is immutable and cryptographically verifiable.
+It is (eventually consistent) sorted using a Merkle-DAG-based logical clock.
+Arbitrary heads can be joined together at any time.
+Whenever the same heads are joined, the resulting log is guaranteed to be equal.
+
+**What makes a Log:**
+This can be thought of like a git graph where each commit is an operation.
+The heads represent the end of the log and also a specific state of the data.
+
 ## Heads
 #todo
 
@@ -199,7 +212,10 @@ In CO-kit, each `CO` or node may generate or be assigned a Peer ID, which then a
 **Proof‑of‑Authority (PoA)** is a reputation-based consensus mechanism where only a small, pre-approved set of trusted validators—known entities with verifiable identities—are empowered to produce and validate transactions. 
 
 ## Storage
-#todo
+One of the base building blocks of CO-kit is the content addressed storage [CID](../glossary/glossary.md#CID).
+The storage is represented as a very simple interface which writes and reads CID/BLOB pairs called Blocks.
+The recommended serialization format (also used throughout CO-kit) is DAG-CBOR which is a subset of CBOR with links to CIDs.
+A [core](../reference/core.md) is not restricted to [DAG-CBOR](../glossary/glossary.md#DAG-CBOR) and may use any given structure.
 
 ## Tauri
 **Tauri** is an open-source framework for building **lightweight, secure, and fast** desktop (and mobile) applications using web technologies for the UI and Rust for the backend logic
@@ -218,5 +234,8 @@ In CO-kit, each `CO` or node may generate or be assigned a Peer ID, which then a
 #todo 
 
 ## WASM
-WebAssembly. 
-#todo
+WebAssembly (WASM) is an open-standard, portable binary intruction format designed for high-performance execution in a sandboxed environment - initially for web browsers, and increasingly for broader contexts including servers, edge devices, and embedded systems.
+It serves as a compilation target for languages such as Rust, C, C++, and others, enabling near-native speed while maintaining security and cross-platform compatibility
+
+For CoKit, WASM offers a powerful mechanism to compile and execute **schema logic** in a safe, efficient, and portable manner—supporting modular, decentralized functionality across diverse environments
+
