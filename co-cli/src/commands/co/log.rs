@@ -45,7 +45,7 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 				println!("{:?}", entry.entry());
 
 				// payload
-				cat_output(storage.clone(), entry.entry().payload, true).await?;
+				cat_output(storage.clone(), entry.entry().payload, true, true).await?;
 				println!();
 			},
 			Err(err) => println!("head ({index}) error: {:?}", err),

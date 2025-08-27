@@ -1,17 +1,21 @@
 use cid::Cid;
-use co_primitives::{KnownMultiCodec, MultiCodec};
+use co_primitives::{BlockStorageSettings, CloneWithBlockStorageSettings, KnownMultiCodec, MultiCodec};
 use co_sdk::{unixfs_cat_buffer, BlockSerializer, BlockStorage, CoStorage};
 use ipld_core::ipld::Ipld;
 use std::io::Write;
 
-pub async fn cat_output(storage: CoStorage, cid: Cid, pretty: bool) -> Result<(), anyhow::Error> {
+pub async fn cat_output(storage: CoStorage, cid: Cid, pretty: bool, decrypt: bool) -> Result<(), anyhow::Error> {
 	if pretty {
-		let block = storage.get(&cid).await?;
-		let codec = MultiCodec::from(block.cid().codec());
-		if MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
-			println!("Codec: {:?} ({})", Into::<MultiCodec>::into(cid.codec()), cid.codec());
+		let block = if decrypt && MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
+			let transform_storage = storage.clone_with_settings(BlockStorageSettings::new().with_transform());
+			let block = transform_storage.get(&cid).await?;
+			println!("Codec: {:?} ({})", MultiCodec::from(cid), cid.codec());
 			println!("Cid: {}", block.cid());
-		}
+			block
+		} else {
+			storage.get(&cid).await?
+		};
+		let codec = MultiCodec::from(block.cid());
 		println!("Codec: {:?} ({})", codec, block.cid().codec());
 		println!("Size: {}", block.data().len());
 		if MultiCodec::is_cbor(codec) {
@@ -22,9 +26,11 @@ pub async fn cat_output(storage: CoStorage, cid: Cid, pretty: bool) -> Result<()
 		}
 	} else {
 		// encrypted?
-		let cid = match MultiCodec::from(cid.codec()) {
-			MultiCodec::Known(KnownMultiCodec::CoEncryptedBlock) => storage.get(&cid).await?.into_inner().0,
-			_ => cid,
+		let storage = match MultiCodec::from(cid.codec()) {
+			MultiCodec::Known(KnownMultiCodec::CoEncryptedBlock) if decrypt => {
+				storage.clone_with_settings(BlockStorageSettings::new().with_transform())
+			},
+			_ => storage,
 		};
 
 		// print
