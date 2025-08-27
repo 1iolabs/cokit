@@ -45,6 +45,10 @@ pub struct BlockStorageSettings {
 	/// Detach as child instance from the parent.
 	pub detached: bool,
 
+	/// Allow to transform blocks while get them.
+	/// Example: Decrypt block when get with encrypted Cid.
+	pub transform: bool,
+
 	/// Clone with empty caches.
 	pub clear: bool,
 }
@@ -60,6 +64,11 @@ impl BlockStorageSettings {
 
 	pub fn with_detached(mut self) -> Self {
 		self.detached = true;
+		self
+	}
+
+	pub fn with_transform(mut self) -> Self {
+		self.transform = true;
 		self
 	}
 

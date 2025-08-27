@@ -26,6 +26,10 @@ pub struct Command {
 	/// Pretty print data.
 	#[arg(short, long)]
 	pub pretty: bool,
+
+	/// Skip decrypt block if Cid is encrypted.
+	#[arg(short, long)]
+	pub no_decrypt: bool,
 }
 
 pub async fn command(
@@ -46,7 +50,7 @@ pub async fn command(
 	let content = node_cid(storage.clone(), file_state, path).await?;
 
 	// print
-	cat_output(storage, content, command.pretty).await?;
+	cat_output(storage, content, command.pretty, !command.no_decrypt).await?;
 
 	// result
 	Ok(exitcode::OK)

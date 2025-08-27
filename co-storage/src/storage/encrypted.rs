@@ -31,13 +31,22 @@ pub struct EncryptedBlockStorage<S> {
 	mapping: EncryptedBlockStorageMapping,
 	links: BlockLinks,
 	reference_mode: EncryptionReferenceMode,
+	transform: bool,
 }
 impl<S> EncryptedBlockStorage<S>
 where
 	S: BlockStorage + Clone + Send + Sync + 'static,
 {
 	pub fn new(next: S, key: Secret, algorithm: Algorithm, mapping: EncryptedBlockStorageMapping) -> Self {
-		Self { algorithm, key, mapping, next, links: Default::default(), reference_mode: Default::default() }
+		Self {
+			algorithm,
+			key,
+			mapping,
+			next,
+			links: Default::default(),
+			reference_mode: Default::default(),
+			transform: false,
+		}
 	}
 
 	pub fn with_encryption_reference_mode(mut self, mode: EncryptionReferenceMode) -> Self {
@@ -308,6 +317,12 @@ where
 
 	/// Get block.
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+		// transform?
+		if self.transform && MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
+			return self.get_unencrypted(&cid).await;
+		}
+
+		// default
 		let encrypted_cid = self.mapping.get(cid).await;
 		#[cfg(feature = "logging-verbose")]
 		tracing::trace!(?encrypted_cid, ?cid, "encrypted-storage-get");
@@ -391,6 +406,7 @@ where
 			} else {
 				self.mapping.clone()
 			},
+			transform: settings.transform,
 			next: self.next.clone_with_settings(settings),
 		}
 	}
