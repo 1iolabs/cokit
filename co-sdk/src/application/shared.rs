@@ -299,6 +299,24 @@ impl CreateCo {
 		}
 	}
 
+	pub fn id(&self) -> &CoId {
+		&self.id
+	}
+
+	pub fn with_id(mut self, id: impl Into<CoId>) -> Self {
+		self.id = id.into();
+		self
+	}
+
+	pub fn name(&self) -> &str {
+		&self.name
+	}
+
+	pub fn with_name(mut self, name: String) -> Self {
+		self.name = name;
+		self
+	}
+
 	pub fn with_core(mut self, core_name: &str, core_type: &str, core_binary: Cid) -> Self {
 		self.cores
 			.insert(core_name.to_owned(), CoreSource::Reference(tags!("type": core_type), core_binary));
@@ -314,6 +332,10 @@ impl CreateCo {
 	pub fn with_algorithm(mut self, algorithm: Option<Algorithm>) -> Self {
 		self.algorithm = algorithm;
 		self
+	}
+
+	pub fn public(&self) -> bool {
+		self.algorithm.is_none()
 	}
 
 	pub fn with_public(self, public: bool) -> Self {
