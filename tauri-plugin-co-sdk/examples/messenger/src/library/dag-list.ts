@@ -1,5 +1,5 @@
 import { CID } from "multiformats";
-import { resolveCid } from "../../../../dist-js";
+import { resolveCid } from "../../../../dist-js/index.js";
 
 export interface Node<I> {
   n: CID[] | undefined;

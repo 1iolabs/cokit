@@ -6,7 +6,7 @@ export async function getResolvedCoState(co: string, externalSessionId?: string)
   // open session if no external session given
   const sessionId = externalSessionId ?? (await sessionOpen(co));
   const [stateCid] = await getCoState(co);
-  const state = stateCid !== undefined ? await resolveCid(sessionId, stateCid) : undefined;
+  const state = stateCid !== undefined && stateCid !== null ? await resolveCid(sessionId, stateCid) : undefined;
   // close opened session
   if (externalSessionId === undefined) {
     sessionClose(sessionId);
@@ -23,14 +23,23 @@ export async function getCoHeads(sessionId: string, co: string): Promise<any[]> 
   return heads;
 }
 
-export async function getCoreState(co: string, core: string, externalSessionId?: string): Promise<any> {
+export async function getCoreState<T = any>(co: string, core: string, externalSessionId?: string): Promise<T | null> {
   const sessionId = externalSessionId ?? (await sessionOpen(co));
-  const state = await getResolvedCoState(co, sessionId);
-  const coreCid = state?.c?.[core]?.state;
-  if (coreCid) {
-    return await resolveCid(sessionId, coreCid);
+  let result = null;
+  try {
+    const state = await getResolvedCoState(co, sessionId);
+    const coreCid = state?.c?.[core]?.state;
+    if (coreCid !== undefined && coreCid !== null) {
+      result = await resolveCid(sessionId, coreCid);
+    }
+  } catch (e) {
+    console.error("Error while fetching core state:", e);
   }
-  return null;
+  if (externalSessionId === undefined) {
+    // close opened session
+    await sessionClose(sessionId);
+  }
+  return result;
 }
 
 export async function getCoIds(): Promise<ReadonlyArray<string>> {
@@ -74,8 +83,10 @@ export async function getFilteredCoreIds(tags: string[], co?: string): Promise<s
   }
   const foundCores: string[] = [];
   for (const coId of coIds) {
-    const sessionId = await sessionOpen(coId);
-    const state = await getResolvedCoState(coId, sessionId);
+    const state = await getResolvedCoState(coId);
+    if (state === undefined || state === null) {
+      continue;
+    }
     for (const [key, value] of Object.entries(state.c)) {
       // TODO remove any cast when js interfaces are done
       const v = value as any;
@@ -85,7 +96,6 @@ export async function getFilteredCoreIds(tags: string[], co?: string): Promise<s
         }
       }
     }
-    await sessionClose(sessionId);
   }
   return foundCores;
 }

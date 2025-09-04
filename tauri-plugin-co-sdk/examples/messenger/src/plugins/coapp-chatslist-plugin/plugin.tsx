@@ -11,14 +11,13 @@ import { ChatsListPlugin, coappChatsListPluginId } from "./types/plugin.js";
 document.body.className = clsx(document.body.className, COApp1ioClassName);
 
 export default function plugin(pluginTags: TagList): ChatsListPlugin {
-    return {
-        api: coappChatsListApi,
-        context: (context) => context,
-        epic: chatsListEpic,
-        reducer: chatsListReducer,
-        render: (renderTags) => <ChatListViewContainer />,
-        state: (state) => ({ identity: state.identity }),
-        tags: [{ key: "type", value: coappChatsListPluginId }, ...pluginTags],
-
-    };
+  return {
+    api: coappChatsListApi,
+    context: (context) => context,
+    epic: chatsListEpic,
+    reducer: chatsListReducer,
+    render: () => <ChatListViewContainer />,
+    state: (state) => ({ identity: state.identity }),
+    tags: [{ key: "type", value: coappChatsListPluginId }, ...pluginTags],
+  };
 }

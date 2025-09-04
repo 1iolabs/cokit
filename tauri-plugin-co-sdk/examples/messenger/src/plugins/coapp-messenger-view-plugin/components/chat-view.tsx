@@ -1,173 +1,28 @@
 import { Message, MessengerView } from "@1io/coapp-messenger-view";
 import { usePluginActionApi, WellKnownTags } from "@1io/kui-application-sdk";
 import "@1io/packaging-utils/svg";
-import { CID } from "multiformats/cid";
 import * as React from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fromEventPattern } from "rxjs";
-import {
-  getActions,
-  GetActionsResponse,
-  getCoState,
-  resolveCid,
-  sessionClose,
-  sessionOpen,
-} from "../../../../../../dist-js/index.js";
 import DefaultProfilePic from "../../../assets/Users_24.svg";
-import { createCoSdkStateEventListener } from "../../../library/co-sdk-state-listener.js";
 import { buildCoCoreId } from "../../../library/core-id.js";
+import { useCoCoreActions } from "../../../library/use-co-core-actions.js";
+import { useCoIpld } from "../../../library/use-co-ipld.js";
+import { useCoSession } from "../../../library/use-co-session.js";
+import { useCo } from "../../../library/use-co.js";
+import { useCoCore } from "../../../library/use-co-core.js";
 import { COAppChatsListApi } from "../../coapp-chatslist-plugin/api/index.js";
 import { coappChatsListPluginId } from "../../coapp-chatslist-plugin/types/plugin.js";
 import { MessengerViewActionType, MessengerViewSendAction } from "../actions/index.js";
 import { resolveMatrixAction } from "../library/handle-matrix-event.js";
 import { MessengerViewPluginState } from "../types/state.js";
+import { useResolvedCid } from "../../../library/use-resolved-cid.js";
+import { Room } from "../../../../../../dist-js/index.js";
 
 // the number of additional actions that should be loaded when scrolling to the top of the page
 const MESSAGE_PAGING_COUNT = 30;
 
 export interface MessengerViewContainerProps {
   onBack: () => void;
-}
-
-function useCoState(co: string): [CID | undefined, CID[] | undefined] {
-  const [coState, setCoState] = React.useState<[CID | undefined, CID[]]>();
-
-  React.useEffect(() => {
-    // get initial state
-    async function loadInitState() {
-      const initState = await getCoState(co);
-      setCoState(initState);
-    }
-    loadInitState();
-
-    // get updated state when new event is triggered
-    const coSdkEventSubscription = createCoSdkStateEventListener().subscribe({
-      next: (event) => {
-        const [coId, state, heads] = event;
-        if (co === coId) {
-          setCoState([state, heads]);
-        }
-      },
-    });
-    return () => {
-      coSdkEventSubscription.unsubscribe();
-    };
-  }, [co]);
-  if (coState !== undefined) {
-    return coState;
-  }
-  return [undefined, undefined];
-}
-
-function useCoreState(coCid: CID | undefined, coreId: string, session: string | undefined): any {
-  const [coreState, setCoreState] = React.useState<any>(undefined);
-  React.useEffect(() => {
-    async function resolveCoreState() {
-      if (session !== undefined && coCid !== undefined) {
-        const resolvedCoState = await resolveCid(session, coCid);
-        const coreCid = resolvedCoState?.c?.[coreId]?.state;
-        if (coreCid !== undefined) {
-          const state = await resolveCid(session, coreCid);
-          setCoreState(state);
-        }
-      }
-    }
-    resolveCoreState();
-  }, [coCid, coreId, session]);
-  return coreState;
-}
-
-function useSession(co: string): string | undefined {
-  const [session, setSession] = React.useState<string | undefined>();
-  const [sessionError, setSessionError] = React.useState<Error | undefined>(undefined);
-  React.useEffect(() => {
-    const sessionSubscription = fromEventPattern<string>(
-      async (handler) => {
-        const s = await sessionOpen(co);
-        handler(s);
-        return s;
-      },
-      async (_, sessionPromise) => {
-        const s = await sessionPromise;
-        await sessionClose(s);
-      },
-    ).subscribe({
-      next: (sessionEvent) => {
-        setSession(sessionEvent);
-      },
-      error(err) {
-        setSessionError(err);
-      },
-    });
-
-    return () => {
-      sessionSubscription.unsubscribe();
-    };
-  }, [co]);
-  if (sessionError !== undefined) {
-    throw sessionError;
-  }
-  return session;
-}
-
-function useCoCoreActions(
-  co: string,
-  core: string,
-  heads: CID[] | undefined,
-  session: string | undefined,
-  count: number,
-) {
-  const [actions, setActions] = React.useState<GetActionsResponse>();
-  React.useEffect(() => {
-    async function getCoreActions() {
-      if (heads !== undefined && session !== undefined) {
-        setActions(await getActions(session, heads, count, undefined));
-      }
-    }
-    getCoreActions();
-  }, [co, core, heads, session, count]);
-  return actions;
-}
-
-function useIpld<T>(
-  cids: CID[],
-  deserialize: (v: any, ownIdentity: string) => T | undefined,
-  sessionId?: string,
-  ownIdentity?: string,
-): ReadonlyMap<CID, T | undefined> {
-  const [ipldMap, setIpldMap] = React.useState<Map<CID, T | undefined>>(new Map());
-  React.useEffect(() => {
-    // cancel flag because component may unmount before fetch is done after which state changes become illegal
-    let canceled = false;
-    // async function that fetches the messages
-    const fetchCids = async () => {
-      if (sessionId === undefined || ownIdentity === undefined) {
-        return;
-      }
-      const newMap = new Map();
-      for (const cid of cids) {
-        if (ipldMap.has(cid)) {
-          // use value from old map
-          newMap.set(cid, ipldMap.get(cid));
-        } else {
-          // fetch cid if not already loaded
-          const ipld = await resolveCid(sessionId, cid);
-          newMap.set(cid, deserialize(ipld, ownIdentity));
-        }
-      }
-      // update map if component is still mounted
-      if (!canceled) {
-        setIpldMap(newMap);
-      }
-    };
-    // call async fetch function
-    fetchCids();
-    // return deconstructor to cancel ongoing operations
-    return () => {
-      canceled = true;
-    };
-  }, [cids.length, sessionId]);
-  return ipldMap;
 }
 
 export function MessengerViewContainer(props: MessengerViewContainerProps) {
@@ -181,12 +36,14 @@ export function MessengerViewContainer(props: MessengerViewContainerProps) {
   ]);
 
   // get co state
-  const [coStateCid, coHeads] = useCoState(coId);
+  const [coStateCid, coHeads] = useCo(coId);
 
-  const session = useSession(coId);
+  const session = useCoSession(coId);
 
-  // get room core state
-  const roomCoreState = useCoreState(coStateCid, coreId, session);
+  // get room core state cid
+  const roomCoreCid = useCoCore(coStateCid, coreId, session);
+
+  const roomCoreState = useResolvedCid<Room.Room>(roomCoreCid, session);
 
   // how many actions should be loaded
   const [actionCount, setActionCount] = React.useState(0);
@@ -195,7 +52,7 @@ export function MessengerViewContainer(props: MessengerViewContainerProps) {
   const actions = useCoCoreActions(coId, coreId, coHeads, session, actionCount)?.actions;
 
   // get and resolve messages
-  const messageMap = useIpld<Message>(actions ?? [], resolveMatrixAction, session, ownIdentity);
+  const messageMap = useCoIpld<Message>(actions ?? [], resolveMatrixAction, session, ownIdentity);
   const messages = React.useMemo(() => {
     const retVal: Message[] = [];
     for (const v of messageMap.values()) {

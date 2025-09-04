@@ -6,25 +6,13 @@ export function chatsListReducer(
   action: ChatsListActions,
 ): ChatsListPluginState {
   if (state === undefined) {
-    return { chats: [], loadedChats: new Map() };
+    return { loadedChats: new Map() };
   }
   switch (action.type) {
-    case ChatsListActionType.AddChat:
-      return { ...state, chats: [...state.chats, action.payload.chat] };
-    case ChatsListActionType.UpdateChat:
-      return {
-        ...state,
-        chats: state.chats.map((chat) => {
-          if (chat.id === action.payload.chat.id) {
-            return { ...chat, ...action.payload.chat };
-          }
-          return chat;
-        }),
-      };
     case ChatsListActionType.ChatPluginLoaded:
       return { ...state, loadedChats: state.loadedChats.set(action.payload.chatId, action.payload.pluginId) };
     case ChatsListActionType.OpenChat:
-      return { ...state, selectedChat: action.payload.chat.id };
+      return { ...state, selectedChat: action.payload.chat };
     case ChatsListActionType.SetPriorityPlugin:
       return { ...state, priorityPluginiId: action.payload.pluginId };
     case ChatsListActionType.SetDialog:

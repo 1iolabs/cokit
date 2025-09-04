@@ -278,9 +278,9 @@ impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateCo {
-	id: CoId,
-	name: String,
-	algorithm: Option<Algorithm>,
+	pub id: CoId,
+	pub name: String,
+	pub algorithm: Option<Algorithm>,
 	cores: BTreeMap<String, CoreSource>,
 }
 impl CreateCo {

@@ -11,12 +11,12 @@
     "build-dist": "npm run clean && npm run build-plugins && npm run build && npm run rollup && npm run deploy-self",
     "lint": "npx tslint --project . && npx nplint",
     "tauri": "tauri",
-    "tauri-dev": "npm run tauri dev -- --no-watch -- -- --no-keychain",
+    "tauri-dev": "npm run tauri dev -- --no-watch -- -- --no-keychain --auto-accept-invite",
     "tauri-build": "npm run tauri -- -v build -b app -d",
     "clean": "npx rimraf -rf ./dist",
     "rollup": "npx cross-env NODE_ENV=development kui-application build -o ./dist/ui",
     "rollup-watch": "npm run rollup -- -w",
-    "start-messengers": "env RUST_BACKTRACE=full open -n ../../../target/debug/bundle/macos/CO\\ Messenger\\ Demo.app --args --no-keychain && open -n ../../../target/debug/bundle/macos/CO\\ Messenger\\ Demo.app --args --no-keychain --base-path ~/Library/Application\\ Support/co.app.1io2.co"
+    "start-messengers": "open -n ../../../target/debug/bundle/macos/CO\\ Messenger\\ Demo.app --args --no-keychain --auto-accept-invite && open -n ../../../target/debug/bundle/macos/CO\\ Messenger\\ Demo.app --args --no-keychain --auto-accept-invite --base-path ~/Library/Application\\ Support/co.app.1io2.co"
   },
   "files": [
     "**/*.css",
@@ -76,16 +76,20 @@
     }
   },
   "dependencies": {
-    "@1io/coapp-chatlist-view": "0.0.1-mr1.5",
+    "@1io/coapp-chatlist-view": "file:../../../../../IdeaProjects/coapp/coapp-chatlist-view/1io-coapp-chatlist-view-0.0.1-5.tgz",
     "@1io/coapp-messenger-view": "0.4.4-mr7.1",
     "@1io/coapp-style": "^0.1.3",
+    "@1io/compare": "^0.1.10",
     "@1io/copy-paste-utils": "^0.3.9",
     "@1io/kui-application": "^0.5.0",
     "@1io/kui-application-sdk": "^5.0.1",
     "@1io/kui-badge": "^0.1.7",
     "@1io/kui-button": "^0.25.0",
+    "@1io/kui-common": "^0.9.36",
     "@1io/kui-dialog": "^0.16.3",
     "@1io/kui-level-stack": "^0.6.16",
+    "@1io/kui-list": "^0.40.9",
+    "@1io/memoize": "^0.1.19",
     "@1io/one2edit-default-icons": "^0.6.43",
     "@1io/packaging-utils": "^0.1.4",
     "@1io/redux-utils": "^0.9.3",

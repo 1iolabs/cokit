@@ -56,6 +56,7 @@ pub trait KnownTag {
 	}
 }
 
+/// Sets behaviour for incoming invites
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub enum CoInvite {
 	/// Manual: Add "pending" membership.
@@ -103,6 +104,7 @@ impl Into<Tags> for &CoInvite {
 	}
 }
 
+/// Sets behaviour for join requests
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub enum CoJoin {
 	/// Invite: Only accept joins when participant has been invited.

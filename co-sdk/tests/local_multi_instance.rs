@@ -1,5 +1,6 @@
 use co_core_co::CoAction;
-use co_sdk::{tags, ApplicationBuilder, CO_CORE_NAME_CO};
+use co_primitives::CoJoin;
+use co_sdk::{tags, ApplicationBuilder, KnownTag, Tags, CO_CORE_NAME_CO};
 use co_storage::TmpDir;
 use futures::{pin_mut, StreamExt};
 
@@ -85,4 +86,29 @@ async fn test_local_multi_instance_push() {
 	let local_co1_state = local_co1.reducer_state().await;
 	tracing::info!(?push_state, ?local_co1_state, "test-push");
 	assert_eq!(local_co1_state, local_co2_next_state.await.unwrap());
+}
+
+/// Create Local CO in tmpdir open a second instance, push someting and exit.
+#[tokio::test]
+async fn test_local_co_tags() {
+	let tmp = TmpDir::new("co");
+
+	// open first
+	let application =
+		ApplicationBuilder::new_with_path(format!("{}-test_local_co_tags", tmp.uuid()), tmp.path().to_owned())
+			.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+			.with_optional_tracing()
+			.without_keychain()
+			.build()
+			.await
+			.expect("application");
+
+	let local_co = application.local_co_reducer().await.expect("local co");
+
+	let mut tags = Tags::new();
+	tags.insert(CoJoin::Accept.tag());
+	local_co
+		.push(&application.local_identity(), CO_CORE_NAME_CO, &CoAction::TagsInsert { tags })
+		.await
+		.unwrap();
 }

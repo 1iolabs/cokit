@@ -3,10 +3,10 @@ import React from "react";
 import { MessengerViewContainer } from "./components/chat-view.js";
 import { messengerViewEpic } from "./epics/index.js";
 import { MessengerViewPlugin } from "./types/plugin.js";
-import { CoreIdTag } from "./types/tags.js";
+import { CoCoreIdTag } from "./types/tags.js";
 
 export default function plugin(pluginTags: TagList): MessengerViewPlugin {
-  const coCoreId = tagValue<CoreIdTag>(pluginTags, "coreId")?.split("/");
+  const coCoreId = tagValue<CoCoreIdTag>(pluginTags, "coCoreId")?.split("/");
   // default values
   let coId = "1io";
   let coreId = "room";
