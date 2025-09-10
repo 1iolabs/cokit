@@ -290,6 +290,16 @@ where
 		self.tags.as_ref()
 	}
 
+	/// Check if actor is running.
+	///
+	/// Running means not initializing, stopping or stopped.
+	pub fn running(&self) -> bool {
+		match *self.state.borrow() {
+			ActorState::Running => true,
+			_ => false,
+		}
+	}
+
 	/// Wait for startup to be complete.
 	pub async fn initialized(&self) -> Result<(), ActorError> {
 		let mut state = self.state.clone();

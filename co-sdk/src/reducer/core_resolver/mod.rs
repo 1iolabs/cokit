@@ -15,8 +15,8 @@ pub mod single;
 pub trait CoreResolver<S> {
 	/// Apply action to root state.
 	///
-	/// This execute operation has to be deterministic I.E. is not allowed to introduce not deterministic values into
-	/// the core. This also implies that usage of `context` parameter is only intendet for side-effects.
+	/// This execute operation has to be deterministic I.E. is not allowed to introduce non deterministic values into
+	/// the core. This also implies that usage of `context` parameter is only intended for side-effects.
 	/// If the implementation executes extra actions (to `state`) these have to be determinisitc as they are not
 	/// reflected in the heads. If the action is deterministic there is also no need to store it because it gets
 	/// recomputed every time this resolver executes.

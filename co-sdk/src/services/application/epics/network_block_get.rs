@@ -1,14 +1,15 @@
 use crate::{
+	is_cid_encrypted,
 	library::{
 		connections_peer_provider::ConnectionsPeerProvider, find_co_secret::find_co_secret_by_membership,
 		network_identity::network_identity_by_id, network_queue::TaskState, settings_timeout::settings_timeout,
 	},
-	services::application::NetworkBlockGetAction,
-	Action, CoContext, CoNetworkTaskSpawner, CoReducerFactory, CoToken, CoTokenParameters, ConnectionMessage,
-	CO_ID_LOCAL,
+	services::application::{action::KeyRequestAction, NetworkBlockGetAction},
+	Action, ActionError, CoContext, CoNetworkTaskSpawner, CoReducerFactory, CoToken, CoTokenParameters,
+	ConnectionMessage, CO_ID_LOCAL,
 };
 use cid::Cid;
-use co_actor::{Actions, ActorHandle};
+use co_actor::{ActionDispatch, Actions, ActorHandle};
 use co_identity::Identity;
 use co_network::{
 	backoff_with_jitter,
@@ -27,7 +28,7 @@ const NETWORK_QUEUE_TYPE: &str = "network-block-get";
 /// In: [`Action::NetworkBlockGet`]
 /// Out: [`Action::NetworkBlockGetComplete`] | [`Action::NetworkTaskQueue`]
 pub fn network_block_get(
-	_actions: &Actions<Action, (), CoContext>,
+	actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
@@ -36,6 +37,7 @@ pub fn network_block_get(
 		Action::NetworkBlockGet(action) => {
 			let action = action.clone();
 			let context = context.clone();
+			let actions = actions.clone();
 			Some(
 				async move {
 					// network
@@ -51,7 +53,13 @@ pub fn network_block_get(
 					};
 
 					// send
-					Either::Right(handle_network_block_get(context.clone(), network, connections, action.clone()))
+					Either::Right(handle_network_block_get(
+						context.clone(),
+						network,
+						connections,
+						actions,
+						action.clone(),
+					))
 				}
 				.into_stream()
 				.flatten(),
@@ -66,7 +74,7 @@ pub fn network_block_get(
 /// In: [`Action::NetworkTaskExecute`]
 /// Out: [`Action::NetworkBlockGetComplete`], [`Action::NetworkTaskExecuteComplete`]
 pub fn network_task_execute(
-	_actions: &Actions<Action, (), CoContext>,
+	actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
@@ -77,6 +85,7 @@ pub fn network_task_execute(
 			let context = context.clone();
 			let task_id = task_id.clone();
 			let co = co.clone();
+			let actions = actions.clone();
 			Some(
 				async move {
 					// action
@@ -100,23 +109,21 @@ pub fn network_task_execute(
 
 					// send
 					Either::Right(
-						handle_network_block_get(context.clone(), network, connections, action.clone()).flat_map(
-							move |result| {
-								let task_complete = match &result {
-									Ok(_) => Action::NetworkTaskExecuteComplete {
+						handle_network_block_get(context.clone(), network, connections, actions, action.clone())
+							.flat_map(move |item| match item {
+								Ok(Action::NetworkBlockGetComplete(request, result)) => stream::iter(vec![
+									Ok(Action::NetworkTaskExecuteComplete {
 										co: action.co.clone(),
 										task_id: task_id.clone(),
-										task_state: TaskState::Done,
-									},
-									Err(_) => Action::NetworkTaskExecuteComplete {
-										co: action.co.clone(),
-										task_id: task_id.clone(),
-										task_state: TaskState::Failed,
-									},
-								};
-								stream::iter([result, Ok(task_complete)])
-							},
-						),
+										task_state: match result {
+											Ok(_) => TaskState::Done,
+											Err(_) => TaskState::Failed,
+										},
+									}),
+									Ok(Action::NetworkBlockGetComplete(request, result)),
+								]),
+								item => stream::iter(vec![item]),
+							}),
 					)
 				}
 				.into_stream()
@@ -136,24 +143,59 @@ fn handle_network_block_get(
 	context: CoContext,
 	network: CoNetworkTaskSpawner,
 	connections: ActorHandle<ConnectionMessage>,
+	actions: Actions<Action, (), CoContext>,
 	action: NetworkBlockGetAction,
 ) -> impl Stream<Item = Result<Action, anyhow::Error>> {
-	async move {
-		let identity = network_identity_by_id(&context, &action.parent_co, &action.co, None).await?;
-		let peer_provider =
-			ConnectionsPeerProvider::new(action.co.clone(), identity.identity().to_owned(), connections);
-		let token = network_token(&context, &network, &action.parent_co, &action.co).await?;
-		let timeout = settings_timeout(&context, &CoId::from(CO_ID_LOCAL), Some("block-get")).await;
-		let concurrent = 10;
+	ActionDispatch::execute_with_response(
+		actions,
+		context.tasks(),
+		{
+			let action = action.clone();
+			move |dispatch| async move {
+				let identity = network_identity_by_id(&context, &action.parent_co, &action.co, None).await?;
+				let peer_provider =
+					ConnectionsPeerProvider::new(action.co.clone(), identity.identity().to_owned(), connections);
+				let token = network_token(&context, &network, &action.parent_co, &action.co).await?;
+				let timeout = settings_timeout(&context, &CoId::from(CO_ID_LOCAL), Some("block-get")).await;
+				let concurrent = 10;
 
-		// execute
-		let result =
-			get_network(network, peer_provider, vec![token.to_bitswap_token()?], timeout, concurrent, action.cid).await;
+				// ensure we got the co key
+				let token = if is_cid_encrypted([action.cid]) && token.is_unsigned() {
+					// reqeust
+					let request = KeyRequestAction {
+						co: action.co.clone(),
+						parent_co: action.parent_co.clone(),
+						key: None,
+						from: Some(identity.identity().to_owned()),
+						network: None,
+					};
+					dispatch
+						.request(Action::KeyRequest(request.clone()), move |action| match action {
+							Action::KeyRequestComplete(action_request, action_result) if action_request == &request => {
+								Some(action_result.clone())
+							},
+							_ => None,
+						})
+						.await
+						.map_err(|err| StorageError::Internal(err.into()))?
+						.map_err(|err| StorageError::Internal(err.into()))?;
 
-		// result
-		Ok(Action::NetworkBlockGetComplete(action, result))
-	}
-	.into_stream()
+					// token
+					network_token(&context, &network, &action.parent_co, &action.co).await?
+				} else {
+					token
+				};
+
+				// execute
+				get_network(network, peer_provider, vec![token.to_bitswap_token()?], timeout, concurrent, action.cid)
+					.await?;
+
+				// result
+				Ok(())
+			}
+		},
+		move |result| Action::NetworkBlockGetComplete(action, result),
+	)
 }
 
 /// Create a CoToken for the co.
@@ -247,13 +289,13 @@ async fn get_network(
 			}
 		}
 
-		// backoff
-		tokio::time::sleep(backoff_with_jitter(retry)).await;
-
 		// timeout?
 		if tokio::time::Instant::now() > deadline {
 			break;
 		}
+
+		// backoff
+		tokio::time::sleep(backoff_with_jitter(retry)).await;
 
 		// retry
 		retry += 1;

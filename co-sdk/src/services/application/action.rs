@@ -55,8 +55,11 @@ pub enum Action {
 	/// Join completed.
 	Joined { co: CoId, participant: Did, success: bool, peer: Option<PeerId> },
 
-	/// Send Key Request to co (participants) or specified peer.
-	// KeyRequest { co: CoId, key: Option<String>, peer: Option<PeerId> },
+	/// Send a Key Request to a co or specified network.
+	KeyRequest(KeyRequestAction),
+
+	/// Key Request has completed.
+	KeyRequestComplete(KeyRequestAction, Result<(), ActionError>),
 
 	/// Start network.
 	NetworkStart(NetworkSettings),
@@ -336,14 +339,32 @@ impl std::fmt::Display for ActionError {
 	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct KeyRequestAction {
+	/// The CO.
+	pub co: CoId,
+
+	/// The parent co of the `co`.
+	pub parent_co: CoId,
+
+	/// The Key URI. If not specified the latest key is retrived.
+	pub key: Option<String>,
+
+	/// The DID to use for the request. If not specified the network identity is used.
+	pub from: Option<Did>,
+
+	/// Specific networks to use. If not specified the Co network settings are used.
+	pub network: Option<BTreeSet<Network>>,
+}
+
 /// Send a DIDComm message to all connectable co peers.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoDidCommSendAction {
 	/// The Co to send the message to.
 	pub co: CoId,
 
 	/// Networks to use.
-	/// If no networks are specified tehy are resolved from the Co.
+	/// If no networks are specified they are resolved from the Co.
 	pub networks: BTreeSet<Network>,
 
 	/// Notification when sent has been sucessfully done.
