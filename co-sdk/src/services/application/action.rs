@@ -88,6 +88,10 @@ pub enum Action {
 	},
 
 	/// Received a DIDComm message.
+	///
+	/// # Security
+	/// It is not proofed that the sender (peer) is the producer of the message.
+	/// If such a proof is needed it must be included in a signed message.
 	DidCommReceive { peer: PeerId, message: Message },
 
 	/// Received a HeadsMessage.
@@ -410,9 +414,19 @@ pub struct HeadsMessageReceivedAction {
 	/// The Co to send the message to.
 	pub co: CoId,
 
+	/// The DID of the sender. If set is must be validated.
 	pub from: Option<Did>,
+
+	/// The trusted PeerId of the sender.
+	pub from_peer: Option<PeerId>,
+
+	/// The PeerId of the sender from which we received the message.
 	pub peer: PeerId,
+
+	/// The message id.
 	pub message_id: String,
+
+	/// The message payload.
 	pub message: HeadsMessage,
 
 	/// Message tags. Used for internal tracking.

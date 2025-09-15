@@ -2,6 +2,7 @@ use co_identity::{network_did_discovery, Identity, IdentityResolver, IdentityRes
 use co_network::{discovery, heads};
 use co_primitives::{Did, Network};
 use futures::{stream::iter, Stream};
+use libp2p::PeerId;
 use std::collections::BTreeSet;
 use tokio_stream::StreamExt;
 
@@ -10,6 +11,7 @@ use tokio_stream::StreamExt;
 /// Errors are retunred with the stream befor continue with the other items.
 pub fn network_discovery<'a, P>(
 	identity_resolver: Option<&'a IdentityResolverBox>,
+	from_peer: PeerId,
 	from: &'a P,
 	networks: impl IntoIterator<Item = Network> + 'a,
 	identities: impl IntoIterator<Item = Did> + 'a,
@@ -24,7 +26,7 @@ where
 		for await network in iter(networks.into_iter().map(Ok)).merge(identities_networks(identity_resolver, identities)) {
 			match network {
 				Ok(network) => {
-					for await discovery_result in network_discovery_one(identity_resolver, from, network) {
+					for await discovery_result in network_discovery_one(identity_resolver, from_peer, from, network) {
 						match discovery_result {
 							Ok(discovery) => {
 								if seen.insert(discovery.clone()) {
@@ -74,6 +76,7 @@ pub fn identities_networks<'a>(
 
 fn network_discovery_one<'a, P>(
 	identity_resolver: Option<&'a IdentityResolverBox>,
+	from_peer: PeerId,
 	from: &'a P,
 	network: Network,
 ) -> impl Stream<Item = Result<discovery::Discovery, anyhow::Error>> + 'a
@@ -96,6 +99,7 @@ where
 				if let Some(identity_resolver) = &identity_resolver {
 					let identity = identity_resolver.resolve(&value.did).await?;
 					yield discovery::DidDiscovery::create(
+						from_peer,
 						from,
 						&identity,
 						Some(value),

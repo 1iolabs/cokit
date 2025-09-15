@@ -38,8 +38,25 @@ pub enum ConnectionAction {
 	/// Disconnect network (entirely).
 	Disconnect(DisconnectAction),
 
+	/// Relate a PeerId to a Co.
+	/// This will make the peer to be returned when a Co connection is requested.
+	///
+	/// Security: This relation must be known to be true by the caller.
+	PeerRelateCo(PeerRelateCoAction),
+
+	/// Relate a PeerId to a DID.
+	///
+	/// Security: This relation must be known to be true (trusted) by the caller.
+	PeerRelateDid(PeerRelateDidAction),
+
 	/// Network has been (entirely) disconnected.
 	Disconnected(DisconnectedAction),
+
+	/// A connection to a peer has been established.
+	PeerConnectionEstablished(PeerConnectionEstablishedAction),
+
+	/// A connection to a peer has been closed.
+	PeerConnectionClosed(PeerConnectionClosedAction),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -110,6 +127,18 @@ pub struct DisconnectedAction {
 	pub reason: DisconnectReason,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PeerConnectionEstablishedAction {
+	pub peer_id: PeerId,
+	pub time: Instant,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PeerConnectionClosedAction {
+	pub peer_id: PeerId,
+	pub time: Instant,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, thiserror::Error)]
 pub enum DisconnectReason {
 	#[error("No network available to connect")]
@@ -120,4 +149,19 @@ pub enum DisconnectReason {
 	Timeout,
 	#[error("Close")]
 	Close,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PeerRelateCoAction {
+	pub peer_id: PeerId,
+	pub co: CoId,
+	pub did: Option<Did>,
+	pub time: Instant,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PeerRelateDidAction {
+	pub peer_id: PeerId,
+	pub did: Did,
+	pub time: Instant,
 }

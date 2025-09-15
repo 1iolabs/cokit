@@ -11,7 +11,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actions, Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, Reducer, SwitchEpic, TracingEpic};
-use co_identity::{Identity, PrivateIdentity, PrivateIdentityBox};
+use co_identity::{Identity, PeerDidCommHeader, PrivateIdentity, PrivateIdentityBox};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{tags, CoId, Tags};
 use futures::{Stream, StreamExt};
@@ -225,9 +225,9 @@ impl Epic<PushHeadsAction, PushHeadsState, PushHeadsContext> for PushHeadsSendEp
 				let peers = peers.clone();
 				async_stream::try_stream! {
 					// message
-					let header = HeadsMessage::create_header();
+					let header = PeerDidCommHeader { header: HeadsMessage::create_header(), from_peer_id: Some(network.local_peer_id().to_string()) };
 					let body = HeadsMessage::Heads(id.clone(), heads.clone());
-					let (_, message) = EncodedMessage::create_signed_json(&identity, header, &body)?;
+					let (_, message) = EncodedMessage::create_signed_json(&identity, header.into(), &body)?;
 
 					// send
 					for peer in peers {

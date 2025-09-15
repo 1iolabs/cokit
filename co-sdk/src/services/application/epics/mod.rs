@@ -8,6 +8,7 @@ mod co_heads_publish;
 mod co_heads_subscribe;
 mod core_action_push;
 mod did_subscribe;
+mod didcomm_connected;
 mod didcomm_receive;
 mod didcomm_send;
 mod heads_message;
@@ -41,6 +42,7 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(heads_message::heads_message_heads)
 		.join(heads_message::heads_message_heads_request)
 		.join(didcomm_send::didcomm_send)
+		.join(didcomm_connected::didcomm_connected)
 		.join(key_request_receive::key_request_receive)
 		.join(key_request_send::join_key_request_send)
 		.join(key_request_send::key_request_send)

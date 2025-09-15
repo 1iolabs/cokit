@@ -5,8 +5,8 @@ use crate::{
 		network_identity::network_identity_by_id, network_queue::TaskState, settings_timeout::settings_timeout,
 	},
 	services::application::{action::KeyRequestAction, NetworkBlockGetAction},
-	Action, ActionError, CoContext, CoNetworkTaskSpawner, CoReducerFactory, CoToken, CoTokenParameters,
-	ConnectionMessage, CO_ID_LOCAL,
+	Action, CoContext, CoNetworkTaskSpawner, CoReducerFactory, CoToken, CoTokenParameters, ConnectionMessage,
+	CO_ID_LOCAL,
 };
 use cid::Cid;
 use co_actor::{ActionDispatch, Actions, ActorHandle};

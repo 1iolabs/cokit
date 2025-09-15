@@ -293,10 +293,20 @@ where
 	/// Check if actor is running.
 	///
 	/// Running means not initializing, stopping or stopped.
-	pub fn running(&self) -> bool {
+	pub fn is_running(&self) -> bool {
 		match *self.state.borrow() {
-			ActorState::Running => true,
+			ActorState::Running => !self.tx.is_closed(),
 			_ => false,
+		}
+	}
+
+	/// Check if actor is closed.
+	///
+	/// Closed means not initializing or running.
+	pub fn is_closed(&self) -> bool {
+		match *self.state.borrow() {
+			ActorState::Stopping => true,
+			_ => self.tx.is_closed(),
 		}
 	}
 

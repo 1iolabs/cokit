@@ -1,6 +1,6 @@
 use crate::{
 	library::network_identity::network_identity,
-	services::application::HeadsMessageReceivedAction,
+	services::{application::HeadsMessageReceivedAction, connections::PeerRelateCoAction},
 	state,
 	types::message::heads::{HeadsErrorCode, HeadsMessage},
 	Action, CoContext, CoReducer, CoReducerFactory, MappedCoReducerState,
@@ -8,11 +8,12 @@ use crate::{
 use anyhow::anyhow;
 use cid::Cid;
 use co_actor::Actions;
+use co_identity::PeerDidCommHeader;
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoId, Did};
 use futures::{future::ready, stream, FutureExt, Stream, StreamExt};
 use libp2p::PeerId;
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, str::FromStr, time::Instant};
 
 /// Receive [`HeadsMessage`] DIDComm message.
 ///
@@ -30,7 +31,9 @@ pub fn heads_message_receive(
 			if &message.header().message_type == &message_type {
 				let heads_message: Option<HeadsMessage> = message.body_deserialize().ok();
 				if let Some(heads_message) = heads_message {
-					Some((message.sender().cloned(), *peer, message.header().id.clone(), heads_message))
+					let header = PeerDidCommHeader::from(message.header().clone());
+					let from_peer = header.from_peer_id.and_then(|s| PeerId::from_str(&s).ok());
+					Some((message.sender().cloned(), *peer, from_peer, message.header().id.clone(), heads_message))
 				} else {
 					None
 				}
@@ -40,10 +43,11 @@ pub fn heads_message_receive(
 		},
 		_ => None,
 	}
-	.map(|(from, peer, message_id, message)| {
+	.map(|(from, peer, from_peer, message_id, message)| {
 		Action::HeadsMessageReceived(HeadsMessageReceivedAction {
 			co: message.co().clone(),
 			from,
+			from_peer,
 			peer,
 			message_id,
 			message,
@@ -119,6 +123,18 @@ async fn handle_heads(
 
 	// verify
 	verify_from_participant(&co_reducer, &message.from).await?;
+
+	// network: let others know that the Co is connected and allow to use the implicit direct peer connection
+	if let Some(from_peer_id) = message.from_peer {
+		if let Some(connections) = context.network_connections().await {
+			connections.dispatch(PeerRelateCoAction {
+				co: co.clone(),
+				peer_id: from_peer_id,
+				did: message.from.clone(),
+				time: Instant::now(),
+			})?;
+		}
+	}
 
 	// join
 	let previous_state = co_reducer.reducer_state().await;

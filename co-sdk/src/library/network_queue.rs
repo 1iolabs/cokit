@@ -99,7 +99,7 @@ pub async fn network_queue_heads(
 				task: Task {
 					id: task_id,
 					name: format!("Heads message {} to co:{}", message.message_id, &message.co),
-					tags: tags!("co": message.co.to_string(), "type": "co-didcomm", "message_id": message.message_id),
+					tags: tags!("co": message.co.to_string(), "type": "co-heads/1.0", "message_id": message.message_id),
 					payload,
 					lock: None,
 				},

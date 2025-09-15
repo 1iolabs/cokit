@@ -6,16 +6,10 @@ use crate::{
 };
 use anyhow::anyhow;
 use co_actor::{Actions, Epic};
-use co_primitives::{
-	tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, CoInviteMetadata, KnownTags, Network,
-};
+use co_primitives::{CoId, CoInviteMetadata, KnownTags, Network};
 use co_storage::BlockStorageExt;
 use futures::{Stream, TryStreamExt};
-use std::{
-	collections::BTreeSet,
-	time::{Duration, Instant},
-};
-use tokio::time::timeout;
+use std::{collections::BTreeSet, time::Instant};
 
 pub struct NetworkResolveEpic();
 impl NetworkResolveEpic {
@@ -57,7 +51,7 @@ async fn network_resolve(context: CoContext, id: CoId) -> Result<BTreeSet<Networ
 	//  this should only happen on invite
 	//  as for every other thing the co root is always available
 	//  because we need it to actually write it
-	if !reducer.running() {
+	if !reducer.is_running() {
 		tracing::debug!(co = ?id, "co-resolve-networks-not-running");
 		match networks_invite(&context, &id).await {
 			Ok(networks) => {

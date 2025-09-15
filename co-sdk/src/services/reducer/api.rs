@@ -66,8 +66,8 @@ impl CoReducer {
 	}
 
 	/// Test if reducer is running.
-	pub fn running(&self) -> bool {
-		self.handle.running()
+	pub fn is_running(&self) -> bool {
+		self.handle.is_running()
 	}
 
 	pub(crate) fn clone_with_detached_storage(&self) -> Self {
