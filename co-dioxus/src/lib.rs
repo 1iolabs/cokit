@@ -15,6 +15,7 @@ pub use hooks::{
 	use_co_selector::use_co_selector,
 	use_co_state::use_co_state,
 	use_co_storage::{use_co_storage, CoBlockStorage},
+	use_did_key_identity::use_did_key_identity,
 };
 pub use library::co_context::CoContext;
 pub use types::{
