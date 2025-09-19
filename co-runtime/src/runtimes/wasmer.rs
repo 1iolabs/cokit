@@ -51,7 +51,7 @@ impl WasmerRuntime {
 		// instance
 		let import_object = Self::imports(&mut store, &env);
 		let instance: Instance = Instance::new(&mut store, &module, &import_object)?;
-		let memory = instance.exports.get_memory("memory").unwrap().clone();
+		let memory = instance.exports.get_memory("memory")?.clone();
 		env.as_mut(&mut store).memory = Some(memory);
 
 		// check
@@ -63,14 +63,14 @@ impl WasmerRuntime {
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err, ret)]
 	pub fn execute_state(&mut self) -> Result<(), WasmerError> {
-		let state = self.instance.exports.get_function("state").unwrap();
+		let state = self.instance.exports.get_function("state")?;
 		state.call(&mut self.store, &[])?;
 		Ok(())
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err, ret)]
 	pub fn execute_guard(&mut self) -> Result<bool, WasmerError> {
-		let state = self.instance.exports.get_function("guard").unwrap();
+		let state = self.instance.exports.get_function("guard")?;
 		let results = state.call(&mut self.store, &[])?;
 		if results.len() != 1 {
 			return Err(wasmer::ExportError::IncompatibleType.into());
@@ -116,7 +116,7 @@ fn wasmer_storage_block_get(
 	buffer_size: u32,
 ) -> u32 {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
+	let memory = data.memory.as_ref().expect("memory").view(&store);
 	let cid_access = cid
 		.slice(&memory, cid_size)
 		.expect("pointer in bounds")
@@ -141,7 +141,7 @@ fn wasmer_storage_block_set(
 	buffer_size: u32,
 ) -> u32 {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
+	let memory = data.memory.as_ref().expect("memory").view(&store);
 	let cid_access = cid
 		.slice(&memory, cid_size)
 		.expect("pointer in bounds")
@@ -157,7 +157,7 @@ fn wasmer_storage_block_set(
 
 fn wasmer_payload_read(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, buffer_size: u32, offset: u32) -> u32 {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
+	let memory = data.memory.as_ref().expect("memory").view(&store);
 	let mut buffer_access = buffer
 		.slice(&memory, buffer_size)
 		.expect("pointer in bounds")
@@ -170,7 +170,7 @@ fn wasmer_payload_read(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, 
 
 fn wasmer_state_cid_read(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, buffer_size: u32) -> u32 {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
+	let memory = data.memory.as_ref().expect("memory").view(&store);
 	let mut buffer_access = buffer
 		.slice(&memory, buffer_size)
 		.expect("pointer in bounds")
@@ -180,7 +180,7 @@ fn wasmer_state_cid_read(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>
 }
 fn wasmer_state_cid_write(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, buffer_size: u32) -> u32 {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
+	let memory = data.memory.as_ref().expect("memory").view(&store);
 	let buffer_access = buffer
 		.slice(&memory, buffer_size)
 		.expect("pointer in bounds")
@@ -190,7 +190,7 @@ fn wasmer_state_cid_write(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8
 }
 fn wasmer_event_cid_read(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, buffer_size: u32) -> u32 {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
+	let memory = data.memory.as_ref().expect("memory").view(&store);
 	let mut buffer_access = buffer
 		.slice(&memory, buffer_size)
 		.expect("pointer in bounds")
@@ -200,7 +200,7 @@ fn wasmer_event_cid_read(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>
 }
 fn wasmer_diagnostic_cid_write(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, buffer_size: u32) -> u32 {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
+	let memory = data.memory.as_ref().expect("memory").view(&store);
 	let buffer_access = buffer
 		.slice(&memory, buffer_size)
 		.expect("pointer in bounds")

@@ -82,6 +82,7 @@ struct PendingRequest {
 	expire: Instant,
 }
 
+// #[deprecated]
 pub struct HeadsState {
 	heads: BTreeSet<TopicHash>,
 	events: VecDeque<HeadsEvent>,

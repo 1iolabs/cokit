@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::BTreeSet;
 
+// #[deprecated]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum HeadsMessage {
 	/// Heads notifictaion.
