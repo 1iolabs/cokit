@@ -1733,6 +1733,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
+ "clap 4.5.16",
  "co-core-co",
  "co-core-membership",
  "co-primitives",

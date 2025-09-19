@@ -10,7 +10,7 @@ async-stream = { workspace = true }
 async-trait = { workspace = true }
 chrono = "0.4.37"
 cid = { workspace = true }
-clap = { version = "^4.3.23", features = ["derive"] }
+clap = { version = "^4.3.23", features = ["derive", "env"] }
 co-core-co = { workspace = true }
 co-core-file = { workspace = true }
 co-core-keystore = { workspace = true }

@@ -385,6 +385,10 @@ impl ApplicationBuilder {
 		Self { tracing: self.tracing.with_bunyan_logging(log_path), ..self }
 	}
 
+	pub fn with_log_max_level(self, max_level: tracing::Level) -> Self {
+		Self { tracing: self.tracing.with_max_level(max_level), ..self }
+	}
+
 	pub fn with_optional_tracing(self) -> Self {
 		Self { tracing: self.tracing.with_optional_tracing(), ..self }
 	}

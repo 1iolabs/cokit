@@ -17,7 +17,10 @@ pub use hooks::{
 	use_co_storage::{use_co_storage, CoBlockStorage},
 	use_did_key_identity::use_did_key_identity,
 };
-pub use library::co_context::CoContext;
+pub use library::{
+	cli::{Cli, CoLogLevel},
+	co_context::CoContext,
+};
 pub use types::{
 	co_settings::CoSettings,
 	co_state_result::CoStateResult,
