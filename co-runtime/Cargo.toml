@@ -15,7 +15,6 @@ colored = "2.1.0"
 derive_more = { workspace = true }
 futures = { workspace = true }
 ipld-core = { workspace = true }
-names = "0.14.0"
 rust-unixfs = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
@@ -25,9 +24,16 @@ tokio = { workspace = true, features = ["macros", "sync"] }
 tokio-stream = { workspace = true, optional = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
-wasmer = "4.2.3"
+wasmer = "6.0.1"
+wasmer-compiler = { version = "6.0.1", optional = true }
+wasmer-compiler-llvm = { version = "6.0.1", optional = true }
+wasmer-types = { version = "6.0.1", optional = true }
 
 [dev-dependencies]
 hexdump = "0.1.1"
 insta = { version = "1.34.0", features = ["default", "yaml"] }
 tracing-subscriber = { workspace = true }
+
+[features]
+default = []
+llvm = ["wasmer-compiler-llvm", "wasmer-compiler", "wasmer-types"]

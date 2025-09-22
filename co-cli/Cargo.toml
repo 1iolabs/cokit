@@ -51,3 +51,7 @@ tracing-log = { workspace = true }
 tracing-opentelemetry = "0.23"
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { workspace = true }
+
+[features]
+default = []
+llvm = ["co-runtime/llvm"]
