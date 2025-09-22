@@ -24,10 +24,10 @@ tokio = { workspace = true, features = ["macros", "sync"] }
 tokio-stream = { workspace = true, optional = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
-wasmer = "=6.1.0-rc.5"
-wasmer-compiler = { version = "=6.1.0-rc.5", optional = true }
-wasmer-compiler-llvm = { version = "=6.1.0-rc.5", optional = true }
-wasmer-types = { version = "=6.1.0-rc.5", optional = true }
+wasmer = "4"
+wasmer-compiler = { version = "4", optional = true }
+wasmer-compiler-llvm = { version = "4", optional = true }
+wasmer-types = { version = "4", optional = true }
 
 [dev-dependencies]
 hexdump = "0.1.1"

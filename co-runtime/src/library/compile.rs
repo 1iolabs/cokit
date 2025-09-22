@@ -2,7 +2,7 @@ use core::str::FromStr;
 use wasmer::{Module, Store};
 use wasmer_compiler::EngineBuilder;
 use wasmer_compiler_llvm::LLVM;
-use wasmer_types::target::{CpuFeature, Target, Triple};
+use wasmer_types::{CpuFeature, Target, Triple};
 
 pub async fn compile_native(wasm_bytes: impl AsRef<[u8]>, arch_triple: &str) -> Result<Vec<u8>, anyhow::Error> {
 	let mut compiler = EngineBuilder::new(LLVM::default());
