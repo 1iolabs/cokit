@@ -697,7 +697,9 @@ mod tests {
 		let storage = MemoryBlockStorage::default();
 
 		// wasm
-		let wasm = build_core(crate_repository_path(true).unwrap(), "examples/counter")
+		let repository_path = crate_repository_path(true).unwrap();
+		let core_path = repository_path.join("examples/counter");
+		let wasm = build_core(repository_path, core_path)
 			.unwrap()
 			.store_artifact(&storage)
 			.await
