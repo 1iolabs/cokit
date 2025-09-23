@@ -31,6 +31,8 @@ test:
   image: ${DOCKERFILE_IMAGE}
   cache:
     <<: *global_cache
+  variables:
+    RUST_BACKTRACE: "full"
   script:
     - cargo test
 

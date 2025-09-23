@@ -124,7 +124,7 @@ impl WasmerRuntime {
 // fn is_sandboxed() -> bool {
 // 	std::env::var("APP_SANDBOX_CONTAINER_ID").is_ok()
 // }
- 	
+
 fn wasmer_storage_block_get(
 	mut env: FunctionEnvMut<WasmerEnv>,
 	cid: WasmPtr<u8>,
