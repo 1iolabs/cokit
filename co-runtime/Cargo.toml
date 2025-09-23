@@ -19,6 +19,7 @@ rust-unixfs = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
 serde_repr = { workspace = true }
+target-lexicon = "0.12"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "sync"] }
 tokio-stream = { workspace = true, optional = true }

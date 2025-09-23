@@ -3,7 +3,10 @@ use crate::co_v1::{
 	storage_block_set, CoV1Api,
 };
 use std::fmt::Debug;
-use wasmer::{imports, AsStoreMut, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, Store, WasmPtr};
+use wasmer::{
+	imports, sys::EngineBuilder, AsStoreMut, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, Store,
+	WasmPtr,
+};
 
 pub struct WasmerRuntime {
 	store: Store,
@@ -35,15 +38,24 @@ pub enum WasmerError {
 	Export(#[from] wasmer::ExportError),
 	#[error("Runtime")]
 	Runtime(#[from] wasmer::RuntimeError),
+	#[error("Deserialize")]
+	Deserialize(#[from] wasmer::DeserializeError),
 }
 
 impl WasmerRuntime {
 	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, skip(bytes), fields(bytes.len = bytes.len()))]
-	pub fn new(api: CoV1Api, bytes: &Vec<u8>) -> Result<Self, WasmerError> {
-		let mut store = Store::default();
-
+	pub fn new(api: CoV1Api, native: bool, bytes: &Vec<u8>) -> Result<Self, WasmerError> {
 		// module
-		let module = Module::new(&store, bytes)?;
+		let (mut store, module) = if native {
+			let engine = EngineBuilder::headless();
+			let store = Store::new(engine);
+			let module = unsafe { Module::deserialize(&store, bytes)? };
+			(store, module)
+		} else {
+			let store = Store::default();
+			let module = Module::new(&store, bytes)?;
+			(store, module)
+		};
 
 		// env
 		let env = FunctionEnv::new(&mut store, WasmerEnv { memory: None, api });
@@ -54,8 +66,9 @@ impl WasmerRuntime {
 		let memory = instance.exports.get_memory("memory")?.clone();
 		env.as_mut(&mut store).memory = Some(memory);
 
-		// check
-		instance.exports.get_function("state")?;
+		// // check
+		// instance.exports.get_function("state")?;
+		// instance.exports.get_function("guard")?;
 
 		// result
 		Ok(Self { store, instance, env })
@@ -108,6 +121,10 @@ impl WasmerRuntime {
 	}
 }
 
+// fn is_sandboxed() -> bool {
+// 	std::env::var("APP_SANDBOX_CONTAINER_ID").is_ok()
+// }
+ 	
 fn wasmer_storage_block_get(
 	mut env: FunctionEnvMut<WasmerEnv>,
 	cid: WasmPtr<u8>,
