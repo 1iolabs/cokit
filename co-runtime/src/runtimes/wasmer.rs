@@ -4,8 +4,8 @@ use crate::co_v1::{
 };
 use std::fmt::Debug;
 use wasmer::{
-	imports, sys::EngineBuilder, AsStoreMut, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, Store,
-	WasmPtr,
+	imports, sys::EngineBuilder, AsStoreMut, Engine, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module,
+	Store, WasmPtr,
 };
 
 pub struct WasmerRuntime {
@@ -46,16 +46,7 @@ impl WasmerRuntime {
 	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, skip(bytes), fields(bytes.len = bytes.len()))]
 	pub fn new(api: CoV1Api, native: bool, bytes: &Vec<u8>) -> Result<Self, WasmerError> {
 		// module
-		let (mut store, module) = if native {
-			let engine = EngineBuilder::headless();
-			let store = Store::new(engine);
-			let module = unsafe { Module::deserialize(&store, bytes)? };
-			(store, module)
-		} else {
-			let store = Store::default();
-			let module = Module::new(&store, bytes)?;
-			(store, module)
-		};
+		let (mut store, module) = wasmer_runtime(native, bytes)?;
 
 		// env
 		let env = FunctionEnv::new(&mut store, WasmerEnv { memory: None, api });
@@ -66,6 +57,7 @@ impl WasmerRuntime {
 		let memory = instance.exports.get_memory("memory")?.clone();
 		env.as_mut(&mut store).memory = Some(memory);
 
+		// TODO: adjust check to support state or guard only binaries
 		// // check
 		// instance.exports.get_function("state")?;
 		// instance.exports.get_function("guard")?;
@@ -119,6 +111,55 @@ impl WasmerRuntime {
 			}
 		}
 	}
+}
+
+/// Initiate a WASM (or AOT native) module.
+/// Attempts to pick the most optimal runtime which is available.
+///
+/// See:
+/// - https://github.com/wasmerio/wasmer/blob/dcaff6c83316e9e67b62ade47e70a9b121c08b15/lib/cli/src/backend.rs#L670
+#[allow(unreachable_code)]
+fn wasmer_runtime(native: bool, bytes: &[u8]) -> Result<(Store, Module), WasmerError> {
+	// bytes are native code
+	if native {
+		let engine: Engine = EngineBuilder::headless().engine().into();
+		let store = Store::new(engine);
+		let module = unsafe { Module::deserialize(&store, bytes)? };
+		return Ok((store, module));
+	}
+
+	// llvm feature
+	#[cfg(feature = "llvm")]
+	{
+		let engine: Engine = EngineBuilder::new(wasmer_compiler_llvm::LLVM::default()).engine();
+		let store = Store::new(engine);
+		let module = Module::new(&store, bytes)?;
+		return Ok((store, module));
+	}
+
+	// wamr (WebAssembly Micro Runtime) feature
+	// See: https://wasmer.io/posts/introducing-wasmer-v5
+	#[cfg(feature = "wamr")]
+	{
+		let engine: Engine = wasmer::wamr::Wamr::new().into();
+		let store = Store::new(engine);
+		let module = Module::new(&store, bytes)?;
+		return Ok((store, module));
+	}
+
+	// wasmi feature
+	#[cfg(feature = "wasmi")]
+	{
+		let engine: Engine = wasmer::wasmi::Wasmi::new().into();
+		let store = Store::new(engine);
+		let module = Module::new(&store, bytes)?;
+		return Ok((store, module));
+	}
+
+	// let wasmer choose
+	let store = Store::default();
+	let module = Module::new(&store, bytes)?;
+	Ok((store, module))
 }
 
 // fn is_sandboxed() -> bool {
