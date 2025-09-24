@@ -34,7 +34,6 @@ test:
   variables:
     RUST_BACKTRACE: "full"
   script:
-    - env
     - cargo test
 
 # run benchmarks
