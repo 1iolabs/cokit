@@ -22,7 +22,6 @@ dockerfile:
   stage: test
   image: ${DOCKERFILE_IMAGE}
   script:
-    - env
     - echo "> test if docker image is in sync with Dockerfile (ci/build.sh)"
     - echo "${DOCKERFILE_HASH}  ci/Dockerfile" | sha256sum --check --status
 
@@ -35,6 +34,7 @@ test:
   variables:
     RUST_BACKTRACE: "full"
   script:
+    - env
     - cargo test
 
 # run benchmarks
