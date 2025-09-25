@@ -11420,6 +11420,7 @@ dependencies = [
  "wasm-bindgen",
  "wasmer-compiler",
  "wasmer-compiler-cranelift",
+ "wasmer-compiler-llvm",
  "wasmer-derive",
  "wasmer-types",
  "wasmer-vm",

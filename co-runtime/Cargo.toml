@@ -36,8 +36,8 @@ insta = { version = "1.34.0", features = ["default", "yaml"] }
 tracing-subscriber = { workspace = true }
 
 [features]
-default = ["cranelift"]
-llvm = ["wasmer-compiler-llvm", "wasmer-compiler", "wasmer-types"]
+default = ["wamr"]
+llvm = ["wasmer/llvm", "wasmer-compiler-llvm", "wasmer-compiler", "wasmer-types"]
 wasmi = ["wasmer/wasmi"]
 wamr = ["wasmer/wamr"]
 cranelift = ["wasmer/cranelift"]

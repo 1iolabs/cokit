@@ -16,6 +16,9 @@ RUN apt-get install --no-install-recommends -y wget gnupg lsb-release software-p
  && ./llvm.sh 18 all \
  && rm llvm.sh
 
+# CMAKE
+RUN apt-get install --no-install-recommends -y cmake
+
 # RUST
 RUN rustup component add rustfmt \
  && rustup target add wasm32-unknown-unknown \

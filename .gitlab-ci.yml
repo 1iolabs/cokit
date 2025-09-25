@@ -34,7 +34,7 @@ test:
   variables:
     RUST_BACKTRACE: "full"
   script:
-    - cargo test -F llvm
+    - cargo test
 
 # run benchmarks
 bench:
