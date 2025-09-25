@@ -1,5 +1,5 @@
+use crate::runtimes::wasmer::WasmerRuntimeBuilder;
 use std::path::Path;
-use wasmer::{Module, Store};
 
 pub struct ModuleDescription {
 	/// Exports (name, type).
@@ -11,8 +11,7 @@ pub struct ModuleDescription {
 impl ModuleDescription {
 	pub async fn from_path(path: &Path) -> anyhow::Result<ModuleDescription> {
 		let bytes = tokio::fs::read(path).await?;
-		let store = Store::default();
-		let module = Module::new(&store, &bytes)?;
+		let (_store, module) = WasmerRuntimeBuilder::wasm(&bytes).for_info().build()?;
 		Ok(ModuleDescription {
 			exports: module
 				.exports()

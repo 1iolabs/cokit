@@ -46,7 +46,8 @@ impl WasmerRuntime {
 	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, skip(bytes), fields(bytes.len = bytes.len()))]
 	pub fn new(api: CoV1Api, native: bool, bytes: &Vec<u8>) -> Result<Self, WasmerError> {
 		// module
-		let (mut store, module) = wasmer_runtime(native, bytes)?;
+		let (mut store, module) =
+			if native { WasmerRuntimeBuilder::native(bytes) } else { WasmerRuntimeBuilder::wasm(bytes) }.build()?;
 
 		// env
 		let env = FunctionEnv::new(&mut store, WasmerEnv { memory: None, api });
@@ -118,48 +119,68 @@ impl WasmerRuntime {
 ///
 /// See:
 /// - https://github.com/wasmerio/wasmer/blob/dcaff6c83316e9e67b62ade47e70a9b121c08b15/lib/cli/src/backend.rs#L670
-#[allow(unreachable_code)]
-fn wasmer_runtime(native: bool, bytes: &[u8]) -> Result<(Store, Module), WasmerError> {
-	// bytes are native code
-	if native {
-		let engine: Engine = EngineBuilder::headless().engine().into();
-		let store = Store::new(engine);
-		let module = unsafe { Module::deserialize(&store, bytes)? };
-		return Ok((store, module));
+pub struct WasmerRuntimeBuilder<'a> {
+	native: bool,
+	bytes: &'a [u8],
+	llvm: bool,
+}
+impl<'a> WasmerRuntimeBuilder<'a> {
+	pub fn wasm(bytes: &'a [u8]) -> Self {
+		Self { native: false, bytes, llvm: true }
 	}
 
-	// llvm feature
-	#[cfg(feature = "llvm")]
-	{
-		let engine: Engine = EngineBuilder::new(wasmer_compiler_llvm::LLVM::default()).engine();
-		let store = Store::new(engine);
-		let module = Module::new(&store, bytes)?;
-		return Ok((store, module));
+	pub fn native(bytes: &'a [u8]) -> Self {
+		Self { native: true, bytes, llvm: true }
 	}
 
-	// wamr (WebAssembly Micro Runtime) feature
-	// See: https://wasmer.io/posts/introducing-wasmer-v5
-	#[cfg(feature = "wamr")]
-	{
-		let engine: Engine = wasmer::wamr::Wamr::new().into();
-		let store = Store::new(engine);
-		let module = Module::new(&store, bytes)?;
-		return Ok((store, module));
+	pub fn for_info(mut self) -> Self {
+		self.llvm = false;
+		self
 	}
 
-	// wasmi feature
-	#[cfg(feature = "wasmi")]
-	{
-		let engine: Engine = wasmer::wasmi::Wasmi::new().into();
-		let store = Store::new(engine);
-		let module = Module::new(&store, bytes)?;
-		return Ok((store, module));
-	}
+	#[allow(unreachable_code)]
+	pub fn build(self) -> Result<(Store, Module), WasmerError> {
+		// bytes are native code
+		if self.native {
+			let engine: Engine = EngineBuilder::headless().engine().into();
+			let store = Store::new(engine);
+			let module = unsafe { Module::deserialize(&store, self.bytes)? };
+			return Ok((store, module));
+		}
 
-	// let wasmer choose
-	let store = Store::default();
-	let module = Module::new(&store, bytes)?;
-	Ok((store, module))
+		// llvm feature
+		#[cfg(feature = "llvm")]
+		if self.llvm {
+			let engine: Engine = EngineBuilder::new(wasmer_compiler_llvm::LLVM::default()).engine().into();
+			let store = Store::new(engine);
+			let module = Module::new(&store, self.bytes)?;
+			return Ok((store, module));
+		}
+
+		// wamr (WebAssembly Micro Runtime) feature
+		// See: https://wasmer.io/posts/introducing-wasmer-v5
+		#[cfg(feature = "wamr")]
+		{
+			let engine: Engine = wasmer::wamr::Wamr::new().into();
+			let store = Store::new(engine);
+			let module = Module::new(&store, self.bytes)?;
+			return Ok((store, module));
+		}
+
+		// wasmi feature
+		#[cfg(feature = "wasmi")]
+		{
+			let engine: Engine = wasmer::wasmi::Wasmi::new().into();
+			let store = Store::new(engine);
+			let module = Module::new(&store, self.bytes)?;
+			return Ok((store, module));
+		}
+
+		// let wasmer choose
+		let store = Store::default();
+		let module = Module::new(&store, self.bytes)?;
+		Ok((store, module))
+	}
 }
 
 // fn is_sandboxed() -> bool {
