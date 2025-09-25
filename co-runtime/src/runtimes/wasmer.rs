@@ -67,14 +67,14 @@ impl WasmerRuntime {
 		Ok(Self { store, instance, env })
 	}
 
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret)]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret)]
 	pub fn execute_state(&mut self) -> Result<(), WasmerError> {
 		let state = self.instance.exports.get_function("state")?;
 		state.call(&mut self.store, &[])?;
 		Ok(())
 	}
 
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret)]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret)]
 	pub fn execute_guard(&mut self) -> Result<bool, WasmerError> {
 		let state = self.instance.exports.get_function("guard")?;
 		let results = state.call(&mut self.store, &[])?;
@@ -292,6 +292,7 @@ fn wasmer_diagnostic_cid_write(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmP
 mod tests {
 	use wasmer::{imports, Function, FunctionEnv, FunctionEnvMut, Instance, Module, Store, Value};
 
+	#[cfg(feature = "cranelift")]
 	#[test]
 	fn wasmer_with_imports_example() -> anyhow::Result<()> {
 		let module_wat = r#"
