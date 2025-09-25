@@ -17,7 +17,7 @@ RUN apt-get install --no-install-recommends -y wget gnupg lsb-release software-p
  && rm llvm.sh
 
 # CMAKE
-RUN apt-get install --no-install-recommends -y cmake
+RUN apt-get install --no-install-recommends -y cmake ninja-build
 
 # RUST
 RUN rustup component add rustfmt \
