@@ -34,7 +34,7 @@ test:
   variables:
     RUST_BACKTRACE: "full"
   script:
-    - cargo test
+    - cargo test -F llvm
 
 # run benchmarks
 bench:
@@ -62,7 +62,7 @@ build:
     <<: *global_cache
   script:
     - echo "> building binaries"
-    - cargo build --release
+    - cargo build --release -F llvm
     - echo "> building cores"
     - ./target/release/co-cli core build-builtin
   artifacts:
