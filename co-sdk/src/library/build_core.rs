@@ -68,7 +68,7 @@ pub fn build_core(
 	// build
 	let output = Command::new("cargo")
 		.current_dir(&core_path)
-		.env("RUSTFLAGS", "-C opt-level=z -C lto -C codegen-units=1 -C panic=abort -C strip=symbols")
+		.env("RUSTFLAGS", "-C opt-level=z -C codegen-units=1 -C panic=abort -C strip=symbols")
 		.args([
 			"build",
 			"--features",

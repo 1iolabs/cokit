@@ -62,7 +62,7 @@ build:
     <<: *global_cache
   script:
     - echo "> building binaries"
-    - cargo build --release -F llvm
+    - cargo build --release
     - echo "> building cores"
     - ./target/release/co-cli core build-builtin
   artifacts:

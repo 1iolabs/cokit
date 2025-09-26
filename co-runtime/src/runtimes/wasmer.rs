@@ -7,6 +7,8 @@ use wasmer::{
 	imports, sys::EngineBuilder, AsStoreMut, Engine, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module,
 	Store, WasmPtr,
 };
+use wasmer_compiler::CompilerConfig;
+use wasmer_types::Features;
 
 pub struct WasmerRuntime {
 	store: Store,
@@ -140,9 +142,11 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 
 	#[allow(unreachable_code)]
 	pub fn build(self) -> Result<(Store, Module), WasmerError> {
+		let mut features = Features::none();
+
 		// bytes are native code
 		if self.native {
-			let engine: Engine = EngineBuilder::headless().engine().into();
+			let engine: Engine = EngineBuilder::headless().set_features(Some(features)).engine().into();
 			let store = Store::new(engine);
 			let module = unsafe { Module::deserialize(&store, self.bytes)? };
 			return Ok((store, module));
@@ -150,8 +154,12 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 
 		// llvm feature
 		#[cfg(feature = "llvm")]
-		if self.llvm {
-			let engine: Engine = EngineBuilder::new(wasmer_compiler_llvm::LLVM::default()).engine().into();
+		if self.llvm && !is_sandboxed() {
+			let mut config = wasmer_compiler_llvm::LLVM::default();
+			config.canonicalize_nans(true);
+			// config.opt_level(wasmer_compiler_llvm::LLVMOptLevel::None);
+			// config.enable_verifier();
+			let engine: Engine = EngineBuilder::new(config).set_features(Some(features)).engine().into();
 			let store = Store::new(engine);
 			let module = Module::new(&store, self.bytes)?;
 			return Ok((store, module));
@@ -161,7 +169,9 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 		// See: https://wasmer.io/posts/introducing-wasmer-v5
 		#[cfg(feature = "wamr")]
 		{
-			let engine: Engine = wasmer::wamr::Wamr::new().into();
+			let mut config = wasmer::wamr::Wamr::new();
+			config.canonicalize_nans(true);
+			let engine: Engine = EngineBuilder::new(config).set_features(Some(features)).engine().into();
 			let store = Store::new(engine);
 			let module = Module::new(&store, self.bytes)?;
 			return Ok((store, module));
@@ -170,7 +180,9 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 		// wasmi feature
 		#[cfg(feature = "wasmi")]
 		{
-			let engine: Engine = wasmer::wasmi::Wasmi::new().into();
+			let mut config = wasmer::wasmi::Wasmi::new();
+			config.canonicalize_nans(true);
+			let engine: Engine = EngineBuilder::new(config).set_features(Some(features)).engine().into();
 			let store = Store::new(engine);
 			let module = Module::new(&store, self.bytes)?;
 			return Ok((store, module));
@@ -183,9 +195,9 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 	}
 }
 
-// fn is_sandboxed() -> bool {
-// 	std::env::var("APP_SANDBOX_CONTAINER_ID").is_ok()
-// }
+fn is_sandboxed() -> bool {
+	std::env::var("APP_SANDBOX_CONTAINER_ID").is_ok()
+}
 
 fn wasmer_storage_block_get(
 	mut env: FunctionEnvMut<WasmerEnv>,

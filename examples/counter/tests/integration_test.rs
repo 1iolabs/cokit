@@ -15,6 +15,7 @@ fn integration_test() {
 
 	// build
 	assert!(Command::new("cargo")
+		.env("RUSTFLAGS", "-C debuginfo=2")
 		.args([
 			"build",
 			"--features",
