@@ -48,12 +48,12 @@ where
 
 	pub async fn get(&mut self) -> Result<&T::Transaction, StorageError> {
 		self.open().await?;
-		Ok(self.opt().unwrap())
+		Ok(self.opt().expect("initialized after open"))
 	}
 
 	pub async fn get_mut(&mut self) -> Result<&mut T::Transaction, StorageError> {
 		self.open().await?;
-		Ok(self.opt_mut().unwrap())
+		Ok(self.opt_mut().expect("initialized after open"))
 	}
 
 	pub fn opt(&self) -> Option<&T::Transaction> {
