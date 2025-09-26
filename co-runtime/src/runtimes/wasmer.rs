@@ -143,6 +143,10 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 	#[allow(unreachable_code)]
 	pub fn build(self) -> Result<(Store, Module), WasmerError> {
 		let mut features = Features::none();
+		features.reference_types = true;
+		features.bulk_memory = true;
+		features.multi_value = true;
+		features.extended_const = true;
 
 		// bytes are native code
 		if self.native {
