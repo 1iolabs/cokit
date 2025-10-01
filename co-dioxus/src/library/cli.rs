@@ -29,7 +29,7 @@ pub struct Cli {
 	pub no_log: bool,
 
 	/// Only log level and above.
-	#[arg(long, value_enum, default_value_t)]
+	#[arg(long, value_enum, default_value_t, env = "CO_LOG_LEVEL")]
 	pub log_level: CoLogLevel,
 
 	/// Read/Write Local CO encryption key to file instead of the OS keychain.
@@ -65,6 +65,7 @@ impl Into<CoSettings> for Cli {
 			no_keychain: self.no_keychain,
 			path: self.base_path,
 			no_log: self.no_log,
+			log_level: self.log_level,
 			no_default_features: self.no_default_features,
 			feature: self.feature,
 			..Default::default()
