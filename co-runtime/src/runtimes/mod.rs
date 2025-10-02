@@ -1,5 +1,7 @@
 use self::wasmer::WasmerRuntime;
 use crate::{co_v1::CoV1Api, RuntimeContext};
+use anyhow::anyhow;
+use std::fmt::Debug;
 
 pub mod wasmer;
 
@@ -28,11 +30,12 @@ impl From<wasmer::WasmerError> for RuntimeError {
 			wasmer::WasmerError::Export(e) => Self::InvalidArgument(e.into()),
 			wasmer::WasmerError::Runtime(e) => Self::Runtime(e.into()),
 			wasmer::WasmerError::Deserialize(e) => Self::Deserialize(e.into()),
+			e @ wasmer::WasmerError::NoEngineAvailable => Self::InvalidArgument(e.into()),
 		}
 	}
 }
 
-pub trait Runtime {
+pub trait Runtime: Debug {
 	/// Execute state runtime with specified api.
 	fn execute_state(&mut self, api: CoV1Api) -> Result<RuntimeContext, RuntimeError>;
 
@@ -44,7 +47,16 @@ enum RuntimeState {
 	Unintialized(bool, Vec<u8>),
 	Intialized(wasmer::WasmerRuntime),
 }
+impl Debug for RuntimeState {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Unintialized(arg0, arg1) => f.debug_tuple("Unintialized").field(arg0).field(&arg1.len()).finish(),
+			Self::Intialized(arg0) => f.debug_tuple("Intialized").field(arg0).finish(),
+		}
+	}
+}
 
+#[derive(Debug)]
 struct Wasmer {
 	state: RuntimeState,
 }
@@ -87,7 +99,7 @@ fn wasmer_runtime_with_api(state: &mut RuntimeState, mut api: CoV1Api) -> Result
 			if let RuntimeState::Intialized(runtime) = state {
 				runtime
 			} else {
-				unreachable!("invalid state");
+				return Err(RuntimeError::InvalidState(anyhow!("Uninitialized after initialize")));
 			}
 		},
 		RuntimeState::Intialized(runtime) => {

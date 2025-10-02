@@ -11,7 +11,7 @@ pub struct ModuleDescription {
 impl ModuleDescription {
 	pub async fn from_path(path: &Path) -> anyhow::Result<ModuleDescription> {
 		let bytes = tokio::fs::read(path).await?;
-		let (_store, module) = WasmerRuntimeBuilder::wasm(&bytes).for_info().build()?;
+		let (_kind, _store, module) = WasmerRuntimeBuilder::wasm(&bytes).for_info().build()?;
 		Ok(ModuleDescription {
 			exports: module
 				.exports()

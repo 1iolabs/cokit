@@ -6,24 +6,24 @@ use co_storage::{unixfs_cat_buffer, StorageError};
 use std::fmt::Debug;
 
 pub struct RuntimeInstance {
-	cid: Cid,
+	core: Cid,
 	runtime: Box<dyn Runtime + Send>,
 }
 impl RuntimeInstance {
 	/// Create a new runtime element which can be used immediately or inserted to the pool.
-	pub async fn create<S>(storage: &S, cid: &Cid) -> Result<Self, StorageError>
+	pub async fn create<S>(storage: &S, core: &Cid) -> Result<Self, StorageError>
 	where
 		S: AnyBlockStorage,
 	{
 		// load
-		let (native, bytes) = read_core(storage, cid).await?;
+		let (native, bytes) = read_core(storage, core).await?;
 
 		// result
-		Ok(RuntimeInstance { cid: *cid, runtime: create_runtime(native, bytes) })
+		Ok(RuntimeInstance { core: *core, runtime: create_runtime(native, bytes) })
 	}
 
 	pub fn cid(&self) -> &Cid {
-		&self.cid
+		&self.core
 	}
 
 	/// The runtime.
@@ -33,7 +33,7 @@ impl RuntimeInstance {
 }
 impl Debug for RuntimeInstance {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("RuntimeInstance").field("cid", &self.cid).finish()
+		f.debug_struct("RuntimeInstance").field("core", &self.core).finish()
 	}
 }
 

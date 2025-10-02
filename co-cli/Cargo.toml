@@ -53,5 +53,10 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { workspace = true }
 
 [features]
-default = []
+default = ["llvm", "wasmi"]
+
+# backends
 llvm = ["co-runtime/llvm"]
+wamr = ["co-runtime/wamr"]
+wasmi = ["co-runtime/wasmi"]
+cranelift = ["co-runtime/cranelift"]

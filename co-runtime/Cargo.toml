@@ -25,8 +25,9 @@ tokio = { workspace = true, features = ["macros", "sync"] }
 tokio-stream = { workspace = true, optional = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
-wasmer = { version = "6.1.0-rc.5", default-features = false, features = ["sys"] }
-wasmer-compiler = { version = "6.1.0-rc.5" }
+wasmer = { version = "6.1.0-rc.5", default-features = false, features = ["compiler"] }
+wasmer-compiler = { version = "6.1.0-rc.5", optional = true }
+wasmer-compiler-cranelift = { version = "6.1.0-rc.5", optional = true }
 wasmer-compiler-llvm = { version = "6.1.0-rc.5", optional = true }
 wasmer-types = { version = "6.1.0-rc.5" }
 
@@ -34,10 +35,16 @@ wasmer-types = { version = "6.1.0-rc.5" }
 hexdump = "0.1.1"
 insta = { version = "1.34.0", features = ["default", "yaml"] }
 tracing-subscriber = { workspace = true }
+wasmer = { version = "6.1.0-rc.5" }
 
 [features]
-default = ["llvm"]
-llvm = ["wasmer/llvm", "wasmer-compiler-llvm"]
+default = []
+
+# backends
+llvm = ["wasmer/llvm", "wasmer-compiler", "wasmer-compiler-llvm"]
+cranelift = ["wasmer/cranelift", "wasmer-compiler", "wasmer-compiler-cranelift"]
 wasmi = ["wasmer/wasmi"]
 wamr = ["wasmer/wamr"]
-cranelift = ["wasmer/cranelift"]
+
+# meta
+apple-sandbox = ["wasmi"]
