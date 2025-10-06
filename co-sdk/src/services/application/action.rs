@@ -49,9 +49,6 @@ pub enum Action {
 	/// Invite request has been sent to a peer.
 	InviteSent { co: CoId, to: Did, peer: PeerId },
 
-	/// Join request has been sent to a peer.
-	JoinKeyRequest { co: CoId, participant: Did, peer: PeerId },
-
 	/// Join completed.
 	Joined { co: CoId, participant: Did, success: bool, peer: Option<PeerId> },
 

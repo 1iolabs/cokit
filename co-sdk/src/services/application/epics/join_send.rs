@@ -13,7 +13,8 @@ use co_core_membership::{Membership, MembershipState, MembershipsAction};
 use co_identity::{Identity, PrivateIdentityResolver};
 use co_primitives::{CoId, CoInviteMetadata, Did, KnownTags};
 use co_storage::BlockStorageExt;
-use futures::{stream, FutureExt, Stream, StreamExt};
+use futures::{FutureExt, Stream, StreamExt};
+use std::future::ready;
 
 /// When a membership is set to active, try to connect the CO and send the join message via didcomm.
 /// TODO: consensus finalization?
@@ -67,25 +68,13 @@ pub fn join_sent(
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
 		Action::CoDidCommSent {
-			message:
-				CoDidCommSendAction { co, notification: Some(NotifyAction::JoinSent { participant, encrypted }), .. },
-			result: Ok(peers),
+			message: CoDidCommSendAction { co, notification: Some(NotifyAction::JoinSent { participant, .. }), .. },
+			result,
 		} => {
-			if let Some(peer) = peers.first() {
-				let result = if *encrypted {
-					Action::JoinKeyRequest { co: co.clone(), participant: participant.clone(), peer: *peer }
-				} else {
-					Action::Joined {
-						co: co.clone(),
-						participant: participant.clone(),
-						success: true,
-						peer: Some(*peer),
-					}
-				};
-				Some(stream::iter([Ok(result)]))
-			} else {
-				None
-			}
+			let peer = result.as_ref().ok().and_then(|result| result.first().cloned());
+			let action =
+				Action::Joined { co: co.clone(), participant: participant.clone(), success: peer.is_some(), peer };
+			Some(ready(Ok(action)).into_stream())
 		},
 		_ => None,
 	}

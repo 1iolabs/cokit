@@ -45,7 +45,6 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(didcomm_send::didcomm_send)
 		.join(didcomm_connected::didcomm_connected)
 		.join(key_request_receive::key_request_receive)
-		.join(key_request_send::join_key_request_send)
 		.join(key_request_send::key_request_send)
 		.join(key_request_send::network_task_execute)
 		.join(membership_update::membership_update)
