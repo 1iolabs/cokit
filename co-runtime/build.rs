@@ -14,18 +14,6 @@ fn main() {
 		// rerun
 		println!("cargo:rerun-if-changed=build.rs");
 
-		// llvm
-		if std::env::var("LLVM_SYS_180_PREFIX").is_err() {
-			match exec(std::process::Command::new("brew").arg("--prefix").arg("llvm@18")) {
-				Ok(path) => {
-					println!("cargo:rustc-env=LLVM_SYS_180_PREFIX={}", path);
-				},
-				Err(err) => {
-					println!("cargo:warning=llvm failed: {}", err);
-				},
-			}
-		}
-
 		// zstd
 		match exec(std::process::Command::new("brew").arg("--prefix").arg("zstd")) {
 			Ok(path) => {
