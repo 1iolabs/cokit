@@ -23,6 +23,7 @@ mod membership_update;
 mod network_block_get;
 mod network_queue;
 mod push_heads;
+mod resolve_private_identity;
 
 pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 	MergeEpic::new()
@@ -58,5 +59,6 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(network_queue::NetworkQueueProcessEpic::default())
 		.join(network_block_get::network_block_get)
 		.join(network_block_get::network_task_execute)
+		.join(resolve_private_identity::resolve_private_identity)
 		.join(TracingEpic::new(tags))
 }

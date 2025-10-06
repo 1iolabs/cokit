@@ -1,5 +1,8 @@
 use crate::{
-	library::{invite_networks::invite_networks, is_cid_encrypted::is_cid_encrypted, join::create_join_message_from},
+	library::{
+		invite_networks::invite_networks, is_membership_heads_encrypted::is_membership_heads_encrypted,
+		join::create_join_message_from,
+	},
 	services::application::action::{CoDidCommSendAction, NotifyAction},
 	state::{query_core, Query},
 	Action, CoContext, CoStorage, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
@@ -150,12 +153,4 @@ async fn create_join_action(context: CoContext, storage: CoStorage, membership: 
 		}),
 		tags: Default::default(),
 	}))
-}
-
-async fn is_membership_heads_encrypted(storage: &CoStorage, membership: &Membership) -> Result<bool, anyhow::Error> {
-	for co_state in membership.state.iter() {
-		let (_state, heads) = storage.get_value(&co_state.state).await?.into_value();
-		return Ok(is_cid_encrypted(&heads));
-	}
-	Ok(false)
 }

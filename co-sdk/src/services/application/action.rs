@@ -6,7 +6,7 @@ use crate::{
 	CoDate, CoStorage, ReducerChangeContext,
 };
 use cid::Cid;
-use co_identity::Message;
+use co_identity::{Message, PrivateIdentityBox};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{Block, BlockSerializer, CoId, DefaultParams, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
@@ -59,7 +59,7 @@ pub enum Action {
 	KeyRequest(KeyRequestAction),
 
 	/// Key Request has completed.
-	KeyRequestComplete(KeyRequestAction, Result<(), ActionError>),
+	KeyRequestComplete(KeyRequestAction, Result<String, ActionError>),
 
 	/// Start network.
 	NetworkStart(NetworkSettings),
@@ -172,6 +172,12 @@ pub enum Action {
 
 	/// Request a block from network complete.
 	NetworkBlockGetComplete(NetworkBlockGetAction, Result<(), StorageError>),
+
+	/// Resolve a private identity.
+	ResolvePrivateIdentity(ResolvePrivateIdentityAction),
+
+	/// Resolve a private identity complete.
+	ResolvePrivateIdentityComplete(ResolvePrivateIdentityAction, Result<PrivateIdentityBox, ActionError>),
 
 	/// Notification.
 	Notify(NotifyAction),
@@ -445,4 +451,12 @@ pub struct NetworkBlockGetAction {
 
 	/// The Cid of the block to get.
 	pub cid: Cid,
+}
+
+/// Request a private identity.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
+pub enum ResolvePrivateIdentityAction {
+	Identity { identity: Did },
+	NetworkIdentity { parent_co: CoId, co: CoId },
 }

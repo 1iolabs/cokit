@@ -116,15 +116,17 @@ fn handle_key_request(
 						&MembershipsAction::ChangeKey {
 							id: action.co.clone(),
 							did: from.identity().to_owned(),
-							key: key_uri,
+							key: key_uri.clone(),
 						},
 					)
 					.await?;
 
-				Ok(())
+				Ok(key_uri)
 			}
 		},
-		move |result: Result<(), anyhow::Error>| Action::KeyRequestComplete(action, result.map_err(ActionError::from)),
+		move |result: Result<String, anyhow::Error>| {
+			Action::KeyRequestComplete(action, result.map_err(ActionError::from))
+		},
 	)
 }
 

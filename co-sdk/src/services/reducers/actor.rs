@@ -1,5 +1,6 @@
 use super::{ReducerRequest, ReducerStorage, ReducersControl};
 use crate::{
+	library::settings_timeout::settings_timeout,
 	types::{co_reducer_context::CoReducerFeature, co_reducer_factory::CoReducerFactoryError},
 	Action, CoContext, CoReducer, CO_ID_LOCAL,
 };
@@ -102,13 +103,17 @@ impl Actor for ReducersActor {
 							let context = state.context.clone();
 							let parent = local.clone();
 							async move {
+								let timeout =
+									settings_timeout(&context, &CoId::from(CO_ID_LOCAL), Some("key-request")).await;
 								let result = ReducerStorage::from_id(
+									context.inner.application(),
 									context
 										.inner
 										.storage()
 										.clone_with_settings(BlockStorageSettings::new().with_detached()),
 									parent,
 									id.clone(),
+									timeout,
 								)
 								.await;
 								control.create_storage(id, result).await;

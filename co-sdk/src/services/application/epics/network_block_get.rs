@@ -1,10 +1,9 @@
 use crate::{
-	is_cid_encrypted,
 	library::{
 		connections_peer_provider::ConnectionsPeerProvider, find_co_secret::find_co_secret_by_membership,
 		network_identity::network_identity_by_id, network_queue::TaskState, settings_timeout::settings_timeout,
 	},
-	services::application::{action::KeyRequestAction, NetworkBlockGetAction},
+	services::application::NetworkBlockGetAction,
 	Action, CoContext, CoNetworkTaskSpawner, CoReducerFactory, CoToken, CoTokenParameters, ConnectionMessage,
 	CO_ID_LOCAL,
 };
@@ -151,40 +150,13 @@ fn handle_network_block_get(
 		context.tasks(),
 		{
 			let action = action.clone();
-			move |dispatch| async move {
+			move |_dispatch| async move {
 				let identity = network_identity_by_id(&context, &action.parent_co, &action.co, None).await?;
 				let peer_provider =
 					ConnectionsPeerProvider::new(action.co.clone(), identity.identity().to_owned(), connections);
 				let token = network_token(&context, &network, &action.parent_co, &action.co).await?;
 				let timeout = settings_timeout(&context, &CoId::from(CO_ID_LOCAL), Some("block-get")).await;
 				let concurrent = 10;
-
-				// ensure we got the co key
-				let token = if is_cid_encrypted([action.cid]) && token.is_unsigned() {
-					// reqeust
-					let request = KeyRequestAction {
-						co: action.co.clone(),
-						parent_co: action.parent_co.clone(),
-						key: None,
-						from: Some(identity.identity().to_owned()),
-						network: None,
-					};
-					dispatch
-						.request(Action::KeyRequest(request.clone()), move |action| match action {
-							Action::KeyRequestComplete(action_request, action_result) if action_request == &request => {
-								Some(action_result.clone())
-							},
-							_ => None,
-						})
-						.await
-						.map_err(|err| StorageError::Internal(err.into()))?
-						.map_err(|err| StorageError::Internal(err.into()))?;
-
-					// token
-					network_token(&context, &network, &action.parent_co, &action.co).await?
-				} else {
-					token
-				};
 
 				// execute
 				get_network(network, peer_provider, vec![token.to_bitswap_token()?], timeout, concurrent, action.cid)

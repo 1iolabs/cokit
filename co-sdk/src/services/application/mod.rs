@@ -3,6 +3,8 @@ mod actor;
 mod epics;
 mod message;
 
-pub use action::{Action, ActionError, CoDidCommSendAction, HeadsMessageReceivedAction, NetworkBlockGetAction};
+pub use action::{
+	Action, ActionError, CoDidCommSendAction, HeadsMessageReceivedAction, KeyRequestAction, NetworkBlockGetAction,
+};
 pub use actor::Application;
 pub use message::ApplicationMessage;
