@@ -28,7 +28,7 @@ impl EncodedMessage {
 		from: &P,
 		mut header: DidCommHeader,
 		body: &T,
-	) -> Result<(String, Self), anyhow::Error>
+	) -> Result<(DidCommHeader, Self), anyhow::Error>
 	where
 		T: Serialize + Debug,
 		P: PrivateIdentity + Send + Sync + 'static,
@@ -36,10 +36,9 @@ impl EncodedMessage {
 		tracing::trace!(?header, ?body, from = from.identity(), "didcomm-message-signed");
 		let from_didcomm = from.try_didcomm_private()?;
 		header.from = Some(from.identity().to_owned());
-		let message_id = header.id.clone();
 		let body_json = to_json_string(body)?;
-		let envelope = from_didcomm.jws(header, &body_json)?;
-		Ok((message_id, Self(envelope.into_bytes())))
+		let envelope = from_didcomm.jws(header.clone(), &body_json)?;
+		Ok((header, Self(envelope.into_bytes())))
 	}
 
 	/// Create encrypted JSON message.
@@ -50,7 +49,7 @@ impl EncodedMessage {
 		to: &I,
 		mut header: DidCommHeader,
 		body: &T,
-	) -> Result<(String, Self), anyhow::Error>
+	) -> Result<(DidCommHeader, Self), anyhow::Error>
 	where
 		T: Serialize + Debug,
 		P: PrivateIdentity + Send + Sync + 'static,
@@ -61,10 +60,9 @@ impl EncodedMessage {
 		let to_didcomm = to.try_didcomm_public()?;
 		header.from = Some(from.identity().to_owned());
 		header.to = [to.identity().to_owned()].into_iter().collect();
-		let message_id = header.id.clone();
 		let body_json = to_json_string(body)?;
-		let envelope = from_didcomm.jwe(&to_didcomm, header, &body_json)?;
-		Ok((message_id, Self(envelope.into_bytes())))
+		let envelope = from_didcomm.jwe(&to_didcomm, header.clone(), &body_json)?;
+		Ok((header, Self(envelope.into_bytes())))
 	}
 
 	/// Sign message. Assuming we currently hold a plain text JSON message.

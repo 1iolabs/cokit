@@ -9,7 +9,7 @@ use crate::{
 use anyhow::anyhow;
 use co_actor::Actions;
 use co_core_co::{Co, CoAction};
-use co_identity::{IdentityResolver, PrivateIdentityResolver};
+use co_identity::{DidCommHeader, IdentityResolver, PrivateIdentityResolver};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoConnectivity, CoId, Did, Network};
 use futures::{stream, FutureExt, Stream, TryStreamExt};
@@ -39,13 +39,13 @@ pub fn invite_send(
 					let to = participant.clone();
 					Some(
 						async move {
-							let (message_id, message, networks) = create_invite(&context, &co, &from, &to).await?;
+							let (message_header, message, networks) = create_invite(&context, &co, &from, &to).await?;
 							Ok(Action::CoDidCommSend(CoDidCommSendAction {
 								co,
 								networks,
 								notification: Some(NotifyAction::InviteSent { to }),
 								message_from: from,
-								message_id,
+								message_header,
 								message,
 								tags: Default::default(),
 							}))
@@ -90,7 +90,7 @@ async fn create_invite(
 	co_id: &CoId,
 	from: &Did,
 	to: &Did,
-) -> anyhow::Result<(String, EncodedMessage, BTreeSet<Network>)> {
+) -> anyhow::Result<(DidCommHeader, EncodedMessage, BTreeSet<Network>)> {
 	let identity_resolver = context.identity_resolver().await?;
 	let co_reducer = context.try_co_reducer(co_id).await?;
 	let (storage, co) = co_reducer.co().await?;
@@ -99,7 +99,7 @@ async fn create_invite(
 	let to_identity = context.identity_resolver().await?.resolve(to).await?;
 
 	// message
-	let (invite_message_id, invite_message) = create_invite_message(
+	let (invite_message_header, invite_message) = create_invite_message(
 		&from_identity,
 		&to_identity,
 		CoInvitePayload {
@@ -118,7 +118,7 @@ async fn create_invite(
 		.await?;
 
 	// result
-	Ok((invite_message_id, invite_message, networks))
+	Ok((invite_message_header, invite_message, networks))
 }
 
 async fn connectivity(storage: CoStorage, co: &Co) -> anyhow::Result<CoConnectivity> {

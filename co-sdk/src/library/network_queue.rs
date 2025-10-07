@@ -45,7 +45,7 @@ pub async fn network_queue_message(context: &CoContext, mut message: CoDidCommSe
 	ensure_network_queue_core(&local_co, &identity, co).await?;
 
 	// setup task id
-	let task_id = message.message_id.clone();
+	let task_id = message.message_header.id.clone();
 	message.tags.insert(tag!("task_id": task_id.clone()));
 
 	// insert message
@@ -58,8 +58,8 @@ pub async fn network_queue_message(context: &CoContext, mut message: CoDidCommSe
 				list: LIST_NAME_BACKLOG.to_owned(),
 				task: Task {
 					id: task_id,
-					name: format!("DIDComm {} to co:{}", message.message_id, &message.co),
-					tags: tags!("co": message.co.to_string(), "type": "co-didcomm", "message_id": message.message_id),
+					name: format!("DIDComm {} to co:{}", message.message_header.id, &message.co),
+					tags: tags!("co": message.co.to_string(), "type": "co-didcomm", "message_id": message.message_header.id),
 					payload,
 					lock: None,
 				},

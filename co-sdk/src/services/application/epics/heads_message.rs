@@ -193,10 +193,10 @@ async fn create_heads_message(
 	// message
 	let mut header = HeadsMessage::create_header();
 	header.thid = parent_message_id;
-	let (message_id, message) = EncodedMessage::create_signed_json(&identity, header, &body)?;
+	let (message_header, message) = EncodedMessage::create_signed_json(&identity, header, &body)?;
 
 	// result
-	Ok(Action::DidCommSend { message_id, peer: to, message })
+	Ok(Action::DidCommSend { message_header, peer: to, message })
 }
 
 async fn create_heads_body(co: &CoReducer) -> HeadsMessage {

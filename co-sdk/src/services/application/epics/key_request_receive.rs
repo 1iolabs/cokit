@@ -85,9 +85,9 @@ async fn key_request(
 	let key: Key = find_co_key(&local_co, &co).await?.ok_or(anyhow!("No key found"))?;
 
 	// message
-	let (message_id, message) =
+	let (message_header, message) =
 		create_key_response_message(&identity, &requester_identity, header.id.clone(), KeyResponsePayload::Ok(key))?;
 
 	// result
-	Ok(vec![Action::DidCommSend { message_id, peer, message }])
+	Ok(vec![Action::DidCommSend { message_header, peer, message }])
 }

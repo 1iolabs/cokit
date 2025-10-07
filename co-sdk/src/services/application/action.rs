@@ -6,7 +6,7 @@ use crate::{
 	CoDate, CoStorage, ReducerChangeContext,
 };
 use cid::Cid;
-use co_identity::{Message, PrivateIdentityBox};
+use co_identity::{DidCommHeader, Message, PrivateIdentityBox};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{Block, BlockSerializer, CoId, DefaultParams, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
@@ -66,8 +66,8 @@ pub enum Action {
 
 	/// Send a DIDComm message.
 	DidCommSend {
-		/// The message id for reference.
-		message_id: String,
+		/// The message header for reference.
+		message_header: DidCommHeader,
 		/// Peer to send the message to.
 		peer: PeerId,
 		/// The message.
@@ -76,8 +76,8 @@ pub enum Action {
 
 	/// Sent result of the DIDComm message.
 	DidCommSent {
-		/// The message id for reference.
-		message_id: String,
+		/// The message header for reference.
+		message_header: DidCommHeader,
 		/// Peer to send the message to.
 		peer: PeerId,
 		/// The send result.
@@ -383,8 +383,8 @@ pub struct CoDidCommSendAction {
 	/// The message sender for reference.
 	pub message_from: Did,
 
-	/// The message id for reference.
-	pub message_id: String,
+	/// The message header for reference.
+	pub message_header: DidCommHeader,
 
 	/// The message.
 	pub message: EncodedMessage,

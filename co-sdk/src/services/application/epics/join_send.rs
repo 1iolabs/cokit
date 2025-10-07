@@ -123,7 +123,8 @@ async fn create_join_action(context: CoContext, storage: CoStorage, membership: 
 	// message
 	let private_identity_resolver = context.private_identity_resolver().await?;
 	let identity = private_identity_resolver.resolve_private(&membership.did).await?;
-	let (message_id, message) = create_join_message_from(&identity, membership.id.clone(), Some(invite.id.clone()))?;
+	let (message_header, message) =
+		create_join_message_from(&identity, membership.id.clone(), Some(invite.id.clone()))?;
 
 	// send message to discovered peers until one send succedded and return Action::Joined.
 	// this will also use invite.peer if possible.
@@ -134,7 +135,7 @@ async fn create_join_action(context: CoContext, storage: CoStorage, membership: 
 		co: membership.id.clone(),
 		message,
 		message_from: identity.identity().to_owned(),
-		message_id,
+		message_header,
 		networks,
 		notification: Some(NotifyAction::JoinSent {
 			participant: membership.did.clone(),

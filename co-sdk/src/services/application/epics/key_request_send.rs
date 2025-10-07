@@ -76,11 +76,12 @@ fn handle_key_request(
 					network_identity_by_id(&context, &action.parent_co, &action.co, action.from.as_ref()).await?;
 
 				// message
-				let (message_id, message) = create_key_request_message(
+				let (message_header, message) = create_key_request_message(
 					&from,
 					KeyRequestPayload { peer: network.local_peer_id(), id: action.co.clone(), key: action.key },
 					Duration::from_secs(30 * 60),
 				)?;
+				let message_id = message_header.id.clone();
 
 				// response
 				let (_response_peer, _response_header, response_body) = dispatch
@@ -91,7 +92,7 @@ fn handle_key_request(
 							notification: None,
 							tags: Default::default(),
 							message_from: from.identity().to_string(),
-							message_id: message_id.clone(),
+							message_header,
 							message,
 						}),
 						move |action| filter_response(&message_id, action),

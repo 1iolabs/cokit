@@ -54,14 +54,14 @@ fn co_didcomm_send_message(
 				Ok(peers) => {
 					for peer in peers.added {
 						// register sent
-						let send_message_id = message.message_id.clone();
+						let send_message_id = message.message_header.id.clone();
 						let sent_peer_fut = actions.clone().once_map(move |action| match action {
-							Action::DidCommSent { message_id, peer, .. } if message_id == &send_message_id => Some(*peer),
+							Action::DidCommSent { message_header, peer, .. } if message_header.id == send_message_id => Some(*peer),
 							_ => None,
 						});
 
 						// send
-						yield Ok(Action::DidCommSend { message_id: message.message_id.clone(), peer, message: message.message.clone() });
+						yield Ok(Action::DidCommSend { message_header: message.message_header.clone(), peer, message: message.message.clone() });
 
 						// wait sent
 						let sent_peer = sent_peer_fut.await;
