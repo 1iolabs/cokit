@@ -1,4 +1,7 @@
-use crate::{Action, CoContext, CoReducerState, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL};
+use crate::{
+	services::reducers::ReducerOptions, Action, CoContext, CoReducerFactoryResultExt, CoReducerState,
+	CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+};
 use co_actor::Actions;
 use co_core_membership::MembershipsAction;
 use co_storage::BlockStorageContentMapping;
@@ -31,7 +34,7 @@ pub fn membership_update(
 		async move {
 			if let Some((parent_storage, id, co_state)) = result {
 				let control = context.inner.reducers_control();
-				if let Some(reducer) = control.reducer_opt(id, true).await {
+				if let Some(reducer) = control.reducer(id, ReducerOptions::default().with_no_create()).await.opt()? {
 					let reducer_state = CoReducerState::from_co_state(&parent_storage, &co_state).await?;
 					let next_reducer_state = reducer_state.to_internal(&parent_storage).await;
 					let current_reducer_state = reducer.reducer_state().await;

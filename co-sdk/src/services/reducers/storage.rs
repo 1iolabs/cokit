@@ -1,5 +1,5 @@
 use crate::{
-	application::shared::SharedCoBuilder, library::shared_membership::shared_membership,
+	application::shared::SharedCoBuilder, library::shared_membership::shared_membership_active,
 	types::co_reducer_factory::CoReducerFactoryError, ApplicationMessage, CoReducer, CoStorage, Cores,
 };
 use anyhow::anyhow;
@@ -37,7 +37,7 @@ impl ReducerStorage {
 		id: CoId,
 		key_request_timeout: Duration,
 	) -> Result<ReducerStorage, CoReducerFactoryError> {
-		let membership = shared_membership(&parent, &id, None)
+		let membership = shared_membership_active(&parent, &id, None)
 			.await?
 			.ok_or(CoReducerFactoryError::CoNotFound(id, anyhow!("No active membership")))?;
 		Ok(Self::from_membership(handle, &storage, &parent, membership, key_request_timeout)

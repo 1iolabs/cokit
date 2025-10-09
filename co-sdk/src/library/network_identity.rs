@@ -27,7 +27,7 @@ pub async fn network_identity_by_id(
 	let parent_co = context.try_co_reducer(parent_co_id).await?;
 	let identity_did = shared_membership(&parent_co, co_id, prefered)
 		.await?
-		.ok_or(anyhow::anyhow!("no membership found"))?
+		.ok_or(anyhow::anyhow!("No active membership"))?
 		.did;
 	let identity = context
 		.private_identity_resolver()

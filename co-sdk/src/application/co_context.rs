@@ -4,7 +4,7 @@ use crate::{
 		identity::{create_identity_resolver, create_private_identity_resolver},
 		shared::SharedCoBuilder,
 	},
-	library::shared_membership::shared_membership,
+	library::shared_membership::shared_membership_active,
 	reducer::core_resolver::{dynamic::DynamicCoreResolver, guard::CoGuardResolver, log::LogCoreResolver},
 	services::{
 		application::ApplicationMessage,
@@ -41,7 +41,12 @@ impl CoContext {
 	/// Get instance of Local CoReducer.
 	#[tracing::instrument(level = tracing::Level::TRACE, skip(self), fields(application = self.inner.settings.identifier))]
 	pub async fn local_co_reducer(&self) -> Result<CoReducer, anyhow::Error> {
-		Ok(self.inner.reducers.clone().reducer(CoId::from(CO_ID_LOCAL)).await?)
+		Ok(self
+			.inner
+			.reducers
+			.clone()
+			.reducer(CoId::from(CO_ID_LOCAL), Default::default())
+			.await?)
 	}
 
 	/// Get a stream to the log entries.
@@ -175,7 +180,7 @@ impl CoReducerFactory for CoContext {
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self), fields(application = self.inner.settings.identifier))]
 	async fn try_co_reducer(&self, co: &CoId) -> Result<CoReducer, CoReducerFactoryError> {
-		self.inner.reducers.clone().reducer(co.clone()).await
+		self.inner.reducers.clone().reducer(co.clone(), Default::default()).await
 	}
 }
 impl Debug for CoContext {
@@ -264,7 +269,11 @@ impl CoContextInner {
 	///
 	/// Todo: Identity Permissions?
 	pub async fn private_identity_resolver(&self) -> Result<PrivateIdentityResolverBox, anyhow::Error> {
-		let local = self.reducers.clone().reducer(CoId::from(CO_ID_LOCAL)).await?;
+		let local = self
+			.reducers
+			.clone()
+			.reducer(CoId::from(CO_ID_LOCAL), Default::default())
+			.await?;
 		create_private_identity_resolver(local).await
 	}
 
@@ -382,7 +391,7 @@ impl CoContextInner {
 		identity: Option<Did>,
 	) -> Result<Option<CoReducer>, anyhow::Error> {
 		// find first active membership
-		let membership = shared_membership(&parent, co, identity.as_ref()).await?;
+		let membership = shared_membership_active(&parent, co, identity.as_ref()).await?;
 		let membership = match membership {
 			Some(m) => m,
 			None => return Ok(None),

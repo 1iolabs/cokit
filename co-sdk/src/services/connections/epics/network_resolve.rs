@@ -1,11 +1,17 @@
 use crate::{
 	find_membership,
-	library::{invite_networks::invite_networks, network_discovery::identities_networks},
-	services::connections::{ConnectionAction, ConnectionState, NetworkResolveAction, NetworkResolvedAction},
-	state, CoContext, CoReducer, CoStorage,
+	library::{
+		invite_networks::invite_networks, network_discovery::identities_networks, shared_membership::shared_membership,
+	},
+	services::{
+		connections::{ConnectionAction, ConnectionState, NetworkResolveAction, NetworkResolvedAction},
+		reducers::ReducerOptions,
+	},
+	state, CoContext, CoReducer, CoReducerFactoryResultExt, CoStorage,
 };
 use anyhow::anyhow;
 use co_actor::{Actions, Epic};
+use co_core_membership::MembershipState;
 use co_primitives::{CoId, CoInviteMetadata, KnownTags, Network};
 use co_storage::BlockStorageExt;
 use futures::{Stream, TryStreamExt};
@@ -40,40 +46,69 @@ impl Epic<ConnectionAction, ConnectionState, CoContext> for NetworkResolveEpic {
 }
 
 async fn network_resolve(context: CoContext, id: CoId) -> Result<BTreeSet<Network>, anyhow::Error> {
-	// to prevent deadlocking we want to use the storage without networking
-	let reducers = context.inner.reducers_control();
-	let storage = reducers.storage(id.clone()).await?.storage().clone();
+	// check membership to know if we can read networks from co
+	// Note: find membership assumes that its local maybe change that later.
+	let local_co = context.local_co_reducer().await?;
+	let membership = shared_membership(&local_co, &id, None)
+		.await?
+		.ok_or(anyhow!("No membership found: {:?}", id))?;
+	let skip_co = match membership.membership_state {
+		MembershipState::Join => true,
+		MembershipState::Invite => true,
+		MembershipState::Inactive => true,
+		_ => false,
+	};
 
-	// reducer
-	let reducer = reducers.reducer(id.clone()).await?;
+	// this may gets called while reducer is being initialized
+	//  to prevent deadlocking:
+	//  - we skip the lookup while the item is created and fallback or error early
+	//  - we want to use the storage without networking
+	//  also we want to ignore storage creation errors and fallback to other strategies (invite)
+	if skip_co {
+		let reducers = context.inner.reducers_control();
+		if let Ok(Some(reducer_storage)) = reducers
+			.storage(id.clone(), ReducerOptions::default().with_no_pending_create())
+			.await
+			.opt()
+		{
+			// storage
+			let storage = reducer_storage.storage();
+
+			// reducer
+			//  this should work in any case when we already got the storage
+			//  may only fails if need to fetch heads from network?
+			let reducer = reducers.reducer(id.clone(), Default::default()).await?;
+
+			// get CO networks
+			// - or participant networks if CO networks are empty
+			// - or invite metadata if the previous fail (because the block is not loaded yet)
+			match networks_co(&context, storage, &reducer).await {
+				Ok(networks) => {
+					return Ok(networks);
+				},
+				Err(err) => {
+					tracing::warn!(?err, co = ?id, "co-resolve-networks-failed (fallback to invite)");
+				},
+			}
+		}
+	}
 
 	// fallback to invite network settings immediately if the reducer is requesting from network while initializing
 	//  this should only happen on invite
 	//  as for every other thing the co root is always available
 	//  because we need it to actually write it
-	if !reducer.is_running() {
-		tracing::debug!(co = ?id, "co-resolve-networks-not-running");
-		match networks_invite(&context, &id).await {
-			Ok(networks) => {
-				if !networks.is_empty() {
-					tracing::debug!(co = ?id, ?networks, "co-resolve-networks-invite");
-					return Ok(networks);
-				}
-			},
-			_ => {},
-		}
+	match networks_invite(&context, &id).await {
+		Ok(networks) => {
+			if !networks.is_empty() {
+				tracing::debug!(co = ?id, ?networks, "co-resolve-networks-invite");
+				return Ok(networks);
+			}
+		},
+		_ => {},
 	}
 
-	// get CO networks
-	// - or participant networks if CO networks are empty
-	// - or invite metadata if the previous fail (because the block is not loaded yet)
-	match networks_co(&context, &storage, &reducer).await {
-		Ok(networks) => Ok(networks),
-		Err(err) => {
-			tracing::debug!(?err, co = ?id, "co-resolve-networks-failed (fallback to invite)");
-			Ok(networks_invite(&context, &id).await?)
-		},
-	}
+	// fail
+	Err(anyhow!("Resolve networks failed"))
 }
 
 /// Get CO Network settings.
