@@ -287,10 +287,15 @@ fn reduce_network_resolved(
 ) {
 	let networks = if let Some(co_connection) = state.co.get(id) {
 		match result {
-			Ok(networks) => Some((networks, co_connection.from.clone())),
+			Ok(new_networks) => Some((new_networks, co_connection.from.clone())),
 			Err(_err) => {
 				// when network resolve has been failed just release the co and let subscribers know it didn't work
-				actions.push(ConnectionAction::Release(ReleaseAction { id: co_connection.id.clone() }));
+				// if we had no networks before
+				if co_connection.networks.is_empty() {
+					actions.push(ConnectionAction::Release(ReleaseAction { id: co_connection.id.clone() }));
+				}
+
+				// nothing to add
 				None
 			},
 		}
