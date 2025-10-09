@@ -4,7 +4,7 @@ use crate::{
 		network_queue_task_complete, network_queue_task_doing, TaskState,
 	},
 	network::PeersNetworkTask,
-	services::application::HeadsMessageReceivedAction,
+	services::application::{HeadsError, HeadsMessageReceivedAction},
 	types::message::heads::HeadsMessage,
 	Action, CoContext, CoUuid,
 };
@@ -37,10 +37,10 @@ pub fn network_queue_message_epic(
 					.boxed(),
 			)
 		},
-		Action::HeadsMessageComplete {
-			message: message @ HeadsMessageReceivedAction { message: HeadsMessage::Heads(_co, _heads), .. },
-			result: Err(_),
-		} => {
+		Action::HeadsMessageComplete(
+			message @ HeadsMessageReceivedAction { message: HeadsMessage::Heads(_co, _heads), .. },
+			Err(HeadsError::Transient(_)),
+		) => {
 			let context = context.clone();
 			let message = message.clone();
 			Some(

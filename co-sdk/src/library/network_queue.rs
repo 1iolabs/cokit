@@ -247,13 +247,14 @@ pub async fn network_queue_action(
 				let task_message_id = task.id.clone();
 				move |action: &Action| -> Option<TaskState> {
 					match action {
-						Action::HeadsMessageComplete {
-							message: HeadsMessageReceivedAction { message_id, .. },
-							result,
-						} if message_id == &task_message_id => Some(match result {
-							Ok(_) => TaskState::Done,
-							Err(_err) => TaskState::Failed,
-						}),
+						Action::HeadsMessageComplete(HeadsMessageReceivedAction { message_id, .. }, result)
+							if message_id == &task_message_id =>
+						{
+							Some(match result {
+								Ok(_) => TaskState::Done,
+								Err(_err) => TaskState::Failed,
+							})
+						},
 						_ => None,
 					}
 				}

@@ -19,6 +19,7 @@ where
 	S: Send + 'static,
 	C: Send + 'static,
 {
+	/// Execute a stateful futures that dispatches/reacts to actions.
 	pub fn execute<F, Fut>(
 		actions: Actions<A, S, C>,
 		spawner: TaskSpawner,
@@ -42,6 +43,7 @@ where
 		rx
 	}
 
+	/// Execute a stateful futures that dispatches/reacts to actions with an final result action.
 	pub fn execute_with_response<F, Fut, R, O, E>(
 		actions: Actions<A, S, C>,
 		spawner: TaskSpawner,
@@ -62,10 +64,14 @@ where
 		rx
 	}
 
+	/// Dispatch an action.
+	/// Actions are dispatched immediately.
 	pub fn dispatch(&self, item: A) -> bool {
 		self.dispatch_result(Ok(item))
 	}
 
+	/// Dispatch an action result.
+	/// Actions are dispatched immediately.
 	pub fn dispatch_result(&self, item: Result<A, anyhow::Error>) -> bool {
 		self.tx.unbounded_send(item).is_ok()
 	}

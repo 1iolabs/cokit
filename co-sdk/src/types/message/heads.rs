@@ -1,6 +1,5 @@
-use cid::Cid;
 use co_identity::DidCommHeader;
-use co_primitives::CoId;
+use co_primitives::{CoId, WeakCid};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::BTreeSet;
@@ -8,9 +7,9 @@ use std::collections::BTreeSet;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum HeadsMessage {
-	/// Heads notifictaion.
+	/// Heads notification.
 	#[serde(rename = "h")]
-	Heads(CoId, BTreeSet<Cid>),
+	Heads(CoId, BTreeSet<WeakCid>),
 
 	/// Request heads from peer.
 	/// This message must be signed.

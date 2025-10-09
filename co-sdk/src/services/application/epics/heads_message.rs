@@ -1,16 +1,20 @@
 use crate::{
-	library::network_identity::network_identity,
-	services::{application::HeadsMessageReceivedAction, connections::PeerRelateCoAction},
+	library::{network_identity::network_identity, shared_membership::shared_membership},
+	services::{
+		application::{HeadsError, HeadsMessageReceivedAction},
+		connections::PeerRelateCoAction,
+	},
 	state,
 	types::message::heads::{HeadsErrorCode, HeadsMessage},
-	Action, CoContext, CoReducer, CoReducerFactory, MappedCoReducerState,
+	Action, ActionError, CoContext, CoReducer, CoReducerFactory, MappedCoReducerState,
 };
 use anyhow::anyhow;
 use cid::Cid;
-use co_actor::Actions;
+use co_actor::{ActionDispatch, Actions};
+use co_core_membership::{Membership, MembershipState};
 use co_identity::PeerDidCommHeader;
 use co_network::didcomm::EncodedMessage;
-use co_primitives::{CoId, Did};
+use co_primitives::{CoId, Did, WeakCid};
 use futures::{future::ready, stream, FutureExt, Stream, StreamExt};
 use libp2p::PeerId;
 use std::{collections::BTreeSet, str::FromStr, time::Instant};
@@ -60,7 +64,7 @@ pub fn heads_message_receive(
 /// Update CO when receive [`HeadsMessage::Heads`] message.
 /// TODO: verify sender/heads?
 pub fn heads_message_heads(
-	_actions: &Actions<Action, (), CoContext>,
+	actions: &Actions<Action, (), CoContext>,
 	action: &Action,
 	_state: &(),
 	context: &CoContext,
@@ -68,16 +72,7 @@ pub fn heads_message_heads(
 	match action {
 		Action::HeadsMessageReceived(
 			message @ HeadsMessageReceivedAction { message: HeadsMessage::Heads(co, heads), .. },
-		) => Some({
-			let context = context.clone();
-			let message = message.clone();
-			let co = co.clone();
-			let heads = heads.clone();
-			async move { handle_heads(context, message, co, heads).await }
-				.into_stream()
-				.flat_map(Action::map_error_stream)
-				.map(Ok)
-		}),
+		) => Some(handle_heads(actions.clone(), context.clone(), message.clone(), co.clone(), heads.clone())),
 		_ => None,
 	}
 }
@@ -112,48 +107,76 @@ pub fn heads_message_heads_request(
 }
 
 /// See: [`HeadsMessage::Heads`]
-#[tracing::instrument(level = tracing::Level::TRACE, skip(context, heads))]
-async fn handle_heads(
+fn handle_heads(
+	actions: Actions<Action, (), CoContext>,
 	context: CoContext,
-	message: HeadsMessageReceivedAction,
+	action: HeadsMessageReceivedAction,
 	co: CoId,
-	heads: BTreeSet<Cid>,
-) -> anyhow::Result<Vec<Action>> {
-	let co_reducer = context.try_co_reducer(&co).await?;
+	heads: BTreeSet<WeakCid>,
+) -> impl Stream<Item = Result<Action, anyhow::Error>> {
+	ActionDispatch::execute_with_response(
+		actions,
+		context.tasks(),
+		{
+			let action = action.clone();
+			move |dispatch| async move {
+				// verify we got a active membership for this co
+				let local_co = context.local_co_reducer().await?;
+				match shared_membership(&local_co, &co, None).await? {
+					Some(Membership { membership_state: MembershipState::Active, .. }) => {
+						// active -> ok
+					},
+					Some(Membership { membership_state: MembershipState::Invite | MembershipState::Join, .. }) => {
+						// pending -> queue
+						return Err(HeadsError::Transient(ActionError::from(anyhow!("Pending membership"))));
+					},
+					_ => {
+						// no membership -> ignore
+						return Ok(());
+					},
+				}
 
-	// verify
-	verify_from_participant(&co_reducer, &message.from).await?;
+				// reducer
+				let co_reducer = context.try_co_reducer(&co).await.map_err(anyhow::Error::from)?;
 
-	// network: let others know that the Co is connected and allow to use the implicit direct peer connection
-	if let Some(from_peer_id) = message.from_peer {
-		if let Some(connections) = context.network_connections().await {
-			connections.dispatch(PeerRelateCoAction {
-				co: co.clone(),
-				peer_id: from_peer_id,
-				did: message.from.clone(),
-				time: Instant::now(),
-			})?;
-		}
-	}
+				// verify
+				verify_from_participant(&co_reducer, &action.from)
+					.await
+					.map_err(|err| HeadsError::Permanent(err.into()))?;
 
-	// join
-	let previous_state = co_reducer.reducer_state().await;
-	let next_state = match co_reducer.join(heads.clone()).await {
-		Ok(next_state) => next_state,
-		Err(err) => {
-			return Ok(vec![Action::HeadsMessageComplete { message, result: Err(err.into()) }]);
+				// network: let others know that the Co is connected and allow to use the implicit direct peer
+				// connection
+				if let Some(from_peer_id) = action.from_peer {
+					if let Some(connections) = context.network_connections().await {
+						connections
+							.dispatch(PeerRelateCoAction {
+								co: co.clone(),
+								peer_id: from_peer_id,
+								did: action.from.clone(),
+								time: Instant::now(),
+							})
+							.ok();
+					}
+				}
+
+				// join
+				let previous_state = co_reducer.reducer_state().await;
+				let next_state = co_reducer.join(heads.into_iter().map(Cid::from).collect()).await?;
+
+				// respond if different
+				if previous_state != next_state {
+					let body = create_heads_body(&co_reducer).await;
+					let message =
+						create_heads_message(&context, &co_reducer, body, Some(action.message_id), action.peer).await?;
+					dispatch.dispatch(message);
+				}
+
+				// result
+				Ok(())
+			}
 		},
-	};
-
-	// result
-	//  respond if different
-	if previous_state != next_state {
-		let body = create_heads_body(&co_reducer).await;
-		let message = create_heads_message(&context, &co_reducer, body, Some(message.message_id), message.peer).await?;
-		Ok(vec![message])
-	} else {
-		Ok(vec![])
-	}
+		move |result: Result<(), HeadsError>| Action::HeadsMessageComplete(action, result),
+	)
 }
 
 /// See: [`HeadsMessage::HeadsRequest`]
@@ -200,7 +223,7 @@ async fn create_heads_message(
 }
 
 async fn create_heads_body(co: &CoReducer) -> HeadsMessage {
-	HeadsMessage::Heads(co.id().clone(), MappedCoReducerState::new_co(&co).await.external().heads())
+	HeadsMessage::Heads(co.id().clone(), MappedCoReducerState::new_co(&co).await.external().weak_heads())
 }
 
 async fn verify_from_participant(co_reducer: &CoReducer, from: &Option<Did>) -> anyhow::Result<()> {

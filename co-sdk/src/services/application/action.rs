@@ -95,7 +95,7 @@ pub enum Action {
 	HeadsMessageReceived(HeadsMessageReceivedAction),
 
 	/// HeadsMessage has been processed.
-	HeadsMessageComplete { message: HeadsMessageReceivedAction, result: Result<(), ActionError> },
+	HeadsMessageComplete(HeadsMessageReceivedAction, Result<(), HeadsError>),
 
 	/// Connect to Co and send message (DidCommSent) to the first peer connectable.
 	CoDidCommSend(CoDidCommSendAction),
@@ -434,6 +434,22 @@ pub struct HeadsMessageReceivedAction {
 
 	/// Message tags. Used for internal tracking.
 	pub tags: Tags,
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum HeadsError {
+	/// Transient/Retryable error.
+	#[error("Transient Heads Error")]
+	Transient(#[from] ActionError),
+
+	/// Permanent error.
+	#[error("Permanent Heads Error")]
+	Permanent(#[source] ActionError),
+}
+impl From<anyhow::Error> for HeadsError {
+	fn from(value: anyhow::Error) -> Self {
+		HeadsError::Transient(value.into())
+	}
 }
 
 /// Request a block from network .
