@@ -3,7 +3,7 @@
 # CO-kit
 
 # Introduction
-- [About CO-SDK](./introduction/about-co-sdk.md)
+- [About CO-KIT](./introduction/about-co-kit.md)
 - [Why](./introduction/why.md)
 - [Key Principles](./introduction/key-principles.md)
 - [Features](./introduction/features.md)
@@ -30,8 +30,8 @@
 # Usage
 - [Best Practices](./usage/best-practices.md)
 - [Security](./usage/security.md)
-- [API Overview core (co-api)](./usage/api-overview-core.md)
-- [API Overview apps (co-sdk)](./usage/api-overview-apps.md)
+- [Core API Overview](./usage/api-overview-core.md)
+- [App API Overview](./usage/api-overview-apps.md)
 - [Configuration](./usage/configuration.md)
 - [OS-specifics](./usage/os-specifics.md)
 

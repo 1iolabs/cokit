@@ -55,7 +55,7 @@ CO-kit uses an extended version of Bitswap which includes token based authorizat
 - https://github.com/dkuhnert/libp2p-bitswap/tree/auth
 
 ### Protocol: didcontact
-A discovery protocol which gossips encrypted didcomm messages using the GossipSub protocol from libp2p.
+A discovery protocol which gossips encrypted didcomm messages using the libp2p GossipSub protocol.
 The didcomm messages denote a connection request from one CO participant to another one.
 The receiver can choose whether to respond to it or not, so no (potentially private) connection information must be shared beforehand.
 

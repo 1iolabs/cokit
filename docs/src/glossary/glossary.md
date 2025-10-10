@@ -6,29 +6,42 @@
 GNU Affero General Public License v3.
 A *strong copyleft* license created by the Free Software Foundation to ensure that not only distributed binaries—but even software accessed over a network—must have source code made available
 
+Key points:
 - **What makes it different from GPLv3**: AGPLv3 closes the "SaaS loophole" by requiring modified source code to be provided when the software is used over a network.
-
 - **Copyleft principle**: Any changes or extensions (including those accessed remotely) must remain under AGPLv3 .
-
 - **Compatibility**: AGPLv3 is compatible with GPLv3. You can combine AGPLv3 and GPLv3 code, but section 13 ensures that the combined work is covered by the AGPL terms.
-
 - **Linking Exception**: An optional addendum that allows proprietary or differently-licensed software to link to AGPLv3 code without forcing the entire application to adopt AGPLv3, granted you don’t modify the interface itself.
+
+For further information see:
+- [GNU Affero General Public License](https://www.gnu.org/licenses/agpl-3.0.de.html)
 
 ## CBOR
 Concise Binary Object Representation.
-**CBOR** is a compact, binary data serialization format based on the JSON data model. It was designed to support extremely small code size, efficient message encoding, and extensibility without requiring version negotiation. Defined by IETF in **RFC 8949**, CBOR excels in scenarios where performance, compactness, and flexibility matter.
+CBOR is a compact, binary data serialization format based on the JSON data model.
+It was designed to support extremely small code size, efficient message encoding, and extensibility without requiring version negotiation.
+Defined by IETF in RFC 8949, CBOR excels in scenarios where performance, compactness, and flexibility matter.
 
+Key points:
 - **Binary Format**: Unlike human-readable JSON, CBOR encodes data in binary form, making it faster to parse and more space-efficient.
-
 - **Extensible**: CBOR supports “tags” that identify special data types (e.g., dates, binary blobs), enabling schema-free evolution and custom data additions.
+
+For further information see:
+- [cbor.io](https://cbor.io/)
+- [RFC 8949: Concise Binary Object Representation (CBOR)](https://www.rfc-editor.org/rfc/rfc8949.html)
 
 ## DAG-CBOR
 IPLD Data Model as a subset of CBOR.
-#todo
-For further information see: https://ipld.io/specs/codecs/dag-cbor/spec/
+DAG-CBOR is the goto serialization method for data used throughout CO-kit.
+
+For further information see:
+- [Core](../reference/core.md#serialization)
+- [DAG-CBOR specification](https://ipld.io/specs/codecs/dag-cbor/spec/)
 
 ## didcontact
-#todo
+A discovery protocol which gossips encrypted didcomm messages using the libp2p GossipSub protocol.
+
+For further information see:
+- [didcontact protocol](../reference/network.md#protocol-didcontact)
 
 ## CLA
 A **Contributor License Agreement (CLA)** is a legal contract between a contributor and a project that grants the project the necessary permissions to use, distribute, and sublicense the contributor’s code or other contributions.
@@ -36,14 +49,12 @@ We use it as an addition to the agreements made within the AGPLv3 License.
 It ensures that:
 
 - The contributor **has the rights** to submit the work (e.g., they wrote it or their employer allows it)
-
 - The project **obtains adequate rights** — such as copyright assignment or an irrevocable license — to include and redistribute the contributions under its license terms.
 
 ## CID
 A **CID** is a self-describing, content-addressed identifier used in distributed systems like IPFS and IPLD. Instead of pointing to *where* data is stored, it refers to *what* the data is via a cryptographic hash.
 
 - **Deterministic & Immutable**: Any change, even a single byte, yields a totally different CID, ensuring verifiability and immutable data.
-
 - **Self-Describing Format**: CIDs combine a hash (via *multihash*), a content-type code (*multicodec*), and encoding info (*multibase*), making them flexible and future-proof.
 
 **Why CO-kit uses CIDs**:
@@ -55,10 +66,15 @@ A CO is a virtual room for collaboration.
 
 CO (virtual data room) is a distributed database whose data is encrypted and is only available to the participants (unique via DID) of the data room. The CO stores references (unique via CID) of the data. The data itself is stored on the participants' devices. The DIDs, permissions and the identities of the participants (PrivateKeys) are stored in a data structure (data structure for states) “COre”. Each CO contains at least one COre. They act as “in-code databases” that store details such as the DIDs of the participants in a CO, their roles (admin, reader, etc.), permissions and status information (states) of systems such as chat rooms.
 
+For further information see:
+- [CO](../reference/co.md)
 
-## CO-api
-#todo
+## CO-API
+The CO-API is the foundation package to create CO-kit cores.
 
+For further information see:
+- [Core](../reference/core.md#serialization)
+- [Core API Overview](../usage/api-overview-core.md)
 
 ## CO-kit
 In essence, CO-kit is a Software Development Kit written in Rust.
@@ -106,27 +122,24 @@ A core (CO reducer) is a piece of data that acts like a state. Cores can be dire
 
 
 ## CRDT
+#todo
 A **CRDT** is a specialized data structure designed for **distributed systems** that allows each replica to be updated **independently and concurrently**, without locking or central coordination, and still achieve **eventual consistency** through deterministic merge rules.
 
-**Core properties**:
+Key points:
 - **Conflict‑free**: Operations commute, ensuring that replicas converge to the same state regardless of operation order.
-
 - **Strong eventual consistency**: When all updates are delivered, every replica reaches the same final state.
-
 - **No coordination needed**: Replicas can be updated offline and merge upon reconnection.
 
-**Types**:
-- **State-based (CvRDT)**: Each replica periodically sends its full or delta state to others and resolves merges with deterministic lattice joins.
+CO-kit leverages CRDTs to implement the built-in log-based Merkle-CRDT.
+- Distributed nodes stay in sync without locking or conflicts.
+- Network partitions or offline work don’t block progress.
+- Updates merge correctly once communication resumes.
 
-- **Operation-based (CmRDT)**: Updates are propagated as individual commutative operations, relying on reliable distribution.
-
-**Why CO-kit uses CRDTs**:
-CO-kit leverages CRDTs to implement its **built-in Merkle log-based CRDT sync**, ensuring that:
-- Distributed nodes stay in sync **without locking or conflicts**.
-- **Network partitions or offline work** don’t block progress.
-- Updates merge correctly **once communication resumes**.
+For further information see:
+- [Log](../reference/log.md)
 
 ## Dioxus
+#todo
 **Dioxus** is a modern, **Rust-based framework for building cross-platform user interfaces**, supporting web, desktop, mobile, and server environments with a single codebase.
 
 - **Declarative UI with RSX**: Uses an `rsx!` macro similar to JSX, allowing you to write HTML-like layouts directly in Rust code (e.g., `rsx! { h1 { "Hello World!" } }`)
@@ -151,23 +164,34 @@ Just like [Cores](../reference/core.md), Guards are pure functions, are compiled
 Important notice: Guards are not permissions.
 
 ## IPLD
-[IPLD](https://ipld.io/) is a single namespace for all hash-inspired protocols. Through IPLD, links can be traversed across protocols, allowing you to explore data regardless of the underlying protocol.
+IPLD is a single namespace for all hash-inspired protocols. Through IPLD, links can be traversed across protocols, allowing you to explore data regardless of the underlying protocol.
 
-## Logs
+For further information see:
+- [ipld.io](https://ipld.io/)
+
+## Log
 The Log is a conflict-free replicated event stream. It is immutable and cryptographically verifiable.
 It is (eventually consistent) sorted using a Merkle-DAG-based logical clock.
 Arbitrary heads can be joined together at any time.
 Whenever the same heads are joined, the resulting log is guaranteed to be equal.
 
+#todo
 **What makes a Log:**
 This can be thought of like a git graph where each commit is an operation.
 The heads represent the end of the log and also a specific state of the data.
 
+For further information see:
+- [Log](../reference/log.md)
+
 ## Heads
-#todo
+The heads represent the end of the log and also a specific state of the data.
+
+For further information see:
+- [Log](../reference/log.md)
 
 ## mDNS
-**mDNS** is a lightweight, zero-configuration networking protocol that resolves hostnames to IP addresses within local networks without the need for a dedicated DNS server.
+#todo: reformat
+mDNS is a lightweight, zero-configuration networking protocol that resolves hostnames to IP addresses within local networks without the need for a dedicated DNS server.
 
 ### How it works
 - A client sends a DNS query via **UDP multicast** to all peers on the local subnet (IPv4 224.0.0.251, IPv6: FF02::FB) over port 5353.
@@ -182,14 +206,14 @@ The heads represent the end of the log and also a specific state of the data.
 CO-kit uses mDNS as an optional networking mode to automatically discover peer nodes and COs on a local subnet - simplifying setup and fostering seamless peer-to-peer collaboration without manual endpoint configuration.
 
 ## Merkle-CRDT
-A **Merkle‑CRDT** combines the strengths of **Merkle‑DAGs (Directed Acyclic Graphs)** and **Conflict‑Free Replicated Data Types (CRDTs)** to create a robust, decentralized synchronization layer. In this design, CRDT payloads are embedded within Merkle‑DAG nodes, allowing each update to serve as a self-verifying event in a content-addressed history, simplifying causality tracking and state merging without relying on messaging guarantees.  
+A Merkle‑CRDT combines the strengths of Merkle‑DAGs (Directed Acyclic Graphs) and CRDTs (Conflict‑Free Replicated Data Types) to create a robust, decentralized synchronization layer. In this design, CRDT payloads are embedded within Merkle‑DAG nodes, allowing each update to serve as a self-verifying event in a content-addressed history, simplifying causality tracking and state merging without relying on messaging guarantees.  
 
-The Merkle‑DAG provides **Merkle‑Clocks**, which function as logical clocks for capturing causality and ordering. Coupled with a DAG‑Syncer and Broadcaster, this approach enables **per‑object causal consistency**, allowing replicas to synchronize efficiently even in unreliable networks with dynamic replica sets.
-
-Merkle‑CRDTs shine in highly distributed and ad‑hoc environments (e.g., mobile, browser, or IoT networks) because they eliminate the need for consensus mechanisms or strict messaging protocols. Instead, convergence is ensured through immutable, verifiable DAG history and CRDT semantics embedded within each node.
+For further information see:
+- [Log](../reference/log.md)
 
 ## Merkle-DAG
-A **Merkle-DAG** is a content-addressed directed acyclic data structure where each node is cryptographically hashed based on its payload and its links to child nodes. This creates a self-verifying graph ideal for the distributed system of CO-kit.
+#todo
+A Merkle-DAG is a content-addressed directed acyclic data structure where each node is cryptographically hashed based on its payload and its links to child nodes. This creates a self-verifying graph ideal for the distributed system of CO-kit.
 
 ### Features
 - **Immutable and self-verifying**: Each node's identifier uniquely represents its content and all descendants. Any change produces a new [CID](./) and a new graph branch.
@@ -199,6 +223,7 @@ A **Merkle-DAG** is a content-addressed directed acyclic data structure where ea
 In CO-kit, we use Merkle DAGs as the foundation for the built-in Merkle log-based CRDT-syncing, especially to enable lightweight storage and content deduplication across COs.
 
 ## PeerID
+#todo
 A [Peer](https://docs.libp2p.io/concepts/fundamentals/peers/) Identity (often written `PeerID`) is a unique reference to a specific peer within the overall p2p-network.
 
 - A Peer ID is derived by hashing a node’s **public key**, and the corresponding **private key** remains secret and is used to sign messages and authenticate the identity of the peer.
@@ -208,7 +233,7 @@ A [Peer](https://docs.libp2p.io/concepts/fundamentals/peers/) Identity (often wr
 In CO-kit, each `CO` or node may generate or be assigned a Peer ID, which then acts as a verifiable handle across the decentralised syncing and networking layers.
 
 ## Proof‑of‑Authority (PoA) Consensus Mechanism
-
+#todo
 **Proof‑of‑Authority (PoA)** is a reputation-based consensus mechanism where only a small, pre-approved set of trusted validators—known entities with verifiable identities—are empowered to produce and validate transactions. 
 
 ## Storage
@@ -218,6 +243,7 @@ The recommended serialization format (also used throughout CO-kit) is DAG-CBOR w
 A [core](../reference/core.md) is not restricted to [DAG-CBOR](../glossary/glossary.md#DAG-CBOR) and may use any given structure.
 
 ## Tauri
+#todo
 **Tauri** is an open-source framework for building **lightweight, secure, and fast** desktop (and mobile) applications using web technologies for the UI and Rust for the backend logic
 
 ### Features
@@ -234,6 +260,7 @@ A [core](../reference/core.md) is not restricted to [DAG-CBOR](../glossary/gloss
 #todo 
 
 ## WASM
+#todo
 WebAssembly (WASM) is an open-standard, portable binary intruction format designed for high-performance execution in a sandboxed environment - initially for web browsers, and increasingly for broader contexts including servers, edge devices, and embedded systems.
 It serves as a compilation target for languages such as Rust, C, C++, and others, enabling near-native speed while maintaining security and cross-platform compatibility
 

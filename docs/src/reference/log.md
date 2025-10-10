@@ -8,6 +8,14 @@ Whenever the same heads are joined, the resulting log is guaranteed to be equal.
 This can be thought of like a git graph where each commit is an operation.
 The heads represent the end of the log and also a specific state of the data.
 
+### Merkle-CRDT
+#todo
+A Merkle‑CRDT combines the strengths of Merkle‑DAGs (Directed Acyclic Graphs) and Conflict‑Free Replicated Data Types (CRDTs) to create a robust, decentralized synchronization layer. In this design, CRDT payloads are embedded within Merkle‑DAG nodes, allowing each update to serve as a self-verifying event in a content-addressed history, simplifying causality tracking and state merging without relying on messaging guarantees.  
+
+The Merkle‑DAG provides Merkle‑Clocks, which function as logical clocks for capturing causality and ordering. Coupled with a DAG‑Syncer and Broadcaster, this approach enables per‑object causal consistency, allowing replicas to synchronize efficiently even in unreliable networks with dynamic replica sets.
+
+Merkle‑CRDTs shine in highly distributed and ad‑hoc environments (e.g., mobile, browser, or IoT networks) because they eliminate the need for consensus mechanisms or strict messaging protocols. Instead, convergence is ensured through immutable, verifiable DAG history and CRDT semantics embedded within each node.
+
 ## How it is used in CO-kit
 Each [CO](./co.md) is event-sourced by a Log.
 The CO state is materialized from the log through its set of cores.

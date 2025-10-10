@@ -1,6 +1,6 @@
 # Architecture
 In this chapter, we want to share an overview of CO-kits components and how they work together.
-In the introductory chapter, we already explained the [scope](../introduction/about-co-sdk.md) of CO-kit and its key [features](../introduction/features.md) and [objectives](../introduction/why.md). The following will be a technical overview.
+In the introductory chapter, we already explained the [scope](../introduction/about-co-kit.md) of CO-kit and its key [features](../introduction/features.md) and [objectives](../introduction/why.md). The following will be a technical overview.
 
 ## Overview
 ### High-Level Components

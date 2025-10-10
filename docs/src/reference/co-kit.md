@@ -10,12 +10,14 @@ A software development kit to build decentralized applications with, written in 
 #todo
 
 ### Database nerds
-- Atomicity: Core.
-- Consistency: Core.
-- Isolation: Core.
+#todo
+- Atomicity: Core
+- Consistency: Core
+- Isolation: Core
 - Durability: Reproducibly anytime with Cores.
 - Concurrency Control
 - Oplog
+- Like a Master-Master replication where your logic can decide what happens on conflicts whereas with transactions only the database can
 
 ## Overview
 ### [CO](../reference/co.md)
