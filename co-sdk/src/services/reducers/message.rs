@@ -6,11 +6,9 @@ use co_primitives::CoId;
 #[derive(Debug)]
 pub enum ReducerRequest {
 	/// Request CO storage instance (without networking).
-	Storage(CoId, Response<Result<ReducerStorage, CoReducerFactoryError>>),
+	Storage(CoId, ReducerOptions, Response<Result<ReducerStorage, CoReducerFactoryError>>),
 	/// Request CO reducer instance by creating it if not created yet.
-	Request(CoId, Response<Result<CoReducer, CoReducerFactoryError>>),
-	/// Request CO reducer instance if it already has been created yet.
-	RequestOpt(CoId, bool, Response<Option<CoReducer>>),
+	Request(CoId, ReducerOptions, Response<Result<CoReducer, CoReducerFactoryError>>),
 	/// Create reducer instance.
 	Create(CoId, Result<CoReducer, CoReducerFactoryError>),
 	/// Create shared storage instance.
@@ -26,27 +24,20 @@ pub struct ReducersControl {
 	pub(crate) handle: ActorHandle<ReducerRequest>,
 }
 impl ReducersControl {
-	pub async fn storage(&self, co: CoId) -> Result<ReducerStorage, CoReducerFactoryError> {
+	pub async fn storage(&self, co: CoId, options: ReducerOptions) -> Result<ReducerStorage, CoReducerFactoryError> {
 		// tracing::trace!(?co, err = ?anyhow::anyhow!("test"), "co-reducer-request");
 		Ok(self
 			.handle
-			.try_request(|response| ReducerRequest::Storage(co, response))
+			.try_request(|response| ReducerRequest::Storage(co, options, response))
 			.await?)
 	}
 
-	pub async fn reducer(&self, co: CoId) -> Result<CoReducer, CoReducerFactoryError> {
+	pub async fn reducer(&self, co: CoId, options: ReducerOptions) -> Result<CoReducer, CoReducerFactoryError> {
 		// tracing::trace!(?co, err = ?anyhow::anyhow!("test"), "co-reducer-request");
 		Ok(self
 			.handle
-			.try_request(|response| ReducerRequest::Request(co, response))
+			.try_request(|response| ReducerRequest::Request(co, options, response))
 			.await?)
-	}
-
-	pub async fn reducer_opt(&self, co: CoId, wait_on_pending_create: bool) -> Option<CoReducer> {
-		self.handle
-			.request(|response| ReducerRequest::RequestOpt(co, wait_on_pending_create, response))
-			.await
-			.ok()?
 	}
 
 	pub async fn create(&self, co: CoId, reducer: Result<CoReducer, CoReducerFactoryError>) {
@@ -71,5 +62,25 @@ impl ReducersControl {
 impl From<ActorHandle<ReducerRequest>> for ReducersControl {
 	fn from(value: ActorHandle<ReducerRequest>) -> Self {
 		Self { handle: value }
+	}
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ReducerOptions {
+	/// When set to [`true`] return [`None`]/[`CoReducerFactoryError::Pending`] if the reducer create is pending.
+	pub no_pending_create: bool,
+
+	/// When set to [`true`] do not attemt to create and return [`None`]/[`CoReducerFactoryError::WouldCreate`].
+	pub no_create: bool,
+}
+impl ReducerOptions {
+	pub fn with_no_create(mut self) -> Self {
+		self.no_create = true;
+		self
+	}
+
+	pub fn with_no_pending_create(mut self) -> Self {
+		self.no_pending_create = true;
+		self
 	}
 }

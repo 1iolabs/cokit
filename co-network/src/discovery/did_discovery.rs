@@ -1,5 +1,6 @@
-use co_identity::{network_did_discovery, DidCommHeader, Identity, PrivateIdentity};
+use co_identity::{network_did_discovery, DidCommHeader, Identity, PeerDidCommHeader, PrivateIdentity};
 use co_primitives::{serde_string_enum, NetworkDidDiscovery};
+use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -11,6 +12,7 @@ pub struct DidDiscovery {
 impl DidDiscovery {
 	/// Create DID Discovery request.
 	pub fn create<F, T>(
+		from_peer: PeerId,
 		from: &F,
 		to: &T,
 		network: Option<NetworkDidDiscovery>,
@@ -22,8 +24,9 @@ impl DidDiscovery {
 	{
 		let network = network_did_discovery(to, network)?;
 		let (from_context, to_context, header) = DidCommHeader::create(from, to, message_type)?;
-		let message_id = header.id.clone();
-		let message = from_context.jwe(&to_context, header, "null")?;
+		let message_header = PeerDidCommHeader { header, from_peer_id: Some(from_peer.to_string()) };
+		let message_id = message_header.header.id.clone();
+		let message = from_context.jwe(&to_context, message_header.into(), "null")?;
 		Ok(DidDiscovery { message_id, network, message })
 	}
 }

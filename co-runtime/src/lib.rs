@@ -3,6 +3,8 @@ mod modules;
 mod runtimes;
 mod types;
 
+#[cfg(feature = "llvm")]
+pub use library::compile::compile_native;
 pub use library::{
 	api_context::ApiContext,
 	async_context::{AsyncBlockStorage, AsyncContext},
@@ -19,5 +21,6 @@ pub use types::{
 	},
 	context::RuntimeContext,
 	core::Core,
+	core_descriptor::CoreDescriptor,
 	guard::GuardReference,
 };

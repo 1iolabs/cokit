@@ -34,6 +34,8 @@ impl Instances {
 	pub async fn networking(
 		peer1: &mut Instance,
 		peer2: &mut Instance,
+		dail_peer1_to_peer2: bool,
+		dail_peer2_to_peer1: bool,
 	) -> (CoNetworkTaskSpawner, CoNetworkTaskSpawner) {
 		// start
 		peer1
@@ -53,14 +55,18 @@ impl Instances {
 
 		// connect
 		//  because of localhost we need to explicitly dial (no mDNS on localhost).
-		network2
-			.dial(Some(network1.local_peer_id()), network1.listeners().await.unwrap())
-			.await
-			.unwrap();
-		network1
-			.dial(Some(network2.local_peer_id()), network2.listeners().await.unwrap())
-			.await
-			.unwrap();
+		if dail_peer2_to_peer1 {
+			network2
+				.dial(Some(network1.local_peer_id()), network1.listeners().await.unwrap())
+				.await
+				.unwrap();
+		}
+		if dail_peer1_to_peer2 {
+			network1
+				.dial(Some(network2.local_peer_id()), network2.listeners().await.unwrap())
+				.await
+				.unwrap();
+		}
 
 		// result
 		(network1, network2)

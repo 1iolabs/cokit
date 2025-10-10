@@ -1,10 +1,10 @@
 use crate::{
 	library::network_queue::{
 		network_queue_action, network_queue_backlog, network_queue_heads, network_queue_message, network_queue_task,
-		network_queue_task_complete, network_queue_task_doing,
+		network_queue_task_complete, network_queue_task_doing, TaskState,
 	},
 	network::PeersNetworkTask,
-	services::application::HeadsMessageReceivedAction,
+	services::application::{HeadsError, HeadsMessageReceivedAction},
 	types::message::heads::HeadsMessage,
 	Action, CoContext, CoUuid,
 };
@@ -37,10 +37,10 @@ pub fn network_queue_message_epic(
 					.boxed(),
 			)
 		},
-		Action::HeadsMessageComplete {
-			message: message @ HeadsMessageReceivedAction { message: HeadsMessage::Heads(_co, _heads), .. },
-			result: Err(_),
-		} => {
+		Action::HeadsMessageComplete(
+			message @ HeadsMessageReceivedAction { message: HeadsMessage::Heads(_co, _heads), .. },
+			Err(HeadsError::Transient(_)),
+		) => {
 			let context = context.clone();
 			let message = message.clone();
 			Some(
@@ -291,7 +291,19 @@ fn process(
 		});
 		for await task in tasks {
 			let task = task?;
-			let (action, complete) = network_queue_action(&local_co, &task, &lock).await?;
+			let (action, complete) = match network_queue_action(&local_co, &task, &lock).await {
+				Ok(result) => result,
+				Err(err) => {
+					// fail
+					network_queue_task_complete(&identity, &local_co, &task, &lock, TaskState::Failed).await?;
+
+					// log
+					tracing::warn!(?task, ?err, "network-queue-task-failed");
+
+					// skip
+					continue;
+				},
+			};
 
 			// doing
 			if !network_queue_task_doing(&identity, &local_co, &task, &lock).await? {

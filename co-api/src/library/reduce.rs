@@ -38,11 +38,11 @@ where
 	let next_state = state.reduce(&event, context);
 
 	// store
-	let next_data = to_cbor(&next_state).unwrap();
+	let next_data = to_cbor(&next_state).expect("serialize next_state to dag-cbor");
 	let next_hash = Code::Blake3_256.digest(&next_data);
 	let next_cid = Cid::new_v1(KnownMultiCodec::DagCbor.into(), next_hash);
 	let next_block = Block::new_unchecked(next_cid, next_data);
-	if cid.is_none() || cid.unwrap() != next_cid {
+	if cid != Some(next_cid) {
 		let store_cid = next_cid;
 		context.storage_mut().set(next_block);
 		context.store_state(store_cid);

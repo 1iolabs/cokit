@@ -14,8 +14,10 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
+mod action_dispatch;
 mod actions;
 
+pub use action_dispatch::ActionDispatch;
 pub use actions::Actions;
 
 /// Epic.

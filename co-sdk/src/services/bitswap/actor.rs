@@ -155,7 +155,7 @@ async fn get(
 			context
 				.inner
 				.reducers_control()
-				.storage(co)
+				.storage(co, Default::default())
 				.await
 				.map_err(|err| StorageError::NotFound(cid, err.into()))?
 		},
@@ -200,7 +200,7 @@ async fn insert(
 	let storage = context
 		.inner
 		.reducers_control()
-		.storage(co)
+		.storage(co, Default::default())
 		.await
 		.map_err(|err| StorageError::InvalidArgument(err.into()))?;
 
@@ -231,7 +231,7 @@ async fn missing_blocks(context: CoContext, cid: Cid, tokens: Vec<Token>) -> Res
 	let storage = context
 		.inner
 		.reducers_control()
-		.storage(co)
+		.storage(co, Default::default())
 		.await
 		.map_err(|err| StorageError::InvalidArgument(err.into()))?
 		.storage()

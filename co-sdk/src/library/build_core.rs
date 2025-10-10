@@ -56,18 +56,19 @@ pub fn build_core(
 	repository_path: impl AsRef<Path>,
 	core_path: impl AsRef<Path>,
 ) -> Result<BuildCoreArtifact, anyhow::Error> {
-	let core_path = repository_path.as_ref().join(core_path.as_ref());
+	let core_path = core_path.as_ref().to_owned();
 	let target_path = repository_path.as_ref().join("target-wasm");
 
 	// read toml for name
 	let core_toml = core_path.join("Cargo.toml");
-	let data = read(&core_toml).context("to read Cargo.toml")?;
-	let core_package: Cargo = toml::from_str(std::str::from_utf8(&data)?).context("valid toml")?;
+	let data = read(&core_toml).context(format!("read {:?}", core_toml))?;
+	let core_package: Cargo = toml::from_str(std::str::from_utf8(&data)?).context(format!("toml {:?}", core_toml))?;
 	let core_package = core_package.package.ok_or(anyhow!("Missing package: {:?}", core_toml))?;
 
 	// build
 	let output = Command::new("cargo")
 		.current_dir(&core_path)
+		.env("RUSTFLAGS", "-C opt-level=z -C codegen-units=1 -C panic=abort -C strip=symbols")
 		.args([
 			"build",
 			"--features",

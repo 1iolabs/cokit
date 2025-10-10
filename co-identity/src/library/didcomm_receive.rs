@@ -26,11 +26,14 @@ pub async fn didcomm_receive<R: IdentityResolver>(
 			Err(err) => return Err(ReceiveError::UnknownFormat(err.into())),
 		};
 
+	// header
+	let mut header = from_didcomm_rs_header(message.get_didcomm_header().clone());
+	for (key, value) in message.get_application_params() {
+		header.fields.insert(key.to_owned(), value.to_owned());
+	}
+
 	// result
-	Ok((
-		from_didcomm_rs_header(message.get_didcomm_header().clone()),
-		message.get_body().map_err(|e| ReceiveError::InvalidArgument(e.into()))?,
-	))
+	Ok((header, message.get_body().map_err(|e| ReceiveError::InvalidArgument(e.into()))?))
 }
 
 #[cfg(test)]

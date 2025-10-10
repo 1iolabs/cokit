@@ -1,5 +1,7 @@
 use self::wasmer::WasmerRuntime;
 use crate::{co_v1::CoV1Api, RuntimeContext};
+use anyhow::anyhow;
+use std::fmt::Debug;
 
 pub mod wasmer;
 
@@ -16,6 +18,9 @@ pub enum RuntimeError {
 
 	#[error("Invalid runtime state")]
 	InvalidState(#[source] anyhow::Error),
+
+	#[error("Deserialize binary error")]
+	Deserialize(#[source] anyhow::Error),
 }
 impl From<wasmer::WasmerError> for RuntimeError {
 	fn from(value: wasmer::WasmerError) -> Self {
@@ -24,11 +29,13 @@ impl From<wasmer::WasmerError> for RuntimeError {
 			wasmer::WasmerError::Instantiation(e) => Self::InvalidArgument(e.into()),
 			wasmer::WasmerError::Export(e) => Self::InvalidArgument(e.into()),
 			wasmer::WasmerError::Runtime(e) => Self::Runtime(e.into()),
+			wasmer::WasmerError::Deserialize(e) => Self::Deserialize(e.into()),
+			e @ wasmer::WasmerError::NoEngineAvailable => Self::InvalidArgument(e.into()),
 		}
 	}
 }
 
-pub trait Runtime {
+pub trait Runtime: Debug {
 	/// Execute state runtime with specified api.
 	fn execute_state(&mut self, api: CoV1Api) -> Result<RuntimeContext, RuntimeError>;
 
@@ -37,16 +44,25 @@ pub trait Runtime {
 }
 
 enum RuntimeState {
-	Unintialized(Vec<u8>),
+	Unintialized(bool, Vec<u8>),
 	Intialized(wasmer::WasmerRuntime),
 }
+impl Debug for RuntimeState {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Unintialized(arg0, arg1) => f.debug_tuple("Unintialized").field(arg0).field(&arg1.len()).finish(),
+			Self::Intialized(arg0) => f.debug_tuple("Intialized").field(arg0).finish(),
+		}
+	}
+}
 
+#[derive(Debug)]
 struct Wasmer {
 	state: RuntimeState,
 }
 impl Wasmer {
-	pub fn new(bytes: Vec<u8>) -> Self {
-		Self { state: RuntimeState::Unintialized(bytes) }
+	pub fn new(native: bool, bytes: Vec<u8>) -> Self {
+		Self { state: RuntimeState::Unintialized(native, bytes) }
 	}
 }
 impl Runtime for Wasmer {
@@ -78,12 +94,12 @@ impl Runtime for Wasmer {
 fn wasmer_runtime_with_api(state: &mut RuntimeState, mut api: CoV1Api) -> Result<&mut WasmerRuntime, RuntimeError> {
 	// initialize
 	let runtime: &mut WasmerRuntime = match state {
-		RuntimeState::Unintialized(bytes) => {
-			*state = RuntimeState::Intialized(wasmer::WasmerRuntime::new(api, bytes)?);
+		RuntimeState::Unintialized(native, bytes) => {
+			*state = RuntimeState::Intialized(wasmer::WasmerRuntime::new(api, *native, bytes)?);
 			if let RuntimeState::Intialized(runtime) = state {
 				runtime
 			} else {
-				unreachable!("invalid state");
+				return Err(RuntimeError::InvalidState(anyhow!("Uninitialized after initialize")));
 			}
 		},
 		RuntimeState::Intialized(runtime) => {
@@ -94,8 +110,8 @@ fn wasmer_runtime_with_api(state: &mut RuntimeState, mut api: CoV1Api) -> Result
 	Ok(runtime)
 }
 
-pub fn create_runtime(bytes: Vec<u8>) -> Box<dyn Runtime + Send> {
-	Box::new(Wasmer::new(bytes))
+pub fn create_runtime(native: bool, bytes: Vec<u8>) -> Box<dyn Runtime + Send> {
+	Box::new(Wasmer::new(native, bytes))
 }
 
 // #[deprecated]

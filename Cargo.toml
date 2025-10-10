@@ -106,5 +106,5 @@ co-messaging = { path = "co-messaging" }
 co-network = { path = "co-network" }
 co-primitives = { path = "co-primitives" }
 co-runtime = { path = "co-runtime" }
-co-sdk = { path = "co-sdk" }
+co-sdk = { path = "co-sdk", default-features = false }
 co-storage = { path = "co-storage" }

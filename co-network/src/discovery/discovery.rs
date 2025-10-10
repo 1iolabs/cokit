@@ -1229,7 +1229,7 @@ mod tests {
 			.layer_mut()
 			.connect(
 				peer2.swarm(),
-				vec![DidDiscovery::create(&did2, &did1, None, DidDiscoveryMessage::Discover.to_string())
+				vec![DidDiscovery::create(peer2_id, &did2, &did1, None, DidDiscoveryMessage::Discover.to_string())
 					.unwrap()
 					.into()],
 			)

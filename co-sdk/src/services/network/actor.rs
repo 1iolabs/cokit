@@ -1,6 +1,7 @@
 use super::message::NetworkMessage;
 use crate::{
 	local_keypair_fetch,
+	network::tasks::connections::ConnectionsNetworkTask,
 	services::{
 		bitswap::Bitswap,
 		connections::Connections,
@@ -160,6 +161,9 @@ impl Actor for Network {
 			Connections::new(self.context.clone(), Duration::from_secs(30)),
 			(),
 		)?;
+		spawner
+			.spawn(ConnectionsNetworkTask::new(connections.handle()))
+			.map_err(|err| ActorError::Actor(err.into()))?;
 
 		// use mdns discoverd peers for gossip discovery
 		spawner

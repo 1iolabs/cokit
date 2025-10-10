@@ -28,7 +28,7 @@ enum TodosAction {
 
     /// Set done state of a TODO.
     SetDone { id: u64, done: bool },
-    
+
     /// Delete one TODO.
     Delete { id: u64 },
 
@@ -76,7 +76,7 @@ impl Todos {
         self.next_todo_id = self.next_todo + 1;
         self.todos.push(context, Todo { id, title, done: false })
     }
-    
+
     #[reducer]
     fn set_done(&mut self, id: u64, done: bool, context: &mut dyn Context) {
         self.todos.update_one(
@@ -92,7 +92,7 @@ impl Todos {
     fn delete(&mut self,  id: u64, context: &mut dyn Context) {
         self.todos.delete_one(context, |todo| todo.id == id);
     },
-    
+
     #[reducer]
     fn delete_done(&mut self, context: &mut dyn Context) {
         self.todos.delete_many(context, |todo| todo.done);
@@ -221,6 +221,7 @@ Dependencies:
 - `rustfmt`
 - `wasm32-unknown-unknown` to build cores.
 - `toolchain nightly` to use `rustfmt +nightly`
+- `llvm-18`
 
 Commands:
 ```shell
@@ -228,6 +229,14 @@ rustup component add rustfmt
 rustup target add wasm32-unknown-unknown
 rustup toolchain install nightly
 rustup component add --toolchain nightly rustfmt
+```
+
+MacOS:
+```shell
+brew install llvm@18
+echo "Add llvm to .config/Cargo.toml:"
+echo "[env]"
+echo "LLVM_SYS_180_PREFIX = \"$("brew" "--prefix" "llvm@18")\""
 ```
 
 ### Rust

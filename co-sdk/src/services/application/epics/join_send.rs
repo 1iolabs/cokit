@@ -1,5 +1,8 @@
 use crate::{
-	library::{invite_networks::invite_networks, is_cid_encrypted::is_cid_encrypted, join::create_join_message_from},
+	library::{
+		invite_networks::invite_networks, is_membership_heads_encrypted::is_membership_heads_encrypted,
+		join::create_join_message_from,
+	},
 	services::application::action::{CoDidCommSendAction, NotifyAction},
 	state::{query_core, Query},
 	Action, CoContext, CoStorage, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
@@ -10,7 +13,8 @@ use co_core_membership::{Membership, MembershipState, MembershipsAction};
 use co_identity::{Identity, PrivateIdentityResolver};
 use co_primitives::{CoId, CoInviteMetadata, Did, KnownTags};
 use co_storage::BlockStorageExt;
-use futures::{stream, FutureExt, Stream, StreamExt};
+use futures::{FutureExt, Stream, StreamExt};
+use std::future::ready;
 
 /// When a membership is set to active, try to connect the CO and send the join message via didcomm.
 /// TODO: consensus finalization?
@@ -64,25 +68,13 @@ pub fn join_sent(
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
 		Action::CoDidCommSent {
-			message:
-				CoDidCommSendAction { co, notification: Some(NotifyAction::JoinSent { participant, encrypted }), .. },
-			result: Ok(peers),
+			message: CoDidCommSendAction { co, notification: Some(NotifyAction::JoinSent { participant, .. }), .. },
+			result,
 		} => {
-			if let Some(peer) = peers.first() {
-				let result = if *encrypted {
-					Action::JoinKeyRequest { co: co.clone(), participant: participant.clone(), peer: *peer }
-				} else {
-					Action::Joined {
-						co: co.clone(),
-						participant: participant.clone(),
-						success: true,
-						peer: Some(*peer),
-					}
-				};
-				Some(stream::iter([Ok(result)]))
-			} else {
-				None
-			}
+			let peer = result.as_ref().ok().and_then(|result| result.first().cloned());
+			let action =
+				Action::Joined { co: co.clone(), participant: participant.clone(), success: peer.is_some(), peer };
+			Some(ready(Ok(action)).into_stream())
 		},
 		_ => None,
 	}
@@ -131,7 +123,8 @@ async fn create_join_action(context: CoContext, storage: CoStorage, membership: 
 	// message
 	let private_identity_resolver = context.private_identity_resolver().await?;
 	let identity = private_identity_resolver.resolve_private(&membership.did).await?;
-	let (message_id, message) = create_join_message_from(&identity, membership.id.clone(), Some(invite.id.clone()))?;
+	let (message_header, message) =
+		create_join_message_from(&identity, membership.id.clone(), Some(invite.id.clone()))?;
 
 	// send message to discovered peers until one send succedded and return Action::Joined.
 	// this will also use invite.peer if possible.
@@ -142,7 +135,7 @@ async fn create_join_action(context: CoContext, storage: CoStorage, membership: 
 		co: membership.id.clone(),
 		message,
 		message_from: identity.identity().to_owned(),
-		message_id,
+		message_header,
 		networks,
 		notification: Some(NotifyAction::JoinSent {
 			participant: membership.did.clone(),
@@ -150,12 +143,4 @@ async fn create_join_action(context: CoContext, storage: CoStorage, membership: 
 		}),
 		tags: Default::default(),
 	}))
-}
-
-async fn is_membership_heads_encrypted(storage: &CoStorage, membership: &Membership) -> Result<bool, anyhow::Error> {
-	for co_state in membership.state.iter() {
-		let (_state, heads) = storage.get_value(&co_state.state).await?.into_value();
-		return Ok(is_cid_encrypted(&heads));
-	}
-	Ok(false)
 }

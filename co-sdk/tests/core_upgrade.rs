@@ -11,7 +11,9 @@ async fn counter_core<S>(storage: &S) -> Cid
 where
 	S: BlockStorage + 'static,
 {
-	let counter = build_core(crate_repository_path(true).unwrap(), "examples/counter")
+	let repository_path = crate_repository_path(true).unwrap();
+	let core_path = repository_path.join("examples/counter");
+	let counter = build_core(repository_path, core_path)
 		.unwrap()
 		.store_artifact(storage)
 		.await
@@ -23,7 +25,9 @@ async fn counter_upgraded_core<S>(storage: &S) -> Cid
 where
 	S: BlockStorage + 'static,
 {
-	let counter = build_core(crate_repository_path(true).unwrap(), "examples/counter-upgraded")
+	let repository_path = crate_repository_path(true).unwrap();
+	let core_path = repository_path.join("examples/counter-upgraded");
+	let counter = build_core(repository_path, core_path)
 		.unwrap()
 		.store_artifact(storage)
 		.await

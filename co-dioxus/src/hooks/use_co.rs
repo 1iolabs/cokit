@@ -1,8 +1,13 @@
 use crate::{use_co_context, use_co_storage, CoBlockStorage, CoContext};
 use anyhow::anyhow;
-use co_sdk::{state::Identity, Application, CoId, CoReducerFactory, CoReducerState, CreateCo, CO_ID_LOCAL};
+use cid::Cid;
+use co_core_co::CoAction;
+use co_sdk::{
+	state::Identity, tags, unixfs_add, Application, CoId, CoReducerFactory, CoReducerState, CreateCo, Tags,
+	CO_CORE_NAME_CO, CO_ID_LOCAL,
+};
 use dioxus::prelude::*;
-use futures::{future::Either, pin_mut, StreamExt};
+use futures::{future::Either, io::Cursor, pin_mut, StreamExt};
 use serde::Serialize;
 use std::{fmt::Debug, future::Future, sync::Arc};
 
@@ -127,6 +132,7 @@ impl Co {
 		self.last_error.set(Ok(()));
 	}
 
+	/// Dispatch a action into a Co.
 	pub fn dispatch<T>(&self, identity: Identity, core: impl Into<String> + Debug, action: T)
 	where
 		T: Serialize + Debug + Send + Sync + Clone + 'static,
@@ -144,6 +150,7 @@ impl Co {
 		});
 	}
 
+	/// Create a new Co.
 	pub fn create_co(&self, identity: Identity, co: CreateCo) {
 		let mut last_error = self.last_error;
 
@@ -156,6 +163,46 @@ impl Co {
 		// create
 		self.context.execute_future(move |application| async move {
 			match create_co(application, identity, co).await {
+				Ok(()) => {},
+				Err(err) => {
+					last_error.set(Err(err.into()));
+				},
+			}
+		});
+	}
+
+	/// Create a core.
+	pub fn create_core(&self, identity: Identity, core_name: &str, core_type: &str, core_binary: Cid) {
+		let co = self.co_id.clone();
+		let core_name = core_name.to_owned();
+		let core_tags = tags!("type": core_type);
+		let core_binary = Either::Left(core_binary);
+		let mut last_error = self.last_error;
+		self.context.execute_future(move |application| async move {
+			match create_core(application, identity, co, core_name, core_tags, core_binary).await {
+				Ok(()) => {},
+				Err(err) => {
+					last_error.set(Err(err.into()));
+				},
+			}
+		});
+	}
+
+	/// Create a core using binary.
+	pub fn create_core_binary(
+		&self,
+		identity: Identity,
+		core_name: &str,
+		core_type: &str,
+		core_binary: impl Into<Vec<u8>>,
+	) {
+		let co = self.co_id.clone();
+		let core_name = core_name.to_owned();
+		let core_tags = tags!("type": core_type);
+		let core_binary = Either::Right(core_binary.into());
+		let mut last_error = self.last_error;
+		self.context.execute_future(move |application| async move {
+			match create_core(application, identity, co, core_name, core_tags, core_binary).await {
 				Ok(()) => {},
 				Err(err) => {
 					last_error.set(Err(err.into()));
@@ -201,5 +248,43 @@ where
 async fn create_co(application: Application, identitiy: Identity, co: CreateCo) -> Result<(), anyhow::Error> {
 	let private_identity = application.private_identity(&identitiy.did).await?;
 	application.create_co(private_identity, co).await?;
+	Ok(())
+}
+
+async fn create_core(
+	application: Application,
+	identitiy: Identity,
+	co: CoId,
+	core_name: String,
+	core_tags: Tags,
+	core_binary: Either<Cid, Vec<u8>>,
+) -> Result<(), anyhow::Error> {
+	let private_identity = application.private_identity(&identitiy.did).await?;
+
+	// reducer
+	let reducer = application
+		.co_reducer(&co)
+		.await?
+		.ok_or_else(|| anyhow::anyhow!("Co not found: {}", co))?;
+	let storage = reducer.storage();
+
+	// binary
+	let binary = match core_binary {
+		Either::Left(cid) => cid,
+		Either::Right(bytes) => {
+			let mut binary_stream = Cursor::new(&bytes);
+			let binary = unixfs_add(&storage, &mut binary_stream)
+				.await?
+				.pop()
+				.ok_or(anyhow!("Add Core binary failed {}", bytes.len()))?;
+			binary
+		},
+	};
+
+	// create
+	reducer
+		.push(&private_identity, CO_CORE_NAME_CO, &CoAction::CoreCreate { core: core_name, binary, tags: core_tags })
+		.await?;
+
 	Ok(())
 }

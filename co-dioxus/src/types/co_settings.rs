@@ -1,3 +1,5 @@
+use crate::library::cli::{Cli, CoLogLevel};
+use clap::Parser;
 use co_sdk::NetworkSettings;
 use std::path::PathBuf;
 
@@ -9,12 +11,22 @@ pub struct CoSettings {
 	pub network: bool,
 	pub no_keychain: bool,
 	pub no_log: bool,
+	pub log_level: CoLogLevel,
 	pub no_default_features: bool,
 	pub feature: Vec<String>,
 }
 impl CoSettings {
 	pub fn new(identifier: &str) -> Self {
 		CoSettings { identifier: identifier.into(), ..Default::default() }
+	}
+
+	/// Create `CoSettings` from command line args.
+	pub fn cli(identifier: &str) -> Self {
+		let mut cli = Cli::parse();
+		if cli.instance_id.is_none() {
+			cli.instance_id = Some(identifier.to_owned());
+		}
+		cli.into()
 	}
 
 	pub fn with_path(self, path: &str) -> Self {

@@ -10,3 +10,4 @@ pub mod use_co_error_signal;
 pub mod use_co_selector;
 pub mod use_co_state;
 pub mod use_co_storage;
+pub mod use_did_key_identity;

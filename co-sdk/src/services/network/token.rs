@@ -31,6 +31,10 @@ impl CoToken {
 		Self { body, signature: [].to_vec(), algorithm: "".to_owned() }
 	}
 
+	pub fn is_unsigned(&self) -> bool {
+		self.signature.is_empty()
+	}
+
 	/// Verify token.
 	/// If local_peer is supplied we also allow our token.
 	pub fn verify(&self, secret: &Secret, remote_peer: &PeerId, local_peer: Option<&PeerId>) -> bool {

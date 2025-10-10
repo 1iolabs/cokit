@@ -9,6 +9,7 @@ use didcomm_rs::{
 	crypto::{CryptoAlgorithm, SignatureAlgorithm},
 	Jwe, Message,
 };
+use std::mem::take;
 
 /// Create a encrypted JWE envelope.
 ///
@@ -26,10 +27,15 @@ pub fn didcomm_jwe(
 	header: DidCommHeader,
 	body: &str,
 ) -> Result<String, SignError> {
-	let message = Message::new()
+	let mut header = header;
+	let fields = take(&mut header.fields);
+	let mut message = Message::new()
 		.didcomm_header(into_didcomm_rs_header(header))
 		.body(body)
 		.map_err(|e| SignError::Other(e.into()))?;
+	for (key, value) in fields {
+		message = message.add_header_field(key, value);
+	}
 	let signer = DidKeyIdentity::generate(None);
 	let result = message
 		.as_flat_jwe(&CryptoAlgorithm::XC20P, Some(to_key_agreement_public_key.clone()))
@@ -80,11 +86,14 @@ pub async fn didcomm_jwe_receive<R: IdentityResolver>(
 	)
 	.map_err(|e| ReceiveError::Decrypt(e.into()))?;
 
+	// header
+	let mut header = from_didcomm_rs_header(message.get_didcomm_header().clone());
+	for (key, value) in message.get_application_params() {
+		header.fields.insert(key.to_owned(), value.to_owned());
+	}
+
 	// result
-	Ok((
-		from_didcomm_rs_header(message.get_didcomm_header().clone()),
-		message.get_body().map_err(|e| ReceiveError::InvalidArgument(e.into()))?,
-	))
+	Ok((header, message.get_body().map_err(|e| ReceiveError::InvalidArgument(e.into()))?))
 }
 
 #[cfg(test)]

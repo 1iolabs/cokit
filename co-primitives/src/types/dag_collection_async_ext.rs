@@ -19,12 +19,12 @@ pub trait DagCollectionAsyncExt: DagCollection {
 	) -> Result<OptionLink<Node<Self::Item>>, StorageError> {
 		let mut node_builder = NodeBuilder::<Self::Item, S::StoreParams>::default();
 		for item in items {
-			node_builder.push(item).unwrap();
+			node_builder.push(item).map_err(|err| StorageError::Internal(err.into()))?;
 			for block in node_builder.take_blocks() {
 				storage.set(block).await?;
 			}
 		}
-		let (root, blocks) = node_builder.into_blocks().unwrap();
+		let (root, blocks) = node_builder.into_blocks().map_err(|err| StorageError::Internal(err.into()))?;
 		for block in blocks {
 			storage.set(block).await?;
 		}

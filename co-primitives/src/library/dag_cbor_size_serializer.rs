@@ -16,10 +16,12 @@ impl DagCborSizeSerializer {
 		Self { size: 0 }
 	}
 
-	pub fn count<T: Serialize>(value: &T) -> usize {
+	pub fn count<T: Serialize>(
+		value: &T,
+	) -> Result<usize, serde_ipld_dagcbor::error::EncodeError<DagCborSizeSerializerError>> {
 		let mut counter = Self::new();
-		value.serialize(&mut counter).unwrap();
-		counter.size
+		value.serialize(&mut counter)?;
+		Ok(counter.size)
 	}
 
 	fn write_len(&mut self, _major: u8, len: u64) {

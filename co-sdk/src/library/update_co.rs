@@ -3,6 +3,7 @@ use crate::{
 	types::message::heads::HeadsMessage, Action, CoReducer,
 };
 use anyhow::anyhow;
+use cid::Cid;
 use co_actor::ActorHandle;
 use co_identity::PrivateIdentity;
 use co_network::didcomm::EncodedMessage;
@@ -24,10 +25,10 @@ where
 	// request
 	let body = HeadsMessage::HeadsRequest(co_reducer.id().clone());
 	let header = HeadsMessage::create_header();
-	let (message_id, message) = EncodedMessage::create_signed_json(from, header, &body)?;
+	let (message_header, message) = EncodedMessage::create_signed_json(from, header, &body)?;
 	let ((_peer, message), _) = try_join!(
 		wait_response_timeout(actions.clone(), timeout, {
-			let message_id = message_id.clone();
+			let message_id = message_header.id.clone();
 			move |action| match action {
 				Action::DidCommReceive { peer, message } if message.header().thid.as_ref() == Some(&message_id) => {
 					Some((*peer, message.clone()))
@@ -37,7 +38,7 @@ where
 		}),
 		async move {
 			actions
-				.dispatch(Action::DidCommSend { message_id, peer: to, message })
+				.dispatch(Action::DidCommSend { message_header, peer: to, message })
 				.map_err(anyhow::Error::from)
 		}
 	)?;
@@ -53,7 +54,7 @@ where
 			// note:
 			//  the heads will be also merged by heads_message_heads epic
 			//  whichever is faster but this makes sure that the heads are merged after this call
-			co_reducer.join(received_heads).await?;
+			co_reducer.join(received_heads.into_iter().map(Cid::from).collect()).await?;
 		},
 		HeadsMessage::Error { co, code, message } => {
 			return Err(anyhow!("Request failed ({:?}): {}: {}", code, co, message));
