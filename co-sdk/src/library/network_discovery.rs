@@ -1,5 +1,6 @@
+use crate::services::heads::HeadsApi;
 use co_identity::{network_did_discovery, Identity, IdentityResolver, IdentityResolverBox, PrivateIdentity};
-use co_network::{discovery, heads};
+use co_network::discovery;
 use co_primitives::{Did, Network};
 use futures::{stream::iter, Stream};
 use libp2p::PeerId;
@@ -87,7 +88,7 @@ where
 		match network {
 			Network::CoHeads(value) =>
 			{
-				yield Ok(discovery::Discovery::Topic(heads::HeadsState::to_topic_hash(&value).into_string()));
+				yield Ok(discovery::Discovery::Topic(HeadsApi::to_topic_hash(&value).into_string()));
 			},
 			Network::Rendezvous(value) => {
 				yield Ok(discovery::Discovery::Rendezvous(value));

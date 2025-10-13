@@ -38,8 +38,7 @@ pub fn key_request_send(
 			Some(
 				async move {
 					// network
-					let network = context.network().await;
-					let Some((network, _connections)) = network else {
+					let Some(network) = context.network_tasks().await else {
 						return Either::Left(stream::iter([Action::network_task_queue(
 							action.co.clone(),
 							format!("urn:key:{}:{}", action.co, action.key.as_deref().unwrap_or("")),
@@ -160,8 +159,7 @@ pub fn network_task_execute(
 					};
 
 					// network
-					let network = context.network().await;
-					let Some((network, _connections)) = network else {
+					let Some(network) = context.network_tasks().await else {
 						return Either::Left(stream::iter([Ok(Action::NetworkTaskExecuteComplete {
 							co,
 							task_id,

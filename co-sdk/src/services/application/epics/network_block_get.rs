@@ -41,7 +41,7 @@ pub fn network_block_get(
 				async move {
 					// network
 					let network = context.network().await;
-					let Some((network, connections)) = network else {
+					let Some((network, connections, _heads)) = network else {
 						return Either::Left(stream::iter([Action::network_task_queue(
 							action.co.clone(),
 							action.cid.to_string(),
@@ -98,7 +98,7 @@ pub fn network_task_execute(
 
 					// network
 					let network = context.network().await;
-					let Some((network, connections)) = network else {
+					let Some((network, connections, _heads)) = network else {
 						return Either::Left(stream::iter([Ok(Action::NetworkTaskExecuteComplete {
 							co,
 							task_id,

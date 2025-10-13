@@ -2,7 +2,6 @@ pub mod bitswap;
 pub mod didcomm;
 mod didcontact;
 pub mod discovery;
-pub mod heads;
 mod library;
 mod network;
 mod types;
@@ -20,7 +19,7 @@ pub use network::{Behaviour, Context, Libp2pNetwork, Libp2pNetworkConfig, Networ
 pub use types::{
 	error::NetworkError,
 	layer_behaviour::{Layer, LayerBehaviour},
-	layer_provider::{DiscoveryLayerBehaviourProvider, HeadsLayerBehaviourProvider},
+	layer_provider::DiscoveryLayerBehaviourProvider,
 	network_task::{FnOnceNetworkTask, NetworkTask, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner},
 	peer_provider::PeerProvider,
 	provider::{
