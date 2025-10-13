@@ -88,6 +88,8 @@ With CO-kit, you can easily build...
 - peer-to-peer
 - & collaborative ...applications that make full use of your skills - there are virtually no limitations that you might have with cloud providers or other SDKs.
 
+For further information see:
+- [CO-kit in the FAQs](./faq/faq.md#general)
 
 ## Consensus
 In CO-kit, **consensus** refers to the protocols ensuring multiple peers agree on shared state or actions—even in the presence of unreliable networks or malicious actors.
@@ -114,16 +116,15 @@ These options let you balance **complexity**, **security**, and **performance** 
 ## Core
 A core (CO reducer) is a piece of data that acts like a state. Cores can be directly added to COs and they work like an in-code database. They implement a reducer function that take actions which have been pushed to a CO. The reducer then changes the cores data accordingly.
 #### Core actions
-#todo
+#todo #tech 
 #### Core schema
-#todo
+#todo #tech 
 #### Core state
-#todo
+#todo #tech 
 
 
 ## CRDT
-#todo
-A **CRDT** is a specialized data structure designed for **distributed systems** that allows each replica to be updated **independently and concurrently**, without locking or central coordination, and still achieve **eventual consistency** through deterministic merge rules.
+A **CRDT** (Conflict Free Replicated Data Type) is a specialized data structure designed for distributed systems that allows each replica to be updated independently and concurrently, without locking or central coordination, and still achieve eventual consistency through deterministic merge rules.
 
 Key points:
 - **Conflict‑free**: Operations commute, ensuring that replicas converge to the same state regardless of operation order.
@@ -139,8 +140,7 @@ For further information see:
 - [Log](../reference/log.md)
 
 ## Dioxus
-#todo
-**Dioxus** is a modern, **Rust-based framework for building cross-platform user interfaces**, supporting web, desktop, mobile, and server environments with a single codebase.
+Dioxus is a Rust-based framework for building cross-platform user interfaces, supporting web, desktop, mobile, and server environments with a single codebase.
 
 - **Declarative UI with RSX**: Uses an `rsx!` macro similar to JSX, allowing you to write HTML-like layouts directly in Rust code (e.g., `rsx! { h1 { "Hello World!" } }`)
 - **Cross-platform target support**:
@@ -149,11 +149,12 @@ For further information see:
   - **Mobile**: supports Android and iOS via JNI/Objective-C interop.
 - **Ergonomic reactivity**: Inspired by React, Solid, and Svelte, it uses signals/hooks like `use_signal` for state management.
 - **Productive developer workflow**:
-  - Integrated **hot-reloading** and CLI tool (`dx`) for instant iteration
-  - Built-in **bundler** for optimized, compact builds (< 50 KB web apps, < 5 MB desktop/mobile)
+  - Integrated hot-reloading and CLI tool (`dx`) for instant iteration
+  - Built-in bundler for optimized, compact builds (< 50 KB web apps, < 5 MB desktop/mobile)
 - **Full-stack and backend integration**: Includes server-side functions, routing, and streaming support—letting frontend invoke backend logic with type safety.
 
-**Why CO-kit docs reference Dioxus**: It exemplifies how Rust can power reactive, real-time, decentralized UIs—making it a natural companion for illustrating CO-kit integrations.
+For further information see:
+- [Dioxus docs](https://docs.rs/dioxus/latest/dioxus/)
 
 ## Guards
 Guards are checks for transactions.
@@ -162,6 +163,9 @@ New transactions will be checked by the configured guards of a CO and will be re
 Just like [Cores](../reference/core.md), Guards are pure functions, are compiled to WebAssembly, and registered to COs.
 
 Important notice: Guards are not permissions.
+
+For further information see:
+- [Guards](../reference/guards.md#guards)
 
 ## IPLD
 IPLD is a single namespace for all hash-inspired protocols. Through IPLD, links can be traversed across protocols, allowing you to explore data regardless of the underlying protocol.
@@ -175,7 +179,6 @@ It is (eventually consistent) sorted using a Merkle-DAG-based logical clock.
 Arbitrary heads can be joined together at any time.
 Whenever the same heads are joined, the resulting log is guaranteed to be equal.
 
-#todo
 **What makes a Log:**
 This can be thought of like a git graph where each commit is an operation.
 The heads represent the end of the log and also a specific state of the data.
@@ -212,7 +215,6 @@ For further information see:
 - [Log](../reference/log.md)
 
 ## Merkle-DAG
-#todo
 A Merkle-DAG is a content-addressed directed acyclic data structure where each node is cryptographically hashed based on its payload and its links to child nodes. This creates a self-verifying graph ideal for the distributed system of CO-kit.
 
 ### Features
@@ -232,9 +234,10 @@ A [Peer](https://docs.libp2p.io/concepts/fundamentals/peers/) Identity (often wr
 
 In CO-kit, each `CO` or node may generate or be assigned a Peer ID, which then acts as a verifiable handle across the decentralised syncing and networking layers.
 
+For further information see:
+- [libp2p docs](https://docs.libp2p.io/concepts/fundamentals/peers/)
 ## Proof‑of‑Authority (PoA) Consensus Mechanism
-#todo
-**Proof‑of‑Authority (PoA)** is a reputation-based consensus mechanism where only a small, pre-approved set of trusted validators—known entities with verifiable identities—are empowered to produce and validate transactions. 
+Proof‑of‑Authority (PoA) is a reputation-based consensus mechanism where only a small, pre-approved set of trusted validators—known entities with verifiable identities—are empowered to produce and validate transactions. 
 
 ## Storage
 One of the base building blocks of CO-kit is the content addressed storage [CID](../glossary/glossary.md#CID).
@@ -243,14 +246,16 @@ The recommended serialization format (also used throughout CO-kit) is DAG-CBOR w
 A [core](../reference/core.md) is not restricted to [DAG-CBOR](../glossary/glossary.md#DAG-CBOR) and may use any given structure.
 
 ## Tauri
-#todo
-**Tauri** is an open-source framework for building **lightweight, secure, and fast** desktop (and mobile) applications using web technologies for the UI and Rust for the backend logic
+**Tauri** is an open-source framework for building lightweight, secure, and fast desktop (and mobile) applications using web technologies for the UI and Rust for the backend logic
 
 ### Features
 
-- **Cross-platform support**: Target apps for **Windows, macOS, Linux**, and—starting from Tauri v2—**iOS and Android** from a single codebase
-- **Tiny binary size and low memory usage**: Unlike Chromium-based frameworks, Tauri uses the OS's native WebView (e.g., WebView2, WKWebView), resulting in ultra-compact executables (often just a few megabytes) and significantly reduced runtime overhead
-- **Security-first architecture**: Built with Rust, Tauri offers memory safety, a minimal attack surface, explicit API permissioning, and optional isolation patterns for untrusted code
+- Cross-platform support: Target apps for Windows, macOS, Linux, and—starting from Tauri v2—iOS and Android from a single codebase
+- Tiny binary size and low memory usage: Unlike Chromium-based frameworks, Tauri uses the OS's native WebView (e.g., WebView2, WKWebView), resulting in ultra-compact executables (often just a few megabytes) and significantly reduced runtime overhead
+- Security-first architecture: Built with Rust, Tauri offers memory safety, a minimal attack surface, explicit API permissioning, and optional isolation patterns for untrusted code
+
+For further information see:
+- [Tauri docs](https://v2.tauri.app/start/)
 
 ### Architecture & Internals
 - Uses Rust-based crates—like **TAO** (for window management) and **WRY** (for WebView integration)—to power the native shell and system interactions
@@ -260,9 +265,8 @@ A [core](../reference/core.md) is not restricted to [DAG-CBOR](../glossary/gloss
 #todo 
 
 ## WASM
-#todo
-WebAssembly (WASM) is an open-standard, portable binary intruction format designed for high-performance execution in a sandboxed environment - initially for web browsers, and increasingly for broader contexts including servers, edge devices, and embedded systems.
+WebAssembly (WASM) is an open-standard, portable binary format designed for high-performance execution in a sandboxed environment - initially for web browsers, and increasingly for broader contexts including servers, edge devices, and embedded systems.
 It serves as a compilation target for languages such as Rust, C, C++, and others, enabling near-native speed while maintaining security and cross-platform compatibility
 
-For CoKit, WASM offers a powerful mechanism to compile and execute **schema logic** in a safe, efficient, and portable manner—supporting modular, decentralized functionality across diverse environments
+For CoKit, WASM offers a powerful mechanism to compile and execute schema logic in a safe, efficient, and portable manner—supporting modular, decentralized functionality across diverse environments
 

@@ -4,25 +4,34 @@
 
 ## General
 ### What is CO-kit and what are its primary use cases?
-#todo
+- CO-kit has been built to provide an SDK that finally allows you to stop worrying about backends and dependencies and lets you focus on the task at hand.
+- Each and every application built on CO-kit shall be:
+	- easy to build and easy to use
+	- decentralized
+	- usable on local infrastructure
+	- secure
+	- non-reliant on middlemen through peer-to-peer
+	- a place where users keep control and track over their data
+
+CO-kit is especially useful for:
 - Collaborative Applications with focus on usability and data-ownership for the users.
--
+- Communications platforms and messengers with focus on privacy and data security
+- Dual-use in the defence sector: Communication for the battlefield and catastrophe management
+- [See more on our website](https://1io.com/de)
 ### Is CO-kit open-source? Under what license is it distributed?
-#todo
-- Yes, we use APLGv3 [see](../license/legal-notice.md)
+
+- Yes CO-kit is open-source
+- We use APLGv3 as the license of choice [see](../license/legal-notice.md)
 
 ### What platforms does CO-kit support? (e.g., Linux, Windows, macOS, etc.)
-
-
-#todo
+- CO-kit is fully platform agnostic and can be supported by any OS
 
 ### How does CO-kit differ from other CRDT or P2P-based frameworks?
-#todo
--
+#todo #tech
 
 ### Can CO-kit be used offline and sync later?
-Yes.
-#todo
+Yes. ENTER EXPLANATION
+#todo #tech
 
 
 ## Architecture & Design
@@ -33,14 +42,14 @@ All files are stored verifiable using content addressing.
 
 ### How are COs structured and persisted?
 A CO is represented as a graph of content addressed objects.
-#todo
+#todo #tech
 
 ### What storage backends are supported out-of-the-box?
 Filesystem and Memory.
-#todo
+#todo #tech
 
 ### How does the decentralized architecture of CO-kit ensure data integrity?
-CO-kit uses a data graph per CO which we call the Log. The log is powered by an Merkle-CRDT which deterministically orders transactions based on a logical clock.
+CO-kit uses a data graph per CO which we call the log. The log is powered by a Merkle-CRDT which deterministically orders transactions based on a logical clock.
 #todo
 
 ### Can CO-kit be integrated with traditional centralized systems?
@@ -50,14 +59,12 @@ Yes.
 
 ## Networking & Synchronization
 ### How does peer discovery work in CO-kit's networking model?
-#todo
-Local peer discovery is done by utilising mDNS.
+Local peer discovery is done by utilizing mDNS.
 CO-kit got built in GossipSub protocol for peer discovery.
 However the networking is entire optional and one could just use HTTP for transferring blocks.
 
-
 ### What networking mode should I use for LAN-only collaboration?
-#todo
+#todo #tech
 
 ### Is it possible to run CO-kit without any network connectivity?
 Yes.
@@ -67,10 +74,10 @@ As each file is Content addressed using its CID we just need to read and write t
 This even makes is possible to just use any cloud storage drive to share the CO-kit managed files.
 
 ### How does CO-kit handle NAT traversal and firewalls in P2P mode?
-#todo
+#todo #tech
 
 ### What happens during a network partition or peer disconnect?
-#todo
+#todo #tech
 
 
 ## Data & Consensus
