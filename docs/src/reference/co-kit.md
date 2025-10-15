@@ -1,6 +1,10 @@
 # CO-kit
 A software development kit to build decentralized applications with, written in Rust.
 
+## CO-kit is like ...
+#todo
+CO-kit is like blockchains zero trust and consensus (but optional) with Git and CRDT integrated with identity.
+
 ## CO-kit for ...
 #todo
 ### Frontend developers

@@ -110,21 +110,29 @@ CO-kit allows you to choose the level of coordination needed for each Collaborat
 - `manual`: Users or admins explicitly approve changes before commit.
 - `shared`: A quorum or team of peers must agree to apply state changes.
 
-These options let you balance **complexity**, **security**, and **performance** based on your application's requirements.
+These options let you balance complexity, security, and performance based on your application's requirements.
 
 
 ## Core
 A core (CO reducer) is a piece of data that acts like a state. Cores can be directly added to COs and they work like an in-code database. They implement a reducer function that take actions which have been pushed to a CO. The reducer then changes the cores data accordingly.
-#### Core actions
-#todo #tech 
-#### Core schema
-#todo #tech 
-#### Core state
-#todo #tech 
 
+For further information see:
+- [Core](../reference/core.md)
+
+#### Core actions
+#todo #review
+A action is a (atomic) operation on the cores state.
+
+#### Core schema
+#todo #review
+The data model of the core state.
+
+#### Core state
+#todo #review
+The resulting state of a series of actions.
 
 ## CRDT
-A **CRDT** (Conflict Free Replicated Data Type) is a specialized data structure designed for distributed systems that allows each replica to be updated independently and concurrently, without locking or central coordination, and still achieve eventual consistency through deterministic merge rules.
+A CRDT (Conflict Free Replicated Data Type) is a specialized data structure designed for distributed systems that allows each replica to be updated independently and concurrently, without locking or central coordination, and still achieve eventual consistency through deterministic merge rules.
 
 Key points:
 - **Conflict‑free**: Operations commute, ensuring that replicas converge to the same state regardless of operation order.
@@ -209,7 +217,7 @@ mDNS is a lightweight, zero-configuration networking protocol that resolves host
 CO-kit uses mDNS as an optional networking mode to automatically discover peer nodes and COs on a local subnet - simplifying setup and fostering seamless peer-to-peer collaboration without manual endpoint configuration.
 
 ## Merkle-CRDT
-A Merkle‑CRDT combines the strengths of Merkle‑DAGs (Directed Acyclic Graphs) and CRDTs (Conflict‑Free Replicated Data Types) to create a robust, decentralized synchronization layer. In this design, CRDT payloads are embedded within Merkle‑DAG nodes, allowing each update to serve as a self-verifying event in a content-addressed history, simplifying causality tracking and state merging without relying on messaging guarantees.  
+A Merkle‑CRDT combines the strengths of Merkle‑DAGs (Directed Acyclic Graphs) and CRDTs (Conflict‑Free Replicated Data Types) to create a robust, decentralized synchronization layer. In this design, CRDT payloads are embedded within Merkle‑DAG nodes, allowing each update to serve as a self-verifying event in a content-addressed history, simplifying causality tracking and state merging without relying on messaging guarantees.
 
 For further information see:
 - [Log](../reference/log.md)
@@ -237,7 +245,7 @@ In CO-kit, each `CO` or node may generate or be assigned a Peer ID, which then a
 For further information see:
 - [libp2p docs](https://docs.libp2p.io/concepts/fundamentals/peers/)
 ## Proof‑of‑Authority (PoA) Consensus Mechanism
-Proof‑of‑Authority (PoA) is a reputation-based consensus mechanism where only a small, pre-approved set of trusted validators—known entities with verifiable identities—are empowered to produce and validate transactions. 
+Proof‑of‑Authority (PoA) is a reputation-based consensus mechanism where only a small, pre-approved set of trusted validators—known entities with verifiable identities—are empowered to produce and validate transactions.
 
 ## Storage
 One of the base building blocks of CO-kit is the content addressed storage [CID](../glossary/glossary.md#CID).
@@ -262,11 +270,10 @@ For further information see:
 - Your frontend app (React, Vue, Svelte, or vanilla HTML/JS) runs inside a WebView shell that communicates securely with Rust backend via IPC commands (`#[tauri::command]` / `invoke`)
 
 ## Tokio
-#todo 
+#todo
 
 ## WASM
 WebAssembly (WASM) is an open-standard, portable binary format designed for high-performance execution in a sandboxed environment - initially for web browsers, and increasingly for broader contexts including servers, edge devices, and embedded systems.
 It serves as a compilation target for languages such as Rust, C, C++, and others, enabling near-native speed while maintaining security and cross-platform compatibility
 
 For CoKit, WASM offers a powerful mechanism to compile and execute schema logic in a safe, efficient, and portable manner—supporting modular, decentralized functionality across diverse environments
-
