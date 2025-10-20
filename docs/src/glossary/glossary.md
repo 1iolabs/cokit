@@ -1,4 +1,4 @@
-# Glossary
+ # Glossary
 
 <!-- toc -->
 
@@ -120,15 +120,15 @@ For further information see:
 - [Core](../reference/core.md)
 
 #### Core actions
-#todo #review
-A action is a (atomic) operation on the cores state.
+#todo 
+A action is an (atomic) operation on the cores state.
 
 #### Core schema
-#todo #review
+#todo 
 The data model of the core state.
 
 #### Core state
-#todo #review
+#todo 
 The resulting state of a series of actions.
 
 ## CRDT
