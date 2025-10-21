@@ -9,6 +9,7 @@ use crate::{
 	services::{
 		application::ApplicationMessage,
 		connections::ConnectionMessage,
+		heads::HeadsApi,
 		network::CoNetworkTaskSpawner,
 		reducers::{ReducerStorage, ReducersControl},
 	},
@@ -113,18 +114,23 @@ impl CoContext {
 	}
 
 	/// Network.
-	pub async fn network(&self) -> Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)> {
+	pub async fn network(&self) -> Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, HeadsApi)> {
 		self.inner.network.read().unwrap().clone()
 	}
 
 	/// Network Spawner.
 	pub async fn network_tasks(&self) -> Option<CoNetworkTaskSpawner> {
-		self.inner.network.read().unwrap().as_ref().map(|(v, _)| v).cloned()
+		self.inner.network.read().unwrap().as_ref().map(|(v, _, _)| v).cloned()
 	}
 
 	/// Network Connections.
 	pub async fn network_connections(&self) -> Option<ActorHandle<ConnectionMessage>> {
-		self.inner.network.read().unwrap().as_ref().map(|(_, v)| v).cloned()
+		self.inner.network.read().unwrap().as_ref().map(|(_, v, _)| v).cloned()
+	}
+
+	/// Network Connections.
+	pub async fn network_heads(&self) -> Option<HeadsApi> {
+		self.inner.network.read().unwrap().as_ref().map(|(_, _, v)| v).cloned()
 	}
 
 	/// Tasks.
@@ -200,7 +206,7 @@ pub(crate) struct CoContextInner {
 
 	local_identity: LocalIdentity,
 
-	network: Arc<RwLock<Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>>>,
+	network: Arc<RwLock<Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, HeadsApi)>>>,
 
 	storage: Storage,
 
@@ -218,7 +224,7 @@ impl CoContextInner {
 		shutdown: CancellationToken,
 		tasks: TaskSpawner,
 		local_identity: LocalIdentity,
-		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
+		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, HeadsApi)>,
 		storage: Storage,
 		runtime: Runtime,
 		reactive_context: ActorHandle<ApplicationMessage>,
@@ -298,7 +304,7 @@ impl CoContextInner {
 	/// Clone with network.
 	pub async fn set_network(
 		&self,
-		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
+		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, HeadsApi)>,
 	) -> Result<(), anyhow::Error> {
 		// assign
 		*self.network.write().unwrap() = network;

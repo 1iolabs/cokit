@@ -1,22 +1,13 @@
 use super::co_heads_publish::network_co_heads;
-use crate::{
-	network::{CoHeadsNetworkTask, CoHeadsRequest},
-	types::co_reducer_context::CoReducerFeature,
-	Action, CoContext, CoNetworkTaskSpawner, CoReducerFactory,
-};
+use crate::{types::co_reducer_context::CoReducerFeature, Action, CoContext, CoReducerFactory};
 use co_actor::{Actions, Epic};
-use co_network::NetworkTaskSpawner;
 use co_primitives::{CoId, NetworkCoHeads};
 use futures::Stream;
-use std::{
-	collections::{BTreeSet, HashMap},
-	sync::{Arc, Mutex},
-};
+use std::collections::BTreeSet;
 
+/// Whe open/close a co subscribe to heads.
 #[derive(Debug, Clone, Default)]
-pub struct CoHeadsSubscribeEpic {
-	subscriptions: Arc<Mutex<HashMap<NetworkCoHeads, CoHeadsSubscription>>>,
-}
+pub struct CoHeadsSubscribeEpic {}
 impl Epic<Action, (), CoContext> for CoHeadsSubscribeEpic {
 	fn epic(
 		&mut self,
@@ -32,13 +23,13 @@ impl Epic<Action, (), CoContext> for CoHeadsSubscribeEpic {
 				return None;
 			},
 		};
-		Some(Action::future_ignore_elements(subscribe(context.clone(), self.clone(), co, mode)))
+		Some(Action::future_ignore_elements(subscribe(context.clone(), co, mode)))
 	}
 }
 
-async fn subscribe(context: CoContext, epic: CoHeadsSubscribeEpic, co: CoId, mode: bool) -> Result<(), anyhow::Error> {
+async fn subscribe(context: CoContext, co: CoId, mode: bool) -> Result<(), anyhow::Error> {
 	// network
-	let Some((spawner, _connections)) = context.network().await else {
+	let Some(heads) = context.network_heads().await else {
 		return Ok(());
 	};
 
@@ -60,52 +51,14 @@ async fn subscribe(context: CoContext, epic: CoHeadsSubscribeEpic, co: CoId, mod
 	};
 
 	// subscribe
-	for network in networks.iter() {
-		let mut subscriptions = epic.subscriptions.lock().unwrap();
-		if !subscriptions.contains_key(&network) {
-			subscriptions.insert(network.clone(), CoHeadsSubscription::subscribe(spawner.clone(), network.clone())?);
-		}
-	}
-
-	// unsubscribe
-	{
-		let mut subscriptions = epic.subscriptions.lock().unwrap();
-		let remove: Vec<NetworkCoHeads> = subscriptions
-			.iter()
-			.filter(|(key, _)| if &key.id == &co { !networks.contains(key) } else { false })
-			.map(|(key, _)| key.to_owned())
-			.collect();
-		for key in remove.into_iter() {
-			if let Some(subscription) = subscriptions.remove(&key) {
-				subscription.unsubscribe();
-			}
+	for network in networks.into_iter() {
+		if mode {
+			heads.subscribe(network)?
+		} else {
+			heads.unsubscribe(network)?
 		}
 	}
 
 	// result
 	Ok(())
-}
-
-/// Subscription for a single CO (`CoReducer`).
-#[derive(Debug)]
-struct CoHeadsSubscription {
-	spawner: CoNetworkTaskSpawner,
-	unsubscribe: Option<CoHeadsNetworkTask>,
-}
-impl CoHeadsSubscription {
-	pub fn subscribe(spawner: CoNetworkTaskSpawner, network: NetworkCoHeads) -> Result<Self, anyhow::Error> {
-		spawner.spawn(CoHeadsNetworkTask::new(CoHeadsRequest::Subscribe { network: network.clone() }))?;
-		Ok(Self { spawner, unsubscribe: Some(CoHeadsNetworkTask::new(CoHeadsRequest::Unsubscribe { network })) })
-	}
-
-	pub fn unsubscribe(self) {
-		drop(self);
-	}
-}
-impl Drop for CoHeadsSubscription {
-	fn drop(&mut self) {
-		if let Some(unsubscribe) = self.unsubscribe.take() {
-			self.spawner.spawn(unsubscribe).ok();
-		}
-	}
 }

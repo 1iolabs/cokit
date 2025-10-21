@@ -50,8 +50,8 @@ impl Instances {
 			.unwrap();
 
 		// networks
-		let (network1, _) = peer1.application.context().network().await.unwrap();
-		let (network2, _) = peer2.application.context().network().await.unwrap();
+		let (network1, _, _) = peer1.application.context().network().await.unwrap();
+		let (network2, _, _) = peer2.application.context().network().await.unwrap();
 
 		// connect
 		//  because of localhost we need to explicitly dial (no mDNS on localhost).

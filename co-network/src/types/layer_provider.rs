@@ -1,26 +1,4 @@
-use crate::{discovery, heads};
-
-/// Trait which can be implemented on NetworkBehaviours which provide gossipsub.
-pub trait HeadsLayerBehaviourProvider {
-	type Event;
-
-	fn heads(&self) -> &heads::HeadsState;
-	fn heads_mut(&mut self) -> &mut heads::HeadsState;
-
-	/// Extract heads event from event.
-	fn heads_event(event: &Self::Event) -> Option<&heads::Event>;
-	fn into_heads_event(event: Self::Event) -> Result<heads::Event, Self::Event>;
-
-	fn handle_event<F: Fn(&heads::Event) -> bool>(
-		event: Self::Event,
-		predicate: F,
-	) -> Result<heads::Event, Self::Event> {
-		match Self::heads_event(&event) {
-			Some(behaviour_event) if predicate(behaviour_event) => Self::into_heads_event(event),
-			_ => Err(event),
-		}
-	}
-}
+use crate::discovery;
 
 pub trait DiscoveryLayerBehaviourProvider<R> {
 	type Event;

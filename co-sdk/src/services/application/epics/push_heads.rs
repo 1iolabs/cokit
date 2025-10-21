@@ -38,7 +38,7 @@ impl Epic<Action, (), CoContext> for PushHeadsEpic {
 
 async fn push(context: CoContext, epic: PushHeadsEpic, co: CoId, identity: Did) -> Result<(), anyhow::Error> {
 	// network
-	let Some((network, connections)) = context.network().await else {
+	let Some((network, connections, _heads)) = context.network().await else {
 		return Ok(());
 	};
 
