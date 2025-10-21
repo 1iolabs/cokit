@@ -6,6 +6,8 @@ Just like [Cores](../reference/core.md), Guards are pure functions, are compiled
 
 Important notice: Guards are not permissions.
 
+This mechanism is used as the basis to implement consensus algorithms and checks that are true for every transaction in a CO.
+
 ## Built-in guards
 ### Check: Is Participant
 The simplest guard is being a participant in order to write transactions to the [CO](../reference/co.md).

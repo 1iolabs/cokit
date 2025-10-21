@@ -3,32 +3,40 @@ A software development kit to build decentralized applications with, written in 
 
 ## CO-kit is like ...
 #todo
-CO-kit is like blockchains zero trust and consensus (but optional) with Git and CRDT integrated with identity.
+CO-kit is like a database that combines blockchains zero trust and consensus (but optional) with git and CRDT then integrate all with verifiable identity.
 
 ## CO-kit for ...
 #todo
 ### Frontend developers
 #todo
+- Like BaaS but for free
+- Realtime database and collaboration
+- Data which are used/produced on a device is automatically available locally
+- Builtin identity management using DID
+- No special handling for files as they are just data which can be stored using content addressing
+- Existing cores can be used in your app without a single line of code
 
 ### Backend developers
 #todo
+- Cores work like containers which contain the business logic and data but shareable over network
 
 ### Database nerds
 #todo
-- Atomicity: Core
-- Consistency: Core
-- Isolation: Core
-- Durability: Reproducibly anytime with Cores.
-- Concurrency Control
-- Oplog
+- Cores are like databases with builtin atomicity, consistency, isolation and durability
+- The Log with its resulting states are a MVCC
 - Like a Master-Master replication where your logic can decide what happens on conflicts whereas with transactions only the database can
+	- With classical databases only transactions/operations can be reapplied/reordered
+		- But without knowing the business logic behind
+		- Cores reapply the whole business logic when reorder a transaction
 
 ## Overview
 ### [CO](../reference/co.md)
 A CO is a virtual room for collaboration.
+It is a container for cores and participants.
 
 ### [Core](../reference/core.md)
 A Core is a CO Reducer.
+It combines data model with business logic.
 
 ### [Guards](../reference/guards.md)
 Guards are checks for transactions.

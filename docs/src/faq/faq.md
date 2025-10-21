@@ -30,7 +30,7 @@ For further information see:
 - CO-kit is fully platform agnostic and can be supported by any OS
 
 ### How does CO-kit differ from other CRDT or P2P-based frameworks?
-#todo #review
+#todo #text
 Not only does CO-kit provide end-to-end encryption in processes, but also end-to-end verification, meaning:
 - Cryptographic integrity verification
 - Cryptographic identity verification

@@ -22,16 +22,14 @@ This chapter explains **how to report a bug**, what information is helpful, and 
 
 When reporting a bug, please include as many of the following details as possible:
 
-- A **clear description** of the problem
-- The **CO-kit version** and any relevant dependencies
-- Your **operating system** and environment
-- **Steps to reproduce** the issue (ideally with minimal code)
-- What you **expected to happen** vs. what actually happened
-- Any **logs**, **error messages**, or screenshots
+- A clear description of the problem
+- The CO-kit version and any relevant dependencies
+- Your operating system and environment
+- Steps to reproduce the issue (ideally with minimal code)
+- What you expected to happen vs. what actually happened
+- Any logs, error messages, or screenshots
 
-You can submit bugs through our issue tracker at:
-
- [`GitLab Issues`] ?? #todo
+You can submit bugs through our [issue tracker](https://gitlab.1io.com/1io/co-sdk/-/issues).
 Thank you for helping improve CO-kit!
 
 ## Testing

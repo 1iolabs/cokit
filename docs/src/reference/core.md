@@ -1,6 +1,8 @@
 # Core
 Core stands for CO Reducer.
 
+It combines data model with business logic.
+
 A reducer is a function that takes the current state and an action as input.
 It figures out how the state should change based on that action.
 It returns a new state without directly modifying the old one.
