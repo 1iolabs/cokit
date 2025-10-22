@@ -10,6 +10,7 @@ No Bullshit.
 To make the benefits of decentralized, local first apps clear, we outline a quick comparison in this chapter.
 
 ### Building a classical app
+#todo #text add infrastructure
 1. Choose a tech stack (Database, Backend, Cloud, ...).
 2. Model your data and create databases and tables or collections.
 3. Connect data to your backend using a database client and data layer (ORM, ...).
@@ -23,6 +24,8 @@ To make the benefits of decentralized, local first apps clear, we outline a quic
 ### Building a CO-kit app
 1. Model data in a core which combines data, business logic and permissions.
 2. Implement your frontend and use the data directly.
+
+#todo add time/money based comparison (classical takes X CO-kit takes Y) in %?
 
 ## Ain't no better DevX
 

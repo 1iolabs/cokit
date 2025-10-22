@@ -16,13 +16,21 @@ Only the necessary data is exchanged in end-to-end encrypted form using peer-to-
 
 ## Instant updates
 #todo
-#Question
-Is this the same as Partial Real Time Sync?
+#question Is this the same as Partial Real Time Sync?
+
 ## Multiplayer
 #todo
 
-## (Partial) Real time sync.
+## Real time sync
 #todo
+Changes are distributed in real time.
+They are pushed directly to all or configured participants.
+Only the Log heads are distributed and participants can fetch the referenced data on demand and in parallel.
+
+## Partial data
+#todo
+No full replica of all data needed.
+Content addressing allows for validated on demand fetching.
 
 ## Interoperability
 Tools that build on Co-kit should be compatible with each other, even if the builders are not partners. Interoperability between cool solutions is already built in.

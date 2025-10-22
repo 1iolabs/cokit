@@ -24,7 +24,7 @@ They have no facilities to react to state changes or perform any side effects.
 ## Serialization
 The core is the description of how state will be serialized to a persistable format.
 CO-kit uses content addressed blocks through [IPLD](https://ipld.io/) with a default block size limit of 1MiB.
-We recommend to use the [DAG-CBOR](../glossary/glossary.md#DAG-CBOR) format because it is optimized for content addressed data and directly supports content addressed links (via [CIDs](../glossary/glossary.md#CID)).
+We recommend to use the [DAG-CBOR](../glossary/glossary.md#dag-cbor) format because it is optimized for content addressed data and directly supports content addressed links (via [CIDs](../glossary/glossary.md#cid)).
 However, any format, even plain binary, is usable as long as it can be adapted to the block size.
 
 ## Validateability
@@ -42,7 +42,7 @@ Some examples:
 - Someone is allowed to post new messages but not to delete them.
 These checks are implemented as simple checks or conditions in the Core.
 
-For an implementation example click [here](../getting-started/next-steps.md#Permissions).
+For an implementation example click [here](../getting-started/next-steps.md#permissions).
 
 ## Features
 

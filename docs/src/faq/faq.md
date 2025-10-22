@@ -36,7 +36,7 @@ Not only does CO-kit provide end-to-end encryption in processes, but also end-to
 - Cryptographic identity verification
 
 Included in CO-kit and thus significantly reducing programming time when building apps are the following:
-- Identity through [DID](../reference/Identity.md##What is a DID)
+- Identity through [DID](../reference/Identity.md##what-is-a-did)
 - Auditable and non-repudiable history of states
 - Zero-trust environment 
 - Decentralization from the get-go

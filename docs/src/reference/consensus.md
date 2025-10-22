@@ -4,7 +4,7 @@ Consensus is the validated state of a CO.
 
 ## What makes a Consensus in CO-kit
 Consensus in CO-kit provides finality.
-When heads from different participants are joined, the event order in the [Log](./log.md#Example) may change.
+When heads from different participants are joined, the event order in the [Log](./log.md#example) may change.
 This is necessary to make the Merkle-CRDT work technically.
 
 The consensus, on the other hand, is used to allow the network of participants of an CO to commit to an known state/heads combination.

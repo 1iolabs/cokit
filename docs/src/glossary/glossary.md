@@ -248,10 +248,10 @@ For further information see:
 Proof‑of‑Authority (PoA) is a reputation-based consensus mechanism where only a small, pre-approved set of trusted validators—known entities with verifiable identities—are empowered to produce and validate transactions.
 
 ## Storage
-One of the base building blocks of CO-kit is the content addressed storage [CID](../glossary/glossary.md#CID).
+One of the base building blocks of CO-kit is the content addressed storage [CID](../glossary/glossary.md#cid).
 The storage is represented as a very simple interface which writes and reads CID/BLOB pairs called Blocks.
 The recommended serialization format (also used throughout CO-kit) is DAG-CBOR which is a subset of CBOR with links to CIDs.
-A [core](../reference/core.md) is not restricted to [DAG-CBOR](../glossary/glossary.md#DAG-CBOR) and may use any given structure.
+A [core](../reference/core.md) is not restricted to [DAG-CBOR](../glossary/glossary.md#dag-cbor) and may use any given structure.
 
 ## Tauri
 **Tauri** is an open-source framework for building lightweight, secure, and fast desktop (and mobile) applications using web technologies for the UI and Rust for the backend logic

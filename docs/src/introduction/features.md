@@ -14,31 +14,25 @@
 CO-kit provides a pluggable networking layer with optional components:
 - Builtin Peer-to-Peer (P2P): Native P2P capabilities are integrated, but entirely optional.
 	- When devices are able to connect locally (LAN, Wifi, Bluetooth[^issue-79], ...) no internet is used.
-- Configurable connectivity per [CO](../reference/co.md):
-	- [DidContact](../reference/network.md###Protocol:didcontact): Gossipsub based mesh networking discovery.
-	- Rendezvous: Use of shared discovery services or coordinators.
-	- Direct: Explicitly configured endpoints (IP/DNS).
-	- PubSub: For broadcasting and subscription-based connectivity.
-	- HTTP[^issue-78]: Use classical client/server connectivity.
+- [Configurable connectivity](../reference/network.md#network-configuration) per [CO](../reference/co.md)
 
-[^issue-78]: [Network: HTTP (#78)](https://gitlab.1io.com/1io/co-sdk/-/issues/78)
 [^issue-79]: [Network: Bluetooth (BLE) (#79)](https://gitlab.1io.com/1io/co-sdk/-/issues/79)
 
 ## Flexible Sync and Data Integrity
 - Conflict-Free Collaboration
-- [Merkle-CRDT](../glossary/glossary.md##Merkle-CRDT) Log-Based Sync: Built-in Conflict-Free Replicated Data Types (CRDTs) using Merkle trees and append-only logs.
+- [Merkle-CRDT](../glossary/glossary.md#merkle-crdt) Log-Based Sync: Built-in Conflict-Free Replicated Data Types (CRDTs) using Merkle trees and append-only logs.
 - Ensures deterministic merges and high traceability across replicas.
-- [Content addressing](../glossary/glossary.md#CID) which ensures validity of data.
+- [Content addressing](../glossary/glossary.md#cid) which ensures validity of data.
 
 ## Flexible Consensus
 Each CO can define its own consensus mechanism:
 - Optional: No consensus; CRDT-only.
-- [Proof-of-authority](../glossary/glossary.md#Proof‑of‑Authority(PoA)ConsensusMechanism): Signed checkpoints by trusted nodes.
+- [Proof-of-authority](../glossary/glossary.md#proofofauthority-poa-consensus-mechanism): Signed checkpoints by trusted nodes.
 - Manual: User-driven or admin-approved commits.
 - Shared: All participants share responsibility; quorum or similar models.
 
 ## Flexible Data
 Each CO may contain multiple [cores](../reference/core.md). A core defines a data model:
-- Cores are compiled to [WebAssembly](../glossary/glossary.md#WASM) (WASM) for safe, fast, and portable execution.
+- Cores are compiled to [WebAssembly](../glossary/glossary.md#wasm) (WASM) for safe, fast, and portable execution.
 - Cores can be versioned, sandboxed, and upgraded.
 - Cores may contain any data depending on your individual requirements.

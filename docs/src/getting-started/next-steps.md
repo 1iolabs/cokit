@@ -62,7 +62,7 @@ const Counter = () => {
 	);
 };
 ```
-Here, `count`, `increment`, and `decrement` are defined in the Core. The state updates are [CRDT-backed](../glossary/glossary.md##CRDT) and instantly reflect across all connected users.
+Here, `count`, `increment`, and `decrement` are defined in the Core. The state updates are [CRDT-backed](../glossary/glossary.md#crdt) and instantly reflect across all connected users.
 
 ### Nested COs
 This example showcases using multiple [COs](../reference/co.md) — e.g. in a project list, where each project has its own [CO](../reference/co.md):

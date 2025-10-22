@@ -4,6 +4,7 @@
 
 # Introduction
 - [Welcome](./introduction/welcome.md)
+- [About CO-KIT](./introduction/about-co-kit.md)
 - [Why](./introduction/why.md)
 - [Key Principles](./introduction/key-principles.md)
 - [Features](./introduction/features.md)

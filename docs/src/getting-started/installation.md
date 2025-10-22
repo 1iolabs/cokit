@@ -19,7 +19,7 @@ We use this to speed-up the installation for the `co` and `dx` (used in the [App
 Head over to https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#installation for further instructions.
 
 ### Runtimes
-Later in this documentation you will hear about [cores](../reference/core.md) which are data models. They will be compiled to [WebAssembly (WASM)](/glossary/glossary.md#WASM). We need the compiler toolchain for it which can be installed through:
+Later in this documentation you will hear about [cores](../reference/core.md) which are data models. They will be compiled to [WebAssembly (WASM)](/glossary/glossary.md#wasm). We need the compiler toolchain for it which can be installed through:
 ```sh
 rustup target add wasm32-unknown-unknown
 ```

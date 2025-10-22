@@ -1,5 +1,5 @@
 # Storage
-One of the base building blocks of CO-kit is the content addressed storage [CID](../glossary/glossary.md#CID).
+One of the base building blocks of CO-kit is the content addressed storage [CID](../glossary/glossary.md#cid).
 The storage is represented as a very simple interface which writes and reads CID/BLOB pairs called Blocks.
 The recommended serialization format (also used throughout CO-kit) is DAG-CBOR which is a subset of CBOR with links to CIDs.
 A [core](../reference/core.md) is not restricted to [DAG-CBOR](../glossary/glossary.md#DAG-CBOR) and may use any given structure.

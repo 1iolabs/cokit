@@ -7,6 +7,32 @@ The peer-to-peer networking is optional and possibly any other protocol like htt
 There is no lock-in to a single networking strategy.
 Just describe your data using a core and easily adapt CO-kit to your infrastructure.
 
+## Network Configuration
+#todo
+For each [CO](../reference/co.md) network configurations for connectivity can be made.
+
+### DidDiscovery
+#todo #tech
+[DidContact](../reference/network.md#protocol-didcontact): Gossipsub based mesh networking discovery.
+
+### CoHeads
+#todo #tech
+GossipSub-based broadcasting and subscription-based connectivity.
+
+### Rendezvous
+#todo #tech
+Rendezvous: Use of shared discovery services or coordinators.
+
+### Peer
+#todo #tech
+Direct: Explicitly configured endpoints (IP/DNS).
+
+### HTTP
+#todo #tech
+HTTP[^issue-78]: Use classical client/server connectivity.
+
+[^issue-78]: [Network: HTTP (#78)](https://gitlab.1io.com/1io/co-sdk/-/issues/78)
+
 ## Supported Interfaces
 #todo
 - Ethernet
@@ -49,7 +75,7 @@ Bitswap is a protocol for exchanging blocks of data.
 It is a message-based protocol where all messages contain want-lists or blocks.
 CO-kit uses an extended version of Bitswap which includes token based authorization.
 
-#### See also
+#### For further information see
 - https://docs.ipfs.tech/concepts/bitswap/
 - [IPIP-270: Bitswap 1.3.0 - Tokens (and auth) support #270](https://github.com/ipfs/specs/pull/270)
 - https://github.com/dkuhnert/libp2p-bitswap/tree/auth
@@ -60,3 +86,6 @@ The didcomm messages denote a connection request from one CO participant to anot
 The receiver can choose whether to respond to it or not, so no (potentially private) connection information must be shared beforehand.
 
 #todo sequence diagram
+
+## References
+- [Flexible Networking Model](../introduction/features.md#flexible-networking-model)
