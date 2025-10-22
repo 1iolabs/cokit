@@ -43,7 +43,6 @@ Included in CO-kit and thus significantly reducing programming time when buildin
 - Fully private data handling as not even encrypted data is shared with unknown peers
 
 ### Can CO-kit be used offline and sync later?
-#todo 
 Yes. Every change happens only local and are eventually distributed to other participants over time. Secondly, every piece of data is content-addressed; this makes it easy to sync between peers.
 If too many peers appear to be offline, consensus within a CO is possibly block, but this is not an issue and depends on the CO-setup, is optional and on demand. 
 
@@ -84,7 +83,7 @@ For further information see:
 - [Log](../reference/log.md)
 
 ### Can CO-kit be integrated with traditional centralized systems?
-#todo #review
+#todo 
 Yes. COs would be serving as an added layer of trust and security when in use in centralized systems. The library can be integrated anywhere and you can also build your backend/data models with CO-kit. 
 Another useful scenario is CO-kit-built apps in processes that are fed back into traditional systems. In that case, COs can be stored and used as receipts (leveraging non-reputability).   
 
@@ -115,7 +114,6 @@ As each file is Content addressed using its CID we just need to read and write t
 This even makes is possible to just use any cloud storage drive to share the CO-kit managed files.
 
 ### How does CO-kit handle NAT traversal and firewalls in P2P mode?
-#todo 
 This is handled through a variety of possibilities. First option is through a circuit relay. libp2p [defines a protocol called p2p-circuit](https://github.com/libp2p/specs/tree/master/relay). When a peer isn’t able to listen on a public address, it can dial out to a relay peer, which will keep a long-lived connection open. Other peers will be able to dial through the relay peer using a `p2p-circuit` address, which will forward traffic to its destination. 
 
 Second option is by Direct Connection Upgrade through Relay [(DCUtR)](https://docs.libp2p.io/concepts/nat/dcutr/) by Hole Punching. It is a protocol for establishing direct connections between nodes through hole punching, without a signaling server. DCUtR involves synchronizing and opening connections to each peer’s predicted external addresses. 
