@@ -3,7 +3,7 @@
 # CO-kit
 
 # Introduction
-- [About CO-KIT](./introduction/about-co-kit.md)
+- [Welcome](./introduction/welcome.md)
 - [Why](./introduction/why.md)
 - [Key Principles](./introduction/key-principles.md)
 - [Features](./introduction/features.md)

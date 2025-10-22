@@ -5,7 +5,6 @@ Everytime we collaborate, we have no option but to trust platforms with our most
 
 CO-kit is turning the tables. Now you can give power back to your users. We want you to build apps that allow your users to physically own their digital life, and not just in a sense of static files, but in full fledged collaboration workflows, while making you as a developer independent from the stacks and clouds of greedy corporates.
 
----
 
 ## Build like never before
 
@@ -22,7 +21,6 @@ Focus on building your app with a set of pre-built components and patterns like 
 CO-kit runs locally on your mobile without the need for clouds or servers. It syncs directly between devices.
 CO-kit can run on clouds and servers too - if needed.
 
----
 
 ## Get started with 3 lines of code
 
