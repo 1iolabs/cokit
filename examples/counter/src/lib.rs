@@ -1,4 +1,7 @@
-use co_api::{Context, Reducer, ReducerAction};
+use co_api::{
+	sync_api::{Context, Reducer},
+	ReducerAction,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
@@ -32,5 +35,5 @@ impl Reducer for Counter {
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	co_api::reduce::<Counter>()
+	co_api::sync_api::reduce::<Counter>()
 }

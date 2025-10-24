@@ -1,5 +1,5 @@
 use cid::Cid;
-use co_api::{DagCollectionExt, DagMap, DagSet, DagSetExt, Reducer, Tags};
+use co_api::{sync_api::Reducer, DagCollectionExt, DagMap, DagSet, DagSetExt, Tags};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -25,7 +25,7 @@ pub enum PinAction {
 
 impl Reducer for Pin {
 	type Action = PinAction;
-	fn reduce(self, event: &co_api::ReducerAction<Self::Action>, context: &mut dyn co_api::Context) -> Self {
+	fn reduce(self, event: &co_api::ReducerAction<Self::Action>, context: &mut dyn co_api::sync_api::Context) -> Self {
 		let mut result = self;
 		let mut pin_map = result.pins.collection(context.storage_mut());
 		match &event.payload {
@@ -69,7 +69,7 @@ fn unpin(
 	mut pin_map: BTreeMap<Cid, DagSet<Tags>>,
 	cid: &Cid,
 	tags: &Tags,
-	context: &mut dyn co_api::Context,
+	context: &mut dyn co_api::sync_api::Context,
 ) -> BTreeMap<Cid, DagSet<Tags>> {
 	// get current tags for cid
 	if let Some(mut pinned_tags) = pin_map.get(cid).cloned() {
@@ -90,5 +90,5 @@ fn unpin(
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	co_api::reduce::<Pin>()
+	co_api::sync_api::reduce::<Pin>()
 }

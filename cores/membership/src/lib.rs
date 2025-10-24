@@ -1,5 +1,8 @@
 use cid::Cid;
-use co_api::{CoId, CoReference, Context, Did, Link, Reducer, ReducerAction, StorageExt, Tags, WeakCid};
+use co_api::{
+	sync_api::{Context, Reducer, StorageExt},
+	CoId, CoReference, Did, Link, ReducerAction, Tags, WeakCid,
+};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::BTreeSet;
@@ -198,5 +201,5 @@ fn find<'a>(memberships: &'a mut Memberships, co: &CoId, did: &str) -> Option<&'
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	co_api::reduce::<Memberships>()
+	co_api::sync_api::reduce::<Memberships>()
 }

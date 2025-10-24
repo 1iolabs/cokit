@@ -1,8 +1,9 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	tags, AbsolutePath, AbsolutePathOwned, Context, DagCollectionExt, DagMap, DagMapExt, DagSet, DagSetExt, Date, Did,
-	PathExt, PathOwned, Reducer, ReducerAction, Storage, Tags,
+	sync_api::{Context, Reducer},
+	tags, AbsolutePath, AbsolutePathOwned, DagCollectionExt, DagMap, DagMapExt, DagSet, DagSetExt, Date, Did, PathExt,
+	PathOwned, ReducerAction, Storage, Tags,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque};
@@ -650,7 +651,7 @@ fn create_folder(
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	co_api::reduce::<File>()
+	co_api::sync_api::reduce::<File>()
 }
 
 #[cfg(test)]
@@ -658,7 +659,8 @@ mod tests {
 	use crate::{File, FileAction, FileModification, FileNode, Node};
 	use cid::Cid;
 	use co_api::{
-		AbsolutePath, Block, BlockSerializer, Context, DagCollectionExt, DefaultParams, PathExt, Reducer, ReducerAction,
+		sync_api::{Context, Reducer},
+		AbsolutePath, Block, BlockSerializer, DagCollectionExt, DefaultParams, PathExt, ReducerAction,
 	};
 	use co_storage::{MemoryStorage, Storage, StorageError};
 	use std::{cell::RefCell, rc::Rc};

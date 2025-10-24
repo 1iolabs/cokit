@@ -1,5 +1,8 @@
 use super::wasm_context::WasmContext;
-use crate::{Block, Cid, Context, Reducer, ReducerAction};
+use crate::{
+	sync_api::{Context, Reducer},
+	Block, Cid, ReducerAction,
+};
 use co_primitives::{from_cbor, to_cbor, KnownMultiCodec};
 use multihash_codetable::{Code, MultihashDigest};
 use serde::{de::DeserializeOwned, Serialize};

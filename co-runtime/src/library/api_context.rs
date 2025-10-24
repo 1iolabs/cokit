@@ -1,6 +1,6 @@
 use crate::{co_v1::CoV1Api, RuntimeContext};
 use cid::Cid;
-use co_api::{Block, Context, DefaultParams, Storage};
+use co_api::{sync_api::Context, Block, DefaultParams, Storage};
 
 /// Native api context.
 /// This should be only used for testing purposes.
