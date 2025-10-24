@@ -8,37 +8,61 @@ There is no lock-in to a single networking strategy.
 Just describe your data using a core and easily adapt CO-kit to your infrastructure.
 
 ## Network Configuration
-#todo
-For each [CO](../reference/co.md) network configurations for connectivity can be made.
+For each [CO](../reference/co.md), a variety of network configurations for connectivity can be made.
+
+For further information see:
+- [co-core-co: Co: network](/crate/co_core_co/struct.Co.html#structfield.network)
+- [co-core-co: CoAction: NetworkInsert](/crate/co_core_co/enum.CoAction.html#variant.NetworkInsert)
+- [co-core-co: CoAction: NetworkRemove](/crate/co_core_co/enum.CoAction.html#variant.NetworkRemove)
 
 ### DidDiscovery
-#todo #tech
-[DidContact](../reference/network.md#protocol-didcontact): Gossipsub based mesh networking discovery.
-This allows to configure explicit DIDs instead of all participants used to connect a CO.
+Gossipsub based mesh networking discovery.
+This allows to configure explicit DIDs to connect, instead of (by default) all participants in a CO.
+
+For further information see:
+- [DidContact](../reference/network.md#protocol-didcontact)
+- [co-primitives: Network: DidDiscovery](/crate/co_primitives/enum.Network.html#variant.DidDiscovery)
 
 ### CoHeads
-#todo #tech
 GossipSub-based broadcasting and subscription-based connectivity.
 
+For further information see:
+- [Protocol: Rendezvous](#protocol-coheads)
+- [co-primitives: Network: CoHeads](/crate/co_primitives/enum.Network.html#variant.CoHeads)
+
 ### Rendezvous
-#todo #tech
-Rendezvous: Use of shared discovery services or coordinators.
+Register the CO to a rendezvous node.
+
+For further information see:
+- [Protocol: Rendezvous](#protocol-rendezvous)
+- [co-primitives: Network: DidDiscovery](/crate/co_primitives/enum.Network.html#variant.DidDiscovery)
 
 ### Peer
-#todo #tech
-Direct: Explicitly configured endpoints (IP/DNS).
+Direct configured endpoints (IP/DNS).
+
+This can be used to host the CO on a dedicated server/cloud or other infrastructure.
+
+For further information see:
+- [co-primitives: Network: Peer](/crate/co_primitives/enum.Network.html#variant.Peer)
 
 ### HTTP
-#todo #tech
-HTTP[^issue-78]: Use classical client/server connectivity.
+Directly configured HTTP endpoint.
+
+Coming soon[^issue-78].
+
+This can be used to host the CO on a dedicated server/cloud or other infrastructure.
 
 [^issue-78]: [Network: HTTP (#78)](https://gitlab.1io.com/1io/co-sdk/-/issues/78)
 
 ## Supported Interfaces
-#todo
-- Ethernet
-- Wifi
-- Bluetooth Low Energy (BLE)
+- Ethernet / Wi-Fi (TCP/IP, QUIC)
+- Bluetooth Low Energy (BLE) (Coming soon[^issue-79])
+- WebRTC / WebSocket (Coming soon[^issue-89])
+- Wi-Fi Direct (Coming soon[^issue-90])
+
+[^issue-79]: [Network: Bluetooth (BLE) (#79)](https://gitlab.1io.com/1io/co-sdk/-/issues/79)
+[^issue-89]: [Network: WebRTC (#89)](https://gitlab.1io.com/1io/co-sdk/-/issues/89)
+[^issue-90]: [Network: Wi-Fi Direct (#90)](https://gitlab.1io.com/1io/co-sdk/-/issues/90)
 
 ## libp2p
 libp2p, (short for “library peer-to-peer”) is a peer-to-peer (P2P) networking framework that enables the development of P2P applications.
@@ -47,7 +71,7 @@ CO-kit uses the [rust implementation of libp2p](https://github.com/libp2p/rust-l
 
 ## Protocols
 ### Protocol: mDNS
-Used for **local peer discovery** via multicast DNS ([RFC 6762](https://datatracker.ietf.org/doc/html/rfc6762)).
+Used for local peer discovery via multicast DNS ([RFC 6762](https://datatracker.ietf.org/doc/html/rfc6762)).
 Peers broadcast `_p2p._udp.local` PTR queries, and libp2p-capable nodes respond with their multi-addresses.
 
 CO-kit uses the libp2p mDNS client.
@@ -76,17 +100,31 @@ Bitswap is a protocol for exchanging blocks of data.
 It is a message-based protocol where all messages contain want-lists or blocks.
 CO-kit uses an extended version of Bitswap which includes token based authorization.
 
-#### For further information see
-- https://docs.ipfs.tech/concepts/bitswap/
+For further information see:
+- [Bitswap](https://docs.ipfs.tech/concepts/bitswap/)
 - [IPIP-270: Bitswap 1.3.0 - Tokens (and auth) support #270](https://github.com/ipfs/specs/pull/270)
-- https://github.com/dkuhnert/libp2p-bitswap/tree/auth
+- [libp2p-bitswap](https://github.com/dkuhnert/libp2p-bitswap/tree/auth)
 
 ### Protocol: didcontact
 A discovery protocol which gossips encrypted didcomm messages using the libp2p GossipSub protocol.
 The didcomm messages denote a connection request from one CO participant to another one.
 The receiver can choose whether to respond to it or not, so no (potentially private) connection information must be shared beforehand.
 
-#todo sequence diagram
+### Protocol: Rendezvous
+Provides a lightweight mechanism for generalized peer discovery.
+Any node implementing the rendezvous protocol can act as a rendezvous point, allowing the discovery of relevant peers in a decentralized manner.
+
+For further information see:
+- [Rendezvous Protocol](https://github.com/libp2p/specs/blob/master/rendezvous/README.md)
+
+### Protocol: CoHeads
+A GossipSub-based protocol with topics (e.g. ID of the CO) that you can subscribe to or publish heads to in a permissionless manner.
+When other participants are subscribed to the topic, they can be used to exchange heads.
+
+Whenever a CO (respectively its heads) changes, a new gossip message with the changed heads will be issued.
+
+For further information see:
+- [What is Publish/Subscribe](https://docs.libp2p.io/concepts/pubsub/overview/#gossip)
 
 ## References
 - [Flexible Networking Model](../introduction/features.md#flexible-networking-model)

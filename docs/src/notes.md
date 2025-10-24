@@ -45,7 +45,7 @@
 
 
 # Structure
-- **Introduction** 
+- Introduction
 	- about co-sdk
 	- why
 	- key principles
@@ -54,16 +54,16 @@
 		- interoperability
 		- accessibility
 		- open & democratic
-- **Getting Started**
+- Getting Started
 	- Requirements
-	- OS-specifics 
+	- OS-specifics
 	- Installation
 		- Rust
 		- cargo-binstall
 		- optional Dioxus CLI
 	- Minimal Coding Example
 	- Next Steps -> Build your first app!
-- **Reference**
+- Reference
 	- Co-Terms
 		- cokit
 		- core
@@ -80,35 +80,35 @@
 		- Data flows
 		- Important design decisions
 		- Dependency overview
-- **Usage**
-	- Best practices 
+- Usage
+	- Best practices
 	- API Overview core (co-api) -> rust doc
 	- API Overview apps (co-sdk) -> rust doc
 	- Configuration
 		- config files
 		- environment variables
-- **Development and Contributing**
+- Development and Contributing
 	- Clone & build
 	- Tests
 	- How to contribute (CLA)
 	- Bug report
 	- Feature request -> cokit maintainer
-- **FAQ & Troubleshooting**
-- **Licensing & Legal**
+- FAQ & Troubleshooting
+- Licensing & Legal
 
 
 
 
 # Notes
 
-- **Intro**
+- Intro
 	- About co-sdk + why
-		Collaboration is the core of the internet's value generation. 
+		Collaboration is the core of the internet's value generation.
 		Everytime collaborate, we have no option but to trust platforms with our most private data to respect and protect our privacy, in exchange for convenience and cool features. We are exploited through the data we generate.
-		Cokit is turning the tables. Now you can give power back to your users. We want you to build apps that allow users to physically own their digital life, and not just in a sense of static files, but in full fledged collab workflows. 
+		Cokit is turning the tables. Now you can give power back to your users. We want you to build apps that allow users to physically own their digital life, and not just in a sense of static files, but in full fledged collab workflows.
 	- COOL:
 		- No Backend
-		- No Databases 
+		- No Databases
 		- No Queries
 
 		- Key Principles
@@ -129,16 +129,16 @@
 
 
 
-- **Licensing**
+- Licensing
 	- AGPLv3 w/ linking exception
 
-- **Reference**
+- Reference
 	- 1io terms
 		- cokit
 			- co
 			- log
 			- heads
-			- 
+			-
 		- core
 			- state
 			- schema
@@ -151,15 +151,15 @@
 		- DID
 
 - additional learning materials -> rust docs
-- 
+-
 
 
 ### Unsure
 - System Requirements
-- matrix 
+- matrix
 - merkle dags
 - mDNS
-- 
+-
 
 
 ### More Notes
@@ -168,8 +168,8 @@
 	- more detailed explanation, if necessary
 	- at least one code example that users can copy/paste to try it
 	- even more advanced explanations if necessary
-	  
-	  
+
+
 
 
 # co-sdk
@@ -177,13 +177,13 @@
 ## Introduction
 
 ### About
-Collaboration is the core of the internet's value generation. 
+Collaboration is the core of the internet's value generation.
 Everytime collaborate, we have no option but to trust platforms with our most private data to respect and protect our privacy, in exchange for convenience and cool features. We are exploited through the data we generate.
-Cokit is turning the tables. Now you can give power back to your users. We want you to build apps that allow users to physically own their digital life, and not just in a sense of static files, but in full fledged collab workflows. 
+Cokit is turning the tables. Now you can give power back to your users. We want you to build apps that allow users to physically own their digital life, and not just in a sense of static files, but in full fledged collab workflows.
 
 ### Key Principles
 #### Local First
-Data is stored locally on the users end device and is only shared with the group of people with whom they are currently collaborating, encapsulated from all other users, creating their own private platform. 
+Data is stored locally on the users end device and is only shared with the group of people with whom they are currently collaborating, encapsulated from all other users, creating their own private platform.
 
 #### p2p
 Only the necessary data is exchanged in end-to-end encrypted form using peer-to-peer technology. There are only users, no central servers as a middleman.

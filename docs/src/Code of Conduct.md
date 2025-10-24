@@ -28,7 +28,7 @@ This Code of Conduct applies within project spaces (e.g. repos, forums, chat roo
 
 
 ## Enforcement
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the CO-kit conduct team at **[INSERT EMAIL ADDRESS]**. All complaints will be reviewed and investigated and will result in a response deemed necessary and appropriate to the circumstances. Confidentiality for reporters will be maintained where possible. Maintainers who do not enforce this Code of Conduct in good faith may face temporary or permanent repercussions as determined by the project leadership :contentReference[oaicite:5]{index=5}.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the CO-kit conduct team at [INSERT EMAIL ADDRESS]. All complaints will be reviewed and investigated and will result in a response deemed necessary and appropriate to the circumstances. Confidentiality for reporters will be maintained where possible. Maintainers who do not enforce this Code of Conduct in good faith may face temporary or permanent repercussions as determined by the project leadership :contentReference[oaicite:5]{index=5}.
 
 ## Attribution
-This Code of Conduct is adapted from **Contributor Covenant v1.4**, available at Contributor Covenant’s official site. For further information, see the [Contributor Covenant FAQ](https://www.contributor-covenant.org/faq)
+This Code of Conduct is adapted from Contributor Covenant v1.4, available at Contributor Covenant’s official site. For further information, see the [Contributor Covenant FAQ](https://www.contributor-covenant.org/faq)

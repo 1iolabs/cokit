@@ -46,4 +46,5 @@ pub trait BlockStorage: Send + Sync {
 
 The built in backends are filesystem and memory.
 
-See: [BlockStorage](https://docs.rs/co-primitives/latest/co-primitives/trait.BlockStorage.html).
+For further information see:
+- [BlockStorage](/crate/co-primitives/latest/co-primitives/trait.BlockStorage.html)

@@ -15,3 +15,6 @@ co-sdk:
 - CoStorage
 - Cores
 - Guards
+## References
+- [co-sdk](/crate/co_sdk/index.html)
+

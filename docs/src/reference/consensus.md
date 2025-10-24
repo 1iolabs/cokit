@@ -39,13 +39,15 @@ In CO-kit consensus is asynchronous and on-demand, meaning users only have to wa
 While conventional databases normally provide finality by default (when a change is written it's final) this comes at the cost that every change losses time by having a lot of overhead (latency, routing, compute, ...).
 
 ## Proof of authority
-... is the built-in consensus mechanism used in CO-kit.
+Proof of authority is the built-in consensus mechanism used in CO-kit.
 
 It is implemented in the `co-core-poa` Core.
 
 When the creator of a CO adds this Core the authority can be specified as a list of DIDs.
 This authority is then responsible for voting and once a majority is reached on a checkpoint, it is finalized.
 The POA allows for Byzantine Fault Tolerance (BFT) when configured with a majority of at least two-thirds of the authority.
+
+By default `2/3` majority is used.
 
 ### Use Cases
 With this mechanism new and classical use cases can be supported.

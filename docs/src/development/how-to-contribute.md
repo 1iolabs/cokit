@@ -16,7 +16,7 @@ These are the ways you can contribute:
 #todo
 Even a decentralized powerhouse like CO-kit isn't immune to the occasional glitch. To help us fix issues quickly, transparently, and effectively, we welcome detailed and thoughtful bug reports from the community.
 
-This chapter explains **how to report a bug**, what information is helpful, and where to submit your issue.
+This chapter explains how to report a bug, what information is helpful, and where to submit your issue.
 
 ### What Makes a Good Bug Report?
 

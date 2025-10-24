@@ -8,12 +8,5 @@ co-api:
 - async_api::Reducer, async_api::Context
 - Guard
 
-co-primitives:
-
-- CoMap
-- CoSet
-- CoList
-- BlockSerializer / from_cbor / to_cbor
-- NodeBuilder / NodeStream
-- BlockStorage / BlockStorageExt
-
+## References
+- [co-api](/crate/co_api/index.html)

@@ -31,6 +31,7 @@
 # Usage
 - [Best Practices](./usage/best-practices.md)
 - [Security](./usage/security.md)
+- [API Overview](./usage/api-overview.md)
 - [Core API Overview](./usage/api-overview-core.md)
 - [App API Overview](./usage/api-overview-apps.md)
 - [CLI](./usage/cli.md)
