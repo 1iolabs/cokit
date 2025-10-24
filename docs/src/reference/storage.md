@@ -2,7 +2,7 @@
 One of the base building blocks of CO-kit is the content addressed storage [CID](../glossary/glossary.md#cid).
 The storage is represented as a very simple interface which writes and reads CID/BLOB pairs called Blocks.
 The recommended serialization format (also used throughout CO-kit) is DAG-CBOR which is a subset of CBOR with links to CIDs.
-A [core](../reference/core.md) is not restricted to [DAG-CBOR](../glossary/glossary.md#DAG-CBOR) and may use any given structure.
+A [core](../reference/core.md) is not restricted to [DAG-CBOR](../glossary/glossary.md#dag-cbor) and may use any given structure.
 
 ## Layers
 Storages can be layered to add functionality.
@@ -16,7 +16,7 @@ The network layer will fetch blocks on demand while being used.
 It checks the layer if the block is known by its CID. If it is unknown it will be fetched from any CO participant.
 
 ## Partial Data
-All data is represented as a graph, more precisely as a [DAG](../glossary/glossary.md#DAG-CBOR) (directed acyclic graph).
+All data is represented as a graph, more precisely as a [DAG](../glossary/glossary.md#dag-cbor) (directed acyclic graph).
 
 The data is always accessed top-down, meaning we can fetch more data as we walk down the graph.
 

@@ -33,6 +33,7 @@
 - [Security](./usage/security.md)
 - [Core API Overview](./usage/api-overview-core.md)
 - [App API Overview](./usage/api-overview-apps.md)
+- [CLI](./usage/cli.md)
 - [Configuration](./usage/configuration.md)
 - [OS-specifics](./usage/os-specifics.md)
 

@@ -14,6 +14,7 @@ For each [CO](../reference/co.md) network configurations for connectivity can be
 ### DidDiscovery
 #todo #tech
 [DidContact](../reference/network.md#protocol-didcontact): Gossipsub based mesh networking discovery.
+This allows to configure explicit DIDs instead of all participants used to connect a CO.
 
 ### CoHeads
 #todo #tech
