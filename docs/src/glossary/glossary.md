@@ -1,8 +1,8 @@
- # Glossary
+# Glossary
 
 <!-- toc -->
 
-### AGPLv3
+## AGPLv3
 GNU Affero General Public License v3.
 A *strong copyleft* license created by the Free Software Foundation to ensure that not only distributed binaries—but even software accessed over a network—must have source code made available
 
@@ -36,6 +36,9 @@ DAG-CBOR is the goto serialization method for data used throughout CO-kit.
 For further information see:
 - [Core](../reference/core.md#serialization)
 - [DAG-CBOR specification](https://ipld.io/specs/codecs/dag-cbor/spec/)
+- [Glossary: Cid](#cid)
+- [Glossary: IPLD](#ipld)
+- [Glossary: Merkle-DAG](#merkle-dag)
 
 ## didcontact
 A discovery protocol which gossips encrypted didcomm messages using the libp2p GossipSub protocol.
@@ -60,6 +63,10 @@ A CID is a self-describing, content-addressed identifier used in distributed sys
 Why CO-kit uses CIDs:
 CIDs allow consistent, tamper-evident data referencing across decentralized storage backends—be they local, IPFS, or cloud—supporting CO-kit’s file-based, content-addressed architecture.
 
+For further information see:
+- [IPLD - The data model of the content-addressable web](https://ipld.io/)
+- [IPLD](#ipld)
+- [Merkle-DAG](#merkle-dag)
 
 ## CO
 A CO is a virtual room for collaboration.
@@ -101,8 +108,6 @@ Key properties of a consensus protocol:
 
 Consensus ensures data integrity, prevents conflicting updates, and supports reliable collaboration in a fully decentralized environment.
 
-### CO-kit’s Flexible Consensus Modes
-
 CO-kit allows you to choose the level of coordination needed for each CO:
 - `none`: No explicit agreement rules - relies solely on CRDT merge guarantees.
 - `proof-of-authority`: Updates must be approved or signed by designated participants.
@@ -113,25 +118,30 @@ These options let you balance complexity, security, and performance based on you
 
 [^issue-87]: https://gitlab.1io.com/1io/co-sdk/-/issues/87
 [^issue-88]: https://gitlab.1io.com/1io/co-sdk/-/issues/88
+
+For further information see:
+- [Consensus](../reference/consensus.md)
+- [Proof‑of‑Authority (PoA) Consensus Mechanism](#proofofauthority-poa-consensus-mechanism)
+
 ## Core
 A core (CO reducer) is a piece of data that acts like a state. Cores can be directly added to COs and they work like an in-code database. They implement a reducer function that take actions which have been pushed to a CO. The reducer then changes the cores data accordingly.
 
 For further information see:
 - [Core](../reference/core.md)
 
-#### Core schema
+## Core schema
 The core schema is data model of the core.
 
 For further information see:
 - [Schema](../reference/core.md#schema)
 
-#### Core actions
+## Core actions
 Core actions are operations on the state of a core.
 
 For further information see:
 - [Actions](../reference/core.md#actions)
 
-#### Core state
+## Core state
 The core state is the root state of a core.
 
 For further information see:
@@ -156,17 +166,6 @@ For further information see:
 ## Dioxus
 Dioxus is a Rust-based framework for building cross-platform user interfaces, supporting web, desktop, mobile, and server environments with a single codebase.
 
-- Declarative UI with RSX: Uses an `rsx!` macro similar to JSX, allowing you to write HTML-like layouts directly in Rust code (e.g., `rsx! { h1 { "Hello World!" } }`)
-- Cross-platform target support:
-  - Web: via WebAssembly, including SSR and hydration
-  - Desktop: through WebView or native renderers
-  - Mobile: supports Android and iOS via JNI/Objective-C interop.
-- Ergonomic reactivity: Inspired by React, Solid, and Svelte, it uses signals/hooks like `use_signal` for state management.
-- Productive developer workflow:
-  - Integrated hot-reloading and CLI tool (`dx`) for instant iteration
-  - Built-in bundler for optimized, compact builds (< 50 KB web apps, < 5 MB desktop/mobile)
-- Full-stack and backend integration: Includes server-side functions, routing, and streaming support—letting frontend invoke backend logic with type safety.
-
 For further information see:
 - [Dioxus docs](https://docs.rs/dioxus/latest/dioxus/)
 
@@ -185,7 +184,10 @@ For further information see:
 IPLD is a single namespace for all hash-inspired protocols. Through IPLD, links can be traversed across protocols, allowing you to explore data regardless of the underlying protocol.
 
 For further information see:
-- [ipld.io](https://ipld.io/)
+- [IPLD - The data model of the content-addressable web](https://ipld.io/)
+- [Core](../reference/core.md)
+- [Glossary: CID](#cid)
+- [Glossary: Merkle-DAG](#merkle-dag)
 
 ## Log
 The Log is a conflict-free replicated event stream. It is immutable and cryptographically verifiable.
@@ -222,20 +224,27 @@ Specifics:
 
 In CO-kit, we use Merkle DAGs as the foundation for the built-in Merkle log-based CRDT and storage.
 
+For further informations see:
+- [IPLD - The data model of the content-addressable web](https://ipld.io/)
+- [Core](../reference/core.md)
+- [Glossary: Cid](#cid)
+- [Glossary: IPLD](#ipld)
+
 ## PeerID
-#todo
-A [Peer](https://docs.libp2p.io/concepts/fundamentals/peers/) Identity (often written `PeerID`) is a unique reference to a specific peer within the overall p2p-network.
+A Peer Identity (often written `PeerID`) is a unique reference to a specific peer within the overall p2p-network.
+It is derived by hashing a node’s public key, and the corresponding private key remains secret and is used to sign messages and authenticate the identity of the peer.
 
-- A Peer ID is derived by hashing a node’s public key, and the corresponding private key remains secret and is used to sign messages and authenticate the identity of the peer.
-- Typically represented as a base58‑encoded multihash (CIDv0)
-- More modern encodings (CIDv1, Base32) are emerging—but the legacy base58 multihash remains widely supported.
-
-In CO-kit, each `CO` or node may generate or be assigned a Peer ID, which then acts as a verifiable handle across the decentralised syncing and networking layers.
+In CO-kit, each node may generate or be assigned a Peer ID, which then acts as a verifiable handle across the decentralised networking layers.
 
 For further information see:
-- [libp2p docs](https://docs.libp2p.io/concepts/fundamentals/peers/)
+- [Peers - libp2p](https://docs.libp2p.io/concepts/fundamentals/peers/)
+
 ## Proof‑of‑Authority (PoA) Consensus Mechanism
 Proof‑of‑Authority (PoA) is a reputation-based consensus mechanism where only a small, pre-approved set of trusted validators—known entities with verifiable identities—are empowered to produce and validate transactions.
+
+For further information see:
+- [Consensus](../reference/consensus.md)
+- [Glossary: Consensus](#consensus)
 
 ## Storage
 One of the base building blocks of CO-kit is the content addressed storage [CID](../glossary/glossary.md#cid).
@@ -243,25 +252,20 @@ The storage is represented as a very simple interface which writes and reads CID
 The recommended serialization format (also used throughout CO-kit) is DAG-CBOR which is a subset of CBOR with links to CIDs.
 A [core](../reference/core.md) is not restricted to [DAG-CBOR](../glossary/glossary.md#dag-cbor) and may use any given structure.
 
+For further information see:
+- [Storage](../reference/storage.md)
+
 ## Tauri
-#todo
-Tauri is an open-source framework for building lightweight, secure, and fast desktop (and mobile) applications using web technologies for the UI and Rust for the backend logic
-
-### Features
-
-- Cross-platform support: Target apps for Windows, macOS, Linux, and—starting from Tauri v2—iOS and Android from a single codebase
-- Tiny binary size and low memory usage: Unlike Chromium-based frameworks, Tauri uses the OS's native WebView (e.g., WebView2, WKWebView), resulting in ultra-compact executables (often just a few megabytes) and significantly reduced runtime overhead
-- Security-first architecture: Built with Rust, Tauri offers memory safety, a minimal attack surface, explicit API permissioning, and optional isolation patterns for untrusted code
+Tauri is an open-source framework for building cross-platform, lightweight, secure, and fast desktop (and mobile) applications using web technologies for the UI and Rust for the backend logic.
 
 For further information see:
 - [Tauri docs](https://v2.tauri.app/start/)
 
-### Architecture & Internals
-- Uses Rust-based crates—like TAO (for window management) and WRY (for WebView integration)—to power the native shell and system interactions
-- Your frontend app (React, Vue, Svelte, or vanilla HTML/JS) runs inside a WebView shell that communicates securely with Rust backend via IPC commands (`#[tauri::command]` / `invoke`)
-
 ## Tokio
-#todo
+Tokio is an asynchronous runtime for the Rust programming language. It provides the building blocks needed for writing network applications. It gives the flexibility to target a wide range of systems, from large servers with dozens of cores to small embedded devices.
+
+For further information see:
+- [Tokio - An asynchronous Rust runtime](https://tokio.rs/)
 
 ## WASM
 WebAssembly (WASM) is an open-standard, portable binary format designed for high-performance execution in a sandboxed environment - initially for web browsers, and increasingly for broader contexts including servers, edge devices, and embedded systems.
