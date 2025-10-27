@@ -36,7 +36,6 @@
 - [App API Overview](./usage/api-overview-apps.md)
 - [CLI](./usage/cli.md)
 - [Configuration](./usage/configuration.md)
-- [OS-specifics](./usage/os-specifics.md)
 
 # Development
 - [How to contribute](./development/how-to-contribute.md)

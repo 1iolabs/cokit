@@ -12,23 +12,15 @@ Therefore you can store CO-kit-managed files on local disk, cloud storages or ob
 All files are stored verifiable using content addressing.
 
 ### Peer-to-Peer
-Only the necessary data is exchanged in end-to-end encrypted form using peer-to-peer technology. There are only users, and no central servers as a middleman.
+Only the necessary data is exchanged, and it is end-to-end encrypted.
+By default there are only users, and no central servers as middlemen.
 
 ## Instant updates
-#todo
-#question Is this the same as Partial Real Time Sync?
-
-## Multiplayer
-#todo
-
-## Real time sync
-#todo
 Changes are distributed in real time.
 They are pushed directly to all or configured participants.
 Only the Log heads are distributed and participants can fetch the referenced data on demand and in parallel.
 
 ## Partial data
-#todo
 No full replica of all data needed.
 Content addressing allows for validated on demand fetching.
 
@@ -39,11 +31,13 @@ Tools that build on Co-kit should be compatible with each other, even if the bui
 We want everyone to be able to take full advantage of the platform and derive value from it, not just developers. Not only shall the applications built with CO-kit be easy to use, but we also hope for the best developer experience possible.
 
 ## Self-Sovereign
-#todo
-No need to rely on big corporates to provide storage space or cloud solutions. Co-kit enables you to build without dependencies and lets you choose (if needed) providers independently. 
+No need to rely on big corporates to provide storage space or cloud solutions.
+CO-kit enables you to build without dependencies and lets you choose providers independently, if needed.
 
 ## Open & Democratic
 No one should ever own a platform and exploit others through their data. We see CO-kit as public property. Everything is open-source. Go and build a better digital future with it. 
 
-See more in the chapter [How to contribute](./development/how-to-contribute.md)
-See more in the chapter [Licensing](./license/lega-notice.md).
+For further information see:
+- [How to contribute](./development/how-to-contribute.md)
+- [Licensing](./license/lega-notice.md)
+

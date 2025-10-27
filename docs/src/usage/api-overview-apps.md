@@ -2,10 +2,11 @@
 
 The `co-sdk` is the foundation package to create CO-kit based applications.
 
-#todo 
+#todo #tech
 
 co-sdk:
 - Application, ApplicationBuilder
+- NetworkSettings
 - CoContext
 - Identity
 - PrivateIdentity
@@ -15,6 +16,7 @@ co-sdk:
 - CoStorage
 - Cores
 - Guards
+
 ## References
 - [co-sdk](/crate/co_sdk/index.html)
 

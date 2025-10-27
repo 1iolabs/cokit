@@ -30,10 +30,9 @@ For further information see:
 - CO-kit is fully platform agnostic and can be supported by any OS
 
 ### How does CO-kit differ from other CRDT or P2P-based frameworks?
-#todo #text
-Not only does CO-kit provide end-to-end encryption in processes, but also end-to-end verification, meaning:
-- Cryptographic integrity verification
-- Cryptographic identity verification
+CO-kit does not only provide end-to-end encryption in processes, but also end-to-end verification, meaning:
+- Cryptographic integrity verification (e.g.: This message is unaltered)
+- Cryptographic identity verification (e.g.: This person is who he/she claims to be)
 
 Included in CO-kit and thus significantly reducing programming time when building apps are the following:
 - Identity through [DID](../reference/Identity.md##what-is-a-did)
@@ -83,16 +82,19 @@ For further information see:
 - [Log](../reference/log.md)
 
 ### Can CO-kit be integrated with traditional centralized systems?
-#todo 
-Yes. COs would be serving as an added layer of trust and security when in use in centralized systems. The library can be integrated anywhere and you can also build your backend/data models with CO-kit. 
-Another useful scenario is CO-kit-built apps in processes that are fed back into traditional systems. In that case, COs can be stored and used as receipts (leveraging non-reputability).   
-
+Yes.
+COs would be serving as an added layer of trust and security when in use in centralized systems.
+The library can be integrated anywhere and you can also build your backend/data models with CO-kit.
+Another useful scenario is CO-kit-built apps in processes that are fed back into traditional centralized systems.
+As COs are lightweight they can be stored and used as receipts (leveraging non-reputability).   
 
 - Library can be integrated everywhere
 - Can be used as backend/data
 - Usable for processes that will be fed back into traditional systems
 	- COs can be stored and used as receipt (leveraging non-reputability)
-- Amplify the edge #question -> please explain
+- Amplify the edge
+	- Use low overhead edge caching through content addressing which allows for efficient syncing
+	- Let the edge work locally and occasionally sync to server/cloud
 
 ## Networking & Synchronization
 ### How does peer discovery work in CO-kit's networking model?
@@ -101,7 +103,6 @@ CO-kit got built in GossipSub protocol for peer discovery.
 However the networking is entire optional and one could just use HTTP for transferring blocks.
 
 ### What networking mode should I use for local, LAN-only collaboration?
-#todo 
 By default, CO-kit uses mDNS for local device discovery.
 For discovery over the internet, a bootstrap peer can be configured which defaults to bootstrap.1io.com. Technically, this bootstrap peer exposes a libp2p gossip-sub endpoint. You are free to choose any or no bootstrap peer(s) at all, or to use your own device as bootstrap for your other devices.
 Both methods are used to discover new peers but they can be changed or disabled using configuration depending on your demands.
@@ -116,28 +117,21 @@ This even makes is possible to just use any cloud storage drive to share the CO-
 ### How does CO-kit handle NAT traversal and firewalls in P2P mode?
 This is handled through a variety of possibilities. First option is through a circuit relay. libp2p [defines a protocol called p2p-circuit](https://github.com/libp2p/specs/tree/master/relay). When a peer isn’t able to listen on a public address, it can dial out to a relay peer, which will keep a long-lived connection open. Other peers will be able to dial through the relay peer using a `p2p-circuit` address, which will forward traffic to its destination. 
 
-Second option is by Direct Connection Upgrade through Relay [(DCUtR)](https://docs.libp2p.io/concepts/nat/dcutr/) by Hole Punching. It is a protocol for establishing direct connections between nodes through hole punching, without a signaling server. DCUtR involves synchronizing and opening connections to each peer’s predicted external addresses. 
+Second option is by [Direct Connection Upgrade through Relay (DCUtR)](https://docs.libp2p.io/concepts/nat/dcutr/) by Hole Punching. It is a protocol for establishing direct connections between nodes through hole punching, without a signalling server. DCUtR involves synchronizing and opening connections to each peer’s predicted external addresses. 
 
 For further information see: 
-- https://docs.libp2p.io/concepts/nat/overview/
+- [What are NATs - libp2p](https://docs.libp2p.io/concepts/nat/overview/)
 
 ### What happens during a network partition or peer disconnect?
-#todo 
-Each peer continues locally by writing operations as a content addressed event to the log.
+Each peer continues locally by writing operations as a content-addressed event to the log.
 This may cause participants heads to diverge.
 When a peer reconnects, the heads are shared again and the Log joins new heads, deterministically sorting all events to a consistent order which is then used to recalculate the state.
 
 ## Data & Consensus
 ### How are conflicts resolved using Merkle-CRDTs in CO-kit?
 Conflicts are resolved by the [Log](../reference/log.md) which is sorting the stream of events by the event's logical clock.
-
-### What are the trade-offs between different consensus modes (none, PoA, manual, shared)?
-#todo
-[Consensus](../reference/consensus.md).
-
 ### Can I define custom consensus logic for my application?
 Yes. A consensus is implemented as a core with an additional guard.
-
 ### What level of schema validation or migration support does CO-kit offer?
 Schema validation is up to the developer of [Core](../reference/core.md) and can be implemented as desired.
 Cores can be migrated between versions. The migration itself is just another event which can be implemented in code.
