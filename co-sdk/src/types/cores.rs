@@ -26,6 +26,7 @@ pub const CO_CORE_NAME_MEMBERSHIP: CoreName<'static, co_core_membership::Members
 pub const CO_CORE_NAME_PIN: CoreName<'static, co_core_pin::Pin> = CoreName::new("pin");
 pub const CO_CORE_NAME_STORAGE: CoreName<'static, co_core_storage::Storage> = CoreName::new("storage");
 
+/// Registry for builtin cores.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Cores {
 	cores: HashMap<String, String>,

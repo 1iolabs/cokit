@@ -234,7 +234,7 @@ rustup component add --toolchain nightly rustfmt
 MacOS:
 ```shell
 brew install llvm@18
-echo "Add llvm to .config/Cargo.toml:"
+echo "Add environment to `.cargo/config.toml` file:"
 echo "[env]"
 echo "LLVM_SYS_180_PREFIX = \"$("brew" "--prefix" "llvm@18")\""
 ```
