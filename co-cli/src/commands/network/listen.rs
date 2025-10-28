@@ -11,11 +11,11 @@ use std::future::ready;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
-	/// CO ID to listen.
+	/// CO ID to listen. By default uses all active COs.
 	#[arg(long)]
 	pub co: Option<Vec<String>>,
 
-	/// Identites to listen to.
+	/// Identites to listen to. By default uses all private identities.
 	#[arg(long)]
 	pub identity: Option<Vec<Did>>,
 
@@ -77,7 +77,7 @@ pub async fn command(
 	// COs
 	// TODO: watch local co
 	// TODO: https://gitlab.1io.com/1io/co-sdk/-/issues/52
-	let cos: Vec<CoId> = match &command.identity {
+	let cos: Vec<CoId> = match &command.co {
 		Some(dids) => dids.iter().map(|id| CoId::from(id)).collect(),
 		None => {
 			let local_co = application.local_co_reducer().await?;
