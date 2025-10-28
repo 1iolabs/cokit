@@ -1,7 +1,26 @@
 # CO CLI
-The builtin co CLI helps to inspect and interact with COs. 
+The builtin co CLI helps to inspect and interact with COs.
 
-#todo #tech add examples
+## Commands
+
+The CLI is organized into command and sub-commands.
+
+The `help` command (or `-h`, `--help`) can be used to get a description of the command and its arguments.
+
+Below some usefaul commands are outlined.
+
+### `co co ls`
+
+List all COs.
+
+### `co network listen`
+
+Listen for connections.
+Using peer-to-peer networking.
+
+### `co core build`
+
+Expects the current directory to be a rust core crate and attempts to build it to WebAssembly.
 
 ## Usage
 
