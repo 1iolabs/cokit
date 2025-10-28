@@ -6,7 +6,7 @@ No Cloud-Dependencies.
 
 No Bullshit.
 
-## Save time. Here's how.
+## Save time.
 To make the benefits of decentralized, local first apps clear, we outline a quick comparison in this chapter.
 
 ### Building a classical app
@@ -24,16 +24,15 @@ To make the benefits of decentralized, local first apps clear, we outline a quic
 1. Model data in a core which combines data, business logic and permissions.
 2. Implement your frontend and use the data directly.
 
-#todo add time/money based comparison (classical takes X CO-kit takes Y) in %?
-
+#### Time/Money estimates when building with CO-kit
 
 | Scenario                        | Duration (weeks) | Estimated Hours | Hourly Rate (€) | Total Cost (€) | Notes                            |
 | ------------------------------- | ---------------- | --------------- | --------------- | -------------- | -------------------------------- |
-| Example A –                     | 4                | 120             | 80              | 9,600          | Minimal features, fast delivery  |
+| Example A – MVP                 | 4                | 120             | 80              | 9,600          | Minimal features, fast delivery  |
 | Option B – Standard Scope       | 8                | 220             | 85              | 18,700         | Balanced cost/time trade-off     |
 | Option C – Extended Features    | 12               | 320             | 90              | 28,800         | Includes advanced integrations   |
 | Option D – Full Custom Solution | 20               | 520             | 95              | 49,400         | Complete feature set and testing |
-*estimated
+*estimated values
 
 ## Ain't no better DevX
 
@@ -49,16 +48,12 @@ Establish data ownership and app interoperability as the standard for every digi
 
 ## Our Philosophy
 No Backend. No Cloud-Dependencies. No Bullshit.
-
 ### Fuck Big Tech
 First of all - if you are big tech - Hi! You're welcome to use CO-kit as well.
-Skip the next part, we're not nice about it.
-
-Big tech owns your online life. We've traded privacy for convenience, entrusting our personal data to closed systems that don't work together.  We are turning the tables and giving all power back to the user with a new technological foundation for truly decentralized collaboration.
-
+You might as well skip the next part, we're not nice about it.
+Big tech owns your online life. We've traded privacy for convenience, entrusting our personal data to closed systems that scarcely work together. We are turning the tables and giving all power back to the user with a new technological foundation for truly decentralized collaboration in data ownership-empowering applications.
 ### Kill the Middleman
-We eliminate intermediaries. You individually decide with whom you want to share your data and under what conditions. CO lives on your local device and is directly synced only with your peers over the network. All apps are built on this fundamental concept.
-
+We eliminate intermediaries. You individually decide with whom you want to share your data and under what conditions. [CO](..reference/co.md) lives on your local device and is directly synced only with your peers over the network. All apps are built on this fundamental concept.
 ### Take back what's yours
 Local-first, always in sync via peer-to-peer and fully open source. Start developing decentralized apps with Data, Identity, AI and Payments all worked out for you on CO-kit – No servers required.
 
