@@ -4,6 +4,7 @@ use co_runtime::{Core, GuardReference};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
 
+/// Registry for builtin guards.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Guards {
 	guards: HashMap<String, String>,

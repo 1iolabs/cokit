@@ -5,7 +5,7 @@ use core::ops::Range;
 use futures::Stream;
 use rust_unixfs::file::visit::IdleFileVisit;
 
-/// Read unixfs file as stream.
+/// Read unixfs file as chunked stream.
 ///
 /// See: https://github.com/dariusc93/rust-ipfs/blob/libp2p-next/unixfs/examples/cat.rs
 pub fn unixfs_stream<S>(

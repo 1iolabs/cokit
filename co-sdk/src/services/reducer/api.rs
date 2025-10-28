@@ -18,6 +18,7 @@ use ipld_core::ipld::Ipld;
 use serde::Serialize;
 use std::{collections::BTreeSet, fmt::Debug, marker::PhantomData};
 
+/// CO handle.
 #[derive(Debug, Clone)]
 pub struct CoReducer {
 	id: CoId,
@@ -133,14 +134,18 @@ impl CoReducer {
 		self.handle.clone()
 	}
 
+	/// Get the CoId.
 	pub fn id(&self) -> &CoId {
 		&self.id
 	}
 
+	/// Get the used date provider.
 	pub fn date(&self) -> &DynamicCoDate {
 		&self.date
 	}
 
+	/// Get the CoId of which this co is a member of.
+	/// Usually this is the Local CO (`"local"`).
 	pub fn parent_id(&self) -> Option<&CoId> {
 		self.parent.as_ref()
 	}
