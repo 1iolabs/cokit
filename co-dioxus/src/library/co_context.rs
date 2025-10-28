@@ -174,6 +174,7 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 	if settings.no_default_features {
 		application_builder = application_builder.with_setting("default-features", false);
 	}
+	application_builder = application_builder.with_log_max_level(settings.log_level.into());
 	for feature in &settings.feature {
 		application_builder = application_builder.with_setting("feature", feature.to_owned());
 	}
@@ -186,12 +187,9 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 	}
 
 	// execute
-	tracing::info!("co-startup");
 	while let Some(task) = tasks.recv().await {
-		tracing::info!("co-task");
 		task(application.clone()).await;
 	}
-	tracing::info!("co-shutdown");
 
 	// result
 	Ok(())

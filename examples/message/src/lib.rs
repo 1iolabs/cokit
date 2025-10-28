@@ -1,5 +1,8 @@
 use cid::Cid;
-use co_api::{CoMetadata, Context, Date, Did, Link, Metadata, Reducer, ReducerAction, Storage, StorageExt};
+use co_api::{
+	sync_api::{Context, Reducer, StorageExt},
+	CoMetadata, Date, Did, Link, Metadata, ReducerAction, Storage,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -164,5 +167,5 @@ impl MessageState {
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	co_api::reduce::<MessageState>()
+	co_api::sync_api::reduce::<MessageState>()
 }

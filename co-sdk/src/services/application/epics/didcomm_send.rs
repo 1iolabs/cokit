@@ -14,14 +14,14 @@ pub fn didcomm_send(
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::DidCommSend { message_id, peer, message } => Some(
-			stream::once(ready((context.clone(), message_id.clone(), *peer, message.clone())))
-				.filter_map(move |(context, message_id, peer, message)| async move {
+		Action::DidCommSend { message_header, peer, message } => Some(
+			stream::once(ready((context.clone(), message_header.clone(), *peer, message.clone())))
+				.filter_map(move |(context, message_header, peer, message)| async move {
 					let network = context.network_tasks().await?;
 					let timeout = settings_timeout(&context, &CoId::from(CO_ID_LOCAL), Some("didcomm-send")).await;
 					Some(match DidCommSendNetworkTask::send(network, [peer], message, timeout).await {
-						Ok(peer) => Action::DidCommSent { message_id, peer, result: Ok(()) },
-						Err(err) => Action::DidCommSent { message_id, peer, result: Err(err.into()) },
+						Ok(peer) => Action::DidCommSent { message_header, peer, result: Ok(()) },
+						Err(err) => Action::DidCommSent { message_header, peer, result: Err(err.into()) },
 					})
 				})
 				.map(Ok),

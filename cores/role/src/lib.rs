@@ -1,4 +1,4 @@
-use co_api::{DagMap, DagSet, Did, Reducer};
+use co_api::{sync_api::Reducer, DagMap, DagSet, Did};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ord;
 
@@ -16,7 +16,11 @@ pub enum RoleAction {}
 impl Reducer for Roles {
 	type Action = RoleAction;
 
-	fn reduce(self, _event: &co_api::ReducerAction<Self::Action>, _context: &mut dyn co_api::Context) -> Self {
+	fn reduce(
+		self,
+		_event: &co_api::ReducerAction<Self::Action>,
+		_context: &mut dyn co_api::sync_api::Context,
+	) -> Self {
 		todo!()
 	}
 }
@@ -24,5 +28,5 @@ impl Reducer for Roles {
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	co_api::reduce::<Roles>()
+	co_api::sync_api::reduce::<Roles>()
 }

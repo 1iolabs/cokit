@@ -169,6 +169,7 @@ impl<T> OptionLink<T> {
 	}
 
 	pub fn unwrap(&self) -> Link<T> {
+		#[allow(clippy::unwrap_used)]
 		Link::new(self.cid.unwrap())
 	}
 

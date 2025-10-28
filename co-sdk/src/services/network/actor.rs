@@ -1,9 +1,11 @@
 use super::message::NetworkMessage;
 use crate::{
 	local_keypair_fetch,
+	network::tasks::connections::ConnectionsNetworkTask,
 	services::{
 		bitswap::Bitswap,
 		connections::Connections,
+		heads::{HeadsActor, HeadsApi, HeadsContext},
 		network::{CoNetworkTaskSpawner, MdnsGossipNetworkTask},
 	},
 	Action, CoContext,
@@ -160,16 +162,27 @@ impl Actor for Network {
 			Connections::new(self.context.clone(), Duration::from_secs(30)),
 			(),
 		)?;
+		spawner
+			.spawn(ConnectionsNetworkTask::new(connections.handle()))
+			.map_err(|err| ActorError::Actor(err.into()))?;
 
 		// use mdns discoverd peers for gossip discovery
 		spawner
 			.spawn(MdnsGossipNetworkTask::new())
 			.map_err(|err| ActorError::Actor(err.into()))?;
 
+		// heads
+		let heads = Actor::spawn_with(
+			self.context.tasks(),
+			tags!("type": "heads", "application": self.context.identifier()),
+			HeadsActor::default(),
+			HeadsContext { network: spawner.clone(), spawner: self.context.tasks() },
+		)?;
+
 		// set network to reducers
 		self.context
 			.inner
-			.set_network(Some((spawner.clone(), connections.handle())))
+			.set_network(Some((spawner.clone(), connections.handle(), HeadsApi::from(&heads))))
 			.await?;
 
 		// log
@@ -179,7 +192,7 @@ impl Actor for Network {
 		self.context.inner.application().dispatch(Action::NetworkStarted)?;
 
 		// result
-		Ok(NetworkState { network, peer_id: network_peer_id, connections, bitswap })
+		Ok(NetworkState { network, peer_id: network_peer_id, connections, heads, bitswap })
 	}
 
 	async fn handle(
@@ -206,6 +219,7 @@ impl Actor for Network {
 		state.network.shutdown().shutdown();
 		state.connections.shutdown();
 		state.bitswap.shutdown();
+		state.heads.shutdown();
 		Ok(())
 	}
 }
@@ -215,4 +229,5 @@ pub struct NetworkState {
 	peer_id: PeerId,
 	connections: ActorInstance<Connections>,
 	bitswap: ActorInstance<Bitswap>,
+	heads: ActorInstance<HeadsActor>,
 }

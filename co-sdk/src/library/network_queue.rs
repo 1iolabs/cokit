@@ -45,7 +45,7 @@ pub async fn network_queue_message(context: &CoContext, mut message: CoDidCommSe
 	ensure_network_queue_core(&local_co, &identity, co).await?;
 
 	// setup task id
-	let task_id = message.message_id.clone();
+	let task_id = message.message_header.id.clone();
 	message.tags.insert(tag!("task_id": task_id.clone()));
 
 	// insert message
@@ -58,8 +58,8 @@ pub async fn network_queue_message(context: &CoContext, mut message: CoDidCommSe
 				list: LIST_NAME_BACKLOG.to_owned(),
 				task: Task {
 					id: task_id,
-					name: format!("DIDComm {} to co:{}", message.message_id, &message.co),
-					tags: tags!("co": message.co.to_string(), "type": "co-didcomm", "message_id": message.message_id),
+					name: format!("DIDComm {} to co:{}", message.message_header.id, &message.co),
+					tags: tags!("co": message.co.to_string(), "type": "co-didcomm", "message_id": message.message_header.id),
 					payload,
 					lock: None,
 				},
@@ -99,7 +99,7 @@ pub async fn network_queue_heads(
 				task: Task {
 					id: task_id,
 					name: format!("Heads message {} to co:{}", message.message_id, &message.co),
-					tags: tags!("co": message.co.to_string(), "type": "co-didcomm", "message_id": message.message_id),
+					tags: tags!("co": message.co.to_string(), "type": "co-heads/1.0", "message_id": message.message_id),
 					payload,
 					lock: None,
 				},
@@ -247,13 +247,14 @@ pub async fn network_queue_action(
 				let task_message_id = task.id.clone();
 				move |action: &Action| -> Option<TaskState> {
 					match action {
-						Action::HeadsMessageComplete {
-							message: HeadsMessageReceivedAction { message_id, .. },
-							result,
-						} if message_id == &task_message_id => Some(match result {
-							Ok(_) => TaskState::Done,
-							Err(_err) => TaskState::Failed,
-						}),
+						Action::HeadsMessageComplete(HeadsMessageReceivedAction { message_id, .. }, result)
+							if message_id == &task_message_id =>
+						{
+							Some(match result {
+								Ok(_) => TaskState::Done,
+								Err(_err) => TaskState::Failed,
+							})
+						},
 						_ => None,
 					}
 				}

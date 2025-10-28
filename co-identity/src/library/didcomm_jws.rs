@@ -5,6 +5,7 @@ use didcomm_rs::{
 	crypto::{SignatureAlgorithm, Signer},
 	Message,
 };
+use std::mem::take;
 
 /// Create a signed JWS envelope.
 ///
@@ -17,11 +18,17 @@ pub fn didcomm_jws(
 	header: DidCommHeader,
 	body: &str,
 ) -> Result<String, SignError> {
-	let result = Message::new()
+	let mut header = header;
+	let fields = take(&mut header.fields);
+	let mut message = Message::new()
 		.didcomm_header(into_didcomm_rs_header(header))
 		.kid(&hex::encode(public_key))
 		.body(body)
-		.map_err(|e| SignError::Other(e.into()))?
+		.map_err(|e| SignError::Other(e.into()))?;
+	for (key, value) in fields {
+		message = message.add_header_field(key, value);
+	}
+	let result = message
 		.as_flat_jws(&SignatureAlgorithm::EdDsa)
 		.sign(SignatureAlgorithm::EdDsa.signer(), private_key.divulge())
 		.map_err(|e| SignError::Other(e.into()))?;

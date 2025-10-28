@@ -3,12 +3,17 @@ use crate::co_v1::{
 	storage_block_set, CoV1Api,
 };
 use std::fmt::Debug;
-use wasmer::{imports, AsStoreMut, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, Store, WasmPtr};
+use wasmer::{
+	imports, sys::EngineBuilder, AsStoreMut, Engine, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module,
+	RuntimeError, Store, WasmPtr,
+};
+use wasmer_types::Features;
 
 pub struct WasmerRuntime {
 	store: Store,
 	instance: Instance,
 	env: FunctionEnv<WasmerEnv>,
+	kind: WasmerRuntimeKind,
 }
 impl Debug for WasmerRuntime {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -16,6 +21,7 @@ impl Debug for WasmerRuntime {
 			// .field("store", &self.store)
 			// .field("instance", &self.instance)
 			.field("api", &self.env.as_ref(&self.store).api)
+			.field("kind", &self.kind)
 			.finish()
 	}
 }
@@ -35,15 +41,18 @@ pub enum WasmerError {
 	Export(#[from] wasmer::ExportError),
 	#[error("Runtime")]
 	Runtime(#[from] wasmer::RuntimeError),
+	#[error("Deserialize")]
+	Deserialize(#[from] wasmer::DeserializeError),
+	#[error("No engine available")]
+	NoEngineAvailable,
 }
 
 impl WasmerRuntime {
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret, skip(bytes), fields(bytes.len = bytes.len()))]
-	pub fn new(api: CoV1Api, bytes: &Vec<u8>) -> Result<Self, WasmerError> {
-		let mut store = Store::default();
-
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(bytes), fields(bytes.len = bytes.len()))]
+	pub fn new(api: CoV1Api, native: bool, bytes: &Vec<u8>) -> Result<Self, WasmerError> {
 		// module
-		let module = Module::new(&store, bytes)?;
+		let (kind, mut store, module) =
+			if native { WasmerRuntimeBuilder::native(bytes) } else { WasmerRuntimeBuilder::wasm(bytes) }.build()?;
 
 		// env
 		let env = FunctionEnv::new(&mut store, WasmerEnv { memory: None, api });
@@ -51,26 +60,28 @@ impl WasmerRuntime {
 		// instance
 		let import_object = Self::imports(&mut store, &env);
 		let instance: Instance = Instance::new(&mut store, &module, &import_object)?;
-		let memory = instance.exports.get_memory("memory").unwrap().clone();
+		let memory = instance.exports.get_memory("memory")?.clone();
 		env.as_mut(&mut store).memory = Some(memory);
 
-		// check
-		instance.exports.get_function("state")?;
+		// TODO: adjust check to support state or guard only binaries
+		// // check
+		// instance.exports.get_function("state")?;
+		// instance.exports.get_function("guard")?;
 
 		// result
-		Ok(Self { store, instance, env })
+		Ok(Self { kind, store, instance, env })
 	}
 
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret)]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret)]
 	pub fn execute_state(&mut self) -> Result<(), WasmerError> {
-		let state = self.instance.exports.get_function("state").unwrap();
+		let state = self.instance.exports.get_function("state")?;
 		state.call(&mut self.store, &[])?;
 		Ok(())
 	}
 
-	#[tracing::instrument(level = tracing::Level::TRACE, err, ret)]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret)]
 	pub fn execute_guard(&mut self) -> Result<bool, WasmerError> {
-		let state = self.instance.exports.get_function("guard").unwrap();
+		let state = self.instance.exports.get_function("guard")?;
 		let results = state.call(&mut self.store, &[])?;
 		if results.len() != 1 {
 			return Err(wasmer::ExportError::IncompatibleType.into());
@@ -108,29 +119,128 @@ impl WasmerRuntime {
 	}
 }
 
+/// Initiate a WASM (or AOT native) module.
+/// Attempts to pick the most optimal runtime which is available.
+///
+/// See:
+/// - https://github.com/wasmerio/wasmer/blob/dcaff6c83316e9e67b62ade47e70a9b121c08b15/lib/cli/src/backend.rs#L670
+pub struct WasmerRuntimeBuilder<'a> {
+	native: bool,
+	bytes: &'a [u8],
+	llvm: bool,
+}
+impl<'a> WasmerRuntimeBuilder<'a> {
+	pub fn wasm(bytes: &'a [u8]) -> Self {
+		Self { native: false, bytes, llvm: true }
+	}
+
+	pub fn native(bytes: &'a [u8]) -> Self {
+		Self { native: true, bytes, llvm: true }
+	}
+
+	pub fn for_info(mut self) -> Self {
+		self.llvm = false;
+		self
+	}
+
+	#[allow(unreachable_code)]
+	pub fn build(self) -> Result<(WasmerRuntimeKind, Store, Module), WasmerError> {
+		let mut features = Features::none();
+		features.reference_types = true;
+		features.bulk_memory = true;
+		features.multi_value = true;
+		features.extended_const = true;
+
+		// bytes are native code
+		if self.native {
+			let engine: Engine = EngineBuilder::headless().set_features(Some(features)).engine().into();
+			let store = Store::new(engine);
+			let module = unsafe { Module::deserialize(&store, self.bytes)? };
+			return Ok((WasmerRuntimeKind::Headless, store, module));
+		}
+
+		// llvm feature
+		#[cfg(feature = "llvm")]
+		if self.llvm && !is_sandboxed() {
+			let mut config = wasmer_compiler_llvm::LLVM::default();
+			wasmer_compiler::CompilerConfig::canonicalize_nans(&mut config, true);
+			// config.opt_level(wasmer_compiler_llvm::LLVMOptLevel::None);
+			// config.enable_verifier();
+			let engine: Engine = EngineBuilder::new(config).set_features(Some(features)).engine().into();
+			let store = Store::new(engine);
+			let module = Module::new(&store, self.bytes)?;
+			return Ok((WasmerRuntimeKind::Llvm, store, module));
+		}
+
+		// cranelift feature
+		#[cfg(feature = "cranelift")]
+		if self.llvm && !is_sandboxed() {
+			let mut config = wasmer_compiler_cranelift::Cranelift::new();
+			wasmer_compiler::CompilerConfig::canonicalize_nans(&mut config, true);
+			let engine: Engine = EngineBuilder::new(config).set_features(Some(features)).engine().into();
+			let store = Store::new(engine);
+			let module = Module::new(&store, self.bytes)?;
+			return Ok((WasmerRuntimeKind::Cranelift, store, module));
+		}
+
+		// wamr (WebAssembly Micro Runtime) feature
+		// See: https://wasmer.io/posts/introducing-wasmer-v5
+		#[cfg(feature = "wamr")]
+		{
+			let engine: Engine = wasmer::wamr::Wamr::new().into();
+			let store = Store::new(engine);
+			let module = Module::new(&store, self.bytes)?;
+			return Ok((WasmerRuntimeKind::Wamr, store, module));
+		}
+
+		// wasmi feature
+		#[cfg(feature = "wasmi")]
+		{
+			let engine: Engine = wasmer::wasmi::Wasmi::new().into();
+			let store = Store::new(engine);
+			let module = Module::new(&store, self.bytes)?;
+			return Ok((WasmerRuntimeKind::Wasmi, store, module));
+		}
+
+		// none
+		Err(WasmerError::NoEngineAvailable)
+	}
+}
+
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
+pub enum WasmerRuntimeKind {
+	Headless,
+	Llvm,
+	Cranelift,
+	Wamr,
+	Wasmi,
+}
+
+#[cfg(any(feature = "llvm", feature = "cranelift"))]
+fn is_sandboxed() -> bool {
+	std::env::var("APP_SANDBOX_CONTAINER_ID").is_ok()
+}
+
+fn into_runtime_error<E: ToString>(err: E) -> RuntimeError {
+	RuntimeError::new(err.to_string())
+}
+
 fn wasmer_storage_block_get(
 	mut env: FunctionEnvMut<WasmerEnv>,
 	cid: WasmPtr<u8>,
 	cid_size: u32,
 	buffer: WasmPtr<u8>,
 	buffer_size: u32,
-) -> u32 {
+) -> Result<u32, RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
-	let cid_access = cid
-		.slice(&memory, cid_size)
-		.expect("pointer in bounds")
-		.access()
-		.expect("pointer in bounds");
-	let mut buffer_access = buffer
-		.slice(&memory, buffer_size)
-		.expect("pointer in bounds")
-		.access()
-		.expect("pointer in bounds");
-	storage_block_get(&mut data.api, cid_access.as_ref(), buffer_access.as_mut())
-		.expect("to not have internal errors")
+	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let cid_access = cid.slice(&memory, cid_size)?.access()?;
+	let mut buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
+	Ok(storage_block_get(&mut data.api, cid_access.as_ref(), buffer_access.as_mut())
+		.map_err(into_runtime_error)?
 		.try_into()
-		.expect("API")
+		.map_err(into_runtime_error)?)
 }
 
 fn wasmer_storage_block_set(
@@ -139,79 +249,76 @@ fn wasmer_storage_block_set(
 	cid_size: u32,
 	buffer: WasmPtr<u8>,
 	buffer_size: u32,
-) -> u32 {
+) -> Result<u32, RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
-	let cid_access = cid
-		.slice(&memory, cid_size)
-		.expect("pointer in bounds")
-		.access()
-		.expect("pointer in bounds");
-	let buffer_access = buffer
-		.slice(&memory, buffer_size)
-		.expect("pointer in bounds")
-		.access()
-		.expect("pointer in bounds");
-	storage_block_set(&mut data.api, cid_access.as_ref(), buffer_access.as_ref()).expect("API")
+	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let cid_access = cid.slice(&memory, cid_size)?.access()?;
+	let buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
+	Ok(storage_block_set(&mut data.api, cid_access.as_ref(), buffer_access.as_ref()).map_err(into_runtime_error)?)
 }
 
-fn wasmer_payload_read(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, buffer_size: u32, offset: u32) -> u32 {
+fn wasmer_payload_read(
+	mut env: FunctionEnvMut<WasmerEnv>,
+	buffer: WasmPtr<u8>,
+	buffer_size: u32,
+	offset: u32,
+) -> Result<u32, RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
-	let mut buffer_access = buffer
-		.slice(&memory, buffer_size)
-		.expect("pointer in bounds")
-		.access()
-		.expect("pointer in bounds");
-	payload_read(&mut data.api, buffer_access.as_mut(), offset)
+	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let mut buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
+	Ok(payload_read(&mut data.api, buffer_access.as_mut(), offset)
+		.map_err(into_runtime_error)?
 		.try_into()
-		.expect("API")
+		.map_err(into_runtime_error)?)
 }
 
-fn wasmer_state_cid_read(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, buffer_size: u32) -> u32 {
+fn wasmer_state_cid_read(
+	mut env: FunctionEnvMut<WasmerEnv>,
+	buffer: WasmPtr<u8>,
+	buffer_size: u32,
+) -> Result<u32, RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
-	let mut buffer_access = buffer
-		.slice(&memory, buffer_size)
-		.expect("pointer in bounds")
-		.access()
-		.expect("pointer in bounds");
-	state_cid_read(&data.api, buffer_access.as_mut())
+	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let mut buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
+	Ok(state_cid_read(&data.api, buffer_access.as_mut()).map_err(into_runtime_error)?)
 }
-fn wasmer_state_cid_write(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, buffer_size: u32) -> u32 {
+
+fn wasmer_state_cid_write(
+	mut env: FunctionEnvMut<WasmerEnv>,
+	buffer: WasmPtr<u8>,
+	buffer_size: u32,
+) -> Result<u32, RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
-	let buffer_access = buffer
-		.slice(&memory, buffer_size)
-		.expect("pointer in bounds")
-		.access()
-		.expect("pointer in bounds");
-	state_cid_write(&mut data.api, buffer_access.as_ref()).expect("API")
+	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
+	Ok(state_cid_write(&mut data.api, buffer_access.as_ref()).map_err(into_runtime_error)?)
 }
-fn wasmer_event_cid_read(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, buffer_size: u32) -> u32 {
+
+fn wasmer_event_cid_read(
+	mut env: FunctionEnvMut<WasmerEnv>,
+	buffer: WasmPtr<u8>,
+	buffer_size: u32,
+) -> Result<u32, RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
-	let mut buffer_access = buffer
-		.slice(&memory, buffer_size)
-		.expect("pointer in bounds")
-		.access()
-		.expect("pointer in bounds");
-	event_cid_read(&data.api, buffer_access.as_mut())
+	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let mut buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
+	Ok(event_cid_read(&data.api, buffer_access.as_mut()).map_err(into_runtime_error)?)
 }
-fn wasmer_diagnostic_cid_write(mut env: FunctionEnvMut<WasmerEnv>, buffer: WasmPtr<u8>, buffer_size: u32) -> u32 {
+
+fn wasmer_diagnostic_cid_write(
+	mut env: FunctionEnvMut<WasmerEnv>,
+	buffer: WasmPtr<u8>,
+	buffer_size: u32,
+) -> Result<u32, RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().unwrap().view(&store);
-	let buffer_access = buffer
-		.slice(&memory, buffer_size)
-		.expect("pointer in bounds")
-		.access()
-		.expect("pointer in bounds");
-	diagnostic_cid_write(&mut data.api, buffer_access.as_ref()).expect("API")
+	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
+	Ok(diagnostic_cid_write(&mut data.api, buffer_access.as_ref()).map_err(into_runtime_error)?)
 }
 
 #[cfg(test)]
 mod tests {
-	use wasmer::{imports, Function, FunctionEnv, FunctionEnvMut, Instance, Module, Store, Value};
+	use wasmer::{imports, Function, FunctionEnv, FunctionEnvMut, Instance, Module, RuntimeError, Store, Value};
 
 	#[test]
 	fn wasmer_with_imports_example() -> anyhow::Result<()> {
@@ -256,6 +363,48 @@ mod tests {
 		let result = add.call(&mut store, &[Value::I32(1)])?;
 		assert_eq!(result[0], Value::I32(86));
 		Ok(())
+	}
+
+	/// Test error handling behaviour of wasmer.
+	///
+	/// Note: panic! from a host function will not be handled inside wasm but will be panic the rust code.
+	#[test]
+	fn wasmer_panic() {
+		let mut store = Store::default();
+		let module = Module::new(
+			&store,
+			r#"
+		        (module
+		            (import "env" "host_func" (func $host_func))
+		            (func (export "panic_host") call $host_func)
+					(func (export "panic_wasm")
+	    				unreachable
+	        		)
+		        )
+		    "#,
+		)
+		.unwrap();
+
+		let host_func = Function::new_typed(&mut store, || -> Result<(), RuntimeError> {
+			Err(RuntimeError::new("oops from host import"))
+		});
+
+		let import_object = imports! {
+			"env" => {
+				"host_func" => host_func,
+			}
+		};
+		let instance = Instance::new(&mut store, &module, &import_object).unwrap();
+
+		// panic from WASM
+		let result = instance.exports.get_function("panic_wasm").unwrap().call(&mut store, &[]);
+		println!("panic_wasm result: {:?}", result);
+		assert!(result.is_err());
+
+		// panic from Host
+		let result = instance.exports.get_function("panic_host").unwrap().call(&mut store, &[]);
+		println!("panic_host: {:?}", result);
+		assert!(result.is_err());
 	}
 
 	// #[test]

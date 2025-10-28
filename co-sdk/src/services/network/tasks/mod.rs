@@ -1,9 +1,10 @@
-pub mod co_heads;
+pub mod connections;
 pub mod dial;
 pub mod did_discovery;
 pub mod didcomm_receive;
 pub mod didcomm_send;
 pub mod discovery_connect;
+pub mod gossip;
 pub mod listeners;
 pub mod mdns_gossip;
 pub mod peers;

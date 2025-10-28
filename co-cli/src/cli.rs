@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 const APP_IDENTIFIER: &str = "co-cli";
 
-/// Run COs via an HTTP Daemon.
+/// CO CLI
 #[derive(Debug, Clone, clap::Parser)]
 pub struct Cli {
 	/// Command.

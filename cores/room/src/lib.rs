@@ -1,5 +1,8 @@
 use cid::Cid;
-use co_api::{Context, Reducer, ReducerAction, Tags};
+use co_api::{
+	sync_api::{Context, Reducer},
+	ReducerAction, Tags,
+};
 use co_messaging::{EventContent, MatrixEvent};
 use co_primitives::CoCid;
 use schemars::JsonSchema;
@@ -45,5 +48,5 @@ impl Reducer for Room {
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	co_api::reduce::<Room>()
+	co_api::sync_api::reduce::<Room>()
 }

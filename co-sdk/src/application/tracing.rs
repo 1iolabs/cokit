@@ -15,6 +15,7 @@ pub struct TracingBuilder {
 	identifier: String,
 	base_path: Option<PathBuf>,
 	bunyan: Option<PathBuf>,
+	log_max_level: Level,
 	stderr: bool,
 	env_filter: Option<EnvFilter>,
 	/// Trace to open telemetry endpoint.
@@ -28,6 +29,7 @@ impl TracingBuilder {
 			identifier,
 			base_path,
 			bunyan: None,
+			log_max_level: Level::TRACE,
 			stderr: false,
 			open_telemetry: None,
 			env_filter: None,
@@ -49,6 +51,10 @@ impl TracingBuilder {
 			_ => None,
 		};
 		Self { bunyan, ..self }
+	}
+
+	pub fn with_max_level(self, log_max_level: Level) -> Self {
+		Self { log_max_level, ..self }
 	}
 
 	pub fn with_open_telemetry(self, endpoint: impl Into<String>) -> Self {
@@ -88,7 +94,7 @@ impl TracingBuilder {
 			std::fs::create_dir_all(log_path.parent().ok_or(anyhow::anyhow!("no parent"))?)?;
 			let log_file = std::fs::File::options().append(true).create(true).open(log_path)?;
 			Some(
-				BunyanFormattingLayer::new(self.identifier.clone(), log_file)
+				BunyanFormattingLayer::new(self.identifier.clone(), log_file.with_max_level(self.log_max_level))
 					.serialize_span_id(true)
 					.serialize_span_type(true)
 					.serialize_span_fields(false),
@@ -99,7 +105,7 @@ impl TracingBuilder {
 
 		// stderr
 		let stderr = if self.stderr {
-			Some(tracing_subscriber::fmt::layer().with_writer(std::io::stderr.with_max_level(Level::TRACE)))
+			Some(tracing_subscriber::fmt::layer().with_writer(std::io::stderr.with_max_level(self.log_max_level)))
 		} else {
 			None
 		};

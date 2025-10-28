@@ -8,6 +8,7 @@ mod co_heads_publish;
 mod co_heads_subscribe;
 mod core_action_push;
 mod did_subscribe;
+mod didcomm_connected;
 mod didcomm_receive;
 mod didcomm_send;
 mod heads_message;
@@ -22,6 +23,7 @@ mod membership_update;
 mod network_block_get;
 mod network_queue;
 mod push_heads;
+mod resolve_private_identity;
 
 pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 	MergeEpic::new()
@@ -41,8 +43,10 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(heads_message::heads_message_heads)
 		.join(heads_message::heads_message_heads_request)
 		.join(didcomm_send::didcomm_send)
+		.join(didcomm_connected::didcomm_connected)
 		.join(key_request_receive::key_request_receive)
 		.join(key_request_send::key_request_send)
+		.join(key_request_send::network_task_execute)
 		.join(membership_update::membership_update)
 		.join(membership_update::membership_remove)
 		.join(push_heads::PushHeadsEpic::default())
@@ -54,5 +58,6 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(network_queue::NetworkQueueProcessEpic::default())
 		.join(network_block_get::network_block_get)
 		.join(network_block_get::network_task_execute)
+		.join(resolve_private_identity::resolve_private_identity)
 		.join(TracingEpic::new(tags))
 }

@@ -1,7 +1,9 @@
-use co_core_co::CoAction;
+use anyhow::anyhow;
+use co_core_co::{CoAction, ParticipantState};
 use co_core_membership::{MembershipState, MembershipsAction};
-use co_sdk::{update_co, Action, CoId, CreateCo, Did, Identity, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL};
-use futures::{join, Stream, StreamExt};
+use co_primitives::CoTryStreamExt;
+use co_sdk::{Action, CoId, CoReducer, CreateCo, Did, Identity, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL};
+use futures::{join, Stream, StreamExt, TryStreamExt};
 use helper::instance::Instances;
 use std::{collections::BTreeSet, future::ready, time::Duration};
 use tokio::time::timeout;
@@ -25,7 +27,7 @@ async fn test_invite() {
 	let mut peer2 = instances.create().await;
 
 	// network
-	let (network1, network2) = Instances::networking(&mut peer1, &mut peer2).await;
+	let (_network1, network2) = Instances::networking(&mut peer1, &mut peer2, true, true).await;
 
 	// create identity
 	let identity1 = peer1.create_identity().await;
@@ -121,21 +123,35 @@ async fn test_invite() {
 	.instrument(info_span!("peer2: join", application = peer2.application.settings().identifier))
 	.await;
 
-	// peer2: force sync (needed because of the paricipant state update)
-	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
-	async {
-		update_co(peer2.application.handle(), &peer2_shared_co, &identity2, network1.local_peer_id(), timeout_duration)
-			.await
-			.unwrap();
-	}
-	.instrument(info_span!("peer2: force sync", application = peer2.application.settings().identifier))
-	.await;
+	// peer2: wait for participant to become active
+	timeout(
+		timeout_duration,
+		wait_participant_active(peer2.application.actions(), identity2.identity().to_owned(), "shared".into()),
+	)
+	.await
+	.unwrap()
+	.unwrap();
 
 	// peer2: read state
+	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
 	assert_eq!(peer2_shared_co.reducer_state().await, shared_co.reducer_state().await);
 	let (_, co) = shared_co.co().await.unwrap();
 	let (_, peer2_co) = peer2_shared_co.co().await.unwrap();
 	assert_eq!(peer2_co, co);
+
+	// check state
+	assert_eq!(
+		get_participant_state(&shared_co, &identity2.identity().to_owned())
+			.await
+			.unwrap(),
+		ParticipantState::Active
+	);
+	assert_eq!(
+		get_participant_state(&peer2_shared_co, &identity2.identity().to_owned())
+			.await
+			.unwrap(),
+		ParticipantState::Active
+	);
 }
 
 /// Invite/Join
@@ -150,12 +166,12 @@ async fn test_invite_encrypted() {
 	let timeout_duration = Duration::from_secs(60);
 
 	// instance
-	let mut instances = Instances::new("test_invite");
+	let mut instances = Instances::new("test_invite_encrypted");
 	let mut peer1 = instances.create().await;
 	let mut peer2 = instances.create().await;
 
 	// network
-	let (network1, network2) = Instances::networking(&mut peer1, &mut peer2).await;
+	let (_network1, network2) = Instances::networking(&mut peer1, &mut peer2, true, false).await;
 
 	// create identity
 	let identity1 = peer1.create_identity().await;
@@ -247,21 +263,35 @@ async fn test_invite_encrypted() {
 	.instrument(info_span!("peer2: join", application = peer2.application.settings().identifier))
 	.await;
 
-	// peer2: force sync (needed because of the paricipant state update)
-	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
-	async {
-		update_co(peer2.application.handle(), &peer2_shared_co, &identity2, network1.local_peer_id(), timeout_duration)
-			.await
-			.unwrap();
-	}
-	.instrument(info_span!("peer2: force sync", application = peer2.application.settings().identifier))
-	.await;
+	// peer2: wait for participant to become active
+	timeout(
+		timeout_duration,
+		wait_participant_active(peer2.application.actions(), identity2.identity().to_owned(), "shared".into()),
+	)
+	.await
+	.unwrap()
+	.unwrap();
 
 	// peer2: read state
+	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
 	assert_eq!(peer2_shared_co.reducer_state().await, shared_co.reducer_state().await);
 	let (_, co) = shared_co.co().await.unwrap();
 	let (_, peer2_co) = peer2_shared_co.co().await.unwrap();
 	assert_eq!(peer2_co, co);
+
+	// peer1: check state
+	assert_eq!(
+		get_participant_state(&shared_co, &identity2.identity().to_owned())
+			.await
+			.unwrap(),
+		ParticipantState::Active
+	);
+	assert_eq!(
+		get_participant_state(&peer2_shared_co, &identity2.identity().to_owned())
+			.await
+			.unwrap(),
+		ParticipantState::Active
+	);
 }
 
 async fn wait_membership_state(
@@ -299,4 +329,48 @@ async fn wait_membership_state(
 		.await
 		.into_iter()
 		.next()
+}
+
+async fn wait_participant_active(
+	actions: impl Stream<Item = Action> + Send + 'static,
+	participant: Did,
+	co: CoId,
+) -> Result<(), String> {
+	actions
+		.map(Result::<Action, String>::Ok)
+		.try_filter_map(move |action| {
+			let co = co.clone();
+			let participant = participant.clone();
+			async move {
+				Ok(match action {
+					Action::CoreAction { co: action_co, storage: _, context: _, action, cid: _, head: _ }
+						if action_co == co && CO_CORE_NAME_CO == action.core =>
+					{
+						let co_action: CoAction = action.get_payload()?;
+						match co_action {
+							CoAction::ParticipantJoin { participant: action_participant, tags: _ }
+								if participant == action_participant =>
+							{
+								Some(())
+							},
+							_ => None,
+						}
+					},
+					_ => None,
+				})
+			}
+		})
+		.try_first()
+		.await?;
+	Ok(())
+}
+
+async fn get_participant_state(co: &CoReducer, participant: &Did) -> Result<ParticipantState, anyhow::Error> {
+	let (storage, co) = co.co().await?;
+	let participant = co
+		.participants
+		.get(&storage, participant)
+		.await?
+		.ok_or(anyhow!("Not found: {}", participant))?;
+	Ok(participant.state)
 }

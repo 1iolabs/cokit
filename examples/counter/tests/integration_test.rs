@@ -15,6 +15,7 @@ fn integration_test() {
 
 	// build
 	assert!(Command::new("cargo")
+		.env("RUSTFLAGS", "-C debuginfo=2")
 		.args([
 			"build",
 			"--features",
@@ -48,7 +49,7 @@ fn integration_test() {
 	// wasm
 	let wasm_path = "../../target-wasm/wasm32-unknown-unknown/release/example_counter.wasm";
 	let wasm_bytes = std::fs::read(wasm_path).unwrap();
-	let next_state = create_runtime(wasm_bytes).execute_state(api).unwrap().state;
+	let next_state = create_runtime(false, wasm_bytes).execute_state(api).unwrap().state;
 
 	// test
 	assert_eq!(Some(Cid::try_from("bafyr4ibjkgjouhwikzwvmoy2owd6l4azqwam3piehbbpkcikjqmxyiggpi").unwrap()), next_state);

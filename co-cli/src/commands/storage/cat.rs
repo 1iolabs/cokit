@@ -38,7 +38,7 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 	}
 
 	// print
-	cat_output(storage, Cid::from_str(&command.cid)?, command.pretty).await?;
+	cat_output(storage, Cid::from_str(&command.cid)?, command.pretty, command.key_file.is_some()).await?;
 
 	// result
 	Ok(exitcode::OK)

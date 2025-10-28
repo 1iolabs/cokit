@@ -21,5 +21,6 @@ pub fn from_didcomm_rs_header(value: didcomm_rs::DidCommHeader) -> crate::DidCom
 		pthid: value.pthid,
 		created_time: value.created_time,
 		expires_time: value.expires_time,
+		fields: Default::default(),
 	}
 }

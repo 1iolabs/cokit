@@ -14,6 +14,7 @@ pub trait CoReducerFactory {
 }
 
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum CoReducerFactoryError {
 	#[error("CO not found: {0:?}")]
 	CoNotFound(CoId, #[source] anyhow::Error),
@@ -26,4 +27,25 @@ pub enum CoReducerFactoryError {
 
 	#[error("CO actor error")]
 	Actor(#[from] ActorError),
+
+	#[error("CO create pending")]
+	Pending,
+
+	#[error("CO not initialized yet")]
+	WouldCreate,
+}
+
+pub trait CoReducerFactoryResultExt<T> {
+	/// Return None for pending/uninitialized COs.
+	fn opt(self) -> Result<Option<T>, CoReducerFactoryError>;
+}
+impl<T> CoReducerFactoryResultExt<T> for Result<T, CoReducerFactoryError> {
+	fn opt(self) -> Result<Option<T>, CoReducerFactoryError> {
+		match self {
+			Err(CoReducerFactoryError::Pending) => Ok(None),
+			Err(CoReducerFactoryError::WouldCreate) => Ok(None),
+			Ok(value) => Ok(Some(value)),
+			Err(err) => Err(err),
+		}
+	}
 }

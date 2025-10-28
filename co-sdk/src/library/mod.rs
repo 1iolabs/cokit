@@ -16,6 +16,7 @@ pub mod invite;
 pub mod invite_networks;
 pub mod ipld_resolve_recursive;
 pub mod is_cid_encrypted;
+pub mod is_membership_heads_encrypted;
 pub mod join;
 pub mod key_exchange;
 pub mod keystore_fetch;

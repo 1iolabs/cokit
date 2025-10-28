@@ -4,7 +4,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use cid::Cid;
-use co_sdk::{CoId, CoReducerFactory};
+use co_sdk::{BlockStorage, CoId, CoReducerFactory};
 use exitcode::ExitCode;
 use std::str::FromStr;
 
@@ -15,26 +15,53 @@ pub struct Command {
 
 	/// The CID to print.
 	/// If not specified using the root state.
-	pub cid: Option<String>,
+	/// To get deeper the whole path of CIDs needs to be specified.
+	pub cid: Vec<String>,
 
 	/// Pretty print data.
 	#[arg(short, long)]
 	pub pretty: bool,
+
+	/// Skip decrypt block if Cid is encrypted.
+	#[arg(short, long)]
+	pub no_decrypt: bool,
 }
 
 pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Result<ExitCode, anyhow::Error> {
 	// reducer
 	let application = context.application(cli).await;
 	let reducer = application.context().try_co_reducer(&command.co).await?;
+	let storage = reducer.storage();
 
 	// cid
-	let cid = match &command.cid {
-		Some(cid) => Cid::from_str(cid)?,
-		None => reducer.reducer_state().await.0.ok_or(anyhow!("CO is empty"))?,
-	};
+	//  we need to walk the path to have the mappings available
+	//  for convenience we also dudup same cids
+	let mut cid = reducer.reducer_state().await.0.ok_or(anyhow!("CO is empty"))?;
+	let mut last_cid = None;
+	let cid_len = command.cid.len();
+	for (cid_index, next_cid) in [Ok(cid)]
+		.into_iter()
+		.chain(command.cid.iter().map(|cid_str| Cid::from_str(cid_str)))
+		.enumerate()
+	{
+		let next_cid = next_cid?;
+		if last_cid == Some(next_cid) {
+			continue;
+		}
+		let _stat = storage.stat(&next_cid).await?;
+		cid = next_cid;
+		last_cid = Some(cid);
+		if command.pretty {
+			if cid_index == cid_len {
+				println!("Cid: {}", cid);
+			} else {
+				println!("Parent Cid: {}", cid);
+			}
+		}
+	}
 
 	// print
-	cat_output(reducer.storage(), cid, command.pretty).await?;
+	cat_output(reducer.storage(), cid, command.pretty, !command.no_decrypt).await?;
 
 	// result
 	Ok(exitcode::OK)

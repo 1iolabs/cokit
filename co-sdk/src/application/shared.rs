@@ -1,18 +1,22 @@
 use super::identity::create_identity_resolver;
 use crate::{
 	find_membership,
-	library::{find_co_secret::find_co_secret_by_reference, membership_all_heads::membership_all_heads},
+	library::{
+		find_co_secret::find_co_secret_by_reference, is_membership_heads_encrypted::is_membership_heads_encrypted,
+		membership_all_heads::membership_all_heads, wait_response::request_response_timeout,
+	},
 	reducer::{
 		change::membership_writer::MembershipWriter,
 		core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
 	},
 	services::{
+		application::KeyRequestAction,
 		reducer::{FlushInfo, ReducerBlockStorage, ReducerFlush},
 		reducers::ReducerStorage,
 	},
 	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
-	ApplicationMessage, CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoUuid, Cores, DynamicCoDate,
-	Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_CO, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+	Action, ApplicationMessage, CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoUuid, Cores,
+	DynamicCoDate, Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_CO, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
 	CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
@@ -34,6 +38,7 @@ use std::{
 	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,
 	sync::Arc,
+	time::Duration,
 };
 
 /// Shared CO Builder.
@@ -44,6 +49,7 @@ pub struct SharedCoBuilder {
 	membership_core_name: String,
 	membership: Membership,
 	initialize: bool,
+	key_request_timeout: Duration,
 }
 impl SharedCoBuilder {
 	pub fn new(parent: CoReducer, membership: Membership) -> Self {
@@ -53,6 +59,7 @@ impl SharedCoBuilder {
 			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_string(),
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_string(),
 			initialize: true,
+			key_request_timeout: Duration::from_secs(30),
 		}
 	}
 
@@ -68,13 +75,55 @@ impl SharedCoBuilder {
 		Self { initialize, ..self }
 	}
 
-	/// Read (latest) secret from parent CO.
-	pub async fn secret(&self) -> anyhow::Result<Option<co_primitives::Secret>> {
+	pub fn with_key_request_timeout(self, key_request_timeout: Duration) -> Self {
+		Self { key_request_timeout, ..self }
+	}
+
+	/// Read (latest) secret from parent CO or network.
+	///
+	/// If secret if not avilalbe it will be fetched using `handle`.
+	pub async fn secret(
+		&self,
+		handle: Option<ActorHandle<ApplicationMessage>>,
+	) -> anyhow::Result<Option<co_primitives::Secret>> {
 		if let Some(key_reference) = &self.membership.key {
 			Ok(Some(find_co_secret_by_reference(&self.parent, key_reference, Some(&self.keystore_core_name)).await?))
+		} else if is_membership_heads_encrypted(&self.parent.storage(), &self.membership).await? {
+			if let Some(handle) = handle {
+				Ok(Some(self.request_secret(handle).await?))
+			} else {
+				Err(anyhow!("Key not available"))
+			}
 		} else {
 			Ok(None)
 		}
+	}
+
+	/// Request secret from network using handle.
+	pub async fn request_secret(
+		&self,
+		handle: ActorHandle<ApplicationMessage>,
+	) -> Result<co_primitives::Secret, anyhow::Error> {
+		let request = KeyRequestAction {
+			co: self.membership.id.clone(),
+			parent_co: self.parent.id().to_owned(),
+			key: None,
+			from: Some(self.membership.did.clone()),
+			network: None,
+		};
+		let key = request_response_timeout(
+			handle,
+			self.key_request_timeout,
+			Action::KeyRequest(request.clone()),
+			move |action| match action {
+				Action::KeyRequestComplete(action_request, action_result) if action_request == &request => {
+					Some(action_result.clone())
+				},
+				_ => None,
+			},
+		)
+		.await??;
+		Ok(find_co_secret_by_reference(&self.parent, &key, Some(&self.keystore_core_name)).await?)
 	}
 
 	pub async fn build<I>(
@@ -299,6 +348,24 @@ impl CreateCo {
 		}
 	}
 
+	pub fn id(&self) -> &CoId {
+		&self.id
+	}
+
+	pub fn with_id(mut self, id: impl Into<CoId>) -> Self {
+		self.id = id.into();
+		self
+	}
+
+	pub fn name(&self) -> &str {
+		&self.name
+	}
+
+	pub fn with_name(mut self, name: String) -> Self {
+		self.name = name;
+		self
+	}
+
 	pub fn with_core(mut self, core_name: &str, core_type: &str, core_binary: Cid) -> Self {
 		self.cores
 			.insert(core_name.to_owned(), CoreSource::Reference(tags!("type": core_type), core_binary));
@@ -314,6 +381,10 @@ impl CreateCo {
 	pub fn with_algorithm(mut self, algorithm: Option<Algorithm>) -> Self {
 		self.algorithm = algorithm;
 		self
+	}
+
+	pub fn public(&self) -> bool {
+		self.algorithm.is_none()
 	}
 
 	pub fn with_public(self, public: bool) -> Self {

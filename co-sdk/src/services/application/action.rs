@@ -6,7 +6,7 @@ use crate::{
 	CoDate, CoStorage, ReducerChangeContext,
 };
 use cid::Cid;
-use co_identity::Message;
+use co_identity::{DidCommHeader, Message, PrivateIdentityBox};
 use co_network::didcomm::EncodedMessage;
 use co_primitives::{Block, BlockSerializer, CoId, DefaultParams, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
@@ -49,14 +49,14 @@ pub enum Action {
 	/// Invite request has been sent to a peer.
 	InviteSent { co: CoId, to: Did, peer: PeerId },
 
-	/// Join request has been sent to a peer.
-	JoinKeyRequest { co: CoId, participant: Did, peer: PeerId },
-
 	/// Join completed.
 	Joined { co: CoId, participant: Did, success: bool, peer: Option<PeerId> },
 
-	/// Send Key Request to co (participants) or specified peer.
-	// KeyRequest { co: CoId, key: Option<String>, peer: Option<PeerId> },
+	/// Send a Key Request to a co or specified network.
+	KeyRequest(KeyRequestAction),
+
+	/// Key Request has completed.
+	KeyRequestComplete(KeyRequestAction, Result<String, ActionError>),
 
 	/// Start network.
 	NetworkStart(NetworkSettings),
@@ -66,8 +66,8 @@ pub enum Action {
 
 	/// Send a DIDComm message.
 	DidCommSend {
-		/// The message id for reference.
-		message_id: String,
+		/// The message header for reference.
+		message_header: DidCommHeader,
 		/// Peer to send the message to.
 		peer: PeerId,
 		/// The message.
@@ -76,8 +76,8 @@ pub enum Action {
 
 	/// Sent result of the DIDComm message.
 	DidCommSent {
-		/// The message id for reference.
-		message_id: String,
+		/// The message header for reference.
+		message_header: DidCommHeader,
 		/// Peer to send the message to.
 		peer: PeerId,
 		/// The send result.
@@ -85,13 +85,17 @@ pub enum Action {
 	},
 
 	/// Received a DIDComm message.
+	///
+	/// # Security
+	/// It is not proofed that the sender (peer) is the producer of the message.
+	/// If such a proof is needed it must be included in a signed message.
 	DidCommReceive { peer: PeerId, message: Message },
 
 	/// Received a HeadsMessage.
 	HeadsMessageReceived(HeadsMessageReceivedAction),
 
 	/// HeadsMessage has been processed.
-	HeadsMessageComplete { message: HeadsMessageReceivedAction, result: Result<(), ActionError> },
+	HeadsMessageComplete(HeadsMessageReceivedAction, Result<(), HeadsError>),
 
 	/// Connect to Co and send message (DidCommSent) to the first peer connectable.
 	CoDidCommSend(CoDidCommSendAction),
@@ -165,6 +169,12 @@ pub enum Action {
 
 	/// Request a block from network complete.
 	NetworkBlockGetComplete(NetworkBlockGetAction, Result<(), StorageError>),
+
+	/// Resolve a private identity.
+	ResolvePrivateIdentity(ResolvePrivateIdentityAction),
+
+	/// Resolve a private identity complete.
+	ResolvePrivateIdentityComplete(ResolvePrivateIdentityAction, Result<PrivateIdentityBox, ActionError>),
 
 	/// Notification.
 	Notify(NotifyAction),
@@ -336,14 +346,32 @@ impl std::fmt::Display for ActionError {
 	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct KeyRequestAction {
+	/// The CO.
+	pub co: CoId,
+
+	/// The parent co of the `co`.
+	pub parent_co: CoId,
+
+	/// The Key URI. If not specified the latest key is retrived.
+	pub key: Option<String>,
+
+	/// The DID to use for the request. If not specified the network identity is used.
+	pub from: Option<Did>,
+
+	/// Specific networks to use. If not specified the Co network settings are used.
+	pub network: Option<BTreeSet<Network>>,
+}
+
 /// Send a DIDComm message to all connectable co peers.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoDidCommSendAction {
 	/// The Co to send the message to.
 	pub co: CoId,
 
 	/// Networks to use.
-	/// If no networks are specified tehy are resolved from the Co.
+	/// If no networks are specified they are resolved from the Co.
 	pub networks: BTreeSet<Network>,
 
 	/// Notification when sent has been sucessfully done.
@@ -355,8 +383,8 @@ pub struct CoDidCommSendAction {
 	/// The message sender for reference.
 	pub message_from: Did,
 
-	/// The message id for reference.
-	pub message_id: String,
+	/// The message header for reference.
+	pub message_header: DidCommHeader,
 
 	/// The message.
 	pub message: EncodedMessage,
@@ -389,13 +417,39 @@ pub struct HeadsMessageReceivedAction {
 	/// The Co to send the message to.
 	pub co: CoId,
 
+	/// The DID of the sender. If set is must be validated.
 	pub from: Option<Did>,
+
+	/// The trusted PeerId of the sender.
+	pub from_peer: Option<PeerId>,
+
+	/// The PeerId of the sender from which we received the message.
 	pub peer: PeerId,
+
+	/// The message id.
 	pub message_id: String,
+
+	/// The message payload.
 	pub message: HeadsMessage,
 
 	/// Message tags. Used for internal tracking.
 	pub tags: Tags,
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum HeadsError {
+	/// Transient/Retryable error.
+	#[error("Transient Heads Error")]
+	Transient(#[from] ActionError),
+
+	/// Permanent error.
+	#[error("Permanent Heads Error")]
+	Permanent(#[source] ActionError),
+}
+impl From<anyhow::Error> for HeadsError {
+	fn from(value: anyhow::Error) -> Self {
+		HeadsError::Transient(value.into())
+	}
 }
 
 /// Request a block from network .
@@ -410,4 +464,12 @@ pub struct NetworkBlockGetAction {
 
 	/// The Cid of the block to get.
 	pub cid: Cid,
+}
+
+/// Request a private identity.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
+pub enum ResolvePrivateIdentityAction {
+	Identity { identity: Did },
+	NetworkIdentity { parent_co: CoId, co: CoId },
 }

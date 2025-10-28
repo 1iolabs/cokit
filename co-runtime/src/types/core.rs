@@ -1,6 +1,9 @@
 use crate::{AsyncBlockStorage, AsyncContext};
 use cid::Cid;
-use co_api::{async_api, reduce_with_context, Context, Reducer};
+use co_api::{
+	async_api,
+	sync_api::{reduce_with_context, Context, Reducer},
+};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, sync::Arc};
 

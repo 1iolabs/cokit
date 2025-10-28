@@ -30,7 +30,7 @@ impl SharedCo {
 		let mut peer2 = instances.create().await;
 
 		// network
-		let (network1, _network2) = Instances::networking(&mut peer1, &mut peer2).await;
+		let (network1, _network2) = Instances::networking(&mut peer1, &mut peer2, true, true).await;
 
 		// create identity
 		let identity1 = peer1.create_identity().await;

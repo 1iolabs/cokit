@@ -9,6 +9,7 @@ rust-version = "1.76"
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
+clap = { version = "^4.3.23", features = ["derive", "env"] }
 co-core-co = { workspace = true }
 co-core-membership = { workspace = true }
 co-primitives = { workspace = true }

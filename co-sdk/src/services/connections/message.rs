@@ -12,9 +12,12 @@ pub enum ConnectionMessage {
 	/// Action.
 	Action(ConnectionAction),
 }
-impl From<ConnectionAction> for ConnectionMessage {
-	fn from(value: ConnectionAction) -> Self {
-		Self::Action(value)
+impl<T> From<T> for ConnectionMessage
+where
+	T: Into<ConnectionAction>,
+{
+	fn from(value: T) -> Self {
+		Self::Action(value.into())
 	}
 }
 impl ConnectionMessage {

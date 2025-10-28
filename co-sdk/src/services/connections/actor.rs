@@ -35,9 +35,9 @@ impl Actor for Connections {
 		Ok(State {
 			state: ConnectionState {
 				keep_alive: self.keep_alive,
-				_cache: Default::default(),
 				co: Default::default(),
 				networks: Default::default(),
+				peers: Default::default(),
 			},
 			epic: EpicRuntime::new(epic(tags.clone()), |err| {
 				tracing::error!(?err, "connection-epic-error");

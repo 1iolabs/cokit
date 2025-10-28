@@ -1,5 +1,5 @@
 use crate::RuntimeContext;
-use co_api::{Block, Cid, DefaultParams, Storage as ApiStorage};
+use co_api::{Block, Cid, DefaultParams};
 use co_storage::{Storage, StorageError};
 use std::{cmp::min, fmt::Debug, mem::swap, time::Duration};
 
@@ -69,14 +69,17 @@ impl Debug for CoV1Api {
 			.finish()
 	}
 }
-impl ApiStorage for CoV1Api {
+impl Storage for CoV1Api {
+	type StoreParams = DefaultParams;
+
 	/// Get block in deterministic fashion.
+	/// Note: If this function fails it will trap the core.
 	/// Todo: Implement diagnostics.
-	fn get(&self, cid: &Cid) -> Block<DefaultParams> {
+	fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		let mut tries = 0;
 		loop {
 			return match self.storage.get(cid) {
-				Ok(b) => b,
+				Ok(b) => Ok(b),
 				Err(e) if Self::is_retriable(&e) && tries < 10 => {
 					tries += 1;
 
@@ -89,80 +92,74 @@ impl ApiStorage for CoV1Api {
 					// retry
 					continue;
 				},
-				Err(e) => panic!("get storage: {:?}", e),
+				Err(e) => Err(e),
 			};
 		}
 	}
 
 	/// Set block in deterministic fashion.
+	/// Note: If this function fails it will trap the core.
 	/// Todo: Implement diagnostics.
 	/// Todo: implement retries etc.
-	fn set(&mut self, block: Block<DefaultParams>) -> Cid {
-		self.storage.set(block).expect("set storage")
+	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+		self.storage.set(block)
+	}
+
+	fn remove(&mut self, _cid: &Cid) -> Result<(), StorageError> {
+		unimplemented!()
 	}
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum CoV1ApiError {
-	#[error("Invalid argument supplied from WASM")]
-	InvalidArgument,
-}
-impl From<cid::Error> for CoV1ApiError {
-	fn from(_value: cid::Error) -> Self {
-		CoV1ApiError::InvalidArgument
-	}
-}
-
-pub fn storage_block_get(api: &mut CoV1Api, cid: &[u8], buffer: &mut [u8]) -> Result<u32, CoV1ApiError> {
+pub fn storage_block_get(api: &mut CoV1Api, cid: &[u8], buffer: &mut [u8]) -> Result<u32, anyhow::Error> {
 	// let cid_buffer: &[u8] = unsafe { from_raw_parts(cid as *const u8, cid_size) };
 	let cid = Cid::try_from(cid)?;
-	let block = api.get(&cid);
+	let block = api.get(&cid)?;
 	let size = min(block.data().len(), buffer.len());
 	buffer[0..size].copy_from_slice(&block.data()[0..size]);
 	// unsafe { copy_nonoverlapping(block.data().as_ptr(), buffer as *mut u8, min(block.data().len(), buffer_size)) };
-	Ok(block.data().len().try_into().expect("u32"))
+	Ok(block.data().len().try_into()?)
 }
 
-pub fn storage_block_set(api: &mut CoV1Api, cid: &[u8], buffer: &[u8]) -> Result<u32, CoV1ApiError> {
+pub fn storage_block_set(api: &mut CoV1Api, cid: &[u8], buffer: &[u8]) -> Result<u32, anyhow::Error> {
 	let cid = Cid::try_from(cid)?;
 	let block = Block::new_unchecked(cid, Vec::from(buffer));
-	let result = block.data().len().try_into().expect("u32");
-	api.set(block);
+	let result = block.data().len().try_into()?;
+	api.set(block)?;
 	Ok(result)
 }
 
-pub fn payload_read(api: &CoV1Api, buffer: &mut [u8], offset: u32) -> u32 {
+pub fn payload_read(api: &CoV1Api, buffer: &mut [u8], offset: u32) -> Result<u32, anyhow::Error> {
 	let len = api.context.payload.len();
 	let size = min(len - (offset as usize), buffer.len());
 	buffer[0..size].copy_from_slice(&api.context.payload[0..size]);
-	len.try_into().expect("u32")
+	Ok(len.try_into()?)
 }
 
-pub fn state_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> u32 {
-	match api.context.state {
+pub fn state_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> Result<u32, anyhow::Error> {
+	Ok(match api.context.state {
 		Some(cid) => {
 			let cid_buffer = cid.to_bytes();
 			let size = min(buffer.len(), cid_buffer.len());
 			buffer[0..size].copy_from_slice(&cid_buffer.as_slice()[0..size]);
-			cid_buffer.len().try_into().expect("u32")
+			cid_buffer.len().try_into()?
 		},
 		None => 0,
-	}
+	})
 }
 
-pub fn state_cid_write(api: &mut CoV1Api, buffer: &[u8]) -> Result<u32, CoV1ApiError> {
+pub fn state_cid_write(api: &mut CoV1Api, buffer: &[u8]) -> Result<u32, anyhow::Error> {
 	api.context.state = Some(Cid::try_from(buffer)?);
-	Ok(buffer.len().try_into().expect("u32"))
+	Ok(buffer.len().try_into()?)
 }
 
-pub fn event_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> u32 {
+pub fn event_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> Result<u32, anyhow::Error> {
 	let cid_buffer = api.context.event.to_bytes();
 	let size = min(buffer.len(), cid_buffer.len());
 	buffer[0..size].copy_from_slice(&cid_buffer.as_slice()[0..size]);
-	cid_buffer.len().try_into().expect("u32")
+	Ok(cid_buffer.len().try_into()?)
 }
 
-pub fn diagnostic_cid_write(api: &mut CoV1Api, buffer: &[u8]) -> Result<u32, CoV1ApiError> {
+pub fn diagnostic_cid_write(api: &mut CoV1Api, buffer: &[u8]) -> Result<u32, anyhow::Error> {
 	api.context.diagnostics.push(Cid::try_from(buffer)?.into());
-	Ok(buffer.len().try_into().expect("u32"))
+	Ok(buffer.len().try_into()?)
 }

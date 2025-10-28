@@ -13,7 +13,7 @@ pub fn create_invite_message<F, T>(
 	to: &T,
 	co: CoInvitePayload,
 	thid: Option<String>,
-) -> anyhow::Result<(String, EncodedMessage)>
+) -> anyhow::Result<(DidCommHeader, EncodedMessage)>
 where
 	F: PrivateIdentity + Send + Sync + 'static,
 	T: Identity + Send + Sync + 'static,
@@ -21,9 +21,8 @@ where
 	let (from_didcomm, to_didcomm, mut header) = DidCommHeader::create(from, to, CO_DIDCOMM_INVITE)?;
 	header.thid = thid;
 	let body = to_json_string(&co)?;
-	let message_id = header.id.clone();
-	let message = from_didcomm.jwe(&to_didcomm, header, &body)?;
-	Ok((message_id, EncodedMessage(message.into_bytes())))
+	let message = from_didcomm.jwe(&to_didcomm, header.clone(), &body)?;
+	Ok((header, EncodedMessage(message.into_bytes())))
 }
 
 #[derive(Debug, Serialize, Deserialize)]

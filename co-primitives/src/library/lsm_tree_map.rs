@@ -368,15 +368,15 @@ pub struct LsmTreeMapSettings {
 }
 impl LsmTreeMapSettings {
 	fn default_max_node_entries() -> u64 {
-		2u64.checked_pow(8).unwrap() // 256
+		2u64.checked_pow(8).expect("to pow") // 256
 	}
 
 	fn default_max_active_entries() -> u64 {
-		2u64.checked_pow(14).unwrap() // 16k
+		2u64.checked_pow(14).expect("to pow") // 16k
 	}
 
 	fn default_max_run_count() -> u64 {
-		2u64.checked_pow(4).unwrap() // 16
+		2u64.checked_pow(4).expect("to pow") // 16
 	}
 
 	fn is_default_max_node_entries(value: &u64) -> bool {

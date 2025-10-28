@@ -8,18 +8,20 @@ use co_storage::StorageError;
 
 /// Find the first active [`Membership`] entry in `reducer` for `co`.
 pub async fn find_membership(reducer: &CoReducer, co: impl AsRef<CoId>) -> Result<Option<Membership>, StorageError> {
-	Ok(memberships(reducer, co).await?.next())
+	Ok(memberships(reducer, co, Some(MembershipState::Active)).await?.next())
 }
 
 /// Find the active [`Membership`] entries in `reducer` for `co`.
 pub async fn find_memberships(reducer: &CoReducer, co: impl AsRef<CoId>) -> Result<Vec<Membership>, StorageError> {
-	Ok(memberships(reducer, co).await?.collect())
+	Ok(memberships(reducer, co, Some(MembershipState::Active)).await?.collect())
 }
 
-/// Find the active [`Membership`] entries in `reducer` for `co`.
+/// Find the [`Membership`] entries in `reducer` for `co`.
+/// Optionally filtered by `state`.
 pub async fn memberships<'a>(
 	reducer: &CoReducer,
 	co: impl AsRef<CoId> + 'a,
+	state: Option<MembershipState>,
 ) -> Result<impl Iterator<Item = Membership> + 'a, StorageError> {
 	let (_, memberships) = query_core(CO_CORE_NAME_MEMBERSHIP)
 		.with_default()
@@ -30,6 +32,6 @@ pub async fn memberships<'a>(
 		.memberships
 		.into_iter()
 		.filter(move |membership| &membership.id == co.as_ref())
-		.filter(|membership| membership.membership_state == MembershipState::Active)
+		.filter(move |membership| if let Some(state) = state { membership.membership_state == state } else { true })
 		.into_iter())
 }

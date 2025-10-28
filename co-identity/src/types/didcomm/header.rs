@@ -1,7 +1,7 @@
 use crate::{DidCommPrivateContext, DidCommPublicContext, Identity, PrivateIdentity};
 use serde::{Deserialize, Serialize};
 use std::{
-	collections::BTreeSet,
+	collections::{BTreeMap, BTreeSet},
 	time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -79,6 +79,10 @@ pub struct DidCommHeader {
 	/// When omitted from any given message, the message is considered to have no expiration by the sender.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub expires_time: Option<u64>,
+
+	/// OPTIONAL. Custom fields.
+	#[serde(flatten, default, skip_serializing_if = "BTreeMap::is_empty")]
+	pub fields: BTreeMap<String, String>,
 }
 impl DidCommHeader {
 	/// Create new DidCommHeader with an
@@ -125,5 +129,50 @@ impl DidCommHeader {
 	/// Create random message id.
 	pub fn create_message_id() -> String {
 		uuid::Uuid::new_v4().to_string()
+	}
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct PeerDidCommHeader {
+	/// OPTIONAL. The PeerId encoded as a string of the producer of the message.
+	/// This is used to verifiable correlate a Did and a PeerId.
+	#[serde(rename = "fpid", default, skip_serializing_if = "Option::is_none")]
+	pub from_peer_id: Option<String>,
+
+	/// Header.
+	#[serde(flatten)]
+	pub header: DidCommHeader,
+}
+impl From<DidCommHeader> for PeerDidCommHeader {
+	fn from(mut header: DidCommHeader) -> Self {
+		Self { from_peer_id: header.fields.remove("fpid"), header }
+	}
+}
+impl Into<DidCommHeader> for PeerDidCommHeader {
+	fn into(self) -> DidCommHeader {
+		let mut header = self.header;
+		if let Some(value) = self.from_peer_id {
+			header.fields.insert("fpid".to_owned(), value);
+		}
+		header
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{DidCommHeader, PeerDidCommHeader};
+	use co_primitives::{from_json_string, to_json_string};
+
+	#[test]
+	fn test_serialize_peer() {
+		let header = DidCommHeader { message_type: "test".to_owned(), ..Default::default() };
+		let mut header_with_field = header.clone();
+		header_with_field.fields.insert("fpid".to_owned(), "peer".to_owned());
+		let peer_header = PeerDidCommHeader { header, from_peer_id: Some("peer".to_owned()) };
+		let json = to_json_string(&peer_header).unwrap();
+		let header_from_json: DidCommHeader = from_json_string(&json).unwrap();
+		let peer_header_from_json: PeerDidCommHeader = from_json_string(&json).unwrap();
+		assert_eq!(peer_header_from_json, peer_header);
+		assert_eq!(header_from_json, header_with_field);
 	}
 }

@@ -1,7 +1,7 @@
 use super::{read_cid::read_cid, wasm_storage::WasmStorage, write_cid::write_cid};
 use crate::{
 	async_api, diagnostic_cid_write, event_cid_read, library::read_payload_buffer::read_payload_buffer, state_cid_read,
-	state_cid_write, Cid, Context, Storage,
+	state_cid_write, sync_api::Context, Cid, Storage,
 };
 
 pub struct WasmContext {

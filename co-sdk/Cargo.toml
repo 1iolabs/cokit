@@ -80,7 +80,13 @@ tokio = { workspace = true, features = ["full", "tracing"] }
 console-subscriber = { version = "0.4.1" }
 
 [features]
-"default" = ["pinning"]
+"default" = ["recommended", "co-runtime/llvm"]
+
+# Meta: Recommended platform neutral features
+"recommended" = ["pinning"]
+
+# Meta: Enable to run in a apple sandbox.
+"apple-sandbox" = ["co-runtime/apple-sandbox"]
 
 # Enable pinning (co-core-storage) feature.
 "pinning" = []

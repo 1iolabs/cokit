@@ -13,7 +13,7 @@ pub use types::{
 	did_core::{Jwk, VerificationMethod, VerificationMethodTypes},
 	didcomm::{
 		context::{DidCommContext, DidCommPrivateContext, DidCommPublicContext},
-		header::DidCommHeader,
+		header::{DidCommHeader, PeerDidCommHeader},
 		message::Message,
 	},
 	identity::{Identity, IdentityBox},

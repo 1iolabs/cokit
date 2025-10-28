@@ -1,5 +1,6 @@
 use super::{ReducerRequest, ReducerStorage, ReducersControl};
 use crate::{
+	library::settings_timeout::settings_timeout,
 	types::{co_reducer_context::CoReducerFeature, co_reducer_factory::CoReducerFactoryError},
 	Action, CoContext, CoReducer, CO_ID_LOCAL,
 };
@@ -31,14 +32,14 @@ impl Reducers {
 
 	fn pending_request_count(&self, co: &CoId) -> usize {
 		self.pending_requests.iter().fold(0, |a, b| match b {
-			ReducerRequest::Request(id, _) if id == co => a + 1,
+			ReducerRequest::Request(id, _, _) if id == co => a + 1,
 			_ => a,
 		})
 	}
 
 	fn pending_storage_count(&self, co: &CoId) -> usize {
 		self.pending_requests.iter().fold(0, |a, b| match b {
-			ReducerRequest::Storage(id, _) if id == co => a + 1,
+			ReducerRequest::Storage(id, _, _) if id == co => a + 1,
 			_ => a,
 		})
 	}
@@ -78,7 +79,7 @@ impl Actor for ReducersActor {
 		state: &mut Self::State,
 	) -> Result<(), ActorError> {
 		match message {
-			ReducerRequest::Storage(id, response) => {
+			ReducerRequest::Storage(id, options, response) => {
 				// local
 				let local = match state.local().await {
 					Ok(local) => local,
@@ -93,8 +94,16 @@ impl Actor for ReducersActor {
 				// get/create
 				if let Some(storage) = state.storages.get(&id) {
 					response.send(Ok(storage.clone())).ok();
+				} else if options.no_pending_create && state.pending_storage_count(&id) > 0 {
+					// would block while reducer is being created
+					response.send(Err(CoReducerFactoryError::Pending)).ok();
+				} else if options.no_create {
+					// would create but create is not allowed
+					response.send(Err(CoReducerFactoryError::WouldCreate)).ok();
 				} else {
-					state.pending_requests.push_back(ReducerRequest::Storage(id.clone(), response));
+					state
+						.pending_requests
+						.push_back(ReducerRequest::Storage(id.clone(), options.clone(), response));
 					if state.pending_storage_count(&id) == 1 {
 						// create storage
 						state.context.tasks().spawn({
@@ -102,13 +111,17 @@ impl Actor for ReducersActor {
 							let context = state.context.clone();
 							let parent = local.clone();
 							async move {
+								let timeout =
+									settings_timeout(&context, &CoId::from(CO_ID_LOCAL), Some("key-request")).await;
 								let result = ReducerStorage::from_id(
+									context.inner.application(),
 									context
 										.inner
 										.storage()
 										.clone_with_settings(BlockStorageSettings::new().with_detached()),
 									parent,
 									id.clone(),
+									timeout,
 								)
 								.await;
 								control.create_storage(id, result).await;
@@ -117,7 +130,7 @@ impl Actor for ReducersActor {
 					}
 				}
 			},
-			ReducerRequest::Request(id, response) => {
+			ReducerRequest::Request(id, options, response) => {
 				// local
 				let local = match state.local().await {
 					Ok(local) => local,
@@ -131,11 +144,21 @@ impl Actor for ReducersActor {
 
 				// get/create
 				if let Some(reducer) = state.reducers.get(&id) {
+					// use already created
 					response
 						.send(Ok(co_reducer_instance(&state.context, &reducer, state.keep_open)))
 						.ok();
+				} else if options.no_pending_create && state.pending_request_count(&id) > 0 {
+					// would block while reducer is being created
+					response.send(Err(CoReducerFactoryError::Pending)).ok();
+				} else if options.no_create {
+					// would create but create is not allowed
+					response.send(Err(CoReducerFactoryError::WouldCreate)).ok();
 				} else {
-					state.pending_requests.push_back(ReducerRequest::Request(id.clone(), response));
+					// create
+					state
+						.pending_requests
+						.push_back(ReducerRequest::Request(id.clone(), options.clone(), response));
 					if state.pending_request_count(&id) == 1 {
 						// create shared co
 						state.context.tasks().spawn({
@@ -144,7 +167,7 @@ impl Actor for ReducersActor {
 							let parent = local.clone_with_detached_storage();
 							async move {
 								// get storage
-								let result = match control.clone().storage(id.clone()).await {
+								let result = match control.clone().storage(id.clone(), options.clone()).await {
 									Ok(storage) => {
 										// create reducer
 										match context.inner.create_co_instance(parent, &id, storage, true, None).await {
@@ -164,24 +187,6 @@ impl Actor for ReducersActor {
 							}
 						});
 					}
-				}
-			},
-			ReducerRequest::RequestOpt(id, wait_on_pending_create, response) => {
-				if let Some(reducer) = state.reducers.get(&id) {
-					// use already created
-					response
-						.send(Some(co_reducer_instance(&state.context, &reducer, state.keep_open)))
-						.ok();
-				} else if wait_on_pending_create && state.pending_request_count(&id) > 0 {
-					// wait if create is currently pending
-					state.pending_requests.push_back(ReducerRequest::RequestOpt(
-						id.clone(),
-						wait_on_pending_create,
-						response,
-					));
-				} else {
-					// not created and not peding
-					response.send(None).ok();
 				}
 			},
 			ReducerRequest::Clear(response) => {
@@ -256,14 +261,13 @@ impl Actor for ReducersActor {
 					.iter()
 					.enumerate()
 					.filter_map(|(index, request)| match request {
-						ReducerRequest::Request(request_id, _) if request_id == &id => Some(index),
-						ReducerRequest::RequestOpt(request_id, _, _) if request_id == &id => Some(index),
+						ReducerRequest::Request(request_id, _, _) if request_id == &id => Some(index),
 						_ => None,
 					})
 					.collect::<VecDeque<usize>>();
 				while let Some(index) = remove.pop_back() {
 					match state.pending_requests.remove(index) {
-						Some(ReducerRequest::Request(_, response)) => {
+						Some(ReducerRequest::Request(_, _, response)) => {
 							if remove.is_empty() {
 								response
 									.send(match result {
@@ -284,14 +288,6 @@ impl Actor for ReducersActor {
 									})
 									.ok();
 							}
-						},
-						Some(ReducerRequest::RequestOpt(_, _, response)) => {
-							response
-								.send(match &result {
-									Err(_err) => None,
-									Ok(reducer) => Some(co_reducer_instance(&state.context, &reducer, state.keep_open)),
-								})
-								.ok();
 						},
 						_ => (),
 					}
@@ -319,12 +315,12 @@ impl Actor for ReducersActor {
 					.iter()
 					.enumerate()
 					.filter_map(|(index, request)| match request {
-						ReducerRequest::Storage(request_id, _) if request_id == &id => Some(index),
+						ReducerRequest::Storage(request_id, _, _) if request_id == &id => Some(index),
 						_ => None,
 					})
 					.collect::<VecDeque<usize>>();
 				while let Some(index) = remove.pop_back() {
-					if let Some(ReducerRequest::Storage(_, response)) = state.pending_requests.remove(index) {
+					if let Some(ReducerRequest::Storage(_, _, response)) = state.pending_requests.remove(index) {
 						// for the last element send the original result
 						if remove.is_empty() {
 							response.send(result).ok();
@@ -357,6 +353,11 @@ fn co_reducer_instance(context: &CoContext, root_instance: &CoReducer, keep_open
 	}
 }
 
+/// Clone CoReducerFactoryError
+///
+/// # Note
+/// The original error is logged by the caller as the resulting error is may missleading.
+/// See: `co-reducer-failed` or `co-storage-failed`.
 fn co_reducerfactory_error_clone(err: &CoReducerFactoryError) -> CoReducerFactoryError {
 	match err {
 		CoReducerFactoryError::CoNotFound(id, err) => {
@@ -367,5 +368,7 @@ fn co_reducerfactory_error_clone(err: &CoReducerFactoryError) -> CoReducerFactor
 		},
 		CoReducerFactoryError::Other(err) => CoReducerFactoryError::Other(anyhow!("source: {:?}", err)),
 		CoReducerFactoryError::Actor(err) => CoReducerFactoryError::Other(anyhow!("source: {:?}", err)),
+		CoReducerFactoryError::Pending => CoReducerFactoryError::Pending,
+		CoReducerFactoryError::WouldCreate => CoReducerFactoryError::WouldCreate,
 	}
 }

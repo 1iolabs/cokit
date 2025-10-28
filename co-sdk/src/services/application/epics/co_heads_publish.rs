@@ -1,12 +1,6 @@
-use crate::{
-	network::{CoHeadsNetworkTask, CoHeadsRequest},
-	state,
-	types::co_reducer_context::CoReducerFeature,
-	Action, CoContext, CoReducerFactory, CoStorage,
-};
+use crate::{state, types::co_reducer_context::CoReducerFeature, Action, CoContext, CoReducerFactory, CoStorage};
 use co_actor::Actions;
 use co_core_co::Co;
-use co_network::NetworkTaskSpawner;
 use co_primitives::{CoId, Network, NetworkCoHeads, OptionLink};
 use futures::Stream;
 
@@ -28,7 +22,7 @@ pub fn co_heads_publish(
 
 async fn publish(context: CoContext, co: CoId) -> Result<(), anyhow::Error> {
 	// network
-	let Some((spawner, _connections)) = context.network().await else {
+	let Some(heads) = context.network_heads().await else {
 		return Ok(());
 	};
 
@@ -46,15 +40,12 @@ async fn publish(context: CoContext, co: CoId) -> Result<(), anyhow::Error> {
 
 	// publish
 	for network in network_co_heads(&storage, co.clone(), co_reducer_state.co()).await? {
-		// publish
-		spawner.spawn(CoHeadsNetworkTask::new(CoHeadsRequest::PublishHeads {
-			network: network.clone(),
-			heads: external_co_reducer_state.as_ref().unwrap_or(&co_reducer_state).heads(),
-		}))?;
+		heads.publish(network, external_co_reducer_state.as_ref().unwrap_or(&co_reducer_state).heads())?;
 	}
 	Ok(())
 }
 
+/// Extract COHeads networks.
 pub async fn network_co_heads<'a>(
 	storage: &CoStorage,
 	co: CoId,

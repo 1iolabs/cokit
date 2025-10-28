@@ -19,15 +19,19 @@ pub use co_primitives::{
 pub use co_v1::{
 	diagnostic_cid_write, event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set,
 };
-pub use library::{
-	guard::{guard, guard_with_context},
-	reduce::{reduce, reduce_with_context},
-	storage_ext::StorageExt,
-};
-pub use types::{
-	guard::Guard,
-	reducer::{Context, Reducer},
-};
+pub use library::guard::{guard, guard_with_context};
+pub use types::guard::Guard;
+
+// sync export
+pub mod sync_api {
+	pub use crate::{
+		library::{
+			reduce::{reduce, reduce_with_context},
+			storage_ext::StorageExt,
+		},
+		types::reducer::{Context, Reducer},
+	};
+}
 
 // async export
 pub mod async_api {

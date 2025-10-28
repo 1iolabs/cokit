@@ -1,5 +1,5 @@
 use crate::{
-	library::wait_response::wait_response, services::application::NetworkBlockGetAction, Action, ApplicationMessage,
+	library::wait_response::request_response, services::application::NetworkBlockGetAction, Action, ApplicationMessage,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -34,21 +34,13 @@ where
 
 	async fn get_handle(&self, cid: Cid) -> Result<(), StorageError> {
 		let action = NetworkBlockGetAction { parent_co: self.parent_co.clone(), co: self.co.clone(), cid };
-		let response = wait_response(self.handle.clone(), {
-			let action = action.clone();
-			move |item| match item {
-				Action::NetworkBlockGetComplete(complete, result) if complete == &action => Some(result.clone()),
-				_ => None,
-			}
-		});
 
 		// request
-		self.handle
-			.dispatch(Action::NetworkBlockGet(action))
-			.map_err(|err| StorageError::Internal(err.into()))?;
-
-		// response
-		response.await??;
+		request_response(self.handle.clone(), Action::NetworkBlockGet(action.clone()), move |item| match item {
+			Action::NetworkBlockGetComplete(complete, result) if complete == &action => Some(result.clone()),
+			_ => None,
+		})
+		.await??;
 
 		// done
 		Ok(())

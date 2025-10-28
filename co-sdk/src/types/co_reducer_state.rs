@@ -68,6 +68,10 @@ impl CoReducerState {
 		self.1.clone()
 	}
 
+	pub fn weak_heads(&self) -> BTreeSet<WeakCid> {
+		self.1.iter().map(WeakCid::from).collect()
+	}
+
 	pub fn co(&self) -> OptionLink<Co> {
 		self.0.into()
 	}

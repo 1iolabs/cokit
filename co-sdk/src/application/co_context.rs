@@ -4,11 +4,12 @@ use crate::{
 		identity::{create_identity_resolver, create_private_identity_resolver},
 		shared::SharedCoBuilder,
 	},
-	library::shared_membership::shared_membership,
+	library::shared_membership::shared_membership_active,
 	reducer::core_resolver::{dynamic::DynamicCoreResolver, guard::CoGuardResolver, log::LogCoreResolver},
 	services::{
 		application::ApplicationMessage,
 		connections::ConnectionMessage,
+		heads::HeadsApi,
 		network::CoNetworkTaskSpawner,
 		reducers::{ReducerStorage, ReducersControl},
 	},
@@ -41,7 +42,12 @@ impl CoContext {
 	/// Get instance of Local CoReducer.
 	#[tracing::instrument(level = tracing::Level::TRACE, skip(self), fields(application = self.inner.settings.identifier))]
 	pub async fn local_co_reducer(&self) -> Result<CoReducer, anyhow::Error> {
-		Ok(self.inner.reducers.clone().reducer(CoId::from(CO_ID_LOCAL)).await?)
+		Ok(self
+			.inner
+			.reducers
+			.clone()
+			.reducer(CoId::from(CO_ID_LOCAL), Default::default())
+			.await?)
 	}
 
 	/// Get a stream to the log entries.
@@ -108,18 +114,23 @@ impl CoContext {
 	}
 
 	/// Network.
-	pub async fn network(&self) -> Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)> {
+	pub async fn network(&self) -> Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, HeadsApi)> {
 		self.inner.network.read().unwrap().clone()
 	}
 
 	/// Network Spawner.
 	pub async fn network_tasks(&self) -> Option<CoNetworkTaskSpawner> {
-		self.inner.network.read().unwrap().as_ref().map(|(v, _)| v).cloned()
+		self.inner.network.read().unwrap().as_ref().map(|(v, _, _)| v).cloned()
 	}
 
 	/// Network Connections.
 	pub async fn network_connections(&self) -> Option<ActorHandle<ConnectionMessage>> {
-		self.inner.network.read().unwrap().as_ref().map(|(_, v)| v).cloned()
+		self.inner.network.read().unwrap().as_ref().map(|(_, v, _)| v).cloned()
+	}
+
+	/// Network Connections.
+	pub async fn network_heads(&self) -> Option<HeadsApi> {
+		self.inner.network.read().unwrap().as_ref().map(|(_, _, v)| v).cloned()
 	}
 
 	/// Tasks.
@@ -175,7 +186,7 @@ impl CoReducerFactory for CoContext {
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self), fields(application = self.inner.settings.identifier))]
 	async fn try_co_reducer(&self, co: &CoId) -> Result<CoReducer, CoReducerFactoryError> {
-		self.inner.reducers.clone().reducer(co.clone()).await
+		self.inner.reducers.clone().reducer(co.clone(), Default::default()).await
 	}
 }
 impl Debug for CoContext {
@@ -195,7 +206,7 @@ pub(crate) struct CoContextInner {
 
 	local_identity: LocalIdentity,
 
-	network: Arc<RwLock<Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>>>,
+	network: Arc<RwLock<Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, HeadsApi)>>>,
 
 	storage: Storage,
 
@@ -213,7 +224,7 @@ impl CoContextInner {
 		shutdown: CancellationToken,
 		tasks: TaskSpawner,
 		local_identity: LocalIdentity,
-		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
+		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, HeadsApi)>,
 		storage: Storage,
 		runtime: Runtime,
 		reactive_context: ActorHandle<ApplicationMessage>,
@@ -264,7 +275,11 @@ impl CoContextInner {
 	///
 	/// Todo: Identity Permissions?
 	pub async fn private_identity_resolver(&self) -> Result<PrivateIdentityResolverBox, anyhow::Error> {
-		let local = self.reducers.clone().reducer(CoId::from(CO_ID_LOCAL)).await?;
+		let local = self
+			.reducers
+			.clone()
+			.reducer(CoId::from(CO_ID_LOCAL), Default::default())
+			.await?;
 		create_private_identity_resolver(local).await
 	}
 
@@ -289,7 +304,7 @@ impl CoContextInner {
 	/// Clone with network.
 	pub async fn set_network(
 		&self,
-		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>)>,
+		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, HeadsApi)>,
 	) -> Result<(), anyhow::Error> {
 		// assign
 		*self.network.write().unwrap() = network;
@@ -382,7 +397,7 @@ impl CoContextInner {
 		identity: Option<Did>,
 	) -> Result<Option<CoReducer>, anyhow::Error> {
 		// find first active membership
-		let membership = shared_membership(&parent, co, identity.as_ref()).await?;
+		let membership = shared_membership_active(&parent, co, identity.as_ref()).await?;
 		let membership = match membership {
 			Some(m) => m,
 			None => return Ok(None),

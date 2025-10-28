@@ -1,5 +1,8 @@
 use cid::Cid;
-use co_api::{CoId, CoReference, Context, Did, Link, Reducer, ReducerAction, StorageExt, Tags, WeakCid};
+use co_api::{
+	sync_api::{Context, Reducer, StorageExt},
+	CoId, CoReference, Did, Link, ReducerAction, Tags, WeakCid,
+};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::BTreeSet;
@@ -50,26 +53,16 @@ pub struct CoState {
 	pub encryption_mapping: Option<Cid>,
 }
 
+/// Membership state.
+///
+/// # Guarantees
+/// - Sortable from active (low) to inactive (high).
 #[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum MembershipState {
 	/// Active membership.
-	Active = 0,
-
-	/// Inactive membership.
-	Inactive = 1,
-
-	/// Pending invite by some participant of the CO.
-	///
-	/// Use Cases:
-	/// - This is waiting for our acception/rejection.
-	/// - Accept invite by change membership state to [`MembershipState::Join`].
-	/// - Reject invite by removing the membership using [`MembershipsAction::Remove`].
-	///
-	/// Related membership Tags:
-	///  `co-invite: CoInviteMetadata`
-	Invite = 2,
+	Active = 10,
 
 	/// Pending join by us.
 	///
@@ -80,7 +73,21 @@ pub enum MembershipState {
 	/// Related membership Tags:
 	///  `co-invite: CoInviteMetadata`
 	///  `join-date: Date`
-	Join = 3,
+	Join = 20,
+
+	/// Pending invite by some participant of the CO.
+	///
+	/// Use Cases:
+	/// - This is waiting for our acception/rejection.
+	/// - Accept invite by change membership state to [`MembershipState::Join`].
+	/// - Reject invite by removing the membership using [`MembershipsAction::Remove`].
+	///
+	/// Related membership Tags:
+	///  `co-invite: CoInviteMetadata`
+	Invite = 30,
+
+	/// Inactive membership.
+	Inactive = 40,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -194,5 +201,5 @@ fn find<'a>(memberships: &'a mut Memberships, co: &CoId, did: &str) -> Option<&'
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state() {
-	co_api::reduce::<Memberships>()
+	co_api::sync_api::reduce::<Memberships>()
 }

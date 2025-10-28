@@ -26,3 +26,30 @@ where
 {
 	Ok(tokio::time::timeout(timeout, wait_response(handle, filter)).await??)
 }
+
+pub async fn request_response<F, T>(
+	handle: ActorHandle<ApplicationMessage>,
+	request: Action,
+	response: F,
+) -> anyhow::Result<T>
+where
+	F: Fn(&Action) -> Option<T>,
+{
+	let response_fut = wait_response(handle.clone(), response);
+	handle.dispatch(request)?;
+	Ok(response_fut.await?)
+}
+
+pub async fn request_response_timeout<F, T>(
+	handle: ActorHandle<ApplicationMessage>,
+	timeout: Duration,
+	request: Action,
+	response: F,
+) -> anyhow::Result<T>
+where
+	F: Fn(&Action) -> Option<T>,
+{
+	let response_fut = wait_response_timeout(handle.clone(), timeout, response);
+	handle.dispatch(request)?;
+	Ok(response_fut.await?)
+}
