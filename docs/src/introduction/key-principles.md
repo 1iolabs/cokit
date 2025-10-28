@@ -1,15 +1,15 @@
 # Key Principles
 
 ## Local First
-Data is stored locally on the users end device and is only shared with the group of people with whom they are currently collaborating, encapsulated from all other users, creating their own private platform. The number of private platforms that can be created is not limited.
+Data is stored locally on the users end device and is only shared with the group of people with whom they are currently collaborating, encapsulated from all other users, creating their own private platform. The number of private platforms that can be created is not limited. Private platforms can be connected with each other and we envision a whole ecosystem of platforms at a later stage.
 
 ## Bring your own infrastructure
-Peer-to-Peer is the go to mechanism used for networking, but there is no lock-in to a single networking strategy and you can configure it to your needs.
+Peer-to-Peer is the go-to mechanism used for networking, but there is no lock-in to a single networking strategy and you can configure it to your needs.
 
 ### File-based
 All data is stored as files without special filesystem requirements like locks, links or consistency levels.
 Therefore you can store CO-kit-managed files on local disk, cloud storages or object stores.
-All files are stored verifiable using content addressing.
+All files are stored verifiable using [content addressing](../glossary/glossary.md#cid)
 
 ### Peer-to-Peer
 Only the necessary data is exchanged, and it is end-to-end encrypted.
@@ -17,18 +17,19 @@ By default there are only users, and no central servers as middlemen.
 
 ## Instant updates
 Changes are distributed in real time.
-They are pushed directly to all or configured participants.
+They are pushed directly to all or to configured participants.
 Only the Log heads are distributed and participants can fetch the referenced data on demand and in parallel.
 
 ## Partial data
 No full replica of all data needed.
-Content addressing allows for validated on demand fetching.
+[Content addressing](../glossary/glossary.md#cid) allows for validated on demand fetching.
 
 ## Interoperability
-Tools that build on Co-kit should be compatible with each other, even if the builders are not partners. Interoperability between cool solutions is already built in.
+Tools that build on Co-kit should be compatible with each other, even if the builders are not partners. Interoperability between cool solutions is already built-in.
 
 ## Accessibility
-We want everyone to be able to take full advantage of the platform and derive value from it, not just developers. Not only shall the applications built with CO-kit be easy to use, but we also hope for the best developer experience possible.
+We want to enable everyone to take full advantage of the platform and derive value from it, not just developers. Not only shall the applications built with CO-kit be easy to use, but we also hope for the best developer experience possible.
+This is why we're also working on a low/no code version of CO-kit. (WIP)
 
 ## Self-Sovereign
 No need to rely on big corporates to provide storage space or cloud solutions.
