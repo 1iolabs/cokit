@@ -1,23 +1,22 @@
 # CO-kit
-A software development kit for building decentralized applications. It is written in Rust.
-CO-kit enables you to build data rooms called COs and integrate data models called COres. #review
-
+A software development kit for building decentralized applications. CO-kit is written in Rust.
+CO-kit enables you to build data rooms called COs using data models called COres.
 ## CO-kit is like ...
-CO-kit is like a database that combines blockchain's zero trust functionalities and (optional) consensus with git, CRDT, and then integrates with verifiable identity.
+...a database that combines blockchain's zero trust functionalities and (optional) consensus with git, CRDT, and then integrates with verifiable identity.
 
 ## CO-kit for ...
 
 ### ... Frontend developers
 - Like BaaS but for free
 - Realtime database and collaboration
-- Data which are used/produced on a device is available local automatically
+- Data used/produced on a device is available local automatically
 - Built-in identity management through [DID](../reference/identity.md#what-is-a-did)
 - No special handling for files – they are just pieces of data which can be stored using [content addressing](../glossary/glossary.md#cid)
-- Existing cores can be used in your app without a single line of code
+- Existing [Cores](../reference/core.md) can be used in your app without a single line of code
 
 ### ... Backend developers
 - [Cores](../reference/core.md) work like containers which contain the business logic and data but shareable over network
-- Efficient automatic caching of data through content addressing
+- Efficient automatic caching of data through [content addressing](../glossary/glossary.md#cid)
 - Works offline without special handling
 - No more managing database clusters
 - Move latency off the critical path - make the client instant
