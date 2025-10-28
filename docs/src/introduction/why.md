@@ -24,6 +24,17 @@ To make the benefits of decentralized, local first apps clear, we outline a quic
 1. Model data in a core which combines data, business logic and permissions.
 2. Implement your frontend and use the data directly.
 
+#todo add time/money based comparison (classical takes X CO-kit takes Y) in %?
+
+
+| Scenario                        | Duration (weeks) | Estimated Hours | Hourly Rate (€) | Total Cost (€) | Notes                            |
+| ------------------------------- | ---------------- | --------------- | --------------- | -------------- | -------------------------------- |
+| Example A –                     | 4                | 120             | 80              | 9,600          | Minimal features, fast delivery  |
+| Option B – Standard Scope       | 8                | 220             | 85              | 18,700         | Balanced cost/time trade-off     |
+| Option C – Extended Features    | 12               | 320             | 90              | 28,800         | Includes advanced integrations   |
+| Option D – Full Custom Solution | 20               | 520             | 95              | 49,400         | Complete feature set and testing |
+*estimated
+
 ## Ain't no better DevX
 
 ### Ship faster today

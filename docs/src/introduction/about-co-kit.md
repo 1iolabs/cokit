@@ -25,7 +25,7 @@ CO-kit is like a database that combines blockchain's zero trust functionalities 
 - It can be integrated with current backends and APIs (REST, GraphQL etc.)
 
 ### ... Database nerds
-- Cores are like databases with built-in atomicity, consistency, isolation and durability
+- [Cores](../reference/core.md) are like databases with built-in atomicity, consistency, isolation and durability
 - The Log with its resulting states are a MVCC
 - CO-kit is like a database with Master-Master replication, where your business logic can decide what happens on conflicts, whereas with transactions only the database can.
 	- With conventional databases only transactions/operations can be reapplied/reordered, but without knowing the business logic behind. Cores reapply the whole business logic when reordering a transaction.
