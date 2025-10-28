@@ -3,22 +3,6 @@ use co_macros::co_data;
 use schemars::JsonSchema;
 use std::collections::BTreeMap;
 
-/// Receipt events are used to indicate that all messages up to a specific event have been read by a user.
-#[co_data]
-#[derive(JsonSchema)]
-pub enum ReceiptType {
-	#[serde(untagged)]
-	Public(PublicReceiptContent),
-	#[serde(untagged)]
-	Private(PrivateReceiptContent),
-}
-
-impl From<ReceiptType> for EventContent {
-	fn from(val: ReceiptType) -> Self {
-		EventContent::Receipt(val)
-	}
-}
-
 /// These receipts are always sent into a room and indicate to all users that the messages sent up to the indicated
 /// event were read by the user that sent this receipt event. This becomes public knowledge to all users
 /// participating in the CO.
@@ -26,7 +10,7 @@ impl From<ReceiptType> for EventContent {
 #[derive(JsonSchema)]
 pub struct PublicReceiptContent {
 	/// The ID of the latest event read by the user
-	#[serde(rename = "m.read")]
+	#[serde(rename = "m_read")]
 	pub read: String,
 	/// The ID of the thread if receipt is threaded
 	pub thread_id: Option<String>,
@@ -34,10 +18,11 @@ pub struct PublicReceiptContent {
 
 impl From<PublicReceiptContent> for EventContent {
 	fn from(val: PublicReceiptContent) -> Self {
-		ReceiptType::Public(val).into()
+		EventContent::Receipt(val)
 	}
 }
 
+// TODO move to another core as these should not be visible to other co participants
 /// A read receipt for one specific room. Indicates that a user has read all messages up to the given event.
 #[co_data]
 #[derive(JsonSchema)]
@@ -57,10 +42,4 @@ pub struct PrivateReceiptContent {
 	/// Map of all room IDs to receipts
 	#[serde(rename = "m.read.private")]
 	pub read: BTreeMap<String, PrivateReceipt>,
-}
-
-impl From<PrivateReceiptContent> for EventContent {
-	fn from(val: PrivateReceiptContent) -> Self {
-		ReceiptType::Private(val).into()
-	}
 }

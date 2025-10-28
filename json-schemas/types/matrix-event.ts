@@ -27,7 +27,7 @@ export type MatrixEvent = {
       type: "m_room_redaction";
     }
   | {
-      content: ReceiptType;
+      content: PublicReceiptContent;
       type: "m_receipt";
     }
   | {
@@ -310,7 +310,7 @@ export type EventContent =
       type: "m_room_redaction";
     }
   | {
-      content: ReceiptType;
+      content: PublicReceiptContent;
       type: "m_receipt";
     }
   | {
@@ -381,16 +381,6 @@ export type EventContent =
  * Simple enum containing all different types of relation that events can have to other events
  */
 export type RelationType = "annotation" | "replace" | "forward" | "thread" | "poll";
-/**
- * Receipt events are used to indicate that all messages up to a specific event have been read by a user.
- */
-export type ReceiptType =
-  | {
-      Public: PublicReceiptContent;
-    }
-  | {
-      Private: PrivateReceiptContent;
-    };
 /**
  * Enum containg possible reasons for a hangup event
  */
@@ -476,35 +466,11 @@ export interface PublicReceiptContent {
   /**
    * The ID of the latest event read by the user
    */
-  "m.read": string;
+  m_read: string;
   /**
    * The ID of the thread if receipt is threaded
    */
   thread_id?: string | null;
-}
-/**
- * Private read receipts are saved in a users private CO so other users cannot infer the read status. The read map in this event only needs to contain the delta on the users receipts. This means that there is no need to contain the complete read receipt state in this event but only the changes.
- */
-export interface PrivateReceiptContent {
-  /**
-   * Map of all room IDs to receipts
-   */
-  "m.read.private": {
-    [k: string]: PrivateReceipt;
-  };
-}
-/**
- * A read receipt for one specific room. Indicates that a user has read all messages up to the given event.
- */
-export interface PrivateReceipt {
-  /**
-   * The ID of the event the receipt references
-   */
-  event_id: string;
-  /**
-   * The ID of the thread if receipt is threaded
-   */
-  thread_id: string;
 }
 export interface RoomNameContent {
   name: string;

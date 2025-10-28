@@ -66,7 +66,7 @@
       ],
       "properties": {
         "content": {
-          "$ref": "#/definitions/ReceiptType"
+          "$ref": "#/definitions/PublicReceiptContent"
         },
         "type": {
           "type": "string",
@@ -639,7 +639,7 @@
           ],
           "properties": {
             "content": {
-              "$ref": "#/definitions/ReceiptType"
+              "$ref": "#/definitions/PublicReceiptContent"
             },
             "type": {
               "type": "string",
@@ -1963,48 +1963,14 @@
         "dnd"
       ]
     },
-    "PrivateReceipt": {
-      "description": "A read receipt for one specific room. Indicates that a user has read all messages up to the given event.",
-      "type": "object",
-      "required": [
-        "event_id",
-        "thread_id"
-      ],
-      "properties": {
-        "event_id": {
-          "description": "The ID of the event the receipt references",
-          "type": "string"
-        },
-        "thread_id": {
-          "description": "The ID of the thread if receipt is threaded",
-          "type": "string"
-        }
-      }
-    },
-    "PrivateReceiptContent": {
-      "description": "Private read receipts are saved in a users private CO so other users cannot infer the read status. The read map in this event only needs to contain the delta on the users receipts. This means that there is no need to contain the complete read receipt state in this event but only the changes.",
-      "type": "object",
-      "required": [
-        "m.read.private"
-      ],
-      "properties": {
-        "m.read.private": {
-          "description": "Map of all room IDs to receipts",
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/PrivateReceipt"
-          }
-        }
-      }
-    },
     "PublicReceiptContent": {
       "description": "These receipts are always sent into a room and indicate to all users that the messages sent up to the indicated event were read by the user that sent this receipt event. This becomes public knowledge to all users participating in the CO.",
       "type": "object",
       "required": [
-        "m.read"
+        "m_read"
       ],
       "properties": {
-        "m.read": {
+        "m_read": {
           "description": "The ID of the latest event read by the user",
           "type": "string"
         },
@@ -2048,35 +2014,6 @@
           ]
         }
       }
-    },
-    "ReceiptType": {
-      "description": "Receipt events are used to indicate that all messages up to a specific event have been read by a user.",
-      "oneOf": [
-        {
-          "type": "object",
-          "required": [
-            "Public"
-          ],
-          "properties": {
-            "Public": {
-              "$ref": "#/definitions/PublicReceiptContent"
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
-            "Private"
-          ],
-          "properties": {
-            "Private": {
-              "$ref": "#/definitions/PrivateReceiptContent"
-            }
-          },
-          "additionalProperties": false
-        }
-      ]
     },
     "RedactionContent": {
       "description": "Event content used to redact other events. Sender of this event must be either the same as the sender of the original event or a user with the necessary permissions. Redactions are idempotent and irreversible. They do not use the same relation fields as other events",

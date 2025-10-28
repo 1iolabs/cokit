@@ -3,6 +3,7 @@ mod matrix_event;
 // TODO
 pub static FORMATTED_BODY_FORMAT: &str = "some.html.standard.format";
 
+use crate::matrix_event::receipts::PublicReceiptContent;
 pub use crate::matrix_event::{
 	call_event, ephemeral_event, message_event, multimedia, poll_event, receipts, relation, state_event, user_events,
 };
@@ -14,7 +15,6 @@ use matrix_event::{
 	},
 	ephemeral_event::{PresenceContent, TypingContent},
 	message_event::MessageType,
-	receipts::ReceiptType,
 	relation::{ReactionContent, RedactionContent, Relation},
 	state_event::{PinnedEventsContent, RoomAvatarContent, RoomNameContent, RoomTopicContent},
 	user_events::{PostUserStoryContent, UpdateProfileContent, ViewUserStoryContent},
@@ -112,7 +112,7 @@ pub enum EventContent {
 	#[serde(rename = "m_room_redaction")]
 	Redaction(RedactionContent),
 	#[serde(rename = "m_receipt")]
-	Receipt(ReceiptType),
+	Receipt(PublicReceiptContent),
 
 	#[serde(rename = "room_name")]
 	RoomName(RoomNameContent),
