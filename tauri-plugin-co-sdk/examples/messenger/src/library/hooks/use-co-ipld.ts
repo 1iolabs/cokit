@@ -1,12 +1,12 @@
 import { CID } from "multiformats";
 import React from "react";
-import { resolveCid } from "../../../../dist-js/index.js";
+import { resolveCid } from "../../../../../dist-js/index.js";
 
-export function useCoIpld<T>(
-  cids: CID[],
-  deserialize: (v: any, ownIdentity: string) => T | undefined,
+export function useCoIpld<T, E = []>(
+  cids: CID[] | undefined,
+  deserialize: (v: any, extras?: E) => T | undefined,
   sessionId?: string,
-  ownIdentity?: string,
+  extras?: E,
 ): ReadonlyMap<CID, T | undefined> {
   const [ipldMap, setIpldMap] = React.useState<Map<CID, T | undefined>>(new Map());
   React.useEffect(() => {
@@ -14,18 +14,21 @@ export function useCoIpld<T>(
     let canceled = false;
     // async function that fetches the messages
     const fetchCids = async () => {
-      if (sessionId === undefined || ownIdentity === undefined) {
+      if (sessionId === undefined || cids === undefined) {
         return;
       }
-      const newMap = new Map();
+      const newMap = new Map<CID, T>();
       for (const cid of cids) {
         if (ipldMap.has(cid)) {
           // use value from old map
-          newMap.set(cid, ipldMap.get(cid));
+          newMap.set(cid, ipldMap.get(cid)!);
         } else {
           // fetch cid if not already loaded
           const ipld = await resolveCid(sessionId, cid);
-          newMap.set(cid, deserialize(ipld, ownIdentity));
+          const data = deserialize(ipld, extras);
+          if (data !== undefined) {
+            newMap.set(cid, data);
+          }
         }
       }
       // update map if component is still mounted
@@ -39,6 +42,6 @@ export function useCoIpld<T>(
     return () => {
       canceled = true;
     };
-  }, [cids.length, sessionId]);
+  }, [cids, sessionId, extras]);
   return ipldMap;
 }

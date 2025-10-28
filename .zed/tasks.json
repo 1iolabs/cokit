@@ -46,7 +46,7 @@
   },
   {
     "label": "Build builtin cores",
-    "command": "cargo run --bin co-cli -- --no-keychain core-build-builtin",
+    "command": "cargo run --bin co-cli -- --no-keychain core build-builtin",
     "use_new_terminal": false,
     "reveal": "always",
     "hide": "on_success"

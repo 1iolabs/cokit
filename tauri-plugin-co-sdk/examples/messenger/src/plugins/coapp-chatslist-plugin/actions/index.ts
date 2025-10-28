@@ -1,5 +1,6 @@
 import { PluginId } from "@1io/kui-application-sdk";
 import { NotifyAction, PayloadAction } from "@1io/redux-utils";
+import { LoadedChatPlugin } from "../types/state";
 
 export enum ChatsListActionType {
   OpenChat = "coapp/chats-list/open-chat",
@@ -32,8 +33,7 @@ export interface ChatsListChatPluginLoaded
   extends PayloadAction<
     ChatsListActionType.ChatPluginLoaded,
     {
-      readonly chatId: string;
-      readonly pluginId: PluginId;
+      readonly loadedChat: LoadedChatPlugin;
     }
   > {}
 

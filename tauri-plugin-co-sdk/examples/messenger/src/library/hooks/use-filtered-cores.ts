@@ -1,6 +1,6 @@
 import React from "react";
-import { getResolvedCoState } from "./invoke-get.js";
-import { buildCoCoreId } from "./core-id.js";
+import { getResolvedCoState } from "../invoke-get.js";
+import { buildCoCoreId } from "../core-id.js";
 import { compareArrayItemsEqual } from "@1io/compare";
 
 // returns true if and only if all of the tags in the pattern can be found in the given tags

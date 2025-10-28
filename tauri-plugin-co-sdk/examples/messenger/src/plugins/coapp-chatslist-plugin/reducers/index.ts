@@ -6,11 +6,14 @@ export function chatsListReducer(
   action: ChatsListActions,
 ): ChatsListPluginState {
   if (state === undefined) {
-    return { loadedChats: new Map() };
+    return { loadedChats: [] };
   }
   switch (action.type) {
     case ChatsListActionType.ChatPluginLoaded:
-      return { ...state, loadedChats: state.loadedChats.set(action.payload.chatId, action.payload.pluginId) };
+      return {
+        ...state,
+        loadedChats: [...state.loadedChats, action.payload.loadedChat],
+      };
     case ChatsListActionType.OpenChat:
       return { ...state, selectedChat: action.payload.chat };
     case ChatsListActionType.SetPriorityPlugin:

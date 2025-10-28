@@ -1,6 +1,6 @@
 import { CID } from "multiformats";
 import React from "react";
-import { GetActionsResponse, getActions } from "../../../../dist-js/index.js";
+import { GetActionsResponse, getActions } from "../../../../../dist-js/index.js";
 
 export function useCoCoreActions(
   co: string,
@@ -12,6 +12,7 @@ export function useCoCoreActions(
   const [actions, setActions] = React.useState<GetActionsResponse>();
   React.useEffect(() => {
     async function getCoreActions() {
+      console.log("get actions");
       if (heads !== undefined && session !== undefined) {
         setActions(await getActions(session, heads, count, undefined));
       }

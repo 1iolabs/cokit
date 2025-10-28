@@ -10,7 +10,7 @@ export const openChatEpic: ChatsListEpicType = (action$, state$, context) =>
     withLatestFrom(state$),
     mergeMap(async ([action, state]) => {
       const chatId = action.payload.chat;
-      const loadedPlugin = undefined; //state.loadedChats.get(chatId);
+      const loadedPlugin = state.loadedChats.find((i) => i.chatId === chatId);
       // if plugin not loaded -> load now
       if (loadedPlugin === undefined) {
         const applicationApi = context.api.getApi<ApplicationApi>([{ key: WellKnownTags.Type, value: "application" }]);
@@ -18,7 +18,7 @@ export const openChatEpic: ChatsListEpicType = (action$, state$, context) =>
         const pluginInfo = await applicationApi.loadPlugin("coapp-messenger-view", [coCoreTag]);
         return [
           identity<ChatsListChatPluginLoaded>({
-            payload: { chatId, pluginId: pluginInfo.id },
+            payload: { loadedChat: { chatId, pluginId: pluginInfo.id } },
             type: ChatsListActionType.ChatPluginLoaded,
           }),
         ];
