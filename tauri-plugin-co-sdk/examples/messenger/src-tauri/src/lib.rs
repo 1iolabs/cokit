@@ -1,7 +1,3 @@
-mod cli;
-
-use crate::cli::Cli;
-use clap::Parser;
 use std::env;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_co_sdk::library::co_application::CoApplicationSettings;
@@ -10,7 +6,7 @@ use tauri_plugin_co_sdk::library::co_application::CoApplicationSettings;
 pub async fn run() {
 	tauri::async_runtime::set(tokio::runtime::Handle::current());
 
-	let co_settings: CoApplicationSettings = Cli::parse().with_env().into();
+	let co_settings = CoApplicationSettings::cli("messenger-demo");
 
 	tauri::Builder::default()
 		.plugin(tauri_plugin_fs::init())

@@ -1,15 +1,13 @@
+use crate::library::co_application::CoApplicationSettings;
 use std::path::PathBuf;
-use tauri_plugin_co_sdk::library::co_application::CoApplicationSettings;
-
-const APP_IDENTIFIER: &str = "coapp-messenger-demo";
 
 /// Run COs via an HTTP Daemon.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct Cli {
 	/// The instance ID of the daemon. Must be uniqure for every instance that runs in parallel.
 	/// Env: CO_INSTANCE_ID
-	#[arg(long, default_value_t = String::from(APP_IDENTIFIER))]
-	pub instance_id: String,
+	#[arg(long, env = "CO_INSTANCE_ID")]
+	pub instance_id: Option<String>,
 
 	/// Base path.
 	///
@@ -20,7 +18,7 @@ pub struct Cli {
 	///
 	/// Default: `~/Library/Application Support/co.app.1io.co`
 	/// Env: CO_BASE_PATH
-	#[arg(long)]
+	#[arg(long, env = "CO_BASE_PATH")]
 	pub base_path: Option<PathBuf>,
 
 	/// Disable logging to file.
@@ -31,12 +29,12 @@ pub struct Cli {
 	///
 	/// Warning: This option is INSECURE only use when you know the implications.
 	/// Env: CO_NO_KEYCHAIN
-	#[arg(long, default_value_t = false)]
+	#[arg(long, default_value_t = false, env = "CO_NO_KEYCHAIN", value_parser = parse_bool)]
 	pub no_keychain: bool,
 
 	/// Skip networking.
 	/// Env: CO_NO_NETWORK
-	#[arg(long, default_value_t = false)]
+	#[arg(long, default_value_t = false, env = "CO_NO_NETWORK", value_parser = parse_bool)]
 	pub no_network: bool,
 
 	/// Force to generate new network peer id on startup.
@@ -47,23 +45,10 @@ pub struct Cli {
 	#[arg(long, default_value_t = false)]
 	pub auto_accept_invite: bool,
 }
-impl Cli {
-	/// Use environment variables to override values.
-	pub fn with_env(self) -> Self {
-		let instance_id = std::env::var("CO_INSTANCE_ID").unwrap_or(self.instance_id);
-		let base_path: Option<PathBuf> = match std::env::var("CO_BASE_PATH") {
-			Ok(path) => Some(path.into()),
-			Err(_) => self.base_path,
-		};
-		let no_keychain = std::env::var("CO_NO_KEYCHAIN").is_ok() || self.no_keychain;
-		let no_network = std::env::var("CO_NO_NETWORK").is_ok() || self.no_network;
-		Self { instance_id, base_path, no_keychain, no_network, ..self }
-	}
-}
 impl Into<CoApplicationSettings> for Cli {
 	fn into(self) -> CoApplicationSettings {
 		CoApplicationSettings {
-			instance_id: self.instance_id,
+			instance_id: self.instance_id.unwrap_or_else(|| String::from("tauri")),
 			network: !self.no_network,
 			force_new_peer_id: self.force_new_peer_id,
 			no_keychain: self.no_keychain,
@@ -72,5 +57,13 @@ impl Into<CoApplicationSettings> for Cli {
 			auto_accept_invite: self.auto_accept_invite,
 			..Default::default()
 		}
+	}
+}
+
+fn parse_bool(s: &str) -> Result<bool, String> {
+	match s {
+		"1" | "true" => Ok(true),
+		"0" | "false" => Ok(false),
+		_ => Err(format!("invalid bool: {s}")),
 	}
 }

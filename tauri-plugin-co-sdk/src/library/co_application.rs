@@ -1,3 +1,5 @@
+use crate::library::cli::Cli;
+use clap::Parser;
 use co_core_co::CoAction;
 use co_primitives::TagPattern;
 use co_sdk::{Application, ApplicationBuilder, CoInvite, KnownTag, KnownTags, NetworkSettings, Tags, CO_CORE_NAME_CO};
@@ -16,6 +18,15 @@ pub struct CoApplicationSettings {
 impl CoApplicationSettings {
 	pub fn new(identifier: &str) -> Self {
 		CoApplicationSettings { instance_id: identifier.into(), ..Default::default() }
+	}
+
+	/// Create `CoApplicationSettings` from command line args.
+	pub fn cli(identifier: &str) -> Self {
+		let mut cli = Cli::parse();
+		if cli.instance_id.is_none() {
+			cli.instance_id = Some(identifier.to_owned());
+		}
+		cli.into()
 	}
 
 	pub fn with_path(self, path: &str) -> Self {
