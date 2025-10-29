@@ -1,26 +1,22 @@
 # Core
 Core stands for CO Reducer.
-
 It combines data model with business logic.
 
-A reducer is a function that takes the current state and an action as input.
-It figures out how the state should change based on that action.
-It returns a new state without directly modifying the old one.
+A reducer is a function that takes the current state and an action as input. It figures out how the state should change based on that action. It returns a new state without directly modifying the old one.
+
 Core reducers are pure functions, meaning it always gives the same output for the same state and action.
 This pureness is necessary to make distributed state and validation possible.
 For that reason they will be compiled to WebAssembly and executed in a sandbox.
 
 ## Design choices
-Cores are reducer-based to allow for easy reasoning and observability. They are predictable and easily testable.
-Their clear interface allows for composition.
+Cores are reducer-based to allow for easy reasoning and observability. They are predictable and easily testable. Their clear interface allows for composition.
 All changes are automatically atomic, meaning each reduce operation guarantees that it is treated as a single "unit".
 As Cores provide strict separation of concerns, they are executed in isolation which allows for verifiability and parallel execution.
 
 ## Structure
-A overview of how Cores are structured and implemented.
-
+An overview of how Cores are structured and implemented.
 ### Schema
-The core schema is data model of the core and are the actual data types that form the state.
+The core schema is the data model of the core and the actual data types that form the state.
 
 In Rust, these types are usually represented by `structs` and `enums` and need to be serializable.
 The `co-api` provides the `#[co]` macro which will automatically implement required traits.
@@ -70,7 +66,7 @@ The pure, deterministic reducer is compiled to WebAssembly so that all peers can
 In addition, [Consensus](../reference/consensus.md) cores allow to finalize a state and therefore produce trust among all CO participants.
 
 ### Atomicity
-Each reducer operation is one "unit" and either, by design, succeeds completely or fails completely.
+Each reducer operation is one "unit" and either, by design, succeeds completely, or fails completely.
 
 ## Permissions
 Permissions are usually implemented in the data model and logic.
@@ -107,41 +103,41 @@ We provide a set of cores.
 We are constantly working on bringing you even more built-in cores. 
 They are the following:
 
-#### co-core-co
+#### `co-core-co`
 Root core which manages the COs core instances, guards and participants.
 
-#### co-core-keystore
+#### `co-core-keystore`
 Stores credentials.
 Used internally to store DID and PeerID private keys.
 
-#### co-core-membership
-Stores memberships informations of COs.
+#### `co-core-membership`
+Stores memberships information of COs.
 Used internally in the Local CO to track which COs one of out identities is a member of.
 
-#### co-core-board
+#### `co-core-board`
 Kanban board core.
 Used internally to coordinate pending network requests.
 
-#### co-core-storage
+#### `co-core-storage`
 Stores reference informations about storage blocks which exist on disk.
 Used internally to free blocks from disk which are not referenced anymore.
 
-#### co-core-poa
+#### `co-core-poa`
 Proof-of-authority core.
 Provides POA [consensus](../reference/consensus.md) for a CO.
 
-#### co-core-room
+#### `co-core-room`
 Messaging core. Stores messages in matrix compatible format.
 
-#### co-core-file
+#### `co-core-file`
 Stores hierarchical file structures like a file system.
 
-#### co-core-data-series
+#### `co-core-data-series`
 Stores data series, counters and aggregations on the data.
 
-#### co-core-rich-text
+#### `co-core-rich-text`
 Stores conflict free rich text.
 
-#### co-core-role
-Basic role-based access rules. As a goto data model for daily permission management.
+#### `co-core-role`
+Basic role-based access rules. As a go-to data model for daily permission management.
 
