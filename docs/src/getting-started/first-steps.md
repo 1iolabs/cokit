@@ -14,7 +14,7 @@ A Core contains [permissions](../reference/permissions.md) as logic in the data 
 As an example we change the [todo list core](../getting-started/rust-core-quick-start.md) to only allow todo task deletion for the creator of the todo task.
 We need to store the creator of a task and compare it in the `TaskDelete` against each other.
 
-Add `creator` to state: 
+Add `creator` to state:
 ```rust
 #[co]
 pub struct TodoTask {
@@ -39,6 +39,9 @@ TodoAction::TaskDelete { id } => {
 CO-kit then verifies if everyone works with the same state.
 
 ## More examples
+
+#review move to "next steps"?
+
 ### Real-time counter
 This example shows how a simple counter can be shared and synchronized across peers using CO-kit:
 
