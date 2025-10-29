@@ -10457,6 +10457,7 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-utils",
  "tokio",
+ "toml 0.8.19",
 ]
 
 [[package]]
