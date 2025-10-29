@@ -4,11 +4,11 @@ CO stands for Collaborative Object and is a fundamentally new concept of distrib
 It rather serves a multitude of functionalities in a distributed network while running locally on each participants device.
 
 ## What makes a CO
-A CO is like a bucket or project for digital data, which can be used for collaboration and communication.
+A CO is like a bucket or project for digital data which can be used for collaboration and communication.
 COs can serve a multitude of digital processes without the requirement for expensive setups.
 They are designed to be lightweight, ad-hoc-usable and cheap to create, enabling the use of thousands or even millions of them.
 
-Each COntainer is unique, much like a receipt, making it ideal for granular, trackable, and disposable data operations at scale.
+Each CO(ntainer😉) is unique, much like a receipt, making it ideal for granular, trackable, and disposable data operations at scale.
 Imagine it like a database that runs for every participant but locally.
 
 ## Structure
@@ -19,18 +19,18 @@ Cores are the data model of which COs are composed and are explained in the foll
 
 ### Participants
 Each CO can contain participants.
-They are identified through their DID - whether they are humans or machines (like an IoT device).
+They are identified through their DID - whether they are humans or machines (like an IoT device, or a piece of infrastructure).
 It is important to notice that a CO can contain zero participants as well as millions of participants.
 
 ### Network settings
 Each CO may contain networking settings.
 With these settings the connectivity of the CO can be configured.
-As a default the [didcontact](../glossary/glossary.md#didcontact) protocol is used with any of the participants.
+As a default, the [didcontact](../glossary/glossary.md#didcontact) protocol is used with any of the participants.
 
 ### Encryption settings
 Each CO can be encrypted.
 The encryption can be set while creating a CO, making it either unencrypted or secure it using a specific encryption algorithm.
-Encryption keys are stored in the Local COs Key-Store core.
+Encryption keys are stored in the Local COs `key-store` core.
 The encryption keys can be versioned.
 Once a new version is created that key is used for new data.
 This allows advanced sharing patterns, like allowing new participants to only see data produced _after_ they joined the CO.
@@ -51,6 +51,7 @@ The Local CO is the the device's local-only CO.
 It manages the device's or application's local state which forms the root entry point.
 It exists once for each unique storage (memory or filesystem path), and is always encrypted.
 The root encryption key is stored in the OS keychain from this key all other keys used in the Local CO will be derived.
+
 The application's local state include:
 - Identities
 - Memberships of COs
@@ -59,7 +60,7 @@ The application's local state include:
 - Network PeerID
 
 ### Private CO
-A CO which can only accessed by participants.
+A CO which can only be accessed by participants.
 While setting up a Private CO, the initiator decides about permissions, cores and who can access it by adding the DIDs of the desired participants.
 All participants with the permissions can do that at a later stage as well.
 Like a private chat between two participants.
