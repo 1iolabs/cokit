@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Tauri plugin to access co sdk functionality"
 authors = ["you"]
 edition = "2021"
-rust-version = "1.76"
 exclude = ["/examples", "/webview-dist", "/webview-src", "/node_modules"]
 links = "tauri-plugin-co-sdk"
 

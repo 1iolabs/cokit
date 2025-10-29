@@ -19,4 +19,3 @@ tauri-utils = { version = "2.6.0" }
 tokio = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-clap = { version = "^4.3.23", features = ["derive"] }

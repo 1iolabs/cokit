@@ -10447,7 +10447,6 @@ dependencies = [
 name = "tauri-app"
 version = "0.1.0"
 dependencies = [
- "clap 4.5.16",
  "serde",
  "serde_json",
  "tauri",
