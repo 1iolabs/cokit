@@ -1,12 +1,13 @@
 # Guards
 Guards are checks for transactions.
-They serve as a sort of "Police" for transactions and decide which transactions will make it into the [Log](../reference/log.md) and which don't.
+They serve as a sort of "police" for transactions and decide which transactions will make it into the [Log](../reference/log.md) and which don't.
+
 New transactions will be checked by the configured guards of a CO and will be rejected if not all guards succeed.
 Just like [Cores](../reference/core.md), Guards are pure functions, are compiled to WebAssembly, and registered to COs.
 
-Important notice: Guards are not permissions.
+**Important notice: Guards are not permissions.**
 
-This mechanism is used as the basis to implement consensus algorithms and checks that are true for every transaction in a CO.
+This mechanism is used as the basis for implementing consensus algorithms and checks that are true for every transaction in a CO.
 
 ## Built-in guards
 ### Check: Is Participant
