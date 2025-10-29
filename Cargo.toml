@@ -108,3 +108,4 @@ co-primitives = { path = "co-primitives" }
 co-runtime = { path = "co-runtime" }
 co-sdk = { path = "co-sdk", default-features = false }
 co-storage = { path = "co-storage" }
+tauri-plugin-co-sdk = { path = "tauri-plugin-co-sdk" }
