@@ -1,11 +1,10 @@
 # Network
 
-CO-kit has got a built-in network stack utilizing [libp2p](https://libp2p.io/).
+CO-kit has a built-in network stack utilizing [libp2p](https://libp2p.io/).
 
 The actual networking protocols used can be configured for every CO.
-The peer-to-peer networking is optional and possibly any other protocol like http or file protocols like NFS can be used (with some effort).
-There is no lock-in to a single networking strategy.
-Just describe your data using a core and easily adapt CO-kit to your infrastructure.
+The peer-to-peer networking is optional. Any other protocol like http or file protocols like NFS can be used (with some effort).
+There is no lock-in to a single networking strategy; just describe your data using a core and easily adapt CO-kit to your infrastructure.
 
 ## Network Configuration
 For each [CO](../reference/co.md), a variety of network configurations for connectivity can be made.
@@ -16,7 +15,7 @@ For further information see:
 - [co-core-co: CoAction: NetworkRemove](/crate/co_core_co/enum.CoAction.html#variant.NetworkRemove)
 
 ### DidDiscovery
-Gossipsub based mesh networking discovery.
+Gossipsub-based mesh networking discovery.
 This allows to configure explicit DIDs to connect, instead of (by default) all participants in a CO.
 
 For further information see:
@@ -65,9 +64,9 @@ This can be used to host the CO on a dedicated server/cloud or other infrastruct
 [^issue-90]: [Network: Wi-Fi Direct (#90)](https://gitlab.1io.com/1io/co-sdk/-/issues/90)
 
 ## libp2p
-libp2p, (short for “library peer-to-peer”) is a peer-to-peer (P2P) networking framework that enables the development of P2P applications.
+libp2p is a networking framework that enables the development of P2P applications.
 It consists of a collection of protocols, specifications, and libraries that facilitate P2P communication between network participants or, in other words, peers.
-CO-kit uses the [rust implementation of libp2p](https://github.com/libp2p/rust-libp2p/).
+We use the [rust implementation of libp2p](https://github.com/libp2p/rust-libp2p/).
 
 ## Protocols
 ### Protocol: mDNS
