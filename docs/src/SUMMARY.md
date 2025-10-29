@@ -11,9 +11,9 @@
 
 # Getting Started
 - [Installation](./getting-started/installation.md)
+- [First Steps](./getting-started/first-steps.md)
 - [Core Quick Start](./getting-started/rust-core-quick-start.md)
 - [App Quick Start](./getting-started/rust-app-quick-start.md)
-- [Next Steps](./getting-started/next-steps.md)
 
 # Reference
 - [CO-kit](./reference/co-kit.md)

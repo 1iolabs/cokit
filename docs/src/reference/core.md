@@ -80,7 +80,7 @@ Some examples:
 - Someone is allowed to post new messages but not to delete them.
 These checks are implemented as simple checks or conditions in the Core.
 
-For an implementation example click [here](../getting-started/next-steps.md#permissions).
+For an implementation example click [here](first%20steps.md#permissions).
 
 ## Features
 

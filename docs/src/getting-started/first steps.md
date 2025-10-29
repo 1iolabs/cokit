@@ -1,6 +1,5 @@
-# Next Steps
-
-Now that you know the basics of working with CO-kit, we introduce a few more concepts and show you some examples of the cool things you can build with it.
+# First Steps
+To start working with CO-kit, we'll introduce you to the basic concepts of it and briefly sketch a few cases to give you an idea for what it is useful.
 
 ## Introducing CO
 A [CO](../reference/co.md) is a virtual room for collaboration.
@@ -37,7 +36,7 @@ TodoAction::TaskDelete { id } => {
 },
 ```
 
-CO-kit then verifies if everyone got the same state.
+CO-kit then verifies if everyone works with the same state.
 
 ## More examples
 ### Real-time counter
