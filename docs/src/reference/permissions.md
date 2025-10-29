@@ -9,8 +9,8 @@ It is important to differentiate between the two for reasons of efficiency and s
 - They are permanent and will be re-evaluated after conflicts.
 
 ## When to use Guards or Permissions
-Guard are evaluated before join transactions into the log.
-Permissions are evaluated after transactions made it into the log, meaning the Guards are executed before any conflict-resolving logic takes place.
+Guards are evaluated _before_ join transactions into the log.
+Permissions are evaluated _after_ transactions made it into the log, meaning the Guards are executed before any conflict-resolving logic takes place.
 
 A quick comparison of Permissions and Guards:
 
