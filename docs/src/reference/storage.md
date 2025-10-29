@@ -13,7 +13,7 @@ The default encryption algorithm used in CO-kit is [XChaCha20-Poly1305](https://
 
 ### Network Layer
 The network layer will fetch blocks on demand while being used.
-It checks the layer if the block is known by its CID. If it is unknown it will be fetched from any CO participant.
+It checks the layer if the block is known by its CID. If it is unknown, it will be fetched from any [CO](../reference/co.md) participant.
 
 ## Partial Data
 All data is represented as a graph, more precisely as a [DAG](../glossary/glossary.md#dag-cbor) (directed acyclic graph).
