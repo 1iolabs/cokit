@@ -49,14 +49,14 @@ flowchart TD
 	B --> S
 ```
 ### Components
-- [Device](./usage/os-specifics.md): The platform host.
-	- [Network](../reference/network.md): The platform network interface.
-	- Filesystem: File based persistence.
-	- App: An Application using CO-kit.
-		- [Storage](../reference/storage.md): Content addressed storage.
-		- [CO](../reference/co.md): Virtual room for collaboration.
-		- [Log](../reference/log.md): Conflict-free replicated event stream.
-			- Head: Specific point in the Log.
-		- [Core](../reference/core.md): Actions to State Reducer.
-			- Action: A change operation.
-			- State: A materialized state based on the actions.
+- [Device](./usage/os-specifics.md): The platform host
+	- [Network](../reference/network.md): The platform network interface
+	- Filesystem: File based persistence
+	- App: An Application using CO-kit
+		- [Storage](../reference/storage.md): Content addressed storage
+		- [CO](../reference/co.md): Virtual room for collaboration
+		- [Log](../reference/log.md): Conflict-free replicated event stream
+			- Head: Specific point in the Log
+		- [Core](../reference/core.md): Actions to State Reducer
+			- Action: A change operation
+			- State: A materialized state based on the actions
