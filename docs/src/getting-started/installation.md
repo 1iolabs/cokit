@@ -6,6 +6,7 @@ We're starting off with the installation, then we'll delve right into building y
 
 ## Requirements
 - `rust-1.88` or greater.
+- `llvm-18`
 
 ## Setup Rust
 
@@ -24,15 +25,51 @@ Later in this documentation, you will hear about [cores](../reference/core.md) w
 rustup target add wasm32-unknown-unknown
 ```
 
+## LLVM
+
+LLVM-18.0.0 is used to execute WebAssembly files as native code.
+
+### MacOS
+
+To install it using macOS use:
+
+```sh
+brew install llvm@18
+```
+
+### Setup cargo
+
+To let cargo know where to search for llvm we need to add the `LLVM_SYS_180_PREFIX` variable to the cargo config.
+Here is a script to help you with that:
+
+```sh
+mkdir -p ~/.cargo
+touch ~/.cargo/config.toml
+echo "[env]\nLLVM_SYS_180_PREFIX = \"$("brew" "--prefix" "llvm@18")\"" >> ~/.cargo/config.toml
+cat ~/.cargo/config.toml
+```
+
+It should look likle this then:
+
+`~/.cargo/config.toml`:
+```toml
+[env]
+LLVM_SYS_180_PREFIX = "/opt/homebrew/opt/llvm@18"
+```
+
+```admonish note
+The script may duplicates the `[env]` table which needs to be fixed manually.
+```
+
 ## Setup CO-kit
 CO-kit ships pre-built binaries for its `co` CLI using [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#installation). This means you can install `co` without needing to compile from source:
 ```sh
-cargo binstall co-cli
+cargo binstall co-cli --git https://gitlab.1io.com/1io/co-sdk.git
 ```
 
 Of course, you can build it from source, too:
 ```sh
-cargo install co-cli
+cargo install co-cli --git https://gitlab.1io.com/1io/co-sdk.git
 ```
 
 ## Building your first app

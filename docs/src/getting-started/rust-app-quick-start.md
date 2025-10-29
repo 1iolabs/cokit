@@ -34,11 +34,11 @@ dx new my-todo-app --subtemplate Bare-Bones -o is_fullstack=false -o is_router=f
 ```
 2. Install `co-sdk`, `co-core-membership`, `co-core-co` and `co-dioxus` which is the dioxus integration as a dependencies:
 ```sh
-cargo add co-sdk co-dioxus co-core-membership co-core-co
+cargo add co-sdk co-dioxus co-core-membership co-core-co --git https://gitlab.1io.com/1io/co-sdk.git
 ```
 3. Install our core as dependency:
-```shell
-cargo add ../my-todo-core
+```sh
+cargo add my-todo-core --path ../my-todo-core
 ```
 4. Setup tailwind
 ```sh

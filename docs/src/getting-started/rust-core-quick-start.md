@@ -8,7 +8,7 @@ First, we need to setup a new rust crate, and add `co-api` dependency:
 ```sh
 cargo init --lib ./my-todo-core
 cd ./my-todo-core
-cargo add co-api
+cargo add co-api --git https://gitlab.1io.com/1io/co-sdk.git
 ```
 
 ## Implementation
