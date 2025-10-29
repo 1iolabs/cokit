@@ -22,15 +22,15 @@ This approach makes it harder for services and participants to track you across 
 So rather than a participant having only a single DID (like a cell number, or national ID number), participants may have thousands of DIDs, yet can still manage them easily using CO-kit.
 
 ## How CO-kit uses DID
-DIDs appear in almost every area of CO-kit since every interaction is signed by a DID. Here's how DIDs are handled in all of CO-kit.
+DIDs appear in almost every part of CO-kit since every interaction is signed by a DID. Here's how DIDs are handled in all of CO-kit.
 
 ### CO Participants
 Every participant has at least one DID. A participant can be human or machine (service, device, IOT-device, AI-agent, ...).
-Within a CO participants are represented by their DID.
+Within a CO, participants are represented by their DID.
 This relation can be extended with attributes for permission-related settings or to distinguish between participants.
 
 ### Wallet
-You can save your DID's in a wallet.
+You can save your DIDs in a wallet.
 This is implemented by the `co-core-keystore` [Core](../reference/core.md), which is normally used in the [Local CO](../reference/co.md#local-co).
 You are free to add the core to another CO, for example to share identities between your devices[^issue-82].
 
@@ -92,7 +92,7 @@ DID security is based on public/private key cryptography controlled by the user.
 With centralized or federated identities, security depends on provider’s authentication systems and centralized storage.
 
 ### Privacy
-With DIDs minimal disclosure is possible (share only what’s needed), often combined with verifiable credentials for selective information sharing.
+With DIDs, minimal disclosure is possible (share only what’s needed), often combined with verifiable credentials for selective information sharing.
 Centralized identity typically requires full disclosure of stored attributes to the identity provider and sometimes to connected services.
 Federated identites allow for more selective information sharing, but also enables tracking between services - especially for the provider of them.
 
