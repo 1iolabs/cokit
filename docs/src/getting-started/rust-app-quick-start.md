@@ -12,7 +12,7 @@ We also use TailwindCSS for styling the application.
 - `npm`
 
 ## Setup
-Install dioxus and setup the empty application crate.
+Install Dioxus and setup the empty application crate.
 
 ### Setup Dioxus
 Install the precompiled `dx` tool:
@@ -49,14 +49,15 @@ npm install -D tailwindcss @tailwindcss/cli daisyui
 ## Implementation
 
 For this example we use the MyTodoCore.
-On first start of the Application a `did:key:` identity is created locally, we name it `my-todo-identity`.
-The first view allows to create toto lists aswell to respond to invites.
+
+Upon first starting the application, a `did:key:` identity is created locally, we name it `my-todo-identity`.
+
+The first view allows to create todo lists as well to respond to invites.
 The second view allows to manage tasks and participants.
 
 ### Application
 
 #### Setup
-
 In the main function we initialize CO-kit and pass it as context to dioxus:
 
 ```rust,noplayground
@@ -70,15 +71,14 @@ fn main() {
 ```
 
 #### Overview
-
-Next we want to show a list of Todo Lists and possible invites.
-We use the CO-kit builtin memberships core and show list items according their state.
-We got the follwing states of interest:
+Next, we want to show a list of Todo Lists and possible invites.
+We use the CO-kit built-in memberships core and show list items according their state.
+We're working with the following states of interest:
 - Active: Normal active membership
-- Invite: We got invited to join a CO by someone else
+- Invite: We got invited to join a [CO](../reference/co.md) by someone else
 - Join: We accepted an invite and waiting for it to complete
 
-The dioxus bindings mostly work using hooks.
+The dioxus bindings mostly work by using hooks.
 We are using the following:
 - `use_co`: Opens a CO and allows to read and write it
 - `use_selector`: Selects relevant state from a opened CO
@@ -99,10 +99,10 @@ let lists = use_selector(&local_co, move |storage, co_state| async move {
 })?;
 ```
 
-For every Todo List we want to show a counter of undone todos.
+For every todo list, we want to show a counter of undone todos.
 We use the CO and use the selector again the count the items.
-As all the state is locally available we can iterate the items while counting them.
-In a more sophiticated example there values could be pre-calculated using the core.
+As all the states are available locally, we can iterate the items while counting them.
+In a more sophisticated example, their values could be pre-calculated using the core.
 
 ```rust,noplayground
 let co = use_co(co_id);
@@ -118,10 +118,9 @@ let (co_info, undone) = use_selector(&co, move |storage, co_state| async move {
 })?;
 ```
 
-Also later we need to add handlers to create and join a CO.
+Later, we need to add handlers to create and join a CO.
 
 #### Todo List
-
 Now we want to show all the todo items and the participants of a specific CO.
 We use the selector again and extract the values we need:
 
@@ -158,9 +157,8 @@ We select:
 - the tasks from the todo-core
 
 ##### Handlers
-
 We now need to define the handlers that respond to user actions.
-First we define `on_todo_action` which will push an action into the todo-core and creates it on-the-fly if it not exists.
+First, we define `on_todo_action` which will push an action into the todo-core and creates it on-the-fly if it not exists.
 
 ```rust,noplayground
 let on_todo_action = use_callback({
@@ -197,8 +195,7 @@ let on_delete_all_done = use_callback(move |_| {
 ```
 
 ##### Render
-
-We then can render the task list using dioxus like this:
+Next, we can render the task list using dioxus like this:
 
 ```rust,noplayground
 for task in tasks {
@@ -207,8 +204,7 @@ for task in tasks {
 ```
 
 #### Full Code
-
-Here is the full example code of the parts which integrate with CO-kit:
+Here is the full example code of the parts which integrates with CO-kit:
 
 `src/main.rs`:
 
