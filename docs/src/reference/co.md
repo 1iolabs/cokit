@@ -76,4 +76,4 @@ Acts like a private CO but usually only accessible by the creator.
 Stores creators, identities and settings, so those can be synced between devices[^issue-82].
 Similar to a wallet.
 
-[^issue-82]: https://gitlab.1io.com/1io/co-sdk/-/issues/82
+[^issue-82]: [Personal CO (#82)](https://gitlab.1io.com/1io/co-sdk/-/issues/82)

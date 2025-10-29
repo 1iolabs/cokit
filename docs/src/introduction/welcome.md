@@ -22,10 +22,10 @@ CO-kit-built apps run locally on your mobile without the need for clouds or serv
 CO-kit can run on clouds and servers too - if needed.
 
 
-## Get started with 3 lines of code
+## Get started with ease
 
 ### Integrates with your frontend stack
-Easily work with the frontend framework of your choice. It just clicks.
+Easily work with the frontend framework of your choice.
 
 ### Cross-platform and platform-agnostic
 CO-kit supports all major operating systems ensuring your application runs smoothly everywhere.

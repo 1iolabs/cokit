@@ -1,12 +1,12 @@
 # Features
 
 ## Fully Decentralized
-- No centralized coordinator or server dependency.
+- No centralized coordinator or server/cloud/infrastructure dependency.
 - Designed for sovereign and federated setups where each participant retains control.
 
 ## Flexible Storage
-- Fully file-based architecture: CO-kit uses a file-centric model. All operations and data structures are persisted in files.
-- Storage Agnostic: compatible with any local or cloud-based storage systems (e.g., local FS, NFS, S3, etc.).
+- Fully file-based architecture: CO-kit, by default, uses a file-centric model. All operations and data structures are persisted in files.
+- Storage Agnostic: compatible with any local or cloud-based file systems (e.g., local FS, NFS, S3, etc.).
 - Each node can operate with partial local datasets, enabling efficient syncing and low network and storage overhead.
 - Nodes selectively fetch _only_ the data they need.
 
@@ -26,13 +26,13 @@ CO-kit provides a pluggable networking layer with optional components:
 
 ## Flexible Consensus
 Each CO can define its own consensus mechanism:
-- Optional: no consensus; CRDT-only.
+- Optional: no consensus – CRDT-only.
 - [Proof-of-authority](../glossary/glossary.md#proofofauthority-poa-consensus-mechanism): signed checkpoints by trusted nodes.
 - Manual: user-driven or admin-approved commits.
-- Shared: all participants share responsibility; quorum or similar models.
+- Shared: all participants share responsibility – quorum model.
 
 ## Flexible Data
 Each CO may contain multiple [cores](../reference/core.md). A core defines a data model:
 - Cores are compiled to [WebAssembly](../glossary/glossary.md#wasm) (WASM) for safe, fast, and portable execution.
-- Cores can be versioned, sandboxed, and upgraded.
+- Cores are versioned, sandboxed, and upgradable.
 - Cores may contain any data depending on your individual requirements.

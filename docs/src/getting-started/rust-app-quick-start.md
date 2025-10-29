@@ -20,11 +20,11 @@ Install the precompiled `dx` tool:
 cargo binstall dioxus-cli
 ```
 
-You can also head over to [Dioxus]( https://dioxuslabs.com/learn/0.6/getting_started/#install-the-dioxus-cli) for further instructions.
+You can also head over to [Dioxus](https://dioxuslabs.com/learn/0.6/getting_started/#install-the-dioxus-cli) for further instructions.
 
 ### Setup NodeJS
-Head over to [NodeJS](https://nodejs.org/en/download)
-We need it to use TailwindCSS within our app.
+We need NodeJS to use TailwindCSS within our app.
+Head over to [NodeJS](https://nodejs.org/en/download) for further instructions.
 
 ### Application
 We need to setup a new rust crate for the application:
@@ -84,9 +84,7 @@ We are using the following:
 - `use_selector`: Selects relevant state from a opened CO
 - `use_did_key_identity`: Uses an `did:key:` identity
 
-Read the memberships which are stored in the Local CO.
-We use the `co_sdk::state` export which contains utilities to access states of builtin cores.
-Here we use `co_sdk::state::memberships` which contains all memberships including the virtual one of the Local CO which we'll filter out:
+We read the memberships which are stored in the Local CO:
 
 ```rust,noplayground
 let local_co_id = use_signal(|| CoId::new(CO_ID_LOCAL));
@@ -99,10 +97,12 @@ let lists = use_selector(&local_co, move |storage, co_state| async move {
 })?;
 ```
 
-For every todo list, we want to show a counter of undone todos.
-We use the CO and use the selector again the count the items.
-As all the states are available locally, we can iterate the items while counting them.
-In a more sophisticated example, their values could be pre-calculated using the core.
+We use the `co_sdk::state` export which contains utilities to access states of builtin cores.
+
+Here we use `co_sdk::state::memberships` which contains all memberships including the virtual one of the Local CO which we'll filter out:
+
+
+For every todo list, we want to show a counter of undone todos:
 
 ```rust,noplayground
 let co = use_co(co_id);
@@ -117,6 +117,10 @@ let (co_info, undone) = use_selector(&co, move |storage, co_state| async move {
 	Ok((info, undone))
 })?;
 ```
+
+We use the CO and use the selector again the count the items.
+As all the states are available locally, we can iterate the items while counting them.
+In a more sophisticated example, their values could be pre-calculated using the core.
 
 Later, we need to add handlers to create and join a CO.
 
@@ -157,8 +161,7 @@ We select:
 - the tasks from the todo-core
 
 ##### Handlers
-We now need to define the handlers that respond to user actions.
-First, we define `on_todo_action` which will push an action into the todo-core and creates it on-the-fly if it not exists.
+We now need to define the handlers that respond to user actions:
 
 ```rust,noplayground
 let on_todo_action = use_callback({
@@ -173,6 +176,8 @@ let on_todo_action = use_callback({
 	}
 });
 ```
+
+First, we define `on_todo_action` which will push an action into the todo-core and creates it on-the-fly if it not exists.
 
 Now we define the different handlers:
 
@@ -799,4 +804,4 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 ### Full example
 
 You can find the full example as a git project here:
-- [https://gitlab.1io.com/1io/example-todo-list](https://gitlab.1io.com/1io/example-todo-list)
+- [1io / example-todo-list - GitLab](https://gitlab.1io.com/1io/example-todo-list.git)

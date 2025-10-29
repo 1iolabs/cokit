@@ -1,5 +1,0 @@
-- Guards
-- Storage
-- network
-- flow chart in didcomm
-- 

@@ -1,4 +1,4 @@
-# Core Quick Start 
+# Core Quick Start
 Let's take a look at how to start things off with with the setup process, followed by the implementation.
 
 In this quick start we implement a basic Todo-List data model.
@@ -100,4 +100,3 @@ To compile to WebAssembly use the following command:
 ```sh
 co core build
 ```
-
