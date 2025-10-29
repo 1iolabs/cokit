@@ -1,11 +1,11 @@
 # Log
 The Log is a conflict-free replicated event stream. It is immutable and cryptographically verifiable.
-It is (eventually consistent) sorted using a Merkle-DAG-based logical clock.
+It is (eventually consistent) sorted using a [Merkle-DAG](../glossary/glossary.md#merkle-dag)-based logical clock.
 Arbitrary heads can be joined together at any time.
 Whenever the same heads are joined, the resulting log is guaranteed to be equal.
 
 ## What makes a Log
-This can be thought of like a git graph where each commit is an operation.
+This can be thought of as a git graph where each commit is an operation.
 The heads represent the end of the log and also a specific state of the data.
 
 ## How it is used in CO-kit
