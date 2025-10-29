@@ -1,6 +1,6 @@
 # Consensus
 
-Consensus is the validated state of a CO.
+The consensus is the mechanism to reach a validated CO state.
 
 ## What makes a Consensus in CO-kit
 Consensus in CO-kit provides finality.
@@ -15,7 +15,7 @@ For each set of heads, a materialized state is calculated.
 A checkpoint (or snapshot) is the combination of this state and heads.
 Each successful consensus round produces a checkpoint.
 For example:
-- a checkpoint functions like a block in a Blockchain, but it's more versatile because it is not dependent on a predefined mining period - but rather works on demand.
+- a checkpoint functions like a block in a Blockchain, but is more versatile because it's not dependent on a predefined mining period - but rather works on demand.
 
 ## Consensus on demand (CoD)
 A consensus round can be triggered manually on demand.
@@ -36,7 +36,7 @@ Depending on your project requirements, you can implement any other consensus me
 
 ## Asynchronous
 In CO-kit consensus is asynchronous and on-demand, meaning users only have to wait for it, if it is really needed.
-While conventional databases normally provide finality by default (when a change is written it's final) this comes at the cost that every change losses time by having a lot of overhead (latency, routing, compute, ...).
+While conventional databases normally provide finality by default (when a change is written it's final), this comes at the cost that every change losses time by having a lot of overhead (latency, routing, compute, ...).
 
 ## Proof of authority
 Proof of authority is the built-in consensus mechanism used in CO-kit.
@@ -49,11 +49,15 @@ The POA allows for Byzantine Fault Tolerance (BFT) when configured with a majori
 
 By default `2/3` majority is used.
 
+For further information see:
+- [Glossary: Proof of Authority](../glossary/glossary.md#proof-of-authority)
+- [co-core-poa](../reference/core.md#co-core-poa)
+
 ### Use Cases
-With this mechanism new and classical use cases can be supported.
+With this mechanism new and conventional use cases can be supported.
 
 #### Client / Server
-Just define the Server (or Servers) as the authority then clients can be sure that the finalized state is known by the server.
+Just define the Server (or Servers) as the authority. Clients can be sure that the finalized state is known by the server.
 
 #### Receipts
 When two parties buy/sell something from each other, a CO can be used as a receipt between them. After all data has been captured, both can sign and therefore finalize the CO and receive a verifiable proof that a transaction took place.
