@@ -57,7 +57,7 @@ export async function getActions(
   const result = await invoke<Uint8Array>("plugin:co-sdk|get_actions", { body });
   return decode(result);
 }
-export async function createIdentity(name: string, seed?: Uint8Array) {
+export async function createIdentity(name: string, seed?: Uint8Array): Promise<string> {
   return await invoke("plugin:co-sdk|create_identity", { name, seed: seed ? Array.from(seed) : undefined });
 }
 export async function createCo(creatorDid: string, coName: string, isPublic: boolean, coId?: string): Promise<string> {
