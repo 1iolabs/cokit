@@ -1,18 +1,18 @@
 # Identity
-CO-kit uses a Decentralized Identifier (DID) as the fundamental identifier for identities. A DID is structured to align with the [W3C DID Core specification](https://www.w3.org/TR/did-1.0/).
+CO-kit uses a DID (Decentralized Identifier) as the fundamental identifier for identities. A DID is structured to align with the [W3C DID Core specification](https://www.w3.org/TR/did-1.0/).
 
 ## What is a DID
-A DID is a globally unique identifier. Using DID ensures that each participant is cryptographically verifiable and fully self-sovereign.
-They provide a foundation of trust as an entirely new layer of decentralized digital identity and public key infrastructure (PKI) for the Internet.
+A DID is a globally unique identifier. Using DID ensures that each participant is cryptographically verifiable and self-sovereign.
+They provide a foundation of trust as an entirely new layer of decentralized digital identity and PKI (public key infrastructure) for the Internet.
 
-It doesn't rely on a centralized authority and can be enriched with verifiable credentials like a government-issued ID.
+Depending on the method, it doesn't rely on a centralized authority and can be enriched with verifiable credentials like a government-issued ID.
 
-DIDs are typically of the form:  `did:<method>:<method-specific-identifier>` 
+DIDs are typically of the form: `did:<method>:<method-specific-identifier>`
 
-for example: `did:example:alice123`.
+For example: `did:example:alice123`.
 
 ## Why CO-kit uses DID
-In CO-kit, every interaction is signed by a DID to make everything verifiable.
+In CO-kit, every interaction is signed by a DID to make everything cryptographically verifiable.
 
 Because a DID is decentralized, self-sovereign, flexible, cryptographically verifiable and self-administered, we don't need any other identity mechanism.
 When building an application, developers can extend supported DID methods.
@@ -31,7 +31,7 @@ This relation can be extended with attributes for permission-related settings or
 
 ### Wallet
 You can save your DIDs in a wallet.
-This is implemented by the `co-core-keystore` [Core](../reference/core.md), which is normally used in the [Local CO](../reference/co.md#local-co).
+This is implemented by the [`co-core-keystore`](/crate/co_core_keystore/index.html) [Core](../reference/core.md), which is normally used in the [Local CO](../reference/co.md#local-co).
 You are free to add the core to another CO, for example to share identities between your devices[^issue-82].
 
 ### Networking
@@ -97,7 +97,7 @@ Centralized identity typically requires full disclosure of stored attributes to 
 Federated identites allow for more selective information sharing, but also enables tracking between services - especially for the provider of them.
 
 ### Self-sovereign
-DIDs can be created and controlled directly by the individual. 
+DIDs can be created and controlled directly by the individual.
 Centralized and federated identity is issued and managed by a central authority or service provider and not owned by the participant.
 However when using the DIDs in a corporate context, issuance can also be controlled by a single entity, e.g. HR, or IT.
 
