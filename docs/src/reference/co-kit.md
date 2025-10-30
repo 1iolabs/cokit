@@ -54,9 +54,11 @@ Ready-to-use CO-kit integrations for different platforms and frameworks.
 
 - [co-dioxus](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-dioxus): Integration and hooks for dioxus.
 - [tauri-plugin-co-sdk](https://gitlab.1io.com/1io/co-sdk/-/tree/main/tauri-plugin-co-sdk): Integrations and hooks for tauri and react.
-- Coming soon:
-  - co-swift: Integrations for macOS and iOS application development.
-  - co-android: Integrations for Android application development.
+- co-swift[^issue-95]: Integrations for macOS and iOS application development (Coming soon).
+- co-android[^issue-96]: Integrations for Android application development (Coming soon).
+
+[^issue-95]: [Swift Bindings](https://gitlab.1io.com/1io/co-sdk/-/issues/95)
+[^issue-96]: [Android Bindings](https://gitlab.1io.com/1io/co-sdk/-/issues/96)
 
 ### Network and Sync
 These are the necessary components to enable distributed use of COs.
