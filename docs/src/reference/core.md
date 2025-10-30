@@ -106,37 +106,70 @@ They are the following:
 #### `co-core-co`
 Root core which manages the COs cores, guards and participants.
 
+For further information see:
+- [`co-core-co`](/crate/co_core_co/index.html)
+
 #### `co-core-keystore`
 Stores credentials.
 Used internally in the [Local CO](../reference/co.md#local-co) to store DID and PeerID private keys.
+
+For further information see:
+- [`co-core-keystore`](/crate/co_core_keystore/index.html)
 
 #### `co-core-membership`
 Stores memberships information of COs.
 Used internally in the [Local CO](../reference/co.md#local-co) to track which COs one of out identities is a member of.
 
+For further information see:
+- [`co-core-membership`](/crate/co_core_membership/index.html)
+
 #### `co-core-board`
 Kanban board core.
 Used internally in the [Local CO](../reference/co.md#local-co) to coordinate pending network requests.
+
+For further information see:
+- [`co-core-board`](/crate/co_core_board/index.html)
 
 #### `co-core-storage`
 Stores reference informations about storage blocks which exist on disk.
 Used internally in the [Local CO](../reference/co.md#local-co) to free blocks from disk which are not referenced anymore.
 
+For further information see:
+- [`co-core-storage`](/crate/co_core_storage/index.html)
+
 #### `co-core-poa`
 Proof-of-authority (PoA) core.
 Provides PoA [consensus](../reference/consensus.md) for a CO.
 
+For further information see:
+- [`co-core-poa`](/crate/co_core_poa/index.html)
+
 #### `co-core-room`
 Messaging core. Stores messages in matrix compatible format.
+
+For further information see:
+- [`co-core-room`](/crate/co_core_room/index.html)
 
 #### `co-core-file`
 Stores hierarchical file structures like a file system.
 
+For further information see:
+- [`co-core-file`](/crate/co_core_file/index.html)
+
 #### `co-core-data-series`
 Stores data series, counters and aggregations on the data.
+
+For further information see:
+- [`co-core-data-series`](/crate/co_core_data_series/index.html)
 
 #### `co-core-rich-text`
 Stores conflict free rich text.
 
+For further information see:
+- [`co-core-rich-text`](/crate/co_core_rich_text/index.html)
+
 #### `co-core-role`
 Basic role-based access rules. As a go-to data model for daily permission management.
+
+For further information see:
+- [`co-core-role`](/crate/co_core_role/index.html)
