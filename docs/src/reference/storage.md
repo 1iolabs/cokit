@@ -16,7 +16,7 @@ The network layer will fetch blocks on demand while being used.
 It checks the layer if the block is known by its CID. If it is unknown, it will be fetched from any [CO](../reference/co.md) participant.
 
 ## Partial Data
-All data is represented as a graph, more precisely as a [DAG](../glossary/glossary.md#dag-cbor) (directed acyclic graph).
+All data is represented as a graph, more precisely as a directed acyclic graph ([DAG](../glossary/glossary.md#dag-cbor)).
 
 The data is always accessed top-down, meaning we can fetch more data as we walk down the graph.
 
@@ -47,4 +47,6 @@ pub trait BlockStorage: Send + Sync {
 The built in backends are filesystem and memory.
 
 For further information see:
-- [BlockStorage](/crate/co-primitives/latest/co-primitives/trait.BlockStorage.html)
+- [BlockStorage](/crate/co_primitives/trait.BlockStorage.html)
+- [MemoryBlockStorage](/crate/co_storage/struct.MemoryBlockStorage.html)
+- [FsStorage](/crate/co_storage/struct.FsStorage.html)
