@@ -4,7 +4,7 @@ Let's take a look at how to start things off with with the setup process, follow
 In this quick start we implement a basic Todo-List data model.
 
 ## Setup
-First, we need to setup a new rust crate, and add `co-api` dependency:
+First, we need to setup a new rust crate, and add [`co-api`](/crate/co_api/index.html) dependency:
 ```sh
 cargo init --lib ./my-todo-core
 cd ./my-todo-core

@@ -19,12 +19,12 @@ An overview of how Cores are structured and implemented.
 The core schema is the data model of the core and the actual data types that form the state.
 
 In Rust, these types are usually represented by `structs` and `enums` and need to be serializable.
-The `co-api` provides the `#[co]` macro which will automatically implement required traits.
+The [`co-api`](/crate/co_api/index.html) provides the [`#[co]`](/crate/co_api/attr.co.html) macro which will automatically implement required traits.
 
-The `co-api` package provides advanced data types like maps, sets and lists with serialization support.
+The [`co-api`](/crate/co_api/index.html) package provides advanced data types like maps, sets and lists with serialization support.
 These data types provide content-addressed serialization into blocks.
 
-For further informations see:
+For further information see:
 - [Core Quick Start](../getting-started/rust-core-quick-start.md#1-define-your-data-model-in-a-core)
 - [Serialization](#serialization)
 - [Core API Overview](../usage/api-overview-core.md)
@@ -39,7 +39,7 @@ The more order-independent actions are, the better the CRDT can handle conflicts
 Each action sees a consistent state and will be applied as all or nothing.
 Actions needs to be serializable into content-addressed blocks.
 
-For further informations see:
+For further information see:
 - [Core Quick Start](../getting-started/rust-core-quick-start.md#2-define-how-the-state-can-be-modified)
 - [Serialization](#serialization)
 
@@ -47,7 +47,7 @@ For further informations see:
 The core state is the schema's resulting root state of actions that are applied sequentially by the [Log's](../reference/log.md) order.
 States needs to be serializable into content-addressed blocks.
 
-For further informations see:
+For further information see:
 - [Serialization](#serialization)
 
 ## Characteristics

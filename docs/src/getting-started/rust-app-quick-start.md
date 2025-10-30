@@ -84,7 +84,7 @@ We are using the following:
 - `use_selector`: Selects relevant state from a opened CO
 - `use_did_key_identity`: Uses an `did:key:` identity
 
-We read the memberships which are stored in the Local CO:
+We read the memberships which are stored in the [Local CO](../reference/co.md#local-co):
 
 ```rust,noplayground
 let local_co_id = use_signal(|| CoId::new(CO_ID_LOCAL));
@@ -99,7 +99,7 @@ let lists = use_selector(&local_co, move |storage, co_state| async move {
 
 We use the `co_sdk::state` export which contains utilities to access states of builtin cores.
 
-Here we use `co_sdk::state::memberships` which contains all memberships including the virtual one of the Local CO which we'll filter out:
+Here we use `co_sdk::state::memberships` which contains all memberships including the virtual one of the [Local CO](../reference/co.md#local-co) which we'll filter out:
 
 
 For every todo list, we want to show a counter of undone todos:

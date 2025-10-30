@@ -11,7 +11,7 @@ For further information see:
 
 #### Invite
 Invite settings when receiving a new invite.
-- Scope: Local CO
+- Scope: [Local CO](../reference/co.md#local-co)
 - Settings
 	- `manual`: Add as “pending” membership.
 	- `disable`: Reject all Invite requests.
@@ -23,7 +23,7 @@ For further information see:
 
 #### Join
 Join settings of a shared CO.
-- Scope: CO
+- Scope: [Private CO](../reference/co.md#private-co), [Public CO](../reference/co.md#public-co)
 - Settings
 	- `invite`: Only accept joins when participant has been invited.
 	- `accept`: Auto-accept all join requests.
@@ -46,7 +46,7 @@ Application-specific configurations available to app developers leveraging CO-ki
 ### Network
 When starting the network, it's possible to pass startup options.
 
-For further informations see:
+For further information see:
 - [co-sdk: NetworkSettings](/crate/co_sdk/struct.NetworkSettings.html)
 - [co-sdk: Application: create_network](/crate/co_sdk/struct.Application.html#method.create_network)
 

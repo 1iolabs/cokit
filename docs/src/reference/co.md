@@ -27,10 +27,13 @@ Each CO may contain networking settings.
 With these settings the connectivity of the CO can be configured.
 As a default, the [didcontact](../glossary/glossary.md#didcontact) protocol is used with any of the participants.
 
+For further information see:
+- [Network](../reference/network.md#network-configuration)
+
 ### Encryption settings
 Each CO can be encrypted.
 The encryption can be set while creating a CO, making it either unencrypted or secure it using a specific encryption algorithm.
-Encryption keys are stored in the Local COs [`keystore`](../reference/core.md#co-core-keystore) core.
+Encryption keys are stored in the [Local COs](../reference/co.md#local-co) [`keystore`](../reference/core.md#co-core-keystore) core.
 The encryption keys can be versioned.
 Once a new version is created that key is used for new data.
 This allows advanced sharing patterns, like allowing new participants to only see data produced _after_ they joined the CO.

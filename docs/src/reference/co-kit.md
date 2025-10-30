@@ -82,7 +82,7 @@ CO-kit ships with built-in cores that are either used to build/further develop C
 ### Internals
 Packages for internals of CO-kit. These are used by contributors of CO-kit.
 
-- [co-primitives](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-primitives): Primitives used throughout the `co-sdk` and `co-api` and [Core](../reference/core.md) implementations.
+- [co-primitives](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-primitives): Primitives used throughout the [`co-sdk`](/crate/co_sdk/index.html) and [`co-api`](/crate/co_api/index.html) and [Core](../reference/core.md) implementations.
 - [co-macros](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-macros): Marco implementations.
 - [co-actor](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-actor): Very lightweight actor abstraction over [tokio](../glossary/glossary.md#tokio) channels. Used to model local services.
 - [co-runtime](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-runtime): WebAssembly runtime implementation.

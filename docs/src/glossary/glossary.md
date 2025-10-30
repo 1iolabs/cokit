@@ -224,7 +224,7 @@ Specifics:
 
 In CO-kit, we use Merkle DAGs as the foundation for the built-in Merkle log-based CRDT and storage.
 
-For further informations see:
+For further information see:
 - [IPLD - The data model of the content-addressable web](https://ipld.io/)
 - [Core](../reference/core.md)
 - [Glossary: Cid](#cid)

@@ -116,7 +116,7 @@ The WASM Binary for guards must export following functions:
 extern "C" fn guard();
 ```
 
-When `co-api` is used this export is handled by the `co` macro.
+When [`co-api`](/crate/co_api/index.html) is used this export is handled by the `co` macro.
 A single binary may be export both.
 
 ## References
