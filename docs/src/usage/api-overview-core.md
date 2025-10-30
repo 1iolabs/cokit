@@ -1,7 +1,5 @@
 # API Overview Core (co-api)
 
-#todo #review
-
 The [`co-api`](/crate/co_api/index.html) is the foundation package to create CO-kit [cores](../reference/core.md).
 It re-exports [`co-primitives`](/crate/co_primitives/index.html) used to implement cores.
 
