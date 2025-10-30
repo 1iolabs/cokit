@@ -53,6 +53,13 @@ For further information see:
 - [Glossary: Proof of Authority](../glossary/glossary.md#proof-of-authority)
 - [co-core-poa](../reference/core.md#co-core-poa)
 
+## Config
+CO-kit allows you to choose the level of coordination needed for each CO:
+- `none`: No explicit agreement rules - relies solely on CRDT merge guarantees.
+- `proof-of-authority`: Updates must be approved or signed by designated participants.
+- `manual`[^issue-87]: Users or admins explicitly approve changes before commit.
+- `shared`[^issue-88]: A quorum or team of peers must agree to apply state changes.
+
 ### Use Cases
 With this mechanism new and conventional use cases can be supported.
 
@@ -68,4 +75,3 @@ When collaborating globally, even across continents (e.g. Europe, North America,
 ## See also
 - [co-core-poa](../reference/core.md#co-core-poa)
 - [guards](../reference/guards.md)
-	

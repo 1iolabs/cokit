@@ -4,10 +4,10 @@
 
 ## AGPLv3
 GNU Affero General Public License v3.
-A *strong copyleft* license created by the Free Software Foundation to ensure that not only distributed binaries—but even software accessed over a network—must have source code made available
+A strong copyleft license created by the [Free Software Foundation](https://www.fsf.org/bulletin/2021/fall/the-fundamentals-of-the-agplv3) to ensure that not only distributed binaries—but even software accessed over a network—must have source code made available.
 
-Key points:
-- What makes it different from GPLv3: AGPLv3 closes the "SaaS loophole" by requiring modified source code to be provided when the software is used over a network.
+Overview:
+- Differs from GPLv3: AGPLv3 closes the "SaaS loophole" by requiring modified source code to be provided when the software is used over a network.
 - Copyleft principle: Any changes or extensions (including those accessed remotely) must remain under AGPLv3.
 - Compatibility: AGPLv3 is compatible with GPLv3. You can combine AGPLv3 and GPLv3 code, but section 13 ensures that the combined work is covered by the AGPL terms.
 - Linking Exception: An optional addendum that allows proprietary or differently-licensed software to link to AGPLv3 code without forcing the entire application to adopt AGPLv3, granted you don’t modify the interface itself.
@@ -19,11 +19,11 @@ For further information see:
 Concise Binary Object Representation.
 CBOR is a compact, binary data serialization format based on the JSON data model.
 It was designed to support extremely small code size, efficient message encoding, and extensibility without requiring version negotiation.
-Defined by IETF in RFC 8949, CBOR excels in scenarios where performance, compactness, and flexibility matter.
+Defined by IETF in RFC 8949.
 
-Key points:
-- Binary Format: Unlike human-readable JSON, CBOR encodes data in binary form, making it faster to parse and more space-efficient.
-- Extensible: CBOR supports “tags” that identify special data types (e.g., dates, binary blobs), enabling schema-free evolution and custom data additions.
+Specs:
+- Binary Format: Unlike JSON, CBOR encodes data in binary form.
+- Extensible: CBOR supports “tags” that identify special data types (e.g., dates, binary blobs).
 
 For further information see:
 - [cbor.io](https://cbor.io/)
@@ -31,7 +31,7 @@ For further information see:
 
 ## DAG-CBOR
 IPLD Data Model as a subset of CBOR.
-DAG-CBOR is the goto serialization method for data used throughout CO-kit.
+DAG-CBOR is the go-to serialization method for data used throughout CO-kit.
 
 For further information see:
 - [Core](../reference/core.md#serialization)
@@ -54,11 +54,15 @@ It ensures that:
 - The contributor has the rights to submit the work (e.g., they wrote it or their employer allows it)
 - The project obtains adequate rights — such as copyright assignment or an irrevocable license — to include and redistribute the contributions under its license terms.
 
+For further information see:
+- [Legal notice](../license/legal-notice.md)
+
 ## CID
 A CID is a self-describing, content-addressed identifier used in distributed systems like IPFS and IPLD. Instead of pointing to *where* data is stored, it refers to *what* the data is via a cryptographic hash.
 
-- Deterministic & Immutable: Any change, even a single byte, yields a totally different CID, ensuring verifiability and immutable data.
-- Self-Describing Format: CIDs combine a hash (via *multihash*), a content-type code (*multicodec*), and encoding info (*multibase*), making them flexible and future-proof.
+Specs:
+- Deterministic & Immutable: Any change yields a totally different CID to ensure verifiability and immutable data.
+- Self-Describing Format: CIDs combine a hash (via *multihash*), a content-type code (*multicodec*), and encoding info (*multibase*).
 
 Why CO-kit uses CIDs:
 CIDs allow consistent, tamper-evident data referencing across decentralized storage backends—be they local, IPFS, or cloud—supporting CO-kit’s file-based, content-addressed architecture.
@@ -71,10 +75,11 @@ For further information see:
 ## CO
 A CO is a virtual room for collaboration.
 
-CO (virtual data room) is a distributed database whose data is encrypted and is only available to the participants (unique via DID) of the data room. The CO stores references (unique via CID) of the data. The data itself is stored on the participants' devices. The DIDs, permissions and the identities of the participants (PrivateKeys) are stored in a data structure (data structure for states) “COre”. Each CO contains at least one COre. They act as “in-code databases” that store details such as the DIDs of the participants in a CO, their roles (admin, reader, etc.), permissions and status information (states) of systems such as chat rooms.
+CO (virtual data room) is a distributed database whose data is encrypted and is only available to the participants (unique via DID) of the data room. The CO stores references (unique via CID) of the data. The data itself is stored on the participants' devices. The DIDs, permissions and the identities of the participants (PrivateKeys) are stored in a data structure (data structure for states) [“Core”](../reference/core.md). Each CO contains at least one core. They act as “in-code databases” that store details such as the DIDs of the participants in a CO, their roles (admin, reader, etc.), permissions and status information (states) of systems such as chat rooms.
 
 For further information see:
 - [CO](../reference/co.md)
+- [“Core”](../reference/core.md)
 
 ## CO-API
 The CO-API is the foundation package to create CO-kit cores.
@@ -99,25 +104,12 @@ For further information see:
 - [CO-kit in the FAQs](../faq/faq.md#general)
 
 ## Consensus
-In CO-kit, consensus refers to the protocols ensuring multiple peers agree on shared state or actions—even in the presence of unreliable networks or malicious actors.
+In CO-kit, consensus refers to the protocols ensuring multiple peers agree on a shared state or actions—even in the presence of unreliable networks or malicious actors.
 
-Key properties of a consensus protocol:
+Benefits:
 - Agreement: All honest peers must decide on the same value.
 - Validity: The decision must reflect a value proposed by a peer.
 - Termination: Every peer eventually makes a decision, even if some fail.
-
-Consensus ensures data integrity, prevents conflicting updates, and supports reliable collaboration in a fully decentralized environment.
-
-CO-kit allows you to choose the level of coordination needed for each CO:
-- `none`: No explicit agreement rules - relies solely on CRDT merge guarantees.
-- `proof-of-authority`: Updates must be approved or signed by designated participants.
-- `manual`[^issue-87]: Users or admins explicitly approve changes before commit.
-- `shared`[^issue-88]: A quorum or team of peers must agree to apply state changes.
-
-These options let you balance complexity, security, and performance based on your application's requirements.
-
-[^issue-87]: https://gitlab.1io.com/1io/co-sdk/-/issues/87
-[^issue-88]: https://gitlab.1io.com/1io/co-sdk/-/issues/88
 
 For further information see:
 - [Consensus](../reference/consensus.md)
@@ -129,19 +121,19 @@ A core (CO reducer) is a piece of data that acts like a state. Cores can be dire
 For further information see:
 - [Core](../reference/core.md)
 
-## Core schema
+### Core schema
 The core schema is data model of the core.
 
 For further information see:
 - [Schema](../reference/core.md#schema)
 
-## Core actions
+### Core actions
 Core actions are operations on the state of a core.
 
 For further information see:
 - [Actions](../reference/core.md#actions)
 
-## Core state
+### Core state
 The core state is the root state of a core.
 
 For further information see:
@@ -150,12 +142,12 @@ For further information see:
 ## CRDT
 A CRDT (Conflict Free Replicated Data Type) is a specialized data structure designed for distributed systems that allows each replica to be updated independently and concurrently, without locking or central coordination, and still achieve eventual consistency through deterministic merge rules.
 
-Key points:
+Benefits:
 - Conflict‑free: Operations commute, ensuring that replicas converge to the same state regardless of operation order.
 - Strong eventual consistency: When all updates are delivered, every replica reaches the same final state.
 - No coordination needed: Replicas can be updated offline and merge upon reconnection.
 
-CO-kit leverages CRDTs to implement the built-in log-based Merkle-CRDT.
+CO-kit leverages CRDTs to implement the built-in log-based Merkle-CRDT:
 - Distributed nodes stay in sync without locking or conflicts.
 - Network partitions or offline work don’t block progress.
 - Updates merge correctly once communication resumes.
@@ -206,10 +198,10 @@ For further information see:
 mDNS (Multicast Domain Name System) is a lightweight, zero-configuration networking protocol that resolves hostnames to IP addresses within local networks without the need for a dedicated DNS server.
 It enables devices on the same network to discover each other using human-readable names rather than IP addresses.
 
-CO-kit uses mDNS as an optional networking mode to automatically discover peer nodes on a local network simplifying setup and fostering seamless peer-to-peer collaboration without manual endpoint configuration.
+CO-kit uses mDNS as an optional networking mode to automatically discover peer nodes on a local network.
 
 ## Merkle-CRDT
-A Merkle‑CRDT combines the strengths of [Merkle-DAGs](../glossary/glossary.md#merkle-dag) (Merkle Directed Acyclic Graphs) and [CRDTs](../glossary/glossary.md#crdt) (Conflict‑Free Replicated Data Types) to create a robust, decentralized synchronization layer.
+A Merkle‑CRDT combines the benefits of [Merkle-DAGs](../glossary/glossary.md#merkle-dag) (Merkle Directed Acyclic Graphs) and [CRDTs](../glossary/glossary.md#crdt) (Conflict‑Free Replicated Data Types) to create a robust, decentralized synchronization layer.
 
 For further information see:
 - [Log](../reference/log.md#merkle-crdt)
@@ -234,13 +226,13 @@ For further information see:
 A Peer Identity (often written `PeerID`) is a unique reference to a specific peer within the overall p2p-network.
 It is derived by hashing a node’s public key, and the corresponding private key remains secret and is used to sign messages and authenticate the identity of the peer.
 
-In CO-kit, each node may generate or be assigned a Peer ID, which then acts as a verifiable handle across the decentralised networking layers.
+In CO-kit, each node may generate or be assigned a Peer ID, which then acts as a verifiable handle across the decentralized networking layers.
 
 For further information see:
 - [Peers - libp2p](https://docs.libp2p.io/concepts/fundamentals/peers/)
 
 ## Proof‑of‑Authority (PoA) Consensus Mechanism
-Proof‑of‑Authority (PoA) is a reputation-based consensus mechanism where only a small, pre-approved set of trusted validators—known entities with verifiable identities—are empowered to produce and validate transactions.
+Proof‑of‑Authority (PoA) is a reputation-based consensus mechanism where only a small, pre-approved set of trusted validator—known entities with verifiable identities are permitted to produce and validate transactions.
 
 For further information see:
 - [Consensus](../reference/consensus.md)
@@ -271,4 +263,4 @@ For further information see:
 WebAssembly (WASM) is an open-standard, portable binary format designed for high-performance execution in a sandboxed environment - initially for web browsers, and increasingly for broader contexts including servers, edge devices, and embedded systems.
 It serves as a compilation target for languages such as Rust, C, C++, and others, enabling near-native speed while maintaining security and cross-platform compatibility
 
-For CoKit, WASM offers a powerful mechanism to compile and execute schema logic in a safe, efficient, and portable manner—supporting modular, decentralized functionality across diverse environments
+For CoKit, WASM is a mechanism to compile and execute schema logic.
