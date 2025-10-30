@@ -20,7 +20,7 @@ CO-kit provides a pluggable networking layer with optional components:
 
 ## Flexible Sync and Data Integrity
 - Conflict-Free Collaboration
-- [Merkle-CRDT](../glossary/glossary.md#merkle-crdt) Log-Based Sync: Built-in Conflict-Free Replicated Data Types (CRDTs) using Merkle trees and append-only logs.
+- [Merkle-CRDT](../glossary/glossary.md#merkle-crdt) Log-Based Sync: Built-in [CRDTs](../glossary/glossary.md#crdt) (Conflict-Free Replicated Data Types) using Merkle trees and append-only logs.
 - Ensures deterministic merges and high traceability across replicas.
 - [Content addressing](../glossary/glossary.md#cid) which ensures validity of data.
 

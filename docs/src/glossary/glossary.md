@@ -209,7 +209,7 @@ It enables devices on the same network to discover each other using human-readab
 CO-kit uses mDNS as an optional networking mode to automatically discover peer nodes on a local network simplifying setup and fostering seamless peer-to-peer collaboration without manual endpoint configuration.
 
 ## Merkle-CRDT
-A Merkle‑CRDT combines the strengths of Merkle‑DAGs (Directed Acyclic Graphs) and CRDTs (Conflict‑Free Replicated Data Types) to create a robust, decentralized synchronization layer.
+A Merkle‑CRDT combines the strengths of [Merkle-DAGs](../glossary/glossary.md#merkle-dag) (Merkle Directed Acyclic Graphs) and [CRDTs](../glossary/glossary.md#crdt) (Conflict‑Free Replicated Data Types) to create a robust, decentralized synchronization layer.
 
 For further information see:
 - [Log](../reference/log.md#merkle-crdt)
