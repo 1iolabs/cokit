@@ -26,7 +26,7 @@ For further information see:
 
 ### Network
 
-Use `Application::create_network` to start the peer-to-peer networking.
+Use [`Application::create_network`](/crate/co_sdk/struct.Application.html#method.create_network) to start the peer-to-peer networking.
 
 ```rust
 use co_sdk::{ApplicationBuilder, NetworkSettings};
@@ -41,9 +41,14 @@ async fn main() -> Result<(), anyhow::Error> {
 }
 ```
 
+For further information see:
+- [Network](../reference/network.md)
+- [co-sdk: NetworkSettings](/crate/co_sdk/struct.NetworkSettings.html)
+- [co-sdk: CoContext: network](/crate/co_sdk/struct.CoContext.html#method.network)
+
 ### `CoContext`
 
-`CoContext` is a clonable handle to most CO related operations.
+[`CoContext`](/crate/co_sdk/struct.CoContext.html) is a clonable handle to most CO related operations.
 
 ```rust
 use co_sdk::{ApplicationBuilder, NetworkSettings};
@@ -65,9 +70,9 @@ For further information see:
 
 ## `Identity`
 
-A `Identity` represents a DID.
+A [`Identity`](/crate/co_sdk/trait.Identity.html) represents a DID.
 It allows to resolve and work with the DID Document.
-`CoContext::identity_resolver` can be used to obtain the applications identity resolver.
+[`CoContext::identity_resolver`](/crate/co_sdk/struct.CoContext.html#method.identity_resolver) can be used to obtain the applications identity resolver.
 
 ```rust
 use co_sdk::{ApplicationBuilder, NetworkSettings, IdentityResolverBox};
@@ -85,11 +90,15 @@ async fn main() -> Result<(), anyhow::Error> {
 }
 ```
 
+For further information see:
+- [Identity](../reference/identity.md)
+- [co-identity: Identity](/crate/co_identity/trait.Identity.html)
+
 ## `PrivateIdentity`
 
-A `PrivateIdentity` represents a DID you own.
+A [`PrivateIdentity`](/crate/co_sdk/trait.PrivateIdentity.html) represents a DID you own.
 It allows to sign and encrypt using the identity.
-`CoContext::private_identity_resolver` can be used to obtain the applications private identity resolver.
+[`CoContext::private_identity_resolver`](/crate/co_sdk/struct.CoContext.html#method.private_identity_resolver) can be used to obtain the applications private identity resolver.
 The applications private identity resolver will resolve identities which are stored in the Local CO keystore core.
 
 ```rust
@@ -107,6 +116,10 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 ```
+
+For further information see:
+- [Identity](../reference/identity.md)
+- [co-identity: PrivateIdentity](/crate/co_identity/trait.PrivateIdentity.html)
 
 ## UnixFS
 
@@ -135,6 +148,9 @@ async fn main() {
 }
 ```
 
+For further information see:
+- [co-storage: unixfs_add](/crate/co_storage/fn.unixfs_add.html)
+
 ### `unixfs_add_file`
 
 Add a file from path as unixfs file to a block storage.
@@ -149,6 +165,9 @@ async fn main() {
 		println!("CIDs: {:?}", cids);
 }
 ```
+
+For further information see:
+- [co-storage: unixfs_add_file](/crate/co_storage/fn.unixfs_add_file.html)
 
 ### `unixfs_cat_buffer`
 
@@ -173,7 +192,10 @@ async fn main() {
 }
 ```
 
-### `unixfs_encode_buffer`
+For further information see:
+- [co-storage: unixfs_cat_buffer](/crate/co_storage/fn.unixfs_cat_buffer.html)
+
+### `unixfs_stream`
 
 Encode buffer into blocks in memory.
 
@@ -186,6 +208,9 @@ async fn main() {
 	let blocks: Vec<Block<P>> = unixfs_encode_buffer(data.as_bytes()).await.unwrap();
 }
 ```
+
+For further information see:
+- [co-storage: unixfs_encode_buffer](/crate/co_storage/fn.unixfs_cat_buffer.html)
 
 ### `unixfs_stream`
 
@@ -211,11 +236,14 @@ async fn main() {
 }
 ```
 
+For further information see:
+- [co-storage: unixfs_stream](/crate/co_storage/fn.unixfs_cat_buffer.html)
+
 ## `CoReducer`
 
 CO handle.
 This is used to interact with a CO.
-It can be obtained from the `CoContext`.
+It can be obtained from the [`CoContext`](/crate/co_sdk/struct.CoContext.html).
 
 ```rust
 use co_sdk::{ApplicationBuilder, NetworkSettings, IdentityResolverBox, DidKeyIdentity, CO_CORE_NAME_KEYSTORE, DidKeyProvider, CreateCo};
@@ -242,6 +270,9 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 ```
+
+For further information see:
+- [co-sdk: CoReducer](/crate/co_sdk/struct.CoReducer.html)
 
 ### `reducer_state`
 
