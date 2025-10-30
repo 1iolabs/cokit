@@ -4,30 +4,36 @@
 
 ## General
 ### What is CO-kit and what are its primary use cases?
-- CO-kit has been built to provide an SDK that finally allows you to stop worrying about backends and dependencies and lets you focus on the task at hand.
-- Each and every application built on CO-kit shall be:
-	- easy to build and easy to use
-	- decentralized
-	- usable on local infrastructure
-	- secure
-	- non-reliant on middlemen through peer-to-peer networking
-	- a place where users may keep control and track over their data
+CO-kit has been built to provide an SDK that finally allows you to stop worrying about backends and dependencies and lets you focus on the task at hand.
+
+Each and every application built on CO-kit shall be:
+- easy to build and easy to use
+- decentralized
+- usable on local infrastructure
+- secure
+- non-reliant on middlemen through peer-to-peer networking
+- a place where users may keep control and track over their data
 
 CO-kit is especially useful for:
-- Collaborative applications with focus on usability and data-ownership for the users.
+- Collaborative applications with focus on usability and data-ownership for the users
 - Communication platforms and messengers in general with a focus on privacy and data security
 - Dual-use in the defence sector: Communication for the battlefield and catastrophe management
-- [See more on our website](https://1io.com/de)
+
+For further information see:
+- [1io.com](https://1io.com/)
 
 ### Is CO-kit open-source? Under what license is it distributed?
-- Yes CO-kit is open-source
-- We use APLGv3 as the license of choice
+Yes CO-kit is open-source.
+
+We use APLGv3 as the license of choice.
 
 For further information see:
 - [Legal Notice](../license/legal-notice.md)
 
 ### What platforms does CO-kit support? (e.g., Linux, Windows, macOS, etc.)
-- CO-kit is platform-agnostic and can be supported by any OS.
+CO-kit is platform-agnostic and supportes all major OS.
+
+Naturally as CO-kit is written in Rust, it should run on other platforms.
 
 ### How does CO-kit differ from other CRDT or P2P-based frameworks?
 CO-kit not only provides end-to-end encryption in processes, but also end-to-end verification, meaning:
@@ -42,11 +48,16 @@ Included in CO-kit and thus significantly reducing programming time when buildin
 - Private data handling as not even encrypted data is shared with unknown peers
 
 ### Can CO-kit-based applications be used offline and sync later?
-Yes. Every change happens only locally and is eventually distributed to other participants over time. Secondly, every piece of data is content-addressed; this makes it easy to sync between peers.
-If too many peers appear to be offline, consensus within a CO is possibly block, but this is not an issue and depends on the CO-setup, is optional and on demand.
+Yes. Every change happens only locally and is eventually distributed to other participants over time.
+Secondly, every piece of data is content-addressed; this makes it easy to sync between peers.
+
+If too many peers appear to be offline, consensus within a CO possibly blocks, but this is not an issue as it is optional and on demand.
+When a consensus is blocked work can still continue (also between peers) and finality will eventually recover.
+Consensus depends on the CO and application setup.
 
 For further information see:
-- [[#What happens during a network partition or peer disconnect?]]
+- [Consensus](../reference/consensus.md)
+- [FAQ: What happens during a network partition or peer disconnect?](#what-happens-during-a-network-partition-or-peer-disconnect)
 - [Glossary: Content addressing](../glossary/glossary.md#cid)
 
 
@@ -57,6 +68,7 @@ Therefore, you can store CO-kit managed files on local disk, cloud storages or o
 All files are stored verifiable using content addressing.
 
 For further information see:
+- [Storage](../reference/storage.md)
 - [Glossary: Content adressing](../glossary/glossary.md#cid)
 
 ### How are COs structured and persisted?
@@ -93,19 +105,22 @@ For further information see:
 ### Can CO-kit be integrated with traditional centralized systems?
 Yes.
 COs would be serving as an added layer of trust and security when in use in centralized systems.
+
 The library can be integrated anywhere and you can also build your backend/data models with CO-kit.
+
 Another useful scenario is CO-kit-built apps in processes that are fed back into traditional centralized systems.
 As COs are lightweight they can be stored and used as receipts (leveraging non-reputability).
-Also:
-- Amplify the edge
-	- Use low overhead edge caching through content addressing which allows for efficient syncing
-	- Let the edge work locally and occasionally sync to server/cloud
+
+Also its usable to amplify the edge.
+Use low overhead edge caching through content-addressing which allows for efficient syncing.
+Let the edge work locally and occasionally sync to server/cloud/infrastructure in a batch.
 
 ## Networking & Synchronization
 ### How does peer discovery work in CO-kit's networking model?
 Local peer discovery is done by utilizing mDNS.
-CO-kit uses the GossipSub protocol for peer discovery.
-The networking is entire optional and one could just use HTTP for transferring blocks.
+For general discovery CO-kit uses a GossipSub-based protocol to discover/contact peers.
+
+The networking is entire optional and one could just use HTTP or plain filesystem for transferring blocks.
 
 For further information see:
 - [Network: DID discovery](../reference/network.md#diddiscovery)
@@ -125,6 +140,8 @@ This even makes is possible to just use any cloud storage drive to share the CO-
 
 For further information see:
 - [Glossary: content addressing](../glossary/glossary.md#cid)
+- [Key Principles](../introduction/key-principles.md#file-based)
+- [Storage](../reference/storage.md)
 
 ### How does CO-kit handle NAT traversal and firewalls in P2P mode?
 This is handled through a variety of possibilities. First option is through a circuit relay. libp2p [defines a protocol called p2p-circuit](https://github.com/libp2p/specs/tree/master/relay). When a peer isn’t able to listen on a public address, it can dial out to a relay peer, which will keep a long-lived connection open. Other peers will be able to dial through the relay peer using a `p2p-circuit` address, which will forward traffic to its destination.
@@ -142,11 +159,19 @@ When a peer reconnects, the heads are shared again and the Log joins new heads, 
 ## Data & Consensus
 ### How are conflicts resolved using Merkle-CRDTs in CO-kit?
 Conflicts are resolved by the [Log](../reference/log.md) which is sorting the stream of events by the event's logical clock.
+
 ### Can I define custom consensus logic for my application?
 Yes. A consensus is implemented as a core with an additional guard.
+
+For further information see:
+- [Guard](../reference/guard.md)
+
 ### What level of schema validation or migration support does CO-kit offer?
 Schema validation is up to the developer of [Core](../reference/core.md) and can be implemented as desired.
 Cores can be migrated between versions. The migration itself is just another event which can be implemented in code.
+
+For further information see:
+- [Core](../reference/core.md#migrations)
 
 ### How does CO-kit manage partial data availability across distributed nodes?
 As all data is represented as a graph, more precisely as a DAG (directed acyclic graph) the data is always accessed top-down, meaning we can fetch more data as we walk down the graph.
