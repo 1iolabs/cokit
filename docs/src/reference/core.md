@@ -71,12 +71,9 @@ Each reducer operation is one "unit" and either, by design, succeeds completely,
 ## Permissions
 Permissions are usually implemented in the data model and logic.
 Therefore, they are inherent to the cores.
-Some examples:
-- Someone is allowed to comment on blog entries but not to create new blog entries.
-- Someone is allowed to post new messages but not to delete them.
-These checks are implemented as simple checks or conditions in the Core.
 
-For an implementation example click [here](first%20steps.md#permissions).
+For further information see:
+- [Permissions](../reference/permissions.md)
 
 ## Features
 
@@ -89,6 +86,9 @@ Therefore it can be programmed just like any other reducer operation.
 This approach is highly flexible and leverages the simple yet effective characteristics of cores.
 These migrations can be used for schema and data alike.
 
+For further information see:
+- [co-core-co: CoAction: CoreUpgrade](/crate/co_core_co/enum.CoAction.html#variant.CoreUpgrade)
+- [example-counter-upgraded: CounterAction: MigrateFromV1](/crate/example_counter_upgraded/enum.CounterAction.html#variant.MigrateFromV1)
 
 ## Higher order cores
 Existing cores can be easily composed into a new core making more complex data models possible.
@@ -100,31 +100,31 @@ For example: It is easily possible to create a Markdown document management-core
 
 ## Built-in cores
 We provide a set of cores.
-We are constantly working on bringing you even more built-in cores. 
+We are constantly working on bringing you even more built-in cores.
 They are the following:
 
 #### `co-core-co`
-Root core which manages the COs core instances, guards and participants.
+Root core which manages the COs cores, guards and participants.
 
 #### `co-core-keystore`
 Stores credentials.
-Used internally to store DID and PeerID private keys.
+Used internally in the [Local CO](../reference/co.md#local-co) to store DID and PeerID private keys.
 
 #### `co-core-membership`
 Stores memberships information of COs.
-Used internally in the Local CO to track which COs one of out identities is a member of.
+Used internally in the [Local CO](../reference/co.md#local-co) to track which COs one of out identities is a member of.
 
 #### `co-core-board`
 Kanban board core.
-Used internally to coordinate pending network requests.
+Used internally in the [Local CO](../reference/co.md#local-co) to coordinate pending network requests.
 
 #### `co-core-storage`
 Stores reference informations about storage blocks which exist on disk.
-Used internally to free blocks from disk which are not referenced anymore.
+Used internally in the [Local CO](../reference/co.md#local-co) to free blocks from disk which are not referenced anymore.
 
 #### `co-core-poa`
-Proof-of-authority core.
-Provides POA [consensus](../reference/consensus.md) for a CO.
+Proof-of-authority (PoA) core.
+Provides PoA [consensus](../reference/consensus.md) for a CO.
 
 #### `co-core-room`
 Messaging core. Stores messages in matrix compatible format.
@@ -140,4 +140,3 @@ Stores conflict free rich text.
 
 #### `co-core-role`
 Basic role-based access rules. As a go-to data model for daily permission management.
-
