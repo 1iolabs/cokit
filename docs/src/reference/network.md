@@ -1,10 +1,12 @@
 # Network
 
-CO-kit has a built-in network stack utilizing [libp2p](https://libp2p.io/).
+CO-kit has a built-in peer-to-peer network stack utilizing [libp2p](https://libp2p.io/).
+
+The peer-to-peer networking is optional.
+Any other protocol like http or file protocols like NFS can be used (with some effort).
+There is no lock-in to a single networking strategy; just describe your data using a core and easily adapt CO-kit to your infrastructure.
 
 The actual networking protocols used can be configured for every CO.
-The peer-to-peer networking is optional. Any other protocol like http or file protocols like NFS can be used (with some effort).
-There is no lock-in to a single networking strategy; just describe your data using a core and easily adapt CO-kit to your infrastructure.
 
 ## Network Configuration
 For each [CO](../reference/co.md), a variety of network configurations for connectivity can be made.
@@ -47,9 +49,9 @@ For further information see:
 ### HTTP
 Directly configured HTTP endpoint.
 
-Coming soon[^issue-78].
-
 This can be used to host the CO on a dedicated server/cloud or other infrastructure.
+
+Coming soon[^issue-78].
 
 [^issue-78]: [Network: HTTP (#78)](https://gitlab.1io.com/1io/co-sdk/-/issues/78)
 
@@ -90,9 +92,12 @@ The libp2p ping protocol is a simple liveness check that peers can use to test t
 The identify protocol allows peers to exchange information about each other, most notably their public keys and known network addresses.
 
 ### Protocol: didcomm
-A Network protocol to send [didcomm](https://identity.foundation/didcomm-messaging/spec/v2.1/)-encoded message to a given peer.
+A Network protocol to send didcomm-encoded message to a given peer.
 It uses a libp2p sub-stream for message transfer with a length prefixed streaming protocol.
 CO-kit uses this to send discovery, join and invite messages directly to peers.
+
+For further information see:
+- [DIDComm Messaging Specification v2.1](https://identity.foundation/didcomm-messaging/spec/v2.1/)
 
 ### Protocol: bitswap
 Bitswap is a protocol for exchanging blocks of data.
