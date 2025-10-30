@@ -1,6 +1,6 @@
 # API Overview apps (co-sdk)
 
-The `co-sdk` is the foundation package to create CO-kit based applications.
+The `co-sdk` is the foundation package to create CO-kit-based applications.
 
 ## `Application`
 
@@ -110,8 +110,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
 ## UnixFS
 
-UnixFS is a IPFS Standard which allow to store files in a graph.
-CO-kit got somew builtin primitives to read and write UnixFS files.
+UnixFS is a IPFS Standard which allows to store files in a graph.
+CO-kit got some built-in primitives to read and write UnixFS files.
 
 For further information see:
 - [UnixFS](https://specs.ipfs.tech/unixfs/)
@@ -276,17 +276,18 @@ For further information see:
 
 ## `Cores`
 
-Registry for builtin cores.
+Registry for built-in cores.
 
 For further information see:
 - [co-sdk: Cores](/crate/co_sdk/struct.Cores.html)
 
 ### `Guards`
 
-Registry for builtin guards.
+Registry for built-in guards.
 
 For further information see:
 - [co-sdk: Guards](/crate/co_sdk/struct.Guards.html)
 
 ## References
 - [co-sdk](/crate/co_sdk/index.html)
+- [Glossary: CID](../glossary/glossary.md#cid)
