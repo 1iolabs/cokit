@@ -2,13 +2,13 @@
 
 #todo #review
 
-The [`co-api`](/crate/co_api/index.html) is the foundation package to create CO-kit cores.
-It reexports [`co-primitives`](/crate/co_primitives/index.html) used to implement cores.
+The [`co-api`](/crate/co_api/index.html) is the foundation package to create CO-kit [cores](../reference/core.md).
+It re-exports [`co-primitives`](/crate/co_primitives/index.html) used to implement cores.
 
 ## `Reducer`
 
 The reducer trait.
-Normally implemented on the root state of the Core.
+Normally implemented on the root state of the core.
 Its purpose is to apply actions to the current state.
 
 Minimal usage example:
@@ -123,3 +123,4 @@ A single binary may be export both.
 - [Core](../reference/core.md)
 - [Guard](../reference/guard.md)
 - [co-api](/crate/co_api/index.html)
+- [Glossary: WASM](../glossary/glossary.md#wasm)
