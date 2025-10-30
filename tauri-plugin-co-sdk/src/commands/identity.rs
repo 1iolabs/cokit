@@ -7,9 +7,11 @@ pub(crate) async fn create_identity(
 	actor_handle: tauri::State<'_, ActorHandle<ApplicationActorMessage>>,
 	name: String,
 	seed: Option<Vec<u8>>,
-) -> Result<(), InvokeError> {
-	actor_handle
-		.dispatch(ApplicationActorMessage::CreateIdentity(CreateIdentityRequest { name, seed }))
-		.map_err(InvokeError::from_error)?;
-	Ok(())
+) -> Result<String, InvokeError> {
+	let result = actor_handle
+		.request(|r| ApplicationActorMessage::CreateIdentity(CreateIdentityRequest { name, seed }, r))
+		.await
+		.map_err(InvokeError::from_error)?
+		.map_err(InvokeError::from_anyhow)?;
+	Ok(result)
 }

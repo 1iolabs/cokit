@@ -3,7 +3,6 @@ import { Action } from "redux";
 import { filter, identity, mergeAll, mergeMap } from "rxjs";
 import DefaultAvatar from "../../../assets/Users_48.svg";
 import { splitCoCoreId } from "../../../library/core-id.js";
-import { getCoreState, getResolvedCoState } from "../../../library/invoke-get.js";
 import { coappChatsListPluginId } from "../../coapp-chatslist-plugin/types/plugin.js";
 import {
   GroupViewParticipantAddedAction,
@@ -13,6 +12,7 @@ import {
 } from "../actions/index.js";
 import { GroupViewEpicType } from "../types/plugin.js";
 import { GroupViewPluginRoomCoreIdTag } from "../types/tag.js";
+import { getCoreState, getResolvedCoState } from "../../../../../../dist-js";
 
 export const initializeEpic: GroupViewEpicType = (action$, _, context) =>
   action$.pipe(

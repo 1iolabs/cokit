@@ -1,6 +1,4 @@
-import { isNonNull } from "@1io/compare";
-import { getCoState, resolveCid, sessionClose, sessionOpen } from "tauri-plugin-co-sdk";
-import { buildCoCoreId } from "./core-id.js";
+import { getCoState, resolveCid, sessionClose, sessionOpen } from "./invoke-utils";
 
 export async function getResolvedCoState(co: string, externalSessionId?: string): Promise<any | undefined> {
   // open session if no external session given
@@ -52,7 +50,7 @@ export async function getCoIds(): Promise<ReadonlyArray<string>> {
         // only get joined COs
         .filter((membership: any) => membership?.membership_state === 0)
         .map((membership: any) => membership?.id)
-        .filter(isNonNull)
+        .filter((i: any) => i !== null)
     );
   }
   return [];
@@ -68,20 +66,25 @@ export async function getInvitedCoIds(): Promise<ReadonlyArray<string>> {
         // only get joined COs
         .filter((membership: any) => membership?.membership_state === 2)
         .map((membership: any) => membership?.id)
-        .filter(isNonNull)
+        .filter((i: any) => i !== null)
     );
   }
   return [];
 }
 
-export async function getFilteredCoreIds(tags: string[], co?: string): Promise<string[]> {
+export interface CoCore {
+  coId: string;
+  coreId: string;
+}
+
+export async function getFilteredCoreIds(tags: string[], co?: string): Promise<CoCore[]> {
   const coIds: string[] = [];
   if (co !== undefined) {
     coIds.push(co);
   } else {
     coIds.push(...(await getCoIds()));
   }
-  const foundCores: string[] = [];
+  const foundCores: CoCore[] = [];
   for (const coId of coIds) {
     const state = await getResolvedCoState(coId);
     if (state === undefined || state === null) {
@@ -92,7 +95,7 @@ export async function getFilteredCoreIds(tags: string[], co?: string): Promise<s
       const v = value as any;
       if (v?.tags) {
         if (v.tags[0].every((tag: string) => tags.includes(tag))) {
-          foundCores.push(buildCoCoreId(coId, key));
+          foundCores.push({coId, coreId: key});
         }
       }
     }

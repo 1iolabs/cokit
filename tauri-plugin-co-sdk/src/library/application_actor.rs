@@ -5,7 +5,7 @@ use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseStream};
 use co_primitives::{Block, DefaultParams};
 use co_sdk::{
 	Action, Application, ApplicationMessage, BlockStorage, BlockStorageExt, CoId, CoReducer, CoReducerFactory, Did,
-	DidKeyIdentity, DidKeyProvider, PrivateIdentityResolver, Tags, CO_CORE_NAME_KEYSTORE,
+	DidKeyIdentity, DidKeyProvider, Identity, PrivateIdentityResolver, Tags, CO_CORE_NAME_KEYSTORE,
 };
 use futures::{pin_mut, StreamExt};
 use ipld_core::ipld::Ipld;
@@ -61,7 +61,7 @@ pub enum ApplicationActorMessage {
 	Push(SessionId, String, Ipld, Did, Response<Result<Option<Cid>, anyhow::Error>>),
 	ResolveCid(SessionId, Cid, Response<Result<Ipld, anyhow::Error>>),
 	GetActions(GetActionsRequest, Response<Result<GetActionsResponse, anyhow::Error>>),
-	CreateIdentity(CreateIdentityRequest),
+	CreateIdentity(CreateIdentityRequest, Response<Result<Did, anyhow::Error>>),
 	CreateCo(CreateCoRequest),
 }
 
@@ -289,11 +289,12 @@ impl Actor for ApplicationActor {
 					Ok(GetActionsResponse { actions, next_heads })
 				});
 			},
-			ApplicationActorMessage::CreateIdentity(request) => {
+			ApplicationActorMessage::CreateIdentity(request, response) => {
 				let identity = DidKeyIdentity::generate(request.seed.as_deref());
 				let co = state.application.local_co_reducer().await?;
 				let provider = DidKeyProvider::new(co, CO_CORE_NAME_KEYSTORE);
 				provider.store(&identity, Some(request.name)).await?;
+				response.respond(Ok(identity.identity().to_owned()));
 			},
 			ApplicationActorMessage::CreateCo(request) => {
 				// resolve identity

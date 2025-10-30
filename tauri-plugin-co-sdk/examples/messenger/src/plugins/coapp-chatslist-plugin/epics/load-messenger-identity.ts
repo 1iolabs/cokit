@@ -1,8 +1,7 @@
 import { isPluginInitializeAction } from "@1io/kui-application-sdk";
 import { filter, identity, mergeAll, mergeMap } from "rxjs";
-import { createIdentity, Keystore, resolveCid, sessionClose, sessionOpen } from "../../../../../../dist-js/index.js";
+import { createIdentity, getCoreState, Keystore, resolveCid, sessionClose, sessionOpen } from "../../../../../../dist-js/index.js";
 import { DagList } from "../../../library/dag-list.js";
-import { getCoreState } from "../../../library/invoke-get.js";
 import { ChatsListActions, ChatsListActionType, ChatsListSetIdentityAction } from "../actions/index.js";
 import { ChatsListEpicType } from "../types/plugin.js";
 

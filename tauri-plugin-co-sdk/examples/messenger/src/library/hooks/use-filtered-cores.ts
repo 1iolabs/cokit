@@ -1,7 +1,7 @@
 import React from "react";
-import { getResolvedCoState } from "../invoke-get.js";
 import { buildCoCoreId } from "../core-id.js";
 import { compareArrayItemsEqual } from "@1io/compare";
+import {getResolvedCoState} from "../../../../../dist-js/index.js"
 
 // returns true if and only if all of the tags in the pattern can be found in the given tags
 function matchesPattern(tags: string[][], pattern: string[][]): boolean {
