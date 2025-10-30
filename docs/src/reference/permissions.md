@@ -8,6 +8,14 @@ It is important to differentiate between the two for reasons of efficiency and s
 - They essentially describe what makes it into the state of a core.
 - They are permanent and will be re-evaluated after conflicts.
 
+Some examples:
+- Someone is allowed to comment on blog entries but not to create new blog entries.
+- Someone is allowed to post new messages but not to delete them.
+
+These checks are implemented as simple checks or conditions in the Core.
+
+For an implementation example click [here](../getting-started/first-steps.md#permissions).
+
 ## When to use Guards or Permissions
 Guards are evaluated _before_ join transactions into the log.
 Permissions are evaluated _after_ transactions made it into the log, meaning the Guards are executed before any conflict-resolving logic takes place.
