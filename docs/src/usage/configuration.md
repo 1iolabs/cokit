@@ -10,7 +10,7 @@ For further information see:
 - [co-core-co: Co: tags](/crate/co_core_co/struct.Co.html#structfield.tags)
 
 #### Invite
-Invite settings when receive a new invite.
+Invite settings when receiving a new invite.
 - Scope: Local CO
 - Settings
 	- `manual`: Add as “pending” membership.
@@ -26,7 +26,7 @@ Join settings of a shared CO.
 - Scope: CO
 - Settings
 	- `invite`: Only accept joins when participant has been invited.
-	- `accept`: Auto Accept all Join requests.
+	- `accept`: Auto-accept all join requests.
 	- `did`: Only accept join when DID can be verified for certain properties.
 	- `manual`: Add "pending" participant.
 
@@ -41,10 +41,10 @@ For further information see:
 
 
 ## Application
-Application specific configurations available to app developers leveraging CO-kit.
+Application-specific configurations available to app developers leveraging CO-kit.
 
 ### Network
-When starting the network it is possible to pass startup options.
+When starting the network, it's possible to pass startup options.
 
 For further informations see:
 - [co-sdk: NetworkSettings](/crate/co_sdk/struct.NetworkSettings.html)
@@ -52,7 +52,7 @@ For further informations see:
 
 #### Force New Peer ID
 Force to create a new PeerID before network startup.
-This can be used to improve privacy so users can not be tracked across application starts.
+This can be used to improve privacy so users can't be tracked across application starts.
 
 #### Listen
 Endpoint to listen to.
