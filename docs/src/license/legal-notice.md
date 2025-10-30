@@ -1,7 +1,7 @@
 # Legal notice
 ## License
 
-The CO-kit SDK is released as open source under the GNU Affero General Public License v3.0 (AGPLv3) with a linking exception.
+The CO-kit SDK is released as open-source under the GNU Affero General Public License v3.0 (AGPLv3) with a linking exception.
 
 ## Summary
 
