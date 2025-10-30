@@ -49,7 +49,7 @@ flowchart TD
 	B --> S
 ```
 ### Components
-- [Device](./usage/os-specifics.md): The platform host
+- Device: The platform host
 	- [Network](../reference/network.md): The platform network interface
 	- Filesystem: File based persistence
 	- App: An Application using CO-kit

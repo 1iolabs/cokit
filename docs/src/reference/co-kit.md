@@ -12,19 +12,19 @@ Guards are checks for transactions.
 
 ### [Storage](../reference/storage.md)
 Content addressed block storage.
-Implemented by the `co-storage` package.
+Implemented by the [`co-storage`](/crate/co_storage/index.html) package.
 
 ### [Log](../reference/log.md)
 Merkle-CRDT log. Conflict free stream of transactions.
-Implemented by the `co-log` package.
+Implemented by the [`co-log`](/crate/co_log/index.html) package.
 
 ### [Network](../reference/network.md)
 Various protocols for peer-to-peer networking.
-Implemented by the `co-network` package.
+Implemented by the [`co-network`](/crate/co_network/index.html) package.
 
 ### [Identity](../reference/identity.md)
 Decentralized Identifiers using [DID](../glossary/glossary.md#did).
-Implemented by the `co-identity` package.
+Implemented by the [`co-identity`](/crate/co_identity/index.html) package.
 
 ### [Permissions](../reference/permissions.md)
 Permissions are checks for states.
@@ -62,7 +62,7 @@ Ready-to-use CO-kit integrations for different platforms and frameworks.
 These are the necessary components to enable distributed use of COs.
 
 - [co-network](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-network): Peer-to-Peer networking implementation.
-- [co-log](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-log): Merkle-CRDT log (event stream) implementation. 
+- [co-log](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-log): Merkle-CRDT log (event stream) implementation.
 
 ### Storage and Encryption
 Storage in CO-kit is content-addressed.
@@ -91,4 +91,3 @@ Packages for internals of CO-kit. These are used by contributors of CO-kit.
 ### Documentation
 
 - [docs](https://gitlab.1io.com/1io/co-sdk/-/tree/main/docs): We used the [mdBook](https://rust-lang.github.io/mdBook/) sources for this documentation.
-
