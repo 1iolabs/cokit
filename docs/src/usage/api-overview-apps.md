@@ -267,7 +267,7 @@ For further information see:
 ## `CoStorage`
 
 A storage instance that belongs to a CO.
-It can be obrained from a opened co instance.
+It can be obtained from a opened co instance.
 
 For further information see:
 - [Storage](../reference/storage.md)

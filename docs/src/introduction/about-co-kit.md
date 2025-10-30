@@ -7,7 +7,7 @@ CO-kit enables you to build data rooms called COs using data models called COres
 ## CO-kit for ...
 
 ### ... Frontend developers
-- Like BaaS but for free
+- Like Backend as a Service (BaaS) but for free
 - Realtime database and collaboration
 - Data used/produced on a device is available local automatically
 - Built-in identity management through [DID](../reference/identity.md#what-is-a-did)
@@ -25,7 +25,8 @@ CO-kit enables you to build data rooms called COs using data models called COres
 
 ### ... Database nerds
 - [Cores](../reference/core.md) are like databases with built-in atomicity, consistency, isolation and durability
-- The Log with its resulting states are a MVCC
+- The [Log](../reference/log.md) with its resulting states are a Multiversion concurrency control
+ (MVCC)
 - CO-kit is like a database with Master-Master replication, where your business logic can decide what happens on conflicts, whereas with transactions only the database can.
 	- With conventional databases only transactions/operations can be reapplied/reordered, but without knowing the business logic behind. Cores reapply the whole business logic when reordering a transaction.
 - No need for an interface or API between data and business logic because it's one thing: a core

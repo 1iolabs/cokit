@@ -56,7 +56,7 @@ The first view allows to create todo lists as well to respond to invites.
 The second view allows to manage tasks and participants.
 
 ### Application
-
+For this quick start we only use a single file: `src/main.rs`.
 #### Setup
 In the main function we initialize CO-kit and pass it as context to dioxus:
 

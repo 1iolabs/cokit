@@ -8,7 +8,7 @@ A *strong copyleft* license created by the Free Software Foundation to ensure th
 
 Key points:
 - What makes it different from GPLv3: AGPLv3 closes the "SaaS loophole" by requiring modified source code to be provided when the software is used over a network.
-- Copyleft principle: Any changes or extensions (including those accessed remotely) must remain under AGPLv3 .
+- Copyleft principle: Any changes or extensions (including those accessed remotely) must remain under AGPLv3.
 - Compatibility: AGPLv3 is compatible with GPLv3. You can combine AGPLv3 and GPLv3 code, but section 13 ensures that the combined work is covered by the AGPL terms.
 - Linking Exception: An optional addendum that allows proprietary or differently-licensed software to link to AGPLv3 code without forcing the entire application to adopt AGPLv3, granted you don’t modify the interface itself.
 
@@ -96,7 +96,7 @@ With CO-kit, you can easily build...
 - & collaborative ...applications that make full use of your skills - there are virtually no limitations that you might have with cloud providers or other SDKs.
 
 For further information see:
-- [CO-kit in the FAQs](./faq/faq.md#general)
+- [CO-kit in the FAQs](../faq/faq.md#general)
 
 ## Consensus
 In CO-kit, consensus refers to the protocols ensuring multiple peers agree on shared state or actions—even in the presence of unreliable networks or malicious actors.

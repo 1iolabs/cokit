@@ -2,8 +2,8 @@
 
 #todo #review
 
-The `co-api` is the foundation package to create CO-kit cores.
-It reexports `co-primitives` used to implement cores.
+The [`co-api`](/crate/co_api/index.html) is the foundation package to create CO-kit cores.
+It reexports [`co-primitives`](/crate/co_primitives/index.html) used to implement cores.
 
 ## `Reducer`
 

@@ -96,7 +96,7 @@ CO-kit uses this to send discovery, join and invite messages directly to peers.
 
 ### Protocol: bitswap
 Bitswap is a protocol for exchanging blocks of data.
-It is a message-based protocol where all messages contain want-lists or blocks.
+It is a message-based protocol where all messages contain want-lists (which blocks we are interested in) or blocks.
 CO-kit uses an extended version of Bitswap which includes token based authorization.
 
 For further information see:
