@@ -4,16 +4,18 @@ The consensus is the mechanism to reach a validated CO state.
 
 ## What makes a Consensus in CO-kit
 Consensus in CO-kit provides finality.
-When heads from different participants are joined, the event order in the [Log](./log.md#example) may change.
-This is necessary to make the Merkle-CRDT work technically.
+When heads from different participants are joined, the event order in the [Log](../reference/log.md#example) may change.
+This is necessary to make the [Merkle-CRDT](../glossary/glossary.md#merkle-crdt) work technically.
 
 The consensus, on the other hand, is used to allow the network of participants of an CO to commit to an known state/heads combination.
 After a successful consensus round (depending on the consensus algorithm), there are no more heads accepted that would alter the sorting of events before this point.
+At this point finalized state has been reached.
 
 ## Checkpoint
 For each set of heads, a materialized state is calculated.
 A checkpoint (or snapshot) is the combination of this state and heads.
 Each successful consensus round produces a checkpoint.
+
 For example:
 - a checkpoint functions like a block in a Blockchain, but is more versatile because it's not dependent on a predefined mining period - but rather works on demand.
 
@@ -29,23 +31,23 @@ Finality means a certain checkpoint is agreed upon and no events can be inserted
 Finality is cryptographically verifiable once reached and therefore can be trusted to be immutable among CO participants.
 
 ## Optional
-Consensus algorithms in a CO are completely optional.
-The [Log](./log.md) with the [Merkle-CRDT](../glossary/glossary.md#merkle-crdt) solves the technical part of syncing, conflict handling and validation.
+Consensus algorithms in a [CO](../reference/co.md) are completely optional.
+The [Log](./log.md) with the [Merkle-CRDT](../glossary/glossary.md#merkle-crdt) and [Cores](../reference/core.md) solve the technical part of syncing, conflict handling and validation.
 If no other mechanism is applied (proof of authority, etc.), the Merkle-CRDT serves as a single source of truth.
 Depending on your project requirements, you can implement any other consensus mechanism.
 
 ## Asynchronous
 In CO-kit consensus is asynchronous and on-demand, meaning users only have to wait for it, if it is really needed.
-While conventional databases normally provide finality by default (when a change is written it's final), this comes at the cost that every change losses time by having a lot of overhead (latency, routing, compute, ...).
+While conventional databases normally provide finality by default (when a change is written/commited it's final), this comes at the cost that every change losses time by having a lot of overhead (latency, routing, compute, ...).
 
 ## Proof of authority
-Proof of authority is the built-in consensus mechanism used in CO-kit.
+Proof of authority (PoA) is the built-in consensus mechanism used in CO-kit.
 
-It is implemented in the `co-core-poa` Core.
+It is implemented in the [`co-core-poa`](/crate/co_core_poa/index.html) Core.
 
 When the creator of a CO adds this Core the authority can be specified as a list of DIDs.
 This authority is then responsible for voting and once a majority is reached on a checkpoint, it is finalized.
-The POA allows for Byzantine Fault Tolerance (BFT) when configured with a majority of at least two-thirds of the authority.
+The PoA allows for Byzantine Fault Tolerance (BFT) when configured with a majority of at least two-thirds of the authority.
 
 By default `2/3` majority is used.
 
