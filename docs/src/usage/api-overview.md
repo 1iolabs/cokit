@@ -10,7 +10,7 @@ Table of Contents:
 ## `BlockStorage`
 
 The block storage API is used to set and get content-addressed blocks of data.
-The `BlockStorageExt` trait extends this with convenience methods like directly setting a block from data.
+The [`BlockStorageExt`](/crate/co_primitives/trait.BlockStorageExt.html) trait extends this with convenience methods like directly setting a block from data.
 
 ```rust
 # use co_storage::MemoryBlockStorage;
@@ -35,7 +35,7 @@ For further information see:
 - [co-primitives: BlockStorageExt](/crate/co_primitives/trait.BlockStorageExt.html)
 
 ## `CoMap`
-`CoMap` stores Key/Value pairs using the IPLD data model in a content-addressed fashion.
+[`CoMap`](/crate/co_primitives/struct.CoMap.html) stores Key/Value pairs using the IPLD data model in a content-addressed fashion.
 Works like a hash map but async and sorted by keys.
 
 For further information see:
@@ -44,7 +44,7 @@ For further information see:
 - [Glossary: content addressing (CID)](../glossary/glossary.md#cid)
 
 ### Read
-Example of how to read a `CoMap`.
+Example of how to read a [`CoMap`](/crate/co_primitives/struct.CoMap.html).
 
 ```rust
 # use co_storage::MemoryBlockStorage;
@@ -75,7 +75,7 @@ assert_eq!(
 ```
 
 ### Write
-Example of how to write a `CoMap`.
+Example of how to write a [`CoMap`](/crate/co_primitives/struct.CoMap.html).
 
 ```rust
 # use co_storage::MemoryBlockStorage;
@@ -129,7 +129,7 @@ assert_eq!(
 ```
 
 ## `CoSet`
-`CoSet` stores values using the IPLD data model in a content-addressed fashion.
+[`CoSet`](/crate/co_primitives/struct.CoSet.html) stores values using the IPLD data model in a content-addressed fashion.
 Works like a hash set but async and sorted by values.
 
 For further information see:
@@ -138,10 +138,10 @@ For further information see:
 - [Glossary: content addressing (CID)](../glossary/glossary.md#cid)
 
 ## `CoList`
-`CoList` stores values by order, using the IPLD data model in a content-addressed fashion.
+[`CoList`](/crate/co_primitives/struct.CoList.html) stores values by order, using the IPLD data model in a content-addressed fashion.
 Works like a vector but async.
 
-The used key type is `CoListIndex`, which internally uses rational numbers.
+The used key type is [`CoListIndex`](/crate/co_primitives/struct.CoListIndex.html), which internally uses rational numbers.
 This way we can insert between existing values without the need to rewrite all values.
 
 For further information see:
@@ -151,7 +151,7 @@ For further information see:
 - [Glossary: content addressing (CID)](../glossary/glossary.md#cid)
 
 ## `BlockSerializer`
-This is a convenience type to create a `Block` from data that support `serde::Serialize`.
+This is a convenience type to create a [`Block`](/crate/co_primitives/struct.Block.html) from data that support `serde::Serialize`.
 It uses the DAG-CBOR encoding.
 
 ```rust
