@@ -6,7 +6,7 @@ If that is not the case you will have much bigger problems to worry about as no 
 ```
 
 ```admonish warning
-Cryptography in CO-kit has currently not been peer reviewed / audited.
+Cryptography in CO-kit has currently not been peer reviewed/audited.
 ```
 
 ## Cryptography
@@ -29,13 +29,13 @@ Cryptography crates used:
 - [aead](https://crates.io/crates/aead)
 
 ## Privacy
-Privacy depends on the used networking strategy.
+Privacy is dependent on the used networking strategy.
 
-PeerID are unique any may tracked by malicious peers.
+PeerIDs are unique any may tracked by malicious peers.
 However, they can be rotated anytime to improve privacy.
 
-The builtin didcontact protocol notably sends, specifed by the didcomm spec, the senders DID reference in plain text.
-The recipent is encrypted so this only allows to relate a PeerID to a DID.
+The built-in [didcontact](../reference/network.md#protocol-didcontact) protocol notably sends, specified by the [didcomm](../reference/network.md#protocol-didcomm) spec, the senders DID reference in plain text.
+The recipient is encrypted so this only allows to relate a PeerID to a DID.
 
 ## Related
 - [Security (#24)](https://gitlab.1io.com/1io/co-sdk/-/issues/24)
