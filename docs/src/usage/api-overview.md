@@ -1,7 +1,7 @@
 # API Overview
 
 Common APIs are exported by the `co-primitives` package.
-They are used across Cores and Applications.
+They are used across [cores](../reference/core.md) and Applications.
 
 Table of Contents:
 
@@ -41,6 +41,7 @@ Works like a hash map but async and sorted by keys.
 For further information see:
 - [co-primitives: CoMap](/crate/co_primitives/struct.CoMap.html)
 - [Glossary: IPLD](../glossary/glossary.md#ipld)
+- [Glossary: content addressing (CID)](../glossary/glossary.md#cid)
 
 ### Read
 Example of how to read a `CoMap`.
@@ -134,6 +135,7 @@ Works like a hash set but async and sorted by values.
 For further information see:
 - [co-primitives: CoSet](/crate/co_primitives/struct.CoSet.html)
 - [Glossary: IPLD](../glossary/glossary.md#ipld)
+- [Glossary: content addressing (CID)](../glossary/glossary.md#cid)
 
 ## `CoList`
 `CoList` stores values by order, using the IPLD data model in a content-addressed fashion.
@@ -146,6 +148,7 @@ For further information see:
 - [co-primitives: CoList](/crate/co_primitives/struct.CoList.html)
 - [co-primitives: CoListIndex](/crate/co_primitives/struct.CoListIndex.html)
 - [Glossary: IPLD](../glossary/glossary.md#ipld)
+- [Glossary: content addressing (CID)](../glossary/glossary.md#cid)
 
 ## `BlockSerializer`
 This is a convenience type to create a `Block` from data that support `serde::Serialize`.
@@ -154,12 +157,12 @@ It uses the DAG-CBOR encoding.
 ```rust
 # use co_primitives::BlockSerializer;
 # use serde::Serialize;
-# 
+#
 #[derive(Debug, Serialize)]
 struct Test {
 	hello: String,
 }
-# 
+#
 # fn main() {
 let test = Test { hello: "world".to_owned() };
 let block = BlockSerializer::default().serialize(&test).unwrap();
@@ -170,21 +173,22 @@ assert_eq!(block.data(), [161, 101, 104, 101, 108, 108, 111, 101, 119, 111, 114,
 
 For further information see:
 - [co-primitives: BlockSerializer](/crate/co_primitives/struct.BlockSerializer.html)
+- [Glossary: DAG-CBOR](../glossary/glossary.md#dag-cbor)
 
-There is also a convenience method to convert from/to DAG-CBOR:
+There is also a convenient method to convert from/to DAG-CBOR:
 
 ### `to_cbor`
-Convenience method to serialize to DAG-CBOR:
+Convenient method to serialize to DAG-CBOR:
 
 ```rust
 # use co_primitives::to_cbor;
 # use serde::Serialize;
-# 
+#
 #[derive(Debug, Serialize)]
 struct Test {
 	hello: String,
 }
-# 
+#
 # fn main() {
 let test = Test { hello: "world".to_owned() };
 let data = to_cbor(&test).unwrap();
@@ -197,17 +201,17 @@ For further information see:
 - [Glossary: DAG-CBOR](../glossary/glossary.md#dag-cbor)
 
 ### `from_cbor`
-Convenience method to deserialize from DAG-CBOR:
+Convenient method to deserialize from DAG-CBOR:
 
 ```rust
 # use co_primitives::from_cbor;
 # use serde::Serialize;
-# 
+#
 #[derive(Debug, Serialize, PartialEq)]
 struct Test {
 	hello: String,
 }
-# 
+#
 # fn main() {
 let data: Test = from_cbor(&[161, 101, 104, 101, 108, 108, 111, 101, 119, 111, 114, 108, 100]).unwrap();
 assert_eq!(data, Test { hello: "world".to_owned() });
@@ -227,7 +231,7 @@ For demonstration purposes we use a node count of `2`, the default is `172`.
 
 ```rust
 # use co_primitives::NodeBuilder;
-# 
+#
 # fn main() {
 // build
 let mut builder = NodeBuilder::<u8>::new(2, DefaultNodeSerializer::new());
@@ -290,14 +294,14 @@ end
 For further information see:
 - [co-primitives: NodeBuilder](/crate/co_primitives/struct.NodeBuilder.html)
 
-### `NodeStream` 
-The `NodeStream` is used to read a graph created with `NodeBuilder` in an async manner as a futures Stream:
+### `NodeStream`
+The `NodeStream` is used to read a graph created with `NodeBuilder` in an async manner as a futures stream:
 
 ```rust
 # use co_primitives::{BlockStorage, DefaultNodeSerializer, NodeBuilder, NodeStream};
 # use futures::TryStreamExt;
 # use co_storage::MemoryBlockStorage;
-# 
+#
 # #[tokio::main]
 # async fn main() {
 let storage = MemoryBlockStorage::default();
