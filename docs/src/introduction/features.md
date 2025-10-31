@@ -27,7 +27,7 @@ CO-kit provides a pluggable networking layer with optional components:
 ## Flexible Consensus
 Each CO can define its own consensus mechanism:
 - Optional: no consensus – CRDT-only.
-- [Proof-of-authority](../glossary/glossary.md#proofofauthority-poa-consensus-mechanism): signed checkpoints by trusted nodes.
+- [Proof-of-authority](../glossary/glossary.md#proofofauthority-consensus-mechanism): signed checkpoints by trusted nodes.
 - Manual: user-driven or admin-approved commits.
 - Shared: all participants share responsibility – quorum model.
 

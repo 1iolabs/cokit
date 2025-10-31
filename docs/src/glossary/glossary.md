@@ -1,25 +1,28 @@
 # Glossary
 
+Table of Contents:
+
 <!-- toc -->
 
 ## AGPLv3
 GNU Affero General Public License v3.
-A strong copyleft license created by the [Free Software Foundation](https://www.fsf.org/bulletin/2021/fall/the-fundamentals-of-the-agplv3) to ensure that not only distributed binaries—but even software accessed over a network—must have source code made available.
+A strong copyleft license created by the [Free Software Foundation](https://www.fsf.org/bulletin/2021/fall/the-fundamentals-of-the-agplv3) to ensure that not only distributed binaries – but even software accessed over a network – must have source code made available.
 
 Overview:
 - Differs from GPLv3: AGPLv3 closes the "SaaS loophole" by requiring modified source code to be provided when the software is used over a network.
 - Copyleft principle: Any changes or extensions (including those accessed remotely) must remain under AGPLv3.
-- Compatibility: AGPLv3 is compatible with GPLv3. You can combine AGPLv3 and GPLv3 code, but section 13 ensures that the combined work is covered by the AGPL terms.
+- Compatibility: AGPLv3 is compatible with GPLv3. You can combine AGPLv3 and GPLv3 code, but section 13 ensures that the combined work is covered by the AGPL terms.
 - Linking Exception: An optional addendum that allows proprietary or differently-licensed software to link to AGPLv3 code without forcing the entire application to adopt AGPLv3, granted you don’t modify the interface itself.
 
 For further information see:
-- [GNU Affero General Public License](https://www.gnu.org/licenses/agpl-3.0.de.html)
+- [GNU Affero General Public License](https://www.gnu.org/licenses/agpl-3.0.html)
+- [Legal notice](../license/legal-notice.md)
 
 ## CBOR
 Concise Binary Object Representation.
 CBOR is a compact, binary data serialization format based on the JSON data model.
 It was designed to support extremely small code size, efficient message encoding, and extensibility without requiring version negotiation.
-Defined by IETF in RFC 8949.
+Defined by IETF in RFC 8949.
 
 Specs:
 - Binary Format: Unlike JSON, CBOR encodes data in binary form.
@@ -40,19 +43,26 @@ For further information see:
 - [Glossary: IPLD](#ipld)
 - [Glossary: Merkle-DAG](#merkle-dag)
 
-## didcontact
+## DID
+Decentralized identifiers (DIDs) are a new type of identifier that enables verifiable, decentralized digital identity.
+A DID refers to any subject (e.g., a person, organization, thing, data model, abstract entity, etc.) as determined by the controller of the DID.
+
+For further information see:
+- [Decentralized Identifiers (DIDs) v1.0](https://www.w3.org/TR/did-1.0/)
+
+## DID Contact
 A discovery protocol which gossips encrypted didcomm messages using the libp2p GossipSub protocol.
 
 For further information see:
 - [didcontact protocol](../reference/network.md#protocol-didcontact)
 
 ## CLA
-A Contributor License Agreement (CLA) is a legal contract between a contributor and a project that grants the project the necessary permissions to use, distribute, and sublicense the contributor’s code or other contributions.
+A CLA (Contributor License Agreement) is a legal contract between a contributor and a project that grants the project the necessary permissions to use, distribute, and sublicense the contributor’s code or other contributions.
 We use it as an addition to the agreements made within the AGPLv3 License.
 It ensures that:
 
 - The contributor has the rights to submit the work (e.g., they wrote it or their employer allows it)
-- The project obtains adequate rights — such as copyright assignment or an irrevocable license — to include and redistribute the contributions under its license terms.
+- The project obtains adequate rights – such as copyright assignment or an irrevocable license – to include and redistribute the contributions under its license terms.
 
 For further information see:
 - [Legal notice](../license/legal-notice.md)
@@ -65,7 +75,9 @@ Specs:
 - Self-Describing Format: CIDs combine a hash (via *multihash*), a content-type code (*multicodec*), and encoding info (*multibase*).
 
 Why CO-kit uses CIDs:
-CIDs allow consistent, tamper-evident data referencing across decentralized storage backends—be they local, IPFS, or cloud—supporting CO-kit’s file-based, content-addressed architecture.
+
+CIDs allow consistent, tamper-evident data referencing across decentralized storage backends – be they local, IPFS, cloud–supporting, or CO-kit’s file-based, content-addressed architecture.
+
 
 For further information see:
 - [IPLD - The data model of the content-addressable web](https://ipld.io/)
@@ -74,12 +86,12 @@ For further information see:
 
 ## CO
 A CO is a virtual room for collaboration.
-
-CO (virtual data room) is a distributed database whose data is encrypted and is only available to the participants (unique via DID) of the data room. The CO stores references (unique via CID) of the data. The data itself is stored on the participants' devices. The DIDs, permissions and the identities of the participants (PrivateKeys) are stored in a data structure (data structure for states) [“Core”](../reference/core.md). Each CO contains at least one core. They act as “in-code databases” that store details such as the DIDs of the participants in a CO, their roles (admin, reader, etc.), permissions and status information (states) of systems such as chat rooms.
+CO stands for Collaborative Object and is a fundamentally new concept of distributed collaboration, because a CO is not just another group chat of sorts.
+It rather serves a multitude of functionalities in a distributed network while running locally on each participants device.
 
 For further information see:
 - [CO](../reference/co.md)
-- [“Core”](../reference/core.md)
+- [Core](../reference/core.md)
 
 ## CO-API
 The CO-API is the foundation package to create CO-kit cores.
@@ -87,6 +99,7 @@ The CO-API is the foundation package to create CO-kit cores.
 For further information see:
 - [Core](../reference/core.md#serialization)
 - [Core API Overview](../usage/api-overview-core.md)
+- [`co-api`](/crate/co_api/index.html)
 
 ## CO-kit
 In essence, CO-kit is a Software Development Kit written in Rust.
@@ -94,46 +107,44 @@ In essence, CO-kit is a Software Development Kit written in Rust.
 With CO-kit, you can easily build...
 
 - decentralized
-- hyper-secure
-- hyper-scalable
+- secure
+- scalable
 - local-first
 - peer-to-peer
-- & collaborative ...applications that make full use of your skills - there are virtually no limitations that you might have with cloud providers or other SDKs.
+- collaborative
+
+...applications that make full use of your skills – there are virtually no limitations that you might have with cloud providers or other SDKs.
 
 For further information see:
+- [CO-kit](../reference/co-kit.md)
 - [CO-kit in the FAQs](../faq/faq.md#general)
 
 ## Consensus
-In CO-kit, consensus refers to the protocols ensuring multiple peers agree on a shared state or actions—even in the presence of unreliable networks or malicious actors.
-
-Benefits:
-- Agreement: All honest peers must decide on the same value.
-- Validity: The decision must reflect a value proposed by a peer.
-- Termination: Every peer eventually makes a decision, even if some fail.
+In CO-kit, consensus refers to the protocols ensuring multiple peers agree on a shared state or actions – even in the presence of unreliable networks or malicious actors.
 
 For further information see:
 - [Consensus](../reference/consensus.md)
-- [Proof‑of‑Authority (PoA) Consensus Mechanism](#proofofauthority-poa-consensus-mechanism)
+- [Proof‑of‑Authority (PoA) Consensus Mechanism](#proofofauthority-consensus-mechanism)
 
 ## Core
-A core (CO reducer) is a piece of data that acts like a state. Cores can be directly added to COs and they work like an in-code database. They implement a reducer function that take actions which have been pushed to a CO. The reducer then changes the cores data accordingly.
+Core stands for CO Reducer. It combines data model with business logic.
 
 For further information see:
 - [Core](../reference/core.md)
 
-### Core schema
+## Core schema
 The core schema is data model of the core.
 
 For further information see:
 - [Schema](../reference/core.md#schema)
 
-### Core actions
+## Core actions
 Core actions are operations on the state of a core.
 
 For further information see:
 - [Actions](../reference/core.md#actions)
 
-### Core state
+## Core state
 The core state is the root state of a core.
 
 For further information see:
@@ -163,11 +174,6 @@ For further information see:
 
 ## Guards
 Guards are checks for transactions.
-They serve as a sort of "Police" for transactions and decide which transactions will make it into the [Log](../reference/log.md) and which don't.
-New transactions will be checked by the configured guards of a CO and will be rejected if not all guards succeed.
-Just like [Cores](../reference/core.md), Guards are pure functions, are compiled to WebAssembly, and registered to COs.
-
-Important notice: Guards are not permissions.
 
 For further information see:
 - [Guards](../reference/guards.md#guards)
@@ -182,8 +188,8 @@ For further information see:
 - [Glossary: Merkle-DAG](#merkle-dag)
 
 ## Log
-The Log is a conflict-free replicated event stream. It is immutable and cryptographically verifiable.
-It is (eventually consistent) sorted using a Merkle-DAG-based logical clock.
+The Log is a conflict-free replicated event stream.
+It is immutable, cryptographically verifiable and eventually consistent, sorted using a [Merkle-DAG](../glossary/glossary.md#merkle-dag)-based logical clock.
 
 For further information see:
 - [Log](../reference/log.md)
@@ -207,20 +213,21 @@ For further information see:
 - [Log](../reference/log.md#merkle-crdt)
 
 ## Merkle-DAG
-A Merkle-DAG is a content-addressed directed acyclic data structure where each node is cryptographically hashed based on its payload and its links to child nodes. This creates a self-verifying graph.
+A Merkle-DAG is a content-addressed directed acyclic graph data structure, where each node is cryptographically hashed based on its payload and its links to child nodes. This creates a self-verifying graph.
 
 Specifics:
 - Immutable and self-verifying: Each node's identifier uniquely represents its content and all descendants. Any change produces a new [CID](#cid) and a new graph branch/root.
 - Graph, not tree: Unlike strict merkle trees, merkle DAGs allow nodes to have multiple parents and include data payloads in non-leaf nodes.
 - Content-addressed deduplication: Identical content chunks share the same [CID](#cid) and need not to be stored more than once, reducing storage and bandwidth.
 
-In CO-kit, we use Merkle DAGs as the foundation for the built-in Merkle log-based CRDT and storage.
+In CO-kit, we use Merkle-DAGs as the foundation for the built-in Merkle log-based CRDT and storage.
 
 For further information see:
 - [IPLD - The data model of the content-addressable web](https://ipld.io/)
 - [Core](../reference/core.md)
 - [Glossary: Cid](#cid)
 - [Glossary: IPLD](#ipld)
+- [Glossary: Merkle-CRDT](#merkle-crdt)
 
 ## PeerID
 A Peer Identity (often written `PeerID`) is a unique reference to a specific peer within the overall p2p-network.
@@ -229,13 +236,14 @@ It is derived by hashing a node’s public key, and the corresponding private ke
 In CO-kit, each node may generate or be assigned a Peer ID, which then acts as a verifiable handle across the decentralized networking layers.
 
 For further information see:
+- [Network](../reference/network.md)
 - [Peers - libp2p](https://docs.libp2p.io/concepts/fundamentals/peers/)
 
-## Proof‑of‑Authority (PoA) Consensus Mechanism
-Proof‑of‑Authority (PoA) is a reputation-based consensus mechanism where only a small, pre-approved set of trusted validator—known entities with verifiable identities are permitted to produce and validate transactions.
+## Proof‑of‑Authority Consensus Mechanism
+PoA (Proof‑of‑Authority) is a reputation-based consensus mechanism where only a small, pre-approved set of trusted validator–known entities with verifiable identities are permitted to produce and validate transactions.
 
 For further information see:
-- [Consensus](../reference/consensus.md)
+- [Consensus](../reference/consensus.md#proof-of-authority)
 - [Glossary: Consensus](#consensus)
 
 ## Storage
@@ -264,3 +272,6 @@ WebAssembly (WASM) is an open-standard, portable binary format designed for high
 It serves as a compilation target for languages such as Rust, C, C++, and others, enabling near-native speed while maintaining security and cross-platform compatibility
 
 For CoKit, WASM is a mechanism to compile and execute schema logic.
+
+For further information see:
+- [Core](../reference/core.md)
