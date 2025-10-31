@@ -45,6 +45,7 @@
 
 # License
 - [Legal notice](./license/legal-notice.md)
+- [License](./license/license.md)
 
 # Glossary
 - [Glossary](./glossary/glossary.md)

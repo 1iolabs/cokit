@@ -1,7 +1,10 @@
 # Legal notice
 ## License
 
-The CO-kit SDK is released as open-source under the GNU Affero General Public License v3.0 (AGPLv3) with a linking exception.
+The CO-kit SDK is released as open-source under the AGPLv3 (GNU Affero General Public License v3.0) with a linking exception.
+
+For further information see:
+- [License](../license/license.md)
 
 ## Summary
 
@@ -11,14 +14,6 @@ The AGPLv3 ensures that improvements made to the software, even when used over a
 
 The included linking exception allows you to link the CO-kit SDK with non-AGPL software without your own codebase being subject to the copyleft terms of AGPL. This exception permits broader adoption while maintaining core protections.
 
-## Full License Text
-
-#todo linking exception missing?
-
----
-
-{{#include ../../../LICENSE.md}}
-
----
-
+```admonish info
 If you are unsure whether your use case complies with the license or the linking exception, please consult with a legal expert or reach out to the project maintainers for guidance.
+```

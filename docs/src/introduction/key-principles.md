@@ -43,5 +43,5 @@ We see CO-kit as public property.
 Everything is open-source. Go and build a better digital future with it.
 
 For further information see:
-- [How to contribute](./development/how-to-contribute.md)
-- [Licensing](./license/lega-notice.md)
+- [How to contribute](../development/how-to-contribute.md)
+- [Legal Notice](../license/legal-notice.md)
