@@ -111,16 +111,16 @@ The library can be integrated anywhere and you can also build your backend/data 
 Another useful scenario is CO-kit-built apps in processes that are fed back into traditional centralized systems.
 As COs are lightweight they can be stored and used as receipts (leveraging non-reputability).
 
-Also its usable to amplify the edge.
+Also it's usable to amplify the edge.
 Use low overhead edge caching through content-addressing which allows for efficient syncing.
 Let the edge work locally and occasionally sync to server/cloud/infrastructure in a batch.
 
 ## Networking & Synchronization
 ### How does peer discovery work in CO-kit's networking model?
-Local peer discovery is done by utilizing mDNS.
 For general discovery CO-kit uses a GossipSub-based protocol to discover/contact peers.
+Local peer discovery is done by utilizing mDNS.
 
-The networking is entire optional and one could just use HTTP or plain filesystem for transferring blocks.
+The networking is entirely optional and one could just use HTTP or plain filesystem for syncing and transferring blocks.
 
 For further information see:
 - [Network: DID discovery](../reference/network.md#diddiscovery)
