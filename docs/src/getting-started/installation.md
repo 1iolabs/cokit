@@ -1,22 +1,20 @@
 # Installation
 To get the fun started, you'll need to install rust and the `co` command.
-In this chapter we will briefly guide you through the process step-by-step.
-
-We're starting off with the installation, then we'll delve right into building your first app.
+This step-by-step guide covers both installing the tools, as well as building your first CO-kit app!
 
 ## Requirements
-- `rust-1.88` or greater.
+- `rust-1.88` or greater
 - `llvm-18`
 
 ## Setup Rust
 
 ### Rustup
-Rustup is the rust toolchain installer.
+Rustup is the Rust toolchain installer.
 
 Head over to <https://www.rust-lang.org/tools/install> for further instructions.
 
 ### Cargo B(inary)Install
-We use this to speed-up the installation for the `co` and `dx` (used in the [App Quick Start](../getting-started/rust-app-quick-start.md)) command. You can skip this step if you want to build them from source.
+We use this to speed up the the installation for the 'co' and 'dx' commands. ('dx' is used in the [App Quick Start](../getting-started/rust-app-quick-start.md)). You can skip this step if you want to build them from source.
 
 Head over to <https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#installation> for further instructions.
 
