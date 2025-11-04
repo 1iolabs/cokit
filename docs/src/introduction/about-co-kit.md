@@ -33,4 +33,4 @@ CO-kit enables you to build data rooms called COs using data models called COres
 - No need for an interface or API between data and business logic because it's one thing: a core
 
 ### ... Poets
-- If your brain is really sore, start using our core. 🤓
+- If your brain is really sore, start using our core! 🤓
