@@ -1,10 +1,9 @@
 # Hello and welcome to CO-kit!
 
-Collaboration is the core of the internet's value generation.
-Everytime we collaborate, we have no option but to entrust platforms with our most private data  and _believe_ they protect our privacy, in exchange for convenience and cool features. We are exploited through the data we generate - in our jobs and in our privates lives.
+Collaboration is core to value generation on the internet.
+However, everytime we collaborate, we have no option but to entrust platforms with our most private data  and _believe_ they protect our privacy. In exchange for this belief, we get convenience and cool features. We are exploited through the data we generate - both in our jobs and in our private lives.
 
-CO-kit is turning the tables. Now you can give power back to your users. We want you to build apps that allow your users to physically own their digital life, and not just in a sense of static files, but in full fledged collaboration workflows, while making you as a developer independent from the stacks and clouds of greedy corporates.
-
+CO-kit is turning the tables. Now you can give the power back to your users. We want you to build apps that allow your users to physically own their digital life. And not just in a sense of static files – we mean full-fledged collaboration workflows, that also make you, the developer, independent from the stacks and clouds of greedy corporates.
 
 ## Build like never before
 
@@ -18,8 +17,7 @@ Streamline development with a unified codebase that supports data storage in any
 Focus on building your app with a set of pre-built components like identity, encryption and permissions to develop faster. Everything decentralized. Everything adaptable to your specific needs.
 
 ### No deployment needed
-CO-kit-built apps run locally on your mobile without the need for clouds or servers. It syncs directly between devices.
-CO-kit can run on clouds and servers too - if needed.
+CO-kit-built apps run locally on your mobile without the need for clouds or servers. It syncs directly between devices. CO-kit can, of course, also run on clouds and servers - if that's what you need.
 
 
 ## Get started with ease
@@ -28,7 +26,7 @@ CO-kit can run on clouds and servers too - if needed.
 Easily work with the frontend framework of your choice.
 
 ### Cross-platform and platform-agnostic
-CO-kit supports all major operating systems ensuring your application runs smoothly everywhere.
+CO-kit supports all major operating systems, ensuring your application runs smoothly everywhere.
 
 ### Built in Rust
-Leverage robust native APIs that simplify complex tasks allowing you to focus on building great user experiences.
+Leverage robust native APIs that simplify complex tasks, allowing you to focus on building great user experiences.
