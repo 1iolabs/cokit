@@ -3,6 +3,7 @@ use crate::{
 	library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError, Streamable,
 };
 use async_trait::async_trait;
+use cid::Cid;
 use futures::{pin_mut, stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
@@ -203,6 +204,24 @@ where
 {
 	fn default() -> Self {
 		Self(Default::default())
+	}
+}
+impl<K, V> From<Option<Cid>> for CoMap<K, V>
+where
+	K: Hash + Ord + Clone + Send + Sync + 'static,
+	V: Clone + Send + Sync + 'static,
+{
+	fn from(cid: Option<Cid>) -> Self {
+		Self(cid.into())
+	}
+}
+impl<K, V> Into<Option<Cid>> for &CoMap<K, V>
+where
+	K: Hash + Ord + Clone + Send + Sync + 'static,
+	V: Clone + Send + Sync + 'static,
+{
+	fn into(self) -> Option<Cid> {
+		*self.0.cid()
 	}
 }
 #[async_trait]
