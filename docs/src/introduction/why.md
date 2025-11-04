@@ -1,0 +1,48 @@
+# Why
+
+No Backend.
+
+No Cloud-Dependencies.
+
+No Bullshit.
+
+## Save time
+Here is a simple, comparative outline to clarify the benefits of decentralized, local-first apps.
+
+### Building a classical app
+1. Choose a tech stack (Database, Backend, Cloud, Infrastructure, ...).
+2. Model your data and create databases and tables or collections.
+3. Connect data to your backend using a database client and data layer (ORM, ...).
+4. Implement business logic and permissions in your backend.
+5. Implement an API to allow to access it from the outside (RPC, REST, ...).
+6. Implement a "syncing frontend data model" which is slightly or completely off the backend version.
+7. Implement your frontend.
+8. Provision and deploy the backend to the infrastructure (Server, Cloud, ...).
+
+### Building a CO-kit app
+1. Model data in a core that combines data, business logic and permissions.
+2. Implement your frontend and use the data directly.
+
+## Ain't no better DX
+
+### Ship faster today
+Forget building separate backends. Focus on your data and building your app – the rest just works.
+
+### Scale cheaper
+Directly connected via peer-to-peer, you’re not dependent on centralized cloud infrastructure.
+
+### Pioneer new standards
+Establish data ownership and app interoperability as the standard for every digital user.
+
+
+## Our Philosophy
+No Backend. No Cloud-Dependencies. No Bullshit.
+
+### Fuck Big Tech
+First of all - if you are big tech - Hi! You're welcome to use CO-kit as well. But you might want to skip the next part, as we're not being nice. Big tech owns your online life. We have traded privacy for convenience, entrusting our personal data to closed systems that scarcely work together. At 1iO, we are turning the tables on centralization with a new technological foundation for truly decentralized collaboration. Applications developed using CO-kit empower users with control of their own data.
+
+### Kill the Middleman
+We eliminate intermediaries. You individually decide with whom you want to share your data and under what conditions. [CO](..reference/co.md) lives on your local device and is directly synced only with your peers over the network. All apps are built on this fundamental concept.
+
+### Take back what's yours
+Local-first, always in sync via peer-to-peer, and fully open source. Start developing decentralized apps with CO-kit today, with data management and identity all worked out for you – No servers required.

@@ -4,3 +4,4 @@
 /.vscode/launch.json
 /data
 .cargo
+/docs/src/crate

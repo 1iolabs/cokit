@@ -5,6 +5,7 @@ members = [
     "co-cli",
     "co-dioxus",
     "co-identity",
+    "co-js",
     "co-log",
     "co-macros",
     "co-messaging",

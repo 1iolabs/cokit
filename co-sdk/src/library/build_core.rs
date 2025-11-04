@@ -51,7 +51,7 @@ pub fn crate_repository_path(workspace: bool) -> Result<PathBuf, anyhow::Error> 
 	Ok(repository_path)
 }
 
-/// Build core using cargo.
+/// Build a rust core to WebAssembly using cargo.
 pub fn build_core(
 	repository_path: impl AsRef<Path>,
 	core_path: impl AsRef<Path>,
