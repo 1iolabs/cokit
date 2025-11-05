@@ -74,8 +74,7 @@ cargo install co-cli --git https://gitlab.1io.com/1io/co-sdk.git
 ```
 
 ## Building your first app
-Lets build a collaborative todo list.
-Keep in mind that you can build any application with CO-kit, though whenever you need to think about some kind of collaboration, CO-kit is destined for the job.
+Let's now build a COllaborative to-do list using CO-kit. While you can build any application with CO-kit, keep in mind that if you are COnsidering COllaboration, then CO-kit is destined for that job.
 
 For any app you build you need these two ingredients:
 1. A core which is the data model of the app:
