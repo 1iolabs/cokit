@@ -28,7 +28,7 @@ rustup target add wasm32-unknown-unknown
 
 LLVM-18.0.0 is used to execute WebAssembly files as native code.
 
-### MacOS
+### macOS
 
 To install it using macOS use:
 
@@ -36,7 +36,7 @@ To install it using macOS use:
 brew install llvm@18
 ```
 
-### Setup cargo
+### Set up cargo
 
 To let cargo know where to search for llvm we need to add the `LLVM_SYS_180_PREFIX` variable to the cargo config.
 Here is a script to help you with that:
@@ -48,7 +48,7 @@ echo "[env]\nLLVM_SYS_180_PREFIX = \"$("brew" "--prefix" "llvm@18")\"" >> ~/.car
 cat ~/.cargo/config.toml
 ```
 
-It should look likle this then:
+It should now look like this:
 
 `~/.cargo/config.toml`:
 ```toml
@@ -57,7 +57,7 @@ LLVM_SYS_180_PREFIX = "/opt/homebrew/opt/llvm@18"
 ```
 
 ```admonish note
-The script may duplicates the `[env]` table which needs to be fixed manually.
+This script may duplicate the '[env]' table, which would need to be fixed manually by removing one of the '[env]' entries.
 ```
 
 ## Setup CO-kit
