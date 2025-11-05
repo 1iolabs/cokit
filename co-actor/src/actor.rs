@@ -62,7 +62,7 @@ pub trait Actor: Send + Sync + 'static {
 
 	fn spawner(tags: Tags, actor: Self) -> Result<ActorSpawner<Self>, ActorError>
 	where
-		Self: Send + Sized + 'static,
+		Self: Send + Sync + Sized + 'static,
 	{
 		ActorSpawner::new(tags, actor)
 	}
@@ -71,7 +71,7 @@ pub trait Actor: Send + Sync + 'static {
 	#[track_caller]
 	fn spawn(tags: Tags, actor: Self, initialize: Self::Initialize) -> Result<ActorInstance<Self>, ActorError>
 	where
-		Self: Send + Sized + 'static,
+		Self: Send + Sync + Sized + 'static,
 	{
 		Self::spawn_with(Default::default(), tags, actor, initialize)
 	}
@@ -86,7 +86,7 @@ pub trait Actor: Send + Sync + 'static {
 		initialize: Self::Initialize,
 	) -> Result<ActorInstance<Self>, ActorError>
 	where
-		Self: Send + Sized + 'static,
+		Self: Send + Sync + Sized + 'static,
 	{
 		Ok(Self::spawner(tags, actor)?.spawn(spawner, initialize))
 	}
@@ -205,7 +205,7 @@ pub enum ActorState {
 }
 
 #[derive(Debug)]
-enum ActorMessage<M> {
+pub enum ActorMessage<M> {
 	/// Actor shutdown requested.
 	Shutdown,
 
@@ -257,9 +257,9 @@ where
 
 /// Handle into an actor which can be used to send messages.
 pub struct ActorHandle<M> {
-	tx: mpsc::UnboundedSender<ActorMessage<M>>,
-	state: watch::Receiver<ActorState>,
-	tags: Arc<Tags>,
+	pub(crate) tx: mpsc::UnboundedSender<ActorMessage<M>>,
+	pub(crate) state: watch::Receiver<ActorState>,
+	pub(crate) tags: Arc<Tags>,
 }
 impl<M> std::fmt::Debug for ActorHandle<M> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
