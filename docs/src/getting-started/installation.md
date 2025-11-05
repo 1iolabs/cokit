@@ -76,10 +76,10 @@ cargo install co-cli --git https://gitlab.1io.com/1io/co-sdk.git
 ## Building your first app
 Let's now build a COllaborative to-do list using CO-kit. While you can build any application with CO-kit, keep in mind that if you are COnsidering COllaboration, then CO-kit is destined for that job.
 
-For any app you build you need these two ingredients:
-1. A core which is the data model of the app:
-	- [Core Quick Start](../getting-started/rust-core-quick-start.md)
-2. Setup an Application which uses the core:
-	- [App Quick Start](../getting-started/rust-app-quick-start.md)
+For any app you build, you need these two ingredients:
 
-We'll take a closer look at these in the following two chapters.
+1. A core, which is the data model of the app:
+  - [Core Quick Start](../getting-started/rust-core-quick-start.md)
+2. An Application which uses the core:
+  - [App Quick Start](../getting-started/rust-app-quick-start.md)
+We'll take a closer look at these in the next two chapters.
