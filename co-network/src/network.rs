@@ -186,6 +186,10 @@ impl Libp2pNetwork {
 		}
 		Ok(())
 	}
+	
+	pub async fn bitswap_get(cid: Cid, tokens: Vec<(MultiCodec, Vec<u8>)>) -> Result<(), anyhow::Error> {
+		
+	}
 }
 impl Drop for Libp2pNetwork {
 	fn drop(&mut self) {

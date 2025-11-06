@@ -4,6 +4,7 @@ mod didcontact;
 pub mod discovery;
 mod library;
 mod network;
+mod services;
 mod types;
 
 pub use didcontact::{
@@ -16,6 +17,8 @@ pub use library::{
 	static_peer_provider::StaticPeerProvider,
 };
 pub use network::{Behaviour, Context, Libp2pNetwork, Libp2pNetworkConfig, NetworkEvent, NetworkMode, Shutdown};
+pub use services::heads;
+pub use services::network;
 pub use types::{
 	error::NetworkError,
 	layer_behaviour::{Layer, LayerBehaviour},
