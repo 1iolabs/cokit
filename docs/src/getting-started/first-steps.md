@@ -1,31 +1,49 @@
 # First Steps
-To start working with CO-kit, we'll introduce you to the basic concepts of it and briefly sketch a few cases to give you an idea for what it is useful.
+Before we start working with CO-kit, we'll first look at some basic concepts, and sketch out a few cases to demonstrate how it is useful.
 
 ## Introducing CO
 A [CO](../reference/co.md) is a virtual room for collaboration.
-It organizes a set of Cores and allows participants to access and modify them.
+CO stands for Collaborative Object. It allows participants to access and modify the Cores contained within it.
+A CO may contain:
+- one or more Cores
+- Participants (i.e. who can access the CO)
+- Network Settings (i.e. connectivity configuration)
+- Encryption Settings (i.e. encrypted or public)
 
-## Introducing Core
-A [Core](../reference/core.md) is a data model used within an [CO](../reference/co.md).
-It models data, business logic and permissions.
+## Introducing Cores
+[Core](../reference/core.md) stands for CO Reducer, and it is a data model used within a CO. Cores model data, business logic and permissions. Being a reducer, a Core takes a state and an action as an input, calculates how the state will change based on that action, and returns the new state.
+
+Here is an example data model of a to-do list task in a Core:
+/// A to-do list task.
+#[co]
+pub struct TodoTask {
+	/// Task UUID.
+	pub id: String,
+	/// Task title.
+	pub title: String,
+	/// Whether the task is done.
+	pub done: bool,
+}
 
 ## Permissions
-A Core contains [permissions](../reference/permissions.md) as logic in the data model.
-As an example we change the [todo list core](../getting-started/rust-core-quick-start.md) to only allow todo task deletion for the creator of the todo task.
-We need to store the creator of a task and compare it in the `TaskDelete` against each other.
+A Core contains [permissions](../reference/permissions.md) as logic in the data model. As an example, we can change our [todo list core](../getting-started/rust-core-quick-start.md) so that only the creator of a task can delete it. First of all, we need to store the task's creator. Then, in the `TaskDelete` function, we compare the user who is trying to delete the task to the creator to see if they match.
 
 Add `creator` to state:
 ```rust
 #[co]
 pub struct TodoTask {
+  ///Task UUID.
 	pub id: String,
+	///Task title.
 	pub title: String,
+	///Whether the task is done.
 	pub done: bool,
+	///The creator's DID.
 	pub creator: Did,
 }
 ```
 
-Check if our condition is fulfilled:
+In the `Task Delete` funtction, we check if our condition is fulfilled:
 ```rust
 TodoAction::TaskDelete { id } => {
 	let task = tasks.get(id).await?.ok_or(anyhow!("Task not found"))?;
@@ -36,7 +54,7 @@ TodoAction::TaskDelete { id } => {
 },
 ```
 
-CO-kit then verifies if everyone works with the same state.
+CO-kit then automatically verifies that everyone is working with the same state.
 
 ## More examples
 
