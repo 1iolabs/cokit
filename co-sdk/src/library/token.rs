@@ -1,4 +1,4 @@
-use co_network::bitswap::Token;
+use crate::bitswap::Token;
 use co_primitives::{CoId, KnownMultiCodec, MultiCodec, Secret};
 use hmac::{Hmac, Mac};
 use libp2p::PeerId;

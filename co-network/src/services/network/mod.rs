@@ -3,7 +3,6 @@ mod message;
 mod network;
 mod subscribe;
 mod tasks;
-mod token;
 
 pub use actor::{Network, NetworkSettings};
 pub use message::NetworkMessage;

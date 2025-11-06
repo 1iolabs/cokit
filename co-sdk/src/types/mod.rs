@@ -9,5 +9,4 @@ pub mod co_uuid;
 pub mod cores;
 pub mod error;
 pub mod guards;
-pub mod message;
 pub mod reference;
