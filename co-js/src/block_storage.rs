@@ -1,8 +1,8 @@
-use crate::actor::{JsActor, JsActorHandle};
+use crate::actor::JsLocalTaskSpawner;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
-use co_actor::Response;
+use co_actor::{ActorError, ActorHandle, LocalActor, Response};
 use co_primitives::{Block, BlockStorage, DefaultParams, StorageError};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -11,13 +11,22 @@ use web_sys::js_sys::{Function, Promise, Uint8Array};
 #[wasm_bindgen(js_name = "BlockStorage")]
 #[derive(Debug, Clone)]
 pub struct JsBlockStorage {
-	handle: JsActorHandle<JsBlockStorageMessage>,
+	handle: ActorHandle<JsBlockStorageMessage>,
 }
 #[wasm_bindgen(js_class = "BlockStorage")]
 impl JsBlockStorage {
 	#[wasm_bindgen(constructor)]
-	pub fn new(get: &Function, set: &Function) -> Self {
-		Self { handle: JsActor::spawn(JsBlockStorageActor { get: get.clone(), set: set.clone() }) }
+	pub fn new(get: &Function, set: &Function) -> Result<Self, JsValue> {
+		Ok(Self {
+			handle: LocalActor::spawn_with(
+				JsLocalTaskSpawner::default(),
+				Default::default(),
+				JsBlockStorageActor { get: get.clone(), set: set.clone() },
+				Default::default(),
+			)
+			.map_err(|err| format!("block storage failed: {:?}", err))?
+			.handle(),
+		})
 	}
 }
 #[async_trait]
@@ -97,10 +106,17 @@ impl JsBlockStorageActor {
 		Ok(cid)
 	}
 }
-impl JsActor for JsBlockStorageActor {
+impl LocalActor for JsBlockStorageActor {
 	type Message = JsBlockStorageMessage;
+	type State = ();
+	type Initialize = ();
 
-	async fn handle(&self, message: Self::Message) {
+	async fn handle(
+		&self,
+		_handle: &ActorHandle<Self::Message>,
+		message: Self::Message,
+		_state: &mut Self::State,
+	) -> Result<(), ActorError> {
 		match message {
 			JsBlockStorageMessage::Get(cid, response) => {
 				response.respond(self.get(&cid).await);
@@ -109,5 +125,15 @@ impl JsActor for JsBlockStorageActor {
 				response.respond(self.set(block).await);
 			},
 		}
+		Ok(())
+	}
+
+	async fn initialize(
+		&self,
+		_handle: &ActorHandle<Self::Message>,
+		_tags: &co_primitives::Tags,
+		_initialize: Self::Initialize,
+	) -> Result<Self::State, co_actor::ActorError> {
+		Ok(())
 	}
 }

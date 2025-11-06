@@ -1,49 +1,19 @@
-use anyhow::anyhow;
-use co_actor::{ActorError, Response, ResponseReceiver};
-use std::ops::Not;
+use co_actor::{LocalJoinError, LocalJoinHandle, LocalTaskSpawner};
+use std::future::Future;
 use wasm_bindgen_futures::spawn_local;
 
-pub trait JsActor: 'static {
-	type Message: 'static;
-
-	async fn handle(&self, message: Self::Message);
-
-	fn spawn(actor: Self) -> JsActorHandle<Self::Message>
+#[derive(Debug, Default, Clone, Copy)]
+pub struct JsLocalTaskSpawner {}
+impl LocalTaskSpawner for JsLocalTaskSpawner {
+	fn spwan_local<F>(&self, fut: F) -> LocalJoinHandle<F::Output>
 	where
-		Self: Sized,
+		F: Future + 'static,
+		F::Output: 'static,
 	{
-		let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Self::Message>();
+		let (tx, rx) = tokio::sync::oneshot::channel();
 		spawn_local(async move {
-			while let Some(message) = rx.recv().await {
-				actor.handle(message).await;
-			}
+			tx.send(fut.await).ok();
 		});
-		JsActorHandle { tx }
-	}
-}
-
-pub struct JsActorHandle<M> {
-	tx: tokio::sync::mpsc::UnboundedSender<M>,
-}
-impl<M> JsActorHandle<M> {
-	/// Request with response.
-	pub async fn request<T>(&self, message: impl FnOnce(Response<T>) -> M) -> Result<T, ActorError> {
-		let (responder, response) = ResponseReceiver::new();
-		self.tx
-			.send(message(responder))
-			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running."), Default::default()))?;
-		response.await
-	}
-}
-impl<M> std::fmt::Debug for JsActorHandle<M> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("JsActorHandle")
-			.field("open", &self.tx.is_closed().not())
-			.finish()
-	}
-}
-impl<M> Clone for JsActorHandle<M> {
-	fn clone(&self) -> Self {
-		Self { tx: self.tx.clone() }
+		LocalJoinHandle::new(async move { rx.await.map_err(|_err| LocalJoinError::Cancelled) })
 	}
 }

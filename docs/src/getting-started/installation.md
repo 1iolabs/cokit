@@ -1,22 +1,20 @@
 # Installation
 To get the fun started, you'll need to install rust and the `co` command.
-In this chapter we will briefly guide you through the process step-by-step.
-
-We're starting off with the installation, then we'll delve right into building your first app.
+This step-by-step guide covers both installing the tools, as well as building your first CO-kit app!
 
 ## Requirements
-- `rust-1.88` or greater.
+- `rust-1.88` or greater
 - `llvm-18`
 
 ## Setup Rust
 
 ### Rustup
-Rustup is the rust toolchain installer.
+Rustup is the Rust toolchain installer.
 
 Head over to <https://www.rust-lang.org/tools/install> for further instructions.
 
 ### Cargo B(inary)Install
-We use this to speed-up the installation for the `co` and `dx` (used in the [App Quick Start](../getting-started/rust-app-quick-start.md)) command. You can skip this step if you want to build them from source.
+We use this to speed up the the installation for the 'co' and 'dx' commands. ('dx' is used in the [App Quick Start](../getting-started/rust-app-quick-start.md)). You can skip this step if you want to build them from source.
 
 Head over to <https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#installation> for further instructions.
 
@@ -30,7 +28,7 @@ rustup target add wasm32-unknown-unknown
 
 LLVM-18.0.0 is used to execute WebAssembly files as native code.
 
-### MacOS
+### macOS
 
 To install it using macOS use:
 
@@ -38,7 +36,7 @@ To install it using macOS use:
 brew install llvm@18
 ```
 
-### Setup cargo
+### Set up cargo
 
 To let cargo know where to search for llvm we need to add the `LLVM_SYS_180_PREFIX` variable to the cargo config.
 Here is a script to help you with that:
@@ -50,7 +48,7 @@ echo "[env]\nLLVM_SYS_180_PREFIX = \"$("brew" "--prefix" "llvm@18")\"" >> ~/.car
 cat ~/.cargo/config.toml
 ```
 
-It should look likle this then:
+It should now look like this:
 
 `~/.cargo/config.toml`:
 ```toml
@@ -59,7 +57,7 @@ LLVM_SYS_180_PREFIX = "/opt/homebrew/opt/llvm@18"
 ```
 
 ```admonish note
-The script may duplicates the `[env]` table which needs to be fixed manually.
+This script may duplicate the '[env]' table, which would need to be fixed manually by removing one of the '[env]' entries.
 ```
 
 ## Setup CO-kit
@@ -76,13 +74,12 @@ cargo install co-cli --git https://gitlab.1io.com/1io/co-sdk.git
 ```
 
 ## Building your first app
-Lets build a collaborative todo list.
-Keep in mind that you can build any application with CO-kit, though whenever you need to think about some kind of collaboration, CO-kit is destined for the job.
+Let's now build a COllaborative to-do list using CO-kit. While you can build any application with CO-kit, keep in mind that if you are COnsidering COllaboration, then CO-kit is destined for that job.
 
-For any app you build you need these two ingredients:
-1. A core which is the data model of the app:
-	- [Core Quick Start](../getting-started/rust-core-quick-start.md)
-2. Setup an Application which uses the core:
-	- [App Quick Start](../getting-started/rust-app-quick-start.md)
+For any app you build, you need these two ingredients:
 
-We'll take a closer look at these in the following two chapters.
+1. A core, which is the data model of the app:
+  - [Core Quick Start](../getting-started/rust-core-quick-start.md)
+2. An Application which uses the core:
+  - [App Quick Start](../getting-started/rust-app-quick-start.md)
+We'll take a closer look at these in the next two chapters.
