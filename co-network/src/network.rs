@@ -7,16 +7,17 @@ use crate::{
 	LayerBehaviour, MdnsBehaviourProvider, NetworkError, NetworkTaskBox, NetworkTaskSpawner,
 };
 use anyhow::anyhow;
+use cid::Cid;
 use co_actor::ActorHandle;
 use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver, PrivateIdentityResolverBox};
-use co_primitives::DefaultParams;
+use co_primitives::{DefaultParams, MultiCodec};
 use futures::{pin_mut, Stream, StreamExt};
 use libp2p::{
-	gossipsub, identify,
+	dcutr, gossipsub, identify,
 	identity::Keypair,
 	mdns::{self, tokio::Behaviour as MdnsBehaviour},
-	ping,
-	swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
+	ping, relay,
+	swarm::{behaviour::toggle::Toggle, dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
 	Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 use libp2p_bitswap::{Bitswap, BitswapEvent};
@@ -44,40 +45,53 @@ impl Libp2pNetwork {
 		let resolver = IdentityResolverBox::new(resolver);
 		let private_resolver = PrivateIdentityResolverBox::new(private_resolver);
 		let local_peer_id = PeerId::from(config.keypair.public().clone());
+
+		// kad
 		// let kademlia_config: KademliaConfig = Default::default();
+		// let kad = kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()),
+		// kademlia_config);
+
+		// gossipsub
 		let gossipsub_config = gossipsub::ConfigBuilder::default()
 			.max_transmit_size(256 * 1024)
 			.build()
 			.expect("valid config");
+		let gossipsub =
+			gossipsub::Behaviour::new(gossipsub::MessageAuthenticity::Signed(config.keypair.clone()), gossipsub_config)
+				.map_err(|err| anyhow!("gossip failed: {}", err))?;
 
+		// bitswap
+		let bitswap = Bitswap::<libipld::DefaultParams>::new(
+			Default::default(),
+			BitswapStoreClient::<DefaultParams>::new(bitswap),
+			{
+				let bitswap_identifier = identifier.clone();
+				Box::new(move |t| {
+					tokio::spawn(async move {
+						t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
+							.await
+					});
+				})
+			},
+		);
+
+		// relay
+		let relay = match config.mode {
+			NetworkMode::Full => Some(libp2p::relay::Behaviour::new(local_peer_id.clone(), relay::Config::default())),
+			_ => None,
+		};
+
+		// behaviour
 		let behaviour = Behaviour {
-			identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
-				"/ipfs/0.1.0".into(),
-				config.keypair.public(),
-			)),
+			identify: identify::Behaviour::new(identify::Config::new("/ipfs/0.1.0".into(), config.keypair.public())),
 			ping: ping::Behaviour::new(ping::Config::new()),
 			mdns: MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?,
-			// kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()),
-			// kademlia_config),
-			bitswap: Bitswap::<libipld::DefaultParams>::new(
-				Default::default(),
-				BitswapStoreClient::<DefaultParams>::new(bitswap),
-				{
-					let bitswap_identifier = identifier.clone();
-					Box::new(move |t| {
-						tokio::spawn(async move {
-							t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
-								.await
-						});
-					})
-				},
-			),
-			gossipsub: gossipsub::Behaviour::new(
-				gossipsub::MessageAuthenticity::Signed(config.keypair.clone()),
-				gossipsub_config,
-			)
-			.map_err(|err| anyhow!("gossip failed: {}", err))?,
+			// kad,
+			bitswap,
+			gossipsub,
 			didcomm: didcomm::Behaviour::new(resolver.clone(), private_resolver, didcomm::Config { auto_dail: false }),
+			dcutr: dcutr::Behaviour::new(local_peer_id.clone()),
+			relay: relay.into(),
 		};
 
 		// // kad
@@ -313,6 +327,8 @@ pub enum NetworkEvent {
 	// Kad(kad::Event),
 	Bitswap(BitswapEvent),
 	Discovery(discovery::Event),
+	Dcutr(dcutr::Event),
+	Relay(relay::Event),
 }
 // impl From<BehaviourEvent> for NetworkEvent {
 // 	fn from(value: BehaviourEvent) -> Self {
@@ -345,6 +361,8 @@ pub struct Behaviour {
 	pub ping: ping::Behaviour,
 	// pub kad: Kademlia<MemoryStore>,
 	pub bitswap: Bitswap<libipld::DefaultParams>,
+	pub dcutr: dcutr::Behaviour,
+	pub relay: Toggle<relay::Behaviour>,
 }
 impl discovery::DiscoveryBehaviour for Behaviour {
 	fn rendezvous_client_mut(&mut self) -> Option<&mut libp2p::rendezvous::client::Behaviour> {
