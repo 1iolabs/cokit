@@ -1,5 +1,4 @@
-use crate::CoNetworkTaskSpawner;
-use co_network::{GossipsubBehaviourProvider, MdnsBehaviourProvider, NetworkTask, NetworkTaskSpawner};
+use crate::{CoNetworkTaskSpawner, GossipsubBehaviourProvider, MdnsBehaviourProvider, NetworkTask, NetworkTaskSpawner};
 use futures::channel::oneshot;
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},

@@ -1,10 +1,12 @@
 use crate::{
-	network::PublishGossipTask,
-	services::heads::{
-		actor::{to_topic_hash, HeadsContext, HeadsState},
-		HeadsAction,
+	services::{
+		heads::{
+			actor::{to_topic_hash, HeadsContext, HeadsState},
+			HeadsAction,
+		},
+		network::PublishGossipTask,
 	},
-	types::message::heads::HeadsMessage,
+	HeadsMessage,
 };
 use co_actor::Actions;
 use co_primitives::{to_cbor, CoTryStreamExt, WeakCid};

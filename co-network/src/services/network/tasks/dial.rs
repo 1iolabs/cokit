@@ -1,5 +1,5 @@
+use crate::{NetworkTask, NetworkTaskSpawner};
 use anyhow::anyhow;
-use co_network::{NetworkTask, NetworkTaskSpawner};
 use futures::channel::oneshot;
 use libp2p::{
 	swarm::{dial_opts::DialOpts, ConnectionId, NetworkBehaviour, SwarmEvent},

@@ -1,6 +1,5 @@
-use crate::services::heads::HeadsApi;
+use crate::{discovery, services::heads::HeadsApi};
 use co_identity::{network_did_discovery, Identity, IdentityResolver, IdentityResolverBox, PrivateIdentity};
-use co_network::discovery;
 use co_primitives::{Did, Network};
 use futures::{stream::iter, Stream};
 use libp2p::PeerId;

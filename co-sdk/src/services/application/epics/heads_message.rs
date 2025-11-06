@@ -1,4 +1,5 @@
 use crate::{
+	didcomm::EncodedMessage,
 	library::{network_identity::network_identity, shared_membership::shared_membership},
 	services::{
 		application::{HeadsError, HeadsMessageReceivedAction},
@@ -13,7 +14,6 @@ use cid::Cid;
 use co_actor::{ActionDispatch, Actions};
 use co_core_membership::{Membership, MembershipState};
 use co_identity::PeerDidCommHeader;
-use co_network::didcomm::EncodedMessage;
 use co_primitives::{CoId, Did, WeakCid};
 use futures::{future::ready, stream, FutureExt, Stream, StreamExt};
 use libp2p::PeerId;

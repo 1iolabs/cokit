@@ -4,7 +4,7 @@ mod didcontact;
 pub mod discovery;
 mod library;
 mod network;
-mod services;
+pub mod services;
 mod types;
 
 pub use didcontact::{
@@ -17,10 +17,10 @@ pub use library::{
 	static_peer_provider::StaticPeerProvider,
 };
 pub use network::{Behaviour, Context, Libp2pNetwork, Libp2pNetworkConfig, NetworkEvent, NetworkMode, Shutdown};
-pub use services::heads;
-pub use services::network;
+pub use services::network::CoNetworkTaskSpawner;
 pub use types::{
 	error::NetworkError,
+	heads::{HeadsErrorCode, HeadsMessage},
 	layer_behaviour::{Layer, LayerBehaviour},
 	layer_provider::DiscoveryLayerBehaviourProvider,
 	network_task::{FnOnceNetworkTask, NetworkTask, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner},

@@ -8,6 +8,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, ActorInstance, EpicRuntime, ResponseStreams, TaskSpawner};
 use co_identity::LocalIdentityResolver;
+use co_network::services::network::{Network, NetworkSettings};
 use co_primitives::{tags, Tags};
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 

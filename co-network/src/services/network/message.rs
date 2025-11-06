@@ -1,5 +1,5 @@
+use crate::{Behaviour, Context, NetworkTaskBox};
 use co_actor::Response;
-use co_network::{Behaviour, Context, NetworkTaskBox};
 use libp2p::PeerId;
 use std::fmt::Debug;
 

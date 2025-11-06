@@ -1,155 +1,55 @@
 use super::message::NetworkMessage;
 use crate::{
-	local_keypair_fetch,
-	network::tasks::connections::ConnectionsNetworkTask,
+	bitswap::BitswapMessage,
 	services::{
-		bitswap::Bitswap,
 		connections::Connections,
 		heads::{HeadsActor, HeadsApi, HeadsContext},
-		network::{CoNetworkTaskSpawner, MdnsGossipNetworkTask},
+		network::{CoNetworkTaskSpawner, ConnectionsNetworkTask, MdnsGossipNetworkTask, NetworkSettings},
 	},
-	Action, CoContext,
+	try_peer_id, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner,
 };
 use async_trait::async_trait;
-use co_actor::{Actor, ActorError, ActorHandle, ActorInstance};
-use co_network::{try_peer_id, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner};
-use co_primitives::{tags, Tags};
-use libp2p::{Multiaddr, PeerId};
+use co_actor::{Actor, ActorError, ActorHandle, ActorInstance, TaskSpawner};
+use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
+use co_primitives::{tags, DefaultParams, Tags};
+use libp2p::{identity::Keypair, Multiaddr, PeerId};
 use std::{collections::BTreeSet, time::Duration};
 
-#[derive(Debug, Clone)]
-#[non_exhaustive]
-pub struct NetworkSettings {
-	pub force_new_peer_id: bool,
-	pub listen: Multiaddr,
-	pub bootstrap: BTreeSet<Multiaddr>,
-}
-impl Default for NetworkSettings {
-	fn default() -> Self {
-		Self {
-			force_new_peer_id: Default::default(),
-			listen: Self::default_listen(),
-			bootstrap: Self::default_bootstrap(),
-		}
-	}
-}
-impl NetworkSettings {
-	pub fn new() -> Self {
-		Self::default()
-	}
-
-	fn default_listen() -> Multiaddr {
-		"/ip4/0.0.0.0/udp/0/quic-v1".parse().expect("to parse")
-	}
-
-	fn default_bootstrap() -> BTreeSet<Multiaddr> {
-		let bootstrap =
-			["/dns/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWCoAgVrvp9dWqk3bds1paFcrK8HuYB8yY13XWaahwfm7o"];
-		bootstrap.into_iter().map(|s| s.parse().expect("to parse")).collect()
-	}
-
-	pub fn with_force_new_peer_id(mut self, value: bool) -> Self {
-		self.force_new_peer_id = value;
-		self
-	}
-
-	/// Set listen endpoint.
-	pub fn with_listen(mut self, listen: Multiaddr) -> Self {
-		self.listen = listen;
-		self
-	}
-
-	/// Set listen endpoint.
-	pub fn with_listen_from_string(mut self, listen: &str) -> Result<Self, anyhow::Error> {
-		self.listen = listen.parse()?;
-		Ok(self)
-	}
-
-	/// Set local listen endpoint.
-	pub fn with_localhost(mut self) -> Self {
-		self.listen = "/ip4/127.0.0.1/tcp/0".parse().unwrap();
-		self
-	}
-
-	/// Clear all bootstrap endpoints.
-	pub fn without_bootstrap(mut self) -> Self {
-		self.bootstrap.clear();
-		self
-	}
-
-	/// Add bootstrap endpoint.
-	pub fn with_bootstrap(mut self, bootstrap: Multiaddr) -> Self {
-		self.bootstrap.insert(bootstrap);
-		self
-	}
-
-	/// Add bootstrap endpoint.
-	pub fn with_bootstraps(mut self, bootstrap: impl IntoIterator<Item = Multiaddr>) -> Self {
-		self.bootstrap.extend(bootstrap);
-		self
-	}
-
-	/// Add bootstrap endpoint.
-	pub fn with_bootstrap_from_string(mut self, bootstrap: &str) -> Result<Self, anyhow::Error> {
-		self.bootstrap.insert(bootstrap.parse()?);
-		Ok(self)
-	}
-
-	/// Validate if settings are correct.
-	pub fn build(self) -> Result<Self, anyhow::Error> {
-		for bootstrap in self.bootstrap.iter() {
-			try_peer_id(bootstrap)?;
-		}
-		Ok(self)
-	}
+pub struct NetworkInitialize {
+	pub settings: NetworkSettings,
+	pub identifier: String,
+	pub keypair: Keypair,
+	pub identity_resolver: IdentityResolverBox,
+	pub private_identity_resolver: PrivateIdentityResolverBox,
+	pub bitswap: ActorHandle<BitswapMessage<DefaultParams>>,
+	pub tasks: TaskSpawner,
 }
 
-#[derive(Debug)]
-pub struct Network {
-	context: CoContext,
-}
-impl Network {
-	pub fn new(context: CoContext) -> Self {
-		Self { context }
-	}
-}
+#[derive(Debug, Default)]
+pub struct Network;
 #[async_trait]
 impl Actor for Network {
 	type Message = NetworkMessage;
 	type State = NetworkState;
-	type Initialize = NetworkSettings;
+	type Initialize = NetworkInitialize;
 
 	async fn initialize(
 		&self,
 		_handle: &ActorHandle<Self::Message>,
 		_tags: &Tags,
-		settings: Self::Initialize,
+		initialize: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
-		// bitswap
-		let bitswap = Actor::spawn_with(
-			self.context.tasks(),
-			tags!("type": "bitswap", "application": self.context.identifier()),
-			Bitswap::new(self.context.clone()),
-			(),
-		)?;
-
-		// resolve key
-		let local_identity = self.context.local_identity();
-		let local_co = self.context.local_co_reducer().await?;
-		let network_key =
-			local_keypair_fetch(self.context.identifier(), &local_co, &local_identity, settings.force_new_peer_id)
-				.await?;
-
 		// network
-		let network_peer_id = PeerId::from(network_key.public());
-		let mut network_config = Libp2pNetworkConfig::from_keypair(settings.listen, network_key.clone());
-		network_config.bootstrap = settings.bootstrap;
+		let network_peer_id = PeerId::from(initialize.keypair.public());
+		let mut network_config =
+			Libp2pNetworkConfig::from_keypair(initialize.settings.listen, initialize.keypair.clone());
+		network_config.bootstrap = initialize.settings.bootstrap;
 		let network = Libp2pNetwork::new(
-			self.context.identifier().to_owned(),
+			initialize.identifier.clone(),
 			network_config,
-			self.context.identity_resolver().await?,
-			self.context.private_identity_resolver().await?,
-			bitswap.handle(),
+			initialize.identity_resolver,
+			initialize.private_identity_resolver,
+			initialize.bitswap,
 		)?;
 
 		// spawner
@@ -157,9 +57,9 @@ impl Actor for Network {
 
 		// connections
 		let connections = Actor::spawn_with(
-			self.context.tasks(),
-			tags!("type": "connections", "application": self.context.identifier()),
-			Connections::new(self.context.clone(), Duration::from_secs(30)),
+			initialize.tasks.clone(),
+			tags!("type": "connections", "application": &initialize.identifier),
+			Connections::new(initialize.context.clone(), Duration::from_secs(30)),
 			(),
 		)?;
 		spawner
@@ -173,26 +73,17 @@ impl Actor for Network {
 
 		// heads
 		let heads = Actor::spawn_with(
-			self.context.tasks(),
-			tags!("type": "heads", "application": self.context.identifier()),
+			initialize.tasks.clone(),
+			tags!("type": "heads", "application": &initialize.identifier),
 			HeadsActor::default(),
-			HeadsContext { network: spawner.clone(), spawner: self.context.tasks() },
+			HeadsContext { network: spawner.clone(), spawner: initialize.tasks.clone() },
 		)?;
 
-		// set network to reducers
-		self.context
-			.inner
-			.set_network(Some((spawner.clone(), connections.handle(), HeadsApi::from(&heads))))
-			.await?;
-
 		// log
-		tracing::info!(application = self.context.identifier(), peer_id = ?network_peer_id, "network");
-
-		// reactive
-		self.context.inner.application().dispatch(Action::NetworkStarted)?;
+		tracing::info!(application = initialize.identifier, peer_id = ?network_peer_id, "network");
 
 		// result
-		Ok(NetworkState { network, peer_id: network_peer_id, connections, heads, bitswap })
+		Ok(NetworkState { network, peer_id: network_peer_id, connections, heads })
 	}
 
 	async fn handle(

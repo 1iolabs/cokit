@@ -5,9 +5,9 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
-	network::NetworkSettings, services::application::ApplicationMessage, Action, CoDate, CoReducer, CoReducerFactory,
-	CoStorage, CoUuid, DynamicCoDate, DynamicCoUuid, RandomCoUuid, Storage, SystemCoDate, CO_CORE_NAME_KEYSTORE,
-	CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
+	services::{application::ApplicationMessage, network::NetworkSettings},
+	Action, CoDate, CoReducer, CoReducerFactory, CoStorage, CoUuid, DynamicCoDate, DynamicCoUuid, RandomCoUuid,
+	Storage, SystemCoDate, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
 use co_actor::{Actor, ActorHandle, ActorInstance};

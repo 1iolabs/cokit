@@ -1955,6 +1955,7 @@ dependencies = [
  "libipld",
  "libp2p",
  "libp2p-bitswap",
+ "multiaddr",
  "pin-project",
  "rand 0.8.5",
  "serde",

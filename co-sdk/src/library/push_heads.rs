@@ -1,5 +1,6 @@
 use super::to_external_cid::{to_external_cids, to_external_cids_opt_force};
 use crate::{
+	didcomm::EncodedMessage,
 	services::{
 		connections::ConnectionMessage,
 		network::{CoNetworkTaskSpawner, DidCommSendNetworkTask},
@@ -12,7 +13,6 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actions, Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, Reducer, SwitchEpic, TracingEpic};
 use co_identity::{Identity, PeerDidCommHeader, PrivateIdentity, PrivateIdentityBox};
-use co_network::didcomm::EncodedMessage;
 use co_primitives::{tags, CoId, Tags, WeakCid};
 use futures::{Stream, StreamExt};
 use libp2p::PeerId;

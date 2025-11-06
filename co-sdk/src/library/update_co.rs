@@ -1,12 +1,11 @@
 use crate::{
-	library::wait_response::wait_response_timeout, services::application::ApplicationMessage,
+	didcomm::EncodedMessage, library::wait_response::wait_response_timeout, services::application::ApplicationMessage,
 	types::message::heads::HeadsMessage, Action, CoReducer,
 };
 use anyhow::anyhow;
 use cid::Cid;
 use co_actor::ActorHandle;
 use co_identity::PrivateIdentity;
-use co_network::didcomm::EncodedMessage;
 use futures::try_join;
 use libp2p::PeerId;
 use std::time::Duration;

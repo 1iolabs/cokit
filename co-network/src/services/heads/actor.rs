@@ -1,6 +1,6 @@
-use crate::{
-	services::heads::{action::UnsubscribeAction, epics::epic, HeadsAction, ReceiveAction, SubscribeAction},
-	CoNetworkTaskSpawner,
+use crate::services::{
+	heads::{action::UnsubscribeAction, epics::epic, HeadsAction, ReceiveAction, SubscribeAction},
+	network::CoNetworkTaskSpawner,
 };
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, ResponseStream, ResponseStreams, TaskSpawner};

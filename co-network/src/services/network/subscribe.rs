@@ -2,8 +2,8 @@ use super::{
 	tasks::did_discovery::{DidDiscoverySubscribe, DidDiscoveryUnsubscribe},
 	CoNetworkTaskSpawner,
 };
+use crate::NetworkTaskSpawner;
 use co_identity::PrivateIdentity;
-use co_network::NetworkTaskSpawner;
 use co_primitives::{Did, NetworkDidDiscovery};
 use std::fmt::Debug;
 

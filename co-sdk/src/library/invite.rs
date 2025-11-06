@@ -1,6 +1,6 @@
+use crate::didcomm::EncodedMessage;
 use cid::Cid;
 use co_identity::{DidCommHeader, Identity, PrivateIdentity};
-use co_network::didcomm::EncodedMessage;
 use co_primitives::{to_json_string, CoConnectivity, CoId, Tags};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;

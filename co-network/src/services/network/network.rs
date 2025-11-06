@@ -1,5 +1,7 @@
-use crate::network::{DialNetworkTask, ListnersNetworkTask};
-use co_network::{Behaviour, Context, NetworkError, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner};
+use crate::{
+	services::network::{DialNetworkTask, ListnersNetworkTask},
+	Behaviour, Context, NetworkError, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner,
+};
 use libp2p::{Multiaddr, PeerId};
 
 #[derive(Clone)]

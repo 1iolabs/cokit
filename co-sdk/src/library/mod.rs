@@ -44,5 +44,6 @@ pub mod storage_pinning;
 pub mod storage_structure;
 pub mod to_external_cid;
 pub mod to_internal_cid;
+pub mod token;
 pub mod update_co;
 pub mod wait_response;

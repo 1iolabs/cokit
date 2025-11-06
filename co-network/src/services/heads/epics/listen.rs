@@ -1,10 +1,12 @@
 use crate::{
-	network::ListenGossipTask,
-	services::heads::{
-		actor::{to_topic_hash, HeadsContext, HeadsState},
-		HeadsAction, ReceiveAction,
+	services::{
+		heads::{
+			actor::{to_topic_hash, HeadsContext, HeadsState},
+			HeadsAction, ReceiveAction,
+		},
+		network::ListenGossipTask,
 	},
-	types::message::heads::HeadsMessage,
+	HeadsMessage,
 };
 use co_actor::Actions;
 use co_primitives::{from_cbor, WeakCid};

@@ -1,9 +1,8 @@
 use crate::{
 	services::connections::{PeerConnectionClosedAction, PeerConnectionEstablishedAction},
-	ConnectionAction, ConnectionMessage,
+	ConnectionAction, ConnectionMessage, NetworkTask,
 };
 use co_actor::ActorHandle;
-use co_network::NetworkTask;
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	Swarm,

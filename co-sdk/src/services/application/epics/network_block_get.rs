@@ -1,20 +1,17 @@
 use crate::{
+	backoff_with_jitter,
+	bitswap::{GetNetworkTask, Token},
 	library::{
 		connections_peer_provider::ConnectionsPeerProvider, find_co_secret::find_co_secret_by_membership,
 		network_identity::network_identity_by_id, network_queue::TaskState, settings_timeout::settings_timeout,
 	},
 	services::application::NetworkBlockGetAction,
 	Action, CoContext, CoNetworkTaskSpawner, CoReducerFactory, CoToken, CoTokenParameters, ConnectionMessage,
-	CO_ID_LOCAL,
+	PeerProvider, CO_ID_LOCAL,
 };
 use cid::Cid;
 use co_actor::{ActionDispatch, Actions, ActorHandle};
 use co_identity::Identity;
-use co_network::{
-	backoff_with_jitter,
-	bitswap::{GetNetworkTask, Token},
-	PeerProvider,
-};
 use co_primitives::{BlockSerializer, CoId};
 use co_storage::StorageError;
 use futures::{future::Either, pin_mut, stream, FutureExt, Stream, StreamExt};

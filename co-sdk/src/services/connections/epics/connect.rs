@@ -6,11 +6,10 @@ use crate::{
 		},
 		network::DiscoveryConnectNetworkTask,
 	},
-	CoContext,
+	CoContext, NetworkTaskSpawner,
 };
 use co_actor::{Actions, Epic};
 use co_identity::PrivateIdentityResolver;
-use co_network::NetworkTaskSpawner;
 use co_primitives::{Did, Network};
 use futures::{Stream, StreamExt, TryStreamExt};
 

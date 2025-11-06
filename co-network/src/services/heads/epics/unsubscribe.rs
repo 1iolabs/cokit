@@ -1,9 +1,9 @@
-use crate::{
-	network::UnsubscribeGossipTask,
-	services::heads::{
+use crate::services::{
+	heads::{
 		actor::{to_topic, to_topic_hash, HeadsContext, HeadsState},
 		HeadsAction,
 	},
+	network::UnsubscribeGossipTask,
 };
 use co_actor::Actions;
 use co_primitives::CoTryStreamExt;

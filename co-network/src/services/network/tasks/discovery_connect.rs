@@ -1,8 +1,8 @@
-use co_identity::IdentityResolverBox;
-use co_network::{
+use crate::{
 	discovery::{self, Discovery, DiscoveryBehaviour},
 	DiscoveryLayerBehaviourProvider, NetworkTask,
 };
+use co_identity::IdentityResolverBox;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},

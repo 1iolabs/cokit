@@ -1,5 +1,5 @@
+use crate::{discovery, DiscoveryLayerBehaviourProvider, NetworkTask};
 use co_identity::{IdentityResolverBox, PrivateIdentity};
-use co_network::{discovery, DiscoveryLayerBehaviourProvider, NetworkTask};
 use co_primitives::{Did, NetworkDidDiscovery};
 use libp2p::{swarm::NetworkBehaviour, Swarm};
 use std::fmt::Debug;
