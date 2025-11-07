@@ -1,5 +1,5 @@
-use crate::didcomm::EncodedMessage;
 use co_identity::{DidCommHeader, PrivateIdentity};
+use co_network::didcomm::EncodedMessage;
 use co_primitives::{to_json_string, CoId};
 use serde::{Deserialize, Serialize};
 

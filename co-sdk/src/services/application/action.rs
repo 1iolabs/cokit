@@ -1,12 +1,11 @@
 use crate::{
-	didcomm::EncodedMessage,
 	library::{create_reducer_action::new_reducer_action, network_queue::TaskState},
 	services::{network::NetworkSettings, reducer::FlushInfo},
-	types::message::heads::HeadsMessage,
 	CoDate, CoStorage, ReducerChangeContext,
 };
 use cid::Cid;
 use co_identity::{DidCommHeader, Message, PrivateIdentityBox};
+use co_network::{didcomm::EncodedMessage, HeadsMessage};
 use co_primitives::{Block, BlockSerializer, CoId, DefaultParams, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{stream::once, Stream, StreamExt};
@@ -61,7 +60,7 @@ pub enum Action {
 	NetworkStart(NetworkSettings),
 
 	/// Network has been started.
-	NetworkStarted,
+	NetworkStartComplete(Result<(), ActionError>),
 
 	/// Send a DIDComm message.
 	DidCommSend {

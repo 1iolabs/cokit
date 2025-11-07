@@ -10,7 +10,7 @@ pub fn didcomm_receive(
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::NetworkStarted => Some({
+		Action::NetworkStartComplete(Ok(())) => Some({
 			stream::once(ready(context.clone()))
 				.filter_map(|context| async move { context.network_tasks().await })
 				.flat_map(|network| DidCommReceiveNetworkTask::receive(network))

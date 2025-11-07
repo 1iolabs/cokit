@@ -1,6 +1,8 @@
 use crate::{
-	services::connections::{PeerConnectionClosedAction, PeerConnectionEstablishedAction},
-	ConnectionAction, ConnectionMessage, NetworkTask,
+	services::connections::{
+		ConnectionAction, ConnectionMessage, PeerConnectionClosedAction, PeerConnectionEstablishedAction,
+	},
+	NetworkTask,
 };
 use co_actor::ActorHandle;
 use libp2p::{

@@ -1,8 +1,8 @@
-use crate::{
+use co_actor::ActorHandle;
+use co_network::{
 	services::connections::{ConnectionMessage, UseAction},
 	PeerProvider,
 };
-use co_actor::ActorHandle;
 use co_primitives::{CoId, Did};
 use futures::{Stream, TryStreamExt};
 use libp2p::PeerId;

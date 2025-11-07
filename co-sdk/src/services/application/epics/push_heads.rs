@@ -38,7 +38,7 @@ impl Epic<Action, (), CoContext> for PushHeadsEpic {
 
 async fn push(context: CoContext, epic: PushHeadsEpic, co: CoId, identity: Did) -> Result<(), anyhow::Error> {
 	// network
-	let Some((network, connections, _heads)) = context.network().await else {
+	let Some(network) = context.network().await else {
 		return Ok(());
 	};
 
@@ -59,7 +59,6 @@ async fn push(context: CoContext, epic: PushHeadsEpic, co: CoId, identity: Did) 
 			None => {
 				let instance = PushHeads::new(
 					network,
-					connections,
 					context.tasks(),
 					co.clone(),
 					co_reducer.context.has_feature(&CoReducerFeature::Encryption),

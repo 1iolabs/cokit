@@ -61,7 +61,7 @@ pub async fn command(
 
 	// verbose
 	if cli.verbose > 0 {
-		if let Some(network) = application.context().network_tasks().await {
+		if let Some(network) = application.context().network().await {
 			// peer-id
 			let peer_id = network.local_peer_id();
 			println!("peer-id: {}", peer_id);

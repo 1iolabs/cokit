@@ -5,14 +5,14 @@ use crate::{
 		network_queue::TaskState,
 	},
 	services::application::{action::KeyRequestAction, CoDidCommSendAction},
-	Action, ActionError, CoContext, CoNetworkTaskSpawner, CoReducerFactory, CO_CORE_NAME_KEYSTORE,
-	CO_CORE_NAME_MEMBERSHIP,
+	Action, ActionError, CoContext, CoReducerFactory, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use co_actor::{ActionDispatch, Actions};
 use co_core_keystore::KeyStoreAction;
 use co_core_membership::MembershipsAction;
 use co_identity::{DidCommHeader, Identity};
+use co_network::CoNetworkTaskSpawner;
 use co_primitives::{from_json_string, BlockSerializer};
 use futures::{future::Either, stream, FutureExt, Stream, StreamExt};
 use libp2p::PeerId;

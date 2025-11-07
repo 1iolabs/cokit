@@ -1,7 +1,8 @@
 use co_core_co::CoAction;
 use co_core_file::{FileAction, FolderNode};
+use co_network::services::connections::{ConnectionAction, ConnectionMessage, ReleaseAction};
 use co_primitives::AbsolutePathOwned;
-use co_sdk::{tags, ConnectionAction, ConnectionMessage, Cores, Identity, ReleaseAction, CO_CORE_NAME_CO};
+use co_sdk::{tags, Cores, Identity, CO_CORE_NAME_CO};
 use futures::{pin_mut, StreamExt};
 use helper::{instance::Instances, shared_co::SharedCo};
 use std::{

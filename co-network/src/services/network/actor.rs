@@ -2,18 +2,17 @@ use super::message::NetworkMessage;
 use crate::{
 	bitswap::BitswapMessage,
 	services::{
-		connections::Connections,
+		connections::{Connections, ConnectionsContext, DynamicNetworkResolver},
 		heads::{HeadsActor, HeadsApi, HeadsContext},
-		network::{CoNetworkTaskSpawner, ConnectionsNetworkTask, MdnsGossipNetworkTask, NetworkSettings},
+		network::{CoNetworkTaskSpawner, ConnectionsNetworkTask, MdnsGossipNetworkTask, NetworkApi, NetworkSettings},
 	},
-	try_peer_id, Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner,
+	Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner,
 };
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, ActorInstance, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
 use co_primitives::{tags, DefaultParams, Tags};
-use libp2p::{identity::Keypair, Multiaddr, PeerId};
-use std::{collections::BTreeSet, time::Duration};
+use libp2p::{identity::Keypair, PeerId};
 
 pub struct NetworkInitialize {
 	pub settings: NetworkSettings,
@@ -23,6 +22,7 @@ pub struct NetworkInitialize {
 	pub private_identity_resolver: PrivateIdentityResolverBox,
 	pub bitswap: ActorHandle<BitswapMessage<DefaultParams>>,
 	pub tasks: TaskSpawner,
+	pub network_resolver: DynamicNetworkResolver,
 }
 
 #[derive(Debug, Default)]
@@ -47,8 +47,8 @@ impl Actor for Network {
 		let network = Libp2pNetwork::new(
 			initialize.identifier.clone(),
 			network_config,
-			initialize.identity_resolver,
-			initialize.private_identity_resolver,
+			initialize.identity_resolver.clone(),
+			initialize.private_identity_resolver.clone(),
 			initialize.bitswap,
 		)?;
 
@@ -56,10 +56,18 @@ impl Actor for Network {
 		let spawner = CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id.clone() };
 
 		// connections
+		let connections_context = ConnectionsContext {
+			tasks: initialize.tasks.clone(),
+			identity_resolver: initialize.identity_resolver.clone(),
+			private_identity_resolver: initialize.private_identity_resolver.clone(),
+			keep_alive: initialize.settings.keep_alive,
+			network: spawner.clone(),
+			network_resolver: initialize.network_resolver,
+		};
 		let connections = Actor::spawn_with(
 			initialize.tasks.clone(),
 			tags!("type": "connections", "application": &initialize.identifier),
-			Connections::new(initialize.context.clone(), Duration::from_secs(30)),
+			Connections::new(connections_context),
 			(),
 		)?;
 		spawner
@@ -88,7 +96,7 @@ impl Actor for Network {
 
 	async fn handle(
 		&self,
-		_handle: &ActorHandle<Self::Message>,
+		handle: &ActorHandle<Self::Message>,
 		message: Self::Message,
 		state: &mut Self::State,
 	) -> Result<(), ActorError> {
@@ -98,7 +106,15 @@ impl Actor for Network {
 				state.network.spawner().spawn_box(task).ok();
 			},
 			NetworkMessage::LocalPeerId(response) => {
-				response.send(state.peer_id).ok();
+				response.respond(state.peer_id);
+			},
+			NetworkMessage::Network(response) => {
+				response.respond(NetworkApi {
+					spawner: CoNetworkTaskSpawner { spawner: state.network.spawner(), local_peer: state.peer_id },
+					connections: state.connections.handle(),
+					heads: HeadsApi::from(&state.heads),
+					_handle: handle.clone(),
+				});
 			},
 		}
 
@@ -109,7 +125,6 @@ impl Actor for Network {
 	async fn shutdown(&self, state: Self::State) -> Result<(), ActorError> {
 		state.network.shutdown().shutdown();
 		state.connections.shutdown();
-		state.bitswap.shutdown();
 		state.heads.shutdown();
 		Ok(())
 	}
@@ -119,6 +134,5 @@ pub struct NetworkState {
 	network: Libp2pNetwork,
 	peer_id: PeerId,
 	connections: ActorInstance<Connections>,
-	bitswap: ActorInstance<Bitswap>,
 	heads: ActorInstance<HeadsActor>,
 }

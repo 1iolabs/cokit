@@ -1,8 +1,6 @@
-use crate::{
-	services::connections::{
-		ConnectionAction, ConnectionState, DisconnectAction, DisconnectReason, DisconnectedAction,
-	},
-	CoContext,
+use crate::services::connections::{
+	actor::ConnectionsContext, ConnectionAction, ConnectionState, DisconnectAction, DisconnectReason,
+	DisconnectedAction,
 };
 use co_actor::{Actions, Epic};
 use futures::{stream, Stream};
@@ -13,13 +11,13 @@ impl DisconnectEpic {
 		Self()
 	}
 }
-impl Epic<ConnectionAction, ConnectionState, CoContext> for DisconnectEpic {
+impl Epic<ConnectionAction, ConnectionState, ConnectionsContext> for DisconnectEpic {
 	fn epic(
 		&mut self,
-		_actions: &Actions<ConnectionAction, ConnectionState, CoContext>,
+		_actions: &Actions<ConnectionAction, ConnectionState, ConnectionsContext>,
 		message: &ConnectionAction,
 		_state: &ConnectionState,
-		_context: &CoContext,
+		_context: &ConnectionsContext,
 	) -> Option<impl Stream<Item = Result<ConnectionAction, anyhow::Error>> + 'static> {
 		match message {
 			ConnectionAction::Disconnect(DisconnectAction { network }) => {

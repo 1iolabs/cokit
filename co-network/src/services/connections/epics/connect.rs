@@ -2,11 +2,12 @@ use crate::{
 	library::network_discovery::network_discovery,
 	services::{
 		connections::{
-			ConnectAction, ConnectedAction, ConnectionAction, ConnectionState, DisconnectReason, DisconnectedAction,
+			actor::ConnectionsContext, ConnectAction, ConnectedAction, ConnectionAction, ConnectionState,
+			DisconnectReason, DisconnectedAction,
 		},
 		network::DiscoveryConnectNetworkTask,
 	},
-	CoContext, NetworkTaskSpawner,
+	NetworkTaskSpawner,
 };
 use co_actor::{Actions, Epic};
 use co_identity::PrivateIdentityResolver;
@@ -19,13 +20,13 @@ impl ConnectEpic {
 		Self()
 	}
 }
-impl Epic<ConnectionAction, ConnectionState, CoContext> for ConnectEpic {
+impl Epic<ConnectionAction, ConnectionState, ConnectionsContext> for ConnectEpic {
 	fn epic(
 		&mut self,
-		_actions: &Actions<ConnectionAction, ConnectionState, CoContext>,
+		_actions: &Actions<ConnectionAction, ConnectionState, ConnectionsContext>,
 		message: &ConnectionAction,
 		_state: &ConnectionState,
-		context: &CoContext,
+		context: &ConnectionsContext,
 	) -> Option<impl Stream<Item = Result<ConnectionAction, anyhow::Error>> + 'static> {
 		match message {
 			ConnectionAction::Connect(ConnectAction { from, network }) => {
@@ -46,30 +47,20 @@ impl Epic<ConnectionAction, ConnectionState, CoContext> for ConnectEpic {
 }
 
 fn connect(
-	context: CoContext,
+	context: ConnectionsContext,
 	from: Did,
 	network: Network,
 ) -> impl Stream<Item = Result<ConnectionAction, anyhow::Error>> + 'static {
 	async_stream::try_stream! {
-		// network
-		let spawner = match context.network_tasks().await {
-			Some(v) => v,
-			None => {
-				yield ConnectionAction::Disconnected(DisconnectedAction { network: network.clone(),  reason: DisconnectReason::NoNetwork });
-				return;
-			},
-		};
-
 		// discovery
-		let identity_resolver = context.identity_resolver().await?;
-		let from_identity = context.private_identity_resolver().await?.resolve_private(&from).await?;
-		let discovery = network_discovery(Some(&identity_resolver), spawner.local_peer_id(), &from_identity, [network.clone()], []).try_collect().await?;
+		let from_identity = context.private_identity_resolver.resolve_private(&from).await?;
+		let discovery = network_discovery(Some(&context.identity_resolver), context.network.local_peer_id(), &from_identity, [network.clone()], []).try_collect().await?;
 
 		// connect
 		let (task, peers) = DiscoveryConnectNetworkTask::new(discovery);
 
 		// spawn
-		spawner.spawn(task)?;
+		context.network.spawn(task)?;
 
 		// yield
 		for await peer in peers {

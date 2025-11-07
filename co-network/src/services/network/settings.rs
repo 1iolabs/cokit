@@ -1,6 +1,6 @@
 use crate::try_peer_id;
 use multiaddr::Multiaddr;
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, time::Duration};
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -9,6 +9,7 @@ pub struct NetworkSettings {
 	pub listen: Multiaddr,
 	pub bootstrap: BTreeSet<Multiaddr>,
 	pub relay: bool,
+	pub keep_alive: Duration,
 }
 impl Default for NetworkSettings {
 	fn default() -> Self {
@@ -17,6 +18,7 @@ impl Default for NetworkSettings {
 			listen: Self::default_listen(),
 			bootstrap: Self::default_bootstrap(),
 			relay: false,
+			keep_alive: Duration::from_secs(30),
 		}
 	}
 }

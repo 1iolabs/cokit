@@ -1,23 +1,33 @@
 use super::{epics::epic, ConnectionAction, ConnectionMessage, ConnectionState, PeersChangedAction};
-use crate::CoContext;
+use crate::{services::connections::resolve::DynamicNetworkResolver, CoNetworkTaskSpawner};
 use async_trait::async_trait;
-use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer, ResponseStreams};
+use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer, ResponseStreams, TaskSpawner};
+use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
 use co_primitives::{CoId, Tags};
 use std::{collections::BTreeMap, time::Duration};
 
+#[derive(Debug, Clone)]
+pub struct ConnectionsContext {
+	pub tasks: TaskSpawner,
+	pub keep_alive: Duration,
+	pub network: CoNetworkTaskSpawner,
+	pub identity_resolver: IdentityResolverBox,
+	pub private_identity_resolver: PrivateIdentityResolverBox,
+	pub network_resolver: DynamicNetworkResolver,
+}
+
 pub struct State {
 	state: ConnectionState,
-	epic: EpicRuntime<ConnectionMessage, ConnectionAction, ConnectionState, CoContext>,
+	epic: EpicRuntime<ConnectionMessage, ConnectionAction, ConnectionState, ConnectionsContext>,
 	peers_changed: BTreeMap<CoId, ResponseStreams<PeersChangedAction>>,
 }
 
 pub struct Connections {
-	context: CoContext,
-	keep_alive: Duration,
+	context: ConnectionsContext,
 }
 impl Connections {
-	pub fn new(context: CoContext, keep_alive: Duration) -> Self {
-		Self { context, keep_alive }
+	pub fn new(context: ConnectionsContext) -> Self {
+		Self { context }
 	}
 }
 #[async_trait]
@@ -34,7 +44,7 @@ impl Actor for Connections {
 	) -> Result<Self::State, ActorError> {
 		Ok(State {
 			state: ConnectionState {
-				keep_alive: self.keep_alive,
+				keep_alive: self.context.keep_alive,
 				co: Default::default(),
 				networks: Default::default(),
 				peers: Default::default(),
@@ -80,7 +90,7 @@ impl Actor for Connections {
 		// epic
 		state
 			.epic
-			.handle(&self.context.tasks(), handle, &action, &state.state, &self.context);
+			.handle(&self.context.tasks, handle, &action, &state.state, &self.context);
 
 		// responses
 		match &action {

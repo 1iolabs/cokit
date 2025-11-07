@@ -5,6 +5,7 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
+	library::wait_response::request_response,
 	services::{application::ApplicationMessage, network::NetworkSettings},
 	Action, CoDate, CoReducer, CoReducerFactory, CoStorage, CoUuid, DynamicCoDate, DynamicCoUuid, RandomCoUuid,
 	Storage, SystemCoDate, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
@@ -100,12 +101,12 @@ impl Application {
 
 	/// Create and startup network.
 	pub async fn create_network(&mut self, settings: NetworkSettings) -> Result<(), anyhow::Error> {
-		// start
-		self.service.handle().dispatch(Action::NetworkStart(settings))?;
-
-		// wait
-		let network = self.service.handle().request(ApplicationMessage::Network).await??;
-		network.initialized().await?;
+		// start and wait
+		request_response(self.service.handle(), Action::NetworkStart(settings), move |action| match action {
+			Action::NetworkStartComplete(result) => Some(result.clone()),
+			_ => None,
+		})
+		.await??;
 
 		// done
 		Ok(())

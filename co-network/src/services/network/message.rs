@@ -1,4 +1,4 @@
-use crate::{Behaviour, Context, NetworkTaskBox};
+use crate::{services::network::NetworkApi, Behaviour, Context, NetworkTaskBox};
 use co_actor::Response;
 use libp2p::PeerId;
 use std::fmt::Debug;
@@ -10,4 +10,7 @@ pub enum NetworkMessage {
 
 	/// Get local PeerID.
 	LocalPeerId(Response<PeerId>),
+
+	/// Get network APIs.
+	Network(Response<NetworkApi>),
 }

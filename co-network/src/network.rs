@@ -7,10 +7,9 @@ use crate::{
 	LayerBehaviour, MdnsBehaviourProvider, NetworkError, NetworkTaskBox, NetworkTaskSpawner,
 };
 use anyhow::anyhow;
-use cid::Cid;
 use co_actor::ActorHandle;
 use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver, PrivateIdentityResolverBox};
-use co_primitives::{DefaultParams, MultiCodec};
+use co_primitives::DefaultParams;
 use futures::{pin_mut, Stream, StreamExt};
 use libp2p::{
 	dcutr, gossipsub, identify,

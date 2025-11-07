@@ -18,7 +18,7 @@ pub fn network_started(
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::NetworkStarted => Some({
+		Action::NetworkStartComplete(Ok(())) => Some({
 			let context = context.clone();
 			async move {
 				if let Some(network) = context.network_tasks().await {

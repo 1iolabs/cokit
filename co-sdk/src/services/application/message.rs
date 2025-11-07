@@ -1,6 +1,7 @@
 use super::Action;
-use crate::{CoContext, NetworkMessage};
-use co_actor::{ActorHandle, Response, ResponseStream};
+use crate::CoContext;
+use co_actor::{Response, ResponseStream};
+use co_network::services::network::NetworkApi;
 use std::fmt::Debug;
 
 #[derive(Debug)]
@@ -15,7 +16,7 @@ pub enum ApplicationMessage {
 	Context(Response<CoContext>),
 
 	/// Get Network.
-	Network(Response<Result<ActorHandle<NetworkMessage>, anyhow::Error>>),
+	Network(Response<Result<NetworkApi, anyhow::Error>>),
 }
 impl From<Action> for ApplicationMessage {
 	fn from(value: Action) -> Self {

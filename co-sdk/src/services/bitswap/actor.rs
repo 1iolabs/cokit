@@ -1,13 +1,11 @@
 use crate::{
-	bitswap::{BitswapMessage, Token},
-	library::find_co_secret::find_co_secret_by_membership,
-	services::reducers::ReducerStorage,
-	CoContext, CoToken,
+	library::find_co_secret::find_co_secret_by_membership, services::reducers::ReducerStorage, CoContext, CoToken,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle};
+use co_network::bitswap::{BitswapMessage, Token};
 use co_primitives::{Block, BlockLinks, CoId, DefaultParams, KnownMultiCodec, MultiCodec, Tags};
 use co_storage::{BlockStorage, StorageError};
 use libp2p::PeerId;

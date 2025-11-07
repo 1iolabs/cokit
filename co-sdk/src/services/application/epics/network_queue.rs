@@ -1,16 +1,14 @@
 use crate::{
-	backoff_with_jitter,
 	library::network_queue::{
 		network_queue_action, network_queue_backlog, network_queue_heads, network_queue_message, network_queue_task,
 		network_queue_task_complete, network_queue_task_doing, TaskState,
 	},
-	network::PeersNetworkTask,
 	services::application::{HeadsError, HeadsMessageReceivedAction},
-	types::message::heads::HeadsMessage,
 	Action, CoContext, CoUuid,
 };
 use co_actor::{Actions, Epic};
 use co_identity::PrivateIdentity;
+use co_network::{backoff_with_jitter, services::network::PeersNetworkTask, HeadsMessage};
 use co_primitives::{CoId, CoTryStreamExt};
 use futures::{future::Either, stream, FutureExt, Stream, StreamExt};
 use std::{collections::BTreeSet, future::ready};
@@ -79,7 +77,7 @@ pub fn network_started_epic(
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::NetworkStarted => {
+		Action::NetworkStartComplete(Ok(())) => {
 			let context = context.clone();
 			Some(
 				async move {
