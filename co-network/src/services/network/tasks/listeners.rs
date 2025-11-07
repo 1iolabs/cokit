@@ -1,15 +1,10 @@
 use crate::{
+	network::{Behaviour, Context, NetworkEvent},
 	services::network::CoNetworkTaskSpawner,
-	types::{
-		network_task::{NetworkTask, NetworkTaskSpawner},
-		provider::{GossipsubBehaviourProvider, MdnsBehaviourProvider},
-	},
+	types::network_task::{NetworkTask, NetworkTaskSpawner},
 };
 use futures::channel::oneshot;
-use libp2p::{
-	swarm::{NetworkBehaviour, SwarmEvent},
-	Multiaddr, Swarm,
-};
+use libp2p::{swarm::SwarmEvent, Multiaddr, Swarm};
 use std::mem::take;
 
 /// Get active listener addresses.
@@ -25,11 +20,8 @@ impl ListnersNetworkTask {
 		Ok(rx.await?)
 	}
 }
-impl<B, C> NetworkTask<B, C> for ListnersNetworkTask
-where
-	B: NetworkBehaviour + MdnsBehaviourProvider + GossipsubBehaviourProvider,
-{
-	fn execute(&mut self, _swarm: &mut Swarm<B>, _context: &mut C) {
+impl NetworkTask<Behaviour, Context> for ListnersNetworkTask {
+	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
 		let listeners: Vec<Multiaddr> = _swarm.listeners().cloned().collect();
 		if !listeners.is_empty() {
 			if let Some(result) = take(&mut self.result) {
@@ -40,10 +32,10 @@ where
 
 	fn on_swarm_event(
 		&mut self,
-		swarm: &mut Swarm<B>,
-		context: &mut C,
-		event: SwarmEvent<B::ToSwarm>,
-	) -> Option<SwarmEvent<B::ToSwarm>> {
+		swarm: &mut Swarm<Behaviour>,
+		context: &mut Context,
+		event: SwarmEvent<NetworkEvent>,
+	) -> Option<SwarmEvent<NetworkEvent>> {
 		match &event {
 			SwarmEvent::NewListenAddr { listener_id: _, address: _ } => {
 				self.execute(swarm, context);

@@ -8,10 +8,7 @@ use co_actor::{
 };
 use co_identity::{Identity, PeerDidCommHeader, PrivateIdentity, PrivateIdentityBox};
 use co_network::{
-	services::{
-		connections::ConnectionMessage,
-		network::{DidCommSendNetworkTask, NetworkApi},
-	},
+	services::{connections::ConnectionMessage, network::NetworkApi},
 	EncodedMessage, HeadsMessage,
 };
 use co_primitives::{tags, CoId, Tags, WeakCid};
@@ -226,7 +223,7 @@ impl Epic<PushHeadsAction, PushHeadsState, PushHeadsContext> for PushHeadsSendEp
 
 					// send
 					for peer in peers {
-						let send = DidCommSendNetworkTask::send(network.spawner().clone(), [peer], message.clone(), Duration::from_secs(30)).await;
+						let send = network.didcomm_send([peer], message.clone(), Duration::from_secs(30)).await;
 						yield PushHeadsAction::Sent(identity.clone(), heads.clone(), peer, match send { Ok(_) => Ok(()), Err(err) => Err(err.to_string()) });
 					}
 				}

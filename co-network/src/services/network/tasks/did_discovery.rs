@@ -1,10 +1,10 @@
 use crate::{
-	discovery,
-	types::{layer_provider::DiscoveryLayerBehaviourProvider, network_task::NetworkTask},
+	network::{Behaviour, Context},
+	types::network_task::NetworkTask,
 };
-use co_identity::{IdentityResolverBox, PrivateIdentity};
+use co_identity::PrivateIdentity;
 use co_primitives::{Did, NetworkDidDiscovery};
-use libp2p::{swarm::NetworkBehaviour, Swarm};
+use libp2p::Swarm;
 use std::fmt::Debug;
 use tokio::sync::oneshot;
 
@@ -25,16 +25,14 @@ where
 		(Self { task: Some((identity, network, tx)) }, rx)
 	}
 }
-impl<B, C, I> NetworkTask<B, C> for DidDiscoverySubscribe<I>
+impl<I> NetworkTask<Behaviour, Context> for DidDiscoverySubscribe<I>
 where
-	B: NetworkBehaviour + discovery::DiscoveryBehaviour,
-	C: DiscoveryLayerBehaviourProvider<IdentityResolverBox, Event = <B as NetworkBehaviour>::ToSwarm>,
 	I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 {
-	fn execute(&mut self, swarm: &mut Swarm<B>, context: &mut C) {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, context: &mut Context) {
 		if let Some((identity, network, result)) = Option::take(&mut self.task) {
 			result
-				.send(context.discovery_mut().did_discovery_subscribe(swarm, network, identity))
+				.send(context.discovery.did_discovery_subscribe(swarm, network, identity))
 				.ok();
 		}
 	}
@@ -51,16 +49,10 @@ impl DidDiscoveryUnsubscribe {
 		(Self { task: Some((identity, tx)) }, rx)
 	}
 }
-impl<B, C> NetworkTask<B, C> for DidDiscoveryUnsubscribe
-where
-	B: NetworkBehaviour + discovery::DiscoveryBehaviour,
-	C: DiscoveryLayerBehaviourProvider<IdentityResolverBox, Event = <B as NetworkBehaviour>::ToSwarm>,
-{
-	fn execute(&mut self, swarm: &mut Swarm<B>, context: &mut C) {
+impl NetworkTask<Behaviour, Context> for DidDiscoveryUnsubscribe {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, context: &mut Context) {
 		if let Some((identity, result)) = Option::take(&mut self.task) {
-			result
-				.send(context.discovery_mut().did_discovery_unsubscribe(swarm, &identity))
-				.ok();
+			result.send(context.discovery.did_discovery_unsubscribe(swarm, &identity)).ok();
 		}
 	}
 }

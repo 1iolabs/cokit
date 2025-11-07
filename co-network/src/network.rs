@@ -4,9 +4,8 @@ use crate::{
 	library::find_peer_id::try_peer_id,
 	types::{
 		layer_behaviour::{Layer, LayerBehaviour},
-		layer_provider::DiscoveryLayerBehaviourProvider,
 		network_task::{FnOnceNetworkTask, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner},
-		provider::{DidcommBehaviourProvider, GossipsubBehaviourProvider, MdnsBehaviourProvider},
+		provider::{DidcommBehaviourProvider, GossipsubBehaviourProvider},
 	},
 	NetworkError,
 };
@@ -295,31 +294,6 @@ impl LayerBehaviour<Behaviour> for Context {
 		Poll::Pending
 	}
 }
-impl DiscoveryLayerBehaviourProvider<IdentityResolverBox> for Context {
-	type Event = NetworkEvent;
-
-	fn discovery(&self) -> &discovery::DiscoveryState<IdentityResolverBox> {
-		&self.discovery
-	}
-
-	fn discovery_mut(&mut self) -> &mut discovery::DiscoveryState<IdentityResolverBox> {
-		&mut self.discovery
-	}
-
-	fn discovery_event(event: &Self::Event) -> Option<&discovery::Event> {
-		match event {
-			NetworkEvent::Discovery(event) => Some(event),
-			_ => None,
-		}
-	}
-
-	fn into_discovery_event(event: Self::Event) -> Result<discovery::Event, Self::Event> {
-		match event {
-			NetworkEvent::Discovery(event) => Ok(event),
-			event => Err(event),
-		}
-	}
-}
 
 #[derive(Debug, derive_more::From)]
 #[non_exhaustive]
@@ -437,32 +411,6 @@ impl GossipsubBehaviourProvider for Behaviour {
 	) -> Result<gossipsub::Event, <Self as NetworkBehaviour>::ToSwarm> {
 		match event {
 			NetworkEvent::Gossipsub(e) => Ok(e),
-			e => Err(e),
-		}
-	}
-}
-
-impl MdnsBehaviourProvider for Behaviour {
-	fn mdns(&self) -> &mdns::tokio::Behaviour {
-		&self.mdns
-	}
-
-	fn mdns_mut(&mut self) -> &mut mdns::tokio::Behaviour {
-		&mut self.mdns
-	}
-
-	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&mdns::Event> {
-		match event {
-			NetworkEvent::Mdns(e) => Some(e),
-			_ => None,
-		}
-	}
-
-	fn into_mdns_event(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-	) -> Result<mdns::Event, <Self as NetworkBehaviour>::ToSwarm> {
-		match event {
-			NetworkEvent::Mdns(e) => Ok(e),
 			e => Err(e),
 		}
 	}

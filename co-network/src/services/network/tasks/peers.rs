@@ -1,16 +1,10 @@
 use crate::{
+	network::{Behaviour, Context, NetworkEvent},
 	services::network::CoNetworkTaskSpawner,
-	types::{
-		network_task::{NetworkTask, NetworkTaskSpawner},
-		provider::MdnsBehaviourProvider,
-	},
+	types::network_task::{NetworkTask, NetworkTaskSpawner},
 };
 use futures::Stream;
-use libp2p::{
-	mdns,
-	swarm::{NetworkBehaviour, SwarmEvent},
-	PeerId, Swarm,
-};
+use libp2p::{mdns, swarm::SwarmEvent, PeerId, Swarm};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
@@ -26,27 +20,22 @@ impl PeersNetworkTask {
 		UnboundedReceiverStream::new(rx)
 	}
 }
-impl<B, C> NetworkTask<B, C> for PeersNetworkTask
-where
-	B: NetworkBehaviour + MdnsBehaviourProvider,
-{
-	fn execute(&mut self, _swarm: &mut Swarm<B>, _context: &mut C) {}
+impl NetworkTask<Behaviour, Context> for PeersNetworkTask {
+	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>, _context: &mut Context) {}
 
 	fn on_swarm_event(
 		&mut self,
-		_swarm: &mut Swarm<B>,
-		_context: &mut C,
-		event: SwarmEvent<B::ToSwarm>,
-	) -> Option<SwarmEvent<B::ToSwarm>> {
-		if let Some(mdns_event) = B::swarm_mdns_event(&event) {
-			match mdns_event {
-				mdns::Event::Discovered(list) => {
-					for (peer_id, _) in list {
-						self.tx.send(*peer_id).ok();
-					}
-				},
-				_ => {},
-			}
+		_swarm: &mut Swarm<Behaviour>,
+		_context: &mut Context,
+		event: SwarmEvent<NetworkEvent>,
+	) -> Option<SwarmEvent<NetworkEvent>> {
+		match &event {
+			SwarmEvent::Behaviour(NetworkEvent::Mdns(mdns::Event::Discovered(list))) => {
+				for (peer_id, _) in list {
+					self.tx.send(*peer_id).ok();
+				}
+			},
+			_ => {},
 		}
 		Some(event)
 	}

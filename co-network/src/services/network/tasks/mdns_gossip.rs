@@ -1,12 +1,8 @@
-use crate::types::{
-	network_task::NetworkTask,
-	provider::{GossipsubBehaviourProvider, MdnsBehaviourProvider},
+use crate::{
+	network::{Behaviour, Context, NetworkEvent},
+	types::{network_task::NetworkTask, provider::GossipsubBehaviourProvider},
 };
-use libp2p::{
-	mdns,
-	swarm::{NetworkBehaviour, SwarmEvent},
-	Swarm,
-};
+use libp2p::{mdns, swarm::SwarmEvent, Swarm};
 
 /// Use discovered peers as gossip peers.
 #[derive(Debug)]
@@ -16,31 +12,27 @@ impl MdnsGossipNetworkTask {
 		Self {}
 	}
 }
-impl<B, C> NetworkTask<B, C> for MdnsGossipNetworkTask
-where
-	B: NetworkBehaviour + MdnsBehaviourProvider + GossipsubBehaviourProvider,
-{
-	fn execute(&mut self, _swarm: &mut Swarm<B>, _context: &mut C) {}
+impl NetworkTask<Behaviour, Context> for MdnsGossipNetworkTask {
+	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>, _context: &mut Context) {}
 
 	fn on_swarm_event(
 		&mut self,
-		swarm: &mut Swarm<B>,
-		_context: &mut C,
-		event: SwarmEvent<B::ToSwarm>,
-	) -> Option<SwarmEvent<B::ToSwarm>> {
-		if let Some(mdns_event) = B::swarm_mdns_event(&event) {
-			match mdns_event {
-				mdns::Event::Discovered(list) => {
-					for (peer_id, _) in list {
-						swarm.behaviour_mut().gossipsub_mut().add_explicit_peer(peer_id);
-					}
-				},
-				mdns::Event::Expired(list) => {
-					for (peer_id, _) in list {
-						swarm.behaviour_mut().gossipsub_mut().remove_explicit_peer(peer_id);
-					}
-				},
-			}
+		swarm: &mut Swarm<Behaviour>,
+		_context: &mut Context,
+		event: SwarmEvent<NetworkEvent>,
+	) -> Option<SwarmEvent<NetworkEvent>> {
+		match &event {
+			SwarmEvent::Behaviour(NetworkEvent::Mdns(mdns::Event::Discovered(list))) => {
+				for (peer_id, _) in list {
+					swarm.behaviour_mut().gossipsub_mut().add_explicit_peer(peer_id);
+				}
+			},
+			SwarmEvent::Behaviour(NetworkEvent::Mdns(mdns::Event::Expired(list))) => {
+				for (peer_id, _) in list {
+					swarm.behaviour_mut().gossipsub_mut().remove_explicit_peer(peer_id);
+				}
+			},
+			_ => {},
 		}
 		Some(event)
 	}

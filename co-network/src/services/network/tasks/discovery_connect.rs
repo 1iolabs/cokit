@@ -1,13 +1,10 @@
 use crate::{
-	discovery::{self, Discovery, DiscoveryBehaviour},
-	types::{layer_provider::DiscoveryLayerBehaviourProvider, network_task::NetworkTask},
+	discovery::{self, Discovery},
+	network::{Behaviour, Context, NetworkEvent},
+	types::network_task::NetworkTask,
 };
-use co_identity::IdentityResolverBox;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use libp2p::{
-	swarm::{NetworkBehaviour, SwarmEvent},
-	PeerId, Swarm,
-};
+use libp2p::{swarm::SwarmEvent, PeerId, Swarm};
 use std::collections::BTreeSet;
 
 /// Connect peers using discovery.
@@ -24,13 +21,9 @@ impl DiscoveryConnectNetworkTask {
 		(Self { discovery, connect_request: None, sender: tx, peers: Default::default() }, rx)
 	}
 }
-impl<B, C> NetworkTask<B, C> for DiscoveryConnectNetworkTask
-where
-	B: NetworkBehaviour + DiscoveryBehaviour,
-	C: DiscoveryLayerBehaviourProvider<IdentityResolverBox, Event = <B as NetworkBehaviour>::ToSwarm>,
-{
-	fn execute(&mut self, swarm: &mut Swarm<B>, context: &mut C) {
-		match context.discovery_mut().connect(swarm, self.discovery.clone()) {
+impl NetworkTask<Behaviour, Context> for DiscoveryConnectNetworkTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, context: &mut Context) {
+		match context.discovery.connect(swarm, self.discovery.clone()) {
 			Ok(v) => {
 				self.connect_request = Some(v);
 			},
@@ -43,20 +36,20 @@ where
 
 	fn on_swarm_event(
 		&mut self,
-		_swarm: &mut Swarm<B>,
-		_context: &mut C,
-		event: SwarmEvent<B::ToSwarm>,
-	) -> Option<SwarmEvent<B::ToSwarm>> {
+		_swarm: &mut Swarm<Behaviour>,
+		_context: &mut Context,
+		event: SwarmEvent<NetworkEvent>,
+	) -> Option<SwarmEvent<NetworkEvent>> {
 		// handle
 		let send = match &event {
-			SwarmEvent::Behaviour(behaviour_event) => match C::discovery_event(behaviour_event) {
-				Some(discovery::Event::Connected { id, peer }) if Some(*id) == self.connect_request => {
+			SwarmEvent::Behaviour(NetworkEvent::Discovery(discovery_event)) => match discovery_event {
+				discovery::Event::Connected { id, peer } if Some(*id) == self.connect_request => {
 					self.peers.insert(*peer)
 				},
-				Some(discovery::Event::Disconnected { id, peer }) if Some(*id) == self.connect_request => {
+				discovery::Event::Disconnected { id, peer } if Some(*id) == self.connect_request => {
 					self.peers.remove(peer)
 				},
-				Some(discovery::Event::Timeout { id }) if Some(*id) == self.connect_request => {
+				discovery::Event::Timeout { id } if Some(*id) == self.connect_request => {
 					self.sender.unbounded_send(Err(DiscoveryError::Timeout)).ok();
 					self.sender.disconnect();
 					false

@@ -1,6 +1,6 @@
 use crate::didcomm;
 use libp2p::{
-	gossipsub, mdns,
+	gossipsub,
 	swarm::{NetworkBehaviour, SwarmEvent},
 };
 
@@ -63,36 +63,6 @@ pub trait DidcommBehaviourProvider: NetworkBehaviour {
 	) -> Result<didcomm::Event, <Self as NetworkBehaviour>::ToSwarm> {
 		match Self::didcomm_event(&event) {
 			Some(behaviour_event) if predicate(behaviour_event) => Self::into_didcomm_event(event),
-			_ => Err(event),
-		}
-	}
-}
-
-/// Trait which can be implemented on NetworkBehaviours which provide mDNS.
-pub trait MdnsBehaviourProvider: NetworkBehaviour {
-	fn mdns(&self) -> &mdns::tokio::Behaviour;
-	fn mdns_mut(&mut self) -> &mut mdns::tokio::Behaviour;
-
-	/// Extract mdns event from event.
-	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&mdns::Event>;
-	fn into_mdns_event(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-	) -> Result<mdns::Event, <Self as NetworkBehaviour>::ToSwarm>;
-
-	fn swarm_mdns_event(event: &SwarmEvent<<Self as NetworkBehaviour>::ToSwarm>) -> Option<&mdns::Event> {
-		if let SwarmEvent::Behaviour(event) = event {
-			Self::mdns_event(event)
-		} else {
-			None
-		}
-	}
-
-	fn handle_event<F: Fn(&mdns::Event) -> bool>(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-		predicate: F,
-	) -> Result<mdns::Event, <Self as NetworkBehaviour>::ToSwarm> {
-		match Self::mdns_event(&event) {
-			Some(behaviour_event) if predicate(behaviour_event) => Self::into_mdns_event(event),
 			_ => Err(event),
 		}
 	}
