@@ -1,15 +1,11 @@
 pub mod bitswap;
 pub mod didcomm;
-mod didcontact;
 pub mod discovery;
 mod library;
 mod network;
 pub mod services;
 mod types;
 
-pub use didcontact::{
-	create_gossipsub, publish, resolve, subscribe, unsubscribe, Error, RendezvousPoint, ResolveError, ResolveResult,
-};
 pub use library::{
 	backoff::{backoff, backoff_with_jitter},
 	clone_key_pair::clone_key_pair,
