@@ -6,9 +6,7 @@ use crate::{
 		layer_behaviour::{Layer, LayerBehaviour},
 		layer_provider::DiscoveryLayerBehaviourProvider,
 		network_task::{FnOnceNetworkTask, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner},
-		provider::{
-			BitswapBehaviourProvider, DidcommBehaviourProvider, GossipsubBehaviourProvider, MdnsBehaviourProvider,
-		},
+		provider::{DidcommBehaviourProvider, GossipsubBehaviourProvider, MdnsBehaviourProvider},
 	},
 	NetworkError,
 };
@@ -443,31 +441,7 @@ impl GossipsubBehaviourProvider for Behaviour {
 		}
 	}
 }
-impl BitswapBehaviourProvider for Behaviour {
-	fn bitswap(&self) -> &Bitswap<libipld::DefaultParams> {
-		&self.bitswap
-	}
 
-	fn bitswap_mut(&mut self) -> &mut Bitswap<libipld::DefaultParams> {
-		&mut self.bitswap
-	}
-
-	fn bitswap_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&BitswapEvent> {
-		match event {
-			NetworkEvent::Bitswap(e) => Some(e),
-			_ => None,
-		}
-	}
-
-	fn into_bitswap_event(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-	) -> Result<BitswapEvent, <Self as NetworkBehaviour>::ToSwarm> {
-		match event {
-			NetworkEvent::Bitswap(e) => Ok(e),
-			e => Err(e),
-		}
-	}
-}
 impl MdnsBehaviourProvider for Behaviour {
 	fn mdns(&self) -> &mdns::tokio::Behaviour {
 		&self.mdns

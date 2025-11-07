@@ -1,10 +1,8 @@
 use crate::didcomm;
-use libipld::DefaultParams;
 use libp2p::{
 	gossipsub, mdns,
 	swarm::{NetworkBehaviour, SwarmEvent},
 };
-use libp2p_bitswap::{Bitswap, BitswapEvent};
 
 /// Trait which can be implemented on NetworkBehaviours which provide gossipsub.
 pub trait GossipsubBehaviourProvider: NetworkBehaviour {
@@ -23,28 +21,6 @@ pub trait GossipsubBehaviourProvider: NetworkBehaviour {
 	) -> Result<gossipsub::Event, <Self as NetworkBehaviour>::ToSwarm> {
 		match Self::gossipsub_event(&event) {
 			Some(behaviour_event) if predicate(behaviour_event) => Self::into_gossipsub_event(event),
-			_ => Err(event),
-		}
-	}
-}
-
-/// Trait which can be implemented on NetworkBehaviours which provide bitswap.
-pub trait BitswapBehaviourProvider: NetworkBehaviour {
-	fn bitswap(&self) -> &Bitswap<DefaultParams>;
-	fn bitswap_mut(&mut self) -> &mut Bitswap<DefaultParams>;
-
-	/// Extract bitswap event from event.
-	fn bitswap_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&BitswapEvent>;
-	fn into_bitswap_event(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-	) -> Result<BitswapEvent, <Self as NetworkBehaviour>::ToSwarm>;
-
-	fn handle_event<F: Fn(&BitswapEvent) -> bool>(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-		predicate: F,
-	) -> Result<BitswapEvent, <Self as NetworkBehaviour>::ToSwarm> {
-		match Self::bitswap_event(&event) {
-			Some(behaviour_event) if predicate(behaviour_event) => Self::into_bitswap_event(event),
 			_ => Err(event),
 		}
 	}

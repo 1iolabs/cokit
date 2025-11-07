@@ -1,4 +1,4 @@
-pub mod bitswap;
+mod bitswap;
 mod didcomm;
 pub mod discovery;
 mod library;
@@ -6,6 +6,7 @@ mod network;
 pub mod services;
 mod types;
 
+pub use bitswap::{BitswapMessage, Token};
 pub use didcomm::EncodedMessage;
 pub use library::{
 	backoff::{backoff, backoff_with_jitter},

@@ -1,4 +1,5 @@
 use crate::{
+	bitswap::GetNetworkTask,
 	didcomm::EncodedMessage,
 	services::{
 		connections::ConnectionMessage,
@@ -10,12 +11,15 @@ use crate::{
 	},
 	types::network_task::NetworkTaskSpawner,
 };
+use cid::Cid;
 use co_actor::ActorHandle;
 use co_identity::{Message, PrivateIdentity};
 use co_primitives::{Did, NetworkDidDiscovery};
+use co_storage::StorageError;
 use futures::{stream::BoxStream, StreamExt};
+use libp2p_bitswap::Token;
 use multiaddr::{Multiaddr, PeerId};
-use std::{fmt::Debug, time::Duration};
+use std::{collections::BTreeSet, fmt::Debug, time::Duration};
 
 #[derive(Debug, Clone)]
 pub struct NetworkApi {
@@ -93,5 +97,10 @@ impl NetworkApi {
 	/// This can be used as a trigger for retries.
 	pub fn network_changed(&self) -> BoxStream<'static, ()> {
 		PeersNetworkTask::peers(&self.spawner).map(|_| ()).boxed()
+	}
+
+	/// Get block `cid` from bitswap.
+	pub async fn bitswap_get(&self, cid: Cid, tokens: Vec<Token>, peers: BTreeSet<PeerId>) -> Result<(), StorageError> {
+		GetNetworkTask::get(&self.spawner, cid, tokens, peers).await
 	}
 }

@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle};
-use co_network::bitswap::{BitswapMessage, Token};
+use co_network::{BitswapMessage, Token};
 use co_primitives::{Block, BlockLinks, CoId, DefaultParams, KnownMultiCodec, MultiCodec, Tags};
 use co_storage::{BlockStorage, StorageError};
 use libp2p::PeerId;

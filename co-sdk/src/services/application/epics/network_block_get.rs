@@ -9,12 +9,7 @@ use crate::{
 use cid::Cid;
 use co_actor::{ActionDispatch, Actions};
 use co_identity::Identity;
-use co_network::{
-	backoff_with_jitter,
-	bitswap::{GetNetworkTask, Token},
-	services::network::NetworkApi,
-	PeerProvider,
-};
+use co_network::{backoff_with_jitter, services::network::NetworkApi, PeerProvider, Token};
 use co_primitives::{BlockSerializer, CoId};
 use co_storage::StorageError;
 use futures::{future::Either, pin_mut, stream, FutureExt, Stream, StreamExt};
@@ -221,14 +216,13 @@ async fn get_network(
 	cid: Cid,
 ) -> Result<(), StorageError> {
 	let deadline = tokio::time::Instant::now() + timeout;
-	let spawner = network.spawner().clone();
 	let mut retry = 1;
 	loop {
 		// start network task for every peer.
 		let get_stream = peer_provider
 			.peers_added()
 			.flat_map(stream::iter)
-			.map(|peer| GetNetworkTask::get(&spawner, cid, tokens.clone(), [peer].into()))
+			.map(|peer| network.bitswap_get(cid, tokens.clone(), [peer].into()))
 			.buffer_unordered(concurrent);
 		pin_mut!(get_stream);
 		loop {
