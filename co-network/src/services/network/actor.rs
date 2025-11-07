@@ -1,12 +1,13 @@
 use super::message::NetworkMessage;
 use crate::{
 	bitswap::BitswapMessage,
+	network::{Libp2pNetwork, Libp2pNetworkConfig},
 	services::{
 		connections::{Connections, ConnectionsContext, DynamicNetworkResolver},
 		heads::{HeadsActor, HeadsApi, HeadsContext},
 		network::{CoNetworkTaskSpawner, ConnectionsNetworkTask, MdnsGossipNetworkTask, NetworkApi, NetworkSettings},
 	},
-	Libp2pNetwork, Libp2pNetworkConfig, NetworkTaskSpawner,
+	NetworkTaskSpawner,
 };
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, ActorInstance, TaskSpawner};

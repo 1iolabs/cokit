@@ -1,4 +1,4 @@
-use crate::{CoNetworkTaskSpawner, GossipsubBehaviourProvider, NetworkTask, NetworkTaskSpawner};
+use crate::{services::network::CoNetworkTaskSpawner, GossipsubBehaviourProvider, NetworkTask, NetworkTaskSpawner};
 use futures::Stream;
 use libp2p::{
 	gossipsub,

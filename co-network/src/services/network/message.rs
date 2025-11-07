@@ -1,4 +1,8 @@
-use crate::{services::network::NetworkApi, Behaviour, Context, NetworkTaskBox};
+use crate::{
+	network::{Behaviour, Context},
+	services::network::NetworkApi,
+	NetworkTaskBox,
+};
 use co_actor::Response;
 use libp2p::PeerId;
 use std::fmt::Debug;

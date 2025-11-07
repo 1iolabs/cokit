@@ -22,10 +22,7 @@ use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 use co_log::{EntryBlock, Log};
-use co_network::{
-	services::{connections::ConnectionMessage, heads::HeadsApi, network::NetworkApi},
-	CoNetworkTaskSpawner,
-};
+use co_network::services::{connections::ConnectionMessage, heads::HeadsApi, network::NetworkApi};
 use co_primitives::{BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did};
 use futures::{Stream, TryStreamExt};
 use std::{
@@ -117,11 +114,6 @@ impl CoContext {
 	/// Network.
 	pub async fn network(&self) -> Option<NetworkApi> {
 		self.inner.network.read().unwrap().clone()
-	}
-
-	/// Network Spawner.
-	pub async fn network_tasks(&self) -> Option<CoNetworkTaskSpawner> {
-		self.inner.network.read().unwrap().as_ref().map(|api| api.spawner().clone())
 	}
 
 	/// Network Connections.

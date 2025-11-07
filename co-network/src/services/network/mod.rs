@@ -11,7 +11,7 @@ pub use api::NetworkApi;
 pub use message::NetworkMessage;
 pub use network::CoNetworkTaskSpawner;
 pub use settings::NetworkSettings;
-pub use subscribe::{subscribe_identity, unsubscribe_identity};
+pub use subscribe::subscribe_identity;
 pub use tasks::{
 	connections::ConnectionsNetworkTask,
 	dial::DialNetworkTask,

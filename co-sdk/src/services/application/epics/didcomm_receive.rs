@@ -1,4 +1,4 @@
-use crate::{services::network::DidCommReceiveNetworkTask, Action, CoContext};
+use crate::{Action, CoContext};
 use co_actor::Actions;
 use futures::{future::ready, stream, Stream, StreamExt};
 
@@ -12,8 +12,8 @@ pub fn didcomm_receive(
 	match action {
 		Action::NetworkStartComplete(Ok(())) => Some({
 			stream::once(ready(context.clone()))
-				.filter_map(|context| async move { context.network_tasks().await })
-				.flat_map(|network| DidCommReceiveNetworkTask::receive(network))
+				.filter_map(|context| async move { context.network().await })
+				.flat_map(|network| network.didcomm_receive())
 				.map(|(peer, message)| Action::DidCommReceive { peer, message })
 				.map(Ok)
 		}),

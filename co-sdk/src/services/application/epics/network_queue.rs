@@ -8,7 +8,7 @@ use crate::{
 };
 use co_actor::{Actions, Epic};
 use co_identity::PrivateIdentity;
-use co_network::{backoff_with_jitter, services::network::PeersNetworkTask, HeadsMessage};
+use co_network::{backoff_with_jitter, HeadsMessage};
 use co_primitives::{CoId, CoTryStreamExt};
 use futures::{future::Either, stream, FutureExt, Stream, StreamExt};
 use std::{collections::BTreeSet, future::ready};
@@ -81,11 +81,12 @@ pub fn network_started_epic(
 			let context = context.clone();
 			Some(
 				async move {
-					if let Some(network) = context.network_tasks().await {
+					if let Some(network) = context.network().await {
 						let initial = stream::once(ready(Ok(Action::NetworkQueueProcess { co: None, retry: 0 })));
-						let peer_discovered = PeersNetworkTask::peers(&network)
-							.map(|_peer_id| Ok(Action::NetworkQueueProcess { co: None, retry: 0 }));
-						Either::Left(initial.chain(peer_discovered))
+						let network_changed = network
+							.network_changed()
+							.map(|_| Ok(Action::NetworkQueueProcess { co: None, retry: 0 }));
+						Either::Left(initial.chain(network_changed))
 					} else {
 						Either::Right(stream::empty())
 					}

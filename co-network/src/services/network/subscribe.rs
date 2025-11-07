@@ -1,17 +1,13 @@
-use super::{
-	tasks::did_discovery::{DidDiscoverySubscribe, DidDiscoveryUnsubscribe},
-	CoNetworkTaskSpawner,
-};
-use crate::NetworkTaskSpawner;
+use crate::services::network::NetworkApi;
 use co_identity::PrivateIdentity;
-use co_primitives::{Did, NetworkDidDiscovery};
+use co_primitives::NetworkDidDiscovery;
 use std::fmt::Debug;
 
 /// Listen on identity requests (DID Discovery).
-pub async fn subscribe_identity<I: PrivateIdentity + Debug + Clone + Send + Sync + 'static>(
-	spawner: &CoNetworkTaskSpawner,
-	identity: &I,
-) -> Result<(), anyhow::Error> {
+pub async fn subscribe_identity<I>(network: &NetworkApi, identity: &I) -> Result<(), anyhow::Error>
+where
+	I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
+{
 	// get did discovery networks
 	let mut networks: Vec<_> = identity
 		.networks()
@@ -27,20 +23,10 @@ pub async fn subscribe_identity<I: PrivateIdentity + Debug + Clone + Send + Sync
 
 	// subscribe
 	//  by returning on any error happens in between
-	for network in networks {
-		let (task, result) = DidDiscoverySubscribe::new(identity.clone(), Some(network));
-		spawner.spawn(task)?;
-		result.await??;
+	for item in networks {
+		network.didcontact_subscribe(identity.clone(), item).await?;
 	}
 
 	// result
-	Ok(())
-}
-
-/// Listen on identity requests (DID Discovery).
-pub async fn unsubscribe_identity(spawner: &CoNetworkTaskSpawner, did: Did) -> Result<(), anyhow::Error> {
-	let (task, result) = DidDiscoveryUnsubscribe::new(did);
-	spawner.spawn(task)?;
-	result.await??;
 	Ok(())
 }

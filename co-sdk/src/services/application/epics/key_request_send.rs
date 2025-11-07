@@ -12,7 +12,7 @@ use co_actor::{ActionDispatch, Actions};
 use co_core_keystore::KeyStoreAction;
 use co_core_membership::MembershipsAction;
 use co_identity::{DidCommHeader, Identity};
-use co_network::CoNetworkTaskSpawner;
+use co_network::services::network::NetworkApi;
 use co_primitives::{from_json_string, BlockSerializer};
 use futures::{future::Either, stream, FutureExt, Stream, StreamExt};
 use libp2p::PeerId;
@@ -38,7 +38,7 @@ pub fn key_request_send(
 			Some(
 				async move {
 					// network
-					let Some(network) = context.network_tasks().await else {
+					let Some(network) = context.network().await else {
 						return Either::Left(stream::iter([Action::network_task_queue(
 							action.co.clone(),
 							format!("urn:key:{}:{}", action.co, action.key.as_deref().unwrap_or("")),
@@ -61,7 +61,7 @@ pub fn key_request_send(
 
 fn handle_key_request(
 	context: CoContext,
-	network: CoNetworkTaskSpawner,
+	network: NetworkApi,
 	actions: Actions<Action, (), CoContext>,
 	action: KeyRequestAction,
 ) -> impl Stream<Item = Result<Action, anyhow::Error>> {
@@ -159,7 +159,7 @@ pub fn network_task_execute(
 					};
 
 					// network
-					let Some(network) = context.network_tasks().await else {
+					let Some(network) = context.network().await else {
 						return Either::Left(stream::iter([Ok(Action::NetworkTaskExecuteComplete {
 							co,
 							task_id,

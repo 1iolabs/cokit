@@ -1,5 +1,5 @@
 use super::{epics::epic, ConnectionAction, ConnectionMessage, ConnectionState, PeersChangedAction};
-use crate::{services::connections::resolve::DynamicNetworkResolver, CoNetworkTaskSpawner};
+use crate::services::{connections::resolve::DynamicNetworkResolver, network::CoNetworkTaskSpawner};
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer, ResponseStreams, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};

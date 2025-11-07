@@ -1,4 +1,7 @@
-use crate::{Behaviour, Context, NetworkError, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner};
+use crate::{
+	network::{Behaviour, Context},
+	NetworkError, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner,
+};
 use libp2p::PeerId;
 
 #[derive(Clone)]

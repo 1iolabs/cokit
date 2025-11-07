@@ -1,4 +1,4 @@
-use crate::{CoNetworkTaskSpawner, MdnsBehaviourProvider, NetworkTask, NetworkTaskSpawner};
+use crate::{services::network::CoNetworkTaskSpawner, MdnsBehaviourProvider, NetworkTask, NetworkTaskSpawner};
 use futures::Stream;
 use libp2p::{
 	mdns,
@@ -14,7 +14,7 @@ pub struct PeersNetworkTask {
 	tx: mpsc::UnboundedSender<PeerId>,
 }
 impl PeersNetworkTask {
-	pub fn peers(spawner: &CoNetworkTaskSpawner) -> impl Stream<Item = PeerId> + use<> {
+	pub fn peers(spawner: &CoNetworkTaskSpawner) -> impl Stream<Item = PeerId> + use<> + 'static {
 		let (tx, rx) = mpsc::unbounded_channel();
 		spawner.spawn(Self { tx }).ok();
 		UnboundedReceiverStream::new(rx)
