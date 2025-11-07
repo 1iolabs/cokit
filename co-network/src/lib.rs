@@ -1,6 +1,6 @@
 mod bitswap;
 mod didcomm;
-pub mod discovery;
+mod discovery;
 mod library;
 mod network;
 pub mod services;

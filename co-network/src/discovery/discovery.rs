@@ -160,13 +160,13 @@ pub enum DiscoveryEvent {
 
 	/// A resolve request to us via did discovery gossip.
 	/// With an pre-computed DIDComm response.
-	DidResolve { from: Did, from_peer: PeerId, response: String },
+	DidResolve { from_peer: PeerId, response: String },
 
 	/// A discovery request.
 	DidDiscovery { discovery: DidDiscovery },
 
 	/// We received an (validated) DIDComm message.
-	ReceivedDidComm { peer_id: PeerId, header: DidCommHeader, body: String },
+	ReceivedDidComm { peer_id: PeerId, header: DidCommHeader },
 
 	/// A peer has been discovered by the swarm and we may need to dail it.
 	PeerDiscoverd { peer_id: PeerId },
@@ -584,7 +584,6 @@ where
 					self.events.push_back(DiscoveryEvent::ReceivedDidComm {
 						peer_id: peer_id.clone(),
 						header: message.header().to_owned(),
-						body: message.body().to_owned(),
 					})
 				}
 			},
@@ -698,7 +697,7 @@ where
 	/// Other events are returned.
 	fn on_layer_event(&mut self, swarm: &mut Swarm<B>, event: Self::ToLayer) -> Option<Self::ToSwarm> {
 		match event {
-			DiscoveryEvent::DidResolve { from: _, from_peer, response } => {
+			DiscoveryEvent::DidResolve { from_peer, response } => {
 				swarm.behaviour_mut().didcomm_mut().send(&from_peer, response.into());
 				None
 			},
@@ -711,7 +710,7 @@ where
 				};
 				None
 			},
-			DiscoveryEvent::ReceivedDidComm { peer_id, header, body: _ } => {
+			DiscoveryEvent::ReceivedDidComm { peer_id, header } => {
 				let message_type: Option<DidDiscoveryMessage> = DidDiscoveryMessage::from_str(&header.message_type);
 				if message_type == Some(DidDiscoveryMessage::Resolve) {
 					for request_id in self
@@ -834,7 +833,7 @@ fn did_discovery_resolve(
 	let message = identity.jws(response, "null")?;
 
 	// result
-	Ok(DiscoveryEvent::DidResolve { from: request_from, from_peer: request_from_peer, response: message })
+	Ok(DiscoveryEvent::DidResolve { from_peer: request_from_peer, response: message })
 }
 
 /// Try to receive a message (data) with one of the supplied identities.
