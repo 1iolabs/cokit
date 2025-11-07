@@ -26,4 +26,8 @@ pub struct TodoTask {
 }
 
 ## Use Case: Collaborative to-do list
-A simple example of how to use CO-kit is a collaborative to-do list. This is what we will build in the Quick-Start sections of this documentation. The Core Quick Start covers the fundamentals of using CO-kit, while also demonstrating just how easy it is to create and use a collaborative Core. The App Quick Start is for those who want some guidance in developing a simple app to use the to-do list Core.
+A simple example of how to use CO-kit is a collaborative to-do list. This is what we will build in the Quick-Start sections of this documentation.
+
+The Core Quick Start covers the fundamentals of using CO-kit, while also demonstrating just how easy it is to create and use a collaborative Core.
+
+The App Quick Start is for those who want some guidance in developing a simple app to use the to-do list Core.
