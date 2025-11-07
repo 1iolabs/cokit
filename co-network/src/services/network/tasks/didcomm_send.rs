@@ -1,4 +1,8 @@
-use crate::{didcomm, DidcommBehaviourProvider, NetworkTask, NetworkTaskSpawner};
+use crate::{
+	didcomm,
+	types::network_task::{NetworkTask, NetworkTaskSpawner},
+	DidcommBehaviourProvider,
+};
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	PeerId, Swarm,

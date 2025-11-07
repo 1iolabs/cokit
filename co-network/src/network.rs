@@ -2,9 +2,12 @@ use crate::{
 	bitswap::{BitswapMessage, BitswapStoreClient},
 	didcomm, discovery,
 	library::find_peer_id::try_peer_id,
-	types::{network_task::TokioNetworkTaskSpawner, provider::BitswapBehaviourProvider},
-	DidcommBehaviourProvider, DiscoveryLayerBehaviourProvider, FnOnceNetworkTask, GossipsubBehaviourProvider, Layer,
-	LayerBehaviour, MdnsBehaviourProvider, NetworkError, NetworkTaskBox, NetworkTaskSpawner,
+	types::{
+		network_task::{FnOnceNetworkTask, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner},
+		provider::BitswapBehaviourProvider,
+	},
+	DidcommBehaviourProvider, DiscoveryLayerBehaviourProvider, GossipsubBehaviourProvider, Layer, LayerBehaviour,
+	MdnsBehaviourProvider, NetworkError,
 };
 use anyhow::anyhow;
 use co_actor::ActorHandle;

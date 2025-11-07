@@ -1,6 +1,7 @@
 use crate::{
 	discovery::{self, Discovery, DiscoveryBehaviour},
-	DiscoveryLayerBehaviourProvider, NetworkTask,
+	types::network_task::NetworkTask,
+	DiscoveryLayerBehaviourProvider,
 };
 use co_identity::IdentityResolverBox;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};

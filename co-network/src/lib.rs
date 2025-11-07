@@ -23,7 +23,6 @@ pub use types::{
 	heads::{HeadsErrorCode, HeadsMessage},
 	layer_behaviour::{Layer, LayerBehaviour},
 	layer_provider::DiscoveryLayerBehaviourProvider,
-	network_task::{FnOnceNetworkTask, NetworkTask, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner},
 	peer_provider::PeerProvider,
 	provider::{
 		BitswapBehaviourProvider, DidcommBehaviourProvider, GossipsubBehaviourProvider, MdnsBehaviourProvider,

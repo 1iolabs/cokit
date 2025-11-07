@@ -7,7 +7,7 @@ use crate::{
 		},
 		network::DiscoveryConnectNetworkTask,
 	},
-	NetworkTaskSpawner,
+	types::network_task::NetworkTaskSpawner,
 };
 use co_actor::{Actions, Epic};
 use co_identity::PrivateIdentityResolver;

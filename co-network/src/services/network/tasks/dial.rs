@@ -1,4 +1,4 @@
-use crate::{NetworkTask, NetworkTaskSpawner};
+use crate::types::network_task::{NetworkTask, NetworkTaskSpawner};
 use anyhow::anyhow;
 use futures::channel::oneshot;
 use libp2p::{

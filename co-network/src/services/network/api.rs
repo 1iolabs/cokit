@@ -8,7 +8,7 @@ use crate::{
 			DidDiscoverySubscribe, DidDiscoveryUnsubscribe, ListnersNetworkTask, NetworkMessage, PeersNetworkTask,
 		},
 	},
-	NetworkTaskSpawner,
+	types::network_task::NetworkTaskSpawner,
 };
 use co_actor::ActorHandle;
 use co_identity::{Message, PrivateIdentity};

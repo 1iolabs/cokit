@@ -7,7 +7,7 @@ use crate::{
 		heads::{HeadsActor, HeadsApi, HeadsContext},
 		network::{CoNetworkTaskSpawner, ConnectionsNetworkTask, MdnsGossipNetworkTask, NetworkApi, NetworkSettings},
 	},
-	NetworkTaskSpawner,
+	types::network_task::NetworkTaskSpawner,
 };
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, ActorInstance, TaskSpawner};

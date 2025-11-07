@@ -1,7 +1,7 @@
 use crate::{
 	network::{Behaviour, Context},
 	services::network::NetworkApi,
-	NetworkTaskBox,
+	types::network_task::NetworkTaskBox,
 };
 use co_actor::Response;
 use libp2p::PeerId;

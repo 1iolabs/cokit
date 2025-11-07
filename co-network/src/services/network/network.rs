@@ -1,6 +1,7 @@
 use crate::{
 	network::{Behaviour, Context},
-	NetworkError, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner,
+	types::network_task::{NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner},
+	NetworkError,
 };
 use libp2p::PeerId;
 

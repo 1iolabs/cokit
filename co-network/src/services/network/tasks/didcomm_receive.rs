@@ -1,4 +1,8 @@
-use crate::{didcomm, DidcommBehaviourProvider, NetworkTask, NetworkTaskSpawner};
+use crate::{
+	didcomm,
+	types::network_task::{NetworkTask, NetworkTaskSpawner},
+	DidcommBehaviourProvider,
+};
 use co_identity::Message;
 use futures::Stream;
 use libp2p::{
