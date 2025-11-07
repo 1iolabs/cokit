@@ -1,7 +1,9 @@
 use crate::{
 	didcomm,
-	types::network_task::{NetworkTask, NetworkTaskSpawner},
-	DidcommBehaviourProvider,
+	types::{
+		network_task::{NetworkTask, NetworkTaskSpawner},
+		provider::DidcommBehaviourProvider,
+	},
 };
 use co_identity::Message;
 use futures::Stream;

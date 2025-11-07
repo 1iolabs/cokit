@@ -1,7 +1,9 @@
 use crate::{
 	didcomm,
-	types::network_task::{NetworkTask, NetworkTaskSpawner},
-	DidcommBehaviourProvider,
+	types::{
+		network_task::{NetworkTask, NetworkTaskSpawner},
+		provider::DidcommBehaviourProvider,
+	},
 };
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},

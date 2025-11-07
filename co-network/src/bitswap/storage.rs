@@ -2,8 +2,11 @@ use crate::{
 	backoff_with_jitter,
 	bitswap::Token,
 	library::libipld_interop::to_libipld_cid,
-	types::network_task::{NetworkTask, NetworkTaskSpawner},
-	BitswapBehaviourProvider, PeerProvider,
+	types::{
+		network_task::{NetworkTask, NetworkTaskSpawner},
+		provider::BitswapBehaviourProvider,
+	},
+	PeerProvider,
 };
 use async_trait::async_trait;
 use cid::Cid;

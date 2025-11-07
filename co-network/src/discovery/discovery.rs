@@ -1,5 +1,11 @@
 use super::did_discovery::{DidDiscovery, DidDiscoveryMessage};
-use crate::{didcomm, types::layer_behaviour::LayerBehaviour, DidcommBehaviourProvider, GossipsubBehaviourProvider};
+use crate::{
+	didcomm,
+	types::{
+		layer_behaviour::LayerBehaviour,
+		provider::{DidcommBehaviourProvider, GossipsubBehaviourProvider},
+	},
+};
 use anyhow::anyhow;
 use co_identity::{
 	network_did_discovery, DidCommContext, DidCommHeader, DidCommPrivateContext, Identity, IdentityResolver,
@@ -954,7 +960,10 @@ mod tests {
 	use crate::{
 		didcomm,
 		discovery::{DidDiscovery, DidDiscoveryMessage, Discovery, DiscoveryState, Event},
-		DidcommBehaviourProvider, GossipsubBehaviourProvider, Layer, LayerBehaviour,
+		types::{
+			layer_behaviour::{Layer, LayerBehaviour},
+			provider::{DidcommBehaviourProvider, GossipsubBehaviourProvider},
+		},
 	};
 	use co_identity::{
 		DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentity,

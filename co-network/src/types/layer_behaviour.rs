@@ -43,10 +43,6 @@ where
 		Self { layer, _b: Default::default() }
 	}
 
-	pub fn layer(&mut self) -> &mut L {
-		&mut self.layer
-	}
-
 	pub fn layer_mut(&mut self) -> &mut L {
 		&mut self.layer
 	}

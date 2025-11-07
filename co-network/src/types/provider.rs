@@ -1,32 +1,10 @@
 use crate::didcomm;
 use libipld::DefaultParams;
 use libp2p::{
-	gossipsub, mdns, rendezvous,
+	gossipsub, mdns,
 	swarm::{NetworkBehaviour, SwarmEvent},
 };
 use libp2p_bitswap::{Bitswap, BitswapEvent};
-
-/// Trait which can be implemented on NetworkBehaviours which provide gossipsub.
-// pub trait HeadsBehaviourProvider {
-// 	type Event;
-
-// 	fn heads(&self) -> &heads::Behaviour;
-// 	fn heads_mut(&mut self) -> &mut heads::Behaviour;
-
-// 	/// Extract heads event from event.
-// 	fn heads_event(event: &SwarmEvent<Self::Event>) -> Option<&heads::Event>;
-// 	fn into_heads_event(event: SwarmEvent<Self::Event>) -> Result<heads::Event, SwarmEvent<Self::Event>>;
-
-// 	fn handle_event<F: Fn(&heads::Event) -> bool>(
-// 		event: SwarmEvent<Self::Event>,
-// 		predicate: F,
-// 	) -> Result<heads::Event, SwarmEvent<Self::Event>> {
-// 		match Self::heads_event(&event) {
-// 			Some(behaviour_event) if predicate(behaviour_event) => Self::into_heads_event(event),
-// 			_ => Err(event),
-// 		}
-// 	}
-// }
 
 /// Trait which can be implemented on NetworkBehaviours which provide gossipsub.
 pub trait GossipsubBehaviourProvider: NetworkBehaviour {
@@ -139,28 +117,6 @@ pub trait MdnsBehaviourProvider: NetworkBehaviour {
 	) -> Result<mdns::Event, <Self as NetworkBehaviour>::ToSwarm> {
 		match Self::mdns_event(&event) {
 			Some(behaviour_event) if predicate(behaviour_event) => Self::into_mdns_event(event),
-			_ => Err(event),
-		}
-	}
-}
-
-/// Trait which can be implemented on NetworkBehaviours which provide Rendezvous client.
-pub trait RendezvousClientBehaviourProvider: NetworkBehaviour {
-	fn rendezvous_client(&self) -> &rendezvous::client::Behaviour;
-	fn rendezvous_client_mut(&mut self) -> &mut rendezvous::client::Behaviour;
-
-	/// Extract rendezvous::client event from event.
-	fn rendezvous_client_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&rendezvous::client::Event>;
-	fn into_rendezvous_client_event(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-	) -> Result<rendezvous::client::Event, <Self as NetworkBehaviour>::ToSwarm>;
-
-	fn handle_event<F: Fn(&rendezvous::client::Event) -> bool>(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-		predicate: F,
-	) -> Result<rendezvous::client::Event, <Self as NetworkBehaviour>::ToSwarm> {
-		match Self::rendezvous_client_event(&event) {
-			Some(behaviour_event) if predicate(behaviour_event) => Self::into_rendezvous_client_event(event),
 			_ => Err(event),
 		}
 	}

@@ -1,4 +1,7 @@
-use crate::{types::network_task::NetworkTask, GossipsubBehaviourProvider, MdnsBehaviourProvider};
+use crate::types::{
+	network_task::NetworkTask,
+	provider::{GossipsubBehaviourProvider, MdnsBehaviourProvider},
+};
 use libp2p::{
 	mdns,
 	swarm::{NetworkBehaviour, SwarmEvent},

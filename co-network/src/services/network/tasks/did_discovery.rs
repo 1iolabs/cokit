@@ -1,4 +1,7 @@
-use crate::{discovery, types::network_task::NetworkTask, DiscoveryLayerBehaviourProvider};
+use crate::{
+	discovery,
+	types::{layer_provider::DiscoveryLayerBehaviourProvider, network_task::NetworkTask},
+};
 use co_identity::{IdentityResolverBox, PrivateIdentity};
 use co_primitives::{Did, NetworkDidDiscovery};
 use libp2p::{swarm::NetworkBehaviour, Swarm};

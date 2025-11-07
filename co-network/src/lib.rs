@@ -17,11 +17,5 @@ pub use network::{Behaviour, Context, Libp2pNetwork, Libp2pNetworkConfig, Networ
 pub use types::{
 	error::NetworkError,
 	heads::{HeadsErrorCode, HeadsMessage},
-	layer_behaviour::{Layer, LayerBehaviour},
-	layer_provider::DiscoveryLayerBehaviourProvider,
 	peer_provider::PeerProvider,
-	provider::{
-		BitswapBehaviourProvider, DidcommBehaviourProvider, GossipsubBehaviourProvider, MdnsBehaviourProvider,
-		RendezvousClientBehaviourProvider,
-	},
 };

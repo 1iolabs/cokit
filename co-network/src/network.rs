@@ -3,11 +3,14 @@ use crate::{
 	didcomm, discovery,
 	library::find_peer_id::try_peer_id,
 	types::{
+		layer_behaviour::{Layer, LayerBehaviour},
+		layer_provider::DiscoveryLayerBehaviourProvider,
 		network_task::{FnOnceNetworkTask, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner},
-		provider::BitswapBehaviourProvider,
+		provider::{
+			BitswapBehaviourProvider, DidcommBehaviourProvider, GossipsubBehaviourProvider, MdnsBehaviourProvider,
+		},
 	},
-	DidcommBehaviourProvider, DiscoveryLayerBehaviourProvider, GossipsubBehaviourProvider, Layer, LayerBehaviour,
-	MdnsBehaviourProvider, NetworkError,
+	NetworkError,
 };
 use anyhow::anyhow;
 use co_actor::ActorHandle;

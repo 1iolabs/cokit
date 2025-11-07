@@ -1,7 +1,9 @@
 use crate::{
 	services::network::CoNetworkTaskSpawner,
-	types::network_task::{NetworkTask, NetworkTaskSpawner},
-	GossipsubBehaviourProvider, MdnsBehaviourProvider,
+	types::{
+		network_task::{NetworkTask, NetworkTaskSpawner},
+		provider::{GossipsubBehaviourProvider, MdnsBehaviourProvider},
+	},
 };
 use futures::channel::oneshot;
 use libp2p::{
