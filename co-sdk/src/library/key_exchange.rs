@@ -1,5 +1,5 @@
 use co_identity::{DidCommHeader, Identity, PrivateIdentity};
-use co_network::didcomm::EncodedMessage;
+use co_network::EncodedMessage;
 use co_primitives::{to_json_string, CoId};
 use libp2p::PeerId;
 use serde::{Deserialize, Serialize};

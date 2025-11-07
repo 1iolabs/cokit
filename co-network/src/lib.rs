@@ -1,11 +1,12 @@
 pub mod bitswap;
-pub mod didcomm;
+mod didcomm;
 pub mod discovery;
 mod library;
 mod network;
 pub mod services;
 mod types;
 
+pub use didcomm::EncodedMessage;
 pub use library::{
 	backoff::{backoff, backoff_with_jitter},
 	clone_key_pair::clone_key_pair,

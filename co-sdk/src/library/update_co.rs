@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use cid::Cid;
 use co_actor::ActorHandle;
 use co_identity::PrivateIdentity;
-use co_network::{didcomm::EncodedMessage, HeadsMessage};
+use co_network::{EncodedMessage, HeadsMessage};
 use futures::try_join;
 use libp2p::PeerId;
 use std::time::Duration;

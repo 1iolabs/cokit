@@ -5,7 +5,7 @@ use crate::{
 };
 use cid::Cid;
 use co_identity::{DidCommHeader, Message, PrivateIdentityBox};
-use co_network::{didcomm::EncodedMessage, HeadsMessage};
+use co_network::{EncodedMessage, HeadsMessage};
 use co_primitives::{Block, BlockSerializer, CoId, DefaultParams, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{stream::once, Stream, StreamExt};

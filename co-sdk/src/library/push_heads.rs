@@ -8,12 +8,11 @@ use co_actor::{
 };
 use co_identity::{Identity, PeerDidCommHeader, PrivateIdentity, PrivateIdentityBox};
 use co_network::{
-	didcomm::EncodedMessage,
 	services::{
 		connections::ConnectionMessage,
 		network::{DidCommSendNetworkTask, NetworkApi},
 	},
-	HeadsMessage,
+	EncodedMessage, HeadsMessage,
 };
 use co_primitives::{tags, CoId, Tags, WeakCid};
 use futures::{Stream, StreamExt};
