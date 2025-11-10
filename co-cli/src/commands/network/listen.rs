@@ -26,6 +26,10 @@ pub struct Command {
 	/// Bootstap addresses.
 	#[arg(long, value_name = "MULTIADDR", value_parser = parse_bootstrap, default_values_t = default_bootstrap())]
 	pub bootstrap: Vec<Multiaddr>,
+
+	/// Enable relay server (Limited for DCUtR).
+	#[arg(short)]
+	pub relay: bool,
 }
 
 fn default_bootstrap() -> Vec<Multiaddr> {
@@ -53,6 +57,7 @@ pub async fn command(
 		.with_force_new_peer_id(network_command.force_new_peer_id)
 		.with_listen(command.listen.clone())
 		.with_bootstraps(command.bootstrap.iter().cloned())
+		.with_relay(command.relay)
 		.build()?;
 
 	// application and network

@@ -60,4 +60,4 @@ Defaults to `/ip4/0.0.0.0/udp/0/quic-v1`, this uses all available interfaces and
 
 #### Bootstrap
 Bootstrap endpoints to improve connectivity.
-Defaults to `dns/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWCoAgVrvp9dWqk3bds1paFcrK8HuYB8yY13XWaahwfm7o`.
+Defaults to `dns/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWEinh2zCgGbJaDfepoiiPiBgFcysSMYSc1EQrgEEZi9aX`.

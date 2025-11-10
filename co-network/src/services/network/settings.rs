@@ -33,7 +33,7 @@ impl NetworkSettings {
 
 	fn default_bootstrap() -> BTreeSet<Multiaddr> {
 		let bootstrap =
-			["/dns/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWCoAgVrvp9dWqk3bds1paFcrK8HuYB8yY13XWaahwfm7o"];
+			["/dns/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWEinh2zCgGbJaDfepoiiPiBgFcysSMYSc1EQrgEEZi9aX"];
 		bootstrap.into_iter().map(|s| s.parse().expect("to parse")).collect()
 	}
 
@@ -85,8 +85,8 @@ impl NetworkSettings {
 	}
 
 	/// Enable relay mode to allow hole-punching over this swarm.
-	pub fn with_relay(mut self) -> Self {
-		self.relay = true;
+	pub fn with_relay(mut self, relay: bool) -> Self {
+		self.relay = relay;
 		self
 	}
 

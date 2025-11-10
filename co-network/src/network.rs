@@ -16,9 +16,9 @@ use libp2p::{
 	dcutr, gossipsub, identify,
 	identity::Keypair,
 	mdns::{self, tokio::Behaviour as MdnsBehaviour},
-	ping, relay,
+	noise, ping, relay,
 	swarm::{behaviour::toggle::Toggle, dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
-	Multiaddr, PeerId, Swarm, SwarmBuilder,
+	yamux, Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 use libp2p_bitswap::{Bitswap, BitswapEvent};
 use std::{collections::BTreeSet, task::Poll, time::Duration};
@@ -75,53 +75,41 @@ impl Libp2pNetwork {
 		);
 
 		// relay
-		let relay = match config.mode {
+		let relay_server = match config.mode {
 			NetworkMode::Full => Some(libp2p::relay::Behaviour::new(local_peer_id.clone(), relay::Config::default())),
 			_ => None,
 		};
 
-		// behaviour
-		let behaviour = Behaviour {
-			identify: identify::Behaviour::new(identify::Config::new("/ipfs/0.1.0".into(), config.keypair.public())),
-			ping: ping::Behaviour::new(ping::Config::new()),
-			mdns: MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?,
-			// kad,
-			bitswap,
-			gossipsub,
-			didcomm: didcomm::Behaviour::new(resolver.clone(), private_resolver, didcomm::Config { auto_dail: false }),
-			dcutr: dcutr::Behaviour::new(local_peer_id.clone()),
-			relay: relay.into(),
-		};
+		// identify
+		let identify = identify::Behaviour::new(identify::Config::new("/co/0.1.0".into(), config.keypair.public()));
 
-		// // kad
-		// for (peer, address) in config.bootstap.iter() {
-		// 	behaviour.kad.add_address(peer, address.clone());
-		// }
-		// set_network_mode(&mut behaviour, config.mode);
-		// if let Err(err) = behaviour.kad.bootstrap() {
-		// 	tracing::warn!(?err, "kad-bootstrap-failed");
-		// }
+		// mdns
+		let mdns = MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?;
 
-		let listen = config.addr.clone();
-		let is_tcp = listen.protocol_stack().any(|protocol| protocol == "tcp");
+		// didcomm
+		let didcomm = didcomm::Behaviour::new(resolver.clone(), private_resolver, didcomm::Config { auto_dail: false });
 
 		// swarm
-		let swarm_builder = SwarmBuilder::with_existing_identity(config.keypair.clone()).with_tokio();
-		let mut swarm = if is_tcp {
-			swarm_builder
-				.with_tcp(libp2p::tcp::Config::default(), libp2p::noise::Config::new, libp2p::yamux::Config::default)?
-				.with_dns()?
-				.with_behaviour(|_| behaviour)?
-				.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
-				.build()
-		} else {
-			swarm_builder
-				.with_quic()
-				.with_dns()?
-				.with_behaviour(|_| behaviour)?
-				.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
-				.build()
-		};
+		let mut swarm = SwarmBuilder::with_existing_identity(config.keypair.clone())
+			.with_tokio()
+			.with_tcp(libp2p::tcp::Config::default(), noise::Config::new, yamux::Config::default)?
+			.with_quic()
+			.with_dns()?
+			.with_relay_client(noise::Config::new, yamux::Config::default)?
+			.with_behaviour(move |_keypair, relay_client| Behaviour {
+				identify,
+				ping: ping::Behaviour::new(ping::Config::new()),
+				mdns,
+				// kad,
+				bitswap,
+				gossipsub,
+				didcomm,
+				dcutr: dcutr::Behaviour::new(local_peer_id.clone()),
+				relay_server: relay_server.into(),
+				relay_client,
+			})?
+			.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
+			.build();
 
 		// bootstrap
 		for bootstrap in config.bootstrap.iter() {
@@ -146,7 +134,7 @@ impl Libp2pNetwork {
 		let mut runtime = Runtime::new(config.clone(), shutdown.child_token());
 
 		// listen
-		runtime.listen(swarm.listen_on(listen)?);
+		runtime.listen(swarm.listen_on(config.addr)?);
 
 		// run
 		tokio::spawn(async move {
@@ -286,7 +274,8 @@ pub enum NetworkEvent {
 	Bitswap(BitswapEvent),
 	Discovery(discovery::Event),
 	Dcutr(dcutr::Event),
-	Relay(relay::Event),
+	RelayServer(relay::Event),
+	RelayClient(relay::client::Event),
 }
 // impl From<BehaviourEvent> for NetworkEvent {
 // 	fn from(value: BehaviourEvent) -> Self {
@@ -320,7 +309,8 @@ pub struct Behaviour {
 	// pub kad: Kademlia<MemoryStore>,
 	pub bitswap: Bitswap<libipld::DefaultParams>,
 	pub dcutr: dcutr::Behaviour,
-	pub relay: Toggle<relay::Behaviour>,
+	pub relay_server: Toggle<relay::Behaviour>,
+	pub relay_client: relay::client::Behaviour,
 }
 impl discovery::DiscoveryBehaviour for Behaviour {
 	fn rendezvous_client_mut(&mut self) -> Option<&mut libp2p::rendezvous::client::Behaviour> {
