@@ -2,8 +2,9 @@ use crate::{
 	library::network_discovery::network_discovery,
 	services::{
 		connections::{
-			actor::ConnectionsContext, ConnectAction, ConnectedAction, ConnectionAction, ConnectionState,
-			DisconnectReason, DisconnectedAction,
+			action::{ConnectAction, ConnectedAction, ConnectionAction, DisconnectReason, DisconnectedAction},
+			actor::ConnectionsContext,
+			ConnectionState,
 		},
 		network::DiscoveryConnectNetworkTask,
 	},

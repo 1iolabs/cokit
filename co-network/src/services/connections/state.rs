@@ -1,10 +1,7 @@
-use super::{
-	action::{ConnectAction, ConnectedAction, ConnectionAction, DisconnectedAction, UseAction},
-	DisconnectAction, NetworkResolveAction, NetworkResolvedAction, PeersChangedAction, ReleaseAction, ReleasedAction,
-};
-use crate::services::connections::{
-	DisconnectReason, PeerConnectionClosedAction, PeerConnectionEstablishedAction, PeerRelateCoAction,
-	PeerRelateDidAction,
+use super::action::{
+	ConnectAction, ConnectedAction, ConnectionAction, DisconnectAction, DisconnectReason, DisconnectedAction,
+	NetworkResolveAction, NetworkResolvedAction, PeerConnectionClosedAction, PeerConnectionEstablishedAction,
+	PeerRelateCoAction, PeerRelateDidAction, PeersChangedAction, ReleaseAction, ReleasedAction, UseAction,
 };
 use co_actor::Reducer;
 use co_primitives::{CoId, Did, Network, NetworkDidDiscovery, NetworkPeer};
@@ -714,8 +711,7 @@ fn reference_network_connection(
 
 #[cfg(test)]
 mod tests {
-	use super::ConnectionState;
-	use crate::services::connections::{ConnectAction, ConnectionAction, UseAction};
+	use crate::connections::{ConnectAction, ConnectionAction, ConnectionState, UseAction};
 	use co_actor::Reducer;
 	use co_primitives::{Network, NetworkPeer, NetworkRendezvous};
 	use libp2p::PeerId;

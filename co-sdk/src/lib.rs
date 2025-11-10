@@ -22,7 +22,7 @@ pub use co_identity::{
 	DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver, IdentityResolverError,
 	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
-pub use co_network::services::network::NetworkSettings;
+pub use co_network::NetworkSettings;
 pub use co_primitives::{
 	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, AbsolutePath,
 	AbsolutePathOwned, AnyBlockStorage, Block, BlockSerializer, BlockStat, BlockStorage, BlockStorageExt,

@@ -1,4 +1,4 @@
-use super::{ConnectionAction, ConnectionState};
+use super::{action::ConnectionAction, ConnectionState};
 use crate::services::connections::actor::ConnectionsContext;
 use co_actor::{Epic, EpicExt, TracingEpic};
 use co_primitives::Tags;

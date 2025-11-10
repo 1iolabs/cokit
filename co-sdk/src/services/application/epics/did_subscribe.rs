@@ -6,7 +6,7 @@ use co_actor::Actions;
 use co_core_co::Co;
 use co_core_keystore::{Key, KeyStoreAction};
 use co_identity::{PrivateIdentityResolver, PrivateIdentityResolverBox};
-use co_network::services::network::{subscribe_identity, NetworkApi};
+use co_network::{subscribe_identity, NetworkApi};
 use co_primitives::{CoTryStreamExt, Did, OptionLink};
 use futures::{future::Either, pin_mut, stream, FutureExt, Stream, StreamExt};
 

@@ -4,10 +4,7 @@ use crate::{
 	Action, ActionError, CoContext,
 };
 use co_actor::{Actions, Actor};
-use co_network::services::{
-	connections::DynamicNetworkResolver,
-	network::{Network, NetworkInitialize, NetworkMessage, NetworkSettings},
-};
+use co_network::{connections::DynamicNetworkResolver, Network, NetworkInitialize, NetworkMessage, NetworkSettings};
 use co_primitives::tags;
 use futures::{FutureExt, Stream};
 

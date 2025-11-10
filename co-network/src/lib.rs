@@ -3,7 +3,7 @@ mod didcomm;
 mod discovery;
 mod library;
 mod network;
-pub mod services;
+mod services;
 mod types;
 
 pub use bitswap::{BitswapMessage, Token};
@@ -15,8 +15,18 @@ pub use library::{
 	network_discovery::identities_networks,
 	static_peer_provider::StaticPeerProvider,
 };
+pub use services::{
+	heads::HeadsApi,
+	network::{subscribe_identity, Network, NetworkApi, NetworkInitialize, NetworkMessage, NetworkSettings},
+};
 pub use types::{
 	error::NetworkError,
 	heads::{HeadsErrorCode, HeadsMessage},
 	peer_provider::PeerProvider,
 };
+pub mod connections {
+	pub use crate::services::connections::{
+		action::*, CoConnection, ConnectionMessage, ConnectionState, Connections, DynamicNetworkResolver,
+		NetworkConnection, NetworkResolver, PeerConnection,
+	};
+}

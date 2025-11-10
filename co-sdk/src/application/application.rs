@@ -5,10 +5,9 @@ use super::{
 	tracing::TracingBuilder,
 };
 use crate::{
-	library::wait_response::request_response,
-	services::{application::ApplicationMessage, network::NetworkSettings},
-	Action, CoDate, CoReducer, CoReducerFactory, CoStorage, CoUuid, DynamicCoDate, DynamicCoUuid, RandomCoUuid,
-	Storage, SystemCoDate, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
+	library::wait_response::request_response, services::application::ApplicationMessage, Action, CoDate, CoReducer,
+	CoReducerFactory, CoStorage, CoUuid, DynamicCoDate, DynamicCoUuid, RandomCoUuid, Storage, SystemCoDate,
+	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
 use co_actor::{Actor, ActorHandle, ActorInstance};
@@ -16,6 +15,7 @@ use co_core_storage::PinStrategy;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
+use co_network::NetworkSettings;
 use co_primitives::{tag, tags, CoId, DefaultParams, TagValue, Tags};
 use co_storage::StaticBlockStorage;
 use directories::ProjectDirs;

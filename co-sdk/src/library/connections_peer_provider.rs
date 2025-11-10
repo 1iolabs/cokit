@@ -1,6 +1,6 @@
 use co_actor::ActorHandle;
 use co_network::{
-	services::connections::{ConnectionMessage, UseAction},
+	connections::{ConnectionMessage, UseAction},
 	PeerProvider,
 };
 use co_primitives::{CoId, Did};

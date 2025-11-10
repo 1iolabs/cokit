@@ -1,6 +1,7 @@
 use crate::services::connections::{
-	actor::ConnectionsContext, ConnectionAction, ConnectionState, DisconnectAction, DisconnectReason,
-	DisconnectedAction,
+	action::{ConnectionAction, DisconnectAction, DisconnectReason, DisconnectedAction},
+	actor::ConnectionsContext,
+	ConnectionState,
 };
 use co_actor::{Actions, Epic};
 use futures::{stream, Stream};

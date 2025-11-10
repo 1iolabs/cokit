@@ -22,7 +22,7 @@ use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 use co_log::{EntryBlock, Log};
-use co_network::services::{connections::ConnectionMessage, heads::HeadsApi, network::NetworkApi};
+use co_network::{connections::ConnectionMessage, HeadsApi, NetworkApi};
 use co_primitives::{BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did};
 use futures::{Stream, TryStreamExt};
 use std::{

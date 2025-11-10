@@ -1,7 +1,7 @@
 use super::Action;
 use crate::CoContext;
 use co_actor::{Response, ResponseStream};
-use co_network::services::network::NetworkApi;
+use co_network::NetworkApi;
 use std::fmt::Debug;
 
 #[derive(Debug)]

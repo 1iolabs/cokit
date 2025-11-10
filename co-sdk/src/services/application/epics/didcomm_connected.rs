@@ -1,7 +1,7 @@
 use crate::{Action, CoContext};
 use co_actor::Actions;
 use co_identity::PeerDidCommHeader;
-use co_network::services::connections::{ConnectionAction, PeerRelateDidAction};
+use co_network::connections::{ConnectionAction, PeerRelateDidAction};
 use co_primitives::CoTryStreamExt;
 use futures::{FutureExt, Stream};
 use libp2p::PeerId;

@@ -7,10 +7,7 @@ use co_actor::{
 	Actions, Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, Reducer, SwitchEpic, TaskSpawner, TracingEpic,
 };
 use co_identity::{Identity, PeerDidCommHeader, PrivateIdentity, PrivateIdentityBox};
-use co_network::{
-	services::{connections::ConnectionMessage, network::NetworkApi},
-	EncodedMessage, HeadsMessage,
-};
+use co_network::{connections::ConnectionMessage, EncodedMessage, HeadsMessage, NetworkApi};
 use co_primitives::{tags, CoId, Tags, WeakCid};
 use futures::{Stream, StreamExt};
 use libp2p::PeerId;

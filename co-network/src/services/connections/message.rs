@@ -1,4 +1,4 @@
-use super::{action::UseAction, ConnectionAction, PeersChangedAction};
+use super::action::{ConnectionAction, PeersChangedAction, UseAction};
 use co_actor::{ActorError, ActorHandle, ResponseStream};
 use co_primitives::{CoId, Did, Network};
 use futures::Stream;

@@ -1,6 +1,7 @@
 use crate::services::connections::{
-	actor::ConnectionsContext, ConnectionAction, ConnectionState, NetworkResolveAction, NetworkResolvedAction,
-	NetworkResolver,
+	action::{ConnectionAction, NetworkResolveAction, NetworkResolvedAction},
+	actor::ConnectionsContext,
+	ConnectionState, NetworkResolver,
 };
 use co_actor::{Actions, Epic};
 use futures::{FutureExt, Stream};

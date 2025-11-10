@@ -1,4 +1,4 @@
-use co_network::services::network::NetworkApi;
+use co_network::NetworkApi;
 use co_sdk::{
 	Application, ApplicationBuilder, DidKeyIdentity, DidKeyProvider, NetworkSettings, TracingBuilder,
 	CO_CORE_NAME_KEYSTORE,

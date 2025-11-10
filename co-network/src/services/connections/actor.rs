@@ -1,4 +1,8 @@
-use super::{epics::epic, ConnectionAction, ConnectionMessage, ConnectionState, PeersChangedAction};
+use super::{
+	action::{ConnectionAction, PeersChangedAction},
+	epics::epic,
+	ConnectionMessage, ConnectionState,
+};
 use crate::services::{connections::resolve::DynamicNetworkResolver, network::CoNetworkTaskSpawner};
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer, ResponseStreams, TaskSpawner};

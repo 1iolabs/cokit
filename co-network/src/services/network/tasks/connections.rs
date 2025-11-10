@@ -1,6 +1,7 @@
 use crate::{
 	services::connections::{
-		ConnectionAction, ConnectionMessage, PeerConnectionClosedAction, PeerConnectionEstablishedAction,
+		action::{ConnectionAction, PeerConnectionClosedAction, PeerConnectionEstablishedAction},
+		ConnectionMessage,
 	},
 	types::network_task::NetworkTask,
 };

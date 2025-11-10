@@ -7,7 +7,7 @@ use crate::{
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_core_membership::MembershipState;
-use co_network::{identities_networks, services::connections::NetworkResolver};
+use co_network::{connections::NetworkResolver, identities_networks};
 use co_primitives::{CoId, CoInviteMetadata, KnownTags, Network};
 use co_storage::BlockStorageExt;
 use futures::TryStreamExt;

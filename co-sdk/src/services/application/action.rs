@@ -1,11 +1,11 @@
 use crate::{
 	library::{create_reducer_action::new_reducer_action, network_queue::TaskState},
-	services::{network::NetworkSettings, reducer::FlushInfo},
+	services::reducer::FlushInfo,
 	CoDate, CoStorage, ReducerChangeContext,
 };
 use cid::Cid;
 use co_identity::{DidCommHeader, Message, PrivateIdentityBox};
-use co_network::{EncodedMessage, HeadsMessage};
+use co_network::{EncodedMessage, HeadsMessage, NetworkSettings};
 use co_primitives::{Block, BlockSerializer, CoId, DefaultParams, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{stream::once, Stream, StreamExt};

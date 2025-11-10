@@ -9,7 +9,7 @@ use crate::{
 use cid::Cid;
 use co_actor::{ActionDispatch, Actions};
 use co_identity::Identity;
-use co_network::{backoff_with_jitter, services::network::NetworkApi, PeerProvider, Token};
+use co_network::{backoff_with_jitter, NetworkApi, PeerProvider, Token};
 use co_primitives::{BlockSerializer, CoId};
 use co_storage::StorageError;
 use futures::{future::Either, pin_mut, stream, FutureExt, Stream, StreamExt};
