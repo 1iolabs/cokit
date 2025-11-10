@@ -15,7 +15,6 @@ pub use library::{
 	network_discovery::identities_networks,
 	static_peer_provider::StaticPeerProvider,
 };
-pub use network::{Behaviour, Context, Libp2pNetwork, Libp2pNetworkConfig, NetworkEvent, NetworkMode, Shutdown};
 pub use types::{
 	error::NetworkError,
 	heads::{HeadsErrorCode, HeadsMessage},

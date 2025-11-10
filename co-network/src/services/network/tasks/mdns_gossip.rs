@@ -1,6 +1,6 @@
 use crate::{
 	network::{Behaviour, Context, NetworkEvent},
-	types::{network_task::NetworkTask, provider::GossipsubBehaviourProvider},
+	types::network_task::NetworkTask,
 };
 use libp2p::{mdns, swarm::SwarmEvent, Swarm};
 
@@ -24,12 +24,12 @@ impl NetworkTask<Behaviour, Context> for MdnsGossipNetworkTask {
 		match &event {
 			SwarmEvent::Behaviour(NetworkEvent::Mdns(mdns::Event::Discovered(list))) => {
 				for (peer_id, _) in list {
-					swarm.behaviour_mut().gossipsub_mut().add_explicit_peer(peer_id);
+					swarm.behaviour_mut().gossipsub.add_explicit_peer(peer_id);
 				}
 			},
 			SwarmEvent::Behaviour(NetworkEvent::Mdns(mdns::Event::Expired(list))) => {
 				for (peer_id, _) in list {
-					swarm.behaviour_mut().gossipsub_mut().remove_explicit_peer(peer_id);
+					swarm.behaviour_mut().gossipsub.remove_explicit_peer(peer_id);
 				}
 			},
 			_ => {},

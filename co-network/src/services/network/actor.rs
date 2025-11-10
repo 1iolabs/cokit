@@ -1,7 +1,7 @@
 use super::message::NetworkMessage;
 use crate::{
 	bitswap::BitswapMessage,
-	network::{Libp2pNetwork, Libp2pNetworkConfig},
+	network::{Libp2pNetwork, Libp2pNetworkConfig, NetworkMode},
 	services::{
 		connections::{Connections, ConnectionsContext, DynamicNetworkResolver},
 		heads::{HeadsActor, HeadsApi, HeadsContext},
@@ -44,6 +44,7 @@ impl Actor for Network {
 		let network_peer_id = PeerId::from(initialize.keypair.public());
 		let mut network_config =
 			Libp2pNetworkConfig::from_keypair(initialize.settings.listen, initialize.keypair.clone());
+		network_config.mode = if initialize.settings.relay { NetworkMode::Full } else { NetworkMode::Light };
 		network_config.bootstrap = initialize.settings.bootstrap;
 		let network = Libp2pNetwork::new(
 			initialize.identifier.clone(),
@@ -103,9 +104,6 @@ impl Actor for Network {
 	) -> Result<(), ActorError> {
 		// handle
 		match message {
-			NetworkMessage::Task(task) => {
-				state.network.spawner().spawn_box(task).ok();
-			},
 			NetworkMessage::LocalPeerId(response) => {
 				response.respond(state.peer_id);
 			},

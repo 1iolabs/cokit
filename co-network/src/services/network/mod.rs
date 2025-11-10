@@ -9,7 +9,7 @@ mod tasks;
 pub use actor::{Network, NetworkInitialize};
 pub use api::NetworkApi;
 pub use message::NetworkMessage;
-pub use network::CoNetworkTaskSpawner;
+pub(crate) use network::CoNetworkTaskSpawner;
 pub use settings::NetworkSettings;
 pub use subscribe::subscribe_identity;
 pub(crate) use tasks::{

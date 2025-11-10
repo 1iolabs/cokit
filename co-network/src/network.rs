@@ -4,10 +4,8 @@ use crate::{
 	library::find_peer_id::try_peer_id,
 	types::{
 		layer_behaviour::{Layer, LayerBehaviour},
-		network_task::{FnOnceNetworkTask, NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner},
-		provider::{DidcommBehaviourProvider, GossipsubBehaviourProvider},
+		network_task::{NetworkTaskBox, TokioNetworkTaskSpawner},
 	},
-	NetworkError,
 };
 use anyhow::anyhow;
 use co_actor::ActorHandle;
@@ -28,7 +26,6 @@ use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
 
 pub struct Libp2pNetwork {
-	config: Libp2pNetworkConfig,
 	shutdown: CancellationToken,
 	tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<Behaviour, Context>>,
 }
@@ -133,7 +130,7 @@ impl Libp2pNetwork {
 				continue;
 			}
 			swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![bootstrap.clone()]).build())?;
-			swarm.behaviour_mut().gossipsub_mut().add_explicit_peer(&peer_id);
+			swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
 		}
 
 		// context
@@ -159,7 +156,7 @@ impl Libp2pNetwork {
 		});
 
 		// result
-		Ok(Self { config, shutdown, tasks: tasks_tx })
+		Ok(Self { shutdown, tasks: tasks_tx })
 	}
 
 	pub fn spawner(&self) -> TokioNetworkTaskSpawner<Behaviour, Context> {
@@ -171,25 +168,6 @@ impl Libp2pNetwork {
 	pub fn shutdown(&self) -> Shutdown {
 		Shutdown { shutdown: self.shutdown.clone() }
 	}
-
-	pub fn config(&self) -> &Libp2pNetworkConfig {
-		&self.config
-	}
-
-	/// Change network mode.
-	pub fn set_network_mode(&mut self, mode: NetworkMode) -> Result<(), NetworkError> {
-		if self.config.mode != mode {
-			self.config.mode = mode;
-			self.spawner()
-				.spawn(FnOnceNetworkTask::new(move |swarm, _| {
-					set_network_mode(swarm.behaviour_mut(), mode);
-				}))
-				.unwrap();
-		}
-		Ok(())
-	}
-
-	// pub async fn bitswap_get(cid: Cid, tokens: Vec<(MultiCodec, Vec<u8>)>) -> Result<(), anyhow::Error> {}
 }
 impl Drop for Libp2pNetwork {
 	fn drop(&mut self) {
@@ -295,6 +273,7 @@ impl LayerBehaviour<Behaviour> for Context {
 	}
 }
 
+#[allow(unused)]
 #[derive(Debug, derive_more::From)]
 #[non_exhaustive]
 pub enum NetworkEvent {
@@ -364,11 +343,6 @@ impl discovery::DiscoveryBehaviour for Behaviour {
 			_ => None,
 		}
 	}
-}
-impl DidcommBehaviourProvider for Behaviour {
-	fn didcomm(&self) -> &didcomm::Behaviour {
-		&self.didcomm
-	}
 
 	fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour {
 		&mut self.didcomm
@@ -381,16 +355,6 @@ impl DidcommBehaviourProvider for Behaviour {
 		}
 	}
 
-	fn into_didcomm_event(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-	) -> Result<didcomm::Event, <Self as NetworkBehaviour>::ToSwarm> {
-		match event {
-			NetworkEvent::Didcomm(e) => Ok(e),
-			e => Err(e),
-		}
-	}
-}
-impl GossipsubBehaviourProvider for Behaviour {
 	fn gossipsub(&self) -> &gossipsub::Behaviour {
 		&self.gossipsub
 	}
@@ -405,22 +369,6 @@ impl GossipsubBehaviourProvider for Behaviour {
 			_ => None,
 		}
 	}
-
-	fn into_gossipsub_event(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-	) -> Result<gossipsub::Event, <Self as NetworkBehaviour>::ToSwarm> {
-		match event {
-			NetworkEvent::Gossipsub(e) => Ok(e),
-			e => Err(e),
-		}
-	}
-}
-
-fn set_network_mode(_behaviour: &mut Behaviour, _mode: NetworkMode) {
-	// match mode {
-	// 	NetworkMode::Full => behaviour.kad.set_mode(Some(libp2p::kad::Mode::Server)),
-	// 	NetworkMode::Light => behaviour.kad.set_mode(Some(libp2p::kad::Mode::Client)),
-	// }
 }
 
 async fn run(

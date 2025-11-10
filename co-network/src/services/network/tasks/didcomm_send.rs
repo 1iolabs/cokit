@@ -1,14 +1,9 @@
 use crate::{
 	didcomm,
-	types::{
-		network_task::{NetworkTask, NetworkTaskSpawner},
-		provider::DidcommBehaviourProvider,
-	},
+	network::{Behaviour, Context, NetworkEvent},
+	types::network_task::{NetworkTask, NetworkTaskSpawner},
 };
-use libp2p::{
-	swarm::{NetworkBehaviour, SwarmEvent},
-	PeerId, Swarm,
-};
+use libp2p::{swarm::SwarmEvent, PeerId, Swarm};
 use std::{collections::BTreeSet, time::Duration};
 
 /// Handle received heads from the network within the application.
@@ -22,15 +17,14 @@ pub struct DidCommSendNetworkTask {
 impl DidCommSendNetworkTask {
 	/// Send DIDComm message to a peer.
 	/// Resolves as soon the message could be sent to one of the specified peers.
-	pub async fn send<B, C, S>(
+	pub async fn send<S>(
 		spawner: S,
 		peers: impl IntoIterator<Item = PeerId>,
 		message: didcomm::EncodedMessage,
 		timeout: Duration,
 	) -> anyhow::Result<PeerId>
 	where
-		S: NetworkTaskSpawner<B, C> + Send + Sync + 'static,
-		B: NetworkBehaviour + DidcommBehaviourProvider,
+		S: NetworkTaskSpawner<Behaviour, Context> + Send + Sync + 'static,
 	{
 		let (tx, rx) = tokio::sync::oneshot::channel();
 		let task = Self { message, peers: peers.into_iter().collect(), sent: Some(tx) };
@@ -38,45 +32,45 @@ impl DidCommSendNetworkTask {
 		Ok(tokio::time::timeout(timeout, rx).await???)
 	}
 }
-impl<B, C> NetworkTask<B, C> for DidCommSendNetworkTask
-where
-	B: NetworkBehaviour + DidcommBehaviourProvider,
-{
-	fn execute(&mut self, swarm: &mut Swarm<B>, _context: &mut C) {
+impl NetworkTask<Behaviour, Context> for DidCommSendNetworkTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
 		for peer in &self.peers {
-			swarm.behaviour_mut().didcomm_mut().send(peer, self.message.clone());
+			swarm.behaviour_mut().didcomm.send(peer, self.message.clone());
 		}
 	}
 
 	fn on_swarm_event(
 		&mut self,
-		_swarm: &mut Swarm<B>,
-		_context: &mut C,
-		event: SwarmEvent<B::ToSwarm>,
-	) -> Option<SwarmEvent<B::ToSwarm>> {
-		if let Some(didcomm_event) = B::swarm_didcomm_event(&event) {
-			match &didcomm_event {
-				didcomm::Event::Sent { peer_id, message } => {
-					// check the message before removing the peer as the peer may sent other message at same time
-					if &self.message == message {
-						if self.peers.remove(peer_id) {
-							if let Some(sent) = Option::take(&mut self.sent) {
-								sent.send(Ok(*peer_id)).ok();
+		_swarm: &mut Swarm<Behaviour>,
+		_context: &mut Context,
+		event: SwarmEvent<NetworkEvent>,
+	) -> Option<SwarmEvent<NetworkEvent>> {
+		match &event {
+			SwarmEvent::Behaviour(NetworkEvent::Didcomm(didcomm_event)) => {
+				match &didcomm_event {
+					didcomm::Event::Sent { peer_id, message } => {
+						// check the message before removing the peer as the peer may sent other message at same time
+						if &self.message == message {
+							if self.peers.remove(peer_id) {
+								if let Some(sent) = Option::take(&mut self.sent) {
+									sent.send(Ok(*peer_id)).ok();
+								}
 							}
 						}
-					}
-				},
-				didcomm::Event::OutboundFailure { peer_id, error, message } => {
-					if self.peers.is_empty() || Some(&self.message) == message.as_ref() {
-						if self.peers.remove(peer_id) {
-							if let Some(sent) = Option::take(&mut self.sent) {
-								sent.send(Err(error.clone().into())).ok();
+					},
+					didcomm::Event::OutboundFailure { peer_id, error, message } => {
+						if self.peers.is_empty() || Some(&self.message) == message.as_ref() {
+							if self.peers.remove(peer_id) {
+								if let Some(sent) = Option::take(&mut self.sent) {
+									sent.send(Err(error.clone().into())).ok();
+								}
 							}
 						}
-					}
-				},
-				_ => {},
-			}
+					},
+					_ => {},
+				}
+			},
+			_ => {},
 		}
 		Some(event)
 	}

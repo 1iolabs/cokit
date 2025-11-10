@@ -1,16 +1,12 @@
 use crate::{
 	didcomm,
-	types::{
-		network_task::{NetworkTask, NetworkTaskSpawner},
-		provider::DidcommBehaviourProvider,
-	},
+	network::{Behaviour, Context, NetworkEvent},
+	services::network::CoNetworkTaskSpawner,
+	types::network_task::{NetworkTask, NetworkTaskSpawner},
 };
 use co_identity::Message;
 use futures::Stream;
-use libp2p::{
-	swarm::{NetworkBehaviour, SwarmEvent},
-	PeerId, Swarm,
-};
+use libp2p::{swarm::SwarmEvent, PeerId, Swarm};
 use std::fmt::Debug;
 
 /// Handle received didcomm messages from network within the application.
@@ -25,11 +21,7 @@ impl Debug for DidCommReceiveNetworkTask {
 	}
 }
 impl DidCommReceiveNetworkTask {
-	pub fn receive<B, C, S>(spawner: S) -> impl Stream<Item = (PeerId, Message)> + Send + 'static
-	where
-		S: NetworkTaskSpawner<B, C> + Send + Sync + 'static,
-		B: NetworkBehaviour + DidcommBehaviourProvider,
-	{
+	pub fn receive(spawner: CoNetworkTaskSpawner) -> impl Stream<Item = (PeerId, Message)> + Send + 'static {
 		let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 		let task = Self { receive: tx };
 
@@ -42,22 +34,20 @@ impl DidCommReceiveNetworkTask {
 		tokio_stream::wrappers::UnboundedReceiverStream::new(rx)
 	}
 }
-impl<B, C> NetworkTask<B, C> for DidCommReceiveNetworkTask
-where
-	B: NetworkBehaviour + DidcommBehaviourProvider,
-{
-	fn execute(&mut self, _swarm: &mut Swarm<B>, _context: &mut C) {}
+impl NetworkTask<Behaviour, Context> for DidCommReceiveNetworkTask {
+	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>, _context: &mut Context) {}
 
 	fn on_swarm_event(
 		&mut self,
-		_swarm: &mut Swarm<B>,
-		_context: &mut C,
-		event: SwarmEvent<B::ToSwarm>,
-	) -> Option<SwarmEvent<B::ToSwarm>> {
-		if let Some(didcomm_event) = B::swarm_didcomm_event(&event) {
-			if let didcomm::Event::Received { peer_id, message } = &didcomm_event {
+		_swarm: &mut Swarm<Behaviour>,
+		_context: &mut Context,
+		event: SwarmEvent<NetworkEvent>,
+	) -> Option<SwarmEvent<NetworkEvent>> {
+		match &event {
+			SwarmEvent::Behaviour(NetworkEvent::Didcomm(didcomm::Event::Received { peer_id, message })) => {
 				self.receive.send((*peer_id, message.clone())).ok();
-			}
+			},
+			_ => {},
 		}
 		Some(event)
 	}

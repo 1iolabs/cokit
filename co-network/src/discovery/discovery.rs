@@ -1,11 +1,5 @@
 use super::did_discovery::{DidDiscovery, DidDiscoveryMessage};
-use crate::{
-	didcomm,
-	types::{
-		layer_behaviour::LayerBehaviour,
-		provider::{DidcommBehaviourProvider, GossipsubBehaviourProvider},
-	},
-};
+use crate::{didcomm, types::layer_behaviour::LayerBehaviour};
 use anyhow::anyhow;
 use co_identity::{
 	network_did_discovery, DidCommContext, DidCommHeader, DidCommPrivateContext, Identity, IdentityResolver,
@@ -49,14 +43,6 @@ pub enum Discovery {
 	Peer(NetworkPeer),
 }
 impl Discovery {
-	/// Create discover from peer.
-	pub fn from_peer<'a>(peer: PeerId, addresses: impl IntoIterator<Item = &'a Multiaddr>) -> Self {
-		Discovery::Peer(NetworkPeer {
-			peer: peer.to_bytes(),
-			addresses: addresses.into_iter().map(|i| i.to_string()).collect(),
-		})
-	}
-
 	/// Validate the discovery contains parseable data.
 	pub fn validate(&self) -> Result<(), anyhow::Error> {
 		match self {
@@ -416,11 +402,6 @@ where
 			return Err(ConnectError::NoNetwork);
 		}
 		Ok(())
-	}
-
-	/// Returns currently connected peers for an request id. If request can not be found return an emty set.
-	pub fn peers(&self, id: u64) -> BTreeSet<PeerId> {
-		self.requests.get(&id).map(|r| &r.connected_peers).cloned().unwrap_or_default()
 	}
 
 	/// Release (may disconnect) discovered peers.
@@ -783,15 +764,23 @@ pub enum ConnectError {
 	Other(#[from] anyhow::Error),
 }
 
-pub trait DiscoveryBehaviour: NetworkBehaviour + GossipsubBehaviourProvider + DidcommBehaviourProvider {
+#[allow(unused)]
+pub trait DiscoveryBehaviour: NetworkBehaviour {
 	fn rendezvous_client_mut(&mut self) -> Option<&mut rendezvous::client::Behaviour>;
 	fn rendezvous_client_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&rendezvous::client::Event>;
 
 	fn mdns_mut(&mut self) -> Option<&mut mdns::tokio::Behaviour>;
 	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&mdns::Event>;
 
+	fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour;
+	fn didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&didcomm::Event>;
+
 	// fn kad_mut(&mut self) -> Option<&mut kad::Behaviour<kad::store::MemoryStore>>;
 	// fn kad_mut(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&kad::Event>;
+
+	fn gossipsub(&self) -> &gossipsub::Behaviour;
+	fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour;
+	fn gossipsub_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&gossipsub::Event>;
 }
 
 /// Acccept DidDiscoveryMessage::Discover events and respond with DidDiscoveryMessage::Resolve.
@@ -959,15 +948,13 @@ mod tests {
 	use crate::{
 		didcomm,
 		discovery::{DidDiscovery, DidDiscoveryMessage, Discovery, DiscoveryState, Event},
-		types::{
-			layer_behaviour::{Layer, LayerBehaviour},
-			provider::{DidcommBehaviourProvider, GossipsubBehaviourProvider},
-		},
+		types::layer_behaviour::{Layer, LayerBehaviour},
 	};
 	use co_identity::{
 		DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentity,
 		PrivateIdentityBox, PrivateIdentityResolver,
 	};
+	use co_primitives::NetworkPeer;
 	use futures::{select, FutureExt, StreamExt};
 	use libp2p::{
 		gossipsub,
@@ -1000,56 +987,6 @@ mod tests {
 			TestBehaviour { didcomm: didcomm_behaviour, gossipsub: gossipsub_behaviour }
 		}
 	}
-	impl DidcommBehaviourProvider for TestBehaviour {
-		fn didcomm(&self) -> &didcomm::Behaviour {
-			&self.didcomm
-		}
-
-		fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour {
-			&mut self.didcomm
-		}
-
-		fn didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&didcomm::Event> {
-			match event {
-				TestBehaviourEvent::Didcomm(e) => Some(e),
-				_ => None,
-			}
-		}
-
-		fn into_didcomm_event(
-			event: <Self as NetworkBehaviour>::ToSwarm,
-		) -> Result<didcomm::Event, <Self as NetworkBehaviour>::ToSwarm> {
-			match event {
-				TestBehaviourEvent::Didcomm(e) => Ok(e),
-				e => Err(e),
-			}
-		}
-	}
-	impl GossipsubBehaviourProvider for TestBehaviour {
-		fn gossipsub(&self) -> &gossipsub::Behaviour {
-			&self.gossipsub
-		}
-
-		fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour {
-			&mut self.gossipsub
-		}
-
-		fn gossipsub_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&gossipsub::Event> {
-			match event {
-				TestBehaviourEvent::Gossipsub(e) => Some(e),
-				_ => None,
-			}
-		}
-
-		fn into_gossipsub_event(
-			event: <Self as NetworkBehaviour>::ToSwarm,
-		) -> Result<gossipsub::Event, <Self as NetworkBehaviour>::ToSwarm> {
-			match event {
-				TestBehaviourEvent::Gossipsub(e) => Ok(e),
-				e => Err(e),
-			}
-		}
-	}
 	impl DiscoveryBehaviour for TestBehaviour {
 		fn rendezvous_client_mut(&mut self) -> Option<&mut rendezvous::client::Behaviour> {
 			None
@@ -1065,6 +1002,32 @@ mod tests {
 
 		fn mdns_event(_event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&libp2p::mdns::Event> {
 			None
+		}
+
+		fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour {
+			&mut self.didcomm
+		}
+
+		fn didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&didcomm::Event> {
+			match event {
+				TestBehaviourEvent::Didcomm(e) => Some(e),
+				_ => None,
+			}
+		}
+
+		fn gossipsub(&self) -> &gossipsub::Behaviour {
+			&self.gossipsub
+		}
+
+		fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour {
+			&mut self.gossipsub
+		}
+
+		fn gossipsub_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&gossipsub::Event> {
+			match event {
+				TestBehaviourEvent::Gossipsub(e) => Some(e),
+				_ => None,
+			}
 		}
 	}
 
@@ -1110,6 +1073,14 @@ mod tests {
 		}
 	}
 
+	/// Create discover from peer.
+	fn discovery_from_peer<'a>(peer: PeerId, addresses: impl IntoIterator<Item = &'a Multiaddr>) -> Discovery {
+		Discovery::Peer(NetworkPeer {
+			peer: peer.to_bytes(),
+			addresses: addresses.into_iter().map(|i| i.to_string()).collect(),
+		})
+	}
+
 	#[tokio::test]
 	async fn test_peer_discovery() {
 		// tracing_subscriber::fmt()
@@ -1139,7 +1110,7 @@ mod tests {
 		// peer2: connect
 		discovery2
 			.layer_mut()
-			.connect(peer2.swarm(), vec![Discovery::from_peer(peer1.peer_id, std::iter::once(&peer1.addr))])
+			.connect(peer2.swarm(), vec![discovery_from_peer(peer1.peer_id, std::iter::once(&peer1.addr))])
 			.unwrap();
 
 		// run
