@@ -61,10 +61,11 @@ build:
   cache:
     <<: *global_cache
   script:
+    - rustc -vV
     - echo "> building binaries"
     - cargo build --release
     - echo "> building cores"
-    - ./target/release/co-cli core build-builtin
+    - ./target/release/co core build-builtin
   artifacts:
     paths:
       - target/release/co
