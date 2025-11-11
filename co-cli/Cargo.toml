@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.76"
 
+[[bin]]
+name = "co"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 async-stream = { workspace = true }

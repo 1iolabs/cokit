@@ -1,6 +1,14 @@
 # CO Documentation
 
-## Run
+## Use
+
+### Install
+
+```shell
+cargo binstall mdbook mdbook-admonish mdbook-toc mdbook-mermaid
+```
+
+### Run
 
 ```shell
 mdbook serve -o
