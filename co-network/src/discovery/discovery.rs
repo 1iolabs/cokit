@@ -9,7 +9,7 @@ use co_primitives::{Did, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous};
 use derive_more::From;
 use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, StreamExt};
 use libp2p::{
-	gossipsub::{self, TopicHash},
+	gossipsub::{self, IdentTopic, TopicHash},
 	mdns, rendezvous,
 	swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
 	Multiaddr, PeerId, Swarm,
@@ -115,9 +115,10 @@ impl DiscoveryConnectRequest {
 }
 
 /// Active subscription listening for DID Discovery requests.
-struct DidDiscoverySubscription {
-	network: NetworkDidDiscovery,
-	identity: PrivateIdentityBox,
+#[derive(Debug, Clone, PartialEq)]
+enum DidDiscoverySubscription {
+	Default,
+	Identity(NetworkDidDiscovery, PrivateIdentityBox),
 }
 
 /// Event.
@@ -212,32 +213,59 @@ where
 	}
 
 	/// Subscribe identity for DID Discovery.
-	pub fn did_discovery_subscribe<B, P>(
+	pub fn did_discovery_subscribe<B>(
 		&mut self,
 		swarm: &mut Swarm<B>,
 		network: Option<NetworkDidDiscovery>,
-		identity: P,
+		identity: PrivateIdentityBox,
 	) -> Result<(), anyhow::Error>
 	where
 		B: DiscoveryBehaviour,
-		P: PrivateIdentity + Send + Sync + 'static,
 	{
-		// network
+		// subscription
 		let network = network_did_discovery(&identity, network)?;
+		let subscription = DidDiscoverySubscription::Identity(network, identity);
 
+		// subscribe
+		self.did_discovery_subscribe_apply(swarm, subscription)?;
+
+		// result
+		Ok(())
+	}
+
+	/// Subscribe identity for DID Discovery.
+	pub fn did_discovery_subscribe_default<B>(&mut self, swarm: &mut Swarm<B>) -> Result<(), anyhow::Error>
+	where
+		B: DiscoveryBehaviour,
+	{
+		// subscription
+		let subscription = DidDiscoverySubscription::Default;
+
+		// subscribe
+		self.did_discovery_subscribe_apply(swarm, subscription)?;
+
+		// result
+		Ok(())
+	}
+
+	fn did_discovery_subscribe_apply<B: DiscoveryBehaviour>(
+		&mut self,
+		swarm: &mut Swarm<B>,
+		subscription: DidDiscoverySubscription,
+	) -> Result<(), anyhow::Error> {
 		// topic
-		let topic = did_discovery_topic(&network);
+		let topic = IdentTopic::new(did_discovery_subscription_topic_str(&subscription));
 
 		// add
 		self.did_subscriptions
 			.entry(topic.hash())
 			.or_insert(Default::default())
-			.push(DidDiscoverySubscription { identity: PrivateIdentityBox::new(identity), network: network.clone() });
+			.push(subscription);
 
 		// subscribe
 		let subscriptions_count = self.did_subscriptions.get(&topic.hash()).map(|v| v.len()).unwrap_or(0);
 		if subscriptions_count == 1 {
-			did_discovery_subscribe(swarm, &network)?;
+			swarm.behaviour_mut().gossipsub_mut().subscribe(&topic)?;
 		}
 
 		// result
@@ -250,30 +278,72 @@ where
 		swarm: &mut Swarm<B>,
 		did: &Did,
 	) -> Result<(), anyhow::Error> {
-		// remove one subscription
-		let mut remove_topic = None;
-		let mut remove_subscription = None;
-		for (topic, subscriptions) in self.did_subscriptions.iter_mut() {
-			for (index, subscription) in subscriptions.iter().enumerate() {
-				if subscription.identity.identity() == did {
-					let remove = subscriptions.remove(index);
-					if subscriptions.is_empty() {
-						remove_topic = Some(topic.to_owned());
-						remove_subscription = Some(remove.network);
-					}
-					break;
-				}
-			}
-		}
-
-		// remove
-		if let Some(remove_topic) = remove_topic {
-			self.did_subscriptions.remove(&remove_topic);
-		}
+		// find first subscription for the did
+		let subscription = self
+			.did_subscriptions
+			.iter()
+			.flat_map(|(_topic, subscriptions)| subscriptions.iter())
+			.find(|subscription| match subscription {
+				DidDiscoverySubscription::Identity(_network, identity) => identity.identity() == did,
+				DidDiscoverySubscription::Default => false,
+			})
+			.cloned();
 
 		// unsubscribe
-		if let Some(remove_subscription) = remove_subscription {
-			did_discovery_unsubscribe(swarm, &remove_subscription)?;
+		if let Some(subscription) = subscription {
+			self.did_discovery_unsubscribe_apply(swarm, subscription)?;
+		}
+
+		// result
+		Ok(())
+	}
+
+	/// Unsubscribe identity for DID Discovery.
+	pub fn did_discovery_unsubscribe_default<B: DiscoveryBehaviour>(
+		&mut self,
+		swarm: &mut Swarm<B>,
+	) -> Result<(), anyhow::Error> {
+		// unsubscribe
+		self.did_discovery_unsubscribe_apply(swarm, DidDiscoverySubscription::Default)?;
+
+		// result
+		Ok(())
+	}
+
+	/// Unsubscribe identity for DID Discovery.
+	fn did_discovery_unsubscribe_apply<B: DiscoveryBehaviour>(
+		&mut self,
+		swarm: &mut Swarm<B>,
+		subscription: DidDiscoverySubscription,
+	) -> Result<(), anyhow::Error> {
+		// topic
+		let topic = IdentTopic::new(did_discovery_subscription_topic_str(&subscription));
+
+		// remove subscription
+		let removed_subscription = if let Some(subscriptions) = self.did_subscriptions.get_mut(&topic.hash()) {
+			if let Some((index, _)) = subscriptions.iter().enumerate().find(|(_index, item)| item == &&subscription) {
+				Some(subscriptions.remove(index))
+			} else {
+				None
+			}
+		} else {
+			None
+		};
+
+		// remove
+		if removed_subscription.is_some() {
+			// clear if empty
+			if self
+				.did_subscriptions
+				.get(&topic.hash())
+				.map(|subscriptions| subscriptions.is_empty())
+				.unwrap_or(false)
+			{
+				self.did_subscriptions.remove(&topic.hash());
+			}
+
+			// unsubscribe
+			swarm.behaviour_mut().gossipsub_mut().unsubscribe(&topic)?;
 		}
 
 		// result
@@ -485,8 +555,10 @@ where
 								self.resolver.clone(),
 								subscriptions
 									.iter()
-									.map(|s| s.identity.didcomm_private())
-									.filter_map(|item| item)
+									.filter_map(|subscription| match subscription {
+										DidDiscoverySubscription::Default => None,
+										DidDiscoverySubscription::Identity(_, identity) => identity.didcomm_private(),
+									})
 									.collect(),
 							)
 							.boxed(),
@@ -855,26 +927,18 @@ fn did_discovery_topic_str(network: &NetworkDidDiscovery) -> &str {
 	network.topic.as_deref().unwrap_or("co-contact")
 }
 
-/// Subscribe did discovery gossipsub topic.
-fn did_discovery_subscribe<B: DiscoveryBehaviour>(
-	swarm: &mut Swarm<B>,
-	did_discovery: &NetworkDidDiscovery,
-) -> Result<bool, gossipsub::SubscriptionError> {
-	Ok(swarm
-		.behaviour_mut()
-		.gossipsub_mut()
-		.subscribe(&did_discovery_topic(did_discovery))?)
+fn did_discovery_subscription_topic_str(subscription: &DidDiscoverySubscription) -> &str {
+	match subscription {
+		DidDiscoverySubscription::Default => did_discovery_topic_default_str(),
+		DidDiscoverySubscription::Identity(network, _) => {
+			network.topic.as_deref().unwrap_or(did_discovery_topic_default_str())
+		},
+	}
 }
 
-/// Unsubscribe did discovery gossipsub topic.
-fn did_discovery_unsubscribe<B: DiscoveryBehaviour>(
-	swarm: &mut Swarm<B>,
-	did_discovery: &NetworkDidDiscovery,
-) -> Result<bool, gossipsub::PublishError> {
-	Ok(swarm
-		.behaviour_mut()
-		.gossipsub_mut()
-		.unsubscribe(&did_discovery_topic(did_discovery))?)
+/// Get default did discovery gossipsub topic as string.
+fn did_discovery_topic_default_str() -> &'static str {
+	"co-contact"
 }
 
 /// Publish to did discovery gossipsub topic.
@@ -1181,13 +1245,13 @@ mod tests {
 		// peer1: subscribe
 		discovery1
 			.layer_mut()
-			.did_discovery_subscribe(peer1.swarm(), None, did1.clone())
+			.did_discovery_subscribe(peer1.swarm(), None, PrivateIdentityBox::new(did1.clone()))
 			.unwrap();
 
 		// peer2: subscribe
 		discovery2
 			.layer_mut()
-			.did_discovery_subscribe(peer2.swarm(), None, did2.clone())
+			.did_discovery_subscribe(peer2.swarm(), None, PrivateIdentityBox::new(did2.clone()))
 			.unwrap();
 
 		// // wait subscribed

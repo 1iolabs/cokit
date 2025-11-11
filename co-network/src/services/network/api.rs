@@ -13,7 +13,7 @@ use crate::{
 };
 use cid::Cid;
 use co_actor::ActorHandle;
-use co_identity::{Message, PrivateIdentity};
+use co_identity::{Message, PrivateIdentity, PrivateIdentityBox};
 use co_primitives::{Did, NetworkDidDiscovery};
 use co_storage::StorageError;
 use futures::{stream::BoxStream, StreamExt};
@@ -63,7 +63,7 @@ impl NetworkApi {
 	where
 		P: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
-		let (task, result) = DidDiscoverySubscribe::new(identity, Some(network));
+		let (task, result) = DidDiscoverySubscribe::new(PrivateIdentityBox::new(identity), Some(network));
 		self.spawner.spawn(task)?;
 		result.await??;
 		Ok(())
@@ -72,6 +72,22 @@ impl NetworkApi {
 	/// Unsubscribe identity from contact discovery.
 	pub async fn didcontact_unsubscribe(&self, identity: Did) -> Result<(), anyhow::Error> {
 		let (task, result) = DidDiscoveryUnsubscribe::new(identity);
+		self.spawner.spawn(task)?;
+		result.await??;
+		Ok(())
+	}
+
+	/// Subscribe identity for contact discovery.
+	pub async fn didcontact_subscribe_default(&self) -> Result<(), anyhow::Error> {
+		let (task, result) = DidDiscoverySubscribe::default();
+		self.spawner.spawn(task)?;
+		result.await??;
+		Ok(())
+	}
+
+	/// Unsubscribe identity from contact discovery.
+	pub async fn didcontact_unsubscribe_default(&self) -> Result<(), anyhow::Error> {
+		let (task, result) = DidDiscoveryUnsubscribe::default();
 		self.spawner.spawn(task)?;
 		result.await??;
 		Ok(())

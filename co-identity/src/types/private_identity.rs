@@ -29,6 +29,11 @@ pub trait PrivateIdentity: Identity {
 pub struct PrivateIdentityBox {
 	identity: Arc<dyn PrivateIdentity + Send + Sync + 'static>,
 }
+impl PartialEq for PrivateIdentityBox {
+	fn eq(&self, other: &Self) -> bool {
+		self.identity.identity() == other.identity.identity()
+	}
+}
 impl PrivateIdentityBox {
 	pub fn new<I: PrivateIdentity + Send + Sync + 'static>(identity: I) -> Self {
 		Self { identity: Arc::new(identity) }

@@ -79,6 +79,11 @@ pub async fn command(
 		}
 	}
 
+	// network
+	if let Some(network) = application.co().network().await {
+		network.didcontact_subscribe_default().await?;
+	}
+
 	// COs
 	// TODO: watch local co
 	// TODO: https://gitlab.1io.com/1io/co-sdk/-/issues/52
