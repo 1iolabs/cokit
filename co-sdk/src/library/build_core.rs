@@ -66,7 +66,8 @@ pub fn build_core(
 	let core_package = core_package.package.ok_or(anyhow!("Missing package: {:?}", core_toml))?;
 
 	// build
-	let output = Command::new("cargo")
+	let mut command: Command = Command::new("cargo");
+	command
 		.current_dir(&core_path)
 		.env("RUSTFLAGS", "-C opt-level=z -C codegen-units=1 -C panic=abort -C strip=symbols")
 		.args([
@@ -79,8 +80,9 @@ pub fn build_core(
 			target_path.to_str().ok_or(anyhow!("Invalid path: {:?}", target_path))?,
 			"--release",
 			// "--message-format=json",
-		])
-		.output()?;
+		]);
+	let output = command.output()?;
+	tracing::trace!(?output, ?command, "cargo-build");
 	if !output.status.success() {
 		return Err(BuildError { core_path, output }.into());
 	}

@@ -1,10 +1,9 @@
 # Core Quick Start
-Let's take a look at how to start things off with with the setup process, followed by the implementation.
-
-In this quick start we implement a basic Todo-List data model.
+In this quick-start guide, we are implementing the data model for a basic to-do list.
+First, we will set up our Rust crate, and then we will implement our Core.
 
 ## Setup
-First, we need to setup a new rust crate, and add [`co-api`](/crate/co_api/index.html) dependency:
+Run the following to set up our new Rust crate, and add [`co-api`](/crate/co_api/index.html) dependency
 ```sh
 cargo init --lib ./my-todo-core
 cd ./my-todo-core
@@ -12,7 +11,12 @@ cargo add co-api --git https://gitlab.1io.com/1io/co-sdk.git
 ```
 
 ## Implementation
-Now we implement the core in `src/lib.rs`:
+Now we implement the core in `src/lib.rs`.
+
+```admonish info
+Please note that there will be some example Rust code in the 'lib.rs' file. You can safely delete the example code, as it is not required.
+```
+
 #### 1. Define your data model in a core:
 ```rust
 #[co]

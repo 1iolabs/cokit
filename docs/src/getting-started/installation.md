@@ -14,7 +14,7 @@ Rustup is the Rust toolchain installer.
 Head over to <https://www.rust-lang.org/tools/install> for further instructions.
 
 ### Cargo B(inary)Install
-We use this to speed up the the installation for the 'co' and 'dx' commands. ('dx' is used in the [App Quick Start](../getting-started/rust-app-quick-start.md)). You can skip this step if you want to build them from source.
+We use this to speed up the the installation for the `co` and `dx` commands. ('dx' is used in the [App Quick Start](../getting-started/rust-app-quick-start.md)). You can skip this step if you want to build them from source.
 
 Head over to <https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#installation> for further instructions.
 
@@ -74,7 +74,7 @@ cargo install co-cli --git https://gitlab.1io.com/1io/co-sdk.git
 ```
 
 ## Building your first app
-Let's now build a COllaborative to-do list using CO-kit. While you can build any application with CO-kit, keep in mind that if you are COnsidering COllaboration, then CO-kit is destined for that job.
+Let's now build a COllaborative to-do list using CO-kit. While you can build any application with CO-kit, keep in mind that if you are COnsidering COllaboration, then CO-kit is destined for that job. Go for CO! 🚀
 
 For any app you build, you need these two ingredients:
 
