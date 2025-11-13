@@ -61,13 +61,14 @@ build:
   cache:
     <<: *global_cache
   script:
+    - rustc -vV
     - echo "> building binaries"
     - cargo build --release
     - echo "> building cores"
-    - ./target/release/co-cli core build-builtin
+    - ./target/release/co core build-builtin
   artifacts:
     paths:
-      - target/release/co-cli
+      - target/release/co
       - target/release/daemon
       - target-wasm/wasm32-unknown-unknown/release/*.wasm
 
@@ -109,8 +110,6 @@ pages:
     - mkdir -p public
     - mv target/doc public/crate
     - mv docs/book public/book
-    - mv target/release/* public/
-    - mv target-wasm/wasm32-unknown-unknown/release/* public/
   artifacts:
     paths:
       - public
