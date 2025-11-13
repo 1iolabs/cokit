@@ -31,7 +31,8 @@ export async function resolveCid(session: string, cid: CID): Promise<any> {
 }
 export async function storageGet(session: string, cid: CID): Promise<Uint8Array> {
   const body = encode({ session, cid });
-  return await invoke("plugin:co-sdk|storage_get", { body });
+  const result = await invoke<Uint8Array>("plugin:co-sdk|storage_get", { body });
+  return decode(result);
 }
 export async function storageSet(session: string, data: Uint8Array): Promise<CID> {
   const result = await invoke<Uint8Array>("plugin:co-sdk|storage_set", { session, data });
