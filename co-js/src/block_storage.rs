@@ -8,6 +8,15 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::js_sys::{Function, Promise, Uint8Array};
 
+#[wasm_bindgen]
+extern "C" {
+	#[wasm_bindgen(typescript_type = "(cid: UInt8Array) => UInt8Array | undefined")]
+	pub type JsBlockStorageGet;
+
+	#[wasm_bindgen(typescript_type = "(cid: UInt8Array, data: UInt8Array) => void")]
+	pub type JsBlockStorageSet;
+}
+
 #[wasm_bindgen(js_name = "BlockStorage")]
 #[derive(Debug, Clone)]
 pub struct JsBlockStorage {
@@ -16,12 +25,12 @@ pub struct JsBlockStorage {
 #[wasm_bindgen(js_class = "BlockStorage")]
 impl JsBlockStorage {
 	#[wasm_bindgen(constructor)]
-	pub fn new(get: &Function, set: &Function) -> Result<Self, JsValue> {
+	pub fn new(get: JsBlockStorageGet, set: JsBlockStorageSet) -> Result<Self, JsValue> {
 		Ok(Self {
 			handle: LocalActor::spawn_with(
 				JsLocalTaskSpawner::default(),
 				Default::default(),
-				JsBlockStorageActor { get: get.clone(), set: set.clone() },
+				JsBlockStorageActor { get: get.dyn_into()?, set: set.dyn_into()? },
 				Default::default(),
 			)
 			.map_err(|err| format!("block storage failed: {:?}", err))?
@@ -62,12 +71,12 @@ enum JsBlockStorageMessage {
 #[derive(Debug)]
 struct JsBlockStorageActor {
 	/// Typescript: ```typescript
-	/// (cid: any) => UInt8Array
+	/// (cid: UInt8Array) => UInt8Array | undefined
 	/// ```
 	get: Function,
 
 	/// Typescript: ```typescript
-	/// (cid: any, data: UInt8Array) => void
+	/// (cid: UInt8Array, data: UInt8Array) => void
 	/// ```
 	set: Function,
 }
@@ -82,10 +91,13 @@ impl JsBlockStorageActor {
 			.map_err(|value| anyhow!("Result is not a `Promise`: {:?}", value))?;
 		let future = JsFuture::from(promise);
 		let result = future.await.map_err(|err| anyhow!("Get block failed: {:?}", err))?;
+		if result.is_null_or_undefined() {
+			return Err(StorageError::NotFound(*cid, anyhow!("Getter returned undefined")));
+		}
 		let bytes = result
 			.dyn_into::<Uint8Array>()
 			.map_err(|err| anyhow!("Failed to convert result to Uint8Array: {:?}", err))?;
-		Ok(Block::new_unchecked(*cid, bytes.to_vec()))
+		Ok(Block::new(*cid, bytes.to_vec()).map_err(|err| anyhow!("Data and Cid are not compatible: {:?}", err))?)
 	}
 
 	async fn set(&self, block: Block<DefaultParams>) -> Result<Cid, StorageError> {

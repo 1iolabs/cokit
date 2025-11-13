@@ -1,5 +1,5 @@
 use crate::{
-	js::{from_js_value, to_js_value, AsyncIteratorStream},
+	js::{from_js_value, to_js_value},
 	JsBlockStorage,
 };
 use cid::Cid;
@@ -26,10 +26,10 @@ impl JsCoMap {
 		self.map().is_empty()
 	}
 
-	pub async fn get(&self, storage: JsBlockStorage, key: JsValue) -> Result<Option<JsValue>, JsValue> {
+	pub async fn get(&self, storage: &JsBlockStorage, key: JsValue) -> Result<Option<JsValue>, JsValue> {
 		let map = self
 			.map()
-			.open(&storage)
+			.open(storage)
 			.await
 			.map_err(|err| format!("open failed: {:?}", err))?;
 		let key: TagValue = from_js_value(key)?;
@@ -40,10 +40,10 @@ impl JsCoMap {
 		})
 	}
 
-	pub async fn contains(&self, storage: JsBlockStorage, key: JsValue) -> Result<bool, JsValue> {
+	pub async fn contains(&self, storage: &JsBlockStorage, key: JsValue) -> Result<bool, JsValue> {
 		let map = self
 			.map()
-			.open(&storage)
+			.open(storage)
 			.await
 			.map_err(|err| format!("open failed: {:?}", err))?;
 		let key: TagValue = from_js_value(key)?;
@@ -53,10 +53,10 @@ impl JsCoMap {
 			.map_err(|err| format!("contains_key failed: {:?}", err))?)
 	}
 
-	pub async fn insert(&mut self, storage: JsBlockStorage, key: JsValue, value: JsValue) -> Result<(), JsValue> {
+	pub async fn insert(&mut self, storage: &JsBlockStorage, key: JsValue, value: JsValue) -> Result<(), JsValue> {
 		let mut map = self
 			.map()
-			.open(&storage)
+			.open(storage)
 			.await
 			.map_err(|err| format!("open failed: {:?}", err))?;
 		let key: TagValue = from_js_value(key)?;
@@ -69,18 +69,21 @@ impl JsCoMap {
 		Ok(())
 	}
 
-	pub fn stream(&self, storage: JsBlockStorage) -> AsyncIteratorStream {
+	pub fn stream(&self, storage: &JsBlockStorage) -> web_sys::ReadableStream {
 		let map = self.map();
-		AsyncIteratorStream::new(async_stream::try_stream! {
+		let storage = storage.clone();
+		let stream = async_stream::try_stream! {
 			let tree = map.open(&storage).await
 				.map_err(|err| format!("open failed: {:?}", err))?;
 			let stream = tree.stream();
 			for await item in stream {
 				let value = item
 					.map_err(|err| format!("read failed: {:?}", err))?;
-				yield to_js_value(&value)?;
+					let js_value = to_js_value(&value)?;
+				yield js_value;
 			}
-		})
+		};
+		wasm_streams::ReadableStream::from_stream(stream).into_raw()
 	}
 }
 impl JsCoMap {
