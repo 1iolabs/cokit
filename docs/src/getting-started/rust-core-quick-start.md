@@ -13,7 +13,14 @@ cargo add co-api --git https://gitlab.1io.com/1io/co-sdk.git
 cargo add serde anyhow
 ```
 
-Add the following to the end of the `./my-todo-core/Cargo.toml` file:
+Add the following two parts to the end of the `./my-todo-core/Cargo.toml` file:
+
+```toml
+[lib]
+crate-type = ["lib", "cdylib"]
+```
+
+We configure the crate-type as [`cdylib`](https://doc.rust-lang.org/reference/linkage.html#r-link.cdylib) to link a `wasm` file.
 
 ```toml
 [features]
