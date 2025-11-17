@@ -248,7 +248,7 @@ Below, you will also find a link to the entire git project.
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 const TODO_CORE_NAME: &str = "todo";
 const TODO_IDENTITY_NAME: &str = "my-todo-identity";
-const TODO_CORE_BINARY: &[u8] = include_bytes!("../../target-wasm/wasm32-unknown-unknown/release/my_todo_core.wasm");
+const TODO_CORE_BINARY: &[u8] = include_bytes!("../../my-todo-core/target-wasm/wasm32-unknown-unknown/release/my_todo_core.wasm");
 
 fn main() {
 	// co
@@ -504,6 +504,7 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 # 	}
 # }
 #
+# /// Render a Todo List element for an active CO membership in the Overview.
 # #[component]
 # pub fn TodoListElement(
 # 	co_id: ReadOnlySignal<CoId>,
@@ -775,7 +776,7 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 # 	}
 # }
 #
-# /// Render Invite Dialog.
+# /// Render Todo List Menu.
 # #[component]
 # fn TodoListMenu(on_delete_all_done: EventHandler<()>) -> Element {
 # 	rsx! {
@@ -797,7 +798,7 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 # 	}
 # }
 #
-# /// Render Invite Dialog.
+# /// Render Nav Bar.
 # #[component]
 # fn NavBar(left: Element, center: Element, right: Element) -> Element {
 # 	rsx! {

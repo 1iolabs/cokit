@@ -2,11 +2,11 @@
 
 CO-kit has a built-in peer-to-peer network stack utilizing [libp2p](https://libp2p.io/).
 
-The peer-to-peer networking is optional.
-Any other protocol like http or file protocols like NFS can be used (with some effort).
-There is no lock-in to a single networking strategy; just describe your data using a core and easily adapt CO-kit to your infrastructure.
+The peer-to-peer networking is optional.  
+Any other protocol (such as http, file protocols like NFS, etc.) can be used (with some effort).  
+There is no lock-in to a single networking strategy; just describe your data using a Core and simply adapt CO-kit to your infrastructure.
 
-The actual networking protocols used can be configured for every CO.
+The actual networking protocols used can be configured for each CO.
 
 ## Network Configuration
 For each [CO](../reference/co.md), a variety of network configurations for connectivity can be made.
@@ -17,7 +17,7 @@ For further information see:
 - [co-core-co: CoAction: NetworkRemove](/crate/co_core_co/enum.CoAction.html#variant.NetworkRemove)
 
 ### DidDiscovery
-Gossipsub-based mesh networking discovery.
+Gossipsub-based mesh networking discovery.  
 This allows to configure explicit DIDs to connect, instead of (by default) all participants in a CO.
 
 For further information see:
