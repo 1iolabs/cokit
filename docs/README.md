@@ -1,6 +1,14 @@
 # CO Documentation
 
-## Run
+## Use
+
+### Install
+
+```shell
+cargo binstall mdbook mdbook-admonish mdbook-toc mdbook-mermaid
+```
+
+### Run
 
 ```shell
 mdbook serve -o
@@ -18,5 +26,5 @@ To link it to view it using `mdbook serve`:
 
 ```shell
 cd docs
-ln -s ../../target/doc ./src/crate
+ln -sn ../../target/doc ./src/crate
 ```
