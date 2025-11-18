@@ -10,7 +10,7 @@ Monotonic counters may change when some conflict resolution takes place.
 ### Core: Design actions to be task-based
 Ideally design actions to be task-based – meaning don't split a single logical task over multiple actions. 
 
-For further information see:
+For further information, see:
 - [Core](../reference/core.md#actions)
 
 ## Don't
@@ -18,5 +18,5 @@ For further information see:
 The Proof-of-Authority Consensus _can_ be configured to allow a minority to reach consensus.  
 While this is technically possible, and may even be useful for certain tasks, it would make things unintuitive to unaware users.
 
-For further information see:
+For further information, see:
 - [Consensus](../reference/consensus.md#proof-of-authority)
