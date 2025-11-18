@@ -10,10 +10,10 @@ For further information see:
 
 You are free to use, modify, and redistribute this software, provided that any distributed changes to the codebase are also made available under the same license.
 
-The AGPLv3 ensures that improvements made to the software, even when used over a network (e.g., in SaaS platforms), must also be shared with the community.
+The AGPLv3 ensures that improvements made to the software, even when used over a network (e.g. in SaaS platforms), must also be shared with the community.
 
 The included [linking exception](../license/license.md#linking-exception) allows you to link the CO-kit SDK with non-AGPL software without your own codebase being subject to the copyleft terms of AGPL. This exception permits broader adoption while maintaining core protections.
 
 ```admonish info
-If you are unsure whether your use case complies with the license or the linking exception, please consult with a legal expert or reach out to the project maintainers for guidance.
+If you are unsure whether your use case complies with the license or the linking exception, please consult with a legal expert, or reach out to the project maintainers for guidance.
 ```
