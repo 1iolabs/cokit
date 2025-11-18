@@ -50,7 +50,7 @@ pub trait BlockStorage: Send + Sync {
 
 The built-in backends are `filesystem` and `memory`.
 
-For further information see:
+For further information, see:
 - [BlockStorage](/crate/co_primitives/trait.BlockStorage.html)
 - [MemoryBlockStorage](/crate/co_storage/struct.MemoryBlockStorage.html)
 - [FsStorage](/crate/co_storage/struct.FsStorage.html)

@@ -28,7 +28,7 @@ Each CO may contain networking settings.
 With these settings the connectivity of the CO can be configured.  
 By default, the [didcontact](../glossary/glossary.md#didcontact) protocol is used for the participants.
 
-For further information see:
+For further information, see:
 - [Network](../reference/network.md#network-configuration)
 
 ### Encryption settings

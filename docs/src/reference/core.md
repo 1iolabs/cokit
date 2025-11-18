@@ -25,7 +25,7 @@ The [`co-api`](/crate/co_api/index.html) provides the [`#[co]`](/crate/co_api/at
 The [`co-api`](/crate/co_api/index.html) package provides advanced data types like maps, sets and lists with serialization support.
 These data types provide content-addressed serialization into blocks.
 
-For further information see:
+For further information, see:
 - [Core Quick Start](../getting-started/rust-core-quick-start.md#1-define-your-data-model-in-a-core)
 - [Serialization](#serialization)
 - [Core API Overview](../usage/api-overview-core.md)
@@ -41,7 +41,7 @@ The more order-independent the actions are, the better the CRDT can handle confl
 Each action sees a consistent state and will be applied as all or nothing.  
 Actions needs to be serializable into content-addressed blocks.
 
-For further information see:
+For further information, see:
 - [Core Quick Start](../getting-started/rust-core-quick-start.md#2-define-how-the-state-can-be-modified)
 - [Serialization](#serialization)
 
@@ -50,7 +50,7 @@ The Core state is the schema's resulting root state from actions that are applie
 
 States needs to be serializable into content-addressed blocks.
 
-For further information see:
+For further information, see:
 - [Serialization](#serialization)
 
 ## Characteristics
@@ -78,7 +78,7 @@ Each reducer operation is one "unit" and, by design, either succeeds completely,
 Permissions are usually implemented in the data model and logic.  
 Therefore, they are inherent to the Cores.
 
-For further information see:
+For further information, see:
 - [Permissions](../reference/permissions.md)
 
 ## Features
@@ -94,7 +94,7 @@ Therefore it can be programmed just like any other reducer operation.
 This approach is highly flexible and leverages the simple-yet-effective characteristics of cores.  
 These migrations can be used for schema and data alike.
 
-For further information see:
+For further information, see:
 - [co-core-co: CoAction: CoreUpgrade](/crate/co_core_co/enum.CoAction.html#variant.CoreUpgrade)
 - [example-counter-upgraded: CounterAction: MigrateFromV1](/crate/example_counter_upgraded/enum.CounterAction.html#variant.MigrateFromV1)
 
@@ -116,72 +116,72 @@ The following is a list of the current built-in Cores:
 #### `co-core-co`
 Root Core that manages the COs Cores, Guards and Participants.
 
-For further information see:
+For further information, see:
 - [`co-core-co`](/crate/co_core_co/index.html)
 
 #### `co-core-keystore`
 Stores credentials.  
 Used internally in the [Local CO](../reference/co.md#local-co) to store DID and PeerID private keys.
 
-For further information see:
+For further information, see:
 - [`co-core-keystore`](/crate/co_core_keystore/index.html)
 
 #### `co-core-membership`
 Stores membership information of COs.  
 Used internally in the [Local CO](../reference/co.md#local-co) to track which COs our identities are a member of.
 
-For further information see:
+For further information, see:
 - [`co-core-membership`](/crate/co_core_membership/index.html)
 
 #### `co-core-board`
 Kanban Board Core.  
 Used internally in the [Local CO](../reference/co.md#local-co) to coordinate pending network requests.
 
-For further information see:
+For further information, see:
 - [`co-core-board`](/crate/co_core_board/index.html)
 
 #### `co-core-storage`
 Stores reference information about existing storage blocks.  
 Used internally in the [Local CO](../reference/co.md#local-co) to free blocks from storage that are no longer referenced.
 
-For further information see:
+For further information, see:
 - [`co-core-storage`](/crate/co_core_storage/index.html)
 
 #### `co-core-poa`
 Proof-of-authority (PoA) Core.  
 Provides PoA [consensus](../reference/consensus.md) for a CO.
 
-For further information see:
+For further information, see:
 - [`co-core-poa`](/crate/co_core_poa/index.html)
 
 #### `co-core-room`
 Messaging Core.  
 Stores messages in Matrix-compatible format.
 
-For further information see:
+For further information, see:
 - [`co-core-room`](/crate/co_core_room/index.html)
 
 #### `co-core-file`
 Stores hierarchical file structures like a file system.
 
-For further information see:
+For further information, see:
 - [`co-core-file`](/crate/co_core_file/index.html)
 
 #### `co-core-data-series`
 Stores data series, counters, and aggregations on the data.
 
-For further information see:
+For further information, see:
 - [`co-core-data-series`](/crate/co_core_data_series/index.html)
 
 #### `co-core-rich-text`
 Stores conflict-free rich text.
 
-For further information see:
+For further information, see:
 - [`co-core-rich-text`](/crate/co_core_rich_text/index.html)
 
 #### `co-core-role`
 Basic role-based access rules.  
 Used as a go-to data model for daily permission management.
 
-For further information see:
+For further information, see:
 - [`co-core-role`](/crate/co_core_role/index.html)

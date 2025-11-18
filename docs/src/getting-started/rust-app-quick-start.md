@@ -17,7 +17,7 @@ Install Dioxus and setup the empty application crate.
 ### Setup Dioxus
 Install the precompiled `dx` tool:
 ```shell
-cargo binstall dioxus-cli
+cargo binstall dioxus-cli@0.6
 ```
 
 You can also head over to [Dioxus](https://dioxuslabs.com/learn/0.6/getting_started/#install-the-dioxus-cli) for further instructions.
@@ -50,7 +50,11 @@ cargo add my-todo-core --path ../my-todo-core
 ```sh
 cargo add futures
 ```
-5. Setup Tailwind
+5. Install the `uuid` crate as a dependency:
+```sh
+cargo add uuid --features v4
+```
+6. Setup Tailwind
 ```sh
 npm init -y
 npm install -D tailwindcss @tailwindcss/cli daisyui
