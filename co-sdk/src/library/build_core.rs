@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context};
 use cid::Cid;
-use co_storage::{unixfs_add_file, BlockStorage, MemoryBlockStorage};
+use co_primitives::unixfs_add_file;
+use co_storage::{BlockStorage, MemoryBlockStorage};
 use serde::Deserialize;
 use std::{
 	fmt::{Debug, Display},

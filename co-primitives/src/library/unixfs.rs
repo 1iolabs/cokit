@@ -1,6 +1,5 @@
-use crate::{BlockStorage, StorageError};
+use crate::{Block, BlockStorage, KnownMultiCodec, MultiCodec, StorageError, StoreParams};
 use cid::Cid;
-use co_primitives::{Block, KnownMultiCodec, MultiCodec, StoreParams};
 use futures::{AsyncRead, AsyncReadExt};
 use rust_unixfs::file::{adder::FileAdder, visit::IdleFileVisit};
 
@@ -134,14 +133,14 @@ where
 
 #[cfg(test)]
 mod tests {
-	use crate::{unixfs_add, unixfs_cat_buffer, MemoryBlockStorage};
+	use crate::{unixfs_add, unixfs_cat_buffer, TestStorage};
 	use cid::Cid;
 	use futures::io::Cursor;
 	use std::str::FromStr;
 
 	#[tokio::test]
 	async fn test_unixfs_add() {
-		let storage = MemoryBlockStorage::default();
+		let storage = TestStorage::default();
 		let mut stream = Cursor::new("hello world test".repeat(64).repeat(1024).as_bytes().to_vec()); // 1024KiB
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();
 		assert_eq!(5, cids.len());
@@ -149,7 +148,7 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_unixfs_add_empty() {
-		let storage = MemoryBlockStorage::default();
+		let storage = TestStorage::default();
 		let mut stream = Cursor::new([]);
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();
 		assert_eq!(1, cids.len());
@@ -158,7 +157,7 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_unixfs_cat_buffer() {
-		let storage = MemoryBlockStorage::default();
+		let storage = TestStorage::default();
 		let data = "hello world test".repeat(64).repeat(1024); // 1024KiB
 		let mut stream = Cursor::new(data.as_bytes().to_vec());
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();

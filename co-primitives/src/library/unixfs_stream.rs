@@ -1,6 +1,5 @@
-use crate::{BlockStorage, StorageError};
+use crate::{BlockStorage, KnownMultiCodec, MultiCodec, StorageError};
 use cid::Cid;
-use co_primitives::{KnownMultiCodec, MultiCodec};
 use core::ops::Range;
 use futures::Stream;
 use rust_unixfs::file::visit::IdleFileVisit;
@@ -70,12 +69,12 @@ where
 
 #[cfg(test)]
 mod tests {
-	use crate::{unixfs_add, unixfs_stream, MemoryBlockStorage};
+	use crate::{unixfs_add, unixfs_stream, TestStorage};
 	use futures::{io::Cursor, TryStreamExt};
 
 	#[tokio::test]
 	async fn test_unixfs_stream() {
-		let storage = MemoryBlockStorage::default();
+		let storage = TestStorage::default();
 		let data = "hello world test".repeat(64).repeat(1024); // 1024KiB
 		let mut stream = Cursor::new(data.as_bytes().to_vec());
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();
@@ -89,7 +88,7 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_unixfs_stream_range() {
-		let storage = MemoryBlockStorage::default();
+		let storage = TestStorage::default();
 		let data = "hello world test".repeat(64).repeat(1024); // 1024KiB
 		let mut stream = Cursor::new(data.as_bytes().to_vec());
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();
@@ -105,7 +104,7 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_unixfs_stream_range_unaligned() {
-		let storage = MemoryBlockStorage::default();
+		let storage = TestStorage::default();
 		let data = "hello world test".repeat(64).repeat(1024); // 1024KiB
 		let mut stream = Cursor::new(data.as_bytes().to_vec());
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();

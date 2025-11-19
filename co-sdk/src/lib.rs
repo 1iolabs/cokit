@@ -23,18 +23,16 @@ pub use co_identity::{
 	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 pub use co_primitives::{
-	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, AbsolutePath,
-	AbsolutePathOwned, AnyBlockStorage, Block, BlockSerializer, BlockStat, BlockStorage, BlockStorageExt,
-	CloneWithBlockStorageSettings, CoId, CoInvite, CoList, CoListIndex, CoListTransaction, CoMap, CoMapTransaction,
-	CoNetwork, CoSet, CoSetTransaction, CoTryStreamExt, Component, Components, CoreName, DagCollection,
-	DagCollectionAsyncExt, DagCollectionExt, Date, DefaultParams, Did, IsDefault, KnownMultiCodec, KnownTag, KnownTags,
-	Link, MultiCodec, MultiCodecError, NodeStream, OptionLink, Path, PathError, PathExt, PathOwned, ReducerAction,
-	RelativePath, RelativePathOwned, StorageError, Tag, Tags,
+	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, unixfs_add, unixfs_add_file,
+	unixfs_cat_buffer, unixfs_encode_buffer, unixfs_stream, AbsolutePath, AbsolutePathOwned, AnyBlockStorage, Block,
+	BlockSerializer, BlockStat, BlockStorage, BlockStorageExt, CloneWithBlockStorageSettings, CoId, CoInvite, CoList,
+	CoListIndex, CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, CoTryStreamExt,
+	Component, Components, CoreName, DagCollection, DagCollectionAsyncExt, DagCollectionExt, Date, DefaultParams, Did,
+	IsDefault, KnownMultiCodec, KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, NodeStream, OptionLink, Path,
+	PathError, PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag, Tags,
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
-pub use co_storage::{
-	unixfs_add, unixfs_add_file, unixfs_cat_buffer, unixfs_encode_buffer, unixfs_stream, BlockStorageContentMapping,
-};
+pub use co_storage::BlockStorageContentMapping;
 pub use library::{
 	build_core::{build_core, crate_repository_path, BuildCoreArtifact},
 	did_key_provider::DidKeyProvider,
