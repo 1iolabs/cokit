@@ -23,11 +23,12 @@ cargo binstall dioxus-cli@0.6
 You can also head over to [Dioxus](https://dioxuslabs.com/learn/0.6/getting_started/#install-the-dioxus-cli) for further instructions.
 
 ### Setup NodeJS
-We need NodeJS to use TailwindCSS within our app.
+We need NodeJS to use TailwindCSS within our app.  
 Head over to [NodeJS](https://nodejs.org/en/download) for further instructions.
 
 ### Application
-We need to setup a new Rust crate for the application. This next command will create a `my-todo-app` folder.
+We need to setup a new Rust crate for the application.  
+This next command will create a `my-todo-app` folder.
 
 ```admonish info
 Ideally, both `my-todo-core` and `my-todo-app` should be located under the same parent folder.
