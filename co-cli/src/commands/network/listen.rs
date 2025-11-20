@@ -72,7 +72,7 @@ pub async fn command(
 			println!("peer-id: {}", peer_id);
 
 			// listeners
-			let listeners = network.listeners().await?;
+			let listeners = network.listeners(true, false).await?;
 			for listener in listeners {
 				println!("listen: {}", listener);
 			}

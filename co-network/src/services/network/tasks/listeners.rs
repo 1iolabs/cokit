@@ -5,24 +5,36 @@ use crate::{
 };
 use futures::channel::oneshot;
 use libp2p::{swarm::SwarmEvent, Multiaddr, Swarm};
-use std::mem::take;
+use std::{collections::BTreeSet, mem::take};
 
 /// Get active listener addresses.
 /// If no listener is present it will wait for the first to come available.
 #[derive(Debug)]
 pub struct ListnersNetworkTask {
-	result: Option<oneshot::Sender<Vec<Multiaddr>>>,
+	local: bool,
+	external: bool,
+	result: Option<oneshot::Sender<BTreeSet<Multiaddr>>>,
 }
 impl ListnersNetworkTask {
-	pub async fn listeners(spawner: &CoNetworkTaskSpawner) -> Result<Vec<Multiaddr>, anyhow::Error> {
+	pub async fn listeners(
+		spawner: &CoNetworkTaskSpawner,
+		local: bool,
+		external: bool,
+	) -> Result<BTreeSet<Multiaddr>, anyhow::Error> {
 		let (tx, rx) = oneshot::channel();
-		spawner.spawn(ListnersNetworkTask { result: Some(tx) })?;
+		spawner.spawn(ListnersNetworkTask { local, external, result: Some(tx) })?;
 		Ok(rx.await?)
 	}
 }
 impl NetworkTask<Behaviour, Context> for ListnersNetworkTask {
-	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
-		let listeners: Vec<Multiaddr> = _swarm.listeners().cloned().collect();
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
+		let mut listeners: BTreeSet<Multiaddr> = BTreeSet::new();
+		if self.local {
+			listeners.extend(swarm.listeners().cloned());
+		}
+		if self.external {
+			listeners.extend(swarm.external_addresses().cloned());
+		}
 		if !listeners.is_empty() {
 			if let Some(result) = take(&mut self.result) {
 				result.send(listeners).ok();
@@ -38,6 +50,9 @@ impl NetworkTask<Behaviour, Context> for ListnersNetworkTask {
 	) -> Option<SwarmEvent<NetworkEvent>> {
 		match &event {
 			SwarmEvent::NewListenAddr { listener_id: _, address: _ } => {
+				self.execute(swarm, context);
+			},
+			SwarmEvent::ExternalAddrConfirmed { address: _ } => {
 				self.execute(swarm, context);
 			},
 			_ => {},

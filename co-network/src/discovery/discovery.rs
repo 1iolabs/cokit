@@ -1,11 +1,11 @@
-use super::did_discovery::{DidDiscovery, DidDiscoveryMessage};
-use crate::{didcomm, types::layer_behaviour::LayerBehaviour};
+use super::did_discovery::{DidDiscovery, DidDiscoveryMessageType};
+use crate::{didcomm, discovery::DiscoverMessage, types::layer_behaviour::LayerBehaviour};
 use anyhow::anyhow;
 use co_identity::{
 	network_did_discovery, DidCommContext, DidCommHeader, DidCommPrivateContext, Identity, IdentityResolver,
 	PrivateIdentity, PrivateIdentityBox,
 };
-use co_primitives::{Did, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous};
+use co_primitives::{from_json_string, Did, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous};
 use derive_more::From;
 use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, StreamExt};
 use libp2p::{
@@ -150,7 +150,7 @@ pub enum DiscoveryEvent {
 
 	/// A resolve request to us via did discovery gossip.
 	/// With an pre-computed DIDComm response.
-	DidResolve { from_peer: PeerId, response: String },
+	DidResolve { from_peer: PeerId, from_endpoints: BTreeSet<Multiaddr>, response: String },
 
 	/// A discovery request.
 	DidDiscovery { discovery: DidDiscovery },
@@ -636,9 +636,9 @@ where
 	fn on_didcomm_event(&mut self, event: &didcomm::Event) {
 		match event {
 			didcomm::Event::Received { peer_id, message } => {
-				let message_type: Option<DidDiscoveryMessage> =
-					DidDiscoveryMessage::try_from(message.header().message_type.clone()).ok();
-				if message_type == Some(DidDiscoveryMessage::Resolve) {
+				let message_type: Option<DidDiscoveryMessageType> =
+					DidDiscoveryMessageType::try_from(message.header().message_type.clone()).ok();
+				if message_type == Some(DidDiscoveryMessageType::Resolve) {
 					self.events.push_back(DiscoveryEvent::ReceivedDidComm {
 						peer_id: peer_id.clone(),
 						header: message.header().to_owned(),
@@ -755,8 +755,24 @@ where
 	/// Other events are returned.
 	fn on_layer_event(&mut self, swarm: &mut Swarm<B>, event: Self::ToLayer) -> Option<Self::ToSwarm> {
 		match event {
-			DiscoveryEvent::DidResolve { from_peer, response } => {
+			DiscoveryEvent::DidResolve { from_peer, from_endpoints, response } => {
+				// dial
+				if !swarm.is_connected(&from_peer) && !from_endpoints.is_empty() {
+					match swarm.dial(
+						DialOpts::peer_id(from_peer)
+							.addresses(from_endpoints.iter().cloned().collect())
+							.build(),
+					) {
+						Ok(_) => {},
+						Err(err) => {
+							tracing::warn!(peer = ?from_peer, endpoints = ?from_endpoints, ?err, "did_discovery-dial-failed");
+						},
+					}
+				}
+
+				// send
 				swarm.behaviour_mut().didcomm_mut().send(&from_peer, response.into());
+
 				None
 			},
 			DiscoveryEvent::DidDiscovery { discovery } => {
@@ -769,8 +785,9 @@ where
 				None
 			},
 			DiscoveryEvent::ReceivedDidComm { peer_id, header } => {
-				let message_type: Option<DidDiscoveryMessage> = DidDiscoveryMessage::from_str(&header.message_type);
-				if message_type == Some(DidDiscoveryMessage::Resolve) {
+				let message_type: Option<DidDiscoveryMessageType> =
+					DidDiscoveryMessageType::from_str(&header.message_type);
+				if message_type == Some(DidDiscoveryMessageType::Resolve) {
 					for request_id in self
 						.all_discovery_diddiscovery()
 						.filter(|(_, discovery)| header.thid.as_ref() == Some(&discovery.message_id))
@@ -868,9 +885,15 @@ async fn did_discovery_receive<R: IdentityResolver>(
 	contexts: Vec<DidCommPrivateContext>,
 ) -> Option<DiscoveryEvent> {
 	let result = didcomm_receive(&data, resolver, contexts.into_iter()).await;
-	if let Some((request_header, _, didcomm_private)) = result {
-		if DidDiscoveryMessage::from_str(&request_header.message_type) == Some(DidDiscoveryMessage::Discover) {
-			match did_discovery_resolve(&didcomm_private, request_from_peer, request_header) {
+	if let Some((request_header, request_body, didcomm_private)) = result {
+		if DidDiscoveryMessageType::from_str(&request_header.message_type) == Some(DidDiscoveryMessageType::Discover) {
+			let body: Option<DiscoverMessage> = from_json_string(&request_body).ok();
+			match did_discovery_resolve(
+				&didcomm_private,
+				request_from_peer,
+				body.map(|body| body.endpoints).unwrap_or_default(),
+				request_header,
+			) {
 				Ok(event) => return Some(event),
 				Err(err) => {
 					tracing::warn!(?err, "discovery-did-resolve-failed");
@@ -885,12 +908,13 @@ async fn did_discovery_receive<R: IdentityResolver>(
 fn did_discovery_resolve(
 	identity: &DidCommPrivateContext,
 	request_from_peer: PeerId,
+	request_from_endpoints: BTreeSet<Multiaddr>,
 	request: DidCommHeader,
 ) -> Result<DiscoveryEvent, anyhow::Error> {
 	let request_from = request.from.ok_or(anyhow!("Missing from header field"))?;
 
 	// response
-	let mut response = DidCommHeader::new(DidDiscoveryMessage::Resolve.to_string());
+	let mut response = DidCommHeader::new(DidDiscoveryMessageType::Resolve.to_string());
 	response.thid = Some(request.id);
 	response.from = Some(identity.did().to_owned());
 	response.to.insert(request_from.clone());
@@ -899,7 +923,11 @@ fn did_discovery_resolve(
 	let message = identity.jws(response, "null")?;
 
 	// result
-	Ok(DiscoveryEvent::DidResolve { from_peer: request_from_peer, response: message })
+	Ok(DiscoveryEvent::DidResolve {
+		from_peer: request_from_peer,
+		from_endpoints: request_from_endpoints,
+		response: message,
+	})
 }
 
 /// Try to receive a message (data) with one of the supplied identities.
@@ -1016,7 +1044,7 @@ mod tests {
 	use super::DiscoveryBehaviour;
 	use crate::{
 		didcomm,
-		discovery::{DidDiscovery, DidDiscoveryMessage, Discovery, DiscoveryState, Event},
+		discovery::{DidDiscovery, DidDiscoveryMessageType, DiscoverMessage, Discovery, DiscoveryState, Event},
 		types::layer_behaviour::{Layer, LayerBehaviour},
 	};
 	use co_identity::{
@@ -1277,9 +1305,16 @@ mod tests {
 			.layer_mut()
 			.connect(
 				peer2.swarm(),
-				vec![DidDiscovery::create(peer2_id, &did2, &did1, None, DidDiscoveryMessage::Discover.to_string())
-					.unwrap()
-					.into()],
+				vec![DidDiscovery::create(
+					peer2_id,
+					&did2,
+					&did1,
+					None,
+					DidDiscoveryMessageType::Discover.to_string(),
+					Some(&DiscoverMessage { endpoints: peer1.swarm().listeners().cloned().collect() }),
+				)
+				.unwrap()
+				.into()],
 			)
 			.unwrap();
 

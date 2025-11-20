@@ -48,8 +48,8 @@ impl NetworkApi {
 
 	/// Get active listener addresses.
 	/// If no listener is present it will wait for the first to come available.
-	pub async fn listeners(&self) -> Result<Vec<Multiaddr>, anyhow::Error> {
-		ListnersNetworkTask::listeners(&self.spawner).await
+	pub async fn listeners(&self, local: bool, external: bool) -> Result<BTreeSet<Multiaddr>, anyhow::Error> {
+		ListnersNetworkTask::listeners(&self.spawner, local, external).await
 	}
 
 	/// Dial and wait for connection to be made or fail.

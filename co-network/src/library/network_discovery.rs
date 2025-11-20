@@ -2,19 +2,22 @@ use crate::{discovery, services::heads::HeadsApi};
 use co_identity::{network_did_discovery, Identity, IdentityResolver, IdentityResolverBox, PrivateIdentity};
 use co_primitives::{Did, Network};
 use futures::{stream::iter, Stream};
-use libp2p::PeerId;
+use libp2p::{Multiaddr, PeerId};
 use std::collections::BTreeSet;
 use tokio_stream::StreamExt;
 
 /// Create Discovery items from networks and participants.
+/// Errors are returned with the stream before continue with the other items.
 ///
-/// Errors are retunred with the stream befor continue with the other items.
+/// # Arguments
+/// - `endpoints` - Our local endpoints others can use to dial us.
 pub fn network_discovery<'a, P>(
 	identity_resolver: Option<&'a IdentityResolverBox>,
 	from_peer: PeerId,
 	from: &'a P,
 	networks: impl IntoIterator<Item = Network> + 'a,
 	identities: impl IntoIterator<Item = Did> + 'a,
+	endpoints: BTreeSet<Multiaddr>,
 ) -> impl Stream<Item = Result<discovery::Discovery, anyhow::Error>> + 'a
 where
 	P: PrivateIdentity + Send + Sync + 'static,
@@ -26,7 +29,7 @@ where
 		for await network in iter(networks.into_iter().map(Ok)).merge(identities_networks(identity_resolver, identities)) {
 			match network {
 				Ok(network) => {
-					for await discovery_result in network_discovery_one(identity_resolver, from_peer, from, network) {
+					for await discovery_result in network_discovery_one(identity_resolver, from_peer, from, network, &endpoints) {
 						match discovery_result {
 							Ok(discovery) => {
 								if seen.insert(discovery.clone()) {
@@ -74,16 +77,18 @@ pub fn identities_networks<'a>(
 	}
 }
 
-fn network_discovery_one<'a, P>(
+fn network_discovery_one<'a, 'b, P>(
 	identity_resolver: Option<&'a IdentityResolverBox>,
 	from_peer: PeerId,
 	from: &'a P,
 	network: Network,
-) -> impl Stream<Item = Result<discovery::Discovery, anyhow::Error>> + 'a
+	endpoints: &'b BTreeSet<Multiaddr>,
+) -> impl Stream<Item = Result<discovery::Discovery, anyhow::Error>> + use<'a, 'b, P>
 where
 	P: PrivateIdentity + Send + Sync + 'static,
 {
 	async_stream::stream! {
+		let mut body = None;
 		match network {
 			Network::CoHeads(value) =>
 			{
@@ -98,12 +103,18 @@ where
 			Network::DidDiscovery(value) => {
 				if let Some(identity_resolver) = &identity_resolver {
 					let identity = identity_resolver.resolve(&value.did).await?;
+					if body.is_none() {
+						body = Some(discovery::DiscoverMessage {
+							endpoints: endpoints.clone(),
+						});
+					}
 					yield discovery::DidDiscovery::create(
 						from_peer,
 						from,
 						&identity,
 						Some(value),
-						discovery::DidDiscoveryMessage::Discover.to_string(),
+						discovery::DidDiscoveryMessageType::Discover.to_string(),
+						body.as_ref(),
 					)
 						.map(|item| discovery::Discovery::DidDiscovery(item));
 				}

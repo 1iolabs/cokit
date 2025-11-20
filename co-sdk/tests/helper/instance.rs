@@ -58,13 +58,19 @@ impl Instances {
 		//  because of localhost we need to explicitly dial (no mDNS on localhost).
 		if dail_peer2_to_peer1 {
 			network2
-				.dial(Some(network1.local_peer_id()), network1.listeners().await.unwrap())
+				.dial(
+					Some(network1.local_peer_id()),
+					network1.listeners(true, false).await.unwrap().into_iter().collect(),
+				)
 				.await
 				.unwrap();
 		}
 		if dail_peer1_to_peer2 {
 			network1
-				.dial(Some(network2.local_peer_id()), network2.listeners().await.unwrap())
+				.dial(
+					Some(network2.local_peer_id()),
+					network2.listeners(true, false).await.unwrap().into_iter().collect(),
+				)
 				.await
 				.unwrap();
 		}

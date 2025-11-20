@@ -7,7 +7,7 @@ use crate::{
 			actor::ConnectionsContext,
 			ConnectionState,
 		},
-		network::DiscoveryConnectNetworkTask,
+		network::{DiscoveryConnectNetworkTask, ListnersNetworkTask},
 	},
 };
 use co_actor::{Actions, Epic};
@@ -54,9 +54,12 @@ fn connect(
 	network: Network,
 ) -> impl Stream<Item = Result<ConnectionAction, anyhow::Error>> + 'static {
 	async_stream::try_stream! {
+		// endpoints
+		let endpoints = ListnersNetworkTask::listeners(&context.network, true, true).await?;
+
 		// discovery
 		let from_identity = context.private_identity_resolver.resolve_private(&from).await?;
-		let discovery = network_discovery(Some(&context.identity_resolver), context.network.local_peer_id(), &from_identity, [network.clone()], []).try_collect().await?;
+		let discovery = network_discovery(Some(&context.identity_resolver), context.network.local_peer_id(), &from_identity, [network.clone()], [], endpoints).try_collect().await?;
 
 		// connect
 		let events = DiscoveryConnectNetworkTask::discover(context.network.clone(), discovery);
