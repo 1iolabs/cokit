@@ -5,11 +5,26 @@ use std::{collections::BTreeSet, time::Duration};
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct NetworkSettings {
+	/// Force to create a new [`PeerId`] on network startup.
 	pub force_new_peer_id: bool,
+
+	/// The endpoint to listen to.
 	pub listen: Multiaddr,
+
+	/// The bootstrap peers to increase connectivity.
 	pub bootstrap: BTreeSet<Multiaddr>,
+
+	/// Wherther to enable a limited relay server.
+	/// This relay can be used by other peers for holepunching.
 	pub relay: bool,
+
+	/// The default keep alive for connections.
 	pub keep_alive: Duration,
+
+	/// Number of peers to keep connected.
+	/// More peers will be discoverd using bootstrap when the count falls below this number.
+	/// This is optional and if it is set to [`None`] all connections are only on demand.
+	pub peers_threshold: Option<u32>,
 }
 impl Default for NetworkSettings {
 	fn default() -> Self {
@@ -19,6 +34,7 @@ impl Default for NetworkSettings {
 			bootstrap: Self::default_bootstrap(),
 			relay: false,
 			keep_alive: Duration::from_secs(30),
+			peers_threshold: Some(10),
 		}
 	}
 }

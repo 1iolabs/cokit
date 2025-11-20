@@ -1,6 +1,6 @@
 use co_primitives::{CoId, Did, Network};
 use derive_more::{From, TryInto};
-use libp2p::PeerId;
+use libp2p::{Multiaddr, PeerId};
 use std::{collections::BTreeSet, time::Instant};
 
 #[derive(Debug, Clone, From, TryInto, PartialEq, Eq, PartialOrd, Ord)]
@@ -57,6 +57,22 @@ pub enum ConnectionAction {
 
 	/// A connection to a peer has been closed.
 	PeerConnectionClosed(PeerConnectionClosedAction),
+
+	/// A connection to a peer has been established.
+	PeerConnectionEstablished(PeerConnectionEstablishedAction),
+
+	/// A connection to a peer has been closed.
+	NewListenAddr(PeerConnectionClosedAction),
+
+	/// Try to dial a peer.
+	Dial(DialAction),
+
+	/// Dial a peer has been completed.
+	DialCompleted(DialCompletedAction),
+
+	/// Notify about insufficent peers.
+	/// That causes to increase connectivity by dailing bootstrap peers.
+	InsufficentPeers,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -163,5 +179,18 @@ pub struct PeerRelateCoAction {
 pub struct PeerRelateDidAction {
 	pub peer_id: PeerId,
 	pub did: Did,
+	pub time: Instant,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DialAction {
+	pub peer_id: PeerId,
+	pub endpoints: BTreeSet<Multiaddr>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DialCompletedAction {
+	pub peer_id: PeerId,
+	pub ok: bool,
 	pub time: Instant,
 }

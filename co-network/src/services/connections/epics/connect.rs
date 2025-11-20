@@ -1,4 +1,5 @@
 use crate::{
+	discovery,
 	library::network_discovery::network_discovery,
 	services::{
 		connections::{
@@ -8,12 +9,12 @@ use crate::{
 		},
 		network::DiscoveryConnectNetworkTask,
 	},
-	types::network_task::NetworkTaskSpawner,
 };
 use co_actor::{Actions, Epic};
 use co_identity::PrivateIdentityResolver;
 use co_primitives::{Did, Network};
 use futures::{Stream, StreamExt, TryStreamExt};
+use std::collections::BTreeSet;
 
 pub struct ConnectEpic();
 impl ConnectEpic {
@@ -58,14 +59,36 @@ fn connect(
 		let discovery = network_discovery(Some(&context.identity_resolver), context.network.local_peer_id(), &from_identity, [network.clone()], []).try_collect().await?;
 
 		// connect
-		let (task, peers) = DiscoveryConnectNetworkTask::new(discovery);
-
-		// spawn
-		context.network.spawn(task)?;
+		let events = DiscoveryConnectNetworkTask::discover(context.network.clone(), discovery);
 
 		// yield
-		for await peer in peers {
-			yield ConnectionAction::Connected(ConnectedAction { network: network.clone(), result: peer.map_err(|err| err.to_string()) });
+		let mut peers = BTreeSet::new();
+		for await event_result in events {
+			let event = match event_result {
+				Ok(event) => event,
+				Err(err) => {
+					yield ConnectionAction::Connected(ConnectedAction { network: network.clone(), result: Err(err.to_string()) });
+					break;
+				},
+			};
+			match event {
+				discovery::Event::Connected { id: _, peer } => {
+					if peers.insert(peer) {
+						yield ConnectionAction::Connected(ConnectedAction { network: network.clone(), result: Ok(peers.clone()) });
+					}
+				},
+				discovery::Event::Disconnected { id: _, peer, } => {
+					if peers.remove(&peer) {
+						yield ConnectionAction::Connected(ConnectedAction { network: network.clone(), result: Ok(peers.clone()) });
+					}
+				},
+				discovery::Event::InsufficentPeers { id: _,  } => {
+					yield ConnectionAction::InsufficentPeers;
+				},
+				discovery::Event::Timeout { id: _,  } => {
+					yield ConnectionAction::Disconnected(DisconnectedAction { network: network.clone(), reason: DisconnectReason::Timeout });
+				},
+			}
 		}
 	}
 }

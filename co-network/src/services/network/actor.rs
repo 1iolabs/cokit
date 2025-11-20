@@ -43,9 +43,9 @@ impl Actor for Network {
 		// network
 		let network_peer_id = PeerId::from(initialize.keypair.public());
 		let mut network_config =
-			Libp2pNetworkConfig::from_keypair(initialize.settings.listen, initialize.keypair.clone());
+			Libp2pNetworkConfig::from_keypair(initialize.settings.listen.clone(), initialize.keypair.clone());
 		network_config.mode = if initialize.settings.relay { NetworkMode::Full } else { NetworkMode::Light };
-		network_config.bootstrap = initialize.settings.bootstrap;
+		network_config.bootstrap = initialize.settings.bootstrap.clone();
 		let network = Libp2pNetwork::new(
 			initialize.identifier.clone(),
 			network_config,
@@ -62,7 +62,7 @@ impl Actor for Network {
 			tasks: initialize.tasks.clone(),
 			identity_resolver: initialize.identity_resolver.clone(),
 			private_identity_resolver: initialize.private_identity_resolver.clone(),
-			keep_alive: initialize.settings.keep_alive,
+			settings: initialize.settings.clone(),
 			network: spawner.clone(),
 			network_resolver: initialize.network_resolver,
 		};

@@ -3,9 +3,10 @@ use super::action::{
 	NetworkResolveAction, NetworkResolvedAction, PeerConnectionClosedAction, PeerConnectionEstablishedAction,
 	PeerRelateCoAction, PeerRelateDidAction, PeersChangedAction, ReleaseAction, ReleasedAction, UseAction,
 };
+use crate::connections::{DialAction, DialCompletedAction};
 use co_actor::Reducer;
 use co_primitives::{CoId, Did, Network, NetworkDidDiscovery, NetworkPeer};
-use libp2p::PeerId;
+use libp2p::{Multiaddr, PeerId};
 use std::{
 	collections::{BTreeSet, HashMap},
 	time::{Duration, Instant},
@@ -35,12 +36,36 @@ pub struct PeerConnection {
 	pub network: BTreeSet<Network>,
 }
 
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct BootstrapPeer {
+	pub peer_id: PeerId,
+	pub endpoints: BTreeSet<Multiaddr>,
+	pub failed_at: Option<Instant>,
+	pub failed: u32,
+	pub connecting: bool,
+}
+impl BootstrapPeer {
+	pub fn new(peer_id: PeerId, endpoints: BTreeSet<Multiaddr>) -> Self {
+		Self { peer_id, endpoints, failed: 0, connecting: false, failed_at: None }
+	}
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct ConnectionState {
 	pub keep_alive: Duration,
+
+	/// Tracks currently used cos and relates them with connectivity networks.
 	pub co: HashMap<CoId, CoConnection>,
+
+	/// Tracks currently used connectivity networks and relates them with cos and peers.
 	pub networks: HashMap<Network, NetworkConnection>,
+
+	/// Tracks currently connected peers and relates them with cos and networks.
 	pub peers: HashMap<PeerId, PeerConnection>,
+
+	/// Configured bootstrap peers.
+	pub bootstrap: HashMap<PeerId, BootstrapPeer>,
 }
 impl ConnectionState {
 	/// Find all PeerId's for an CO.
@@ -106,6 +131,12 @@ impl Reducer<ConnectionAction> for ConnectionState {
 			},
 			ConnectionAction::PeerRelateCo(action) => {
 				reduce_peer_relate_co(state, &mut actions, action);
+			},
+			ConnectionAction::Dial(action) => {
+				reduce_dial(state, &mut actions, action);
+			},
+			ConnectionAction::DialCompleted(action) => {
+				reduce_dial_completed(state, &mut actions, action);
 			},
 			_ => {},
 		}
@@ -550,6 +581,29 @@ fn reduce_peer_relate_co(
 	}
 }
 
+fn reduce_dial(state: &mut ConnectionState, _actions: &mut Vec<ConnectionAction>, action: &DialAction) {
+	if let Some(bootstrap) = state.bootstrap.get_mut(&action.peer_id) {
+		bootstrap.connecting = true;
+	}
+}
+
+fn reduce_dial_completed(
+	state: &mut ConnectionState,
+	_actions: &mut Vec<ConnectionAction>,
+	action: &DialCompletedAction,
+) {
+	if let Some(bootstrap) = state.bootstrap.get_mut(&action.peer_id) {
+		bootstrap.connecting = false;
+		if action.ok {
+			bootstrap.failed_at = None;
+			bootstrap.failed = 0;
+		} else {
+			bootstrap.failed_at = Some(action.time);
+			bootstrap.failed += 1;
+		}
+	}
+}
+
 // /// Validate all direct connections to a peer.
 // fn peer_connect(state: &mut ConnectionState, actions: &mut Vec<ConnectionAction>, time: &Instant, peer_id: PeerId) {
 // 	let mut networks_connected = BTreeSet::new();
@@ -711,7 +765,10 @@ fn reference_network_connection(
 
 #[cfg(test)]
 mod tests {
-	use crate::connections::{ConnectAction, ConnectionAction, ConnectionState, UseAction};
+	use crate::connections::{
+		ConnectAction, ConnectionAction, ConnectionState, PeerConnectionEstablishedAction, PeerRelateDidAction,
+		UseAction,
+	};
 	use co_actor::Reducer;
 	use co_primitives::{Network, NetworkPeer, NetworkRendezvous};
 	use libp2p::PeerId;
@@ -762,5 +819,33 @@ mod tests {
 			.into(),
 		);
 		assert_eq!(result, vec![]); // already connecting
+	}
+
+	#[test]
+	fn test_peer_relate_did() {
+		let mut state = ConnectionState::default();
+		let peer_id = PeerId::random();
+		let did = "did:local:test".to_string();
+
+		// add peer as connected
+		let action = ConnectionAction::PeerConnectionEstablished(PeerConnectionEstablishedAction {
+			peer_id,
+			time: Instant::now(),
+		});
+		state.reduce(action);
+		assert!(state.peers.contains_key(&peer_id));
+
+		// relate
+		let action =
+			ConnectionAction::PeerRelateDid(PeerRelateDidAction { peer_id, did: did.clone(), time: Instant::now() });
+		state.reduce(action);
+		assert!(state.peers[&peer_id]
+			.network
+			.iter()
+			.find(|network| match network {
+				Network::DidDiscovery(did_discovery) if did_discovery.did == did => true,
+				_ => false,
+			})
+			.is_some());
 	}
 }

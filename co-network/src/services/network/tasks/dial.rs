@@ -27,7 +27,10 @@ impl DialNetworkTask {
 		let opts = match peer_id {
 			Some(peer_id) => DialOpts::peer_id(peer_id).addresses(addresses).build(),
 			None => {
-				let address = addresses.into_iter().next().ok_or(anyhow!("Expected exactly one address"))?;
+				let address = addresses
+					.into_iter()
+					.next()
+					.ok_or(anyhow!("Expected exactly one address if no peer is specified"))?;
 				DialOpts::unknown_peer_id().address(address).build()
 			},
 		};

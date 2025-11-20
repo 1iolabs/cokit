@@ -31,11 +31,9 @@ impl NetworkResolver for CoNetworkResolver {
 		let membership = shared_membership(&local_co, &id, None)
 			.await?
 			.ok_or(anyhow!("No membership found: {:?}", id))?;
-		let skip_co = match membership.membership_state {
-			MembershipState::Join => true,
-			MembershipState::Invite => true,
-			MembershipState::Inactive => true,
-			_ => false,
+		let use_co = match membership.membership_state {
+			MembershipState::Join | MembershipState::Invite | MembershipState::Inactive => false,
+			MembershipState::Active | _ => true,
 		};
 
 		// this may gets called while reducer is being initialized
@@ -43,7 +41,7 @@ impl NetworkResolver for CoNetworkResolver {
 		//  - we skip the lookup while the item is created and fallback or error early
 		//  - we want to use the storage without networking
 		//  also we want to ignore storage creation errors and fallback to other strategies (invite)
-		if skip_co {
+		if use_co {
 			let reducers = self.context.inner.reducers_control();
 			if let Ok(Some(reducer_storage)) = reducers
 				.storage(id.clone(), ReducerOptions::default().with_no_pending_create())

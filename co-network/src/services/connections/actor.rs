@@ -3,17 +3,23 @@ use super::{
 	epics::epic,
 	ConnectionMessage, ConnectionState,
 };
-use crate::services::{connections::resolve::DynamicNetworkResolver, network::CoNetworkTaskSpawner};
+use crate::{
+	services::{
+		connections::{library::bootstrap_from_multiaddrs::bootstrap_from_multiaddrs, resolve::DynamicNetworkResolver},
+		network::CoNetworkTaskSpawner,
+	},
+	NetworkSettings,
+};
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer, ResponseStreams, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
 use co_primitives::{CoId, Tags};
-use std::{collections::BTreeMap, time::Duration};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 pub struct ConnectionsContext {
 	pub tasks: TaskSpawner,
-	pub keep_alive: Duration,
+	pub settings: NetworkSettings,
 	pub network: CoNetworkTaskSpawner,
 	pub identity_resolver: IdentityResolverBox,
 	pub private_identity_resolver: PrivateIdentityResolverBox,
@@ -48,10 +54,11 @@ impl Actor for Connections {
 	) -> Result<Self::State, ActorError> {
 		Ok(State {
 			state: ConnectionState {
-				keep_alive: self.context.keep_alive,
+				keep_alive: self.context.settings.keep_alive,
 				co: Default::default(),
 				networks: Default::default(),
 				peers: Default::default(),
+				bootstrap: bootstrap_from_multiaddrs(self.context.settings.bootstrap.clone())?,
 			},
 			epic: EpicRuntime::new(epic(tags.clone()), |err| {
 				tracing::error!(?err, "connection-epic-error");

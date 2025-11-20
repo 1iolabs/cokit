@@ -131,6 +131,9 @@ pub enum Event {
 	/// A peer to be discovered has disconnected.
 	Disconnected { id: u64, peer: PeerId },
 
+	/// A discovery connect has infufficent peers to amke a connection.
+	InsufficentPeers { id: u64 },
+
 	/// A discovery connect has timedout.
 	/// TODO: Does it always mean it has failed?
 	Timeout { id: u64 },
@@ -441,6 +444,8 @@ where
 						Err(gossipsub::PublishError::InsufficientPeers) => {
 							tracing::trace!(network = ?item.network, ?topic, "discovery-did-pending-insufficient-peers");
 							self.pending_discovery.push_back((request.id, topic_hash, item.clone()));
+							self.events
+								.push_back(DiscoveryEvent::GenerateEvent(Event::InsufficentPeers { id: request.id }));
 						},
 
 						// forward other errors
