@@ -58,12 +58,6 @@ pub enum ConnectionAction {
 	/// A connection to a peer has been closed.
 	PeerConnectionClosed(PeerConnectionClosedAction),
 
-	/// A connection to a peer has been established.
-	PeerConnectionEstablished(PeerConnectionEstablishedAction),
-
-	/// A connection to a peer has been closed.
-	NewListenAddr(PeerConnectionClosedAction),
-
 	/// Try to dial a peer.
 	Dial(DialAction),
 
