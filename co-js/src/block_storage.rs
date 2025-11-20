@@ -1,19 +1,25 @@
-use crate::actor::JsLocalTaskSpawner;
+use crate::{
+	actor::JsLocalTaskSpawner,
+	js::{from_js_value, to_js_value},
+};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{ActorError, ActorHandle, LocalActor, Response};
-use co_primitives::{Block, BlockStorage, DefaultParams, StorageError};
+use co_primitives::{from_cbor, Block, BlockStorage, DefaultParams, StorageError};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::js_sys::{Function, Promise, Uint8Array};
+use web_sys::{
+	console,
+	js_sys::{Function, Promise, Uint8Array},
+};
 
 #[wasm_bindgen]
 extern "C" {
-	#[wasm_bindgen(typescript_type = "(cid: UInt8Array) => UInt8Array | undefined")]
+	#[wasm_bindgen(typescript_type = "(cid: Uint8Array) => Uint8Array | undefined")]
 	pub type JsBlockStorageGet;
 
-	#[wasm_bindgen(typescript_type = "(cid: UInt8Array, data: UInt8Array) => void")]
+	#[wasm_bindgen(typescript_type = "(cid: Uint8Array, data: Uint8Array) => void")]
 	pub type JsBlockStorageSet;
 }
 
@@ -71,12 +77,12 @@ enum JsBlockStorageMessage {
 #[derive(Debug)]
 struct JsBlockStorageActor {
 	/// Typescript: ```typescript
-	/// (cid: UInt8Array) => UInt8Array | undefined
+	/// (cid: Uint8Array) => Uint8Array | undefined
 	/// ```
 	get: Function,
 
 	/// Typescript: ```typescript
-	/// (cid: UInt8Array, data: UInt8Array) => void
+	/// (cid: Uint8Array, data: Uint8Array) => void
 	/// ```
 	set: Function,
 }
@@ -114,8 +120,16 @@ impl JsBlockStorageActor {
 			.dyn_into::<Promise>()
 			.map_err(|value| anyhow!("Result is not a `Promise`: {:?}", value))?;
 		let future = JsFuture::from(promise);
-		let _result = future.await.map_err(|err| anyhow!("Set block failed: {:?}", err))?;
-		Ok(cid)
+		let result = future.await.map_err(|err| anyhow!("Set block failed: {:?}", err))?;
+		console::log_1(&result);
+		let cid_bytes = result
+			.dyn_into::<Uint8Array>()
+			.map_err(|err| anyhow!("Convert storage set result JsValue to Cid failed: {:?}", err.as_string()))?
+			.to_vec();
+		let storage_set_cid =
+			Cid::try_from(cid_bytes).map_err(|err| anyhow!("Get Cid from bytes failed: {}", err.to_string()))?;
+		console::log_2(&"cid string".into(), &to_js_value(&storage_set_cid.to_string()).expect("msg"));
+		Ok(storage_set_cid)
 	}
 }
 impl LocalActor for JsBlockStorageActor {

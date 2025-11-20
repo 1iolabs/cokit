@@ -9,7 +9,8 @@ use crate::{
 use anyhow::anyhow;
 use co_core_file::{FileAction, FileNode, Node};
 use co_primitives::{tags, AbsolutePath, PathExt};
-use co_sdk::{unixfs_add_file, CoReducerFactory, Identity};
+use co_sdk::{CoReducerFactory, Identity};
+use co_storage::unixfs_add_file;
 use exitcode::ExitCode;
 use std::{os::unix::fs::MetadataExt, time::UNIX_EPOCH};
 

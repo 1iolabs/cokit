@@ -1916,7 +1916,6 @@ dependencies = [
  "cid 0.11.1",
  "co-actor",
  "co-primitives",
- "co-storage",
  "futures",
  "ipld-core",
  "multihash-codetable",

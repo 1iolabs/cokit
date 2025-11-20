@@ -17,7 +17,6 @@ pub use library::{
 	node_reader::{node_reader, NodeReaderError},
 	node_stream::NodeStream,
 	unixfs::{unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer},
-	unixfs_add_file::unixfs_add_file,
 	unixfs_stream::unixfs_stream,
 };
 pub use types::{

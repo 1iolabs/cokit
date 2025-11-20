@@ -10,7 +10,7 @@ pub use crypto::{
 	block::{Algorithm, AlgorithmError},
 	secret::Secret,
 };
-pub use library::{node_reader::node_reader, tmp_dir::TmpDir};
+pub use library::{node_reader::node_reader, tmp_dir::TmpDir, unixfs_add_file::unixfs_add_file};
 pub use storage::{
 	change::{BlockStorageChange, ChangeBlockStorage},
 	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping, EncryptionReferenceMode},

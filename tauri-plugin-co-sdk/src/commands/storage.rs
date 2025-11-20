@@ -34,6 +34,7 @@ pub(crate) async fn storage_set(
 	session: SessionId,
 	data: Vec<u8>,
 ) -> Result<Response, InvokeError> {
+	tracing::info!("tauri command storage set: \n\tSession: {:#?}\n\tdata: {:#?}", session, data,);
 	let block = Block::<DefaultParams>::new_data(KnownMultiCodec::Raw, data);
 	let cid = actor_handle
 		.request(|r| ApplicationActorMessage::StorageSet(session, block, r))

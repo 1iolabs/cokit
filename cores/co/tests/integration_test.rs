@@ -1,8 +1,7 @@
 use co_api::{BlockSerializer, ReducerAction, Tags};
 use co_core_co::{Co, CoAction};
-use co_primitives::unixfs_add_file;
 use co_runtime::{RuntimeContext, RuntimePool};
-use co_storage::{BlockStorage, MemoryBlockStorage};
+use co_storage::{unixfs_add_file, BlockStorage, MemoryBlockStorage};
 use std::process::Command;
 
 #[tokio::test]
