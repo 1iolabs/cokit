@@ -13,7 +13,7 @@ use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver
 use co_primitives::DefaultParams;
 use futures::{pin_mut, Stream, StreamExt};
 use libp2p::{
-	dcutr, gossipsub, identify,
+	autonat, dcutr, gossipsub, identify,
 	identity::Keypair,
 	mdns::{self, tokio::Behaviour as MdnsBehaviour},
 	noise, ping, relay,
@@ -89,6 +89,9 @@ impl Libp2pNetwork {
 		// didcomm
 		let didcomm = didcomm::Behaviour::new(resolver.clone(), private_resolver, didcomm::Config { auto_dail: false });
 
+		// autonat
+		let autonat = autonat::Behaviour::new(local_peer_id, autonat::Config::default());
+
 		// swarm
 		let mut swarm = SwarmBuilder::with_existing_identity(config.keypair.clone())
 			.with_tokio()
@@ -107,6 +110,7 @@ impl Libp2pNetwork {
 				dcutr: dcutr::Behaviour::new(local_peer_id.clone()),
 				relay_server: relay_server.into(),
 				relay_client,
+				autonat,
 			})?
 			.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
 			.build();
@@ -119,6 +123,7 @@ impl Libp2pNetwork {
 			}
 			swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![bootstrap.clone()]).build())?;
 			swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+			swarm.behaviour_mut().autonat.add_server(peer_id, None);
 		}
 
 		// context
@@ -276,6 +281,7 @@ pub enum NetworkEvent {
 	Dcutr(dcutr::Event),
 	RelayServer(relay::Event),
 	RelayClient(relay::client::Event),
+	Autonat(autonat::Event),
 }
 // impl From<BehaviourEvent> for NetworkEvent {
 // 	fn from(value: BehaviourEvent) -> Self {
@@ -311,6 +317,7 @@ pub struct Behaviour {
 	pub dcutr: dcutr::Behaviour,
 	pub relay_server: Toggle<relay::Behaviour>,
 	pub relay_client: relay::client::Behaviour,
+	pub autonat: autonat::Behaviour,
 }
 impl discovery::DiscoveryBehaviour for Behaviour {
 	fn rendezvous_client_mut(&mut self) -> Option<&mut libp2p::rendezvous::client::Behaviour> {
