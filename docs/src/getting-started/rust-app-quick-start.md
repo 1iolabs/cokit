@@ -819,12 +819,17 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 
 
 ### Tailwind
-`tailwind.css`:
+`/tailwind.css`:
 ```css
 @import "tailwindcss";
 @source "./src/**/*.{rs,html,css}";
 @plugin "daisyui";
 ```
+
+### Run the App
+
+Serve your App by following the instructions in the `README.md` file in your `my-todo-app` folder.
+
 
 ### Full Example Project
 
