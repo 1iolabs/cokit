@@ -346,7 +346,7 @@ where
 			}
 
 			// unsubscribe
-			swarm.behaviour_mut().gossipsub_mut().unsubscribe(&topic)?;
+			swarm.behaviour_mut().gossipsub_mut().unsubscribe(&topic);
 		}
 
 		// result
@@ -441,8 +441,8 @@ where
 						},
 
 						// we try again when a peer subscribes
-						Err(gossipsub::PublishError::InsufficientPeers) => {
-							tracing::trace!(network = ?item.network, ?topic, "discovery-did-pending-insufficient-peers");
+						Err(gossipsub::PublishError::NoPeersSubscribedToTopic) => {
+							tracing::trace!(network = ?item.network, ?topic, "discovery-did-pending-no-peers-subscribed-to-topic");
 							self.pending_discovery.push_back((request.id, topic_hash, item.clone()));
 							self.events
 								.push_back(DiscoveryEvent::GenerateEvent(Event::InsufficentPeers { id: request.id }));

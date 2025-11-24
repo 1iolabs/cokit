@@ -148,8 +148,8 @@ impl UnsubscribeGossipTask {
 impl NetworkTask<Behaviour, Context> for UnsubscribeGossipTask {
 	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
 		if let Some(result) = take(&mut self.result) {
-			let subscribe_result = swarm.behaviour_mut().gossipsub.unsubscribe(&self.topic);
-			result.send(subscribe_result.map_err(anyhow::Error::from)).ok();
+			let unsubscribe_result = swarm.behaviour_mut().gossipsub.unsubscribe(&self.topic);
+			result.send(Ok(unsubscribe_result)).ok();
 		}
 	}
 }
