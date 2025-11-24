@@ -17,10 +17,12 @@ use libp2p::{
 	identity::Keypair,
 	mdns::{self, tokio::Behaviour as MdnsBehaviour},
 	noise, ping, relay,
-	swarm::{behaviour::toggle::Toggle, dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
+	swarm::{behaviour::toggle::Toggle, NetworkBehaviour, SwarmEvent},
 	yamux, Multiaddr, PeerId, Swarm, SwarmBuilder,
 };
 use libp2p_bitswap::{Bitswap, BitswapEvent};
+use multiaddr::Protocol;
+use rand::rngs::OsRng;
 use std::{collections::BTreeSet, task::Poll, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
@@ -90,7 +92,11 @@ impl Libp2pNetwork {
 		let didcomm = didcomm::Behaviour::new(resolver.clone(), private_resolver, didcomm::Config { auto_dail: false });
 
 		// autonat
-		let autonat = autonat::Behaviour::new(local_peer_id, autonat::Config::default());
+		let autonat_server = match config.mode {
+			NetworkMode::Full => Some(autonat::v2::server::Behaviour::new(OsRng)),
+			_ => None,
+		};
+		let autonat_client = autonat::v2::client::Behaviour::new(OsRng, autonat::v2::client::Config::default());
 
 		// swarm
 		let mut swarm = SwarmBuilder::with_existing_identity(config.keypair.clone())
@@ -110,7 +116,8 @@ impl Libp2pNetwork {
 				dcutr: dcutr::Behaviour::new(local_peer_id.clone()),
 				relay_server: relay_server.into(),
 				relay_client,
-				autonat,
+				autonat_server: autonat_server.into(),
+				autonat_client,
 			})?
 			.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
 			.build();
@@ -121,9 +128,18 @@ impl Libp2pNetwork {
 			if local_peer_id == peer_id {
 				continue;
 			}
-			swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![bootstrap.clone()]).build())?;
+
+			// listen on relay
+			match config.mode {
+				NetworkMode::Full => {},
+				NetworkMode::Light => {
+					swarm.listen_on(bootstrap.clone().with(Protocol::P2pCircuit)).ok();
+				},
+			}
+			// swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![bootstrap.clone()]).build())?;
+
+			// use as explicent gossip peer
 			swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
-			swarm.behaviour_mut().autonat.add_server(peer_id, None);
 		}
 
 		// context
@@ -281,7 +297,8 @@ pub enum NetworkEvent {
 	Dcutr(dcutr::Event),
 	RelayServer(relay::Event),
 	RelayClient(relay::client::Event),
-	Autonat(autonat::Event),
+	AutonatServer(autonat::v2::server::Event),
+	AutonatClient(autonat::v2::client::Event),
 }
 // impl From<BehaviourEvent> for NetworkEvent {
 // 	fn from(value: BehaviourEvent) -> Self {
@@ -317,7 +334,8 @@ pub struct Behaviour {
 	pub dcutr: dcutr::Behaviour,
 	pub relay_server: Toggle<relay::Behaviour>,
 	pub relay_client: relay::client::Behaviour,
-	pub autonat: autonat::Behaviour,
+	pub autonat_server: Toggle<autonat::v2::server::Behaviour>,
+	pub autonat_client: autonat::v2::client::Behaviour,
 }
 impl discovery::DiscoveryBehaviour for Behaviour {
 	fn rendezvous_client_mut(&mut self) -> Option<&mut libp2p::rendezvous::client::Behaviour> {

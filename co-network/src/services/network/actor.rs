@@ -5,10 +5,7 @@ use crate::{
 	services::{
 		connections::{Connections, ConnectionsContext, DynamicNetworkResolver},
 		heads::{HeadsActor, HeadsApi, HeadsContext},
-		network::{
-			tasks::relay_listen::RelayListenTask, CoNetworkTaskSpawner, ConnectionsNetworkTask, MdnsGossipNetworkTask,
-			NetworkApi, NetworkSettings,
-		},
+		network::{CoNetworkTaskSpawner, ConnectionsNetworkTask, MdnsGossipNetworkTask, NetworkApi, NetworkSettings},
 	},
 	types::network_task::NetworkTaskSpawner,
 };
@@ -83,13 +80,6 @@ impl Actor for Network {
 		spawner
 			.spawn(MdnsGossipNetworkTask::new())
 			.map_err(|err| ActorError::Actor(err.into()))?;
-
-		// use bootstraps as relay
-		for bootstrap in initialize.settings.bootstrap.iter() {
-			spawner
-				.spawn(RelayListenTask::new(bootstrap.clone()))
-				.map_err(|err| ActorError::Actor(err.into()))?;
-		}
 
 		// heads
 		let heads = Actor::spawn_with(
