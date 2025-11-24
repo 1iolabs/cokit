@@ -12,10 +12,9 @@ use co_actor::{ActionDispatch, Actions};
 use co_core_keystore::KeyStoreAction;
 use co_core_membership::MembershipsAction;
 use co_identity::{DidCommHeader, Identity};
-use co_network::NetworkApi;
+use co_network::{NetworkApi, PeerId};
 use co_primitives::{from_json_string, BlockSerializer};
 use futures::{future::Either, stream, FutureExt, Stream, StreamExt};
-use libp2p::PeerId;
 use std::time::Duration;
 
 const NETWORK_QUEUE_TYPE: &str = "network-key";

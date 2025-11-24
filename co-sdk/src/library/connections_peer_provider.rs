@@ -1,11 +1,10 @@
 use co_actor::ActorHandle;
 use co_network::{
 	connections::{ConnectionMessage, UseAction},
-	PeerProvider,
+	PeerId, PeerProvider,
 };
 use co_primitives::{CoId, Did};
 use futures::{Stream, TryStreamExt};
-use libp2p::PeerId;
 use std::{collections::BTreeSet, time::Instant};
 
 #[derive(Debug, Clone)]

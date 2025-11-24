@@ -30,3 +30,6 @@ pub mod connections {
 		NetworkConnection, NetworkResolver, PeerConnection,
 	};
 }
+
+// external re-exports
+pub use libp2p::{identity::Keypair, PeerId};

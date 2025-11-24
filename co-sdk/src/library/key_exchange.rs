@@ -1,7 +1,6 @@
 use co_identity::{DidCommHeader, Identity, PrivateIdentity};
-use co_network::EncodedMessage;
+use co_network::{EncodedMessage, PeerId};
 use co_primitives::{to_json_string, CoId};
-use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -69,8 +68,8 @@ mod tests {
 	use super::KeyResponsePayload;
 	use crate::library::key_exchange::KeyRequestPayload;
 	use co_core_keystore::Key;
+	use co_network::PeerId;
 	use co_primitives::{from_json, tags, to_json, CoId, Secret};
-	use libp2p::PeerId;
 
 	#[test]
 	fn test_serialize_request() {

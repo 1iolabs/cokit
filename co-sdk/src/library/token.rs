@@ -1,7 +1,6 @@
-use co_network::Token;
+use co_network::{PeerId, Token};
 use co_primitives::{CoId, KnownMultiCodec, MultiCodec, Secret};
 use hmac::{Hmac, Mac};
-use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 
@@ -78,8 +77,8 @@ impl CoToken {
 #[cfg(test)]
 mod tests {
 	use crate::CoToken;
+	use co_network::PeerId;
 	use co_primitives::Secret;
-	use libp2p::PeerId;
 
 	#[test]
 	fn smoke() {

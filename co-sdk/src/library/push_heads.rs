@@ -7,10 +7,9 @@ use co_actor::{
 	Actions, Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, Reducer, SwitchEpic, TaskSpawner, TracingEpic,
 };
 use co_identity::{Identity, PeerDidCommHeader, PrivateIdentity, PrivateIdentityBox};
-use co_network::{connections::ConnectionMessage, EncodedMessage, HeadsMessage, NetworkApi};
+use co_network::{connections::ConnectionMessage, EncodedMessage, HeadsMessage, NetworkApi, PeerId};
 use co_primitives::{tags, CoId, Tags, WeakCid};
 use futures::{Stream, StreamExt};
-use libp2p::PeerId;
 use std::{collections::BTreeSet, future::ready, time::Duration};
 
 ///	Use PeerProvider to discover peers and send heads to them whenever a peer comes online or new heads are produced.

@@ -8,10 +8,9 @@ use cid::Cid;
 use co_actor::{ActionDispatch, Actions};
 use co_core_membership::{Membership, MembershipState};
 use co_identity::PeerDidCommHeader;
-use co_network::{connections::PeerRelateCoAction, EncodedMessage, HeadsErrorCode, HeadsMessage};
+use co_network::{connections::PeerRelateCoAction, EncodedMessage, HeadsErrorCode, HeadsMessage, PeerId};
 use co_primitives::{CoId, Did, WeakCid};
 use futures::{future::ready, stream, FutureExt, Stream, StreamExt};
-use libp2p::PeerId;
 use std::{collections::BTreeSet, str::FromStr, time::Instant};
 
 /// Receive [`HeadsMessage`] DIDComm message.
