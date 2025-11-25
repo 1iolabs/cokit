@@ -14,6 +14,8 @@ A CO may contain:
 [Core](../reference/core.md) stands for CO Reducer, and it is a data model used within a CO. Cores model data, business logic and permissions. Being a reducer, a Core takes a state and an action as an input, calculates how the state will change based on that action, and returns the new state.
 
 Here is an example data model of a to-do list task in a Core:
+
+```rust
 /// A to-do list task.
 #[co]
 pub struct TodoTask {
@@ -24,6 +26,7 @@ pub struct TodoTask {
 	/// Whether the task is done.
 	pub done: bool,
 }
+```
 
 ## Use Case: Collaborative to-do list
 A simple example of how to use CO-kit is a collaborative to-do list. This is what we will build in the Quick-Start sections of this documentation.
