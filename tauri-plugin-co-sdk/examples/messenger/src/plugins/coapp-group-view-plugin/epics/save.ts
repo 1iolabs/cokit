@@ -108,9 +108,10 @@ export const submitEpic: GroupViewEpicType = (action$, state$, context) =>
         await pushAction(session, "room", setNameAction, state.chatsListState.identity);
 
         // TODO save room core image
+        console.log("avatar", state);
         if (state.avatar !== undefined) {
-          const file = await readFile(state.avatar);
-          console.log(file);
+          // const file = await readFile(state.avatar);
+          // console.log(file);
         }
 
         // participant invite and remove should work directly in edit mode

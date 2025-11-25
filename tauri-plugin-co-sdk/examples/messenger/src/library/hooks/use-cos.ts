@@ -9,7 +9,7 @@ export function useCoIds(membershipsState: any): string[] {
       setCoIds(
         membershipsState.memberships
           // only get joined COs
-          .filter((membership: any) => membership?.membership_state === 0)
+          .filter((membership: any) => membership?.membership_state === 10)
           .map((membership: any) => membership?.id)
           .filter(isNonNull),
       );

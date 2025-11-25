@@ -5,7 +5,6 @@ import { resolveCid } from "../../../../../dist-js/index.js";
 export function useCoCore(coCid: CID | undefined, coreId: string, session: string | undefined): CID | undefined {
   const [coreState, setCoreState] = React.useState<CID | undefined>(undefined);
   React.useEffect(() => {
-    console.log("use co core");
     let canceled = false;
     async function getCoreCid() {
       if (session !== undefined && coCid !== undefined && !canceled) {
@@ -20,6 +19,6 @@ export function useCoCore(coCid: CID | undefined, coreId: string, session: strin
     return () => {
       canceled = true;
     };
-  }, [coCid, coreId, session]);
+  }, [coCid?.toString(), coreId, session]);
   return coreState;
 }

@@ -12,7 +12,6 @@ export function useCoCoreActions(
   const [actions, setActions] = React.useState<GetActionsResponse>();
   React.useEffect(() => {
     async function getCoreActions() {
-      console.log("get actions");
       if (heads !== undefined && session !== undefined) {
         setActions(await getActions(session, heads, count, undefined));
       }

@@ -12,7 +12,7 @@ import {
 } from "../actions/index.js";
 import { GroupViewEpicType } from "../types/plugin.js";
 import { GroupViewPluginRoomCoreIdTag } from "../types/tag.js";
-import { getCoreState, getResolvedCoState } from "../../../../../../dist-js";
+import { getCoreState, getResolvedCoState, resolveCid, sessionClose, sessionOpen } from "../../../../../../dist-js";
 
 export const initializeEpic: GroupViewEpicType = (action$, _, context) =>
   action$.pipe(
@@ -38,9 +38,14 @@ export const initializeEpic: GroupViewEpicType = (action$, _, context) =>
             ),
           ];
         }
+
+        // session
+        const session = await sessionOpen(result.coId);
+
         // get core state and cancel if failed
-        const coreState = await getCoreState(result.coId, result.coreId);
+        const coreState = await getCoreState(result.coId, result.coreId, session);
         if (!coreState) {
+          sessionClose(session);
           // Error!
           return [
             createPluginErroredAction(
@@ -66,16 +71,20 @@ export const initializeEpic: GroupViewEpicType = (action$, _, context) =>
           }),
         );
         // set participants
-        const coState = await getResolvedCoState(result.coId);
-        if (coState?.participants === undefined) {
+        const coState = await getResolvedCoState(result.coId, session);
+        if (coState?.p === undefined) {
+          sessionClose(session);
           // Error!
           throw new Error("Couldn't fetch CO core participants state: " + coState);
         }
-        for (const participant in coState.participants) {
-          if (participant !== undefined) {
+        // TODO need CoMap
+        // TODO bundle wasm
+        const participants = await resolveCid(session, coState.p);
+        for (const participant of participants.a.l) {
+          if (participant !== undefined && participant[0] !== undefined)  {
             actions.push(
               identity<GroupViewParticipantAddedAction>({
-                payload: { participant },
+                payload: { participant: participant[0] },
                 type: GroupViewPluginActionType.ParticipantAdded,
               }),
             );

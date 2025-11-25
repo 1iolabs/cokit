@@ -42,6 +42,6 @@ export function useCoIpld<T, E = []>(
     return () => {
       canceled = true;
     };
-  }, [cids, sessionId, extras]);
+  }, [cids?.length, cids?.at(0), sessionId, extras]);
   return ipldMap;
 }
