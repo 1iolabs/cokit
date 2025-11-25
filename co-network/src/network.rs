@@ -4,7 +4,7 @@ use crate::{
 	library::find_peer_id::try_peer_id,
 	types::{
 		layer_behaviour::{Layer, LayerBehaviour},
-		network_task::{NetworkTaskBox, TokioNetworkTaskSpawner},
+		network_task::{NetworkTaskBox, NetworkTaskState, TokioNetworkTaskSpawner},
 	},
 	NetworkSettings,
 };
@@ -23,7 +23,12 @@ use libp2p::{
 };
 use libp2p_bitswap::{Bitswap, BitswapEvent};
 use rand::rngs::OsRng;
-use std::{task::Poll, time::Duration};
+use std::{
+	cmp::min,
+	future::Future,
+	task::Poll,
+	time::{Duration, Instant},
+};
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
 
@@ -229,10 +234,11 @@ struct Runtime {
 	/// Tasks which have been executed but waiting for events.
 	pending_tasks: Vec<(NetworkTaskBox<Behaviour, Context>, Span)>,
 	shutdown: CancellationToken,
+	next_delayed_task: Option<Instant>,
 }
 impl Runtime {
 	fn new(shutdown: CancellationToken) -> Self {
-		Self { listener_id: None, shutdown, pending_tasks: Default::default() }
+		Self { listener_id: None, shutdown, pending_tasks: Default::default(), next_delayed_task: Default::default() }
 	}
 
 	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
@@ -241,6 +247,15 @@ impl Runtime {
 
 	fn is_running(&self) -> bool {
 		!self.shutdown.is_cancelled()
+	}
+
+	fn use_task_state(&mut self, state: NetworkTaskState) {
+		if let NetworkTaskState::Delayed(until) = state {
+			self.next_delayed_task = Some(match self.next_delayed_task {
+				Some(next_delayed_task) => min(next_delayed_task, until),
+				None => until,
+			});
+		}
 	}
 }
 
@@ -418,13 +433,13 @@ async fn run(
 				let task_span = tracing::trace_span!("network-task", ?task);
 
 				// execute
-				let task_complete = task_span.in_scope(|| {
+				let task_state = task_span.in_scope(|| {
 					task.execute(&mut swarm, context_layer.layer_mut());
-					task.is_complete()
+					task.task_state()
 				});
 
 				// move to pending if not complete
-				if !task_complete {
+				if task_state != NetworkTaskState::Complete {
 					// log
 					task_span.in_scope(|| {
 						tracing::trace!("network-task-pending");
@@ -432,6 +447,7 @@ async fn run(
 
 					// pending
 					runtime.pending_tasks.push((task, task_span));
+					runtime.use_task_state(task_state);
 				}
 			},
 
@@ -455,6 +471,10 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		},
 		layer_event = context.select_next_some() => {
 			context.on_layer_event(swarm, layer_event).map(|layer_event| SwarmEvent::Behaviour(NetworkEvent::from(layer_event)))
+		},
+		Some(_) = option_await(runtime.next_delayed_task.map(|until| tokio::time::sleep_until(until.into()))) => {
+			runtime.next_delayed_task = None;
+			None
 		},
 	};
 
@@ -489,7 +509,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		let mut task_index = 0;
 		while task_index < runtime.pending_tasks.len() {
 			// handle
-			let task_complete = {
+			let task_state = {
 				let (task, task_span) = &mut runtime.pending_tasks[task_index];
 				let _enter = task_span.enter();
 
@@ -497,20 +517,11 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 				result_event = task.on_swarm_event(swarm, context.layer_mut(), result_event.unwrap());
 
 				// complete?
-				task.is_complete()
+				task.task_state()
 			};
 
-			// done?
-			if task_complete {
-				// remove
-				let (task, task_span) = runtime.pending_tasks.remove(task_index);
-				task_index -= 1;
-
-				// log
-				task_span.in_scope(|| {
-					tracing::trace!(?task, "network-task-completed");
-				});
-			}
+			// complete?
+			run_task_complete(runtime, &mut task_index, task_state);
 
 			// event consumed?
 			if result_event.is_none() {
@@ -525,6 +536,52 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		if let Some(_event) = result_event {
 			// ignore
 		}
+	} else {
+		let mut task_index = 0;
+		while task_index < runtime.pending_tasks.len() {
+			// handle
+			let task_state = {
+				let (task, task_span) = &mut runtime.pending_tasks[task_index];
+
+				// pending
+				let task_state = task.task_state();
+				match task_state {
+					NetworkTaskState::Pending => {
+						let _enter = task_span.enter();
+
+						// run
+						task.execute(swarm, context.layer_mut());
+
+						// complete?
+						task.task_state()
+					},
+					task_state => task_state,
+				}
+			};
+
+			// complete?
+			run_task_complete(runtime, &mut task_index, task_state);
+
+			// next
+			task_index += 1;
+		}
+	}
+}
+
+fn run_task_complete(runtime: &mut Runtime, task_index: &mut usize, task_state: NetworkTaskState) {
+	// use
+	runtime.use_task_state(task_state);
+
+	// done?
+	if task_state == NetworkTaskState::Complete {
+		// remove
+		let (task, task_span) = runtime.pending_tasks.remove(*task_index);
+		*task_index -= 1;
+
+		// log
+		task_span.in_scope(|| {
+			tracing::trace!(?task, "network-task-completed");
+		});
 	}
 }
 
@@ -532,5 +589,15 @@ fn is_log(event: &SwarmEvent<NetworkEvent>) -> bool {
 	match event {
 		SwarmEvent::Behaviour(NetworkEvent::Ping(_)) => false,
 		_ => true,
+	}
+}
+
+async fn option_await<T, O>(t: Option<T>) -> Option<O>
+where
+	T: Future<Output = O>,
+{
+	match t {
+		Some(fut) => Some(fut.await),
+		None => None,
 	}
 }

@@ -3,7 +3,7 @@ use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	Swarm,
 };
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Instant};
 
 pub trait NetworkTask<B, C>: Debug
 where
@@ -27,8 +27,25 @@ where
 	fn is_complete(&mut self) -> bool {
 		true
 	}
+
+	/// Task state.
+	fn task_state(&mut self) -> NetworkTaskState {
+		if self.is_complete() {
+			NetworkTaskState::Complete
+		} else {
+			NetworkTaskState::Waiting
+		}
+	}
 }
 pub type NetworkTaskBox<B, C> = Box<dyn NetworkTask<B, C> + Send + 'static>;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum NetworkTaskState {
+	Pending,
+	Delayed(Instant),
+	Waiting,
+	Complete,
+}
 
 #[derive(Debug)]
 pub struct TokioNetworkTaskSpawner<B, C> {

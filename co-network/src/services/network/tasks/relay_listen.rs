@@ -1,11 +1,11 @@
 use crate::{
 	backoff,
 	network::{Behaviour, Context, NetworkEvent},
-	types::network_task::NetworkTask,
+	types::network_task::{NetworkTask, NetworkTaskState},
 };
 use libp2p::{core::transport::ListenerId, swarm::SwarmEvent, Multiaddr, Swarm};
 use multiaddr::Protocol;
-use tokio::time::Instant;
+use std::time::Instant;
 
 /// Try to listen to a relay when we are behind NAT.
 #[derive(Debug)]
@@ -30,8 +30,8 @@ impl NetworkTask<Behaviour, Context> for RelayListenTask {
 
 	fn on_swarm_event(
 		&mut self,
-		swarm: &mut Swarm<Behaviour>,
-		context: &mut Context,
+		_swarm: &mut Swarm<Behaviour>,
+		_context: &mut Context,
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
 		// event
@@ -40,6 +40,8 @@ impl NetworkTask<Behaviour, Context> for RelayListenTask {
 			SwarmEvent::ListenerClosed { listener_id, .. } => {
 				if Some(listener_id) == self.listener_id.as_ref() {
 					self.listener_id = None;
+					self.backoff_retry += 1;
+					self.backoff_until = Some(Instant::now() + backoff(self.backoff_retry));
 				}
 			},
 			SwarmEvent::NewListenAddr { listener_id, .. } => {
@@ -50,28 +52,26 @@ impl NetworkTask<Behaviour, Context> for RelayListenTask {
 			},
 			_ => {},
 		}
-
-		// listen
-		//  TODO: move this to tick or something as currently we only retry on some events
-		if self.listener_id.is_none() {
-			if match self.backoff_until {
-				Some(until) if until < Instant::now() => true,
-				None => true,
-				_ => false,
-			} {
-				// listen
-				self.execute(swarm, context);
-
-				// adjust backoff
-				self.backoff_retry += 1;
-				self.backoff_until = Some(Instant::now() + backoff(self.backoff_retry));
-			}
-		}
-
 		Some(event)
 	}
 
 	fn is_complete(&mut self) -> bool {
 		false
+	}
+
+	fn task_state(&mut self) -> NetworkTaskState {
+		match self.listener_id {
+			Some(_) => NetworkTaskState::Waiting,
+			None => match self.backoff_until {
+				Some(until) => {
+					if until < Instant::now() {
+						NetworkTaskState::Pending
+					} else {
+						NetworkTaskState::Delayed(until)
+					}
+				},
+				None => NetworkTaskState::Pending,
+			},
+		}
 	}
 }
