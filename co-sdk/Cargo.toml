@@ -41,8 +41,7 @@ indexmap = "2.9.0"
 ipld-core = { workspace = true }
 keyring = "2.3.2"
 libc = "0.2"
-libp2p = { workspace = true, features = ["rendezvous", "tokio"] }
-multibase = "0.9.1"
+multibase = { workspace = true }
 names = "0.14.0"
 nix = { version = "0.29.0", features = ["fs"] }
 notify = { version = "7.0.0", features = ["macos_kqueue"] }

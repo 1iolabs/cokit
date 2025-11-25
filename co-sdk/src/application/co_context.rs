@@ -8,9 +8,6 @@ use crate::{
 	reducer::core_resolver::{dynamic::DynamicCoreResolver, guard::CoGuardResolver, log::LogCoreResolver},
 	services::{
 		application::ApplicationMessage,
-		connections::ConnectionMessage,
-		heads::HeadsApi,
-		network::CoNetworkTaskSpawner,
 		reducers::{ReducerStorage, ReducersControl},
 	},
 	types::co_reducer_factory::CoReducerFactoryError,
@@ -25,6 +22,7 @@ use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 use co_log::{EntryBlock, Log};
+use co_network::{connections::ConnectionMessage, HeadsApi, NetworkApi};
 use co_primitives::{BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did};
 use futures::{Stream, TryStreamExt};
 use std::{
@@ -114,23 +112,18 @@ impl CoContext {
 	}
 
 	/// Network.
-	pub async fn network(&self) -> Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, HeadsApi)> {
+	pub async fn network(&self) -> Option<NetworkApi> {
 		self.inner.network.read().unwrap().clone()
-	}
-
-	/// Network Spawner.
-	pub async fn network_tasks(&self) -> Option<CoNetworkTaskSpawner> {
-		self.inner.network.read().unwrap().as_ref().map(|(v, _, _)| v).cloned()
 	}
 
 	/// Network Connections.
 	pub async fn network_connections(&self) -> Option<ActorHandle<ConnectionMessage>> {
-		self.inner.network.read().unwrap().as_ref().map(|(_, v, _)| v).cloned()
+		self.inner.network.read().unwrap().as_ref().map(|api| api.connections().clone())
 	}
 
-	/// Network Connections.
+	/// Network Heads.
 	pub async fn network_heads(&self) -> Option<HeadsApi> {
-		self.inner.network.read().unwrap().as_ref().map(|(_, _, v)| v).cloned()
+		self.inner.network.read().unwrap().as_ref().map(|api| api.heads().clone())
 	}
 
 	/// Tasks.
@@ -206,7 +199,7 @@ pub(crate) struct CoContextInner {
 
 	local_identity: LocalIdentity,
 
-	network: Arc<RwLock<Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, HeadsApi)>>>,
+	network: Arc<RwLock<Option<NetworkApi>>>,
 
 	storage: Storage,
 
@@ -224,7 +217,7 @@ impl CoContextInner {
 		shutdown: CancellationToken,
 		tasks: TaskSpawner,
 		local_identity: LocalIdentity,
-		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, HeadsApi)>,
+		network: Option<NetworkApi>,
 		storage: Storage,
 		runtime: Runtime,
 		reactive_context: ActorHandle<ApplicationMessage>,
@@ -302,10 +295,7 @@ impl CoContextInner {
 	}
 
 	/// Clone with network.
-	pub async fn set_network(
-		&self,
-		network: Option<(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>, HeadsApi)>,
-	) -> Result<(), anyhow::Error> {
+	pub async fn set_network(&self, network: Option<NetworkApi>) -> Result<(), anyhow::Error> {
 		// assign
 		*self.network.write().unwrap() = network;
 

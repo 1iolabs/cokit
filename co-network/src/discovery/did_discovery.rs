@@ -1,7 +1,8 @@
 use co_identity::{network_did_discovery, DidCommHeader, Identity, PeerDidCommHeader, PrivateIdentity};
-use co_primitives::{serde_string_enum, NetworkDidDiscovery};
-use libp2p::PeerId;
+use co_primitives::{serde_string_enum, to_json_string, NetworkDidDiscovery};
+use libp2p::{Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DidDiscovery {
@@ -17,6 +18,7 @@ impl DidDiscovery {
 		to: &T,
 		network: Option<NetworkDidDiscovery>,
 		message_type: String,
+		message_body: Option<&DiscoverMessage>,
 	) -> Result<DidDiscovery, anyhow::Error>
 	where
 		F: PrivateIdentity + Send + Sync + 'static,
@@ -26,13 +28,17 @@ impl DidDiscovery {
 		let (from_context, to_context, header) = DidCommHeader::create(from, to, message_type)?;
 		let message_header = PeerDidCommHeader { header, from_peer_id: Some(from_peer.to_string()) };
 		let message_id = message_header.header.id.clone();
-		let message = from_context.jwe(&to_context, message_header.into(), "null")?;
+		let message_body = match message_body {
+			Some(body) => to_json_string(body)?,
+			None => "null".to_owned(),
+		};
+		let message = from_context.jwe(&to_context, message_header.into(), &message_body)?;
 		Ok(DidDiscovery { message_id, network, message })
 	}
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub enum DidDiscoveryMessage {
+pub enum DidDiscoveryMessageType {
 	/// Message type for a did discovery request.
 	#[serde(rename = "diddiscovery")]
 	Discover,
@@ -41,9 +47,17 @@ pub enum DidDiscoveryMessage {
 	#[serde(rename = "diddiscovery-resolve")]
 	Resolve,
 }
-impl DidDiscoveryMessage {
+impl DidDiscoveryMessageType {
 	pub fn from_str(value: &str) -> Option<Self> {
 		Self::try_from(value.to_owned()).ok()
 	}
 }
-serde_string_enum!(DidDiscoveryMessage);
+serde_string_enum!(DidDiscoveryMessageType);
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DiscoverMessage {
+	/// Endpoints where we (our local peer) can be dialed.
+	/// This are the callback endpoints when the discovery request is accepted.
+	#[serde(rename = "e")]
+	pub endpoints: BTreeSet<Multiaddr>,
+}

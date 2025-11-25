@@ -22,6 +22,7 @@ pub use co_identity::{
 	DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver, IdentityResolverError,
 	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
+pub use co_network::NetworkSettings;
 pub use co_primitives::{
 	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, AbsolutePath,
 	AbsolutePathOwned, AnyBlockStorage, Block, BlockSerializer, BlockStat, BlockStorage, BlockStorageExt,
@@ -50,6 +51,7 @@ pub use library::{
 	memory_dispatch::MemoryDispatch,
 	storage_cleanup::storage_cleanup,
 	storage_structure::{storage_structure_recursive, CoStructureResolver, StructureResolveResult, StructureResolver},
+	token::{CoToken, CoTokenParameters},
 	update_co::update_co,
 };
 pub use pin::pin::PinAPI;
@@ -58,8 +60,6 @@ pub use reducer::core_resolver::{
 };
 pub use services::{
 	application::{Action, ActionError, ApplicationMessage},
-	connections::{ConnectionAction, ConnectionMessage, ReleaseAction},
-	network::{self, CoNetworkTaskSpawner, CoToken, CoTokenParameters, Network, NetworkMessage, NetworkSettings},
 	reducer::CoReducer,
 };
 pub use types::{

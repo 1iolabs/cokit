@@ -1,10 +1,7 @@
-use crate::{
-	library::settings_timeout::settings_timeout, services::network::DidCommSendNetworkTask, Action, CoContext,
-	CO_ID_LOCAL,
-};
+use crate::{library::settings_timeout::settings_timeout, Action, ActionError, CoContext, CO_ID_LOCAL};
 use co_actor::Actions;
 use co_primitives::CoId;
-use futures::{future::ready, stream, Stream, StreamExt};
+use futures::{FutureExt, Stream};
 
 /// Send DIDComm message to peer and respond with
 pub fn didcomm_send(
@@ -14,18 +11,26 @@ pub fn didcomm_send(
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::DidCommSend { message_header, peer, message } => Some(
-			stream::once(ready((context.clone(), message_header.clone(), *peer, message.clone())))
-				.filter_map(move |(context, message_header, peer, message)| async move {
-					let network = context.network_tasks().await?;
+		Action::DidCommSend { message_header, peer, message } => Some({
+			let context = context.clone();
+			let message_header = message_header.clone();
+			let peer = *peer;
+			let message = message.clone();
+			async move {
+				let result = if let Some(network) = context.network().await {
 					let timeout = settings_timeout(&context, &CoId::from(CO_ID_LOCAL), Some("didcomm-send")).await;
-					Some(match DidCommSendNetworkTask::send(network, [peer], message, timeout).await {
-						Ok(peer) => Action::DidCommSent { message_header, peer, result: Ok(()) },
-						Err(err) => Action::DidCommSent { message_header, peer, result: Err(err.into()) },
-					})
-				})
-				.map(Ok),
-		),
+					network
+						.didcomm_send([peer], message, timeout)
+						.await
+						.map_err(ActionError::from)
+						.map(|_| ())
+				} else {
+					Err(anyhow::anyhow!("No network").into())
+				};
+				Ok(Action::DidCommSent { message_header, peer, result })
+			}
+			.into_stream()
+		}),
 		_ => None,
 	}
 }

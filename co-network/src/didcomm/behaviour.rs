@@ -2,7 +2,7 @@ use super::{handler, inbound, protocol::MessageProtocol, EncodedMessage};
 use co_identity::{IdentityResolverBox, Message, PrivateIdentityResolverBox};
 use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, StreamExt};
 use libp2p::{
-	core::{ConnectedPoint, Endpoint},
+	core::{transport::PortUse, ConnectedPoint, Endpoint},
 	swarm::{
 		behaviour::{AddressChange, ConnectionClosed, DialFailure, FromSwarm},
 		derive_prelude::{ConnectionEstablished, ConnectionId},
@@ -245,6 +245,7 @@ impl NetworkBehaviour for Behaviour {
 		_peer: PeerId,
 		_addr: &Multiaddr,
 		_role_override: Endpoint,
+		_port_use: PortUse,
 	) -> Result<THandler<Self>, ConnectionDenied> {
 		Ok(handler::Handler::new())
 	}

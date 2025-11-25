@@ -10,9 +10,9 @@ use anyhow::anyhow;
 use co_actor::Actions;
 use co_core_keystore::Key;
 use co_identity::{DidCommHeader, Identity, IdentityResolver};
+use co_network::PeerId;
 use co_primitives::from_json_string;
 use futures::{FutureExt, Stream, StreamExt};
-use libp2p::PeerId;
 
 /// When we receive an key request send an response.
 pub fn key_request_receive(

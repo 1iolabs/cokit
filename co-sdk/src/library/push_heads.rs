@@ -1,21 +1,15 @@
 use super::to_external_cid::{to_external_cids, to_external_cids_opt_force};
-use crate::{
-	services::{
-		connections::ConnectionMessage,
-		network::{CoNetworkTaskSpawner, DidCommSendNetworkTask},
-	},
-	types::message::heads::HeadsMessage,
-	CoReducerState, CoStorage, TaskSpawner,
-};
+use crate::{CoReducerState, CoStorage};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
-use co_actor::{Actions, Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, Reducer, SwitchEpic, TracingEpic};
+use co_actor::{
+	Actions, Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, Reducer, SwitchEpic, TaskSpawner, TracingEpic,
+};
 use co_identity::{Identity, PeerDidCommHeader, PrivateIdentity, PrivateIdentityBox};
-use co_network::didcomm::EncodedMessage;
+use co_network::{connections::ConnectionMessage, EncodedMessage, HeadsMessage, NetworkApi, PeerId};
 use co_primitives::{tags, CoId, Tags, WeakCid};
 use futures::{Stream, StreamExt};
-use libp2p::PeerId;
 use std::{collections::BTreeSet, future::ready, time::Duration};
 
 ///	Use PeerProvider to discover peers and send heads to them whenever a peer comes online or new heads are produced.
@@ -26,17 +20,11 @@ pub struct PushHeads {
 	force_mapping: bool,
 }
 impl PushHeads {
-	pub fn new(
-		spawner: CoNetworkTaskSpawner,
-		connections: ActorHandle<ConnectionMessage>,
-		tasks: TaskSpawner,
-		co: CoId,
-		force_mapping: bool,
-	) -> Result<Self, anyhow::Error> {
+	pub fn new(network: NetworkApi, tasks: TaskSpawner, co: CoId, force_mapping: bool) -> Result<Self, anyhow::Error> {
 		let instance = Actor::spawn_with(
 			tasks.clone(),
 			tags!("type": "co-push-heads", "co": co.as_str()),
-			PushHeadsActor { tasks, context: PushHeadsContext(spawner, connections) },
+			PushHeadsActor { tasks, context: PushHeadsContext(network) },
 			PushHeadsState { co: co.clone(), heads: Default::default() },
 		)?;
 		Ok(Self { handle: instance.handle(), force_mapping })
@@ -119,7 +107,7 @@ impl Actor for PushHeadsActor {
 }
 
 #[derive(Debug, Clone)]
-struct PushHeadsContext(CoNetworkTaskSpawner, ActorHandle<ConnectionMessage>);
+struct PushHeadsContext(NetworkApi);
 
 #[derive(Debug, Clone)]
 #[allow(unused)] // we want to see Sent in the logs
@@ -176,7 +164,7 @@ impl Epic<PushHeadsAction, PushHeadsState, PushHeadsContext> for PushHeadsConnec
 		match action {
 			PushHeadsAction::Connect(identity, heads) => Some({
 				let id = state.co.clone();
-				let connections = context.1.clone();
+				let connections = context.0.connections().clone();
 				let identity = identity.clone();
 				let from = identity.identity().to_owned();
 				let heads = heads.clone();
@@ -231,7 +219,7 @@ impl Epic<PushHeadsAction, PushHeadsState, PushHeadsContext> for PushHeadsSendEp
 
 					// send
 					for peer in peers {
-						let send = DidCommSendNetworkTask::send(network.clone(), [peer], message.clone(), Duration::from_secs(30)).await;
+						let send = network.didcomm_send([peer], message.clone(), Duration::from_secs(30)).await;
 						yield PushHeadsAction::Sent(identity.clone(), heads.clone(), peer, match send { Ok(_) => Ok(()), Err(err) => Err(err.to_string()) });
 					}
 				}

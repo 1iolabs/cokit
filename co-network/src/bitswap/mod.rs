@@ -3,4 +3,4 @@ mod storage;
 
 pub use client::{BitswapMessage, BitswapStoreClient};
 pub use libp2p_bitswap::Token;
-pub use storage::{GetNetworkTask, NetworkBlockStorage};
+pub use storage::GetNetworkTask;

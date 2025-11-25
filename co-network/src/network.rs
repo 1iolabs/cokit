@@ -2,113 +2,160 @@ use crate::{
 	bitswap::{BitswapMessage, BitswapStoreClient},
 	didcomm, discovery,
 	library::find_peer_id::try_peer_id,
-	types::{network_task::TokioNetworkTaskSpawner, provider::BitswapBehaviourProvider},
-	DidcommBehaviourProvider, DiscoveryLayerBehaviourProvider, FnOnceNetworkTask, GossipsubBehaviourProvider, Layer,
-	LayerBehaviour, MdnsBehaviourProvider, NetworkError, NetworkTaskBox, NetworkTaskSpawner,
+	types::{
+		layer_behaviour::{Layer, LayerBehaviour},
+		network_task::{NetworkTaskBox, NetworkTaskState, TokioNetworkTaskSpawner},
+	},
+	NetworkSettings,
 };
 use anyhow::anyhow;
 use co_actor::ActorHandle;
-use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver, PrivateIdentityResolverBox};
+use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
 use co_primitives::DefaultParams;
 use futures::{pin_mut, Stream, StreamExt};
 use libp2p::{
-	gossipsub, identify,
+	autonat, dcutr, gossipsub, identify,
 	identity::Keypair,
 	mdns::{self, tokio::Behaviour as MdnsBehaviour},
-	ping,
-	swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
-	Multiaddr, PeerId, Swarm, SwarmBuilder,
+	noise, ping, relay,
+	swarm::{behaviour::toggle::Toggle, dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
+	yamux, PeerId, StreamProtocol, Swarm, SwarmBuilder,
 };
 use libp2p_bitswap::{Bitswap, BitswapEvent};
-use std::{collections::BTreeSet, task::Poll, time::Duration};
+use rand::rngs::OsRng;
+use std::{
+	cmp::min,
+	future::Future,
+	task::Poll,
+	time::{Duration, Instant},
+};
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
 
+pub const CO_AGENT: &str = "co/0.1.0";
+pub const IPFS_IDENTIFY_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/id/1.0.0");
+
 pub struct Libp2pNetwork {
-	config: Libp2pNetworkConfig,
 	shutdown: CancellationToken,
 	tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<Behaviour, Context>>,
 }
 impl Libp2pNetwork {
-	pub fn new<R, P>(
+	pub fn new(
 		identifier: String,
-		config: Libp2pNetworkConfig,
-		resolver: R,
-		private_resolver: P,
+		keypair: Keypair,
+		config: NetworkSettings,
+		resolver: IdentityResolverBox,
+		private_resolver: PrivateIdentityResolverBox,
 		bitswap: ActorHandle<BitswapMessage<DefaultParams>>,
-	) -> anyhow::Result<Libp2pNetwork>
-	where
-		R: IdentityResolver + Clone + Send + Sync + 'static,
-		P: PrivateIdentityResolver + Clone + Send + Sync + 'static,
-	{
+	) -> anyhow::Result<Libp2pNetwork> {
 		let resolver = IdentityResolverBox::new(resolver);
 		let private_resolver = PrivateIdentityResolverBox::new(private_resolver);
-		let local_peer_id = PeerId::from(config.keypair.public().clone());
+		let local_peer_id = PeerId::from(keypair.public().clone());
+
+		// kad
 		// let kademlia_config: KademliaConfig = Default::default();
+		// let kad = kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()),
+		// kademlia_config);
+
+		// gossipsub
 		let gossipsub_config = gossipsub::ConfigBuilder::default()
 			.max_transmit_size(256 * 1024)
 			.build()
 			.expect("valid config");
+		let gossipsub =
+			gossipsub::Behaviour::new(gossipsub::MessageAuthenticity::Signed(keypair.clone()), gossipsub_config)
+				.map_err(|err| anyhow!("gossip failed: {}", err))?;
 
-		let behaviour = Behaviour {
-			identify: libp2p::identify::Behaviour::new(libp2p::identify::Config::new(
-				"/ipfs/0.1.0".into(),
-				config.keypair.public(),
-			)),
+		// bitswap
+		let bitswap = Bitswap::<libipld::DefaultParams>::new(
+			Default::default(),
+			BitswapStoreClient::<DefaultParams>::new(bitswap),
+			{
+				let bitswap_identifier = identifier.clone();
+				Box::new(move |t| {
+					tokio::spawn(async move {
+						t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
+							.await
+					});
+				})
+			},
+		);
+
+		// relay
+		let relay_server = if config.relay {
+			Some(libp2p::relay::Behaviour::new(local_peer_id.clone(), relay::Config::default()))
+		} else {
+			None
+		}
+		.into();
+
+		// identify
+		let identify_config = identify::Config::new(IPFS_IDENTIFY_PROTOCOL_NAME.to_string(), keypair.public())
+			.with_agent_version(CO_AGENT.into());
+		let identify = identify::Behaviour::new(identify_config);
+
+		// mdns
+		let mdns =
+			if config.mdns { Some(MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?) } else { None }
+				.into();
+
+		// didcomm
+		let didcomm = didcomm::Behaviour::new(resolver.clone(), private_resolver, didcomm::Config { auto_dail: false });
+
+		// autonat
+		let autonat_server = if config.relay { Some(autonat::v2::server::Behaviour::new(OsRng)) } else { None }.into();
+		let autonat_client = if config.nat {
+			Some(autonat::v2::client::Behaviour::new(OsRng, autonat::v2::client::Config::default()))
+		} else {
+			None
+		}
+		.into();
+
+		// dcutr
+		let dcutr = if config.nat { Some(dcutr::Behaviour::new(local_peer_id.clone())) } else { None }.into();
+
+		// behaviour
+		let mut behaviour = Behaviour {
+			identify,
 			ping: ping::Behaviour::new(ping::Config::new()),
-			mdns: MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?,
-			// kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()),
-			// kademlia_config),
-			bitswap: Bitswap::<libipld::DefaultParams>::new(
-				Default::default(),
-				BitswapStoreClient::<DefaultParams>::new(bitswap),
-				{
-					let bitswap_identifier = identifier.clone();
-					Box::new(move |t| {
-						tokio::spawn(async move {
-							t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
-								.await
-						});
-					})
-				},
-			),
-			gossipsub: gossipsub::Behaviour::new(
-				gossipsub::MessageAuthenticity::Signed(config.keypair.clone()),
-				gossipsub_config,
-			)
-			.map_err(|err| anyhow!("gossip failed: {}", err))?,
-			didcomm: didcomm::Behaviour::new(resolver.clone(), private_resolver, didcomm::Config { auto_dail: false }),
+			mdns,
+			// kad,
+			bitswap,
+			gossipsub,
+			didcomm,
+			dcutr,
+			relay_server,
+			relay_client: None.into(),
+			autonat_server,
+			autonat_client,
 		};
 
-		// // kad
-		// for (peer, address) in config.bootstap.iter() {
-		// 	behaviour.kad.add_address(peer, address.clone());
-		// }
-		// set_network_mode(&mut behaviour, config.mode);
-		// if let Err(err) = behaviour.kad.bootstrap() {
-		// 	tracing::warn!(?err, "kad-bootstrap-failed");
-		// }
-
-		let listen = config.addr.clone();
-		let is_tcp = listen.protocol_stack().any(|protocol| protocol == "tcp");
-
 		// swarm
-		let swarm_builder = SwarmBuilder::with_existing_identity(config.keypair.clone()).with_tokio();
-		let mut swarm = if is_tcp {
+		let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
+			.with_tokio()
+			.with_tcp(libp2p::tcp::Config::default(), noise::Config::new, yamux::Config::default)?
+			.with_quic()
+			.with_dns()?;
+		let mut swarm = if config.nat {
 			swarm_builder
-				.with_tcp(libp2p::tcp::Config::default(), libp2p::noise::Config::new, libp2p::yamux::Config::default)?
-				.with_dns()?
-				.with_behaviour(|_| behaviour)?
-				.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
+				.with_relay_client(noise::Config::new, yamux::Config::default)?
+				.with_behaviour(move |_keypair, relay_client| {
+					behaviour.relay_client = Some(relay_client).into();
+					behaviour
+				})?
+				.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
 				.build()
 		} else {
 			swarm_builder
-				.with_quic()
-				.with_dns()?
-				.with_behaviour(|_| behaviour)?
-				.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
+				.with_behaviour(move |_keypair| behaviour)?
+				.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
 				.build()
 		};
+
+		// external addresses
+		for external_address in config.external_addresses.iter() {
+			swarm.add_external_address(external_address.clone());
+		}
 
 		// bootstrap
 		for bootstrap in config.bootstrap.iter() {
@@ -116,8 +163,17 @@ impl Libp2pNetwork {
 			if local_peer_id == peer_id {
 				continue;
 			}
+
+			// // listen on bootstrap as relay
+			// if config.nat {
+			// 	swarm.listen_on(bootstrap.clone().with(multiaddr::Protocol::P2pCircuit)).ok();
+			// }
+
+			// dial bootstrap
 			swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![bootstrap.clone()]).build())?;
-			swarm.behaviour_mut().gossipsub_mut().add_explicit_peer(&peer_id);
+
+			// use as explicent gossip peer
+			swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
 		}
 
 		// context
@@ -130,10 +186,10 @@ impl Libp2pNetwork {
 
 		// runtime
 		let shutdown = CancellationToken::new();
-		let mut runtime = Runtime::new(config.clone(), shutdown.child_token());
+		let mut runtime = Runtime::new(shutdown.child_token());
 
 		// listen
-		runtime.listen(swarm.listen_on(listen)?);
+		runtime.listen(swarm.listen_on(config.listen)?);
 
 		// run
 		tokio::spawn(async move {
@@ -143,7 +199,7 @@ impl Libp2pNetwork {
 		});
 
 		// result
-		Ok(Self { config, shutdown, tasks: tasks_tx })
+		Ok(Self { shutdown, tasks: tasks_tx })
 	}
 
 	pub fn spawner(&self) -> TokioNetworkTaskSpawner<Behaviour, Context> {
@@ -154,23 +210,6 @@ impl Libp2pNetwork {
 	/// This will stop accepting new connections and waits until established connections are done.
 	pub fn shutdown(&self) -> Shutdown {
 		Shutdown { shutdown: self.shutdown.clone() }
-	}
-
-	pub fn config(&self) -> &Libp2pNetworkConfig {
-		&self.config
-	}
-
-	/// Change network mode.
-	pub fn set_network_mode(&mut self, mode: NetworkMode) -> Result<(), NetworkError> {
-		if self.config.mode != mode {
-			self.config.mode = mode;
-			self.spawner()
-				.spawn(FnOnceNetworkTask::new(move |swarm, _| {
-					set_network_mode(swarm.behaviour_mut(), mode);
-				}))
-				.unwrap();
-		}
-		Ok(())
 	}
 }
 impl Drop for Libp2pNetwork {
@@ -190,43 +229,16 @@ impl Shutdown {
 	}
 }
 
-#[derive(Clone, Debug)]
-pub struct Libp2pNetworkConfig {
-	pub keypair: Keypair,
-	pub addr: Multiaddr,
-
-	// Nodes to initialiy dial.
-	/// The multiaddress is required to include an address (protocol) and and peer id (p2p).
-	pub bootstrap: BTreeSet<Multiaddr>,
-
-	/// Network mode to optimize for.
-	/// This may change dynamically.
-	/// For example when a mobile device gets plugged in to an power outlet.
-	pub mode: NetworkMode,
-}
-impl Libp2pNetworkConfig {
-	pub fn from_keypair(listen: Multiaddr, keypair: Keypair) -> Self {
-		Self { keypair, addr: listen, bootstrap: Default::default(), mode: Default::default() }
-	}
-}
-
-#[derive(Clone, Debug, Default, Copy, PartialEq)]
-pub enum NetworkMode {
-	#[default]
-	Full,
-	Light,
-}
-
 struct Runtime {
-	_config: Libp2pNetworkConfig,
 	listener_id: Option<libp2p::core::transport::ListenerId>,
 	/// Tasks which have been executed but waiting for events.
 	pending_tasks: Vec<(NetworkTaskBox<Behaviour, Context>, Span)>,
 	shutdown: CancellationToken,
+	next_delayed_task: Option<Instant>,
 }
 impl Runtime {
-	fn new(config: Libp2pNetworkConfig, shutdown: CancellationToken) -> Self {
-		Self { _config: config, listener_id: None, shutdown, pending_tasks: Default::default() }
+	fn new(shutdown: CancellationToken) -> Self {
+		Self { listener_id: None, shutdown, pending_tasks: Default::default(), next_delayed_task: Default::default() }
 	}
 
 	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
@@ -235,6 +247,15 @@ impl Runtime {
 
 	fn is_running(&self) -> bool {
 		!self.shutdown.is_cancelled()
+	}
+
+	fn use_task_state(&mut self, state: NetworkTaskState) {
+		if let NetworkTaskState::Delayed(until) = state {
+			self.next_delayed_task = Some(match self.next_delayed_task {
+				Some(next_delayed_task) => min(next_delayed_task, until),
+				None => until,
+			});
+		}
 	}
 }
 
@@ -276,32 +297,8 @@ impl LayerBehaviour<Behaviour> for Context {
 		Poll::Pending
 	}
 }
-impl DiscoveryLayerBehaviourProvider<IdentityResolverBox> for Context {
-	type Event = NetworkEvent;
 
-	fn discovery(&self) -> &discovery::DiscoveryState<IdentityResolverBox> {
-		&self.discovery
-	}
-
-	fn discovery_mut(&mut self) -> &mut discovery::DiscoveryState<IdentityResolverBox> {
-		&mut self.discovery
-	}
-
-	fn discovery_event(event: &Self::Event) -> Option<&discovery::Event> {
-		match event {
-			NetworkEvent::Discovery(event) => Some(event),
-			_ => None,
-		}
-	}
-
-	fn into_discovery_event(event: Self::Event) -> Result<discovery::Event, Self::Event> {
-		match event {
-			NetworkEvent::Discovery(event) => Ok(event),
-			event => Err(event),
-		}
-	}
-}
-
+#[allow(unused)]
 #[derive(Debug, derive_more::From)]
 #[non_exhaustive]
 pub enum NetworkEvent {
@@ -313,6 +310,11 @@ pub enum NetworkEvent {
 	// Kad(kad::Event),
 	Bitswap(BitswapEvent),
 	Discovery(discovery::Event),
+	Dcutr(dcutr::Event),
+	RelayServer(relay::Event),
+	RelayClient(relay::client::Event),
+	AutonatServer(autonat::v2::server::Event),
+	AutonatClient(autonat::v2::client::Event),
 }
 // impl From<BehaviourEvent> for NetworkEvent {
 // 	fn from(value: BehaviourEvent) -> Self {
@@ -341,10 +343,15 @@ pub struct Behaviour {
 	pub didcomm: didcomm::Behaviour,
 	pub gossipsub: gossipsub::Behaviour,
 	pub identify: identify::Behaviour,
-	pub mdns: MdnsBehaviour,
+	pub mdns: Toggle<MdnsBehaviour>,
 	pub ping: ping::Behaviour,
 	// pub kad: Kademlia<MemoryStore>,
 	pub bitswap: Bitswap<libipld::DefaultParams>,
+	pub dcutr: Toggle<dcutr::Behaviour>,
+	pub relay_server: Toggle<relay::Behaviour>,
+	pub relay_client: Toggle<relay::client::Behaviour>,
+	pub autonat_server: Toggle<autonat::v2::server::Behaviour>,
+	pub autonat_client: Toggle<autonat::v2::client::Behaviour>,
 }
 impl discovery::DiscoveryBehaviour for Behaviour {
 	fn rendezvous_client_mut(&mut self) -> Option<&mut libp2p::rendezvous::client::Behaviour> {
@@ -358,7 +365,7 @@ impl discovery::DiscoveryBehaviour for Behaviour {
 	}
 
 	fn mdns_mut(&mut self) -> Option<&mut mdns::tokio::Behaviour> {
-		Some(&mut self.mdns)
+		self.mdns.as_mut()
 	}
 
 	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&mdns::Event> {
@@ -366,11 +373,6 @@ impl discovery::DiscoveryBehaviour for Behaviour {
 			NetworkEvent::Mdns(e) => Some(e),
 			_ => None,
 		}
-	}
-}
-impl DidcommBehaviourProvider for Behaviour {
-	fn didcomm(&self) -> &didcomm::Behaviour {
-		&self.didcomm
 	}
 
 	fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour {
@@ -384,16 +386,6 @@ impl DidcommBehaviourProvider for Behaviour {
 		}
 	}
 
-	fn into_didcomm_event(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-	) -> Result<didcomm::Event, <Self as NetworkBehaviour>::ToSwarm> {
-		match event {
-			NetworkEvent::Didcomm(e) => Ok(e),
-			e => Err(e),
-		}
-	}
-}
-impl GossipsubBehaviourProvider for Behaviour {
 	fn gossipsub(&self) -> &gossipsub::Behaviour {
 		&self.gossipsub
 	}
@@ -408,72 +400,6 @@ impl GossipsubBehaviourProvider for Behaviour {
 			_ => None,
 		}
 	}
-
-	fn into_gossipsub_event(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-	) -> Result<gossipsub::Event, <Self as NetworkBehaviour>::ToSwarm> {
-		match event {
-			NetworkEvent::Gossipsub(e) => Ok(e),
-			e => Err(e),
-		}
-	}
-}
-impl BitswapBehaviourProvider for Behaviour {
-	fn bitswap(&self) -> &Bitswap<libipld::DefaultParams> {
-		&self.bitswap
-	}
-
-	fn bitswap_mut(&mut self) -> &mut Bitswap<libipld::DefaultParams> {
-		&mut self.bitswap
-	}
-
-	fn bitswap_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&BitswapEvent> {
-		match event {
-			NetworkEvent::Bitswap(e) => Some(e),
-			_ => None,
-		}
-	}
-
-	fn into_bitswap_event(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-	) -> Result<BitswapEvent, <Self as NetworkBehaviour>::ToSwarm> {
-		match event {
-			NetworkEvent::Bitswap(e) => Ok(e),
-			e => Err(e),
-		}
-	}
-}
-impl MdnsBehaviourProvider for Behaviour {
-	fn mdns(&self) -> &mdns::tokio::Behaviour {
-		&self.mdns
-	}
-
-	fn mdns_mut(&mut self) -> &mut mdns::tokio::Behaviour {
-		&mut self.mdns
-	}
-
-	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&mdns::Event> {
-		match event {
-			NetworkEvent::Mdns(e) => Some(e),
-			_ => None,
-		}
-	}
-
-	fn into_mdns_event(
-		event: <Self as NetworkBehaviour>::ToSwarm,
-	) -> Result<mdns::Event, <Self as NetworkBehaviour>::ToSwarm> {
-		match event {
-			NetworkEvent::Mdns(e) => Ok(e),
-			e => Err(e),
-		}
-	}
-}
-
-fn set_network_mode(_behaviour: &mut Behaviour, _mode: NetworkMode) {
-	// match mode {
-	// 	NetworkMode::Full => behaviour.kad.set_mode(Some(libp2p::kad::Mode::Server)),
-	// 	NetworkMode::Light => behaviour.kad.set_mode(Some(libp2p::kad::Mode::Client)),
-	// }
 }
 
 async fn run(
@@ -507,13 +433,13 @@ async fn run(
 				let task_span = tracing::trace_span!("network-task", ?task);
 
 				// execute
-				let task_complete = task_span.in_scope(|| {
+				let task_state = task_span.in_scope(|| {
 					task.execute(&mut swarm, context_layer.layer_mut());
-					task.is_complete()
+					task.task_state()
 				});
 
 				// move to pending if not complete
-				if !task_complete {
+				if task_state != NetworkTaskState::Complete {
 					// log
 					task_span.in_scope(|| {
 						tracing::trace!("network-task-pending");
@@ -521,6 +447,7 @@ async fn run(
 
 					// pending
 					runtime.pending_tasks.push((task, task_span));
+					runtime.use_task_state(task_state);
 				}
 			},
 
@@ -544,6 +471,10 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		},
 		layer_event = context.select_next_some() => {
 			context.on_layer_event(swarm, layer_event).map(|layer_event| SwarmEvent::Behaviour(NetworkEvent::from(layer_event)))
+		},
+		Some(_) = option_await(runtime.next_delayed_task.map(|until| tokio::time::sleep_until(until.into()))) => {
+			runtime.next_delayed_task = None;
+			None
 		},
 	};
 
@@ -578,7 +509,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		let mut task_index = 0;
 		while task_index < runtime.pending_tasks.len() {
 			// handle
-			let task_complete = {
+			let task_state = {
 				let (task, task_span) = &mut runtime.pending_tasks[task_index];
 				let _enter = task_span.enter();
 
@@ -586,20 +517,11 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 				result_event = task.on_swarm_event(swarm, context.layer_mut(), result_event.unwrap());
 
 				// complete?
-				task.is_complete()
+				task.task_state()
 			};
 
-			// done?
-			if task_complete {
-				// remove
-				let (task, task_span) = runtime.pending_tasks.remove(task_index);
-				task_index -= 1;
-
-				// log
-				task_span.in_scope(|| {
-					tracing::trace!(?task, "network-task-completed");
-				});
-			}
+			// complete?
+			run_task_complete(runtime, &mut task_index, task_state);
 
 			// event consumed?
 			if result_event.is_none() {
@@ -614,6 +536,52 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		if let Some(_event) = result_event {
 			// ignore
 		}
+	} else {
+		let mut task_index = 0;
+		while task_index < runtime.pending_tasks.len() {
+			// handle
+			let task_state = {
+				let (task, task_span) = &mut runtime.pending_tasks[task_index];
+
+				// pending
+				let task_state = task.task_state();
+				match task_state {
+					NetworkTaskState::Pending => {
+						let _enter = task_span.enter();
+
+						// run
+						task.execute(swarm, context.layer_mut());
+
+						// complete?
+						task.task_state()
+					},
+					task_state => task_state,
+				}
+			};
+
+			// complete?
+			run_task_complete(runtime, &mut task_index, task_state);
+
+			// next
+			task_index += 1;
+		}
+	}
+}
+
+fn run_task_complete(runtime: &mut Runtime, task_index: &mut usize, task_state: NetworkTaskState) {
+	// use
+	runtime.use_task_state(task_state);
+
+	// done?
+	if task_state == NetworkTaskState::Complete {
+		// remove
+		let (task, task_span) = runtime.pending_tasks.remove(*task_index);
+		*task_index -= 1;
+
+		// log
+		task_span.in_scope(|| {
+			tracing::trace!(?task, "network-task-completed");
+		});
 	}
 }
 
@@ -621,5 +589,15 @@ fn is_log(event: &SwarmEvent<NetworkEvent>) -> bool {
 	match event {
 		SwarmEvent::Behaviour(NetworkEvent::Ping(_)) => false,
 		_ => true,
+	}
+}
+
+async fn option_await<T, O>(t: Option<T>) -> Option<O>
+where
+	T: Future<Output = O>,
+{
+	match t {
+		Some(fut) => Some(fut.await),
+		None => None,
 	}
 }

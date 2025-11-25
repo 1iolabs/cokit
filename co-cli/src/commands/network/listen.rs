@@ -24,8 +24,30 @@ pub struct Command {
 	pub listen: Multiaddr,
 
 	/// Bootstap addresses.
-	#[arg(long, value_name = "MULTIADDR", value_parser = parse_bootstrap, default_values_t = default_bootstrap())]
+	#[arg(long, value_name = "MULTIADDR", value_parser = parse_bootstrap, default_values_t = default_bootstrap(), conflicts_with = "no_bootstrap")]
 	pub bootstrap: Vec<Multiaddr>,
+
+	/// External address.
+	#[arg(long, value_name = "MULTIADDR")]
+	pub external_address: Vec<Multiaddr>,
+
+	/// Do not use any bootstraps.
+	#[arg(long)]
+	pub no_bootstrap: bool,
+
+	/// Enable relay server.
+	/// A (public) external address needs to be configured to enable it.
+	/// The relay is limited and only used for holepunching (DCUtR).
+	#[arg(long, short, requires = "external_address")]
+	pub relay: bool,
+
+	/// Disable mDNS protocol client.
+	#[arg(long)]
+	pub no_mdns: bool,
+
+	/// Disable NAT protocol clients.
+	#[arg(long)]
+	pub no_nat: bool,
 }
 
 fn default_bootstrap() -> Vec<Multiaddr> {
@@ -52,7 +74,11 @@ pub async fn command(
 	let network_settings = NetworkSettings::new()
 		.with_force_new_peer_id(network_command.force_new_peer_id)
 		.with_listen(command.listen.clone())
-		.with_bootstraps(command.bootstrap.iter().cloned())
+		.with_bootstraps(if !command.no_bootstrap { command.bootstrap.clone() } else { Default::default() })
+		.with_added_external_addresses(command.external_address.clone())
+		.with_relay(command.relay)
+		.with_mdns(!command.no_mdns)
+		.with_nat(!command.no_nat)
 		.build()?;
 
 	// application and network
@@ -61,17 +87,22 @@ pub async fn command(
 
 	// verbose
 	if cli.verbose > 0 {
-		if let Some(network) = application.context().network_tasks().await {
+		if let Some(network) = application.context().network().await {
 			// peer-id
 			let peer_id = network.local_peer_id();
 			println!("peer-id: {}", peer_id);
 
 			// listeners
-			let listeners = network.listeners().await?;
+			let listeners = network.listeners(true, false).await?;
 			for listener in listeners {
 				println!("listen: {}", listener);
 			}
 		}
+	}
+
+	// network
+	if let Some(network) = application.co().network().await {
+		network.didcontact_subscribe_default().await?;
 	}
 
 	// COs

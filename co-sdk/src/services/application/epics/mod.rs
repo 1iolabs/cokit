@@ -22,6 +22,7 @@ mod key_request_send;
 mod membership_update;
 mod network_block_get;
 mod network_queue;
+mod network_start;
 mod push_heads;
 mod resolve_private_identity;
 
@@ -59,5 +60,6 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(network_block_get::network_block_get)
 		.join(network_block_get::network_task_execute)
 		.join(resolve_private_identity::resolve_private_identity)
+		.join(network_start::network_start)
 		.join(TracingEpic::new(tags))
 }

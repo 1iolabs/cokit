@@ -1,9 +1,12 @@
-use crate::{services::connections::PeerRelateDidAction, Action, CoContext, ConnectionAction};
+use crate::{Action, CoContext};
 use co_actor::Actions;
 use co_identity::PeerDidCommHeader;
+use co_network::{
+	connections::{ConnectionAction, PeerRelateDidAction},
+	PeerId,
+};
 use co_primitives::CoTryStreamExt;
 use futures::{FutureExt, Stream};
-use libp2p::PeerId;
 use std::{str::FromStr, time::Instant};
 
 /// When receive a DidComm message with an verified peer header relate it with the Did for future connections.

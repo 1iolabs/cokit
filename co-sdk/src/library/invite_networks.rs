@@ -1,5 +1,5 @@
-use super::network_discovery::identities_networks;
 use crate::CoContext;
+use co_network::identities_networks;
 use co_primitives::{CoInviteMetadata, Network, NetworkPeer};
 use futures::TryStreamExt;
 use std::collections::BTreeSet;
