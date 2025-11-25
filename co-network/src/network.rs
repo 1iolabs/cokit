@@ -147,6 +147,11 @@ impl Libp2pNetwork {
 				.build()
 		};
 
+		// external addresses
+		for external_address in config.external_addresses.iter() {
+			swarm.add_external_address(external_address.clone());
+		}
+
 		// bootstrap
 		for bootstrap in config.bootstrap.iter() {
 			let peer_id = try_peer_id(bootstrap)?;
@@ -156,7 +161,7 @@ impl Libp2pNetwork {
 
 			// // listen on bootstrap as relay
 			// if config.nat {
-			// 	swarm.listen_on(bootstrap.clone().with(Protocol::P2pCircuit)).ok();
+			// 	swarm.listen_on(bootstrap.clone().with(multiaddr::Protocol::P2pCircuit)).ok();
 			// }
 
 			// dial bootstrap

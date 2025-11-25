@@ -14,6 +14,11 @@ pub struct NetworkSettings {
 	/// The bootstrap peers to increase connectivity.
 	pub bootstrap: BTreeSet<Multiaddr>,
 
+	/// Explicitly configured external addresses.
+	/// If the public address of a node is known.
+	/// Note: This is required when using relay mode.
+	pub external_addresses: Vec<Multiaddr>,
+
 	/// The default keep alive for connections.
 	pub keep_alive: Duration,
 
@@ -38,6 +43,7 @@ impl Default for NetworkSettings {
 			force_new_peer_id: Default::default(),
 			listen: Self::default_listen(),
 			bootstrap: Self::default_bootstrap(),
+			external_addresses: Default::default(),
 			keep_alive: Duration::from_secs(30),
 			peers_threshold: Some(10),
 			relay: false,
@@ -118,6 +124,18 @@ impl NetworkSettings {
 	pub fn with_bootstrap_from_string(mut self, bootstrap: &str) -> Result<Self, anyhow::Error> {
 		self.bootstrap.insert(bootstrap.parse()?);
 		Ok(self)
+	}
+
+	/// Add external address.
+	pub fn with_added_external_address(mut self, external_address: Multiaddr) -> Self {
+		self.external_addresses.push(external_address);
+		self
+	}
+
+	/// Add external addresses.
+	pub fn with_added_external_addresses(mut self, external_address: impl IntoIterator<Item = Multiaddr>) -> Self {
+		self.external_addresses.extend(external_address);
+		self
 	}
 
 	/// Enable relay mode to allow hole-punching over this swarm.

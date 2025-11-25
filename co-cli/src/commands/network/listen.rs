@@ -27,12 +27,18 @@ pub struct Command {
 	#[arg(long, value_name = "MULTIADDR", value_parser = parse_bootstrap, default_values_t = default_bootstrap(), conflicts_with = "no_bootstrap")]
 	pub bootstrap: Vec<Multiaddr>,
 
+	/// External address.
+	#[arg(long, value_name = "MULTIADDR")]
+	pub external_address: Vec<Multiaddr>,
+
 	/// Do not use any bootstraps.
 	#[arg(long)]
 	pub no_bootstrap: bool,
 
-	/// Enable relay server (Limited for DCUtR).
-	#[arg(long, short)]
+	/// Enable relay server.
+	/// A (public) external address needs to be configured to enable it.
+	/// The relay is limited and only used for holepunching (DCUtR).
+	#[arg(long, short, requires = "external_address")]
 	pub relay: bool,
 
 	/// Disable mDNS protocol client.
@@ -69,6 +75,7 @@ pub async fn command(
 		.with_force_new_peer_id(network_command.force_new_peer_id)
 		.with_listen(command.listen.clone())
 		.with_bootstraps(if !command.no_bootstrap { command.bootstrap.clone() } else { Default::default() })
+		.with_added_external_addresses(command.external_address.clone())
 		.with_relay(command.relay)
 		.with_mdns(!command.no_mdns)
 		.with_nat(!command.no_nat)

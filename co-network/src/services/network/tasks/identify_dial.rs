@@ -37,10 +37,10 @@ impl NetworkTask<Behaviour, Context> for IdentifyDialNetworkTask {
 						if !is_private_ip(addr) {
 							match swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![addr.clone()]).build()) {
 								Err(err) => {
-									tracing::debug!(?err, ?peer_id, ?addr, "identify-dial-failed");
+									tracing::debug!(?err, ?peer_id, ?addr, "network-identify-dial-failed");
 								},
 								Ok(_) => {
-									tracing::trace!(?peer_id, ?addr, "identify-dial");
+									tracing::trace!(?peer_id, ?addr, "network-identify-dial");
 								},
 							}
 						}

@@ -6,8 +6,8 @@ use crate::{
 		connections::{Connections, ConnectionsContext, DynamicNetworkResolver},
 		heads::{HeadsActor, HeadsApi, HeadsContext},
 		network::{
-			tasks::identify_dial::IdentifyDialNetworkTask, CoNetworkTaskSpawner, ConnectionsNetworkTask,
-			MdnsGossipNetworkTask, NetworkApi, NetworkSettings,
+			tasks::{identify_dial::IdentifyDialNetworkTask, relay_listen::RelayListenTask},
+			CoNetworkTaskSpawner, ConnectionsNetworkTask, MdnsGossipNetworkTask, NetworkApi, NetworkSettings,
 		},
 	},
 	types::network_task::NetworkTaskSpawner,
@@ -94,6 +94,13 @@ impl Actor for Network {
 			HeadsActor::default(),
 			HeadsContext { network: spawner.clone(), spawner: initialize.tasks.clone() },
 		)?;
+
+		// use bootstraps as relay
+		for bootstrap in initialize.settings.bootstrap.iter() {
+			spawner
+				.spawn(RelayListenTask::new(bootstrap.clone()))
+				.map_err(|err| ActorError::Actor(err.into()))?;
+		}
 
 		// log
 		tracing::info!(application = initialize.identifier, peer_id = ?network_peer_id, "network");
