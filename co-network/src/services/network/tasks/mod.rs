@@ -5,6 +5,7 @@ pub mod didcomm_receive;
 pub mod didcomm_send;
 pub mod discovery_connect;
 pub mod gossip;
+pub mod identify_dial;
 pub mod listeners;
 pub mod mdns_gossip;
 pub mod peers;

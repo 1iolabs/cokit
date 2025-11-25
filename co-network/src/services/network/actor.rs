@@ -58,6 +58,16 @@ impl Actor for Network {
 		// spawner
 		let spawner = CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id.clone() };
 
+		// dial identified peer addresses
+		spawner
+			.spawn(IdentifyDialNetworkTask::new(CO_AGENT.to_string()))
+			.map_err(|err| ActorError::Actor(err.into()))?;
+
+		// use mdns discoverd peers for gossip discovery
+		spawner
+			.spawn(MdnsGossipNetworkTask::new())
+			.map_err(|err| ActorError::Actor(err.into()))?;
+
 		// connections
 		let connections_context = ConnectionsContext {
 			tasks: initialize.tasks.clone(),
@@ -75,11 +85,6 @@ impl Actor for Network {
 		)?;
 		spawner
 			.spawn(ConnectionsNetworkTask::new(connections.handle()))
-			.map_err(|err| ActorError::Actor(err.into()))?;
-
-		// use mdns discoverd peers for gossip discovery
-		spawner
-			.spawn(MdnsGossipNetworkTask::new())
 			.map_err(|err| ActorError::Actor(err.into()))?;
 
 		// heads
