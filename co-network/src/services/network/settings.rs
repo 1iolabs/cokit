@@ -14,10 +14,6 @@ pub struct NetworkSettings {
 	/// The bootstrap peers to increase connectivity.
 	pub bootstrap: BTreeSet<Multiaddr>,
 
-	/// Wherther to enable a limited relay server.
-	/// This relay can be used by other peers for holepunching.
-	pub relay: bool,
-
 	/// The default keep alive for connections.
 	pub keep_alive: Duration,
 
@@ -25,6 +21,16 @@ pub struct NetworkSettings {
 	/// More peers will be discoverd using bootstrap when the count falls below this number.
 	/// This is optional and if it is set to [`None`] all connections are only on demand.
 	pub peers_threshold: Option<u32>,
+
+	/// Wherther to enable a limited relay server.
+	/// This relay can be used by other peers for holepunching.
+	pub relay: bool,
+
+	/// Enable NAT related protocols.
+	pub nat: bool,
+
+	/// Enable mDNS protocol.
+	pub mdns: bool,
 }
 impl Default for NetworkSettings {
 	fn default() -> Self {
@@ -32,9 +38,11 @@ impl Default for NetworkSettings {
 			force_new_peer_id: Default::default(),
 			listen: Self::default_listen(),
 			bootstrap: Self::default_bootstrap(),
-			relay: false,
 			keep_alive: Duration::from_secs(30),
 			peers_threshold: Some(10),
+			relay: false,
+			nat: true,
+			mdns: true,
 		}
 	}
 }
@@ -82,14 +90,26 @@ impl NetworkSettings {
 		self
 	}
 
-	/// Add bootstrap endpoint.
+	/// Set bootstrap endpoint.
 	pub fn with_bootstrap(mut self, bootstrap: Multiaddr) -> Self {
+		self.bootstrap = [bootstrap].into_iter().collect();
+		self
+	}
+
+	/// Set bootstrap endpoint.
+	pub fn with_bootstraps(mut self, bootstrap: impl IntoIterator<Item = Multiaddr>) -> Self {
+		self.bootstrap = bootstrap.into_iter().collect();
+		self
+	}
+
+	/// Add bootstrap endpoint.
+	pub fn with_added_bootstrap(mut self, bootstrap: Multiaddr) -> Self {
 		self.bootstrap.insert(bootstrap);
 		self
 	}
 
 	/// Add bootstrap endpoint.
-	pub fn with_bootstraps(mut self, bootstrap: impl IntoIterator<Item = Multiaddr>) -> Self {
+	pub fn with_added_bootstraps(mut self, bootstrap: impl IntoIterator<Item = Multiaddr>) -> Self {
 		self.bootstrap.extend(bootstrap);
 		self
 	}
@@ -103,6 +123,18 @@ impl NetworkSettings {
 	/// Enable relay mode to allow hole-punching over this swarm.
 	pub fn with_relay(mut self, relay: bool) -> Self {
 		self.relay = relay;
+		self
+	}
+
+	/// Enable mDNS protocol.
+	pub fn with_mdns(mut self, mdns: bool) -> Self {
+		self.mdns = mdns;
+		self
+	}
+
+	/// Enable NAT related protocols.
+	pub fn with_nat(mut self, nat: bool) -> Self {
+		self.nat = nat;
 		self
 	}
 

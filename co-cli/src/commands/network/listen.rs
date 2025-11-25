@@ -24,12 +24,24 @@ pub struct Command {
 	pub listen: Multiaddr,
 
 	/// Bootstap addresses.
-	#[arg(long, value_name = "MULTIADDR", value_parser = parse_bootstrap, default_values_t = default_bootstrap())]
+	#[arg(long, value_name = "MULTIADDR", value_parser = parse_bootstrap, default_values_t = default_bootstrap(), conflicts_with = "no_bootstrap")]
 	pub bootstrap: Vec<Multiaddr>,
 
+	/// Do not use any bootstraps.
+	#[arg(long)]
+	pub no_bootstrap: bool,
+
 	/// Enable relay server (Limited for DCUtR).
-	#[arg(short)]
+	#[arg(long, short)]
 	pub relay: bool,
+
+	/// Disable mDNS protocol client.
+	#[arg(long)]
+	pub no_mdns: bool,
+
+	/// Disable NAT protocol clients.
+	#[arg(long)]
+	pub no_nat: bool,
 }
 
 fn default_bootstrap() -> Vec<Multiaddr> {
@@ -56,8 +68,10 @@ pub async fn command(
 	let network_settings = NetworkSettings::new()
 		.with_force_new_peer_id(network_command.force_new_peer_id)
 		.with_listen(command.listen.clone())
-		.with_bootstraps(command.bootstrap.iter().cloned())
+		.with_bootstraps(if !command.no_bootstrap { command.bootstrap.clone() } else { Default::default() })
 		.with_relay(command.relay)
+		.with_mdns(!command.no_mdns)
+		.with_nat(!command.no_nat)
 		.build()?;
 
 	// application and network

@@ -6,10 +6,11 @@ use crate::{
 		layer_behaviour::{Layer, LayerBehaviour},
 		network_task::{NetworkTaskBox, TokioNetworkTaskSpawner},
 	},
+	NetworkSettings,
 };
 use anyhow::anyhow;
 use co_actor::ActorHandle;
-use co_identity::{IdentityResolver, IdentityResolverBox, PrivateIdentityResolver, PrivateIdentityResolverBox};
+use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
 use co_primitives::DefaultParams;
 use futures::{pin_mut, Stream, StreamExt};
 use libp2p::{
@@ -17,35 +18,34 @@ use libp2p::{
 	identity::Keypair,
 	mdns::{self, tokio::Behaviour as MdnsBehaviour},
 	noise, ping, relay,
-	swarm::{behaviour::toggle::Toggle, NetworkBehaviour, SwarmEvent},
-	yamux, Multiaddr, PeerId, Swarm, SwarmBuilder,
+	swarm::{behaviour::toggle::Toggle, dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
+	yamux, PeerId, StreamProtocol, Swarm, SwarmBuilder,
 };
 use libp2p_bitswap::{Bitswap, BitswapEvent};
-use multiaddr::Protocol;
 use rand::rngs::OsRng;
-use std::{collections::BTreeSet, task::Poll, time::Duration};
+use std::{task::Poll, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
+
+pub const CO_AGENT: &str = "co/0.1.0";
+pub const IPFS_IDENTIFY_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/id/1.0.0");
 
 pub struct Libp2pNetwork {
 	shutdown: CancellationToken,
 	tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<Behaviour, Context>>,
 }
 impl Libp2pNetwork {
-	pub fn new<R, P>(
+	pub fn new(
 		identifier: String,
-		config: Libp2pNetworkConfig,
-		resolver: R,
-		private_resolver: P,
+		keypair: Keypair,
+		config: NetworkSettings,
+		resolver: IdentityResolverBox,
+		private_resolver: PrivateIdentityResolverBox,
 		bitswap: ActorHandle<BitswapMessage<DefaultParams>>,
-	) -> anyhow::Result<Libp2pNetwork>
-	where
-		R: IdentityResolver + Clone + Send + Sync + 'static,
-		P: PrivateIdentityResolver + Clone + Send + Sync + 'static,
-	{
+	) -> anyhow::Result<Libp2pNetwork> {
 		let resolver = IdentityResolverBox::new(resolver);
 		let private_resolver = PrivateIdentityResolverBox::new(private_resolver);
-		let local_peer_id = PeerId::from(config.keypair.public().clone());
+		let local_peer_id = PeerId::from(keypair.public().clone());
 
 		// kad
 		// let kademlia_config: KademliaConfig = Default::default();
@@ -58,7 +58,7 @@ impl Libp2pNetwork {
 			.build()
 			.expect("valid config");
 		let gossipsub =
-			gossipsub::Behaviour::new(gossipsub::MessageAuthenticity::Signed(config.keypair.clone()), gossipsub_config)
+			gossipsub::Behaviour::new(gossipsub::MessageAuthenticity::Signed(keypair.clone()), gossipsub_config)
 				.map_err(|err| anyhow!("gossip failed: {}", err))?;
 
 		// bitswap
@@ -77,50 +77,75 @@ impl Libp2pNetwork {
 		);
 
 		// relay
-		let relay_server = match config.mode {
-			NetworkMode::Full => Some(libp2p::relay::Behaviour::new(local_peer_id.clone(), relay::Config::default())),
-			_ => None,
-		};
+		let relay_server = if config.relay {
+			Some(libp2p::relay::Behaviour::new(local_peer_id.clone(), relay::Config::default()))
+		} else {
+			None
+		}
+		.into();
 
 		// identify
-		let identify = identify::Behaviour::new(identify::Config::new("/co/0.1.0".into(), config.keypair.public()));
+		let identify_config = identify::Config::new(IPFS_IDENTIFY_PROTOCOL_NAME.to_string(), keypair.public())
+			.with_agent_version(CO_AGENT.into());
+		let identify = identify::Behaviour::new(identify_config);
 
 		// mdns
-		let mdns = MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?;
+		let mdns =
+			if config.mdns { Some(MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?) } else { None }
+				.into();
 
 		// didcomm
 		let didcomm = didcomm::Behaviour::new(resolver.clone(), private_resolver, didcomm::Config { auto_dail: false });
 
 		// autonat
-		let autonat_server = match config.mode {
-			NetworkMode::Full => Some(autonat::v2::server::Behaviour::new(OsRng)),
-			_ => None,
+		let autonat_server = if config.relay { Some(autonat::v2::server::Behaviour::new(OsRng)) } else { None }.into();
+		let autonat_client = if config.nat {
+			Some(autonat::v2::client::Behaviour::new(OsRng, autonat::v2::client::Config::default()))
+		} else {
+			None
+		}
+		.into();
+
+		// dcutr
+		let dcutr = if config.nat { Some(dcutr::Behaviour::new(local_peer_id.clone())) } else { None }.into();
+
+		// behaviour
+		let mut behaviour = Behaviour {
+			identify,
+			ping: ping::Behaviour::new(ping::Config::new()),
+			mdns,
+			// kad,
+			bitswap,
+			gossipsub,
+			didcomm,
+			dcutr,
+			relay_server,
+			relay_client: None.into(),
+			autonat_server,
+			autonat_client,
 		};
-		let autonat_client = autonat::v2::client::Behaviour::new(OsRng, autonat::v2::client::Config::default());
 
 		// swarm
-		let mut swarm = SwarmBuilder::with_existing_identity(config.keypair.clone())
+		let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
 			.with_tokio()
 			.with_tcp(libp2p::tcp::Config::default(), noise::Config::new, yamux::Config::default)?
 			.with_quic()
-			.with_dns()?
-			.with_relay_client(noise::Config::new, yamux::Config::default)?
-			.with_behaviour(move |_keypair, relay_client| Behaviour {
-				identify,
-				ping: ping::Behaviour::new(ping::Config::new()),
-				mdns,
-				// kad,
-				bitswap,
-				gossipsub,
-				didcomm,
-				dcutr: dcutr::Behaviour::new(local_peer_id.clone()),
-				relay_server: relay_server.into(),
-				relay_client,
-				autonat_server: autonat_server.into(),
-				autonat_client,
-			})?
-			.with_swarm_config(|config| config.with_idle_connection_timeout(Duration::from_secs(30)))
-			.build();
+			.with_dns()?;
+		let mut swarm = if config.nat {
+			swarm_builder
+				.with_relay_client(noise::Config::new, yamux::Config::default)?
+				.with_behaviour(move |_keypair, relay_client| {
+					behaviour.relay_client = Some(relay_client).into();
+					behaviour
+				})?
+				.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
+				.build()
+		} else {
+			swarm_builder
+				.with_behaviour(move |_keypair| behaviour)?
+				.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
+				.build()
+		};
 
 		// bootstrap
 		for bootstrap in config.bootstrap.iter() {
@@ -129,14 +154,13 @@ impl Libp2pNetwork {
 				continue;
 			}
 
-			// listen on relay
-			match config.mode {
-				NetworkMode::Full => {},
-				NetworkMode::Light => {
-					swarm.listen_on(bootstrap.clone().with(Protocol::P2pCircuit)).ok();
-				},
-			}
-			// swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![bootstrap.clone()]).build())?;
+			// // listen on bootstrap as relay
+			// if config.nat {
+			// 	swarm.listen_on(bootstrap.clone().with(Protocol::P2pCircuit)).ok();
+			// }
+
+			// dial bootstrap
+			swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![bootstrap.clone()]).build())?;
 
 			// use as explicent gossip peer
 			swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
@@ -152,10 +176,10 @@ impl Libp2pNetwork {
 
 		// runtime
 		let shutdown = CancellationToken::new();
-		let mut runtime = Runtime::new(config.clone(), shutdown.child_token());
+		let mut runtime = Runtime::new(shutdown.child_token());
 
 		// listen
-		runtime.listen(swarm.listen_on(config.addr)?);
+		runtime.listen(swarm.listen_on(config.listen)?);
 
 		// run
 		tokio::spawn(async move {
@@ -195,43 +219,15 @@ impl Shutdown {
 	}
 }
 
-#[derive(Clone, Debug)]
-pub struct Libp2pNetworkConfig {
-	pub keypair: Keypair,
-	pub addr: Multiaddr,
-
-	// Nodes to initialiy dial.
-	/// The multiaddress is required to include an address (protocol) and and peer id (p2p).
-	pub bootstrap: BTreeSet<Multiaddr>,
-
-	/// Network mode to optimize for.
-	/// This may change dynamically.
-	/// For example when a mobile device gets plugged in to an power outlet.
-	pub mode: NetworkMode,
-}
-impl Libp2pNetworkConfig {
-	pub fn from_keypair(listen: Multiaddr, keypair: Keypair) -> Self {
-		Self { keypair, addr: listen, bootstrap: Default::default(), mode: Default::default() }
-	}
-}
-
-#[derive(Clone, Debug, Default, Copy, PartialEq)]
-pub enum NetworkMode {
-	#[default]
-	Full,
-	Light,
-}
-
 struct Runtime {
-	_config: Libp2pNetworkConfig,
 	listener_id: Option<libp2p::core::transport::ListenerId>,
 	/// Tasks which have been executed but waiting for events.
 	pending_tasks: Vec<(NetworkTaskBox<Behaviour, Context>, Span)>,
 	shutdown: CancellationToken,
 }
 impl Runtime {
-	fn new(config: Libp2pNetworkConfig, shutdown: CancellationToken) -> Self {
-		Self { _config: config, listener_id: None, shutdown, pending_tasks: Default::default() }
+	fn new(shutdown: CancellationToken) -> Self {
+		Self { listener_id: None, shutdown, pending_tasks: Default::default() }
 	}
 
 	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
@@ -327,15 +323,15 @@ pub struct Behaviour {
 	pub didcomm: didcomm::Behaviour,
 	pub gossipsub: gossipsub::Behaviour,
 	pub identify: identify::Behaviour,
-	pub mdns: MdnsBehaviour,
+	pub mdns: Toggle<MdnsBehaviour>,
 	pub ping: ping::Behaviour,
 	// pub kad: Kademlia<MemoryStore>,
 	pub bitswap: Bitswap<libipld::DefaultParams>,
-	pub dcutr: dcutr::Behaviour,
+	pub dcutr: Toggle<dcutr::Behaviour>,
 	pub relay_server: Toggle<relay::Behaviour>,
-	pub relay_client: relay::client::Behaviour,
+	pub relay_client: Toggle<relay::client::Behaviour>,
 	pub autonat_server: Toggle<autonat::v2::server::Behaviour>,
-	pub autonat_client: autonat::v2::client::Behaviour,
+	pub autonat_client: Toggle<autonat::v2::client::Behaviour>,
 }
 impl discovery::DiscoveryBehaviour for Behaviour {
 	fn rendezvous_client_mut(&mut self) -> Option<&mut libp2p::rendezvous::client::Behaviour> {
@@ -349,7 +345,7 @@ impl discovery::DiscoveryBehaviour for Behaviour {
 	}
 
 	fn mdns_mut(&mut self) -> Option<&mut mdns::tokio::Behaviour> {
-		Some(&mut self.mdns)
+		self.mdns.as_mut()
 	}
 
 	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&mdns::Event> {

@@ -1,11 +1,14 @@
 use super::message::NetworkMessage;
 use crate::{
 	bitswap::BitswapMessage,
-	network::{Libp2pNetwork, Libp2pNetworkConfig, NetworkMode},
+	network::{Libp2pNetwork, CO_AGENT},
 	services::{
 		connections::{Connections, ConnectionsContext, DynamicNetworkResolver},
 		heads::{HeadsActor, HeadsApi, HeadsContext},
-		network::{CoNetworkTaskSpawner, ConnectionsNetworkTask, MdnsGossipNetworkTask, NetworkApi, NetworkSettings},
+		network::{
+			tasks::identify_dial::IdentifyDialNetworkTask, CoNetworkTaskSpawner, ConnectionsNetworkTask,
+			MdnsGossipNetworkTask, NetworkApi, NetworkSettings,
+		},
 	},
 	types::network_task::NetworkTaskSpawner,
 };
@@ -40,15 +43,13 @@ impl Actor for Network {
 		_tags: &Tags,
 		initialize: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
-		// network
 		let network_peer_id = PeerId::from(initialize.keypair.public());
-		let mut network_config =
-			Libp2pNetworkConfig::from_keypair(initialize.settings.listen.clone(), initialize.keypair.clone());
-		network_config.mode = if initialize.settings.relay { NetworkMode::Full } else { NetworkMode::Light };
-		network_config.bootstrap = initialize.settings.bootstrap.clone();
+
+		// network
 		let network = Libp2pNetwork::new(
 			initialize.identifier.clone(),
-			network_config,
+			initialize.keypair.clone(),
+			initialize.settings.clone(),
 			initialize.identity_resolver.clone(),
 			initialize.private_identity_resolver.clone(),
 			initialize.bitswap,
