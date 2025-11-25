@@ -1,18 +1,18 @@
 # How to contribute
-Contributions from the community are always more than welcome!
-In fact, CO-kit can only become better through your contributions.
+Contributions from the community are always more than welcome!  
+In fact, CO-kit can only become better through your contributions.  
 Your ideas, feedback and code are super important for improving CO-kit.
 
-Wether you're fixing a bug, enhancing features, or suggesting improvements, we'd love to have you on board.
+Whether you're fixing a bug, enhancing features, or suggesting improvements, we'd love to have you on board.
 
 These are the ways you can contribute:
 - Fix Bugs
 - Add new features through resolving issues
 - Suggest improvements/add-ons concerning documentation
-- Suggest improvements creating an issue
+- Suggest improvements by creating an issue
 
 ## Bug report
-CO-kit isn't immune to the occasional glitch.
+CO-kit isn't immune to the occasional glitch.  
 To help us fix issues quickly, transparently, and effectively, we welcome detailed and thoughtful bug reports from the community.
 
 ### What Makes a Good Bug Report?
@@ -20,7 +20,7 @@ When reporting a bug, please include as many of the following details as possibl
 - A clear description of the problem
 - The CO-kit version and any relevant dependencies
 - Your operating system and environment
-- Steps to reproduce the issue (ideally with test case or minimal code)
+- Steps to reproduce the issue (ideally with a test case or minimal code)
 - What you expected to happen vs. what actually happened
 - Any logs, error messages, or screenshots
 

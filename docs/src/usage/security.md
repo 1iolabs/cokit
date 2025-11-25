@@ -1,17 +1,18 @@
 # Security
 
 ```admonish note
-All security mechanics in CO-kit assume that the host machine it is running on is safe and can be trusted.
-If that is not the case you will have much bigger problems to worry about as no piece of software will be secure.
+All security mechanics in CO-kit assume that the host machine it is running on is safe and can be trusted.  
+
+If this is not the case, you have much bigger problems to worry about, because no software will be secure.
 ```
 
 ```admonish warning
-Cryptography in CO-kit has currently not been peer reviewed/audited.
+Cryptography in CO-kit has not yet been peer reviewed/audited.
 ```
 
 ## Cryptography
-Each piece of data in CO-kit carries an identifier for the cryptographic scheme used.
-This ensures interoperability, supports multiple algorithms, allows upgrading and makes data structures self-describing.
+Each piece of data in CO-kit carries an identifier for the cryptographic scheme used.  
+This ensures interoperability, supports multiple algorithms, allows upgrading, and makes data structures self-describing.
 
 Cryptography used:
 - Content hashing: Blake3-256
@@ -29,13 +30,13 @@ Cryptography crates used:
 - [aead](https://crates.io/crates/aead)
 
 ## Privacy
-Privacy is dependent on the used networking strategy.
+Privacy is dependent on the networking strategy used.
 
-PeerIDs are unique any may tracked by malicious peers.
+PeerIDs are unique, and may tracked by malicious peers.  
 However, they can be rotated anytime to improve privacy.
 
-The built-in [didcontact](../reference/network.md#protocol-didcontact) protocol notably sends, specified by the [didcomm](../reference/network.md#protocol-didcomm) spec, the senders DID reference in plain text.
-The recipient is encrypted so this only allows to relate a PeerID to a DID.
+As specified by the [didcomm](../reference/network.md#protocol-didcomm) spec, the built-in [didcontact](../reference/network.md#protocol-didcontact) protocol sends the sender's DID reference in plain text.  
+The recipient is encrypted, however, so this can only be used to relate a PeerID to a DID.
 
 ## Related
 - [Security (#24)](https://gitlab.1io.com/1io/co-sdk/-/issues/24)

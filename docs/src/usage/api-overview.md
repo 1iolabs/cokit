@@ -1,7 +1,7 @@
 # API Overview
 
-Common APIs are exported by the `co-primitives` package.
-They are used across [cores](../reference/core.md) and Applications.
+Common APIs are exported by the `co-primitives` package.  
+They are used across [Cores](../reference/core.md) and Applications.
 
 Table of Contents:
 
@@ -9,8 +9,8 @@ Table of Contents:
 
 ## `BlockStorage`
 
-The block storage API is used to set and get content-addressed blocks of data.
-The [`BlockStorageExt`](/crate/co_primitives/trait.BlockStorageExt.html) trait extends this with convenience methods like directly setting a block from data.
+The block storage API is used to set and get content-addressed blocks of data.  
+The [`BlockStorageExt`](/crate/co_primitives/trait.BlockStorageExt.html) trait extends this with convenient methods like directly setting a block from data.
 
 ```rust
 # use co_storage::MemoryBlockStorage;
@@ -29,16 +29,16 @@ assert_eq!(value, 1);
 # }
 ```
 
-For further information see:
+For further information, see:
 - [Storage](../reference/storage.md)
 - [co-primitives: BlockStorage](/crate/co_primitives/trait.BlockStorage.html)
 - [co-primitives: BlockStorageExt](/crate/co_primitives/trait.BlockStorageExt.html)
 
 ## `CoMap`
-[`CoMap`](/crate/co_primitives/struct.CoMap.html) stores Key/Value pairs using the IPLD data model in a content-addressed fashion.
-Works like a hash map but async and sorted by keys.
+[`CoMap`](/crate/co_primitives/struct.CoMap.html) stores Key/Value pairs using the IPLD data model in a content-addressed fashion.  
+Works like a hash map, but asynchronously and sorted by keys.
 
-For further information see:
+For further information, see:
 - [co-primitives: CoMap](/crate/co_primitives/struct.CoMap.html)
 - [Glossary: IPLD](../glossary/glossary.md#ipld)
 - [Glossary: content addressing (CID)](../glossary/glossary.md#cid)
@@ -104,7 +104,7 @@ assert_eq!(
 ```
 
 ### Transactions
-To optimize storage access, a transaction-based API is available and recommended to be used.
+To optimize storage access, a transaction-based API is available, and using it is recommended.
 
 ```rust
 # use co_storage::MemoryBlockStorage;
@@ -129,29 +129,29 @@ assert_eq!(
 ```
 
 ## `CoSet`
-[`CoSet`](/crate/co_primitives/struct.CoSet.html) stores values using the IPLD data model in a content-addressed fashion.
-Works like a hash set but async and sorted by values.
+[`CoSet`](/crate/co_primitives/struct.CoSet.html) stores values using the IPLD data model in a content-addressed fashion.  
+Works like a hash set, but asynchronously and sorted by values.
 
-For further information see:
+For further information, see:
 - [co-primitives: CoSet](/crate/co_primitives/struct.CoSet.html)
 - [Glossary: IPLD](../glossary/glossary.md#ipld)
 - [Glossary: content addressing (CID)](../glossary/glossary.md#cid)
 
 ## `CoList`
-[`CoList`](/crate/co_primitives/struct.CoList.html) stores values by order, using the IPLD data model in a content-addressed fashion.
-Works like a vector but async.
+[`CoList`](/crate/co_primitives/struct.CoList.html) stores values in order, using the IPLD data model in a content-addressed fashion.  
+Works like a vector, but asynchronously.
 
-The used key type is [`CoListIndex`](/crate/co_primitives/struct.CoListIndex.html), which internally uses rational numbers.
-This way we can insert between existing values without the need to rewrite all values.
+The used key type is [`CoListIndex`](/crate/co_primitives/struct.CoListIndex.html), which internally uses rational numbers.  
+This way, we can insert between existing values without the need to rewrite all values.
 
-For further information see:
+For further information, see:
 - [co-primitives: CoList](/crate/co_primitives/struct.CoList.html)
 - [co-primitives: CoListIndex](/crate/co_primitives/struct.CoListIndex.html)
 - [Glossary: IPLD](../glossary/glossary.md#ipld)
 - [Glossary: content addressing (CID)](../glossary/glossary.md#cid)
 
 ## `BlockSerializer`
-This is a convenience type to create a [`Block`](/crate/co_primitives/struct.Block.html) from data that support `serde::Serialize`.
+This is a convenience type to create a [`Block`](/crate/co_primitives/struct.Block.html) from data that supports `serde::Serialize`.  
 It uses the DAG-CBOR encoding.
 
 ```rust
@@ -171,11 +171,11 @@ assert_eq!(block.data(), [161, 101, 104, 101, 108, 108, 111, 101, 119, 111, 114,
 # }
 ```
 
-For further information see:
+For further information, see:
 - [co-primitives: BlockSerializer](/crate/co_primitives/struct.BlockSerializer.html)
 - [Glossary: DAG-CBOR](../glossary/glossary.md#dag-cbor)
 
-There is also a convenient method to convert from/to DAG-CBOR:
+There are also convenient methods to convert from/to DAG-CBOR:
 
 ### `to_cbor`
 Convenient method to serialize to DAG-CBOR:
@@ -196,7 +196,7 @@ assert_eq!(&data, [161, 101, 104, 101, 108, 108, 111, 101, 119, 111, 114, 108, 1
 # }
 ```
 
-For further information see:
+For further information, see:
 - [co-primitives: to_cbor](/crate/co_primitives/fn.to_cbor.html)
 - [Glossary: DAG-CBOR](../glossary/glossary.md#dag-cbor)
 
@@ -218,7 +218,7 @@ assert_eq!(data, Test { hello: "world".to_owned() });
 # }
 ```
 
-For further information see:
+For further information, see:
 - [co-primitives: from_cbor](/crate/co_primitives/fn.from_cbor.html)
 - [Glossary: DAG-CBOR](../glossary/glossary.md#dag-cbor)
 
@@ -250,7 +250,7 @@ assert_eq!(blocks.len(), 7);
 # }
 ```
 
-This builds a graph like this:
+This builds the following graph:
 
 ```mermaid
 flowchart TD
@@ -291,11 +291,11 @@ subgraph "CID7 (root)"
 end
 ```
 
-For further information see:
+For further information, see:
 - [co-primitives: NodeBuilder](/crate/co_primitives/struct.NodeBuilder.html)
 
 ### `NodeStream`
-The `NodeStream` is used to read a graph created with `NodeBuilder` in an async manner as a futures stream:
+The `NodeStream` is used to read a graph created with `NodeBuilder` in an async manner as a _futures_ stream:
 
 ```rust
 # use co_primitives::{BlockStorage, DefaultNodeSerializer, NodeBuilder, NodeStream};
@@ -326,7 +326,7 @@ assert_eq!(list[..], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 ```
 
 
-For further information see:
+For further information, see:
 - [co-primitives: NodeStream](/crate/co_primitives/struct.NodeStream.html)
 
 ## References
