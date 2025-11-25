@@ -1,12 +1,9 @@
-use crate::{
-	actor::JsLocalTaskSpawner,
-	js::{from_js_value, to_js_value},
-};
+use crate::{actor::JsLocalTaskSpawner, js::to_js_value};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{ActorError, ActorHandle, LocalActor, Response};
-use co_primitives::{from_cbor, Block, BlockStorage, DefaultParams, StorageError};
+use co_primitives::{Block, BlockStorage, DefaultParams, StorageError};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -16,7 +13,7 @@ use web_sys::{
 
 #[wasm_bindgen]
 extern "C" {
-	#[wasm_bindgen(typescript_type = "(cid: Uint8Array) => Uint8Array | undefined")]
+	#[wasm_bindgen(typescript_type = "(cid: Uint8Array) => Promise<Uint8Array | undefined>")]
 	pub type JsBlockStorageGet;
 
 	#[wasm_bindgen(typescript_type = "(cid: Uint8Array, data: Uint8Array) => void")]
@@ -77,7 +74,7 @@ enum JsBlockStorageMessage {
 #[derive(Debug)]
 struct JsBlockStorageActor {
 	/// Typescript: ```typescript
-	/// (cid: Uint8Array) => Uint8Array | undefined
+	/// (cid: Uint8Array) => Promise<Uint8Array | undefined>
 	/// ```
 	get: Function,
 

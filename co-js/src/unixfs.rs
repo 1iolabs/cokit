@@ -20,10 +20,35 @@ pub async fn js_unixfs_add(storage: &JsBlockStorage, stream: web_sys::ReadableSt
 				.map_err(|err| futures::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", err)))?)
 		})
 		.into_async_read();
+
 	console::log_1(&"After Stream maybe?".into());
-	let cids = unixfs_add(storage, &mut async_stream)
-		.await
-		.map_err(|err| format!("unixfs add failed: \n{:?}", err))?;
+	let cids = unixfs_add(storage, &mut async_stream).await.map_err(|err| {
+		let error = format!("unixfs add failed: \n{:?}", err);
+		console::log_2(&"Unixfs Error: ".into(), &error.clone().into());
+		error
+	})?;
 	console::log_2(&"After Stream maybe?".into(), &to_js_value(&cids).expect("msg"));
 	to_js_value(&cids)
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{
+		block_storage::{JsBlockStorageGet, JsBlockStorageSet},
+		js_unixfs_add, JsBlockStorage,
+	};
+	use wasm_bindgen::prelude::Closure;
+	use web_sys::js_sys::Uint8Array;
+
+	#[tokio::test]
+	async fn test_unixfs() {
+		let stream = web_sys::ReadableStream::new().expect("stream");
+		let get_closure: Closure<dyn Fn(Uint8Array) -> Uint8Array> = Closure::new(|cid| cid);
+		let set_closure: Closure<dyn Fn(Uint8Array, Uint8Array) -> Uint8Array> = Closure::new(|cid, data| cid);
+		let get: JsBlockStorageGet = JsBlockStorageGet::from(get_closure.into_js_value());
+		let set: JsBlockStorageSet = JsBlockStorageSet::from(set_closure.into_js_value());
+		let storage = JsBlockStorage::new(get, set).expect("storage");
+		let cids = js_unixfs_add(&storage, stream).await;
+		println!("cids: {:?}", cids);
+	}
 }
