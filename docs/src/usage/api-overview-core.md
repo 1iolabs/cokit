@@ -1,12 +1,12 @@
-# API Overview Core (co-api)
+# Core API Overview (co-api)
 
-The [`co-api`](/crate/co_api/index.html) is the foundation package to create CO-kit [cores](../reference/core.md).
-It re-exports [`co-primitives`](/crate/co_primitives/index.html) used to implement cores.
+The [`co-api`](/crate/co_api/index.html) is the foundation package to create CO-kit [Cores](../reference/core.md).  
+It re-exports those [`co-primitives`](/crate/co_primitives/index.html) used to implement Cores.
 
 ## `Reducer`
 
-The reducer trait.
-Normally implemented on the root state of the core.
+The reducer trait.  
+Normally implemented on the root state of the core.  
 Its purpose is to apply actions to the current state.
 
 Minimal usage example:
@@ -36,13 +36,13 @@ where
 }
 ```
 
-For further information see:
+For further information, see:
 - [Core Quick Start](../getting-started/rust-core-quick-start.md)
 - [Core](../reference/core.md)
 
 ## `Guard`
 
-The guard trait.
+The guard trait.  
 Verifies if `next_head` are allowed to be integrated into state.
 
 Minimal usage example:
@@ -67,7 +67,7 @@ impl<S: BlockStorage + Clone + 'static> Guard<S> for MyGuard {
 }
 ```
 
-For further information see:
+For further information, see:
 - [Guard](../reference/guard.md)
 - [co-core-co: Co](/crate/co_core_co/struct.Co.html#impl-Guard<S>-for-Co)
 
@@ -102,20 +102,20 @@ extern "C" fn diagnostic_cid_write(buffer: *const u8, buffer_size: u32) -> u32;
 
 ### Exports
 
-The WASM Binary for reducers must export following functions:
+The WASM Binary for Reducers must export the following function:
 
 ```rust
 extern "C" fn state();
 ```
 
-The WASM Binary for guards must export following functions:
+The WASM Binary for Guards must export the following function:
 
 ```rust
 extern "C" fn guard();
 ```
 
-When [`co-api`](/crate/co_api/index.html) is used this export is handled by the `co` macro.
-A single binary may be export both.
+When [`co-api`](/crate/co_api/index.html) is used, this export is handled by the `co` macro.  
+A single binary may export both.
 
 ## References
 - [Core](../reference/core.md)

@@ -1,5 +1,5 @@
 # CO CLI
-The built-in co CLI helps to inspect and interact with COs.
+The built-in `co` CLI helps to inspect and interact with COs.
 
 ## Commands
 

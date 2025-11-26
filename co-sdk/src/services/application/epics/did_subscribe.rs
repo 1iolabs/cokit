@@ -1,5 +1,4 @@
 use crate::{
-	services::network::{subscribe_identity, unsubscribe_identity, CoNetworkTaskSpawner},
 	state::{self, query_core, Query},
 	Action, CoContext, CoStorage, CO_CORE_NAME_KEYSTORE, CO_ID_LOCAL,
 };
@@ -7,6 +6,7 @@ use co_actor::Actions;
 use co_core_co::Co;
 use co_core_keystore::{Key, KeyStoreAction};
 use co_identity::{PrivateIdentityResolver, PrivateIdentityResolverBox};
+use co_network::{subscribe_identity, NetworkApi};
 use co_primitives::{CoTryStreamExt, Did, OptionLink};
 use futures::{future::Either, pin_mut, stream, FutureExt, Stream, StreamExt};
 
@@ -18,10 +18,10 @@ pub fn network_started(
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::NetworkStarted => Some({
+		Action::NetworkStartComplete(Ok(())) => Some({
 			let context = context.clone();
 			async move {
-				if let Some(network) = context.network_tasks().await {
+				if let Some(network) = context.network().await {
 					Either::Left(subscribe_all(context.clone(), network))
 				} else {
 					Either::Right(stream::empty())
@@ -54,14 +54,14 @@ pub fn keystore_changed(
 						if let Some(subscribe_action) =
 							SubscribeAction::from_keystore_action(&context, keystore_action).await
 						{
-							if let Some(network) = context.network_tasks().await {
+							if let Some(network) = context.network().await {
 								let private_identity_resolver = context.private_identity_resolver().await?;
 								match subscribe_action {
 									SubscribeAction::Subscribe(did) => {
 										subscribe(&private_identity_resolver, &network, &did).await?;
 									},
 									SubscribeAction::Unsubscribe(did) => {
-										unsubscribe_identity(&network, did).await?;
+										network.didcontact_unsubscribe(did).await?;
 									},
 								}
 							}
@@ -125,10 +125,7 @@ async fn key_by_uri(storage: &CoStorage, co: OptionLink<Co>, uri: &str) -> Resul
 	first_error.map(Err).unwrap_or(Ok(None))
 }
 
-fn subscribe_all(
-	context: CoContext,
-	network: CoNetworkTaskSpawner,
-) -> impl Stream<Item = Result<Action, anyhow::Error>> {
+fn subscribe_all(context: CoContext, network: NetworkApi) -> impl Stream<Item = Result<Action, anyhow::Error>> {
 	async_stream::try_stream! {
 		let local_co = context.local_co_reducer().await?;
 		let private_identity_resolver = context.private_identity_resolver().await?;
@@ -150,7 +147,7 @@ fn subscribe_all(
 
 async fn subscribe(
 	private_identity_resolver: &PrivateIdentityResolverBox,
-	network: &CoNetworkTaskSpawner,
+	network: &NetworkApi,
 	did: &Did,
 ) -> Result<(), anyhow::Error> {
 	let identity = private_identity_resolver.resolve_private(&did).await?;

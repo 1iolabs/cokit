@@ -7,10 +7,10 @@ use anyhow::anyhow;
 use co_actor::Actions;
 use co_core_membership::{Membership, MembershipState, MembershipsAction};
 use co_identity::DidCommHeader;
+use co_network::PeerId;
 use co_primitives::{from_json_string, tags, CoInviteMetadata, Did, KnownTags, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{FutureExt, Stream, StreamExt};
-use libp2p::PeerId;
 use std::collections::BTreeSet;
 
 /// When we receive a invite message:

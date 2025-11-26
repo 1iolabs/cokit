@@ -2,8 +2,8 @@ use crate::{keystore_fetch, CoReducer};
 use anyhow::anyhow;
 use co_core_keystore::Key;
 use co_identity::PrivateIdentity;
+use co_network::Keypair;
 use co_primitives::tags;
-use libp2p::identity::Keypair;
 use std::fmt::Debug;
 
 pub async fn local_keypair_fetch<I>(

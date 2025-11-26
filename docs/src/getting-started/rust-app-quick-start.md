@@ -1,6 +1,6 @@
 # App Quick Start
 
-As a very simple UI building tool, we use [dioxus](https://dioxuslabs.com/) in this tutorial.
+As a very simple UI building tool, we use [Dioxus](https://dioxuslabs.com/) in this tutorial.
 We also use TailwindCSS for styling the application.
 
 ## Table of Contents
@@ -17,30 +17,45 @@ Install Dioxus and setup the empty application crate.
 ### Setup Dioxus
 Install the precompiled `dx` tool:
 ```shell
-cargo binstall dioxus-cli
+cargo binstall dioxus-cli@0.6
 ```
 
 You can also head over to [Dioxus](https://dioxuslabs.com/learn/0.6/getting_started/#install-the-dioxus-cli) for further instructions.
 
 ### Setup NodeJS
-We need NodeJS to use TailwindCSS within our app.
+We need NodeJS to use TailwindCSS within our app.  
 Head over to [NodeJS](https://nodejs.org/en/download) for further instructions.
 
 ### Application
-We need to setup a new rust crate for the application:
-1. Initialize dioxus application:
+We need to setup a new Rust crate for the application.  
+This next command will create a `my-todo-app` folder.
+
+```admonish info
+Ideally, both `my-todo-core` and `my-todo-app` should be located under the same parent folder.
+```
+
+1. Initialize Dioxus application:
 ```sh
 dx new my-todo-app --subtemplate Bare-Bones -o is_fullstack=false -o is_router=false -o default_platform=desktop -o is_tailwind=true
 ```
-2. Install `co-sdk`, `co-core-membership`, `co-core-co` and `co-dioxus` which is the dioxus integration as a dependencies:
+2. In the `my-todo-app` folder, install `co-sdk`, `co-core-membership`, `co-core-co` and `co-dioxus` (the dioxus integration) as dependencies:
 ```sh
+cd my-todo-app
 cargo add co-sdk co-dioxus co-core-membership co-core-co --git https://gitlab.1io.com/1io/co-sdk.git
 ```
-3. Install our core as dependency:
+3. Install our to-do list Core as a dependency:
 ```sh
 cargo add my-todo-core --path ../my-todo-core
 ```
-4. Setup tailwind
+4. Install the `futures` crate as a dependency:
+```sh
+cargo add futures
+```
+5. Install the `uuid` crate as a dependency:
+```sh
+cargo add uuid --features v4
+```
+6. Setup Tailwind
 ```sh
 npm init -y
 npm install -D tailwindcss @tailwindcss/cli daisyui
@@ -52,11 +67,16 @@ For this example we use the MyTodoCore.
 
 Upon first starting the application, a `did:key:` identity is created locally, we name it `my-todo-identity`.
 
-The first view allows to create todo lists as well to respond to invites.
-The second view allows to manage tasks and participants.
+The first view is where we create to-do lists, and respond to invites.  
+The second view is where we manage tasks and participants.
 
 ### Application
 For this quick start we only use a single file: `src/main.rs`.
+
+```admonish info
+You can delete all of the example Rust code from `main.rs`.
+```
+
 #### Setup
 In the main function we initialize CO-kit and pass it as context to dioxus:
 
@@ -71,18 +91,18 @@ fn main() {
 ```
 
 #### Overview
-Next, we want to show a list of Todo Lists and possible invites.
-We use the CO-kit built-in memberships core and show list items according their state.
-We're working with the following states of interest:
+Next, we want to display a list of To-do Lists and possible invites.  
+We use the CO-kit built-in memberships core, and show To-do-List items according their state.  
+We're working with the following states of interest:  
 - Active: Normal active membership
 - Invite: We got invited to join a [CO](../reference/co.md) by someone else
-- Join: We accepted an invite and waiting for it to complete
+- Join: We accepted an invite and are waiting for it to complete
 
-The dioxus bindings mostly work by using hooks.
+The Dioxus bindings mostly work by using hooks.  
 We are using the following:
-- `use_co`: Opens a CO and allows to read and write it
-- `use_selector`: Selects relevant state from a opened CO
-- `use_did_key_identity`: Uses an `did:key:` identity
+- [`use_co`](/crate/co_dioxus/fn.use_co.html) : Opens a CO and allows to read and write it 
+- [`use_selector`](/crate/co_dioxus/fn.use_selector.html) : Selects relevant state from an opened CO
+- [`use_did_key_identity`](/crate/co_dioxus/fn.use_did_key_identity.html) : Uses a `did:key:` identity
 
 We read the memberships which are stored in the [Local CO](../reference/co.md#local-co):
 
@@ -97,12 +117,14 @@ let lists = use_selector(&local_co, move |storage, co_state| async move {
 })?;
 ```
 
-We use the `co_sdk::state` export which contains utilities to access states of builtin cores.
+The [`co_sdk::state`](/crate/co_sdk/state/index.html) export contains utilities to access states of built-in cores.
 
-Here we use `co_sdk::state::memberships` which contains all memberships including the virtual one of the [Local CO](../reference/co.md#local-co) which we'll filter out:
+Here we use [`co_sdk::state::memberships`](/crate/co_sdk/state/fn.memberships.html).  
+This contains all memberships, including the virtual one of the [Local CO](../reference/co.md#local-co) that we'll filter out:
 
+We also use [`co_sdk::state::co_info`](/crate/co_sdk/state/fn.co_info.html) to return info about the CO.
 
-For every todo list, we want to show a counter of undone todos:
+For every To-do List, we want to show a counter of undone todos:
 
 ```rust,noplayground
 let co = use_co(co_id);
@@ -118,14 +140,14 @@ let (co_info, undone) = use_selector(&co, move |storage, co_state| async move {
 })?;
 ```
 
-We use the CO and use the selector again the count the items.
-As all the states are available locally, we can iterate the items while counting them.
-In a more sophisticated example, their values could be pre-calculated using the core.
+We use the CO and use the selector again to count the items.  
+Since all the states are available locally, we can iterate through the items while counting them.  
+In a more sophisticated example, the values could be pre-calculated using the Core.
 
 Later, we need to add handlers to create and join a CO.
 
-#### Todo List
-Now we want to show all the todo items and the participants of a specific CO.
+#### To-do List
+Now we want to show all the todo items and the participants of a specific CO.  
 We use the selector again and extract the values we need:
 
 ```rust,noplayground
@@ -155,13 +177,16 @@ let (name, participants, tasks_core_exists, tasks) = use_selector(&co, move |sto
 ```
 
 We select:
-- the basic informations of the CO (like its name) to display them
-- the participants of the CO
+- the basic information about the CO (like its name) for display.
+- the participants of the CO.
 - if the todo-core has already been added to this CO. If not we will create it on-the-fly later.
-- the tasks from the todo-core
+- the tasks from the todo-core.
 
 ##### Handlers
-We now need to define the handlers that respond to user actions:
+We now need to define the handlers that respond to user actions.
+
+First, we define `on_todo_action`, which will push an action into the todo-core.  
+It will also create the todo-core on-the-fly if it does not yet exist.
 
 ```rust,noplayground
 let on_todo_action = use_callback({
@@ -176,8 +201,6 @@ let on_todo_action = use_callback({
 	}
 });
 ```
-
-First, we define `on_todo_action` which will push an action into the todo-core and creates it on-the-fly if it not exists.
 
 Now we define the different handlers:
 
@@ -200,7 +223,7 @@ let on_delete_all_done = use_callback(move |_| {
 ```
 
 ##### Render
-Next, we can render the task list using dioxus like this:
+Next, we can render the task list using Dioxus.
 
 ```rust,noplayground
 for task in tasks {
@@ -208,8 +231,9 @@ for task in tasks {
 }
 ```
 
-#### Full Code
-Here is the full example code of the parts which integrates with CO-kit:
+#### Full Example Code
+Here is a full example of the code parts that integrate with CO-kit.  
+Below, you will also find a link to the entire git project.
 
 `src/main.rs`:
 
@@ -229,7 +253,7 @@ Here is the full example code of the parts which integrates with CO-kit:
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 const TODO_CORE_NAME: &str = "todo";
 const TODO_IDENTITY_NAME: &str = "my-todo-identity";
-const TODO_CORE_BINARY: &[u8] = include_bytes!("../../target-wasm/wasm32-unknown-unknown/release/my_todo_core.wasm");
+const TODO_CORE_BINARY: &[u8] = include_bytes!("../../my-todo-core/target-wasm/wasm32-unknown-unknown/release/my_todo_core.wasm");
 
 fn main() {
 	// co
@@ -485,6 +509,7 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 # 	}
 # }
 #
+# /// Render a Todo List element for an active CO membership in the Overview.
 # #[component]
 # pub fn TodoListElement(
 # 	co_id: ReadOnlySignal<CoId>,
@@ -756,7 +781,7 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 # 	}
 # }
 #
-# /// Render Invite Dialog.
+# /// Render Todo List Menu.
 # #[component]
 # fn TodoListMenu(on_delete_all_done: EventHandler<()>) -> Element {
 # 	rsx! {
@@ -778,7 +803,7 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 # 	}
 # }
 #
-# /// Render Invite Dialog.
+# /// Render Nav Bar.
 # #[component]
 # fn NavBar(left: Element, center: Element, right: Element) -> Element {
 # 	rsx! {
@@ -794,14 +819,19 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 
 
 ### Tailwind
-`tailwind.css`:
+`/tailwind.css`:
 ```css
 @import "tailwindcss";
 @source "./src/**/*.{rs,html,css}";
 @plugin "daisyui";
 ```
 
-### Full example
+### Run the App
+
+Serve your App by following the instructions in the `README.md` file in your `my-todo-app` folder.
+
+
+### Full Example Project
 
 You can find the full example as a git project here:
 - [1io / example-todo-list - GitLab](https://gitlab.1io.com/1io/example-todo-list.git)

@@ -3,7 +3,7 @@ use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	Swarm,
 };
-use std::{fmt::Debug, marker::PhantomData};
+use std::{fmt::Debug, time::Instant};
 
 pub trait NetworkTask<B, C>: Debug
 where
@@ -27,8 +27,25 @@ where
 	fn is_complete(&mut self) -> bool {
 		true
 	}
+
+	/// Task state.
+	fn task_state(&mut self) -> NetworkTaskState {
+		if self.is_complete() {
+			NetworkTaskState::Complete
+		} else {
+			NetworkTaskState::Waiting
+		}
+	}
 }
 pub type NetworkTaskBox<B, C> = Box<dyn NetworkTask<B, C> + Send + 'static>;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum NetworkTaskState {
+	Pending,
+	Delayed(Instant),
+	Waiting,
+	Complete,
+}
 
 #[derive(Debug)]
 pub struct TokioNetworkTaskSpawner<B, C> {
@@ -62,44 +79,4 @@ where
 	}
 
 	fn spawn_box(&self, task: NetworkTaskBox<B, C>) -> Result<(), NetworkError>;
-}
-
-pub struct FnOnceNetworkTask<F, B, C>
-where
-	F: FnOnce(&mut Swarm<B>, &mut C) + Send + 'static,
-{
-	_b: PhantomData<B>,
-	_c: PhantomData<C>,
-	f: Option<F>,
-}
-
-impl<F, B, C> FnOnceNetworkTask<F, B, C>
-where
-	F: FnOnce(&mut Swarm<B>, &mut C) + Send + 'static,
-{
-	pub fn new(f: F) -> Self {
-		Self { _b: Default::default(), _c: Default::default(), f: Some(f) }
-	}
-}
-impl<B, C, F> NetworkTask<B, C> for FnOnceNetworkTask<F, B, C>
-where
-	B: NetworkBehaviour,
-	F: FnOnce(&mut Swarm<B>, &mut C) + Send + 'static,
-{
-	fn execute(&mut self, swarm: &mut Swarm<B>, context: &mut C) {
-		if let Some(f) = Option::take(&mut self.f) {
-			f(swarm, context);
-		}
-	}
-}
-impl<F, B, C> Debug for FnOnceNetworkTask<F, B, C>
-where
-	F: FnOnce(&mut Swarm<B>, &mut C) + Send + 'static,
-{
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("FnOnceNetworkTask")
-			.field("_b", &self._b)
-			.field("_c", &self._c)
-			.finish()
-	}
 }

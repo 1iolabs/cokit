@@ -418,13 +418,13 @@ where
 		&mut self,
 		storage: &S,
 		reducer: &mut Reducer<S, R>,
-		info: &FlushInfo,
+		_info: &FlushInfo,
 		_new_roots: Vec<CoReducerState>,
 		_removed_blocks: BTreeSet<OptionMappedCid>,
 	) -> anyhow::Result<()> {
 		// write references
 		#[cfg(feature = "pinning")]
-		if info.local {
+		if _info.local {
 			let new_roots = _new_roots;
 			let removed_blocks = _removed_blocks;
 			let (last_reducer_state, context) = &self.pinning;
@@ -524,8 +524,6 @@ async fn setup_local_co(
 	identity: &LocalIdentity,
 	settings: &ApplicationSettings,
 ) -> Result<(), anyhow::Error> {
-	let storage = reducer.storage();
-
 	// create
 	let create = co_core_co::CreateAction::new(
 		CO_ID_LOCAL.into(),
@@ -557,7 +555,7 @@ async fn setup_local_co(
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_STORAGE).expect(CO_CORE_STORAGE),
 			tags: tags!("core": CO_CORE_STORAGE),
-			state: create_storage_core_state(&storage, settings).await?,
+			state: create_storage_core_state(&reducer.storage(), settings).await?,
 		},
 	);
 

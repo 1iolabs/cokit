@@ -1,18 +1,15 @@
 use crate::{
 	library::{create_reducer_action::new_reducer_action, network_queue::TaskState},
-	network::NetworkSettings,
 	services::reducer::FlushInfo,
-	types::message::heads::HeadsMessage,
 	CoDate, CoStorage, ReducerChangeContext,
 };
 use cid::Cid;
 use co_identity::{DidCommHeader, Message, PrivateIdentityBox};
-use co_network::didcomm::EncodedMessage;
+use co_network::{EncodedMessage, HeadsMessage, NetworkSettings, PeerId};
 use co_primitives::{Block, BlockSerializer, CoId, DefaultParams, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{stream::once, Stream, StreamExt};
 use ipld_core::ipld::Ipld;
-use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::BTreeSet,
@@ -62,7 +59,7 @@ pub enum Action {
 	NetworkStart(NetworkSettings),
 
 	/// Network has been started.
-	NetworkStarted,
+	NetworkStartComplete(Result<(), ActionError>),
 
 	/// Send a DIDComm message.
 	DidCommSend {

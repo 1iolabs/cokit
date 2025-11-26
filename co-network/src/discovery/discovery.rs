@@ -1,15 +1,15 @@
-use super::did_discovery::{DidDiscovery, DidDiscoveryMessage};
-use crate::{didcomm, types::layer_behaviour::LayerBehaviour, DidcommBehaviourProvider, GossipsubBehaviourProvider};
+use super::did_discovery::{DidDiscovery, DidDiscoveryMessageType};
+use crate::{didcomm, discovery::DiscoverMessage, types::layer_behaviour::LayerBehaviour};
 use anyhow::anyhow;
 use co_identity::{
 	network_did_discovery, DidCommContext, DidCommHeader, DidCommPrivateContext, Identity, IdentityResolver,
 	PrivateIdentity, PrivateIdentityBox,
 };
-use co_primitives::{Did, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous};
+use co_primitives::{from_json_string, Did, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous};
 use derive_more::From;
 use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, StreamExt};
 use libp2p::{
-	gossipsub::{self, TopicHash},
+	gossipsub::{self, IdentTopic, TopicHash},
 	mdns, rendezvous,
 	swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
 	Multiaddr, PeerId, Swarm,
@@ -43,14 +43,6 @@ pub enum Discovery {
 	Peer(NetworkPeer),
 }
 impl Discovery {
-	/// Create discover from peer.
-	pub fn from_peer<'a>(peer: PeerId, addresses: impl IntoIterator<Item = &'a Multiaddr>) -> Self {
-		Discovery::Peer(NetworkPeer {
-			peer: peer.to_bytes(),
-			addresses: addresses.into_iter().map(|i| i.to_string()).collect(),
-		})
-	}
-
 	/// Validate the discovery contains parseable data.
 	pub fn validate(&self) -> Result<(), anyhow::Error> {
 		match self {
@@ -123,9 +115,10 @@ impl DiscoveryConnectRequest {
 }
 
 /// Active subscription listening for DID Discovery requests.
-struct DidDiscoverySubscription {
-	network: NetworkDidDiscovery,
-	identity: PrivateIdentityBox,
+#[derive(Debug, Clone, PartialEq)]
+enum DidDiscoverySubscription {
+	Default,
+	Identity(NetworkDidDiscovery, PrivateIdentityBox),
 }
 
 /// Event.
@@ -137,6 +130,9 @@ pub enum Event {
 
 	/// A peer to be discovered has disconnected.
 	Disconnected { id: u64, peer: PeerId },
+
+	/// A discovery connect has infufficent peers to amke a connection.
+	InsufficentPeers { id: u64 },
 
 	/// A discovery connect has timedout.
 	/// TODO: Does it always mean it has failed?
@@ -154,13 +150,13 @@ pub enum DiscoveryEvent {
 
 	/// A resolve request to us via did discovery gossip.
 	/// With an pre-computed DIDComm response.
-	DidResolve { from: Did, from_peer: PeerId, response: String },
+	DidResolve { from_peer: PeerId, from_endpoints: BTreeSet<Multiaddr>, response: String },
 
 	/// A discovery request.
 	DidDiscovery { discovery: DidDiscovery },
 
 	/// We received an (validated) DIDComm message.
-	ReceivedDidComm { peer_id: PeerId, header: DidCommHeader, body: String },
+	ReceivedDidComm { peer_id: PeerId, header: DidCommHeader },
 
 	/// A peer has been discovered by the swarm and we may need to dail it.
 	PeerDiscoverd { peer_id: PeerId },
@@ -220,32 +216,59 @@ where
 	}
 
 	/// Subscribe identity for DID Discovery.
-	pub fn did_discovery_subscribe<B, P>(
+	pub fn did_discovery_subscribe<B>(
 		&mut self,
 		swarm: &mut Swarm<B>,
 		network: Option<NetworkDidDiscovery>,
-		identity: P,
+		identity: PrivateIdentityBox,
 	) -> Result<(), anyhow::Error>
 	where
 		B: DiscoveryBehaviour,
-		P: PrivateIdentity + Send + Sync + 'static,
 	{
-		// network
+		// subscription
 		let network = network_did_discovery(&identity, network)?;
+		let subscription = DidDiscoverySubscription::Identity(network, identity);
 
+		// subscribe
+		self.did_discovery_subscribe_apply(swarm, subscription)?;
+
+		// result
+		Ok(())
+	}
+
+	/// Subscribe identity for DID Discovery.
+	pub fn did_discovery_subscribe_default<B>(&mut self, swarm: &mut Swarm<B>) -> Result<(), anyhow::Error>
+	where
+		B: DiscoveryBehaviour,
+	{
+		// subscription
+		let subscription = DidDiscoverySubscription::Default;
+
+		// subscribe
+		self.did_discovery_subscribe_apply(swarm, subscription)?;
+
+		// result
+		Ok(())
+	}
+
+	fn did_discovery_subscribe_apply<B: DiscoveryBehaviour>(
+		&mut self,
+		swarm: &mut Swarm<B>,
+		subscription: DidDiscoverySubscription,
+	) -> Result<(), anyhow::Error> {
 		// topic
-		let topic = did_discovery_topic(&network);
+		let topic = IdentTopic::new(did_discovery_subscription_topic_str(&subscription));
 
 		// add
 		self.did_subscriptions
 			.entry(topic.hash())
 			.or_insert(Default::default())
-			.push(DidDiscoverySubscription { identity: PrivateIdentityBox::new(identity), network: network.clone() });
+			.push(subscription);
 
 		// subscribe
 		let subscriptions_count = self.did_subscriptions.get(&topic.hash()).map(|v| v.len()).unwrap_or(0);
 		if subscriptions_count == 1 {
-			did_discovery_subscribe(swarm, &network)?;
+			swarm.behaviour_mut().gossipsub_mut().subscribe(&topic)?;
 		}
 
 		// result
@@ -258,30 +281,72 @@ where
 		swarm: &mut Swarm<B>,
 		did: &Did,
 	) -> Result<(), anyhow::Error> {
-		// remove one subscription
-		let mut remove_topic = None;
-		let mut remove_subscription = None;
-		for (topic, subscriptions) in self.did_subscriptions.iter_mut() {
-			for (index, subscription) in subscriptions.iter().enumerate() {
-				if subscription.identity.identity() == did {
-					let remove = subscriptions.remove(index);
-					if subscriptions.is_empty() {
-						remove_topic = Some(topic.to_owned());
-						remove_subscription = Some(remove.network);
-					}
-					break;
-				}
-			}
-		}
-
-		// remove
-		if let Some(remove_topic) = remove_topic {
-			self.did_subscriptions.remove(&remove_topic);
-		}
+		// find first subscription for the did
+		let subscription = self
+			.did_subscriptions
+			.iter()
+			.flat_map(|(_topic, subscriptions)| subscriptions.iter())
+			.find(|subscription| match subscription {
+				DidDiscoverySubscription::Identity(_network, identity) => identity.identity() == did,
+				DidDiscoverySubscription::Default => false,
+			})
+			.cloned();
 
 		// unsubscribe
-		if let Some(remove_subscription) = remove_subscription {
-			did_discovery_unsubscribe(swarm, &remove_subscription)?;
+		if let Some(subscription) = subscription {
+			self.did_discovery_unsubscribe_apply(swarm, subscription)?;
+		}
+
+		// result
+		Ok(())
+	}
+
+	/// Unsubscribe identity for DID Discovery.
+	pub fn did_discovery_unsubscribe_default<B: DiscoveryBehaviour>(
+		&mut self,
+		swarm: &mut Swarm<B>,
+	) -> Result<(), anyhow::Error> {
+		// unsubscribe
+		self.did_discovery_unsubscribe_apply(swarm, DidDiscoverySubscription::Default)?;
+
+		// result
+		Ok(())
+	}
+
+	/// Unsubscribe identity for DID Discovery.
+	fn did_discovery_unsubscribe_apply<B: DiscoveryBehaviour>(
+		&mut self,
+		swarm: &mut Swarm<B>,
+		subscription: DidDiscoverySubscription,
+	) -> Result<(), anyhow::Error> {
+		// topic
+		let topic = IdentTopic::new(did_discovery_subscription_topic_str(&subscription));
+
+		// remove subscription
+		let removed_subscription = if let Some(subscriptions) = self.did_subscriptions.get_mut(&topic.hash()) {
+			if let Some((index, _)) = subscriptions.iter().enumerate().find(|(_index, item)| item == &&subscription) {
+				Some(subscriptions.remove(index))
+			} else {
+				None
+			}
+		} else {
+			None
+		};
+
+		// remove
+		if removed_subscription.is_some() {
+			// clear if empty
+			if self
+				.did_subscriptions
+				.get(&topic.hash())
+				.map(|subscriptions| subscriptions.is_empty())
+				.unwrap_or(false)
+			{
+				self.did_subscriptions.remove(&topic.hash());
+			}
+
+			// unsubscribe
+			swarm.behaviour_mut().gossipsub_mut().unsubscribe(&topic);
 		}
 
 		// result
@@ -376,9 +441,11 @@ where
 						},
 
 						// we try again when a peer subscribes
-						Err(gossipsub::PublishError::InsufficientPeers) => {
-							tracing::trace!(network = ?item.network, ?topic, "discovery-did-pending-insufficient-peers");
+						Err(gossipsub::PublishError::NoPeersSubscribedToTopic) => {
+							tracing::trace!(network = ?item.network, ?topic, "discovery-did-pending-no-peers-subscribed-to-topic");
 							self.pending_discovery.push_back((request.id, topic_hash, item.clone()));
+							self.events
+								.push_back(DiscoveryEvent::GenerateEvent(Event::InsufficentPeers { id: request.id }));
 						},
 
 						// forward other errors
@@ -410,11 +477,6 @@ where
 			return Err(ConnectError::NoNetwork);
 		}
 		Ok(())
-	}
-
-	/// Returns currently connected peers for an request id. If request can not be found return an emty set.
-	pub fn peers(&self, id: u64) -> BTreeSet<PeerId> {
-		self.requests.get(&id).map(|r| &r.connected_peers).cloned().unwrap_or_default()
 	}
 
 	/// Release (may disconnect) discovered peers.
@@ -498,8 +560,10 @@ where
 								self.resolver.clone(),
 								subscriptions
 									.iter()
-									.map(|s| s.identity.didcomm_private())
-									.filter_map(|item| item)
+									.filter_map(|subscription| match subscription {
+										DidDiscoverySubscription::Default => None,
+										DidDiscoverySubscription::Identity(_, identity) => identity.didcomm_private(),
+									})
 									.collect(),
 							)
 							.boxed(),
@@ -572,13 +636,12 @@ where
 	fn on_didcomm_event(&mut self, event: &didcomm::Event) {
 		match event {
 			didcomm::Event::Received { peer_id, message } => {
-				let message_type: Option<DidDiscoveryMessage> =
-					DidDiscoveryMessage::try_from(message.header().message_type.clone()).ok();
-				if message_type == Some(DidDiscoveryMessage::Resolve) {
+				let message_type: Option<DidDiscoveryMessageType> =
+					DidDiscoveryMessageType::try_from(message.header().message_type.clone()).ok();
+				if message_type == Some(DidDiscoveryMessageType::Resolve) {
 					self.events.push_back(DiscoveryEvent::ReceivedDidComm {
 						peer_id: peer_id.clone(),
 						header: message.header().to_owned(),
-						body: message.body().to_owned(),
 					})
 				}
 			},
@@ -692,8 +755,24 @@ where
 	/// Other events are returned.
 	fn on_layer_event(&mut self, swarm: &mut Swarm<B>, event: Self::ToLayer) -> Option<Self::ToSwarm> {
 		match event {
-			DiscoveryEvent::DidResolve { from: _, from_peer, response } => {
+			DiscoveryEvent::DidResolve { from_peer, from_endpoints, response } => {
+				// dial
+				if !swarm.is_connected(&from_peer) && !from_endpoints.is_empty() {
+					match swarm.dial(
+						DialOpts::peer_id(from_peer)
+							.addresses(from_endpoints.iter().cloned().collect())
+							.build(),
+					) {
+						Ok(_) => {},
+						Err(err) => {
+							tracing::warn!(peer = ?from_peer, endpoints = ?from_endpoints, ?err, "did_discovery-dial-failed");
+						},
+					}
+				}
+
+				// send
 				swarm.behaviour_mut().didcomm_mut().send(&from_peer, response.into());
+
 				None
 			},
 			DiscoveryEvent::DidDiscovery { discovery } => {
@@ -705,9 +784,10 @@ where
 				};
 				None
 			},
-			DiscoveryEvent::ReceivedDidComm { peer_id, header, body: _ } => {
-				let message_type: Option<DidDiscoveryMessage> = DidDiscoveryMessage::from_str(&header.message_type);
-				if message_type == Some(DidDiscoveryMessage::Resolve) {
+			DiscoveryEvent::ReceivedDidComm { peer_id, header } => {
+				let message_type: Option<DidDiscoveryMessageType> =
+					DidDiscoveryMessageType::from_str(&header.message_type);
+				if message_type == Some(DidDiscoveryMessageType::Resolve) {
 					for request_id in self
 						.all_discovery_diddiscovery()
 						.filter(|(_, discovery)| header.thid.as_ref() == Some(&discovery.message_id))
@@ -778,15 +858,23 @@ pub enum ConnectError {
 	Other(#[from] anyhow::Error),
 }
 
-pub trait DiscoveryBehaviour: NetworkBehaviour + GossipsubBehaviourProvider + DidcommBehaviourProvider {
+#[allow(unused)]
+pub trait DiscoveryBehaviour: NetworkBehaviour {
 	fn rendezvous_client_mut(&mut self) -> Option<&mut rendezvous::client::Behaviour>;
 	fn rendezvous_client_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&rendezvous::client::Event>;
 
 	fn mdns_mut(&mut self) -> Option<&mut mdns::tokio::Behaviour>;
 	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&mdns::Event>;
 
+	fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour;
+	fn didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&didcomm::Event>;
+
 	// fn kad_mut(&mut self) -> Option<&mut kad::Behaviour<kad::store::MemoryStore>>;
 	// fn kad_mut(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&kad::Event>;
+
+	fn gossipsub(&self) -> &gossipsub::Behaviour;
+	fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour;
+	fn gossipsub_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&gossipsub::Event>;
 }
 
 /// Acccept DidDiscoveryMessage::Discover events and respond with DidDiscoveryMessage::Resolve.
@@ -797,9 +885,15 @@ async fn did_discovery_receive<R: IdentityResolver>(
 	contexts: Vec<DidCommPrivateContext>,
 ) -> Option<DiscoveryEvent> {
 	let result = didcomm_receive(&data, resolver, contexts.into_iter()).await;
-	if let Some((request_header, _, didcomm_private)) = result {
-		if DidDiscoveryMessage::from_str(&request_header.message_type) == Some(DidDiscoveryMessage::Discover) {
-			match did_discovery_resolve(&didcomm_private, request_from_peer, request_header) {
+	if let Some((request_header, request_body, didcomm_private)) = result {
+		if DidDiscoveryMessageType::from_str(&request_header.message_type) == Some(DidDiscoveryMessageType::Discover) {
+			let body: Option<DiscoverMessage> = from_json_string(&request_body).ok();
+			match did_discovery_resolve(
+				&didcomm_private,
+				request_from_peer,
+				body.map(|body| body.endpoints).unwrap_or_default(),
+				request_header,
+			) {
 				Ok(event) => return Some(event),
 				Err(err) => {
 					tracing::warn!(?err, "discovery-did-resolve-failed");
@@ -814,12 +908,13 @@ async fn did_discovery_receive<R: IdentityResolver>(
 fn did_discovery_resolve(
 	identity: &DidCommPrivateContext,
 	request_from_peer: PeerId,
+	request_from_endpoints: BTreeSet<Multiaddr>,
 	request: DidCommHeader,
 ) -> Result<DiscoveryEvent, anyhow::Error> {
 	let request_from = request.from.ok_or(anyhow!("Missing from header field"))?;
 
 	// response
-	let mut response = DidCommHeader::new(DidDiscoveryMessage::Resolve.to_string());
+	let mut response = DidCommHeader::new(DidDiscoveryMessageType::Resolve.to_string());
 	response.thid = Some(request.id);
 	response.from = Some(identity.did().to_owned());
 	response.to.insert(request_from.clone());
@@ -828,7 +923,11 @@ fn did_discovery_resolve(
 	let message = identity.jws(response, "null")?;
 
 	// result
-	Ok(DiscoveryEvent::DidResolve { from: request_from, from_peer: request_from_peer, response: message })
+	Ok(DiscoveryEvent::DidResolve {
+		from_peer: request_from_peer,
+		from_endpoints: request_from_endpoints,
+		response: message,
+	})
 }
 
 /// Try to receive a message (data) with one of the supplied identities.
@@ -861,26 +960,18 @@ fn did_discovery_topic_str(network: &NetworkDidDiscovery) -> &str {
 	network.topic.as_deref().unwrap_or("co-contact")
 }
 
-/// Subscribe did discovery gossipsub topic.
-fn did_discovery_subscribe<B: DiscoveryBehaviour>(
-	swarm: &mut Swarm<B>,
-	did_discovery: &NetworkDidDiscovery,
-) -> Result<bool, gossipsub::SubscriptionError> {
-	Ok(swarm
-		.behaviour_mut()
-		.gossipsub_mut()
-		.subscribe(&did_discovery_topic(did_discovery))?)
+fn did_discovery_subscription_topic_str(subscription: &DidDiscoverySubscription) -> &str {
+	match subscription {
+		DidDiscoverySubscription::Default => did_discovery_topic_default_str(),
+		DidDiscoverySubscription::Identity(network, _) => {
+			network.topic.as_deref().unwrap_or(did_discovery_topic_default_str())
+		},
+	}
 }
 
-/// Unsubscribe did discovery gossipsub topic.
-fn did_discovery_unsubscribe<B: DiscoveryBehaviour>(
-	swarm: &mut Swarm<B>,
-	did_discovery: &NetworkDidDiscovery,
-) -> Result<bool, gossipsub::PublishError> {
-	Ok(swarm
-		.behaviour_mut()
-		.gossipsub_mut()
-		.unsubscribe(&did_discovery_topic(did_discovery))?)
+/// Get default did discovery gossipsub topic as string.
+fn did_discovery_topic_default_str() -> &'static str {
+	"co-contact"
 }
 
 /// Publish to did discovery gossipsub topic.
@@ -953,13 +1044,14 @@ mod tests {
 	use super::DiscoveryBehaviour;
 	use crate::{
 		didcomm,
-		discovery::{DidDiscovery, DidDiscoveryMessage, Discovery, DiscoveryState, Event},
-		DidcommBehaviourProvider, GossipsubBehaviourProvider, Layer, LayerBehaviour,
+		discovery::{DidDiscovery, DidDiscoveryMessageType, DiscoverMessage, Discovery, DiscoveryState, Event},
+		types::layer_behaviour::{Layer, LayerBehaviour},
 	};
 	use co_identity::{
 		DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentity,
 		PrivateIdentityBox, PrivateIdentityResolver,
 	};
+	use co_primitives::NetworkPeer;
 	use futures::{select, FutureExt, StreamExt};
 	use libp2p::{
 		gossipsub,
@@ -992,56 +1084,6 @@ mod tests {
 			TestBehaviour { didcomm: didcomm_behaviour, gossipsub: gossipsub_behaviour }
 		}
 	}
-	impl DidcommBehaviourProvider for TestBehaviour {
-		fn didcomm(&self) -> &didcomm::Behaviour {
-			&self.didcomm
-		}
-
-		fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour {
-			&mut self.didcomm
-		}
-
-		fn didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&didcomm::Event> {
-			match event {
-				TestBehaviourEvent::Didcomm(e) => Some(e),
-				_ => None,
-			}
-		}
-
-		fn into_didcomm_event(
-			event: <Self as NetworkBehaviour>::ToSwarm,
-		) -> Result<didcomm::Event, <Self as NetworkBehaviour>::ToSwarm> {
-			match event {
-				TestBehaviourEvent::Didcomm(e) => Ok(e),
-				e => Err(e),
-			}
-		}
-	}
-	impl GossipsubBehaviourProvider for TestBehaviour {
-		fn gossipsub(&self) -> &gossipsub::Behaviour {
-			&self.gossipsub
-		}
-
-		fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour {
-			&mut self.gossipsub
-		}
-
-		fn gossipsub_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&gossipsub::Event> {
-			match event {
-				TestBehaviourEvent::Gossipsub(e) => Some(e),
-				_ => None,
-			}
-		}
-
-		fn into_gossipsub_event(
-			event: <Self as NetworkBehaviour>::ToSwarm,
-		) -> Result<gossipsub::Event, <Self as NetworkBehaviour>::ToSwarm> {
-			match event {
-				TestBehaviourEvent::Gossipsub(e) => Ok(e),
-				e => Err(e),
-			}
-		}
-	}
 	impl DiscoveryBehaviour for TestBehaviour {
 		fn rendezvous_client_mut(&mut self) -> Option<&mut rendezvous::client::Behaviour> {
 			None
@@ -1057,6 +1099,32 @@ mod tests {
 
 		fn mdns_event(_event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&libp2p::mdns::Event> {
 			None
+		}
+
+		fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour {
+			&mut self.didcomm
+		}
+
+		fn didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&didcomm::Event> {
+			match event {
+				TestBehaviourEvent::Didcomm(e) => Some(e),
+				_ => None,
+			}
+		}
+
+		fn gossipsub(&self) -> &gossipsub::Behaviour {
+			&self.gossipsub
+		}
+
+		fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour {
+			&mut self.gossipsub
+		}
+
+		fn gossipsub_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&gossipsub::Event> {
+			match event {
+				TestBehaviourEvent::Gossipsub(e) => Some(e),
+				_ => None,
+			}
 		}
 	}
 
@@ -1102,6 +1170,14 @@ mod tests {
 		}
 	}
 
+	/// Create discover from peer.
+	fn discovery_from_peer<'a>(peer: PeerId, addresses: impl IntoIterator<Item = &'a Multiaddr>) -> Discovery {
+		Discovery::Peer(NetworkPeer {
+			peer: peer.to_bytes(),
+			addresses: addresses.into_iter().map(|i| i.to_string()).collect(),
+		})
+	}
+
 	#[tokio::test]
 	async fn test_peer_discovery() {
 		// tracing_subscriber::fmt()
@@ -1131,7 +1207,7 @@ mod tests {
 		// peer2: connect
 		discovery2
 			.layer_mut()
-			.connect(peer2.swarm(), vec![Discovery::from_peer(peer1.peer_id, std::iter::once(&peer1.addr))])
+			.connect(peer2.swarm(), vec![discovery_from_peer(peer1.peer_id, std::iter::once(&peer1.addr))])
 			.unwrap();
 
 		// run
@@ -1202,13 +1278,13 @@ mod tests {
 		// peer1: subscribe
 		discovery1
 			.layer_mut()
-			.did_discovery_subscribe(peer1.swarm(), None, did1.clone())
+			.did_discovery_subscribe(peer1.swarm(), None, PrivateIdentityBox::new(did1.clone()))
 			.unwrap();
 
 		// peer2: subscribe
 		discovery2
 			.layer_mut()
-			.did_discovery_subscribe(peer2.swarm(), None, did2.clone())
+			.did_discovery_subscribe(peer2.swarm(), None, PrivateIdentityBox::new(did2.clone()))
 			.unwrap();
 
 		// // wait subscribed
@@ -1229,9 +1305,16 @@ mod tests {
 			.layer_mut()
 			.connect(
 				peer2.swarm(),
-				vec![DidDiscovery::create(peer2_id, &did2, &did1, None, DidDiscoveryMessage::Discover.to_string())
-					.unwrap()
-					.into()],
+				vec![DidDiscovery::create(
+					peer2_id,
+					&did2,
+					&did1,
+					None,
+					DidDiscoveryMessageType::Discover.to_string(),
+					Some(&DiscoverMessage { endpoints: peer1.swarm().listeners().cloned().collect() }),
+				)
+				.unwrap()
+				.into()],
 			)
 			.unwrap();
 

@@ -1,5 +1,6 @@
-use crate::{services::application::action::CoDidCommSendAction, Action, CoContext, ConnectionMessage};
+use crate::{services::application::action::CoDidCommSendAction, Action, CoContext};
 use co_actor::{Actions, ActorHandle};
+use co_network::connections::ConnectionMessage;
 use futures::{future::Either, stream, FutureExt, Stream, StreamExt};
 use std::collections::BTreeSet;
 

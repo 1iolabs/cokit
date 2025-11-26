@@ -1,14 +1,33 @@
 # Core Quick Start
-In this quick-start guide, we are implementing the data model for a basic to-do list.
+In this quick-start guide, we are implementing the data model for a basic to-do list.  
 First, we will set up our Rust crate, and then we will implement our Core.
 
 ## Setup
-Run the following to set up our new Rust crate, and add [`co-api`](/crate/co_api/index.html) dependency
+Run the following to set up our new Rust crate, and add [`co-api`](/crate/co_api/index.html) dependency.  
+Then we need to add the `serde` and `anyhow` crates.
+
 ```sh
 cargo init --lib ./my-todo-core
 cd ./my-todo-core
 cargo add co-api --git https://gitlab.1io.com/1io/co-sdk.git
+cargo add serde anyhow
 ```
+
+Add the following two parts to the end of the `./my-todo-core/Cargo.toml` file:
+
+```toml
+[lib]
+crate-type = ["lib", "cdylib"]
+```
+
+We configure the crate-type as [`cdylib`](https://doc.rust-lang.org/reference/linkage.html#r-link.cdylib) to link a `wasm` file.
+
+```toml
+[features]
+"core" = []
+```
+
+This feature will be activated when compiling the crate to a CO-kit-compatible WebAssembly binary.
 
 ## Implementation
 Now we implement the core in `src/lib.rs`.
@@ -31,7 +50,7 @@ pub struct Todo {
   pub tasks: CoMap<String, TodoTask>,
 }
 ```
-Here we define a simple todo task data model:
+Here we define a simple to-do task data model:
 - `TodoTask` → single task (id, title, done flag)
 - `Todo` → state container with a map of tasks
 
@@ -48,8 +67,8 @@ pub enum TodoAction {
 }
 ```
 Here we enumerate all state-changing events:
-- Create, complete, un-complete, rename, delete tasks
-- Bulk-delete completed tasks
+- Create, complete, un-complete, rename, and delete tasks
+- Bulk-delete all completed tasks
 
 #### 3. Define how the modifications are applied:
 ```rust
@@ -90,11 +109,14 @@ where
 	}
 }
 ```
-Here we implement how the events are applied to the existing state:
+We implement how the events are applied to the existing state:
 - Loads state + event → modifies task map → stores updated state
 - Each `TodoAction` maps directly to a state change
 
-#### 4. For completeness, here are the imports:
+#### 4. Imports
+
+For completeness, here are the imports to add to the top of your file:
+
 ```rust
 use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, Link, OptionLink, ReducerAction};
 ```
@@ -103,6 +125,10 @@ use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, Link,
 To compile to WebAssembly use the following command:
 ```sh
 co core build
+```
+
+```admonish info
+Please ensure that you run this command in the `my-todo-core` folder.
 ```
 
 ## Full example

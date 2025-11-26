@@ -9,10 +9,10 @@ use anyhow::anyhow;
 use co_actor::Actions;
 use co_core_co::{CoAction, ParticipantState};
 use co_identity::DidCommHeader;
+use co_network::PeerId;
 use co_primitives::{from_json_string, CloneWithBlockStorageSettings, CoJoin, Did, KnownTag, ReducerAction};
 use co_storage::BlockStorageExt;
 use futures::{FutureExt, Stream, StreamExt, TryStreamExt};
-use libp2p::PeerId;
 
 /// When we receive a join message:
 /// - decide is requester is allowed to join

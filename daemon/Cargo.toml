@@ -19,7 +19,6 @@ directories = "5.0.1"
 futures = { workspace = true }
 hyper = { workspace = true }
 ipld-core = { workspace = true }
-libp2p = { workspace = true, features = ["rendezvous"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

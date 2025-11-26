@@ -1,8 +1,5 @@
 use crate::{
-	library::{
-		invite::{create_invite_message, CoInvitePayload},
-		network_discovery::identities_networks,
-	},
+	library::invite::{create_invite_message, CoInvitePayload},
 	services::application::action::{CoDidCommSendAction, NotifyAction},
 	state, Action, CoContext, CoNetwork, CoReducerFactory, CoStorage, KnownTag, CO_CORE_NAME_CO,
 };
@@ -10,7 +7,7 @@ use anyhow::anyhow;
 use co_actor::Actions;
 use co_core_co::{Co, CoAction};
 use co_identity::{DidCommHeader, IdentityResolver, PrivateIdentityResolver};
-use co_network::didcomm::EncodedMessage;
+use co_network::{identities_networks, EncodedMessage};
 use co_primitives::{CoConnectivity, CoId, Did, Network};
 use futures::{stream, FutureExt, Stream, TryStreamExt};
 use std::{collections::BTreeSet, future::ready};

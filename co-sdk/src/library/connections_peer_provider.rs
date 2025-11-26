@@ -1,9 +1,10 @@
-use crate::services::connections::{ConnectionMessage, UseAction};
 use co_actor::ActorHandle;
-use co_network::PeerProvider;
+use co_network::{
+	connections::{ConnectionMessage, UseAction},
+	PeerId, PeerProvider,
+};
 use co_primitives::{CoId, Did};
 use futures::{Stream, TryStreamExt};
-use libp2p::PeerId;
 use std::{collections::BTreeSet, time::Instant};
 
 #[derive(Debug, Clone)]

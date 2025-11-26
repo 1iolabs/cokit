@@ -51,8 +51,8 @@ futures-util = "0.3.26"
 hyper = { version = "0.14.23" }
 ipld-core = { version = "0.4.1", features = ["serde"] }
 ipld-dagpb = "0.2.1"
-libp2p = { version = "0.53", features = ["full"] }
 multiaddr = "0.18.2"
+multibase = "0.9.1"
 multihash = "0.19.3"
 multihash-codetable = { version = "0.1.4", features = ["blake3"] }
 num-rational = "0.4"
