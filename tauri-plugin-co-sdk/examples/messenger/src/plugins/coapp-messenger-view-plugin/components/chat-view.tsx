@@ -13,7 +13,7 @@ import { useCoIpld } from "../../../library/hooks/use-co-ipld.js";
 import { useCoSession } from "../../../library/hooks/use-co-session.js";
 import { useCo } from "../../../library/hooks/use-co.js";
 import { useResolveCid } from "../../../library/hooks/use-resolve-cid.js";
-import { invokePushMessage } from "../../../library/invoke-push.js";
+import { invokePushMessage, invokePushReadReceipt } from "../../../library/invoke-push.js";
 import { COAppChatsListApi } from "../../coapp-chatslist-plugin/api/index.js";
 import { coappChatsListPluginId } from "../../coapp-chatslist-plugin/types/plugin.js";
 import { MessengerViewPluginState } from "../types/state.js";
@@ -53,7 +53,7 @@ export function MessengerViewContainer(props: MessengerViewContainerProps) {
 
   // get and resolve messages
   const messageMap = useCoIpld(actions ?? [], resolveMatrixAction, session, ownIdentity);
-  const [messages, _readReceipt] = React.useMemo(() => {
+  const [messages, readReceipt] = React.useMemo(() => {
     const m: Message[] = [];
     let r: ReadReceipt | undefined = undefined;
     for (const v of messageMap.values()) {
@@ -69,15 +69,15 @@ export function MessengerViewContainer(props: MessengerViewContainerProps) {
     return [m.reverse(), r];
   }, [messageMap]);
 
-  // React.useEffect(() => {
-  //   // Chat window is open -> always keep read receipt on newest message
-  //   // TODO check for focus and scroll pos
-  //   if (ownIdentity !== undefined) {
-  //     if (messages.length > 0 && messages[messages.length - 1]!.key !== readReceipt?.messageId) {
-  //       invokePushReadReceipt(coId, coreId, ownIdentity, messages[messages.length - 1]!.key, session);
-  //     }
-  //   }
-  // }, [messages, readReceipt]);
+  React.useEffect(() => {
+    // Chat window is open -> always keep read receipt on newest message
+    // TODO check for focus and scroll pos
+    if (ownIdentity !== undefined) {
+      if (messages.length > 0 && messages[messages.length - 1]!.key !== readReceipt?.messageId) {
+        invokePushReadReceipt(coId, coreId, ownIdentity, messages[messages.length - 1]!.key, session);
+      }
+    }
+  }, [messages, readReceipt]);
 
   // currently typed message
   const [message, setMessage] = React.useState("");
