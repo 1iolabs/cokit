@@ -61,4 +61,4 @@ This uses all available interfaces and a random port with QUIC connectivity.
 
 #### Bootstrap
 Bootstrap endpoints to improve connectivity.  
-Defaults to: `dns/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWEinh2zCgGbJaDfepoiiPiBgFcysSMYSc1EQrgEEZi9aX`
+Defaults to: `/dns4/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWEinh2zCgGbJaDfepoiiPiBgFcysSMYSc1EQrgEEZi9aX`
