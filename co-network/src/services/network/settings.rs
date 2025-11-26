@@ -63,7 +63,7 @@ impl NetworkSettings {
 
 	fn default_bootstrap() -> BTreeSet<Multiaddr> {
 		let bootstrap =
-			["/dns/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWEinh2zCgGbJaDfepoiiPiBgFcysSMYSc1EQrgEEZi9aX"];
+			["/dns4/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWEinh2zCgGbJaDfepoiiPiBgFcysSMYSc1EQrgEEZi9aX"];
 		bootstrap.into_iter().map(|s| s.parse().expect("to parse")).collect()
 	}
 

@@ -33,7 +33,7 @@ mod tests {
 		let bootstrap: BTreeSet<Multiaddr> = [
 			format!("/ip4/127.0.0.1/tcp/9090/p2p/{}", peer1).parse().unwrap(),
 			format!("/ip6/::1/tcp/9091/p2p/{}", peer1).parse().unwrap(),
-			"/dns/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWEinh2zCgGbJaDfepoiiPiBgFcysSMYSc1EQrgEEZi9aX"
+			"/dns4/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWEinh2zCgGbJaDfepoiiPiBgFcysSMYSc1EQrgEEZi9aX"
 				.parse()
 				.unwrap(),
 		]
@@ -53,7 +53,7 @@ mod tests {
 		);
 		assert_eq!(
 			result.get(&peer2).unwrap().endpoints,
-			["/dns/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWEinh2zCgGbJaDfepoiiPiBgFcysSMYSc1EQrgEEZi9aX"
+			["/dns4/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWEinh2zCgGbJaDfepoiiPiBgFcysSMYSc1EQrgEEZi9aX"
 				.parse()
 				.unwrap()]
 			.into_iter()
