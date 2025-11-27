@@ -20,6 +20,10 @@ pub struct CoCoreResolver {
 	mapping: HashMap<Cid, Core>,
 }
 impl CoCoreResolver {
+	pub fn new(cores: &Cores) -> Self {
+		Self::with_mapping(cores.mapping())
+	}
+
 	pub fn with_mapping(mapping: HashMap<Cid, Core>) -> Self {
 		Self { mapping }
 	}
@@ -164,7 +168,7 @@ impl CoCoreResolver {
 }
 impl Default for CoCoreResolver {
 	fn default() -> Self {
-		Self::with_mapping(Cores::default().built_in_native_mapping())
+		Self::new(&Cores::default())
 	}
 }
 #[async_trait]

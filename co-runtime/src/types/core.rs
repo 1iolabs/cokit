@@ -32,6 +32,14 @@ impl Core {
 			async_api::reduce_with_context::<R, A, AsyncContext, AsyncBlockStorage>(context)
 		}))
 	}
+
+	pub fn is_native(&self) -> bool {
+		match &self {
+			Core::Wasm(_) => false,
+			Core::Native(_) => true,
+			Core::NativeAsync(_) => true,
+		}
+	}
 }
 impl Debug for Core {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -11,8 +11,8 @@ use crate::{
 		reducers::{ReducerStorage, ReducersControl},
 	},
 	types::co_reducer_factory::CoReducerFactoryError,
-	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, DynamicCoDate, DynamicCoUuid, LocalCoBuilder, Runtime,
-	Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, DynamicCoDate, DynamicCoUuid, LocalCoBuilder,
+	Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -210,6 +210,7 @@ pub(crate) struct CoContextInner {
 	date: DynamicCoDate,
 	uuid: DynamicCoUuid,
 	block_links: BlockLinks,
+	cores: Cores,
 }
 impl CoContextInner {
 	pub(crate) fn new(
@@ -224,6 +225,7 @@ impl CoContextInner {
 		reducers: ReducersControl,
 		date: DynamicCoDate,
 		uuid: DynamicCoUuid,
+		cores: Cores,
 	) -> Self {
 		Self {
 			settings,
@@ -238,6 +240,7 @@ impl CoContextInner {
 			date,
 			uuid,
 			block_links: Default::default(),
+			cores,
 		}
 	}
 
@@ -325,7 +328,7 @@ impl CoContextInner {
 
 	/// Creates the Core Resolver for the local CO.
 	fn create_local_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
-		let core_resolver = CoCoreResolver::default();
+		let core_resolver = CoCoreResolver::new(&self.cores);
 		let core_resolver = LogCoreResolver::new(core_resolver, id);
 		let core_resolver = DynamicCoreResolver::new(core_resolver);
 		core_resolver
@@ -333,7 +336,7 @@ impl CoContextInner {
 
 	/// Creates the Core Resolver for a shared CO.
 	pub(crate) fn create_shared_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
-		let core_resolver = CoCoreResolver::default();
+		let core_resolver = CoCoreResolver::new(&self.cores);
 		let core_resolver = CoGuardResolver::new(core_resolver);
 		let core_resolver = LogCoreResolver::new(core_resolver, id);
 		let core_resolver = DynamicCoreResolver::new(core_resolver);
