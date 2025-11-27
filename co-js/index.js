@@ -23,32 +23,98 @@ function newStorage() {
 }
 
 async function test_stream() {
-  console.log("Test stream:\n");
   const [storage, blocks] = newStorage();
   let map = new CoMap();
-  console.log("co", map, blocks);
   await map.insert(storage, "hello", "world");
-  console.log("co 2", map, blocks);
+  assertEq(blocks.size, 1);
+  assertEq(
+    CID.decode(map.cid()).toString(),
+    "bafyr4ib4sqmbfbyhkoh64ylvnwrm3uyqhq43zeknhnfj643kpghqjdopza",
+  );
   const stream = map.stream(storage);
+  let values = [];
   for await (const i of stream) {
-    console.log("stream content", i);
+    values.push(i);
   }
+  console.log("values: ", values);
+  assertEq(values.length, 1);
+  assertEq(values[0][0], "hello");
+  assertEq(values[0][1], "world");
+}
+
+async function test_unixfs_add() {
+  const [storage, blocks] = newStorage();
+  var count = 64 * 1024;
+  const stream = new ReadableStream({
+    start(controller) {
+      for (var i = 1024; i--; i > 0) {
+        controller.enqueue(
+          new TextEncoder().encode("hello world test".repeat(64)),
+        );
+      }
+      controller.close();
+    },
+  });
+  const cids = await unixfsAdd(storage, stream);
+  console.log("cids: ", cids);
+  assertEq(cids.length, 5);
+  assertEq(
+    CID.decode(cids[0]).toString(),
+    "QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy",
+  );
+  assertEq(
+    CID.decode(cids[1]).toString(),
+    "QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy",
+  );
+  assertEq(
+    CID.decode(cids[2]).toString(),
+    "QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy",
+  );
+  assertEq(
+    CID.decode(cids[3]).toString(),
+    "QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy",
+  );
+  assertEq(
+    CID.decode(cids[4]).toString(),
+    "QmVRRmYKvn8m3jQT8VHX1BCgrQLFvzsB26aKwLCyFRvYSv",
+  );
 }
 
 async function test_unixfs_add_empty() {
   console.log("Test unixfs add:\n");
   const [storage, blocks] = newStorage();
   console.log("test add empty", storage, blocks);
-  const stream = new ReadableStream([]);
+  const stream = new ReadableStream({
+    start(controller) {
+      // controller.enqueue(new TextEncoder().encode("hello"));
+      controller.close();
+    },
+  });
   const cids = await unixfsAdd(storage, stream);
-  console.log("test cid count: ", cids.length === 1);
+  console.log("cids: ", cids);
+  assertEq(cids.length, 1);
+  assertEq(
+    CID.decode(cids[0]).toString(),
+    "QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH",
+  );
+}
 
-  console.log("testing cid: ", cids[0] === "QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH");
+async function test_async(func) {
+  console.info("🧪 test:", func.name);
+  await func();
+}
+
+function assertEq(actual, expected) {
+  if (actual !== expected) {
+    console.error("❌ failed:", expected, "!==", actual);
+  } else {
+    console.info("✅ passed:", expected, "===", actual);
+  }
 }
 
 async function tests() {
-  // await test_stream();
-  await test_unixfs_add_empty();
+  await test_async(test_stream);
+  await test_async(test_unixfs_add);
+  await test_async(test_unixfs_add_empty);
 }
-
 tests();

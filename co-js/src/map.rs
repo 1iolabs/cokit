@@ -85,6 +85,13 @@ impl JsCoMap {
 		};
 		wasm_streams::ReadableStream::from_stream(stream).into_raw()
 	}
+
+	pub fn cid(&self) -> Result<JsValue, JsValue> {
+		match &self.root {
+			None => Ok(JsValue::null()),
+			Some(cid) => to_js_value(cid),
+		}
+	}
 }
 impl JsCoMap {
 	fn map(&self) -> CoMap<TagValue, TagValue> {

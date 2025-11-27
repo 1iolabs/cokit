@@ -5,7 +5,6 @@ use crate::{
 use co_primitives::unixfs_add;
 use futures::{StreamExt, TryStreamExt};
 use wasm_bindgen::prelude::*;
-use web_sys::console;
 
 /// Add stream as unixfs file to storage.
 /// The last CID in the result is the root.
@@ -20,14 +19,9 @@ pub async fn js_unixfs_add(storage: &JsBlockStorage, stream: web_sys::ReadableSt
 				.map_err(|err| futures::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", err)))?)
 		})
 		.into_async_read();
-
-	console::log_1(&"After Stream maybe?".into());
-	let cids = unixfs_add(storage, &mut async_stream).await.map_err(|err| {
-		let error = format!("unixfs add failed: \n{:?}", err);
-		console::log_2(&"Unixfs Error: ".into(), &error.clone().into());
-		error
-	})?;
-	console::log_2(&"After Stream maybe?".into(), &to_js_value(&cids).expect("msg"));
+	let cids = unixfs_add(storage, &mut async_stream)
+		.await
+		.map_err(|err| format!("unixfs add failed: {:?}", err))?;
 	to_js_value(&cids)
 }
 
@@ -44,7 +38,7 @@ mod tests {
 	async fn test_unixfs() {
 		let stream = web_sys::ReadableStream::new().expect("stream");
 		let get_closure: Closure<dyn Fn(Uint8Array) -> Uint8Array> = Closure::new(|cid| cid);
-		let set_closure: Closure<dyn Fn(Uint8Array, Uint8Array) -> Uint8Array> = Closure::new(|cid, data| cid);
+		let set_closure: Closure<dyn Fn(Uint8Array, Uint8Array) -> Uint8Array> = Closure::new(|cid, _data| cid);
 		let get: JsBlockStorageGet = JsBlockStorageGet::from(get_closure.into_js_value());
 		let set: JsBlockStorageSet = JsBlockStorageSet::from(set_closure.into_js_value());
 		let storage = JsBlockStorage::new(get, set).expect("storage");

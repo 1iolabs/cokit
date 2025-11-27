@@ -138,12 +138,20 @@ mod tests {
 	use futures::io::Cursor;
 	use std::str::FromStr;
 
+	/// Test 1MiB of data.
+	/// Note that the leaf blocks are the same because they contain the same data.
 	#[tokio::test]
 	async fn test_unixfs_add() {
 		let storage = TestStorage::default();
 		let mut stream = Cursor::new("hello world test".repeat(64).repeat(1024).as_bytes().to_vec()); // 1024KiB
 		let cids = unixfs_add(&storage, &mut stream).await.unwrap();
+		// println!("cids: {:?}", cids);
 		assert_eq!(5, cids.len());
+		assert_eq!(cids[0], Cid::from_str("QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy").unwrap());
+		assert_eq!(cids[1], Cid::from_str("QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy").unwrap());
+		assert_eq!(cids[2], Cid::from_str("QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy").unwrap());
+		assert_eq!(cids[3], Cid::from_str("QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy").unwrap());
+		assert_eq!(cids[4], Cid::from_str("QmVRRmYKvn8m3jQT8VHX1BCgrQLFvzsB26aKwLCyFRvYSv").unwrap());
 	}
 
 	#[tokio::test]
