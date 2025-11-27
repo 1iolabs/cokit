@@ -53,7 +53,7 @@ cargo add futures
 ```
 5. Install the `uuid` crate as a dependency:
 ```sh
-cargo add uuid --features v7
+cargo add uuid --features v4
 ```
 6. Setup Tailwind
 ```sh
@@ -231,9 +231,20 @@ for task in tasks {
 }
 ```
 
-#### Full Example Code
-Here is a full example of the code parts that integrate with CO-kit.  
-Below, you will also find a link to the entire git project.
+### Run the App
+
+Follow the instructions in `my-todo-app/README.md` to run the Tailwind CSS compiler and serve your App.
+
+
+
+## Full Example Code
+Here is a full example of the code parts in `main.rs` that integrate with CO-kit.  
+Below that is the content for your `tailwind.css` file.  
+And, at the bottom of this page, you will find a link to the entire git project.
+
+```admonish info
+Please be sure to 'unhide' all of the code if you are copy/pasting into your `main.rs` file.
+```
 
 `src/main.rs`:
 
@@ -374,7 +385,7 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 		}
 	});
 	let on_create_task = use_callback(move |title| {
-		on_todo_action(TodoAction::TaskCreate(TodoTask { id: uuid::Uuid::now_v7().to_string(), title, done: false }));
+		on_todo_action(TodoAction::TaskCreate(TodoTask { id: uuid::Uuid::new_v4().to_string(), title, done: false }));
 	});
 	let on_done = use_callback(move |(id, done)| {
 		on_todo_action(if done { TodoAction::TaskDone { id } } else { TodoAction::TaskUndone { id } });
@@ -475,7 +486,7 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 # 					}
 # 				},
 # 				div {
-# 					class: "bg-base-300 w-screen h-screen",
+# 					class: "bg-slate-100 w-screen h-screen",
 # 					{children}
 # 				}
 # 			}
@@ -649,7 +660,7 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 # 	});
 # 	rsx! {
 # 		form {
-# 			class: "flex-none join w-full",
+# 			class: "flex-none join w-full flex-1",
 # 			onsubmit: add_task,
 # 			input { class: "grow input join-item", placeholder: "New task...", value: "{new_title}", oninput: move |e| new_title.set(e.value().to_string()) }
 # 			button { class: "btn btn-primary join-item text-xl font-bold", type: "submit", "+" }
@@ -818,17 +829,13 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 ```
 
 
-### Tailwind
+#### Tailwind
 `/tailwind.css`:
 ```css
 @import "tailwindcss";
 @source "./src/**/*.{rs,html,css}";
 @plugin "daisyui";
 ```
-
-### Run the App
-
-Serve your App by following the instructions in the `README.md` file in your `my-todo-app` folder.
 
 
 ### Full Example Project
