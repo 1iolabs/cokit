@@ -53,7 +53,7 @@ cargo add futures
 ```
 5. Install the `uuid` crate as a dependency:
 ```sh
-cargo add uuid --features v4
+cargo add uuid --features v7
 ```
 6. Setup Tailwind
 ```sh
@@ -385,7 +385,7 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 		}
 	});
 	let on_create_task = use_callback(move |title| {
-		on_todo_action(TodoAction::TaskCreate(TodoTask { id: uuid::Uuid::new_v4().to_string(), title, done: false }));
+		on_todo_action(TodoAction::TaskCreate(TodoTask { id: uuid::Uuid::now_v7().to_string(), title, done: false }));
 	});
 	let on_done = use_callback(move |(id, done)| {
 		on_todo_action(if done { TodoAction::TaskDone { id } } else { TodoAction::TaskUndone { id } });
@@ -486,7 +486,7 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 # 					}
 # 				},
 # 				div {
-# 					class: "bg-slate-100 w-screen h-screen",
+# 					class: "bg-base-300 w-screen h-screen",
 # 					{children}
 # 				}
 # 			}
@@ -660,7 +660,7 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 # 	});
 # 	rsx! {
 # 		form {
-# 			class: "flex-none join w-full flex-1",
+# 			class: "flex-none join w-full",
 # 			onsubmit: add_task,
 # 			input { class: "grow input join-item", placeholder: "New task...", value: "{new_title}", oninput: move |e| new_title.set(e.value().to_string()) }
 # 			button { class: "btn btn-primary join-item text-xl font-bold", type: "submit", "+" }
