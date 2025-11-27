@@ -43,7 +43,7 @@ impl CoCoreResolver {
 	where
 		S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 	{
-		let (_root, _name, state, core) = self
+		let (_root, _name, state, core_binary, core) = self
 			.core_state_binary(storage, state, CoreSource::Name(CO_CORE_NAME_CO.as_ref()))
 			.await?;
 		let mut dispatch = RuntimeDispatch::new(
@@ -51,6 +51,7 @@ impl CoCoreResolver {
 			runtime.clone(),
 			storage.clone(),
 			CO_CORE_NAME_CO.to_string(),
+			core_binary,
 			core,
 			state,
 		);
@@ -65,7 +66,7 @@ impl CoCoreResolver {
 		storage: &S,
 		state: &Option<Cid>,
 		core: CoreSource<'_>,
-	) -> Result<(bool, String, Option<Cid>, Core), CoreResolverError>
+	) -> Result<(bool, String, Option<Cid>, Cid, Core), CoreResolverError>
 	where
 		S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 	{
@@ -124,7 +125,7 @@ impl CoCoreResolver {
 		};
 
 		// result
-		Ok((root, core_name, core_state, self.core(core_binary)))
+		Ok((root, core_name, core_state, core_binary, self.core(core_binary)))
 	}
 
 	async fn migrate<S>(
@@ -139,7 +140,8 @@ impl CoCoreResolver {
 		S: ExtendedBlockStorage + Send + Sync + Clone + 'static,
 	{
 		// get core
-		let (root, _, core_state, core) = self.core_state_binary(storage, state, CoreSource::Name(core_name)).await?;
+		let (root, _, core_state, core_binary, core) =
+			self.core_state_binary(storage, state, CoreSource::Name(core_name)).await?;
 
 		// read migrate
 		let migrate: Ipld = storage.get_deserialized(migrate).await?;
@@ -150,6 +152,7 @@ impl CoCoreResolver {
 			runtime.clone(),
 			storage.clone(),
 			core_name.to_owned(),
+			core_binary,
 			core,
 			core_state,
 		);
@@ -185,12 +188,12 @@ where
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
 		// find core
-		let (root, core_name, core_state, core) =
+		let (root, core_name, core_state, core_binary, core) =
 			self.core_state_binary(storage, state, CoreSource::Action(*action)).await?;
 
 		// apply to state
 		let mut result = runtime
-			.execute_state(storage, &core, RuntimeContext::new(core_state, action.into()))
+			.execute_state(storage, &core_binary, &core, RuntimeContext::new(core_state, action.into()))
 			.await
 			.map_err(|e| CoreResolverError::Execute(core_name.clone(), e))?;
 

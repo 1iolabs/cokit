@@ -6,11 +6,12 @@ use co_storage::BlockStorage;
 
 #[derive(Debug, Clone)]
 pub struct SingleCoreResolver {
+	core_binary: Cid,
 	core: Core,
 }
 impl SingleCoreResolver {
-	pub fn new(core: Core) -> Self {
-		Self { core }
+	pub fn new(core_binary: Cid, core: Core) -> Self {
+		Self { core_binary, core }
 	}
 }
 #[async_trait]
@@ -27,7 +28,7 @@ where
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
 		Ok(runtime
-			.execute_state(storage, &self.core, RuntimeContext::new(*state, action.into()))
+			.execute_state(storage, &self.core_binary, &self.core, RuntimeContext::new(*state, action.into()))
 			.await
 			.map_err(|e| CoreResolverError::Execute("root".to_owned(), e))?)
 	}

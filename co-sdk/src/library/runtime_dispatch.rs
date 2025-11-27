@@ -14,6 +14,7 @@ pub struct RuntimeDispatch<S, A> {
 	runtime: RuntimePool,
 	storage: S,
 	core_name: String,
+	core_binary: Cid,
 	core: Core,
 	state: Option<Cid>,
 	_action: PhantomData<A>,
@@ -25,10 +26,11 @@ impl<S, A> RuntimeDispatch<S, A> {
 		runtime: RuntimePool,
 		storage: S,
 		core_name: String,
+		core_binary: Cid,
 		core: Core,
 		state: Option<Cid>,
 	) -> Self {
-		Self { identity, runtime, storage, core_name, core, state, _action: PhantomData }
+		Self { identity, runtime, storage, core_name, core_binary, core, state, _action: PhantomData }
 	}
 }
 #[async_trait]
@@ -53,7 +55,12 @@ where
 		// apply
 		let result = self
 			.runtime
-			.execute_state(&self.storage, &self.core, RuntimeContext::new(self.state, action_cid.into()))
+			.execute_state(
+				&self.storage,
+				&self.core_binary,
+				&self.core,
+				RuntimeContext::new(self.state, action_cid.into()),
+			)
 			.await
 			.map_err(|e| CoreResolverError::Execute(self.core_name.clone(), e))?;
 

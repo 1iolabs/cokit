@@ -22,6 +22,11 @@ impl RuntimeInstance {
 		Ok(RuntimeInstance { core: *core, runtime: create_runtime(native, bytes) })
 	}
 
+	/// Create a new runtime element which can be used immediately or inserted to the pool.
+	pub async fn create_native(core: &Cid, bytes: &[u8]) -> Result<Self, StorageError> {
+		Ok(RuntimeInstance { core: *core, runtime: create_runtime(true, bytes.to_vec()) })
+	}
+
 	pub fn cid(&self) -> &Cid {
 		&self.core
 	}

@@ -64,6 +64,7 @@ impl RuntimePool {
 	pub async fn execute_state<S>(
 		&self,
 		storage: &S,
+		core_cid: &Cid,
 		core: &Core,
 		context: RuntimeContext,
 	) -> Result<RuntimeContext, ExecuteError>
@@ -83,6 +84,32 @@ impl RuntimePool {
 				let mut instance = match pool_instance {
 					Some(i) => i,
 					None => RuntimeInstance::create(storage, core).await?,
+				};
+
+				// api
+				let api = create_cov1_api(storage, context, checked);
+
+				// execute
+				let (result, instance): (RuntimeContext, RuntimeInstance) =
+					tokio::task::spawn_blocking(move || -> Result<(RuntimeContext, RuntimeInstance), RuntimeError> {
+						let result = instance.runtime_mut().execute_state(api)?;
+						Ok((result, instance))
+					})
+					.await
+					.map_err(|e| ExecuteError::Other(e.into()))??;
+
+				// pool instance
+				self.reuse_runtime_instance(instance);
+
+				// result
+				result
+			},
+			Core::Binary(bytes) => {
+				// get/create instance
+				let pool_instance = self.get_runtime_instance(core_cid);
+				let mut instance = match pool_instance {
+					Some(i) => i,
+					None => RuntimeInstance::create_native(core_cid, bytes).await?,
 				};
 
 				// api
