@@ -7,13 +7,13 @@ Add `creator` to state:
 ```rust
 #[co]
 pub struct TodoTask {
-  ///Task UUID.
+	/// Task UUID.
 	pub id: String,
-	///Task title.
+	/// Task title.
 	pub title: String,
-	///Whether the task is done.
+	/// Whether the task is done.
 	pub done: bool,
-	///The creator's DID.
+	/// The creator's DID.
 	pub creator: Did,
 }
 ```
