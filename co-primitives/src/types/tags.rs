@@ -250,15 +250,23 @@ impl Tags {
 
 	/// Remove specified tags.
 	/// If no tags are specified all tags will be removed.
-	pub fn clear(&mut self, tags: Option<&Tags>) {
+	/// Returns `true` if tags has changed.
+	pub fn clear(&mut self, tags: Option<&Tags>) -> bool {
+		let mut result = false;
 		match tags {
 			Some(tags) => {
 				for tag in tags.0.iter() {
-					self.0.remove(tag);
+					result = self.0.remove(tag) || result;
 				}
 			},
-			None => self.0.clear(),
+			None => {
+				if !self.0.is_empty() {
+					result = true;
+				}
+				self.0.clear()
+			},
 		}
+		result
 	}
 
 	/// Remove tags with key.

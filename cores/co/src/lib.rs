@@ -23,7 +23,12 @@ pub struct Co {
 	#[serde(rename = "b")]
 	pub binary: Cid,
 
+	/// Next state (ancestor).
+	#[serde(rename = "a", default, skip_serializing_if = "OptionLink::is_none")]
+	pub next: OptionLink<Co>,
+
 	/// CO Current heads.
+	#[serde(rename = "h", default, skip_serializing_if = "BTreeSet::is_empty")]
 	pub heads: BTreeSet<Cid>,
 
 	/// CO Participants.
@@ -59,6 +64,7 @@ impl Default for Co {
 			tags: Default::default(),
 			name: Default::default(),
 			binary: Default::default(),
+			next: Default::default(),
 			heads: Default::default(),
 			participants: Default::default(),
 			cores: Default::default(),
@@ -79,7 +85,9 @@ where
 	) -> Result<Link<Self>, anyhow::Error> {
 		let mut result = storage.get_value_or_default(&state).await?;
 		let event = storage.get_value(&event).await?;
-		reduce(storage, &mut result, &event.payload).await?;
+		if reduce(storage, &mut result, &event.payload).await? {
+			result.next = state;
+		}
 		let state = storage.set_value(&result).await?;
 		Ok(state)
 	}
@@ -340,35 +348,35 @@ pub enum CoAction {
 	},
 }
 
-async fn reduce<S>(storage: &S, result: &mut Co, action: &CoAction) -> Result<(), anyhow::Error>
+/// Reduce [`CoAction`] to result [`Co`] state.
+/// Returns [`true`] if anything in result has changed.
+async fn reduce<S>(storage: &S, result: &mut Co, action: &CoAction) -> Result<bool, anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
-	match &action {
-		CoAction::Create(create) => {
-			reduce_create(storage, result, create).await?;
-		},
+	Ok(match &action {
+		CoAction::Create(create) => reduce_create(storage, result, create).await?,
 		CoAction::Upgrade { binary, migrate } => reduce_upgrade(result, binary, migrate),
 		CoAction::ParticipantInvite { participant, tags } => {
-			reduce_participant_invite(storage, result, participant, tags).await?;
+			reduce_participant_invite(storage, result, participant, tags).await?
 		},
 		CoAction::ParticipantJoin { participant, tags } => {
-			reduce_participant_join(storage, result, participant, tags).await?;
+			reduce_participant_join(storage, result, participant, tags).await?
 		},
 		CoAction::ParticipantPending { participant, tags } => {
-			reduce_participant_pending(storage, result, participant, tags).await?;
+			reduce_participant_pending(storage, result, participant, tags).await?
 		},
 		CoAction::ParticipantRemove { participant, tags } => {
-			reduce_participant_remove(storage, result, participant, tags).await?;
+			reduce_participant_remove(storage, result, participant, tags).await?
 		},
 		CoAction::Heads { heads } => reduce_heads(result, heads),
 		CoAction::CoreCreate { core, binary, tags } => reduce_core_create(result, core, binary, tags),
 		CoAction::CoreRemove { core } => reduce_core_remove(result, core),
 		CoAction::ParticipantTagsInsert { participant, tags } => {
-			reduce_participant_tags_insert(storage, result, participant, tags).await?;
+			reduce_participant_tags_insert(storage, result, participant, tags).await?
 		},
 		CoAction::ParticipantTagsRemove { participant, tags } => {
-			reduce_participant_tags_remove(storage, result, participant, tags).await?;
+			reduce_participant_tags_remove(storage, result, participant, tags).await?
 		},
 		CoAction::CoreChange { core, state } => reduce_core_change(result, core, state),
 		CoAction::CoreUpgrade { core, binary, migrate } => reduce_core_upgrade(result, core, binary, migrate),
@@ -376,20 +384,17 @@ where
 		CoAction::CoreTagsRemove { core, tags } => reduce_core_tags_remove(result, core, tags),
 		CoAction::TagsInsert { tags } => reduce_tags_insert(result, tags),
 		CoAction::TagsRemove { tags } => reduce_tags_remove(result, tags),
-		CoAction::NetworkInsert { network } => {
-			reduce_network_insert(storage, result, network).await?;
-		},
+		CoAction::NetworkInsert { network } => reduce_network_insert(storage, result, network).await?,
 		CoAction::NetworkRemove { network } => reduce_network_remove(storage, result, network).await?,
 		CoAction::GuardCreate { guard, binary, tags } => reduce_guard_create(result, guard, binary, tags),
 		CoAction::GuardRemove { guard } => reduce_guard_remove(result, guard),
 		CoAction::GuardUpgrade { guard, binary } => reduce_guard_upgrade(result, guard, binary),
 		CoAction::GuardTagsInsert { guard, tags } => reduce_guard_tags_insert(result, guard, tags),
 		CoAction::GuardTagsRemove { guard, tags } => reduce_guard_tags_remove(result, guard, tags),
-	}
-	Ok(())
+	})
 }
 
-async fn reduce_create<S>(storage: &S, result: &mut Co, create: &CreateAction) -> Result<(), anyhow::Error>
+async fn reduce_create<S>(storage: &S, result: &mut Co, create: &CreateAction) -> Result<bool, anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
@@ -410,11 +415,12 @@ where
 		.as_ref()
 		.map(|key_id| vec![Key { id: key_id.to_owned(), state: KeyState::Active }]);
 	result.binary = create.binary;
-	Ok(())
+	Ok(true)
 }
 
-fn reduce_upgrade(result: &mut Co, binary: &Cid, _migrate: &Option<Cid>) {
+fn reduce_upgrade(result: &mut Co, binary: &Cid, _migrate: &Option<Cid>) -> bool {
 	result.binary = *binary;
+	true
 }
 
 async fn reduce_participant_invite<S>(
@@ -422,7 +428,7 @@ async fn reduce_participant_invite<S>(
 	result: &mut Co,
 	participant: &String,
 	tags: &Tags,
-) -> Result<(), anyhow::Error>
+) -> Result<bool, anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
@@ -445,9 +451,14 @@ where
 				Participant { did: participant.clone(), state: ParticipantState::Invite, tags: tags.clone() },
 			)
 			.await?;
-	}
-	result.participants = participants.store().await?;
-	Ok(())
+	};
+	let next_participants = participants.store().await?;
+	Ok(if result.participants != next_participants {
+		result.participants = next_participants;
+		true
+	} else {
+		false
+	})
 }
 
 async fn reduce_participant_join<S>(
@@ -455,18 +466,20 @@ async fn reduce_participant_join<S>(
 	result: &mut Co,
 	participant: &String,
 	tags: &Tags,
-) -> Result<(), anyhow::Error>
+) -> Result<bool, anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
 	let mut participants = result.participants.open(storage).await?;
-	if let Some(mut item) = participants.get(participant).await? {
+	Ok(if let Some(mut item) = participants.get(participant).await? {
 		item.state = ParticipantState::Active;
 		item.tags.append(&mut tags.clone());
 		participants.insert(participant.clone(), item).await?;
 		result.participants = participants.store().await?;
-	}
-	Ok(())
+		true
+	} else {
+		false
+	})
 }
 
 async fn reduce_participant_pending<S>(
@@ -474,12 +487,12 @@ async fn reduce_participant_pending<S>(
 	result: &mut Co,
 	participant: &String,
 	tags: &Tags,
-) -> Result<(), anyhow::Error>
+) -> Result<bool, anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
 	let mut participants = result.participants.open(storage).await?;
-	if !participants.contains_key(participant).await? {
+	Ok(if !participants.contains_key(participant).await? {
 		participants
 			.insert(
 				participant.clone(),
@@ -487,8 +500,10 @@ where
 			)
 			.await?;
 		result.participants = participants.store().await?;
-	}
-	Ok(())
+		true
+	} else {
+		false
+	})
 }
 
 async fn reduce_participant_remove<S>(
@@ -496,7 +511,7 @@ async fn reduce_participant_remove<S>(
 	result: &mut Co,
 	participant: &String,
 	tags: &Tags,
-) -> Result<(), anyhow::Error>
+) -> Result<bool, anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
@@ -515,27 +530,33 @@ where
 	} else {
 		false
 	};
-	if remove {
+	Ok(if remove {
 		participants.remove(participant.clone()).await?;
 		result.participants = participants.store().await?;
-	}
-	Ok(())
+		true
+	} else {
+		false
+	})
 }
 
-fn reduce_heads(result: &mut Co, heads: &BTreeSet<Cid>) {
+fn reduce_heads(result: &mut Co, heads: &BTreeSet<Cid>) -> bool {
 	result.heads = heads.clone();
+	true
 }
 
-fn reduce_core_create(result: &mut Co, core: &String, binary: &Cid, tags: &Tags) {
+fn reduce_core_create(result: &mut Co, core: &String, binary: &Cid, tags: &Tags) -> bool {
 	if !result.cores.contains_key(core) {
 		result
 			.cores
 			.insert(core.clone(), Core { binary: *binary, tags: tags.clone(), state: None });
+		true
+	} else {
+		false
 	}
 }
 
-fn reduce_core_remove(result: &mut Co, core: &String) {
-	result.cores.remove(core);
+fn reduce_core_remove(result: &mut Co, core: &String) -> bool {
+	result.cores.remove(core).is_some()
 }
 
 async fn reduce_participant_tags_insert<S>(
@@ -543,17 +564,19 @@ async fn reduce_participant_tags_insert<S>(
 	result: &mut Co,
 	participant: &String,
 	tags: &Tags,
-) -> Result<(), anyhow::Error>
+) -> Result<bool, anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
 	let mut participants = result.participants.open(storage).await?;
-	if let Some(mut item) = participants.get(participant).await? {
+	Ok(if let Some(mut item) = participants.get(participant).await? {
 		item.tags.append(&mut tags.clone());
 		participants.insert(participant.clone(), item).await?;
 		result.participants = participants.store().await?;
-	}
-	Ok(())
+		true
+	} else {
+		false
+	})
 }
 
 async fn reduce_participant_tags_remove<S>(
@@ -561,93 +584,121 @@ async fn reduce_participant_tags_remove<S>(
 	result: &mut Co,
 	participant: &String,
 	tags: &Tags,
-) -> Result<(), anyhow::Error>
+) -> Result<bool, anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
 	let mut participants = result.participants.open(storage).await?;
-	if let Some(mut item) = participants.get(participant).await? {
+	Ok(if let Some(mut item) = participants.get(participant).await? {
 		item.tags.clear(Some(tags));
 		participants.insert(participant.clone(), item).await?;
 		result.participants = participants.store().await?;
-	}
-	Ok(())
+		true
+	} else {
+		false
+	})
 }
 
-fn reduce_core_upgrade(result: &mut Co, core: &String, binary: &Cid, _migrate: &Option<Cid>) {
+fn reduce_core_upgrade(result: &mut Co, core: &String, binary: &Cid, _migrate: &Option<Cid>) -> bool {
 	if let Some(core) = result.cores.get_mut(core) {
 		core.binary = *binary;
+		true
+	} else {
+		false
 	}
 }
 
-fn reduce_core_change(result: &mut Co, core: &String, state: &Option<Cid>) {
+fn reduce_core_change(result: &mut Co, core: &String, state: &Option<Cid>) -> bool {
 	if let Some(core) = result.cores.get_mut(core) {
+		let result = core.state != *state;
 		core.state = *state;
+		result
+	} else {
+		false
 	}
 }
 
-fn reduce_core_tags_insert(result: &mut Co, core: &String, tags: &Tags) {
+fn reduce_core_tags_insert(result: &mut Co, core: &String, tags: &Tags) -> bool {
 	if let Some(core) = result.cores.get_mut(core) {
 		core.tags.append(&mut tags.clone());
+		true
+	} else {
+		false
 	}
 }
 
-async fn reduce_network_remove<S>(storage: &S, result: &mut Co, network: &Network) -> Result<(), StorageError>
+async fn reduce_network_remove<S>(storage: &S, result: &mut Co, network: &Network) -> Result<bool, StorageError>
 where
 	S: BlockStorage + Clone + 'static,
 {
-	result.network.remove(storage, network.clone()).await?;
-	Ok(())
+	Ok(result.network.remove(storage, network.clone()).await?)
 }
 
-async fn reduce_network_insert<S>(storage: &S, result: &mut Co, network: &Network) -> Result<(), StorageError>
+async fn reduce_network_insert<S>(storage: &S, result: &mut Co, network: &Network) -> Result<bool, StorageError>
 where
 	S: BlockStorage + Clone + 'static,
 {
 	result.network.insert(storage, network.clone()).await?;
-	Ok(())
+	Ok(true)
 }
 
-fn reduce_tags_remove(result: &mut Co, tags: &Tags) {
+fn reduce_tags_remove(result: &mut Co, tags: &Tags) -> bool {
 	result.tags.clear(Some(tags));
+	true
 }
 
-fn reduce_tags_insert(result: &mut Co, tags: &Tags) {
+fn reduce_tags_insert(result: &mut Co, tags: &Tags) -> bool {
 	result.tags.append(&mut tags.clone());
+	true
 }
 
-fn reduce_core_tags_remove(result: &mut Co, core: &String, tags: &Tags) {
+fn reduce_core_tags_remove(result: &mut Co, core: &String, tags: &Tags) -> bool {
 	if let Some(core) = result.cores.get_mut(core) {
 		core.tags.clear(Some(tags));
+		true
+	} else {
+		false
 	}
 }
 
-fn reduce_guard_create(result: &mut Co, guard_name: &String, binary: &Cid, tags: &Tags) {
+fn reduce_guard_create(result: &mut Co, guard_name: &String, binary: &Cid, tags: &Tags) -> bool {
 	if !result.guards.contains_key(guard_name) {
 		result
 			.guards
 			.insert(guard_name.clone(), Guard { binary: *binary, tags: tags.clone() });
+		true
+	} else {
+		false
 	}
 }
 
-fn reduce_guard_remove(result: &mut Co, guard_name: &String) {
-	result.guards.remove(guard_name);
+fn reduce_guard_remove(result: &mut Co, guard_name: &String) -> bool {
+	result.guards.remove(guard_name).is_some()
 }
 
-fn reduce_guard_upgrade(result: &mut Co, guard_name: &String, binary: &Cid) {
+fn reduce_guard_upgrade(result: &mut Co, guard_name: &String, binary: &Cid) -> bool {
 	if let Some(guard) = result.guards.get_mut(guard_name) {
+		let result = guard.binary != *binary;
 		guard.binary = *binary;
+		result
+	} else {
+		false
 	}
 }
 
-fn reduce_guard_tags_insert(result: &mut Co, guard_name: &String, tags: &Tags) {
+fn reduce_guard_tags_insert(result: &mut Co, guard_name: &String, tags: &Tags) -> bool {
 	if let Some(guard) = result.guards.get_mut(guard_name) {
 		guard.tags.append(&mut tags.clone());
+		true
+	} else {
+		false
 	}
 }
 
-fn reduce_guard_tags_remove(result: &mut Co, guard_name: &String, tags: &Tags) {
+fn reduce_guard_tags_remove(result: &mut Co, guard_name: &String, tags: &Tags) -> bool {
 	if let Some(guard) = result.guards.get_mut(guard_name) {
-		guard.tags.clear(Some(tags));
+		guard.tags.clear(Some(tags))
+	} else {
+		false
 	}
 }
