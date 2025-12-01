@@ -20,7 +20,7 @@ Here is a simple, comparative outline to clarify the benefits of decentralized, 
 8. Provision and deploy the backend to the infrastructure (Server, Cloud, ...).
 
 ### Building a CO-kit app
-1. Model data in a core that combines data, business logic and permissions.
+1. Model data in a Core that combines data, business logic and permissions.
 2. Implement your frontend and use the data directly.
 
 ## Ain't no better DX

@@ -32,7 +32,7 @@ Each CO can define its own consensus mechanism:
 - Shared: all participants share responsibility – quorum model.
 
 ## Flexible Data
-Each CO may contain multiple [cores](../reference/core.md). A core defines a data model:
+Each CO may contain multiple [Cores](../reference/core.md). A Core defines a data model:
 - Cores are compiled to [WebAssembly](../glossary/glossary.md#wasm) (WASM) for safe, fast, and portable execution.
 - Cores are versioned, sandboxed, and upgradable.
 - Cores may contain any data, depending on your individual requirements.
