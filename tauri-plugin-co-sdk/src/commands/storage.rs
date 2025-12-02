@@ -1,10 +1,11 @@
 use crate::library::application_actor::{ApplicationActorMessage, SessionId};
+use anyhow::anyhow;
 use cid::Cid;
 use co_actor::ActorHandle;
 use co_primitives::{Block, DefaultParams};
-use co_sdk::{from_cbor, to_cbor, KnownMultiCodec};
+use co_sdk::{from_cbor, to_cbor};
 use serde::Deserialize;
-use tauri::ipc::{InvokeError, Response};
+use tauri::ipc::{InvokeError, Request, Response};
 
 #[derive(Debug, Deserialize)]
 pub struct StorageGetBody {
@@ -15,9 +16,12 @@ pub struct StorageGetBody {
 #[tauri::command]
 pub(crate) async fn storage_get(
 	actor_handle: tauri::State<'_, ActorHandle<ApplicationActorMessage>>,
-	body: Vec<u8>,
+	request: Request<'_>,
 ) -> Result<Response, InvokeError> {
-	let body: StorageGetBody = from_cbor(&body).map_err(InvokeError::from_error)?;
+	let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+		return Err(InvokeError::from_anyhow(anyhow!("Request body must be raw")));
+	};
+	let body: StorageGetBody = from_cbor(bytes).map_err(InvokeError::from_error)?;
 	let data: Vec<u8> = actor_handle
 		.request(|r| ApplicationActorMessage::StorageGet(body.session, body.cid, r))
 		.await
@@ -28,16 +32,32 @@ pub(crate) async fn storage_get(
 	Ok(Response::new(data))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct StorageSetBody {
+	session: SessionId,
+	cid: Cid,
+	#[serde(with = "serde_bytes")]
+	data: Vec<u8>,
+}
+
 #[tauri::command]
 pub(crate) async fn storage_set(
 	actor_handle: tauri::State<'_, ActorHandle<ApplicationActorMessage>>,
-	session: SessionId,
-	data: Vec<u8>,
+	request: Request<'_>,
 ) -> Result<Response, InvokeError> {
-	tracing::info!("tauri command storage set: \n\tSession: {:#?}\n\tdata: {:#?}", session, data,);
-	let block = Block::<DefaultParams>::new_data(KnownMultiCodec::Raw, data);
+	let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+		return Err(InvokeError::from_anyhow(anyhow!("Request body must be raw")));
+	};
+	let body: StorageSetBody = from_cbor(bytes).map_err(InvokeError::from_error)?;
+	tracing::info!(
+		"tauri command storage set: \n\tSession: {:#?}\n\tdata: {:#?} \n\tcid:{:#?}",
+		body.session,
+		body.data,
+		body.cid
+	);
+	let block = Block::<DefaultParams>::new(body.cid, body.data).map_err(InvokeError::from_error)?;
 	let cid = actor_handle
-		.request(|r| ApplicationActorMessage::StorageSet(session, block, r))
+		.request(|r| ApplicationActorMessage::StorageSet(body.session, block, r))
 		.await
 		.map_err(InvokeError::from_error)?
 		.map_err(InvokeError::from_anyhow)?;

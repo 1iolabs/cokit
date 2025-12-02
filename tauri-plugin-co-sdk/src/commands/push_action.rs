@@ -81,10 +81,13 @@ impl PushCommandBody {
 #[tauri::command]
 pub async fn push_action(
 	actor_handle: tauri::State<'_, ActorHandle<ApplicationActorMessage>>,
-	body: Vec<u8>,
+	request: tauri::ipc::Request<'_>,
 ) -> Result<Response, InvokeError> {
 	// manually deserialize body into PushCommandBody type
-	let body: PushCommandBody = from_cbor(&body).map_err(InvokeError::from_error)?;
+	let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+		return Err(InvokeError::from_anyhow(anyhow!("Request body must be raw")));
+	};
+	let body: PushCommandBody = from_cbor(bytes).map_err(InvokeError::from_error)?;
 	tracing::info!(
 		"tauri command push: \n\tSession: {:#?}\n\tcore: {:#?}\n\taction: {:#?}",
 		body.session,

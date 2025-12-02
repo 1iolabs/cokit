@@ -21,21 +21,22 @@ export async function pushAction(
   identity: string,
 ): Promise<CID | undefined> {
   const body = encode({ session, core, action, identity });
-  const result = await invoke<ArrayBuffer>("plugin:co-sdk|push_action", { body });
+  const result = await invoke<ArrayBuffer>("plugin:co-sdk|push_action", body);
   return decode<CID | undefined>(result);
 }
 export async function resolveCid(session: string, cid: CID): Promise<any> {
   let body = encode({ session, cid });
-  const result = await invoke<ArrayBuffer>("plugin:co-sdk|resolve_cid", { body });
+  const result = await invoke<ArrayBuffer>("plugin:co-sdk|resolve_cid", body);
   return decode(result);
 }
 export async function storageGet(session: string, cid: CID): Promise<Uint8Array> {
   const body = encode({ session, cid });
-  const result = await invoke<ArrayBuffer>("plugin:co-sdk|storage_get", { body });
+  const result = await invoke<ArrayBuffer>("plugin:co-sdk|storage_get", body);
   return new Uint8Array(result);
 }
-export async function storageSet(session: string, data: Uint8Array): Promise<CID> {
-  const result = await invoke<ArrayBuffer>("plugin:co-sdk|storage_set", {session, data});
+export async function storageSet(session: string, cid: CID, data: Uint8Array): Promise<CID> {
+  const body = encode({session, cid, data});
+  const result = await invoke<ArrayBuffer>("plugin:co-sdk|storage_set", body);
   return decode(result);
 }
 
@@ -55,7 +56,7 @@ export async function getActions(
   } else {
     body = encode({ session, heads, count, until: null });
   }
-  const result = await invoke<ArrayBuffer>("plugin:co-sdk|get_actions", { body });
+  const result = await invoke<ArrayBuffer>("plugin:co-sdk|get_actions", body);
   return decode(result);
 }
 export async function createIdentity(name: string, seed?: Uint8Array): Promise<string> {

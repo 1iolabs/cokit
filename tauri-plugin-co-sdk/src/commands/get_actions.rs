@@ -1,4 +1,5 @@
 use crate::library::application_actor::{ApplicationActorMessage, GetActionsRequest};
+use anyhow::anyhow;
 use co_actor::ActorHandle;
 use co_sdk::{from_cbor, to_cbor};
 use tauri::ipc::InvokeError;
@@ -6,9 +7,12 @@ use tauri::ipc::InvokeError;
 #[tauri::command]
 pub(crate) async fn get_actions(
 	actor_handle: tauri::State<'_, ActorHandle<ApplicationActorMessage>>,
-	body: Vec<u8>,
+	request: tauri::ipc::Request<'_>,
 ) -> Result<tauri::ipc::Response, InvokeError> {
-	let body: GetActionsRequest = from_cbor(&body).map_err(InvokeError::from_error)?;
+	let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+		return Err(InvokeError::from_anyhow(anyhow!("Request body must be raw")));
+	};
+	let body: GetActionsRequest = from_cbor(bytes).map_err(InvokeError::from_error)?;
 	let result = actor_handle
 		.request(|r| ApplicationActorMessage::GetActions(body, r))
 		.await
