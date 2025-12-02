@@ -3,8 +3,9 @@ use crate::{
 	JsBlockStorage,
 };
 use co_primitives::unixfs_add;
-use futures::{StreamExt, TryStreamExt};
+use futures::{io::Cursor, StreamExt, TryStreamExt};
 use wasm_bindgen::prelude::*;
+use web_sys::js_sys::Uint8Array;
 
 /// Add stream as unixfs file to storage.
 /// The last CID in the result is the root.
@@ -25,6 +26,19 @@ pub async fn js_unixfs_add(storage: &JsBlockStorage, stream: web_sys::ReadableSt
 	to_js_value(&cids)
 }
 
+/// Add stream as unixfs file to storage.
+/// Instead of stream give complete binary data.
+/// The last CID in the result is the root.
+#[wasm_bindgen(js_name = "unixfsAddBinary", unchecked_return_type = "Promise<UInt8Array[]>")]
+pub async fn js_unixfs_add_binary(storage: &JsBlockStorage, js_binary: Uint8Array) -> Result<JsValue, JsValue> {
+	let binary: Vec<u8> = from_js_value(js_binary.into())?;
+	let mut stream = Cursor::new(binary);
+	let cids = unixfs_add(storage, &mut stream)
+		.await
+		.map_err(|err| format!("unixfs add failed: {:?}", err))?;
+	to_js_value(&cids)
+}
+
 #[cfg(test)]
 mod tests {
 	use crate::{
@@ -32,9 +46,10 @@ mod tests {
 		js_unixfs_add, JsBlockStorage,
 	};
 	use wasm_bindgen::prelude::Closure;
+	use wasm_bindgen_test::wasm_bindgen_test;
 	use web_sys::js_sys::Uint8Array;
 
-	#[tokio::test]
+	#[wasm_bindgen_test]
 	async fn test_unixfs() {
 		let stream = web_sys::ReadableStream::new().expect("stream");
 		let get_closure: Closure<dyn Fn(Uint8Array) -> Uint8Array> = Closure::new(|cid| cid);

@@ -6,10 +6,7 @@ use co_actor::{ActorError, ActorHandle, LocalActor, Response};
 use co_primitives::{Block, BlockStorage, DefaultParams, StorageError};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{
-	console,
-	js_sys::{Function, Promise, Uint8Array},
-};
+use web_sys::js_sys::{Function, Promise, Uint8Array};
 
 #[wasm_bindgen]
 extern "C" {
@@ -98,6 +95,7 @@ impl JsBlockStorageActor {
 			return Err(StorageError::NotFound(*cid, anyhow!("Getter returned undefined")));
 		}
 		let bytes = result
+			.clone()
 			.dyn_into::<Uint8Array>()
 			.map_err(|err| anyhow!("Failed to convert result to Uint8Array: {:?}", err))?;
 		Ok(Block::new(*cid, bytes.to_vec()).map_err(|err| anyhow!("Data and Cid are not compatible: {:?}", err))?)
@@ -118,14 +116,12 @@ impl JsBlockStorageActor {
 			.map_err(|value| anyhow!("Result is not a `Promise`: {:?}", value))?;
 		let future = JsFuture::from(promise);
 		let result = future.await.map_err(|err| anyhow!("Set block failed: {:?}", err))?;
-		console::log_1(&result);
 		let cid_bytes = result
 			.dyn_into::<Uint8Array>()
 			.map_err(|err| anyhow!("Convert storage set result JsValue to Cid failed: {:?}", err.as_string()))?
 			.to_vec();
 		let storage_set_cid =
 			Cid::try_from(cid_bytes).map_err(|err| anyhow!("Get Cid from bytes failed: {}", err.to_string()))?;
-		console::log_2(&"cid string".into(), &to_js_value(&storage_set_cid.to_string()).expect("msg"));
 		Ok(storage_set_cid)
 	}
 }
