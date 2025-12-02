@@ -331,6 +331,29 @@ where
 	where
 		I: PrivateIdentity + Send + Sync,
 	{
+		self.push_reference_with_state(storage, runtime, identity, action_link, None)
+			.await
+	}
+
+	/// Push an event.
+	///
+	/// # Returns
+	/// The resulting state.
+	///
+	/// # Note
+	/// Specifing a `core_state_link` may is dangerous and the caller is responsible to know that:
+	/// `action_link + current core state = core_state_link`.
+	pub async fn push_reference_with_state<I>(
+		&mut self,
+		storage: &S,
+		runtime: &RuntimePool,
+		identity: &I,
+		action_link: Link<ReducerAction<Ipld>>,
+		core_state_link: Option<Cid>,
+	) -> Result<PushResult, anyhow::Error>
+	where
+		I: PrivateIdentity + Send + Sync,
+	{
 		let action: ReducerAction<serde::de::IgnoredAny> = storage.get_deserialized(action_link.as_ref()).await?;
 
 		// validate
@@ -351,7 +374,11 @@ where
 		// println!("entry = {:?}", ipld);
 
 		// apply to state
-		let context = CoreResolverContext { change: ReducerChangeContext { cause: ReducerChangeCause::Push }, entry };
+		let context = CoreResolverContext {
+			change: ReducerChangeContext { cause: ReducerChangeCause::Push },
+			entry,
+			state: core_state_link,
+		};
 		let runtime_context = self
 			.core_resolver
 			.execute(storage, runtime, &context, &self.state, action_link.cid())
@@ -514,7 +541,7 @@ where
 
 			// context
 			let action = entry.entry().payload;
-			let context = CoreResolverContext { change: context.clone(), entry };
+			let context = CoreResolverContext { change: context.clone(), entry, state: None };
 
 			// apply
 			state = self

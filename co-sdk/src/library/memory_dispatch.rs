@@ -1,5 +1,5 @@
 use crate::{
-	application::memory::create_memory_reducer, reducer::core_resolver::dynamic::DynamicCoreResolver,
+	application::memory::create_memory_reducer, reducer::core_resolver::dynamic::DynamicCoreResolver, state,
 	types::co_dispatch::CoDispatch, CoContext, CoReducer, CoReducerState, CoStorage, DynamicCoDate, Reducer, Runtime,
 	Storage,
 };
@@ -119,7 +119,9 @@ where
 	}
 
 	/// Push action with an precomputed state.
-	/// Note: This is dangerous if `unsafe_skip_verify` is used and the caller is responsible to know that
+	///
+	/// # Note
+	/// This is dangerous if `unsafe_skip_verify` is used and the caller is responsible to know that
 	///  `action + current state = state`.
 	pub async fn push_reference_with_state(
 		&mut self,
@@ -147,7 +149,51 @@ where
 				)
 				.await?;
 			if verify_state.state != Some(state) {
-				return Err(anyhow!("Verify action failed"));
+				return Err(anyhow!("Verify action failed: {:?} != {:?}", verify_state.state, Some(state)));
+			}
+		}
+
+		// record
+		self.new_roots.push(self.reducer_state());
+		Ok(())
+	}
+
+	/// Push action with an precomputed core state.
+	///
+	/// # Note
+	/// This is dangerous if `unsafe_skip_verify` is used and the caller is responsible to know that
+	///  `action + current core state = core state`.
+	pub async fn push_reference_with_core_state(
+		&mut self,
+		action_reference: Link<ReducerAction<A>>,
+		core_state: Cid,
+		unsafe_skip_verify: bool,
+	) -> Result<(), anyhow::Error> {
+		// push
+		if unsafe_skip_verify {
+			self.reducer
+				.push_reference_with_state(
+					&self.reducer_storage,
+					self.runtime.runtime(),
+					&self.identity,
+					action_reference.cid().into(),
+					Some(core_state),
+				)
+				.await?;
+		} else {
+			let verify_state = self
+				.reducer
+				.push_reference(
+					&self.reducer_storage,
+					self.runtime.runtime(),
+					&self.identity,
+					action_reference.cid().into(),
+				)
+				.await?;
+			let result_core_state =
+				state::core_state(&self.reducer_storage, verify_state.state.into(), &self.core).await?;
+			if result_core_state != Some(core_state) {
+				return Err(anyhow!("Verify action failed: {:?} != {:?}", result_core_state, Some(core_state)));
 			}
 		}
 
@@ -317,6 +363,74 @@ mod tests {
 			.push_reference_with_state(
 				memory_dispatch_entry.entry().payload.into(),
 				memory_dispatch_reducer_state.state().unwrap(),
+				true,
+			)
+			.await
+			.unwrap();
+		let next_unsafe_memory_dispatch_reducer_state = memory_dispatch.reducer_state();
+
+		// check local has not changed
+		assert_eq!(local_co.reducer_state().await, local_co_reducer_state);
+		assert_eq!(next_memory_dispatch_reducer_state, memory_dispatch_reducer_state);
+		assert_eq!(next_unsafe_memory_dispatch_reducer_state, memory_dispatch_reducer_state);
+		assert_ne!(memory_dispatch_reducer_state, local_co_reducer_state);
+	}
+
+	#[tokio::test]
+	async fn test_push_with_core_state() {
+		let application = ApplicationBuilder::new_memory("test")
+			// .with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+			.with_disabled_feature("co-local-encryption")
+			.with_co_date(MonotonicCoDate::default())
+			.with_co_uuid(MonotonicCoUuid::default())
+			.without_keychain()
+			.build()
+			.await
+			.unwrap();
+		let local_co = application.local_co_reducer().await.unwrap();
+		let local_co_reducer_state = local_co.reducer_state().await;
+
+		// create memory dispatcher
+		let mut memory_dispatch = MemoryDispatch::<CoAction, CoStorage>::new_reducer(
+			application.co(),
+			&local_co,
+			application.local_identity().boxed(),
+			CO_CORE_NAME_CO,
+		)
+		.await
+		.unwrap();
+		memory_dispatch
+			.dispatch(&CoAction::TagsInsert { tags: tags!("hello": "world") })
+			.await
+			.unwrap();
+		let memory_dispatch_reducer_state = memory_dispatch.reducer_state();
+		let memory_dispatch_entry = EntryBlock::from_block(
+			memory_dispatch
+				.storage()
+				.get(memory_dispatch_reducer_state.heads().first().unwrap())
+				.await
+				.unwrap(),
+		)
+		.unwrap();
+
+		// reset
+		memory_dispatch.reset(local_co_reducer_state.clone()).await.unwrap();
+		memory_dispatch
+			.push_reference_with_core_state(
+				memory_dispatch_entry.entry().payload.into(),
+				memory_dispatch_reducer_state.state().unwrap(), // note: for the root (co) this is also the root
+				false,
+			)
+			.await
+			.unwrap();
+		let next_memory_dispatch_reducer_state = memory_dispatch.reducer_state();
+
+		// reset unsafe
+		memory_dispatch.reset(local_co_reducer_state.clone()).await.unwrap();
+		memory_dispatch
+			.push_reference_with_core_state(
+				memory_dispatch_entry.entry().payload.into(),
+				memory_dispatch_reducer_state.state().unwrap(), // note: for the root (co) this is also the root
 				true,
 			)
 			.await

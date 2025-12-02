@@ -8,8 +8,10 @@ use crate::{
 		create_reducer_action::create_reducer_action, storage_dispatch_remove::storage_dispatch_remove,
 		storage_dispatch_roots::storage_dispatch_roots,
 	},
+	state::core_state,
 	CoPinningKey, CoReducerState, DynamicCoDate, Runtime, Storage, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
+use anyhow::anyhow;
 use cid::Cid;
 use co_actor::TaskSpawner;
 use co_core_storage::{BlockInfo, StorageAction};
@@ -96,6 +98,11 @@ where
 	let overlay = dispatcher.storage().clone();
 	let roots = dispatcher.take_new_roots();
 	if let Some(state) = roots.last().and_then(|state| state.state()) {
+		// create storage core state
+		let storage_core_state = core_state(&overlay, state.into(), CO_CORE_NAME_STORAGE.as_ref())
+			.await?
+			.ok_or(anyhow!("No storage core found: {:?}", state))?;
+
 		// collapse actions into single batch action
 		let mut actions = CoList::default().open(&overlay).await?;
 		for root in roots {
@@ -122,7 +129,7 @@ where
 		// apply
 		dispatcher.reset(local_state).await?;
 		dispatcher
-			.push_reference_with_state(batch_reducer_action.into(), state, true)
+			.push_reference_with_core_state(batch_reducer_action.into(), storage_core_state, true)
 			.await?;
 
 		// flush

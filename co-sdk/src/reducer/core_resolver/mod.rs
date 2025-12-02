@@ -62,6 +62,9 @@ pub enum CoreResolverError {
 pub struct CoreResolverContext {
 	pub entry: EntryBlock,
 	pub change: ReducerChangeContext,
+	/// The precomputed state matching the entry.
+	/// Used as optimization when a trusted core state already has been calculated.
+	pub state: Option<Cid>,
 }
 impl CoreResolverContext {
 	/// Whether this change was caused locally.

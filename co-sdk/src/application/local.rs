@@ -432,7 +432,7 @@ where
 			// add last state from disk
 			//  we add the lastest state (from disk) as first root
 			//  this contains the pinnings (state updates below) from the last time
-			//  we need this to have a full hisotry of heads
+			//  we need this to have a full history of heads
 			//  TODO: do we need to add intermediate heads from below (or encapsulate them into one transaction)?
 			let mut new_roots = new_roots;
 			if !last_reducer_state.is_empty() {
