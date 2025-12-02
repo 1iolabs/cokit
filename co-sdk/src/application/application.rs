@@ -6,10 +6,11 @@ use super::{
 };
 use crate::{
 	library::wait_response::request_response, services::application::ApplicationMessage, Action, CoDate, CoReducer,
-	CoReducerFactory, CoStorage, CoUuid, DynamicCoDate, DynamicCoUuid, RandomCoUuid, Storage, SystemCoDate,
+	CoReducerFactory, CoStorage, CoUuid, Cores, DynamicCoDate, DynamicCoUuid, RandomCoUuid, Storage, SystemCoDate,
 	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
 };
 use anyhow::anyhow;
+use cid::Cid;
 use co_actor::{Actor, ActorHandle, ActorInstance};
 use co_core_storage::PinStrategy;
 use co_identity::{
@@ -17,6 +18,7 @@ use co_identity::{
 };
 use co_network::NetworkSettings;
 use co_primitives::{tag, tags, CoId, DefaultParams, TagValue, Tags};
+use co_runtime::Core;
 use co_storage::StaticBlockStorage;
 use directories::ProjectDirs;
 use futures::{Stream, StreamExt};
@@ -333,6 +335,7 @@ pub struct ApplicationBuilder {
 	date: Option<DynamicCoDate>,
 	uuid: Option<DynamicCoUuid>,
 	static_blocks: Vec<StaticBlockStorage<'static, DefaultParams>>,
+	cores: Cores,
 }
 impl ApplicationBuilder {
 	pub fn default_path() -> PathBuf {
@@ -353,6 +356,7 @@ impl ApplicationBuilder {
 			date: None,
 			uuid: None,
 			static_blocks: Default::default(),
+			cores: Cores::default(),
 		}
 	}
 
@@ -373,6 +377,7 @@ impl ApplicationBuilder {
 			date: None,
 			uuid: None,
 			static_blocks: Default::default(),
+			cores: Cores::default(),
 		}
 	}
 
@@ -408,6 +413,11 @@ impl ApplicationBuilder {
 
 	pub fn with_co_uuid(self, uuid: impl CoUuid + 'static) -> Self {
 		Self { uuid: Some(DynamicCoUuid::new(uuid)), ..self }
+	}
+
+	pub fn with_core(mut self, core_cid: Cid, core: Core) -> Self {
+		self.cores = self.cores.with_override(core_cid, core);
+		self
 	}
 
 	pub fn with_static_blocks(mut self, storage: StaticBlockStorage<'static, DefaultParams>) -> Self {
@@ -476,7 +486,7 @@ impl ApplicationBuilder {
 		let service = Actor::spawn(
 			tags!("type": "application", "application": settings.identifier.clone()),
 			crate::services::application::Application::new(settings.clone()),
-			(storage, tasks.clone(), date, uuid),
+			(storage, tasks.clone(), date, uuid, self.cores),
 		)?;
 
 		// wait for context

@@ -683,6 +683,7 @@ mod tests {
 		ReducerChangeContext, ReducerChangedHandler, SingleCoreResolver,
 	};
 	use async_trait::async_trait;
+	use cid::Cid;
 	use co_identity::{IdentityResolverBox, LocalIdentityResolver};
 	use co_log::{IdentityEntryVerifier, Log};
 	use co_primitives::{BlockSerializer, ReducerAction};
@@ -728,8 +729,8 @@ mod tests {
 		// pool
 		let date = MonotonicCoDate::default().boxed();
 		let runtime = RuntimePool::new(IdleRuntimePool::default());
-		let core_resolver = SingleCoreResolver::new(wasm.into());
-		let native_core_resolver = SingleCoreResolver::new(Core::native::<Counter>());
+		let core_resolver = SingleCoreResolver::new(wasm, wasm.into());
+		let native_core_resolver = SingleCoreResolver::new(wasm, Core::native::<Counter>());
 
 		// reducer
 		let mut reducer1 = ReducerBuilder::new(native_core_resolver, log1)
@@ -922,7 +923,7 @@ mod tests {
 			Default::default(),
 		);
 		let runtime = RuntimePool::new(IdleRuntimePool::default());
-		let native_core_resolver = SingleCoreResolver::new(Core::native::<Counter>());
+		let native_core_resolver = SingleCoreResolver::new(Cid::default(), Core::native::<Counter>());
 		let mut reducer = ReducerBuilder::new(native_core_resolver, log)
 			.build(&storage, &runtime, MonotonicCoDate::default())
 			.await
@@ -975,7 +976,7 @@ mod tests {
 		let storage = MemoryBlockStorage::default();
 		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
 		let runtime = RuntimePool::new(IdleRuntimePool::default());
-		let native_core_resolver = SingleCoreResolver::new(Core::native::<Counter>());
+		let native_core_resolver = SingleCoreResolver::new(Cid::default(), Core::native::<Counter>());
 		let co_date = MonotonicCoDate::default().boxed();
 
 		// reducer1
@@ -1073,7 +1074,7 @@ mod tests {
 		let storage = MemoryBlockStorage::default();
 		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
 		let runtime = RuntimePool::new(IdleRuntimePool::default());
-		let native_core_resolver = SingleCoreResolver::new(Core::native::<Counter>());
+		let native_core_resolver = SingleCoreResolver::new(Cid::default(), Core::native::<Counter>());
 		let co_date = MonotonicCoDate::default().boxed();
 
 		// reducer1

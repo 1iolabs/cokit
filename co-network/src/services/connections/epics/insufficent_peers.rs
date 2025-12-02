@@ -82,7 +82,7 @@ mod tests {
 		let local_peer = PeerId::from_multihash(Multihash::wrap(0, &[0; 32]).unwrap()).unwrap();
 		let bootstrap_peer1 = PeerId::from_multihash(Multihash::wrap(0, &[1; 32]).unwrap()).unwrap();
 		let bootstrap_peer1_endpoints: BTreeSet<Multiaddr> =
-			[Multiaddr::from_str("/dns/bootstrap.1io.com/udp/5000/quic-v1").unwrap()]
+			[Multiaddr::from_str("/dns4/bootstrap.1io.com/udp/5000/quic-v1").unwrap()]
 				.into_iter()
 				.collect();
 		bootstrap.insert(bootstrap_peer1, BootstrapPeer::new(bootstrap_peer1, bootstrap_peer1_endpoints.clone()));

@@ -47,6 +47,7 @@ flowchart TD
 	S --> F
 	A --> M
 	B --> S
+	B --> N
 ```
 ### Components
 - Device: The platform host

@@ -21,6 +21,5 @@ pub use types::{
 	},
 	context::RuntimeContext,
 	core::Core,
-	core_descriptor::CoreDescriptor,
 	guard::GuardReference,
 };

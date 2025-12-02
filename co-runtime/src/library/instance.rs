@@ -1,4 +1,4 @@
-use crate::{create_runtime, runtimes::Runtime, CoreDescriptor};
+use crate::{create_runtime, runtimes::Runtime};
 use anyhow::anyhow;
 use cid::Cid;
 use co_primitives::{unixfs_cat_buffer, AnyBlockStorage, BlockStorageExt, KnownMultiCodec, MultiCodec};
@@ -22,6 +22,11 @@ impl RuntimeInstance {
 		Ok(RuntimeInstance { core: *core, runtime: create_runtime(native, bytes) })
 	}
 
+	/// Create a new runtime element which can be used immediately or inserted to the pool.
+	pub async fn create_native(core: &Cid, bytes: &[u8]) -> Result<Self, StorageError> {
+		Ok(RuntimeInstance { core: *core, runtime: create_runtime(true, bytes.to_vec()) })
+	}
+
 	pub fn cid(&self) -> &Cid {
 		&self.core
 	}
@@ -43,15 +48,6 @@ async fn read_core(storage: &impl AnyBlockStorage, cid: &Cid) -> Result<(bool, V
 		MultiCodec::Known(KnownMultiCodec::DagPb) => (false, unixfs_cat_buffer(storage, cid).await?),
 		// raw
 		MultiCodec::Known(KnownMultiCodec::Raw) => (false, storage.get(cid).await?.into_inner().1),
-		MultiCodec::Known(KnownMultiCodec::DagCbor) => {
-			let descriptor: CoreDescriptor = storage.get_deserialized(cid).await?;
-			let host = target_lexicon::HOST.to_string();
-			if let Some(arch) = descriptor.native.get(&host) {
-				(true, Box::pin(read_core(storage, arch)).await?.1)
-			} else {
-				Box::pin(read_core(storage, &descriptor.wasm)).await?
-			}
-		},
 		_ => return Err(StorageError::InvalidArgument(anyhow!("Invalid codec"))),
 	})
 }

@@ -75,8 +75,8 @@ columns 3
 	style Bob stroke-width:4px
 	style Charlie stroke-width:4px
 
-	style 9 fill:#f55
-	style C5 fill:#f55
+	class 9 highlight
+	class C5 highlight
 ```
 
 ### 2. Sequence before `'`
@@ -153,8 +153,8 @@ columns 1
 	9 --> 8
 	9 --> C5
 
-	style 9 fill:#f55
-	style C5 fill:#f55
+	class 9 highlight
+	class C5 highlight
 ```
 
 ## References

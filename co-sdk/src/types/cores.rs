@@ -27,9 +27,16 @@ pub const CO_CORE_NAME_PIN: CoreName<'static, co_core_pin::Pin> = CoreName::new(
 pub const CO_CORE_NAME_STORAGE: CoreName<'static, co_core_storage::Storage> = CoreName::new("storage");
 
 /// Registry for builtin cores.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cores {
+	/// Built-in cores.
+	/// Maps names to Cid strings.
 	cores: HashMap<String, String>,
+
+	/// Override core implementations.
+	/// This can used to replace known Cid's with trusted native cores.
+	#[serde(skip, default)]
+	overrides: HashMap<Cid, Core>,
 }
 impl Default for Cores {
 	fn default() -> Self {
@@ -37,6 +44,12 @@ impl Default for Cores {
 	}
 }
 impl Cores {
+	/// Override a core by its [`Cid`].
+	pub fn with_override(mut self, core_cid: Cid, core: Core) -> Self {
+		self.overrides.insert(core_cid, core);
+		self
+	}
+
 	/// Returns the core name used across the co-sdk fot an core create name.
 	/// Example: `co-core-co` reutrns `co`
 	/// See:
@@ -72,6 +85,13 @@ impl Cores {
 			.collect()
 	}
 
+	/// Map WASM CIDs to (possibly native) built-in versions.
+	pub fn mapping(&self) -> HashMap<Cid, Core> {
+		let mut result = self.built_in_native_mapping();
+		result.extend(self.overrides.clone());
+		result
+	}
+
 	/// Get the binary CID for a built-in core.
 	pub fn binary(&self, crate_name: &str) -> Option<Cid> {
 		self.cores
@@ -82,15 +102,6 @@ impl Cores {
 	/// Get the Core for a built-in core.
 	pub fn core(&self, crate_name: &str) -> Option<Core> {
 		self.cores.get(crate_name).map(|_cid_str| get_native(crate_name))
-	}
-
-	/// Test if the core is a built in core.
-	pub fn is_built_in(&self, core: Core) -> bool {
-		match &core {
-			Core::Wasm(cid) => self.cores.iter().any(|(_, i)| &Cid::from_str(i).expect("valid cid") == cid),
-			Core::Native(_) => true,
-			Core::NativeAsync(_) => true,
-		}
 	}
 }
 

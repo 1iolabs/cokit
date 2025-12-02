@@ -4,7 +4,7 @@ use co_storage::{unixfs_add_file, BlockStorage, MemoryBlockStorage};
 use serde::Deserialize;
 use std::{
 	fmt::{Debug, Display},
-	fs::read,
+	fs::{canonicalize, read},
 	io::ErrorKind,
 	path::{Path, PathBuf},
 	process::{Command, Output},
@@ -57,7 +57,9 @@ pub fn build_core(
 	core_path: impl AsRef<Path>,
 ) -> Result<BuildCoreArtifact, anyhow::Error> {
 	let core_path = core_path.as_ref().to_owned();
-	let target_path = repository_path.as_ref().join("target-wasm");
+	let target_path = canonicalize(repository_path.as_ref())
+		.context(format!("path: {:?}", repository_path.as_ref()))?
+		.join("target-wasm");
 
 	// read toml for name
 	let core_toml = core_path.join("Cargo.toml");

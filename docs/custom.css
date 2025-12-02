@@ -1,0 +1,66 @@
+/* custom.css */
+
+:root {
+    /* Optional: Define specific Mermaid variables based on mdbook vars
+       if you want a layer of abstraction */
+    --mermaid-bg: var(--bg);
+    --mermaid-fg: var(--fg);
+    --mermaid-stroke: var(--fg);
+    --mermaid-node-bg: var(--table-header-bg); /* A nice subtle contrast */
+}
+
+/* Background of the diagram */
+.mermaid {
+    background-color: var(--mermaid-bg) !important;
+}
+
+/* Nodes (Rectangles, Rhombuses, etc.) */
+.mermaid .node rect,
+.mermaid .node circle,
+.mermaid .node polygon,
+.mermaid .node path {
+    fill: var(--mermaid-node-bg) !important;
+    stroke: var(--mermaid-stroke) !important;
+    color: var(--mermaid-fg) !important;
+}
+
+/* Groups */
+.mermaid .cluster rect {
+    fill: var(--mermaid-bg) !important;
+    stroke: var(--mermaid-stroke) !important;
+    color: var(--mermaid-fg) !important;
+}
+
+/* Text Labels */
+.mermaid .node .label {
+    color: var(--mermaid-fg) !important;
+}
+.mermaid .node .label div {
+    color: var(--mermaid-fg) !important;
+}
+
+/* Lines/Edges */
+.mermaid .edgePath .path {
+    stroke: var(--mermaid-stroke) !important;
+    stroke-width: 1.5px !important;
+}
+
+/* Arrowheads */
+.mermaid .marker {
+    fill: var(--mermaid-stroke) !important;
+    stroke: var(--mermaid-stroke) !important;
+}
+
+/* Sequence Diagram specific overrides */
+.mermaid .actor {
+    fill: var(--mermaid-node-bg) !important;
+    stroke: var(--mermaid-stroke) !important;
+}
+.mermaid line {
+    stroke: var(--mermaid-stroke) !important;
+}
+
+/* Highlight */
+.mermaid .highlight rect {
+    fill: var(--footnote-highlight) !important;
+}
