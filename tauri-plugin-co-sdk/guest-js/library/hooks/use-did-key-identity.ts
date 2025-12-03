@@ -1,7 +1,6 @@
 import { createIdentity, getCoreState, Keystore, resolveCid } from "@1io/tauri-plugin-co-sdk-api";
 import React, { useEffect } from "react";
 import { DagList } from "../dag-list";
-import { TODO_IDENTITY_NAME } from "../../types/consts";
 import { Did } from "../../types";
 import { useCoSession } from "./use-co-session";
 
@@ -23,7 +22,7 @@ export function useDidKeyIdentity(name: string): Did | undefined {
       const dagList = new DagList<[string, { v?: Keystore.Key; t?: undefined }]>(keyStoreKeys.a, sessionId);
       const messengerIdentity = await dagList.find((i) => i[1].v?.name === name);
       if (messengerIdentity === undefined) {
-        const newIdentity = await createIdentity(TODO_IDENTITY_NAME);
+        const newIdentity = await createIdentity(name);
         setIdentity(newIdentity);
       } else {
         setIdentity(messengerIdentity?.[0]);
