@@ -98,4 +98,4 @@ For any app you build, you need these two ingredients:
 2. An Application, which uses the core:
   - [App Quick Start](../getting-started/rust-app-quick-start.md)
 
-We'll take a closer look at these in the next two chapters.
+We'll take a closer look at these in the next chapters.
