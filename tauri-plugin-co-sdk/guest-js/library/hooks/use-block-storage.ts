@@ -1,7 +1,7 @@
-import { storageGet, storageSet } from "@1io/tauri-plugin-co-sdk-api";
 import { BlockStorage } from "co-js";
 import { CID } from "multiformats";
 import { useMemo } from "react";
+import { storageGet, storageSet } from "../../invoke-utils";
 
 export function useBlockStorage(session?: string) {
   return useMemo(() => {

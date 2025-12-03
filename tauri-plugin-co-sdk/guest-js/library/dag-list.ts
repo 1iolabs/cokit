@@ -1,5 +1,5 @@
-import { resolveCid } from "@1io/tauri-plugin-co-sdk-api";
 import { CID } from "multiformats";
+import { resolveCid } from "../invoke-utils";
 
 export interface Node<I> {
   n: CID[] | undefined;

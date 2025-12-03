@@ -1,6 +1,6 @@
-import { sessionClose, sessionOpen } from "@1io/tauri-plugin-co-sdk-api";
 import React from "react";
 import { fromEventPattern } from "rxjs";
+import { sessionOpen, sessionClose } from "../../invoke-utils";
 
 export function useCoSession(co: string): string | undefined {
   const [session, setSession] = React.useState<string | undefined>();

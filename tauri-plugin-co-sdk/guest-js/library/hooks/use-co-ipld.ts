@@ -1,6 +1,6 @@
-import { resolveCid } from "@1io/tauri-plugin-co-sdk-api";
 import { CID } from "multiformats";
 import React from "react";
+import { resolveCid } from "../../invoke-utils";
 
 export function useCoIpld<T, E = []>(
   cids: CID[] | undefined,

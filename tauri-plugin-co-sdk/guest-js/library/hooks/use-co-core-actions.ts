@@ -1,6 +1,6 @@
-import { getActions, GetActionsResponse } from "@1io/tauri-plugin-co-sdk-api";
 import { CID } from "multiformats";
 import React from "react";
+import { GetActionsResponse, getActions } from "../../invoke-utils";
 
 export function useCoCoreActions(
   co: string,

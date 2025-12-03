@@ -1,6 +1,5 @@
 import { BlockStorage, CoMap } from "co-js";
 import { useEffect, useState } from "react";
-import "web-streams-polyfill/polyfill";
 
 /**
  * IPLD can only use string keys for maps

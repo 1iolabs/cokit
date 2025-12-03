@@ -1,7 +1,7 @@
 import { CID } from "multiformats";
 import React from "react";
 import { createCoSdkStateEventListener } from "../co-sdk-state-listener.js";
-import { getCoState } from "@1io/tauri-plugin-co-sdk-api";
+import { getCoState } from "../../invoke-utils.js";
 
 export function useCo(co: string): [CID | undefined, CID[] | undefined] {
   const [coState, setCoState] = React.useState<[CID | undefined, CID[]]>();

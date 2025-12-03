@@ -1,6 +1,6 @@
 import React from "react";
 import { compareArrayItemsEqual } from "@1io/compare";
-import { CoCore, getResolvedCoState } from "@1io/tauri-plugin-co-sdk-api";
+import { CoCore, getResolvedCoState } from "../../invoke-get-utils";
 
 // returns true if and only if all of the tags in the pattern can be found in the given tags
 function matchesPattern(tags: string[][], pattern: string[][]): boolean {

@@ -1,8 +1,9 @@
-import { createIdentity, getCoreState, Keystore, resolveCid } from "@1io/tauri-plugin-co-sdk-api";
 import React, { useEffect } from "react";
 import { DagList } from "../dag-list";
-import { Did } from "../../types";
+import { Did, Keystore } from "../../types";
 import { useCoSession } from "./use-co-session";
+import { getCoreState } from "../../invoke-get-utils";
+import { resolveCid, createIdentity } from "../../invoke-utils";
 
 export function useDidKeyIdentity(name: string): Did | undefined {
   const [identity, setIdentity] = React.useState<Did | undefined>();
