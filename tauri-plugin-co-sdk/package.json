@@ -31,12 +31,17 @@
     "pretest": "yarn build"
   },
   "dependencies": {
+    "@1io/compare": "^0.2.0",
     "@ipld/dag-cbor": "^9.2.2",
     "@tauri-apps/api": ">=2.0.0-beta.6",
-    "multiformats": "^13.3.1"
+    "co-js": "file:../co-js/pkg",
+    "multiformats": "^13.3.1",
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@rollup/plugin-typescript": "^11.1.6",
+    "@types/react": "^19.2.7",
+    "react": "^19.2.0",
     "rollup": "^4.9.6",
     "tslib": "^2.6.2",
     "typescript": "^5.3.3"
