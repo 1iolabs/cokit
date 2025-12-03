@@ -58,7 +58,7 @@ async fn trace_heads(note: &str, co: &str, context: &CoContext, storage: &CoStor
 /// See:
 /// - https://gitlab.1io.com/1io/co-sdk/-/issues/59
 #[tokio::test]
-async fn test_conflicting_membership_update() {
+async fn test_conflicting_membership_update_plain() {
 	conflicting_membership_update(false).await;
 }
 
@@ -70,12 +70,26 @@ async fn test_conflicting_membership_update_encrypted() {
 async fn conflicting_membership_update(encryption: bool) {
 	let timeout_duration = Duration::from_secs(5);
 	let tmp = TmpDir::new("co").without_clear();
+	let log_path = std::env::current_exe()
+		.unwrap()
+		.parent()
+		.unwrap()
+		.parent()
+		.unwrap()
+		.parent()
+		.unwrap()
+		.parent()
+		.unwrap()
+		.join("data/log/co.log");
+	println!("path: {:?}", tmp.path());
+	println!("log_path: {:?}", log_path);
 
 	// application
 	let mut application_builder = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
 		.without_keychain()
 		.with_disabled_feature("co-local-watch")
-		.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+		.with_setting("feature", "co-storage-verify-links")
+		.with_bunyan_logging(Some(log_path))
 		.with_optional_tracing()
 		.with_co_date(MonotonicCoDate::default())
 		.with_co_uuid(MonotonicCoUuid::default());
@@ -133,6 +147,7 @@ async fn conflicting_membership_update(encryption: bool) {
 	let mut application2_builder = ApplicationBuilder::new_with_path("test2".to_owned(), tmp.path().to_owned())
 		.without_keychain()
 		.with_disabled_feature("co-local-watch")
+		.with_setting("feature", "co-storage-verify-links")
 		.with_co_date(MonotonicCoDate::default())
 		.with_co_uuid(MonotonicCoUuid::default());
 	if !encryption {

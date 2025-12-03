@@ -46,7 +46,11 @@ pub async fn command(context: &CliContext, cli: &Cli, _command: &Command) -> Res
 				// filter
 				let mut filter = CoStructureResolver::new(
 					co.id(),
-					application.co().block_links().clone().with_filter(WeakCoReferenceFilter::new()),
+					application
+						.co()
+						.block_links(false)
+						.clone()
+						.with_filter(WeakCoReferenceFilter::new()),
 				);
 
 				// resolve

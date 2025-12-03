@@ -2,8 +2,9 @@ use super::identity::create_identity_resolver;
 use crate::{
 	find_membership,
 	library::{
-		find_co_secret::find_co_secret_by_reference, is_membership_heads_encrypted::is_membership_heads_encrypted,
-		membership_all_heads::membership_all_heads, wait_response::request_response_timeout,
+		builtin_cores::builtin_cores, find_co_secret::find_co_secret_by_reference,
+		is_membership_heads_encrypted::is_membership_heads_encrypted, membership_all_heads::membership_all_heads,
+		wait_response::request_response_timeout,
 	},
 	reducer::{
 		change::membership_writer::MembershipWriter,
@@ -28,7 +29,9 @@ use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::{IdentityEntryVerifier, Log};
-use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, Tags};
+use co_primitives::{
+	tags, BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, Tags,
+};
 use co_storage::{
 	unixfs_add, Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret,
 };
@@ -50,6 +53,7 @@ pub struct SharedCoBuilder {
 	membership: Membership,
 	initialize: bool,
 	key_request_timeout: Duration,
+	verify_links: Option<BlockLinks>,
 }
 impl SharedCoBuilder {
 	pub fn new(parent: CoReducer, membership: Membership) -> Self {
@@ -60,6 +64,7 @@ impl SharedCoBuilder {
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_string(),
 			initialize: true,
 			key_request_timeout: Duration::from_secs(30),
+			verify_links: None,
 		}
 	}
 
@@ -77,6 +82,10 @@ impl SharedCoBuilder {
 
 	pub fn with_key_request_timeout(self, key_request_timeout: Duration) -> Self {
 		Self { key_request_timeout, ..self }
+	}
+
+	pub fn with_verify_links(self, verify_links: Option<BlockLinks>) -> Self {
+		Self { verify_links, ..self }
 	}
 
 	/// Read (latest) secret from parent CO or network.
@@ -264,13 +273,13 @@ impl SharedCoBuilder {
 			application_identifier,
 			self.membership.id,
 			Some(self.parent.id().clone()),
-			context.storage(false),
 			tasks,
 			runtime,
 			reducer,
 			context,
 			Box::new(flush),
 			self.initialize,
+			self.verify_links,
 		)?)
 	}
 }
@@ -556,14 +565,9 @@ impl SharedCoCreator {
 				Some(algorithm) => {
 					let key_uri = format!("urn:co:{}:{}", self.co.id, uuid.uuid());
 					let key = algorithm.generate_serect();
-					let builtin_cores = Cores::default()
-						.built_in_native_mapping()
-						.into_iter()
-						.map(|(cid, _)| cid)
-						.collect();
 					let result_storage =
 						EncryptedBlockStorage::new(storage.clone(), key.clone(), algorithm, Default::default())
-							.with_encryption_reference_mode(EncryptionReferenceMode::DisallowExcept(builtin_cores));
+							.with_encryption_reference_mode(EncryptionReferenceMode::DisallowExcept(builtin_cores()));
 					(CoStorage::new(result_storage.clone()), Some((result_storage, key_uri, key)))
 				},
 				None => (storage.clone_with_settings(BlockStorageSettings::new().with_detached()), None),

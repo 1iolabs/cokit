@@ -33,6 +33,7 @@ pub struct StoragePinningContext {
 	pub tasks: TaskSpawner,
 	pub block_links: BlockLinks,
 	pub free: bool,
+	pub verify_links: Option<BlockLinks>,
 }
 
 /// Apply pinning to storage core.
@@ -62,6 +63,7 @@ where
 		local_storage,
 		context.identity.clone(),
 		CO_CORE_NAME_STORAGE,
+		context.verify_links.clone(),
 	)
 	.await?;
 	let storage = dispatcher.storage().clone();
@@ -95,28 +97,29 @@ where
 	}
 
 	// result
-	let overlay = dispatcher.storage().clone();
+	let storage = dispatcher.storage().clone();
+	let overlay_storage = dispatcher.overlay_storage().clone();
 	let roots = dispatcher.take_new_roots();
 	if let Some(state) = roots.last().and_then(|state| state.state()) {
 		// create storage core state
-		let storage_core_state = core_state(&overlay, state.into(), CO_CORE_NAME_STORAGE.as_ref())
+		let storage_core_state = core_state(&storage, state.into(), CO_CORE_NAME_STORAGE.as_ref())
 			.await?
 			.ok_or(anyhow!("No storage core found: {:?}", state))?;
 
 		// collapse actions into single batch action
-		let mut actions = CoList::default().open(&overlay).await?;
+		let mut actions = CoList::default().open(&storage).await?;
 		for root in roots {
 			for head in &root.1 {
-				let block = overlay.get(head).await?;
+				let block = storage.get(head).await?;
 				let entry = EntryBlock::from_block(block)?;
 				let action_reference: Link<ReducerAction<StorageAction>> = entry.entry().payload.into();
-				let action = overlay.get_value(&action_reference).await?;
+				let action = storage.get_value(&action_reference).await?;
 				actions.push(action.payload).await?;
 			}
 		}
 		let batch_action = StorageAction::Batch(actions.store().await?);
 		let batch_reducer_action: Cid = create_reducer_action(
-			&overlay,
+			&storage,
 			&context.identity,
 			CO_CORE_NAME_STORAGE,
 			batch_action,
@@ -135,17 +138,17 @@ where
 		// flush
 		let next_local_state = dispatcher.reducer_state();
 		for cid in next_local_state.iter() {
-			overlay.flush(cid, Some(context.block_links.clone())).await?;
+			overlay_storage.flush(cid, Some(context.block_links.clone())).await?;
 		}
 
 		// flush changes
-		let changes = overlay.consume_changes();
+		let changes = overlay_storage.consume_changes();
 		pin_mut!(changes);
 		while let Some(change) = changes.try_next().await? {
 			match change {
 				OverlayChange::Remove(cid) => {
 					// this will actually delte the blocks from storage_cleanup
-					overlay.next_storage().remove(&cid).await?;
+					overlay_storage.next_storage().remove(&cid).await?;
 				},
 				_ => {},
 			}

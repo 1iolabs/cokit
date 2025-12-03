@@ -1,5 +1,6 @@
 pub mod all_tags;
 pub mod build_core;
+pub mod builtin_cores;
 pub mod cancel;
 pub mod connections_peer_provider;
 pub mod create_reducer_action;

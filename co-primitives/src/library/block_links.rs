@@ -6,16 +6,16 @@ use std::{collections::BTreeSet, fmt::Debug};
 
 #[derive(Debug, Default, Clone)]
 pub struct BlockLinks {
-	filters: Vec<Box<dyn BlockLinksFilter>>,
+	filters: JoinFilter,
 }
 impl BlockLinks {
 	pub fn new() -> Self {
-		Self { filters: Default::default() }
+		Self::default()
 	}
 
 	/// Filter.
 	pub fn with_filter(mut self, filter: impl BlockLinksFilter + 'static) -> Self {
-		self.filters.push(Box::new(filter));
+		self.filters = self.filters.with_filter(filter);
 		self
 	}
 
@@ -39,39 +39,22 @@ impl BlockLinks {
 		&self,
 		block: &'a Block<P>,
 	) -> Result<impl Iterator<Item = Cid> + Send + Sync + use<'_, 'a, P>, anyhow::Error> {
-		let iter: Box<dyn Iterator<Item = Cid> + Send + Sync> = if !self.filter_block(block.cid(), block.data())? {
-			Box::new(std::iter::empty())
-		} else {
-			match MultiCodec::from(block.cid()) {
-				MultiCodec::Known(KnownMultiCodec::DagPb) => Box::new(ipld_dagpb::DagPbCodec::links(block.data())?),
-				MultiCodec::Known(KnownMultiCodec::DagCbor) | MultiCodec::Known(KnownMultiCodec::CoReference) => {
-					Box::new(serde_ipld_dagcbor::codec::DagCborCodec::links(block.data())?)
-				},
-				MultiCodec::Known(KnownMultiCodec::DagJson) => {
-					Box::new(serde_ipld_dagjson::codec::DagJsonCodec::links(block.data())?)
-				},
-				_ => Box::new(std::iter::empty()),
-			}
-		};
-		Ok(iter.filter(|cid| self.filter(cid)))
-	}
-
-	fn filter(&self, cid: &Cid) -> bool {
-		for filter in self.filters.iter() {
-			if !filter.filter(cid) {
-				return false;
-			}
-		}
-		true
-	}
-
-	fn filter_block(&self, cid: &Cid, data: &[u8]) -> Result<bool, anyhow::Error> {
-		for filter in self.filters.iter() {
-			if !filter.filter_block(cid, data)? {
-				return Ok(false);
-			}
-		}
-		Ok(true)
+		let iter: Box<dyn Iterator<Item = Cid> + Send + Sync> =
+			if !self.filters.filter_block(block.cid(), block.data())? {
+				Box::new(std::iter::empty())
+			} else {
+				match MultiCodec::from(block.cid()) {
+					MultiCodec::Known(KnownMultiCodec::DagPb) => Box::new(ipld_dagpb::DagPbCodec::links(block.data())?),
+					MultiCodec::Known(KnownMultiCodec::DagCbor) | MultiCodec::Known(KnownMultiCodec::CoReference) => {
+						Box::new(serde_ipld_dagcbor::codec::DagCborCodec::links(block.data())?)
+					},
+					MultiCodec::Known(KnownMultiCodec::DagJson) => {
+						Box::new(serde_ipld_dagjson::codec::DagJsonCodec::links(block.data())?)
+					},
+					_ => Box::new(std::iter::empty()),
+				}
+			};
+		Ok(iter.filter(|cid| self.filters.filter(cid)))
 	}
 }
 
@@ -79,7 +62,7 @@ pub trait BlockLinksFilter: Debug + BlockLinksFilterClone + Send + Sync {
 	/// Filter `cid`. Only cids which returned true will be returned.
 	fn filter(&self, cid: &Cid) -> bool;
 
-	/// Filter the block if its links should be resolve at al.
+	/// Filter the block if its links should be resolve at all.
 	fn filter_block(&self, cid: &Cid, data: &[u8]) -> Result<bool, anyhow::Error>;
 }
 
@@ -97,6 +80,37 @@ where
 {
 	fn box_clone(&self) -> Box<dyn BlockLinksFilter> {
 		Box::new(self.clone())
+	}
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct JoinFilter {
+	filters: Vec<Box<dyn BlockLinksFilter>>,
+}
+impl JoinFilter {
+	/// Filter.
+	pub fn with_filter(mut self, filter: impl BlockLinksFilter + 'static) -> Self {
+		self.filters.push(Box::new(filter));
+		self
+	}
+}
+impl BlockLinksFilter for JoinFilter {
+	fn filter(&self, cid: &Cid) -> bool {
+		for filter in self.filters.iter() {
+			if !filter.filter(cid) {
+				return false;
+			}
+		}
+		true
+	}
+
+	fn filter_block(&self, cid: &Cid, data: &[u8]) -> Result<bool, anyhow::Error> {
+		for filter in self.filters.iter() {
+			if !filter.filter_block(cid, data)? {
+				return Ok(false);
+			}
+		}
+		Ok(true)
 	}
 }
 

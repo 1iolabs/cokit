@@ -9,7 +9,9 @@ use cid::Cid;
 use co_actor::TaskSpawner;
 use co_identity::PrivateIdentityBox;
 use co_primitives::{BlockLinks, CoId, Link, ReducerAction};
-use co_storage::{BlockStorageContentMapping, ExtendedBlockStorage, OverlayBlockStorage, StoreParamsBlockStorage};
+use co_storage::{
+	BlockStorageContentMapping, ExtendedBlockStorage, LinksBlockStorage, OverlayBlockStorage, StoreParamsBlockStorage,
+};
 use serde::Serialize;
 use std::{collections::BTreeSet, marker::PhantomData, mem::take};
 
@@ -26,8 +28,12 @@ where
 	core: String,
 	identity: PrivateIdentityBox,
 
-	reducer: Reducer<OverlayBlockStorage<S>, DynamicCoreResolver<OverlayBlockStorage<S>>>,
-	reducer_storage: OverlayBlockStorage<S>,
+	reducer: Reducer<
+		LinksBlockStorage<OverlayBlockStorage<S>>,
+		DynamicCoreResolver<LinksBlockStorage<OverlayBlockStorage<S>>>,
+	>,
+	reducer_storage: LinksBlockStorage<OverlayBlockStorage<S>>,
+	overlay_storage: OverlayBlockStorage<S>,
 
 	new_roots: Vec<CoReducerState>,
 }
@@ -54,12 +60,14 @@ where
 		reducer_storage: &S,
 		identity: PrivateIdentityBox,
 		core: impl Into<String>,
+		verify_links: Option<BlockLinks>,
 	) -> Result<Self, anyhow::Error>
 	where
 		S: ExtendedBlockStorage + Clone + 'static,
 	{
 		let tmp = StoreParamsBlockStorage::new(storage.tmp_storage(), false);
-		let reducer_storage = OverlayBlockStorage::new(tasks, reducer_storage.clone(), tmp, None, true, false);
+		let overlay_storage = OverlayBlockStorage::new(tasks, reducer_storage.clone(), tmp, None, true, false);
+		let reducer_storage = LinksBlockStorage::new(overlay_storage.clone(), verify_links);
 		let reducer = create_memory_reducer(
 			runtime.runtime(),
 			date.clone(),
@@ -76,6 +84,7 @@ where
 			core: core.into(),
 			identity,
 			reducer_storage,
+			overlay_storage,
 			new_roots: Default::default(),
 			_action: PhantomData,
 			date,
@@ -98,6 +107,10 @@ where
 			&co.storage(),
 			identity,
 			core,
+			context
+				.settings()
+				.feature_co_storage_verify_links()
+				.then(|| context.block_links(true).clone()),
 		)
 		.await
 	}
@@ -202,8 +215,12 @@ where
 		Ok(())
 	}
 
-	pub fn storage(&self) -> &OverlayBlockStorage<S> {
+	pub fn storage(&self) -> &LinksBlockStorage<OverlayBlockStorage<S>> {
 		&self.reducer_storage
+	}
+
+	pub fn overlay_storage(&self) -> &OverlayBlockStorage<S> {
+		&self.overlay_storage
 	}
 
 	pub fn state(&self) -> Option<Cid> {
@@ -230,13 +247,13 @@ where
 		for root in roots.iter() {
 			// heads
 			for head in root.1.iter() {
-				self.reducer_storage.flush(*head, Some(links.clone())).await?;
+				self.overlay_storage.flush(*head, Some(links.clone())).await?;
 			}
 
 			// last state
 			if roots.last() == Some(root) {
 				if let Some(state) = root.state() {
-					self.reducer_storage.flush(state, Some(links.clone())).await?;
+					self.overlay_storage.flush(state, Some(links.clone())).await?;
 				}
 			}
 		}

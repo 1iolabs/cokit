@@ -6,6 +6,7 @@ use crate::types::{
 };
 use crate::{
 	library::{
+		builtin_cores::builtin_cores,
 		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
 		locals::{ApplicationLocal, FileLocals, Locals, MemoryLocals},
 	},
@@ -24,7 +25,7 @@ use cid::Cid;
 use co_actor::ActorHandle;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
-use co_primitives::{tags, CloneWithBlockStorageSettings, OptionMappedCid};
+use co_primitives::{tags, BlockLinks, CloneWithBlockStorageSettings, OptionMappedCid};
 use co_storage::{
 	BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, ExtendedBlockStorage,
 };
@@ -35,7 +36,7 @@ use tokio_util::sync::CancellationToken;
 pub const CO_ID_LOCAL: &str = "local";
 
 /// Local CO Builder.
-/// A local co is special because it's root state will be saved locally to an fiel on an device.
+/// A local co is special because it's root state will be saved locally to a file on a device.
 #[derive(Debug, Clone)]
 pub struct LocalCoBuilder {
 	/// Our application identifier.
@@ -46,14 +47,21 @@ pub struct LocalCoBuilder {
 
 	/// Whether to initialize the reducer (compute latest state).
 	initialize: bool,
+
+	/// Verify Links
+	verify_links: Option<BlockLinks>,
 }
 impl LocalCoBuilder {
 	pub fn new(settings: ApplicationSettings, identity: LocalIdentity, initialize: bool) -> Self {
-		Self { settings, identity, initialize }
+		Self { settings, identity, initialize, verify_links: None }
 	}
 
 	pub fn with_initialize(self, initialize: bool) -> Self {
 		Self { initialize, ..self }
+	}
+
+	pub fn with_verify_links(self, verify_links: Option<BlockLinks>) -> Self {
+		Self { verify_links, ..self }
 	}
 
 	/// Create LocalCO instance.
@@ -228,13 +236,13 @@ where
 			local_co.settings.identifier.clone(),
 			CO_ID_LOCAL.into(),
 			None,
-			storage,
 			tasks.clone(),
 			runtime,
 			reducer,
 			context,
 			Box::new(flush),
 			false,
+			local_co.verify_links,
 		)?;
 
 		// setup
@@ -504,12 +512,7 @@ where
 	// - unencrypted shared COs
 	//   - all references to it should be [`CoReference::Weak`].
 	let reference_mode = if disallow_plain {
-		let builtin_cores = Cores::default()
-			.built_in_native_mapping()
-			.into_iter()
-			.map(|(cid, _)| cid)
-			.collect();
-		EncryptionReferenceMode::DisallowPlainExcept(builtin_cores)
+		EncryptionReferenceMode::DisallowPlainExcept(builtin_cores())
 	} else {
 		EncryptionReferenceMode::Warning
 	};

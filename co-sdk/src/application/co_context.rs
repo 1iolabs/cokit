@@ -4,7 +4,7 @@ use crate::{
 		identity::{create_identity_resolver, create_private_identity_resolver},
 		shared::SharedCoBuilder,
 	},
-	library::shared_membership::shared_membership_active,
+	library::{builtin_cores::builtin_cores, shared_membership::shared_membership_active},
 	reducer::core_resolver::{dynamic::DynamicCoreResolver, guard::CoGuardResolver, log::LogCoreResolver},
 	services::{
 		application::ApplicationMessage,
@@ -23,7 +23,7 @@ use co_identity::{
 };
 use co_log::{EntryBlock, Log};
 use co_network::{connections::ConnectionMessage, HeadsApi, NetworkApi};
-use co_primitives::{BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did};
+use co_primitives::{BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did, IgnoreFilter};
 use futures::{Stream, TryStreamExt};
 use std::{
 	collections::BTreeSet,
@@ -152,8 +152,12 @@ impl CoContext {
 	}
 
 	/// Block links reader.
-	pub fn block_links(&self) -> &BlockLinks {
-		&self.inner.block_links
+	pub fn block_links(&self, exclude_builtin: bool) -> &BlockLinks {
+		if exclude_builtin {
+			&self.inner.block_links_builtin
+		} else {
+			&self.inner.block_links
+		}
 	}
 
 	/// Force refresh co instance.
@@ -210,6 +214,7 @@ pub(crate) struct CoContextInner {
 	date: DynamicCoDate,
 	uuid: DynamicCoUuid,
 	block_links: BlockLinks,
+	block_links_builtin: BlockLinks,
 	cores: Cores,
 }
 impl CoContextInner {
@@ -227,6 +232,8 @@ impl CoContextInner {
 		uuid: DynamicCoUuid,
 		cores: Cores,
 	) -> Self {
+		let block_links = BlockLinks::default();
+		let block_links_builtin = block_links.clone().with_filter(IgnoreFilter::new(builtin_cores()));
 		Self {
 			settings,
 			shutdown,
@@ -239,7 +246,8 @@ impl CoContextInner {
 			reducers,
 			date,
 			uuid,
-			block_links: Default::default(),
+			block_links,
+			block_links_builtin,
 			cores,
 		}
 	}
@@ -309,7 +317,12 @@ impl CoContextInner {
 	/// Creates a CoReducer instance of the Local CO.
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	pub(crate) async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
-		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize);
+		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize)
+			.with_verify_links(
+				self.settings
+					.feature_co_storage_verify_links()
+					.then(|| self.block_links_builtin.clone()),
+			);
 		let local_co_reducer = local_co
 			.build(
 				self.storage().clone_with_settings(BlockStorageSettings::new().with_detached()),
@@ -362,6 +375,11 @@ impl CoContextInner {
 		let reducer = SharedCoBuilder::new(parent, membership)
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_string())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_string())
+			.with_verify_links(
+				self.settings
+					.feature_co_storage_verify_links()
+					.then(|| self.block_links_builtin.clone()),
+			)
 			.with_initialize(initialize)
 			.build(
 				self.tasks.clone(),
@@ -419,6 +437,10 @@ impl CoContextInner {
 			tasks: self.tasks.clone(),
 			block_links: self.block_links.clone(),
 			free: self.settings.feature_co_storage_free(),
+			verify_links: self
+				.settings
+				.feature_co_storage_verify_links()
+				.then(|| self.block_links_builtin.clone()),
 		}
 	}
 }

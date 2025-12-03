@@ -22,6 +22,7 @@ pub use storage::{
 	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping, EncryptionReferenceMode},
 	fs::FsStorage,
 	join::JoinBlockStorage,
+	links::LinksBlockStorage,
 	mapped::MappedBlockStorage,
 	memory::{MemoryBlockStorage, MemoryStorage},
 	overlay::{OverlayBlockStorage, OverlayChange, OverlayChangeReference},

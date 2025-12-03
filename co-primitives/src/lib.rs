@@ -6,7 +6,7 @@ mod types;
 pub use library::test::TestStorage;
 pub use library::{
 	block_diff::{block_diff, block_diff_added_with_parent, BlockDiff, BlockDiffFollow},
-	block_links::{BlockLinks, BlockLinksFilter, IgnoreFilter, WeakCoReferenceFilter},
+	block_links::{BlockLinks, BlockLinksFilter, IgnoreFilter, JoinFilter, WeakCoReferenceFilter},
 	block_serializer::{BlockSerializer, BlockSerializerError},
 	cbor::{from_cbor, to_cbor, CborError},
 	co_try_stream_ext::CoTryStreamExt,
