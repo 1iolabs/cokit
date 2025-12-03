@@ -31,8 +31,7 @@ members = [
     "examples/counter",
     "examples/counter-upgraded",
     "examples/message",
-    "tauri-plugin-co-sdk",
-    "tauri-plugin-co-sdk/examples/messenger/src-tauri",
+    "tauri-plugin-co-sdk"
 ]
 resolver = "2"
 
