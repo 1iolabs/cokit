@@ -1,3 +1,4 @@
+use crate::MultiCodec;
 use cid::Cid;
 use multihash_codetable::{Code, MultihashDigest};
 use std::{
@@ -102,9 +103,13 @@ impl<S> Hash for Block<S> {
 }
 impl<S> std::fmt::Debug for Block<S> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let hex = self.data.iter().map(|c| format!("{:02X}", c)).collect::<String>();
+		let codec = MultiCodec::from(&self.cid);
 		f.debug_struct("Block")
 			.field("cid", &self.cid)
-			.field("data", &self.data)
+			.field("codec", &codec)
+			.field("size", &self.data.len())
+			.field("data", &hex)
 			.finish()
 	}
 }
