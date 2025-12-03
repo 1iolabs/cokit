@@ -24,7 +24,7 @@ You can also head over to [Dioxus](https://dioxuslabs.com/learn/0.6/getting_star
 
 ### Setup NodeJS
 We need NodeJS to use TailwindCSS within our app.  
-Head over to [NodeJS](https://nodejs.org/en/download) for further instructions.
+Head over to [NodeJS](https://nodejs.org/en/download) for download instructions.
 
 ### Application
 We need to setup a new Rust crate for the application.  
@@ -65,13 +65,14 @@ npm install -D tailwindcss @tailwindcss/cli daisyui
 
 For this example we use the MyTodoCore.
 
-Upon first starting the application, a `did:key:` identity is created locally, we name it `my-todo-identity`.
+Upon first starting the application, a `did:key:` identity is created locally.  
+We name it `my-todo-identity`.
 
 The first view is where we create to-do lists, and respond to invites.  
 The second view is where we manage tasks and participants.
 
 ### Application
-For this quick start we only use a single file: `src/main.rs`.
+For this quick-start example, we only use a single file: `src/main.rs`.
 
 ```admonish info
 You can delete all of the example Rust code from `main.rs`.
@@ -92,19 +93,22 @@ fn main() {
 
 #### Overview
 Next, we want to display a list of To-do Lists and possible invites.  
-We use the CO-kit built-in memberships core, and show To-do-List items according their state.  
+
+
+##### Memberships/Invites
+We use the CO-kit built-in [memberships Core](/crate/co_core_membership/struct.Memberships.html), and show To-do-List items according their state.  
 We're working with the following states of interest:  
 - Active: Normal active membership
-- Invite: We got invited to join a [CO](../reference/co.md) by someone else
+- Invite: We were invited to join a [CO](../reference/co.md) by someone else
 - Join: We accepted an invite and are waiting for it to complete
 
 The Dioxus bindings mostly work by using hooks.  
 We are using the following:
-- [`use_co`](/crate/co_dioxus/fn.use_co.html) : Opens a CO and allows to read and write it 
+- [`use_co`](/crate/co_dioxus/fn.use_co.html) : Opens a CO for read/write
 - [`use_selector`](/crate/co_dioxus/fn.use_selector.html) : Selects relevant state from an opened CO
 - [`use_did_key_identity`](/crate/co_dioxus/fn.use_did_key_identity.html) : Uses a `did:key:` identity
 
-We read the memberships which are stored in the [Local CO](../reference/co.md#local-co):
+We read the memberships that are stored in the [Local CO](../reference/co.md#local-co):
 
 ```rust,noplayground
 let local_co_id = use_signal(|| CoId::new(CO_ID_LOCAL));
@@ -117,13 +121,14 @@ let lists = use_selector(&local_co, move |storage, co_state| async move {
 })?;
 ```
 
-The [`co_sdk::state`](/crate/co_sdk/state/index.html) export contains utilities to access states of built-in cores.
+The [`co_sdk::state`](/crate/co_sdk/state/index.html) export contains utilities to access states of built-in Cores.
 
 Here we use [`co_sdk::state::memberships`](/crate/co_sdk/state/fn.memberships.html).  
 This contains all memberships, including the virtual one of the [Local CO](../reference/co.md#local-co) that we'll filter out:
 
 We also use [`co_sdk::state::co_info`](/crate/co_sdk/state/fn.co_info.html) to return info about the CO.
 
+##### Counter
 For every To-do List, we want to show a counter of undone todos:
 
 ```rust,noplayground
@@ -231,9 +236,20 @@ for task in tasks {
 }
 ```
 
-#### Full Example Code
-Here is a full example of the code parts that integrate with CO-kit.  
-Below, you will also find a link to the entire git project.
+### Run the App
+
+Follow the instructions in `my-todo-app/README.md` to run the Tailwind CSS compiler and serve your App.
+
+
+
+## Full Example Code
+Here is a full example of the code parts in `main.rs` that integrate with CO-kit.  
+Below that is the content for your `tailwind.css` file.  
+And, at the bottom of this page, you will find a link to the entire git project.
+
+```admonish info
+Please be sure to 'unhide' all of the code if you are copy/pasting into your `main.rs` file.
+```
 
 `src/main.rs`:
 
@@ -818,17 +834,13 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 ```
 
 
-### Tailwind
+#### Tailwind
 `/tailwind.css`:
 ```css
 @import "tailwindcss";
 @source "./src/**/*.{rs,html,css}";
 @plugin "daisyui";
 ```
-
-### Run the App
-
-Serve your App by following the instructions in the `README.md` file in your `my-todo-app` folder.
 
 
 ### Full Example Project
