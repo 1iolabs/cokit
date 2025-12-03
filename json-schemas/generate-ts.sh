@@ -17,7 +17,7 @@ cd ..
 
 # run co-cli command to generate json schemas for room core, messaging and cores
 echo "Calling co cli schema generate command"
-cargo run --bin co-cli -- --no-keychain schemars generate -m room messaging cores key
+cargo run --bin co schemars generate -m room messaging cores key
 
 # generate .d.ts files, needs globally installed 'json-schema-to-typescript' npm package
 echo "Calling json2ts command"
@@ -35,11 +35,11 @@ done
 cd ../..
 # clean tauri types folder
 echo "Cleanup tauri folders"
-rm -rf ./tauri-plugin-co-sdk/guest-js/types
+rm -rf ./tauri-plugin-co-sdk/guest-js/types/generated
 
 # copy all generated types to tauri plugin
 echo "Copy generated files into tauri guest-js folder"
-cp -R json-schemas/types tauri-plugin-co-sdk/guest-js
+cp -R json-schemas/types/ tauri-plugin-co-sdk/guest-js/types/generated
 
 # build guest js
 echo "Building tauri plugin packages"
