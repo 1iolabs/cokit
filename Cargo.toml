@@ -49,6 +49,7 @@ either = { version = "1" }
 futures = "0.3.30"
 futures-util = "0.3.26"
 hyper = { version = "0.14.23" }
+insta = { version = "1.34.0", features = ["default", "yaml"] }
 ipld-core = { version = "0.4.1", features = ["serde"] }
 ipld-dagpb = "0.2.1"
 multiaddr = "0.18.2"
