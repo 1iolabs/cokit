@@ -2,7 +2,7 @@ use super::{flush::CoReducerFlush, message::ReducerMessage, FlushInfo};
 use crate::{
 	application::reducer::JoinResult,
 	library::{
-		extract_next_heads::{extract_next_heads, extract_next_state},
+		extract_next_heads::extract_next_heads,
 		log_entries_until::log_entries_until,
 		to_external_cid::{to_external_mapped, to_external_mapped_opt},
 	},
@@ -273,7 +273,6 @@ async fn flush(
 			// - skip to walk previous state - only use the latest
 			// - skip weak references
 			let links = BlockLinks::default()
-				.with_filter(IgnoreFilter::new(extract_next_state(overlay_storage, &root.0).await?))
 				.with_filter(IgnoreFilter::new(extract_next_heads(overlay_storage, &root.1, true).await?))
 				.with_filter(WeakCoReferenceFilter::new());
 

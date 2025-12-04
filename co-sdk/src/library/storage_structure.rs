@@ -1,8 +1,5 @@
 use crate::{
-	library::{
-		extract_next_heads::{extract_next_heads, extract_next_state},
-		to_external_cid::to_external_cids,
-	},
+	library::{extract_next_heads::extract_next_heads, to_external_cid::to_external_cids},
 	state::{query_core, Query, QueryExt},
 	types::co_dispatch::CoDispatch,
 	CoPinningKey, CO_CORE_NAME_STORAGE,
@@ -260,12 +257,7 @@ where
 			};
 			Ok(StructureResolveResult::Include(links))
 		} else if pins.contains(&self.state_pin) {
-			let links = if info.block_type.is_root() {
-				let next_state = extract_next_state(item_storage, &Some(*item)).await?;
-				self.block_links.clone().with_filter(IgnoreFilter::new(next_state))
-			} else {
-				self.block_links.clone()
-			};
+			let links = self.block_links.clone();
 			Ok(StructureResolveResult::Include(links))
 		} else {
 			Ok(StructureResolveResult::Exclude)

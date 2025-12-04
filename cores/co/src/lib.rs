@@ -23,14 +23,6 @@ pub struct Co {
 	#[serde(rename = "b")]
 	pub binary: Cid,
 
-	/// Next state (ancestor).
-	#[serde(rename = "a", default, skip_serializing_if = "OptionLink::is_none")]
-	pub next: OptionLink<Co>,
-
-	/// CO Current heads.
-	#[serde(rename = "h", default, skip_serializing_if = "BTreeSet::is_empty")]
-	pub heads: BTreeSet<Cid>,
-
 	/// CO Participants.
 	#[serde(rename = "p", default, skip_serializing_if = "CoMap::is_empty")]
 	pub participants: CoMap<Did, Participant>,
@@ -64,8 +56,6 @@ impl Default for Co {
 			tags: Default::default(),
 			name: Default::default(),
 			binary: Default::default(),
-			next: Default::default(),
-			heads: Default::default(),
 			participants: Default::default(),
 			cores: Default::default(),
 			keys: Default::default(),
@@ -85,9 +75,7 @@ where
 	) -> Result<Link<Self>, anyhow::Error> {
 		let mut result = storage.get_value_or_default(&state).await?;
 		let event = storage.get_value(&event).await?;
-		if reduce(storage, &mut result, &event.payload).await? {
-			result.next = state;
-		}
+		reduce(storage, &mut result, &event.payload).await?;
 		let state = storage.set_value(&result).await?;
 		Ok(state)
 	}
@@ -256,9 +244,6 @@ pub enum CoAction {
 		binary: Cid,
 		migrate: Option<Cid>,
 	},
-	Heads {
-		heads: BTreeSet<Cid>,
-	},
 	TagsInsert {
 		tags: Tags,
 	},
@@ -369,7 +354,6 @@ where
 		CoAction::ParticipantRemove { participant, tags } => {
 			reduce_participant_remove(storage, result, participant, tags).await?
 		},
-		CoAction::Heads { heads } => reduce_heads(result, heads),
 		CoAction::CoreCreate { core, binary, tags } => reduce_core_create(result, core, binary, tags),
 		CoAction::CoreRemove { core } => reduce_core_remove(result, core),
 		CoAction::ParticipantTagsInsert { participant, tags } => {
@@ -537,11 +521,6 @@ where
 	} else {
 		false
 	})
-}
-
-fn reduce_heads(result: &mut Co, heads: &BTreeSet<Cid>) -> bool {
-	result.heads = heads.clone();
-	true
 }
 
 fn reduce_core_create(result: &mut Co, core: &String, binary: &Cid, tags: &Tags) -> bool {

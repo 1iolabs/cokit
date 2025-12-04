@@ -1,8 +1,6 @@
 use cid::Cid;
-use co_core_co::Co;
 use co_log::EntryBlock;
-use co_primitives::AnyBlockStorage;
-use co_storage::{BlockStorage, BlockStorageExt};
+use co_storage::BlockStorage;
 use std::collections::BTreeSet;
 
 /// Extract all `next` heads from given heads.
@@ -24,22 +22,4 @@ where
 		}
 	}
 	Ok(next)
-}
-
-/// Extract `next` state from given state.
-pub async fn extract_next_state(
-	storage: &impl AnyBlockStorage,
-	state: &Option<Cid>,
-) -> Result<BTreeSet<Cid>, anyhow::Error> {
-	Ok(if let Some(state) = state {
-		if let Some(co) = storage.get_deserialized::<Co>(state).await.ok() {
-			co.next.cid().to_owned()
-		} else {
-			None
-		}
-	} else {
-		None
-	}
-	.into_iter()
-	.collect())
 }
