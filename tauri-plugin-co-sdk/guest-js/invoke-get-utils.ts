@@ -1,4 +1,4 @@
-import { getCoState, resolveCid, sessionClose, sessionOpen } from "./invoke-utils";
+import { getCoState, resolveCid, sessionClose, sessionOpen } from "./invoke-utils.js";
 
 export async function getResolvedCoState(co: string, externalSessionId?: string): Promise<any | undefined> {
   // open session if no external session given
@@ -95,7 +95,7 @@ export async function getFilteredCoreIds(tags: string[], co?: string): Promise<C
       const v = value as any;
       if (v?.tags) {
         if (v.tags[0].every((tag: string) => tags.includes(tag))) {
-          foundCores.push({coId, coreId: key});
+          foundCores.push({ coId, coreId: key });
         }
       }
     }

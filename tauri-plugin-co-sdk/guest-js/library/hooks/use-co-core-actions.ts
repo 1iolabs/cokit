@@ -1,6 +1,6 @@
 import { CID } from "multiformats";
 import React from "react";
-import { GetActionsResponse, getActions } from "../../invoke-utils";
+import { GetActionsResponse, getActions } from "../../invoke-utils.js";
 
 export function useCoCoreActions(
   co: string,

@@ -1,5 +1,5 @@
 import React from "react";
-import { MembershipState } from "../../types";
+import { MembershipState } from "../../types/index.js";
 
 // TODO: type for memberships state
 /**

@@ -1,6 +1,6 @@
 import { CID } from "multiformats";
 import React from "react";
-import { resolveCid } from "../../invoke-utils";
+import { resolveCid } from "../../invoke-utils.js";
 
 export function useCoIpld<T, E = []>(
   cids: CID[] | undefined,

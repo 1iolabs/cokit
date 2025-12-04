@@ -1,5 +1,5 @@
 import { CID } from "multiformats";
-import { Network } from "./network";
+import { Network } from "./network.js";
 
 export type CoId = string;
 export type Did = string;

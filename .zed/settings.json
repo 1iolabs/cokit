@@ -6,22 +6,25 @@
   "languages": {
     "TypeScript": {
       "language_servers": ["typescript-language-server", "!vtsls", "..."],
+      "code_actions_on_format": {
+        "source.fixAll.eslint": true,
+        "source.organizeImports": true
+      },
       "prettier": { "allowed": true },
-      "formatter": {
-        "code_actions": {
-          "source.fixAll.eslint": true
-        }
-      }
+      "preferred_line_length": 120
     },
     "TSX": {
       "language_servers": ["typescript-language-server", "!vtsls", "..."],
-      "code_actions_on_format": { "source.organizeImports": true },
+      "code_actions_on_format": {
+        "source.fixAll.eslint": true,
+        "source.organizeImports": true
+      },
       "prettier": { "allowed": true },
-      "formatter": {
-        "code_actions": {
-          "source.fixAll.eslint": true
-        }
-      }
+      "preferred_line_length": 120
+    },
+    "Markdown": {
+      "format_on_save": "off",
+      "remove_trailing_whitespace_on_save": false
     }
   },
   "lsp": {

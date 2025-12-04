@@ -1,5 +1,5 @@
 import { CID } from "multiformats";
-import { resolveCid } from "../invoke-utils";
+import { resolveCid } from "../invoke-utils.js";
 
 export interface Node<I> {
   n: CID[] | undefined;

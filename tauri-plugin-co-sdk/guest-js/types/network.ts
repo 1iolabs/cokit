@@ -1,4 +1,4 @@
-import { CoId } from "./co";
+import { CoId } from "./co.js";
 
 /** Enum (serde external-tag) */
 export type Network =
@@ -10,7 +10,7 @@ export type Network =
 /** DID Discovery protocol. */
 export interface NetworkDidDiscovery {
   /** The GossipSub topic used for DidDiscovery messages. Default: "co-contact". */
-  topic?: string;        // Option<String>
+  topic?: string; // Option<String>
   /** The DID to be discovered. */
   did: string;
 }
@@ -18,7 +18,7 @@ export interface NetworkDidDiscovery {
 /** CO Heads protocol. */
 export interface NetworkCoHeads {
   /** The GossipSub topic used for Heads messages. Default: "co-{co.id}". */
-  topic?: string;        // Option<String>
+  topic?: string; // Option<String>
   /** The CO to be discovered. */
   id: CoId;
 }
@@ -34,7 +34,7 @@ export interface NetworkRendezvous {
 /** Direct peer connection. */
 export interface NetworkPeer {
   /** libp2p PeerId as bytes. (serde_json: number[] unless using serde_bytes for base64) */
-  peer: number[];        // Vec<u8>
+  peer: number[]; // Vec<u8>
   /** Optional known multi-addresses. */
   addresses: string[];
 }

@@ -1,9 +1,9 @@
 import React, { useEffect } from "react";
-import { DagList } from "../dag-list";
-import { Did, Keystore } from "../../types";
-import { useCoSession } from "./use-co-session";
-import { getCoreState } from "../../invoke-get-utils";
-import { resolveCid, createIdentity } from "../../invoke-utils";
+import { DagList } from "../dag-list.js";
+import { Did, Keystore } from "../../types/index.js";
+import { useCoSession } from "./use-co-session.js";
+import { getCoreState } from "../../invoke-get-utils.js";
+import { resolveCid, createIdentity } from "../../invoke-utils.js";
 
 export function useDidKeyIdentity(name: string): Did | undefined {
   const [identity, setIdentity] = React.useState<Did | undefined>();

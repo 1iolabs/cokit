@@ -1,6 +1,6 @@
 import { CID } from "multiformats";
 import React from "react";
-import { resolveCid } from "../../invoke-utils";
+import { resolveCid } from "../../invoke-utils.js";
 
 export function useResolveCid<T = any>(cid: CID | undefined | null, session: string | undefined): T | undefined {
   const [state, setState] = React.useState<T | undefined>(undefined);

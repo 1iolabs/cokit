@@ -1,6 +1,6 @@
 import React from "react";
 import { fromEventPattern } from "rxjs";
-import { sessionOpen, sessionClose } from "../../invoke-utils";
+import { sessionOpen, sessionClose } from "../../invoke-utils.js";
 
 export function useCoSession(co: string): string | undefined {
   const [session, setSession] = React.useState<string | undefined>();

@@ -1,5 +1,5 @@
 import { CID } from "multiformats";
-import { CoId, Did, Tags } from "./co";
+import { CoId, Did, Tags } from "./co.js";
 
 export enum MembershipState {
   /// Active membership.
