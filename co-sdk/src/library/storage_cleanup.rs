@@ -130,22 +130,24 @@ mod tests {
 	use crate::{
 		state::{query_core, Query},
 		types::co_pinning_key::CoPinningKey,
-		ApplicationBuilder, CoReducer, MonotonicCoDate, MonotonicCoUuid, CO_CORE_NAME_CO, CO_CORE_NAME_STORAGE,
+		ApplicationBuilder, CoReducer, CreateCo, DidKeyProvider, MonotonicCoDate, MonotonicCoUuid, CO_CORE_NAME_CO,
+		CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_STORAGE,
 	};
 	use co_core_co::CoAction;
 	use co_core_storage::{PinStrategy, StorageAction};
-	use co_primitives::tags;
+	use co_identity::DidKeyIdentity;
+	use co_primitives::{tags, CoId};
 	use co_storage::{ExtendedBlockStorage, TmpDir};
 	use futures::TryStreamExt;
 
-	async fn count_pin_references(co: &CoReducer, pin: CoPinningKey) -> u32 {
-		let storage = co.storage();
-		let co_state = co.reducer_state().await;
+	async fn count_pin_references(local_co: &CoReducer, co: &CoId, pin: CoPinningKey) -> u32 {
+		let storage = local_co.storage();
+		let co_state = local_co.reducer_state().await;
 		let storage_core = query_core(CO_CORE_NAME_STORAGE)
 			.execute(&storage, co_state.state().into())
 			.await
 			.unwrap();
-		let pin = storage_core.pins.get(&storage, &pin.to_string(co.id())).await.unwrap().unwrap();
+		let pin = storage_core.pins.get(&storage, &pin.to_string(co)).await.unwrap().unwrap();
 		let pin_references = pin.references.stream(&storage).try_collect::<Vec<_>>().await.unwrap();
 		assert_eq!(pin_references.len(), pin.references_count as usize);
 		let blocks_index_unreferenced = storage_core
@@ -179,7 +181,7 @@ mod tests {
 			.unwrap();
 		let local_co = application.local_co_reducer().await.unwrap();
 		let storage = local_co.storage();
-		assert_eq!(count_pin_references(&local_co, CoPinningKey::State).await, 1); // this contains the intermediate point before pinning
+		assert_eq!(count_pin_references(&local_co, local_co.id(), CoPinningKey::State).await, 1); // this contains the intermediate point before pinning
 
 		// push
 		let local_co_state = local_co.reducer_state().await;
@@ -193,18 +195,18 @@ mod tests {
 			)
 			.await
 			.unwrap();
-		assert_eq!(count_pin_references(&local_co, CoPinningKey::State).await, 3); // this contains the intermediate point before pinning, the actual state before and the next intermediate point.
+		assert_eq!(count_pin_references(&local_co, local_co.id(), CoPinningKey::Root).await, 3); // this contains the intermediate point before pinning, the actual state before and the next intermediate point.
 
 		// only keep latest
 		local_co
 			.push(
 				&application.local_identity(),
 				CO_CORE_NAME_STORAGE,
-				&StorageAction::PinUpdate(CoPinningKey::State.to_string(local_co.id()), PinStrategy::MaxCount(1)),
+				&StorageAction::PinUpdate(CoPinningKey::Root.to_string(local_co.id()), PinStrategy::MaxCount(1)),
 			)
 			.await
 			.unwrap();
-		assert_eq!(count_pin_references(&local_co, CoPinningKey::State).await, 1);
+		assert_eq!(count_pin_references(&local_co, local_co.id(), CoPinningKey::Root).await, 1);
 
 		// push
 		//  this will trigger the cleanup as the previous has set to one we not got items to remove
@@ -215,12 +217,92 @@ mod tests {
 		let next_local_co_state = local_co.reducer_state().await;
 		let external_next_local_co_state = next_local_co_state.to_external_force(&storage).await.unwrap();
 		tracing::trace!(?next_local_co_state, ?external_next_local_co_state, "test-state-next");
-		assert_eq!(count_pin_references(&local_co, CoPinningKey::State).await, 1);
+		assert_eq!(count_pin_references(&local_co, local_co.id(), CoPinningKey::Root).await, 1);
 
 		// verify states are removed
 		assert_eq!(storage.exists(&external_local_co_state.state().unwrap()).await.unwrap(), false);
 		assert_eq!(storage.exists(&external_next_local_co_state.state().unwrap()).await.unwrap(), true);
 		assert_eq!(storage.exists(&local_co_state.state().unwrap()).await.unwrap(), false);
 		assert_eq!(storage.exists(&next_local_co_state.state().unwrap()).await.unwrap(), true);
+	}
+
+	/// Integration Test to verify storage_cleanup actualy deletes states.
+	/// Note: The pinned state is always one state late.
+	#[tokio::test]
+	async fn integration_test_storage_cleanup_shared() {
+		let application_identifier = format!("integration_test_storage_cleanup-{}", uuid::Uuid::new_v4().to_string());
+		let tmp = TmpDir::new("co");
+		let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
+			// .with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+			.with_bunyan_logging(None)
+			.with_disabled_feature("co-local-encryption")
+			.with_setting("feature", "co-storage-free")
+			.with_co_date(MonotonicCoDate::default())
+			.with_co_uuid(MonotonicCoUuid::default())
+			.without_keychain()
+			.build()
+			.await
+			.unwrap();
+		let local_co = application.local_co_reducer().await.unwrap();
+		let storage = local_co.storage();
+
+		// create identity
+		let identity = DidKeyIdentity::generate(None);
+		let co = application.local_co_reducer().await.unwrap();
+		let provider = DidKeyProvider::new(co, CO_CORE_NAME_KEYSTORE);
+		provider.store(&identity, None).await.unwrap();
+
+		// create co
+		let co = application
+			.create_co(identity.clone(), CreateCo::new("shared", None).with_algorithm(None))
+			.await
+			.unwrap();
+		assert_eq!(count_pin_references(&local_co, co.id(), CoPinningKey::Root).await, 1);
+
+		// push
+		let co_state = co.reducer_state().await;
+		let external_co_state = co_state.to_external_force(&storage).await.unwrap();
+		tracing::trace!(?co_state, ?external_co_state, "test-state");
+		co.push(
+			&application.local_identity(),
+			CO_CORE_NAME_CO,
+			&CoAction::TagsInsert { tags: tags!("hello": "world") },
+		)
+		.await
+		.unwrap();
+		assert_eq!(count_pin_references(&local_co, co.id(), CoPinningKey::Root).await, 2); // this contains the intermediate point before pinning, the actual state before and the next intermediate point.
+
+		// only keep latest
+		local_co
+			.push(
+				&application.local_identity(),
+				CO_CORE_NAME_STORAGE,
+				&StorageAction::PinUpdate(CoPinningKey::Root.to_string(co.id()), PinStrategy::MaxCount(1)),
+			)
+			.await
+			.unwrap();
+		assert_eq!(count_pin_references(&local_co, co.id(), CoPinningKey::Root).await, 1);
+
+		// push
+		//  this will trigger the cleanup as the previous has set to one we not got items to remove
+		co.push(&application.local_identity(), CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("test": 123) })
+			.await
+			.unwrap();
+		let next_co_state = co.reducer_state().await;
+		let external_next_co_state = next_co_state.to_external_force(&storage).await.unwrap();
+		tracing::trace!(?next_co_state, ?external_next_co_state, "test-state-next");
+		assert_eq!(count_pin_references(&local_co, co.id(), CoPinningKey::Root).await, 1);
+
+		// verify states are removed
+		assert_eq!(storage.exists(&external_co_state.state().unwrap()).await.unwrap(), false);
+		assert_eq!(storage.exists(&external_next_co_state.state().unwrap()).await.unwrap(), true);
+		assert_eq!(storage.exists(&co_state.state().unwrap()).await.unwrap(), false);
+		assert_eq!(storage.exists(&next_co_state.state().unwrap()).await.unwrap(), true);
+
+		// verify heads are removed
+		assert_eq!(storage.exists(external_co_state.heads().first().unwrap()).await.unwrap(), false);
+		assert_eq!(storage.exists(external_next_co_state.heads().first().unwrap()).await.unwrap(), true);
+		assert_eq!(storage.exists(co_state.heads().first().unwrap()).await.unwrap(), false);
+		assert_eq!(storage.exists(next_co_state.heads().first().unwrap()).await.unwrap(), true);
 	}
 }

@@ -5,12 +5,14 @@ use co_primitives::CoId;
 pub enum CoPinningKey {
 	State,
 	Log,
+	Root,
 }
 impl CoPinningKey {
 	pub fn to_string(&self, co: &CoId) -> String {
 		match self {
 			CoPinningKey::State => format!("co.state.{}", co.as_str()),
 			CoPinningKey::Log => format!("co.log.{}", co.as_str()),
+			CoPinningKey::Root => format!("co:{}", co.as_str()),
 		}
 	}
 
@@ -24,6 +26,8 @@ fn parse_co_id_from_pin(mut pin: String) -> Result<(CoPinningKey, CoId), anyhow:
 		Ok((CoPinningKey::State, pin.split_off("co.state.".len()).into()))
 	} else if pin.starts_with("co.log.") {
 		Ok((CoPinningKey::Log, pin.split_off("co.log.".len()).into()))
+	} else if pin.starts_with("co:") {
+		Ok((CoPinningKey::Root, pin.split_off("co:".len()).into()))
 	} else {
 		Err(anyhow!("Parse pin failed: {}", pin))
 	}

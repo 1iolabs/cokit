@@ -4,6 +4,8 @@ pub mod builtin_cores;
 pub mod cancel;
 pub mod connections_peer_provider;
 pub mod create_reducer_action;
+#[cfg(feature = "pinning")]
+pub mod create_storage_core_state;
 pub mod did_key_provider;
 pub mod extract_next_heads;
 pub mod find_co_by_pin;

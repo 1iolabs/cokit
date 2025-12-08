@@ -1,10 +1,5 @@
-use super::application::ApplicationSettings;
-#[cfg(feature = "pinning")]
-use crate::types::{
-	co_pinning_key::CoPinningKey,
-	cores::{CO_CORE_NAME_STORAGE, CO_CORE_STORAGE},
-};
 use crate::{
+	application::application::ApplicationSettings,
 	library::{
 		builtin_cores::builtin_cores,
 		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
@@ -19,6 +14,11 @@ use crate::{
 	ApplicationMessage, CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, DynamicCoDate, Reducer,
 	ReducerBuilder, Runtime, TaskSpawner, CO_CORE_CO, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
 	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+};
+#[cfg(feature = "pinning")]
+use crate::{
+	library::create_storage_core_state::create_storage_core_state,
+	types::cores::{CO_CORE_NAME_STORAGE, CO_CORE_STORAGE},
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -558,7 +558,7 @@ async fn setup_local_co(
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_STORAGE).expect(CO_CORE_STORAGE),
 			tags: tags!("core": CO_CORE_STORAGE),
-			state: create_storage_core_state(&reducer.storage(), settings).await?,
+			state: create_storage_core_state(&reducer.storage(), settings, &CO_ID_LOCAL.into()).await?,
 		},
 	);
 
@@ -568,28 +568,4 @@ async fn setup_local_co(
 
 	// done
 	Ok(())
-}
-
-#[cfg(feature = "pinning")]
-async fn create_storage_core_state<S: BlockStorage + Clone + 'static>(
-	storage: &S,
-	settings: &ApplicationSettings,
-) -> Result<Option<Cid>, anyhow::Error> {
-	Ok(co_core_storage::Storage::initial_state(
-		storage,
-		vec![
-			co_core_storage::StorageAction::PinCreate(
-				CoPinningKey::State.to_string(&CO_ID_LOCAL.into()),
-				settings.setting_co_default_max_state(),
-				Default::default(),
-			),
-			co_core_storage::StorageAction::PinCreate(
-				CoPinningKey::Log.to_string(&CO_ID_LOCAL.into()),
-				settings.setting_co_default_max_log(),
-				Default::default(),
-			),
-		],
-	)
-	.await?
-	.into())
 }

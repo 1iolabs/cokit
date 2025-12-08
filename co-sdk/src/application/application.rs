@@ -163,6 +163,8 @@ impl Application {
 				creator,
 				self.context().date().clone(),
 				self.context().uuid().clone(),
+				#[cfg(feature = "pinning")]
+				self.context().inner.create_pinning_context(),
 			)
 			.await?;
 

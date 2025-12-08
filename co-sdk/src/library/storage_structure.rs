@@ -2,14 +2,14 @@ use crate::{
 	library::{extract_next_heads::extract_next_heads, to_external_cid::to_external_cids},
 	state::{query_core, Query, QueryExt},
 	types::co_dispatch::CoDispatch,
-	CoPinningKey, CO_CORE_NAME_STORAGE,
+	CoPinningKey, CoRoot, CO_CORE_NAME_STORAGE,
 };
 use async_trait::async_trait;
 use cid::Cid;
 use co_core_co::Co;
 use co_core_storage::{BlockInfo, StorageAction};
 use co_primitives::{BlockLinks, CoId, IgnoreFilter, OptionLink, WeakCid};
-use co_storage::{BlockStorage, BlockStorageContentMapping, ExtendedBlockStorage};
+use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage};
 use futures::{pin_mut, TryStreamExt};
 use std::{
 	collections::BTreeSet,
@@ -225,13 +225,19 @@ pub trait StructureResolver<S, D>: Send + Sync {
 /// - Only follow references related to the Co.
 /// - For heads do not follow [`co_log::Entry::next`] and [`co_log::Entry::refs`].
 pub struct CoStructureResolver {
+	root_pin: String,
 	log_pin: String,
 	state_pin: String,
 	block_links: BlockLinks,
 }
 impl CoStructureResolver {
 	pub fn new(co: &CoId, block_links: BlockLinks) -> Self {
-		Self { log_pin: CoPinningKey::Log.to_string(co), state_pin: CoPinningKey::State.to_string(co), block_links }
+		Self {
+			root_pin: CoPinningKey::Root.to_string(co),
+			log_pin: CoPinningKey::Log.to_string(co),
+			state_pin: CoPinningKey::State.to_string(co),
+			block_links,
+		}
 	}
 }
 #[async_trait]
@@ -248,7 +254,16 @@ where
 		item: &Cid,
 	) -> Result<StructureResolveResult, anyhow::Error> {
 		let pins: BTreeSet<String> = info.pins.stream(storage_core_storage).try_collect().await?;
-		if pins.contains(&self.log_pin) {
+		if pins.contains(&self.root_pin) {
+			let links = if info.block_type.is_root() {
+				let co_root: CoRoot = item_storage.get_deserialized(item).await?;
+				let next_heads = extract_next_heads(item_storage, co_root.heads.iter(), true).await?;
+				self.block_links.clone().with_filter(IgnoreFilter::new(next_heads))
+			} else {
+				self.block_links.clone()
+			};
+			Ok(StructureResolveResult::Include(links))
+		} else if pins.contains(&self.log_pin) {
 			let links = if info.block_type.is_root() {
 				let next_heads = extract_next_heads(item_storage, [item], true).await?;
 				self.block_links.clone().with_filter(IgnoreFilter::new(next_heads))

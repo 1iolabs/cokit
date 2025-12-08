@@ -66,7 +66,6 @@ where
 		context.verify_links.clone(),
 	)
 	.await?;
-	let storage = dispatcher.storage().clone();
 
 	// storage: remove
 	//  note: we assume that removed block only belongs to state
@@ -79,10 +78,13 @@ where
 	.await?;
 
 	// storage: pins
-	storage_dispatch_roots(&storage, &mut dispatcher, &co_id, co_new_roots).await?;
+	storage_dispatch_roots(&mut dispatcher, co_storage, &co_id, co_new_roots).await?;
 
 	// caluculate and free?
 	if context.free {
+		let storage = dispatcher.storage().clone();
+
+		// filter weak
 		let mut structure_filter =
 			CoStructureResolver::new(co_id, context.block_links.clone().with_filter(WeakCoReferenceFilter::new()));
 

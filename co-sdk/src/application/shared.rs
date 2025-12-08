@@ -310,6 +310,7 @@ impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 			let new_roots = _new_roots;
 			let removed_blocks = _removed_blocks;
 			let parent = &self.membership_writer.parent;
+			let id = &self.membership_writer.id;
 
 			// compute
 			let parent_pinning_state = crate::library::storage_pinning::storage_pinning(
@@ -317,7 +318,7 @@ impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 				None,
 				&parent.storage(),
 				parent.reducer_state().await,
-				parent.id(),
+				id,
 				storage,
 				new_roots,
 				removed_blocks,
@@ -555,6 +556,7 @@ impl SharedCoCreator {
 		identity: I,
 		date: impl CoDate,
 		uuid: impl CoUuid,
+		#[cfg(feature = "pinning")] pinning: crate::library::storage_pinning::StoragePinningContext,
 	) -> Result<CoId, anyhow::Error>
 	where
 		I: PrivateIdentity + Clone + Debug + Send + Sync + 'static,
@@ -656,6 +658,11 @@ impl SharedCoCreator {
 		#[cfg(feature = "pinning")]
 		{
 			// add pin to parent co
+			let pin_root = co_core_storage::StorageAction::PinCreate(
+				crate::types::co_pinning_key::CoPinningKey::Root.to_string(&self.co.id),
+				co_core_storage::PinStrategy::Unlimited,
+				Default::default(),
+			);
 			let pin_state = co_core_storage::StorageAction::PinCreate(
 				crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.co.id),
 				co_core_storage::PinStrategy::Unlimited,
@@ -666,22 +673,33 @@ impl SharedCoCreator {
 				co_core_storage::PinStrategy::Unlimited,
 				Default::default(),
 			);
+			self.parent.push(&identity, &self.storage_core_name, &pin_root).await?;
 			self.parent.push(&identity, &self.storage_core_name, &pin_log).await?;
 			self.parent.push(&identity, &self.storage_core_name, &pin_state).await?;
 
-			// pin initial state
-			crate::reducer::change::reference_writer::write_storage_references(
-				co_storage.clone(),
-				&mut self
-					.parent
-					.dispatcher(crate::CO_CORE_NAME_STORAGE.with_name(&self.storage_core_name), identity.clone()),
-				co_primitives::BlockLinks::default(),
-				Some(crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.co.id)),
-				None,
-				reducer_state.state().ok_or(anyhow::anyhow!("Expected state after create"))?,
-				None,
-			)
-			.await?;
+			// write initial pinning
+			#[cfg(feature = "pinning")]
+			{
+				let parent = self.parent;
+
+				// compute
+				let parent_pinning_state = crate::library::storage_pinning::storage_pinning(
+					&pinning,
+					None,
+					&parent.storage(),
+					parent.reducer_state().await,
+					&self.co.id,
+					&co_storage,
+					vec![reducer_state],
+					Default::default(),
+				)
+				.await?;
+
+				// apply
+				if let Some(parent_pinning_state) = parent_pinning_state {
+					parent.join_state(parent_pinning_state).await?;
+				}
+			}
 		}
 
 		// result

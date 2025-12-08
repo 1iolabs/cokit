@@ -69,6 +69,7 @@ pub use types::{
 	co_reducer_context::CoReducerContext,
 	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError, CoReducerFactoryResultExt},
 	co_reducer_state::{CoReducerState, MappedCoReducerState},
+	co_root::CoRoot,
 	co_storage::CoStorage,
 	co_uuid::{CoUuid, DynamicCoUuid, MonotonicCoUuid, RandomCoUuid},
 	cores::{

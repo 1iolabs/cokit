@@ -428,7 +428,7 @@ impl CoContextInner {
 	}
 
 	#[cfg(feature = "pinning")]
-	fn create_pinning_context(&self) -> crate::library::storage_pinning::StoragePinningContext {
+	pub(crate) fn create_pinning_context(&self) -> crate::library::storage_pinning::StoragePinningContext {
 		crate::library::storage_pinning::StoragePinningContext {
 			identity: self.local_identity.clone().boxed(),
 			storage: self.storage.clone(),
