@@ -17,7 +17,6 @@ serde_repr = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-co-primitives = { workspace = true }
 co-storage = { workspace = true }
 co-runtime = { workspace = true }
 tokio = { workspace = true }
