@@ -10277,6 +10277,7 @@ dependencies = [
  "co-messaging",
  "co-primitives",
  "co-sdk",
+ "derive_more 0.99.20",
  "futures",
  "ipld-core",
  "serde",

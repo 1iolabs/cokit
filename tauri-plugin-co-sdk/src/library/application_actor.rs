@@ -1,3 +1,4 @@
+use crate::library::co_application::{start_application, CoApplicationSettings};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
@@ -17,6 +18,7 @@ use std::{
 	hash::Hash,
 };
 
+#[derive(Default, Debug)]
 pub struct ApplicationActor {}
 
 #[derive(Clone)]
@@ -93,13 +95,19 @@ pub struct CreateCoRequest {
 	pub public: bool,
 }
 
+#[derive(Debug, derive_more::From)]
+pub enum ApplicationActorInizialize {
+	Settings(CoApplicationSettings),
+	App(Application),
+}
+
 #[async_trait]
 impl Actor for ApplicationActor {
 	type Message = ApplicationActorMessage;
 
 	type State = ApplicationActorState;
 
-	type Initialize = Application;
+	type Initialize = ApplicationActorInizialize;
 
 	async fn initialize(
 		&self,
@@ -107,7 +115,13 @@ impl Actor for ApplicationActor {
 		_tags: &Tags,
 		initialize: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
-		Ok(ApplicationActorState { application: initialize, sessions: HashMap::new() })
+		let app = match initialize {
+			ApplicationActorInizialize::Settings(co_application_settings) => {
+				start_application(co_application_settings).await?
+			},
+			ApplicationActorInizialize::App(application) => application,
+		};
+		Ok(ApplicationActorState { application: app, sessions: HashMap::new() })
 	}
 
 	async fn handle(
@@ -364,7 +378,7 @@ mod tests {
 		}
 
 		// init actor
-		let actor_handle = Actor::spawn(Default::default(), ApplicationActor {}, app)
+		let actor_handle = Actor::spawn(Default::default(), ApplicationActor {}, app.into())
 			.expect("actor")
 			.handle();
 

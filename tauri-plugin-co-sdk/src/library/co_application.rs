@@ -42,7 +42,7 @@ impl CoApplicationSettings {
 	}
 }
 
-pub async fn application(settings: CoApplicationSettings) -> Application {
+pub async fn start_application(settings: CoApplicationSettings) -> Result<Application, anyhow::Error> {
 	let identifier = settings.instance_id;
 	let mut builder = match settings.base_path {
 		Some(path) => ApplicationBuilder::new_with_path(identifier, path),
@@ -51,28 +51,20 @@ pub async fn application(settings: CoApplicationSettings) -> Application {
 	if settings.no_keychain {
 		builder = builder.without_keychain()
 	}
-	let mut application = builder.with_bunyan_logging(None).build().await.expect("application");
+	let mut application = builder.with_bunyan_logging(None).build().await?;
 
 	// network
 	if settings.network {
 		application
 			.create_network(NetworkSettings::new().with_force_new_peer_id(settings.force_new_peer_id))
-			.await
-			.expect("network");
+			.await?;
 	}
 
-	let local_co = application.local_co_reducer().await.expect("local co");
+	let local_co = application.local_co_reducer().await?;
 
 	if settings.auto_accept_invite {
 		// check current invite tag
-		let insert_tag = match local_co
-			.co()
-			.await
-			.expect("local co state")
-			.1
-			.tags
-			.find_key(&KnownTags::CoInvite.to_string())
-		{
+		let insert_tag = match local_co.co().await?.1.tags.find_key(&KnownTags::CoInvite.to_string()) {
 			None => true,
 			Some(tag) => {
 				if tag.matches_pattern(&CoInvite::Accept.tag()) {
@@ -84,8 +76,7 @@ pub async fn application(settings: CoApplicationSettings) -> Application {
 					tags.insert(tag.clone());
 					local_co
 						.push(&application.local_identity(), CO_CORE_NAME_CO, &CoAction::TagsRemove { tags })
-						.await
-						.expect("tag removed");
+						.await?;
 					true
 				}
 			},
@@ -97,19 +88,11 @@ pub async fn application(settings: CoApplicationSettings) -> Application {
 			tags.insert(CoInvite::Accept.tag());
 			local_co
 				.push(&application.local_identity(), CO_CORE_NAME_CO, &CoAction::TagsInsert { tags })
-				.await
-				.expect("tag inserted");
+				.await?;
 		}
 	} else {
 		// remove current accept tag if present
-		match local_co
-			.co()
-			.await
-			.expect("local co state")
-			.1
-			.tags
-			.find_key(&KnownTags::CoInvite.to_string())
-		{
+		match local_co.co().await?.1.tags.find_key(&KnownTags::CoInvite.to_string()) {
 			None => (),
 			Some(tag) => {
 				if tag.matches_pattern(&CoInvite::Accept.tag()) {
@@ -118,12 +101,11 @@ pub async fn application(settings: CoApplicationSettings) -> Application {
 					tags.insert(CoInvite::Accept.tag());
 					local_co
 						.push(&application.local_identity(), CO_CORE_NAME_CO, &CoAction::TagsRemove { tags })
-						.await
-						.expect("tag removed");
+						.await?;
 				}
 			},
 		};
 	}
 
-	application.clone()
+	Ok(application.clone())
 }
