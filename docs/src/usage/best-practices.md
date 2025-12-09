@@ -20,3 +20,10 @@ While this is technically possible, and may even be useful for certain tasks, it
 
 For further information, see:
 - [Consensus](../reference/consensus.md#proof-of-authority)
+
+### Core: Reference previous state(s)
+When referencing a previous state, this effectively disables the ability to free up any of the previous states.  
+This means that all states will be kept alive, as the latest state is marked as an active root in the storage core.
+
+For further information, see:
+- [Core: Storage](../reference/core.md#co-core-storage)
