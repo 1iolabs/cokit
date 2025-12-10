@@ -27,7 +27,10 @@ async function test_stream() {
   let map = new CoMap();
   await map.insert(storage, "hello", "world");
   assertEq(blocks.size, 1);
-  assertEq(CID.decode(map.cid()).toString(), "bafyr4ib4sqmbfbyhkoh64ylvnwrm3uyqhq43zeknhnfj643kpghqjdopza");
+  assertEq(
+    CID.decode(map.cid()).toString(),
+    "bafyr4ib4sqmbfbyhkoh64ylvnwrm3uyqhq43zeknhnfj643kpghqjdopza",
+  );
   const stream = map.stream(storage);
   let values = [];
   for await (const i of stream) {
@@ -44,7 +47,9 @@ async function test_unixfs_add() {
   const stream = new ReadableStream({
     start(controller) {
       for (var i = 1024; i--; i > 0) {
-        controller.enqueue(new TextEncoder().encode("hello world test".repeat(64)));
+        controller.enqueue(
+          new TextEncoder().encode("hello world test".repeat(64)),
+        );
       }
       controller.close();
     },
@@ -52,11 +57,26 @@ async function test_unixfs_add() {
   const cids = await unixfsAdd(storage, stream);
   console.log("cids: ", cids);
   assertEq(cids.length, 5);
-  assertEq(CID.decode(cids[0]).toString(), "QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy");
-  assertEq(CID.decode(cids[1]).toString(), "QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy");
-  assertEq(CID.decode(cids[2]).toString(), "QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy");
-  assertEq(CID.decode(cids[3]).toString(), "QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy");
-  assertEq(CID.decode(cids[4]).toString(), "QmVRRmYKvn8m3jQT8VHX1BCgrQLFvzsB26aKwLCyFRvYSv");
+  assertEq(
+    CID.decode(cids[0]).toString(),
+    "QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy",
+  );
+  assertEq(
+    CID.decode(cids[1]).toString(),
+    "QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy",
+  );
+  assertEq(
+    CID.decode(cids[2]).toString(),
+    "QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy",
+  );
+  assertEq(
+    CID.decode(cids[3]).toString(),
+    "QmPEvxGmvxzfMews81gF5NMvFNeFAdNmhtwzGPhkHhoyqy",
+  );
+  assertEq(
+    CID.decode(cids[4]).toString(),
+    "QmVRRmYKvn8m3jQT8VHX1BCgrQLFvzsB26aKwLCyFRvYSv",
+  );
 }
 
 async function test_unixfs_add_empty() {
@@ -72,19 +92,31 @@ async function test_unixfs_add_empty() {
   const cids = await unixfsAdd(storage, stream);
   console.log("cids: ", cids);
   assertEq(cids.length, 1);
-  assertEq(CID.decode(cids[0]).toString(), "QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH");
+  assertEq(
+    CID.decode(cids[0]).toString(),
+    "QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH",
+  );
 }
 
 async function test_async(func) {
   console.info("🧪 test:", func.name);
+  const div = document.createElement("div");
+  div.textContent = `========= Testing ${func.name} =========`;
+  document.getElementById("main").appendChild(div);
   await func();
 }
 
 function assertEq(actual, expected) {
   if (actual !== expected) {
-    console.error("❌ failed:", expected, "!==", actual);
+    console.error("❌ Failed:", expected, "!==", actual);
+    const div = document.createElement("div");
+    div.textContent = `❌ Failed: Wanted: ${expected} but got ${actual}`;
+    document.getElementById("main").appendChild(div);
   } else {
-    console.info("✅ passed:", expected, "===", actual);
+    console.info("✅ Passed:", expected, "===", actual);
+    const div = document.createElement("div");
+    div.textContent = `✅ Passed: Value: ${actual}`;
+    document.getElementById("main").appendChild(div);
   }
 }
 
