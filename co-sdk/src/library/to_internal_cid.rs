@@ -1,4 +1,5 @@
 use cid::Cid;
+use co_primitives::OptionMappedCid;
 use co_storage::BlockStorageContentMapping;
 use futures::StreamExt;
 use std::collections::BTreeSet;
@@ -10,6 +11,19 @@ pub async fn to_internal_cid(mapping: &impl BlockStorageContentMapping, cid: Cid
 		mapping.to_mapped(&cid).await.unwrap_or(cid)
 	} else {
 		cid
+	}
+}
+
+/// Map external [`Cid`] to [`OptionMappedCid`].
+/// Returns None if can not be mapped.
+pub async fn to_internal_mapped(mapping: &impl BlockStorageContentMapping, external: Cid) -> Option<OptionMappedCid> {
+	if mapping.is_content_mapped().await {
+		match mapping.to_mapped(&external).await {
+			Some(internal) => Some(OptionMappedCid::new(internal, external)),
+			None => None,
+		}
+	} else {
+		Some(OptionMappedCid::Unmapped(external))
 	}
 }
 

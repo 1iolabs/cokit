@@ -33,10 +33,10 @@ pub struct CoInvitePayload {
 	/// The invite tags.
 	pub tags: Tags,
 
-	/// The latest known CO State (encrypted if the CO is not public).
+	/// The latest known CO State (external - encrypted if the CO is not public).
 	pub state: Cid,
 
-	/// The latest known CO Heads (encrypted if the CO is not public).
+	/// The latest known CO Heads (external - encrypted if the CO is not public).
 	pub heads: BTreeSet<Cid>,
 
 	/// Connectivity settings.

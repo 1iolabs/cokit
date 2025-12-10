@@ -72,13 +72,8 @@ async fn conflicting_membership_update(encryption: bool) {
 	let tmp = TmpDir::new("co").without_clear();
 	let log_path = std::env::current_exe()
 		.unwrap()
-		.parent()
-		.unwrap()
-		.parent()
-		.unwrap()
-		.parent()
-		.unwrap()
-		.parent()
+		.join("../../../..") // "target/debug/build/test"
+		.canonicalize()
 		.unwrap()
 		.join("data/log/co.log");
 	println!("path: {:?}", tmp.path());

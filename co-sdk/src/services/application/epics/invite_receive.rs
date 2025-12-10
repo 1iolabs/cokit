@@ -83,7 +83,8 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 					&co_core_storage::StorageAction::PinCreate(
 						crate::types::co_pinning_key::CoPinningKey::Root.to_string(&payload.id),
 						context.settings().setting_co_default_max_state(),
-						vec![payload.state.into()],
+						// TODO: Do we need to pin the initial state?
+						Default::default(),
 					),
 				)
 				.await?;
@@ -94,7 +95,7 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 					&co_core_storage::StorageAction::PinCreate(
 						crate::types::co_pinning_key::CoPinningKey::State.to_string(&payload.id),
 						context.settings().setting_co_default_max_state(),
-						vec![payload.state.into()],
+						[payload.state.into()].into(),
 					),
 				)
 				.await?;

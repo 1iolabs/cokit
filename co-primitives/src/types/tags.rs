@@ -226,6 +226,9 @@ impl Tags {
 	}
 
 	/// Insert mutiple tags.
+	///
+	/// Tags that equal exactly (key and value) will be skipped.
+	/// All others will be added.
 	pub fn extend(&mut self, tags: impl Iterator<Item = Tag>) {
 		self.0.extend(tags);
 	}

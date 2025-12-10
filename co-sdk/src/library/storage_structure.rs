@@ -1,5 +1,7 @@
 use crate::{
-	library::{extract_next_heads::extract_next_heads, to_external_cid::to_external_cids},
+	library::{
+		extract_next_heads::extract_next_heads, to_external_cid::to_external_cid, to_internal_cid::to_internal_mapped,
+	},
 	state::{query_core, Query, QueryExt},
 	types::co_dispatch::CoDispatch,
 	CoPinningKey, CoRoot, CO_CORE_NAME_STORAGE,
@@ -7,14 +9,18 @@ use crate::{
 use async_trait::async_trait;
 use cid::Cid;
 use co_core_co::Co;
-use co_core_storage::{BlockInfo, StorageAction};
-use co_primitives::{BlockLinks, CoId, IgnoreFilter, OptionLink, WeakCid};
+use co_core_storage::{BlockInfo, References, StorageAction};
+use co_primitives::{tags, BlockLinks, CoId, IgnoreFilter, OptionLink, OptionMappedCid, Tags, WeakCid};
 use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage};
 use futures::{pin_mut, TryStreamExt};
 use std::{
 	collections::BTreeSet,
 	time::{Duration, Instant},
 };
+
+pub const STORAGE_CO_ROOT_TYPE: &'static str = "co-root";
+pub const STORAGE_CO_HEAD_TYPE: &'static str = "co-head";
+pub const STORAGE_CO_STATE_TYPE: &'static str = "co-state";
 
 /// Resolve shallow structure.
 /// Returns all children of resolved entries.
@@ -36,18 +42,18 @@ where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 	D: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 {
-	let is_content_mapped = storage.is_content_mapped().await;
 	let mut result_state = storage_core_state;
 	let mut result = BTreeSet::new();
 
-	// get shallow references
-	let block_structure_pending = query_core(CO_CORE_NAME_STORAGE)
+	// get shallow references and blocks
+	let (block_structure_pending, blocks) = query_core(CO_CORE_NAME_STORAGE)
 		.with_default()
-		.map(|storage_core| storage_core.block_structure_pending)
+		.map(|storage_core| (storage_core.block_structure_pending, storage_core.blocks))
 		.execute(storage_core_storage, storage_core_state)
 		.await?;
 	let block_structure_pending_stream = block_structure_pending.stream(storage_core_storage);
 	pin_mut!(block_structure_pending_stream);
+	let blocks = blocks.open(storage_core_storage).await?;
 
 	// resolve
 	let start = Instant::now();
@@ -77,47 +83,41 @@ where
 			continue;
 		}
 
+		// get tags
+		let block_tags = match blocks.get(&cid).await? {
+			Some(block) => block.tags.clone(),
+			None => Default::default(),
+		};
+
 		// map (this should return None if wrong "namespace")
-		let internal_cid = if is_content_mapped { storage.to_mapped(&cid).await } else { Some(cid.into()) };
-		let Some(internal_cid) = internal_cid else {
+		let Some(mapped_cid) = to_internal_mapped(storage, cid.into()).await else {
 			num_skip_no_mapping += 1;
 			continue;
 		};
 
 		// structure
-		let StructureResolveResult::Include(links) = structure_resolver
-			.resolve(storage_core_storage, pending.info(), storage, &internal_cid)
-			.await?
-		else {
-			num_skip_structure_resolver += 1;
-			continue;
+		let external_links = match structure_resolver
+			.resolve(storage_core_storage, pending.info(), storage, &mapped_cid, &block_tags)
+			.await
+		{
+			Ok(StructureResolveResult::Include(external_links)) => external_links,
+			Ok(StructureResolveResult::Exclude) => {
+				num_skip_structure_resolver += 1;
+				continue;
+			},
+			Err(err) => {
+				tracing::warn!(?mapped_cid, ?err, "storage-structure-resolve-failed");
+				num_skip_failure += 1;
+				continue;
+			},
 		};
-
-		// try to resolve links
-		let internal_links: BTreeSet<Cid> = if links.has_links(&internal_cid) {
-			let block = match storage.get(&internal_cid).await {
-				Ok(block) => block,
-				Err(err) => {
-					tracing::warn!(external_cid = ?cid, ?internal_cid, ?err, "storage-structure-get-failed");
-					num_skip_failure += 1;
-					continue;
-				},
-			};
-			let block_links = links.links(&block)?;
-			block_links.collect()
-		} else {
-			Default::default()
-		};
-
-		// external links
-		let external_links = to_external_cids(storage, internal_links).await;
 
 		// record children for net iteration
-		result.extend(external_links.iter().cloned());
+		result.extend(external_links.iter().map(|weak| weak.cid()));
 
 		// dispatch
 		//  TODO: combine actions?
-		let action = StorageAction::Structure(vec![(cid, external_links.into_iter().map(WeakCid::from).collect())]);
+		let action = StorageAction::Structure([(cid, external_links)].into());
 		result_state = storage_core_dispatcher.dispatch(&action).await?.into();
 		num_resolved += 1;
 
@@ -206,18 +206,32 @@ pub enum StructureResolveResult {
 	/// Exclude the item.
 	Exclude,
 
-	/// Include the item by using specified links.
-	Include(BlockLinks),
+	/// Include the item by using specified children references.
+	/// Note: All Cids returned here are external.
+	Include(References),
 }
 
 #[async_trait]
 pub trait StructureResolver<S, D>: Send + Sync {
+	/// Resolve links for `item`.
+	///
+	/// # Args
+	/// - `storage_core_storage` - The storage instance which owns the storage core.
+	/// - `info` - Causal block info.
+	/// - `item_storage` - The storage instance which owns the item.
+	/// - `item` - The Cid of the item.
+	/// - `item_tags` - The tags metadata for this item.
+	///
+	/// # Returns
+	/// A filter result.
+	/// If included returns external references.
 	async fn resolve(
 		&mut self,
 		storage_core_storage: &S,
 		info: &BlockInfo,
 		item_storage: &D,
-		item: &Cid,
+		item: &OptionMappedCid,
+		item_tags: &Tags,
 	) -> Result<StructureResolveResult, anyhow::Error>;
 }
 
@@ -244,36 +258,59 @@ impl CoStructureResolver {
 impl<S, D> StructureResolver<S, D> for CoStructureResolver
 where
 	S: BlockStorage + Clone + 'static,
-	D: BlockStorage + Clone + 'static,
+	D: BlockStorage + BlockStorageContentMapping + Clone + 'static,
 {
 	async fn resolve(
 		&mut self,
 		storage_core_storage: &S,
 		info: &BlockInfo,
 		item_storage: &D,
-		item: &Cid,
+		item: &OptionMappedCid,
+		item_tags: &Tags,
 	) -> Result<StructureResolveResult, anyhow::Error> {
 		let pins: BTreeSet<String> = info.pins.stream(storage_core_storage).try_collect().await?;
 		if pins.contains(&self.root_pin) {
-			let links = if info.block_type.is_root() {
-				let co_root: CoRoot = item_storage.get_deserialized(item).await?;
-				let next_heads = extract_next_heads(item_storage, co_root.heads.iter(), true).await?;
-				self.block_links.clone().with_filter(IgnoreFilter::new(next_heads))
-			} else {
-				self.block_links.clone()
-			};
-			Ok(StructureResolveResult::Include(links))
-		} else if pins.contains(&self.log_pin) {
-			let links = if info.block_type.is_root() {
-				let next_heads = extract_next_heads(item_storage, [item], true).await?;
-				self.block_links.clone().with_filter(IgnoreFilter::new(next_heads))
-			} else {
-				self.block_links.clone()
-			};
-			Ok(StructureResolveResult::Include(links))
-		} else if pins.contains(&self.state_pin) {
-			let links = self.block_links.clone();
-			Ok(StructureResolveResult::Include(links))
+			let mut references = References::new();
+			let mut block_links = self.block_links.clone();
+
+			// sepcial types
+			match item_tags.string("type") {
+				Some(STORAGE_CO_ROOT_TYPE) => {
+					let co_root: CoRoot = item_storage.get_deserialized(&item.internal()).await?;
+
+					// add state with type tag
+					references.extend_with_tags(
+						co_root.state.iter().map(WeakCid::from),
+						tags!("type": STORAGE_CO_STATE_TYPE),
+					);
+
+					// add head with type tag
+					references
+						.extend_with_tags(co_root.heads.iter().map(WeakCid::from), tags!("type": STORAGE_CO_HEAD_TYPE));
+
+					// ignore state and heads (as we already added it)
+					block_links =
+						block_links.with_filter(IgnoreFilter::new(references.iter().map(Into::into).collect()));
+				},
+				Some(STORAGE_CO_HEAD_TYPE) => {
+					// ignore next heads
+					block_links = block_links.with_filter(IgnoreFilter::new(
+						extract_next_heads(item_storage, [&item.internal()], true).await?,
+					));
+				},
+				_ => {},
+			}
+
+			// links
+			if block_links.has_links(item.internal()) {
+				let block = item_storage.get(&item.internal()).await?;
+				for internal_block_link in block_links.links(&block)? {
+					references.insert(to_external_cid(item_storage, internal_block_link).await);
+				}
+			}
+
+			// result
+			Ok(StructureResolveResult::Include(references))
 		} else {
 			Ok(StructureResolveResult::Exclude)
 		}

@@ -1,5 +1,5 @@
-use super::max_reference_count::max_reference_count;
 use crate::{
+	library::{max_reference_count::max_reference_count, to_internal_cid::to_internal_mapped},
 	state::{query_core, Query, QueryExt},
 	types::co_dispatch::CoDispatch,
 	StructureResolveResult, StructureResolver, CO_CORE_NAME_STORAGE,
@@ -12,6 +12,7 @@ use futures::{pin_mut, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 /// Cleanup storage by removing all unreferenced blocks.
+#[tracing::instrument(level = tracing::Level::TRACE, name = "storage-cleanup", err(Debug), skip_all)]
 pub async fn storage_cleanup<S, D>(
 	storage_core_storage: &S,
 	storage_core_dispatcher: &mut impl CoDispatch<StorageAction>,
@@ -33,6 +34,10 @@ where
 		.map(|storage_core| storage_core.blocks);
 	let mut state = storage_core_state;
 	loop {
+		// open blocks
+		let blocks = query_blocks.execute(storage_core_storage, state.into()).await?;
+		let blocks = blocks.open(storage_core_storage).await?;
+
 		// open stream
 		let blocks_index_unreferenced = query_blocks_index_unreferenced.execute(storage_core_storage, state).await?;
 		let remove_stream = blocks_index_unreferenced.stream(storage_core_storage);
@@ -43,12 +48,28 @@ where
 		let mut remove_from_disk = HashSet::<WeakCid>::new();
 		let mut remove_by_info = HashMap::<BlockInfo, BTreeMap<WeakCid, BTreeSet<WeakCid>>>::new();
 		while let Some((cid, info)) = remove_stream.try_next().await? {
+			tracing::info!(?cid, "storage-cleanup");
+
+			// get tags
+			let block_tags = match blocks.get(&cid).await? {
+				Some(block) => block.tags.clone(),
+				None => Default::default(),
+			};
+
+			// map
+			let Some(mapped_cid) = to_internal_mapped(storage, cid.into()).await else {
+				continue;
+			};
+
 			// filter
-			let block_links = match structure_resolver.resolve(storage_core_storage, &info, storage, &cid).await? {
+			let external_links = match structure_resolver
+				.resolve(storage_core_storage, &info, storage, &mapped_cid, &block_tags)
+				.await?
+			{
 				StructureResolveResult::Exclude => {
 					continue;
 				},
-				StructureResolveResult::Include(block_links) => block_links,
+				StructureResolveResult::Include(block_references) => block_references,
 			};
 
 			// add
@@ -59,23 +80,14 @@ where
 					remove_from_disk.insert(cid);
 				}
 
-				// links
-				let links = if exists && block_links.has_links(cid.cid()) {
-					let block = storage.get(&cid).await?;
-					let links = block_links.links(&block)?;
-					links.map(WeakCid::from).collect::<BTreeSet<WeakCid>>()
-				} else {
-					Default::default()
-				};
+				// insert
+				by_info.insert(cid, external_links.iter().collect());
 
 				// count
-				references_count += 1 + links.len();
+				references_count += 1 + external_links.len();
 				if references_count > max_references {
 					break;
 				}
-
-				// insert
-				by_info.insert(cid, links);
 			}
 		}
 
@@ -100,7 +112,7 @@ where
 		for cid in remove_from_disk {
 			let exists_in_core = blocks.contains_key(&cid).await?;
 			#[cfg(feature = "logging-verbose")]
-			tracing::trace!(?cid, ?exists_in_core, "storage-free-delete");
+			tracing::trace!(?cid, ?exists_in_core, "storage-cleanup-delete");
 			if !exists_in_core {
 				match storage_core_storage.remove(&cid.cid()).await {
 					Ok(_) => {
@@ -118,7 +130,7 @@ where
 
 	// log
 	if removed_blocks > 0 {
-		tracing::info!(removed_blocks, "storage-free");
+		tracing::info!(removed_blocks, "storage-cleanup-free");
 	}
 
 	// result
@@ -168,9 +180,17 @@ mod tests {
 	async fn integration_test_storage_cleanup() {
 		let application_identifier = format!("integration_test_storage_cleanup-{}", uuid::Uuid::new_v4().to_string());
 		let tmp = TmpDir::new("co");
+		let log_path = std::env::current_exe()
+			.unwrap()
+			.join("../../../..") // "target/debug/build/test"
+			.canonicalize()
+			.unwrap()
+			.join("data/log/co.log");
+		println!("path: {:?}", tmp.path());
+		println!("log_path: {:?}", log_path);
 		let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
-			// .with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
-			.with_bunyan_logging(None)
+			.with_bunyan_logging(Some(log_path))
+			.with_optional_tracing()
 			.with_disabled_feature("co-local-encryption")
 			.with_setting("feature", "co-storage-free")
 			.with_co_date(MonotonicCoDate::default())
@@ -181,7 +201,7 @@ mod tests {
 			.unwrap();
 		let local_co = application.local_co_reducer().await.unwrap();
 		let storage = local_co.storage();
-		assert_eq!(count_pin_references(&local_co, local_co.id(), CoPinningKey::State).await, 1); // this contains the intermediate point before pinning
+		assert_eq!(count_pin_references(&local_co, local_co.id(), CoPinningKey::Root).await, 1); // this contains the intermediate point before pinning
 
 		// push
 		let local_co_state = local_co.reducer_state().await;
@@ -224,6 +244,18 @@ mod tests {
 		assert_eq!(storage.exists(&external_next_local_co_state.state().unwrap()).await.unwrap(), true);
 		assert_eq!(storage.exists(&local_co_state.state().unwrap()).await.unwrap(), false);
 		assert_eq!(storage.exists(&next_local_co_state.state().unwrap()).await.unwrap(), true);
+
+		// verify heads are removed
+		assert_eq!(storage.exists(external_local_co_state.heads().first().unwrap()).await.unwrap(), false);
+		assert_eq!(
+			storage
+				.exists(external_next_local_co_state.heads().first().unwrap())
+				.await
+				.unwrap(),
+			true
+		);
+		assert_eq!(storage.exists(local_co_state.heads().first().unwrap()).await.unwrap(), false);
+		assert_eq!(storage.exists(next_local_co_state.heads().first().unwrap()).await.unwrap(), true);
 	}
 
 	/// Integration Test to verify storage_cleanup actualy deletes states.
@@ -232,9 +264,17 @@ mod tests {
 	async fn integration_test_storage_cleanup_shared() {
 		let application_identifier = format!("integration_test_storage_cleanup-{}", uuid::Uuid::new_v4().to_string());
 		let tmp = TmpDir::new("co");
+		let log_path = std::env::current_exe()
+			.unwrap()
+			.join("../../../..") // "target/debug/build/test"
+			.canonicalize()
+			.unwrap()
+			.join("data/log/co.log");
+		println!("path: {:?}", tmp.path());
+		println!("log_path: {:?}", log_path);
 		let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
-			// .with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
-			.with_bunyan_logging(None)
+			.with_bunyan_logging(Some(log_path))
+			.with_optional_tracing()
 			.with_disabled_feature("co-local-encryption")
 			.with_setting("feature", "co-storage-free")
 			.with_co_date(MonotonicCoDate::default())
