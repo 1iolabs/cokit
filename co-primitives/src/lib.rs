@@ -16,6 +16,7 @@ pub use library::{
 	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
 	node_reader::{node_reader, NodeReaderError},
 	node_stream::NodeStream,
+	serde_map_as_list,
 };
 pub use types::{
 	action::ReducerAction,
