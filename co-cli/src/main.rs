@@ -23,13 +23,7 @@ fn main() {
 		.build()
 		.unwrap()
 		.block_on(async { app_main().await });
-	match result {
-		Ok(code) => std::process::exit(code),
-		Err(err) => {
-			println!("{:#?}", err);
-			std::process::exit(exitcode::DATAERR);
-		},
-	};
+	std::process::exit(result.unwrap());
 }
 
 async fn app_main() -> anyhow::Result<exitcode::ExitCode> {
