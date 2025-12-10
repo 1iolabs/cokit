@@ -1,4 +1,10 @@
 {
+  "name": "@1io/co-js",
+  "version": "0.1.0-0",
+  "author": "1io",
+  "publishConfig": {
+    "registry": "http://npm.intranet.1io.com"
+  },
   "scripts": {
     "build": "webpack",
     "serve": "webpack serve"
