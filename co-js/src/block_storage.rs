@@ -1,4 +1,4 @@
-use crate::{actor::JsLocalTaskSpawner, js::to_js_value};
+use crate::actor::JsLocalTaskSpawner;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;

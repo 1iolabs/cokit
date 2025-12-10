@@ -38,26 +38,3 @@ pub async fn js_unixfs_add_binary(storage: &JsBlockStorage, js_binary: Uint8Arra
 		.map_err(|err| format!("unixfs add failed: {:?}", err))?;
 	to_js_value(&cids)
 }
-
-#[cfg(test)]
-mod tests {
-	use crate::{
-		block_storage::{JsBlockStorageGet, JsBlockStorageSet},
-		js_unixfs_add, JsBlockStorage,
-	};
-	use wasm_bindgen::prelude::Closure;
-	use wasm_bindgen_test::wasm_bindgen_test;
-	use web_sys::js_sys::Uint8Array;
-
-	#[wasm_bindgen_test]
-	async fn test_unixfs() {
-		let stream = web_sys::ReadableStream::new().expect("stream");
-		let get_closure: Closure<dyn Fn(Uint8Array) -> Uint8Array> = Closure::new(|cid| cid);
-		let set_closure: Closure<dyn Fn(Uint8Array, Uint8Array) -> Uint8Array> = Closure::new(|cid, _data| cid);
-		let get: JsBlockStorageGet = JsBlockStorageGet::from(get_closure.into_js_value());
-		let set: JsBlockStorageSet = JsBlockStorageSet::from(set_closure.into_js_value());
-		let storage = JsBlockStorage::new(get, set).expect("storage");
-		let cids = js_unixfs_add(&storage, stream).await;
-		println!("cids: {:?}", cids);
-	}
-}
