@@ -4,5 +4,4 @@ pub mod async_context;
 pub mod compile;
 pub mod instance;
 pub mod module_description;
-pub mod pin;
 pub mod pool;
