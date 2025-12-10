@@ -40,10 +40,6 @@ pub struct Cli {
 	/// Force to generate new network peer id on startup.
 	#[arg(long, default_value_t = false)]
 	pub force_new_peer_id: bool,
-
-	/// Sets the local CO to automatically accept incoming invites
-	#[arg(long, default_value_t = false)]
-	pub auto_accept_invite: bool,
 }
 impl Into<CoApplicationSettings> for Cli {
 	fn into(self) -> CoApplicationSettings {
@@ -54,7 +50,6 @@ impl Into<CoApplicationSettings> for Cli {
 			no_keychain: self.no_keychain,
 			base_path: self.base_path,
 			no_log: self.no_log,
-			auto_accept_invite: self.auto_accept_invite,
 			..Default::default()
 		}
 	}
