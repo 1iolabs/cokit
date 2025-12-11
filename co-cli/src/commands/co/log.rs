@@ -1,6 +1,9 @@
 use crate::{
 	cli::Cli,
-	library::{cat::cat_output, cli_context::CliContext},
+	library::{
+		cat::{cat_output, CatOptions},
+		cli_context::CliContext,
+	},
 };
 use co_sdk::{BlockStorageContentMapping, CoId, MultiCodec};
 use exitcode::ExitCode;
@@ -45,7 +48,12 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 				println!("{:?}", entry.entry());
 
 				// payload
-				cat_output(storage.clone(), entry.entry().payload, true, true).await?;
+				cat_output(
+					storage.clone(),
+					entry.entry().payload,
+					CatOptions::default().with_pretty(true).with_decrypt(true),
+				)
+				.await?;
 				println!();
 			},
 			Err(err) => println!("head ({index}) error: {:?}", err),
