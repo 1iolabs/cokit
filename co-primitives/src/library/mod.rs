@@ -12,3 +12,5 @@ pub mod node_reader;
 pub mod node_stream;
 #[cfg(any(test, feature = "benchmarking"))]
 pub mod test;
+pub mod unixfs;
+pub mod unixfs_stream;

@@ -22,7 +22,6 @@ ipld-dagpb = { workspace = true }
 multihash = { workspace = true }
 multihash-codetable = { workspace = true }
 names = "0.14.0"
-rust-unixfs = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }

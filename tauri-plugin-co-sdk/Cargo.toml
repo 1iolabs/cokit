@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Tauri plugin to access co sdk functionality"
 authors = ["you"]
 edition = "2021"
-rust-version = "1.76"
 exclude = ["/examples", "/webview-dist", "/webview-src", "/node_modules"]
 links = "tauri-plugin-co-sdk"
 
@@ -12,6 +11,7 @@ links = "tauri-plugin-co-sdk"
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
+clap = { version = "^4.3.23", features = ["derive", "env"] }
 co-actor = { workspace = true }
 co-core-co = { workspace = true }
 co-core-membership = { workspace = true }
@@ -20,18 +20,25 @@ co-log = { workspace = true }
 co-messaging = { workspace = true }
 co-primitives = { workspace = true }
 co-sdk = { workspace = true }
+derive_more = { workspace = true }
 futures = { workspace = true }
 ipld-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_bytes = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
-tauri = { version = "=2.0.0-beta.25", default-features = false }
-tauri-plugin-shell = "=2.0.0-beta.10"
-tauri-utils = { version = "=2.0.0-beta.19" }
+tauri = { version = "2.7.0", features = ["protocol-asset"] }
+tauri-plugin-shell = "2.3.0"
+tauri-utils = { version = "2.6.0" }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true, features = ["sync"] }
+toml = { workspace = true }
 tracing = { workspace = true }
+uuid = { workspace = true }
 
 [build-dependencies]
-tauri-plugin = { version = "2.0.0-beta.17", features = ["build"] }
+tauri-plugin = { version = "2.1.0", features = ["build"] }
+
+[features]
+default = ["co-sdk/default"]

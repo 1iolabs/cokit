@@ -1,4 +1,10 @@
 {
+  "name": "@1io/co-js",
+  "version": "0.1.0-0",
+  "author": "1io",
+  "publishConfig": {
+    "registry": "http://npm.intranet.1io.com"
+  },
   "scripts": {
     "build": "webpack",
     "serve": "webpack serve"
@@ -9,5 +15,9 @@
     "webpack": "^5.97.0",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^5.0.4"
+  },
+  "dependencies": {
+    "multiformats": "^13.4.1",
+    "web-streams-polyfill": "^4.2.0"
   }
 }

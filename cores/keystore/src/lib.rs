@@ -1,4 +1,5 @@
 use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, Link, OptionLink, ReducerAction, Tags};
+use schemars::JsonSchema;
 
 /// Key Store.
 ///
@@ -10,6 +11,7 @@ pub struct KeyStore {
 }
 
 #[co]
+#[derive(JsonSchema)]
 pub struct Key {
 	/// URI which uniquely identifies this key.
 	pub uri: String,
@@ -28,6 +30,7 @@ pub struct Key {
 }
 
 #[co]
+#[derive(JsonSchema)]
 pub enum Secret {
 	Password(co_api::Secret),
 	PrivateKey(co_api::Secret),

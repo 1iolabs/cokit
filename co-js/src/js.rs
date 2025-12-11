@@ -1,5 +1,6 @@
 use futures::{Stream, TryStreamExt};
 use serde::Serialize;
+use serde_wasm_bindgen::Serializer;
 use std::{any::type_name, cell::RefCell, pin::Pin, rc::Rc};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
@@ -11,7 +12,9 @@ pub fn from_js_value<T: serde::de::DeserializeOwned>(value: JsValue) -> Result<T
 }
 
 pub fn to_js_value<T: serde::Serialize>(value: &T) -> Result<JsValue, JsValue> {
-	Ok(serde_wasm_bindgen::to_value(value)
+	let serializer = Serializer::new().serialize_maps_as_objects(true);
+	Ok(value
+		.serialize(&serializer)
 		.map_err(|err| format!("convert from `{}` to `JsValue` failed: {}", type_name::<T>(), err.to_string()))?)
 }
 
@@ -26,7 +29,7 @@ impl AsyncIteratorStream {
 }
 #[wasm_bindgen]
 impl AsyncIteratorStream {
-	#[wasm_bindgen(unchecked_return_type = "Promise<{done: bool, value?: any}>")]
+	#[wasm_bindgen(unchecked_return_type = "Promise<{done: boolean, value?: any}>")]
 	pub async fn next(&self) -> Promise {
 		let stream = self.stream.clone();
 		future_to_promise(async move {

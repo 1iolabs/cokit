@@ -28,10 +28,10 @@ use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::{IdentityEntryVerifier, Log};
-use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, Tags};
-use co_storage::{
-	unixfs_add, Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret,
+use co_primitives::{
+	tags, unixfs_add, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, Tags,
 };
+use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret};
 use futures::io::Cursor;
 use serde::{Deserialize, Serialize};
 use std::{

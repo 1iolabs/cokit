@@ -1,8 +1,8 @@
 use crate::{create_runtime, runtimes::Runtime};
 use anyhow::anyhow;
 use cid::Cid;
-use co_primitives::{AnyBlockStorage, KnownMultiCodec, MultiCodec};
-use co_storage::{unixfs_cat_buffer, StorageError};
+use co_primitives::{unixfs_cat_buffer, AnyBlockStorage, BlockStorageExt, KnownMultiCodec, MultiCodec};
+use co_storage::StorageError;
 use std::fmt::Debug;
 
 pub struct RuntimeInstance {

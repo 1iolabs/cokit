@@ -2,14 +2,20 @@
 
 Allows usage of co-sdk api
 
+#### This default permission set includes the following:
+
 - `allow-get-co-state`
 - `allow-resolve-cid`
 - `allow-storage-get`
 - `allow-storage-set`
 - `allow-push-action`
 - `allow-get-actions`
+- `allow-create-identity`
+- `allow-session-open`
+- `allow-session-close`
+- `allow-create-co`
 
-### Permission Table 
+## Permission Table
 
 <table>
 <tr>
@@ -17,6 +23,58 @@ Allows usage of co-sdk api
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`co-sdk:allow-create-co`
+
+</td>
+<td>
+
+Enables the create_co command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:deny-create-co`
+
+</td>
+<td>
+
+Denies the create_co command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:allow-create-identity`
+
+</td>
+<td>
+
+Enables the create_identity command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:deny-create-identity`
+
+</td>
+<td>
+
+Denies the create_identity command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>
@@ -170,6 +228,58 @@ Enables the resolve_cid command without any pre-configured scope.
 <td>
 
 Denies the resolve_cid command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:allow-session-close`
+
+</td>
+<td>
+
+Enables the session_close command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:deny-session-close`
+
+</td>
+<td>
+
+Denies the session_close command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:allow-session-open`
+
+</td>
+<td>
+
+Enables the session_open command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`co-sdk:deny-session-open`
+
+</td>
+<td>
+
+Denies the session_open command without any pre-configured scope.
 
 </td>
 </tr>

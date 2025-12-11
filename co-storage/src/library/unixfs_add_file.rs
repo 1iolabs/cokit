@@ -1,6 +1,7 @@
-use crate::{unixfs_add, BlockStorage, StorageError};
+use crate::{BlockStorage, StorageError};
 use anyhow::{anyhow, Context};
 use cid::Cid;
+use co_primitives::unixfs_add;
 use std::path::Path;
 use tokio_util::compat::TokioAsyncReadCompatExt;
 

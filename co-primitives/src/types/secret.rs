@@ -1,10 +1,15 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 use zeroize::Zeroize;
 
 /// Simple wrapper type for secrents to not escape them.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Secret(#[serde(with = "serde_bytes")] Vec<u8>);
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema)]
+pub struct Secret(
+	#[serde(with = "serde_bytes")]
+	#[schemars(with = "Vec<u8>")]
+	Vec<u8>,
+);
 impl Secret {
 	/// Create secret from vec.
 	pub fn new(key: Vec<u8>) -> Self {

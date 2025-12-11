@@ -6,7 +6,6 @@ use co_messaging::{
 	relation::{ReactionContent, RedactionContent, RelatesTo, Relation},
 	MatrixEvent, FORMATTED_BODY_FORMAT,
 };
-use co_primitives::CoCid;
 
 #[test]
 fn test_text_content() {
@@ -77,7 +76,7 @@ fn test_video_content() {
 	let info = VideoInfo {
 		h: 1080,
 		w: 1690,
-		thumbnail_file: CoCid::default(),
+		thumbnail_file: Cid::default(),
 		thumbnail_info: ThumbnailInfo { h: 10, w: 10, mimetype: "image/jpeg".to_string(), size: 500 },
 		duration: 50,
 		mimetype: "video/mp4".to_string(),
@@ -96,7 +95,7 @@ fn test_video_content() {
 #[test]
 fn test_file_content() {
 	let info = FileInfo {
-		thumbnail_file: CoCid::default(),
+		thumbnail_file: Cid::default(),
 		thumbnail_info: ThumbnailInfo { h: 10, w: 10, mimetype: "image/jpeg".to_string(), size: 500 },
 		mimetype: "application/msword".to_string(),
 		size: 5000,
@@ -114,7 +113,7 @@ fn test_file_content() {
 #[test]
 fn test_location_content() {
 	let info = LocationInfo {
-		thumbnail_file: CoCid::default(),
+		thumbnail_file: Cid::default(),
 		thumbnail_info: ThumbnailInfo { h: 20, w: 20, mimetype: "image/jpeg".to_string(), size: 500 },
 	};
 	let event_content = LocationContent::new("Eiffeltower", "wherever the eiffeltower is", info);
