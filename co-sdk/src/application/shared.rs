@@ -663,19 +663,7 @@ impl SharedCoCreator {
 				co_core_storage::PinStrategy::Unlimited,
 				Default::default(),
 			);
-			let pin_state = co_core_storage::StorageAction::PinCreate(
-				crate::types::co_pinning_key::CoPinningKey::State.to_string(&self.co.id),
-				co_core_storage::PinStrategy::Unlimited,
-				Default::default(),
-			);
-			let pin_log = co_core_storage::StorageAction::PinCreate(
-				crate::types::co_pinning_key::CoPinningKey::Log.to_string(&self.co.id),
-				co_core_storage::PinStrategy::Unlimited,
-				Default::default(),
-			);
 			self.parent.push(&identity, &self.storage_core_name, &pin_root).await?;
-			self.parent.push(&identity, &self.storage_core_name, &pin_log).await?;
-			self.parent.push(&identity, &self.storage_core_name, &pin_state).await?;
 
 			// write initial pinning
 			#[cfg(feature = "pinning")]

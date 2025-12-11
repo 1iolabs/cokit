@@ -68,10 +68,10 @@ where
 	.await?;
 
 	// storage: remove
-	//  note: we assume that removed block only belongs to state
+	//  note: we assume that removed block only belongs to a co root
 	storage_dispatch_remove(
 		&mut dispatcher,
-		BlockInfo::new(local_storage, CoPinningKey::State.to_string(co_id), Default::default()).await?,
+		BlockInfo::new(local_storage, CoPinningKey::Root.to_string(co_id), Default::default()).await?,
 		stream::iter(co_removed_blocks),
 		<S as BlockStorage>::StoreParams::MAX_BLOCK_SIZE,
 	)

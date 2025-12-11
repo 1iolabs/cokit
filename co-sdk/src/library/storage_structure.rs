@@ -240,18 +240,11 @@ pub trait StructureResolver<S, D>: Send + Sync {
 /// - For heads do not follow [`co_log::Entry::next`] and [`co_log::Entry::refs`].
 pub struct CoStructureResolver {
 	root_pin: String,
-	log_pin: String,
-	state_pin: String,
 	block_links: BlockLinks,
 }
 impl CoStructureResolver {
 	pub fn new(co: &CoId, block_links: BlockLinks) -> Self {
-		Self {
-			root_pin: CoPinningKey::Root.to_string(co),
-			log_pin: CoPinningKey::Log.to_string(co),
-			state_pin: CoPinningKey::State.to_string(co),
-			block_links,
-		}
+		Self { root_pin: CoPinningKey::Root.to_string(co), block_links }
 	}
 }
 #[async_trait]

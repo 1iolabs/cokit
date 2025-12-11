@@ -16,16 +16,6 @@ pub async fn create_storage_core_state(
 				settings.setting_co_default_max_state(),
 				Default::default(),
 			),
-			co_core_storage::StorageAction::PinCreate(
-				CoPinningKey::State.to_string(co),
-				settings.setting_co_default_max_state(),
-				Default::default(),
-			),
-			co_core_storage::StorageAction::PinCreate(
-				CoPinningKey::Log.to_string(co),
-				settings.setting_co_default_max_log(),
-				Default::default(),
-			),
 		],
 	)
 	.await?
