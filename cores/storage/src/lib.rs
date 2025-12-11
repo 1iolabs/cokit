@@ -164,12 +164,12 @@ pub enum PinStrategy {
 	MaxCount(u32),
 }
 
-/// A list of references.
+//// A list of references.
 /// A single [`Cid`] is allowed to be contained multiple times (=reference count).
 #[co]
 #[derive(Default)]
 #[serde(transparent)]
-pub struct References(#[serde(with = "co_api::serde_map_as_list")] BTreeMap<WeakCid, BlockMetadata>);
+pub struct References(Vec<(WeakCid, BlockMetadata)>);
 impl References {
 	pub fn new() -> Self {
 		Self::default()
@@ -177,13 +177,27 @@ impl References {
 
 	pub fn insert(&mut self, reference: impl Into<WeakCid>) {
 		let reference = reference.into();
-		let block = self.0.entry(reference).or_default();
+		let (_, block) = match self.0.iter_mut().find(|(cid, _block)| *cid == reference) {
+			Some(block) => block,
+			None => {
+				self.0.push((reference, Default::default()));
+				// SAFETY: Just created.
+				self.0.last_mut().unwrap()
+			},
+		};
 		block.references += 1;
 	}
 
 	pub fn insert_with_tags(&mut self, reference: impl Into<WeakCid>, tags: Tags) {
 		let reference = reference.into();
-		let block = self.0.entry(reference).or_default();
+		let (_, block) = match self.0.iter_mut().find(|(cid, _block)| *cid == reference) {
+			Some(block) => block,
+			None => {
+				self.0.push((reference, Default::default()));
+				// SAFETY: Just created.
+				self.0.last_mut().unwrap()
+			},
+		};
 		block.references += 1;
 		block.tags.extend(tags.into_iter());
 	}
@@ -304,7 +318,6 @@ pub enum StorageAction {
 	PinUpdate(String, PinStrategy),
 
 	/// Insert references to a named pin and reference all specified [`Cid`]s.
-	/// Tags will be applied to all specified references.
 	#[serde(rename = "pr")]
 	PinReference(String, References),
 

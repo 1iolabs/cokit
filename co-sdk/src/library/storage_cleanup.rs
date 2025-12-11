@@ -48,8 +48,6 @@ where
 		let mut remove_from_disk = HashSet::<WeakCid>::new();
 		let mut remove_by_info = HashMap::<BlockInfo, BTreeMap<WeakCid, BTreeSet<WeakCid>>>::new();
 		while let Some((cid, info)) = remove_stream.try_next().await? {
-			tracing::info!(?cid, "storage-cleanup");
-
 			// get tags
 			let block_tags = match blocks.get(&cid).await? {
 				Some(block) => block.tags.clone(),
