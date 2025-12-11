@@ -1790,7 +1790,6 @@ dependencies = [
  "co-primitives",
  "futures",
  "ipld-core",
- "multihash-codetable",
  "serde",
  "serde-wasm-bindgen",
  "serde_repr",

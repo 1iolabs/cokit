@@ -8,7 +8,6 @@ rust-version = "1.76"
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
-multihash-codetable = { workspace = true }
 anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
@@ -24,8 +23,8 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros"] }
 wasm-bindgen = { version = "0.2.105" }
 wasm-bindgen-futures = { version = "0.4.55", features = ["futures-core-03-stream"] }
-web-sys = { version = "0.3.82", features = ["console"] }
 wasm-streams = "0.4.2"
+web-sys = { version = "0.3.82", features = ["console"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.55"
