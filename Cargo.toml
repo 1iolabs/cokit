@@ -14,6 +14,7 @@ members = [
     "co-runtime",
     "co-sdk",
     "co-storage",
+    "co-test",
     "cores/board",
     "cores/co",
     "cores/data-series",
@@ -110,3 +111,4 @@ co-primitives = { path = "co-primitives" }
 co-runtime = { path = "co-runtime" }
 co-sdk = { path = "co-sdk", default-features = false }
 co-storage = { path = "co-storage" }
+co-test = { path = "co-test" }

@@ -149,7 +149,8 @@ mod tests {
 	use co_core_storage::{PinStrategy, StorageAction};
 	use co_identity::DidKeyIdentity;
 	use co_primitives::{tags, CoId};
-	use co_storage::{ExtendedBlockStorage, TmpDir};
+	use co_storage::ExtendedBlockStorage;
+	use co_test::{test_application_identifier, test_log_path, test_tmp_dir};
 	use futures::TryStreamExt;
 
 	async fn count_pin_references(local_co: &CoReducer, co: &CoId, pin: CoPinningKey) -> u32 {
@@ -178,18 +179,10 @@ mod tests {
 	/// Note: The pinned state is always one state late.
 	#[tokio::test]
 	async fn integration_test_storage_cleanup() {
-		let application_identifier = format!("integration_test_storage_cleanup-{}", uuid::Uuid::new_v4().to_string());
-		let tmp = TmpDir::new("co");
-		let log_path = std::env::current_exe()
-			.unwrap()
-			.join("../../../..") // "target/debug/build/test"
-			.canonicalize()
-			.unwrap()
-			.join("data/log/co.log");
-		println!("path: {:?}", tmp.path());
-		println!("log_path: {:?}", log_path);
+		let application_identifier = test_application_identifier("integration_test_storage_cleanup");
+		let tmp = test_tmp_dir();
 		let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
-			.with_bunyan_logging(Some(log_path))
+			.with_bunyan_logging(Some(test_log_path()))
 			.with_optional_tracing()
 			.with_disabled_feature("co-local-encryption")
 			.with_setting("feature", "co-storage-free")
@@ -262,18 +255,10 @@ mod tests {
 	/// Note: The pinned state is always one state late.
 	#[tokio::test]
 	async fn integration_test_storage_cleanup_shared() {
-		let application_identifier = format!("integration_test_storage_cleanup-{}", uuid::Uuid::new_v4().to_string());
-		let tmp = TmpDir::new("co");
-		let log_path = std::env::current_exe()
-			.unwrap()
-			.join("../../../..") // "target/debug/build/test"
-			.canonicalize()
-			.unwrap()
-			.join("data/log/co.log");
-		println!("path: {:?}", tmp.path());
-		println!("log_path: {:?}", log_path);
+		let application_identifier = test_application_identifier("integration_test_storage_cleanup_shared");
+		let tmp = test_tmp_dir();
 		let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
-			.with_bunyan_logging(Some(log_path))
+			.with_bunyan_logging(Some(test_log_path()))
 			.with_optional_tracing()
 			.with_disabled_feature("co-local-encryption")
 			.with_setting("feature", "co-storage-free")

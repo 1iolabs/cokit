@@ -1978,6 +1978,7 @@ dependencies = [
  "co-primitives",
  "co-runtime",
  "co-storage",
+ "co-test",
  "console-subscriber",
  "criterion",
  "derive_more 0.99.18",
@@ -2035,6 +2036,7 @@ dependencies = [
  "cid 0.11.1",
  "co-actor",
  "co-primitives",
+ "co-test",
  "derive_more 0.99.18",
  "either",
  "futures",
@@ -2057,6 +2059,14 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "co-test"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
  "uuid",
 ]
 

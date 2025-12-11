@@ -6,11 +6,9 @@ use co_sdk::{
 	ApplicationBuilder, BlockStorage, DidKeyIdentity, Identity, MonotonicCoDate, MonotonicCoUuid, CO_CORE_NAME_CO,
 	CO_CORE_NAME_KEYSTORE,
 };
-use co_storage::TmpDir;
+use co_test::{test_application_identifier, test_log_path, test_tmp_dir, TmpDir};
 use example_counter::CounterAction;
 use std::collections::BTreeMap;
-
-pub mod helper;
 
 async fn counter_core<S>(storage: &S) -> Cid
 where
@@ -30,21 +28,22 @@ where
 /// This test is designed to not have random values and should therefore always use the same Cids.
 #[tokio::test]
 async fn test_local_smoke() {
-	let tmp = TmpDir::new("co");
+	let tmp = test_tmp_dir();
 
 	// create
 	let identity = DidKeyIdentity::generate(Some(&vec![1; 32]));
 	{
-		let application = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
-			.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
-			.with_optional_tracing()
-			.without_keychain()
-			.with_disabled_feature("co-local-encryption")
-			.with_co_date(MonotonicCoDate::default())
-			.with_co_uuid(MonotonicCoUuid::default())
-			.build()
-			.await
-			.expect("application");
+		let application =
+			ApplicationBuilder::new_with_path(test_application_identifier("test_local_smoke"), tmp.path().to_owned())
+				.with_bunyan_logging(Some(test_log_path()))
+				.with_optional_tracing()
+				.without_keychain()
+				.with_disabled_feature("co-local-encryption")
+				.with_co_date(MonotonicCoDate::default())
+				.with_co_uuid(MonotonicCoUuid::default())
+				.build()
+				.await
+				.expect("application");
 		let local_identity = application.local_identity();
 		let local_co = application.local_co_reducer().await.unwrap();
 		local_co
@@ -58,14 +57,17 @@ async fn test_local_smoke() {
 	}
 
 	// reopen
-	let application = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
-		.without_keychain()
-		.with_disabled_feature("co-local-encryption")
-		.with_co_date(MonotonicCoDate::default())
-		.with_co_uuid(MonotonicCoUuid::default())
-		.build()
-		.await
-		.expect("application");
+	let application = ApplicationBuilder::new_with_path(
+		test_application_identifier("test_local_smoke:reopen"),
+		tmp.path().to_owned(),
+	)
+	.without_keychain()
+	.with_disabled_feature("co-local-encryption")
+	.with_co_date(MonotonicCoDate::default())
+	.with_co_uuid(MonotonicCoUuid::default())
+	.build()
+	.await
+	.expect("application");
 	let local_co = application.local_co_reducer().await.unwrap();
 	let (storage, key_store) = query_core(CO_CORE_NAME_KEYSTORE).execute_reducer(&local_co).await.unwrap();
 	let keys: BTreeMap<String, co_core_keystore::Key> =
@@ -77,13 +79,13 @@ async fn test_local_smoke() {
 /// Create Local CO in tmpdir and exit.
 #[tokio::test]
 async fn test_local_smoke_encrypted() {
-	let tmp = TmpDir::new("co");
+	let tmp = test_tmp_dir();
 
 	// create
 	let identity = DidKeyIdentity::generate(None);
 	{
 		let application = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
-			.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+			.with_bunyan_logging(Some(test_log_path()))
 			.with_optional_tracing()
 			.without_keychain()
 			.build()
@@ -123,7 +125,7 @@ async fn test_local_push() {
 	let application_identifier = format!("test_local_push-{}", uuid::Uuid::new_v4().to_string());
 	let tmp = TmpDir::new("co");
 	let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
-		.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+		.with_bunyan_logging(Some(test_log_path()))
 		.with_optional_tracing()
 		.without_keychain()
 		.with_disabled_feature("co-local-encryption")
@@ -162,9 +164,8 @@ async fn test_local_push_encrypted() {
 	let application_identifier = format!("test_local_push_encrypted-{}", uuid::Uuid::new_v4().to_string());
 	let tmp = TmpDir::new("co");
 	let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
-		.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+		.with_bunyan_logging(Some(test_log_path()))
 		.with_optional_tracing()
-		.with_bunyan_logging(None)
 		.without_keychain()
 		.build()
 		.await

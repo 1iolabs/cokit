@@ -1,12 +1,14 @@
 use co_core_co::CoAction;
 use co_sdk::{build_core, crate_repository_path, Application, ApplicationBuilder, CO_CORE_NAME_CO};
+use co_test::test_log_path;
 use criterion::{criterion_group, criterion_main, Criterion};
 use example_counter::CounterAction;
 use tokio::runtime::Builder;
 
 async fn setup_local_memory() -> Application {
 	let application = ApplicationBuilder::new_memory("test".to_owned())
-		// .with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+		.with_bunyan_logging(Some(test_log_path()))
+		.with_optional_tracing()
 		.without_keychain()
 		.build()
 		.await
