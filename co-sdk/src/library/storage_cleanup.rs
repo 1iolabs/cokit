@@ -178,7 +178,7 @@ mod tests {
 	/// Integration Test to verify storage_cleanup actualy deletes states.
 	/// Note: The pinned state is always one state late.
 	#[tokio::test]
-	async fn integration_test_storage_cleanup() {
+	async fn integration_test_storage_cleanup_local() {
 		let application_identifier = test_application_identifier("integration_test_storage_cleanup");
 		let tmp = test_tmp_dir();
 		let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
@@ -252,7 +252,14 @@ mod tests {
 	}
 
 	/// Integration Test to verify storage_cleanup actualy deletes states.
-	/// Note: The pinned state is always one state late.
+	///
+	/// # Note
+	/// The pinned state is always one state late.
+	///
+	/// # Debug
+	/// ```shell
+	/// co --base-path <path> --no-keychain --no-default-features co log local
+	/// ```
 	#[tokio::test]
 	async fn integration_test_storage_cleanup_shared() {
 		let application_identifier = test_application_identifier("integration_test_storage_cleanup_shared");

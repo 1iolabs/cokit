@@ -960,6 +960,7 @@ mod tests {
 	use cid::Cid;
 	use co_api::{async_api::Reducer, BlockSerializer, BlockStorageExt, OptionLink, ReducerAction, WeakCid};
 	use co_storage::MemoryBlockStorage;
+	use futures::TryStreamExt;
 	use ipld_core::{ipld::Ipld, serde::to_ipld};
 	use std::{collections::BTreeMap, str::FromStr};
 
@@ -1150,5 +1151,60 @@ mod tests {
 				.await
 				.unwrap()
 		);
+	}
+
+	/// This is data gatered from storage_cleanup test which failed.
+	#[tokio::test]
+	async fn test_pin_strategy_max() {
+		fn cid(s: &str) -> co_api::WeakCid {
+			Cid::from_str(s).unwrap().into()
+		}
+		fn action(s: StorageAction) -> ReducerAction<StorageAction> {
+			ReducerAction { from: "did:local:device".into(), time: 0, core: "storage".into(), payload: s }
+		}
+		let storage = MemoryBlockStorage::default();
+
+		// actions
+		let actions = [
+			action(StorageAction::PinCreate("co:local".into(), PinStrategy::MaxCount(100), [].into())),
+			action(StorageAction::PinReference(
+				"co:local".into(),
+				[(cid("bafyr4idmz6tdkhmdwhis4w2yov4g7ctjs72bcixzk2q7m3ioihhm4lvnky"))].into(),
+			)),
+			action(StorageAction::PinReference(
+				"co:local".into(),
+				[
+					(cid("bafyr4id6ivgo6penzkew6tv2jsnncuq7a3zm7ajqd4nfmuxry7tq6xawbq")),
+					(cid("bafyr4ih47p3rp5ppftduphy2fikph63iey5fwv42du6eyjccyu3ygvqvzy")),
+				]
+				.into(),
+			)),
+			action(StorageAction::PinUpdate("co:local".into(), PinStrategy::MaxCount(1))),
+			action(StorageAction::PinReference(
+				"co:local".into(),
+				[
+					(cid("bafyr4igconcuuuokydue7wglesze5vdyahzprgpkn7ukajd76besyhw2mi")),
+					(cid("bafyr4iegqvwuhpdfp6vdfyxpxbm4qfjjo5y4rko34j6s7eqf2xfijo5chy")),
+				]
+				.into(),
+			)),
+		];
+		let mut state_reference = OptionLink::none();
+		for action in actions {
+			let action_link = storage.set_value(&action).await.unwrap();
+			state_reference = Storage::reduce(state_reference, action_link, &storage).await.unwrap().into();
+		}
+
+		// validate
+		let state = storage.get_value(&state_reference.unwrap()).await.unwrap();
+		let pin = state.pins.get(&storage, &"co:local".to_owned()).await.unwrap().unwrap();
+		let pin = pin
+			.references
+			.stream(&storage)
+			.map_ok(|(_index, value)| value)
+			.try_collect::<Vec<_>>()
+			.await
+			.unwrap();
+		assert_eq!(pin, vec![cid("bafyr4iegqvwuhpdfp6vdfyxpxbm4qfjjo5y4rko34j6s7eqf2xfijo5chy")]);
 	}
 }
