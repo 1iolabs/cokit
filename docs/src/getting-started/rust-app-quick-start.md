@@ -1,4 +1,4 @@
-# App Quick Start
+# Rust App Quick Start
 
 As a very simple UI building tool, we use [Dioxus](https://dioxuslabs.com/) in this tutorial.
 We also use TailwindCSS for styling the application.
