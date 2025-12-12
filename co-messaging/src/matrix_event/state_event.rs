@@ -1,43 +1,12 @@
 use super::multimedia::ImageInfo;
 use crate::{EventContent, EventType};
+use cid::Cid;
+use co_macros::co_data;
 use co_primitives::CoCid;
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
-/**
- * All events that in some way alter the state of a room
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
-#[serde(tag = "type", content = "content")]
-pub enum StateType {
-	#[serde(rename = "room_name")]
-	RoomName(RoomNameContent),
-	#[serde(rename = "room_topic")]
-	RoomTopic(RoomTopicContent),
-	#[serde(rename = "room_avatar")]
-	RoomAvatar(RoomAvatarContent),
-	#[serde(rename = "room_pinned_events")]
-	PinnedEvents(PinnedEventsContent),
-}
-
-impl From<StateType> for EventContent {
-	fn from(val: StateType) -> Self {
-		EventContent::State(val)
-	}
-}
-
-impl EventType for StateType {
-	fn generate_event_type(&self) -> String {
-		match &self {
-			StateType::RoomName(content) => content.generate_event_type(),
-			StateType::RoomTopic(content) => content.generate_event_type(),
-			StateType::RoomAvatar(content) => content.generate_event_type(),
-			StateType::PinnedEvents(content) => content.generate_event_type(),
-		}
-	}
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
+#[derive(JsonSchema)]
 pub struct RoomNameContent {
 	pub name: String,
 }
@@ -56,11 +25,12 @@ impl EventType for RoomNameContent {
 
 impl From<RoomNameContent> for EventContent {
 	fn from(val: RoomNameContent) -> Self {
-		StateType::RoomName(val).into()
+		EventContent::RoomName(val).into()
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
+#[derive(JsonSchema)]
 pub struct RoomTopicContent {
 	pub topic: String,
 }
@@ -79,18 +49,20 @@ impl EventType for RoomTopicContent {
 
 impl From<RoomTopicContent> for EventContent {
 	fn from(val: RoomTopicContent) -> Self {
-		StateType::RoomTopic(val).into()
+		EventContent::RoomTopic(val).into()
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
+#[derive(JsonSchema)]
 pub struct RoomAvatarContent {
-	pub file: Option<CoCid>,
+	#[schemars(with = "Option<CoCid>")]
+	pub file: Option<Cid>,
 	pub info: ImageInfo,
 }
 
 impl RoomAvatarContent {
-	pub fn new(file: Option<impl Into<CoCid>>, info: ImageInfo) -> Self {
+	pub fn new(file: Option<Cid>, info: ImageInfo) -> Self {
 		Self { file: file.map(Into::into), info }
 	}
 }
@@ -103,11 +75,12 @@ impl EventType for RoomAvatarContent {
 
 impl From<RoomAvatarContent> for EventContent {
 	fn from(val: RoomAvatarContent) -> Self {
-		StateType::RoomAvatar(val).into()
+		EventContent::RoomAvatar(val).into()
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
+#[derive(JsonSchema)]
 pub struct PinnedEventsContent {
 	pub pinned: Vec<String>,
 }
@@ -126,6 +99,6 @@ impl EventType for PinnedEventsContent {
 
 impl From<PinnedEventsContent> for EventContent {
 	fn from(val: PinnedEventsContent) -> Self {
-		StateType::PinnedEvents(val).into()
+		EventContent::PinnedEvents(val).into()
 	}
 }

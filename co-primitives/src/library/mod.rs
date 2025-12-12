@@ -13,3 +13,5 @@ pub mod node_stream;
 pub mod serde_map_as_list;
 #[cfg(any(test, feature = "benchmarking"))]
 pub mod test;
+pub mod unixfs;
+pub mod unixfs_stream;

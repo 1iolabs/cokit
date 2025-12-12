@@ -1,17 +1,16 @@
 use crate::{EventContent, EventType};
+use co_macros::co_data;
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 pub trait Relation {
 	fn generate_relation_type(&self) -> Option<String>;
 	fn get_in_reply_to(&self) -> Option<String>;
 }
 
-/**
- * Empty content as the only purpose is holding a relation to another event.
- * Mostly used for annotation events
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Empty content as the only purpose is holding a relation to another event.
+/// Mostly used for annotation events
+#[co_data]
+#[derive(JsonSchema)]
 pub struct ReactionContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_silent: Option<bool>,
@@ -54,24 +53,27 @@ impl EventType for ReactionContent {
 	}
 }
 
-/**
- * Used in some event contents to define a relation to other events
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Used in some event contents to define a relation to other events
+#[co_data]
+#[derive(JsonSchema)]
 #[serde(rename = "relates_to")]
 pub struct RelatesTo {
+	/// The type of the relation
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub rel_type: Option<RelationType>, // The type of the relation
+	pub rel_type: Option<RelationType>,
+	/// The ID of the event that is being related to
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub event_id: Option<String>, // The ID of the event that is being related to
+	pub event_id: Option<String>,
+	/// Special relation to depict replies. Listed extra as this can happen with the other relations simultaneously
 	#[serde(rename = "in_reply_to")]
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub in_reply_to: Option<ReplyContent>, /* Special relation to depict replies. Listed extra as this can happen
-	                                        * with the other relations simultaneously */
+	pub in_reply_to: Option<ReplyContent>,
+	/// The ID of the room the related-to event is in. Only needed for forwarding.
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub room_id: Option<String>, // The ID of the room the related-to event is in. Only needed for forwarding.
+	pub room_id: Option<String>,
+	/// Used for annotations. Defines the type of emoji that has been reacted with.
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub key: Option<String>, // Used for annotations. Defines the type of emoji that has been reacted with.
+	pub key: Option<String>,
 }
 
 impl RelatesTo {
@@ -153,10 +155,9 @@ impl Relation for RelatesTo {
 	}
 }
 
-/**
- *Simple enum containing all different types of relation that events can have to other events
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Simple enum containing all different types of relation that events can have to other events
+#[co_data]
+#[derive(JsonSchema)]
 pub enum RelationType {
 	#[serde(rename = "annotation")]
 	Annotation,
@@ -185,21 +186,23 @@ impl Relation for RelationType {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[co_data]
+#[derive(JsonSchema)]
 pub struct ReplyContent {
 	pub event_id: String,
 }
 
-/**
- * Event content used to redact other events. Sender of this event must be either the same as the sender of the
- * original event or a user with the necessary permissions.
- * Redactions are idempotent and irreversible. They do not use the same relation fields as other events
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Event content used to redact other events. Sender of this event must be either the same as the sender of the
+/// original event or a user with the necessary permissions.
+/// Redactions are idempotent and irreversible. They do not use the same relation fields as other events
+#[co_data]
+#[derive(JsonSchema)]
 pub struct RedactionContent {
+	/// An optional reason field mostly used when event got redacted by another user
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub reason: Option<String>, // An optional reason field mostly used when event got redacted by another user
-	pub redacts: String, // Event ID of the redacted event
+	pub reason: Option<String>,
+	/// Event ID of the redacted event
+	pub redacts: String,
 }
 
 impl From<RedactionContent> for EventContent {

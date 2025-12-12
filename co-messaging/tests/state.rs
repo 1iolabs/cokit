@@ -9,5 +9,20 @@ fn room_name() {
 	println!("{json}");
 	assert_eq!(event, serde_json::from_str(&json).unwrap());
 
-	state_event::RoomAvatarContent::new(Some(Cid::default()), ImageInfo::default());
+	state_event::RoomAvatarContent::new(
+		Some(Cid::default()),
+		ImageInfo {
+			h: 100,
+			w: 100,
+			size: 10000,
+			mimetype: "image/png".into(),
+			thumbnail_info: co_messaging::multimedia::ThumbnailInfo {
+				h: 10,
+				w: 10,
+				mimetype: "image/png".into(),
+				size: 1000,
+			},
+			thumbnail_file: Default::default(),
+		},
+	);
 }

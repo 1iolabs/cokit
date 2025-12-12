@@ -15,6 +15,7 @@ ipld-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_repr = { workspace = true }
 thiserror = { workspace = true }
+schemars = { workspace = true }
 
 [dev-dependencies]
 co-storage = { workspace = true }

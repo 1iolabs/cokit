@@ -1,11 +1,10 @@
 use crate::{EventContent, EventType};
+use co_macros::co_data;
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
-/**
- * Session description object for sdp offers and answers
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Session description object for sdp offers and answers
+#[co_data]
+#[derive(JsonSchema)]
 pub struct SessionDescription {
 	pub sdp: String,
 	#[serde(rename = "type")]
@@ -18,10 +17,9 @@ impl SessionDescription {
 	}
 }
 
-/**
- * ICE candidate for WebRTC exchange protocol
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// ICE candidate for WebRTC exchange protocol
+#[co_data]
+#[derive(JsonSchema)]
 pub struct ICECandidate {
 	pub candidate: String, // SDP 'a' line of the candidate
 	#[serde(rename = "sdpMLineIndex")]
@@ -36,69 +34,25 @@ impl ICECandidate {
 	}
 }
 
-/**
- * All call events share the call_id, party_id and version fields
- * call_id: A unique ID that that are used to determine which call events correspond to each other
- * party_id: A unique ID to identify a call participant. May but not must be used for multiple calls. Must be unique
- * across all participants. version: The version of the VoIP specs used for the message. This version is "1". A
- * string is used for experimental versions.
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
-#[serde(tag = "type", content = "content")]
-pub enum CallType {
-	#[serde(rename = "call_invite")]
-	Invite(CallInviteContent),
-	#[serde(rename = "call_answer")]
-	Answer(AnswerCallContent),
-	#[serde(rename = "call_candidates")]
-	Candidates(CallCandidatesContent),
-	#[serde(rename = "call_select_answer")]
-	SelectAnswer(SelectCallAnswerContent),
-	#[serde(rename = "call_negotiate")]
-	Negotioation(CallNegotiationContent),
-	#[serde(rename = "call_reject")]
-	Reject(RejectCallContent),
-	#[serde(rename = "call_hangup")]
-	Hangup(HangupCallContent),
-}
-
-impl EventType for CallType {
-	fn generate_event_type(&self) -> String {
-		match self {
-			CallType::Invite(content) => content.generate_event_type(),
-			CallType::Answer(content) => content.generate_event_type(),
-			CallType::Candidates(content) => content.generate_event_type(),
-			CallType::SelectAnswer(content) => content.generate_event_type(),
-			CallType::Negotioation(content) => content.generate_event_type(),
-			CallType::Reject(content) => content.generate_event_type(),
-			CallType::Hangup(content) => content.generate_event_type(),
-		}
-	}
-}
-
-impl From<CallType> for EventContent {
-	fn from(val: CallType) -> Self {
-		EventContent::Call(val)
-	}
-}
-
-/**
- * Initial event to invite other parties to a call
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Initial event to invite other parties to a call
+#[co_data]
+#[derive(JsonSchema)]
 pub struct CallInviteContent {
 	pub call_id: String,
 	pub party_id: String,
 	pub version: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
-	pub invitee: Option<String>, // DID of the called user. Any user in room may answer if omitted
-	pub lifetime: u32,             // Time in ms during which invite is valid after sending this event
-	pub offer: SessionDescription, // Session description object
+	/// DID of the called user. Any user in room may answer if omitted
+	pub invitee: Option<String>,
+	/// Time in ms during which invite is valid after sending this event
+	pub lifetime: u32,
+	/// Session description object
+	pub offer: SessionDescription,
 }
 
 impl From<CallInviteContent> for EventContent {
 	fn from(val: CallInviteContent) -> Self {
-		CallType::Invite(val).into()
+		EventContent::Invite(val).into()
 	}
 }
 
@@ -127,10 +81,9 @@ impl CallInviteContent {
 	}
 }
 
-/**
- * Event used when answering an invite event
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+///Event used when answering an invite event
+#[co_data]
+#[derive(JsonSchema)]
 pub struct AnswerCallContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -140,7 +93,7 @@ pub struct AnswerCallContent {
 
 impl From<AnswerCallContent> for EventContent {
 	fn from(val: AnswerCallContent) -> Self {
-		CallType::Answer(val).into()
+		EventContent::Answer(val).into()
 	}
 }
 
@@ -161,10 +114,9 @@ impl AnswerCallContent {
 	}
 }
 
-/**
- * Event used to exchange viable ICE candidates with the other party upon answering a call
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Event used to exchange viable ICE candidates with the other party upon answering a call
+#[co_data]
+#[derive(JsonSchema)]
 pub struct CallCandidatesContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -174,7 +126,7 @@ pub struct CallCandidatesContent {
 
 impl From<CallCandidatesContent> for EventContent {
 	fn from(val: CallCandidatesContent) -> Self {
-		CallType::Candidates(val).into()
+		EventContent::Candidates(val).into()
 	}
 }
 
@@ -190,20 +142,20 @@ impl CallCandidatesContent {
 	}
 }
 
-/**
- * Event used to select one of possibly multiple call answers
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Event used to select one of possibly multiple call answers
+#[co_data]
+#[derive(JsonSchema)]
 pub struct SelectCallAnswerContent {
 	pub call_id: String,
 	pub party_id: String,
 	pub version: String,
-	pub selected_party_id: String, // party id of the participant whose answer has been selected
+	/// Party id of the participant whose answer has been selected
+	pub selected_party_id: String,
 }
 
 impl From<SelectCallAnswerContent> for EventContent {
 	fn from(val: SelectCallAnswerContent) -> Self {
-		CallType::SelectAnswer(val).into()
+		EventContent::SelectAnswer(val).into()
 	}
 }
 
@@ -224,27 +176,29 @@ impl SelectCallAnswerContent {
 	}
 }
 
-/**
- * Event used to renegotiate between participants. First an offer containing a lifetime is sent. Other participants
- * then send an answer. Offer and answer should never both be set. To ensure this they are not public to force the
- * users to use the setters.
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Event used to renegotiate between participants. First an offer containing a lifetime is sent. Other participants
+/// then send an answer. Offer and answer should never both be set. To ensure this they are not public to force the
+/// users to use the setters.
+#[co_data]
+#[derive(JsonSchema)]
 pub struct CallNegotiationContent {
 	pub call_id: String,
 	pub party_id: String,
 	pub version: String,
+	/// Session description object for negotioation answers
 	#[serde(skip_serializing_if = "Option::is_none")]
-	answer: Option<SessionDescription>, // session description object for negotioation answers
+	answer: Option<SessionDescription>,
+	/// Session description object for negotioation offers
 	#[serde(skip_serializing_if = "Option::is_none")]
-	offer: Option<SessionDescription>, // Session description object for negotioation offers
+	offer: Option<SessionDescription>,
+	/// Time in ms before offer timeout
 	#[serde(skip_serializing_if = "Option::is_none")]
-	lifetime: Option<u32>, // Time in ms before offer timeout
+	lifetime: Option<u32>,
 }
 
 impl From<CallNegotiationContent> for EventContent {
 	fn from(val: CallNegotiationContent) -> Self {
-		CallType::Negotioation(val).into()
+		EventContent::Negotioation(val).into()
 	}
 }
 
@@ -301,10 +255,9 @@ impl CallNegotiationContent {
 	}
 }
 
-/**
- * Event sent if call was rejected by a user.
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Event sent if call was rejected by a user.
+#[co_data]
+#[derive(JsonSchema)]
 pub struct RejectCallContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -313,7 +266,7 @@ pub struct RejectCallContent {
 
 impl From<RejectCallContent> for EventContent {
 	fn from(val: RejectCallContent) -> Self {
-		CallType::Reject(val).into()
+		EventContent::Reject(val).into()
 	}
 }
 
@@ -329,33 +282,36 @@ impl RejectCallContent {
 	}
 }
 
-/**
- * Enum containg possible reasons for a hangup event
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Enum containg possible reasons for a hangup event
+#[co_data]
+#[derive(JsonSchema)]
 pub enum HangupCallReason {
+	/// ICE negotiation has failed and connection could not be established
 	#[serde(rename = "ice_failed")]
-	IceFailed, // ICE negotiation has failed and connection could not be established
+	IceFailed,
+	/// Connection failed after some media was exchanged. Includes when renegotiation fails if media was sent prviously
 	#[serde(rename = "ice_timeout")]
-	IceTimeout, /* Connection failed after some media was exchanged. Includes when renegotiation fails if media was
-	             * sent prviously */
+	IceTimeout,
+	/// The other party did not answer in time
 	#[serde(rename = "invite_timeout")]
-	InviteTimeout, // The other party did not answer in time
+	InviteTimeout,
+	/// User actively chooses to end the call
 	#[serde(rename = "user_hangup")]
-	UserHangup, // User actively chooses to end the call
+	UserHangup,
+	/// Client was unable to start capturing media in such a way that it is unable to continue the call
 	#[serde(rename = "user_media_failed")]
-	UserMediaFailed, /* Client was unable to start capturing media in such a way that it is unable to continue the
-	                  * call */
+	UserMediaFailed,
+	/// User is busy. Exists primarily for bridging and does not include when user is in a call already
 	#[serde(rename = "user_busy")]
-	UserBusy, // User is busy. Exists primarily for bridging and does not include when user is in a call already
+	UserBusy,
+	/// Some other error occured that is not described by the above
 	#[serde(rename = "unknown_error")]
-	UnknownError, // Some other error occured that is not described by the above
+	UnknownError,
 }
 
-/**
- * Hangup event used to signal the termination of the call.
- */
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+/// Hangup event used to signal the termination of the call.
+#[co_data]
+#[derive(JsonSchema)]
 pub struct HangupCallContent {
 	pub call_id: String,
 	pub party_id: String,
@@ -365,7 +321,7 @@ pub struct HangupCallContent {
 
 impl From<HangupCallContent> for EventContent {
 	fn from(val: HangupCallContent) -> Self {
-		CallType::Hangup(val).into()
+		EventContent::Hangup(val).into()
 	}
 }
 

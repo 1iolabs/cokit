@@ -32,8 +32,7 @@ members = [
     "examples/counter",
     "examples/counter-upgraded",
     "examples/message",
-    "tauri-plugin-co-sdk",
-    "tauri-plugin-co-sdk/examples/messenger/src-tauri",
+    "tauri-plugin-co-sdk"
 ]
 resolver = "2"
 
@@ -76,7 +75,7 @@ tokio-context = "0.1.3"
 tokio-stream = "0.1.15"
 tokio-test = "0.4.2"
 tokio-util = "0.7"
-toml = "0.8.9"
+toml = "0.8"
 tracing = "0.1.34"
 tracing-bunyan-formatter = { version = "0.3.10", git = "https://github.com/dkuhnert/tracing-bunyan-formatter.git" }
 tracing-log = "0.1.3"
@@ -112,3 +111,4 @@ co-runtime = { path = "co-runtime" }
 co-sdk = { path = "co-sdk", default-features = false }
 co-storage = { path = "co-storage" }
 co-test = { path = "co-test" }
+tauri-plugin-co-sdk = { path = "tauri-plugin-co-sdk" }

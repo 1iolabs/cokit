@@ -9,7 +9,7 @@ use co_messaging::{
 	state_event::{RoomAvatarContent, RoomNameContent, RoomTopicContent},
 	MatrixEvent,
 };
-use co_primitives::{CoCid, CoreName};
+use co_primitives::CoreName;
 use co_sdk::{
 	state::{query_core, QueryError, QueryExt},
 	tags, CoReducerFactory, Cores, CO_CORE_NAME_CO, CO_CORE_ROOM,
@@ -83,7 +83,7 @@ pub async fn command(
 					w: 0,
 					mimetype: "".into(),
 					size: 0,
-					thumbnail_file: CoCid::default(),
+					thumbnail_file: Default::default(),
 					thumbnail_info: ThumbnailInfo { h: 0, w: 0, mimetype: "".into(), size: 0 },
 				},
 			),

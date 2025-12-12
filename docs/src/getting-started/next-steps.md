@@ -1,7 +1,9 @@
 # Next Steps 
 
 ## Permissions
-A Core contains [permissions](../reference/permissions.md) as logic in the data model. As an example, we can change our [todo list core](../getting-started/rust-core-quick-start.md) so that only the creator of a task can delete it. First of all, we need to store the task's creator. Then, in the `TaskDelete` function, we compare the user who is trying to delete the task to the creator to see if they match.
+A Core contains [permissions](../reference/permissions.md) as logic in the data model. 
+
+As an example, we can change our [To-Do list Core](../getting-started/rust-core-quick-start.md) so that only the creator of a task can delete it. First of all, we need to store the task's creator. Then, in the `TaskDelete` function, we compare the user who is trying to delete the task to the creator to see if they match.
 
 Add `creator` to state:
 ```rust
@@ -31,11 +33,9 @@ TodoAction::TaskDelete { id } => {
 
 CO-kit then automatically verifies that everyone is working with the same state.
 
-## More examples
+## More Examples
 
-#review move to "next steps"?
-
-### Real-time counter
+### Real-time Counter
 This example shows how a simple counter can be shared and synchronized across peers using CO-kit:
 
 ```js
@@ -57,7 +57,8 @@ const Counter = () => {
 	);
 };
 ```
-Here, `count`, `increment`, and `decrement` are defined in the Core. The state updates are [CRDT-backed](../glossary/glossary.md#crdt) and instantly reflect across all connected users.
+Here, `count`, `increment`, and `decrement` are defined in the Core.  
+The state updates are [CRDT-backed](../glossary/glossary.md#crdt), and are instantly reflected across all connected users.
 
 ### Nested COs
 This example showcases using multiple [COs](../reference/co.md) – e.g. in a project list, where each project has its own [CO](../reference/co.md):
@@ -100,8 +101,9 @@ const ProjectView = ({ coId, title }) => {
 ```
 Each project lives as a standalone [CO](../reference/co.md), making the structure scalable and naturally modular.
 
-### Schema-based form editing
-Here we bind a form to a [CO](../reference/co.md) that holds user profile data. Changes propagate live, but validation logic is handled by the [Core](../reference/core.md) (data model compiled to WASM):
+### Schema-based Form Editing
+Here we bind a form to a [CO](../reference/co.md) that holds user profile data.  
+Changes propagate live, but validation logic is handled by the [Core](../reference/core.md) (data model compiled to WASM):
 
 ```js
 const ProfileForm = () => {
@@ -134,4 +136,4 @@ const ProfileForm = () => {
 The [Core](../reference/core.md) ensures the email format is correct, and optional constraints like uniqueness or required fields can be enforced at runtime through WASM-based validation.
 
 ### Peer-to-Peer Messaging Application
-One obvious, cool thing that you can use CO-kit for is building a messaging application. We have already built a demo for such a use case that you can check out here: [Gitlab](https://gitlab.1io.com/1io/co-sdk/-/tree/tauri-messenger-demo/tauri-plugin-co-sdk/examples/messenger)
+One obvious, cool use for CO-kit is building a messaging application. We have already built a demo for such a use case that you can check out here: [Gitlab](https://gitlab.1io.com/1io/co-sdk/-/tree/tauri-messenger-demo/tauri-plugin-co-sdk/examples/messenger)

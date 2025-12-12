@@ -73,7 +73,8 @@ pub enum TagValue {
 	/// Represents an IPLD Link structure, implemented with Cid's (Content Identifiers)
 	/// For more information see: https://ipld.io/docs/data-model/kinds/#link-kind
 	#[from]
-	Link(CoCid),
+	#[schemars(with = "CoCid")]
+	Link(Cid),
 }
 impl TagValue {
 	/// Test if the default value is assigned.
@@ -132,11 +133,6 @@ impl From<Ipld> for TagValue {
 impl From<&str> for TagValue {
 	fn from(value: &str) -> Self {
 		Self::String(value.to_owned())
-	}
-}
-impl From<Cid> for TagValue {
-	fn from(value: Cid) -> Self {
-		Self::Link(value.into())
 	}
 }
 impl std::fmt::Display for TagValue {
@@ -339,7 +335,7 @@ impl Tags {
 	/// Find first tag value, that is a link, by key.
 	pub fn link(&self, key: &str) -> Option<&Cid> {
 		self.0.iter().find_map(|tag| match tag {
-			(k, TagValue::Link(link)) if k == key => Some(link.as_ref()),
+			(k, TagValue::Link(link)) if k == key => Some(link),
 			_ => None,
 		})
 	}

@@ -17,6 +17,8 @@ pub use library::{
 	node_reader::{node_reader, NodeReaderError},
 	node_stream::NodeStream,
 	serde_map_as_list,
+	unixfs::{unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer},
+	unixfs_stream::unixfs_stream,
 };
 pub use types::{
 	action::ReducerAction,

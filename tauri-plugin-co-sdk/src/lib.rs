@@ -1,15 +1,19 @@
 use co_actor::Actor;
+use co_sdk::to_cbor;
 use commands::{
+	co::create_co,
 	get_actions::get_actions,
 	get_state::get_co_state,
+	identity::create_identity,
 	push_action::push_action,
 	resolve_cid::resolve_cid,
+	session::{session_close, session_open},
 	storage::{storage_get, storage_set},
 };
 use futures::{pin_mut, StreamExt};
 use library::{
 	application_actor::{ApplicationActor, ApplicationActorMessage},
-	co_application::{application, CoApplicationSettings},
+	co_application::CoApplicationSettings,
 };
 use tauri::{plugin::TauriPlugin, Emitter, Manager, Runtime};
 
@@ -17,11 +21,6 @@ pub mod commands;
 pub mod library;
 
 pub async fn init<R: Runtime>(co_settings: CoApplicationSettings) -> TauriPlugin<R> {
-	// create an actor to handle application tasks
-	let actor_handle = Actor::spawn(Default::default(), ApplicationActor {}, application(co_settings).await)
-		.unwrap()
-		.handle();
-
 	// create a tauri plugin that acts as an api between frontends and co sdk
 	tauri::plugin::Builder::new("co-sdk")
 		.invoke_handler(tauri::generate_handler![
@@ -30,9 +29,18 @@ pub async fn init<R: Runtime>(co_settings: CoApplicationSettings) -> TauriPlugin
 			resolve_cid,
 			storage_get,
 			storage_set,
-			get_actions
+			get_actions,
+			create_identity,
+			session_open,
+			session_close,
+			create_co,
 		])
-		.setup(|app_handle, _api| {
+		.setup(move |app_handle, _api| {
+			// create an actor to handle application tasks
+			let actor_handle = Actor::spawn(Default::default(), ApplicationActor::default(), co_settings.into())?
+				.handle()
+				.clone();
+			// adds actor handle to tauri state so it can be used in commands
 			app_handle.manage(actor_handle.clone());
 			tokio::spawn({
 				let app_handle = app_handle.clone();
@@ -40,7 +48,12 @@ pub async fn init<R: Runtime>(co_settings: CoApplicationSettings) -> TauriPlugin
 					let stream = actor_handle.stream(ApplicationActorMessage::WatchState);
 					pin_mut!(stream);
 					while let Some(Ok(result)) = stream.next().await {
-						app_handle.emit("co-sdk-new-state", result).ok();
+						match to_cbor(&result) {
+							Ok(cbor) => {
+								app_handle.emit("co-sdk-new-state", cbor).ok();
+							},
+							Err(err) => tracing::error!(?err, "Couldn't serialize to cbor:"),
+						}
 					}
 				}
 			});

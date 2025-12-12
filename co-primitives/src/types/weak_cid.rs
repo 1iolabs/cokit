@@ -1,10 +1,11 @@
+use crate::CoCid;
 use cid::{serde::BytesToCidVisitor, Cid};
 use serde::{Deserialize, Serialize};
 use std::{borrow::Borrow, ops::Deref};
 
 /// A CID that will be serialized as just bytes and will not be returned by [`crate::BlockLinks`].
-#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct WeakCid(Cid);
+#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord, schemars::JsonSchema)]
+pub struct WeakCid(#[schemars(with = "CoCid")] Cid);
 impl WeakCid {
 	pub fn new(cid: Cid) -> Self {
 		Self(cid)

@@ -30,11 +30,9 @@ use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::{IdentityEntryVerifier, Log};
 use co_primitives::{
-	tags, BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, Tags,
+	tags, unixfs_add, BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, Tags,
 };
-use co_storage::{
-	unixfs_add, Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret,
-};
+use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret};
 use futures::io::Cursor;
 use serde::{Deserialize, Serialize};
 use std::{

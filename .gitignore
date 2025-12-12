@@ -5,3 +5,4 @@
 /data
 .cargo
 /docs/src/crate
+/dist
