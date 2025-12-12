@@ -2,8 +2,8 @@
 
 # React App Quick Start
 
-In this tutorial we are using React with Tailwind and DaisyUI to build a Todo App in Typescript that is using CoKit in the background.
-We use [Tauri](https://tauri.app/) to build a Desktop app that runs using the OS specific browser.
+In this tutorial we will build our To-do List App in Typescript, using React with Tailwind and DaisyUI, alongside CO-kit and our [To-do List Core](rust-core-quick-start.md).  
+We will use [Tauri](https://tauri.app/) to create a Desktop app that runs using the OS-specific browser.
 
 ## Table of Contents
 
@@ -16,83 +16,98 @@ We use [Tauri](https://tauri.app/) to build a Desktop app that runs using the OS
 
 ## Setup
 
-### Setup tauri
+### Setup Tauri
 
-At the location where the tauri project should be created, run `npm create tauri-app@latest`. The install script will ask for extra information. We used the following:
-- Project name: `my-todo-app-tauri` (This will affect the name of the workspace folder, the name of the npm package and the name of the cargo package)
+Run the following at the location where the Tauri project should be created:
+```sh
+npm create tauri-app@latest
+```  
+The install script will ask for extra information. 
+
+We used the following:
+- Project name: `my-todo-app-tauri` 
+  - **NOTE**: This will affect the name of the workspace folder, the name of the npm package, and the name of the Cargo package
 - [Identifier](https://tauri.app/reference/config/#identifier): `com.1io.examples.todo`
 - Frontend language: `Typescript / Javascript`
 - Package manager: `npm`
 - UI Template: `React`
 - UI Flavor: `Typescript`
 
-This created a new tauri workspace at your location using React, Typescript and vite.
-That new directory is an npm package and the workspace for your new App. You can now open it in you IDE of choice.
+This creates a new Tauri workspace at this location using React, Typescript and Vite.  
+The new directory is both an npm package and the workspace for your new App.  
+You can now open it in you IDE of choice.
 
-In the new workspace, first run `npm install`, then the command `npm run tauri dev` should start the bare bones tauri project.
+In this new workspace, first run:
+```sh
+npm install
+```
 
-You should see that tauri opened a new window that looks like this:
+The following command should now start the bare-bones Tauri project:
+```sh
+npm run tauri dev
+```
+
+Tauri should open a new window that looks like this:
 
 ![App screenshot loading failed](../assets/tauri-app-scrrenshot.png)
 
 ***Important Folders:***
 
-The `src` folder later contains all our frontend App components.
-
-The `src-tauri` folder contains all rust related code and is a cargo package.
-
-The `public` folder is for resources that vite might need to load at runtime. This is where the compiled `{core}.wasm` files should go.
+- `src` : This will contain all our frontend App components
+- `src-tauri` : This contains all Rust-related code and is a Cargo package
+- `public` : This is for resources that Vite might need to load at runtime. 
+   - This is where the compiled `{core}.wasm` files should go.
 
 ### Setup NodeJS
-We need NodeJS to use TailwindCSS within our app.  
+We need NodeJS in order to use TailwindCSS within our app.   
 Head over to [NodeJS](https://nodejs.org/en/download) for download instructions.
 
 ### Application
-
 Before we can write our app, we need to install some additional packages and tweak some configs.
 
-1. Install needed npm packages:
+1. Install required npm packages:
 
-``` sh
+```sh
 npm i @1io/compare @1io/tauri-plugin-co-sdk-api co-js multiformats react-error-boundary uuid web-streams-polyfill
 npm i -D @tailwindcss/cli @tailwindcss/vite @types/node daisyui tailwindcss vite-plugin-wasm
 ```
 
-2. Init Tailwind by adding file `tailwind.css` to the root:
+2. Initialize Tailwind by adding a `tailwind.css` file to the root:
 
-``` css
+```css
 @import "tailwindcss";
 @source "./src/**/*.{rs,html,css}";
 @plugin "daisyui";
 ```
 
-3. Edit vite config file `vite.config.ts` to work with tailwind and wasm:
+3. Edit the Vite config file (`vite.config.ts`) to work with Tailwind and WASM:
 
-``` Typescript
+```Typescript
 // add these imports
 import tailwindcss from "@tailwindcss/vite";
 import wasm from "vite-plugin-wasm";
 
 export default defineConfig(() => ({
 	plugins: [react(), tailwindcss(), wasm()], // <--- Add these plugins
-	// ... leave rest
+	// ... leave the rest
 	}));
 ```
 
-4. Add Tauri plugin:
+4. Add the CO-kit Tauri plugin:
 
-``` sh
+```sh
 cd src-tauri
 cargo add tauri-plugin-co-sdk --git https://gitlab.1io.com/1io/co-sdk.git --branch main
 ```
 
-5. Our tauri plugin uses async code, so we also need an async runtime. We use tokio:
+5. The CO-kit Tauri plugin uses async code, so we also need an async runtime.  
+We can use Tokio for this:
 
 ```sh
 cargo add tokio@1.48
 ```
 
-6. Edit `src-tauri/src/lib.rs` so it looks like this:
+6. Edit `src-tauri/src/lib.rs` so that it looks like this:
 
 ```rust
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -111,7 +126,7 @@ pub async fn run() {
 }
 ```
 
-7. Turn main function in `src-tauri/src/main.rs` async:
+7. Change the main function in `src-tauri/src/main.rs` to be async:
 
 ```rust
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
@@ -123,10 +138,10 @@ async fn main() {
 }
 ```
 
-8. Tauri has a permission system. We need to add the `tauri-plugin-co-sdk` permissions to `src-tauri/capabilities/default.json`.
-Add `co-sdk:default` to the `permissions` field:
+8. Add `co-sdk:default` to the `permissions` field.
+   - Tauri has a permissions system. We need to add the `tauri-plugin-co-sdk` permissions to `src-tauri/capabilities/default.json`.  
 
-``` json
+```json
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
@@ -136,25 +151,34 @@ Add `co-sdk:default` to the `permissions` field:
 }
 ```
 
-9. (Optional) There are a lot of possible settings in the `src-tauri/tauri.conf.json` config file. You can define the starting conditions of the app under `app.windows`: 
-
-- Adjust `title`, `width` and `height` to your hearts content.
-- If you are a developer, you may want the app to open with devtools opened: Add `"devtools": true`.
+9. (**Optional**) There are a lot of possible settings in the `src-tauri/tauri.conf.json` config file. You can define the starting conditions of the app under `app.windows`: 
+   - Adjust `title`, `width` and `height` to your heart's content.
+   - Add `"devtools": true` if you are a developer, and you want the app to start with devtools opened.  
 
 ## Implementation
 
-1. Delete all files from `src` folder.
+1. Delete all files from your `src` folder.
 
-2. Copy all files from [Existing todo example repository](https://gitlab.1io.com/1io/example-todo-list.git) `my-todo-app-tauri/src` folder into this `src` folder.
+2. Copy all files from the `my-todo-app-tauri/src` folder of the [existing To-do List example repository](https://gitlab.1io.com/1io/example-todo-list.git) into your `src` folder.
 
-3. Copy the wasm from your core into the `public` folder as `my_todo_core.wasm`.
+3. Copy the WASM from your Core into the `public` folder as `my_todo_core.wasm`.
 
-4. Run tailwind: `npx tailwindcss -i ./tailwind.css -o ./assets/tailwind.css --watch`
+4. Run Tailwind:  
+```sh
+npx tailwindcss -i ./tailwind.css -o ./assets/tailwind.css
+```
 
-5. Build frontend: `npm run build`
+5. Build the frontend:  
+```sh 
+npm run build
+```
 
-6. Start App: `npm run tauri dev`
+6. Start the App: 
+```sh
+npm run tauri dev
+```
 
-7. (Optional) The tauri plugin checks environment variables. You can set these to change behaviour:
-- Set `CO_NO_KEYCHAIN=true` if you don't want to save the keys to your keychain. This improves handling in dev mode as it skips the pop ups to ask for permission to save but is highly unsafe in production.
-- Set `CO_BASE_PATH={path}` to change the path where the data is stored.
+7. (**Optional**) You can set the following environment variables when using the CO-kit Tauri plugin:  
+   - `CO_NO_KEYCHAIN=true` : Set this to `true` if you don't want to save keys to your keychain. 
+     - **NOTE**: While this can improve handling during development by skipping the pop-ups that ask for permission to save the keys, it is **highly unsafe** in production.
+   - `CO_BASE_PATH={path}` : Change the path where the data is stored.
