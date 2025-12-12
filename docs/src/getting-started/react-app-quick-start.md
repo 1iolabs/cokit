@@ -16,6 +16,10 @@ We will use [Tauri](https://tauri.app/) to create a Desktop app that runs using 
 
 ## Setup
 
+### Setup NodeJS
+We need NodeJS in order to use TailwindCSS within our app.   
+Head over to [NodeJS](https://nodejs.org/en/download) for download instructions.
+
 ### Setup Tauri
 
 Run the following at the location where the Tauri project should be created:
@@ -57,10 +61,6 @@ Tauri should open a new window that looks like this:
 - `src-tauri` : This contains all Rust-related code and is a Cargo package
 - `public` : This is for resources that Vite might need to load at runtime. 
    - This is where the compiled `{core}.wasm` files should go.
-
-### Setup NodeJS
-We need NodeJS in order to use TailwindCSS within our app.   
-Head over to [NodeJS](https://nodejs.org/en/download) for download instructions.
 
 ### Application
 Before we can write our app, we need to install some additional packages and tweak some configs.
