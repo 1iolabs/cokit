@@ -15,7 +15,7 @@ pub struct Command {
 	pub co: CoId,
 
 	/// Entries to print.
-	#[arg(short, long, default_value_t = 10)]
+	#[arg(short('n'), long, default_value_t = 10)]
 	pub count: usize,
 
 	/// Entries to print.
