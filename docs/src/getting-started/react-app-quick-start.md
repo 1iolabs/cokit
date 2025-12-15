@@ -41,8 +41,9 @@ This creates a new Tauri workspace at this location using React, Typescript and 
 The new directory is both an npm package and the workspace for your new App.  
 You can now open it in you IDE of choice.
 
-In this new workspace, first run:
+Browse to this new workspace, and run `npm install`:
 ```sh
+cd my-todo-app-tauri
 npm install
 ```
 
@@ -55,6 +56,8 @@ Tauri should open a new window that looks like this:
 
 ![App screenshot loading failed](../assets/tauri-app-scrrenshot.png)
 
+You can now quit this app, and continue below.
+
 ***Important Folders:***
 
 - `src` : This will contain all our frontend App components
@@ -65,7 +68,7 @@ Tauri should open a new window that looks like this:
 ### Application
 Before we can write our app, we need to install some additional packages and tweak some configs.
 
-1. Install required npm packages:
+1. Install the required npm packages:
 
 ```sh
 npm i @1io/compare @1io/tauri-plugin-co-sdk-api co-js multiformats react-error-boundary uuid web-streams-polyfill
