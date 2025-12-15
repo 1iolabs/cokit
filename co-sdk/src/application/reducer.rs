@@ -574,7 +574,7 @@ where
 	#[tracing::instrument(level = tracing::Level::TRACE, skip(self, storage))]
 	async fn compute_stack(&self, storage: &S) -> Result<(Option<Cid>, VecDeque<EntryBlock>), anyhow::Error> {
 		let heads: BTreeSet<Cid> = self.log.heads().clone();
-		let mut state = self.state;
+		let mut state = None;
 		let mut stack = VecDeque::new();
 
 		// is latest state?
@@ -1233,4 +1233,100 @@ mod tests {
 	// };
 	// let count = find(reducer1.state().unwrap(), reducer1.heads().clone()).await.unwrap();
 	// println!("count: {}", count);
+
+	/// Test `compute_stack` when we have no previous state to start calculation from.
+	#[tokio::test]
+	async fn test_compute_stack_without_previous_state() {
+		// reducer
+		let storage = MemoryBlockStorage::default();
+		let co_date = MonotonicCoDate::default();
+		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
+		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let mut reducer1 = create_reducer(&storage, &runtime, &co_date, None).await;
+
+		// push
+		let action1 = reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(1))
+			.await
+			.unwrap();
+
+		// reducer2
+		let mut reducer2 = create_reducer(&storage, &runtime, &co_date, Some(&reducer1)).await;
+		assert_eq!((reducer2.state(), reducer2.heads()), (reducer1.state(), reducer1.heads()));
+
+		// conflict
+		let action2 = reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(2))
+			.await
+			.unwrap();
+		let action3 = reducer2
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(3))
+			.await
+			.unwrap();
+
+		// update reducer with reducer1 state
+		reducer2.clear_snapshots();
+		reducer2.log.join_heads(&storage, reducer1.log.heads()).await.unwrap();
+		let (source_state, stack) = reducer2.compute_stack(&storage).await.unwrap();
+		assert_eq!(source_state, None);
+		assert_eq!(stack.len(), 3);
+		assert_eq!(stack[0].cid(), action1.entry.cid());
+		assert_eq!(stack[1].cid(), action3.entry.cid());
+		assert_eq!(stack[2].cid(), action2.entry.cid());
+	}
+
+	/// Test `compute_stack` when we have a previous state to start calculation from.
+	#[tokio::test]
+	async fn test_compute_stack() {
+		// reducer
+		let storage = MemoryBlockStorage::default();
+		let co_date = MonotonicCoDate::default();
+		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
+		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let mut reducer1 = create_reducer(&storage, &runtime, &co_date, None).await;
+
+		// push
+		let action1 = reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(1))
+			.await
+			.unwrap();
+
+		// reducer2
+		let mut reducer2 = create_reducer(&storage, &runtime, &co_date, Some(&reducer1)).await;
+		assert_eq!((reducer2.state(), reducer2.heads()), (reducer1.state(), reducer1.heads()));
+
+		// conflict
+		let action2 = reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(2))
+			.await
+			.unwrap();
+		let action3 = reducer2
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(3))
+			.await
+			.unwrap();
+
+		// update reducer with reducer1 state
+		reducer2.log.join_heads(&storage, reducer1.log.heads()).await.unwrap();
+		let (source_state, stack) = reducer2.compute_stack(&storage).await.unwrap();
+		assert_eq!(source_state, Some(action1.state.unwrap()));
+		assert_eq!(stack.len(), 2);
+		assert_eq!(stack[0].cid(), action3.entry.cid());
+		assert_eq!(stack[1].cid(), action2.entry.cid());
+	}
+
+	async fn create_reducer(
+		storage: &MemoryBlockStorage,
+		runtime: &RuntimePool,
+		co_date: &MonotonicCoDate,
+		from: Option<&Reducer<MemoryBlockStorage, SingleCoreResolver>>,
+	) -> Reducer<MemoryBlockStorage, SingleCoreResolver> {
+		let mut builder = ReducerBuilder::new(
+			SingleCoreResolver::new(Cid::default(), Core::native::<Counter>()),
+			Log::new_local("test".as_bytes().to_vec(), from.map(|log| log.heads().clone()).unwrap_or_default()),
+		);
+		if let Some(from) = from {
+			builder = builder.with_snapshot(from.state().unwrap(), from.heads().clone());
+		}
+		builder.build(storage, runtime, co_date.clone()).await.unwrap()
+	}
 }
