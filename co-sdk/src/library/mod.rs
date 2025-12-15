@@ -44,6 +44,8 @@ pub mod storage_dispatch_remove;
 pub mod storage_dispatch_roots;
 #[cfg(feature = "pinning")]
 pub mod storage_pinning;
+#[cfg(feature = "pinning")]
+pub mod storage_snapshots;
 pub mod storage_structure;
 pub mod to_external_cid;
 pub mod to_internal_cid;

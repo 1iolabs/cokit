@@ -239,6 +239,22 @@ impl SharedCoBuilder {
 				reducer_builder = reducer_builder.with_snapshot(state, heads);
 			}
 		}
+		#[cfg(feature = "pinning")]
+		{
+			let roots = crate::library::storage_snapshots::storage_snapshots_samples(
+				parent_storage.clone(),
+				self.parent.co_state().await,
+				&self.membership.id,
+				co_storage.clone(),
+				100,
+			)
+			.await?;
+			for reducer_state in roots {
+				if let Some((state, heads)) = reducer_state.some() {
+					reducer_builder = reducer_builder.with_snapshot(state, heads);
+				}
+			}
+		}
 		let reducer = reducer_builder.build(&co_storage, runtime.runtime(), date).await?;
 
 		// setup auto write to parent co
