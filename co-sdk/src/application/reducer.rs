@@ -1,5 +1,7 @@
 use crate::{
-	library::create_reducer_action::create_reducer_action, CoDate, CoreResolver, CoreResolverContext, DynamicCoDate,
+	library::create_reducer_action::create_reducer_action,
+	reducer::state_resolver::{DynamicStateResolver, JoinStateResolver, StateResolver, StateResolverContext},
+	CoDate, CoreResolver, CoreResolverContext, DynamicCoDate,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -34,6 +36,8 @@ pub struct ReducerBuilder<S, R> {
 	snapshots: HashMap<BTreeSet<Cid>, Cid>,
 	/// Initialize
 	initialize: bool,
+	/// State resolvers
+	state_resolver: Vec<DynamicStateResolver<S>>,
 }
 impl<S, R> ReducerBuilder<S, R>
 where
@@ -49,6 +53,7 @@ where
 			state: None,
 			log,
 			initialize: true,
+			state_resolver: Default::default(),
 		}
 	}
 
@@ -72,6 +77,11 @@ where
 		Self { snapshots, ..self }
 	}
 
+	pub fn with_state_resolver(mut self, state_resolver: impl StateResolver<S>) -> Self {
+		self.state_resolver.push(DynamicStateResolver::new(state_resolver));
+		self
+	}
+
 	pub async fn build(
 		self,
 		storage: &S,
@@ -83,6 +93,13 @@ where
 			return Err(anyhow!("Invalid heads. The log and state heads must be the same"));
 		}
 
+		// state_resolver
+		let state_resolver = match self.state_resolver.len() {
+			0 => None,
+			1 => self.state_resolver.into_iter().next(),
+			_ => JoinStateResolver::from_iter(self.state_resolver).map(DynamicStateResolver::new),
+		};
+
 		// build
 		let mut result = Reducer {
 			core_resolver: self.core_resolver,
@@ -93,6 +110,7 @@ where
 			change_handlers: Default::default(),
 			watch: watch::channel(None),
 			date: date.boxed(),
+			state_resolver,
 		};
 		if self.initialize {
 			result.initialize(storage, runtime).await?;
@@ -119,6 +137,8 @@ pub struct Reducer<S, R> {
 	watch: (watch::Sender<Option<(Cid, BTreeSet<Cid>)>>, watch::Receiver<Option<(Cid, BTreeSet<Cid>)>>),
 	/// Date.
 	date: DynamicCoDate,
+	/// State resolver.
+	state_resolver: Option<DynamicStateResolver<S>>,
 }
 impl<S, R> Reducer<S, R>
 where
@@ -266,11 +286,28 @@ where
 	}
 
 	/// Find the state matching the specified heads, if one.
-	fn find_state(&self, heads: &BTreeSet<Cid>) -> Option<Cid> {
+	async fn find_state(
+		&self,
+		storage: &S,
+		context: &StateResolverContext,
+		heads: &BTreeSet<Cid>,
+	) -> Result<Option<Cid>, anyhow::Error> {
 		if self.heads.eq(heads) {
-			return self.state;
+			return Ok(self.state);
 		}
-		self.snapshots.get(heads).cloned()
+		if let Some(state) = self.snapshots.get(heads) {
+			return Ok(Some(*state));
+		}
+		if let Some(state_resolver) = &self.state_resolver {
+			if let Some((resolved_state, resolved_heads)) =
+				state_resolver.resolve_state(storage, &context, heads).await?
+			{
+				if &resolved_heads == heads {
+					return Ok(Some(resolved_state));
+				}
+			}
+		}
+		Ok(None)
 	}
 
 	/// Push an event.
@@ -573,6 +610,7 @@ where
 	/// Algorithm: We search for the lowest known ancestors of the heads while walking the log backwards.
 	#[tracing::instrument(level = tracing::Level::TRACE, skip(self, storage))]
 	async fn compute_stack(&self, storage: &S) -> Result<(Option<Cid>, VecDeque<EntryBlock>), anyhow::Error> {
+		let context = StateResolverContext { state: self.state, heads: self.heads.clone() };
 		let heads: BTreeSet<Cid> = self.log.heads().clone();
 		let mut state = None;
 		let mut stack = VecDeque::new();
@@ -594,7 +632,7 @@ where
 				// does the current heads reference a state we know?
 				// note: this will never match if we have no previous states
 				//  and a new state will be recomputed from scratch
-				if let Some(entry_state) = self.find_state(&current_heads) {
+				if let Some(entry_state) = self.find_state(storage, &context, &current_heads).await? {
 					state = Some(entry_state);
 					break;
 				}

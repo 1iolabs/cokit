@@ -132,6 +132,20 @@ where
 		}
 	}
 
+	pub fn reverse_stream<S>(&self, storage: &S) -> impl Stream<Item = Result<(CoListIndex, V), StorageError>> + '_
+	where
+		S: BlockStorage + Clone + 'static,
+	{
+		let storage = storage.clone();
+		async_stream::try_stream! {
+			let tree = self.open(&storage).await?;
+			let stream = tree.reverse_stream();
+			for await item in stream {
+				yield item?;
+			}
+		}
+	}
+
 	/// Convenience method to load all or `limit` entries into memory.
 	pub async fn vec<S>(&self, storage: &S, limit: Option<usize>) -> Result<Vec<V>, StorageError>
 	where

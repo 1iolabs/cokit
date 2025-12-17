@@ -35,6 +35,7 @@ pub mod network_queue;
 pub mod network_resolver;
 pub mod push_heads;
 pub mod runtime_dispatch;
+pub mod sample_stream;
 pub mod settings_timeout;
 pub mod shared_membership;
 pub mod storage_cleanup;
