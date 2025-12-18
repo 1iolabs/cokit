@@ -287,6 +287,9 @@ mod tests {
 			.create_co(identity.clone(), CreateCo::new("shared", None).with_algorithm(None))
 			.await
 			.unwrap();
+
+		// when the co has fully initialized check the initial state count
+		let _co_state = co.reducer_state().await;
 		assert_eq!(count_pin_references(&local_co, co.id(), CoPinningKey::Root).await, 1);
 
 		// push
