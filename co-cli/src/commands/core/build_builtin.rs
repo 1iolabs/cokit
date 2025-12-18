@@ -79,16 +79,6 @@ pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 	Ok(exitcode::OK)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Cargo {
-	package: CargoPackage,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct CargoPackage {
-	name: String,
-}
-
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct Cores {
 	cores: BTreeMap<String, String>,

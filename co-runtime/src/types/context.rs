@@ -65,8 +65,13 @@ pub enum RuntimeDiagnosic {
 impl RuntimeDiagnosic {
 	pub async fn resolve<S: BlockStorage>(&mut self, storage: &S) {
 		if let RuntimeDiagnosic::Reference(diagnostic_cid) = &self {
-			if let Ok(message) = storage.get_deserialized::<DiagnosticMessage>(diagnostic_cid).await {
-				*self = RuntimeDiagnosic::Message(message);
+			match storage.get_deserialized::<DiagnosticMessage>(diagnostic_cid).await {
+				Ok(message) => {
+					*self = RuntimeDiagnosic::Message(message);
+				},
+				Err(err) => {
+					tracing::warn!(?diagnostic_cid, ?err, "resolve-diagnostic-failed");
+				},
 			}
 		}
 	}

@@ -1,11 +1,7 @@
-use super::application::ApplicationSettings;
-#[cfg(feature = "pinning")]
-use crate::types::{
-	co_pinning_key::CoPinningKey,
-	cores::{CO_CORE_NAME_STORAGE, CO_CORE_STORAGE},
-};
 use crate::{
+	application::application::ApplicationSettings,
 	library::{
+		builtin_cores::builtin_cores,
 		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
 		locals::{ApplicationLocal, FileLocals, Locals, MemoryLocals},
 	},
@@ -19,12 +15,17 @@ use crate::{
 	ReducerBuilder, Runtime, TaskSpawner, CO_CORE_CO, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
 	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
+#[cfg(feature = "pinning")]
+use crate::{
+	library::create_storage_core_state::create_storage_core_state,
+	types::cores::{CO_CORE_NAME_STORAGE, CO_CORE_STORAGE},
+};
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::ActorHandle;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
-use co_primitives::{tags, CloneWithBlockStorageSettings, OptionMappedCid};
+use co_primitives::{tags, BlockLinks, CloneWithBlockStorageSettings, OptionMappedCid};
 use co_storage::{
 	BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, ExtendedBlockStorage,
 };
@@ -35,7 +36,7 @@ use tokio_util::sync::CancellationToken;
 pub const CO_ID_LOCAL: &str = "local";
 
 /// Local CO Builder.
-/// A local co is special because it's root state will be saved locally to an fiel on an device.
+/// A local co is special because it's root state will be saved locally to a file on a device.
 #[derive(Debug, Clone)]
 pub struct LocalCoBuilder {
 	/// Our application identifier.
@@ -46,14 +47,21 @@ pub struct LocalCoBuilder {
 
 	/// Whether to initialize the reducer (compute latest state).
 	initialize: bool,
+
+	/// Verify Links
+	verify_links: Option<BlockLinks>,
 }
 impl LocalCoBuilder {
 	pub fn new(settings: ApplicationSettings, identity: LocalIdentity, initialize: bool) -> Self {
-		Self { settings, identity, initialize }
+		Self { settings, identity, initialize, verify_links: None }
 	}
 
 	pub fn with_initialize(self, initialize: bool) -> Self {
 		Self { initialize, ..self }
+	}
+
+	pub fn with_verify_links(self, verify_links: Option<BlockLinks>) -> Self {
+		Self { verify_links, ..self }
 	}
 
 	/// Create LocalCO instance.
@@ -193,7 +201,7 @@ where
 		let log = Log::new_local(CO_ID_LOCAL.as_bytes().to_vec(), Default::default());
 
 		// create builder
-		let mut builder =
+		let mut reducer_builder =
 			ReducerBuilder::new(DynamicCoreResolver::new(core_resolver), log).with_initialize(local_co.initialize);
 
 		// load locals as snapshots
@@ -204,13 +212,21 @@ where
 			while let Some(next) = locals_stream.try_next().await? {
 				// apply to builder as snapshot
 				if let Some((state, heads)) = next.some() {
-					builder = builder.with_snapshot(state, heads);
+					reducer_builder = reducer_builder.with_snapshot(state, heads);
 				}
 			}
 		}
 
+		// use storage core
+		#[cfg(feature = "pinning")]
+		{
+			reducer_builder = reducer_builder.with_state_resolver(
+				crate::reducer::state_resolver::LocalStorageStateResolver::new(CO_ID_LOCAL.into()),
+			);
+		}
+
 		// create reducer
-		let reducer = builder.build(&storage, runtime.runtime(), date).await?;
+		let reducer = reducer_builder.build(&storage, runtime.runtime(), date).await?;
 		let initial = reducer.is_empty();
 
 		// flush
@@ -228,13 +244,13 @@ where
 			local_co.settings.identifier.clone(),
 			CO_ID_LOCAL.into(),
 			None,
-			storage,
 			tasks.clone(),
 			runtime,
 			reducer,
 			context,
 			Box::new(flush),
 			false,
+			local_co.verify_links,
 		)?;
 
 		// setup
@@ -432,7 +448,7 @@ where
 			// add last state from disk
 			//  we add the lastest state (from disk) as first root
 			//  this contains the pinnings (state updates below) from the last time
-			//  we need this to have a full hisotry of heads
+			//  we need this to have a full history of heads
 			//  TODO: do we need to add intermediate heads from below (or encapsulate them into one transaction)?
 			let mut new_roots = new_roots;
 			if !last_reducer_state.is_empty() {
@@ -459,7 +475,7 @@ where
 			// apply
 			if let Some(pinning_state) = pinning_state {
 				if let Some((state, heads)) = pinning_state.some() {
-					reducer.insert_snapshot(state, heads.clone());
+					reducer.insert_snapshot(storage, state, heads.clone()).await?;
 					reducer.join(storage, &heads, context.runtime.runtime()).await?;
 				}
 			}
@@ -504,12 +520,7 @@ where
 	// - unencrypted shared COs
 	//   - all references to it should be [`CoReference::Weak`].
 	let reference_mode = if disallow_plain {
-		let builtin_cores = Cores::default()
-			.built_in_native_mapping()
-			.into_iter()
-			.map(|(cid, _)| cid)
-			.collect();
-		EncryptionReferenceMode::DisallowPlainExcept(builtin_cores)
+		EncryptionReferenceMode::DisallowPlainExcept(builtin_cores())
 	} else {
 		EncryptionReferenceMode::Warning
 	};
@@ -555,7 +566,7 @@ async fn setup_local_co(
 		co_core_co::Core {
 			binary: Cores::default().binary(CO_CORE_STORAGE).expect(CO_CORE_STORAGE),
 			tags: tags!("core": CO_CORE_STORAGE),
-			state: create_storage_core_state(&reducer.storage(), settings).await?,
+			state: create_storage_core_state(&reducer.storage(), settings, &CO_ID_LOCAL.into()).await?,
 		},
 	);
 
@@ -565,28 +576,4 @@ async fn setup_local_co(
 
 	// done
 	Ok(())
-}
-
-#[cfg(feature = "pinning")]
-async fn create_storage_core_state<S: BlockStorage + Clone + 'static>(
-	storage: &S,
-	settings: &ApplicationSettings,
-) -> Result<Option<Cid>, anyhow::Error> {
-	Ok(co_core_storage::Storage::initial_state(
-		storage,
-		vec![
-			co_core_storage::StorageAction::PinCreate(
-				CoPinningKey::State.to_string(&CO_ID_LOCAL.into()),
-				settings.setting_co_default_max_state(),
-				Default::default(),
-			),
-			co_core_storage::StorageAction::PinCreate(
-				CoPinningKey::Log.to_string(&CO_ID_LOCAL.into()),
-				settings.setting_co_default_max_log(),
-				Default::default(),
-			),
-		],
-	)
-	.await?
-	.into())
 }

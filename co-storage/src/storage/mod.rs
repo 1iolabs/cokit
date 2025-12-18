@@ -2,6 +2,7 @@ pub mod change;
 pub mod encrypted;
 pub mod fs;
 pub mod join;
+pub mod links;
 pub mod mapped;
 pub mod memory;
 pub mod overlay;

@@ -1,5 +1,5 @@
 use crate::{
-	application::memory::create_memory_reducer, reducer::core_resolver::dynamic::DynamicCoreResolver,
+	application::memory::create_memory_reducer, reducer::core_resolver::dynamic::DynamicCoreResolver, state,
 	types::co_dispatch::CoDispatch, CoContext, CoReducer, CoReducerState, CoStorage, DynamicCoDate, Reducer, Runtime,
 	Storage,
 };
@@ -9,7 +9,9 @@ use cid::Cid;
 use co_actor::TaskSpawner;
 use co_identity::PrivateIdentityBox;
 use co_primitives::{BlockLinks, CoId, Link, ReducerAction};
-use co_storage::{BlockStorageContentMapping, ExtendedBlockStorage, OverlayBlockStorage, StoreParamsBlockStorage};
+use co_storage::{
+	BlockStorageContentMapping, ExtendedBlockStorage, LinksBlockStorage, OverlayBlockStorage, StoreParamsBlockStorage,
+};
 use serde::Serialize;
 use std::{collections::BTreeSet, marker::PhantomData, mem::take};
 
@@ -26,8 +28,12 @@ where
 	core: String,
 	identity: PrivateIdentityBox,
 
-	reducer: Reducer<OverlayBlockStorage<S>, DynamicCoreResolver<OverlayBlockStorage<S>>>,
-	reducer_storage: OverlayBlockStorage<S>,
+	reducer: Reducer<
+		LinksBlockStorage<OverlayBlockStorage<S>>,
+		DynamicCoreResolver<LinksBlockStorage<OverlayBlockStorage<S>>>,
+	>,
+	reducer_storage: LinksBlockStorage<OverlayBlockStorage<S>>,
+	overlay_storage: OverlayBlockStorage<S>,
 
 	new_roots: Vec<CoReducerState>,
 }
@@ -54,12 +60,14 @@ where
 		reducer_storage: &S,
 		identity: PrivateIdentityBox,
 		core: impl Into<String>,
+		verify_links: Option<BlockLinks>,
 	) -> Result<Self, anyhow::Error>
 	where
 		S: ExtendedBlockStorage + Clone + 'static,
 	{
 		let tmp = StoreParamsBlockStorage::new(storage.tmp_storage(), false);
-		let reducer_storage = OverlayBlockStorage::new(tasks, reducer_storage.clone(), tmp, None, true, false);
+		let overlay_storage = OverlayBlockStorage::new(tasks, reducer_storage.clone(), tmp, None, true, false);
+		let reducer_storage = LinksBlockStorage::new(overlay_storage.clone(), verify_links);
 		let reducer = create_memory_reducer(
 			runtime.runtime(),
 			date.clone(),
@@ -76,6 +84,7 @@ where
 			core: core.into(),
 			identity,
 			reducer_storage,
+			overlay_storage,
 			new_roots: Default::default(),
 			_action: PhantomData,
 			date,
@@ -98,6 +107,10 @@ where
 			&co.storage(),
 			identity,
 			core,
+			context
+				.settings()
+				.feature_co_storage_verify_links()
+				.then(|| context.block_links(true).clone()),
 		)
 		.await
 	}
@@ -119,7 +132,9 @@ where
 	}
 
 	/// Push action with an precomputed state.
-	/// Note: This is dangerous if `unsafe_skip_verify` is used and the caller is responsible to know that
+	///
+	/// # Note
+	/// This is dangerous if `unsafe_skip_verify` is used and the caller is responsible to know that
 	///  `action + current state = state`.
 	pub async fn push_reference_with_state(
 		&mut self,
@@ -147,7 +162,7 @@ where
 				)
 				.await?;
 			if verify_state.state != Some(state) {
-				return Err(anyhow!("Verify action failed"));
+				return Err(anyhow!("Verify action failed: {:?} != {:?}", verify_state.state, Some(state)));
 			}
 		}
 
@@ -156,8 +171,56 @@ where
 		Ok(())
 	}
 
-	pub fn storage(&self) -> &OverlayBlockStorage<S> {
+	/// Push action with an precomputed core state.
+	///
+	/// # Note
+	/// This is dangerous if `unsafe_skip_verify` is used and the caller is responsible to know that
+	///  `action + current core state = core state`.
+	pub async fn push_reference_with_core_state(
+		&mut self,
+		action_reference: Link<ReducerAction<A>>,
+		core_state: Cid,
+		unsafe_skip_verify: bool,
+	) -> Result<(), anyhow::Error> {
+		// push
+		if unsafe_skip_verify {
+			self.reducer
+				.push_reference_with_state(
+					&self.reducer_storage,
+					self.runtime.runtime(),
+					&self.identity,
+					action_reference.cid().into(),
+					Some(core_state),
+				)
+				.await?;
+		} else {
+			let verify_state = self
+				.reducer
+				.push_reference(
+					&self.reducer_storage,
+					self.runtime.runtime(),
+					&self.identity,
+					action_reference.cid().into(),
+				)
+				.await?;
+			let result_core_state =
+				state::core_state(&self.reducer_storage, verify_state.state.into(), &self.core).await?;
+			if result_core_state != Some(core_state) {
+				return Err(anyhow!("Verify action failed: {:?} != {:?}", result_core_state, Some(core_state)));
+			}
+		}
+
+		// record
+		self.new_roots.push(self.reducer_state());
+		Ok(())
+	}
+
+	pub fn storage(&self) -> &LinksBlockStorage<OverlayBlockStorage<S>> {
 		&self.reducer_storage
+	}
+
+	pub fn overlay_storage(&self) -> &OverlayBlockStorage<S> {
+		&self.overlay_storage
 	}
 
 	pub fn state(&self) -> Option<Cid> {
@@ -184,13 +247,13 @@ where
 		for root in roots.iter() {
 			// heads
 			for head in root.1.iter() {
-				self.reducer_storage.flush(*head, Some(links.clone())).await?;
+				self.overlay_storage.flush(*head, Some(links.clone())).await?;
 			}
 
 			// last state
 			if roots.last() == Some(root) {
 				if let Some(state) = root.state() {
-					self.reducer_storage.flush(state, Some(links.clone())).await?;
+					self.overlay_storage.flush(state, Some(links.clone())).await?;
 				}
 			}
 		}
@@ -227,11 +290,13 @@ mod tests {
 	use co_identity::PrivateIdentity;
 	use co_log::EntryBlock;
 	use co_primitives::{tags, BlockStorage};
+	use co_test::test_log_path;
 
 	#[tokio::test]
 	async fn smoke() {
 		let application = ApplicationBuilder::new_memory("test")
-			// .with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+			.with_bunyan_logging(Some(test_log_path()))
+			.with_optional_tracing()
 			.with_disabled_feature("co-local-encryption")
 			.with_co_date(MonotonicCoDate::default())
 			.with_co_uuid(MonotonicCoUuid::default())
@@ -265,7 +330,8 @@ mod tests {
 	#[tokio::test]
 	async fn test_push_with_state() {
 		let application = ApplicationBuilder::new_memory("test")
-			// .with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+			.with_bunyan_logging(Some(test_log_path()))
+			.with_optional_tracing()
 			.with_disabled_feature("co-local-encryption")
 			.with_co_date(MonotonicCoDate::default())
 			.with_co_uuid(MonotonicCoUuid::default())
@@ -317,6 +383,75 @@ mod tests {
 			.push_reference_with_state(
 				memory_dispatch_entry.entry().payload.into(),
 				memory_dispatch_reducer_state.state().unwrap(),
+				true,
+			)
+			.await
+			.unwrap();
+		let next_unsafe_memory_dispatch_reducer_state = memory_dispatch.reducer_state();
+
+		// check local has not changed
+		assert_eq!(local_co.reducer_state().await, local_co_reducer_state);
+		assert_eq!(next_memory_dispatch_reducer_state, memory_dispatch_reducer_state);
+		assert_eq!(next_unsafe_memory_dispatch_reducer_state, memory_dispatch_reducer_state);
+		assert_ne!(memory_dispatch_reducer_state, local_co_reducer_state);
+	}
+
+	#[tokio::test]
+	async fn test_push_with_core_state() {
+		let application = ApplicationBuilder::new_memory("test")
+			.with_bunyan_logging(Some(test_log_path()))
+			.with_optional_tracing()
+			.with_disabled_feature("co-local-encryption")
+			.with_co_date(MonotonicCoDate::default())
+			.with_co_uuid(MonotonicCoUuid::default())
+			.without_keychain()
+			.build()
+			.await
+			.unwrap();
+		let local_co = application.local_co_reducer().await.unwrap();
+		let local_co_reducer_state = local_co.reducer_state().await;
+
+		// create memory dispatcher
+		let mut memory_dispatch = MemoryDispatch::<CoAction, CoStorage>::new_reducer(
+			application.co(),
+			&local_co,
+			application.local_identity().boxed(),
+			CO_CORE_NAME_CO,
+		)
+		.await
+		.unwrap();
+		memory_dispatch
+			.dispatch(&CoAction::TagsInsert { tags: tags!("hello": "world") })
+			.await
+			.unwrap();
+		let memory_dispatch_reducer_state = memory_dispatch.reducer_state();
+		let memory_dispatch_entry = EntryBlock::from_block(
+			memory_dispatch
+				.storage()
+				.get(memory_dispatch_reducer_state.heads().first().unwrap())
+				.await
+				.unwrap(),
+		)
+		.unwrap();
+
+		// reset
+		memory_dispatch.reset(local_co_reducer_state.clone()).await.unwrap();
+		memory_dispatch
+			.push_reference_with_core_state(
+				memory_dispatch_entry.entry().payload.into(),
+				memory_dispatch_reducer_state.state().unwrap(), // note: for the root (co) this is also the root
+				false,
+			)
+			.await
+			.unwrap();
+		let next_memory_dispatch_reducer_state = memory_dispatch.reducer_state();
+
+		// reset unsafe
+		memory_dispatch.reset(local_co_reducer_state.clone()).await.unwrap();
+		memory_dispatch
+			.push_reference_with_core_state(
+				memory_dispatch_entry.entry().payload.into(),
+				memory_dispatch_reducer_state.state().unwrap(), // note: for the root (co) this is also the root
 				true,
 			)
 			.await

@@ -1,17 +1,17 @@
 use co_core_co::CoAction;
 use co_sdk::{tags, ApplicationBuilder, CO_CORE_NAME_CO};
-use co_storage::TmpDir;
+use co_test::{test_log_path, test_tmp_dir, TmpDir};
 use futures::{pin_mut, StreamExt};
 
 /// Create Local CO in tmpdir open a second instance and exit.
 #[tokio::test]
 async fn test_local_multi_instance() {
-	let tmp = TmpDir::new("co");
+	let tmp = test_tmp_dir();
 
 	// open first
 	let application1 =
 		ApplicationBuilder::new_with_path(format!("{}-test_local_multi_instance_1", tmp.uuid()), tmp.path().to_owned())
-			.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+			.with_bunyan_logging(Some(test_log_path()))
 			.with_optional_tracing()
 			.without_keychain()
 			.build()
@@ -42,7 +42,7 @@ async fn test_local_multi_instance_push() {
 	// open first
 	let application1 =
 		ApplicationBuilder::new_with_path(format!("{}-test_local_multi_instance_1", tmp.uuid()), tmp.path().to_owned())
-			.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+			.with_bunyan_logging(Some(test_log_path()))
 			.with_optional_tracing()
 			.without_keychain()
 			.build()

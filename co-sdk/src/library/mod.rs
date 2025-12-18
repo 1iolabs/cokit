@@ -1,8 +1,11 @@
 pub mod all_tags;
 pub mod build_core;
+pub mod builtin_cores;
 pub mod cancel;
 pub mod connections_peer_provider;
 pub mod create_reducer_action;
+#[cfg(feature = "pinning")]
+pub mod create_storage_core_state;
 pub mod did_key_provider;
 pub mod extract_next_heads;
 pub mod find_co_by_pin;
@@ -32,6 +35,7 @@ pub mod network_queue;
 pub mod network_resolver;
 pub mod push_heads;
 pub mod runtime_dispatch;
+pub mod sample_stream;
 pub mod settings_timeout;
 pub mod shared_membership;
 pub mod storage_cleanup;
@@ -41,6 +45,8 @@ pub mod storage_dispatch_remove;
 pub mod storage_dispatch_roots;
 #[cfg(feature = "pinning")]
 pub mod storage_pinning;
+#[cfg(feature = "pinning")]
+pub mod storage_snapshots;
 pub mod storage_structure;
 pub mod to_external_cid;
 pub mod to_internal_cid;

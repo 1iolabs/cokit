@@ -6,7 +6,7 @@ mod types;
 pub use library::test::TestStorage;
 pub use library::{
 	block_diff::{block_diff, block_diff_added_with_parent, BlockDiff, BlockDiffFollow},
-	block_links::{BlockLinks, BlockLinksFilter, IgnoreFilter, WeakCoReferenceFilter},
+	block_links::{BlockLinks, BlockLinksFilter, IgnoreFilter, JoinFilter, WeakCoReferenceFilter},
 	block_serializer::{BlockSerializer, BlockSerializerError},
 	cbor::{from_cbor, to_cbor, CborError},
 	co_try_stream_ext::CoTryStreamExt,
@@ -16,6 +16,7 @@ pub use library::{
 	node_builder::{DefaultNodeSerializer, Node, NodeBuilder, NodeBuilderError, NodeSerializer},
 	node_reader::{node_reader, NodeReaderError},
 	node_stream::NodeStream,
+	serde_map_as_list,
 	unixfs::{unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer},
 	unixfs_stream::unixfs_stream,
 };

@@ -1,6 +1,9 @@
 use crate::{
 	cli::Cli,
-	library::{cat::cat_output, cli_context::CliContext},
+	library::{
+		cat::{cat_output, CatOptions},
+		cli_context::CliContext,
+	},
 };
 use cid::Cid;
 use co_primitives::{from_cbor, Secret};
@@ -38,7 +41,14 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 	}
 
 	// print
-	cat_output(storage, Cid::from_str(&command.cid)?, command.pretty, command.key_file.is_some()).await?;
+	cat_output(
+		storage,
+		Cid::from_str(&command.cid)?,
+		CatOptions::default()
+			.with_pretty(command.pretty)
+			.with_decrypt(command.key_file.is_some()),
+	)
+	.await?;
 
 	// result
 	Ok(exitcode::OK)

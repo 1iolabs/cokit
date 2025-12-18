@@ -347,7 +347,7 @@ impl FileLocalsActor {
 			let lock = flock { l_start: 0, l_len: 0, l_pid: 0, l_type: libc::F_WRLCK as libc::c_short, l_whence: 0 };
 			match fcntl(file.as_raw_fd(), FcntlArg::F_SETLK(&lock)) {
 				Ok(_) => {
-					tracing::info!(?path, "local-lock");
+					tracing::info!(?path, "locals-lock");
 					return Ok(FileLocalsFile::LockedFile(path, file));
 				},
 				Err(errno) => {
@@ -356,7 +356,7 @@ impl FileLocalsActor {
 					drop(file);
 
 					// log
-					tracing::warn!(?path, ?errno, "local-lock-failed");
+					tracing::warn!(?path, ?errno, "locals-lock-failed");
 
 					// index
 					path = self
@@ -392,7 +392,7 @@ impl FileLocalsActor {
 			// lock
 			match Flock::lock(file, nix::fcntl::FlockArg::LockExclusiveNonblock) {
 				Ok(lock) => {
-					tracing::info!(?path, "local-lock (flock)");
+					tracing::info!(?path, "locals-lock (flock)");
 					return Ok(FileLocalsFile::Flock(path, lock));
 				},
 				Err((file, errno)) => {
@@ -401,7 +401,7 @@ impl FileLocalsActor {
 					drop(file);
 
 					// log
-					tracing::warn!(?path, ?errno, "local-lock-failed");
+					tracing::warn!(?path, ?errno, "locals-lock-failed");
 
 					// index
 					path = self
@@ -638,6 +638,7 @@ impl ApplicationLocal {
 
 	/// Read path as ApplicationLocal expecting DAG-CBOR format.
 	/// Returns `None` if file not exists.
+	#[tracing::instrument(level = tracing::Level::TRACE, name = "locals-read", err(Debug))]
 	pub async fn read(path: &PathBuf) -> anyhow::Result<Option<ApplicationLocal>> {
 		Ok(
 			match fs_read_option(path)
@@ -665,7 +666,7 @@ impl ApplicationLocal {
 mod tests {
 	use crate::library::locals::{ApplicationLocal, FileLocals, Locals};
 	use co_primitives::BlockSerializer;
-	use co_storage::TmpDir;
+	use co_test::TmpDir;
 
 	#[tokio::test]
 	async fn test_file_locals_overwrite() {

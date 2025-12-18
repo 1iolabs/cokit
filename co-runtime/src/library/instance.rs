@@ -1,7 +1,7 @@
 use crate::{create_runtime, runtimes::Runtime};
 use anyhow::anyhow;
 use cid::Cid;
-use co_primitives::{unixfs_cat_buffer, AnyBlockStorage, BlockStorageExt, KnownMultiCodec, MultiCodec};
+use co_primitives::{unixfs_cat_buffer, AnyBlockStorage, KnownMultiCodec, MultiCodec};
 use co_storage::StorageError;
 use std::fmt::Debug;
 

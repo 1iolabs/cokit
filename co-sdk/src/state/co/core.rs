@@ -1,4 +1,8 @@
-use crate::state::{query_core, Query, QueryError};
+use crate::{
+	state::{query_core, Query, QueryError},
+	CO_CORE_NAME_CO,
+};
+use cid::Cid;
 use co_core_co::Co;
 use co_primitives::{AnyBlockStorage, CoreName, OptionLink};
 use serde::de::DeserializeOwned;
@@ -24,4 +28,19 @@ where
 		.with_default()
 		.execute(storage, co_state)
 		.await?)
+}
+
+/// Get the state of a core by name.
+/// Returns [`None`] is core can not be found.
+pub async fn core_state(
+	storage: &impl AnyBlockStorage,
+	co_state: OptionLink<Co>,
+	name: &str,
+) -> Result<Option<Cid>, QueryError> {
+	if CO_CORE_NAME_CO == name {
+		Ok(co_state.into())
+	} else {
+		let co = query_core(CO_CORE_NAME_CO).with_default().execute(storage, co_state).await?;
+		Ok(co.cores.get(name).and_then(|core| core.state))
+	}
 }

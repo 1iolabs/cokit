@@ -10,6 +10,7 @@ pub mod lsm_tree_map;
 pub mod node_builder;
 pub mod node_reader;
 pub mod node_stream;
+pub mod serde_map_as_list;
 #[cfg(any(test, feature = "benchmarking"))]
 pub mod test;
 pub mod unixfs;

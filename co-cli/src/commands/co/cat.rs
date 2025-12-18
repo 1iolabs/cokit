@@ -1,6 +1,9 @@
 use crate::{
 	cli::Cli,
-	library::{cat::cat_output, cli_context::CliContext},
+	library::{
+		cat::{cat_output, CatOptions},
+		cli_context::CliContext,
+	},
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -21,6 +24,10 @@ pub struct Command {
 	/// Pretty print data.
 	#[arg(short, long)]
 	pub pretty: bool,
+
+	/// Print useing formatter.
+	#[arg(long)]
+	pub format: Option<String>,
 
 	/// Skip decrypt block if Cid is encrypted.
 	#[arg(short, long)]
@@ -61,7 +68,15 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 	}
 
 	// print
-	cat_output(reducer.storage(), cid, command.pretty, !command.no_decrypt).await?;
+	cat_output(
+		reducer.storage(),
+		cid,
+		CatOptions::default()
+			.with_pretty(command.pretty)
+			.with_decrypt(!command.no_decrypt)
+			.with_format(command.format.clone()),
+	)
+	.await?;
 
 	// result
 	Ok(exitcode::OK)

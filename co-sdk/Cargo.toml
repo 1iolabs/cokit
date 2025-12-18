@@ -76,6 +76,7 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 example-counter = { path = "../examples/counter" }
 example-counter-upgraded = { path = "../examples/counter-upgraded" }
 tokio = { workspace = true, features = ["full", "tracing"] }
+co-test = { workspace = true }
 console-subscriber = { version = "0.4.1" }
 
 [features]

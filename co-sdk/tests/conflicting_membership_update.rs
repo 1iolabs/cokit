@@ -9,7 +9,7 @@ use co_sdk::{
 	CoReducerState, CoStorage, Cores, CreateCo, DidKeyIdentity, DidKeyProvider, Identity, MonotonicCoDate,
 	MonotonicCoUuid, CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
-use co_storage::TmpDir;
+use co_test::{test_application_identifier, test_log_path, test_tmp_dir};
 use futures::{join, pin_mut, stream, StreamExt, TryStreamExt};
 use ipld_core::ipld::Ipld;
 use std::{
@@ -58,7 +58,7 @@ async fn trace_heads(note: &str, co: &str, context: &CoContext, storage: &CoStor
 /// See:
 /// - https://gitlab.1io.com/1io/co-sdk/-/issues/59
 #[tokio::test]
-async fn test_conflicting_membership_update() {
+async fn test_conflicting_membership_update_plain() {
 	conflicting_membership_update(false).await;
 }
 
@@ -69,16 +69,18 @@ async fn test_conflicting_membership_update_encrypted() {
 
 async fn conflicting_membership_update(encryption: bool) {
 	let timeout_duration = Duration::from_secs(5);
-	let tmp = TmpDir::new("co").without_clear();
-
-	// application
-	let mut application_builder = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
-		.without_keychain()
-		.with_disabled_feature("co-local-watch")
-		.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
-		.with_optional_tracing()
-		.with_co_date(MonotonicCoDate::default())
-		.with_co_uuid(MonotonicCoUuid::default());
+	let tmp = test_tmp_dir().without_clear();
+	let mut application_builder = ApplicationBuilder::new_with_path(
+		test_application_identifier("conflicting_membership_update"),
+		tmp.path().to_owned(),
+	)
+	.without_keychain()
+	.with_disabled_feature("co-local-watch")
+	.with_setting("feature", "co-storage-verify-links")
+	.with_bunyan_logging(Some(test_log_path()))
+	.with_optional_tracing()
+	.with_co_date(MonotonicCoDate::default())
+	.with_co_uuid(MonotonicCoUuid::default());
 	if !encryption {
 		application_builder = application_builder.with_disabled_feature("co-local-encryption");
 	}
@@ -133,6 +135,7 @@ async fn conflicting_membership_update(encryption: bool) {
 	let mut application2_builder = ApplicationBuilder::new_with_path("test2".to_owned(), tmp.path().to_owned())
 		.without_keychain()
 		.with_disabled_feature("co-local-watch")
+		.with_setting("feature", "co-storage-verify-links")
 		.with_co_date(MonotonicCoDate::default())
 		.with_co_uuid(MonotonicCoUuid::default());
 	if !encryption {

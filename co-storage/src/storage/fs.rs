@@ -298,9 +298,10 @@ fn to_cid_path(path: &PathBuf, cid: &Cid, prefix: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
 	use super::to_cid_path;
-	use crate::{FsStorage, TmpDir};
+	use crate::FsStorage;
 	use cid::Cid;
 	use co_primitives::BlockStorageExt;
+	use co_test::TmpDir;
 	use std::{path::PathBuf, str::FromStr};
 
 	#[test]

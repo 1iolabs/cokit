@@ -11,7 +11,7 @@ mod participants;
 mod query;
 
 pub use co::{
-	core::{core, core_or_default},
+	core::{core, core_or_default, core_state},
 	info::{co, co_info},
 };
 pub use dag::{find::find, into_collection::into_collection, is_empty::is_empty, stream::stream};

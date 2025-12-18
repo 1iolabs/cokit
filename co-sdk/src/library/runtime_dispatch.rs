@@ -53,7 +53,7 @@ where
 		.await?;
 
 		// apply
-		let result = self
+		let runtime_context = self
 			.runtime
 			.execute_state(
 				&self.storage,
@@ -69,7 +69,12 @@ where
 		// TODO: make sure it not in use by anyone else?
 		self.storage.remove(action_cid.cid()).await?;
 
+		// check diagostics
+		//  (albeit they only happen due to bugs)
+		//  we should always use diagnostics for implicit actions to not silently fail tasks
+		runtime_context.ok(&self.storage).await?;
+
 		// result
-		Ok(result.state)
+		Ok(runtime_context.state)
 	}
 }

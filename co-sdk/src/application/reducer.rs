@@ -1,5 +1,9 @@
 use crate::{
-	library::create_reducer_action::create_reducer_action, CoDate, CoreResolver, CoreResolverContext, DynamicCoDate,
+	library::create_reducer_action::create_reducer_action,
+	reducer::state_resolver::{
+		DynamicStateResolver, JoinStateResolver, StateResolver, StateResolverContext, StaticStateResolver,
+	},
+	CoDate, CoreResolver, CoreResolverContext, DynamicCoDate,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -9,7 +13,7 @@ use co_log::{EntryBlock, Log, LogError};
 use co_primitives::{Link, ReducerAction, SignedEntry};
 use co_runtime::RuntimePool;
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
-use futures::{pin_mut, TryStreamExt};
+use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use ipld_core::ipld::Ipld;
 use serde::Serialize;
 use std::{
@@ -34,6 +38,8 @@ pub struct ReducerBuilder<S, R> {
 	snapshots: HashMap<BTreeSet<Cid>, Cid>,
 	/// Initialize
 	initialize: bool,
+	/// State resolvers
+	state_resolver: Vec<DynamicStateResolver<S>>,
 }
 impl<S, R> ReducerBuilder<S, R>
 where
@@ -49,6 +55,7 @@ where
 			state: None,
 			log,
 			initialize: true,
+			state_resolver: Default::default(),
 		}
 	}
 
@@ -72,6 +79,11 @@ where
 		Self { snapshots, ..self }
 	}
 
+	pub fn with_state_resolver(mut self, state_resolver: impl StateResolver<S>) -> Self {
+		self.state_resolver.push(DynamicStateResolver::new(state_resolver));
+		self
+	}
+
 	pub async fn build(
 		self,
 		storage: &S,
@@ -83,16 +95,38 @@ where
 			return Err(anyhow!("Invalid heads. The log and state heads must be the same"));
 		}
 
+		// static state resolver
+		let state_resolver = if !self.snapshots.is_empty() {
+			StaticStateResolver::new_unsorted(
+				storage,
+				stream::iter(self.snapshots).map(|(heads, state)| (state, heads)),
+			)
+			.await?
+		} else {
+			StaticStateResolver::default()
+		};
+
+		// state resolvers
+		let state_resolver = if !self.state_resolver.is_empty() {
+			DynamicStateResolver::new(
+				self.state_resolver
+					.into_iter()
+					.fold(JoinStateResolver::new(state_resolver), JoinStateResolver::join_box),
+			)
+		} else {
+			DynamicStateResolver::new(state_resolver)
+		};
+
 		// build
 		let mut result = Reducer {
 			core_resolver: self.core_resolver,
 			heads: self.heads,
-			snapshots: self.snapshots,
 			state: self.state,
 			log: self.log,
 			change_handlers: Default::default(),
 			watch: watch::channel(None),
 			date: date.boxed(),
+			state_resolver,
 		};
 		if self.initialize {
 			result.initialize(storage, runtime).await?;
@@ -111,14 +145,14 @@ pub struct Reducer<S, R> {
 	state: Option<Cid>,
 	/// Latest heads.
 	heads: BTreeSet<Cid>,
-	/// Avilable historic snapshots (in chronologic order?).
-	snapshots: HashMap<BTreeSet<Cid>, Cid>,
 	/// Change handlers.
 	change_handlers: Vec<Box<dyn ReducerChangedHandler<S, R>>>,
 	/// State/Heads watcher.
 	watch: (watch::Sender<Option<(Cid, BTreeSet<Cid>)>>, watch::Receiver<Option<(Cid, BTreeSet<Cid>)>>),
 	/// Date.
 	date: DynamicCoDate,
+	/// State resolver.
+	state_resolver: DynamicStateResolver<S>,
 }
 impl<S, R> Reducer<S, R>
 where
@@ -128,24 +162,37 @@ where
 	/// Initialize this reducer by computing current state if one.
 	#[tracing::instrument(level = tracing::Level::TRACE, skip(self, storage, runtime))]
 	pub async fn initialize(&mut self, storage: &S, runtime: &RuntimePool) -> Result<(), anyhow::Error> {
-		tracing::trace!(?self.snapshots, "reducer-initialize");
+		tracing::trace!(?self.state_resolver, "reducer-initialize");
 		let context = ReducerChangeContext { cause: ReducerChangeCause::Initialize };
+
+		// initialize state resolver
+		self.state_resolver.initialize(storage).await?;
 
 		// if we have snapshots but no state/heads join all heads from snapshots
 		// find latest state if we have snapshots but no latest selection
-		if self.state.is_none() && self.heads.is_empty() && !self.snapshots.is_empty() {
-			for (heads, _) in self.snapshots.iter() {
-				// join heads
-				self.log.join_heads(storage, heads.iter()).await?;
+		if self.state.is_none() && self.heads.is_empty() {
+			// provide roots
+			if let Some(roots) = self.state_resolver.provide_roots(storage, &StateResolverContext::default()) {
+				pin_mut!(roots);
+				while let Some((state, heads)) = roots.try_next().await? {
+					// join heads
+					self.log.join_heads(storage, heads.iter()).await?;
 
-				// try to find state for latest heads
-				//  do this every iteration so we end up with the latest known state
-				if let Some((state, heads)) = self.find_snapshot_state(self.log.heads()) {
-					self.state = state;
-					self.heads = heads;
+					// use state?
+					//  do this every iteration so we end up with the latest known state
+					if state.is_some() && self.log.heads() == &heads {
+						self.state = state;
+						self.heads = heads;
+					}
+				}
+				tracing::trace!(state = ?self.state, heads = ?self.heads, log_heads = ?self.log.heads(), "reducer-roots");
+
+				// push resolved state
+				//  this makes it possible for compute state to may use recomputed
+				if let Some(state) = self.state {
+					self.state_resolver.push_state(storage, &context, state, &self.heads).await?;
 				}
 			}
-			tracing::trace!(state = ?self.state, heads = ?self.heads, log_heads = ?self.log.heads(), "reducer-snapshots");
 		}
 
 		// if log heads are different from reducer heads
@@ -154,6 +201,11 @@ where
 			let (state, heads) = self.compute_state(storage, runtime, &context).await?;
 			self.state = state;
 			self.heads = heads;
+
+			// push calculated state
+			if let Some(state) = self.state {
+				self.state_resolver.push_state(storage, &context, state, &self.heads).await?;
+			}
 		}
 
 		// fail if we have state but no heads
@@ -174,15 +226,6 @@ where
 
 		// if we have state and heads we are fine
 		Ok(())
-	}
-
-	/// Find snapshot state which matches `heads`.
-	fn find_snapshot_state(&self, heads: &BTreeSet<Cid>) -> Option<(Option<Cid>, BTreeSet<Cid>)> {
-		if let Some(state) = self.snapshots.get(heads) {
-			Some((Some(*state), heads.clone()))
-		} else {
-			None
-		}
 	}
 
 	/// (Re)sets the reducer and the log to a given state.
@@ -250,27 +293,43 @@ where
 		self.clear_snapshots();
 	}
 
-	/// Iterator over avilable snapshots.
-	pub fn snapshots_iter(&self) -> impl Iterator<Item = (&Cid, &BTreeSet<Cid>)> {
-		self.snapshots.iter().map(|(heads, state)| (state, heads))
-	}
-
 	/// Clear all state but latest.
 	pub fn clear_snapshots(&mut self) {
-		self.snapshots.clear();
+		self.state_resolver.clear();
 	}
 
 	/// Insert previous snapshots (trusted) of the same log from which we can continue.
-	pub fn insert_snapshot(&mut self, state: Cid, heads: BTreeSet<Cid>) {
-		self.snapshots.insert(heads, state);
+	pub async fn insert_snapshot(
+		&mut self,
+		storage: &S,
+		state: Cid,
+		heads: BTreeSet<Cid>,
+	) -> Result<(), anyhow::Error> {
+		let change_context = ReducerChangeContext::new_join();
+		self.state_resolver.push_state(storage, &change_context, state, &heads).await?;
+		Ok(())
 	}
 
 	/// Find the state matching the specified heads, if one.
-	fn find_state(&self, heads: &BTreeSet<Cid>) -> Option<Cid> {
-		if self.heads.eq(heads) {
-			return self.state;
+	async fn find_state(
+		&self,
+		storage: &S,
+		context: &StateResolverContext,
+		heads: &BTreeSet<Cid>,
+	) -> Result<Option<(Cid, BTreeSet<Cid>)>, anyhow::Error> {
+		if &self.heads == heads {
+			if let Some(state) = self.state {
+				return Ok(Some((state, self.heads.clone())));
+			}
 		}
-		self.snapshots.get(heads).cloned()
+		if let Some((resolved_state, resolved_heads)) =
+			self.state_resolver.resolve_state(storage, &context, heads).await?
+		{
+			if &resolved_heads == heads {
+				return Ok(Some((resolved_state, resolved_heads)));
+			}
+		}
+		Ok(None)
 	}
 
 	/// Push an event.
@@ -331,6 +390,29 @@ where
 	where
 		I: PrivateIdentity + Send + Sync,
 	{
+		self.push_reference_with_state(storage, runtime, identity, action_link, None)
+			.await
+	}
+
+	/// Push an event.
+	///
+	/// # Returns
+	/// The resulting state.
+	///
+	/// # Note
+	/// Specifing a `core_state_link` may is dangerous and the caller is responsible to know that:
+	/// `action_link + current core state = core_state_link`.
+	pub async fn push_reference_with_state<I>(
+		&mut self,
+		storage: &S,
+		runtime: &RuntimePool,
+		identity: &I,
+		action_link: Link<ReducerAction<Ipld>>,
+		core_state_link: Option<Cid>,
+	) -> Result<PushResult, anyhow::Error>
+	where
+		I: PrivateIdentity + Send + Sync,
+	{
 		let action: ReducerAction<serde::de::IgnoredAny> = storage.get_deserialized(action_link.as_ref()).await?;
 
 		// validate
@@ -351,7 +433,11 @@ where
 		// println!("entry = {:?}", ipld);
 
 		// apply to state
-		let context = CoreResolverContext { change: ReducerChangeContext { cause: ReducerChangeCause::Push }, entry };
+		let context = CoreResolverContext {
+			change: ReducerChangeContext { cause: ReducerChangeCause::Push },
+			entry,
+			state: core_state_link,
+		};
 		let runtime_context = self
 			.core_resolver
 			.execute(storage, runtime, &context, &self.state, action_link.cid())
@@ -387,8 +473,10 @@ where
 		runtime_context.ok(storage).await?;
 
 		// snapshot
-		if self.state.is_some() {
-			self.insert_snapshot(self.state.unwrap(), self.heads.clone());
+		if let Some(state) = self.state {
+			self.state_resolver
+				.push_state(storage, &context.change, state, &self.heads)
+				.await?;
 		}
 
 		// update
@@ -422,13 +510,15 @@ where
 			let context = ReducerChangeContext { cause: ReducerChangeCause::Log };
 
 			// sync state
-			let (next_state, next_heads) = if let Some((state, heads)) = self.find_snapshot_state(self.log().heads()) {
-				// use snapshot
-				(state, heads)
-			} else {
-				// compute state
-				self.compute_state(storage, runtime, &context).await?
-			};
+			let state_context = StateResolverContext { state: self.state, heads: self.heads.clone() };
+			let (has_snapshot, (next_state, next_heads)) =
+				if let Some((state, heads)) = self.find_state(storage, &state_context, self.log().heads()).await? {
+					// use snapshot
+					(true, (Some(state), heads))
+				} else {
+					// compute state
+					(false, self.compute_state(storage, runtime, &context).await?)
+				};
 
 			// result
 			let result = JoinResult {
@@ -447,7 +537,7 @@ where
 					log_heads = ?if log_heads == self.heads { None } else { Some(&log_heads) },
 					join_heads = ?heads,
 					?result,
-					has_snapshot = self.find_snapshot_state(&result.heads).is_some(),
+					has_snapshot,
 					"joined"
 				);
 
@@ -514,7 +604,7 @@ where
 
 			// context
 			let action = entry.entry().payload;
-			let context = CoreResolverContext { change: context.clone(), entry };
+			let context = CoreResolverContext { change: context.clone(), entry, state: None };
 
 			// apply
 			state = self
@@ -546,8 +636,9 @@ where
 	/// Algorithm: We search for the lowest known ancestors of the heads while walking the log backwards.
 	#[tracing::instrument(level = tracing::Level::TRACE, skip(self, storage))]
 	async fn compute_stack(&self, storage: &S) -> Result<(Option<Cid>, VecDeque<EntryBlock>), anyhow::Error> {
+		let context = StateResolverContext { state: self.state, heads: self.heads.clone() };
 		let heads: BTreeSet<Cid> = self.log.heads().clone();
-		let mut state = self.state;
+		let mut state = None;
 		let mut stack = VecDeque::new();
 
 		// is latest state?
@@ -567,7 +658,7 @@ where
 				// does the current heads reference a state we know?
 				// note: this will never match if we have no previous states
 				//  and a new state will be recomputed from scratch
-				if let Some(entry_state) = self.find_state(&current_heads) {
+				if let Some((entry_state, _)) = self.find_state(storage, &context, &current_heads).await? {
 					state = Some(entry_state);
 					break;
 				}
@@ -629,7 +720,7 @@ impl<S, R> Debug for Reducer<S, R> {
 			.field("id", &self.log.id_string())
 			.field("state", &self.state)
 			.field("heads", &self.heads)
-			.field("snapshots", &self.snapshots)
+			.field("state_resolver", &self.state_resolver)
 			.finish()
 	}
 }
@@ -652,6 +743,14 @@ impl ReducerChangeContext {
 	/// Whether this change was caused locally.
 	pub fn is_local_change(&self) -> bool {
 		self.cause.is_local()
+	}
+
+	/// Whether this change was caused by initialize.
+	pub fn is_initialize(&self) -> bool {
+		match self.cause {
+			ReducerChangeCause::Initialize => true,
+			_ => false,
+		}
 	}
 }
 
@@ -1040,8 +1139,14 @@ mod tests {
 		assert!(h1 > h2);
 
 		// transfer state
-		reducer1.insert_snapshot(reducer2.state().unwrap(), reducer2.heads().clone());
-		reducer2.insert_snapshot(reducer1.state().unwrap(), reducer1.heads().clone());
+		reducer1
+			.insert_snapshot(&storage, reducer2.state().unwrap(), reducer2.heads().clone())
+			.await
+			.unwrap();
+		reducer2
+			.insert_snapshot(&storage, reducer1.state().unwrap(), reducer1.heads().clone())
+			.await
+			.unwrap();
 
 		// join1
 		reducer1.join(&storage, reducer2.heads(), &runtime).await.unwrap();
@@ -1138,8 +1243,14 @@ mod tests {
 		assert!(h1 < h2);
 
 		// transfer state
-		reducer1.insert_snapshot(reducer2.state().unwrap(), reducer2.heads().clone());
-		reducer2.insert_snapshot(reducer1.state().unwrap(), reducer1.heads().clone());
+		reducer1
+			.insert_snapshot(&storage, reducer2.state().unwrap(), reducer2.heads().clone())
+			.await
+			.unwrap();
+		reducer2
+			.insert_snapshot(&storage, reducer1.state().unwrap(), reducer1.heads().clone())
+			.await
+			.unwrap();
 
 		// join1
 		reducer1.join(&storage, reducer2.heads(), &runtime).await.unwrap();
@@ -1206,4 +1317,100 @@ mod tests {
 	// };
 	// let count = find(reducer1.state().unwrap(), reducer1.heads().clone()).await.unwrap();
 	// println!("count: {}", count);
+
+	/// Test `compute_stack` when we have no previous state to start calculation from.
+	#[tokio::test]
+	async fn test_compute_stack_without_previous_state() {
+		// reducer
+		let storage = MemoryBlockStorage::default();
+		let co_date = MonotonicCoDate::default();
+		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
+		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let mut reducer1 = create_reducer(&storage, &runtime, &co_date, None).await;
+
+		// push
+		let action1 = reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(1))
+			.await
+			.unwrap();
+
+		// reducer2
+		let mut reducer2 = create_reducer(&storage, &runtime, &co_date, Some(&reducer1)).await;
+		assert_eq!((reducer2.state(), reducer2.heads()), (reducer1.state(), reducer1.heads()));
+
+		// conflict
+		let action2 = reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(2))
+			.await
+			.unwrap();
+		let action3 = reducer2
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(3))
+			.await
+			.unwrap();
+
+		// update reducer with reducer1 state
+		reducer2.clear_snapshots();
+		reducer2.log.join_heads(&storage, reducer1.log.heads()).await.unwrap();
+		let (source_state, stack) = reducer2.compute_stack(&storage).await.unwrap();
+		assert_eq!(source_state, None);
+		assert_eq!(stack.len(), 3);
+		assert_eq!(stack[0].cid(), action1.entry.cid());
+		assert_eq!(stack[1].cid(), action3.entry.cid());
+		assert_eq!(stack[2].cid(), action2.entry.cid());
+	}
+
+	/// Test `compute_stack` when we have a previous state to start calculation from.
+	#[tokio::test]
+	async fn test_compute_stack() {
+		// reducer
+		let storage = MemoryBlockStorage::default();
+		let co_date = MonotonicCoDate::default();
+		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
+		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let mut reducer1 = create_reducer(&storage, &runtime, &co_date, None).await;
+
+		// push
+		let action1 = reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(1))
+			.await
+			.unwrap();
+
+		// reducer2
+		let mut reducer2 = create_reducer(&storage, &runtime, &co_date, Some(&reducer1)).await;
+		assert_eq!((reducer2.state(), reducer2.heads()), (reducer1.state(), reducer1.heads()));
+
+		// conflict
+		let action2 = reducer1
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(2))
+			.await
+			.unwrap();
+		let action3 = reducer2
+			.push(&storage, &runtime, &identity, "test", &CounterAction::Increment(3))
+			.await
+			.unwrap();
+
+		// update reducer with reducer1 state
+		reducer2.log.join_heads(&storage, reducer1.log.heads()).await.unwrap();
+		let (source_state, stack) = reducer2.compute_stack(&storage).await.unwrap();
+		assert_eq!(source_state, Some(action1.state.unwrap()));
+		assert_eq!(stack.len(), 2);
+		assert_eq!(stack[0].cid(), action3.entry.cid());
+		assert_eq!(stack[1].cid(), action2.entry.cid());
+	}
+
+	async fn create_reducer(
+		storage: &MemoryBlockStorage,
+		runtime: &RuntimePool,
+		co_date: &MonotonicCoDate,
+		from: Option<&Reducer<MemoryBlockStorage, SingleCoreResolver>>,
+	) -> Reducer<MemoryBlockStorage, SingleCoreResolver> {
+		let mut builder = ReducerBuilder::new(
+			SingleCoreResolver::new(Cid::default(), Core::native::<Counter>()),
+			Log::new_local("test".as_bytes().to_vec(), from.map(|log| log.heads().clone()).unwrap_or_default()),
+		);
+		if let Some(from) = from {
+			builder = builder.with_snapshot(from.state().unwrap(), from.heads().clone());
+		}
+		builder.build(storage, runtime, co_date.clone()).await.unwrap()
+	}
 }

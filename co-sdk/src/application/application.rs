@@ -7,7 +7,7 @@ use super::{
 use crate::{
 	library::wait_response::request_response, services::application::ApplicationMessage, Action, CoDate, CoReducer,
 	CoReducerFactory, CoStorage, CoUuid, Cores, DynamicCoDate, DynamicCoUuid, RandomCoUuid, Storage, SystemCoDate,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE,
+	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -156,13 +156,16 @@ impl Application {
 		let co = SharedCoCreator::new(local, create)
 			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_string())
 			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_string())
-			.with_storage_core_name(CO_CORE_NAME_STORAGE.to_string())
 			.create(
 				self.storage(),
 				self.context().inner.runtime(),
 				creator,
 				self.context().date().clone(),
 				self.context().uuid().clone(),
+				#[cfg(feature = "pinning")]
+				self.context().inner.create_pinning_context(),
+				#[cfg(feature = "pinning")]
+				Default::default(),
 			)
 			.await?;
 
@@ -242,13 +245,13 @@ pub struct ApplicationSettings {
 	/// - `default-features` [`TagValue::Bool`] - (default: `true`)
 	/// - `feature` [`TagValue::String`]
 	/// - `co-default-max-state` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_state`]
-	/// - `co-default-max-log` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_log`]
 	///
 	/// Known Features:
 	/// - `co-local-watch` (default)
 	/// - `co-local-encryption` (default)
 	/// - `co-storage-free` - [`ApplicationSettings::feature_co_storage_free`]
 	/// - `co-open-keep` - [`ApplicationSettings::feature_co_open_keep`]
+	/// - `co-storage-verify-links` - [`ApplicationSettings::feature_co_storage_verify_links`]
 	pub settings: Tags,
 }
 impl ApplicationSettings {
@@ -299,24 +302,17 @@ impl ApplicationSettings {
 		self.has_feature("co-open-keep")
 	}
 
-	/// Count of states to store for LocalCO and newly joined COs. A value of zero means unlimited.
+	/// Verify links every time when a block gets created.
+	/// This setting is recommended for development as it help to catch errors early.
+	pub fn feature_co_storage_verify_links(&self) -> bool {
+		self.has_feature("co-storage-verify-links")
+	}
+
+	/// Count of roots to store for LocalCO and newly joined COs. A value of zero means unlimited.
 	pub fn setting_co_default_max_state(&self) -> PinStrategy {
 		match self
 			.settings
 			.integer("co-default-max-state")
-			.and_then(|v| v.try_into().ok())
-			.unwrap_or(100)
-		{
-			0 => PinStrategy::Unlimited,
-			max => PinStrategy::MaxCount(max),
-		}
-	}
-
-	/// Count of transactions to store for LocalCO and newly joined. A value of zero means unlimited.
-	pub fn setting_co_default_max_log(&self) -> PinStrategy {
-		match self
-			.settings
-			.integer("co-default-max-log")
 			.and_then(|v| v.try_into().ok())
 			.unwrap_or(100)
 		{

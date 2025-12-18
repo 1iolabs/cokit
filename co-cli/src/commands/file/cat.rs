@@ -2,7 +2,7 @@ use super::Command as FileCommand;
 use crate::{
 	cli::Cli,
 	library::{
-		cat::cat_output,
+		cat::{cat_output, CatOptions},
 		cli_context::CliContext,
 		file::{get_nodes, FileError},
 	},
@@ -50,7 +50,14 @@ pub async fn command(
 	let content = node_cid(storage.clone(), file_state, path).await?;
 
 	// print
-	cat_output(storage, content, command.pretty, !command.no_decrypt).await?;
+	cat_output(
+		storage,
+		content,
+		CatOptions::default()
+			.with_pretty(command.pretty)
+			.with_decrypt(!command.no_decrypt),
+	)
+	.await?;
 
 	// result
 	Ok(exitcode::OK)

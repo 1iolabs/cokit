@@ -57,17 +57,36 @@ async fn print(command: &PrintCborCommand) -> Result<ExitCode, anyhow::Error> {
 }
 
 async fn inspect_cid(command: &InspectCidCommand) -> Result<ExitCode, anyhow::Error> {
-	let cid = Cid::from_str(&command.cid)?;
-	println!("Version: {:?}", cid.version());
-	if cid.version() == Version::V1 && KnownMultiCodec::DagPb == cid.codec() {
-		if let Ok(v0) = Cid::new_v0(cid.hash().clone()) {
-			println!("V0: {}", v0.to_string());
+	let cid = parse_cid(&command.cid)?;
+	if cid.version() == Version::V1 {
+		if KnownMultiCodec::DagPb == cid.codec() {
+			if let Ok(v0) = Cid::new_v0(cid.hash().clone()) {
+				println!("V0: {}", v0.to_string());
+			}
 		}
+		println!("V1: {} (specified)", cid);
 	} else if cid.version() == Version::V0 {
+		println!("V0: {} (specified)", cid.to_string());
 		println!("V1: {}", Cid::new_v1(cid.codec(), cid.hash().clone()).to_string());
 	}
 	println!("Codec: {} (code={})", MultiCodec::from(cid.codec()), cid.codec());
 	println!("Hash {} (code={}, size={}):", MultiCodec::from(cid.hash().code()), cid.hash().code(), cid.hash().size());
 	hexdump::hexdump(cid.hash().digest());
 	Ok(exitcode::OK)
+}
+
+fn parse_cid(cid: &str) -> Result<Cid, anyhow::Error> {
+	// try as JSON array with ints as bytes
+	// Like: `[18, 32, 39, 249, 200, 182, 10, ..., 125, 206, 29]`
+	if cid.chars().next() == Some('[') {
+		match serde_json::from_str::<Vec<u8>>(cid) {
+			Ok(binary) => {
+				if let Ok(cid) = Cid::try_from(binary) {
+					return Ok(cid);
+				}
+			},
+			Err(_) => {},
+		}
+	}
+	Ok(Cid::from_str(cid)?)
 }

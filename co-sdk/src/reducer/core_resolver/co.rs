@@ -104,7 +104,8 @@ impl CoCoreResolver {
 					CoAction::Create(CreateAction { binary, .. }) => binary,
 					_ => {
 						return Err(CoreResolverError::InvalidArgument(anyhow::anyhow!(
-							"Execute before CoAction::Create"
+							"Execute before CoAction::Create: {:?}",
+							co_action.payload,
 						)))
 					},
 				}
@@ -183,7 +184,7 @@ where
 		&self,
 		storage: &S,
 		runtime: &RuntimePool,
-		_context: &CoreResolverContext,
+		context: &CoreResolverContext,
 		state: &Option<Cid>,
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
@@ -192,10 +193,15 @@ where
 			self.core_state_binary(storage, state, CoreSource::Action(*action)).await?;
 
 		// apply to state
-		let mut result = runtime
-			.execute_state(storage, &core_binary, &core, RuntimeContext::new(core_state, action.into()))
-			.await
-			.map_err(|e| CoreResolverError::Execute(core_name.clone(), e))?;
+		//  use precomputed state if specified
+		let mut result = if let Some(result_core_state) = context.state {
+			RuntimeContext::new(Some(result_core_state), action.into())
+		} else {
+			runtime
+				.execute_state(storage, &core_binary, &core, RuntimeContext::new(core_state, action.into()))
+				.await
+				.map_err(|e| CoreResolverError::Execute(core_name.clone(), e))?
+		};
 
 		// log
 		#[cfg(feature = "logging-verbose")]

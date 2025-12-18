@@ -38,6 +38,7 @@ uuid = { workspace = true }
 hexdump = "0.1.1"
 insta = { version = "1.34.0", features = ["default", "yaml"] }
 tracing-subscriber = { workspace = true }
+co-test = { workspace = true }
 
 [features]
 default = []
