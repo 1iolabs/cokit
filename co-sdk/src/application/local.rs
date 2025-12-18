@@ -201,7 +201,7 @@ where
 		let log = Log::new_local(CO_ID_LOCAL.as_bytes().to_vec(), Default::default());
 
 		// create builder
-		let mut builder =
+		let mut reducer_builder =
 			ReducerBuilder::new(DynamicCoreResolver::new(core_resolver), log).with_initialize(local_co.initialize);
 
 		// load locals as snapshots
@@ -212,13 +212,21 @@ where
 			while let Some(next) = locals_stream.try_next().await? {
 				// apply to builder as snapshot
 				if let Some((state, heads)) = next.some() {
-					builder = builder.with_snapshot(state, heads);
+					reducer_builder = reducer_builder.with_snapshot(state, heads);
 				}
 			}
 		}
 
+		// use storage core
+		#[cfg(feature = "pinning")]
+		{
+			reducer_builder = reducer_builder.with_state_resolver(
+				crate::reducer::state_resolver::LocalStorageStateResolver::new(CO_ID_LOCAL.into()),
+			);
+		}
+
 		// create reducer
-		let reducer = builder.build(&storage, runtime.runtime(), date).await?;
+		let reducer = reducer_builder.build(&storage, runtime.runtime(), date).await?;
 		let initial = reducer.is_empty();
 
 		// flush

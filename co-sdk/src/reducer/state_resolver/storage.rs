@@ -1,7 +1,7 @@
 use crate::{
 	library::storage_snapshots::storage_snapshots_samples,
 	reducer::state_resolver::{StateResolver, StateResolverContext},
-	CoReducerState, ReducerChangeContext,
+	CoReducer, CoReducerState,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -13,25 +13,27 @@ use std::{
 	marker::PhantomData,
 };
 
-/// Tries to resolve states from the current CO storage core.
-pub struct LocalStorageStateResolver<S> {
+/// Tries to resolve states from the CO storage core.
+///
+/// # Implementation
+/// Currently we only load state from storage core on initialize.
+/// Newly produced states will be managed in memory by the [`super::StaticStateResolver`].
+pub struct StorageStateResolver<S> {
+	parent: CoReducer,
 	co: CoId,
 	snapshots: Vec<CoReducerState>,
 	threshold: usize,
 	index: HashMap<BTreeSet<Cid>, Cid>,
 	_s: PhantomData<S>,
 }
-impl<S> Debug for LocalStorageStateResolver<S> {
+impl<S> Debug for StorageStateResolver<S> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("LocalStorageStateResolver").finish()
+		f.debug_struct("StorageStateResolver").finish()
 	}
 }
-impl<S> LocalStorageStateResolver<S>
-where
-	S: AnyBlockStorage + BlockStorageContentMapping,
-{
-	pub fn new(co: CoId) -> Self {
-		Self { co, _s: PhantomData, snapshots: Default::default(), index: Default::default(), threshold: 100 }
+impl<S> StorageStateResolver<S> {
+	pub fn new(parent: CoReducer, co: CoId) -> Self {
+		Self { parent, co, snapshots: Default::default(), index: Default::default(), threshold: 100, _s: PhantomData }
 	}
 
 	fn rebuild_index(&mut self) {
@@ -43,7 +45,7 @@ where
 	}
 }
 #[async_trait]
-impl<S> StateResolver<S> for LocalStorageStateResolver<S>
+impl<S> StateResolver<S> for StorageStateResolver<S>
 where
 	S: AnyBlockStorage + BlockStorageContentMapping,
 {
@@ -56,19 +58,20 @@ where
 		Ok(self.index.get(heads).map(|state| (*state, heads.clone())))
 	}
 
-	async fn push_state(
-		&mut self,
-		storage: &S,
-		change_context: &ReducerChangeContext,
-		state: Cid,
-		_heads: BTreeSet<Cid>,
-	) -> Result<(), anyhow::Error> {
-		if change_context.is_initialize() && self.snapshots.is_empty() {
-			self.snapshots =
-				storage_snapshots_samples(storage.clone(), state.into(), &self.co, storage.clone(), self.threshold)
-					.await?;
-			self.rebuild_index();
-		}
+	/// Initialize the resolver.
+	async fn initialize(&mut self, storage: &S) -> Result<(), anyhow::Error> {
+		// load sampled snapshots
+		self.snapshots = storage_snapshots_samples(
+			self.parent.storage(),
+			self.parent.co_state().await,
+			&self.co,
+			storage.clone(),
+			self.threshold,
+		)
+		.await?;
+		self.rebuild_index();
+
+		// result
 		Ok(())
 	}
 }

@@ -1,6 +1,7 @@
 use crate::{
 	library::sample_stream::sample_stream_ordered_first_last,
 	reducer::state_resolver::{StateResolver, StateResolverContext},
+	ReducerChangeContext,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -119,7 +120,13 @@ impl<S: AnyBlockStorage> StateResolver<S> for StaticStateResolver<S> {
 		)
 	}
 
-	async fn push_state(&mut self, _storage: &S, state: Cid, heads: BTreeSet<Cid>) -> Result<(), anyhow::Error> {
+	async fn push_state(
+		&mut self,
+		_storage: &S,
+		_change_context: &ReducerChangeContext,
+		state: Cid,
+		heads: BTreeSet<Cid>,
+	) -> Result<(), anyhow::Error> {
 		if self.snapshots.iter().find(|item| item.1 == heads).is_none() {
 			self.push(state, heads);
 		}

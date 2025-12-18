@@ -172,8 +172,7 @@ where
 		// find latest state if we have snapshots but no latest selection
 		if self.state.is_none() && self.heads.is_empty() {
 			// provide roots
-			let context = StateResolverContext::default();
-			if let Some(roots) = self.state_resolver.provide_roots(storage, &context) {
+			if let Some(roots) = self.state_resolver.provide_roots(storage, &StateResolverContext::default()) {
 				for (state, heads) in roots.try_collect::<Vec<_>>().await? {
 					// join heads
 					self.log.join_heads(storage, heads.iter()).await?;
@@ -186,6 +185,14 @@ where
 					}
 				}
 				tracing::trace!(state = ?self.state, heads = ?self.heads, log_heads = ?self.log.heads(), "reducer-roots");
+
+				// push resolved state
+				//  this makes it possible for compute state to may use recomputed
+				if let Some(state) = self.state {
+					self.state_resolver
+						.push_state(storage, &context, state, self.heads.clone())
+						.await?;
+				}
 			}
 		}
 
@@ -195,6 +202,13 @@ where
 			let (state, heads) = self.compute_state(storage, runtime, &context).await?;
 			self.state = state;
 			self.heads = heads;
+
+			// push calculated state
+			if let Some(state) = self.state {
+				self.state_resolver
+					.push_state(storage, &context, state, self.heads.clone())
+					.await?;
+			}
 		}
 
 		// fail if we have state but no heads
@@ -294,7 +308,8 @@ where
 		state: Cid,
 		heads: BTreeSet<Cid>,
 	) -> Result<(), anyhow::Error> {
-		self.state_resolver.push_state(storage, state, heads).await?;
+		let change_context = ReducerChangeContext::new_join();
+		self.state_resolver.push_state(storage, &change_context, state, heads).await?;
 		Ok(())
 	}
 
@@ -461,8 +476,10 @@ where
 		runtime_context.ok(storage).await?;
 
 		// snapshot
-		if self.state.is_some() {
-			self.insert_snapshot(storage, self.state.unwrap(), self.heads.clone()).await?;
+		if let Some(state) = self.state {
+			self.state_resolver
+				.push_state(storage, &context.change, state, self.heads.clone())
+				.await?;
 		}
 
 		// update
@@ -729,6 +746,14 @@ impl ReducerChangeContext {
 	/// Whether this change was caused locally.
 	pub fn is_local_change(&self) -> bool {
 		self.cause.is_local()
+	}
+
+	/// Whether this change was caused by initialize.
+	pub fn is_initialize(&self) -> bool {
+		match self.cause {
+			ReducerChangeCause::Initialize => true,
+			_ => false,
+		}
 	}
 }
 

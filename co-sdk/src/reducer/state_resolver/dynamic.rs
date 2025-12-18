@@ -1,4 +1,7 @@
-use crate::reducer::state_resolver::{StateResolver, StateResolverContext};
+use crate::{
+	reducer::state_resolver::{StateResolver, StateResolverContext},
+	ReducerChangeContext,
+};
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::AnyBlockStorage;
@@ -36,8 +39,14 @@ impl<S: AnyBlockStorage> StateResolver<S> for DynamicStateResolver<S> {
 		self.0.provide_roots(storage, context)
 	}
 
-	async fn push_state(&mut self, storage: &S, state: Cid, heads: BTreeSet<Cid>) -> Result<(), anyhow::Error> {
-		self.0.push_state(storage, state, heads).await
+	async fn push_state(
+		&mut self,
+		storage: &S,
+		change_context: &ReducerChangeContext,
+		state: Cid,
+		heads: BTreeSet<Cid>,
+	) -> Result<(), anyhow::Error> {
+		self.0.push_state(storage, change_context, state, heads).await
 	}
 
 	fn clear(&mut self) {

@@ -244,25 +244,14 @@ impl SharedCoBuilder {
 			.with_initialize(false)
 			.with_state_resolver(membership_states);
 
-		// load states from pinning
-		//  this will map all external pinned to internal
+		// use states from pinning
 		#[cfg(feature = "pinning")]
 		{
-			let roots = crate::library::storage_snapshots::storage_snapshots_samples(
-				parent_storage.clone(),
-				self.parent.co_state().await,
-				&self.membership.id,
-				// to be sure we use the local storage
-				//  in any case we do not want to refetch deleted roots and better fail
-				context.storage(true),
-				100,
-			)
-			.await?;
-			for reducer_state in roots {
-				if let Some((state, heads)) = reducer_state.some() {
-					reducer_builder = reducer_builder.with_snapshot(state, heads);
-				}
-			}
+			reducer_builder =
+				reducer_builder.with_state_resolver(crate::reducer::state_resolver::StorageStateResolver::new(
+					self.parent.clone(),
+					self.membership.id.clone(),
+				));
 		}
 
 		// reducer

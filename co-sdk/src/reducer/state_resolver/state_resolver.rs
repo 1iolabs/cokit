@@ -1,3 +1,4 @@
+use crate::ReducerChangeContext;
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::AnyBlockStorage;
@@ -24,7 +25,12 @@ where
 		storage: &S,
 		context: &StateResolverContext,
 		heads: &BTreeSet<Cid>,
-	) -> Result<Option<(Cid, BTreeSet<Cid>)>, anyhow::Error>;
+	) -> Result<Option<(Cid, BTreeSet<Cid>)>, anyhow::Error> {
+		let _storage = storage;
+		let _context = context;
+		let _heads = heads;
+		Ok(None)
+	}
 
 	/// Provide a stream of known roots (state/heads or just heads).
 	/// The states/heads are not required to be sorted.
@@ -33,7 +39,11 @@ where
 		&mut self,
 		storage: &S,
 		context: &StateResolverContext,
-	) -> Option<BoxStream<'static, Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>>;
+	) -> Option<BoxStream<'static, Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>> {
+		let _storage = storage;
+		let _context = context;
+		None
+	}
 
 	/// Initialize the resolver.
 	async fn initialize(&mut self, storage: &S) -> Result<(), anyhow::Error> {
@@ -42,8 +52,15 @@ where
 	}
 
 	/// Push a new latest state that we calculated.
-	async fn push_state(&mut self, storage: &S, state: Cid, heads: BTreeSet<Cid>) -> Result<(), anyhow::Error> {
+	async fn push_state(
+		&mut self,
+		storage: &S,
+		change_context: &ReducerChangeContext,
+		state: Cid,
+		heads: BTreeSet<Cid>,
+	) -> Result<(), anyhow::Error> {
 		let _storage = storage;
+		let _change_context = change_context;
 		let _state = state;
 		let _heads = heads;
 		Ok(())
