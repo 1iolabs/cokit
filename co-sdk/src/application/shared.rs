@@ -144,6 +144,7 @@ impl SharedCoBuilder {
 		date: DynamicCoDate,
 		application_handle: ActorHandle<ApplicationMessage>,
 		#[cfg(feature = "pinning")] pinning: crate::library::storage_pinning::StoragePinningContext,
+		#[cfg(feature = "pinning")] pin_strategy: co_core_storage::PinStrategy,
 	) -> Result<CoReducer, anyhow::Error>
 	where
 		I: PrivateIdentity + Debug + Send + Sync + Clone + 'static,
@@ -250,6 +251,8 @@ impl SharedCoBuilder {
 			reducer_builder =
 				reducer_builder.with_state_resolver(crate::reducer::state_resolver::StorageStateResolver::new(
 					self.parent.clone(),
+					pinning.identity.clone(),
+					pin_strategy,
 					self.membership.id.clone(),
 				));
 		}
@@ -531,8 +534,6 @@ pub struct SharedCoCreator {
 	parent: CoReducer,
 	keystore_core_name: String,
 	membership_core_name: String,
-	#[cfg(feature = "pinning")]
-	storage_core_name: String,
 	co: CreateCo,
 }
 impl SharedCoCreator {
@@ -542,8 +543,6 @@ impl SharedCoCreator {
 			co,
 			membership_core_name: CO_CORE_NAME_MEMBERSHIP.to_string(),
 			keystore_core_name: CO_CORE_NAME_KEYSTORE.to_string(),
-			#[cfg(feature = "pinning")]
-			storage_core_name: crate::CO_CORE_NAME_STORAGE.to_string(),
 		}
 	}
 
@@ -555,13 +554,6 @@ impl SharedCoCreator {
 		Self { keystore_core_name, ..self }
 	}
 
-	pub fn with_storage_core_name(self, _storage_core_name: String) -> Self {
-		#[cfg(feature = "pinning")]
-		return Self { storage_core_name: _storage_core_name, ..self };
-		#[cfg(not(feature = "pinning"))]
-		return self;
-	}
-
 	/// TODO: Cleanup when something fails?
 	pub async fn create<I>(
 		self,
@@ -571,6 +563,7 @@ impl SharedCoCreator {
 		date: impl CoDate,
 		uuid: impl CoUuid,
 		#[cfg(feature = "pinning")] pinning: crate::library::storage_pinning::StoragePinningContext,
+		#[cfg(feature = "pinning")] pin_strategy: co_core_storage::PinStrategy,
 	) -> Result<CoId, anyhow::Error>
 	where
 		I: PrivateIdentity + Clone + Debug + Send + Sync + 'static,
@@ -599,9 +592,18 @@ impl SharedCoCreator {
 		// reducer
 		let core_resolver = CoCoreResolver::default();
 		let core_resolver = LogCoreResolver::new(core_resolver, self.co.id.clone());
-		let mut reducer = ReducerBuilder::new(core_resolver, log)
-			.build(&co_storage, runtime.runtime(), date)
-			.await?;
+		let mut reducer_builder = ReducerBuilder::new(core_resolver, log);
+		#[cfg(feature = "pinning")]
+		{
+			reducer_builder =
+				reducer_builder.with_state_resolver(crate::reducer::state_resolver::StorageStateResolver::new(
+					self.parent.clone(),
+					pinning.identity.clone(),
+					pin_strategy,
+					self.co.id.clone(),
+				));
+		}
+		let mut reducer = reducer_builder.build(&co_storage, runtime.runtime(), date).await?;
 
 		// initialize
 		let mut create = CreateAction::new(
@@ -667,42 +669,6 @@ impl SharedCoCreator {
 				}),
 			)
 			.await?;
-
-		// pin
-		#[cfg(feature = "pinning")]
-		{
-			// add pin to parent co
-			let pin_root = co_core_storage::StorageAction::PinCreate(
-				crate::types::co_pinning_key::CoPinningKey::Root.to_string(&self.co.id),
-				co_core_storage::PinStrategy::Unlimited,
-				Default::default(),
-			);
-			self.parent.push(&identity, &self.storage_core_name, &pin_root).await?;
-
-			// write initial pinning
-			#[cfg(feature = "pinning")]
-			{
-				let parent = self.parent;
-
-				// compute
-				let parent_pinning_state = crate::library::storage_pinning::storage_pinning(
-					&pinning,
-					None,
-					&parent.storage(),
-					parent.reducer_state().await,
-					&self.co.id,
-					&co_storage,
-					vec![reducer_state],
-					Default::default(),
-				)
-				.await?;
-
-				// apply
-				if let Some(parent_pinning_state) = parent_pinning_state {
-					parent.join_state(parent_pinning_state).await?;
-				}
-			}
-		}
 
 		// result
 		Ok(self.co.id)

@@ -99,10 +99,10 @@ impl<S: AnyBlockStorage> StateResolver<S> for JoinStateResolver<S> {
 		storage: &S,
 		change_context: &ReducerChangeContext,
 		state: Cid,
-		heads: BTreeSet<Cid>,
+		heads: &BTreeSet<Cid>,
 	) -> Result<(), anyhow::Error> {
 		for next in self.0.iter_mut() {
-			next.push_state(storage, change_context, state, heads.clone()).await?;
+			next.push_state(storage, change_context, state, heads).await?;
 		}
 		Ok(())
 	}

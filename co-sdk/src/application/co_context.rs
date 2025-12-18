@@ -391,6 +391,8 @@ impl CoContextInner {
 				self.application(),
 				#[cfg(feature = "pinning")]
 				self.create_pinning_context(),
+				#[cfg(feature = "pinning")]
+				self.settings.setting_co_default_max_state(),
 			)
 			.await?;
 

@@ -73,23 +73,6 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 
 	// apply
 	if let Some(membership_state) = membership_state {
-		// storage
-		#[cfg(feature = "pinning")]
-		{
-			local
-				.push(
-					&context.local_identity(),
-					crate::CO_CORE_NAME_STORAGE,
-					&co_core_storage::StorageAction::PinCreate(
-						crate::types::co_pinning_key::CoPinningKey::Root.to_string(&payload.id),
-						context.settings().setting_co_default_max_state(),
-						// TODO: Do we need to pin the initial state?
-						Default::default(),
-					),
-				)
-				.await?;
-		}
-
 		// payload
 		let metadata = CoInviteMetadata {
 			id: header.id,

@@ -53,7 +53,7 @@ async fn test_invite() {
 				&CoAction::ParticipantInvite { participant: identity2.identity().to_owned(), tags: Default::default() },
 			)
 			.await
-			.unwrap();
+			.unwrap()
 	}
 	.instrument(info_span!("peer1: added other peer identity", application = peer1.application.settings().identifier));
 
@@ -90,7 +90,7 @@ async fn test_invite() {
 	};
 
 	// check
-	let ((_, membership_co, membership_participant), (_, invited_participant, invited_peer), _) =
+	let ((_, membership_co, membership_participant), (_, invited_participant, invited_peer), invite_state) =
 		join!(peer2_membership_invite, peer1_invite_sent, peer1_invite);
 	assert_eq!(invited_participant, identity2.identity());
 	assert_eq!(invited_peer, network2.local_peer_id());
@@ -131,6 +131,7 @@ async fn test_invite() {
 	.await
 	.unwrap()
 	.unwrap();
+	let join_state = shared_co.reducer_state().await;
 
 	// peer2: read state
 	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
@@ -152,6 +153,24 @@ async fn test_invite() {
 			.unwrap(),
 		ParticipantState::Active
 	);
+
+	// check pinning
+	#[cfg(feature = "pinning")]
+	{
+		let peer2_local_co = peer2.application.local_co_reducer().await.unwrap();
+		let peer2_shared_co_snapshots = co_sdk::storage_snapshots(
+			peer2_local_co.storage(),
+			peer2_local_co.co_state().await,
+			peer2_shared_co.id(),
+			peer2_shared_co.storage(),
+		)
+		.try_collect::<Vec<_>>()
+		.await
+		.unwrap();
+		assert_eq!(peer2_shared_co_snapshots.len(), 2);
+		assert_eq!(peer2_shared_co_snapshots[0], join_state);
+		assert_eq!(peer2_shared_co_snapshots[1], invite_state);
+	}
 }
 
 /// Invite/Join
@@ -197,7 +216,7 @@ async fn test_invite_encrypted() {
 				&CoAction::ParticipantInvite { participant: identity2.identity().to_owned(), tags: Default::default() },
 			)
 			.await
-			.unwrap();
+			.unwrap()
 	}
 	.instrument(info_span!("peer1: added other peer identity", application = peer1.application.settings().identifier));
 
@@ -234,7 +253,7 @@ async fn test_invite_encrypted() {
 	};
 
 	// check
-	let ((_, membership_co, membership_participant), (_, invited_participant, invited_peer), _) =
+	let ((_, membership_co, membership_participant), (_, invited_participant, invited_peer), invite_state) =
 		join!(peer2_membership_invite, peer1_invite_sent, peer1_invite);
 	assert_eq!(invited_participant, identity2.identity());
 	assert_eq!(invited_peer, network2.local_peer_id());
@@ -271,6 +290,7 @@ async fn test_invite_encrypted() {
 	.await
 	.unwrap()
 	.unwrap();
+	let join_state = shared_co.reducer_state().await;
 
 	// peer2: read state
 	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
@@ -292,6 +312,24 @@ async fn test_invite_encrypted() {
 			.unwrap(),
 		ParticipantState::Active
 	);
+
+	// check pinning
+	#[cfg(feature = "pinning")]
+	{
+		let peer2_local_co = peer2.application.local_co_reducer().await.unwrap();
+		let peer2_shared_co_snapshots = co_sdk::storage_snapshots(
+			peer2_local_co.storage(),
+			peer2_local_co.co_state().await,
+			peer2_shared_co.id(),
+			peer2_shared_co.storage(),
+		)
+		.try_collect::<Vec<_>>()
+		.await
+		.unwrap();
+		assert_eq!(peer2_shared_co_snapshots.len(), 2);
+		assert_eq!(peer2_shared_co_snapshots[0], join_state);
+		assert_eq!(peer2_shared_co_snapshots[1], invite_state);
+	}
 }
 
 async fn wait_membership_state(

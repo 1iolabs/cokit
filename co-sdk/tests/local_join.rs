@@ -133,6 +133,9 @@ async fn test_local_join() {
 							println!("action: {:?}", action);
 							Some(from_ipld::<CounterAction>(action.payload).unwrap())
 						},
+						Action::Error { err } => {
+							panic!("action error: {:?}", err);
+						},
 						_ => None,
 					})
 				})

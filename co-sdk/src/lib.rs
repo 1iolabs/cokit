@@ -6,6 +6,12 @@ mod services;
 pub mod state;
 mod types;
 
+#[cfg(feature = "pinning")]
+pub use crate::library::{
+	storage_cleanup::storage_cleanup,
+	storage_snapshots::storage_snapshots,
+	storage_structure::{storage_structure_recursive, CoStructureResolver, StructureResolveResult, StructureResolver},
+};
 pub use application::{
 	application::{Application, ApplicationBuilder},
 	co_context::CoContext,
@@ -47,8 +53,6 @@ pub use library::{
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
 	memory_dispatch::MemoryDispatch,
-	storage_cleanup::storage_cleanup,
-	storage_structure::{storage_structure_recursive, CoStructureResolver, StructureResolveResult, StructureResolver},
 	token::{CoToken, CoTokenParameters},
 	update_co::update_co,
 };

@@ -61,7 +61,7 @@ where
 		storage: &S,
 		change_context: &ReducerChangeContext,
 		state: Cid,
-		_heads: BTreeSet<Cid>,
+		_heads: &BTreeSet<Cid>,
 	) -> Result<(), anyhow::Error> {
 		if change_context.is_initialize() && self.snapshots.is_empty() {
 			self.snapshots =

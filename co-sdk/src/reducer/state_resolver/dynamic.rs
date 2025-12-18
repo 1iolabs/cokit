@@ -48,7 +48,7 @@ impl<S: AnyBlockStorage> StateResolver<S> for DynamicStateResolver<S> {
 		storage: &S,
 		change_context: &ReducerChangeContext,
 		state: Cid,
-		heads: BTreeSet<Cid>,
+		heads: &BTreeSet<Cid>,
 	) -> Result<(), anyhow::Error> {
 		self.0.push_state(storage, change_context, state, heads).await
 	}

@@ -125,10 +125,10 @@ impl<S: AnyBlockStorage> StateResolver<S> for StaticStateResolver<S> {
 		_storage: &S,
 		_change_context: &ReducerChangeContext,
 		state: Cid,
-		heads: BTreeSet<Cid>,
+		heads: &BTreeSet<Cid>,
 	) -> Result<(), anyhow::Error> {
-		if self.snapshots.iter().find(|item| item.1 == heads).is_none() {
-			self.push(state, heads);
+		if self.snapshots.iter().find(|item| &item.1 == heads).is_none() {
+			self.push(state, heads.clone());
 		}
 		Ok(())
 	}

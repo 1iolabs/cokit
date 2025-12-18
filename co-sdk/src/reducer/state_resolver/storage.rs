@@ -1,12 +1,15 @@
 use crate::{
-	library::storage_snapshots::storage_snapshots_samples,
+	library::{storage_snapshots::storage_snapshots_samples, to_external_cid::to_external_cid},
 	reducer::state_resolver::{StateResolver, StateResolverContext},
-	CoReducer, CoReducerState,
+	types::co_pinning_key::CoPinningKey,
+	CoReducer, CoReducerState, CoRoot, ReducerChangeContext, CO_CORE_NAME_STORAGE,
 };
 use async_trait::async_trait;
 use cid::Cid;
+use co_core_storage::{PinStrategy, References, StorageAction};
+use co_identity::PrivateIdentityBox;
 use co_primitives::{AnyBlockStorage, CoId};
-use co_storage::BlockStorageContentMapping;
+use co_storage::{BlockStorageContentMapping, BlockStorageExt};
 use std::{
 	collections::{BTreeSet, HashMap},
 	fmt::Debug,
@@ -20,8 +23,11 @@ use std::{
 /// Newly produced states will be managed in memory by the [`super::StaticStateResolver`].
 pub struct StorageStateResolver<S> {
 	parent: CoReducer,
+	parent_identity: PrivateIdentityBox,
+	pin_strategy: PinStrategy,
 	co: CoId,
 	snapshots: Vec<CoReducerState>,
+	/// Maximum count of states to keep in memory.
 	threshold: usize,
 	index: HashMap<BTreeSet<Cid>, Cid>,
 	_s: PhantomData<S>,
@@ -32,8 +38,17 @@ impl<S> Debug for StorageStateResolver<S> {
 	}
 }
 impl<S> StorageStateResolver<S> {
-	pub fn new(parent: CoReducer, co: CoId) -> Self {
-		Self { parent, co, snapshots: Default::default(), index: Default::default(), threshold: 100, _s: PhantomData }
+	pub fn new(parent: CoReducer, parent_identity: PrivateIdentityBox, pin_strategy: PinStrategy, co: CoId) -> Self {
+		Self {
+			parent,
+			parent_identity,
+			pin_strategy,
+			co,
+			snapshots: Default::default(),
+			index: Default::default(),
+			threshold: 100,
+			_s: PhantomData,
+		}
 	}
 
 	fn rebuild_index(&mut self) {
@@ -72,6 +87,36 @@ where
 		self.rebuild_index();
 
 		// result
+		Ok(())
+	}
+
+	/// Push a new latest state that we calculated.
+	async fn push_state(
+		&mut self,
+		storage: &S,
+		change_context: &ReducerChangeContext,
+		state: Cid,
+		heads: &BTreeSet<Cid>,
+	) -> Result<(), anyhow::Error> {
+		// create pin upon first use
+		if change_context.is_initialize() && self.snapshots.len() == 0 {
+			let root = CoRoot { heads: heads.clone(), state: Some(state) };
+			let root_link = storage.set_serialized(&root).await?;
+			let external_root_link = to_external_cid(storage, root_link).await;
+			let mut references = References::new();
+			references.insert(external_root_link);
+			self.parent
+				.push(
+					&self.parent_identity,
+					CO_CORE_NAME_STORAGE,
+					&StorageAction::PinCreate(
+						CoPinningKey::Root.to_string(&self.co),
+						self.pin_strategy.clone(),
+						references,
+					),
+				)
+				.await?;
+		}
 		Ok(())
 	}
 }

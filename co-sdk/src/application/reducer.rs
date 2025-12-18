@@ -190,9 +190,7 @@ where
 				// push resolved state
 				//  this makes it possible for compute state to may use recomputed
 				if let Some(state) = self.state {
-					self.state_resolver
-						.push_state(storage, &context, state, self.heads.clone())
-						.await?;
+					self.state_resolver.push_state(storage, &context, state, &self.heads).await?;
 				}
 			}
 		}
@@ -206,9 +204,7 @@ where
 
 			// push calculated state
 			if let Some(state) = self.state {
-				self.state_resolver
-					.push_state(storage, &context, state, self.heads.clone())
-					.await?;
+				self.state_resolver.push_state(storage, &context, state, &self.heads).await?;
 			}
 		}
 
@@ -310,7 +306,7 @@ where
 		heads: BTreeSet<Cid>,
 	) -> Result<(), anyhow::Error> {
 		let change_context = ReducerChangeContext::new_join();
-		self.state_resolver.push_state(storage, &change_context, state, heads).await?;
+		self.state_resolver.push_state(storage, &change_context, state, &heads).await?;
 		Ok(())
 	}
 
@@ -479,7 +475,7 @@ where
 		// snapshot
 		if let Some(state) = self.state {
 			self.state_resolver
-				.push_state(storage, &context.change, state, self.heads.clone())
+				.push_state(storage, &context.change, state, &self.heads)
 				.await?;
 		}
 

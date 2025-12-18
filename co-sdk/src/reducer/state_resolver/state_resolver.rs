@@ -57,7 +57,7 @@ where
 		storage: &S,
 		change_context: &ReducerChangeContext,
 		state: Cid,
-		heads: BTreeSet<Cid>,
+		heads: &BTreeSet<Cid>,
 	) -> Result<(), anyhow::Error> {
 		let _storage = storage;
 		let _change_context = change_context;
