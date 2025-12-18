@@ -39,6 +39,10 @@ impl<S: AnyBlockStorage> StateResolver<S> for DynamicStateResolver<S> {
 		self.0.provide_roots(storage, context)
 	}
 
+	async fn initialize(&mut self, storage: &S) -> Result<(), anyhow::Error> {
+		self.0.initialize(storage).await
+	}
+
 	async fn push_state(
 		&mut self,
 		storage: &S,

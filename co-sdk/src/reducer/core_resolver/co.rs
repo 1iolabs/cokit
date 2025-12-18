@@ -104,7 +104,8 @@ impl CoCoreResolver {
 					CoAction::Create(CreateAction { binary, .. }) => binary,
 					_ => {
 						return Err(CoreResolverError::InvalidArgument(anyhow::anyhow!(
-							"Execute before CoAction::Create"
+							"Execute before CoAction::Create: {:?}",
+							co_action.payload,
 						)))
 					},
 				}

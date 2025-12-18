@@ -111,7 +111,7 @@ where
 			DynamicStateResolver::new(
 				self.state_resolver
 					.into_iter()
-					.fold(JoinStateResolver::new(state_resolver), JoinStateResolver::join),
+					.fold(JoinStateResolver::new(state_resolver), JoinStateResolver::join_box),
 			)
 		} else {
 			DynamicStateResolver::new(state_resolver)
@@ -173,7 +173,8 @@ where
 		if self.state.is_none() && self.heads.is_empty() {
 			// provide roots
 			if let Some(roots) = self.state_resolver.provide_roots(storage, &StateResolverContext::default()) {
-				for (state, heads) in roots.try_collect::<Vec<_>>().await? {
+				pin_mut!(roots);
+				while let Some((state, heads)) = roots.try_next().await? {
 					// join heads
 					self.log.join_heads(storage, heads.iter()).await?;
 

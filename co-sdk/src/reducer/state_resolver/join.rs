@@ -36,6 +36,11 @@ impl<S: AnyBlockStorage> JoinStateResolver<S> {
 		self.0.push(DynamicStateResolver::new(next));
 		self
 	}
+
+	pub fn join_box(mut self, next: DynamicStateResolver<S>) -> Self {
+		self.0.push(next);
+		self
+	}
 }
 #[async_trait]
 impl<S: AnyBlockStorage> StateResolver<S> for JoinStateResolver<S> {
@@ -70,7 +75,7 @@ impl<S: AnyBlockStorage> StateResolver<S> for JoinStateResolver<S> {
 			.iter_mut()
 			.filter_map(|next| next.provide_roots(storage, context))
 			.collect::<Vec<_>>();
-		if streams.is_empty() {
+		if !streams.is_empty() {
 			Some(
 				stream::iter(streams)
 					.map(Result::<_, anyhow::Error>::Ok)
@@ -80,6 +85,13 @@ impl<S: AnyBlockStorage> StateResolver<S> for JoinStateResolver<S> {
 		} else {
 			None
 		}
+	}
+
+	async fn initialize(&mut self, storage: &S) -> Result<(), anyhow::Error> {
+		for next in self.0.iter_mut() {
+			next.initialize(storage).await?;
+		}
+		Ok(())
 	}
 
 	async fn push_state(
