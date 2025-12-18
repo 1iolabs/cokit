@@ -1,6 +1,8 @@
 use crate::{
 	library::create_reducer_action::create_reducer_action,
-	reducer::state_resolver::{DynamicStateResolver, JoinStateResolver, StateResolver, StateResolverContext},
+	reducer::state_resolver::{
+		DynamicStateResolver, JoinStateResolver, StateResolver, StateResolverContext, StaticStateResolver,
+	},
 	CoDate, CoreResolver, CoreResolverContext, DynamicCoDate,
 };
 use anyhow::{anyhow, Context};
@@ -11,7 +13,7 @@ use co_log::{EntryBlock, Log, LogError};
 use co_primitives::{Link, ReducerAction, SignedEntry};
 use co_runtime::RuntimePool;
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
-use futures::{pin_mut, TryStreamExt};
+use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use ipld_core::ipld::Ipld;
 use serde::Serialize;
 use std::{
@@ -93,18 +95,32 @@ where
 			return Err(anyhow!("Invalid heads. The log and state heads must be the same"));
 		}
 
-		// state_resolver
-		let state_resolver = match self.state_resolver.len() {
-			0 => None,
-			1 => self.state_resolver.into_iter().next(),
-			_ => JoinStateResolver::from_iter(self.state_resolver).map(DynamicStateResolver::new),
+		// static state resolver
+		let state_resolver = if !self.snapshots.is_empty() {
+			StaticStateResolver::new_unsorted(
+				storage,
+				stream::iter(self.snapshots).map(|(heads, state)| (state, heads)),
+			)
+			.await?
+		} else {
+			StaticStateResolver::default()
+		};
+
+		// state resolvers
+		let state_resolver = if !self.state_resolver.is_empty() {
+			DynamicStateResolver::new(
+				self.state_resolver
+					.into_iter()
+					.fold(JoinStateResolver::new(state_resolver), JoinStateResolver::join),
+			)
+		} else {
+			DynamicStateResolver::new(state_resolver)
 		};
 
 		// build
 		let mut result = Reducer {
 			core_resolver: self.core_resolver,
 			heads: self.heads,
-			snapshots: self.snapshots,
 			state: self.state,
 			log: self.log,
 			change_handlers: Default::default(),
@@ -129,8 +145,6 @@ pub struct Reducer<S, R> {
 	state: Option<Cid>,
 	/// Latest heads.
 	heads: BTreeSet<Cid>,
-	/// Avilable historic snapshots (in chronologic order?).
-	snapshots: HashMap<BTreeSet<Cid>, Cid>,
 	/// Change handlers.
 	change_handlers: Vec<Box<dyn ReducerChangedHandler<S, R>>>,
 	/// State/Heads watcher.
@@ -138,7 +152,7 @@ pub struct Reducer<S, R> {
 	/// Date.
 	date: DynamicCoDate,
 	/// State resolver.
-	state_resolver: Option<DynamicStateResolver<S>>,
+	state_resolver: DynamicStateResolver<S>,
 }
 impl<S, R> Reducer<S, R>
 where
@@ -148,24 +162,31 @@ where
 	/// Initialize this reducer by computing current state if one.
 	#[tracing::instrument(level = tracing::Level::TRACE, skip(self, storage, runtime))]
 	pub async fn initialize(&mut self, storage: &S, runtime: &RuntimePool) -> Result<(), anyhow::Error> {
-		tracing::trace!(?self.snapshots, "reducer-initialize");
+		tracing::trace!(?self.state_resolver, "reducer-initialize");
 		let context = ReducerChangeContext { cause: ReducerChangeCause::Initialize };
+
+		// initialize state resolver
+		self.state_resolver.initialize(storage).await?;
 
 		// if we have snapshots but no state/heads join all heads from snapshots
 		// find latest state if we have snapshots but no latest selection
-		if self.state.is_none() && self.heads.is_empty() && !self.snapshots.is_empty() {
-			for (heads, _) in self.snapshots.iter() {
-				// join heads
-				self.log.join_heads(storage, heads.iter()).await?;
+		if self.state.is_none() && self.heads.is_empty() {
+			// provide roots
+			let context = StateResolverContext::default();
+			if let Some(roots) = self.state_resolver.provide_roots(storage, &context) {
+				for (state, heads) in roots.try_collect::<Vec<_>>().await? {
+					// join heads
+					self.log.join_heads(storage, heads.iter()).await?;
 
-				// try to find state for latest heads
-				//  do this every iteration so we end up with the latest known state
-				if let Some((state, heads)) = self.find_snapshot_state(self.log.heads()) {
-					self.state = state;
-					self.heads = heads;
+					// use state?
+					//  do this every iteration so we end up with the latest known state
+					if state.is_some() && self.log.heads() == &heads {
+						self.state = state;
+						self.heads = heads;
+					}
 				}
+				tracing::trace!(state = ?self.state, heads = ?self.heads, log_heads = ?self.log.heads(), "reducer-roots");
 			}
-			tracing::trace!(state = ?self.state, heads = ?self.heads, log_heads = ?self.log.heads(), "reducer-snapshots");
 		}
 
 		// if log heads are different from reducer heads
@@ -194,15 +215,6 @@ where
 
 		// if we have state and heads we are fine
 		Ok(())
-	}
-
-	/// Find snapshot state which matches `heads`.
-	fn find_snapshot_state(&self, heads: &BTreeSet<Cid>) -> Option<(Option<Cid>, BTreeSet<Cid>)> {
-		if let Some(state) = self.snapshots.get(heads) {
-			Some((Some(*state), heads.clone()))
-		} else {
-			None
-		}
 	}
 
 	/// (Re)sets the reducer and the log to a given state.
@@ -270,19 +282,20 @@ where
 		self.clear_snapshots();
 	}
 
-	/// Iterator over avilable snapshots.
-	pub fn snapshots_iter(&self) -> impl Iterator<Item = (&Cid, &BTreeSet<Cid>)> {
-		self.snapshots.iter().map(|(heads, state)| (state, heads))
-	}
-
 	/// Clear all state but latest.
 	pub fn clear_snapshots(&mut self) {
-		self.snapshots.clear();
+		self.state_resolver.clear();
 	}
 
 	/// Insert previous snapshots (trusted) of the same log from which we can continue.
-	pub fn insert_snapshot(&mut self, state: Cid, heads: BTreeSet<Cid>) {
-		self.snapshots.insert(heads, state);
+	pub async fn insert_snapshot(
+		&mut self,
+		storage: &S,
+		state: Cid,
+		heads: BTreeSet<Cid>,
+	) -> Result<(), anyhow::Error> {
+		self.state_resolver.push_state(storage, state, heads).await?;
+		Ok(())
 	}
 
 	/// Find the state matching the specified heads, if one.
@@ -291,20 +304,17 @@ where
 		storage: &S,
 		context: &StateResolverContext,
 		heads: &BTreeSet<Cid>,
-	) -> Result<Option<Cid>, anyhow::Error> {
-		if self.heads.eq(heads) {
-			return Ok(self.state);
+	) -> Result<Option<(Cid, BTreeSet<Cid>)>, anyhow::Error> {
+		if &self.heads == heads {
+			if let Some(state) = self.state {
+				return Ok(Some((state, self.heads.clone())));
+			}
 		}
-		if let Some(state) = self.snapshots.get(heads) {
-			return Ok(Some(*state));
-		}
-		if let Some(state_resolver) = &self.state_resolver {
-			if let Some((resolved_state, resolved_heads)) =
-				state_resolver.resolve_state(storage, &context, heads).await?
-			{
-				if &resolved_heads == heads {
-					return Ok(Some(resolved_state));
-				}
+		if let Some((resolved_state, resolved_heads)) =
+			self.state_resolver.resolve_state(storage, &context, heads).await?
+		{
+			if &resolved_heads == heads {
+				return Ok(Some((resolved_state, resolved_heads)));
 			}
 		}
 		Ok(None)
@@ -452,7 +462,7 @@ where
 
 		// snapshot
 		if self.state.is_some() {
-			self.insert_snapshot(self.state.unwrap(), self.heads.clone());
+			self.insert_snapshot(storage, self.state.unwrap(), self.heads.clone()).await?;
 		}
 
 		// update
@@ -486,13 +496,15 @@ where
 			let context = ReducerChangeContext { cause: ReducerChangeCause::Log };
 
 			// sync state
-			let (next_state, next_heads) = if let Some((state, heads)) = self.find_snapshot_state(self.log().heads()) {
-				// use snapshot
-				(state, heads)
-			} else {
-				// compute state
-				self.compute_state(storage, runtime, &context).await?
-			};
+			let state_context = StateResolverContext { state: self.state, heads: self.heads.clone() };
+			let (has_snapshot, (next_state, next_heads)) =
+				if let Some((state, heads)) = self.find_state(storage, &state_context, self.log().heads()).await? {
+					// use snapshot
+					(true, (Some(state), heads))
+				} else {
+					// compute state
+					(false, self.compute_state(storage, runtime, &context).await?)
+				};
 
 			// result
 			let result = JoinResult {
@@ -511,7 +523,7 @@ where
 					log_heads = ?if log_heads == self.heads { None } else { Some(&log_heads) },
 					join_heads = ?heads,
 					?result,
-					has_snapshot = self.find_snapshot_state(&result.heads).is_some(),
+					has_snapshot,
 					"joined"
 				);
 
@@ -632,7 +644,7 @@ where
 				// does the current heads reference a state we know?
 				// note: this will never match if we have no previous states
 				//  and a new state will be recomputed from scratch
-				if let Some(entry_state) = self.find_state(storage, &context, &current_heads).await? {
+				if let Some((entry_state, _)) = self.find_state(storage, &context, &current_heads).await? {
 					state = Some(entry_state);
 					break;
 				}
@@ -694,7 +706,7 @@ impl<S, R> Debug for Reducer<S, R> {
 			.field("id", &self.log.id_string())
 			.field("state", &self.state)
 			.field("heads", &self.heads)
-			.field("snapshots", &self.snapshots)
+			.field("state_resolver", &self.state_resolver)
 			.finish()
 	}
 }
@@ -1105,8 +1117,14 @@ mod tests {
 		assert!(h1 > h2);
 
 		// transfer state
-		reducer1.insert_snapshot(reducer2.state().unwrap(), reducer2.heads().clone());
-		reducer2.insert_snapshot(reducer1.state().unwrap(), reducer1.heads().clone());
+		reducer1
+			.insert_snapshot(&storage, reducer2.state().unwrap(), reducer2.heads().clone())
+			.await
+			.unwrap();
+		reducer2
+			.insert_snapshot(&storage, reducer1.state().unwrap(), reducer1.heads().clone())
+			.await
+			.unwrap();
 
 		// join1
 		reducer1.join(&storage, reducer2.heads(), &runtime).await.unwrap();
@@ -1203,8 +1221,14 @@ mod tests {
 		assert!(h1 < h2);
 
 		// transfer state
-		reducer1.insert_snapshot(reducer2.state().unwrap(), reducer2.heads().clone());
-		reducer2.insert_snapshot(reducer1.state().unwrap(), reducer1.heads().clone());
+		reducer1
+			.insert_snapshot(&storage, reducer2.state().unwrap(), reducer2.heads().clone())
+			.await
+			.unwrap();
+		reducer2
+			.insert_snapshot(&storage, reducer1.state().unwrap(), reducer1.heads().clone())
+			.await
+			.unwrap();
 
 		// join1
 		reducer1.join(&storage, reducer2.heads(), &runtime).await.unwrap();

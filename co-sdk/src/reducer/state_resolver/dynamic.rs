@@ -29,14 +29,18 @@ impl<S: AnyBlockStorage> StateResolver<S> for DynamicStateResolver<S> {
 	}
 
 	fn provide_roots(
-		&self,
+		&mut self,
 		storage: &S,
 		context: &StateResolverContext,
-	) -> Option<BoxStream<'static, Result<(Cid, BTreeSet<Cid>), anyhow::Error>>> {
+	) -> Option<BoxStream<'static, Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>> {
 		self.0.provide_roots(storage, context)
 	}
 
-	async fn push_state(&mut self, storage: &S, context: &StateResolverContext) -> Result<(), anyhow::Error> {
-		self.0.push_state(storage, context).await
+	async fn push_state(&mut self, storage: &S, state: Cid, heads: BTreeSet<Cid>) -> Result<(), anyhow::Error> {
+		self.0.push_state(storage, state, heads).await
+	}
+
+	fn clear(&mut self) {
+		self.0.clear();
 	}
 }

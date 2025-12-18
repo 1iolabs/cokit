@@ -9,6 +9,7 @@ use crate::{
 	reducer::{
 		change::membership_writer::MembershipWriter,
 		core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
+		state_resolver::MembershipStateResolver,
 	},
 	services::{
 		application::KeyRequestAction,
@@ -220,9 +221,9 @@ impl SharedCoBuilder {
 			Default::default(),
 		);
 
-		// reducer
-		let mut reducer_builder = ReducerBuilder::new(core_resolver, log).with_initialize(false);
+		// membership states
 		let parent_storage = self.parent.storage();
+		let mut membership_states = MembershipStateResolver::default();
 		for co_state in self.membership.state.iter() {
 			// reducer state
 			//  note: external states (from invite) get mapped in the reducer initialize to not have network request
@@ -235,17 +236,25 @@ impl SharedCoBuilder {
 			}
 
 			// add to builder
-			if let Some((state, heads)) = reducer_state.some() {
-				reducer_builder = reducer_builder.with_snapshot(state, heads);
-			}
+			membership_states.insert(reducer_state);
 		}
+
+		// reducer builder
+		let mut reducer_builder = ReducerBuilder::new(core_resolver, log)
+			.with_initialize(false)
+			.with_state_resolver(membership_states);
+
+		// load states from pinning
+		//  this will map all external pinned to internal
 		#[cfg(feature = "pinning")]
 		{
 			let roots = crate::library::storage_snapshots::storage_snapshots_samples(
 				parent_storage.clone(),
 				self.parent.co_state().await,
 				&self.membership.id,
-				co_storage.clone(),
+				// to be sure we use the local storage
+				//  in any case we do not want to refetch deleted roots and better fail
+				context.storage(true),
 				100,
 			)
 			.await?;
@@ -255,6 +264,8 @@ impl SharedCoBuilder {
 				}
 			}
 		}
+
+		// reducer
 		let reducer = reducer_builder.build(&co_storage, runtime.runtime(), date).await?;
 
 		// setup auto write to parent co

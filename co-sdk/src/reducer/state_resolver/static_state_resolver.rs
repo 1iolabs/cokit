@@ -13,10 +13,14 @@ use futures::{
 };
 use std::{collections::BTreeSet, fmt::Debug, marker::PhantomData, mem::take};
 
-#[derive(Default)]
 pub struct StaticStateResolver<S> {
 	snapshots: Vec<(Cid, BTreeSet<Cid>)>,
 	_s: PhantomData<S>,
+}
+impl<S> Default for StaticStateResolver<S> {
+	fn default() -> Self {
+		Self { snapshots: Default::default(), _s: Default::default() }
+	}
 }
 impl<S> Debug for StaticStateResolver<S> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -30,18 +34,8 @@ impl<S: AnyBlockStorage> StaticStateResolver<S> {
 		storage: &S,
 		snapshots: impl Stream<Item = (Cid, BTreeSet<Cid>)>,
 	) -> Result<Self, StorageError> {
-		let mut unsorted_with_clock = snapshots
-			.then(|(state, heads)| {
-				let storage = storage.clone();
-				async move {
-					let clock = heads_clock(&storage, &heads).await?;
-					Result::<_, StorageError>::Ok((clock, (state, heads)))
-				}
-			})
-			.try_collect::<Vec<_>>()
-			.await?;
-		unsorted_with_clock.sort_by(|(a_time, _), (b_time, _)| a_time.cmp(b_time));
-		Ok(Self { _s: PhantomData, snapshots: unsorted_with_clock.into_iter().map(|(_, snapshot)| snapshot).collect() })
+		let snapshots = Self::sort(storage, snapshots).await?;
+		Ok(Self { _s: PhantomData, snapshots })
 	}
 
 	// /// Insert unsorted state.
@@ -61,6 +55,24 @@ impl<S: AnyBlockStorage> StaticStateResolver<S> {
 
 	pub fn len(&self) -> usize {
 		self.snapshots.len()
+	}
+
+	pub async fn sort(
+		storage: &S,
+		snapshots: impl Stream<Item = (Cid, BTreeSet<Cid>)>,
+	) -> Result<Vec<(Cid, BTreeSet<Cid>)>, anyhow::Error> {
+		let mut unsorted_with_clock = snapshots
+			.then(|(state, heads)| {
+				let storage = storage.clone();
+				async move {
+					let clock = heads_clock(&storage, &heads).await?;
+					Result::<_, StorageError>::Ok((clock, (state, heads)))
+				}
+			})
+			.try_collect::<Vec<_>>()
+			.await?;
+		unsorted_with_clock.sort_by(|(a_time, _), (b_time, _)| a_time.cmp(b_time));
+		Ok(unsorted_with_clock.into_iter().map(|(_, snapshot)| snapshot).collect())
 	}
 
 	/// Shrink snapshots by sample them, keeping first and last.
@@ -95,18 +107,27 @@ impl<S: AnyBlockStorage> StateResolver<S> for StaticStateResolver<S> {
 	}
 
 	fn provide_roots(
-		&self,
+		&mut self,
 		_storage: &S,
 		_context: &StateResolverContext,
-	) -> Option<BoxStream<'static, Result<(Cid, BTreeSet<Cid>), anyhow::Error>>> {
-		Some(stream::iter(self.snapshots.clone()).map(Ok).boxed())
+	) -> Option<BoxStream<'static, Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>> {
+		Some(
+			stream::iter(self.snapshots.clone())
+				.map(|(state, heads)| (Some(state), heads))
+				.map(Ok)
+				.boxed(),
+		)
 	}
 
-	async fn push_state(&mut self, _storage: &S, context: &StateResolverContext) -> Result<(), anyhow::Error> {
-		if let Some(state) = context.state {
-			self.push(state, context.heads.clone());
+	async fn push_state(&mut self, _storage: &S, state: Cid, heads: BTreeSet<Cid>) -> Result<(), anyhow::Error> {
+		if self.snapshots.iter().find(|item| item.1 == heads).is_none() {
+			self.push(state, heads);
 		}
 		Ok(())
+	}
+
+	fn clear(&mut self) {
+		self.snapshots.clear();
 	}
 }
 

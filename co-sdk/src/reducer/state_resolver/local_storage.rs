@@ -36,18 +36,14 @@ impl<S: AnyBlockStorage + BlockStorageContentMapping> StateResolver<S> for Local
 	}
 
 	fn provide_roots(
-		&self,
+		&mut self,
 		storage: &S,
 		context: &StateResolverContext,
-	) -> Option<BoxStream<'static, Result<(Cid, BTreeSet<Cid>), anyhow::Error>>> {
+	) -> Option<BoxStream<'static, Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>> {
 		// as snapshots are chronological just use the latest
 		let states = storage_snapshots(storage.clone(), context.state.into(), &self.co, storage.clone())
-			.try_filter_map(|reducer_state| async move { Ok(reducer_state.some()) })
+			.map_ok(|reducer_state| (reducer_state.state(), reducer_state.heads()))
 			.take(1);
 		Some(states.boxed())
-	}
-
-	async fn push_state(&mut self, _storage: &S, _context: &StateResolverContext) -> Result<(), anyhow::Error> {
-		Ok(())
 	}
 }

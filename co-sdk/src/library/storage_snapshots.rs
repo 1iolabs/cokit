@@ -10,6 +10,7 @@ use futures::{pin_mut, Stream, TryStreamExt};
 
 /// Read all pinned CO roots from the stroage core.
 /// The roots are returned from newest (first) to oldest (last).
+/// This method return internal/mapped Cid's.
 pub fn storage_snapshots(
 	storage_core_storage: impl AnyBlockStorage,
 	storage_core_state: OptionLink<Co>,

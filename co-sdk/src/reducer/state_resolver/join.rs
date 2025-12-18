@@ -58,13 +58,13 @@ impl<S: AnyBlockStorage> StateResolver<S> for JoinStateResolver<S> {
 	}
 
 	fn provide_roots(
-		&self,
+		&mut self,
 		storage: &S,
 		context: &StateResolverContext,
-	) -> Option<BoxStream<'static, Result<(Cid, BTreeSet<Cid>), anyhow::Error>>> {
+	) -> Option<BoxStream<'static, Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>> {
 		let streams = self
 			.0
-			.iter()
+			.iter_mut()
 			.filter_map(|next| next.provide_roots(storage, context))
 			.collect::<Vec<_>>();
 		if streams.is_empty() {
@@ -79,10 +79,16 @@ impl<S: AnyBlockStorage> StateResolver<S> for JoinStateResolver<S> {
 		}
 	}
 
-	async fn push_state(&mut self, storage: &S, context: &StateResolverContext) -> Result<(), anyhow::Error> {
+	async fn push_state(&mut self, storage: &S, state: Cid, heads: BTreeSet<Cid>) -> Result<(), anyhow::Error> {
 		for next in self.0.iter_mut() {
-			next.push_state(storage, context).await?;
+			next.push_state(storage, state, heads.clone()).await?;
 		}
 		Ok(())
+	}
+
+	fn clear(&mut self) {
+		for next in self.0.iter_mut() {
+			next.clear();
+		}
 	}
 }

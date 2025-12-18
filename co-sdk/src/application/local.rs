@@ -467,7 +467,7 @@ where
 			// apply
 			if let Some(pinning_state) = pinning_state {
 				if let Some((state, heads)) = pinning_state.some() {
-					reducer.insert_snapshot(state, heads.clone());
+					reducer.insert_snapshot(storage, state, heads.clone()).await?;
 					reducer.join(storage, &heads, context.runtime.runtime()).await?;
 				}
 			}
