@@ -9,7 +9,7 @@ publish = false
 repository = ""
 rust-version = "1.91"
 
-[package.metadata.docs.rs]9
+[package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
