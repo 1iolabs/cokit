@@ -21,8 +21,9 @@ RUN apt-get install --no-install-recommends -y cmake ninja-build
 
 # RUST
 RUN rustup component add rustfmt \
+ && rustup component add clippy \
  && rustup target add wasm32-unknown-unknown \
- && rustup toolchain install nightly \
+ && rustup toolchain install nightly-2025-12-09 \
  && rustup component add --toolchain nightly rustfmt
 
 # cargo-binstall

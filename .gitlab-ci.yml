@@ -45,14 +45,15 @@ bench:
   script:
     - cargo bench
 
-# verfiy all files a re formatted correctly
-fmt:
+# verfiy fmt/lint
+lint:
   stage: test
   image: ${DOCKERFILE_IMAGE}
   cache:
     <<: *global_cache
   script:
-    - cargo +nightly fmt --check
+    - cargo +nightly-2025-12-09 fmt --check
+    - cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 # generate binaries
 build:
