@@ -16,6 +16,14 @@ impl LocalIdentity {
 	pub fn device() -> Self {
 		LocalIdentity { did: "did:local:device".to_owned() }
 	}
+
+	/// Device local identity.
+	///
+	/// # Note
+	/// This has no real usage. Use only for testing.
+	pub fn new(name: &str) -> Self {
+		LocalIdentity { did: format!("did:local:{name}") }
+	}
 }
 impl Identity for LocalIdentity {
 	fn identity(&self) -> &str {

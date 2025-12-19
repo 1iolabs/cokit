@@ -1,5 +1,6 @@
 use cid::Cid;
 use co_core_co::CoAction;
+use co_identity::LocalIdentity;
 use co_sdk::{
 	build_core, crate_repository_path,
 	state::{query_core, QueryExt},
@@ -50,11 +51,12 @@ async fn test_local_join() {
 		.await
 		.expect("application");
 	let counter = counter_core(&application1.storage()).await;
-	let local_identity = application1.local_identity();
+	let local_identity1 = LocalIdentity::new("app1");
+	let local_identity2 = LocalIdentity::new("app2");
 	let local_co1 = application1.local_co_reducer().await.unwrap();
 	local_co1
 		.push(
-			&local_identity,
+			&local_identity1,
 			CO_CORE_NAME_CO,
 			&CoAction::CoreCreate { core: "counter".to_owned(), binary: counter, tags: Default::default() },
 		)
@@ -64,7 +66,7 @@ async fn test_local_join() {
 	// push
 	for i in 0..3 {
 		local_co1
-			.push(&local_identity, "counter", &CounterAction::Increment(i + 1))
+			.push(&local_identity1, "counter", &CounterAction::Increment(i + 1))
 			.await
 			.unwrap();
 	}
@@ -85,7 +87,7 @@ async fn test_local_join() {
 
 	// push
 	local_co1
-		.push(&local_identity, "counter", &CounterAction::Increment(10))
+		.push(&local_identity1, "counter", &CounterAction::Increment(10))
 		.await
 		.unwrap();
 	assert_eq!(counter_count(&local_co1).await, 16);
@@ -105,7 +107,7 @@ async fn test_local_join() {
 
 	// push conflict
 	local_co2
-		.push(&local_identity, "counter", &CounterAction::Increment(1))
+		.push(&local_identity2, "counter", &CounterAction::Increment(1))
 		.await
 		.unwrap();
 	assert_eq!(counter_count(&local_co2).await, 7);
@@ -154,11 +156,17 @@ async fn test_local_join() {
 	assert_eq!(counter_count(&local_co3).await, 17);
 	done.cancel();
 	let actions = rx.await.unwrap();
-	assert_eq!(actions.len(), 2); // note: sometimes they arrive in different order
+	assert_eq!(actions.len(), 2);
 	assert!(actions.contains(&CounterAction::Increment(10)));
 	assert!(actions.contains(&CounterAction::Increment(1)));
 
 	// check actual order
+	// note:
+	// 	checking order is actually tricky because every change in history (like the Cid of the core)
+	//  influences the ordereing when using the same identity
+	//  as this cahnges the Cid any therefore the deterministic sorting
+	//  normally that is not a problem because we use the same core but here we compare different
+	//  cores (build on different machines) for the same order
 	let (storage, entries) = application3.context().entries(local_co3.id()).await.unwrap();
 	let mut counter_actions = entries
 		.try_filter_map(|entry_block| {
