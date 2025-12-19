@@ -55,7 +55,7 @@ impl TryFrom<&str> for CoMacroFeature {
 			"no_derive" => Self::NoDerive,
 			"repr" => Self::Repr,
 			other => {
-				return Err(syn::Error::new_spanned(other, format!("Unknown flag: {}", other)));
+				return Err(syn::Error::new_spanned(other, format!("Unknown flag: {other}")));
 			},
 		})
 	}

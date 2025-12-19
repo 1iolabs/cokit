@@ -3,12 +3,12 @@ use co_core_co::CoAction;
 use co_sdk::{
 	build_core, crate_repository_path,
 	state::{query_core, QueryExt},
-	Action, AnyBlockStorage, ApplicationBuilder, CoReducer, CoreName, MonotonicCoDate, MonotonicCoUuid,
-	CO_CORE_NAME_CO, CO_ID_LOCAL,
+	Action, AnyBlockStorage, ApplicationBuilder, BlockStorageExt, CoReducer, CoreName, MonotonicCoDate,
+	MonotonicCoUuid, ReducerAction, CO_CORE_NAME_CO, CO_ID_LOCAL,
 };
 use co_test::{test_log_path, test_tmp_dir};
 use example_counter::{Counter, CounterAction};
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use ipld_core::serde::from_ipld;
 use std::future::ready;
 use tokio::sync::oneshot;
@@ -151,9 +151,39 @@ async fn test_local_join() {
 
 	// update thrid with conflicting application
 	local_co3.join_state(local_co2.reducer_state().await).await.unwrap();
+	assert_eq!(counter_count(&local_co3).await, 17);
 	done.cancel();
 	let actions = rx.await.unwrap();
-	assert_eq!(actions.len(), 2);
-	assert_eq!(actions, vec![CounterAction::Increment(10), CounterAction::Increment(1)]);
-	assert_eq!(counter_count(&local_co3).await, 17);
+	assert_eq!(actions.len(), 2); // note: sometimes they arrive in different order
+	assert!(actions.contains(&CounterAction::Increment(10)));
+	assert!(actions.contains(&CounterAction::Increment(1)));
+
+	// check actual order
+	let (storage, entries) = application3.context().entries(local_co3.id()).await.unwrap();
+	let mut counter_actions = entries
+		.try_filter_map(|entry_block| {
+			let storage = storage.clone();
+			async move {
+				Ok(storage
+					.get_deserialized::<ReducerAction<CounterAction>>(&entry_block.entry().payload)
+					.await
+					.ok()
+					.filter(|reducer_action| reducer_action.core == "counter")
+					.map(|reducer_action| reducer_action.payload))
+			}
+		})
+		.try_collect::<Vec<_>>()
+		.await
+		.unwrap();
+	counter_actions.reverse();
+	assert_eq!(
+		counter_actions,
+		vec![
+			CounterAction::Increment(1),
+			CounterAction::Increment(2),
+			CounterAction::Increment(3),
+			CounterAction::Increment(10),
+			CounterAction::Increment(1),
+		]
+	)
 }
