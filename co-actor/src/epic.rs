@@ -219,9 +219,14 @@ where
 
 /// Merge BoxEpic into one.
 pub struct MergeEpic<A, S, C>(Vec<BoxEpic<'static, A, S, C>>);
+impl<A, S, C> Default for MergeEpic<A, S, C> {
+	fn default() -> Self {
+		Self(Default::default())
+	}
+}
 impl<A, S, C> MergeEpic<A, S, C> {
 	pub fn new() -> Self {
-		Self(Default::default())
+		Self::default()
 	}
 
 	pub fn join(mut self, epic: impl EpicExt<A, S, C> + Send + 'static) -> Self {
@@ -256,7 +261,7 @@ where
 			.0
 			.iter_mut()
 			.filter(|epic| !epic.box_is_terminated())
-			.filter_map(|epic| epic.box_epic(actions, &action, &state, &context))
+			.filter_map(|epic| epic.box_epic(actions, action, state, context))
 			.collect();
 		if !streams.is_empty() {
 			Some(stream::iter(streams).flatten_unordered(None))

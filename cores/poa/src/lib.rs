@@ -27,11 +27,11 @@ pub enum AuthorityAction {
 }
 impl AuthorityAction {
 	pub fn is_same_kind(&self, other: &AuthorityAction) -> bool {
-		match (self, other) {
-			(AuthorityAction::Agree(_), AuthorityAction::Agree(_)) => true,
-			(AuthorityAction::Update(_), AuthorityAction::Update(_)) => true,
-			_ => false,
-		}
+		matches!(
+			(self, other),
+			(AuthorityAction::Agree(_), AuthorityAction::Agree(_))
+				| (AuthorityAction::Update(_), AuthorityAction::Update(_))
+		)
 	}
 }
 

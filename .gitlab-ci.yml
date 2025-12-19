@@ -1,12 +1,13 @@
 include: "ci/build.yml"
 
 stages:
+  - lint
   - test
   - build
   - publish
 
 variables:
-  RUST_VERSION: "1.88"
+  RUST_VERSION: "1.91"
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
 
 cache: &global_cache
@@ -19,11 +20,21 @@ cache: &global_cache
 
 # verfiy the configured in `co/build.yml` (DOCKERFILE_IMAGE) is in sync with `ci/Dockerfile`.
 dockerfile:
-  stage: test
+  stage: lint
   image: ${DOCKERFILE_IMAGE}
   script:
     - echo "> test if docker image is in sync with Dockerfile (ci/build.sh)"
     - echo "${DOCKERFILE_HASH}  ci/Dockerfile" | sha256sum --check --status
+
+# verfiy fmt/lint
+lint:
+  stage: lint
+  image: ${DOCKERFILE_IMAGE}
+  cache:
+    <<: *global_cache
+  script:
+    - cargo +nightly-2025-12-09 fmt --check
+    - cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 # verify all tests are running to success
 test:
@@ -35,6 +46,10 @@ test:
     RUST_BACKTRACE: "full"
   script:
     - cargo test
+  artifacts:
+    when: on_failure
+    paths:
+      - data
 
 # run benchmarks
 bench:
@@ -44,15 +59,6 @@ bench:
     <<: *global_cache
   script:
     - cargo bench
-
-# verfiy all files a re formatted correctly
-fmt:
-  stage: test
-  image: ${DOCKERFILE_IMAGE}
-  cache:
-    <<: *global_cache
-  script:
-    - cargo +nightly fmt --check
 
 # generate binaries
 build:

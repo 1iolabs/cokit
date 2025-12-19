@@ -87,7 +87,7 @@ where
 				match get.poll_unpin(cx) {
 					Poll::Ready(Ok(node)) => match node.read(&self.filter) {
 						Either::Left(links) => {
-							self.stack.extend(links.into_iter());
+							self.stack.extend(links);
 							continue;
 						},
 						Either::Right(entries) => {
@@ -138,7 +138,7 @@ mod tests {
 		}
 
 		// stream
-		let list = NodeStream::from_link(storage.clone(), root.into())
+		let list = NodeStream::from_link(storage.clone(), root)
 			.try_collect::<Vec<i32>>()
 			.await
 			.unwrap();
@@ -160,7 +160,7 @@ mod tests {
 		}
 
 		// stream
-		let list = NodeStream::from_link(storage.clone(), root.into())
+		let list = NodeStream::from_link(storage.clone(), root)
 			.with_reverse()
 			.try_collect::<Vec<i32>>()
 			.await

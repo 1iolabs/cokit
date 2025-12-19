@@ -140,10 +140,9 @@ impl CoContext {
 				tx.send(result).ok();
 			})
 		});
-		Ok(rx
-			.await
+		rx.await
 			.map_err(|_err| CoContextError::Shutdown)?
-			.map_err(|err| CoContextError::Execute(err))?)
+			.map_err(|err| CoContextError::Execute(err))
 	}
 }
 

@@ -1,11 +1,10 @@
 use crate::{
-	reducer::state_resolver::{StateResolver, StateResolverContext},
+	reducer::state_resolver::{StateResolver, StateResolverContext, StateStream},
 	ReducerChangeContext,
 };
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::AnyBlockStorage;
-use futures::stream::BoxStream;
 use std::{collections::BTreeSet, fmt::Debug};
 
 // StateResolver Box
@@ -31,11 +30,7 @@ impl<S: AnyBlockStorage> StateResolver<S> for DynamicStateResolver<S> {
 		self.0.resolve_state(storage, context, heads).await
 	}
 
-	fn provide_roots(
-		&mut self,
-		storage: &S,
-		context: &StateResolverContext,
-	) -> Option<BoxStream<'static, Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>> {
+	fn provide_roots(&mut self, storage: &S, context: &StateResolverContext) -> Option<StateStream> {
 		self.0.provide_roots(storage, context)
 	}
 

@@ -133,24 +133,15 @@ impl Node {
 	}
 
 	pub fn is_dir(&self) -> bool {
-		match self {
-			Node::Folder(_) => true,
-			_ => false,
-		}
+		matches!(self, Node::Folder(_))
 	}
 
 	pub fn is_file(&self) -> bool {
-		match self {
-			Node::File(_) => true,
-			_ => false,
-		}
+		matches!(self, Node::File(_))
 	}
 
 	pub fn is_link(&self) -> bool {
-		match self {
-			Node::Link(_) => true,
-			_ => false,
-		}
+		matches!(self, Node::Link(_))
 	}
 
 	pub fn modify(
@@ -415,7 +406,7 @@ fn reduce_modify(
 	storage: &mut dyn Storage,
 	mut state: File,
 	path: &AbsolutePath,
-	modifications: &Vec<FileModification>,
+	modifications: &[FileModification],
 ) -> Result<File, anyhow::Error> {
 	let path = path.normalize()?;
 	let (parent_path, name) = path.parent_and_file_name_result()?;
@@ -431,7 +422,7 @@ fn reduce_modify(
 			// validate: check `to_parent` exists
 			let validated_to_parent = if to_parent == "/" {
 				to_parent.to_owned()
-			} else if let Some((to_parent, node)) = get_node(context, paths, &to_parent, true)? {
+			} else if let Some((to_parent, node)) = get_node(context, paths, to_parent, true)? {
 				if !node.is_dir() {
 					return Err(anyhow!("Can only move into folders: {}", to_parent));
 				}
@@ -474,14 +465,11 @@ fn reduce_modify(
 		state.nodes.try_update_key(storage, &parent_path, |storage, _, item| {
 			// validate
 			for modification in modifications.iter() {
-				match modification {
-					FileModification::Rename(name) => {
-						// check `name` dont exists as sibling
-						if item.iter(storage).find(|node| node.name() == name).is_some() {
-							return Err(anyhow!("File exists: {}", parent_path.join_path(name)?));
-						}
-					},
-					_ => {},
+				if let FileModification::Rename(name) = modification {
+					// check `name` dont exists as sibling
+					if item.iter(storage).any(|node| node.name() == name) {
+						return Err(anyhow!("File exists: {}", parent_path.join_path(name)?));
+					}
 				}
 			}
 
@@ -581,12 +569,9 @@ fn get_node(
 	// resolve_link
 	if let Some(node) = &node {
 		if resolve_link {
-			match node {
-				Node::Link(link) => {
-					let target = parent_path.join(&link.contents)?;
-					return get_node(storage, paths, &target, resolve_link);
-				},
-				_ => {},
+			if let Node::Link(link) = node {
+				let target = parent_path.join(&link.contents)?;
+				return get_node(storage, paths, &target, resolve_link);
 			}
 		}
 	}
@@ -845,7 +830,7 @@ mod tests {
 		};
 		let state = state.reduce(&action, &mut context);
 		let paths = state.nodes.collection(&context);
-		assert_eq!(paths.iter().map(|(k, _)| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/test", "/test/world"]);
+		assert_eq!(paths.keys().map(|k| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/test", "/test/world"]);
 		assert_eq!(names(&context, &state, "/"), vec!["test"]);
 		assert_eq!(names(&context, &state, "/test"), vec!["world"]);
 		assert_eq!(names(&context, &state, "/test/world"), vec!["test.txt"]);
@@ -867,7 +852,7 @@ mod tests {
 		};
 		let state = state.reduce(&action, &mut context);
 		let paths = state.nodes.collection(&context);
-		assert_eq!(paths.iter().map(|(k, _)| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/world"]); // "/hello" is empty now
+		assert_eq!(paths.keys().map(|k| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/world"]); // "/hello" is empty now
 		assert_eq!(names(&context, &state, "/"), Vec::<&str>::from(["hello", "world"]));
 		assert_eq!(names(&context, &state, "/hello"), Vec::<&str>::from([]));
 		assert_eq!(names(&context, &state, "/world"), Vec::<&str>::from(["test.txt"]));
@@ -889,7 +874,7 @@ mod tests {
 		};
 		let state = state.reduce(&action, &mut context);
 		let paths = state.nodes.collection(&context);
-		assert_eq!(paths.iter().map(|(k, _)| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/hello"]); // "/world" is empty now
+		assert_eq!(paths.keys().map(|k| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/hello"]); // "/world" is empty now
 		assert_eq!(names(&context, &state, "/"), Vec::<&str>::from(["hello"]));
 		assert_eq!(names(&context, &state, "/hello"), Vec::<&str>::from(["world", "test.txt"]));
 		assert_eq!(names(&context, &state, "/hello/world"), Vec::<&str>::from([]));

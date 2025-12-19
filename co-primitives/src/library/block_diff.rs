@@ -207,16 +207,16 @@ pub trait BlockDiffFollow: Send + Sync {
 /// Pop a ReferenceDepth for next, if one.
 fn pop_reference(prev_links: &mut HashMap<Cid, BinaryHeap<ReferenceDepth>>, next: &Cid) -> Option<ReferenceDepth> {
 	// pop previous
-	let reference = match prev_links.get_mut(&next) {
+	let reference = match prev_links.get_mut(next) {
 		Some(prev) => prev.pop(),
 		None => None,
 	};
 
 	// remove empty keys
 	if reference.is_some() {
-		if let Some(references) = prev_links.get(&next) {
+		if let Some(references) = prev_links.get(next) {
 			if references.is_empty() {
-				prev_links.remove(&next);
+				prev_links.remove(next);
 			}
 		}
 	}
@@ -265,7 +265,7 @@ where
 	let links = if let Some(prev) = prev_links.get_mut(&cid) {
 		if let Some(mut reference) = prev.peek_mut() {
 			match *reference {
-				ReferenceDepth::Deep => match extract_links_children(storage, &cid, &block_links).await {
+				ReferenceDepth::Deep => match extract_links_children(storage, &cid, block_links).await {
 					Ok(links) => {
 						*reference = ReferenceDepth::Shallow;
 						Some(links)
@@ -288,7 +288,7 @@ where
 	// add new resolved links
 	if let Some(links) = links {
 		for link in links {
-			prev_links.entry(link).or_insert(Default::default()).push(ReferenceDepth::Deep);
+			prev_links.entry(link).or_default().push(ReferenceDepth::Deep);
 		}
 	}
 
@@ -301,7 +301,7 @@ where
 	S: BlockStorage + Clone + 'static,
 {
 	let block = storage.get(reference).await?;
-	let result = links.links(&block).map_err(|err| StorageError::Internal(err))?.collect();
+	let result = links.links(&block).map_err(StorageError::Internal)?.collect();
 	Ok(result)
 }
 

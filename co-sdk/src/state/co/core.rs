@@ -12,7 +12,7 @@ pub async fn core<T>(storage: &impl AnyBlockStorage, co_state: OptionLink<Co>, n
 where
 	T: Default + DeserializeOwned + Clone + Send + Sync + 'static,
 {
-	Ok(query_core(CoreName::<T>::new(name)).execute(storage, co_state).await?)
+	query_core(CoreName::<T>::new(name)).execute(storage, co_state).await
 }
 
 /// Get core by name. Returns default if not exists.
@@ -24,10 +24,10 @@ pub async fn core_or_default<T>(
 where
 	T: Default + DeserializeOwned + Clone + Send + Sync + 'static,
 {
-	Ok(query_core(CoreName::<T>::new(name))
+	query_core(CoreName::<T>::new(name))
 		.with_default()
 		.execute(storage, co_state)
-		.await?)
+		.await
 }
 
 /// Get the state of a core by name.

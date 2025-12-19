@@ -18,9 +18,9 @@ use std::{
 	time::{Duration, Instant},
 };
 
-pub const STORAGE_CO_ROOT_TYPE: &'static str = "co-root";
-pub const STORAGE_CO_HEAD_TYPE: &'static str = "co-head";
-pub const STORAGE_CO_STATE_TYPE: &'static str = "co-state";
+pub const STORAGE_CO_ROOT_TYPE: &str = "co-root";
+pub const STORAGE_CO_HEAD_TYPE: &str = "co-head";
+pub const STORAGE_CO_STATE_TYPE: &str = "co-state";
 
 /// Resolve shallow structure.
 /// Returns all children of resolved entries.

@@ -80,14 +80,13 @@ where
 		cid: Cid,
 		links: Option<BlockLinks>,
 	) -> Result<Option<OverlayChangeReference>, StorageError> {
-		Ok(self
-			.handle
+		self.handle
 			.request({
 				let next = self.next.clone();
 				move |response| OverlayBlockMessage::Flush(next, cid, links, response)
 			})
 			.await
-			.map_err(|err| StorageError::Internal(err.into()))??)
+			.map_err(|err| StorageError::Internal(err.into()))?
 	}
 
 	/// Consume and flush all changes to `to`.
@@ -298,7 +297,7 @@ where
 	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
 		Ok(self
 			.handle
-			.request(|response| OverlayBlockMessage::Set(self.next.clone(), block.into(), response))
+			.request(|response| OverlayBlockMessage::Set(self.next.clone(), block, response))
 			.await
 			.map_err(|err| StorageError::Internal(err.into()))??)
 	}
@@ -364,9 +363,7 @@ where
 		_tags: &Tags,
 		blocks_max_memory: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
-		let mut result = OverlayBlocks::default();
-		result.blocks_max_memory = blocks_max_memory;
-		Ok(result)
+		Ok(OverlayBlocks { blocks_max_memory, ..Default::default() })
 	}
 
 	async fn shutdown(&self, _state: Self::State) -> Result<(), ActorError> {
@@ -415,16 +412,14 @@ where
 							},
 							_ => {},
 						}
-						if self.skip_already_existing {
-							if next.exists(&cid).await.ok().unwrap_or(false) {
-								return Ok(cid);
-							}
+						if self.skip_already_existing && next.exists(&cid).await.ok().unwrap_or(false) {
+							return Ok(cid);
 						}
 
 						// log
 						#[cfg(feature = "logging-verbose")]
 						{
-							if co_primitives::MultiCodec::is_cbor(&cid) {
+							if co_primitives::MultiCodec::is_cbor(cid) {
 								tracing::trace!(?cid, ipld = ?co_primitives::from_cbor::<ipld_core::ipld::Ipld>(&data), "set");
 							} else {
 								tracing::trace!(?cid, "set");
@@ -463,7 +458,7 @@ where
 								}
 
 								// done?
-								if !(state.blocks_memory > state.blocks_max_memory) {
+								if state.blocks_memory <= state.blocks_max_memory {
 									break;
 								}
 							}
@@ -511,14 +506,14 @@ where
 				Some(OverlayBlock::Tmp(_)) => {
 					response.spawn_with(self.spawner.clone(), {
 						let blocks_tmp = self.blocks_tmp.clone();
-						move || async move { Ok(blocks_tmp.stat(&cid).await?) }
+						move || async move { blocks_tmp.stat(&cid).await }
 					});
 				},
 				Some(OverlayBlock::Remove) => {
 					response.send(Err(StorageError::NotFound(cid, anyhow!("removed")))).ok();
 				},
 				None => {
-					response.spawn_with(self.spawner.clone(), move || async move { Ok(next.stat(&cid).await?) });
+					response.spawn_with(self.spawner.clone(), move || async move { next.stat(&cid).await });
 				},
 			},
 			OverlayBlockMessage::Exists(next, cid, response) => match state.blocks.get(&cid) {
@@ -526,7 +521,7 @@ where
 					response.respond(Ok(block.exists()));
 				},
 				None => {
-					response.spawn_with(self.spawner.clone(), move || async move { Ok(next.exists(&cid).await?) });
+					response.spawn_with(self.spawner.clone(), move || async move { next.exists(&cid).await });
 				},
 			},
 			OverlayBlockMessage::ToPlain(next, cid, response) => {
@@ -684,18 +679,15 @@ where
 	//  depest first as some BlockStorage implemtations rely on that all children exists before creating a block
 	let mut result = None;
 	while let Some(cid) = stack.pop_back() {
-		match state.blocks.remove(&cid) {
-			Some(block) => {
-				// state
-				state.blocks_memory -= block.memory_len();
+		if let Some(block) = state.blocks.remove(&cid) {
+			// state
+			state.blocks_memory -= block.memory_len();
 
-				// flush block
-				let block_result = flush_block(next, blocks_tmp, cid, block).await?;
-				if result.is_none() {
-					result = Some(block_result);
-				}
-			},
-			None => {},
+			// flush block
+			let block_result = flush_block(next, blocks_tmp, cid, block).await?;
+			if result.is_none() {
+				result = Some(block_result);
+			}
 		}
 	}
 	Ok(result)
@@ -806,10 +798,7 @@ impl OverlayBlock {
 	}
 
 	pub fn is_remove(&self) -> bool {
-		match self {
-			OverlayBlock::Remove => true,
-			_ => false,
-		}
+		matches!(self, OverlayBlock::Remove)
 	}
 }
 

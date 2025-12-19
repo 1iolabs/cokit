@@ -9,7 +9,7 @@ use co_core_storage::{BlockInfo, StorageAction};
 use co_primitives::{OptionLink, StoreParams, WeakCid};
 use co_storage::{BlockStorageContentMapping, ExtendedBlockStorage};
 use futures::{pin_mut, TryStreamExt};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet};
 
 /// Cleanup storage by removing all unreferenced blocks.
 #[tracing::instrument(level = tracing::Level::TRACE, name = "storage-cleanup", err(Debug), skip_all)]
@@ -35,7 +35,7 @@ where
 	let mut state = storage_core_state;
 	loop {
 		// open blocks
-		let blocks = query_blocks.execute(storage_core_storage, state.into()).await?;
+		let blocks = query_blocks.execute(storage_core_storage, state).await?;
 		let blocks = blocks.open(storage_core_storage).await?;
 
 		// open stream
@@ -71,15 +71,15 @@ where
 			};
 
 			// add
-			let by_info = remove_by_info.entry(info.clone()).or_insert(Default::default());
-			if !by_info.contains_key(&cid) {
+			let by_info = remove_by_info.entry(info.clone()).or_default();
+			if let Entry::Vacant(e) = by_info.entry(cid) {
 				let exists = storage.exists(&cid).await?;
 				if exists {
 					remove_from_disk.insert(cid);
 				}
 
 				// insert
-				by_info.insert(cid, external_links.iter().collect());
+				e.insert(external_links.iter().collect());
 
 				// count
 				references_count += 1 + external_links.len();
@@ -105,7 +105,7 @@ where
 		// remove from disk
 		//  we double check if it has been removed because we dont use the force flag
 		let mut last_error = Ok(());
-		let blocks = query_blocks.execute(storage_core_storage, state.into()).await?;
+		let blocks = query_blocks.execute(storage_core_storage, state).await?;
 		let blocks = blocks.open(storage_core_storage).await?;
 		for cid in remove_from_disk {
 			let exists_in_core = blocks.contains_key(&cid).await?;
@@ -231,22 +231,19 @@ mod tests {
 		assert_eq!(count_pin_references(&local_co, local_co.id(), CoPinningKey::Root).await, 1);
 
 		// verify states are removed
-		assert_eq!(storage.exists(&external_local_co_state.state().unwrap()).await.unwrap(), false);
-		assert_eq!(storage.exists(&external_next_local_co_state.state().unwrap()).await.unwrap(), true);
-		assert_eq!(storage.exists(&local_co_state.state().unwrap()).await.unwrap(), false);
-		assert_eq!(storage.exists(&next_local_co_state.state().unwrap()).await.unwrap(), true);
+		assert!(!storage.exists(&external_local_co_state.state().unwrap()).await.unwrap());
+		assert!(storage.exists(&external_next_local_co_state.state().unwrap()).await.unwrap());
+		assert!(!storage.exists(&local_co_state.state().unwrap()).await.unwrap());
+		assert!(storage.exists(&next_local_co_state.state().unwrap()).await.unwrap());
 
 		// verify heads are removed
-		assert_eq!(storage.exists(external_local_co_state.heads().first().unwrap()).await.unwrap(), false);
-		assert_eq!(
-			storage
-				.exists(external_next_local_co_state.heads().first().unwrap())
-				.await
-				.unwrap(),
-			true
-		);
-		assert_eq!(storage.exists(local_co_state.heads().first().unwrap()).await.unwrap(), false);
-		assert_eq!(storage.exists(next_local_co_state.heads().first().unwrap()).await.unwrap(), true);
+		assert!(!storage.exists(external_local_co_state.heads().first().unwrap()).await.unwrap());
+		assert!(storage
+			.exists(external_next_local_co_state.heads().first().unwrap())
+			.await
+			.unwrap(),);
+		assert!(!storage.exists(local_co_state.heads().first().unwrap()).await.unwrap());
+		assert!(storage.exists(next_local_co_state.heads().first().unwrap()).await.unwrap());
 	}
 
 	/// Integration Test to verify storage_cleanup actualy deletes states.
@@ -327,15 +324,15 @@ mod tests {
 		assert_eq!(count_pin_references(&local_co, co.id(), CoPinningKey::Root).await, 1);
 
 		// verify states are removed
-		assert_eq!(storage.exists(&external_co_state.state().unwrap()).await.unwrap(), false);
-		assert_eq!(storage.exists(&external_next_co_state.state().unwrap()).await.unwrap(), true);
-		assert_eq!(storage.exists(&co_state.state().unwrap()).await.unwrap(), false);
-		assert_eq!(storage.exists(&next_co_state.state().unwrap()).await.unwrap(), true);
+		assert!(!storage.exists(&external_co_state.state().unwrap()).await.unwrap());
+		assert!(storage.exists(&external_next_co_state.state().unwrap()).await.unwrap());
+		assert!(!storage.exists(&co_state.state().unwrap()).await.unwrap());
+		assert!(storage.exists(&next_co_state.state().unwrap()).await.unwrap());
 
 		// verify heads are removed
-		assert_eq!(storage.exists(external_co_state.heads().first().unwrap()).await.unwrap(), false);
-		assert_eq!(storage.exists(external_next_co_state.heads().first().unwrap()).await.unwrap(), true);
-		assert_eq!(storage.exists(co_state.heads().first().unwrap()).await.unwrap(), false);
-		assert_eq!(storage.exists(next_co_state.heads().first().unwrap()).await.unwrap(), true);
+		assert!(!storage.exists(external_co_state.heads().first().unwrap()).await.unwrap());
+		assert!(storage.exists(external_next_co_state.heads().first().unwrap()).await.unwrap());
+		assert!(!storage.exists(co_state.heads().first().unwrap()).await.unwrap());
+		assert!(storage.exists(next_co_state.heads().first().unwrap()).await.unwrap());
 	}
 }

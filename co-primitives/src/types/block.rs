@@ -51,7 +51,7 @@ impl<S: StoreParams> Block<S> {
 	}
 
 	pub fn cid_data_digest(digest: impl MultihashDigest<64>, codec: impl Into<u64>, data: &[u8]) -> Cid {
-		Cid::new_v1(codec.into(), digest.digest(&data))
+		Cid::new_v1(codec.into(), digest.digest(data))
 	}
 
 	/// Returns the cid.
@@ -88,7 +88,7 @@ impl<S> PartialEq for Block<S> {
 impl<S> Eq for Block<S> {}
 impl<S> PartialOrd for Block<S> {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		self.cid.partial_cmp(&other.cid)
+		Some(self.cmp(other))
 	}
 }
 impl<S> Ord for Block<S> {

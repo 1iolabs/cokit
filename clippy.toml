@@ -1,0 +1,4 @@
+msrv = "1.91.0"
+large-error-threshold = 256
+type-complexity-threshold = 300
+enum-variant-size-threshold = 300

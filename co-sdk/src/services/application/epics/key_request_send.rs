@@ -195,7 +195,7 @@ pub fn network_task_execute(
 fn filter_response(message_id: &str, action: &Action) -> Option<(PeerId, DidCommHeader, String)> {
 	match action {
 		Action::DidCommReceive { peer, message } => {
-			if &message.header().message_type == CO_DIDCOMM_KEY_RESPONSE
+			if message.header().message_type == CO_DIDCOMM_KEY_RESPONSE
 				&& message.header().to.len() == 1
 				&& message.is_validated_sender()
 				&& message.header().thid.as_deref() == Some(message_id)

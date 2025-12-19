@@ -158,10 +158,9 @@ fn get_external(ipld: &Ipld) -> Result<HashSet<String>, GetExternalError> {
 	Ok(from_ipld::<Vec<Metadata>>(ipld_co.clone())
 		.map_err(|_| GetExternalError::Decode)?
 		.into_iter()
-		.filter_map(|v| match v {
-			Metadata::External(f) => Some(f),
+		.flat_map(|v| match v {
+			Metadata::External(f) => f,
 		})
-		.flatten()
 		.map(|s| s.to_owned())
 		.collect())
 }

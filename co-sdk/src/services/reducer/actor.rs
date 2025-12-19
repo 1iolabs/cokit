@@ -81,7 +81,7 @@ impl Actor for ReducerActor {
 	) -> Result<(), ActorError> {
 		match message {
 			ReducerMessage::State(response) => {
-				response.respond(handle_state(&state));
+				response.respond(handle_state(state));
 			},
 			ReducerMessage::StateStream(mut response) => {
 				if response.send(CoReducerState::new_reducer(&state.reducer)).is_ok() {
@@ -89,10 +89,10 @@ impl Actor for ReducerActor {
 				}
 			},
 			ReducerMessage::Push(overlay_storage, storage, identity, action_link, response) => {
-				response.respond(handle_push(&self, overlay_storage, state, identity, storage, action_link).await);
+				response.respond(handle_push(self, overlay_storage, state, identity, storage, action_link).await);
 			},
 			ReducerMessage::JoinState(overlay_storage, storage, join_state, response) => {
-				response.respond(handle_join_state(&self, overlay_storage, state, storage, join_state).await);
+				response.respond(handle_join_state(self, overlay_storage, state, storage, join_state).await);
 			},
 			ReducerMessage::Clear(response) => {
 				response.respond(handle_clear(state));
@@ -118,9 +118,7 @@ fn changed(
 	roots: impl IntoIterator<Item = CoReducerState>,
 ) {
 	if reducer_state.flush_info.is_none() {
-		let mut flush_info = FlushInfo::default();
-		flush_info.network = reducer_state.network_feature;
-		reducer_state.flush_info = Some(flush_info);
+		reducer_state.flush_info = Some(FlushInfo { network: reducer_state.network_feature, ..Default::default() });
 	}
 	if let Some(flush_info) = &mut reducer_state.flush_info {
 		if local {

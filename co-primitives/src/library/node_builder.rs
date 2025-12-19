@@ -211,7 +211,7 @@ where
 			.as_slice()
 			.chunks(self.max_children)
 			.map(|chunk| {
-				let node = self.serializer.nodes(chunk.iter().cloned().collect())?;
+				let node = self.serializer.nodes(chunk.to_vec())?;
 				let block = self.serializer.serialize(node)?;
 				Ok(block)
 			})
@@ -293,7 +293,7 @@ mod tests {
 		library::node_builder::{DefaultNodeSerializer, Node, NodeBuilder},
 		DefaultParams, StoreParams,
 	};
-	use std::iter::repeat;
+	use std::iter::repeat_n;
 
 	#[test]
 	fn into_blocks() {
@@ -365,7 +365,7 @@ mod tests {
 		let mut builder = NodeBuilder::<Vec<u8>, DefaultParams>::new(174, DefaultNodeSerializer::new());
 		let block_size = DefaultParams::MAX_BLOCK_SIZE / 10;
 		for _ in 0..11 {
-			builder.push(repeat(0u8).take(block_size).collect()).unwrap();
+			builder.push(repeat_n(0u8, block_size).collect()).unwrap();
 		}
 
 		// blocks

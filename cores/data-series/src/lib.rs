@@ -300,6 +300,7 @@ fn reduce_data(
 	state
 }
 
+#[allow(clippy::too_many_arguments)]
 fn reduce_pending_data(
 	storage: &mut dyn Storage,
 	did: &Did,
@@ -376,7 +377,7 @@ fn reduce_remove_aggregate(
 	aggregate_key: &str,
 ) -> DataSeries {
 	state.aggregates.update(storage, |_storage, aggregates| {
-		if aggregates.get(aggregate_key).map_or(false, |item| item.series == series_key) {
+		if aggregates.get(aggregate_key).is_some_and(|item| item.series == series_key) {
 			aggregates.remove(aggregate_key);
 		}
 	});

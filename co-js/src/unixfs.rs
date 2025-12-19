@@ -14,11 +14,8 @@ pub async fn js_unixfs_add(storage: &JsBlockStorage, stream: web_sys::ReadableSt
 	let mut async_stream = wasm_streams::ReadableStream::from_raw(stream)
 		.try_into_stream()
 		.map_err(|err| format!("Error converting stream: {:?}", err))?
-		.map_err(|err| futures::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", err)))
-		.map(|v| {
-			Ok(from_js_value::<Vec<u8>>(v?)
-				.map_err(|err| futures::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", err)))?)
-		})
+		.map_err(|err| futures::io::Error::other(format!("{:?}", err)))
+		.map(|v| from_js_value::<Vec<u8>>(v?).map_err(|err| futures::io::Error::other(format!("{:?}", err))))
 		.into_async_read();
 	let cids = unixfs_add(storage, &mut async_stream)
 		.await

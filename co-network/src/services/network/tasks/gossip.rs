@@ -50,23 +50,21 @@ impl NetworkTask<Behaviour, Context> for ListenGossipTask {
 		_context: &mut Context,
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
-		match &event {
-			SwarmEvent::Behaviour(NetworkEvent::Gossipsub(gossipsub::Event::Message {
-				propagation_source,
-				message_id,
-				message,
-			})) => {
-				if message.topic == self.topic {
-					self.messages
-						.send(GossipMessage {
-							_propagation_source: propagation_source.clone(),
-							_message_id: message_id.clone(),
-							message: message.clone(),
-						})
-						.ok();
-				}
-			},
-			_ => {},
+		if let SwarmEvent::Behaviour(NetworkEvent::Gossipsub(gossipsub::Event::Message {
+			propagation_source,
+			message_id,
+			message,
+		})) = &event
+		{
+			if message.topic == self.topic {
+				self.messages
+					.send(GossipMessage {
+						_propagation_source: *propagation_source,
+						_message_id: message_id.clone(),
+						message: message.clone(),
+					})
+					.ok();
+			}
 		}
 		Some(event)
 	}
@@ -95,7 +93,7 @@ impl PublishGossipTask {
 		let (tx, rx) = tokio::sync::oneshot::channel();
 		let task = Self { payload: Some((topic, message, tx)) };
 		spawner.spawn(task)?;
-		Ok(rx.await??)
+		rx.await?
 	}
 }
 impl NetworkTask<Behaviour, Context> for PublishGossipTask {
@@ -117,7 +115,7 @@ impl SubscribeGossipTask {
 		let (tx, rx) = tokio::sync::oneshot::channel();
 		let task = Self { topic, result: Some(tx) };
 		spawner.spawn(task)?;
-		Ok(rx.await??)
+		rx.await?
 	}
 }
 impl NetworkTask<Behaviour, Context> for SubscribeGossipTask {
@@ -142,7 +140,7 @@ impl UnsubscribeGossipTask {
 		let (tx, rx) = tokio::sync::oneshot::channel();
 		let task = Self { topic, result: Some(tx) };
 		spawner.spawn(task)?;
-		Ok(rx.await??)
+		rx.await?
 	}
 }
 impl NetworkTask<Behaviour, Context> for UnsubscribeGossipTask {

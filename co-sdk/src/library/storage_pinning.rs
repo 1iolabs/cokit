@@ -39,6 +39,7 @@ pub struct StoragePinningContext {
 /// Apply pinning to storage core.
 /// Return the next `local_state` if something has changed.
 #[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all)]
+#[allow(clippy::too_many_arguments)]
 pub async fn storage_pinning<S>(
 	context: &StoragePinningContext,
 	max_duration: Option<Duration>,
@@ -78,7 +79,7 @@ where
 	.await?;
 
 	// storage: pins
-	storage_dispatch_roots(&mut dispatcher, co_storage, &co_id, co_new_roots).await?;
+	storage_dispatch_roots(&mut dispatcher, co_storage, co_id, co_new_roots).await?;
 
 	// caluculate and free?
 	if context.free {
@@ -147,12 +148,9 @@ where
 		let changes = overlay_storage.consume_changes();
 		pin_mut!(changes);
 		while let Some(change) = changes.try_next().await? {
-			match change {
-				OverlayChange::Remove(cid) => {
-					// this will actually delte the blocks from storage_cleanup
-					overlay_storage.next_storage().remove(&cid).await?;
-				},
-				_ => {},
+			if let OverlayChange::Remove(cid) = change {
+				// this will actually delte the blocks from storage_cleanup
+				overlay_storage.next_storage().remove(&cid).await?;
 			}
 		}
 

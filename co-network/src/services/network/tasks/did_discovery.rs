@@ -11,8 +11,7 @@ use tokio::sync::oneshot;
 /// Subscribe identity for DID Discovery.
 #[derive(Debug)]
 pub struct DidDiscoverySubscribe {
-	task:
-		Option<(Option<(PrivateIdentityBox, Option<NetworkDidDiscovery>)>, oneshot::Sender<Result<(), anyhow::Error>>)>,
+	task: Option<Task>,
 }
 impl DidDiscoverySubscribe {
 	pub fn new(
@@ -20,17 +19,17 @@ impl DidDiscoverySubscribe {
 		network: Option<NetworkDidDiscovery>,
 	) -> (Self, oneshot::Receiver<Result<(), anyhow::Error>>) {
 		let (tx, rx) = oneshot::channel();
-		(Self { task: Some((Some((identity, network)), tx)) }, rx)
+		(Self { task: Some(Task { subscribe: Some((identity, network)), result: tx }) }, rx)
 	}
 
 	pub fn default() -> (Self, oneshot::Receiver<Result<(), anyhow::Error>>) {
 		let (tx, rx) = oneshot::channel();
-		(Self { task: Some((None, tx)) }, rx)
+		(Self { task: Some(Task { subscribe: None, result: tx }) }, rx)
 	}
 }
 impl NetworkTask<Behaviour, Context> for DidDiscoverySubscribe {
 	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, context: &mut Context) {
-		if let Some((subscribe, result)) = Option::take(&mut self.task) {
+		if let Some(Task { subscribe, result }) = Option::take(&mut self.task) {
 			let subscribe_result = match subscribe {
 				Some((identity, network)) => context.discovery.did_discovery_subscribe(swarm, network, identity),
 				None => context.discovery.did_discovery_subscribe_default(swarm),
@@ -66,4 +65,10 @@ impl NetworkTask<Behaviour, Context> for DidDiscoveryUnsubscribe {
 			result.send(unsubscribe_result).ok();
 		}
 	}
+}
+
+#[derive(Debug)]
+struct Task {
+	subscribe: Option<(PrivateIdentityBox, Option<NetworkDidDiscovery>)>,
+	result: oneshot::Sender<Result<(), anyhow::Error>>,
 }

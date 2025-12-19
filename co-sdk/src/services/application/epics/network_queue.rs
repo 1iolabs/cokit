@@ -150,8 +150,8 @@ impl Epic<Action, (), CoContext> for NetworkQueueProcessEpic {
 				self.processing = false;
 
 				// retry
-				if let Some(co) = self.pending.pop() {
-					Some(Either::Right(
+				self.pending.pop().map(|co| {
+					Either::Right(
 						{
 							let retry = *retry + 1;
 							async move {
@@ -160,10 +160,8 @@ impl Epic<Action, (), CoContext> for NetworkQueueProcessEpic {
 							}
 						}
 						.into_stream(),
-					))
-				} else {
-					None
-				}
+					)
+				})
 			},
 			_ => None,
 		}
@@ -232,7 +230,7 @@ impl Pending {
 				Some(None)
 			},
 			Pending::Co(cos) => {
-				let result = if let Some(co) = cos.pop_first() { Some(Some(co)) } else { None };
+				let result = cos.pop_first().map(Some);
 				if cos.is_empty() {
 					*self = Pending::None;
 				}
@@ -254,7 +252,7 @@ fn process_complete(
 			let co = co.clone();
 			move |task| {
 				if let Some(co) = &co {
-					return task.tags.string("co") == Some(co.as_str());
+					task.tags.string("co") == Some(co.as_str())
 				} else {
 					true
 				}
@@ -282,7 +280,7 @@ fn process(
 			let co = co.clone();
 			move |task| {
 				if let Some(co) = &co {
-					return task.tags.string("co") == Some(co.as_str());
+					task.tags.string("co") == Some(co.as_str())
 				} else {
 					true
 				}

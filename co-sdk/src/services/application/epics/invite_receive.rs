@@ -27,7 +27,7 @@ pub fn invite_receive(
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
 		Action::DidCommReceive { peer, message } => {
-			if &message.header().message_type == CO_DIDCOMM_INVITE
+			if message.header().message_type == CO_DIDCOMM_INVITE
 				&& message.header().to.len() == 1
 				&& message.is_validated_sender()
 			{

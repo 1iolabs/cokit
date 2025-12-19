@@ -550,13 +550,13 @@ mod tests {
 			) -> Result<(), ActorError> {
 				match message {
 					TestMessage::Inc(value) => {
-						*state = value + *state;
+						*state += value;
 					},
 					TestMessage::Get(response) => {
 						response.respond(*state);
 					},
 					TestMessage::IncGet(value, response) => {
-						*state = value + *state;
+						*state += value;
 						response.respond(*state);
 					},
 				}
@@ -609,7 +609,7 @@ mod tests {
 			) -> Result<(), ActorError> {
 				match message {
 					TestMessage::Inc(value) => {
-						state.value = value + state.value;
+						state.value += value;
 						state.watchers.send(state.value);
 					},
 					TestMessage::Watch(mut response) => {
@@ -663,7 +663,7 @@ mod tests {
 			) -> Result<(), ActorError> {
 				match message {
 					TestMessage::Inc(value) => {
-						*state = value + *state;
+						*state += value;
 					},
 					TestMessage::Get(response) => {
 						response.send(*state).ok();

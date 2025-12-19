@@ -61,5 +61,5 @@ where
 	.await?;
 
 	// result
-	Ok(next_state.into())
+	Ok(next_state)
 }

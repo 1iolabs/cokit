@@ -36,7 +36,7 @@ pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 					true
 				} else if let Some(name) = entry.file_name().and_then(|name| std::str::from_utf8(name.as_bytes()).ok())
 				{
-					command.core.iter().find(|filter| filter.as_str() == name).is_some()
+					command.core.iter().any(|filter| filter.as_str() == name)
 				} else {
 					true
 				}

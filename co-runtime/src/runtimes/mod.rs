@@ -45,7 +45,7 @@ pub trait Runtime: Debug {
 
 enum RuntimeState {
 	Unintialized(bool, Vec<u8>),
-	Intialized(wasmer::WasmerRuntime),
+	Intialized(Box<wasmer::WasmerRuntime>),
 }
 impl Debug for RuntimeState {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -95,7 +95,7 @@ fn wasmer_runtime_with_api(state: &mut RuntimeState, mut api: CoV1Api) -> Result
 	// initialize
 	let runtime: &mut WasmerRuntime = match state {
 		RuntimeState::Unintialized(native, bytes) => {
-			*state = RuntimeState::Intialized(wasmer::WasmerRuntime::new(api, *native, bytes)?);
+			*state = RuntimeState::Intialized(Box::new(wasmer::WasmerRuntime::new(api, *native, bytes)?));
 			if let RuntimeState::Intialized(runtime) = state {
 				runtime
 			} else {

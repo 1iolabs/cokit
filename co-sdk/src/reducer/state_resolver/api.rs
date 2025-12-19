@@ -35,11 +35,7 @@ where
 	/// Provide a stream of known roots (state/heads or just heads).
 	/// The states/heads are not required to be sorted.
 	/// Called once per initialize.
-	fn provide_roots(
-		&mut self,
-		storage: &S,
-		context: &StateResolverContext,
-	) -> Option<BoxStream<'static, Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>> {
+	fn provide_roots(&mut self, storage: &S, context: &StateResolverContext) -> Option<StateStream> {
 		let _storage = storage;
 		let _context = context;
 		None
@@ -69,6 +65,9 @@ where
 	/// Clear the resolver.
 	fn clear(&mut self) {}
 }
+
+/// Stream of state/heads pairs.
+pub type StateStream = BoxStream<'static, Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>;
 
 /// Context informations that may used by the resolver to help state resolving.
 #[derive(Debug, Default, Clone)]

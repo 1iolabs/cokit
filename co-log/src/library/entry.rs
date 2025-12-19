@@ -91,7 +91,7 @@ impl PartialEq for EntryBlock {
 impl Eq for EntryBlock {}
 impl PartialOrd for EntryBlock {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		self.cid().partial_cmp(other.cid())
+		Some(self.cmp(other))
 	}
 }
 impl Ord for EntryBlock {

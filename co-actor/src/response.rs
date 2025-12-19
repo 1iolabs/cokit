@@ -233,14 +233,12 @@ where
 	}
 
 	pub fn send(&mut self, value: T) {
-		self.streams.retain_mut(|stream| match stream.send(value.clone()) {
-			Err(ActorError::Canceled) => false,
-			_ => true,
-		});
+		self.streams
+			.retain_mut(|stream| !matches!(stream.send(value.clone()), Err(ActorError::Canceled)));
 	}
 
 	/// Test if the streams has been closed by the caller.
 	pub fn is_closed(&self) -> bool {
-		self.streams.iter().find(|s| !s.is_closed()).is_none()
+		!self.streams.iter().any(|s| !s.is_closed())
 	}
 }

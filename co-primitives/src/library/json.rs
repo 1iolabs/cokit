@@ -5,8 +5,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub fn to_json<T: Serialize>(value: &T) -> Result<Vec<u8>, JsonError> {
 	let ipld =
 		to_ipld(value).map_err(|err| JsonError::Serialize(std::any::type_name::<T>().to_owned(), err.to_string()))?;
-	Ok(serde_ipld_dagjson::to_vec(&ipld)
-		.map_err(|err| JsonError::Serialize(std::any::type_name::<T>().to_owned(), err.to_string()))?)
+	serde_ipld_dagjson::to_vec(&ipld)
+		.map_err(|err| JsonError::Serialize(std::any::type_name::<T>().to_owned(), err.to_string()))
 }
 
 /// Deserialize from JSON string (using dag-json).
@@ -14,20 +14,19 @@ pub fn from_json<'a, T: Deserialize<'a>>(value: &'a [u8]) -> Result<T, JsonError
 	// because of an bug in `serde_ipld_dagjson` we take an extra step via Ipld to make bytes work correctly
 	let ipld: Ipld = serde_ipld_dagjson::from_slice(value)
 		.map_err(|err| JsonError::Deserialize(std::any::type_name::<T>().to_owned(), err.to_string()))?;
-	Ok(T::deserialize(ipld)
-		.map_err(|err| JsonError::Deserialize(std::any::type_name::<T>().to_owned(), err.to_string()))?)
+	T::deserialize(ipld).map_err(|err| JsonError::Deserialize(std::any::type_name::<T>().to_owned(), err.to_string()))
 }
 
 /// Serialize `value` to JSON string (using dag-json).
 pub fn to_json_string<T: Serialize>(value: &T) -> Result<String, JsonError> {
-	Ok(String::from_utf8(to_json(value)?)
-		.map_err(|err| JsonError::Serialize(std::any::type_name::<T>().to_owned(), err.to_string()))?)
+	String::from_utf8(to_json(value)?)
+		.map_err(|err| JsonError::Serialize(std::any::type_name::<T>().to_owned(), err.to_string()))
 }
 
 /// Deserialize from JSON string (using dag-json).
 pub fn from_json_string<T: DeserializeOwned>(value: impl AsRef<[u8]>) -> Result<T, JsonError> {
-	Ok(from_json(value.as_ref())
-		.map_err(|err| JsonError::Deserialize(std::any::type_name::<T>().to_owned(), err.to_string()))?)
+	from_json(value.as_ref())
+		.map_err(|err| JsonError::Deserialize(std::any::type_name::<T>().to_owned(), err.to_string()))
 }
 
 #[derive(Debug, thiserror::Error)]

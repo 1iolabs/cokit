@@ -102,7 +102,7 @@ where
 
 	pub async fn entries(&self) -> impl Iterator<Item = Block<P>> + use<P> {
 		let records = { self.records.read().unwrap().clone() };
-		records.into_iter().map(|(_, record)| record.block)
+		records.into_values().map(|record| record.block)
 	}
 }
 impl Default for MemoryBlockStorage<DefaultParams> {

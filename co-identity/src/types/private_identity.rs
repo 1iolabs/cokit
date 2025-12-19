@@ -11,9 +11,8 @@ pub trait PrivateIdentity: Identity {
 	fn didcomm_private(&self) -> Option<DidCommPrivateContext>;
 
 	fn try_didcomm_private(&self) -> Result<DidCommPrivateContext, anyhow::Error> {
-		Ok(self
-			.didcomm_private()
-			.ok_or(anyhow::anyhow!("unsupported identity: no private didcomm context: {}", self.identity()))?)
+		self.didcomm_private()
+			.ok_or(anyhow::anyhow!("unsupported identity: no private didcomm context: {}", self.identity()))
 	}
 
 	fn boxed(self) -> PrivateIdentityBox
@@ -83,9 +82,9 @@ impl PrivateIdentity for PrivateIdentityBox {
 		self.clone()
 	}
 }
-impl Into<String> for &PrivateIdentityBox {
-	fn into(self) -> String {
-		self.identity().to_string()
+impl From<&PrivateIdentityBox> for String {
+	fn from(value: &PrivateIdentityBox) -> Self {
+		value.identity().to_string()
 	}
 }
 

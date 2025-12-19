@@ -35,7 +35,7 @@ impl NetworkTask<Behaviour, Context> for DiscoveryConnectNetworkTask {
 				self.connect_request = Some(v);
 			},
 			Err(e) => {
-				self.sender.send(Err(e.into())).ok();
+				self.sender.send(Err(e)).ok();
 			},
 		}
 	}

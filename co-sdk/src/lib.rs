@@ -56,7 +56,7 @@ pub use library::{
 	token::{CoToken, CoTokenParameters},
 	update_co::update_co,
 };
-pub use pin::pin::PinAPI;
+pub use pin::PinAPI;
 pub use reducer::core_resolver::{
 	co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverContext, CoreResolverError,
 };

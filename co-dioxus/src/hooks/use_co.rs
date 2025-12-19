@@ -86,11 +86,8 @@ async fn lastest_reducer_state(
 ) -> Result<CoReducerState, CoError> {
 	loop {
 		// done?
-		match &*reducer_state.borrow_and_update() {
-			Some(result) => {
-				return result.clone();
-			},
-			None => {},
+		if let Some(result) = &*reducer_state.borrow_and_update() {
+			return result.clone();
 		}
 
 		// wait for next change
@@ -125,7 +122,7 @@ impl Co {
 	}
 
 	pub fn last_error(&self) -> Result<(), RenderError> {
-		self.last_error.cloned().map_err(|err| RenderError::from(err))
+		self.last_error.cloned().map_err(RenderError::from)
 	}
 
 	pub fn clear_last_error(&mut self) {

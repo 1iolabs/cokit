@@ -31,7 +31,7 @@ where
 		for (key, value) in iter.into_iter() {
 			transaction.insert(key, value).await?;
 		}
-		Ok(transaction.store().await?)
+		transaction.store().await
 	}
 
 	/// Whether this collection is empty.
@@ -92,7 +92,7 @@ where
 	pub async fn update_or_insert<S, F>(&mut self, storage: &S, key: K, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
-		F: FnOnce(&mut V) -> () + Send,
+		F: FnOnce(&mut V) + Send,
 		S: BlockStorage + Clone + 'static,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
@@ -125,7 +125,7 @@ where
 	/// Update value ignore if key not exists.
 	pub async fn update<S, F>(&mut self, storage: &S, key: K, update: F) -> Result<(), StorageError>
 	where
-		F: FnOnce(&mut V) -> () + Send,
+		F: FnOnce(&mut V) + Send,
 		S: BlockStorage + Clone + 'static,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
@@ -215,13 +215,13 @@ where
 		Self(cid.into())
 	}
 }
-impl<K, V> Into<Option<Cid>> for &CoMap<K, V>
+impl<K, V> From<&CoMap<K, V>> for Option<Cid>
 where
 	K: Hash + Ord + Clone + Send + Sync + 'static,
 	V: Clone + Send + Sync + 'static,
 {
-	fn into(self) -> Option<Cid> {
-		*self.0.cid()
+	fn from(value: &CoMap<K, V>) -> Self {
+		*value.0.cid()
 	}
 }
 #[async_trait]
@@ -373,7 +373,7 @@ where
 	pub async fn update_or_insert<F>(&mut self, key: K, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
-		F: FnOnce(&mut V) -> () + Send,
+		F: FnOnce(&mut V) + Send,
 	{
 		let mut item = self.get(&key).await?.unwrap_or_default();
 		update(&mut item);
@@ -397,7 +397,7 @@ where
 	/// Update value, ignore if key not exists.
 	pub async fn update<F>(&mut self, key: K, update: F) -> Result<(), StorageError>
 	where
-		F: FnOnce(&mut V) -> () + Send,
+		F: FnOnce(&mut V) + Send,
 	{
 		if let Some(mut item) = self.get(&key).await? {
 			update(&mut item);
@@ -422,7 +422,7 @@ where
 	pub async fn update_stream(
 		&mut self,
 		keys_to_update: impl Stream<Item = Result<K, StorageError>>,
-		mut update: impl FnMut(&K, &mut V) -> () + Send,
+		mut update: impl FnMut(&K, &mut V) + Send,
 	) -> Result<(), StorageError> {
 		pin_mut!(keys_to_update);
 		while let Some(key) = keys_to_update.try_next().await? {

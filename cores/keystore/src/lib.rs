@@ -62,6 +62,6 @@ where
 				state.keys.remove(storage, uri.clone()).await?;
 			},
 		}
-		Ok(storage.set_value(&state).await?.into())
+		Ok(storage.set_value(&state).await?)
 	}
 }

@@ -58,7 +58,7 @@ pub async fn find_co_key_by_reference(
 	keystore_core_name: Option<&str>,
 ) -> Result<Key, anyhow::Error> {
 	let (parent_storage, key_store) = state::query_core(CO_CORE_NAME_KEYSTORE.with_name_opt(keystore_core_name))
-		.execute_reducer(&parent)
+		.execute_reducer(parent)
 		.await?;
 	let (_, key) = state::find(&parent_storage, &key_store.keys, |(k, _)| k == key_reference)
 		.await?

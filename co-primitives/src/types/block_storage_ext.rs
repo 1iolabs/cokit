@@ -64,7 +64,7 @@ pub trait BlockStorageExt: BlockStorage {
 		T: Send + Sync + Serialize,
 	{
 		let block = BlockSerializer::new().serialize(value)?;
-		Ok(self.set(block).await?)
+		self.set(block).await
 	}
 
 	/// Get deserialized value.

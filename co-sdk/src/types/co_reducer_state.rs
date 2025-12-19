@@ -49,11 +49,7 @@ impl CoReducerState {
 	}
 
 	pub fn some(&self) -> Option<(Cid, BTreeSet<Cid>)> {
-		if let Some(state) = self.0 {
-			Some((state, self.1.clone()))
-		} else {
-			None
-		}
+		self.0.map(|state| (state, self.1.clone()))
 	}
 
 	pub fn unwrap(self) -> (Cid, BTreeSet<Cid>) {

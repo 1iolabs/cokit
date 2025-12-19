@@ -88,7 +88,7 @@ async fn conflicting_membership_update(encryption: bool) {
 	tracing::info!(settings = ?application.settings(), encryption, "application-settings");
 
 	// create identity
-	let identity = DidKeyIdentity::generate(Some(&vec![1; 32]));
+	let identity = DidKeyIdentity::generate(Some(&[1; 32]));
 	let local_co = application.local_co_reducer().await.unwrap();
 	let provider = DidKeyProvider::new(local_co.clone(), CO_CORE_NAME_KEYSTORE);
 	provider.store(&identity, None).await.unwrap();

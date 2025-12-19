@@ -45,7 +45,7 @@ fn test_image_content() {
 		w: 20,
 		mimetype: "image/jpeg".to_string(),
 		size: 5000,
-		thumbnail_file: Cid::default().into(),
+		thumbnail_file: Cid::default(),
 		thumbnail_info: ThumbnailInfo { h: 10, w: 10, mimetype: "image/jpeg".to_string(), size: 500 },
 	};
 	let event_content = message_event::ImageContent::new("Some image", Cid::default(), info);

@@ -31,7 +31,7 @@ impl JsBlockStorage {
 				JsLocalTaskSpawner::default(),
 				Default::default(),
 				JsBlockStorageActor { get: get.dyn_into()?, set: set.dyn_into()? },
-				Default::default(),
+				(),
 			)
 			.map_err(|err| format!("block storage failed: {:?}", err))?
 			.handle(),
@@ -83,8 +83,8 @@ struct JsBlockStorageActor {
 impl JsBlockStorageActor {
 	async fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError> {
 		let this = JsValue::null();
-		let js_cid = serde_wasm_bindgen::to_value(cid)
-			.map_err(|err| anyhow!("Convert `Cid` to `JsValue` failed: {}", err.to_string()))?;
+		let js_cid =
+			serde_wasm_bindgen::to_value(cid).map_err(|err| anyhow!("Convert `Cid` to `JsValue` failed: {}", err))?;
 		let call: JsValue = self.get.call1(&this, &js_cid).map_err(|err| anyhow!("Call error: {:?}", err))?;
 		let promise: Promise = call
 			.dyn_into::<Promise>()
@@ -104,8 +104,8 @@ impl JsBlockStorageActor {
 	async fn set(&self, block: Block<DefaultParams>) -> Result<Cid, StorageError> {
 		let this = JsValue::null();
 		let (cid, data) = block.into_inner();
-		let js_cid = serde_wasm_bindgen::to_value(&cid)
-			.map_err(|err| anyhow!("Convert `Cid` to `JsValue` failed: {}", err.to_string()))?;
+		let js_cid =
+			serde_wasm_bindgen::to_value(&cid).map_err(|err| anyhow!("Convert `Cid` to `JsValue` failed: {}", err))?;
 		let js_data = Uint8Array::from(data.as_ref());
 		let call = self
 			.set
@@ -120,8 +120,7 @@ impl JsBlockStorageActor {
 			.dyn_into::<Uint8Array>()
 			.map_err(|err| anyhow!("Convert storage set result JsValue to Cid failed: {:?}", err.as_string()))?
 			.to_vec();
-		let storage_set_cid =
-			Cid::try_from(cid_bytes).map_err(|err| anyhow!("Get Cid from bytes failed: {}", err.to_string()))?;
+		let storage_set_cid = Cid::try_from(cid_bytes).map_err(|err| anyhow!("Get Cid from bytes failed: {}", err))?;
 		Ok(storage_set_cid)
 	}
 }

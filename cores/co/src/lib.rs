@@ -160,18 +160,11 @@ pub enum ParticipantState {
 }
 impl ParticipantState {
 	pub fn is_active(&self) -> bool {
-		match self {
-			ParticipantState::Active => true,
-			_ => false,
-		}
+		matches!(self, ParticipantState::Active)
 	}
 
 	pub fn has_access(&self) -> bool {
-		match self {
-			ParticipantState::Active => true,
-			ParticipantState::Invite => true,
-			_ => false,
-		}
+		matches!(self, ParticipantState::Active | ParticipantState::Invite)
 	}
 }
 
@@ -610,7 +603,7 @@ async fn reduce_network_remove<S>(storage: &S, result: &mut Co, network: &Networ
 where
 	S: BlockStorage + Clone + 'static,
 {
-	Ok(result.network.remove(storage, network.clone()).await?)
+	result.network.remove(storage, network.clone()).await
 }
 
 async fn reduce_network_insert<S>(storage: &S, result: &mut Co, network: &Network) -> Result<bool, StorageError>

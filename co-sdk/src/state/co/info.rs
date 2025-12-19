@@ -10,7 +10,7 @@ pub async fn co<S>(storage: &S, co_state: OptionLink<Co>) -> Result<Co, QueryErr
 where
 	S: BlockStorage + Clone + 'static,
 {
-	Ok(query_core(CO_CORE_NAME_CO).with_default().execute(storage, co_state).await?)
+	query_core(CO_CORE_NAME_CO).with_default().execute(storage, co_state).await
 }
 
 pub async fn co_info<S>(storage: &S, co_state: OptionLink<Co>) -> Result<CoInfo, QueryError>

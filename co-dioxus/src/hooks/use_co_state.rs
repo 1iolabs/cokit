@@ -8,7 +8,7 @@ use futures::{pin_mut, StreamExt};
 pub fn use_co_state(co: &str) -> Signal<CoReducerState, SyncStorage> {
 	// hooks
 	let error = use_co_error();
-	let state = use_signal_sync(|| Default::default());
+	let state = use_signal_sync(Default::default);
 	let context: CoContext = use_context();
 	let hook = use_hook(|| {
 		// run and update until drop_rx dropped

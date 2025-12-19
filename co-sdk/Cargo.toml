@@ -2,7 +2,7 @@
 name = "co-sdk"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.76"
+rust-version = "1.91"
 
 [dependencies]
 #librocksdb-sys = { version = "0.10.0+7.9.2" }

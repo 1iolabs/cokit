@@ -242,7 +242,7 @@ where
 		let sender_public_key = sender_context
 			.verification_method()
 			.public_key_bytes()
-			.map_err(|err| ReceiveError::BadDid(from.to_owned(), err.into()))?;
+			.map_err(|err| ReceiveError::BadDid(from.to_owned(), err))?;
 		let sender_kid = hex::encode(&sender_public_key);
 
 		// check signature kid

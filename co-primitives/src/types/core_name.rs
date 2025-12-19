@@ -7,7 +7,7 @@ pub struct CoreName<'a, S> {
 }
 impl<'a, S> Clone for CoreName<'a, S> {
 	fn clone(&self) -> Self {
-		Self { name: self.name, _core: self._core.clone() }
+		*self
 	}
 }
 impl<'a, S> Copy for CoreName<'a, S> {}
@@ -46,9 +46,9 @@ impl<'a, S> From<&'a str> for CoreName<'a, S> {
 		Self::new(value)
 	}
 }
-impl<'a, S> Into<String> for CoreName<'a, S> {
-	fn into(self) -> String {
-		self.name.to_string()
+impl<'a, S> From<CoreName<'a, S>> for String {
+	fn from(value: CoreName<'a, S>) -> Self {
+		value.name.to_string()
 	}
 }
 impl<'a, S> AsRef<str> for CoreName<'a, S> {

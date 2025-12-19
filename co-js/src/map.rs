@@ -18,6 +18,7 @@ impl JsCoMap {
 		Ok(JsCoMap { root })
 	}
 
+	#[allow(clippy::should_implement_trait)]
 	pub fn default() -> Self {
 		JsCoMap { root: None }
 	}

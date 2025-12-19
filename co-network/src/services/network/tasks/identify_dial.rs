@@ -29,25 +29,22 @@ impl NetworkTask<Behaviour, Context> for IdentifyDialNetworkTask {
 		_context: &mut Context,
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
-		match &event {
-			SwarmEvent::Behaviour(NetworkEvent::Identify(identify::Event::Received { info, .. })) => {
-				if info.agent_version == self.agent {
-					let peer_id: PeerId = info.public_key.clone().into();
-					for addr in info.listen_addrs.iter() {
-						if !is_private_ip(addr) {
-							match swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![addr.clone()]).build()) {
-								Err(err) => {
-									tracing::debug!(?err, ?peer_id, ?addr, "network-identify-dial-failed");
-								},
-								Ok(_) => {
-									tracing::trace!(?peer_id, ?addr, "network-identify-dial");
-								},
-							}
+		if let SwarmEvent::Behaviour(NetworkEvent::Identify(identify::Event::Received { info, .. })) = &event {
+			if info.agent_version == self.agent {
+				let peer_id: PeerId = info.public_key.clone().into();
+				for addr in info.listen_addrs.iter() {
+					if !is_private_ip(addr) {
+						match swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![addr.clone()]).build()) {
+							Err(err) => {
+								tracing::debug!(?err, ?peer_id, ?addr, "network-identify-dial-failed");
+							},
+							Ok(_) => {
+								tracing::trace!(?peer_id, ?addr, "network-identify-dial");
+							},
 						}
 					}
 				}
-			},
-			_ => {},
+			}
 		}
 		Some(event)
 	}

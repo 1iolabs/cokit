@@ -56,19 +56,18 @@ pub struct Cli {
 	#[arg(long, short = 'F')]
 	pub feature: Vec<String>,
 }
-impl Into<CoSettings> for Cli {
-	fn into(self) -> CoSettings {
+impl From<Cli> for CoSettings {
+	fn from(cli: Cli) -> Self {
 		CoSettings {
-			identifier: self.instance_id.unwrap_or_else(|| String::from("dioxus")),
-			network: !self.no_network,
-			network_settings: NetworkSettings::default().with_force_new_peer_id(self.force_new_peer_id),
-			no_keychain: self.no_keychain,
-			path: self.base_path,
-			no_log: self.no_log,
-			log_level: self.log_level,
-			no_default_features: self.no_default_features,
-			feature: self.feature,
-			..Default::default()
+			identifier: cli.instance_id.unwrap_or_else(|| String::from("dioxus")),
+			network: !cli.no_network,
+			network_settings: NetworkSettings::default().with_force_new_peer_id(cli.force_new_peer_id),
+			no_keychain: cli.no_keychain,
+			path: cli.base_path,
+			no_log: cli.no_log,
+			log_level: cli.log_level,
+			no_default_features: cli.no_default_features,
+			feature: cli.feature,
 		}
 	}
 }
@@ -90,9 +89,9 @@ pub enum CoLogLevel {
 	Debug,
 	Trace,
 }
-impl Into<tracing::Level> for CoLogLevel {
-	fn into(self) -> tracing::Level {
-		match self {
+impl From<CoLogLevel> for tracing::Level {
+	fn from(value: CoLogLevel) -> Self {
+		match value {
 			CoLogLevel::Error => tracing::Level::ERROR,
 			CoLogLevel::Warn => tracing::Level::WARN,
 			CoLogLevel::Info => tracing::Level::INFO,

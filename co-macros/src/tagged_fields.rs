@@ -21,7 +21,7 @@ pub fn derive_tagged_fields(item: TokenStream) -> TokenStream {
 									external.push(field_ident.to_string());
 								},
 								other => {
-									return syn::Error::new_spanned(attr, format!("Unknown flag: {}", other))
+									return syn::Error::new_spanned(attr, format!("Unknown flag: {other}"))
 										.to_compile_error()
 										.into();
 								},

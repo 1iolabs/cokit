@@ -36,7 +36,7 @@ where
 			match fut.await {
 				Ok(_) => {},
 				Err(err) => {
-					dispatch.dispatch_result(Err(err.into()));
+					dispatch.dispatch_result(Err(err));
 				},
 			}
 		});

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	fmt::{Debug, Display},
+	ops::Not,
 };
 
 /// Tags inline macro.
@@ -84,7 +85,7 @@ impl TagValue {
 			TagValue::Bool(v) => v == &bool::default(),
 			TagValue::Integer(v) => v == &Default::default(),
 			TagValue::Float(v) => *v == TotalFloat64::from(0f64),
-			TagValue::String(v) => v == "",
+			TagValue::String(v) => v.is_empty(),
 			TagValue::Bytes(v) => v.is_empty(),
 			TagValue::List(v) => v.is_empty(),
 			TagValue::Map(v) => v.is_empty(),
@@ -111,7 +112,7 @@ impl From<TagValue> for Ipld {
 			TagValue::Bytes(i) => Ipld::Bytes(i),
 			TagValue::List(i) => Ipld::List(i.into_iter().map(|e| e.into()).collect()),
 			TagValue::Map(i) => Ipld::Map(i.into_iter().map(|(k, v)| (k, v.into())).collect()),
-			TagValue::Link(i) => Ipld::Link(i.into()),
+			TagValue::Link(i) => Ipld::Link(i),
 		}
 	}
 }
@@ -126,7 +127,7 @@ impl From<Ipld> for TagValue {
 			Ipld::Bytes(i) => TagValue::Bytes(i),
 			Ipld::List(i) => TagValue::List(i.into_iter().map(|e| e.into()).collect()),
 			Ipld::Map(i) => TagValue::Map(i.into_iter().map(|(k, v)| (k, v.into())).collect()),
-			Ipld::Link(i) => TagValue::Link(i.into()),
+			Ipld::Link(i) => TagValue::Link(i),
 		}
 	}
 }
@@ -184,7 +185,7 @@ impl TagPattern for Tag {
 }
 impl TagMatcher for Tag {
 	fn matches_tag(&self, key: &str, value: &TagValue) -> bool {
-		&self.0 == key && &self.1 == value
+		self.0 == key && &self.1 == value
 	}
 }
 
@@ -282,11 +283,6 @@ impl Tags {
 		self.0.iter()
 	}
 
-	/// Iterate over tags.
-	pub fn into_iter(self) -> impl Iterator<Item = Tag> {
-		self.0.into_iter()
-	}
-
 	/// Find first tag by key.
 	pub fn find_key(&self, key: &str) -> Option<&Tag> {
 		self.0.iter().find(|tag| tag.0 == key)
@@ -371,12 +367,10 @@ impl Display for Tags {
 			// separator
 			if first {
 				first = false;
+			} else if f.is_human_readable() {
+				write!(f, ", ")?;
 			} else {
-				if f.is_human_readable() {
-					write!(f, ", ")?;
-				} else {
-					write!(f, ",")?;
-				}
+				write!(f, ",")?;
 			}
 
 			// key/value
@@ -434,6 +428,7 @@ impl TagsExpr {
 		TagsExpr::Tag((key.to_owned(), value.into()))
 	}
 
+	#[allow(clippy::should_implement_trait)]
 	pub fn not(self) -> TagsExpr {
 		TagsExpr::Not(Box::new(self))
 	}
@@ -442,7 +437,7 @@ impl TagsExpr {
 		match &mut self {
 			TagsExpr::And(items) => {
 				items.push(other);
-				return self;
+				self
 			},
 			_ => TagsExpr::And(vec![self, other]),
 		}
@@ -452,10 +447,17 @@ impl TagsExpr {
 		match &mut self {
 			TagsExpr::Or(items) => {
 				items.push(other);
-				return self;
+				self
 			},
 			_ => TagsExpr::Or(vec![self, other]),
 		}
+	}
+}
+impl Not for TagsExpr {
+	type Output = TagsExpr;
+
+	fn not(self) -> Self::Output {
+		TagsExpr::Not(Box::new(self))
 	}
 }
 impl From<Tag> for TagsExpr {
@@ -511,45 +513,45 @@ mod tests {
 	#[test]
 	fn test_matches_expr_not() {
 		let pattern_expr = TagsExpr::Not(Box::new(TagsExpr::Tag(tag!("hello": "world"))));
-		assert_eq!(tags!("hello": "world").matches(&pattern_expr), false);
-		assert_eq!(tags!("hello": "world", "five": "ten").matches(&pattern_expr), false);
-		assert_eq!(tags!("hello": "something else").matches(&pattern_expr), true);
-		assert_eq!(tags!("five": "ten").matches(&pattern_expr), true);
+		assert!(!tags!("hello": "world").matches(&pattern_expr));
+		assert!(!tags!("hello": "world", "five": "ten").matches(&pattern_expr));
+		assert!(tags!("hello": "something else").matches(&pattern_expr));
+		assert!(tags!("five": "ten").matches(&pattern_expr));
 	}
 
 	#[test]
 	fn test_matches_expr_and() {
 		let pattern_tags = tags!("hello": "world", "hello": "greet");
 		let pattern_expr: TagsExpr = pattern_tags.clone().into();
-		assert_eq!(tags!("hello": "world", "hello": "greet", "test": 123).matches(&pattern_tags), true);
-		assert_eq!(tags!("hello": "world", "hello": "greet", "test": 123).matches(&pattern_expr), true);
-		assert_eq!(tags!("hello": "world").matches(&pattern_tags), false);
-		assert_eq!(tags!("hello": "world").matches(&pattern_expr), false);
+		assert!(tags!("hello": "world", "hello": "greet", "test": 123).matches(&pattern_tags));
+		assert!(tags!("hello": "world", "hello": "greet", "test": 123).matches(&pattern_expr));
+		assert!(!tags!("hello": "world").matches(&pattern_tags));
+		assert!(!tags!("hello": "world").matches(&pattern_expr));
 	}
 
 	#[test]
 	fn test_matches() {
 		let tags = tags!("format": "Ed25519", "type": "co-identity");
-		assert_eq!(tags.matches(&tags!("format": "Ed25519")), true);
-		assert_eq!(tags.matches(&tags!("type": "co-identity")), true);
-		assert_eq!(tags.matches(&tags!("format": "Ed25519", "type": "co-identity")), true);
-		assert_eq!(tags.matches(&tags!("format": "other")), false);
-		assert_eq!(tags.matches(&tags!("format": "Ed25519", "type": "co-identity", "some": "other")), false);
-		assert_eq!(tags.matches(&tags!("format": "other", "type": "co-identity")), false);
-		assert_eq!(tags.matches(&tags!()), false);
+		assert!(tags.matches(&tags!("format": "Ed25519")));
+		assert!(tags.matches(&tags!("type": "co-identity")));
+		assert!(tags.matches(&tags!("format": "Ed25519", "type": "co-identity")));
+		assert!(!tags.matches(&tags!("format": "other")));
+		assert!(!tags.matches(&tags!("format": "Ed25519", "type": "co-identity", "some": "other")));
+		assert!(!tags.matches(&tags!("format": "other", "type": "co-identity")));
+		assert!(!tags.matches(&tags!()));
 	}
 
 	#[test]
 	fn test_matches_empty() {
 		let pattern_tags = tags!();
-		assert_eq!(tags!("hello": "world").matches(&pattern_tags), false);
-		assert_eq!(tags!().matches(&pattern_tags), false);
+		assert!(!tags!("hello": "world").matches(&pattern_tags));
+		assert!(!tags!().matches(&pattern_tags));
 		let pattern_expr: TagsExpr = pattern_tags.clone().into();
-		assert_eq!(tags!("hello": "world").matches(&pattern_expr), false);
-		assert_eq!(tags!().matches(&pattern_expr), false);
+		assert!(!tags!("hello": "world").matches(&pattern_expr));
+		assert!(!tags!().matches(&pattern_expr));
 		let pattern_or_empty = TagsExpr::Or(vec![]);
-		assert_eq!(tags!("hello": "world").matches(&pattern_or_empty), false);
-		assert_eq!(tags!().matches(&pattern_or_empty), false);
+		assert!(!tags!("hello": "world").matches(&pattern_or_empty));
+		assert!(!tags!().matches(&pattern_or_empty));
 	}
 
 	#[test]

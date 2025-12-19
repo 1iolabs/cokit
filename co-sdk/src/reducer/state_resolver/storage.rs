@@ -99,7 +99,7 @@ where
 		heads: &BTreeSet<Cid>,
 	) -> Result<(), anyhow::Error> {
 		// create pin upon first use
-		if change_context.is_initialize() && self.snapshots.len() == 0 {
+		if change_context.is_initialize() && self.snapshots.is_empty() {
 			let root = CoRoot { heads: heads.clone(), state: Some(state) };
 			let root_link = storage.set_serialized(&root).await?;
 			let external_root_link = to_external_cid(storage, root_link).await;

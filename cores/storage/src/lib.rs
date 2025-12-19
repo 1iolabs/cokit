@@ -98,17 +98,11 @@ pub enum BlockType {
 }
 impl BlockType {
 	pub fn is_unknown(&self) -> bool {
-		match self {
-			BlockType::Unknown => true,
-			_ => false,
-		}
+		matches!(self, BlockType::Unknown)
 	}
 
 	pub fn is_root(&self) -> bool {
-		match self {
-			BlockType::Root => true,
-			_ => false,
-		}
+		matches!(self, BlockType::Root)
 	}
 }
 
@@ -164,7 +158,7 @@ pub enum PinStrategy {
 	MaxCount(u32),
 }
 
-//// A list of references.
+/// A list of references.
 /// A single [`Cid`] is allowed to be contained multiple times (=reference count).
 #[co]
 #[derive(Default)]
@@ -242,7 +236,7 @@ impl<const N: usize> From<[WeakCid; N]> for References {
 		if N == 0 {
 			return Self::default();
 		}
-		Self::from_iter(arr.into_iter())
+		Self::from_iter(arr)
 	}
 }
 
@@ -572,10 +566,7 @@ where
 	let info = BlockInfo::new(transaction.storage(), key.clone(), BlockType::Root).await?;
 
 	// references
-	let cids = pin
-		.references
-		.stream(transaction.storage())
-		.map_ok(|(_key, value)| value.into());
+	let cids = pin.references.stream(transaction.storage()).map_ok(|(_key, value)| value);
 	pin_mut!(cids);
 	while let Some(reference) = cids.try_next().await? {
 		unreference_cid(transaction, &info, reference, Unreference::ByOne).await?;
@@ -728,7 +719,7 @@ where
 		transaction
 			.blocks_mut()
 			.await?
-			.try_update_or_insert_async(cid.into(), |mut block| async {
+			.try_update_or_insert_async(cid, |mut block| async {
 				block.tags.clear(Some(&tags));
 				Ok(block)
 			})
@@ -749,7 +740,7 @@ where
 		transaction
 			.blocks_mut()
 			.await?
-			.try_update_or_insert_async(cid.into(), |mut block| {
+			.try_update_or_insert_async(cid, |mut block| {
 				let mut tags = tags.clone();
 				async move {
 					block.tags.append(&mut tags);
@@ -846,8 +837,7 @@ where
 		if transaction.blocks().await?.get(&reference).await?.is_none() {
 			// we only want to reuse tags here
 			// other data is managed internally by the core
-			let mut block = BlockMetadata::default();
-			block.tags = block_metadata.tags;
+			let block = BlockMetadata { tags: block_metadata.tags, ..Default::default() };
 
 			// block
 			transaction.blocks_mut().await?.insert(reference, block).await?;
@@ -958,7 +948,7 @@ where
 			}
 
 			// store
-			transaction.blocks_mut().await?.insert(cid.clone(), block).await?;
+			transaction.blocks_mut().await?.insert(cid, block).await?;
 
 			// result
 			true
@@ -979,9 +969,9 @@ mod tests {
 
 	#[test]
 	fn test_serialize_storage_action() {
-		let cid1 = BlockSerializer::default().serialize(&1).unwrap().cid().clone();
-		let cid2 = BlockSerializer::default().serialize(&2).unwrap().cid().clone();
-		let cid3 = BlockSerializer::default().serialize(&2).unwrap().cid().clone();
+		let cid1 = *BlockSerializer::default().serialize(&1).unwrap().cid();
+		let cid2 = *BlockSerializer::default().serialize(&2).unwrap().cid();
+		let cid3 = *BlockSerializer::default().serialize(&2).unwrap().cid();
 		let mut map = BTreeMap::<WeakCid, References>::new();
 		map.entry(cid1.into()).or_default().insert(cid2);
 		map.entry(cid1.into()).or_default().insert(cid3);
@@ -1148,22 +1138,16 @@ mod tests {
 
 		// validate
 		let state = storage.get_value(&state_reference.unwrap()).await.unwrap();
-		assert_eq!(
-			true,
-			state
-				.blocks_index_unreferenced
-				.contains(&storage, &cid("bagakbqabdyqar5vlsfqd3g4mxngt3yl7nx2na2kb4jybylzn5bktwnihjhih42a"))
-				.await
-				.unwrap()
-		);
-		assert_eq!(
-			false,
-			state
-				.blocks_index_unreferenced
-				.contains(&storage, &cid("bagakbqabdyqldyp7kxv6p5wb3edrywc74xfkgauqzlumlxncdlzncbwt36y7iby"))
-				.await
-				.unwrap()
-		);
+		assert!(state
+			.blocks_index_unreferenced
+			.contains(&storage, &cid("bagakbqabdyqar5vlsfqd3g4mxngt3yl7nx2na2kb4jybylzn5bktwnihjhih42a"))
+			.await
+			.unwrap());
+		assert!(!state
+			.blocks_index_unreferenced
+			.contains(&storage, &cid("bagakbqabdyqldyp7kxv6p5wb3edrywc74xfkgauqzlumlxncdlzncbwt36y7iby"))
+			.await
+			.unwrap());
 	}
 
 	/// This is data gatered from storage_cleanup test which failed.

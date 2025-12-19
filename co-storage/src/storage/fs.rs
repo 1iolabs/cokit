@@ -87,11 +87,11 @@ impl Storage for FsStorage {
 
 			// write exclusive to tmp_path
 			fn write(write_path: &Path, write_data: &[u8]) -> std::io::Result<()> {
-				Ok(OpenOptions::new()
+				OpenOptions::new()
 					.write(true)
 					.create_new(true)
 					.open(write_path)?
-					.write_all(write_data)?)
+					.write_all(write_data)
 			}
 			match write(&tmp_path, block.data()) {
 				Ok(_) => {},
@@ -182,13 +182,13 @@ impl BlockStorage for FsStorage {
 
 			// write exclusive to tmp_path
 			async fn write(write_path: &Path, write_data: &[u8]) -> std::io::Result<()> {
-				Ok(tokio::fs::OpenOptions::new()
+				tokio::fs::OpenOptions::new()
 					.write(true)
 					.create_new(true)
 					.open(write_path)
 					.await?
 					.write_all(write_data)
-					.await?)
+					.await
 			}
 			match write(&tmp_path, block.data()).await {
 				Ok(_) => {},
@@ -279,7 +279,7 @@ fn into_block_result<P: StoreParams>(cid: &Cid, result: std::io::Result<Vec<u8>>
 	into_storage_result(cid, result).map(|data| Block::new_unchecked(*cid, data))
 }
 
-fn to_cid_path(path: &PathBuf, cid: &Cid, prefix: &str) -> PathBuf {
+fn to_cid_path(path: &Path, cid: &Cid, prefix: &str) -> PathBuf {
 	let mut folder = cid
 		.hash()
 		.digest()
@@ -287,7 +287,7 @@ fn to_cid_path(path: &PathBuf, cid: &Cid, prefix: &str) -> PathBuf {
 		// .next_chunk::<2>()
 		.map(|chunk| format!("{:02x}", chunk))
 		.take(2)
-		.fold(path.clone(), |mut result, next| {
+		.fold(path.to_owned(), |mut result, next| {
 			result.push(next);
 			result
 		});

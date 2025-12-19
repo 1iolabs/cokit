@@ -2,7 +2,7 @@ use crate::TmpDir;
 use std::path::PathBuf;
 
 pub fn test_application_identifier(test_name: &str) -> String {
-	let application_identifier = format!("{}-{}", test_name, uuid::Uuid::new_v4().to_string());
+	let application_identifier = format!("{}-{}", test_name, uuid::Uuid::new_v4());
 	application_identifier
 }
 

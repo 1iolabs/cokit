@@ -6,18 +6,20 @@ use co_identity::{
 
 /// Create the default identity resolver.
 pub fn create_identity_resolver() -> IdentityResolverBox {
-	let mut resolvers: Vec<IdentityResolverBox> = Vec::new();
-	resolvers.push(IdentityResolver::boxed(LocalIdentityResolver::new()));
-	resolvers.push(DidKeyIdentityResolver::new().boxed());
-	JoinIdentityResolver::new(resolvers).boxed()
+	JoinIdentityResolver::new(vec![
+		IdentityResolver::boxed(LocalIdentityResolver::new()),
+		DidKeyIdentityResolver::new().boxed(),
+	])
+	.boxed()
 }
 
 /// Create the default private identity resolver.
 pub async fn create_private_identity_resolver(local: CoReducer) -> Result<PrivateIdentityResolverBox, anyhow::Error> {
-	let mut resolvers: Vec<PrivateIdentityResolverBox> = Vec::new();
-	resolvers.push(PrivateIdentityResolver::boxed(LocalIdentityResolver::default()));
-	resolvers.push(DidKeyProvider::new(local, CO_CORE_NAME_KEYSTORE).boxed());
-	Ok(JoinPrivateIdentityResolver::new(resolvers).boxed())
+	Ok(JoinPrivateIdentityResolver::new(vec![
+		PrivateIdentityResolver::boxed(LocalIdentityResolver::default()),
+		DidKeyProvider::new(local, CO_CORE_NAME_KEYSTORE).boxed(),
+	])
+	.boxed())
 }
 
 /// Resolve a private identity.

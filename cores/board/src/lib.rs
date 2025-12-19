@@ -198,7 +198,7 @@ where
 			.get()
 			.await?
 			.stream()
-			.try_filter(|item| ready(&item.1.name == &name))
+			.try_filter(|item| ready(item.1.name == name))
 			.try_first()
 			.await?)
 	}
@@ -228,13 +228,12 @@ where
 
 	/// Get task by id.
 	async fn task(&mut self, task_id: &TaskId) -> Result<Task, anyhow::Error> {
-		Ok(self
-			.tasks
+		self.tasks
 			.get()
 			.await?
-			.get(&task_id)
+			.get(task_id)
 			.await?
-			.ok_or_else(|| anyhow!("Task not found: {}", task_id))?)
+			.ok_or_else(|| anyhow!("Task not found: {}", task_id))
 	}
 }
 
@@ -420,7 +419,7 @@ async fn reduce_task_move<S: BlockStorage + Clone + 'static>(
 			let list_tasks = source_list.tasks.open(&transaction.storage).await?;
 			let source_task_index = list_tasks
 				.stream()
-				.try_filter(|item| ready(&item.1 == &task_id))
+				.try_filter(|item| ready(item.1 == task_id))
 				.try_first()
 				.await?
 				.map(|(index, _)| index)
@@ -606,7 +605,7 @@ async fn reduce_list_arrange<S: BlockStorage + Clone + 'static>(
 
 	// find after
 	let after_index = if let Some(after) = &after {
-		transaction.find_list_by_name(&after).await?.map(|(index, _)| index)
+		transaction.find_list_by_name(after).await?.map(|(index, _)| index)
 	} else {
 		None
 	};
@@ -635,7 +634,7 @@ async fn reduce_list_create<S: BlockStorage + Clone + 'static>(
 
 	// find after
 	let after_index = if let Some(after) = &after {
-		transaction.find_list_by_name(&after).await?.map(|(index, _)| index)
+		transaction.find_list_by_name(after).await?.map(|(index, _)| index)
 	} else {
 		None
 	};
@@ -671,7 +670,7 @@ async fn task_lock<S: BlockStorage + Clone + 'static>(
 ) -> Result<(), anyhow::Error> {
 	match lock {
 		TaskLock::None => {
-			let task = transaction.task(&task_id).await?;
+			let task = transaction.task(task_id).await?;
 			if task.lock.is_some() {
 				Err(anyhow!("Task locked"))
 			} else {
@@ -680,7 +679,7 @@ async fn task_lock<S: BlockStorage + Clone + 'static>(
 		},
 		TaskLock::Force => Ok(()),
 		TaskLock::Lock(lock) => {
-			let mut task = transaction.task(&task_id).await?;
+			let mut task = transaction.task(task_id).await?;
 			match task.lock {
 				Some(task_lock) if lock == &task_lock => Ok(()),
 				Some(_task_lock) => Err(anyhow!("Task locked")),
@@ -692,7 +691,7 @@ async fn task_lock<S: BlockStorage + Clone + 'static>(
 			}
 		},
 		TaskLock::Unlock(lock) => {
-			let mut task = transaction.task(&task_id).await?;
+			let mut task = transaction.task(task_id).await?;
 			match task.lock {
 				Some(task_lock) if lock == &task_lock => {
 					task.lock = None;

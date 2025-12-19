@@ -2,7 +2,7 @@
 name = "co-core-pin"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.76"
+rust-version = "1.91"
 
 [lib]
 crate-type = ["lib", "cdylib"]

@@ -40,7 +40,11 @@ impl From<&String> for SessionId {
 		SessionId(value.to_string())
 	}
 }
-
+impl Default for SessionId {
+	fn default() -> Self {
+		Self::new()
+	}
+}
 impl SessionId {
 	pub fn new() -> Self {
 		SessionId(uuid::Uuid::new_v4().into())
@@ -155,7 +159,6 @@ impl Actor for ApplicationActor {
 				response.spawn(move || async move {
 					let session = sessions
 						.get(&session_id)
-						.clone()
 						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
 					Ok(session
 						.reducer
@@ -170,7 +173,6 @@ impl Actor for ApplicationActor {
 				response.spawn(move || async move {
 					let session = sessions
 						.get(&session_id)
-						.clone()
 						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
 					Ok(session
 						.reducer
@@ -216,7 +218,7 @@ impl Actor for ApplicationActor {
 						pin_mut!(changed);
 						let context = application.context();
 						while let Some(co) = changed.next().await {
-							if let Some(reducer) = context.try_co_reducer(&co).await.ok() {
+							if let Ok(reducer) = context.try_co_reducer(&co).await {
 								let (state, heads) = reducer.reducer_state().await.into();
 								tracing::debug!("tauri watch: new state: {:?}, {:?}", co, state);
 								if response.send((co, state, heads)).is_err() {
@@ -233,7 +235,6 @@ impl Actor for ApplicationActor {
 					.execute(|| async {
 						let session = sessions
 							.get(&session_id)
-							.clone()
 							.ok_or(anyhow!("Session not found: No session for ID {session_id}"))?;
 						let private_identity = state.application.private_identity(&identity).await?;
 						session
@@ -250,7 +251,6 @@ impl Actor for ApplicationActor {
 				response.spawn(move || async move {
 					let session = sessions
 						.get(&session_id)
-						.clone()
 						.ok_or(ActorError::Actor(anyhow!("Session not found: No session for ID {session_id}")))?;
 					Ok(session
 						.reducer
@@ -282,7 +282,7 @@ impl Actor for ApplicationActor {
 					pin_mut!(stream);
 					let mut actions = Vec::new();
 					while let Some(item) = stream.next().await {
-						let entry_block = item.map_err(|err| ActorError::Actor(err.into()))?;
+						let entry_block = item.map_err(ActorError::Actor)?;
 
 						// resolve entry from block
 						let entry_payload = entry_block.entry().payload;

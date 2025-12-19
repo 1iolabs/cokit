@@ -258,7 +258,7 @@ impl Actor for FileLocalsActor {
 						state.read(self.config_path.clone()).await?;
 
 						// result
-						Ok(state.locals.iter().map(|(_, local)| local.clone()).collect())
+						Ok(state.locals.values().cloned().collect())
 					})
 					.await
 					.ok();
@@ -319,7 +319,12 @@ impl FileLocalsActor {
 		tokio::fs::create_dir_all(path.parent().ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?).await?;
 
 		// open
-		let file = tokio::fs::OpenOptions::new().create(true).write(true).open(&path).await?;
+		let file = tokio::fs::OpenOptions::new()
+			.create(true)
+			.truncate(false)
+			.write(true)
+			.open(&path)
+			.await?;
 
 		// result
 		Ok(FileLocalsFile::File(path, file))
@@ -340,6 +345,7 @@ impl FileLocalsActor {
 				.read(true)
 				.write(true)
 				.create(true)
+				.truncate(false)
 				.open(&path)
 				.await?;
 
@@ -385,6 +391,7 @@ impl FileLocalsActor {
 					.read(true)
 					.write(true)
 					.create(true)
+					.truncate(false)
 					.open(&path)
 					.await?,
 			);
@@ -455,10 +462,7 @@ impl FileLocalsFile {
 	}
 
 	fn is_none(&self) -> bool {
-		match self {
-			Self::None => true,
-			_ => false,
-		}
+		matches!(self, Self::None)
 	}
 }
 
@@ -695,7 +699,7 @@ mod tests {
 		// read
 		let items = locals.get().await.unwrap();
 		assert_eq!(items.len(), 1);
-		assert_eq!(&items.get(0).unwrap().state, v1.cid());
+		assert_eq!(&items.first().unwrap().state, v1.cid());
 
 		// write
 		let v2 = BlockSerializer::default().serialize(&2).unwrap();
@@ -707,6 +711,6 @@ mod tests {
 		// read
 		let items = locals.get().await.unwrap();
 		assert_eq!(items.len(), 1);
-		assert_eq!(&items.get(0).unwrap().state, v2.cid());
+		assert_eq!(&items.first().unwrap().state, v2.cid());
 	}
 }

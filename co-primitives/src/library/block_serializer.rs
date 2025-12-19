@@ -61,7 +61,7 @@ where
 		T: serde::de::Deserialize<'a>,
 	{
 		// MultiCodec::with_cbor(item.cid())?;
-		Ok(from_cbor(item.data()).map_err(|err| BlockSerializerError::CborDeserialize(*item.cid(), err))?)
+		from_cbor(item.data()).map_err(|err| BlockSerializerError::CborDeserialize(*item.cid(), err))
 	}
 }
 

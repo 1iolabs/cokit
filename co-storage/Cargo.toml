@@ -2,7 +2,7 @@
 name = "co-storage"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.76"
+rust-version = "1.91"
 
 [dependencies]
 aead = { version = "0.5.2", features = ["stream"] }
@@ -28,7 +28,7 @@ serde_ipld_dagcbor = { workspace = true }
 serde_ipld_dagjson = { workspace = true }
 serde_repr = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["macros", "fs", "rt"] }
+tokio = { workspace = true, features = ["macros", "fs", "rt", "io-util"] }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true, features = ["compat"] }
 tracing = { workspace = true }

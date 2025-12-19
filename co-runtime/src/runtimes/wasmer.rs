@@ -49,7 +49,7 @@ pub enum WasmerError {
 
 impl WasmerRuntime {
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(bytes), fields(bytes.len = bytes.len()))]
-	pub fn new(api: CoV1Api, native: bool, bytes: &Vec<u8>) -> Result<Self, WasmerError> {
+	pub fn new(api: CoV1Api, native: bool, bytes: &[u8]) -> Result<Self, WasmerError> {
 		// module
 		let (kind, mut store, module) =
 			if native { WasmerRuntimeBuilder::native(bytes) } else { WasmerRuntimeBuilder::wasm(bytes) }.build()?;
@@ -237,10 +237,7 @@ fn wasmer_storage_block_get(
 	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
 	let cid_access = cid.slice(&memory, cid_size)?.access()?;
 	let mut buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
-	Ok(storage_block_get(&mut data.api, cid_access.as_ref(), buffer_access.as_mut())
-		.map_err(into_runtime_error)?
-		.try_into()
-		.map_err(into_runtime_error)?)
+	storage_block_get(&mut data.api, cid_access.as_ref(), buffer_access.as_mut()).map_err(into_runtime_error)
 }
 
 fn wasmer_storage_block_set(
@@ -254,7 +251,7 @@ fn wasmer_storage_block_set(
 	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
 	let cid_access = cid.slice(&memory, cid_size)?.access()?;
 	let buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
-	Ok(storage_block_set(&mut data.api, cid_access.as_ref(), buffer_access.as_ref()).map_err(into_runtime_error)?)
+	storage_block_set(&mut data.api, cid_access.as_ref(), buffer_access.as_ref()).map_err(into_runtime_error)
 }
 
 fn wasmer_payload_read(
@@ -266,10 +263,7 @@ fn wasmer_payload_read(
 	let (data, store) = env.data_and_store_mut();
 	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
 	let mut buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
-	Ok(payload_read(&mut data.api, buffer_access.as_mut(), offset)
-		.map_err(into_runtime_error)?
-		.try_into()
-		.map_err(into_runtime_error)?)
+	payload_read(&data.api, buffer_access.as_mut(), offset).map_err(into_runtime_error)
 }
 
 fn wasmer_state_cid_read(
@@ -280,7 +274,7 @@ fn wasmer_state_cid_read(
 	let (data, store) = env.data_and_store_mut();
 	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
 	let mut buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
-	Ok(state_cid_read(&data.api, buffer_access.as_mut()).map_err(into_runtime_error)?)
+	state_cid_read(&data.api, buffer_access.as_mut()).map_err(into_runtime_error)
 }
 
 fn wasmer_state_cid_write(
@@ -291,7 +285,7 @@ fn wasmer_state_cid_write(
 	let (data, store) = env.data_and_store_mut();
 	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
 	let buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
-	Ok(state_cid_write(&mut data.api, buffer_access.as_ref()).map_err(into_runtime_error)?)
+	state_cid_write(&mut data.api, buffer_access.as_ref()).map_err(into_runtime_error)
 }
 
 fn wasmer_event_cid_read(
@@ -302,7 +296,7 @@ fn wasmer_event_cid_read(
 	let (data, store) = env.data_and_store_mut();
 	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
 	let mut buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
-	Ok(event_cid_read(&data.api, buffer_access.as_mut()).map_err(into_runtime_error)?)
+	event_cid_read(&data.api, buffer_access.as_mut()).map_err(into_runtime_error)
 }
 
 fn wasmer_diagnostic_cid_write(
@@ -313,7 +307,7 @@ fn wasmer_diagnostic_cid_write(
 	let (data, store) = env.data_and_store_mut();
 	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
 	let buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
-	Ok(diagnostic_cid_write(&mut data.api, buffer_access.as_ref()).map_err(into_runtime_error)?)
+	diagnostic_cid_write(&mut data.api, buffer_access.as_ref()).map_err(into_runtime_error)
 }
 
 #[cfg(test)]

@@ -160,13 +160,10 @@ async fn get_all_co_storages(application: Application) -> anyhow::Result<Vec<CoS
 	let mut storages: Vec<CoStorage> = vec![];
 	pin_mut!(stream);
 	while let Some(result) = stream.next().await {
-		match result {
-			Ok((co, _, _, _)) => {
-				if let Some(reducer) = application.co_reducer(co).await? {
-					storages.push(reducer.storage());
-				}
-			},
-			Err(_) => (),
+		if let Ok((co, _, _, _)) = result {
+			if let Some(reducer) = application.co_reducer(co).await? {
+				storages.push(reducer.storage());
+			}
 		}
 	}
 	Ok(storages)

@@ -116,7 +116,7 @@ where
 						discovery::DidDiscoveryMessageType::Discover.to_string(),
 						body.as_ref(),
 					)
-						.map(|item| discovery::Discovery::DidDiscovery(item));
+						.map(discovery::Discovery::DidDiscovery);
 				}
 			},
 			_ => {},
