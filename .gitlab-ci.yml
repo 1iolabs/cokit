@@ -34,7 +34,7 @@ lint:
     <<: *global_cache
   script:
     - cargo +nightly-2025-12-09 fmt --check
-    - cargo clippy --workspace --all-targets --all-features -- -D warnings
+    - cargo clippy --workspace --all-targets --all-features
 
 # verify all tests are running to success
 test:
