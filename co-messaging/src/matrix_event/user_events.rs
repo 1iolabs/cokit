@@ -24,7 +24,7 @@ impl EventType for PostUserStoryContent {
 
 impl From<PostUserStoryContent> for EventContent {
 	fn from(val: PostUserStoryContent) -> Self {
-		EventContent::PostStory(val).into()
+		EventContent::PostStory(val)
 	}
 }
 
@@ -49,7 +49,7 @@ impl EventType for ViewUserStoryContent {
 
 impl From<ViewUserStoryContent> for EventContent {
 	fn from(val: ViewUserStoryContent) -> Self {
-		EventContent::ViewStory(val).into()
+		EventContent::ViewStory(val)
 	}
 }
 
@@ -79,7 +79,7 @@ impl EventType for UpdateProfileContent {
 
 impl From<UpdateProfileContent> for EventContent {
 	fn from(val: UpdateProfileContent) -> Self {
-		EventContent::UpdateProfile(val).into()
+		EventContent::UpdateProfile(val)
 	}
 }
 

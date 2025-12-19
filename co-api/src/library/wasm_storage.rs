@@ -4,6 +4,11 @@ use async_trait::async_trait;
 
 /// Storage implementation for the co_v1 API.
 pub struct WasmStorage {}
+impl Default for WasmStorage {
+	fn default() -> Self {
+		Self::new()
+	}
+}
 impl WasmStorage {
 	pub fn new() -> Self {
 		Self {}
@@ -45,8 +50,7 @@ fn wasm_block_get(cid: &Cid) -> Block<DefaultParams> {
 
 	// try to read block in 1KiB buffer
 	let buffer_size = 2usize.pow(10); // 1024
-	let mut buffer = Vec::with_capacity(buffer_size);
-	buffer.resize(buffer_size, 0);
+	let mut buffer = vec![0; buffer_size];
 	#[allow(unused_unsafe)]
 	let block_size = unsafe {
 		co_v1::storage_block_get(

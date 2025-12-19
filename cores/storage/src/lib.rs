@@ -164,7 +164,7 @@ pub enum PinStrategy {
 	MaxCount(u32),
 }
 
-//// A list of references.
+/// A list of references.
 /// A single [`Cid`] is allowed to be contained multiple times (=reference count).
 #[co]
 #[derive(Default)]
@@ -242,7 +242,7 @@ impl<const N: usize> From<[WeakCid; N]> for References {
 		if N == 0 {
 			return Self::default();
 		}
-		Self::from_iter(arr.into_iter())
+		Self::from_iter(arr)
 	}
 }
 
@@ -572,10 +572,7 @@ where
 	let info = BlockInfo::new(transaction.storage(), key.clone(), BlockType::Root).await?;
 
 	// references
-	let cids = pin
-		.references
-		.stream(transaction.storage())
-		.map_ok(|(_key, value)| value.into());
+	let cids = pin.references.stream(transaction.storage()).map_ok(|(_key, value)| value);
 	pin_mut!(cids);
 	while let Some(reference) = cids.try_next().await? {
 		unreference_cid(transaction, &info, reference, Unreference::ByOne).await?;
@@ -728,7 +725,7 @@ where
 		transaction
 			.blocks_mut()
 			.await?
-			.try_update_or_insert_async(cid.into(), |mut block| async {
+			.try_update_or_insert_async(cid, |mut block| async {
 				block.tags.clear(Some(&tags));
 				Ok(block)
 			})
@@ -749,7 +746,7 @@ where
 		transaction
 			.blocks_mut()
 			.await?
-			.try_update_or_insert_async(cid.into(), |mut block| {
+			.try_update_or_insert_async(cid, |mut block| {
 				let mut tags = tags.clone();
 				async move {
 					block.tags.append(&mut tags);
@@ -958,7 +955,7 @@ where
 			}
 
 			// store
-			transaction.blocks_mut().await?.insert(cid.clone(), block).await?;
+			transaction.blocks_mut().await?.insert(cid, block).await?;
 
 			// result
 			true

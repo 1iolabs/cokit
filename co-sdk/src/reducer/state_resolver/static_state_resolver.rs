@@ -127,7 +127,7 @@ impl<S: AnyBlockStorage> StateResolver<S> for StaticStateResolver<S> {
 		state: Cid,
 		heads: &BTreeSet<Cid>,
 	) -> Result<(), anyhow::Error> {
-		if self.snapshots.iter().find(|item| &item.1 == heads).is_none() {
+		if !self.snapshots.iter().any(|item| &item.1 == heads) {
 			self.push(state, heads.clone());
 		}
 		Ok(())
@@ -145,7 +145,7 @@ impl<S: AnyBlockStorage> StateResolver<S> for StaticStateResolver<S> {
 async fn heads_clock(storage: &impl AnyBlockStorage, heads: &BTreeSet<Cid>) -> Result<u64, StorageError> {
 	if let Some(head) = heads.first() {
 		let entry: SignedEntry = storage.get_deserialized(head).await?;
-		return Ok(entry.entry.clock.time);
+		Ok(entry.entry.clock.time)
 	} else {
 		Err(StorageError::InvalidArgument(anyhow!("heads empty")))
 	}

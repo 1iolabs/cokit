@@ -195,7 +195,7 @@ fn find<'a>(memberships: &'a mut Memberships, co: &CoId, did: &str) -> Option<&'
 	memberships
 		.memberships
 		.iter_mut()
-		.find(|item| &item.id == co && &item.did == did)
+		.find(|item| &item.id == co && item.did == did)
 }
 
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]

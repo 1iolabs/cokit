@@ -87,11 +87,11 @@ impl Storage for FsStorage {
 
 			// write exclusive to tmp_path
 			fn write(write_path: &Path, write_data: &[u8]) -> std::io::Result<()> {
-				Ok(OpenOptions::new()
+				OpenOptions::new()
 					.write(true)
 					.create_new(true)
 					.open(write_path)?
-					.write_all(write_data)?)
+					.write_all(write_data)
 			}
 			match write(&tmp_path, block.data()) {
 				Ok(_) => {},
@@ -182,13 +182,13 @@ impl BlockStorage for FsStorage {
 
 			// write exclusive to tmp_path
 			async fn write(write_path: &Path, write_data: &[u8]) -> std::io::Result<()> {
-				Ok(tokio::fs::OpenOptions::new()
+				tokio::fs::OpenOptions::new()
 					.write(true)
 					.create_new(true)
 					.open(write_path)
 					.await?
 					.write_all(write_data)
-					.await?)
+					.await
 			}
 			match write(&tmp_path, block.data()).await {
 				Ok(_) => {},

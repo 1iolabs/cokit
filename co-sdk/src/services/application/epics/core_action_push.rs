@@ -34,7 +34,7 @@ pub fn core_action_push(
 }
 
 async fn push(context: &CoContext, co: &CoId, action: &ReducerAction<Ipld>) -> anyhow::Result<()> {
-	let reducer = context.try_co_reducer(&co).await?;
+	let reducer = context.try_co_reducer(co).await?;
 	let identity = context.private_identity_resolver().await?.resolve_private(&action.from).await?;
 	reducer.push_action(&identity, action).await?;
 	Ok(())

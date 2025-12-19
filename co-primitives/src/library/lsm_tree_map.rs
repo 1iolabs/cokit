@@ -112,7 +112,7 @@ impl BloomFilter {
 	pub fn may_contains_key<K: Hash + Ord + Clone + Send + Sync + 'static>(&self, key: &K) -> bool {
 		match self {
 			BloomFilter::Bloomfilter(data) => {
-				if let Ok(bloom) = Bloom::from_slice(&data) {
+				if let Ok(bloom) = Bloom::from_slice(data) {
 					bloom.check(key)
 				} else {
 					true
@@ -607,7 +607,7 @@ where
 
 	/// Tree stats.
 	pub async fn stats(&self) -> Result<LsmTreeStats, StorageError> {
-		Ok(Self::load_levels_and_runs(self.storage.clone(), self.root)
+		Self::load_levels_and_runs(self.storage.clone(), self.root)
 			.try_fold(
 				LsmTreeStats { entries: 0, active_entries: self.active.len(), levels: 0, runs: 0 },
 				|mut result, item| {
@@ -621,7 +621,7 @@ where
 					ready(Ok(result))
 				},
 			)
-			.await?)
+			.await
 	}
 
 	/// Whether the collection is empty.
@@ -669,7 +669,7 @@ where
 	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + Send + use<S, K, V> {
 		let storage = self.storage.clone();
 		let active = self.active.clone();
-		let root = self.root.clone();
+		let root = self.root;
 		async_stream::try_stream! {
 			// heap (max-sorted)
 			let mut heap = match only_run_indicies {
@@ -714,7 +714,7 @@ where
 				// skip items before start at
 				//  we need to filter overlaps as nodes which come before start_at will be skipped
 				if let Some(start_at) = &start_at {
-					if !(start_at <= &item.item.0) {
+					if start_at > &item.item.0 {
 						continue;
 					}
 				}
@@ -734,7 +734,7 @@ where
 	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + use<S, K, V> {
 		let storage = self.storage.clone();
 		let active = self.active.clone();
-		let root = self.root.clone();
+		let root = self.root;
 		async_stream::try_stream! {
 			// heap (max-sorted)
 			let mut heap = match only_run_indicies {
@@ -779,7 +779,7 @@ where
 				// skip items after start at
 				//  we need to filter overlaps as nodes which come after start_at will be skipped
 				if let Some(start_at) = &start_at {
-					if !(start_at >= &item.item.0) {
+					if start_at < &item.item.0 {
 						continue;
 					}
 				}
@@ -1068,7 +1068,7 @@ where
 
 	/// Root.
 	async fn load_root(storage: &S, root: OptionLink<Root<K, V>>) -> Result<Option<Root<K, V>>, StorageError> {
-		Ok(storage.get_value_or_none(&root).await?)
+		storage.get_value_or_none(&root).await
 	}
 
 	/// Levels.
@@ -1202,7 +1202,7 @@ where
 	}
 
 	// result
-	Ok(root.into())
+	Ok(root)
 }
 
 /// Store a new run to storage composed of `entries`.
@@ -1293,7 +1293,7 @@ where
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(&other))
+		Some(self.cmp(other))
 	}
 }
 impl<K, V> Ord for TreeStreamItem<K, V>
@@ -1344,7 +1344,7 @@ where
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(&other))
+		Some(self.cmp(other))
 	}
 }
 impl<K, V> Ord for ReverseTreeStreamItem<K, V>

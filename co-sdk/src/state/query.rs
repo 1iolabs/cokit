@@ -474,15 +474,15 @@ pub enum QueryError {
 	#[error("Query Storage failed")]
 	Storage(#[from] StorageError),
 }
-impl Into<StorageError> for QueryError {
-	fn into(self) -> StorageError {
-		match &self {
-			Self::NotFound(_) => StorageError::Internal(self.into()),
+impl From<QueryError> for StorageError {
+	fn from(value: QueryError) -> Self {
+		match &value {
+			QueryError::NotFound(_) => StorageError::Internal(value.into()),
 			// copy by keeping StateQueryError in chain
-			Self::Storage(storage_err) => match &storage_err {
-				StorageError::NotFound(cid, _) => StorageError::NotFound(*cid, self.into()),
-				StorageError::Internal(_) => StorageError::Internal(self.into()),
-				StorageError::InvalidArgument(_) => StorageError::InvalidArgument(self.into()),
+			QueryError::Storage(storage_err) => match &storage_err {
+				StorageError::NotFound(cid, _) => StorageError::NotFound(*cid, value.into()),
+				StorageError::Internal(_) => StorageError::Internal(value.into()),
+				StorageError::InvalidArgument(_) => StorageError::InvalidArgument(value.into()),
 			},
 		}
 	}

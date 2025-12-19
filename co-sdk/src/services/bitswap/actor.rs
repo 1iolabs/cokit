@@ -87,11 +87,11 @@ async fn first_valid_token(
 ) -> Result<Option<CoId>, StorageError> {
 	let local_co = context.local_co_reducer().await?;
 	for token in tokens.iter() {
-		match CoToken::from_bitswap_token(&token) {
+		match CoToken::from_bitswap_token(token) {
 			Ok(co_token) => {
 				let secret = find_co_secret_by_membership(&local_co, &co_token.body.1).await?;
 				if let Some(secret) = secret {
-					if co_token.verify(&secret, &remote_peer, None) {
+					if co_token.verify(&secret, remote_peer, None) {
 						return Ok(Some(co_token.body.1));
 					}
 				}
@@ -99,7 +99,7 @@ async fn first_valid_token(
 			Err(err) => return Err(StorageError::InvalidArgument(err)),
 		}
 	}
-	return Ok(None);
+	Ok(None)
 }
 
 /// Get first CO token (local use only).
@@ -107,13 +107,12 @@ async fn first_valid_token(
 async fn enforce_first_token_local(context: &CoContext, tokens: &[Token]) -> Result<CoId, StorageError> {
 	// get the co which initialited the request
 	let mut co = None;
-	for token in tokens.iter() {
-		match CoToken::from_bitswap_token(&token) {
+	if let Some(token) = tokens.iter().next() {
+		match CoToken::from_bitswap_token(token) {
 			Ok(co_token) => {
 				co = Some(co_token.body.1);
-				break;
 			},
-			Err(err) => return Err(StorageError::InvalidArgument(err.into())),
+			Err(err) => return Err(StorageError::InvalidArgument(err)),
 		}
 	}
 	let co = co.ok_or(StorageError::InvalidArgument(anyhow!("Insert is only allowed in context of a CO")))?;
@@ -163,7 +162,7 @@ async fn get(
 
 	// encrypted block:
 	// - only allow if the token provides access
-	if MultiCodec::is(&cid, KnownMultiCodec::CoEncryptedBlock) {
+	if MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
 		let storage = storage
 			.encrypted_storage()
 			.ok_or(StorageError::NotFound(cid, anyhow!("Not allowed")))?;
@@ -247,7 +246,7 @@ async fn missing_blocks(context: CoContext, cid: Cid, tokens: Vec<Token>) -> Res
 			Err(StorageError::NotFound(_, _)) => {
 				missing.push(cid);
 			},
-			Err(e) => return Err(e.into()),
+			Err(e) => return Err(e),
 		}
 	}
 	Ok(missing)

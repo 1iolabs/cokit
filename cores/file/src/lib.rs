@@ -431,7 +431,7 @@ fn reduce_modify(
 			// validate: check `to_parent` exists
 			let validated_to_parent = if to_parent == "/" {
 				to_parent.to_owned()
-			} else if let Some((to_parent, node)) = get_node(context, paths, &to_parent, true)? {
+			} else if let Some((to_parent, node)) = get_node(context, paths, to_parent, true)? {
 				if !node.is_dir() {
 					return Err(anyhow!("Can only move into folders: {}", to_parent));
 				}
@@ -474,14 +474,11 @@ fn reduce_modify(
 		state.nodes.try_update_key(storage, &parent_path, |storage, _, item| {
 			// validate
 			for modification in modifications.iter() {
-				match modification {
-					FileModification::Rename(name) => {
-						// check `name` dont exists as sibling
-						if item.iter(storage).find(|node| node.name() == name).is_some() {
-							return Err(anyhow!("File exists: {}", parent_path.join_path(name)?));
-						}
-					},
-					_ => {},
+				if let FileModification::Rename(name) = modification {
+					// check `name` dont exists as sibling
+					if item.iter(storage).any(|node| node.name() == name) {
+						return Err(anyhow!("File exists: {}", parent_path.join_path(name)?));
+					}
 				}
 			}
 
@@ -581,12 +578,9 @@ fn get_node(
 	// resolve_link
 	if let Some(node) = &node {
 		if resolve_link {
-			match node {
-				Node::Link(link) => {
-					let target = parent_path.join(&link.contents)?;
-					return get_node(storage, paths, &target, resolve_link);
-				},
-				_ => {},
+			if let Node::Link(link) = node {
+				let target = parent_path.join(&link.contents)?;
+				return get_node(storage, paths, &target, resolve_link);
 			}
 		}
 	}

@@ -59,7 +59,7 @@ where
 		}
 	}
 
-	deserializer.deserialize_seq(MapAsListVisitor { marker: PhantomData::<(K, V, M)>::default() })
+	deserializer.deserialize_seq(MapAsListVisitor { marker: PhantomData::<(K, V, M)> })
 }
 
 #[cfg(test)]

@@ -81,7 +81,7 @@ impl Actor for ReducerActor {
 	) -> Result<(), ActorError> {
 		match message {
 			ReducerMessage::State(response) => {
-				response.respond(handle_state(&state));
+				response.respond(handle_state(state));
 			},
 			ReducerMessage::StateStream(mut response) => {
 				if response.send(CoReducerState::new_reducer(&state.reducer)).is_ok() {
@@ -89,10 +89,10 @@ impl Actor for ReducerActor {
 				}
 			},
 			ReducerMessage::Push(overlay_storage, storage, identity, action_link, response) => {
-				response.respond(handle_push(&self, overlay_storage, state, identity, storage, action_link).await);
+				response.respond(handle_push(self, overlay_storage, state, identity, storage, action_link).await);
 			},
 			ReducerMessage::JoinState(overlay_storage, storage, join_state, response) => {
-				response.respond(handle_join_state(&self, overlay_storage, state, storage, join_state).await);
+				response.respond(handle_join_state(self, overlay_storage, state, storage, join_state).await);
 			},
 			ReducerMessage::Clear(response) => {
 				response.respond(handle_clear(state));

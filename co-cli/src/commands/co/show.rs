@@ -30,7 +30,7 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 		println!("# Core {}", core_name);
 		println!("- State: `{:?}`", core.state);
 		println!("- Tags: {:?}", core.tags);
-		println!("");
+		println!();
 		match core.tags.string("core") {
 			Some("co-core-storage") => {
 				print_storage(&storage, core.state.into()).await?;
@@ -51,7 +51,7 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 		println!("- Tags: {}", co.tags);
 		println!("- State: `{:?}`", reducer_state.state());
 		println!("- Heads: `{:?}`", reducer_state.heads());
-		println!("");
+		println!();
 
 		// participants
 		let participants = co.participants.stream(&storage).try_collect::<Vec<_>>().await?;
@@ -61,7 +61,7 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 			println!("- Status: `{:?}`", participant.1.state);
 			println!("- Tags: {:?}", participant.1.tags);
 		}
-		println!("");
+		println!();
 
 		// cores
 		let cores = co.cores;
@@ -71,7 +71,7 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 			println!("- State: `{:?}`", core.1.state);
 			println!("- Tags: {:?}", core.1.tags);
 		}
-		println!("");
+		println!();
 	}
 
 	// result
@@ -95,7 +95,7 @@ async fn print_storage(storage: &CoStorage, state: OptionLink<co_core_storage::S
 					println!("#### {name}");
 					println!("- References: {}", pin.references_count);
 					println!("- Strategy: {:?}", pin.strategy);
-					println!("");
+					println!();
 					println!("Pins:");
 					let storage = storage.clone();
 					pin.references
@@ -104,7 +104,7 @@ async fn print_storage(storage: &CoStorage, state: OptionLink<co_core_storage::S
 						.map(|(index, item)| item.map(|inner| (index, inner)))
 						.try_for_each({
 							move |(index, (_list_index, item))| async move {
-								println!("{}. {}", index, item.cid().to_string());
+								println!("{}. {}", index, item.cid());
 								Ok(())
 							}
 						})
@@ -114,7 +114,7 @@ async fn print_storage(storage: &CoStorage, state: OptionLink<co_core_storage::S
 			}
 		})
 		.await?;
-	println!("");
+	println!();
 
 	// blocks
 	println!("### Blocks");
@@ -123,15 +123,11 @@ async fn print_storage(storage: &CoStorage, state: OptionLink<co_core_storage::S
 		.stream(storage)
 		.try_for_each({
 			move |(block_cid, block)| async move {
-				println!(
-					"#### {}{}",
-					block_cid.cid().to_string(),
-					if block.is_removable() { " (removable)" } else { "" }
-				);
+				println!("#### {}{}", block_cid.cid(), if block.is_removable() { " (removable)" } else { "" });
 				println!("- References: {}", block.references);
 				println!("- Mode: {:?}", block.mode);
 				println!("- Tags: {}", block.tags);
-				println!("");
+				println!();
 				Ok(())
 			}
 		})

@@ -48,7 +48,7 @@ impl CoToken {
 		};
 		match self.algorithm.as_str() {
 			"HS256" => Self::new(secret, CoTokenParameters(*token_peer, self.body.1.clone()))
-				.map(|token| &token.signature == &self.signature)
+				.map(|token| token.signature == self.signature)
 				.unwrap_or(false),
 			_ => false,
 		}

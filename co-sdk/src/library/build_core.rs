@@ -17,22 +17,24 @@ use std::{
 pub fn crate_repository_path(workspace: bool) -> Result<PathBuf, anyhow::Error> {
 	let mut repository_path =
 		PathBuf::from(option_env!("CARGO_MANIFEST_DIR").ok_or(anyhow!("Missing CARGO_MANIFEST_DIR"))?);
-	while workspace {
-		match read(repository_path.join("Cargo.toml")) {
-			Ok(data) => {
-				let core_package: Cargo = toml::from_str(std::str::from_utf8(&data)?).context("valid toml")?;
-				if core_package.workspace.is_some() {
-					break;
-				}
-			},
-			Err(err) if err.kind() == ErrorKind::NotFound => {},
-			Err(err) => return Err(err.into()),
-		}
+	if workspace {
+		loop {
+			match read(repository_path.join("Cargo.toml")) {
+				Ok(data) => {
+					let core_package: Cargo = toml::from_str(std::str::from_utf8(&data)?).context("valid toml")?;
+					if core_package.workspace.is_some() {
+						break;
+					}
+				},
+				Err(err) if err.kind() == ErrorKind::NotFound => {},
+				Err(err) => return Err(err.into()),
+			}
 
-		// continue to walk up
-		repository_path = repository_path.parent().ok_or(anyhow!("Not found parent"))?.to_owned();
-		if !repository_path.try_exists()? {
-			return Err(anyhow!("Not found"));
+			// continue to walk up
+			repository_path = repository_path.parent().ok_or(anyhow!("Not found parent"))?.to_owned();
+			if !repository_path.try_exists()? {
+				return Err(anyhow!("Not found"));
+			}
 		}
 	}
 	// println!("env {:#?}", std::env::vars());
@@ -114,7 +116,7 @@ impl BuildCoreArtifact {
 	where
 		S: BlockStorage + 'static,
 	{
-		Ok(unixfs_add_file(storage, &self.artifact_path).await?)
+		unixfs_add_file(storage, &self.artifact_path).await
 	}
 
 	/// Compute Cid for the artifact.
@@ -123,7 +125,7 @@ impl BuildCoreArtifact {
 		S: BlockStorage + 'static,
 	{
 		let storage = MemoryBlockStorage::default();
-		Ok(self.store_artifact(&storage).await?)
+		self.store_artifact(&storage).await
 	}
 }
 

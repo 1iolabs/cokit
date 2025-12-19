@@ -12,7 +12,7 @@ use futures::Future;
 use tokio::sync::{mpsc, oneshot};
 
 pub fn use_co_storage(co: &String) -> CoBlockStorage {
-	let mut co_id = use_reactive(co, |co| CoId::from(co));
+	let mut co_id = use_reactive(co, CoId::from);
 	let context: CoContext = use_context();
 	let storage = use_callback(move |_| {
 		let (tx, mut rx) = mpsc::unbounded_channel::<Command<<CoBlockStorage as BlockStorage>::StoreParams>>();

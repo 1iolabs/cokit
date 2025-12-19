@@ -323,7 +323,7 @@ where
 			}
 		}
 		if let Some((resolved_state, resolved_heads)) =
-			self.state_resolver.resolve_state(storage, &context, heads).await?
+			self.state_resolver.resolve_state(storage, context, heads).await?
 		{
 			if &resolved_heads == heads {
 				return Ok(Some((resolved_state, resolved_heads)));
@@ -564,7 +564,7 @@ where
 		let mut last_result: Result<(), anyhow::Error> = Ok(());
 		for change_handler in change_handlers.iter_mut() {
 			last_result = change_handler
-				.on_state_changed(storage, &self, context.clone())
+				.on_state_changed(storage, self, context.clone())
 				.await
 				.with_context(|| format!("running {:?}", change_handler.type_name()));
 			if last_result.is_err() {
@@ -729,6 +729,12 @@ impl<S, R> Debug for Reducer<S, R> {
 pub struct ReducerChangeContext {
 	cause: ReducerChangeCause,
 }
+impl Default for ReducerChangeContext {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 impl ReducerChangeContext {
 	/// Create a new local change context.
 	pub fn new() -> Self {

@@ -25,13 +25,12 @@ pub async fn memberships<'a>(
 ) -> Result<impl Iterator<Item = Membership> + 'a, StorageError> {
 	let (_, memberships) = query_core(CO_CORE_NAME_MEMBERSHIP)
 		.with_default()
-		.execute_reducer(&reducer)
+		.execute_reducer(reducer)
 		.await
 		.map_err(Into::<StorageError>::into)?;
 	Ok(memberships
 		.memberships
 		.into_iter()
 		.filter(move |membership| &membership.id == co.as_ref())
-		.filter(move |membership| if let Some(state) = state { membership.membership_state == state } else { true })
-		.into_iter())
+		.filter(move |membership| if let Some(state) = state { membership.membership_state == state } else { true }))
 }

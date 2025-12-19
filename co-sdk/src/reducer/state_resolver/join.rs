@@ -55,7 +55,7 @@ impl<S: AnyBlockStorage> StateResolver<S> for JoinStateResolver<S> {
 			match next.resolve_state(storage, context, heads).await {
 				Ok(Some(result)) => return Ok(Some(result)),
 				Err(err) => {
-					if !result.is_err() {
+					if result.is_ok() {
 						result = Err(err);
 					}
 				},

@@ -94,7 +94,7 @@ impl Actor for PushHeadsActor {
 		let next_actions = state.reduce(action.clone());
 
 		// epic
-		epic.handle(&self.tasks, handle, &action, &state, &self.context);
+		epic.handle(&self.tasks, handle, &action, state, &self.context);
 
 		// dispatch
 		for next_action in next_actions {
@@ -133,14 +133,11 @@ struct PushHeadsState {
 impl Reducer<PushHeadsAction> for PushHeadsState {
 	fn reduce(&mut self, action: PushHeadsAction) -> Vec<PushHeadsAction> {
 		let mut result = vec![];
-		match action {
-			PushHeadsAction::Changed(identity, heads) => {
-				if self.heads != heads {
-					result.push(PushHeadsAction::Connect(identity, heads.clone()));
-					self.heads = heads;
-				}
-			},
-			_ => {},
+		if let PushHeadsAction::Changed(identity, heads) = action {
+			if self.heads != heads {
+				result.push(PushHeadsAction::Connect(identity, heads.clone()));
+				self.heads = heads;
+			}
 		}
 		result
 	}

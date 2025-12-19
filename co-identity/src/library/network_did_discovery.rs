@@ -11,7 +11,7 @@ where
 {
 	let network = network
 		.unwrap_or_else(|| NetworkDidDiscovery { did: identity.identity().to_owned(), topic: Default::default() });
-	if &network.did != identity.identity() {
+	if network.did != identity.identity() {
 		return Err(anyhow::anyhow!("Invalid arguments"));
 	}
 	Ok(network)

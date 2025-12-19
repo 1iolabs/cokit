@@ -28,7 +28,7 @@ pub trait DagCollectionAsyncExt: DagCollection {
 		for block in blocks {
 			storage.set(block).await?;
 		}
-		Ok(root.into())
+		Ok(root)
 	}
 
 	async fn from_link<S: BlockStorage + Clone + Send + Sync + 'static>(
@@ -38,7 +38,7 @@ pub trait DagCollectionAsyncExt: DagCollection {
 	where
 		Self::Item: Send + Sync + 'static,
 	{
-		Ok(self.stream(storage).try_collect().await?)
+		self.stream(storage).try_collect().await
 	}
 }
 impl<T> DagCollectionAsyncExt for T where T: DagCollection {}

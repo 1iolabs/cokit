@@ -44,7 +44,7 @@ async fn ensure_identity(name: String, application: Application) -> Result<state
 	let local_co = application.co().try_co_reducer(&CoId::new(CO_ID_LOCAL)).await?;
 	let storage = local_co.storage();
 	let identity = state::identities(storage, local_co.co_state().await, None)
-		.try_filter(|identity| ready(&identity.name == &name && identity.did.starts_with("did:key:")))
+		.try_filter(|identity| ready(identity.name == name && identity.did.starts_with("did:key:")))
 		.try_first()
 		.await?;
 	Ok(if let Some(identity) = identity {

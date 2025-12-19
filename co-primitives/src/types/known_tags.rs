@@ -44,7 +44,7 @@ pub trait KnownTag {
 	where
 		Self: Sized;
 
-	fn from_tags<'a>(tags: &'a Tags) -> Option<Self>
+	fn from_tags(tags: &Tags) -> Option<Self>
 	where
 		Self: Sized,
 	{
@@ -93,14 +93,14 @@ impl KnownTag for CoInvite {
 		value.string().and_then(|str| Self::try_from(str).ok())
 	}
 }
-impl Into<Tag> for &CoInvite {
-	fn into(self) -> Tag {
-		self.tag()
+impl From<&CoInvite> for Tag {
+	fn from(val: &CoInvite) -> Self {
+		val.tag()
 	}
 }
-impl Into<Tags> for &CoInvite {
-	fn into(self) -> Tags {
-		[self.tag()].into_iter().collect()
+impl From<&CoInvite> for Tags {
+	fn from(val: &CoInvite) -> Self {
+		[val.tag()].into_iter().collect()
 	}
 }
 

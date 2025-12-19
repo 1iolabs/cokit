@@ -75,7 +75,7 @@ where
 	where
 		T: NetworkTask<B, C> + Send + 'static,
 	{
-		Ok(self.spawn_box(Box::new(task))?)
+		self.spawn_box(Box::new(task))
 	}
 
 	fn spawn_box(&self, task: NetworkTaskBox<B, C>) -> Result<(), NetworkError>;

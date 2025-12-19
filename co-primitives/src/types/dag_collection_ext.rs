@@ -69,7 +69,7 @@ pub trait DagCollectionExt: DagCollection {
 		for block in blocks {
 			storage.set(block);
 		}
-		root.into()
+		root
 	}
 
 	fn from_link(&self, storage: &dyn Storage) -> Result<Self::Collection, NodeReaderError> {

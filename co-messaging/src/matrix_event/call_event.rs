@@ -52,7 +52,7 @@ pub struct CallInviteContent {
 
 impl From<CallInviteContent> for EventContent {
 	fn from(val: CallInviteContent) -> Self {
-		EventContent::Invite(val).into()
+		EventContent::Invite(val)
 	}
 }
 
@@ -93,7 +93,7 @@ pub struct AnswerCallContent {
 
 impl From<AnswerCallContent> for EventContent {
 	fn from(val: AnswerCallContent) -> Self {
-		EventContent::Answer(val).into()
+		EventContent::Answer(val)
 	}
 }
 
@@ -126,7 +126,7 @@ pub struct CallCandidatesContent {
 
 impl From<CallCandidatesContent> for EventContent {
 	fn from(val: CallCandidatesContent) -> Self {
-		EventContent::Candidates(val).into()
+		EventContent::Candidates(val)
 	}
 }
 
@@ -155,7 +155,7 @@ pub struct SelectCallAnswerContent {
 
 impl From<SelectCallAnswerContent> for EventContent {
 	fn from(val: SelectCallAnswerContent) -> Self {
-		EventContent::SelectAnswer(val).into()
+		EventContent::SelectAnswer(val)
 	}
 }
 
@@ -198,7 +198,7 @@ pub struct CallNegotiationContent {
 
 impl From<CallNegotiationContent> for EventContent {
 	fn from(val: CallNegotiationContent) -> Self {
-		EventContent::Negotioation(val).into()
+		EventContent::Negotioation(val)
 	}
 }
 
@@ -266,7 +266,7 @@ pub struct RejectCallContent {
 
 impl From<RejectCallContent> for EventContent {
 	fn from(val: RejectCallContent) -> Self {
-		EventContent::Reject(val).into()
+		EventContent::Reject(val)
 	}
 }
 
@@ -321,7 +321,7 @@ pub struct HangupCallContent {
 
 impl From<HangupCallContent> for EventContent {
 	fn from(val: HangupCallContent) -> Self {
-		EventContent::Hangup(val).into()
+		EventContent::Hangup(val)
 	}
 }
 

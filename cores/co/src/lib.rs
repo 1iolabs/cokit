@@ -610,7 +610,7 @@ async fn reduce_network_remove<S>(storage: &S, result: &mut Co, network: &Networ
 where
 	S: BlockStorage + Clone + 'static,
 {
-	Ok(result.network.remove(storage, network.clone()).await?)
+	result.network.remove(storage, network.clone()).await
 }
 
 async fn reduce_network_insert<S>(storage: &S, result: &mut Co, network: &Network) -> Result<bool, StorageError>

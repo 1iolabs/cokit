@@ -56,7 +56,7 @@ impl Actor for Network {
 		)?;
 
 		// spawner
-		let spawner = CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id.clone() };
+		let spawner = CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id };
 
 		// dial identified peer addresses
 		spawner

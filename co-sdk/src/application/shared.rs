@@ -131,7 +131,7 @@ impl SharedCoBuilder {
 			},
 		)
 		.await??;
-		Ok(find_co_secret_by_reference(&self.parent, &key, Some(&self.keystore_core_name)).await?)
+		find_co_secret_by_reference(&self.parent, &key, Some(&self.keystore_core_name)).await
 	}
 
 	pub async fn build<I>(
@@ -285,7 +285,7 @@ impl SharedCoBuilder {
 			.string("application")
 			.ok_or_else(|| anyhow!("Missing parent tag: application"))?
 			.to_owned();
-		Ok(CoReducer::spawn(
+		CoReducer::spawn(
 			application_handle,
 			application_identifier,
 			self.membership.id,
@@ -297,7 +297,7 @@ impl SharedCoBuilder {
 			Box::new(flush),
 			self.initialize,
 			self.verify_links,
-		)?)
+		)
 	}
 }
 
@@ -463,7 +463,7 @@ impl SharedContext {
 				for state in membership.state.iter() {
 					// encryption mapping
 					if let (Some(storage), Some(cid)) = (&self.encrypted_storage, &state.encryption_mapping) {
-						storage.load_mapping(&cid).await?;
+						storage.load_mapping(cid).await?;
 					}
 
 					// state
@@ -630,7 +630,7 @@ impl SharedCoCreator {
 		reducer
 			.push(&co_storage, runtime.runtime(), &identity, CO_CORE_NAME_CO, &CoAction::Create(create))
 			.await?;
-		let reducer_state = CoReducerState::new(reducer.state().clone(), reducer.heads().clone());
+		let reducer_state = CoReducerState::new(*reducer.state(), reducer.heads().clone());
 
 		// store key in parent co
 		let (key_uri, _encrypted_storage) = if let Some((encrypted_storage, key_uri, secret)) = encrypted_storage {

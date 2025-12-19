@@ -117,7 +117,7 @@ impl Identity for DidKeyIdentity {
 	fn verify(&self, signature: &[u8], data: &[u8], public_key: Option<&[u8]>) -> bool {
 		// if key is provided verify its our key
 		if let Some(key) = public_key {
-			if key != &self.key.public_key_bytes() {
+			if key != self.key.public_key_bytes() {
 				return false;
 			}
 		}

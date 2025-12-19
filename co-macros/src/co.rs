@@ -85,10 +85,10 @@ pub fn macro_co(input: proc_macro::TokenStream, features: BTreeSet<CoMacroFeatur
 			derives.push(syn::parse_quote!(serde::Serialize));
 			derives.push(syn::parse_quote!(serde::Deserialize));
 		}
-		if !features.contains(&CoMacroFeature::NoDefault) {
-			if features.contains(&CoMacroFeature::State) || features.contains(&CoMacroFeature::StateSync) {
-				derives.push(syn::parse_quote!(Default));
-			}
+		if !features.contains(&CoMacroFeature::NoDefault)
+			&& (features.contains(&CoMacroFeature::State) || features.contains(&CoMacroFeature::StateSync))
+		{
+			derives.push(syn::parse_quote!(Default));
 		}
 		derives
 	} else {

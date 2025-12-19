@@ -220,9 +220,8 @@ impl NetworkBehaviour for Behaviour {
 		}
 
 		// pending inbound
-		match self.pending_inbound.poll_next_unpin(cx) {
-			Poll::Ready(Some(Some(event))) => return Poll::Ready(ToSwarm::GenerateEvent(event)),
-			_ => {},
+		if let Poll::Ready(Some(Some(event))) = self.pending_inbound.poll_next_unpin(cx) {
+			return Poll::Ready(ToSwarm::GenerateEvent(event));
 		}
 
 		// pending

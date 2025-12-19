@@ -83,7 +83,7 @@ impl Libp2pNetwork {
 
 		// relay
 		let relay_server = if config.relay {
-			Some(libp2p::relay::Behaviour::new(local_peer_id.clone(), relay::Config::default()))
+			Some(libp2p::relay::Behaviour::new(local_peer_id, relay::Config::default()))
 		} else {
 			None
 		}
@@ -96,8 +96,7 @@ impl Libp2pNetwork {
 
 		// mdns
 		let mdns =
-			if config.mdns { Some(MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?) } else { None }
-				.into();
+			if config.mdns { Some(MdnsBehaviour::new(mdns::Config::default(), local_peer_id)?) } else { None }.into();
 
 		// didcomm
 		let didcomm = didcomm::Behaviour::new(resolver.clone(), private_resolver, didcomm::Config { auto_dail: false });
@@ -112,7 +111,7 @@ impl Libp2pNetwork {
 		.into();
 
 		// dcutr
-		let dcutr = if config.nat { Some(dcutr::Behaviour::new(local_peer_id.clone())) } else { None }.into();
+		let dcutr = if config.nat { Some(dcutr::Behaviour::new(local_peer_id)) } else { None }.into();
 
 		// behaviour
 		let mut behaviour = Behaviour {
@@ -282,10 +281,9 @@ impl LayerBehaviour<Behaviour> for Context {
 
 	fn on_layer_event(&mut self, swarm: &mut Swarm<Behaviour>, event: Self::ToLayer) -> Option<Self::ToSwarm> {
 		match event {
-			ContextLayerEvent::Discovery(event) => self
-				.discovery
-				.on_layer_event(swarm, event)
-				.map(|event| ContextEvent::Discovery(event)),
+			ContextLayerEvent::Discovery(event) => {
+				self.discovery.on_layer_event(swarm, event).map(ContextEvent::Discovery)
+			},
 		}
 	}
 

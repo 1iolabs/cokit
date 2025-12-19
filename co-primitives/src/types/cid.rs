@@ -52,9 +52,9 @@ impl From<Cid> for CoCid {
 		CoCid(value)
 	}
 }
-impl Into<Cid> for CoCid {
-	fn into(self) -> Cid {
-		self.0
+impl From<CoCid> for Cid {
+	fn from(value: CoCid) -> Self {
+		value.0
 	}
 }
 impl AsRef<Cid> for CoCid {

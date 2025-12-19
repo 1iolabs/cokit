@@ -100,7 +100,7 @@ impl Actor for Application {
 
 		// epic
 		if let Some(action) = &action {
-			state.epic.handle(&state.context.tasks(), &handle, action, &(), &state.context);
+			state.epic.handle(&state.context.tasks(), handle, action, &(), &state.context);
 		}
 
 		// responses

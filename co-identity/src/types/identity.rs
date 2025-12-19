@@ -20,9 +20,8 @@ pub trait Identity {
 	fn networks(&self) -> BTreeSet<Network>;
 
 	fn try_didcomm_public(&self) -> Result<DidCommPublicContext, anyhow::Error> {
-		Ok(self
-			.didcomm_public()
-			.ok_or(anyhow::anyhow!("unsupported identity: no public didcomm context: {}", self.identity()))?)
+		self.didcomm_public()
+			.ok_or(anyhow::anyhow!("unsupported identity: no public didcomm context: {}", self.identity()))
 	}
 
 	fn boxed_public(self) -> IdentityBox

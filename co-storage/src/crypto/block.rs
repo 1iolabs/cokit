@@ -56,13 +56,10 @@ impl From<MultiCodecError> for AlgorithmError {
 
 #[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq)]
 #[repr(u8)]
+#[derive(Default)]
 pub enum Algorithm {
+	#[default]
 	XChaCha20Poly1305 = 1,
-}
-impl Default for Algorithm {
-	fn default() -> Self {
-		Self::XChaCha20Poly1305
-	}
 }
 impl Algorithm {
 	/// Cipher algorithm key size in bytes.
@@ -229,7 +226,7 @@ impl EncryptedBlock {
 			.inline()
 			.ok_or(AlgorithmError::InvalidArguments(anyhow::anyhow!("Expected inline data")))?;
 		let data_plain = self.decrypt_data(&block_secret, data, &aad)?;
-		Ok(from_cbor(&data_plain).map_err(|err| AlgorithmError::InvalidArguments(err.into()))?)
+		from_cbor(&data_plain).map_err(|err| AlgorithmError::InvalidArguments(err.into()))
 	}
 
 	fn decrypt_data(&self, block_secret: &Secret, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, AlgorithmError> {
@@ -297,14 +294,14 @@ pub enum EncryptedData {
 impl EncryptedData {
 	pub fn inline(&self) -> Option<&[u8]> {
 		match self {
-			Self::Inline(data) => Some(&data),
+			Self::Inline(data) => Some(data),
 			_ => None,
 		}
 	}
 
 	pub fn blocks(&self) -> Option<&[Cid]> {
 		match self {
-			Self::Block(data) => Some(&data),
+			Self::Block(data) => Some(data),
 			_ => None,
 		}
 	}
@@ -405,12 +402,12 @@ where
 		Self { cid, data, references: Default::default() }
 	}
 }
-impl<S> Into<Block<S>> for BlockPayload
+impl<S> From<BlockPayload> for Block<S>
 where
 	S: StoreParams,
 {
-	fn into(self) -> Block<S> {
-		Block::new_unchecked(self.cid, self.data)
+	fn from(value: BlockPayload) -> Self {
+		Block::new_unchecked(value.cid, value.data)
 	}
 }
 

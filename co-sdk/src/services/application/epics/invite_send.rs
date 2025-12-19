@@ -71,13 +71,9 @@ pub fn invite_sent(
 		Action::CoDidCommSent {
 			message: CoDidCommSendAction { co, notification: Some(NotifyAction::InviteSent { to }), .. },
 			result: Ok(peers),
-		} => {
-			if let Some(peer) = peers.first() {
-				Some(stream::iter([Ok(Action::InviteSent { co: co.clone(), to: to.clone(), peer: *peer })]))
-			} else {
-				None
-			}
-		},
+		} => peers
+			.first()
+			.map(|peer| stream::iter([Ok(Action::InviteSent { co: co.clone(), to: to.clone(), peer: *peer })])),
 		_ => None,
 	}
 }

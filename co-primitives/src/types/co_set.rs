@@ -25,7 +25,7 @@ where
 		for key in iter.into_iter() {
 			transaction.insert(key).await?;
 		}
-		Ok(transaction.store().await?)
+		transaction.store().await
 	}
 
 	/// Whether this collection is empty.
@@ -59,9 +59,9 @@ where
 		S: BlockStorage + Clone + 'static,
 	{
 		let mut transaction = self.open(storage).await?;
-		let result = transaction.insert(key).await?;
+		transaction.insert(key).await?;
 		self.commit(transaction).await?;
-		Ok(result)
+		Ok(())
 	}
 
 	/// Remove key from set and return `true` if it was present.

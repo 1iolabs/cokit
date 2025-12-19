@@ -148,10 +148,10 @@ impl From<DidCommHeader> for PeerDidCommHeader {
 		Self { from_peer_id: header.fields.remove("fpid"), header }
 	}
 }
-impl Into<DidCommHeader> for PeerDidCommHeader {
-	fn into(self) -> DidCommHeader {
-		let mut header = self.header;
-		if let Some(value) = self.from_peer_id {
+impl From<PeerDidCommHeader> for DidCommHeader {
+	fn from(value: PeerDidCommHeader) -> Self {
+		let mut header = value.header;
+		if let Some(value) = value.from_peer_id {
 			header.fields.insert("fpid".to_owned(), value);
 		}
 		header

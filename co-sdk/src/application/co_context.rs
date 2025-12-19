@@ -163,7 +163,7 @@ impl CoContext {
 	/// Force refresh co instance.
 	pub async fn refresh(&self, co: CoReducer) -> Result<(), anyhow::Error> {
 		let parent = match co.parent_id() {
-			Some(parent) => self.try_co_reducer(&parent).await?,
+			Some(parent) => self.try_co_reducer(parent).await?,
 			None => co.clone(),
 		};
 		co.context.refresh(parent, co.clone()).await?;
@@ -343,8 +343,7 @@ impl CoContextInner {
 	fn create_local_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::new(&self.cores);
 		let core_resolver = LogCoreResolver::new(core_resolver, id);
-		let core_resolver = DynamicCoreResolver::new(core_resolver);
-		core_resolver
+		DynamicCoreResolver::new(core_resolver)
 	}
 
 	/// Creates the Core Resolver for a shared CO.
@@ -352,8 +351,7 @@ impl CoContextInner {
 		let core_resolver = CoCoreResolver::new(&self.cores);
 		let core_resolver = CoGuardResolver::new(core_resolver);
 		let core_resolver = LogCoreResolver::new(core_resolver, id);
-		let core_resolver = DynamicCoreResolver::new(core_resolver);
-		core_resolver
+		DynamicCoreResolver::new(core_resolver)
 	}
 
 	/// Creates a CoReducer instance for a CO.

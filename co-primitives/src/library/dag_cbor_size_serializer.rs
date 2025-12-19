@@ -10,7 +10,11 @@ use serde::{
 pub struct DagCborSizeSerializer {
 	pub size: usize,
 }
-
+impl Default for DagCborSizeSerializer {
+	fn default() -> Self {
+		Self::new()
+	}
+}
 impl DagCborSizeSerializer {
 	pub fn new() -> Self {
 		Self { size: 0 }
@@ -48,7 +52,7 @@ impl DagCborSizeSerializer {
 #[derive(Debug, thiserror::Error)]
 pub enum DagCborSizeSerializerError {}
 
-impl<'a> Serializer for &'a mut DagCborSizeSerializer {
+impl Serializer for &mut DagCborSizeSerializer {
 	type Ok = ();
 	type Error = serde_ipld_dagcbor::error::EncodeError<DagCborSizeSerializerError>;
 
@@ -237,7 +241,7 @@ impl<'a> Serializer for &'a mut DagCborSizeSerializer {
 }
 
 // All compound containers use same struct
-impl<'a> SerializeSeq for &'a mut DagCborSizeSerializer {
+impl SerializeSeq for &mut DagCborSizeSerializer {
 	type Ok = ();
 	type Error = serde_ipld_dagcbor::error::EncodeError<DagCborSizeSerializerError>;
 
@@ -250,7 +254,7 @@ impl<'a> SerializeSeq for &'a mut DagCborSizeSerializer {
 	}
 }
 
-impl<'a> SerializeTuple for &'a mut DagCborSizeSerializer {
+impl SerializeTuple for &mut DagCborSizeSerializer {
 	type Ok = ();
 	type Error = serde_ipld_dagcbor::error::EncodeError<DagCborSizeSerializerError>;
 
@@ -262,7 +266,7 @@ impl<'a> SerializeTuple for &'a mut DagCborSizeSerializer {
 		Ok(())
 	}
 }
-impl<'a> SerializeTupleStruct for &'a mut DagCborSizeSerializer {
+impl SerializeTupleStruct for &mut DagCborSizeSerializer {
 	type Ok = ();
 	type Error = serde_ipld_dagcbor::error::EncodeError<DagCborSizeSerializerError>;
 
@@ -274,7 +278,7 @@ impl<'a> SerializeTupleStruct for &'a mut DagCborSizeSerializer {
 		Ok(())
 	}
 }
-impl<'a> SerializeTupleVariant for &'a mut DagCborSizeSerializer {
+impl SerializeTupleVariant for &mut DagCborSizeSerializer {
 	type Ok = ();
 	type Error = serde_ipld_dagcbor::error::EncodeError<DagCborSizeSerializerError>;
 
@@ -286,7 +290,7 @@ impl<'a> SerializeTupleVariant for &'a mut DagCborSizeSerializer {
 		Ok(())
 	}
 }
-impl<'a> SerializeMap for &'a mut DagCborSizeSerializer {
+impl SerializeMap for &mut DagCborSizeSerializer {
 	type Ok = ();
 	type Error = serde_ipld_dagcbor::error::EncodeError<DagCborSizeSerializerError>;
 
@@ -302,7 +306,7 @@ impl<'a> SerializeMap for &'a mut DagCborSizeSerializer {
 		Ok(())
 	}
 }
-impl<'a> SerializeStruct for &'a mut DagCborSizeSerializer {
+impl SerializeStruct for &mut DagCborSizeSerializer {
 	type Ok = ();
 	type Error = serde_ipld_dagcbor::error::EncodeError<DagCborSizeSerializerError>;
 
@@ -319,7 +323,7 @@ impl<'a> SerializeStruct for &'a mut DagCborSizeSerializer {
 		Ok(())
 	}
 }
-impl<'a> SerializeStructVariant for &'a mut DagCborSizeSerializer {
+impl SerializeStructVariant for &mut DagCborSizeSerializer {
 	type Ok = ();
 	type Error = serde_ipld_dagcbor::error::EncodeError<DagCborSizeSerializerError>;
 

@@ -318,9 +318,9 @@ impl From<String> for ActionError {
 		Self::Serialized { message: value }
 	}
 }
-impl Into<String> for ActionError {
-	fn into(self) -> String {
-		match self {
+impl From<ActionError> for String {
+	fn from(value: ActionError) -> Self {
+		match value {
 			ActionError::Serialized { message } => message,
 			ActionError::Native { err } => err.to_string(),
 		}

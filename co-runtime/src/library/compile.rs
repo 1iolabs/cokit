@@ -11,8 +11,8 @@ pub async fn compile_native(wasm_bytes: impl AsRef<[u8]>, arch_triple: &str) -> 
 		"x86_64-apple-darwin" if cfg!(target_arch = "x86_64") && cfg!(target_vendor = "apple") => {},
 		_ => {
 			let target = Triple::from_str(arch_triple)
-				.map_err(|err| anyhow::anyhow!("Parse triple failed: {}: {}", arch_triple, err.to_string()))?;
-			let target = Target::new(target, CpuFeature::for_host().into());
+				.map_err(|err| anyhow::anyhow!("Parse triple failed: {}: {}", arch_triple, err))?;
+			let target = Target::new(target, CpuFeature::for_host());
 			compiler = compiler.set_target(Some(target));
 			// compiler.target_machine(&target)
 			// compiler = LLVM::for_traget(target);

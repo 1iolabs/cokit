@@ -211,7 +211,7 @@ where
 			.as_slice()
 			.chunks(self.max_children)
 			.map(|chunk| {
-				let node = self.serializer.nodes(chunk.iter().cloned().collect())?;
+				let node = self.serializer.nodes(chunk.to_vec())?;
 				let block = self.serializer.serialize(node)?;
 				Ok(block)
 			})

@@ -43,11 +43,8 @@ impl NetworkTask<Behaviour, Context> for DidCommReceiveNetworkTask {
 		_context: &mut Context,
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
-		match &event {
-			SwarmEvent::Behaviour(NetworkEvent::Didcomm(didcomm::Event::Received { peer_id, message })) => {
-				self.receive.send((*peer_id, message.clone())).ok();
-			},
-			_ => {},
+		if let SwarmEvent::Behaviour(NetworkEvent::Didcomm(didcomm::Event::Received { peer_id, message })) = &event {
+			self.receive.send((*peer_id, message.clone())).ok();
 		}
 		Some(event)
 	}

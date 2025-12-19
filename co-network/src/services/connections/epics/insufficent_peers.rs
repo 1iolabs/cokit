@@ -23,7 +23,7 @@ impl Epic<ConnectionAction, ConnectionState, ConnectionsContext> for Insufficent
 	) -> Option<impl Stream<Item = Result<ConnectionAction, anyhow::Error>> + 'static> {
 		match message {
 			ConnectionAction::InsufficentPeers => {
-				let next_attempt = find_connectable_bootstrap(&state, Instant::now(), backoff_with_jitter);
+				let next_attempt = find_connectable_bootstrap(state, Instant::now(), backoff_with_jitter);
 				Some(
 					async move {
 						let action = match next_attempt {

@@ -260,10 +260,7 @@ where
 		let topic = IdentTopic::new(did_discovery_subscription_topic_str(&subscription));
 
 		// add
-		self.did_subscriptions
-			.entry(topic.hash())
-			.or_insert(Default::default())
-			.push(subscription);
+		self.did_subscriptions.entry(topic.hash()).or_default().push(subscription);
 
 		// subscribe
 		let subscriptions_count = self.did_subscriptions.get(&topic.hash()).map(|v| v.len()).unwrap_or(0);
@@ -640,7 +637,7 @@ where
 					DidDiscoveryMessageType::try_from(message.header().message_type.clone()).ok();
 				if message_type == Some(DidDiscoveryMessageType::Resolve) {
 					self.events.push_back(DiscoveryEvent::ReceivedDidComm {
-						peer_id: peer_id.clone(),
+						peer_id: *peer_id,
 						header: message.header().to_owned(),
 					})
 				}
@@ -836,9 +833,8 @@ where
 		}
 
 		// pending futures
-		match self.future_events.poll_next_unpin(cx) {
-			Poll::Ready(Some(Some(event))) => return Poll::Ready(event),
-			_ => {},
+		if let Poll::Ready(Some(Some(event))) = self.future_events.poll_next_unpin(cx) {
+			return Poll::Ready(event);
 		}
 
 		// pending
@@ -1018,7 +1014,7 @@ fn peer_to_dial_opts(item: &NetworkPeer) -> Result<DialOpts, anyhow::Error> {
 	let addresses = item
 		.addresses
 		.iter()
-		.map(|address| Multiaddr::from_str(&address))
+		.map(|address| Multiaddr::from_str(address))
 		.collect::<Result<BTreeSet<_>, _>>()?;
 	Ok(DialOpts::peer_id(peer)
 		.addresses(addresses.clone().into_iter().collect())

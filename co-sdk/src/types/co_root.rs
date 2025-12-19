@@ -18,8 +18,8 @@ impl From<CoReducerState> for CoRoot {
 		CoRoot { heads: value.1, state: value.0 }
 	}
 }
-impl Into<CoReducerState> for CoRoot {
-	fn into(self) -> CoReducerState {
-		CoReducerState::new(self.state, self.heads)
+impl From<CoRoot> for CoReducerState {
+	fn from(value: CoRoot) -> Self {
+		CoReducerState::new(value.state, value.heads)
 	}
 }

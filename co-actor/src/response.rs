@@ -241,6 +241,6 @@ where
 
 	/// Test if the streams has been closed by the caller.
 	pub fn is_closed(&self) -> bool {
-		self.streams.iter().find(|s| !s.is_closed()).is_none()
+		!self.streams.iter().any(|s| !s.is_closed())
 	}
 }

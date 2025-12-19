@@ -18,10 +18,10 @@ pub async fn to_internal_cid(mapping: &impl BlockStorageContentMapping, cid: Cid
 /// Returns None if can not be mapped.
 pub async fn to_internal_mapped(mapping: &impl BlockStorageContentMapping, external: Cid) -> Option<OptionMappedCid> {
 	if mapping.is_content_mapped().await {
-		match mapping.to_mapped(&external).await {
-			Some(internal) => Some(OptionMappedCid::new(internal, external)),
-			None => None,
-		}
+		mapping
+			.to_mapped(&external)
+			.await
+			.map(|internal| OptionMappedCid::new(internal, external))
 	} else {
 		Some(OptionMappedCid::Unmapped(external))
 	}

@@ -258,7 +258,7 @@ impl Actor for FileLocalsActor {
 						state.read(self.config_path.clone()).await?;
 
 						// result
-						Ok(state.locals.iter().map(|(_, local)| local.clone()).collect())
+						Ok(state.locals.values().cloned().collect())
 					})
 					.await
 					.ok();

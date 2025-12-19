@@ -7,7 +7,7 @@ pub async fn is_membership_heads_encrypted(
 	storage: &CoStorage,
 	membership: &Membership,
 ) -> Result<bool, anyhow::Error> {
-	for co_state in membership.state.iter() {
+	if let Some(co_state) = membership.state.iter().next() {
 		let (_state, heads) = storage.get_value(&co_state.state).await?.into_value();
 		return Ok(is_cid_encrypted(&heads));
 	}

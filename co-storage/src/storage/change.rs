@@ -46,9 +46,8 @@ where
 
 	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
 		// already exists?
-		match self.next.stat(block.cid()).await {
-			Ok(_) => return Ok(*block.cid()),
-			_ => {},
+		if let Ok(_) = self.next.stat(block.cid()).await {
+			return Ok(*block.cid());
 		}
 
 		// create

@@ -85,11 +85,10 @@ fn print_message(action: ReducerAction<MatrixEvent>) {
 
 	let event = action.payload;
 	match event.content {
-		co_messaging::EventContent::Message(message) => match message {
-			co_messaging::message_event::MessageType::Text(content) => {
+		co_messaging::EventContent::Message(message) => {
+			if let co_messaging::message_event::MessageType::Text(content) = message {
 				println!("{} ({}): {}", action.from, timestamp_str, content.body)
-			},
-			_ => (),
+			}
 		},
 		co_messaging::EventContent::RoomName(name) => {
 			println!("{} changed the room name to: '{}' ({})", action.from, name.name, timestamp_str)

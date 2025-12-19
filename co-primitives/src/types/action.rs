@@ -32,6 +32,6 @@ impl ReducerAction<Ipld> {
 	}
 
 	pub fn get_payload<T: DeserializeOwned>(&self) -> Result<T, String> {
-		Ok(from_ipld(self.payload.clone()).map_err(|e| e.to_string())?)
+		from_ipld(self.payload.clone()).map_err(|e| e.to_string())
 	}
 }

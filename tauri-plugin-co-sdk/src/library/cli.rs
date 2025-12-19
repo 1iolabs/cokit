@@ -41,15 +41,15 @@ pub struct Cli {
 	#[arg(long, default_value_t = false)]
 	pub force_new_peer_id: bool,
 }
-impl Into<CoApplicationSettings> for Cli {
-	fn into(self) -> CoApplicationSettings {
+impl From<Cli> for CoApplicationSettings {
+	fn from(value: Cli) -> Self {
 		CoApplicationSettings {
-			instance_id: self.instance_id.unwrap_or_else(|| String::from("tauri")),
-			network: !self.no_network,
-			force_new_peer_id: self.force_new_peer_id,
-			no_keychain: self.no_keychain,
-			base_path: self.base_path,
-			no_log: self.no_log,
+			instance_id: value.instance_id.unwrap_or_else(|| String::from("tauri")),
+			network: !value.no_network,
+			force_new_peer_id: value.force_new_peer_id,
+			no_keychain: value.no_keychain,
+			base_path: value.base_path,
+			no_log: value.no_log,
 			..Default::default()
 		}
 	}

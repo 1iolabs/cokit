@@ -113,18 +113,24 @@ impl PartialEq<u64> for KnownMultiCodec {
 /// MultiCodec matching utility.
 ///
 /// See: https://github.com/multiformats/multicodec/blob/master/table.csv
-#[derive(Copy, Clone, Eq, Ord)]
+#[derive(Copy, Clone)]
 #[non_exhaustive]
 #[repr(u64)]
 pub enum MultiCodec {
 	Known(KnownMultiCodec),
 	Unknown(u64),
 }
-impl PartialOrd for MultiCodec {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		self.codec().partial_cmp(&other.codec())
+impl Ord for MultiCodec {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		self.codec().cmp(&other.codec())
 	}
 }
+impl PartialOrd for MultiCodec {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+impl Eq for MultiCodec {}
 impl PartialEq for MultiCodec {
 	fn eq(&self, other: &Self) -> bool {
 		self.codec() == other.codec()

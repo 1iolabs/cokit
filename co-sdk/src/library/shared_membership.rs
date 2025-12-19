@@ -12,7 +12,7 @@ pub async fn shared_membership(
 	identity: Option<&Did>,
 ) -> Result<Option<Membership>, anyhow::Error> {
 	let mut result = None;
-	for membership in memberships(&parent, &co, None).await? {
+	for membership in memberships(parent, &co, None).await? {
 		result = Some(match result {
 			None => membership,
 			Some(prev) => match sort_membership(identity, &membership, &prev) {
@@ -31,7 +31,7 @@ pub async fn shared_membership_active(
 	identity: Option<&Did>,
 ) -> Result<Option<Membership>, anyhow::Error> {
 	// find first active membership
-	Ok(memberships(&parent, &co, Some(MembershipState::Active))
+	Ok(memberships(parent, &co, Some(MembershipState::Active))
 		.await?
 		.find(move |membership| match identity {
 			Some(value) => value == &membership.did,

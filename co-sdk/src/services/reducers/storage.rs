@@ -42,9 +42,9 @@ impl ReducerStorage {
 		let membership = shared_membership_active(&parent, &id, None)
 			.await?
 			.ok_or(CoReducerFactoryError::CoNotFound(id, anyhow!("No active membership")))?;
-		Ok(Self::from_membership(handle, &storage, &parent, membership, key_request_timeout)
+		Self::from_membership(handle, &storage, &parent, membership, key_request_timeout)
 			.await
-			.map_err(|e| CoReducerFactoryError::Other(e.into()))?)
+			.map_err(|e| CoReducerFactoryError::Other(e.into()))
 	}
 
 	pub(crate) async fn from_membership(

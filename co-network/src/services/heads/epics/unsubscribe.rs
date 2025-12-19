@@ -23,7 +23,7 @@ pub fn unsubscribe(
 			let is_last_unsubscribe = state
 				.heads
 				.get(&hash)
-				.map(|subscriptions| subscriptions.len() == 0)
+				.map(|subscriptions| subscriptions.is_empty())
 				.unwrap_or(true);
 			if is_last_unsubscribe {
 				let topic = to_topic(&action.network);

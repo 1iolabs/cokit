@@ -25,7 +25,7 @@ impl EventType for RoomNameContent {
 
 impl From<RoomNameContent> for EventContent {
 	fn from(val: RoomNameContent) -> Self {
-		EventContent::RoomName(val).into()
+		EventContent::RoomName(val)
 	}
 }
 
@@ -49,7 +49,7 @@ impl EventType for RoomTopicContent {
 
 impl From<RoomTopicContent> for EventContent {
 	fn from(val: RoomTopicContent) -> Self {
-		EventContent::RoomTopic(val).into()
+		EventContent::RoomTopic(val)
 	}
 }
 
@@ -63,7 +63,7 @@ pub struct RoomAvatarContent {
 
 impl RoomAvatarContent {
 	pub fn new(file: Option<Cid>, info: ImageInfo) -> Self {
-		Self { file: file.map(Into::into), info }
+		Self { file, info }
 	}
 }
 
@@ -75,7 +75,7 @@ impl EventType for RoomAvatarContent {
 
 impl From<RoomAvatarContent> for EventContent {
 	fn from(val: RoomAvatarContent) -> Self {
-		EventContent::RoomAvatar(val).into()
+		EventContent::RoomAvatar(val)
 	}
 }
 
@@ -99,6 +99,6 @@ impl EventType for PinnedEventsContent {
 
 impl From<PinnedEventsContent> for EventContent {
 	fn from(val: PinnedEventsContent) -> Self {
-		EventContent::PinnedEvents(val).into()
+		EventContent::PinnedEvents(val)
 	}
 }

@@ -74,14 +74,11 @@ impl NetworkResolver for CoNetworkResolver {
 		// initializing  this should only happen on invite
 		//  as for every other thing the co root is always available
 		//  because we need it to actually write it
-		match networks_invite(&self.context, &id).await {
-			Ok(networks) => {
-				if !networks.is_empty() {
-					tracing::debug!(co = ?id, ?networks, "co-resolve-networks-invite");
-					return Ok(networks);
-				}
-			},
-			_ => {},
+		if let Ok(networks) = networks_invite(&self.context, &id).await {
+			if !networks.is_empty() {
+				tracing::debug!(co = ?id, ?networks, "co-resolve-networks-invite");
+				return Ok(networks);
+			}
 		}
 
 		// fail
@@ -96,11 +93,11 @@ async fn networks_co(
 	reducer: &CoReducer,
 ) -> Result<BTreeSet<Network>, anyhow::Error> {
 	let co_state = reducer.reducer_state().await.co();
-	let networks = state::networks(&storage, co_state).await?;
+	let networks = state::networks(storage, co_state).await?;
 	if networks.is_empty() {
 		// get participant networks
 		let identity_resolver = context.identity_resolver().await?;
-		let participants = state::participants_active(&storage, co_state).await?;
+		let participants = state::participants_active(storage, co_state).await?;
 		Ok(identities_networks(Some(&identity_resolver), participants.into_iter().map(|item| item.did))
 			.try_collect()
 			.await?)
@@ -125,5 +122,5 @@ async fn networks_invite(context: &CoContext, id: &CoId) -> Result<BTreeSet<Netw
 	let invite: CoInviteMetadata = local_co.storage().get_deserialized(invite_cid).await?;
 
 	// get networks
-	Ok(invite_networks(&context, &invite).await?)
+	invite_networks(context, &invite).await
 }

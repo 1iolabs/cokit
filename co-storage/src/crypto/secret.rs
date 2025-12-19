@@ -15,8 +15,7 @@ impl Secret {
 
 	/// Generate random secret of given size.
 	pub fn generate(size: usize) -> Self {
-		let mut secret: Vec<u8> = Vec::with_capacity(size);
-		secret.resize(size, 0);
+		let mut secret: Vec<u8> = vec![0; size];
 		OsRng.fill_bytes(secret.as_mut_slice());
 		Self::new(secret)
 	}

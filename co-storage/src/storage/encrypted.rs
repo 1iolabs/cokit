@@ -150,11 +150,11 @@ where
 		Ok(if MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
 			// get block
 			let mut block =
-				EncryptedBlock::try_from(self.next.get(&cid).await?).map_err(|e| StorageError::Internal(e.into()))?;
+				EncryptedBlock::try_from(self.next.get(cid).await?).map_err(|e| StorageError::Internal(e.into()))?;
 
 			// make inline
 			if let Some(blocks) = block.payload.blocks() {
-				let blocks = stream::iter(blocks.into_iter().cloned())
+				let blocks = stream::iter(blocks.iter().cloned())
 					.map(|cid| {
 						let next = self.next.clone();
 						async move { next.get(&cid).await }
@@ -249,7 +249,7 @@ where
 		//  Question: are there any valid cases for not unencrypted and not known reference?
 		// 	  Yes: encrypted local CO stores references to unencrypted shared CO.
 		let mut references = extended_block.options.references.unwrap_or_default();
-		if self.links.has_links(&cid) {
+		if self.links.has_links(cid) {
 			// links
 			//  filter out already mapped links
 			let links = self.links.links(&block)?.filter(|link| !references.contains_key(link));
@@ -319,7 +319,7 @@ where
 	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
 		// transform?
 		if self.transform && MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
-			return self.get_unencrypted(&cid).await;
+			return self.get_unencrypted(cid).await;
 		}
 
 		// default
@@ -396,7 +396,7 @@ where
 	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
 		EncryptedBlockStorage {
 			key: self.key.clone(),
-			algorithm: self.algorithm.clone(),
+			algorithm: self.algorithm,
 			links: self.links.clone(),
 			reference_mode: self.reference_mode.clone(),
 			mapping: if settings.clear {
@@ -432,7 +432,7 @@ where
 
 		// try to decrypt
 		if MultiCodec::is(plain, KnownMultiCodec::CoEncryptedBlock) {
-			if let Some(block) = self.get_unencrypted(plain).await.ok() {
+			if let Ok(block) = self.get_unencrypted(plain).await {
 				return Some(*block.cid());
 			}
 		}
@@ -501,8 +501,8 @@ impl EncryptionReferenceMode {
 		S: BlockStorage,
 	{
 		// encrypted block reference in plain data
-		let is_unreleated_encrypted = MultiCodec::is(&reference, KnownMultiCodec::CoEncryptedBlock);
-		let is_co_reference = MultiCodec::is(&parent, KnownMultiCodec::CoReference);
+		let is_unreleated_encrypted = MultiCodec::is(reference, KnownMultiCodec::CoEncryptedBlock);
+		let is_co_reference = MultiCodec::is(parent, KnownMultiCodec::CoReference);
 
 		// evaluate
 		match &self {
@@ -543,7 +543,7 @@ impl EncryptedBlockStorageMapping {
 	{
 		// load
 		let mut mapping = BlockMapping::new();
-		mapping.read_mappings(&storage, map).await?;
+		mapping.read_mappings(storage, map).await?;
 
 		// insert
 		//  we dont use read_mappings directly because of possible deadlocks and because it involves IO.
@@ -590,7 +590,7 @@ impl EncryptedBlockStorageMapping {
 	/// Map multiple Cids into an Map.
 	pub async fn get_mapping(&self, keys: impl IntoIterator<Item = Cid>) -> BTreeMap<Cid, Option<Cid>> {
 		let mapping = self.mapping.read().unwrap();
-		let parent = if let Some(parent) = &self.parent { Some(parent.read().unwrap()) } else { None };
+		let parent = self.parent.as_ref().map(|parent| parent.read().unwrap());
 		keys.into_iter()
 			.map(|key| {
 				let value = match mapping.get(&key) {
@@ -720,7 +720,7 @@ impl BlockMapping {
 	}
 
 	pub fn extend(&mut self, items: impl IntoIterator<Item = (Cid, Cid)>) {
-		self.map.extend(items.into_iter().map(|(key, value)| (key, value)));
+		self.map.extend(items.into_iter());
 	}
 
 	pub fn append(&mut self, other: &mut BlockMapping) {

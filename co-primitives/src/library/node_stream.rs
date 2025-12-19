@@ -87,7 +87,7 @@ where
 				match get.poll_unpin(cx) {
 					Poll::Ready(Ok(node)) => match node.read(&self.filter) {
 						Either::Left(links) => {
-							self.stack.extend(links.into_iter());
+							self.stack.extend(links);
 							continue;
 						},
 						Either::Right(entries) => {

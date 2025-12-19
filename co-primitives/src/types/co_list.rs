@@ -72,7 +72,7 @@ impl<'de> Deserialize<'de> for CoListIndex {
 		D: serde::Deserializer<'de>,
 	{
 		let bytes: (&Bytes, &Bytes) = Deserialize::deserialize(deserializer)?;
-		let dec = (decode::u64(&bytes.0).map_err(D::Error::custom)?, decode::u64(&bytes.1).map_err(D::Error::custom)?);
+		let dec = (decode::u64(bytes.0).map_err(D::Error::custom)?, decode::u64(bytes.1).map_err(D::Error::custom)?);
 		Ok(Self(Ratio::new(dec.0 .0, dec.1 .0)))
 	}
 }
@@ -96,7 +96,7 @@ where
 		for value in iter.into_iter() {
 			transaction.push(value).await?;
 		}
-		Ok(transaction.store().await?)
+		transaction.store().await
 	}
 
 	/// Whether this collection is empty.
@@ -227,7 +227,7 @@ where
 	pub async fn update_or_insert<S, F>(&mut self, storage: &S, key: CoListIndex, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
-		F: FnOnce(&mut V) -> () + Send,
+		F: FnOnce(&mut V) + Send,
 		S: BlockStorage + Clone + 'static,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
@@ -260,7 +260,7 @@ where
 	/// Update value ignore if key not exists.
 	pub async fn update<S, F>(&mut self, storage: &S, key: CoListIndex, update: F) -> Result<(), StorageError>
 	where
-		F: FnOnce(&mut V) -> () + Send,
+		F: FnOnce(&mut V) + Send,
 		S: BlockStorage + Clone + 'static,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
@@ -419,7 +419,7 @@ where
 	pub async fn insert(&mut self, index: CoListIndex, value: V) -> Result<CoListIndex, StorageError> {
 		// find index + 1 items
 		let items: Vec<(CoListIndex, V)> = self.tree.stream_query(Some(index)).take(2).try_collect().await?;
-		let result = match (items.get(0), items.get(1)) {
+		let result = match (items.first(), items.get(1)) {
 			(Some(_), None) => index.next(),
 			(Some((first, _)), Some((second, _))) => first.between(second),
 			_ => return Err(StorageError::InvalidArgument(anyhow!("Index not found: {:?}", index))),
@@ -436,7 +436,7 @@ where
 	pub async fn insert_before(&mut self, index: CoListIndex, value: V) -> Result<CoListIndex, StorageError> {
 		// find index - 1 items
 		let items: Vec<(CoListIndex, V)> = self.tree.reverse_stream_query(Some(index)).take(2).try_collect().await?;
-		let result = match (items.get(0), items.get(1)) {
+		let result = match (items.first(), items.get(1)) {
 			(Some(_), None) => index.prev(),
 			(Some((first, _)), Some((second, _))) => first.between(second),
 			_ => return Err(StorageError::InvalidArgument(anyhow!("Index not found: {:?}", index))),
@@ -494,7 +494,7 @@ where
 	{
 		if let Some(key) = self.max_key().await? {
 			self.max_key = None;
-			Ok(self.remove(key.clone()).await?.map(|value| (key, value)))
+			Ok(self.remove(key).await?.map(|value| (key, value)))
 		} else {
 			Ok(None)
 		}
@@ -506,7 +506,7 @@ where
 		S: BlockStorage + Clone + 'static,
 	{
 		if let Some(key) = self.tree.min_key().await? {
-			Ok(self.remove(key.clone()).await?.map(|value| (key, value)))
+			Ok(self.remove(key).await?.map(|value| (key, value)))
 		} else {
 			Ok(None)
 		}
@@ -526,7 +526,7 @@ where
 	pub async fn update_or_insert<F>(&mut self, key: CoListIndex, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
-		F: FnOnce(&mut V) -> () + Send,
+		F: FnOnce(&mut V) + Send,
 	{
 		let mut item = self.get(&key).await?.unwrap_or_default();
 		update(&mut item);
@@ -550,7 +550,7 @@ where
 	/// Update value, ignore if key not exists.
 	pub async fn update<F>(&mut self, key: CoListIndex, update: F) -> Result<(), StorageError>
 	where
-		F: FnOnce(&mut V) -> () + Send,
+		F: FnOnce(&mut V) + Send,
 	{
 		if let Some(mut item) = self.get(&key).await? {
 			update(&mut item);

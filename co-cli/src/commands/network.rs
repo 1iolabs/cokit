@@ -22,6 +22,6 @@ pub enum Commands {
 
 pub async fn command(context: &CliContext, cli: &Cli, network_command: &Command) -> Result<ExitCode, anyhow::Error> {
 	match &network_command.command {
-		Commands::Listen(command) => listen::command(context, cli, &network_command, command).await,
+		Commands::Listen(command) => listen::command(context, cli, network_command, command).await,
 	}
 }

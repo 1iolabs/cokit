@@ -26,7 +26,7 @@ pub fn heads_message_receive(
 	let message_type = HeadsMessage::message_type();
 	let result = match action {
 		Action::DidCommReceive { peer, message } => {
-			if &message.header().message_type == &message_type {
+			if message.header().message_type == message_type {
 				let heads_message: Option<HeadsMessage> = message.body_deserialize().ok();
 				if let Some(heads_message) = heads_message {
 					let header = PeerDidCommHeader::from(message.header().clone());
@@ -194,7 +194,7 @@ async fn handle_request_heads(
 	};
 
 	// result
-	Ok(create_heads_message(&context, &co_reducer, body, Some(parent_message_id), peer).await?)
+	create_heads_message(&context, &co_reducer, body, Some(parent_message_id), peer).await
 }
 
 async fn create_heads_message(
@@ -205,7 +205,7 @@ async fn create_heads_message(
 	to: PeerId,
 ) -> anyhow::Result<Action> {
 	// identity
-	let identity = network_identity(&context, &co_reducer, None).await?;
+	let identity = network_identity(context, co_reducer, None).await?;
 
 	// message
 	let mut header = HeadsMessage::create_header();
@@ -217,7 +217,7 @@ async fn create_heads_message(
 }
 
 async fn create_heads_body(co: &CoReducer) -> HeadsMessage {
-	HeadsMessage::Heads(co.id().clone(), MappedCoReducerState::new_co(&co).await.external().weak_heads())
+	HeadsMessage::Heads(co.id().clone(), MappedCoReducerState::new_co(co).await.external().weak_heads())
 }
 
 async fn verify_from_participant(co_reducer: &CoReducer, from: &Option<Did>) -> anyhow::Result<()> {

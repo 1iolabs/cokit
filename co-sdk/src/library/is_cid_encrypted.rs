@@ -12,7 +12,7 @@ where
 			return true;
 		}
 	}
-	return false;
+	false
 }
 
 #[cfg(test)]

@@ -84,7 +84,7 @@ impl TagValue {
 			TagValue::Bool(v) => v == &bool::default(),
 			TagValue::Integer(v) => v == &Default::default(),
 			TagValue::Float(v) => *v == TotalFloat64::from(0f64),
-			TagValue::String(v) => v == "",
+			TagValue::String(v) => v.is_empty(),
 			TagValue::Bytes(v) => v.is_empty(),
 			TagValue::List(v) => v.is_empty(),
 			TagValue::Map(v) => v.is_empty(),
@@ -111,7 +111,7 @@ impl From<TagValue> for Ipld {
 			TagValue::Bytes(i) => Ipld::Bytes(i),
 			TagValue::List(i) => Ipld::List(i.into_iter().map(|e| e.into()).collect()),
 			TagValue::Map(i) => Ipld::Map(i.into_iter().map(|(k, v)| (k, v.into())).collect()),
-			TagValue::Link(i) => Ipld::Link(i.into()),
+			TagValue::Link(i) => Ipld::Link(i),
 		}
 	}
 }
@@ -126,7 +126,7 @@ impl From<Ipld> for TagValue {
 			Ipld::Bytes(i) => TagValue::Bytes(i),
 			Ipld::List(i) => TagValue::List(i.into_iter().map(|e| e.into()).collect()),
 			Ipld::Map(i) => TagValue::Map(i.into_iter().map(|(k, v)| (k, v.into())).collect()),
-			Ipld::Link(i) => TagValue::Link(i.into()),
+			Ipld::Link(i) => TagValue::Link(i),
 		}
 	}
 }
@@ -184,7 +184,7 @@ impl TagPattern for Tag {
 }
 impl TagMatcher for Tag {
 	fn matches_tag(&self, key: &str, value: &TagValue) -> bool {
-		&self.0 == key && &self.1 == value
+		self.0 == key && &self.1 == value
 	}
 }
 
@@ -371,12 +371,10 @@ impl Display for Tags {
 			// separator
 			if first {
 				first = false;
+			} else if f.is_human_readable() {
+				write!(f, ", ")?;
 			} else {
-				if f.is_human_readable() {
-					write!(f, ", ")?;
-				} else {
-					write!(f, ",")?;
-				}
+				write!(f, ",")?;
 			}
 
 			// key/value
@@ -442,7 +440,7 @@ impl TagsExpr {
 		match &mut self {
 			TagsExpr::And(items) => {
 				items.push(other);
-				return self;
+				self
 			},
 			_ => TagsExpr::And(vec![self, other]),
 		}
@@ -452,7 +450,7 @@ impl TagsExpr {
 		match &mut self {
 			TagsExpr::Or(items) => {
 				items.push(other);
-				return self;
+				self
 			},
 			_ => TagsExpr::Or(vec![self, other]),
 		}

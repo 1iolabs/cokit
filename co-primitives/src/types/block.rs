@@ -51,7 +51,7 @@ impl<S: StoreParams> Block<S> {
 	}
 
 	pub fn cid_data_digest(digest: impl MultihashDigest<64>, codec: impl Into<u64>, data: &[u8]) -> Cid {
-		Cid::new_v1(codec.into(), digest.digest(&data))
+		Cid::new_v1(codec.into(), digest.digest(data))
 	}
 
 	/// Returns the cid.

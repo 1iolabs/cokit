@@ -58,7 +58,7 @@ async fn start(context: CoContext, settings: NetworkSettings) -> Result<(), anyh
 	let network = Actor::spawn_with(
 		context.tasks(),
 		tags!("type": "network", "application": context.identifier()),
-		Network::default(),
+		Network,
 		network_initialize,
 	)?;
 
