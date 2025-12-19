@@ -419,7 +419,7 @@ where
 						// log
 						#[cfg(feature = "logging-verbose")]
 						{
-							if co_primitives::MultiCodec::is_cbor(&cid) {
+							if co_primitives::MultiCodec::is_cbor(cid) {
 								tracing::trace!(?cid, ipld = ?co_primitives::from_cbor::<ipld_core::ipld::Ipld>(&data), "set");
 							} else {
 								tracing::trace!(?cid, "set");

@@ -3,6 +3,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::cell::RefCell;
 use tokio::runtime::Builder;
 
+#[allow(clippy::await_holding_refcell_ref)]
 fn lsm_tree_map_benchmark(c: &mut Criterion) {
 	c.bench_function("insert_and_get", |b| {
 		let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
