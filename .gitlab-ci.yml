@@ -35,6 +35,10 @@ test:
     RUST_BACKTRACE: "full"
   script:
     - cargo test
+  artifacts:
+    when: on_failure
+    paths:
+      - data
 
 # run benchmarks
 bench:
