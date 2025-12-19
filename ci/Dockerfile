@@ -1,4 +1,4 @@
-FROM rust:1.88
+FROM rust:1.91-bookworm
 
 # OS
 RUN apt-get update \

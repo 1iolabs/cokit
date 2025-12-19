@@ -7,7 +7,7 @@ stages:
   - publish
 
 variables:
-  RUST_VERSION: "1.88"
+  RUST_VERSION: "1.91"
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
 
 cache: &global_cache
@@ -34,7 +34,7 @@ lint:
     <<: *global_cache
   script:
     - cargo +nightly-2025-12-09 fmt --check
-    - cargo clippy --workspace --all-targets --all-features
+    - cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 # verify all tests are running to success
 test:
