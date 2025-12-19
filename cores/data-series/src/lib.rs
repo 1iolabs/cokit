@@ -300,6 +300,7 @@ fn reduce_data(
 	state
 }
 
+#[allow(clippy::too_many_arguments)]
 fn reduce_pending_data(
 	storage: &mut dyn Storage,
 	did: &Did,

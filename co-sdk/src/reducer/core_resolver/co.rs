@@ -9,7 +9,7 @@ use co_core_co::{CoAction, CreateAction};
 use co_identity::{LocalIdentity, PrivateIdentity};
 use co_primitives::ReducerAction;
 use co_runtime::{Core, RuntimeContext, RuntimePool};
-use co_storage::{BlockStorage, BlockStorageExt, ExtendedBlockStorage};
+use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use ipld_core::ipld::Ipld;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -32,7 +32,7 @@ impl CoCoreResolver {
 		self.mapping.get(&wasm).cloned().unwrap_or(Core::Wasm(wasm))
 	}
 
-	async fn apply_core_state_to_root<S: BlockStorage + 'static>(
+	async fn apply_core_state_to_root<S>(
 		&self,
 		storage: &S,
 		runtime: RuntimePool,
@@ -61,7 +61,7 @@ impl CoCoreResolver {
 			.context("apply to root")
 	}
 
-	async fn core_state_binary<S: BlockStorage + 'static>(
+	async fn core_state_binary<S>(
 		&self,
 		storage: &S,
 		state: &Option<Cid>,

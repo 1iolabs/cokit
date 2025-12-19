@@ -279,7 +279,7 @@ fn into_block_result<P: StoreParams>(cid: &Cid, result: std::io::Result<Vec<u8>>
 	into_storage_result(cid, result).map(|data| Block::new_unchecked(*cid, data))
 }
 
-fn to_cid_path(path: &PathBuf, cid: &Cid, prefix: &str) -> PathBuf {
+fn to_cid_path(path: &Path, cid: &Cid, prefix: &str) -> PathBuf {
 	let mut folder = cid
 		.hash()
 		.digest()
@@ -287,7 +287,7 @@ fn to_cid_path(path: &PathBuf, cid: &Cid, prefix: &str) -> PathBuf {
 		// .next_chunk::<2>()
 		.map(|chunk| format!("{:02x}", chunk))
 		.take(2)
-		.fold(path.clone(), |mut result, next| {
+		.fold(path.to_owned(), |mut result, next| {
 			result.push(next);
 			result
 		});

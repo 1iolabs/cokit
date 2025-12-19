@@ -39,6 +39,7 @@ pub struct StoragePinningContext {
 /// Apply pinning to storage core.
 /// Return the next `local_state` if something has changed.
 #[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all)]
+#[allow(clippy::too_many_arguments)]
 pub async fn storage_pinning<S>(
 	context: &StoragePinningContext,
 	max_duration: Option<Duration>,

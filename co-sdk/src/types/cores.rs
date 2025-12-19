@@ -57,10 +57,10 @@ impl Cores {
 	/// - [`CO_CORE_NAME_KEYSTORE`]
 	/// - [`CO_CORE_NAME_MEMBERSHIP`]
 	pub fn to_core_name(crate_name: &str) -> &str {
-		if crate_name.starts_with("co-core-") {
-			return &crate_name["co-core-".len()..];
+		match crate_name.strip_prefix("co-core-") {
+			Some(stripped) => stripped,
+			None => crate_name,
 		}
-		crate_name
 	}
 
 	/// Get WebAssembly versions CIDs of the built-in cores.
@@ -106,10 +106,13 @@ impl Cores {
 }
 
 /// Get native core for name.
-/// Panics:
+///
+/// # Panics
 /// - When a core listed in Cores.toml are not present in the match below. This can only happen when the list is out of
 ///   sync.
-/// Note: When changing this you have to run `co core build builtin` to get ``
+///
+/// # Note
+/// When changing this you have to run `co core build builtin` to get a new `Cargo.toml`
 fn get_native(name: &str) -> Core {
 	match name {
 		CO_CORE_CO => Core::native_async::<co_core_co::Co, co_core_co::CoAction>(),

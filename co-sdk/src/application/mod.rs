@@ -1,3 +1,4 @@
+#[allow(clippy::module_inception)]
 pub mod application;
 pub mod co_context;
 pub mod identity;

@@ -39,6 +39,7 @@ pub struct CoReducer {
 	verify_links: Option<BlockLinks>,
 }
 impl CoReducer {
+	#[allow(clippy::too_many_arguments)]
 	pub(crate) fn spawn(
 		application_handle: ActorHandle<ApplicationMessage>,
 		application_identifier: String,

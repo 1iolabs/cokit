@@ -23,7 +23,7 @@ impl<S: AnyBlockStorage> JoinStateResolver<S> {
 		Self(vec![DynamicStateResolver::new(next)])
 	}
 
-	pub fn from_iter<T: IntoIterator<Item = DynamicStateResolver<S>>>(iter: T) -> Option<Self> {
+	pub fn new_iter<T: IntoIterator<Item = DynamicStateResolver<S>>>(iter: T) -> Option<Self> {
 		let items = iter.into_iter().collect::<Vec<_>>();
 		if items.is_empty() {
 			None

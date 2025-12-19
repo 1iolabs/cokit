@@ -68,7 +68,6 @@ impl From<Cli> for CoSettings {
 			log_level: cli.log_level,
 			no_default_features: cli.no_default_features,
 			feature: cli.feature,
-			..Default::default()
 		}
 	}
 }

@@ -81,7 +81,6 @@ impl DidCommPrivateContext {
 	/// # Arguments
 	/// - `body` - JSON String.
 	pub fn jwe(&self, to: &DidCommPublicContext, header: DidCommHeader, body: &str) -> Result<String, SignError> {
-		let header = header;
 		if !header.to.contains(&to.did) {
 			return Err(SignError::InvalidArgument(anyhow::anyhow!("header must contain recipent: to: {}", to.did)));
 		}

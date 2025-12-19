@@ -148,6 +148,7 @@ pub struct Reducer<S, R> {
 	/// Change handlers.
 	change_handlers: Vec<Box<dyn ReducerChangedHandler<S, R>>>,
 	/// State/Heads watcher.
+	#[allow(clippy::type_complexity)]
 	watch: (watch::Sender<Option<(Cid, BTreeSet<Cid>)>>, watch::Receiver<Option<(Cid, BTreeSet<Cid>)>>),
 	/// Date.
 	date: DynamicCoDate,
@@ -753,10 +754,7 @@ impl ReducerChangeContext {
 
 	/// Whether this change was caused by initialize.
 	pub fn is_initialize(&self) -> bool {
-		match self.cause {
-			ReducerChangeCause::Initialize => true,
-			_ => false,
-		}
+		matches!(self.cause, ReducerChangeCause::Initialize)
 	}
 }
 
@@ -773,10 +771,7 @@ enum ReducerChangeCause {
 impl ReducerChangeCause {
 	/// Whether this change was caused locally.
 	pub fn is_local(&self) -> bool {
-		match self {
-			ReducerChangeCause::Push => true,
-			_ => false,
-		}
+		matches!(self, ReducerChangeCause::Push)
 	}
 }
 
@@ -1136,7 +1131,7 @@ mod tests {
 			.unwrap();
 		let h1 = reducer1.heads().first().unwrap();
 		let h2 = reducer2.heads().first().unwrap();
-		println!("{} cmp {} = {:?}", h1, h2, h1.cmp(&h2));
+		println!("{} cmp {} = {:?}", h1, h2, h1.cmp(h2));
 		// bafyr4iff65doekq7e6jbbr6lfcaqw4yygr2xwnhcewk5n4x7656xgo3smq
 		// cmp
 		// bafyr4id7kpr5kduefd4j4s4lixevlrkbpbym2daylp7tztnqcdogg6ommq
@@ -1240,7 +1235,7 @@ mod tests {
 			.unwrap();
 		let h1 = reducer1.heads().first().unwrap();
 		let h2 = reducer2.heads().first().unwrap();
-		println!("{} cmp {} = {:?}", h1, h2, h1.cmp(&h2));
+		println!("{} cmp {} = {:?}", h1, h2, h1.cmp(h2));
 		// bafyr4ib2txm6m2l4kbjghdpotl7tt54fzvwazsqs3lnoelwrbt4odqxzz4
 		// cmp
 		// bafyr4id7kpr5kduefd4j4s4lixevlrkbpbym2daylp7tztnqcdogg6ommq

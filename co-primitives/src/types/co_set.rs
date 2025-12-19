@@ -186,7 +186,7 @@ where
 
 	/// Remove key from set and return `true` if it was present.
 	pub async fn remove(&mut self, key: K) -> Result<bool, StorageError> {
-		if let Some(_) = self.tree.get(&key).await? {
+		if (self.tree.get(&key).await?).is_some() {
 			self.tree.remove(key).await?;
 			Ok(true)
 		} else {

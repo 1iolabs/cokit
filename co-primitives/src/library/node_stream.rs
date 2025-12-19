@@ -138,7 +138,7 @@ mod tests {
 		}
 
 		// stream
-		let list = NodeStream::from_link(storage.clone(), root.into())
+		let list = NodeStream::from_link(storage.clone(), root)
 			.try_collect::<Vec<i32>>()
 			.await
 			.unwrap();
@@ -160,7 +160,7 @@ mod tests {
 		}
 
 		// stream
-		let list = NodeStream::from_link(storage.clone(), root.into())
+		let list = NodeStream::from_link(storage.clone(), root)
 			.with_reverse()
 			.try_collect::<Vec<i32>>()
 			.await

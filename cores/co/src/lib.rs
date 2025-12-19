@@ -160,18 +160,11 @@ pub enum ParticipantState {
 }
 impl ParticipantState {
 	pub fn is_active(&self) -> bool {
-		match self {
-			ParticipantState::Active => true,
-			_ => false,
-		}
+		matches!(self, ParticipantState::Active)
 	}
 
 	pub fn has_access(&self) -> bool {
-		match self {
-			ParticipantState::Active => true,
-			ParticipantState::Invite => true,
-			_ => false,
-		}
+		matches!(self, ParticipantState::Active | ParticipantState::Invite)
 	}
 }
 

@@ -1,6 +1,6 @@
 use crate::{
 	library::sample_stream::sample_stream_ordered_first_last,
-	reducer::state_resolver::{StateResolver, StateResolverContext},
+	reducer::state_resolver::{StateResolver, StateResolverContext, StateStream},
 	ReducerChangeContext,
 };
 use anyhow::anyhow;
@@ -8,10 +8,7 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{AnyBlockStorage, SignedEntry};
 use co_storage::{BlockStorageExt, StorageError};
-use futures::{
-	stream::{self, BoxStream},
-	Stream, StreamExt, TryStreamExt,
-};
+use futures::{stream, Stream, StreamExt, TryStreamExt};
 use std::{collections::BTreeSet, fmt::Debug, marker::PhantomData, mem::take};
 
 pub struct StaticStateResolver<S> {
@@ -107,11 +104,7 @@ impl<S: AnyBlockStorage> StateResolver<S> for StaticStateResolver<S> {
 		Ok(None)
 	}
 
-	fn provide_roots(
-		&mut self,
-		_storage: &S,
-		_context: &StateResolverContext,
-	) -> Option<BoxStream<'static, Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>> {
+	fn provide_roots(&mut self, _storage: &S, _context: &StateResolverContext) -> Option<StateStream> {
 		Some(
 			stream::iter(self.snapshots.clone())
 				.map(|(state, heads)| (Some(state), heads))

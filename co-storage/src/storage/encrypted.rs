@@ -720,7 +720,7 @@ impl BlockMapping {
 	}
 
 	pub fn extend(&mut self, items: impl IntoIterator<Item = (Cid, Cid)>) {
-		self.map.extend(items.into_iter());
+		self.map.extend(items);
 	}
 
 	pub fn append(&mut self, other: &mut BlockMapping) {
@@ -905,7 +905,7 @@ mod tests {
 	use cid::Cid;
 	use co_primitives::{BlockSerializer, DefaultParams, StorageError, StoreParams};
 	use serde::{Deserialize, Serialize};
-	use std::iter::repeat;
+	use std::iter::repeat_n;
 
 	#[derive(Debug, Serialize, Deserialize)]
 	struct Test {
@@ -917,7 +917,7 @@ mod tests {
 		// storage
 		let memory = MemoryBlockStorage::default();
 		let algorithm = Algorithm::default();
-		let key = Secret::new(repeat(42).take(algorithm.key_size()).collect());
+		let key = Secret::new(repeat_n(42, algorithm.key_size()).collect());
 		let encryption = EncryptedBlockStorage::new(memory.clone(), key, algorithm, Default::default());
 
 		// block
@@ -940,7 +940,7 @@ mod tests {
 		// storage
 		let memory = MemoryBlockStorage::new();
 		let algorithm = Algorithm::default();
-		let key = Secret::new(repeat(42).take(algorithm.key_size()).collect());
+		let key = Secret::new(repeat_n(42, algorithm.key_size()).collect());
 		let encryption = EncryptedBlockStorage::new(memory.clone(), key.clone(), algorithm, Default::default());
 
 		// blocks

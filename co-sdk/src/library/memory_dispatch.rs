@@ -50,6 +50,7 @@ where
 	/// - `storage` - The base storage of the CO.
 	/// - `identity` - The identity to push actions.
 	/// - `core` - The core name to push to.
+	#[allow(clippy::too_many_arguments)]
 	pub async fn new(
 		storage: Storage,
 		runtime: Runtime,

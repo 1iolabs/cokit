@@ -3,17 +3,14 @@ use co_core_co::CoAction;
 use co_sdk::{
 	build_core, crate_repository_path,
 	state::{self, query_core, QueryExt},
-	ApplicationBuilder, BlockStorage, DidKeyIdentity, Identity, MonotonicCoDate, MonotonicCoUuid, CO_CORE_NAME_CO,
+	AnyBlockStorage, ApplicationBuilder, DidKeyIdentity, Identity, MonotonicCoDate, MonotonicCoUuid, CO_CORE_NAME_CO,
 	CO_CORE_NAME_KEYSTORE,
 };
 use co_test::{test_application_identifier, test_log_path, test_tmp_dir, TmpDir};
 use example_counter::CounterAction;
 use std::collections::BTreeMap;
 
-async fn counter_core<S>(storage: &S) -> Cid
-where
-	S: BlockStorage + 'static,
-{
+async fn counter_core(storage: &impl AnyBlockStorage) -> Cid {
 	let repository_path = crate_repository_path(true).unwrap();
 	let core_path = repository_path.join("examples/counter");
 	let counter = build_core(repository_path, core_path)
@@ -31,7 +28,7 @@ async fn test_local_smoke() {
 	let tmp = test_tmp_dir();
 
 	// create
-	let identity = DidKeyIdentity::generate(Some(&vec![1; 32]));
+	let identity = DidKeyIdentity::generate(Some(&[1; 32]));
 	{
 		let application =
 			ApplicationBuilder::new_with_path(test_application_identifier("test_local_smoke"), tmp.path().to_owned())
@@ -122,7 +119,7 @@ async fn test_local_smoke_encrypted() {
 #[tokio::test]
 async fn test_local_push() {
 	// app
-	let application_identifier = format!("test_local_push-{}", uuid::Uuid::new_v4().to_string());
+	let application_identifier = format!("test_local_push-{}", uuid::Uuid::new_v4());
 	let tmp = TmpDir::new("co");
 	let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
 		.with_bunyan_logging(Some(test_log_path()))
@@ -161,7 +158,7 @@ async fn test_local_push() {
 #[tokio::test]
 async fn test_local_push_encrypted() {
 	// app
-	let application_identifier = format!("test_local_push_encrypted-{}", uuid::Uuid::new_v4().to_string());
+	let application_identifier = format!("test_local_push_encrypted-{}", uuid::Uuid::new_v4());
 	let tmp = TmpDir::new("co");
 	let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
 		.with_bunyan_logging(Some(test_log_path()))

@@ -134,6 +134,7 @@ impl SharedCoBuilder {
 		find_co_secret_by_reference(&self.parent, &key, Some(&self.keystore_core_name)).await
 	}
 
+	#[allow(clippy::too_many_arguments)]
 	pub async fn build<I>(
 		self,
 		tasks: TaskSpawner,
@@ -554,7 +555,8 @@ impl SharedCoCreator {
 		Self { keystore_core_name, ..self }
 	}
 
-	/// TODO: Cleanup when something fails?
+	// TODO: Cleanup when something fails?
+	#[allow(clippy::too_many_arguments)]
 	pub async fn create<I>(
 		self,
 		storage: CoStorage,

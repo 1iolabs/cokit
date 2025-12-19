@@ -348,7 +348,7 @@ mod tests {
 			swarm.listen_on("/ip4/127.0.0.1/tcp/0".parse().unwrap()).unwrap();
 			while swarm.next().now_or_never().is_some() {}
 			let addr = Swarm::listeners(&swarm).next().unwrap().clone();
-			Self { peer_id: swarm.local_peer_id().clone(), addr, swarm }
+			Self { peer_id: *swarm.local_peer_id(), addr, swarm }
 		}
 
 		fn peer_id(&self) -> PeerId {
@@ -357,11 +357,7 @@ mod tests {
 
 		fn add_address(&mut self, peer: &Peer) {
 			self.swarm
-				.dial(
-					DialOpts::peer_id(peer.peer_id.clone())
-						.addresses(vec![peer.addr.clone()])
-						.build(),
-				)
+				.dial(DialOpts::peer_id(peer.peer_id).addresses(vec![peer.addr.clone()]).build())
 				.unwrap();
 			// when we dail just the peerid we always get an dail error because we have no addresses
 			// self.swarm.behaviour_mut().add_explicit_peer(co, peer.peer_id.clone());
@@ -387,40 +383,34 @@ mod tests {
 		join!(
 			async {
 				loop {
-					match peer1.swarm().next().await {
-						Some(SwarmEvent::Behaviour(event)) => {
-							match event {
-								didcomm::Event::Sent { peer_id, message } => {
-									assert_eq!(peer_id, peer_id2);
-									assert_eq!(message, send_message);
-								},
-								e => panic!("peer1: invalid event: {:?}", e),
-							}
-							break;
-						},
-						_ => {},
+					if let Some(SwarmEvent::Behaviour(event)) = peer1.swarm().next().await {
+						match event {
+							didcomm::Event::Sent { peer_id, message } => {
+								assert_eq!(peer_id, peer_id2);
+								assert_eq!(message, send_message);
+							},
+							e => panic!("peer1: invalid event: {:?}", e),
+						}
+						break;
 					}
 				}
 			},
 			async {
 				loop {
-					match peer2.swarm().next().await {
-						Some(SwarmEvent::Behaviour(event)) => {
-							match event {
-								didcomm::Event::Received { peer_id, message } => {
-									assert_eq!(peer_id, peer_id1);
-									if let Message::PlainJson { header, body } = message {
-										assert_eq!(header, send_header);
-										assert_eq!(serde_json::from_str::<&str>(&body).unwrap(), send_body);
-									} else {
-										panic!("peer2: invalid message: {:?}", message);
-									}
-								},
-								e => panic!("peer2: invalid event: {:?}", e),
-							}
-							break;
-						},
-						_ => {},
+					if let Some(SwarmEvent::Behaviour(event)) = peer2.swarm().next().await {
+						match event {
+							didcomm::Event::Received { peer_id, message } => {
+								assert_eq!(peer_id, peer_id1);
+								if let Message::PlainJson { header, body } = message {
+									assert_eq!(header, send_header);
+									assert_eq!(serde_json::from_str::<&str>(&body).unwrap(), send_body);
+								} else {
+									panic!("peer2: invalid message: {:?}", message);
+								}
+							},
+							e => panic!("peer2: invalid event: {:?}", e),
+						}
+						break;
 					}
 				}
 			},
@@ -430,8 +420,8 @@ mod tests {
 	#[tokio::test]
 	async fn test_smoke() {
 		// identities
-		let identity1 = DidKeyIdentity::generate(Some(&vec![1; 32]));
-		let identity2 = DidKeyIdentity::generate(Some(&vec![2; 32]));
+		let identity1 = DidKeyIdentity::generate(Some(&[1; 32]));
+		let identity2 = DidKeyIdentity::generate(Some(&[2; 32]));
 
 		// peers
 		let mut peer1 = Peer::new(

@@ -26,7 +26,7 @@ pub enum TaskState {
 	Done,
 }
 impl TaskState {
-	pub fn to_list_name(&self) -> &str {
+	pub fn list_name(&self) -> &str {
 		match self {
 			TaskState::Backlog => LIST_NAME_BACKLOG,
 			TaskState::Doing => LIST_NAME_DOING,
@@ -281,7 +281,7 @@ pub async fn network_queue_task_doing(
 			CO_CORE_NAME_NETWORK_QUEUE,
 			&BoardAction::TaskMove {
 				from_list: Some(LIST_NAME_BACKLOG.to_owned()),
-				list: TaskState::Doing.to_list_name().to_string(),
+				list: TaskState::Doing.list_name().to_string(),
 				task: task.id.clone(),
 				after: None,
 				lock: TaskLock::Lock(lock_id.to_string()),
@@ -323,7 +323,7 @@ pub async fn network_queue_task_complete(
 			CO_CORE_NAME_NETWORK_QUEUE,
 			&BoardAction::TaskMove {
 				from_list: Some(LIST_NAME_BACKLOG.to_owned()),
-				list: to.to_list_name().to_string(),
+				list: to.list_name().to_string(),
 				task: task.id.clone(),
 				after: None,
 				lock: TaskLock::Unlock(lock_id.to_string()),
@@ -367,7 +367,7 @@ async fn ensure_network_queue_core(
 	identity: &LocalIdentity,
 	co: Co,
 ) -> Result<(), anyhow::Error> {
-	let _: () = if co.cores.get(CO_CORE_NAME_NETWORK_QUEUE.as_ref()).is_none() {
+	let _: () = if !co.cores.contains_key(CO_CORE_NAME_NETWORK_QUEUE.as_ref()) {
 		local_co
 			.push(
 				identity,

@@ -122,7 +122,6 @@ async fn handle_command(application: &Application, command: Command<<CoBlockStor
 				.ok();
 		},
 		Command::Set(co, block, settings, result) => {
-			let block = block;
 			result
 				.send(with_storage(application, &co, settings, |storage| async move { storage.set(block).await }).await)
 				.ok();

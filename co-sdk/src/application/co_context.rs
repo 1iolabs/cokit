@@ -218,6 +218,7 @@ pub(crate) struct CoContextInner {
 	cores: Cores,
 }
 impl CoContextInner {
+	#[allow(clippy::too_many_arguments)]
 	pub(crate) fn new(
 		settings: ApplicationSettings,
 		shutdown: CancellationToken,

@@ -363,9 +363,7 @@ where
 		_tags: &Tags,
 		blocks_max_memory: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
-		let mut result = OverlayBlocks::default();
-		result.blocks_max_memory = blocks_max_memory;
-		Ok(result)
+		Ok(OverlayBlocks { blocks_max_memory, ..Default::default() })
 	}
 
 	async fn shutdown(&self, _state: Self::State) -> Result<(), ActorError> {
@@ -800,10 +798,7 @@ impl OverlayBlock {
 	}
 
 	pub fn is_remove(&self) -> bool {
-		match self {
-			OverlayBlock::Remove => true,
-			_ => false,
-		}
+		matches!(self, OverlayBlock::Remove)
 	}
 }
 

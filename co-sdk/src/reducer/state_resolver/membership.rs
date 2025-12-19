@@ -1,16 +1,13 @@
 use crate::{
 	is_cid_encrypted,
-	reducer::state_resolver::{StateResolver, StateResolverContext},
+	reducer::state_resolver::{StateResolver, StateResolverContext, StateStream},
 	CoReducerState,
 };
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::AnyBlockStorage;
 use co_storage::BlockStorageContentMapping;
-use futures::{
-	stream::{self, BoxStream},
-	StreamExt,
-};
+use futures::{stream, StreamExt};
 use std::{collections::BTreeSet, fmt::Debug, future::ready, marker::PhantomData};
 
 pub struct MembershipStateResolver<S> {
@@ -85,11 +82,7 @@ where
 		Ok(None)
 	}
 
-	fn provide_roots(
-		&mut self,
-		_storage: &S,
-		_context: &StateResolverContext,
-	) -> Option<BoxStream<'static, Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>> {
+	fn provide_roots(&mut self, _storage: &S, _context: &StateResolverContext) -> Option<StateStream> {
 		Some(
 			stream::iter(self.snapshots.clone())
 				.filter_map(|(external, state)| ready(if !external { Some((state.0, state.1)) } else { None }))

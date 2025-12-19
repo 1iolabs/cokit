@@ -16,7 +16,7 @@ pub enum ErrorKind {
 
 impl From<ErrorKind> for ErrorContext {
 	fn from(val: ErrorKind) -> Self {
-		ErrorContext { kind: val, ..ErrorContext::default() }
+		ErrorContext { kind: val }
 	}
 }
 

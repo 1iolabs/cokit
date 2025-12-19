@@ -36,7 +36,7 @@ async fn counter_count(co: &CoReducer) -> i64 {
 #[tokio::test]
 async fn test_local_join() {
 	// app
-	let application_identifier = format!("test_local_join-{}", uuid::Uuid::new_v4().to_string());
+	let application_identifier = format!("test_local_join-{}", uuid::Uuid::new_v4());
 	let tmp = test_tmp_dir().without_clear();
 	let application1 = ApplicationBuilder::new_with_path(application_identifier.clone(), tmp.path().to_owned())
 		.with_bunyan_logging(Some(test_log_path()))

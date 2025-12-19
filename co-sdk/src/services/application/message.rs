@@ -5,6 +5,7 @@ use co_network::NetworkApi;
 use std::fmt::Debug;
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum ApplicationMessage {
 	/// Dispatch action.
 	Dispatch(Action),

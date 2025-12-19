@@ -205,10 +205,7 @@ mod tests {
 				TestAction::Greet => Some({
 					let actions = actions.clone();
 					let answer_with_world = async move {
-						let once_world = actions.once(|a| match a {
-							TestAction::Hello => true,
-							_ => false,
-						});
+						let once_world = actions.once(|a| matches!(a, TestAction::Hello));
 
 						// wait for world action
 						once_world.await?;

@@ -118,9 +118,7 @@ fn changed(
 	roots: impl IntoIterator<Item = CoReducerState>,
 ) {
 	if reducer_state.flush_info.is_none() {
-		let mut flush_info = FlushInfo::default();
-		flush_info.network = reducer_state.network_feature;
-		reducer_state.flush_info = Some(flush_info);
+		reducer_state.flush_info = Some(FlushInfo { network: reducer_state.network_feature, ..Default::default() });
 	}
 	if let Some(flush_info) = &mut reducer_state.flush_info {
 		if local {

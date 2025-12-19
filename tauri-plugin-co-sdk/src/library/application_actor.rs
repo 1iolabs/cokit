@@ -282,7 +282,7 @@ impl Actor for ApplicationActor {
 					pin_mut!(stream);
 					let mut actions = Vec::new();
 					while let Some(item) = stream.next().await {
-						let entry_block = item.map_err(|err| ActorError::Actor(err))?;
+						let entry_block = item.map_err(ActorError::Actor)?;
 
 						// resolve entry from block
 						let entry_payload = entry_block.entry().payload;

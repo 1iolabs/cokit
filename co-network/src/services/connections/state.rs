@@ -160,7 +160,7 @@ fn reduce_use(
 	actions: &mut Vec<ConnectionAction>,
 	networks: &BTreeSet<Network>,
 	id: &CoId,
-	from: &String,
+	from: &str,
 	time: &Instant,
 	create: bool,
 ) {
@@ -217,7 +217,7 @@ fn reduce_use(
 					id.clone(),
 					CoConnection {
 						id: id.clone(),
-						from: from.clone(),
+						from: from.to_owned(),
 						// keep_alive: *time + state.keep_alive,
 						networks: networks.clone(),
 					},
@@ -239,7 +239,7 @@ fn reduce_use(
 		let (connect, connected_peers) = if let Some(connected_network_peers) = connected_networks.remove(network) {
 			(None, connected_network_peers)
 		} else {
-			(Some(from.clone()), Default::default())
+			(Some(from.to_owned()), Default::default())
 		};
 
 		// networks: get/create
@@ -838,10 +838,6 @@ mod tests {
 		assert!(state.peers[&peer_id]
 			.network
 			.iter()
-			.find(|network| match network {
-				Network::DidDiscovery(did_discovery) if did_discovery.did == did => true,
-				_ => false,
-			})
-			.is_some());
+			.any(|network| matches!(network, Network::DidDiscovery(did_discovery) if did_discovery.did == did)));
 	}
 }

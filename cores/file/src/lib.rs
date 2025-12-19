@@ -133,24 +133,15 @@ impl Node {
 	}
 
 	pub fn is_dir(&self) -> bool {
-		match self {
-			Node::Folder(_) => true,
-			_ => false,
-		}
+		matches!(self, Node::Folder(_))
 	}
 
 	pub fn is_file(&self) -> bool {
-		match self {
-			Node::File(_) => true,
-			_ => false,
-		}
+		matches!(self, Node::File(_))
 	}
 
 	pub fn is_link(&self) -> bool {
-		match self {
-			Node::Link(_) => true,
-			_ => false,
-		}
+		matches!(self, Node::Link(_))
 	}
 
 	pub fn modify(
@@ -415,7 +406,7 @@ fn reduce_modify(
 	storage: &mut dyn Storage,
 	mut state: File,
 	path: &AbsolutePath,
-	modifications: &Vec<FileModification>,
+	modifications: &[FileModification],
 ) -> Result<File, anyhow::Error> {
 	let path = path.normalize()?;
 	let (parent_path, name) = path.parent_and_file_name_result()?;
@@ -839,7 +830,7 @@ mod tests {
 		};
 		let state = state.reduce(&action, &mut context);
 		let paths = state.nodes.collection(&context);
-		assert_eq!(paths.iter().map(|(k, _)| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/test", "/test/world"]);
+		assert_eq!(paths.keys().map(|k| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/test", "/test/world"]);
 		assert_eq!(names(&context, &state, "/"), vec!["test"]);
 		assert_eq!(names(&context, &state, "/test"), vec!["world"]);
 		assert_eq!(names(&context, &state, "/test/world"), vec!["test.txt"]);
@@ -861,7 +852,7 @@ mod tests {
 		};
 		let state = state.reduce(&action, &mut context);
 		let paths = state.nodes.collection(&context);
-		assert_eq!(paths.iter().map(|(k, _)| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/world"]); // "/hello" is empty now
+		assert_eq!(paths.keys().map(|k| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/world"]); // "/hello" is empty now
 		assert_eq!(names(&context, &state, "/"), Vec::<&str>::from(["hello", "world"]));
 		assert_eq!(names(&context, &state, "/hello"), Vec::<&str>::from([]));
 		assert_eq!(names(&context, &state, "/world"), Vec::<&str>::from(["test.txt"]));
@@ -883,7 +874,7 @@ mod tests {
 		};
 		let state = state.reduce(&action, &mut context);
 		let paths = state.nodes.collection(&context);
-		assert_eq!(paths.iter().map(|(k, _)| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/hello"]); // "/world" is empty now
+		assert_eq!(paths.keys().map(|k| k.as_str()).collect::<Vec<&str>>(), vec!["/", "/hello"]); // "/world" is empty now
 		assert_eq!(names(&context, &state, "/"), Vec::<&str>::from(["hello"]));
 		assert_eq!(names(&context, &state, "/hello"), Vec::<&str>::from(["world", "test.txt"]));
 		assert_eq!(names(&context, &state, "/hello/world"), Vec::<&str>::from([]));

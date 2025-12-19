@@ -7,7 +7,7 @@ pub struct CoreName<'a, S> {
 }
 impl<'a, S> Clone for CoreName<'a, S> {
 	fn clone(&self) -> Self {
-		Self { name: self.name, _core: self._core }
+		*self
 	}
 }
 impl<'a, S> Copy for CoreName<'a, S> {}

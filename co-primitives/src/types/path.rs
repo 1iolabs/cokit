@@ -370,7 +370,7 @@ impl AsRef<AbsolutePath> for AbsolutePathOwned {
 }
 impl PartialEq<AbsolutePath> for AbsolutePathOwned {
 	fn eq(&self, other: &AbsolutePath) -> bool {
-		self == other
+		self.0 == other.0
 	}
 }
 impl Borrow<AbsolutePath> for AbsolutePathOwned {
@@ -647,6 +647,11 @@ impl<'a> Component<'a> {
 			Component::ParentDir => "..",
 			Component::Normal(s) => s,
 		}
+	}
+
+	/// Test if component is empty.
+	pub fn is_empty(&self) -> bool {
+		matches!(self, Component::Normal(s) if s.len() == 0)
 	}
 
 	/// Actual length of hte component (without separators).

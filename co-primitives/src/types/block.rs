@@ -88,7 +88,7 @@ impl<S> PartialEq for Block<S> {
 impl<S> Eq for Block<S> {}
 impl<S> PartialOrd for Block<S> {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		self.cid.partial_cmp(&other.cid)
+		Some(self.cmp(other))
 	}
 }
 impl<S> Ord for Block<S> {

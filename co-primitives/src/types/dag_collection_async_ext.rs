@@ -13,7 +13,7 @@ pub trait DagCollectionAsyncExt: DagCollection {
 		NodeStream::from_link(storage.to_owned(), self.link())
 	}
 
-	async fn to_link<S: BlockStorage + Clone + Send + Sync + 'static>(
+	async fn write<S: BlockStorage + Clone + Send + Sync + 'static>(
 		storage: &S,
 		items: impl IntoIterator<Item = Self::Item>,
 	) -> Result<OptionLink<Node<Self::Item>>, StorageError> {
@@ -31,7 +31,7 @@ pub trait DagCollectionAsyncExt: DagCollection {
 		Ok(root)
 	}
 
-	async fn from_link<S: BlockStorage + Clone + Send + Sync + 'static>(
+	async fn read<S: BlockStorage + Clone + Send + Sync + 'static>(
 		&self,
 		storage: &S,
 	) -> Result<Self::Collection, StorageError>

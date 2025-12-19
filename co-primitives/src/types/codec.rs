@@ -175,7 +175,7 @@ impl MultiCodec {
 	}
 
 	/// Expect cid to be of type codec.
-	pub fn is_any_codec<'a, C: Into<MultiCodec>>(codecs: impl IntoIterator<Item = C>, cid: &Cid) -> Option<&Cid> {
+	pub fn is_any_codec<C: Into<MultiCodec>>(codecs: impl IntoIterator<Item = C>, cid: &Cid) -> Option<&Cid> {
 		let actual_codec: MultiCodec = cid.codec().into();
 		if codecs.into_iter().map(Into::into).any(|c| c == actual_codec) {
 			Some(cid)
@@ -192,10 +192,10 @@ impl MultiCodec {
 
 	/// Is DAG-CBOR or a codec that is represented in DAG-CBOR.
 	pub fn is_cbor(cid: impl Into<MultiCodec>) -> bool {
-		match cid.into() {
-			MultiCodec::Known(KnownMultiCodec::DagCbor) | MultiCodec::Known(KnownMultiCodec::CoReference) => true,
-			_ => false,
-		}
+		matches!(
+			cid.into(),
+			MultiCodec::Known(KnownMultiCodec::DagCbor) | MultiCodec::Known(KnownMultiCodec::CoReference)
+		)
 	}
 
 	pub fn is(actual: impl Into<MultiCodec>, expect: impl Into<MultiCodec>) -> bool {

@@ -684,7 +684,7 @@ where
 
 			// runs
 			//  filter and pop first item of each run
-			let mut runs: Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)> = Self::load_levels_and_runs(storage.clone(), root)
+			let mut runs: Vec<(usize, RunNodeStream<S, K, V>)> = Self::load_levels_and_runs(storage.clone(), root)
 				.try_filter_map(|item| ready(Ok(item.right())))
 				.try_filter(|(index, _)| ready(match &only_run_indicies {
 					Some(run_indicies) => run_indicies.contains(index),
@@ -749,7 +749,7 @@ where
 
 			// runs
 			//  filter and pop first item of each run
-			let mut runs: Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)> = Self::load_levels_and_runs(storage.clone(), root)
+			let mut runs: Vec<(usize, RunNodeStream<S, K, V>)> = Self::load_levels_and_runs(storage.clone(), root)
 				.try_filter_map(|item| ready(Ok(item.right())))
 				.try_filter(|(index, _)| ready(match &only_run_indicies {
 					Some(run_indicies) => run_indicies.contains(index),
@@ -794,7 +794,7 @@ where
 	/// Pop item and continue to read the run.
 	async fn pop_and_fetch(
 		heap: &mut BinaryHeap<TreeStreamItem<K, V>>,
-		runs: &mut Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)>,
+		runs: &mut [(usize, RunNodeStream<S, K, V>)],
 	) -> Result<Option<TreeStreamItem<K, V>>, StorageError> {
 		if let Some(item) = heap.pop() {
 			// fetch next
@@ -819,7 +819,7 @@ where
 	/// Pop item and continue to read the run.
 	async fn pop_and_fetch_reverse(
 		heap: &mut BinaryHeap<ReverseTreeStreamItem<K, V>>,
-		runs: &mut Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)>,
+		runs: &mut [(usize, RunNodeStream<S, K, V>)],
 	) -> Result<Option<ReverseTreeStreamItem<K, V>>, StorageError> {
 		if let Some(item) = heap.pop() {
 			// fetch next
@@ -1081,7 +1081,7 @@ where
 	fn load_levels_and_runs(
 		storage: S,
 		root: OptionLink<Root<K, V>>,
-	) -> impl Stream<Item = Result<Either<(usize, Level<K, V>), (usize, Run<K, V>)>, StorageError>> + Send {
+	) -> impl Stream<Item = Result<EitherLevelOrRun<K, V>, StorageError>> + Send {
 		async_stream::try_stream! {
 			let mut global_level_index = 0;
 			let mut global_run_index = 0;
@@ -1099,6 +1099,9 @@ where
 		}
 	}
 }
+
+type EitherLevelOrRun<K, V> = Either<(usize, Level<K, V>), (usize, Run<K, V>)>;
+type RunNodeStream<S, K, V> = NodeStream<S, (K, Value<V>), RunNode<K, V>>;
 
 /// Store as DAG Node and return the root [`cid::Cid`].
 async fn store_items<'a, S, T>(

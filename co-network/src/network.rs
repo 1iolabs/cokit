@@ -299,6 +299,7 @@ impl LayerBehaviour<Behaviour> for Context {
 #[allow(unused)]
 #[derive(Debug, derive_more::From)]
 #[non_exhaustive]
+#[allow(clippy::large_enum_variant)]
 pub enum NetworkEvent {
 	Didcomm(didcomm::Event),
 	Gossipsub(gossipsub::Event),
@@ -584,10 +585,7 @@ fn run_task_complete(runtime: &mut Runtime, task_index: &mut usize, task_state: 
 }
 
 fn is_log(event: &SwarmEvent<NetworkEvent>) -> bool {
-	match event {
-		SwarmEvent::Behaviour(NetworkEvent::Ping(_)) => false,
-		_ => true,
-	}
+	!matches!(event, SwarmEvent::Behaviour(NetworkEvent::Ping(_)))
 }
 
 async fn option_await<T, O>(t: Option<T>) -> Option<O>

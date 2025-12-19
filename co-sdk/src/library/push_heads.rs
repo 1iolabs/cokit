@@ -12,7 +12,7 @@ use co_primitives::{tags, CoId, Tags, WeakCid};
 use futures::{Stream, StreamExt};
 use std::{collections::BTreeSet, future::ready, time::Duration};
 
-///	Use PeerProvider to discover peers and send heads to them whenever a peer comes online or new heads are produced.
+/// Use PeerProvider to discover peers and send heads to them whenever a peer comes online or new heads are produced.
 #[derive(Debug, Clone)]
 pub struct PushHeads {
 	handle: ActorHandle<PushHeadsAction>,

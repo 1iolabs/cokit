@@ -50,7 +50,6 @@ impl From<Cli> for CoApplicationSettings {
 			no_keychain: value.no_keychain,
 			base_path: value.base_path,
 			no_log: value.no_log,
-			..Default::default()
 		}
 	}
 }

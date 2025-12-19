@@ -86,10 +86,7 @@ impl DiscoveryConnectRequest {
 
 	/// Hit max peers?
 	fn is_max_peers(&self) -> bool {
-		match (self.max_peers, self.connected_peers.len()) {
-			(Some(max), len) if len >= max as usize => true,
-			_ => false,
-		}
+		matches!((self.max_peers, self.connected_peers.len()), (Some(max), len) if len >= max as usize)
 	}
 
 	fn build(&mut self) -> Result<(), anyhow::Error> {
@@ -417,7 +414,7 @@ where
 					// note: currently we can only receive requests for DID which we also subscribed to
 					//       so when we may change this we need to keep track of connection requests for
 					//       dids/identities.
-					if self.did_subscriptions.get(&topic.hash()).is_none() {
+					if !self.did_subscriptions.contains_key(&topic.hash()) {
 						tracing::trace!(network = ?item.network, ?topic, "discovery-did-unsubscribed");
 						continue;
 					}
@@ -575,18 +572,14 @@ where
 				}
 
 				// DidDiscovery: move pending discoveries to events when its topic has subscribed
-				loop {
-					if let Some((index, _)) = self
-						.pending_discovery
-						.iter()
-						.enumerate()
-						.find(|(_, (_, pending_topic, _))| pending_topic == topic)
-					{
-						if let Some((_request, _topic, discovery)) = self.pending_discovery.remove(index) {
-							self.events.push_back(DiscoveryEvent::DidDiscovery { discovery });
-						}
-					} else {
-						break;
+				while let Some((index, _)) = self
+					.pending_discovery
+					.iter()
+					.enumerate()
+					.find(|(_, (_, pending_topic, _))| pending_topic == topic)
+				{
+					if let Some((_request, _topic, discovery)) = self.pending_discovery.remove(index) {
+						self.events.push_back(DiscoveryEvent::DidDiscovery { discovery });
 					}
 				}
 
@@ -631,20 +624,15 @@ where
 	///
 	/// TODO: Validate did message sender / recevier?
 	fn on_didcomm_event(&mut self, event: &didcomm::Event) {
-		match event {
-			didcomm::Event::Received { peer_id, message } => {
-				let message_type: Option<DidDiscoveryMessageType> =
-					DidDiscoveryMessageType::try_from(message.header().message_type.clone()).ok();
-				if message_type == Some(DidDiscoveryMessageType::Resolve) {
-					self.events.push_back(DiscoveryEvent::ReceivedDidComm {
-						peer_id: *peer_id,
-						header: message.header().to_owned(),
-					})
-				}
-			},
-			_ => {},
-			// didcomm::Event::Sent { peer_id, message } => todo!(),
-			// didcomm::Event::OutboundFailure { peer_id, error, message } => todo!(),
+		if let didcomm::Event::Received { peer_id, message } = event {
+			let message_type: Option<DidDiscoveryMessageType> =
+				DidDiscoveryMessageType::try_from(message.header().message_type.clone()).ok();
+			if message_type == Some(DidDiscoveryMessageType::Resolve) {
+				self.events.push_back(DiscoveryEvent::ReceivedDidComm {
+					peer_id: *peer_id,
+					header: message.header().to_owned(),
+				})
+			}
 		}
 	}
 
@@ -1142,7 +1130,7 @@ mod tests {
 			swarm.listen_on("/ip4/127.0.0.1/tcp/0".parse().unwrap()).unwrap();
 			while swarm.next().now_or_never().is_some() {}
 			let addr = Swarm::listeners(&swarm).next().unwrap().clone();
-			Self { peer_id: swarm.local_peer_id().clone(), addr, swarm }
+			Self { peer_id: *swarm.local_peer_id(), addr, swarm }
 		}
 
 		fn peer_id(&self) -> PeerId {
@@ -1151,11 +1139,7 @@ mod tests {
 
 		fn add_address(&mut self, peer: &Peer) {
 			self.swarm
-				.dial(
-					DialOpts::peer_id(peer.peer_id.clone())
-						.addresses(vec![peer.addr.clone()])
-						.build(),
-				)
+				.dial(DialOpts::peer_id(peer.peer_id).addresses(vec![peer.addr.clone()]).build())
 				.unwrap();
 			// when we dail just the peerid we always get an dail error because we have no addresses
 			// self.swarm.behaviour_mut().add_explicit_peer(co, peer.peer_id.clone());
@@ -1251,8 +1235,8 @@ mod tests {
 		// 	.ok();
 
 		// identities
-		let did1 = DidKeyIdentity::generate(Some(&vec![1; 32]));
-		let did2 = DidKeyIdentity::generate(Some(&vec![2; 32]));
+		let did1 = DidKeyIdentity::generate(Some(&[1; 32]));
+		let did2 = DidKeyIdentity::generate(Some(&[2; 32]));
 
 		// peers
 		let mut peer1 = Peer::new(vec![did1.clone().boxed()]);

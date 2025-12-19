@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context};
 use cid::Cid;
-use co_storage::{unixfs_add_file, BlockStorage, MemoryBlockStorage};
+use co_primitives::AnyBlockStorage;
+use co_storage::{unixfs_add_file, MemoryBlockStorage};
 use serde::Deserialize;
 use std::{
 	fmt::{Debug, Display},
@@ -112,18 +113,12 @@ pub struct BuildCoreArtifact {
 }
 impl BuildCoreArtifact {
 	/// Store the artifact to storage.
-	pub async fn store_artifact<S>(&self, storage: &S) -> Result<Cid, anyhow::Error>
-	where
-		S: BlockStorage + 'static,
-	{
+	pub async fn store_artifact(&self, storage: &impl AnyBlockStorage) -> Result<Cid, anyhow::Error> {
 		unixfs_add_file(storage, &self.artifact_path).await
 	}
 
 	/// Compute Cid for the artifact.
-	pub async fn cid<S>(&self) -> Result<Cid, anyhow::Error>
-	where
-		S: BlockStorage + 'static,
-	{
+	pub async fn cid(&self) -> Result<Cid, anyhow::Error> {
 		let storage = MemoryBlockStorage::default();
 		self.store_artifact(&storage).await
 	}

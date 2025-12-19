@@ -3,16 +3,12 @@ use co_api::{sync_api::Reducer, DagCollectionExt, DagMap, DagSet, DagSetExt, Tag
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-/**
- * COre that handles pinning and unpinning
- */
+/// COre that handles pinning and unpinning
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Pin {
-	/**
-	 * A DAG map containing all pinned content ids. Map is keyed by the referenced content ids. The value is a set
-	 * of tags making pinning and unpinning idempotent. A service may use tags with unique identifiers to ensure
-	 * that a cid stays pinned as it then cannot be unpinned by other services. To unpin, all tags must match.
-	 */
+	/// A DAG map containing all pinned content ids. Map is keyed by the referenced content ids. The value is a set
+	/// of tags making pinning and unpinning idempotent. A service may use tags with unique identifiers to ensure
+	/// that a cid stays pinned as it then cannot be unpinned by other services. To unpin, all tags must match.
 	pub pins: DagMap<Cid, DagSet<Tags>>,
 }
 

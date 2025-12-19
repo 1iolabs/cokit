@@ -590,7 +590,7 @@ mod tests {
 	use crate::crypto::{block::EncryptedData, secret::Secret};
 	use cid::Cid;
 	use co_primitives::{from_cbor, to_cbor, Block, BlockSerializer, DefaultParams, KnownMultiCodec, StoreParams};
-	use std::iter::repeat;
+	use std::iter::repeat_n;
 
 	#[test]
 	fn algorithm_key_size() {
@@ -604,8 +604,8 @@ mod tests {
 
 	#[test]
 	fn is_valid() {
-		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
-		let block_secret = Secret::new(repeat(1u8).take(Algorithm::default().key_size()).collect());
+		let secret = Secret::new(repeat_n(0u8, Algorithm::default().key_size()).collect());
+		let block_secret = Secret::new(repeat_n(1u8, Algorithm::default().key_size()).collect());
 		let key_slot = KeySlot::new(Algorithm::default(), &secret, &block_secret).unwrap();
 		let header = Header::new(Algorithm::default(), vec![key_slot]);
 		assert!(header.is_valid());
@@ -613,8 +613,8 @@ mod tests {
 
 	#[test]
 	fn serialize_header() {
-		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
-		let block_secret = Secret::new(repeat(1u8).take(Algorithm::default().key_size()).collect());
+		let secret = Secret::new(repeat_n(0u8, Algorithm::default().key_size()).collect());
+		let block_secret = Secret::new(repeat_n(1u8, Algorithm::default().key_size()).collect());
 		let key_slot = KeySlot::new(Algorithm::default(), &secret, &block_secret).unwrap();
 		let header = Header::new(Algorithm::default(), vec![key_slot]);
 
@@ -645,8 +645,8 @@ mod tests {
 
 	#[test]
 	fn key_slot_encoded_size() {
-		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
-		let block_secret = Secret::new(repeat(1u8).take(Algorithm::default().key_size()).collect());
+		let secret = Secret::new(repeat_n(0u8, Algorithm::default().key_size()).collect());
+		let block_secret = Secret::new(repeat_n(1u8, Algorithm::default().key_size()).collect());
 		let key_slot = KeySlot::new(Algorithm::default(), &secret, &block_secret).unwrap();
 
 		// serialize header
@@ -657,8 +657,8 @@ mod tests {
 
 	#[test]
 	fn header_encoded_size() {
-		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
-		let block_secret = Secret::new(repeat(1u8).take(Algorithm::default().key_size()).collect());
+		let secret = Secret::new(repeat_n(0u8, Algorithm::default().key_size()).collect());
+		let block_secret = Secret::new(repeat_n(1u8, Algorithm::default().key_size()).collect());
 		let key_slot = KeySlot::new(Algorithm::default(), &secret, &block_secret).unwrap();
 		let header = Header::new(Algorithm::default(), vec![key_slot]);
 
@@ -670,7 +670,7 @@ mod tests {
 
 	#[test]
 	fn encrypt_block_roundtrip() {
-		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
+		let secret = Secret::new(repeat_n(0u8, Algorithm::default().key_size()).collect());
 		let block = BlockSerializer::default().serialize(&"Hello World!").unwrap();
 
 		//println!("cid: ({}): {}", block.cid().to_bytes().len(), block.cid()); // 36
@@ -700,8 +700,8 @@ mod tests {
 
 	#[test]
 	fn test_fit_to_blocks() {
-		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
-		let data: Vec<u8> = repeat(0u8).take(DefaultParams::MAX_BLOCK_SIZE).collect();
+		let secret = Secret::new(repeat_n(0u8, Algorithm::default().key_size()).collect());
+		let data: Vec<u8> = repeat_n(0u8, DefaultParams::MAX_BLOCK_SIZE).collect();
 		let block = Block::<DefaultParams>::new_data(KnownMultiCodec::Raw, data);
 
 		//println!("cid: ({}): {}", block.cid().to_bytes().len(), block.cid()); // 36
@@ -716,8 +716,7 @@ mod tests {
 			.fit_into_blocks::<DefaultParams>(Some(Header::encoded_size(Algorithm::default())));
 		assert!(match &encrypted_block.payload {
 			EncryptedData::Block(blocks) =>
-				blocks.iter().map(|c| *c).collect::<Vec<Cid>>()
-					== encrypted_extra_blocks.iter().map(|b| *b.cid()).collect::<Vec<Cid>>(),
+				blocks == &encrypted_extra_blocks.iter().map(|b| *b.cid()).collect::<Vec<Cid>>(),
 			_ => false,
 		});
 

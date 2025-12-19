@@ -1020,12 +1020,12 @@ mod tests {
 		assert_eq!(run.first(), Position(head, 0));
 		assert_eq!(run.last(), Position(head, 4));
 		assert_eq!(run.range(), 0..5);
-		assert_eq!(run.contains(Position(head, 0)), true);
-		assert_eq!(run.contains(Position(head, 1)), true);
-		assert_eq!(run.contains(Position(head, 2)), true);
-		assert_eq!(run.contains(Position(head, 3)), true);
-		assert_eq!(run.contains(Position(head, 4)), true);
-		assert_eq!(run.contains(Position(head, 5)), false);
+		assert!(run.contains(Position(head, 0)));
+		assert!(run.contains(Position(head, 1)));
+		assert!(run.contains(Position(head, 2)));
+		assert!(run.contains(Position(head, 3)));
+		assert!(run.contains(Position(head, 4)));
+		assert!(!run.contains(Position(head, 5)));
 	}
 
 	#[tokio::test]

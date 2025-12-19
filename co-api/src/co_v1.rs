@@ -41,6 +41,10 @@ extern "C" {
 	pub fn diagnostic_cid_write(buffer: *const u8, buffer_size: u32) -> u32;
 }
 
+/// Stub
+///
+/// # Safety
+/// This is only a stub to prevent mistakes.
 #[cfg(not(target_arch = "wasm32"))]
 pub unsafe extern "C" fn storage_block_get(
 	_cid: *const u8,
@@ -51,6 +55,10 @@ pub unsafe extern "C" fn storage_block_get(
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
+/// Stub
+///
+/// # Safety
+/// This is only a stub to prevent mistakes.
 #[cfg(not(target_arch = "wasm32"))]
 pub unsafe extern "C" fn storage_block_set(
 	_cid: *const u8,
@@ -61,26 +69,46 @@ pub unsafe extern "C" fn storage_block_set(
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
+/// Stub
+///
+/// # Safety
+/// This is only a stub to prevent mistakes.
 #[cfg(not(target_arch = "wasm32"))]
 pub unsafe extern "C" fn payload_read(_buffer: *mut u8, _buffer_size: u32, _offset: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
+/// Stub
+///
+/// # Safety
+/// This is only a stub to prevent mistakes.
 #[cfg(not(target_arch = "wasm32"))]
 pub unsafe extern "C" fn state_cid_read(_buffer: *mut u8, _buffer_size: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
+/// Stub
+///
+/// # Safety
+/// This is only a stub to prevent mistakes.
 #[cfg(not(target_arch = "wasm32"))]
 pub unsafe extern "C" fn state_cid_write(_buffer: *const u8, _buffer_size: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
+/// Stub
+///
+/// # Safety
+/// This is only a stub to prevent mistakes.
 #[cfg(not(target_arch = "wasm32"))]
 pub unsafe extern "C" fn event_cid_read(_buffer: *mut u8, _buffer_size: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");
 }
 
+/// Stub
+///
+/// # Safety
+/// This is only a stub to prevent mistakes.
 #[cfg(not(target_arch = "wasm32"))]
 pub unsafe extern "C" fn diagnostic_cid_write(_buffer: *const u8, _buffer_size: u32) -> u32 {
 	panic!("only available for target_arch = \"wasm32\"");

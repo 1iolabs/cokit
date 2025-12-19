@@ -21,13 +21,13 @@ impl BlockLinks {
 
 	/// Test if the CID codec possibly contains links.
 	pub fn has_links(&self, cid: impl Into<MultiCodec>) -> bool {
-		match cid.into() {
+		matches!(
+			cid.into(),
 			MultiCodec::Known(KnownMultiCodec::DagPb)
-			| MultiCodec::Known(KnownMultiCodec::DagCbor)
-			| MultiCodec::Known(KnownMultiCodec::DagJson)
-			| MultiCodec::Known(KnownMultiCodec::CoReference) => true,
-			_ => false,
-		}
+				| MultiCodec::Known(KnownMultiCodec::DagCbor)
+				| MultiCodec::Known(KnownMultiCodec::DagJson)
+				| MultiCodec::Known(KnownMultiCodec::CoReference)
+		)
 	}
 
 	/// Get block references.

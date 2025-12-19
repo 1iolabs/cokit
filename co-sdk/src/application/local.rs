@@ -65,6 +65,7 @@ impl LocalCoBuilder {
 	}
 
 	/// Create LocalCO instance.
+	#[allow(clippy::too_many_arguments)]
 	pub async fn build<R>(
 		self,
 		storage: CoStorage,
@@ -156,11 +157,11 @@ where
 {
 	/// Read the local co state from disk.
 	/// As we trust all of the local states we use all the states without fuhter checks to continue.
-	///
-	///	We use a explicit shutdown signal for this as the reducer is self referencial (through a box) and will not be
+	/// We use a explicit shutdown signal for this as the reducer is self referencial (through a box) and will not be
 	/// dropped when a watcher is active.
 	///
 	/// NOTE: This assumes the same encryption key is used by all local applications.
+	#[allow(clippy::too_many_arguments)]
 	async fn create<R>(
 		runtime: Runtime,
 		local_co: LocalCoBuilder,
