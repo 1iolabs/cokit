@@ -242,21 +242,20 @@ impl SharedCoBuilder {
 		}
 
 		// reducer builder
-		let mut reducer_builder = ReducerBuilder::new(core_resolver, log)
+		let reducer_builder = ReducerBuilder::new(core_resolver, log)
 			.with_initialize(false)
 			.with_state_resolver(membership_states);
 
 		// use states from pinning
 		#[cfg(feature = "pinning")]
-		{
-			reducer_builder =
-				reducer_builder.with_state_resolver(crate::reducer::state_resolver::StorageStateResolver::new(
-					self.parent.clone(),
-					pinning.identity.clone(),
-					pin_strategy,
-					self.membership.id.clone(),
-				));
-		}
+		let reducer_builder = {
+			reducer_builder.with_state_resolver(crate::reducer::state_resolver::StorageStateResolver::new(
+				self.parent.clone(),
+				pinning.identity.clone(),
+				pin_strategy,
+				self.membership.id.clone(),
+			))
+		};
 
 		// reducer
 		let reducer = reducer_builder.build(&co_storage, runtime.runtime(), date).await?;
@@ -594,17 +593,16 @@ impl SharedCoCreator {
 		// reducer
 		let core_resolver = CoCoreResolver::default();
 		let core_resolver = LogCoreResolver::new(core_resolver, self.co.id.clone());
-		let mut reducer_builder = ReducerBuilder::new(core_resolver, log);
+		let reducer_builder = ReducerBuilder::new(core_resolver, log);
 		#[cfg(feature = "pinning")]
-		{
-			reducer_builder =
-				reducer_builder.with_state_resolver(crate::reducer::state_resolver::StorageStateResolver::new(
-					self.parent.clone(),
-					pinning.identity.clone(),
-					pin_strategy,
-					self.co.id.clone(),
-				));
-		}
+		let reducer_builder = {
+			reducer_builder.with_state_resolver(crate::reducer::state_resolver::StorageStateResolver::new(
+				self.parent.clone(),
+				pinning.identity.clone(),
+				pin_strategy,
+				self.co.id.clone(),
+			))
+		};
 		let mut reducer = reducer_builder.build(&co_storage, runtime.runtime(), date).await?;
 
 		// initialize

@@ -27,6 +27,7 @@ pub mod local_keypair_fetch;
 pub mod local_secret;
 pub mod locals;
 pub mod log_entries_until;
+#[cfg(feature = "pinning")]
 pub mod max_reference_count;
 pub mod membership_all_heads;
 pub mod memory_dispatch;
@@ -38,6 +39,7 @@ pub mod runtime_dispatch;
 pub mod sample_stream;
 pub mod settings_timeout;
 pub mod shared_membership;
+#[cfg(feature = "pinning")]
 pub mod storage_cleanup;
 #[cfg(feature = "pinning")]
 pub mod storage_dispatch_remove;
@@ -47,6 +49,7 @@ pub mod storage_dispatch_roots;
 pub mod storage_pinning;
 #[cfg(feature = "pinning")]
 pub mod storage_snapshots;
+#[cfg(feature = "pinning")]
 pub mod storage_structure;
 pub mod to_external_cid;
 pub mod to_internal_cid;

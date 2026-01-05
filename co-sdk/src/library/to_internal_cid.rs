@@ -16,6 +16,7 @@ pub async fn to_internal_cid(mapping: &impl BlockStorageContentMapping, cid: Cid
 
 /// Map external [`Cid`] to [`OptionMappedCid`].
 /// Returns None if can not be mapped.
+#[allow(dead_code)]
 pub async fn to_internal_mapped(mapping: &impl BlockStorageContentMapping, external: Cid) -> Option<OptionMappedCid> {
 	if mapping.is_content_mapped().await {
 		mapping
