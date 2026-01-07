@@ -1,0 +1,28 @@
+[package]
+name = "co-uniffi"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.91"
+
+[lib]
+name = "co_uniffi"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+anyhow = { workspace = true }
+async-stream = { workspace = true }
+async-trait = { workspace = true }
+cid = { workspace = true }
+co-actor = { workspace = true }
+co-primitives = { workspace = true }
+co-sdk = { workspace = true }
+derive_more = { workspace = true }
+futures = { workspace = true }
+ipld-core = { workspace = true }
+multiaddr = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_repr = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }
+tracing = { workspace = true }
+uniffi = "0.25"

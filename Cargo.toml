@@ -15,6 +15,7 @@ members = [
     "co-sdk",
     "co-storage",
     "co-test",
+    "co-uniffi",
     "cores/board",
     "cores/co",
     "cores/data-series",
