@@ -18,6 +18,10 @@ additional-js = ["mermaid.min.js", "mermaid-init.js"]
 [output.html.playground]
 runnable = false
 
+[output.html.code.hidelines]
+typescript = "~"
+ts = "~"
+
 [preprocessor.toc]
 command = "mdbook-toc"
 renderer = ["html"]
