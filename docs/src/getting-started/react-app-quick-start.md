@@ -179,14 +179,18 @@ You can delete all generated files from the `src` folder except `vite-env.d.ts`.
 There is no need to inittialize CO-kit here because the tauri plugin does that for us. Instead we just need to write code for the frontend.
 
 ##### Main
+```admonish info
+Some code of the examples below is hidden to focus on the interaction with CO-kit. Make sure to unhide these lines if you want the full component code.
+```
+
 We start with the `main.tsx`:
 
 ```typescript
-import React from "react";
-import ReactDOM from "react-dom/client";
-import { App } from "./components/app";
-import "../tailwind.css";
-
+~import React from "react";
+~import ReactDOM from "react-dom/client";
+~import { App } from "./components/app";
+~import "../tailwind.css";
+~
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <div className="bg-base-300 w-screen h-screen">
@@ -202,8 +206,8 @@ Add a `types` folder.
 In that folder we add a file `todo.ts` that contains all the types we need from our Todo Core:
 
 ```typescript 
-import { CID } from "multiformats";
-
+~import { CID } from "multiformats";
+~
 export type TodoTask = {
   id: string;
   title: string;
@@ -227,8 +231,8 @@ export type TodoAction =
 Next is the file `consts.ts` that contains all const variables like the core name or identity name:
 
 ```typescript
-import { fetchBinary } from "@1io/tauri-plugin-co-sdk-api";
-
+~import { fetchBinary } from "@1io/tauri-plugin-co-sdk-api";
+~
 export const TODO_CORE_NAME: string = "todo";
 export const TODO_IDENTITY_NAME: string = "my-todo-identity";
 
@@ -239,7 +243,7 @@ export async function fetchTodoCoreBinary(): Promise<
 }
 ```
 
-Because we cannot just include the Core WASM bytes like in rust, we need to fetch it. This only works if the WASM file is in the `public` folder, i.e. included in the vite environment.
+Because we cannot just include the Core WASM bytes like in rust, we need to fetch it. We use the helper function `fetchBinary` from the `@1io/tauri-plugin-co-sdk-api` package for this. This only works if the WASM file is in the `public` folder, i.e. included in the vite environment. The single argument for this function is the file name of the core in the `public` folder.
 
 Add an `index.ts` file for exports:
 
@@ -254,13 +258,13 @@ Add a `components` folder under `src`.
 Now we add an `app.tsx` file to that folder. The App component handles whether the Overview or a specific Todo list should be shown:
 
 ```typescript
-import { ErrorBoundary } from "react-error-boundary";
-import React from "react";
-import { TodoList } from "./todo-list";
-import { TodoOverview } from "./todo-overview";
-import { CoId } from "@1io/tauri-plugin-co-sdk-api";
-import "web-streams-polyfill/polyfill";
-
+~import { ErrorBoundary } from "react-error-boundary";
+~import React from "react";
+~import { TodoList } from "./todo-list";
+~import { TodoOverview } from "./todo-overview";
+~import { CoId } from "@1io/tauri-plugin-co-sdk-api";
+~import "web-streams-polyfill/polyfill";
+~
 function Fallback(props: { error: unknown }) {
   return <pre className="p-4">Oops, we encountered an error: {String(props.error)}</pre>;
 }
@@ -476,7 +480,240 @@ export function TodoListElement(props: TodoListElementProps) {
 ~    </li>
 ~  );
 }
+```
 
+We again open a session and load the state of the CO. This time we use the CO id from the props that we got from the memberships. The CO state contains information we need in this case so we need to resolve that Cid as well. Most importantly we need the name of the co: `coState?.n`.
+
+We want to show how many Todo items in the list are undone. For this we need the Todo Core state as well. We get the Core Cid with `useCoCore` and resolve it. The Core name for this Core we get from our `const.ts` types this time.
+
+The Core state contains the tasks which in typescript is a `CID`. In rust it is a `CoMap` instead. A `CoMap` is a map that has the common `BTreeMap` functions but behind the covers only contains a root Cid and uses the storage to set/get the linked data. The `co-js` package contains a WASM wrapper for the rust `CoMap`. With this we can use the rust functions directly. These functions need a `BlockStorage` that we can create with the `useBlockStorage` hook. We can create a new `CoMap` with the constructor taking a Cid in byte form. There is no way to directly get all elements of the map but there is a stream function. To help collect the items from the stream into a typescript `Map` object we use the `useCollectCoMap` hook. Now we just need to filter for unfinished tasks.
+
+#### Todo List
+If, for one of our active COs, a list element is opened, we land on this view where all the Todo items of the opened CO are shown. We use our hooks and the `CoMap` again to get our needed data:
+
+```typescript
+  const session = useCoSession(props.coId);
+  const [coCid] = useCo(props.coId);
+  const co = useResolveCid<Co>(coCid, session);
+  const core = co?.c[TODO_CORE_NAME];
+  const coreState = useResolveCid<TodoCoreState>(core?.state, session);
+
+  const identity = useDidKeyIdentity(TODO_IDENTITY_NAME);
+
+  const storage = useBlockStorage(session);
+  const taskMap = useMemo(() => {
+    if (coreState?.tasks !== undefined) {
+      return new CoMap(coreState.tasks.bytes);
+    }
+    return undefined;
+  }, [coreState?.tasks]);
+  const tasks = useCollectCoMap<TodoTask>(taskMap, storage);
+
+  const participantMap = useMemo(() => {
+    if (co?.p !== undefined) {
+      return new CoMap(co.p.bytes);
+    }
+  }, [co?.p]);
+  const participants = useCollectCoMap<Participant>(participantMap, storage);
+```
+
+We fetch all particpants of the CO because the view contains a `NavBar` that shows that information. There is also a button that opens a dialog from where you can invite new participants.
+
+##### Handlers
+In the overview we can create COs but they will spawn without the Todo Core. We create a function that checks if a Todo Core exists in the CO and adds it if not:
+
+```typescript
+  // returns false if for any reason it coulnd't be assured whether core exists
+  // most likely because needed information isn't loaded yet
+  // returns true if core exists, either because it already did or it was missing but then created
+  const assureCoreExists = useCallback(async () => {
+    if (
+      storage === undefined ||
+      session === undefined ||
+      identity === undefined
+    ) {
+      return false;
+    }
+
+    // if co is undefined we haven't finished loading yet and don't know if core is missing
+    if (co === undefined) {
+      return false;
+    }
+
+    // core exists already
+    if (core !== undefined) {
+      return true;
+    }
+
+    const coreBinaryStream = await fetchTodoCoreBinary();
+
+    const cids = await unixfsAdd(storage, coreBinaryStream);
+
+    if (cids.length === 0) {
+      return false;
+    }
+
+    const rootCid = CID.decode(cids[cids.length - 1]);
+
+    // add todo core
+    const createTodoCoreAction = {
+      CoreCreate: {
+        binary: rootCid,
+        core: TODO_CORE_NAME,
+        tags: [["type", "my-todo-core"]],
+      },
+    };
+    try {
+      await pushAction(session, "co", createTodoCoreAction, identity);
+    } catch (e) {
+      // error creating core
+      console.log(e);
+      return false;
+    }
+    return true;
+  }, [storage, session, identity, co, core]);
+```
+
+The MyTodoCore Core is not a builtin Core and we have to add it to the storage first before we can use it. We call the WASM function unixfsAdd for this. It takes a WASM storage which we already created and a binary stream to the Core WASM. The function returns the Cids of all created blocks where the last one is the Cid of the root block. We need this Cid to add the Core to the CO.
+
+Next we create handlers using the React `useCallback` hook:
+
+```typescript
+  const onDeleteAllDone = useCallback(async () => {
+    if (identity !== undefined && session !== undefined) {
+      if (!(await assureCoreExists())) {
+        return;
+      }
+      const action: TodoAction = "DeleteAllDoneTasks";
+      try {
+        await pushAction(session, TODO_CORE_NAME, action, identity);
+      } catch (e) {
+        setError(e);
+      }
+    }
+  }, [session, identity]);
+
+  const onCreateTask = useCallback(
+    async (title: string) => {
+      if (identity !== undefined && session !== undefined) {
+        if (!(await assureCoreExists())) {
+          return;
+        }
+        const action: TodoAction = {
+          TaskCreate: { done: false, title, id: v7() },
+        };
+        try {
+          await pushAction(session, TODO_CORE_NAME, action, identity);
+        } catch (e) {
+          setError(e);
+        }
+      }
+    },
+    [session, identity],
+  );
+
+  const onDone = useCallback(
+    async (id: string, done: boolean) => {
+      if (session !== undefined && identity !== undefined) {
+        if (!(await assureCoreExists())) {
+          return;
+        }
+        let action: TodoAction;
+        if (done) {
+          action = { TaskDone: { id } };
+        } else {
+          action = { TaskUndone: { id } };
+        }
+        try {
+          await pushAction(session, TODO_CORE_NAME, action, identity);
+        } catch (e) {
+          setError(e);
+        }
+      }
+    },
+    [session, identity],
+  );
+
+  const onDelete = useCallback(
+    async (id: string) => {
+      if (session !== undefined && identity !== undefined) {
+        if (!(await assureCoreExists())) {
+          return;
+        }
+        const action: TodoAction = { TaskDelete: { id } };
+        try {
+          await pushAction(session, TODO_CORE_NAME, action, identity);
+        } catch (e) {
+          setError(e);
+        }
+      }
+    },
+    [session, identity],
+  );
+
+  const onEdit = useCallback(
+    async (id: string, title: string) => {
+      if (session !== undefined && identity !== undefined) {
+        if (!(await assureCoreExists())) {
+          return;
+        }
+        const action: TodoAction = { TaskSetTitle: { id, title } };
+        try {
+          await pushAction(session, TODO_CORE_NAME, action, identity);
+        } catch (e) {
+          setError(e);
+        }
+      }
+    },
+    [session, identity],
+  );
+
+  const onInvite = useCallback(
+    async (name: string, did: Did) => {
+      if (session !== undefined && identity !== undefined) {
+        if (!(await assureCoreExists())) {
+          return;
+        }
+        // TODO invite action
+        const action: CoAction = {
+          ParticipantInvite: { participant: did, tags: [["name", name]] },
+        };
+        try {
+          await pushAction(session, "co", action, identity);
+        } catch (e) {
+          setError(e);
+        }
+      }
+    },
+    [session, identity],
+  );
+```
+
+At first we always call our assure function to make sure that a Todo Core exists which we can push our actions to. Then we can create the Action objects using the types from either the `@1io/tauri-plugin-co-sdk-api` package or our created Todo types. The action names should be self explanatory. The `onInvite` handler is used in the participant invite dialog. The other handlers just change data in the Todo Core.
+
+The react `ErrorBoundary` cannot catch errors thrown out of async callbacks. We fix this by saving any occuring errors in a React state and then throwing them in a sync context on the next render:
+
+```typescript
+  const [error, setError] = useState<unknown | undefined>();
+  if (error) {
+    throw error;
+  }
+```
+
+Now we just need to render the Todo list items:
+
+```typescript
+<ul className="list grow shrink overflow-y-auto min-h-0">
+  {Array.from(tasks.values()).map((task) => (
+    <TodoItem
+      key={task.id}
+      task={task}
+      onDone={onDone}
+      onDelete={onDelete}
+      onEdit={onEdit}
+    />
+  ))}
+</ul>
 ```
 
 ### Build the App
@@ -487,7 +724,7 @@ npx tailwindcss -i ./tailwind.css -o ./assets/tailwind.css
 npm run build
 ```
 
-### Start the App
+### Run the App
 Start your app with:
  
 ```sh
@@ -504,7 +741,7 @@ npm run tauri dev
 
 To have a better structural overview we split the code so that each component lives in its own file.
 As copying the code into this documentation would unnecessarily bloat it, we instead link to a repository where all the code can be viewed.
-You can find the full examples as a git project here:
+You can find the full example in the `my-todo-app-tauri` folder of this git repository:
 - [1io / example-todo-list - GitLab](https://gitlab.1io.com/1io/example-todo-list.git)
 
 If you followed the [earlier steps](#setup) to create your example app workspace, these last steps will complete your app:
@@ -513,6 +750,6 @@ If you followed the [earlier steps](#setup) to create your example app workspace
 
 2. Copy all files from the `src` folder of the [existing react Todo List example repository](https://gitlab.1io.com/1io/example-todo-list/-/tree/main/my-todo-app-tauri) into your `src` folder.
 
-3. Copy the WASM from your Core into the `public` folder as `my_todo_core.wasm`.
+3. Copy the WASM file from your Core into the `public` folder as `my_todo_core.wasm`.
 
-Otherwise you can instead just copy the complete `my-todo-app-tauri` folder from the repository.
+If you skipped the setup steps you can instead clone the complete repository which also contains the Todo Core and rust app or just copy the `my-todo-app-tauri` folder.
