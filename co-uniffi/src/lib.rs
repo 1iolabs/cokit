@@ -16,7 +16,13 @@ pub use library::{
 	co_error::CoError,
 	co_settings::CoSettings,
 };
-pub use types::{cid::Cid, identity::CoPrivateIdentity, level::CoLogLevel, network_settings::CoNetworkSettings};
+pub use types::{
+	cid::Cid,
+	identity::CoPrivateIdentity,
+	level::CoLogLevel,
+	network_settings::CoNetworkSettings,
+	storage::{Block, BlockStorage},
+};
 
 // uniffi
 #[cfg(feature = "uniffi")]

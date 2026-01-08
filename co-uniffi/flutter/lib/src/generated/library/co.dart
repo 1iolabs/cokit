@@ -6,22 +6,11 @@
 import '../frb_generated.dart';
 import '../types/cid.dart';
 import '../types/identity.dart';
+import '../types/storage.dart';
 import 'co_error.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `fmt`, `fmt`, `from`, `from`
-
-Future<Uint8List> storageGet({required Co co, required Cid cid}) =>
-    CoKit.instance.api.crateLibraryCoStorageGet(co: co, cid: cid);
-
-Future<void> storageSet(
-        {required Co co, required Cid cid, required List<int> data}) =>
-    CoKit.instance.api.crateLibraryCoStorageSet(co: co, cid: cid, data: data);
-
-Future<Cid> storageSetData(
-        {required Co co, required BigInt codec, required List<int> data}) =>
-    CoKit.instance.api
-        .crateLibraryCoStorageSetData(co: co, codec: codec, data: data);
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Co>>
 abstract class Co implements RustOpaqueInterface {
@@ -31,6 +20,8 @@ abstract class Co implements RustOpaqueInterface {
       required List<int> action});
 
   Future<CoState> state();
+
+  Future<BlockStorage> storage();
 }
 
 class CoState {

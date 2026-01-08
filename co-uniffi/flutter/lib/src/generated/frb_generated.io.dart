@@ -16,6 +16,7 @@ import 'types/cid.dart';
 import 'types/identity.dart';
 import 'types/level.dart';
 import 'types/network_settings.dart';
+import 'types/storage.dart';
 
 abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   CoKitApiImplPlatform({
@@ -24,6 +25,10 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
     required super.generalizedFrbRustBinding,
     required super.portManager,
   });
+
+  CrossPlatformFinalizerArg
+      get rust_arc_decrement_strong_count_BlockStoragePtr => wire
+          ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStoragePtr;
 
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_CoPtr => wire
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPtr;
@@ -37,6 +42,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   CrossPlatformFinalizerArg
       get rust_arc_decrement_strong_count_CoPrivateIdentityPtr => wire
           ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentityPtr;
+
+  @protected
+  BlockStorage
+      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          dynamic raw);
 
   @protected
   Co dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
@@ -58,6 +68,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
           dynamic raw);
 
   @protected
+  BlockStorage
+      dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          dynamic raw);
+
+  @protected
   Co dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
       dynamic raw);
 
@@ -74,6 +89,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   @protected
   CoPrivateIdentity
       dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+          dynamic raw);
+
+  @protected
+  BlockStorage
+      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
           dynamic raw);
 
   @protected
@@ -99,7 +119,13 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  Block dco_decode_block(dynamic raw);
+
+  @protected
   bool dco_decode_bool(dynamic raw);
+
+  @protected
+  Block dco_decode_box_autoadd_block(dynamic raw);
 
   @protected
   bool dco_decode_box_autoadd_bool(dynamic raw);
@@ -187,6 +213,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   BigInt dco_decode_usize(dynamic raw);
 
   @protected
+  BlockStorage
+      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          SseDeserializer deserializer);
+
+  @protected
   Co sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
       SseDeserializer deserializer);
 
@@ -206,6 +237,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
           SseDeserializer deserializer);
 
   @protected
+  BlockStorage
+      sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          SseDeserializer deserializer);
+
+  @protected
   Co sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
       SseDeserializer deserializer);
 
@@ -222,6 +258,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   @protected
   CoPrivateIdentity
       sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+          SseDeserializer deserializer);
+
+  @protected
+  BlockStorage
+      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
           SseDeserializer deserializer);
 
   @protected
@@ -247,7 +288,13 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  Block sse_decode_block(SseDeserializer deserializer);
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer);
+
+  @protected
+  Block sse_decode_box_autoadd_block(SseDeserializer deserializer);
 
   @protected
   bool sse_decode_box_autoadd_bool(SseDeserializer deserializer);
@@ -339,6 +386,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void
+      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          BlockStorage self, SseSerializer serializer);
+
+  @protected
+  void
       sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
           Co self, SseSerializer serializer);
 
@@ -359,6 +411,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void
+      sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          BlockStorage self, SseSerializer serializer);
+
+  @protected
+  void
       sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
           Co self, SseSerializer serializer);
 
@@ -376,6 +433,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   void
       sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
           CoPrivateIdentity self, SseSerializer serializer);
+
+  @protected
+  void
+      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          BlockStorage self, SseSerializer serializer);
 
   @protected
   void
@@ -401,7 +463,13 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_block(Block self, SseSerializer serializer);
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_block(Block self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer);
@@ -508,6 +576,38 @@ class CoKitWire implements BaseWire {
   /// The symbols are looked up in [dynamicLibrary].
   CoKitWire(ffi.DynamicLibrary dynamicLibrary)
       : _lookup = dynamicLibrary.lookup;
+
+  void
+      rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStoragePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+          'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage');
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStoragePtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+      rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStoragePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+          'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage');
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStoragePtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
       rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(

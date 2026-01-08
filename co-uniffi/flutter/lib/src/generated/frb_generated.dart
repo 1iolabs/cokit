@@ -17,6 +17,7 @@ import 'types/cid.dart';
 import 'types/identity.dart';
 import 'types/level.dart';
 import 'types/network_settings.dart';
+import 'types/storage.dart';
 
 /// Main entrypoint of the Rust API
 class CoKit extends BaseEntrypoint<CoKitApi, CoKitApiImpl, CoKitWire> {
@@ -75,7 +76,7 @@ class CoKit extends BaseEntrypoint<CoKitApi, CoKitApiImpl, CoKitWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -471991239;
+  int get rustContentHash => 1042217628;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -86,6 +87,12 @@ class CoKit extends BaseEntrypoint<CoKitApi, CoKitApiImpl, CoKitWire> {
 }
 
 abstract class CoKitApi extends BaseApi {
+  Future<Block> crateTypesStorageBlockStorageGet(
+      {required BlockStorage that, required Cid cid});
+
+  Future<Cid> crateTypesStorageBlockStorageSet(
+      {required BlockStorage that, required Block block});
+
   Future<CoContext> crateLibraryCoContextCoContextOpen(
       {required CoSettings settings});
 
@@ -109,6 +116,17 @@ abstract class CoKitApi extends BaseApi {
 
   Future<CoState> crateLibraryCoCoState({required Co that});
 
+  Future<BlockStorage> crateLibraryCoCoStorage({required Co that});
+
+  Future<Block> crateTypesStorageBlockNew(
+      {required Cid cid, required List<int> data});
+
+  Future<Block> crateTypesStorageBlockNewData(
+      {required BigInt codec, required List<int> data});
+
+  Future<Block> crateTypesStorageBlockNewUnchecked(
+      {required Cid cid, required List<int> data});
+
   BigInt crateTypesCidCidCodec({required Cid that});
 
   Future<Cid> crateTypesCidCidFromString({required String string});
@@ -123,14 +141,13 @@ abstract class CoKitApi extends BaseApi {
 
   Future<CoSettings> crateLibraryCoSettingsCoSettingsDefault();
 
-  Future<Uint8List> crateLibraryCoStorageGet(
-      {required Co co, required Cid cid});
+  RustArcIncrementStrongCountFnType
+      get rust_arc_increment_strong_count_BlockStorage;
 
-  Future<void> crateLibraryCoStorageSet(
-      {required Co co, required Cid cid, required List<int> data});
+  RustArcDecrementStrongCountFnType
+      get rust_arc_decrement_strong_count_BlockStorage;
 
-  Future<Cid> crateLibraryCoStorageSetData(
-      {required Co co, required BigInt codec, required List<int> data});
+  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_BlockStoragePtr;
 
   RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_Co;
 
@@ -171,6 +188,64 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   });
 
   @override
+  Future<Block> crateTypesStorageBlockStorageGet(
+      {required BlockStorage that, required Cid cid}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+            that, serializer);
+        sse_encode_box_autoadd_cid(cid, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 1, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_block,
+        decodeErrorData:
+            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError,
+      ),
+      constMeta: kCrateTypesStorageBlockStorageGetConstMeta,
+      argValues: [that, cid],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateTypesStorageBlockStorageGetConstMeta =>
+      const TaskConstMeta(
+        debugName: "BlockStorage_get",
+        argNames: ["that", "cid"],
+      );
+
+  @override
+  Future<Cid> crateTypesStorageBlockStorageSet(
+      {required BlockStorage that, required Block block}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+            that, serializer);
+        sse_encode_box_autoadd_block(block, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 2, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_cid,
+        decodeErrorData:
+            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError,
+      ),
+      constMeta: kCrateTypesStorageBlockStorageSetConstMeta,
+      argValues: [that, block],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateTypesStorageBlockStorageSetConstMeta =>
+      const TaskConstMeta(
+        debugName: "BlockStorage_set",
+        argNames: ["that", "block"],
+      );
+
+  @override
   Future<CoContext> crateLibraryCoContextCoContextOpen(
       {required CoSettings settings}) {
     return handler.executeNormal(NormalTask(
@@ -178,7 +253,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_box_autoadd_co_settings(settings, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 1, port: port_);
+            funcId: 3, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -208,7 +283,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             that, serializer);
         sse_encode_String(id, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 2, port: port_);
+            funcId: 4, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -239,7 +314,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             that, serializer);
         sse_encode_String(did, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 3, port: port_);
+            funcId: 5, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -267,7 +342,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
             that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -294,7 +369,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
             that, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 5, port: port_);
+            funcId: 7, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -328,7 +403,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_String(core, serializer);
         sse_encode_list_prim_u_8_loose(action, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 6, port: port_);
+            funcId: 8, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -354,7 +429,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
             that, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 7, port: port_);
+            funcId: 9, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_state,
@@ -372,12 +447,119 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       );
 
   @override
+  Future<BlockStorage> crateLibraryCoCoStorage({required Co that}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
+            that, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 10, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData:
+            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateLibraryCoCoStorageConstMeta,
+      argValues: [that],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateLibraryCoCoStorageConstMeta => const TaskConstMeta(
+        debugName: "Co_storage",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<Block> crateTypesStorageBlockNew(
+      {required Cid cid, required List<int> data}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_box_autoadd_cid(cid, serializer);
+        sse_encode_list_prim_u_8_loose(data, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 11, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_block,
+        decodeErrorData:
+            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError,
+      ),
+      constMeta: kCrateTypesStorageBlockNewConstMeta,
+      argValues: [cid, data],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateTypesStorageBlockNewConstMeta => const TaskConstMeta(
+        debugName: "block_new",
+        argNames: ["cid", "data"],
+      );
+
+  @override
+  Future<Block> crateTypesStorageBlockNewData(
+      {required BigInt codec, required List<int> data}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_u_64(codec, serializer);
+        sse_encode_list_prim_u_8_loose(data, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 12, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_block,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateTypesStorageBlockNewDataConstMeta,
+      argValues: [codec, data],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateTypesStorageBlockNewDataConstMeta =>
+      const TaskConstMeta(
+        debugName: "block_new_data",
+        argNames: ["codec", "data"],
+      );
+
+  @override
+  Future<Block> crateTypesStorageBlockNewUnchecked(
+      {required Cid cid, required List<int> data}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_box_autoadd_cid(cid, serializer);
+        sse_encode_list_prim_u_8_loose(data, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 13, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_block,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateTypesStorageBlockNewUncheckedConstMeta,
+      argValues: [cid, data],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateTypesStorageBlockNewUncheckedConstMeta =>
+      const TaskConstMeta(
+        debugName: "block_new_unchecked",
+        argNames: ["cid", "data"],
+      );
+
+  @override
   BigInt crateTypesCidCidCodec({required Cid that}) {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_box_autoadd_cid(that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_u_64,
@@ -402,7 +584,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(string, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 9, port: port_);
+            funcId: 15, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_cid,
@@ -426,7 +608,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_box_autoadd_cid(that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -450,7 +632,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_box_autoadd_cid(that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_u_64,
@@ -474,7 +656,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 12, port: port_);
+            funcId: 18, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_log_level,
@@ -499,7 +681,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 13, port: port_);
+            funcId: 19, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_network_settings,
@@ -524,7 +706,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 14, port: port_);
+            funcId: 20, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_settings,
@@ -542,92 +724,13 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         argNames: [],
       );
 
-  @override
-  Future<Uint8List> crateLibraryCoStorageGet(
-      {required Co co, required Cid cid}) {
-    return handler.executeNormal(NormalTask(
-      callFfi: (port_) {
-        final serializer = SseSerializer(generalizedFrbRustBinding);
-        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
-            co, serializer);
-        sse_encode_box_autoadd_cid(cid, serializer);
-        pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 15, port: port_);
-      },
-      codec: SseCodec(
-        decodeSuccessData: sse_decode_list_prim_u_8_strict,
-        decodeErrorData:
-            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError,
-      ),
-      constMeta: kCrateLibraryCoStorageGetConstMeta,
-      argValues: [co, cid],
-      apiImpl: this,
-    ));
-  }
+  RustArcIncrementStrongCountFnType
+      get rust_arc_increment_strong_count_BlockStorage => wire
+          .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage;
 
-  TaskConstMeta get kCrateLibraryCoStorageGetConstMeta => const TaskConstMeta(
-        debugName: "storage_get",
-        argNames: ["co", "cid"],
-      );
-
-  @override
-  Future<void> crateLibraryCoStorageSet(
-      {required Co co, required Cid cid, required List<int> data}) {
-    return handler.executeNormal(NormalTask(
-      callFfi: (port_) {
-        final serializer = SseSerializer(generalizedFrbRustBinding);
-        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
-            co, serializer);
-        sse_encode_box_autoadd_cid(cid, serializer);
-        sse_encode_list_prim_u_8_loose(data, serializer);
-        pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 16, port: port_);
-      },
-      codec: SseCodec(
-        decodeSuccessData: sse_decode_unit,
-        decodeErrorData:
-            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError,
-      ),
-      constMeta: kCrateLibraryCoStorageSetConstMeta,
-      argValues: [co, cid, data],
-      apiImpl: this,
-    ));
-  }
-
-  TaskConstMeta get kCrateLibraryCoStorageSetConstMeta => const TaskConstMeta(
-        debugName: "storage_set",
-        argNames: ["co", "cid", "data"],
-      );
-
-  @override
-  Future<Cid> crateLibraryCoStorageSetData(
-      {required Co co, required BigInt codec, required List<int> data}) {
-    return handler.executeNormal(NormalTask(
-      callFfi: (port_) {
-        final serializer = SseSerializer(generalizedFrbRustBinding);
-        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
-            co, serializer);
-        sse_encode_u_64(codec, serializer);
-        sse_encode_list_prim_u_8_loose(data, serializer);
-        pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 17, port: port_);
-      },
-      codec: SseCodec(
-        decodeSuccessData: sse_decode_cid,
-        decodeErrorData:
-            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError,
-      ),
-      constMeta: kCrateLibraryCoStorageSetDataConstMeta,
-      argValues: [co, codec, data],
-      apiImpl: this,
-    ));
-  }
-
-  TaskConstMeta get kCrateLibraryCoStorageSetDataConstMeta =>
-      const TaskConstMeta(
-        debugName: "storage_set_data",
-        argNames: ["co", "codec", "data"],
-      );
+  RustArcDecrementStrongCountFnType
+      get rust_arc_decrement_strong_count_BlockStorage => wire
+          .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage;
 
   RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_Co => wire
       .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo;
@@ -658,6 +761,14 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   RustArcDecrementStrongCountFnType
       get rust_arc_decrement_strong_count_CoPrivateIdentity => wire
           .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity;
+
+  @protected
+  BlockStorage
+      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return BlockStorageImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
 
   @protected
   Co dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
@@ -691,6 +802,14 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  BlockStorage
+      dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return BlockStorageImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
   Co dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
       dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -719,6 +838,14 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
           dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return CoPrivateIdentityImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
+  BlockStorage
+      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return BlockStorageImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -759,9 +886,27 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  Block dco_decode_block(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return Block(
+      cid: dco_decode_cid(arr[0]),
+      data: dco_decode_list_prim_u_8_strict(arr[1]),
+    );
+  }
+
+  @protected
   bool dco_decode_bool(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as bool;
+  }
+
+  @protected
+  Block dco_decode_box_autoadd_block(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_block(raw);
   }
 
   @protected
@@ -971,6 +1116,15 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  BlockStorage
+      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return BlockStorageImpl.frbInternalSseDecode(
+        sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
+  }
+
+  @protected
   Co sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
       SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1006,6 +1160,15 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  BlockStorage
+      sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return BlockStorageImpl.frbInternalSseDecode(
+        sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
+  }
+
+  @protected
   Co sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
       SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1037,6 +1200,15 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
           SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return CoPrivateIdentityImpl.frbInternalSseDecode(
+        sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
+  }
+
+  @protected
+  BlockStorage
+      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return BlockStorageImpl.frbInternalSseDecode(
         sse_decode_usize(deserializer), sse_decode_i_32(deserializer));
   }
 
@@ -1083,9 +1255,23 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  Block sse_decode_block(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_cid = sse_decode_cid(deserializer);
+    var var_data = sse_decode_list_prim_u_8_strict(deserializer);
+    return Block(cid: var_cid, data: var_data);
+  }
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8() != 0;
+  }
+
+  @protected
+  Block sse_decode_box_autoadd_block(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_block(deserializer));
   }
 
   @protected
@@ -1351,6 +1537,16 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
 
   @protected
   void
+      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          BlockStorage self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+        (self as BlockStorageImpl).frbInternalSseEncode(move: true),
+        serializer);
+  }
+
+  @protected
+  void
       sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
           Co self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1388,6 +1584,16 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
 
   @protected
   void
+      sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          BlockStorage self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+        (self as BlockStorageImpl).frbInternalSseEncode(move: false),
+        serializer);
+  }
+
+  @protected
+  void
       sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
           Co self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1420,6 +1626,16 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
         (self as CoPrivateIdentityImpl).frbInternalSseEncode(move: false),
+        serializer);
+  }
+
+  @protected
+  void
+      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          BlockStorage self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+        (self as BlockStorageImpl).frbInternalSseEncode(move: null),
         serializer);
   }
 
@@ -1467,9 +1683,22 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  void sse_encode_block(Block self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_cid(self.cid, serializer);
+    sse_encode_list_prim_u_8_strict(self.data, serializer);
+  }
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self ? 1 : 0);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_block(Block self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_block(self, serializer);
   }
 
   @protected
@@ -1705,6 +1934,32 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
 }
 
 @sealed
+class BlockStorageImpl extends RustOpaque implements BlockStorage {
+  // Not to be used by end users
+  BlockStorageImpl.frbInternalDcoDecode(List<dynamic> wire)
+      : super.frbInternalDcoDecode(wire, _kStaticData);
+
+  // Not to be used by end users
+  BlockStorageImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative)
+      : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+  static final _kStaticData = RustArcStaticData(
+    rustArcIncrementStrongCount:
+        CoKit.instance.api.rust_arc_increment_strong_count_BlockStorage,
+    rustArcDecrementStrongCount:
+        CoKit.instance.api.rust_arc_decrement_strong_count_BlockStorage,
+    rustArcDecrementStrongCountPtr:
+        CoKit.instance.api.rust_arc_decrement_strong_count_BlockStoragePtr,
+  );
+
+  Future<Block> get_({required Cid cid}) =>
+      CoKit.instance.api.crateTypesStorageBlockStorageGet(that: this, cid: cid);
+
+  Future<Cid> set_({required Block block}) => CoKit.instance.api
+      .crateTypesStorageBlockStorageSet(that: this, block: block);
+}
+
+@sealed
 class CoContextImpl extends RustOpaque implements CoContext {
   // Not to be used by end users
   CoContextImpl.frbInternalDcoDecode(List<dynamic> wire)
@@ -1782,6 +2037,10 @@ class CoImpl extends RustOpaque implements Co {
           that: this, identity: identity, core: core, action: action);
 
   Future<CoState> state() => CoKit.instance.api.crateLibraryCoCoState(
+        that: this,
+      );
+
+  Future<BlockStorage> storage() => CoKit.instance.api.crateLibraryCoCoStorage(
         that: this,
       );
 }

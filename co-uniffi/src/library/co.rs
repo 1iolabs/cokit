@@ -1,5 +1,5 @@
-use crate::{CoCid, CoError, CoPrivateIdentity};
-use co_sdk::{from_cbor, Block, BlockStorage, CoReducer, CoReducerState};
+use crate::{BlockStorage, CoCid, CoError, CoPrivateIdentity};
+use co_sdk::{from_cbor, CoReducer, CoReducerState};
 use ipld_core::ipld::Ipld;
 
 #[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
@@ -22,6 +22,10 @@ impl Co {
 		let ipld: Ipld = from_cbor(&action).map_err(CoError::new)?;
 		let _state = self.co.push(identity.as_ref(), core, &ipld).await.map_err(CoError::new)?;
 		Ok(())
+	}
+
+	pub fn storage(&self) -> BlockStorage {
+		BlockStorage::new(self.co.storage())
 	}
 
 	// pub async fn subscribe(&self, listener: Arc<dyn CoStateListener>) -> Arc<CoStateSubscription> {
@@ -63,22 +67,22 @@ impl From<CoReducerState> for CoState {
 // 	fn on_change(&self, state: CoState);
 // }
 
-#[cfg_attr(feature = "uniffi", uniffi::export)]
-pub async fn storage_get(co: &Co, cid: &CoCid) -> Result<Vec<u8>, CoError> {
-	Ok(co.co.storage().get(&cid.cid()?).await.map_err(CoError::new)?.into_inner().1)
-}
+// #[cfg_attr(feature = "uniffi", uniffi::export)]
+// pub async fn storage_get(co: &Co, cid: &CoCid) -> Result<Vec<u8>, CoError> {
+// 	Ok(co.co.storage().get(&cid.cid()?).await.map_err(CoError::new)?.into_inner().1)
+// }
 
-#[cfg_attr(feature = "uniffi", uniffi::export)]
-pub async fn storage_set(co: &Co, cid: &CoCid, data: Vec<u8>) -> Result<(), CoError> {
-	let block = Block::new(cid.cid()?, data).map_err(CoError::new)?;
-	co.co.storage().set(block).await.map_err(CoError::new)?;
-	Ok(())
-}
+// #[cfg_attr(feature = "uniffi", uniffi::export)]
+// pub async fn storage_set(co: &Co, cid: &CoCid, data: Vec<u8>) -> Result<(), CoError> {
+// 	let block = Block::new(cid.cid()?, data).map_err(CoError::new)?;
+// 	co.co.storage().set(block).await.map_err(CoError::new)?;
+// 	Ok(())
+// }
 
-#[cfg_attr(feature = "uniffi", uniffi::export)]
-pub async fn storage_set_data(co: &Co, codec: u64, data: Vec<u8>) -> Result<CoCid, CoError> {
-	let block = Block::new_data(codec, data);
-	let cid = *block.cid();
-	co.co.storage().set(block).await.map_err(CoError::new)?;
-	Ok(cid.into())
-}
+// #[cfg_attr(feature = "uniffi", uniffi::export)]
+// pub async fn storage_set_data(co: &Co, codec: u64, data: Vec<u8>) -> Result<CoCid, CoError> {
+// 	let block = Block::new_data(codec, data);
+// 	let cid = *block.cid();
+// 	co.co.storage().set(block).await.map_err(CoError::new)?;
+// 	Ok(cid.into())
+// }

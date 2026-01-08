@@ -29,6 +29,7 @@ use crate::library::co::*;
 use crate::library::co_context::*;
 use crate::library::co_error::*;
 use crate::types::identity::*;
+use crate::types::storage::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
 use flutter_rust_bridge::{Handler, IntoIntoDart};
@@ -41,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
 	default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -471991239;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1042217628;
 
 // Section: executor
 
@@ -49,6 +50,98 @@ flutter_rust_bridge::frb_generated_default_handler!();
 
 // Section: wire_funcs
 
+fn wire__crate__types__storage__BlockStorage_get_impl(
+	port_: flutter_rust_bridge::for_generated::MessagePort,
+	ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+	rust_vec_len_: i32,
+	data_len_: i32,
+) {
+	FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+		flutter_rust_bridge::for_generated::TaskInfo {
+			debug_name: "BlockStorage_get",
+			port: Some(port_),
+			mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+		},
+		move || {
+			let message = unsafe {
+				flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+			};
+			let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+			let api_that =
+				<RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>>>::sse_decode(
+					&mut deserializer,
+				);
+			let api_cid = <crate::types::cid::Cid>::sse_decode(&mut deserializer);
+			deserializer.end();
+			move |context| async move {
+				transform_result_sse::<_, CoError>(
+					(move || async move {
+						let mut api_that_guard = None;
+						let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+							flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false),
+						]);
+						for i in decode_indices_ {
+							match i {
+								0 => api_that_guard = Some(api_that.lockable_decode_async_ref().await),
+								_ => unreachable!(),
+							}
+						}
+						let api_that_guard = api_that_guard.unwrap();
+						let output_ok = crate::types::storage::BlockStorage::get(&*api_that_guard, &api_cid).await?;
+						Ok(output_ok)
+					})()
+					.await,
+				)
+			}
+		},
+	)
+}
+fn wire__crate__types__storage__BlockStorage_set_impl(
+	port_: flutter_rust_bridge::for_generated::MessagePort,
+	ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+	rust_vec_len_: i32,
+	data_len_: i32,
+) {
+	FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+		flutter_rust_bridge::for_generated::TaskInfo {
+			debug_name: "BlockStorage_set",
+			port: Some(port_),
+			mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+		},
+		move || {
+			let message = unsafe {
+				flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+			};
+			let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+			let api_that =
+				<RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>>>::sse_decode(
+					&mut deserializer,
+				);
+			let api_block = <crate::types::storage::Block>::sse_decode(&mut deserializer);
+			deserializer.end();
+			move |context| async move {
+				transform_result_sse::<_, CoError>(
+					(move || async move {
+						let mut api_that_guard = None;
+						let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+							flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false),
+						]);
+						for i in decode_indices_ {
+							match i {
+								0 => api_that_guard = Some(api_that.lockable_decode_async_ref().await),
+								_ => unreachable!(),
+							}
+						}
+						let api_that_guard = api_that_guard.unwrap();
+						let output_ok = crate::types::storage::BlockStorage::set(&*api_that_guard, api_block).await?;
+						Ok(output_ok)
+					})()
+					.await,
+				)
+			}
+		},
+	)
+}
 fn wire__crate__library__co_context__CoContext_open_impl(
 	port_: flutter_rust_bridge::for_generated::MessagePort,
 	ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -356,6 +449,135 @@ fn wire__crate__library__co__Co_state_impl(
 		},
 	)
 }
+fn wire__crate__library__co__Co_storage_impl(
+	port_: flutter_rust_bridge::for_generated::MessagePort,
+	ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+	rust_vec_len_: i32,
+	data_len_: i32,
+) {
+	FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+		flutter_rust_bridge::for_generated::TaskInfo {
+			debug_name: "Co_storage",
+			port: Some(port_),
+			mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+		},
+		move || {
+			let message = unsafe {
+				flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+			};
+			let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+			let api_that = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Co>>>::sse_decode(
+				&mut deserializer,
+			);
+			deserializer.end();
+			move |context| {
+				transform_result_sse::<_, ()>((move || {
+					let mut api_that_guard = None;
+					let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+						flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_that, 0, false),
+					]);
+					for i in decode_indices_ {
+						match i {
+							0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+							_ => unreachable!(),
+						}
+					}
+					let api_that_guard = api_that_guard.unwrap();
+					let output_ok = Result::<_, ()>::Ok(crate::library::co::Co::storage(&*api_that_guard))?;
+					Ok(output_ok)
+				})())
+			}
+		},
+	)
+}
+fn wire__crate__types__storage__block_new_impl(
+	port_: flutter_rust_bridge::for_generated::MessagePort,
+	ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+	rust_vec_len_: i32,
+	data_len_: i32,
+) {
+	FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+		flutter_rust_bridge::for_generated::TaskInfo {
+			debug_name: "block_new",
+			port: Some(port_),
+			mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+		},
+		move || {
+			let message = unsafe {
+				flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+			};
+			let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+			let api_cid = <crate::types::cid::Cid>::sse_decode(&mut deserializer);
+			let api_data = <Vec<u8>>::sse_decode(&mut deserializer);
+			deserializer.end();
+			move |context| {
+				transform_result_sse::<_, CoError>((move || {
+					let output_ok = crate::types::storage::Block::new(api_cid, api_data)?;
+					Ok(output_ok)
+				})())
+			}
+		},
+	)
+}
+fn wire__crate__types__storage__block_new_data_impl(
+	port_: flutter_rust_bridge::for_generated::MessagePort,
+	ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+	rust_vec_len_: i32,
+	data_len_: i32,
+) {
+	FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+		flutter_rust_bridge::for_generated::TaskInfo {
+			debug_name: "block_new_data",
+			port: Some(port_),
+			mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+		},
+		move || {
+			let message = unsafe {
+				flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+			};
+			let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+			let api_codec = <u64>::sse_decode(&mut deserializer);
+			let api_data = <Vec<u8>>::sse_decode(&mut deserializer);
+			deserializer.end();
+			move |context| {
+				transform_result_sse::<_, ()>((move || {
+					let output_ok = Result::<_, ()>::Ok(crate::types::storage::Block::new_data(api_codec, api_data))?;
+					Ok(output_ok)
+				})())
+			}
+		},
+	)
+}
+fn wire__crate__types__storage__block_new_unchecked_impl(
+	port_: flutter_rust_bridge::for_generated::MessagePort,
+	ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+	rust_vec_len_: i32,
+	data_len_: i32,
+) {
+	FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+		flutter_rust_bridge::for_generated::TaskInfo {
+			debug_name: "block_new_unchecked",
+			port: Some(port_),
+			mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+		},
+		move || {
+			let message = unsafe {
+				flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+			};
+			let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+			let api_cid = <crate::types::cid::Cid>::sse_decode(&mut deserializer);
+			let api_data = <Vec<u8>>::sse_decode(&mut deserializer);
+			deserializer.end();
+			move |context| {
+				transform_result_sse::<_, ()>((move || {
+					let output_ok =
+						Result::<_, ()>::Ok(crate::types::storage::Block::new_unchecked(api_cid, api_data))?;
+					Ok(output_ok)
+				})())
+			}
+		},
+	)
+}
 fn wire__crate__types__cid__cid_codec_impl(
 	ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
 	rust_vec_len_: i32,
@@ -540,147 +762,12 @@ fn wire__crate__library__co_settings__co_settings_default_impl(
 		},
 	)
 }
-fn wire__crate__library__co__storage_get_impl(
-	port_: flutter_rust_bridge::for_generated::MessagePort,
-	ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-	rust_vec_len_: i32,
-	data_len_: i32,
-) {
-	FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-		flutter_rust_bridge::for_generated::TaskInfo {
-			debug_name: "storage_get",
-			port: Some(port_),
-			mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-		},
-		move || {
-			let message = unsafe {
-				flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
-			};
-			let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-			let api_co = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Co>>>::sse_decode(
-				&mut deserializer,
-			);
-			let api_cid = <crate::types::cid::Cid>::sse_decode(&mut deserializer);
-			deserializer.end();
-			move |context| async move {
-				transform_result_sse::<_, CoError>(
-					(move || async move {
-						let mut api_co_guard = None;
-						let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
-							flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_co, 0, false),
-						]);
-						for i in decode_indices_ {
-							match i {
-								0 => api_co_guard = Some(api_co.lockable_decode_async_ref().await),
-								_ => unreachable!(),
-							}
-						}
-						let api_co_guard = api_co_guard.unwrap();
-						let output_ok = crate::library::co::storage_get(&*api_co_guard, &api_cid).await?;
-						Ok(output_ok)
-					})()
-					.await,
-				)
-			}
-		},
-	)
-}
-fn wire__crate__library__co__storage_set_impl(
-	port_: flutter_rust_bridge::for_generated::MessagePort,
-	ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-	rust_vec_len_: i32,
-	data_len_: i32,
-) {
-	FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-		flutter_rust_bridge::for_generated::TaskInfo {
-			debug_name: "storage_set",
-			port: Some(port_),
-			mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-		},
-		move || {
-			let message = unsafe {
-				flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
-			};
-			let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-			let api_co = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Co>>>::sse_decode(
-				&mut deserializer,
-			);
-			let api_cid = <crate::types::cid::Cid>::sse_decode(&mut deserializer);
-			let api_data = <Vec<u8>>::sse_decode(&mut deserializer);
-			deserializer.end();
-			move |context| async move {
-				transform_result_sse::<_, CoError>(
-					(move || async move {
-						let mut api_co_guard = None;
-						let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
-							flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_co, 0, false),
-						]);
-						for i in decode_indices_ {
-							match i {
-								0 => api_co_guard = Some(api_co.lockable_decode_async_ref().await),
-								_ => unreachable!(),
-							}
-						}
-						let api_co_guard = api_co_guard.unwrap();
-						let output_ok = crate::library::co::storage_set(&*api_co_guard, &api_cid, api_data).await?;
-						Ok(output_ok)
-					})()
-					.await,
-				)
-			}
-		},
-	)
-}
-fn wire__crate__library__co__storage_set_data_impl(
-	port_: flutter_rust_bridge::for_generated::MessagePort,
-	ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-	rust_vec_len_: i32,
-	data_len_: i32,
-) {
-	FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-		flutter_rust_bridge::for_generated::TaskInfo {
-			debug_name: "storage_set_data",
-			port: Some(port_),
-			mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-		},
-		move || {
-			let message = unsafe {
-				flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
-			};
-			let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-			let api_co = <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Co>>>::sse_decode(
-				&mut deserializer,
-			);
-			let api_codec = <u64>::sse_decode(&mut deserializer);
-			let api_data = <Vec<u8>>::sse_decode(&mut deserializer);
-			deserializer.end();
-			move |context| async move {
-				transform_result_sse::<_, CoError>(
-					(move || async move {
-						let mut api_co_guard = None;
-						let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
-							flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_co, 0, false),
-						]);
-						for i in decode_indices_ {
-							match i {
-								0 => api_co_guard = Some(api_co.lockable_decode_async_ref().await),
-								_ => unreachable!(),
-							}
-						}
-						let api_co_guard = api_co_guard.unwrap();
-						let output_ok =
-							crate::library::co::storage_set_data(&*api_co_guard, api_codec, api_data).await?;
-						Ok(output_ok)
-					})()
-					.await,
-				)
-			}
-		},
-	)
-}
 
 // Section: related_funcs
 
+flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
+	flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>
+);
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Co>);
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
 	flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CoContext>
@@ -693,6 +780,17 @@ flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
 );
 
 // Section: dart2rust
+
+impl SseDecode for BlockStorage {
+	// Codec=Sse (Serialization based), see doc to use other codecs
+	fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+		let mut inner =
+			<RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>>>::sse_decode(
+				deserializer,
+			);
+		return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
+	}
+}
 
 impl SseDecode for Co {
 	// Codec=Sse (Serialization based), see doc to use other codecs
@@ -733,6 +831,14 @@ impl SseDecode for CoPrivateIdentity {
 	}
 }
 
+impl SseDecode for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>> {
+	// Codec=Sse (Serialization based), see doc to use other codecs
+	fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+		let mut inner = <usize>::sse_decode(deserializer);
+		return decode_rust_opaque_moi(inner);
+	}
+}
+
 impl SseDecode for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Co>> {
 	// Codec=Sse (Serialization based), see doc to use other codecs
 	fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -770,6 +876,15 @@ impl SseDecode for String {
 	fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
 		let mut inner = <Vec<u8>>::sse_decode(deserializer);
 		return String::from_utf8(inner).unwrap();
+	}
+}
+
+impl SseDecode for crate::types::storage::Block {
+	// Codec=Sse (Serialization based), see doc to use other codecs
+	fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+		let mut var_cid = <crate::types::cid::Cid>::sse_decode(deserializer);
+		let mut var_data = <Vec<u8>>::sse_decode(deserializer);
+		return crate::types::storage::Block { cid: var_cid, data: var_data };
 	}
 }
 
@@ -1027,21 +1142,24 @@ fn pde_ffi_dispatcher_primary_impl(
 ) {
 	// Codec=Pde (Serialization + dispatch), see doc to use other codecs
 	match func_id {
-		1 => wire__crate__library__co_context__CoContext_open_impl(port, ptr, rust_vec_len, data_len),
-		2 => wire__crate__library__co_context__CoContext_open_co_impl(port, ptr, rust_vec_len, data_len),
-		3 => {
+		1 => wire__crate__types__storage__BlockStorage_get_impl(port, ptr, rust_vec_len, data_len),
+		2 => wire__crate__types__storage__BlockStorage_set_impl(port, ptr, rust_vec_len, data_len),
+		3 => wire__crate__library__co_context__CoContext_open_impl(port, ptr, rust_vec_len, data_len),
+		4 => wire__crate__library__co_context__CoContext_open_co_impl(port, ptr, rust_vec_len, data_len),
+		5 => {
 			wire__crate__library__co_context__CoContext_resolve_private_identity_impl(port, ptr, rust_vec_len, data_len)
 		},
-		5 => wire__crate__types__identity__CoPrivateIdentity_identity_impl(port, ptr, rust_vec_len, data_len),
-		6 => wire__crate__library__co__Co_push_impl(port, ptr, rust_vec_len, data_len),
-		7 => wire__crate__library__co__Co_state_impl(port, ptr, rust_vec_len, data_len),
-		9 => wire__crate__types__cid__cid_from_string_impl(port, ptr, rust_vec_len, data_len),
-		12 => wire__crate__types__level__co_log_level_default_impl(port, ptr, rust_vec_len, data_len),
-		13 => wire__crate__types__network_settings__co_network_settings_default_impl(port, ptr, rust_vec_len, data_len),
-		14 => wire__crate__library__co_settings__co_settings_default_impl(port, ptr, rust_vec_len, data_len),
-		15 => wire__crate__library__co__storage_get_impl(port, ptr, rust_vec_len, data_len),
-		16 => wire__crate__library__co__storage_set_impl(port, ptr, rust_vec_len, data_len),
-		17 => wire__crate__library__co__storage_set_data_impl(port, ptr, rust_vec_len, data_len),
+		7 => wire__crate__types__identity__CoPrivateIdentity_identity_impl(port, ptr, rust_vec_len, data_len),
+		8 => wire__crate__library__co__Co_push_impl(port, ptr, rust_vec_len, data_len),
+		9 => wire__crate__library__co__Co_state_impl(port, ptr, rust_vec_len, data_len),
+		10 => wire__crate__library__co__Co_storage_impl(port, ptr, rust_vec_len, data_len),
+		11 => wire__crate__types__storage__block_new_impl(port, ptr, rust_vec_len, data_len),
+		12 => wire__crate__types__storage__block_new_data_impl(port, ptr, rust_vec_len, data_len),
+		13 => wire__crate__types__storage__block_new_unchecked_impl(port, ptr, rust_vec_len, data_len),
+		15 => wire__crate__types__cid__cid_from_string_impl(port, ptr, rust_vec_len, data_len),
+		18 => wire__crate__types__level__co_log_level_default_impl(port, ptr, rust_vec_len, data_len),
+		19 => wire__crate__types__network_settings__co_network_settings_default_impl(port, ptr, rust_vec_len, data_len),
+		20 => wire__crate__library__co_settings__co_settings_default_impl(port, ptr, rust_vec_len, data_len),
 		_ => unreachable!(),
 	}
 }
@@ -1054,15 +1172,29 @@ fn pde_ffi_dispatcher_sync_impl(
 ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
 	// Codec=Pde (Serialization + dispatch), see doc to use other codecs
 	match func_id {
-		4 => wire__crate__library__co_error__CoError_message_impl(ptr, rust_vec_len, data_len),
-		8 => wire__crate__types__cid__cid_codec_impl(ptr, rust_vec_len, data_len),
-		10 => wire__crate__types__cid__cid_to_string_impl(ptr, rust_vec_len, data_len),
-		11 => wire__crate__types__cid__cid_version_impl(ptr, rust_vec_len, data_len),
+		6 => wire__crate__library__co_error__CoError_message_impl(ptr, rust_vec_len, data_len),
+		14 => wire__crate__types__cid__cid_codec_impl(ptr, rust_vec_len, data_len),
+		16 => wire__crate__types__cid__cid_to_string_impl(ptr, rust_vec_len, data_len),
+		17 => wire__crate__types__cid__cid_version_impl(ptr, rust_vec_len, data_len),
 		_ => unreachable!(),
 	}
 }
 
 // Section: rust2dart
+
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<BlockStorage> {
+	fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+		flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0).into_dart()
+	}
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<BlockStorage> {}
+
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<BlockStorage>> for BlockStorage {
+	fn into_into_dart(self) -> FrbWrapper<BlockStorage> {
+		self.into()
+	}
+}
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for FrbWrapper<Co> {
@@ -1120,6 +1252,18 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<CoPrivateIdentity>> for CoPriv
 	}
 }
 
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::types::storage::Block {
+	fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+		[self.cid.into_into_dart().into_dart(), self.data.into_into_dart().into_dart()].into_dart()
+	}
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::types::storage::Block {}
+impl flutter_rust_bridge::IntoIntoDart<crate::types::storage::Block> for crate::types::storage::Block {
+	fn into_into_dart(self) -> crate::types::storage::Block {
+		self
+	}
+}
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::types::cid::Cid {
 	fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
@@ -1214,6 +1358,16 @@ impl flutter_rust_bridge::IntoIntoDart<crate::library::co::CoState> for crate::l
 	}
 }
 
+impl SseEncode for BlockStorage {
+	// Codec=Sse (Serialization based), see doc to use other codecs
+	fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+		<RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>>>::sse_encode(
+			flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self),
+			serializer,
+		);
+	}
+}
+
 impl SseEncode for Co {
 	// Codec=Sse (Serialization based), see doc to use other codecs
 	fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1251,6 +1405,15 @@ impl SseEncode for CoPrivateIdentity {
 			flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self),
 			serializer,
 		);
+	}
+}
+
+impl SseEncode for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>> {
+	// Codec=Sse (Serialization based), see doc to use other codecs
+	fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+		let (ptr, size) = self.sse_encode_raw();
+		<usize>::sse_encode(ptr, serializer);
+		<i32>::sse_encode(size, serializer);
 	}
 }
 
@@ -1294,6 +1457,14 @@ impl SseEncode for String {
 	// Codec=Sse (Serialization based), see doc to use other codecs
 	fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
 		<Vec<u8>>::sse_encode(self.into_bytes(), serializer);
+	}
+}
+
+impl SseEncode for crate::types::storage::Block {
+	// Codec=Sse (Serialization based), see doc to use other codecs
+	fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+		<crate::types::cid::Cid>::sse_encode(self.cid, serializer);
+		<Vec<u8>>::sse_encode(self.data, serializer);
 	}
 }
 
@@ -1520,6 +1691,7 @@ mod io {
 	use crate::library::co_context::*;
 	use crate::library::co_error::*;
 	use crate::types::identity::*;
+	use crate::types::storage::*;
 	use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 	use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
 	use flutter_rust_bridge::{Handler, IntoIntoDart};
@@ -1527,6 +1699,24 @@ mod io {
 	// Section: boilerplate
 
 	flutter_rust_bridge::frb_generated_boilerplate_io!();
+
+	#[unsafe(no_mangle)]
+	pub extern "C" fn frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+		ptr: *const std::ffi::c_void,
+	) {
+		MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>>::increment_strong_count(
+			ptr as _,
+		);
+	}
+
+	#[unsafe(no_mangle)]
+	pub extern "C" fn frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+		ptr: *const std::ffi::c_void,
+	) {
+		MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>>::decrement_strong_count(
+			ptr as _,
+		);
+	}
 
 	#[unsafe(no_mangle)]
 	pub extern "C" fn frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
@@ -1604,6 +1794,7 @@ mod web {
 	use crate::library::co_context::*;
 	use crate::library::co_error::*;
 	use crate::types::identity::*;
+	use crate::types::storage::*;
 	use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
 	use flutter_rust_bridge::for_generated::wasm_bindgen;
 	use flutter_rust_bridge::for_generated::wasm_bindgen::prelude::*;
@@ -1613,6 +1804,24 @@ mod web {
 	// Section: boilerplate
 
 	flutter_rust_bridge::frb_generated_boilerplate_web!();
+
+	#[wasm_bindgen]
+	pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+		ptr: *const std::ffi::c_void,
+	) {
+		MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>>::increment_strong_count(
+			ptr as _,
+		);
+	}
+
+	#[wasm_bindgen]
+	pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+		ptr: *const std::ffi::c_void,
+	) {
+		MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>>::decrement_strong_count(
+			ptr as _,
+		);
+	}
 
 	#[wasm_bindgen]
 	pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
