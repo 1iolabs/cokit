@@ -2209,6 +2209,7 @@ dependencies = [
  "serde_repr",
  "thiserror 1.0.69",
  "tokio",
+ "tokio-util",
  "tracing",
  "uniffi",
 ]

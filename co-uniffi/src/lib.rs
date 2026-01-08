@@ -12,12 +12,13 @@ pub use library::{
 };
 pub use library::{
 	co::{Co, CoState},
-	co_context::CoContext,
+	co_context::{CoContext, CreateCo, CreateCore},
 	co_error::CoError,
 	co_settings::CoSettings,
 };
 pub use types::{
 	cid::Cid,
+	co_map::CoMap,
 	identity::CoPrivateIdentity,
 	level::CoLogLevel,
 	network_settings::CoNetworkSettings,

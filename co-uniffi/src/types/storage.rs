@@ -15,10 +15,12 @@ impl BlockStorage {
 		Self { storage: Arc::new(storage) }
 	}
 
+	#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(name = "getBlock"))]
 	pub async fn get(&self, cid: &CoCid) -> Result<Block, CoError> {
 		Ok(self.storage.get(&cid.cid()?).await.map_err(CoError::new)?.into())
 	}
 
+	#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(name = "setBlock"))]
 	pub async fn set(&self, block: Block) -> Result<CoCid, CoError> {
 		Ok(self.storage.set(block.try_into()?).await.map_err(CoError::new)?.into())
 	}

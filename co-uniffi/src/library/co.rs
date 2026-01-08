@@ -1,6 +1,8 @@
 use crate::{BlockStorage, CoCid, CoError, CoPrivateIdentity};
 use co_sdk::{from_cbor, CoReducer, CoReducerState};
+use futures::StreamExt;
 use ipld_core::ipld::Ipld;
+use tokio_util::sync::CancellationToken;
 
 #[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 #[cfg_attr(feature = "frb", flutter_rust_bridge::frb(opaque))]
@@ -28,9 +30,10 @@ impl Co {
 		BlockStorage::new(self.co.storage())
 	}
 
-	// pub async fn subscribe(&self, listener: Arc<dyn CoStateListener>) -> Arc<CoStateSubscription> {
-	// 	self.co.reducer_state_stream();
-	// }
+	#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(sync))]
+	pub fn subscribe(&self) -> CoSubscription {
+		CoSubscription { co: self.co.clone(), cancel: CancellationToken::new() }
+	}
 }
 impl From<CoReducer> for Co {
 	fn from(value: CoReducer) -> Self {
@@ -50,17 +53,42 @@ impl From<CoReducerState> for CoState {
 	}
 }
 
-// #[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
-// #[derive(Debug)]
-// pub struct CoStateSubscription {
-// 	cancel: tokio
-// }
-// #[cfg_attr(feature = "uniffi", uniffi::export)]
-// impl CoStateSubscription {
-// 	pub fn close(&self) {
+#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(opaque))]
+pub struct CoSubscription {
+	cancel: CancellationToken,
+	co: CoReducer,
+}
+impl CoSubscription {
+	#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(sync))]
+	pub fn close(&self) {
+		self.cancel.cancel();
+	}
 
-// 	}
-// }
+	#[cfg(feature = "frb")]
+	pub fn stream(&self, sink: crate::frb_generated::StreamSink<CoState>) {
+		let cancel = self.cancel.child_token();
+		let stream = self.co.reducer_state_stream().map(CoState::from);
+		let task = async move {
+			futures::pin_mut!(stream);
+			while let Some(item) = stream.next().await {
+				if sink.add(item).is_err() {
+					break;
+				}
+			}
+		};
+		flutter_rust_bridge::spawn(async move {
+			tokio::select! {
+				_ = cancel.cancelled() => {},
+				_ = task => {},
+			}
+		});
+	}
+}
+impl Drop for CoSubscription {
+	fn drop(&mut self) {
+		self.cancel.cancel();
+	}
+}
 
 // #[cfg_attr(feature = "uniffi", uniffi::export)]
 // pub trait CoStateListener: Send + Sync {

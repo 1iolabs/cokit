@@ -13,9 +13,9 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>>
 abstract class BlockStorage implements RustOpaqueInterface {
-  Future<Block> get_({required Cid cid});
+  Future<Block> getBlock({required Cid cid});
 
-  Future<Cid> set_({required Block block});
+  Future<Cid> setBlock({required Block block});
 }
 
 class Block {

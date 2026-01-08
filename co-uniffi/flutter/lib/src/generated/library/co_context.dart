@@ -4,6 +4,7 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
+import '../types/cid.dart';
 import '../types/identity.dart';
 import '../types/level.dart';
 import '../types/network_settings.dart';
@@ -12,14 +13,73 @@ import 'co_error.dart';
 import 'co_settings.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `fmt`, `try_from`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CoContext>>
 abstract class CoContext implements RustOpaqueInterface {
+  Future<Co> createCo(
+      {required CoPrivateIdentity identity, required CreateCo create});
+
+  /// Use the first or create an identity with `name`.
+  Future<CoPrivateIdentity> ensureDidKeyIdentity({required String name});
+
   static Future<CoContext> open({required CoSettings settings}) =>
       CoKit.instance.api.crateLibraryCoContextCoContextOpen(settings: settings);
 
   Future<Co> openCo({required String id});
 
   Future<CoPrivateIdentity> resolvePrivateIdentity({required String did});
+}
+
+class CreateCo {
+  final String id;
+  final String? name;
+  final bool public;
+  final Map<String, CreateCore> cores;
+
+  const CreateCo({
+    required this.id,
+    this.name,
+    required this.public,
+    required this.cores,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^ name.hashCode ^ public.hashCode ^ cores.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CreateCo &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          public == other.public &&
+          cores == other.cores;
+}
+
+class CreateCore {
+  final String coreType;
+  final Cid? coreReference;
+  final Uint8List? coreBytes;
+
+  const CreateCore({
+    required this.coreType,
+    this.coreReference,
+    this.coreBytes,
+  });
+
+  @override
+  int get hashCode =>
+      coreType.hashCode ^ coreReference.hashCode ^ coreBytes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CreateCore &&
+          runtimeType == other.runtimeType &&
+          coreType == other.coreType &&
+          coreReference == other.coreReference &&
+          coreBytes == other.coreBytes;
 }

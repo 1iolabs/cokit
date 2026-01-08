@@ -25,11 +25,12 @@ serde = { workspace = true, features = ["derive"] }
 serde_repr = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros"] }
+tokio-util = { workspace = true }
 tracing = { workspace = true }
 uniffi = { version = "0.25", optional = true }
 
 [features]
-default = []
+default = ["frb"]
 uniffi = ["dep:uniffi"]
 frb = ["dep:flutter_rust_bridge"]
 

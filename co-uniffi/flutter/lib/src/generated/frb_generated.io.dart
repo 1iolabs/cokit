@@ -43,6 +43,13 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
       get rust_arc_decrement_strong_count_CoPrivateIdentityPtr => wire
           ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentityPtr;
 
+  CrossPlatformFinalizerArg
+      get rust_arc_decrement_strong_count_CoSubscriptionPtr => wire
+          ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscriptionPtr;
+
+  @protected
+  AnyhowException dco_decode_AnyhowException(dynamic raw);
+
   @protected
   BlockStorage
       dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
@@ -65,6 +72,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   @protected
   CoPrivateIdentity
       dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+          dynamic raw);
+
+  @protected
+  CoSubscription
+      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
           dynamic raw);
 
   @protected
@@ -92,6 +104,14 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
           dynamic raw);
 
   @protected
+  CoSubscription
+      dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          dynamic raw);
+
+  @protected
+  Map<String, CreateCore> dco_decode_Map_String_create_core_None(dynamic raw);
+
+  @protected
   BlockStorage
       dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
           dynamic raw);
@@ -114,6 +134,14 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   CoPrivateIdentity
       dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
           dynamic raw);
+
+  @protected
+  CoSubscription
+      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          dynamic raw);
+
+  @protected
+  RustStreamSink<CoState> dco_decode_StreamSink_co_state_Sse(dynamic raw);
 
   @protected
   String dco_decode_String(dynamic raw);
@@ -143,6 +171,9 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   CoSettings dco_decode_box_autoadd_co_settings(dynamic raw);
 
   @protected
+  CreateCo dco_decode_box_autoadd_create_co(dynamic raw);
+
+  @protected
   int dco_decode_box_autoadd_u_32(dynamic raw);
 
   @protected
@@ -161,6 +192,12 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   CoState dco_decode_co_state(dynamic raw);
 
   @protected
+  CreateCo dco_decode_create_co(dynamic raw);
+
+  @protected
+  CreateCore dco_decode_create_core(dynamic raw);
+
+  @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
@@ -174,6 +211,10 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  List<(String, CreateCore)> dco_decode_list_record_string_create_core(
+      dynamic raw);
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
@@ -198,6 +239,12 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   List<String>? dco_decode_opt_list_String(dynamic raw);
 
   @protected
+  Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  (String, CreateCore) dco_decode_record_string_create_core(dynamic raw);
+
+  @protected
   int dco_decode_u_32(dynamic raw);
 
   @protected
@@ -211,6 +258,9 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   BigInt dco_decode_usize(dynamic raw);
+
+  @protected
+  AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
 
   @protected
   BlockStorage
@@ -234,6 +284,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   @protected
   CoPrivateIdentity
       sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+          SseDeserializer deserializer);
+
+  @protected
+  CoSubscription
+      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
           SseDeserializer deserializer);
 
   @protected
@@ -261,6 +316,15 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
           SseDeserializer deserializer);
 
   @protected
+  CoSubscription
+      sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          SseDeserializer deserializer);
+
+  @protected
+  Map<String, CreateCore> sse_decode_Map_String_create_core_None(
+      SseDeserializer deserializer);
+
+  @protected
   BlockStorage
       sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
           SseDeserializer deserializer);
@@ -283,6 +347,15 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   CoPrivateIdentity
       sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
           SseDeserializer deserializer);
+
+  @protected
+  CoSubscription
+      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          SseDeserializer deserializer);
+
+  @protected
+  RustStreamSink<CoState> sse_decode_StreamSink_co_state_Sse(
+      SseDeserializer deserializer);
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
@@ -313,6 +386,9 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   CoSettings sse_decode_box_autoadd_co_settings(SseDeserializer deserializer);
 
   @protected
+  CreateCo sse_decode_box_autoadd_create_co(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
 
   @protected
@@ -332,6 +408,12 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   CoState sse_decode_co_state(SseDeserializer deserializer);
 
   @protected
+  CreateCo sse_decode_create_co(SseDeserializer deserializer);
+
+  @protected
+  CreateCore sse_decode_create_core(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
@@ -345,6 +427,10 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  List<(String, CreateCore)> sse_decode_list_record_string_create_core(
+      SseDeserializer deserializer);
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
@@ -370,6 +456,13 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   List<String>? sse_decode_opt_list_String(SseDeserializer deserializer);
 
   @protected
+  Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  (String, CreateCore) sse_decode_record_string_create_core(
+      SseDeserializer deserializer);
+
+  @protected
   int sse_decode_u_32(SseDeserializer deserializer);
 
   @protected
@@ -383,6 +476,10 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   BigInt sse_decode_usize(SseDeserializer deserializer);
+
+  @protected
+  void sse_encode_AnyhowException(
+      AnyhowException self, SseSerializer serializer);
 
   @protected
   void
@@ -411,6 +508,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void
+      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          CoSubscription self, SseSerializer serializer);
+
+  @protected
+  void
       sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
           BlockStorage self, SseSerializer serializer);
 
@@ -436,6 +538,15 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void
+      sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          CoSubscription self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_Map_String_create_core_None(
+      Map<String, CreateCore> self, SseSerializer serializer);
+
+  @protected
+  void
       sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
           BlockStorage self, SseSerializer serializer);
 
@@ -458,6 +569,15 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   void
       sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
           CoPrivateIdentity self, SseSerializer serializer);
+
+  @protected
+  void
+      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          CoSubscription self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_StreamSink_co_state_Sse(
+      RustStreamSink<CoState> self, SseSerializer serializer);
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
@@ -490,6 +610,10 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
       CoSettings self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_create_co(
+      CreateCo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
 
   @protected
@@ -509,6 +633,12 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   void sse_encode_co_state(CoState self, SseSerializer serializer);
 
   @protected
+  void sse_encode_create_co(CreateCo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_create_core(CreateCore self, SseSerializer serializer);
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
@@ -523,6 +653,10 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   @protected
   void sse_encode_list_prim_u_8_strict(
       Uint8List self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_record_string_create_core(
+      List<(String, CreateCore)> self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
@@ -546,6 +680,14 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void sse_encode_opt_list_String(List<String>? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_list_prim_u_8_strict(
+      Uint8List? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_record_string_create_core(
+      (String, CreateCore) self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);
@@ -735,5 +877,37 @@ class CoKitWire implements BaseWire {
           'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity');
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity =
       _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentityPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+      rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscriptionPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+          'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription');
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscriptionPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+      rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscriptionPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+          'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription');
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscriptionPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 }
