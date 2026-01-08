@@ -4,32 +4,37 @@ use co_actor::{Actor, ActorError, ActorHandle, Response};
 use co_sdk::{Application, ApplicationBuilder, CoContext, CoId, CoReducerFactory, Did, PrivateIdentityResolver, Tags};
 use std::path::PathBuf;
 
+#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(ignore))]
 pub enum CoMessage {
 	OpenCo(CoId, Response<Result<Co, anyhow::Error>>),
 	ResolvePrivateIdentity(Did, Response<Result<CoPrivateIdentity, anyhow::Error>>),
 }
 
 /// CoApplication actor that spawns a Application in a new thread.
+#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(ignore))]
 #[derive(Debug, Default)]
 pub struct CoApplication {}
+#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(ignore))]
 impl CoApplication {
 	pub async fn spawn(settings: CoSettings) -> Result<ActorHandle<CoMessage>, anyhow::Error> {
 		let (tx, rx) = tokio::sync::oneshot::channel::<Result<ActorHandle<CoMessage>, anyhow::Error>>();
-		tokio::runtime::Builder::new_multi_thread()
-			.enable_all()
-			.build()
-			.unwrap()
-			.block_on(async move {
-				match Actor::spawn(Default::default(), CoApplication::default(), settings) {
-					Ok(application) => {
-						tx.send(Ok(application.handle())).ok();
-						application.join().await.expect("app");
-					},
-					Err(err) => {
-						tx.send(Err(err.into())).ok();
-					},
-				}
-			});
+		std::thread::spawn(|| {
+			tokio::runtime::Builder::new_multi_thread()
+				.enable_all()
+				.build()
+				.unwrap()
+				.block_on(async move {
+					match Actor::spawn(Default::default(), CoApplication::default(), settings) {
+						Ok(application) => {
+							tx.send(Ok(application.handle())).ok();
+							application.join().await.expect("app");
+						},
+						Err(err) => {
+							tx.send(Err(err.into())).ok();
+						},
+					}
+				});
+		});
 		rx.await?
 	}
 }
@@ -49,24 +54,39 @@ impl Actor for CoApplication {
 			Some(path) => ApplicationBuilder::new_with_path(settings.identifier, PathBuf::from(&path)),
 			None => ApplicationBuilder::new(settings.identifier),
 		};
-		if !settings.no_log {
+		if !settings
+			.no_log
+			.unwrap_or_else(|| CoSettings::default().no_log.unwrap_or_default())
+		{
 			application_builder = application_builder.with_bunyan_logging(None);
 		}
-		if settings.no_keychain {
+		if settings
+			.no_keychain
+			.unwrap_or_else(|| CoSettings::default().no_keychain.unwrap_or_default())
+		{
 			application_builder = application_builder.without_keychain();
 		}
-		if settings.no_default_features {
+		if settings
+			.no_default_features
+			.unwrap_or_else(|| CoSettings::default().no_default_features.unwrap_or_default())
+		{
 			application_builder = application_builder.with_setting("default-features", false);
 		}
 		application_builder = application_builder.with_log_max_level(settings.log_level.unwrap_or_default().into());
-		for feature in &settings.feature {
+		for feature in settings
+			.feature
+			.unwrap_or_else(|| CoSettings::default().feature.unwrap_or_default())
+		{
 			application_builder = application_builder.with_setting("feature", feature.to_owned());
 		}
 		application_builder = application_builder.with_setting("feature", "co-open-keep");
 		let mut application = application_builder.build().await?;
 
 		// network
-		if settings.network {
+		if settings
+			.network
+			.unwrap_or_else(|| CoSettings::default().network.unwrap_or_default())
+		{
 			application
 				.create_network(settings.network_settings.unwrap_or_default().try_into()?)
 				.await?;

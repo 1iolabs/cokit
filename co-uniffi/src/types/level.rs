@@ -1,7 +1,8 @@
 use tracing::Level;
 
 /// Binding for [`Level`].
-#[derive(uniffi::Enum, Debug, Default, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[derive(Debug, Default, Clone)]
 pub enum CoLogLevel {
 	Error,
 	Warn,

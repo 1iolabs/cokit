@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
-import 'generated/co_uniffi.dart';
+import 'generated/frb_generated.dart';
+import '../co_flutter.dart';
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 class CoContextProvider extends InheritedWidget {
   final CoContext context;
@@ -23,19 +25,6 @@ class CoContextProvider extends InheritedWidget {
 }
 
 Future<CoContext> openCoContext(CoSettings settings) async {
-  return await co_context_open(settings);
-}
-
-CoSettings createCoSettings(
-  String identifier, {
-  String? path,
-  CoNetworkSettings? network_settings,
-  bool? network,
-  bool? no_keychain,
-  bool? no_log,
-  CoLogLevel? log_level,
-  bool? no_default_features,
-  List<String>? feature,
-}) {
-  return co_settings_new(identifier);
+  await CoKit.init(externalLibrary: ExternalLibrary.open("libco_uniffi.dylib"));
+  return await CoContext.open(settings: settings);
 }

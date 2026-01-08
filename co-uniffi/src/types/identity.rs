@@ -1,13 +1,15 @@
 use co_sdk::{Identity, PrivateIdentityBox};
 
-#[derive(Debug, uniffi::Object)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
+#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(opaque))]
+#[derive(Debug)]
 pub struct CoPrivateIdentity {
 	identity: PrivateIdentityBox,
 }
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl CoPrivateIdentity {
 	#[allow(clippy::inherent_to_string)]
-	pub fn to_string(&self) -> String {
+	pub fn identity(&self) -> String {
 		self.identity.identity().to_owned()
 	}
 }

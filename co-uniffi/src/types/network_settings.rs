@@ -2,7 +2,8 @@ use co_sdk::NetworkSettings;
 use std::time::Duration;
 
 /// Binding for [`NetworkSettings`].
-#[derive(uniffi::Record, Debug, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[derive(Debug, Clone)]
 pub struct CoNetworkSettings {
 	/// Force to create a new [`PeerId`] on network startup.
 	pub force_new_peer_id: bool,

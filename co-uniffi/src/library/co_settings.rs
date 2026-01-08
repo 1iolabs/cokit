@@ -1,19 +1,36 @@
 use crate::types::{level::CoLogLevel, network_settings::CoNetworkSettings};
 
-#[derive(uniffi::Record, Debug, Default, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[derive(Debug, Clone)]
 pub struct CoSettings {
 	pub identifier: String,
 	pub path: Option<String>,
 	pub network_settings: Option<CoNetworkSettings>,
-	pub network: bool,
-	pub no_keychain: bool,
-	pub no_log: bool,
+	pub network: Option<bool>,
+	pub no_keychain: Option<bool>,
+	pub no_log: Option<bool>,
 	pub log_level: Option<CoLogLevel>,
-	pub no_default_features: bool,
-	pub feature: Vec<String>,
+	pub no_default_features: Option<bool>,
+	pub feature: Option<Vec<String>>,
+}
+impl Default for CoSettings {
+	fn default() -> Self {
+		Self {
+			identifier: Default::default(),
+			path: Default::default(),
+			network_settings: Default::default(),
+			network: Some(true),
+			no_keychain: Some(true),
+			no_log: Default::default(),
+			log_level: Default::default(),
+			no_default_features: Default::default(),
+			feature: Default::default(),
+		}
+	}
 }
 
-#[uniffi::export]
+#[cfg(feature = "uniffi")]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 pub fn co_settings_new(identifier: String) -> CoSettings {
 	CoSettings { identifier, ..Default::default() }
 }

@@ -17,6 +17,7 @@ co-actor = { workspace = true }
 co-primitives = { workspace = true }
 co-sdk = { workspace = true }
 derive_more = { workspace = true }
+flutter_rust_bridge = { version = "=2.11.1", optional = true }
 futures = { workspace = true }
 ipld-core = { workspace = true }
 multiaddr = { workspace = true }
@@ -25,4 +26,12 @@ serde_repr = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros"] }
 tracing = { workspace = true }
-uniffi = "0.25"
+uniffi = { version = "0.25", optional = true }
+
+[features]
+default = []
+uniffi = ["dep:uniffi"]
+frb = ["dep:flutter_rust_bridge"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

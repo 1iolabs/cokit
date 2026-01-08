@@ -1,16 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
-
-/// Minimal CID wrapper for DAG-CBOR:
-/// CBOR tag 42 with content: bytes(0x00 + <cid-bytes>)
-class Cid {
-  final Uint8List
-  bytes; // raw CID bytes (multibase decoded already, typically multicodec+multihash)
-  Cid(this.bytes);
-
-  @override
-  String toString() => 'Cid(${base64Url.encode(bytes)})';
-}
+import 'generated/types/cid.dart';
 
 class DagCbor {
   static Uint8List encode(dynamic value) {
@@ -157,7 +147,7 @@ class DagCbor {
             throw FormatException('CID byte string must start with 0x00.');
           }
           final cidBytes = Uint8List.fromList(payload.sublist(1));
-          return Cid(cidBytes);
+          return Cid(bytes: cidBytes);
         } else {
           // For unknown tags: decode and return as a tagged structure.
           final inner = _decodeDag(r);
@@ -344,7 +334,6 @@ class _Reader {
 
   int readLengthDefinite() {
     final ib = readByte();
-    final major = ib >> 5;
     final ai = ib & 0x1f;
     if (ai == 31) throw FormatException('Indefinite length not allowed');
     return _readAiValue(ai);

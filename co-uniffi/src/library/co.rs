@@ -1,10 +1,10 @@
 use crate::{CoCid, CoError, CoPrivateIdentity};
-use cid::Cid;
 use co_sdk::{from_cbor, Block, BlockStorage, CoReducer, CoReducerState};
 use ipld_core::ipld::Ipld;
-use std::sync::Arc;
 
-#[derive(Debug, Clone, uniffi::Object)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
+#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(opaque))]
+#[derive(Debug, Clone)]
 pub struct Co {
 	/// The CO instance.
 	///
@@ -12,15 +12,15 @@ pub struct Co {
 	/// This works directly by the fact that the CoReducer internally is abstracted by an ActorHandle.
 	co: CoReducer,
 }
-#[uniffi::export]
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl Co {
 	pub async fn state(&self) -> CoState {
 		self.co.reducer_state().await.into()
 	}
 
-	pub async fn push(&self, identity: &CoPrivateIdentity, core: String, action: Vec<u8>) -> Result<(), Arc<CoError>> {
-		let ipld: Ipld = from_cbor(&action).map_err(CoError::new_arc)?;
-		let _state = self.co.push(identity.as_ref(), core, &ipld).await.map_err(CoError::new_arc)?;
+	pub async fn push(&self, identity: &CoPrivateIdentity, core: String, action: Vec<u8>) -> Result<(), CoError> {
+		let ipld: Ipld = from_cbor(&action).map_err(CoError::new)?;
+		let _state = self.co.push(identity.as_ref(), core, &ipld).await.map_err(CoError::new)?;
 		Ok(())
 	}
 
@@ -34,7 +34,8 @@ impl From<CoReducer> for Co {
 	}
 }
 
-#[derive(Debug, Clone, uniffi::Record)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[derive(Debug, Clone)]
 pub struct CoState {
 	pub state: Option<CoCid>,
 	pub heads: Vec<CoCid>,
@@ -45,40 +46,39 @@ impl From<CoReducerState> for CoState {
 	}
 }
 
-// #[derive(Debug, uniffi::Object)]
+// #[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
+// #[derive(Debug)]
 // pub struct CoStateSubscription {
 // 	cancel: tokio
 // }
-// #[uniffi::export]
+// #[cfg_attr(feature = "uniffi", uniffi::export)]
 // impl CoStateSubscription {
 // 	pub fn close(&self) {
 
 // 	}
 // }
 
-// #[uniffi::export]
+// #[cfg_attr(feature = "uniffi", uniffi::export)]
 // pub trait CoStateListener: Send + Sync {
 // 	fn on_change(&self, state: CoState);
 // }
 
-#[uniffi::export]
-pub async fn storage_get(co: &Co, cid: &CoCid) -> Result<Vec<u8>, Arc<CoError>> {
-	let cid: Cid = cid.try_into().map_err(CoError::new_arc)?;
-	Ok(co.co.storage().get(&cid).await.map_err(CoError::new_arc)?.into_inner().1)
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+pub async fn storage_get(co: &Co, cid: &CoCid) -> Result<Vec<u8>, CoError> {
+	Ok(co.co.storage().get(&cid.cid()?).await.map_err(CoError::new)?.into_inner().1)
 }
 
-#[uniffi::export]
-pub async fn storage_set(co: &Co, cid: &CoCid, data: Vec<u8>) -> Result<(), Arc<CoError>> {
-	let cid: Cid = cid.try_into().map_err(CoError::new_arc)?;
-	let block = Block::new(cid, data).map_err(CoError::new_arc)?;
-	co.co.storage().set(block).await.map_err(CoError::new_arc)?;
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+pub async fn storage_set(co: &Co, cid: &CoCid, data: Vec<u8>) -> Result<(), CoError> {
+	let block = Block::new(cid.cid()?, data).map_err(CoError::new)?;
+	co.co.storage().set(block).await.map_err(CoError::new)?;
 	Ok(())
 }
 
-#[uniffi::export]
-pub async fn storage_set_data(co: &Co, codec: u64, data: Vec<u8>) -> Result<CoCid, Arc<CoError>> {
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+pub async fn storage_set_data(co: &Co, codec: u64, data: Vec<u8>) -> Result<CoCid, CoError> {
 	let block = Block::new_data(codec, data);
 	let cid = *block.cid();
-	co.co.storage().set(block).await.map_err(CoError::new_arc)?;
+	co.co.storage().set(block).await.map_err(CoError::new)?;
 	Ok(cid.into())
 }
