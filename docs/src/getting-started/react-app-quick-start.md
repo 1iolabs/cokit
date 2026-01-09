@@ -158,7 +158,7 @@ async fn main() {
 
 ## Implementation
 
-This example App is the same as in [the rust App example](rust-app-quick-start.md#implementation) but using react instead of dioxus.
+This example To-do app is the same as the [Rust-app example](rust-app-quick-start.md#implementation), but using React instead of Dioxus.
 
 We use the [MyTodoCore](rust-core-quick-start.md).
 
@@ -169,21 +169,24 @@ The first view is where we create to-do lists, and respond to invites.
 The second view is where we manage tasks and participants.
 
 ### Application
-Instead of the single file approach we use in the [rust app](rust-app-quick-start.md) we split the applications into extra files for each components. We also create an extra folder for the types like in a classic react app.
+Instead of the single-file approach used in the example [Rust app](rust-app-quick-start.md), we split the components of this applications across multiple files.  
+We also create an extra folder for the types, as you would in a classic React app.
 
 ```admonish info
-You can delete all generated files from the `src` folder except `vite-env.d.ts`.
+You can delete all of the generated files from the `src` folder, except `vite-env.d.ts`.
 ```
 
 #### Setup
-There is no need to inittialize CO-kit here because the tauri plugin does that for us. Instead we just need to write code for the frontend.
+There is no need to inittialize CO-kit here because the Tauri plugin does that for us.  
+Instead we just need to write the code for the frontend.
 
 ##### Main
 ```admonish info
-Some code of the examples below is hidden to focus on the interaction with CO-kit. Make sure to unhide these lines if you want the full component code.
+Some code is hidden in the examples below, allowing us to focus on the interactions with CO-kit.  
+Make sure to unhide these lines if you want to view or copy the full component code.
 ```
 
-We start with the `main.tsx`:
+We start with `main.tsx`:
 
 ```typescript
 ~import React from "react";
@@ -201,9 +204,9 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 ```
 
 ##### Types
-Add a `types` folder.
+Add a `types` subfolder to `src`.
 
-In that folder we add a file `todo.ts` that contains all the types we need from our Todo Core:
+In this folder, create `todo.ts`, which contains all of the types we will need from our Todo Core:
 
 ```typescript 
 ~import { CID } from "multiformats";
@@ -228,7 +231,8 @@ export type TodoAction =
   | "DeleteAllDoneTasks";
 ```
 
-Next is the file `consts.ts` that contains all const variables like the core name or identity name:
+Next, create a file `consts.ts`, also under `/src/types/`.  
+This file contains all const variables, such as the Core name or Identity name:
 
 ```typescript
 ~import { fetchBinary } from "@1io/tauri-plugin-co-sdk-api";
@@ -243,9 +247,12 @@ export async function fetchTodoCoreBinary(): Promise<
 }
 ```
 
-Because we cannot just include the Core WASM bytes like in rust, we need to fetch it. We use the helper function `fetchBinary` from the `@1io/tauri-plugin-co-sdk-api` package for this. This only works if the WASM file is in the `public` folder, i.e. included in the vite environment. The single argument for this function is the file name of the core in the `public` folder.
+We cannot just include the Core WASM bytes like in Rust, so we need to fetch it instead.  
+We use the helper function `fetchBinary` from the `@1io/tauri-plugin-co-sdk-api` package for this.  
+For this to work, the WASM file must be in the `public` folder (i.e. included in the Vite environment).  
+The single argument for this function is the filename of the Core in the `public` folder.
 
-Add an `index.ts` file for exports:
+Finally, add an `index.ts` file for exports, also under `/src/types/`:
 
 ```typescript
 export * from "./todo";
@@ -255,7 +262,8 @@ export * from "./consts";
 ##### Components
 Add a `components` folder under `src`.
 
-Now we add an `app.tsx` file to that folder. The App component handles whether the Overview or a specific Todo list should be shown:
+Create an `app.tsx` file in that folder.  
+The `App` component handles whether the Overview or a specific Todo list should be shown:
 
 ```typescript
 ~import { ErrorBoundary } from "react-error-boundary";
@@ -281,13 +289,18 @@ export function App() {
 }
 ```
 
-The `import "web-streams-polyfill/polyfill"` import is needed in this root file so all functions from the WASM wrappers (at the moment only CoMap but also CoList and CoSet in the future) work on native safari browsers. Tauri opens a webview using the native browser which under MacOS is Safari where unfortunately some features aren't implemented. Therefore we need the polyfill. 
+Tauri opens a webview using the native browser. Under MacOS this is Safari, where unfortunately some features are not implemented.  
+Therefore we need the `import "web-streams-polyfill/polyfill"` import in this root file, so that the functions from the WASM wrappers work on Safari browsers.  
 
-#### Overview
-Next, we want to display a list of Todo Lists and possible invites.
+```admonish info
+At the moment only `CoMap` functions will work on Safari, but `CoList` and `CoSet` shall also work in the future.
+```
 
-##### Memberships/invites
-We use the tauri hooks to fetch the membership state in the `todo-overview.tsx` file:
+#### Overview View
+Next, we want to display a list of To-do Lists and possible invites.
+
+##### Memberships/Invites
+We use the Tauri hooks to fetch the membership state in a `/components/todo-overview.tsx` file:
 
 ```typescript
 ~import { useCallback } from "react";
@@ -323,7 +336,7 @@ export function TodoOverview(props: TodoOverviewProps) {
   const identity = useDidKeyIdentity(TODO_IDENTITY_NAME);
 
 ~  // TODO can probably do this better
-~  // memberships can be undefined if there is no state yet but we want an emnpty array in that case
+~  // memberships can be undefined if there is no state yet, but we want an emnpty array in that case
 ~  if (membershipCoreCid === null) {
 ~    memberships = [];
 ~  }
@@ -387,26 +400,52 @@ export function TodoOverview(props: TodoOverviewProps) {
 }
 ```
 
-We open a new session on the local CO. This causes fetched and pushed data to retain in the memory while the session is open.
-The `useCoSession` hook opens a session the first time it is called and returns the same session afterwards. It automatically closes the session if the component unmounts. Many other hooks need this session ID to function properly.
+We open a new session on the local CO. This causes 'fetched' and 'pushed' data to be retained in the memory while the session is open.  
+The `useCoSession` hook opens a session the first time it is called, and returns the same session afterwards. It automatically closes the session if the component unmounts. Many other hooks need this session ID to function properly.
 
 
-The `useCo` hook returns `[stateCid, heads]` of a given CO.
-In this case we only take interest in the state. This is a Cid and we can use it with the `useCoCore` hook. It takes the CO state Cid, a core name and CO session to fetch the Core state Cid.
+The `useCo` hook returns `[stateCid, heads]` of a given CO.  
+In this case we only take interest in the state. This is a CID, and we can use it with the `useCoCore` hook.  
+It fetches the Core state CID using:
+- CO state CID
+- a Core name
+- the CO session  
 
-The Cid can be resolved using the `useResolveCid` hook. The returned object is of the type `Memberships` which contains information about all the COs we can interact with. Depending on this state we render different [list items](#list-items).
+
+The CID can be resolved using the `useResolveCid` hook. The returned object is of the type `Memberships`, which contains information about all the COs we can interact with. Depending on this state, we render different [list items](#list-items).
+
 
 ##### Identity
-To push an action or create a CO we need our identity. We use the `useDidKeyIdentity` hook for that. It takes an identity name and creates a new `did:key` identity if none were found. It then returns the Did in string form.
+To push an action, or to create a CO, we need our identity.  
+We use the `useDidKeyIdentity` hook for that.  
+It takes an identity name and creates a new `did:key` identity if none are found.  
+It then returns the DID in string form.
+
 
 ##### Creating a CO
-We can simply use the `createCo` function to create a CO. Creating a CO is a bit special so there is a specific command for it.
-We need our identity, a name for the CO and whether it's a public CO. In our example we only create private COs.
+We simply use the `createCo` function to create a CO.  
+Creating a CO is a bit special so there is a specific command for it.
+
+We need:
+- our Identity
+- a name for the CO
+- whether it's a public or private CO 
+
+In our example we only create private COs.
+
 
 ##### Joining a CO
-We have a handler for joining a CO that we set as prop for the `TodoListJoin` Element. We call the `pushAction` function using the session string, our identity the core name we get as a constant from the `@1io/tauri-plugin-co-sdk-api` and an action. This will then push the given action to the specified Core.
+We have a handler for joining a CO that we set as prop for the `TodoListJoin` Element.  
 
-The `ChangeMembershipState` action comes from CO-kit and we have ts types for it in the `@1io/tauri-plugin-co-sdk-api` package. In our case we want to set our membership status from `Invite` to `Join`.
+We call the `pushAction` function using:
+- the session string
+- our identity, which is the Core name we get as a constant from the `@1io/tauri-plugin-co-sdk-api`
+- an action
+
+This will then push the given action to the specified Core.
+
+The `ChangeMembershipState` action comes from CO-kit, and we have TypeScript types for it in the `@1io/tauri-plugin-co-sdk-api` package. In our case, we want to set our membership status from `Invite` to `Join`.
+
 
 ##### List items
 The possible membership states that are of interest to us are:
@@ -414,9 +453,10 @@ The possible membership states that are of interest to us are:
 - Invite: We were invited to join a [CO](../reference/co.md) by someone else
 - Join: We accepted an invite and are waiting for it to complete
 
-If state is Invite or Join, we show a list element that either has a Join button or is marked as pending.
+If the state is `Invite` or `Join`, we show a list element that either has a `Join` button or is marked as pending.
 
-If state is Active, we render a list item that shows the number of unone tasks. We set a prop that contains the CO id that we get from the membership state.
+If the state is `Active`, we render a List item that shows the number of undone tasks.  
+We set a prop that contains the CO ID, which we get from the membership state.
 
 `todo-list-element.ts`:
 
@@ -482,14 +522,29 @@ export function TodoListElement(props: TodoListElementProps) {
 }
 ```
 
-We again open a session and load the state of the CO. This time we use the CO id from the props that we got from the memberships. The CO state contains information we need in this case so we need to resolve that Cid as well. Most importantly we need the name of the co: `coState?.n`.
+We again open a session and load the state of the CO.  
+This time we use the CO ID from the props that we got from the memberships.  
+The CO state contains information we need in this case, so we need to resolve that CID as well.  
+Most importantly, we need the name of the CO: `coState?.n`.
 
-We want to show how many Todo items in the list are undone. For this we need the Todo Core state as well. We get the Core Cid with `useCoCore` and resolve it. The Core name for this Core we get from our `const.ts` types this time.
+We want to show how many to-do items in the list are undone.  
+For this, we need the Todo Core state as well.  
+We get the Core CID with `useCoCore` and resolve it.  
+This time, we get the Core name for this Core from our `const.ts` types.
 
-The Core state contains the tasks which in typescript is a `CID`. In rust it is a `CoMap` instead. A `CoMap` is a map that has the common `BTreeMap` functions but behind the covers only contains a root Cid and uses the storage to set/get the linked data. The `co-js` package contains a WASM wrapper for the rust `CoMap`. With this we can use the rust functions directly. These functions need a `BlockStorage` that we can create with the `useBlockStorage` hook. We can create a new `CoMap` with the constructor taking a Cid in byte form. There is no way to directly get all elements of the map but there is a stream function. To help collect the items from the stream into a typescript `Map` object we use the `useCollectCoMap` hook. Now we just need to filter for unfinished tasks.
+The Core state contains the tasks, which in TypeScript is a `CID`.  
+In Rust it is a `CoMap` instead. A `CoMap` is a map that has the common `BTreeMap` functions, but behind the curtains only contains a root CID, and uses the storage to set/get the linked data.  
 
-#### Todo List
-If, for one of our active COs, a list element is opened, we land on this view where all the Todo items of the opened CO are shown. We use our hooks and the `CoMap` again to get our needed data:
+The `co-js` package contains a WASM wrapper for the Rust `CoMap`. With this we can use the Rust functions directly.  
+These functions need a `BlockStorage` that we can create with the `useBlockStorage` hook.  
+We can create a new `CoMap` with the constructor taking a CID in byte form.  
+There is no way to directly get all elements of the map, but there is a stream function. To help collect the items from the stream into a TypeScript `Map` object, we use the `useCollectCoMap` hook. 
+
+Now we just need to filter for unfinished tasks.
+
+#### To-do List
+If, for one of our active COs, a list element is opened, we land on this view where all the to-do items of the opened CO are shown.  
+We use our hooks and the `CoMap` again to get the data we require:
 
 ```typescript
   const session = useCoSession(props.coId);
@@ -517,15 +572,17 @@ If, for one of our active COs, a list element is opened, we land on this view wh
   const participants = useCollectCoMap<Participant>(participantMap, storage);
 ```
 
-We fetch all particpants of the CO because the view contains a `NavBar` that shows that information. There is also a button that opens a dialog from where you can invite new participants.
+We fetch all particpants of the CO because the view contains a `NavBar` that shows that information.  
+There is also a button that opens a dialog from where you can invite new participants.
 
 ##### Handlers
-In the overview we can create COs but they will spawn without the Todo Core. We create a function that checks if a Todo Core exists in the CO and adds it if not:
+In the overview we can create COs, but they will spawn without the Todo Core.  
+We create a function that checks if a Todo Core exists in the CO and adds it if not:
 
 ```typescript
-  // returns false if for any reason it coulnd't be assured whether core exists
-  // most likely because needed information isn't loaded yet
-  // returns true if core exists, either because it already did or it was missing but then created
+  // returns false if for any reason it can't be assured if the Core exists
+  // most likely because required information isn't loaded yet
+  // returns true if Core exists, either because it already did or it was missing but was then created
   const assureCoreExists = useCallback(async () => {
     if (
       storage === undefined ||
@@ -535,12 +592,12 @@ In the overview we can create COs but they will spawn without the Todo Core. We 
       return false;
     }
 
-    // if co is undefined we haven't finished loading yet and don't know if core is missing
+    // if CO is undefined, we haven't finished loading yet and don't know if Core is missing
     if (co === undefined) {
       return false;
     }
 
-    // core exists already
+    // Core exists already
     if (core !== undefined) {
       return true;
     }
@@ -555,7 +612,7 @@ In the overview we can create COs but they will spawn without the Todo Core. We 
 
     const rootCid = CID.decode(cids[cids.length - 1]);
 
-    // add todo core
+    // add Todo Core
     const createTodoCoreAction = {
       CoreCreate: {
         binary: rootCid,
@@ -566,7 +623,7 @@ In the overview we can create COs but they will spawn without the Todo Core. We 
     try {
       await pushAction(session, "co", createTodoCoreAction, identity);
     } catch (e) {
-      // error creating core
+      // error creating Core
       console.log(e);
       return false;
     }
@@ -574,9 +631,13 @@ In the overview we can create COs but they will spawn without the Todo Core. We 
   }, [storage, session, identity, co, core]);
 ```
 
-The MyTodoCore Core is not a builtin Core and we have to add it to the storage first before we can use it. We call the WASM function unixfsAdd for this. It takes a WASM storage which we already created and a binary stream to the Core WASM. The function returns the Cids of all created blocks where the last one is the Cid of the root block. We need this Cid to add the Core to the CO.
+The `MyTodoCore` Core is not a built-in Core, and so we must add it to the storage first before we can use it.  
+We call the WASM function `unixfsAdd` for this.  
+It takes a WASM storage, which we already created, and a binary stream to the Core WASM.  
+The function returns the CIDs of all created Blocks, where the last one is the CID of the Root Block.  
+We need this CID to add the Core to the CO.
 
-Next we create handlers using the React `useCallback` hook:
+Next, we create handlers using the React `useCallback` hook:
 
 ```typescript
   const onDeleteAllDone = useCallback(async () => {
