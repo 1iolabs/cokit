@@ -1,6 +1,5 @@
-use crate::{BlockStorage, CoCid, CoError, CoPrivateIdentity};
+use crate::{BlockStorage, CoCid, CoContext, CoError, CoPrivateIdentity};
 use co_sdk::{from_cbor, CoReducer, CoReducerState};
-use futures::StreamExt;
 use ipld_core::ipld::Ipld;
 use tokio_util::sync::CancellationToken;
 
@@ -8,11 +7,14 @@ use tokio_util::sync::CancellationToken;
 #[cfg_attr(feature = "frb", flutter_rust_bridge::frb(opaque))]
 #[derive(Debug, Clone)]
 pub struct Co {
+	/// The context instance.
+	context: CoContext,
+
 	/// The CO instance.
 	///
 	/// # Warning
 	/// This works directly by the fact that the CoReducer internally is abstracted by an ActorHandle.
-	co: CoReducer,
+	pub(crate) co: CoReducer,
 }
 #[cfg_attr(feature = "uniffi", uniffi::export)]
 impl Co {
@@ -32,12 +34,12 @@ impl Co {
 
 	#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(sync))]
 	pub fn subscribe(&self) -> CoSubscription {
-		CoSubscription { co: self.co.clone(), cancel: CancellationToken::new() }
+		CoSubscription { co: self.clone(), cancel: CancellationToken::new() }
 	}
 }
-impl From<CoReducer> for Co {
-	fn from(value: CoReducer) -> Self {
-		Self { co: value }
+impl From<(CoContext, CoReducer)> for Co {
+	fn from((context, co): (CoContext, CoReducer)) -> Self {
+		Self { context, co }
 	}
 }
 
@@ -56,7 +58,7 @@ impl From<CoReducerState> for CoState {
 #[cfg_attr(feature = "frb", flutter_rust_bridge::frb(opaque))]
 pub struct CoSubscription {
 	cancel: CancellationToken,
-	co: CoReducer,
+	co: Co,
 }
 impl CoSubscription {
 	#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(sync))]
@@ -66,22 +68,15 @@ impl CoSubscription {
 
 	#[cfg(feature = "frb")]
 	pub fn stream(&self, sink: crate::frb_generated::StreamSink<CoState>) {
-		let cancel = self.cancel.child_token();
-		let stream = self.co.reducer_state_stream().map(CoState::from);
-		let task = async move {
-			futures::pin_mut!(stream);
-			while let Some(item) = stream.next().await {
-				if sink.add(item).is_err() {
-					break;
-				}
-			}
-		};
-		flutter_rust_bridge::spawn(async move {
-			tokio::select! {
-				_ = cancel.cancelled() => {},
-				_ = task => {},
-			}
-		});
+		self.co
+			.context
+			.handle
+			.dispatch(crate::library::co_application::CoMessage::CoSubscribe(
+				self.co.clone(),
+				self.cancel.child_token(),
+				sink,
+			))
+			.ok();
 	}
 }
 impl Drop for CoSubscription {

@@ -1,19 +1,22 @@
-use crate::{Co, CoPrivateIdentity, CoSettings};
+use crate::{Co, CoPrivateIdentity, CoSettings, CoState};
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, Response};
 use co_sdk::{
 	state, Application, ApplicationBuilder, CoContext, CoId, CoReducerFactory, CoTryStreamExt, CreateCo, Did,
-	DidKeyIdentity, DidKeyProvider, PrivateIdentity, PrivateIdentityResolver, Tags, CO_CORE_NAME_KEYSTORE, CO_ID_LOCAL,
+	DidKeyIdentity, DidKeyProvider, PrivateIdentity, PrivateIdentityResolver, Tags, TaskSpawner, CO_CORE_NAME_KEYSTORE,
+	CO_ID_LOCAL,
 };
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use std::{future::ready, path::PathBuf};
 
 #[cfg_attr(feature = "frb", flutter_rust_bridge::frb(ignore))]
 pub enum CoMessage {
-	OpenCo(CoId, Response<Result<Co, anyhow::Error>>),
-	CreateCo(CoPrivateIdentity, CreateCo, Response<Result<Co, anyhow::Error>>),
+	CoOpen(CoId, Response<Result<Co, anyhow::Error>>),
+	CoCreate(CoPrivateIdentity, CreateCo, Response<Result<Co, anyhow::Error>>),
 	ResolvePrivateIdentity(Did, Response<Result<CoPrivateIdentity, anyhow::Error>>),
 	EnsureDidKeyIdentity(String, Response<Result<CoPrivateIdentity, anyhow::Error>>),
+	#[cfg(feature = "frb")]
+	CoSubscribe(Co, tokio_util::sync::CancellationToken, crate::frb_generated::StreamSink<crate::CoState>),
 }
 
 /// CoApplication actor that spawns a Application in a new thread.
@@ -103,18 +106,20 @@ impl Actor for CoApplication {
 
 	async fn handle(
 		&self,
-		_handle: &ActorHandle<Self::Message>,
+		handle: &ActorHandle<Self::Message>,
 		message: Self::Message,
 		state: &mut Self::State,
 	) -> Result<(), ActorError> {
 		match message {
-			CoMessage::OpenCo(co_id, response) => response.spawn({
+			CoMessage::CoOpen(co_id, response) => response.spawn({
+				let handle = handle.clone();
 				let co_context = state.co().clone();
-				move || open_co(co_context, co_id)
+				move || co_open(co_context, handle, co_id)
 			}),
-			CoMessage::CreateCo(creator, create, response) => response.spawn({
+			CoMessage::CoCreate(creator, create, response) => response.spawn({
+				let handle = handle.clone();
 				let application = state.clone();
-				move || create_co(application, creator, create)
+				move || co_create(application, handle, creator, create)
 			}),
 			CoMessage::ResolvePrivateIdentity(did, response) => response.spawn({
 				let co_context = state.co().clone();
@@ -124,23 +129,48 @@ impl Actor for CoApplication {
 				let co_context = state.co().clone();
 				move || ensure_did_key_identity(co_context, name)
 			}),
+			CoMessage::CoSubscribe(co, cancel, sink) => co_subscribe(state.context().tasks(), co, cancel, sink),
 		}
 		Ok(())
 	}
 }
 
-async fn open_co(co_context: CoContext, co_id: CoId) -> Result<Co, anyhow::Error> {
+async fn co_open(co_context: CoContext, handle: ActorHandle<CoMessage>, co_id: CoId) -> Result<Co, anyhow::Error> {
 	let co = co_context.try_co_reducer(&co_id).await?;
-	Ok(Co::from(co))
+	Ok(Co::from((handle.into(), co)))
 }
 
-async fn create_co(
+async fn co_create(
 	application: Application,
+	handle: ActorHandle<CoMessage>,
 	creator: CoPrivateIdentity,
 	create: CreateCo,
 ) -> Result<Co, anyhow::Error> {
 	let co = application.create_co(creator.identity.clone(), create).await?;
-	Ok(Co::from(co))
+	Ok(Co::from((handle.into(), co)))
+}
+
+fn co_subscribe(
+	tasks: TaskSpawner,
+	co: Co,
+	cancel: tokio_util::sync::CancellationToken,
+	sink: crate::frb_generated::StreamSink<crate::CoState>,
+) {
+	let stream = co.co.reducer_state_stream().map(CoState::from);
+	let task = async move {
+		futures::pin_mut!(stream);
+		while let Some(item) = stream.next().await {
+			if sink.add(item).is_err() {
+				break;
+			}
+		}
+	};
+	tasks.spawn(async move {
+		tokio::select! {
+			_ = cancel.cancelled() => {},
+			_ = task => {},
+		}
+	});
 }
 
 async fn resolve_private_identity(co_context: CoContext, did: Did) -> Result<CoPrivateIdentity, anyhow::Error> {

@@ -12,9 +12,9 @@ use std::collections::HashMap;
 
 #[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 #[cfg_attr(feature = "frb", flutter_rust_bridge::frb(opaque))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CoContext {
-	handle: ActorHandle<CoMessage>,
+	pub(crate) handle: ActorHandle<CoMessage>,
 }
 #[cfg_attr(feature = "uniffi", uniffi::export)]
 impl CoContext {
@@ -29,7 +29,7 @@ impl CoContext {
 		let co_id = CoId::from(id);
 		let co = self
 			.handle
-			.request(move |response| CoMessage::OpenCo(co_id, response))
+			.request(move |response| CoMessage::CoOpen(co_id, response))
 			.await
 			.map_err(CoError::new)?
 			.map_err(CoError::new)?;
@@ -41,7 +41,7 @@ impl CoContext {
 		let create = co_sdk::CreateCo::try_from(create)?;
 		let result = self
 			.handle
-			.request(move |response| CoMessage::CreateCo(identity, create, response))
+			.request(move |response| CoMessage::CoCreate(identity, create, response))
 			.await
 			.map_err(CoError::new)?
 			.map_err(CoError::new)?;
@@ -67,6 +67,11 @@ impl CoContext {
 			.map_err(CoError::new)?
 			.map_err(CoError::new)?;
 		Ok(result)
+	}
+}
+impl From<ActorHandle<CoMessage>> for CoContext {
+	fn from(handle: ActorHandle<CoMessage>) -> Self {
+		Self { handle }
 	}
 }
 
@@ -107,7 +112,7 @@ pub struct CreateCore {
 #[cfg_attr(feature = "uniffi", uniffi::export)]
 pub async fn co_context_open(settings: &CoSettings) -> Result<CoContext, CoError> {
 	match CoApplication::spawn(settings.clone()).await {
-		Ok(handle) => Ok(CoContext { handle }),
+		Ok(handle) => Ok(handle.into()),
 		Err(err) => Err(CoError::new(err)),
 	}
 }
