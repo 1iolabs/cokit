@@ -57,7 +57,8 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { workspace = true }
 
 [features]
-default = ["llvm", "wasmi"]
+default = ["llvm", "wasmi", "pinning"]
+pinning = ["co-sdk/pinning"]
 
 # backends
 llvm = ["co-runtime/llvm"]

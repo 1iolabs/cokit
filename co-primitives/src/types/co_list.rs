@@ -4,6 +4,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
+use cid::Cid;
 use futures::{future::Either, stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use num_rational::Ratio;
 use serde::{
@@ -336,6 +337,22 @@ where
 {
 	fn default() -> Self {
 		Self(Default::default())
+	}
+}
+impl<V> From<Option<Cid>> for CoList<V>
+where
+	V: Clone + Send + Sync + 'static,
+{
+	fn from(value: Option<Cid>) -> Self {
+		Self(value.into())
+	}
+}
+impl<V> From<&CoList<V>> for Option<Cid>
+where
+	V: Clone + Send + Sync + 'static,
+{
+	fn from(value: &CoList<V>) -> Self {
+		*value.0.cid()
 	}
 }
 #[async_trait]

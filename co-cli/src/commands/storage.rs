@@ -1,4 +1,5 @@
 mod cat;
+#[cfg(feature = "pinning")]
 mod gc;
 
 use crate::{cli::Cli, library::cli_context::CliContext};
@@ -17,12 +18,14 @@ pub enum Commands {
 	Cat(cat::Command),
 
 	/// Free unreferenced blocks.
+	#[cfg(feature = "pinning")]
 	Gc(gc::Command),
 }
 
 pub async fn command(context: &CliContext, cli: &Cli, co_command: &Command) -> Result<ExitCode, anyhow::Error> {
 	match &co_command.command {
 		Commands::Cat(command) => cat::command(context, cli, command).await,
+		#[cfg(feature = "pinning")]
 		Commands::Gc(command) => gc::command(context, cli, command).await,
 	}
 }
