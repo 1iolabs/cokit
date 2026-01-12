@@ -67,7 +67,7 @@ impl CoSubscription {
 	}
 
 	#[cfg(feature = "frb")]
-	pub fn stream(&self, sink: crate::frb_generated::StreamSink<CoState>) {
+	pub async fn stream(&self, sink: crate::frb_generated::StreamSink<CoState>) {
 		self.co
 			.context
 			.handle

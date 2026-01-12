@@ -9,7 +9,7 @@ import 'cid.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `fmt`, `from`, `try_from`
-// These functions are ignored (category: IgnoreBecauseExplicitAttribute): `new`
+// These functions are ignored (category: IgnoreBecauseExplicitAttribute): `get`, `new`, `remove`, `set`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>>
 abstract class BlockStorage implements RustOpaqueInterface {

@@ -1,4 +1,5 @@
 use crate::{CoCid, CoError};
+use async_trait::async_trait;
 use co_primitives::StoreParams;
 use co_sdk::DefaultParams;
 use std::sync::Arc;
@@ -8,7 +9,6 @@ use std::sync::Arc;
 pub struct BlockStorage {
 	storage: Arc<dyn co_sdk::BlockStorage<StoreParams = DefaultParams> + 'static>,
 }
-
 impl BlockStorage {
 	#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(ignore))]
 	pub fn new(storage: impl co_sdk::BlockStorage<StoreParams = DefaultParams> + 'static) -> Self {
@@ -23,6 +23,29 @@ impl BlockStorage {
 	#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(name = "setBlock"))]
 	pub async fn set(&self, block: Block) -> Result<CoCid, CoError> {
 		Ok(self.storage.set(block.try_into()?).await.map_err(CoError::new)?.into())
+	}
+}
+#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(ignore))]
+#[async_trait]
+impl co_sdk::BlockStorage for BlockStorage {
+	type StoreParams = DefaultParams;
+
+	async fn get(
+		&self,
+		cid: &cid::Cid,
+	) -> Result<co_primitives::Block<Self::StoreParams>, co_primitives::StorageError> {
+		Ok(self.storage.get(cid).await?)
+	}
+
+	async fn set(
+		&self,
+		block: co_primitives::Block<Self::StoreParams>,
+	) -> Result<cid::Cid, co_primitives::StorageError> {
+		Ok(self.storage.set(block).await?)
+	}
+
+	async fn remove(&self, cid: &cid::Cid) -> Result<(), co_primitives::StorageError> {
+		Ok(self.storage.remove(cid).await?)
 	}
 }
 

@@ -2,7 +2,7 @@
 #[derive(Debug, thiserror::Error)]
 #[error("{source:?}")]
 pub struct CoError {
-	#[source]
+	#[from]
 	source: anyhow::Error,
 }
 #[cfg_attr(feature = "uniffi", uniffi::export)]

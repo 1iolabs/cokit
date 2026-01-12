@@ -2,6 +2,10 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'generated/types/cid.dart';
 
+abstract interface class DagCborEncodable {
+  dynamic toDagCborValue();
+}
+
 class DagCbor {
   static Uint8List encode(dynamic value) {
     final w = _Writer();
@@ -17,6 +21,9 @@ class DagCbor {
   }
 
   static void _encodeDag(dynamic v, _Writer w) {
+    if (v is DagCborEncodable) {
+      v = v.toDagCborValue();
+    }
     if (v == null) {
       w.writeSimple(22); // null
       return;

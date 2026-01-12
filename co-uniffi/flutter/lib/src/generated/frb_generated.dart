@@ -14,6 +14,7 @@ import 'library/co_error.dart';
 import 'library/co_settings.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'types/cid.dart';
+import 'types/co_map.dart';
 import 'types/identity.dart';
 import 'types/level.dart';
 import 'types/network_settings.dart';
@@ -76,7 +77,7 @@ class CoKit extends BaseEntrypoint<CoKitApi, CoKitApiImpl, CoKitWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -324089980;
+  int get rustContentHash => -2093626454;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -151,6 +152,37 @@ abstract class CoKitApi extends BaseApi {
   BigInt crateTypesCidCidVersion({required Cid that});
 
   Future<CoLogLevel> crateTypesLevelCoLogLevelDefault();
+
+  Future<bool> crateTypesCoMapCoMapContains(
+      {required CoMap that,
+      required BlockStorage storage,
+      required List<int> key});
+
+  Future<CoMap> crateTypesCoMapCoMapDefault();
+
+  Future<List<(Uint8List, Uint8List)>> crateTypesCoMapCoMapEntries(
+      {required CoMap that,
+      required BlockStorage storage,
+      BigInt? skip,
+      BigInt? limit});
+
+  Future<Uint8List?> crateTypesCoMapCoMapGet(
+      {required CoMap that,
+      required BlockStorage storage,
+      required List<int> key});
+
+  Future<CoMap> crateTypesCoMapCoMapInsert(
+      {required CoMap that,
+      required BlockStorage storage,
+      required List<int> key,
+      required List<int> value});
+
+  Future<bool> crateTypesCoMapCoMapIsEmpty({required CoMap that});
+
+  CoMap crateTypesCoMapCoMapNew({required Cid root});
+
+  Stream<(Uint8List, Uint8List)> crateTypesCoMapCoMapStream(
+      {required CoMap that, required BlockStorage storage});
 
   Future<CoNetworkSettings> crateTypesNetworkSettingsCoNetworkSettingsDefault();
 
@@ -843,13 +875,248 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       );
 
   @override
+  Future<bool> crateTypesCoMapCoMapContains(
+      {required CoMap that,
+      required BlockStorage storage,
+      required List<int> key}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_box_autoadd_co_map(that, serializer);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+            storage, serializer);
+        sse_encode_list_prim_u_8_loose(key, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 24, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_bool,
+        decodeErrorData:
+            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError,
+      ),
+      constMeta: kCrateTypesCoMapCoMapContainsConstMeta,
+      argValues: [that, storage, key],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateTypesCoMapCoMapContainsConstMeta =>
+      const TaskConstMeta(
+        debugName: "co_map_contains",
+        argNames: ["that", "storage", "key"],
+      );
+
+  @override
+  Future<CoMap> crateTypesCoMapCoMapDefault() {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 25, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_co_map,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateTypesCoMapCoMapDefaultConstMeta,
+      argValues: [],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateTypesCoMapCoMapDefaultConstMeta =>
+      const TaskConstMeta(
+        debugName: "co_map_default",
+        argNames: [],
+      );
+
+  @override
+  Future<List<(Uint8List, Uint8List)>> crateTypesCoMapCoMapEntries(
+      {required CoMap that,
+      required BlockStorage storage,
+      BigInt? skip,
+      BigInt? limit}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_box_autoadd_co_map(that, serializer);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+            storage, serializer);
+        sse_encode_opt_box_autoadd_usize(skip, serializer);
+        sse_encode_opt_box_autoadd_usize(limit, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 26, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData:
+            sse_decode_list_record_list_prim_u_8_strict_list_prim_u_8_strict,
+        decodeErrorData:
+            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError,
+      ),
+      constMeta: kCrateTypesCoMapCoMapEntriesConstMeta,
+      argValues: [that, storage, skip, limit],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateTypesCoMapCoMapEntriesConstMeta =>
+      const TaskConstMeta(
+        debugName: "co_map_entries",
+        argNames: ["that", "storage", "skip", "limit"],
+      );
+
+  @override
+  Future<Uint8List?> crateTypesCoMapCoMapGet(
+      {required CoMap that,
+      required BlockStorage storage,
+      required List<int> key}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_box_autoadd_co_map(that, serializer);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+            storage, serializer);
+        sse_encode_list_prim_u_8_loose(key, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 27, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_opt_list_prim_u_8_strict,
+        decodeErrorData:
+            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError,
+      ),
+      constMeta: kCrateTypesCoMapCoMapGetConstMeta,
+      argValues: [that, storage, key],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateTypesCoMapCoMapGetConstMeta => const TaskConstMeta(
+        debugName: "co_map_get(dart_style=getValue)",
+        argNames: ["that", "storage", "key"],
+      );
+
+  @override
+  Future<CoMap> crateTypesCoMapCoMapInsert(
+      {required CoMap that,
+      required BlockStorage storage,
+      required List<int> key,
+      required List<int> value}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_box_autoadd_co_map(that, serializer);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+            storage, serializer);
+        sse_encode_list_prim_u_8_loose(key, serializer);
+        sse_encode_list_prim_u_8_loose(value, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 28, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_co_map,
+        decodeErrorData:
+            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError,
+      ),
+      constMeta: kCrateTypesCoMapCoMapInsertConstMeta,
+      argValues: [that, storage, key, value],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateTypesCoMapCoMapInsertConstMeta => const TaskConstMeta(
+        debugName: "co_map_insert",
+        argNames: ["that", "storage", "key", "value"],
+      );
+
+  @override
+  Future<bool> crateTypesCoMapCoMapIsEmpty({required CoMap that}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_box_autoadd_co_map(that, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 29, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_bool,
+        decodeErrorData:
+            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError,
+      ),
+      constMeta: kCrateTypesCoMapCoMapIsEmptyConstMeta,
+      argValues: [that],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateTypesCoMapCoMapIsEmptyConstMeta =>
+      const TaskConstMeta(
+        debugName: "co_map_is_empty",
+        argNames: ["that"],
+      );
+
+  @override
+  CoMap crateTypesCoMapCoMapNew({required Cid root}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_box_autoadd_cid(root, serializer);
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_co_map,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateTypesCoMapCoMapNewConstMeta,
+      argValues: [root],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateTypesCoMapCoMapNewConstMeta => const TaskConstMeta(
+        debugName: "co_map_new",
+        argNames: ["root"],
+      );
+
+  @override
+  Stream<(Uint8List, Uint8List)> crateTypesCoMapCoMapStream(
+      {required CoMap that, required BlockStorage storage}) {
+    final sink = RustStreamSink<(Uint8List, Uint8List)>();
+    unawaited(handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_box_autoadd_co_map(that, serializer);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+            storage, serializer);
+        sse_encode_StreamSink_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+            sink, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 31, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateTypesCoMapCoMapStreamConstMeta,
+      argValues: [that, storage, sink],
+      apiImpl: this,
+    )));
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateTypesCoMapCoMapStreamConstMeta => const TaskConstMeta(
+        debugName: "co_map_stream",
+        argNames: ["that", "storage", "sink"],
+      );
+
+  @override
   Future<CoNetworkSettings>
       crateTypesNetworkSettingsCoNetworkSettingsDefault() {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 24, port: port_);
+            funcId: 32, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_network_settings,
@@ -874,7 +1141,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 25, port: port_);
+            funcId: 33, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_settings,
@@ -1099,6 +1366,14 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  RustStreamSink<(Uint8List, Uint8List)>
+      dco_decode_StreamSink_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+          dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
   String dco_decode_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as String;
@@ -1147,6 +1422,12 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  CoMap dco_decode_box_autoadd_co_map(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_co_map(raw);
+  }
+
+  @protected
   CoNetworkSettings dco_decode_box_autoadd_co_network_settings(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_co_network_settings(raw);
@@ -1171,6 +1452,12 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  BigInt dco_decode_box_autoadd_usize(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_usize(raw);
+  }
+
+  @protected
   Cid dco_decode_cid(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1185,6 +1472,17 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   CoLogLevel dco_decode_co_log_level(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return CoLogLevel.values[raw as int];
+  }
+
+  @protected
+  CoMap dco_decode_co_map(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 1)
+      throw Exception('unexpected arr length: expect 1 but see ${arr.length}');
+    return CoMap.raw(
+      root: dco_decode_opt_box_autoadd_cid(arr[0]),
+    );
   }
 
   @protected
@@ -1295,6 +1593,16 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  List<(Uint8List, Uint8List)>
+      dco_decode_list_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_record_list_prim_u_8_strict_list_prim_u_8_strict)
+        .toList();
+  }
+
+  @protected
   List<(String, CreateCore)> dco_decode_list_record_string_create_core(
       dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -1341,6 +1649,12 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  BigInt? dco_decode_opt_box_autoadd_usize(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_usize(raw);
+  }
+
+  @protected
   List<String>? dco_decode_opt_list_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_list_String(raw);
@@ -1350,6 +1664,20 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_list_prim_u_8_strict(raw);
+  }
+
+  @protected
+  (Uint8List, Uint8List)
+      dco_decode_record_list_prim_u_8_strict_list_prim_u_8_strict(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2) {
+      throw Exception('Expected 2 elements, got ${arr.length}');
+    }
+    return (
+      dco_decode_list_prim_u_8_strict(arr[0]),
+      dco_decode_list_prim_u_8_strict(arr[1]),
+    );
   }
 
   @protected
@@ -1577,6 +1905,14 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  RustStreamSink<(Uint8List, Uint8List)>
+      sse_decode_StreamSink_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+          SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
   String sse_decode_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_list_prim_u_8_strict(deserializer);
@@ -1622,6 +1958,12 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  CoMap sse_decode_box_autoadd_co_map(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_co_map(deserializer));
+  }
+
+  @protected
   CoNetworkSettings sse_decode_box_autoadd_co_network_settings(
       SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1647,6 +1989,12 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  BigInt sse_decode_box_autoadd_usize(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_usize(deserializer));
+  }
+
+  @protected
   Cid sse_decode_cid(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_bytes = sse_decode_list_prim_u_8_strict(deserializer);
@@ -1658,6 +2006,13 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return CoLogLevel.values[inner];
+  }
+
+  @protected
+  CoMap sse_decode_co_map(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_root = sse_decode_opt_box_autoadd_cid(deserializer);
+    return CoMap.raw(root: var_root);
   }
 
   @protected
@@ -1786,6 +2141,21 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  List<(Uint8List, Uint8List)>
+      sse_decode_list_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <(Uint8List, Uint8List)>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<(String, CreateCore)> sse_decode_list_record_string_create_core(
       SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1867,6 +2237,17 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  BigInt? sse_decode_opt_box_autoadd_usize(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_usize(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   List<String>? sse_decode_opt_list_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -1886,6 +2267,16 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
     } else {
       return null;
     }
+  }
+
+  @protected
+  (Uint8List, Uint8List)
+      sse_decode_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_field0 = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_field1 = sse_decode_list_prim_u_8_strict(deserializer);
+    return (var_field0, var_field1);
   }
 
   @protected
@@ -2126,6 +2517,22 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  void
+      sse_encode_StreamSink_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+          RustStreamSink<(Uint8List, Uint8List)> self,
+          SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+        self.setupAndSerialize(
+            codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_record_list_prim_u_8_strict_list_prim_u_8_strict,
+          decodeErrorData: sse_decode_AnyhowException,
+        )),
+        serializer);
+  }
+
+  @protected
   void sse_encode_String(String self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_prim_u_8_strict(utf8.encoder.convert(self), serializer);
@@ -2170,6 +2577,12 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_co_map(CoMap self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_co_map(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_co_network_settings(
       CoNetworkSettings self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -2197,6 +2610,12 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_usize(BigInt self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(self, serializer);
+  }
+
+  @protected
   void sse_encode_cid(Cid self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_prim_u_8_strict(self.bytes, serializer);
@@ -2206,6 +2625,12 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   void sse_encode_co_log_level(CoLogLevel self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_co_map(CoMap self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_cid(self.root, serializer);
   }
 
   @protected
@@ -2304,6 +2729,17 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  void sse_encode_list_record_list_prim_u_8_strict_list_prim_u_8_strict(
+      List<(Uint8List, Uint8List)> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_record_string_create_core(
       List<(String, CreateCore)> self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -2376,6 +2812,17 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_usize(
+      BigInt? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_usize(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_list_String(
       List<String>? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -2395,6 +2842,14 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
     if (self != null) {
       sse_encode_list_prim_u_8_strict(self, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_record_list_prim_u_8_strict_list_prim_u_8_strict(
+      (Uint8List, Uint8List) self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_prim_u_8_strict(self.$1, serializer);
+    sse_encode_list_prim_u_8_strict(self.$2, serializer);
   }
 
   @protected

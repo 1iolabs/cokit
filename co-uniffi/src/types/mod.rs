@@ -1,4 +1,5 @@
 pub mod cid;
+pub mod co_map;
 pub mod identity;
 pub mod level;
 pub mod network_settings;
