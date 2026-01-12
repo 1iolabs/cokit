@@ -156,6 +156,12 @@ async fn main() {
    - Adjust `title`, `width` and `height` to your heart's content.
    - Add `"devtools": true` if you are a developer, and you want the app to start with devtools opened.  
 
+```admonish info
+The steps below detail how to use CO-Kit to create an App with React.  
+
+However, if you wish to try out the complete React App with Tauri, please see the [Full Example](#full-example) at the end of this page for details on how to get the full code from the git repository.
+```
+
 ## Implementation
 
 This example To-do app is the same as the [Rust-app example](rust-app-quick-start.md#implementation), but using React instead of Dioxus.
@@ -750,9 +756,14 @@ Next, we create handlers using the React `useCallback` hook:
   );
 ```
 
-At first we always call our assure function to make sure that a Todo Core exists which we can push our actions to. Then we can create the Action objects using the types from either the `@1io/tauri-plugin-co-sdk-api` package or our created Todo types. The action names should be self explanatory. The `onInvite` handler is used in the participant invite dialog. The other handlers just change data in the Todo Core.
+We first call `assureCoreExists()` to ensure that a Todo Core exists. It is to this Core that we can push our actions.  
+We then create Action objects using the types from either the `@1io/tauri-plugin-co-sdk-api` package, or from our created Todo types.  
+These action names should be self explanatory.  
+The `onInvite` handler is used in the participant invite dialog.  
+The other handlers just change data in the Todo Core.
 
-The react `ErrorBoundary` cannot catch errors thrown out of async callbacks. We fix this by saving any occuring errors in a React state and then throwing them in a sync context on the next render:
+The React `ErrorBoundary` cannot catch errors thrown by async callbacks.  
+We fix this by saving any occuring errors in a React state, and then throwing them in a sync context on the next render:
 
 ```typescript
   const [error, setError] = useState<unknown | undefined>();
@@ -794,14 +805,15 @@ npm run tauri dev
 
 (**Optional**) You can set the following environment variables when using the CO-kit Tauri plugin:  
 - `CO_NO_KEYCHAIN=true` : Set this to `true` if you don't want to save keys to your keychain. 
-  - **NOTE**: While this can improve handling during development by skipping the pop-ups that ask for permission to save the keys, it is **highly unsafe** in production.
+  - **NOTE**: While this can improve handling during development, by skipping the pop-ups that ask for permission to save the keys, it is **highly unsafe** in production.
 - `CO_BASE_PATH={path}` : Change the path where the data is stored.
 
 
-## Full example
+## Full Example
 
-To have a better structural overview we split the code so that each component lives in its own file.
-As copying the code into this documentation would unnecessarily bloat it, we instead link to a repository where all the code can be viewed.
+To have a better structural overview we split the code so that each component lives in its own file.  
+As copying the code into this documentation would unnecessarily bloat it, we instead link to a repository where all the code can be viewed.  
+
 You can find the full example in the `my-todo-app-tauri` folder of this git repository:
 - [1io / example-todo-list - GitLab](https://gitlab.1io.com/1io/example-todo-list.git)
 
@@ -809,8 +821,10 @@ If you followed the [earlier steps](#setup) to create your example app workspace
 
 1. Delete all files from your `src` folder.
 
-2. Copy all files from the `src` folder of the [existing react Todo List example repository](https://gitlab.1io.com/1io/example-todo-list/-/tree/main/my-todo-app-tauri) into your `src` folder.
+2. Copy all files from the `src` folder of the [existing React Todo-List example repository](https://gitlab.1io.com/1io/example-todo-list/-/tree/main/my-todo-app-tauri) into your `src` folder.
 
 3. Copy the WASM file from your Core into the `public` folder as `my_todo_core.wasm`.
 
-If you skipped the setup steps you can instead clone the complete repository which also contains the Todo Core and rust app or just copy the `my-todo-app-tauri` folder.
+4. Then build & run the app using the commands above.
+
+If you skipped the setup steps, you can instead clone the complete repository, which also contains the Todo Core and Rust App. Or you can copy only the `my-todo-app-tauri` folder.
