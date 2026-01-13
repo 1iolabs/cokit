@@ -299,7 +299,7 @@ Tauri opens a webview using the native browser. Under MacOS this is Safari, wher
 Therefore we need the `import "web-streams-polyfill/polyfill"` import in this root file, so that the functions from the WASM wrappers work on Safari browsers.  
 
 ```admonish info
-At the moment only `CoMap` functions will work on Safari, but `CoList` and `CoSet` shall also work in the future.
+At the moment there are only JS WASM wrappers for `CoMap` and `CoSet`, but `CoList` shall also work in the future.
 ```
 
 #### Overview View
@@ -342,7 +342,7 @@ export function TodoOverview(props: TodoOverviewProps) {
   const identity = useDidKeyIdentity(TODO_IDENTITY_NAME);
 
 ~  // TODO can probably do this better
-~  // memberships can be undefined if there is no state yet, but we want an emnpty array in that case
+~  // memberships can be undefined if there is no state yet, but we want an empty array in that case
 ~  if (membershipCoreCid === null) {
 ~    memberships = [];
 ~  }
@@ -418,13 +418,21 @@ It fetches the Core state CID using:
 - the CO session  
 
 
-The CID can be resolved using the `useResolveCid` hook. The returned object is of the type `Memberships`, which contains information about all the COs we can interact with. Depending on this state, we render different [list items](#list-items).
+The returned `membershipCoreCid` can be resolved using the `useResolveCid` hook. The returned object is of the type `Memberships`, which contains information about all the COs we can interact with. Depending on this state, we render different [list items](#list-items).
 
+```admonish info
+Most hooks may returned undefined.  
+This is because it uses async tauri commands in the background and therefore data might not be loaded on render time.  
+To prevent conditional hook calls, which are forbidden in react, the hooks can be called with undefined arguments.  
+In those cases they will return undefined as well.
+
+In a newly created Core, there is no state yet which means the `useCoCore` hook cannot return a Cid. In that case `null` is returned to indicate that a Core exitst but has no state yet.
+```
 
 ##### Identity
-To push an action, or to create a CO, we need our identity.  
+To push an action, or to create a CO, we need an identity.  
 We use the `useDidKeyIdentity` hook for that.  
-It takes an identity name and creates a new `did:key` identity if none are found.  
+It searches for an identity with the given name or creates a new `did:key` identity with that name if none are found.  
 It then returns the DID in string form.
 
 
@@ -444,13 +452,15 @@ In our example we only create private COs.
 We have a handler for joining a CO that we set as prop for the `TodoListJoin` Element.  
 
 We call the `pushAction` function using:
-- the session string
-- our identity, which is the Core name we get as a constant from the `@1io/tauri-plugin-co-sdk-api`
-- an action
+- the local CO session string
+- the Core name `CO_CORE_NAME_MEMBERSHIP` we get as a constant from the `@1io/tauri-plugin-co-sdk-api`
+- an action that changes the membership state to  `Join`
+- our identity
 
-This will then push the given action to the specified Core.
+This will then push the join action to the membership Core.
 
-The `ChangeMembershipState` action comes from CO-kit, and we have TypeScript types for it in the `@1io/tauri-plugin-co-sdk-api` package. In our case, we want to set our membership status from `Invite` to `Join`.
+The `ChangeMembershipState` action comes from CO-kit, and we have TypeScript types for it in the `@1io/tauri-plugin-co-sdk-api` package.  
+To join a CO that we have been invited to, we need to set our membership status for that CO from `Invite` to `Join`.
 
 
 ##### List items
@@ -803,7 +813,7 @@ Start your app with:
 npm run tauri dev
 ```
 
-(**Optional**) You can set the following environment variables when using the CO-kit Tauri plugin:  
+(**Optional**) You can set the following environment variables when using the CO-kit Tauri plugin by appending them to the start command:  
 - `CO_NO_KEYCHAIN=true` : Set this to `true` if you don't want to save keys to your keychain. 
   - **NOTE**: While this can improve handling during development, by skipping the pop-ups that ask for permission to save the keys, it is **highly unsafe** in production.
 - `CO_BASE_PATH={path}` : Change the path where the data is stored.
