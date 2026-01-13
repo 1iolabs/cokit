@@ -1,5 +1,6 @@
 // mods
 #[cfg(feature = "frb")]
+#[rustfmt::skip]
 mod frb_generated;
 mod library;
 mod types;
