@@ -2,8 +2,18 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'generated/types/cid.dart';
 
-abstract interface class DagCborEncodable {
-  dynamic toDagCborValue();
+abstract interface class DagCborCodecProvider {
+  DagCborCodec<dynamic> get dagCborCodec;
+}
+
+extension DagCborConvenience on DagCborCodecProvider {
+  dynamic toDagCborValue() => dagCborCodec.toDagCborValue(this);
+  Uint8List toDagCbor() => DagCbor.encodeCodec(dagCborCodec, this);
+}
+
+abstract interface class DagCborCodec<T> {
+  T fromDagCborValue(dynamic value);
+  dynamic toDagCborValue(T value);
 }
 
 class DagCbor {
@@ -20,8 +30,28 @@ class DagCbor {
     return v;
   }
 
+  static Uint8List encodeCodec<T>(
+    DagCborCodec<T>? codec,
+    T value,
+  ) {
+    if (codec != null) {
+      return encode(codec.toDagCborValue(value));
+    }
+    return encode(value);
+  }
+
+  static T decodeCodec<T>(
+    DagCborCodec<T>? codec,
+    Uint8List bytes,
+  ) {
+    if (codec != null) {
+      return codec.fromDagCborValue(decode(bytes));
+    }
+    return decode(bytes);
+  }
+
   static void _encodeDag(dynamic v, _Writer w) {
-    if (v is DagCborEncodable) {
+    if (v is DagCborCodecProvider) {
       v = v.toDagCborValue();
     }
     if (v == null) {
