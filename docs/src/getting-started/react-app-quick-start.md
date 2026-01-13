@@ -37,7 +37,7 @@ We used the following:
 
 This creates a new Tauri workspace at this location using React, Typescript and Vite.  
 The new directory is both an npm package and the workspace for your new App.  
-You can now open it in you IDE of choice.
+You can now open it in your IDE of choice.
 
 Browse to this new workspace, and run `npm install`:
 ```sh
