@@ -1239,9 +1239,10 @@ fn wire__crate__types__co_map__co_map_stream_impl(
 				<RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>>>::sse_decode(
 					&mut deserializer,
 				);
-			let api_sink = <StreamSink<(Vec<u8>, Vec<u8>), flutter_rust_bridge::for_generated::SseCodec>>::sse_decode(
-				&mut deserializer,
-			);
+			let api_sink =
+				<StreamSink<Option<(Vec<u8>, Vec<u8>)>, flutter_rust_bridge::for_generated::SseCodec>>::sse_decode(
+					&mut deserializer,
+				);
 			deserializer.end();
 			move |context| async move {
 				transform_result_sse::<_, ()>(
@@ -1477,7 +1478,7 @@ impl SseDecode for StreamSink<crate::library::co::CoState, flutter_rust_bridge::
 	}
 }
 
-impl SseDecode for StreamSink<(Vec<u8>, Vec<u8>), flutter_rust_bridge::for_generated::SseCodec> {
+impl SseDecode for StreamSink<Option<(Vec<u8>, Vec<u8>)>, flutter_rust_bridge::for_generated::SseCodec> {
 	// Codec=Sse (Serialization based), see doc to use other codecs
 	fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
 		let mut inner = <String>::sse_decode(deserializer);
@@ -1749,6 +1750,17 @@ impl SseDecode for Option<crate::types::network_settings::CoNetworkSettings> {
 	fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
 		if (<bool>::sse_decode(deserializer)) {
 			return Some(<crate::types::network_settings::CoNetworkSettings>::sse_decode(deserializer));
+		} else {
+			return None;
+		}
+	}
+}
+
+impl SseDecode for Option<(Vec<u8>, Vec<u8>)> {
+	// Codec=Sse (Serialization based), see doc to use other codecs
+	fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+		if (<bool>::sse_decode(deserializer)) {
+			return Some(<(Vec<u8>, Vec<u8>)>::sse_decode(deserializer));
 		} else {
 			return None;
 		}
@@ -2288,7 +2300,7 @@ impl SseEncode for StreamSink<crate::library::co::CoState, flutter_rust_bridge::
 	}
 }
 
-impl SseEncode for StreamSink<(Vec<u8>, Vec<u8>), flutter_rust_bridge::for_generated::SseCodec> {
+impl SseEncode for StreamSink<Option<(Vec<u8>, Vec<u8>)>, flutter_rust_bridge::for_generated::SseCodec> {
 	// Codec=Sse (Serialization based), see doc to use other codecs
 	fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
 		unimplemented!("")
@@ -2510,6 +2522,16 @@ impl SseEncode for Option<crate::types::network_settings::CoNetworkSettings> {
 		<bool>::sse_encode(self.is_some(), serializer);
 		if let Some(value) = self {
 			<crate::types::network_settings::CoNetworkSettings>::sse_encode(value, serializer);
+		}
+	}
+}
+
+impl SseEncode for Option<(Vec<u8>, Vec<u8>)> {
+	// Codec=Sse (Serialization based), see doc to use other codecs
+	fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+		<bool>::sse_encode(self.is_some(), serializer);
+		if let Some(value) = self {
+			<(Vec<u8>, Vec<u8>)>::sse_encode(value, serializer);
 		}
 	}
 }

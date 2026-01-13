@@ -181,7 +181,7 @@ abstract class CoKitApi extends BaseApi {
 
   CoMap crateTypesCoMapCoMapNew({required Cid root});
 
-  Stream<(Uint8List, Uint8List)> crateTypesCoMapCoMapStream(
+  Stream<(Uint8List, Uint8List)?> crateTypesCoMapCoMapStream(
       {required CoMap that, required BlockStorage storage});
 
   Future<CoNetworkSettings> crateTypesNetworkSettingsCoNetworkSettingsDefault();
@@ -1079,16 +1079,16 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       );
 
   @override
-  Stream<(Uint8List, Uint8List)> crateTypesCoMapCoMapStream(
+  Stream<(Uint8List, Uint8List)?> crateTypesCoMapCoMapStream(
       {required CoMap that, required BlockStorage storage}) {
-    final sink = RustStreamSink<(Uint8List, Uint8List)>();
+    final sink = RustStreamSink<(Uint8List, Uint8List)?>();
     unawaited(handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_box_autoadd_co_map(that, serializer);
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
             storage, serializer);
-        sse_encode_StreamSink_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+        sse_encode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
             sink, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
             funcId: 31, port: port_);
@@ -1366,8 +1366,8 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
-  RustStreamSink<(Uint8List, Uint8List)>
-      dco_decode_StreamSink_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+  RustStreamSink<(Uint8List, Uint8List)?>
+      dco_decode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
           dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     throw UnimplementedError();
@@ -1443,6 +1443,14 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   CreateCo dco_decode_box_autoadd_create_co(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_create_co(raw);
+  }
+
+  @protected
+  (Uint8List, Uint8List)
+      dco_decode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as (Uint8List, Uint8List);
   }
 
   @protected
@@ -1640,6 +1648,19 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_co_network_settings(raw);
+  }
+
+  @protected
+  (
+    Uint8List,
+    Uint8List
+  )? dco_decode_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+      dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null
+        ? null
+        : dco_decode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+            raw);
   }
 
   @protected
@@ -1905,8 +1926,8 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
-  RustStreamSink<(Uint8List, Uint8List)>
-      sse_decode_StreamSink_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+  RustStreamSink<(Uint8List, Uint8List)?>
+      sse_decode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
           SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     throw UnimplementedError('Unreachable ()');
@@ -1980,6 +2001,15 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   CreateCo sse_decode_box_autoadd_create_co(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_create_co(deserializer));
+  }
+
+  @protected
+  (Uint8List, Uint8List)
+      sse_decode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_record_list_prim_u_8_strict_list_prim_u_8_strict(
+        deserializer));
   }
 
   @protected
@@ -2220,6 +2250,22 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_co_network_settings(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  (
+    Uint8List,
+    Uint8List
+  )? sse_decode_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+      SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          deserializer));
     } else {
       return null;
     }
@@ -2518,15 +2564,15 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
 
   @protected
   void
-      sse_encode_StreamSink_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
-          RustStreamSink<(Uint8List, Uint8List)> self,
+      sse_encode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+          RustStreamSink<(Uint8List, Uint8List)?> self,
           SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(
         self.setupAndSerialize(
             codec: SseCodec(
           decodeSuccessData:
-              sse_decode_record_list_prim_u_8_strict_list_prim_u_8_strict,
+              sse_decode_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict,
           decodeErrorData: sse_decode_AnyhowException,
         )),
         serializer);
@@ -2601,6 +2647,14 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       CreateCo self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_create_co(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+      (Uint8List, Uint8List) self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_record_list_prim_u_8_strict_list_prim_u_8_strict(
+        self, serializer);
   }
 
   @protected
@@ -2798,6 +2852,19 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_co_network_settings(self, serializer);
+    }
+  }
+
+  @protected
+  void
+      sse_encode_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          (Uint8List, Uint8List)? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          self, serializer);
     }
   }
 

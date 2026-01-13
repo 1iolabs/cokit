@@ -3,7 +3,7 @@ import '../../co_flutter.dart';
 /// See: ../../../../../cores/co/src/lib.rs
 class CoreCo implements DagCborCodecProvider {
   final String /* CoId */ id;
-  final List<dynamic>? /* Tags */ tags;
+  final Tags /* Tags */ tags;
   final String /* String */ name;
   final Cid /* Cid */ binary;
   final CoMap<String, Participant> /* CoMap<Did, Participant> */ participants;
@@ -35,7 +35,7 @@ class CoreCoDagCborCodec implements DagCborCodec<CoreCo> {
   CoreCo fromDagCborValue(data) {
     return CoreCo(
       id: data["id"],
-      tags: data["t"],
+      tags: Tags.codec.fromDagCborValue(data["t"]),
       name: data["n"],
       binary: data["b"],
       participants: CoMap(data["p"], codec: Participant.codec),
@@ -51,7 +51,7 @@ class CoreCoDagCborCodec implements DagCborCodec<CoreCo> {
   dynamic toDagCborValue(CoreCo value) {
     return {
       "id": value.id,
-      "t": value.tags,
+      "t": value.tags.toDagCborValue(),
       "n": value.name,
       "b": value.binary,
       "p": value.participants,
@@ -98,9 +98,9 @@ class CoreDagCborCodec implements DagCborCodec<Core> {
 }
 
 class Participant implements DagCborCodecProvider {
-  final dynamic /* Did */ did;
-  final dynamic /* ParticipantState */ state;
-  final dynamic /* Tags */ tags;
+  final String /* Did */ did;
+  final ParticipantState /* ParticipantState */ state;
+  final Tags /* Tags */ tags;
 
   Participant({required this.did, required this.state, required this.tags});
 
@@ -115,8 +115,8 @@ class ParticipantDagCborCodec implements DagCborCodec<Participant> {
   Participant fromDagCborValue(value) {
     return Participant(
       did: value["did"],
-      state: value["state"],
-      tags: value["tags"],
+      state: ParticipantState.codec.fromDagCborValue(value["state"]),
+      tags: Tags.codec.fromDagCborValue(value["tags"]),
     );
   }
 
@@ -124,8 +124,43 @@ class ParticipantDagCborCodec implements DagCborCodec<Participant> {
   dynamic toDagCborValue(Participant value) {
     return {
       "did": value.did,
-      "state": value.state,
-      "tags": value.tags,
+      "state": value.state.toDagCborValue(),
+      "tags": value.tags.toDagCborValue(),
     };
+  }
+}
+
+enum ParticipantState implements DagCborCodecProvider {
+  active(0),
+  inactive(1),
+  invite(2),
+  pending(3);
+
+  final int value;
+  const ParticipantState(this.value);
+
+  factory ParticipantState.fromInt(int value) {
+    return ParticipantState.values.firstWhere(
+      (e) => e.value == value,
+      orElse: () =>
+          throw ArgumentError('Invalid ParticipantState value: $value'),
+    );
+  }
+
+  static final codec = ParticipantStateDagCborCodec();
+
+  @override
+  DagCborCodec<dynamic> get dagCborCodec => codec;
+}
+
+class ParticipantStateDagCborCodec implements DagCborCodec<ParticipantState> {
+  @override
+  fromDagCborValue(value) {
+    return ParticipantState.fromInt(value);
+  }
+
+  @override
+  toDagCborValue(ParticipantState value) {
+    return value.value;
   }
 }

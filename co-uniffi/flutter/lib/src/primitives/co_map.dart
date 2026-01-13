@@ -57,8 +57,8 @@ class CoMap<K, V> implements DagCborCodecProvider {
 
   Stream<(K, V)> stream(BlockStorage storage) {
     final result = _inner.stream(storage: storage);
-    return result.map((item) {
-      final (key, value) = item;
+    return result.takeWhile((item) => item != null).map((item) {
+      final (key, value) = item!;
       return (
         DagCbor.decodeCodec(_keyCodec, key),
         DagCbor.decodeCodec(_codec, value)

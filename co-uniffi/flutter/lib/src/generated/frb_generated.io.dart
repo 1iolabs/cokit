@@ -145,8 +145,8 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   RustStreamSink<CoState> dco_decode_StreamSink_co_state_Sse(dynamic raw);
 
   @protected
-  RustStreamSink<(Uint8List, Uint8List)>
-      dco_decode_StreamSink_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+  RustStreamSink<(Uint8List, Uint8List)?>
+      dco_decode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
           dynamic raw);
 
   @protected
@@ -181,6 +181,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   CreateCo dco_decode_box_autoadd_create_co(dynamic raw);
+
+  @protected
+  (Uint8List, Uint8List)
+      dco_decode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          dynamic raw);
 
   @protected
   int dco_decode_box_autoadd_u_32(dynamic raw);
@@ -250,6 +255,13 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   CoNetworkSettings? dco_decode_opt_box_autoadd_co_network_settings(
+      dynamic raw);
+
+  @protected
+  (
+    Uint8List,
+    Uint8List
+  )? dco_decode_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
       dynamic raw);
 
   @protected
@@ -385,8 +397,8 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
       SseDeserializer deserializer);
 
   @protected
-  RustStreamSink<(Uint8List, Uint8List)>
-      sse_decode_StreamSink_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+  RustStreamSink<(Uint8List, Uint8List)?>
+      sse_decode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
           SseDeserializer deserializer);
 
   @protected
@@ -422,6 +434,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   CreateCo sse_decode_box_autoadd_create_co(SseDeserializer deserializer);
+
+  @protected
+  (Uint8List, Uint8List)
+      sse_decode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          SseDeserializer deserializer);
 
   @protected
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
@@ -493,6 +510,13 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   CoNetworkSettings? sse_decode_opt_box_autoadd_co_network_settings(
+      SseDeserializer deserializer);
+
+  @protected
+  (
+    Uint8List,
+    Uint8List
+  )? sse_decode_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
       SseDeserializer deserializer);
 
   @protected
@@ -635,8 +659,8 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void
-      sse_encode_StreamSink_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
-          RustStreamSink<(Uint8List, Uint8List)> self,
+      sse_encode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+          RustStreamSink<(Uint8List, Uint8List)?> self,
           SseSerializer serializer);
 
   @protected
@@ -675,6 +699,10 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   @protected
   void sse_encode_box_autoadd_create_co(
       CreateCo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+      (Uint8List, Uint8List) self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
@@ -747,6 +775,11 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   @protected
   void sse_encode_opt_box_autoadd_co_network_settings(
       CoNetworkSettings? self, SseSerializer serializer);
+
+  @protected
+  void
+      sse_encode_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          (Uint8List, Uint8List)? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);

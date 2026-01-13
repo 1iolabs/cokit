@@ -90,7 +90,11 @@ impl CoMap {
 			.await
 	}
 
-	pub async fn stream(&self, storage: &BlockStorage, sink: crate::frb_generated::StreamSink<(Vec<u8>, Vec<u8>)>) {
+	pub async fn stream(
+		&self,
+		storage: &BlockStorage,
+		sink: crate::frb_generated::StreamSink<Option<(Vec<u8>, Vec<u8>)>>,
+	) {
 		let map = match to_map(self) {
 			Ok(map) => map,
 			Err(err) => {
@@ -119,8 +123,8 @@ impl CoMap {
 								break;
 							},
 						};
-						if sink.add((key, value)).is_err() {
-							break;
+						if sink.add(Some((key, value))).is_err() {
+							return;
 						}
 					},
 					Err(err) => {
@@ -129,6 +133,7 @@ impl CoMap {
 					},
 				}
 			}
+			sink.add(None).ok();
 		};
 		flutter_rust_bridge::spawn(task);
 	}
