@@ -114,9 +114,9 @@ cargo add tokio@1.48
 6. Edit `src-tauri/src/lib.rs` so that it looks like this:
 
 ```rust
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use tauri_plugin_co_sdk::library::co_application::CoApplicationSettings;
-
+# // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+# use tauri_plugin_co_sdk::library::co_application::CoApplicationSettings;
+# 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
 	tauri::async_runtime::set(tokio::runtime::Handle::current());
@@ -133,9 +133,9 @@ pub async fn run() {
 7. Change the main function in `src-tauri/src/main.rs` to be async:
 
 ```rust
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
+# // Prevents additional console window on Windows in release, DO NOT REMOVE!!
+# #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+# 
 #[tokio::main]
 async fn main() {
 	my_todo_app_tauri_lib::run().await;
