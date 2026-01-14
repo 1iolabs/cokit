@@ -1,0 +1,38 @@
+[package]
+name = "co-bindings"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.91"
+
+[lib]
+name = "co_bindings"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+anyhow = { workspace = true }
+async-stream = { workspace = true }
+async-trait = { workspace = true }
+cid = { workspace = true }
+co-actor = { workspace = true }
+co-primitives = { workspace = true }
+co-sdk = { workspace = true, default-features = false, features = ["recommended", "apple-sandbox"] }
+derive_more = { workspace = true }
+flutter_rust_bridge = { version = "=2.11.1", optional = true }
+futures = { workspace = true }
+ipld-core = { workspace = true }
+multiaddr = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_repr = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+uniffi = { version = "0.30", optional = true }
+
+[features]
+default = ["frb"]
+uniffi = ["dep:uniffi"]
+frb = ["dep:flutter_rust_bridge"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

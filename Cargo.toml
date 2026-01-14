@@ -2,6 +2,7 @@
 members = [
     "co-actor",
     "co-api",
+    "co-bindings",
     "co-cli",
     "co-dioxus",
     "co-identity",
