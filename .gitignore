@@ -3,5 +3,6 @@
 /.vscode/tasks.json
 /.vscode/launch.json
 /data
+.cargo
 /docs/src/crate
 /dist

@@ -45,9 +45,6 @@ test:
   variables:
     RUST_BACKTRACE: "full"
   script:
-    - df -h
-    - df -i
-    - free -m
     - cargo test
   artifacts:
     when: on_failure
