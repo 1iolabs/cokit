@@ -1,5 +1,5 @@
 import { CID } from "multiformats";
-import { CoMap, BlockStorage, unixfsAdd } from "./pkg";
+import { CoMap, BlockStorage, unixfsAdd, CoSet, CoList } from "./pkg";
 import "web-streams-polyfill";
 
 function newStorage() {
@@ -22,15 +22,20 @@ function newStorage() {
   return [storage, blocks];
 }
 
-async function test_stream() {
+async function test_co_map() {
   const [storage, blocks] = newStorage();
   let map = new CoMap();
+  // test empty
+  assertEq(map.is_empty(), true);
+  // test insert
   await map.insert(storage, "hello", "world");
   assertEq(blocks.size, 1);
   assertEq(
     CID.decode(map.cid()).toString(),
     "bafyr4ib4sqmbfbyhkoh64ylvnwrm3uyqhq43zeknhnfj643kpghqjdopza",
   );
+  assertEq(map.is_empty(), false);
+  // test stream
   const stream = map.stream(storage);
   let values = [];
   for await (const i of stream) {
@@ -40,10 +45,69 @@ async function test_stream() {
   assertEq(values.length, 1);
   assertEq(values[0][0], "hello");
   assertEq(values[0][1], "world");
+  // test contains
+  assertEq(await map.contains(storage, "not contained"), false);
+  assertEq(await map.contains(storage, "hello"), true);
+  // test get
+  assertEq(await map.get(storage, "hello"), "world");
+}
+
+async function test_co_set() {
+  const [storage, _] = newStorage();
+  let set = new CoSet();
+  // test empty
+  assertEq(set.is_empty(), true);
+  // test insert
+  await set.insert(storage, "hello");
+  await set.insert(storage, "world");
+  assertEq(set.is_empty(), false);
+  // test stream
+  let values = [];
+  for await (const item of set.stream(storage)) {
+    values.push(item);
+  }
+  assertEq(values[0], "hello");
+  assertEq(values[1], "world");
+  // test contains
+  assertEq(await set.contains(storage, "not contained"), false);
+  assertEq(await set.contains(storage, "hello"), true);
+  assertEq(await set.contains(storage, "world"), true);
+  // test remove
+  assertEq(await set.remove(storage, "hello"), true);
+  assertEq(await set.remove(storage, "hello"), false);
+  assertEq(await set.contains(storage, "hello"), false);
+}
+
+async function test_co_list() {
+  const [storage, _] = newStorage();
+  const list = new CoList();
+  // test push
+  await list.push(storage, "hello");
+  await list.push(storage, "world");
+  await list.push(storage, "test");
+  // test stream
+  let values = [];
+  for await (const item of list.stream(storage)) {
+    values.push(item);
+  }
+  assertEq(values[0], "hello");
+  assertEq(values[1], "world");
+  assertEq(values[2], "test");
+  // test reverse stream
+  values = [];
+  for await (const item of list.reverse_stream(storage)) {
+    values.push(item);
+  }
+  assertEq(values[2], "hello");
+  assertEq(values[1], "world");
+  assertEq(values[0], "test");
+  // pop
+  assertEq(await list.pop_front(storage), "hello");
+  assertEq(await list.pop(storage), "test");
 }
 
 async function test_unixfs_add() {
-  const [storage, blocks] = newStorage();
+  const [storage, _] = newStorage();
   const stream = new ReadableStream({
     start(controller) {
       for (var i = 1024; i--; i > 0) {
@@ -101,7 +165,8 @@ async function test_unixfs_add_empty() {
 async function test_async(func) {
   console.info("🧪 test:", func.name);
   const div = document.createElement("div");
-  div.textContent = `========= Testing ${func.name} =========`;
+  const equalSignCount = 50 - (func.name.length + 10) / 2;
+  div.textContent = `${"=".repeat(equalSignCount)} Testing ${func.name} ${"=".repeat(equalSignCount)}`;
   document.getElementById("main").appendChild(div);
   await func();
 }
@@ -121,7 +186,9 @@ function assertEq(actual, expected) {
 }
 
 async function tests() {
-  await test_async(test_stream);
+  await test_async(test_co_map);
+  await test_async(test_co_set);
+  await test_async(test_co_list);
   await test_async(test_unixfs_add);
   await test_async(test_unixfs_add_empty);
 }
