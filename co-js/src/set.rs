@@ -2,6 +2,7 @@ use crate::{from_js_value, to_js_value, JsBlockStorage};
 use cid::Cid;
 use co_primitives::{CoSet, TagValue};
 use wasm_bindgen::prelude::*;
+use web_sys::js_sys::Boolean;
 
 #[wasm_bindgen(js_name = "CoSet")]
 pub struct JsCoSet {
@@ -51,7 +52,7 @@ impl JsCoSet {
 		Ok(())
 	}
 
-	pub async fn remove(&mut self, storage: &JsBlockStorage, value: JsValue) -> Result<JsValue, JsValue> {
+	pub async fn remove(&mut self, storage: &JsBlockStorage, value: JsValue) -> Result<Boolean, JsValue> {
 		let mut set = self
 			.set()
 			.open(storage)
@@ -61,7 +62,7 @@ impl JsCoSet {
 		let removed = set.remove(value).await.map_err(|err| format!("remove failed: {:?}", err))?;
 		let set = set.store().await.map_err(|err| format!("store failed: {:?}", err))?;
 		self.root = Into::<Option<Cid>>::into(&set);
-		to_js_value(&removed)
+		Ok(Boolean::from(removed))
 	}
 
 	pub fn stream(&self, storage: &JsBlockStorage) -> web_sys::ReadableStream {
