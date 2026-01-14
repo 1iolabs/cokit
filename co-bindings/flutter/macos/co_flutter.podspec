@@ -31,5 +31,19 @@ A new Flutter FFI plugin project.
   s.platform = :osx, '10.11'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
   s.swift_version = '5.0'
+  s.script_phase = {
+    :name => 'Build Rust library',
+    :execution_position => :before_compile,
+    :shell_path => '/bin/sh',
+    :script => <<-SCRIPT
+      set -e
+
+      echo "Building Rust library"
+
+      export PATH="$HOME/.cargo/bin:$PATH"
+
+      cargo build -p co-bindings -F frb
+    SCRIPT
+  }
   s.vendored_libraries = 'Frameworks/libco_bindings.dylib'
 end
