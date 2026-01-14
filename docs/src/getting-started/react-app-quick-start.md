@@ -468,9 +468,9 @@ To join a CO that we have been invited to, we need to set our membership status 
 
 ##### List items
 The possible membership states that are of interest to us are:
-- Active: Normal active membership
-- Invite: We were invited to join a [CO](../reference/co.md) by someone else
-- Join: We accepted an invite and are waiting for it to complete
+- `Active`: Normal active membership
+- `Invite`: We were invited to join a [CO](../reference/co.md) by someone else
+- `Join`: We accepted an invite and are waiting for it to complete
 
 If the state is `Invite` or `Join`, we show a list element that either has a `Join` button or is marked as pending.
 
@@ -525,8 +525,8 @@ export function TodoListElement(props: TodoListElementProps) {
     }
     return count;
   }, [tasks]);
-
-  // render
+~
+~  // render
 ~  return (
 ~    <li
 ~      className="list-row flex hover:bg-base-300 rounded-none cursor-pointer after:opacity-5"
@@ -541,25 +541,28 @@ export function TodoListElement(props: TodoListElementProps) {
 }
 ```
 
-We again open a session and load the state of the CO.  
-This time we use the CO ID from the props that we got from the memberships.  
-The CO state contains information we need in this case, so we need to resolve that CID as well.  
-Most importantly, we need the name of the CO: `coState?.n`.
+The CO state contains information we need – specifically the name of the CO: `coState?.n`.  
+- We use the CO ID (`props.coId`) that we got from the memberships:  
+  - to get the `coCid` using `useCo`  
+  - to open the `coSession` using `useCoSession`  
+- We then resolve the state of the CO (`coState`) using `useResolveCid` with both the session (`coSession`) and the CO CID (`coCid`).  
 
-We want to show how many to-do items in the list are undone.  
-For this, we need the Todo Core state as well.  
-We get the Core CID with `useCoCore` and resolve it.  
-This time, we get the Core name for this Core from our `const.ts` types.
+
+We want to show how many to-do items in the list are undone, for which we will need the state of the to-do Core: `todoState`.  
+- From `useCoCore`, we get the Core CID (`todoCoreCid`) using:
+  - `coCid` and `coSession` from before
+  - `TODO_CORE_NAME`, which we get from our `const.ts` types
+- We then resolve the state of the Core (`todoState`) using `useResolveCid` with both the session (`coSession`) and the Core CID (`todoCoreCid`).  
 
 The Core state contains the tasks, which in TypeScript is a `CID`.  
 In Rust it is a `CoMap` instead. A `CoMap` is a map that has the common `BTreeMap` functions, but behind the curtains only contains a root CID, and uses the storage to set/get the linked data.  
 
 The `co-js` package contains a WASM wrapper for the Rust `CoMap`. With this we can use the Rust functions directly.  
-These functions need a `BlockStorage` that we can create with the `useBlockStorage` hook.  
-We can create a new `CoMap` with the constructor taking a CID in byte form.  
-There is no way to directly get all elements of the map, but there is a stream function. To help collect the items from the stream into a TypeScript `Map` object, we use the `useCollectCoMap` hook. 
+- These functions need a `BlockStorage` (named `storage`) that we create with the `useBlockStorage` hook, using our `coSession` from before.  
+- We then create a new `CoMap` (named `taskMap`), where the constructor takes our tasks CID in byte form (`todoState.tasks.bytes`).  
+- There is no way to directly get all elements of the map, but there is a stream function. We use the `useCollectCoMap` hook to collect the items from the stream into a TypeScript `Map` object named `tasks`. 
 
-Now we just need to filter for unfinished tasks.
+Now we just need to filter for unfinished tasks using `tasks.values()`.
 
 #### To-do List
 If, for one of our active COs, a list element is opened, we land on this view where all the to-do items of the opened CO are shown.  
@@ -591,12 +594,12 @@ We use our hooks and the `CoMap` again to get the data we require:
   const participants = useCollectCoMap<Participant>(participantMap, storage);
 ```
 
-We fetch all particpants of the CO because the view contains a `NavBar` that shows that information.  
+We fetch all particpants of the CO (via `co.p`) because the view of the to-do list contains a `NavBar` that shows the participants.  
 There is also a button that opens a dialog from where you can invite new participants.
 
 ##### Handlers
-In the overview we can create COs, but they will spawn without the Todo Core.  
-We create a function that checks if a Todo Core exists in the CO and adds it if not:
+In the overview we can create COs, but they will spawn even without a to-do Core.  
+We create the function `assureCoreExists`, which checks if a to-do Core exists in the CO, and adds one if not:
 
 ```typescript
   // returns false if for any reason it can't be assured if the Core exists
@@ -650,11 +653,10 @@ We create a function that checks if a Todo Core exists in the CO and adds it if 
   }, [storage, session, identity, co, core]);
 ```
 
-The `MyTodoCore` Core is not a built-in Core, and so we must add it to the storage first before we can use it.  
-We call the WASM function `unixfsAdd` for this.  
-It takes a WASM storage, which we already created, and a binary stream to the Core WASM.  
-The function returns the CIDs of all created Blocks, where the last one is the CID of the Root Block.  
-We need this CID to add the Core to the CO.
+Because the `MyTodoCore` Core is not a built-in Core, we must first add it to the storage before we can use it.  
+- To do this, we call the WASM function `unixfsAdd`. This takes a WASM `BlockStorage`, which we already created, and a binary stream to the Core WASM.  
+- `unixfsAdd` returns the CIDs of all created Blocks, where the last one (`rootCid`) is the CID of the Root Block.  
+- This is the CID we use when adding the Core to the CO with `CoreCreate`.
 
 Next, we create handlers using the React `useCallback` hook:
 

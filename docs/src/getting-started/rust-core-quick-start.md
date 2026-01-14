@@ -52,7 +52,7 @@ pub struct Todo {
 ```
 Here we define a simple to-do task data model:
 - `TodoTask` → single task (id, title, done flag)
-- `Todo` → state container with a map of tasks
+- `Todo` → state container with a map of tasks (i.e. a to-do list)
 
 #### 2. Define how the state can be modified:
 ```rust
