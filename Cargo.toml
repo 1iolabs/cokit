@@ -2,6 +2,7 @@
 members = [
     "co-actor",
     "co-api",
+    "co-bindings",
     "co-cli",
     "co-dioxus",
     "co-identity",
@@ -15,7 +16,6 @@ members = [
     "co-sdk",
     "co-storage",
     "co-test",
-    "co-uniffi",
     "cores/board",
     "cores/co",
     "cores/data-series",

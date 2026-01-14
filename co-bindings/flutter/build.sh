@@ -9,7 +9,7 @@ flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml
 
 echo ""
 echo "> building...";
-cargo build -p co-uniffi -F frb
+cargo build -p co-bindings -F frb
 
 echo ""
 echo "> checking flutter ..."

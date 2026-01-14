@@ -13,8 +13,8 @@
     "command": "cargo build -p co-cli",
   },
   {
-    "label": "co-uniffi: generate flutter",
-    "command": "$ZED_WORKTREE_ROOT/co-uniffi/flutter/build.sh",
+    "label": "co-bindings: generate flutter",
+    "command": "$ZED_WORKTREE_ROOT/co-bindings/flutter/build.sh",
   },
   {
     "label": "tatauri-plugin-co-sdkuri: npm install",

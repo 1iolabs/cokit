@@ -81,7 +81,7 @@ class CoKit extends BaseEntrypoint<CoKitApi, CoKitApiImpl, CoKitWire> {
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
-    stem: 'co_uniffi',
+    stem: 'co_bindings',
     ioDirectory: '../target/release/',
     webPrefix: 'pkg/',
   );

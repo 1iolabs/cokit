@@ -3,7 +3,8 @@ import 'generated/frb_generated.dart';
 import '../co_flutter.dart';
 
 Future<CoContext> openCoContext(CoSettings settings) async {
-  await CoKit.init(externalLibrary: ExternalLibrary.open("libco_uniffi.dylib"));
+  await CoKit.init(
+      externalLibrary: ExternalLibrary.open("libco_bindings.dylib"));
   return await CoContext.open(settings: settings);
 }
 
