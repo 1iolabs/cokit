@@ -65,7 +65,7 @@ impl JsCoList {
 		Ok(JsValue::null())
 	}
 
-	pub async fn stream(&self, storage: &JsBlockStorage) -> web_sys::ReadableStream {
+	pub fn stream(&self, storage: &JsBlockStorage) -> web_sys::ReadableStream {
 		let list = self.list();
 		let storage = storage.clone();
 		let stream = async_stream::try_stream! {
@@ -73,15 +73,16 @@ impl JsCoList {
 				.map_err(|err| format!("open failed: {:?}", err))?;
 			let stream = list.stream();
 			for await item in stream {
-				let value = item
+				let (_, value) = item
 					.map_err(|err| format!("read failed: {:?}", err))?;
-					let js_value = to_js_value(&value)?;
+				let js_value = to_js_value(&value)?;
 				yield js_value;
 			}
 		};
 		wasm_streams::ReadableStream::from_stream(stream).into_raw()
 	}
-	pub async fn reverse_stream(&self, storage: &JsBlockStorage) -> web_sys::ReadableStream {
+
+	pub fn reverse_stream(&self, storage: &JsBlockStorage) -> web_sys::ReadableStream {
 		let list = self.list();
 		let storage = storage.clone();
 		let stream = async_stream::try_stream! {
@@ -89,9 +90,9 @@ impl JsCoList {
 				.map_err(|err| format!("open failed: {:?}", err))?;
 			let stream = list.reverse_stream();
 			for await item in stream {
-				let value = item
+				let (_, value) = item
 					.map_err(|err| format!("read failed: {:?}", err))?;
-					let js_value = to_js_value(&value)?;
+				let js_value = to_js_value(&value)?;
 				yield js_value;
 			}
 		};
