@@ -27,7 +27,7 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros"] }
 tokio-util = { workspace = true }
 tracing = { workspace = true }
-uniffi = { version = "0.25", optional = true }
+uniffi = { version = "0.30", optional = true }
 
 [features]
 default = ["frb"]

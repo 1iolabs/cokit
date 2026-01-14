@@ -55,6 +55,7 @@ impl From<CoReducerState> for CoState {
 	}
 }
 
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 #[cfg_attr(feature = "frb", flutter_rust_bridge::frb(opaque))]
 pub struct CoSubscription {
 	cancel: CancellationToken,

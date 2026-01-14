@@ -4,6 +4,7 @@ use co_primitives::StoreParams;
 use co_sdk::DefaultParams;
 use std::sync::Arc;
 
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 #[cfg_attr(feature = "frb", flutter_rust_bridge::frb(opaque))]
 #[derive(Clone)]
 pub struct BlockStorage {

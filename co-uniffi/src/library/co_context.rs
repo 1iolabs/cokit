@@ -16,7 +16,7 @@ use std::collections::HashMap;
 pub struct CoContext {
 	pub(crate) handle: ActorHandle<CoMessage>,
 }
-#[cfg_attr(feature = "uniffi", uniffi::export)]
+// #[cfg_attr(feature = "uniffi", uniffi::export)]
 impl CoContext {
 	pub async fn open(settings: CoSettings) -> Result<Self, CoError> {
 		match CoApplication::spawn(settings.clone()).await {

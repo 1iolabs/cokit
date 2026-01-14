@@ -7,10 +7,7 @@ mod types;
 
 // exports
 #[cfg(feature = "uniffi")]
-pub use library::{
-	co::{storage_get, storage_set, storage_set_data},
-	co_context::co_context_open,
-};
+pub use library::co_context::co_context_open;
 pub use library::{
 	co::{Co, CoState},
 	co_context::{CoContext, CreateCo, CreateCore},
@@ -28,7 +25,6 @@ pub use types::{
 
 // uniffi
 #[cfg(feature = "uniffi")]
-#[allow(unpredictable_function_pointer_comparisons)]
 uniffi::setup_scaffolding!();
 
 // types
