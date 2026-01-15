@@ -298,12 +298,8 @@ export function App() {
 }
 ```
 
-Tauri opens a webview using the native browser. Under MacOS this is Safari, where unfortunately some features are not implemented.  
-Therefore we need the `import "web-streams-polyfill/polyfill"` import in this root file, so that the functions from the WASM wrappers work on Safari browsers.  
-
-```admonish info
-At the moment there are only JS WASM wrappers for `CoMap` and `CoSet`, but `CoList` shall also work in the future.
-```
+Tauri opens a webview using the native browser. Under MacOS this is Safari, where unfortunately async iteration of a `ReadableStream` is unavailable.  
+Therefore we need the `import "web-streams-polyfill/polyfill"` import in this root file, so we can iterate the streams from the WASM wrappers on Safari browsers.  
 
 #### Overview View
 Next, we want to display a list of To-do Lists and possible invites.
