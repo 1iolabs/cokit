@@ -597,13 +597,13 @@ There is also a button that opens a dialog from where you can invite new partici
 
 ##### Handlers
 In the overview we can create COs, but they will spawn even without a to-do Core.  
-We create the function `assureCoreExists`, which checks if a to-do Core exists in the CO, and adds one if not:
+We create the function `ensureCoreExists`, which checks if a to-do Core exists in the CO, and adds one if not:
 
 ```typescript
-  // returns false if for any reason it can't be assured if the Core exists
-  // most likely because required information isn't loaded yet
+  // returns false if for any reason it can't be sure that the Core exists
+  // most likely because the required information isn't loaded yet
   // returns true if Core exists, either because it already did or it was missing but was then created
-  const assureCoreExists = useCallback(async () => {
+  const ensureCoreExists = useCallback(async () => {
     if (
       storage === undefined ||
       session === undefined ||
