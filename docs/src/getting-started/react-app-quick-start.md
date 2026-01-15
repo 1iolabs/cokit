@@ -240,6 +240,8 @@ export type TodoAction =
   | "DeleteAllDoneTasks";
 ```
 
+These should reflect the data model and state as [defined in your Core](/getting-started/rust-core-quick-start.html#1-define-your-data-model-in-a-core).
+
 Next, create a file `consts.ts`, also under `/src/types/`.  
 This file contains all const variables, such as the Core name or Identity name:
 
@@ -659,7 +661,7 @@ Next, we create handlers using the React `useCallback` hook:
 ```typescript
   const onDeleteAllDone = useCallback(async () => {
     if (identity !== undefined && session !== undefined) {
-      if (!(await assureCoreExists())) {
+      if (!(await ensureCoreExists())) {
         return;
       }
       const action: TodoAction = "DeleteAllDoneTasks";
@@ -674,7 +676,7 @@ Next, we create handlers using the React `useCallback` hook:
   const onCreateTask = useCallback(
     async (title: string) => {
       if (identity !== undefined && session !== undefined) {
-        if (!(await assureCoreExists())) {
+        if (!(await ensureCoreExists())) {
           return;
         }
         const action: TodoAction = {
@@ -693,7 +695,7 @@ Next, we create handlers using the React `useCallback` hook:
   const onDone = useCallback(
     async (id: string, done: boolean) => {
       if (session !== undefined && identity !== undefined) {
-        if (!(await assureCoreExists())) {
+        if (!(await ensureCoreExists())) {
           return;
         }
         let action: TodoAction;
@@ -715,7 +717,7 @@ Next, we create handlers using the React `useCallback` hook:
   const onDelete = useCallback(
     async (id: string) => {
       if (session !== undefined && identity !== undefined) {
-        if (!(await assureCoreExists())) {
+        if (!(await ensureCoreExists())) {
           return;
         }
         const action: TodoAction = { TaskDelete: { id } };
@@ -732,7 +734,7 @@ Next, we create handlers using the React `useCallback` hook:
   const onEdit = useCallback(
     async (id: string, title: string) => {
       if (session !== undefined && identity !== undefined) {
-        if (!(await assureCoreExists())) {
+        if (!(await ensureCoreExists())) {
           return;
         }
         const action: TodoAction = { TaskSetTitle: { id, title } };
@@ -749,7 +751,7 @@ Next, we create handlers using the React `useCallback` hook:
   const onInvite = useCallback(
     async (name: string, did: Did) => {
       if (session !== undefined && identity !== undefined) {
-        if (!(await assureCoreExists())) {
+        if (!(await ensureCoreExists())) {
           return;
         }
         // TODO invite action
@@ -767,14 +769,14 @@ Next, we create handlers using the React `useCallback` hook:
   );
 ```
 
-We first call `assureCoreExists()` to ensure that a Todo Core exists. It is to this Core that we can push our actions.  
-We then create Action objects using the types from either the `@1io/tauri-plugin-co-sdk-api` package, or from our created Todo types.  
-These action names should be self explanatory.  
-The `onInvite` handler is used in the participant invite dialog.  
-The other handlers just change data in the Todo Core.
+Our actions are pushed to a to-do Core.
+- We first call `ensureCoreExists()` to ensure that a to-do Core exists.  
+- We then create Action objects using either the types from the `@1io/tauri-plugin-co-sdk-api` package, or from our own to-do types (`/src/types/todo.ts`).
+- The `onInvite` handler is used in the participant-invite dialog.  
+- The other handlers just change data in the to-do Core.
 
 The React `ErrorBoundary` cannot catch errors thrown by async callbacks.  
-We fix this by saving any occuring errors in a React state, and then throwing them in a sync context on the next render:
+We fix this by saving any errors that occur in a React state, and then throwing them in a sync context on the next render:
 
 ```typescript
   const [error, setError] = useState<unknown | undefined>();
@@ -783,7 +785,7 @@ We fix this by saving any occuring errors in a React state, and then throwing th
   }
 ```
 
-Now we just need to render the Todo list items:
+Now we just need to render the items in the to-do list:
 
 ```typescript
 <ul className="list grow shrink overflow-y-auto min-h-0">
@@ -814,7 +816,7 @@ Start your app with:
 npm run tauri dev
 ```
 
-(**Optional**) You can set the following environment variables when using the CO-kit Tauri plugin by appending them to the start command:  
+(**Optional**) You can set the following environment variables when using the CO-kit Tauri plugin by prepending them to the command above when starting your app:  
 - `CO_NO_KEYCHAIN=true` : Set this to `true` if you don't want to save keys to your keychain. 
   - **NOTE**: While this can improve handling during development, by skipping the pop-ups that ask for permission to save the keys, it is **highly unsafe** in production.
 - `CO_BASE_PATH={path}` : Change the path where the data is stored.
