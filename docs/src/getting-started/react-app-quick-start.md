@@ -754,7 +754,6 @@ Next, we create handlers using the React `useCallback` hook:
         if (!(await ensureCoreExists())) {
           return;
         }
-        // TODO invite action
         const action: CoAction = {
           ParticipantInvite: { participant: did, tags: [["name", name]] },
         };
