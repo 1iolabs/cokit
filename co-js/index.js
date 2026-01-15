@@ -6,20 +6,57 @@ function newStorage() {
   let blocks = new Map();
   let storage = new BlockStorage(
     async (cid) => {
-      console.log("Getting block ", blocks, cid);
+      // console.log("Getting block ", blocks, cid);
       const block = blocks.get(CID.decode(cid).toString());
-      // const block = blocks.get(cid);
-      console.log("Got block: ", block);
+      // console.log("Got block: ", block);
       return block;
     },
     async (cid_bytes, data) => {
       const cid = CID.decode(cid_bytes);
-      console.log("Setting block ", cid.toString(), data);
+      // console.log("Setting block ", cid.toString(), data);
       blocks.set(cid.toString(), data);
       return cid.bytes;
     },
   );
   return [storage, blocks];
+}
+
+const BENCHMARK_REPEATS = 1000;
+
+async function benchmark_map() {
+  const tsStart = Date.now();
+  const [storage, _] = newStorage();
+  let map = new CoMap();
+  for (let i = 0; i < BENCHMARK_REPEATS; i++) {
+    await map.insert(storage, i, i);
+  }
+  assertEq(await map.contains(storage, BENCHMARK_REPEATS - 1), true);
+  console.log(
+    "Benchmark ",
+    BENCHMARK_REPEATS,
+    " map inserts. Took: ",
+    (Date.now() - tsStart) / 1000,
+    " seconds",
+  );
+}
+
+async function benchmark_map_transaction() {
+  const tsStart = Date.now();
+  const [storage, _] = newStorage();
+  let map = new CoMap();
+  let transaction = await map.open(storage);
+  for (let i = 0; i < BENCHMARK_REPEATS; i++) {
+    await transaction.insert(i, i);
+  }
+  map = await transaction.store();
+  assertEq(await map.contains(storage, BENCHMARK_REPEATS - 1), true);
+  console.log(
+    "Benchmark ",
+    BENCHMARK_REPEATS,
+    " map inserts using transactions. Took: ",
+    (Date.now() - tsStart) / 1000,
+    " seconds",
+  );
 }
 
 async function test_co_map() {
@@ -46,10 +83,32 @@ async function test_co_map() {
   assertEq(values[0][0], "hello");
   assertEq(values[0][1], "world");
   // test contains
-  assertEq(await map.contains(storage, "not contained"), false);
-  assertEq(await map.contains(storage, "hello"), true);
+  assertEq(await map.contains_key(storage, "not contained"), false);
+  assertEq(await map.contains_key(storage, "hello"), true);
   // test get
   assertEq(await map.get(storage, "hello"), "world");
+  assertEq(await map.get(storage, "none"), undefined);
+  // test transaction
+  let transaction = await map.open(storage);
+  await transaction.insert("trans", "action");
+  let transactionStream = transaction.stream();
+  values = [];
+  for await (const i of transactionStream) {
+    values.push(i);
+  }
+  console.log("values: ", values);
+  assertEq(values.length, 2);
+  assertEq(values[0][0], "hello");
+  assertEq(values[0][1], "world");
+  assertEq(values[1][0], "trans");
+  assertEq(values[1][1], "action");
+  assertEq(await transaction.contains_key("trans"), true);
+  const newMap = await transaction.store();
+  await map.commit(transaction);
+  assertEq(
+    await map.contains_key(storage, "trans"),
+    await newMap.contains_key(storage, "trans"),
+  );
 }
 
 async function test_co_set() {
@@ -191,5 +250,8 @@ async function tests() {
   await test_async(test_co_list);
   await test_async(test_unixfs_add);
   await test_async(test_unixfs_add_empty);
+  // await benchmark_map();
+  // await benchmark_map();
+  // await benchmark_map_transaction();
 }
 tests();

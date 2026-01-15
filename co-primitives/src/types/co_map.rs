@@ -456,15 +456,49 @@ where
 mod tests {
 	use crate::{library::test::TestStorage, CoMap};
 	use futures::TryStreamExt;
+	use std::time::SystemTime;
 
 	#[tokio::test]
 	async fn smoke() {
 		let storage = TestStorage::default();
-		let mut set = CoMap::<i32, i32>::default();
-		let mut transaction = set.open(&storage).await.unwrap();
+		let mut map = CoMap::<i32, i32>::default();
+		let mut transaction = map.open(&storage).await.unwrap();
 		transaction.insert(1, 1).await.unwrap();
 		transaction.insert(2, 2).await.unwrap();
-		set.commit(transaction).await.unwrap();
-		assert_eq!(set.stream(&storage).try_collect::<Vec<(i32, i32)>>().await.unwrap(), vec![(1, 1), (2, 2)]);
+		map.commit(transaction).await.unwrap();
+		assert_eq!(map.stream(&storage).try_collect::<Vec<(i32, i32)>>().await.unwrap(), vec![(1, 1), (2, 2)]);
+	}
+
+	const BENCHMARK_REPEATS: i32 = 1000;
+	#[tokio::test]
+	async fn benchmark_transactional() {
+		let ts = SystemTime::now();
+		let storage = TestStorage::default();
+		let mut map = CoMap::<i32, i32>::default();
+		let mut transaction = map.open(&storage).await.unwrap();
+		for i in 0..BENCHMARK_REPEATS {
+			transaction.insert(i, i).await.unwrap();
+		}
+		map.commit(transaction).await.unwrap();
+		println!(
+			"{} insert transactions done in: {:?} seconds",
+			BENCHMARK_REPEATS,
+			SystemTime::now().duration_since(ts).unwrap().as_secs_f32()
+		);
+	}
+
+	#[tokio::test]
+	async fn benchmark_pure() {
+		let ts = SystemTime::now();
+		let storage = TestStorage::default();
+		let mut map = CoMap::<i32, i32>::default();
+		for i in 0..BENCHMARK_REPEATS {
+			map.insert(&storage, i, i).await.unwrap();
+		}
+		println!(
+			"{} pure inserts done in: {:?} seconds",
+			BENCHMARK_REPEATS,
+			SystemTime::now().duration_since(ts).unwrap().as_secs_f32()
+		);
 	}
 }
