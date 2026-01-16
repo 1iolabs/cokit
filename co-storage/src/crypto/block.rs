@@ -5,7 +5,7 @@ use chacha20poly1305::{
 	Key, XChaCha20Poly1305,
 };
 use cid::Cid;
-use co_primitives::{from_cbor, to_cbor, Block, KnownMultiCodec, MultiCodec, MultiCodecError, StoreParams};
+use co_primitives::{from_cbor, to_cbor, Block, KnownMultiCodec, MultiCodec, MultiCodecError};
 use derive_more::From;
 use multihash_codetable::{Code, MultihashDigest};
 use serde::{Deserialize, Serialize};
@@ -240,28 +240,22 @@ impl EncryptedBlock {
 		self.header.is_valid()
 	}
 }
-impl<S> TryInto<Block<S>> for EncryptedBlock
-where
-	S: StoreParams,
-{
+impl TryInto<Block> for EncryptedBlock {
 	type Error = AlgorithmError;
 
 	/// Convert to encrypted Block.
-	fn try_into(self) -> Result<Block<S>, Self::Error> {
+	fn try_into(self) -> Result<Block, Self::Error> {
 		let encrypted_data = to_cbor(&self).map_err(|_| AlgorithmError::Encoding)?;
 		let mh = Code::Blake3_256.digest(&encrypted_data);
 		let cid = Cid::new_v1(KnownMultiCodec::CoEncryptedBlock.into(), mh);
 		Ok(Block::new_unchecked(cid, encrypted_data))
 	}
 }
-impl<S> TryFrom<Block<S>> for EncryptedBlock
-where
-	S: StoreParams,
-{
+impl TryFrom<Block> for EncryptedBlock {
 	type Error = AlgorithmError;
 
 	/// Convert from encrypted Block.
-	fn try_from(value: Block<S>) -> Result<Self, Self::Error> {
+	fn try_from(value: Block) -> Result<Self, Self::Error> {
 		// validate
 		MultiCodec::with_codec(KnownMultiCodec::CoEncryptedBlock, value.cid())?;
 
@@ -313,10 +307,10 @@ impl EncryptedData {
 	///
 	/// # Returns
 	/// The extra blocks or an empty Vec if it fits inline.
-	pub fn fit_into_blocks<P: StoreParams>(&mut self, inline_offset: Option<usize>) -> Vec<Block<P>> {
+	pub fn fit_into_blocks(&mut self, max_block_size: usize, inline_offset: Option<usize>) -> Vec<Block> {
 		let mut data = match self {
 			Self::Inline(data) => {
-				if P::MAX_BLOCK_SIZE >= data.len() + inline_offset.unwrap_or(0) {
+				if max_block_size >= data.len() + inline_offset.unwrap_or(0) {
 					return vec![];
 				} else {
 					take(data)
@@ -328,7 +322,7 @@ impl EncryptedData {
 		};
 		let mut extra_blocks = Vec::new();
 		while !data.is_empty() {
-			let rest = data.split_off(min(data.len(), P::MAX_BLOCK_SIZE));
+			let rest = data.split_off(min(data.len(), max_block_size));
 			extra_blocks.push(Block::new_data(KnownMultiCodec::Raw, data));
 			data = rest;
 		}
@@ -393,19 +387,13 @@ impl BlockPayload {
 		Ok(to_cbor(self)?)
 	}
 }
-impl<S> From<Block<S>> for BlockPayload
-where
-	S: StoreParams,
-{
-	fn from(value: Block<S>) -> Self {
+impl From<Block> for BlockPayload {
+	fn from(value: Block) -> Self {
 		let (cid, data) = value.into_inner();
 		Self { cid, data, references: Default::default() }
 	}
 }
-impl<S> From<BlockPayload> for Block<S>
-where
-	S: StoreParams,
-{
+impl From<BlockPayload> for Block {
 	fn from(value: BlockPayload) -> Self {
 		Block::new_unchecked(value.cid, value.data)
 	}
@@ -702,7 +690,7 @@ mod tests {
 	fn test_fit_to_blocks() {
 		let secret = Secret::new(repeat_n(0u8, Algorithm::default().key_size()).collect());
 		let data: Vec<u8> = repeat_n(0u8, DefaultParams::MAX_BLOCK_SIZE).collect();
-		let block = Block::<DefaultParams>::new_data(KnownMultiCodec::Raw, data);
+		let block = Block::new_data(KnownMultiCodec::Raw, data);
 
 		//println!("cid: ({}): {}", block.cid().to_bytes().len(), block.cid()); // 36
 		//println!("data: ({}): {:?}", block.data().len(), block.data()); // 13
@@ -713,7 +701,7 @@ mod tests {
 		// split
 		let encrypted_extra_blocks = encrypted_block
 			.payload
-			.fit_into_blocks::<DefaultParams>(Some(Header::encoded_size(Algorithm::default())));
+			.fit_into_blocks(DefaultParams::MAX_BLOCK_SIZE, Some(Header::encoded_size(Algorithm::default())));
 		assert!(match &encrypted_block.payload {
 			EncryptedData::Block(blocks) =>
 				blocks == &encrypted_extra_blocks.iter().map(|b| *b.cid()).collect::<Vec<Cid>>(),

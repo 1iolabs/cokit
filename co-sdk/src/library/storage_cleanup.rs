@@ -6,7 +6,7 @@ use crate::{
 };
 use co_core_co::Co;
 use co_core_storage::{BlockInfo, StorageAction};
-use co_primitives::{OptionLink, StoreParams, WeakCid};
+use co_primitives::{OptionLink, WeakCid};
 use co_storage::{BlockStorageContentMapping, ExtendedBlockStorage};
 use futures::{pin_mut, TryStreamExt};
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet};
@@ -24,7 +24,7 @@ where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 	D: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 {
-	let max_references = max_reference_count(<S::StoreParams as StoreParams>::MAX_BLOCK_SIZE);
+	let max_references = max_reference_count(storage_core_storage.max_block_size());
 	let mut removed_blocks = 0;
 	let mut query_blocks_index_unreferenced = query_core(CO_CORE_NAME_STORAGE)
 		.with_default()

@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use co_core_board::{Board, BoardAction, List, Task, TaskLock};
 use co_core_co::{Co, CoAction};
 use co_identity::{LocalIdentity, PrivateIdentityBox};
-use co_primitives::{tag, tags, Block, CoId, CoreName, DefaultParams};
+use co_primitives::{tag, tags, Block, CoId, CoreName};
 use co_storage::{BlockStorage, BlockStorageExt};
 use futures::{pin_mut, Stream, TryStreamExt};
 
@@ -118,7 +118,7 @@ pub async fn network_queue_task(
 	task_id: String,
 	task_type: String,
 	task_name: String,
-	task: Block<DefaultParams>,
+	task: Block,
 ) -> Result<(), anyhow::Error> {
 	let local_co = context.local_co_reducer().await?;
 	let identity = context.local_identity();

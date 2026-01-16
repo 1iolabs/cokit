@@ -1,4 +1,4 @@
-use co_primitives::{Block, StoreParams};
+use co_primitives::Block;
 
 /// TODO remove
 pub fn to_libipld_cid(cid: cid::Cid) -> libipld::Cid {
@@ -22,13 +22,13 @@ pub fn from_libipld_cid(cid: libipld::Cid) -> cid::Cid {
 
 /// TODO remove
 #[allow(dead_code)]
-pub fn to_libipld_block<P: StoreParams, S: libipld::store::StoreParams>(block: Block<P>) -> libipld::Block<S> {
+pub fn to_libipld_block<S: libipld::store::StoreParams>(block: Block) -> libipld::Block<S> {
 	let (cid, data) = block.into_inner();
 	libipld::Block::new_unchecked(to_libipld_cid(cid), data)
 }
 
 /// TODO remove
-pub fn from_libipld_block<P: StoreParams, S: libipld::store::StoreParams>(block: libipld::Block<S>) -> Block<P> {
+pub fn from_libipld_block<S: libipld::store::StoreParams>(block: libipld::Block<S>) -> Block {
 	let (cid, data) = block.into_inner();
 	Block::new_unchecked(from_libipld_cid(cid), data)
 }

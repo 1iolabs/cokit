@@ -1,6 +1,6 @@
 use super::lazy_transaction::Transactionable;
 use crate::{
-	library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError, Streamable,
+	library::lsm_tree_map::Root, AnyBlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError, Streamable,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -25,7 +25,7 @@ where
 	/// Create collection from iterator.
 	pub async fn from_iter<S>(storage: &S, iter: impl IntoIterator<Item = (K, V)>) -> Result<Self, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = Self::default().open(storage).await?;
 		for (key, value) in iter.into_iter() {
@@ -41,21 +41,21 @@ where
 
 	pub async fn get<S>(&self, storage: &S, key: &K) -> Result<Option<V>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.open(storage).await?.get(key).await
 	}
 
 	pub async fn contains<S>(&self, storage: &S, key: &K) -> Result<bool, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.open(storage).await?.contains_key(key).await
 	}
 
 	pub fn stream<S>(&self, storage: &S) -> impl Stream<Item = Result<(K, V), StorageError>> + '_
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let storage = storage.clone();
 		async_stream::try_stream! {
@@ -69,7 +69,7 @@ where
 
 	pub async fn insert<S>(&mut self, storage: &S, key: K, value: V) -> Result<(), StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.insert(key, value).await?;
@@ -80,7 +80,7 @@ where
 
 	pub async fn remove<S>(&mut self, storage: &S, key: K) -> Result<Option<V>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = self.open(storage).await?;
 		let result = transaction.remove(key).await?;
@@ -93,7 +93,7 @@ where
 	where
 		V: Default,
 		F: FnOnce(&mut V) + Send,
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.update_or_insert(key, update).await?;
@@ -113,7 +113,7 @@ where
 		V: Default,
 		F: FnOnce(V) -> Fut + Send,
 		Fut: Future<Output = Result<V, StorageError>> + Send,
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.try_update_or_insert_async(key, update).await?;
@@ -126,7 +126,7 @@ where
 	pub async fn update<S, F>(&mut self, storage: &S, key: K, update: F) -> Result<(), StorageError>
 	where
 		F: FnOnce(&mut V) + Send,
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.update(key, update).await?;
@@ -140,7 +140,7 @@ where
 	where
 		F: FnOnce(V) -> Fut + Send,
 		Fut: Future<Output = Result<V, StorageError>> + Send,
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.try_update_async(key, update).await?;
@@ -151,14 +151,14 @@ where
 
 	pub async fn open_mut<'m, S>(&'m mut self, storage: &S) -> Result<CoMapMutTransaction<'m, S, K, V>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		Ok(CoMapMutTransaction { transaction: self.open(storage).await?, container: self })
 	}
 
 	pub async fn open<S>(&self, storage: &S) -> Result<CoMapTransaction<S, K, V>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		Ok(CoMapTransaction {
 			tree: match self.0.link() {
@@ -170,7 +170,7 @@ where
 
 	pub async fn open_lazy<S>(&self, storage: &S) -> Result<LazyTransaction<S, Self>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		Ok(LazyTransaction::new(storage.clone(), self.clone()))
 	}
@@ -178,7 +178,7 @@ where
 	/// Commit transaction to this map.
 	pub async fn commit<S>(&mut self, mut transaction: CoMapTransaction<S, K, V>) -> Result<(), StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.0 = transaction.tree.store().await?;
 		Ok(())
@@ -187,7 +187,7 @@ where
 	/// Open transaction, apply `update` and store it.
 	pub async fn with_transaction<S, F, Fut>(&mut self, storage: &S, update: F) -> Result<(), StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 		F: FnOnce(CoMapTransaction<S, K, V>) -> Fut + Send,
 		Fut: Future<Output = Result<CoMapTransaction<S, K, V>, StorageError>> + Send,
 	{
@@ -227,7 +227,7 @@ where
 #[async_trait]
 impl<S, K, V> Transactionable<S> for CoMap<K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -239,7 +239,7 @@ where
 }
 impl<S, K, V> Streamable<S> for CoMap<K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -261,7 +261,7 @@ where
 
 pub struct CoMapMutTransaction<'m, S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -270,7 +270,7 @@ where
 }
 impl<'m, S, K, V> CoMapMutTransaction<'m, S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -281,7 +281,7 @@ where
 }
 impl<'m, S, K, V> CoMapMutTransaction<'m, S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -324,7 +324,7 @@ where
 #[derive(Clone)]
 pub struct CoMapTransaction<S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -332,7 +332,7 @@ where
 }
 impl<S, K, V> CoMapTransaction<S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {

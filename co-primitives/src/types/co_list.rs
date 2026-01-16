@@ -1,6 +1,6 @@
 use super::lazy_transaction::Transactionable;
 use crate::{
-	library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError, Streamable,
+	library::lsm_tree_map::Root, AnyBlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError, Streamable,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -91,7 +91,7 @@ where
 	/// Create collection from iterator.
 	pub async fn from_iter<S>(storage: &S, iter: impl IntoIterator<Item = V>) -> Result<Self, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = Self::default().open(storage).await?;
 		for value in iter.into_iter() {
@@ -107,21 +107,21 @@ where
 
 	pub async fn get<S>(&self, storage: &S, key: &CoListIndex) -> Result<Option<V>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.open(storage).await?.get(key).await
 	}
 
 	pub async fn contains<S>(&self, storage: &S, key: &CoListIndex) -> Result<bool, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.open(storage).await?.contains(key).await
 	}
 
 	pub fn stream<S>(&self, storage: &S) -> impl Stream<Item = Result<(CoListIndex, V), StorageError>> + '_
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let storage = storage.clone();
 		async_stream::try_stream! {
@@ -135,7 +135,7 @@ where
 
 	pub fn reverse_stream<S>(&self, storage: &S) -> impl Stream<Item = Result<(CoListIndex, V), StorageError>> + '_
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let storage = storage.clone();
 		async_stream::try_stream! {
@@ -150,7 +150,7 @@ where
 	/// Convenience method to load all or `limit` entries into memory.
 	pub async fn vec<S>(&self, storage: &S, limit: Option<usize>) -> Result<Vec<V>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let transaction = self.open(storage).await?;
 		let stream = transaction.stream().map_ok(|(_index, value)| value);
@@ -160,7 +160,7 @@ where
 
 	pub async fn insert<S>(&mut self, storage: &S, index: CoListIndex, value: V) -> Result<CoListIndex, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = self.open(storage).await?;
 		let result = transaction.insert(index, value).await?;
@@ -170,7 +170,7 @@ where
 
 	pub async fn set<S>(&mut self, storage: &S, key: CoListIndex, value: V) -> Result<(), StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = self.open(storage).await?;
 		transaction.set(key, value).await?;
@@ -180,7 +180,7 @@ where
 
 	pub async fn push<S>(&mut self, storage: &S, value: V) -> Result<CoListIndex, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = self.open(storage).await?;
 		let result = transaction.push(value).await?;
@@ -193,7 +193,7 @@ where
 	/// See: [`CoListTransaction::pop`]
 	pub async fn pop<S>(&mut self, storage: &S) -> Result<Option<(CoListIndex, V)>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = self.open(storage).await?;
 		let result = transaction.pop().await?;
@@ -206,7 +206,7 @@ where
 	/// See: [`CoListTransaction::pop_front`]
 	pub async fn pop_front<S>(&mut self, storage: &S) -> Result<Option<(CoListIndex, V)>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = self.open(storage).await?;
 		let result = transaction.pop_front().await?;
@@ -216,7 +216,7 @@ where
 
 	pub async fn remove<S>(&mut self, storage: &S, key: CoListIndex) -> Result<Option<V>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = self.open(storage).await?;
 		let result = transaction.remove(key).await?;
@@ -229,7 +229,7 @@ where
 	where
 		V: Default,
 		F: FnOnce(&mut V) + Send,
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.update_or_insert(key, update).await?;
@@ -249,7 +249,7 @@ where
 		V: Default,
 		F: FnOnce(V) -> Fut + Send,
 		Fut: Future<Output = Result<V, StorageError>> + Send,
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.try_update_or_insert_async(key, update).await?;
@@ -262,7 +262,7 @@ where
 	pub async fn update<S, F>(&mut self, storage: &S, key: CoListIndex, update: F) -> Result<(), StorageError>
 	where
 		F: FnOnce(&mut V) + Send,
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.update(key, update).await?;
@@ -281,7 +281,7 @@ where
 	where
 		F: FnOnce(V) -> Fut + Send,
 		Fut: Future<Output = Result<V, StorageError>> + Send,
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.try_update_async(key, update).await?;
@@ -292,7 +292,7 @@ where
 
 	pub async fn open<S>(&self, storage: &S) -> Result<CoListTransaction<S, V>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		Ok(CoListTransaction {
 			tree: match self.0.link() {
@@ -305,14 +305,14 @@ where
 
 	pub async fn open_lazy<S>(&self, storage: &S) -> Result<LazyTransaction<S, Self>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		Ok(LazyTransaction::new(storage.clone(), self.clone()))
 	}
 
 	pub async fn commit<S>(&mut self, mut transaction: CoListTransaction<S, V>) -> Result<(), StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.0 = transaction.tree.store().await?;
 		Ok(())
@@ -321,7 +321,7 @@ where
 	/// Open transaction, apply `update` and store it.
 	pub async fn with_transaction<S, F, Fut>(&mut self, storage: &S, update: F) -> Result<(), StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 		F: FnOnce(CoListTransaction<S, V>) -> Fut + Send,
 		Fut: Future<Output = Result<CoListTransaction<S, V>, StorageError>> + Send,
 	{
@@ -358,7 +358,7 @@ where
 #[async_trait]
 impl<S, V> Transactionable<S> for CoList<V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	type Transaction = CoListTransaction<S, V>;
@@ -369,7 +369,7 @@ where
 }
 impl<S, V> Streamable<S> for CoList<V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	type Item = Result<(CoListIndex, V), StorageError>;
@@ -391,7 +391,7 @@ where
 #[derive(Clone)]
 pub struct CoListTransaction<S, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	/// The tree.
@@ -402,7 +402,7 @@ where
 }
 impl<S, V> CoListTransaction<S, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	async fn max_key(&mut self) -> Result<Option<CoListIndex>, StorageError> {
@@ -496,7 +496,7 @@ where
 	/// Push as last value.
 	pub async fn push(&mut self, value: V) -> Result<CoListIndex, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let next_key = self.max_key().await?.unwrap_or_default().next();
 		self.tree.insert(next_key, value).await?;
@@ -507,7 +507,7 @@ where
 	/// Pop last element.
 	pub async fn pop(&mut self) -> Result<Option<(CoListIndex, V)>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		if let Some(key) = self.max_key().await? {
 			self.max_key = None;
@@ -520,7 +520,7 @@ where
 	/// Pop first element.
 	pub async fn pop_front(&mut self) -> Result<Option<(CoListIndex, V)>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		if let Some(key) = self.tree.min_key().await? {
 			Ok(self.remove(key).await?.map(|value| (key, value)))

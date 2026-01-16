@@ -11,7 +11,6 @@ use crate::{
 use anyhow::anyhow;
 use co_actor::ActorHandle;
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
-use co_primitives::DefaultParams;
 use futures::{pin_mut, Stream, StreamExt};
 use libp2p::{
 	autonat, dcutr, gossipsub, identify,
@@ -46,7 +45,7 @@ impl Libp2pNetwork {
 		config: NetworkSettings,
 		resolver: IdentityResolverBox,
 		private_resolver: PrivateIdentityResolverBox,
-		bitswap: ActorHandle<BitswapMessage<DefaultParams>>,
+		bitswap: ActorHandle<BitswapMessage>,
 	) -> anyhow::Result<Libp2pNetwork> {
 		let resolver = IdentityResolverBox::new(resolver);
 		let private_resolver = PrivateIdentityResolverBox::new(private_resolver);
@@ -67,19 +66,15 @@ impl Libp2pNetwork {
 				.map_err(|err| anyhow!("gossip failed: {}", err))?;
 
 		// bitswap
-		let bitswap = Bitswap::<libipld::DefaultParams>::new(
-			Default::default(),
-			BitswapStoreClient::<DefaultParams>::new(bitswap),
-			{
-				let bitswap_identifier = identifier.clone();
-				Box::new(move |t| {
-					tokio::spawn(async move {
-						t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
-							.await
-					});
-				})
-			},
-		);
+		let bitswap = Bitswap::<libipld::DefaultParams>::new(Default::default(), BitswapStoreClient::new(bitswap), {
+			let bitswap_identifier = identifier.clone();
+			Box::new(move |t| {
+				tokio::spawn(async move {
+					t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
+						.await
+				});
+			})
+		});
 
 		// relay
 		let relay_server = if config.relay {

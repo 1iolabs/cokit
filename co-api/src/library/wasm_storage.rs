@@ -1,6 +1,7 @@
 use crate::{co_v1, Block, BlockStorage, Cid, DefaultParams, Storage, StorageError};
 use anyhow::anyhow;
 use async_trait::async_trait;
+use co_primitives::{BlockStorageStoreParams, StoreParams};
 
 /// Storage implementation for the co_v1 API.
 pub struct WasmStorage {}
@@ -15,29 +16,34 @@ impl WasmStorage {
 	}
 }
 impl Storage for WasmStorage {
-	fn get(&self, cid: &Cid) -> Block<DefaultParams> {
+	fn get(&self, cid: &Cid) -> Block {
 		wasm_block_get(cid)
 	}
 
-	fn set(&mut self, block: Block<DefaultParams>) -> Cid {
+	fn set(&mut self, block: Block) -> Cid {
 		wasm_block_set(block)
 	}
 }
 #[async_trait]
 impl BlockStorage for WasmStorage {
-	type StoreParams = DefaultParams;
-
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		Ok(wasm_block_get(cid))
 	}
 
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		Ok(wasm_block_set(block))
 	}
 
 	async fn remove(&self, _cid: &Cid) -> Result<(), StorageError> {
 		Err(StorageError::Internal(anyhow!("Unsupported")))
 	}
+
+	fn max_block_size(&self) -> usize {
+		<Self as BlockStorageStoreParams>::StoreParams::MAX_BLOCK_SIZE
+	}
+}
+impl BlockStorageStoreParams for WasmStorage {
+	type StoreParams = DefaultParams;
 }
 impl Clone for WasmStorage {
 	fn clone(&self) -> Self {
@@ -45,7 +51,7 @@ impl Clone for WasmStorage {
 	}
 }
 
-fn wasm_block_get(cid: &Cid) -> Block<DefaultParams> {
+fn wasm_block_get(cid: &Cid) -> Block {
 	let cid_bytes = cid.to_bytes();
 
 	// try to read block in 1KiB buffer
@@ -84,7 +90,7 @@ fn wasm_block_get(cid: &Cid) -> Block<DefaultParams> {
 	Block::new_unchecked(*cid, buffer)
 }
 
-fn wasm_block_set(block: Block<DefaultParams>) -> Cid {
+fn wasm_block_set(block: Block) -> Cid {
 	let cid_bytes = block.cid().to_bytes();
 	#[allow(unused_unsafe)]
 	let block_size = unsafe {

@@ -31,7 +31,7 @@ use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::{IdentityEntryVerifier, Log};
 use co_primitives::{
-	tags, unixfs_add, BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, Tags,
+	tags, unixfs_add, BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, Tags,
 };
 use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret};
 use futures::io::Cursor;
@@ -580,7 +580,7 @@ impl SharedCoCreator {
 							.with_encryption_reference_mode(EncryptionReferenceMode::DisallowExcept(builtin_cores()));
 					(CoStorage::new(result_storage.clone()), Some((result_storage, key_uri, key)))
 				},
-				None => (storage.clone_with_settings(BlockStorageSettings::new().with_detached()), None),
+				None => (storage.clone_with_settings(BlockStorageCloneSettings::new().with_detached()), None),
 			};
 
 		// log

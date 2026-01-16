@@ -7,7 +7,7 @@ use crate::{
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle};
-use co_primitives::{BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Tags};
+use co_primitives::{BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, Tags};
 use std::collections::{BTreeMap, VecDeque};
 
 pub struct Reducers {
@@ -118,7 +118,7 @@ impl Actor for ReducersActor {
 									context
 										.inner
 										.storage()
-										.clone_with_settings(BlockStorageSettings::new().with_detached()),
+										.clone_with_settings(BlockStorageCloneSettings::new().with_detached()),
 									parent,
 									id.clone(),
 									timeout,

@@ -3,6 +3,7 @@ use crate::{
 	RuntimeContext, RuntimeInstance,
 };
 use cid::Cid;
+use co_api::{DefaultParams, StoreParams};
 use co_storage::{BlockStorage, StorageError, StoreParamsBlockStorage, SyncBlockStorage};
 use std::{
 	collections::VecDeque,
@@ -234,7 +235,10 @@ impl Default for RuntimePool {
 
 fn create_cov1_api<S: BlockStorage + Clone + 'static>(storage: &S, context: RuntimeContext, checked: bool) -> CoV1Api {
 	CoV1Api::new(
-		Box::new(SyncBlockStorage::new(StoreParamsBlockStorage::new(storage.clone(), checked), Handle::current())),
+		Box::new(SyncBlockStorage::new(
+			StoreParamsBlockStorage::new(storage.clone(), checked, DefaultParams::MAX_BLOCK_SIZE),
+			Handle::current(),
+		)),
 		context,
 	)
 }

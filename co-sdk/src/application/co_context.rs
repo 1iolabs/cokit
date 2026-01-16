@@ -23,7 +23,7 @@ use co_identity::{
 };
 use co_log::{EntryBlock, Log};
 use co_network::{connections::ConnectionMessage, HeadsApi, NetworkApi};
-use co_primitives::{BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Did, IgnoreFilter};
+use co_primitives::{BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, Did, IgnoreFilter};
 use futures::{Stream, TryStreamExt};
 use std::{
 	collections::BTreeSet,
@@ -326,7 +326,7 @@ impl CoContextInner {
 			);
 		let local_co_reducer = local_co
 			.build(
-				self.storage().clone_with_settings(BlockStorageSettings::new().with_detached()),
+				self.storage().clone_with_settings(BlockStorageCloneSettings::new().with_detached()),
 				self.runtime.clone(),
 				self.shutdown.child_token(),
 				self.tasks.clone(),

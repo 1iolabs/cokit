@@ -17,9 +17,7 @@ use co_actor::TaskSpawner;
 use co_core_storage::{BlockInfo, StorageAction};
 use co_identity::PrivateIdentityBox;
 use co_log::EntryBlock;
-use co_primitives::{
-	BlockLinks, CoId, CoList, Link, OptionMappedCid, ReducerAction, StoreParams, WeakCoReferenceFilter,
-};
+use co_primitives::{BlockLinks, CoId, CoList, Link, OptionMappedCid, ReducerAction, WeakCoReferenceFilter};
 use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage, OverlayChange};
 use futures::{pin_mut, stream, TryStreamExt};
 use std::{collections::BTreeSet, time::Duration};
@@ -74,7 +72,7 @@ where
 		&mut dispatcher,
 		BlockInfo::new(local_storage, CoPinningKey::Root.to_string(co_id), Default::default()).await?,
 		stream::iter(co_removed_blocks),
-		<S as BlockStorage>::StoreParams::MAX_BLOCK_SIZE,
+		local_storage.max_block_size(),
 	)
 	.await?;
 

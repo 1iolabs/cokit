@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle};
 use co_network::{BitswapMessage, PeerId, Token};
-use co_primitives::{Block, BlockLinks, CoId, DefaultParams, KnownMultiCodec, MultiCodec, Tags};
+use co_primitives::{Block, BlockLinks, CoId, KnownMultiCodec, MultiCodec, Tags};
 use co_storage::{BlockStorage, StorageError};
 
 /// Bitswap service that responds to bitswap protocol requests.
@@ -20,7 +20,7 @@ impl Bitswap {
 }
 #[async_trait]
 impl Actor for Bitswap {
-	type Message = BitswapMessage<DefaultParams>;
+	type Message = BitswapMessage;
 	type State = ();
 	type Initialize = ();
 
@@ -187,7 +187,7 @@ async fn get(
 /// Note: This request always has an local origin so the tokens was created by us and dont need to be validated.
 async fn insert(
 	context: CoContext,
-	block: Block<DefaultParams>,
+	block: Block,
 	_remote_peer: PeerId,
 	tokens: Vec<Token>,
 ) -> Result<(), StorageError> {

@@ -6,7 +6,7 @@ use crate::{
 use cid::Cid;
 use co_identity::{DidCommHeader, Message, PrivateIdentityBox};
 use co_network::{EncodedMessage, HeadsMessage, NetworkSettings, PeerId};
-use co_primitives::{Block, BlockSerializer, CoId, DefaultParams, Did, Link, Network, ReducerAction, Tags};
+use co_primitives::{Block, BlockSerializer, CoId, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{stream::once, Stream, StreamExt};
 use ipld_core::ipld::Ipld;
@@ -132,10 +132,10 @@ pub enum Action {
 	},
 
 	/// Add task to network queue.
-	NetworkTaskQueue { co: CoId, task_id: String, task_type: String, task_name: String, task: Block<DefaultParams> },
+	NetworkTaskQueue { co: CoId, task_id: String, task_type: String, task_name: String, task: Block },
 
 	/// Execute network queue task.
-	NetworkTaskExecute { co: CoId, task_id: String, task_type: String, task: Block<DefaultParams> },
+	NetworkTaskExecute { co: CoId, task_id: String, task_type: String, task: Block },
 
 	/// Execute network queue task has been completed.
 	NetworkTaskExecuteComplete { co: CoId, task_id: String, task_state: TaskState },

@@ -1,49 +1,36 @@
 use crate::{ExtendedBlock, ExtendedBlockStorage};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStat, BlockStorage, DefaultParams, KnownMultiCodec, StorageError, StoreParams};
-use std::{collections::BTreeMap, marker::PhantomData, ops::Range};
+use co_primitives::{Block, BlockStat, BlockStorage, KnownMultiCodec, StorageError};
+use std::{collections::BTreeMap, ops::Range};
 
 /// Block storage implementation for static data.
 #[derive(Debug, Clone)]
-pub struct StaticBlockStorage<'a, P> {
+pub struct StaticBlockStorage<'a> {
 	data: &'a [u8],
 	blocks: BTreeMap<Cid, StaticBlock>,
-	_params: PhantomData<P>,
 }
-impl<'a, P> StaticBlockStorage<'a, P>
-where
-	P: StoreParams,
-{
+impl<'a> StaticBlockStorage<'a> {
 	/// Static block storage builder.
-	pub fn builder(data: &'a [u8]) -> StaticBlockStorageBuilder<'a, P> {
+	pub fn builder(data: &'a [u8]) -> StaticBlockStorageBuilder<'a> {
 		StaticBlockStorageBuilder::new(data)
 	}
 
 	/// Create static block storage from plain block.
 	pub fn new_unchecked(cid: Cid, data: &'a [u8]) -> Self {
-		Self { blocks: [(cid, StaticBlock::Range(0..data.len()))].into_iter().collect(), data, _params: PhantomData }
+		Self { blocks: [(cid, StaticBlock::Range(0..data.len()))].into_iter().collect(), data }
 	}
 
 	/// Create static block storage from raw block.
 	pub fn new_raw(data: &'a [u8]) -> (Cid, Self) {
-		let cid = Block::<DefaultParams>::cid_data(KnownMultiCodec::Raw, data);
-		let storage = Self {
-			blocks: [(cid, StaticBlock::Range(0..data.len()))].into_iter().collect(),
-			data,
-			_params: PhantomData,
-		};
+		let cid = Block::cid_data(KnownMultiCodec::Raw, data);
+		let storage = Self { blocks: [(cid, StaticBlock::Range(0..data.len()))].into_iter().collect(), data };
 		(cid, storage)
 	}
 }
 #[async_trait]
-impl<'a, P> BlockStorage for StaticBlockStorage<'a, P>
-where
-	P: StoreParams,
-{
-	type StoreParams = P;
-
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+impl<'a> BlockStorage for StaticBlockStorage<'a> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		let block = self
 			.blocks
 			.get(cid)
@@ -51,7 +38,7 @@ where
 		Ok(Block::new_unchecked(*cid, block.to_vec(self.data)))
 	}
 
-	async fn set(&self, _block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, _block: Block) -> Result<Cid, StorageError> {
 		Err(StorageError::InvalidArgument(anyhow::anyhow!("Readonly storage")))
 	}
 
@@ -66,13 +53,14 @@ where
 	async fn remove(&self, _cid: &Cid) -> Result<(), StorageError> {
 		Err(StorageError::InvalidArgument(anyhow::anyhow!("Readonly storage")))
 	}
+
+	fn max_block_size(&self) -> usize {
+		0
+	}
 }
 #[async_trait]
-impl<'a, P> ExtendedBlockStorage for StaticBlockStorage<'a, P>
-where
-	P: StoreParams,
-{
-	async fn set_extended(&self, _block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+impl<'a> ExtendedBlockStorage for StaticBlockStorage<'a> {
+	async fn set_extended(&self, _block: ExtendedBlock) -> Result<Cid, StorageError> {
 		Err(StorageError::InvalidArgument(anyhow::anyhow!("Readonly storage")))
 	}
 
@@ -106,14 +94,13 @@ impl StaticBlock {
 	}
 }
 
-pub struct StaticBlockStorageBuilder<'a, P = DefaultParams> {
+pub struct StaticBlockStorageBuilder<'a> {
 	data: &'a [u8],
 	blocks: BTreeMap<Cid, StaticBlock>,
-	_params: PhantomData<P>,
 }
-impl<'a, P> StaticBlockStorageBuilder<'a, P> {
+impl<'a> StaticBlockStorageBuilder<'a> {
 	pub fn new(data: &'a [u8]) -> Self {
-		Self { data, blocks: Default::default(), _params: PhantomData }
+		Self { data, blocks: Default::default() }
 	}
 
 	pub fn with_range(mut self, cid: Cid, range: Range<usize>) -> Self {
@@ -126,7 +113,7 @@ impl<'a, P> StaticBlockStorageBuilder<'a, P> {
 		self
 	}
 
-	pub fn build(self) -> StaticBlockStorage<'a, P> {
-		StaticBlockStorage { _params: self._params, blocks: self.blocks, data: self.data }
+	pub fn build(self) -> StaticBlockStorage<'a> {
+		StaticBlockStorage { blocks: self.blocks, data: self.data }
 	}
 }

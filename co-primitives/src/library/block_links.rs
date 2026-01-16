@@ -1,4 +1,4 @@
-use crate::{from_cbor, Block, CoReference, KnownMultiCodec, MultiCodec, StoreParams};
+use crate::{from_cbor, Block, CoReference, KnownMultiCodec, MultiCodec};
 use cid::Cid;
 use ipld_core::codec::Links;
 use serde::de::IgnoredAny;
@@ -35,10 +35,10 @@ impl BlockLinks {
 	/// # Notes
 	/// - This because of the block size limit should usually small.
 	/// - The same [`Cid`] possibly is referenced multiple times.
-	pub fn links<'a, P: StoreParams>(
+	pub fn links<'a>(
 		&self,
-		block: &'a Block<P>,
-	) -> Result<impl Iterator<Item = Cid> + Send + Sync + use<'_, 'a, P>, anyhow::Error> {
+		block: &'a Block,
+	) -> Result<impl Iterator<Item = Cid> + Send + Sync + use<'_, 'a>, anyhow::Error> {
 		let iter: Box<dyn Iterator<Item = Cid> + Send + Sync> =
 			if !self.filters.filter_block(block.cid(), block.data())? {
 				Box::new(std::iter::empty())

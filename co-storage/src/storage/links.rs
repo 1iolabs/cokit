@@ -2,8 +2,8 @@ use crate::{BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage};
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{
-	Block, BlockLinks, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, MappedCid,
-	StorageError,
+	Block, BlockLinks, BlockStat, BlockStorage, BlockStorageCloneSettings, BlockStorageStoreParams,
+	CloneWithBlockStorageSettings, MappedCid, StorageError,
 };
 use std::collections::BTreeSet;
 
@@ -23,13 +23,11 @@ impl<S> BlockStorage for LinksBlockStorage<S>
 where
 	S: BlockStorage + 'static,
 {
-	type StoreParams = S::StoreParams;
-
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		self.next.get(cid).await
 	}
 
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		// verify all links exist
 		if let Some(block_links) = &self.links {
 			if block_links.has_links(block.cid()) {
@@ -62,13 +60,17 @@ where
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
 		self.next.remove(cid).await
 	}
+
+	fn max_block_size(&self) -> usize {
+		self.next.max_block_size()
+	}
 }
 #[async_trait]
 impl<S> ExtendedBlockStorage for LinksBlockStorage<S>
 where
 	S: ExtendedBlockStorage + 'static,
 {
-	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set_extended(&self, block: ExtendedBlock) -> Result<Cid, StorageError> {
 		self.next.set_extended(block).await
 	}
 
@@ -106,7 +108,13 @@ impl<S> CloneWithBlockStorageSettings for LinksBlockStorage<S>
 where
 	S: BlockStorage + CloneWithBlockStorageSettings + 'static,
 {
-	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+	fn clone_with_settings(&self, settings: BlockStorageCloneSettings) -> Self {
 		Self::new(self.next.clone_with_settings(settings), self.links.clone())
 	}
+}
+impl<S> BlockStorageStoreParams for LinksBlockStorage<S>
+where
+	S: BlockStorageStoreParams,
+{
+	type StoreParams = S::StoreParams;
 }

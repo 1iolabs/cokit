@@ -1,12 +1,12 @@
 use crate::{use_co_context, use_co_error, CoContext, CoError, CoErrorSignal};
 use anyhow::anyhow;
 use cid::Cid;
-use co_primitives::{Block, DefaultParams};
+use co_primitives::Block;
 use co_sdk::{BlockStorage, BlockStorageExt, CoId};
 use dioxus::prelude::*;
 use serde::de::DeserializeOwned;
 
-pub fn use_co_block(co: impl Into<CoId>, cid: Cid) -> Signal<Option<Block<DefaultParams>>, SyncStorage> {
+pub fn use_co_block(co: impl Into<CoId>, cid: Cid) -> Signal<Option<Block>, SyncStorage> {
 	let signal = use_signal_sync(|| None);
 	let error = use_co_error();
 	let context = use_co_context();
@@ -35,7 +35,7 @@ impl CoBlockHook {
 	fn fetch(
 		&mut self,
 		context: CoContext,
-		mut signal: Signal<Option<Block<DefaultParams>>, SyncStorage>,
+		mut signal: Signal<Option<Block>, SyncStorage>,
 		mut error: CoErrorSignal,
 		co: impl Into<CoId>,
 		cid: Cid,

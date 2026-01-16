@@ -121,20 +121,20 @@ where
 
 #[cfg(test)]
 mod test {
-	use crate::{Block, DagCollectionExt, DagMap, DagSet, DagVec, DefaultParams, Storage};
+	use crate::{Block, DagCollectionExt, DagMap, DagSet, DagVec, Storage};
 	use cid::Cid;
 	use std::collections::{BTreeMap, BTreeSet};
 
 	#[derive(Debug, Default)]
 	struct TestStorage {
-		records: BTreeMap<Cid, Block<DefaultParams>>,
+		records: BTreeMap<Cid, Block>,
 	}
 	impl Storage for TestStorage {
-		fn get(&self, cid: &Cid) -> Block<DefaultParams> {
+		fn get(&self, cid: &Cid) -> Block {
 			self.records.get(cid).expect("get").clone()
 		}
 
-		fn set(&mut self, block: Block<DefaultParams>) -> Cid {
+		fn set(&mut self, block: Block) -> Cid {
 			let cid = *block.cid();
 			self.records.insert(cid, block);
 			cid

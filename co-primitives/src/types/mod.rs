@@ -30,6 +30,7 @@ pub mod network;
 pub mod path;
 pub mod secret;
 pub mod storage;
+pub mod store_params;
 pub mod streamable;
 pub mod tags;
 pub mod total_float;

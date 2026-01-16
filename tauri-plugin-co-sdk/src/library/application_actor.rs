@@ -3,7 +3,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseStream};
-use co_primitives::{Block, DefaultParams};
+use co_primitives::Block;
 use co_sdk::{
 	Action, Application, ApplicationMessage, BlockStorage, BlockStorageExt, CoId, CoReducer, CoReducerFactory, Did,
 	DidKeyIdentity, DidKeyProvider, Identity, PrivateIdentityResolver, Tags, CO_CORE_NAME_KEYSTORE,
@@ -60,8 +60,8 @@ pub struct ApplicationActorState {
 pub enum ApplicationActorMessage {
 	SessionOpen(CoId, Response<Result<SessionId, anyhow::Error>>),
 	SessionClose(SessionId),
-	StorageGet(SessionId, Cid, Response<Result<Block<DefaultParams>, anyhow::Error>>),
-	StorageSet(SessionId, Block<DefaultParams>, Response<Result<Cid, anyhow::Error>>),
+	StorageGet(SessionId, Cid, Response<Result<Block, anyhow::Error>>),
+	StorageSet(SessionId, Block, Response<Result<Cid, anyhow::Error>>),
 	GetCoState(CoId, Response<Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>),
 	WatchState(ResponseStream<(CoId, Option<Cid>, BTreeSet<Cid>)>),
 	Push(SessionId, String, Ipld, Did, Response<Result<Option<Cid>, anyhow::Error>>),

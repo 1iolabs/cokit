@@ -128,7 +128,7 @@ mod tests {
 		let storage = TestStorage::default();
 
 		// build
-		let mut builder = NodeBuilder::new(2, DefaultNodeSerializer::new());
+		let mut builder = NodeBuilder::new(storage.max_block_size(), 2, DefaultNodeSerializer::new());
 		for i in 0..10 {
 			builder.push(i).unwrap();
 		}
@@ -150,7 +150,7 @@ mod tests {
 		let storage = TestStorage::default();
 
 		// build
-		let mut builder = NodeBuilder::new(2, DefaultNodeSerializer::new());
+		let mut builder = NodeBuilder::new(storage.max_block_size(), 2, DefaultNodeSerializer::new());
 		for i in 0..10 {
 			builder.push(i).unwrap();
 		}

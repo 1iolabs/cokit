@@ -6,10 +6,10 @@ pub trait Storage {
 	type StoreParams: StoreParams;
 
 	/// Returns a block from storage.
-	fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError>;
+	fn get(&self, cid: &Cid) -> Result<Block, StorageError>;
 
 	/// Inserts a block into storage.
-	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError>;
+	fn set(&mut self, block: Block) -> Result<Cid, StorageError>;
 
 	/// Remove a block from storage.
 	fn remove(&mut self, cid: &Cid) -> Result<(), StorageError>;

@@ -1,4 +1,4 @@
-use crate::{AnyBlockStorage, Block, BlockStorage, KnownMultiCodec, MultiCodec, StorageError, StoreParams};
+use crate::{AnyBlockStorage, Block, BlockStorage, KnownMultiCodec, MultiCodec, StorageError};
 use cid::Cid;
 use futures::{AsyncRead, AsyncReadExt};
 use rust_unixfs::file::{adder::FileAdder, visit::IdleFileVisit};
@@ -90,7 +90,7 @@ where
 
 /// Encode buffer into blocks.
 /// The last block in the result is the root.
-pub fn unixfs_encode_buffer<P: StoreParams>(buf: &[u8]) -> Vec<Block<P>> {
+pub fn unixfs_encode_buffer(buf: &[u8]) -> Vec<Block> {
 	let mut result = Vec::new();
 	let mut adder = FileAdder::default();
 

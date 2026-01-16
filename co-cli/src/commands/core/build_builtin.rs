@@ -1,5 +1,4 @@
 use anyhow::anyhow;
-use co_primitives::DefaultParams;
 use co_sdk::{build_core, crate_repository_path, unixfs_encode_buffer};
 use exitcode::ExitCode;
 use futures::{StreamExt, TryStreamExt};
@@ -61,7 +60,7 @@ pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 		let core_wasm = tokio::fs::read(&build_artifact.artifact_path)
 			.await
 			.expect("wasm artifact to exist");
-		let core_blocks = unixfs_encode_buffer::<DefaultParams>(&core_wasm);
+		let core_blocks = unixfs_encode_buffer(&core_wasm);
 		let core_cid = *core_blocks
 			.last()
 			.ok_or(anyhow!("{:?} to be at least one block", build_artifact.artifact_path))?

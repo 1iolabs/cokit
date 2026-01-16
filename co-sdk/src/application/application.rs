@@ -17,7 +17,7 @@ use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
 use co_network::NetworkSettings;
-use co_primitives::{tag, tags, CoId, DefaultParams, TagValue, Tags};
+use co_primitives::{tag, tags, CoId, TagValue, Tags};
 use co_runtime::Core;
 use co_storage::StaticBlockStorage;
 use directories::ProjectDirs;
@@ -330,7 +330,7 @@ pub struct ApplicationBuilder {
 	settings: Tags,
 	date: Option<DynamicCoDate>,
 	uuid: Option<DynamicCoUuid>,
-	static_blocks: Vec<StaticBlockStorage<'static, DefaultParams>>,
+	static_blocks: Vec<StaticBlockStorage<'static>>,
 	cores: Cores,
 }
 impl ApplicationBuilder {
@@ -416,7 +416,7 @@ impl ApplicationBuilder {
 		self
 	}
 
-	pub fn with_static_blocks(mut self, storage: StaticBlockStorage<'static, DefaultParams>) -> Self {
+	pub fn with_static_blocks(mut self, storage: StaticBlockStorage<'static>) -> Self {
 		self.static_blocks.push(storage);
 		self
 	}

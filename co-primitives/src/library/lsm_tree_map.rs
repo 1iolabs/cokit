@@ -1,7 +1,7 @@
 use super::{dag_cbor_size_serializer::DagCborSizeSerializer, node_builder::NodeReader};
 use crate::{
-	Block, BlockSerializer, BlockStorage, BlockStorageExt, Link, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
-	NodeStream, OptionLink, StorageError, StoreParams,
+	AnyBlockStorage, Block, BlockSerializer, BlockStorageExt, Link, Node, NodeBuilder, NodeBuilderError,
+	NodeSerializer, NodeStream, OptionLink, StorageError,
 };
 use anyhow::anyhow;
 use bloomfilter::Bloom;
@@ -280,11 +280,10 @@ impl<K, V> RunNodeSerializer<K, V> {
 		Self { _d: Default::default(), pending: Default::default() }
 	}
 }
-impl<K, V, P> NodeSerializer<RunNode<K, V>, (K, Value<V>), P> for RunNodeSerializer<K, V>
+impl<K, V> NodeSerializer<RunNode<K, V>, (K, Value<V>)> for RunNodeSerializer<K, V>
 where
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-	P: StoreParams,
 {
 	fn nodes(&mut self, nodes: Vec<Link<RunNode<K, V>>>) -> Result<RunNode<K, V>, NodeBuilderError> {
 		let mut min_key = None;
@@ -310,8 +309,9 @@ where
 		Ok(RunNode::Leaf(entries.into_iter().collect()))
 	}
 
-	fn serialize(&mut self, node: RunNode<K, V>) -> Result<Block<P>, NodeBuilderError> {
+	fn serialize(&mut self, max_bock_size: usize, node: RunNode<K, V>) -> Result<Block, NodeBuilderError> {
 		let block = BlockSerializer::new()
+			.with_max_block_size(max_bock_size)
 			.serialize(&node)
 			.map_err(|err| NodeBuilderError::Encoding(err.into()))?;
 
@@ -410,7 +410,7 @@ impl Default for LsmTreeMapSettings {
 #[derive(Clone)]
 pub struct LsmTreeMap<S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -430,7 +430,7 @@ where
 }
 impl<S, K, V> LsmTreeMap<S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -1057,7 +1057,7 @@ where
 	/// Store Levels.
 	async fn store_levels(&self, levels: Vec<Level<K, V>>) -> Result<Node<Level<K, V>>, StorageError> {
 		let mut builder = NodeBuilder::default()
-			.with_items_size_max((INLINE_SIZE_FACTOR_LEVELS * S::StoreParams::MAX_BLOCK_SIZE).to_integer());
+			.with_items_size_max((INLINE_SIZE_FACTOR_LEVELS * self.storage.max_block_size()).to_integer());
 		builder.extend(levels).map_err(|e| StorageError::InvalidArgument(e.into()))?;
 		let (node, blocks) = builder.into_node().map_err(|e| StorageError::InvalidArgument(e.into()))?;
 		for block in blocks {
@@ -1110,10 +1110,11 @@ async fn store_items<'a, S, T>(
 	items: impl Stream<Item = Result<&'a T, StorageError>> + Send,
 ) -> Result<OptionLink<Node<T>>, StorageError>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	T: Clone + Serialize + 'a,
 {
-	let mut node_builder = NodeBuilder::<_, S::StoreParams>::new(
+	let mut node_builder = NodeBuilder::<_>::new(
+		storage.max_block_size(),
 		max_node_entries
 			.try_into()
 			.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
@@ -1144,17 +1145,18 @@ async fn store_active<S, K, V>(
 	entries: impl Stream<Item = Result<(&K, &Value<V>), StorageError>>,
 ) -> Result<Node<(K, Value<V>)>, StorageError>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
-	let mut node_builder = NodeBuilder::<_, S::StoreParams>::new(
+	let mut node_builder = NodeBuilder::<_>::new(
+		storage.max_block_size(),
 		max_node_entries
 			.try_into()
 			.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
 		Default::default(),
 	)
-	.with_items_size_max((INLINE_SIZE_FACTOR_ACTIVE * S::StoreParams::MAX_BLOCK_SIZE).to_integer());
+	.with_items_size_max((INLINE_SIZE_FACTOR_ACTIVE * storage.max_block_size()).to_integer());
 	pin_mut!(entries);
 	while let Some(item) = entries.try_next().await? {
 		node_builder
@@ -1180,11 +1182,12 @@ async fn store_run_node<S, K, V>(
 	entries: impl Stream<Item = Result<(K, Value<V>), StorageError>>,
 ) -> Result<OptionLink<RunNode<K, V>>, StorageError>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
-	let mut node_builder = NodeBuilder::<(K, Value<V>), S::StoreParams, RunNode<K, V>, RunNodeSerializer<K, V>>::new(
+	let mut node_builder = NodeBuilder::<(K, Value<V>), RunNode<K, V>, RunNodeSerializer<K, V>>::new(
+		storage.max_block_size(),
 		max_node_entries
 			.try_into()
 			.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
@@ -1216,7 +1219,7 @@ async fn store_run<S, K, V>(
 	entries_size_hint: usize,
 ) -> Result<Option<Run<K, V>>, StorageError>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
