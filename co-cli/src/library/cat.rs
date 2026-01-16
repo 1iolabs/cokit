@@ -3,9 +3,7 @@ use co_primitives::{
 	BlockStorageCloneSettings, CloneWithBlockStorageSettings, KnownMultiCodec, MultiCodec, SignedEntry, TagValue,
 	WeakCid,
 };
-use co_sdk::{
-	from_cbor, to_cbor, unixfs_cat_buffer, Block, BlockStorage, CoMap, CoStorage, ReducerAction,
-};
+use co_sdk::{from_cbor, to_cbor, unixfs_cat_buffer, Block, BlockStorage, CoMap, CoStorage, ReducerAction};
 use futures::pin_mut;
 use ipld_core::ipld::Ipld;
 use serde::de::DeserializeOwned;

@@ -326,7 +326,8 @@ impl CoContextInner {
 			);
 		let local_co_reducer = local_co
 			.build(
-				self.storage().clone_with_settings(BlockStorageCloneSettings::new().with_detached()),
+				self.storage()
+					.clone_with_settings(BlockStorageCloneSettings::new().with_detached()),
 				self.runtime.clone(),
 				self.shutdown.child_token(),
 				self.tasks.clone(),
