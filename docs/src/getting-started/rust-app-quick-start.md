@@ -72,10 +72,13 @@ The first view is where we create to-do lists, and respond to invites.
 The second view is where we manage tasks and participants.
 
 ### Application
+
 For this quick-start example, we only use a single file: `src/main.rs`.
 
 ```admonish info
-You can delete all of the example Rust code from `main.rs`.
+The steps below detail how to use CO-Kit to create an App with Rust.  
+
+However, if you wish to try out the complete Rust App with Dioxus, please see the [Full Example Code](#full-example-code) at the end of this page.
 ```
 
 #### Setup
@@ -92,11 +95,11 @@ fn main() {
 ```
 
 #### Overview
-Next, we want to display a list of To-do Lists and possible invites.  
+Next, we want to display a list of to-do lists and possible invites.  
 
 
 ##### Memberships/Invites
-We use the CO-kit built-in [memberships Core](/crate/co_core_membership/struct.Memberships.html), and show To-do-List items according their state.  
+We use the CO-kit built-in [memberships Core](/crate/co_core_membership/struct.Memberships.html), and show to-do lists according their state.  
 We're working with the following states of interest:  
 - Active: Normal active membership
 - Invite: We were invited to join a [CO](../reference/co.md) by someone else
@@ -129,7 +132,7 @@ This contains all memberships, including the virtual one of the [Local CO](../re
 We also use [`co_sdk::state::co_info`](/crate/co_sdk/state/fn.co_info.html) to return info about the CO.
 
 ##### Counter
-For every To-do List, we want to show a counter of undone todos:
+For every To-do List, we want to show a counter of undone to-dos:
 
 ```rust,noplayground
 let co = use_co(co_id);
@@ -145,14 +148,14 @@ let (co_info, undone) = use_selector(&co, move |storage, co_state| async move {
 })?;
 ```
 
-We use the CO and use the selector again to count the items.  
+We use the CO, and use the selector again to count the items.  
 Since all the states are available locally, we can iterate through the items while counting them.  
 In a more sophisticated example, the values could be pre-calculated using the Core.
 
 Later, we need to add handlers to create and join a CO.
 
 #### To-do List
-Now we want to show all the todo items and the participants of a specific CO.  
+Now we want to show all the to-do items and the participants of a specific CO.  
 We use the selector again and extract the values we need:
 
 ```rust,noplayground
@@ -184,14 +187,14 @@ let (name, participants, tasks_core_exists, tasks) = use_selector(&co, move |sto
 We select:
 - the basic information about the CO (like its name) for display.
 - the participants of the CO.
-- if the todo-core has already been added to this CO. If not we will create it on-the-fly later.
-- the tasks from the todo-core.
+- if the to-do Core has already been added to this CO. If not we will create it on-the-fly later.
+- the tasks from the to-do Core.
 
 ##### Handlers
 We now need to define the handlers that respond to user actions.
 
-First, we define `on_todo_action`, which will push an action into the todo-core.  
-It will also create the todo-core on-the-fly if it does not yet exist.
+First, we define `on_todo_action`, which will push an action into the to-do Core.  
+It will also create the to-do Core on-the-fly, if it does not yet exist.
 
 ```rust,noplayground
 let on_todo_action = use_callback({
@@ -243,9 +246,9 @@ Follow the instructions in `my-todo-app/README.md` to run the Tailwind CSS compi
 
 
 ## Full Example Code
-Here is a full example of the code parts in `main.rs` that integrate with CO-kit.  
-Below that is the content for your `tailwind.css` file.  
-And, at the bottom of this page, you will find a link to the entire git project.
+- Here is a full example of the code parts in `main.rs` that integrate with CO-kit.  
+- Below that is the content for your `tailwind.css` file.  
+- And, at the bottom of this page, you will find a link to the entire git project.
 
 ```admonish info
 Please be sure to 'unhide' all of the code if you are copy/pasting into your `main.rs` file.
