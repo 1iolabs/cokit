@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, DefaultParams, MappedCid};
+use co_primitives::{Block, BlockStorageCloneSettings, CloneWithBlockStorageSettings, MappedCid};
 use co_storage::{
 	BlockStat, BlockStorage, BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, StorageError,
 };
@@ -9,16 +9,12 @@ use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
 /// Public storage API.
 #[derive(Clone)]
 pub struct CoStorage {
-	inner: Arc<dyn CoStorageBlockStorage<StoreParams = DefaultParams>>,
+	inner: Arc<dyn CoStorageBlockStorage>,
 }
 impl CoStorage {
 	pub fn new<S>(storage: S) -> Self
 	where
-		S: BlockStorage<StoreParams = DefaultParams>
-			+ ExtendedBlockStorage
-			+ BlockStorageContentMapping
-			+ CloneWithBlockStorageSettings
-			+ 'static,
+		S: BlockStorage + ExtendedBlockStorage + BlockStorageContentMapping + CloneWithBlockStorageSettings + 'static,
 	{
 		Self { inner: Arc::new(storage) }
 	}
@@ -30,16 +26,14 @@ impl Debug for CoStorage {
 }
 #[async_trait]
 impl BlockStorage for CoStorage {
-	type StoreParams = DefaultParams;
-
 	/// Returns a block from storage.
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		self.inner.get(cid).await
 	}
 
 	/// Inserts a block into storage.
 	/// Returns the CID of the block (gurranted to be the same as the supplied).
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		self.inner.set(block).await
 	}
 
@@ -52,10 +46,15 @@ impl BlockStorage for CoStorage {
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		self.inner.stat(cid).await
 	}
+
+	/// Maximum accepted block size.
+	fn max_block_size(&self) -> usize {
+		self.inner.max_block_size()
+	}
 }
 #[async_trait]
 impl ExtendedBlockStorage for CoStorage {
-	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set_extended(&self, block: ExtendedBlock) -> Result<Cid, StorageError> {
 		self.inner.set_extended(block).await
 	}
 
@@ -68,7 +67,7 @@ impl ExtendedBlockStorage for CoStorage {
 	}
 }
 impl CloneWithBlockStorageSettings for CoStorage {
-	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+	fn clone_with_settings(&self, settings: BlockStorageCloneSettings) -> Self {
 		CoStorage { inner: self.inner.clone_arc_with_settings(settings) }
 	}
 }
@@ -101,23 +100,13 @@ impl<T> CoStorageBlockStorage for T where
 }
 
 trait CloneArcWithSettings {
-	fn clone_arc_with_settings(
-		&self,
-		settings: BlockStorageSettings,
-	) -> Arc<dyn CoStorageBlockStorage<StoreParams = DefaultParams> + 'static>;
+	fn clone_arc_with_settings(&self, settings: BlockStorageCloneSettings) -> Arc<dyn CoStorageBlockStorage + 'static>;
 }
 impl<T> CloneArcWithSettings for T
 where
-	T: BlockStorage<StoreParams = DefaultParams>
-		+ ExtendedBlockStorage
-		+ BlockStorageContentMapping
-		+ CloneWithBlockStorageSettings
-		+ 'static,
+	T: BlockStorage + ExtendedBlockStorage + BlockStorageContentMapping + CloneWithBlockStorageSettings + 'static,
 {
-	fn clone_arc_with_settings(
-		&self,
-		settings: BlockStorageSettings,
-	) -> Arc<dyn CoStorageBlockStorage<StoreParams = DefaultParams> + 'static> {
+	fn clone_arc_with_settings(&self, settings: BlockStorageCloneSettings) -> Arc<dyn CoStorageBlockStorage + 'static> {
 		Arc::new(self.clone_with_settings(settings))
 	}
 }

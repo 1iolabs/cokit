@@ -35,16 +35,14 @@ impl<S> BlockStorage for MappedBlockStorage<S>
 where
 	S: BlockStorage + BlockStorageContentMapping + Send + Sync + 'static,
 {
-	type StoreParams = S::StoreParams;
-
 	/// Returns a block from storage.
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		Ok(self.storage.get(&self.to_mapped(cid).await).await?)
 	}
 
 	/// Inserts a block into storage.
 	/// Returns the CID of the block (gurranted to be the same as the supplied).
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		Ok(self.storage.set(block).await?)
 	}
 
@@ -57,12 +55,16 @@ where
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		Ok(self.storage.stat(&self.to_mapped(cid).await).await?)
 	}
+
+	fn max_block_size(&self) -> usize {
+		self.storage.max_block_size()
+	}
 }
 impl<S> CloneWithBlockStorageSettings for MappedBlockStorage<S>
 where
 	S: CloneWithBlockStorageSettings,
 {
-	fn clone_with_settings(&self, settings: co_primitives::BlockStorageSettings) -> Self {
+	fn clone_with_settings(&self, settings: co_primitives::BlockStorageCloneSettings) -> Self {
 		MappedBlockStorage { storage: self.storage.clone_with_settings(settings), codecs: self.codecs.clone() }
 	}
 }

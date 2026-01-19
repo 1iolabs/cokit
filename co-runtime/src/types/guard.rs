@@ -1,4 +1,4 @@
-use crate::{AsyncBlockStorage, AsyncContext};
+use crate::AsyncContext;
 use cid::Cid;
 use co_api::{guard_with_context, Guard};
 use std::{fmt::Debug, sync::Arc};
@@ -12,9 +12,9 @@ pub enum GuardReference {
 impl GuardReference {
 	pub fn native<R>() -> GuardReference
 	where
-		R: Guard<AsyncBlockStorage>,
+		R: Guard,
 	{
-		GuardReference::Native(Arc::new(|context| guard_with_context::<AsyncBlockStorage, AsyncContext, R>(context)))
+		GuardReference::Native(Arc::new(|context| guard_with_context::<AsyncContext, R>(context)))
 	}
 }
 impl Debug for GuardReference {

@@ -6,7 +6,7 @@ use crate::{
 };
 use co_core_co::Co;
 use co_core_storage::{BlockInfo, StorageAction};
-use co_primitives::{OptionLink, StoreParams, WeakCid};
+use co_primitives::{OptionLink, WeakCid};
 use co_storage::{BlockStorageContentMapping, ExtendedBlockStorage};
 use futures::{pin_mut, TryStreamExt};
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet};
@@ -24,7 +24,7 @@ where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 	D: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 {
-	let max_references = max_reference_count(<S::StoreParams as StoreParams>::MAX_BLOCK_SIZE);
+	let max_references = max_reference_count(storage_core_storage.max_block_size());
 	let mut removed_blocks = 0;
 	let mut query_blocks_index_unreferenced = query_core(CO_CORE_NAME_STORAGE)
 		.with_default()
@@ -293,13 +293,9 @@ mod tests {
 		let co_state = co.reducer_state().await;
 		let external_co_state = co_state.to_external_force(&storage).await.unwrap();
 		tracing::trace!(?co_state, ?external_co_state, "test-state");
-		co.push(
-			&application.local_identity(),
-			CO_CORE_NAME_CO,
-			&CoAction::TagsInsert { tags: tags!("hello": "world") },
-		)
-		.await
-		.unwrap();
+		co.push(&identity, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("hello": "world") })
+			.await
+			.unwrap();
 		assert_eq!(count_pin_references(&local_co, co.id(), CoPinningKey::Root).await, 2); // this contains the intermediate point before pinning, the actual state before and the next intermediate point.
 
 		// only keep latest
@@ -315,7 +311,7 @@ mod tests {
 
 		// push
 		//  this will trigger the cleanup as the previous has set to one we not got items to remove
-		co.push(&application.local_identity(), CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("test": 123) })
+		co.push(&identity, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("test": 123) })
 			.await
 			.unwrap();
 		let next_co_state = co.reducer_state().await;

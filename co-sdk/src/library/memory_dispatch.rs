@@ -66,7 +66,7 @@ where
 	where
 		S: ExtendedBlockStorage + Clone + 'static,
 	{
-		let tmp = StoreParamsBlockStorage::new(storage.tmp_storage(), false);
+		let tmp = StoreParamsBlockStorage::new(storage.tmp_storage(), false, reducer_storage.max_block_size());
 		let overlay_storage = OverlayBlockStorage::new(tasks, reducer_storage.clone(), tmp, None, true, false);
 		let reducer_storage = LinksBlockStorage::new(overlay_storage.clone(), verify_links);
 		let reducer = create_memory_reducer(

@@ -1,7 +1,9 @@
 use crate::{BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStat, BlockStorage, CloneWithBlockStorageSettings, MappedCid, StorageError};
+use co_primitives::{
+	Block, BlockStat, BlockStorage, BlockStorageStoreParams, CloneWithBlockStorageSettings, MappedCid, StorageError,
+};
 use std::{
 	collections::{BTreeSet, HashSet},
 	mem::swap,
@@ -38,13 +40,11 @@ impl<S> BlockStorage for ChangeBlockStorage<S>
 where
 	S: BlockStorage + 'static,
 {
-	type StoreParams = S::StoreParams;
-
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		Ok(self.next.get(cid).await?)
 	}
 
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		// already exists?
 		if (self.next.stat(block.cid()).await).is_ok() {
 			return Ok(*block.cid());
@@ -83,13 +83,17 @@ where
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		Ok(self.next.stat(cid).await?)
 	}
+
+	fn max_block_size(&self) -> usize {
+		self.next.max_block_size()
+	}
 }
 #[async_trait]
 impl<S> ExtendedBlockStorage for ChangeBlockStorage<S>
 where
 	S: ExtendedBlockStorage + 'static,
 {
-	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set_extended(&self, block: ExtendedBlock) -> Result<Cid, StorageError> {
 		self.next.set_extended(block).await
 	}
 
@@ -105,7 +109,7 @@ impl<S> CloneWithBlockStorageSettings for ChangeBlockStorage<S>
 where
 	S: BlockStorage + CloneWithBlockStorageSettings + 'static,
 {
-	fn clone_with_settings(&self, settings: co_primitives::BlockStorageSettings) -> Self {
+	fn clone_with_settings(&self, settings: co_primitives::BlockStorageCloneSettings) -> Self {
 		Self { next: self.next.clone_with_settings(settings), changes: self.changes.clone(), record: self.record }
 	}
 }
@@ -129,6 +133,12 @@ where
 	async fn insert_mappings(&self, mappings: BTreeSet<MappedCid>) {
 		self.next.insert_mappings(mappings).await
 	}
+}
+impl<S> BlockStorageStoreParams for ChangeBlockStorage<S>
+where
+	S: BlockStorageStoreParams,
+{
+	type StoreParams = S::StoreParams;
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]

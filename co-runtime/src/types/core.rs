@@ -1,4 +1,4 @@
-use crate::{AsyncBlockStorage, AsyncContext};
+use crate::AsyncContext;
 use cid::Cid;
 use co_api::{
 	async_api,
@@ -26,12 +26,10 @@ impl Core {
 
 	pub fn native_async<R, A>() -> Core
 	where
-		R: async_api::Reducer<A, AsyncBlockStorage> + Default,
+		R: async_api::Reducer<A> + Default,
 		A: Clone + DeserializeOwned,
 	{
-		Core::NativeAsync(Arc::new(|context| {
-			async_api::reduce_with_context::<R, A, AsyncContext, AsyncBlockStorage>(context)
-		}))
+		Core::NativeAsync(Arc::new(|context| async_api::reduce_with_context::<R, A, AsyncContext>(context)))
 	}
 }
 impl Debug for Core {

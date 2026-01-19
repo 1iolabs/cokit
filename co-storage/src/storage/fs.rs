@@ -3,8 +3,8 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{
-	Block, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, DefaultParams, StorageError,
-	StoreParams,
+	Block, BlockStat, BlockStorage, BlockStorageCloneSettings, CloneWithBlockStorageSettings, DefaultParams,
+	StorageError, StoreParams,
 };
 use std::{
 	fs::OpenOptions,
@@ -25,10 +25,11 @@ use tokio::io::AsyncWriteExt;
 pub struct FsStorage {
 	path: PathBuf,
 	allow_clear: bool,
+	max_block_size: usize,
 }
 impl FsStorage {
 	pub fn new(path: PathBuf) -> Self {
-		Self { path, allow_clear: false }
+		Self { path, allow_clear: false, max_block_size: DefaultParams::MAX_BLOCK_SIZE }
 	}
 
 	pub fn create(&self) -> std::io::Result<()> {
@@ -43,12 +44,12 @@ impl FsStorage {
 impl Storage for FsStorage {
 	type StoreParams = DefaultParams;
 
-	fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError> {
+	fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		let path = to_cid_path(&self.path, cid, "");
 		into_block_result(cid, std::fs::read(path))
 	}
 
-	fn set(&mut self, block: Block<DefaultParams>) -> Result<Cid, StorageError> {
+	fn set(&mut self, block: Block) -> Result<Cid, StorageError> {
 		let path = to_cid_path(&self.path, block.cid(), "");
 
 		// exists?
@@ -133,15 +134,13 @@ impl Storage for FsStorage {
 
 #[async_trait]
 impl BlockStorage for FsStorage {
-	type StoreParams = DefaultParams;
-
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		let path = to_cid_path(&self.path, cid, "");
 		into_block_result(cid, tokio::fs::read(path).await)
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(block), fields(cid = ?block.cid(), path = ?to_cid_path(&self.path, block.cid(), "")))]
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		let path = to_cid_path(&self.path, block.cid(), "");
 
 		// exists?
@@ -233,10 +232,14 @@ impl BlockStorage for FsStorage {
 		let path = to_cid_path(&self.path, cid, "");
 		into_storage_result(cid, tokio::fs::metadata(&path).await.map(|v| BlockStat { size: v.size() }))
 	}
+
+	fn max_block_size(&self) -> usize {
+		self.max_block_size
+	}
 }
 #[async_trait]
 impl ExtendedBlockStorage for FsStorage {
-	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set_extended(&self, block: ExtendedBlock) -> Result<Cid, StorageError> {
 		self.set(block.block).await
 	}
 
@@ -258,7 +261,7 @@ impl ExtendedBlockStorage for FsStorage {
 	}
 }
 impl CloneWithBlockStorageSettings for FsStorage {
-	fn clone_with_settings(&self, _settings: BlockStorageSettings) -> Self {
+	fn clone_with_settings(&self, _settings: BlockStorageCloneSettings) -> Self {
 		self.clone()
 	}
 }
@@ -275,7 +278,7 @@ fn into_storage_result<T>(cid: &Cid, result: std::io::Result<T>) -> Result<T, St
 }
 
 /// Convert io result to block result.
-fn into_block_result<P: StoreParams>(cid: &Cid, result: std::io::Result<Vec<u8>>) -> Result<Block<P>, StorageError> {
+fn into_block_result(cid: &Cid, result: std::io::Result<Vec<u8>>) -> Result<Block, StorageError> {
 	into_storage_result(cid, result).map(|data| Block::new_unchecked(*cid, data))
 }
 

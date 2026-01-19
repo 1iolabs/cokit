@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 #[async_trait]
 pub trait ExtendedBlockStorage: BlockStorage {
 	/// Inserts a block into storage.
-	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError>;
+	async fn set_extended(&self, block: ExtendedBlock) -> Result<Cid, StorageError>;
 
 	/// Test if a Cid exists.
 	///
@@ -18,12 +18,12 @@ pub trait ExtendedBlockStorage: BlockStorage {
 }
 
 #[derive(Debug, Clone)]
-pub struct ExtendedBlock<P> {
-	pub block: Block<P>,
+pub struct ExtendedBlock {
+	pub block: Block,
 	pub options: ExtendedBlockOptions,
 }
-impl<P> ExtendedBlock<P> {
-	pub fn new(block: Block<P>) -> Self {
+impl ExtendedBlock {
+	pub fn new(block: Block) -> Self {
 		Self { block, options: Default::default() }
 	}
 
@@ -37,13 +37,13 @@ impl<P> ExtendedBlock<P> {
 		self
 	}
 }
-impl<P> From<Block<P>> for ExtendedBlock<P> {
-	fn from(block: Block<P>) -> Self {
+impl From<Block> for ExtendedBlock {
+	fn from(block: Block) -> Self {
 		Self::new(block)
 	}
 }
-impl<P> From<(Block<P>, ExtendedBlockOptions)> for ExtendedBlock<P> {
-	fn from(value: (Block<P>, ExtendedBlockOptions)) -> Self {
+impl From<(Block, ExtendedBlockOptions)> for ExtendedBlock {
+	fn from(value: (Block, ExtendedBlockOptions)) -> Self {
 		Self { block: value.0, options: value.1 }
 	}
 }

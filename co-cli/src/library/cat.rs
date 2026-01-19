@@ -1,10 +1,9 @@
 use cid::Cid;
 use co_primitives::{
-	BlockStorageSettings, CloneWithBlockStorageSettings, KnownMultiCodec, MultiCodec, SignedEntry, TagValue, WeakCid,
+	BlockStorageCloneSettings, CloneWithBlockStorageSettings, KnownMultiCodec, MultiCodec, SignedEntry, TagValue,
+	WeakCid,
 };
-use co_sdk::{
-	from_cbor, to_cbor, unixfs_cat_buffer, Block, BlockStorage, CoMap, CoStorage, DefaultParams, ReducerAction,
-};
+use co_sdk::{from_cbor, to_cbor, unixfs_cat_buffer, Block, BlockStorage, CoMap, CoStorage, ReducerAction};
 use futures::pin_mut;
 use ipld_core::ipld::Ipld;
 use serde::de::DeserializeOwned;
@@ -37,7 +36,7 @@ impl CatOptions {
 pub async fn cat_output(storage: CoStorage, cid: Cid, options: CatOptions) -> Result<(), anyhow::Error> {
 	if options.pretty || options.format.is_some() {
 		let block = if options.decrypt && MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
-			let transform_storage = storage.clone_with_settings(BlockStorageSettings::new().with_transform());
+			let transform_storage = storage.clone_with_settings(BlockStorageCloneSettings::new().with_transform());
 			let block = transform_storage.get(&cid).await?;
 			println!("Codec: {:?} ({})", MultiCodec::from(cid), cid.codec());
 			println!("Cid: {}", block.cid());
@@ -65,7 +64,7 @@ pub async fn cat_output(storage: CoStorage, cid: Cid, options: CatOptions) -> Re
 		// encrypted?
 		let storage = match MultiCodec::from(cid.codec()) {
 			MultiCodec::Known(KnownMultiCodec::CoEncryptedBlock) if options.decrypt => {
-				storage.clone_with_settings(BlockStorageSettings::new().with_transform())
+				storage.clone_with_settings(BlockStorageCloneSettings::new().with_transform())
 			},
 			_ => storage,
 		};
@@ -89,11 +88,7 @@ pub async fn cat_output(storage: CoStorage, cid: Cid, options: CatOptions) -> Re
 	Ok(())
 }
 
-async fn print_format(
-	storage: &CoStorage,
-	options: &CatOptions,
-	block: &Block<DefaultParams>,
-) -> Result<(), anyhow::Error> {
+async fn print_format(storage: &CoStorage, options: &CatOptions, block: &Block) -> Result<(), anyhow::Error> {
 	if let Some(name) = &options.format {
 		if name.starts_with("CoMap;") {
 			let parts = name.split(";").collect::<Vec<_>>();

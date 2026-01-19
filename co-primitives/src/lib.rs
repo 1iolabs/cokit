@@ -23,8 +23,11 @@ pub use library::{
 pub use types::{
 	action::ReducerAction,
 	any_block_storage::AnyBlockStorage,
-	block::{Block, BlockError, DefaultParams, StoreParams},
-	block_storage::{BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, StorageError},
+	block::{Block, BlockError},
+	block_storage::{
+		BlockStat, BlockStorage, BlockStorageCloneSettings, BlockStorageStoreParams, CloneWithBlockStorageSettings,
+		StorageError,
+	},
 	block_storage_ext::BlockStorageExt,
 	cid::CoCid,
 	clock::Clock,
@@ -56,6 +59,7 @@ pub use types::{
 	},
 	secret::Secret,
 	storage::Storage,
+	store_params::{DefaultParams, StoreParams},
 	streamable::Streamable,
 	tags::{Tag, TagMatcher, TagPattern, TagValue, Tags, TagsExpr},
 	total_float::TotalFloat64,

@@ -55,34 +55,32 @@ where
 pub mod async_reduce {
 	use crate::{
 		async_api::{Context, Reducer},
-		library::{wasm_context::WasmContext, wasm_storage::WasmStorage},
+		library::wasm_context::WasmContext,
 	};
 	use cid::Cid;
-	use co_primitives::{BlockStorage, BlockStorageExt, DiagnosticMessage};
+	use co_primitives::{BlockStorageExt, DiagnosticMessage};
 	use futures::{executor::LocalPool, task::LocalSpawnExt};
 	use serde::de::DeserializeOwned;
 
 	pub fn reduce<R, A>()
 	where
-		R: Reducer<A, WasmStorage>,
+		R: Reducer<A>,
 		A: Clone + DeserializeOwned,
 	{
-		let context = WasmContext::new();
-		reduce_with_context::<R, A, WasmContext, WasmStorage>(context);
+		reduce_with_context::<R, A, _>(WasmContext::new());
 	}
 
-	pub fn reduce_with_context<R, A, C, S>(mut context: C) -> C
+	pub fn reduce_with_context<R, A, C>(mut context: C) -> C
 	where
-		R: Reducer<A, S>,
+		R: Reducer<A>,
 		A: Clone + DeserializeOwned,
-		S: BlockStorage + Clone + 'static,
-		C: Context<S> + 'static,
+		C: Context + 'static,
 	{
 		let mut pool = LocalPool::new();
 		let handle = pool
 			.spawner()
 			.spawn_local_with_handle(async move {
-				match reduce_execute_with_context::<R, A, C, S>(&context).await {
+				match reduce_execute_with_context::<R, A, C>(&context).await {
 					Ok(next_state) => {
 						if let Some(next_state) = next_state {
 							context.set_state(next_state);
@@ -103,12 +101,11 @@ pub mod async_reduce {
 		pool.run_until(handle)
 	}
 
-	pub async fn reduce_execute_with_context<R, A, C, S>(context: &C) -> Result<Option<Cid>, anyhow::Error>
+	pub async fn reduce_execute_with_context<R, A, C>(context: &C) -> Result<Option<Cid>, anyhow::Error>
 	where
-		R: Reducer<A, S>,
+		R: Reducer<A>,
 		A: Clone + DeserializeOwned,
-		S: BlockStorage + Clone + 'static,
-		C: Context<S> + 'static,
+		C: Context + 'static,
 	{
 		// reduce
 		let next_state = R::reduce(context.state().into(), context.event().into(), context.storage()).await?;

@@ -261,7 +261,7 @@ pub struct MultiCodecError(Cid, MultiCodec, MultiCodec);
 #[cfg(test)]
 mod tests {
 	use super::MultiCodec;
-	use crate::{BlockSerializer, CoReference, DefaultParams, KnownMultiCodec};
+	use crate::{BlockSerializer, CoReference, KnownMultiCodec};
 	use serde::{Deserialize, Serialize};
 
 	#[test]
@@ -315,7 +315,7 @@ mod tests {
 
 	#[test]
 	fn test_cid() {
-		let block = BlockSerializer::<DefaultParams>::new_codec(KnownMultiCodec::CoReference)
+		let block = BlockSerializer::new_codec(KnownMultiCodec::CoReference)
 			.serialize(&CoReference::Weak(1))
 			.unwrap();
 		assert_eq!(block.cid().to_string(), "baga2bqabdyqe2tf374ji3ixvay5hqmwyymxxpgjtxmqfijehizup5f5pypp6bda");

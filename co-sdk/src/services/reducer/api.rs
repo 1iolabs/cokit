@@ -12,8 +12,7 @@ use co_actor::{Actor, ActorHandle, TaskSpawner};
 use co_core_co::Co;
 use co_identity::{PrivateIdentity, PrivateIdentityBox};
 use co_primitives::{
-	tags, BlockLinks, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, DefaultParams, Link, OptionLink,
-	ReducerAction,
+	tags, BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, Link, OptionLink, ReducerAction,
 };
 use co_storage::{
 	BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage, LinksBlockStorage,
@@ -82,10 +81,10 @@ impl CoReducer {
 	}
 
 	pub(crate) fn clone_with_detached_storage(&self) -> Self {
-		self.clone_with_settings(BlockStorageSettings::new().with_detached())
+		self.clone_with_settings(BlockStorageCloneSettings::new().with_detached())
 	}
 
-	pub(crate) fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+	pub(crate) fn clone_with_settings(&self, settings: BlockStorageCloneSettings) -> Self {
 		let (storage, overlay_storage) = match &self.overlay_storage {
 			Some(overlay_storage) => {
 				// clone the base storage without overlay but with settings
@@ -126,11 +125,7 @@ impl CoReducer {
 	/// Create the actural storage instance.
 	fn create_storage<S>(verify_links: &Option<BlockLinks>, storage: &S) -> CoStorage
 	where
-		S: BlockStorage<StoreParams = DefaultParams>
-			+ ExtendedBlockStorage
-			+ BlockStorageContentMapping
-			+ CloneWithBlockStorageSettings
-			+ 'static,
+		S: BlockStorage + ExtendedBlockStorage + BlockStorageContentMapping + CloneWithBlockStorageSettings + 'static,
 	{
 		if let Some(verify_links) = &verify_links {
 			CoStorage::new(LinksBlockStorage::new(storage.clone(), Some(verify_links.clone())))

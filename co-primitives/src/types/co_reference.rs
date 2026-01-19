@@ -1,4 +1,4 @@
-use crate::{Block, BlockSerializer, BlockSerializerError, KnownMultiCodec, StoreParams};
+use crate::{Block, BlockSerializer, BlockSerializerError, KnownMultiCodec};
 use serde::{Deserialize, Serialize};
 
 /// Wrapps a reference/link/Cid and applies attributes useful in context of a Co.
@@ -29,9 +29,8 @@ impl<T> CoReference<T> {
 		}
 	}
 
-	pub fn to_block<P>(&self) -> Result<Block<P>, BlockSerializerError>
+	pub fn to_block(&self) -> Result<Block, BlockSerializerError>
 	where
-		P: StoreParams,
 		T: Serialize,
 	{
 		BlockSerializer::new_codec(KnownMultiCodec::CoReference).serialize(self)

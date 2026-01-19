@@ -1,8 +1,8 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoTryStreamExt, IsDefault, LazyTransaction, Link,
-	OptionLink, ReducerAction, TagValue, WeakCid,
+	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoTryStreamExt, CoreBlockStorage, IsDefault,
+	LazyTransaction, Link, OptionLink, ReducerAction, TagValue, WeakCid,
 };
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
 use std::{collections::BTreeMap, future::ready, ops::Range};
@@ -131,14 +131,11 @@ pub struct RichText {
 	#[serde(rename = "i", default, skip_serializing_if = "IsDefault::is_default")]
 	pub runs: CoMap<Position, Run>,
 }
-impl<S> Reducer<RichTextAction, S> for RichText
-where
-	S: BlockStorage + Clone + 'static,
-{
+impl Reducer<RichTextAction> for RichText {
 	async fn reduce(
 		state_link: OptionLink<Self>,
 		event_link: Link<ReducerAction<RichTextAction>>,
-		storage: &S,
+		storage: &CoreBlockStorage,
 	) -> Result<Link<Self>, anyhow::Error> {
 		let event = storage.get_value(&event_link).await?;
 		let mut state = storage.get_value_or_default(&state_link).await?;
@@ -990,7 +987,9 @@ mod tests {
 		RichTextAction, Run,
 	};
 	use cid::Cid;
-	use co_api::{async_api::Reducer, BlockStorage, BlockStorageExt, CoTryStreamExt, Date, ReducerAction};
+	use co_api::{
+		async_api::Reducer, BlockStorage, BlockStorageExt, CoTryStreamExt, CoreBlockStorage, Date, ReducerAction,
+	};
 	use co_storage::MemoryBlockStorage;
 	use futures::{StreamExt, TryStreamExt};
 
@@ -1002,7 +1001,10 @@ mod tests {
 		*time += 1;
 		let action_link = storage.set_value(&action).await.unwrap();
 		let state_link = storage.set_value(&state).await.unwrap();
-		let next_state_link = RichText::reduce(state_link.into(), action_link, storage).await.unwrap();
+		let next_state_link =
+			RichText::reduce(state_link.into(), action_link, &CoreBlockStorage::new(storage.clone(), true))
+				.await
+				.unwrap();
 		storage.get_value(&next_state_link).await.unwrap()
 	}
 

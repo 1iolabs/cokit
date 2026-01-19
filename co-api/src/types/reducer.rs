@@ -23,16 +23,14 @@ pub trait Context {
 }
 
 pub mod async_reducer {
+	use crate::CoreBlockStorage;
 	use cid::Cid;
-	use co_primitives::{BlockStorage, Link, OptionLink, ReducerAction};
+	use co_primitives::{Link, OptionLink, ReducerAction};
 
 	/// COre execution context.
-	pub trait Context<S>
-	where
-		S: BlockStorage + Clone + 'static,
-	{
+	pub trait Context {
 		/// Storage instance.
-		fn storage(&self) -> &S;
+		fn storage(&self) -> &CoreBlockStorage;
 
 		/// Get runtime payload.
 		fn payload(&self) -> Vec<u8>;
@@ -52,16 +50,15 @@ pub mod async_reducer {
 	}
 
 	#[allow(async_fn_in_trait)]
-	pub trait Reducer<A, S>
+	pub trait Reducer<A>
 	where
 		Self: Sized,
 		A: Clone,
-		S: BlockStorage + Clone + 'static,
 	{
 		async fn reduce(
 			state: OptionLink<Self>,
 			event: Link<ReducerAction<A>>,
-			storage: &S,
+			storage: &CoreBlockStorage,
 		) -> Result<Link<Self>, anyhow::Error>;
 	}
 }

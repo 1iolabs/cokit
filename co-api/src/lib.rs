@@ -20,7 +20,7 @@ pub use co_v1::{
 	diagnostic_cid_write, event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set,
 };
 pub use library::guard::{guard, guard_with_context};
-pub use types::guard::Guard;
+pub use types::{guard::Guard, storage::CoreBlockStorage};
 
 // sync export
 pub mod sync_api {

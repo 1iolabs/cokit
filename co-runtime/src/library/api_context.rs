@@ -1,6 +1,6 @@
 use crate::{co_v1::CoV1Api, RuntimeContext};
 use cid::Cid;
-use co_api::{sync_api::Context, Block, DefaultParams, Storage};
+use co_api::{sync_api::Context, Block, Storage};
 
 /// Native api context.
 /// This should be only used for testing purposes.
@@ -47,11 +47,11 @@ impl Context for ApiContext {
 	}
 }
 impl Storage for ApiContext {
-	fn get(&self, cid: &Cid) -> Block<DefaultParams> {
+	fn get(&self, cid: &Cid) -> Block {
 		co_storage::Storage::get(&self.api, cid).expect("get")
 	}
 
-	fn set(&mut self, block: Block<DefaultParams>) -> Cid {
+	fn set(&mut self, block: Block) -> Cid {
 		co_storage::Storage::set(&mut self.api, block).expect("set")
 	}
 }

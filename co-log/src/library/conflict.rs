@@ -28,7 +28,7 @@ mod tests {
 	use super::last_write_wins;
 	use crate::library::entry::EntryBlock;
 	use co_identity::{Identity, PrivateIdentity, SignError};
-	use co_primitives::{BlockSerializer, Clock, DefaultParams, Entry};
+	use co_primitives::{BlockSerializer, Clock, Entry};
 	use serde::Serialize;
 	use std::{
 		cmp::Ordering,
@@ -88,7 +88,7 @@ mod tests {
 			refs: Default::default(),
 			clock: Clock::new(identity.as_bytes().to_vec(), time),
 		};
-		EntryBlock::from_entry::<DefaultParams, _>(&TestIdentity::new(identity), entry).unwrap()
+		EntryBlock::from_entry(&TestIdentity::new(identity), entry).unwrap()
 	}
 
 	#[test]

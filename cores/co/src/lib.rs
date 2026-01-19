@@ -1,8 +1,9 @@
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoId, CoMap, CoSet, Did, Link, Network, OptionLink,
-	ReducerAction, SignedEntry, StorageError, Tags,
+	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoId, CoMap, CoSet, CoreBlockStorage, Did, Link, Network,
+	OptionLink, ReducerAction, SignedEntry, StorageError, Tags,
 };
+use serde::de::IgnoredAny;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[co(state, guard, no_default)]
@@ -64,14 +65,11 @@ impl Default for Co {
 		}
 	}
 }
-impl<S> Reducer<CoAction, S> for Co
-where
-	S: BlockStorage + Clone + 'static,
-{
+impl Reducer<CoAction> for Co {
 	async fn reduce(
 		state: OptionLink<Self>,
 		event: Link<ReducerAction<CoAction>>,
-		storage: &S,
+		storage: &CoreBlockStorage,
 	) -> Result<Link<Self>, anyhow::Error> {
 		let mut result = storage.get_value_or_default(&state).await?;
 		let event = storage.get_value(&event).await?;
@@ -80,23 +78,40 @@ where
 		Ok(state)
 	}
 }
-impl<S: BlockStorage + Clone + 'static> co_api::Guard<S> for Co {
-	/// Test if next_head creator is a participant with access.
+impl co_api::Guard for Co {
+	/// Test:
+	/// - the specified core exists.
+	/// - if next_head creator is a participant with access.
 	async fn verify(
-		storage: &S,
+		storage: &CoreBlockStorage,
 		_guard: String,
 		state: Cid,
 		_heads: BTreeSet<Cid>,
 		next_head: Cid,
 	) -> Result<bool, anyhow::Error> {
 		let next_entry: SignedEntry = storage.get_deserialized(&next_head).await?;
-		let participant = next_entry.identity;
 		let co: Co = storage.get_deserialized(&state).await?;
-		if let Some(participant) = co.participants.get(storage, &participant).await? {
-			Ok(participant.state.has_access())
+
+		// participant
+		let participant = next_entry.identity;
+		let has_access = if let Some(participant) = co.participants.get(storage, &participant).await? {
+			participant.state.has_access()
 		} else {
-			Ok(false)
+			false
+		};
+		if !has_access {
+			return Ok(false);
 		}
+
+		// core
+		let action: ReducerAction<IgnoredAny> = storage.get_deserialized(&next_entry.entry.payload).await?;
+		let has_core = action.core == "co" || co.cores.contains_key(&action.core);
+		if !has_core {
+			return Ok(false);
+		}
+
+		// ok
+		Ok(true)
 	}
 }
 
@@ -199,6 +214,11 @@ impl CreateAction {
 
 	pub fn with_core(mut self, core_name: String, core: Core) -> Self {
 		self.cores.insert(core_name, core);
+		self
+	}
+
+	pub fn with_guard(mut self, guard_name: String, guard: Guard) -> Self {
+		self.guards.insert(guard_name, guard);
 		self
 	}
 

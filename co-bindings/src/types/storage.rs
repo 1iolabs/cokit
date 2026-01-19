@@ -1,18 +1,16 @@
 use crate::{CoCid, CoError};
 use async_trait::async_trait;
-use co_primitives::StoreParams;
-use co_sdk::DefaultParams;
 use std::sync::Arc;
 
 #[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 #[cfg_attr(feature = "frb", flutter_rust_bridge::frb(opaque))]
 #[derive(Clone)]
 pub struct BlockStorage {
-	storage: Arc<dyn co_sdk::BlockStorage<StoreParams = DefaultParams> + 'static>,
+	storage: Arc<dyn co_sdk::BlockStorage + 'static>,
 }
 impl BlockStorage {
 	#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(ignore))]
-	pub fn new(storage: impl co_sdk::BlockStorage<StoreParams = DefaultParams> + 'static) -> Self {
+	pub fn new(storage: impl co_sdk::BlockStorage + 'static) -> Self {
 		Self { storage: Arc::new(storage) }
 	}
 
@@ -29,24 +27,20 @@ impl BlockStorage {
 #[cfg_attr(feature = "frb", flutter_rust_bridge::frb(ignore))]
 #[async_trait]
 impl co_sdk::BlockStorage for BlockStorage {
-	type StoreParams = DefaultParams;
-
-	async fn get(
-		&self,
-		cid: &cid::Cid,
-	) -> Result<co_primitives::Block<Self::StoreParams>, co_primitives::StorageError> {
+	async fn get(&self, cid: &cid::Cid) -> Result<co_primitives::Block, co_primitives::StorageError> {
 		Ok(self.storage.get(cid).await?)
 	}
 
-	async fn set(
-		&self,
-		block: co_primitives::Block<Self::StoreParams>,
-	) -> Result<cid::Cid, co_primitives::StorageError> {
+	async fn set(&self, block: co_primitives::Block) -> Result<cid::Cid, co_primitives::StorageError> {
 		Ok(self.storage.set(block).await?)
 	}
 
 	async fn remove(&self, cid: &cid::Cid) -> Result<(), co_primitives::StorageError> {
 		Ok(self.storage.remove(cid).await?)
+	}
+
+	fn max_block_size(&self) -> usize {
+		self.storage.max_block_size()
 	}
 }
 
@@ -59,9 +53,7 @@ impl Block {
 	/// Creates a new block. Returns an error if the hash doesn't match
 	/// the data.
 	pub fn new(cid: CoCid, data: Vec<u8>) -> Result<Self, CoError> {
-		let (cid, data) = co_sdk::Block::<co_sdk::DefaultParams>::new(cid.cid()?, data)
-			.map_err(CoError::new)?
-			.into_inner();
+		let (cid, data) = co_sdk::Block::new(cid.cid()?, data).map_err(CoError::new)?.into_inner();
 		Ok(Self { cid: cid.into(), data })
 	}
 
@@ -73,16 +65,16 @@ impl Block {
 	/// Create a new block by calculating the [`Cid`] from data using the default hasher.
 	/// Note: The default hasher may changes without notice.
 	pub fn new_data(codec: u64, data: Vec<u8>) -> Self {
-		Self::new_unchecked(co_sdk::Block::<DefaultParams>::cid_data(codec, &data).into(), data)
+		Self::new_unchecked(co_sdk::Block::cid_data(codec, &data).into(), data)
 	}
 }
-impl<P: StoreParams> From<co_sdk::Block<P>> for Block {
-	fn from(value: co_sdk::Block<P>) -> Self {
+impl From<co_sdk::Block> for Block {
+	fn from(value: co_sdk::Block) -> Self {
 		let (cid, data) = value.into_inner();
 		Self { cid: cid.into(), data }
 	}
 }
-impl<P: StoreParams> TryFrom<Block> for co_sdk::Block<P> {
+impl TryFrom<Block> for co_sdk::Block {
 	type Error = CoError;
 
 	fn try_from(value: Block) -> Result<Self, Self::Error> {

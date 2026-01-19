@@ -1,8 +1,8 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoMapTransaction, CoSet, CoSetTransaction, Did,
-	Guard, Link, OptionLink, ReducerAction, SignedEntry, WeakCid,
+	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoMapTransaction, CoSet, CoSetTransaction,
+	CoreBlockStorage, Did, Guard, Link, OptionLink, ReducerAction, SignedEntry, WeakCid,
 };
 use co_core_co::Co;
 use futures::{pin_mut, TryStreamExt};
@@ -93,14 +93,11 @@ pub struct Authority {
 	#[serde(rename = "n")]
 	pub update_count: u64,
 }
-impl<S> Reducer<AuthorityAction, S> for Authority
-where
-	S: BlockStorage + Clone + 'static,
-{
+impl Reducer<AuthorityAction> for Authority {
 	async fn reduce(
 		state_link: OptionLink<Self>,
 		event_link: Link<ReducerAction<AuthorityAction>>,
-		storage: &S,
+		storage: &CoreBlockStorage,
 	) -> Result<Link<Self>, anyhow::Error> {
 		// get
 		let event = storage.get_value(&event_link).await?;
@@ -176,12 +173,9 @@ where
 		Ok(storage.set_value(&state).await?)
 	}
 }
-impl<S> Guard<S> for Authority
-where
-	S: BlockStorage + Clone + 'static,
-{
+impl Guard for Authority {
 	async fn verify(
-		storage: &S,
+		storage: &CoreBlockStorage,
 		guard: String,
 		state: Cid,
 		_heads: BTreeSet<Cid>,

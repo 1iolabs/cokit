@@ -1,7 +1,6 @@
-use crate::{from_cbor, to_cbor, Block, CborError, DefaultParams, KnownMultiCodec, StoreParams};
+use crate::{from_cbor, to_cbor, Block, CborError, KnownMultiCodec, StoreParams};
 use cid::Cid;
 use serde::Serialize;
-use std::marker::PhantomData;
 
 #[derive(Debug, thiserror::Error)]
 pub enum BlockSerializerError {
@@ -16,47 +15,55 @@ pub enum BlockSerializerError {
 }
 
 /// DagCbor Block Serializer/Deserializer.
-pub struct BlockSerializer<S> {
-	_s: PhantomData<S>,
+pub struct BlockSerializer {
 	codec: u64,
+	max_block_size: Option<usize>,
 }
-impl<S> BlockSerializer<S> {
+impl BlockSerializer {
 	pub fn new() -> Self {
 		Self::new_codec(KnownMultiCodec::DagCbor)
 	}
 
+	pub fn new_store_params<P: StoreParams>() -> Self {
+		Self::new_codec(KnownMultiCodec::DagCbor).with_max_block_size(P::MAX_BLOCK_SIZE)
+	}
+
 	pub fn new_codec(codec: impl Into<u64>) -> Self {
-		Self { _s: Default::default(), codec: codec.into() }
+		Self { max_block_size: None, codec: codec.into() }
 	}
 
 	pub fn with_codec(mut self, codec: impl Into<u64>) -> Self {
 		self.codec = codec.into();
 		self
 	}
+
+	pub fn with_max_block_size(mut self, max_block_size: usize) -> Self {
+		self.max_block_size = Some(max_block_size);
+		self
+	}
 }
-impl Default for BlockSerializer<DefaultParams> {
+impl Default for BlockSerializer {
 	fn default() -> Self {
 		Self::new()
 	}
 }
-impl<S> BlockSerializer<S>
-where
-	S: StoreParams,
-{
+impl BlockSerializer {
 	/// Serialize item to block.
-	pub fn serialize<T>(&self, item: &T) -> Result<Block<S>, BlockSerializerError>
+	pub fn serialize<T>(&self, item: &T) -> Result<Block, BlockSerializerError>
 	where
 		T: Serialize,
 	{
 		let data = to_cbor(item)?;
-		if S::MAX_BLOCK_SIZE < data.len() {
-			return Err(BlockSerializerError::BlockToLarge(S::MAX_BLOCK_SIZE, data.len()));
+		if let Some(max_block_size) = self.max_block_size {
+			if max_block_size < data.len() {
+				return Err(BlockSerializerError::BlockToLarge(max_block_size, data.len()));
+			}
 		}
 		Ok(Block::new_data(self.codec, data))
 	}
 
 	/// Deserialize block to item.
-	pub fn deserialize<'a, T>(&self, item: &'a Block<S>) -> Result<T, BlockSerializerError>
+	pub fn deserialize<'a, T>(&self, item: &'a Block) -> Result<T, BlockSerializerError>
 	where
 		T: serde::de::Deserialize<'a>,
 	{

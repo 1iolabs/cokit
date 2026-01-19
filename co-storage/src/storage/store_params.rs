@@ -1,46 +1,45 @@
 use crate::{BlockStat, BlockStorage, BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, StorageError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, MappedCid, StoreParams};
-use std::{collections::BTreeSet, marker::PhantomData};
+use co_primitives::{Block, BlockStorageCloneSettings, CloneWithBlockStorageSettings, MappedCid};
+use std::collections::BTreeSet;
 
 /// This storage implementation converts block storeparams.
 /// If an conversation is not possible `StorageError::InvalidArgument` is retuned.
 #[derive(Debug, Clone)]
-pub struct StoreParamsBlockStorage<S, P>
+pub struct StoreParamsBlockStorage<S>
 where
 	S: Clone,
 {
-	_p: PhantomData<P>,
 	next: S,
 	checked: bool,
+	max_block_size: usize,
 }
-impl<S, P> StoreParamsBlockStorage<S, P>
+impl<S> StoreParamsBlockStorage<S>
 where
 	S: Clone,
 {
-	pub fn new(next: S, checked: bool) -> Self {
-		Self { _p: Default::default(), next, checked }
+	pub fn new(next: S, checked: bool, max_block_size: usize) -> Self {
+		Self { next, checked, max_block_size }
 	}
 }
 #[async_trait]
-impl<S, P> BlockStorage for StoreParamsBlockStorage<S, P>
+impl<S> BlockStorage for StoreParamsBlockStorage<S>
 where
 	S: BlockStorage + Send + Sync + Clone,
-	P: StoreParams,
 {
-	type StoreParams = P;
-
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
-		let (cid, data) = self.next.get(cid).await?.into_inner();
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
+		let (cid, data) = self.next.get(cid).await?.with_block_max_size(self.max_block_size)?.into_inner();
 		match self.checked {
-			true => Ok(Block::new(cid, data).map_err(|e| StorageError::InvalidArgument(e.into()))?),
+			true => Ok(Block::new(cid, data)?),
 			false => Ok(Block::new_unchecked(cid, data)),
 		}
 	}
 
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
-		self.next.set(convert_block_store_params(block, self.checked)?).await
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
+		self.next
+			.set(if self.checked { block.with_block_max_size(self.max_block_size)? } else { block })
+			.await
 	}
 
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
@@ -50,16 +49,21 @@ where
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		self.next.stat(cid).await
 	}
+
+	fn max_block_size(&self) -> usize {
+		self.max_block_size
+	}
 }
 #[async_trait]
-impl<S, P> ExtendedBlockStorage for StoreParamsBlockStorage<S, P>
+impl<S> ExtendedBlockStorage for StoreParamsBlockStorage<S>
 where
 	S: ExtendedBlockStorage + Send + Sync + Clone,
-	P: StoreParams,
 {
-	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
-		let next_block =
-			ExtendedBlock { block: convert_block_store_params(block.block, self.checked)?, options: block.options };
+	async fn set_extended(&self, block: ExtendedBlock) -> Result<Cid, StorageError> {
+		let next_block = ExtendedBlock {
+			block: if self.checked { block.block.with_block_max_size(self.max_block_size)? } else { block.block },
+			options: block.options,
+		};
 		self.next.set_extended(next_block).await
 	}
 
@@ -71,20 +75,22 @@ where
 		self.next.clear().await
 	}
 }
-impl<S, P> CloneWithBlockStorageSettings for StoreParamsBlockStorage<S, P>
+impl<S> CloneWithBlockStorageSettings for StoreParamsBlockStorage<S>
 where
 	S: BlockStorage + CloneWithBlockStorageSettings,
-	P: Clone,
 {
-	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
-		Self { next: self.next.clone_with_settings(settings), checked: self.checked, _p: Default::default() }
+	fn clone_with_settings(&self, settings: BlockStorageCloneSettings) -> Self {
+		Self {
+			next: self.next.clone_with_settings(settings),
+			checked: self.checked,
+			max_block_size: self.max_block_size,
+		}
 	}
 }
 #[async_trait]
-impl<S, P> BlockStorageContentMapping for StoreParamsBlockStorage<S, P>
+impl<S> BlockStorageContentMapping for StoreParamsBlockStorage<S>
 where
 	S: BlockStorage + CloneWithBlockStorageSettings + BlockStorageContentMapping + 'static,
-	P: StoreParams,
 {
 	async fn is_content_mapped(&self) -> bool {
 		self.next.is_content_mapped().await
@@ -101,17 +107,4 @@ where
 	async fn insert_mappings(&self, mappings: BTreeSet<MappedCid>) {
 		self.next.insert_mappings(mappings).await
 	}
-}
-
-fn convert_block_store_params<I, O>(block: Block<I>, checked: bool) -> Result<Block<O>, StorageError>
-where
-	I: StoreParams,
-	O: StoreParams,
-{
-	let (cid, data) = block.into_inner();
-	let next_block: Block<O> = match checked {
-		true => Block::new(cid, data).map_err(|e| StorageError::InvalidArgument(e.into()))?,
-		false => Block::new_unchecked(cid, data),
-	};
-	Ok(next_block)
 }

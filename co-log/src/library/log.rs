@@ -131,7 +131,7 @@ impl Log {
 			next: self.heads().clone(),
 			refs: Default::default(),
 		};
-		let entry_block = EntryBlock::from_entry::<S::StoreParams, _>(identity, entry)?;
+		let entry_block = EntryBlock::from_entry(identity, entry)?;
 		let entry_cid = *entry_block.cid();
 
 		// set state

@@ -684,22 +684,22 @@ mod tests {
 		}
 	}
 	impl co_api::Storage for TestContext {
-		fn get(&self, cid: &Cid) -> Block<DefaultParams> {
+		fn get(&self, cid: &Cid) -> Block {
 			self.storage.borrow().get(cid).unwrap()
 		}
 
-		fn set(&mut self, block: Block<DefaultParams>) -> Cid {
+		fn set(&mut self, block: Block) -> Cid {
 			self.storage.borrow_mut().set(block).unwrap()
 		}
 	}
 	impl Storage for TestContext {
 		type StoreParams = DefaultParams;
 
-		fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+		fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 			self.storage.borrow().get(cid)
 		}
 
-		fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+		fn set(&mut self, block: Block) -> Result<Cid, StorageError> {
 			self.storage.borrow_mut().set(block)
 		}
 
