@@ -217,6 +217,11 @@ impl CreateAction {
 		self
 	}
 
+	pub fn with_guard(mut self, guard_name: String, guard: Guard) -> Self {
+		self.guards.insert(guard_name, guard);
+		self
+	}
+
 	pub fn with_participant(mut self, participant: Did, tags: Tags) -> Self {
 		self.participants.insert(
 			participant.clone(),

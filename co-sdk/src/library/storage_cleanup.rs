@@ -293,13 +293,9 @@ mod tests {
 		let co_state = co.reducer_state().await;
 		let external_co_state = co_state.to_external_force(&storage).await.unwrap();
 		tracing::trace!(?co_state, ?external_co_state, "test-state");
-		co.push(
-			&application.local_identity(),
-			CO_CORE_NAME_CO,
-			&CoAction::TagsInsert { tags: tags!("hello": "world") },
-		)
-		.await
-		.unwrap();
+		co.push(&identity, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("hello": "world") })
+			.await
+			.unwrap();
 		assert_eq!(count_pin_references(&local_co, co.id(), CoPinningKey::Root).await, 2); // this contains the intermediate point before pinning, the actual state before and the next intermediate point.
 
 		// only keep latest
@@ -315,7 +311,7 @@ mod tests {
 
 		// push
 		//  this will trigger the cleanup as the previous has set to one we not got items to remove
-		co.push(&application.local_identity(), CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("test": 123) })
+		co.push(&identity, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("test": 123) })
 			.await
 			.unwrap();
 		let next_co_state = co.reducer_state().await;

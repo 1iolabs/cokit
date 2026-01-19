@@ -1,13 +1,7 @@
-use super::{
-	co_context::CoContext,
-	identity::resolve_private_identity,
-	shared::{CreateCo, SharedCoCreator},
-	tracing::TracingBuilder,
-};
+use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo, tracing::TracingBuilder};
 use crate::{
 	library::wait_response::request_response, services::application::ApplicationMessage, Action, CoDate, CoReducer,
 	CoReducerFactory, CoStorage, CoUuid, Cores, DynamicCoDate, DynamicCoUuid, RandomCoUuid, Storage, SystemCoDate,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -141,36 +135,14 @@ impl Application {
 	}
 
 	/// Create a new CO.
-	///
-	/// TODO: Identity
-	/// TODO: The crator of the co should be added as first participant.
 	#[tracing::instrument(level = tracing::Level::TRACE,err, skip(self))]
 	pub async fn create_co<I>(&self, creator: I, create: CreateCo) -> Result<CoReducer, anyhow::Error>
 	where
 		I: PrivateIdentity + Clone + Debug + Send + Sync + 'static,
 	{
-		// local
 		let local = self.co_context.local_co_reducer().await?;
-
-		// create
-		let co = SharedCoCreator::new(local, create)
-			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_string())
-			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_string())
-			.create(
-				self.storage(),
-				self.context().inner.runtime(),
-				creator,
-				self.context().date().clone(),
-				self.context().uuid().clone(),
-				#[cfg(feature = "pinning")]
-				self.context().inner.create_pinning_context(),
-				#[cfg(feature = "pinning")]
-				Default::default(),
-			)
-			.await?;
-
-		// load
-		self.co().co_reducer(&co).await?.ok_or(anyhow!("Open CO failed: {}", co))
+		let co = self.context().inner.create_co(local, creator, create).await?;
+		self.context().co_reducer(&co).await?.ok_or(anyhow!("Open CO failed: {}", co))
 	}
 
 	/// Initialize application.

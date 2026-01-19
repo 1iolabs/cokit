@@ -2,7 +2,7 @@ use crate::{
 	application::{
 		application::ApplicationSettings,
 		identity::{create_identity_resolver, create_private_identity_resolver},
-		shared::SharedCoBuilder,
+		shared::{SharedCoBuilder, SharedCoCreator},
 	},
 	library::{builtin_cores::builtin_cores, shared_membership::shared_membership_active},
 	reducer::core_resolver::{dynamic::DynamicCoreResolver, guard::CoGuardResolver, log::LogCoreResolver},
@@ -11,8 +11,8 @@ use crate::{
 		reducers::{ReducerStorage, ReducersControl},
 	},
 	types::co_reducer_factory::CoReducerFactoryError,
-	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, DynamicCoDate, DynamicCoUuid, LocalCoBuilder,
-	Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoDate, DynamicCoUuid,
+	LocalCoBuilder, Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -444,6 +444,33 @@ impl CoContextInner {
 				.feature_co_storage_verify_links()
 				.then(|| self.block_links_builtin.clone()),
 		}
+	}
+
+	/// Create a new shared CO.
+	pub async fn create_co<I>(&self, parent: CoReducer, creator: I, create: CreateCo) -> Result<CoId, anyhow::Error>
+	where
+		I: PrivateIdentity + Clone + Debug + Send + Sync + 'static,
+	{
+		// create
+		let co = SharedCoCreator::new(parent, create)
+			.with_membership_core_name(CO_CORE_NAME_MEMBERSHIP.to_string())
+			.with_keystore_core_name(CO_CORE_NAME_KEYSTORE.to_string())
+			.create(
+				self.storage(),
+				self.runtime.clone(),
+				creator,
+				&self.cores,
+				self.date.clone(),
+				self.uuid.clone(),
+				#[cfg(feature = "pinning")]
+				self.create_pinning_context(),
+				#[cfg(feature = "pinning")]
+				Default::default(),
+			)
+			.await?;
+
+		// result
+		Ok(co)
 	}
 }
 impl From<CoContextInner> for CoContext {
