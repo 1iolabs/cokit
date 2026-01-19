@@ -7,7 +7,7 @@ mod types;
 pub use library::compile::compile_native;
 pub use library::{
 	api_context::ApiContext,
-	async_context::{AsyncBlockStorage, AsyncContext},
+	async_context::AsyncContext,
 	instance::RuntimeInstance,
 	module_description::ModuleDescription,
 	pool::{ExecuteError, IdleRuntimePool, RuntimePool},

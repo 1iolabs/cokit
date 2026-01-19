@@ -1,7 +1,7 @@
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoId, CoMap, CoSet, Did, Link, Network, OptionLink,
-	ReducerAction, SignedEntry, StorageError, Tags,
+	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoId, CoMap, CoSet, CoreBlockStorage, Did, Link, Network,
+	OptionLink, ReducerAction, SignedEntry, StorageError, Tags,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -64,14 +64,11 @@ impl Default for Co {
 		}
 	}
 }
-impl<S> Reducer<CoAction, S> for Co
-where
-	S: BlockStorage + Clone + 'static,
-{
+impl Reducer<CoAction> for Co {
 	async fn reduce(
 		state: OptionLink<Self>,
 		event: Link<ReducerAction<CoAction>>,
-		storage: &S,
+		storage: &CoreBlockStorage,
 	) -> Result<Link<Self>, anyhow::Error> {
 		let mut result = storage.get_value_or_default(&state).await?;
 		let event = storage.get_value(&event).await?;

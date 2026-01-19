@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use co_api::{
 	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoList, CoListTransaction, CoMap, CoMapTransaction, CoSet,
-	IsDefault, LazyTransaction, Link, OptionLink, ReducerAction, StorageError, Tags, WeakCid,
+	CoreBlockStorage, IsDefault, LazyTransaction, Link, OptionLink, ReducerAction, StorageError, Tags, WeakCid,
 };
 use futures::{pin_mut, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet};
@@ -338,11 +338,11 @@ impl Storage {
 		Ok(storage.set_value(&state).await?.into())
 	}
 }
-impl<S: BlockStorage + Clone + 'static> Reducer<StorageAction, S> for Storage {
+impl Reducer<StorageAction> for Storage {
 	async fn reduce(
 		state: OptionLink<Self>,
 		event: Link<ReducerAction<StorageAction>>,
-		storage: &S,
+		storage: &CoreBlockStorage,
 	) -> Result<Link<Self>, anyhow::Error> {
 		let event = storage.get_value(&event).await?;
 		let mut state = storage.get_value_or_default(&state).await?;
@@ -961,7 +961,9 @@ where
 mod tests {
 	use crate::{PinStrategy, References, Storage, StorageAction};
 	use cid::Cid;
-	use co_api::{async_api::Reducer, BlockSerializer, BlockStorageExt, OptionLink, ReducerAction, WeakCid};
+	use co_api::{
+		async_api::Reducer, BlockSerializer, BlockStorageExt, CoreBlockStorage, OptionLink, ReducerAction, WeakCid,
+	};
 	use co_storage::MemoryBlockStorage;
 	use futures::TryStreamExt;
 	use ipld_core::{ipld::Ipld, serde::to_ipld};
@@ -1009,7 +1011,7 @@ mod tests {
 		fn cid(s: &str) -> co_api::WeakCid {
 			Cid::from_str(s).unwrap().into()
 		}
-		let storage = MemoryBlockStorage::default();
+		let storage = CoreBlockStorage::new(MemoryBlockStorage::default(), true);
 
 		// actions
 		let actions = [
@@ -1159,7 +1161,7 @@ mod tests {
 		fn action(s: StorageAction) -> ReducerAction<StorageAction> {
 			ReducerAction { from: "did:local:device".into(), time: 0, core: "storage".into(), payload: s }
 		}
-		let storage = MemoryBlockStorage::default();
+		let storage = CoreBlockStorage::new(MemoryBlockStorage::default(), true);
 
 		// actions
 		let actions = [

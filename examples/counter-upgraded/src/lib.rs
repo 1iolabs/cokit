@@ -1,4 +1,4 @@
-use co_api::{async_api::Reducer, BlockStorage, BlockStorageExt, Link, OptionLink, ReducerAction};
+use co_api::{async_api::Reducer, BlockStorage, BlockStorageExt, CoreBlockStorage, Link, OptionLink, ReducerAction};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::future::Future;
 
@@ -22,11 +22,11 @@ pub enum CounterAction {
 	MigrateFromV1,
 }
 
-impl<S: BlockStorage + Clone + 'static> Reducer<CounterAction, S> for Counter {
+impl Reducer<CounterAction> for Counter {
 	async fn reduce(
 		state: OptionLink<Self>,
 		event: Link<ReducerAction<CounterAction>>,
-		storage: &S,
+		storage: &CoreBlockStorage,
 	) -> Result<Link<Self>, anyhow::Error> {
 		let event = storage.get_value(&event).await?;
 		match event.payload {

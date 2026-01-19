@@ -1,30 +1,24 @@
-use crate::{
-	async_api::Context,
-	library::{wasm_context::WasmContext, wasm_storage::WasmStorage},
-	Guard,
-};
-use co_primitives::{from_cbor, BlockStorage, BlockStorageExt, DiagnosticMessage, GuardVerifyPayload};
+use crate::{async_api::Context, library::wasm_context::WasmContext, CoreBlockStorage, Guard};
+use co_primitives::{from_cbor, BlockStorageExt, DiagnosticMessage, GuardVerifyPayload};
 use futures::{executor::LocalPool, task::LocalSpawnExt};
 
 pub fn guard<R>() -> bool
 where
-	R: Guard<WasmStorage>,
+	R: Guard<CoreBlockStorage>,
 {
-	let context = WasmContext::new();
-	guard_with_context::<WasmStorage, WasmContext, R>(context)
+	guard_with_context::<_, R>(WasmContext::new())
 }
 
-pub fn guard_with_context<S, C, R>(mut context: C) -> bool
+pub fn guard_with_context<C, R>(mut context: C) -> bool
 where
-	S: BlockStorage + Clone + 'static,
-	C: Context<S> + 'static,
-	R: Guard<S>,
+	C: Context + 'static,
+	R: Guard<CoreBlockStorage>,
 {
 	let mut pool = LocalPool::new();
 	let handle = pool
 		.spawner()
 		.spawn_local_with_handle(async move {
-			match guard_execute_with_context::<S, C, R>(&context).await {
+			match guard_execute_with_context::<C, R>(&context).await {
 				Ok(result) => result,
 				Err(err) => {
 					let cid = context
@@ -41,11 +35,10 @@ where
 	pool.run_until(handle)
 }
 
-pub async fn guard_execute_with_context<S, C, R>(context: &C) -> Result<bool, anyhow::Error>
+pub async fn guard_execute_with_context<C, R>(context: &C) -> Result<bool, anyhow::Error>
 where
-	S: BlockStorage + Clone + 'static,
-	C: Context<S> + 'static,
-	R: Guard<S>,
+	C: Context + 'static,
+	R: Guard<CoreBlockStorage>,
 {
 	let payload = context.payload();
 	let guard_payload: GuardVerifyPayload = from_cbor(&payload)?;

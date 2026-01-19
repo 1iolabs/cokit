@@ -56,6 +56,12 @@ impl Block {
 		(self.cid, self.data)
 	}
 
+	/// Block with verified hash.
+	pub fn with_verify(self) -> Result<Block, BlockError> {
+		verify_cid::<multihash_codetable::Code, 64>(&self.cid, &self.data)?;
+		Ok(self)
+	}
+
 	/// Block with specific store params.
 	pub fn with_store_params<P: StoreParams>(self) -> Result<Block, BlockError> {
 		self.with_block_max_size(P::MAX_BLOCK_SIZE)

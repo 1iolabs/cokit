@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
 	async_api::Reducer, co_data, co_state, BlockStorage, BlockStorageExt, CoList, CoListIndex, CoMap, CoTryStreamExt,
-	IsDefault, LazyTransaction, Link, OptionLink, ReducerAction, Tags,
+	CoreBlockStorage, IsDefault, LazyTransaction, Link, OptionLink, ReducerAction, Tags,
 };
 use futures::{pin_mut, TryStreamExt};
 use std::future::ready;
@@ -51,14 +51,11 @@ pub struct Board {
 	#[serde(rename = "i", default, skip_serializing_if = "CoMap::is_empty")]
 	pub tasks: CoMap<TaskId, Task>,
 }
-impl<S> Reducer<BoardAction, S> for Board
-where
-	S: BlockStorage + Clone + 'static,
-{
+impl Reducer<BoardAction> for Board {
 	async fn reduce(
 		state_link: OptionLink<Self>,
 		event_link: Link<ReducerAction<BoardAction>>,
-		storage: &S,
+		storage: &CoreBlockStorage,
 	) -> Result<Link<Self>, anyhow::Error> {
 		let event = storage.get_value(&event_link).await?;
 		let mut state = storage.get_value_or_default(&state_link).await?;
