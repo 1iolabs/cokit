@@ -3,7 +3,8 @@ use co_core_co::CoAction;
 use co_runtime::Core;
 use co_sdk::{
 	build_core, crate_repository_path, Application, ApplicationBuilder, BuildCoreArtifact, CoId, CoReducerFactory,
-	CreateCo, DidKeyIdentity, DidKeyProvider, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+	CreateCo, DidKeyIdentity, DidKeyProvider, PrivateIdentity, PrivateIdentityBox, CO_CORE_NAME_CO,
+	CO_CORE_NAME_KEYSTORE,
 };
 use co_storage::MemoryBlockStorage;
 use co_test::TmpDir;
@@ -21,7 +22,7 @@ async fn build_counter(native: bool) -> (Cid, Core, BuildCoreArtifact) {
 	(counter, if native { native_counter } else { Core::Wasm(counter) }, counter_artifact)
 }
 
-async fn setup_memory(public: bool) -> Application {
+async fn setup_memory(public: bool) -> (Application, PrivateIdentityBox) {
 	// core
 	let (counter, counter_core, counter_artifact) = build_counter(true).await;
 
@@ -53,10 +54,10 @@ async fn setup_memory(public: bool) -> Application {
 	.unwrap();
 
 	// result
-	application
+	(application, identity.boxed())
 }
 
-async fn setup_file(public: bool) -> (Application, TmpDir) {
+async fn setup_file(public: bool) -> (Application, PrivateIdentityBox, TmpDir) {
 	let tmp = TmpDir::new("co");
 	let application = ApplicationBuilder::new_with_path("test", tmp.path().to_owned())
 		.without_keychain()
@@ -91,49 +92,51 @@ async fn setup_file(public: bool) -> (Application, TmpDir) {
 	.unwrap();
 
 	// result
-	(application, tmp)
+	(application, identity.boxed(), tmp)
 }
 
-async fn shared_push(co_id: CoId, application: Application) {
+async fn shared_push(co_id: CoId, application: Application, identity: PrivateIdentityBox) {
 	let co = application.context().try_co_reducer(&co_id).await.unwrap();
-	co.push(&application.local_identity(), "counter", &CounterAction::Increment(1))
-		.await
-		.unwrap();
+	co.push(&identity, "counter", &CounterAction::Increment(1)).await.unwrap();
 }
 
 fn benchmark(c: &mut Criterion) {
 	let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
-	let application = runtime.block_on(setup_memory(false));
+	let (application, identity) = runtime.block_on(setup_memory(false));
 	let co_id = CoId::from("shared");
 	c.bench_function("shared_push", move |b| {
-		b.to_async(&runtime).iter(|| shared_push(co_id.clone(), application.clone()))
+		b.to_async(&runtime)
+			.iter(|| shared_push(co_id.clone(), application.clone(), identity.clone()))
 	});
 }
 
 fn public_benchmark(c: &mut Criterion) {
 	let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
-	let application = runtime.block_on(setup_memory(true));
+	let (application, identity) = runtime.block_on(setup_memory(true));
 	let co_id = CoId::from("shared");
 	c.bench_function("shared_push (public)", move |b| {
-		b.to_async(&runtime).iter(|| shared_push(co_id.clone(), application.clone()))
+		b.to_async(&runtime)
+			.iter(|| shared_push(co_id.clone(), application.clone(), identity.clone()))
 	});
 }
 
 fn file_benchmark(c: &mut Criterion) {
 	let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
-	let (application, _tmp) = runtime.block_on(setup_file(false));
+	let (application, identity, _tmp) = runtime.block_on(setup_file(false));
 	let co_id = CoId::from("shared");
 	c.bench_function("shared_push (file)", move |b| {
-		b.to_async(&runtime).iter(|| shared_push(co_id.clone(), application.clone()))
+		b.to_async(&runtime)
+			.iter(|| shared_push(co_id.clone(), application.clone(), identity.clone()))
 	});
 }
 
 fn file_public_benchmark(c: &mut Criterion) {
 	let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
-	let (application, _tmp) = runtime.block_on(setup_file(true));
+	let (application, identity, _tmp) = runtime.block_on(setup_file(true));
 	let co_id = CoId::from("shared");
 	c.bench_function("shared_push (file; public)", move |b| {
-		b.to_async(&runtime).iter(|| shared_push(co_id.clone(), application.clone()))
+		b.to_async(&runtime)
+			.iter(|| shared_push(co_id.clone(), application.clone(), identity.clone()))
 	});
 }
 
