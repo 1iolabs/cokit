@@ -1,10 +1,10 @@
-use crate::{async_api::Context, library::wasm_context::WasmContext, CoreBlockStorage, Guard};
+use crate::{async_api::Context, library::wasm_context::WasmContext, Guard};
 use co_primitives::{from_cbor, BlockStorageExt, DiagnosticMessage, GuardVerifyPayload};
 use futures::{executor::LocalPool, task::LocalSpawnExt};
 
 pub fn guard<R>() -> bool
 where
-	R: Guard<CoreBlockStorage>,
+	R: Guard,
 {
 	guard_with_context::<_, R>(WasmContext::new())
 }
@@ -12,7 +12,7 @@ where
 pub fn guard_with_context<C, R>(mut context: C) -> bool
 where
 	C: Context + 'static,
-	R: Guard<CoreBlockStorage>,
+	R: Guard,
 {
 	let mut pool = LocalPool::new();
 	let handle = pool
@@ -38,7 +38,7 @@ where
 pub async fn guard_execute_with_context<C, R>(context: &C) -> Result<bool, anyhow::Error>
 where
 	C: Context + 'static,
-	R: Guard<CoreBlockStorage>,
+	R: Guard,
 {
 	let payload = context.payload();
 	let guard_payload: GuardVerifyPayload = from_cbor(&payload)?;

@@ -173,12 +173,9 @@ impl Reducer<AuthorityAction> for Authority {
 		Ok(storage.set_value(&state).await?)
 	}
 }
-impl<S> Guard<S> for Authority
-where
-	S: BlockStorage + Clone + 'static,
-{
+impl Guard for Authority {
 	async fn verify(
-		storage: &S,
+		storage: &CoreBlockStorage,
 		guard: String,
 		state: Cid,
 		_heads: BTreeSet<Cid>,

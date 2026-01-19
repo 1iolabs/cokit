@@ -3,6 +3,7 @@ use co_api::{
 	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoId, CoMap, CoSet, CoreBlockStorage, Did, Link, Network,
 	OptionLink, ReducerAction, SignedEntry, StorageError, Tags,
 };
+use serde::de::IgnoredAny;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[co(state, guard, no_default)]
@@ -77,23 +78,40 @@ impl Reducer<CoAction> for Co {
 		Ok(state)
 	}
 }
-impl<S: BlockStorage + Clone + 'static> co_api::Guard<S> for Co {
-	/// Test if next_head creator is a participant with access.
+impl co_api::Guard for Co {
+	/// Test:
+	/// - the specified core exists.
+	/// - if next_head creator is a participant with access.
 	async fn verify(
-		storage: &S,
+		storage: &CoreBlockStorage,
 		_guard: String,
 		state: Cid,
 		_heads: BTreeSet<Cid>,
 		next_head: Cid,
 	) -> Result<bool, anyhow::Error> {
 		let next_entry: SignedEntry = storage.get_deserialized(&next_head).await?;
-		let participant = next_entry.identity;
 		let co: Co = storage.get_deserialized(&state).await?;
-		if let Some(participant) = co.participants.get(storage, &participant).await? {
-			Ok(participant.state.has_access())
+
+		// participant
+		let participant = next_entry.identity;
+		let has_access = if let Some(participant) = co.participants.get(storage, &participant).await? {
+			participant.state.has_access()
 		} else {
-			Ok(false)
+			false
+		};
+		if !has_access {
+			return Ok(false);
 		}
+
+		// core
+		let action: ReducerAction<IgnoredAny> = storage.get_deserialized(&next_entry.entry.payload).await?;
+		let has_core = action.core == "co" || co.cores.contains_key(&action.core);
+		if !has_core {
+			return Ok(false);
+		}
+
+		// ok
+		Ok(true)
 	}
 }
 
