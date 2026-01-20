@@ -88,6 +88,7 @@ async function test_co_map() {
   // test get
   assertEq(await map.get(storage, "hello"), "world");
   assertEq(await map.get(storage, "none"), undefined);
+
   // test transaction
   let transaction = await map.open(storage);
   await transaction.insert("trans", "action");
@@ -106,8 +107,8 @@ async function test_co_map() {
   const newMap = await transaction.store();
   await map.commit(transaction);
   assertEq(
-    await map.contains_key(storage, "trans"),
-    await newMap.contains_key(storage, "trans"),
+    CID.decode(newMap.cid()).toString(),
+    CID.decode(map.cid()).toString(),
   );
 }
 
@@ -135,6 +136,26 @@ async function test_co_set() {
   assertEq(await set.remove(storage, "hello"), true);
   assertEq(await set.remove(storage, "hello"), false);
   assertEq(await set.contains(storage, "hello"), false);
+
+  // test transaction
+  const transaction = await set.open(storage);
+  await transaction.insert("hello");
+  values = [];
+  const transactionStream = transaction.stream();
+  for await (const i of transactionStream) {
+    values.push(i);
+  }
+  assertEq(values[0], "hello");
+  assertEq(values[1], "world");
+  assertEq(await transaction.remove("world"), true);
+  assertEq(await transaction.remove("world"), false);
+  assertEq(await transaction.contains("world"), false);
+  let newSet = await transaction.store();
+  await set.commit(transaction);
+  assertEq(
+    CID.decode(newSet.cid()).toString(),
+    CID.decode(set.cid()).toString(),
+  );
 }
 
 async function test_co_list() {

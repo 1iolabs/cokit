@@ -1,6 +1,7 @@
 use crate::{from_js_value, to_js_value, JsBlockStorage};
 use cid::Cid;
-use co_primitives::{CoSet, TagValue};
+use co_primitives::{CoSet, CoSetTransaction, TagValue};
+use futures::TryFutureExt;
 use wasm_bindgen::prelude::*;
 use web_sys::js_sys::Boolean;
 
@@ -26,6 +27,22 @@ impl JsCoSet {
 		self.set().is_empty()
 	}
 
+	pub async fn open(&self, storage: &JsBlockStorage) -> Result<JsCoSetTransaction, JsValue> {
+		let transaction = self
+			.set()
+			.open(storage)
+			.await
+			.map_err(|err| format!("Open failed: {:?}", err))?;
+		Ok(JsCoSetTransaction(transaction))
+	}
+	pub async fn commit(&mut self, transaction: JsCoSetTransaction) -> Result<(), JsValue> {
+		let mut set = self.set();
+		set.commit(transaction.0)
+			.await
+			.map_err(|err| format!("Commit failed: {:?}", err))?;
+		self.root = Into::<Option<Cid>>::into(&set);
+		Ok(())
+	}
 	pub async fn contains(&self, storage: &JsBlockStorage, value: JsValue) -> Result<bool, JsValue> {
 		let set = self
 			.set()
@@ -52,7 +69,7 @@ impl JsCoSet {
 		Ok(())
 	}
 
-	pub async fn remove(&mut self, storage: &JsBlockStorage, value: JsValue) -> Result<Boolean, JsValue> {
+	pub async fn remove(&mut self, storage: &JsBlockStorage, value: JsValue) -> Result<bool, JsValue> {
 		let mut set = self
 			.set()
 			.open(storage)
@@ -62,7 +79,7 @@ impl JsCoSet {
 		let removed = set.remove(value).await.map_err(|err| format!("remove failed: {:?}", err))?;
 		let set = set.store().await.map_err(|err| format!("store failed: {:?}", err))?;
 		self.root = Into::<Option<Cid>>::into(&set);
-		Ok(Boolean::from(removed))
+		Ok(removed)
 	}
 
 	pub fn stream(&self, storage: &JsBlockStorage) -> web_sys::ReadableStream {
@@ -82,6 +99,7 @@ impl JsCoSet {
 		wasm_streams::ReadableStream::from_stream(stream).into_raw()
 	}
 
+	#[wasm_bindgen(unchecked_return_type = "UInt8Array | undefined")]
 	pub fn cid(&self) -> Result<JsValue, JsValue> {
 		match &self.root {
 			None => Ok(JsValue::null()),
@@ -92,5 +110,50 @@ impl JsCoSet {
 impl JsCoSet {
 	fn set(&self) -> CoSet<TagValue> {
 		CoSet::from(self.root)
+	}
+}
+impl From<Option<Cid>> for JsCoSet {
+	fn from(value: Option<Cid>) -> Self {
+		Self { root: value }
+	}
+}
+
+#[wasm_bindgen(js_name = "CoSetTransaction")]
+pub struct JsCoSetTransaction(CoSetTransaction<JsBlockStorage, TagValue>);
+
+#[wasm_bindgen(js_class = "CoSetTransaction")]
+impl JsCoSetTransaction {
+	pub async fn store(&mut self) -> Result<JsCoSet, JsValue> {
+		let co_set = self.0.store().await.map_err(|err| format!("Store failed: {:?}", err))?;
+		Ok(Into::<Option<Cid>>::into(&co_set).into())
+	}
+	pub async fn contains(&self, key: JsValue) -> Result<bool, JsValue> {
+		let key: TagValue = from_js_value(key)?;
+		Ok(self
+			.0
+			.contains(&key)
+			.await
+			.map_err(|err| format!("Contains failed: {:?}", err))?)
+	}
+	pub async fn insert(&mut self, key: JsValue) -> Result<(), JsValue> {
+		let key: TagValue = from_js_value(key)?;
+		Ok(self.0.insert(key).await.map_err(|err| format!("Insert failed: {:?}", err))?)
+	}
+	pub async fn remove(&mut self, key: JsValue) -> Result<bool, JsValue> {
+		let key: TagValue = from_js_value(key)?;
+		Ok(self.0.remove(key).await.map_err(|err| format!("Remove failed: {:?}", err))?)
+	}
+	pub fn stream(&self) -> web_sys::ReadableStream {
+		let transaction = self.0.clone();
+		let stream = async_stream::try_stream! {
+			let stream = transaction.stream();
+			for await item in stream {
+				let value = item
+					.map_err(|err| format!("read failed: {:?}", err))?;
+					let js_value = to_js_value(&value)?;
+				yield js_value;
+			}
+		};
+		wasm_streams::ReadableStream::from_stream(stream).into_raw()
 	}
 }
