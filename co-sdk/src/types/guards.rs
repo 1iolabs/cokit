@@ -82,8 +82,8 @@ impl Default for Guards {
 fn get_native_opt(name: &str) -> Option<GuardReference> {
 	#[cfg(feature = "bundle-wasm-cores")]
 	match name {
-		CO_CORE_CO => Cores::default().binary(name),
-		CO_CORE_POA => Cores::default().binary(name),
+		CO_CORE_CO => Some(get_from_core(name)),
+		CO_CORE_POA => Some(get_from_core(name)),
 		_ => None,
 	}
 
@@ -98,5 +98,18 @@ fn get_native(name: &str) -> GuardReference {
 	match get_native_opt(name) {
 		Some(i) => i,
 		None => panic!("unknown native guard name: {}", name),
+	}
+}
+
+#[cfg(feature = "bundle-wasm-cores")]
+fn get_from_core(name: &str) -> GuardReference {
+	let (_cid, core) = Cores::default()
+		.built_in_by_name(name)
+		.ok_or(anyhow::anyhow!("unknown native guard name: {}", name))
+		.expect("buildin core");
+	match core {
+		Core::Wasm(cid) => GuardReference::Wasm(cid),
+		Core::Binary(binary) => GuardReference::Binary(binary),
+		_ => panic!("native is not allowed with bundle-wasm-cores"),
 	}
 }
