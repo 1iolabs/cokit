@@ -121,7 +121,7 @@ impl Cores {
 /// # Note
 /// When changing this you have to run `co core build builtin` to get a new `Cargo.toml`
 fn get_native(name: &str) -> Core {
-	#[cfg(feature = "bundle-wasm-cores")]
+	#[cfg(all(feature = "bundle-wasm-cores", not(clippy)))]
 	macro_rules! include_prebuild_core {
 		($name:literal) => {
 			Core::Binary(
@@ -132,6 +132,12 @@ fn get_native(name: &str) -> Core {
 				))))
 				.expect("to decode"),
 			)
+		};
+	}
+	#[cfg(all(feature = "bundle-wasm-cores", clippy))]
+	macro_rules! include_prebuild_core {
+		($name:literal) => {
+			Core::Binary(Vec::new())
 		};
 	}
 	#[cfg(feature = "bundle-wasm-cores")]

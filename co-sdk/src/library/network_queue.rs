@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use co_core_board::{Board, BoardAction, List, Task, TaskLock};
-use co_core_co::{Co, CoAction};
+use co_core_co::Co;
 use co_identity::{LocalIdentity, PrivateIdentityBox};
 use co_primitives::{tag, tags, Block, CoId, CoreName};
 use co_storage::{BlockStorage, BlockStorageExt};
