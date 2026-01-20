@@ -42,6 +42,7 @@ pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, Runti
 pub use co_storage::BlockStorageContentMapping;
 pub use library::{
 	build_core::{build_core, crate_repository_path, BuildCoreArtifact},
+	core_source::CoreSource,
 	did_key_provider::DidKeyProvider,
 	find_co_by_pin::find_co_by_pin,
 	find_co_identities::{find_co_identities, find_co_private_identity},

@@ -2,7 +2,7 @@ use super::identity::create_identity_resolver;
 use crate::{
 	find_membership,
 	library::{
-		builtin_cores::builtin_cores, find_co_secret::find_co_secret_by_reference,
+		builtin_cores::builtin_cores, core_source::CoreSource, find_co_secret::find_co_secret_by_reference,
 		is_membership_heads_encrypted::is_membership_heads_encrypted, membership_all_heads::membership_all_heads,
 		wait_response::request_response_timeout,
 	},
@@ -25,17 +25,15 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::ActorHandle;
-use co_core_co::{CoAction, Core, CreateAction, Guard};
+use co_core_co::{CoAction, CreateAction};
 use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::{IdentityEntryVerifier, Log};
 use co_primitives::{
-	tags, unixfs_add, AnyBlockStorage, BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId,
-	OptionMappedCid, Tags,
+	tags, BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, Tags,
 };
 use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret};
-use futures::io::Cursor;
 use serde::{Deserialize, Serialize};
 use std::{
 	collections::{BTreeMap, BTreeSet},
@@ -358,8 +356,8 @@ pub struct CreateCo {
 	id: CoId,
 	name: String,
 	algorithm: Option<Algorithm>,
-	cores: BTreeMap<String, CoreSource>,
-	guards: BTreeMap<String, CoreSource>,
+	cores: BTreeMap<String, (CoreSource, Tags)>,
+	guards: BTreeMap<String, (CoreSource, Tags)>,
 }
 impl CreateCo {
 	pub fn new(id: impl Into<CoId>, name: Option<String>) -> Self {
@@ -399,13 +397,13 @@ impl CreateCo {
 
 	pub fn with_core(mut self, core_name: &str, core_type: &str, core_binary: Cid) -> Self {
 		self.cores
-			.insert(core_name.to_owned(), CoreSource::Reference(tags!("type": core_type), core_binary));
+			.insert(core_name.to_owned(), (CoreSource::Reference(core_binary), tags!("type": core_type)));
 		self
 	}
 
 	pub fn with_core_bytes(mut self, core_name: &str, core_type: &str, core_binary: impl Into<Vec<u8>>) -> Self {
 		self.cores
-			.insert(core_name.to_owned(), CoreSource::Bytes(tags!("type": core_type), core_binary.into()));
+			.insert(core_name.to_owned(), (CoreSource::Bytes(core_binary.into()), tags!("type": core_type)));
 		self
 	}
 
@@ -415,20 +413,22 @@ impl CreateCo {
 	}
 
 	pub fn with_co_guard(mut self) -> Self {
-		self.guards
-			.insert(CO_CORE_NAME_CO.to_string(), CoreSource::Builtin(tags!("type": CO_CORE_CO), CO_CORE_CO.to_owned()));
+		self.guards.insert(
+			CO_CORE_NAME_CO.to_string(),
+			(CoreSource::Builtin(CO_CORE_CO.to_owned()), tags!("type": CO_CORE_CO)),
+		);
 		self
 	}
 
 	pub fn with_guard(mut self, guard_name: &str, guard_type: &str, guard_binary: Cid) -> Self {
 		self.guards
-			.insert(guard_name.to_owned(), CoreSource::Reference(tags!("type": guard_type), guard_binary));
+			.insert(guard_name.to_owned(), (CoreSource::Reference(guard_binary), tags!("type": guard_type)));
 		self
 	}
 
 	pub fn with_guard_bytes(mut self, guard_name: &str, guard_type: &str, guard_binary: impl Into<Vec<u8>>) -> Self {
 		self.guards
-			.insert(guard_name.to_owned(), CoreSource::Bytes(tags!("type": guard_type), guard_binary.into()));
+			.insert(guard_name.to_owned(), (CoreSource::Bytes(guard_binary.into()), tags!("type": guard_type)));
 		self
 	}
 
@@ -443,31 +443,6 @@ impl CreateCo {
 
 	pub fn with_public(self, public: bool) -> Self {
 		self.with_algorithm(if public { None } else { Some(Algorithm::default()) })
-	}
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum CoreSource {
-	Builtin(Tags, String),
-	Reference(Tags, Cid),
-	Bytes(Tags, Vec<u8>),
-}
-impl CoreSource {
-	async fn binary(&self, storage: &impl AnyBlockStorage, cores: &Cores) -> Result<(Cid, Tags), anyhow::Error> {
-		Ok(match self {
-			CoreSource::Reference(tags, binary) => (*binary, tags.clone()),
-			CoreSource::Bytes(tags, binary_bytes) => {
-				let mut binary_stream = Cursor::new(&binary_bytes);
-				let binary = unixfs_add(storage, &mut binary_stream)
-					.await?
-					.pop()
-					.ok_or(anyhow!("Add Core binary failed {}", binary_bytes.len()))?;
-				(binary, tags.clone())
-			},
-			CoreSource::Builtin(tags, name) => {
-				(cores.binary(name).ok_or(anyhow!("Unknown built-in core: {}", name))?, tags.clone())
-			},
-		})
 	}
 }
 
@@ -606,8 +581,8 @@ impl SharedCoCreator {
 		self,
 		storage: CoStorage,
 		runtime: Runtime,
-		identity: I,
 		cores: &Cores,
+		identity: I,
 		date: impl CoDate,
 		uuid: impl CoUuid,
 		#[cfg(feature = "pinning")] pinning: crate::library::storage_pinning::StoragePinningContext,
@@ -656,17 +631,15 @@ impl SharedCoCreator {
 		let mut create = CreateAction::new(
 			self.co.id.to_owned(),
 			self.co.name.to_owned(),
-			Cores::default().binary(CO_CORE_CO).expect(CO_CORE_CO),
+			CoreSource::built_in(CO_CORE_CO).binary(&storage, cores).await?,
 		)
 		.with_participant(identity.identity().to_owned(), tags!())
 		.with_key(encrypted_storage.as_ref().map(|(_, key_uri, _)| key_uri.clone()));
-		for (core_name, core_source) in self.co.cores {
-			let (binary, tags) = core_source.binary(&co_storage, cores).await?;
-			create = create.with_core(core_name, Core { binary, tags, state: Default::default() });
+		for (core_name, (core_source, tags)) in self.co.cores {
+			create = create.with_core(core_name, core_source.to_core(&co_storage, cores, tags).await?);
 		}
-		for (guard_name, guard_source) in self.co.guards {
-			let (binary, tags) = guard_source.binary(&co_storage, cores).await?;
-			create = create.with_guard(guard_name, Guard { binary, tags });
+		for (guard_name, (guard_source, tags)) in self.co.guards {
+			create = create.with_guard(guard_name, guard_source.to_guard(&co_storage, cores, tags).await?);
 		}
 		reducer
 			.push(&co_storage, runtime.runtime(), &identity, CO_CORE_NAME_CO, &CoAction::Create(create))

@@ -48,6 +48,7 @@ where
 				let valid = runtime
 					.execute_guard(
 						storage,
+						&guard.binary,
 						&guard_reference,
 						RuntimeContext::new_payload(&GuardVerifyPayload {
 							guard: guard_name.clone(),

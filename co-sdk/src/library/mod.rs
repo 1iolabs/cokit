@@ -3,6 +3,7 @@ pub mod build_core;
 pub mod builtin_cores;
 pub mod cancel;
 pub mod connections_peer_provider;
+pub mod core_source;
 pub mod create_reducer_action;
 #[cfg(feature = "pinning")]
 pub mod create_storage_core_state;

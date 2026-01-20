@@ -2,7 +2,7 @@ use crate::{
 	services::application::{CoDidCommSendAction, HeadsMessageReceivedAction},
 	state::{self, query_core, QueryExt},
 	types::cores::CO_CORE_BOARD,
-	Action, CoContext, CoReducer, Cores, CO_CORE_NAME_CO,
+	Action, CoContext, CoReducer, CoreSource, Cores, CO_CORE_NAME_CO,
 };
 use anyhow::anyhow;
 use co_core_board::{Board, BoardAction, List, Task, TaskLock};
@@ -42,7 +42,7 @@ pub async fn network_queue_message(context: &CoContext, mut message: CoDidCommSe
 
 	// create core
 	let (storage, co) = local_co.co().await?;
-	ensure_network_queue_core(&local_co, &identity, co).await?;
+	ensure_network_queue_core(context.cores(), &local_co, &identity, co).await?;
 
 	// setup task id
 	let task_id = message.message_header.id.clone();
@@ -81,7 +81,7 @@ pub async fn network_queue_heads(
 
 	// create core
 	let (storage, co) = local_co.co().await?;
-	ensure_network_queue_core(&local_co, &identity, co).await?;
+	ensure_network_queue_core(context.cores(), &local_co, &identity, co).await?;
 
 	// setup task id
 	//  TODO: SECURITY: we should not trust the task_id is random as is supplied from the network participant
@@ -125,7 +125,7 @@ pub async fn network_queue_task(
 
 	// create core
 	let (storage, co) = local_co.co().await?;
-	ensure_network_queue_core(&local_co, &identity, co).await?;
+	ensure_network_queue_core(context.cores(), &local_co, &identity, co).await?;
 
 	// insert message
 	let payload = Some(storage.set(task).await?);
@@ -363,6 +363,7 @@ pub fn network_queue_backlog(
 
 /// Create `network_queue` core if not exists yet.
 async fn ensure_network_queue_core(
+	cores: &Cores,
 	local_co: &CoReducer,
 	identity: &LocalIdentity,
 	co: Co,
@@ -372,11 +373,14 @@ async fn ensure_network_queue_core(
 			.push(
 				identity,
 				CO_CORE_NAME_CO,
-				&CoAction::CoreCreate {
-					core: CO_CORE_NAME_NETWORK_QUEUE.to_string(),
-					binary: Cores::default().binary(CO_CORE_BOARD).expect(CO_CORE_BOARD),
-					tags: tags!( "core": CO_CORE_BOARD ),
-				},
+				&CoreSource::built_in(CO_CORE_BOARD)
+					.to_core_create(
+						&local_co.storage(),
+						cores,
+						CO_CORE_NAME_NETWORK_QUEUE,
+						tags!( "core": CO_CORE_BOARD ),
+					)
+					.await?,
 			)
 			.await?;
 		local_co

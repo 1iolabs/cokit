@@ -2,6 +2,7 @@ use crate::{
 	application::application::ApplicationSettings,
 	library::{
 		builtin_cores::builtin_cores,
+		core_source::CoreSource,
 		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
 		locals::{ApplicationLocal, FileLocals, Locals, MemoryLocals},
 	},
@@ -70,6 +71,7 @@ impl LocalCoBuilder {
 		self,
 		storage: CoStorage,
 		runtime: Runtime,
+		cores: &Cores,
 		shutdown: CancellationToken,
 		tasks: TaskSpawner,
 		core_resolver: R,
@@ -103,6 +105,7 @@ impl LocalCoBuilder {
 				let locals = FileLocals::new(config_path.to_owned(), self.settings.identifier.clone(), true)?;
 				Ok(LocalCoInstance::create(
 					runtime,
+					cores,
 					self,
 					storage,
 					shutdown,
@@ -123,6 +126,7 @@ impl LocalCoBuilder {
 				let locals = MemoryLocals::new(None);
 				Ok(LocalCoInstance::create(
 					runtime,
+					cores,
 					self,
 					storage,
 					shutdown,
@@ -164,6 +168,7 @@ where
 	#[allow(clippy::too_many_arguments)]
 	async fn create<R>(
 		runtime: Runtime,
+		cores: &Cores,
 		local_co: LocalCoBuilder,
 		storage: CoStorage,
 		shutdown: CancellationToken,
@@ -256,7 +261,7 @@ where
 
 		// setup
 		if initial {
-			setup_local_co(&co_reducer, &local_co.identity, &local_co.settings).await?;
+			setup_local_co(&co_reducer, &local_co.identity, &local_co.settings, cores).await?;
 		}
 
 		// watch
@@ -535,28 +540,27 @@ async fn setup_local_co(
 	reducer: &CoReducer,
 	identity: &LocalIdentity,
 	settings: &ApplicationSettings,
+	cores: &Cores,
 ) -> Result<(), anyhow::Error> {
+	let storage = reducer.storage();
+
 	// create
 	let create = co_core_co::CreateAction::new(
 		CO_ID_LOCAL.into(),
 		CO_ID_LOCAL.to_owned(),
-		Cores::default().binary(CO_CORE_CO).expect(CO_CORE_CO),
+		CoreSource::built_in(CO_CORE_CO).binary(&storage, cores).await?,
 	)
 	.with_core(
 		CO_CORE_NAME_MEMBERSHIP.to_string(),
-		co_core_co::Core {
-			binary: Cores::default().binary(CO_CORE_MEMBERSHIP).expect(CO_CORE_MEMBERSHIP),
-			tags: tags!( "core": CO_CORE_MEMBERSHIP ),
-			state: None,
-		},
+		CoreSource::built_in(CO_CORE_MEMBERSHIP)
+			.to_core(&storage, cores, tags!( "core": CO_CORE_MEMBERSHIP ))
+			.await?,
 	)
 	.with_core(
 		CO_CORE_NAME_KEYSTORE.to_string(),
-		co_core_co::Core {
-			binary: Cores::default().binary(CO_CORE_KEYSTORE).expect(CO_CORE_KEYSTORE),
-			tags: tags!( "core": CO_CORE_KEYSTORE ),
-			state: None,
-		},
+		CoreSource::built_in(CO_CORE_KEYSTORE)
+			.to_core(&storage, cores, tags!( "core": CO_CORE_KEYSTORE ))
+			.await?,
 	)
 	.with_participant(identity.identity().to_owned(), tags!());
 
@@ -564,11 +568,10 @@ async fn setup_local_co(
 	#[cfg(feature = "pinning")]
 	let create = create.with_core(
 		CO_CORE_NAME_STORAGE.to_string(),
-		co_core_co::Core {
-			binary: Cores::default().binary(CO_CORE_STORAGE).expect(CO_CORE_STORAGE),
-			tags: tags!("core": CO_CORE_STORAGE),
-			state: create_storage_core_state(&reducer.storage(), settings, &CO_ID_LOCAL.into()).await?,
-		},
+		CoreSource::built_in(CO_CORE_STORAGE)
+			.to_core(&storage, cores, tags!( "core": CO_CORE_STORAGE ))
+			.await?
+			.with_state(create_storage_core_state(&reducer.storage(), settings, &CO_ID_LOCAL.into()).await?),
 	);
 
 	// create

@@ -151,6 +151,11 @@ impl CoContext {
 		&self.inner.uuid
 	}
 
+	/// Builtin cores.
+	pub fn cores(&self) -> &Cores {
+		&self.inner.cores
+	}
+
 	/// Block links reader.
 	pub fn block_links(&self, exclude_builtin: bool) -> &BlockLinks {
 		if exclude_builtin {
@@ -329,6 +334,7 @@ impl CoContextInner {
 				self.storage()
 					.clone_with_settings(BlockStorageCloneSettings::new().with_detached()),
 				self.runtime.clone(),
+				&self.cores,
 				self.shutdown.child_token(),
 				self.tasks.clone(),
 				self.create_local_core_resolver(CoId::new(CO_ID_LOCAL)),
@@ -458,8 +464,8 @@ impl CoContextInner {
 			.create(
 				self.storage(),
 				self.runtime.clone(),
-				creator,
 				&self.cores,
+				creator,
 				self.date.clone(),
 				self.uuid.clone(),
 				#[cfg(feature = "pinning")]

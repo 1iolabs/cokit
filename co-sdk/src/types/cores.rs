@@ -103,6 +103,13 @@ impl Cores {
 	pub fn core(&self, crate_name: &str) -> Option<Core> {
 		self.cores.get(crate_name).map(|_cid_str| get_native(crate_name))
 	}
+
+	/// Get the Core for a built-in core.
+	pub fn built_in_by_name(&self, crate_name: &str) -> Option<(Cid, Core)> {
+		self.cores
+			.get(crate_name)
+			.map(|cid_str| (Cid::from_str(cid_str).expect("valid cid"), get_native(crate_name)))
+	}
 }
 
 /// Get native core for name.
@@ -114,6 +121,36 @@ impl Cores {
 /// # Note
 /// When changing this you have to run `co core build builtin` to get a new `Cargo.toml`
 fn get_native(name: &str) -> Core {
+	#[cfg(feature = "bundle-wasm-cores")]
+	macro_rules! include_prebuild_core {
+		($name:literal) => {
+			Core::Binary(
+				::zstd::decode_all(::std::io::Cursor::new(include_bytes!(concat!(
+					"../../../target-wasm/wasm32-unknown-unknown/release/co_core_",
+					$name,
+					".wasm.zst"
+				))))
+				.expect("to decode"),
+			)
+		};
+	}
+	#[cfg(feature = "bundle-wasm-cores")]
+	match name {
+		CO_CORE_CO => include_prebuild_core!("co"),
+		CO_CORE_FILE => include_prebuild_core!("file"),
+		CO_CORE_KEYSTORE => include_prebuild_core!("keystore"),
+		CO_CORE_MEMBERSHIP => include_prebuild_core!("membership"),
+		CO_CORE_PIN => include_prebuild_core!("pin"),
+		CO_CORE_ROOM => include_prebuild_core!("room"),
+		CO_CORE_ROLE => include_prebuild_core!("role"),
+		CO_CORE_DATA_SERIES => include_prebuild_core!("data_series"),
+		CO_CORE_STORAGE => include_prebuild_core!("storage"),
+		CO_CORE_POA => include_prebuild_core!("poa"),
+		CO_CORE_BOARD => include_prebuild_core!("board"),
+		CO_CORE_RICH_TEXT => include_prebuild_core!("rich_text"),
+		_ => panic!("unknown native core name: {}", name),
+	}
+	#[cfg(not(feature = "bundle-wasm-cores"))]
 	match name {
 		CO_CORE_CO => Core::native_async::<co_core_co::Co, co_core_co::CoAction>(),
 		CO_CORE_FILE => Core::native::<co_core_file::File>(),
