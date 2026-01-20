@@ -75,6 +75,7 @@ build:
     - cargo build --release --feature bundle-wasm-cores
   artifacts:
     paths:
+      - cores/Cores.toml
       - target/release/co
       - target/release/daemon
       - target-wasm/wasm32-unknown-unknown/release/*.wasm
