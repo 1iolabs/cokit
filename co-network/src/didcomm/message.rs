@@ -89,11 +89,8 @@ impl EncodedMessage {
 	/// Note: No verification will be done.
 	pub fn json(&self) -> Option<&str> {
 		let data = &self.0;
-		if !data.is_empty() && data[0] == '{' as u8 {
-			match std::str::from_utf8(&data) {
-				Ok(str) => Some(str),
-				Err(_) => None,
-			}
+		if !data.is_empty() && data[0] == b'{' {
+			std::str::from_utf8(data).ok()
 		} else {
 			None
 		}

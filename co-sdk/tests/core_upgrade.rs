@@ -4,13 +4,11 @@ use co_primitives::CoreName;
 use co_sdk::{
 	build_core, crate_repository_path,
 	state::{query_core, QueryExt},
-	ApplicationBuilder, BlockStorage, BlockStorageExt, MonotonicCoDate, MonotonicCoUuid, CO_CORE_NAME_CO,
+	AnyBlockStorage, ApplicationBuilder, BlockStorageExt, MonotonicCoDate, MonotonicCoUuid, CO_CORE_NAME_CO,
 };
+use co_test::test_log_path;
 
-async fn counter_core<S>(storage: &S) -> Cid
-where
-	S: BlockStorage + 'static,
-{
+async fn counter_core(storage: &impl AnyBlockStorage) -> Cid {
 	let repository_path = crate_repository_path(true).unwrap();
 	let core_path = repository_path.join("examples/counter");
 	let counter = build_core(repository_path, core_path)
@@ -21,10 +19,7 @@ where
 	counter
 }
 
-async fn counter_upgraded_core<S>(storage: &S) -> Cid
-where
-	S: BlockStorage + 'static,
-{
+async fn counter_upgraded_core(storage: &impl AnyBlockStorage) -> Cid {
 	let repository_path = crate_repository_path(true).unwrap();
 	let core_path = repository_path.join("examples/counter-upgraded");
 	let counter = build_core(repository_path, core_path)
@@ -39,9 +34,9 @@ where
 #[tokio::test]
 async fn test_core_upgrade() {
 	// app
-	let application_identifier = format!("test_core_upgrade-{}", uuid::Uuid::new_v4().to_string());
+	let application_identifier = format!("test_core_upgrade-{}", uuid::Uuid::new_v4());
 	let application = ApplicationBuilder::new_memory(application_identifier)
-		.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+		.with_bunyan_logging(Some(test_log_path()))
 		.with_optional_tracing()
 		.without_keychain()
 		.with_disabled_feature("co-local-encryption")

@@ -101,7 +101,7 @@ impl AsRef<RelativePath> for Path {
 }
 impl AsRef<Path> for str {
 	fn as_ref(&self) -> &Path {
-		Path::from_str_unchecked(&self)
+		Path::from_str_unchecked(self)
 	}
 }
 impl PartialEq<AbsolutePath> for Path {
@@ -314,7 +314,7 @@ impl PartialEq<AbsolutePathOwned> for AbsolutePath {
 }
 impl AsRef<AbsolutePath> for str {
 	fn as_ref(&self) -> &AbsolutePath {
-		AbsolutePath::from_str_unchecked(&self)
+		AbsolutePath::from_str_unchecked(self)
 	}
 }
 
@@ -370,7 +370,7 @@ impl AsRef<AbsolutePath> for AbsolutePathOwned {
 }
 impl PartialEq<AbsolutePath> for AbsolutePathOwned {
 	fn eq(&self, other: &AbsolutePath) -> bool {
-		self == other
+		self.0 == other.0
 	}
 }
 impl Borrow<AbsolutePath> for AbsolutePathOwned {
@@ -503,7 +503,7 @@ impl PartialEq<RelativePathOwned> for RelativePath {
 }
 impl AsRef<RelativePath> for str {
 	fn as_ref(&self) -> &RelativePath {
-		RelativePath::from_str_unchecked(&self)
+		RelativePath::from_str_unchecked(self)
 	}
 }
 
@@ -647,6 +647,11 @@ impl<'a> Component<'a> {
 			Component::ParentDir => "..",
 			Component::Normal(s) => s,
 		}
+	}
+
+	/// Test if component is empty.
+	pub fn is_empty(&self) -> bool {
+		matches!(self, Component::Normal(s) if s.len() == 0)
 	}
 
 	/// Actual length of hte component (without separators).

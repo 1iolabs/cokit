@@ -1,0 +1,8 @@
+rust_input: crate
+rust_root: ..
+dart_output: lib/src/generated
+add_mod_to_lib: false
+auto_upgrade_dependency: false
+rust_features:
+  - frb
+dart_entrypoint_class_name: CoKit

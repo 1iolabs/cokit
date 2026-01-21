@@ -1,7 +1,8 @@
 use crate::{actor::ActorMessage, ActorError, ActorHandle, ActorState, LocalJoinHandle, LocalTaskSpawner};
 use co_primitives::Tags;
-use std::sync::Arc;
+use std::{any::type_name, sync::Arc};
 use tokio::sync::{mpsc, watch};
+use tracing::Instrument;
 
 /// A LocalActor will not moved between threads.
 /// This is sometimes neccesarry when interfacing with external code.
@@ -94,9 +95,11 @@ where
 		let actor = self.actor;
 		let tags = self.handle.tags.clone();
 		let handle = self.handle;
+		let span = tracing::trace_span!("actor", ?tags, actor_type = type_name::<A>());
 		let join = spawner.spwan_local({
 			let tags = tags.clone();
 			let handle = handle.clone();
+			let actor_span = span.clone();
 			async move {
 				// log
 				tracing::trace!(?tags, "actor-initialize");
@@ -113,16 +116,11 @@ where
 				// execute
 				let weak_handle = handle.downgrade();
 				while let Some(actor_message) = rx.recv().await {
-					match actor_message {
-						ActorMessage::Message(message) => {
-							// get a strong handle to call the handle method - this should never fail as we should not
-							// receive any message when this fails.
-							if let Some(handle) = weak_handle.clone().upgrade() {
-								actor.handle(&handle, message, &mut actor_state).await.map_err(|err| {
-									tracing::error!(?err, ?tags, "actor-handle-failed");
-									err
-								})?;
-							}
+					// handle message
+					let (message, message_span) = match actor_message {
+						ActorMessage::Message(message) => (message, tracing::trace_span!("actor-handle")),
+						ActorMessage::MessageWithSpan(message, message_span) => {
+							(message, tracing::trace_span!(parent: message_span, "actor-handle"))
 						},
 						ActorMessage::Shutdown => {
 							// log
@@ -131,6 +129,20 @@ where
 							// done
 							break;
 						},
+					};
+					message_span.follows_from(&actor_span);
+
+					// get a strong handle to call the handle method - this should never fail as we should not
+					// receive any message when this fails.
+					if let Some(handle) = weak_handle.clone().upgrade() {
+						actor
+							.handle(&handle, message, &mut actor_state)
+							.instrument(message_span)
+							.await
+							.map_err(|err| {
+								tracing::error!(?err, ?tags, "actor-handle-failed");
+								err
+							})?;
 					}
 				}
 
@@ -152,6 +164,7 @@ where
 					.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
 				Ok(())
 			}
+			.instrument(span)
 		});
 		LocalActorInstance { handle, join }
 	}

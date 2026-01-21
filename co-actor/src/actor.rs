@@ -11,6 +11,7 @@ use tokio::{
 	sync::{mpsc, watch},
 	task::JoinHandle,
 };
+use tracing::{Instrument, Span};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ActorError {
@@ -125,16 +126,18 @@ where
 		let actor = self.actor;
 		let tags = self.handle.tags.clone();
 		let handle = self.handle;
+		let span = tracing::trace_span!("actor", ?tags, actor_type = type_name::<A>());
 		let join = spawner.spawn_named(type_name::<A>(), {
 			let tags = tags.clone();
 			let handle = handle.clone();
+			let actor_span = span.clone();
 			async move {
 				// log
-				tracing::trace!(?tags, "actor-initialize");
+				tracing::trace!("actor-initialize");
 
 				// initialize
 				let mut actor_state = actor.initialize(&handle, &tags, initialize).await.map_err(|err| {
-					tracing::error!(?err, ?tags, "actor-initialize-failed");
+					tracing::error!(?err, "actor-initialize-failed");
 					err
 				})?;
 				state_tx
@@ -144,24 +147,32 @@ where
 				// execute
 				let weak_handle = handle.downgrade();
 				while let Some(actor_message) = rx.recv().await {
-					match actor_message {
-						ActorMessage::Message(message) => {
-							// get a strong handle to call the handle method - this should never fail as we should not
-							// receive any message when this fails.
-							if let Some(handle) = weak_handle.clone().upgrade() {
-								actor.handle(&handle, message, &mut actor_state).await.map_err(|err| {
-									tracing::error!(?err, ?tags, "actor-handle-failed");
-									err
-								})?;
-							}
+					let (message, message_span) = match actor_message {
+						ActorMessage::Message(message) => (message, tracing::trace_span!("actor-handle")),
+						ActorMessage::MessageWithSpan(message, message_span) => {
+							(message, tracing::trace_span!(parent: message_span, "actor-handle"))
 						},
 						ActorMessage::Shutdown => {
 							// log
-							tracing::trace!(?tags, "actor-shutdown");
+							tracing::trace!("actor-shutdown");
 
 							// done
 							break;
 						},
+					};
+					message_span.follows_from(&actor_span);
+
+					// get a strong handle to call the handle method - this should never fail as we should not
+					// receive any message when this fails.
+					if let Some(handle) = weak_handle.clone().upgrade() {
+						actor
+							.handle(&handle, message, &mut actor_state)
+							.instrument(message_span)
+							.await
+							.map_err(|err| {
+								tracing::error!(?err, "actor-handle-failed");
+								err
+							})?;
 					}
 				}
 
@@ -183,6 +194,7 @@ where
 					.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
 				Ok(())
 			}
+			.instrument(span)
 		});
 		ActorInstance { join, handle }
 	}
@@ -211,6 +223,9 @@ pub enum ActorMessage<M> {
 
 	/// Actor received message.
 	Message(M),
+
+	/// Actor received message.
+	MessageWithSpan(M, tracing::Span),
 }
 
 /// The actual actor instance.
@@ -365,23 +380,25 @@ where
 	}
 
 	/// Request with response.
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all, fields(message_type = type_name::<M>()))]
 	pub async fn request<T>(&self, message: impl FnOnce(Response<T>) -> M) -> Result<T, ActorError> {
 		let (responder, response) = ResponseReceiver::new();
 		self.tx
-			.send(ActorMessage::Message(message(responder)))
+			.send(ActorMessage::MessageWithSpan(message(responder), Span::current()))
 			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running."), self.tags().clone()))?;
 		response.await
 	}
 
 	/// Request with response result.
 	/// If an error is returned in the result it will be wrapped in ´ActorError::Actor`.
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all, fields(message_type = type_name::<M>()))]
 	pub async fn try_request<T, E>(&self, message: impl FnOnce(Response<Result<T, E>>) -> M) -> Result<T, ActorError>
 	where
 		E: Into<anyhow::Error>,
 	{
 		let (responder, response) = ResponseReceiver::new();
 		self.tx
-			.send(ActorMessage::Message(message(responder)))
+			.send(ActorMessage::MessageWithSpan(message(responder), Span::current()))
 			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running."), self.tags().clone()))?;
 		response
 			.await?
@@ -533,13 +550,13 @@ mod tests {
 			) -> Result<(), ActorError> {
 				match message {
 					TestMessage::Inc(value) => {
-						*state = value + *state;
+						*state += value;
 					},
 					TestMessage::Get(response) => {
 						response.respond(*state);
 					},
 					TestMessage::IncGet(value, response) => {
-						*state = value + *state;
+						*state += value;
 						response.respond(*state);
 					},
 				}
@@ -592,7 +609,7 @@ mod tests {
 			) -> Result<(), ActorError> {
 				match message {
 					TestMessage::Inc(value) => {
-						state.value = value + state.value;
+						state.value += value;
 						state.watchers.send(state.value);
 					},
 					TestMessage::Watch(mut response) => {
@@ -646,7 +663,7 @@ mod tests {
 			) -> Result<(), ActorError> {
 				match message {
 					TestMessage::Inc(value) => {
-						*state = value + *state;
+						*state += value;
 					},
 					TestMessage::Get(response) => {
 						response.send(*state).ok();

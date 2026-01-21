@@ -1,17 +1,15 @@
-use crate::{Block, BlockSerializerError, CborError, JsonError, MultiCodecError, StoreParams};
+use crate::{Block, BlockError, BlockSerializerError, CborError, JsonError, MultiCodecError, StoreParams};
 use async_trait::async_trait;
 use cid::Cid;
 use std::num::TryFromIntError;
 
 #[async_trait]
 pub trait BlockStorage: Send + Sync {
-	type StoreParams: StoreParams;
-
 	/// Returns a block from storage.
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError>;
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError>;
 
 	/// Inserts a block into storage.
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError>;
+	async fn set(&self, block: Block) -> Result<Cid, StorageError>;
 
 	/// Stat a block.
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
@@ -27,18 +25,26 @@ pub trait BlockStorage: Send + Sync {
 
 	/// Remove a block.
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError>;
+
+	/// Maximum accepted block size.
+	fn max_block_size(&self) -> usize;
+}
+
+/// Block storage with custom store params.
+pub trait BlockStorageStoreParams: BlockStorage + 'static {
+	type StoreParams: StoreParams;
 }
 
 pub trait CloneWithBlockStorageSettings: Clone {
-	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self;
+	fn clone_with_settings(&self, settings: BlockStorageCloneSettings) -> Self;
 
 	fn without_networking(&self) -> Self {
-		self.clone_with_settings(BlockStorageSettings::new().without_networking())
+		self.clone_with_settings(BlockStorageCloneSettings::new().without_networking())
 	}
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct BlockStorageSettings {
+pub struct BlockStorageCloneSettings {
 	/// Do not allow to use networking in the clone.
 	pub disallow_networking: bool,
 
@@ -52,7 +58,7 @@ pub struct BlockStorageSettings {
 	/// Clone with empty caches.
 	pub clear: bool,
 }
-impl BlockStorageSettings {
+impl BlockStorageCloneSettings {
 	pub fn new() -> Self {
 		Default::default()
 	}
@@ -128,6 +134,11 @@ impl From<CborError> for StorageError {
 }
 impl From<JsonError> for StorageError {
 	fn from(value: JsonError) -> Self {
+		StorageError::InvalidArgument(value.into())
+	}
+}
+impl From<BlockError> for StorageError {
+	fn from(value: BlockError) -> Self {
 		StorageError::InvalidArgument(value.into())
 	}
 }

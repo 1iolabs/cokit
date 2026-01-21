@@ -23,7 +23,7 @@ pub fn read_payload_buffer() -> Vec<u8> {
 		result.extend_from_slice(&buffer[0..read]);
 
 		// done?
-		if !(result.len() < total) {
+		if result.len() >= total {
 			break;
 		}
 	}

@@ -13,11 +13,11 @@ pub trait DagCollectionAsyncExt: DagCollection {
 		NodeStream::from_link(storage.to_owned(), self.link())
 	}
 
-	async fn to_link<S: BlockStorage + Clone + Send + Sync + 'static>(
+	async fn write<S: BlockStorage + Clone + Send + Sync + 'static>(
 		storage: &S,
 		items: impl IntoIterator<Item = Self::Item>,
 	) -> Result<OptionLink<Node<Self::Item>>, StorageError> {
-		let mut node_builder = NodeBuilder::<Self::Item, S::StoreParams>::default();
+		let mut node_builder = NodeBuilder::<Self::Item>::default();
 		for item in items {
 			node_builder.push(item).map_err(|err| StorageError::Internal(err.into()))?;
 			for block in node_builder.take_blocks() {
@@ -28,17 +28,17 @@ pub trait DagCollectionAsyncExt: DagCollection {
 		for block in blocks {
 			storage.set(block).await?;
 		}
-		Ok(root.into())
+		Ok(root)
 	}
 
-	async fn from_link<S: BlockStorage + Clone + Send + Sync + 'static>(
+	async fn read<S: BlockStorage + Clone + Send + Sync + 'static>(
 		&self,
 		storage: &S,
 	) -> Result<Self::Collection, StorageError>
 	where
 		Self::Item: Send + Sync + 'static,
 	{
-		Ok(self.stream(storage).try_collect().await?)
+		self.stream(storage).try_collect().await
 	}
 }
 impl<T> DagCollectionAsyncExt for T where T: DagCollection {}

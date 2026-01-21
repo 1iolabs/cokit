@@ -49,7 +49,7 @@ impl ReducersControl {
 	}
 
 	pub async fn clear(&self) -> Result<(), CoReducerFactoryError> {
-		Ok(self.handle.try_request(|response| ReducerRequest::Clear(response)).await?)
+		Ok(self.handle.try_request(ReducerRequest::Clear).await?)
 	}
 
 	pub async fn clear_one(&self, co: CoId) -> Result<(), CoReducerFactoryError> {

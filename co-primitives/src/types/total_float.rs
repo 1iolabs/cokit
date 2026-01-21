@@ -32,9 +32,9 @@ impl JsonSchema for TotalFloat64 {
 		.into()
 	}
 }
-impl Into<f64> for TotalFloat64 {
-	fn into(self) -> f64 {
-		self.0.into()
+impl From<TotalFloat64> for f64 {
+	fn from(value: TotalFloat64) -> Self {
+		value.0.into()
 	}
 }
 impl From<f64> for TotalFloat64 {

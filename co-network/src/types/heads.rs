@@ -26,7 +26,7 @@ pub enum HeadsMessage {
 impl HeadsMessage {
 	/// Message type
 	pub fn message_type() -> String {
-		format!("co-heads/1.0")
+		"co-heads/1.0".to_string()
 	}
 
 	/// DIDComm message header.

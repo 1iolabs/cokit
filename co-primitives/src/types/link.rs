@@ -30,7 +30,7 @@ impl<T> Ord for Link<T> {
 impl<T> Eq for Link<T> {}
 impl<T> PartialOrd for Link<T> {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		self.cid.partial_cmp(&other.cid)
+		Some(self.cmp(other))
 	}
 }
 impl<T> PartialEq for Link<T> {
@@ -131,7 +131,7 @@ impl<T> Ord for OptionLink<T> {
 impl<T> Eq for OptionLink<T> {}
 impl<T> PartialOrd for OptionLink<T> {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		self.cid.partial_cmp(&other.cid)
+		Some(self.cmp(other))
 	}
 }
 impl<T: Default> Linkable<T> for OptionLink<T> {

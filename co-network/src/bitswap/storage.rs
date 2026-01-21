@@ -56,7 +56,7 @@ impl<C> NetworkTask<Behaviour, C> for GetNetworkTask {
 
 		// execute
 		if let GetNetworkTaskState::Pending(peers, result) = state {
-			let query = bitswap.get(to_libipld_cid(self.cid), peers.clone().into_iter(), self.tokens.clone());
+			let query = bitswap.get(to_libipld_cid(self.cid), peers.clone(), self.tokens.clone());
 			tracing::debug!(?self.cid, ?peers, ?query, "bitswap-get");
 			self.state = GetNetworkTaskState::Query(query, result);
 		}
@@ -85,8 +85,7 @@ impl<C> NetworkTask<Behaviour, C> for GetNetworkTask {
 
 							// result
 							if let GetNetworkTaskState::Query(_, result) = state {
-								match result.send(event_result.map_err(|e| StorageError::NotFound(self.cid, e.into())))
-								{
+								match result.send(event_result.map_err(|e| StorageError::NotFound(self.cid, e))) {
 									Ok(_) => {},
 									Err(_) => {
 										// cancelled

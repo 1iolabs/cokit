@@ -3,7 +3,7 @@ use futures::{future::BoxFuture, AsyncWriteExt};
 use libp2p::{core::UpgradeInfo, InboundUpgrade, OutboundUpgrade, Stream};
 use std::iter;
 
-pub const PROTOCOL_NAME: &'static str = "/didcomm/2";
+pub const PROTOCOL_NAME: &str = "/didcomm/2";
 
 #[derive(Debug, Clone)]
 pub struct MessageProtocol {
@@ -30,7 +30,7 @@ impl UpgradeInfo for MessageProtocol {
 	type InfoIter = iter::Once<Self::Info>;
 
 	fn protocol_info(&self) -> Self::InfoIter {
-		iter::once(PROTOCOL_NAME).into_iter()
+		iter::once(PROTOCOL_NAME)
 	}
 }
 

@@ -55,7 +55,7 @@ impl TryFrom<&str> for CoMacroFeature {
 			"no_derive" => Self::NoDerive,
 			"repr" => Self::Repr,
 			other => {
-				return Err(syn::Error::new_spanned(other, format!("Unknown flag: {}", other)));
+				return Err(syn::Error::new_spanned(other, format!("Unknown flag: {other}")));
 			},
 		})
 	}
@@ -85,10 +85,10 @@ pub fn macro_co(input: proc_macro::TokenStream, features: BTreeSet<CoMacroFeatur
 			derives.push(syn::parse_quote!(serde::Serialize));
 			derives.push(syn::parse_quote!(serde::Deserialize));
 		}
-		if !features.contains(&CoMacroFeature::NoDefault) {
-			if features.contains(&CoMacroFeature::State) || features.contains(&CoMacroFeature::StateSync) {
-				derives.push(syn::parse_quote!(Default));
-			}
+		if !features.contains(&CoMacroFeature::NoDefault)
+			&& (features.contains(&CoMacroFeature::State) || features.contains(&CoMacroFeature::StateSync))
+		{
+			derives.push(syn::parse_quote!(Default));
 		}
 		derives
 	} else {

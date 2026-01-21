@@ -1,27 +1,15 @@
+use crate::{MultiCodec, StoreParams};
 use cid::Cid;
 use multihash_codetable::{Code, MultihashDigest};
-use std::{
-	hash::{Hash, Hasher},
-	marker::PhantomData,
-};
-
-pub trait StoreParams: std::fmt::Debug + Clone + Send + Sync + Unpin + 'static {
-	const MAX_BLOCK_SIZE: usize;
-}
-#[derive(Debug, Clone)]
-pub struct DefaultParams {}
-impl StoreParams for DefaultParams {
-	const MAX_BLOCK_SIZE: usize = 1_048_576;
-}
+use std::hash::{Hash, Hasher};
 
 /// Block
 #[derive(Clone)]
-pub struct Block<S> {
-	_s: PhantomData<S>,
+pub struct Block {
 	cid: Cid,
 	data: Vec<u8>,
 }
-impl<S: StoreParams> Block<S> {
+impl Block {
 	/// Creates a new block. Returns an error if the hash doesn't match
 	/// the data.
 	pub fn new(cid: Cid, data: Vec<u8>) -> Result<Self, BlockError> {
@@ -31,7 +19,7 @@ impl<S: StoreParams> Block<S> {
 
 	/// Creates a new block without verifying the cid.
 	pub fn new_unchecked(cid: Cid, data: Vec<u8>) -> Self {
-		Self { _s: Default::default(), cid, data }
+		Self { cid, data }
 	}
 
 	/// Create a new block by calculating the [`Cid`] from data using the default hasher.
@@ -50,7 +38,7 @@ impl<S: StoreParams> Block<S> {
 	}
 
 	pub fn cid_data_digest(digest: impl MultihashDigest<64>, codec: impl Into<u64>, data: &[u8]) -> Cid {
-		Cid::new_v1(codec.into(), digest.digest(&data))
+		Cid::new_v1(codec.into(), digest.digest(data))
 	}
 
 	/// Returns the cid.
@@ -68,43 +56,55 @@ impl<S: StoreParams> Block<S> {
 		(self.cid, self.data)
 	}
 
+	/// Block with verified hash.
+	pub fn with_verify(self) -> Result<Block, BlockError> {
+		verify_cid::<multihash_codetable::Code, 64>(&self.cid, &self.data)?;
+		Ok(self)
+	}
+
 	/// Block with specific store params.
-	pub fn with_store_params<P>(self) -> Result<Block<P>, BlockError>
-	where
-		P: StoreParams,
-	{
-		if self.data.len() > P::MAX_BLOCK_SIZE {
-			return Err(BlockError::SizeOverflow(self.data.len(), P::MAX_BLOCK_SIZE));
+	pub fn with_store_params<P: StoreParams>(self) -> Result<Block, BlockError> {
+		self.with_block_max_size(P::MAX_BLOCK_SIZE)
+	}
+
+	/// Block with specific store max size.
+	pub fn with_block_max_size(self, max_block_size: usize) -> Result<Block, BlockError> {
+		if self.data.len() > max_block_size {
+			return Err(BlockError::SizeOverflow(self.data.len(), max_block_size));
 		}
-		Ok(Block::new_unchecked(self.cid, self.data))
+		Ok(self)
 	}
 }
-impl<S> PartialEq for Block<S> {
+impl PartialEq for Block {
 	fn eq(&self, other: &Self) -> bool {
 		self.cid == other.cid
 	}
 }
-impl<S> Eq for Block<S> {}
-impl<S> PartialOrd for Block<S> {
+impl Eq for Block {}
+impl PartialOrd for Block {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		self.cid.partial_cmp(&other.cid)
+		Some(self.cmp(other))
 	}
 }
-impl<S> Ord for Block<S> {
+impl Ord for Block {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		self.cid.cmp(&other.cid)
 	}
 }
-impl<S> Hash for Block<S> {
+impl Hash for Block {
 	fn hash<H: Hasher>(&self, state: &mut H) {
 		Hash::hash(&self, state);
 	}
 }
-impl<S> std::fmt::Debug for Block<S> {
+impl std::fmt::Debug for Block {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let hex = self.data.iter().map(|c| format!("{:02X}", c)).collect::<String>();
+		let codec = MultiCodec::from(&self.cid);
 		f.debug_struct("Block")
 			.field("cid", &self.cid)
-			.field("data", &self.data)
+			.field("codec", &codec)
+			.field("size", &self.data.len())
+			.field("data", &hex)
 			.finish()
 	}
 }

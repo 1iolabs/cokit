@@ -1,6 +1,8 @@
 use crate::{
-	application::shared::SharedCoBuilder, library::shared_membership::shared_membership_active,
-	types::co_reducer_factory::CoReducerFactoryError, ApplicationMessage, CoReducer, CoStorage, Cores,
+	application::shared::SharedCoBuilder,
+	library::{builtin_cores::builtin_cores, shared_membership::shared_membership_active},
+	types::co_reducer_factory::CoReducerFactoryError,
+	ApplicationMessage, CoReducer, CoStorage,
 };
 use anyhow::anyhow;
 use co_actor::ActorHandle;
@@ -40,9 +42,9 @@ impl ReducerStorage {
 		let membership = shared_membership_active(&parent, &id, None)
 			.await?
 			.ok_or(CoReducerFactoryError::CoNotFound(id, anyhow!("No active membership")))?;
-		Ok(Self::from_membership(handle, &storage, &parent, membership, key_request_timeout)
+		Self::from_membership(handle, &storage, &parent, membership, key_request_timeout)
 			.await
-			.map_err(|e| CoReducerFactoryError::Other(e.into()))?)
+			.map_err(|e| CoReducerFactoryError::Other(e.into()))
 	}
 
 	pub(crate) async fn from_membership(
@@ -57,14 +59,9 @@ impl ReducerStorage {
 		let secret = builder.secret(Some(handle)).await?;
 		Ok(match secret {
 			Some(secret) => {
-				let builtin_cores = Cores::default()
-					.built_in_native_mapping()
-					.into_iter()
-					.map(|(cid, _)| cid)
-					.collect();
 				let encrypted_storage =
 					EncryptedBlockStorage::new(storage.clone(), secret.into(), Default::default(), Default::default())
-						.with_encryption_reference_mode(EncryptionReferenceMode::DisallowExcept(builtin_cores));
+						.with_encryption_reference_mode(EncryptionReferenceMode::DisallowExcept(builtin_cores()));
 				for state in membership.state {
 					if let Some(encryption_mapping) = &state.encryption_mapping {
 						encrypted_storage.load_mapping(encryption_mapping).await?;

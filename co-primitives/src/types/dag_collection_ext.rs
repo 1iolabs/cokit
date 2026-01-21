@@ -6,17 +6,17 @@ use serde::{de::DeserializeOwned, Serialize};
 pub trait DagCollectionExt: DagCollection {
 	/// Replace contents with collection.
 	fn set_collection(&mut self, storage: &mut dyn Storage, items: Self::Collection) {
-		self.set_link(Self::to_link(storage, items))
+		self.set_link(Self::write(storage, items))
 	}
 
 	/// Materialize into the collection.
 	fn collection(&self, storage: &dyn Storage) -> Self::Collection {
-		self.from_link(storage).expect("Valid serialized data")
+		self.read(storage).expect("Valid serialized data")
 	}
 
 	fn create(storage: &mut dyn Storage, items: impl IntoIterator<Item = Self::Item>) -> Self {
 		let mut result = Self::default();
-		result.set_link(Self::to_link(storage, items));
+		result.set_link(Self::write(storage, items));
 		result
 	}
 
@@ -60,7 +60,7 @@ pub trait DagCollectionExt: DagCollection {
 		node_reader::<Self::Item>(storage, *self.link().cid())
 	}
 
-	fn to_link(storage: &mut dyn Storage, items: impl IntoIterator<Item = Self::Item>) -> OptionLink<Node<Self::Item>> {
+	fn write(storage: &mut dyn Storage, items: impl IntoIterator<Item = Self::Item>) -> OptionLink<Node<Self::Item>> {
 		let mut node_builder = NodeBuilder::<Self::Item>::default();
 		for item in items {
 			node_builder.push(item).unwrap();
@@ -69,10 +69,10 @@ pub trait DagCollectionExt: DagCollection {
 		for block in blocks {
 			storage.set(block);
 		}
-		root.into()
+		root
 	}
 
-	fn from_link(&self, storage: &dyn Storage) -> Result<Self::Collection, NodeReaderError> {
+	fn read(&self, storage: &dyn Storage) -> Result<Self::Collection, NodeReaderError> {
 		self.try_iter(storage).collect()
 	}
 }

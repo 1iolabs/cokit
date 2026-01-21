@@ -3,7 +3,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{ActorError, ActorHandle, LocalActor, Response};
-use co_primitives::{Block, BlockStorage, DefaultParams, StorageError};
+use co_primitives::{Block, BlockStorage, DefaultParams, StorageError, StoreParams};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::js_sys::{Function, Promise, Uint8Array};
@@ -31,7 +31,7 @@ impl JsBlockStorage {
 				JsLocalTaskSpawner::default(),
 				Default::default(),
 				JsBlockStorageActor { get: get.dyn_into()?, set: set.dyn_into()? },
-				Default::default(),
+				(),
 			)
 			.map_err(|err| format!("block storage failed: {:?}", err))?
 			.handle(),
@@ -40,9 +40,7 @@ impl JsBlockStorage {
 }
 #[async_trait]
 impl BlockStorage for JsBlockStorage {
-	type StoreParams = DefaultParams;
-
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		Ok(self
 			.handle
 			.request(|response| JsBlockStorageMessage::Get(*cid, response))
@@ -50,7 +48,7 @@ impl BlockStorage for JsBlockStorage {
 			.map_err(|err| StorageError::Internal(err.into()))??)
 	}
 
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		Ok(self
 			.handle
 			.request(|response| JsBlockStorageMessage::Set(block, response))
@@ -61,11 +59,15 @@ impl BlockStorage for JsBlockStorage {
 	async fn remove(&self, _cid: &Cid) -> Result<(), StorageError> {
 		Err(StorageError::Internal(anyhow!("Unsupported")))
 	}
+
+	fn max_block_size(&self) -> usize {
+		DefaultParams::MAX_BLOCK_SIZE
+	}
 }
 
 enum JsBlockStorageMessage {
-	Get(Cid, Response<Result<Block<DefaultParams>, StorageError>>),
-	Set(Block<DefaultParams>, Response<Result<Cid, StorageError>>),
+	Get(Cid, Response<Result<Block, StorageError>>),
+	Set(Block, Response<Result<Cid, StorageError>>),
 }
 
 #[derive(Debug)]
@@ -81,10 +83,10 @@ struct JsBlockStorageActor {
 	set: Function,
 }
 impl JsBlockStorageActor {
-	async fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		let this = JsValue::null();
-		let js_cid = serde_wasm_bindgen::to_value(cid)
-			.map_err(|err| anyhow!("Convert `Cid` to `JsValue` failed: {}", err.to_string()))?;
+		let js_cid =
+			serde_wasm_bindgen::to_value(cid).map_err(|err| anyhow!("Convert `Cid` to `JsValue` failed: {}", err))?;
 		let call: JsValue = self.get.call1(&this, &js_cid).map_err(|err| anyhow!("Call error: {:?}", err))?;
 		let promise: Promise = call
 			.dyn_into::<Promise>()
@@ -101,11 +103,11 @@ impl JsBlockStorageActor {
 		Ok(Block::new(*cid, bytes.to_vec()).map_err(|err| anyhow!("Data and Cid are not compatible: {:?}", err))?)
 	}
 
-	async fn set(&self, block: Block<DefaultParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		let this = JsValue::null();
 		let (cid, data) = block.into_inner();
-		let js_cid = serde_wasm_bindgen::to_value(&cid)
-			.map_err(|err| anyhow!("Convert `Cid` to `JsValue` failed: {}", err.to_string()))?;
+		let js_cid =
+			serde_wasm_bindgen::to_value(&cid).map_err(|err| anyhow!("Convert `Cid` to `JsValue` failed: {}", err))?;
 		let js_data = Uint8Array::from(data.as_ref());
 		let call = self
 			.set
@@ -120,8 +122,7 @@ impl JsBlockStorageActor {
 			.dyn_into::<Uint8Array>()
 			.map_err(|err| anyhow!("Convert storage set result JsValue to Cid failed: {:?}", err.as_string()))?
 			.to_vec();
-		let storage_set_cid =
-			Cid::try_from(cid_bytes).map_err(|err| anyhow!("Get Cid from bytes failed: {}", err.to_string()))?;
+		let storage_set_cid = Cid::try_from(cid_bytes).map_err(|err| anyhow!("Get Cid from bytes failed: {}", err))?;
 		Ok(storage_set_cid)
 	}
 }

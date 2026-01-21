@@ -4,7 +4,7 @@ use crate::{
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::ActorHandle;
-use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, MappedCid};
+use co_primitives::{Block, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, MappedCid};
 use co_storage::{
 	BlockStat, BlockStorage, BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage, StorageError,
 };
@@ -16,7 +16,7 @@ pub struct ReducerBlockStorage<S> {
 	co: CoId,
 	next: S,
 	handle: ActorHandle<ApplicationMessage>,
-	settings: BlockStorageSettings,
+	settings: BlockStorageCloneSettings,
 }
 impl<S> ReducerBlockStorage<S>
 where
@@ -27,7 +27,7 @@ where
 		co: CoId,
 		next: S,
 		handle: ActorHandle<ApplicationMessage>,
-		settings: BlockStorageSettings,
+		settings: BlockStorageCloneSettings,
 	) -> Self {
 		Self { parent_co, co, next, handle, settings }
 	}
@@ -51,10 +51,8 @@ impl<S> BlockStorage for ReducerBlockStorage<S>
 where
 	S: BlockStorage + BlockStorageContentMapping + Send + Sync + Clone + 'static,
 {
-	type StoreParams = S::StoreParams;
-
 	/// Returns a block from storage.
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		match self.next.get(cid).await {
 			Ok(block) => Ok(block),
 			Err(StorageError::NotFound(_, _)) if !self.settings.disallow_networking => {
@@ -67,7 +65,7 @@ where
 
 	/// Inserts a block into storage.
 	/// Returns the CID of the block (gurranted to be the same as the supplied).
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		self.next.set(block).await
 	}
 
@@ -86,13 +84,18 @@ where
 			result => result,
 		}
 	}
+
+	/// Maximum accepted block size.
+	fn max_block_size(&self) -> usize {
+		self.next.max_block_size()
+	}
 }
 #[async_trait]
 impl<S> ExtendedBlockStorage for ReducerBlockStorage<S>
 where
 	S: BlockStorage + ExtendedBlockStorage + BlockStorageContentMapping + Send + Sync + Clone + 'static,
 {
-	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set_extended(&self, block: ExtendedBlock) -> Result<Cid, StorageError> {
 		self.next.set_extended(block).await
 	}
 
@@ -108,7 +111,7 @@ impl<S> CloneWithBlockStorageSettings for ReducerBlockStorage<S>
 where
 	S: CloneWithBlockStorageSettings,
 {
-	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+	fn clone_with_settings(&self, settings: BlockStorageCloneSettings) -> Self {
 		Self {
 			parent_co: self.parent_co.clone(),
 			co: self.co.clone(),

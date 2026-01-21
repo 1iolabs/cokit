@@ -47,7 +47,7 @@ pub fn keystore_changed(
 				&& change_context.is_local_change()
 				&& CO_CORE_NAME_KEYSTORE == action.core =>
 		{
-			if let Some(keystore_action) = action.get_payload::<KeyStoreAction>().ok() {
+			if let Ok(keystore_action) = action.get_payload::<KeyStoreAction>() {
 				Some({
 					let context = context.clone();
 					async move {
@@ -111,7 +111,7 @@ async fn key_by_uri(storage: &CoStorage, co: OptionLink<Co>, uri: &str) -> Resul
 	while let Some(key) = keys.next().await {
 		match key {
 			Ok((key_uri, key)) => {
-				if &key_uri == uri {
+				if key_uri == uri {
 					return Ok(Some(key));
 				}
 			},
@@ -150,7 +150,7 @@ async fn subscribe(
 	network: &NetworkApi,
 	did: &Did,
 ) -> Result<(), anyhow::Error> {
-	let identity = private_identity_resolver.resolve_private(&did).await?;
+	let identity = private_identity_resolver.resolve_private(did).await?;
 	subscribe_identity(network, &identity).await?;
 	Ok(())
 }

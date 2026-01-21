@@ -4,7 +4,7 @@ use co_primitives::{OptionMappedCid, WeakCid};
 use futures::{pin_mut, Stream, StreamExt};
 use std::collections::BTreeSet;
 
-/// Apply removes in `overlay_storage` to `storage` and storage core (`dispatch`).
+/// Apply removes in `overlay_storage` to `storage` and storage core (using `dispatch`).
 pub async fn storage_dispatch_remove(
 	dispatch: &mut impl CoDispatch<StorageAction>,
 	info: BlockInfo,

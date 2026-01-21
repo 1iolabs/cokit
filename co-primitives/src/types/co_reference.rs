@@ -1,4 +1,4 @@
-use crate::{Block, BlockSerializer, BlockSerializerError, KnownMultiCodec, StoreParams};
+use crate::{Block, BlockSerializer, BlockSerializerError, KnownMultiCodec};
 use serde::{Deserialize, Serialize};
 
 /// Wrapps a reference/link/Cid and applies attributes useful in context of a Co.
@@ -6,6 +6,15 @@ use serde::{Deserialize, Serialize};
 /// - A [`CoReference`] should be used with a narrow scope so that only the links to it are moved around.
 /// - A [`CoReference`] should be used for cross Co references to state and heads as this has special semantics for
 ///   example encryption mapping.
+///
+/// ## FAQ
+/// ### When to use [`CoReference::Weak`] and when [`co_primitives::WeakCid`]?
+/// Use [`CoReference::Weak`] when you want to reference a root.
+/// When the garbage collection reaches a [`CoReference::Weak`] it will not try to keep it alve with its parent.
+/// Example: Keeping a historic root for reference or fast traversing.
+///
+/// Use [`co_primitives::WeakCid`] when the reference should not been handled as a link and will not be
+/// accessed/traversed using this reference.
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum CoReference<T> {
@@ -20,9 +29,8 @@ impl<T> CoReference<T> {
 		}
 	}
 
-	pub fn to_block<P>(&self) -> Result<Block<P>, BlockSerializerError>
+	pub fn to_block(&self) -> Result<Block, BlockSerializerError>
 	where
-		P: StoreParams,
 		T: Serialize,
 	{
 		BlockSerializer::new_codec(KnownMultiCodec::CoReference).serialize(self)

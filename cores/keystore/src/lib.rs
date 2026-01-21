@@ -1,4 +1,4 @@
-use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, Link, OptionLink, ReducerAction, Tags};
+use co_api::{async_api::Reducer, co, BlockStorageExt, CoMap, CoreBlockStorage, Link, OptionLink, ReducerAction, Tags};
 use schemars::JsonSchema;
 
 /// Key Store.
@@ -43,14 +43,11 @@ pub enum KeyStoreAction {
 	Remove(String),
 }
 
-impl<S> Reducer<KeyStoreAction, S> for KeyStore
-where
-	S: BlockStorage + Clone + 'static,
-{
+impl Reducer<KeyStoreAction> for KeyStore {
 	async fn reduce(
 		state_link: OptionLink<Self>,
 		event_link: Link<ReducerAction<KeyStoreAction>>,
-		storage: &S,
+		storage: &CoreBlockStorage,
 	) -> Result<Link<Self>, anyhow::Error> {
 		let mut state = storage.get_value_or_default(&state_link).await?;
 		let action = storage.get_value(&event_link).await?;
@@ -62,6 +59,6 @@ where
 				state.keys.remove(storage, uri.clone()).await?;
 			},
 		}
-		Ok(storage.set_value(&state).await?.into())
+		Ok(storage.set_value(&state).await?)
 	}
 }

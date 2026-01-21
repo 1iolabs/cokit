@@ -1,16 +1,19 @@
 use anyhow::anyhow;
-use co_primitives::DefaultParams;
 use co_sdk::{build_core, crate_repository_path, unixfs_encode_buffer};
 use exitcode::ExitCode;
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, future::ready, os::unix::ffi::OsStrExt, path::PathBuf};
+use std::{collections::BTreeMap, future::ready, io::Cursor, os::unix::ffi::OsStrExt, path::PathBuf};
 use tokio_stream::wrappers::ReadDirStream;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
 	/// Only compile specific cores (folder name).
 	pub core: Vec<String>,
+
+	/// Additionally compress `.wasm` file to `.wasm.zst` using zstd compression.
+	#[arg(long)]
+	pub zst: bool,
 }
 
 pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
@@ -36,7 +39,7 @@ pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 					true
 				} else if let Some(name) = entry.file_name().and_then(|name| std::str::from_utf8(name.as_bytes()).ok())
 				{
-					command.core.iter().find(|filter| filter.as_str() == name).is_some()
+					command.core.iter().any(|filter| filter.as_str() == name)
 				} else {
 					true
 				}
@@ -58,14 +61,20 @@ pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 	// create Cids
 	let mut cores: Cores = Default::default();
 	for build_artifact in build_artifacts {
-		let core_wasm = tokio::fs::read(&build_artifact.artifact_path)
-			.await
-			.expect("wasm artifact to exist");
-		let core_blocks = unixfs_encode_buffer::<DefaultParams>(&core_wasm);
+		let core_wasm = tokio::fs::read(&build_artifact.artifact_path).await?;
+		let core_blocks = unixfs_encode_buffer(&core_wasm);
 		let core_cid = *core_blocks
 			.last()
 			.ok_or(anyhow!("{:?} to be at least one block", build_artifact.artifact_path))?
 			.cid();
+
+		// compress
+		if command.zst {
+			let mut compressed_path = build_artifact.artifact_path.clone();
+			compressed_path.add_extension("zst");
+			let compressed_contents = zstd::encode_all(Cursor::new(&core_wasm), 19)?;
+			tokio::fs::write(&compressed_path, &compressed_contents).await?;
+		}
 
 		// add
 		cores.cores.insert(build_artifact.name, core_cid.to_string());
@@ -77,16 +86,6 @@ pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 	tokio::fs::write(cores_path, toml::to_string(&cores)?.as_bytes()).await?;
 
 	Ok(exitcode::OK)
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Cargo {
-	package: CargoPackage,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct CargoPackage {
-	name: String,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]

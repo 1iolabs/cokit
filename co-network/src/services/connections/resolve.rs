@@ -28,8 +28,10 @@ impl NetworkResolver for DynamicNetworkResolver {
 	}
 }
 
+#[cfg(test)]
 #[derive(Debug, Default)]
 pub struct StaticNetworkResolver(pub BTreeSet<Network>);
+#[cfg(test)]
 #[async_trait]
 impl NetworkResolver for StaticNetworkResolver {
 	async fn networks(&self, _co: CoId) -> Result<BTreeSet<Network>, anyhow::Error> {

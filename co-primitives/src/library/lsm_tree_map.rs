@@ -1,7 +1,7 @@
 use super::{dag_cbor_size_serializer::DagCborSizeSerializer, node_builder::NodeReader};
 use crate::{
-	Block, BlockSerializer, BlockStorage, BlockStorageExt, Link, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
-	NodeStream, OptionLink, StorageError, StoreParams,
+	AnyBlockStorage, Block, BlockSerializer, BlockStorageExt, Link, Node, NodeBuilder, NodeBuilderError,
+	NodeSerializer, NodeStream, OptionLink, StorageError,
 };
 use anyhow::anyhow;
 use bloomfilter::Bloom;
@@ -112,7 +112,7 @@ impl BloomFilter {
 	pub fn may_contains_key<K: Hash + Ord + Clone + Send + Sync + 'static>(&self, key: &K) -> bool {
 		match self {
 			BloomFilter::Bloomfilter(data) => {
-				if let Ok(bloom) = Bloom::from_slice(&data) {
+				if let Ok(bloom) = Bloom::from_slice(data) {
 					bloom.check(key)
 				} else {
 					true
@@ -280,11 +280,10 @@ impl<K, V> RunNodeSerializer<K, V> {
 		Self { _d: Default::default(), pending: Default::default() }
 	}
 }
-impl<K, V, P> NodeSerializer<RunNode<K, V>, (K, Value<V>), P> for RunNodeSerializer<K, V>
+impl<K, V> NodeSerializer<RunNode<K, V>, (K, Value<V>)> for RunNodeSerializer<K, V>
 where
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-	P: StoreParams,
 {
 	fn nodes(&mut self, nodes: Vec<Link<RunNode<K, V>>>) -> Result<RunNode<K, V>, NodeBuilderError> {
 		let mut min_key = None;
@@ -310,8 +309,9 @@ where
 		Ok(RunNode::Leaf(entries.into_iter().collect()))
 	}
 
-	fn serialize(&mut self, node: RunNode<K, V>) -> Result<Block<P>, NodeBuilderError> {
+	fn serialize(&mut self, max_bock_size: usize, node: RunNode<K, V>) -> Result<Block, NodeBuilderError> {
 		let block = BlockSerializer::new()
+			.with_max_block_size(max_bock_size)
 			.serialize(&node)
 			.map_err(|err| NodeBuilderError::Encoding(err.into()))?;
 
@@ -410,7 +410,7 @@ impl Default for LsmTreeMapSettings {
 #[derive(Clone)]
 pub struct LsmTreeMap<S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -430,7 +430,7 @@ where
 }
 impl<S, K, V> LsmTreeMap<S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -607,7 +607,7 @@ where
 
 	/// Tree stats.
 	pub async fn stats(&self) -> Result<LsmTreeStats, StorageError> {
-		Ok(Self::load_levels_and_runs(self.storage.clone(), self.root)
+		Self::load_levels_and_runs(self.storage.clone(), self.root)
 			.try_fold(
 				LsmTreeStats { entries: 0, active_entries: self.active.len(), levels: 0, runs: 0 },
 				|mut result, item| {
@@ -621,7 +621,7 @@ where
 					ready(Ok(result))
 				},
 			)
-			.await?)
+			.await
 	}
 
 	/// Whether the collection is empty.
@@ -669,7 +669,7 @@ where
 	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + Send + use<S, K, V> {
 		let storage = self.storage.clone();
 		let active = self.active.clone();
-		let root = self.root.clone();
+		let root = self.root;
 		async_stream::try_stream! {
 			// heap (max-sorted)
 			let mut heap = match only_run_indicies {
@@ -684,7 +684,7 @@ where
 
 			// runs
 			//  filter and pop first item of each run
-			let mut runs: Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)> = Self::load_levels_and_runs(storage.clone(), root)
+			let mut runs: Vec<(usize, RunNodeStream<S, K, V>)> = Self::load_levels_and_runs(storage.clone(), root)
 				.try_filter_map(|item| ready(Ok(item.right())))
 				.try_filter(|(index, _)| ready(match &only_run_indicies {
 					Some(run_indicies) => run_indicies.contains(index),
@@ -714,7 +714,7 @@ where
 				// skip items before start at
 				//  we need to filter overlaps as nodes which come before start_at will be skipped
 				if let Some(start_at) = &start_at {
-					if !(start_at <= &item.item.0) {
+					if start_at > &item.item.0 {
 						continue;
 					}
 				}
@@ -734,7 +734,7 @@ where
 	) -> impl Stream<Item = Result<(K, Value<V>), StorageError>> + use<S, K, V> {
 		let storage = self.storage.clone();
 		let active = self.active.clone();
-		let root = self.root.clone();
+		let root = self.root;
 		async_stream::try_stream! {
 			// heap (max-sorted)
 			let mut heap = match only_run_indicies {
@@ -749,7 +749,7 @@ where
 
 			// runs
 			//  filter and pop first item of each run
-			let mut runs: Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)> = Self::load_levels_and_runs(storage.clone(), root)
+			let mut runs: Vec<(usize, RunNodeStream<S, K, V>)> = Self::load_levels_and_runs(storage.clone(), root)
 				.try_filter_map(|item| ready(Ok(item.right())))
 				.try_filter(|(index, _)| ready(match &only_run_indicies {
 					Some(run_indicies) => run_indicies.contains(index),
@@ -779,7 +779,7 @@ where
 				// skip items after start at
 				//  we need to filter overlaps as nodes which come after start_at will be skipped
 				if let Some(start_at) = &start_at {
-					if !(start_at >= &item.item.0) {
+					if start_at < &item.item.0 {
 						continue;
 					}
 				}
@@ -794,7 +794,7 @@ where
 	/// Pop item and continue to read the run.
 	async fn pop_and_fetch(
 		heap: &mut BinaryHeap<TreeStreamItem<K, V>>,
-		runs: &mut Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)>,
+		runs: &mut [(usize, RunNodeStream<S, K, V>)],
 	) -> Result<Option<TreeStreamItem<K, V>>, StorageError> {
 		if let Some(item) = heap.pop() {
 			// fetch next
@@ -819,7 +819,7 @@ where
 	/// Pop item and continue to read the run.
 	async fn pop_and_fetch_reverse(
 		heap: &mut BinaryHeap<ReverseTreeStreamItem<K, V>>,
-		runs: &mut Vec<(usize, NodeStream<S, (K, Value<V>), RunNode<K, V>>)>,
+		runs: &mut [(usize, RunNodeStream<S, K, V>)],
 	) -> Result<Option<ReverseTreeStreamItem<K, V>>, StorageError> {
 		if let Some(item) = heap.pop() {
 			// fetch next
@@ -1057,7 +1057,7 @@ where
 	/// Store Levels.
 	async fn store_levels(&self, levels: Vec<Level<K, V>>) -> Result<Node<Level<K, V>>, StorageError> {
 		let mut builder = NodeBuilder::default()
-			.with_items_size_max((INLINE_SIZE_FACTOR_LEVELS * S::StoreParams::MAX_BLOCK_SIZE).to_integer());
+			.with_items_size_max((INLINE_SIZE_FACTOR_LEVELS * self.storage.max_block_size()).to_integer());
 		builder.extend(levels).map_err(|e| StorageError::InvalidArgument(e.into()))?;
 		let (node, blocks) = builder.into_node().map_err(|e| StorageError::InvalidArgument(e.into()))?;
 		for block in blocks {
@@ -1068,7 +1068,7 @@ where
 
 	/// Root.
 	async fn load_root(storage: &S, root: OptionLink<Root<K, V>>) -> Result<Option<Root<K, V>>, StorageError> {
-		Ok(storage.get_value_or_none(&root).await?)
+		storage.get_value_or_none(&root).await
 	}
 
 	/// Levels.
@@ -1081,7 +1081,7 @@ where
 	fn load_levels_and_runs(
 		storage: S,
 		root: OptionLink<Root<K, V>>,
-	) -> impl Stream<Item = Result<Either<(usize, Level<K, V>), (usize, Run<K, V>)>, StorageError>> + Send {
+	) -> impl Stream<Item = Result<EitherLevelOrRun<K, V>, StorageError>> + Send {
 		async_stream::try_stream! {
 			let mut global_level_index = 0;
 			let mut global_run_index = 0;
@@ -1100,6 +1100,9 @@ where
 	}
 }
 
+type EitherLevelOrRun<K, V> = Either<(usize, Level<K, V>), (usize, Run<K, V>)>;
+type RunNodeStream<S, K, V> = NodeStream<S, (K, Value<V>), RunNode<K, V>>;
+
 /// Store as DAG Node and return the root [`cid::Cid`].
 async fn store_items<'a, S, T>(
 	storage: &S,
@@ -1107,10 +1110,11 @@ async fn store_items<'a, S, T>(
 	items: impl Stream<Item = Result<&'a T, StorageError>> + Send,
 ) -> Result<OptionLink<Node<T>>, StorageError>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	T: Clone + Serialize + 'a,
 {
-	let mut node_builder = NodeBuilder::<_, S::StoreParams>::new(
+	let mut node_builder = NodeBuilder::<_>::new(
+		storage.max_block_size(),
 		max_node_entries
 			.try_into()
 			.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
@@ -1141,17 +1145,18 @@ async fn store_active<S, K, V>(
 	entries: impl Stream<Item = Result<(&K, &Value<V>), StorageError>>,
 ) -> Result<Node<(K, Value<V>)>, StorageError>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
-	let mut node_builder = NodeBuilder::<_, S::StoreParams>::new(
+	let mut node_builder = NodeBuilder::<_>::new(
+		storage.max_block_size(),
 		max_node_entries
 			.try_into()
 			.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
 		Default::default(),
 	)
-	.with_items_size_max((INLINE_SIZE_FACTOR_ACTIVE * S::StoreParams::MAX_BLOCK_SIZE).to_integer());
+	.with_items_size_max((INLINE_SIZE_FACTOR_ACTIVE * storage.max_block_size()).to_integer());
 	pin_mut!(entries);
 	while let Some(item) = entries.try_next().await? {
 		node_builder
@@ -1177,11 +1182,12 @@ async fn store_run_node<S, K, V>(
 	entries: impl Stream<Item = Result<(K, Value<V>), StorageError>>,
 ) -> Result<OptionLink<RunNode<K, V>>, StorageError>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
-	let mut node_builder = NodeBuilder::<(K, Value<V>), S::StoreParams, RunNode<K, V>, RunNodeSerializer<K, V>>::new(
+	let mut node_builder = NodeBuilder::<(K, Value<V>), RunNode<K, V>, RunNodeSerializer<K, V>>::new(
+		storage.max_block_size(),
 		max_node_entries
 			.try_into()
 			.map_err(|e: TryFromIntError| StorageError::InvalidArgument(e.into()))?,
@@ -1202,7 +1208,7 @@ where
 	}
 
 	// result
-	Ok(root.into())
+	Ok(root)
 }
 
 /// Store a new run to storage composed of `entries`.
@@ -1213,7 +1219,7 @@ async fn store_run<S, K, V>(
 	entries_size_hint: usize,
 ) -> Result<Option<Run<K, V>>, StorageError>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -1293,7 +1299,7 @@ where
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(&other))
+		Some(self.cmp(other))
 	}
 }
 impl<K, V> Ord for TreeStreamItem<K, V>
@@ -1344,7 +1350,7 @@ where
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(&other))
+		Some(self.cmp(other))
 	}
 }
 impl<K, V> Ord for ReverseTreeStreamItem<K, V>

@@ -5,7 +5,7 @@ use chacha20poly1305::{
 	Key, XChaCha20Poly1305,
 };
 use cid::Cid;
-use co_primitives::{from_cbor, to_cbor, Block, KnownMultiCodec, MultiCodec, MultiCodecError, StoreParams};
+use co_primitives::{from_cbor, to_cbor, Block, KnownMultiCodec, MultiCodec, MultiCodecError};
 use derive_more::From;
 use multihash_codetable::{Code, MultihashDigest};
 use serde::{Deserialize, Serialize};
@@ -56,13 +56,10 @@ impl From<MultiCodecError> for AlgorithmError {
 
 #[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq)]
 #[repr(u8)]
+#[derive(Default)]
 pub enum Algorithm {
+	#[default]
 	XChaCha20Poly1305 = 1,
-}
-impl Default for Algorithm {
-	fn default() -> Self {
-		Self::XChaCha20Poly1305
-	}
 }
 impl Algorithm {
 	/// Cipher algorithm key size in bytes.
@@ -229,7 +226,7 @@ impl EncryptedBlock {
 			.inline()
 			.ok_or(AlgorithmError::InvalidArguments(anyhow::anyhow!("Expected inline data")))?;
 		let data_plain = self.decrypt_data(&block_secret, data, &aad)?;
-		Ok(from_cbor(&data_plain).map_err(|err| AlgorithmError::InvalidArguments(err.into()))?)
+		from_cbor(&data_plain).map_err(|err| AlgorithmError::InvalidArguments(err.into()))
 	}
 
 	fn decrypt_data(&self, block_secret: &Secret, data: &[u8], aad: &[u8]) -> Result<Vec<u8>, AlgorithmError> {
@@ -243,28 +240,22 @@ impl EncryptedBlock {
 		self.header.is_valid()
 	}
 }
-impl<S> TryInto<Block<S>> for EncryptedBlock
-where
-	S: StoreParams,
-{
+impl TryInto<Block> for EncryptedBlock {
 	type Error = AlgorithmError;
 
 	/// Convert to encrypted Block.
-	fn try_into(self) -> Result<Block<S>, Self::Error> {
+	fn try_into(self) -> Result<Block, Self::Error> {
 		let encrypted_data = to_cbor(&self).map_err(|_| AlgorithmError::Encoding)?;
 		let mh = Code::Blake3_256.digest(&encrypted_data);
 		let cid = Cid::new_v1(KnownMultiCodec::CoEncryptedBlock.into(), mh);
 		Ok(Block::new_unchecked(cid, encrypted_data))
 	}
 }
-impl<S> TryFrom<Block<S>> for EncryptedBlock
-where
-	S: StoreParams,
-{
+impl TryFrom<Block> for EncryptedBlock {
 	type Error = AlgorithmError;
 
 	/// Convert from encrypted Block.
-	fn try_from(value: Block<S>) -> Result<Self, Self::Error> {
+	fn try_from(value: Block) -> Result<Self, Self::Error> {
 		// validate
 		MultiCodec::with_codec(KnownMultiCodec::CoEncryptedBlock, value.cid())?;
 
@@ -297,14 +288,14 @@ pub enum EncryptedData {
 impl EncryptedData {
 	pub fn inline(&self) -> Option<&[u8]> {
 		match self {
-			Self::Inline(data) => Some(&data),
+			Self::Inline(data) => Some(data),
 			_ => None,
 		}
 	}
 
 	pub fn blocks(&self) -> Option<&[Cid]> {
 		match self {
-			Self::Block(data) => Some(&data),
+			Self::Block(data) => Some(data),
 			_ => None,
 		}
 	}
@@ -316,10 +307,10 @@ impl EncryptedData {
 	///
 	/// # Returns
 	/// The extra blocks or an empty Vec if it fits inline.
-	pub fn fit_into_blocks<P: StoreParams>(&mut self, inline_offset: Option<usize>) -> Vec<Block<P>> {
+	pub fn fit_into_blocks(&mut self, max_block_size: usize, inline_offset: Option<usize>) -> Vec<Block> {
 		let mut data = match self {
 			Self::Inline(data) => {
-				if P::MAX_BLOCK_SIZE >= data.len() + inline_offset.unwrap_or(0) {
+				if max_block_size >= data.len() + inline_offset.unwrap_or(0) {
 					return vec![];
 				} else {
 					take(data)
@@ -331,7 +322,7 @@ impl EncryptedData {
 		};
 		let mut extra_blocks = Vec::new();
 		while !data.is_empty() {
-			let rest = data.split_off(min(data.len(), P::MAX_BLOCK_SIZE));
+			let rest = data.split_off(min(data.len(), max_block_size));
 			extra_blocks.push(Block::new_data(KnownMultiCodec::Raw, data));
 			data = rest;
 		}
@@ -396,21 +387,15 @@ impl BlockPayload {
 		Ok(to_cbor(self)?)
 	}
 }
-impl<S> From<Block<S>> for BlockPayload
-where
-	S: StoreParams,
-{
-	fn from(value: Block<S>) -> Self {
+impl From<Block> for BlockPayload {
+	fn from(value: Block) -> Self {
 		let (cid, data) = value.into_inner();
 		Self { cid, data, references: Default::default() }
 	}
 }
-impl<S> Into<Block<S>> for BlockPayload
-where
-	S: StoreParams,
-{
-	fn into(self) -> Block<S> {
-		Block::new_unchecked(self.cid, self.data)
+impl From<BlockPayload> for Block {
+	fn from(value: BlockPayload) -> Self {
+		Block::new_unchecked(value.cid, value.data)
 	}
 }
 
@@ -593,7 +578,7 @@ mod tests {
 	use crate::crypto::{block::EncryptedData, secret::Secret};
 	use cid::Cid;
 	use co_primitives::{from_cbor, to_cbor, Block, BlockSerializer, DefaultParams, KnownMultiCodec, StoreParams};
-	use std::iter::repeat;
+	use std::iter::repeat_n;
 
 	#[test]
 	fn algorithm_key_size() {
@@ -607,8 +592,8 @@ mod tests {
 
 	#[test]
 	fn is_valid() {
-		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
-		let block_secret = Secret::new(repeat(1u8).take(Algorithm::default().key_size()).collect());
+		let secret = Secret::new(repeat_n(0u8, Algorithm::default().key_size()).collect());
+		let block_secret = Secret::new(repeat_n(1u8, Algorithm::default().key_size()).collect());
 		let key_slot = KeySlot::new(Algorithm::default(), &secret, &block_secret).unwrap();
 		let header = Header::new(Algorithm::default(), vec![key_slot]);
 		assert!(header.is_valid());
@@ -616,8 +601,8 @@ mod tests {
 
 	#[test]
 	fn serialize_header() {
-		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
-		let block_secret = Secret::new(repeat(1u8).take(Algorithm::default().key_size()).collect());
+		let secret = Secret::new(repeat_n(0u8, Algorithm::default().key_size()).collect());
+		let block_secret = Secret::new(repeat_n(1u8, Algorithm::default().key_size()).collect());
 		let key_slot = KeySlot::new(Algorithm::default(), &secret, &block_secret).unwrap();
 		let header = Header::new(Algorithm::default(), vec![key_slot]);
 
@@ -648,8 +633,8 @@ mod tests {
 
 	#[test]
 	fn key_slot_encoded_size() {
-		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
-		let block_secret = Secret::new(repeat(1u8).take(Algorithm::default().key_size()).collect());
+		let secret = Secret::new(repeat_n(0u8, Algorithm::default().key_size()).collect());
+		let block_secret = Secret::new(repeat_n(1u8, Algorithm::default().key_size()).collect());
 		let key_slot = KeySlot::new(Algorithm::default(), &secret, &block_secret).unwrap();
 
 		// serialize header
@@ -660,8 +645,8 @@ mod tests {
 
 	#[test]
 	fn header_encoded_size() {
-		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
-		let block_secret = Secret::new(repeat(1u8).take(Algorithm::default().key_size()).collect());
+		let secret = Secret::new(repeat_n(0u8, Algorithm::default().key_size()).collect());
+		let block_secret = Secret::new(repeat_n(1u8, Algorithm::default().key_size()).collect());
 		let key_slot = KeySlot::new(Algorithm::default(), &secret, &block_secret).unwrap();
 		let header = Header::new(Algorithm::default(), vec![key_slot]);
 
@@ -673,7 +658,7 @@ mod tests {
 
 	#[test]
 	fn encrypt_block_roundtrip() {
-		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
+		let secret = Secret::new(repeat_n(0u8, Algorithm::default().key_size()).collect());
 		let block = BlockSerializer::default().serialize(&"Hello World!").unwrap();
 
 		//println!("cid: ({}): {}", block.cid().to_bytes().len(), block.cid()); // 36
@@ -703,9 +688,9 @@ mod tests {
 
 	#[test]
 	fn test_fit_to_blocks() {
-		let secret = Secret::new(repeat(0u8).take(Algorithm::default().key_size()).collect());
-		let data: Vec<u8> = repeat(0u8).take(DefaultParams::MAX_BLOCK_SIZE).collect();
-		let block = Block::<DefaultParams>::new_data(KnownMultiCodec::Raw, data);
+		let secret = Secret::new(repeat_n(0u8, Algorithm::default().key_size()).collect());
+		let data: Vec<u8> = repeat_n(0u8, DefaultParams::MAX_BLOCK_SIZE).collect();
+		let block = Block::new_data(KnownMultiCodec::Raw, data);
 
 		//println!("cid: ({}): {}", block.cid().to_bytes().len(), block.cid()); // 36
 		//println!("data: ({}): {:?}", block.data().len(), block.data()); // 13
@@ -716,11 +701,10 @@ mod tests {
 		// split
 		let encrypted_extra_blocks = encrypted_block
 			.payload
-			.fit_into_blocks::<DefaultParams>(Some(Header::encoded_size(Algorithm::default())));
+			.fit_into_blocks(DefaultParams::MAX_BLOCK_SIZE, Some(Header::encoded_size(Algorithm::default())));
 		assert!(match &encrypted_block.payload {
 			EncryptedData::Block(blocks) =>
-				blocks.iter().map(|c| *c).collect::<Vec<Cid>>()
-					== encrypted_extra_blocks.iter().map(|b| *b.cid()).collect::<Vec<Cid>>(),
+				blocks == &encrypted_extra_blocks.iter().map(|b| *b.cid()).collect::<Vec<Cid>>(),
 			_ => false,
 		});
 

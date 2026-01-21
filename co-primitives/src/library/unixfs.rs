@@ -1,4 +1,4 @@
-use crate::{Block, BlockStorage, KnownMultiCodec, MultiCodec, StorageError, StoreParams};
+use crate::{AnyBlockStorage, Block, BlockStorage, KnownMultiCodec, MultiCodec, StorageError};
 use cid::Cid;
 use futures::{AsyncRead, AsyncReadExt};
 use rust_unixfs::file::{adder::FileAdder, visit::IdleFileVisit};
@@ -6,7 +6,7 @@ use rust_unixfs::file::{adder::FileAdder, visit::IdleFileVisit};
 /// Read unixfs file into buffer.
 ///
 /// See: https://github.com/dariusc93/rust-ipfs/blob/libp2p-next/unixfs/examples/cat.rs
-pub async fn unixfs_cat_buffer<S: BlockStorage + Send>(storage: &S, cid: &Cid) -> Result<Vec<u8>, StorageError> {
+pub async fn unixfs_cat_buffer(storage: &impl AnyBlockStorage, cid: &Cid) -> Result<Vec<u8>, StorageError> {
 	let mut result = Vec::new();
 
 	// The blockstore specific way of reading the block. Here we assume go-ipfs 0.5 default flatfs
@@ -61,9 +61,8 @@ pub async fn unixfs_cat_buffer<S: BlockStorage + Send>(storage: &S, cid: &Cid) -
 /// The last CID in the result is the root.
 ///
 /// See: https://github.com/dariusc93/rust-ipfs/blob/libp2p-next/unixfs/examples/add.rs
-pub async fn unixfs_add<S, I>(storage: &S, stream: &mut I) -> Result<Vec<Cid>, StorageError>
+pub async fn unixfs_add<I>(storage: &impl AnyBlockStorage, stream: &mut I) -> Result<Vec<Cid>, StorageError>
 where
-	S: BlockStorage + Send,
 	I: AsyncRead + Unpin,
 {
 	let mut result = Vec::new();
@@ -91,7 +90,7 @@ where
 
 /// Encode buffer into blocks.
 /// The last block in the result is the root.
-pub fn unixfs_encode_buffer<P: StoreParams>(buf: &[u8]) -> Vec<Block<P>> {
+pub fn unixfs_encode_buffer(buf: &[u8]) -> Vec<Block> {
 	let mut result = Vec::new();
 	let mut adder = FileAdder::default();
 

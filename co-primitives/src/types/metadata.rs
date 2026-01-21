@@ -40,7 +40,7 @@ impl<T: CoMetadata + Serialize> From<T> for WithCoMetadata<T> {
 // 	WithCoMetadata::new(value).serialize(serializer)
 // }
 
-/// Workaround for https://github.com/rust-lang/rust/issues/50133
+// Workaround for https://github.com/rust-lang/rust/issues/50133
 // pub struct WithCoMetadataWrapper<T>(T);
 // impl<T: CoMetadata> Into<WithCoMetadataWrapper<T>> for WithCoMetadata<T> {
 // 	fn into(self) -> WithCoMetadataWrapper<T> {

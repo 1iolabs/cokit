@@ -1,7 +1,7 @@
 use crate::{BlockStat, BlockStorage, Storage, StorageError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, StoreParams};
+use co_primitives::{Block, DefaultParams};
 use futures::Future;
 use std::{
 	marker::PhantomData,
@@ -18,7 +18,7 @@ pub struct SyncStorage<S>
 where
 	S: Storage,
 {
-	sender: Sender<Message<S::StoreParams>>,
+	sender: Sender<Message>,
 	_handle: Arc<JoinHandle<()>>,
 	_type: PhantomData<S>,
 }
@@ -36,14 +36,11 @@ where
 {
 	/// Construct threaded storage with next as underlying storage.
 	pub fn new(mut next: S) -> Self {
-		let (sender, receiver) = std::sync::mpsc::channel::<Message<S::StoreParams>>();
+		let (sender, receiver) = std::sync::mpsc::channel::<Message>();
 		let handle = thread::spawn(move || {
 			fn handle_send_result<T>(t: Result<(), SendError<T>>) {
-				match t {
-					Err(err) => {
-						tracing::warn!(?err, "send-failed");
-					},
-					_ => {},
+				if let Err(err) = t {
+					tracing::warn!(?err, "send-failed");
 				}
 			}
 			loop {
@@ -64,8 +61,8 @@ where
 {
 	type StoreParams = S::StoreParams;
 
-	fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
-		let (sender, receiver) = std::sync::mpsc::channel::<Result<Block<Self::StoreParams>, StorageError>>();
+	fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
+		let (sender, receiver) = std::sync::mpsc::channel::<Result<Block, StorageError>>();
 		self.sender
 			.send(Message::Get(*cid, sender))
 			.map_err(|e| StorageError::Internal(e.into()))?;
@@ -76,7 +73,7 @@ where
 		}
 	}
 
-	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	fn set(&mut self, block: Block) -> Result<Cid, StorageError> {
 		let (sender, receiver) = std::sync::mpsc::channel::<Result<Cid, StorageError>>();
 		self.sender
 			.send(Message::Set(block, sender))
@@ -102,9 +99,9 @@ where
 }
 
 #[derive(Debug)]
-enum Message<P: StoreParams> {
-	Get(Cid, Sender<Result<Block<P>, StorageError>>),
-	Set(Block<P>, Sender<Result<Cid, StorageError>>),
+enum Message {
+	Get(Cid, Sender<Result<Block, StorageError>>),
+	Set(Block, Sender<Result<Cid, StorageError>>),
 	Remove(Cid, Sender<Result<(), StorageError>>),
 }
 
@@ -137,15 +134,15 @@ impl<S> Storage for SyncBlockStorage<S>
 where
 	S: BlockStorage + Send + Sync + Clone + 'static,
 {
-	type StoreParams = S::StoreParams;
+	type StoreParams = DefaultParams;
 
-	fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		let storage = self.storage.clone();
 		let cid = *cid;
 		self.execute(async move { storage.get(&cid).await })
 	}
 
-	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	fn set(&mut self, block: Block) -> Result<Cid, StorageError> {
 		let storage = self.storage.clone();
 		self.execute(async move { storage.set(block).await })
 	}
@@ -159,18 +156,16 @@ where
 #[async_trait]
 impl<S> BlockStorage for SyncBlockStorage<S>
 where
-	S: BlockStorage + Send + Sync + Clone + 'static,
+	S: BlockStorage + Clone + 'static,
 {
-	type StoreParams = S::StoreParams;
-
 	/// Returns a block from storage.
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		self.storage.get(cid).await
 	}
 
 	/// Inserts a block into storage.
 	/// Returns the CID of the block (gurranted to be the same as the supplied).
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		self.storage.set(block).await
 	}
 
@@ -182,5 +177,9 @@ where
 	/// Stat a block.
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		self.storage.stat(cid).await
+	}
+
+	fn max_block_size(&self) -> usize {
+		self.storage.max_block_size()
 	}
 }

@@ -7,7 +7,7 @@ use crate::{
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle};
-use co_primitives::{BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Tags};
+use co_primitives::{BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, Tags};
 use std::collections::{BTreeMap, VecDeque};
 
 pub struct Reducers {
@@ -118,7 +118,7 @@ impl Actor for ReducersActor {
 									context
 										.inner
 										.storage()
-										.clone_with_settings(BlockStorageSettings::new().with_detached()),
+										.clone_with_settings(BlockStorageCloneSettings::new().with_detached()),
 									parent,
 									id.clone(),
 									timeout,
@@ -146,7 +146,7 @@ impl Actor for ReducersActor {
 				if let Some(reducer) = state.reducers.get(&id) {
 					// use already created
 					response
-						.send(Ok(co_reducer_instance(&state.context, &reducer, state.keep_open)))
+						.send(Ok(co_reducer_instance(&state.context, reducer, state.keep_open)))
 						.ok();
 				} else if options.no_pending_create && state.pending_request_count(&id) > 0 {
 					// would block while reducer is being created
@@ -266,30 +266,23 @@ impl Actor for ReducersActor {
 					})
 					.collect::<VecDeque<usize>>();
 				while let Some(index) = remove.pop_back() {
-					match state.pending_requests.remove(index) {
-						Some(ReducerRequest::Request(_, _, response)) => {
-							if remove.is_empty() {
-								response
-									.send(match result {
-										Err(err) => Err(err),
-										Ok(reducer) => {
-											Ok(co_reducer_instance(&state.context, &reducer, state.keep_open))
-										},
-									})
-									.ok();
-								break;
-							} else {
-								response
-									.send(match &result {
-										Err(err) => Err(co_reducerfactory_error_clone(err)),
-										Ok(reducer) => {
-											Ok(co_reducer_instance(&state.context, &reducer, state.keep_open))
-										},
-									})
-									.ok();
-							}
-						},
-						_ => (),
+					if let Some(ReducerRequest::Request(_, _, response)) = state.pending_requests.remove(index) {
+						if remove.is_empty() {
+							response
+								.send(match result {
+									Err(err) => Err(err),
+									Ok(reducer) => Ok(co_reducer_instance(&state.context, &reducer, state.keep_open)),
+								})
+								.ok();
+							break;
+						} else {
+							response
+								.send(match &result {
+									Err(err) => Err(co_reducerfactory_error_clone(err)),
+									Ok(reducer) => Ok(co_reducer_instance(&state.context, reducer, state.keep_open)),
+								})
+								.ok();
+						}
 					}
 				}
 

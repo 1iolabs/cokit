@@ -3,8 +3,8 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{
-	Block, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, DefaultParams, StorageError,
-	StoreParams,
+	Block, BlockStat, BlockStorage, BlockStorageCloneSettings, CloneWithBlockStorageSettings, DefaultParams,
+	StorageError, StoreParams,
 };
 use std::{
 	collections::BTreeMap,
@@ -13,7 +13,7 @@ use std::{
 
 #[derive(Debug)]
 pub struct MemoryStorage {
-	records: BTreeMap<Cid, Record<DefaultParams>>,
+	records: BTreeMap<Cid, Record>,
 }
 
 impl Default for MemoryStorage {
@@ -56,15 +56,16 @@ impl MemoryStorage {
 impl Storage for MemoryStorage {
 	type StoreParams = DefaultParams;
 
-	fn set(&mut self, block: Block<DefaultParams>) -> Result<Cid, StorageError> {
+	fn set(&mut self, block: Block) -> Result<Cid, StorageError> {
 		// let cid = Cid::new_v1(options.codec, Code::Blake3_256.digest(&data[..]));
 		tracing::debug!(cid = ?block.cid(), "memory-store-set");
 		let result = *block.cid();
-		self.records.insert(*block.cid(), Record { pin: false, block });
+		self.records
+			.insert(*block.cid(), Record { pin: false, block: block.with_store_params::<Self::StoreParams>()? });
 		Ok(result)
 	}
 
-	fn get(&self, cid: &Cid) -> Result<Block<DefaultParams>, StorageError> {
+	fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		let result = self
 			.records
 			.get(cid)
@@ -82,42 +83,37 @@ impl Storage for MemoryStorage {
 }
 
 #[derive(Debug, Clone)]
-pub struct MemoryBlockStorage<P = DefaultParams>
-where
-	P: StoreParams,
-{
-	records: Arc<RwLock<BTreeMap<Cid, Record<P>>>>,
+pub struct MemoryBlockStorage {
+	records: Arc<RwLock<BTreeMap<Cid, Record>>>,
+	max_block_size: usize,
 }
-impl<P> MemoryBlockStorage<P>
-where
-	P: StoreParams,
-{
+impl MemoryBlockStorage {
 	pub fn new() -> Self {
-		Self { records: Default::default() }
+		Self { records: Default::default(), max_block_size: DefaultParams::MAX_BLOCK_SIZE }
+	}
+
+	pub fn with_max_block_size(mut self, max_block_size: usize) -> Self {
+		self.max_block_size = max_block_size;
+		self
 	}
 
 	pub async fn is_empty(&self) -> bool {
 		self.records.read().unwrap().is_empty()
 	}
 
-	pub async fn entries(&self) -> impl Iterator<Item = Block<P>> + use<P> {
+	pub async fn entries(&self) -> impl Iterator<Item = Block> {
 		let records = { self.records.read().unwrap().clone() };
-		records.into_iter().map(|(_, record)| record.block)
+		records.into_values().map(|record| record.block)
 	}
 }
-impl Default for MemoryBlockStorage<DefaultParams> {
+impl Default for MemoryBlockStorage {
 	fn default() -> Self {
 		Self::new()
 	}
 }
 #[async_trait]
-impl<P> BlockStorage for MemoryBlockStorage<P>
-where
-	P: StoreParams,
-{
-	type StoreParams = P;
-
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+impl BlockStorage for MemoryBlockStorage {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		let result = self
 			.records
 			.read()
@@ -130,7 +126,7 @@ where
 		result
 	}
 
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		// log
 		#[cfg(feature = "logging-verbose")]
 		{
@@ -175,13 +171,14 @@ where
 		// result
 		result
 	}
+
+	fn max_block_size(&self) -> usize {
+		self.max_block_size
+	}
 }
 #[async_trait]
-impl<P> ExtendedBlockStorage for MemoryBlockStorage<P>
-where
-	P: StoreParams,
-{
-	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+impl ExtendedBlockStorage for MemoryBlockStorage {
+	async fn set_extended(&self, block: ExtendedBlock) -> Result<Cid, StorageError> {
 		self.set(block.block).await
 	}
 
@@ -201,11 +198,8 @@ where
 		Ok(())
 	}
 }
-impl<P> CloneWithBlockStorageSettings for MemoryBlockStorage<P>
-where
-	P: StoreParams,
-{
-	fn clone_with_settings(&self, _settings: BlockStorageSettings) -> Self {
+impl CloneWithBlockStorageSettings for MemoryBlockStorage {
+	fn clone_with_settings(&self, _settings: BlockStorageCloneSettings) -> Self {
 		self.clone()
 	}
 }
@@ -213,7 +207,7 @@ where
 impl BlockStorageContentMapping for MemoryBlockStorage {}
 
 #[derive(Debug, Clone)]
-struct Record<P> {
-	block: Block<P>,
+struct Record {
+	block: Block,
 	pin: bool,
 }

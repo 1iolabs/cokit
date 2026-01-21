@@ -2,7 +2,7 @@
 name = "co-cli"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.76"
+rust-version = "1.91"
 
 [[bin]]
 name = "co"
@@ -55,11 +55,16 @@ tracing-log = { workspace = true }
 tracing-opentelemetry = "0.23"
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { workspace = true }
+zstd = { workspace = true }
 
 [features]
-default = ["llvm", "wasmi"]
+default = ["llvm", "wasmi", "pinning"]
 
-# backends
+# sdk
+pinning = ["co-sdk/pinning"]
+bundle-wasm-cores = ["co-sdk/bundle-wasm-cores"]
+
+# runtime
 llvm = ["co-runtime/llvm"]
 wamr = ["co-runtime/wamr"]
 wasmi = ["co-runtime/wasmi"]

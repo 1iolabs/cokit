@@ -2,13 +2,13 @@ use crate::{
 	services::application::{CoDidCommSendAction, HeadsMessageReceivedAction},
 	state::{self, query_core, QueryExt},
 	types::cores::CO_CORE_BOARD,
-	Action, CoContext, CoReducer, Cores, CO_CORE_NAME_CO,
+	Action, CoContext, CoReducer, CoreSource, Cores, CO_CORE_NAME_CO,
 };
 use anyhow::anyhow;
 use co_core_board::{Board, BoardAction, List, Task, TaskLock};
-use co_core_co::{Co, CoAction};
+use co_core_co::Co;
 use co_identity::{LocalIdentity, PrivateIdentityBox};
-use co_primitives::{tag, tags, Block, CoId, CoreName, DefaultParams};
+use co_primitives::{tag, tags, Block, CoId, CoreName};
 use co_storage::{BlockStorage, BlockStorageExt};
 use futures::{pin_mut, Stream, TryStreamExt};
 
@@ -26,7 +26,7 @@ pub enum TaskState {
 	Done,
 }
 impl TaskState {
-	pub fn to_list_name(&self) -> &str {
+	pub fn list_name(&self) -> &str {
 		match self {
 			TaskState::Backlog => LIST_NAME_BACKLOG,
 			TaskState::Doing => LIST_NAME_DOING,
@@ -42,7 +42,7 @@ pub async fn network_queue_message(context: &CoContext, mut message: CoDidCommSe
 
 	// create core
 	let (storage, co) = local_co.co().await?;
-	ensure_network_queue_core(&local_co, &identity, co).await?;
+	ensure_network_queue_core(context.cores(), &local_co, &identity, co).await?;
 
 	// setup task id
 	let task_id = message.message_header.id.clone();
@@ -81,7 +81,7 @@ pub async fn network_queue_heads(
 
 	// create core
 	let (storage, co) = local_co.co().await?;
-	ensure_network_queue_core(&local_co, &identity, co).await?;
+	ensure_network_queue_core(context.cores(), &local_co, &identity, co).await?;
 
 	// setup task id
 	//  TODO: SECURITY: we should not trust the task_id is random as is supplied from the network participant
@@ -118,14 +118,14 @@ pub async fn network_queue_task(
 	task_id: String,
 	task_type: String,
 	task_name: String,
-	task: Block<DefaultParams>,
+	task: Block,
 ) -> Result<(), anyhow::Error> {
 	let local_co = context.local_co_reducer().await?;
 	let identity = context.local_identity();
 
 	// create core
 	let (storage, co) = local_co.co().await?;
-	ensure_network_queue_core(&local_co, &identity, co).await?;
+	ensure_network_queue_core(context.cores(), &local_co, &identity, co).await?;
 
 	// insert message
 	let payload = Some(storage.set(task).await?);
@@ -182,37 +182,34 @@ pub async fn network_queue_action(
 	let storage = local_co.storage();
 
 	// execute
-	match (task.tags.string("co"), task.tags.string("task-type")) {
-		(Some(co), Some(task_type)) => {
-			// complete
-			let complete = {
-				let complete_task_id = task.id.clone();
-				move |action: &Action| -> Option<TaskState> {
-					match action {
-						Action::NetworkTaskExecuteComplete { co: _, task_id, task_state }
-							if task_id == &complete_task_id =>
-						{
-							Some(*task_state)
-						},
-						_ => None,
-					}
+	if let (Some(co), Some(task_type)) = (task.tags.string("co"), task.tags.string("task-type")) {
+		// complete
+		let complete = {
+			let complete_task_id = task.id.clone();
+			move |action: &Action| -> Option<TaskState> {
+				match action {
+					Action::NetworkTaskExecuteComplete { co: _, task_id, task_state }
+						if task_id == &complete_task_id =>
+					{
+						Some(*task_state)
+					},
+					_ => None,
 				}
-			};
+			}
+		};
 
-			// send
-			let payload_reference = task.payload.ok_or(anyhow!("No payload"))?;
-			let payload = storage.get(&payload_reference).await?;
-			return Ok((
-				Action::NetworkTaskExecute {
-					co: CoId::new(co),
-					task: payload,
-					task_id: task.id.clone(),
-					task_type: task_type.to_owned(),
-				},
-				Box::new(complete),
-			));
-		},
-		_ => {},
+		// send
+		let payload_reference = task.payload.ok_or(anyhow!("No payload"))?;
+		let payload = storage.get(&payload_reference).await?;
+		return Ok((
+			Action::NetworkTaskExecute {
+				co: CoId::new(co),
+				task: payload,
+				task_id: task.id.clone(),
+				task_type: task_type.to_owned(),
+			},
+			Box::new(complete),
+		));
 	}
 
 	// legacy
@@ -284,7 +281,7 @@ pub async fn network_queue_task_doing(
 			CO_CORE_NAME_NETWORK_QUEUE,
 			&BoardAction::TaskMove {
 				from_list: Some(LIST_NAME_BACKLOG.to_owned()),
-				list: TaskState::Doing.to_list_name().to_string(),
+				list: TaskState::Doing.list_name().to_string(),
 				task: task.id.clone(),
 				after: None,
 				lock: TaskLock::Lock(lock_id.to_string()),
@@ -297,7 +294,7 @@ pub async fn network_queue_task_doing(
 		.with_default()
 		.map(|board| board.tasks)
 		.get_value(task.id.clone())
-		.execute_reducer(&local_co)
+		.execute_reducer(local_co)
 		.await?
 	else {
 		return Ok(false);
@@ -326,7 +323,7 @@ pub async fn network_queue_task_complete(
 			CO_CORE_NAME_NETWORK_QUEUE,
 			&BoardAction::TaskMove {
 				from_list: Some(LIST_NAME_BACKLOG.to_owned()),
-				list: to.to_list_name().to_string(),
+				list: to.list_name().to_string(),
 				task: task.id.clone(),
 				after: None,
 				lock: TaskLock::Unlock(lock_id.to_string()),
@@ -366,20 +363,24 @@ pub fn network_queue_backlog(
 
 /// Create `network_queue` core if not exists yet.
 async fn ensure_network_queue_core(
+	cores: &Cores,
 	local_co: &CoReducer,
 	identity: &LocalIdentity,
 	co: Co,
 ) -> Result<(), anyhow::Error> {
-	Ok(if co.cores.get(CO_CORE_NAME_NETWORK_QUEUE.as_ref()).is_none() {
+	let _: () = if !co.cores.contains_key(CO_CORE_NAME_NETWORK_QUEUE.as_ref()) {
 		local_co
 			.push(
 				identity,
 				CO_CORE_NAME_CO,
-				&CoAction::CoreCreate {
-					core: CO_CORE_NAME_NETWORK_QUEUE.to_string(),
-					binary: Cores::default().binary(CO_CORE_BOARD).expect(CO_CORE_BOARD),
-					tags: tags!( "core": CO_CORE_BOARD ),
-				},
+				&CoreSource::built_in(CO_CORE_BOARD)
+					.to_core_create(
+						&local_co.storage(),
+						cores,
+						CO_CORE_NAME_NETWORK_QUEUE,
+						tags!( "core": CO_CORE_BOARD ),
+					)
+					.await?,
 			)
 			.await?;
 		local_co
@@ -410,5 +411,6 @@ async fn ensure_network_queue_core(
 				&BoardAction::ListCreate { list: List::new(LIST_NAME_DONE), after: None },
 			)
 			.await?;
-	})
+	};
+	Ok(())
 }

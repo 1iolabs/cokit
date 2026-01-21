@@ -1,5 +1,5 @@
+mod behaviour;
 mod did_discovery;
-mod discovery;
 
+pub use behaviour::{ConnectError, Discovery, DiscoveryBehaviour, DiscoveryEvent, DiscoveryState, Event};
 pub use did_discovery::{DidDiscovery, DidDiscoveryMessageType, DiscoverMessage};
-pub use discovery::{ConnectError, Discovery, DiscoveryBehaviour, DiscoveryEvent, DiscoveryState, Event};

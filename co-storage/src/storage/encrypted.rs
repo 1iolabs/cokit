@@ -9,9 +9,9 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{
-	from_cbor, Block, BlockLinks, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings,
-	DefaultNodeSerializer, KnownMultiCodec, Link, MappedCid, MultiCodec, Node, NodeBuilder, NodeBuilderError,
-	NodeSerializer, StoreParams,
+	from_cbor, AnyBlockStorage, Block, BlockLinks, BlockStat, BlockStorage, BlockStorageCloneSettings,
+	CloneWithBlockStorageSettings, DefaultNodeSerializer, KnownMultiCodec, Link, MappedCid, MultiCodec, Node,
+	NodeBuilder, NodeBuilderError, NodeSerializer,
 };
 use futures::{
 	stream::{self, FuturesOrdered},
@@ -35,7 +35,7 @@ pub struct EncryptedBlockStorage<S> {
 }
 impl<S> EncryptedBlockStorage<S>
 where
-	S: BlockStorage + Clone + Send + Sync + 'static,
+	S: AnyBlockStorage,
 {
 	pub fn new(next: S, key: Secret, algorithm: Algorithm, mapping: EncryptedBlockStorageMapping) -> Self {
 		Self {
@@ -84,7 +84,10 @@ where
 		let node_serializer = EncryptedNodeSerializer { algorithm: self.algorithm, key: self.key.clone() };
 
 		// blocks
-		let (root, blocks) = self.mapping.to_blocks(node_serializer, Default::default()).await?;
+		let (root, blocks) = self
+			.mapping
+			.to_blocks(node_serializer, WriteOptions::new(self.max_block_size()))
+			.await?;
 
 		// store
 		for block in blocks {
@@ -146,15 +149,15 @@ where
 	}
 
 	/// Get encrypted cid as unencrypted block.
-	pub async fn get_unencrypted(&self, cid: &Cid) -> Result<Block<S::StoreParams>, StorageError> {
+	pub async fn get_unencrypted(&self, cid: &Cid) -> Result<Block, StorageError> {
 		Ok(if MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
 			// get block
 			let mut block =
-				EncryptedBlock::try_from(self.next.get(&cid).await?).map_err(|e| StorageError::Internal(e.into()))?;
+				EncryptedBlock::try_from(self.next.get(cid).await?).map_err(|e| StorageError::Internal(e.into()))?;
 
 			// make inline
 			if let Some(blocks) = block.payload.blocks() {
-				let blocks = stream::iter(blocks.into_iter().cloned())
+				let blocks = stream::iter(blocks.iter().cloned())
 					.map(|cid| {
 						let next = self.next.clone();
 						async move { next.get(&cid).await }
@@ -195,7 +198,7 @@ where
 	///
 	/// Errors:
 	/// - [`StorageError::InvalidArgument`]: Block can not be decrypted.
-	pub async fn set_encrypted(&self, block: Block<S::StoreParams>) -> Result<Cid, StorageError> {
+	pub async fn set_encrypted(&self, block: Block) -> Result<Cid, StorageError> {
 		if MultiCodec::is(block.cid(), KnownMultiCodec::CoEncryptedBlock) {
 			// decrypt the block to update the mapping
 			let plain = EncryptedBlock::try_from(block.clone())
@@ -226,7 +229,7 @@ where
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, extended_block), fields(cid = ?extended_block.block.cid()))]
-	async fn set_block(&self, extended_block: ExtendedBlock<S::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set_block(&self, extended_block: ExtendedBlock) -> Result<Cid, StorageError> {
 		let block = extended_block.block;
 		let cid = *block.cid();
 
@@ -249,7 +252,7 @@ where
 		//  Question: are there any valid cases for not unencrypted and not known reference?
 		// 	  Yes: encrypted local CO stores references to unencrypted shared CO.
 		let mut references = extended_block.options.references.unwrap_or_default();
-		if self.links.has_links(&cid) {
+		if self.links.has_links(cid) {
 			// links
 			//  filter out already mapped links
 			let links = self.links.links(&block)?.filter(|link| !references.contains_key(link));
@@ -286,8 +289,8 @@ where
 		// fit into block size limit
 		let extra_encrypted_blocks = encrypted
 			.payload
-			.fit_into_blocks::<S::StoreParams>(Some(Header::encoded_size(encrypted.header.algorithm)));
-		let encrypted_block: Block<S::StoreParams> = encrypted
+			.fit_into_blocks(self.next.max_block_size(), Some(Header::encoded_size(encrypted.header.algorithm)));
+		let encrypted_block: Block = encrypted
 			.try_into()
 			.map_err(|e: AlgorithmError| StorageError::Internal(e.into()))?;
 
@@ -311,15 +314,13 @@ where
 #[async_trait]
 impl<S> BlockStorage for EncryptedBlockStorage<S>
 where
-	S: BlockStorage + Clone + Send + Sync + 'static,
+	S: AnyBlockStorage,
 {
-	type StoreParams = S::StoreParams;
-
 	/// Get block.
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		// transform?
 		if self.transform && MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
-			return self.get_unencrypted(&cid).await;
+			return self.get_unencrypted(cid).await;
 		}
 
 		// default
@@ -347,7 +348,7 @@ where
 		}
 	}
 
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		self.set_block(block.into()).await
 	}
 
@@ -368,13 +369,17 @@ where
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		self.get(cid).await.map(|v| BlockStat { size: v.data().len() as u64 })
 	}
+
+	fn max_block_size(&self) -> usize {
+		self.next.max_block_size()
+	}
 }
 #[async_trait]
 impl<S> ExtendedBlockStorage for EncryptedBlockStorage<S>
 where
 	S: ExtendedBlockStorage + Clone + 'static,
 {
-	async fn set_extended(&self, extended_block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set_extended(&self, extended_block: ExtendedBlock) -> Result<Cid, StorageError> {
 		self.set_block(extended_block).await
 	}
 
@@ -393,10 +398,10 @@ impl<S> CloneWithBlockStorageSettings for EncryptedBlockStorage<S>
 where
 	S: CloneWithBlockStorageSettings,
 {
-	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+	fn clone_with_settings(&self, settings: BlockStorageCloneSettings) -> Self {
 		EncryptedBlockStorage {
 			key: self.key.clone(),
-			algorithm: self.algorithm.clone(),
+			algorithm: self.algorithm,
 			links: self.links.clone(),
 			reference_mode: self.reference_mode.clone(),
 			mapping: if settings.clear {
@@ -432,7 +437,7 @@ where
 
 		// try to decrypt
 		if MultiCodec::is(plain, KnownMultiCodec::CoEncryptedBlock) {
-			if let Some(block) = self.get_unencrypted(plain).await.ok() {
+			if let Ok(block) = self.get_unencrypted(plain).await {
 				return Some(*block.cid());
 			}
 		}
@@ -501,8 +506,8 @@ impl EncryptionReferenceMode {
 		S: BlockStorage,
 	{
 		// encrypted block reference in plain data
-		let is_unreleated_encrypted = MultiCodec::is(&reference, KnownMultiCodec::CoEncryptedBlock);
-		let is_co_reference = MultiCodec::is(&parent, KnownMultiCodec::CoReference);
+		let is_unreleated_encrypted = MultiCodec::is(reference, KnownMultiCodec::CoEncryptedBlock);
+		let is_co_reference = MultiCodec::is(parent, KnownMultiCodec::CoReference);
 
 		// evaluate
 		match &self {
@@ -543,7 +548,7 @@ impl EncryptedBlockStorageMapping {
 	{
 		// load
 		let mut mapping = BlockMapping::new();
-		mapping.read_mappings(&storage, map).await?;
+		mapping.read_mappings(storage, map).await?;
 
 		// insert
 		//  we dont use read_mappings directly because of possible deadlocks and because it involves IO.
@@ -590,7 +595,7 @@ impl EncryptedBlockStorageMapping {
 	/// Map multiple Cids into an Map.
 	pub async fn get_mapping(&self, keys: impl IntoIterator<Item = Cid>) -> BTreeMap<Cid, Option<Cid>> {
 		let mapping = self.mapping.read().unwrap();
-		let parent = if let Some(parent) = &self.parent { Some(parent.read().unwrap()) } else { None };
+		let parent = self.parent.as_ref().map(|parent| parent.read().unwrap());
 		keys.into_iter()
 			.map(|key| {
 				let value = match mapping.get(&key) {
@@ -632,13 +637,13 @@ impl EncryptedBlockStorageMapping {
 			.extend(items.into_iter().map(|MappedCid(internal, external)| (internal, external)));
 	}
 
-	pub async fn to_blocks<S, P: StoreParams>(
+	pub async fn to_blocks<S>(
 		&self,
 		serializer: S,
 		options: WriteOptions,
-	) -> Result<(Option<Cid>, Vec<Block<P>>), StorageError>
+	) -> Result<(Option<Cid>, Vec<Block>), StorageError>
 	where
-		S: NodeSerializer<Node<(Cid, Cid)>, (Cid, Cid), P>,
+		S: NodeSerializer<Node<(Cid, Cid)>, (Cid, Cid)>,
 	{
 		// copy items
 		let mapping = {
@@ -720,7 +725,7 @@ impl BlockMapping {
 	}
 
 	pub fn extend(&mut self, items: impl IntoIterator<Item = (Cid, Cid)>) {
-		self.map.extend(items.into_iter().map(|(key, value)| (key, value)));
+		self.map.extend(items);
 	}
 
 	pub fn append(&mut self, other: &mut BlockMapping) {
@@ -821,16 +826,16 @@ impl BlockMapping {
 	/// Encode mapping into blocks.
 	///
 	/// Returns the root cid and all blocks.
-	pub fn to_blocks<S, P: StoreParams>(
-		&self,
-		serializer: S,
-		options: WriteOptions,
-	) -> Result<(Option<Cid>, Vec<Block<P>>), StorageError>
+	pub fn to_blocks<S>(&self, serializer: S, options: WriteOptions) -> Result<(Option<Cid>, Vec<Block>), StorageError>
 	where
-		S: NodeSerializer<Node<(Cid, Cid)>, (Cid, Cid), P>,
+		S: NodeSerializer<Node<(Cid, Cid)>, (Cid, Cid)>,
 	{
 		// blocks
-		let mut builder = NodeBuilder::<(Cid, Cid), P, Node<(Cid, Cid)>, S>::new(options.max_children, serializer);
+		let mut builder = NodeBuilder::<(Cid, Cid), Node<(Cid, Cid)>, S>::new(
+			options.max_block_size,
+			options.max_children,
+			serializer,
+		);
 		for (key, value) in self.map.iter() {
 			builder.push((*key, *value)).map_err(|e| StorageError::Internal(e.into()))?;
 		}
@@ -851,10 +856,9 @@ struct EncryptedNodeSerializer {
 	key: Secret,
 	algorithm: Algorithm,
 }
-impl<T, P> NodeSerializer<Node<T>, T, P> for EncryptedNodeSerializer
+impl<T> NodeSerializer<Node<T>, T> for EncryptedNodeSerializer
 where
 	T: Clone + Serialize,
-	P: StoreParams,
 {
 	fn nodes(&mut self, nodes: Vec<Link<Node<T>>>) -> Result<Node<T>, NodeBuilderError> {
 		Ok(Node::Node(nodes))
@@ -864,10 +868,10 @@ where
 		Ok(Node::Leaf(entries))
 	}
 
-	fn serialize(&mut self, node: Node<T>) -> Result<Block<P>, NodeBuilderError> {
-		let block: Block<P> = DefaultNodeSerializer::new().serialize(node)?;
+	fn serialize(&mut self, max_block_size: usize, node: Node<T>) -> Result<Block, NodeBuilderError> {
+		let block: Block = DefaultNodeSerializer::new().serialize(max_block_size, node)?;
 		let encrypted = EncryptedBlock::encrypt(self.algorithm, &self.key, block)?;
-		let encrypted_block: Block<P> = encrypted.try_into()?;
+		let encrypted_block: Block = encrypted.try_into()?;
 		Ok(encrypted_block)
 	}
 }
@@ -879,17 +883,14 @@ impl From<AlgorithmError> for NodeBuilderError {
 
 pub struct WriteOptions {
 	/// Max byte size for each block.
-	// max_size: usize,
+	max_block_size: usize,
 
 	/// Max children for each block.
 	max_children: usize,
 }
-impl Default for WriteOptions {
-	fn default() -> Self {
-		Self {
-			// max_size: 2.pow(18),
-			max_children: 174,
-		}
+impl WriteOptions {
+	fn new(max_block_size: usize) -> Self {
+		Self { max_block_size, max_children: 174 }
 	}
 }
 
@@ -905,7 +906,7 @@ mod tests {
 	use cid::Cid;
 	use co_primitives::{BlockSerializer, DefaultParams, StorageError, StoreParams};
 	use serde::{Deserialize, Serialize};
-	use std::iter::repeat;
+	use std::iter::repeat_n;
 
 	#[derive(Debug, Serialize, Deserialize)]
 	struct Test {
@@ -917,7 +918,7 @@ mod tests {
 		// storage
 		let memory = MemoryBlockStorage::default();
 		let algorithm = Algorithm::default();
-		let key = Secret::new(repeat(42).take(algorithm.key_size()).collect());
+		let key = Secret::new(repeat_n(42, algorithm.key_size()).collect());
 		let encryption = EncryptedBlockStorage::new(memory.clone(), key, algorithm, Default::default());
 
 		// block
@@ -940,7 +941,7 @@ mod tests {
 		// storage
 		let memory = MemoryBlockStorage::new();
 		let algorithm = Algorithm::default();
-		let key = Secret::new(repeat(42).take(algorithm.key_size()).collect());
+		let key = Secret::new(repeat_n(42, algorithm.key_size()).collect());
 		let encryption = EncryptedBlockStorage::new(memory.clone(), key.clone(), algorithm, Default::default());
 
 		// blocks

@@ -27,7 +27,7 @@ pub fn join_receive(
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
 		Action::DidCommReceive { peer, message } => {
-			if &message.header().message_type == CO_DIDCOMM_JOIN && message.is_validated_sender() {
+			if message.header().message_type == CO_DIDCOMM_JOIN && message.is_validated_sender() {
 				let (header, body) = message.clone().into_inner();
 				let context = context.clone();
 				let peer = *peer;

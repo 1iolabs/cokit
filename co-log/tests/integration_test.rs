@@ -15,8 +15,8 @@ async fn smoke() {
 	// 	.init();
 
 	// create store
-	let mut store = MemoryBlockStorage::default();
-	let block0 = create_event(&mut store, "hello").await;
+	let store = MemoryBlockStorage::default();
+	let block0 = create_event(&store, "hello").await;
 
 	// create log
 	let identity = DidKeyIdentity::generate(None);
@@ -39,10 +39,10 @@ async fn smoke() {
 #[tokio::test]
 async fn traverse_sinlge_user_log() {
 	// create store
-	let mut store = MemoryBlockStorage::default();
-	let block0 = create_event(&mut store, "hello").await;
-	let block1 = create_event(&mut store, "world").await;
-	let block2 = create_event(&mut store, "whats").await;
+	let store = MemoryBlockStorage::default();
+	let block0 = create_event(&store, "hello").await;
+	let block1 = create_event(&store, "world").await;
+	let block2 = create_event(&store, "whats").await;
 
 	// create log
 	let identity = DidKeyIdentity::generate(None);

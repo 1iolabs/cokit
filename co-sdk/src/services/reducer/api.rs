@@ -11,8 +11,13 @@ use cid::Cid;
 use co_actor::{Actor, ActorHandle, TaskSpawner};
 use co_core_co::Co;
 use co_identity::{PrivateIdentity, PrivateIdentityBox};
-use co_primitives::{tags, BlockStorageSettings, CloneWithBlockStorageSettings, CoId, Link, OptionLink, ReducerAction};
-use co_storage::{BlockStorageExt, OverlayBlockStorage, StorageError};
+use co_primitives::{
+	tags, BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, Link, OptionLink, ReducerAction,
+};
+use co_storage::{
+	BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage, LinksBlockStorage,
+	OverlayBlockStorage, StorageError,
+};
 use futures::Stream;
 use ipld_core::ipld::Ipld;
 use serde::Serialize;
@@ -30,23 +35,26 @@ pub struct CoReducer {
 	date: DynamicCoDate,
 	runtime: Runtime,
 	core_resolver: DynamicCoreResolver<CoStorage>,
+	verify_links: Option<BlockLinks>,
 }
 impl CoReducer {
+	#[allow(clippy::too_many_arguments)]
 	pub(crate) fn spawn(
 		application_handle: ActorHandle<ApplicationMessage>,
 		application_identifier: String,
 		id: CoId,
 		parent: Option<CoId>,
-		storage: CoStorage,
 		tasks: TaskSpawner,
 		runtime: Runtime,
 		reducer: Reducer<CoStorage, DynamicCoreResolver<CoStorage>>,
 		context: CoReducerContextRef,
 		flush: CoReducerFlush,
 		initialize: bool,
+		verify_links: Option<BlockLinks>,
 	) -> Result<Self, anyhow::Error> {
 		let date = reducer.date().clone();
 		let core_resolver = reducer.core_resolver().clone();
+		let storage = Self::create_storage(&verify_links, &context.storage(false));
 		let actor = Actor::spawn_with(
 			tasks.clone(),
 			tags!("application": application_identifier, "co": id.as_str()),
@@ -63,6 +71,7 @@ impl CoReducer {
 			overlay_storage: None,
 			runtime,
 			core_resolver,
+			verify_links,
 		})
 	}
 
@@ -72,21 +81,21 @@ impl CoReducer {
 	}
 
 	pub(crate) fn clone_with_detached_storage(&self) -> Self {
-		self.clone_with_settings(BlockStorageSettings::new().with_detached())
+		self.clone_with_settings(BlockStorageCloneSettings::new().with_detached())
 	}
 
-	pub(crate) fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+	pub(crate) fn clone_with_settings(&self, settings: BlockStorageCloneSettings) -> Self {
 		let (storage, overlay_storage) = match &self.overlay_storage {
 			Some(overlay_storage) => {
 				// clone the base storage without overlay but with settings
-				let storage = overlay_storage.next_storage().clone_with_settings(settings);
+				let storage = self.context.storage(false).clone_with_settings(settings);
 
 				// clone the overlay and replace next storage with the cloned instance
 				//  this will use the same overlay as the source clone
 				let overlay_storage = overlay_storage.clone().with_next_storage(storage);
 
 				// result
-				(CoStorage::new(overlay_storage.clone()), Some(overlay_storage))
+				(Self::create_storage(&self.verify_links, &overlay_storage), Some(overlay_storage))
 			},
 			None => (self.storage.clone_with_settings(settings), None),
 		};
@@ -100,24 +109,29 @@ impl CoReducer {
 			core_resolver: self.core_resolver.clone(),
 			storage,
 			overlay_storage,
-		}
-	}
-
-	/// Get the reducer base storage (without overlay).
-	pub(crate) fn base_storage(&self) -> &CoStorage {
-		match &self.overlay_storage {
-			Some(overlay_storage) => overlay_storage.next_storage(),
-			None => &self.storage,
+			verify_links: self.verify_links.clone(),
 		}
 	}
 
 	/// Use a new overlay storage for this instance.
 	pub(crate) fn with_overlay_storage(mut self, tasks: TaskSpawner, storage: Storage) -> Self {
-		let overlay_storage =
-			OverlayBlockStorage::new(tasks, self.base_storage().clone(), storage.tmp_storage(), None, true, true);
-		self.storage = CoStorage::new(overlay_storage.clone());
+		let base_storage = self.context.storage(false);
+		let overlay_storage = OverlayBlockStorage::new(tasks, base_storage, storage.tmp_storage(), None, true, true);
+		self.storage = Self::create_storage(&self.verify_links, &overlay_storage);
 		self.overlay_storage = Some(overlay_storage);
 		self
+	}
+
+	/// Create the actural storage instance.
+	fn create_storage<S>(verify_links: &Option<BlockLinks>, storage: &S) -> CoStorage
+	where
+		S: BlockStorage + ExtendedBlockStorage + BlockStorageContentMapping + CloneWithBlockStorageSettings + 'static,
+	{
+		if let Some(verify_links) = &verify_links {
+			CoStorage::new(LinksBlockStorage::new(storage.clone(), Some(verify_links.clone())))
+		} else {
+			CoStorage::new(storage.clone())
+		}
 	}
 
 	pub(crate) async fn clear(&self) -> CoReducerState {

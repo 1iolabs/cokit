@@ -6,6 +6,12 @@ mod services;
 pub mod state;
 mod types;
 
+#[cfg(feature = "pinning")]
+pub use crate::library::{
+	storage_cleanup::storage_cleanup,
+	storage_snapshots::storage_snapshots,
+	storage_structure::{storage_structure_recursive, CoStructureResolver, StructureResolveResult, StructureResolver},
+};
 pub use application::{
 	application::{Application, ApplicationBuilder},
 	co_context::CoContext,
@@ -36,6 +42,7 @@ pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, Runti
 pub use co_storage::BlockStorageContentMapping;
 pub use library::{
 	build_core::{build_core, crate_repository_path, BuildCoreArtifact},
+	core_source::CoreSource,
 	did_key_provider::DidKeyProvider,
 	find_co_by_pin::find_co_by_pin,
 	find_co_identities::{find_co_identities, find_co_private_identity},
@@ -47,12 +54,10 @@ pub use library::{
 	keystore_fetch::keystore_fetch,
 	local_keypair_fetch::local_keypair_fetch,
 	memory_dispatch::MemoryDispatch,
-	storage_cleanup::storage_cleanup,
-	storage_structure::{storage_structure_recursive, CoStructureResolver, StructureResolveResult, StructureResolver},
 	token::{CoToken, CoTokenParameters},
 	update_co::update_co,
 };
-pub use pin::pin::PinAPI;
+pub use pin::PinAPI;
 pub use reducer::core_resolver::{
 	co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverContext, CoreResolverError,
 };
@@ -67,6 +72,7 @@ pub use types::{
 	co_reducer_context::CoReducerContext,
 	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError, CoReducerFactoryResultExt},
 	co_reducer_state::{CoReducerState, MappedCoReducerState},
+	co_root::CoRoot,
 	co_storage::CoStorage,
 	co_uuid::{CoUuid, DynamicCoUuid, MonotonicCoUuid, RandomCoUuid},
 	cores::{

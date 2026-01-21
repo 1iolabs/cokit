@@ -11,7 +11,6 @@ use crate::{
 use anyhow::anyhow;
 use co_actor::ActorHandle;
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
-use co_primitives::DefaultParams;
 use futures::{pin_mut, Stream, StreamExt};
 use libp2p::{
 	autonat, dcutr, gossipsub, identify,
@@ -46,7 +45,7 @@ impl Libp2pNetwork {
 		config: NetworkSettings,
 		resolver: IdentityResolverBox,
 		private_resolver: PrivateIdentityResolverBox,
-		bitswap: ActorHandle<BitswapMessage<DefaultParams>>,
+		bitswap: ActorHandle<BitswapMessage>,
 	) -> anyhow::Result<Libp2pNetwork> {
 		let resolver = IdentityResolverBox::new(resolver);
 		let private_resolver = PrivateIdentityResolverBox::new(private_resolver);
@@ -67,23 +66,19 @@ impl Libp2pNetwork {
 				.map_err(|err| anyhow!("gossip failed: {}", err))?;
 
 		// bitswap
-		let bitswap = Bitswap::<libipld::DefaultParams>::new(
-			Default::default(),
-			BitswapStoreClient::<DefaultParams>::new(bitswap),
-			{
-				let bitswap_identifier = identifier.clone();
-				Box::new(move |t| {
-					tokio::spawn(async move {
-						t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
-							.await
-					});
-				})
-			},
-		);
+		let bitswap = Bitswap::<libipld::DefaultParams>::new(Default::default(), BitswapStoreClient::new(bitswap), {
+			let bitswap_identifier = identifier.clone();
+			Box::new(move |t| {
+				tokio::spawn(async move {
+					t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
+						.await
+				});
+			})
+		});
 
 		// relay
 		let relay_server = if config.relay {
-			Some(libp2p::relay::Behaviour::new(local_peer_id.clone(), relay::Config::default()))
+			Some(libp2p::relay::Behaviour::new(local_peer_id, relay::Config::default()))
 		} else {
 			None
 		}
@@ -96,8 +91,7 @@ impl Libp2pNetwork {
 
 		// mdns
 		let mdns =
-			if config.mdns { Some(MdnsBehaviour::new(mdns::Config::default(), local_peer_id.clone())?) } else { None }
-				.into();
+			if config.mdns { Some(MdnsBehaviour::new(mdns::Config::default(), local_peer_id)?) } else { None }.into();
 
 		// didcomm
 		let didcomm = didcomm::Behaviour::new(resolver.clone(), private_resolver, didcomm::Config { auto_dail: false });
@@ -112,7 +106,7 @@ impl Libp2pNetwork {
 		.into();
 
 		// dcutr
-		let dcutr = if config.nat { Some(dcutr::Behaviour::new(local_peer_id.clone())) } else { None }.into();
+		let dcutr = if config.nat { Some(dcutr::Behaviour::new(local_peer_id)) } else { None }.into();
 
 		// behaviour
 		let mut behaviour = Behaviour {
@@ -282,10 +276,9 @@ impl LayerBehaviour<Behaviour> for Context {
 
 	fn on_layer_event(&mut self, swarm: &mut Swarm<Behaviour>, event: Self::ToLayer) -> Option<Self::ToSwarm> {
 		match event {
-			ContextLayerEvent::Discovery(event) => self
-				.discovery
-				.on_layer_event(swarm, event)
-				.map(|event| ContextEvent::Discovery(event)),
+			ContextLayerEvent::Discovery(event) => {
+				self.discovery.on_layer_event(swarm, event).map(ContextEvent::Discovery)
+			},
 		}
 	}
 
@@ -301,6 +294,7 @@ impl LayerBehaviour<Behaviour> for Context {
 #[allow(unused)]
 #[derive(Debug, derive_more::From)]
 #[non_exhaustive]
+#[allow(clippy::large_enum_variant)]
 pub enum NetworkEvent {
 	Didcomm(didcomm::Event),
 	Gossipsub(gossipsub::Event),
@@ -586,10 +580,7 @@ fn run_task_complete(runtime: &mut Runtime, task_index: &mut usize, task_state: 
 }
 
 fn is_log(event: &SwarmEvent<NetworkEvent>) -> bool {
-	match event {
-		SwarmEvent::Behaviour(NetworkEvent::Ping(_)) => false,
-		_ => true,
-	}
+	!matches!(event, SwarmEvent::Behaviour(NetworkEvent::Ping(_)))
 }
 
 async fn option_await<T, O>(t: Option<T>) -> Option<O>

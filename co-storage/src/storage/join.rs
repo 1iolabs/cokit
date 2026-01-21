@@ -2,7 +2,8 @@ use crate::{BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage};
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{
-	Block, BlockStat, BlockStorage, BlockStorageSettings, CloneWithBlockStorageSettings, MappedCid, StorageError,
+	Block, BlockStat, BlockStorage, BlockStorageCloneSettings, BlockStorageStoreParams, CloneWithBlockStorageSettings,
+	MappedCid, StorageError,
 };
 use std::{collections::BTreeSet, sync::Arc};
 
@@ -16,7 +17,7 @@ pub struct JoinBlockStorage<S, R> {
 impl<S, R> JoinBlockStorage<S, R>
 where
 	S: BlockStorage + 'static,
-	R: ExtendedBlockStorage<StoreParams = S::StoreParams> + 'static,
+	R: ExtendedBlockStorage + 'static,
 {
 	pub fn new(next: S, read: Vec<R>) -> Self {
 		Self { next: Arc::new((next, read)) }
@@ -26,11 +27,9 @@ where
 impl<S, R> BlockStorage for JoinBlockStorage<S, R>
 where
 	S: BlockStorage + 'static,
-	R: ExtendedBlockStorage<StoreParams = S::StoreParams>,
+	R: ExtendedBlockStorage,
 {
-	type StoreParams = S::StoreParams;
-
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		for read in self.next.1.iter() {
 			if read.exists(cid).await.unwrap_or(false) {
 				return read.get(cid).await;
@@ -39,7 +38,7 @@ where
 		self.next.0.get(cid).await
 	}
 
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		self.next.0.set(block).await
 	}
 
@@ -55,14 +54,18 @@ where
 		}
 		self.next.0.stat(cid).await
 	}
+
+	fn max_block_size(&self) -> usize {
+		self.next.0.max_block_size()
+	}
 }
 #[async_trait]
 impl<S, R> ExtendedBlockStorage for JoinBlockStorage<S, R>
 where
 	S: ExtendedBlockStorage + 'static,
-	R: ExtendedBlockStorage<StoreParams = S::StoreParams> + 'static,
+	R: ExtendedBlockStorage + 'static,
 {
-	async fn set_extended(&self, block: ExtendedBlock<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set_extended(&self, block: ExtendedBlock) -> Result<Cid, StorageError> {
 		self.next.0.set_extended(block).await
 	}
 
@@ -83,7 +86,7 @@ where
 impl<S, R> BlockStorageContentMapping for JoinBlockStorage<S, R>
 where
 	S: BlockStorage + BlockStorageContentMapping + 'static,
-	R: ExtendedBlockStorage<StoreParams = S::StoreParams> + 'static,
+	R: ExtendedBlockStorage + 'static,
 {
 	async fn is_content_mapped(&self) -> bool {
 		self.next.0.is_content_mapped().await
@@ -105,9 +108,16 @@ where
 impl<S, R> CloneWithBlockStorageSettings for JoinBlockStorage<S, R>
 where
 	S: BlockStorage + CloneWithBlockStorageSettings + 'static,
-	R: ExtendedBlockStorage<StoreParams = S::StoreParams> + Clone + 'static,
+	R: ExtendedBlockStorage + Clone + 'static,
 {
-	fn clone_with_settings(&self, settings: BlockStorageSettings) -> Self {
+	fn clone_with_settings(&self, settings: BlockStorageCloneSettings) -> Self {
 		Self::new(self.next.0.clone_with_settings(settings), self.next.1.clone())
 	}
+}
+impl<S, R> BlockStorageStoreParams for JoinBlockStorage<S, R>
+where
+	S: BlockStorage + BlockStorageStoreParams + 'static,
+	R: ExtendedBlockStorage + 'static,
+{
+	type StoreParams = S::StoreParams;
 }

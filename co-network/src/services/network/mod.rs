@@ -1,16 +1,16 @@
 mod actor;
 mod api;
 mod message;
-mod network;
 mod settings;
+mod spawner;
 mod subscribe;
 mod tasks;
 
 pub use actor::{Network, NetworkInitialize};
 pub use api::NetworkApi;
 pub use message::NetworkMessage;
-pub use network::CoNetworkTaskSpawner;
 pub use settings::NetworkSettings;
+pub use spawner::CoNetworkTaskSpawner;
 pub use subscribe::subscribe_identity;
 pub use tasks::{
 	connections::ConnectionsNetworkTask,

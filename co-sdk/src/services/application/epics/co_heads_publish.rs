@@ -46,7 +46,7 @@ async fn publish(context: CoContext, co: CoId) -> Result<(), anyhow::Error> {
 }
 
 /// Extract COHeads networks.
-pub async fn network_co_heads<'a>(
+pub async fn network_co_heads(
 	storage: &CoStorage,
 	co: CoId,
 	state: OptionLink<Co>,

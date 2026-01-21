@@ -18,8 +18,8 @@ impl OptionMappedCid {
 		MappedCid(internal, external).into()
 	}
 
-	pub fn new_unmapped(cid: Cid) -> OptionMappedCid {
-		cid.into()
+	pub fn new_unmapped(internal: Cid) -> OptionMappedCid {
+		internal.into()
 	}
 
 	pub fn mapped(&self) -> Option<MappedCid> {

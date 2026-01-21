@@ -27,7 +27,7 @@ pub fn invite_receive(
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
 		Action::DidCommReceive { peer, message } => {
-			if &message.header().message_type == CO_DIDCOMM_INVITE
+			if message.header().message_type == CO_DIDCOMM_INVITE
 				&& message.header().to.len() == 1
 				&& message.is_validated_sender()
 			{
@@ -73,33 +73,6 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 
 	// apply
 	if let Some(membership_state) = membership_state {
-		// storage
-		#[cfg(feature = "pinning")]
-		{
-			local
-				.push(
-					&context.local_identity(),
-					crate::CO_CORE_NAME_STORAGE,
-					&co_core_storage::StorageAction::PinCreate(
-						crate::types::co_pinning_key::CoPinningKey::State.to_string(&payload.id),
-						context.settings().setting_co_default_max_state(),
-						vec![payload.state.into()],
-					),
-				)
-				.await?;
-			local
-				.push(
-					&context.local_identity(),
-					crate::CO_CORE_NAME_STORAGE,
-					&co_core_storage::StorageAction::PinCreate(
-						crate::types::co_pinning_key::CoPinningKey::Log.to_string(&payload.id),
-						context.settings().setting_co_default_max_log(),
-						payload.heads.iter().map(Into::into).collect(),
-					),
-				)
-				.await?;
-		}
-
 		// payload
 		let metadata = CoInviteMetadata {
 			id: header.id,

@@ -29,7 +29,7 @@ impl DidCommSendNetworkTask {
 		let (tx, rx) = tokio::sync::oneshot::channel();
 		let task = Self { message, peers: peers.into_iter().collect(), sent: Some(tx) };
 		spawner.spawn(task)?;
-		Ok(tokio::time::timeout(timeout, rx).await???)
+		tokio::time::timeout(timeout, rx).await??
 	}
 }
 impl NetworkTask<Behaviour, Context> for DidCommSendNetworkTask {
@@ -45,32 +45,26 @@ impl NetworkTask<Behaviour, Context> for DidCommSendNetworkTask {
 		_context: &mut Context,
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
-		match &event {
-			SwarmEvent::Behaviour(NetworkEvent::Didcomm(didcomm_event)) => {
-				match &didcomm_event {
-					didcomm::Event::Sent { peer_id, message } => {
-						// check the message before removing the peer as the peer may sent other message at same time
-						if &self.message == message {
-							if self.peers.remove(peer_id) {
-								if let Some(sent) = Option::take(&mut self.sent) {
-									sent.send(Ok(*peer_id)).ok();
-								}
-							}
+		if let SwarmEvent::Behaviour(NetworkEvent::Didcomm(didcomm_event)) = &event {
+			match &didcomm_event {
+				didcomm::Event::Sent { peer_id, message } => {
+					// check the message before removing the peer as the peer may sent other message at same time
+					if &self.message == message && self.peers.remove(peer_id) {
+						if let Some(sent) = Option::take(&mut self.sent) {
+							sent.send(Ok(*peer_id)).ok();
 						}
-					},
-					didcomm::Event::OutboundFailure { peer_id, error, message } => {
-						if self.peers.is_empty() || Some(&self.message) == message.as_ref() {
-							if self.peers.remove(peer_id) {
-								if let Some(sent) = Option::take(&mut self.sent) {
-									sent.send(Err(error.clone().into())).ok();
-								}
-							}
+					}
+				},
+				didcomm::Event::OutboundFailure { peer_id, error, message } => {
+					if (self.peers.is_empty() || Some(&self.message) == message.as_ref()) && self.peers.remove(peer_id)
+					{
+						if let Some(sent) = Option::take(&mut self.sent) {
+							sent.send(Err(error.clone().into())).ok();
 						}
-					},
-					_ => {},
-				}
-			},
-			_ => {},
+					}
+				},
+				_ => {},
+			}
 		}
 		Some(event)
 	}

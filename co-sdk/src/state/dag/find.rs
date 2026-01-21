@@ -75,7 +75,7 @@ mod tests {
 	async fn smoke() {
 		// test data
 		let storage = MemoryBlockStorage::default();
-		let mut builder = NodeBuilder::new(2, DefaultNodeSerializer::new());
+		let mut builder = NodeBuilder::new(storage.max_block_size(), 2, DefaultNodeSerializer::new());
 		builder.push(1).unwrap();
 		builder.push(2).unwrap();
 		builder.push(3).unwrap();

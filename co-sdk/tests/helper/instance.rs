@@ -3,6 +3,7 @@ use co_sdk::{
 	Application, ApplicationBuilder, DidKeyIdentity, DidKeyProvider, NetworkSettings, TracingBuilder,
 	CO_CORE_NAME_KEYSTORE,
 };
+use co_test::test_log_path;
 use tracing::subscriber::DefaultGuard;
 
 pub struct Instances {
@@ -13,7 +14,7 @@ impl Instances {
 	pub fn new(name: impl Into<String>) -> Self {
 		// log
 		let _guard = TracingBuilder::new(name.into(), None)
-			.with_bunyan_logging(Some(std::env::current_dir().unwrap().join("../data/log/co.log")))
+			.with_bunyan_logging(Some(test_log_path()))
 			//.with_open_telemetry("http://localhost:4317")
 			//.with_stderr_logging()
 			.with_env_filter_directives(

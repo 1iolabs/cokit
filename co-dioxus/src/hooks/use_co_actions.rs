@@ -43,7 +43,7 @@ async fn read_actions<T>(
 where
 	T: DeserializeOwned + Send + Sync + 'static,
 {
-	let reducer = application.co().try_co_reducer(&co).await?;
+	let reducer = application.co().try_co_reducer(co).await?;
 	let storage = reducer.storage();
 	if state.is_empty() {
 		return Ok(Vec::new());

@@ -24,8 +24,8 @@ where
 		Log::new(id.as_bytes().to_vec(), IdentityEntryVerifier::new(create_identity_resolver()), reducer_state.heads());
 	let core_resolver = core_resolver.unwrap_or_else(|| {
 		let core_resolver = CoCoreResolver::default();
-		let core_resolver = DynamicCoreResolver::new(core_resolver);
-		core_resolver
+
+		DynamicCoreResolver::new(core_resolver)
 	});
 	let mut builder = ReducerBuilder::new(core_resolver, log);
 	if let Some((state, heads)) = reducer_state.some() {

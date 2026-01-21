@@ -1,8 +1,8 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoTryStreamExt, IsDefault, LazyTransaction, Link,
-	OptionLink, ReducerAction, TagValue, WeakCid,
+	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoTryStreamExt, CoreBlockStorage, IsDefault,
+	LazyTransaction, Link, OptionLink, ReducerAction, TagValue, WeakCid,
 };
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
 use std::{collections::BTreeMap, future::ready, ops::Range};
@@ -131,14 +131,11 @@ pub struct RichText {
 	#[serde(rename = "i", default, skip_serializing_if = "IsDefault::is_default")]
 	pub runs: CoMap<Position, Run>,
 }
-impl<S> Reducer<RichTextAction, S> for RichText
-where
-	S: BlockStorage + Clone + 'static,
-{
+impl Reducer<RichTextAction> for RichText {
 	async fn reduce(
 		state_link: OptionLink<Self>,
 		event_link: Link<ReducerAction<RichTextAction>>,
-		storage: &S,
+		storage: &CoreBlockStorage,
 	) -> Result<Link<Self>, anyhow::Error> {
 		let event = storage.get_value(&event_link).await?;
 		let mut state = storage.get_value_or_default(&state_link).await?;
@@ -224,11 +221,10 @@ impl RichText {
 	where
 		S: BlockStorage + Clone + 'static,
 	{
-		Ok(self
-			.chars(storage.clone())
+		self.chars(storage.clone())
 			.map_ok(|(char, _, _)| char)
 			.try_collect::<String>()
-			.await?)
+			.await
 	}
 }
 
@@ -258,7 +254,7 @@ impl Run {
 	/// The last character in this run.
 	/// If the run has only one character this is equal to frist.
 	pub fn last(&self) -> Position {
-		assert!(self.text.len() > 0);
+		assert!(!self.text.is_empty());
 		self.id.right_by(self.text.len() - 1)
 	}
 
@@ -335,10 +331,9 @@ where
 
 	/// Get the run at position.
 	pub async fn get_run(&mut self, at: Position) -> anyhow::Result<Run> {
-		Ok(self
-			.find_run(at)
+		self.find_run(at)
 			.await?
-			.ok_or_else(|| anyhow!("InsertionPoint not found: {:?}", at))?)
+			.ok_or_else(|| anyhow!("InsertionPoint not found: {:?}", at))
 	}
 }
 
@@ -810,7 +805,7 @@ where
 				index += run.text.len();
 			}
 		}
-		return Err(anyhow!("Position not found: {:?}", at));
+		Err(anyhow!("Position not found: {:?}", at))
 	}
 
 	/// Range for positions.
@@ -826,25 +821,21 @@ where
 		pin_mut!(runs);
 		while let Some(run) = runs.try_next().await? {
 			// done?
-			if !start_found {
-				if run.contains(*at) {
-					start = if !run.deleted { index + at.1 - run.id.1 } else { index };
-					start_found = true;
-					start_deleted = run.deleted;
-				}
+			if !start_found && run.contains(*at) {
+				start = if !run.deleted { index + at.1 - run.id.1 } else { index };
+				start_found = true;
+				start_deleted = run.deleted;
 			}
 			if start_found {
 				if let Some(last) = last {
 					if run.contains(*last) {
 						return Ok(Range { start, end: if !run.deleted { index + at.1 - run.id.1 } else { index } });
 					}
+				} else if run.deleted && start_deleted {
+					// return a empty range as the range is fully deleted
+					return Ok(Range { start, end: start });
 				} else {
-					if run.deleted && start_deleted {
-						// return a empty range as the range is fully deleted
-						return Ok(Range { start, end: start });
-					} else {
-						return Ok(Range { start, end: start + 1 });
-					}
+					return Ok(Range { start, end: start + 1 });
 				}
 			}
 
@@ -856,7 +847,7 @@ where
 		if !start_found {
 			return Err(anyhow!("Position not found: {:?}", at));
 		}
-		return Err(anyhow!("Position not found: {:?}", last));
+		Err(anyhow!("Position not found: {:?}", last))
 	}
 
 	/// Position for index.
@@ -874,7 +865,7 @@ where
 	/// Positions for range.
 	pub async fn position_range(&self, range: &Range<usize>) -> anyhow::Result<(Option<Position>, Option<Position>)> {
 		// validate
-		if range.len() == 0 {
+		if range.is_empty() {
 			return Err(anyhow!("Invalid range: {:?}", range));
 		}
 
@@ -996,7 +987,9 @@ mod tests {
 		RichTextAction, Run,
 	};
 	use cid::Cid;
-	use co_api::{async_api::Reducer, BlockStorage, BlockStorageExt, CoTryStreamExt, Date, ReducerAction};
+	use co_api::{
+		async_api::Reducer, BlockStorage, BlockStorageExt, CoTryStreamExt, CoreBlockStorage, Date, ReducerAction,
+	};
 	use co_storage::MemoryBlockStorage;
 	use futures::{StreamExt, TryStreamExt};
 
@@ -1008,7 +1001,10 @@ mod tests {
 		*time += 1;
 		let action_link = storage.set_value(&action).await.unwrap();
 		let state_link = storage.set_value(&state).await.unwrap();
-		let next_state_link = RichText::reduce(state_link.into(), action_link, storage).await.unwrap();
+		let next_state_link =
+			RichText::reduce(state_link.into(), action_link, &CoreBlockStorage::new(storage.clone(), true))
+				.await
+				.unwrap();
 		storage.get_value(&next_state_link).await.unwrap()
 	}
 
@@ -1026,12 +1022,12 @@ mod tests {
 		assert_eq!(run.first(), Position(head, 0));
 		assert_eq!(run.last(), Position(head, 4));
 		assert_eq!(run.range(), 0..5);
-		assert_eq!(run.contains(Position(head, 0)), true);
-		assert_eq!(run.contains(Position(head, 1)), true);
-		assert_eq!(run.contains(Position(head, 2)), true);
-		assert_eq!(run.contains(Position(head, 3)), true);
-		assert_eq!(run.contains(Position(head, 4)), true);
-		assert_eq!(run.contains(Position(head, 5)), false);
+		assert!(run.contains(Position(head, 0)));
+		assert!(run.contains(Position(head, 1)));
+		assert!(run.contains(Position(head, 2)));
+		assert!(run.contains(Position(head, 3)));
+		assert!(run.contains(Position(head, 4)));
+		assert!(!run.contains(Position(head, 5)));
 	}
 
 	#[tokio::test]

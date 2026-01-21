@@ -17,8 +17,7 @@ use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, ResponseStreams};
 use co_identity::{Identity, PrivateIdentityBox};
 use co_primitives::{
-	BlockLinks, CoId, IgnoreFilter, KnownMultiCodec, Link, MappedCid, MultiCodec, OptionMappedCid, ReducerAction, Tags,
-	WeakCoReferenceFilter,
+	BlockLinks, CoId, IgnoreFilter, Link, MappedCid, OptionMappedCid, ReducerAction, Tags, WeakCoReferenceFilter,
 };
 use co_storage::{BlockStorageContentMapping, BlockStorageExt, OverlayBlockStorage};
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
@@ -56,27 +55,6 @@ impl Actor for ReducerActor {
 	) -> Result<Self::State, ActorError> {
 		// initialize
 		if initialize {
-			// check all snapshots are internal
-			// note: this will fetch the block from network if neccesarry. To prevent reducer init deadlocks we do this
-			//  here to have the actor instance available for caller while doing the network stuff.
-			let has_encrypted = reducer
-				.snapshots_iter()
-				.flat_map(|(state, heads)| [state].into_iter().chain(heads.iter()))
-				.any(|cid| MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock));
-			if has_encrypted {
-				let mut internal = Vec::new();
-				for (state, heads) in reducer.snapshots_iter() {
-					internal.push(CoReducerState::new(Some(*state), heads.clone()).to_internal(&storage).await);
-				}
-				reducer.clear_snapshots();
-				for CoReducerState(state, heads) in internal {
-					if let Some(state) = state {
-						reducer.insert_snapshot(state, heads);
-					}
-				}
-			}
-
-			// initialize
 			reducer.initialize(&storage, self.runtime.runtime()).await?;
 		}
 
@@ -103,7 +81,7 @@ impl Actor for ReducerActor {
 	) -> Result<(), ActorError> {
 		match message {
 			ReducerMessage::State(response) => {
-				response.respond(handle_state(&state));
+				response.respond(handle_state(state));
 			},
 			ReducerMessage::StateStream(mut response) => {
 				if response.send(CoReducerState::new_reducer(&state.reducer)).is_ok() {
@@ -111,10 +89,10 @@ impl Actor for ReducerActor {
 				}
 			},
 			ReducerMessage::Push(overlay_storage, storage, identity, action_link, response) => {
-				response.respond(handle_push(&self, overlay_storage, state, identity, storage, action_link).await);
+				response.respond(handle_push(self, overlay_storage, state, identity, storage, action_link).await);
 			},
 			ReducerMessage::JoinState(overlay_storage, storage, join_state, response) => {
-				response.respond(handle_join_state(&self, overlay_storage, state, storage, join_state).await);
+				response.respond(handle_join_state(self, overlay_storage, state, storage, join_state).await);
 			},
 			ReducerMessage::Clear(response) => {
 				response.respond(handle_clear(state));
@@ -140,9 +118,7 @@ fn changed(
 	roots: impl IntoIterator<Item = CoReducerState>,
 ) {
 	if reducer_state.flush_info.is_none() {
-		let mut flush_info = FlushInfo::default();
-		flush_info.network = reducer_state.network_feature;
-		reducer_state.flush_info = Some(flush_info);
+		reducer_state.flush_info = Some(FlushInfo { network: reducer_state.network_feature, ..Default::default() });
 	}
 	if let Some(flush_info) = &mut reducer_state.flush_info {
 		if local {
@@ -268,7 +244,10 @@ async fn flush(
 	if let Some(overlay_storage) = &overlay_storage {
 		// flush roots from `overlay_storage` to `storage`
 		for root in new_roots.iter() {
-			// skip to walk all head only use the latest
+			// filter links
+			// - skip to walk previous head - only use the latest
+			// - skip to walk previous state - only use the latest
+			// - skip weak references
 			let links = BlockLinks::default()
 				.with_filter(IgnoreFilter::new(extract_next_heads(overlay_storage, &root.1, true).await?))
 				.with_filter(WeakCoReferenceFilter::new());
@@ -357,7 +336,7 @@ async fn apply_join(
 ) -> Result<Option<JoinResult>, anyhow::Error> {
 	// insert snapshot if have state and heads
 	if let Some((state, heads)) = state.some() {
-		reducer_state.reducer.insert_snapshot(state, heads);
+		reducer_state.reducer.insert_snapshot(storage, state, heads).await?;
 	}
 
 	// join

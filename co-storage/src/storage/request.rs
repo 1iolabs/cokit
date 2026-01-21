@@ -1,45 +1,35 @@
 use crate::{BlockStat, BlockStorage, StorageError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{Block, BlockStorageSettings, CloneWithBlockStorageSettings, StoreParams};
+use co_primitives::{Block, BlockStorageCloneSettings, CloneWithBlockStorageSettings};
 use futures::{
 	channel::{mpsc, oneshot},
 	SinkExt,
 };
 
 #[derive(Debug)]
-pub enum Request<P: StoreParams> {
-	Get(Cid, oneshot::Sender<Result<Block<P>, StorageError>>),
-	Set(Block<P>, oneshot::Sender<Result<Cid, StorageError>>),
+pub enum Request {
+	Get(Cid, oneshot::Sender<Result<Block, StorageError>>),
+	Set(Block, oneshot::Sender<Result<Cid, StorageError>>),
 	Remove(Cid, oneshot::Sender<Result<(), StorageError>>),
 	Stat(Cid, oneshot::Sender<Result<BlockStat, StorageError>>),
 }
 
 #[derive(Debug, Clone)]
-pub struct RequestBlockStorage<S>
-where
-	S: BlockStorage + Send + Sync + Clone + 'static,
-{
-	sender: mpsc::Sender<Request<S::StoreParams>>,
+pub struct RequestBlockStorage {
+	sender: mpsc::Sender<Request>,
+	max_block_size: usize,
 }
-impl<S> RequestBlockStorage<S>
-where
-	S: BlockStorage + Send + Sync + Clone + 'static,
-{
-	pub fn new(buffer: usize) -> (Self, mpsc::Receiver<Request<S::StoreParams>>) {
+impl RequestBlockStorage {
+	pub fn new(buffer: usize, max_block_size: usize) -> (Self, mpsc::Receiver<Request>) {
 		let (tx, rx) = mpsc::channel(buffer);
-		(Self { sender: tx }, rx)
+		(Self { sender: tx, max_block_size }, rx)
 	}
 }
 #[async_trait]
-impl<S> BlockStorage for RequestBlockStorage<S>
-where
-	S: BlockStorage + Send + Sync + Clone + 'static,
-{
-	type StoreParams = S::StoreParams;
-
+impl BlockStorage for RequestBlockStorage {
 	/// Returns a block from storage.
-	async fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		let (tx, rx) = oneshot::channel();
 		self.sender
 			.clone()
@@ -51,7 +41,7 @@ where
 
 	/// Inserts a block into storage.
 	/// Returns the CID of the block (gurranted to be the same as the supplied).
-	async fn set(&self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
+	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		let (tx, rx) = oneshot::channel();
 		self.sender
 			.clone()
@@ -82,12 +72,13 @@ where
 			.map_err(|e| StorageError::Internal(e.into()))?;
 		rx.await.map_err(|e| StorageError::Internal(e.into()))?
 	}
+
+	fn max_block_size(&self) -> usize {
+		self.max_block_size
+	}
 }
-impl<S> CloneWithBlockStorageSettings for RequestBlockStorage<S>
-where
-	S: BlockStorage + CloneWithBlockStorageSettings + 'static,
-{
-	fn clone_with_settings(&self, _settings: BlockStorageSettings) -> Self {
+impl CloneWithBlockStorageSettings for RequestBlockStorage {
+	fn clone_with_settings(&self, _settings: BlockStorageCloneSettings) -> Self {
 		self.clone()
 	}
 }

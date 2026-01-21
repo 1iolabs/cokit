@@ -15,7 +15,7 @@ use crate::{
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, ActorInstance, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
-use co_primitives::{tags, DefaultParams, Tags};
+use co_primitives::{tags, Tags};
 use libp2p::{identity::Keypair, PeerId};
 
 pub struct NetworkInitialize {
@@ -24,7 +24,7 @@ pub struct NetworkInitialize {
 	pub keypair: Keypair,
 	pub identity_resolver: IdentityResolverBox,
 	pub private_identity_resolver: PrivateIdentityResolverBox,
-	pub bitswap: ActorHandle<BitswapMessage<DefaultParams>>,
+	pub bitswap: ActorHandle<BitswapMessage>,
 	pub tasks: TaskSpawner,
 	pub network_resolver: DynamicNetworkResolver,
 }
@@ -56,7 +56,7 @@ impl Actor for Network {
 		)?;
 
 		// spawner
-		let spawner = CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id.clone() };
+		let spawner = CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id };
 
 		// dial identified peer addresses
 		spawner

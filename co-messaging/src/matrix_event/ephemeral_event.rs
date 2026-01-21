@@ -23,7 +23,7 @@ impl EventType for TypingContent {
 
 impl From<TypingContent> for EventContent {
 	fn from(val: TypingContent) -> Self {
-		EventContent::Typing(val).into()
+		EventContent::Typing(val)
 	}
 }
 
@@ -79,7 +79,7 @@ impl EventType for PresenceContent {
 
 impl From<PresenceContent> for EventContent {
 	fn from(val: PresenceContent) -> Self {
-		EventContent::Presence(val).into()
+		EventContent::Presence(val)
 	}
 }
 
@@ -96,7 +96,7 @@ impl PresenceContent {
 			presence,
 			last_active,
 			currently_active,
-			avatar: avatar.into(),
+			avatar,
 			display_name: display_name.into(),
 			status_msg: status_msg.into(),
 		}

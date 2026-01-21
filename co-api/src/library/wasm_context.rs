@@ -1,15 +1,17 @@
 use super::{read_cid::read_cid, wasm_storage::WasmStorage, write_cid::write_cid};
 use crate::{
 	async_api, diagnostic_cid_write, event_cid_read, library::read_payload_buffer::read_payload_buffer, state_cid_read,
-	state_cid_write, sync_api::Context, Cid, Storage,
+	state_cid_write, sync_api::Context, Cid, CoreBlockStorage, Storage,
 };
 
 pub struct WasmContext {
+	block_storage: CoreBlockStorage,
 	storage: WasmStorage,
 }
 impl WasmContext {
 	pub fn new() -> Self {
-		Self { storage: WasmStorage::new() }
+		let storage = WasmStorage::new();
+		Self { block_storage: CoreBlockStorage::new(storage.clone(), false), storage }
 	}
 }
 impl Context for WasmContext {
@@ -41,9 +43,9 @@ impl Context for WasmContext {
 		write_cid(diagnostic_cid_write, &cid);
 	}
 }
-impl async_api::Context<WasmStorage> for WasmContext {
-	fn storage(&self) -> &WasmStorage {
-		&self.storage
+impl async_api::Context for WasmContext {
+	fn storage(&self) -> &CoreBlockStorage {
+		&self.block_storage
 	}
 
 	fn payload(&self) -> Vec<u8> {

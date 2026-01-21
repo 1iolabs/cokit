@@ -11,7 +11,7 @@ pub trait EntryVerifier: Debug + Send + Sync + 'static {
 
 pub async fn verify_entry(log: &Log, entry: &EntryBlock) -> Result<(), LogError> {
 	// verify log
-	if &entry.entry().id != log.id() {
+	if entry.entry().id != log.id() {
 		return Err(LogError::InvalidArgument(anyhow::anyhow!(
 			"Invalid log: {:02X?} != {:02X?}",
 			&entry.entry().id,

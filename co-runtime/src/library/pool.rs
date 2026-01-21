@@ -3,6 +3,7 @@ use crate::{
 	RuntimeContext, RuntimeInstance,
 };
 use cid::Cid;
+use co_api::{DefaultParams, StoreParams};
 use co_storage::{BlockStorage, StorageError, StoreParamsBlockStorage, SyncBlockStorage};
 use std::{
 	collections::VecDeque,
@@ -167,6 +168,7 @@ impl RuntimePool {
 	pub async fn execute_guard<S>(
 		&self,
 		storage: &S,
+		guard_cid: &Cid,
 		guard: &GuardReference,
 		context: RuntimeContext,
 	) -> Result<bool, ExecuteError>
@@ -186,6 +188,32 @@ impl RuntimePool {
 				let mut instance = match pool_instance {
 					Some(i) => i,
 					None => RuntimeInstance::create(storage, core).await?,
+				};
+
+				// api
+				let api = create_cov1_api(storage, context, checked);
+
+				// execute
+				let (result, instance) =
+					tokio::task::spawn_blocking(move || -> Result<(bool, RuntimeInstance), RuntimeError> {
+						let result = instance.runtime_mut().execute_guard(api)?;
+						Ok((result, instance))
+					})
+					.await
+					.map_err(|e| ExecuteError::Other(e.into()))??;
+
+				// pool instance
+				self.reuse_runtime_instance(instance);
+
+				// result
+				result
+			},
+			GuardReference::Binary(bytes) => {
+				// get/create instance
+				let pool_instance = self.get_runtime_instance(guard_cid);
+				let mut instance = match pool_instance {
+					Some(i) => i,
+					None => RuntimeInstance::create_native(guard_cid, bytes).await?,
 				};
 
 				// api
@@ -234,7 +262,10 @@ impl Default for RuntimePool {
 
 fn create_cov1_api<S: BlockStorage + Clone + 'static>(storage: &S, context: RuntimeContext, checked: bool) -> CoV1Api {
 	CoV1Api::new(
-		Box::new(SyncBlockStorage::new(StoreParamsBlockStorage::new(storage.clone(), checked), Handle::current())),
+		Box::new(SyncBlockStorage::new(
+			StoreParamsBlockStorage::new(storage.clone(), checked, DefaultParams::MAX_BLOCK_SIZE),
+			Handle::current(),
+		)),
 		context,
 	)
 }

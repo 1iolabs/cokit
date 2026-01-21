@@ -1,6 +1,9 @@
 use crate::{
 	cli::Cli,
-	library::{cat::cat_output, cli_context::CliContext},
+	library::{
+		cat::{cat_output, CatOptions},
+		cli_context::CliContext,
+	},
 };
 use co_sdk::{BlockStorageContentMapping, CoId, MultiCodec};
 use exitcode::ExitCode;
@@ -12,7 +15,7 @@ pub struct Command {
 	pub co: CoId,
 
 	/// Entries to print.
-	#[arg(short, long, default_value_t = 10)]
+	#[arg(short('n'), long, default_value_t = 10)]
 	pub count: usize,
 
 	/// Entries to print.
@@ -45,7 +48,12 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 				println!("{:?}", entry.entry());
 
 				// payload
-				cat_output(storage.clone(), entry.entry().payload, true, true).await?;
+				cat_output(
+					storage.clone(),
+					entry.entry().payload,
+					CatOptions::default().with_pretty(true).with_decrypt(true),
+				)
+				.await?;
 				println!();
 			},
 			Err(err) => println!("head ({index}) error: {:?}", err),

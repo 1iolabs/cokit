@@ -3,7 +3,6 @@ use clap::Parser;
 use co_sdk::{ApplicationBuilder, NetworkSettings};
 use std::net::SocketAddr;
 
-mod error;
 mod http;
 mod library;
 mod service;

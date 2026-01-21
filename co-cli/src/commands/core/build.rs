@@ -55,7 +55,6 @@ pub async fn command(
 		#[cfg(feature = "llvm")]
 		target_path: Default::default(),
 	};
-	result.name = result.name; // silence warning
 
 	// native target
 	#[cfg(feature = "llvm")]

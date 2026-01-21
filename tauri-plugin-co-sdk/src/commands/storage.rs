@@ -2,7 +2,7 @@ use crate::library::application_actor::{ApplicationActorMessage, SessionId};
 use anyhow::anyhow;
 use cid::Cid;
 use co_actor::ActorHandle;
-use co_primitives::{Block, DefaultParams};
+use co_primitives::Block;
 use co_sdk::{from_cbor, to_cbor};
 use serde::Deserialize;
 use tauri::ipc::{InvokeError, Request, Response};
@@ -55,7 +55,7 @@ pub(crate) async fn storage_set(
 		body.data,
 		body.cid
 	);
-	let block = Block::<DefaultParams>::new(body.cid, body.data).map_err(InvokeError::from_error)?;
+	let block = Block::new(body.cid, body.data).map_err(InvokeError::from_error)?;
 	let cid = actor_handle
 		.request(|r| ApplicationActorMessage::StorageSet(body.session, block, r))
 		.await

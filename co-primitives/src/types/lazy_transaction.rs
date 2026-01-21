@@ -39,7 +39,7 @@ where
 	async fn open(&mut self) -> Result<(), StorageError> {
 		match &self.0 {
 			Either::Left((storage, item)) => {
-				self.0 = Either::Right((item.open(&storage).await?, false));
+				self.0 = Either::Right((item.open(storage).await?, false));
 			},
 			Either::Right(_) => {},
 		}

@@ -1,4 +1,4 @@
-FROM rust:1.88
+FROM rust:1.91-bookworm
 
 # OS
 RUN apt-get update \
@@ -21,9 +21,10 @@ RUN apt-get install --no-install-recommends -y cmake ninja-build
 
 # RUST
 RUN rustup component add rustfmt \
+ && rustup component add clippy \
  && rustup target add wasm32-unknown-unknown \
- && rustup toolchain install nightly \
- && rustup component add --toolchain nightly rustfmt
+ && rustup toolchain install nightly-2025-12-09 \
+ && rustup component add --toolchain nightly-2025-12-09 rustfmt
 
 # cargo-binstall
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash

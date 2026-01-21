@@ -1,8 +1,9 @@
 use super::lazy_transaction::Transactionable;
 use crate::{
-	library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError, Streamable,
+	library::lsm_tree_map::Root, AnyBlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError, Streamable,
 };
 use async_trait::async_trait;
+use cid::Cid;
 use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{fmt::Debug, future::Future, hash::Hash};
@@ -19,13 +20,13 @@ where
 	/// Create collection from iterator.
 	pub async fn from_iter<S>(storage: &S, iter: impl IntoIterator<Item = K>) -> Result<Self, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = Self::default().open(storage).await?;
 		for key in iter.into_iter() {
 			transaction.insert(key).await?;
 		}
-		Ok(transaction.store().await?)
+		transaction.store().await
 	}
 
 	/// Whether this collection is empty.
@@ -35,14 +36,14 @@ where
 
 	pub async fn contains<S>(&self, storage: &S, key: &K) -> Result<bool, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.open(storage).await?.contains(key).await
 	}
 
 	pub fn stream<S>(&self, storage: &S) -> impl Stream<Item = Result<K, StorageError>> + '_
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let storage = storage.clone();
 		async_stream::try_stream! {
@@ -56,18 +57,18 @@ where
 
 	pub async fn insert<S>(&mut self, storage: &S, key: K) -> Result<(), StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = self.open(storage).await?;
-		let result = transaction.insert(key).await?;
+		transaction.insert(key).await?;
 		self.commit(transaction).await?;
-		Ok(result)
+		Ok(())
 	}
 
 	/// Remove key from set and return `true` if it was present.
 	pub async fn remove<S>(&mut self, storage: &S, key: K) -> Result<bool, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = self.open(storage).await?;
 		let result = transaction.remove(key).await?;
@@ -79,7 +80,7 @@ where
 
 	pub async fn open<S>(&self, storage: &S) -> Result<CoSetTransaction<S, K>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		Ok(CoSetTransaction {
 			tree: match self.0.link() {
@@ -91,7 +92,7 @@ where
 
 	pub async fn open_lazy<S>(&self, storage: &S) -> Result<LazyTransaction<S, Self>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		Ok(LazyTransaction::new(storage.clone(), self.clone()))
 	}
@@ -99,7 +100,7 @@ where
 	/// Commit transaction to this map.
 	pub async fn commit<S>(&mut self, mut transaction: CoSetTransaction<S, K>) -> Result<(), StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.0 = transaction.tree.store().await?;
 		Ok(())
@@ -108,7 +109,7 @@ where
 	/// Open transaction, apply `update` and store it.
 	pub async fn with_transaction<S, F, Fut>(&mut self, storage: &S, update: F) -> Result<(), StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 		F: FnOnce(CoSetTransaction<S, K>) -> Fut + Send,
 		Fut: Future<Output = Result<CoSetTransaction<S, K>, StorageError>> + Send,
 	{
@@ -126,10 +127,26 @@ where
 		Self(Default::default())
 	}
 }
+impl<K> From<Option<Cid>> for CoSet<K>
+where
+	K: Hash + Ord + Clone + Send + Sync + 'static,
+{
+	fn from(value: Option<Cid>) -> Self {
+		Self(value.into())
+	}
+}
+impl<K> From<&CoSet<K>> for Option<Cid>
+where
+	K: Hash + Ord + Clone + Send + Sync + 'static,
+{
+	fn from(value: &CoSet<K>) -> Self {
+		*value.0.cid()
+	}
+}
 #[async_trait]
 impl<S, K> Transactionable<S> for CoSet<K>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	type Transaction = CoSetTransaction<S, K>;
@@ -140,7 +157,7 @@ where
 }
 impl<S, K> Streamable<S> for CoSet<K>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	type Item = Result<K, StorageError>;
@@ -162,14 +179,14 @@ where
 #[derive(Clone)]
 pub struct CoSetTransaction<S, K>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	tree: LsmTreeMap<S, K, SetValZST>,
 }
 impl<S, K> CoSetTransaction<S, K>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
 	pub async fn contains(&self, key: &K) -> Result<bool, StorageError> {
@@ -186,7 +203,7 @@ where
 
 	/// Remove key from set and return `true` if it was present.
 	pub async fn remove(&mut self, key: K) -> Result<bool, StorageError> {
-		if let Some(_) = self.tree.get(&key).await? {
+		if (self.tree.get(&key).await?).is_some() {
 			self.tree.remove(key).await?;
 			Ok(true)
 		} else {

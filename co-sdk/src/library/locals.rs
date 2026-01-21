@@ -258,7 +258,7 @@ impl Actor for FileLocalsActor {
 						state.read(self.config_path.clone()).await?;
 
 						// result
-						Ok(state.locals.iter().map(|(_, local)| local.clone()).collect())
+						Ok(state.locals.values().cloned().collect())
 					})
 					.await
 					.ok();
@@ -319,7 +319,12 @@ impl FileLocalsActor {
 		tokio::fs::create_dir_all(path.parent().ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?).await?;
 
 		// open
-		let file = tokio::fs::OpenOptions::new().create(true).write(true).open(&path).await?;
+		let file = tokio::fs::OpenOptions::new()
+			.create(true)
+			.truncate(false)
+			.write(true)
+			.open(&path)
+			.await?;
 
 		// result
 		Ok(FileLocalsFile::File(path, file))
@@ -340,6 +345,7 @@ impl FileLocalsActor {
 				.read(true)
 				.write(true)
 				.create(true)
+				.truncate(false)
 				.open(&path)
 				.await?;
 
@@ -347,7 +353,7 @@ impl FileLocalsActor {
 			let lock = flock { l_start: 0, l_len: 0, l_pid: 0, l_type: libc::F_WRLCK as libc::c_short, l_whence: 0 };
 			match fcntl(file.as_raw_fd(), FcntlArg::F_SETLK(&lock)) {
 				Ok(_) => {
-					tracing::info!(?path, "local-lock");
+					tracing::info!(?path, "locals-lock");
 					return Ok(FileLocalsFile::LockedFile(path, file));
 				},
 				Err(errno) => {
@@ -356,7 +362,7 @@ impl FileLocalsActor {
 					drop(file);
 
 					// log
-					tracing::warn!(?path, ?errno, "local-lock-failed");
+					tracing::warn!(?path, ?errno, "locals-lock-failed");
 
 					// index
 					path = self
@@ -385,6 +391,7 @@ impl FileLocalsActor {
 					.read(true)
 					.write(true)
 					.create(true)
+					.truncate(false)
 					.open(&path)
 					.await?,
 			);
@@ -392,7 +399,7 @@ impl FileLocalsActor {
 			// lock
 			match Flock::lock(file, nix::fcntl::FlockArg::LockExclusiveNonblock) {
 				Ok(lock) => {
-					tracing::info!(?path, "local-lock (flock)");
+					tracing::info!(?path, "locals-lock (flock)");
 					return Ok(FileLocalsFile::Flock(path, lock));
 				},
 				Err((file, errno)) => {
@@ -401,7 +408,7 @@ impl FileLocalsActor {
 					drop(file);
 
 					// log
-					tracing::warn!(?path, ?errno, "local-lock-failed");
+					tracing::warn!(?path, ?errno, "locals-lock-failed");
 
 					// index
 					path = self
@@ -455,10 +462,7 @@ impl FileLocalsFile {
 	}
 
 	fn is_none(&self) -> bool {
-		match self {
-			Self::None => true,
-			_ => false,
-		}
+		matches!(self, Self::None)
 	}
 }
 
@@ -638,6 +642,7 @@ impl ApplicationLocal {
 
 	/// Read path as ApplicationLocal expecting DAG-CBOR format.
 	/// Returns `None` if file not exists.
+	#[tracing::instrument(level = tracing::Level::TRACE, name = "locals-read", err(Debug))]
 	pub async fn read(path: &PathBuf) -> anyhow::Result<Option<ApplicationLocal>> {
 		Ok(
 			match fs_read_option(path)
@@ -665,7 +670,7 @@ impl ApplicationLocal {
 mod tests {
 	use crate::library::locals::{ApplicationLocal, FileLocals, Locals};
 	use co_primitives::BlockSerializer;
-	use co_storage::TmpDir;
+	use co_test::TmpDir;
 
 	#[tokio::test]
 	async fn test_file_locals_overwrite() {
@@ -694,7 +699,7 @@ mod tests {
 		// read
 		let items = locals.get().await.unwrap();
 		assert_eq!(items.len(), 1);
-		assert_eq!(&items.get(0).unwrap().state, v1.cid());
+		assert_eq!(&items.first().unwrap().state, v1.cid());
 
 		// write
 		let v2 = BlockSerializer::default().serialize(&2).unwrap();
@@ -706,6 +711,6 @@ mod tests {
 		// read
 		let items = locals.get().await.unwrap();
 		assert_eq!(items.len(), 1);
-		assert_eq!(&items.get(0).unwrap().state, v2.cid());
+		assert_eq!(&items.first().unwrap().state, v2.cid());
 	}
 }

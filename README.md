@@ -217,7 +217,7 @@ function Todos({co}) {
 ### Setup
 
 Dependencies:
-- `rust-1.82` (MSRV)
+- `rust-1.91` (MSRV)
 - `rustfmt`
 - `wasm32-unknown-unknown` to build cores.
 - `toolchain nightly` to use `rustfmt +nightly`

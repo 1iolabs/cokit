@@ -1,4 +1,4 @@
-use futures::{pin_mut, Stream, StreamExt};
+use futures::{pin_mut, Stream, TryStreamExt};
 use std::{marker::PhantomData, task::Poll};
 
 #[async_trait::async_trait]
@@ -34,13 +34,7 @@ where
 	S: Stream<Item = Result<T, E>> + Sized,
 {
 	pin_mut!(stream);
-	while let Some(item) = stream.next().await {
-		return match item {
-			Ok(val) => Ok(Some(val)),
-			Err(err) => Err(err),
-		};
-	}
-	Ok(None)
+	stream.try_next().await
 }
 
 #[pin_project::pin_project]

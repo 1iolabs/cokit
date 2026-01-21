@@ -87,7 +87,7 @@ async fn fetch_and_observe_state<T, F, Fut, D>(
 								None => {
 									tracing::trace!(co = ?co_id, "watch-failed");
 									// should not happen?
-									*state.write() = CoStateResult::Error(format!("Co has been closed"));
+									*state.write() = CoStateResult::Error("Co has been closed".to_string());
 									break;
 								}
 							}

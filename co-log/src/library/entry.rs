@@ -1,8 +1,6 @@
 use cid::Cid;
 use co_identity::{Identity, PrivateIdentity, SignError};
-use co_primitives::{
-	to_cbor, Block, BlockSerializer, BlockSerializerError, CborError, Entry, SignedEntry, StoreParams,
-};
+use co_primitives::{to_cbor, Block, BlockSerializer, BlockSerializerError, CborError, Entry, SignedEntry};
 
 #[derive(Debug, thiserror::Error)]
 pub enum EntryError {
@@ -26,10 +24,10 @@ pub struct EntryBlock {
 	data: SignedEntry,
 }
 impl EntryBlock {
-	pub fn from_entry<P: StoreParams, I: PrivateIdentity>(identity: &I, entry: Entry) -> Result<Self, EntryError> {
+	pub fn from_entry<I: PrivateIdentity>(identity: &I, entry: Entry) -> Result<Self, EntryError> {
 		let data = to_cbor(&entry)?;
 		let signature = identity.sign(&data)?;
-		Self::from_signed_entry::<P>(SignedEntry {
+		Self::from_signed_entry(SignedEntry {
 			identity: identity.identity().to_string(),
 			signature,
 			entry,
@@ -37,21 +35,18 @@ impl EntryBlock {
 		})
 	}
 
-	pub fn from_unsigned_block<P: StoreParams, I: PrivateIdentity>(
-		identity: &I,
-		block: Block<P>,
-	) -> Result<Self, EntryError> {
-		let entry = BlockSerializer::<P>::new().deserialize(&block)?;
-		Self::from_entry::<P, I>(identity, entry)
+	pub fn from_unsigned_block<I: PrivateIdentity>(identity: &I, block: Block) -> Result<Self, EntryError> {
+		let entry = BlockSerializer::new().deserialize(&block)?;
+		Self::from_entry(identity, entry)
 	}
 
-	pub fn from_signed_entry<P: StoreParams>(entry: SignedEntry) -> Result<Self, EntryError> {
-		let signed_block = BlockSerializer::<P>::new().serialize(&entry)?;
+	pub fn from_signed_entry(entry: SignedEntry) -> Result<Self, EntryError> {
+		let signed_block = BlockSerializer::new().serialize(&entry)?;
 		Ok(Self { cid: signed_block.into_inner().0, data: entry })
 	}
 
-	pub fn from_block<P: StoreParams>(block: Block<P>) -> Result<Self, EntryError> {
-		let entry: SignedEntry = BlockSerializer::<P>::new().deserialize(&block)?;
+	pub fn from_block(block: Block) -> Result<Self, EntryError> {
+		let entry: SignedEntry = BlockSerializer::new().deserialize(&block)?;
 		Ok(Self { cid: block.into_inner().0, data: entry })
 	}
 
@@ -67,15 +62,15 @@ impl EntryBlock {
 		Ok(to_cbor(self.entry())?)
 	}
 
-	pub fn unsigned_block<P: StoreParams>(&self) -> Result<Block<P>, EntryError> {
-		Ok(BlockSerializer::<P>::new().serialize(self.entry())?)
+	pub fn unsigned_block(&self) -> Result<Block, EntryError> {
+		Ok(BlockSerializer::new().serialize(self.entry())?)
 	}
 
 	pub fn signed_entry(&self) -> &SignedEntry {
 		&self.data
 	}
 
-	pub fn block<P: StoreParams>(&self) -> Result<Block<P>, EntryError> {
+	pub fn block(&self) -> Result<Block, EntryError> {
 		Ok(BlockSerializer::new().serialize(&self.data)?)
 	}
 
@@ -91,7 +86,7 @@ impl PartialEq for EntryBlock {
 impl Eq for EntryBlock {}
 impl PartialOrd for EntryBlock {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		self.cid().partial_cmp(other.cid())
+		Some(self.cmp(other))
 	}
 }
 impl Ord for EntryBlock {
@@ -104,7 +99,7 @@ impl Ord for EntryBlock {
 mod tests {
 	use crate::EntryBlock;
 	use co_identity::DidKeyIdentity;
-	use co_primitives::{BlockSerializer, Clock, DefaultParams, Entry};
+	use co_primitives::{BlockSerializer, Clock, Entry};
 	use serde::{Deserialize, Serialize};
 
 	#[test]
@@ -121,7 +116,7 @@ mod tests {
 
 		// entry
 		let identity = Box::new(DidKeyIdentity::generate(None));
-		let entry = EntryBlock::from_entry::<DefaultParams, _>(
+		let entry = EntryBlock::from_entry(
 			identity.as_ref(),
 			Entry {
 				id: vec![0],
@@ -134,7 +129,7 @@ mod tests {
 		.unwrap();
 
 		// serialize
-		let signed_block = entry.block::<DefaultParams>().unwrap();
+		let signed_block = entry.block().unwrap();
 
 		// deserialize
 		let entry_desertialized = EntryBlock::from_block(signed_block).unwrap();

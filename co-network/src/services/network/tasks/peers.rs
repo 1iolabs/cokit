@@ -29,13 +29,10 @@ impl NetworkTask<Behaviour, Context> for PeersNetworkTask {
 		_context: &mut Context,
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
-		match &event {
-			SwarmEvent::Behaviour(NetworkEvent::Mdns(mdns::Event::Discovered(list))) => {
-				for (peer_id, _) in list {
-					self.tx.send(*peer_id).ok();
-				}
-			},
-			_ => {},
+		if let SwarmEvent::Behaviour(NetworkEvent::Mdns(mdns::Event::Discovered(list))) = &event {
+			for (peer_id, _) in list {
+				self.tx.send(*peer_id).ok();
+			}
 		}
 		Some(event)
 	}

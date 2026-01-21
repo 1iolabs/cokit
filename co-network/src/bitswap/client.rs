@@ -6,42 +6,30 @@ use anyhow::Result;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{ActorHandle, Response};
-use co_primitives::{Block, StoreParams};
+use co_primitives::Block;
 use co_storage::StorageError;
 use libp2p::PeerId;
 use libp2p_bitswap::BitswapStore;
 
 #[derive(Debug)]
-pub enum BitswapMessage<P>
-where
-	P: StoreParams,
-{
+pub enum BitswapMessage {
 	Contains(Cid, PeerId, Vec<Token>, Response<Result<bool, StorageError>>),
 	Get(Cid, PeerId, Vec<Token>, Response<Result<Option<Vec<u8>>, StorageError>>),
-	Insert(Block<P>, PeerId, Vec<Token>, Response<Result<(), StorageError>>),
+	Insert(Block, PeerId, Vec<Token>, Response<Result<(), StorageError>>),
 	MissingBlocks(Cid, Vec<Token>, Response<Result<Vec<Cid>, StorageError>>),
 }
 
 /// Handle bitswap requests by sendings them to an actor.
-pub struct BitswapStoreClient<P>
-where
-	P: StoreParams,
-{
-	handle: ActorHandle<BitswapMessage<P>>,
+pub struct BitswapStoreClient {
+	handle: ActorHandle<BitswapMessage>,
 }
-impl<P> BitswapStoreClient<P>
-where
-	P: StoreParams,
-{
-	pub fn new(handle: ActorHandle<BitswapMessage<P>>) -> Self {
+impl BitswapStoreClient {
+	pub fn new(handle: ActorHandle<BitswapMessage>) -> Self {
 		Self { handle }
 	}
 }
 #[async_trait]
-impl<P> BitswapStore for BitswapStoreClient<P>
-where
-	P: StoreParams,
-{
+impl BitswapStore for BitswapStoreClient {
 	type Params = libipld::DefaultParams;
 
 	#[tracing::instrument(level = tracing::Level::TRACE, ret, err(Debug), skip(self))]

@@ -160,7 +160,7 @@ fn reduce_use(
 	actions: &mut Vec<ConnectionAction>,
 	networks: &BTreeSet<Network>,
 	id: &CoId,
-	from: &String,
+	from: &str,
 	time: &Instant,
 	create: bool,
 ) {
@@ -217,7 +217,7 @@ fn reduce_use(
 					id.clone(),
 					CoConnection {
 						id: id.clone(),
-						from: from.clone(),
+						from: from.to_owned(),
 						// keep_alive: *time + state.keep_alive,
 						networks: networks.clone(),
 					},
@@ -236,10 +236,10 @@ fn reduce_use(
 	// network connections
 	for network in networks.iter() {
 		// already connected?
-		let (connect, connected_peers) = if let Some(connected_network_peers) = connected_networks.remove(&network) {
+		let (connect, connected_peers) = if let Some(connected_network_peers) = connected_networks.remove(network) {
 			(None, connected_network_peers)
 		} else {
-			(Some(from.clone()), Default::default())
+			(Some(from.to_owned()), Default::default())
 		};
 
 		// networks: get/create
@@ -258,7 +258,7 @@ fn reduce_connected(
 		network
 			.references
 			.iter()
-			.map(|co| (co.clone(), state.co_peers(&co)))
+			.map(|co| (co.clone(), state.co_peers(co)))
 			.collect::<HashMap<CoId, BTreeSet<PeerId>>>()
 	});
 
@@ -379,10 +379,8 @@ fn reduce_release(state: &mut ConnectionState, actions: &mut Vec<ConnectionActio
 		// remove references and disconnect if unused
 		while let Some(network) = co_connection.networks.pop_first() {
 			if let Some(network_connection) = state.networks.get_mut(&network) {
-				if network_connection.references.remove(id) {
-					if network_connection.references.is_empty() {
-						actions.push(ConnectionAction::Disconnect(DisconnectAction { network }));
-					}
+				if network_connection.references.remove(id) && network_connection.references.is_empty() {
+					actions.push(ConnectionAction::Disconnect(DisconnectAction { network }));
 				}
 			}
 		}
@@ -401,10 +399,8 @@ fn reduce_released(state: &mut ConnectionState, actions: &mut Vec<ConnectionActi
 		// normally this should be empty at this point
 		while let Some(network) = co_connection.networks.pop_first() {
 			if let Some(network_connection) = state.networks.get_mut(&network) {
-				if network_connection.references.remove(id) {
-					if network_connection.references.is_empty() {
-						actions.push(ConnectionAction::Disconnect(DisconnectAction { network }));
-					}
+				if network_connection.references.remove(id) && network_connection.references.is_empty() {
+					actions.push(ConnectionAction::Disconnect(DisconnectAction { network }));
 				}
 			}
 		}
@@ -419,7 +415,7 @@ fn reduce_peer_connection_established(
 ) {
 	// mark as connected
 	let (cos, networks) = {
-		let peer_connection = state.peers.entry(peer_id).or_insert_with(PeerConnection::default);
+		let peer_connection = state.peers.entry(peer_id).or_default();
 		peer_connection.connected = true;
 		(peer_connection.co.clone(), peer_connection.network.clone())
 	};
@@ -842,10 +838,6 @@ mod tests {
 		assert!(state.peers[&peer_id]
 			.network
 			.iter()
-			.find(|network| match network {
-				Network::DidDiscovery(did_discovery) if did_discovery.did == did => true,
-				_ => false,
-			})
-			.is_some());
+			.any(|network| matches!(network, Network::DidDiscovery(did_discovery) if did_discovery.did == did)));
 	}
 }

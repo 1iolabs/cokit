@@ -1,6 +1,6 @@
 use super::lazy_transaction::Transactionable;
 use crate::{
-	library::lsm_tree_map::Root, BlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError, Streamable,
+	library::lsm_tree_map::Root, AnyBlockStorage, LazyTransaction, LsmTreeMap, OptionLink, StorageError, Streamable,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -25,13 +25,13 @@ where
 	/// Create collection from iterator.
 	pub async fn from_iter<S>(storage: &S, iter: impl IntoIterator<Item = (K, V)>) -> Result<Self, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = Self::default().open(storage).await?;
 		for (key, value) in iter.into_iter() {
 			transaction.insert(key, value).await?;
 		}
-		Ok(transaction.store().await?)
+		transaction.store().await
 	}
 
 	/// Whether this collection is empty.
@@ -41,21 +41,21 @@ where
 
 	pub async fn get<S>(&self, storage: &S, key: &K) -> Result<Option<V>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.open(storage).await?.get(key).await
 	}
 
 	pub async fn contains<S>(&self, storage: &S, key: &K) -> Result<bool, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.open(storage).await?.contains_key(key).await
 	}
 
 	pub fn stream<S>(&self, storage: &S) -> impl Stream<Item = Result<(K, V), StorageError>> + '_
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let storage = storage.clone();
 		async_stream::try_stream! {
@@ -69,7 +69,7 @@ where
 
 	pub async fn insert<S>(&mut self, storage: &S, key: K, value: V) -> Result<(), StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.insert(key, value).await?;
@@ -80,7 +80,7 @@ where
 
 	pub async fn remove<S>(&mut self, storage: &S, key: K) -> Result<Option<V>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut transaction = self.open(storage).await?;
 		let result = transaction.remove(key).await?;
@@ -92,8 +92,8 @@ where
 	pub async fn update_or_insert<S, F>(&mut self, storage: &S, key: K, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
-		F: FnOnce(&mut V) -> () + Send,
-		S: BlockStorage + Clone + 'static,
+		F: FnOnce(&mut V) + Send,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.update_or_insert(key, update).await?;
@@ -113,7 +113,7 @@ where
 		V: Default,
 		F: FnOnce(V) -> Fut + Send,
 		Fut: Future<Output = Result<V, StorageError>> + Send,
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.try_update_or_insert_async(key, update).await?;
@@ -125,8 +125,8 @@ where
 	/// Update value ignore if key not exists.
 	pub async fn update<S, F>(&mut self, storage: &S, key: K, update: F) -> Result<(), StorageError>
 	where
-		F: FnOnce(&mut V) -> () + Send,
-		S: BlockStorage + Clone + 'static,
+		F: FnOnce(&mut V) + Send,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.update(key, update).await?;
@@ -140,7 +140,7 @@ where
 	where
 		F: FnOnce(V) -> Fut + Send,
 		Fut: Future<Output = Result<V, StorageError>> + Send,
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.with_transaction(storage, |mut transaction| async move {
 			transaction.try_update_async(key, update).await?;
@@ -151,14 +151,14 @@ where
 
 	pub async fn open_mut<'m, S>(&'m mut self, storage: &S) -> Result<CoMapMutTransaction<'m, S, K, V>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		Ok(CoMapMutTransaction { transaction: self.open(storage).await?, container: self })
 	}
 
 	pub async fn open<S>(&self, storage: &S) -> Result<CoMapTransaction<S, K, V>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		Ok(CoMapTransaction {
 			tree: match self.0.link() {
@@ -170,7 +170,7 @@ where
 
 	pub async fn open_lazy<S>(&self, storage: &S) -> Result<LazyTransaction<S, Self>, StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		Ok(LazyTransaction::new(storage.clone(), self.clone()))
 	}
@@ -178,7 +178,7 @@ where
 	/// Commit transaction to this map.
 	pub async fn commit<S>(&mut self, mut transaction: CoMapTransaction<S, K, V>) -> Result<(), StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.0 = transaction.tree.store().await?;
 		Ok(())
@@ -187,7 +187,7 @@ where
 	/// Open transaction, apply `update` and store it.
 	pub async fn with_transaction<S, F, Fut>(&mut self, storage: &S, update: F) -> Result<(), StorageError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 		F: FnOnce(CoMapTransaction<S, K, V>) -> Fut + Send,
 		Fut: Future<Output = Result<CoMapTransaction<S, K, V>, StorageError>> + Send,
 	{
@@ -215,19 +215,19 @@ where
 		Self(cid.into())
 	}
 }
-impl<K, V> Into<Option<Cid>> for &CoMap<K, V>
+impl<K, V> From<&CoMap<K, V>> for Option<Cid>
 where
 	K: Hash + Ord + Clone + Send + Sync + 'static,
 	V: Clone + Send + Sync + 'static,
 {
-	fn into(self) -> Option<Cid> {
-		*self.0.cid()
+	fn from(value: &CoMap<K, V>) -> Self {
+		*value.0.cid()
 	}
 }
 #[async_trait]
 impl<S, K, V> Transactionable<S> for CoMap<K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -239,7 +239,7 @@ where
 }
 impl<S, K, V> Streamable<S> for CoMap<K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -261,7 +261,7 @@ where
 
 pub struct CoMapMutTransaction<'m, S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -270,7 +270,7 @@ where
 }
 impl<'m, S, K, V> CoMapMutTransaction<'m, S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -281,7 +281,7 @@ where
 }
 impl<'m, S, K, V> CoMapMutTransaction<'m, S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -324,7 +324,7 @@ where
 #[derive(Clone)]
 pub struct CoMapTransaction<S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -332,7 +332,7 @@ where
 }
 impl<S, K, V> CoMapTransaction<S, K, V>
 where
-	S: BlockStorage + Clone + 'static,
+	S: AnyBlockStorage,
 	K: Hash + Ord + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 	V: Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -373,7 +373,7 @@ where
 	pub async fn update_or_insert<F>(&mut self, key: K, update: F) -> Result<(), StorageError>
 	where
 		V: Default,
-		F: FnOnce(&mut V) -> () + Send,
+		F: FnOnce(&mut V) + Send,
 	{
 		let mut item = self.get(&key).await?.unwrap_or_default();
 		update(&mut item);
@@ -397,7 +397,7 @@ where
 	/// Update value, ignore if key not exists.
 	pub async fn update<F>(&mut self, key: K, update: F) -> Result<(), StorageError>
 	where
-		F: FnOnce(&mut V) -> () + Send,
+		F: FnOnce(&mut V) + Send,
 	{
 		if let Some(mut item) = self.get(&key).await? {
 			update(&mut item);
@@ -422,7 +422,7 @@ where
 	pub async fn update_stream(
 		&mut self,
 		keys_to_update: impl Stream<Item = Result<K, StorageError>>,
-		mut update: impl FnMut(&K, &mut V) -> () + Send,
+		mut update: impl FnMut(&K, &mut V) + Send,
 	) -> Result<(), StorageError> {
 		pin_mut!(keys_to_update);
 		while let Some(key) = keys_to_update.try_next().await? {
@@ -456,15 +456,49 @@ where
 mod tests {
 	use crate::{library::test::TestStorage, CoMap};
 	use futures::TryStreamExt;
+	use std::time::SystemTime;
 
 	#[tokio::test]
 	async fn smoke() {
 		let storage = TestStorage::default();
-		let mut set = CoMap::<i32, i32>::default();
-		let mut transaction = set.open(&storage).await.unwrap();
+		let mut map = CoMap::<i32, i32>::default();
+		let mut transaction = map.open(&storage).await.unwrap();
 		transaction.insert(1, 1).await.unwrap();
 		transaction.insert(2, 2).await.unwrap();
-		set.commit(transaction).await.unwrap();
-		assert_eq!(set.stream(&storage).try_collect::<Vec<(i32, i32)>>().await.unwrap(), vec![(1, 1), (2, 2)]);
+		map.commit(transaction).await.unwrap();
+		assert_eq!(map.stream(&storage).try_collect::<Vec<(i32, i32)>>().await.unwrap(), vec![(1, 1), (2, 2)]);
+	}
+
+	const BENCHMARK_REPEATS: i32 = 1000;
+	#[tokio::test]
+	async fn benchmark_transactional() {
+		let ts = SystemTime::now();
+		let storage = TestStorage::default();
+		let mut map = CoMap::<i32, i32>::default();
+		let mut transaction = map.open(&storage).await.unwrap();
+		for i in 0..BENCHMARK_REPEATS {
+			transaction.insert(i, i).await.unwrap();
+		}
+		map.commit(transaction).await.unwrap();
+		println!(
+			"{} insert transactions done in: {:?} seconds",
+			BENCHMARK_REPEATS,
+			SystemTime::now().duration_since(ts).unwrap().as_secs_f32()
+		);
+	}
+
+	#[tokio::test]
+	async fn benchmark_pure() {
+		let ts = SystemTime::now();
+		let storage = TestStorage::default();
+		let mut map = CoMap::<i32, i32>::default();
+		for i in 0..BENCHMARK_REPEATS {
+			map.insert(&storage, i, i).await.unwrap();
+		}
+		println!(
+			"{} pure inserts done in: {:?} seconds",
+			BENCHMARK_REPEATS,
+			SystemTime::now().duration_since(ts).unwrap().as_secs_f32()
+		);
 	}
 }

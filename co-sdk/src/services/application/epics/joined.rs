@@ -75,7 +75,7 @@ pub fn joined_fetch(
 /// We fetch at least the co state with networks and participants so we can reconnect later.
 #[tracing::instrument(level = tracing::Level::TRACE, err, skip(context))]
 async fn joined_initialize(context: &CoContext, id: &CoId, did: Did) -> anyhow::Result<()> {
-	let co_reducer = context.co_reducer(&id).await?.ok_or(anyhow::anyhow!("Co not found: {}", id))?;
+	let co_reducer = context.co_reducer(id).await?.ok_or(anyhow::anyhow!("Co not found: {}", id))?;
 
 	// fetch co
 	let (storage, co) = co_reducer.co().await?;

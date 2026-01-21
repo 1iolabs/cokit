@@ -109,7 +109,7 @@ pub async fn command(
 	// TODO: watch local co
 	// TODO: https://gitlab.1io.com/1io/co-sdk/-/issues/52
 	let cos: Vec<CoId> = match &command.co {
-		Some(dids) => dids.iter().map(|id| CoId::from(id)).collect(),
+		Some(dids) => dids.iter().map(CoId::from).collect(),
 		None => {
 			let local_co = application.local_co_reducer().await?;
 			let co_context = application.co();

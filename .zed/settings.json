@@ -8,32 +8,35 @@
       "language_servers": ["typescript-language-server", "!vtsls", "..."],
       "code_actions_on_format": {
         "source.fixAll.eslint": true,
-        "source.organizeImports": true
+        "source.organizeImports": true,
       },
       "prettier": { "allowed": true },
-      "preferred_line_length": 120
+      "preferred_line_length": 120,
     },
     "TSX": {
       "language_servers": ["typescript-language-server", "!vtsls", "..."],
       "code_actions_on_format": {
         "source.fixAll.eslint": true,
-        "source.organizeImports": true
+        "source.organizeImports": true,
       },
       "prettier": { "allowed": true },
-      "preferred_line_length": 120
+      "preferred_line_length": 120,
     },
     "Markdown": {
       "format_on_save": "off",
-      "remove_trailing_whitespace_on_save": false
-    }
+      "remove_trailing_whitespace_on_save": false,
+    },
   },
   "lsp": {
     "rust-analyzer": {
       "initialization_options": {
         "rustfmt": {
-          "extraArgs": ["+nightly"]
-        }
-      }
-    }
-  }
+          "extraArgs": ["+nightly"],
+        },
+        "check": {
+          "command": "clippy",
+        },
+      },
+    },
+  },
 }

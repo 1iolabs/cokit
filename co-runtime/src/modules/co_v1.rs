@@ -55,10 +55,7 @@ impl CoV1Api {
 
 	/// Whether is error is retriable with same parameters.
 	fn is_retriable(error: &StorageError) -> bool {
-		match error {
-			StorageError::NotFound(_, _) => true,
-			_ => false,
-		}
+		matches!(error, StorageError::NotFound(_, _))
 	}
 }
 impl Debug for CoV1Api {
@@ -75,7 +72,7 @@ impl Storage for CoV1Api {
 	/// Get block in deterministic fashion.
 	/// Note: If this function fails it will trap the core.
 	/// Todo: Implement diagnostics.
-	fn get(&self, cid: &Cid) -> Result<Block<Self::StoreParams>, StorageError> {
+	fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		let mut tries = 0;
 		loop {
 			return match self.storage.get(cid) {
@@ -101,8 +98,8 @@ impl Storage for CoV1Api {
 	/// Note: If this function fails it will trap the core.
 	/// Todo: Implement diagnostics.
 	/// Todo: implement retries etc.
-	fn set(&mut self, block: Block<Self::StoreParams>) -> Result<Cid, StorageError> {
-		self.storage.set(block)
+	fn set(&mut self, block: Block) -> Result<Cid, StorageError> {
+		self.storage.set(block.with_store_params::<Self::StoreParams>()?)
 	}
 
 	fn remove(&mut self, _cid: &Cid) -> Result<(), StorageError> {

@@ -2,7 +2,7 @@
 name = "co-primitives"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.76"
+rust-version = "1.91"
 
 [dependencies]
 anyhow = { workspace = true }
@@ -37,7 +37,7 @@ zeroize = { workspace = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["async_tokio"] }
-insta = { version = "1.34.0", features = ["default", "yaml"] }
+insta = { workspace = true }
 tokio = { workspace = true, features = ["full", "tracing"] }
 
 [features]

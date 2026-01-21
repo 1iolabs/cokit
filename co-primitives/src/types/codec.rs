@@ -113,18 +113,24 @@ impl PartialEq<u64> for KnownMultiCodec {
 /// MultiCodec matching utility.
 ///
 /// See: https://github.com/multiformats/multicodec/blob/master/table.csv
-#[derive(Copy, Clone, Eq, Ord)]
+#[derive(Copy, Clone)]
 #[non_exhaustive]
 #[repr(u64)]
 pub enum MultiCodec {
 	Known(KnownMultiCodec),
 	Unknown(u64),
 }
-impl PartialOrd for MultiCodec {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		self.codec().partial_cmp(&other.codec())
+impl Ord for MultiCodec {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		self.codec().cmp(&other.codec())
 	}
 }
+impl PartialOrd for MultiCodec {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+impl Eq for MultiCodec {}
 impl PartialEq for MultiCodec {
 	fn eq(&self, other: &Self) -> bool {
 		self.codec() == other.codec()
@@ -169,7 +175,7 @@ impl MultiCodec {
 	}
 
 	/// Expect cid to be of type codec.
-	pub fn is_any_codec<'a, C: Into<MultiCodec>>(codecs: impl IntoIterator<Item = C>, cid: &Cid) -> Option<&Cid> {
+	pub fn is_any_codec<C: Into<MultiCodec>>(codecs: impl IntoIterator<Item = C>, cid: &Cid) -> Option<&Cid> {
 		let actual_codec: MultiCodec = cid.codec().into();
 		if codecs.into_iter().map(Into::into).any(|c| c == actual_codec) {
 			Some(cid)
@@ -186,10 +192,10 @@ impl MultiCodec {
 
 	/// Is DAG-CBOR or a codec that is represented in DAG-CBOR.
 	pub fn is_cbor(cid: impl Into<MultiCodec>) -> bool {
-		match cid.into() {
-			MultiCodec::Known(KnownMultiCodec::DagCbor) | MultiCodec::Known(KnownMultiCodec::CoReference) => true,
-			_ => false,
-		}
+		matches!(
+			cid.into(),
+			MultiCodec::Known(KnownMultiCodec::DagCbor) | MultiCodec::Known(KnownMultiCodec::CoReference)
+		)
 	}
 
 	pub fn is(actual: impl Into<MultiCodec>, expect: impl Into<MultiCodec>) -> bool {
@@ -255,7 +261,7 @@ pub struct MultiCodecError(Cid, MultiCodec, MultiCodec);
 #[cfg(test)]
 mod tests {
 	use super::MultiCodec;
-	use crate::{BlockSerializer, CoReference, DefaultParams, KnownMultiCodec};
+	use crate::{BlockSerializer, CoReference, KnownMultiCodec};
 	use serde::{Deserialize, Serialize};
 
 	#[test]
@@ -309,7 +315,7 @@ mod tests {
 
 	#[test]
 	fn test_cid() {
-		let block = BlockSerializer::<DefaultParams>::new_codec(KnownMultiCodec::CoReference)
+		let block = BlockSerializer::new_codec(KnownMultiCodec::CoReference)
 			.serialize(&CoReference::Weak(1))
 			.unwrap();
 		assert_eq!(block.cid().to_string(), "baga2bqabdyqe2tf374ji3ixvay5hqmwyymxxpgjtxmqfijehizup5f5pypp6bda");

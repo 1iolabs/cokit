@@ -21,7 +21,7 @@ async fn test_push() {
 	let shared_co = SharedCo::create(&mut instances, "shared").await;
 
 	// disconnect
-	let context0 = shared_co.peers.get(0).unwrap().0.application.co();
+	let context0 = shared_co.peers.first().unwrap().0.application.co();
 	context0
 		.network_connections()
 		.await

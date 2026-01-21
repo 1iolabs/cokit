@@ -3,7 +3,7 @@ name = "co-dioxus"
 version = "0.1.0"
 authors = ["DK <34+dk@users.noreply.1io.com>"]
 edition = "2021"
-rust-version = "1.76"
+rust-version = "1.91"
 
 [dependencies]
 anyhow = { workspace = true }

@@ -13,7 +13,7 @@ where
 		.filter_map(move |action| ready(filter(&action)))
 		.take(1);
 	pin_mut!(stream);
-	Ok(stream.next().await.ok_or(anyhow::anyhow!("No response"))?)
+	stream.next().await.ok_or(anyhow::anyhow!("No response"))
 }
 
 pub async fn wait_response_timeout<F, T>(
@@ -24,7 +24,7 @@ pub async fn wait_response_timeout<F, T>(
 where
 	F: Fn(&Action) -> Option<T>,
 {
-	Ok(tokio::time::timeout(timeout, wait_response(handle, filter)).await??)
+	tokio::time::timeout(timeout, wait_response(handle, filter)).await?
 }
 
 pub async fn request_response<F, T>(
@@ -37,7 +37,7 @@ where
 {
 	let response_fut = wait_response(handle.clone(), response);
 	handle.dispatch(request)?;
-	Ok(response_fut.await?)
+	response_fut.await
 }
 
 pub async fn request_response_timeout<F, T>(
@@ -51,5 +51,5 @@ where
 {
 	let response_fut = wait_response_timeout(handle.clone(), timeout, response);
 	handle.dispatch(request)?;
-	Ok(response_fut.await?)
+	response_fut.await
 }

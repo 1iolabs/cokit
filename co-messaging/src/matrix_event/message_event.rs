@@ -275,7 +275,7 @@ pub struct ImageContent {
 
 impl ImageContent {
 	pub fn new(body: impl Into<String>, file: Cid, info: ImageInfo) -> Self {
-		Self { body: body.into(), file: file.into(), info, is_silent: None, relates_to: None, new_content: None }
+		Self { body: body.into(), file, info, is_silent: None, relates_to: None, new_content: None }
 	}
 }
 
@@ -320,7 +320,7 @@ pub struct AudioContent {
 
 impl AudioContent {
 	pub fn new(body: impl Into<String>, file: Cid, info: AudioInfo) -> Self {
-		Self { body: body.into(), file: file.into(), info, is_silent: None, relates_to: None, new_content: None }
+		Self { body: body.into(), file, info, is_silent: None, relates_to: None, new_content: None }
 	}
 }
 
@@ -365,7 +365,7 @@ pub struct VideoContent {
 
 impl VideoContent {
 	pub fn new(body: impl Into<String>, file: Cid, info: VideoInfo) -> Self {
-		Self { body: body.into(), file: file.into(), info, is_silent: None, relates_to: None, new_content: None }
+		Self { body: body.into(), file, info, is_silent: None, relates_to: None, new_content: None }
 	}
 }
 
@@ -414,7 +414,7 @@ impl FileContent {
 	pub fn new(body: impl Into<String>, file: Cid, filename: impl Into<String>, info: FileInfo) -> Self {
 		Self {
 			body: body.into(),
-			file: file.into(),
+			file,
 			filename: filename.into(),
 			info,
 			is_silent: None,

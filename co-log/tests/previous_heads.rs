@@ -24,9 +24,9 @@ async fn test_previous_heads() {
 
 	// join
 	let mut log = Log::new("test".as_bytes().to_vec(), entry_verifier.clone(), Default::default());
-	assert_eq!(log.join_heads(&storage, heads4.iter()).await.unwrap(), true);
+	assert!(log.join_heads(&storage, heads4.iter()).await.unwrap());
 	assert_eq!(log.heads(), &heads4);
-	assert_eq!(log.join_heads(&storage, heads2.iter()).await.unwrap(), false); // should have no effect as its already integrated
+	assert!(!log.join_heads(&storage, heads2.iter()).await.unwrap()); // should have no effect as its already integrated
 	assert_eq!(log.heads(), &heads4);
 }
 
@@ -49,11 +49,11 @@ async fn test_previous_heads_not_load_whole_log_item_hit() {
 
 	// validate to not the whole log has been loaded
 	let mut log = Log::new("test".as_bytes().to_vec(), entry_verifier.clone(), heads4.clone());
-	assert_eq!(log.join_heads(&storage, heads2.iter()).await.unwrap(), false);
+	assert!(!log.join_heads(&storage, heads2.iter()).await.unwrap());
 	assert_eq!(log.heads(), &heads4);
-	assert_eq!(log.contains(entry2.cid()), true);
-	assert_eq!(log.contains(entry1.cid()), false);
-	assert_eq!(log.contains(entry0.cid()), false);
+	assert!(log.contains(entry2.cid()));
+	assert!(!log.contains(entry1.cid()));
+	assert!(!log.contains(entry0.cid()));
 }
 
 #[tokio::test]
@@ -81,11 +81,11 @@ async fn test_previous_heads_not_load_whole_log_clock_hit() {
 
 	// validate to not the whole log has been loaded and stop after clock has seen
 	let mut log = Log::new("test".as_bytes().to_vec(), entry_verifier.clone(), heads4.clone());
-	assert_eq!(log.join_heads(&storage, log2_heads.iter()).await.unwrap(), true);
+	assert!(log.join_heads(&storage, log2_heads.iter()).await.unwrap());
 	let mut expected_heads = heads4.clone();
 	expected_heads.insert(*entry30.cid());
 	assert_eq!(log.heads(), &expected_heads);
-	assert_eq!(log.contains(entry2.cid()), true);
-	assert_eq!(log.contains(entry1.cid()), true);
-	assert_eq!(log.contains(entry0.cid()), false);
+	assert!(log.contains(entry2.cid()));
+	assert!(log.contains(entry1.cid()));
+	assert!(!log.contains(entry0.cid()));
 }
