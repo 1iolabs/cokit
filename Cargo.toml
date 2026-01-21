@@ -22,6 +22,7 @@ members = [
     "cores/file",
     "cores/keystore",
     "cores/membership",
+    "cores/names",
     "cores/pin",
     "cores/poa",
     "cores/rich-text",
@@ -96,6 +97,7 @@ co-core-data-series = { path = "cores/data-series" }
 co-core-file = { path = "cores/file" }
 co-core-keystore = { path = "cores/keystore" }
 co-core-membership = { path = "cores/membership" }
+co-core-names = { path = "cores/names" }
 co-core-pin = { path = "cores/pin" }
 co-core-poa = { path = "cores/poa" }
 co-core-rich-text = { path = "cores/rich-text" }
