@@ -72,7 +72,7 @@ build:
     - echo "> building cores"
     - cargo run --package co-cli --release -- core build-builtin --zst
     - echo "> building binaries"
-    - cargo build --release --feature bundle-wasm-cores
+    - cargo build --release --features bundle-wasm-cores
   artifacts:
     paths:
       - cores/Cores.toml
