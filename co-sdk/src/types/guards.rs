@@ -54,19 +54,18 @@ impl Guards {
 		self.guards.get(crate_name).map(|_cid_str| get_native(crate_name))
 	}
 
-	/// Test if the guard is a built in guard.
-	pub fn is_built_in(&self, core: GuardReference) -> bool {
-		match &core {
-			GuardReference::Wasm(cid) => self.guards.iter().any(|(_, i)| &Cid::from_str(i).expect("valid cid") == cid),
-			GuardReference::Native(_) => true,
-		}
+	/// Get the GuardReference for a built-in guard.
+	pub fn built_in_by_name(&self, crate_name: &str) -> Option<(Cid, GuardReference)> {
+		self.guards
+			.get(crate_name)
+			.map(|cid_str| (Cid::from_str(cid_str).expect("valid cid"), get_native(crate_name)))
 	}
 }
 impl Default for Guards {
 	fn default() -> Self {
 		let mut result = Self { guards: Default::default() };
 
-		// we only got buildin guard within the cores (for now) so jsut scan an use them
+		// we only got buildin guard within the cores (for now) so just scan an use them
 		for (name, core) in Cores::default().built_in() {
 			if let Some(_native_guard) = get_native_opt(&name) {
 				if let Core::Wasm(wasm) = core {
@@ -81,6 +80,14 @@ impl Default for Guards {
 
 /// Get native guard for name.
 fn get_native_opt(name: &str) -> Option<GuardReference> {
+	#[cfg(feature = "bundle-wasm-cores")]
+	match name {
+		CO_CORE_CO => Some(get_from_core(name)),
+		CO_CORE_POA => Some(get_from_core(name)),
+		_ => None,
+	}
+
+	#[cfg(not(feature = "bundle-wasm-cores"))]
 	match name {
 		CO_CORE_CO => Some(GuardReference::native::<co_core_co::Co>()),
 		CO_CORE_POA => Some(GuardReference::native::<co_core_poa::Authority>()),
@@ -91,5 +98,18 @@ fn get_native(name: &str) -> GuardReference {
 	match get_native_opt(name) {
 		Some(i) => i,
 		None => panic!("unknown native guard name: {}", name),
+	}
+}
+
+#[cfg(feature = "bundle-wasm-cores")]
+fn get_from_core(name: &str) -> GuardReference {
+	let (_cid, core) = Cores::default()
+		.built_in_by_name(name)
+		.ok_or(anyhow::anyhow!("unknown native guard name: {}", name))
+		.expect("buildin core");
+	match core {
+		Core::Wasm(cid) => GuardReference::Wasm(cid),
+		Core::Binary(binary) => GuardReference::Binary(binary),
+		_ => panic!("native is not allowed with bundle-wasm-cores"),
 	}
 }

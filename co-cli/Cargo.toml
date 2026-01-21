@@ -55,12 +55,16 @@ tracing-log = { workspace = true }
 tracing-opentelemetry = "0.23"
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { workspace = true }
+zstd = { workspace = true }
 
 [features]
 default = ["llvm", "wasmi", "pinning"]
-pinning = ["co-sdk/pinning"]
 
-# backends
+# sdk
+pinning = ["co-sdk/pinning"]
+bundle-wasm-cores = ["co-sdk/bundle-wasm-cores"]
+
+# runtime
 llvm = ["co-runtime/llvm"]
 wamr = ["co-runtime/wamr"]
 wasmi = ["co-runtime/wasmi"]

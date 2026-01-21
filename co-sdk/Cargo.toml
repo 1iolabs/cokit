@@ -62,6 +62,7 @@ tracing-bunyan-formatter = { workspace = true }
 tracing-log = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { workspace = true }
+zstd = { workspace = true, optional = true }
 
 # opentelemetry
 opentelemetry = "0.22"
@@ -93,6 +94,10 @@ console-subscriber = { version = "0.4.1" }
 
 # Enable very verbose logging which may has security implications. Only use in development.
 "logging-verbose" = ["co-storage/logging-verbose"]
+
+# Bundle WASM binaries instead of native for build-in cores.
+# Note: Assumes cores are pre-built and compressed using zst.
+"bundle-wasm-cores" = ["dep:zstd"]
 
 [[bench]]
 name = "local_push"

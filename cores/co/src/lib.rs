@@ -127,6 +127,12 @@ pub struct Core {
 	/// The latest stream state.
 	pub state: Option<Cid>,
 }
+impl Core {
+	pub fn with_state(mut self, state: Option<Cid>) -> Self {
+		self.state = state;
+		self
+	}
+}
 
 #[co]
 pub struct Guard {

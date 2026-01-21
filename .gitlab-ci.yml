@@ -61,6 +61,7 @@ bench:
     - cargo bench
 
 # generate binaries
+#  note: we need to build cores before the release build to have the correct built-in core Cid's.
 build:
   stage: build
   image: ${DOCKERFILE_IMAGE}
@@ -68,12 +69,13 @@ build:
     <<: *global_cache
   script:
     - rustc -vV
-    - echo "> building binaries"
-    - cargo build --release
     - echo "> building cores"
-    - ./target/release/co core build-builtin
+    - cargo run --package co-cli --release -- core build-builtin --zst
+    - echo "> building binaries"
+    - cargo build --release --features bundle-wasm-cores
   artifacts:
     paths:
+      - cores/Cores.toml
       - target/release/co
       - target/release/daemon
       - target-wasm/wasm32-unknown-unknown/release/*.wasm
