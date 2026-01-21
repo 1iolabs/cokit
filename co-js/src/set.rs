@@ -1,9 +1,7 @@
 use crate::{from_js_value, to_js_value, JsBlockStorage};
 use cid::Cid;
 use co_primitives::{CoSet, CoSetTransaction, TagValue};
-use futures::TryFutureExt;
 use wasm_bindgen::prelude::*;
-use web_sys::js_sys::Boolean;
 
 #[wasm_bindgen(js_name = "CoSet")]
 pub struct JsCoSet {
