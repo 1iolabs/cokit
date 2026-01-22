@@ -104,6 +104,8 @@ async function test_co_map() {
   assertEq(values[1][0], "trans");
   assertEq(values[1][1], "action");
   assertEq(await transaction.contains_key("trans"), true);
+
+  // store and commit should result in same map
   const newMap = await transaction.store();
   await map.commit(transaction);
   assertEq(
@@ -150,6 +152,8 @@ async function test_co_set() {
   assertEq(await transaction.remove("world"), true);
   assertEq(await transaction.remove("world"), false);
   assertEq(await transaction.contains("world"), false);
+
+  // store and commit should result in same set
   let newSet = await transaction.store();
   await set.commit(transaction);
   assertEq(
@@ -181,9 +185,40 @@ async function test_co_list() {
   assertEq(values[2], "hello");
   assertEq(values[1], "world");
   assertEq(values[0], "test");
-  // pop
+  // test pop
   assertEq(await list.pop_front(storage), "hello");
   assertEq(await list.pop(storage), "test");
+
+  // test transaction
+  let transaction = await list.open(storage);
+  await transaction.push("trans");
+  await transaction.push("action");
+
+  values = [];
+  for await (const i of transaction.stream()) {
+    values.push(i);
+  }
+  assertEq(values[0], "world");
+  assertEq(values[1], "trans");
+  assertEq(values[2], "action");
+
+  values = [];
+  for await (const i of transaction.reverse_stream()) {
+    values.push(i);
+  }
+  assertEq(values[2], "world");
+  assertEq(values[1], "trans");
+  assertEq(values[0], "action");
+  assertEq(await transaction.pop(), "action");
+  assertEq(await transaction.pop_front(), "world");
+
+  // store and commit should result in same list
+  const newList = await transaction.store();
+  await list.commit(transaction);
+  assertEq(
+    CID.decode(list.cid()).toString(),
+    CID.decode(newList.cid()).toString(),
+  );
 }
 
 async function test_unixfs_add() {
