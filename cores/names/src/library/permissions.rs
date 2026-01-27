@@ -1,0 +1,136 @@
+use crate::{record::KnownRecord, transaction::NamesTransaction, Record, RecordId, RecordType, DELEGATE_RECORD_TYPE};
+use anyhow::anyhow;
+use co_api::{Did, TagPattern, Tags, TagsExpr};
+use futures::{pin_mut, TryStreamExt};
+use std::borrow::Borrow;
+
+pub async fn check_access(
+	state: &mut NamesTransaction,
+	did: &Did,
+	record_id: &RecordId,
+	scope: impl Borrow<Tags>,
+) -> Result<(), anyhow::Error> {
+	let access = get_access(state, did, record_id, true).await?;
+	if access.test(Some(scope.borrow())) {
+		Ok(())
+	} else {
+		Err(anyhow!("Permission denied"))
+	}
+}
+
+pub async fn check_access_full(
+	state: &mut NamesTransaction,
+	did: &Did,
+	record_id: &RecordId,
+) -> Result<(), anyhow::Error> {
+	if get_access(state, did, record_id, true).await?.is_full() {
+		Ok(())
+	} else {
+		Err(anyhow!("Permission denied"))
+	}
+}
+
+pub async fn check_access_owner(
+	state: &mut NamesTransaction,
+	did: &Did,
+	record_id: &RecordId,
+) -> Result<(), anyhow::Error> {
+	if matches!(get_access(state, did, record_id, false).await?, Access::Owner) {
+		Ok(())
+	} else {
+		Err(anyhow!("Permission denied"))
+	}
+}
+
+pub async fn get_access(
+	state: &mut NamesTransaction,
+	did: &Did,
+	record_id: &RecordId,
+	delegate: bool,
+) -> Result<Access, anyhow::Error> {
+	let record = state.record(record_id).await?;
+
+	// access
+	let access = check_direct_access(did, &record);
+	if access.is_some() {
+		return Ok(access);
+	}
+
+	// is delegated?
+	let mut access = Access::None;
+	if delegate {
+		let delegate_records = state.index_lookup_records(DELEGATE_RECORD_TYPE, "to", did.to_owned()).await?;
+		pin_mut!(delegate_records);
+		while let Some(delegate_record) = delegate_records.try_next().await? {
+			if let Record::Known(KnownRecord::Delegate(delegate_record)) = delegate_record {
+				if &delegate_record.to == did && check_direct_access(&delegate_record.owner, &record).is_some() {
+					access = access.merge(Access::Delegate(delegate_record.scope));
+					if access.is_full_delegate() {
+						break;
+					}
+				}
+			}
+		}
+	}
+	Ok(access)
+}
+
+pub enum Access {
+	None,
+	Owner,
+	Controller,
+
+	/// Delegated access.
+	Delegate(Option<TagsExpr>),
+}
+impl Access {
+	pub fn is_some(&self) -> bool {
+		matches!(self, Access::Owner | Access::Controller | Access::Delegate(_))
+	}
+
+	pub fn is_full(&self) -> bool {
+		matches!(self, Access::Owner | Access::Controller | Access::Delegate(None))
+	}
+
+	pub fn is_full_delegate(&self) -> bool {
+		matches!(self, Access::Delegate(None))
+	}
+
+	pub fn merge(self, other: Access) -> Access {
+		match (self, other) {
+			(Access::Owner, _) | (_, Access::Owner) => Access::Owner,
+			(Access::Controller, _) | (_, Access::Controller) => Access::Controller,
+			(Access::Delegate(None), _) | (_, Access::Delegate(None)) => Access::Delegate(None),
+			(Access::Delegate(Some(a)), Access::Delegate(Some(b))) => Access::Delegate(Some(a.or(b))),
+			(Access::Delegate(Some(tags)), _) | (_, Access::Delegate(Some(tags))) => Access::Delegate(Some(tags)),
+			(Access::None, Access::None) => Access::None,
+		}
+	}
+
+	pub fn test(&self, scope: Option<&Tags>) -> bool {
+		match (self, scope) {
+			(Access::None, _) => false,
+			(Access::Owner, _) => true,
+			(Access::Controller, _) => true,
+			(Access::Delegate(None), _) => true,
+			(Access::Delegate(Some(_)), None) => false,
+			(Access::Delegate(Some(expr)), Some(scope)) => expr.matches_pattern(scope),
+		}
+	}
+}
+
+/// Check if `did` has direct access to `record`.
+fn check_direct_access(did: &Did, record: &Record) -> Access {
+	// is owner?
+	if record.owner() == Some(did) {
+		return Access::Owner;
+	}
+
+	// is controller?
+	if record.controller().contains(did) {
+		return Access::Controller;
+	}
+
+	// none
+	Access::None
+}

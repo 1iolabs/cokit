@@ -197,6 +197,13 @@ impl Tags {
 		Self(Default::default())
 	}
 
+	pub fn merge(a: Self, b: Self) -> Self {
+		let mut tags = Self::new();
+		tags.extend(a);
+		tags.extend(b);
+		tags
+	}
+
 	/// Tag count.
 	pub fn len(&self) -> usize {
 		self.0.len()
@@ -226,7 +233,7 @@ impl Tags {
 	///
 	/// Tags that equal exactly (key and value) will be skipped.
 	/// All others will be added.
-	pub fn extend(&mut self, tags: impl Iterator<Item = Tag>) {
+	pub fn extend(&mut self, tags: impl IntoIterator<Item = Tag>) {
 		self.0.extend(tags);
 	}
 
@@ -408,7 +415,7 @@ impl TagMatcher for Tags {
 }
 
 /// Tags match pattern.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema)]
 pub enum TagsExpr {
 	/// Tests if tag exists (with same key and value).
 	#[serde(rename = "$tag")]
