@@ -5,7 +5,7 @@
 ### Install
 
 ```shell
-cargo binstall mdbook mdbook-admonish mdbook-toc mdbook-mermaid
+cargo binstall mdbook@0.4 mdbook-admonish@1.20 mdbook-toc@0.14 mdbook-mermaid@0.15
 ```
 
 ### Run
