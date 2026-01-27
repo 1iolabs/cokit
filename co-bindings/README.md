@@ -14,3 +14,17 @@ This crate contains wrappers for variaous co-sdk types for that uniffi and flutt
 - [ ] Initial CoList
 - [ ] More primitives
 - [ ] Integrate `co-js`
+
+## Flutter 
+
+### Setup
+
+```sh
+cargo install flutter_rust_bridge_codegen@2.11.1
+```
+
+### Build
+
+```sh
+./co-bindings/flutter/build.sh
+```
