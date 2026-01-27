@@ -8,7 +8,7 @@ class CoreCo implements DagCborCodecProvider {
   final Cid /* Cid */ binary;
   final CoMap<String, Participant> /* CoMap<Did, Participant> */ participants;
   final Map<String, Core> /* BTreeMap<String, Core> */ cores;
-  final Map<String, Map<String, dynamic>>? /* BTreeMap<String, Guard> */ guards;
+  final Map<String, dynamic>? /* BTreeMap<String, Guard> */ guards;
   final dynamic /* Option<Vec<Key>> */ keys;
   final dynamic /* CoSet<Network> */ network;
 
