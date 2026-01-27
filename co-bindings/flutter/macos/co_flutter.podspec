@@ -42,6 +42,7 @@ A new Flutter FFI plugin project.
 
       export PATH="$HOME/.cargo/bin:$PATH"
 
+      cd "$PODS_TARGET_SRCROOT"
       cargo build -p co-bindings -F frb
     SCRIPT
   }

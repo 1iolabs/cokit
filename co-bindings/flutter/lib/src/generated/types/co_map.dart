@@ -15,45 +15,62 @@ import 'storage.dart';
 class CoMap {
   final Cid? root;
 
-  const CoMap.raw({
-    this.root,
-  });
+  const CoMap.raw({this.root});
 
-  Future<bool> contains(
-          {required BlockStorage storage, required List<int> key}) =>
-      CoKit.instance.api
-          .crateTypesCoMapCoMapContains(that: this, storage: storage, key: key);
+  Future<bool> contains({
+    required BlockStorage storage,
+    required List<int> key,
+  }) => CoKit.instance.api.crateTypesCoMapCoMapContains(
+    that: this,
+    storage: storage,
+    key: key,
+  );
 
   static Future<CoMap> default_() =>
       CoKit.instance.api.crateTypesCoMapCoMapDefault();
 
-  Future<List<(Uint8List, Uint8List)>> entries(
-          {required BlockStorage storage, BigInt? skip, BigInt? limit}) =>
-      CoKit.instance.api.crateTypesCoMapCoMapEntries(
-          that: this, storage: storage, skip: skip, limit: limit);
+  Future<List<(Uint8List, Uint8List)>> entries({
+    required BlockStorage storage,
+    BigInt? skip,
+    BigInt? limit,
+  }) => CoKit.instance.api.crateTypesCoMapCoMapEntries(
+    that: this,
+    storage: storage,
+    skip: skip,
+    limit: limit,
+  );
 
-  Future<Uint8List?> getValue(
-          {required BlockStorage storage, required List<int> key}) =>
-      CoKit.instance.api
-          .crateTypesCoMapCoMapGet(that: this, storage: storage, key: key);
+  Future<Uint8List?> getValue({
+    required BlockStorage storage,
+    required List<int> key,
+  }) => CoKit.instance.api.crateTypesCoMapCoMapGet(
+    that: this,
+    storage: storage,
+    key: key,
+  );
 
-  Future<CoMap> insert(
-          {required BlockStorage storage,
-          required List<int> key,
-          required List<int> value}) =>
-      CoKit.instance.api.crateTypesCoMapCoMapInsert(
-          that: this, storage: storage, key: key, value: value);
+  Future<CoMap> insert({
+    required BlockStorage storage,
+    required List<int> key,
+    required List<int> value,
+  }) => CoKit.instance.api.crateTypesCoMapCoMapInsert(
+    that: this,
+    storage: storage,
+    key: key,
+    value: value,
+  );
 
-  Future<bool> isEmpty() => CoKit.instance.api.crateTypesCoMapCoMapIsEmpty(
-        that: this,
-      );
+  Future<bool> isEmpty() =>
+      CoKit.instance.api.crateTypesCoMapCoMapIsEmpty(that: this);
 
   factory CoMap({required Cid root}) =>
       CoKit.instance.api.crateTypesCoMapCoMapNew(root: root);
 
   Stream<(Uint8List, Uint8List)?> stream({required BlockStorage storage}) =>
-      CoKit.instance.api
-          .crateTypesCoMapCoMapStream(that: this, storage: storage);
+      CoKit.instance.api.crateTypesCoMapCoMapStream(
+        that: this,
+        storage: storage,
+      );
 
   @override
   int get hashCode => root.hashCode;

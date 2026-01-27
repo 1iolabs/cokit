@@ -14,8 +14,7 @@ enum CoLogLevel {
   warn,
   info,
   debug,
-  trace,
-  ;
+  trace;
 
   static Future<CoLogLevel> default_() =>
       CoKit.instance.api.crateTypesLevelCoLogLevelDefault();

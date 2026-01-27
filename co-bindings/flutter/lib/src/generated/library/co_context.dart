@@ -17,8 +17,10 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CoContext>>
 abstract class CoContext implements RustOpaqueInterface {
-  Future<Co> createCo(
-      {required CoPrivateIdentity identity, required CreateCo create});
+  Future<Co> createCo({
+    required CoPrivateIdentity identity,
+    required CreateCo create,
+  });
 
   /// Use the first or create an identity with `name`.
   Future<CoPrivateIdentity> ensureDidKeyIdentity({required String name});

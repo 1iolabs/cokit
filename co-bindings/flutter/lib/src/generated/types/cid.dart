@@ -14,24 +14,16 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 class Cid {
   final Uint8List bytes;
 
-  const Cid({
-    required this.bytes,
-  });
+  const Cid({required this.bytes});
 
-  BigInt codec() => CoKit.instance.api.crateTypesCidCidCodec(
-        that: this,
-      );
+  BigInt codec() => CoKit.instance.api.crateTypesCidCidCodec(that: this);
 
   static Future<Cid> fromString({required String string}) =>
       CoKit.instance.api.crateTypesCidCidFromString(string: string);
 
-  String toString() => CoKit.instance.api.crateTypesCidCidToString(
-        that: this,
-      );
+  String toString() => CoKit.instance.api.crateTypesCidCidToString(that: this);
 
-  BigInt version() => CoKit.instance.api.crateTypesCidCidVersion(
-        that: this,
-      );
+  BigInt version() => CoKit.instance.api.crateTypesCidCidVersion(that: this);
 
   @override
   int get hashCode => bytes.hashCode;
