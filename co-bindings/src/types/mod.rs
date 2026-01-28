@@ -4,3 +4,4 @@ pub mod identity;
 pub mod level;
 pub mod network_settings;
 pub mod storage;
+pub mod unixfs;

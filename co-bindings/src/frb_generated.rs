@@ -25,17 +25,14 @@
 
 // Section: imports
 
-use crate::{
-	library::{co::*, co_context::*, co_error::*},
-	types::{identity::*, storage::*},
-};
-use flutter_rust_bridge::{
-	for_generated::{
-		byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt},
-		transform_result_dco, Lifetimeable, Lockable,
-	},
-	Handler, IntoIntoDart,
-};
+use crate::library::co::*;
+use crate::library::co_context::*;
+use crate::library::co_error::*;
+use crate::types::identity::*;
+use crate::types::storage::*;
+use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
+use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
+use flutter_rust_bridge::{Handler, IntoIntoDart};
 
 // Section: boilerplate
 
@@ -45,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
 	default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -2093626454;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1195173536;
 
 // Section: executor
 
@@ -1326,6 +1323,52 @@ fn wire__crate__library__co_settings__co_settings_default_impl(
 		},
 	)
 }
+fn wire__crate__types__unixfs__unixfs_add_buffer_impl(
+	port_: flutter_rust_bridge::for_generated::MessagePort,
+	ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+	rust_vec_len_: i32,
+	data_len_: i32,
+) {
+	FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+		flutter_rust_bridge::for_generated::TaskInfo {
+			debug_name: "unixfs_add_buffer",
+			port: Some(port_),
+			mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+		},
+		move || {
+			let message = unsafe {
+				flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
+			};
+			let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+			let api_storage =
+				<RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BlockStorage>>>::sse_decode(
+					&mut deserializer,
+				);
+			let api_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
+			deserializer.end();
+			move |context| async move {
+				transform_result_sse::<_, CoError>(
+					(move || async move {
+						let mut api_storage_guard = None;
+						let decode_indices_ = flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+							flutter_rust_bridge::for_generated::LockableOrderInfo::new(&api_storage, 0, false),
+						]);
+						for i in decode_indices_ {
+							match i {
+								0 => api_storage_guard = Some(api_storage.lockable_decode_async_ref().await),
+								_ => unreachable!(),
+							}
+						}
+						let api_storage_guard = api_storage_guard.unwrap();
+						let output_ok = crate::types::unixfs::unixfs_add_buffer(&*api_storage_guard, api_bytes).await?;
+						Ok(output_ok)
+					})()
+					.await,
+				)
+			}
+		},
+	)
+}
 
 // Section: related_funcs
 
@@ -1903,6 +1946,7 @@ fn pde_ffi_dispatcher_primary_impl(
 		31 => wire__crate__types__co_map__co_map_stream_impl(port, ptr, rust_vec_len, data_len),
 		32 => wire__crate__types__network_settings__co_network_settings_default_impl(port, ptr, rust_vec_len, data_len),
 		33 => wire__crate__library__co_settings__co_settings_default_impl(port, ptr, rust_vec_len, data_len),
+		34 => wire__crate__types__unixfs__unixfs_add_buffer_impl(port, ptr, rust_vec_len, data_len),
 		_ => unreachable!(),
 	}
 }
@@ -2636,17 +2680,14 @@ mod io {
 	// Section: imports
 
 	use super::*;
-	use crate::{
-		library::{co::*, co_context::*, co_error::*},
-		types::{identity::*, storage::*},
-	};
-	use flutter_rust_bridge::{
-		for_generated::{
-			byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt},
-			transform_result_dco, Lifetimeable, Lockable,
-		},
-		Handler, IntoIntoDart,
-	};
+	use crate::library::co::*;
+	use crate::library::co_context::*;
+	use crate::library::co_error::*;
+	use crate::types::identity::*;
+	use crate::types::storage::*;
+	use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
+	use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
+	use flutter_rust_bridge::{Handler, IntoIntoDart};
 
 	// Section: boilerplate
 
@@ -2760,19 +2801,16 @@ mod web {
 	// Section: imports
 
 	use super::*;
-	use crate::{
-		library::{co::*, co_context::*, co_error::*},
-		types::{identity::*, storage::*},
-	};
-	use flutter_rust_bridge::{
-		for_generated::{
-			byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt},
-			transform_result_dco, wasm_bindgen,
-			wasm_bindgen::prelude::*,
-			Lifetimeable, Lockable,
-		},
-		Handler, IntoIntoDart,
-	};
+	use crate::library::co::*;
+	use crate::library::co_context::*;
+	use crate::library::co_error::*;
+	use crate::types::identity::*;
+	use crate::types::storage::*;
+	use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
+	use flutter_rust_bridge::for_generated::wasm_bindgen;
+	use flutter_rust_bridge::for_generated::wasm_bindgen::prelude::*;
+	use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
+	use flutter_rust_bridge::{Handler, IntoIntoDart};
 
 	// Section: boilerplate
 

@@ -18,6 +18,7 @@ import 'types/identity.dart';
 import 'types/level.dart';
 import 'types/network_settings.dart';
 import 'types/storage.dart';
+import 'types/unixfs.dart';
 
 abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   CoKitApiImplPlatform({

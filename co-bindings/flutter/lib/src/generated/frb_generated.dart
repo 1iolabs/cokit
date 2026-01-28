@@ -19,6 +19,7 @@ import 'types/identity.dart';
 import 'types/level.dart';
 import 'types/network_settings.dart';
 import 'types/storage.dart';
+import 'types/unixfs.dart';
 
 /// Main entrypoint of the Rust API
 class CoKit extends BaseEntrypoint<CoKitApi, CoKitApiImpl, CoKitWire> {
@@ -77,7 +78,7 @@ class CoKit extends BaseEntrypoint<CoKitApi, CoKitApiImpl, CoKitWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -2093626454;
+  int get rustContentHash => 1195173536;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -187,6 +188,9 @@ abstract class CoKitApi extends BaseApi {
   Future<CoNetworkSettings> crateTypesNetworkSettingsCoNetworkSettingsDefault();
 
   Future<CoSettings> crateLibraryCoSettingsCoSettingsDefault();
+
+  Future<Cid> crateTypesUnixfsUnixfsAddBuffer(
+      {required BlockStorage storage, required List<int> bytes});
 
   RustArcIncrementStrongCountFnType
       get rust_arc_increment_strong_count_BlockStorage;
@@ -1157,6 +1161,35 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       const TaskConstMeta(
         debugName: "co_settings_default",
         argNames: [],
+      );
+
+  @override
+  Future<Cid> crateTypesUnixfsUnixfsAddBuffer(
+      {required BlockStorage storage, required List<int> bytes}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+            storage, serializer);
+        sse_encode_list_prim_u_8_loose(bytes, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 34, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_cid,
+        decodeErrorData:
+            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError,
+      ),
+      constMeta: kCrateTypesUnixfsUnixfsAddBufferConstMeta,
+      argValues: [storage, bytes],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateTypesUnixfsUnixfsAddBufferConstMeta =>
+      const TaskConstMeta(
+        debugName: "unixfs_add_buffer",
+        argNames: ["storage", "bytes"],
       );
 
   RustArcIncrementStrongCountFnType

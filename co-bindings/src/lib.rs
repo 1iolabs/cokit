@@ -21,6 +21,7 @@ pub use types::{
 	level::CoLogLevel,
 	network_settings::CoNetworkSettings,
 	storage::{Block, BlockStorage},
+	unixfs::unixfs_add_buffer,
 };
 
 // uniffi
