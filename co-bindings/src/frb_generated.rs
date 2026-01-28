@@ -25,14 +25,17 @@
 
 // Section: imports
 
-use crate::library::co::*;
-use crate::library::co_context::*;
-use crate::library::co_error::*;
-use crate::types::identity::*;
-use crate::types::storage::*;
-use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
-use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
-use flutter_rust_bridge::{Handler, IntoIntoDart};
+use crate::{
+	library::{co::*, co_context::*, co_error::*},
+	types::{identity::*, storage::*},
+};
+use flutter_rust_bridge::{
+	for_generated::{
+		byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt},
+		transform_result_dco, Lifetimeable, Lockable,
+	},
+	Handler, IntoIntoDart,
+};
 
 // Section: boilerplate
 
@@ -1208,7 +1211,7 @@ fn wire__crate__types__co_map__co_map_new_impl(
 				flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_)
 			};
 			let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-			let api_root = <crate::types::cid::Cid>::sse_decode(&mut deserializer);
+			let api_root = <Option<crate::types::cid::Cid>>::sse_decode(&mut deserializer);
 			deserializer.end();
 			transform_result_sse::<_, ()>((move || {
 				let output_ok = Result::<_, ()>::Ok(crate::types::co_map::CoMap::new(api_root))?;
@@ -2633,14 +2636,17 @@ mod io {
 	// Section: imports
 
 	use super::*;
-	use crate::library::co::*;
-	use crate::library::co_context::*;
-	use crate::library::co_error::*;
-	use crate::types::identity::*;
-	use crate::types::storage::*;
-	use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
-	use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
-	use flutter_rust_bridge::{Handler, IntoIntoDart};
+	use crate::{
+		library::{co::*, co_context::*, co_error::*},
+		types::{identity::*, storage::*},
+	};
+	use flutter_rust_bridge::{
+		for_generated::{
+			byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt},
+			transform_result_dco, Lifetimeable, Lockable,
+		},
+		Handler, IntoIntoDart,
+	};
 
 	// Section: boilerplate
 
@@ -2754,16 +2760,19 @@ mod web {
 	// Section: imports
 
 	use super::*;
-	use crate::library::co::*;
-	use crate::library::co_context::*;
-	use crate::library::co_error::*;
-	use crate::types::identity::*;
-	use crate::types::storage::*;
-	use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
-	use flutter_rust_bridge::for_generated::wasm_bindgen;
-	use flutter_rust_bridge::for_generated::wasm_bindgen::prelude::*;
-	use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
-	use flutter_rust_bridge::{Handler, IntoIntoDart};
+	use crate::{
+		library::{co::*, co_context::*, co_error::*},
+		types::{identity::*, storage::*},
+	};
+	use flutter_rust_bridge::{
+		for_generated::{
+			byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt},
+			transform_result_dco, wasm_bindgen,
+			wasm_bindgen::prelude::*,
+			Lifetimeable, Lockable,
+		},
+		Handler, IntoIntoDart,
+	};
 
 	// Section: boilerplate
 

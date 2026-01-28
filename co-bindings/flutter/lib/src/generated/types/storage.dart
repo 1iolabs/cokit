@@ -22,34 +22,30 @@ class Block {
   final Cid cid;
   final Uint8List data;
 
-  const Block({required this.cid, required this.data});
+  const Block({
+    required this.cid,
+    required this.data,
+  });
 
   // HINT: Make it `#[frb(sync)]` to let it become the default constructor of Dart class.
   /// Creates a new block. Returns an error if the hash doesn't match
   /// the data.
-  static Future<Block> newInstance({
-    required Cid cid,
-    required List<int> data,
-  }) => CoKit.instance.api.crateTypesStorageBlockNew(cid: cid, data: data);
+  static Future<Block> newInstance(
+          {required Cid cid, required List<int> data}) =>
+      CoKit.instance.api.crateTypesStorageBlockNew(cid: cid, data: data);
 
   /// Create a new block by calculating the [`Cid`] from data using the default hasher.
   /// Note: The default hasher may changes without notice.
-  static Future<Block> newData({
-    required BigInt codec,
-    required List<int> data,
-  }) => CoKit.instance.api.crateTypesStorageBlockNewData(
-    codec: codec,
-    data: data,
-  );
+  static Future<Block> newData(
+          {required BigInt codec, required List<int> data}) =>
+      CoKit.instance.api
+          .crateTypesStorageBlockNewData(codec: codec, data: data);
 
   /// Creates a new block without verifying the cid.
-  static Future<Block> newUnchecked({
-    required Cid cid,
-    required List<int> data,
-  }) => CoKit.instance.api.crateTypesStorageBlockNewUnchecked(
-    cid: cid,
-    data: data,
-  );
+  static Future<Block> newUnchecked(
+          {required Cid cid, required List<int> data}) =>
+      CoKit.instance.api
+          .crateTypesStorageBlockNewUnchecked(cid: cid, data: data);
 
   @override
   int get hashCode => cid.hashCode ^ data.hashCode;

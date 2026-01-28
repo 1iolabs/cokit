@@ -8,7 +8,7 @@ class CoMap<K, V> implements DagCborCodecProvider {
   final DagCborCodec<K>? _keyCodec;
   final DagCborCodec<V>? _codec;
 
-  CoMap(Cid root, {DagCborCodec<K>? keyCodec, DagCborCodec<V>? codec})
+  CoMap(Cid? root, {DagCborCodec<K>? keyCodec, DagCborCodec<V>? codec})
       : _inner = bridge.CoMap(root: root),
         _keyCodec = keyCodec,
         _codec = codec;

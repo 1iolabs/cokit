@@ -14,11 +14,10 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Co>>
 abstract class Co implements RustOpaqueInterface {
-  Future<void> push({
-    required CoPrivateIdentity identity,
-    required String core,
-    required List<int> action,
-  });
+  Future<void> push(
+      {required CoPrivateIdentity identity,
+      required String core,
+      required List<int> action});
 
   Future<CoState> state();
 
@@ -38,7 +37,10 @@ class CoState {
   final Cid? state;
   final List<Cid> heads;
 
-  const CoState({this.state, required this.heads});
+  const CoState({
+    this.state,
+    required this.heads,
+  });
 
   @override
   int get hashCode => state.hashCode ^ heads.hashCode;

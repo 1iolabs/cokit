@@ -28,150 +28,126 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   });
 
   CrossPlatformFinalizerArg
-  get rust_arc_decrement_strong_count_BlockStoragePtr => wire
-      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStoragePtr;
+      get rust_arc_decrement_strong_count_BlockStoragePtr => wire
+          ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStoragePtr;
 
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_CoPtr => wire
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPtr;
 
-  CrossPlatformFinalizerArg
-  get rust_arc_decrement_strong_count_CoContextPtr => wire
-      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContextPtr;
+  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_CoContextPtr =>
+      wire._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContextPtr;
 
-  CrossPlatformFinalizerArg
-  get rust_arc_decrement_strong_count_CoErrorPtr => wire
+  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_CoErrorPtr => wire
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoErrorPtr;
 
   CrossPlatformFinalizerArg
-  get rust_arc_decrement_strong_count_CoPrivateIdentityPtr => wire
-      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentityPtr;
+      get rust_arc_decrement_strong_count_CoPrivateIdentityPtr => wire
+          ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentityPtr;
 
   CrossPlatformFinalizerArg
-  get rust_arc_decrement_strong_count_CoSubscriptionPtr => wire
-      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscriptionPtr;
+      get rust_arc_decrement_strong_count_CoSubscriptionPtr => wire
+          ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscriptionPtr;
 
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw);
 
   @protected
   BlockStorage
-  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
-    dynamic raw,
-  );
+      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          dynamic raw);
 
   @protected
-  Co
-  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
-    dynamic raw,
-  );
+  Co dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
+      dynamic raw);
 
   @protected
   CoContext
-  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
-    dynamic raw,
-  );
+      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
+          dynamic raw);
 
   @protected
   CoError
-  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
-    dynamic raw,
-  );
+      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
+          dynamic raw);
 
   @protected
   CoPrivateIdentity
-  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
-    dynamic raw,
-  );
+      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+          dynamic raw);
 
   @protected
   CoSubscription
-  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
-    dynamic raw,
-  );
+      dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          dynamic raw);
 
   @protected
   BlockStorage
-  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
-    dynamic raw,
-  );
+      dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          dynamic raw);
 
   @protected
-  Co
-  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
-    dynamic raw,
-  );
+  Co dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
+      dynamic raw);
 
   @protected
   CoContext
-  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
-    dynamic raw,
-  );
+      dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
+          dynamic raw);
 
   @protected
   CoError
-  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
-    dynamic raw,
-  );
+      dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
+          dynamic raw);
 
   @protected
   CoPrivateIdentity
-  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
-    dynamic raw,
-  );
+      dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+          dynamic raw);
 
   @protected
   CoSubscription
-  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
-    dynamic raw,
-  );
+      dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          dynamic raw);
 
   @protected
   Map<String, CreateCore> dco_decode_Map_String_create_core_None(dynamic raw);
 
   @protected
   BlockStorage
-  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
-    dynamic raw,
-  );
+      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          dynamic raw);
 
   @protected
-  Co
-  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
-    dynamic raw,
-  );
+  Co dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
+      dynamic raw);
 
   @protected
   CoContext
-  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
-    dynamic raw,
-  );
+      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
+          dynamic raw);
 
   @protected
   CoError
-  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
-    dynamic raw,
-  );
+      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
+          dynamic raw);
 
   @protected
   CoPrivateIdentity
-  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
-    dynamic raw,
-  );
+      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+          dynamic raw);
 
   @protected
   CoSubscription
-  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
-    dynamic raw,
-  );
+      dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          dynamic raw);
 
   @protected
   RustStreamSink<CoState> dco_decode_StreamSink_co_state_Sse(dynamic raw);
 
   @protected
   RustStreamSink<(Uint8List, Uint8List)?>
-  dco_decode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
-    dynamic raw,
-  );
+      dco_decode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+          dynamic raw);
 
   @protected
   String dco_decode_String(dynamic raw);
@@ -208,9 +184,8 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   (Uint8List, Uint8List)
-  dco_decode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
-    dynamic raw,
-  );
+      dco_decode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          dynamic raw);
 
   @protected
   int dco_decode_box_autoadd_u_32(dynamic raw);
@@ -259,12 +234,12 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   List<(Uint8List, Uint8List)>
-  dco_decode_list_record_list_prim_u_8_strict_list_prim_u_8_strict(dynamic raw);
+      dco_decode_list_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          dynamic raw);
 
   @protected
   List<(String, CreateCore)> dco_decode_list_record_string_create_core(
-    dynamic raw,
-  );
+      dynamic raw);
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
@@ -280,14 +255,14 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   CoNetworkSettings? dco_decode_opt_box_autoadd_co_network_settings(
-    dynamic raw,
-  );
+      dynamic raw);
 
   @protected
-  (Uint8List, Uint8List)?
-  dco_decode_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
-    dynamic raw,
-  );
+  (
+    Uint8List,
+    Uint8List
+  )? dco_decode_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+      dynamic raw);
 
   @protected
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
@@ -303,7 +278,7 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   (Uint8List, Uint8List)
-  dco_decode_record_list_prim_u_8_strict_list_prim_u_8_strict(dynamic raw);
+      dco_decode_record_list_prim_u_8_strict_list_prim_u_8_strict(dynamic raw);
 
   @protected
   (String, CreateCore) dco_decode_record_string_create_core(dynamic raw);
@@ -328,127 +303,103 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   BlockStorage
-  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
-    SseDeserializer deserializer,
-  );
+      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          SseDeserializer deserializer);
 
   @protected
-  Co
-  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
-    SseDeserializer deserializer,
-  );
+  Co sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
+      SseDeserializer deserializer);
 
   @protected
   CoContext
-  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
-    SseDeserializer deserializer,
-  );
+      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
+          SseDeserializer deserializer);
 
   @protected
   CoError
-  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
-    SseDeserializer deserializer,
-  );
+      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
+          SseDeserializer deserializer);
 
   @protected
   CoPrivateIdentity
-  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
-    SseDeserializer deserializer,
-  );
+      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+          SseDeserializer deserializer);
 
   @protected
   CoSubscription
-  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
-    SseDeserializer deserializer,
-  );
+      sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          SseDeserializer deserializer);
 
   @protected
   BlockStorage
-  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
-    SseDeserializer deserializer,
-  );
+      sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          SseDeserializer deserializer);
 
   @protected
-  Co
-  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
-    SseDeserializer deserializer,
-  );
+  Co sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
+      SseDeserializer deserializer);
 
   @protected
   CoContext
-  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
-    SseDeserializer deserializer,
-  );
+      sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
+          SseDeserializer deserializer);
 
   @protected
   CoError
-  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
-    SseDeserializer deserializer,
-  );
+      sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
+          SseDeserializer deserializer);
 
   @protected
   CoPrivateIdentity
-  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
-    SseDeserializer deserializer,
-  );
+      sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+          SseDeserializer deserializer);
 
   @protected
   CoSubscription
-  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
-    SseDeserializer deserializer,
-  );
+      sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          SseDeserializer deserializer);
 
   @protected
   Map<String, CreateCore> sse_decode_Map_String_create_core_None(
-    SseDeserializer deserializer,
-  );
+      SseDeserializer deserializer);
 
   @protected
   BlockStorage
-  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
-    SseDeserializer deserializer,
-  );
+      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          SseDeserializer deserializer);
 
   @protected
-  Co
-  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
-    SseDeserializer deserializer,
-  );
+  Co sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
+      SseDeserializer deserializer);
 
   @protected
   CoContext
-  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
-    SseDeserializer deserializer,
-  );
+      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
+          SseDeserializer deserializer);
 
   @protected
   CoError
-  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
-    SseDeserializer deserializer,
-  );
+      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
+          SseDeserializer deserializer);
 
   @protected
   CoPrivateIdentity
-  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
-    SseDeserializer deserializer,
-  );
+      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+          SseDeserializer deserializer);
 
   @protected
   CoSubscription
-  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
-    SseDeserializer deserializer,
-  );
+      sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          SseDeserializer deserializer);
 
   @protected
   RustStreamSink<CoState> sse_decode_StreamSink_co_state_Sse(
-    SseDeserializer deserializer,
-  );
+      SseDeserializer deserializer);
 
   @protected
   RustStreamSink<(Uint8List, Uint8List)?>
-  sse_decode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
-    SseDeserializer deserializer,
-  );
+      sse_decode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+          SseDeserializer deserializer);
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
@@ -476,8 +427,7 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   CoNetworkSettings sse_decode_box_autoadd_co_network_settings(
-    SseDeserializer deserializer,
-  );
+      SseDeserializer deserializer);
 
   @protected
   CoSettings sse_decode_box_autoadd_co_settings(SseDeserializer deserializer);
@@ -487,9 +437,8 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   (Uint8List, Uint8List)
-  sse_decode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
-    SseDeserializer deserializer,
-  );
+      sse_decode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          SseDeserializer deserializer);
 
   @protected
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
@@ -508,8 +457,7 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   CoNetworkSettings sse_decode_co_network_settings(
-    SseDeserializer deserializer,
-  );
+      SseDeserializer deserializer);
 
   @protected
   CoSettings sse_decode_co_settings(SseDeserializer deserializer);
@@ -540,14 +488,12 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   List<(Uint8List, Uint8List)>
-  sse_decode_list_record_list_prim_u_8_strict_list_prim_u_8_strict(
-    SseDeserializer deserializer,
-  );
+      sse_decode_list_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          SseDeserializer deserializer);
 
   @protected
   List<(String, CreateCore)> sse_decode_list_record_string_create_core(
-    SseDeserializer deserializer,
-  );
+      SseDeserializer deserializer);
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
@@ -560,19 +506,18 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   CoLogLevel? sse_decode_opt_box_autoadd_co_log_level(
-    SseDeserializer deserializer,
-  );
+      SseDeserializer deserializer);
 
   @protected
   CoNetworkSettings? sse_decode_opt_box_autoadd_co_network_settings(
-    SseDeserializer deserializer,
-  );
+      SseDeserializer deserializer);
 
   @protected
-  (Uint8List, Uint8List)?
-  sse_decode_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
-    SseDeserializer deserializer,
-  );
+  (
+    Uint8List,
+    Uint8List
+  )? sse_decode_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+      SseDeserializer deserializer);
 
   @protected
   int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
@@ -588,14 +533,12 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   (Uint8List, Uint8List)
-  sse_decode_record_list_prim_u_8_strict_list_prim_u_8_strict(
-    SseDeserializer deserializer,
-  );
+      sse_decode_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          SseDeserializer deserializer);
 
   @protected
   (String, CreateCore) sse_decode_record_string_create_core(
-    SseDeserializer deserializer,
-  );
+      SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -614,154 +557,111 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void sse_encode_AnyhowException(
-    AnyhowException self,
-    SseSerializer serializer,
-  );
+      AnyhowException self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
-    BlockStorage self,
-    SseSerializer serializer,
-  );
+      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          BlockStorage self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
-    Co self,
-    SseSerializer serializer,
-  );
+      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
+          Co self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
-    CoContext self,
-    SseSerializer serializer,
-  );
+      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
+          CoContext self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
-    CoError self,
-    SseSerializer serializer,
-  );
+      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
+          CoError self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
-    CoPrivateIdentity self,
-    SseSerializer serializer,
-  );
+      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+          CoPrivateIdentity self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
-    CoSubscription self,
-    SseSerializer serializer,
-  );
+      sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          CoSubscription self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
-    BlockStorage self,
-    SseSerializer serializer,
-  );
+      sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          BlockStorage self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
-    Co self,
-    SseSerializer serializer,
-  );
+      sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
+          Co self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
-    CoContext self,
-    SseSerializer serializer,
-  );
+      sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
+          CoContext self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
-    CoError self,
-    SseSerializer serializer,
-  );
+      sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
+          CoError self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
-    CoPrivateIdentity self,
-    SseSerializer serializer,
-  );
+      sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+          CoPrivateIdentity self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
-    CoSubscription self,
-    SseSerializer serializer,
-  );
+      sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          CoSubscription self, SseSerializer serializer);
 
   @protected
   void sse_encode_Map_String_create_core_None(
-    Map<String, CreateCore> self,
-    SseSerializer serializer,
-  );
+      Map<String, CreateCore> self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
-    BlockStorage self,
-    SseSerializer serializer,
-  );
+      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+          BlockStorage self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
-    Co self,
-    SseSerializer serializer,
-  );
+      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
+          Co self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
-    CoContext self,
-    SseSerializer serializer,
-  );
+      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
+          CoContext self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
-    CoError self,
-    SseSerializer serializer,
-  );
+      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
+          CoError self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
-    CoPrivateIdentity self,
-    SseSerializer serializer,
-  );
+      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+          CoPrivateIdentity self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
-    CoSubscription self,
-    SseSerializer serializer,
-  );
+      sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+          CoSubscription self, SseSerializer serializer);
 
   @protected
   void sse_encode_StreamSink_co_state_Sse(
-    RustStreamSink<CoState> self,
-    SseSerializer serializer,
-  );
+      RustStreamSink<CoState> self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
-    RustStreamSink<(Uint8List, Uint8List)?> self,
-    SseSerializer serializer,
-  );
+      sse_encode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
+          RustStreamSink<(Uint8List, Uint8List)?> self,
+          SseSerializer serializer);
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
@@ -783,36 +683,26 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void sse_encode_box_autoadd_co_log_level(
-    CoLogLevel self,
-    SseSerializer serializer,
-  );
+      CoLogLevel self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_co_map(CoMap self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_co_network_settings(
-    CoNetworkSettings self,
-    SseSerializer serializer,
-  );
+      CoNetworkSettings self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_co_settings(
-    CoSettings self,
-    SseSerializer serializer,
-  );
+      CoSettings self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_create_co(
-    CreateCo self,
-    SseSerializer serializer,
-  );
+      CreateCo self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
-    (Uint8List, Uint8List) self,
-    SseSerializer serializer,
-  );
+      (Uint8List, Uint8List) self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
@@ -831,9 +721,7 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void sse_encode_co_network_settings(
-    CoNetworkSettings self,
-    SseSerializer serializer,
-  );
+      CoNetworkSettings self, SseSerializer serializer);
 
   @protected
   void sse_encode_co_settings(CoSettings self, SseSerializer serializer);
@@ -861,21 +749,15 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void sse_encode_list_prim_u_8_strict(
-    Uint8List self,
-    SseSerializer serializer,
-  );
+      Uint8List self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_record_list_prim_u_8_strict_list_prim_u_8_strict(
-    List<(Uint8List, Uint8List)> self,
-    SseSerializer serializer,
-  );
+      List<(Uint8List, Uint8List)> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_record_string_create_core(
-    List<(String, CreateCore)> self,
-    SseSerializer serializer,
-  );
+      List<(String, CreateCore)> self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
@@ -888,22 +770,16 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_co_log_level(
-    CoLogLevel? self,
-    SseSerializer serializer,
-  );
+      CoLogLevel? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_box_autoadd_co_network_settings(
-    CoNetworkSettings? self,
-    SseSerializer serializer,
-  );
+      CoNetworkSettings? self, SseSerializer serializer);
 
   @protected
   void
-  sse_encode_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
-    (Uint8List, Uint8List)? self,
-    SseSerializer serializer,
-  );
+      sse_encode_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict(
+          (Uint8List, Uint8List)? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
@@ -916,21 +792,15 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void sse_encode_opt_list_prim_u_8_strict(
-    Uint8List? self,
-    SseSerializer serializer,
-  );
+      Uint8List? self, SseSerializer serializer);
 
   @protected
   void sse_encode_record_list_prim_u_8_strict_list_prim_u_8_strict(
-    (Uint8List, Uint8List) self,
-    SseSerializer serializer,
-  );
+      (Uint8List, Uint8List) self, SseSerializer serializer);
 
   @protected
   void sse_encode_record_string_create_core(
-    (String, CreateCore) self,
-    SseSerializer serializer,
-  );
+      (String, CreateCore) self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);
@@ -956,14 +826,14 @@ class CoKitWire implements BaseWire {
 
   /// Holds the symbol lookup function.
   final ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName)
-  _lookup;
+      _lookup;
 
   /// The symbols are looked up in [dynamicLibrary].
   CoKitWire(ffi.DynamicLibrary dynamicLibrary)
-    : _lookup = dynamicLibrary.lookup;
+      : _lookup = dynamicLibrary.lookup;
 
   void
-  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+      rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
     ffi.Pointer<ffi.Void> ptr,
   ) {
     return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
@@ -973,14 +843,13 @@ class CoKitWire implements BaseWire {
 
   late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStoragePtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage',
-      );
+          'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage');
   late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage =
       _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStoragePtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
-  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
+      rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
     ffi.Pointer<ffi.Void> ptr,
   ) {
     return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage(
@@ -990,14 +859,13 @@ class CoKitWire implements BaseWire {
 
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStoragePtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage',
-      );
+          'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage');
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStorage =
       _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBlockStoragePtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
-  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
+      rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
     ffi.Pointer<ffi.Void> ptr,
   ) {
     return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
@@ -1007,14 +875,13 @@ class CoKitWire implements BaseWire {
 
   late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo',
-      );
+          'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo');
   late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo =
       _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
-  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
+      rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
     ffi.Pointer<ffi.Void> ptr,
   ) {
     return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
@@ -1024,14 +891,13 @@ class CoKitWire implements BaseWire {
 
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo',
-      );
+          'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo');
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo =
       _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
-  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
+      rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
     ffi.Pointer<ffi.Void> ptr,
   ) {
     return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
@@ -1041,14 +907,13 @@ class CoKitWire implements BaseWire {
 
   late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContextPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext',
-      );
+          'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext');
   late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext =
       _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContextPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
-  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
+      rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
     ffi.Pointer<ffi.Void> ptr,
   ) {
     return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
@@ -1058,14 +923,13 @@ class CoKitWire implements BaseWire {
 
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContextPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext',
-      );
+          'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext');
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext =
       _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContextPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
-  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
+      rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
     ffi.Pointer<ffi.Void> ptr,
   ) {
     return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
@@ -1075,14 +939,13 @@ class CoKitWire implements BaseWire {
 
   late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoErrorPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError',
-      );
+          'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError');
   late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError =
       _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoErrorPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
-  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
+      rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
     ffi.Pointer<ffi.Void> ptr,
   ) {
     return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
@@ -1092,14 +955,13 @@ class CoKitWire implements BaseWire {
 
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoErrorPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError',
-      );
+          'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError');
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError =
       _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoErrorPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
-  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+      rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
     ffi.Pointer<ffi.Void> ptr,
   ) {
     return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
@@ -1109,14 +971,13 @@ class CoKitWire implements BaseWire {
 
   late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentityPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity',
-      );
+          'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity');
   late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity =
       _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentityPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
-  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
+      rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
     ffi.Pointer<ffi.Void> ptr,
   ) {
     return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
@@ -1126,14 +987,13 @@ class CoKitWire implements BaseWire {
 
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentityPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity',
-      );
+          'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity');
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity =
       _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentityPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
-  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+      rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
     ffi.Pointer<ffi.Void> ptr,
   ) {
     return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
@@ -1143,14 +1003,13 @@ class CoKitWire implements BaseWire {
 
   late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscriptionPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription',
-      );
+          'frbgen_co_flutter_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription');
   late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription =
       _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscriptionPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
-  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
+      rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
     ffi.Pointer<ffi.Void> ptr,
   ) {
     return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
@@ -1160,8 +1019,7 @@ class CoKitWire implements BaseWire {
 
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscriptionPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription',
-      );
+          'frbgen_co_flutter_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription');
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription =
       _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscriptionPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();

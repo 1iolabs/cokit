@@ -16,8 +16,8 @@ pub struct CoMap {
 }
 impl CoMap {
 	#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(sync))]
-	pub fn new(root: CoCid) -> Self {
-		Self { root: Some(root) }
+	pub fn new(root: Option<CoCid>) -> Self {
+		Self { root }
 	}
 
 	pub fn is_empty(&self) -> Result<bool, CoError> {
