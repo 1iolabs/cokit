@@ -17,6 +17,7 @@ pub use library::{
 pub use types::{
 	cid::Cid,
 	co_map::CoMap,
+	co_set::CoSet,
 	identity::CoPrivateIdentity,
 	level::CoLogLevel,
 	network_settings::CoNetworkSettings,

@@ -14,6 +14,7 @@ export 'src/generated/types/network_settings.dart';
 export 'src/generated/types/storage.dart';
 export 'src/generated/types/unixfs.dart';
 export 'src/primitives/co_map.dart';
+export 'src/primitives/co_set.dart';
 export 'src/primitives/tags.dart';
 export 'src/widgets/co.dart';
 export 'src/widgets/context.dart';
