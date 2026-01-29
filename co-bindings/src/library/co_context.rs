@@ -25,6 +25,10 @@ impl CoContext {
 		}
 	}
 
+	pub async fn base_path(&self) -> Result<Option<String>, CoError> {
+		self.handle.request(CoMessage::BasePath).await.map_err(CoError::new)
+	}
+
 	pub async fn open_co(&self, id: String) -> Result<Co, CoError> {
 		let co_id = CoId::from(id);
 		let co = self

@@ -79,7 +79,7 @@ class CoKit extends BaseEntrypoint<CoKitApi, CoKitApiImpl, CoKitWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -92676724;
+  int get rustContentHash => -397335583;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -95,6 +95,9 @@ abstract class CoKitApi extends BaseApi {
 
   Future<Cid> crateTypesStorageBlockStorageSet(
       {required BlockStorage that, required Block block});
+
+  Future<String?> crateLibraryCoContextCoContextBasePath(
+      {required CoContext that});
 
   Future<Co> crateLibraryCoContextCoContextCreateCo(
       {required CoContext that,
@@ -332,6 +335,34 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       );
 
   @override
+  Future<String?> crateLibraryCoContextCoContextBasePath(
+      {required CoContext that}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoContext(
+            that, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 3, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_opt_String,
+        decodeErrorData:
+            sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError,
+      ),
+      constMeta: kCrateLibraryCoContextCoContextBasePathConstMeta,
+      argValues: [that],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateLibraryCoContextCoContextBasePathConstMeta =>
+      const TaskConstMeta(
+        debugName: "CoContext_base_path",
+        argNames: ["that"],
+      );
+
+  @override
   Future<Co> crateLibraryCoContextCoContextCreateCo(
       {required CoContext that,
       required CoPrivateIdentity identity,
@@ -345,7 +376,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             identity, serializer);
         sse_encode_box_autoadd_create_co(create, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 3, port: port_);
+            funcId: 4, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -375,7 +406,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             that, serializer);
         sse_encode_String(name, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 4, port: port_);
+            funcId: 5, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -404,7 +435,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_box_autoadd_co_settings(settings, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 5, port: port_);
+            funcId: 6, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -434,7 +465,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             that, serializer);
         sse_encode_String(id, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 6, port: port_);
+            funcId: 7, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -465,7 +496,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             that, serializer);
         sse_encode_String(did, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 7, port: port_);
+            funcId: 8, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -493,7 +524,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoError(
             that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -519,7 +550,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoPrivateIdentity(
             that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -544,7 +575,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCoSubscription(
             that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -573,7 +604,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             that, serializer);
         sse_encode_StreamSink_co_state_Sse(sink, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 11, port: port_);
+            funcId: 12, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -608,7 +639,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_String(core, serializer);
         sse_encode_list_prim_u_8_loose(action, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 12, port: port_);
+            funcId: 13, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -634,7 +665,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
             that, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 13, port: port_);
+            funcId: 14, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_state,
@@ -659,7 +690,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
             that, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 14, port: port_);
+            funcId: 15, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -684,7 +715,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCo(
             that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -711,7 +742,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_box_autoadd_cid(cid, serializer);
         sse_encode_list_prim_u_8_loose(data, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 16, port: port_);
+            funcId: 17, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_block,
@@ -738,7 +769,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_u_64(codec, serializer);
         sse_encode_list_prim_u_8_loose(data, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 17, port: port_);
+            funcId: 18, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_block,
@@ -765,7 +796,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_box_autoadd_cid(cid, serializer);
         sse_encode_list_prim_u_8_loose(data, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 18, port: port_);
+            funcId: 19, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_block,
@@ -789,7 +820,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_box_autoadd_cid(that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_u_64,
@@ -814,7 +845,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(string, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 20, port: port_);
+            funcId: 21, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_cid,
@@ -838,7 +869,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_box_autoadd_cid(that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -862,7 +893,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_box_autoadd_cid(that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_u_64,
@@ -886,7 +917,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 23, port: port_);
+            funcId: 24, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_log_level,
@@ -917,7 +948,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             storage, serializer);
         sse_encode_list_prim_u_8_loose(key, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 24, port: port_);
+            funcId: 25, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_bool,
@@ -942,7 +973,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 25, port: port_);
+            funcId: 26, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_map,
@@ -975,7 +1006,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_opt_box_autoadd_usize(skip, serializer);
         sse_encode_opt_box_autoadd_usize(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 26, port: port_);
+            funcId: 27, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -1008,7 +1039,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             storage, serializer);
         sse_encode_list_prim_u_8_loose(key, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 27, port: port_);
+            funcId: 28, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_opt_list_prim_u_8_strict,
@@ -1041,7 +1072,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_list_prim_u_8_loose(key, serializer);
         sse_encode_list_prim_u_8_loose(value, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 28, port: port_);
+            funcId: 29, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_map,
@@ -1066,7 +1097,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_box_autoadd_co_map(that, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 29, port: port_);
+            funcId: 30, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_bool,
@@ -1091,7 +1122,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_opt_box_autoadd_cid(root, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_map,
@@ -1121,7 +1152,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
             sink, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 31, port: port_);
+            funcId: 32, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -1146,7 +1177,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 32, port: port_);
+            funcId: 33, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_network_settings,
@@ -1178,7 +1209,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             storage, serializer);
         sse_encode_list_prim_u_8_loose(key, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 33, port: port_);
+            funcId: 34, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_bool,
@@ -1203,7 +1234,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 34, port: port_);
+            funcId: 35, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_set,
@@ -1236,7 +1267,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_opt_box_autoadd_usize(skip, serializer);
         sse_encode_opt_box_autoadd_usize(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 35, port: port_);
+            funcId: 36, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_list_prim_u_8_strict,
@@ -1268,7 +1299,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             storage, serializer);
         sse_encode_list_prim_u_8_loose(value, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 36, port: port_);
+            funcId: 37, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_set,
@@ -1293,7 +1324,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_box_autoadd_co_set(that, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 37, port: port_);
+            funcId: 38, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_bool,
@@ -1318,7 +1349,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_opt_box_autoadd_cid(root, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 38)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_set,
@@ -1347,7 +1378,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             storage, serializer);
         sse_encode_StreamSink_opt_list_prim_u_8_strict_Sse(sink, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 39, port: port_);
+            funcId: 40, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -1371,7 +1402,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 40, port: port_);
+            funcId: 41, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_settings,
@@ -1399,7 +1430,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             storage, serializer);
         sse_encode_list_prim_u_8_loose(bytes, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 41, port: port_);
+            funcId: 42, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_cid,
@@ -3358,6 +3389,11 @@ class CoContextImpl extends RustOpaque implements CoContext {
     rustArcDecrementStrongCountPtr:
         CoKit.instance.api.rust_arc_decrement_strong_count_CoContextPtr,
   );
+
+  Future<String?> basePath() =>
+      CoKit.instance.api.crateLibraryCoContextCoContextBasePath(
+        that: this,
+      );
 
   Future<Co> createCo(
           {required CoPrivateIdentity identity, required CreateCo create}) =>
