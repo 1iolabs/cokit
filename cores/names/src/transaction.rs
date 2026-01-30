@@ -7,23 +7,16 @@ use futures::{pin_mut, Stream, TryStreamExt};
 use std::future::ready;
 
 pub struct NamesTransaction {
-	storage: CoreBlockStorage,
-
-	config: Config,
-
-	records_mut: bool,
-	records: LazyTransaction<CoreBlockStorage, CoMap<RecordId, Link<Record>>>,
-
-	indexes_mut: bool,
-	indexes: LazyTransaction<CoreBlockStorage, CoMap<Link<IndexKey>, Index>>,
+	pub storage: CoreBlockStorage,
+	pub config: Config,
+	pub records: LazyTransaction<CoreBlockStorage, CoMap<RecordId, Link<Record>>>,
+	pub indexes: LazyTransaction<CoreBlockStorage, CoMap<Link<IndexKey>, Index>>,
 }
 impl NamesTransaction {
 	pub async fn open(storage: CoreBlockStorage, state: &Names) -> Result<Self, anyhow::Error> {
 		Ok(Self {
 			config: storage.get_value_or_default(&state.config).await?,
-			records_mut: false,
 			records: state.records.open_lazy(&storage).await?,
-			indexes_mut: false,
 			indexes: state.indexes.open_lazy(&storage).await?,
 			storage,
 		})
@@ -31,19 +24,13 @@ impl NamesTransaction {
 
 	pub async fn store(&mut self, state: &mut Names) -> Result<bool, anyhow::Error> {
 		let mut changed = false;
-		if let Some(records) = self.records.opt_mut() {
-			if self.records_mut {
-				state.records = records.store().await?;
-				self.records_mut = false;
-				changed = true;
-			}
+		if let Some(records) = self.records.opt_if_is_mut_access() {
+			state.records = records.store().await?;
+			changed = true;
 		}
-		if let Some(indexes) = self.indexes.opt_mut() {
-			if self.indexes_mut {
-				state.indexes = indexes.store().await?;
-				self.indexes_mut = false;
-				changed = true;
-			}
+		if let Some(indexes) = self.indexes.opt_if_is_mut_access() {
+			state.indexes = indexes.store().await?;
+			changed = true;
 		}
 		Ok(changed)
 	}
@@ -67,7 +54,6 @@ impl NamesTransaction {
 	pub async fn records_mut(
 		&mut self,
 	) -> Result<&mut CoMapTransaction<CoreBlockStorage, RecordId, Link<Record>>, StorageError> {
-		self.records_mut = true;
 		self.records.get_mut().await
 	}
 
@@ -80,7 +66,6 @@ impl NamesTransaction {
 	pub async fn indexes_mut(
 		&mut self,
 	) -> Result<&mut CoMapTransaction<CoreBlockStorage, Link<IndexKey>, Index>, StorageError> {
-		self.indexes_mut = true;
 		self.indexes.get_mut().await
 	}
 
@@ -107,11 +92,7 @@ impl NamesTransaction {
 		name: &str,
 		value: impl Into<TagValue>,
 	) -> Result<i32, anyhow::Error> {
-		Ok(index_lookup(&self.storage, self.indexes.get().await?, record_type, name, value)
-			.await?
-			.into_stream(self.storage().clone())
-			.try_fold(0, |result, _id| ready(Ok(result + 1)))
-			.await?)
+		index_lookup_count(&self.storage, self.indexes.get().await?, record_type, name, value).await
 	}
 
 	pub async fn index_lookup_records(
@@ -126,7 +107,7 @@ impl NamesTransaction {
 		let storage = self.storage.clone();
 		let records = self.records.get().await?.clone();
 		let indexes = self.indexes.get().await?.clone();
-		Ok(index_lookup_records(storage, records, indexes, record_type, name, value))
+		Ok(index_lookup_records(records, indexes, storage, record_type, name, value))
 	}
 }
 
@@ -175,10 +156,24 @@ async fn index_lookup(
 	Ok(Default::default())
 }
 
+pub async fn index_lookup_count(
+	storage: &CoreBlockStorage,
+	indexes: &CoMapTransaction<CoreBlockStorage, Link<IndexKey>, Index>,
+	record_type: &str,
+	name: &str,
+	value: impl Into<TagValue>,
+) -> Result<i32, anyhow::Error> {
+	Ok(index_lookup(storage, indexes, record_type, name, value)
+		.await?
+		.into_stream(storage.clone())
+		.try_fold(0, |result, _id| ready(Ok(result + 1)))
+		.await?)
+}
+
 fn index_lookup_records(
-	storage: CoreBlockStorage,
 	records: CoMapTransaction<CoreBlockStorage, RecordId, Link<Record>>,
 	indexes: CoMapTransaction<CoreBlockStorage, Link<IndexKey>, Index>,
+	storage: CoreBlockStorage,
 	record_type: String,
 	name: String,
 	value: TagValue,

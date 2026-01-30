@@ -7,11 +7,10 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_core_co::{CoAction, CreateAction};
 use co_identity::{LocalIdentity, PrivateIdentity};
-use co_primitives::ReducerAction;
+use co_primitives::{reducer_action_core_from_storage, ReducerAction};
 use co_runtime::{Core, RuntimeContext, RuntimePool};
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use ipld_core::ipld::Ipld;
-use serde::Deserialize;
 use std::collections::HashMap;
 
 /// Resolve action core assuming the Co root state is to [`co_core_co::Co`].
@@ -73,14 +72,10 @@ impl CoCoreResolver {
 		// get core source
 		let core_name = match core {
 			CoreSource::Name(name) => name.to_owned(),
-			CoreSource::Action(action) => {
-				let reducer_action: CoreReducerAction = storage
-					.get_deserialized(&action)
-					.await
-					.map_err(|e| CoreResolverError::InvalidArgument(e.into()))
-					.context("resolving CoreReducerAction")?;
-				reducer_action.core
-			},
+			CoreSource::Action(action) => reducer_action_core_from_storage(storage, action)
+				.await
+				.map_err(CoreResolverError::InvalidArgument)
+				.context("resolving ReducerAction core")?,
 		};
 
 		let root = CO_CORE_NAME_CO == core_name;
@@ -270,32 +265,4 @@ where
 enum CoreSource<'a> {
 	Name(&'a str),
 	Action(Cid),
-}
-
-/// Only extracts the core of an reducer action.
-/// See: [`co_primitives::ReducerAction`]
-#[derive(Debug, Deserialize)]
-struct CoreReducerAction {
-	#[serde(rename = "c")]
-	core: String,
-}
-
-#[cfg(test)]
-mod tests {
-	use crate::reducer::core_resolver::co::CoreReducerAction;
-	use co_core_co::CoAction;
-	use co_primitives::{from_cbor, tags, to_cbor, ReducerAction};
-
-	#[test]
-	fn test_core_reducer_action() {
-		let reducer_action = ReducerAction {
-			core: "test-core".into(),
-			from: "did:test".into(),
-			payload: CoAction::TagsInsert { tags: tags!("hello": "world") },
-			time: 1,
-		};
-		let reducer_action_cbor = to_cbor(&reducer_action).unwrap();
-		let core_reducer_action: CoreReducerAction = from_cbor(&reducer_action_cbor).unwrap();
-		assert_eq!(core_reducer_action.core.as_str(), "test-core");
-	}
 }

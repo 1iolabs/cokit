@@ -2,7 +2,7 @@ use crate::{
 	library::permissions::check_access, record::KnownRecord, transaction::NamesTransaction, Record, RecordId,
 	RecordType, NAME_RECORD_TYPE,
 };
-use co_api::{co, tags, BlockStorageExt, CoId, Did, TagValue};
+use co_api::{co, tags, BlockStorageExt, CoId, Did, TagValue, Tags};
 use std::borrow::Cow;
 
 /// Name Record.
@@ -67,6 +67,21 @@ pub struct Endpoint {
 pub enum NameRecordAction {
 	EndpointInsert(EndpointInsertAction),
 	EndpointRemove(EndpointRemoveAction),
+}
+impl NameRecordAction {
+	pub fn record(&self) -> RecordId {
+		match self {
+			NameRecordAction::EndpointInsert(action) => action.record,
+			NameRecordAction::EndpointRemove(action) => action.record,
+		}
+	}
+
+	pub fn scope(&self) -> Tags {
+		match self {
+			NameRecordAction::EndpointInsert(_) => tags!("action": "name-endpoint-insert"),
+			NameRecordAction::EndpointRemove(_) => tags!("action": "name-endpoint-remove"),
+		}
+	}
 }
 
 #[co]

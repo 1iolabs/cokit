@@ -1,8 +1,60 @@
-use crate::{record::KnownRecord, transaction::NamesTransaction, Record, RecordId, RecordType, DELEGATE_RECORD_TYPE};
+use crate::{
+	record::KnownRecord, transaction::NamesTransaction, DynamicRecord, Record, RecordId, RecordInsertAction,
+	RecordType, RecordTypeLimit, DELEGATE_RECORD_TYPE,
+};
 use anyhow::anyhow;
-use co_api::{Did, TagPattern, Tags, TagsExpr};
+use co_api::{BlockStorageExt, Did, TagPattern, Tags, TagsExpr};
 use futures::{pin_mut, TryStreamExt};
 use std::borrow::Borrow;
+
+/// Test if `from` is allowed to insert a record based on configuration.
+pub async fn has_record_insert_access(
+	state: &mut NamesTransaction,
+	from: &Did,
+	action: &RecordInsertAction,
+) -> Result<bool, anyhow::Error> {
+	// permissions
+	let record: DynamicRecord = state.storage().get_deserialized(action.record.cid()).await?;
+	if let Some(record_config) = state.config().types.get(record.record_type()).cloned() {
+		if let Some(creator) = &record_config.creator {
+			// creator
+			if creator != from {
+				return Ok(false);
+			}
+		}
+
+		// limits
+		if !match &record_config.limit {
+			RecordTypeLimit::None => true,
+			RecordTypeLimit::ByIdentity(max) => {
+				let count = state.index_lookup_count(record.record_type(), "owner", from.clone()).await?;
+				(*max as i32) - count > 0
+			},
+			RecordTypeLimit::ByRecord(max, by_record_type) => {
+				let count = state.index_lookup_count(record.record_type(), "owner", from.clone()).await?;
+				let by_record_count = state.index_lookup_count(by_record_type, "owner", from.clone()).await?;
+				by_record_count * (*max as i32) - count > 0
+			},
+		} {
+			return Ok(false);
+		}
+
+		// ok
+		Ok(true)
+	} else {
+		Ok(false)
+	}
+}
+
+pub async fn has_access(
+	state: &mut NamesTransaction,
+	did: &Did,
+	record_id: &RecordId,
+	scope: impl Borrow<Tags>,
+) -> Result<bool, anyhow::Error> {
+	let access = get_access(state, did, record_id, true).await?;
+	Ok(access.test(Some(scope.borrow())))
+}
 
 pub async fn check_access(
 	state: &mut NamesTransaction,
@@ -10,12 +62,19 @@ pub async fn check_access(
 	record_id: &RecordId,
 	scope: impl Borrow<Tags>,
 ) -> Result<(), anyhow::Error> {
-	let access = get_access(state, did, record_id, true).await?;
-	if access.test(Some(scope.borrow())) {
+	if has_access(state, did, record_id, scope).await? {
 		Ok(())
 	} else {
 		Err(anyhow!("Permission denied"))
 	}
+}
+
+pub async fn has_access_full(
+	state: &mut NamesTransaction,
+	did: &Did,
+	record_id: &RecordId,
+) -> Result<bool, anyhow::Error> {
+	Ok(get_access(state, did, record_id, true).await?.is_full())
 }
 
 pub async fn check_access_full(
@@ -23,11 +82,19 @@ pub async fn check_access_full(
 	did: &Did,
 	record_id: &RecordId,
 ) -> Result<(), anyhow::Error> {
-	if get_access(state, did, record_id, true).await?.is_full() {
+	if has_access_full(state, did, record_id).await? {
 		Ok(())
 	} else {
 		Err(anyhow!("Permission denied"))
 	}
+}
+
+pub async fn has_access_owner(
+	state: &mut NamesTransaction,
+	did: &Did,
+	record_id: &RecordId,
+) -> Result<bool, anyhow::Error> {
+	Ok(matches!(get_access(state, did, record_id, false).await?, Access::Owner))
 }
 
 pub async fn check_access_owner(
@@ -35,7 +102,7 @@ pub async fn check_access_owner(
 	did: &Did,
 	record_id: &RecordId,
 ) -> Result<(), anyhow::Error> {
-	if matches!(get_access(state, did, record_id, false).await?, Access::Owner) {
+	if has_access_owner(state, did, record_id).await? {
 		Ok(())
 	} else {
 		Err(anyhow!("Permission denied"))

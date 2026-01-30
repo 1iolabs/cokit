@@ -1739,6 +1739,7 @@ dependencies = [
  "async-trait",
  "cid 0.11.1",
  "co-api",
+ "co-core-co",
  "co-runtime",
  "co-storage",
  "derive_more 0.99.20",
