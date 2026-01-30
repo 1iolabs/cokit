@@ -72,14 +72,12 @@ Here we enumerate all state-changing events:
 
 #### 3. Define how the modifications are applied:
 ```rust
-impl<S> Reducer<TodoAction, S> for Todo
-where
-	S: BlockStorage + Clone + 'static,
+impl Reducer<TodoAction> for Todo
 {
 	async fn reduce(
 		state_link: OptionLink<Self>,
 		event_link: Link<ReducerAction<TodoAction>>,
-		storage: &S,
+		storage: &CoreBlockStorage,
 	) -> Result<Link<Self>, anyhow::Error> {
 		let event = storage.get_value(&event_link).await?;
 		let mut state = storage.get_value_or_default(&state_link).await?;
@@ -118,7 +116,7 @@ We implement how the events are applied to the existing state:
 For completeness, here are the imports to add to the top of your file:
 
 ```rust
-use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, Link, OptionLink, ReducerAction};
+use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoreBlockStorage, Link, OptionLink, ReducerAction};
 ```
 
 ## Build as WebAssembly
