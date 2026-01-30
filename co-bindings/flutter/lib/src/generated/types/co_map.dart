@@ -48,7 +48,7 @@ class CoMap {
         that: this,
       );
 
-  factory CoMap({required Cid root}) =>
+  factory CoMap({Cid? root}) =>
       CoKit.instance.api.crateTypesCoMapCoMapNew(root: root);
 
   Stream<(Uint8List, Uint8List)?> stream({required BlockStorage storage}) =>

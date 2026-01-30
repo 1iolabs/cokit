@@ -44,6 +44,7 @@ class CoSelector<T, D> extends StatefulWidget {
 }
 
 class _CoSelectorState<T, D> extends State<CoSelector<T, D>> {
+  bool hasValue = false;
   T? _value;
   Object? _error;
   bool _loading = false;
@@ -55,7 +56,10 @@ class _CoSelectorState<T, D> extends State<CoSelector<T, D>> {
   @override
   void initState() {
     super.initState();
-    _value = widget.initial;
+    if (widget.initial != null) {
+      hasValue = true;
+      _value = widget.initial;
+    }
     widget.notifier.addListener(_invalidate);
     _maybeRun(force: true);
   }
@@ -80,10 +84,11 @@ class _CoSelectorState<T, D> extends State<CoSelector<T, D>> {
     }
   }
 
-  bool _depsChanged(D next) {
+  bool _depsChanged(D nextDeps) {
     final prevDeps = _lastDeps;
     if (prevDeps == null) return true;
-    return !(widget.equalsDeps?.call(prevDeps, next) ?? prevDeps == next);
+    return !(widget.equalsDeps?.call(prevDeps, nextDeps) ??
+        prevDeps == nextDeps);
   }
 
   bool _stateChanged(CoState? next) {
@@ -108,12 +113,15 @@ class _CoSelectorState<T, D> extends State<CoSelector<T, D>> {
           await widget.select(await widget.co.storage(), _lastState!, nextDeps);
       if (!mounted || myRun != _runId) return;
 
-      final sameValue = _value != null &&
-          (widget.equalsValue?.call(_value as T, next) ?? _value == next);
+      final sameValue = hasValue &&
+          (widget.equalsValue?.call(_value as T, next) ?? (_value == next));
 
       setState(() {
         _loading = false;
-        if (!sameValue) _value = next;
+        if (!sameValue) {
+          hasValue = true;
+          _value = next;
+        }
       });
     } catch (e) {
       if (!mounted || myRun != _runId) return;
@@ -138,11 +146,11 @@ class _CoSelectorState<T, D> extends State<CoSelector<T, D>> {
           Text('Error: $_error');
     }
 
-    if (_loading && _value == null) {
+    if (_loading && !hasValue) {
       return widget.loading ?? const SizedBox.shrink();
     }
 
-    if (_value == null) {
+    if (!hasValue) {
       return widget.loading ?? const SizedBox.shrink();
     }
 

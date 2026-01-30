@@ -11,6 +11,7 @@ use std::{future::ready, path::PathBuf};
 
 #[cfg_attr(feature = "frb", flutter_rust_bridge::frb(ignore))]
 pub enum CoMessage {
+	BasePath(Response<Option<String>>),
 	CoOpen(CoId, Response<Result<Co, anyhow::Error>>),
 	CoCreate(CoPrivateIdentity, CreateCo, Response<Result<Co, anyhow::Error>>),
 	ResolvePrivateIdentity(Did, Response<Result<CoPrivateIdentity, anyhow::Error>>),
@@ -111,6 +112,9 @@ impl Actor for CoApplication {
 		state: &mut Self::State,
 	) -> Result<(), ActorError> {
 		match message {
+			CoMessage::BasePath(response) => {
+				response.respond(base_path(state));
+			},
 			CoMessage::CoOpen(co_id, response) => response.spawn({
 				let handle = handle.clone();
 				let co_context = state.co().clone();
@@ -133,6 +137,13 @@ impl Actor for CoApplication {
 		}
 		Ok(())
 	}
+}
+
+fn base_path(application: &Application) -> Option<String> {
+	application
+		.settings()
+		.base_path()
+		.map(|path| path.to_string_lossy().to_string())
 }
 
 async fn co_open(co_context: CoContext, handle: ActorHandle<CoMessage>, co_id: CoId) -> Result<Co, anyhow::Error> {

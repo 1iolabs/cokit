@@ -51,6 +51,11 @@ impl From<cid::Cid> for Cid {
 		Cid { bytes: value.to_bytes() }
 	}
 }
+impl From<&cid::Cid> for Cid {
+	fn from(value: &cid::Cid) -> Self {
+		Cid { bytes: value.to_bytes() }
+	}
+}
 
 // #[cfg_attr(feature = "uniffi", uniffi::export)]
 // pub fn cid_version(cid: &CoCid) -> Result<u64, CoError> {
