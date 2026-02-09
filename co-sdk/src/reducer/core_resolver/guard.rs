@@ -12,8 +12,8 @@ pub struct CoGuardResolver<C> {
 	next: C,
 }
 impl<C> CoGuardResolver<C> {
-	pub fn new(core_resolver: C) -> Self {
-		Self { next: core_resolver, mapping: Guards::default().built_in_native_mapping() }
+	pub fn new(core_resolver: C, guards: &Guards) -> Self {
+		Self { next: core_resolver, mapping: guards.mapping() }
 	}
 
 	pub fn with_mapping(self, mapping: HashMap<Cid, GuardReference>) -> Self {

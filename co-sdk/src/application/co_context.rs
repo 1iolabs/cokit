@@ -11,7 +11,7 @@ use crate::{
 		reducers::{ReducerStorage, ReducersControl},
 	},
 	types::co_reducer_factory::CoReducerFactoryError,
-	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoDate, DynamicCoUuid,
+	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoDate, DynamicCoUuid, Guards,
 	LocalCoBuilder, Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
@@ -221,6 +221,7 @@ pub(crate) struct CoContextInner {
 	block_links: BlockLinks,
 	block_links_builtin: BlockLinks,
 	cores: Cores,
+	guards: Guards,
 }
 impl CoContextInner {
 	#[allow(clippy::too_many_arguments)]
@@ -237,6 +238,7 @@ impl CoContextInner {
 		date: DynamicCoDate,
 		uuid: DynamicCoUuid,
 		cores: Cores,
+		guards: Guards,
 	) -> Self {
 		let block_links = BlockLinks::default();
 		let block_links_builtin = block_links.clone().with_filter(IgnoreFilter::new(builtin_cores()));
@@ -255,6 +257,7 @@ impl CoContextInner {
 			block_links,
 			block_links_builtin,
 			cores,
+			guards,
 		}
 	}
 
@@ -357,7 +360,7 @@ impl CoContextInner {
 	/// Creates the Core Resolver for a shared CO.
 	pub(crate) fn create_shared_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::new(&self.cores);
-		let core_resolver = CoGuardResolver::new(core_resolver);
+		let core_resolver = CoGuardResolver::new(core_resolver, &self.guards);
 		let core_resolver = LogCoreResolver::new(core_resolver, id);
 		DynamicCoreResolver::new(core_resolver)
 	}
