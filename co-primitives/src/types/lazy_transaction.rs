@@ -72,4 +72,11 @@ where
 			},
 		}
 	}
+
+	pub fn opt_if_is_mut_access(&mut self) -> Option<&mut T::Transaction> {
+		match &mut self.0 {
+			Either::Right((transaction, true)) => Some(transaction),
+			_ => None,
+		}
+	}
 }

@@ -55,6 +55,20 @@ where
 		}
 	}
 
+	pub fn into_stream<S>(self, storage: S) -> impl Stream<Item = Result<K, StorageError>> + 'static
+	where
+		S: AnyBlockStorage,
+	{
+		let storage = storage.clone();
+		async_stream::try_stream! {
+			let transaction = self.open(&storage).await?;
+			let stream = transaction.stream();
+			for await item in stream {
+				yield item?;
+			}
+		}
+	}
+
 	pub async fn insert<S>(&mut self, storage: &S, key: K) -> Result<(), StorageError>
 	where
 		S: AnyBlockStorage,
