@@ -1,7 +1,7 @@
 # Installation
 To get the fun started, you'll need to install rust and the `co` command.
 This step-by-step guide covers both installing the tools, as well as building your first CO-kit app!
-1
+
 ## Requirements
 - `rust-1.91` or greater
 - `llvm-18`
