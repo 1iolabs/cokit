@@ -35,7 +35,7 @@ async fn test_guard() {
 	assert!(result.is_ok());
 
 	// add guard
-	shared_co
+	let before_push_with_non_participant = shared_co
 		.push(
 			&identity,
 			CO_CORE_NAME_CO,
@@ -54,4 +54,9 @@ async fn test_guard() {
 		.await;
 	tracing::info!(?result, "push-with-non-participant");
 	assert!(result.is_err());
+
+	// check state and heads don't has changed
+	//  we always strip errored trailing heads
+	//  this prevents the log being spammed with known invalid actions
+	assert_eq!(shared_co.reducer_state().await, before_push_with_non_participant);
 }
