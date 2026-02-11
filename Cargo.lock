@@ -1731,6 +1731,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-core-names"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "async-trait",
+ "cid 0.11.1",
+ "co-api",
+ "co-core-co",
+ "co-runtime",
+ "co-storage",
+ "derive_more 0.99.20",
+ "futures",
+ "ipld-core",
+ "serde",
+ "serde_repr",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "co-core-pin"
 version = "0.1.0"
 dependencies = [

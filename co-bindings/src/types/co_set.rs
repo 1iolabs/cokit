@@ -11,60 +11,44 @@ use futures::{StreamExt, TryStreamExt};
 // }
 
 #[derive(Debug, Default, Clone)]
-pub struct CoMap {
+pub struct CoSet {
 	pub root: Option<CoCid>,
 }
-impl CoMap {
+impl CoSet {
 	#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(sync))]
 	pub fn new(root: Option<CoCid>) -> Self {
 		Self { root }
 	}
 
 	pub fn is_empty(&self) -> Result<bool, CoError> {
-		Ok(to_map(self)?.is_empty())
-	}
-
-	#[cfg_attr(feature = "frb", flutter_rust_bridge::frb(name = "getValue"))]
-	pub async fn get(&self, storage: &BlockStorage, key: Vec<u8>) -> Result<Option<Vec<u8>>, CoError> {
-		let key: TagValue = from_cbor(&key).map_err(CoError::new)?;
-		let map = to_map(&self)?
-			.open(storage)
-			.await
-			.map_err(|err| anyhow::anyhow!("open failed: {:?}", err))?;
-		let value: Option<TagValue> = map.get(&key).await.map_err(|err| anyhow::anyhow!("get failed: {:?}", err))?;
-		let result = match value {
-			Some(value) => Some(to_cbor(&value).map_err(CoError::new)?),
-			None => None,
-		};
-		Ok(result)
+		Ok(to_set(self)?.is_empty())
 	}
 
 	pub async fn contains(&self, storage: &BlockStorage, key: Vec<u8>) -> Result<bool, CoError> {
 		let key: TagValue = from_cbor(&key).map_err(CoError::new)?;
-		let map = to_map(self)?
+		let set = to_set(self)?
 			.open(storage)
 			.await
 			.map_err(|err| anyhow::anyhow!("open failed: {:?}", err))?;
-		let value = map
-			.contains_key(&key)
+		let value = set
+			.contains(&key)
 			.await
 			.map_err(|err| anyhow::anyhow!("contains_key failed: {:?}", err))?;
 		Ok(value)
 	}
 
-	pub async fn insert(&self, storage: &BlockStorage, key: Vec<u8>, value: Vec<u8>) -> Result<Self, CoError> {
-		let key: TagValue = from_cbor(&key).map_err(CoError::new)?;
+	pub async fn insert(&self, storage: &BlockStorage, value: Vec<u8>) -> Result<Self, CoError> {
 		let value: TagValue = from_cbor(&value).map_err(CoError::new)?;
-		let mut map = to_map(self)?
+		let mut set = to_set(self)?
 			.open(storage)
 			.await
 			.map_err(|err| anyhow::anyhow!("open failed: {:?}", err))?;
-		map.insert(key, value)
+		set.insert(value)
 			.await
 			.map_err(|err| anyhow::anyhow!("contains_key failed: {:?}", err))?;
-		let map = map.store().await.map_err(|err| anyhow::anyhow!("store failed: {:?}", err))?;
+		let map = set.store().await.map_err(|err| anyhow::anyhow!("store failed: {:?}", err))?;
 		let root = Into::<Option<cid::Cid>>::into(&map).map(CoCid::from);
-		Ok(CoMap { root })
+		Ok(CoSet { root })
 	}
 
 	pub async fn entries(
@@ -72,8 +56,8 @@ impl CoMap {
 		storage: &BlockStorage,
 		skip: Option<usize>,
 		limit: Option<usize>,
-	) -> Result<Vec<(Vec<u8>, Vec<u8>)>, CoError> {
-		let map = to_map(self)?;
+	) -> Result<Vec<Vec<u8>>, CoError> {
+		let map = to_set(self)?;
 		let mut stream = map.stream(storage).boxed();
 		if let Some(skip) = skip {
 			stream = stream.skip(skip).boxed();
@@ -83,19 +67,15 @@ impl CoMap {
 		}
 		stream
 			.map(|item| match item {
-				Ok((key, value)) => Ok((to_cbor(&key).map_err(CoError::new)?, to_cbor(&value).map_err(CoError::new)?)),
+				Ok(value) => Ok(to_cbor(&value).map_err(CoError::new)?),
 				Err(err) => Err(CoError::new(err)),
 			})
 			.try_collect()
 			.await
 	}
 
-	pub async fn stream(
-		&self,
-		storage: &BlockStorage,
-		sink: crate::frb_generated::StreamSink<Option<(Vec<u8>, Vec<u8>)>>,
-	) {
-		let map = match to_map(self) {
+	pub async fn stream(&self, storage: &BlockStorage, sink: crate::frb_generated::StreamSink<Option<Vec<u8>>>) {
+		let map = match to_set(self) {
 			Ok(map) => map,
 			Err(err) => {
 				sink.add_error(err).ok();
@@ -108,14 +88,7 @@ impl CoMap {
 			futures::pin_mut!(stream);
 			while let Some(item) = stream.next().await {
 				match item {
-					Ok((key, value)) => {
-						let key = match to_cbor(&key) {
-							Ok(value) => value,
-							Err(err) => {
-								sink.add_error(CoError::new(err)).ok();
-								break;
-							},
-						};
+					Ok(value) => {
 						let value = match to_cbor(&value) {
 							Ok(value) => value,
 							Err(err) => {
@@ -123,7 +96,7 @@ impl CoMap {
 								break;
 							},
 						};
-						if sink.add(Some((key, value))).is_err() {
+						if sink.add(Some(value)).is_err() {
 							return;
 						}
 					},
@@ -140,10 +113,10 @@ impl CoMap {
 }
 
 #[cfg_attr(feature = "frb", flutter_rust_bridge::frb(ignore))]
-fn to_map(map: &CoMap) -> Result<co_primitives::CoMap<TagValue, TagValue>, CoError> {
+fn to_set(map: &CoSet) -> Result<co_primitives::CoSet<TagValue>, CoError> {
 	let cid = match &map.root {
 		Some(cid) => Some(cid.cid()?),
 		None => None,
 	};
-	Ok(co_primitives::CoMap::from(cid))
+	Ok(co_primitives::CoSet::from(cid))
 }

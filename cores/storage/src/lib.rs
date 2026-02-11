@@ -193,7 +193,7 @@ impl References {
 			},
 		};
 		block.references += 1;
-		block.tags.extend(tags.into_iter());
+		block.tags.extend(tags);
 	}
 
 	pub fn extend(&mut self, references: impl IntoIterator<Item = WeakCid>) {

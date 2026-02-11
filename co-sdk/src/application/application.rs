@@ -227,6 +227,13 @@ pub struct ApplicationSettings {
 	pub settings: Tags,
 }
 impl ApplicationSettings {
+	/// Base path.
+	pub fn base_path(&self) -> Option<PathBuf> {
+		self.application_path
+			.as_ref()
+			.and_then(|p| p.parent().and_then(|p| p.parent()).map(|p| p.to_path_buf()))
+	}
+
 	/// Get all enabled features from tags.
 	fn features_from_tags(tags: &Tags) -> impl Iterator<Item = &str> + '_ {
 		let default_features = ["co-local-watch", "co-local-encryption"];

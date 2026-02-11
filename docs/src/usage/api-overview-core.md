@@ -19,14 +19,12 @@ pub enum MyAction {}
 
 #[co(state)]
 pub struct MyState {}
-impl<S> Reducer<MyAction, S> for MyState
-where
-	S: BlockStorage + Clone + 'static,
+impl Reducer<MyAction> for MyState
 {
 	async fn reduce(
 		state_link: OptionLink<Self>,
 		event_link: Link<ReducerAction<TodoAction>>,
-		storage: &S,
+		storage: &CoreBlockStorage,
 	) -> Result<Link<Self>, anyhow::Error> {
 			let event = storage.get_value(&event_link).await?;
 			let mut state = storage.get_value_or_default(&state_link).await?;
