@@ -33,7 +33,7 @@ This feature will be activated when compiling the crate to a CO-kit-compatible W
 Now we implement the core in `src/lib.rs`.
 
 ```admonish info
-Please note that there will be some example Rust code in the 'lib.rs' file. You can safely delete the example code, as it is not required.
+Please note that you can safely delete any example Rust code in the 'lib.rs' file. 
 ```
 
 #### 1. Define your data model in a core:
@@ -52,7 +52,7 @@ pub struct Todo {
 ```
 Here we define a simple to-do task data model:
 - `TodoTask` → single task (id, title, done flag)
-- `Todo` → state container with a map of tasks
+- `Todo` → state container with a map of tasks (i.e. a to-do list)
 
 #### 2. Define how the state can be modified:
 ```rust
@@ -120,13 +120,18 @@ use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoreB
 ```
 
 ## Build as WebAssembly
-To compile to WebAssembly use the following command:
+The following command compiles the Core to WebAssembly:
 ```sh
 co core build
 ```
 
 ```admonish info
 Please ensure that you run this command in the `my-todo-core` folder.
+```
+
+You should find the resulting `.wasm` file at:  
+```sh
+/my-todo-core/target-wasm/wasm32-unknown-unknown/release/my_todo_core.wasm
 ```
 
 ## Full example
