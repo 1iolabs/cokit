@@ -11,7 +11,7 @@ use futures::{future::Either, io::Cursor, pin_mut, StreamExt};
 use serde::Serialize;
 use std::{fmt::Debug, future::Future, sync::Arc};
 
-pub fn use_co(co: ReadOnlySignal<CoId>) -> Co {
+pub fn use_co(co: ReadSignal<CoId>) -> Co {
 	// TODO: port storage
 	let storage = use_co_storage(&co().to_string());
 	let mut reducer_state = use_signal_sync(|| None);

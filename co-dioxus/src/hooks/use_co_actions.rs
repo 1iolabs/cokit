@@ -6,8 +6,8 @@ use futures::{StreamExt, TryStreamExt};
 use serde::de::{DeserializeOwned, IgnoredAny};
 
 pub fn use_co_actions<T>(
-	co: ReadOnlySignal<CoId>,
-	state: ReadOnlySignal<CoReducerState, SyncStorage>,
+	co: ReadSignal<CoId>,
+	state: ReadSignal<CoReducerState, SyncStorage>,
 	core: Option<String>,
 	skip: usize,
 	limit: usize,

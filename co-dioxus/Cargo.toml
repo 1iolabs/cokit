@@ -14,7 +14,7 @@ co-core-co = { workspace = true }
 co-core-membership = { workspace = true }
 co-primitives = { workspace = true }
 co-sdk = { workspace = true }
-dioxus = { version = "^0.6.3", default-features = false, features = [
+dioxus = { version = "^0.7.3", default-features = false, features = [
     "hooks",
     "signals",
 ] }
