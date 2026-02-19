@@ -8,7 +8,7 @@ We also use TailwindCSS for styling the application.
 <!-- toc -->
 
 ## Requirements
-- `dioxus-0.6`
+- `dioxus-0.7.3`
 - `npm`
 
 ## Setup
@@ -17,10 +17,10 @@ Install Dioxus and setup the empty application crate.
 ### Setup Dioxus
 Install the precompiled `dx` tool:
 ```shell
-cargo binstall dioxus-cli@0.6
+cargo binstall dioxus-cli@0.7.3
 ```
 
-You can also head over to [Dioxus](https://dioxuslabs.com/learn/0.6/getting_started/#install-the-dioxus-cli) for further instructions.
+You can also head over to [Dioxus](https://dioxuslabs.com/learn/0.7/getting_started/#install-the-dioxus-cli) for further instructions.
 
 ### Setup NodeJS
 We need NodeJS to use TailwindCSS within our app.  
