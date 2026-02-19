@@ -1,13 +1,13 @@
 # Architecture
-In this chapter, we want to share an overview of CO-kit's components and how they work together.
-In the introductory chapters, we explained the [scope](../introduction/welcome.md) of CO-kit and its key [features](../introduction/features.md) and [objectives](../introduction/why.md). The following is a technical overview.
+In this chapter, we want to share an overview of COkit's components and how they work together.
+In the introductory chapters, we explained the [scope](../introduction/welcome.md) of COkit and its key [features](../introduction/features.md) and [objectives](../introduction/why.md). The following is a technical overview.
 
 ## Overview
 ### High-Level Components
 
 ```mermaid
 flowchart TD
-	subgraph CO-kit
+	subgraph COkit
 		D["Device"]
 		subgraph Resource
 			F["Filesystem"]
@@ -53,7 +53,7 @@ flowchart TD
 - Device: The platform host
 	- [Network](../reference/network.md): The platform network interface
 	- Filesystem: File-based persistence
-	- App: An Application using CO-kit
+	- App: An Application using COkit
 		- [Storage](../reference/storage.md): Content-addressed storage
 		- [CO](../reference/co.md): Virtual room for collaboration
 		- [Log](../reference/log.md): Conflict-free replicated event stream

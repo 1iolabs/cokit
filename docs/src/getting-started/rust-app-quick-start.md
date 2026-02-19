@@ -76,13 +76,13 @@ The second view is where we manage tasks and participants.
 For this quick-start example, we only use a single file: `src/main.rs`.
 
 ```admonish info
-The steps below detail how to use CO-Kit to create an App with Rust.  
+The steps below detail how to use COkit to create an App with Rust.  
 
 However, if you wish to try out the complete Rust App with Dioxus, please see the [Full Example Code](#full-example-code) at the end of this page.
 ```
 
 #### Setup
-In the main function we initialize CO-kit and pass it as context to dioxus:
+In the main function we initialize COkit and pass it as context to dioxus:
 
 ```rust,noplayground
 fn main() {
@@ -99,7 +99,7 @@ Next, we want to display a list of to-do lists and possible invites.
 
 
 ##### Memberships/Invites
-We use the CO-kit built-in [memberships Core](/crate/co_core_membership/struct.Memberships.html), and show to-do lists according their state.  
+We use the COkit built-in [memberships Core](/crate/co_core_membership/struct.Memberships.html), and show to-do lists according their state.  
 We're working with the following states of interest:  
 - Active: Normal active membership
 - Invite: We were invited to join a [CO](../reference/co.md) by someone else
@@ -246,7 +246,7 @@ Follow the instructions in `my-todo-app/README.md` to run the Tailwind CSS compi
 
 
 ## Full Example Code
-- Here is a full example of the code parts in `main.rs` that integrate with CO-kit.  
+- Here is a full example of the code parts in `main.rs` that integrate with COkit.  
 - Below that is the content for your `tailwind.css` file.  
 - And, at the bottom of this page, you will find a link to the entire git project.
 

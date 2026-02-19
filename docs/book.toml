@@ -2,7 +2,7 @@
 authors = ["DK"]
 language = "en"
 src = "src"
-title = "CO-kit"
+title = "COkit"
 
 [build]
 create-missing = false

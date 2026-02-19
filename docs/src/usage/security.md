@@ -1,17 +1,17 @@
 # Security
 
 ```admonish note
-All security mechanics in CO-kit assume that the host machine it is running on is safe and can be trusted.  
+All security mechanics in COkit assume that the host machine it is running on is safe and can be trusted.  
 
 If this is not the case, you have much bigger problems to worry about, because no software will be secure.
 ```
 
 ```admonish warning
-Cryptography in CO-kit has not yet been peer reviewed/audited.
+Cryptography in COkit has not yet been peer reviewed/audited.
 ```
 
 ## Cryptography
-Each piece of data in CO-kit carries an identifier for the cryptographic scheme used.  
+Each piece of data in COkit carries an identifier for the cryptographic scheme used.  
 This ensures interoperability, supports multiple algorithms, allows upgrading, and makes data structures self-describing.
 
 Cryptography used:
