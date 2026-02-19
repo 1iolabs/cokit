@@ -68,13 +68,13 @@ use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt,
 ## Quick Start: Rust App with Dioxus
 
 ### Requirements
-- Dioxus 0.6 (`dx` CLI)
+- Dioxus 0.7.3 (`dx` CLI)
 - npm (for TailwindCSS)
 
 ### Project Setup
 1. Install the Dioxus CLI:
 ```sh
-cargo binstall dioxus-cli@0.6
+cargo binstall dioxus-cli@0.7.3
 ```
 
 2. Create a new Dioxus app:
