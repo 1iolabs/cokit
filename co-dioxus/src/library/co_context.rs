@@ -4,7 +4,7 @@
 use crate::{CoError, CoErrorSignal, CoSettings};
 use anyhow::Result;
 use co_sdk::{Application, ApplicationBuilder};
-use dioxus::signals::Writable;
+use dioxus::signals::WritableExt;
 use futures::{future::BoxFuture, Future};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 

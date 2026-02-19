@@ -9,13 +9,13 @@ use co_sdk::{
 use dioxus::{
 	hooks::use_resource,
 	prelude::RenderError,
-	signals::{MappedSignal, Readable},
+	signals::{ReadSignal, ReadableExt},
 };
 use futures::TryStreamExt;
 use std::future::ready;
 
 /// Use `did:key:` by name and creating a new one if it not exists.
-pub fn use_did_key_identity(name: impl Into<String>) -> Result<MappedSignal<state::Identity>, RenderError> {
+pub fn use_did_key_identity(name: impl Into<String>) -> Result<ReadSignal<state::Identity>, RenderError> {
 	let context = use_co_context();
 	let result = use_resource({
 		let name = name.into();
@@ -27,7 +27,7 @@ pub fn use_did_key_identity(name: impl Into<String>) -> Result<MappedSignal<stat
 				context
 					.try_with_application(move |application| ensure_identity(name, application))
 					.await
-					.map_err(|err| RenderError::Aborted(err.into()))
+					.map_err(|err| RenderError::Error(err.into()))
 			}
 		}
 	})
@@ -39,7 +39,7 @@ pub fn use_did_key_identity(name: impl Into<String>) -> Result<MappedSignal<stat
 	}
 
 	// unrwap result
-	Ok(result.map(|result| result.as_ref().expect("ok")))
+	Ok(ReadSignal::new(result.map(|result| result.as_ref().expect("ok"))))
 }
 
 /// Use the first or create an identity.

@@ -18,7 +18,7 @@ pub fn use_co_block(co: impl Into<CoId>, cid: Cid) -> Signal<Option<Block>, Sync
 	signal
 }
 
-pub fn use_co_block_deserialized<T: DeserializeOwned + Send + Sync>(
+pub fn use_co_block_deserialized<T: DeserializeOwned + Send + Sync + 'static>(
 	co: impl Into<CoId>,
 	cid: Cid,
 ) -> Signal<Option<T>, SyncStorage> {
@@ -72,7 +72,7 @@ impl CoBlockHook {
 		});
 	}
 
-	fn fetch_deserialized<T: DeserializeOwned + Send + Sync>(
+	fn fetch_deserialized<T: DeserializeOwned + Send + Sync + 'static>(
 		&mut self,
 		context: CoContext,
 		mut signal: Signal<Option<T>, SyncStorage>,
