@@ -21,6 +21,15 @@ impl<C> CoGuardResolver<C> {
 		Self { next: self.next, mapping, mode: GuardRejectionMode::Skip }
 	}
 
+	pub fn with_ignore_mode(mut self, ignore: bool) -> Self {
+		if ignore {
+			self.mode = GuardRejectionMode::Ignore;
+		} else {
+			self.mode = GuardRejectionMode::Skip;
+		}
+		self
+	}
+
 	pub fn with_failure_mode(mut self) -> Self {
 		self.mode = GuardRejectionMode::Fail;
 		self
@@ -71,13 +80,15 @@ where
 					})?;
 				if !valid {
 					// handle permission failure
-					return match self.mode {
+					match self.mode {
 						// fail
-						GuardRejectionMode::Fail => Err(CoreResolverError::Middleware(anyhow::anyhow!(
-							"Guard reports invalid head: {}: {}",
-							guard_name,
-							next_head
-						))),
+						GuardRejectionMode::Fail => {
+							return Err(CoreResolverError::Middleware(anyhow::anyhow!(
+								"Guard reports invalid head: {}: {}",
+								guard_name,
+								next_head
+							)))
+						},
 						// skip to compute
 						GuardRejectionMode::Skip => {
 							let mut result = RuntimeContext::new(Some(state), *action);
@@ -85,7 +96,11 @@ where
 								"Guard reports invalid head: {}: {}",
 								guard_name, next_head
 							)));
-							Ok(result)
+							return Ok(result);
+						},
+						// warn and ignore
+						GuardRejectionMode::Ignore => {
+							tracing::warn!(?guard_name, ?next_head, "guard-ignore-rejection");
 						},
 					};
 				}
@@ -103,6 +118,8 @@ where
 /// Guard rejection mode.
 #[derive(Debug, Clone, Copy)]
 enum GuardRejectionMode {
+	/// Ignore rejection and just trace a warning.
+	Ignore,
 	/// Skip the computation and insert a diagnostic message.
 	Skip,
 	/// Fail the operation hard.

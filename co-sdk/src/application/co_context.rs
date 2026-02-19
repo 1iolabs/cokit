@@ -360,7 +360,8 @@ impl CoContextInner {
 	/// Creates the Core Resolver for a shared CO.
 	pub(crate) fn create_shared_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::new(&self.cores);
-		let core_resolver = CoGuardResolver::new(core_resolver, &self.guards);
+		let core_resolver =
+			CoGuardResolver::new(core_resolver, &self.guards).with_ignore_mode(self.settings.feature_co_guard_ignore());
 		let core_resolver = LogCoreResolver::new(core_resolver, id);
 		DynamicCoreResolver::new(core_resolver)
 	}

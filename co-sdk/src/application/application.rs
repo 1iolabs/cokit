@@ -220,11 +220,12 @@ pub struct ApplicationSettings {
 	/// - `co-default-max-state` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_state`]
 	///
 	/// Known Features:
-	/// - `co-local-watch` (default)
-	/// - `co-local-encryption` (default)
+	/// - `co-local-watch` [`ApplicationSettings::feature_co_local_watch`] (default)
+	/// - `co-local-encryption` [`ApplicationSettings::feature_co_local_encryption`] (default)
 	/// - `co-storage-free` - [`ApplicationSettings::feature_co_storage_free`]
 	/// - `co-open-keep` - [`ApplicationSettings::feature_co_open_keep`]
 	/// - `co-storage-verify-links` - [`ApplicationSettings::feature_co_storage_verify_links`]
+	/// - `co-guard-ignore` - [`ApplicationSettings::feature_co_guard_ignore`]
 	pub settings: Tags,
 }
 impl ApplicationSettings {
@@ -286,6 +287,16 @@ impl ApplicationSettings {
 	/// This setting is recommended for development as it help to catch errors early.
 	pub fn feature_co_storage_verify_links(&self) -> bool {
 		self.has_feature("co-storage-verify-links")
+	}
+
+	/// Ignore guards when checking actions.
+	/// Disabled in release builds.
+	/// Warning: This may destroys your CO. Only use this for development/testing.
+	pub fn feature_co_guard_ignore(&self) -> bool {
+		#[cfg(debug_assertions)]
+		return self.has_feature("co-guard-ignore");
+		#[cfg(not(debug_assertions))]
+		return false;
 	}
 
 	/// Count of roots to store for LocalCO and newly joined COs. A value of zero means unlimited.
