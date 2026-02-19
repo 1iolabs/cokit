@@ -67,20 +67,182 @@ use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt,
 
 ## Quick Start: Rust App with Dioxus
 
-Uses `co-dioxus` integration. Key setup:
-```rust
-let context = co_dioxus::CoContext::new(co_dioxus::CoSettings::cli("my-app"));
-LaunchBuilder::desktop().with_context(context).launch(App);
+### Requirements
+- Dioxus 0.6 (`dx` CLI)
+- npm (for TailwindCSS)
+
+### Project Setup
+1. Install the Dioxus CLI:
+```sh
+cargo binstall dioxus-cli@0.6
 ```
 
-Key hooks:
-- `use_co(co_id)` - Opens a CO for read/write
-- `use_selector(&co, |storage, co_state| async { ... })` - Selects state
-- `use_did_key_identity(name)` - Gets/creates a did:key identity
+2. Create a new Dioxus app:
+```sh
+dx new my-todo-app --subtemplate Bare-Bones \
+  -o is_fullstack=false -o is_router=false \
+  -o default_platform=desktop -o is_tailwind=true
+```
 
-Actions are dispatched via: `co.dispatch(identity, core_name, action)`
+3. Add COkit dependencies (must use `--git`):
+```sh
+cd my-todo-app
+cargo add co-sdk co-dioxus co-core-membership co-core-co \
+  --git https://gitlab.1io.com/1io/co-sdk.git
+```
 
-Cores can be added on-the-fly: `co.create_core_binary(identity, name, type, binary)`
+4. Add your Core as a local dependency:
+```sh
+cargo add my-todo-core --path ../my-todo-core
+```
+
+5. Add utility dependencies:
+```sh
+cargo add futures
+cargo add uuid --features v7
+```
+
+6. Setup TailwindCSS:
+```sh
+npm init -y
+npm install -D tailwindcss @tailwindcss/cli daisyui
+```
+
+### Initialization
+Initialize COkit and pass it as context to Dioxus:
+```rust
+fn main() {
+    let context = co_dioxus::CoContext::new(
+        co_dioxus::CoSettings::cli("my-todo-app")
+    );
+    LaunchBuilder::desktop().with_context(context).launch(App);
+}
+```
+
+### Embedding the Core WASM Binary
+Include the compiled Core binary at compile time:
+```rust
+const TODO_CORE_NAME: &str = "todo";
+const TODO_CORE_BINARY: &[u8] = include_bytes!(
+    "../../my-todo-core/target-wasm/wasm32-unknown-unknown/release/my_todo_core.wasm"
+);
+```
+
+### Key Hooks (co-dioxus)
+- `use_co(co_id)` - Opens a CO for read/write. Returns a handle used by other hooks.
+- `use_selector(&co, |storage, co_state| async { ... })` - Selects and derives state
+  from a CO. The closure receives block storage and the CO state, and returns
+  the derived value. Re-runs reactively when the CO state changes.
+- `use_did_key_identity(name)` - Gets or creates a `did:key` identity with the given
+  name. Returns a signal with the identity (including `.did` for the DID string).
+
+### Reading State
+Use `use_selector` to read Core state from a CO. The closure has access to the
+block storage and can traverse the content-addressed data:
+```rust
+let co = use_co(co_id);
+let (name, tasks) = use_selector(&co, move |storage, co_state| async move {
+    let co = state::co(&storage, co_state.co()).await?;
+    let todo: Todo = state::core_or_default(&storage, co_state.co(), "todo").await?;
+    let tasks = todo.tasks
+        .stream(&storage)
+        .map_ok(|(_id, task)| task)
+        .try_collect::<Vec<_>>()
+        .await?;
+    Ok((co.name, tasks))
+})?;
+```
+
+The `co_sdk::state` module provides utilities for reading built-in Core states:
+- `state::co(storage, co_state)` - Read the root CO state (name, participants, etc.)
+- `state::co_info(storage, co_state)` - Read CO metadata
+- `state::core::<T>(storage, co_state, core_name)` - Read a typed Core state
+- `state::core_or_default::<T>(storage, co_state, core_name)` - Read Core state with default
+- `state::memberships(storage, co_state)` - Stream all CO memberships from the Local CO
+
+### Reading Memberships / Invites
+To list COs the user belongs to, read memberships from the Local CO:
+```rust
+let local_co_id = use_signal(|| CoId::new(CO_ID_LOCAL));
+let local_co = use_co(local_co_id.into());
+let lists = use_selector(&local_co, move |storage, co_state| async move {
+    Ok(state::memberships(storage, co_state.co())
+        .try_filter(move |item| ready(item.0.as_str() != CO_ID_LOCAL))
+        .try_collect::<Vec<_>>()
+        .await?)
+})?;
+```
+
+Membership states of interest: `Active`, `Invite`, `Join`.
+
+### Dispatching Actions
+Push actions into a Core via the CO handle:
+```rust
+co.dispatch(identity, "todo", TodoAction::TaskCreate(TodoTask {
+    id: uuid::Uuid::now_v7().to_string(),
+    title: "My task".to_string(),
+    done: false,
+}));
+```
+
+### Creating a Core On-the-Fly
+If the Core doesn't exist yet in the CO, create it before dispatching:
+```rust
+if !tasks_core_exists {
+    co.create_core_binary(
+        identity.clone(),
+        TODO_CORE_NAME,
+        "my-todo-core",
+        TODO_CORE_BINARY,
+    );
+}
+co.dispatch(identity, "todo", action);
+```
+
+### Creating a CO
+Create a new CO from the Local CO handle:
+```rust
+local_co.create_co(
+    identity,
+    CreateCo::generate(name)
+        .with_core_bytes(TODO_CORE_NAME, "my-todo-core", TODO_CORE_BINARY),
+);
+```
+
+### Joining a CO (Accepting an Invite)
+Change membership state from `Invite` to `Join`:
+```rust
+local_co.dispatch(
+    identity.clone(),
+    CO_CORE_NAME_MEMBERSHIP,
+    MembershipsAction::ChangeMembershipState {
+        did: identity.did.clone(),
+        id: co_id,
+        membership_state: MembershipState::Join,
+    },
+);
+```
+
+### Inviting a Participant
+Invite a DID to an existing CO:
+```rust
+co.dispatch(
+    identity,
+    CO_CORE_NAME_CO,
+    CoAction::ParticipantInvite {
+        participant: did,
+        tags: tags!("name": display_name),
+    },
+);
+```
+
+### Running the App
+Follow the Dioxus instructions in the generated README to run the TailwindCSS compiler
+and serve the app (typically `dx serve`).
+
+### Full Example
+The complete Dioxus todo app example is available at:
+`https://gitlab.1io.com/1io/example-todo-list`
 
 ## Quick Start: React App with Tauri
 
