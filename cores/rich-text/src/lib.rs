@@ -8,7 +8,11 @@ use co_api::{
 	LazyTransaction, Link, OptionLink, ReducerAction, TagValue, WeakCid,
 };
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
-use std::{collections::BTreeMap, future::ready, ops::Range};
+use std::{
+	collections::{BTreeMap, BTreeSet},
+	future::ready,
+	ops::Range,
+};
 
 /// Rich text actions.
 #[co]
@@ -68,8 +72,10 @@ pub enum AttributesOperation {
 	Merge(Attributes),
 	#[serde(rename = "r")]
 	Replace(Attributes),
+	#[serde(rename = "x")]
+	Remove(BTreeSet<String>),
 	#[serde(rename = "d")]
-	Remove,
+	RemoveAll,
 }
 impl Default for AttributesOperation {
 	fn default() -> Self {
@@ -699,7 +705,7 @@ where
 	S: BlockStorage + Clone + 'static,
 {
 	Ok(match attributes {
-		AttributesOperation::Merge(_) => {
+		AttributesOperation::Merge(_) | AttributesOperation::Remove(_) => {
 			let run = if let Some(position) = insertion_point.position(state) {
 				Some(transaction.get_run(position).await?)
 			} else {
@@ -708,7 +714,7 @@ where
 			attributes_run(storage, run.as_ref(), attributes).await?
 		},
 		AttributesOperation::Replace(attributes) => attributes.clone(),
-		AttributesOperation::Remove => Default::default(),
+		AttributesOperation::RemoveAll => Default::default(),
 	})
 }
 
@@ -732,7 +738,18 @@ where
 			}
 		},
 		AttributesOperation::Replace(attributes) => attributes.clone(),
-		AttributesOperation::Remove => Default::default(),
+		AttributesOperation::Remove(attribute_names) => {
+			if let Some(run) = run {
+				let mut run_attributes = storage.get_value_or_default(&run.attributes).await?;
+				for attribute_name in attribute_names {
+					run_attributes.values.remove(attribute_name);
+				}
+				run_attributes
+			} else {
+				Default::default()
+			}
+		},
+		AttributesOperation::RemoveAll => Default::default(),
 	})
 }
 
