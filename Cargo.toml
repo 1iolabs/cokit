@@ -54,6 +54,7 @@ hyper = { version = "0.14.23" }
 insta = { version = "1.34.0", features = ["default", "yaml"] }
 ipld-core = { version = "0.4.1", features = ["serde"] }
 ipld-dagpb = "0.2.1"
+js-sys = "0.3"
 multiaddr = "0.18.2"
 multibase = "0.9.1"
 multihash = "0.19.3"
@@ -84,6 +85,7 @@ tracing-log = "0.1.3"
 tracing-opentelemetry = "0.18"
 tracing-subscriber = "0.3.14"
 uuid = { version = "1.2.2", features = ["default", "v4"] }
+wasm-bindgen = "0.2.105"
 wasm-bindgen-futures = "0.4.55"
 zeroize = "1.7.0"
 zstd = "0.13.3"

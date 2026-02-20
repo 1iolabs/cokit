@@ -75,7 +75,7 @@ pub async fn command(
 fn print_message(action: ReducerAction<MatrixEvent>) {
 	// TODO move everything timestamp related to primitives
 	// calc system time from unix ts
-	let d = UNIX_EPOCH + Duration::from_millis(action.time.try_into().unwrap());
+	let d = UNIX_EPOCH + Duration::from_millis(action.time);
 	let datetime = DateTime::<Local>::from(d);
 	// format a datetime string
 	let timestamp_str = datetime.format("%d.%m.%Y, %H:%M:%S").to_string();

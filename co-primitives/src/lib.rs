@@ -34,6 +34,7 @@ pub use types::{
 	cid::CoCid,
 	clock::Clock,
 	co::CoId,
+	co_date::{CoDate, CoDateRef, DynamicCoDate, MonotonicCoDate, StaticCoDate},
 	co_list::{CoList, CoListIndex, CoListTransaction},
 	co_map::{CoMap, CoMapTransaction},
 	co_reference::CoReference,

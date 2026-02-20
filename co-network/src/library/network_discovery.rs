@@ -1,6 +1,6 @@
 use crate::{discovery, services::heads::HeadsApi};
 use co_identity::{network_did_discovery, Identity, IdentityResolver, IdentityResolverBox, PrivateIdentity};
-use co_primitives::{Did, Network};
+use co_primitives::{Did, DynamicCoDate, Network};
 use futures::{stream::iter, Stream};
 use libp2p::{Multiaddr, PeerId};
 use std::collections::BTreeSet;
@@ -12,6 +12,7 @@ use tokio_stream::StreamExt;
 /// # Arguments
 /// - `endpoints` - Our local endpoints others can use to dial us.
 pub fn network_discovery<'a, P>(
+	date: DynamicCoDate,
 	identity_resolver: Option<&'a IdentityResolverBox>,
 	from_peer: PeerId,
 	from: &'a P,
@@ -29,7 +30,7 @@ where
 		for await network in iter(networks.into_iter().map(Ok)).merge(identities_networks(identity_resolver, identities)) {
 			match network {
 				Ok(network) => {
-					for await discovery_result in network_discovery_one(identity_resolver, from_peer, from, network, &endpoints) {
+					for await discovery_result in network_discovery_one(date.clone(), identity_resolver, from_peer, from, network, &endpoints) {
 						match discovery_result {
 							Ok(discovery) => {
 								if seen.insert(discovery.clone()) {
@@ -78,6 +79,7 @@ pub fn identities_networks<'a>(
 }
 
 fn network_discovery_one<'a, 'b, P>(
+	date: DynamicCoDate,
 	identity_resolver: Option<&'a IdentityResolverBox>,
 	from_peer: PeerId,
 	from: &'a P,
@@ -109,6 +111,7 @@ where
 						});
 					}
 					yield discovery::DidDiscovery::create(
+						&date,
 						from_peer,
 						from,
 						&identity,

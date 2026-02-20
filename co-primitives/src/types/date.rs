@@ -1,1 +1,1 @@
-pub type Date = u128; // unix timestamp in milliseconds
+pub type Date = u64; // unix timestamp in milliseconds

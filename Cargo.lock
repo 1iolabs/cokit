@@ -1812,6 +1812,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -2059,6 +2060,7 @@ dependencies = [
  "hmac 0.12.1",
  "indexmap 2.13.0",
  "ipld-core",
+ "js-sys",
  "keyring",
  "libc",
  "multibase",

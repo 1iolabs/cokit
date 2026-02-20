@@ -320,6 +320,7 @@ mod tests {
 		DidCommHeader, DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, IdentityResolverBox,
 		MemoryPrivateIdentityResolver, Message, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
 	};
+	use co_primitives::StaticCoDate;
 	use futures::{join, FutureExt, StreamExt};
 	use libp2p::{
 		noise,
@@ -374,7 +375,7 @@ mod tests {
 
 		// send
 		let send_body = "Hello";
-		let send_header = DidCommHeader::new("test");
+		let send_header = DidCommHeader::new(&StaticCoDate(0), "test");
 		let (_send_message_id, send_message) =
 			didcomm::EncodedMessage::create_plain_json(send_header.clone(), &send_body).unwrap();
 		peer1.swarm().behaviour_mut().send(&peer_id2, send_message.clone());

@@ -33,11 +33,12 @@ pub use co_network::NetworkSettings;
 pub use co_primitives::{
 	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, unixfs_add, unixfs_cat_buffer,
 	unixfs_encode_buffer, unixfs_stream, AbsolutePath, AbsolutePathOwned, AnyBlockStorage, Block, BlockSerializer,
-	BlockStat, BlockStorage, BlockStorageExt, CloneWithBlockStorageSettings, CoId, CoInvite, CoList, CoListIndex,
-	CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, CoTryStreamExt, Component,
-	Components, CoreName, DagCollection, DagCollectionAsyncExt, DagCollectionExt, Date, DefaultParams, Did, IsDefault,
-	KnownMultiCodec, KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, NodeStream, OptionLink, Path, PathError,
-	PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag, Tags,
+	BlockStat, BlockStorage, BlockStorageExt, CloneWithBlockStorageSettings, CoDate, CoDateRef, CoId, CoInvite, CoList,
+	CoListIndex, CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, CoTryStreamExt,
+	Component, Components, CoreName, DagCollection, DagCollectionAsyncExt, DagCollectionExt, Date, DefaultParams, Did,
+	DynamicCoDate, IsDefault, KnownMultiCodec, KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, NodeStream,
+	OptionLink, Path, PathError, PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag,
+	Tags,
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::BlockStorageContentMapping;
@@ -71,8 +72,11 @@ pub use services::{
 	application::{Action, ActionError, ApplicationMessage},
 	reducer::CoReducer,
 };
+#[cfg(feature = "js")]
+pub use types::co_date::JsCoDate;
+#[cfg(feature = "native")]
+pub use types::co_date::SystemCoDate;
 pub use types::{
-	co_date::{CoDate, DynamicCoDate, MonotonicCoDate, StaticCoDate, SystemCoDate},
 	co_dispatch::{CoDispatch, DynamicCoDispatch},
 	co_pinning_key::CoPinningKey,
 	co_reducer_context::CoReducerContext,

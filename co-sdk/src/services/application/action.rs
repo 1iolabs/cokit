@@ -1,8 +1,7 @@
 #[cfg(feature = "network")]
 use crate::library::network_queue::TaskState;
 use crate::{
-	library::create_reducer_action::new_reducer_action, services::reducer::FlushInfo, CoDate, CoStorage,
-	ReducerChangeContext,
+	library::create_reducer_action::new_reducer_action, services::reducer::FlushInfo, CoStorage, ReducerChangeContext,
 };
 use cid::Cid;
 use co_identity::PrivateIdentityBox;
@@ -10,7 +9,7 @@ use co_identity::PrivateIdentityBox;
 use co_identity::{DidCommHeader, Message};
 #[cfg(feature = "network")]
 use co_network::{EncodedMessage, HeadsMessage, NetworkSettings, PeerId};
-use co_primitives::{Block, BlockSerializer, CoId, Did, Link, Network, ReducerAction, Tags};
+use co_primitives::{Block, BlockSerializer, CoDate, CoId, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{stream::once, Stream, StreamExt};
 use ipld_core::ipld::Ipld;

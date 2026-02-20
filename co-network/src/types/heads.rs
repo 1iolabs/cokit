@@ -1,5 +1,5 @@
 use co_identity::DidCommHeader;
-use co_primitives::{CoId, WeakCid};
+use co_primitives::{CoDateRef, CoId, WeakCid};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::BTreeSet;
@@ -30,8 +30,8 @@ impl HeadsMessage {
 	}
 
 	/// DIDComm message header.
-	pub fn create_header() -> DidCommHeader {
-		let mut header = DidCommHeader::new(Self::message_type());
+	pub fn create_header(date: &CoDateRef) -> DidCommHeader {
+		let mut header = DidCommHeader::new(date, Self::message_type());
 		header.expires_time = header.created_time.map(|t| t + 120);
 		header
 	}

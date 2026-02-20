@@ -5,7 +5,9 @@ use co_identity::{
 	network_did_discovery, DidCommContext, DidCommHeader, DidCommPrivateContext, Identity, IdentityResolver,
 	PrivateIdentity, PrivateIdentityBox,
 };
-use co_primitives::{from_json_string, Did, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous};
+use co_primitives::{
+	from_json_string, CoDateRef, Did, DynamicCoDate, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous,
+};
 use derive_more::From;
 use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, StreamExt};
 use libp2p::{
@@ -163,6 +165,8 @@ pub enum DiscoveryEvent {
 ///
 /// Peer connections will be managed by the swarm (and its timeout).
 pub struct DiscoveryState<R> {
+	date: DynamicCoDate,
+
 	/// Our PeerId
 	local_peer_id: PeerId,
 
@@ -197,8 +201,15 @@ impl<R> DiscoveryState<R>
 where
 	R: IdentityResolver + Clone + Send + Sync + 'static,
 {
-	pub fn new(resolver: R, local_peer_id: PeerId, timeout: Duration, max_peers: Option<u16>) -> Self {
+	pub fn new(
+		date: DynamicCoDate,
+		resolver: R,
+		local_peer_id: PeerId,
+		timeout: Duration,
+		max_peers: Option<u16>,
+	) -> Self {
 		Self {
+			date,
 			local_peer_id,
 			next_id: 1,
 			requests: Default::default(),
@@ -549,6 +560,7 @@ where
 						// receive
 						self.future_events.push(
 							did_discovery_receive(
+								self.date.clone(),
 								data.to_owned(),
 								request_from_peer,
 								self.resolver.clone(),
@@ -863,6 +875,7 @@ pub trait DiscoveryBehaviour: NetworkBehaviour {
 
 /// Acccept DidDiscoveryMessage::Discover events and respond with DidDiscoveryMessage::Resolve.
 async fn did_discovery_receive<R: IdentityResolver>(
+	date: DynamicCoDate,
 	data: String,
 	request_from_peer: PeerId,
 	resolver: R,
@@ -873,6 +886,7 @@ async fn did_discovery_receive<R: IdentityResolver>(
 		if DidDiscoveryMessageType::from_str(&request_header.message_type) == Some(DidDiscoveryMessageType::Discover) {
 			let body: Option<DiscoverMessage> = from_json_string(&request_body).ok();
 			match did_discovery_resolve(
+				&date,
 				&didcomm_private,
 				request_from_peer,
 				body.map(|body| body.endpoints).unwrap_or_default(),
@@ -890,6 +904,7 @@ async fn did_discovery_receive<R: IdentityResolver>(
 
 /// Respond to an did discovery resolve request.
 fn did_discovery_resolve(
+	date: &CoDateRef,
 	identity: &DidCommPrivateContext,
 	request_from_peer: PeerId,
 	request_from_endpoints: BTreeSet<Multiaddr>,
@@ -898,7 +913,7 @@ fn did_discovery_resolve(
 	let request_from = request.from.ok_or(anyhow!("Missing from header field"))?;
 
 	// response
-	let mut response = DidCommHeader::new(DidDiscoveryMessageType::Resolve.to_string());
+	let mut response = DidCommHeader::new(date, DidDiscoveryMessageType::Resolve.to_string());
 	response.thid = Some(request.id);
 	response.from = Some(identity.did().to_owned());
 	response.to.insert(request_from.clone());
@@ -1035,7 +1050,7 @@ mod tests {
 		DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentity,
 		PrivateIdentityBox, PrivateIdentityResolver,
 	};
-	use co_primitives::NetworkPeer;
+	use co_primitives::{CoDate, NetworkPeer, StaticCoDate};
 	use futures::{select, FutureExt, StreamExt};
 	use libp2p::{
 		gossipsub,
@@ -1177,11 +1192,23 @@ mod tests {
 		// states
 		let mut discovery1 = Layer::new(
 			peer1.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), peer1_id, Duration::from_secs(10), None),
+			DiscoveryState::new(
+				StaticCoDate(0).boxed(),
+				DidKeyIdentityResolver::new(),
+				peer1_id,
+				Duration::from_secs(10),
+				None,
+			),
 		);
 		let mut discovery2 = Layer::new(
 			peer2.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), peer2_id, Duration::from_secs(10), None),
+			DiscoveryState::new(
+				StaticCoDate(0).boxed(),
+				DidKeyIdentityResolver::new(),
+				peer2_id,
+				Duration::from_secs(10),
+				None,
+			),
 		);
 
 		// peer2: connect
@@ -1248,11 +1275,23 @@ mod tests {
 		// states
 		let mut discovery1 = Layer::new(
 			peer1.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), peer1_id, Duration::from_secs(10), None),
+			DiscoveryState::new(
+				StaticCoDate(0).boxed(),
+				DidKeyIdentityResolver::new(),
+				peer1_id,
+				Duration::from_secs(10),
+				None,
+			),
 		);
 		let mut discovery2 = Layer::new(
 			peer2.swarm().behaviour(),
-			DiscoveryState::new(DidKeyIdentityResolver::new(), peer2_id, Duration::from_secs(10), None),
+			DiscoveryState::new(
+				StaticCoDate(0).boxed(),
+				DidKeyIdentityResolver::new(),
+				peer2_id,
+				Duration::from_secs(10),
+				None,
+			),
 		);
 
 		// peer1: subscribe
@@ -1286,6 +1325,7 @@ mod tests {
 			.connect(
 				peer2.swarm(),
 				vec![DidDiscovery::create(
+					&StaticCoDate(0),
 					peer2_id,
 					&did2,
 					&did1,

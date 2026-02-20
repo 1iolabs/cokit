@@ -66,6 +66,7 @@ mod tests {
 	use co_identity::{
 		IdentityResolver, MemoryIdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentityResolver,
 	};
+	use co_primitives::{CoDate, StaticCoDate};
 	use futures::TryStreamExt;
 	use libp2p::{Multiaddr, PeerId};
 	use std::{
@@ -94,6 +95,7 @@ mod tests {
 			bootstrap,
 		};
 		let context = ConnectionsContext {
+			date: StaticCoDate(0).boxed(),
 			tasks: TaskSpawner::default(),
 			settings: NetworkSettings::default(),
 			network: CoNetworkTaskSpawner::new_closed(local_peer),

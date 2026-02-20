@@ -1,10 +1,10 @@
 use super::identity::create_identity_resolver;
 use crate::{
-	reducer::core_resolver::dynamic::DynamicCoreResolver, services::runtime::RuntimeHandle, CoCoreResolver, CoDate,
+	reducer::core_resolver::dynamic::DynamicCoreResolver, services::runtime::RuntimeHandle, CoCoreResolver,
 	CoReducerState, Reducer, ReducerBuilder,
 };
 use co_log::{IdentityEntryVerifier, Log};
-use co_primitives::CoId;
+use co_primitives::{CoDate, CoId};
 use co_storage::ExtendedBlockStorage;
 
 /// Create a memory instance.

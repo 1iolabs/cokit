@@ -1,9 +1,7 @@
 use crate::{DidCommPrivateContext, DidCommPublicContext, Identity, PrivateIdentity};
+use co_primitives::CoDateRef;
 use serde::{Deserialize, Serialize};
-use std::{
-	collections::{BTreeMap, BTreeSet},
-	time::{SystemTime, UNIX_EPOCH},
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// See: https://identity.foundation/didcomm-messaging/spec/#message-headers
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -86,15 +84,10 @@ pub struct DidCommHeader {
 }
 impl DidCommHeader {
 	/// Create new DidCommHeader with an
-	pub fn new(message_type: impl Into<String>) -> Self {
+	pub fn new(date: &CoDateRef, message_type: impl Into<String>) -> Self {
 		Self {
 			id: Self::create_message_id(),
-			created_time: Some(
-				SystemTime::now()
-					.duration_since(UNIX_EPOCH)
-					.expect("valid system time")
-					.as_secs(),
-			),
+			created_time: Some(date.now_duration().as_secs()),
 			message_type: message_type.into(),
 			..Default::default()
 		}
@@ -102,6 +95,7 @@ impl DidCommHeader {
 
 	/// Create new DidCommHeader for a message with sender `from` and single recipent `to`.
 	pub fn create<F, T>(
+		date: &CoDateRef,
 		from: &F,
 		to: &T,
 		message_type: impl Into<String>,
@@ -110,18 +104,22 @@ impl DidCommHeader {
 		F: PrivateIdentity + Send + Sync + 'static,
 		T: Identity + Send + Sync + 'static,
 	{
-		let mut header = DidCommHeader::new(message_type.into());
+		let mut header = DidCommHeader::new(date, message_type.into());
 		header.from = Some(from.identity().to_owned());
 		header.to = [to.identity().to_owned()].into_iter().collect();
 		Ok((from.try_didcomm_private()?, to.try_didcomm_public()?, header))
 	}
 
 	/// Create new DidCommHeader for a message with sender `from` and unknown recipent(s).
-	pub fn create_from<F>(from: &F, message_type: impl Into<String>) -> anyhow::Result<(DidCommPrivateContext, Self)>
+	pub fn create_from<F>(
+		date: &CoDateRef,
+		from: &F,
+		message_type: impl Into<String>,
+	) -> anyhow::Result<(DidCommPrivateContext, Self)>
 	where
 		F: PrivateIdentity + Send + Sync + 'static,
 	{
-		let mut header = DidCommHeader::new(message_type.into());
+		let mut header = DidCommHeader::new(date, message_type.into());
 		header.from = Some(from.identity().to_owned());
 		Ok((from.try_didcomm_private()?, header))
 	}

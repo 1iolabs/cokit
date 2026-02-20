@@ -6,6 +6,7 @@ pub mod block_storage_ext;
 pub mod cid;
 pub mod clock;
 pub mod co;
+pub mod co_date;
 pub mod co_list;
 pub mod co_map;
 pub mod co_reference;

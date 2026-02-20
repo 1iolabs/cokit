@@ -15,13 +15,14 @@ use crate::{
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, ActorInstance, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
-use co_primitives::{tags, Tags};
+use co_primitives::{tags, DynamicCoDate, Tags};
 use libp2p::{identity::Keypair, PeerId};
 
 pub struct NetworkInitialize {
 	pub settings: NetworkSettings,
 	pub identifier: String,
 	pub keypair: Keypair,
+	pub date: DynamicCoDate,
 	pub identity_resolver: IdentityResolverBox,
 	pub private_identity_resolver: PrivateIdentityResolverBox,
 	pub bitswap: ActorHandle<BitswapMessage>,
@@ -50,6 +51,7 @@ impl Actor for Network {
 			initialize.identifier.clone(),
 			initialize.keypair.clone(),
 			initialize.settings.clone(),
+			initialize.date.clone(),
 			initialize.identity_resolver.clone(),
 			initialize.private_identity_resolver.clone(),
 			initialize.bitswap,
@@ -70,6 +72,7 @@ impl Actor for Network {
 
 		// connections
 		let connections_context = ConnectionsContext {
+			date: initialize.date.clone(),
 			tasks: initialize.tasks.clone(),
 			identity_resolver: initialize.identity_resolver.clone(),
 			private_identity_resolver: initialize.private_identity_resolver.clone(),

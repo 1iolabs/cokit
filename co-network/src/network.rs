@@ -11,6 +11,7 @@ use crate::{
 use anyhow::anyhow;
 use co_actor::ActorHandle;
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
+use co_primitives::DynamicCoDate;
 use futures::{pin_mut, Stream, StreamExt};
 use libp2p::{
 	autonat, dcutr, gossipsub, identify,
@@ -43,6 +44,7 @@ impl Libp2pNetwork {
 		identifier: String,
 		keypair: Keypair,
 		config: NetworkSettings,
+		date: DynamicCoDate,
 		resolver: IdentityResolverBox,
 		private_resolver: PrivateIdentityResolverBox,
 		bitswap: ActorHandle<BitswapMessage>,
@@ -172,7 +174,13 @@ impl Libp2pNetwork {
 
 		// context
 		let context = Context {
-			discovery: discovery::DiscoveryState::new(resolver.clone(), local_peer_id, Duration::from_secs(30), None),
+			discovery: discovery::DiscoveryState::new(
+				date.clone(),
+				resolver.clone(),
+				local_peer_id,
+				Duration::from_secs(30),
+				None,
+			),
 		};
 
 		// tasks

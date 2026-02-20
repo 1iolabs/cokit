@@ -140,13 +140,13 @@ mod tests {
 	use crate::{
 		state::{query_core, Query},
 		types::co_pinning_key::CoPinningKey,
-		ApplicationBuilder, CoReducer, CreateCo, DidKeyProvider, MonotonicCoDate, MonotonicCoUuid, CO_CORE_NAME_CO,
+		ApplicationBuilder, CoReducer, CreateCo, DidKeyProvider, MonotonicCoUuid, CO_CORE_NAME_CO,
 		CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_STORAGE,
 	};
 	use co_core_co::CoAction;
 	use co_core_storage::{PinStrategy, StorageAction};
 	use co_identity::DidKeyIdentity;
-	use co_primitives::{tags, CoId};
+	use co_primitives::{tags, CoId, MonotonicCoDate};
 	use co_storage::ExtendedBlockStorage;
 	use co_test::{test_application_identifier, test_log_path, test_tmp_dir};
 	use futures::TryStreamExt;

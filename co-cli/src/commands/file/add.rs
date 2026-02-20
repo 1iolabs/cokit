@@ -58,8 +58,8 @@ pub async fn command(
 		path: parent_path.to_owned(),
 		node: Node::File(FileNode {
 			name: name.to_owned(),
-			create_time: stat.created()?.duration_since(UNIX_EPOCH)?.as_millis(),
-			modify_time: stat.modified()?.duration_since(UNIX_EPOCH)?.as_millis(),
+			create_time: stat.created()?.duration_since(UNIX_EPOCH)?.as_millis() as u64,
+			modify_time: stat.modified()?.duration_since(UNIX_EPOCH)?.as_millis() as u64,
 			tags: tags!(),
 			owner: identity.identity().to_owned(),
 			mode: stat.mode(),

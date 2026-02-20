@@ -1,8 +1,9 @@
 use super::create_reducer_action::create_reducer_action;
-use crate::{services::runtime::RuntimeHandle, types::co_dispatch::CoDispatch, CoreResolverError, StaticCoDate};
+use crate::{services::runtime::RuntimeHandle, types::co_dispatch::CoDispatch, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
 use co_identity::PrivateIdentityBox;
+use co_primitives::StaticCoDate;
 use co_runtime::{Core, RuntimeContext};
 use co_storage::ExtendedBlockStorage;
 use serde::Serialize;

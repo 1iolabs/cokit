@@ -38,6 +38,7 @@ futures-util = { workspace = true }
 hmac = "0.12.1"
 indexmap = "2.9.0"
 ipld-core = { workspace = true }
+js-sys = { workspace = true, optional = true }
 keyring = { version = "2.3.2", optional = true }
 libc = "0.2"
 multibase = { workspace = true }
@@ -108,7 +109,7 @@ co-test = { workspace = true }
 "network" = ["dep:co-network"]
 
 # Enable JS features
-"js" = ["dep:wasm-bindgen-futures", "uuid/js", "co-runtime/js"]
+"js" = ["dep:wasm-bindgen-futures", "dep:js-sys", "uuid/js", "co-runtime/js"]
 
 # Enable opentelemetry tracing
 "opentelemetry" = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:opentelemetry-semantic-conventions", "dep:opentelemetry-stdout", "dep:tracing-opentelemetry"]

@@ -13,7 +13,7 @@ use crate::{
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer, ResponseStreams, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
-use co_primitives::{CoId, Tags};
+use co_primitives::{CoId, DynamicCoDate, Tags};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
@@ -24,6 +24,7 @@ pub struct ConnectionsContext {
 	pub identity_resolver: IdentityResolverBox,
 	pub private_identity_resolver: PrivateIdentityResolverBox,
 	pub network_resolver: DynamicNetworkResolver,
+	pub date: DynamicCoDate,
 }
 
 pub struct State {

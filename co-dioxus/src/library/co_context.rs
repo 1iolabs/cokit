@@ -205,7 +205,11 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 
 fn co_main(settings: CoSettings, tasks: UnboundedReceiver<Task>) {
 	#[cfg(feature = "web")]
-	tokio::task::spawn_local(async move { co_app(settings, tasks).await.expect("app to run") });
+	tokio::runtime::Builder::new_current_thread()
+		.enable_all()
+		.build()
+		.unwrap()
+		.spawn(async move { co_app(settings, tasks).await.expect("app to run") });
 
 	#[cfg(not(feature = "web"))]
 	tokio::runtime::Builder::new_multi_thread()

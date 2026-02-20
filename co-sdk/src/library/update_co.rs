@@ -22,7 +22,7 @@ where
 {
 	// request
 	let body = HeadsMessage::HeadsRequest(co_reducer.id().clone());
-	let header = HeadsMessage::create_header();
+	let header = HeadsMessage::create_header(co_reducer.date());
 	let (message_header, message) = EncodedMessage::create_signed_json(from, header, &body)?;
 	let ((_peer, message), _) = try_join!(
 		wait_response_timeout(actions.clone(), timeout, {

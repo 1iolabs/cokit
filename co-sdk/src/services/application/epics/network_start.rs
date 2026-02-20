@@ -46,6 +46,7 @@ async fn start(context: CoContext, settings: NetworkSettings) -> Result<(), anyh
 
 	// network
 	let network_initialize = NetworkInitialize {
+		date: context.date().clone(),
 		bitswap: bitswap.handle(),
 		identifier: context.identifier().to_owned(),
 		identity_resolver: context.identity_resolver().await?,

@@ -58,6 +58,7 @@ async fn push(context: CoContext, epic: PushHeadsEpic, co: CoId, identity: Did) 
 			Some(instance) => instance.clone(),
 			None => {
 				let instance = PushHeads::new(
+					context.date().clone(),
 					network,
 					context.tasks(),
 					co.clone(),

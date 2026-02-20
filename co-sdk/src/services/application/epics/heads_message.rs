@@ -208,7 +208,7 @@ async fn create_heads_message(
 	let identity = network_identity(context, co_reducer, None).await?;
 
 	// message
-	let mut header = HeadsMessage::create_header();
+	let mut header = HeadsMessage::create_header(context.date());
 	header.thid = parent_message_id;
 	let (message_header, message) = EncodedMessage::create_signed_json(&identity, header, &body)?;
 

@@ -1,6 +1,5 @@
-use crate::CoDate;
 use co_identity::PrivateIdentity;
-use co_primitives::{BlockSerializer, Did, Link, ReducerAction};
+use co_primitives::{BlockSerializer, CoDate, Did, Link, ReducerAction};
 use co_storage::{ExtendedBlockOptions, ExtendedBlockStorage, StorageError};
 use ipld_core::{ipld::Ipld, serde::to_ipld};
 use serde::Serialize;

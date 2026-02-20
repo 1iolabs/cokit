@@ -1,7 +1,7 @@
 use cid::Cid;
 use co_identity::{DidCommHeader, Identity, PrivateIdentity};
 use co_network::EncodedMessage;
-use co_primitives::{to_json_string, CoConnectivity, CoId, Tags};
+use co_primitives::{to_json_string, CoConnectivity, CoDateRef, CoId, Tags};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -9,6 +9,7 @@ pub const CO_DIDCOMM_INVITE: &str = "co-invite";
 
 /// Create an encoded invite message.
 pub fn create_invite_message<F, T>(
+	date: &CoDateRef,
 	from: &F,
 	to: &T,
 	co: CoInvitePayload,
@@ -18,7 +19,7 @@ where
 	F: PrivateIdentity + Send + Sync + 'static,
 	T: Identity + Send + Sync + 'static,
 {
-	let (from_didcomm, to_didcomm, mut header) = DidCommHeader::create(from, to, CO_DIDCOMM_INVITE)?;
+	let (from_didcomm, to_didcomm, mut header) = DidCommHeader::create(date, from, to, CO_DIDCOMM_INVITE)?;
 	header.thid = thid;
 	let body = to_json_string(&co)?;
 	let message = from_didcomm.jwe(&to_didcomm, header.clone(), &body)?;

@@ -12,10 +12,9 @@ use co_messaging::{
 use co_primitives::CoreName;
 use co_sdk::{
 	state::{query_core, QueryError, QueryExt},
-	tags, CoReducerFactory, Cores, CO_CORE_NAME_CO, CO_CORE_ROOM,
+	tags, CoDate, CoReducerFactory, Cores, CO_CORE_NAME_CO, CO_CORE_ROOM,
 };
 use exitcode::ExitCode;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
@@ -58,7 +57,7 @@ pub async fn command(
 		_ => return Err(anyhow!("Room core with ID {} already exists", core)),
 	};
 
-	let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+	let timestamp = application.context().date().now();
 
 	// set name of new room
 	let set_name = MatrixEvent::new(

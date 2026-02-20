@@ -1,7 +1,7 @@
 use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo, tracing::TracingBuilder};
 use crate::{
-	library::wait_response::request_response, services::application::ApplicationMessage, Action, CoDate, CoReducer,
-	CoReducerFactory, CoStorage, CoUuid, Cores, DynamicCoDate, DynamicCoUuid, RandomCoUuid, Storage, SystemCoDate,
+	library::wait_response::request_response, services::application::ApplicationMessage, Action, CoReducer,
+	CoReducerFactory, CoStorage, CoUuid, Cores, DynamicCoUuid, RandomCoUuid, Storage,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -12,7 +12,7 @@ use co_identity::{
 };
 #[cfg(feature = "network")]
 use co_network::NetworkSettings;
-use co_primitives::{tag, tags, CoId, TagValue, Tags};
+use co_primitives::{tag, tags, CoDate, CoId, DynamicCoDate, TagValue, Tags};
 use co_runtime::Core;
 use co_storage::StaticBlockStorage;
 #[cfg(feature = "fs")]
@@ -449,7 +449,10 @@ impl ApplicationBuilder {
 		self.tracing.init()?;
 
 		// sources
-		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(SystemCoDate));
+		#[cfg(feature = "js")]
+		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(crate::JsCoDate));
+		#[cfg(not(feature = "js"))]
+		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(crate::SystemCoDate));
 		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
 
 		// storage

@@ -5,9 +5,8 @@ use co_messaging::{
 	state_event::{RoomAvatarContent, RoomNameContent, RoomTopicContent},
 	MatrixEvent,
 };
-use co_sdk::CoReducerFactory;
+use co_sdk::{CoDate, CoReducerFactory};
 use exitcode::ExitCode;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub async fn command(
 	context: &CliContext,
@@ -21,7 +20,7 @@ pub async fn command(
 	let core = &room_command.core;
 	let co_reducer = application.context().try_co_reducer(co).await?;
 
-	let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+	let timestamp = application.context().date().now();
 
 	if let Some(name) = &command.name {
 		// set new name of room

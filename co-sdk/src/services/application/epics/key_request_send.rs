@@ -75,6 +75,7 @@ fn handle_key_request(
 
 				// message
 				let (message_header, message) = create_key_request_message(
+					context.date(),
 					&from,
 					KeyRequestPayload { peer: network.local_peer_id(), id: action.co.clone(), key: action.key },
 					Duration::from_secs(30 * 60),
