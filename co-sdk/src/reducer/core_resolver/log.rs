@@ -1,19 +1,19 @@
 use crate::{services::runtime::RuntimeHandle, CoreResolver, CoreResolverContext, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{BlockStorage, BlockStorageExt, CoId, DiagnosticMessage, ReducerAction};
+use co_primitives::{BlockStorage, BlockStorageExt, CoDate, CoId, DiagnosticMessage, DynamicCoDate, ReducerAction};
 use co_runtime::RuntimeContext;
 use ipld_core::ipld::Ipld;
-use std::time::Instant;
 
 #[derive(Debug, Clone)]
 pub struct LogCoreResolver<C> {
 	next: C,
 	co: CoId,
+	date: DynamicCoDate,
 }
 impl<C> LogCoreResolver<C> {
-	pub fn new(core_resolver: C, co: CoId) -> Self {
-		Self { next: core_resolver, co }
+	pub fn new(core_resolver: C, co: CoId, date: DynamicCoDate) -> Self {
+		Self { next: core_resolver, co, date }
 	}
 }
 #[async_trait]
@@ -31,12 +31,12 @@ where
 		state: &Option<Cid>,
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
-		let start = Instant::now();
+		let start = self.date.now();
 		let mut runtime_context = self.next.execute(storage, runtime, context, state, action).await?;
 
 		// log
 		let action_ipld: Option<ReducerAction<Ipld>> = storage.get_deserialized(action).await.ok();
-		let duration = Instant::now() - start;
+		let duration = self.date.now() - start;
 		tracing::trace!(
 			co = ?self.co,
 			previous_state = ?state,

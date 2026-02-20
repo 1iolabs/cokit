@@ -359,7 +359,7 @@ impl CoContextInner {
 	/// Creates the Core Resolver for the local CO.
 	fn create_local_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::new(&self.cores);
-		let core_resolver = LogCoreResolver::new(core_resolver, id);
+		let core_resolver = LogCoreResolver::new(core_resolver, id, self.date.clone());
 		DynamicCoreResolver::new(core_resolver)
 	}
 
@@ -367,7 +367,7 @@ impl CoContextInner {
 	pub(crate) fn create_shared_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::new(&self.cores);
 		let core_resolver = CoGuardResolver::new(core_resolver);
-		let core_resolver = LogCoreResolver::new(core_resolver, id);
+		let core_resolver = LogCoreResolver::new(core_resolver, id, self.date.clone());
 		DynamicCoreResolver::new(core_resolver)
 	}
 

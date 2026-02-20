@@ -593,6 +593,8 @@ impl SharedCoCreator {
 	where
 		I: PrivateIdentity + Clone + Debug + Send + Sync + 'static,
 	{
+		let date = date.boxed();
+
 		// storage
 		let (co_storage, encrypted_storage): (CoStorage, Option<(EncryptedBlockStorage<CoStorage>, String, Secret)>) =
 			match self.co.algorithm {
@@ -616,7 +618,7 @@ impl SharedCoCreator {
 
 		// reducer
 		let core_resolver = CoCoreResolver::default();
-		let core_resolver = LogCoreResolver::new(core_resolver, self.co.id.clone());
+		let core_resolver = LogCoreResolver::new(core_resolver, self.co.id.clone(), date.clone());
 		let reducer_builder = ReducerBuilder::new(core_resolver, log);
 		#[cfg(feature = "pinning")]
 		let reducer_builder = {
