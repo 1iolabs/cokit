@@ -1,6 +1,3 @@
-use crate::runtimes::wasmer::WasmerRuntimeBuilder;
-use std::path::Path;
-
 pub struct ModuleDescription {
 	/// Exports (name, type).
 	pub exports: Vec<(String, String)>,
@@ -9,9 +6,10 @@ pub struct ModuleDescription {
 	pub imports: Vec<(String, String, String)>,
 }
 impl ModuleDescription {
-	pub async fn from_path(path: &Path) -> anyhow::Result<ModuleDescription> {
+	#[cfg(feature = "fs")]
+	pub async fn from_path(path: &std::path::Path) -> anyhow::Result<ModuleDescription> {
 		let bytes = tokio::fs::read(path).await?;
-		let (_kind, _store, module) = WasmerRuntimeBuilder::wasm(&bytes).for_info().build()?;
+		let (_kind, _store, module) = crate::runtimes::wasmer::WasmerRuntimeBuilder::wasm(&bytes).for_info().build()?;
 		Ok(ModuleDescription {
 			exports: module
 				.exports()

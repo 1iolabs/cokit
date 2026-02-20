@@ -1,4 +1,7 @@
-use crate::{create_runtime, runtimes::Runtime};
+use crate::{
+	create_runtime,
+	runtimes::{Runtime, RuntimeBox},
+};
 use anyhow::anyhow;
 use cid::Cid;
 use co_primitives::{unixfs_cat_buffer, AnyBlockStorage, KnownMultiCodec, MultiCodec};
@@ -7,7 +10,7 @@ use std::fmt::Debug;
 
 pub struct RuntimeInstance {
 	core: Cid,
-	runtime: Box<dyn Runtime + Send>,
+	runtime: RuntimeBox,
 }
 impl RuntimeInstance {
 	/// Create a new runtime element which can be used immediately or inserted to the pool.

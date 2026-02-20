@@ -13,7 +13,7 @@ pub enum Core {
 	Wasm(Cid),
 	Binary(Vec<u8>),
 	Native(Arc<dyn Fn(&mut dyn Context) + Send + Sync>),
-	NativeAsync(Arc<dyn Fn(AsyncContext) -> AsyncContext + Send + Sync>),
+	NativeAsync(async_api::ReducerRef<AsyncContext>),
 }
 impl Core {
 	pub fn native<S>() -> Core
@@ -26,10 +26,10 @@ impl Core {
 
 	pub fn native_async<R, A>() -> Core
 	where
-		R: async_api::Reducer<A> + Default,
-		A: Clone + DeserializeOwned,
+		R: async_api::Reducer<A> + Default + 'static,
+		A: Clone + DeserializeOwned + 'static,
 	{
-		Core::NativeAsync(Arc::new(|context| async_api::reduce_with_context::<R, A, AsyncContext>(context)))
+		Core::NativeAsync(async_api::ReducerRef::new::<R, A>())
 	}
 }
 impl Debug for Core {

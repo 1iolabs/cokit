@@ -3,6 +3,7 @@ use crate::{co_v1::CoV1Api, RuntimeContext};
 use anyhow::anyhow;
 use std::fmt::Debug;
 
+// pub mod local;
 pub mod wasmer;
 
 #[derive(Debug, thiserror::Error)]
@@ -35,13 +36,18 @@ impl From<wasmer::WasmerError> for RuntimeError {
 	}
 }
 
-pub trait Runtime: Debug {
+pub trait Runtime: Debug + 'static {
 	/// Execute state runtime with specified api.
 	fn execute_state(&mut self, api: CoV1Api) -> Result<RuntimeContext, RuntimeError>;
 
 	/// Execute guard runtime with specified api.
 	fn execute_guard(&mut self, api: CoV1Api) -> Result<bool, RuntimeError>;
 }
+
+#[cfg(not(feature = "js"))]
+pub type RuntimeBox = Box<dyn Runtime + Send>;
+#[cfg(feature = "js")]
+pub type RuntimeBox = Box<dyn Runtime>;
 
 enum RuntimeState {
 	Unintialized(bool, Vec<u8>),
@@ -110,7 +116,7 @@ fn wasmer_runtime_with_api(state: &mut RuntimeState, mut api: CoV1Api) -> Result
 	Ok(runtime)
 }
 
-pub fn create_runtime(native: bool, bytes: Vec<u8>) -> Box<dyn Runtime + Send> {
+pub fn create_runtime(native: bool, bytes: Vec<u8>) -> RuntimeBox {
 	Box::new(Wasmer::new(native, bytes))
 }
 

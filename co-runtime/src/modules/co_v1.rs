@@ -3,12 +3,17 @@ use co_api::{Block, Cid, DefaultParams};
 use co_storage::{Storage, StorageError};
 use std::{cmp::min, fmt::Debug, mem::swap, time::Duration};
 
+//#[cfg(not(feature = "js"))]
+pub type CoV1ApiStorageBox = Box<dyn Storage<StoreParams = DefaultParams> + Send + Sync>;
+// #[cfg(feature = "js")]
+// pub type CoV1ApiStorageBox = Box<dyn Storage<StoreParams = DefaultParams>>;
+
 pub struct CoV1Api {
-	storage: Box<dyn Storage<StoreParams = DefaultParams> + Send + Sync>,
+	storage: CoV1ApiStorageBox,
 	context: RuntimeContext,
 }
 impl CoV1Api {
-	pub fn new(storage: Box<dyn Storage<StoreParams = DefaultParams> + Send + Sync>, context: RuntimeContext) -> Self {
+	pub fn new(storage: CoV1ApiStorageBox, context: RuntimeContext) -> Self {
 		Self { storage, context }
 	}
 
@@ -49,7 +54,7 @@ impl CoV1Api {
 		self.storage.as_mut()
 	}
 
-	pub fn into_inner(self) -> (Box<dyn Storage<StoreParams = DefaultParams> + Send + Sync>, RuntimeContext) {
+	pub fn into_inner(self) -> (CoV1ApiStorageBox, RuntimeContext) {
 		(self.storage, self.context)
 	}
 

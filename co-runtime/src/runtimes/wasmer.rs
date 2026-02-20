@@ -4,8 +4,7 @@ use crate::co_v1::{
 };
 use std::fmt::Debug;
 use wasmer::{
-	imports, sys::EngineBuilder, AsStoreMut, Engine, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module,
-	RuntimeError, Store, WasmPtr,
+	imports, AsStoreMut, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, RuntimeError, Store, WasmPtr,
 };
 use wasmer_types::Features;
 
@@ -125,19 +124,34 @@ impl WasmerRuntime {
 /// See:
 /// - https://github.com/wasmerio/wasmer/blob/dcaff6c83316e9e67b62ade47e70a9b121c08b15/lib/cli/src/backend.rs#L670
 pub struct WasmerRuntimeBuilder<'a> {
+	#[cfg(feature = "native")]
 	native: bool,
 	bytes: &'a [u8],
+	#[cfg(feature = "llvm")]
 	llvm: bool,
 }
 impl<'a> WasmerRuntimeBuilder<'a> {
 	pub fn wasm(bytes: &'a [u8]) -> Self {
-		Self { native: false, bytes, llvm: true }
+		Self {
+			#[cfg(feature = "native")]
+			native: false,
+			bytes,
+			#[cfg(feature = "llvm")]
+			llvm: true,
+		}
 	}
 
 	pub fn native(bytes: &'a [u8]) -> Self {
-		Self { native: true, bytes, llvm: true }
+		Self {
+			#[cfg(feature = "native")]
+			native: true,
+			bytes,
+			#[cfg(feature = "llvm")]
+			llvm: true,
+		}
 	}
 
+	#[cfg(feature = "llvm")]
 	pub fn for_info(mut self) -> Self {
 		self.llvm = false;
 		self
@@ -151,9 +165,21 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 		features.multi_value = true;
 		features.extended_const = true;
 
+		// js
+		#[cfg(feature = "js")]
+		{
+			let store = Store::default();
+			let module = unsafe { Module::deserialize(&store, self.bytes)? };
+			return Ok((WasmerRuntimeKind::Js, store, module));
+		}
+
 		// bytes are native code
+		#[cfg(feature = "native")]
 		if self.native {
-			let engine: Engine = EngineBuilder::headless().set_features(Some(features)).engine().into();
+			let engine: wasmer::Engine = wasmer::sys::EngineBuilder::headless()
+				.set_features(Some(features))
+				.engine()
+				.into();
 			let store = Store::new(engine);
 			let module = unsafe { Module::deserialize(&store, self.bytes)? };
 			return Ok((WasmerRuntimeKind::Headless, store, module));
@@ -166,7 +192,10 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 			wasmer_compiler::CompilerConfig::canonicalize_nans(&mut config, true);
 			// config.opt_level(wasmer_compiler_llvm::LLVMOptLevel::None);
 			// config.enable_verifier();
-			let engine: Engine = EngineBuilder::new(config).set_features(Some(features)).engine().into();
+			let engine: wasmer::Engine = wasmer::sys::EngineBuilder::new(config)
+				.set_features(Some(features))
+				.engine()
+				.into();
 			let store = Store::new(engine);
 			let module = Module::new(&store, self.bytes)?;
 			return Ok((WasmerRuntimeKind::Llvm, store, module));
@@ -177,7 +206,10 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 		if self.llvm && !is_sandboxed() {
 			let mut config = wasmer_compiler_cranelift::Cranelift::new();
 			wasmer_compiler::CompilerConfig::canonicalize_nans(&mut config, true);
-			let engine: Engine = EngineBuilder::new(config).set_features(Some(features)).engine().into();
+			let engine: wasmer::Engine = wasmer::sys::EngineBuilder::new(config)
+				.set_features(Some(features))
+				.engine()
+				.into();
 			let store = Store::new(engine);
 			let module = Module::new(&store, self.bytes)?;
 			return Ok((WasmerRuntimeKind::Cranelift, store, module));
@@ -187,7 +219,7 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 		// See: https://wasmer.io/posts/introducing-wasmer-v5
 		#[cfg(feature = "wamr")]
 		{
-			let engine: Engine = wasmer::wamr::Wamr::new().into();
+			let engine: wasmer::Engine = wasmer::wamr::Wamr::new().into();
 			let store = Store::new(engine);
 			let module = Module::new(&store, self.bytes)?;
 			return Ok((WasmerRuntimeKind::Wamr, store, module));
@@ -196,7 +228,7 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 		// wasmi feature
 		#[cfg(feature = "wasmi")]
 		{
-			let engine: Engine = wasmer::wasmi::Wasmi::new().into();
+			let engine: wasmer::Engine = wasmer::wasmi::Wasmi::new().into();
 			let store = Store::new(engine);
 			let module = Module::new(&store, self.bytes)?;
 			return Ok((WasmerRuntimeKind::Wasmi, store, module));
@@ -215,6 +247,7 @@ pub enum WasmerRuntimeKind {
 	Cranelift,
 	Wamr,
 	Wasmi,
+	Js,
 }
 
 #[cfg(any(feature = "llvm", feature = "cranelift"))]

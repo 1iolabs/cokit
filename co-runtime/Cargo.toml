@@ -39,12 +39,16 @@ wasmer = { version = "7.0.1" }
 
 [features]
 default = []
+native = ["wasmer/compiler", "fs"]
+web = ["uuid/js", "js"]
+fs = []
 
 # backends
 llvm = ["wasmer/llvm", "dep:wasmer-compiler", "dep:wasmer-compiler-llvm"]
 cranelift = ["wasmer/cranelift", "dep:wasmer-compiler", "dep:wasmer-compiler-cranelift"]
 wasmi = ["wasmer/wasmi"]
 wamr = ["wasmer/wamr"]
+js = ["wasmer/js-default"]
 
 # meta
 apple-sandbox = ["wasmi"]

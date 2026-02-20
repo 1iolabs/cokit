@@ -37,7 +37,9 @@ pub mod sync_api {
 // async export
 pub mod async_api {
 	pub use crate::{
-		library::reduce::async_reduce::{reduce, reduce_execute_with_context, reduce_with_context},
+		library::reduce::async_reduce::{
+			reduce, reduce_async_with_context, reduce_execute_with_context, reduce_with_context, ReducerRef,
+		},
 		types::reducer::async_reducer::{Context, Reducer},
 	};
 }
