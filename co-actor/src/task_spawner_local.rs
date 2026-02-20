@@ -7,7 +7,7 @@ use std::{
 
 /// Spwan a local (not Send) future.
 pub trait LocalTaskSpawner {
-	fn spwan_local<F>(&self, fut: F) -> LocalJoinHandle<F::Output>
+	fn spawn_local<F>(&self, fut: F) -> LocalJoinHandle<F::Output>
 	where
 		F: Future + 'static,
 		F::Output: Send + 'static;

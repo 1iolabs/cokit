@@ -1,5 +1,5 @@
 use super::ActorError;
-use crate::TaskSpawner;
+use crate::{LocalTaskSpawner, TaskSpawner};
 use futures::{FutureExt, Sink, Stream};
 use std::{
 	any::type_name,
@@ -76,6 +76,18 @@ impl<T> Response<T> {
 		T: Send + 'static,
 	{
 		spawner.borrow().spawn(async move { self.send(value().await).ok() });
+	}
+
+	/// Spawns a new task using the given spawner and executes given closure in it
+	#[inline]
+	#[track_caller]
+	pub fn spawn_local<Fut, F>(self, spawner: impl LocalTaskSpawner, value: F)
+	where
+		Fut: Future<Output = T> + 'static,
+		F: FnOnce() -> Fut + 'static,
+		T: Send + 'static,
+	{
+		spawner.spawn_local(async move { self.send(value().await).ok() });
 	}
 }
 impl<T> Debug for Response<T> {

@@ -28,6 +28,7 @@ pub use co_identity::{
 	DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver, IdentityResolverError,
 	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
+#[cfg(feature = "network")]
 pub use co_network::NetworkSettings;
 pub use co_primitives::{
 	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, unixfs_add, unixfs_cat_buffer,
@@ -40,8 +41,17 @@ pub use co_primitives::{
 };
 pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::BlockStorageContentMapping;
+#[cfg(feature = "fs")]
+pub use library::build_core::{build_core, crate_repository_path, BuildCoreArtifact};
+#[cfg(feature = "network")]
+pub use library::keystore_fetch::keystore_fetch;
+#[cfg(feature = "network")]
+pub use library::local_keypair_fetch::local_keypair_fetch;
+#[cfg(feature = "network")]
+pub use library::token::{CoToken, CoTokenParameters};
+#[cfg(feature = "network")]
+pub use library::update_co::update_co;
 pub use library::{
-	build_core::{build_core, crate_repository_path, BuildCoreArtifact},
 	core_source::CoreSource,
 	did_key_provider::DidKeyProvider,
 	find_co_by_pin::find_co_by_pin,
@@ -51,11 +61,7 @@ pub use library::{
 	generate_random_name::generate_random_name,
 	ipld_resolve_recursive::ipld_resolve_recursive,
 	is_cid_encrypted::is_cid_encrypted,
-	keystore_fetch::keystore_fetch,
-	local_keypair_fetch::local_keypair_fetch,
 	memory_dispatch::MemoryDispatch,
-	token::{CoToken, CoTokenParameters},
-	update_co::update_co,
 };
 pub use pin::PinAPI;
 pub use reducer::core_resolver::{
@@ -82,5 +88,4 @@ pub use types::{
 	},
 	error::{ErrorContext, ErrorKind, IntoAction},
 	guards::Guards,
-	reference::{Reference, Request, Response, ResponseError},
 };

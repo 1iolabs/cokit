@@ -1,4 +1,6 @@
 use super::identity::create_identity_resolver;
+#[cfg(feature = "network")]
+use crate::services::application::KeyRequestAction;
 use crate::{
 	find_membership,
 	library::{
@@ -12,7 +14,6 @@ use crate::{
 		state_resolver::MembershipStateResolver,
 	},
 	services::{
-		application::KeyRequestAction,
 		reducer::{FlushInfo, ReducerBlockStorage, ReducerFlush},
 		reducers::ReducerStorage,
 	},
@@ -91,22 +92,23 @@ impl SharedCoBuilder {
 	/// If secret if not avilalbe it will be fetched using `handle`.
 	pub async fn secret(
 		&self,
-		handle: Option<ActorHandle<ApplicationMessage>>,
+		_handle: Option<ActorHandle<ApplicationMessage>>,
 	) -> anyhow::Result<Option<co_primitives::Secret>> {
 		if let Some(key_reference) = &self.membership.key {
 			Ok(Some(find_co_secret_by_reference(&self.parent, key_reference, Some(&self.keystore_core_name)).await?))
 		} else if is_membership_heads_encrypted(&self.parent.storage(), &self.membership).await? {
-			if let Some(handle) = handle {
-				Ok(Some(self.request_secret(handle).await?))
-			} else {
-				Err(anyhow!("Key not available"))
+			#[cfg(feature = "network")]
+			if let Some(handle) = _handle {
+				return Ok(Some(self.request_secret(handle).await?));
 			}
+			Err(anyhow!("Key not available"))
 		} else {
 			Ok(None)
 		}
 	}
 
 	/// Request secret from network using handle.
+	#[cfg(feature = "network")]
 	pub async fn request_secret(
 		&self,
 		handle: ActorHandle<ApplicationMessage>,

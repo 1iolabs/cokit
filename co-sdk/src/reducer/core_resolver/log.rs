@@ -1,8 +1,8 @@
-use crate::{CoreResolver, CoreResolverContext, CoreResolverError};
+use crate::{services::runtime::RuntimeHandle, CoreResolver, CoreResolverContext, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{BlockStorage, BlockStorageExt, CoId, DiagnosticMessage, ReducerAction};
-use co_runtime::{RuntimeContext, RuntimePool};
+use co_runtime::RuntimeContext;
 use ipld_core::ipld::Ipld;
 use std::time::Instant;
 
@@ -26,7 +26,7 @@ where
 	async fn execute(
 		&self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		context: &CoreResolverContext,
 		state: &Option<Cid>,
 		action: &Cid,

@@ -22,6 +22,7 @@ use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 use co_log::{EntryBlock, Log};
+#[cfg(feature = "network")]
 use co_network::{connections::ConnectionMessage, HeadsApi, NetworkApi};
 use co_primitives::{BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, Did, IgnoreFilter};
 use futures::{Stream, TryStreamExt};
@@ -112,16 +113,19 @@ impl CoContext {
 	}
 
 	/// Network.
+	#[cfg(feature = "network")]
 	pub async fn network(&self) -> Option<NetworkApi> {
 		self.inner.network.read().unwrap().clone()
 	}
 
 	/// Network Connections.
+	#[cfg(feature = "network")]
 	pub async fn network_connections(&self) -> Option<ActorHandle<ConnectionMessage>> {
 		self.inner.network.read().unwrap().as_ref().map(|api| api.connections().clone())
 	}
 
 	/// Network Heads.
+	#[cfg(feature = "network")]
 	pub async fn network_heads(&self) -> Option<HeadsApi> {
 		self.inner.network.read().unwrap().as_ref().map(|api| api.heads().clone())
 	}
@@ -208,6 +212,7 @@ pub(crate) struct CoContextInner {
 
 	local_identity: LocalIdentity,
 
+	#[cfg(feature = "network")]
 	network: Arc<RwLock<Option<NetworkApi>>>,
 
 	storage: Storage,
@@ -229,7 +234,7 @@ impl CoContextInner {
 		shutdown: CancellationToken,
 		tasks: TaskSpawner,
 		local_identity: LocalIdentity,
-		network: Option<NetworkApi>,
+		#[cfg(feature = "network")] network: Option<NetworkApi>,
 		storage: Storage,
 		runtime: Runtime,
 		reactive_context: ActorHandle<ApplicationMessage>,
@@ -245,6 +250,7 @@ impl CoContextInner {
 			shutdown,
 			tasks,
 			local_identity,
+			#[cfg(feature = "network")]
 			network: Arc::new(RwLock::new(network)),
 			storage,
 			runtime,
@@ -312,6 +318,7 @@ impl CoContextInner {
 	}
 
 	/// Clone with network.
+	#[cfg(feature = "network")]
 	pub async fn set_network(&self, network: Option<NetworkApi>) -> Result<(), anyhow::Error> {
 		// assign
 		*self.network.write().unwrap() = network;

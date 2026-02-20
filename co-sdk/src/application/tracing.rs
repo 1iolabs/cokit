@@ -1,12 +1,17 @@
+#[cfg(feature = "opentelemetry")]
 use opentelemetry::{trace::TraceError, KeyValue};
+#[cfg(feature = "opentelemetry")]
 use opentelemetry_otlp::WithExportConfig;
+#[cfg(feature = "opentelemetry")]
 use opentelemetry_sdk::{runtime, trace as sdktrace, Resource};
+#[cfg(feature = "opentelemetry")]
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 use std::path::PathBuf;
 use tracing::{
 	subscriber::{set_default, set_global_default, DefaultGuard},
 	Level,
 };
+#[cfg(feature = "bunyan")]
 use tracing_bunyan_formatter::BunyanFormattingLayer;
 use tracing_log::LogTracer;
 use tracing_subscriber::{fmt::writer::MakeWriterExt, layer::SubscriberExt, EnvFilter, Registry};
@@ -14,11 +19,13 @@ use tracing_subscriber::{fmt::writer::MakeWriterExt, layer::SubscriberExt, EnvFi
 pub struct TracingBuilder {
 	identifier: String,
 	base_path: Option<PathBuf>,
+	#[cfg(feature = "bunyan")]
 	bunyan: Option<PathBuf>,
 	log_max_level: Level,
 	stderr: bool,
 	env_filter: Option<EnvFilter>,
 	/// Trace to open telemetry endpoint.
+	#[cfg(feature = "opentelemetry")]
 	open_telemetry: Option<String>,
 	/// If true do not fail if a other tracing is already registered.
 	optional: bool,
@@ -28,9 +35,11 @@ impl TracingBuilder {
 		Self {
 			identifier,
 			base_path,
+			#[cfg(feature = "bunyan")]
 			bunyan: None,
 			log_max_level: Level::TRACE,
 			stderr: false,
+			#[cfg(feature = "opentelemetry")]
 			open_telemetry: None,
 			env_filter: None,
 			optional: false,
@@ -43,6 +52,7 @@ impl TracingBuilder {
 	/// ```sh
 	/// tail -0f ~/Application\ Support/co.app/log/application.log | bunyan -c '!/^(libp2p|hickory_proto)/.test(this.target)'
 	/// ```
+	#[cfg(feature = "bunyan")]
 	pub fn with_bunyan_logging(self, log_path: Option<PathBuf>) -> Self {
 		let bunyan = match (log_path, &self.base_path) {
 			(Some(p), _) => Some(p),
@@ -57,6 +67,7 @@ impl TracingBuilder {
 		Self { log_max_level, ..self }
 	}
 
+	#[cfg(feature = "opentelemetry")]
 	pub fn with_open_telemetry(self, endpoint: impl Into<String>) -> Self {
 		Self { open_telemetry: Some(endpoint.into()), ..self }
 	}
@@ -83,13 +94,17 @@ impl TracingBuilder {
 
 	fn build_subscriber(self) -> Result<Option<impl tracing::Subscriber + Send + Sync + 'static>, anyhow::Error> {
 		// open telemetry
+		#[cfg(feature = "opentelemetry")]
 		let open_telemetry = if let Some(endpoint) = &self.open_telemetry {
 			Some(open_telemetry_endpoint(self.identifier.clone(), endpoint.clone())?)
 		} else {
 			None
 		};
+		#[cfg(not(feature = "opentelemetry"))]
+		let open_telemetry = Option::<tracing_subscriber::layer::Identity>::None;
 
 		// bunyan
+		#[cfg(feature = "bunyan")]
 		let bunyan = if let Some(log_path) = &self.bunyan {
 			std::fs::create_dir_all(log_path.parent().ok_or(anyhow::anyhow!("no parent"))?)?;
 			let log_file = std::fs::File::options().append(true).create(true).open(log_path)?;
@@ -102,6 +117,8 @@ impl TracingBuilder {
 		} else {
 			None
 		};
+		#[cfg(not(feature = "bunyan"))]
+		let bunyan = Option::<tracing_subscriber::layer::Identity>::None;
 
 		// stderr
 		let stderr = if self.stderr {
@@ -158,6 +175,7 @@ impl TracingBuilder {
 	}
 }
 
+#[cfg(feature = "opentelemetry")]
 fn open_telemetry_endpoint(
 	service_name: impl Into<String>,
 	endpoint: impl Into<String>,
@@ -168,6 +186,7 @@ fn open_telemetry_endpoint(
 /// See:
 /// - https://github.com/open-telemetry/opentelemetry-rust/blob/main/examples/tracing-jaeger/src/main.rs
 /// - https://quickwit.io/blog/observing-rust-app-with-quickwit-jaeger-grafana
+#[cfg(feature = "opentelemetry")]
 fn init_tracer(
 	service_name: impl Into<String>,
 	endpoint: impl Into<String>,

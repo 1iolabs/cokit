@@ -1,10 +1,14 @@
+#[cfg(feature = "network")]
+use crate::library::network_queue::TaskState;
 use crate::{
-	library::{create_reducer_action::new_reducer_action, network_queue::TaskState},
-	services::reducer::FlushInfo,
-	CoDate, CoStorage, ReducerChangeContext,
+	library::create_reducer_action::new_reducer_action, services::reducer::FlushInfo, CoDate, CoStorage,
+	ReducerChangeContext,
 };
 use cid::Cid;
-use co_identity::{DidCommHeader, Message, PrivateIdentityBox};
+use co_identity::PrivateIdentityBox;
+#[cfg(feature = "network")]
+use co_identity::{DidCommHeader, Message};
+#[cfg(feature = "network")]
 use co_network::{EncodedMessage, HeadsMessage, NetworkSettings, PeerId};
 use co_primitives::{Block, BlockSerializer, CoId, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
@@ -44,24 +48,31 @@ pub enum Action {
 	Invite { co: CoId, from: Did, to: Did },
 
 	/// Invite request has been sent to a peer.
+	#[cfg(feature = "network")]
 	InviteSent { co: CoId, to: Did, peer: PeerId },
 
 	/// Join completed.
+	#[cfg(feature = "network")]
 	Joined { co: CoId, participant: Did, success: bool, peer: Option<PeerId> },
 
 	/// Send a Key Request to a co or specified network.
+	#[cfg(feature = "network")]
 	KeyRequest(KeyRequestAction),
 
 	/// Key Request has completed.
+	#[cfg(feature = "network")]
 	KeyRequestComplete(KeyRequestAction, Result<String, ActionError>),
 
 	/// Start network.
+	#[cfg(feature = "network")]
 	NetworkStart(NetworkSettings),
 
 	/// Network has been started.
+	#[cfg(feature = "network")]
 	NetworkStartComplete(Result<(), ActionError>),
 
 	/// Send a DIDComm message.
+	#[cfg(feature = "network")]
 	DidCommSend {
 		/// The message header for reference.
 		message_header: DidCommHeader,
@@ -72,6 +83,7 @@ pub enum Action {
 	},
 
 	/// Sent result of the DIDComm message.
+	#[cfg(feature = "network")]
 	DidCommSent {
 		/// The message header for reference.
 		message_header: DidCommHeader,
@@ -86,19 +98,24 @@ pub enum Action {
 	/// # Security
 	/// It is not proofed that the sender (peer) is the producer of the message.
 	/// If such a proof is needed it must be included in a signed message.
+	#[cfg(feature = "network")]
 	DidCommReceive { peer: PeerId, message: Message },
 
 	/// Received a HeadsMessage.
+	#[cfg(feature = "network")]
 	HeadsMessageReceived(HeadsMessageReceivedAction),
 
 	/// HeadsMessage has been processed.
+	#[cfg(feature = "network")]
 	HeadsMessageComplete(HeadsMessageReceivedAction, Result<(), HeadsError>),
 
 	/// Connect to Co and send message (DidCommSent) to the first peer connectable.
+	#[cfg(feature = "network")]
 	CoDidCommSend(CoDidCommSendAction),
 
 	/// DidComm message send result
 	/// Emitted once per [`Action::CoDidCommSend`].
+	#[cfg(feature = "network")]
 	CoDidCommSent {
 		// The message.
 		message: CoDidCommSendAction,
@@ -135,9 +152,11 @@ pub enum Action {
 	NetworkTaskQueue { co: CoId, task_id: String, task_type: String, task_name: String, task: Block },
 
 	/// Execute network queue task.
+	#[cfg(feature = "network")]
 	NetworkTaskExecute { co: CoId, task_id: String, task_type: String, task: Block },
 
 	/// Execute network queue task has been completed.
+	#[cfg(feature = "network")]
 	NetworkTaskExecuteComplete { co: CoId, task_id: String, task_state: TaskState },
 
 	/// Network Queue Process
@@ -343,6 +362,7 @@ impl std::fmt::Display for ActionError {
 	}
 }
 
+#[cfg(feature = "network")]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct KeyRequestAction {
 	/// The CO.
@@ -362,6 +382,7 @@ pub struct KeyRequestAction {
 }
 
 /// Send a DIDComm message to all connectable co peers.
+#[cfg(feature = "network")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoDidCommSendAction {
 	/// The Co to send the message to.
@@ -408,6 +429,7 @@ pub enum NotifyAction {
 }
 
 /// Received a HeadsMessage.
+#[cfg(feature = "network")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct HeadsMessageReceivedAction {

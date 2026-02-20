@@ -26,7 +26,7 @@ co-core-room = { workspace = true }
 co-core-storage = { workspace = true }
 co-identity = { workspace = true }
 co-log = { workspace = true }
-co-network = { workspace = true }
+co-network = { workspace = true, optional = true }
 co-primitives = { workspace = true }
 co-runtime = { workspace = true }
 co-storage = { workspace = true }
@@ -36,15 +36,14 @@ either = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
 hmac = "0.12.1"
-hyper = { workspace = true }
 indexmap = "2.9.0"
 ipld-core = { workspace = true }
-keyring = "2.3.2"
+keyring = { version = "2.3.2", optional = true }
 libc = "0.2"
 multibase = { workspace = true }
 names = "0.14.0"
-nix = { version = "0.29.0", features = ["fs"] }
-notify = { version = "7.0.0", features = ["macos_kqueue"] }
+nix = { version = "0.29.0", optional = true, features = ["fs"] }
+notify = { version = "7.0.0", optional = true, features = ["macos_kqueue"] }
 pin-project = { workspace = true }
 scopeguard = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -53,24 +52,25 @@ serde_json = { workspace = true }
 serde_repr = { workspace = true }
 sha2 = "0.10.8"
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
+tokio = { workspace = true, features = ["rt", "macros", "sync", "io-util"] }
 tokio-stream = { workspace = true, features = ["sync"] }
 tokio-util = { workspace = true, features = ["rt"] }
 toml = { workspace = true }
 tracing = { workspace = true }
-tracing-bunyan-formatter = { workspace = true }
+tracing-bunyan-formatter = { workspace = true, optional = true }
 tracing-log = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { workspace = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
 zstd = { workspace = true, optional = true }
 
 # opentelemetry
-opentelemetry = "0.22"
-opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
-opentelemetry-otlp = { version = "0.15.0", features = ["tonic"] }
-opentelemetry-semantic-conventions = "0.14.0"
-opentelemetry-stdout = { version = "0.3.0", features = ["trace"] }
-tracing-opentelemetry = "0.23"
+opentelemetry = { version = "0.22", optional = true }
+opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"], optional = true }
+opentelemetry-otlp = { version = "0.15.0", features = ["tonic"], optional = true}
+opentelemetry-semantic-conventions = { version = "0.14.0", optional = true }
+opentelemetry-stdout = { version = "0.3.0", features = ["trace"], optional = true }
+tracing-opentelemetry = { version = "0.23", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["async_tokio"] }
@@ -78,13 +78,12 @@ example-counter = { path = "../examples/counter" }
 example-counter-upgraded = { path = "../examples/counter-upgraded" }
 tokio = { workspace = true, features = ["full", "tracing"] }
 co-test = { workspace = true }
-console-subscriber = { version = "0.4.1" }
 
 [features]
 "default" = ["recommended", "co-runtime/llvm"]
 
 # Meta: Recommended platform neutral features
-"recommended" = ["pinning"]
+"recommended" = ["pinning", "native", "network", "bunyan"]
 
 # Meta: Enable to run in a apple sandbox.
 "apple-sandbox" = ["co-runtime/apple-sandbox"]
@@ -98,6 +97,30 @@ console-subscriber = { version = "0.4.1" }
 # Bundle WASM binaries instead of native for build-in cores.
 # Note: Assumes cores are pre-built and compressed using zst.
 "bundle-wasm-cores" = ["dep:zstd"]
+
+# Enable filesystem access
+"fs" = ["co-storage/fs", "co-runtime/fs", "dep:notify", "dep:nix"]
+
+# Enable keychain access
+"keychain" = ["dep:keyring"]
+
+# Enable libp2p networking
+"network" = ["dep:co-network"]
+
+# Enable JS features
+"js" = ["dep:wasm-bindgen-futures", "uuid/js", "co-runtime/js"]
+
+# Enable opentelemetry tracing
+"opentelemetry" = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:opentelemetry-semantic-conventions", "dep:opentelemetry-stdout", "dep:tracing-opentelemetry"]
+
+# Enable bunyan formatter
+"bunyan" = ["dep:tracing-bunyan-formatter"]
+
+# Native Target
+"native" = ["co-runtime/native", "fs", "tokio/full"]
+
+# Web Target (WASM)
+"web" = ["js", "co-identity/web", "co-storage/web", "co-runtime/web"]
 
 [[bench]]
 name = "local_push"

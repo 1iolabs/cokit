@@ -1,6 +1,6 @@
 use crate::{
-	library::runtime_dispatch::RuntimeDispatch, types::co_dispatch::CoDispatch, CoreResolver, CoreResolverContext,
-	CoreResolverError, Cores, CO_CORE_NAME_CO,
+	library::runtime_dispatch::RuntimeDispatch, services::runtime::RuntimeHandle, types::co_dispatch::CoDispatch,
+	CoreResolver, CoreResolverContext, CoreResolverError, Cores, CO_CORE_NAME_CO,
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -8,7 +8,7 @@ use cid::Cid;
 use co_core_co::{CoAction, CreateAction};
 use co_identity::{LocalIdentity, PrivateIdentity};
 use co_primitives::{reducer_action_core_from_storage, ReducerAction};
-use co_runtime::{Core, RuntimeContext, RuntimePool};
+use co_runtime::{Core, RuntimeContext};
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use ipld_core::ipld::Ipld;
 use std::collections::HashMap;
@@ -34,7 +34,7 @@ impl CoCoreResolver {
 	async fn apply_core_state_to_root<S>(
 		&self,
 		storage: &S,
-		runtime: RuntimePool,
+		runtime: RuntimeHandle,
 		state: &Option<Cid>,
 		core_name: String,
 		core_state: Option<Cid>,
@@ -127,7 +127,7 @@ impl CoCoreResolver {
 	async fn migrate<S>(
 		&self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		state: &Option<Cid>,
 		core_name: &str,
 		migrate: &Cid,
@@ -178,7 +178,7 @@ where
 	async fn execute(
 		&self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		context: &CoreResolverContext,
 		state: &Option<Cid>,
 		action: &Cid,

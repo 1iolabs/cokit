@@ -30,9 +30,10 @@ tracing = { workspace = true }
 uniffi = { version = "0.30", optional = true }
 
 [features]
-default = ["frb"]
+default = ["frb", "network"]
 uniffi = ["dep:uniffi"]
 frb = ["dep:flutter_rust_bridge"]
+network = ["co-sdk/network"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

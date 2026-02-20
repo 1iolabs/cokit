@@ -22,7 +22,7 @@ serde_repr = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros"] }
 wasm-bindgen = { version = "0.2.105" }
-wasm-bindgen-futures = { version = "0.4.55", features = ["futures-core-03-stream"] }
+wasm-bindgen-futures = { workspace = true, features = ["futures-core-03-stream"] }
 wasm-streams = "0.4.2"
 web-sys = { version = "0.3.82", features = ["console"] }
 

@@ -1,16 +1,15 @@
 use super::identity::create_identity_resolver;
 use crate::{
-	reducer::core_resolver::dynamic::DynamicCoreResolver, CoCoreResolver, CoDate, CoReducerState, Reducer,
-	ReducerBuilder,
+	reducer::core_resolver::dynamic::DynamicCoreResolver, services::runtime::RuntimeHandle, CoCoreResolver, CoDate,
+	CoReducerState, Reducer, ReducerBuilder,
 };
 use co_log::{IdentityEntryVerifier, Log};
 use co_primitives::CoId;
-use co_runtime::RuntimePool;
 use co_storage::ExtendedBlockStorage;
 
 /// Create a memory instance.
 pub async fn create_memory_reducer<S>(
-	runtime_pool: &RuntimePool,
+	runtime: &RuntimeHandle,
 	date: impl CoDate,
 	id: &CoId,
 	storage: &S,
@@ -31,6 +30,6 @@ where
 	if let Some((state, heads)) = reducer_state.some() {
 		builder = builder.with_latest_state(state, heads);
 	}
-	let reducer = builder.build(storage, runtime_pool, date).await?;
+	let reducer = builder.build(storage, runtime, date).await?;
 	Ok(reducer)
 }

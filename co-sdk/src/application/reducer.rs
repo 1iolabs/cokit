@@ -3,6 +3,7 @@ use crate::{
 	reducer::state_resolver::{
 		DynamicStateResolver, JoinStateResolver, StateResolver, StateResolverContext, StaticStateResolver,
 	},
+	services::runtime::RuntimeHandle,
 	CoDate, CoreResolver, CoreResolverContext, DynamicCoDate,
 };
 use anyhow::{anyhow, Context};
@@ -11,7 +12,6 @@ use cid::Cid;
 use co_identity::PrivateIdentity;
 use co_log::{EntryBlock, Log, LogError};
 use co_primitives::{Link, ReducerAction, SignedEntry};
-use co_runtime::RuntimePool;
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use ipld_core::ipld::Ipld;
@@ -87,7 +87,7 @@ where
 	pub async fn build(
 		self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		date: impl CoDate,
 	) -> Result<Reducer<S, R>, anyhow::Error> {
 		// validate heads
@@ -162,7 +162,7 @@ where
 {
 	/// Initialize this reducer by computing current state if one.
 	#[tracing::instrument(level = tracing::Level::TRACE, skip(self, storage, runtime))]
-	pub async fn initialize(&mut self, storage: &S, runtime: &RuntimePool) -> Result<(), anyhow::Error> {
+	pub async fn initialize(&mut self, storage: &S, runtime: &RuntimeHandle) -> Result<(), anyhow::Error> {
 		tracing::trace!(?self.state_resolver, "reducer-initialize");
 		let context = ReducerChangeContext { cause: ReducerChangeCause::Initialize };
 
@@ -340,7 +340,7 @@ where
 	pub async fn push<T, I>(
 		&mut self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		identity: &I,
 		core: impl Into<String> + Debug,
 		item: &T,
@@ -365,7 +365,7 @@ where
 	pub async fn push_action<T, I>(
 		&mut self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		identity: &I,
 		action: &ReducerAction<T>,
 	) -> Result<PushResult, anyhow::Error>
@@ -384,7 +384,7 @@ where
 	pub async fn push_reference<I>(
 		&mut self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		identity: &I,
 		action_link: Link<ReducerAction<Ipld>>,
 	) -> Result<PushResult, anyhow::Error>
@@ -406,7 +406,7 @@ where
 	pub async fn push_reference_with_state<I>(
 		&mut self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		identity: &I,
 		action_link: Link<ReducerAction<Ipld>>,
 		core_state_link: Option<Cid>,
@@ -503,7 +503,7 @@ where
 		&mut self,
 		storage: &S,
 		heads: &BTreeSet<Cid>,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 	) -> Result<Option<JoinResult>, LogError> {
 		// join
 		let log_heads = self.log().heads().clone();
@@ -593,7 +593,7 @@ where
 	async fn compute_state(
 		&self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		context: &ReducerChangeContext,
 	) -> Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error> {
 		// compute stack
@@ -779,15 +779,17 @@ impl ReducerChangeCause {
 mod tests {
 	use super::Reducer;
 	use crate::{
-		application::reducer::ReducerBuilder, build_core, crate_repository_path, CoDate, CoreResolver, MonotonicCoDate,
-		ReducerChangeContext, ReducerChangedHandler, SingleCoreResolver,
+		application::reducer::ReducerBuilder,
+		build_core, crate_repository_path,
+		services::runtime::{RuntimeActor, RuntimeHandle},
+		CoDate, CoreResolver, MonotonicCoDate, ReducerChangeContext, ReducerChangedHandler, SingleCoreResolver,
 	};
 	use async_trait::async_trait;
 	use cid::Cid;
 	use co_identity::{IdentityResolverBox, LocalIdentityResolver};
 	use co_log::{IdentityEntryVerifier, Log};
 	use co_primitives::{BlockSerializer, ReducerAction};
-	use co_runtime::{Core, IdleRuntimePool, RuntimePool};
+	use co_runtime::Core;
 	use co_storage::{ExtendedBlockStorage, MemoryBlockStorage};
 	use example_counter::{Counter, CounterAction};
 	use futures::StreamExt;
@@ -828,7 +830,7 @@ mod tests {
 
 		// pool
 		let date = MonotonicCoDate::default().boxed();
-		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let runtime = RuntimeActor::spawn("test", Default::default()).unwrap();
 		let core_resolver = SingleCoreResolver::new(wasm, wasm.into());
 		let native_core_resolver = SingleCoreResolver::new(wasm, Core::native::<Counter>());
 
@@ -1022,7 +1024,7 @@ mod tests {
 			IdentityEntryVerifier::new(IdentityResolverBox::new(LocalIdentityResolver::default())),
 			Default::default(),
 		);
-		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let runtime = RuntimeActor::spawn("test", Default::default()).unwrap();
 		let native_core_resolver = SingleCoreResolver::new(Cid::default(), Core::native::<Counter>());
 		let mut reducer = ReducerBuilder::new(native_core_resolver, log)
 			.build(&storage, &runtime, MonotonicCoDate::default())
@@ -1075,7 +1077,7 @@ mod tests {
 		// reducer
 		let storage = MemoryBlockStorage::default();
 		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
-		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let runtime = RuntimeActor::spawn("test", Default::default()).unwrap();
 		let native_core_resolver = SingleCoreResolver::new(Cid::default(), Core::native::<Counter>());
 		let co_date = MonotonicCoDate::default().boxed();
 
@@ -1179,7 +1181,7 @@ mod tests {
 		// reducer
 		let storage = MemoryBlockStorage::default();
 		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
-		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let runtime = RuntimeActor::spawn("test", Default::default()).unwrap();
 		let native_core_resolver = SingleCoreResolver::new(Cid::default(), Core::native::<Counter>());
 		let co_date = MonotonicCoDate::default().boxed();
 
@@ -1326,7 +1328,7 @@ mod tests {
 		let storage = MemoryBlockStorage::default();
 		let co_date = MonotonicCoDate::default();
 		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
-		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let runtime = RuntimeActor::spawn("test", Default::default()).unwrap();
 		let mut reducer1 = create_reducer(&storage, &runtime, &co_date, None).await;
 
 		// push
@@ -1367,7 +1369,7 @@ mod tests {
 		let storage = MemoryBlockStorage::default();
 		let co_date = MonotonicCoDate::default();
 		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
-		let runtime = RuntimePool::new(IdleRuntimePool::default());
+		let runtime = RuntimeActor::spawn("test", Default::default()).unwrap();
 		let mut reducer1 = create_reducer(&storage, &runtime, &co_date, None).await;
 
 		// push
@@ -1401,7 +1403,7 @@ mod tests {
 
 	async fn create_reducer(
 		storage: &MemoryBlockStorage,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		co_date: &MonotonicCoDate,
 		from: Option<&Reducer<MemoryBlockStorage, SingleCoreResolver>>,
 	) -> Reducer<MemoryBlockStorage, SingleCoreResolver> {

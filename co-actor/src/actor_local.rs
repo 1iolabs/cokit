@@ -96,7 +96,7 @@ where
 		let tags = self.handle.tags.clone();
 		let handle = self.handle;
 		let span = tracing::trace_span!("actor", ?tags, actor_type = type_name::<A>());
-		let join = spawner.spwan_local({
+		let join = spawner.spawn_local({
 			let tags = tags.clone();
 			let handle = handle.clone();
 			let actor_span = span.clone();

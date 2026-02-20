@@ -1,7 +1,7 @@
-use crate::{CoreResolver, CoreResolverContext, CoreResolverError};
+use crate::{services::runtime::RuntimeHandle, CoreResolver, CoreResolverContext, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_runtime::{RuntimeContext, RuntimePool};
+use co_runtime::RuntimeContext;
 use co_storage::BlockStorage;
 use std::{
 	fmt::{Debug, Formatter},
@@ -37,7 +37,7 @@ where
 	async fn execute(
 		&self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		context: &CoreResolverContext,
 		state: &Option<Cid>,
 		action: &Cid,

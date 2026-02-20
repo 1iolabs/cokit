@@ -10,10 +10,12 @@ use co_core_storage::PinStrategy;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
+#[cfg(feature = "network")]
 use co_network::NetworkSettings;
 use co_primitives::{tag, tags, CoId, TagValue, Tags};
 use co_runtime::Core;
 use co_storage::StaticBlockStorage;
+#[cfg(feature = "fs")]
 use directories::ProjectDirs;
 use futures::{Stream, StreamExt};
 use std::{collections::BTreeSet, fmt::Debug, future::ready, path::PathBuf, sync::Arc};
@@ -96,6 +98,7 @@ impl Application {
 	}
 
 	/// Create and startup network.
+	#[cfg(feature = "network")]
 	pub async fn create_network(&mut self, settings: NetworkSettings) -> Result<(), anyhow::Error> {
 		// start and wait
 		request_response(self.service.handle(), Action::NetworkStart(settings), move |action| match action {
@@ -206,6 +209,7 @@ pub struct ApplicationSettings {
 	/// Normally composed of `{base_path}/etc/{identifier}`.
 	/// The Local CO read method tries to read states of all applications by searching for
 	/// `{application_path}/../*/local.cbor` files.
+	#[cfg(feature = "fs")]
 	pub application_path: Option<PathBuf>,
 
 	/// Use keychain or file for Local CO.
@@ -228,6 +232,7 @@ pub struct ApplicationSettings {
 }
 impl ApplicationSettings {
 	/// Base path.
+	#[cfg(feature = "fs")]
 	pub fn base_path(&self) -> Option<PathBuf> {
 		self.application_path
 			.as_ref()
@@ -303,6 +308,7 @@ impl ApplicationSettings {
 
 pub struct ApplicationBuilder {
 	identifier: String,
+	#[cfg(feature = "fs")]
 	path: Option<PathBuf>,
 	keychain: bool,
 	tracing: TracingBuilder,
@@ -313,12 +319,14 @@ pub struct ApplicationBuilder {
 	cores: Cores,
 }
 impl ApplicationBuilder {
+	#[cfg(feature = "fs")]
 	pub fn default_path() -> PathBuf {
 		let dirs = ProjectDirs::from("co.app", "1io", "co").expect("home directory");
 		dirs.data_dir().into()
 	}
 
 	/// Create new instance with path.
+	#[cfg(feature = "fs")]
 	pub fn new_with_path(identifier: impl Into<String>, path: PathBuf) -> Self {
 		let identifier = identifier.into();
 		let tracing = TracingBuilder::new(identifier.clone(), Some(path.clone()));
@@ -335,6 +343,7 @@ impl ApplicationBuilder {
 		}
 	}
 
+	#[cfg(feature = "fs")]
 	pub fn new(identifier: impl Into<String>) -> Self {
 		Self::new_with_path(identifier, Self::default_path())
 	}
@@ -345,6 +354,7 @@ impl ApplicationBuilder {
 		let tracing = TracingBuilder::new(identifier.clone(), None);
 		Self {
 			identifier,
+			#[cfg(feature = "fs")]
 			path: None,
 			keychain: false,
 			tracing,
@@ -362,6 +372,7 @@ impl ApplicationBuilder {
 	/// ```sh
 	/// tail -0f ~/Application\ Support/co.app/log/application.log | bunyan -c '!/^(libp2p|hickory_proto)/.test(this.target)'
 	/// ```
+	#[cfg(feature = "bunyan")]
 	pub fn with_bunyan_logging(self, log_path: Option<PathBuf>) -> Self {
 		Self { tracing: self.tracing.with_bunyan_logging(log_path), ..self }
 	}
@@ -374,6 +385,7 @@ impl ApplicationBuilder {
 		Self { tracing: self.tracing.with_optional_tracing(), ..self }
 	}
 
+	#[cfg(feature = "opentelemetry")]
 	pub fn with_open_telemetry(self, endpoint: impl Into<String>) -> Self {
 		Self { tracing: self.tracing.with_open_telemetry(endpoint), ..self }
 	}
@@ -441,16 +453,20 @@ impl ApplicationBuilder {
 		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
 
 		// storage
+		#[cfg(feature = "fs")]
 		let mut storage = match &self.path {
 			Some(path) => Storage::new(path.join("data"), path.join("tmp/data"), uuid.clone()),
 			None => Storage::new_memory(),
 		};
+		#[cfg(not(feature = "fs"))]
+		let mut storage = Storage::new_memory();
 		if !self.static_blocks.is_empty() {
 			storage = storage.with_static(self.static_blocks);
 		}
 
 		// settings
 		let settings = ApplicationSettings {
+			#[cfg(feature = "fs")]
 			application_path: self.path.map(|path| path.join("etc").join(&self.identifier)),
 			identifier: self.identifier,
 			keychain: self.keychain,

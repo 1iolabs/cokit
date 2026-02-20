@@ -1,8 +1,10 @@
-use crate::{types::guards::Guards, CoreResolver, CoreResolverContext, CoreResolverError};
+use crate::{
+	services::runtime::RuntimeHandle, types::guards::Guards, CoreResolver, CoreResolverContext, CoreResolverError,
+};
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::GuardVerifyPayload;
-use co_runtime::{GuardReference, RuntimeContext, RuntimePool};
+use co_runtime::{GuardReference, RuntimeContext};
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use std::collections::HashMap;
 
@@ -33,7 +35,7 @@ where
 	async fn execute(
 		&self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		context: &CoreResolverContext,
 		state: &Option<Cid>,
 		action: &Cid,

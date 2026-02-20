@@ -58,11 +58,12 @@ uuid = { workspace = true }
 zstd = { workspace = true }
 
 [features]
-default = ["llvm", "wasmi", "pinning"]
+default = ["llvm", "wasmi", "pinning", "network"]
 
 # sdk
 pinning = ["co-sdk/pinning"]
 bundle-wasm-cores = ["co-sdk/bundle-wasm-cores"]
+network = ["co-sdk/network"]
 
 # runtime
 llvm = ["co-runtime/llvm"]

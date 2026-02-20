@@ -1,9 +1,7 @@
+use crate::{AnyBlockStorage, Block, BlockStorage, BlockStorageStoreParams, DefaultParams, StorageError, StoreParams};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{
-	AnyBlockStorage, Block, BlockStorage, BlockStorageStoreParams, DefaultParams, StorageError, StoreParams,
-};
 use std::{fmt::Debug, sync::Arc};
 
 #[derive(Clone)]

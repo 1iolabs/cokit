@@ -1,7 +1,12 @@
-use crate::{CoStorage, CoUuid, DynamicCoUuid};
+use crate::CoStorage;
+#[cfg(feature = "fs")]
+use crate::CoUuid;
+#[cfg(feature = "fs")]
+use crate::DynamicCoUuid;
+#[cfg(feature = "fs")]
+use co_storage::FsStorage;
 use co_storage::{
-	Algorithm, EncryptedBlockStorage, EncryptionReferenceMode, FsStorage, JoinBlockStorage, MemoryBlockStorage,
-	StaticBlockStorage,
+	Algorithm, EncryptedBlockStorage, EncryptionReferenceMode, JoinBlockStorage, MemoryBlockStorage, StaticBlockStorage,
 };
 use std::path::PathBuf;
 
@@ -11,6 +16,7 @@ pub struct Storage {
 	tmp_storage: TmpStorage,
 }
 impl Storage {
+	#[cfg(feature = "fs")]
 	pub fn new(storage_path: PathBuf, tmp_storage_path: PathBuf, tmp_uuid: DynamicCoUuid) -> Self {
 		// to prevent data loss verify the tmp folder is not the actual storage folder
 		assert!(storage_path != tmp_storage_path);
@@ -39,6 +45,7 @@ impl Storage {
 	pub fn tmp_storage(&self) -> CoStorage {
 		match &self.tmp_storage {
 			TmpStorage::Memory => CoStorage::new(MemoryBlockStorage::default()),
+			#[cfg(feature = "fs")]
 			TmpStorage::Path(uuid, path) => CoStorage::new(
 				EncryptedBlockStorage::new(
 					FsStorage::new(path.join(uuid.uuid())).with_allow_clear(true),
@@ -55,5 +62,6 @@ impl Storage {
 #[derive(Debug, Clone)]
 enum TmpStorage {
 	Memory,
+	#[cfg(feature = "fs")]
 	Path(DynamicCoUuid, PathBuf),
 }

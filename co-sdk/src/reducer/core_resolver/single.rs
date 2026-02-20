@@ -1,7 +1,7 @@
-use crate::{CoreResolver, CoreResolverContext, CoreResolverError};
+use crate::{services::runtime::RuntimeHandle, CoreResolver, CoreResolverContext, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_runtime::{Core, RuntimeContext, RuntimePool};
+use co_runtime::{Core, RuntimeContext};
 use co_storage::BlockStorage;
 
 #[derive(Debug, Clone)]
@@ -22,7 +22,7 @@ where
 	async fn execute(
 		&self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		_context: &CoreResolverContext,
 		state: &Option<Cid>,
 		action: &Cid,

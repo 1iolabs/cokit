@@ -18,6 +18,7 @@ pub use library::{
 	node_stream::NodeStream,
 	reducer_action_core::{reducer_action_core, reducer_action_core_from_storage},
 	serde_map_as_list,
+	storage::CoreBlockStorage,
 	unixfs::{unixfs_add, unixfs_cat_buffer, unixfs_encode_buffer},
 	unixfs_stream::unixfs_stream,
 };

@@ -3,32 +3,60 @@ use crate::CoContext;
 use co_actor::{Epic, MergeEpic, TracingEpic};
 use co_primitives::Tags;
 
+#[cfg(feature = "network")]
 mod co_didcomm_send;
+#[cfg(feature = "network")]
 mod co_heads_publish;
+#[cfg(feature = "network")]
 mod co_heads_subscribe;
 mod core_action_push;
+#[cfg(feature = "network")]
 mod did_subscribe;
+#[cfg(feature = "network")]
 mod didcomm_connected;
+#[cfg(feature = "network")]
 mod didcomm_receive;
+#[cfg(feature = "network")]
 mod didcomm_send;
+#[cfg(feature = "network")]
 mod heads_message;
+#[cfg(feature = "network")]
 mod invite_receive;
+#[cfg(feature = "network")]
 mod invite_send;
+#[cfg(feature = "network")]
 mod join_receive;
+#[cfg(feature = "network")]
 mod join_send;
+#[cfg(feature = "network")]
 mod joined;
+#[cfg(feature = "network")]
 mod key_request_receive;
+#[cfg(feature = "network")]
 mod key_request_send;
+#[cfg(feature = "network")]
 mod membership_update;
+#[cfg(feature = "network")]
 mod network_block_get;
+#[cfg(feature = "network")]
 mod network_queue;
+#[cfg(feature = "network")]
 mod network_start;
+#[cfg(feature = "network")]
 mod push_heads;
 mod resolve_private_identity;
 
 pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
-	MergeEpic::new()
+	let epic = MergeEpic::new();
+
+	// epics
+	let epic = epic
 		.join(core_action_push::core_action_push)
+		.join(resolve_private_identity::resolve_private_identity);
+
+	// network epics
+	#[cfg(feature = "network")]
+	let epic = epic
 		.join(did_subscribe::keystore_changed)
 		.join(did_subscribe::network_started)
 		.join(didcomm_receive::didcomm_receive)
@@ -59,7 +87,9 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(network_queue::NetworkQueueProcessEpic::default())
 		.join(network_block_get::network_block_get)
 		.join(network_block_get::network_task_execute)
-		.join(resolve_private_identity::resolve_private_identity)
-		.join(network_start::network_start)
-		.join(TracingEpic::new(tags))
+		.join(network_start::network_start);
+
+	// trace
+	let epic = epic.join(TracingEpic::new(tags));
+	epic
 }

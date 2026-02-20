@@ -1,7 +1,7 @@
 use super::{epics::epic, Action, ApplicationMessage};
 use crate::{
 	application::{application::ApplicationSettings, co_context::CoContextInner},
-	services::reducers::ReducersActor,
+	services::{reducers::ReducersActor, runtime::RuntimeActor},
 	CoContext, Cores, DynamicCoDate, DynamicCoUuid, Runtime, Storage,
 };
 use anyhow::anyhow;
@@ -33,12 +33,17 @@ impl Actor for Application {
 		(storage, tasks, date, uuid, cores): Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		tracing::trace!(settings = ?self.settings, "application-initialize");
-
+		let spawner = TaskSpawner::new(self.settings.identifier.clone(), tasks.clone());
 		let shutdown = CancellationToken::new();
 		let local_identity = LocalIdentityResolver::default().private_identity("did:local:device").unwrap();
-		let runtime = Runtime::new();
 
-		// reducers
+		// service: runtime
+		#[cfg(feature = "js")]
+		let runtime = Runtime::new(RuntimeActor::spawn_local(self.settings.identifier.clone())?);
+		#[cfg(not(feature = "js"))]
+		let runtime = Runtime::new(RuntimeActor::spawn(self.settings.identifier.clone(), spawner.clone())?);
+
+		// service: reducers
 		let reducers = Actor::spawner(
 			tags!("type": "reducers", "application": self.settings.identifier.clone()),
 			ReducersActor::new(),
@@ -50,6 +55,7 @@ impl Actor for Application {
 			shutdown.child_token(),
 			TaskSpawner::new(self.settings.identifier.clone(), tasks.clone()),
 			local_identity.clone(),
+			#[cfg(feature = "network")]
 			None,
 			storage,
 			runtime.clone(),
@@ -92,6 +98,7 @@ impl Actor for Application {
 				response.send(state.context.clone()).ok();
 				None
 			},
+			#[cfg(feature = "network")]
 			ApplicationMessage::Network(response) => {
 				response.respond(state.context.network().await.ok_or(anyhow!("Not started")));
 				None

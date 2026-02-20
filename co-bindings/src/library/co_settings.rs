@@ -1,10 +1,13 @@
-use crate::types::{level::CoLogLevel, network_settings::CoNetworkSettings};
+use crate::types::level::CoLogLevel;
+#[cfg(feature = "network")]
+use crate::types::network_settings::CoNetworkSettings;
 
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone)]
 pub struct CoSettings {
 	pub identifier: String,
 	pub path: Option<String>,
+	#[cfg(feature = "network")]
 	pub network_settings: Option<CoNetworkSettings>,
 	pub network: Option<bool>,
 	pub no_keychain: Option<bool>,
@@ -18,6 +21,7 @@ impl Default for CoSettings {
 		Self {
 			identifier: Default::default(),
 			path: Default::default(),
+			#[cfg(feature = "network")]
 			network_settings: Default::default(),
 			network: Some(true),
 			no_keychain: Some(true),

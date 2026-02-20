@@ -1,10 +1,17 @@
+#[cfg(feature = "fs")]
+use crate::library::local_secret_file::FileLocalSecret;
+#[cfg(feature = "keychain")]
+use crate::library::local_secret_keychain::KeychainLocalSecret;
+#[cfg(feature = "fs")]
+use crate::library::locals_file::FileLocals;
 use crate::{
 	application::application::ApplicationSettings,
 	library::{
 		builtin_cores::builtin_cores,
 		core_source::CoreSource,
-		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
-		locals::{ApplicationLocal, FileLocals, Locals, MemoryLocals},
+		local_secret::{LocalSecret, MemoryLocalSecret},
+		locals::{ApplicationLocal, Locals},
+		locals_memory::MemoryLocals,
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	services::reducer::{FlushInfo, ReducerFlush},
@@ -83,67 +90,74 @@ impl LocalCoBuilder {
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
 	{
 		// key
-		let key: Option<Box<dyn LocalSecret + Send + Sync + 'static>> = if self.settings.feature_co_local_encryption() {
-			Some(if self.settings.keychain {
-				Box::new(KeychainLocalSecret::new("co.app".to_owned(), self.identity.identity().to_owned()))
-			} else if let Some(application_path) = &self.settings.application_path {
-				Box::new(FileLocalSecret::new(application_path.parent().expect("etc folder").join("key.cbor")))
-			} else {
-				Box::new(MemoryLocalSecret::new())
-			})
-		} else {
-			None
-		};
+		let key: Option<Box<dyn LocalSecret + Send + Sync + 'static>> =
+			if self.settings.feature_co_local_encryption() { Some(self.build_local_secret()) } else { None };
 
-		// create
-		let watcher = self.settings.feature_co_local_watch();
-		match &self.settings.application_path {
-			Some(application_path) => {
-				let config_path = application_path
-					.parent()
-					.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", application_path))?;
-				let locals = FileLocals::new(config_path.to_owned(), self.settings.identifier.clone(), true)?;
-				Ok(LocalCoInstance::create(
-					runtime,
-					cores,
-					self,
-					storage,
-					shutdown,
-					tasks,
-					locals,
-					key,
-					core_resolver,
-					watcher,
-					date,
-					application_handle,
-					#[cfg(feature = "pinning")]
-					pinning,
-				)
-				.await?
-				.1)
-			},
-			None => {
-				let locals = MemoryLocals::new(None);
-				Ok(LocalCoInstance::create(
-					runtime,
-					cores,
-					self,
-					storage,
-					shutdown,
-					tasks,
-					locals,
-					key,
-					core_resolver,
-					watcher,
-					date,
-					application_handle,
-					#[cfg(feature = "pinning")]
-					pinning,
-				)
-				.await?
-				.1)
-			},
+		// file
+		#[cfg(feature = "fs")]
+		if let Some(application_path) = &self.settings.application_path {
+			let watcher = self.settings.feature_co_local_watch();
+			let config_path = application_path
+				.parent()
+				.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", application_path))?;
+			let locals = FileLocals::new(config_path.to_owned(), self.settings.identifier.clone(), true)?;
+			return Ok(LocalCoInstance::create(
+				runtime,
+				cores,
+				self,
+				storage,
+				shutdown,
+				tasks,
+				locals,
+				key,
+				core_resolver,
+				watcher,
+				date,
+				application_handle,
+				#[cfg(feature = "pinning")]
+				pinning,
+			)
+			.await?
+			.1);
 		}
+
+		// memory
+		let locals = MemoryLocals::new(None);
+		Ok(LocalCoInstance::create(
+			runtime,
+			cores,
+			self,
+			storage,
+			shutdown,
+			tasks,
+			locals,
+			key,
+			core_resolver,
+			false,
+			date,
+			application_handle,
+			#[cfg(feature = "pinning")]
+			pinning,
+		)
+		.await?
+		.1)
+	}
+
+	fn build_local_secret(&self) -> Box<dyn LocalSecret + Send + Sync> {
+		// keychain
+		#[cfg(feature = "keychain")]
+		if self.settings.keychain {
+			return Box::new(KeychainLocalSecret::new("co.app".to_owned(), self.identity.identity().to_owned()));
+		}
+
+		// fs
+		#[cfg(feature = "fs")]
+		if let Some(application_path) = &self.settings.application_path {
+			return Box::new(FileLocalSecret::new(application_path.parent().expect("etc folder").join("key.cbor")));
+		}
+
+		// memory
+		Box::new(MemoryLocalSecret::new())
 	}
 }
 
@@ -265,6 +279,7 @@ where
 		}
 
 		// watch
+		#[cfg(feature = "fs")]
 		if watcher {
 			let watch_reducer: CoReducer = co_reducer.clone();
 			let watch_locals = result.locals.clone();
