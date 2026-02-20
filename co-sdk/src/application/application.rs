@@ -451,7 +451,7 @@ impl ApplicationBuilder {
 		// sources
 		#[cfg(feature = "js")]
 		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(crate::JsCoDate));
-		#[cfg(not(feature = "js"))]
+		#[cfg(feature = "native")]
 		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(crate::SystemCoDate));
 		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
 

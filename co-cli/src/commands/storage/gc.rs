@@ -59,6 +59,7 @@ pub async fn command(context: &CliContext, cli: &Cli, _command: &Command) -> Res
 					&mut local_dispatcher,
 					local_co.reducer_state().await.co(),
 					&co_storage,
+					application.context().date().clone(),
 					None,
 					&mut filter,
 				)

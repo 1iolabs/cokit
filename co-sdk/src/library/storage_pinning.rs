@@ -91,8 +91,16 @@ where
 
 		// storage: references
 		let state = dispatcher.state().into();
-		storage_structure_recursive(&storage, &mut dispatcher, state, co_storage, max_duration, &mut structure_filter)
-			.await?;
+		storage_structure_recursive(
+			&storage,
+			&mut dispatcher,
+			state,
+			co_storage,
+			context.date.clone(),
+			max_duration,
+			&mut structure_filter,
+		)
+		.await?;
 
 		// storage: cleanup
 		let state = dispatcher.state().into();
