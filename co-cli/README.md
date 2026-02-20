@@ -6,7 +6,7 @@ To support native core ahead of time compilation LLVM is required:
 
 To install LLVM:
 ```sh
-brew install llvm@18
+brew install llvm@21
 ```
 
 To build co-cli with native compilation support:
