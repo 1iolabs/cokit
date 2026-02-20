@@ -1,13 +1,18 @@
 use crate::library::cli::{Cli, CoLogLevel};
 use clap::Parser;
+#[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
+#[cfg(feature = "fs")]
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default)]
 pub struct CoSettings {
 	pub identifier: String,
+	#[cfg(feature = "fs")]
 	pub path: Option<PathBuf>,
+	#[cfg(feature = "network")]
 	pub network_settings: NetworkSettings,
+	#[cfg(feature = "network")]
 	pub network: bool,
 	pub no_keychain: bool,
 	pub no_log: bool,
@@ -29,10 +34,12 @@ impl CoSettings {
 		cli.into()
 	}
 
+	#[cfg(feature = "fs")]
 	pub fn with_path(self, path: &str) -> Self {
 		Self { path: Some(path.into()), ..self }
 	}
 
+	#[cfg(feature = "network")]
 	pub fn with_network(self, network_settings: NetworkSettings) -> Self {
 		Self { network: true, network_settings, ..self }
 	}

@@ -26,10 +26,13 @@ impl CoContext {
 
 	pub(crate) fn spawn(settings: CoSettings) -> Self {
 		let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Task>();
+		#[cfg(not(feature = "web"))]
 		std::thread::Builder::new()
 			.name("co".to_owned())
 			.spawn(|| co_main(settings, rx))
 			.expect("co thread to start");
+		#[cfg(feature = "web")]
+		co_main(settings, rx);
 		Self { tasks: tx }
 	}
 
@@ -160,10 +163,14 @@ type Task = Box<TaskFn>;
 // type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
 
 async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Result<(), anyhow::Error> {
+	#[cfg(feature = "fs")]
 	let mut application_builder = match settings.path {
 		Some(path) => ApplicationBuilder::new_with_path(settings.identifier, path),
 		None => ApplicationBuilder::new(settings.identifier),
 	};
+	#[cfg(not(feature = "fs"))]
+	let mut application_builder = ApplicationBuilder::new_memory(settings.identifier);
+	#[cfg(feature = "fs")]
 	if !settings.no_log {
 		application_builder = application_builder.with_bunyan_logging(None);
 	}
@@ -178,9 +185,11 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 		application_builder = application_builder.with_setting("feature", feature.to_owned());
 	}
 	application_builder = application_builder.with_setting("feature", "co-open-keep");
+	#[allow(unused_mut)]
 	let mut application = application_builder.build().await?;
 
 	// network
+	#[cfg(feature = "network")]
 	if settings.network {
 		application.create_network(settings.network_settings).await?;
 	}
@@ -195,9 +204,13 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 }
 
 fn co_main(settings: CoSettings, tasks: UnboundedReceiver<Task>) {
+	#[cfg(feature = "web")]
+	tokio::task::spawn_local(async move { co_app(settings, tasks).await.expect("app to run") });
+
+	#[cfg(not(feature = "web"))]
 	tokio::runtime::Builder::new_multi_thread()
 		.enable_all()
 		.build()
 		.unwrap()
-		.block_on(async move { co_app(settings, tasks).await.expect("app to run") })
+		.block_on(async move { co_app(settings, tasks).await.expect("app to run") });
 }

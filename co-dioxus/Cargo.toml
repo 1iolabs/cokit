@@ -26,3 +26,14 @@ tokio = { workspace = true }
 tokio-util = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
+
+[features]
+# targets
+"desktop" = ["fs", "network", "co-sdk/recommended"]
+"mobile" = ["fs", "network", "co-sdk/recommended", "co-sdk/apple-sandbox"]
+"web" = ["js", "co-sdk/web"]
+
+# features
+"fs" = ["co-sdk/fs"]
+"network" = ["co-sdk/network"]
+"js" = ["co-sdk/js", "uuid/js"]

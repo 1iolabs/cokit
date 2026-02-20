@@ -1,6 +1,8 @@
 use crate::CoSettings;
 use clap::ValueEnum;
+#[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
+#[cfg(feature = "fs")]
 use std::path::PathBuf;
 
 /// Run COs via an HTTP Daemon.
@@ -21,6 +23,7 @@ pub struct Cli {
 	///
 	/// Default: `~/Application Support/co.app.1io.co`
 	/// Env: CO_BASE_PATH
+	#[cfg(feature = "fs")]
 	#[arg(long, env = "CO_BASE_PATH")]
 	pub base_path: Option<PathBuf>,
 
@@ -41,10 +44,12 @@ pub struct Cli {
 
 	/// Skip networking.
 	/// Env: CO_NO_NETWORK
+	#[cfg(feature = "network")]
 	#[arg(long, default_value_t = false, env = "CO_NO_NETWORK", value_parser = parse_bool)]
 	pub no_network: bool,
 
 	/// Force to generate new network peer id on startup.
+	#[cfg(feature = "network")]
 	#[arg(long, default_value_t = false)]
 	pub force_new_peer_id: bool,
 
@@ -60,9 +65,12 @@ impl From<Cli> for CoSettings {
 	fn from(cli: Cli) -> Self {
 		CoSettings {
 			identifier: cli.instance_id.unwrap_or_else(|| String::from("dioxus")),
+			#[cfg(feature = "network")]
 			network: !cli.no_network,
+			#[cfg(feature = "network")]
 			network_settings: NetworkSettings::default().with_force_new_peer_id(cli.force_new_peer_id),
 			no_keychain: cli.no_keychain,
+			#[cfg(feature = "fs")]
 			path: cli.base_path,
 			no_log: cli.no_log,
 			log_level: cli.log_level,
