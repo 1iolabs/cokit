@@ -1,6 +1,6 @@
 use crate::EntryError;
 use co_identity::IdentityResolverError;
-use co_storage::StorageError;
+use co_primitives::StorageError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum LogError {

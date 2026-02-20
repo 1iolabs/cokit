@@ -5,7 +5,8 @@ use crate::{
 };
 use anyhow::Context;
 use cid::Cid;
-use co_storage::{BlockStorage, Storage};
+use co_primitives::BlockStorage;
+use co_storage::Storage;
 use futures::{stream, Stream, StreamExt, TryStreamExt};
 use std::collections::{BTreeSet, HashSet};
 
