@@ -33,6 +33,7 @@ form_urlencoded = "1.2.1"
 
 [features]
 "default" = []
+"web" = ["uuid/js"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }
