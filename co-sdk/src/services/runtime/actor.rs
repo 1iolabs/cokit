@@ -20,8 +20,7 @@ impl RuntimeHandle {
 		core: &Core,
 		context: RuntimeContext,
 	) -> Result<RuntimeContext, ExecuteError> {
-		Ok(self
-			.handle
+		self.handle
 			.request(|response| {
 				RuntimeMessage::ExecuteState(
 					ExecuteStateAction {
@@ -34,7 +33,7 @@ impl RuntimeHandle {
 				)
 			})
 			.await
-			.map_err(|err| ExecuteError::Other(err.into()))??)
+			.map_err(|err| ExecuteError::Other(err.into()))?
 	}
 
 	pub async fn execute_guard(
@@ -44,8 +43,7 @@ impl RuntimeHandle {
 		guard: &GuardReference,
 		context: RuntimeContext,
 	) -> Result<bool, ExecuteError> {
-		Ok(self
-			.handle
+		self.handle
 			.request(|response| {
 				RuntimeMessage::ExecuteGuard(
 					ExecuteGuardAction {
@@ -58,7 +56,7 @@ impl RuntimeHandle {
 				)
 			})
 			.await
-			.map_err(|err| ExecuteError::Other(err.into()))??)
+			.map_err(|err| ExecuteError::Other(err.into()))?
 	}
 }
 

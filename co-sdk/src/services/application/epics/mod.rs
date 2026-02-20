@@ -90,6 +90,5 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(network_start::network_start);
 
 	// trace
-	let epic = epic.join(TracingEpic::new(tags));
-	epic
+	epic.join(TracingEpic::new(tags))
 }
