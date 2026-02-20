@@ -1,5 +1,6 @@
 pub mod change;
 pub mod encrypted;
+#[cfg(feature = "fs")]
 pub mod fs;
 pub mod join;
 pub mod links;

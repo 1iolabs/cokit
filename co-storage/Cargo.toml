@@ -17,18 +17,18 @@ co-primitives = { workspace = true }
 derive_more = { workspace = true }
 either = { workspace = true }
 futures = { workspace = true }
+getrandom = { version = "0.2", optional = true, default-features = false }
 ipld-core = { workspace = true }
 ipld-dagpb = { workspace = true }
 multihash = { workspace = true }
 multihash-codetable = { workspace = true }
-names = "0.14.0"
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
 serde_ipld_dagjson = { workspace = true }
 serde_repr = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["macros", "fs", "rt", "io-util"] }
+tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true, features = ["compat"] }
 tracing = { workspace = true }
@@ -43,3 +43,5 @@ co-test = { workspace = true }
 [features]
 default = []
 logging-verbose = []
+"fs" = ["tokio/fs"]
+"web" = ["uuid/js", "getrandom/js"]
