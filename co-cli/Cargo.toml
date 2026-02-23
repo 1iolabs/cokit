@@ -26,7 +26,7 @@ co-log = { workspace = true }
 co-messaging = { workspace = true }
 co-primitives = { workspace = true }
 co-runtime = { workspace = true }
-co-sdk = { workspace = true }
+co-sdk = { workspace = true, features = ["native"] }
 co-storage = { workspace = true }
 colored = "2.1.0"
 exitcode = "1.1.2"

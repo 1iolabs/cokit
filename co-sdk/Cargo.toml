@@ -86,7 +86,7 @@ co-test = { workspace = true }
 "default" = ["recommended", "co-runtime/llvm"]
 
 # Meta: Recommended platform neutral features
-"recommended" = ["pinning", "native", "network", "bunyan"]
+"recommended" = ["pinning", "native", "network"]
 
 # Meta: Enable to run in a apple sandbox.
 "apple-sandbox" = ["co-runtime/apple-sandbox"]
@@ -123,7 +123,7 @@ co-test = { workspace = true }
 "tracing" = ["dep:tracing-subscriber"]
 
 # Native Target
-"native" = ["co-runtime/native", "co-actor/native", "co-storage/native", "fs", "tokio/full", "tracing"]
+"native" = ["co-runtime/native", "co-actor/native", "co-storage/native", "fs", "tokio/full", "tracing", "bunyan", "keychain"]
 
 # Web Target (WASM)
 "web" = ["js", "co-identity/web", "co-storage/web", "co-runtime/web"]

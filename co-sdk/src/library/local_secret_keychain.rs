@@ -1,8 +1,7 @@
-use super::{fs_read::fs_read_option, fs_write::fs_write};
+use crate::library::local_secret::LocalSecret;
 use async_trait::async_trait;
 use co_primitives::Secret;
 use co_storage::Algorithm;
-use std::{io::ErrorKind, path::PathBuf};
 
 pub struct KeychainLocalSecret {
 	service: String,
