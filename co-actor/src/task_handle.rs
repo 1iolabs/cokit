@@ -8,6 +8,8 @@ use std::{
 	pin::Pin,
 	task::{Context, Poll},
 };
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 #[derive(Debug, thiserror::Error)]
 pub enum TaskError {

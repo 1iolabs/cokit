@@ -48,7 +48,7 @@ llvm = ["wasmer/llvm", "dep:wasmer-compiler", "dep:wasmer-compiler-llvm"]
 cranelift = ["wasmer/cranelift", "dep:wasmer-compiler", "dep:wasmer-compiler-cranelift"]
 wasmi = ["wasmer/wasmi"]
 wamr = ["wasmer/wamr"]
-js = ["wasmer/js-default"]
+js = ["wasmer/js-default", "wasmer/js-serializable-module"]
 
 # meta
 apple-sandbox = ["wasmi"]

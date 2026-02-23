@@ -1,6 +1,9 @@
-use crate::co_v1::{
-	diagnostic_cid_write, event_cid_read, payload_read, state_cid_read, state_cid_write, storage_block_get,
-	storage_block_set, CoV1Api,
+use crate::{
+	co_v1::{
+		diagnostic_cid_write, event_cid_read, payload_read, state_cid_read, state_cid_write, storage_block_get,
+		storage_block_set, CoV1Api,
+	},
+	RuntimeContext,
 };
 use std::fmt::Debug;
 use wasmer::{
@@ -10,8 +13,7 @@ use wasmer_types::Features;
 
 pub struct WasmerRuntime {
 	store: Store,
-	instance: Instance,
-	env: FunctionEnv<WasmerEnv>,
+	module: Module,
 	kind: WasmerRuntimeKind,
 }
 impl Debug for WasmerRuntime {
@@ -19,7 +21,7 @@ impl Debug for WasmerRuntime {
 		f.debug_struct("WasmerRuntime")
 			// .field("store", &self.store)
 			// .field("instance", &self.instance)
-			.field("api", &self.env.as_ref(&self.store).api)
+			// .field("api", &self.api)
 			.field("kind", &self.kind)
 			.finish()
 	}
@@ -48,19 +50,10 @@ pub enum WasmerError {
 
 impl WasmerRuntime {
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(bytes), fields(bytes.len = bytes.len()))]
-	pub fn new(api: CoV1Api, native: bool, bytes: &[u8]) -> Result<Self, WasmerError> {
+	pub fn new(native: bool, bytes: &[u8]) -> Result<Self, WasmerError> {
 		// module
-		let (kind, mut store, module) =
+		let (kind, store, module) =
 			if native { WasmerRuntimeBuilder::native(bytes) } else { WasmerRuntimeBuilder::wasm(bytes) }.build()?;
-
-		// env
-		let env = FunctionEnv::new(&mut store, WasmerEnv { memory: None, api });
-
-		// instance
-		let import_object = Self::imports(&mut store, &env);
-		let instance: Instance = Instance::new(&mut store, &module, &import_object)?;
-		let memory = instance.exports.get_memory("memory")?.clone();
-		env.as_mut(&mut store).memory = Some(memory);
 
 		// TODO: adjust check to support state or guard only binaries
 		// // check
@@ -68,19 +61,30 @@ impl WasmerRuntime {
 		// instance.exports.get_function("guard")?;
 
 		// result
-		Ok(Self { kind, store, instance, env })
+		Ok(Self { kind, store, module })
+	}
+
+	fn instance(&mut self, api: CoV1Api) -> Result<(Instance, FunctionEnv<WasmerEnv>), WasmerError> {
+		let env = FunctionEnv::new(&mut self.store, WasmerEnv { memory: None, api });
+		let import_object = Self::imports(&mut self.store, &env);
+		let instance: Instance = Instance::new(&mut self.store, &self.module, &import_object)?;
+		let memory = instance.exports.get_memory("memory")?.clone();
+		env.as_mut(&mut self.store).memory = Some(memory);
+		Ok((instance, env))
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret)]
-	pub fn execute_state(&mut self) -> Result<(), WasmerError> {
-		let state = self.instance.exports.get_function("state")?;
+	pub fn execute_state(&mut self, api: CoV1Api) -> Result<RuntimeContext, WasmerError> {
+		let (instance, env) = self.instance(api)?;
+		let state = instance.exports.get_function("state")?;
 		state.call(&mut self.store, &[])?;
-		Ok(())
+		Ok(env.as_ref(&self.store).api.context().clone())
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret)]
-	pub fn execute_guard(&mut self) -> Result<bool, WasmerError> {
-		let state = self.instance.exports.get_function("guard")?;
+	pub fn execute_guard(&mut self, api: CoV1Api) -> Result<bool, WasmerError> {
+		let (instance, _) = self.instance(api)?;
+		let state = instance.exports.get_function("guard")?;
 		let results = state.call(&mut self.store, &[])?;
 		if results.len() != 1 {
 			return Err(wasmer::ExportError::IncompatibleType.into());
@@ -91,16 +95,6 @@ impl WasmerRuntime {
 			.i32()
 			.ok_or(wasmer::ExportError::IncompatibleType)?;
 		Ok(result == 1)
-	}
-
-	/// API Access.
-	pub fn api(&self) -> &CoV1Api {
-		&self.env.as_ref(&self.store).api
-	}
-
-	/// Mutable API accress.
-	pub fn api_mut(&mut self) -> &mut CoV1Api {
-		&mut self.env.as_mut(&mut self.store).api
 	}
 
 	fn imports(store: &mut impl AsStoreMut, env: &FunctionEnv<WasmerEnv>) -> wasmer::Imports {

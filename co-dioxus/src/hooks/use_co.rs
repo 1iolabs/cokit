@@ -10,6 +10,8 @@ use dioxus::prelude::*;
 use futures::{future::Either, io::Cursor, pin_mut, StreamExt};
 use serde::Serialize;
 use std::{fmt::Debug, future::Future, sync::Arc};
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 pub fn use_co(co: ReadSignal<CoId>) -> Co {
 	// TODO: port storage
@@ -34,7 +36,7 @@ pub fn use_co(co: ReadSignal<CoId>) -> Co {
 				let reducer_states = reducer.reducer_state_stream();
 				pin_mut!(reducer_states);
 				loop {
-					tokio::select! {
+					::tokio::select! {
 						Some(next_state) = reducer_states.next() => {
 							reducer_state.set(Some(Ok(next_state)));
 							tx.send(reducer_state.cloned()).ok();

@@ -4,6 +4,8 @@ use co_sdk::{Application, ApplicationBuilder};
 use dioxus::signals::WritableExt;
 use futures::{future::BoxFuture, Future};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 #[derive(Debug, Clone)]
 pub struct CoContext {
@@ -11,17 +13,28 @@ pub struct CoContext {
 }
 impl CoContext {
 	pub fn new(settings: CoSettings) -> Self {
-		let context = Self::spawn(settings);
+		Self::spawn(settings)
+	}
 
-		// block until startup is complete
+	/// Wait until the context is ready.
+	pub async fn ready(&self) -> Result<(), anyhow::Error> {
 		let (tx, rx) = tokio::sync::oneshot::channel();
-		context.execute(|_app| {
-			tx.send(()).unwrap();
+		self.execute(|_app| {
+			tx.send(()).ok();
 		});
-		rx.blocking_recv().unwrap();
+		rx.await?;
+		Ok(())
+	}
 
-		// result
-		context
+	/// Wait until the context is ready by blocking.
+	#[cfg(not(feature = "web"))]
+	pub async fn ready_blocking(&self) -> Result<(), anyhow::Error> {
+		let (tx, rx) = tokio::sync::oneshot::channel();
+		self.execute(|_app| {
+			tx.send(()).ok();
+		});
+		rx.blocking_recv()?;
+		Ok(())
 	}
 
 	pub(crate) fn spawn(settings: CoSettings) -> Self {

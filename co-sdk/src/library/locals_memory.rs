@@ -2,6 +2,8 @@ use crate::library::locals::{ApplicationLocal, Locals};
 use async_trait::async_trait;
 use futures::{stream, Stream};
 use std::fmt::Debug;
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 #[derive(Debug, Clone)]
 pub struct MemoryLocals {

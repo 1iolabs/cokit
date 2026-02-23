@@ -3,6 +3,8 @@ use cid::Cid;
 use co_sdk::{Application, CoId, CoReducer, CoStorage, OptionLink};
 use dioxus::prelude::*;
 use futures::{pin_mut, Future, StreamExt};
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 /// Select state from an CO.
 pub fn use_co_selector<T, F, Fut, D>(co: &str, dependency: D, selector: F) -> Signal<CoStateResult<T>, SyncStorage>
@@ -74,7 +76,7 @@ async fn fetch_and_observe_state<T, F, Fut, D>(
 				pin_mut!(stream);
 				tracing::trace!(co = ?co_id, "watch");
 				loop {
-					tokio::select! {
+					::tokio::select! {
 						item = stream.next() => {
 							match item {
 								Some(next) => {

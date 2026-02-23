@@ -2,6 +2,8 @@ use crate::{actor::ActorMessage, ActorError, ActorHandle, ActorState, LocalTaskH
 use co_primitives::Tags;
 use std::{any::type_name, sync::Arc};
 use tokio::sync::{mpsc, watch};
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 use tracing::Instrument;
 
 /// A LocalActor will not moved between threads.

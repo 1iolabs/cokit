@@ -23,6 +23,8 @@ use std::{
 	mem::swap,
 };
 use tokio::sync::watch;
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 pub struct ReducerBuilder<S, R> {
 	_storage: PhantomData<S>,

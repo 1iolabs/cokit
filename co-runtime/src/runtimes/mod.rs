@@ -75,11 +75,10 @@ impl Runtime for Wasmer {
 	/// Execute runtime with api and return new state `Cid`.
 	fn execute_state(&mut self, api: CoV1Api) -> Result<RuntimeContext, RuntimeError> {
 		// initialize
-		let runtime: &mut WasmerRuntime = wasmer_runtime_with_api(&mut self.state, api)?;
+		let runtime: &mut WasmerRuntime = wasmer_runtime(&mut self.state)?;
 
 		// execute
-		runtime.execute_state()?;
-		let result = runtime.api().context().clone();
+		let result = runtime.execute_state(api)?;
 
 		// result
 		Ok(result)
@@ -87,21 +86,22 @@ impl Runtime for Wasmer {
 
 	fn execute_guard(&mut self, api: CoV1Api) -> Result<bool, RuntimeError> {
 		// initialize
-		let runtime: &mut WasmerRuntime = wasmer_runtime_with_api(&mut self.state, api)?;
+		let runtime: &mut WasmerRuntime = wasmer_runtime(&mut self.state)?;
 
 		// execute
-		let result = runtime.execute_guard()?;
+		let result = runtime.execute_guard(api)?;
 
 		// result
 		Ok(result)
 	}
 }
 
-fn wasmer_runtime_with_api(state: &mut RuntimeState, mut api: CoV1Api) -> Result<&mut WasmerRuntime, RuntimeError> {
+fn wasmer_runtime(state: &mut RuntimeState) -> Result<&mut WasmerRuntime, RuntimeError> {
 	// initialize
 	let runtime: &mut WasmerRuntime = match state {
 		RuntimeState::Unintialized(native, bytes) => {
-			*state = RuntimeState::Intialized(Box::new(wasmer::WasmerRuntime::new(api, *native, bytes)?));
+			tracing::trace!("deferred-runtime-new");
+			*state = RuntimeState::Intialized(Box::new(wasmer::WasmerRuntime::new(*native, bytes)?));
 			if let RuntimeState::Intialized(runtime) = state {
 				runtime
 			} else {
@@ -109,7 +109,7 @@ fn wasmer_runtime_with_api(state: &mut RuntimeState, mut api: CoV1Api) -> Result
 			}
 		},
 		RuntimeState::Intialized(runtime) => {
-			runtime.api_mut().swap(&mut api);
+			tracing::trace!("deferred-runtime-intialized");
 			runtime
 		},
 	};

@@ -270,17 +270,26 @@ async fn execute_with_api<T: 'static, I: 'static>(
 ) -> Result<(T, I), ExecuteError> {
 	// api
 	let mut api_storage = DeferredStorage::default();
+	api_storage.warm(storage, &Default::default(), &context).await?;
 
 	// execute
 	loop {
 		let api = create_cov1_api(api_storage.clone(), context.clone(), checked);
 		match execute(&mut instance, api) {
-			Ok(result) => return Ok((result, instance)),
-			Err(_err) => {
+			Ok(result) => {
 				if api_storage.process(storage, false).await? {
+					tracing::trace!("deferred-execute-retry");
+					continue;
+				}
+				return Ok((result, instance));
+			},
+			Err(err) => {
+				if api_storage.process(storage, false).await? {
+					tracing::trace!(?err, "deferred-execute-retry");
 					continue;
 				} else {
-					return Err(_err);
+					tracing::trace!(?err, "deferred-execute-error");
+					return Err(err);
 				}
 			},
 		}

@@ -10,6 +10,8 @@ use std::{
 	task::{Context, Poll},
 };
 use tokio::sync::{mpsc, oneshot};
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 /// Response.
 ///

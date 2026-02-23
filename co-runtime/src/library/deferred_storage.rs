@@ -1,9 +1,10 @@
+use crate::RuntimeContext;
 use anyhow::anyhow;
 use cid::Cid;
-use co_primitives::{AnyBlockStorage, Block, DefaultParams, StorageError};
+use co_primitives::{AnyBlockStorage, Block, BlockLinks, DefaultParams, StorageError};
 use co_storage::Storage;
 use std::{
-	collections::HashMap,
+	collections::{HashMap, VecDeque},
 	sync::{Arc, Mutex},
 };
 
@@ -25,6 +26,7 @@ impl DeferredStorage {
 				DeferredOps::Get(cid) => {
 					let block = storage.get(&cid).await?;
 					context.blocks.insert(*block.cid(), block);
+					retry = true;
 				},
 				DeferredOps::Set(cid) => {
 					if flush_set {
@@ -39,9 +41,48 @@ impl DeferredStorage {
 					storage.remove(&cid).await?;
 				},
 			}
-			retry = true;
 		}
 		Ok(retry)
+	}
+
+	/// Warm the storage cache so we dont need to retry immediately.
+	pub async fn warm(
+		&mut self,
+		storage: &impl AnyBlockStorage,
+		links: &BlockLinks,
+		runtime_context: &RuntimeContext,
+	) -> Result<(), anyhow::Error> {
+		// stack
+		let mut stack = VecDeque::with_capacity(10);
+		if let Some(cid) = runtime_context.state {
+			stack.push_back((cid, 0));
+		}
+		stack.push_back((runtime_context.event, 1));
+
+		// process
+		let mut blocks = Vec::new();
+		while let Some((cid, depth)) = stack.pop_front() {
+			let block = storage.get(&cid).await?;
+
+			// links
+			if depth > 0 && links.has_links(block.cid()) {
+				for link in links.links(&block)? {
+					stack.push_back((link, depth - 1));
+				}
+			}
+
+			// add
+			blocks.push(block);
+		}
+
+		// store
+		let mut context = self.context.lock().unwrap();
+		for block in blocks {
+			context.blocks.insert(*block.cid(), block);
+		}
+
+		// result
+		Ok(())
 	}
 }
 impl Storage for DeferredStorage {
@@ -52,6 +93,7 @@ impl Storage for DeferredStorage {
 		match context.blocks.get(cid).cloned() {
 			Some(block) => Ok(block),
 			None => {
+				tracing::trace!(?cid, "deferred-block-pending");
 				context.ops.push(DeferredOps::Get(*cid));
 				Err(StorageError::Internal(anyhow!("Block pending")))
 			},
@@ -88,4 +130,3 @@ struct DeferredStorageContext {
 	blocks: HashMap<Cid, Block>,
 	ops: Vec<DeferredOps>,
 }
-impl DeferredStorageContext {}

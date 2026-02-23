@@ -8,6 +8,8 @@ use co_primitives::Tags;
 use futures::{Stream, StreamExt};
 use std::{any::type_name, future::ready, ops::Deref, sync::Arc};
 use tokio::sync::{mpsc, watch};
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 use tracing::{Instrument, Span};
 
 #[derive(Debug, thiserror::Error)]

@@ -12,6 +12,8 @@ use dioxus::{
 };
 use futures::Future;
 use tokio::sync::{mpsc, oneshot};
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 pub fn use_co_storage(co: &String) -> CoBlockStorage {
 	let mut co_id = use_reactive(co, CoId::from);
