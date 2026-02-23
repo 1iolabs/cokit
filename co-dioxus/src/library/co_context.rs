@@ -163,9 +163,6 @@ type Task = Box<TaskFn>;
 // type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
 
 async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Result<(), anyhow::Error> {
-	#[cfg(feature = "web")]
-	web_sys::console::log_1(&"cokit starting...".into());
-
 	#[cfg(feature = "fs")]
 	let mut application_builder = match settings.path {
 		Some(path) => ApplicationBuilder::new_with_path(settings.identifier, path),
@@ -200,18 +197,10 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 		application.create_network(settings.network_settings).await?;
 	}
 
-	// log
-	#[cfg(feature = "web")]
-	web_sys::console::log_1(&"cokit running...".into());
-
 	// execute
 	while let Some(task) = tasks.recv().await {
 		task(application.clone()).await;
 	}
-
-	// log
-	#[cfg(feature = "web")]
-	web_sys::console::log_1(&"cokit stopping...".into());
 
 	// result
 	Ok(())
@@ -219,13 +208,9 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 
 fn co_main(settings: CoSettings, tasks: UnboundedReceiver<Task>) {
 	#[cfg(feature = "web")]
-	{
-		wasm_bindgen_futures::spawn_local(async move {
-			let runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
-			let _guard = runtime.enter();
-			co_app(settings, tasks).await.expect("app to run");
-		});
-	}
+	wasm_bindgen_futures::spawn_local(async move {
+		co_app(settings, tasks).await.expect("app to run");
+	});
 
 	#[cfg(not(feature = "web"))]
 	tokio::runtime::Builder::new_multi_thread()
