@@ -1,4 +1,6 @@
-use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo, tracing::TracingBuilder};
+#[cfg(feature = "tracing")]
+use super::tracing::TracingBuilder;
+use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
 use crate::{
 	library::wait_response::request_response, services::application::ApplicationMessage, Action, CoReducer,
 	CoReducerFactory, CoStorage, CoUuid, Cores, DynamicCoUuid, RandomCoUuid, Storage,
@@ -311,6 +313,7 @@ pub struct ApplicationBuilder {
 	#[cfg(feature = "fs")]
 	path: Option<PathBuf>,
 	keychain: bool,
+	#[cfg(feature = "tracing")]
 	tracing: TracingBuilder,
 	settings: Tags,
 	date: Option<DynamicCoDate>,
@@ -351,12 +354,14 @@ impl ApplicationBuilder {
 	/// Create new memory only instance.
 	pub fn new_memory(identifier: impl Into<String>) -> Self {
 		let identifier = identifier.into();
+		#[cfg(feature = "tracing")]
 		let tracing = TracingBuilder::new(identifier.clone(), None);
 		Self {
 			identifier,
 			#[cfg(feature = "fs")]
 			path: None,
 			keychain: false,
+			#[cfg(feature = "tracing")]
 			tracing,
 			settings: Default::default(),
 			date: None,
@@ -377,10 +382,12 @@ impl ApplicationBuilder {
 		Self { tracing: self.tracing.with_bunyan_logging(log_path), ..self }
 	}
 
+	#[cfg(feature = "tracing")]
 	pub fn with_log_max_level(self, max_level: tracing::Level) -> Self {
 		Self { tracing: self.tracing.with_max_level(max_level), ..self }
 	}
 
+	#[cfg(feature = "tracing")]
 	pub fn with_optional_tracing(self) -> Self {
 		Self { tracing: self.tracing.with_optional_tracing(), ..self }
 	}
@@ -446,6 +453,7 @@ impl ApplicationBuilder {
 		let tasks = TaskTracker::new();
 
 		// log
+		#[cfg(feature = "tracing")]
 		self.tracing.init()?;
 
 		// sources

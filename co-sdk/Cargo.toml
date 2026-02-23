@@ -54,13 +54,13 @@ serde_repr = { workspace = true }
 sha2 = "0.10.8"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros", "sync", "io-util"] }
-tokio-stream = { workspace = true, features = ["sync"] }
+tokio-stream = { workspace = true, default-features = false, features = ["sync"] }
 tokio-util = { workspace = true, features = ["rt"] }
 toml = { workspace = true }
 tracing = { workspace = true }
 tracing-bunyan-formatter = { workspace = true, optional = true }
 tracing-log = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tracing-subscriber = { workspace = true, optional = true, features = ["env-filter"] }
 uuid = { workspace = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
 zstd = { workspace = true, optional = true }
@@ -117,8 +117,11 @@ co-test = { workspace = true }
 # Enable bunyan formatter
 "bunyan" = ["dep:tracing-bunyan-formatter"]
 
+# Enable tracing
+"tracing" = ["dep:tracing-subscriber"]
+
 # Native Target
-"native" = ["co-runtime/native", "fs", "tokio/full"]
+"native" = ["co-runtime/native", "fs", "tokio/full", "tracing"]
 
 # Web Target (WASM)
 "web" = ["js", "co-identity/web", "co-storage/web", "co-runtime/web"]

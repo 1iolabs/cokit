@@ -1,4 +1,6 @@
 use super::identity::create_identity_resolver;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::library::wait_response::request_response_timeout;
 #[cfg(feature = "network")]
 use crate::services::application::KeyRequestAction;
 use crate::{
@@ -6,7 +8,6 @@ use crate::{
 	library::{
 		builtin_cores::builtin_cores, core_source::CoreSource, find_co_secret::find_co_secret_by_reference,
 		is_membership_heads_encrypted::is_membership_heads_encrypted, membership_all_heads::membership_all_heads,
-		wait_response::request_response_timeout,
 	},
 	reducer::{
 		change::membership_writer::MembershipWriter,

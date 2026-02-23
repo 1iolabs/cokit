@@ -22,7 +22,7 @@ serde_repr = { workspace = true }
 target-lexicon = "0.12"
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "sync"] }
-tokio-stream = { workspace = true, optional = true }
+tokio-stream = { workspace = true, default-features = false, optional = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 wasmer = { version = "7.0.1", default-features = false }

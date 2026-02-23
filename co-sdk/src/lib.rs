@@ -12,6 +12,8 @@ pub use crate::library::{
 	storage_snapshots::storage_snapshots,
 	storage_structure::{storage_structure_recursive, CoStructureResolver, StructureResolveResult, StructureResolver},
 };
+#[cfg(feature = "tracing")]
+pub use application::tracing::TracingBuilder;
 pub use application::{
 	application::{Application, ApplicationBuilder},
 	co_context::CoContext,
@@ -20,7 +22,6 @@ pub use application::{
 	runtime::Runtime,
 	shared::CreateCo,
 	storage::Storage,
-	tracing::TracingBuilder,
 };
 pub use co_actor::TaskSpawner;
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};

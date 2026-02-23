@@ -13,7 +13,7 @@ derive_more = { workspace = true }
 futures = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
-tokio-stream = { workspace = true, features = ["sync"] }
+tokio-stream = { workspace = true, default-features = false, features = ["sync"] }
 tokio-util = { workspace = true, features = ["rt"] }
 tracing = { workspace = true }
 

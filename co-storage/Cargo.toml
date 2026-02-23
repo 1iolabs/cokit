@@ -29,7 +29,7 @@ serde_ipld_dagjson = { workspace = true }
 serde_repr = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
-tokio-stream = { workspace = true }
+tokio-stream = { workspace = true, default-features = false }
 tokio-util = { workspace = true, features = ["compat"] }
 tracing = { workspace = true }
 uuid = { workspace = true }

@@ -16,6 +16,7 @@ where
 	stream.next().await.ok_or(anyhow::anyhow!("No response"))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn wait_response_timeout<F, T>(
 	handle: ActorHandle<ApplicationMessage>,
 	timeout: Duration,
@@ -40,6 +41,7 @@ where
 	response_fut.await
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn request_response_timeout<F, T>(
 	handle: ActorHandle<ApplicationMessage>,
 	timeout: Duration,

@@ -27,14 +27,16 @@ tokio-util = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
+web-sys = { version = "0.3", optional = true }
 
 [features]
 # targets
-"desktop" = ["fs", "network", "co-sdk/default", "co-sdk/apple-sandbox"]
-"mobile" = ["fs", "network", "co-sdk/recommended", "co-sdk/apple-sandbox"]
+"desktop" = ["fs", "network", "tracing", "co-sdk/default", "co-sdk/apple-sandbox"]
+"mobile" = ["fs", "network", "tracing", "co-sdk/recommended", "co-sdk/apple-sandbox"]
 "web" = ["js", "co-sdk/web"]
 
 # features
 "fs" = ["co-sdk/fs"]
 "network" = ["co-sdk/network"]
-"js" = ["co-sdk/js", "uuid/js", "dep:wasm-bindgen-futures"]
+"js" = ["co-sdk/js", "uuid/js", "dep:wasm-bindgen-futures", "dep:web-sys"]
+"tracing" = ["co-sdk/tracing"]
