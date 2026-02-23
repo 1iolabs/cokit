@@ -100,7 +100,6 @@ fn wasmer_runtime(state: &mut RuntimeState) -> Result<&mut WasmerRuntime, Runtim
 	// initialize
 	let runtime: &mut WasmerRuntime = match state {
 		RuntimeState::Unintialized(native, bytes) => {
-			tracing::trace!("deferred-runtime-new");
 			*state = RuntimeState::Intialized(Box::new(wasmer::WasmerRuntime::new(*native, bytes)?));
 			if let RuntimeState::Intialized(runtime) = state {
 				runtime
@@ -108,10 +107,7 @@ fn wasmer_runtime(state: &mut RuntimeState) -> Result<&mut WasmerRuntime, Runtim
 				return Err(RuntimeError::InvalidState(anyhow!("Uninitialized after initialize")));
 			}
 		},
-		RuntimeState::Intialized(runtime) => {
-			tracing::trace!("deferred-runtime-intialized");
-			runtime
-		},
+		RuntimeState::Intialized(runtime) => runtime,
 	};
 	Ok(runtime)
 }

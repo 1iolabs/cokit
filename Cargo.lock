@@ -11966,6 +11966,7 @@ dependencies = [
 [[package]]
 name = "wasmer"
 version = "7.0.1"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=main#5dde6b5c764c74f8023b5b2bac71a5e2da37c5a3"
 dependencies = [
  "bindgen",
  "bytes",
@@ -12003,6 +12004,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler"
 version = "7.0.1"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=main#5dde6b5c764c74f8023b5b2bac71a5e2da37c5a3"
 dependencies = [
  "backtrace",
  "bytes",
@@ -12037,6 +12039,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler-cranelift"
 version = "7.0.1"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=main#5dde6b5c764c74f8023b5b2bac71a5e2da37c5a3"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -12057,6 +12060,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler-llvm"
 version = "7.0.1"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=main#5dde6b5c764c74f8023b5b2bac71a5e2da37c5a3"
 dependencies = [
  "byteorder",
  "cc",
@@ -12082,6 +12086,7 @@ dependencies = [
 [[package]]
 name = "wasmer-derive"
 version = "7.0.1"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=main#5dde6b5c764c74f8023b5b2bac71a5e2da37c5a3"
 dependencies = [
  "proc-macro-error2",
  "proc-macro2",
@@ -12092,6 +12097,7 @@ dependencies = [
 [[package]]
 name = "wasmer-types"
 version = "7.0.1"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=main#5dde6b5c764c74f8023b5b2bac71a5e2da37c5a3"
 dependencies = [
  "bytecheck",
  "enum-iterator",
@@ -12109,6 +12115,7 @@ dependencies = [
 [[package]]
 name = "wasmer-vm"
 version = "7.0.1"
+source = "git+https://github.com/wasmerio/wasmer.git?branch=main#5dde6b5c764c74f8023b5b2bac71a5e2da37c5a3"
 dependencies = [
  "backtrace",
  "bytesize",
