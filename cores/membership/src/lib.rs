@@ -1,21 +1,20 @@
 use cid::Cid;
 use co_api::{
-	sync_api::{Context, Reducer, StorageExt},
-	CoId, CoReference, Did, Link, ReducerAction, Tags, WeakCid,
+	async_api::Reducer, co, BlockStorageExt, CoId, CoReference, CoreBlockStorage, Did, Link, OptionLink, ReducerAction,
+	StorageError, Tags, WeakCid,
 };
-use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
+use futures::TryStreamExt;
 use std::collections::BTreeSet;
 
 /// Membership COre.
 /// Stores membership information of an CO (counterpart to co participants).
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[co(state)]
 pub struct Memberships {
 	pub memberships: Vec<Membership>,
 }
 
 /// Membership entry.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
 pub struct Membership {
 	/// The CO Unique Identifier.
 	pub id: CoId,
@@ -38,7 +37,7 @@ pub struct Membership {
 
 /// A CO State entry.
 /// Contains heads the computed state for the heads and an option encryption mapping.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[co]
 pub struct CoState {
 	/// The CO root state (usually co-core-co) and heads.
 	/// Note: This is not an Option so we can not be member of an emtpy CO (which has no id anyway).
@@ -57,7 +56,7 @@ pub struct CoState {
 ///
 /// # Guarantees
 /// - Sortable from active (low) to inactive (high).
-#[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq, Eq, PartialOrd, Ord)]
+#[co(repr)]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum MembershipState {
@@ -90,7 +89,7 @@ pub enum MembershipState {
 	Inactive = 40,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
 pub enum MembershipsAction {
 	/// Join a Co. The membership state indicates if it was an invite from someone.
 	Join(Membership),
@@ -127,12 +126,15 @@ pub enum MembershipsAction {
 	},
 }
 
-impl Reducer for Memberships {
-	type Action = MembershipsAction;
-
-	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
-		let mut result = self;
-		match &event.payload {
+impl Reducer<MembershipsAction> for Memberships {
+	async fn reduce(
+		state_ref: OptionLink<Self>,
+		action_ref: Link<ReducerAction<MembershipsAction>>,
+		storage: &CoreBlockStorage,
+	) -> Result<Link<Self>, anyhow::Error> {
+		let action = storage.get_value(&action_ref).await?;
+		let mut result = storage.get_value_or_default(&state_ref).await?;
+		match &action.payload {
 			MembershipsAction::Update { id, state, remove } => {
 				// if find(&mut result, &membership.id, &membership.did).is_none() {
 				// 	membership.state = state.clone();
@@ -142,12 +144,7 @@ impl Reducer for Memberships {
 				let remove = remove.iter().map(WeakCid::cid).collect::<BTreeSet<Cid>>();
 				for membership in result.memberships.iter_mut() {
 					if &membership.id == id {
-						// remove
-						membership.state.retain(|item| {
-							let (_state, heads) =
-								context.storage().get_value(&item.state).expect("CoReference").into_value();
-							!remove.is_superset(&heads)
-						});
+						membership.state = filter_state(storage.clone(), &membership.state, &remove).await?;
 
 						// add
 						membership.state.insert(state.clone());
@@ -187,8 +184,25 @@ impl Reducer for Memberships {
 				}
 			},
 		}
-		result
+		Ok(storage.set_value(&result).await?)
 	}
+}
+
+async fn filter_state(
+	storage: CoreBlockStorage,
+	state: &BTreeSet<CoState>,
+	remove: &BTreeSet<Cid>,
+) -> Result<BTreeSet<CoState>, StorageError> {
+	async_stream::try_stream! {
+		for item in state {
+			let (_state, heads) = storage.get_value(&item.state).await?.into_value();
+			if !remove.is_superset(&heads) {
+				yield item.clone();
+			}
+		}
+	}
+	.try_collect()
+	.await
 }
 
 fn find<'a>(memberships: &'a mut Memberships, co: &CoId, did: &str) -> Option<&'a mut Membership> {
@@ -196,10 +210,4 @@ fn find<'a>(memberships: &'a mut Memberships, co: &CoId, did: &str) -> Option<&'
 		.memberships
 		.iter_mut()
 		.find(|item| &item.id == co && item.did == did)
-}
-
-#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
-#[no_mangle]
-pub extern "C" fn state() {
-	co_api::sync_api::reduce::<Memberships>()
 }

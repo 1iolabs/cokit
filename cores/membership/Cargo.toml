@@ -9,9 +9,11 @@ crate-type = ["lib", "cdylib"]
 
 [dependencies]
 anyhow = { workspace = true }
+async-stream = { workspace = true }
 cid = { workspace = true }
 co-api = { workspace = true }
 co-macros = { workspace = true }
+futures = { workspace = true }
 ipld-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_repr = { workspace = true }
