@@ -74,9 +74,9 @@ pub use services::{
 	reducer::CoReducer,
 };
 #[cfg(feature = "js")]
-pub use types::co_date::JsCoDate;
+pub use types::js_co_date::JsCoDate;
 #[cfg(feature = "native")]
-pub use types::co_date::SystemCoDate;
+pub use types::system_co_date::SystemCoDate;
 pub use types::{
 	co_dispatch::{CoDispatch, DynamicCoDispatch},
 	co_pinning_key::CoPinningKey,

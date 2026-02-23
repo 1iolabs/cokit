@@ -82,6 +82,7 @@ impl Storage for CoV1Api {
 		loop {
 			return match self.storage.get(cid) {
 				Ok(b) => Ok(b),
+				#[cfg(not(feature = "js"))]
 				Err(e) if Self::is_retriable(&e) && tries < 10 => {
 					tries += 1;
 

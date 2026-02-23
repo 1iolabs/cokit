@@ -2,12 +2,12 @@
 use super::tracing::TracingBuilder;
 use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
 use crate::{
-	library::wait_response::request_response, services::application::ApplicationMessage, Action, CoReducer,
-	CoReducerFactory, CoStorage, CoUuid, Cores, DynamicCoUuid, RandomCoUuid, Storage,
+	library::wait_response::request_response, services::application::ApplicationMessage, types::co_date::co_date_env,
+	Action, CoReducer, CoReducerFactory, CoStorage, CoUuid, Cores, DynamicCoUuid, RandomCoUuid, Storage,
 };
 use anyhow::anyhow;
 use cid::Cid;
-use co_actor::{Actor, ActorHandle, ActorInstance};
+use co_actor::{Actor, ActorHandle, ActorInstance, TaskSpawner};
 use co_core_storage::PinStrategy;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
@@ -21,10 +21,7 @@ use co_storage::StaticBlockStorage;
 use directories::ProjectDirs;
 use futures::{Stream, StreamExt};
 use std::{collections::BTreeSet, fmt::Debug, future::ready, path::PathBuf, sync::Arc};
-use tokio_util::{
-	sync::{CancellationToken, DropGuard},
-	task::TaskTracker,
-};
+use tokio_util::sync::{CancellationToken, DropGuard};
 
 #[derive(Clone)]
 pub struct Application {
@@ -35,7 +32,7 @@ pub struct Application {
 	settings: ApplicationSettings,
 
 	/// Tasks.
-	tasks: TaskTracker,
+	tasks: TaskSpawner,
 
 	/// CO Context.
 	co_context: CoContext,
@@ -67,13 +64,6 @@ impl Application {
 		self.service.handle()
 	}
 
-	/// Tasks bound to this application.
-	/// Internal use only. Use `tasks`.
-	#[doc(hidden)]
-	pub fn task_tracker(&self) -> TaskTracker {
-		self.tasks.clone()
-	}
-
 	pub fn context(&self) -> &CoContext {
 		&self.co_context
 	}
@@ -96,7 +86,14 @@ impl Application {
 		self.context().inner.shutdown().cancel();
 
 		// wait
-		self.tasks.wait().await;
+		self.join().await;
+	}
+
+	/// Wait until all tasks are done.
+	pub async fn join(&self) {
+		// wait
+		#[cfg(not(feature = "js"))]
+		self.tasks.tracker().wait().await;
 	}
 
 	/// Create and startup network.
@@ -153,17 +150,20 @@ impl Application {
 	/// Initialize application.
 	async fn init(&self) -> Result<(), anyhow::Error> {
 		// shutdown
-		let shutdown = self.context().inner.shutdown().clone();
-		let tasks = self.tasks.clone();
-		let reactive = self.service.handle();
-		tokio::spawn(async move {
-			// shutdown
-			shutdown.cancelled().await;
-			reactive.shutdown();
-			tasks.close();
+		#[cfg(not(feature = "js"))]
+		tokio::spawn({
+			let shutdown = self.context().inner.shutdown().clone();
+			let tasks = self.tasks.clone();
+			let reactive = self.service.handle();
+			async move {
+				// shutdown
+				shutdown.cancelled().await;
+				reactive.shutdown();
+				tasks.tracker().close();
 
-			// log
-			tracing::trace!("application-shutdown");
+				// log
+				tracing::trace!("application-shutdown");
+			}
 		});
 
 		// log
@@ -195,6 +195,7 @@ impl std::fmt::Debug for Application {
 			.finish()
 	}
 }
+static_assertions::assert_impl_all!(Application: Send);
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -450,17 +451,14 @@ impl ApplicationBuilder {
 	}
 
 	pub async fn build(self) -> Result<Application, anyhow::Error> {
-		let tasks = TaskTracker::new();
+		let tasks = TaskSpawner::new(self.identifier.clone());
 
 		// log
 		#[cfg(feature = "tracing")]
 		self.tracing.init()?;
 
 		// sources
-		#[cfg(feature = "js")]
-		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(crate::JsCoDate));
-		#[cfg(feature = "native")]
-		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(crate::SystemCoDate));
+		let date = self.date.unwrap_or_else(co_date_env);
 		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
 
 		// storage

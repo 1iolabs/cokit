@@ -1,4 +1,4 @@
-use crate::{actor::ActorMessage, ActorError, ActorHandle, ActorState, LocalJoinHandle, LocalTaskSpawner};
+use crate::{actor::ActorMessage, ActorError, ActorHandle, ActorState, LocalTaskHandle, LocalTaskSpawner};
 use co_primitives::Tags;
 use std::{any::type_name, sync::Arc};
 use tokio::sync::{mpsc, watch};
@@ -176,7 +176,7 @@ where
 	A: LocalActor,
 {
 	handle: ActorHandle<A::Message>,
-	join: LocalJoinHandle<Result<(), ActorError>>,
+	join: LocalTaskHandle<Result<(), ActorError>>,
 }
 
 impl<A: std::fmt::Debug> std::fmt::Debug for LocalActorInstance<A>

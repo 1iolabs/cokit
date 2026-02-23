@@ -52,6 +52,7 @@ impl Actor for Network {
 			initialize.keypair.clone(),
 			initialize.settings.clone(),
 			initialize.date.clone(),
+			initialize.tasks.clone(),
 			initialize.identity_resolver.clone(),
 			initialize.private_identity_resolver.clone(),
 			initialize.bitswap,

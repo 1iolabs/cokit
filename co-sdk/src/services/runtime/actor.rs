@@ -1,10 +1,8 @@
-#[cfg(feature = "js")]
-use crate::services::runtime::js::JsLocalTaskSpawner;
 use async_trait::async_trait;
 use cid::Cid;
-#[cfg(feature = "js")]
-use co_actor::LocalActor;
 use co_actor::{Actor, ActorError, ActorHandle, Response, TaskSpawner};
+#[cfg(feature = "js")]
+use co_actor::{JsLocalTaskSpawner, LocalActor};
 use co_primitives::{tags, AnyBlockStorage, CoreBlockStorage, Tags};
 use co_runtime::{Core, ExecuteError, GuardReference, RuntimeContext, RuntimePool};
 

@@ -32,4 +32,8 @@
     "label": "cores: build builtin",
     "command": "cargo run --bin co-cli -- --no-keychain core build-builtin",
   },
+  {
+    "label": "check: web",
+    "command": "./ci/scripts/check-web.sh",
+  },
 ]

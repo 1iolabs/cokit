@@ -9,7 +9,7 @@ use crate::{
 	NetworkSettings,
 };
 use anyhow::anyhow;
-use co_actor::ActorHandle;
+use co_actor::{ActorHandle, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
 use co_primitives::DynamicCoDate;
 use futures::{pin_mut, Stream, StreamExt};
@@ -40,11 +40,13 @@ pub struct Libp2pNetwork {
 	tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<Behaviour, Context>>,
 }
 impl Libp2pNetwork {
+	#[allow(clippy::too_many_arguments)]
 	pub fn new(
 		identifier: String,
 		keypair: Keypair,
 		config: NetworkSettings,
 		date: DynamicCoDate,
+		tasks: TaskSpawner,
 		resolver: IdentityResolverBox,
 		private_resolver: PrivateIdentityResolverBox,
 		bitswap: ActorHandle<BitswapMessage>,
@@ -70,8 +72,9 @@ impl Libp2pNetwork {
 		// bitswap
 		let bitswap = Bitswap::<libipld::DefaultParams>::new(Default::default(), BitswapStoreClient::new(bitswap), {
 			let bitswap_identifier = identifier.clone();
+			let tasks = tasks.clone();
 			Box::new(move |t| {
-				tokio::spawn(async move {
+				tasks.spawn(async move {
 					t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
 						.await
 				});
@@ -194,7 +197,7 @@ impl Libp2pNetwork {
 		runtime.listen(swarm.listen_on(config.listen)?);
 
 		// run
-		tokio::spawn(async move {
+		tasks.spawn(async move {
 			run(swarm, context, runtime, tokio_stream::wrappers::UnboundedReceiverStream::new(tasks_rx))
 				.instrument(tracing::trace_span!("network", application = identifier))
 				.await;

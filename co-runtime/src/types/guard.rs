@@ -1,21 +1,21 @@
 use crate::AsyncContext;
 use cid::Cid;
-use co_api::{guard_with_context, Guard};
-use std::{fmt::Debug, sync::Arc};
+use co_api::{Guard, GuardRef};
+use std::fmt::Debug;
 
 /// A executable guard reference.
 #[derive(Clone)]
 pub enum GuardReference {
 	Wasm(Cid),
 	Binary(Vec<u8>),
-	Native(Arc<dyn Fn(AsyncContext) -> bool + Send + Sync>),
+	Native(GuardRef<AsyncContext>),
 }
 impl GuardReference {
 	pub fn native<R>() -> GuardReference
 	where
-		R: Guard,
+		R: Guard + 'static,
 	{
-		GuardReference::Native(Arc::new(|context| guard_with_context::<AsyncContext, R>(context)))
+		GuardReference::Native(GuardRef::new::<R>())
 	}
 }
 impl Debug for GuardReference {

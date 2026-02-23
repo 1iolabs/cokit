@@ -1,25 +1,16 @@
-use co_primitives::{CoDate, Date};
-use std::{
-	fmt::Debug,
-	time::{SystemTime, UNIX_EPOCH},
-};
+use co_primitives::DynamicCoDate;
 
-#[cfg(feature = "js")]
-#[derive(Debug, Default, Clone)]
-pub struct JsCoDate;
-#[cfg(feature = "js")]
-impl CoDate for JsCoDate {
-	fn now(&self) -> Date {
-		js_sys::Date::now() as u64
-	}
-}
+/// Get co date for the current environment
+#[allow(unreachable_code)]
+pub fn co_date_env() -> DynamicCoDate {
+	// js
+	#[cfg(feature = "js")]
+	return DynamicCoDate::new(crate::JsCoDate);
 
-#[cfg(feature = "native")]
-#[derive(Debug, Default, Clone)]
-pub struct SystemCoDate;
-#[cfg(feature = "native")]
-impl CoDate for SystemCoDate {
-	fn now(&self) -> Date {
-		SystemTime::now().duration_since(UNIX_EPOCH).expect("Valid time").as_millis() as u64
-	}
+	// native
+	#[cfg(feature = "native")]
+	return DynamicCoDate::new(crate::SystemCoDate);
+
+	// unknown
+	unreachable!("CoDate not supported on this platform")
 }

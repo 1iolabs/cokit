@@ -1,7 +1,7 @@
 use crate::library::locals::{ApplicationLocal, Locals};
 use anyhow::anyhow;
 use async_trait::async_trait;
-use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseStream, ResponseStreams};
+use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseStream, ResponseStreams, TaskHandle, TaskSpawner};
 use co_primitives::{tags, to_cbor, Tags};
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use libc::flock;
@@ -25,7 +25,6 @@ use std::{
 use tokio::{
 	fs::File,
 	io::{AsyncSeekExt, AsyncWriteExt},
-	task::JoinHandle,
 };
 use tokio_util::sync::{CancellationToken, DropGuard};
 
@@ -38,11 +37,16 @@ impl FileLocals {
 	///
 	/// # Arguments
 	/// * `config_path` - The local configuratin path. Normally `{base_path}/etc`.
-	pub fn new(config_path: PathBuf, identifier: String, lock: bool) -> Result<Self, anyhow::Error> {
+	pub fn new(
+		tasks: TaskSpawner,
+		config_path: PathBuf,
+		identifier: String,
+		lock: bool,
+	) -> Result<Self, anyhow::Error> {
 		let instance = Actor::spawn(
 			tags!("type": "file-locals", "application": &identifier),
 			FileLocalsActor { config_path, identifier, lock: if lock { Lock::Fcntl } else { Lock::None } },
-			(),
+			tasks,
 		)?;
 		Ok(Self { handle: instance.handle() })
 	}
@@ -167,15 +171,15 @@ struct FileLocalsActor {
 impl Actor for FileLocalsActor {
 	type Message = FileLocalsMessage;
 	type State = FileLocalsState;
-	type Initialize = ();
+	type Initialize = TaskSpawner;
 
 	async fn initialize(
 		&self,
 		_handle: &ActorHandle<Self::Message>,
 		_tags: &Tags,
-		_initialize: Self::Initialize,
+		initialize: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
-		Ok(FileLocalsState::default())
+		Ok(FileLocalsState::new(initialize))
 	}
 
 	async fn handle(
@@ -228,10 +232,11 @@ impl Actor for FileLocalsActor {
 
 					// watch
 					let cancel = CancellationToken::new();
-					let stream = watch(self.config_path.clone())?.take_until(cancel.clone().cancelled_owned());
+					let stream = watch(state.tasks.clone(), self.config_path.clone())?
+						.take_until(cancel.clone().cancelled_owned());
 					state.watch = Some((
 						cancel.drop_guard(),
-						tokio::spawn({
+						state.tasks.spawn({
 							let handle = handle.clone();
 							async move {
 								pin_mut!(stream);
@@ -423,6 +428,8 @@ impl FileLocalsFile {
 
 #[derive(Debug, Default)]
 struct FileLocalsState {
+	tasks: TaskSpawner,
+
 	/// Loaded locals.
 	locals: BTreeMap<PathBuf, ApplicationLocal>,
 
@@ -431,9 +438,13 @@ struct FileLocalsState {
 
 	/// Active watchers.
 	watchers: ResponseStreams<(PathBuf, ApplicationLocal)>,
-	watch: Option<(DropGuard, JoinHandle<()>)>,
+	watch: Option<(DropGuard, TaskHandle<()>)>,
 }
 impl FileLocalsState {
+	fn new(tasks: TaskSpawner) -> Self {
+		Self { tasks, ..Default::default() }
+	}
+
 	/// Apply `next` to current state.
 	fn update(&mut self, path: PathBuf, next: ApplicationLocal) {
 		if match self.locals.get(&path) {
@@ -484,7 +495,7 @@ impl FileLocalsState {
 }
 
 /// Watch for all local.cbor changes in config_path.
-fn watch(config_path: PathBuf) -> Result<impl Stream<Item = PathBuf>, anyhow::Error> {
+fn watch(tasks: TaskSpawner, config_path: PathBuf) -> Result<impl Stream<Item = PathBuf>, anyhow::Error> {
 	let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Result<notify::Event, notify::Error>>();
 
 	// watcher
@@ -497,7 +508,7 @@ fn watch(config_path: PathBuf) -> Result<impl Stream<Item = PathBuf>, anyhow::Er
 	watcher.watch(&config_path, RecursiveMode::Recursive)?;
 
 	// shutdown
-	tokio::spawn({
+	tasks.spawn({
 		let config_path = config_path.clone();
 		async move {
 			// wait reader is dropped
@@ -589,7 +600,7 @@ mod tests {
 		let tmp = TmpDir::new("co");
 
 		// read
-		let mut locals = FileLocals::new(tmp.path().into(), "test".to_owned(), true).unwrap();
+		let mut locals = FileLocals::new(Default::default(), tmp.path().into(), "test".to_owned(), true).unwrap();
 		let items = locals.get().await.unwrap();
 		assert_eq!(items.len(), 0);
 

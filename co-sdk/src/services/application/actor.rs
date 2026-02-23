@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, ResponseStreams, TaskSpawner};
 use co_identity::LocalIdentityResolver;
 use co_primitives::{tags, DynamicCoDate, Tags};
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug)]
 pub struct Application {
@@ -24,16 +24,15 @@ impl Application {
 impl Actor for Application {
 	type Message = ApplicationMessage;
 	type State = ApplicationState;
-	type Initialize = (Storage, TaskTracker, DynamicCoDate, DynamicCoUuid, Cores);
+	type Initialize = (Storage, TaskSpawner, DynamicCoDate, DynamicCoUuid, Cores);
 
 	async fn initialize(
 		&self,
 		handle: &ActorHandle<Self::Message>,
 		tags: &Tags,
-		(storage, tasks, date, uuid, cores): Self::Initialize,
+		(storage, spawner, date, uuid, cores): Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		tracing::trace!(settings = ?self.settings, "application-initialize");
-		let spawner = TaskSpawner::new(self.settings.identifier.clone(), tasks.clone());
 		let shutdown = CancellationToken::new();
 		let local_identity = LocalIdentityResolver::default().private_identity("did:local:device").unwrap();
 
@@ -53,7 +52,7 @@ impl Actor for Application {
 		let co_context: CoContext = CoContextInner::new(
 			self.settings.clone(),
 			shutdown.child_token(),
-			TaskSpawner::new(self.settings.identifier.clone(), tasks.clone()),
+			spawner.clone(),
 			local_identity.clone(),
 			#[cfg(feature = "network")]
 			None,

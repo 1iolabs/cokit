@@ -1,16 +1,13 @@
 use crate::{
 	Response, ResponseBackPressureStream, ResponseBackPressureStreamReceiver, ResponseReceiver, ResponseStream,
-	ResponseStreamReceiver, TaskSpawner,
+	ResponseStreamReceiver, TaskHandle, TaskSpawner,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_primitives::Tags;
 use futures::{Stream, StreamExt};
 use std::{any::type_name, future::ready, ops::Deref, sync::Arc};
-use tokio::{
-	sync::{mpsc, watch},
-	task::JoinHandle,
-};
+use tokio::sync::{mpsc, watch};
 use tracing::{Instrument, Span};
 
 #[derive(Debug, thiserror::Error)]
@@ -235,7 +232,7 @@ where
 	A: Actor,
 {
 	handle: ActorHandle<A::Message>,
-	join: JoinHandle<Result<(), ActorError>>,
+	join: TaskHandle<Result<(), ActorError>>,
 }
 impl<A> ActorInstance<A>
 where

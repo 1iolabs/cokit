@@ -15,6 +15,8 @@ pub use library::node_reader::node_reader;
 pub use library::unixfs_add_file::unixfs_add_file;
 #[cfg(feature = "fs")]
 pub use storage::fs::FsStorage;
+#[cfg(not(feature = "js"))]
+pub use storage::sync::{SyncBlockStorage, SyncStorage};
 pub use storage::{
 	change::{BlockStorageChange, ChangeBlockStorage},
 	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping, EncryptionReferenceMode},
@@ -26,7 +28,6 @@ pub use storage::{
 	request,
 	static_storage::StaticBlockStorage,
 	store_params::StoreParamsBlockStorage,
-	sync::{SyncBlockStorage, SyncStorage},
 };
 pub use types::{
 	extended_block_storage::{ExtendedBlock, ExtendedBlockOptions, ExtendedBlockStorage},

@@ -12,7 +12,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
 clap = { version = "^4.3.23", features = ["derive", "env"] }
-co-actor = { workspace = true }
+co-actor = { workspace = true, features = ["native"] }
 co-core-co = { workspace = true }
 co-core-membership = { workspace = true }
 co-core-room = { workspace = true }

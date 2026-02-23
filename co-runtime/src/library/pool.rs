@@ -140,11 +140,11 @@ impl RuntimePool {
 				// execute
 				let execute = f.clone();
 				#[cfg(not(feature = "js"))]
-				let result = tokio::task::spawn_blocking(move || execute.execute(api).context())
+				let result = tokio::task::spawn_blocking(move || execute.execute_blocking(api).context())
 					.await
 					.map_err(|e| ExecuteError::Other(e.into()))?;
 				#[cfg(feature = "js")]
-				let result = execute.execute(api).context();
+				let result = execute.execute_async(api).await.context();
 
 				// result
 				result
@@ -217,11 +217,13 @@ impl RuntimePool {
 				let api = AsyncContext::new(storage.clone(), context, checked);
 
 				// execute
-				// TODO: expose async fn and call directly on js
-				let execute = f.clone();
-				let result = tokio::task::spawn_blocking(move || execute(api))
+				let guard = f.clone();
+				#[cfg(not(feature = "js"))]
+				let result = tokio::task::spawn_blocking(move || guard.execute_blocking(api))
 					.await
 					.map_err(|e| ExecuteError::Other(e.into()))?;
+				#[cfg(feature = "js")]
+				let result = guard.execute_async(api).await;
 
 				// result
 				result

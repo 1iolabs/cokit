@@ -1,4 +1,4 @@
-use co_actor::{LocalTaskHandle, LocalTaskSpawner};
+use crate::{LocalTaskHandle, LocalTaskSpawner};
 use std::future::Future;
 use wasm_bindgen_futures::spawn_local;
 

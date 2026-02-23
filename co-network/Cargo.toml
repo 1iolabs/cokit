@@ -10,7 +10,7 @@ async-stream = { workspace = true }
 async-trait = { workspace = true }
 asynchronous-codec = "0.7.0"
 cid = { workspace = true }
-co-actor = { workspace = true }
+co-actor = { workspace = true, features = ["native"] }
 co-identity = { workspace = true }
 co-primitives = { workspace = true }
 co-storage = { workspace = true }

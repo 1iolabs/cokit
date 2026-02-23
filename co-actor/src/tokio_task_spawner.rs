@@ -4,20 +4,22 @@ use tokio::task::JoinHandle;
 use tokio_util::task::TaskTracker;
 use tracing::Instrument;
 
+pub type TaskHandle<T> = JoinHandle<T>;
+
 #[derive(Debug, Clone)]
 pub struct TaskSpawner {
 	pub(crate) idenitfier: Arc<String>,
 	pub(crate) inner: TaskTracker,
 }
 impl TaskSpawner {
-	pub fn new(idenitfier: String, inner: TaskTracker) -> Self {
-		Self { idenitfier: Arc::new(idenitfier), inner }
+	pub fn new(idenitfier: String) -> Self {
+		Self { idenitfier: Arc::new(idenitfier), inner: TaskTracker::new() }
 	}
 
 	/// Spawn task.
 	#[inline]
 	#[track_caller]
-	pub fn spawn<F>(&self, task: F) -> JoinHandle<F::Output>
+	pub fn spawn<F>(&self, task: F) -> TaskHandle<F::Output>
 	where
 		F: Future + Send + 'static,
 		F::Output: Send + 'static,
@@ -39,7 +41,7 @@ impl TaskSpawner {
 	#[inline]
 	#[track_caller]
 	#[allow(unexpected_cfgs)]
-	pub fn spawn_named<F>(&self, name: &str, task: F) -> JoinHandle<F::Output>
+	pub fn spawn_named<F>(&self, name: &str, task: F) -> TaskHandle<F::Output>
 	where
 		F: Future + Send + 'static,
 		F::Output: Send + 'static,

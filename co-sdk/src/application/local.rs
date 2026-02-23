@@ -100,7 +100,8 @@ impl LocalCoBuilder {
 			let config_path = application_path
 				.parent()
 				.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", application_path))?;
-			let locals = FileLocals::new(config_path.to_owned(), self.settings.identifier.clone(), true)?;
+			let locals =
+				FileLocals::new(tasks.clone(), config_path.to_owned(), self.settings.identifier.clone(), true)?;
 			return Ok(LocalCoInstance::create(
 				runtime,
 				cores,

@@ -55,7 +55,7 @@ pub async fn command(
 	};
 
 	// result
-	let done = tokio::spawn({
+	let done = application.context().tasks().spawn({
 		let command_co = co_reducer.id().clone();
 		let command_did = command.did.clone();
 		let actions = application.actions();

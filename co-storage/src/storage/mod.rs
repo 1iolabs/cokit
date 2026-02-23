@@ -10,4 +10,5 @@ pub mod overlay;
 pub mod request;
 pub mod static_storage;
 pub mod store_params;
+#[cfg(not(feature = "js"))]
 pub mod sync;

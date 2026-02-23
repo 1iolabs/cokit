@@ -12,7 +12,7 @@ anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
-co-actor = { workspace = true }
+co-actor = { workspace = true, features = ["native"] }
 co-primitives = { workspace = true }
 futures = { workspace = true }
 ipld-core = { workspace = true }

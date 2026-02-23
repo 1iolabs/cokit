@@ -117,7 +117,7 @@ async fn test_local_join() {
 	let init = CancellationToken::new();
 	let done = CancellationToken::new();
 	let (tx, rx) = oneshot::channel();
-	tokio::spawn({
+	application3.context().tasks().spawn({
 		let application3 = application3.clone();
 		let done = done.child_token();
 		let init = init.clone();

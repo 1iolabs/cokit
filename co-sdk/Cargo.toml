@@ -52,6 +52,7 @@ serde_ipld_dagcbor = { workspace = true }
 serde_json = { workspace = true }
 serde_repr = { workspace = true }
 sha2 = "0.10.8"
+static_assertions = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros", "sync", "io-util"] }
 tokio-stream = { workspace = true, default-features = false, features = ["sync"] }
@@ -109,7 +110,7 @@ co-test = { workspace = true }
 "network" = ["dep:co-network"]
 
 # Enable JS features
-"js" = ["dep:wasm-bindgen-futures", "dep:js-sys", "uuid/js", "co-runtime/js"]
+"js" = ["dep:wasm-bindgen-futures", "dep:js-sys", "uuid/js", "co-runtime/js", "co-actor/js", "co-storage/js"]
 
 # Enable opentelemetry tracing
 "opentelemetry" = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:opentelemetry-semantic-conventions", "dep:opentelemetry-stdout", "dep:tracing-opentelemetry"]
@@ -121,7 +122,7 @@ co-test = { workspace = true }
 "tracing" = ["dep:tracing-subscriber"]
 
 # Native Target
-"native" = ["co-runtime/native", "fs", "tokio/full", "tracing"]
+"native" = ["co-runtime/native", "co-actor/native", "co-storage/native", "fs", "tokio/full", "tracing"]
 
 # Web Target (WASM)
 "web" = ["js", "co-identity/web", "co-storage/web", "co-runtime/web"]

@@ -25,22 +25,22 @@ tokio = { workspace = true, features = ["macros", "sync"] }
 tokio-stream = { workspace = true, default-features = false, optional = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
-wasmer = { version = "7.0.1", default-features = false }
-wasmer-compiler = { version = "7.0.1", optional = true }
-wasmer-compiler-cranelift = { version = "7.0.1", optional = true }
-wasmer-compiler-llvm = { version = "7.0.1", optional = true }
-wasmer-types = { version = "7.0.1" }
+wasmer = { path = "/Users/dominik/Workspaces/github/wasmerio/wasmer/lib/api", default-features = false }
+wasmer-compiler = { path = "/Users/dominik/Workspaces/github/wasmerio/wasmer/lib/compiler", optional = true }
+wasmer-compiler-cranelift = { path = "/Users/dominik/Workspaces/github/wasmerio/wasmer/lib/compiler-cranelift", optional = true }
+wasmer-compiler-llvm = { path = "/Users/dominik/Workspaces/github/wasmerio/wasmer/lib/compiler-llvm", optional = true }
+wasmer-types = { path = "/Users/dominik/Workspaces/github/wasmerio/wasmer/lib/types" }
 
 [dev-dependencies]
 hexdump = "0.1.1"
 insta = { version = "1.34.0", features = ["default", "yaml"] }
 tracing-subscriber = { workspace = true }
-wasmer = { version = "7.0.1" }
+wasmer = { path = "/Users/dominik/Workspaces/github/wasmerio/wasmer/lib/api" }
 
 [features]
 default = []
-native = ["wasmer/compiler", "fs"]
-web = ["uuid/js", "js"]
+native = ["wasmer/compiler", "fs", "tokio/rt"]
+web = ["uuid/js", "js", "co-storage/web"]
 fs = []
 
 # backends

@@ -78,10 +78,10 @@ pub mod async_reduce {
 			R: Reducer<A> + 'static,
 			A: Clone + DeserializeOwned + 'static,
 		{
-			Self(Arc::new(|context| async { reduce_execute_with_context::<R, A, C>(context).await }.boxed_local()))
+			Self(Arc::new(|context| async { execute::<R, A, C>(context).await }.boxed_local()))
 		}
 
-		pub fn execute(self, context: C) -> C {
+		pub fn execute_blocking(self, context: C) -> C {
 			let mut pool = LocalPool::new();
 			let handle = pool
 				.spawner()
@@ -91,7 +91,7 @@ pub mod async_reduce {
 		}
 
 		pub async fn execute_async(&self, mut context: C) -> C {
-			match self.reduce(&context).await {
+			match self.execute(&context).await {
 				Ok(next_state) => {
 					if let Some(next_state) = next_state {
 						context.set_state(next_state);
@@ -109,7 +109,7 @@ pub mod async_reduce {
 			context
 		}
 
-		pub async fn reduce(&self, context: &C) -> Result<Option<Cid>, anyhow::Error> {
+		async fn execute(&self, context: &C) -> Result<Option<Cid>, anyhow::Error> {
 			(self.0)(context).await
 		}
 	}
@@ -124,51 +124,13 @@ pub mod async_reduce {
 
 	pub fn reduce<R, A>()
 	where
-		R: Reducer<A>,
-		A: Clone + DeserializeOwned,
+		R: Reducer<A> + 'static,
+		A: Clone + DeserializeOwned + 'static,
 	{
-		reduce_with_context::<R, A, _>(WasmContext::new());
+		ReducerRef::new::<R, A>().execute_blocking(WasmContext::new());
 	}
 
-	pub fn reduce_with_context<R, A, C>(context: C) -> C
-	where
-		R: Reducer<A>,
-		A: Clone + DeserializeOwned,
-		C: Context + 'static,
-	{
-		let mut pool = LocalPool::new();
-		let handle = pool
-			.spawner()
-			.spawn_local_with_handle(async move { reduce_async_with_context::<R, A, C>(context).await })
-			.expect("future to execute");
-		pool.run_until(handle)
-	}
-
-	pub async fn reduce_async_with_context<R, A, C>(mut context: C) -> C
-	where
-		R: Reducer<A>,
-		A: Clone + DeserializeOwned,
-		C: Context + 'static,
-	{
-		match reduce_execute_with_context::<R, A, C>(&context).await {
-			Ok(next_state) => {
-				if let Some(next_state) = next_state {
-					context.set_state(next_state);
-				}
-			},
-			Err(err) => {
-				let cid = context
-					.storage()
-					.set_serialized(&DiagnosticMessage::from(err))
-					.await
-					.expect("DiagnosticMessage to serialize");
-				context.write_diagnostic(cid);
-			},
-		}
-		context
-	}
-
-	pub async fn reduce_execute_with_context<R, A, C>(context: &C) -> Result<Option<Cid>, anyhow::Error>
+	async fn execute<R, A, C>(context: &C) -> Result<Option<Cid>, anyhow::Error>
 	where
 		R: Reducer<A>,
 		A: Clone + DeserializeOwned,
