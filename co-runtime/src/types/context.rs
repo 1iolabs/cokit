@@ -40,6 +40,10 @@ impl RuntimeContext {
 		Ok(())
 	}
 
+	pub fn push_diagnostic(&mut self, message: DiagnosticMessage) {
+		self.diagnostics.push(RuntimeDiagnosic::Message(message));
+	}
+
 	/// Test for failures in diagnostics.
 	pub async fn ok<S: BlockStorage>(&self, storage: &S) -> Result<(), anyhow::Error> {
 		for diagnostic in self.diagnostics.iter() {

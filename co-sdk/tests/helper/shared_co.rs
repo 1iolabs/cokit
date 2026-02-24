@@ -2,8 +2,8 @@ use super::instance::{Instance, Instances};
 use co_core_co::CoAction;
 use co_core_membership::{MembershipState, MembershipsAction};
 use co_sdk::{
-	update_co, Action, CoId, CoReducer, CoReducerFactory, CreateCo, Did, DidKeyIdentity, Identity, PrivateIdentity,
-	PrivateIdentityBox, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	update_co, Action, Application, CoId, CoReducer, CoReducerFactory, CreateCo, Did, DidKeyIdentity, Identity,
+	PrivateIdentity, PrivateIdentityBox, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use futures::{join, Stream, StreamExt};
 use std::{collections::BTreeSet, time::Duration};
@@ -16,18 +16,53 @@ pub struct SharedCo {
 impl SharedCo {
 	/// Get reducer and identity for a peer.
 	pub async fn reducer(&self, peer: usize, id: &str) -> (CoReducer, PrivateIdentityBox) {
-		let (instance, identity) = self.peers.get(peer).unwrap();
+		let (instance, identity) = self.peers.get(peer).expect("peer exists");
 		let context = instance.application.co();
 		let co_id = CoId::from(id);
 		(context.try_co_reducer(&co_id).await.unwrap(), PrivateIdentity::boxed(identity.clone()))
 	}
 
+	/// Get a peers appliction.
+	pub fn application(&self, peer: usize) -> Application {
+		self.peers.get(peer).expect("peer exists").0.application.clone()
+	}
+
+	/// Get a peer instance.
+	pub fn instance(&self, peer: usize) -> &Instance {
+		&self.peers.get(peer).expect("peer exists").0
+	}
+
+	/// Get peer default identity.
+	pub fn identity(&self, peer: usize) -> PrivateIdentityBox {
+		PrivateIdentity::boxed(self.peers.get(peer).expect("peer exists").1.clone())
+	}
+
 	/// Create two peers with an connected shared co.
 	pub async fn create(instances: &mut Instances, id: &str) -> Self {
-		let timeout_duration = Duration::from_secs(10);
+		let peer1 = instances.create().await;
+		let peer2 = instances.create().await;
+		Self::create_with_peers(peer1, peer2, id).await
+	}
 
-		let mut peer1 = instances.create().await;
-		let mut peer2 = instances.create().await;
+	/// Sync changed from peer `from` to peer `to`.
+	pub async fn sync(&self, id: &str, from: usize, to: usize) {
+		let from = self.peers.get(from).expect("peer exists");
+		let to = self.peers.get(to).expect("peer exists");
+		let co_id = CoId::from(id);
+		let from_co = from.0.application.context().try_co_reducer(&co_id).await.expect("co");
+		update_co(
+			from.0.application.handle(),
+			&from_co,
+			&from.1,
+			to.0.application.context().network().await.expect("network").local_peer_id(),
+			Duration::from_secs(10),
+		)
+		.await
+		.expect("sync");
+	}
+
+	pub async fn create_with_peers(mut peer1: Instance, mut peer2: Instance, id: &str) -> Self {
+		let timeout_duration = Duration::from_secs(10);
 
 		// network
 		let (network1, _network2) = Instances::networking(&mut peer1, &mut peer2, true, true).await;

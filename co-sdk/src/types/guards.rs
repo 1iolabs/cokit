@@ -5,11 +5,22 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
 
 /// Registry for builtin guards.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Guards {
 	guards: HashMap<String, String>,
+
+	/// Override core implementations.
+	/// This can used to replace known Cid's with trusted native cores.
+	#[serde(skip, default)]
+	overrides: HashMap<Cid, GuardReference>,
 }
 impl Guards {
+	/// Override a core by its [`Cid`].
+	pub fn with_override(mut self, guard_cid: Cid, guard: GuardReference) -> Self {
+		self.overrides.insert(guard_cid, guard);
+		self
+	}
+
 	/// Returns the core name used across the co-sdk fot an core create name.
 	/// Example: `co-core-co` reutrns `co`
 	/// See:
@@ -42,6 +53,13 @@ impl Guards {
 			.collect()
 	}
 
+	/// Map WASM CIDs to (possibly native) built-in versions.
+	pub fn mapping(&self) -> HashMap<Cid, GuardReference> {
+		let mut result = self.built_in_native_mapping();
+		result.extend(self.overrides.clone());
+		result
+	}
+
 	/// Get the binary CID for a built-in guard.
 	pub fn binary(&self, crate_name: &str) -> Option<Cid> {
 		self.guards
@@ -63,7 +81,7 @@ impl Guards {
 }
 impl Default for Guards {
 	fn default() -> Self {
-		let mut result = Self { guards: Default::default() };
+		let mut result = Self { guards: Default::default(), overrides: Default::default() };
 
 		// we only got buildin guard within the cores (for now) so just scan an use them
 		for (name, core) in Cores::default().built_in() {

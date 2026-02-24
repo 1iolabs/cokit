@@ -1,7 +1,7 @@
 use crate::{types::guards::Guards, CoreResolver, CoreResolverContext, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::GuardVerifyPayload;
+use co_primitives::{DiagnosticMessage, GuardVerifyPayload};
 use co_runtime::{GuardReference, RuntimeContext, RuntimePool};
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use std::collections::HashMap;
@@ -10,14 +10,29 @@ use std::collections::HashMap;
 pub struct CoGuardResolver<C> {
 	mapping: HashMap<Cid, GuardReference>,
 	next: C,
+	mode: GuardRejectionMode,
 }
 impl<C> CoGuardResolver<C> {
-	pub fn new(core_resolver: C) -> Self {
-		Self { next: core_resolver, mapping: Guards::default().built_in_native_mapping() }
+	pub fn new(core_resolver: C, guards: &Guards) -> Self {
+		Self { next: core_resolver, mapping: guards.mapping(), mode: GuardRejectionMode::Skip }
 	}
 
 	pub fn with_mapping(self, mapping: HashMap<Cid, GuardReference>) -> Self {
-		Self { next: self.next, mapping }
+		Self { next: self.next, mapping, mode: GuardRejectionMode::Skip }
+	}
+
+	pub fn with_ignore_mode(mut self, ignore: bool) -> Self {
+		if ignore {
+			self.mode = GuardRejectionMode::Ignore;
+		} else {
+			self.mode = GuardRejectionMode::Skip;
+		}
+		self
+	}
+
+	pub fn with_failure_mode(mut self) -> Self {
+		self.mode = GuardRejectionMode::Fail;
+		self
 	}
 
 	fn guard(&self, wasm: Cid) -> GuardReference {
@@ -64,11 +79,30 @@ where
 						)
 					})?;
 				if !valid {
-					return Err(CoreResolverError::Middleware(anyhow::anyhow!(
-						"Guard reports invalid head: {}: {}",
-						guard_name,
-						next_head
-					)));
+					// handle permission failure
+					match self.mode {
+						// fail
+						GuardRejectionMode::Fail => {
+							return Err(CoreResolverError::Middleware(anyhow::anyhow!(
+								"Guard reports invalid head: {}: {}",
+								guard_name,
+								next_head
+							)))
+						},
+						// skip to compute
+						GuardRejectionMode::Skip => {
+							let mut result = RuntimeContext::new(Some(state), *action);
+							result.push_diagnostic(DiagnosticMessage::Failure(format!(
+								"Guard reports invalid head: {}: {}",
+								guard_name, next_head
+							)));
+							return Ok(result);
+						},
+						// warn and ignore
+						GuardRejectionMode::Ignore => {
+							tracing::warn!(?guard_name, ?next_head, "guard-ignore-rejection");
+						},
+					};
 				}
 			}
 		}
@@ -79,4 +113,15 @@ where
 		// result
 		Ok(result)
 	}
+}
+
+/// Guard rejection mode.
+#[derive(Debug, Clone, Copy)]
+enum GuardRejectionMode {
+	/// Ignore rejection and just trace a warning.
+	Ignore,
+	/// Skip the computation and insert a diagnostic message.
+	Skip,
+	/// Fail the operation hard.
+	Fail,
 }
