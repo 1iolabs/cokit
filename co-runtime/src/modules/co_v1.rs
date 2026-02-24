@@ -1,7 +1,9 @@
 use crate::RuntimeContext;
 use co_api::{Block, Cid, DefaultParams};
 use co_storage::{Storage, StorageError};
-use std::{cmp::min, fmt::Debug, mem::swap, time::Duration};
+#[cfg(not(feature = "js"))]
+use std::time::Duration;
+use std::{cmp::min, fmt::Debug, mem::swap};
 
 //#[cfg(not(feature = "js"))]
 pub type CoV1ApiStorageBox = Box<dyn Storage<StoreParams = DefaultParams> + Send + Sync>;
@@ -59,6 +61,7 @@ impl CoV1Api {
 	}
 
 	/// Whether is error is retriable with same parameters.
+	#[cfg(not(feature = "js"))]
 	fn is_retriable(error: &StorageError) -> bool {
 		matches!(error, StorageError::NotFound(_, _))
 	}
@@ -78,25 +81,31 @@ impl Storage for CoV1Api {
 	/// Note: If this function fails it will trap the core.
 	/// Todo: Implement diagnostics.
 	fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
-		let mut tries = 0;
-		loop {
-			return match self.storage.get(cid) {
-				Ok(b) => Ok(b),
-				#[cfg(not(feature = "js"))]
-				Err(e) if Self::is_retriable(&e) && tries < 10 => {
-					tries += 1;
+		#[cfg(feature = "js")]
+		{
+			self.storage.get(cid)
+		}
+		#[cfg(not(feature = "js"))]
+		{
+			let mut tries = 0;
+			loop {
+				return match self.storage.get(cid) {
+					Ok(b) => Ok(b),
+					Err(e) if Self::is_retriable(&e) && tries < 10 => {
+						tries += 1;
 
-					// log
-					tracing::warn!(?cid, tries, "runtime-get-block-retry");
+						// log
+						tracing::warn!(?cid, tries, "runtime-get-block-retry");
 
-					// wait with exponential backoff
-					std::thread::sleep(Duration::from_millis(2u64.pow(tries) * 1000));
+						// wait with exponential backoff
+						std::thread::sleep(Duration::from_millis(2u64.pow(tries) * 1000));
 
-					// retry
-					continue;
-				},
-				Err(e) => Err(e),
-			};
+						// retry
+						continue;
+					},
+					Err(e) => Err(e),
+				};
+			}
 		}
 	}
 

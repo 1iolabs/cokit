@@ -48,10 +48,12 @@ impl Default for IdleRuntimePool {
 
 #[derive(Debug, Clone)]
 pub struct RuntimePool {
+	#[cfg_attr(feature = "js", allow(clippy::arc_with_non_send_sync))]
 	pool: Arc<Mutex<IdleRuntimePool>>,
 }
 impl RuntimePool {
 	pub fn new(pool: IdleRuntimePool) -> Self {
+		#[cfg_attr(feature = "js", allow(clippy::arc_with_non_send_sync))]
 		Self { pool: Arc::new(Mutex::new(pool)) }
 	}
 

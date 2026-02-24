@@ -1,6 +1,5 @@
-use async_trait::async_trait;
 use cid::Cid;
-use co_actor::{Actor, ActorError, ActorHandle, Response, TaskSpawner};
+use co_actor::{ActorError, ActorHandle, Response};
 #[cfg(feature = "js")]
 use co_actor::{JsLocalTaskSpawner, LocalActor};
 use co_primitives::{tags, AnyBlockStorage, CoreBlockStorage, Tags};
@@ -84,8 +83,8 @@ pub struct ExecuteGuardAction {
 pub struct RuntimeActor {}
 impl RuntimeActor {
 	#[cfg(not(feature = "js"))]
-	pub fn spawn(application: impl Into<String>, tasks: TaskSpawner) -> Result<RuntimeHandle, anyhow::Error> {
-		let runtime_service = Actor::spawn_with(
+	pub fn spawn(application: impl Into<String>, tasks: co_actor::TaskSpawner) -> Result<RuntimeHandle, anyhow::Error> {
+		let runtime_service = co_actor::Actor::spawn_with(
 			tasks,
 			tags!("type": "runtime", "application": application.into()),
 			RuntimeActor::default(),
@@ -98,7 +97,7 @@ impl RuntimeActor {
 	pub fn spawn_local(application: impl Into<String>) -> Result<RuntimeHandle, anyhow::Error> {
 		let tasks = JsLocalTaskSpawner::default();
 		let runtime_service = LocalActor::spawn_with(
-			tasks.clone(),
+			tasks,
 			tags!("type": "runtime", "application": application.into()),
 			RuntimeActor::default(),
 			tasks,
@@ -149,8 +148,8 @@ impl LocalActor for RuntimeActor {
 	}
 }
 #[cfg(not(feature = "js"))]
-#[async_trait]
-impl Actor for RuntimeActor {
+#[async_trait::async_trait]
+impl co_actor::Actor for RuntimeActor {
 	type Message = RuntimeMessage;
 	type State = RuntimePool;
 	type Initialize = ();

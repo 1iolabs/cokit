@@ -18,23 +18,33 @@ impl DeferredStorage {
 	/// # Args
 	/// - `flush_set` - if `true`, then flush all blocks that has been set to storage
 	pub async fn process(&mut self, storage: &impl AnyBlockStorage, flush_set: bool) -> Result<bool, StorageError> {
-		let mut context = self.context.lock().unwrap();
 		let mut retry = false;
-		while !context.ops.is_empty() {
-			let op = context.ops.remove(0);
+		loop {
+			let op = {
+				let mut context = self.context.lock().unwrap();
+				if context.ops.is_empty() {
+					break;
+				}
+				context.ops.remove(0)
+			};
 			match op {
 				DeferredOps::Get(cid) => {
 					let block = storage.get(&cid).await?;
+					let mut context = self.context.lock().unwrap();
 					context.blocks.insert(*block.cid(), block);
 					retry = true;
 				},
 				DeferredOps::Set(cid) => {
-					if flush_set {
-						if let Some(block) = context.blocks.remove(&cid) {
-							storage.set(block).await?;
+					let block = {
+						let mut context = self.context.lock().unwrap();
+						if flush_set {
+							context.blocks.remove(&cid)
+						} else {
+							context.blocks.get(&cid).cloned()
 						}
-					} else if let Some(block) = context.blocks.get(&cid) {
-						storage.set(block.clone()).await?;
+					};
+					if let Some(block) = block {
+						storage.set(block).await?;
 					}
 				},
 				DeferredOps::Remove(cid) => {

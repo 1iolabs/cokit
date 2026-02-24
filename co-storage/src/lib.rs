@@ -15,7 +15,7 @@ pub use library::node_reader::node_reader;
 pub use library::unixfs_add_file::unixfs_add_file;
 #[cfg(feature = "fs")]
 pub use storage::fs::FsStorage;
-#[cfg(not(feature = "js"))]
+#[cfg(feature = "native")]
 pub use storage::sync::{SyncBlockStorage, SyncStorage};
 pub use storage::{
 	change::{BlockStorageChange, ChangeBlockStorage},

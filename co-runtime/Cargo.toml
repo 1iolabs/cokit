@@ -31,6 +31,9 @@ wasmer-compiler-cranelift = { git = "https://github.com/wasmerio/wasmer.git", br
 wasmer-compiler-llvm = { git = "https://github.com/wasmerio/wasmer.git", branch = "main", optional = true }
 wasmer-types = { git = "https://github.com/wasmerio/wasmer.git", branch = "main" }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasmer = { git = "https://github.com/wasmerio/wasmer.git", branch = "main", default-features = false, features = ["js", "wasm-types-polyfill", "js-serializable-module", "enable-serde"] }
+
 [dev-dependencies]
 hexdump = "0.1.1"
 insta = { version = "1.34.0", features = ["default", "yaml"] }
@@ -49,7 +52,7 @@ llvm = ["wasmer/llvm", "wasmer/compiler", "dep:wasmer-compiler", "dep:wasmer-com
 cranelift = ["wasmer/cranelift", "wasmer/compiler", "dep:wasmer-compiler", "dep:wasmer-compiler-cranelift"]
 wasmi = ["wasmer/wasmi"]
 wamr = ["wasmer/wamr"]
-js = ["wasmer/js-default", "wasmer/js-serializable-module"]
+js = []
 
 # meta
 apple-sandbox = ["wasmi"]

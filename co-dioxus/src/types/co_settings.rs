@@ -66,13 +66,14 @@ pub enum CoStorageSetting {
 	Path(PathBuf),
 }
 #[cfg(feature = "fs")]
+#[allow(clippy::derivable_impls)]
 impl Default for CoStorageSetting {
 	fn default() -> Self {
 		CoStorageSetting::PathDefault
 	}
 }
-#[allow(clippy::derivable_impls)]
 #[cfg(not(feature = "fs"))]
+#[allow(clippy::derivable_impls)]
 impl Default for CoStorageSetting {
 	fn default() -> Self {
 		CoStorageSetting::Memory

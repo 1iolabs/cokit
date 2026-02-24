@@ -1,6 +1,4 @@
-#[cfg(all(feature = "js", feature = "native"))]
-compile_error!("Features 'js' and 'native' cannot be enabled together.");
-
+// modules
 mod actor;
 mod actor_local;
 mod epic;
@@ -15,15 +13,15 @@ mod task_spawner_local;
 #[cfg(feature = "native")]
 mod tokio_task_spawner;
 
+// exports
 pub use actor::{Actor, ActorError, ActorHandle, ActorInstance, ActorState};
 pub use actor_local::{LocalActor, LocalActorInstance, LocalActorSpawner};
+pub use backend::{TaskHandle, TaskSpawner};
 pub use epic::{
 	ActionDispatch, Actions, BoxEpic, Epic, EpicExt, EpicRuntime, JoinEpic, MergeEpic, SwitchEpic, TracingEpic,
 };
 #[cfg(feature = "js")]
-pub use js_local_task_spawner::JsLocalTaskSpawner;
-#[cfg(feature = "js")]
-pub use js_task_spawner::{TaskHandle, TaskSpawner};
+pub use js::JsLocalTaskSpawner;
 pub use response::{
 	Response, ResponseBackPressureStream, ResponseBackPressureStreamReceiver, ResponseReceiver, ResponseStream,
 	ResponseStreamReceiver, ResponseStreams,
@@ -31,5 +29,24 @@ pub use response::{
 pub use state::Reducer;
 pub use task_handle::TaskError;
 pub use task_spawner_local::{LocalTaskHandle, LocalTaskSpawner};
+
+// backends
 #[cfg(feature = "native")]
-pub use tokio_task_spawner::{TaskHandle, TaskSpawner};
+mod backend {
+	pub use super::tokio_task_spawner::{TaskHandle, TaskSpawner};
+}
+#[cfg(feature = "native")]
+pub mod tokio {
+	pub use super::tokio_task_spawner::{TaskHandle, TaskSpawner};
+}
+#[cfg(all(feature = "js", not(feature = "native")))]
+mod backend {
+	pub use super::js_task_spawner::{TaskHandle, TaskSpawner};
+}
+#[cfg(feature = "js")]
+pub mod js {
+	pub use super::{
+		js_local_task_spawner::JsLocalTaskSpawner,
+		js_task_spawner::{TaskHandle, TaskSpawner},
+	};
+}

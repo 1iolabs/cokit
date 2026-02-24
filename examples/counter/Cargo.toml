@@ -19,7 +19,7 @@ thiserror = { workspace = true }
 co-primitives = { workspace = true }
 co-runtime = { workspace = true }
 co-sdk = { workspace = true }
-co-storage = { workspace = true }
+co-storage = { workspace = true, features = ["native"] }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

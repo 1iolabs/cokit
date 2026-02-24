@@ -777,7 +777,7 @@ impl ReducerChangeCause {
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "js")))]
 mod tests {
 	use super::Reducer;
 	use crate::{

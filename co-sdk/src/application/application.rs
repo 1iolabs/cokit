@@ -32,6 +32,7 @@ pub struct Application {
 	settings: ApplicationSettings,
 
 	/// Tasks.
+	#[cfg_attr(feature = "js", allow(dead_code))]
 	tasks: TaskSpawner,
 
 	/// CO Context.

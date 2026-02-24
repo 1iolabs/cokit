@@ -1,10 +1,3 @@
-#[cfg(all(feature = "web", feature = "desktop"))]
-compile_error!("Features 'web' and 'desktop' cannot be enabled together.");
-#[cfg(all(feature = "web", feature = "mobile"))]
-compile_error!("Features 'web' and 'mobile' cannot be enabled together.");
-#[cfg(all(feature = "desktop", feature = "mobile"))]
-compile_error!("Features 'desktop' and 'mobile' cannot be enabled together.");
-
 mod hooks;
 mod library;
 mod types;
