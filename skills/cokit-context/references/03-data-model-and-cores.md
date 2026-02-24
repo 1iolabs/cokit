@@ -40,6 +40,14 @@ async fn reduce(
 The reducer reads the action and current state from storage, computes the new state,
 writes it to storage, and returns the new state's CID.
 
+### Core Requirements
+
+Cores need to be executed as WASM because:
+- of different versions
+- a CO can have unknown cores and we need them to calculate and verify its overall state
+
+`Core::Native`/`Core::NativeAsync` are just helper which can be used during development.
+
 ## Core Characteristics
 
 - **Passive**: Cores only compute state. They cannot trigger side effects or reactions.
@@ -101,10 +109,10 @@ The `co-api` `#[co]` macro handles these exports automatically.
 ## Development Workflow for Cores
 
 1. `cargo init --lib ./my-core`
-2. `cargo add co-api --git https://gitlab.1io.com/1io/co-sdk.git`
+2. `cargo add co-api --git https://gitlab.1io.com/1io/co-sdk.git --branch wasm`
 3. Add `crate-type = ["lib", "cdylib"]` and `features = ["core"]` to Cargo.toml
 4. Define schema with `#[co]`, actions with `#[co]`, state with `#[co(state)]`
-5. Implement `Reducer<MyAction> for MyState`
+5. Implement `co_api::async_reducer::Reducer<MyAction> for MyState`
 6. Build: `co core build` (produces .wasm in target-wasm/)
 
 ## Source Map

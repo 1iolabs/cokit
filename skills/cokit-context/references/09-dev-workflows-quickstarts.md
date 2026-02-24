@@ -12,8 +12,8 @@
 **COkit crates are NOT published to crates.io.** All Rust dependencies must be added
 via the git repository:
 ```sh
-cargo add co-sdk --git https://gitlab.1io.com/1io/co-sdk.git
-cargo add co-api --git https://gitlab.1io.com/1io/co-sdk.git
+cargo add co-sdk --git https://gitlab.1io.com/1io/co-sdk.git --branch wasm --no-default-features
+cargo add co-api --git https://gitlab.1io.com/1io/co-sdk.git --branch wasm
 ```
 
 Do NOT use `cargo add co-sdk` without `--git` -- it will fail or pull the wrong package.
@@ -27,7 +27,7 @@ or bundled locally.
 ### Install co CLI
 From source:
 ```sh
-cargo install co-cli --git https://gitlab.1io.com/1io/co-sdk.git
+cargo install co-cli --git https://gitlab.1io.com/1io/co-sdk.git --branch wasm
 ```
 
 ### LLVM Setup (macOS)
@@ -56,7 +56,7 @@ Every COkit app has two parts:
 3. Set `crate-type = ["lib", "cdylib"]` and add `features = ["core"]`
 4. Define schema types with `#[co]` and `#[co(state)]`
 5. Define actions enum with `#[co]`
-6. Implement `Reducer<MyAction> for MyState`
+6. Implement `co_api::async_api::Reducer<MyAction> for MyState`
 7. Build to WASM: `co core build`
 
 Key imports:
@@ -88,7 +88,7 @@ dx new my-todo-app --subtemplate Bare-Bones \
 ```sh
 cd my-todo-app
 cargo add co-sdk co-dioxus co-core-membership co-core-co \
-  --git https://gitlab.1io.com/1io/co-sdk.git
+  --git https://gitlab.1io.com/1io/co-sdk.git --branch wasm
 ```
 
 4. Add your Core as a local dependency:
@@ -106,6 +106,15 @@ cargo add uuid --features v7
 ```sh
 npm init -y
 npm install -D tailwindcss @tailwindcss/cli daisyui
+```
+
+7. Add `co-dioxus` features for co-kit to `Cargo.toml`
+
+```toml
+[features]
+web = ["dioxus/web", "co-dioxus/web"]
+webview = ["dioxus/desktop", "co-dioxus/desktop"]
+server = ["dioxus/server", "co-dioxus/server"]
 ```
 
 ### Initialization
