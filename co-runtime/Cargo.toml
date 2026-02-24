@@ -32,7 +32,7 @@ wasmer-compiler-llvm = { git = "https://github.com/wasmerio/wasmer.git", branch 
 wasmer-types = { git = "https://github.com/wasmerio/wasmer.git", branch = "main" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasmer = { git = "https://github.com/wasmerio/wasmer.git", branch = "main", default-features = false, features = ["js", "wasm-types-polyfill", "js-serializable-module", "enable-serde"] }
+wasmer = { git = "https://github.com/wasmerio/wasmer.git", branch = "main", default-features = false, features = ["js", "std", "wasm-types-polyfill", "js-serializable-module", "enable-serde"] }
 
 [dev-dependencies]
 hexdump = "0.1.1"
