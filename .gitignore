@@ -6,3 +6,5 @@
 .cargo
 /docs/src/crate
 /dist
+cokit-context.zip
+.DS_Store
