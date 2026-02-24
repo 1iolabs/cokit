@@ -1,3 +1,8 @@
+// CONFIDENTIAL — © 1io BRANDGUARDIAN GmbH. Proprietary COkit code/docs for internal use within our company domain and
+// authorized users/tools only; do not copy, disclose, or transmit any part outside this domain. No license is granted
+// by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
+// retention—approved secure tools may process solely for internal use.
+
 use crate::{Co, CoPrivateIdentity, CoSettings, CoState};
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, Response};

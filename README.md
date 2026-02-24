@@ -36,7 +36,7 @@ enum TodosAction {
     DeleteDone,
 }
 
-impl CoreReducer<TodosAction> for Todos {
+impl Reducer<TodosAction> for Todos {
     type Action = TodosAction;
 
 	fn reduce(mut self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {

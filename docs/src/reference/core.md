@@ -60,7 +60,7 @@ They have no facilities to react to state changes or perform any side effects.
 
 ### Serialization
 The Core is the description of how state will be serialized to a persistable format.  
-CO-kit uses content-addressed blocks through [IPLD](https://ipld.io/) with a default block size limit of 1MiB.  
+COkit uses content-addressed blocks through [IPLD](https://ipld.io/) with a default block size limit of 1MiB.  
 
 We recommend using the [DAG-CBOR](../glossary/glossary.md#dag-cbor) format because it is optimized for content-addressed data, and it directly supports content-addressed links (via [CIDs](../glossary/glossary.md#cid)).  
 

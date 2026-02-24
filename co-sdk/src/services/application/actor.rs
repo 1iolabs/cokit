@@ -1,8 +1,13 @@
+// CONFIDENTIAL — © 1io BRANDGUARDIAN GmbH. Proprietary COkit code/docs for internal use within our company domain and
+// authorized users/tools only; do not copy, disclose, or transmit any part outside this domain. No license is granted
+// by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
+// retention—approved secure tools may process solely for internal use.
+
 use super::{epics::epic, Action, ApplicationMessage};
 use crate::{
 	application::{application::ApplicationSettings, co_context::CoContextInner},
 	services::{reducers::ReducersActor, runtime::RuntimeActor},
-	CoContext, Cores, DynamicCoUuid, Runtime, Storage,
+	CoContext, Cores, DynamicCoUuid, Guards, Runtime, Storage,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -24,13 +29,13 @@ impl Application {
 impl Actor for Application {
 	type Message = ApplicationMessage;
 	type State = ApplicationState;
-	type Initialize = (Storage, TaskSpawner, DynamicCoDate, DynamicCoUuid, Cores);
+	type Initialize = (Storage, TaskSpawner, DynamicCoDate, DynamicCoUuid, Cores, Guards);
 
 	async fn initialize(
 		&self,
 		handle: &ActorHandle<Self::Message>,
 		tags: &Tags,
-		(storage, spawner, date, uuid, cores): Self::Initialize,
+		(storage, spawner, date, uuid, cores, guards): Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		tracing::trace!(settings = ?self.settings, "application-initialize");
 		let shutdown = CancellationToken::new();
@@ -63,6 +68,7 @@ impl Actor for Application {
 			date,
 			uuid,
 			cores,
+			guards,
 		)
 		.into();
 

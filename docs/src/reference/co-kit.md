@@ -37,10 +37,10 @@ High-level architecture overview.
 
 ## Project Structure
 
-### Libraries to build on top of CO-kit
-These are the main crates that are used to build on top of CO-kit:
+### Libraries to build on top of COkit
+These are the main crates that are used to build on top of COkit:
 
-- [co-sdk](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-sdk): The main package to develop CO-kit based applications.
+- [co-sdk](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-sdk): The main package to develop COkit based applications.
 - [co-api](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-api): The main package to develop Cores.
 
 ### Command line
@@ -50,7 +50,7 @@ Utilities to accelerate development and integrations.
 - [daemon](https://gitlab.1io.com/1io/co-sdk/-/tree/main/daemon): HTTP daemon that exposes COs as HTTP API.
 
 ### Framework integrations
-Ready-to-use CO-kit integrations for different platforms and frameworks.
+Ready-to-use COkit integrations for different platforms and frameworks.
 
 - [co-dioxus](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-dioxus): Integrations and hooks for Dioxus.
 - [tauri-plugin-co-sdk](https://gitlab.1io.com/1io/co-sdk/-/tree/main/tauri-plugin-co-sdk): Integrations and hooks for Tauri and React.
@@ -67,22 +67,22 @@ These are the necessary components to enable the distributed use of COs.
 - [co-log](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-log): Merkle-CRDT log (event stream) implementation.
 
 ### Storage and Encryption
-Storage in CO-kit is content-addressed.
+Storage in COkit is content-addressed.
 
 - [co-storage](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-storage): BlockStorage implementations. Including filesystem, memory and encryption.
 
 ### Identity
-Identities in CO-kit are fully decentralized.
+Identities in COkit are fully decentralized.
 
 - [co-identity](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-identity): [DID](../glossary/glossary.md#did) Integration, DIDComm primitives and [DID](../glossary/glossary.md#did) methods supported by default.
 
 ### Built-in Cores
-CO-kit ships with built-in cores that are either used to build/further develop CO-kit itself, or which are useful in general when building applications.
+COkit ships with built-in cores that are either used to build/further develop COkit itself, or which are useful in general when building applications.
 
 - [cores](https://gitlab.1io.com/1io/co-sdk/-/tree/main/cores): The built-in cores with a description file of the current CIDs.
 
 ### Internals
-Packages for internals of CO-kit. These are used by contributors of CO-kit.
+Packages for internals of COkit. These are used by contributors of COkit.
 
 - [co-primitives](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-primitives): Primitives used throughout the [`co-sdk`](/crate/co_sdk/index.html) and [`co-api`](/crate/co_api/index.html) and [Core](../reference/core.md) implementations.
 - [co-macros](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-macros): Macro implementations.

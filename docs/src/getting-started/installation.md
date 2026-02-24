@@ -1,6 +1,6 @@
 # Installation
 To get the fun started, you'll need to install rust and the `co` command.
-This step-by-step guide covers both installing the tools, as well as building your first CO-kit app!
+This step-by-step guide covers both installing the tools, as well as building your first COkit app!
 
 ## Requirements
 - `rust-1.91` or greater
@@ -72,8 +72,8 @@ LLVM_SYS_180_PREFIX = "/opt/homebrew/opt/llvm@18"
 This script may duplicate the '[env]' table, which would need to be fixed manually by removing one of the '[env]' entries.
 ```
 
-## Setup CO-kit
-CO-kit ships pre-built binaries[^issue-94] for its `co` CLI using [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#installation).  
+## Setup COkit
+COkit ships pre-built binaries[^issue-94] for its `co` CLI using [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#installation).  
 This means you can install `co` without needing to compile from source:
 ```sh
 cargo binstall co-cli --git https://gitlab.1io.com/1io/co-sdk.git
@@ -87,9 +87,9 @@ cargo install co-cli --git https://gitlab.1io.com/1io/co-sdk.git
 ```
 
 ## Building your first app
-Let's now build a COllaborative to-do list using CO-kit. 
+Let's now build a COllaborative to-do list using COkit. 
 
-While you can build any application with CO-kit, keep in mind that if you are COnsidering COllaboration, then CO-kit is destined for that job. Go for CO! 🚀
+While you can build any application with COkit, keep in mind that if you are COnsidering COllaboration, then COkit is destined for that job. Go for CO! 🚀
 
 For any app you build, you need these two ingredients:
 

@@ -1,9 +1,14 @@
+// CONFIDENTIAL — © 1io BRANDGUARDIAN GmbH. Proprietary COkit code/docs for internal use within our company domain and
+// authorized users/tools only; do not copy, disclose, or transmit any part outside this domain. No license is granted
+// by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
+// retention—approved secure tools may process solely for internal use.
+
 #[cfg(feature = "tracing")]
 use super::tracing::TracingBuilder;
 use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
 use crate::{
 	library::wait_response::request_response, services::application::ApplicationMessage, types::co_date::co_date_env,
-	Action, CoReducer, CoReducerFactory, CoStorage, CoUuid, Cores, DynamicCoUuid, RandomCoUuid, Storage,
+	Action, CoReducer, CoReducerFactory, CoStorage, CoUuid, Cores, DynamicCoUuid, Guards, RandomCoUuid, Storage,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -15,7 +20,7 @@ use co_identity::{
 #[cfg(feature = "network")]
 use co_network::NetworkSettings;
 use co_primitives::{tag, tags, CoDate, CoId, DynamicCoDate, TagValue, Tags};
-use co_runtime::Core;
+use co_runtime::{Core, GuardReference};
 use co_storage::StaticBlockStorage;
 #[cfg(feature = "fs")]
 use directories::ProjectDirs;
@@ -227,11 +232,12 @@ pub struct ApplicationSettings {
 	/// - `co-default-max-state` - [`TagValue::Integer`] [`ApplicationSettings::setting_co_default_max_state`]
 	///
 	/// Known Features:
-	/// - `co-local-watch` (default)
-	/// - `co-local-encryption` (default)
+	/// - `co-local-watch` [`ApplicationSettings::feature_co_local_watch`] (default)
+	/// - `co-local-encryption` [`ApplicationSettings::feature_co_local_encryption`] (default)
 	/// - `co-storage-free` - [`ApplicationSettings::feature_co_storage_free`]
 	/// - `co-open-keep` - [`ApplicationSettings::feature_co_open_keep`]
 	/// - `co-storage-verify-links` - [`ApplicationSettings::feature_co_storage_verify_links`]
+	/// - `co-guard-ignore` - [`ApplicationSettings::feature_co_guard_ignore`]
 	pub settings: Tags,
 }
 impl ApplicationSettings {
@@ -296,6 +302,16 @@ impl ApplicationSettings {
 		self.has_feature("co-storage-verify-links")
 	}
 
+	/// Ignore guards when checking actions.
+	/// Disabled in release builds.
+	/// Warning: This may destroys your CO. Only use this for development/testing.
+	pub fn feature_co_guard_ignore(&self) -> bool {
+		#[cfg(debug_assertions)]
+		return self.has_feature("co-guard-ignore");
+		#[cfg(not(debug_assertions))]
+		return false;
+	}
+
 	/// Count of roots to store for LocalCO and newly joined COs. A value of zero means unlimited.
 	pub fn setting_co_default_max_state(&self) -> PinStrategy {
 		match self
@@ -322,6 +338,7 @@ pub struct ApplicationBuilder {
 	uuid: Option<DynamicCoUuid>,
 	static_blocks: Vec<StaticBlockStorage<'static>>,
 	cores: Cores,
+	guards: Guards,
 }
 impl ApplicationBuilder {
 	#[cfg(feature = "fs")]
@@ -344,7 +361,8 @@ impl ApplicationBuilder {
 			date: None,
 			uuid: None,
 			static_blocks: Default::default(),
-			cores: Cores::default(),
+			cores: Default::default(),
+			guards: Default::default(),
 		}
 	}
 
@@ -369,7 +387,8 @@ impl ApplicationBuilder {
 			date: None,
 			uuid: None,
 			static_blocks: Default::default(),
-			cores: Cores::default(),
+			cores: Default::default(),
+			guards: Default::default(),
 		}
 	}
 
@@ -413,6 +432,11 @@ impl ApplicationBuilder {
 
 	pub fn with_core(mut self, core_cid: Cid, core: Core) -> Self {
 		self.cores = self.cores.with_override(core_cid, core);
+		self
+	}
+
+	pub fn with_guard(mut self, guard_cid: Cid, guard: GuardReference) -> Self {
+		self.guards = self.guards.with_override(guard_cid, guard);
 		self
 	}
 
@@ -487,7 +511,7 @@ impl ApplicationBuilder {
 		let service = Actor::spawn(
 			tags!("type": "application", "application": settings.identifier.clone()),
 			crate::services::application::Application::new(settings.clone()),
-			(storage, tasks.clone(), date, uuid, self.cores),
+			(storage, tasks.clone(), date, uuid, self.cores, self.guards),
 		)?;
 
 		// wait for context

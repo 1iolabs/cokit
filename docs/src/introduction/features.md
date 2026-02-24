@@ -5,13 +5,13 @@
 - Designed for sovereign and federated setups where each participant retains control.
 
 ## Flexible Storage
-- Fully file-based architecture: CO-kit, by default, uses a file-centric model. All operations and data structures are persisted in files.
+- Fully file-based architecture: COkit, by default, uses a file-centric model. All operations and data structures are persisted in files.
 - Storage Agnostic: compatible with any local or cloud-based file systems (e.g., local FS, NFS, S3, etc.).
 - Each node can operate with partial local datasets, enabling efficient syncing and low network and storage overhead.
 - Nodes selectively fetch _only_ the data they need.
 
 ## Flexible Networking Model
-CO-kit provides a pluggable networking layer with optional components:
+COkit provides a pluggable networking layer with optional components:
 - Built-in Peer-to-Peer (P2P): Native P2P capabilities are integrated, but entirely optional.
 	- When devices are able to connect locally (LAN, Wifi, Bluetooth[^issue-79], ...) no internet is used.
 - [Configurable connectivity](../reference/network.md#network-configuration) per [CO](../reference/co.md)

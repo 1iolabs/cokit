@@ -1,10 +1,10 @@
 # Network
 
-CO-kit has a built-in peer-to-peer network stack utilizing [libp2p](https://libp2p.io/).
+COkit has a built-in peer-to-peer network stack utilizing [libp2p](https://libp2p.io/).
 
 The peer-to-peer networking is optional.  
 Any other protocol (such as http, file protocols like NFS, etc.) can be used (with some effort).  
-There is no lock-in to a single networking strategy; just describe your data using a Core and simply adapt CO-kit to your infrastructure.
+There is no lock-in to a single networking strategy; just describe your data using a Core and simply adapt COkit to your infrastructure.
 
 The actual networking protocols used can be configured for each CO.
 
@@ -75,17 +75,17 @@ We use the [Rust implementation of libp2p](https://github.com/libp2p/rust-libp2p
 Used for local peer discovery via multicast DNS ([RFC 6762](https://datatracker.ietf.org/doc/html/rfc6762)).  
 Peers broadcast `_p2p._udp.local` PTR queries, and libp2p-capable nodes respond with their multi-addresses.
 
-CO-kit uses the [libp2p mDNS client](https://docs.libp2p.io/concepts/discovery-routing/mdns/).
+COkit uses the [libp2p mDNS client](https://docs.libp2p.io/concepts/discovery-routing/mdns/).
 
 ### Protocol: Noise
 The [Noise Protocol Framework](https://noiseprotocol.org/) is a widely-used encryption scheme that allows for secure communication by combining cryptographic primitives into patterns with verifiable security properties.  
 
-CO-kit uses the [libp2p noise transport](https://docs.libp2p.io/concepts/secure-comm/noise/).
+COkit uses the [libp2p noise transport](https://docs.libp2p.io/concepts/secure-comm/noise/).
 
 ### Protocol: QUIC
 QUIC is a new transport protocol that provides an always-encrypted, stream-multiplexed connection built on top of UDP.
 
-CO-kit uses the [libp2p QUIC transport](https://docs.libp2p.io/concepts/transports/quic/) by default.
+COkit uses the [libp2p QUIC transport](https://docs.libp2p.io/concepts/transports/quic/) by default.
 
 ### Protocol: Ping
 The libp2p ping protocol is a simple liveness check that peers can use to test the connectivity and performance between two peers.  
@@ -97,7 +97,7 @@ The identify protocol allows peers to exchange information about each other, m
 ### Protocol: didcomm
 A Network protocol to send didcomm-encoded message to a given peer.  
 It uses a libp2p sub-stream for message transfer with a length prefixed streaming protocol.  
-CO-kit uses this to send discovery, join and invite messages directly to peers.
+COkit uses this to send discovery, join and invite messages directly to peers.
 
 For further information, see:
 - [DIDComm Messaging Specification v2.1](https://identity.foundation/didcomm-messaging/spec/v2.1/)
@@ -105,7 +105,7 @@ For further information, see:
 ### Protocol: bitswap
 Bitswap is a protocol for exchanging blocks of data.  
 It is a message-based protocol, where all messages contain want-lists (i.e. which blocks we are interested in) or blocks.  
-CO-kit uses an extended version of Bitswap that includes token-based authorization.
+COkit uses an extended version of Bitswap that includes token-based authorization.
 
 For further information, see:
 - [Bitswap](https://docs.ipfs.tech/concepts/bitswap/)

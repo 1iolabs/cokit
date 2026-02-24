@@ -1,3 +1,8 @@
+// CONFIDENTIAL — © 1io BRANDGUARDIAN GmbH. Proprietary COkit code/docs for internal use within our company domain and
+// authorized users/tools only; do not copy, disclose, or transmit any part outside this domain. No license is granted
+// by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
+// retention—approved secure tools may process solely for internal use.
+
 use crate::{
 	application::{
 		application::ApplicationSettings,
@@ -11,8 +16,8 @@ use crate::{
 		reducers::{ReducerStorage, ReducersControl},
 	},
 	types::co_reducer_factory::CoReducerFactoryError,
-	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoUuid, LocalCoBuilder, Runtime,
-	Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoUuid, Guards, LocalCoBuilder,
+	Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -228,6 +233,7 @@ pub(crate) struct CoContextInner {
 	block_links: BlockLinks,
 	block_links_builtin: BlockLinks,
 	cores: Cores,
+	guards: Guards,
 }
 impl CoContextInner {
 	#[allow(clippy::too_many_arguments)]
@@ -244,6 +250,7 @@ impl CoContextInner {
 		date: DynamicCoDate,
 		uuid: DynamicCoUuid,
 		cores: Cores,
+		guards: Guards,
 	) -> Self {
 		let block_links = BlockLinks::default();
 		let block_links_builtin = block_links.clone().with_filter(IgnoreFilter::new(builtin_cores()));
@@ -263,6 +270,7 @@ impl CoContextInner {
 			block_links,
 			block_links_builtin,
 			cores,
+			guards,
 		}
 	}
 
@@ -366,7 +374,8 @@ impl CoContextInner {
 	/// Creates the Core Resolver for a shared CO.
 	pub(crate) fn create_shared_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::new(&self.cores);
-		let core_resolver = CoGuardResolver::new(core_resolver);
+		let core_resolver =
+			CoGuardResolver::new(core_resolver, &self.guards).with_ignore_mode(self.settings.feature_co_guard_ignore());
 		let core_resolver = LogCoreResolver::new(core_resolver, id, self.date.clone());
 		DynamicCoreResolver::new(core_resolver)
 	}

@@ -1,3 +1,8 @@
+// CONFIDENTIAL — © 1io BRANDGUARDIAN GmbH. Proprietary COkit code/docs for internal use within our company domain and
+// authorized users/tools only; do not copy, disclose, or transmit any part outside this domain. No license is granted
+// by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
+// retention—approved secure tools may process solely for internal use.
+
 use co_network::NetworkApi;
 use co_sdk::{
 	Application, ApplicationBuilder, DidKeyIdentity, DidKeyProvider, NetworkSettings, TracingBuilder,
@@ -27,12 +32,21 @@ impl Instances {
 		Self { next_instance_id: 1, _guard: None }
 	}
 
+	/// Create a new peer.
 	pub async fn create(&mut self) -> Instance {
 		let instance_id = self.next_instance_id;
 		self.next_instance_id += 1;
 		Instance::new(instance_id).await
 	}
 
+	/// Create a new peer.
+	pub async fn create_builder(&mut self, build: impl FnOnce(ApplicationBuilder) -> ApplicationBuilder) -> Instance {
+		let instance_id = self.next_instance_id;
+		self.next_instance_id += 1;
+		Instance::new_builder(instance_id, build).await
+	}
+
+	/// Start networking for two peers and optionally dial them.
 	pub async fn networking(
 		peer1: &mut Instance,
 		peer2: &mut Instance,
@@ -86,11 +100,15 @@ pub struct Instance {
 }
 impl Instance {
 	pub async fn new(instance: u8) -> Self {
+		Self::new_builder(instance, |builder| builder).await
+	}
+
+	pub async fn new_builder(instance: u8, build: impl FnOnce(ApplicationBuilder) -> ApplicationBuilder) -> Self {
 		let identifier = format!("network-test-{}", instance);
 
 		// app
 		let builder = ApplicationBuilder::new_memory(identifier);
-		let application = builder.without_keychain().build().await.expect("application");
+		let application = build(builder).without_keychain().build().await.expect("application");
 		Self { application }
 	}
 
