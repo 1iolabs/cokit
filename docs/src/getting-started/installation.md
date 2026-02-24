@@ -4,7 +4,7 @@ This step-by-step guide covers both installing the tools, as well as building yo
 
 ## Requirements
 - `rust-1.91` or greater
-- `llvm-18`
+- `llvm-21`
 
 ## Setup Rust
 
@@ -26,7 +26,7 @@ rustup target add wasm32-unknown-unknown
 
 ## LLVM
 
-LLVM-18.0.0 is used to execute WebAssembly files as native code.
+LLVM-21.1.0 is used to execute WebAssembly files as native code.
 
 ### Linux
 
@@ -36,7 +36,7 @@ To install it using Linux use:
 apt-get install --no-install-recommends -y wget gnupg lsb-release software-properties-common \
  && wget https://apt.llvm.org/llvm.sh \
  && chmod +x llvm.sh \
- && ./llvm.sh 18 all \
+ && ./llvm.sh 21 all \
  && rm llvm.sh
 ```
 
@@ -50,13 +50,13 @@ brew install llvm@21
 
 #### Set up cargo (macOS)
 
-To let cargo know where to search for llvm we need to add the `LLVM_SYS_180_PREFIX` variable to the cargo config.  
+To let cargo know where to search for llvm we need to add the `LLVM_SYS_211_PREFIX` variable to the cargo config.  
 Here is a script for macOS to help you with that:
 
 ```sh
 mkdir -p ~/.cargo
 touch ~/.cargo/config.toml
-echo "[env]\nLLVM_SYS_180_PREFIX = \"$("brew" "--prefix" "llvm@18")\"" >> ~/.cargo/config.toml
+echo "[env]\nLLVM_SYS_211_PREFIX = \"$("brew" "--prefix" "llvm@21")\"" >> ~/.cargo/config.toml
 cat ~/.cargo/config.toml
 ```
 
@@ -65,7 +65,7 @@ It should now look like this:
 `~/.cargo/config.toml`:
 ```toml
 [env]
-LLVM_SYS_180_PREFIX = "/opt/homebrew/opt/llvm@18"
+LLVM_SYS_211_PREFIX = "/opt/homebrew/opt/llvm"
 ```
 
 ```admonish note

@@ -73,7 +73,7 @@ COkit's built-in Merkle-CRDT uses this to ensure eventual consistency.
 
 ### WASM (WebAssembly)
 Portable binary format for sandboxed execution. COkit compiles Cores to WASM for
-deterministic, cross-peer execution. Uses LLVM-18 for native-speed execution.
+deterministic, cross-peer execution. Uses LLVM-21 for native-speed execution.
 
 ## Identity Terms
 

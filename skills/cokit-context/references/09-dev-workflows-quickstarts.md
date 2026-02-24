@@ -3,7 +3,7 @@
 ## Requirements
 
 - Rust 1.91+ (MSRV)
-- LLVM 18 (for WASM native execution)
+- LLVM 21 (for WASM native execution)
 - wasm32-unknown-unknown target
 - Nightly toolchain (for rustfmt)
 
@@ -32,10 +32,10 @@ cargo install co-cli --git https://gitlab.1io.com/1io/co-sdk.git
 
 ### LLVM Setup (macOS)
 ```sh
-brew install llvm@18
+brew install llvm@21
 # Add to ~/.cargo/config.toml:
 # [env]
-# LLVM_SYS_180_PREFIX = "/opt/homebrew/opt/llvm@18"
+# LLVM_SYS_211_PREFIX = "/opt/homebrew/opt/llvm"
 ```
 
 ### WASM Target
