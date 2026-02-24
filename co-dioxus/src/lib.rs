@@ -29,7 +29,7 @@ pub use library::{
 	co_context::CoContext,
 };
 pub use types::{
-	co_settings::CoSettings,
+	co_settings::{CoSettings, CoStorageSetting},
 	co_state_result::CoStateResult,
 	error::{CoError, CoErrorSignal},
 };

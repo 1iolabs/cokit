@@ -1,4 +1,4 @@
-use crate::CoSettings;
+use crate::{CoSettings, CoStorageSetting};
 use clap::ValueEnum;
 #[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
@@ -26,6 +26,11 @@ pub struct Cli {
 	#[cfg(feature = "fs")]
 	#[arg(long, env = "CO_BASE_PATH")]
 	pub base_path: Option<PathBuf>,
+
+	/// Start instance in memory.
+	/// Implies: no_keychain, no_log
+	#[arg(long, env = "CO_MEMORY")]
+	pub memory: bool,
 
 	/// Disable logging to file.
 	#[arg(long, default_value_t = false)]
@@ -64,20 +69,30 @@ pub struct Cli {
 impl From<Cli> for CoSettings {
 	fn from(cli: Cli) -> Self {
 		CoSettings {
+			storage: co_storage(&cli),
 			identifier: cli.instance_id.unwrap_or_else(|| String::from("dioxus")),
 			#[cfg(feature = "network")]
 			network: !cli.no_network,
 			#[cfg(feature = "network")]
 			network_settings: NetworkSettings::default().with_force_new_peer_id(cli.force_new_peer_id),
 			no_keychain: cli.no_keychain,
-			#[cfg(feature = "fs")]
-			path: cli.base_path,
 			no_log: cli.no_log,
 			log_level: cli.log_level,
 			no_default_features: cli.no_default_features,
 			feature: cli.feature,
 		}
 	}
+}
+
+fn co_storage(_cli: &Cli) -> CoStorageSetting {
+	#[cfg(feature = "fs")]
+	if !_cli.memory {
+		return match _cli.base_path.clone() {
+			Some(path) => CoStorageSetting::Path(path),
+			None => CoStorageSetting::PathDefault,
+		};
+	}
+	CoStorageSetting::Memory
 }
 
 fn parse_bool(s: &str) -> Result<bool, String> {

@@ -1,3 +1,7 @@
+#[cfg(not(feature = "fs"))]
+use crate::CoStorageSetting;
+#[cfg(feature = "fs")]
+use crate::CoStorageSetting;
 use crate::{CoError, CoErrorSignal, CoSettings};
 use anyhow::Result;
 use co_sdk::{Application, ApplicationBuilder};
@@ -17,10 +21,13 @@ impl CoContext {
 		//  note: we initialize the logging synchonously before dioxus registers the default
 		#[cfg(feature = "tracing")]
 		if !settings.no_log {
-			#[cfg(feature = "fs")]
-			let base_path = Some(settings.path.clone().unwrap_or_else(ApplicationBuilder::default_path));
-			#[cfg(not(feature = "fs"))]
-			let base_path = None;
+			let base_path = match settings.storage.clone() {
+				#[cfg(feature = "fs")]
+				CoStorageSetting::Path(path) => Some(path),
+				#[cfg(feature = "fs")]
+				CoStorageSetting::PathDefault => Some(ApplicationBuilder::default_path()),
+				CoStorageSetting::Memory => None,
+			};
 			co_sdk::TracingBuilder::new(settings.identifier.clone(), base_path)
 				.with_bunyan_logging(None)
 				.with_max_level(settings.log_level.into())
@@ -192,13 +199,13 @@ type Task = Box<TaskFn>;
 // type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
 
 async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Result<(), anyhow::Error> {
-	#[cfg(feature = "fs")]
-	let mut application_builder = match settings.path {
-		Some(path) => ApplicationBuilder::new_with_path(settings.identifier, path),
-		None => ApplicationBuilder::new(settings.identifier),
+	let mut application_builder = match settings.storage {
+		#[cfg(feature = "fs")]
+		CoStorageSetting::Path(path) => ApplicationBuilder::new_with_path(settings.identifier, path),
+		#[cfg(feature = "fs")]
+		CoStorageSetting::PathDefault => ApplicationBuilder::new(settings.identifier),
+		CoStorageSetting::Memory => ApplicationBuilder::new_memory(settings.identifier),
 	};
-	#[cfg(not(feature = "fs"))]
-	let mut application_builder = ApplicationBuilder::new_memory(settings.identifier);
 	if settings.no_keychain {
 		application_builder = application_builder.without_keychain();
 	}

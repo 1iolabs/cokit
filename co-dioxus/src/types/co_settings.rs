@@ -8,8 +8,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Default)]
 pub struct CoSettings {
 	pub identifier: String,
-	#[cfg(feature = "fs")]
-	pub path: Option<PathBuf>,
+	pub storage: CoStorageSetting,
 	#[cfg(feature = "network")]
 	pub network_settings: NetworkSettings,
 	#[cfg(feature = "network")]
@@ -36,7 +35,11 @@ impl CoSettings {
 
 	#[cfg(feature = "fs")]
 	pub fn with_path(self, path: &str) -> Self {
-		Self { path: Some(path.into()), ..self }
+		Self { storage: CoStorageSetting::Path(path.into()), ..self }
+	}
+
+	pub fn with_memory(self) -> Self {
+		Self { storage: CoStorageSetting::Memory, ..self }
 	}
 
 	#[cfg(feature = "network")]
@@ -46,5 +49,32 @@ impl CoSettings {
 
 	pub fn without_keychain(self) -> Self {
 		Self { no_keychain: true, ..self }
+	}
+}
+
+#[derive(Debug, Clone)]
+pub enum CoStorageSetting {
+	/// Store data in memory
+	Memory,
+
+	/// Store data in default path
+	#[cfg(feature = "fs")]
+	PathDefault,
+
+	/// Storage data in path
+	#[cfg(feature = "fs")]
+	Path(PathBuf),
+}
+#[cfg(feature = "fs")]
+impl Default for CoStorageSetting {
+	fn default() -> Self {
+		CoStorageSetting::PathDefault
+	}
+}
+#[allow(clippy::derivable_impls)]
+#[cfg(not(feature = "fs"))]
+impl Default for CoStorageSetting {
+	fn default() -> Self {
+		CoStorageSetting::Memory
 	}
 }
