@@ -3,6 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+/// Async storage interface.
 #[async_trait::async_trait(?Send)]
 pub trait AsyncStorage {
 	/// Returns a block from storage.

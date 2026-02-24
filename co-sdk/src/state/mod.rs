@@ -3,6 +3,8 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+//! Utilites to work with state managed by an core.
+//! This usually only involves the storage (BlockStorage) and content addresses (CID).
 pub mod board;
 mod co;
 mod dag;

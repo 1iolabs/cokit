@@ -3,6 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+// #![feature(type_alias_impl_trait)] // used in older nightly
 #![feature(impl_trait_in_assoc_type)]
 // #![feature(associated_type_defaults)]
 // #![feature(return_position_impl_trait_in_trait)]

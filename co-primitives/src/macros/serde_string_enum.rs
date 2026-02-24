@@ -3,6 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+/// Adds display and to_string implementation to serde enum types.
 #[macro_export]
 macro_rules! serde_string_enum {
 	($t: ident) => {

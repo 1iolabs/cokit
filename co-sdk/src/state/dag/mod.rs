@@ -3,6 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+// DAG Collection Utilities
 pub mod find;
 pub mod into_collection;
 pub mod is_empty;
