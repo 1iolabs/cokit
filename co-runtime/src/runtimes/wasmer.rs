@@ -118,7 +118,7 @@ impl WasmerRuntime {
 /// See:
 /// - https://github.com/wasmerio/wasmer/blob/dcaff6c83316e9e67b62ade47e70a9b121c08b15/lib/cli/src/backend.rs#L670
 pub struct WasmerRuntimeBuilder<'a> {
-	#[cfg(feature = "native")]
+	#[cfg(feature = "headless")]
 	native: bool,
 	bytes: &'a [u8],
 	#[cfg(feature = "llvm")]
@@ -127,7 +127,7 @@ pub struct WasmerRuntimeBuilder<'a> {
 impl<'a> WasmerRuntimeBuilder<'a> {
 	pub fn wasm(bytes: &'a [u8]) -> Self {
 		Self {
-			#[cfg(feature = "native")]
+			#[cfg(feature = "headless")]
 			native: false,
 			bytes,
 			#[cfg(feature = "llvm")]
@@ -137,7 +137,7 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 
 	pub fn native(bytes: &'a [u8]) -> Self {
 		Self {
-			#[cfg(feature = "native")]
+			#[cfg(feature = "headless")]
 			native: true,
 			bytes,
 			#[cfg(feature = "llvm")]
@@ -145,7 +145,7 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 		}
 	}
 
-	#[cfg(feature = "llvm")]
+	#[cfg(any(feature = "llvm", feature = "cranelift"))]
 	pub fn for_info(mut self) -> Self {
 		self.llvm = false;
 		self
@@ -168,7 +168,7 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 		}
 
 		// bytes are native code
-		#[cfg(feature = "native")]
+		#[cfg(feature = "headless")]
 		if self.native {
 			let engine: wasmer::Engine = wasmer::sys::EngineBuilder::headless()
 				.set_features(Some(features))

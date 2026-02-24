@@ -13,7 +13,7 @@ clap = { version = "^4.3.23", features = ["derive", "env"] }
 co-core-co = { workspace = true }
 co-core-membership = { workspace = true }
 co-primitives = { workspace = true }
-co-sdk = { workspace = true }
+co-sdk = { workspace = true, default-features = false }
 dioxus = { version = "^0.7.3", default-features = false, features = [
     "hooks",
     "signals",
@@ -34,7 +34,7 @@ web-sys = { version = "0.3", optional = true }
 default = []
 
 # targets
-"desktop" = ["fs", "network", "tracing", "co-sdk/default", "co-sdk/apple-sandbox"]
+"desktop" = ["fs", "network", "tracing", "co-sdk/recommended", "co-sdk/apple-sandbox"]
 "mobile" = ["fs", "network", "tracing", "co-sdk/recommended", "co-sdk/apple-sandbox"]
 "web" = ["js", "co-sdk/web"]
 

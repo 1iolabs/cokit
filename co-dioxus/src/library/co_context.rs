@@ -13,6 +13,22 @@ pub struct CoContext {
 }
 impl CoContext {
 	pub fn new(settings: CoSettings) -> Self {
+		// log
+		//  note: we initialize the logging synchonously before dioxus registers the default
+		#[cfg(feature = "tracing")]
+		if !settings.no_log {
+			#[cfg(feature = "fs")]
+			let base_path = Some(settings.path.clone().unwrap_or_else(ApplicationBuilder::default_path));
+			#[cfg(not(feature = "fs"))]
+			let base_path = None;
+			co_sdk::TracingBuilder::new(settings.identifier.clone(), base_path)
+				.with_bunyan_logging(None)
+				.with_max_level(settings.log_level.into())
+				.init()
+				.expect("tracing init");
+		}
+
+		// spawn
 		Self::spawn(settings)
 	}
 
@@ -183,19 +199,11 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 	};
 	#[cfg(not(feature = "fs"))]
 	let mut application_builder = ApplicationBuilder::new_memory(settings.identifier);
-	#[cfg(feature = "fs")]
-	if !settings.no_log {
-		application_builder = application_builder.with_bunyan_logging(None);
-	}
 	if settings.no_keychain {
 		application_builder = application_builder.without_keychain();
 	}
 	if settings.no_default_features {
 		application_builder = application_builder.with_setting("default-features", false);
-	}
-	#[cfg(feature = "tracing")]
-	{
-		application_builder = application_builder.with_log_max_level(settings.log_level.into());
 	}
 	for feature in &settings.feature {
 		application_builder = application_builder.with_setting("feature", feature.to_owned());

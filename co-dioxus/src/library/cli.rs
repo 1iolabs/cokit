@@ -88,7 +88,7 @@ fn parse_bool(s: &str) -> Result<bool, String> {
 	}
 }
 
-#[derive(Debug, Default, Clone, ValueEnum)]
+#[derive(Debug, Default, Clone, Copy, ValueEnum)]
 pub enum CoLogLevel {
 	Error,
 	Warn,

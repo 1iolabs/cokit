@@ -39,13 +39,14 @@ wasmer = { git = "https://github.com/wasmerio/wasmer.git", branch = "main" }
 
 [features]
 default = []
-native = ["wasmer/compiler", "fs", "tokio/rt"]
+native = ["fs", "tokio/rt"]
 web = ["uuid/js", "js", "co-storage/web"]
 fs = []
 
 # backends
-llvm = ["wasmer/llvm", "dep:wasmer-compiler", "dep:wasmer-compiler-llvm"]
-cranelift = ["wasmer/cranelift", "dep:wasmer-compiler", "dep:wasmer-compiler-cranelift"]
+headless = ["wasmer/headless", "wasmer/compiler"]
+llvm = ["wasmer/llvm", "wasmer/compiler", "dep:wasmer-compiler", "dep:wasmer-compiler-llvm"]
+cranelift = ["wasmer/cranelift", "wasmer/compiler", "dep:wasmer-compiler", "dep:wasmer-compiler-cranelift"]
 wasmi = ["wasmer/wasmi"]
 wamr = ["wasmer/wamr"]
 js = ["wasmer/js-default", "wasmer/js-serializable-module"]
