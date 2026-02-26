@@ -79,7 +79,7 @@ pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 		if command.zst {
 			let mut compressed_path = build_artifact.artifact_path.clone();
 			compressed_path.add_extension("zst");
-			let compressed_contents = zstd::encode_all(Cursor::new(&core_wasm), 19)?;
+			let compressed_contents = zstd::encode_all(std::io::Cursor::new(&core_wasm), 19)?;
 			tokio::fs::write(&compressed_path, &compressed_contents).await?;
 		}
 
