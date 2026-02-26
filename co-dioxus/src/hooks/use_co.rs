@@ -18,8 +18,6 @@ use dioxus::prelude::*;
 use futures::{future::Either, io::Cursor};
 use serde::Serialize;
 use std::fmt::Debug;
-#[cfg(feature = "js")]
-use tokio_with_wasm::alias as tokio;
 
 pub fn use_co(co: ReadSignal<CoId>) -> Co {
 	let reducer_state = use_signal_sync(|| None);

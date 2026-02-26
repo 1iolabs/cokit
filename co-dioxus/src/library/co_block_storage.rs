@@ -9,8 +9,6 @@ use cid::Cid;
 use co_actor::ActorHandle;
 use co_primitives::{Block, BlockStorageCloneSettings, CloneWithBlockStorageSettings, StoreParams};
 use co_sdk::{BlockStat, BlockStorage, BlockStorageContentMapping, DefaultParams, StorageError};
-#[cfg(feature = "js")]
-use tokio_with_wasm::alias as tokio;
 
 #[derive(Debug, Clone)]
 pub struct CoBlockStorage {
