@@ -7,6 +7,8 @@ pub mod change;
 pub mod encrypted;
 #[cfg(feature = "fs")]
 pub mod fs;
+#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+pub mod indexeddb;
 pub mod join;
 pub mod links;
 pub mod mapped;

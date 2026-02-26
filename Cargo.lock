@@ -2131,6 +2131,7 @@ dependencies = [
  "insta",
  "ipld-core",
  "ipld-dagpb",
+ "js-sys",
  "multihash 0.19.3",
  "multihash-codetable",
  "serde",
@@ -2145,6 +2146,9 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
