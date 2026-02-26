@@ -134,7 +134,7 @@ pub struct WasmerRuntimeBuilder<'a> {
 	#[cfg(feature = "headless")]
 	native: bool,
 	bytes: &'a [u8],
-	#[cfg(feature = "llvm")]
+	#[cfg(any(feature = "llvm", feature = "cranelift"))]
 	llvm: bool,
 }
 impl<'a> WasmerRuntimeBuilder<'a> {
@@ -143,7 +143,7 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 			#[cfg(feature = "headless")]
 			native: false,
 			bytes,
-			#[cfg(feature = "llvm")]
+			#[cfg(any(feature = "llvm", feature = "cranelift"))]
 			llvm: true,
 		}
 	}
@@ -153,7 +153,7 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 			#[cfg(feature = "headless")]
 			native: true,
 			bytes,
-			#[cfg(feature = "llvm")]
+			#[cfg(any(feature = "llvm", feature = "cranelift"))]
 			llvm: true,
 		}
 	}
