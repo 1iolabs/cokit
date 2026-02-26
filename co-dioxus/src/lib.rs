@@ -18,7 +18,7 @@ pub use hooks::{
 pub use library::{
 	cli::{Cli, CoLogLevel},
 	co_block_storage::CoBlockStorage,
-	co_context::CoContext,
+	co_context::{CoContext, CoContextError},
 };
 pub use types::{
 	co_settings::{CoSettings, CoStorageSetting},

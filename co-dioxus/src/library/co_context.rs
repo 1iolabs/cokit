@@ -130,7 +130,7 @@ impl CoContext {
 	}
 
 	/// Execute future task using CO Application and return its result when done.
-	pub(crate) async fn try_with_application<F, Fut, T, E>(&self, f: F) -> Result<T, CoContextError<E>>
+	pub async fn try_with_application<F, Fut, T, E>(&self, f: F) -> Result<T, CoContextError<E>>
 	where
 		Fut: Future<Output = Result<T, E>> + Send + 'static,
 		F: FnOnce(Application) -> Fut + Send + 'static,
