@@ -8,7 +8,7 @@ use co_sdk::{build_core, crate_repository_path, unixfs_encode_buffer};
 use exitcode::ExitCode;
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, future::ready, io::Cursor, os::unix::ffi::OsStrExt, path::PathBuf};
+use std::{collections::BTreeMap, future::ready, os::unix::ffi::OsStrExt, path::PathBuf};
 use tokio_stream::wrappers::ReadDirStream;
 
 #[derive(Debug, Clone, clap::Args)]

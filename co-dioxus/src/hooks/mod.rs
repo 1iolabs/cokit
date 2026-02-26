@@ -4,15 +4,8 @@
 // retention—approved secure tools may process solely for internal use.
 
 pub mod use_co;
-pub mod use_co_actions;
-pub mod use_co_api;
-pub mod use_co_block;
 pub mod use_co_context;
-pub mod use_co_context_provider;
-pub mod use_co_error;
-pub mod use_co_error_provider;
-pub mod use_co_error_signal;
-pub mod use_co_selector;
-pub mod use_co_state;
-pub mod use_co_storage;
+pub mod use_co_id;
+pub mod use_co_reducer_state;
 pub mod use_did_key_identity;
+pub mod use_selector;

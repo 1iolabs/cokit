@@ -351,22 +351,7 @@ where
 
 	/// Wait for actor shutdown.
 	pub async fn closed(&self) -> Result<(), ActorError> {
-		let mut state = self.state.clone();
-		loop {
-			let actor_state = *state.borrow_and_update();
-			match actor_state {
-				ActorState::Starting | ActorState::Running => {
-					state
-						.changed()
-						.await
-						.map_err(|e| ActorError::InvalidState(e.into(), self.tags().clone()))?;
-				},
-				_ => {
-					break;
-				},
-			}
-		}
-		Ok(())
+		actor_closed(self.state.clone(), self.tags.clone()).await
 	}
 
 	/// Request shutdown.
@@ -502,8 +487,31 @@ impl<M> WeakActorHandle<M> {
 	pub fn upgrade(self) -> Option<ActorHandle<M>> {
 		Some(ActorHandle { state: self.state, tags: self.tags, tx: self.tx.upgrade()? })
 	}
+
+	/// Wait for actor shutdown.
+	pub async fn closed(&self) -> Result<(), ActorError> {
+		actor_closed(self.state.clone(), self.tags.clone()).await
+	}
 }
 
+/// Wait for actor shutdown.
+async fn actor_closed(mut state: watch::Receiver<ActorState>, tags: Arc<Tags>) -> Result<(), ActorError> {
+	loop {
+		let actor_state = *state.borrow_and_update();
+		match actor_state {
+			ActorState::Starting | ActorState::Running => {
+				state
+					.changed()
+					.await
+					.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
+			},
+			_ => {
+				break;
+			},
+		}
+	}
+	Ok(())
+}
 // pub trait ActorExt: Actor {
 // 	fn with_epic<E, C>(self, epic: E, context: C) -> EpicActor<Self, C>
 // 	where

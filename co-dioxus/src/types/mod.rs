@@ -4,5 +4,4 @@
 // retention—approved secure tools may process solely for internal use.
 
 pub mod co_settings;
-pub mod co_state_result;
 pub mod error;

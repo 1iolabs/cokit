@@ -3,25 +3,29 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use dioxus::signals::SyncSignal;
-use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Display};
+use co_actor::ActorError;
+use std::{fmt::Debug, sync::Arc};
 
-pub type CoErrorSignal = SyncSignal<Vec<CoError>>;
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CoError {
-	id: String,
-	// name: String,
-	message: String,
-	details: String,
-	// tags: Tags,
-}
+#[derive(Clone, thiserror::Error)]
+#[error(transparent)]
+pub struct CoError(Arc<anyhow::Error>);
 impl CoError {
-	pub fn from_error<E>(error: E) -> Self
-	where
-		E: Display + Debug,
-	{
-		Self { id: uuid::Uuid::new_v4().to_string(), message: format!("{}", error), details: format!("{:?}", error) }
+	pub fn new<E: Into<anyhow::Error>>(error: E) -> Self {
+		Self(Arc::new(error.into()))
+	}
+}
+impl From<anyhow::Error> for CoError {
+	fn from(err: anyhow::Error) -> Self {
+		Self::new(err)
+	}
+}
+impl From<ActorError> for CoError {
+	fn from(err: ActorError) -> Self {
+		Self::new(err)
+	}
+}
+impl Debug for CoError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.0.fmt(f)
 	}
 }

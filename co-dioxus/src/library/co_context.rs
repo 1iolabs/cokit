@@ -3,14 +3,13 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+use crate::CoSettings;
 #[cfg(not(feature = "fs"))]
 use crate::CoStorageSetting;
 #[cfg(feature = "fs")]
 use crate::CoStorageSetting;
-use crate::{CoError, CoErrorSignal, CoSettings};
 use anyhow::Result;
 use co_sdk::{Application, ApplicationBuilder};
-use dioxus::signals::WritableExt;
 use futures::{future::BoxFuture, Future};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 #[cfg(feature = "js")]
@@ -79,7 +78,7 @@ impl CoContext {
 
 	/// Execute future task using CO Application.
 	/// Futures will be executed in sequence.
-	pub fn execute_future_box<F>(&self, f: F)
+	pub(crate) fn execute_future_box<F>(&self, f: F)
 	where
 		F: (FnOnce(Application) -> BoxFuture<'static, ()>) + Send + 'static,
 	{
@@ -89,7 +88,7 @@ impl CoContext {
 	}
 
 	/// Execute task using CO Application.
-	pub fn execute<F>(&self, f: F)
+	pub(crate) fn execute<F>(&self, f: F)
 	where
 		F: FnOnce(Application) + Send + 'static,
 	{
@@ -102,7 +101,7 @@ impl CoContext {
 
 	/// Execute future task using CO Application.
 	/// Futures will be started in sequence but executed in parallel.
-	pub fn execute_future_parallel<F, Fut>(&self, f: F)
+	pub(crate) fn execute_future_parallel<F, Fut>(&self, f: F)
 	where
 		Fut: Future<Output = ()> + Send + 'static,
 		F: FnOnce(Application) -> Fut + Send + 'static,
@@ -118,7 +117,7 @@ impl CoContext {
 
 	/// Execute future task using CO Application.
 	/// Futures will be executed in sequence.
-	pub fn execute_future<F, Fut>(&self, f: F)
+	pub(crate) fn execute_future<F, Fut>(&self, f: F)
 	where
 		Fut: Future<Output = ()> + Send + 'static,
 		F: FnOnce(Application) -> Fut + Send + 'static,
@@ -130,47 +129,8 @@ impl CoContext {
 		});
 	}
 
-	/// Execute future task using CO Application.
-	/// Note: Tasks will be started in sequence but executed in parallel.
-	pub fn execute_future_with_error<F, Fut>(&self, mut error: CoErrorSignal, f: F)
-	where
-		Fut: Future<Output = Result<(), anyhow::Error>> + Send + 'static,
-		F: FnOnce(Application) -> Fut + Send + 'static,
-	{
-		self.execute_future_box(move |application| {
-			Box::pin(async move {
-				match f(application).await {
-					Ok(_) => {},
-					Err(e) => error.write().push(CoError::from_error(e)),
-				}
-			})
-		});
-	}
-
 	/// Execute future task using CO Application and return its result when done.
-	/// Note: Tasks will be started in sequence but executed in parallel.
-	pub async fn result<F, Fut, T>(&self, mut error: CoErrorSignal, f: F) -> Option<T>
-	where
-		Fut: Future<Output = Result<T, anyhow::Error>> + Send + 'static,
-		F: FnOnce(Application) -> Fut + Send + 'static,
-		T: Send + 'static,
-	{
-		let (tx, rx) = futures::channel::oneshot::channel();
-		self.execute_future_box(move |application| {
-			Box::pin(async move {
-				match f(application).await {
-					Ok(result) => {
-						tx.send(result).ok();
-					},
-					Err(e) => error.write().push(CoError::from_error(e)),
-				}
-			})
-		});
-		rx.await.ok()
-	}
-
-	/// Execute future task using CO Application and return its result when done.
-	pub async fn try_with_application<F, Fut, T, E>(&self, f: F) -> Result<T, CoContextError<E>>
+	pub(crate) async fn try_with_application<F, Fut, T, E>(&self, f: F) -> Result<T, CoContextError<E>>
 	where
 		Fut: Future<Output = Result<T, E>> + Send + 'static,
 		F: FnOnce(Application) -> Fut + Send + 'static,

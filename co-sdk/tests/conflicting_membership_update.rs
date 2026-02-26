@@ -33,7 +33,7 @@ async fn trace_state(note: &str, co: &str, storage: &CoStorage, reducer_state: &
 }
 
 #[tracing::instrument(level = tracing::Level::TRACE, skip_all)]
-async fn trace_heads(note: &str, co: &str, context: &CoContext, storage: &CoStorage, reducer_state: &CoReducerState) {
+async fn trace_heads(note: &str, co: &str, _context: &CoContext, storage: &CoStorage, reducer_state: &CoReducerState) {
 	// fn pretty_print_with_indent<T: std::fmt::Debug>(value: &T, indent: usize) {
 	// 	let formatted = format!("{:#?}", value);
 	// 	let indent_str = " ".repeat(indent);
@@ -45,10 +45,7 @@ async fn trace_heads(note: &str, co: &str, context: &CoContext, storage: &CoStor
 	// 	println!("{}", indented);
 	// }
 	tracing::trace!(note, heads = ?reducer_state.heads(), ?co, "trace-heads");
-	let entries = context
-		.entries_from_heads(CoId::from(co), storage.clone(), reducer_state.heads().clone())
-		.await
-		.unwrap()
+	let entries = state::heads_stream(storage.clone(), &CoId::from(co), reducer_state.heads())
 		.enumerate()
 		.map(|(index, result)| result.map(|ok| (index, ok)));
 	pin_mut!(entries);

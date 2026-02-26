@@ -10,7 +10,7 @@ use crate::{
 };
 use cid::Cid;
 use co_identity::PrivateIdentity;
-use co_primitives::{BlockStorage, BlockStorageExt, Clock, Entry, Link};
+use co_primitives::{AnyBlockStorage, BlockStorageExt, Clock, Entry, Link};
 use futures::{pin_mut, Stream, TryStreamExt};
 use serde::Serialize;
 use std::{
@@ -87,7 +87,7 @@ impl Log {
 
 	pub async fn get<S>(&self, storage: &S, cid: &Cid) -> Result<EntryBlock, LogError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let block = storage.get(cid).await?;
 		Ok(EntryBlock::from_block(block)?)
@@ -96,17 +96,16 @@ impl Log {
 	/// Iterate entries starting at the head.
 	pub fn stream<'a, S>(&self, storage: &'a S) -> impl Stream<Item = Result<EntryBlock, LogError>> + use<'a, S>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		create_stream(storage, self.heads().clone())
 	}
 
 	/// Iterate entries starting at the head.
-	pub fn into_stream<S>(self, storage: &S) -> impl Stream<Item = Result<EntryBlock, LogError>> + use<S>
+	pub fn into_stream<S>(self, storage: S) -> impl Stream<Item = Result<EntryBlock, LogError>> + use<S>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
-		let storage = storage.clone();
 		async_stream::stream! {
 			for await i in create_stream(&storage, self.heads().clone()) {
 				yield i;
@@ -117,7 +116,7 @@ impl Log {
 	/// Push item as new entry.
 	pub async fn push<S, I>(&mut self, storage: &S, identity: &I, item: Cid) -> Result<EntryBlock, LogError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 		I: PrivateIdentity + Send + Sync,
 	{
 		// heads
@@ -157,7 +156,7 @@ impl Log {
 		item: &T,
 	) -> Result<(EntryBlock, Link<T>), LogError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 		T: Serialize + Send + Sync + Clone,
 		I: PrivateIdentity + Send + Sync,
 	{
@@ -170,7 +169,7 @@ impl Log {
 	/// Returns true if the other heads has been joined.
 	pub async fn join_entry<S>(&mut self, storage: &S, entry: EntryBlock) -> Result<bool, LogError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut join = JoinEntry::new(self.heads.clone());
 
@@ -191,7 +190,7 @@ impl Log {
 	/// Returns true if the other heads has been joined.
 	pub async fn join<S>(&mut self, storage: &S, other: &Log) -> Result<bool, LogError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		self.join_heads(storage, other.heads.iter()).await
 	}
@@ -205,7 +204,7 @@ impl Log {
 		other_heads: impl IntoIterator<Item = &'a Cid> + 'a,
 	) -> Result<bool, LogError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let mut result = false;
 		let entries = get_entry_blocks(storage, other_heads.into_iter()).await?;
@@ -255,7 +254,7 @@ impl Log {
 	/// Returns `true` if the entry is found in the log (already integrated).
 	async fn load<S>(&mut self, storage: &S, entry: &EntryBlock) -> Result<bool, LogError>
 	where
-		S: BlockStorage + Clone + 'static,
+		S: AnyBlockStorage,
 	{
 		let entry_clock_time = entry.entry().clock.time;
 

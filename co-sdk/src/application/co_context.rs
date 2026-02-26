@@ -15,6 +15,7 @@ use crate::{
 		application::ApplicationMessage,
 		reducers::{ReducerStorage, ReducersControl},
 	},
+	state,
 	types::co_reducer_factory::CoReducerFactoryError,
 	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoUuid, Guards, LocalCoBuilder,
 	Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
@@ -59,6 +60,7 @@ impl CoContext {
 	/// Get a stream to the log entries.
 	/// Starting at the latest (reverse chronological).
 	/// The stream is read with snapshot isolation (not watching changes).
+	//#[deprecated(note = "Use co_sdk::state::heads instead")]
 	pub async fn entries(
 		&self,
 		co: impl AsRef<CoId>,
@@ -69,7 +71,7 @@ impl CoContext {
 		let state = reducer.reducer_state().await;
 
 		// stream
-		let stream = self.entries_from_heads(co, storage.clone(), state.1).await?;
+		let stream = state::heads_stream(storage.clone(), co.as_ref(), state.heads());
 
 		// result
 		Ok((storage, stream))
@@ -77,6 +79,7 @@ impl CoContext {
 
 	/// Get a stream to the log entries.
 	/// Starting at `heads` (reverse chronological).
+	#[deprecated(note = "Use co_sdk::state::heads instead")]
 	pub async fn entries_from_heads(
 		&self,
 		co: impl AsRef<CoId>,
@@ -89,7 +92,7 @@ impl CoContext {
 		let log = Log::new_readonly(co.as_bytes().to_vec(), heads);
 
 		// stream
-		let stream = log.into_stream(&storage).map_err(|e| e.into());
+		let stream = log.into_stream(storage).map_err(|e| e.into());
 
 		// result
 		Ok(stream)

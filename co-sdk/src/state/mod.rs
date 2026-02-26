@@ -8,6 +8,7 @@
 pub mod board;
 mod co;
 mod dag;
+mod heads;
 mod identities;
 mod memberships;
 mod networks;
@@ -19,6 +20,7 @@ pub use co::{
 	info::{co, co_info},
 };
 pub use dag::{find::find, into_collection::into_collection, is_empty::is_empty, stream::stream};
+pub use heads::{heads_action_stream, heads_stream};
 pub use identities::{identities, is_identity, Identity};
 pub use memberships::memberships;
 pub use networks::networks;

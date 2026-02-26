@@ -40,7 +40,7 @@ pub fn App() -> Element {
 			.try_filter(move |item| ready(item.0.as_str() != CO_ID_LOCAL))
 			.try_collect::<Vec<_>>()
 			.await?)
-	})?;
+	}).suspend()?;
 	
 	// use a identity
 	let identity = use_did_key_identity("my-identity")?;
