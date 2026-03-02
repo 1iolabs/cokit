@@ -34,7 +34,7 @@ impl DidCommSendNetworkTask {
 		let (tx, rx) = tokio::sync::oneshot::channel();
 		let task = Self { message, peers: peers.into_iter().collect(), sent: Some(tx) };
 		spawner.spawn(task)?;
-		tokio::time::timeout(timeout, rx).await??
+		crate::compat::timeout(timeout, rx).await??
 	}
 }
 impl NetworkTask<Behaviour, Context> for DidCommSendNetworkTask {

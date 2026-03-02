@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	library::{network_identity::network_identity, shared_membership::shared_membership},
+	library::{compat::Instant, network_identity::network_identity, shared_membership::shared_membership},
 	services::application::{HeadsError, HeadsMessageReceivedAction},
 	state, Action, ActionError, CoContext, CoReducer, CoReducerFactory, MappedCoReducerState,
 };
@@ -16,7 +16,7 @@ use co_identity::PeerDidCommHeader;
 use co_network::{connections::PeerRelateCoAction, EncodedMessage, HeadsErrorCode, HeadsMessage, PeerId};
 use co_primitives::{CoId, Did, WeakCid};
 use futures::{future::ready, stream, FutureExt, Stream, StreamExt};
-use std::{collections::BTreeSet, str::FromStr, time::Instant};
+use std::{collections::BTreeSet, str::FromStr};
 
 /// Receive [`HeadsMessage`] DIDComm message.
 ///

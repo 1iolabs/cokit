@@ -2060,6 +2060,7 @@ dependencies = [
  "example-counter",
  "example-counter-upgraded",
  "futures",
+ "futures-timer",
  "futures-util",
  "hmac 0.12.1",
  "indexmap 2.13.0",
@@ -2099,6 +2100,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+ "web-time",
  "zstd",
 ]
 

@@ -3,7 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{Action, CoContext};
+use crate::{library::compat::Instant, Action, CoContext};
 use co_actor::Actions;
 use co_identity::PeerDidCommHeader;
 use co_network::{
@@ -12,7 +12,7 @@ use co_network::{
 };
 use co_primitives::CoTryStreamExt;
 use futures::{FutureExt, Stream};
-use std::{str::FromStr, time::Instant};
+use std::str::FromStr;
 
 /// When receive a DidComm message with an verified peer header relate it with the Did for future connections.
 ///

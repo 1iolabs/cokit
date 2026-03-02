@@ -227,7 +227,8 @@ impl Libp2pNetwork {
 		let shutdown = CancellationToken::new();
 		let mut runtime = Runtime::new(shutdown.child_token());
 
-		// listen
+		// listen (browsers connect via relay, not direct listen)
+		#[cfg(not(target_arch = "wasm32"))]
 		runtime.listen(swarm.listen_on(config.listen)?);
 
 		// run
@@ -269,6 +270,7 @@ impl Shutdown {
 }
 
 struct Runtime {
+	#[cfg(not(target_arch = "wasm32"))]
 	listener_id: Option<libp2p::core::transport::ListenerId>,
 	/// Tasks which have been executed but waiting for events.
 	pending_tasks: Vec<(NetworkTaskBox<Behaviour, Context>, Span)>,
@@ -277,9 +279,16 @@ struct Runtime {
 }
 impl Runtime {
 	fn new(shutdown: CancellationToken) -> Self {
-		Self { listener_id: None, shutdown, pending_tasks: Default::default(), next_delayed_task: Default::default() }
+		Self {
+			#[cfg(not(target_arch = "wasm32"))]
+			listener_id: None,
+			shutdown,
+			pending_tasks: Default::default(),
+			next_delayed_task: Default::default(),
+		}
 	}
 
+	#[cfg(not(target_arch = "wasm32"))]
 	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
 		self.listener_id = Some(id);
 	}

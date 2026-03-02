@@ -160,7 +160,7 @@ impl Epic<Action, (), CoContext> for NetworkQueueProcessEpic {
 						{
 							let retry = *retry + 1;
 							async move {
-								tokio::time::sleep(backoff_with_jitter(retry)).await;
+								crate::library::compat::sleep(backoff_with_jitter(retry)).await;
 								Ok(Action::NetworkQueueProcess { co, retry })
 							}
 						}

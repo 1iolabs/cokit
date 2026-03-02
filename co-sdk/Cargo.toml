@@ -58,6 +58,8 @@ tokio = { workspace = true, features = ["macros", "sync", "io-util"] }
 tokio-stream = { workspace = true, default-features = false, features = ["sync"] }
 tokio-util = { workspace = true }
 tokio_with_wasm = { workspace = true, optional = true, features = ["sync"] }
+futures-timer = { version = "3", optional = true }
+web-time = { workspace = true, optional = true }
 toml = { workspace = true }
 tracing = { workspace = true }
 tracing-bunyan-formatter = { workspace = true, optional = true }
@@ -113,7 +115,7 @@ co-test = { workspace = true }
 "network" = ["dep:co-network"]
 
 # Enable JS features
-"js" = ["dep:wasm-bindgen-futures", "dep:tokio_with_wasm", "dep:js-sys", "uuid/js", "co-runtime/js", "co-actor/js", "co-storage/js"]
+"js" = ["dep:wasm-bindgen-futures", "dep:tokio_with_wasm", "dep:js-sys", "dep:futures-timer", "dep:web-time", "uuid/js", "co-runtime/js", "co-actor/js", "co-storage/js"]
 
 # Enable opentelemetry tracing
 "opentelemetry" = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:opentelemetry-semantic-conventions", "dep:opentelemetry-stdout", "dep:tracing-opentelemetry"]

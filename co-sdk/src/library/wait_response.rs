@@ -3,7 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{services::application::ApplicationMessage, Action};
+use crate::{library::compat, services::application::ApplicationMessage, Action};
 use co_actor::ActorHandle;
 use futures::{future::ready, pin_mut, StreamExt};
 use std::time::Duration;
@@ -21,7 +21,6 @@ where
 	stream.next().await.ok_or(anyhow::anyhow!("No response"))
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 pub async fn wait_response_timeout<F, T>(
 	handle: ActorHandle<ApplicationMessage>,
 	timeout: Duration,
@@ -30,7 +29,9 @@ pub async fn wait_response_timeout<F, T>(
 where
 	F: Fn(&Action) -> Option<T>,
 {
-	tokio::time::timeout(timeout, wait_response(handle, filter)).await?
+	compat::timeout(timeout, wait_response(handle, filter))
+		.await
+		.map_err(|_| anyhow::anyhow!("Timeout"))?
 }
 
 pub async fn request_response<F, T>(
@@ -46,7 +47,6 @@ where
 	response_fut.await
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 pub async fn request_response_timeout<F, T>(
 	handle: ActorHandle<ApplicationMessage>,
 	timeout: Duration,
