@@ -166,6 +166,7 @@ impl Application {
 		// shutdown
 		self.tasks.spawn_options(TaskOptions::untracked(), {
 			let shutdown = self.context().inner.shutdown().clone();
+			#[cfg(not(feature = "js"))]
 			let tasks = self.tasks.clone();
 			let reactive = self.service.handle();
 			async move {

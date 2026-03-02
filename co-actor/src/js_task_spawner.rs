@@ -4,6 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 pub use crate::task_handle::TaskHandle;
+use crate::TaskOptions;
 use futures::Future;
 use std::{panic::Location, sync::Arc};
 use tracing::Instrument;
