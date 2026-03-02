@@ -123,10 +123,10 @@ co-test = { workspace = true }
 "tracing" = ["dep:tracing-subscriber"]
 
 # Native Target
-"native" = ["co-runtime/native", "co-actor/native", "co-storage/native", "fs", "tokio/full", "tracing", "bunyan", "keychain"]
+"native" = ["co-runtime/native", "co-actor/native", "co-storage/native", "co-network?/native", "fs", "tokio/full", "tracing", "bunyan", "keychain"]
 
 # Web Target (WASM)
-"web" = ["js", "co-identity/web", "co-storage/web", "co-runtime/web"]
+"web" = ["js", "co-identity/web", "co-storage/web", "co-runtime/web", "co-network?/web"]
 
 [[bench]]
 name = "local_push"

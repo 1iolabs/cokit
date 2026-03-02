@@ -19,5 +19,6 @@ check_wasm co-log --no-default-features -F web
 check_wasm co-messaging
 check_wasm co-macros
 check_wasm co-runtime --no-default-features -F web
+check_wasm co-network --no-default-features -F web
 check_wasm co-sdk --no-default-features -F web
 check_wasm co-dioxus --no-default-features -F web

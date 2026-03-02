@@ -8,13 +8,16 @@ use super::action::{
 	NetworkResolveAction, NetworkResolvedAction, PeerConnectionClosedAction, PeerConnectionEstablishedAction,
 	PeerRelateCoAction, PeerRelateDidAction, PeersChangedAction, ReleaseAction, ReleasedAction, UseAction,
 };
-use crate::connections::{DialAction, DialCompletedAction};
+use crate::{
+	compat::Instant,
+	connections::{DialAction, DialCompletedAction},
+};
 use co_actor::Reducer;
 use co_primitives::{CoId, Did, Network, NetworkDidDiscovery, NetworkPeer};
 use libp2p::{Multiaddr, PeerId};
 use std::{
 	collections::{BTreeSet, HashMap},
-	time::{Duration, Instant},
+	time::Duration,
 };
 
 #[derive(Debug, Clone)]

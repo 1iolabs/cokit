@@ -5,12 +5,12 @@
 
 use crate::{
 	backoff,
+	compat::Instant,
 	network::{Behaviour, Context, NetworkEvent},
 	types::network_task::{NetworkTask, NetworkTaskState},
 };
 use libp2p::{core::transport::ListenerId, swarm::SwarmEvent, Multiaddr, Swarm};
 use multiaddr::Protocol;
-use std::time::Instant;
 
 /// Try to listen to a relay when we are behind NAT.
 #[derive(Debug)]

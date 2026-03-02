@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use super::did_discovery::{DidDiscovery, DidDiscoveryMessageType};
-use crate::{didcomm, discovery::DiscoverMessage, types::layer_behaviour::LayerBehaviour};
+use crate::{compat::Instant, didcomm, discovery::DiscoverMessage, types::layer_behaviour::LayerBehaviour};
 use anyhow::anyhow;
 use co_identity::{
 	network_did_discovery, DidCommContext, DidCommHeader, DidCommPrivateContext, Identity, IdentityResolver,
@@ -17,7 +17,7 @@ use derive_more::From;
 use futures::{future::BoxFuture, stream::FuturesUnordered, FutureExt, StreamExt};
 use libp2p::{
 	gossipsub::{self, IdentTopic, TopicHash},
-	mdns, rendezvous,
+	rendezvous,
 	swarm::{dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
 	Multiaddr, PeerId, Swarm,
 };
@@ -25,7 +25,7 @@ use std::{
 	collections::{BTreeMap, BTreeSet, VecDeque},
 	str::{from_utf8, FromStr},
 	task::{Context, Poll},
-	time::{Duration, Instant},
+	time::Duration,
 };
 
 /// Single actionable discovery item with all context.
@@ -657,9 +657,10 @@ where
 	///
 	/// Specifically:
 	/// - Dail peers which we want to discover.
-	fn on_mdns_event(&mut self, event: &mdns::Event) {
+	#[cfg(feature = "native")]
+	fn on_mdns_event(&mut self, event: &libp2p::mdns::Event) {
 		match event {
-			mdns::Event::Discovered(items) => {
+			libp2p::mdns::Event::Discovered(items) => {
 				let discovered_peers: BTreeSet<&PeerId> = items.iter().map(|(peer, _)| peer).collect();
 				self.events.extend(
 					self.all_discovery_peers()
@@ -673,7 +674,7 @@ where
 						.collect::<Vec<_>>(),
 				);
 			},
-			mdns::Event::Expired(_) => {},
+			libp2p::mdns::Event::Expired(_) => {},
 		}
 	}
 
@@ -742,6 +743,7 @@ where
 				if let Some(didcomm_event) = B::didcomm_event(behaviour_event) {
 					self.on_didcomm_event(didcomm_event);
 				}
+				#[cfg(feature = "native")]
 				if let Some(mdns_event) = B::mdns_event(behaviour_event) {
 					self.on_mdns_event(mdns_event);
 				}
@@ -864,8 +866,10 @@ pub trait DiscoveryBehaviour: NetworkBehaviour {
 	fn rendezvous_client_mut(&mut self) -> Option<&mut rendezvous::client::Behaviour>;
 	fn rendezvous_client_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&rendezvous::client::Event>;
 
-	fn mdns_mut(&mut self) -> Option<&mut mdns::tokio::Behaviour>;
-	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&mdns::Event>;
+	#[cfg(feature = "native")]
+	fn mdns_mut(&mut self) -> Option<&mut libp2p::mdns::tokio::Behaviour>;
+	#[cfg(feature = "native")]
+	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&libp2p::mdns::Event>;
 
 	fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour;
 	fn didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&didcomm::Event>;
@@ -1097,10 +1101,12 @@ mod tests {
 			None
 		}
 
+		#[cfg(feature = "native")]
 		fn mdns_mut(&mut self) -> Option<&mut libp2p::mdns::tokio::Behaviour> {
 			None
 		}
 
+		#[cfg(feature = "native")]
 		fn mdns_event(_event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&libp2p::mdns::Event> {
 			None
 		}

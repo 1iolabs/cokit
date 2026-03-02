@@ -62,6 +62,11 @@ impl NetworkSettings {
 		Self::default()
 	}
 
+	#[cfg(feature = "web")]
+	pub fn web() -> Self {
+		Self { mdns: false, nat: true, relay: false, ..Default::default() }
+	}
+
 	fn default_listen() -> Multiaddr {
 		"/ip4/0.0.0.0/udp/0/quic-v1".parse().expect("to parse")
 	}

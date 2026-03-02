@@ -5,6 +5,7 @@
 
 use crate::{
 	backoff_with_jitter,
+	compat::Instant,
 	connections::DialAction,
 	services::connections::{
 		action::ConnectionAction, actor::ConnectionsContext,
@@ -13,7 +14,6 @@ use crate::{
 };
 use co_actor::{Actions, Epic};
 use futures::{stream, FutureExt, Stream, StreamExt};
-use std::time::Instant;
 
 /// Dial a bootstrap when we have a insufficent peers condition.
 #[derive(Debug, Default)]
@@ -37,7 +37,7 @@ impl Epic<ConnectionAction, ConnectionState, ConnectionsContext> for Insufficent
 								endpoints: bootstrap.endpoints.clone(),
 							})),
 							Err(Some(next_attempt)) => {
-								tokio::time::sleep_until(next_attempt.into()).await;
+								crate::compat::sleep_until(next_attempt).await;
 								Some(ConnectionAction::InsufficentPeers)
 							},
 							Err(None) => None,

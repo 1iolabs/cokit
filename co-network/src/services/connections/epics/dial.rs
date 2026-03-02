@@ -4,6 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
+	compat::Instant,
 	connections::DialCompletedAction,
 	services::{
 		connections::{action::ConnectionAction, actor::ConnectionsContext, ConnectionState},
@@ -12,7 +13,6 @@ use crate::{
 };
 use co_actor::Actions;
 use futures::{FutureExt, Stream};
-use std::time::Instant;
 
 /// Dial a peer.
 pub fn dial_epic(

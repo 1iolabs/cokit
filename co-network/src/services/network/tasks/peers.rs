@@ -9,7 +9,7 @@ use crate::{
 	types::network_task::{NetworkTask, NetworkTaskSpawner},
 };
 use futures::Stream;
-use libp2p::{mdns, swarm::SwarmEvent, PeerId, Swarm};
+use libp2p::{swarm::SwarmEvent, PeerId, Swarm};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
@@ -34,7 +34,8 @@ impl NetworkTask<Behaviour, Context> for PeersNetworkTask {
 		_context: &mut Context,
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
-		if let SwarmEvent::Behaviour(NetworkEvent::Mdns(mdns::Event::Discovered(list))) = &event {
+		#[cfg(feature = "native")]
+		if let SwarmEvent::Behaviour(NetworkEvent::Mdns(libp2p::mdns::Event::Discovered(list))) = &event {
 			for (peer_id, _) in list {
 				self.tx.send(*peer_id).ok();
 			}

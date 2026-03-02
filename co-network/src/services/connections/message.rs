@@ -4,10 +4,10 @@
 // retention—approved secure tools may process solely for internal use.
 
 use super::action::{ConnectionAction, PeersChangedAction, UseAction};
+use crate::compat::Instant;
 use co_actor::{ActorError, ActorHandle, ResponseStream};
 use co_primitives::{CoId, Did, Network};
 use futures::Stream;
-use std::time::Instant;
 
 #[derive(Debug)]
 pub enum ConnectionMessage {

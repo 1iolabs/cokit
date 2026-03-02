@@ -3,10 +3,11 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+use crate::compat::Instant;
 use co_primitives::{CoId, Did, Network};
 use derive_more::{From, TryInto};
 use libp2p::{Multiaddr, PeerId};
-use std::{collections::BTreeSet, time::Instant};
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, From, TryInto, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ConnectionAction {

@@ -3,12 +3,12 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::NetworkError;
+use crate::{compat::Instant, NetworkError};
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	Swarm,
 };
-use std::{fmt::Debug, time::Instant};
+use std::fmt::Debug;
 
 pub trait NetworkTask<B, C>: Debug
 where

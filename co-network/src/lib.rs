@@ -3,7 +3,11 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+#[cfg(feature = "web")]
+extern crate tokio_with_wasm as tokio;
+
 mod bitswap;
+pub(crate) mod compat;
 mod didcomm;
 mod discovery;
 mod library;

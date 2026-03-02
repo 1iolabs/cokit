@@ -5,6 +5,7 @@
 
 use crate::{
 	bitswap::{BitswapMessage, BitswapStoreClient},
+	compat::Instant,
 	didcomm, discovery,
 	library::find_peer_id::try_peer_id,
 	types::{
@@ -18,22 +19,18 @@ use co_actor::{ActorHandle, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
 use co_primitives::DynamicCoDate;
 use futures::{pin_mut, Stream, StreamExt};
+#[cfg(feature = "native")]
+use libp2p::mdns::{self, tokio::Behaviour as MdnsBehaviour};
 use libp2p::{
 	autonat, dcutr, gossipsub, identify,
 	identity::Keypair,
-	mdns::{self, tokio::Behaviour as MdnsBehaviour},
 	noise, ping, relay,
 	swarm::{behaviour::toggle::Toggle, dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
 	yamux, PeerId, StreamProtocol, Swarm, SwarmBuilder,
 };
 use libp2p_bitswap::{Bitswap, BitswapEvent};
 use rand::rngs::OsRng;
-use std::{
-	cmp::min,
-	future::Future,
-	task::Poll,
-	time::{Duration, Instant},
-};
+use std::{cmp::min, future::Future, task::Poll, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
 
@@ -100,7 +97,8 @@ impl Libp2pNetwork {
 		let identify = identify::Behaviour::new(identify_config);
 
 		// mdns
-		let mdns =
+		#[cfg(feature = "native")]
+		let mdns: Toggle<MdnsBehaviour> =
 			if config.mdns { Some(MdnsBehaviour::new(mdns::Config::default(), local_peer_id)?) } else { None }.into();
 
 		// didcomm
@@ -122,6 +120,7 @@ impl Libp2pNetwork {
 		let mut behaviour = Behaviour {
 			identify,
 			ping: ping::Behaviour::new(ping::Config::new()),
+			#[cfg(feature = "native")]
 			mdns,
 			// kad,
 			bitswap,
@@ -135,25 +134,52 @@ impl Libp2pNetwork {
 		};
 
 		// swarm
-		let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
-			.with_tokio()
-			.with_tcp(libp2p::tcp::Config::default(), noise::Config::new, yamux::Config::default)?
-			.with_quic()
-			.with_dns()?;
-		let mut swarm = if config.nat {
-			swarm_builder
-				.with_relay_client(noise::Config::new, yamux::Config::default)?
-				.with_behaviour(move |_keypair, relay_client| {
-					behaviour.relay_client = Some(relay_client).into();
-					behaviour
-				})?
-				.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
-				.build()
-		} else {
-			swarm_builder
-				.with_behaviour(move |_keypair| behaviour)?
-				.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
-				.build()
+		#[cfg(feature = "native")]
+		let mut swarm = {
+			let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
+				.with_tokio()
+				.with_tcp(libp2p::tcp::Config::default(), noise::Config::new, yamux::Config::default)?
+				.with_quic()
+				.with_dns()?;
+			if config.nat {
+				swarm_builder
+					.with_relay_client(noise::Config::new, yamux::Config::default)?
+					.with_behaviour(move |_keypair, relay_client| {
+						behaviour.relay_client = Some(relay_client).into();
+						behaviour
+					})?
+					.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
+					.build()
+			} else {
+				swarm_builder
+					.with_behaviour(move |_keypair| behaviour)?
+					.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
+					.build()
+			}
+		};
+
+		#[cfg(feature = "web")]
+		let mut swarm = {
+			let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
+				.with_wasm_bindgen()
+				.with_other_transport(|keypair| {
+					libp2p::webrtc_websys::Transport::new(libp2p::webrtc_websys::Config::new(&keypair))
+				})?;
+			if config.nat {
+				swarm_builder
+					.with_relay_client(noise::Config::new, yamux::Config::default)?
+					.with_behaviour(move |_keypair, relay_client| {
+						behaviour.relay_client = Some(relay_client).into();
+						behaviour
+					})?
+					.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
+					.build()
+			} else {
+				swarm_builder
+					.with_behaviour(move |_keypair| behaviour)?
+					.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
+					.build()
+			}
 		};
 
 		// external addresses
@@ -315,7 +341,8 @@ pub enum NetworkEvent {
 	Didcomm(didcomm::Event),
 	Gossipsub(gossipsub::Event),
 	Identify(identify::Event),
-	Mdns(mdns::Event),
+	#[cfg(feature = "native")]
+	Mdns(libp2p::mdns::Event),
 	Ping(ping::Event),
 	// Kad(kad::Event),
 	Bitswap(BitswapEvent),
@@ -353,6 +380,7 @@ pub struct Behaviour {
 	pub didcomm: didcomm::Behaviour,
 	pub gossipsub: gossipsub::Behaviour,
 	pub identify: identify::Behaviour,
+	#[cfg(feature = "native")]
 	pub mdns: Toggle<MdnsBehaviour>,
 	pub ping: ping::Behaviour,
 	// pub kad: Kademlia<MemoryStore>,
@@ -374,11 +402,13 @@ impl discovery::DiscoveryBehaviour for Behaviour {
 		None
 	}
 
-	fn mdns_mut(&mut self) -> Option<&mut mdns::tokio::Behaviour> {
+	#[cfg(feature = "native")]
+	fn mdns_mut(&mut self) -> Option<&mut libp2p::mdns::tokio::Behaviour> {
 		self.mdns.as_mut()
 	}
 
-	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&mdns::Event> {
+	#[cfg(feature = "native")]
+	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&libp2p::mdns::Event> {
 		match event {
 			NetworkEvent::Mdns(e) => Some(e),
 			_ => None,
@@ -482,7 +512,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		layer_event = context.select_next_some() => {
 			context.on_layer_event(swarm, layer_event).map(|layer_event| SwarmEvent::Behaviour(NetworkEvent::from(layer_event)))
 		},
-		Some(_) = option_await(runtime.next_delayed_task.map(|until| tokio::time::sleep_until(until.into()))) => {
+		Some(_) = option_await(runtime.next_delayed_task.map(|until| crate::compat::sleep_until(until))) => {
 			runtime.next_delayed_task = None;
 			None
 		},

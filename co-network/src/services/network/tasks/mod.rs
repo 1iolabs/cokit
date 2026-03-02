@@ -12,6 +12,7 @@ pub mod discovery_connect;
 pub mod gossip;
 pub mod identify_dial;
 pub mod listeners;
+#[cfg(feature = "native")]
 pub mod mdns_gossip;
 pub mod peers;
 pub mod relay_listen;

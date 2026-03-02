@@ -4,6 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
+	compat::Instant,
 	services::connections::{
 		action::{ConnectionAction, PeerConnectionClosedAction, PeerConnectionEstablishedAction},
 		ConnectionMessage,
@@ -15,7 +16,6 @@ use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	Swarm,
 };
-use std::time::Instant;
 
 /// Monitor connnections.
 #[derive(Debug)]
