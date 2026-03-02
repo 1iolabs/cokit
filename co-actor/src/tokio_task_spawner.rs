@@ -3,6 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+use crate::TaskOptions;
 use futures::Future;
 use std::{panic::Location, sync::Arc};
 use tokio::task::JoinHandle;
@@ -75,6 +76,47 @@ impl TaskSpawner {
 		}
 	}
 
+	/// Spawn task.
+	#[inline]
+	#[track_caller]
+	#[allow(unexpected_cfgs)]
+	pub fn spawn_options<F>(&self, options: TaskOptions, task: F) -> TaskHandle<F::Output>
+	where
+		F: Future + Send + 'static,
+		F::Output: Send + 'static,
+	{
+		let caller_file = Location::caller().file();
+		let caller_line = Location::caller().line();
+		let caller_column = Location::caller().column();
+		let span = tracing::trace_span!(
+			"task",
+			task_name = options.name,
+			application = self.idenitfier.as_str(),
+			caller_file,
+			caller_line,
+			caller_column,
+		);
+		#[cfg(tokio_unstable)]
+		{
+			let mut builder = tokio::task::Builder::new();
+			if let Some(name) = options.name {
+				builder = builder.name(name);
+			}
+			builder
+				.spawn(if options.untracked {
+					futures::future::Either::Left(task.instrument(span))
+				} else {
+					futures::future::Either::Right(self.inner.track_future(task.instrument(span)))
+				})
+				.expect("tokio runtime")
+		}
+		#[cfg(not(tokio_unstable))]
+		if options.untracked {
+			tokio::spawn(task.instrument(span))
+		} else {
+			self.inner.spawn(task.instrument(span))
+		}
+	}
 	pub fn tracker(&self) -> TaskTracker {
 		self.inner.clone()
 	}

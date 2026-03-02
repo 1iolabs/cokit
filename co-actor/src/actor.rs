@@ -5,7 +5,7 @@
 
 use crate::{
 	Response, ResponseBackPressureStream, ResponseBackPressureStreamReceiver, ResponseReceiver, ResponseStream,
-	ResponseStreamReceiver, TaskHandle, TaskSpawner,
+	ResponseStreamReceiver, TaskHandle, TaskOptions, TaskSpawner,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -106,6 +106,7 @@ where
 	actor: A,
 	rx: tokio::sync::mpsc::UnboundedReceiver<ActorMessage<A::Message>>,
 	state_tx: tokio::sync::watch::Sender<ActorState>,
+	options: TaskOptions,
 }
 impl<A> ActorSpawner<A>
 where
@@ -116,7 +117,7 @@ where
 		let (state_tx, state_rx) = watch::channel(ActorState::Starting);
 		let tags = Arc::new(actor.tags(tags)?);
 		let handle = ActorHandle { tx: tx.clone(), state: state_rx.clone(), tags: tags.clone() };
-		Ok(Self { handle, actor, rx, state_tx })
+		Ok(Self { handle, actor, rx, state_tx, options: TaskOptions::new(type_name::<A>()) })
 	}
 
 	pub fn handle(&self) -> ActorHandle<A::Message> {
@@ -131,7 +132,7 @@ where
 		let tags = self.handle.tags.clone();
 		let handle = self.handle;
 		let span = tracing::trace_span!("actor", ?tags, actor_type = type_name::<A>());
-		let join = spawner.spawn_named(type_name::<A>(), {
+		let join = spawner.spawn_options(self.options, {
 			let tags = tags.clone();
 			let handle = handle.clone();
 			let actor_span = span.clone();

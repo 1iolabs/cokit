@@ -12,7 +12,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use cid::Cid;
-use co_actor::{Actor, ActorHandle, ActorInstance, TaskSpawner};
+use co_actor::{Actor, ActorHandle, ActorInstance, TaskOptions, TaskSpawner};
 use co_core_storage::PinStrategy;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
@@ -24,7 +24,7 @@ use co_runtime::{Core, GuardReference};
 use co_storage::StaticBlockStorage;
 #[cfg(feature = "fs")]
 use directories::ProjectDirs;
-use futures::{Stream, StreamExt};
+use futures::{future::BoxFuture, FutureExt, Stream, StreamExt};
 use std::{collections::BTreeSet, fmt::Debug, future::ready, path::PathBuf, sync::Arc};
 use tokio_util::sync::{CancellationToken, DropGuard};
 
@@ -92,14 +92,22 @@ impl Application {
 		self.context().inner.shutdown().cancel();
 
 		// wait
-		self.join().await;
+		self.joiner().await;
 	}
 
-	/// Wait until all tasks are done.
-	pub async fn join(&self) {
+	/// Created a futures that resolved when all pending tasks are done.
+	pub fn joiner(&self) -> BoxFuture<'static, ()> {
 		// wait
 		#[cfg(not(feature = "js"))]
-		self.tasks.tracker().wait().await;
+		{
+			let tasks = self.tasks.clone();
+			async move {
+				tasks.tracker().wait().await;
+			}
+			.boxed()
+		}
+		#[cfg(feature = "js")]
+		async move { /* no-op */ }.boxed()
 	}
 
 	/// Create and startup network.
@@ -156,8 +164,7 @@ impl Application {
 	/// Initialize application.
 	async fn init(&self) -> Result<(), anyhow::Error> {
 		// shutdown
-		#[cfg(not(feature = "js"))]
-		tokio::spawn({
+		self.tasks.spawn_options(TaskOptions::untracked(), {
 			let shutdown = self.context().inner.shutdown().clone();
 			let tasks = self.tasks.clone();
 			let reactive = self.service.handle();
@@ -165,6 +172,7 @@ impl Application {
 				// shutdown
 				shutdown.cancelled().await;
 				reactive.shutdown();
+				#[cfg(not(feature = "js"))]
 				tasks.tracker().close();
 
 				// log

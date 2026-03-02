@@ -14,6 +14,7 @@ mod js_task_spawner;
 mod response;
 mod state;
 mod task_handle;
+mod task_options;
 mod task_spawner_local;
 #[cfg(feature = "native")]
 mod tokio_task_spawner;
@@ -33,6 +34,7 @@ pub use response::{
 };
 pub use state::Reducer;
 pub use task_handle::TaskError;
+pub use task_options::TaskOptions;
 pub use task_spawner_local::{LocalTaskHandle, LocalTaskSpawner};
 
 // backends
