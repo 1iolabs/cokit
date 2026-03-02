@@ -80,6 +80,10 @@ pub async fn command(
 		for external in &command.external_address {
 			println!("relay: {external}/p2p/{peer_id}");
 		}
+
+		// subscribe to gossipsub topics so the relay participates in the mesh
+		// and can forward messages between browser peers
+		network.subscribe_gossip_topic("co-contact").await?;
 	}
 
 	// run until shutdown
