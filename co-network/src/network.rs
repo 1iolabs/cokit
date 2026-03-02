@@ -524,7 +524,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		layer_event = context.select_next_some() => {
 			context.on_layer_event(swarm, layer_event).map(|layer_event| SwarmEvent::Behaviour(NetworkEvent::from(layer_event)))
 		},
-		Some(_) = option_await(runtime.next_delayed_task.map(|until| crate::compat::sleep_until(until))) => {
+		Some(_) = option_await(runtime.next_delayed_task.map(crate::compat::sleep_until)) => {
 			runtime.next_delayed_task = None;
 			None
 		},

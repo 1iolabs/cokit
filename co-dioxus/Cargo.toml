@@ -37,7 +37,7 @@ default = []
 # targets
 "desktop" = ["fs", "network", "tracing", "co-sdk/recommended", "co-sdk/apple-sandbox", "co-actor/native"]
 "mobile" = ["fs", "network", "tracing", "co-sdk/recommended", "co-sdk/apple-sandbox", "co-actor/native"]
-"web" = ["js", "co-sdk/web", "co-actor/js"]
+"web" = ["js", "network", "co-sdk/web", "co-sdk/indexeddb", "co-actor/js"]
 
 # features
 "fs" = ["co-sdk/fs"]

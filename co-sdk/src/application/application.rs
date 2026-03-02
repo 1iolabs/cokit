@@ -8,8 +8,8 @@ use super::tracing::TracingBuilder;
 use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
 use crate::{
 	library::wait_response::request_response, services::application::ApplicationMessage, types::co_date::co_date_env,
-	Action, CoReducer, CoReducerFactory, CoStorage, CoStorageSetting, CoUuid, Cores, DynamicCoUuid, Guards,
-	RandomCoUuid, Storage,
+	Action, CoReducer, CoReducerFactory, CoStorage, CoStorageSetting, CoUuid, Cores, DynamicCoUuid,
+	DynamicLocalSecret, Guards, LocalSecret, RandomCoUuid, Storage,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -348,6 +348,7 @@ pub struct ApplicationBuilder {
 	settings: Tags,
 	date: Option<DynamicCoDate>,
 	uuid: Option<DynamicCoUuid>,
+	local_secret: Option<DynamicLocalSecret>,
 	static_blocks: Vec<StaticBlockStorage<'static>>,
 	cores: Cores,
 	guards: Guards,
@@ -379,6 +380,7 @@ impl ApplicationBuilder {
 			settings: Default::default(),
 			date: None,
 			uuid: None,
+			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
@@ -398,6 +400,7 @@ impl ApplicationBuilder {
 			settings: Default::default(),
 			date: None,
 			uuid: None,
+			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
@@ -421,6 +424,7 @@ impl ApplicationBuilder {
 			settings: Default::default(),
 			date: None,
 			uuid: None,
+			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
@@ -440,6 +444,7 @@ impl ApplicationBuilder {
 			settings: Default::default(),
 			date: None,
 			uuid: None,
+			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
@@ -482,6 +487,10 @@ impl ApplicationBuilder {
 
 	pub fn with_co_uuid(self, uuid: impl CoUuid + 'static) -> Self {
 		Self { uuid: Some(DynamicCoUuid::new(uuid)), ..self }
+	}
+
+	pub fn with_local_secret(self, secret: impl LocalSecret + 'static) -> Self {
+		Self { local_secret: Some(DynamicLocalSecret::new(secret)), ..self }
 	}
 
 	pub fn with_core(mut self, core_cid: Cid, core: Core) -> Self {
@@ -573,7 +582,7 @@ impl ApplicationBuilder {
 		let service = Actor::spawn(
 			tags!("type": "application", "application": settings.identifier.clone()),
 			crate::services::application::Application::new(settings.clone()),
-			(storage, tasks.clone(), date, uuid, self.cores, self.guards),
+			(storage, tasks.clone(), date, uuid, self.cores, self.guards, self.local_secret),
 		)?;
 
 		// wait for context

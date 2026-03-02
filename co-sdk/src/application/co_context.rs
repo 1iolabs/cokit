@@ -18,8 +18,9 @@ use crate::{
 	},
 	state,
 	types::co_reducer_factory::CoReducerFactoryError,
-	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoUuid, Guards, LocalCoBuilder,
-	Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoUuid, DynamicLocalSecret,
+	Guards, LocalCoBuilder, Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CO_ID_LOCAL,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -238,6 +239,7 @@ pub(crate) struct CoContextInner {
 	block_links_builtin: BlockLinks,
 	cores: Cores,
 	guards: Guards,
+	local_secret: Option<DynamicLocalSecret>,
 }
 impl CoContextInner {
 	#[allow(clippy::too_many_arguments)]
@@ -255,6 +257,7 @@ impl CoContextInner {
 		uuid: DynamicCoUuid,
 		cores: Cores,
 		guards: Guards,
+		local_secret: Option<DynamicLocalSecret>,
 	) -> Self {
 		let block_links = BlockLinks::default();
 		let block_links_builtin = block_links.clone().with_filter(IgnoreFilter::new(builtin_cores()));
@@ -275,6 +278,7 @@ impl CoContextInner {
 			block_links_builtin,
 			cores,
 			guards,
+			local_secret,
 		}
 	}
 
@@ -345,6 +349,7 @@ impl CoContextInner {
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	pub(crate) async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
 		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize)
+			.with_local_secret(self.local_secret.clone())
 			.with_verify_links(
 				self.settings
 					.feature_co_storage_verify_links()

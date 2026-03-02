@@ -60,6 +60,7 @@ pub use library::token::{CoToken, CoTokenParameters};
 pub use library::update_co::update_co;
 pub use library::{
 	core_source::CoreSource,
+	local_secret::{DynamicLocalSecret, LocalSecret, MemoryLocalSecret},
 	did_key_provider::DidKeyProvider,
 	find_co_by_pin::find_co_by_pin,
 	find_co_identities::{find_co_identities, find_co_private_identity},

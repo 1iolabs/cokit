@@ -5,11 +5,9 @@
 
 use crate::library::cli::{Cli, CoLogLevel};
 use clap::Parser;
-use co_sdk::CoStorageSetting;
 #[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
-#[cfg(feature = "fs")]
-use std::path::PathBuf;
+use co_sdk::{CoStorageSetting, DynamicLocalSecret, LocalSecret};
 
 #[derive(Debug, Clone, Default)]
 pub struct CoSettings {
@@ -24,6 +22,7 @@ pub struct CoSettings {
 	pub log_level: CoLogLevel,
 	pub no_default_features: bool,
 	pub feature: Vec<String>,
+	pub local_secret: Option<DynamicLocalSecret>,
 }
 impl CoSettings {
 	pub fn new(identifier: &str) -> Self {
@@ -55,5 +54,9 @@ impl CoSettings {
 
 	pub fn without_keychain(self) -> Self {
 		Self { no_keychain: true, ..self }
+	}
+
+	pub fn with_local_secret(self, secret: impl LocalSecret + 'static) -> Self {
+		Self { local_secret: Some(DynamicLocalSecret::new(secret)), ..self }
 	}
 }

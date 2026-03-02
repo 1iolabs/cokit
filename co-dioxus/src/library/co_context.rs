@@ -5,6 +5,8 @@
 
 use crate::CoSettings;
 use anyhow::Result;
+#[cfg(feature = "fs")]
+use co_sdk::CoStorageSetting;
 use co_sdk::{Application, ApplicationBuilder};
 use futures::{future::BoxFuture, Future};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -169,6 +171,9 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 	}
 	for feature in &settings.feature {
 		application_builder = application_builder.with_setting("feature", feature.to_owned());
+	}
+	if let Some(local_secret) = settings.local_secret {
+		application_builder = application_builder.with_local_secret(local_secret);
 	}
 	#[allow(unused_mut)]
 	let mut application = application_builder.build().await?;
