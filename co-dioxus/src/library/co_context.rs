@@ -4,10 +4,6 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::CoSettings;
-#[cfg(not(feature = "fs"))]
-use crate::CoStorageSetting;
-#[cfg(feature = "fs")]
-use crate::CoStorageSetting;
 use anyhow::Result;
 use co_sdk::{Application, ApplicationBuilder};
 use futures::{future::BoxFuture, Future};
@@ -30,7 +26,7 @@ impl CoContext {
 				CoStorageSetting::Path(path) => Some(path),
 				#[cfg(feature = "fs")]
 				CoStorageSetting::PathDefault => Some(ApplicationBuilder::default_path()),
-				CoStorageSetting::Memory => None,
+				_ => None,
 			};
 			co_sdk::TracingBuilder::new(settings.identifier.clone(), base_path)
 				.with_bunyan_logging(None)
@@ -164,13 +160,7 @@ type Task = Box<TaskFn>;
 // type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
 
 async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Result<(), anyhow::Error> {
-	let mut application_builder = match settings.storage {
-		#[cfg(feature = "fs")]
-		CoStorageSetting::Path(path) => ApplicationBuilder::new_with_path(settings.identifier, path),
-		#[cfg(feature = "fs")]
-		CoStorageSetting::PathDefault => ApplicationBuilder::new(settings.identifier),
-		CoStorageSetting::Memory => ApplicationBuilder::new_memory(settings.identifier),
-	};
+	let mut application_builder = ApplicationBuilder::new_with_storage(settings.identifier, settings.storage);
 	if settings.no_keychain {
 		application_builder = application_builder.without_keychain();
 	}
@@ -180,7 +170,6 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 	for feature in &settings.feature {
 		application_builder = application_builder.with_setting("feature", feature.to_owned());
 	}
-	application_builder = application_builder.with_setting("feature", "co-open-keep");
 	#[allow(unused_mut)]
 	let mut application = application_builder.build().await?;
 

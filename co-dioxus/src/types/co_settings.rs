@@ -5,6 +5,7 @@
 
 use crate::library::cli::{Cli, CoLogLevel};
 use clap::Parser;
+use co_sdk::CoStorageSetting;
 #[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
 #[cfg(feature = "fs")]
@@ -54,33 +55,5 @@ impl CoSettings {
 
 	pub fn without_keychain(self) -> Self {
 		Self { no_keychain: true, ..self }
-	}
-}
-
-#[derive(Debug, Clone)]
-pub enum CoStorageSetting {
-	/// Store data in memory
-	Memory,
-
-	/// Store data in default path
-	#[cfg(feature = "fs")]
-	PathDefault,
-
-	/// Storage data in path
-	#[cfg(feature = "fs")]
-	Path(PathBuf),
-}
-#[cfg(feature = "fs")]
-#[allow(clippy::derivable_impls)]
-impl Default for CoStorageSetting {
-	fn default() -> Self {
-		CoStorageSetting::PathDefault
-	}
-}
-#[cfg(not(feature = "fs"))]
-#[allow(clippy::derivable_impls)]
-impl Default for CoStorageSetting {
-	fn default() -> Self {
-		CoStorageSetting::Memory
 	}
 }

@@ -90,6 +90,7 @@ pub use types::{
 	co_reducer_state::{CoReducerState, MappedCoReducerState},
 	co_root::CoRoot,
 	co_storage::CoStorage,
+	co_storage_setting::CoStorageSetting,
 	co_uuid::{CoUuid, DynamicCoUuid, MonotonicCoUuid, RandomCoUuid},
 	cores::{
 		Cores, CO_CORE_CO, CO_CORE_DATA_SERIES, CO_CORE_FILE, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,

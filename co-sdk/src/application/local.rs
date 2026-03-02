@@ -33,6 +33,8 @@ use crate::{
 	library::create_storage_core_state::create_storage_core_state,
 	types::cores::{CO_CORE_NAME_STORAGE, CO_CORE_STORAGE},
 };
+#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+use crate::{library::locals_indexeddb::IndexedDbLocals, CoStorageSetting};
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::ActorHandle;
@@ -78,19 +80,7 @@ impl LocalCoBuilder {
 	}
 
 	/// Create LocalCO instance.
-	#[allow(clippy::too_many_arguments)]
-	pub async fn build<R>(
-		self,
-		storage: CoStorage,
-		runtime: Runtime,
-		cores: &Cores,
-		shutdown: CancellationToken,
-		tasks: TaskSpawner,
-		core_resolver: R,
-		date: DynamicCoDate,
-		application_handle: ActorHandle<ApplicationMessage>,
-		#[cfg(feature = "pinning")] pinning: crate::library::storage_pinning::StoragePinningContext,
-	) -> Result<CoReducer, anyhow::Error>
+	pub async fn build<R>(self, context: LocalCoContext<R>, cores: &Cores) -> Result<CoReducer, anyhow::Error>
 	where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
 	{
@@ -106,47 +96,21 @@ impl LocalCoBuilder {
 				.parent()
 				.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", application_path))?;
 			let locals =
-				FileLocals::new(tasks.clone(), config_path.to_owned(), self.settings.identifier.clone(), true)?;
-			return Ok(LocalCoInstance::create(
-				runtime,
-				cores,
-				self,
-				storage,
-				shutdown,
-				tasks,
-				locals,
-				key,
-				core_resolver,
-				watcher,
-				date,
-				application_handle,
-				#[cfg(feature = "pinning")]
-				pinning,
-			)
-			.await?
-			.1);
+				FileLocals::new(context.tasks.clone(), config_path.to_owned(), self.settings.identifier.clone(), true)?;
+			return Ok(LocalCoInstance::create(context, cores, self, locals, key, watcher).await?.1);
+		}
+
+		// indexeddb
+		#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+		if let CoStorageSetting::IndexedDb = &self.settings.storage {
+			let watcher = self.settings.feature_co_local_watch();
+			let locals = IndexedDbLocals::new(format!("co-locals::{}", self.settings.identifier))?;
+			return Ok(LocalCoInstance::create(context, cores, self, locals, key, watcher).await?.1);
 		}
 
 		// memory
 		let locals = MemoryLocals::new(None);
-		Ok(LocalCoInstance::create(
-			runtime,
-			cores,
-			self,
-			storage,
-			shutdown,
-			tasks,
-			locals,
-			key,
-			core_resolver,
-			false,
-			date,
-			application_handle,
-			#[cfg(feature = "pinning")]
-			pinning,
-		)
-		.await?
-		.1)
+		Ok(LocalCoInstance::create(context, cores, self, locals, key, false).await?.1)
 	}
 
 	fn build_local_secret(&self) -> Box<dyn LocalSecret + Send + Sync> {
@@ -167,6 +131,19 @@ impl LocalCoBuilder {
 	}
 }
 
+/// Context for the LocalCo
+pub struct LocalCoContext<R> {
+	pub storage: CoStorage,
+	pub runtime: Runtime,
+	pub shutdown: CancellationToken,
+	pub tasks: TaskSpawner,
+	pub core_resolver: R,
+	pub date: DynamicCoDate,
+	pub application_handle: ActorHandle<ApplicationMessage>,
+	#[cfg(feature = "pinning")]
+	pub pinning: crate::library::storage_pinning::StoragePinningContext,
+}
+
 #[derive(Debug, Clone)]
 struct LocalCoInstance<L> {
 	storage: CoStorage,
@@ -185,21 +162,23 @@ where
 	/// dropped when a watcher is active.
 	///
 	/// NOTE: This assumes the same encryption key is used by all local applications.
-	#[allow(clippy::too_many_arguments)]
 	async fn create<R>(
-		runtime: Runtime,
+		LocalCoContext {
+			storage,
+			runtime,
+			shutdown,
+			tasks,
+			core_resolver,
+			date,
+			application_handle,
+			#[cfg(feature = "pinning")]
+			pinning,
+		}: LocalCoContext<R>,
 		cores: &Cores,
 		local_co: LocalCoBuilder,
-		storage: CoStorage,
-		shutdown: CancellationToken,
-		tasks: TaskSpawner,
 		locals: L,
 		key: Option<Box<dyn LocalSecret + Send + Sync + 'static>>,
-		core_resolver: R,
 		watcher: bool,
-		date: DynamicCoDate,
-		application_handle: ActorHandle<ApplicationMessage>,
-		#[cfg(feature = "pinning")] pinning: crate::library::storage_pinning::StoragePinningContext,
 	) -> Result<(Self, CoReducer), anyhow::Error>
 	where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
@@ -285,7 +264,7 @@ where
 		}
 
 		// watch
-		#[cfg(feature = "fs")]
+		#[cfg(any(feature = "fs", all(feature = "indexeddb", target_arch = "wasm32")))]
 		if watcher {
 			let watch_reducer: CoReducer = co_reducer.clone();
 			let watch_locals = result.locals.clone();

@@ -64,7 +64,9 @@ tracing-bunyan-formatter = { workspace = true, optional = true }
 tracing-log = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true, features = ["env-filter"] }
 uuid = { workspace = true }
+wasm-bindgen = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true, features = ["BroadcastChannel", "DomException", "DomStringList", "Event", "EventTarget", "IdbDatabase", "IdbFactory", "IdbObjectStore", "IdbOpenDbRequest", "IdbRequest", "IdbTransaction", "IdbTransactionMode", "MessageEvent", "Window"] }
 zstd = { workspace = true, optional = true }
 
 # opentelemetry
@@ -124,6 +126,9 @@ co-test = { workspace = true }
 
 # Native Target
 "native" = ["co-runtime/native", "co-actor/native", "co-storage/native", "co-network?/native", "fs", "tokio/full", "tracing", "bunyan", "keychain"]
+
+# IndexedDB persistent locals (WASM only)
+"indexeddb" = ["js", "co-storage/indexeddb", "dep:web-sys", "dep:wasm-bindgen"]
 
 # Web Target (WASM)
 "web" = ["js", "co-identity/web", "co-storage/web", "co-runtime/web", "co-network?/web"]
