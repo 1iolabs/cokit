@@ -9,6 +9,8 @@ use crate::library::local_secret_file::FileLocalSecret;
 use crate::library::local_secret_keychain::KeychainLocalSecret;
 #[cfg(feature = "fs")]
 use crate::library::locals_file::FileLocals;
+#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+use crate::library::locals_indexeddb::IndexedDbLocals;
 use crate::{
 	application::application::ApplicationSettings,
 	library::{
@@ -118,6 +120,31 @@ impl LocalCoBuilder {
 				key,
 				core_resolver,
 				watcher,
+				date,
+				application_handle,
+				#[cfg(feature = "pinning")]
+				pinning,
+			)
+			.await?
+			.1);
+		}
+
+		// indexeddb
+		#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+		{
+			let locals =
+				IndexedDbLocals::new(format!("co-locals::{}", self.settings.identifier))?;
+			return Ok(LocalCoInstance::create(
+				runtime,
+				cores,
+				self,
+				storage,
+				shutdown,
+				tasks,
+				locals,
+				key,
+				core_resolver,
+				false,
 				date,
 				application_handle,
 				#[cfg(feature = "pinning")]

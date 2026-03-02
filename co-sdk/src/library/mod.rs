@@ -48,6 +48,8 @@ pub mod local_secret_keychain;
 pub mod locals;
 #[cfg(feature = "fs")]
 pub mod locals_file;
+#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+pub mod locals_indexeddb;
 pub mod locals_memory;
 pub mod log_entries_until;
 #[cfg(feature = "pinning")]
