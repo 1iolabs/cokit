@@ -37,6 +37,14 @@ impl Storage {
 		Self { storage: CoStorage::new(MemoryBlockStorage::default()), tmp_storage: TmpStorage::Memory }
 	}
 
+	#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+	pub async fn new_indexeddb() -> Result<Self, anyhow::Error> {
+		Ok(Self {
+			storage: CoStorage::new(co_storage::IndexedDbBlockStorage::new("co::blocks").await?),
+			tmp_storage: TmpStorage::Memory,
+		})
+	}
+
 	pub fn with_static(mut self, storages: Vec<StaticBlockStorage<'static>>) -> Self {
 		self.storage = CoStorage::new(JoinBlockStorage::new(self.storage, storages));
 		self

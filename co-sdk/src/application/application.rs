@@ -8,7 +8,8 @@ use super::tracing::TracingBuilder;
 use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
 use crate::{
 	library::wait_response::request_response, services::application::ApplicationMessage, types::co_date::co_date_env,
-	Action, CoReducer, CoReducerFactory, CoStorage, CoUuid, Cores, DynamicCoUuid, Guards, RandomCoUuid, Storage,
+	Action, CoReducer, CoReducerFactory, CoStorage, CoStorageSetting, CoUuid, Cores, DynamicCoUuid, Guards,
+	RandomCoUuid, Storage,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -230,6 +231,9 @@ pub struct ApplicationSettings {
 	#[cfg(feature = "fs")]
 	pub application_path: Option<PathBuf>,
 
+	/// Application storage.
+	pub storage: CoStorageSetting,
+
 	/// Use keychain or file for Local CO.
 	pub keychain: bool,
 
@@ -337,8 +341,7 @@ impl ApplicationSettings {
 
 pub struct ApplicationBuilder {
 	identifier: String,
-	#[cfg(feature = "fs")]
-	path: Option<PathBuf>,
+	storage: CoStorageSetting,
 	keychain: bool,
 	#[cfg(feature = "tracing")]
 	tracing: TracingBuilder,
@@ -356,16 +359,42 @@ impl ApplicationBuilder {
 		dirs.data_dir().into()
 	}
 
+	/// Create new instance with storage.
+	pub fn new_with_storage(identifier: impl Into<String>, storage: CoStorageSetting) -> Self {
+		let identifier = identifier.into();
+		#[cfg(feature = "tracing")]
+		let path = match &storage {
+			#[cfg(feature = "fs")]
+			CoStorageSetting::Path(path) => Some(path.clone()),
+			#[cfg(feature = "fs")]
+			CoStorageSetting::PathDefault => Some(Self::default_path()),
+			_ => None,
+		};
+		Self {
+			#[cfg(feature = "tracing")]
+			tracing: TracingBuilder::new(identifier.clone(), path),
+			identifier,
+			storage,
+			keychain: true,
+			settings: Default::default(),
+			date: None,
+			uuid: None,
+			static_blocks: Default::default(),
+			cores: Default::default(),
+			guards: Default::default(),
+		}
+	}
+
 	/// Create new instance with path.
 	#[cfg(feature = "fs")]
 	pub fn new_with_path(identifier: impl Into<String>, path: PathBuf) -> Self {
 		let identifier = identifier.into();
-		let tracing = TracingBuilder::new(identifier.clone(), Some(path.clone()));
 		Self {
+			#[cfg(feature = "tracing")]
+			tracing: TracingBuilder::new(identifier.clone(), Some(path.clone())),
 			identifier,
-			path: Some(path),
+			storage: CoStorageSetting::Path(path),
 			keychain: true,
-			tracing,
 			settings: Default::default(),
 			date: None,
 			uuid: None,
@@ -383,15 +412,31 @@ impl ApplicationBuilder {
 	/// Create new memory only instance.
 	pub fn new_memory(identifier: impl Into<String>) -> Self {
 		let identifier = identifier.into();
-		#[cfg(feature = "tracing")]
-		let tracing = TracingBuilder::new(identifier.clone(), None);
 		Self {
-			identifier,
-			#[cfg(feature = "fs")]
-			path: None,
-			keychain: false,
 			#[cfg(feature = "tracing")]
-			tracing,
+			tracing: TracingBuilder::new(identifier.clone(), None),
+			identifier,
+			storage: CoStorageSetting::Memory,
+			keychain: false,
+			settings: Default::default(),
+			date: None,
+			uuid: None,
+			static_blocks: Default::default(),
+			cores: Default::default(),
+			guards: Default::default(),
+		}
+	}
+
+	/// Create new memory only instance.
+	#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+	pub fn new_indexeddb(identifier: impl Into<String>) -> Self {
+		let identifier = identifier.into();
+		Self {
+			#[cfg(feature = "tracing")]
+			tracing: TracingBuilder::new(identifier.clone(), None),
+			identifier,
+			storage: CoStorageSetting::IndexedDb,
+			keychain: false,
 			settings: Default::default(),
 			date: None,
 			uuid: None,
@@ -496,10 +541,17 @@ impl ApplicationBuilder {
 		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
 
 		// storage
-		#[cfg(feature = "fs")]
-		let mut storage = match &self.path {
-			Some(path) => Storage::new(path.join("data"), path.join("tmp/data"), uuid.clone()),
-			None => Storage::new_memory(),
+		let (mut storage, path): (_, Option<PathBuf>) = match self.storage.clone() {
+			#[cfg(feature = "fs")]
+			CoStorageSetting::PathDefault => {
+				let path = Self::default_path();
+				(Storage::new(path.join("data"), path.join("tmp/data"), uuid.clone()), Some(path))
+			},
+			#[cfg(feature = "fs")]
+			CoStorageSetting::Path(path) => (Storage::new(path.join("data"), path.join("tmp/data"), uuid.clone()), Some(path)),
+			CoStorageSetting::Memory => (Storage::new_memory(), None),
+			#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+			CoStorageSetting::IndexedDb => (Storage::new_indexeddb().await?, None),
 		};
 		#[cfg(not(feature = "fs"))]
 		let mut storage = Storage::new_memory();
@@ -510,7 +562,8 @@ impl ApplicationBuilder {
 		// settings
 		let settings = ApplicationSettings {
 			#[cfg(feature = "fs")]
-			application_path: self.path.map(|path| path.join("etc").join(&self.identifier)),
+			application_path: path.map(|path| path.join("etc").join(&self.identifier)),
+			storage: self.storage,
 			identifier: self.identifier,
 			keychain: self.keychain,
 			settings: self.settings,

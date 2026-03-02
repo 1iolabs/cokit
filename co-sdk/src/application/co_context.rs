@@ -7,6 +7,7 @@ use crate::{
 	application::{
 		application::ApplicationSettings,
 		identity::{create_identity_resolver, create_private_identity_resolver},
+		local::LocalCoContext,
 		shared::{SharedCoBuilder, SharedCoCreator},
 	},
 	library::{builtin_cores::builtin_cores, shared_membership::shared_membership_active},
@@ -351,17 +352,20 @@ impl CoContextInner {
 			);
 		let local_co_reducer = local_co
 			.build(
-				self.storage()
-					.clone_with_settings(BlockStorageCloneSettings::new().with_detached()),
-				self.runtime.clone(),
+				LocalCoContext {
+					storage: self
+						.storage()
+						.clone_with_settings(BlockStorageCloneSettings::new().with_detached()),
+					runtime: self.runtime.clone(),
+					shutdown: self.shutdown.child_token(),
+					tasks: self.tasks.clone(),
+					core_resolver: self.create_local_core_resolver(CoId::new(CO_ID_LOCAL)),
+					date: self.date.clone(),
+					application_handle: self.application(),
+					#[cfg(feature = "pinning")]
+					pinning: self.create_pinning_context(),
+				},
 				&self.cores,
-				self.shutdown.child_token(),
-				self.tasks.clone(),
-				self.create_local_core_resolver(CoId::new(CO_ID_LOCAL)),
-				self.date.clone(),
-				self.application(),
-				#[cfg(feature = "pinning")]
-				self.create_pinning_context(),
 			)
 			.await?;
 		Ok(local_co_reducer)

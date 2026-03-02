@@ -3,12 +3,14 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+use crate::{BlockStorageContentMapping, ExtendedBlockStorage};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{ActorError, ActorHandle, JsLocalTaskSpawner, LocalActor, Response};
 use co_primitives::{
-	Block, BlockStat, BlockStorage, BlockStorageStoreParams, DefaultParams, StorageError, StoreParams,
+	Block, BlockStat, BlockStorage, BlockStorageCloneSettings, BlockStorageStoreParams, CloneWithBlockStorageSettings,
+	DefaultParams, StorageError, StoreParams,
 };
 use js_sys::Uint8Array;
 use wasm_bindgen::{prelude::*, JsCast};
@@ -82,6 +84,31 @@ impl BlockStorage for IndexedDbBlockStorage {
 impl BlockStorageStoreParams for IndexedDbBlockStorage {
 	type StoreParams = DefaultParams;
 }
+#[async_trait]
+impl ExtendedBlockStorage for IndexedDbBlockStorage {
+	async fn set_extended(&self, block: crate::ExtendedBlock) -> Result<Cid, StorageError> {
+		self.set(block.block).await
+	}
+
+	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
+		match self.stat(cid).await {
+			Ok(_) => Ok(true),
+			Err(StorageError::NotFound(..)) => Ok(false),
+			Err(e) => Err(e),
+		}
+	}
+
+	async fn clear(&self) -> Result<(), StorageError> {
+		unimplemented!()
+	}
+}
+impl CloneWithBlockStorageSettings for IndexedDbBlockStorage {
+	fn clone_with_settings(&self, _settings: BlockStorageCloneSettings) -> Self {
+		self.clone()
+	}
+}
+#[async_trait]
+impl BlockStorageContentMapping for IndexedDbBlockStorage {}
 
 #[derive(Debug)]
 enum IdbMessage {

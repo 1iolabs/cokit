@@ -256,6 +256,10 @@ where
 			.retain_mut(|stream| !matches!(stream.send(value.clone()), Err(ActorError::Canceled)));
 	}
 
+	pub fn is_empty(&self) -> bool {
+		self.streams.is_empty() || self.is_closed()
+	}
+
 	/// Test if the streams has been closed by the caller.
 	pub fn is_closed(&self) -> bool {
 		!self.streams.iter().any(|s| !s.is_closed())

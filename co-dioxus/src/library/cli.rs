@@ -3,8 +3,9 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{CoSettings, CoStorageSetting};
+use crate::CoSettings;
 use clap::ValueEnum;
+use co_sdk::CoStorageSetting;
 #[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
 #[cfg(feature = "fs")]
