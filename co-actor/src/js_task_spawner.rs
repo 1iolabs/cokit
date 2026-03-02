@@ -64,6 +64,31 @@ impl TaskSpawner {
 		wasm_bindgen_futures::spawn_local(task.instrument(span));
 		task_handle
 	}
+
+	/// Spawn task.
+	#[inline]
+	#[track_caller]
+	#[allow(unexpected_cfgs)]
+	pub fn spawn_options<F>(&self, options: TaskOptions, task: F) -> TaskHandle<F::Output>
+	where
+		F: Future + Send + 'static,
+		F::Output: Send + 'static,
+	{
+		let caller_file = Location::caller().file();
+		let caller_line = Location::caller().line();
+		let caller_column = Location::caller().column();
+		let span = tracing::trace_span!(
+			"task",
+			task_name = options.name,
+			application = self.idenitfier.as_str(),
+			caller_file,
+			caller_line,
+			caller_column,
+		);
+		let (task, task_handle) = TaskHandle::handle(task);
+		wasm_bindgen_futures::spawn_local(task.instrument(span));
+		task_handle
+	}
 }
 impl Default for TaskSpawner {
 	fn default() -> Self {

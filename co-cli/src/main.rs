@@ -94,7 +94,9 @@ async fn app_main() -> anyhow::Result<exitcode::ExitCode> {
 	};
 
 	// tracing
-	tracing_subscriber::registry().with(telemetry).with(output).with(log).init();
+	if telemetry.is_some() || output.is_some() || log.is_some() {
+		tracing_subscriber::registry().with(telemetry).with(output).with(log).init();
+	}
 
 	// execute
 	cli::command(&cli).await
