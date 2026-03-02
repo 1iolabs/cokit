@@ -5820,6 +5820,7 @@ dependencies = [
  "libp2p-upnp",
  "libp2p-webrtc-websys",
  "libp2p-websocket",
+ "libp2p-websocket-websys",
  "libp2p-yamux",
  "multiaddr",
  "pin-project",
@@ -6368,6 +6369,23 @@ dependencies = [
  "tracing",
  "url",
  "webpki-roots 0.26.11",
+]
+
+[[package]]
+name = "libp2p-websocket-websys"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e73d85b4dc8c2044f58508461bd8bb12f541217c0038ade8cce0ddc1607b8f72"
+dependencies = [
+ "bytes",
+ "futures",
+ "js-sys",
+ "libp2p-core",
+ "send_wrapper 0.6.0",
+ "thiserror 2.0.17",
+ "tracing",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

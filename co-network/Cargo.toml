@@ -65,7 +65,7 @@ native = [
 ]
 web = [
     "co-actor/js",
-    "libp2p/wasm-bindgen", "libp2p/webrtc-websys",
+    "libp2p/wasm-bindgen", "libp2p/webrtc-websys", "libp2p/websocket-websys",
     "dep:tokio_with_wasm",
     "dep:wasm-bindgen-futures", "dep:web-time", "dep:getrandom", "dep:getrandom_03",
     "dep:futures-timer",

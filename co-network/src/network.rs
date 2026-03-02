@@ -163,8 +163,17 @@ impl Libp2pNetwork {
 
 		#[cfg(feature = "web")]
 		let mut swarm = {
+			use libp2p::core::upgrade::Version;
+			use libp2p::core::Transport;
 			let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
 				.with_wasm_bindgen()
+				.with_other_transport(|keypair| {
+					Ok(libp2p::websocket_websys::Transport::default()
+						.upgrade(Version::V1Lazy)
+						.authenticate(noise::Config::new(&keypair).expect("noise config"))
+						.multiplex(yamux::Config::default())
+						.boxed())
+				})?
 				.with_other_transport(|keypair| {
 					libp2p::webrtc_websys::Transport::new(libp2p::webrtc_websys::Config::new(&keypair))
 				})?;
