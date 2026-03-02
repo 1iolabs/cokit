@@ -61,7 +61,8 @@ impl Actor for Network {
 			initialize.identity_resolver.clone(),
 			initialize.private_identity_resolver.clone(),
 			initialize.bitswap,
-		)?;
+		)
+		.await?;
 
 		// spawner
 		let spawner = CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id };

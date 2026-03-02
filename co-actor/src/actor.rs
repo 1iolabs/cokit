@@ -269,6 +269,22 @@ where
 		Ok(())
 	}
 
+	/// Wait for startup to be complete and then run in background.
+	/// This will resolve when initialization is done by returning any initialization errors.
+	pub async fn initialized(self) -> Result<ActorHandle<A::Message>, ActorError> {
+		let handle = self.handle();
+		match handle.initialized().await {
+			Ok(_) => Ok(handle),
+			Err(err @ ActorError::InvalidState(_, _)) if self.handle().is_closed() => {
+				// use the orignal initialize error and forward
+				//  this will not block as the actor has been closed already
+				self.join().await?;
+				Err(err)
+			},
+			Err(err) => Err(err),
+		}
+	}
+
 	/// Get actor state.
 	pub fn state(&self) -> ActorState {
 		*self.handle.state.borrow()

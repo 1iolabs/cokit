@@ -43,7 +43,7 @@ pub struct Libp2pNetwork {
 }
 impl Libp2pNetwork {
 	#[allow(clippy::too_many_arguments)]
-	pub fn new(
+	pub async fn new(
 		identifier: String,
 		keypair: Keypair,
 		config: NetworkSettings,
@@ -140,7 +140,10 @@ impl Libp2pNetwork {
 				.with_tokio()
 				.with_tcp(libp2p::tcp::Config::default(), noise::Config::new, yamux::Config::default)?
 				.with_quic()
-				.with_dns()?;
+				.with_dns()?
+				.with_websocket(noise::Config::new, yamux::Config::default)
+				.await
+				.map_err(|e| anyhow!("websocket transport: {e}"))?;
 			if config.nat {
 				swarm_builder
 					.with_relay_client(noise::Config::new, yamux::Config::default)?
