@@ -85,7 +85,14 @@ impl Libp2pNetwork {
 
 		// relay
 		let relay_server = if config.relay {
-			Some(libp2p::relay::Behaviour::new(local_peer_id, relay::Config::default()))
+			let mut relay_config = relay::Config::default();
+			if let Some(bytes) = config.max_circuit_bytes {
+				relay_config.max_circuit_bytes = bytes;
+			}
+			if let Some(duration) = config.max_circuit_duration {
+				relay_config.max_circuit_duration = duration;
+			}
+			Some(libp2p::relay::Behaviour::new(local_peer_id, relay_config))
 		} else {
 			None
 		}
@@ -205,10 +212,10 @@ impl Libp2pNetwork {
 				continue;
 			}
 
-			// // listen on bootstrap as relay
-			// if config.nat {
-			// 	swarm.listen_on(bootstrap.clone().with(multiaddr::Protocol::P2pCircuit)).ok();
-			// }
+			// listen on bootstrap as relay
+			if config.nat {
+				swarm.listen_on(bootstrap.clone().with(multiaddr::Protocol::P2pCircuit)).ok();
+			}
 
 			// dial bootstrap
 			swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![bootstrap.clone()]).build())?;

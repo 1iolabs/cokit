@@ -41,6 +41,14 @@ pub struct NetworkSettings {
 
 	/// Enable mDNS protocol.
 	pub mdns: bool,
+
+	/// Maximum number of bytes allowed on a relay circuit.
+	/// If `None`, the libp2p default (128 KiB) is used.
+	pub max_circuit_bytes: Option<u64>,
+
+	/// Maximum duration of a relay circuit.
+	/// If `None`, the libp2p default (120s) is used.
+	pub max_circuit_duration: Option<Duration>,
 }
 impl Default for NetworkSettings {
 	fn default() -> Self {
@@ -54,6 +62,8 @@ impl Default for NetworkSettings {
 			relay: false,
 			nat: true,
 			mdns: true,
+			max_circuit_bytes: None,
+			max_circuit_duration: None,
 		}
 	}
 }
@@ -163,6 +173,18 @@ impl NetworkSettings {
 	/// Enable NAT related protocols.
 	pub fn with_nat(mut self, nat: bool) -> Self {
 		self.nat = nat;
+		self
+	}
+
+	/// Set the maximum number of bytes allowed on a relay circuit.
+	pub fn with_max_circuit_bytes(mut self, max_circuit_bytes: u64) -> Self {
+		self.max_circuit_bytes = Some(max_circuit_bytes);
+		self
+	}
+
+	/// Set the maximum duration of a relay circuit.
+	pub fn with_max_circuit_duration(mut self, max_circuit_duration: Duration) -> Self {
+		self.max_circuit_duration = Some(max_circuit_duration);
 		self
 	}
 

@@ -13,6 +13,7 @@ use anyhow::Result;
 use co_sdk::NetworkSettings;
 use exitcode::ExitCode;
 use multiaddr::Multiaddr;
+use std::time::Duration;
 
 /// Run a relay node for browser WebRTC peers.
 #[derive(Debug, Clone, clap::Args)]
@@ -36,6 +37,14 @@ pub struct Command {
 	/// Do not use default bootstraps.
 	#[arg(long)]
 	pub no_bootstrap: bool,
+
+	/// Maximum bytes allowed per relay circuit (default: 128 KiB).
+	#[arg(long, value_name = "BYTES")]
+	pub max_circuit_bytes: Option<u64>,
+
+	/// Maximum duration in seconds per relay circuit (default: 120s).
+	#[arg(long, value_name = "SECONDS")]
+	pub max_circuit_duration: Option<u64>,
 }
 
 pub async fn command(
@@ -52,15 +61,21 @@ pub async fn command(
 		bs.extend(command.bootstrap.clone());
 		bs
 	};
-	let network_settings = NetworkSettings::new()
+	let mut network_settings = NetworkSettings::new()
 		.with_force_new_peer_id(network_command.force_new_peer_id)
 		.with_listen(command.listen.clone())
 		.with_bootstraps(bootstrap)
 		.with_added_external_addresses(command.external_address.clone())
 		.with_relay(true)
 		.with_mdns(false)
-		.with_nat(true)
-		.build()?;
+		.with_nat(true);
+	if let Some(bytes) = command.max_circuit_bytes {
+		network_settings = network_settings.with_max_circuit_bytes(bytes);
+	}
+	if let Some(seconds) = command.max_circuit_duration {
+		network_settings = network_settings.with_max_circuit_duration(Duration::from_secs(seconds));
+	}
+	let network_settings = network_settings.build()?;
 
 	// application and network
 	let mut application = context.application(cli).await;
