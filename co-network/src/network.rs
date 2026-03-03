@@ -161,7 +161,7 @@ impl Libp2pNetwork {
 			}
 		};
 
-		#[cfg(feature = "web")]
+		#[cfg(all(feature = "js", target_arch = "wasm32"))]
 		let mut swarm = {
 			use libp2p::core::{upgrade::Version, Transport};
 			let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
@@ -480,7 +480,7 @@ async fn run(
 	let tasks = tasks.fuse();
 	pin_mut!(tasks);
 	while runtime.is_running() {
-		tokio::select! {
+		::tokio::select! {
 			// to not stack them up before creating new work
 			// use biased as we always want to handle events first
 			biased;
@@ -524,7 +524,7 @@ async fn run(
 
 async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, Context>, runtime: &mut Runtime) {
 	// event
-	let network_event: Option<SwarmEvent<NetworkEvent>> = tokio::select! {
+	let network_event: Option<SwarmEvent<NetworkEvent>> = ::tokio::select! {
 		swarm_event = swarm.select_next_some() => {
 			context.on_swarm_event(&swarm_event);
 			Some(swarm_event)

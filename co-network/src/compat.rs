@@ -1,17 +1,17 @@
 use std::time::Duration;
-#[cfg(not(feature = "web"))]
+#[cfg(not(feature = "js"))]
 pub use std::time::Instant;
-#[cfg(feature = "web")]
+#[cfg(feature = "js")]
 pub use web_time::Instant;
 
 /// platform-agnostic sleep until a deadline
-#[cfg(not(feature = "web"))]
+#[cfg(not(feature = "js"))]
 pub async fn sleep_until(deadline: Instant) {
 	tokio::time::sleep_until(deadline.into()).await;
 }
 
 /// platform-agnostic sleep until a deadline (tokio_with_wasm Sleep is !Send)
-#[cfg(feature = "web")]
+#[cfg(feature = "js")]
 pub async fn sleep_until(deadline: Instant) {
 	let now = Instant::now();
 	if let Some(duration) = deadline.checked_duration_since(now) {
@@ -20,7 +20,7 @@ pub async fn sleep_until(deadline: Instant) {
 }
 
 /// Platform-agnostic timeout. Send-safe on all platforms.
-#[cfg(not(feature = "web"))]
+#[cfg(not(feature = "js"))]
 pub async fn timeout<F: std::future::Future>(
 	duration: Duration,
 	future: F,
@@ -29,7 +29,7 @@ pub async fn timeout<F: std::future::Future>(
 }
 
 /// Platform-agnostic timeout. Send-safe on all platforms.
-#[cfg(feature = "web")]
+#[cfg(feature = "js")]
 pub async fn timeout<F: std::future::Future>(duration: Duration, future: F) -> Result<F::Output, Elapsed> {
 	use futures::future::Either;
 	use std::pin::pin;
@@ -44,16 +44,16 @@ pub async fn timeout<F: std::future::Future>(duration: Duration, future: F) -> R
 }
 
 /// Error returned when a timeout expires.
-#[cfg(feature = "web")]
+#[cfg(feature = "js")]
 #[derive(Debug)]
 pub struct Elapsed;
 
-#[cfg(feature = "web")]
+#[cfg(feature = "js")]
 impl std::fmt::Display for Elapsed {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "deadline has elapsed")
 	}
 }
 
-#[cfg(feature = "web")]
+#[cfg(feature = "js")]
 impl std::error::Error for Elapsed {}

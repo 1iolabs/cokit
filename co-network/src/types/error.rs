@@ -4,6 +4,8 @@
 // retention—approved secure tools may process solely for internal use.
 
 use tokio::sync::mpsc::error::SendError;
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 #[derive(Debug, thiserror::Error)]
 pub enum NetworkError {

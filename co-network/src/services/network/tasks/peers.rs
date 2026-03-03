@@ -12,6 +12,8 @@ use futures::Stream;
 use libp2p::{swarm::SwarmEvent, PeerId, Swarm};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 /// Notify about discovered peers.
 #[derive(Debug)]

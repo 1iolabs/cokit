@@ -63,6 +63,7 @@ native = [
     "dep:tokio",
 ]
 web = [
+    "js",
     "co-actor/js",
     "libp2p/wasm-bindgen", "libp2p/webrtc-websys", "libp2p/websocket-websys",
     "dep:tokio_with_wasm",
@@ -70,3 +71,4 @@ web = [
     "dep:futures-timer",
     "uuid/js",
 ]
+js = []
