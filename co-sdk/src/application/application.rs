@@ -503,6 +503,16 @@ impl ApplicationBuilder {
 		self
 	}
 
+	pub fn with_cores(mut self, cores: Cores) -> Self {
+		self.cores = cores;
+		self
+	}
+
+	pub fn with_guards(mut self, guards: Guards) -> Self {
+		self.guards = guards;
+		self
+	}
+
 	pub fn with_static_blocks(mut self, storage: StaticBlockStorage<'static>) -> Self {
 		self.static_blocks.push(storage);
 		self

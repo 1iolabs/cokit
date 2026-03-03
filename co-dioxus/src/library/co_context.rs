@@ -162,7 +162,9 @@ type Task = Box<TaskFn>;
 // type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
 
 async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Result<(), anyhow::Error> {
-	let mut application_builder = ApplicationBuilder::new_with_storage(settings.identifier, settings.storage);
+	let mut application_builder = ApplicationBuilder::new_with_storage(settings.identifier, settings.storage)
+		.with_cores(settings.cores)
+		.with_guards(settings.guards);
 	if settings.no_keychain {
 		application_builder = application_builder.without_keychain();
 	}

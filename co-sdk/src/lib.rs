@@ -46,8 +46,8 @@ pub use co_primitives::{
 	OptionLink, Path, PathError, PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag,
 	Tags,
 };
-pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
-pub use co_storage::BlockStorageContentMapping;
+pub use co_runtime::{co_v1, Core, ExecuteError, GuardReference, RuntimeContext, RuntimeInstance, RuntimePool};
+pub use co_storage::{BlockStorageContentMapping, MemoryBlockStorage};
 #[cfg(feature = "fs")]
 pub use library::build_core::{build_core, crate_repository_path, BuildCoreArtifact};
 #[cfg(feature = "network")]

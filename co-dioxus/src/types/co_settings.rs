@@ -4,10 +4,11 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::library::cli::{Cli, CoLogLevel};
+use cid::Cid;
 use clap::Parser;
 #[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
-use co_sdk::{CoStorageSetting, DynamicLocalSecret, LocalSecret};
+use co_sdk::{CoStorageSetting, Core, Cores, DynamicLocalSecret, GuardReference, Guards, LocalSecret};
 
 #[derive(Debug, Clone, Default)]
 pub struct CoSettings {
@@ -23,6 +24,8 @@ pub struct CoSettings {
 	pub no_default_features: bool,
 	pub feature: Vec<String>,
 	pub local_secret: Option<DynamicLocalSecret>,
+	pub cores: Cores,
+	pub guards: Guards,
 }
 impl CoSettings {
 	pub fn new(identifier: &str) -> Self {
@@ -63,5 +66,15 @@ impl CoSettings {
 
 	pub fn with_local_secret(self, secret: impl LocalSecret + 'static) -> Self {
 		Self { local_secret: Some(DynamicLocalSecret::new(secret)), ..self }
+	}
+
+	pub fn with_core(mut self, core_cid: Cid, core: Core) -> Self {
+		self.cores = self.cores.with_override(core_cid, core);
+		self
+	}
+
+	pub fn with_guard(mut self, guard_cid: Cid, guard: GuardReference) -> Self {
+		self.guards = self.guards.with_override(guard_cid, guard);
+		self
 	}
 }
