@@ -152,10 +152,11 @@ where
 				// execute
 				let weak_handle = handle.downgrade();
 				while let Some(actor_message) = rx.recv().await {
-					let (message, message_span) = match actor_message {
-						ActorMessage::Message(message) => (message, tracing::trace_span!("actor-handle")),
+					// handle message
+					let (message, message_span, _parent_span) = match actor_message {
+						ActorMessage::Message(message) => (message, tracing::trace_span!("actor-handle"), None),
 						ActorMessage::MessageWithSpan(message, message_span) => {
-							(message, tracing::trace_span!(parent: message_span, "actor-handle"))
+							(message, tracing::trace_span!(parent: &message_span, "actor-handle"), Some(message_span))
 						},
 						ActorMessage::Shutdown => {
 							// log
