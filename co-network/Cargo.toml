@@ -19,10 +19,7 @@ did-key = "0.2.1"
 futures = { workspace = true }
 ipld-core = { workspace = true }
 libipld = "0.16"
-libp2p = { version = "0.56", default-features = false, features = [
-    "identify", "ping", "gossipsub", "relay", "dcutr", "autonat",
-    "noise", "yamux", "macros", "request-response", "serde", "rendezvous",
-] }
+libp2p = { version = "0.56", default-features = false, features = ["identify", "ping", "gossipsub", "relay", "dcutr", "autonat", "noise", "yamux", "macros", "request-response", "serde", "rendezvous"] }
 libp2p-bitswap = { version = "0.25.0", git = "https://github.com/dkuhnert/libp2p-bitswap.git", branch = "auth", default-features = false, features = ["compat"] }
 multiaddr = { workspace = true }
 pin-project = { workspace = true }
@@ -33,13 +30,11 @@ serde_json = { workspace = true }
 serde_repr = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros"] }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
-
-# native-only (optional)
-tokio = { workspace = true, features = ["macros", "sync", "time"], optional = true }
 
 # web-only (optional)
 tokio_with_wasm = { workspace = true, features = ["macros", "sync", "time"], optional = true }
@@ -57,18 +52,20 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 default = ["native"]
 native = [
     "co-actor/native",
-    "libp2p/tokio", "libp2p/tcp", "libp2p/quic", "libp2p/dns",
-    "libp2p/mdns", "libp2p/upnp", "libp2p/websocket", "libp2p/tls",
+    "libp2p/tokio", "libp2p/tcp", "libp2p/quic", "libp2p/dns", "libp2p/mdns", "libp2p/upnp", "libp2p/websocket", "libp2p/tls",
     "libp2p-bitswap/metrics",
-    "dep:tokio",
+    "tokio/sync", "tokio/time",
 ]
-web = [
-    "js",
+web = ["js"]
+js = [
     "co-actor/js",
-    "libp2p/wasm-bindgen", "libp2p/webrtc-websys", "libp2p/websocket-websys",
     "dep:tokio_with_wasm",
-    "dep:wasm-bindgen-futures", "dep:web-time", "dep:getrandom", "dep:getrandom_03",
+    "dep:wasm-bindgen-futures",
+    "dep:web-time",
+    "dep:getrandom",
+    "dep:getrandom_03",
     "dep:futures-timer",
     "uuid/js",
+    "libp2p/webrtc-websys", "libp2p/websocket-websys", "libp2p/wasm-bindgen",
+    "libp2p-bitswap/wasm-bindgen",
 ]
-js = []
