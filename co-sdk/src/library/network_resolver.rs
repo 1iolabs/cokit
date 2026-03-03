@@ -58,19 +58,27 @@ impl NetworkResolver for CoNetworkResolver {
 
 				// reducer
 				//  this should work in any case when we already got the storage
-				//  may only fails if need to fetch heads from network?
+				//  no networking is involved because the reducer is initialized in the actor
 				let reducer = reducers.reducer(id.clone(), Default::default()).await?;
 
-				// get CO networks
-				// - or participant networks if CO networks are empty
-				// - or invite metadata if the previous fail (because the block is not loaded yet)
-				match networks_co(&self.context, storage, &reducer).await {
-					Ok(networks) => {
-						return Ok(networks);
-					},
-					Err(err) => {
-						tracing::warn!(?err, co = ?id, "co-resolve-networks-failed (fallback to invite)");
-					},
+				// we only access the reducer when is already has been initialized
+				//  if it has not initialized we can be sure here that the initialize is caused the networking request
+				//  and this would deadlock.
+				//  there are only two cases:
+				//  - network access in initialize
+				//  - network access after initialize (join/read) in which case the reducer is already running
+				if reducer.is_running() {
+					// get CO networks
+					// - or participant networks if CO networks are empty
+					// - or invite metadata if the previous fail (because the block is not loaded yet)
+					match networks_co(&self.context, storage, &reducer).await {
+						Ok(networks) => {
+							return Ok(networks);
+						},
+						Err(err) => {
+							tracing::warn!(?err, co = ?id, "co-resolve-networks-failed (fallback to invite)");
+						},
+					}
 				}
 			}
 		}
