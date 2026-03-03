@@ -35,12 +35,13 @@ web-sys = { workspace = true, optional = true }
 default = []
 
 # targets
-"desktop" = ["fs", "network", "tracing", "co-sdk/recommended", "co-sdk/apple-sandbox", "co-actor/native"]
-"mobile" = ["fs", "network", "tracing", "co-sdk/recommended", "co-sdk/apple-sandbox", "co-actor/native"]
-"web" = ["js", "network", "co-sdk/web", "co-sdk/indexeddb", "co-actor/js"]
+desktop = ["fs", "network", "tracing", "co-sdk/recommended", "co-sdk/apple-sandbox", "co-actor/native"]
+mobile = ["fs", "network", "tracing", "co-sdk/recommended", "co-sdk/apple-sandbox", "co-actor/native"]
+web = ["js", "network", "indexeddb", "co-sdk/web"]
 
 # features
-"fs" = ["co-sdk/fs"]
-"network" = ["co-sdk/network"]
-"js" = ["co-sdk/js", "uuid/js", "dep:wasm-bindgen-futures", "dep:web-sys", "dep:tokio_with_wasm"]
-"tracing" = ["co-sdk/tracing"]
+fs = ["co-sdk/fs"]
+network = ["co-sdk/network"]
+js = ["co-sdk/js", "co-actor/js", "uuid/js", "dep:wasm-bindgen-futures", "dep:web-sys", "dep:tokio_with_wasm"]
+tracing = ["co-sdk/tracing"]
+indexeddb = ["co-sdk/indexeddb"]

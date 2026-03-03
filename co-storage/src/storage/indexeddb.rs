@@ -3,7 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{BlockStorageContentMapping, ExtendedBlockStorage};
+use crate::{BlockStorageContentMapping, ExtendedBlock, ExtendedBlockStorage};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
@@ -49,6 +49,7 @@ impl IndexedDbBlockStorage {
 }
 #[async_trait]
 impl BlockStorage for IndexedDbBlockStorage {
+	#[tracing::instrument(level = tracing::Level::TRACE, name = "indexeddb-storage-get", err(Debug))]
 	async fn get(&self, cid: &Cid) -> Result<Block, StorageError> {
 		self.handle
 			.request(|response| IdbMessage::Get(*cid, response))
@@ -56,6 +57,7 @@ impl BlockStorage for IndexedDbBlockStorage {
 			.map_err(actor_err)?
 	}
 
+	#[tracing::instrument(level = tracing::Level::TRACE, name = "indexeddb-storage-set", err(Debug), skip_all, fields(cid = ?block.cid()))]
 	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		self.handle
 			.request(|response| IdbMessage::Set(block, response))
@@ -63,6 +65,7 @@ impl BlockStorage for IndexedDbBlockStorage {
 			.map_err(actor_err)?
 	}
 
+	#[tracing::instrument(level = tracing::Level::TRACE, name = "indexeddb-storage-stat", err(Debug))]
 	async fn stat(&self, cid: &Cid) -> Result<BlockStat, StorageError> {
 		self.handle
 			.request(|response| IdbMessage::Stat(*cid, response))
@@ -70,6 +73,7 @@ impl BlockStorage for IndexedDbBlockStorage {
 			.map_err(actor_err)?
 	}
 
+	#[tracing::instrument(level = tracing::Level::TRACE, name = "indexeddb-storage-remove", err(Debug))]
 	async fn remove(&self, cid: &Cid) -> Result<(), StorageError> {
 		self.handle
 			.request(|response| IdbMessage::Remove(*cid, response))
@@ -86,7 +90,7 @@ impl BlockStorageStoreParams for IndexedDbBlockStorage {
 }
 #[async_trait]
 impl ExtendedBlockStorage for IndexedDbBlockStorage {
-	async fn set_extended(&self, block: crate::ExtendedBlock) -> Result<Cid, StorageError> {
+	async fn set_extended(&self, block: ExtendedBlock) -> Result<Cid, StorageError> {
 		self.set(block.block).await
 	}
 

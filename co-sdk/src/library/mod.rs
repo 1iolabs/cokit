@@ -46,6 +46,7 @@ pub mod local_secret;
 pub mod local_secret_file;
 #[cfg(feature = "keychain")]
 pub mod local_secret_keychain;
+pub mod local_secret_password;
 pub mod locals;
 #[cfg(feature = "fs")]
 pub mod locals_file;

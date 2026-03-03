@@ -11,14 +11,20 @@ use co_storage::Algorithm;
 use std::{io::ErrorKind, path::PathBuf};
 
 pub struct FileLocalSecret {
+	algorithm: Algorithm,
 	key_path: PathBuf,
 }
 impl FileLocalSecret {
 	pub fn new(file: PathBuf) -> Self {
-		Self { key_path: file }
+		let algorithm = Algorithm::default();
+		Self { algorithm, key_path: file }
 	}
 
-	async fn fetch_secret_cbor(key_path: &PathBuf, allow_create: bool) -> Result<Secret, anyhow::Error> {
+	async fn fetch_secret_cbor(
+		key_path: &PathBuf,
+		algorithm: Algorithm,
+		allow_create: bool,
+	) -> Result<Secret, anyhow::Error> {
 		match fs_read_option(key_path).await {
 			Ok(Some(data)) => {
 				let result: Secret = serde_ipld_dagcbor::from_slice(&data)?;
@@ -26,7 +32,7 @@ impl FileLocalSecret {
 			},
 			Ok(None) if allow_create => {
 				// create
-				let secret: Secret = Algorithm::default().generate_serect().into();
+				let secret: Secret = algorithm.generate_serect().into();
 				let contents = serde_ipld_dagcbor::to_vec(&secret)?;
 				fs_write(key_path, contents, true).await?;
 
@@ -40,7 +46,7 @@ impl FileLocalSecret {
 }
 #[async_trait]
 impl LocalSecret for FileLocalSecret {
-	async fn fetch(&self) -> Result<Secret, anyhow::Error> {
-		Self::fetch_secret_cbor(&self.key_path, true).await
+	async fn fetch(&self) -> Result<(Algorithm, Secret), anyhow::Error> {
+		Ok((self.algorithm, Self::fetch_secret_cbor(&self.key_path, self.algorithm, true).await?))
 	}
 }

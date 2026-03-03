@@ -47,6 +47,11 @@ impl CoSettings {
 		Self { storage: CoStorageSetting::Memory, ..self }
 	}
 
+	#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+	pub fn with_indexeddb(self, secret: impl LocalSecret + 'static) -> Self {
+		Self { storage: CoStorageSetting::IndexedDb, local_secret: Some(DynamicLocalSecret::new(secret)), ..self }
+	}
+
 	#[cfg(feature = "network")]
 	pub fn with_network(self, network_settings: NetworkSettings) -> Self {
 		Self { network: true, network_settings, ..self }

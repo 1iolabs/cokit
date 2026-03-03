@@ -92,9 +92,9 @@ impl LocalCoBuilder {
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
 	{
 		// key
-		let key: Option<Box<dyn LocalSecret>> = if self.settings.feature_co_local_encryption() {
+		let key: Option<DynamicLocalSecret> = if self.settings.feature_co_local_encryption() {
 			match self.local_secret.take() {
-				Some(secret) => Some(Box::new(secret)),
+				Some(secret) => Some(secret),
 				None => Some(self.build_local_secret()),
 			}
 		} else {
@@ -127,21 +127,26 @@ impl LocalCoBuilder {
 	}
 
 	/// Build default implementation for local secret.
-	fn build_local_secret(&self) -> Box<dyn LocalSecret> {
+	fn build_local_secret(&self) -> DynamicLocalSecret {
 		// keychain
 		#[cfg(feature = "keychain")]
 		if self.settings.keychain {
-			return Box::new(KeychainLocalSecret::new("co.app".to_owned(), self.identity.identity().to_owned()));
+			return DynamicLocalSecret::new(KeychainLocalSecret::new(
+				"co.app".to_owned(),
+				self.identity.identity().to_owned(),
+			));
 		}
 
 		// fs
 		#[cfg(feature = "fs")]
 		if let Some(application_path) = &self.settings.application_path {
-			return Box::new(FileLocalSecret::new(application_path.parent().expect("etc folder").join("key.cbor")));
+			return DynamicLocalSecret::new(FileLocalSecret::new(
+				application_path.parent().expect("etc folder").join("key.cbor"),
+			));
 		}
 
 		// memory
-		Box::new(MemoryLocalSecret::generate())
+		DynamicLocalSecret::new(MemoryLocalSecret::generate())
 	}
 }
 
@@ -176,6 +181,7 @@ where
 	/// dropped when a watcher is active.
 	///
 	/// NOTE: This assumes the same encryption key is used by all local applications.
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all)]
 	async fn create<R>(
 		LocalCoContext {
 			storage,
@@ -191,7 +197,7 @@ where
 		cores: &Cores,
 		local_co: LocalCoBuilder,
 		locals: L,
-		key: Option<Box<dyn LocalSecret>>,
+		key: Option<DynamicLocalSecret>,
 		watcher: bool,
 	) -> Result<(Self, CoReducer), anyhow::Error>
 	where
@@ -528,12 +534,15 @@ where
 /// Todo: What happens if muliple applications try to access the same key?
 async fn create_encrypted_storage<S>(
 	storage: S,
-	key: Box<dyn LocalSecret + Send + Sync + 'static>,
+	key: DynamicLocalSecret,
 	disallow_plain: bool,
 ) -> Result<EncryptedBlockStorage<S>, anyhow::Error>
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
+	// fetch key
+	let (algorithm, secret) = key.fetch().await?;
+
 	// we have plain references:
 	// - buildin core references
 	//   - third party cores are expected to be encrypted
@@ -544,7 +553,7 @@ where
 	} else {
 		EncryptionReferenceMode::Warning
 	};
-	Ok(EncryptedBlockStorage::new(storage.clone(), key.fetch().await?.into(), Default::default(), Default::default())
+	Ok(EncryptedBlockStorage::new(storage.clone(), secret.into(), algorithm, Default::default())
 		.with_encryption_reference_mode(reference_mode))
 }
 

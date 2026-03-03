@@ -60,7 +60,6 @@ pub use library::token::{CoToken, CoTokenParameters};
 pub use library::update_co::update_co;
 pub use library::{
 	core_source::CoreSource,
-	local_secret::{DynamicLocalSecret, LocalSecret, MemoryLocalSecret},
 	did_key_provider::DidKeyProvider,
 	find_co_by_pin::find_co_by_pin,
 	find_co_identities::{find_co_identities, find_co_private_identity},
@@ -69,6 +68,8 @@ pub use library::{
 	generate_random_name::generate_random_name,
 	ipld_resolve_recursive::ipld_resolve_recursive,
 	is_cid_encrypted::is_cid_encrypted,
+	local_secret::{DynamicLocalSecret, LocalSecret, MemoryLocalSecret},
+	local_secret_password::PasswordLocalSecret,
 	memory_dispatch::MemoryDispatch,
 };
 pub use pin::PinAPI;

@@ -8,8 +8,8 @@ use super::tracing::TracingBuilder;
 use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
 use crate::{
 	library::wait_response::request_response, services::application::ApplicationMessage, types::co_date::co_date_env,
-	Action, CoReducer, CoReducerFactory, CoStorage, CoStorageSetting, CoUuid, Cores, DynamicCoUuid,
-	DynamicLocalSecret, Guards, LocalSecret, RandomCoUuid, Storage,
+	Action, CoReducer, CoReducerFactory, CoStorage, CoStorageSetting, CoUuid, Cores, DynamicCoUuid, DynamicLocalSecret,
+	Guards, LocalSecret, RandomCoUuid, Storage,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -562,8 +562,6 @@ impl ApplicationBuilder {
 			#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
 			CoStorageSetting::IndexedDb => (Storage::new_indexeddb().await?, None),
 		};
-		#[cfg(not(feature = "fs"))]
-		let mut storage = Storage::new_memory();
 		if !self.static_blocks.is_empty() {
 			storage = storage.with_static(self.static_blocks);
 		}

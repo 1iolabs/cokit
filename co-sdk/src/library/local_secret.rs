@@ -13,21 +13,23 @@ use std::{
 
 #[async_trait]
 pub trait LocalSecret: Send + Sync + 'static {
-	async fn fetch(&self) -> Result<Secret, anyhow::Error>;
+	async fn fetch(&self) -> Result<(Algorithm, Secret), anyhow::Error>;
 }
 
 pub struct MemoryLocalSecret {
+	algorithm: Algorithm,
 	secret: co_storage::Secret,
 }
 impl MemoryLocalSecret {
 	pub fn generate() -> Self {
-		Self { secret: Algorithm::default().generate_serect() }
+		let algorithm = Algorithm::default();
+		Self { secret: algorithm.generate_serect(), algorithm }
 	}
 }
 #[async_trait]
 impl LocalSecret for MemoryLocalSecret {
-	async fn fetch(&self) -> Result<Secret, anyhow::Error> {
-		Ok(self.secret.clone().into())
+	async fn fetch(&self) -> Result<(Algorithm, Secret), anyhow::Error> {
+		Ok((self.algorithm, self.secret.clone().into()))
 	}
 }
 
@@ -45,7 +47,7 @@ impl DynamicLocalSecret {
 }
 #[async_trait]
 impl LocalSecret for DynamicLocalSecret {
-	async fn fetch(&self) -> Result<Secret, anyhow::Error> {
+	async fn fetch(&self) -> Result<(Algorithm, Secret), anyhow::Error> {
 		self.0.fetch().await
 	}
 }
