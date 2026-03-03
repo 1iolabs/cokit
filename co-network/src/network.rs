@@ -163,8 +163,7 @@ impl Libp2pNetwork {
 
 		#[cfg(feature = "web")]
 		let mut swarm = {
-			use libp2p::core::upgrade::Version;
-			use libp2p::core::Transport;
+			use libp2p::core::{upgrade::Version, Transport};
 			let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
 				.with_wasm_bindgen()
 				.with_other_transport(|keypair| {
