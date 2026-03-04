@@ -125,7 +125,10 @@ fn handle_heads(
 					Some(Membership { membership_state: MembershipState::Active, .. }) => {
 						// active -> ok
 					},
-					Some(Membership { membership_state: MembershipState::Invite | MembershipState::Join | MembershipState::Pending, .. }) => {
+					Some(Membership {
+						membership_state: MembershipState::Invite | MembershipState::Join | MembershipState::Pending,
+						..
+					}) => {
 						// pending -> queue
 						return Err(HeadsError::Transient(ActionError::from(anyhow!("Pending membership"))));
 					},
@@ -280,11 +283,7 @@ async fn handle_request_state(
 
 async fn create_state_body(co: &CoReducer) -> anyhow::Result<HeadsMessage> {
 	let (state, heads) = MappedCoReducerState::new_co(co).await.external().weak();
-	Ok(HeadsMessage::State(
-		co.id().clone(),
-		state.ok_or_else(|| anyhow!("no state"))?,
-		heads,
-	))
+	Ok(HeadsMessage::State(co.id().clone(), state.ok_or_else(|| anyhow!("no state"))?, heads))
 }
 
 async fn verify_from_participant(

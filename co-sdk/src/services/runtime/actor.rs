@@ -4,9 +4,11 @@
 // retention—approved secure tools may process solely for internal use.
 
 use cid::Cid;
+#[cfg(not(feature = "js"))]
+use co_actor::TaskSpawner;
+use co_actor::{ActorError, ActorHandle, Response};
 #[cfg(feature = "js")]
-use co_actor::LocalActor;
-use co_actor::{ActorError, ActorHandle, Response, TaskSpawner};
+use co_actor::{JsLocalTaskSpawner, LocalActor};
 use co_primitives::{tags, AnyBlockStorage, CoreBlockStorage, Tags};
 use co_runtime::{Core, ExecuteError, GuardReference, RuntimeContext, RuntimePool};
 
@@ -88,7 +90,7 @@ pub struct ExecuteGuardAction {
 pub struct RuntimeActor {}
 impl RuntimeActor {
 	#[cfg(not(feature = "js"))]
-	pub fn spawn(application: impl Into<String>, tasks: co_actor::TaskSpawner) -> Result<RuntimeHandle, anyhow::Error> {
+	pub fn spawn(application: impl Into<String>, tasks: TaskSpawner) -> Result<RuntimeHandle, anyhow::Error> {
 		let runtime_service = co_actor::Actor::spawn_with(
 			tasks.clone(),
 			tags!("type": "runtime", "application": application.into()),

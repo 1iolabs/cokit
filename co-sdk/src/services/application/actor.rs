@@ -29,7 +29,16 @@ impl Application {
 impl Actor for Application {
 	type Message = ApplicationMessage;
 	type State = ApplicationState;
-	type Initialize = (Storage, TaskSpawner, DynamicCoDate, DynamicCoUuid, Cores, Guards, Option<DynamicLocalSecret>, Option<DynamicCoAccessPolicy>);
+	type Initialize = (
+		Storage,
+		TaskSpawner,
+		DynamicCoDate,
+		DynamicCoUuid,
+		Cores,
+		Guards,
+		Option<DynamicLocalSecret>,
+		Option<DynamicCoAccessPolicy>,
+	);
 
 	async fn initialize(
 		&self,

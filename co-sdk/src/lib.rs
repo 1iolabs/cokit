@@ -55,9 +55,9 @@ pub use library::keystore_fetch::keystore_fetch;
 #[cfg(feature = "network")]
 pub use library::local_keypair_fetch::local_keypair_fetch;
 #[cfg(feature = "network")]
-pub use library::token::{CoToken, CoTokenParameters};
-#[cfg(feature = "network")]
 pub use library::request_co_state::request_co_state;
+#[cfg(feature = "network")]
+pub use library::token::{CoToken, CoTokenParameters};
 #[cfg(feature = "network")]
 pub use library::update_co::update_co;
 pub use library::{

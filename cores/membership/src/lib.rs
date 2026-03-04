@@ -79,7 +79,7 @@ pub enum MembershipState {
 	/// Pending join by us.
 	/// The goal of a join is to end up as a CO's participant.
 	/// We are signaling that we want to be an participant in their CO.
-	/// 
+	///
 	/// Use Cases:
 	/// - This is a pending join triggered by an invite waiting for completion.
 	/// - This is waiting for CO participant acceptation/rejection (remote).
