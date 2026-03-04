@@ -76,6 +76,7 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(heads_message::heads_message_receive)
 		.join(heads_message::heads_message_heads)
 		.join(heads_message::heads_message_heads_request)
+		.join(heads_message::heads_message_state_request)
 		.join(didcomm_send::didcomm_send)
 		.join(didcomm_connected::didcomm_connected)
 		.join(key_request_receive::key_request_receive)

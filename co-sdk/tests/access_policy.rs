@@ -5,11 +5,18 @@
 
 use async_trait::async_trait;
 use co_core_co::CoAction;
+use co_core_membership::{Membership, MembershipState, MembershipsAction};
+use co_network::connections::PeerRelateCoAction;
 use co_primitives::CoId;
-use co_sdk::{Action, CoAccessPolicy, Identity, KeyRequestAction, CO_CORE_NAME_CO, CO_ID_LOCAL};
+use co_sdk::{
+	request_co_state, update_co, Action, CoAccessPolicy, CoReducerState, CreateCo, Identity, KeyRequestAction,
+	CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+};
 use futures::StreamExt;
-use helper::{instance::Instances, shared_co::SharedCo};
-use std::time::Duration;
+use helper::instance::Instances;
+#[allow(unused_imports)]
+use helper::shared_co::SharedCo;
+use std::{collections::BTreeSet, time::Duration};
 use tokio::time::timeout;
 
 pub mod helper;
@@ -93,5 +100,112 @@ async fn test_access_policy_allows_removed_participant() {
 		.expect("key request to complete in time");
 	let result = results.into_iter().next().expect("one result");
 	assert!(result.is_ok(), "key request should succeed via access policy, got: {:?}", result);
+	tracing::info!("test-complete");
+}
+
+/// Test that an unrelated peer (never invited) can join a CO via `request_co_state` when the
+/// owner has an AllowAll access policy and the CO is unencrypted.
+///
+/// Steps:
+/// - Create two peers (peer1 with AllowAll policy, peer2 standard), networking between them
+/// - Peer1: create unencrypted shared CO
+/// - Peer2: request_co_state → (state, heads)
+/// - Peer2: create Active membership in local CO with state/heads from step above
+/// - Peer2: open CO via co_reducer() and sync via update_co
+/// - Verify: peer2 CO state matches peer1 CO state
+#[tokio::test]
+async fn test_access_policy_unrelated_peer_joins() {
+	let timeout_duration = Duration::from_secs(30);
+	let mut instances = Instances::new("test_access_policy_unrelated");
+
+	// peer1: with access policy
+	let mut peer1 = instances.create_builder(|b| b.with_access_policy(AllowAll)).await;
+	let mut peer2 = instances.create().await;
+
+	// network
+	let (network1, _network2) = Instances::networking(&mut peer1, &mut peer2, true, true).await;
+
+	// create identities
+	let identity1 = peer1.create_identity().await;
+	let identity2 = peer2.create_identity().await;
+
+	// peer1: create unencrypted shared CO
+	let shared_co = peer1
+		.application
+		.create_co(identity1.clone(), CreateCo::new("shared", None).with_algorithm(None))
+		.await
+		.unwrap();
+	tracing::info!("peer1: created unencrypted shared CO");
+
+	// peer2: request state from peer1
+	let (state, heads) = timeout(
+		timeout_duration,
+		request_co_state(
+			peer2.application.handle(),
+			&CoId::from("shared"),
+			&identity2,
+			network1.local_peer_id(),
+			peer2.application.context().date(),
+			Duration::from_secs(10),
+		),
+	)
+	.await
+	.expect("request_co_state to complete in time")
+	.expect("request_co_state to succeed");
+	tracing::info!(?state, ?heads, "peer2: received state from peer1");
+
+	// peer2: create Active membership in local CO
+	let local_co = peer2.application.local_co_reducer().await.unwrap();
+	let reducer_state = CoReducerState::new_weak(Some(state), heads);
+	let co_state = reducer_state
+		.to_external_co_state(&local_co.storage())
+		.await
+		.expect("to_external_co_state")
+		.expect("co_state");
+	let membership = Membership {
+		id: CoId::from("shared"),
+		did: identity2.identity().to_owned(),
+		state: BTreeSet::from([co_state]),
+		key: None,
+		membership_state: MembershipState::Active,
+		tags: Default::default(),
+	};
+	local_co
+		.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &MembershipsAction::Join(membership))
+		.await
+		.unwrap();
+	tracing::info!("peer2: created Active membership");
+
+	// peer2: associate peer1 with the shared CO so block fetching can find it
+	let connections = peer2.application.context().network_connections().await.expect("connections");
+	connections
+		.dispatch(PeerRelateCoAction {
+			co: CoId::from("shared"),
+			peer_id: network1.local_peer_id(),
+			did: Some(identity1.identity().to_owned()),
+			time: std::time::Instant::now(),
+		})
+		.ok();
+
+	// peer2: open CO and sync
+	let peer2_co = peer2
+		.application
+		.co_reducer(CoId::from("shared"))
+		.await
+		.expect("co_reducer")
+		.expect("co exists after membership");
+	update_co(
+		peer2.application.handle(),
+		&peer2_co,
+		&identity2,
+		network1.local_peer_id(),
+		Duration::from_secs(10),
+	)
+	.await
+	.expect("update_co");
+	tracing::info!("peer2: synced CO");
+
+	// verify: states match
+	assert_eq!(peer2_co.reducer_state().await, shared_co.reducer_state().await);
 	tracing::info!("test-complete");
 }

@@ -66,6 +66,8 @@ pub mod network_queue;
 pub mod network_resolver;
 #[cfg(feature = "network")]
 pub mod push_heads;
+#[cfg(feature = "network")]
+pub mod request_co_state;
 pub mod runtime_dispatch;
 pub mod sample_stream;
 pub mod settings_timeout;

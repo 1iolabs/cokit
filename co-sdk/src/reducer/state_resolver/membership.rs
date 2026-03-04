@@ -38,7 +38,7 @@ where
 	/// Push new latest state.
 	pub fn insert(&mut self, state: CoReducerState) {
 		if is_cid_encrypted(state.iter()) {
-			self.insert_extenral(state);
+			self.insert_external(state);
 		} else {
 			self.insert_internal(state);
 		}
@@ -50,7 +50,7 @@ where
 	}
 
 	/// Push new latest state.
-	pub fn insert_extenral(&mut self, state: CoReducerState) {
+	pub fn insert_external(&mut self, state: CoReducerState) {
 		self.snapshots.push((true, state));
 	}
 

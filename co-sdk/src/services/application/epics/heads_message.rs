@@ -225,6 +225,68 @@ async fn create_heads_body(co: &CoReducer) -> HeadsMessage {
 	HeadsMessage::Heads(co.id().clone(), MappedCoReducerState::new_co(co).await.external().weak_heads())
 }
 
+/// Respond when receive [`HeadsMessage::StateRequest`] message.
+pub fn heads_message_state_request(
+	_actions: &Actions<Action, (), CoContext>,
+	action: &Action,
+	_state: &(),
+	context: &CoContext,
+) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
+	match action {
+		Action::HeadsMessageReceived(HeadsMessageReceivedAction {
+			from,
+			peer,
+			message_id,
+			message: HeadsMessage::StateRequest(co),
+			..
+		}) => Some({
+			let context = context.clone();
+			let message_id = message_id.clone();
+			let from = from.clone();
+			let peer = *peer;
+			let co = co.clone();
+			async move { handle_request_state(context, message_id, from, peer, co).await }
+				.into_stream()
+				.map(Action::map_error)
+				.map(Ok)
+		}),
+		_ => None,
+	}
+}
+
+/// See: [`HeadsMessage::StateRequest`]
+async fn handle_request_state(
+	context: CoContext,
+	parent_message_id: String,
+	from: Option<Did>,
+	peer: PeerId,
+	co: CoId,
+) -> anyhow::Result<Action> {
+	// identity
+	let co_reducer = context.try_co_reducer(&co).await?;
+
+	// body
+	let body = match verify_from_participant(&context, &co_reducer, &from).await {
+		Ok(_) => create_state_body(&co_reducer).await?,
+		Err(err) => {
+			tracing::warn!(?co, ?peer, ?from, ?err, "co-request-state-failed");
+			HeadsMessage::Error { co, code: HeadsErrorCode::Forbidden, message: "Forbidden".to_owned() }
+		},
+	};
+
+	// result
+	create_heads_message(&context, &co_reducer, body, Some(parent_message_id), peer).await
+}
+
+async fn create_state_body(co: &CoReducer) -> anyhow::Result<HeadsMessage> {
+	let (state, heads) = MappedCoReducerState::new_co(co).await.external().weak();
+	Ok(HeadsMessage::State(
+		co.id().clone(),
+		state.ok_or_else(|| anyhow!("no state"))?,
+		heads,
+	))
+}
+
 async fn verify_from_participant(
 	context: &CoContext,
 	co_reducer: &CoReducer,
