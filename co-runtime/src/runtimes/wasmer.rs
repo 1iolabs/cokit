@@ -95,8 +95,8 @@ impl WasmerRuntime {
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), ret)]
-	pub fn execute_guard(&mut self, api: CoV1Api) -> Result<bool, WasmerError> {
-		let (instance, _) = self.instance(api)?;
+	pub fn execute_guard(&mut self, api: CoV1Api) -> Result<(RuntimeContext, bool), WasmerError> {
+		let (instance, env) = self.instance(api)?;
 		let state = instance.exports.get_function("guard")?;
 		let results = state.call(&mut self.store, &[])?;
 		if results.len() != 1 {
@@ -107,7 +107,9 @@ impl WasmerRuntime {
 			.ok_or(wasmer::ExportError::IncompatibleType)?
 			.i32()
 			.ok_or(wasmer::ExportError::IncompatibleType)?;
-		Ok(result == 1)
+
+		// result
+		Ok((env.as_ref(&self.store).api.context().clone(), result == 1))
 	}
 
 	fn imports(store: &mut impl AsStoreMut, env: &FunctionEnv<WasmerEnv>) -> wasmer::Imports {

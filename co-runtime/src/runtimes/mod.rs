@@ -46,7 +46,7 @@ pub trait Runtime: Debug + 'static {
 	fn execute_state(&mut self, api: CoV1Api) -> Result<RuntimeContext, RuntimeError>;
 
 	/// Execute guard runtime with specified api.
-	fn execute_guard(&mut self, api: CoV1Api) -> Result<bool, RuntimeError>;
+	fn execute_guard(&mut self, api: CoV1Api) -> Result<(RuntimeContext, bool), RuntimeError>;
 }
 
 #[cfg(not(feature = "js"))]
@@ -55,14 +55,14 @@ pub type RuntimeBox = Box<dyn Runtime + Send>;
 pub type RuntimeBox = Box<dyn Runtime>;
 
 enum RuntimeState {
-	Unintialized(bool, Vec<u8>),
-	Intialized(Box<wasmer::WasmerRuntime>),
+	Uninitialized(bool, Vec<u8>),
+	Initialized(Box<wasmer::WasmerRuntime>),
 }
 impl Debug for RuntimeState {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::Unintialized(arg0, arg1) => f.debug_tuple("Unintialized").field(arg0).field(&arg1.len()).finish(),
-			Self::Intialized(arg0) => f.debug_tuple("Intialized").field(arg0).finish(),
+			Self::Uninitialized(arg0, arg1) => f.debug_tuple("Uninitialized").field(arg0).field(&arg1.len()).finish(),
+			Self::Initialized(arg0) => f.debug_tuple("Initialized").field(arg0).finish(),
 		}
 	}
 }
@@ -73,7 +73,7 @@ struct Wasmer {
 }
 impl Wasmer {
 	pub fn new(native: bool, bytes: Vec<u8>) -> Self {
-		Self { state: RuntimeState::Unintialized(native, bytes) }
+		Self { state: RuntimeState::Uninitialized(native, bytes) }
 	}
 }
 impl Runtime for Wasmer {
@@ -89,7 +89,7 @@ impl Runtime for Wasmer {
 		Ok(result)
 	}
 
-	fn execute_guard(&mut self, api: CoV1Api) -> Result<bool, RuntimeError> {
+	fn execute_guard(&mut self, api: CoV1Api) -> Result<(RuntimeContext, bool), RuntimeError> {
 		// initialize
 		let runtime: &mut WasmerRuntime = wasmer_runtime(&mut self.state)?;
 
@@ -104,15 +104,15 @@ impl Runtime for Wasmer {
 fn wasmer_runtime(state: &mut RuntimeState) -> Result<&mut WasmerRuntime, RuntimeError> {
 	// initialize
 	let runtime: &mut WasmerRuntime = match state {
-		RuntimeState::Unintialized(native, bytes) => {
-			*state = RuntimeState::Intialized(Box::new(wasmer::WasmerRuntime::new(*native, bytes)?));
-			if let RuntimeState::Intialized(runtime) = state {
+		RuntimeState::Uninitialized(native, bytes) => {
+			*state = RuntimeState::Initialized(Box::new(wasmer::WasmerRuntime::new(*native, bytes)?));
+			if let RuntimeState::Initialized(runtime) = state {
 				runtime
 			} else {
 				return Err(RuntimeError::InvalidState(anyhow!("Uninitialized after initialize")));
 			}
 		},
-		RuntimeState::Intialized(runtime) => runtime,
+		RuntimeState::Initialized(runtime) => runtime,
 	};
 	Ok(runtime)
 }

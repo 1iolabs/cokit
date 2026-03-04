@@ -1,4 +1,6 @@
-words = ["brandguardian"]
-ignore_patterns = [
-    "COkit|BRANDGUARDIAN GmbH|AGPLv3"
+words = [
+    "brandguardian",
+    "cbor",
+    "tokio",
 ]
+ignore_patterns = ["COkit|BRANDGUARDIAN GmbH|AGPLv3"]

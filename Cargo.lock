@@ -1986,6 +1986,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
+ "co-actor",
  "co-api",
  "co-primitives",
  "co-storage",

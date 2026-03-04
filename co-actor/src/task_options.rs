@@ -4,7 +4,7 @@ pub struct TaskOptions {
 
 	/// Untracked mode.
 	///
-	/// Use this for services which usually depend on callers and use own lifecycle.
+	/// Use this for services which usually depend on callers and use own life-cycle.
 	pub untracked: bool,
 }
 impl TaskOptions {

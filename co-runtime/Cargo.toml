@@ -8,6 +8,7 @@ rust-version = "1.91"
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
+co-actor = { workspace = true }
 co-api = { workspace = true }
 co-primitives = { workspace = true }
 co-storage = { workspace = true }
@@ -42,8 +43,8 @@ wasmer = { git = "https://github.com/wasmerio/wasmer.git", branch = "main" }
 
 [features]
 default = []
-native = ["fs", "tokio/rt"]
-web = ["uuid/js", "js", "co-storage/web"]
+native = ["fs", "tokio/rt", "co-actor/native"]
+web = ["uuid/js", "js", "co-storage/web", ]
 fs = []
 
 # backends
@@ -52,7 +53,7 @@ llvm = ["wasmer/llvm", "wasmer/compiler", "dep:wasmer-compiler", "dep:wasmer-com
 cranelift = ["wasmer/cranelift", "wasmer/compiler", "dep:wasmer-compiler", "dep:wasmer-compiler-cranelift"]
 wasmi = ["wasmer/wasmi"]
 wamr = ["wasmer/wamr"]
-js = []
+js = ["co-actor/js"]
 
 # meta
 apple-sandbox = ["wasmi"]
