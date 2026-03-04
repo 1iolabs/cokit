@@ -99,7 +99,7 @@ where
 	/// Initialize membership state resolver by checking all snapshots are internal
 	///
 	/// # Note
-	/// This will fetch the block from network if neccesarry.
+	/// This will fetch the block from network if necessary.
 	/// To prevent reducer init deadlocks we do this here to have the actor instance available for caller while doing
 	/// the network stuff.
 	async fn initialize(&mut self, storage: &S) -> Result<(), anyhow::Error> {

@@ -39,7 +39,7 @@ impl CoAccessPolicy for AllowAll {
 /// - Peer2 dispatches a KeyRequest
 /// - Access policy on peer1 grants access → key request succeeds
 #[tokio::test]
-async fn test_access_policy_allows_removed_participant() {
+async fn test_allows_removed_participant() {
 	let timeout_duration = Duration::from_secs(30);
 	let mut instances = Instances::new("test_access_policy");
 
@@ -114,7 +114,7 @@ async fn test_access_policy_allows_removed_participant() {
 /// - Peer2: open CO via co_reducer() and sync via update_co
 /// - Verify: peer2 CO state matches peer1 CO state
 #[tokio::test]
-async fn test_access_policy_unrelated_peer_joins() {
+async fn test_unrelated_peer_joins() {
 	let timeout_duration = Duration::from_secs(30);
 	let mut instances = Instances::new("test_access_policy_unrelated");
 
@@ -194,15 +194,9 @@ async fn test_access_policy_unrelated_peer_joins() {
 		.await
 		.expect("co_reducer")
 		.expect("co exists after membership");
-	update_co(
-		peer2.application.handle(),
-		&peer2_co,
-		&identity2,
-		network1.local_peer_id(),
-		Duration::from_secs(10),
-	)
-	.await
-	.expect("update_co");
+	update_co(peer2.application.handle(), &peer2_co, &identity2, network1.local_peer_id(), Duration::from_secs(10))
+		.await
+		.expect("update_co");
 	tracing::info!("peer2: synced CO");
 
 	// verify: states match

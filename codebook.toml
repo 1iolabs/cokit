@@ -6,4 +6,4 @@ words = [
     "thid",
     "tokio",
 ]
-ignore_patterns = ["COkit|BRANDGUARDIAN GmbH|AGPLv3"]
+ignore_patterns = ["COkit|BRANDGUARDIAN GmbH|AGPLv3|libp2p"]

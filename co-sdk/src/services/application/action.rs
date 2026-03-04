@@ -396,7 +396,7 @@ pub struct CoDidCommSendAction {
 	/// If no networks are specified they are resolved from the Co.
 	pub networks: BTreeSet<Network>,
 
-	/// Notification when sent has been sucessfully done.
+	/// Notification when sent has been successfully done.
 	pub notification: Option<NotifyAction>,
 
 	/// Message tags. Used for internal tracking.

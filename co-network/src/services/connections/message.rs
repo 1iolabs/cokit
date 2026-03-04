@@ -11,7 +11,7 @@ use futures::Stream;
 
 #[derive(Debug)]
 pub enum ConnectionMessage {
-	/// Use a CO by utilitsing the specified networks.
+	/// Use a CO by utilizing the specified networks.
 	Use(UseAction, ResponseStream<PeersChangedAction>),
 
 	/// Action.
