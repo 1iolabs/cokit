@@ -59,6 +59,7 @@ pub use library::token::{CoToken, CoTokenParameters};
 #[cfg(feature = "network")]
 pub use library::update_co::update_co;
 pub use library::{
+	co_access_policy::{CoAccessPolicy, DynamicCoAccessPolicy},
 	core_source::CoreSource,
 	did_key_provider::DidKeyProvider,
 	find_co_by_pin::find_co_by_pin,

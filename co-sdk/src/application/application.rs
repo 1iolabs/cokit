@@ -8,8 +8,8 @@ use super::tracing::TracingBuilder;
 use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
 use crate::{
 	library::wait_response::request_response, services::application::ApplicationMessage, types::co_date::co_date_env,
-	Action, CoReducer, CoReducerFactory, CoStorage, CoStorageSetting, CoUuid, Cores, DynamicCoUuid, DynamicLocalSecret,
-	Guards, LocalSecret, RandomCoUuid, Storage,
+	Action, CoAccessPolicy, CoReducer, CoReducerFactory, CoStorage, CoStorageSetting, CoUuid, Cores,
+	DynamicCoAccessPolicy, DynamicCoUuid, DynamicLocalSecret, Guards, LocalSecret, RandomCoUuid, Storage,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -146,7 +146,7 @@ impl Application {
 		self.co_context.private_identity_resolver().await
 	}
 
-	/// Get unsiged local device identity.
+	/// Get unsigned local device identity.
 	pub fn local_identity(&self) -> LocalIdentity {
 		self.co_context.local_identity()
 	}
@@ -352,6 +352,7 @@ pub struct ApplicationBuilder {
 	static_blocks: Vec<StaticBlockStorage<'static>>,
 	cores: Cores,
 	guards: Guards,
+	access_policy: Option<DynamicCoAccessPolicy>,
 }
 impl ApplicationBuilder {
 	#[cfg(feature = "fs")]
@@ -384,6 +385,7 @@ impl ApplicationBuilder {
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
+			access_policy: None,
 		}
 	}
 
@@ -404,6 +406,7 @@ impl ApplicationBuilder {
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
+			access_policy: None,
 		}
 	}
 
@@ -428,6 +431,7 @@ impl ApplicationBuilder {
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
+			access_policy: None,
 		}
 	}
 
@@ -448,6 +452,7 @@ impl ApplicationBuilder {
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
+			co_access_policy: None,
 		}
 	}
 
@@ -511,6 +516,10 @@ impl ApplicationBuilder {
 	pub fn with_guards(mut self, guards: Guards) -> Self {
 		self.guards = guards;
 		self
+	}
+
+	pub fn with_access_policy(self, policy: impl CoAccessPolicy + 'static) -> Self {
+		Self { access_policy: Some(DynamicCoAccessPolicy::new(policy)), ..self }
 	}
 
 	pub fn with_static_blocks(mut self, storage: StaticBlockStorage<'static>) -> Self {
@@ -590,7 +599,7 @@ impl ApplicationBuilder {
 		let service = Actor::spawn(
 			tags!("type": "application", "application": settings.identifier.clone()),
 			crate::services::application::Application::new(settings.clone()),
-			(storage, tasks.clone(), date, uuid, self.cores, self.guards, self.local_secret),
+			(storage, tasks.clone(), date, uuid, self.cores, self.guards, self.local_secret, self.access_policy),
 		)?;
 
 		// wait for context

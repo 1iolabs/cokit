@@ -18,8 +18,9 @@ use crate::{
 	},
 	state,
 	types::co_reducer_factory::CoReducerFactoryError,
-	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoUuid, DynamicLocalSecret, Guards,
-	LocalCoBuilder, Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoAccessPolicy, DynamicCoUuid,
+	DynamicLocalSecret, Guards, LocalCoBuilder, Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -180,6 +181,11 @@ impl CoContext {
 		}
 	}
 
+	/// CO access policy for non-participants.
+	pub fn access_policy(&self) -> Option<&DynamicCoAccessPolicy> {
+		self.inner.access_policy.as_ref()
+	}
+
 	/// Force refresh co instance.
 	pub async fn refresh(&self, co: CoReducer) -> Result<(), anyhow::Error> {
 		let parent = match co.parent_id() {
@@ -239,6 +245,7 @@ pub(crate) struct CoContextInner {
 	cores: Cores,
 	guards: Guards,
 	local_secret: Option<DynamicLocalSecret>,
+	access_policy: Option<DynamicCoAccessPolicy>,
 }
 impl CoContextInner {
 	#[allow(clippy::too_many_arguments)]
@@ -257,6 +264,7 @@ impl CoContextInner {
 		cores: Cores,
 		guards: Guards,
 		local_secret: Option<DynamicLocalSecret>,
+		access_policy: Option<DynamicCoAccessPolicy>,
 	) -> Self {
 		let block_links = BlockLinks::default();
 		let block_links_builtin = block_links.clone().with_filter(IgnoreFilter::new(builtin_cores()));
@@ -278,6 +286,7 @@ impl CoContextInner {
 			cores,
 			guards,
 			local_secret,
+			access_policy,
 		}
 	}
 
