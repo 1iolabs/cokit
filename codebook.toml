@@ -1,0 +1,4 @@
+words = ["brandguardian"]
+ignore_patterns = [
+    "COkit|BRANDGUARDIAN GmbH|AGPLv3"
+]
