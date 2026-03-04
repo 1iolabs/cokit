@@ -27,7 +27,7 @@ impl SharedCo {
 		(context.try_co_reducer(&co_id).await.unwrap(), PrivateIdentity::boxed(identity.clone()))
 	}
 
-	/// Get a peers appliction.
+	/// Get a peers application.
 	pub fn application(&self, peer: usize) -> Application {
 		self.peers.get(peer).expect("peer exists").0.application.clone()
 	}
@@ -64,6 +64,15 @@ impl SharedCo {
 		)
 		.await
 		.expect("sync");
+	}
+
+	/// Shutdown all applications gracefully.
+	pub async fn shutdown(self) {
+		futures::stream::iter(self.peers)
+			.for_each_concurrent(None, |(instance, _)| async move {
+				instance.application.shutdown_application().await;
+			})
+			.await;
 	}
 
 	pub async fn create_with_peers(mut peer1: Instance, mut peer2: Instance, id: &str) -> Self {
@@ -137,7 +146,7 @@ impl SharedCo {
 		.instrument(info_span!("peer2: join", application = peer2.application.settings().identifier))
 		.await;
 
-		// peer2: force sync (needed because of the paricipant state update)
+		// peer2: force sync (needed because of the participant state update)
 		let peer2_shared_co = peer2.application.co_reducer(CoId::from(id)).await.unwrap().unwrap();
 		async {
 			update_co(

@@ -6,7 +6,7 @@
 use crate::{
 	library::{compat::Instant, network_identity::network_identity, shared_membership::shared_membership},
 	services::application::{HeadsError, HeadsMessageReceivedAction},
-	state, Action, ActionError, CoContext, CoReducer, CoReducerFactory, MappedCoReducerState,
+	state, Action, ActionError, CoAccessPolicy, CoContext, CoReducer, CoReducerFactory, MappedCoReducerState,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -139,7 +139,7 @@ fn handle_heads(
 				let co_reducer = context.try_co_reducer(&co).await.map_err(anyhow::Error::from)?;
 
 				// verify
-				verify_from_participant(&co_reducer, &action.from)
+				verify_from_participant(&context, &co_reducer, &action.from)
 					.await
 					.map_err(|err| HeadsError::Permanent(err.into()))?;
 
@@ -190,7 +190,7 @@ async fn handle_request_heads(
 	let co_reducer = context.try_co_reducer(&co).await?;
 
 	// body
-	let body = match verify_from_participant(&co_reducer, &from).await {
+	let body = match verify_from_participant(&context, &co_reducer, &from).await {
 		Ok(_) => create_heads_body(&co_reducer).await,
 		Err(err) => {
 			tracing::warn!(?co, ?peer, ?from, ?err, "co-request-heads-failed");
@@ -225,12 +225,22 @@ async fn create_heads_body(co: &CoReducer) -> HeadsMessage {
 	HeadsMessage::Heads(co.id().clone(), MappedCoReducerState::new_co(co).await.external().weak_heads())
 }
 
-async fn verify_from_participant(co_reducer: &CoReducer, from: &Option<Did>) -> anyhow::Result<()> {
+async fn verify_from_participant(
+	context: &CoContext,
+	co_reducer: &CoReducer,
+	from: &Option<Did>,
+) -> anyhow::Result<()> {
 	let storage = co_reducer.storage();
 	let state = co_reducer.reducer_state().await;
 
 	// verify
 	if !state::is_participant(&storage, state.co(), from).await? {
+		if let Some(did) = from {
+			match context.access_policy() {
+				Some(policy) if policy.check_access(co_reducer.id(), did).await? => return Ok(()),
+				_ => {},
+			}
+		}
 		return Err(anyhow!("Not a participant {:?} of {}", from, co_reducer.id()));
 	}
 

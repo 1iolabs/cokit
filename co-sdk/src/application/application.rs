@@ -96,7 +96,7 @@ impl Application {
 		self.joiner().await;
 	}
 
-	/// Created a futures that resolved when all pending tasks are done.
+	/// Created a futures that resolves when all pending tasks are done.
 	pub fn joiner(&self) -> BoxFuture<'static, ()> {
 		// wait
 		#[cfg(not(feature = "js"))]

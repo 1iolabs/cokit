@@ -72,7 +72,7 @@ pub enum MembershipState {
 	///
 	/// Use Cases:
 	/// - This is a pending join triggered by an invite waiting for completion.
-	/// - This is waiting for CO participant acception/rejection (remote).
+	/// - This is waiting for CO participant acceptation/rejection (remote).
 	///
 	/// Related membership Tags:
 	///  `co-invite: CoInviteMetadata`
@@ -82,7 +82,7 @@ pub enum MembershipState {
 	/// Pending invite by some participant of the CO.
 	///
 	/// Use Cases:
-	/// - This is waiting for our acception/rejection.
+	/// - This is waiting for our acceptation/rejection.
 	/// - Accept invite by change membership state to [`MembershipState::Join`].
 	/// - Reject invite by removing the membership using [`MembershipsAction::Remove`].
 	///
