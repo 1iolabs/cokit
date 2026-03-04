@@ -98,7 +98,7 @@ impl DidCommHeader {
 		}
 	}
 
-	/// Create new DidCommHeader for a message with sender `from` and single recipent `to`.
+	/// Create new DidCommHeader for a message with sender `from` and single recipient `to`.
 	pub fn create<F, T>(
 		date: &CoDateRef,
 		from: &F,

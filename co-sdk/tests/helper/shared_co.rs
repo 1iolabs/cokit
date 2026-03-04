@@ -186,8 +186,8 @@ async fn wait_membership_state(
 					Action::CoreAction { co, storage: _, context: _, action, cid: _, head: _ }
 						if co.as_str() == CO_ID_LOCAL && CO_CORE_NAME_MEMBERSHIP == action.core =>
 					{
-						let mambership_action: MembershipsAction = action.get_payload().ok()?;
-						match mambership_action {
+						let membership_action: MembershipsAction = action.get_payload().ok()?;
+						match membership_action {
 							MembershipsAction::Join(membership) if state.contains(&membership.membership_state) => {
 								Some((membership.membership_state, membership.id, membership.did))
 							},

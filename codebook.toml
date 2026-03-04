@@ -2,6 +2,8 @@ words = [
     "bitswap",
     "brandguardian",
     "cbor",
+    "didcomm",
+    "thid",
     "tokio",
 ]
 ignore_patterns = ["COkit|BRANDGUARDIAN GmbH|AGPLv3"]

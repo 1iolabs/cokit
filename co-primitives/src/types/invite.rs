@@ -20,19 +20,20 @@ pub struct CoInviteMetadata {
 	pub peer: Option<Vec<u8>>,
 
 	/// CO Connectivity
+	#[serde(default, skip_serializing_if = "IsDefault::is_default")]
 	pub network: CoConnectivity,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CoConnectivity {
 	/// Networks to connect to.
 	/// Maybe empty.
-	#[serde(rename = "n")]
+	#[serde(rename = "n", default, skip_serializing_if = "BTreeSet::is_empty")]
 	pub network: BTreeSet<Network>,
 
 	/// Participants to connect to.
 	/// Maybe empty.
 	/// Network should be preferred.
-	#[serde(rename = "p")]
+	#[serde(rename = "p", default, skip_serializing_if = "BTreeSet::is_empty")]
 	pub participants: BTreeSet<Did>,
 }
