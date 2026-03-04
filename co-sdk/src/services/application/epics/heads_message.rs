@@ -125,7 +125,7 @@ fn handle_heads(
 					Some(Membership { membership_state: MembershipState::Active, .. }) => {
 						// active -> ok
 					},
-					Some(Membership { membership_state: MembershipState::Invite | MembershipState::Join, .. }) => {
+					Some(Membership { membership_state: MembershipState::Invite | MembershipState::Join | MembershipState::Pending, .. }) => {
 						// pending -> queue
 						return Err(HeadsError::Transient(ActionError::from(anyhow!("Pending membership"))));
 					},

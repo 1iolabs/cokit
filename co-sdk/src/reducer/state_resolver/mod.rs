@@ -9,6 +9,8 @@ mod join;
 #[cfg(feature = "pinning")]
 mod local_storage;
 mod membership;
+#[cfg(feature = "network")]
+mod network;
 mod static_state_resolver;
 #[cfg(feature = "pinning")]
 mod storage;

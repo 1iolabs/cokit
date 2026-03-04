@@ -7,10 +7,10 @@ use async_trait::async_trait;
 use co_core_co::CoAction;
 use co_core_membership::{Membership, MembershipState, MembershipsAction};
 use co_network::connections::PeerRelateCoAction;
-use co_primitives::CoId;
+use co_primitives::{CoId, CoInviteMetadata};
 use co_sdk::{
-	request_co_state, update_co, Action, CoAccessPolicy, CoReducerState, CreateCo, Identity, KeyRequestAction,
-	CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	request_co_state, tags, update_co, Action, BlockStorageExt, CoAccessPolicy, CoReducerState, CreateCo, Identity,
+	KeyRequestAction, KnownTags, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use futures::StreamExt;
 use helper::instance::Instances;
@@ -198,6 +198,214 @@ async fn test_unrelated_peer_joins() {
 		.await
 		.expect("update_co");
 	tracing::info!("peer2: synced CO");
+
+	// verify: states match
+	assert_eq!(peer2_co.reducer_state().await, shared_co.reducer_state().await);
+	tracing::info!("test-complete");
+}
+
+/// Test that an unrelated peer can auto-fetch CO state via the `pending_resolve` epic when
+/// creating a membership with `CoInviteMetadata` tags and Pending state.
+///
+/// Steps:
+/// - Create two peers (peer1 with AllowAll policy, peer2 standard), networking between them
+/// - Peer1: create unencrypted shared CO
+/// - Peer2: create CoInviteMetadata with peer1's PeerId, store in local CO tags
+/// - Peer2: create Pending membership with empty state + metadata tags
+/// - Wait for Pending → Active transition (epic resolves state from network)
+/// - Peer2: open CO via co_reducer() and verify state matches
+#[tokio::test]
+async fn test_unrelated_peer_auto_state() {
+	let timeout_duration = Duration::from_secs(30);
+	let mut instances = Instances::new("test_access_policy_auto_state");
+
+	// peer1: with access policy
+	let mut peer1 = instances.create_builder(|b| b.with_access_policy(AllowAll)).await;
+	let mut peer2 = instances.create().await;
+
+	// network
+	let (network1, _network2) = Instances::networking(&mut peer1, &mut peer2, true, true).await;
+
+	// create identities
+	let identity1 = peer1.create_identity().await;
+	let identity2 = peer2.create_identity().await;
+
+	// peer1: create unencrypted shared CO
+	let shared_co = peer1
+		.application
+		.create_co(identity1.clone(), CreateCo::new("shared", None).with_algorithm(None))
+		.await
+		.unwrap();
+	tracing::info!("peer1: created unencrypted shared CO");
+
+	// peer2: create CoInviteMetadata and store in local CO
+	let local_co = peer2.application.local_co_reducer().await.unwrap();
+	let metadata = CoInviteMetadata {
+		id: "auto-state-request".to_string(),
+		from: identity1.identity().to_owned(),
+		peer: Some(network1.local_peer_id().to_bytes()),
+		network: Default::default(),
+	};
+	let metadata_cid = local_co.storage().set_serialized(&metadata).await.unwrap();
+	let membership_tags = tags!(
+		{KnownTags::CoInviteMetadata}: metadata_cid,
+	);
+
+	// peer2: subscribe for Pending → Active transition before pushing membership
+	let active_transition = peer2
+		.application
+		.actions()
+		.filter_map(|action| async move {
+			match &action {
+				Action::CoreAction { co, action, .. } if co.as_str() == CO_ID_LOCAL => {
+					let membership_action: MembershipsAction = action.get_payload().ok()?;
+					match membership_action {
+						MembershipsAction::ChangeMembershipState {
+							id,
+							membership_state: MembershipState::Active,
+							..
+						} if id.as_str() == "shared" => Some(()),
+						_ => None,
+					}
+				},
+				_ => None,
+			}
+		})
+		.take(1)
+		.collect::<Vec<_>>();
+
+	// peer2: create Pending membership with empty state + metadata tags
+	let membership = Membership {
+		id: CoId::from("shared"),
+		did: identity2.identity().to_owned(),
+		state: BTreeSet::new(),
+		key: None,
+		membership_state: MembershipState::Pending,
+		tags: membership_tags,
+	};
+	local_co
+		.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &MembershipsAction::Join(membership))
+		.await
+		.unwrap();
+	tracing::info!("peer2: created Pending membership with empty state");
+
+	// wait for Pending → Active transition
+	timeout(timeout_duration, active_transition)
+		.await
+		.expect("Pending → Active transition to complete in time");
+	tracing::info!("peer2: membership transitioned to Active");
+
+	// peer2: open CO via co_reducer
+	let peer2_co = timeout(timeout_duration, peer2.application.co_reducer(CoId::from("shared")))
+		.await
+		.expect("co_reducer to complete in time")
+		.expect("co_reducer ok")
+		.expect("co exists after membership");
+	tracing::info!("peer2: opened CO via auto state resolution");
+
+	// verify: states match
+	assert_eq!(peer2_co.reducer_state().await, shared_co.reducer_state().await);
+	tracing::info!("test-complete");
+}
+
+/// Test that an unrelated peer can auto-fetch an encrypted CO state via the `pending_resolve`
+/// epic when creating a membership with `CoInviteMetadata` tags and Pending state.
+///
+/// Steps:
+/// - Create two peers (peer1 with AllowAll policy, peer2 standard), networking between them
+/// - Peer1: create encrypted shared CO
+/// - Peer2: create CoInviteMetadata with peer1's PeerId, store in local CO tags
+/// - Peer2: create Pending membership with empty state + metadata tags
+/// - Wait for Pending → Active transition (epic resolves state + key from network)
+/// - Peer2: open CO via co_reducer() and verify state matches
+#[tokio::test]
+async fn test_unrelated_auto_state_encrypted() {
+	let timeout_duration = Duration::from_secs(30);
+	let mut instances = Instances::new("test_access_policy_auto_state");
+
+	// peer1: with access policy
+	let mut peer1 = instances.create_builder(|b| b.with_access_policy(AllowAll)).await;
+	let mut peer2 = instances.create().await;
+
+	// network
+	let (network1, _network2) = Instances::networking(&mut peer1, &mut peer2, true, true).await;
+
+	// create identities
+	let identity1 = peer1.create_identity().await;
+	let identity2 = peer2.create_identity().await;
+
+	// peer1: create encrypted shared CO
+	let shared_co = peer1
+		.application
+		.create_co(identity1.clone(), CreateCo::new("shared", None))
+		.await
+		.unwrap();
+	tracing::info!("peer1: created encrypted shared CO");
+
+	// peer2: create CoInviteMetadata and store in local CO
+	let local_co = peer2.application.local_co_reducer().await.unwrap();
+	let metadata = CoInviteMetadata {
+		id: "auto-state-request".to_string(),
+		from: identity1.identity().to_owned(),
+		peer: Some(network1.local_peer_id().to_bytes()),
+		network: Default::default(),
+	};
+	let metadata_cid = local_co.storage().set_serialized(&metadata).await.unwrap();
+	let membership_tags = tags!(
+		{KnownTags::CoInviteMetadata}: metadata_cid,
+	);
+
+	// peer2: subscribe for Pending → Active transition before pushing membership
+	let active_transition = peer2
+		.application
+		.actions()
+		.filter_map(|action| async move {
+			match &action {
+				Action::CoreAction { co, action, .. } if co.as_str() == CO_ID_LOCAL => {
+					let membership_action: MembershipsAction = action.get_payload().ok()?;
+					match membership_action {
+						MembershipsAction::ChangeMembershipState {
+							id,
+							membership_state: MembershipState::Active,
+							..
+						} if id.as_str() == "shared" => Some(()),
+						_ => None,
+					}
+				},
+				_ => None,
+			}
+		})
+		.take(1)
+		.collect::<Vec<_>>();
+
+	// peer2: create Pending membership with empty state + metadata tags
+	let membership = Membership {
+		id: CoId::from("shared"),
+		did: identity2.identity().to_owned(),
+		state: BTreeSet::new(),
+		key: None,
+		membership_state: MembershipState::Pending,
+		tags: membership_tags,
+	};
+	local_co
+		.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &MembershipsAction::Join(membership))
+		.await
+		.unwrap();
+	tracing::info!("peer2: created Pending membership with empty state");
+
+	// wait for Pending → Active transition
+	timeout(timeout_duration, active_transition)
+		.await
+		.expect("Pending → Active transition to complete in time");
+	tracing::info!("peer2: membership transitioned to Active");
+
+	// peer2: open CO via co_reducer
+	let peer2_co = timeout(timeout_duration, peer2.application.co_reducer(CoId::from("shared")))
+		.await
+		.expect("co_reducer to complete in time")
+		.expect("co_reducer ok")
+		.expect("co exists after membership");
+	tracing::info!("peer2: opened CO via auto state resolution");
 
 	// verify: states match
 	assert_eq!(peer2_co.reducer_state().await, shared_co.reducer_state().await);

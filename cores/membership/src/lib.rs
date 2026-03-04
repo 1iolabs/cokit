@@ -68,6 +68,14 @@ pub enum MembershipState {
 	/// Active membership.
 	Active = 10,
 
+	/// Pending state resolution.
+	/// Has CoInviteMetadata to connect, but needs to resolve CO state
+	/// (and optionally encryption key) from network before use.
+	///
+	/// Related membership Tags:
+	///  `co-invite-metadata: CoInviteMetadata`
+	Pending = 15,
+
 	/// Pending join by us.
 	/// The goal of a join is to end up as a CO's participant.
 	/// We are signaling that we want to be an participant in their CO.

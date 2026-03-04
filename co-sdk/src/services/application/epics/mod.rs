@@ -48,6 +48,8 @@ mod network_queue;
 #[cfg(feature = "network")]
 mod network_start;
 #[cfg(feature = "network")]
+mod pending_resolve;
+#[cfg(feature = "network")]
 mod push_heads;
 mod resolve_private_identity;
 
@@ -93,7 +95,8 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(network_queue::NetworkQueueProcessEpic::default())
 		.join(network_block_get::network_block_get)
 		.join(network_block_get::network_task_execute)
-		.join(network_start::network_start);
+		.join(network_start::network_start)
+		.join(pending_resolve::pending_resolve);
 
 	// trace
 	epic.join(TracingEpic::new(tags))
