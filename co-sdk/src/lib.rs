@@ -72,6 +72,7 @@ pub use library::{
 	generate_random_name::generate_random_name,
 	ipld_resolve_recursive::ipld_resolve_recursive,
 	is_cid_encrypted::is_cid_encrypted,
+	join_unrelated_co::join_unrelated_co,
 	local_secret::{DynamicLocalSecret, LocalSecret, MemoryLocalSecret},
 	local_secret_password::PasswordLocalSecret,
 	memory_dispatch::MemoryDispatch,

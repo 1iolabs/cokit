@@ -39,6 +39,7 @@ pub mod is_cid_encrypted;
 pub mod is_membership_heads_encrypted;
 #[cfg(feature = "network")]
 pub mod join;
+pub mod join_unrelated_co;
 #[cfg(feature = "network")]
 pub mod key_exchange;
 #[cfg(feature = "network")]

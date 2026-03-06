@@ -5,10 +5,12 @@
 
 use crate::CoSettings;
 use anyhow::Result;
+use co_primitives::Network;
 #[cfg(feature = "fs")]
 use co_sdk::CoStorageSetting;
-use co_sdk::{Application, ApplicationBuilder};
+use co_sdk::{state, Application, ApplicationBuilder, CoId, Did, IdentityResolver};
 use futures::{future::BoxFuture, Future};
+use std::collections::{BTreeMap, BTreeSet};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 #[cfg(feature = "js")]
 use tokio_with_wasm::alias as tokio;
@@ -20,7 +22,7 @@ pub struct CoContext {
 impl CoContext {
 	pub fn new(settings: CoSettings) -> Self {
 		// log
-		//  note: we initialize the logging synchonously before dioxus registers the default
+		//  note: we initialize the logging synchronously before dioxus registers the default
 		#[cfg(feature = "tracing")]
 		if !settings.no_log {
 			let base_path = match settings.storage.clone() {
@@ -145,6 +147,47 @@ impl CoContext {
 		rx.await
 			.map_err(|_err| CoContextError::Shutdown)?
 			.map_err(|err| CoContextError::Execute(err))
+	}
+
+	/// Join a unrelated CO.
+	///
+	/// This only initiates a join.
+	/// When completed the membership state of the CO will change to active.
+	pub async fn join_unrelated_co(
+		&self,
+		from: state::Identity,
+		to: Did,
+		to_co: CoId,
+		to_networks: BTreeSet<Network>,
+	) -> Result<(), anyhow::Error> {
+		Ok(self
+			.try_with_application(move |application| async move {
+				let to_identity = application.identity_resolver().await?.resolve(&to).await?;
+				let from_identity = application.private_identity(&from.did).await?;
+				co_sdk::join_unrelated_co(application.context(), &from_identity, &to_identity, to_co, to_networks)
+					.await?;
+				Result::<(), anyhow::Error>::Ok(())
+			})
+			.await?)
+	}
+
+	/// Send a contact request.
+	pub async fn contact(
+		&self,
+		from: state::Identity,
+		to: Did,
+		to_subject: Option<String>,
+		to_headers: BTreeMap<String, String>,
+		to_networks: BTreeSet<Network>,
+	) -> Result<(), anyhow::Error> {
+		Ok(self
+			.try_with_application(move |application| async move {
+				application
+					.context()
+					.contact(from.did, to, to_subject, to_headers, to_networks)
+					.await
+			})
+			.await?)
 	}
 }
 

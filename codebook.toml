@@ -3,6 +3,7 @@ words = [
     "brandguardian",
     "cbor",
     "didcomm",
+    "dioxus",
     "thid",
     "tokio",
 ]
