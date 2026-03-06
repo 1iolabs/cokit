@@ -177,6 +177,12 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 	if let Some(local_secret) = settings.local_secret {
 		application_builder = application_builder.with_local_secret(local_secret);
 	}
+	if let Some(access_policy) = settings.access_policy {
+		application_builder = application_builder.with_access_policy(access_policy);
+	}
+	if let Some(contact_handler) = settings.contact_handler {
+		application_builder = application_builder.with_contact_handler(contact_handler);
+	}
 	#[allow(unused_mut)]
 	let mut application = application_builder.build().await?;
 

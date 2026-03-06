@@ -8,7 +8,10 @@ use cid::Cid;
 use clap::Parser;
 #[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
-use co_sdk::{CoStorageSetting, Core, Cores, DynamicLocalSecret, GuardReference, Guards, LocalSecret};
+use co_sdk::{
+	CoAccessPolicy, CoStorageSetting, ContactHandler, Core, Cores, DynamicCoAccessPolicy, DynamicContactHandler,
+	DynamicLocalSecret, GuardReference, Guards, LocalSecret,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct CoSettings {
@@ -24,6 +27,8 @@ pub struct CoSettings {
 	pub no_default_features: bool,
 	pub feature: Vec<String>,
 	pub local_secret: Option<DynamicLocalSecret>,
+	pub access_policy: Option<DynamicCoAccessPolicy>,
+	pub contact_handler: Option<DynamicContactHandler>,
 	pub cores: Cores,
 	pub guards: Guards,
 }
@@ -66,6 +71,14 @@ impl CoSettings {
 
 	pub fn with_local_secret(self, secret: impl LocalSecret + 'static) -> Self {
 		Self { local_secret: Some(DynamicLocalSecret::new(secret)), ..self }
+	}
+
+	pub fn with_access_policy(self, policy: impl CoAccessPolicy + 'static) -> Self {
+		Self { access_policy: Some(DynamicCoAccessPolicy::new(policy)), ..self }
+	}
+
+	pub fn with_contact_handler(self, handler: impl ContactHandler + 'static) -> Self {
+		Self { contact_handler: Some(DynamicContactHandler::new(handler)), ..self }
 	}
 
 	pub fn with_core(mut self, core_cid: Cid, core: Core) -> Self {
