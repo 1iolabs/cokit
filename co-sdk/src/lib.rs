@@ -31,8 +31,8 @@ pub use application::{
 pub use co_actor::TaskSpawner;
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 pub use co_identity::{
-	DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver, IdentityResolverError,
-	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
+	DidCommHeader, DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver,
+	IdentityResolverError, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 #[cfg(feature = "network")]
 pub use co_network::NetworkSettings;
