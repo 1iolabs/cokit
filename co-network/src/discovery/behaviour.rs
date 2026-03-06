@@ -72,12 +72,12 @@ impl Discovery {
 	}
 }
 
-/// Request to try to connect peers using suplied discovery methods.
+/// Request to try to connect peers using supplied discovery methods.
 struct DiscoveryConnectRequest {
 	pub id: u64,
 	/// The discovery items. Only contains validated ([`Discovery::validate`]) discovery items.
 	pub discovery: BTreeSet<Discovery>,
-	/// Cache for all direct PeerId we are intreseted in.
+	/// Cache for all direct PeerId we are interested in.
 	pub discovery_peers: BTreeSet<PeerId>,
 	pub start: Instant,
 	pub timeout: Duration,
@@ -187,7 +187,7 @@ pub struct DiscoveryState<R> {
 	/// Pending events.
 	events: VecDeque<DiscoveryEvent>,
 
-	/// Pending DID Discovery requests. Insufficent peers.
+	/// Pending DID Discovery requests. Insufficient peers.
 	pending_discovery: VecDeque<(u64, TopicHash, DidDiscovery)>,
 
 	/// Default discovery timeout.

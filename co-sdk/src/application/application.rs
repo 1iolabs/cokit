@@ -461,7 +461,7 @@ impl ApplicationBuilder {
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
-			co_access_policy: None,
+			access_policy: None,
 			contact_handler: None,
 		}
 	}

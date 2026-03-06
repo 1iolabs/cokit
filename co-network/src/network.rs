@@ -240,11 +240,15 @@ impl Libp2pNetwork {
 
 		// runtime
 		let shutdown = CancellationToken::new();
-		let mut runtime = Runtime::new(shutdown.child_token());
+		let runtime = Runtime::new(shutdown.child_token());
 
 		// listen (browsers connect via relay, not direct listen)
 		#[cfg(not(target_arch = "wasm32"))]
-		runtime.listen(swarm.listen_on(config.listen)?);
+		let runtime = {
+			let mut runtime = runtime;
+			runtime.listen(swarm.listen_on(config.listen)?);
+			runtime
+		};
 
 		// run
 		tasks.spawn(async move {
