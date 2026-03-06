@@ -20,7 +20,7 @@ use futures::{stream::once, Stream, StreamExt};
 use ipld_core::ipld::Ipld;
 use serde::{Deserialize, Serialize};
 use std::{
-	collections::BTreeSet,
+	collections::{BTreeMap, BTreeSet},
 	future::{ready, Future},
 	ops::Deref,
 	sync::Arc,
@@ -32,7 +32,7 @@ pub enum Action {
 	/// Push core action.
 	CoreActionPush { co: CoId, action: ReducerAction<Ipld> },
 
-	/// Core action has been succesfully processed (and flushed).
+	/// Core action has been successfully processed (and flushed).
 	CoreAction {
 		co: CoId,
 		storage: CoStorage,
@@ -74,6 +74,12 @@ pub enum Action {
 	/// Network has been started.
 	#[cfg(feature = "network")]
 	NetworkStartComplete(Result<(), ActionError>),
+
+	/// Send a contact request.
+	Contact(ContactAction),
+
+	/// Contact request send result.
+	ContactSent(ContactAction, Result<(), ActionError>),
 
 	/// Send a DIDComm message.
 	#[cfg(feature = "network")]
@@ -364,6 +370,27 @@ impl std::fmt::Display for ActionError {
 			ActionError::Native { err } => write!(f, "{}", err),
 		}
 	}
+}
+
+/// Contact request.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ContactAction {
+	/// Sender of the contact request.
+	pub from: Did,
+
+	/// Receiver of the contact request.
+	pub to: Did,
+
+	/// The subject of the contact request.
+	/// Usually the invite link or token.
+	pub sub: Option<String>,
+
+	/// Explicit networks to use. If empty, resolved from the recipient's DID.
+	#[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+	pub networks: BTreeSet<Network>,
+
+	/// Additional fields.
+	pub fields: BTreeMap<String, String>,
 }
 
 #[cfg(feature = "network")]

@@ -95,6 +95,7 @@ mod tests {
 		let state = ConnectionState {
 			keep_alive: Duration::from_secs(30),
 			co: Default::default(),
+			did: Default::default(),
 			networks: Default::default(),
 			peers: Default::default(),
 			bootstrap,

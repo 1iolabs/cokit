@@ -14,6 +14,6 @@ pub use action::CoDidCommSendAction;
 pub use action::HeadsMessageReceivedAction;
 #[cfg(feature = "network")]
 pub use action::KeyRequestAction;
-pub use action::{Action, ActionError, HeadsError, NetworkBlockGetAction};
+pub use action::{Action, ActionError, ContactAction, HeadsError, NetworkBlockGetAction};
 pub use actor::Application;
 pub use message::ApplicationMessage;

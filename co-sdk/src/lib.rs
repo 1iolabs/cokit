@@ -80,7 +80,7 @@ pub use reducer::core_resolver::{
 	co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverContext, CoreResolverError,
 };
 pub use services::{
-	application::{Action, ActionError, ApplicationMessage, KeyRequestAction},
+	application::{Action, ActionError, ApplicationMessage, ContactAction, KeyRequestAction},
 	reducer::CoReducer,
 };
 #[cfg(feature = "js")]

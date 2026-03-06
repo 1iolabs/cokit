@@ -10,16 +10,18 @@ use crate::{
 		local::LocalCoContext,
 		shared::{SharedCoBuilder, SharedCoCreator},
 	},
-	library::{builtin_cores::builtin_cores, shared_membership::shared_membership_active},
+	library::{
+		builtin_cores::builtin_cores, shared_membership::shared_membership_active, wait_response::request_response,
+	},
 	reducer::core_resolver::{dynamic::DynamicCoreResolver, guard::CoGuardResolver, log::LogCoreResolver},
 	services::{
-		application::ApplicationMessage,
+		application::{ApplicationMessage, ContactAction},
 		reducers::{ReducerStorage, ReducersControl},
 	},
 	state,
 	types::co_reducer_factory::CoReducerFactoryError,
-	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoAccessPolicy, DynamicCoUuid,
-	DynamicLocalSecret, Guards, LocalCoBuilder, Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE,
+	Action, CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoAccessPolicy,
+	DynamicCoUuid, DynamicLocalSecret, Guards, LocalCoBuilder, Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE,
 	CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
@@ -34,10 +36,11 @@ use co_log::{EntryBlock, Log};
 use co_network::{connections::ConnectionMessage, HeadsApi, NetworkApi};
 use co_primitives::{
 	BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, Did, DynamicCoDate, IgnoreFilter,
+	Network,
 };
 use futures::{Stream, TryStreamExt};
 use std::{
-	collections::BTreeSet,
+	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,
 	sync::{Arc, RwLock},
 };
@@ -119,7 +122,7 @@ impl CoContext {
 		self.inner.private_identity_resolver().await
 	}
 
-	/// Get unsiged local device identity.
+	/// Get unsigned local device identity.
 	pub fn local_identity(&self) -> LocalIdentity {
 		LocalIdentity::device()
 	}
@@ -184,6 +187,32 @@ impl CoContext {
 	/// CO access policy for non-participants.
 	pub fn access_policy(&self) -> Option<&DynamicCoAccessPolicy> {
 		self.inner.access_policy.as_ref()
+	}
+
+	/// Send a contact request to a DID.
+	///
+	/// # Return
+	/// This method returns whether the contact request could be send to to recipient.
+	/// Note that the actual contact can decide if and when he want to connect back.
+	pub async fn contact(
+		&self,
+		from: Did,
+		to: Did,
+		subject: Option<String>,
+		headers: BTreeMap<String, String>,
+		networks: impl IntoIterator<Item = Network>,
+	) -> Result<(), anyhow::Error> {
+		let contact =
+			ContactAction { from, to, sub: subject, networks: networks.into_iter().collect(), fields: headers };
+
+		let result: Result<(), crate::ActionError> =
+			request_response(self.inner.application(), Action::Contact(contact.clone()), move |action| match action {
+				Action::ContactSent(sent, result) if *sent == contact => Some(result.clone()),
+				_ => None,
+			})
+			.await?;
+
+		result.map_err(|err| err.into())
 	}
 
 	/// Force refresh co instance.

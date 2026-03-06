@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use super::{
-	action::{ConnectionAction, PeersChangedAction},
+	action::{ConnectionAction, DidPeersChangedAction, PeersChangedAction},
 	epics::epic,
 	ConnectionMessage, ConnectionState,
 };
@@ -16,9 +16,9 @@ use crate::{
 	NetworkSettings,
 };
 use async_trait::async_trait;
-use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer, ResponseStreams, TaskSpawner};
+use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer, ResponseStream, ResponseStreams, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
-use co_primitives::{CoId, DynamicCoDate, Tags};
+use co_primitives::{CoId, Did, DynamicCoDate, Tags};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
@@ -36,6 +36,7 @@ pub struct State {
 	state: ConnectionState,
 	epic: EpicRuntime<ConnectionMessage, ConnectionAction, ConnectionState, ConnectionsContext>,
 	peers_changed: BTreeMap<CoId, ResponseStreams<PeersChangedAction>>,
+	did_peers_changed: BTreeMap<Did, ResponseStreams<DidPeersChangedAction>>,
 }
 
 pub struct Connections {
@@ -62,6 +63,7 @@ impl Actor for Connections {
 			state: ConnectionState {
 				keep_alive: self.context.settings.keep_alive,
 				co: Default::default(),
+				did: Default::default(),
 				networks: Default::default(),
 				peers: Default::default(),
 				bootstrap: bootstrap_from_multiaddrs(self.context.settings.bootstrap.clone())?,
@@ -71,6 +73,7 @@ impl Actor for Connections {
 				None
 			}),
 			peers_changed: Default::default(),
+			did_peers_changed: Default::default(),
 		})
 	}
 
@@ -84,7 +87,11 @@ impl Actor for Connections {
 		let (action, response) = match message {
 			ConnectionMessage::Use(action, response) => {
 				let co = action.id.clone();
-				(ConnectionAction::Use(action), Some((co, response)))
+				(ConnectionAction::Use(action), Some(ResponseKind::Co(co, response)))
+			},
+			ConnectionMessage::DidUse(action, response) => {
+				let did = action.to.clone();
+				(ConnectionAction::DidUse(action), Some(ResponseKind::Did(did, response)))
 			},
 			ConnectionMessage::Action(action) => (action, None),
 		};
@@ -94,14 +101,20 @@ impl Actor for Connections {
 
 		// response
 		//  note: must be done after reducer to have use_initial return the correct results
-		if let Some((co, mut response)) = response {
-			// initial
-			if let Some(initial) = state.state.use_initial(&co) {
-				response.send(initial).ok();
-			}
-
-			// add response
-			state.peers_changed.entry(co).or_insert(Default::default()).push(response);
+		match response {
+			Some(ResponseKind::Co(co, mut response)) => {
+				if let Some(initial) = state.state.use_initial(&co) {
+					response.send(initial).ok();
+				}
+				state.peers_changed.entry(co).or_default().push(response);
+			},
+			Some(ResponseKind::Did(did, mut response)) => {
+				if let Some(initial) = state.state.did_use_initial(&did) {
+					response.send(initial).ok();
+				}
+				state.did_peers_changed.entry(did).or_default().push(response);
+			},
+			None => {},
 		}
 
 		// epic
@@ -119,6 +132,14 @@ impl Actor for Connections {
 			ConnectionAction::Released(released_action) => {
 				state.peers_changed.remove(&released_action.id);
 			},
+			ConnectionAction::DidPeersChanged(did_peers_action) => {
+				if let Some(responses) = state.did_peers_changed.get_mut(&did_peers_action.to) {
+					responses.send(did_peers_action.clone());
+				}
+			},
+			ConnectionAction::DidReleased(released_did_action) => {
+				state.did_peers_changed.remove(&released_did_action.to);
+			},
 			_ => {},
 		}
 
@@ -130,4 +151,9 @@ impl Actor for Connections {
 		// result
 		Ok(())
 	}
+}
+
+enum ResponseKind {
+	Co(CoId, ResponseStream<PeersChangedAction>),
+	Did(Did, ResponseStream<DidPeersChangedAction>),
 }
