@@ -14,6 +14,7 @@ pub(crate) mod compat;
 pub mod connections_peer_provider;
 #[cfg(feature = "network")]
 pub(crate) mod contact;
+pub mod contact_handler;
 pub mod core_source;
 pub mod create_reducer_action;
 #[cfg(feature = "pinning")]

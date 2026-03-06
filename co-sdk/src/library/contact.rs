@@ -3,10 +3,9 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use co_identity::{DidCommHeader, Identity, PrivateIdentity};
-use co_network::EncodedMessage;
-use co_primitives::{to_json_string, CoDateRef};
-use serde::{Deserialize, Serialize};
+use co_identity::{DidCommHeader, Identity, PeerDidCommHeader, PrivateIdentity};
+use co_network::{EncodedMessage, PeerId};
+use co_primitives::CoDateRef;
 use std::collections::BTreeMap;
 
 pub const CO_DIDCOMM_CONTACT: &str = "co-contact";
@@ -14,25 +13,22 @@ pub const CO_DIDCOMM_CONTACT: &str = "co-contact";
 /// Create an encoded contact message.
 pub fn create_contact_message<F, T>(
 	date: &CoDateRef,
+	from_peer: PeerId,
 	from: &F,
 	to: &T,
-	payload: ContactPayload,
+	sub: Option<String>,
+	fields: BTreeMap<String, String>,
 ) -> anyhow::Result<(DidCommHeader, EncodedMessage)>
 where
 	F: PrivateIdentity + Send + Sync + 'static,
 	T: Identity + Send + Sync + 'static,
 {
 	let (from_didcomm, to_didcomm, header) = DidCommHeader::create(date, from, to, CO_DIDCOMM_CONTACT)?;
-	let body = to_json_string(&payload)?;
-	let message = from_didcomm.jwe(&to_didcomm, header.clone(), &body)?;
-	Ok((header, EncodedMessage(message.into_bytes())))
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ContactPayload {
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub sub: Option<String>,
-
-	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-	pub fields: BTreeMap<String, String>,
+	let mut header = header.with_fields(fields)?;
+	if let Some(sub) = sub {
+		header.fields.insert("sub".to_owned(), sub);
+	}
+	let message_header: DidCommHeader = PeerDidCommHeader { header, from_peer_id: Some(from_peer.to_string()) }.into();
+	let message = from_didcomm.jwe(&to_didcomm, message_header.clone(), "null")?;
+	Ok((message_header, EncodedMessage(message.into_bytes())))
 }

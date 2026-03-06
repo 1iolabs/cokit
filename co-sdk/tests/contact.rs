@@ -3,11 +3,17 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+use async_trait::async_trait;
+use co_identity::DidCommHeader;
 use co_primitives::{Network, NetworkPeer};
-use co_sdk::{Action, Identity};
+use co_sdk::{Action, ContactHandler, Did, Identity};
 use futures::StreamExt;
 use helper::instance::Instances;
-use std::{collections::BTreeMap, time::Duration};
+use std::{
+	collections::BTreeMap,
+	sync::{Arc, Mutex},
+	time::Duration,
+};
 use tokio::time::timeout;
 
 pub mod helper;
@@ -134,4 +140,114 @@ async fn test_contact_no_peers() {
 	.expect("should complete in time");
 
 	assert!(result.is_err(), "contact to unreachable peer should fail");
+}
+
+/// Captured contact handler invocation.
+struct CapturedContact {
+	sender: Did,
+	header: DidCommHeader,
+}
+
+/// Test handler that records invocations.
+#[derive(Clone)]
+struct TestContactHandler {
+	captured: Arc<Mutex<Vec<CapturedContact>>>,
+}
+#[async_trait]
+impl ContactHandler for TestContactHandler {
+	async fn handle_contact(&self, sender: &Did, header: &DidCommHeader) -> Result<(), anyhow::Error> {
+		self.captured
+			.lock()
+			.unwrap()
+			.push(CapturedContact { sender: sender.to_owned(), header: header.clone() });
+		Ok(())
+	}
+}
+
+/// ContactHandler is invoked when a contact message is received.
+///
+/// Steps:
+/// - P2: Created with a TestContactHandler
+/// - P1: Sends contact request to P2
+/// - Verify: Handler was called with correct header and body
+#[tokio::test]
+async fn test_contact_handler() {
+	let timeout_duration = Duration::from_secs(60);
+
+	let captured: Arc<Mutex<Vec<CapturedContact>>> = Arc::new(Mutex::new(Vec::new()));
+	let handler = TestContactHandler { captured: captured.clone() };
+
+	let mut instances = Instances::new("test_contact_handler");
+	let mut peer1 = instances.create().await;
+	let mut peer2 = instances.create_builder(|b| b.with_contact_handler(handler)).await;
+
+	let (_network1, network2) = Instances::networking(&mut peer1, &mut peer2, false, false).await;
+
+	let identity1 = peer1.create_identity().await;
+	let identity2 = peer2.create_identity().await;
+
+	let peer2_listeners: Vec<String> = network2
+		.listeners(true, false)
+		.await
+		.unwrap()
+		.into_iter()
+		.map(|addr| addr.to_string())
+		.collect();
+	let peer2_network =
+		Network::Peer(NetworkPeer { peer: network2.local_peer_id().to_bytes(), addresses: peer2_listeners });
+
+	// wait for ContactSent on peer1 side
+	let peer1_sent = {
+		let actions = peer1.application.actions();
+		async move {
+			timeout(
+				timeout_duration,
+				actions
+					.filter_map(|action| async move {
+						match action {
+							Action::ContactSent(_, result) => Some(result),
+							_ => None,
+						}
+					})
+					.take(1)
+					.collect::<Vec<_>>(),
+			)
+			.await
+			.expect("peer1 ContactSent in time")
+			.into_iter()
+			.next()
+			.expect("ContactSent action")
+		}
+	};
+
+	let peer1_contact = async {
+		peer1
+			.application
+			.context()
+			.contact(
+				identity1.identity().to_owned(),
+				identity2.identity().to_owned(),
+				Some("handler-test-token".to_string()),
+				BTreeMap::from([("key1".to_string(), "value1".to_string())]),
+				[peer2_network],
+			)
+			.await
+			.expect("contact send to succeed")
+	};
+
+	let (sent_result, ()) = futures::join!(peer1_sent, peer1_contact);
+	assert!(sent_result.is_ok(), "contact should be sent successfully");
+
+	// give peer2 a moment to process the received message through the epic
+	tokio::time::sleep(Duration::from_secs(2)).await;
+
+	// verify handler was called
+	let captures = captured.lock().unwrap();
+	assert_eq!(captures.len(), 1, "handler should have been called exactly once");
+	let contact = &captures[0];
+	assert_eq!(&contact.sender, identity1.identity());
+	assert_eq!(contact.header.message_type, "co-contact");
+	assert!(contact.header.from.as_ref().is_some_and(|from| from == identity1.identity()));
+	assert!(contact.header.to.iter().any(|to| to == identity2.identity()));
+	assert_eq!(contact.header.fields.get("sub"), Some(&"handler-test-token".to_owned()));
 }

@@ -4,6 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{DidCommPrivateContext, DidCommPublicContext, Identity, PrivateIdentity};
+use anyhow::anyhow;
 use co_primitives::CoDateRef;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -132,6 +133,19 @@ impl DidCommHeader {
 	/// Create random message id.
 	pub fn create_message_id() -> String {
 		uuid::Uuid::new_v4().to_string()
+	}
+
+	pub fn with_fields(mut self, fields: impl IntoIterator<Item = (String, String)>) -> Result<Self, anyhow::Error> {
+		for (key, value) in fields {
+			match key.as_str() {
+				"id" | "type" | "to" | "from" | "thid" | "pthid" | "created_time" | "expires_time" => {
+					return Err(anyhow!("Reserved key: {}", key));
+				},
+				_ => {},
+			}
+			self.fields.insert(key, value);
+		}
+		Ok(self)
 	}
 }
 

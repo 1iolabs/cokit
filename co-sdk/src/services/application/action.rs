@@ -6,7 +6,9 @@
 #[cfg(feature = "network")]
 use crate::library::network_queue::TaskState;
 use crate::{
-	library::create_reducer_action::new_reducer_action, services::reducer::FlushInfo, CoStorage, ReducerChangeContext,
+	library::create_reducer_action::new_reducer_action,
+	services::reducer::FlushInfo,
+	CoStorage, ReducerChangeContext,
 };
 use cid::Cid;
 use co_identity::PrivateIdentityBox;

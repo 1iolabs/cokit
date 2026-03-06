@@ -4,10 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	library::{
-		contact::{create_contact_message, ContactPayload},
-		settings_timeout::settings_timeout,
-	},
+	library::{contact::create_contact_message, settings_timeout::settings_timeout},
 	services::application::action::ContactAction,
 	Action, ActionError, CoContext, CO_ID_LOCAL,
 };
@@ -15,7 +12,7 @@ use co_actor::Actions;
 use co_identity::{IdentityResolver, PrivateIdentityResolver};
 use co_network::identities_networks;
 use co_primitives::CoId;
-use futures::{FutureExt, Stream, StreamExt, TryStreamExt};
+use futures::{pin_mut, FutureExt, Stream, StreamExt, TryStreamExt};
 
 /// Send a contact request to a DID.
 ///
@@ -58,9 +55,11 @@ async fn send_contact(context: &CoContext, contact: &ContactAction) -> anyhow::R
 	// create message
 	let (_header, message) = create_contact_message(
 		context.date(),
+		network.local_peer_id(),
 		&from_identity,
 		&to_identity,
-		ContactPayload { sub: contact.sub.clone(), fields: contact.fields.clone() },
+		contact.sub.clone(),
+		contact.fields.clone(),
 	)?;
 
 	// resolve networks for the recipient
@@ -87,11 +86,12 @@ async fn send_contact(context: &CoContext, contact: &ContactAction) -> anyhow::R
 		networks,
 	);
 
+	// get timeout
 	let timeout = settings_timeout(context, &CoId::from(CO_ID_LOCAL), Some("didcomm-send")).await;
 
 	// try to send to the first connectable peer
 	let mut last_error: Option<anyhow::Error> = None;
-	futures::pin_mut!(peers_stream);
+	pin_mut!(peers_stream);
 	while let Some(peers) = peers_stream.next().await {
 		match peers {
 			Ok(peers) => {

@@ -7,7 +7,12 @@
 use super::tracing::TracingBuilder;
 use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
 use crate::{
-	library::wait_response::request_response, services::application::ApplicationMessage, types::co_date::co_date_env,
+	library::{
+		contact_handler::{ContactHandler, DynamicContactHandler},
+		wait_response::request_response,
+	},
+	services::application::ApplicationMessage,
+	types::co_date::co_date_env,
 	Action, CoAccessPolicy, CoReducer, CoReducerFactory, CoStorage, CoStorageSetting, CoUuid, Cores,
 	DynamicCoAccessPolicy, DynamicCoUuid, DynamicLocalSecret, Guards, LocalSecret, RandomCoUuid, Storage,
 };
@@ -353,6 +358,7 @@ pub struct ApplicationBuilder {
 	cores: Cores,
 	guards: Guards,
 	access_policy: Option<DynamicCoAccessPolicy>,
+	contact_handler: Option<DynamicContactHandler>,
 }
 impl ApplicationBuilder {
 	#[cfg(feature = "fs")]
@@ -386,6 +392,7 @@ impl ApplicationBuilder {
 			cores: Default::default(),
 			guards: Default::default(),
 			access_policy: None,
+			contact_handler: None,
 		}
 	}
 
@@ -407,6 +414,7 @@ impl ApplicationBuilder {
 			cores: Default::default(),
 			guards: Default::default(),
 			access_policy: None,
+			contact_handler: None,
 		}
 	}
 
@@ -432,6 +440,7 @@ impl ApplicationBuilder {
 			cores: Default::default(),
 			guards: Default::default(),
 			access_policy: None,
+			contact_handler: None,
 		}
 	}
 
@@ -453,6 +462,7 @@ impl ApplicationBuilder {
 			cores: Default::default(),
 			guards: Default::default(),
 			co_access_policy: None,
+			contact_handler: None,
 		}
 	}
 
@@ -520,6 +530,10 @@ impl ApplicationBuilder {
 
 	pub fn with_access_policy(self, policy: impl CoAccessPolicy + 'static) -> Self {
 		Self { access_policy: Some(DynamicCoAccessPolicy::new(policy)), ..self }
+	}
+
+	pub fn with_contact_handler(self, handler: impl ContactHandler + 'static) -> Self {
+		Self { contact_handler: Some(DynamicContactHandler::new(handler)), ..self }
 	}
 
 	pub fn with_static_blocks(mut self, storage: StaticBlockStorage<'static>) -> Self {
@@ -599,7 +613,17 @@ impl ApplicationBuilder {
 		let service = Actor::spawn(
 			tags!("type": "application", "application": settings.identifier.clone()),
 			crate::services::application::Application::new(settings.clone()),
-			(storage, tasks.clone(), date, uuid, self.cores, self.guards, self.local_secret, self.access_policy),
+			(
+				storage,
+				tasks.clone(),
+				date,
+				uuid,
+				self.cores,
+				self.guards,
+				self.local_secret,
+				self.access_policy,
+				self.contact_handler,
+			),
 		)?;
 
 		// wait for context

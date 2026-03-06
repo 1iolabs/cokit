@@ -15,6 +15,8 @@ mod co_heads_publish;
 #[cfg(feature = "network")]
 mod co_heads_subscribe;
 #[cfg(feature = "network")]
+mod contact_receive;
+#[cfg(feature = "network")]
 mod contact_send;
 mod core_action_push;
 #[cfg(feature = "network")]
@@ -92,6 +94,7 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(co_heads_publish::co_heads_publish)
 		.join(co_heads_subscribe::CoHeadsSubscribeEpic::default())
 		.join(contact_send::contact_send)
+		.join(contact_receive::contact_receive)
 		.join(co_didcomm_send::co_didcomm_send)
 		.join(network_queue::network_queue_message_epic)
 		.join(network_queue::network_started_epic)

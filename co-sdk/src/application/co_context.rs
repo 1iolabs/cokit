@@ -11,7 +11,8 @@ use crate::{
 		shared::{SharedCoBuilder, SharedCoCreator},
 	},
 	library::{
-		builtin_cores::builtin_cores, shared_membership::shared_membership_active, wait_response::request_response,
+		builtin_cores::builtin_cores, contact_handler::DynamicContactHandler,
+		shared_membership::shared_membership_active, wait_response::request_response,
 	},
 	reducer::core_resolver::{dynamic::DynamicCoreResolver, guard::CoGuardResolver, log::LogCoreResolver},
 	services::{
@@ -189,6 +190,11 @@ impl CoContext {
 		self.inner.access_policy.as_ref()
 	}
 
+	/// Contact handler for incoming contact requests.
+	pub fn contact_handler(&self) -> Option<&DynamicContactHandler> {
+		self.inner.contact_handler.as_ref()
+	}
+
 	/// Send a contact request to a DID.
 	///
 	/// # Return
@@ -275,6 +281,7 @@ pub(crate) struct CoContextInner {
 	guards: Guards,
 	local_secret: Option<DynamicLocalSecret>,
 	access_policy: Option<DynamicCoAccessPolicy>,
+	contact_handler: Option<DynamicContactHandler>,
 }
 impl CoContextInner {
 	#[allow(clippy::too_many_arguments)]
@@ -294,6 +301,7 @@ impl CoContextInner {
 		guards: Guards,
 		local_secret: Option<DynamicLocalSecret>,
 		access_policy: Option<DynamicCoAccessPolicy>,
+		contact_handler: Option<DynamicContactHandler>,
 	) -> Self {
 		let block_links = BlockLinks::default();
 		let block_links_builtin = block_links.clone().with_filter(IgnoreFilter::new(builtin_cores()));
@@ -316,6 +324,7 @@ impl CoContextInner {
 			guards,
 			local_secret,
 			access_policy,
+			contact_handler,
 		}
 	}
 
