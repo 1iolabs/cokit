@@ -42,10 +42,8 @@ async fn test_contact() {
 		.into_iter()
 		.map(|addr| addr.to_string())
 		.collect();
-	let peer2_network = Network::Peer(NetworkPeer {
-		peer: network2.local_peer_id().to_bytes(),
-		addresses: peer2_listeners,
-	});
+	let peer2_network =
+		Network::Peer(NetworkPeer { peer: network2.local_peer_id().to_bytes(), addresses: peer2_listeners });
 
 	// peer2: listen for DidCommReceive with "co-contact" message type
 	let peer2_receive = {
@@ -118,10 +116,8 @@ async fn test_contact_no_peers() {
 	let identity2 = peer2.create_identity().await;
 
 	// use a NetworkPeer with no valid addresses (unreachable)
-	let unreachable_network = Network::Peer(NetworkPeer {
-		peer: network2.local_peer_id().to_bytes(),
-		addresses: vec![],
-	});
+	let unreachable_network =
+		Network::Peer(NetworkPeer { peer: network2.local_peer_id().to_bytes(), addresses: vec![] });
 
 	// peer1: send contact request — should fail
 	let result = timeout(

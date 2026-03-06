@@ -9,11 +9,11 @@ pub mod build_core;
 pub mod builtin_cores;
 pub mod cancel;
 pub mod co_access_policy;
-#[cfg(feature = "network")]
-pub(crate) mod contact;
 pub(crate) mod compat;
 #[cfg(feature = "network")]
 pub mod connections_peer_provider;
+#[cfg(feature = "network")]
+pub(crate) mod contact;
 pub mod core_source;
 pub mod create_reducer_action;
 #[cfg(feature = "pinning")]

@@ -47,7 +47,11 @@ async fn send_contact(context: &CoContext, contact: &ContactAction) -> anyhow::R
 	let network = context.network().await.ok_or_else(|| anyhow::anyhow!("No network"))?;
 
 	// resolve identities
-	let from_identity = context.private_identity_resolver().await?.resolve_private(&contact.from).await?;
+	let from_identity = context
+		.private_identity_resolver()
+		.await?
+		.resolve_private(&contact.from)
+		.await?;
 	let identity_resolver = context.identity_resolver().await?;
 	let to_identity = identity_resolver.resolve(&contact.to).await?;
 
@@ -62,7 +66,9 @@ async fn send_contact(context: &CoContext, contact: &ContactAction) -> anyhow::R
 	// resolve networks for the recipient
 	let networks = if contact.networks.is_empty() {
 		let resolved: std::collections::BTreeSet<_> =
-			identities_networks(Some(&identity_resolver), [contact.to.clone()]).try_collect().await?;
+			identities_networks(Some(&identity_resolver), [contact.to.clone()])
+				.try_collect()
+				.await?;
 		anyhow::ensure!(!resolved.is_empty(), "No networks found for recipient DID");
 		resolved
 	} else {
