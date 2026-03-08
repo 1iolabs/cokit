@@ -44,6 +44,7 @@ test:
     <<: *global_cache
   variables:
     RUST_BACKTRACE: "full"
+    RUST_MIN_STACK: "33554432" # 32Mib
   script:
     - cargo test
   artifacts:
