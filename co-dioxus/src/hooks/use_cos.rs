@@ -3,10 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{
-	library::co_actor::CoActor,
-	use_co_context, Co, CoBlockStorage,
-};
+use crate::{library::co_actor::CoActor, use_co_context, Co, CoBlockStorage};
 use co_actor::Actor;
 use co_sdk::CoId;
 use dioxus::prelude::*;
@@ -22,12 +19,10 @@ pub fn use_cos(cos: ReadSignal<Vec<CoId>>) -> Cos {
 			.map(|co_id| {
 				let reducer_state = SyncSignal::new_maybe_sync(None);
 				let last_error = SyncSignal::new_maybe_sync(Ok(()));
-				let actor_spawner =
-					Actor::spawner(Default::default(), CoActor::new(co_id.clone())).expect("actor");
+				let actor_spawner = Actor::spawner(Default::default(), CoActor::new(co_id.clone())).expect("actor");
 				let handle = actor_spawner.handle();
 				context.execute_future_parallel(move |application| async move {
-					actor_spawner
-						.spawn(application.context().tasks(), (application.context().clone(), reducer_state));
+					actor_spawner.spawn(application.context().tasks(), (application.context().clone(), reducer_state));
 				});
 				let storage = CoBlockStorage::new(handle.clone(), None);
 				Co { co_id, last_error, context: context.clone(), reducer_state, handle, storage }
