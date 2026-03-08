@@ -5,7 +5,6 @@
 
 use crate::{
 	bitswap::{BitswapMessage, BitswapStoreClient},
-	compat::Instant,
 	didcomm, discovery,
 	library::find_peer_id::try_peer_id,
 	types::{
@@ -15,7 +14,7 @@ use crate::{
 	NetworkSettings,
 };
 use anyhow::anyhow;
-use co_actor::{ActorHandle, TaskSpawner};
+use co_actor::{time, ActorHandle, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
 use co_primitives::DynamicCoDate;
 use futures::{pin_mut, Stream, StreamExt};
@@ -33,7 +32,6 @@ use rand::rngs::OsRng;
 use std::{cmp::min, future::Future, task::Poll, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
-
 pub const CO_AGENT: &str = "co/0.1.0";
 pub const IPFS_IDENTIFY_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/id/1.0.0");
 
@@ -294,7 +292,7 @@ struct Runtime {
 	/// Tasks which have been executed but waiting for events.
 	pending_tasks: Vec<(NetworkTaskBox<Behaviour, Context>, Span)>,
 	shutdown: CancellationToken,
-	next_delayed_task: Option<Instant>,
+	next_delayed_task: Option<time::Instant>,
 }
 impl Runtime {
 	fn new(shutdown: CancellationToken) -> Self {
@@ -543,7 +541,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 		layer_event = context.select_next_some() => {
 			context.on_layer_event(swarm, layer_event).map(|layer_event| SwarmEvent::Behaviour(NetworkEvent::from(layer_event)))
 		},
-		Some(_) = option_await(runtime.next_delayed_task.map(crate::compat::sleep_until)) => {
+		Some(_) = option_await(runtime.next_delayed_task.map(time::sleep_until)) => {
 			runtime.next_delayed_task = None;
 			None
 		},

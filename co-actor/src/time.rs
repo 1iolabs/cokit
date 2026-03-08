@@ -9,13 +9,25 @@ pub use std::time::Instant;
 #[cfg(feature = "js")]
 pub use web_time::Instant;
 
-/// platform-agnostic sleep until a deadline
+/// Platform-agnostic sleep for a duration. Send-safe on all platforms.
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn sleep(duration: Duration) {
+	tokio::time::sleep(duration).await;
+}
+
+/// Platform-agnostic sleep for a duration. Send-safe on all platforms.
+#[cfg(target_arch = "wasm32")]
+pub async fn sleep(duration: Duration) {
+	futures_timer::Delay::new(duration).await;
+}
+
+/// Platform-agnostic sleep until a deadline
 #[cfg(not(feature = "js"))]
 pub async fn sleep_until(deadline: Instant) {
 	tokio::time::sleep_until(deadline.into()).await;
 }
 
-/// platform-agnostic sleep until a deadline (tokio_with_wasm Sleep is !Send)
+/// Platform-agnostic sleep until a deadline (tokio_with_wasm Sleep is !Send)
 #[cfg(feature = "js")]
 pub async fn sleep_until(deadline: Instant) {
 	let now = Instant::now();

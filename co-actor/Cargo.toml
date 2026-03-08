@@ -16,9 +16,10 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 tokio-stream = { workspace = true, default-features = false, features = ["sync"] }
 tokio-util = { workspace = true }
+tokio_with_wasm = { workspace = true, optional = true, features = ["sync"] }
 tracing = { workspace = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
-tokio_with_wasm = { workspace = true, optional = true, features = ["sync"] }
+web-time = { workspace = true, optional = true }
 
 [target.'cfg(tokio_unstable)'.dependencies]
 tokio = { workspace = true, features = ["full", "tracing"] }
@@ -28,5 +29,5 @@ insta = { version = "1.34.0", features = ["default", "yaml"] }
 
 [features]
 default = ["native"]
-js = ["dep:wasm-bindgen-futures", "dep:tokio_with_wasm"]
+js = ["dep:web-time", "dep:wasm-bindgen-futures", "dep:tokio_with_wasm"]
 native = ["tokio-util/rt"]

@@ -9,18 +9,14 @@ use super::action::{
 	PeerConnectionClosedAction, PeerConnectionEstablishedAction, PeerRelateCoAction, PeerRelateDidAction,
 	PeersChangedAction, ReleaseAction, ReleasedAction, UseAction,
 };
-use crate::{
-	compat::Instant,
-	connections::{DialAction, DialCompletedAction},
-};
-use co_actor::Reducer;
+use crate::connections::{DialAction, DialCompletedAction};
+use co_actor::{time::Instant, Reducer};
 use co_primitives::{CoId, Did, Network, NetworkDidDiscovery, NetworkPeer};
 use libp2p::{Multiaddr, PeerId};
 use std::{
 	collections::{BTreeSet, HashMap},
 	time::Duration,
 };
-
 #[derive(Debug, Clone)]
 pub struct CoConnection {
 	pub id: CoId,

@@ -4,13 +4,13 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	library::{compat::Instant, network_identity::network_identity, shared_membership::shared_membership},
+	library::{network_identity::network_identity, shared_membership::shared_membership},
 	services::application::{HeadsError, HeadsMessageReceivedAction},
 	state, Action, ActionError, CoAccessPolicy, CoContext, CoReducer, CoReducerFactory, MappedCoReducerState,
 };
 use anyhow::anyhow;
 use cid::Cid;
-use co_actor::{ActionDispatch, Actions};
+use co_actor::{time, ActionDispatch, Actions};
 use co_core_membership::{Membership, MembershipState};
 use co_identity::PeerDidCommHeader;
 use co_network::{connections::PeerRelateCoAction, EncodedMessage, HeadsErrorCode, HeadsMessage, PeerId};
@@ -155,7 +155,7 @@ fn handle_heads(
 								co: co.clone(),
 								peer_id: from_peer_id,
 								did: action.from.clone(),
-								time: Instant::now(),
+								time: time::Instant::now(),
 							})
 							.ok();
 					}

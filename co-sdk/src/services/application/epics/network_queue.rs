@@ -11,7 +11,7 @@ use crate::{
 	services::application::{HeadsError, HeadsMessageReceivedAction},
 	Action, CoContext, CoUuid,
 };
-use co_actor::{Actions, Epic};
+use co_actor::{time, Actions, Epic};
 use co_identity::PrivateIdentity;
 use co_network::{backoff_with_jitter, HeadsMessage};
 use co_primitives::{CoId, CoTryStreamExt};
@@ -160,7 +160,7 @@ impl Epic<Action, (), CoContext> for NetworkQueueProcessEpic {
 						{
 							let retry = *retry + 1;
 							async move {
-								crate::library::compat::sleep(backoff_with_jitter(retry)).await;
+								time::sleep(backoff_with_jitter(retry)).await;
 								Ok(Action::NetworkQueueProcess { co, retry })
 							}
 						}

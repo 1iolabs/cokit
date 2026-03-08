@@ -11,23 +11,25 @@ use crate::{
 		shared::{SharedCoBuilder, SharedCoCreator},
 	},
 	library::{
-		builtin_cores::builtin_cores, contact_handler::DynamicContactHandler,
-		shared_membership::shared_membership_active, wait_response::request_response,
+		builtin_cores::builtin_cores,
+		contact_handler::DynamicContactHandler,
+		shared_membership::{shared_membership_active, wait_shared_membership_active},
+		wait_response::request_response,
 	},
 	reducer::core_resolver::{dynamic::DynamicCoreResolver, guard::CoGuardResolver, log::LogCoreResolver},
 	services::{
 		application::{ApplicationMessage, ContactAction},
-		reducers::{ReducerStorage, ReducersControl},
+		reducers::{ReducerOptions, ReducerStorage, ReducersControl},
 	},
 	state,
 	types::co_reducer_factory::CoReducerFactoryError,
-	Action, CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoAccessPolicy,
+	Action, CoCoreResolver, CoOptions, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoAccessPolicy,
 	DynamicCoUuid, DynamicLocalSecret, Guards, LocalCoBuilder, Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE,
 	CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
 use cid::Cid;
-use co_actor::ActorHandle;
+use co_actor::{time, ActorHandle};
 use co_core_membership::Membership;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
@@ -245,6 +247,19 @@ impl CoReducerFactory for CoContext {
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self), fields(application = self.inner.settings.identifier))]
 	async fn try_co_reducer(&self, co: &CoId) -> Result<CoReducer, CoReducerFactoryError> {
 		self.inner.reducers.clone().reducer(co.clone(), Default::default()).await
+	}
+
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self), fields(application = self.inner.settings.identifier))]
+	async fn try_co_reducer_with_options(
+		&self,
+		co: &CoId,
+		options: CoOptions,
+	) -> Result<CoReducer, CoReducerFactoryError> {
+		self.inner
+			.reducers
+			.clone()
+			.reducer(co.clone(), ReducerOptions::default().with_co_options(options))
+			.await
 	}
 }
 impl Debug for CoContext {
@@ -490,9 +505,18 @@ impl CoContextInner {
 		storage: ReducerStorage,
 		initialize: bool,
 		identity: Option<Did>,
+		options: CoOptions,
 	) -> Result<Option<CoReducer>, anyhow::Error> {
 		// find first active membership
-		let membership = shared_membership_active(&parent, co, identity.as_ref()).await?;
+		let membership = if options.wait {
+			if let Some(timeout) = options.wait_timeout {
+				time::timeout(timeout, wait_shared_membership_active(&parent, co, identity.as_ref())).await??
+			} else {
+				wait_shared_membership_active(&parent, co, identity.as_ref()).await?
+			}
+		} else {
+			shared_membership_active(&parent, co, identity.as_ref()).await?
+		};
 		let membership = match membership {
 			Some(m) => m,
 			None => return Ok(None),

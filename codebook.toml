@@ -1,9 +1,15 @@
 words = [
+    "autonat",
     "bitswap",
     "brandguardian",
     "cbor",
+    "dcutr",
     "didcomm",
     "dioxus",
+    "gossipsub",
+    "kad",
+    "kademlia",
+    "mdns",
     "thid",
     "tokio",
 ]

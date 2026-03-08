@@ -93,7 +93,7 @@ pub use types::{
 	co_dispatch::{CoDispatch, DynamicCoDispatch},
 	co_pinning_key::CoPinningKey,
 	co_reducer_context::CoReducerContext,
-	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError, CoReducerFactoryResultExt},
+	co_reducer_factory::{CoOptions, CoReducerFactory, CoReducerFactoryError, CoReducerFactoryResultExt},
 	co_reducer_state::{CoReducerState, MappedCoReducerState},
 	co_root::CoRoot,
 	co_storage::CoStorage,

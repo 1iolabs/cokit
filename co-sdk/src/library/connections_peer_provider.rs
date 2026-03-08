@@ -3,8 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::library::compat::Instant;
-use co_actor::ActorHandle;
+use co_actor::{time, ActorHandle};
 use co_network::{
 	connections::{ConnectionMessage, UseAction},
 	PeerId, PeerProvider,
@@ -29,7 +28,7 @@ impl PeerProvider for ConnectionsPeerProvider {
 		let action = UseAction {
 			id: self.id.clone(),
 			from: self.from.clone(),
-			time: Instant::now(),
+			time: time::Instant::now(),
 			networks: Default::default(),
 		};
 		self.connections

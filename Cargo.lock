@@ -1427,6 +1427,7 @@ dependencies = [
  "tokio_with_wasm",
  "tracing",
  "wasm-bindgen-futures",
+ "web-time",
 ]
 
 [[package]]

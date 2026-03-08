@@ -4,14 +4,13 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	compat::Instant,
 	services::connections::{
 		action::{ConnectionAction, PeerConnectionClosedAction, PeerConnectionEstablishedAction},
 		ConnectionMessage,
 	},
 	types::network_task::NetworkTask,
 };
-use co_actor::ActorHandle;
+use co_actor::{time::Instant, ActorHandle};
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	Swarm,

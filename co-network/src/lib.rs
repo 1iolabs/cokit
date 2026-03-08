@@ -4,7 +4,6 @@
 // retention—approved secure tools may process solely for internal use.
 
 mod bitswap;
-pub(crate) mod compat;
 mod didcomm;
 mod discovery;
 mod library;

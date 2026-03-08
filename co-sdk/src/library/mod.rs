@@ -9,7 +9,6 @@ pub mod build_core;
 pub mod builtin_cores;
 pub mod cancel;
 pub mod co_access_policy;
-pub(crate) mod compat;
 #[cfg(feature = "network")]
 pub mod connections_peer_provider;
 #[cfg(feature = "network")]
