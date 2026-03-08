@@ -12,8 +12,10 @@ pub use hooks::{
 	use_co_context::use_co_context,
 	use_co_id::use_co_id,
 	use_co_reducer_state::use_co_reducer_state,
+	use_cos::{use_cos, Cos},
 	use_did_key_identity::use_did_key_identity,
 	use_selector::{use_selector, use_selector_state},
+	use_selectors::{use_selector_states, use_selectors, CoSelector, CoSelectorState},
 };
 pub use library::{
 	cli::{Cli, CoLogLevel},

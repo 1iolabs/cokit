@@ -37,12 +37,12 @@ pub fn use_co(co: ReadSignal<CoId>) -> Co {
 
 #[derive(Debug, Clone)]
 pub struct Co {
-	co_id: CoId,
-	context: CoContext,
+	pub(crate) co_id: CoId,
+	pub(crate) context: CoContext,
 	pub(crate) reducer_state: SyncSignal<Option<Result<CoReducerState, CoError>>>,
-	last_error: SyncSignal<Result<(), CoError>>,
-	handle: ActorHandle<CoMessage>,
-	storage: CoBlockStorage,
+	pub(crate) last_error: SyncSignal<Result<(), CoError>>,
+	pub(crate) handle: ActorHandle<CoMessage>,
+	pub(crate) storage: CoBlockStorage,
 }
 impl Co {
 	pub fn co(&self) -> CoId {
