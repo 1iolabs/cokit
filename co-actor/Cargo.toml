@@ -11,6 +11,7 @@ async-trait = { workspace = true }
 co-primitives = { workspace = true }
 derive_more = { workspace = true }
 futures = { workspace = true }
+futures-timer = { version = "3", optional = true }
 static_assertions = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
@@ -29,5 +30,5 @@ insta = { version = "1.34.0", features = ["default", "yaml"] }
 
 [features]
 default = ["native"]
-js = ["dep:web-time", "dep:wasm-bindgen-futures", "dep:tokio_with_wasm"]
+js = ["dep:web-time", "dep:futures-timer", "dep:wasm-bindgen-futures", "dep:tokio_with_wasm"]
 native = ["tokio-util/rt"]

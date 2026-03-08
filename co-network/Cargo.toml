@@ -42,7 +42,6 @@ wasm-bindgen-futures = { workspace = true, optional = true }
 web-time = { workspace = true, optional = true }
 getrandom = { version = "0.2", features = ["js"], optional = true }
 getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"], optional = true }
-futures-timer = { version = "3", optional = true }
 
 [dev-dependencies]
 insta = { version = "1.34.0", features = ["default", "yaml"] }
@@ -64,7 +63,6 @@ js = [
     "dep:web-time",
     "dep:getrandom",
     "dep:getrandom_03",
-    "dep:futures-timer",
     "uuid/js",
     "libp2p/webrtc-websys", "libp2p/websocket-websys", "libp2p/wasm-bindgen",
     "libp2p-bitswap/wasm-bindgen",
