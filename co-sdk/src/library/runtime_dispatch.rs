@@ -75,7 +75,7 @@ where
 		// TODO: make sure it not in use by anyone else?
 		self.storage.remove(action_cid.cid()).await?;
 
-		// check diagostics
+		// check diagnostics
 		//  (albeit they only happen due to bugs)
 		//  we should always use diagnostics for implicit actions to not silently fail tasks
 		runtime_context.ok(&self.storage).await?;

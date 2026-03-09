@@ -168,6 +168,11 @@ impl Co {
 		});
 	}
 }
+impl PartialEq for Co {
+	fn eq(&self, other: &Self) -> bool {
+		self.co_id == other.co_id
+	}
+}
 
 async fn dispatch<T>(
 	application: Application,
