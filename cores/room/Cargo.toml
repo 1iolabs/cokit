@@ -13,6 +13,7 @@ cid = { workspace = true }
 co-api = { workspace = true }
 co-messaging = { workspace = true }
 co-primitives = { workspace = true }
+futures = { workspace = true }
 ipld-core = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
