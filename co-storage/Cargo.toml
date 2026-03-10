@@ -12,7 +12,7 @@ async-trait = { workspace = true }
 blake3 = "=1.5.0"
 chacha20poly1305 = "=0.10.1"
 cid = { workspace = true }
-co-actor = { workspace = true }
+co-actor = { workspace = true, optional = true }
 co-primitives = { workspace = true }
 derive_more = { workspace = true }
 either = { workspace = true }
@@ -48,7 +48,10 @@ co-test = { workspace = true }
 default = []
 logging-verbose = []
 fs = ["tokio/fs"]
-web = ["js"]
-native = ["co-actor/native", "fs"]
+web = ["js", "overlay"]
+native = ["fs", "overlay", "co-actor/native"]
 js = ["uuid/js", "getrandom/js", "co-actor/js"]
-indexeddb = ["js", "dep:web-sys", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys"]
+
+# backends
+indexeddb = ["js", "dep:web-sys", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:co-actor"]
+overlay = ["dep:co-actor"]

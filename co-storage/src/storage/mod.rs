@@ -13,6 +13,7 @@ pub mod join;
 pub mod links;
 pub mod mapped;
 pub mod memory;
+#[cfg(feature = "overlay")]
 pub mod overlay;
 pub mod request;
 pub mod static_storage;
