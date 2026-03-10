@@ -71,7 +71,7 @@ build:
   script:
     - rustc -vV
     - echo "> building cores"
-    - cargo run --package co-cli --release --features bundle-wasm-cores -- core build-builtin --zst
+    - cargo run --package co-cli --release --features zst -- core build-builtin --zst
     - echo "> building binaries"
     - cargo build --release --features bundle-wasm-cores
   artifacts:

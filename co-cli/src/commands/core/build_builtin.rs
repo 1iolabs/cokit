@@ -17,7 +17,7 @@ pub struct Command {
 	pub core: Vec<String>,
 
 	/// Additionally compress `.wasm` file to `.wasm.zst` using zstd compression.
-	#[cfg(feature = "bundle-wasm-cores")]
+	#[cfg(feature = "zst")]
 	#[arg(long)]
 	pub zst: bool,
 }
