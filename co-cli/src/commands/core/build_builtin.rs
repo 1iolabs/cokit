@@ -75,7 +75,7 @@ pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 			.cid();
 
 		// compress
-		#[cfg(feature = "bundle-wasm-cores")]
+		#[cfg(feature = "zst")]
 		if command.zst {
 			let mut compressed_path = build_artifact.artifact_path.clone();
 			compressed_path.add_extension("zst");
