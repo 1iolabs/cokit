@@ -78,7 +78,7 @@ impl NetworkSettings {
 	/// Example: `/ip4/127.0.0.1/tcp/4001/ws/p2p/12D3KooWGW7HBqhnY9wN9F9JWc72SYrb15nKWyGfLZDDYR8KA17x`
 	/// Note that the p2p part is currently required.
 	#[cfg(feature = "web")]
-	pub fn web(relay_multiaddr: String) -> Result<Self, anyhow::Error> {
+	pub fn web(relay_multiaddr: &str) -> Result<Self, anyhow::Error> {
 		Self { mdns: false, nat: true, relay: false, bootstrap: Default::default(), ..Default::default() }
 			.with_bootstrap_from_string(relay_multiaddr)
 	}

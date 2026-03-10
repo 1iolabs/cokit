@@ -3127,10 +3127,17 @@ dependencies = [
  "dioxus-config-macros",
  "dioxus-core",
  "dioxus-hooks",
+ "dioxus-logger",
  "dioxus-signals",
  "dioxus-stores",
  "subsecond",
 ]
+
+[[package]]
+name = "dioxus-cli-config"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccd67ab405e1915a47df9769cd5408545d1b559d5c01ce7a0f442caef520d1f3"
 
 [[package]]
 name = "dioxus-config-macros"
@@ -3179,6 +3186,18 @@ dependencies = [
  "rustversion",
  "slab",
  "tracing",
+]
+
+[[package]]
+name = "dioxus-logger"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1eeab114cb009d9e6b85ea10639a18cfc54bb342f3b837770b004c4daeb89c2"
+dependencies = [
+ "dioxus-cli-config",
+ "tracing",
+ "tracing-subscriber",
+ "tracing-wasm",
 ]
 
 [[package]]
@@ -11084,6 +11103,17 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log 0.2.0",
+]
+
+[[package]]
+name = "tracing-wasm"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4575c663a174420fa2d78f4108ff68f65bf2fbb7dd89f33749b6e826b3626e07"
+dependencies = [
+ "tracing",
+ "tracing-subscriber",
+ "wasm-bindgen",
 ]
 
 [[package]]
