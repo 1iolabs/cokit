@@ -1758,7 +1758,6 @@ dependencies = [
  "co-api",
  "co-messaging",
  "co-primitives",
- "co-runtime",
  "co-storage",
  "futures",
  "ipld-core",
@@ -1767,6 +1766,7 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "thiserror 1.0.69",
+ "tokio",
  "tracing",
  "tracing-subscriber",
 ]
