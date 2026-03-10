@@ -30,13 +30,15 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
+tracing-oslog = { version = "0.2", optional = true }
+tracing-subscriber = { workspace = true, optional = true }
 
 [features]
 default = []
 
 # targets
 desktop = ["fs", "network", "tracing", "co-sdk/recommended", "co-sdk/apple-sandbox", "co-actor/native"]
-mobile = ["fs", "network", "tracing", "co-sdk/recommended", "co-sdk/apple-sandbox", "co-actor/native"]
+mobile = ["fs", "network", "tracing-oslog", "co-sdk/recommended", "co-sdk/apple-sandbox", "co-actor/native"]
 web = ["js", "network", "indexeddb", "co-sdk/web"]
 
 # features
@@ -44,4 +46,5 @@ fs = ["co-sdk/fs"]
 network = ["co-sdk/network"]
 js = ["co-sdk/js", "co-actor/js", "uuid/js", "dep:wasm-bindgen-futures", "dep:web-sys", "dep:tokio_with_wasm"]
 tracing = ["co-sdk/tracing"]
+tracing-oslog = ["dep:tracing-oslog", "dep:tracing-subscriber"]
 indexeddb = ["co-sdk/indexeddb"]

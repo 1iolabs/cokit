@@ -6,8 +6,6 @@
 use crate::CoSettings;
 use anyhow::Result;
 use co_primitives::Network;
-#[cfg(feature = "fs")]
-use co_sdk::CoStorageSetting;
 use co_sdk::{state, Application, ApplicationBuilder, CoId, Did, IdentityResolver};
 use futures::{future::BoxFuture, Future};
 use std::collections::{BTreeMap, BTreeSet};
@@ -21,22 +19,57 @@ pub struct CoContext {
 }
 impl CoContext {
 	pub fn new(settings: CoSettings) -> Self {
-		// log
-		//  note: we initialize the logging synchronously before dioxus registers the default
-		#[cfg(feature = "tracing")]
-		if !settings.no_log {
-			let base_path = match settings.storage.clone() {
-				#[cfg(feature = "fs")]
-				CoStorageSetting::Path(path) => Some(path),
-				#[cfg(feature = "fs")]
-				CoStorageSetting::PathDefault => Some(ApplicationBuilder::default_path()),
-				_ => None,
-			};
-			co_sdk::TracingBuilder::new(settings.identifier.clone(), base_path)
-				.with_bunyan_logging(None)
-				.with_max_level(settings.log_level.into())
-				.init()
-				.expect("tracing init");
+		match settings.log.clone().with_resolved_default() {
+			#[cfg(feature = "web")]
+			crate::CoLog::Console => {
+				dioxus::logger::init(settings.log_level.into()).expect("logger");
+			},
+			#[cfg(feature = "tracing")]
+			crate::CoLog::Print => {
+				println!("tracing-print");
+				co_sdk::TracingBuilder::new(settings.identifier.clone(), None)
+					.with_stderr_logging()
+					.with_max_level(settings.log_level.into())
+					.init()
+					.expect("tracing init");
+			},
+			#[cfg(all(feature = "fs", feature = "tracing"))]
+			crate::CoLog::File(path) => {
+				#[cfg(feature = "tracing")]
+				{
+					let base_path = match settings.storage.clone() {
+						#[cfg(feature = "fs")]
+						co_sdk::CoStorageSetting::Path(path) => Some(path),
+						#[cfg(feature = "fs")]
+						co_sdk::CoStorageSetting::PathDefault => Some(ApplicationBuilder::default_path()),
+						_ => None,
+					};
+					println!("tracing-bunyan: {:?}", base_path);
+					co_sdk::TracingBuilder::new(settings.identifier.clone(), base_path)
+						.with_bunyan_logging(path)
+						.with_max_level(settings.log_level.into())
+						.init()
+						.expect("tracing init");
+				}
+			},
+			#[cfg(feature = "tracing-oslog")]
+			crate::CoLog::Os => {
+				println!("tracing-oslog");
+				use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+				tracing_subscriber::registry()
+					.with(
+						tracing_subscriber::filter::EnvFilter::builder()
+							.with_default_directive(
+								tracing_subscriber::filter::LevelFilter::from_level(settings.log_level.into()).into(),
+							)
+							.from_env_lossy(),
+					)
+					.with(tracing_oslog::OsLogger::new(&settings.bundle_identifier, "default"))
+					.init();
+			},
+			_ => {
+				println!("tracing-none");
+			},
 		}
 
 		// spawn

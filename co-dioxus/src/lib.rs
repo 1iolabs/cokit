@@ -22,4 +22,7 @@ pub use library::{
 	co_block_storage::CoBlockStorage,
 	co_context::{CoContext, CoContextError},
 };
-pub use types::{co_settings::CoSettings, error::CoError};
+pub use types::{
+	co_settings::{CoLog, CoSettings},
+	error::CoError,
+};

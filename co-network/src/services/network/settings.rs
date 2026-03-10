@@ -32,8 +32,8 @@ pub struct NetworkSettings {
 	/// This is optional and if it is set to [`None`] all connections are only on demand.
 	pub peers_threshold: Option<u32>,
 
-	/// Wherther to enable a limited relay server.
-	/// This relay can be used by other peers for holepunching.
+	/// Whether to enable a limited relay server.
+	/// This relay can be used by other peers for hole-punching.
 	pub relay: bool,
 
 	/// Enable NAT related protocols.
@@ -72,9 +72,15 @@ impl NetworkSettings {
 		Self::default()
 	}
 
+	/// Web configuration.
+	///
+	/// Currently a webrtc relay is required to connect via. web browser.
+	/// Example: `/ip4/127.0.0.1/tcp/4001/ws/p2p/12D3KooWGW7HBqhnY9wN9F9JWc72SYrb15nKWyGfLZDDYR8KA17x`
+	/// Note that the p2p part is currently required.
 	#[cfg(feature = "web")]
-	pub fn web() -> Self {
-		Self { mdns: false, nat: true, relay: false, ..Default::default() }
+	pub fn web(relay_multiaddr: String) -> Result<Self, anyhow::Error> {
+		Self { mdns: false, nat: true, relay: false, bootstrap: Default::default(), ..Default::default() }
+			.with_bootstrap_from_string(relay_multiaddr)
 	}
 
 	fn default_listen() -> Multiaddr {

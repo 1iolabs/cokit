@@ -218,7 +218,7 @@ impl Libp2pNetwork {
 			// dial bootstrap
 			swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![bootstrap.clone()]).build())?;
 
-			// use as explicent gossip peer
+			// use as explicit gossip peer
 			swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
 		}
 
