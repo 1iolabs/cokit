@@ -178,7 +178,7 @@ pub enum Action {
 		retry: u32,
 	},
 
-	/// Network Queue Process Complte
+	/// Network Queue Process Complete
 	NetworkQueueProcessComplete {
 		/// Only process given co.
 		co: Option<CoId>,
