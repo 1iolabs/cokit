@@ -2046,6 +2046,7 @@ dependencies = [
  "co-core-file",
  "co-core-keystore",
  "co-core-membership",
+ "co-core-names",
  "co-core-pin",
  "co-core-poa",
  "co-core-rich-text",
