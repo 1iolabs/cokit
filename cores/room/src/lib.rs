@@ -64,10 +64,10 @@ pub struct Room {
 	pub pinned_messages: Vec<String>,
 	pub tags: Tags,
 
-	/// Read receipts: sender DID / timestamp they read up to
+	/// Read receipts: sender DID / event_id of last message they read
 	#[schemars(skip)]
 	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-	pub read_receipts: BTreeMap<String, u64>,
+	pub read_receipts: BTreeMap<String, String>,
 
 	/// Typing indicators: sender DID / timestamp of typing event
 	#[schemars(skip)]
@@ -171,9 +171,22 @@ where
 	// control notices: read receipts and typing indicators / track in Room state
 	if let MessageType::Notice(nc) = msg_type {
 		if nc.body.starts_with("__READ_RECEIPT__") {
-			if let Ok(ts) = nc.body["__READ_RECEIPT__".len()..].parse::<u64>() {
-				let entry = state.read_receipts.entry(sender.to_owned()).or_insert(0);
-				*entry = (*entry).max(ts);
+			let event_id = nc.body["__READ_RECEIPT__".len()..].to_string();
+			if !event_id.is_empty() {
+				let should_update = if let Some(existing_id) = state.read_receipts.get(sender) {
+					let existing_idx = state.event_index.get(storage, existing_id).await?;
+					let new_idx = state.event_index.get(storage, &event_id).await?;
+					match (existing_idx, new_idx) {
+						(Some(e), Some(n)) => n > e,
+						(None, Some(_)) => true,
+						_ => false,
+					}
+				} else {
+					state.event_index.get(storage, &event_id).await?.is_some()
+				};
+				if should_update {
+					state.read_receipts.insert(sender.to_owned(), event_id.to_owned());
+				}
 			}
 			return Ok(());
 		}
@@ -539,20 +552,25 @@ mod tests {
 		let mut time: Date = 1000;
 		let state = Room::default();
 
-		let state =
-			dispatch(&storage, &mut time, state, "alice", "$e1", NoticeContent::new("__READ_RECEIPT__123")).await;
-		assert_eq!(event_count(&storage, &state).await, 0);
-		assert_eq!(state.read_receipts.get("alice"), Some(&123));
+		// First create real messages so they get indexed in event_index
+		let state = dispatch(&storage, &mut time, state, "bob", "$msg1", TextContent::new("hello")).await;
+		let state = dispatch(&storage, &mut time, state, "bob", "$msg2", TextContent::new("world")).await;
+		let state = dispatch(&storage, &mut time, state, "bob", "$msg3", TextContent::new("foo")).await;
 
-		// Later receipt with higher timestamp wins
+		// Read receipt pointing to $msg1
 		let state =
-			dispatch(&storage, &mut time, state, "alice", "$e2", NoticeContent::new("__READ_RECEIPT__456")).await;
-		assert_eq!(state.read_receipts.get("alice"), Some(&456));
+			dispatch(&storage, &mut time, state, "alice", "$rr1", NoticeContent::new("__READ_RECEIPT__$msg1")).await;
+		assert_eq!(state.read_receipts.get("alice"), Some(&"$msg1".to_string()));
 
-		// Earlier receipt does not overwrite
+		// Later receipt pointing to $msg3 (later in list) wins
 		let state =
-			dispatch(&storage, &mut time, state, "alice", "$e3", NoticeContent::new("__READ_RECEIPT__100")).await;
-		assert_eq!(state.read_receipts.get("alice"), Some(&456));
+			dispatch(&storage, &mut time, state, "alice", "$rr2", NoticeContent::new("__READ_RECEIPT__$msg3")).await;
+		assert_eq!(state.read_receipts.get("alice"), Some(&"$msg3".to_string()));
+
+		// Earlier receipt pointing to $msg2 does not overwrite (before $msg3 in list)
+		let state =
+			dispatch(&storage, &mut time, state, "alice", "$rr3", NoticeContent::new("__READ_RECEIPT__$msg2")).await;
+		assert_eq!(state.read_receipts.get("alice"), Some(&"$msg3".to_string()));
 	}
 
 	#[tokio::test]
@@ -825,12 +843,18 @@ mod tests {
 		let mut time: Date = 1000;
 		let state = Room::default();
 
-		let state =
-			dispatch(&storage, &mut time, state, "alice", "$e1", NoticeContent::new("__READ_RECEIPT__100")).await;
-		let state = dispatch(&storage, &mut time, state, "bob", "$e2", NoticeContent::new("__READ_RECEIPT__200")).await;
+		// Create real messages so they get indexed
+		let state = dispatch(&storage, &mut time, state, "carol", "$msg1", TextContent::new("hi")).await;
+		let state = dispatch(&storage, &mut time, state, "carol", "$msg2", TextContent::new("there")).await;
 
-		assert_eq!(state.read_receipts.get("alice"), Some(&100));
-		assert_eq!(state.read_receipts.get("bob"), Some(&200));
-		assert_eq!(event_count(&storage, &state).await, 0);
+		let state =
+			dispatch(&storage, &mut time, state, "alice", "$rr1", NoticeContent::new("__READ_RECEIPT__$msg1")).await;
+		let state =
+			dispatch(&storage, &mut time, state, "bob", "$rr2", NoticeContent::new("__READ_RECEIPT__$msg2")).await;
+
+		assert_eq!(state.read_receipts.get("alice"), Some(&"$msg1".to_string()));
+		assert_eq!(state.read_receipts.get("bob"), Some(&"$msg2".to_string()));
+		// Read receipts don't count as visible events (only the 2 messages do)
+		assert_eq!(event_count(&storage, &state).await, 2);
 	}
 }
