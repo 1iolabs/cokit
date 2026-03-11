@@ -7,3 +7,5 @@
 /docs/src/crate
 /dist
 .DS_Store
+/skills/*-workspace
+/skills/**/evals.json
