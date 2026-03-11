@@ -5,8 +5,6 @@ edition = "2021"
 rust-version = "1.91"
 
 [dependencies]
-#librocksdb-sys = { version = "0.10.0+7.9.2" }
-#rocksdb = { version = "0.20.1" }
 anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }

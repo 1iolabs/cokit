@@ -81,8 +81,10 @@ pub use pin::PinAPI;
 pub use reducer::core_resolver::{
 	co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverContext, CoreResolverError,
 };
+#[cfg(feature = "network")]
+pub use services::application::KeyRequestAction;
 pub use services::{
-	application::{Action, ActionError, ApplicationMessage, ContactAction, KeyRequestAction},
+	application::{Action, ActionError, ApplicationMessage, ContactAction},
 	reducer::CoReducer,
 };
 #[cfg(feature = "js")]
