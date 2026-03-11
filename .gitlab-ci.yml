@@ -18,7 +18,7 @@ cache: &global_cache
     - .cargo/registry/cache
   policy: pull-push
 
-# verfiy the configured in `co/build.yml` (DOCKERFILE_IMAGE) is in sync with `ci/Dockerfile`.
+# verify the configured in `co/build.yml` (DOCKERFILE_IMAGE) is in sync with `ci/Dockerfile`.
 dockerfile:
   stage: lint
   image: ${DOCKERFILE_IMAGE}
@@ -26,7 +26,7 @@ dockerfile:
     - echo "> test if docker image is in sync with Dockerfile (ci/build.sh)"
     - echo "${DOCKERFILE_HASH}  ci/Dockerfile" | sha256sum --check --status
 
-# verfiy fmt/lint
+# verify fmt/lint
 lint:
   stage: lint
   image: ${DOCKERFILE_IMAGE}

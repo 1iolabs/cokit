@@ -26,14 +26,17 @@ tokio = { workspace = true, features = ["macros", "sync"] }
 tokio-stream = { workspace = true, default-features = false, optional = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
-wasmer = { git = "https://github.com/wasmerio/wasmer.git", rev = "5e6c9d361e5de4e02033b754d33c98ca96982ce9", default-features = false }
+wasmer = { git = "https://github.com/wasmerio/wasmer.git", rev = "5e6c9d361e5de4e02033b754d33c98ca96982ce9", default-features = false, optional = true }
 wasmer-compiler = { git = "https://github.com/wasmerio/wasmer.git", rev = "5e6c9d361e5de4e02033b754d33c98ca96982ce9", optional = true }
 wasmer-compiler-cranelift = { git = "https://github.com/wasmerio/wasmer.git", rev = "5e6c9d361e5de4e02033b754d33c98ca96982ce9", optional = true }
 wasmer-compiler-llvm = { git = "https://github.com/wasmerio/wasmer.git", rev = "5e6c9d361e5de4e02033b754d33c98ca96982ce9", optional = true }
 wasmer-types = { git = "https://github.com/wasmerio/wasmer.git", rev = "5e6c9d361e5de4e02033b754d33c98ca96982ce9" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasmer = { git = "https://github.com/wasmerio/wasmer.git", rev = "5e6c9d361e5de4e02033b754d33c98ca96982ce9", default-features = false, features = ["js", "std", "wasm-types-polyfill", "js-serializable-module", "enable-serde"] }
+wasmer = { git = "https://github.com/wasmerio/wasmer.git", rev = "5e6c9d361e5de4e02033b754d33c98ca96982ce9", default-features = false, optional = true, features = ["js", "std", "wasm-types-polyfill", "js-serializable-module", "enable-serde"] }
+
+[target.'cfg(target_vendor = "apple")'.dependencies]
+wasmer = { git = "https://github.com/wasmerio/wasmer.git", rev = "5e6c9d361e5de4e02033b754d33c98ca96982ce9", default-features = false, optional = true, features = ["jsc", "std"] }
 
 [dev-dependencies]
 hexdump = "0.1.1"
@@ -53,8 +56,8 @@ llvm = ["wasmer/llvm", "wasmer/compiler", "dep:wasmer-compiler", "dep:wasmer-com
 cranelift = ["wasmer/cranelift", "wasmer/compiler", "dep:wasmer-compiler", "dep:wasmer-compiler-cranelift"]
 wasmi = ["wasmer/wasmi"]
 wamr = ["wasmer/wamr"]
-js = ["co-actor/js"]
-jsc = ["wasmer/jsc", "wasmer/std"]
+js = ["dep:wasmer", "co-actor/js"]
+jsc = ["dep:wasmer"]
 
 # meta
 apple-sandbox = ["wasmi"]

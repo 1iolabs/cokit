@@ -9,6 +9,7 @@ compile_error!("feature \"js\" can only used for \"wasm32-unknown-unknown\" targ
 
 // modules
 mod library;
+mod macros;
 mod modules;
 mod runtimes;
 mod types;
@@ -20,11 +21,10 @@ pub use library::{
 	api_context::ApiContext,
 	async_context::AsyncContext,
 	instance::RuntimeInstance,
-	module_description::ModuleDescription,
 	pool::{ExecuteError, IdleRuntimePool, RuntimePool},
 };
+pub(crate) use macros::cfg_wasmer;
 pub use modules::co_v1;
-pub use runtimes::create_runtime;
 pub use types::{
 	cid_resolver::{
 		create_cid_resolver, CidResolver, CidResolverBox, IpldResolver, JoinCidResolver, MultiLayerCidResolver,
@@ -34,3 +34,7 @@ pub use types::{
 	core::Core,
 	guard::GuardReference,
 };
+cfg_wasmer! {
+	pub use runtimes::wasmer::create_runtime;
+	pub use library::module_description::ModuleDescription;
+}
