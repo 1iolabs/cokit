@@ -36,6 +36,15 @@ lint:
     - cargo +nightly-2025-12-09 fmt --check
     - cargo clippy --workspace --all-targets --all-features -- -D warnings
 
+# check web build is working
+check:
+  stage: lint
+  image: ${DOCKERFILE_IMAGE}
+  cache:
+    <<: *global_cache
+  script:
+    - ./ci/scripts/check-web.sh
+
 # verify all tests are running to success
 test:
   stage: test
