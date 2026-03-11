@@ -43,8 +43,8 @@ wasmer = { git = "https://github.com/wasmerio/wasmer.git", rev = "5e6c9d361e5de4
 
 [features]
 default = []
-native = ["fs", "tokio/rt", "co-actor/native"]
-web = ["uuid/js", "js", "co-storage/web", ]
+native = ["fs", "tokio/rt", "co-actor/native", "co-storage/native"]
+web = ["uuid/js", "js", "co-storage/web"]
 fs = []
 
 # backends
@@ -54,6 +54,7 @@ cranelift = ["wasmer/cranelift", "wasmer/compiler", "dep:wasmer-compiler", "dep:
 wasmi = ["wasmer/wasmi"]
 wamr = ["wasmer/wamr"]
 js = ["co-actor/js"]
+jsc = ["wasmer/jsc", "wasmer/std"]
 
 # meta
 apple-sandbox = ["wasmi"]

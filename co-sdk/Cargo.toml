@@ -86,7 +86,7 @@ tokio = { workspace = true, features = ["full", "tracing"] }
 co-test = { workspace = true }
 
 [features]
-"default" = ["recommended", "co-runtime/llvm"]
+"default" = ["recommended", "co-runtime/wasmi"]
 
 # Meta: Recommended platform neutral features
 "recommended" = ["pinning", "native", "network"]
