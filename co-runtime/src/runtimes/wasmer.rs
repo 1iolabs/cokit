@@ -286,7 +286,7 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 		}
 
 		// jsc feature (run WASM using JavaScriptCore framework on macos/ios)
-		#[cfg(feature = "jsc")]
+		#[cfg(all(feature = "jsc", target_vendor = "apple"))]
 		{
 			let engine = wasmer::jsc::JSC::default();
 			let store = Store::new(engine);
