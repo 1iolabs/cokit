@@ -151,17 +151,8 @@ impl WasmerRuntime {
 	/// Reset the Store to prevent unbounded growth of StoreObjects::function_environments.
 	/// Each FunctionEnv::new() pushes an entry that is never removed, holding a reference to
 	/// WebAssembly.Memory and preventing GC.
-	///
-	/// On the JS backend, Store is lightweight (empty Engine)
-	/// and Module is an independent WebAssembly.Module, so resetting is safe and nearly free.
 	fn reset(&mut self) {
-		// js
-		#[cfg(feature = "js")]
-		{
-			self.store = Store::default();
-		}
-
-		// TODO: check other backends
+		self.store = Store::new(self.store.engine().clone());
 	}
 
 	fn instance(&mut self, api: CoV1Api) -> Result<(Instance, FunctionEnv<WasmerEnv>), WasmerError> {
@@ -254,6 +245,7 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 		self
 	}
 
+	#[cfg(any(feature = "headless", feature = "llvm", feature = "cranelift"))]
 	fn features() -> Features {
 		let mut features = Features::none();
 		features.reference_types = true;

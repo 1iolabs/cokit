@@ -3,6 +3,8 @@ words = [
     "bitswap",
     "brandguardian",
     "cbor",
+    "clippy",
+    "cranelift",
     "dcutr",
     "didcomm",
     "dioxus",
