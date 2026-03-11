@@ -8,13 +8,80 @@ use crate::{
 		diagnostic_cid_write, event_cid_read, payload_read, state_cid_read, state_cid_write, storage_block_get,
 		storage_block_set, CoV1Api,
 	},
+	runtimes::{Runtime, RuntimeBox, RuntimeError},
 	RuntimeContext,
 };
+use anyhow::anyhow;
 use std::fmt::Debug;
-use wasmer::{
-	imports, AsStoreMut, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, RuntimeError, Store, WasmPtr,
-};
+use wasmer::{imports, AsStoreMut, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, Store, WasmPtr};
 use wasmer_types::Features;
+
+enum RuntimeState {
+	Uninitialized(bool, Vec<u8>),
+	Initialized(Box<WasmerRuntime>),
+}
+impl Debug for RuntimeState {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Uninitialized(arg0, arg1) => f.debug_tuple("Uninitialized").field(arg0).field(&arg1.len()).finish(),
+			Self::Initialized(arg0) => f.debug_tuple("Initialized").field(arg0).finish(),
+		}
+	}
+}
+
+#[derive(Debug)]
+struct Wasmer {
+	state: RuntimeState,
+}
+impl Wasmer {
+	pub fn new(native: bool, bytes: Vec<u8>) -> Self {
+		Self { state: RuntimeState::Uninitialized(native, bytes) }
+	}
+}
+impl Runtime for Wasmer {
+	/// Execute runtime with api and return new state `Cid`.
+	fn execute_state(&mut self, api: CoV1Api) -> Result<RuntimeContext, RuntimeError> {
+		// initialize
+		let runtime: &mut WasmerRuntime = wasmer_runtime(&mut self.state)?;
+
+		// execute
+		let result = runtime.execute_state(api)?;
+
+		// result
+		Ok(result)
+	}
+
+	fn execute_guard(&mut self, api: CoV1Api) -> Result<(RuntimeContext, bool), RuntimeError> {
+		// initialize
+		let runtime: &mut WasmerRuntime = wasmer_runtime(&mut self.state)?;
+
+		// execute
+		let result = runtime.execute_guard(api)?;
+
+		// result
+		Ok(result)
+	}
+}
+
+fn wasmer_runtime(state: &mut RuntimeState) -> Result<&mut WasmerRuntime, RuntimeError> {
+	// initialize
+	let runtime: &mut WasmerRuntime = match state {
+		RuntimeState::Uninitialized(native, bytes) => {
+			*state = RuntimeState::Initialized(Box::new(WasmerRuntime::new(*native, bytes)?));
+			if let RuntimeState::Initialized(runtime) = state {
+				runtime
+			} else {
+				return Err(RuntimeError::InvalidState(anyhow!("Uninitialized after initialize")));
+			}
+		},
+		RuntimeState::Initialized(runtime) => runtime,
+	};
+	Ok(runtime)
+}
+
+pub fn create_runtime(native: bool, bytes: Vec<u8>) -> RuntimeBox {
+	Box::new(Wasmer::new(native, bytes))
+}
 
 pub struct WasmerRuntime {
 	store: Store,
@@ -51,6 +118,18 @@ pub enum WasmerError {
 	Deserialize(#[from] wasmer::DeserializeError),
 	#[error("No engine available")]
 	NoEngineAvailable,
+}
+impl From<WasmerError> for RuntimeError {
+	fn from(value: WasmerError) -> Self {
+		match value {
+			WasmerError::Compile(e) => Self::InvalidArgument(e.into()),
+			WasmerError::Instantiation(e) => Self::InvalidArgument(e.into()),
+			WasmerError::Export(e) => Self::InvalidArgument(e.into()),
+			WasmerError::Runtime(e) => Self::Runtime(e.into()),
+			WasmerError::Deserialize(e) => Self::Deserialize(e.into()),
+			e @ WasmerError::NoEngineAvailable => Self::InvalidArgument(e.into()),
+		}
+	}
 }
 
 impl WasmerRuntime {
@@ -286,8 +365,8 @@ fn is_sandboxed() -> bool {
 	std::env::var("APP_SANDBOX_CONTAINER_ID").is_ok()
 }
 
-fn into_runtime_error<E: ToString>(err: E) -> RuntimeError {
-	RuntimeError::new(err.to_string())
+fn into_runtime_error<E: ToString>(err: E) -> wasmer::RuntimeError {
+	wasmer::RuntimeError::new(err.to_string())
 }
 
 fn wasmer_storage_block_get(
@@ -296,9 +375,13 @@ fn wasmer_storage_block_get(
 	cid_size: u32,
 	buffer: WasmPtr<u8>,
 	buffer_size: u32,
-) -> Result<u32, RuntimeError> {
+) -> Result<u32, wasmer::RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let memory = data
+		.memory
+		.as_ref()
+		.ok_or_else(|| wasmer::RuntimeError::new("no memory"))?
+		.view(&store);
 	let cid_access = cid.slice(&memory, cid_size)?.access()?;
 	let mut buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
 	storage_block_get(&mut data.api, cid_access.as_ref(), buffer_access.as_mut()).map_err(into_runtime_error)
@@ -310,9 +393,13 @@ fn wasmer_storage_block_set(
 	cid_size: u32,
 	buffer: WasmPtr<u8>,
 	buffer_size: u32,
-) -> Result<u32, RuntimeError> {
+) -> Result<u32, wasmer::RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let memory = data
+		.memory
+		.as_ref()
+		.ok_or_else(|| wasmer::RuntimeError::new("no memory"))?
+		.view(&store);
 	let cid_access = cid.slice(&memory, cid_size)?.access()?;
 	let buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
 	storage_block_set(&mut data.api, cid_access.as_ref(), buffer_access.as_ref()).map_err(into_runtime_error)
@@ -323,9 +410,13 @@ fn wasmer_payload_read(
 	buffer: WasmPtr<u8>,
 	buffer_size: u32,
 	offset: u32,
-) -> Result<u32, RuntimeError> {
+) -> Result<u32, wasmer::RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let memory = data
+		.memory
+		.as_ref()
+		.ok_or_else(|| wasmer::RuntimeError::new("no memory"))?
+		.view(&store);
 	let mut buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
 	payload_read(&data.api, buffer_access.as_mut(), offset).map_err(into_runtime_error)
 }
@@ -334,9 +425,13 @@ fn wasmer_state_cid_read(
 	mut env: FunctionEnvMut<WasmerEnv>,
 	buffer: WasmPtr<u8>,
 	buffer_size: u32,
-) -> Result<u32, RuntimeError> {
+) -> Result<u32, wasmer::RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let memory = data
+		.memory
+		.as_ref()
+		.ok_or_else(|| wasmer::RuntimeError::new("no memory"))?
+		.view(&store);
 	let mut buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
 	state_cid_read(&data.api, buffer_access.as_mut()).map_err(into_runtime_error)
 }
@@ -345,9 +440,13 @@ fn wasmer_state_cid_write(
 	mut env: FunctionEnvMut<WasmerEnv>,
 	buffer: WasmPtr<u8>,
 	buffer_size: u32,
-) -> Result<u32, RuntimeError> {
+) -> Result<u32, wasmer::RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let memory = data
+		.memory
+		.as_ref()
+		.ok_or_else(|| wasmer::RuntimeError::new("no memory"))?
+		.view(&store);
 	let buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
 	state_cid_write(&mut data.api, buffer_access.as_ref()).map_err(into_runtime_error)
 }
@@ -356,9 +455,13 @@ fn wasmer_event_cid_read(
 	mut env: FunctionEnvMut<WasmerEnv>,
 	buffer: WasmPtr<u8>,
 	buffer_size: u32,
-) -> Result<u32, RuntimeError> {
+) -> Result<u32, wasmer::RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let memory = data
+		.memory
+		.as_ref()
+		.ok_or_else(|| wasmer::RuntimeError::new("no memory"))?
+		.view(&store);
 	let mut buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
 	event_cid_read(&data.api, buffer_access.as_mut()).map_err(into_runtime_error)
 }
@@ -367,9 +470,13 @@ fn wasmer_diagnostic_cid_write(
 	mut env: FunctionEnvMut<WasmerEnv>,
 	buffer: WasmPtr<u8>,
 	buffer_size: u32,
-) -> Result<u32, RuntimeError> {
+) -> Result<u32, wasmer::RuntimeError> {
 	let (data, store) = env.data_and_store_mut();
-	let memory = data.memory.as_ref().ok_or_else(|| RuntimeError::new("no memory"))?.view(&store);
+	let memory = data
+		.memory
+		.as_ref()
+		.ok_or_else(|| wasmer::RuntimeError::new("no memory"))?
+		.view(&store);
 	let buffer_access = buffer.slice(&memory, buffer_size)?.access()?;
 	diagnostic_cid_write(&mut data.api, buffer_access.as_ref()).map_err(into_runtime_error)
 }
