@@ -782,6 +782,7 @@ impl ReducerChangeCause {
 	}
 }
 
+#[cfg(not(feature = "js"))]
 #[cfg(test)]
 mod tests {
 	use super::Reducer;
