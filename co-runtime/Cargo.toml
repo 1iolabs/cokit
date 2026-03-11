@@ -54,6 +54,7 @@ cranelift = ["wasmer/cranelift", "wasmer/compiler", "dep:wasmer-compiler", "dep:
 wasmi = ["wasmer/wasmi"]
 wamr = ["wasmer/wamr"]
 js = ["co-actor/js"]
+jsc = ["wasmer/jsc", "wasmer/std"]
 
 # meta
 apple-sandbox = ["wasmi"]

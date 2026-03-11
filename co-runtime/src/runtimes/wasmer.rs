@@ -69,15 +69,24 @@ impl WasmerRuntime {
 		Ok(Self { kind, store, module })
 	}
 
-	fn instance(&mut self, api: CoV1Api) -> Result<(Instance, FunctionEnv<WasmerEnv>), WasmerError> {
-		// Reset the Store to prevent unbounded growth of StoreObjects::function_environments.
-		// Each FunctionEnv::new() pushes an entry that is never removed, holding a reference to
-		// WebAssembly.Memory and preventing GC. On the JS backend, Store is lightweight (empty Engine)
-		// and Module is an independent WebAssembly.Module, so resetting is safe and nearly free.
+	/// Reset the Store to prevent unbounded growth of StoreObjects::function_environments.
+	/// Each FunctionEnv::new() pushes an entry that is never removed, holding a reference to
+	/// WebAssembly.Memory and preventing GC.
+	///
+	/// On the JS backend, Store is lightweight (empty Engine)
+	/// and Module is an independent WebAssembly.Module, so resetting is safe and nearly free.
+	fn reset(&mut self) {
+		// js
 		#[cfg(feature = "js")]
 		{
 			self.store = Store::default();
 		}
+
+		// TODO: check other backends
+	}
+
+	fn instance(&mut self, api: CoV1Api) -> Result<(Instance, FunctionEnv<WasmerEnv>), WasmerError> {
+		self.reset();
 		let env = FunctionEnv::new(&mut self.store, WasmerEnv { memory: None, api });
 		let import_object = Self::imports(&mut self.store, &env);
 		let instance: Instance = Instance::new(&mut self.store, &self.module, &import_object)?;
@@ -166,14 +175,17 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 		self
 	}
 
-	#[allow(unreachable_code)]
-	pub fn build(self) -> Result<(WasmerRuntimeKind, Store, Module), WasmerError> {
+	fn features() -> Features {
 		let mut features = Features::none();
 		features.reference_types = true;
 		features.bulk_memory = true;
 		features.multi_value = true;
 		features.extended_const = true;
+		features
+	}
 
+	#[allow(unreachable_code)]
+	pub fn build(self) -> Result<(WasmerRuntimeKind, Store, Module), WasmerError> {
 		// js
 		#[cfg(feature = "js")]
 		{
@@ -186,12 +198,21 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 		#[cfg(feature = "headless")]
 		if self.native {
 			let engine: wasmer::Engine = wasmer::sys::EngineBuilder::headless()
-				.set_features(Some(features))
+				.set_features(Some(Self::features()))
 				.engine()
 				.into();
 			let store = Store::new(engine);
 			let module = unsafe { Module::deserialize(&store, self.bytes)? };
 			return Ok((WasmerRuntimeKind::Headless, store, module));
+		}
+
+		// jsc feature (run WASM using JavaScriptCore framework on macos/ios)
+		#[cfg(feature = "jsc")]
+		{
+			let engine = wasmer::jsc::JSC::default();
+			let store = Store::new(engine);
+			let module = Module::new(&store, self.bytes)?;
+			return Ok((WasmerRuntimeKind::Jsc, store, module));
 		}
 
 		// llvm feature
@@ -202,7 +223,7 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 			// config.opt_level(wasmer_compiler_llvm::LLVMOptLevel::None);
 			// config.enable_verifier();
 			let engine: wasmer::Engine = wasmer::sys::EngineBuilder::new(config)
-				.set_features(Some(features))
+				.set_features(Some(Self::features()))
 				.engine()
 				.into();
 			let store = Store::new(engine);
@@ -216,7 +237,7 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 			let mut config = wasmer_compiler_cranelift::Cranelift::new();
 			wasmer_compiler::CompilerConfig::canonicalize_nans(&mut config, true);
 			let engine: wasmer::Engine = wasmer::sys::EngineBuilder::new(config)
-				.set_features(Some(features))
+				.set_features(Some(Self::features()))
 				.engine()
 				.into();
 			let store = Store::new(engine);
@@ -257,6 +278,7 @@ pub enum WasmerRuntimeKind {
 	Wamr,
 	Wasmi,
 	Js,
+	Jsc,
 }
 
 #[cfg(any(feature = "llvm", feature = "cranelift"))]
