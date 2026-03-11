@@ -6,7 +6,7 @@
 - **Based on**: All documentation in `docs/src/` + public pages (1io.com/en/COkit, 1io.com/en/manifest)
 
 ## What Changed
-- Initial creation of the `cokit-context` skill package
+- Initial creation of the `cokit` skill package
 - 11 reference files covering all major topics
 - SKILL.md with mental model, lookup index, and common pitfalls
 
@@ -29,9 +29,9 @@ frontmatter, this is handled at the provisioning level when uploading.
 1. Navigate to your Claude Organization admin panel.
 2. Go to Skills management (or Custom Skills section).
 3. Click "Upload Skill" or "Add Custom Skill."
-4. Upload the `cokit-context.zip` file.
+4. Upload the `cokit.zip` file.
 5. The system will validate the SKILL.md frontmatter and folder structure.
-6. Review the parsed name (`cokit-context`) and description.
+6. Review the parsed name (`cokit`) and description.
 7. Configure visibility: recommend making it available to all org members who work
    with COkit/co-sdk.
 8. If the platform supports it, set to background-only (non-user-invocable).
