@@ -12,6 +12,7 @@ pub use co_messaging::MatrixEvent;
 use co_messaging::{message_event::MessageType, relation::Relation, EventContent};
 use co_primitives::CoCid;
 use schemars::JsonSchema;
+use std::collections::BTreeMap;
 
 /// Pre-calculated room event for direct display without event sourcing.
 #[co]
@@ -36,9 +37,13 @@ pub struct RoomEvent {
 	#[serde(rename = "h", default, skip_serializing_if = "Vec::is_empty")]
 	pub edits: Vec<Link<ReducerAction<MatrixEvent>>>,
 
-	/// modification events: poll votes, poll closes, checklist adds/checks
+	/// modification events: checklist adds, poll/checklist closes
 	#[serde(rename = "m", default, skip_serializing_if = "Vec::is_empty")]
 	pub modifications: Vec<Link<ReducerAction<MatrixEvent>>>,
+
+	/// poll/checklist votes, deduplicated per voter (last-vote-wins)
+	#[serde(rename = "v", default, skip_serializing_if = "Vec::is_empty")]
+	pub votes: Vec<Link<ReducerAction<MatrixEvent>>>,
 
 	/// redacted
 	#[serde(rename = "d", default, skip_serializing_if = "IsDefault::is_default")]
@@ -58,6 +63,16 @@ pub struct Room {
 	pub avatar: Option<Cid>,
 	pub pinned_messages: Vec<String>,
 	pub tags: Tags,
+
+	/// Read receipts: sender DID / timestamp they read up to
+	#[schemars(skip)]
+	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+	pub read_receipts: BTreeMap<String, u64>,
+
+	/// Typing indicators: sender DID / timestamp of typing event
+	#[schemars(skip)]
+	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+	pub typing: BTreeMap<String, u64>,
 
 	/// Ordered events for display
 	#[schemars(skip)]
@@ -86,7 +101,7 @@ impl Reducer<MatrixEvent> for Room {
 		}
 
 		// apply event list changes
-		reduce_events(storage, &mut state, &event.payload, event_link).await?;
+		reduce_events(storage, &mut state, &event.payload, event_link, &event.from).await?;
 
 		Ok(storage.set_value(&state).await?)
 	}
@@ -97,17 +112,33 @@ async fn reduce_events<S>(
 	state: &mut Room,
 	matrix_event: &MatrixEvent,
 	event_link: Link<ReducerAction<MatrixEvent>>,
+	sender: &str,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
 	match &matrix_event.content {
-		EventContent::Message(msg_type) => reduce_message(storage, state, matrix_event, msg_type, event_link).await,
+		EventContent::Message(msg_type) => {
+			reduce_message(storage, state, matrix_event, msg_type, event_link, sender).await
+		},
 		EventContent::Reaction(reaction) => {
 			let target_id = reaction.relates_to.as_ref().and_then(|r| r.event_id.clone());
 			if let Some(target_id) = target_id {
-				update_room_event_simple(storage, state, &target_id, |room_event| {
-					room_event.reactions.push(event_link);
+				// Deduplicate: remove prior reaction from same sender, push new one
+				update_room_event_async(storage, state, &target_id, |mut room_event| {
+					let sender = sender.to_owned();
+					async move {
+						let mut kept = Vec::new();
+						for link in &room_event.reactions {
+							let existing: ReducerAction<MatrixEvent> = storage.get_value(link).await?;
+							if existing.from != sender {
+								kept.push(*link);
+							}
+						}
+						kept.push(event_link);
+						room_event.reactions = kept;
+						Ok(room_event)
+					}
 				})
 				.await
 			} else {
@@ -132,13 +163,22 @@ async fn reduce_message<S>(
 	matrix_event: &MatrixEvent,
 	msg_type: &MessageType,
 	event_link: Link<ReducerAction<MatrixEvent>>,
+	sender: &str,
 ) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
 {
-	// skip control notices (read receipts, typing indicators)
+	// control notices: read receipts and typing indicators / track in Room state
 	if let MessageType::Notice(nc) = msg_type {
-		if nc.body.starts_with("__READ_RECEIPT__") || nc.body == "__TYPING__" {
+		if nc.body.starts_with("__READ_RECEIPT__") {
+			if let Ok(ts) = nc.body["__READ_RECEIPT__".len()..].parse::<u64>() {
+				let entry = state.read_receipts.entry(sender.to_owned()).or_insert(0);
+				*entry = (*entry).max(ts);
+			}
+			return Ok(());
+		}
+		if nc.body == "__TYPING__" {
+			state.typing.insert(sender.to_owned(), matrix_event.timestamp);
 			return Ok(());
 		}
 		// checklist item addition — attach to target
@@ -153,11 +193,25 @@ where
 		}
 	}
 
-	// poll vote — attach to target
+	// poll/checklist vote — deduplicate per voter, attach to target
 	if let MessageType::Response(prc) = msg_type {
 		if let Some(target_id) = prc.relates_to.as_ref().and_then(|r| r.event_id.as_ref()) {
-			return update_room_event_simple(storage, state, target_id, |room_event| {
-				room_event.modifications.push(event_link);
+			let target_id = target_id.clone();
+			return update_room_event_async(storage, state, &target_id, |mut room_event| {
+				let sender = sender.to_owned();
+				async move {
+					// Remove prior vote from same voter (last-vote-wins)
+					let mut kept = Vec::new();
+					for link in &room_event.votes {
+						let existing: ReducerAction<MatrixEvent> = storage.get_value(link).await?;
+						if existing.from != sender {
+							kept.push(*link);
+						}
+					}
+					kept.push(event_link);
+					room_event.votes = kept;
+					Ok(room_event)
+				}
 			})
 			.await;
 		}
@@ -200,6 +254,7 @@ where
 		reactions: Vec::new(),
 		edits: Vec::new(),
 		modifications: Vec::new(),
+		votes: Vec::new(),
 		is_deleted: false,
 		is_closed: false,
 	};
@@ -241,7 +296,7 @@ where
 	Ok(Some(room_event.event))
 }
 
-/// Update an existing RoomEvent in the events list.
+/// Update an existing RoomEvent in the events list (sync closure).
 async fn update_room_event_simple<S, F>(
 	storage: &S,
 	state: &mut Room,
@@ -262,6 +317,33 @@ where
 	};
 	let mut room_event: RoomEvent = storage.get_value(&room_event_link).await?;
 	update(&mut room_event);
+	let new_link: Link<RoomEvent> = storage.set_value(&room_event).await?;
+	state.events.set(storage, idx, new_link).await?;
+	Ok(())
+}
+
+/// Update an existing RoomEvent in the events list (async closure for link resolution).
+async fn update_room_event_async<S, F, Fut>(
+	storage: &S,
+	state: &mut Room,
+	target_id: &str,
+	update: F,
+) -> Result<(), anyhow::Error>
+where
+	S: BlockStorage + Clone + 'static,
+	F: FnOnce(RoomEvent) -> Fut,
+	Fut: std::future::Future<Output = Result<RoomEvent, anyhow::Error>>,
+{
+	let idx = match state.event_index.get(storage, &target_id.to_string()).await? {
+		Some(idx) => idx,
+		None => return Ok(()),
+	};
+	let room_event_link = match state.events.get(storage, &idx).await? {
+		Some(link) => link,
+		None => return Ok(()),
+	};
+	let room_event: RoomEvent = storage.get_value(&room_event_link).await?;
+	let room_event = update(room_event).await?;
 	let new_link: Link<RoomEvent> = storage.set_value(&room_event).await?;
 	state.events.set(storage, idx, new_link).await?;
 	Ok(())
@@ -341,6 +423,7 @@ mod tests {
 		assert!(ev.reactions.is_empty());
 		assert!(ev.edits.is_empty());
 		assert!(ev.modifications.is_empty());
+		assert!(ev.votes.is_empty());
 		assert!(ev.reply_to.is_none());
 	}
 
@@ -451,7 +534,7 @@ mod tests {
 	}
 
 	#[tokio::test]
-	async fn skip_read_receipt_and_typing() {
+	async fn read_receipt_tracked_in_state() {
 		let storage = MemoryBlockStorage::default();
 		let mut time: Date = 1000;
 		let state = Room::default();
@@ -459,9 +542,32 @@ mod tests {
 		let state =
 			dispatch(&storage, &mut time, state, "alice", "$e1", NoticeContent::new("__READ_RECEIPT__123")).await;
 		assert_eq!(event_count(&storage, &state).await, 0);
+		assert_eq!(state.read_receipts.get("alice"), Some(&123));
 
-		let state = dispatch(&storage, &mut time, state, "alice", "$e2", NoticeContent::new("__TYPING__")).await;
+		// Later receipt with higher timestamp wins
+		let state =
+			dispatch(&storage, &mut time, state, "alice", "$e2", NoticeContent::new("__READ_RECEIPT__456")).await;
+		assert_eq!(state.read_receipts.get("alice"), Some(&456));
+
+		// Earlier receipt does not overwrite
+		let state =
+			dispatch(&storage, &mut time, state, "alice", "$e3", NoticeContent::new("__READ_RECEIPT__100")).await;
+		assert_eq!(state.read_receipts.get("alice"), Some(&456));
+	}
+
+	#[tokio::test]
+	async fn typing_tracked_in_state() {
+		let storage = MemoryBlockStorage::default();
+		let mut time: Date = 1000;
+		let state = Room::default();
+
+		let state = dispatch(&storage, &mut time, state, "alice", "$e1", NoticeContent::new("__TYPING__")).await;
 		assert_eq!(event_count(&storage, &state).await, 0);
+		assert_eq!(state.typing.get("alice"), Some(&1000));
+
+		// Second typing event updates timestamp
+		let state = dispatch(&storage, &mut time, state, "alice", "$e2", NoticeContent::new("__TYPING__")).await;
+		assert_eq!(state.typing.get("alice"), Some(&1001));
 	}
 
 	#[tokio::test]
@@ -511,7 +617,8 @@ mod tests {
 
 		assert_eq!(event_count(&storage, &state).await, 1);
 		let ev = get_event(&storage, &state, "$poll1").await.unwrap();
-		assert_eq!(ev.modifications.len(), 1);
+		assert_eq!(ev.votes.len(), 1);
+		assert!(ev.modifications.is_empty());
 		assert!(!ev.is_closed);
 	}
 
@@ -629,6 +736,101 @@ mod tests {
 			dispatch(&storage, &mut time, state, "alice", "$redact1", RedactionContent::new("$nonexistent", None))
 				.await;
 
+		assert_eq!(event_count(&storage, &state).await, 0);
+	}
+
+	#[tokio::test]
+	async fn reaction_dedup_same_sender() {
+		let storage = MemoryBlockStorage::default();
+		let mut time: Date = 1000;
+		let state = Room::default();
+
+		let state = dispatch(&storage, &mut time, state, "alice", "$msg1", TextContent::new("hi")).await;
+
+		// bob reacts with 👍
+		let state = dispatch(
+			&storage,
+			&mut time,
+			state,
+			"bob",
+			"$r1",
+			ReactionContent::new(RelatesTo::annotation("$msg1", "👍")),
+		)
+		.await;
+		let ev = get_event(&storage, &state, "$msg1").await.unwrap();
+		assert_eq!(ev.reactions.len(), 1);
+
+		// bob changes reaction to ❤️ — should replace, not add
+		let state = dispatch(
+			&storage,
+			&mut time,
+			state,
+			"bob",
+			"$r2",
+			ReactionContent::new(RelatesTo::annotation("$msg1", "❤️")),
+		)
+		.await;
+		let ev = get_event(&storage, &state, "$msg1").await.unwrap();
+		assert_eq!(ev.reactions.len(), 1); // still 1, not 2
+
+		// carol reacts — different sender, so it adds
+		let state = dispatch(
+			&storage,
+			&mut time,
+			state,
+			"carol",
+			"$r3",
+			ReactionContent::new(RelatesTo::annotation("$msg1", "👍")),
+		)
+		.await;
+		let ev = get_event(&storage, &state, "$msg1").await.unwrap();
+		assert_eq!(ev.reactions.len(), 2); // bob + carol
+	}
+
+	#[tokio::test]
+	async fn vote_dedup_same_voter() {
+		let storage = MemoryBlockStorage::default();
+		let mut time: Date = 1000;
+		let state = Room::default();
+
+		let poll = PollStartContent::new(
+			"Color?",
+			vec![PollAnswer::new("1", "Red"), PollAnswer::new("2", "Blue")],
+			PollKind::Disclosed,
+		);
+		let state = dispatch(&storage, &mut time, state, "alice", "$poll1", poll).await;
+
+		// bob votes Red
+		let vote1 = PollResponseContent::new("vote", vec!["1".to_owned()], "$poll1");
+		let state = dispatch(&storage, &mut time, state, "bob", "$v1", vote1).await;
+		let ev = get_event(&storage, &state, "$poll1").await.unwrap();
+		assert_eq!(ev.votes.len(), 1);
+
+		// bob changes vote to Blue — should replace, not add
+		let vote2 = PollResponseContent::new("vote", vec!["2".to_owned()], "$poll1");
+		let state = dispatch(&storage, &mut time, state, "bob", "$v2", vote2).await;
+		let ev = get_event(&storage, &state, "$poll1").await.unwrap();
+		assert_eq!(ev.votes.len(), 1); // still 1
+
+		// carol votes — different voter, adds
+		let vote3 = PollResponseContent::new("vote", vec!["1".to_owned()], "$poll1");
+		let state = dispatch(&storage, &mut time, state, "carol", "$v3", vote3).await;
+		let ev = get_event(&storage, &state, "$poll1").await.unwrap();
+		assert_eq!(ev.votes.len(), 2); // bob + carol
+	}
+
+	#[tokio::test]
+	async fn read_receipts_multiple_senders() {
+		let storage = MemoryBlockStorage::default();
+		let mut time: Date = 1000;
+		let state = Room::default();
+
+		let state =
+			dispatch(&storage, &mut time, state, "alice", "$e1", NoticeContent::new("__READ_RECEIPT__100")).await;
+		let state = dispatch(&storage, &mut time, state, "bob", "$e2", NoticeContent::new("__READ_RECEIPT__200")).await;
+
+		assert_eq!(state.read_receipts.get("alice"), Some(&100));
+		assert_eq!(state.read_receipts.get("bob"), Some(&200));
 		assert_eq!(event_count(&storage, &state).await, 0);
 	}
 }
