@@ -3,6 +3,11 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+// fail with proper error message when try to us js for non wasm32
+#[cfg(all(feature = "js", not(target_arch = "wasm32"), not(clippy)))]
+compile_error!("feature \"js\" can only used for \"wasm32-unknown-unknown\" target");
+
+// modules
 mod bitswap;
 mod didcomm;
 mod discovery;
@@ -11,6 +16,7 @@ mod network;
 mod services;
 mod types;
 
+// exports
 pub use bitswap::{BitswapMessage, Token};
 pub use didcomm::EncodedMessage;
 pub use library::{

@@ -48,7 +48,7 @@ co-test = { workspace = true }
 default = []
 logging-verbose = []
 fs = ["tokio/fs", "tokio/io-util"]
-web = ["js", "overlay"]
+web = ["js", "overlay", "co-actor/web"]
 native = ["fs", "overlay", "co-actor/native"]
 js = ["uuid/js", "getrandom/js", "co-actor/js"]
 

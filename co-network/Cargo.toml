@@ -55,7 +55,7 @@ native = [
     "libp2p-bitswap/metrics",
     "tokio/sync", "tokio/time",
 ]
-web = ["js"]
+web = ["js", "co-actor/web"]
 js = [
     "co-actor/js",
     "dep:tokio_with_wasm",
