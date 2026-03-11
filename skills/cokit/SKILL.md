@@ -1,5 +1,5 @@
 ---
-name: cokit-context
+name: cokit
 description: >-
   Provides accurate domain knowledge about COkit (also known as CO-kit), the Rust-based SDK
   by 1iO for building decentralized, local-first, peer-to-peer collaborative applications.
