@@ -9,7 +9,7 @@ use cid::Cid;
 use co_primitives::{Block, CloneWithBlockStorageSettings, MappedCid, MultiCodec};
 use std::collections::BTreeSet;
 
-/// Mappes certain CID codecs to mapped CIDs using BlockStorageContentMapping.
+/// Maps certain CID codecs to mapped CIDs using BlockStorageContentMapping.
 #[derive(Debug, Clone)]
 pub struct MappedBlockStorage<S> {
 	storage: S,
@@ -46,7 +46,7 @@ where
 	}
 
 	/// Inserts a block into storage.
-	/// Returns the CID of the block (gurranted to be the same as the supplied).
+	/// Returns the CID of the block (guaranteed to be the same as the supplied).
 	async fn set(&self, block: Block) -> Result<Cid, StorageError> {
 		Ok(self.storage.set(block).await?)
 	}

@@ -6,23 +6,48 @@
 use async_trait::async_trait;
 use co_primitives::Secret;
 use co_storage::Algorithm;
+use std::{
+	fmt::{Debug, Formatter},
+	sync::Arc,
+};
 
 #[async_trait]
-pub trait LocalSecret {
-	async fn fetch(&self) -> Result<Secret, anyhow::Error>;
+pub trait LocalSecret: Send + Sync + 'static {
+	async fn fetch(&self) -> Result<(Algorithm, Secret), anyhow::Error>;
 }
 
 pub struct MemoryLocalSecret {
+	algorithm: Algorithm,
 	secret: co_storage::Secret,
 }
 impl MemoryLocalSecret {
-	pub fn new() -> Self {
-		Self { secret: Algorithm::default().generate_serect() }
+	pub fn generate() -> Self {
+		let algorithm = Algorithm::default();
+		Self { secret: algorithm.generate_serect(), algorithm }
 	}
 }
 #[async_trait]
 impl LocalSecret for MemoryLocalSecret {
-	async fn fetch(&self) -> Result<Secret, anyhow::Error> {
-		Ok(self.secret.clone().into())
+	async fn fetch(&self) -> Result<(Algorithm, Secret), anyhow::Error> {
+		Ok((self.algorithm, self.secret.clone().into()))
+	}
+}
+
+#[derive(Clone)]
+pub struct DynamicLocalSecret(Arc<dyn LocalSecret>);
+impl Debug for DynamicLocalSecret {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		f.debug_tuple("DynamicLocalSecret").finish()
+	}
+}
+impl DynamicLocalSecret {
+	pub fn new(secret: impl LocalSecret) -> Self {
+		Self(Arc::new(secret))
+	}
+}
+#[async_trait]
+impl LocalSecret for DynamicLocalSecret {
+	async fn fetch(&self) -> Result<(Algorithm, Secret), anyhow::Error> {
+		self.0.fetch().await
 	}
 }

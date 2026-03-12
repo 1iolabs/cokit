@@ -33,7 +33,7 @@ form_urlencoded = "1.2.1"
 
 [features]
 "default" = []
-"web" = ["uuid/js"]
+"web" = ["uuid/js", "didcomm-rs/wasm_js"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }

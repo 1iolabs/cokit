@@ -5,8 +5,6 @@ edition = "2021"
 rust-version = "1.91"
 
 [dependencies]
-#librocksdb-sys = { version = "0.10.0+7.9.2" }
-#rocksdb = { version = "0.20.1" }
 anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
@@ -18,6 +16,7 @@ co-core-data-series = { workspace = true }
 co-core-file = { workspace = true }
 co-core-keystore = { workspace = true }
 co-core-membership = { workspace = true }
+co-core-names = { workspace = true }
 co-core-pin = { workspace = true }
 co-core-poa = { workspace = true }
 co-core-rich-text = { workspace = true }
@@ -58,6 +57,8 @@ tokio = { workspace = true, features = ["macros", "sync", "io-util"] }
 tokio-stream = { workspace = true, default-features = false, features = ["sync"] }
 tokio-util = { workspace = true }
 tokio_with_wasm = { workspace = true, optional = true, features = ["sync"] }
+futures-timer = { version = "3", optional = true }
+web-time = { workspace = true, optional = true }
 toml = { workspace = true }
 tracing = { workspace = true }
 tracing-bunyan-formatter = { workspace = true, optional = true }
@@ -85,7 +86,7 @@ tokio = { workspace = true, features = ["full", "tracing"] }
 co-test = { workspace = true }
 
 [features]
-"default" = ["recommended", "co-runtime/cranelift"]
+"default" = ["recommended", "co-runtime/llvm"]
 
 # Meta: Recommended platform neutral features
 "recommended" = ["pinning", "native", "network"]
@@ -113,7 +114,7 @@ co-test = { workspace = true }
 "network" = ["dep:co-network"]
 
 # Enable JS features
-"js" = ["dep:wasm-bindgen-futures", "dep:tokio_with_wasm", "dep:js-sys", "uuid/js", "co-runtime/js", "co-actor/js", "co-storage/js"]
+"js" = ["dep:wasm-bindgen-futures", "dep:tokio_with_wasm", "dep:js-sys", "dep:futures-timer", "dep:web-time", "uuid/js", "co-runtime/js", "co-actor/js", "co-storage/js"]
 
 # Enable opentelemetry tracing
 "opentelemetry" = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:opentelemetry-semantic-conventions", "dep:opentelemetry-stdout", "dep:tracing-opentelemetry"]
@@ -125,13 +126,13 @@ co-test = { workspace = true }
 "tracing" = ["dep:tracing-subscriber"]
 
 # Native Target
-"native" = ["co-runtime/native", "co-actor/native", "co-storage/native", "fs", "tokio/full", "tracing", "bunyan", "keychain"]
+"native" = ["co-runtime/native", "co-actor/native", "co-storage/native", "co-network?/native", "fs", "tokio/full", "tracing", "bunyan", "keychain"]
 
 # IndexedDB persistent locals (WASM only)
 "indexeddb" = ["js", "co-storage/indexeddb", "dep:web-sys", "dep:wasm-bindgen"]
 
 # Web Target (WASM)
-"web" = ["js", "co-identity/web", "co-storage/web", "co-runtime/web"]
+"web" = ["js", "co-identity/web", "co-storage/web", "co-runtime/web", "co-network?/web"]
 
 [[bench]]
 name = "local_push"

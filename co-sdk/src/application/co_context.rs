@@ -10,20 +10,26 @@ use crate::{
 		local::LocalCoContext,
 		shared::{SharedCoBuilder, SharedCoCreator},
 	},
-	library::{builtin_cores::builtin_cores, shared_membership::shared_membership_active},
+	library::{
+		builtin_cores::builtin_cores,
+		contact_handler::DynamicContactHandler,
+		shared_membership::{shared_membership_active, wait_shared_membership_active},
+		wait_response::request_response,
+	},
 	reducer::core_resolver::{dynamic::DynamicCoreResolver, guard::CoGuardResolver, log::LogCoreResolver},
 	services::{
-		application::ApplicationMessage,
-		reducers::{ReducerStorage, ReducersControl},
+		application::{ApplicationMessage, ContactAction},
+		reducers::{ReducerOptions, ReducerStorage, ReducersControl},
 	},
 	state,
 	types::co_reducer_factory::CoReducerFactoryError,
-	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoUuid, Guards, LocalCoBuilder,
-	Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	Action, CoCoreResolver, CoOptions, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoAccessPolicy,
+	DynamicCoUuid, DynamicLocalSecret, Guards, LocalCoBuilder, Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
 use cid::Cid;
-use co_actor::ActorHandle;
+use co_actor::{time, ActorHandle};
 use co_core_membership::Membership;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
@@ -33,10 +39,11 @@ use co_log::{EntryBlock, Log};
 use co_network::{connections::ConnectionMessage, HeadsApi, NetworkApi};
 use co_primitives::{
 	BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, Did, DynamicCoDate, IgnoreFilter,
+	Network,
 };
 use futures::{Stream, TryStreamExt};
 use std::{
-	collections::BTreeSet,
+	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,
 	sync::{Arc, RwLock},
 };
@@ -118,7 +125,7 @@ impl CoContext {
 		self.inner.private_identity_resolver().await
 	}
 
-	/// Get unsiged local device identity.
+	/// Get unsigned local device identity.
 	pub fn local_identity(&self) -> LocalIdentity {
 		LocalIdentity::device()
 	}
@@ -180,6 +187,42 @@ impl CoContext {
 		}
 	}
 
+	/// CO access policy for non-participants.
+	pub fn access_policy(&self) -> Option<&DynamicCoAccessPolicy> {
+		self.inner.access_policy.as_ref()
+	}
+
+	/// Contact handler for incoming contact requests.
+	pub fn contact_handler(&self) -> Option<&DynamicContactHandler> {
+		self.inner.contact_handler.as_ref()
+	}
+
+	/// Send a contact request to a DID.
+	///
+	/// # Return
+	/// This method returns whether the contact request could be send to to recipient.
+	/// Note that the actual contact can decide if and when he want to connect back.
+	pub async fn contact(
+		&self,
+		from: Did,
+		to: Did,
+		subject: Option<String>,
+		headers: BTreeMap<String, String>,
+		networks: impl IntoIterator<Item = Network>,
+	) -> Result<(), anyhow::Error> {
+		let contact =
+			ContactAction { from, to, sub: subject, networks: networks.into_iter().collect(), fields: headers };
+
+		let result: Result<(), crate::ActionError> =
+			request_response(self.inner.application(), Action::Contact(contact.clone()), move |action| match action {
+				Action::ContactSent(sent, result) if *sent == contact => Some(result.clone()),
+				_ => None,
+			})
+			.await?;
+
+		result.map_err(|err| err.into())
+	}
+
 	/// Force refresh co instance.
 	pub async fn refresh(&self, co: CoReducer) -> Result<(), anyhow::Error> {
 		let parent = match co.parent_id() {
@@ -204,6 +247,19 @@ impl CoReducerFactory for CoContext {
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self), fields(application = self.inner.settings.identifier))]
 	async fn try_co_reducer(&self, co: &CoId) -> Result<CoReducer, CoReducerFactoryError> {
 		self.inner.reducers.clone().reducer(co.clone(), Default::default()).await
+	}
+
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self), fields(application = self.inner.settings.identifier))]
+	async fn try_co_reducer_with_options(
+		&self,
+		co: &CoId,
+		options: CoOptions,
+	) -> Result<CoReducer, CoReducerFactoryError> {
+		self.inner
+			.reducers
+			.clone()
+			.reducer(co.clone(), ReducerOptions::default().with_co_options(options))
+			.await
 	}
 }
 impl Debug for CoContext {
@@ -238,6 +294,9 @@ pub(crate) struct CoContextInner {
 	block_links_builtin: BlockLinks,
 	cores: Cores,
 	guards: Guards,
+	local_secret: Option<DynamicLocalSecret>,
+	access_policy: Option<DynamicCoAccessPolicy>,
+	contact_handler: Option<DynamicContactHandler>,
 }
 impl CoContextInner {
 	#[allow(clippy::too_many_arguments)]
@@ -255,6 +314,9 @@ impl CoContextInner {
 		uuid: DynamicCoUuid,
 		cores: Cores,
 		guards: Guards,
+		local_secret: Option<DynamicLocalSecret>,
+		access_policy: Option<DynamicCoAccessPolicy>,
+		contact_handler: Option<DynamicContactHandler>,
 	) -> Self {
 		let block_links = BlockLinks::default();
 		let block_links_builtin = block_links.clone().with_filter(IgnoreFilter::new(builtin_cores()));
@@ -275,6 +337,9 @@ impl CoContextInner {
 			block_links_builtin,
 			cores,
 			guards,
+			local_secret,
+			access_policy,
+			contact_handler,
 		}
 	}
 
@@ -345,6 +410,7 @@ impl CoContextInner {
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	pub(crate) async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
 		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize)
+			.with_local_secret(self.local_secret.clone())
 			.with_verify_links(
 				self.settings
 					.feature_co_storage_verify_links()
@@ -439,9 +505,18 @@ impl CoContextInner {
 		storage: ReducerStorage,
 		initialize: bool,
 		identity: Option<Did>,
+		options: CoOptions,
 	) -> Result<Option<CoReducer>, anyhow::Error> {
 		// find first active membership
-		let membership = shared_membership_active(&parent, co, identity.as_ref()).await?;
+		let membership = if options.wait {
+			if let Some(timeout) = options.wait_timeout {
+				time::timeout(timeout, wait_shared_membership_active(&parent, co, identity.as_ref())).await??
+			} else {
+				wait_shared_membership_active(&parent, co, identity.as_ref()).await?
+			}
+		} else {
+			shared_membership_active(&parent, co, identity.as_ref()).await?
+		};
 		let membership = match membership {
 			Some(m) => m,
 			None => return Ok(None),

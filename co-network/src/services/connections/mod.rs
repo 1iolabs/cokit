@@ -14,4 +14,4 @@ mod state;
 pub use actor::{Connections, ConnectionsContext};
 pub use message::ConnectionMessage;
 pub use resolve::{DynamicNetworkResolver, NetworkResolver};
-pub use state::{CoConnection, ConnectionState, NetworkConnection, PeerConnection};
+pub use state::{CoConnection, ConnectionState, DidConnection, NetworkConnection, PeerConnection};

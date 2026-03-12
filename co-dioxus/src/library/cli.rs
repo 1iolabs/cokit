@@ -3,11 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::CoSettings;
 use clap::ValueEnum;
-use co_sdk::CoStorageSetting;
-#[cfg(feature = "network")]
-use co_sdk::NetworkSettings;
 #[cfg(feature = "fs")]
 use std::path::PathBuf;
 
@@ -15,7 +11,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, clap::Parser)]
 #[non_exhaustive]
 pub struct Cli {
-	/// The instance ID of the daemon. Must be uniqure for every instance that runs in parallel.
+	/// The instance ID of the process. Must be unique for every instance that runs in parallel.
 	/// Env: CO_INSTANCE_ID
 	#[arg(long, env = "CO_INSTANCE_ID")]
 	pub instance_id: Option<String>,
@@ -72,34 +68,6 @@ pub struct Cli {
 	#[arg(long, short = 'F')]
 	pub feature: Vec<String>,
 }
-impl From<Cli> for CoSettings {
-	fn from(cli: Cli) -> Self {
-		CoSettings {
-			storage: co_storage(&cli),
-			identifier: cli.instance_id.unwrap_or_else(|| String::from("dioxus")),
-			#[cfg(feature = "network")]
-			network: !cli.no_network,
-			#[cfg(feature = "network")]
-			network_settings: NetworkSettings::default().with_force_new_peer_id(cli.force_new_peer_id),
-			no_keychain: cli.no_keychain,
-			no_log: cli.no_log,
-			log_level: cli.log_level,
-			no_default_features: cli.no_default_features,
-			feature: cli.feature,
-		}
-	}
-}
-
-fn co_storage(_cli: &Cli) -> CoStorageSetting {
-	#[cfg(feature = "fs")]
-	if !_cli.memory {
-		return match _cli.base_path.clone() {
-			Some(path) => CoStorageSetting::Path(path),
-			None => CoStorageSetting::PathDefault,
-		};
-	}
-	CoStorageSetting::Memory
-}
 
 fn parse_bool(s: &str) -> Result<bool, String> {
 	match s {
@@ -126,6 +94,17 @@ impl From<CoLogLevel> for tracing::Level {
 			CoLogLevel::Info => tracing::Level::INFO,
 			CoLogLevel::Debug => tracing::Level::DEBUG,
 			CoLogLevel::Trace => tracing::Level::TRACE,
+		}
+	}
+}
+impl From<tracing::Level> for CoLogLevel {
+	fn from(value: tracing::Level) -> Self {
+		match value {
+			tracing::Level::ERROR => CoLogLevel::Error,
+			tracing::Level::WARN => CoLogLevel::Warn,
+			tracing::Level::INFO => CoLogLevel::Info,
+			tracing::Level::DEBUG => CoLogLevel::Debug,
+			tracing::Level::TRACE => CoLogLevel::Trace,
 		}
 	}
 }

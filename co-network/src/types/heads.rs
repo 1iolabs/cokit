@@ -24,6 +24,22 @@ pub enum HeadsMessage {
 	#[serde(rename = "r")]
 	HeadsRequest(CoId),
 
+	/// State notification.
+	/// This message must be signed.
+	/// Will be responded with one of:
+	/// - [`HeadsMessage::State`].
+	/// - [`HeadsMessage::Error`].
+	#[serde(rename = "s")]
+	State(CoId, WeakCid, BTreeSet<WeakCid>),
+
+	/// Request state and heads from peer.
+	/// This message must be signed.
+	/// Will be responded with one of:
+	/// - [`HeadsMessage::State`].
+	/// - [`HeadsMessage::Error`].
+	#[serde(rename = "t")]
+	StateRequest(CoId),
+
 	/// Error notification.
 	#[serde(rename = "e")]
 	Error { co: CoId, code: HeadsErrorCode, message: String },
@@ -46,6 +62,8 @@ impl HeadsMessage {
 			HeadsMessage::Heads(co_id, ..) => co_id,
 			HeadsMessage::HeadsRequest(co_id) => co_id,
 			HeadsMessage::Error { co, .. } => co,
+			HeadsMessage::State(co, ..) => co,
+			HeadsMessage::StateRequest(co) => co,
 		}
 	}
 }

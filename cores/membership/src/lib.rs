@@ -68,11 +68,21 @@ pub enum MembershipState {
 	/// Active membership.
 	Active = 10,
 
+	/// Pending state resolution.
+	/// Has CoInviteMetadata to connect, but needs to resolve CO state
+	/// (and optionally encryption key) from network before use.
+	///
+	/// Related membership Tags:
+	///  `co-invite-metadata: CoInviteMetadata`
+	Pending = 15,
+
 	/// Pending join by us.
+	/// The goal of a join is to end up as a CO's participant.
+	/// We are signaling that we want to be an participant in their CO.
 	///
 	/// Use Cases:
 	/// - This is a pending join triggered by an invite waiting for completion.
-	/// - This is waiting for CO participant acception/rejection (remote).
+	/// - This is waiting for CO participant acceptation/rejection (remote).
 	///
 	/// Related membership Tags:
 	///  `co-invite: CoInviteMetadata`
@@ -80,9 +90,11 @@ pub enum MembershipState {
 	Join = 20,
 
 	/// Pending invite by some participant of the CO.
+	/// The goal of a invite is to end up as a CO's participant.
+	/// A CO's participant are signaling that they want us to be an participant in their CO.
 	///
 	/// Use Cases:
-	/// - This is waiting for our acception/rejection.
+	/// - This is waiting for our acceptation/rejection.
 	/// - Accept invite by change membership state to [`MembershipState::Join`].
 	/// - Reject invite by removing the membership using [`MembershipsAction::Remove`].
 	///

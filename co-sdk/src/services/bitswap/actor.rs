@@ -108,9 +108,9 @@ async fn first_valid_token(
 }
 
 /// Get first CO token (local use only).
-/// Warning: The token will not be validated as this is only intendetd for local operations.
+/// Warning: The token will not be validated as this is only intended for local operations.
 async fn enforce_first_token_local(context: &CoContext, tokens: &[Token]) -> Result<CoId, StorageError> {
-	// get the co which initialited the request
+	// get the co which initialized the request
 	let mut co = None;
 	if let Some(token) = tokens.iter().next() {
 		match CoToken::from_bitswap_token(token) {

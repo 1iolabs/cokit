@@ -152,10 +152,11 @@ where
 				// execute
 				let weak_handle = handle.downgrade();
 				while let Some(actor_message) = rx.recv().await {
-					let (message, message_span) = match actor_message {
-						ActorMessage::Message(message) => (message, tracing::trace_span!("actor-handle")),
+					// handle message
+					let (message, message_span, _parent_span) = match actor_message {
+						ActorMessage::Message(message) => (message, tracing::trace_span!("actor-handle"), None),
 						ActorMessage::MessageWithSpan(message, message_span) => {
-							(message, tracing::trace_span!(parent: message_span, "actor-handle"))
+							(message, tracing::trace_span!(parent: &message_span, "actor-handle"), Some(message_span))
 						},
 						ActorMessage::Shutdown => {
 							// log
@@ -267,6 +268,22 @@ where
 		drop(self.handle);
 		self.join.await.map_err(|e| ActorError::InvalidState(e.into(), tags))??;
 		Ok(())
+	}
+
+	/// Wait for startup to be complete and then run in background.
+	/// This will resolve when initialization is done by returning any initialization errors.
+	pub async fn initialized(self) -> Result<ActorHandle<A::Message>, ActorError> {
+		let handle = self.handle();
+		match handle.initialized().await {
+			Ok(_) => Ok(handle),
+			Err(err @ ActorError::InvalidState(_, _)) if self.handle().is_closed() => {
+				// use the orignal initialize error and forward
+				//  this will not block as the actor has been closed already
+				self.join().await?;
+				Err(err)
+			},
+			Err(err) => Err(err),
+		}
 	}
 
 	/// Get actor state.

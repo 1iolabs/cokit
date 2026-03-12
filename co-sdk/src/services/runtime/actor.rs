@@ -4,6 +4,8 @@
 // retention—approved secure tools may process solely for internal use.
 
 use cid::Cid;
+#[cfg(not(feature = "js"))]
+use co_actor::TaskSpawner;
 use co_actor::{ActorError, ActorHandle, Response};
 #[cfg(feature = "js")]
 use co_actor::{JsLocalTaskSpawner, LocalActor};
@@ -44,7 +46,7 @@ impl RuntimeHandle {
 		guard_cid: &Cid,
 		guard: &GuardReference,
 		context: RuntimeContext,
-	) -> Result<bool, ExecuteError> {
+	) -> Result<(RuntimeContext, bool), ExecuteError> {
 		self.handle
 			.request(|response| {
 				RuntimeMessage::ExecuteGuard(
@@ -65,7 +67,7 @@ impl RuntimeHandle {
 #[derive(Debug)]
 pub enum RuntimeMessage {
 	ExecuteState(ExecuteStateAction, Response<Result<RuntimeContext, ExecuteError>>),
-	ExecuteGuard(ExecuteGuardAction, Response<Result<bool, ExecuteError>>),
+	ExecuteGuard(ExecuteGuardAction, Response<Result<(RuntimeContext, bool), ExecuteError>>),
 }
 
 #[derive(Debug, Clone)]
@@ -88,12 +90,12 @@ pub struct ExecuteGuardAction {
 pub struct RuntimeActor {}
 impl RuntimeActor {
 	#[cfg(not(feature = "js"))]
-	pub fn spawn(application: impl Into<String>, tasks: co_actor::TaskSpawner) -> Result<RuntimeHandle, anyhow::Error> {
+	pub fn spawn(application: impl Into<String>, tasks: TaskSpawner) -> Result<RuntimeHandle, anyhow::Error> {
 		let runtime_service = co_actor::Actor::spawn_with(
-			tasks,
+			tasks.clone(),
 			tags!("type": "runtime", "application": application.into()),
 			RuntimeActor::default(),
-			(),
+			tasks,
 		)?;
 		Ok(RuntimeHandle { handle: runtime_service.handle() })
 	}
@@ -156,16 +158,16 @@ impl LocalActor for RuntimeActor {
 #[async_trait::async_trait]
 impl co_actor::Actor for RuntimeActor {
 	type Message = RuntimeMessage;
-	type State = RuntimePool;
-	type Initialize = ();
+	type State = (TaskSpawner, RuntimePool);
+	type Initialize = TaskSpawner;
 
 	async fn initialize(
 		&self,
 		_handle: &ActorHandle<Self::Message>,
 		_tags: &Tags,
-		_initialize: Self::Initialize,
+		tasks: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
-		Ok(RuntimePool::default())
+		Ok((tasks.clone(), RuntimePool::new(tasks, Default::default())))
 	}
 
 	async fn handle(
@@ -176,16 +178,16 @@ impl co_actor::Actor for RuntimeActor {
 	) -> Result<(), ActorError> {
 		match message {
 			RuntimeMessage::ExecuteState(action, response) => {
-				let state = state.clone();
-				response.spawn(move || async move {
+				let (spawner, state) = state.clone();
+				response.spawn_with(spawner.clone(), move || async move {
 					state
 						.execute_state(&action.storage, &action.core_cid, &action.core, action.context)
 						.await
 				});
 			},
 			RuntimeMessage::ExecuteGuard(action, response) => {
-				let state = state.clone();
-				response.spawn(move || async move {
+				let (spawner, state) = state.clone();
+				response.spawn_with(spawner.clone(), move || async move {
 					state
 						.execute_guard(&action.storage, &action.guard_cid, &action.guard, action.context)
 						.await

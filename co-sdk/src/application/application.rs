@@ -7,9 +7,14 @@
 use super::tracing::TracingBuilder;
 use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
 use crate::{
-	library::wait_response::request_response, services::application::ApplicationMessage, types::co_date::co_date_env,
-	Action, CoReducer, CoReducerFactory, CoStorage, CoStorageSetting, CoUuid, Cores, DynamicCoUuid, Guards,
-	RandomCoUuid, Storage,
+	library::{
+		contact_handler::{ContactHandler, DynamicContactHandler},
+		wait_response::request_response,
+	},
+	services::application::ApplicationMessage,
+	types::co_date::co_date_env,
+	Action, CoAccessPolicy, CoReducer, CoReducerFactory, CoStorage, CoStorageSetting, CoUuid, Cores,
+	DynamicCoAccessPolicy, DynamicCoUuid, DynamicLocalSecret, Guards, LocalSecret, RandomCoUuid, Storage,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -96,7 +101,7 @@ impl Application {
 		self.joiner().await;
 	}
 
-	/// Created a futures that resolved when all pending tasks are done.
+	/// Created a futures that resolves when all pending tasks are done.
 	pub fn joiner(&self) -> BoxFuture<'static, ()> {
 		// wait
 		#[cfg(not(feature = "js"))]
@@ -146,7 +151,7 @@ impl Application {
 		self.co_context.private_identity_resolver().await
 	}
 
-	/// Get unsiged local device identity.
+	/// Get unsigned local device identity.
 	pub fn local_identity(&self) -> LocalIdentity {
 		self.co_context.local_identity()
 	}
@@ -348,9 +353,12 @@ pub struct ApplicationBuilder {
 	settings: Tags,
 	date: Option<DynamicCoDate>,
 	uuid: Option<DynamicCoUuid>,
+	local_secret: Option<DynamicLocalSecret>,
 	static_blocks: Vec<StaticBlockStorage<'static>>,
 	cores: Cores,
 	guards: Guards,
+	access_policy: Option<DynamicCoAccessPolicy>,
+	contact_handler: Option<DynamicContactHandler>,
 }
 impl ApplicationBuilder {
 	#[cfg(feature = "fs")]
@@ -379,9 +387,12 @@ impl ApplicationBuilder {
 			settings: Default::default(),
 			date: None,
 			uuid: None,
+			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
+			access_policy: None,
+			contact_handler: None,
 		}
 	}
 
@@ -398,9 +409,12 @@ impl ApplicationBuilder {
 			settings: Default::default(),
 			date: None,
 			uuid: None,
+			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
+			access_policy: None,
+			contact_handler: None,
 		}
 	}
 
@@ -421,9 +435,12 @@ impl ApplicationBuilder {
 			settings: Default::default(),
 			date: None,
 			uuid: None,
+			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
+			access_policy: None,
+			contact_handler: None,
 		}
 	}
 
@@ -440,9 +457,12 @@ impl ApplicationBuilder {
 			settings: Default::default(),
 			date: None,
 			uuid: None,
+			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
+			access_policy: None,
+			contact_handler: None,
 		}
 	}
 
@@ -484,6 +504,10 @@ impl ApplicationBuilder {
 		Self { uuid: Some(DynamicCoUuid::new(uuid)), ..self }
 	}
 
+	pub fn with_local_secret(self, secret: impl LocalSecret + 'static) -> Self {
+		Self { local_secret: Some(DynamicLocalSecret::new(secret)), ..self }
+	}
+
 	pub fn with_core(mut self, core_cid: Cid, core: Core) -> Self {
 		self.cores = self.cores.with_override(core_cid, core);
 		self
@@ -492,6 +516,24 @@ impl ApplicationBuilder {
 	pub fn with_guard(mut self, guard_cid: Cid, guard: GuardReference) -> Self {
 		self.guards = self.guards.with_override(guard_cid, guard);
 		self
+	}
+
+	pub fn with_cores(mut self, cores: Cores) -> Self {
+		self.cores = cores;
+		self
+	}
+
+	pub fn with_guards(mut self, guards: Guards) -> Self {
+		self.guards = guards;
+		self
+	}
+
+	pub fn with_access_policy(self, policy: impl CoAccessPolicy + 'static) -> Self {
+		Self { access_policy: Some(DynamicCoAccessPolicy::new(policy)), ..self }
+	}
+
+	pub fn with_contact_handler(self, handler: impl ContactHandler + 'static) -> Self {
+		Self { contact_handler: Some(DynamicContactHandler::new(handler)), ..self }
 	}
 
 	pub fn with_static_blocks(mut self, storage: StaticBlockStorage<'static>) -> Self {
@@ -553,8 +595,6 @@ impl ApplicationBuilder {
 			#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
 			CoStorageSetting::IndexedDb => (Storage::new_indexeddb().await?, None),
 		};
-		#[cfg(not(feature = "fs"))]
-		let mut storage = Storage::new_memory();
 		if !self.static_blocks.is_empty() {
 			storage = storage.with_static(self.static_blocks);
 		}
@@ -573,7 +613,17 @@ impl ApplicationBuilder {
 		let service = Actor::spawn(
 			tags!("type": "application", "application": settings.identifier.clone()),
 			crate::services::application::Application::new(settings.clone()),
-			(storage, tasks.clone(), date, uuid, self.cores, self.guards),
+			(
+				storage,
+				tasks.clone(),
+				date,
+				uuid,
+				self.cores,
+				self.guards,
+				self.local_secret,
+				self.access_policy,
+				self.contact_handler,
+			),
 		)?;
 
 		// wait for context

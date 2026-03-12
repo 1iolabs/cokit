@@ -1,3 +1,3 @@
 # CO Network
 ## Abstract
-Networking releated primitves and peer-to-peer implementation using libp2p.
+Networking related primitives and peer-to-peer implementation using libp2p.

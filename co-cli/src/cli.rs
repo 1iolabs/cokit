@@ -21,7 +21,7 @@ pub struct Cli {
 	pub command: CliCommand,
 
 	/// The instance ID of the daemon. Must be uniqure for every instance that runs in parallel.
-	#[arg(long, default_value_t = String::from(APP_IDENTIFIER))]
+	#[arg(long, default_value_t = String::from(APP_IDENTIFIER), env = "CO_INSTANCE_ID")]
 	pub instance_id: String,
 
 	/// Base path.
@@ -32,7 +32,7 @@ pub struct Cli {
 	/// - log_path: <base_path>/log
 	///
 	/// Default: `~/Application Support/co.app.1io.co`
-	#[arg(long)]
+	#[arg(long, env = "CO_BASE_PATH")]
 	pub base_path: Option<PathBuf>,
 
 	/// Log path.
@@ -44,13 +44,13 @@ pub struct Cli {
 	pub no_log: bool,
 
 	/// Only log level and above.
-	#[arg(long, value_enum, default_value_t)]
+	#[arg(long, value_enum, default_value_t, env = "CO_LOG_LEVEL")]
 	pub log_level: CliLogLevel,
 
 	/// Read/Write Local CO encryption key to file instead of the OS keychain.
 	///
 	/// Warning: This option is INSECURE only use when you know the implications.
-	#[arg(long)]
+	#[arg(long, default_value_t = false, env = "CO_NO_KEYCHAIN", value_parser = parse_bool)]
 	pub no_keychain: bool,
 
 	/// No output.
@@ -161,4 +161,12 @@ pub async fn command(cli: &Cli) -> Result<ExitCode, anyhow::Error> {
 
 	// result
 	result
+}
+
+fn parse_bool(s: &str) -> Result<bool, String> {
+	match s {
+		"1" | "true" => Ok(true),
+		"0" | "false" => Ok(false),
+		_ => Err(format!("invalid bool: {s}")),
+	}
 }

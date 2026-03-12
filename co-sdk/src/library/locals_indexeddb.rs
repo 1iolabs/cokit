@@ -49,6 +49,7 @@ impl IndexedDbLocals {
 }
 #[async_trait]
 impl Locals for IndexedDbLocals {
+	#[tracing::instrument(level = tracing::Level::TRACE, name = "indexeddb-locals-get", err(Debug), ret)]
 	async fn get(&self) -> Result<Vec<ApplicationLocal>, anyhow::Error> {
 		self.handle
 			.request(|response| IdbLocalsMessage::Get(response))
@@ -56,6 +57,7 @@ impl Locals for IndexedDbLocals {
 			.map_err(|e| anyhow!("IndexedDB actor error: {:?}", e))?
 	}
 
+	#[tracing::instrument(level = tracing::Level::TRACE, name = "indexeddb-locals-set", err(Debug))]
 	async fn set(&mut self, local: ApplicationLocal) -> Result<(), anyhow::Error> {
 		self.handle
 			.request(|response| IdbLocalsMessage::Set(local, response))
@@ -176,7 +178,7 @@ impl LocalActor for IdbLocalsActor {
 
 	async fn initialize(
 		&self,
-		handle: &ActorHandle<Self::Message>,
+		_handle: &ActorHandle<Self::Message>,
 		_tags: &co_primitives::Tags,
 		db_name: Self::Initialize,
 	) -> Result<Self::State, ActorError> {

@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{Action, CoContext};
-use co_actor::Actions;
+use co_actor::{time, Actions};
 use co_identity::PeerDidCommHeader;
 use co_network::{
 	connections::{ConnectionAction, PeerRelateDidAction},
@@ -12,7 +12,7 @@ use co_network::{
 };
 use co_primitives::CoTryStreamExt;
 use futures::{FutureExt, Stream};
-use std::{str::FromStr, time::Instant};
+use std::str::FromStr;
 
 /// When receive a DidComm message with an verified peer header relate it with the Did for future connections.
 ///
@@ -36,7 +36,7 @@ pub fn didcomm_connected(
 							network.dispatch(ConnectionAction::PeerRelateDid(PeerRelateDidAction {
 								did: from.to_owned(),
 								peer_id: PeerId::from_str(peer)?,
-								time: Instant::now(),
+								time: time::Instant::now(),
 							}))?;
 						}
 					}

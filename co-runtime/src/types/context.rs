@@ -29,12 +29,18 @@ impl RuntimeContext {
 	}
 
 	pub fn new_payload<T: Serialize>(payload: &T) -> Result<Self, anyhow::Error> {
-		Ok(Self {
+		Self {
 			state: Default::default(),
 			event: Default::default(),
-			payload: to_cbor(payload)?,
+			payload: Default::default(),
 			diagnostics: Default::default(),
-		})
+		}
+		.with_payload(payload)
+	}
+
+	pub fn with_payload<T: Serialize>(mut self, payload: &T) -> Result<Self, anyhow::Error> {
+		self.payload = to_cbor(payload)?;
+		Ok(self)
 	}
 
 	/// Resolve diagnostics to messages.

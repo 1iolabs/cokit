@@ -29,10 +29,16 @@ pub struct Command {
 	pub listen: Multiaddr,
 
 	/// Bootstap addresses.
+	///
+	/// # Examples
+	/// - `/dns4/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWEinh2zCgGbJaDfepoiiPiBgFcysSMYSc1EQrgEEZi9aX`
 	#[arg(long, value_name = "MULTIADDR", value_parser = parse_bootstrap, default_values_t = default_bootstrap(), conflicts_with = "no_bootstrap")]
 	pub bootstrap: Vec<Multiaddr>,
 
 	/// External address.
+	///
+	/// # Examples
+	/// - `/dns4/bootstrap.1io.com/upd/5000`
 	#[arg(long, value_name = "MULTIADDR")]
 	pub external_address: Vec<Multiaddr>,
 
@@ -55,15 +61,15 @@ pub struct Command {
 	pub no_nat: bool,
 }
 
-fn default_bootstrap() -> Vec<Multiaddr> {
+pub fn default_bootstrap() -> Vec<Multiaddr> {
 	NetworkSettings::default().bootstrap.into_iter().collect()
 }
 
-fn default_listen() -> Multiaddr {
+pub fn default_listen() -> Multiaddr {
 	NetworkSettings::default().listen
 }
 
-fn parse_bootstrap(str: &str) -> Result<Multiaddr, anyhow::Error> {
+pub fn parse_bootstrap(str: &str) -> Result<Multiaddr, anyhow::Error> {
 	let addr: Multiaddr = str.parse()?;
 	NetworkSettings::default().with_bootstrap(addr.clone()).build()?;
 	Ok(addr)

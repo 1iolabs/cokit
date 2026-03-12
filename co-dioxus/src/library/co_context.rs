@@ -5,8 +5,10 @@
 
 use crate::CoSettings;
 use anyhow::Result;
-use co_sdk::{Application, ApplicationBuilder};
+use co_primitives::Network;
+use co_sdk::{state, Application, ApplicationBuilder, CoId, Did, IdentityResolver};
 use futures::{future::BoxFuture, Future};
+use std::collections::{BTreeMap, BTreeSet};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 #[cfg(feature = "js")]
 use tokio_with_wasm::alias as tokio;
@@ -17,22 +19,52 @@ pub struct CoContext {
 }
 impl CoContext {
 	pub fn new(settings: CoSettings) -> Self {
-		// log
-		//  note: we initialize the logging synchonously before dioxus registers the default
-		#[cfg(feature = "tracing")]
-		if !settings.no_log {
-			let base_path = match settings.storage.clone() {
-				#[cfg(feature = "fs")]
-				CoStorageSetting::Path(path) => Some(path),
-				#[cfg(feature = "fs")]
-				CoStorageSetting::PathDefault => Some(ApplicationBuilder::default_path()),
-				_ => None,
-			};
-			co_sdk::TracingBuilder::new(settings.identifier.clone(), base_path)
-				.with_bunyan_logging(None)
-				.with_max_level(settings.log_level.into())
-				.init()
-				.expect("tracing init");
+		match settings.log.clone().with_resolved_default() {
+			#[cfg(feature = "web")]
+			crate::CoLog::Console => {
+				dioxus::logger::init(settings.log_level.into()).expect("logger");
+			},
+			#[cfg(feature = "tracing")]
+			crate::CoLog::Print => {
+				co_sdk::TracingBuilder::new(settings.identifier.clone(), None)
+					.with_stderr_logging()
+					.with_max_level(settings.log_level.into())
+					.init()
+					.expect("tracing init");
+			},
+			#[cfg(all(feature = "fs", feature = "tracing"))]
+			crate::CoLog::File(path) => {
+				#[cfg(feature = "tracing")]
+				{
+					let base_path = match settings.storage.clone() {
+						#[cfg(feature = "fs")]
+						co_sdk::CoStorageSetting::Path(path) => Some(path),
+						#[cfg(feature = "fs")]
+						co_sdk::CoStorageSetting::PathDefault => Some(ApplicationBuilder::default_path()),
+						_ => None,
+					};
+					co_sdk::TracingBuilder::new(settings.identifier.clone(), base_path)
+						.with_bunyan_logging(path)
+						.with_max_level(settings.log_level.into())
+						.init()
+						.expect("tracing init");
+				}
+			},
+			#[cfg(feature = "tracing-oslog")]
+			crate::CoLog::Os => {
+				use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+				tracing_subscriber::registry()
+					.with(
+						tracing_subscriber::filter::EnvFilter::builder()
+							.with_default_directive(
+								tracing_subscriber::filter::LevelFilter::from_level(settings.log_level.into()).into(),
+							)
+							.from_env_lossy(),
+					)
+					.with(tracing_oslog::OsLogger::new(&settings.bundle_identifier, "default"))
+					.init();
+			},
+			_ => {},
 		}
 
 		// spawn
@@ -144,6 +176,47 @@ impl CoContext {
 			.map_err(|_err| CoContextError::Shutdown)?
 			.map_err(|err| CoContextError::Execute(err))
 	}
+
+	/// Join a unrelated CO.
+	///
+	/// This only initiates a join.
+	/// When completed the membership state of the CO will change to active.
+	pub async fn join_unrelated_co(
+		&self,
+		from: state::Identity,
+		to: Did,
+		to_co: CoId,
+		to_networks: BTreeSet<Network>,
+	) -> Result<(), anyhow::Error> {
+		Ok(self
+			.try_with_application(move |application| async move {
+				let to_identity = application.identity_resolver().await?.resolve(&to).await?;
+				let from_identity = application.private_identity(&from.did).await?;
+				co_sdk::join_unrelated_co(application.context(), &from_identity, &to_identity, to_co, to_networks)
+					.await?;
+				Result::<(), anyhow::Error>::Ok(())
+			})
+			.await?)
+	}
+
+	/// Send a contact request.
+	pub async fn contact(
+		&self,
+		from: state::Identity,
+		to: Did,
+		to_subject: Option<String>,
+		to_headers: BTreeMap<String, String>,
+		to_networks: BTreeSet<Network>,
+	) -> Result<(), anyhow::Error> {
+		Ok(self
+			.try_with_application(move |application| async move {
+				application
+					.context()
+					.contact(from.did, to, to_subject, to_headers, to_networks)
+					.await
+			})
+			.await?)
+	}
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -160,7 +233,9 @@ type Task = Box<TaskFn>;
 // type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
 
 async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Result<(), anyhow::Error> {
-	let mut application_builder = ApplicationBuilder::new_with_storage(settings.identifier, settings.storage);
+	let mut application_builder = ApplicationBuilder::new_with_storage(settings.identifier, settings.storage)
+		.with_cores(settings.cores)
+		.with_guards(settings.guards);
 	if settings.no_keychain {
 		application_builder = application_builder.without_keychain();
 	}
@@ -169,6 +244,15 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 	}
 	for feature in &settings.feature {
 		application_builder = application_builder.with_setting("feature", feature.to_owned());
+	}
+	if let Some(local_secret) = settings.local_secret {
+		application_builder = application_builder.with_local_secret(local_secret);
+	}
+	if let Some(access_policy) = settings.access_policy {
+		application_builder = application_builder.with_access_policy(access_policy);
+	}
+	if let Some(contact_handler) = settings.contact_handler {
+		application_builder = application_builder.with_contact_handler(contact_handler);
 	}
 	#[allow(unused_mut)]
 	let mut application = application_builder.build().await?;

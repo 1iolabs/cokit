@@ -16,6 +16,7 @@ mod state;
 mod task_handle;
 mod task_options;
 mod task_spawner_local;
+pub mod time;
 #[cfg(feature = "native")]
 mod tokio_task_spawner;
 

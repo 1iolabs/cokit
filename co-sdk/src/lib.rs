@@ -31,8 +31,8 @@ pub use application::{
 pub use co_actor::TaskSpawner;
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 pub use co_identity::{
-	DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver, IdentityResolverError,
-	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
+	DidCommHeader, DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver,
+	IdentityResolverError, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 #[cfg(feature = "network")]
 pub use co_network::NetworkSettings;
@@ -46,19 +46,25 @@ pub use co_primitives::{
 	OptionLink, Path, PathError, PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag,
 	Tags,
 };
-pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
-pub use co_storage::BlockStorageContentMapping;
+pub use co_runtime::{co_v1, Core, ExecuteError, GuardReference, RuntimeContext, RuntimeInstance, RuntimePool};
+pub use co_storage::{BlockStorageContentMapping, MemoryBlockStorage};
 #[cfg(feature = "fs")]
-pub use library::build_core::{build_core, crate_repository_path, BuildCoreArtifact};
+pub use library::build_core::{
+	build_core, build_core_with_options, crate_repository_path, BuildCoreArtifact, BuildCoreOptions,
+};
 #[cfg(feature = "network")]
 pub use library::keystore_fetch::keystore_fetch;
 #[cfg(feature = "network")]
 pub use library::local_keypair_fetch::local_keypair_fetch;
 #[cfg(feature = "network")]
+pub use library::request_co_state::request_co_state;
+#[cfg(feature = "network")]
 pub use library::token::{CoToken, CoTokenParameters};
 #[cfg(feature = "network")]
 pub use library::update_co::update_co;
 pub use library::{
+	co_access_policy::{CoAccessPolicy, DynamicCoAccessPolicy},
+	contact_handler::{ContactHandler, DynamicContactHandler},
 	core_source::CoreSource,
 	did_key_provider::DidKeyProvider,
 	find_co_by_pin::find_co_by_pin,
@@ -68,14 +74,19 @@ pub use library::{
 	generate_random_name::generate_random_name,
 	ipld_resolve_recursive::ipld_resolve_recursive,
 	is_cid_encrypted::is_cid_encrypted,
+	join_unrelated_co::join_unrelated_co,
+	local_secret::{DynamicLocalSecret, LocalSecret, MemoryLocalSecret},
+	local_secret_password::PasswordLocalSecret,
 	memory_dispatch::MemoryDispatch,
 };
 pub use pin::PinAPI;
 pub use reducer::core_resolver::{
 	co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverContext, CoreResolverError,
 };
+#[cfg(feature = "network")]
+pub use services::application::KeyRequestAction;
 pub use services::{
-	application::{Action, ActionError, ApplicationMessage},
+	application::{Action, ActionError, ApplicationMessage, ContactAction},
 	reducer::CoReducer,
 };
 #[cfg(feature = "js")]
@@ -86,7 +97,7 @@ pub use types::{
 	co_dispatch::{CoDispatch, DynamicCoDispatch},
 	co_pinning_key::CoPinningKey,
 	co_reducer_context::CoReducerContext,
-	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError, CoReducerFactoryResultExt},
+	co_reducer_factory::{CoOptions, CoReducerFactory, CoReducerFactoryError, CoReducerFactoryResultExt},
 	co_reducer_state::{CoReducerState, MappedCoReducerState},
 	co_root::CoRoot,
 	co_storage::CoStorage,

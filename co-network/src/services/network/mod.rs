@@ -14,9 +14,11 @@ mod tasks;
 pub use actor::{Network, NetworkInitialize};
 pub use api::NetworkApi;
 pub use message::NetworkMessage;
-pub use settings::NetworkSettings;
+pub use settings::{NetworkDns, NetworkSettings};
 pub use spawner::CoNetworkTaskSpawner;
 pub use subscribe::subscribe_identity;
+#[cfg(feature = "native")]
+pub use tasks::mdns_gossip::MdnsGossipNetworkTask;
 pub use tasks::{
 	connections::ConnectionsNetworkTask,
 	dial::DialNetworkTask,
@@ -26,6 +28,5 @@ pub use tasks::{
 	discovery_connect::DiscoveryConnectNetworkTask,
 	gossip::{ListenGossipTask, PublishGossipTask, SubscribeGossipTask, UnsubscribeGossipTask},
 	listeners::ListnersNetworkTask,
-	mdns_gossip::MdnsGossipNetworkTask,
 	peers::PeersNetworkTask,
 };

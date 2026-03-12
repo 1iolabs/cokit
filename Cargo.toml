@@ -90,6 +90,7 @@ uuid = { version = "1.2.2", features = ["default", "v4"] }
 wasm-bindgen = "0.2.105"
 wasm-bindgen-futures = "0.4.55"
 web-sys = "0.3.82"
+web-time = "1.1"
 zeroize = "1.7.0"
 zstd = "0.13.3"
 
@@ -115,7 +116,7 @@ co-identity = { path = "co-identity" }
 co-log = { path = "co-log" }
 co-macros = { path = "co-macros" }
 co-messaging = { path = "co-messaging" }
-co-network = { path = "co-network" }
+co-network = { path = "co-network", default-features = false }
 co-primitives = { path = "co-primitives" }
 co-runtime = { path = "co-runtime" }
 co-sdk = { path = "co-sdk", default-features = false }

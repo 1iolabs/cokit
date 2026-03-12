@@ -12,7 +12,7 @@ use crate::{
 	Action, CoContext, CoReducerFactory, CoToken, CoTokenParameters, CO_ID_LOCAL,
 };
 use cid::Cid;
-use co_actor::{ActionDispatch, Actions};
+use co_actor::{time, ActionDispatch, Actions};
 use co_identity::Identity;
 use co_network::{backoff_with_jitter, NetworkApi, PeerProvider, Token};
 use co_primitives::{BlockSerializer, CoId};
@@ -220,7 +220,7 @@ async fn get_network(
 	concurrent: usize,
 	cid: Cid,
 ) -> Result<(), StorageError> {
-	let deadline = tokio::time::Instant::now() + timeout;
+	let deadline = time::Instant::now() + timeout;
 	let mut retry = 1;
 	loop {
 		// start network task for every peer.
@@ -231,7 +231,8 @@ async fn get_network(
 			.buffer_unordered(concurrent);
 		pin_mut!(get_stream);
 		loop {
-			let result = tokio::time::timeout_at(deadline, get_stream.next()).await;
+			let remaining = deadline.saturating_duration_since(time::Instant::now());
+			let result = time::timeout(remaining, get_stream.next()).await;
 			match result {
 				// no more peers
 				Ok(None) => {
@@ -255,15 +256,15 @@ async fn get_network(
 		}
 
 		// timeout?
-		if tokio::time::Instant::now() > deadline {
+		if time::Instant::now() > deadline {
 			break;
 		}
 
 		// backoff
-		tokio::time::sleep(backoff_with_jitter(retry)).await;
+		time::sleep(backoff_with_jitter(retry)).await;
 
 		// retry
 		retry += 1;
 	}
-	Err(StorageError::NotFound(cid, anyhow::anyhow!("Insufficent peers")))
+	Err(StorageError::NotFound(cid, anyhow::anyhow!("Insufficient peers")))
 }

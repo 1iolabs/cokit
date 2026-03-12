@@ -14,7 +14,7 @@ use crate::{
 	library::{
 		builtin_cores::builtin_cores,
 		core_source::CoreSource,
-		local_secret::{LocalSecret, MemoryLocalSecret},
+		local_secret::{DynamicLocalSecret, LocalSecret, MemoryLocalSecret},
 		locals::{ApplicationLocal, Locals},
 		locals_memory::MemoryLocals,
 	},
@@ -63,16 +63,23 @@ pub struct LocalCoBuilder {
 	/// Whether to initialize the reducer (compute latest state).
 	initialize: bool,
 
+	/// Custom local secret for encryption.
+	local_secret: Option<DynamicLocalSecret>,
+
 	/// Verify Links
 	verify_links: Option<BlockLinks>,
 }
 impl LocalCoBuilder {
 	pub fn new(settings: ApplicationSettings, identity: LocalIdentity, initialize: bool) -> Self {
-		Self { settings, identity, initialize, verify_links: None }
+		Self { settings, identity, initialize, local_secret: None, verify_links: None }
 	}
 
 	pub fn with_initialize(self, initialize: bool) -> Self {
 		Self { initialize, ..self }
+	}
+
+	pub fn with_local_secret(self, local_secret: Option<DynamicLocalSecret>) -> Self {
+		Self { local_secret, ..self }
 	}
 
 	pub fn with_verify_links(self, verify_links: Option<BlockLinks>) -> Self {
@@ -80,13 +87,19 @@ impl LocalCoBuilder {
 	}
 
 	/// Create LocalCO instance.
-	pub async fn build<R>(self, context: LocalCoContext<R>, cores: &Cores) -> Result<CoReducer, anyhow::Error>
+	pub async fn build<R>(mut self, context: LocalCoContext<R>, cores: &Cores) -> Result<CoReducer, anyhow::Error>
 	where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
 	{
 		// key
-		let key: Option<Box<dyn LocalSecret + Send + Sync + 'static>> =
-			if self.settings.feature_co_local_encryption() { Some(self.build_local_secret()) } else { None };
+		let key: Option<DynamicLocalSecret> = if self.settings.feature_co_local_encryption() {
+			match self.local_secret.take() {
+				Some(secret) => Some(secret),
+				None => Some(self.build_local_secret()),
+			}
+		} else {
+			None
+		};
 
 		// file
 		#[cfg(feature = "fs")]
@@ -113,21 +126,27 @@ impl LocalCoBuilder {
 		Ok(LocalCoInstance::create(context, cores, self, locals, key, false).await?.1)
 	}
 
-	fn build_local_secret(&self) -> Box<dyn LocalSecret + Send + Sync> {
+	/// Build default implementation for local secret.
+	fn build_local_secret(&self) -> DynamicLocalSecret {
 		// keychain
 		#[cfg(feature = "keychain")]
 		if self.settings.keychain {
-			return Box::new(KeychainLocalSecret::new("co.app".to_owned(), self.identity.identity().to_owned()));
+			return DynamicLocalSecret::new(KeychainLocalSecret::new(
+				"co.app".to_owned(),
+				self.identity.identity().to_owned(),
+			));
 		}
 
 		// fs
 		#[cfg(feature = "fs")]
 		if let Some(application_path) = &self.settings.application_path {
-			return Box::new(FileLocalSecret::new(application_path.parent().expect("etc folder").join("key.cbor")));
+			return DynamicLocalSecret::new(FileLocalSecret::new(
+				application_path.parent().expect("etc folder").join("key.cbor"),
+			));
 		}
 
 		// memory
-		Box::new(MemoryLocalSecret::new())
+		DynamicLocalSecret::new(MemoryLocalSecret::generate())
 	}
 }
 
@@ -162,6 +181,7 @@ where
 	/// dropped when a watcher is active.
 	///
 	/// NOTE: This assumes the same encryption key is used by all local applications.
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all)]
 	async fn create<R>(
 		LocalCoContext {
 			storage,
@@ -177,7 +197,7 @@ where
 		cores: &Cores,
 		local_co: LocalCoBuilder,
 		locals: L,
-		key: Option<Box<dyn LocalSecret + Send + Sync + 'static>>,
+		key: Option<DynamicLocalSecret>,
 		watcher: bool,
 	) -> Result<(Self, CoReducer), anyhow::Error>
 	where
@@ -514,12 +534,15 @@ where
 /// Todo: What happens if muliple applications try to access the same key?
 async fn create_encrypted_storage<S>(
 	storage: S,
-	key: Box<dyn LocalSecret + Send + Sync + 'static>,
+	key: DynamicLocalSecret,
 	disallow_plain: bool,
 ) -> Result<EncryptedBlockStorage<S>, anyhow::Error>
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
+	// fetch key
+	let (algorithm, secret) = key.fetch().await?;
+
 	// we have plain references:
 	// - buildin core references
 	//   - third party cores are expected to be encrypted
@@ -530,7 +553,7 @@ where
 	} else {
 		EncryptionReferenceMode::Warning
 	};
-	Ok(EncryptedBlockStorage::new(storage.clone(), key.fetch().await?.into(), Default::default(), Default::default())
+	Ok(EncryptedBlockStorage::new(storage.clone(), secret.into(), algorithm, Default::default())
 		.with_encryption_reference_mode(reference_mode))
 }
 

@@ -14,6 +14,8 @@ use libp2p::{swarm::SwarmEvent, Swarm};
 use std::collections::BTreeSet;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::wrappers::UnboundedReceiverStream;
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 /// Connect peers using discovery.
 #[derive(Debug)]

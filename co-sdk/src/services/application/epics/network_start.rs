@@ -25,7 +25,9 @@ pub fn network_start(
 			let settings = settings.clone();
 			Some(
 				async move {
-					Ok(Action::NetworkStartComplete(start(context, settings).await.map_err(ActionError::from)))
+					Ok(Action::NetworkStartComplete(
+						network_service(context, settings).await.map_err(ActionError::from),
+					))
 				}
 				.into_stream(),
 			)
@@ -34,7 +36,8 @@ pub fn network_start(
 	}
 }
 
-async fn start(context: CoContext, settings: NetworkSettings) -> Result<(), anyhow::Error> {
+#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all)]
+async fn network_service(context: CoContext, settings: NetworkSettings) -> Result<(), anyhow::Error> {
 	// resolve key
 	let local_identity = context.local_identity();
 	let local_co = context.local_co_reducer().await?;
@@ -69,10 +72,10 @@ async fn start(context: CoContext, settings: NetworkSettings) -> Result<(), anyh
 	)?;
 
 	// initialize
-	network.handle().initialized().await?;
+	let network_handle = network.initialized().await?;
 
 	// set network to reducers
-	let network = network.handle().request(NetworkMessage::Network).await?;
+	let network = network_handle.request(NetworkMessage::Network).await?;
 	context.inner.set_network(Some(network)).await?;
 
 	// done

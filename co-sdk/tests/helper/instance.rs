@@ -5,7 +5,7 @@
 
 use co_network::NetworkApi;
 use co_sdk::{
-	Application, ApplicationBuilder, DidKeyIdentity, DidKeyProvider, NetworkSettings, TracingBuilder,
+	Application, ApplicationBuilder, DidKeyIdentity, DidKeyProvider, Identity, NetworkSettings, TracingBuilder,
 	CO_CORE_NAME_KEYSTORE,
 };
 use co_test::test_log_path;
@@ -118,6 +118,11 @@ impl Instance {
 		let co = self.application.local_co_reducer().await.unwrap();
 		let provider = DidKeyProvider::new(co, CO_CORE_NAME_KEYSTORE);
 		provider.store(&identity, None).await.unwrap();
+		tracing::trace!(
+			did = identity.identity(),
+			application = self.application.settings().identifier,
+			"create-identity"
+		);
 		identity
 	}
 }

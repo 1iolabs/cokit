@@ -4,11 +4,12 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::NetworkError;
+use co_actor::time::Instant;
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	Swarm,
 };
-use std::{fmt::Debug, time::Instant};
+use std::fmt::Debug;
 
 pub trait NetworkTask<B, C>: Debug
 where

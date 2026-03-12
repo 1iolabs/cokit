@@ -10,6 +10,7 @@ use crate::{
 	RuntimeContext, RuntimeInstance,
 };
 use cid::Cid;
+use co_actor::TaskSpawner;
 use co_primitives::AnyBlockStorage;
 use co_storage::{BlockStorage, StorageError};
 use std::{
@@ -55,11 +56,12 @@ impl Default for IdleRuntimePool {
 pub struct RuntimePool {
 	#[cfg_attr(feature = "js", allow(clippy::arc_with_non_send_sync))]
 	pool: Arc<Mutex<IdleRuntimePool>>,
+	spawner: TaskSpawner,
 }
 impl RuntimePool {
-	pub fn new(pool: IdleRuntimePool) -> Self {
+	pub fn new(spawner: TaskSpawner, pool: IdleRuntimePool) -> Self {
 		#[cfg_attr(feature = "js", allow(clippy::arc_with_non_send_sync))]
-		Self { pool: Arc::new(Mutex::new(pool)) }
+		Self { pool: Arc::new(Mutex::new(pool)), spawner }
 	}
 
 	fn get_runtime_instance(&self, core: &Cid) -> Option<RuntimeInstance> {
@@ -70,6 +72,7 @@ impl RuntimePool {
 		self.pool.lock().unwrap().insert(runtime_instance);
 	}
 
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, storage), ret)]
 	pub async fn execute_state<S>(
 		&self,
 		storage: &S,
@@ -96,10 +99,11 @@ impl RuntimePool {
 				};
 
 				// execute
-				let (result, instance) = execute_with_api(storage, context, checked, instance, |instance, api| {
-					Ok(instance.runtime_mut().execute_state(api)?)
-				})
-				.await?;
+				let (result, instance) =
+					execute_with_api(self.spawner.clone(), storage, context, checked, instance, |instance, api| {
+						Ok(instance.runtime_mut().execute_state(api)?)
+					})
+					.await?;
 
 				// pool instance
 				self.reuse_runtime_instance(instance);
@@ -116,10 +120,11 @@ impl RuntimePool {
 				};
 
 				// execute
-				let (result, instance) = execute_with_api(storage, context, checked, instance, |instance, api| {
-					Ok(instance.runtime_mut().execute_state(api)?)
-				})
-				.await?;
+				let (result, instance) =
+					execute_with_api(self.spawner.clone(), storage, context, checked, instance, |instance, api| {
+						Ok(instance.runtime_mut().execute_state(api)?)
+					})
+					.await?;
 
 				// pool instance
 				self.reuse_runtime_instance(instance);
@@ -130,12 +135,13 @@ impl RuntimePool {
 			Core::Native(f) => {
 				// execute
 				let execute = f.clone();
-				let (result, _) = execute_with_api(storage, context, checked, (), move |_, api| {
-					let mut context = ApiContext::new(api);
-					execute(&mut context);
-					Ok(context.context().clone())
-				})
-				.await?;
+				let (result, _) =
+					execute_with_api(self.spawner.clone(), storage, context, checked, (), move |_, api| {
+						let mut context = ApiContext::new(api);
+						execute(&mut context);
+						Ok(context.context().clone())
+					})
+					.await?;
 
 				// result
 				result
@@ -147,7 +153,9 @@ impl RuntimePool {
 				// execute
 				let execute = f.clone();
 				#[cfg(not(feature = "js"))]
-				let result = tokio::task::spawn_blocking(move || execute.execute_blocking(api).context())
+				let result = self
+					.spawner
+					.spawn_blocking(Default::default(), move || execute.execute_blocking(api).context())
 					.await
 					.map_err(|e| ExecuteError::Other(e.into()))?;
 				#[cfg(feature = "js")]
@@ -162,13 +170,14 @@ impl RuntimePool {
 		Ok(result)
 	}
 
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, storage), ret)]
 	pub async fn execute_guard<S>(
 		&self,
 		storage: &S,
 		guard_cid: &Cid,
 		guard: &GuardReference,
 		context: RuntimeContext,
-	) -> Result<bool, ExecuteError>
+	) -> Result<(RuntimeContext, bool), ExecuteError>
 	where
 		S: BlockStorage + Send + Sync + Clone + 'static,
 	{
@@ -188,10 +197,11 @@ impl RuntimePool {
 				};
 
 				// execute
-				let (result, instance) = execute_with_api(storage, context, checked, instance, |instance, api| {
-					Ok(instance.runtime_mut().execute_guard(api)?)
-				})
-				.await?;
+				let (result, instance) =
+					execute_with_api(self.spawner.clone(), storage, context, checked, instance, |instance, api| {
+						Ok(instance.runtime_mut().execute_guard(api)?)
+					})
+					.await?;
 
 				// pool instance
 				self.reuse_runtime_instance(instance);
@@ -208,9 +218,14 @@ impl RuntimePool {
 				};
 
 				// execute
-				let (result, instance) = execute_with_api(storage, context, checked, instance, move |instance, api| {
-					Ok(instance.runtime_mut().execute_guard(api)?)
-				})
+				let (result, instance) = execute_with_api(
+					self.spawner.clone(),
+					storage,
+					context,
+					checked,
+					instance,
+					move |instance, api| Ok(instance.runtime_mut().execute_guard(api)?),
+				)
 				.await?;
 
 				// pool instance
@@ -226,14 +241,16 @@ impl RuntimePool {
 				// execute
 				let guard = f.clone();
 				#[cfg(not(feature = "js"))]
-				let result = tokio::task::spawn_blocking(move || guard.execute_blocking(api))
+				let (api, result) = self
+					.spawner
+					.spawn_blocking(Default::default(), move || guard.execute_blocking(api))
 					.await
 					.map_err(|e| ExecuteError::Other(e.into()))?;
 				#[cfg(feature = "js")]
-				let result = guard.execute_async(api).await;
+				let (api, result) = guard.execute_async(api).await;
 
 				// result
-				result
+				(api.context(), result)
 			},
 		};
 
@@ -243,12 +260,13 @@ impl RuntimePool {
 }
 impl Default for RuntimePool {
 	fn default() -> Self {
-		Self::new(Default::default())
+		Self::new(Default::default(), Default::default())
 	}
 }
 
 #[cfg(not(feature = "js"))]
 async fn execute_with_api<T: Send + 'static, I: Send + 'static>(
+	spawner: TaskSpawner,
 	storage: &impl AnyBlockStorage,
 	context: RuntimeContext,
 	checked: bool,
@@ -259,7 +277,8 @@ async fn execute_with_api<T: Send + 'static, I: Send + 'static>(
 	let api = create_cov1_api(storage, context, checked);
 
 	// execute
-	let (result, instance) = tokio::task::spawn_blocking(move || (execute(&mut instance, api), instance))
+	let (result, instance) = spawner
+		.spawn_blocking(Default::default(), move || (execute(&mut instance, api), instance))
 		.await
 		.map_err(|e| ExecuteError::Other(e.into()))?;
 
@@ -269,6 +288,7 @@ async fn execute_with_api<T: Send + 'static, I: Send + 'static>(
 
 #[cfg(feature = "js")]
 async fn execute_with_api<T: 'static, I: 'static>(
+	_spawner: TaskSpawner,
 	storage: &impl AnyBlockStorage,
 	context: RuntimeContext,
 	checked: bool,

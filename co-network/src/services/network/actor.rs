@@ -12,7 +12,7 @@ use crate::{
 		heads::{HeadsActor, HeadsApi, HeadsContext},
 		network::{
 			tasks::{identify_dial::IdentifyDialNetworkTask, relay_listen::RelayListenTask},
-			CoNetworkTaskSpawner, ConnectionsNetworkTask, MdnsGossipNetworkTask, NetworkApi, NetworkSettings,
+			CoNetworkTaskSpawner, ConnectionsNetworkTask, NetworkApi, NetworkSettings,
 		},
 	},
 	types::network_task::NetworkTaskSpawner,
@@ -61,7 +61,8 @@ impl Actor for Network {
 			initialize.identity_resolver.clone(),
 			initialize.private_identity_resolver.clone(),
 			initialize.bitswap,
-		)?;
+		)
+		.await?;
 
 		// spawner
 		let spawner = CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id };
@@ -72,8 +73,9 @@ impl Actor for Network {
 			.map_err(|err| ActorError::Actor(err.into()))?;
 
 		// use mdns discoverd peers for gossip discovery
+		#[cfg(feature = "native")]
 		spawner
-			.spawn(MdnsGossipNetworkTask::new())
+			.spawn(super::MdnsGossipNetworkTask::new())
 			.map_err(|err| ActorError::Actor(err.into()))?;
 
 		// connections
