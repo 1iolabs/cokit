@@ -251,7 +251,7 @@ dependencies = [
  "memchr",
  "proc-macro2",
  "quote",
- "rustc-hash",
+ "rustc-hash 2.1.1",
  "serde",
  "serde_derive",
  "syn 2.0.117",
@@ -739,6 +739,26 @@ checksum = "230c5f1ca6a325a32553f8640d31ac9b49f2411e901e427570154868b46da4f7"
 
 [[package]]
 name = "bindgen"
+version = "0.70.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f49d8fed880d473ea71efb9bf597651e77201bdd4893efe54c9e5d65ae04ce6f"
+dependencies = [
+ "bitflags 2.11.0",
+ "cexpr",
+ "clang-sys",
+ "itertools 0.13.0",
+ "log",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash 1.1.0",
+ "shlex",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "bindgen"
 version = "0.72.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "993776b509cfb49c750f11b8f07a46fa23e0a1386ffc01fb1e7d343efc387895"
@@ -752,7 +772,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex",
- "rustc-hash",
+ "rustc-hash 2.1.1",
  "shlex",
  "syn 2.0.117",
 ]
@@ -1418,6 +1438,7 @@ dependencies = [
  "co-primitives",
  "derive_more 0.99.20",
  "futures",
+ "futures-timer",
  "insta",
  "static_assertions",
  "thiserror 1.0.69",
@@ -1427,6 +1448,7 @@ dependencies = [
  "tokio_with_wasm",
  "tracing",
  "wasm-bindgen-futures",
+ "web-time",
 ]
 
 [[package]]
@@ -1797,6 +1819,8 @@ dependencies = [
  "tokio-util",
  "tokio_with_wasm",
  "tracing",
+ "tracing-oslog",
+ "tracing-subscriber",
  "uuid",
  "wasm-bindgen-futures",
  "web-sys",
@@ -1913,7 +1937,6 @@ dependencies = [
  "derive_more 0.99.20",
  "did-key 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
- "futures-timer",
  "getrandom 0.2.17",
  "getrandom 0.3.4",
  "insta",
@@ -1986,6 +2009,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
+ "co-actor",
  "co-api",
  "co-primitives",
  "co-storage",
@@ -2028,6 +2052,7 @@ dependencies = [
  "co-core-file",
  "co-core-keystore",
  "co-core-membership",
+ "co-core-names",
  "co-core-pin",
  "co-core-poa",
  "co-core-rich-text",
@@ -2420,7 +2445,7 @@ dependencies = [
  "libm",
  "log",
  "regalloc2",
- "rustc-hash",
+ "rustc-hash 2.1.1",
  "serde",
  "smallvec",
  "target-lexicon 0.13.5",
@@ -3114,10 +3139,17 @@ dependencies = [
  "dioxus-config-macros",
  "dioxus-core",
  "dioxus-hooks",
+ "dioxus-logger",
  "dioxus-signals",
  "dioxus-stores",
  "subsecond",
 ]
+
+[[package]]
+name = "dioxus-cli-config"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccd67ab405e1915a47df9769cd5408545d1b559d5c01ce7a0f442caef520d1f3"
 
 [[package]]
 name = "dioxus-config-macros"
@@ -3138,7 +3170,7 @@ dependencies = [
  "futures-util",
  "generational-box",
  "longest-increasing-subsequence",
- "rustc-hash",
+ "rustc-hash 2.1.1",
  "rustversion",
  "slab",
  "slotmap",
@@ -3169,6 +3201,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "dioxus-logger"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1eeab114cb009d9e6b85ea10639a18cfc54bb342f3b837770b004c4daeb89c2"
+dependencies = [
+ "dioxus-cli-config",
+ "tracing",
+ "tracing-subscriber",
+ "tracing-wasm",
+]
+
+[[package]]
 name = "dioxus-signals"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3179,7 +3223,7 @@ dependencies = [
  "futures-util",
  "generational-box",
  "parking_lot",
- "rustc-hash",
+ "rustc-hash 2.1.1",
  "tracing",
  "warnings",
 ]
@@ -8457,7 +8501,7 @@ dependencies = [
  "pin-project-lite",
  "quinn-proto",
  "quinn-udp",
- "rustc-hash",
+ "rustc-hash 2.1.1",
  "rustls",
  "socket2 0.6.2",
  "thiserror 2.0.18",
@@ -8477,7 +8521,7 @@ dependencies = [
  "lru-slab",
  "rand 0.9.2",
  "ring",
- "rustc-hash",
+ "rustc-hash 2.1.1",
  "rustls",
  "rustls-pki-types",
  "slab",
@@ -8771,7 +8815,7 @@ dependencies = [
  "bumpalo",
  "hashbrown 0.15.5",
  "log",
- "rustc-hash",
+ "rustc-hash 2.1.1",
  "smallvec",
 ]
 
@@ -8988,6 +9032,12 @@ checksum = "b50b8869d9fc858ce7266cce0194bd74df58b9d0e3f6df3a9fc8eb470d95c09d"
 
 [[package]]
 name = "rustc-hash"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
+
+[[package]]
+name = "rustc-hash"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
@@ -9091,6 +9141,36 @@ name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
+
+[[package]]
+name = "rusty_jsc"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f8f838ac489c4fec2ae60bcd620e70ca829b75f83d4516f2708fd2a9edafdd0"
+dependencies = [
+ "rusty_jsc_macros",
+ "rusty_jsc_sys",
+]
+
+[[package]]
+name = "rusty_jsc_macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b2407097cc2d172aedd2da887e68c1724c96f7828bad033096d0bb911dc4071"
+dependencies = [
+ "pkg-config",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "rusty_jsc_sys"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "927443ab7a267331865e31bfe0ffb70216cbbadb8e3b15c09774fae6caa9d8df"
+dependencies = [
+ "pkg-config",
+]
 
 [[package]]
 name = "ruzstd"
@@ -11038,6 +11118,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-oslog"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "528bdd1f0e27b5dd9a4ededf154e824b0532731e4af73bb531de46276e0aab1e"
+dependencies = [
+ "bindgen 0.70.1",
+ "cc",
+ "cfg-if",
+ "once_cell",
+ "parking_lot",
+ "tracing-core",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "tracing-subscriber"
 version = "0.3.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11053,6 +11148,17 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log 0.2.0",
+]
+
+[[package]]
+name = "tracing-wasm"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4575c663a174420fa2d78f4108ff68f65bf2fbb7dd89f33749b6e826b3626e07"
+dependencies = [
+ "tracing",
+ "tracing-subscriber",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -11732,9 +11838,9 @@ dependencies = [
 [[package]]
 name = "wasmer"
 version = "7.1.0-alpha.1"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=main#079027f7235a7ac6eeaf9a477fb2e403007353de"
+source = "git+https://github.com/wasmerio/wasmer.git?rev=5e6c9d361e5de4e02033b754d33c98ca96982ce9#5e6c9d361e5de4e02033b754d33c98ca96982ce9"
 dependencies = [
- "bindgen",
+ "bindgen 0.72.1",
  "bytes",
  "cfg-if",
  "cmake",
@@ -11744,6 +11850,7 @@ dependencies = [
  "more-asserts",
  "paste",
  "rustc-demangle",
+ "rusty_jsc",
  "serde",
  "serde-wasm-bindgen",
  "shared-buffer",
@@ -11770,7 +11877,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler"
 version = "7.1.0-alpha.1"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=main#079027f7235a7ac6eeaf9a477fb2e403007353de"
+source = "git+https://github.com/wasmerio/wasmer.git?rev=5e6c9d361e5de4e02033b754d33c98ca96982ce9#5e6c9d361e5de4e02033b754d33c98ca96982ce9"
 dependencies = [
  "backtrace",
  "bytes",
@@ -11807,7 +11914,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler-cranelift"
 version = "7.1.0-alpha.1"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=main#079027f7235a7ac6eeaf9a477fb2e403007353de"
+source = "git+https://github.com/wasmerio/wasmer.git?rev=5e6c9d361e5de4e02033b754d33c98ca96982ce9#5e6c9d361e5de4e02033b754d33c98ca96982ce9"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -11828,7 +11935,7 @@ dependencies = [
 [[package]]
 name = "wasmer-compiler-llvm"
 version = "7.1.0-alpha.1"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=main#079027f7235a7ac6eeaf9a477fb2e403007353de"
+source = "git+https://github.com/wasmerio/wasmer.git?rev=5e6c9d361e5de4e02033b754d33c98ca96982ce9#5e6c9d361e5de4e02033b754d33c98ca96982ce9"
 dependencies = [
  "byteorder",
  "cc",
@@ -11854,7 +11961,7 @@ dependencies = [
 [[package]]
 name = "wasmer-derive"
 version = "7.1.0-alpha.1"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=main#079027f7235a7ac6eeaf9a477fb2e403007353de"
+source = "git+https://github.com/wasmerio/wasmer.git?rev=5e6c9d361e5de4e02033b754d33c98ca96982ce9#5e6c9d361e5de4e02033b754d33c98ca96982ce9"
 dependencies = [
  "proc-macro-error2",
  "proc-macro2",
@@ -11865,7 +11972,7 @@ dependencies = [
 [[package]]
 name = "wasmer-types"
 version = "7.1.0-alpha.1"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=main#079027f7235a7ac6eeaf9a477fb2e403007353de"
+source = "git+https://github.com/wasmerio/wasmer.git?rev=5e6c9d361e5de4e02033b754d33c98ca96982ce9#5e6c9d361e5de4e02033b754d33c98ca96982ce9"
 dependencies = [
  "bytecheck",
  "enum-iterator",
@@ -11885,7 +11992,7 @@ dependencies = [
 [[package]]
 name = "wasmer-vm"
 version = "7.1.0-alpha.1"
-source = "git+https://github.com/wasmerio/wasmer.git?branch=main#079027f7235a7ac6eeaf9a477fb2e403007353de"
+source = "git+https://github.com/wasmerio/wasmer.git?rev=5e6c9d361e5de4e02033b754d33c98ca96982ce9#5e6c9d361e5de4e02033b754d33c98ca96982ce9"
 dependencies = [
  "backtrace",
  "bytesize",

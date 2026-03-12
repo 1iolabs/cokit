@@ -59,10 +59,28 @@ pub fn crate_repository_path(workspace: bool) -> Result<PathBuf, anyhow::Error> 
 	Ok(repository_path)
 }
 
+const DEFAULT_RUSTFLAGS: &str = "-C opt-level=3 -C codegen-units=1 -C panic=abort -C strip=symbols";
+
+/// Options for building a core to WebAssembly.
+#[derive(Debug, Clone, Default)]
+pub struct BuildCoreOptions {
+	/// Custom RUSTFLAGS to use for the build. If `None`, uses the default flags.
+	pub rustflags: Option<String>,
+}
+
 /// Build a rust core to WebAssembly using cargo.
 pub fn build_core(
 	repository_path: impl AsRef<Path>,
 	core_path: impl AsRef<Path>,
+) -> Result<BuildCoreArtifact, anyhow::Error> {
+	build_core_with_options(repository_path, core_path, BuildCoreOptions::default())
+}
+
+/// Build a rust core to WebAssembly using cargo with custom options.
+pub fn build_core_with_options(
+	repository_path: impl AsRef<Path>,
+	core_path: impl AsRef<Path>,
+	options: BuildCoreOptions,
 ) -> Result<BuildCoreArtifact, anyhow::Error> {
 	let core_path = core_path.as_ref().to_owned();
 	let target_path = canonicalize(repository_path.as_ref())
@@ -76,21 +94,19 @@ pub fn build_core(
 	let core_package = core_package.package.ok_or(anyhow!("Missing package: {:?}", core_toml))?;
 
 	// build
+	let rustflags = options.rustflags.as_deref().unwrap_or(DEFAULT_RUSTFLAGS);
 	let mut command: Command = Command::new("cargo");
-	command
-		.current_dir(&core_path)
-		.env("RUSTFLAGS", "-C opt-level=z -C codegen-units=1 -C panic=abort -C strip=symbols")
-		.args([
-			"build",
-			"--features",
-			"core",
-			"--target",
-			"wasm32-unknown-unknown",
-			"--target-dir",
-			target_path.to_str().ok_or(anyhow!("Invalid path: {:?}", target_path))?,
-			"--release",
-			// "--message-format=json",
-		]);
+	command.current_dir(&core_path).env("RUSTFLAGS", rustflags).args([
+		"build",
+		"--features",
+		"core",
+		"--target",
+		"wasm32-unknown-unknown",
+		"--target-dir",
+		target_path.to_str().ok_or(anyhow!("Invalid path: {:?}", target_path))?,
+		"--release",
+		// "--message-format=json",
+	]);
 	let output = command.output()?;
 	tracing::trace!(?output, ?command, "cargo-build");
 	if !output.status.success() {
@@ -101,14 +117,6 @@ pub fn build_core(
 	let core_wasm_name = format!("{}.wasm", core_package.name.replace('-', "_"));
 	let core_wasm_path = target_path.join("wasm32-unknown-unknown/release").join(&core_wasm_name);
 	Ok(BuildCoreArtifact { name: core_package.name, version: core_package.version, artifact_path: core_wasm_path })
-
-	// let output = std::str::from_utf8(&output.stdout).unwrap();
-	// for line in output.lines() {
-	// 	let json: serde_json::Value = serde_json::from_str(&line)?;
-	// 	println!("json: {:#?}", json);
-	// }
-	// let output: BuildOutput = serde_json::from_slice(&output.stdout)?;
-	// Ok(output.filenames.first().ok_or(anyhow!("No artifacts"))?.clone())
 }
 
 pub struct BuildCoreArtifact {

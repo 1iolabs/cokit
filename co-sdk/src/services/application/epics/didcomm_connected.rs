@@ -3,8 +3,8 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{library::compat::Instant, Action, CoContext};
-use co_actor::Actions;
+use crate::{Action, CoContext};
+use co_actor::{time, Actions};
 use co_identity::PeerDidCommHeader;
 use co_network::{
 	connections::{ConnectionAction, PeerRelateDidAction},
@@ -36,7 +36,7 @@ pub fn didcomm_connected(
 							network.dispatch(ConnectionAction::PeerRelateDid(PeerRelateDidAction {
 								did: from.to_owned(),
 								peer_id: PeerId::from_str(peer)?,
-								time: Instant::now(),
+								time: time::Instant::now(),
 							}))?;
 						}
 					}

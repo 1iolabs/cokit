@@ -37,7 +37,9 @@ impl NetworkResolver for CoNetworkResolver {
 			.await?
 			.ok_or(anyhow!("No membership found: {:?}", id))?;
 		let use_co = match membership.membership_state {
-			MembershipState::Join | MembershipState::Invite | MembershipState::Inactive => false,
+			MembershipState::Join | MembershipState::Invite | MembershipState::Inactive | MembershipState::Pending => {
+				false
+			},
 			MembershipState::Active | _ => true,
 		};
 

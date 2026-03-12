@@ -21,6 +21,7 @@ pub const CO_CORE_STORAGE: &str = "co-core-storage";
 pub const CO_CORE_POA: &str = "co-core-poa";
 pub const CO_CORE_BOARD: &str = "co-core-board";
 pub const CO_CORE_RICH_TEXT: &str = "co-core-rich-text";
+pub const CO_CORE_NAMES: &str = "co-core-names";
 
 /// CO Core name expected by the SDK implementation (key to `co.cores`).
 pub const CO_CORE_NAME_CO: CoreName<'static, co_core_co::Co> = CoreName::new("co");
@@ -159,6 +160,7 @@ fn get_native(name: &str) -> Core {
 		CO_CORE_POA => include_prebuild_core!("poa"),
 		CO_CORE_BOARD => include_prebuild_core!("board"),
 		CO_CORE_RICH_TEXT => include_prebuild_core!("rich_text"),
+		CO_CORE_NAMES => include_prebuild_core!("names"),
 		_ => panic!("unknown native core name: {}", name),
 	}
 	#[cfg(not(feature = "bundle-wasm-cores"))]
@@ -175,6 +177,7 @@ fn get_native(name: &str) -> Core {
 		CO_CORE_POA => Core::native_async::<co_core_poa::Authority, co_core_poa::AuthorityAction>(),
 		CO_CORE_BOARD => Core::native_async::<co_core_board::Board, co_core_board::BoardAction>(),
 		CO_CORE_RICH_TEXT => Core::native_async::<co_core_rich_text::RichText, co_core_rich_text::RichTextAction>(),
+		CO_CORE_NAMES => Core::native_async::<co_core_names::Names, co_core_names::NamesAction>(),
 		_ => panic!("unknown native core name: {}", name),
 	}
 }

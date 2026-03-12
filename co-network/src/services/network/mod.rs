@@ -14,7 +14,7 @@ mod tasks;
 pub use actor::{Network, NetworkInitialize};
 pub use api::NetworkApi;
 pub use message::NetworkMessage;
-pub use settings::NetworkSettings;
+pub use settings::{NetworkDns, NetworkSettings};
 pub use spawner::CoNetworkTaskSpawner;
 pub use subscribe::subscribe_identity;
 #[cfg(feature = "native")]

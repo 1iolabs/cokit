@@ -5,8 +5,6 @@ edition = "2021"
 rust-version = "1.91"
 
 [dependencies]
-#librocksdb-sys = { version = "0.10.0+7.9.2" }
-#rocksdb = { version = "0.20.1" }
 anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
@@ -18,6 +16,7 @@ co-core-data-series = { workspace = true }
 co-core-file = { workspace = true }
 co-core-keystore = { workspace = true }
 co-core-membership = { workspace = true }
+co-core-names = { workspace = true }
 co-core-pin = { workspace = true }
 co-core-poa = { workspace = true }
 co-core-rich-text = { workspace = true }

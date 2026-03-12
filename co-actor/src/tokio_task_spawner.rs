@@ -117,6 +117,53 @@ impl TaskSpawner {
 			self.inner.spawn(task.instrument(span))
 		}
 	}
+
+	/// Spawn blocking task.
+	#[inline]
+	#[track_caller]
+	#[allow(unexpected_cfgs)]
+	pub fn spawn_blocking<F, R>(&self, options: TaskOptions, task: F) -> TaskHandle<R>
+	where
+		F: FnOnce() -> R + Send + 'static,
+		R: Send + 'static,
+	{
+		let caller_file = Location::caller().file();
+		let caller_line = Location::caller().line();
+		let caller_column = Location::caller().column();
+		let span = tracing::trace_span!(
+			"task-blocking",
+			task_name = options.name,
+			application = self.idenitfier.as_str(),
+			caller_file,
+			caller_line,
+			caller_column,
+		);
+		let task = move || {
+			let _span_guard = span.enter();
+			task()
+		};
+		#[cfg(tokio_unstable)]
+		{
+			let mut builder = tokio::task::Builder::new();
+			if let Some(name) = options.name {
+				builder = builder.name(name);
+			}
+			builder
+				.spawn_blocking(if options.untracked {
+					futures::future::Either::Left(task)
+				} else {
+					futures::future::Either::Right(self.inner.track_future(task))
+				})
+				.expect("tokio runtime")
+		}
+		#[cfg(not(tokio_unstable))]
+		if options.untracked {
+			tokio::task::spawn_blocking(task)
+		} else {
+			self.inner.spawn_blocking(task)
+		}
+	}
+
 	pub fn tracker(&self) -> TaskTracker {
 		self.inner.clone()
 	}

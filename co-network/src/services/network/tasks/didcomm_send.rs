@@ -8,6 +8,7 @@ use crate::{
 	network::{Behaviour, Context, NetworkEvent},
 	types::network_task::{NetworkTask, NetworkTaskSpawner},
 };
+use co_actor::time;
 use libp2p::{swarm::SwarmEvent, PeerId, Swarm};
 use std::{collections::BTreeSet, time::Duration};
 
@@ -34,7 +35,7 @@ impl DidCommSendNetworkTask {
 		let (tx, rx) = tokio::sync::oneshot::channel();
 		let task = Self { message, peers: peers.into_iter().collect(), sent: Some(tx) };
 		spawner.spawn(task)?;
-		crate::compat::timeout(timeout, rx).await??
+		time::timeout(timeout, rx).await??
 	}
 }
 impl NetworkTask<Behaviour, Context> for DidCommSendNetworkTask {

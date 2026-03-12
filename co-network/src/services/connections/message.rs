@@ -3,16 +3,18 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use super::action::{ConnectionAction, PeersChangedAction, UseAction};
-use crate::compat::Instant;
-use co_actor::{ActorError, ActorHandle, ResponseStream};
+use super::action::{ConnectionAction, DidPeersChangedAction, DidUseAction, PeersChangedAction, UseAction};
+use co_actor::{time::Instant, ActorError, ActorHandle, ResponseStream};
 use co_primitives::{CoId, Did, Network};
 use futures::Stream;
 
 #[derive(Debug)]
 pub enum ConnectionMessage {
-	/// Use a CO by utilitsing the specified networks.
+	/// Use a CO by utilizing the specified networks.
 	Use(UseAction, ResponseStream<PeersChangedAction>),
+
+	/// Use a DID connection by utilizing the specified networks.
+	DidUse(DidUseAction, ResponseStream<DidPeersChangedAction>),
 
 	/// Action.
 	Action(ConnectionAction),
@@ -34,5 +36,15 @@ impl ConnectionMessage {
 	) -> impl Stream<Item = Result<PeersChangedAction, ActorError>> {
 		let action = UseAction { id, from, time: Instant::now(), networks: networks.into_iter().collect() };
 		actor.stream(|response| Self::Use(action, response))
+	}
+
+	pub fn did_use(
+		actor: ActorHandle<Self>,
+		from: Did,
+		to: Did,
+		networks: impl IntoIterator<Item = Network>,
+	) -> impl Stream<Item = Result<DidPeersChangedAction, ActorError>> {
+		let action = DidUseAction { from, to, time: Instant::now(), networks: networks.into_iter().collect() };
+		actor.stream(|response| Self::DidUse(action, response))
 	}
 }

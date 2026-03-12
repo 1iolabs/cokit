@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use super::ReducerStorage;
-use crate::{types::co_reducer_factory::CoReducerFactoryError, CoReducer};
+use crate::{types::co_reducer_factory::CoReducerFactoryError, CoOptions, CoReducer};
 use co_actor::{ActorHandle, Response};
 use co_primitives::CoId;
 
@@ -75,8 +75,11 @@ pub struct ReducerOptions {
 	/// When set to [`true`] return [`None`]/[`CoReducerFactoryError::Pending`] if the reducer create is pending.
 	pub no_pending_create: bool,
 
-	/// When set to [`true`] do not attemt to create and return [`None`]/[`CoReducerFactoryError::WouldCreate`].
+	/// When set to [`true`] do not attempt to create and return [`None`]/[`CoReducerFactoryError::WouldCreate`].
 	pub no_create: bool,
+
+	/// Co Options
+	pub co: CoOptions,
 }
 impl ReducerOptions {
 	pub fn with_no_create(mut self) -> Self {
@@ -86,6 +89,11 @@ impl ReducerOptions {
 
 	pub fn with_no_pending_create(mut self) -> Self {
 		self.no_pending_create = true;
+		self
+	}
+
+	pub fn with_co_options(mut self, co: CoOptions) -> Self {
+		self.co = co;
 		self
 	}
 }

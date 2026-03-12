@@ -23,7 +23,7 @@ pub const CO_DIDCOMM_JOIN: &str = "co-join";
 // 	Ok(EncodedMessage(message.into_bytes()))
 // }
 
-/// Create an encoded (signed) join message to unknown receipents.
+/// Create an encoded (signed) join message to unknown recipients.
 pub fn create_join_message_from<F>(
 	date: &CoDateRef,
 	from: &F,

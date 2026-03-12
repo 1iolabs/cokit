@@ -59,10 +59,11 @@ zstd = { workspace = true, optional = true }
 
 [features]
 default = ["llvm", "wasmi", "pinning", "network"]
+zst = ["dep:zstd"]
 
 # sdk
 pinning = ["co-sdk/pinning"]
-bundle-wasm-cores = ["co-sdk/bundle-wasm-cores", "dep:zstd"]
+bundle-wasm-cores = ["co-sdk/bundle-wasm-cores", "zst"]
 network = ["co-sdk/network"]
 
 # runtime

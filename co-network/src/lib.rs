@@ -4,7 +4,6 @@
 // retention—approved secure tools may process solely for internal use.
 
 mod bitswap;
-pub(crate) mod compat;
 mod didcomm;
 mod discovery;
 mod library;
@@ -32,8 +31,8 @@ pub use types::{
 };
 pub mod connections {
 	pub use crate::services::connections::{
-		action::*, CoConnection, ConnectionMessage, ConnectionState, Connections, DynamicNetworkResolver,
-		NetworkConnection, NetworkResolver, PeerConnection,
+		action::*, CoConnection, ConnectionMessage, ConnectionState, Connections, DidConnection,
+		DynamicNetworkResolver, NetworkConnection, NetworkResolver, PeerConnection,
 	};
 }
 

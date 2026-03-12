@@ -4,8 +4,9 @@
 // retention—approved secure tools may process solely for internal use.
 
 use super::did_discovery::{DidDiscovery, DidDiscoveryMessageType};
-use crate::{compat::Instant, didcomm, discovery::DiscoverMessage, types::layer_behaviour::LayerBehaviour};
+use crate::{didcomm, discovery::DiscoverMessage, types::layer_behaviour::LayerBehaviour};
 use anyhow::anyhow;
+use co_actor::time::Instant;
 use co_identity::{
 	network_did_discovery, DidCommContext, DidCommHeader, DidCommPrivateContext, Identity, IdentityResolver,
 	PrivateIdentity, PrivateIdentityBox,
@@ -41,7 +42,7 @@ pub enum Discovery {
 	#[from]
 	Topic(String),
 
-	/// Rendezvouz protocol.
+	/// Rendezvous protocol.
 	#[from]
 	Rendezvous(NetworkRendezvous),
 
@@ -72,12 +73,12 @@ impl Discovery {
 	}
 }
 
-/// Request to try to connect peers using suplied discovery methods.
+/// Request to try to connect peers using supplied discovery methods.
 struct DiscoveryConnectRequest {
 	pub id: u64,
 	/// The discovery items. Only contains validated ([`Discovery::validate`]) discovery items.
 	pub discovery: BTreeSet<Discovery>,
-	/// Cache for all direct PeerId we are intreseted in.
+	/// Cache for all direct PeerId we are interested in.
 	pub discovery_peers: BTreeSet<PeerId>,
 	pub start: Instant,
 	pub timeout: Duration,
@@ -187,7 +188,7 @@ pub struct DiscoveryState<R> {
 	/// Pending events.
 	events: VecDeque<DiscoveryEvent>,
 
-	/// Pending DID Discovery requests. Insufficent peers.
+	/// Pending DID Discovery requests. Insufficient peers.
 	pending_discovery: VecDeque<(u64, TopicHash, DidDiscovery)>,
 
 	/// Default discovery timeout.

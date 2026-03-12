@@ -1,0 +1,22 @@
+words = [
+    "autonat",
+    "bitswap",
+    "brandguardian",
+    "cbor",
+    "clippy",
+    "cranelift",
+    "dcutr",
+    "didcomm",
+    "dioxus",
+    "gossipsub",
+    "jsc",
+    "kad",
+    "kademlia",
+    "mdns",
+    "thid",
+    "tokio",
+    "wasmer",
+    "webrtc",
+    "wasmi",
+]
+ignore_patterns = ["COkit|BRANDGUARDIAN GmbH|AGPLv3|libp2p"]

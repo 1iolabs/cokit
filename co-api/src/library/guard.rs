@@ -12,7 +12,7 @@ pub fn guard<R>() -> bool
 where
 	R: Guard + 'static,
 {
-	GuardRef::new::<R>().execute_blocking(WasmContext::new())
+	GuardRef::new::<R>().execute_blocking(WasmContext::new()).1
 }
 
 async fn execute<C, R>(context: &C) -> Result<bool, anyhow::Error>
@@ -54,7 +54,7 @@ where
 		Self(Arc::new(|context| async { execute::<C, R>(context).await }.boxed_local()))
 	}
 
-	pub fn execute_blocking(self, context: C) -> bool {
+	pub fn execute_blocking(self, context: C) -> (C, bool) {
 		let mut pool = LocalPool::new();
 		let handle = pool
 			.spawner()
@@ -63,9 +63,9 @@ where
 		pool.run_until(handle)
 	}
 
-	pub async fn execute_async(&self, mut context: C) -> bool {
+	pub async fn execute_async(&self, mut context: C) -> (C, bool) {
 		match self.execute(&context).await {
-			Ok(result) => result,
+			Ok(result) => (context, result),
 			Err(err) => {
 				let cid = context
 					.storage()
@@ -73,7 +73,7 @@ where
 					.await
 					.expect("DiagnosticMessage to serialize");
 				context.write_diagnostic(cid);
-				false
+				(context, false)
 			},
 		}
 	}

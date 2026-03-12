@@ -14,7 +14,7 @@ impl ModuleDescription {
 	#[cfg(all(feature = "fs", any(feature = "llvm", feature = "cranelift")))]
 	pub async fn from_path(path: &std::path::Path) -> anyhow::Result<ModuleDescription> {
 		let bytes = tokio::fs::read(path).await?;
-		let (_kind, _store, module) = crate::runtimes::wasmer::WasmerRuntimeBuilder::wasm(&bytes).for_info().build()?;
+		let (_kind, _store, module) = crate::runtimes::wasmer::WasmerRuntimeBuilder::wasm(&bytes).build()?;
 		Ok(ModuleDescription {
 			exports: module
 				.exports()

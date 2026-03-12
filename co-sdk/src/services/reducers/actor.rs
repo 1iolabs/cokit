@@ -175,7 +175,11 @@ impl Actor for ReducersActor {
 								let result = match control.clone().storage(id.clone(), options.clone()).await {
 									Ok(storage) => {
 										// create reducer
-										match context.inner.create_co_instance(parent, &id, storage, true, None).await {
+										match context
+											.inner
+											.create_co_instance(parent, &id, storage, true, None, options.co)
+											.await
+										{
 											Ok(Some(reducer)) => Ok(reducer),
 											Ok(None) => Err(CoReducerFactoryError::CoNotFound(
 												id.clone(),

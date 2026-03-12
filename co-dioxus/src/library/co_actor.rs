@@ -8,8 +8,8 @@ use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Response};
 use co_primitives::BlockStorageCloneSettings;
 use co_sdk::{
-	Block, BlockStat, BlockStorage, CloneWithBlockStorageSettings, CoContext, CoId, CoReducer, CoReducerFactory,
-	CoReducerState, CoStorage, StorageError, Tags, TaskSpawner,
+	Block, BlockStat, BlockStorage, CloneWithBlockStorageSettings, CoContext, CoId, CoOptions, CoReducer,
+	CoReducerFactory, CoReducerState, CoStorage, StorageError, Tags, TaskSpawner,
 };
 use dioxus::signals::{SyncSignal, WritableExt};
 use futures::StreamExt;
@@ -36,7 +36,10 @@ impl Actor for CoActor {
 		_tags: &Tags,
 		(context, mut signal): Self::Initialize,
 	) -> Result<Self::State, ActorError> {
-		let reducer = match context.try_co_reducer(&self.id).await {
+		let reducer = match context
+			.try_co_reducer_with_options(&self.id, CoOptions::default().with_wait(None))
+			.await
+		{
 			Ok(reducer) => {
 				// subscribe state and update signal on change
 				context.tasks().spawn({

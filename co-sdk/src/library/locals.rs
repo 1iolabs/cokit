@@ -6,13 +6,17 @@
 #[cfg(feature = "fs")]
 use super::fs_read::fs_read_option;
 use crate::CoReducerState;
+#[cfg(feature = "fs")]
 use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
 use cid::Cid;
+#[cfg(feature = "fs")]
 use co_primitives::from_cbor;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, fmt::Debug, path::PathBuf};
+#[cfg(feature = "fs")]
+use std::path::PathBuf;
+use std::{collections::BTreeSet, fmt::Debug};
 
 #[async_trait]
 pub trait Locals: Clone + Debug + Send + Sync {

@@ -4,14 +4,13 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	compat::Instant,
 	connections::DialCompletedAction,
 	services::{
 		connections::{action::ConnectionAction, actor::ConnectionsContext, ConnectionState},
 		network::DialNetworkTask,
 	},
 };
-use co_actor::Actions;
+use co_actor::{time, Actions};
 use futures::{FutureExt, Stream};
 
 /// Dial a peer.
@@ -36,7 +35,7 @@ pub fn dial_epic(
 					Ok(ConnectionAction::DialCompleted(DialCompletedAction {
 						peer_id: action.peer_id,
 						ok: result.is_ok(),
-						time: Instant::now(),
+						time: time::Instant::now(),
 					}))
 				}
 				.into_stream(),

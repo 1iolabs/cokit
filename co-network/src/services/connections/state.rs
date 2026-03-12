@@ -4,22 +4,19 @@
 // retention—approved secure tools may process solely for internal use.
 
 use super::action::{
-	ConnectAction, ConnectedAction, ConnectionAction, DisconnectAction, DisconnectReason, DisconnectedAction,
-	NetworkResolveAction, NetworkResolvedAction, PeerConnectionClosedAction, PeerConnectionEstablishedAction,
-	PeerRelateCoAction, PeerRelateDidAction, PeersChangedAction, ReleaseAction, ReleasedAction, UseAction,
+	ConnectAction, ConnectedAction, ConnectionAction, DidPeersChangedAction, DidReleaseAction, DidReleasedAction,
+	DidUseAction, DisconnectAction, DisconnectReason, DisconnectedAction, NetworkResolveAction, NetworkResolvedAction,
+	PeerConnectionClosedAction, PeerConnectionEstablishedAction, PeerRelateCoAction, PeerRelateDidAction,
+	PeersChangedAction, ReleaseAction, ReleasedAction, UseAction,
 };
-use crate::{
-	compat::Instant,
-	connections::{DialAction, DialCompletedAction},
-};
-use co_actor::Reducer;
+use crate::connections::{DialAction, DialCompletedAction};
+use co_actor::{time::Instant, Reducer};
 use co_primitives::{CoId, Did, Network, NetworkDidDiscovery, NetworkPeer};
 use libp2p::{Multiaddr, PeerId};
 use std::{
 	collections::{BTreeSet, HashMap},
 	time::Duration,
 };
-
 #[derive(Debug, Clone)]
 pub struct CoConnection {
 	pub id: CoId,
@@ -29,9 +26,17 @@ pub struct CoConnection {
 }
 
 #[derive(Debug, Clone)]
+pub struct DidConnection {
+	pub to: Did,
+	pub from: Did,
+	pub networks: BTreeSet<Network>,
+}
+
+#[derive(Debug, Clone)]
 pub struct NetworkConnection {
 	pub network: Network,
 	pub references: BTreeSet<CoId>,
+	pub did_references: BTreeSet<Did>,
 	pub peers: BTreeSet<PeerId>,
 	/// TODO: implement cache
 	pub keep_alive: Instant,
@@ -66,6 +71,9 @@ pub struct ConnectionState {
 	/// Tracks currently used cos and relates them with connectivity networks.
 	pub co: HashMap<CoId, CoConnection>,
 
+	/// Tracks currently used DID connections and relates them with connectivity networks.
+	pub did: HashMap<Did, DidConnection>,
+
 	/// Tracks currently used connectivity networks and relates them with cos and peers.
 	pub networks: HashMap<Network, NetworkConnection>,
 
@@ -87,15 +95,41 @@ impl ConnectionState {
 			.collect()
 	}
 
+	/// Find all PeerId's for a DID connection.
+	fn did_peers(&self, to: &Did) -> BTreeSet<PeerId> {
+		self.did
+			.get(to)
+			.iter()
+			.flat_map(|did_connection| &did_connection.networks)
+			.filter_map(|network| self.networks.get(network))
+			.flat_map(|network_connection| network_connection.peers.clone())
+			.collect()
+	}
+
+	/// Get initial use_did action.
+	pub fn did_use_initial(&self, to: &Did) -> Option<DidPeersChangedAction> {
+		let initial_peers = self.did_peers(to);
+		if !initial_peers.is_empty() {
+			Some(DidPeersChangedAction {
+				to: to.clone(),
+				peers: initial_peers.clone(),
+				added: initial_peers,
+				removed: Default::default(),
+			})
+		} else {
+			None
+		}
+	}
+
 	/// Get initial use action.
 	pub fn use_initial(&self, id: &CoId) -> Option<PeersChangedAction> {
 		// initial
-		let intital_peers = self.co_peers(id);
-		if !intital_peers.is_empty() {
+		let initial_peers = self.co_peers(id);
+		if !initial_peers.is_empty() {
 			Some(PeersChangedAction {
 				id: id.clone(),
-				peers: intital_peers.clone(),
-				added: intital_peers,
+				peers: initial_peers.clone(),
+				added: initial_peers,
 				removed: Default::default(),
 			})
 		} else {
@@ -139,6 +173,15 @@ impl Reducer<ConnectionAction> for ConnectionState {
 			},
 			ConnectionAction::PeerRelateCo(action) => {
 				reduce_peer_relate_co(state, &mut actions, action);
+			},
+			ConnectionAction::DidUse(action) => {
+				reduce_did_use(state, &mut actions, action);
+			},
+			ConnectionAction::DidRelease(action) => {
+				reduce_did_release(state, &mut actions, action);
+			},
+			ConnectionAction::DidReleased(action) => {
+				reduce_did_released(state, &mut actions, action);
 			},
 			ConnectionAction::Dial(action) => {
 				reduce_dial(state, &mut actions, action);
@@ -261,14 +304,24 @@ fn reduce_connected(
 	network: &Network,
 	result: &Result<BTreeSet<PeerId>, String>,
 ) {
-	// get previous peer map to create diffs
-	let network_co_peers = state.networks.get(network).map(|network| {
-		network
-			.references
-			.iter()
-			.map(|co| (co.clone(), state.co_peers(co)))
-			.collect::<HashMap<CoId, BTreeSet<PeerId>>>()
-	});
+	// get previous peer maps to create diffs
+	let (network_co_peers, network_did_peers) = match state.networks.get(network) {
+		Some(nc) => (
+			Some(
+				nc.references
+					.iter()
+					.map(|co| (co.clone(), state.co_peers(co)))
+					.collect::<HashMap<CoId, BTreeSet<PeerId>>>(),
+			),
+			Some(
+				nc.did_references
+					.iter()
+					.map(|did| (did.clone(), state.did_peers(did)))
+					.collect::<HashMap<Did, BTreeSet<PeerId>>>(),
+			),
+		),
+		None => (None, None),
+	};
 
 	// apply
 	if let Some(network_connection) = state.networks.get_mut(network) {
@@ -306,6 +359,23 @@ fn reduce_connected(
 				actions.push(ConnectionAction::PeersChanged(PeersChangedAction {
 					id: co.clone(),
 					peers: next_co_peers,
+					added,
+					removed,
+				}));
+			}
+		}
+	}
+
+	// update did handles
+	if let Some(network_did_peers) = network_did_peers {
+		for (did, previous_did_peers) in network_did_peers {
+			let next_did_peers = state.did_peers(&did);
+			let added: BTreeSet<PeerId> = next_did_peers.difference(&previous_did_peers).cloned().collect();
+			let removed: BTreeSet<PeerId> = previous_did_peers.difference(&next_did_peers).cloned().collect();
+			if !removed.is_empty() || !added.is_empty() {
+				actions.push(ConnectionAction::DidPeersChanged(DidPeersChangedAction {
+					to: did.clone(),
+					peers: next_did_peers,
 					added,
 					removed,
 				}));
@@ -372,8 +442,27 @@ fn reduce_disconnected(state: &mut ConnectionState, actions: &mut Vec<Connection
 			}
 		}
 
+		// remove did references
+		while let Some(did) = network_connection.did_references.pop_first() {
+			if let Some(did_connection) = state.did.get_mut(&did) {
+				if did_connection.networks.remove(network) {
+					if did_connection.networks.is_empty() {
+						actions.push(ConnectionAction::DidReleased(DidReleasedAction { to: did.clone() }));
+					} else if !network_connection.peers.is_empty() {
+						actions.push(ConnectionAction::DidPeersChanged(DidPeersChangedAction {
+							to: did.clone(),
+							removed: network_connection.peers.clone(),
+							peers: state.did_peers(&did),
+							added: [].into(),
+						}));
+					}
+				}
+			}
+		}
+
 		// remove disconnected
 		state.co.retain(|_, co_connection| !co_connection.networks.is_empty());
+		state.did.retain(|_, did_connection| !did_connection.networks.is_empty());
 	}
 }
 
@@ -387,7 +476,10 @@ fn reduce_release(state: &mut ConnectionState, actions: &mut Vec<ConnectionActio
 		// remove references and disconnect if unused
 		while let Some(network) = co_connection.networks.pop_first() {
 			if let Some(network_connection) = state.networks.get_mut(&network) {
-				if network_connection.references.remove(id) && network_connection.references.is_empty() {
+				if network_connection.references.remove(id)
+					&& network_connection.references.is_empty()
+					&& network_connection.did_references.is_empty()
+				{
 					actions.push(ConnectionAction::Disconnect(DisconnectAction { network }));
 				}
 			}
@@ -407,7 +499,10 @@ fn reduce_released(state: &mut ConnectionState, actions: &mut Vec<ConnectionActi
 		// normally this should be empty at this point
 		while let Some(network) = co_connection.networks.pop_first() {
 			if let Some(network_connection) = state.networks.get_mut(&network) {
-				if network_connection.references.remove(id) && network_connection.references.is_empty() {
+				if network_connection.references.remove(id)
+					&& network_connection.references.is_empty()
+					&& network_connection.did_references.is_empty()
+				{
 					actions.push(ConnectionAction::Disconnect(DisconnectAction { network }));
 				}
 			}
@@ -585,6 +680,154 @@ fn reduce_peer_relate_co(
 	}
 }
 
+fn reduce_did_use(state: &mut ConnectionState, actions: &mut Vec<ConnectionAction>, action: &DidUseAction) {
+	let to = &action.to;
+
+	// get or create did connection
+	let new_networks = match state.did.get_mut(to) {
+		Some(did_connection) => {
+			let mut new = BTreeSet::new();
+			for network in &action.networks {
+				if did_connection.networks.insert(network.clone()) {
+					new.insert(network.clone());
+				}
+			}
+			new
+		},
+		None => {
+			state.did.insert(
+				to.clone(),
+				DidConnection { from: action.from.clone(), to: to.clone(), networks: action.networks.clone() },
+			);
+			action.networks.clone()
+		},
+	};
+
+	// connect new networks
+	for network in &new_networks {
+		// check if already connected with peers
+		let (connect, connected_peers) = if let Some(nc) = state.networks.get(network) {
+			if nc.peers.is_empty() {
+				(None, Default::default())
+			} else {
+				(None, nc.peers.clone())
+			}
+		} else {
+			(Some(action.from.clone()), Default::default())
+		};
+
+		// reference network for this DID
+		reference_did_network_connection(state, actions, network, to, connected_peers, connect, &action.time);
+	}
+}
+
+fn reduce_did_release(state: &mut ConnectionState, actions: &mut Vec<ConnectionAction>, action: &DidReleaseAction) {
+	let id = &action.to;
+	if let Some(did_connection) = state.did.get_mut(id) {
+		let mut networks = std::mem::take(&mut did_connection.networks);
+		while let Some(network) = networks.pop_first() {
+			if let Some(network_connection) = state.networks.get_mut(&network) {
+				if network_connection.did_references.remove(id)
+					&& network_connection.references.is_empty()
+					&& network_connection.did_references.is_empty()
+				{
+					actions.push(ConnectionAction::Disconnect(DisconnectAction { network }));
+				}
+			}
+		}
+		actions.push(ConnectionAction::DidReleased(DidReleasedAction { to: id.clone() }));
+	}
+}
+
+fn reduce_did_released(state: &mut ConnectionState, actions: &mut Vec<ConnectionAction>, action: &DidReleasedAction) {
+	// remove did
+	let id = &action.to;
+	if let Some(mut connection) = state.did.remove(id) {
+		// remove references and disconnect if unused
+		// normally this should be empty at this point
+		while let Some(network) = connection.networks.pop_first() {
+			if let Some(network_connection) = state.networks.get_mut(&network) {
+				if network_connection.did_references.remove(id)
+					&& network_connection.references.is_empty()
+					&& network_connection.did_references.is_empty()
+				{
+					actions.push(ConnectionAction::Disconnect(DisconnectAction { network }));
+				}
+			}
+		}
+	}
+}
+
+/// Update/Create NetworkConnection and relate it with a DID.
+fn reference_did_network_connection(
+	state: &mut ConnectionState,
+	actions: &mut Vec<ConnectionAction>,
+	network: &Network,
+	did: &Did,
+	connected_peers: BTreeSet<PeerId>,
+	connect: Option<Did>,
+	time: &Instant,
+) {
+	let did_has_network = match state.did.get(did) {
+		Some(dc) => dc.networks.contains(network),
+		None => return,
+	};
+	let (network_has_peers, network_has_did_ref) = match state.networks.get(network) {
+		Some(nc) => (nc.peers.is_superset(&connected_peers), nc.did_references.contains(did)),
+		None => (false, false),
+	};
+
+	let previous_did_peers =
+		if !did_has_network || !network_has_did_ref || !network_has_peers { Some(state.did_peers(did)) } else { None };
+
+	// add network to did
+	if !did_has_network {
+		if let Some(dc) = state.did.get_mut(did) {
+			dc.networks.insert(network.clone());
+		}
+	}
+
+	// add did ref to network or create
+	if !network_has_did_ref || !network_has_peers {
+		match state.networks.get_mut(network) {
+			Some(nc) => {
+				nc.did_references.insert(did.clone());
+				nc.peers.extend(connected_peers.iter().cloned());
+				nc.keep_alive = *time + state.keep_alive;
+			},
+			None => {
+				let nc = NetworkConnection {
+					keep_alive: *time + state.keep_alive,
+					network: network.clone(),
+					peers: connected_peers,
+					references: Default::default(),
+					did_references: [did.clone()].into(),
+				};
+				state.networks.insert(network.clone(), nc);
+
+				if let Some(from) = connect {
+					actions.push(ConnectionAction::Connect(ConnectAction { network: network.clone(), from }));
+				}
+			},
+		}
+	}
+
+	// notify
+	if let Some(previous_did_peers) = previous_did_peers {
+		let next_did_peers = state.did_peers(did);
+		let added: BTreeSet<PeerId> = next_did_peers.difference(&previous_did_peers).cloned().collect();
+		let removed: BTreeSet<PeerId> = previous_did_peers.difference(&next_did_peers).cloned().collect();
+		if !removed.is_empty() || !added.is_empty() {
+			actions.push(ConnectionAction::DidPeersChanged(DidPeersChangedAction {
+				to: did.clone(),
+				peers: next_did_peers,
+				added,
+				removed,
+			}));
+		}
+	}
+}
+
 fn reduce_dial(state: &mut ConnectionState, _actions: &mut Vec<ConnectionAction>, action: &DialAction) {
 	if let Some(bootstrap) = state.bootstrap.get_mut(&action.peer_id) {
 		bootstrap.connecting = true;
@@ -738,6 +981,7 @@ fn reference_network_connection(
 					network: network.clone(),
 					peers: connected_peers,
 					references: [co.clone()].into(),
+					did_references: Default::default(),
 				};
 
 				// insert
@@ -770,7 +1014,8 @@ fn reference_network_connection(
 #[cfg(test)]
 mod tests {
 	use crate::connections::{
-		ConnectAction, ConnectionAction, ConnectionState, PeerConnectionEstablishedAction, PeerRelateDidAction,
+		ConnectAction, ConnectedAction, ConnectionAction, ConnectionState, DidPeersChangedAction, DidReleaseAction,
+		DidReleasedAction, DidUseAction, DisconnectAction, PeerConnectionEstablishedAction, PeerRelateDidAction,
 		UseAction,
 	};
 	use co_actor::Reducer;
@@ -847,5 +1092,238 @@ mod tests {
 			.network
 			.iter()
 			.any(|network| matches!(network, Network::DidDiscovery(did_discovery) if did_discovery.did == did)));
+	}
+
+	#[test]
+	fn test_did_use_connects_networks() {
+		let mut state = ConnectionState::default();
+		let network1 = Network::Rendezvous(NetworkRendezvous { namespace: "n1".to_string(), addresses: vec![] });
+		let network2 = Network::Rendezvous(NetworkRendezvous { namespace: "n2".to_string(), addresses: vec![] });
+		let from = "did:local:alice".to_string();
+		let to = "did:local:bob".to_string();
+
+		let result = state.reduce(ConnectionAction::DidUse(DidUseAction {
+			from: from.clone(),
+			to: to.clone(),
+			time: Instant::now(),
+			networks: [network1.clone(), network2.clone()].into_iter().collect(),
+		}));
+
+		// should emit Connect for both networks
+		assert_eq!(
+			BTreeSet::from_iter(result),
+			BTreeSet::from_iter([
+				ConnectionAction::Connect(ConnectAction { network: network1.clone(), from: from.clone() }),
+				ConnectionAction::Connect(ConnectAction { network: network2.clone(), from: from.clone() }),
+			])
+		);
+		assert_eq!(state.did.len(), 1);
+		assert_eq!(state.did[&to].networks.len(), 2);
+		assert_eq!(state.networks.len(), 2);
+		assert!(state.networks[&network1].did_references.contains(&to));
+		assert!(state.networks[&network2].did_references.contains(&to));
+	}
+
+	#[test]
+	fn test_did_use_reuses_existing_network() {
+		let mut state = ConnectionState::default();
+		let network = Network::Rendezvous(NetworkRendezvous { namespace: "n1".to_string(), addresses: vec![] });
+		let from = "did:local:alice".to_string();
+		let to = "did:local:bob".to_string();
+
+		// first DidUse creates the network
+		state.reduce(ConnectionAction::DidUse(DidUseAction {
+			from: from.clone(),
+			to: to.clone(),
+			time: Instant::now(),
+			networks: [network.clone()].into_iter().collect(),
+		}));
+
+		// second DidUse for same DID+network should not re-connect
+		let result = state.reduce(ConnectionAction::DidUse(DidUseAction {
+			from: from.clone(),
+			to: to.clone(),
+			time: Instant::now(),
+			networks: [network.clone()].into_iter().collect(),
+		}));
+		assert_eq!(result, vec![]);
+	}
+
+	#[test]
+	fn test_did_use_peers_changed_on_connected() {
+		let mut state = ConnectionState::default();
+		let network = Network::Rendezvous(NetworkRendezvous { namespace: "n1".to_string(), addresses: vec![] });
+		let from = "did:local:alice".to_string();
+		let to = "did:local:bob".to_string();
+		let peer = PeerId::random();
+
+		// setup did connection
+		state.reduce(ConnectionAction::DidUse(DidUseAction {
+			from: from.clone(),
+			to: to.clone(),
+			time: Instant::now(),
+			networks: [network.clone()].into_iter().collect(),
+		}));
+
+		// simulate network connected with a peer
+		let result = state.reduce(ConnectionAction::Connected(ConnectedAction {
+			network: network.clone(),
+			result: Ok([peer].into()),
+		}));
+
+		// should emit DidPeersChanged
+		assert_eq!(
+			result,
+			vec![ConnectionAction::DidPeersChanged(DidPeersChangedAction {
+				to: to.clone(),
+				peers: [peer].into(),
+				added: [peer].into(),
+				removed: Default::default(),
+			})]
+		);
+		assert_eq!(state.did_peers(&to), [peer].into());
+	}
+
+	#[test]
+	fn test_did_use_shared_network_with_co() {
+		let mut state = ConnectionState::default();
+		let network = Network::Rendezvous(NetworkRendezvous { namespace: "shared".to_string(), addresses: vec![] });
+		let from = "did:local:alice".to_string();
+		let to = "did:local:bob".to_string();
+
+		// CO uses network first
+		state.reduce(ConnectionAction::Use(UseAction {
+			from: from.clone(),
+			id: "co1".into(),
+			time: Instant::now(),
+			networks: [network.clone()].into_iter().collect(),
+		}));
+		assert_eq!(state.networks.len(), 1);
+
+		// DID uses same network — should not emit Connect (already exists)
+		let result = state.reduce(ConnectionAction::DidUse(DidUseAction {
+			from: from.clone(),
+			to: to.clone(),
+			time: Instant::now(),
+			networks: [network.clone()].into_iter().collect(),
+		}));
+		// no Connect action since network already exists
+		assert!(result.iter().all(|a| !matches!(a, ConnectionAction::Connect(_))));
+		let co1: co_primitives::CoId = "co1".into();
+		assert!(state.networks[&network].references.contains(&co1));
+		assert!(state.networks[&network].did_references.contains(&to));
+	}
+
+	#[test]
+	fn test_did_release_disconnects_exclusive_network() {
+		let mut state = ConnectionState::default();
+		let network = Network::Rendezvous(NetworkRendezvous { namespace: "n1".to_string(), addresses: vec![] });
+		let from = "did:local:alice".to_string();
+		let to = "did:local:bob".to_string();
+
+		state.reduce(ConnectionAction::DidUse(DidUseAction {
+			from: from.clone(),
+			to: to.clone(),
+			time: Instant::now(),
+			networks: [network.clone()].into_iter().collect(),
+		}));
+
+		let result = state.reduce(ConnectionAction::DidRelease(DidReleaseAction { to: to.clone() }));
+
+		assert_eq!(
+			BTreeSet::from_iter(result),
+			BTreeSet::from_iter([
+				ConnectionAction::Disconnect(DisconnectAction { network: network.clone() }),
+				ConnectionAction::DidReleased(DidReleasedAction { to: to.clone() }),
+			])
+		);
+	}
+
+	#[test]
+	fn test_did_release_preserves_shared_network() {
+		let mut state = ConnectionState::default();
+		let network = Network::Rendezvous(NetworkRendezvous { namespace: "shared".to_string(), addresses: vec![] });
+		let from = "did:local:alice".to_string();
+		let to = "did:local:bob".to_string();
+
+		// CO uses network
+		state.reduce(ConnectionAction::Use(UseAction {
+			from: from.clone(),
+			id: "co1".into(),
+			time: Instant::now(),
+			networks: [network.clone()].into_iter().collect(),
+		}));
+
+		// DID also uses same network
+		state.reduce(ConnectionAction::DidUse(DidUseAction {
+			from: from.clone(),
+			to: to.clone(),
+			time: Instant::now(),
+			networks: [network.clone()].into_iter().collect(),
+		}));
+
+		// releasing DID should NOT disconnect the shared network
+		let result = state.reduce(ConnectionAction::DidRelease(DidReleaseAction { to: to.clone() }));
+		assert_eq!(result, vec![ConnectionAction::DidReleased(DidReleasedAction { to: to.clone() })]);
+		assert!(state.networks.contains_key(&network));
+		assert!(!state.networks[&network].did_references.contains(&to));
+	}
+
+	#[test]
+	fn test_did_released_cleans_up_state() {
+		let mut state = ConnectionState::default();
+		let network = Network::Rendezvous(NetworkRendezvous { namespace: "n1".to_string(), addresses: vec![] });
+		let from = "did:local:alice".to_string();
+		let to = "did:local:bob".to_string();
+
+		state.reduce(ConnectionAction::DidUse(DidUseAction {
+			from: from.clone(),
+			to: to.clone(),
+			time: Instant::now(),
+			networks: [network.clone()].into_iter().collect(),
+		}));
+		assert!(state.did.contains_key(&to));
+
+		// release + released
+		state.reduce(ConnectionAction::DidRelease(DidReleaseAction { to: to.clone() }));
+		state.reduce(ConnectionAction::DidReleased(DidReleasedAction { to: to.clone() }));
+
+		assert!(!state.did.contains_key(&to));
+	}
+
+	#[test]
+	fn test_did_use_initial_peers() {
+		let mut state = ConnectionState::default();
+		let network = Network::Rendezvous(NetworkRendezvous { namespace: "n1".to_string(), addresses: vec![] });
+		let from = "did:local:alice".to_string();
+		let to = "did:local:bob".to_string();
+		let peer = PeerId::random();
+
+		// setup: did_use + connected
+		state.reduce(ConnectionAction::DidUse(DidUseAction {
+			from: from.clone(),
+			to: to.clone(),
+			time: Instant::now(),
+			networks: [network.clone()].into_iter().collect(),
+		}));
+		state.reduce(ConnectionAction::Connected(ConnectedAction {
+			network: network.clone(),
+			result: Ok([peer].into()),
+		}));
+
+		// did_use_initial should return current peers
+		let initial = state.did_use_initial(&to);
+		assert_eq!(
+			initial,
+			Some(DidPeersChangedAction {
+				to: to.clone(),
+				peers: [peer].into(),
+				added: [peer].into(),
+				removed: Default::default(),
+			})
+		);
+
+		// unknown DID should return None
+		assert_eq!(state.did_use_initial(&"did:local:unknown".to_string()), None);
 	}
 }

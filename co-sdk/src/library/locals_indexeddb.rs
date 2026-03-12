@@ -178,7 +178,7 @@ impl LocalActor for IdbLocalsActor {
 
 	async fn initialize(
 		&self,
-		handle: &ActorHandle<Self::Message>,
+		_handle: &ActorHandle<Self::Message>,
 		_tags: &co_primitives::Tags,
 		db_name: Self::Initialize,
 	) -> Result<Self::State, ActorError> {

@@ -8,9 +8,12 @@ pub mod all_tags;
 pub mod build_core;
 pub mod builtin_cores;
 pub mod cancel;
-pub(crate) mod compat;
+pub mod co_access_policy;
 #[cfg(feature = "network")]
 pub mod connections_peer_provider;
+#[cfg(feature = "network")]
+pub(crate) mod contact;
+pub mod contact_handler;
 pub mod core_source;
 pub mod create_reducer_action;
 #[cfg(feature = "pinning")]
@@ -35,6 +38,7 @@ pub mod is_cid_encrypted;
 pub mod is_membership_heads_encrypted;
 #[cfg(feature = "network")]
 pub mod join;
+pub mod join_unrelated_co;
 #[cfg(feature = "network")]
 pub mod key_exchange;
 #[cfg(feature = "network")]
@@ -65,6 +69,8 @@ pub mod network_queue;
 pub mod network_resolver;
 #[cfg(feature = "network")]
 pub mod push_heads;
+#[cfg(feature = "network")]
+pub mod request_co_state;
 pub mod runtime_dispatch;
 pub mod sample_stream;
 pub mod settings_timeout;

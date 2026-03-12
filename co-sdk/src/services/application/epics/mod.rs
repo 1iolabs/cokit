@@ -14,6 +14,10 @@ mod co_didcomm_send;
 mod co_heads_publish;
 #[cfg(feature = "network")]
 mod co_heads_subscribe;
+#[cfg(feature = "network")]
+mod contact_receive;
+#[cfg(feature = "network")]
+mod contact_send;
 mod core_action_push;
 #[cfg(feature = "network")]
 mod did_subscribe;
@@ -48,6 +52,8 @@ mod network_queue;
 #[cfg(feature = "network")]
 mod network_start;
 #[cfg(feature = "network")]
+mod pending_resolve;
+#[cfg(feature = "network")]
 mod push_heads;
 mod resolve_private_identity;
 
@@ -76,6 +82,7 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(heads_message::heads_message_receive)
 		.join(heads_message::heads_message_heads)
 		.join(heads_message::heads_message_heads_request)
+		.join(heads_message::heads_message_state_request)
 		.join(didcomm_send::didcomm_send)
 		.join(didcomm_connected::didcomm_connected)
 		.join(key_request_receive::key_request_receive)
@@ -86,13 +93,16 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(push_heads::PushHeadsEpic::default())
 		.join(co_heads_publish::co_heads_publish)
 		.join(co_heads_subscribe::CoHeadsSubscribeEpic::default())
+		.join(contact_send::contact_send)
+		.join(contact_receive::contact_receive)
 		.join(co_didcomm_send::co_didcomm_send)
 		.join(network_queue::network_queue_message_epic)
 		.join(network_queue::network_started_epic)
 		.join(network_queue::NetworkQueueProcessEpic::default())
 		.join(network_block_get::network_block_get)
 		.join(network_block_get::network_task_execute)
-		.join(network_start::network_start);
+		.join(network_start::network_start)
+		.join(pending_resolve::pending_resolve);
 
 	// trace
 	epic.join(TracingEpic::new(tags))

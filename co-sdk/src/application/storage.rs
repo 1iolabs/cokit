@@ -9,10 +9,9 @@ use crate::CoUuid;
 #[cfg(feature = "fs")]
 use crate::DynamicCoUuid;
 #[cfg(feature = "fs")]
-use co_storage::FsStorage;
-use co_storage::{
-	Algorithm, EncryptedBlockStorage, EncryptionReferenceMode, JoinBlockStorage, MemoryBlockStorage, StaticBlockStorage,
-};
+use co_storage::{Algorithm, EncryptedBlockStorage, EncryptionReferenceMode, FsStorage};
+use co_storage::{JoinBlockStorage, MemoryBlockStorage, StaticBlockStorage};
+#[cfg(feature = "fs")]
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]

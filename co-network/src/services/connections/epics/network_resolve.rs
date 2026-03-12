@@ -3,17 +3,13 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{
-	compat::Instant,
-	services::connections::{
-		action::{ConnectionAction, NetworkResolveAction, NetworkResolvedAction},
-		actor::ConnectionsContext,
-		ConnectionState, NetworkResolver,
-	},
+use crate::services::connections::{
+	action::{ConnectionAction, NetworkResolveAction, NetworkResolvedAction},
+	actor::ConnectionsContext,
+	ConnectionState, NetworkResolver,
 };
-use co_actor::{Actions, Epic};
+use co_actor::{time::Instant, Actions, Epic};
 use futures::{FutureExt, Stream};
-
 pub struct NetworkResolveEpic();
 impl NetworkResolveEpic {
 	pub fn new() -> Self {

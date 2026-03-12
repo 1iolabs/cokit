@@ -11,7 +11,7 @@ check_wasm () {
 }
 
 check_wasm co-primitives
-check_wasm co-actor
+check_wasm co-actor --no-default-features -F js
 check_wasm co-api
 check_wasm co-identity --no-default-features -F web
 check_wasm co-storage --no-default-features -F web
