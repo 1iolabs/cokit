@@ -3,6 +3,8 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+#[cfg(feature = "native")]
+use crate::services::network::NetworkDns;
 use crate::{
 	bitswap::{BitswapMessage, BitswapStoreClient},
 	didcomm, discovery,
@@ -13,7 +15,7 @@ use crate::{
 	},
 	NetworkSettings,
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, Context as _};
 use co_actor::{time, ActorHandle, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
 use co_primitives::DynamicCoDate;
@@ -138,34 +140,73 @@ impl Libp2pNetwork {
 			autonat_client,
 		};
 
-		// swarm
+		// swarm helper
+		macro_rules! build_swarm {
+			(@finalize $builder:expr) => {
+				if config.nat {
+					$builder
+						.with_relay_client(noise::Config::new, yamux::Config::default)?
+						.with_behaviour(move |_keypair, relay_client| {
+							behaviour.relay_client = Some(relay_client).into();
+							behaviour
+						})
+						.context("behaviour")?
+						.with_swarm_config(|c| c.with_idle_connection_timeout(config.keep_alive))
+						.build()
+				} else {
+					$builder
+						.with_behaviour(move |_keypair| behaviour)?
+						.with_swarm_config(|c| c.with_idle_connection_timeout(config.keep_alive))
+						.build()
+				}
+			};
+			(@websocket $builder:expr) => {
+				if config.websocket {
+					let b = $builder
+						.with_websocket(noise::Config::new, yamux::Config::default)
+						.await
+						.context("websocket")?;
+					build_swarm!(@finalize b)
+				} else {
+					build_swarm!(@finalize $builder)
+				}
+			};
+			($builder:expr) => {
+				match config.dns {
+					NetworkDns::None => {
+						let b = $builder.with_dns_config(
+							libp2p::dns::ResolverConfig::new(),
+							libp2p::dns::ResolverOpts::default(),
+						);
+						build_swarm!(@websocket b)
+					}
+					NetworkDns::System => {
+						let b = $builder.with_dns().context("dns")?;
+						build_swarm!(@websocket b)
+					}
+					NetworkDns::Cloudflare => {
+						let b = $builder.with_dns_config(
+							libp2p::dns::ResolverConfig::cloudflare(),
+							libp2p::dns::ResolverOpts::default(),
+						);
+						build_swarm!(@websocket b)
+					}
+				}
+			};
+		}
+
+		// swarm: native
 		#[cfg(feature = "native")]
 		let mut swarm = {
 			let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
 				.with_tokio()
-				.with_tcp(libp2p::tcp::Config::default(), noise::Config::new, yamux::Config::default)?
-				.with_quic()
-				.with_dns()?
-				.with_websocket(noise::Config::new, yamux::Config::default)
-				.await
-				.map_err(|e| anyhow!("websocket transport: {e}"))?;
-			if config.nat {
-				swarm_builder
-					.with_relay_client(noise::Config::new, yamux::Config::default)?
-					.with_behaviour(move |_keypair, relay_client| {
-						behaviour.relay_client = Some(relay_client).into();
-						behaviour
-					})?
-					.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
-					.build()
-			} else {
-				swarm_builder
-					.with_behaviour(move |_keypair| behaviour)?
-					.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
-					.build()
-			}
+				.with_tcp(libp2p::tcp::Config::default(), noise::Config::new, yamux::Config::default)
+				.context("tcp")?
+				.with_quic();
+			build_swarm!(swarm_builder)
 		};
 
+		// swarm: webrtc
 		#[cfg(all(feature = "js", target_arch = "wasm32"))]
 		let mut swarm = {
 			use libp2p::core::{upgrade::Version, Transport};
@@ -177,25 +218,12 @@ impl Libp2pNetwork {
 						.authenticate(noise::Config::new(&keypair).expect("noise config"))
 						.multiplex(yamux::Config::default())
 						.boxed())
-				})?
+				})
+				.context("webrtc")?
 				.with_other_transport(|keypair| {
 					libp2p::webrtc_websys::Transport::new(libp2p::webrtc_websys::Config::new(&keypair))
 				})?;
-			if config.nat {
-				swarm_builder
-					.with_relay_client(noise::Config::new, yamux::Config::default)?
-					.with_behaviour(move |_keypair, relay_client| {
-						behaviour.relay_client = Some(relay_client).into();
-						behaviour
-					})?
-					.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
-					.build()
-			} else {
-				swarm_builder
-					.with_behaviour(move |_keypair| behaviour)?
-					.with_swarm_config(|swarm_config| swarm_config.with_idle_connection_timeout(config.keep_alive))
-					.build()
-			}
+			build_swarm!(@finalize swarm_builder)
 		};
 
 		// external addresses
@@ -216,7 +244,9 @@ impl Libp2pNetwork {
 			}
 
 			// dial bootstrap
-			swarm.dial(DialOpts::peer_id(peer_id).addresses(vec![bootstrap.clone()]).build())?;
+			swarm
+				.dial(DialOpts::peer_id(peer_id).addresses(vec![bootstrap.clone()]).build())
+				.with_context(|| format!("dial bootstrap: {:?}", bootstrap))?;
 
 			// use as explicit gossip peer
 			swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
@@ -244,7 +274,11 @@ impl Libp2pNetwork {
 		#[cfg(not(target_arch = "wasm32"))]
 		let runtime = {
 			let mut runtime = runtime;
-			runtime.listen(swarm.listen_on(config.listen)?);
+			runtime.listen(
+				swarm
+					.listen_on(config.listen.clone())
+					.with_context(|| format!("listen_on: {:?}", config.listen))?,
+			);
 			runtime
 		};
 

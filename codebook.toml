@@ -16,5 +16,6 @@ words = [
     "thid",
     "tokio",
     "wasmer",
+    "webrtc",
 ]
 ignore_patterns = ["COkit|BRANDGUARDIAN GmbH|AGPLv3|libp2p"]

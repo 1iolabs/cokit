@@ -26,7 +26,6 @@ impl CoContext {
 			},
 			#[cfg(feature = "tracing")]
 			crate::CoLog::Print => {
-				println!("tracing-print");
 				co_sdk::TracingBuilder::new(settings.identifier.clone(), None)
 					.with_stderr_logging()
 					.with_max_level(settings.log_level.into())
@@ -44,7 +43,6 @@ impl CoContext {
 						co_sdk::CoStorageSetting::PathDefault => Some(ApplicationBuilder::default_path()),
 						_ => None,
 					};
-					println!("tracing-bunyan: {:?}", base_path);
 					co_sdk::TracingBuilder::new(settings.identifier.clone(), base_path)
 						.with_bunyan_logging(path)
 						.with_max_level(settings.log_level.into())
@@ -54,7 +52,6 @@ impl CoContext {
 			},
 			#[cfg(feature = "tracing-oslog")]
 			crate::CoLog::Os => {
-				println!("tracing-oslog");
 				use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 				tracing_subscriber::registry()
 					.with(
@@ -67,9 +64,7 @@ impl CoContext {
 					.with(tracing_oslog::OsLogger::new(&settings.bundle_identifier, "default"))
 					.init();
 			},
-			_ => {
-				println!("tracing-none");
-			},
+			_ => {},
 		}
 
 		// spawn
