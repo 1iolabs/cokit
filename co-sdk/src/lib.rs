@@ -55,7 +55,9 @@ pub use co_primitives::{
 pub use co_runtime::{co_v1, Core, ExecuteError, GuardReference, RuntimeContext, RuntimeInstance, RuntimePool};
 pub use co_storage::{BlockStorageContentMapping, MemoryBlockStorage};
 #[cfg(feature = "fs")]
-pub use library::build_core::{build_core, build_core_with_options, crate_repository_path, BuildCoreArtifact, BuildCoreOptions};
+pub use library::build_core::{
+	build_core, build_core_with_options, crate_repository_path, BuildCoreArtifact, BuildCoreOptions,
+};
 #[cfg(feature = "network")]
 pub use library::keystore_fetch::keystore_fetch;
 #[cfg(feature = "network")]
