@@ -14,16 +14,22 @@ use crate::{
 use anyhow::anyhow;
 use std::fmt::Debug;
 use wasmer::{imports, AsStoreMut, Function, FunctionEnv, FunctionEnvMut, Instance, Memory, Module, Store, WasmPtr};
+#[cfg(any(feature = "headless", feature = "llvm", feature = "cranelift"))]
 use wasmer_types::Features;
 
 enum RuntimeState {
-	Uninitialized(bool, Vec<u8>),
+	Uninitialized(bool, Vec<u8>, Option<Vec<WasmerRuntimeKind>>),
 	Initialized(Box<WasmerRuntime>),
 }
 impl Debug for RuntimeState {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::Uninitialized(arg0, arg1) => f.debug_tuple("Uninitialized").field(arg0).field(&arg1.len()).finish(),
+			Self::Uninitialized(arg0, arg1, arg2) => f
+				.debug_tuple("Uninitialized")
+				.field(arg0)
+				.field(&arg1.len())
+				.field(arg2)
+				.finish(),
 			Self::Initialized(arg0) => f.debug_tuple("Initialized").field(arg0).finish(),
 		}
 	}
@@ -35,7 +41,11 @@ struct Wasmer {
 }
 impl Wasmer {
 	pub fn new(native: bool, bytes: Vec<u8>) -> Self {
-		Self { state: RuntimeState::Uninitialized(native, bytes) }
+		Self { state: RuntimeState::Uninitialized(native, bytes, None) }
+	}
+
+	pub fn with_preferred_engines(native: bool, bytes: Vec<u8>, engines: Vec<WasmerRuntimeKind>) -> Self {
+		Self { state: RuntimeState::Uninitialized(native, bytes, Some(engines)) }
 	}
 }
 impl Runtime for Wasmer {
@@ -66,8 +76,8 @@ impl Runtime for Wasmer {
 fn wasmer_runtime(state: &mut RuntimeState) -> Result<&mut WasmerRuntime, RuntimeError> {
 	// initialize
 	let runtime: &mut WasmerRuntime = match state {
-		RuntimeState::Uninitialized(native, bytes) => {
-			*state = RuntimeState::Initialized(Box::new(WasmerRuntime::new(*native, bytes)?));
+		RuntimeState::Uninitialized(native, bytes, preferred) => {
+			*state = RuntimeState::Initialized(Box::new(WasmerRuntime::new(*native, bytes, preferred.take())?));
 			if let RuntimeState::Initialized(runtime) = state {
 				runtime
 			} else {
@@ -81,6 +91,10 @@ fn wasmer_runtime(state: &mut RuntimeState) -> Result<&mut WasmerRuntime, Runtim
 
 pub fn create_runtime(native: bool, bytes: Vec<u8>) -> RuntimeBox {
 	Box::new(Wasmer::new(native, bytes))
+}
+
+pub fn create_runtime_with_engines(native: bool, bytes: Vec<u8>, engines: Vec<WasmerRuntimeKind>) -> RuntimeBox {
+	Box::new(Wasmer::with_preferred_engines(native, bytes, engines))
 }
 
 pub struct WasmerRuntime {
@@ -118,6 +132,10 @@ pub enum WasmerError {
 	Deserialize(#[from] wasmer::DeserializeError),
 	#[error("No engine available")]
 	NoEngineAvailable,
+	#[error("Engine not available: {0:?}")]
+	EngineNotAvailable(WasmerRuntimeKind),
+	#[error("All engines failed: {0:?}")]
+	AllEnginesFailed(Vec<(WasmerRuntimeKind, String)>),
 }
 impl From<WasmerError> for RuntimeError {
 	fn from(value: WasmerError) -> Self {
@@ -128,16 +146,25 @@ impl From<WasmerError> for RuntimeError {
 			WasmerError::Runtime(e) => Self::Runtime(e.into()),
 			WasmerError::Deserialize(e) => Self::Deserialize(e.into()),
 			e @ WasmerError::NoEngineAvailable => Self::InvalidArgument(e.into()),
+			e @ WasmerError::EngineNotAvailable(_) => Self::InvalidArgument(e.into()),
+			e @ WasmerError::AllEnginesFailed(_) => Self::InvalidArgument(e.into()),
 		}
 	}
 }
 
 impl WasmerRuntime {
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(bytes), fields(bytes.len = bytes.len()))]
-	pub fn new(native: bool, bytes: &[u8]) -> Result<Self, WasmerError> {
+	pub fn new(
+		native: bool,
+		bytes: &[u8],
+		preferred_engines: Option<Vec<WasmerRuntimeKind>>,
+	) -> Result<Self, WasmerError> {
 		// module
-		let (kind, store, module) =
-			if native { WasmerRuntimeBuilder::native(bytes) } else { WasmerRuntimeBuilder::wasm(bytes) }.build()?;
+		let mut builder = if native { WasmerRuntimeBuilder::native(bytes) } else { WasmerRuntimeBuilder::wasm(bytes) };
+		if let Some(engines) = preferred_engines {
+			builder = builder.with_preferred_engines(engines);
+		}
+		let (kind, store, module) = builder.build()?;
 
 		// TODO: adjust check to support state or guard only binaries
 		// // check
@@ -208,6 +235,7 @@ impl WasmerRuntime {
 
 /// Initiate a WASM (or AOT native) module.
 /// Attempts to pick the most optimal runtime which is available.
+/// If compilation fails for one engine, falls back to the next available engine.
 ///
 /// See:
 /// - https://github.com/wasmerio/wasmer/blob/dcaff6c83316e9e67b62ade47e70a9b121c08b15/lib/cli/src/backend.rs#L670
@@ -215,8 +243,7 @@ pub struct WasmerRuntimeBuilder<'a> {
 	#[cfg(feature = "headless")]
 	native: bool,
 	bytes: &'a [u8],
-	#[cfg(any(feature = "llvm", feature = "cranelift"))]
-	llvm: bool,
+	preferred_engines: Option<Vec<WasmerRuntimeKind>>,
 }
 impl<'a> WasmerRuntimeBuilder<'a> {
 	pub fn wasm(bytes: &'a [u8]) -> Self {
@@ -224,8 +251,7 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 			#[cfg(feature = "headless")]
 			native: false,
 			bytes,
-			#[cfg(any(feature = "llvm", feature = "cranelift"))]
-			llvm: true,
+			preferred_engines: None,
 		}
 	}
 
@@ -234,14 +260,12 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 			#[cfg(feature = "headless")]
 			native: true,
 			bytes,
-			#[cfg(any(feature = "llvm", feature = "cranelift"))]
-			llvm: true,
+			preferred_engines: None,
 		}
 	}
 
-	#[cfg(any(feature = "llvm", feature = "cranelift"))]
-	pub fn for_info(mut self) -> Self {
-		self.llvm = false;
+	pub fn with_preferred_engines(mut self, engines: Vec<WasmerRuntimeKind>) -> Self {
+		self.preferred_engines = Some(engines);
 		self
 	}
 
@@ -255,8 +279,82 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 		features
 	}
 
+	/// Try to compile the WASM module using a specific engine.
+	#[allow(unreachable_code, unused_variables)]
+	fn try_engine(&self, kind: WasmerRuntimeKind) -> Result<(WasmerRuntimeKind, Store, Module), WasmerError> {
+		match kind {
+			WasmerRuntimeKind::Llvm => {
+				#[cfg(feature = "llvm")]
+				if !is_sandboxed() {
+					let mut config = wasmer_compiler_llvm::LLVM::default();
+					wasmer_compiler::CompilerConfig::canonicalize_nans(&mut config, true);
+					let engine: wasmer::Engine = wasmer::sys::EngineBuilder::new(config)
+						.set_features(Some(Self::features()))
+						.engine()
+						.into();
+					let store = Store::new(engine);
+					let module = Module::new(&store, self.bytes)?;
+					return Ok((WasmerRuntimeKind::Llvm, store, module));
+				}
+				Err(WasmerError::EngineNotAvailable(kind))
+			},
+			WasmerRuntimeKind::Cranelift => {
+				#[cfg(feature = "cranelift")]
+				if !is_sandboxed() {
+					let mut config = wasmer_compiler_cranelift::Cranelift::new();
+					wasmer_compiler::CompilerConfig::canonicalize_nans(&mut config, true);
+					let engine: wasmer::Engine = wasmer::sys::EngineBuilder::new(config)
+						.set_features(Some(Self::features()))
+						.engine()
+						.into();
+					let store = Store::new(engine);
+					let module = Module::new(&store, self.bytes)?;
+					return Ok((WasmerRuntimeKind::Cranelift, store, module));
+				}
+				Err(WasmerError::EngineNotAvailable(kind))
+			},
+			WasmerRuntimeKind::Wamr => {
+				#[cfg(feature = "wamr")]
+				{
+					let engine: wasmer::Engine = wasmer::wamr::Wamr::new().into();
+					let store = Store::new(engine);
+					let module = Module::new(&store, self.bytes)?;
+					return Ok((WasmerRuntimeKind::Wamr, store, module));
+				}
+				#[allow(unreachable_code)]
+				Err(WasmerError::EngineNotAvailable(kind))
+			},
+			WasmerRuntimeKind::Wasmi => {
+				#[cfg(feature = "wasmi")]
+				{
+					let engine: wasmer::Engine = wasmer::wasmi::Wasmi::new().into();
+					let store = Store::new(engine);
+					let module = Module::new(&store, self.bytes)?;
+					return Ok((WasmerRuntimeKind::Wasmi, store, module));
+				}
+				#[allow(unreachable_code)]
+				Err(WasmerError::EngineNotAvailable(kind))
+			},
+			WasmerRuntimeKind::Jsc => {
+				#[cfg(all(feature = "jsc", target_vendor = "apple"))]
+				{
+					let engine = wasmer::jsc::JSC::default();
+					let store = Store::new(engine);
+					let module = Module::new(&store, self.bytes)?;
+					return Ok((WasmerRuntimeKind::Jsc, store, module));
+				}
+				#[allow(unreachable_code)]
+				Err(WasmerError::EngineNotAvailable(kind))
+			},
+			// Platform-specific kinds are not fallback candidates
+			_ => Err(WasmerError::EngineNotAvailable(kind)),
+		}
+	}
+
 	#[allow(unreachable_code)]
 	pub fn build(self) -> Result<(WasmerRuntimeKind, Store, Module), WasmerError> {
+		// Platform-specific paths: no fallback, return immediately.
+
 		// js
 		#[cfg(feature = "js")]
 		{
@@ -277,71 +375,43 @@ impl<'a> WasmerRuntimeBuilder<'a> {
 			return Ok((WasmerRuntimeKind::Headless, store, module));
 		}
 
-		// jsc feature (run WASM using JavaScriptCore framework on macos/ios)
-		#[cfg(all(feature = "jsc", target_vendor = "apple"))]
-		{
-			let engine = wasmer::jsc::JSC::default();
-			let store = Store::new(engine);
-			let module = Module::new(&store, self.bytes)?;
-			return Ok((WasmerRuntimeKind::Jsc, store, module));
+		// Compiler backends: try each with fallback on compilation failure.
+		let default_order = [
+			WasmerRuntimeKind::Llvm,
+			WasmerRuntimeKind::Cranelift,
+			WasmerRuntimeKind::Jsc,
+			WasmerRuntimeKind::Wamr,
+			WasmerRuntimeKind::Wasmi,
+		];
+		let engine_order: &[WasmerRuntimeKind] = match &self.preferred_engines {
+			Some(engines) => engines,
+			None => &default_order,
+		};
+
+		let mut errors: Vec<(WasmerRuntimeKind, String)> = Vec::new();
+
+		for &kind in engine_order {
+			match self.try_engine(kind) {
+				Ok(result) => return Ok(result),
+				Err(WasmerError::EngineNotAvailable(_)) => {
+					// engine not compiled in or not usable — skip silently
+				},
+				Err(err) => {
+					tracing::warn!(?kind, ?err, "engine compilation failed, trying next");
+					errors.push((kind, err.to_string()));
+				},
+			}
 		}
 
-		// llvm feature
-		#[cfg(feature = "llvm")]
-		if self.llvm && !is_sandboxed() {
-			let mut config = wasmer_compiler_llvm::LLVM::default();
-			wasmer_compiler::CompilerConfig::canonicalize_nans(&mut config, true);
-			// config.opt_level(wasmer_compiler_llvm::LLVMOptLevel::None);
-			// config.enable_verifier();
-			let engine: wasmer::Engine = wasmer::sys::EngineBuilder::new(config)
-				.set_features(Some(Self::features()))
-				.engine()
-				.into();
-			let store = Store::new(engine);
-			let module = Module::new(&store, self.bytes)?;
-			return Ok((WasmerRuntimeKind::Llvm, store, module));
+		if errors.is_empty() {
+			Err(WasmerError::NoEngineAvailable)
+		} else {
+			Err(WasmerError::AllEnginesFailed(errors))
 		}
-
-		// cranelift feature
-		#[cfg(feature = "cranelift")]
-		if self.llvm && !is_sandboxed() {
-			let mut config = wasmer_compiler_cranelift::Cranelift::new();
-			wasmer_compiler::CompilerConfig::canonicalize_nans(&mut config, true);
-			let engine: wasmer::Engine = wasmer::sys::EngineBuilder::new(config)
-				.set_features(Some(Self::features()))
-				.engine()
-				.into();
-			let store = Store::new(engine);
-			let module = Module::new(&store, self.bytes)?;
-			return Ok((WasmerRuntimeKind::Cranelift, store, module));
-		}
-
-		// wamr (WebAssembly Micro Runtime) feature
-		// See: https://wasmer.io/posts/introducing-wasmer-v5
-		#[cfg(feature = "wamr")]
-		{
-			let engine: wasmer::Engine = wasmer::wamr::Wamr::new().into();
-			let store = Store::new(engine);
-			let module = Module::new(&store, self.bytes)?;
-			return Ok((WasmerRuntimeKind::Wamr, store, module));
-		}
-
-		// wasmi feature
-		#[cfg(feature = "wasmi")]
-		{
-			let engine: wasmer::Engine = wasmer::wasmi::Wasmi::new().into();
-			let store = Store::new(engine);
-			let module = Module::new(&store, self.bytes)?;
-			return Ok((WasmerRuntimeKind::Wasmi, store, module));
-		}
-
-		// none
-		Err(WasmerError::NoEngineAvailable)
 	}
 }
 
-#[derive(Debug, Clone, Copy)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WasmerRuntimeKind {
 	Headless,
 	Llvm,

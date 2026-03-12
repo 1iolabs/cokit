@@ -35,6 +35,6 @@ pub use types::{
 	guard::GuardReference,
 };
 cfg_wasmer! {
-	pub use runtimes::wasmer::create_runtime;
+	pub use runtimes::wasmer::{create_runtime, create_runtime_with_engines, WasmerRuntimeKind};
 	pub use library::module_description::ModuleDescription;
 }

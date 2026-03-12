@@ -42,6 +42,16 @@ pub struct NetworkSettings {
 	/// Enable mDNS protocol.
 	pub mdns: bool,
 
+	/// Enable Websocket protocol.
+	///
+	/// # Notes
+	/// - Required to let browsers connect to this instance.
+	/// - Not available on mobile.
+	pub websocket: bool,
+
+	/// DNS configuration.
+	pub dns: NetworkDns,
+
 	/// Maximum number of bytes allowed on a relay circuit.
 	/// If `None`, the libp2p default (128 KiB) is used.
 	pub max_circuit_bytes: Option<u64>,
@@ -62,6 +72,8 @@ impl Default for NetworkSettings {
 			relay: false,
 			nat: true,
 			mdns: true,
+			websocket: true,
+			dns: Default::default(),
 			max_circuit_bytes: None,
 			max_circuit_duration: None,
 		}
@@ -70,6 +82,11 @@ impl Default for NetworkSettings {
 impl NetworkSettings {
 	pub fn new() -> Self {
 		Self::default()
+	}
+
+	/// Mobile configuration.
+	pub fn mobile() -> Self {
+		Self { websocket: false, dns: NetworkDns::Cloudflare, ..Default::default() }
 	}
 
 	/// Web configuration.
@@ -201,4 +218,22 @@ impl NetworkSettings {
 		}
 		Ok(self)
 	}
+}
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub enum NetworkDns {
+	/// Do not use and DNS.
+	None,
+
+	/// Use system configuration.
+	///
+	/// # Note
+	/// - Uses /etc/resolv.conf
+	/// - Not available on mobile yet.
+	#[default]
+	System,
+
+	/// Use preconfigured Cloudflare DNS.
+	Cloudflare,
 }
