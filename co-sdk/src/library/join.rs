@@ -5,7 +5,7 @@
 
 use co_identity::{DidCommHeader, PrivateIdentity};
 use co_network::EncodedMessage;
-use co_primitives::{to_json_string, CoId};
+use co_primitives::{to_json_string, CoDateRef, CoId};
 use serde::{Deserialize, Serialize};
 
 pub const CO_DIDCOMM_JOIN: &str = "co-join";
@@ -23,8 +23,9 @@ pub const CO_DIDCOMM_JOIN: &str = "co-join";
 // 	Ok(EncodedMessage(message.into_bytes()))
 // }
 
-/// Create an encoded (signed) join message to unknown receipents.
+/// Create an encoded (signed) join message to unknown recipients.
 pub fn create_join_message_from<F>(
+	date: &CoDateRef,
 	from: &F,
 	co: CoId,
 	thid: Option<String>,
@@ -32,7 +33,7 @@ pub fn create_join_message_from<F>(
 where
 	F: PrivateIdentity + Send + Sync + 'static,
 {
-	let (from_didcomm, mut header) = DidCommHeader::create_from(from, CO_DIDCOMM_JOIN)?;
+	let (from_didcomm, mut header) = DidCommHeader::create_from(date, from, CO_DIDCOMM_JOIN)?;
 	header.thid = thid;
 	let payload = CoJoinPayload { id: co };
 	let body = to_json_string(&payload)?;

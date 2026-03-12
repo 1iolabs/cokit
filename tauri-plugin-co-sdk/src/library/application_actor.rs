@@ -10,8 +10,8 @@ use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Response, ResponseStream};
 use co_primitives::Block;
 use co_sdk::{
-	Action, Application, ApplicationMessage, BlockStorage, BlockStorageExt, CoId, CoReducer, CoReducerFactory, Did,
-	DidKeyIdentity, DidKeyProvider, Identity, PrivateIdentityResolver, Tags, CO_CORE_NAME_KEYSTORE,
+	state, Action, Application, ApplicationMessage, BlockStorage, BlockStorageExt, CoId, CoReducer, CoReducerFactory,
+	Did, DidKeyIdentity, DidKeyProvider, Identity, PrivateIdentityResolver, Tags, CO_CORE_NAME_KEYSTORE,
 };
 use futures::{pin_mut, StreamExt};
 use ipld_core::ipld::Ipld;
@@ -268,7 +268,6 @@ impl Actor for ApplicationActor {
 			ApplicationActorMessage::GetActions(request, response) => {
 				let sessions = state.sessions.clone();
 				let mut next_heads = request.heads.clone();
-				let co_context = state.application.context().clone();
 				response.spawn(move || async move {
 					let session_id = request.session;
 					let session = sessions
@@ -280,10 +279,7 @@ impl Actor for ApplicationActor {
 						.reducer
 						.storage();
 
-					let stream = co_context
-						.entries_from_heads(session.reducer.id(), storage, request.heads)
-						.await?
-						.take(request.count);
+					let stream = state::heads_stream(storage, session.reducer.id(), request.heads).take(request.count);
 					pin_mut!(stream);
 					let mut actions = Vec::new();
 					while let Some(item) = stream.next().await {

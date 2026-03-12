@@ -11,10 +11,8 @@ use crate::{
 		library::find_connectable_bootstrap::find_connectable_bootstrap, ConnectionState,
 	},
 };
-use co_actor::{Actions, Epic};
+use co_actor::{time, Actions, Epic};
 use futures::{stream, FutureExt, Stream, StreamExt};
-use std::time::Instant;
-
 /// Dial a bootstrap when we have a insufficent peers condition.
 #[derive(Debug, Default)]
 pub struct InsufficentPeersEpic {}
@@ -28,7 +26,7 @@ impl Epic<ConnectionAction, ConnectionState, ConnectionsContext> for Insufficent
 	) -> Option<impl Stream<Item = Result<ConnectionAction, anyhow::Error>> + 'static> {
 		match message {
 			ConnectionAction::InsufficentPeers => {
-				let next_attempt = find_connectable_bootstrap(state, Instant::now(), backoff_with_jitter);
+				let next_attempt = find_connectable_bootstrap(state, time::Instant::now(), backoff_with_jitter);
 				Some(
 					async move {
 						let action = match next_attempt {
@@ -37,7 +35,7 @@ impl Epic<ConnectionAction, ConnectionState, ConnectionsContext> for Insufficent
 								endpoints: bootstrap.endpoints.clone(),
 							})),
 							Err(Some(next_attempt)) => {
-								tokio::time::sleep_until(next_attempt.into()).await;
+								time::sleep_until(next_attempt).await;
 								Some(ConnectionAction::InsufficentPeers)
 							},
 							Err(None) => None,
@@ -71,6 +69,7 @@ mod tests {
 	use co_identity::{
 		IdentityResolver, MemoryIdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentityResolver,
 	};
+	use co_primitives::{CoDate, StaticCoDate};
 	use futures::TryStreamExt;
 	use libp2p::{Multiaddr, PeerId};
 	use std::{
@@ -94,11 +93,13 @@ mod tests {
 		let state = ConnectionState {
 			keep_alive: Duration::from_secs(30),
 			co: Default::default(),
+			did: Default::default(),
 			networks: Default::default(),
 			peers: Default::default(),
 			bootstrap,
 		};
 		let context = ConnectionsContext {
+			date: StaticCoDate(0).boxed(),
 			tasks: TaskSpawner::default(),
 			settings: NetworkSettings::default(),
 			network: CoNetworkTaskSpawner::new_closed(local_peer),

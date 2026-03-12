@@ -5,7 +5,10 @@
 
 pub mod change;
 pub mod encrypted;
+#[cfg(feature = "fs")]
 pub mod fs;
+#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+pub mod indexeddb;
 pub mod join;
 pub mod links;
 pub mod mapped;
@@ -14,4 +17,5 @@ pub mod overlay;
 pub mod request;
 pub mod static_storage;
 pub mod store_params;
+#[cfg(feature = "native")]
 pub mod sync;

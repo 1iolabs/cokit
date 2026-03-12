@@ -6,12 +6,12 @@
 use crate::{
 	library::{create_reducer_action::create_reducer_action, membership_all_heads::membership_all_heads},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
-	CoReducer, CoReducerState, CoStorage, Reducer, ReducerChangeContext, ReducerChangedHandler, StaticCoDate,
+	CoReducer, CoReducerState, CoStorage, Reducer, ReducerChangeContext, ReducerChangedHandler,
 };
 use async_trait::async_trait;
 use co_core_membership::{CoState, MembershipsAction};
 use co_identity::PrivateIdentityBox;
-use co_primitives::{CoId, WeakCid};
+use co_primitives::{CoId, StaticCoDate, WeakCid};
 use co_storage::EncryptedBlockStorage;
 use std::collections::BTreeSet;
 

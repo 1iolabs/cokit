@@ -4,10 +4,8 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::services::connections::{state::BootstrapPeer, ConnectionState};
-use std::{
-	cmp::min,
-	time::{Duration, Instant},
-};
+use co_actor::time::Instant;
+use std::{cmp::min, time::Duration};
 
 pub fn find_connectable_bootstrap(
 	state: &ConnectionState,

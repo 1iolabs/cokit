@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use co_identity::{network_did_discovery, DidCommHeader, Identity, PeerDidCommHeader, PrivateIdentity};
-use co_primitives::{serde_string_enum, to_json_string, NetworkDidDiscovery};
+use co_primitives::{serde_string_enum, to_json_string, CoDateRef, NetworkDidDiscovery};
 use libp2p::{Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -18,6 +18,7 @@ pub struct DidDiscovery {
 impl DidDiscovery {
 	/// Create DID Discovery request.
 	pub fn create<F, T>(
+		date: &CoDateRef,
 		from_peer: PeerId,
 		from: &F,
 		to: &T,
@@ -30,7 +31,7 @@ impl DidDiscovery {
 		T: Identity + Send + Sync + 'static,
 	{
 		let network = network_did_discovery(to, network)?;
-		let (from_context, to_context, header) = DidCommHeader::create(from, to, message_type)?;
+		let (from_context, to_context, header) = DidCommHeader::create(date, from, to, message_type)?;
 		let message_header = PeerDidCommHeader { header, from_peer_id: Some(from_peer.to_string()) };
 		let message_id = message_header.header.id.clone();
 		let message_body = match message_body {

@@ -34,8 +34,8 @@ pub fn join_send(
 		Action::CoreAction { co, storage, context: _, action, cid: _, head: _ }
 			if co.as_str() == CO_ID_LOCAL && CO_CORE_NAME_MEMBERSHIP == action.core =>
 		{
-			let mambership_action: MembershipsAction = action.get_payload().ok()?;
-			match mambership_action {
+			let membership_action: MembershipsAction = action.get_payload().ok()?;
+			match membership_action {
 				MembershipsAction::Join(membership) if membership.membership_state == MembershipState::Join => {
 					Some((context.clone(), storage.clone(), membership.id, membership.did))
 				},
@@ -118,7 +118,7 @@ async fn find_membership(
 
 /// Create co join message action.
 async fn create_join_action(context: CoContext, storage: CoStorage, membership: Membership) -> anyhow::Result<Action> {
-	// metdata
+	// metadata
 	let invite_cid = membership
 		.tags
 		.link(&KnownTags::CoInviteMetadata.to_string())
@@ -129,9 +129,9 @@ async fn create_join_action(context: CoContext, storage: CoStorage, membership: 
 	let private_identity_resolver = context.private_identity_resolver().await?;
 	let identity = private_identity_resolver.resolve_private(&membership.did).await?;
 	let (message_header, message) =
-		create_join_message_from(&identity, membership.id.clone(), Some(invite.id.clone()))?;
+		create_join_message_from(context.date(), &identity, membership.id.clone(), Some(invite.id.clone()))?;
 
-	// send message to discovered peers until one send succedded and return Action::Joined.
+	// send message to discovered peers until one send succeeded and return Action::Joined.
 	// this will also use invite.peer if possible.
 	let networks = invite_networks(&context, &invite).await?;
 

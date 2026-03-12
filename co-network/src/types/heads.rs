@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use co_identity::DidCommHeader;
-use co_primitives::{CoId, WeakCid};
+use co_primitives::{CoDateRef, CoId, WeakCid};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::BTreeSet;
@@ -24,6 +24,22 @@ pub enum HeadsMessage {
 	#[serde(rename = "r")]
 	HeadsRequest(CoId),
 
+	/// State notification.
+	/// This message must be signed.
+	/// Will be responded with one of:
+	/// - [`HeadsMessage::State`].
+	/// - [`HeadsMessage::Error`].
+	#[serde(rename = "s")]
+	State(CoId, WeakCid, BTreeSet<WeakCid>),
+
+	/// Request state and heads from peer.
+	/// This message must be signed.
+	/// Will be responded with one of:
+	/// - [`HeadsMessage::State`].
+	/// - [`HeadsMessage::Error`].
+	#[serde(rename = "t")]
+	StateRequest(CoId),
+
 	/// Error notification.
 	#[serde(rename = "e")]
 	Error { co: CoId, code: HeadsErrorCode, message: String },
@@ -35,8 +51,8 @@ impl HeadsMessage {
 	}
 
 	/// DIDComm message header.
-	pub fn create_header() -> DidCommHeader {
-		let mut header = DidCommHeader::new(Self::message_type());
+	pub fn create_header(date: &CoDateRef) -> DidCommHeader {
+		let mut header = DidCommHeader::new(date, Self::message_type());
 		header.expires_time = header.created_time.map(|t| t + 120);
 		header
 	}
@@ -46,6 +62,8 @@ impl HeadsMessage {
 			HeadsMessage::Heads(co_id, ..) => co_id,
 			HeadsMessage::HeadsRequest(co_id) => co_id,
 			HeadsMessage::Error { co, .. } => co,
+			HeadsMessage::State(co, ..) => co,
+			HeadsMessage::StateRequest(co) => co,
 		}
 	}
 }

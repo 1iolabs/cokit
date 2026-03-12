@@ -3,98 +3,51 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use super::{fs_read::fs_read_option, fs_write::fs_write};
 use async_trait::async_trait;
 use co_primitives::Secret;
 use co_storage::Algorithm;
-use std::{io::ErrorKind, path::PathBuf};
+use std::{
+	fmt::{Debug, Formatter},
+	sync::Arc,
+};
 
 #[async_trait]
-pub trait LocalSecret {
-	async fn fetch(&self) -> Result<Secret, anyhow::Error>;
+pub trait LocalSecret: Send + Sync + 'static {
+	async fn fetch(&self) -> Result<(Algorithm, Secret), anyhow::Error>;
 }
 
 pub struct MemoryLocalSecret {
+	algorithm: Algorithm,
 	secret: co_storage::Secret,
 }
 impl MemoryLocalSecret {
-	pub fn new() -> Self {
-		Self { secret: Algorithm::default().generate_serect() }
+	pub fn generate() -> Self {
+		let algorithm = Algorithm::default();
+		Self { secret: algorithm.generate_serect(), algorithm }
 	}
 }
 #[async_trait]
 impl LocalSecret for MemoryLocalSecret {
-	async fn fetch(&self) -> Result<Secret, anyhow::Error> {
-		Ok(self.secret.clone().into())
+	async fn fetch(&self) -> Result<(Algorithm, Secret), anyhow::Error> {
+		Ok((self.algorithm, self.secret.clone().into()))
 	}
 }
 
-pub struct KeychainLocalSecret {
-	service: String,
-	user: String,
-}
-impl KeychainLocalSecret {
-	pub fn new(service: String, user: String) -> Self {
-		Self { service, user }
+#[derive(Clone)]
+pub struct DynamicLocalSecret(Arc<dyn LocalSecret>);
+impl Debug for DynamicLocalSecret {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		f.debug_tuple("DynamicLocalSecret").finish()
 	}
-
-	/// Get or create encryption key in OS Keychain.
-	fn fetch_secret_keychain(service: &str, user: &str, allow_create: bool) -> Result<Secret, anyhow::Error> {
-		let entry = keyring::Entry::new(service, user)?;
-		let key_as_base64 = match entry.get_password() {
-			Ok(p) => p,
-			Err(keyring::Error::NoEntry) if allow_create => {
-				// generate and set key
-				let secret = Algorithm::default().generate_serect();
-				let secret_base64 = multibase::encode(multibase::Base::Base64, secret.divulge());
-				entry.set_password(&secret_base64)?;
-
-				// fetch again to make sure the key has persisted
-				return Self::fetch_secret_keychain(service, user, false);
-			},
-			Err(e) => return Err(e.into()),
-		};
-		Ok(Secret::new(multibase::decode(key_as_base64)?.1))
+}
+impl DynamicLocalSecret {
+	pub fn new(secret: impl LocalSecret) -> Self {
+		Self(Arc::new(secret))
 	}
 }
 #[async_trait]
-impl LocalSecret for KeychainLocalSecret {
-	async fn fetch(&self) -> Result<Secret, anyhow::Error> {
-		Self::fetch_secret_keychain(&self.service, &self.user, true)
-	}
-}
-
-pub struct FileLocalSecret {
-	key_path: PathBuf,
-}
-impl FileLocalSecret {
-	pub fn new(file: PathBuf) -> Self {
-		Self { key_path: file }
-	}
-
-	async fn fetch_secret_cbor(key_path: &PathBuf, allow_create: bool) -> Result<Secret, anyhow::Error> {
-		match fs_read_option(key_path).await {
-			Ok(Some(data)) => {
-				let result: Secret = serde_ipld_dagcbor::from_slice(&data)?;
-				Ok(result)
-			},
-			Ok(None) if allow_create => {
-				// create
-				let secret: Secret = Algorithm::default().generate_serect().into();
-				let contents = serde_ipld_dagcbor::to_vec(&secret)?;
-				fs_write(key_path, contents, true).await?;
-
-				// result
-				Ok(secret)
-			},
-			Ok(None) => Err(Into::<std::io::Error>::into(ErrorKind::NotFound).into()),
-			Err(e) => Err(e.into()),
-		}
-	}
-}
-#[async_trait]
-impl LocalSecret for FileLocalSecret {
-	async fn fetch(&self) -> Result<Secret, anyhow::Error> {
-		Self::fetch_secret_cbor(&self.key_path, true).await
+impl LocalSecret for DynamicLocalSecret {
+	async fn fetch(&self) -> Result<(Algorithm, Secret), anyhow::Error> {
+		self.0.fetch().await
 	}
 }

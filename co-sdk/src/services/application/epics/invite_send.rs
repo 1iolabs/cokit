@@ -98,6 +98,7 @@ async fn create_invite(
 
 	// message
 	let (invite_message_header, invite_message) = create_invite_message(
+		context.date(),
 		&from_identity,
 		&to_identity,
 		CoInvitePayload {

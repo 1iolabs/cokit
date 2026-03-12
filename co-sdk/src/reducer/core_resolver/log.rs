@@ -3,22 +3,22 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{CoreResolver, CoreResolverContext, CoreResolverError};
+use crate::{services::runtime::RuntimeHandle, CoreResolver, CoreResolverContext, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{BlockStorage, BlockStorageExt, CoId, DiagnosticMessage, ReducerAction};
-use co_runtime::{RuntimeContext, RuntimePool};
+use co_primitives::{BlockStorage, BlockStorageExt, CoDate, CoId, DiagnosticMessage, DynamicCoDate, ReducerAction};
+use co_runtime::RuntimeContext;
 use ipld_core::ipld::Ipld;
-use std::time::Instant;
 
 #[derive(Debug, Clone)]
 pub struct LogCoreResolver<C> {
 	next: C,
 	co: CoId,
+	date: DynamicCoDate,
 }
 impl<C> LogCoreResolver<C> {
-	pub fn new(core_resolver: C, co: CoId) -> Self {
-		Self { next: core_resolver, co }
+	pub fn new(core_resolver: C, co: CoId, date: DynamicCoDate) -> Self {
+		Self { next: core_resolver, co, date }
 	}
 }
 #[async_trait]
@@ -31,17 +31,17 @@ where
 	async fn execute(
 		&self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		context: &CoreResolverContext,
 		state: &Option<Cid>,
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
-		let start = Instant::now();
+		let start = self.date.now();
 		let mut runtime_context = self.next.execute(storage, runtime, context, state, action).await?;
 
 		// log
 		let action_ipld: Option<ReducerAction<Ipld>> = storage.get_deserialized(action).await.ok();
-		let duration = Instant::now() - start;
+		let duration = self.date.now() - start;
 		tracing::trace!(
 			co = ?self.co,
 			previous_state = ?state,

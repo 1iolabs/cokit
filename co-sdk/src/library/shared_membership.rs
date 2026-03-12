@@ -5,7 +5,8 @@
 
 use crate::{library::find_membership::memberships, CoReducer};
 use co_core_membership::{Membership, MembershipState};
-use co_primitives::{CoId, Did};
+use co_primitives::{CoId, CoTryStreamExt, Did};
+use futures::{StreamExt, TryStreamExt};
 use std::cmp::Ordering;
 
 /// Find shared membership.
@@ -42,6 +43,37 @@ pub async fn shared_membership_active(
 			Some(value) => value == &membership.did,
 			None => true,
 		}))
+}
+
+/// Find active shared membership.
+/// If it is not active yet wait for it to become active.
+pub async fn wait_shared_membership_active(
+	parent: &CoReducer,
+	co: &CoId,
+	identity: Option<&Did>,
+) -> Result<Option<Membership>, anyhow::Error> {
+	if let Some(membership) = shared_membership(parent, co, identity).await? {
+		match membership.membership_state {
+			MembershipState::Active => Ok(Some(membership)),
+			MembershipState::Pending | MembershipState::Join => {
+				let result = parent
+					.reducer_state_stream()
+					.map(Ok)
+					.try_filter_map(move |_parent_reducer_state| {
+						let parent = parent.clone();
+						let co = co.clone();
+						let identity = identity.cloned();
+						async move { shared_membership_active(&parent, &co, identity.as_ref()).await }
+					})
+					.try_first()
+					.await;
+				result
+			},
+			_ => Ok(None),
+		}
+	} else {
+		Ok(None)
+	}
 }
 
 fn sort_membership(identity: Option<&Did>, a: &Membership, b: &Membership) -> Ordering {

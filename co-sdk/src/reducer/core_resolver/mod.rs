@@ -3,11 +3,11 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::ReducerChangeContext;
+use crate::{services::runtime::RuntimeHandle, ReducerChangeContext};
 use async_trait::async_trait;
 use cid::Cid;
 use co_log::EntryBlock;
-use co_runtime::{ExecuteError, RuntimeContext, RuntimePool};
+use co_runtime::{ExecuteError, RuntimeContext};
 use co_storage::StorageError;
 
 pub mod co;
@@ -31,7 +31,7 @@ pub trait CoreResolver<S> {
 	async fn execute(
 		&self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		context: &CoreResolverContext,
 		state: &Option<Cid>,
 		action: &Cid,

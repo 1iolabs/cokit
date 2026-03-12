@@ -13,7 +13,7 @@ use co_actor::{
 };
 use co_identity::{Identity, PeerDidCommHeader, PrivateIdentity, PrivateIdentityBox};
 use co_network::{connections::ConnectionMessage, EncodedMessage, HeadsMessage, NetworkApi, PeerId};
-use co_primitives::{tags, CoId, Tags, WeakCid};
+use co_primitives::{tags, CoId, DynamicCoDate, Tags, WeakCid};
 use futures::{Stream, StreamExt};
 use std::{collections::BTreeSet, future::ready, time::Duration};
 
@@ -25,11 +25,17 @@ pub struct PushHeads {
 	force_mapping: bool,
 }
 impl PushHeads {
-	pub fn new(network: NetworkApi, tasks: TaskSpawner, co: CoId, force_mapping: bool) -> Result<Self, anyhow::Error> {
+	pub fn new(
+		date: DynamicCoDate,
+		network: NetworkApi,
+		tasks: TaskSpawner,
+		co: CoId,
+		force_mapping: bool,
+	) -> Result<Self, anyhow::Error> {
 		let instance = Actor::spawn_with(
 			tasks.clone(),
 			tags!("type": "co-push-heads", "co": co.as_str()),
-			PushHeadsActor { tasks, context: PushHeadsContext(network) },
+			PushHeadsActor { tasks, context: PushHeadsContext(network, date) },
 			PushHeadsState { co: co.clone(), heads: Default::default() },
 		)?;
 		Ok(Self { handle: instance.handle(), force_mapping })
@@ -112,7 +118,7 @@ impl Actor for PushHeadsActor {
 }
 
 #[derive(Debug, Clone)]
-struct PushHeadsContext(NetworkApi);
+struct PushHeadsContext(NetworkApi, DynamicCoDate);
 
 #[derive(Debug, Clone)]
 #[allow(unused)] // we want to see Sent in the logs
@@ -213,9 +219,10 @@ impl Epic<PushHeadsAction, PushHeadsState, PushHeadsContext> for PushHeadsSendEp
 				let identity = identity.clone();
 				let heads = heads.clone();
 				let peers = peers.clone();
+				let date = context.1.clone();
 				async_stream::try_stream! {
 					// message
-					let header = PeerDidCommHeader { header: HeadsMessage::create_header(), from_peer_id: Some(network.local_peer_id().to_string()) };
+					let header = PeerDidCommHeader { header: HeadsMessage::create_header(&date), from_peer_id: Some(network.local_peer_id().to_string()) };
 					let body = HeadsMessage::Heads(id.clone(), heads.iter().map(WeakCid::from).collect());
 					let (_, message) = EncodedMessage::create_signed_json(&identity, header.into(), &body)?;
 

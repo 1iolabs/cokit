@@ -64,7 +64,7 @@ fn connect(
 
 		// discovery
 		let from_identity = context.private_identity_resolver.resolve_private(&from).await?;
-		let discovery = network_discovery(Some(&context.identity_resolver), context.network.local_peer_id(), &from_identity, [network.clone()], [], endpoints).try_collect().await?;
+		let discovery = network_discovery(context.date.clone(), Some(&context.identity_resolver), context.network.local_peer_id(), &from_identity, [network.clone()], [], endpoints).try_collect().await?;
 
 		// connect
 		let events = DiscoveryConnectNetworkTask::discover(context.network.clone(), discovery);

@@ -15,13 +15,12 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_core_co::Co;
 use co_core_storage::{BlockInfo, References, StorageAction};
-use co_primitives::{tags, BlockLinks, CoId, IgnoreFilter, OptionLink, OptionMappedCid, Tags, WeakCid};
+use co_primitives::{
+	tags, BlockLinks, CoDate, CoId, DynamicCoDate, IgnoreFilter, OptionLink, OptionMappedCid, Tags, WeakCid,
+};
 use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage};
 use futures::{pin_mut, TryStreamExt};
-use std::{
-	collections::BTreeSet,
-	time::{Duration, Instant},
-};
+use std::{collections::BTreeSet, time::Duration};
 
 pub const STORAGE_CO_ROOT_TYPE: &str = "co-root";
 pub const STORAGE_CO_HEAD_TYPE: &str = "co-head";
@@ -33,12 +32,14 @@ pub const STORAGE_CO_STATE_TYPE: &str = "co-state";
 /// # Args
 /// - `filter` - Only include specific Cid's.
 /// - `filter_pins` - Only include if BlockInfo matched any pins.
+#[allow(clippy::too_many_arguments)]
 #[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(storage_core_storage, storage_core_dispatcher, storage, structure_resolver))]
 pub async fn storage_structure<S, D>(
 	storage_core_storage: &S,
 	storage_core_dispatcher: &mut impl CoDispatch<StorageAction>,
 	storage_core_state: OptionLink<Co>,
 	storage: &D,
+	date: DynamicCoDate,
 	max_duration: Option<Duration>,
 	filter: Option<BTreeSet<Cid>>,
 	structure_resolver: &mut impl StructureResolver<S, D>,
@@ -61,7 +62,7 @@ where
 	let blocks = blocks.open(storage_core_storage).await?;
 
 	// resolve
-	let start = Instant::now();
+	let start = date.now_duration();
 	let mut num_resolved = 0;
 	let mut num_visited = 0;
 	let mut num_skip_exists = 0;
@@ -128,14 +129,14 @@ where
 
 		// deadline?
 		if let Some(max_duration) = max_duration {
-			if max_duration < (Instant::now() - start) {
+			if max_duration < (date.now_duration() - start) {
 				break;
 			}
 		}
 	}
 
 	// log
-	let duration_ms: Duration = Instant::now() - start;
+	let duration_ms: Duration = date.now_duration() - start;
 	tracing::trace!(
 		duration_ms = duration_ms.as_millis(),
 		num_resolved,
@@ -161,6 +162,7 @@ pub async fn storage_structure_recursive<S, D>(
 	storage_core_dispatcher: &mut impl CoDispatch<StorageAction>,
 	storage_core_state: OptionLink<Co>,
 	storage: &D,
+	date: DynamicCoDate,
 	max_duration: Option<Duration>,
 	structure_resolver: &mut impl StructureResolver<S, D>,
 ) -> Result<(), anyhow::Error>
@@ -168,7 +170,7 @@ where
 	S: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 	D: ExtendedBlockStorage + BlockStorageContentMapping + Clone + 'static,
 {
-	let start = Instant::now();
+	let start = date.now_duration();
 	let mut filter: Option<BTreeSet<Cid>> = None;
 
 	// apply
@@ -180,7 +182,8 @@ where
 			storage_core_dispatcher,
 			storage_core_state,
 			storage,
-			max_duration.map(|duration| duration - (Instant::now() - start)),
+			date.clone(),
+			max_duration.map(|duration| duration - (date.now_duration() - start)),
 			filter,
 			structure_resolver,
 		)
@@ -193,14 +196,14 @@ where
 
 		// deadline?
 		if let Some(max_duration) = max_duration {
-			if max_duration < (Instant::now() - start) {
+			if max_duration < (date.now_duration() - start) {
 				break;
 			}
 		}
 	}
 
 	// log
-	let duration_ms: Duration = Instant::now() - start;
+	let duration_ms: Duration = date.now_duration() - start;
 	tracing::trace!(duration_ms = duration_ms.as_millis(), "storage-structure-recursive");
 
 	// result

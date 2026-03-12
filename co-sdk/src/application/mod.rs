@@ -13,4 +13,5 @@ pub mod reducer;
 pub mod runtime;
 pub mod shared;
 pub mod storage;
+#[cfg(feature = "tracing")]
 pub mod tracing;

@@ -10,7 +10,7 @@ use super::{
 };
 use crate::{EntryBlock, Log, LogError};
 use cid::Cid;
-use co_storage::BlockStorage;
+use co_primitives::BlockStorage;
 use std::collections::BTreeSet;
 
 pub struct JoinEntry {

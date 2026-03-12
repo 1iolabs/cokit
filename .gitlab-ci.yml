@@ -18,7 +18,7 @@ cache: &global_cache
     - .cargo/registry/cache
   policy: pull-push
 
-# verfiy the configured in `co/build.yml` (DOCKERFILE_IMAGE) is in sync with `ci/Dockerfile`.
+# verify the configured in `co/build.yml` (DOCKERFILE_IMAGE) is in sync with `ci/Dockerfile`.
 dockerfile:
   stage: lint
   image: ${DOCKERFILE_IMAGE}
@@ -26,7 +26,7 @@ dockerfile:
     - echo "> test if docker image is in sync with Dockerfile (ci/build.sh)"
     - echo "${DOCKERFILE_HASH}  ci/Dockerfile" | sha256sum --check --status
 
-# verfiy fmt/lint
+# verify fmt/lint
 lint:
   stage: lint
   image: ${DOCKERFILE_IMAGE}
@@ -36,6 +36,15 @@ lint:
     - cargo +nightly-2025-12-09 fmt --check
     - cargo clippy --workspace --all-targets --all-features -- -D warnings
 
+# check web build is working
+check:
+  stage: lint
+  image: ${DOCKERFILE_IMAGE}
+  cache:
+    <<: *global_cache
+  script:
+    - ./ci/scripts/check-web.sh
+
 # verify all tests are running to success
 test:
   stage: test
@@ -44,6 +53,7 @@ test:
     <<: *global_cache
   variables:
     RUST_BACKTRACE: "full"
+    RUST_MIN_STACK: "33554432" # 32Mib
   script:
     - cargo test
   artifacts:
@@ -70,7 +80,8 @@ build:
   script:
     - rustc -vV
     - echo "> building cores"
-    - cargo run --package co-cli --release -- core build-builtin --zst
+    - cargo run --package co-cli --release --features zst -- core build-builtin --zst
+    - cat "cores/Cores.toml"
     - echo "> building binaries"
     - cargo build --release --features bundle-wasm-cores
   artifacts:

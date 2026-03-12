@@ -3,11 +3,15 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{CoStorage, CoUuid, DynamicCoUuid};
-use co_storage::{
-	Algorithm, EncryptedBlockStorage, EncryptionReferenceMode, FsStorage, JoinBlockStorage, MemoryBlockStorage,
-	StaticBlockStorage,
-};
+use crate::CoStorage;
+#[cfg(feature = "fs")]
+use crate::CoUuid;
+#[cfg(feature = "fs")]
+use crate::DynamicCoUuid;
+#[cfg(feature = "fs")]
+use co_storage::{Algorithm, EncryptedBlockStorage, EncryptionReferenceMode, FsStorage};
+use co_storage::{JoinBlockStorage, MemoryBlockStorage, StaticBlockStorage};
+#[cfg(feature = "fs")]
 use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
@@ -16,6 +20,7 @@ pub struct Storage {
 	tmp_storage: TmpStorage,
 }
 impl Storage {
+	#[cfg(feature = "fs")]
 	pub fn new(storage_path: PathBuf, tmp_storage_path: PathBuf, tmp_uuid: DynamicCoUuid) -> Self {
 		// to prevent data loss verify the tmp folder is not the actual storage folder
 		assert!(storage_path != tmp_storage_path);
@@ -31,6 +36,14 @@ impl Storage {
 		Self { storage: CoStorage::new(MemoryBlockStorage::default()), tmp_storage: TmpStorage::Memory }
 	}
 
+	#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+	pub async fn new_indexeddb() -> Result<Self, anyhow::Error> {
+		Ok(Self {
+			storage: CoStorage::new(co_storage::IndexedDbBlockStorage::new("co::blocks").await?),
+			tmp_storage: TmpStorage::Memory,
+		})
+	}
+
 	pub fn with_static(mut self, storages: Vec<StaticBlockStorage<'static>>) -> Self {
 		self.storage = CoStorage::new(JoinBlockStorage::new(self.storage, storages));
 		self
@@ -44,6 +57,7 @@ impl Storage {
 	pub fn tmp_storage(&self) -> CoStorage {
 		match &self.tmp_storage {
 			TmpStorage::Memory => CoStorage::new(MemoryBlockStorage::default()),
+			#[cfg(feature = "fs")]
 			TmpStorage::Path(uuid, path) => CoStorage::new(
 				EncryptedBlockStorage::new(
 					FsStorage::new(path.join(uuid.uuid())).with_allow_clear(true),
@@ -60,5 +74,6 @@ impl Storage {
 #[derive(Debug, Clone)]
 enum TmpStorage {
 	Memory,
+	#[cfg(feature = "fs")]
 	Path(DynamicCoUuid, PathBuf),
 }

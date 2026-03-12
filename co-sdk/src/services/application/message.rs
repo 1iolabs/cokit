@@ -6,6 +6,7 @@
 use super::Action;
 use crate::CoContext;
 use co_actor::{Response, ResponseStream};
+#[cfg(feature = "network")]
 use co_network::NetworkApi;
 use std::fmt::Debug;
 
@@ -22,6 +23,7 @@ pub enum ApplicationMessage {
 	Context(Response<CoContext>),
 
 	/// Get Network.
+	#[cfg(feature = "network")]
 	Network(Response<Result<NetworkApi, anyhow::Error>>),
 }
 impl From<Action> for ApplicationMessage {

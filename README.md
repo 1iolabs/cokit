@@ -221,7 +221,7 @@ Dependencies:
 - `rustfmt`
 - `wasm32-unknown-unknown` to build cores.
 - `toolchain nightly` to use `rustfmt +nightly`
-- `llvm-18`
+- `llvm-21`
 
 Commands:
 ```shell
@@ -233,10 +233,10 @@ rustup component add --toolchain nightly rustfmt
 
 MacOS:
 ```shell
-brew install llvm@18
+brew install llvm@21
 echo "Add environment to `.cargo/config.toml` file:"
 echo "[env]"
-echo "LLVM_SYS_180_PREFIX = \"$("brew" "--prefix" "llvm@18")\""
+echo "LLVM_SYS_211_PREFIX = \"$("brew" "--prefix" "llvm@21")\""
 ```
 
 ### Rust

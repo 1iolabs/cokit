@@ -1,35 +1,43 @@
 // Project tasks configuration. See https://zed.dev/docs/tasks for documentation.
 [
-  {
-    "label": "lint: clippy",
-    "command": "cargo clippy --workspace --all-targets --all-features -- -D warnings",
-  },
-  {
-    "label": "lint: fmt",
-    "command": "cargo +nightly fmt --check",
-  },
-  {
-    "label": "co-cli: build (debug)",
-    "command": "cargo build -p co-cli",
-  },
-  {
-    "label": "co-bindings: generate flutter",
-    "command": "$ZED_WORKTREE_ROOT/co-bindings/flutter/build.sh",
-  },
-  {
-    "label": "tatauri-plugin-co-sdkuri: npm install",
-    "command": "cd $ZED_WORKTREE_ROOT/tauri-plugin-co-sdk; npm install",
-  },
-  {
-    "label": "tauri-plugin-co-sdk: build dist-js",
-    "command": "cd $ZED_WORKTREE_ROOT/tauri-plugin-co-sdk; npm run build",
-  },
-  {
-    "label": "json-schemas: generate json schemas and ts interfaces",
-    "command": "$ZED_WORKTREE_ROOT/json-schemas/generate-ts.sh",
-  },
-  {
-    "label": "cores: build builtin",
-    "command": "cargo run --bin co-cli -- --no-keychain core build-builtin",
-  },
+    {
+        "label": "lint: clippy",
+        "command": "cargo clippy --workspace --all-targets --all-features -- -D warnings"
+    },
+    {
+        "label": "lint: fmt",
+        "command": "cargo +nightly fmt --check"
+    },
+    {
+        "label": "fmt",
+        "command": "cargo +nightly fmt"
+    },
+    {
+        "label": "co-cli: build (debug)",
+        "command": "cargo build -p co-cli"
+    },
+    {
+        "label": "co-bindings: generate flutter",
+        "command": "$ZED_WORKTREE_ROOT/co-bindings/flutter/build.sh"
+    },
+    {
+        "label": "tatauri-plugin-co-sdkuri: npm install",
+        "command": "cd $ZED_WORKTREE_ROOT/tauri-plugin-co-sdk; npm install"
+    },
+    {
+        "label": "tauri-plugin-co-sdk: build dist-js",
+        "command": "cd $ZED_WORKTREE_ROOT/tauri-plugin-co-sdk; npm run build"
+    },
+    {
+        "label": "json-schemas: generate json schemas and ts interfaces",
+        "command": "$ZED_WORKTREE_ROOT/json-schemas/generate-ts.sh"
+    },
+    {
+        "label": "cores: build builtin",
+        "command": "cargo run --bin co-cli -- --no-keychain core build-builtin"
+    },
+    {
+        "label": "check: web",
+        "command": "./ci/scripts/check-web.sh"
+    }
 ]

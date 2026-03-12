@@ -8,10 +8,8 @@ use crate::services::connections::{
 	actor::ConnectionsContext,
 	ConnectionState, NetworkResolver,
 };
-use co_actor::{Actions, Epic};
+use co_actor::{time::Instant, Actions, Epic};
 use futures::{FutureExt, Stream};
-use std::time::Instant;
-
 pub struct NetworkResolveEpic();
 impl NetworkResolveEpic {
 	pub fn new() -> Self {

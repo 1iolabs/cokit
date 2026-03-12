@@ -8,7 +8,7 @@ use co_sdk::{build_core, crate_repository_path, unixfs_encode_buffer};
 use exitcode::ExitCode;
 use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, future::ready, io::Cursor, os::unix::ffi::OsStrExt, path::PathBuf};
+use std::{collections::BTreeMap, future::ready, os::unix::ffi::OsStrExt, path::PathBuf};
 use tokio_stream::wrappers::ReadDirStream;
 
 #[derive(Debug, Clone, clap::Args)]
@@ -17,6 +17,7 @@ pub struct Command {
 	pub core: Vec<String>,
 
 	/// Additionally compress `.wasm` file to `.wasm.zst` using zstd compression.
+	#[cfg(feature = "zst")]
 	#[arg(long)]
 	pub zst: bool,
 }
@@ -74,10 +75,11 @@ pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 			.cid();
 
 		// compress
+		#[cfg(feature = "zst")]
 		if command.zst {
 			let mut compressed_path = build_artifact.artifact_path.clone();
 			compressed_path.add_extension("zst");
-			let compressed_contents = zstd::encode_all(Cursor::new(&core_wasm), 19)?;
+			let compressed_contents = zstd::encode_all(std::io::Cursor::new(&core_wasm), 19)?;
 			tokio::fs::write(&compressed_path, &compressed_contents).await?;
 		}
 

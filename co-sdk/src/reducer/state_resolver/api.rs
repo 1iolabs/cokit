@@ -74,7 +74,7 @@ where
 /// Stream of state/heads pairs.
 pub type StateStream = BoxStream<'static, Result<(Option<Cid>, BTreeSet<Cid>), anyhow::Error>>;
 
-/// Context informations that may used by the resolver to help state resolving.
+/// Context information that may used by the resolver to help state resolving.
 #[derive(Debug, Default, Clone)]
 pub struct StateResolverContext {
 	/// Latest state.

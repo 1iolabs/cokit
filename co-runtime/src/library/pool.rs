@@ -3,18 +3,20 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+#[cfg(feature = "js")]
+use crate::library::deferred_storage::DeferredStorage;
 use crate::{
 	co_v1::CoV1Api, runtimes::RuntimeError, types::guard::GuardReference, ApiContext, AsyncContext, Core,
 	RuntimeContext, RuntimeInstance,
 };
 use cid::Cid;
-use co_api::{DefaultParams, StoreParams};
-use co_storage::{BlockStorage, StorageError, StoreParamsBlockStorage, SyncBlockStorage};
+use co_actor::TaskSpawner;
+use co_primitives::AnyBlockStorage;
+use co_storage::{BlockStorage, StorageError};
 use std::{
 	collections::VecDeque,
 	sync::{Arc, Mutex},
 };
-use tokio::runtime::Handle;
 
 #[derive(Debug)]
 pub struct IdleRuntimePool {
@@ -52,11 +54,14 @@ impl Default for IdleRuntimePool {
 
 #[derive(Debug, Clone)]
 pub struct RuntimePool {
+	#[cfg_attr(feature = "js", allow(clippy::arc_with_non_send_sync))]
 	pool: Arc<Mutex<IdleRuntimePool>>,
+	spawner: TaskSpawner,
 }
 impl RuntimePool {
-	pub fn new(pool: IdleRuntimePool) -> Self {
-		Self { pool: Arc::new(Mutex::new(pool)) }
+	pub fn new(spawner: TaskSpawner, pool: IdleRuntimePool) -> Self {
+		#[cfg_attr(feature = "js", allow(clippy::arc_with_non_send_sync))]
+		Self { pool: Arc::new(Mutex::new(pool)), spawner }
 	}
 
 	fn get_runtime_instance(&self, core: &Cid) -> Option<RuntimeInstance> {
@@ -67,6 +72,7 @@ impl RuntimePool {
 		self.pool.lock().unwrap().insert(runtime_instance);
 	}
 
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, storage), ret)]
 	pub async fn execute_state<S>(
 		&self,
 		storage: &S,
@@ -87,22 +93,17 @@ impl RuntimePool {
 			Core::Wasm(core) => {
 				// get/create instance
 				let pool_instance = self.get_runtime_instance(core);
-				let mut instance = match pool_instance {
+				let instance = match pool_instance {
 					Some(i) => i,
 					None => RuntimeInstance::create(storage, core).await?,
 				};
 
-				// api
-				let api = create_cov1_api(storage, context, checked);
-
 				// execute
-				let (result, instance): (RuntimeContext, RuntimeInstance) =
-					tokio::task::spawn_blocking(move || -> Result<(RuntimeContext, RuntimeInstance), RuntimeError> {
-						let result = instance.runtime_mut().execute_state(api)?;
-						Ok((result, instance))
+				let (result, instance) =
+					execute_with_api(self.spawner.clone(), storage, context, checked, instance, |instance, api| {
+						Ok(instance.runtime_mut().execute_state(api)?)
 					})
-					.await
-					.map_err(|e| ExecuteError::Other(e.into()))??;
+					.await?;
 
 				// pool instance
 				self.reuse_runtime_instance(instance);
@@ -113,22 +114,17 @@ impl RuntimePool {
 			Core::Binary(bytes) => {
 				// get/create instance
 				let pool_instance = self.get_runtime_instance(core_cid);
-				let mut instance = match pool_instance {
+				let instance = match pool_instance {
 					Some(i) => i,
 					None => RuntimeInstance::create_native(core_cid, bytes).await?,
 				};
 
-				// api
-				let api = create_cov1_api(storage, context, checked);
-
 				// execute
-				let (result, instance): (RuntimeContext, RuntimeInstance) =
-					tokio::task::spawn_blocking(move || -> Result<(RuntimeContext, RuntimeInstance), RuntimeError> {
-						let result = instance.runtime_mut().execute_state(api)?;
-						Ok((result, instance))
+				let (result, instance) =
+					execute_with_api(self.spawner.clone(), storage, context, checked, instance, |instance, api| {
+						Ok(instance.runtime_mut().execute_state(api)?)
 					})
-					.await
-					.map_err(|e| ExecuteError::Other(e.into()))??;
+					.await?;
 
 				// pool instance
 				self.reuse_runtime_instance(instance);
@@ -137,19 +133,18 @@ impl RuntimePool {
 				result
 			},
 			Core::Native(f) => {
-				// api
-				let api = create_cov1_api(storage, context, checked);
-
 				// execute
 				let execute = f.clone();
-				tokio::task::spawn_blocking(move || -> Result<RuntimeContext, RuntimeError> {
-					let mut context = ApiContext::new(api);
-					// Todo: handle panics to not crash the host
-					execute(&mut context);
-					Ok(context.context().clone())
-				})
-				.await
-				.map_err(|e| ExecuteError::Other(e.into()))??
+				let (result, _) =
+					execute_with_api(self.spawner.clone(), storage, context, checked, (), move |_, api| {
+						let mut context = ApiContext::new(api);
+						execute(&mut context);
+						Ok(context.context().clone())
+					})
+					.await?;
+
+				// result
+				result
 			},
 			Core::NativeAsync(f) => {
 				// api
@@ -157,12 +152,17 @@ impl RuntimePool {
 
 				// execute
 				let execute = f.clone();
-				tokio::task::spawn_blocking(move || -> Result<RuntimeContext, RuntimeError> {
-					// Todo: handle panics to not crash the host
-					Ok(execute(api).context())
-				})
-				.await
-				.map_err(|e| ExecuteError::Other(e.into()))??
+				#[cfg(not(feature = "js"))]
+				let result = self
+					.spawner
+					.spawn_blocking(Default::default(), move || execute.execute_blocking(api).context())
+					.await
+					.map_err(|e| ExecuteError::Other(e.into()))?;
+				#[cfg(feature = "js")]
+				let result = execute.execute_async(api).await.context();
+
+				// result
+				result
 			},
 		};
 
@@ -170,13 +170,14 @@ impl RuntimePool {
 		Ok(result)
 	}
 
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, storage), ret)]
 	pub async fn execute_guard<S>(
 		&self,
 		storage: &S,
 		guard_cid: &Cid,
 		guard: &GuardReference,
 		context: RuntimeContext,
-	) -> Result<bool, ExecuteError>
+	) -> Result<(RuntimeContext, bool), ExecuteError>
 	where
 		S: BlockStorage + Send + Sync + Clone + 'static,
 	{
@@ -190,22 +191,17 @@ impl RuntimePool {
 			GuardReference::Wasm(core) => {
 				// get/create instance
 				let pool_instance = self.get_runtime_instance(core);
-				let mut instance = match pool_instance {
+				let instance = match pool_instance {
 					Some(i) => i,
 					None => RuntimeInstance::create(storage, core).await?,
 				};
 
-				// api
-				let api = create_cov1_api(storage, context, checked);
-
 				// execute
 				let (result, instance) =
-					tokio::task::spawn_blocking(move || -> Result<(bool, RuntimeInstance), RuntimeError> {
-						let result = instance.runtime_mut().execute_guard(api)?;
-						Ok((result, instance))
+					execute_with_api(self.spawner.clone(), storage, context, checked, instance, |instance, api| {
+						Ok(instance.runtime_mut().execute_guard(api)?)
 					})
-					.await
-					.map_err(|e| ExecuteError::Other(e.into()))??;
+					.await?;
 
 				// pool instance
 				self.reuse_runtime_instance(instance);
@@ -216,22 +212,21 @@ impl RuntimePool {
 			GuardReference::Binary(bytes) => {
 				// get/create instance
 				let pool_instance = self.get_runtime_instance(guard_cid);
-				let mut instance = match pool_instance {
+				let instance = match pool_instance {
 					Some(i) => i,
 					None => RuntimeInstance::create_native(guard_cid, bytes).await?,
 				};
 
-				// api
-				let api = create_cov1_api(storage, context, checked);
-
 				// execute
-				let (result, instance) =
-					tokio::task::spawn_blocking(move || -> Result<(bool, RuntimeInstance), RuntimeError> {
-						let result = instance.runtime_mut().execute_guard(api)?;
-						Ok((result, instance))
-					})
-					.await
-					.map_err(|e| ExecuteError::Other(e.into()))??;
+				let (result, instance) = execute_with_api(
+					self.spawner.clone(),
+					storage,
+					context,
+					checked,
+					instance,
+					move |instance, api| Ok(instance.runtime_mut().execute_guard(api)?),
+				)
+				.await?;
 
 				// pool instance
 				self.reuse_runtime_instance(instance);
@@ -244,14 +239,18 @@ impl RuntimePool {
 				let api = AsyncContext::new(storage.clone(), context, checked);
 
 				// execute
-				let execute = f.clone();
-				tokio::task::spawn_blocking(move || -> Result<bool, RuntimeError> {
-					// Todo: handle panics to not crash the host
-					let result = execute(api);
-					Ok(result)
-				})
-				.await
-				.map_err(|e| ExecuteError::Other(e.into()))??
+				let guard = f.clone();
+				#[cfg(not(feature = "js"))]
+				let (api, result) = self
+					.spawner
+					.spawn_blocking(Default::default(), move || guard.execute_blocking(api))
+					.await
+					.map_err(|e| ExecuteError::Other(e.into()))?;
+				#[cfg(feature = "js")]
+				let (api, result) = guard.execute_async(api).await;
+
+				// result
+				(api.context(), result)
 			},
 		};
 
@@ -261,18 +260,87 @@ impl RuntimePool {
 }
 impl Default for RuntimePool {
 	fn default() -> Self {
-		Self::new(Default::default())
+		Self::new(Default::default(), Default::default())
 	}
 }
 
-fn create_cov1_api<S: BlockStorage + Clone + 'static>(storage: &S, context: RuntimeContext, checked: bool) -> CoV1Api {
+#[cfg(not(feature = "js"))]
+async fn execute_with_api<T: Send + 'static, I: Send + 'static>(
+	spawner: TaskSpawner,
+	storage: &impl AnyBlockStorage,
+	context: RuntimeContext,
+	checked: bool,
+	mut instance: I,
+	execute: impl Fn(&mut I, CoV1Api) -> Result<T, ExecuteError> + Send + 'static,
+) -> Result<(T, I), ExecuteError> {
+	// api
+	let api = create_cov1_api(storage, context, checked);
+
+	// execute
+	let (result, instance) = spawner
+		.spawn_blocking(Default::default(), move || (execute(&mut instance, api), instance))
+		.await
+		.map_err(|e| ExecuteError::Other(e.into()))?;
+
+	// result
+	Ok((result?, instance))
+}
+
+#[cfg(feature = "js")]
+async fn execute_with_api<T: 'static, I: 'static>(
+	_spawner: TaskSpawner,
+	storage: &impl AnyBlockStorage,
+	context: RuntimeContext,
+	checked: bool,
+	mut instance: I,
+	execute: impl Fn(&mut I, CoV1Api) -> Result<T, ExecuteError> + 'static,
+) -> Result<(T, I), ExecuteError> {
+	// api
+	let mut api_storage = DeferredStorage::default();
+	api_storage.warm(storage, &Default::default(), &context).await?;
+
+	// execute
+	loop {
+		let api = create_cov1_api(api_storage.clone(), context.clone(), checked);
+		match execute(&mut instance, api) {
+			Ok(result) => {
+				if api_storage.process(storage, false).await? {
+					tracing::trace!("deferred-execute-retry");
+					continue;
+				}
+				return Ok((result, instance));
+			},
+			Err(err) => {
+				if api_storage.process(storage, false).await? {
+					tracing::trace!(?err, "deferred-execute-retry");
+					continue;
+				} else {
+					tracing::trace!(?err, "deferred-execute-error");
+					return Err(err);
+				}
+			},
+		}
+	}
+}
+
+#[cfg(not(feature = "js"))]
+fn create_cov1_api(storage: &impl AnyBlockStorage, context: RuntimeContext, checked: bool) -> CoV1Api {
 	CoV1Api::new(
-		Box::new(SyncBlockStorage::new(
-			StoreParamsBlockStorage::new(storage.clone(), checked, DefaultParams::MAX_BLOCK_SIZE),
-			Handle::current(),
+		Box::new(co_storage::SyncBlockStorage::new(
+			co_storage::StoreParamsBlockStorage::new(
+				storage.clone(),
+				checked,
+				<co_primitives::DefaultParams as co_primitives::StoreParams>::MAX_BLOCK_SIZE,
+			),
+			tokio::runtime::Handle::current(),
 		)),
 		context,
 	)
+}
+
+#[cfg(feature = "js")]
+fn create_cov1_api(storage: DeferredStorage, context: RuntimeContext, _checked: bool) -> CoV1Api {
+	CoV1Api::new(Box::new(storage.clone()), context)
 }
 
 #[derive(Debug, thiserror::Error)]

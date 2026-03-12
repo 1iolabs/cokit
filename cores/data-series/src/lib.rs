@@ -268,7 +268,7 @@ fn reduce_data(
 
 							// ttl
 							if let Some(time_to_live) = series.time_to_live {
-								let expire = action_time - time_to_live as u128;
+								let expire = action_time - time_to_live;
 								values.retain(|item| item.time == 0 || item.time < expire);
 							}
 
@@ -293,7 +293,7 @@ fn reduce_data(
 
 				// ttl?
 				if let Some(time_to_live) = series.time_to_live {
-					let expire = action_time - time_to_live as u128;
+					let expire = action_time - time_to_live;
 					items.retain(|item| item.time < expire);
 				}
 

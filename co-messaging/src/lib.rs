@@ -13,6 +13,7 @@ pub use crate::matrix_event::{
 	call_event, ephemeral_event, message_event, multimedia, poll_event, receipts, relation, state_event, user_events,
 };
 use co_macros::co_data;
+use co_primitives::Date;
 use matrix_event::{
 	call_event::{
 		AnswerCallContent, CallCandidatesContent, CallInviteContent, CallNegotiationContent, HangupCallContent,
@@ -35,7 +36,7 @@ pub trait EventType {
 #[derive(JsonSchema)]
 pub struct MatrixEvent {
 	pub event_id: String,
-	pub timestamp: u128,
+	pub timestamp: Date,
 	pub room_id: String,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub state_key: Option<String>,
@@ -46,7 +47,7 @@ pub struct MatrixEvent {
 impl MatrixEvent {
 	pub fn new(
 		event_id: impl Into<String>,
-		timestamp: u128,
+		timestamp: Date,
 		room_id: impl Into<String>,
 		content: impl Into<EventContent>,
 	) -> Self {
@@ -59,7 +60,7 @@ impl MatrixEvent {
 		// TODO: filter for event types that can have a state key
 		self.state_key = Some(state_key);
 	}
-	pub fn set_timestamp(&mut self, ts: u128) {
+	pub fn set_timestamp(&mut self, ts: Date) {
 		self.timestamp = ts;
 	}
 }

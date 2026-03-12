@@ -19,7 +19,7 @@ use anyhow::anyhow;
 use cid::Cid;
 use co_core_co::Co;
 use co_core_membership::CoState;
-use co_primitives::{CoReference, MappedCid, OptionLink, OptionMappedCid, WeakCid};
+use co_primitives::{CoReference, MappedCid, MultiCodec, OptionLink, OptionMappedCid, WeakCid};
 use co_storage::{
 	BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlock, ExtendedBlockStorage, StorageError,
 };
@@ -91,17 +91,15 @@ impl CoReducerState {
 	pub async fn to_external_force<S: BlockStorageContentMapping>(&self, storage: &S) -> Result<Self, anyhow::Error> {
 		Ok(Self(
 			if let Some(state) = self.0 {
-				Some(
-					to_external_cid_opt_force(storage, Some(state))
-						.await
-						.ok_or_else(|| anyhow!("Failed to map state: {:?}", self.0))?,
-				)
+				Some(to_external_cid_opt_force(storage, Some(state)).await.ok_or_else(|| {
+					anyhow!("Failed to map to external state: {:?} ({:?})", self.0, MultiCodec::from(state))
+				})?)
 			} else {
 				None
 			},
 			to_external_cids_opt_force(storage, self.1.clone())
 				.await
-				.ok_or_else(|| anyhow!("Failed to map heads: {:?}", self.1))?,
+				.ok_or_else(|| anyhow!("Failed to map to external heads: {:?}", self.1))?,
 		))
 	}
 
@@ -112,17 +110,15 @@ impl CoReducerState {
 	pub async fn to_internal_force<S: BlockStorageContentMapping>(&self, storage: &S) -> Result<Self, anyhow::Error> {
 		Ok(Self(
 			if let Some(state) = self.0 {
-				Some(
-					to_internal_cid_opt_force(storage, Some(state))
-						.await
-						.ok_or_else(|| anyhow!("Failed to map state: {:?}", self.0))?,
-				)
+				Some(to_internal_cid_opt_force(storage, Some(state)).await.ok_or_else(|| {
+					anyhow!("Failed to map to internal state: {:?} ({:?})", self.0, MultiCodec::from(state))
+				})?)
 			} else {
 				None
 			},
 			to_internal_cids_opt_force(storage, self.1.clone())
 				.await
-				.ok_or_else(|| anyhow!("Failed to map heads: {:?}", self.1))?,
+				.ok_or_else(|| anyhow!("Failed to map internal heads: {:?}", self.1))?,
 		))
 	}
 

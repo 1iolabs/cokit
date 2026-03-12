@@ -23,7 +23,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [features]
-"default" = []
+"web" = ["co-identity/web", "co-storage/web"]
 
 [dev-dependencies]
 tokio = { workspace = true }

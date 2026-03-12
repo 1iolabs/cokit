@@ -5,9 +5,9 @@
 
 use co_identity::{DidCommHeader, Identity, PrivateIdentity};
 use co_network::{EncodedMessage, PeerId};
-use co_primitives::{to_json_string, CoId};
+use co_primitives::{to_json_string, CoDateRef, CoId};
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 pub const CO_DIDCOMM_KEY_REQUEST: &str = "co-key-request";
 pub const CO_DIDCOMM_KEY_RESPONSE: &str = "co-key-response";
@@ -15,6 +15,7 @@ pub const CO_DIDCOMM_KEY_RESPONSE: &str = "co-key-response";
 /// Create an signed key request message.
 /// As we may send this request to any CO participant it's only signed by the sender and without an explicit recipent.
 pub fn create_key_request_message<F>(
+	date: &CoDateRef,
 	from: &F,
 	payload: KeyRequestPayload,
 	expire: Duration,
@@ -22,8 +23,8 @@ pub fn create_key_request_message<F>(
 where
 	F: PrivateIdentity + Send + Sync + 'static,
 {
-	let (from_didcomm, mut header) = DidCommHeader::create_from(from, CO_DIDCOMM_KEY_REQUEST)?;
-	header.expires_time = Some((SystemTime::now().duration_since(UNIX_EPOCH)? + expire).as_secs());
+	let (from_didcomm, mut header) = DidCommHeader::create_from(date, from, CO_DIDCOMM_KEY_REQUEST)?;
+	header.expires_time = Some((date.now_duration() + expire).as_secs());
 	let body = to_json_string(&payload)?;
 	let message = from_didcomm.jws(header.clone(), &body)?;
 	Ok((header, EncodedMessage(message.into_bytes())))
@@ -31,6 +32,7 @@ where
 
 /// Create an encrypted key response message.
 pub fn create_key_response_message<F, T>(
+	date: &CoDateRef,
 	from: &F,
 	to: &T,
 	request_message_id: String,
@@ -40,7 +42,7 @@ where
 	F: PrivateIdentity + Send + Sync + 'static,
 	T: Identity + Send + Sync + 'static,
 {
-	let (from_didcomm, to_didcomm, mut header) = DidCommHeader::create(from, to, CO_DIDCOMM_KEY_RESPONSE)?;
+	let (from_didcomm, to_didcomm, mut header) = DidCommHeader::create(date, from, to, CO_DIDCOMM_KEY_RESPONSE)?;
 	header.thid = Some(request_message_id);
 	let body = to_json_string(&payload)?;
 	let message = from_didcomm.jwe(&to_didcomm, header.clone(), &body)?;

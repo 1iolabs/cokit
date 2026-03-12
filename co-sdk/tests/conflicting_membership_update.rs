@@ -6,13 +6,13 @@
 use cid::Cid;
 use co_core_co::CoAction;
 use co_core_file::{File, FileAction, FolderNode, Node};
-use co_primitives::CoreName;
+use co_primitives::{CoreName, MonotonicCoDate};
 use co_sdk::{
 	ipld_resolve_recursive,
 	state::{self, query_core, QueryExt},
 	tags, AbsolutePath, ApplicationBuilder, BlockStorageExt, CoContext, CoId, CoReducer, CoReducerFactory,
-	CoReducerState, CoStorage, Cores, CreateCo, DidKeyIdentity, DidKeyProvider, Identity, MonotonicCoDate,
-	MonotonicCoUuid, CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CoReducerState, CoStorage, Cores, CreateCo, DidKeyIdentity, DidKeyProvider, Identity, MonotonicCoUuid,
+	CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use co_test::{test_application_identifier, test_log_path, test_tmp_dir};
 use futures::{join, pin_mut, stream, StreamExt, TryStreamExt};
@@ -33,7 +33,7 @@ async fn trace_state(note: &str, co: &str, storage: &CoStorage, reducer_state: &
 }
 
 #[tracing::instrument(level = tracing::Level::TRACE, skip_all)]
-async fn trace_heads(note: &str, co: &str, context: &CoContext, storage: &CoStorage, reducer_state: &CoReducerState) {
+async fn trace_heads(note: &str, co: &str, _context: &CoContext, storage: &CoStorage, reducer_state: &CoReducerState) {
 	// fn pretty_print_with_indent<T: std::fmt::Debug>(value: &T, indent: usize) {
 	// 	let formatted = format!("{:#?}", value);
 	// 	let indent_str = " ".repeat(indent);
@@ -45,10 +45,7 @@ async fn trace_heads(note: &str, co: &str, context: &CoContext, storage: &CoStor
 	// 	println!("{}", indented);
 	// }
 	tracing::trace!(note, heads = ?reducer_state.heads(), ?co, "trace-heads");
-	let entries = context
-		.entries_from_heads(CoId::from(co), storage.clone(), reducer_state.heads().clone())
-		.await
-		.unwrap()
+	let entries = state::heads_stream(storage.clone(), &CoId::from(co), reducer_state.heads())
 		.enumerate()
 		.map(|(index, result)| result.map(|ok| (index, ok)));
 	pin_mut!(entries);

@@ -10,12 +10,11 @@ use crate::{
 	},
 	types::network_task::NetworkTask,
 };
-use co_actor::ActorHandle;
+use co_actor::{time::Instant, ActorHandle};
 use libp2p::{
 	swarm::{NetworkBehaviour, SwarmEvent},
 	Swarm,
 };
-use std::time::Instant;
 
 /// Monitor connnections.
 #[derive(Debug)]

@@ -7,13 +7,10 @@ use co_core_co::CoAction;
 use co_core_file::{FileAction, FolderNode};
 use co_network::connections::{ConnectionAction, ConnectionMessage, ReleaseAction};
 use co_primitives::AbsolutePathOwned;
-use co_sdk::{tags, Cores, Identity, CO_CORE_NAME_CO};
+use co_sdk::{tags, CoDate, Cores, Identity, CO_CORE_NAME_CO};
 use futures::{pin_mut, StreamExt};
 use helper::{instance::Instances, shared_co::SharedCo};
-use std::{
-	future::ready,
-	time::{Duration, SystemTime},
-};
+use std::{future::ready, time::Duration};
 use tokio::time::{sleep, timeout};
 
 pub mod helper;
@@ -67,8 +64,8 @@ async fn test_push() {
 	for i in 0..3 {
 		let folder = FolderNode {
 			name: format!("test-{}", i),
-			create_time: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis(),
-			modify_time: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis(),
+			create_time: context0.date().now(),
+			modify_time: context0.date().now(),
 			tags: tags!(),
 			owner: identity0.identity().to_owned(),
 			mode: 0o665,

@@ -5,10 +5,11 @@
 
 use cid::Cid;
 use co_core_co::CoAction;
+use co_primitives::MonotonicCoDate;
 use co_sdk::{
 	build_core, crate_repository_path,
 	state::{self, query_core, QueryExt},
-	AnyBlockStorage, ApplicationBuilder, DidKeyIdentity, Identity, MonotonicCoDate, MonotonicCoUuid, CO_CORE_NAME_CO,
+	AnyBlockStorage, ApplicationBuilder, DidKeyIdentity, Identity, MonotonicCoUuid, CO_CORE_NAME_CO,
 	CO_CORE_NAME_KEYSTORE,
 };
 use co_test::{test_application_identifier, test_log_path, test_tmp_dir, TmpDir};

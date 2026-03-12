@@ -4,6 +4,8 @@
 // retention—approved secure tools may process solely for internal use.
 
 use super::identity::create_identity_resolver;
+#[cfg(feature = "network")]
+use crate::services::application::KeyRequestAction;
 use crate::{
 	find_membership,
 	library::{
@@ -17,14 +19,12 @@ use crate::{
 		state_resolver::MembershipStateResolver,
 	},
 	services::{
-		application::KeyRequestAction,
 		reducer::{FlushInfo, ReducerBlockStorage, ReducerFlush},
 		reducers::ReducerStorage,
 	},
 	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
-	Action, ApplicationMessage, CoCoreResolver, CoDate, CoReducer, CoReducerState, CoStorage, CoUuid, Cores,
-	DynamicCoDate, Reducer, ReducerBuilder, Runtime, TaskSpawner, CO_CORE_CO, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
-	CO_CORE_NAME_MEMBERSHIP,
+	Action, ApplicationMessage, CoCoreResolver, CoReducer, CoReducerState, CoStorage, CoUuid, Cores, Reducer,
+	ReducerBuilder, Runtime, TaskSpawner, CO_CORE_CO, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -36,7 +36,8 @@ use co_core_membership::{Membership, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::{IdentityEntryVerifier, Log};
 use co_primitives::{
-	tags, BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, OptionMappedCid, Tags,
+	tags, BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoDate, CoId, DynamicCoDate,
+	OptionMappedCid, Tags,
 };
 use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret};
 use serde::{Deserialize, Serialize};
@@ -96,22 +97,23 @@ impl SharedCoBuilder {
 	/// If secret if not avilalbe it will be fetched using `handle`.
 	pub async fn secret(
 		&self,
-		handle: Option<ActorHandle<ApplicationMessage>>,
+		_handle: Option<ActorHandle<ApplicationMessage>>,
 	) -> anyhow::Result<Option<co_primitives::Secret>> {
 		if let Some(key_reference) = &self.membership.key {
 			Ok(Some(find_co_secret_by_reference(&self.parent, key_reference, Some(&self.keystore_core_name)).await?))
 		} else if is_membership_heads_encrypted(&self.parent.storage(), &self.membership).await? {
-			if let Some(handle) = handle {
-				Ok(Some(self.request_secret(handle).await?))
-			} else {
-				Err(anyhow!("Key not available"))
+			#[cfg(feature = "network")]
+			if let Some(handle) = _handle {
+				return Ok(Some(self.request_secret(handle).await?));
 			}
+			Err(anyhow!("Key not available"))
 		} else {
 			Ok(None)
 		}
 	}
 
 	/// Request secret from network using handle.
+	#[cfg(feature = "network")]
 	pub async fn request_secret(
 		&self,
 		handle: ActorHandle<ApplicationMessage>,
@@ -177,7 +179,7 @@ impl SharedCoBuilder {
 			);
 
 			// create encrypted storage which uses the network storage as base
-			// note: it uses the same mapping as the instance withput networking
+			// note: it uses the same mapping as the instance without networking
 			let next_storage = if let Some(encrypted_storage) = storage.encrypted_storage() {
 				let mut encrypted_storage = encrypted_storage.clone();
 				encrypted_storage.set_storage(CoStorage::new(network_storage));
@@ -596,6 +598,8 @@ impl SharedCoCreator {
 	where
 		I: PrivateIdentity + Clone + Debug + Send + Sync + 'static,
 	{
+		let date = date.boxed();
+
 		// storage
 		let (co_storage, encrypted_storage): (CoStorage, Option<(EncryptedBlockStorage<CoStorage>, String, Secret)>) =
 			match self.co.algorithm {
@@ -619,7 +623,7 @@ impl SharedCoCreator {
 
 		// reducer
 		let core_resolver = CoCoreResolver::default();
-		let core_resolver = LogCoreResolver::new(core_resolver, self.co.id.clone());
+		let core_resolver = LogCoreResolver::new(core_resolver, self.co.id.clone(), date.clone());
 		let reducer_builder = ReducerBuilder::new(core_resolver, log);
 		#[cfg(feature = "pinning")]
 		let reducer_builder = {

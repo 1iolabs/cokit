@@ -214,6 +214,7 @@ impl IdentityResolver for DidKeyIdentityResolver {
 #[cfg(test)]
 mod tests {
 	use crate::{DidCommHeader, DidKeyIdentity, Identity, IdentityBox, MemoryIdentityResolver, PrivateIdentity};
+	use co_primitives::StaticCoDate;
 
 	#[test]
 	fn it_should_sign_and_verfiy() {
@@ -266,7 +267,7 @@ mod tests {
 		resolver.insert(IdentityBox::new(to.clone())).await;
 
 		// "send"
-		let (from_private, to_public, header) = DidCommHeader::create(&from, &to, "test").unwrap();
+		let (from_private, to_public, header) = DidCommHeader::create(&StaticCoDate(0), &from, &to, "test").unwrap();
 		let message = from_private.jwe(&to_public, header.clone(), "null").unwrap();
 
 		// "recv"

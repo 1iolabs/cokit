@@ -14,7 +14,7 @@ use crate::{
 		storage_dispatch_roots::storage_dispatch_roots,
 	},
 	state::core_state,
-	CoPinningKey, CoReducerState, DynamicCoDate, Runtime, Storage, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
+	CoPinningKey, CoReducerState, Runtime, Storage, CO_CORE_NAME_STORAGE, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -22,7 +22,9 @@ use co_actor::TaskSpawner;
 use co_core_storage::{BlockInfo, StorageAction};
 use co_identity::PrivateIdentityBox;
 use co_log::EntryBlock;
-use co_primitives::{BlockLinks, CoId, CoList, Link, OptionMappedCid, ReducerAction, WeakCoReferenceFilter};
+use co_primitives::{
+	BlockLinks, CoId, CoList, DynamicCoDate, Link, OptionMappedCid, ReducerAction, WeakCoReferenceFilter,
+};
 use co_storage::{BlockStorage, BlockStorageContentMapping, BlockStorageExt, ExtendedBlockStorage, OverlayChange};
 use futures::{pin_mut, stream, TryStreamExt};
 use std::{collections::BTreeSet, time::Duration};
@@ -94,8 +96,16 @@ where
 
 		// storage: references
 		let state = dispatcher.state().into();
-		storage_structure_recursive(&storage, &mut dispatcher, state, co_storage, max_duration, &mut structure_filter)
-			.await?;
+		storage_structure_recursive(
+			&storage,
+			&mut dispatcher,
+			state,
+			co_storage,
+			context.date.clone(),
+			max_duration,
+			&mut structure_filter,
+		)
+		.await?;
 
 		// storage: cleanup
 		let state = dispatcher.state().into();

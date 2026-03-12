@@ -32,8 +32,8 @@ pub struct NetworkSettings {
 	/// This is optional and if it is set to [`None`] all connections are only on demand.
 	pub peers_threshold: Option<u32>,
 
-	/// Wherther to enable a limited relay server.
-	/// This relay can be used by other peers for holepunching.
+	/// Whether to enable a limited relay server.
+	/// This relay can be used by other peers for hole-punching.
 	pub relay: bool,
 
 	/// Enable NAT related protocols.
@@ -41,6 +41,24 @@ pub struct NetworkSettings {
 
 	/// Enable mDNS protocol.
 	pub mdns: bool,
+
+	/// Enable Websocket protocol.
+	///
+	/// # Notes
+	/// - Required to let browsers connect to this instance.
+	/// - Not available on mobile.
+	pub websocket: bool,
+
+	/// DNS configuration.
+	pub dns: NetworkDns,
+
+	/// Maximum number of bytes allowed on a relay circuit.
+	/// If `None`, the libp2p default (128 KiB) is used.
+	pub max_circuit_bytes: Option<u64>,
+
+	/// Maximum duration of a relay circuit.
+	/// If `None`, the libp2p default (120s) is used.
+	pub max_circuit_duration: Option<Duration>,
 }
 impl Default for NetworkSettings {
 	fn default() -> Self {
@@ -54,12 +72,32 @@ impl Default for NetworkSettings {
 			relay: false,
 			nat: true,
 			mdns: true,
+			websocket: true,
+			dns: Default::default(),
+			max_circuit_bytes: None,
+			max_circuit_duration: None,
 		}
 	}
 }
 impl NetworkSettings {
 	pub fn new() -> Self {
 		Self::default()
+	}
+
+	/// Mobile configuration.
+	pub fn mobile() -> Self {
+		Self { websocket: false, dns: NetworkDns::Cloudflare, ..Default::default() }
+	}
+
+	/// Web configuration.
+	///
+	/// Currently a webrtc relay is required to connect via. web browser.
+	/// Example: `/ip4/127.0.0.1/tcp/4001/ws/p2p/12D3KooWGW7HBqhnY9wN9F9JWc72SYrb15nKWyGfLZDDYR8KA17x`
+	/// Note that the p2p part is currently required.
+	#[cfg(feature = "web")]
+	pub fn web(relay_multiaddr: &str) -> Result<Self, anyhow::Error> {
+		Self { mdns: false, nat: true, relay: false, bootstrap: Default::default(), ..Default::default() }
+			.with_bootstrap_from_string(relay_multiaddr)
 	}
 
 	fn default_listen() -> Multiaddr {
@@ -161,6 +199,18 @@ impl NetworkSettings {
 		self
 	}
 
+	/// Set the maximum number of bytes allowed on a relay circuit.
+	pub fn with_max_circuit_bytes(mut self, max_circuit_bytes: u64) -> Self {
+		self.max_circuit_bytes = Some(max_circuit_bytes);
+		self
+	}
+
+	/// Set the maximum duration of a relay circuit.
+	pub fn with_max_circuit_duration(mut self, max_circuit_duration: Duration) -> Self {
+		self.max_circuit_duration = Some(max_circuit_duration);
+		self
+	}
+
 	/// Validate if settings are correct.
 	pub fn build(self) -> Result<Self, anyhow::Error> {
 		for bootstrap in self.bootstrap.iter() {
@@ -168,4 +218,22 @@ impl NetworkSettings {
 		}
 		Ok(self)
 	}
+}
+
+#[derive(Debug, Clone, Default)]
+#[non_exhaustive]
+pub enum NetworkDns {
+	/// Do not use and DNS.
+	None,
+
+	/// Use system configuration.
+	///
+	/// # Note
+	/// - Uses /etc/resolv.conf
+	/// - Not available on mobile yet.
+	#[default]
+	System,
+
+	/// Use preconfigured Cloudflare DNS.
+	Cloudflare,
 }

@@ -7,6 +7,7 @@ use crate::{cli::Cli, library::cli_context::CliContext};
 use exitcode::ExitCode;
 
 mod listen;
+mod webrtc_signal;
 
 #[derive(Debug, Clone, clap::Args)]
 pub struct Command {
@@ -23,10 +24,14 @@ pub struct Command {
 pub enum Commands {
 	/// Listen for connections.
 	Listen(listen::Command),
+
+	/// Run a relay node for browser WebRTC peers.
+	WebrtcSignal(webrtc_signal::Command),
 }
 
 pub async fn command(context: &CliContext, cli: &Cli, network_command: &Command) -> Result<ExitCode, anyhow::Error> {
 	match &network_command.command {
 		Commands::Listen(command) => listen::command(context, cli, network_command, command).await,
+		Commands::WebrtcSignal(command) => webrtc_signal::command(context, cli, network_command, command).await,
 	}
 }

@@ -6,8 +6,8 @@
 use cid::Cid;
 use co_identity::{DidKeyIdentity, DidKeyIdentityResolver, IdentityResolverBox, PrivateIdentity};
 use co_log::{EntryBlock, IdentityEntryVerifier, Log};
-use co_primitives::BlockSerializer;
-use co_storage::{BlockStorage, MemoryBlockStorage};
+use co_primitives::{BlockSerializer, BlockStorage};
+use co_storage::MemoryBlockStorage;
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;

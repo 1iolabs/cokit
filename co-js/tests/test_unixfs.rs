@@ -28,7 +28,7 @@ async fn test_unixfs() {
 	}) as Box<dyn FnMut(Uint8Array) -> Promise>);
 	let set_closure: Closure<dyn FnMut(Uint8Array, Uint8Array) -> Promise> = Closure::wrap(Box::new({
 		let blocks = blocks.clone();
-		move |cid, data| {
+		move |cid: Uint8Array, data: Uint8Array| {
 			let cid_r: Cid = from_js_value(cid.clone().into()).unwrap();
 			blocks.write().unwrap().insert(cid_r, data);
 			future_to_promise(async move { Ok(cid.into()) })

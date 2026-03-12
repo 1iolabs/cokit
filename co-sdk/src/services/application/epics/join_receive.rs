@@ -8,7 +8,7 @@ use crate::{
 		join::{CoJoinPayload, CO_DIDCOMM_JOIN},
 		network_identity::network_identity,
 	},
-	Action, CoContext, CoReducer, CoReducerFactory, CO_CORE_NAME_CO,
+	state, Action, CoContext, CoReducer, CoReducerFactory, CO_CORE_NAME_CO,
 };
 use anyhow::anyhow;
 use co_actor::Actions;
@@ -107,11 +107,13 @@ async fn joined(context: CoContext, _peer: PeerId, header: DidCommHeader, body: 
 }
 
 /// Find the inviters identity by walking the log until the first invite action.
-async fn find_inviter(context: &CoContext, co: &CoReducer, invited_did: &str) -> Result<Option<String>, anyhow::Error> {
+async fn find_inviter(
+	_context: &CoContext,
+	co: &CoReducer,
+	invited_did: &str,
+) -> Result<Option<String>, anyhow::Error> {
 	let storage = co.storage().without_networking();
-	let invite_identity_did = context
-		.entries_from_heads(co.id(), storage.clone(), co.heads().await)
-		.await?
+	let invite_identity_did = state::heads_stream(storage.clone(), co.id(), co.heads().await)
 		.try_filter_map(|entry| {
 			let storage = storage.clone();
 			async move {

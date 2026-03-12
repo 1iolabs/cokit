@@ -5,17 +5,16 @@
 
 use crate::{
 	Response, ResponseBackPressureStream, ResponseBackPressureStreamReceiver, ResponseReceiver, ResponseStream,
-	ResponseStreamReceiver, TaskSpawner,
+	ResponseStreamReceiver, TaskHandle, TaskOptions, TaskSpawner,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_primitives::Tags;
 use futures::{Stream, StreamExt};
 use std::{any::type_name, future::ready, ops::Deref, sync::Arc};
-use tokio::{
-	sync::{mpsc, watch},
-	task::JoinHandle,
-};
+use tokio::sync::{mpsc, watch};
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 use tracing::{Instrument, Span};
 
 #[derive(Debug, thiserror::Error)]
@@ -107,6 +106,7 @@ where
 	actor: A,
 	rx: tokio::sync::mpsc::UnboundedReceiver<ActorMessage<A::Message>>,
 	state_tx: tokio::sync::watch::Sender<ActorState>,
+	options: TaskOptions,
 }
 impl<A> ActorSpawner<A>
 where
@@ -117,7 +117,7 @@ where
 		let (state_tx, state_rx) = watch::channel(ActorState::Starting);
 		let tags = Arc::new(actor.tags(tags)?);
 		let handle = ActorHandle { tx: tx.clone(), state: state_rx.clone(), tags: tags.clone() };
-		Ok(Self { handle, actor, rx, state_tx })
+		Ok(Self { handle, actor, rx, state_tx, options: TaskOptions::new(type_name::<A>()) })
 	}
 
 	pub fn handle(&self) -> ActorHandle<A::Message> {
@@ -132,7 +132,7 @@ where
 		let tags = self.handle.tags.clone();
 		let handle = self.handle;
 		let span = tracing::trace_span!("actor", ?tags, actor_type = type_name::<A>());
-		let join = spawner.spawn_named(type_name::<A>(), {
+		let join = spawner.spawn_options(self.options, {
 			let tags = tags.clone();
 			let handle = handle.clone();
 			let actor_span = span.clone();
@@ -152,10 +152,11 @@ where
 				// execute
 				let weak_handle = handle.downgrade();
 				while let Some(actor_message) = rx.recv().await {
-					let (message, message_span) = match actor_message {
-						ActorMessage::Message(message) => (message, tracing::trace_span!("actor-handle")),
+					// handle message
+					let (message, message_span, _parent_span) = match actor_message {
+						ActorMessage::Message(message) => (message, tracing::trace_span!("actor-handle"), None),
 						ActorMessage::MessageWithSpan(message, message_span) => {
-							(message, tracing::trace_span!(parent: message_span, "actor-handle"))
+							(message, tracing::trace_span!(parent: &message_span, "actor-handle"), Some(message_span))
 						},
 						ActorMessage::Shutdown => {
 							// log
@@ -240,7 +241,7 @@ where
 	A: Actor,
 {
 	handle: ActorHandle<A::Message>,
-	join: JoinHandle<Result<(), ActorError>>,
+	join: TaskHandle<Result<(), ActorError>>,
 }
 impl<A> ActorInstance<A>
 where
@@ -267,6 +268,22 @@ where
 		drop(self.handle);
 		self.join.await.map_err(|e| ActorError::InvalidState(e.into(), tags))??;
 		Ok(())
+	}
+
+	/// Wait for startup to be complete and then run in background.
+	/// This will resolve when initialization is done by returning any initialization errors.
+	pub async fn initialized(self) -> Result<ActorHandle<A::Message>, ActorError> {
+		let handle = self.handle();
+		match handle.initialized().await {
+			Ok(_) => Ok(handle),
+			Err(err @ ActorError::InvalidState(_, _)) if self.handle().is_closed() => {
+				// use the orignal initialize error and forward
+				//  this will not block as the actor has been closed already
+				self.join().await?;
+				Err(err)
+			},
+			Err(err) => Err(err),
+		}
 	}
 
 	/// Get actor state.
@@ -352,22 +369,7 @@ where
 
 	/// Wait for actor shutdown.
 	pub async fn closed(&self) -> Result<(), ActorError> {
-		let mut state = self.state.clone();
-		loop {
-			let actor_state = *state.borrow_and_update();
-			match actor_state {
-				ActorState::Starting | ActorState::Running => {
-					state
-						.changed()
-						.await
-						.map_err(|e| ActorError::InvalidState(e.into(), self.tags().clone()))?;
-				},
-				_ => {
-					break;
-				},
-			}
-		}
-		Ok(())
+		actor_closed(self.state.clone(), self.tags.clone()).await
 	}
 
 	/// Request shutdown.
@@ -503,8 +505,31 @@ impl<M> WeakActorHandle<M> {
 	pub fn upgrade(self) -> Option<ActorHandle<M>> {
 		Some(ActorHandle { state: self.state, tags: self.tags, tx: self.tx.upgrade()? })
 	}
+
+	/// Wait for actor shutdown.
+	pub async fn closed(&self) -> Result<(), ActorError> {
+		actor_closed(self.state.clone(), self.tags.clone()).await
+	}
 }
 
+/// Wait for actor shutdown.
+async fn actor_closed(mut state: watch::Receiver<ActorState>, tags: Arc<Tags>) -> Result<(), ActorError> {
+	loop {
+		let actor_state = *state.borrow_and_update();
+		match actor_state {
+			ActorState::Starting | ActorState::Running => {
+				state
+					.changed()
+					.await
+					.map_err(|e| ActorError::InvalidState(e.into(), tags.as_ref().clone()))?;
+			},
+			_ => {
+				break;
+			},
+		}
+	}
+	Ok(())
+}
 // pub trait ActorExt: Actor {
 // 	fn with_epic<E, C>(self, epic: E, context: C) -> EpicActor<Self, C>
 // 	where

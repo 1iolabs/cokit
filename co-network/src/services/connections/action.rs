@@ -3,11 +3,11 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+use co_actor::time::Instant;
 use co_primitives::{CoId, Did, Network};
 use derive_more::{From, TryInto};
 use libp2p::{Multiaddr, PeerId};
-use std::{collections::BTreeSet, time::Instant};
-
+use std::collections::BTreeSet;
 #[derive(Debug, Clone, From, TryInto, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ConnectionAction {
 	/// Use a CO by utilising the specified networks.
@@ -69,8 +69,20 @@ pub enum ConnectionAction {
 	/// Dial a peer has been completed.
 	DialCompleted(DialCompletedAction),
 
-	/// Notify about insufficent peers.
-	/// That causes to increase connectivity by dailing bootstrap peers.
+	/// Use a DID connection by utilising the specified networks.
+	DidUse(DidUseAction),
+
+	/// DID related peers changed.
+	DidPeersChanged(DidPeersChangedAction),
+
+	/// Release DID connection.
+	DidRelease(DidReleaseAction),
+
+	/// DID connection has been released.
+	DidReleased(DidReleasedAction),
+
+	/// Notify about insufficient peers.
+	/// That causes to increase connectivity by dialing bootstrap peers.
 	InsufficentPeers,
 }
 
@@ -192,4 +204,30 @@ pub struct DialCompletedAction {
 	pub peer_id: PeerId,
 	pub ok: bool,
 	pub time: Instant,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DidUseAction {
+	pub from: Did,
+	pub to: Did,
+	pub time: Instant,
+	pub networks: BTreeSet<Network>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DidPeersChangedAction {
+	pub to: Did,
+	pub peers: BTreeSet<PeerId>,
+	pub added: BTreeSet<PeerId>,
+	pub removed: BTreeSet<PeerId>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DidReleaseAction {
+	pub to: Did,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DidReleasedAction {
+	pub to: Did,
 }

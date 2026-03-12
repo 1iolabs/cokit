@@ -10,20 +10,17 @@ async-stream = { workspace = true }
 async-trait = { workspace = true }
 asynchronous-codec = "0.7.0"
 cid = { workspace = true }
-co-actor = { workspace = true }
+co-actor = { workspace = true, default-features = false }
 co-identity = { workspace = true }
 co-primitives = { workspace = true }
 co-storage = { workspace = true }
 derive_more = { workspace = true }
-did_url = "0.1.0"
 did-key = "0.2.1"
 futures = { workspace = true }
 ipld-core = { workspace = true }
 libipld = "0.16"
-libp2p = { version = "0.56", features = ["full"] }
-libp2p-bitswap = { version = "0.25.0", git = "https://github.com/dkuhnert/libp2p-bitswap.git", branch = "auth", features = [
-    "compat",
-] }
+libp2p = { version = "0.56", default-features = false, features = ["identify", "ping", "gossipsub", "relay", "dcutr", "autonat", "noise", "yamux", "macros", "request-response", "serde", "rendezvous"] }
+libp2p-bitswap = { version = "0.25.0", git = "https://github.com/dkuhnert/libp2p-bitswap.git", branch = "auth", default-features = false, features = ["compat"] }
 multiaddr = { workspace = true }
 pin-project = { workspace = true }
 rand = { workspace = true }
@@ -39,8 +36,34 @@ tokio-util = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 
+# web-only (optional)
+tokio_with_wasm = { workspace = true, features = ["macros", "sync", "time"], optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
+web-time = { workspace = true, optional = true }
+getrandom = { version = "0.2", features = ["js"], optional = true }
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"], optional = true }
+
 [dev-dependencies]
 insta = { version = "1.34.0", features = ["default", "yaml"] }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
-#tracing-test = "0.1"
-#test-log = "0.2"
+
+[features]
+default = ["native"]
+native = [
+    "co-actor/native",
+    "libp2p/tokio", "libp2p/tcp", "libp2p/quic", "libp2p/dns", "libp2p/mdns", "libp2p/upnp", "libp2p/websocket", "libp2p/tls",
+    "libp2p-bitswap/metrics",
+    "tokio/sync", "tokio/time",
+]
+web = ["js"]
+js = [
+    "co-actor/js",
+    "dep:tokio_with_wasm",
+    "dep:wasm-bindgen-futures",
+    "dep:web-time",
+    "dep:getrandom",
+    "dep:getrandom_03",
+    "uuid/js",
+    "libp2p/webrtc-websys", "libp2p/websocket-websys", "libp2p/wasm-bindgen",
+    "libp2p-bitswap/wasm-bindgen",
+]

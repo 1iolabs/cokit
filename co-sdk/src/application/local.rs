@@ -3,13 +3,20 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+#[cfg(feature = "fs")]
+use crate::library::local_secret_file::FileLocalSecret;
+#[cfg(feature = "keychain")]
+use crate::library::local_secret_keychain::KeychainLocalSecret;
+#[cfg(feature = "fs")]
+use crate::library::locals_file::FileLocals;
 use crate::{
 	application::application::ApplicationSettings,
 	library::{
 		builtin_cores::builtin_cores,
 		core_source::CoreSource,
-		local_secret::{FileLocalSecret, KeychainLocalSecret, LocalSecret, MemoryLocalSecret},
-		locals::{ApplicationLocal, FileLocals, Locals, MemoryLocals},
+		local_secret::{DynamicLocalSecret, LocalSecret, MemoryLocalSecret},
+		locals::{ApplicationLocal, Locals},
+		locals_memory::MemoryLocals,
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
 	services::reducer::{FlushInfo, ReducerFlush},
@@ -17,21 +24,23 @@ use crate::{
 		co_reducer_context::{CoReducerContext, CoReducerFeature},
 		co_reducer_state::MappedCoReducerState,
 	},
-	ApplicationMessage, CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, DynamicCoDate, Reducer,
-	ReducerBuilder, Runtime, TaskSpawner, CO_CORE_CO, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
-	CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	ApplicationMessage, CoReducer, CoReducerState, CoStorage, CoreResolver, Cores, Reducer, ReducerBuilder, Runtime,
+	TaskSpawner, CO_CORE_CO, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP,
 };
 #[cfg(feature = "pinning")]
 use crate::{
 	library::create_storage_core_state::create_storage_core_state,
 	types::cores::{CO_CORE_NAME_STORAGE, CO_CORE_STORAGE},
 };
+#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+use crate::{library::locals_indexeddb::IndexedDbLocals, CoStorageSetting};
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::ActorHandle;
 use co_identity::{Identity, LocalIdentity};
 use co_log::Log;
-use co_primitives::{tags, BlockLinks, CloneWithBlockStorageSettings, OptionMappedCid};
+use co_primitives::{tags, BlockLinks, CloneWithBlockStorageSettings, DynamicCoDate, OptionMappedCid};
 use co_storage::{
 	BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, ExtendedBlockStorage,
 };
@@ -54,16 +63,23 @@ pub struct LocalCoBuilder {
 	/// Whether to initialize the reducer (compute latest state).
 	initialize: bool,
 
+	/// Custom local secret for encryption.
+	local_secret: Option<DynamicLocalSecret>,
+
 	/// Verify Links
 	verify_links: Option<BlockLinks>,
 }
 impl LocalCoBuilder {
 	pub fn new(settings: ApplicationSettings, identity: LocalIdentity, initialize: bool) -> Self {
-		Self { settings, identity, initialize, verify_links: None }
+		Self { settings, identity, initialize, local_secret: None, verify_links: None }
 	}
 
 	pub fn with_initialize(self, initialize: bool) -> Self {
 		Self { initialize, ..self }
+	}
+
+	pub fn with_local_secret(self, local_secret: Option<DynamicLocalSecret>) -> Self {
+		Self { local_secret, ..self }
 	}
 
 	pub fn with_verify_links(self, verify_links: Option<BlockLinks>) -> Self {
@@ -71,85 +87,80 @@ impl LocalCoBuilder {
 	}
 
 	/// Create LocalCO instance.
-	#[allow(clippy::too_many_arguments)]
-	pub async fn build<R>(
-		self,
-		storage: CoStorage,
-		runtime: Runtime,
-		cores: &Cores,
-		shutdown: CancellationToken,
-		tasks: TaskSpawner,
-		core_resolver: R,
-		date: DynamicCoDate,
-		application_handle: ActorHandle<ApplicationMessage>,
-		#[cfg(feature = "pinning")] pinning: crate::library::storage_pinning::StoragePinningContext,
-	) -> Result<CoReducer, anyhow::Error>
+	pub async fn build<R>(mut self, context: LocalCoContext<R>, cores: &Cores) -> Result<CoReducer, anyhow::Error>
 	where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
 	{
 		// key
-		let key: Option<Box<dyn LocalSecret + Send + Sync + 'static>> = if self.settings.feature_co_local_encryption() {
-			Some(if self.settings.keychain {
-				Box::new(KeychainLocalSecret::new("co.app".to_owned(), self.identity.identity().to_owned()))
-			} else if let Some(application_path) = &self.settings.application_path {
-				Box::new(FileLocalSecret::new(application_path.parent().expect("etc folder").join("key.cbor")))
-			} else {
-				Box::new(MemoryLocalSecret::new())
-			})
+		let key: Option<DynamicLocalSecret> = if self.settings.feature_co_local_encryption() {
+			match self.local_secret.take() {
+				Some(secret) => Some(secret),
+				None => Some(self.build_local_secret()),
+			}
 		} else {
 			None
 		};
 
-		// create
-		let watcher = self.settings.feature_co_local_watch();
-		match &self.settings.application_path {
-			Some(application_path) => {
-				let config_path = application_path
-					.parent()
-					.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", application_path))?;
-				let locals = FileLocals::new(config_path.to_owned(), self.settings.identifier.clone(), true)?;
-				Ok(LocalCoInstance::create(
-					runtime,
-					cores,
-					self,
-					storage,
-					shutdown,
-					tasks,
-					locals,
-					key,
-					core_resolver,
-					watcher,
-					date,
-					application_handle,
-					#[cfg(feature = "pinning")]
-					pinning,
-				)
-				.await?
-				.1)
-			},
-			None => {
-				let locals = MemoryLocals::new(None);
-				Ok(LocalCoInstance::create(
-					runtime,
-					cores,
-					self,
-					storage,
-					shutdown,
-					tasks,
-					locals,
-					key,
-					core_resolver,
-					watcher,
-					date,
-					application_handle,
-					#[cfg(feature = "pinning")]
-					pinning,
-				)
-				.await?
-				.1)
-			},
+		// file
+		#[cfg(feature = "fs")]
+		if let Some(application_path) = &self.settings.application_path {
+			let watcher = self.settings.feature_co_local_watch();
+			let config_path = application_path
+				.parent()
+				.ok_or(anyhow::anyhow!("application_path to have a parent: {:?}", application_path))?;
+			let locals =
+				FileLocals::new(context.tasks.clone(), config_path.to_owned(), self.settings.identifier.clone(), true)?;
+			return Ok(LocalCoInstance::create(context, cores, self, locals, key, watcher).await?.1);
 		}
+
+		// indexeddb
+		#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+		if let CoStorageSetting::IndexedDb = &self.settings.storage {
+			let watcher = self.settings.feature_co_local_watch();
+			let locals = IndexedDbLocals::new(format!("co-locals::{}", self.settings.identifier))?;
+			return Ok(LocalCoInstance::create(context, cores, self, locals, key, watcher).await?.1);
+		}
+
+		// memory
+		let locals = MemoryLocals::new(None);
+		Ok(LocalCoInstance::create(context, cores, self, locals, key, false).await?.1)
 	}
+
+	/// Build default implementation for local secret.
+	fn build_local_secret(&self) -> DynamicLocalSecret {
+		// keychain
+		#[cfg(feature = "keychain")]
+		if self.settings.keychain {
+			return DynamicLocalSecret::new(KeychainLocalSecret::new(
+				"co.app".to_owned(),
+				self.identity.identity().to_owned(),
+			));
+		}
+
+		// fs
+		#[cfg(feature = "fs")]
+		if let Some(application_path) = &self.settings.application_path {
+			return DynamicLocalSecret::new(FileLocalSecret::new(
+				application_path.parent().expect("etc folder").join("key.cbor"),
+			));
+		}
+
+		// memory
+		DynamicLocalSecret::new(MemoryLocalSecret::generate())
+	}
+}
+
+/// Context for the LocalCo
+pub struct LocalCoContext<R> {
+	pub storage: CoStorage,
+	pub runtime: Runtime,
+	pub shutdown: CancellationToken,
+	pub tasks: TaskSpawner,
+	pub core_resolver: R,
+	pub date: DynamicCoDate,
+	pub application_handle: ActorHandle<ApplicationMessage>,
+	#[cfg(feature = "pinning")]
+	pub pinning: crate::library::storage_pinning::StoragePinningContext,
 }
 
 #[derive(Debug, Clone)]
@@ -170,21 +181,24 @@ where
 	/// dropped when a watcher is active.
 	///
 	/// NOTE: This assumes the same encryption key is used by all local applications.
-	#[allow(clippy::too_many_arguments)]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all)]
 	async fn create<R>(
-		runtime: Runtime,
+		LocalCoContext {
+			storage,
+			runtime,
+			shutdown,
+			tasks,
+			core_resolver,
+			date,
+			application_handle,
+			#[cfg(feature = "pinning")]
+			pinning,
+		}: LocalCoContext<R>,
 		cores: &Cores,
 		local_co: LocalCoBuilder,
-		storage: CoStorage,
-		shutdown: CancellationToken,
-		tasks: TaskSpawner,
 		locals: L,
-		key: Option<Box<dyn LocalSecret + Send + Sync + 'static>>,
-		core_resolver: R,
+		key: Option<DynamicLocalSecret>,
 		watcher: bool,
-		date: DynamicCoDate,
-		application_handle: ActorHandle<ApplicationMessage>,
-		#[cfg(feature = "pinning")] pinning: crate::library::storage_pinning::StoragePinningContext,
 	) -> Result<(Self, CoReducer), anyhow::Error>
 	where
 		R: CoreResolver<CoStorage> + Send + Sync + 'static,
@@ -270,6 +284,7 @@ where
 		}
 
 		// watch
+		#[cfg(any(feature = "fs", all(feature = "indexeddb", target_arch = "wasm32")))]
 		if watcher {
 			let watch_reducer: CoReducer = co_reducer.clone();
 			let watch_locals = result.locals.clone();
@@ -519,12 +534,15 @@ where
 /// Todo: What happens if muliple applications try to access the same key?
 async fn create_encrypted_storage<S>(
 	storage: S,
-	key: Box<dyn LocalSecret + Send + Sync + 'static>,
+	key: DynamicLocalSecret,
 	disallow_plain: bool,
 ) -> Result<EncryptedBlockStorage<S>, anyhow::Error>
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,
 {
+	// fetch key
+	let (algorithm, secret) = key.fetch().await?;
+
 	// we have plain references:
 	// - buildin core references
 	//   - third party cores are expected to be encrypted
@@ -535,7 +553,7 @@ where
 	} else {
 		EncryptionReferenceMode::Warning
 	};
-	Ok(EncryptedBlockStorage::new(storage.clone(), key.fetch().await?.into(), Default::default(), Default::default())
+	Ok(EncryptedBlockStorage::new(storage.clone(), secret.into(), algorithm, Default::default())
 		.with_encryption_reference_mode(reference_mode))
 }
 

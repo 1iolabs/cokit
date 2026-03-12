@@ -12,6 +12,7 @@ use crate::{
 		network::{
 			CoNetworkTaskSpawner, DialNetworkTask, DidCommReceiveNetworkTask, DidCommSendNetworkTask,
 			DidDiscoverySubscribe, DidDiscoveryUnsubscribe, ListnersNetworkTask, NetworkMessage, PeersNetworkTask,
+			SubscribeGossipTask,
 		},
 	},
 	types::network_task::NetworkTaskSpawner,
@@ -118,6 +119,11 @@ impl NetworkApi {
 	/// This can be used as a trigger for retries.
 	pub fn network_changed(&self) -> BoxStream<'static, ()> {
 		PeersNetworkTask::peers(&self.spawner).map(|_| ()).boxed()
+	}
+
+	/// Subscribe to a gossipsub topic by name.
+	pub async fn subscribe_gossip_topic(&self, topic: &str) -> Result<bool, anyhow::Error> {
+		SubscribeGossipTask::subscribe(self.spawner.clone(), libp2p::gossipsub::IdentTopic::new(topic)).await
 	}
 
 	/// Get block `cid` from bitswap.

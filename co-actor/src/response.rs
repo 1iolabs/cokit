@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use super::ActorError;
-use crate::TaskSpawner;
+use crate::{LocalTaskSpawner, TaskSpawner};
 use futures::{FutureExt, Sink, Stream};
 use std::{
 	any::type_name,
@@ -15,6 +15,8 @@ use std::{
 	task::{Context, Poll},
 };
 use tokio::sync::{mpsc, oneshot};
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 /// Response.
 ///
@@ -81,6 +83,18 @@ impl<T> Response<T> {
 		T: Send + 'static,
 	{
 		spawner.borrow().spawn(async move { self.send(value().await).ok() });
+	}
+
+	/// Spawns a new task using the given spawner and executes given closure in it
+	#[inline]
+	#[track_caller]
+	pub fn spawn_local<Fut, F>(self, spawner: impl LocalTaskSpawner, value: F)
+	where
+		Fut: Future<Output = T> + 'static,
+		F: FnOnce() -> Fut + 'static,
+		T: Send + 'static,
+	{
+		spawner.spawn_local(async move { self.send(value().await).ok() });
 	}
 }
 impl<T> Debug for Response<T> {
@@ -240,6 +254,10 @@ where
 	pub fn send(&mut self, value: T) {
 		self.streams
 			.retain_mut(|stream| !matches!(stream.send(value.clone()), Err(ActorError::Canceled)));
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.streams.is_empty() || self.is_closed()
 	}
 
 	/// Test if the streams has been closed by the caller.

@@ -17,6 +17,8 @@ pub use crate::library::{
 	storage_snapshots::storage_snapshots,
 	storage_structure::{storage_structure_recursive, CoStructureResolver, StructureResolveResult, StructureResolver},
 };
+#[cfg(feature = "tracing")]
+pub use application::tracing::TracingBuilder;
 pub use application::{
 	application::{Application, ApplicationBuilder},
 	co_context::CoContext,
@@ -25,28 +27,44 @@ pub use application::{
 	runtime::Runtime,
 	shared::CreateCo,
 	storage::Storage,
-	tracing::TracingBuilder,
 };
 pub use co_actor::TaskSpawner;
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 pub use co_identity::{
-	DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver, IdentityResolverError,
-	PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
+	DidCommHeader, DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver,
+	IdentityResolverError, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
+#[cfg(feature = "network")]
 pub use co_network::NetworkSettings;
 pub use co_primitives::{
 	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, unixfs_add, unixfs_cat_buffer,
 	unixfs_encode_buffer, unixfs_stream, AbsolutePath, AbsolutePathOwned, AnyBlockStorage, Block, BlockSerializer,
-	BlockStat, BlockStorage, BlockStorageExt, CloneWithBlockStorageSettings, CoId, CoInvite, CoList, CoListIndex,
-	CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, CoTryStreamExt, Component,
-	Components, CoreName, DagCollection, DagCollectionAsyncExt, DagCollectionExt, Date, DefaultParams, Did, IsDefault,
-	KnownMultiCodec, KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, NodeStream, OptionLink, Path, PathError,
-	PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag, Tags,
+	BlockStat, BlockStorage, BlockStorageExt, CloneWithBlockStorageSettings, CoDate, CoDateRef, CoId, CoInvite, CoList,
+	CoListIndex, CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, CoTryStreamExt,
+	Component, Components, CoreName, DagCollection, DagCollectionAsyncExt, DagCollectionExt, Date, DefaultParams, Did,
+	DynamicCoDate, IsDefault, KnownMultiCodec, KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, NodeStream,
+	OptionLink, Path, PathError, PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag,
+	Tags,
 };
-pub use co_runtime::{co_v1, ExecuteError, RuntimeContext, RuntimeInstance, RuntimePool};
-pub use co_storage::BlockStorageContentMapping;
+pub use co_runtime::{co_v1, Core, ExecuteError, GuardReference, RuntimeContext, RuntimeInstance, RuntimePool};
+pub use co_storage::{BlockStorageContentMapping, MemoryBlockStorage};
+#[cfg(feature = "fs")]
+pub use library::build_core::{
+	build_core, build_core_with_options, crate_repository_path, BuildCoreArtifact, BuildCoreOptions,
+};
+#[cfg(feature = "network")]
+pub use library::keystore_fetch::keystore_fetch;
+#[cfg(feature = "network")]
+pub use library::local_keypair_fetch::local_keypair_fetch;
+#[cfg(feature = "network")]
+pub use library::request_co_state::request_co_state;
+#[cfg(feature = "network")]
+pub use library::token::{CoToken, CoTokenParameters};
+#[cfg(feature = "network")]
+pub use library::update_co::update_co;
 pub use library::{
-	build_core::{build_core, crate_repository_path, BuildCoreArtifact},
+	co_access_policy::{CoAccessPolicy, DynamicCoAccessPolicy},
+	contact_handler::{ContactHandler, DynamicContactHandler},
 	core_source::CoreSource,
 	did_key_provider::DidKeyProvider,
 	find_co_by_pin::find_co_by_pin,
@@ -56,29 +74,34 @@ pub use library::{
 	generate_random_name::generate_random_name,
 	ipld_resolve_recursive::ipld_resolve_recursive,
 	is_cid_encrypted::is_cid_encrypted,
-	keystore_fetch::keystore_fetch,
-	local_keypair_fetch::local_keypair_fetch,
+	join_unrelated_co::join_unrelated_co,
+	local_secret::{DynamicLocalSecret, LocalSecret, MemoryLocalSecret},
+	local_secret_password::PasswordLocalSecret,
 	memory_dispatch::MemoryDispatch,
-	token::{CoToken, CoTokenParameters},
-	update_co::update_co,
 };
 pub use pin::PinAPI;
 pub use reducer::core_resolver::{
 	co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverContext, CoreResolverError,
 };
+#[cfg(feature = "network")]
+pub use services::application::KeyRequestAction;
 pub use services::{
-	application::{Action, ActionError, ApplicationMessage},
+	application::{Action, ActionError, ApplicationMessage, ContactAction},
 	reducer::CoReducer,
 };
+#[cfg(feature = "js")]
+pub use types::js_co_date::JsCoDate;
+#[cfg(feature = "native")]
+pub use types::system_co_date::SystemCoDate;
 pub use types::{
-	co_date::{CoDate, DynamicCoDate, MonotonicCoDate, StaticCoDate, SystemCoDate},
 	co_dispatch::{CoDispatch, DynamicCoDispatch},
 	co_pinning_key::CoPinningKey,
 	co_reducer_context::CoReducerContext,
-	co_reducer_factory::{CoReducerFactory, CoReducerFactoryError, CoReducerFactoryResultExt},
+	co_reducer_factory::{CoOptions, CoReducerFactory, CoReducerFactoryError, CoReducerFactoryResultExt},
 	co_reducer_state::{CoReducerState, MappedCoReducerState},
 	co_root::CoRoot,
 	co_storage::CoStorage,
+	co_storage_setting::CoStorageSetting,
 	co_uuid::{CoUuid, DynamicCoUuid, MonotonicCoUuid, RandomCoUuid},
 	cores::{
 		Cores, CO_CORE_CO, CO_CORE_DATA_SERIES, CO_CORE_FILE, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
@@ -87,5 +110,4 @@ pub use types::{
 	},
 	error::{ErrorContext, ErrorKind, IntoAction},
 	guards::Guards,
-	reference::{Reference, Request, Response, ResponseError},
 };

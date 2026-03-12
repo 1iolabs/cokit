@@ -6,15 +6,16 @@
 use super::{epics::epic, Action, ApplicationMessage};
 use crate::{
 	application::{application::ApplicationSettings, co_context::CoContextInner},
-	services::reducers::ReducersActor,
-	CoContext, Cores, DynamicCoDate, DynamicCoUuid, Guards, Runtime, Storage,
+	services::{reducers::ReducersActor, runtime::RuntimeActor},
+	CoContext, Cores, DynamicCoAccessPolicy, DynamicCoUuid, DynamicContactHandler, DynamicLocalSecret, Guards, Runtime,
+	Storage,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, ResponseStreams, TaskSpawner};
 use co_identity::LocalIdentityResolver;
-use co_primitives::{tags, Tags};
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use co_primitives::{tags, DynamicCoDate, Tags};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug)]
 pub struct Application {
@@ -29,21 +30,35 @@ impl Application {
 impl Actor for Application {
 	type Message = ApplicationMessage;
 	type State = ApplicationState;
-	type Initialize = (Storage, TaskTracker, DynamicCoDate, DynamicCoUuid, Cores, Guards);
+	type Initialize = (
+		Storage,
+		TaskSpawner,
+		DynamicCoDate,
+		DynamicCoUuid,
+		Cores,
+		Guards,
+		Option<DynamicLocalSecret>,
+		Option<DynamicCoAccessPolicy>,
+		Option<DynamicContactHandler>,
+	);
 
 	async fn initialize(
 		&self,
 		handle: &ActorHandle<Self::Message>,
 		tags: &Tags,
-		(storage, tasks, date, uuid, cores, guards): Self::Initialize,
+		(storage, spawner, date, uuid, cores, guards, local_secret, co_access_policy, contact_handler): Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		tracing::trace!(settings = ?self.settings, "application-initialize");
-
 		let shutdown = CancellationToken::new();
 		let local_identity = LocalIdentityResolver::default().private_identity("did:local:device").unwrap();
-		let runtime = Runtime::new();
 
-		// reducers
+		// service: runtime
+		#[cfg(feature = "js")]
+		let runtime = Runtime::new(RuntimeActor::spawn_local(self.settings.identifier.clone())?);
+		#[cfg(not(feature = "js"))]
+		let runtime = Runtime::new(RuntimeActor::spawn(self.settings.identifier.clone(), spawner.clone())?);
+
+		// service: reducers
 		let reducers = Actor::spawner(
 			tags!("type": "reducers", "application": self.settings.identifier.clone()),
 			ReducersActor::new(),
@@ -53,8 +68,9 @@ impl Actor for Application {
 		let co_context: CoContext = CoContextInner::new(
 			self.settings.clone(),
 			shutdown.child_token(),
-			TaskSpawner::new(self.settings.identifier.clone(), tasks.clone()),
+			spawner.clone(),
 			local_identity.clone(),
+			#[cfg(feature = "network")]
 			None,
 			storage,
 			runtime.clone(),
@@ -64,6 +80,9 @@ impl Actor for Application {
 			uuid,
 			cores,
 			guards,
+			local_secret,
+			co_access_policy,
+			contact_handler,
 		)
 		.into();
 
@@ -98,6 +117,7 @@ impl Actor for Application {
 				response.send(state.context.clone()).ok();
 				None
 			},
+			#[cfg(feature = "network")]
 			ApplicationMessage::Network(response) => {
 				response.respond(state.context.network().await.ok_or(anyhow!("Not started")));
 				None

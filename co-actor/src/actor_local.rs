@@ -3,10 +3,12 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{actor::ActorMessage, ActorError, ActorHandle, ActorState, LocalJoinHandle, LocalTaskSpawner};
+use crate::{actor::ActorMessage, ActorError, ActorHandle, ActorState, LocalTaskHandle, LocalTaskSpawner};
 use co_primitives::Tags;
 use std::{any::type_name, sync::Arc};
 use tokio::sync::{mpsc, watch};
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 use tracing::Instrument;
 
 /// A LocalActor will not moved between threads.
@@ -101,7 +103,7 @@ where
 		let tags = self.handle.tags.clone();
 		let handle = self.handle;
 		let span = tracing::trace_span!("actor", ?tags, actor_type = type_name::<A>());
-		let join = spawner.spwan_local({
+		let join = spawner.spawn_local({
 			let tags = tags.clone();
 			let handle = handle.clone();
 			let actor_span = span.clone();
@@ -122,14 +124,14 @@ where
 				let weak_handle = handle.downgrade();
 				while let Some(actor_message) = rx.recv().await {
 					// handle message
-					let (message, message_span) = match actor_message {
-						ActorMessage::Message(message) => (message, tracing::trace_span!("actor-handle")),
+					let (message, message_span, _parent_span) = match actor_message {
+						ActorMessage::Message(message) => (message, tracing::trace_span!("actor-handle"), None),
 						ActorMessage::MessageWithSpan(message, message_span) => {
-							(message, tracing::trace_span!(parent: message_span, "actor-handle"))
+							(message, tracing::trace_span!(parent: &message_span, "actor-handle"), Some(message_span))
 						},
 						ActorMessage::Shutdown => {
 							// log
-							tracing::trace!(?tags, "actor-shutdown");
+							tracing::trace!("actor-shutdown");
 
 							// done
 							break;
@@ -181,7 +183,7 @@ where
 	A: LocalActor,
 {
 	handle: ActorHandle<A::Message>,
-	join: LocalJoinHandle<Result<(), ActorError>>,
+	join: LocalTaskHandle<Result<(), ActorError>>,
 }
 
 impl<A: std::fmt::Debug> std::fmt::Debug for LocalActorInstance<A>

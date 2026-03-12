@@ -3,30 +3,36 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo, tracing::TracingBuilder};
+#[cfg(feature = "tracing")]
+use super::tracing::TracingBuilder;
+use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
 use crate::{
-	library::wait_response::request_response, services::application::ApplicationMessage, Action, CoDate, CoReducer,
-	CoReducerFactory, CoStorage, CoUuid, Cores, DynamicCoDate, DynamicCoUuid, Guards, RandomCoUuid, Storage,
-	SystemCoDate,
+	library::{
+		contact_handler::{ContactHandler, DynamicContactHandler},
+		wait_response::request_response,
+	},
+	services::application::ApplicationMessage,
+	types::co_date::co_date_env,
+	Action, CoAccessPolicy, CoReducer, CoReducerFactory, CoStorage, CoStorageSetting, CoUuid, Cores,
+	DynamicCoAccessPolicy, DynamicCoUuid, DynamicLocalSecret, Guards, LocalSecret, RandomCoUuid, Storage,
 };
 use anyhow::anyhow;
 use cid::Cid;
-use co_actor::{Actor, ActorHandle, ActorInstance};
+use co_actor::{Actor, ActorHandle, ActorInstance, TaskOptions, TaskSpawner};
 use co_core_storage::PinStrategy;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
+#[cfg(feature = "network")]
 use co_network::NetworkSettings;
-use co_primitives::{tag, tags, CoId, TagValue, Tags};
+use co_primitives::{tag, tags, CoDate, CoId, DynamicCoDate, TagValue, Tags};
 use co_runtime::{Core, GuardReference};
 use co_storage::StaticBlockStorage;
+#[cfg(feature = "fs")]
 use directories::ProjectDirs;
-use futures::{Stream, StreamExt};
+use futures::{future::BoxFuture, FutureExt, Stream, StreamExt};
 use std::{collections::BTreeSet, fmt::Debug, future::ready, path::PathBuf, sync::Arc};
-use tokio_util::{
-	sync::{CancellationToken, DropGuard},
-	task::TaskTracker,
-};
+use tokio_util::sync::{CancellationToken, DropGuard};
 
 #[derive(Clone)]
 pub struct Application {
@@ -37,7 +43,8 @@ pub struct Application {
 	settings: ApplicationSettings,
 
 	/// Tasks.
-	tasks: TaskTracker,
+	#[cfg_attr(feature = "js", allow(dead_code))]
+	tasks: TaskSpawner,
 
 	/// CO Context.
 	co_context: CoContext,
@@ -69,13 +76,6 @@ impl Application {
 		self.service.handle()
 	}
 
-	/// Tasks bound to this application.
-	/// Internal use only. Use `tasks`.
-	#[doc(hidden)]
-	pub fn task_tracker(&self) -> TaskTracker {
-		self.tasks.clone()
-	}
-
 	pub fn context(&self) -> &CoContext {
 		&self.co_context
 	}
@@ -98,10 +98,26 @@ impl Application {
 		self.context().inner.shutdown().cancel();
 
 		// wait
-		self.tasks.wait().await;
+		self.joiner().await;
+	}
+
+	/// Created a futures that resolves when all pending tasks are done.
+	pub fn joiner(&self) -> BoxFuture<'static, ()> {
+		// wait
+		#[cfg(not(feature = "js"))]
+		{
+			let tasks = self.tasks.clone();
+			async move {
+				tasks.tracker().wait().await;
+			}
+			.boxed()
+		}
+		#[cfg(feature = "js")]
+		async move { /* no-op */ }.boxed()
 	}
 
 	/// Create and startup network.
+	#[cfg(feature = "network")]
 	pub async fn create_network(&mut self, settings: NetworkSettings) -> Result<(), anyhow::Error> {
 		// start and wait
 		request_response(self.service.handle(), Action::NetworkStart(settings), move |action| match action {
@@ -135,7 +151,7 @@ impl Application {
 		self.co_context.private_identity_resolver().await
 	}
 
-	/// Get unsiged local device identity.
+	/// Get unsigned local device identity.
 	pub fn local_identity(&self) -> LocalIdentity {
 		self.co_context.local_identity()
 	}
@@ -154,17 +170,21 @@ impl Application {
 	/// Initialize application.
 	async fn init(&self) -> Result<(), anyhow::Error> {
 		// shutdown
-		let shutdown = self.context().inner.shutdown().clone();
-		let tasks = self.tasks.clone();
-		let reactive = self.service.handle();
-		tokio::spawn(async move {
-			// shutdown
-			shutdown.cancelled().await;
-			reactive.shutdown();
-			tasks.close();
+		self.tasks.spawn_options(TaskOptions::untracked(), {
+			let shutdown = self.context().inner.shutdown().clone();
+			#[cfg(not(feature = "js"))]
+			let tasks = self.tasks.clone();
+			let reactive = self.service.handle();
+			async move {
+				// shutdown
+				shutdown.cancelled().await;
+				reactive.shutdown();
+				#[cfg(not(feature = "js"))]
+				tasks.tracker().close();
 
-			// log
-			tracing::trace!("application-shutdown");
+				// log
+				tracing::trace!("application-shutdown");
+			}
 		});
 
 		// log
@@ -196,6 +216,7 @@ impl std::fmt::Debug for Application {
 			.finish()
 	}
 }
+static_assertions::assert_impl_all!(Application: Send);
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -212,7 +233,11 @@ pub struct ApplicationSettings {
 	/// Normally composed of `{base_path}/etc/{identifier}`.
 	/// The Local CO read method tries to read states of all applications by searching for
 	/// `{application_path}/../*/local.cbor` files.
+	#[cfg(feature = "fs")]
 	pub application_path: Option<PathBuf>,
+
+	/// Application storage.
+	pub storage: CoStorageSetting,
 
 	/// Use keychain or file for Local CO.
 	pub keychain: bool,
@@ -235,6 +260,7 @@ pub struct ApplicationSettings {
 }
 impl ApplicationSettings {
 	/// Base path.
+	#[cfg(feature = "fs")]
 	pub fn base_path(&self) -> Option<PathBuf> {
 		self.application_path
 			.as_ref()
@@ -320,40 +346,79 @@ impl ApplicationSettings {
 
 pub struct ApplicationBuilder {
 	identifier: String,
-	path: Option<PathBuf>,
+	storage: CoStorageSetting,
 	keychain: bool,
+	#[cfg(feature = "tracing")]
 	tracing: TracingBuilder,
 	settings: Tags,
 	date: Option<DynamicCoDate>,
 	uuid: Option<DynamicCoUuid>,
+	local_secret: Option<DynamicLocalSecret>,
 	static_blocks: Vec<StaticBlockStorage<'static>>,
 	cores: Cores,
 	guards: Guards,
+	access_policy: Option<DynamicCoAccessPolicy>,
+	contact_handler: Option<DynamicContactHandler>,
 }
 impl ApplicationBuilder {
+	#[cfg(feature = "fs")]
 	pub fn default_path() -> PathBuf {
 		let dirs = ProjectDirs::from("co.app", "1io", "co").expect("home directory");
 		dirs.data_dir().into()
 	}
 
-	/// Create new instance with path.
-	pub fn new_with_path(identifier: impl Into<String>, path: PathBuf) -> Self {
+	/// Create new instance with storage.
+	pub fn new_with_storage(identifier: impl Into<String>, storage: CoStorageSetting) -> Self {
 		let identifier = identifier.into();
-		let tracing = TracingBuilder::new(identifier.clone(), Some(path.clone()));
+		#[cfg(feature = "tracing")]
+		let path = match &storage {
+			#[cfg(feature = "fs")]
+			CoStorageSetting::Path(path) => Some(path.clone()),
+			#[cfg(feature = "fs")]
+			CoStorageSetting::PathDefault => Some(Self::default_path()),
+			_ => None,
+		};
 		Self {
+			#[cfg(feature = "tracing")]
+			tracing: TracingBuilder::new(identifier.clone(), path),
 			identifier,
-			path: Some(path),
+			storage,
 			keychain: true,
-			tracing,
 			settings: Default::default(),
 			date: None,
 			uuid: None,
+			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
+			access_policy: None,
+			contact_handler: None,
 		}
 	}
 
+	/// Create new instance with path.
+	#[cfg(feature = "fs")]
+	pub fn new_with_path(identifier: impl Into<String>, path: PathBuf) -> Self {
+		let identifier = identifier.into();
+		Self {
+			#[cfg(feature = "tracing")]
+			tracing: TracingBuilder::new(identifier.clone(), Some(path.clone())),
+			identifier,
+			storage: CoStorageSetting::Path(path),
+			keychain: true,
+			settings: Default::default(),
+			date: None,
+			uuid: None,
+			local_secret: None,
+			static_blocks: Default::default(),
+			cores: Default::default(),
+			guards: Default::default(),
+			access_policy: None,
+			contact_handler: None,
+		}
+	}
+
+	#[cfg(feature = "fs")]
 	pub fn new(identifier: impl Into<String>) -> Self {
 		Self::new_with_path(identifier, Self::default_path())
 	}
@@ -361,18 +426,43 @@ impl ApplicationBuilder {
 	/// Create new memory only instance.
 	pub fn new_memory(identifier: impl Into<String>) -> Self {
 		let identifier = identifier.into();
-		let tracing = TracingBuilder::new(identifier.clone(), None);
 		Self {
+			#[cfg(feature = "tracing")]
+			tracing: TracingBuilder::new(identifier.clone(), None),
 			identifier,
-			path: None,
+			storage: CoStorageSetting::Memory,
 			keychain: false,
-			tracing,
 			settings: Default::default(),
 			date: None,
 			uuid: None,
+			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
 			guards: Default::default(),
+			access_policy: None,
+			contact_handler: None,
+		}
+	}
+
+	/// Create new memory only instance.
+	#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+	pub fn new_indexeddb(identifier: impl Into<String>) -> Self {
+		let identifier = identifier.into();
+		Self {
+			#[cfg(feature = "tracing")]
+			tracing: TracingBuilder::new(identifier.clone(), None),
+			identifier,
+			storage: CoStorageSetting::IndexedDb,
+			keychain: false,
+			settings: Default::default(),
+			date: None,
+			uuid: None,
+			local_secret: None,
+			static_blocks: Default::default(),
+			cores: Default::default(),
+			guards: Default::default(),
+			access_policy: None,
+			contact_handler: None,
 		}
 	}
 
@@ -382,18 +472,22 @@ impl ApplicationBuilder {
 	/// ```sh
 	/// tail -0f ~/Application\ Support/co.app/log/application.log | bunyan -c '!/^(libp2p|hickory_proto)/.test(this.target)'
 	/// ```
+	#[cfg(feature = "bunyan")]
 	pub fn with_bunyan_logging(self, log_path: Option<PathBuf>) -> Self {
 		Self { tracing: self.tracing.with_bunyan_logging(log_path), ..self }
 	}
 
+	#[cfg(feature = "tracing")]
 	pub fn with_log_max_level(self, max_level: tracing::Level) -> Self {
 		Self { tracing: self.tracing.with_max_level(max_level), ..self }
 	}
 
+	#[cfg(feature = "tracing")]
 	pub fn with_optional_tracing(self) -> Self {
 		Self { tracing: self.tracing.with_optional_tracing(), ..self }
 	}
 
+	#[cfg(feature = "opentelemetry")]
 	pub fn with_open_telemetry(self, endpoint: impl Into<String>) -> Self {
 		Self { tracing: self.tracing.with_open_telemetry(endpoint), ..self }
 	}
@@ -410,6 +504,10 @@ impl ApplicationBuilder {
 		Self { uuid: Some(DynamicCoUuid::new(uuid)), ..self }
 	}
 
+	pub fn with_local_secret(self, secret: impl LocalSecret + 'static) -> Self {
+		Self { local_secret: Some(DynamicLocalSecret::new(secret)), ..self }
+	}
+
 	pub fn with_core(mut self, core_cid: Cid, core: Core) -> Self {
 		self.cores = self.cores.with_override(core_cid, core);
 		self
@@ -418,6 +516,24 @@ impl ApplicationBuilder {
 	pub fn with_guard(mut self, guard_cid: Cid, guard: GuardReference) -> Self {
 		self.guards = self.guards.with_override(guard_cid, guard);
 		self
+	}
+
+	pub fn with_cores(mut self, cores: Cores) -> Self {
+		self.cores = cores;
+		self
+	}
+
+	pub fn with_guards(mut self, guards: Guards) -> Self {
+		self.guards = guards;
+		self
+	}
+
+	pub fn with_access_policy(self, policy: impl CoAccessPolicy + 'static) -> Self {
+		Self { access_policy: Some(DynamicCoAccessPolicy::new(policy)), ..self }
+	}
+
+	pub fn with_contact_handler(self, handler: impl ContactHandler + 'static) -> Self {
+		Self { contact_handler: Some(DynamicContactHandler::new(handler)), ..self }
 	}
 
 	pub fn with_static_blocks(mut self, storage: StaticBlockStorage<'static>) -> Self {
@@ -456,19 +572,28 @@ impl ApplicationBuilder {
 	}
 
 	pub async fn build(self) -> Result<Application, anyhow::Error> {
-		let tasks = TaskTracker::new();
+		let tasks = TaskSpawner::new(self.identifier.clone());
 
 		// log
+		#[cfg(feature = "tracing")]
 		self.tracing.init()?;
 
 		// sources
-		let date = self.date.unwrap_or_else(|| DynamicCoDate::new(SystemCoDate));
+		let date = self.date.unwrap_or_else(co_date_env);
 		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
 
 		// storage
-		let mut storage = match &self.path {
-			Some(path) => Storage::new(path.join("data"), path.join("tmp/data"), uuid.clone()),
-			None => Storage::new_memory(),
+		let (mut storage, path): (_, Option<PathBuf>) = match self.storage.clone() {
+			#[cfg(feature = "fs")]
+			CoStorageSetting::PathDefault => {
+				let path = Self::default_path();
+				(Storage::new(path.join("data"), path.join("tmp/data"), uuid.clone()), Some(path))
+			},
+			#[cfg(feature = "fs")]
+			CoStorageSetting::Path(path) => (Storage::new(path.join("data"), path.join("tmp/data"), uuid.clone()), Some(path)),
+			CoStorageSetting::Memory => (Storage::new_memory(), None),
+			#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+			CoStorageSetting::IndexedDb => (Storage::new_indexeddb().await?, None),
 		};
 		if !self.static_blocks.is_empty() {
 			storage = storage.with_static(self.static_blocks);
@@ -476,7 +601,9 @@ impl ApplicationBuilder {
 
 		// settings
 		let settings = ApplicationSettings {
-			application_path: self.path.map(|path| path.join("etc").join(&self.identifier)),
+			#[cfg(feature = "fs")]
+			application_path: path.map(|path| path.join("etc").join(&self.identifier)),
+			storage: self.storage,
 			identifier: self.identifier,
 			keychain: self.keychain,
 			settings: self.settings,
@@ -486,7 +613,17 @@ impl ApplicationBuilder {
 		let service = Actor::spawn(
 			tags!("type": "application", "application": settings.identifier.clone()),
 			crate::services::application::Application::new(settings.clone()),
-			(storage, tasks.clone(), date, uuid, self.cores, self.guards),
+			(
+				storage,
+				tasks.clone(),
+				date,
+				uuid,
+				self.cores,
+				self.guards,
+				self.local_secret,
+				self.access_policy,
+				self.contact_handler,
+			),
 		)?;
 
 		// wait for context

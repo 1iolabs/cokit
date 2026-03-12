@@ -4,11 +4,12 @@
 // retention—approved secure tools may process solely for internal use.
 
 use super::create_reducer_action::create_reducer_action;
-use crate::{types::co_dispatch::CoDispatch, CoreResolverError, StaticCoDate};
+use crate::{services::runtime::RuntimeHandle, types::co_dispatch::CoDispatch, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
 use co_identity::PrivateIdentityBox;
-use co_runtime::{Core, RuntimeContext, RuntimePool};
+use co_primitives::StaticCoDate;
+use co_runtime::{Core, RuntimeContext};
 use co_storage::ExtendedBlockStorage;
 use serde::Serialize;
 use std::{fmt::Debug, marker::PhantomData};
@@ -16,7 +17,7 @@ use std::{fmt::Debug, marker::PhantomData};
 /// Dispatch for implicit core resolver actions.
 pub struct RuntimeDispatch<S, A> {
 	identity: PrivateIdentityBox,
-	runtime: RuntimePool,
+	runtime: RuntimeHandle,
 	storage: S,
 	core_name: String,
 	core_binary: Cid,
@@ -28,7 +29,7 @@ pub struct RuntimeDispatch<S, A> {
 impl<S, A> RuntimeDispatch<S, A> {
 	pub fn new(
 		identity: PrivateIdentityBox,
-		runtime: RuntimePool,
+		runtime: RuntimeHandle,
 		storage: S,
 		core_name: String,
 		core_binary: Cid,
@@ -74,7 +75,7 @@ where
 		// TODO: make sure it not in use by anyone else?
 		self.storage.remove(action_cid.cid()).await?;
 
-		// check diagostics
+		// check diagnostics
 		//  (albeit they only happen due to bugs)
 		//  we should always use diagnostics for implicit actions to not silently fail tasks
 		runtime_context.ok(&self.storage).await?;

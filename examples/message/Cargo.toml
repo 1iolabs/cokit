@@ -17,7 +17,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 co-sdk = { workspace = true }
-co-storage = { workspace = true }
+co-storage = { workspace = true, features = ["native"] }
 co-runtime = { workspace = true }
 co-primitives = { workspace = true }
 tracing = { workspace = true }

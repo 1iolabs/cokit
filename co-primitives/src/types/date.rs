@@ -3,4 +3,4 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-pub type Date = u128; // unix timestamp in milliseconds
+pub type Date = u64; // unix timestamp in milliseconds

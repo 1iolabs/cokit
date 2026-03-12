@@ -12,6 +12,8 @@ use co_primitives::{Did, NetworkDidDiscovery};
 use libp2p::Swarm;
 use std::fmt::Debug;
 use tokio::sync::oneshot;
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 /// Subscribe identity for DID Discovery.
 #[derive(Debug)]

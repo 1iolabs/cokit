@@ -10,9 +10,8 @@ use crate::{
 		network::DialNetworkTask,
 	},
 };
-use co_actor::Actions;
+use co_actor::{time, Actions};
 use futures::{FutureExt, Stream};
-use std::time::Instant;
 
 /// Dial a peer.
 pub fn dial_epic(
@@ -36,7 +35,7 @@ pub fn dial_epic(
 					Ok(ConnectionAction::DialCompleted(DialCompletedAction {
 						peer_id: action.peer_id,
 						ok: result.is_ok(),
-						time: Instant::now(),
+						time: time::Instant::now(),
 					}))
 				}
 				.into_stream(),

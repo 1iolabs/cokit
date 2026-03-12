@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{services::application::ApplicationMessage, Action};
-use co_actor::ActorHandle;
+use co_actor::{time, ActorHandle};
 use futures::{future::ready, pin_mut, StreamExt};
 use std::time::Duration;
 
@@ -29,7 +29,9 @@ pub async fn wait_response_timeout<F, T>(
 where
 	F: Fn(&Action) -> Option<T>,
 {
-	tokio::time::timeout(timeout, wait_response(handle, filter)).await?
+	time::timeout(timeout, wait_response(handle, filter))
+		.await
+		.map_err(|_| anyhow::anyhow!("Timeout"))?
 }
 
 pub async fn request_response<F, T>(

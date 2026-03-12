@@ -4,11 +4,10 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{DidCommPrivateContext, DidCommPublicContext, Identity, PrivateIdentity};
+use anyhow::anyhow;
+use co_primitives::CoDateRef;
 use serde::{Deserialize, Serialize};
-use std::{
-	collections::{BTreeMap, BTreeSet},
-	time::{SystemTime, UNIX_EPOCH},
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// See: https://identity.foundation/didcomm-messaging/spec/#message-headers
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -91,22 +90,18 @@ pub struct DidCommHeader {
 }
 impl DidCommHeader {
 	/// Create new DidCommHeader with an
-	pub fn new(message_type: impl Into<String>) -> Self {
+	pub fn new(date: &CoDateRef, message_type: impl Into<String>) -> Self {
 		Self {
 			id: Self::create_message_id(),
-			created_time: Some(
-				SystemTime::now()
-					.duration_since(UNIX_EPOCH)
-					.expect("valid system time")
-					.as_secs(),
-			),
+			created_time: Some(date.now_duration().as_secs()),
 			message_type: message_type.into(),
 			..Default::default()
 		}
 	}
 
-	/// Create new DidCommHeader for a message with sender `from` and single recipent `to`.
+	/// Create new DidCommHeader for a message with sender `from` and single recipient `to`.
 	pub fn create<F, T>(
+		date: &CoDateRef,
 		from: &F,
 		to: &T,
 		message_type: impl Into<String>,
@@ -115,18 +110,22 @@ impl DidCommHeader {
 		F: PrivateIdentity + Send + Sync + 'static,
 		T: Identity + Send + Sync + 'static,
 	{
-		let mut header = DidCommHeader::new(message_type.into());
+		let mut header = DidCommHeader::new(date, message_type.into());
 		header.from = Some(from.identity().to_owned());
 		header.to = [to.identity().to_owned()].into_iter().collect();
 		Ok((from.try_didcomm_private()?, to.try_didcomm_public()?, header))
 	}
 
 	/// Create new DidCommHeader for a message with sender `from` and unknown recipent(s).
-	pub fn create_from<F>(from: &F, message_type: impl Into<String>) -> anyhow::Result<(DidCommPrivateContext, Self)>
+	pub fn create_from<F>(
+		date: &CoDateRef,
+		from: &F,
+		message_type: impl Into<String>,
+	) -> anyhow::Result<(DidCommPrivateContext, Self)>
 	where
 		F: PrivateIdentity + Send + Sync + 'static,
 	{
-		let mut header = DidCommHeader::new(message_type.into());
+		let mut header = DidCommHeader::new(date, message_type.into());
 		header.from = Some(from.identity().to_owned());
 		Ok((from.try_didcomm_private()?, header))
 	}
@@ -134,6 +133,19 @@ impl DidCommHeader {
 	/// Create random message id.
 	pub fn create_message_id() -> String {
 		uuid::Uuid::new_v4().to_string()
+	}
+
+	pub fn with_fields(mut self, fields: impl IntoIterator<Item = (String, String)>) -> Result<Self, anyhow::Error> {
+		for (key, value) in fields {
+			match key.as_str() {
+				"id" | "type" | "to" | "from" | "thid" | "pthid" | "created_time" | "expires_time" => {
+					return Err(anyhow!("Reserved key: {}", key));
+				},
+				_ => {},
+			}
+			self.fields.insert(key, value);
+		}
+		Ok(self)
 	}
 }
 

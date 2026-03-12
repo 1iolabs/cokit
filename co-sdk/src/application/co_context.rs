@@ -7,31 +7,43 @@ use crate::{
 	application::{
 		application::ApplicationSettings,
 		identity::{create_identity_resolver, create_private_identity_resolver},
+		local::LocalCoContext,
 		shared::{SharedCoBuilder, SharedCoCreator},
 	},
-	library::{builtin_cores::builtin_cores, shared_membership::shared_membership_active},
+	library::{
+		builtin_cores::builtin_cores,
+		contact_handler::DynamicContactHandler,
+		shared_membership::{shared_membership_active, wait_shared_membership_active},
+		wait_response::request_response,
+	},
 	reducer::core_resolver::{dynamic::DynamicCoreResolver, guard::CoGuardResolver, log::LogCoreResolver},
 	services::{
-		application::ApplicationMessage,
-		reducers::{ReducerStorage, ReducersControl},
+		application::{ApplicationMessage, ContactAction},
+		reducers::{ReducerOptions, ReducerStorage, ReducersControl},
 	},
+	state,
 	types::co_reducer_factory::CoReducerFactoryError,
-	CoCoreResolver, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoDate, DynamicCoUuid, Guards,
-	LocalCoBuilder, Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	Action, CoCoreResolver, CoOptions, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoAccessPolicy,
+	DynamicCoUuid, DynamicLocalSecret, Guards, LocalCoBuilder, Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE,
+	CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use async_trait::async_trait;
 use cid::Cid;
-use co_actor::ActorHandle;
+use co_actor::{time, ActorHandle};
 use co_core_membership::Membership;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
 };
 use co_log::{EntryBlock, Log};
+#[cfg(feature = "network")]
 use co_network::{connections::ConnectionMessage, HeadsApi, NetworkApi};
-use co_primitives::{BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, Did, IgnoreFilter};
+use co_primitives::{
+	BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, Did, DynamicCoDate, IgnoreFilter,
+	Network,
+};
 use futures::{Stream, TryStreamExt};
 use std::{
-	collections::BTreeSet,
+	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,
 	sync::{Arc, RwLock},
 };
@@ -56,6 +68,7 @@ impl CoContext {
 	/// Get a stream to the log entries.
 	/// Starting at the latest (reverse chronological).
 	/// The stream is read with snapshot isolation (not watching changes).
+	//#[deprecated(note = "Use co_sdk::state::heads instead")]
 	pub async fn entries(
 		&self,
 		co: impl AsRef<CoId>,
@@ -66,7 +79,7 @@ impl CoContext {
 		let state = reducer.reducer_state().await;
 
 		// stream
-		let stream = self.entries_from_heads(co, storage.clone(), state.1).await?;
+		let stream = state::heads_stream(storage.clone(), co.as_ref(), state.heads());
 
 		// result
 		Ok((storage, stream))
@@ -74,6 +87,7 @@ impl CoContext {
 
 	/// Get a stream to the log entries.
 	/// Starting at `heads` (reverse chronological).
+	#[deprecated(note = "Use co_sdk::state::heads instead")]
 	pub async fn entries_from_heads(
 		&self,
 		co: impl AsRef<CoId>,
@@ -86,7 +100,7 @@ impl CoContext {
 		let log = Log::new_readonly(co.as_bytes().to_vec(), heads);
 
 		// stream
-		let stream = log.into_stream(&storage).map_err(|e| e.into());
+		let stream = log.into_stream(storage).map_err(|e| e.into());
 
 		// result
 		Ok(stream)
@@ -111,22 +125,25 @@ impl CoContext {
 		self.inner.private_identity_resolver().await
 	}
 
-	/// Get unsiged local device identity.
+	/// Get unsigned local device identity.
 	pub fn local_identity(&self) -> LocalIdentity {
 		LocalIdentity::device()
 	}
 
 	/// Network.
+	#[cfg(feature = "network")]
 	pub async fn network(&self) -> Option<NetworkApi> {
 		self.inner.network.read().unwrap().clone()
 	}
 
 	/// Network Connections.
+	#[cfg(feature = "network")]
 	pub async fn network_connections(&self) -> Option<ActorHandle<ConnectionMessage>> {
 		self.inner.network.read().unwrap().as_ref().map(|api| api.connections().clone())
 	}
 
 	/// Network Heads.
+	#[cfg(feature = "network")]
 	pub async fn network_heads(&self) -> Option<HeadsApi> {
 		self.inner.network.read().unwrap().as_ref().map(|api| api.heads().clone())
 	}
@@ -170,6 +187,42 @@ impl CoContext {
 		}
 	}
 
+	/// CO access policy for non-participants.
+	pub fn access_policy(&self) -> Option<&DynamicCoAccessPolicy> {
+		self.inner.access_policy.as_ref()
+	}
+
+	/// Contact handler for incoming contact requests.
+	pub fn contact_handler(&self) -> Option<&DynamicContactHandler> {
+		self.inner.contact_handler.as_ref()
+	}
+
+	/// Send a contact request to a DID.
+	///
+	/// # Return
+	/// This method returns whether the contact request could be send to to recipient.
+	/// Note that the actual contact can decide if and when he want to connect back.
+	pub async fn contact(
+		&self,
+		from: Did,
+		to: Did,
+		subject: Option<String>,
+		headers: BTreeMap<String, String>,
+		networks: impl IntoIterator<Item = Network>,
+	) -> Result<(), anyhow::Error> {
+		let contact =
+			ContactAction { from, to, sub: subject, networks: networks.into_iter().collect(), fields: headers };
+
+		let result: Result<(), crate::ActionError> =
+			request_response(self.inner.application(), Action::Contact(contact.clone()), move |action| match action {
+				Action::ContactSent(sent, result) if *sent == contact => Some(result.clone()),
+				_ => None,
+			})
+			.await?;
+
+		result.map_err(|err| err.into())
+	}
+
 	/// Force refresh co instance.
 	pub async fn refresh(&self, co: CoReducer) -> Result<(), anyhow::Error> {
 		let parent = match co.parent_id() {
@@ -195,6 +248,19 @@ impl CoReducerFactory for CoContext {
 	async fn try_co_reducer(&self, co: &CoId) -> Result<CoReducer, CoReducerFactoryError> {
 		self.inner.reducers.clone().reducer(co.clone(), Default::default()).await
 	}
+
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self), fields(application = self.inner.settings.identifier))]
+	async fn try_co_reducer_with_options(
+		&self,
+		co: &CoId,
+		options: CoOptions,
+	) -> Result<CoReducer, CoReducerFactoryError> {
+		self.inner
+			.reducers
+			.clone()
+			.reducer(co.clone(), ReducerOptions::default().with_co_options(options))
+			.await
+	}
 }
 impl Debug for CoContext {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -213,6 +279,7 @@ pub(crate) struct CoContextInner {
 
 	local_identity: LocalIdentity,
 
+	#[cfg(feature = "network")]
 	network: Arc<RwLock<Option<NetworkApi>>>,
 
 	storage: Storage,
@@ -227,6 +294,9 @@ pub(crate) struct CoContextInner {
 	block_links_builtin: BlockLinks,
 	cores: Cores,
 	guards: Guards,
+	local_secret: Option<DynamicLocalSecret>,
+	access_policy: Option<DynamicCoAccessPolicy>,
+	contact_handler: Option<DynamicContactHandler>,
 }
 impl CoContextInner {
 	#[allow(clippy::too_many_arguments)]
@@ -235,7 +305,7 @@ impl CoContextInner {
 		shutdown: CancellationToken,
 		tasks: TaskSpawner,
 		local_identity: LocalIdentity,
-		network: Option<NetworkApi>,
+		#[cfg(feature = "network")] network: Option<NetworkApi>,
 		storage: Storage,
 		runtime: Runtime,
 		reactive_context: ActorHandle<ApplicationMessage>,
@@ -244,6 +314,9 @@ impl CoContextInner {
 		uuid: DynamicCoUuid,
 		cores: Cores,
 		guards: Guards,
+		local_secret: Option<DynamicLocalSecret>,
+		access_policy: Option<DynamicCoAccessPolicy>,
+		contact_handler: Option<DynamicContactHandler>,
 	) -> Self {
 		let block_links = BlockLinks::default();
 		let block_links_builtin = block_links.clone().with_filter(IgnoreFilter::new(builtin_cores()));
@@ -252,6 +325,7 @@ impl CoContextInner {
 			shutdown,
 			tasks,
 			local_identity,
+			#[cfg(feature = "network")]
 			network: Arc::new(RwLock::new(network)),
 			storage,
 			runtime,
@@ -263,6 +337,9 @@ impl CoContextInner {
 			block_links_builtin,
 			cores,
 			guards,
+			local_secret,
+			access_policy,
+			contact_handler,
 		}
 	}
 
@@ -320,6 +397,7 @@ impl CoContextInner {
 	}
 
 	/// Clone with network.
+	#[cfg(feature = "network")]
 	pub async fn set_network(&self, network: Option<NetworkApi>) -> Result<(), anyhow::Error> {
 		// assign
 		*self.network.write().unwrap() = network;
@@ -332,6 +410,7 @@ impl CoContextInner {
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	pub(crate) async fn create_local_co_instance(&self, initialize: bool) -> Result<CoReducer, anyhow::Error> {
 		let local_co = LocalCoBuilder::new(self.settings.clone(), self.local_identity.clone(), initialize)
+			.with_local_secret(self.local_secret.clone())
 			.with_verify_links(
 				self.settings
 					.feature_co_storage_verify_links()
@@ -339,17 +418,20 @@ impl CoContextInner {
 			);
 		let local_co_reducer = local_co
 			.build(
-				self.storage()
-					.clone_with_settings(BlockStorageCloneSettings::new().with_detached()),
-				self.runtime.clone(),
+				LocalCoContext {
+					storage: self
+						.storage()
+						.clone_with_settings(BlockStorageCloneSettings::new().with_detached()),
+					runtime: self.runtime.clone(),
+					shutdown: self.shutdown.child_token(),
+					tasks: self.tasks.clone(),
+					core_resolver: self.create_local_core_resolver(CoId::new(CO_ID_LOCAL)),
+					date: self.date.clone(),
+					application_handle: self.application(),
+					#[cfg(feature = "pinning")]
+					pinning: self.create_pinning_context(),
+				},
 				&self.cores,
-				self.shutdown.child_token(),
-				self.tasks.clone(),
-				self.create_local_core_resolver(CoId::new(CO_ID_LOCAL)),
-				self.date.clone(),
-				self.application(),
-				#[cfg(feature = "pinning")]
-				self.create_pinning_context(),
 			)
 			.await?;
 		Ok(local_co_reducer)
@@ -358,7 +440,7 @@ impl CoContextInner {
 	/// Creates the Core Resolver for the local CO.
 	fn create_local_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::new(&self.cores);
-		let core_resolver = LogCoreResolver::new(core_resolver, id);
+		let core_resolver = LogCoreResolver::new(core_resolver, id, self.date.clone());
 		DynamicCoreResolver::new(core_resolver)
 	}
 
@@ -367,7 +449,7 @@ impl CoContextInner {
 		let core_resolver = CoCoreResolver::new(&self.cores);
 		let core_resolver =
 			CoGuardResolver::new(core_resolver, &self.guards).with_ignore_mode(self.settings.feature_co_guard_ignore());
-		let core_resolver = LogCoreResolver::new(core_resolver, id);
+		let core_resolver = LogCoreResolver::new(core_resolver, id, self.date.clone());
 		DynamicCoreResolver::new(core_resolver)
 	}
 
@@ -423,9 +505,18 @@ impl CoContextInner {
 		storage: ReducerStorage,
 		initialize: bool,
 		identity: Option<Did>,
+		options: CoOptions,
 	) -> Result<Option<CoReducer>, anyhow::Error> {
 		// find first active membership
-		let membership = shared_membership_active(&parent, co, identity.as_ref()).await?;
+		let membership = if options.wait {
+			if let Some(timeout) = options.wait_timeout {
+				time::timeout(timeout, wait_shared_membership_active(&parent, co, identity.as_ref())).await??
+			} else {
+				wait_shared_membership_active(&parent, co, identity.as_ref()).await?
+			}
+		} else {
+			shared_membership_active(&parent, co, identity.as_ref()).await?
+		};
 		let membership = match membership {
 			Some(m) => m,
 			None => return Ok(None),

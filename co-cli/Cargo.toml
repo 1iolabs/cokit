@@ -26,7 +26,7 @@ co-log = { workspace = true }
 co-messaging = { workspace = true }
 co-primitives = { workspace = true }
 co-runtime = { workspace = true }
-co-sdk = { workspace = true }
+co-sdk = { workspace = true, features = ["native"] }
 co-storage = { workspace = true }
 colored = "2.1.0"
 exitcode = "1.1.2"
@@ -55,14 +55,16 @@ tracing-log = { workspace = true }
 tracing-opentelemetry = "0.23"
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 uuid = { workspace = true }
-zstd = { workspace = true }
+zstd = { workspace = true, optional = true }
 
 [features]
-default = ["llvm", "wasmi", "pinning"]
+default = ["llvm", "wasmi", "pinning", "network"]
+zst = ["dep:zstd"]
 
 # sdk
 pinning = ["co-sdk/pinning"]
-bundle-wasm-cores = ["co-sdk/bundle-wasm-cores"]
+bundle-wasm-cores = ["co-sdk/bundle-wasm-cores", "zst"]
+network = ["co-sdk/network"]
 
 # runtime
 llvm = ["co-runtime/llvm"]

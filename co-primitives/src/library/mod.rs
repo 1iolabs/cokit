@@ -17,6 +17,7 @@ pub mod node_reader;
 pub mod node_stream;
 pub mod reducer_action_core;
 pub mod serde_map_as_list;
+pub mod storage;
 #[cfg(any(test, feature = "benchmarking"))]
 pub mod test;
 pub mod unixfs;

@@ -3,11 +3,13 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{types::guards::Guards, CoreResolver, CoreResolverContext, CoreResolverError};
+use crate::{
+	services::runtime::RuntimeHandle, types::guards::Guards, CoreResolver, CoreResolverContext, CoreResolverError,
+};
 use async_trait::async_trait;
 use cid::Cid;
 use co_primitives::{DiagnosticMessage, GuardVerifyPayload};
-use co_runtime::{GuardReference, RuntimeContext, RuntimePool};
+use co_runtime::{GuardReference, RuntimeContext};
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use std::collections::HashMap;
 
@@ -53,7 +55,7 @@ where
 	async fn execute(
 		&self,
 		storage: &S,
-		runtime: &RuntimePool,
+		runtime: &RuntimeHandle,
 		context: &CoreResolverContext,
 		state: &Option<Cid>,
 		action: &Cid,
@@ -65,12 +67,12 @@ where
 				let heads = context.entry.entry().next.clone();
 				let next_head = *context.entry.cid();
 				let guard_reference = self.guard(guard.binary);
-				let valid = runtime
+				let (mut result, valid) = runtime
 					.execute_guard(
 						storage,
 						&guard.binary,
 						&guard_reference,
-						RuntimeContext::new_payload(&GuardVerifyPayload {
+						RuntimeContext::new(Some(state), *action).with_payload(&GuardVerifyPayload {
 							guard: guard_name.clone(),
 							state,
 							heads,
@@ -84,28 +86,43 @@ where
 						)
 					})?;
 				if !valid {
+					// diagnostics
+					result.resolve_diagnostics(storage).await?;
+
+					// trace
+					tracing::trace!(
+						co = ?co_state.id,
+						guard_name,
+						?guard,
+						?state,
+						heads = ?context.entry.entry().next,
+						next_head = ?context.entry.cid(),
+						mode = ?self.mode,
+						diagnostics = ?result.diagnostics,
+						"guard-reject"
+					);
+
 					// handle permission failure
 					match self.mode {
 						// fail
 						GuardRejectionMode::Fail => {
 							return Err(CoreResolverError::Middleware(anyhow::anyhow!(
-								"Guard reports invalid head: {}: {}",
+								"Guard \"{}\" rejected head \"{}\"",
 								guard_name,
 								next_head
 							)))
 						},
 						// skip to compute
 						GuardRejectionMode::Skip => {
-							let mut result = RuntimeContext::new(Some(state), *action);
 							result.push_diagnostic(DiagnosticMessage::Failure(format!(
-								"Guard reports invalid head: {}: {}",
+								"Guard \"{}\" rejected head \"{}\"",
 								guard_name, next_head
 							)));
 							return Ok(result);
 						},
 						// warn and ignore
 						GuardRejectionMode::Ignore => {
-							tracing::warn!(?guard_name, ?next_head, "guard-ignore-rejection");
+							tracing::warn!(?guard_name, ?next_head, "guard-reject-ignore");
 						},
 					};
 				}

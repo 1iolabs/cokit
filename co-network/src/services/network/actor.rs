@@ -12,7 +12,7 @@ use crate::{
 		heads::{HeadsActor, HeadsApi, HeadsContext},
 		network::{
 			tasks::{identify_dial::IdentifyDialNetworkTask, relay_listen::RelayListenTask},
-			CoNetworkTaskSpawner, ConnectionsNetworkTask, MdnsGossipNetworkTask, NetworkApi, NetworkSettings,
+			CoNetworkTaskSpawner, ConnectionsNetworkTask, NetworkApi, NetworkSettings,
 		},
 	},
 	types::network_task::NetworkTaskSpawner,
@@ -20,13 +20,14 @@ use crate::{
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, ActorInstance, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
-use co_primitives::{tags, Tags};
+use co_primitives::{tags, DynamicCoDate, Tags};
 use libp2p::{identity::Keypair, PeerId};
 
 pub struct NetworkInitialize {
 	pub settings: NetworkSettings,
 	pub identifier: String,
 	pub keypair: Keypair,
+	pub date: DynamicCoDate,
 	pub identity_resolver: IdentityResolverBox,
 	pub private_identity_resolver: PrivateIdentityResolverBox,
 	pub bitswap: ActorHandle<BitswapMessage>,
@@ -55,10 +56,13 @@ impl Actor for Network {
 			initialize.identifier.clone(),
 			initialize.keypair.clone(),
 			initialize.settings.clone(),
+			initialize.date.clone(),
+			initialize.tasks.clone(),
 			initialize.identity_resolver.clone(),
 			initialize.private_identity_resolver.clone(),
 			initialize.bitswap,
-		)?;
+		)
+		.await?;
 
 		// spawner
 		let spawner = CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id };
@@ -69,12 +73,14 @@ impl Actor for Network {
 			.map_err(|err| ActorError::Actor(err.into()))?;
 
 		// use mdns discoverd peers for gossip discovery
+		#[cfg(feature = "native")]
 		spawner
-			.spawn(MdnsGossipNetworkTask::new())
+			.spawn(super::MdnsGossipNetworkTask::new())
 			.map_err(|err| ActorError::Actor(err.into()))?;
 
 		// connections
 		let connections_context = ConnectionsContext {
+			date: initialize.date.clone(),
 			tasks: initialize.tasks.clone(),
 			identity_resolver: initialize.identity_resolver.clone(),
 			private_identity_resolver: initialize.private_identity_resolver.clone(),

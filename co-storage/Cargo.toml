@@ -17,22 +17,26 @@ co-primitives = { workspace = true }
 derive_more = { workspace = true }
 either = { workspace = true }
 futures = { workspace = true }
+getrandom = { version = "0.2", optional = true, default-features = false }
 ipld-core = { workspace = true }
 ipld-dagpb = { workspace = true }
+js-sys = { workspace = true, optional = true }
 multihash = { workspace = true }
 multihash-codetable = { workspace = true }
-names = "0.14.0"
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
 serde_ipld_dagcbor = { workspace = true }
 serde_ipld_dagjson = { workspace = true }
 serde_repr = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["macros", "fs", "rt", "io-util"] }
-tokio-stream = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true, default-features = false }
 tokio-util = { workspace = true, features = ["compat"] }
 tracing = { workspace = true }
 uuid = { workspace = true }
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true, features = ["DomException", "DomStringList", "Event", "EventTarget", "IdbDatabase", "IdbFactory", "IdbObjectStore", "IdbOpenDbRequest", "IdbRequest", "IdbTransaction", "IdbTransactionMode", "Window"] }
 
 [dev-dependencies]
 hexdump = "0.1.1"
@@ -43,3 +47,8 @@ co-test = { workspace = true }
 [features]
 default = []
 logging-verbose = []
+fs = ["tokio/fs", "tokio/io-util"]
+web = ["js"]
+native = ["co-actor/native", "fs"]
+js = ["uuid/js", "getrandom/js", "co-actor/js"]
+indexeddb = ["js", "dep:web-sys", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys"]

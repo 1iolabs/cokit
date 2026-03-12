@@ -70,7 +70,7 @@ async fn test_local_multi_instance_push() {
 	tracing::info!(?local_co2_state, "test-open");
 
 	// setup wait
-	let local_co2_next_state = tokio::spawn({
+	let local_co2_next_state = application1.context().tasks().spawn({
 		let stream = local_co2.reducer_state_stream().skip(1).take(1).inspect(|state| {
 			tracing::info!(?state, "test-push-change");
 		});

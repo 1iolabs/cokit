@@ -19,10 +19,16 @@ pub async fn invite_networks(
 		invite.network.network.clone()
 	} else {
 		// participants
+		//  note: we use the invite senders did as fallback if no connectivity settings
 		let identity_resolver = context.identity_resolver().await?;
-		identities_networks(Some(&identity_resolver), invite.network.participants.iter().cloned())
-			.try_collect()
-			.await?
+		identities_networks(
+			Some(&identity_resolver),
+			[invite.from.clone()]
+				.into_iter()
+				.chain(invite.network.participants.iter().cloned()),
+		)
+		.try_collect()
+		.await?
 	};
 
 	// the invite peer (maybe still connected)

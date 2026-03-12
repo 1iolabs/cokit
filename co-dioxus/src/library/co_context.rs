@@ -3,12 +3,15 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{CoError, CoErrorSignal, CoSettings};
+use crate::CoSettings;
 use anyhow::Result;
-use co_sdk::{Application, ApplicationBuilder};
-use dioxus::signals::WritableExt;
+use co_primitives::Network;
+use co_sdk::{state, Application, ApplicationBuilder, CoId, Did, IdentityResolver};
 use futures::{future::BoxFuture, Future};
+use std::collections::{BTreeMap, BTreeSet};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 #[derive(Debug, Clone)]
 pub struct CoContext {
@@ -16,31 +19,94 @@ pub struct CoContext {
 }
 impl CoContext {
 	pub fn new(settings: CoSettings) -> Self {
-		let context = Self::spawn(settings);
+		match settings.log.clone().with_resolved_default() {
+			#[cfg(feature = "web")]
+			crate::CoLog::Console => {
+				dioxus::logger::init(settings.log_level.into()).expect("logger");
+			},
+			#[cfg(feature = "tracing")]
+			crate::CoLog::Print => {
+				co_sdk::TracingBuilder::new(settings.identifier.clone(), None)
+					.with_stderr_logging()
+					.with_max_level(settings.log_level.into())
+					.init()
+					.expect("tracing init");
+			},
+			#[cfg(all(feature = "fs", feature = "tracing"))]
+			crate::CoLog::File(path) => {
+				#[cfg(feature = "tracing")]
+				{
+					let base_path = match settings.storage.clone() {
+						#[cfg(feature = "fs")]
+						co_sdk::CoStorageSetting::Path(path) => Some(path),
+						#[cfg(feature = "fs")]
+						co_sdk::CoStorageSetting::PathDefault => Some(ApplicationBuilder::default_path()),
+						_ => None,
+					};
+					co_sdk::TracingBuilder::new(settings.identifier.clone(), base_path)
+						.with_bunyan_logging(path)
+						.with_max_level(settings.log_level.into())
+						.init()
+						.expect("tracing init");
+				}
+			},
+			#[cfg(feature = "tracing-oslog")]
+			crate::CoLog::Os => {
+				use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+				tracing_subscriber::registry()
+					.with(
+						tracing_subscriber::filter::EnvFilter::builder()
+							.with_default_directive(
+								tracing_subscriber::filter::LevelFilter::from_level(settings.log_level.into()).into(),
+							)
+							.from_env_lossy(),
+					)
+					.with(tracing_oslog::OsLogger::new(&settings.bundle_identifier, "default"))
+					.init();
+			},
+			_ => {},
+		}
 
-		// block until startup is complete
+		// spawn
+		Self::spawn(settings)
+	}
+
+	/// Wait until the context is ready.
+	pub async fn ready(&self) -> Result<(), anyhow::Error> {
 		let (tx, rx) = tokio::sync::oneshot::channel();
-		context.execute(|_app| {
-			tx.send(()).unwrap();
+		self.execute(|_app| {
+			tx.send(()).ok();
 		});
-		rx.blocking_recv().unwrap();
+		rx.await?;
+		Ok(())
+	}
 
-		// result
-		context
+	/// Wait until the context is ready by blocking.
+	#[cfg(not(feature = "web"))]
+	pub async fn ready_blocking(&self) -> Result<(), anyhow::Error> {
+		let (tx, rx) = tokio::sync::oneshot::channel();
+		self.execute(|_app| {
+			tx.send(()).ok();
+		});
+		rx.blocking_recv()?;
+		Ok(())
 	}
 
 	pub(crate) fn spawn(settings: CoSettings) -> Self {
 		let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Task>();
+		#[cfg(not(feature = "web"))]
 		std::thread::Builder::new()
 			.name("co".to_owned())
 			.spawn(|| co_main(settings, rx))
 			.expect("co thread to start");
+		#[cfg(feature = "web")]
+		co_main(settings, rx);
 		Self { tasks: tx }
 	}
 
 	/// Execute future task using CO Application.
 	/// Futures will be executed in sequence.
-	pub fn execute_future_box<F>(&self, f: F)
+	pub(crate) fn execute_future_box<F>(&self, f: F)
 	where
 		F: (FnOnce(Application) -> BoxFuture<'static, ()>) + Send + 'static,
 	{
@@ -50,7 +116,7 @@ impl CoContext {
 	}
 
 	/// Execute task using CO Application.
-	pub fn execute<F>(&self, f: F)
+	pub(crate) fn execute<F>(&self, f: F)
 	where
 		F: FnOnce(Application) + Send + 'static,
 	{
@@ -63,7 +129,7 @@ impl CoContext {
 
 	/// Execute future task using CO Application.
 	/// Futures will be started in sequence but executed in parallel.
-	pub fn execute_future_parallel<F, Fut>(&self, f: F)
+	pub(crate) fn execute_future_parallel<F, Fut>(&self, f: F)
 	where
 		Fut: Future<Output = ()> + Send + 'static,
 		F: FnOnce(Application) -> Fut + Send + 'static,
@@ -79,7 +145,7 @@ impl CoContext {
 
 	/// Execute future task using CO Application.
 	/// Futures will be executed in sequence.
-	pub fn execute_future<F, Fut>(&self, f: F)
+	pub(crate) fn execute_future<F, Fut>(&self, f: F)
 	where
 		Fut: Future<Output = ()> + Send + 'static,
 		F: FnOnce(Application) -> Fut + Send + 'static,
@@ -89,45 +155,6 @@ impl CoContext {
 				f(application).await;
 			})
 		});
-	}
-
-	/// Execute future task using CO Application.
-	/// Note: Tasks will be started in sequence but executed in parallel.
-	pub fn execute_future_with_error<F, Fut>(&self, mut error: CoErrorSignal, f: F)
-	where
-		Fut: Future<Output = Result<(), anyhow::Error>> + Send + 'static,
-		F: FnOnce(Application) -> Fut + Send + 'static,
-	{
-		self.execute_future_box(move |application| {
-			Box::pin(async move {
-				match f(application).await {
-					Ok(_) => {},
-					Err(e) => error.write().push(CoError::from_error(e)),
-				}
-			})
-		});
-	}
-
-	/// Execute future task using CO Application and return its result when done.
-	/// Note: Tasks will be started in sequence but executed in parallel.
-	pub async fn result<F, Fut, T>(&self, mut error: CoErrorSignal, f: F) -> Option<T>
-	where
-		Fut: Future<Output = Result<T, anyhow::Error>> + Send + 'static,
-		F: FnOnce(Application) -> Fut + Send + 'static,
-		T: Send + 'static,
-	{
-		let (tx, rx) = futures::channel::oneshot::channel();
-		self.execute_future_box(move |application| {
-			Box::pin(async move {
-				match f(application).await {
-					Ok(result) => {
-						tx.send(result).ok();
-					},
-					Err(e) => error.write().push(CoError::from_error(e)),
-				}
-			})
-		});
-		rx.await.ok()
 	}
 
 	/// Execute future task using CO Application and return its result when done.
@@ -149,6 +176,47 @@ impl CoContext {
 			.map_err(|_err| CoContextError::Shutdown)?
 			.map_err(|err| CoContextError::Execute(err))
 	}
+
+	/// Join a unrelated CO.
+	///
+	/// This only initiates a join.
+	/// When completed the membership state of the CO will change to active.
+	pub async fn join_unrelated_co(
+		&self,
+		from: state::Identity,
+		to: Did,
+		to_co: CoId,
+		to_networks: BTreeSet<Network>,
+	) -> Result<(), anyhow::Error> {
+		Ok(self
+			.try_with_application(move |application| async move {
+				let to_identity = application.identity_resolver().await?.resolve(&to).await?;
+				let from_identity = application.private_identity(&from.did).await?;
+				co_sdk::join_unrelated_co(application.context(), &from_identity, &to_identity, to_co, to_networks)
+					.await?;
+				Result::<(), anyhow::Error>::Ok(())
+			})
+			.await?)
+	}
+
+	/// Send a contact request.
+	pub async fn contact(
+		&self,
+		from: state::Identity,
+		to: Did,
+		to_subject: Option<String>,
+		to_headers: BTreeMap<String, String>,
+		to_networks: BTreeSet<Network>,
+	) -> Result<(), anyhow::Error> {
+		Ok(self
+			.try_with_application(move |application| async move {
+				application
+					.context()
+					.contact(from.did, to, to_subject, to_headers, to_networks)
+					.await
+			})
+			.await?)
+	}
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -165,27 +233,32 @@ type Task = Box<TaskFn>;
 // type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
 
 async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Result<(), anyhow::Error> {
-	let mut application_builder = match settings.path {
-		Some(path) => ApplicationBuilder::new_with_path(settings.identifier, path),
-		None => ApplicationBuilder::new(settings.identifier),
-	};
-	if !settings.no_log {
-		application_builder = application_builder.with_bunyan_logging(None);
-	}
+	let mut application_builder = ApplicationBuilder::new_with_storage(settings.identifier, settings.storage)
+		.with_cores(settings.cores)
+		.with_guards(settings.guards);
 	if settings.no_keychain {
 		application_builder = application_builder.without_keychain();
 	}
 	if settings.no_default_features {
 		application_builder = application_builder.with_setting("default-features", false);
 	}
-	application_builder = application_builder.with_log_max_level(settings.log_level.into());
 	for feature in &settings.feature {
 		application_builder = application_builder.with_setting("feature", feature.to_owned());
 	}
-	application_builder = application_builder.with_setting("feature", "co-open-keep");
+	if let Some(local_secret) = settings.local_secret {
+		application_builder = application_builder.with_local_secret(local_secret);
+	}
+	if let Some(access_policy) = settings.access_policy {
+		application_builder = application_builder.with_access_policy(access_policy);
+	}
+	if let Some(contact_handler) = settings.contact_handler {
+		application_builder = application_builder.with_contact_handler(contact_handler);
+	}
+	#[allow(unused_mut)]
 	let mut application = application_builder.build().await?;
 
 	// network
+	#[cfg(feature = "network")]
 	if settings.network {
 		application.create_network(settings.network_settings).await?;
 	}
@@ -200,9 +273,15 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 }
 
 fn co_main(settings: CoSettings, tasks: UnboundedReceiver<Task>) {
+	#[cfg(feature = "web")]
+	wasm_bindgen_futures::spawn_local(async move {
+		co_app(settings, tasks).await.expect("app to run");
+	});
+
+	#[cfg(not(feature = "web"))]
 	tokio::runtime::Builder::new_multi_thread()
 		.enable_all()
 		.build()
 		.unwrap()
-		.block_on(async move { co_app(settings, tasks).await.expect("app to run") })
+		.block_on(async move { co_app(settings, tasks).await.expect("app to run") });
 }

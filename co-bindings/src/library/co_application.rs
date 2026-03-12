@@ -98,6 +98,7 @@ impl Actor for CoApplication {
 		let mut application = application_builder.build().await?;
 
 		// network
+		#[cfg(feature = "network")]
 		if settings
 			.network
 			.unwrap_or_else(|| CoSettings::default().network.unwrap_or_default())
@@ -105,7 +106,7 @@ impl Actor for CoApplication {
 			application
 				.create_network(settings.network_settings.unwrap_or_default().try_into()?)
 				.await?;
-		}
+		};
 
 		Ok(application)
 	}

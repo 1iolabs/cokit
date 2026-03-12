@@ -3,22 +3,20 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use co_actor::{LocalJoinError, LocalJoinHandle, LocalTaskSpawner};
+use co_actor::{LocalTaskHandle, LocalTaskSpawner};
 use std::future::Future;
 use wasm_bindgen_futures::spawn_local;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct JsLocalTaskSpawner {}
 impl LocalTaskSpawner for JsLocalTaskSpawner {
-	fn spwan_local<F>(&self, fut: F) -> LocalJoinHandle<F::Output>
+	fn spawn_local<F>(&self, fut: F) -> LocalTaskHandle<F::Output>
 	where
 		F: Future + 'static,
-		F::Output: 'static,
+		F::Output: Send + 'static,
 	{
-		let (tx, rx) = tokio::sync::oneshot::channel();
-		spawn_local(async move {
-			tx.send(fut.await).ok();
-		});
-		LocalJoinHandle::new(async move { rx.await.map_err(|_err| LocalJoinError::Cancelled) })
+		let (task, task_handle) = LocalTaskHandle::handle_local(fut);
+		spawn_local(task);
+		task_handle
 	}
 }

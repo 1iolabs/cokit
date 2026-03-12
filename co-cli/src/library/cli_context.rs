@@ -34,8 +34,8 @@ impl CliContext {
 		let application = application_builder.build().await.expect("application");
 
 		// add the application to cli task list
-		let application_tasks = application.task_tracker();
-		self.tasks.spawn(async move { application_tasks.wait().await });
+		//  note: we only clone the tasks so the application gets closed when goes out of scope
+		self.tasks.spawn(application.joiner());
 
 		application
 	}

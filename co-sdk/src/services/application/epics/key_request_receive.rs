@@ -9,7 +9,7 @@ use crate::{
 		key_exchange::{create_key_response_message, KeyRequestPayload, KeyResponsePayload, CO_DIDCOMM_KEY_REQUEST},
 		network_identity::network_identity,
 	},
-	Action, CoContext, CoReducerFactory,
+	Action, CoAccessPolicy, CoContext, CoReducerFactory,
 };
 use anyhow::anyhow;
 use co_actor::Actions;
@@ -78,7 +78,10 @@ async fn key_request(
 
 	// validate access
 	if !participant_state.has_access() {
-		return Err(anyhow!("Invalid participant state: {:?}", participant_state));
+		match context.access_policy() {
+			Some(policy) if policy.check_access(&payload.id, requester_identity.identity()).await? => {},
+			_ => return Err(anyhow!("Invalid participant state: {:?}", participant_state)),
+		}
 	}
 
 	// membership
@@ -90,8 +93,13 @@ async fn key_request(
 	let key: Key = find_co_key(&local_co, &co).await?.ok_or(anyhow!("No key found"))?;
 
 	// message
-	let (message_header, message) =
-		create_key_response_message(&identity, &requester_identity, header.id.clone(), KeyResponsePayload::Ok(key))?;
+	let (message_header, message) = create_key_response_message(
+		context.date(),
+		&identity,
+		&requester_identity,
+		header.id.clone(),
+		KeyResponsePayload::Ok(key),
+	)?;
 
 	// result
 	Ok(vec![Action::DidCommSend { message_header, peer, message }])

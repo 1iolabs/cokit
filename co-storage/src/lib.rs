@@ -15,11 +15,18 @@ pub use crypto::{
 	block::{Algorithm, AlgorithmError},
 	secret::Secret,
 };
-pub use library::{node_reader::node_reader, unixfs_add_file::unixfs_add_file};
+pub use library::node_reader::node_reader;
+#[cfg(feature = "fs")]
+pub use library::unixfs_add_file::unixfs_add_file;
+#[cfg(feature = "fs")]
+pub use storage::fs::FsStorage;
+#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
+pub use storage::indexeddb::IndexedDbBlockStorage;
+#[cfg(feature = "native")]
+pub use storage::sync::{SyncBlockStorage, SyncStorage};
 pub use storage::{
 	change::{BlockStorageChange, ChangeBlockStorage},
 	encrypted::{EncryptedBlockStorage, EncryptedBlockStorageMapping, EncryptionReferenceMode},
-	fs::FsStorage,
 	join::JoinBlockStorage,
 	links::LinksBlockStorage,
 	mapped::MappedBlockStorage,
@@ -28,7 +35,6 @@ pub use storage::{
 	request,
 	static_storage::StaticBlockStorage,
 	store_params::StoreParamsBlockStorage,
-	sync::{SyncBlockStorage, SyncStorage},
 };
 pub use types::{
 	extended_block_storage::{ExtendedBlock, ExtendedBlockOptions, ExtendedBlockStorage},

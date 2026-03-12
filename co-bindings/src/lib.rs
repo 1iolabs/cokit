@@ -19,13 +19,14 @@ pub use library::{
 	co_error::CoError,
 	co_settings::CoSettings,
 };
+#[cfg(feature = "network")]
+pub use types::network_settings::CoNetworkSettings;
 pub use types::{
 	cid::Cid,
 	co_map::CoMap,
 	co_set::CoSet,
 	identity::CoPrivateIdentity,
 	level::CoLogLevel,
-	network_settings::CoNetworkSettings,
 	storage::{Block, BlockStorage},
 	unixfs::unixfs_add_buffer,
 };
