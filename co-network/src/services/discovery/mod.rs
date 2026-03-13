@@ -3,7 +3,17 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-pub mod connections;
-pub mod discovery;
-pub mod heads;
-pub mod network;
+pub mod action;
+pub mod actor;
+mod api;
+mod epics;
+mod event;
+pub mod message;
+pub mod state;
+mod types;
+
+pub use actor::{DiscoveryActor, DiscoveryContext};
+pub use api::DiscoveryApi;
+pub use event::Event;
+pub use message::DiscoveryMessage;
+pub use types::{DidDiscovery, DidDiscoveryMessageType, DiscoverMessage, Discovery};

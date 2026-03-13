@@ -313,6 +313,15 @@ impl<M> Clone for ActorHandle<M> {
 		Self { tx: self.tx.clone(), state: self.state.clone(), tags: self.tags.clone() }
 	}
 }
+impl<M> ActorHandle<M> {
+	/// Create a closed (disconnected) handle useful for tests.
+	pub fn new_closed() -> Self {
+		let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+		let (_state_tx, state_rx) = watch::channel(ActorState::Stopping);
+		Self { tx, state: state_rx, tags: Arc::new(Tags::default()) }
+	}
+}
+
 impl<M> ActorHandle<M>
 where
 	M: Send + 'static,
