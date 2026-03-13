@@ -60,6 +60,8 @@ pub enum DiscoveryAction {
 	MeshPeersResult(MeshPeersResultAction),
 	/// Async DID discovery message decrypted, ready to resolve.
 	DidDecrypted(DidDecryptedAction),
+	/// A dial attempt failed.
+	DialFailed(DialFailedAction),
 	/// A discovery request timed out.
 	Timeout(TimeoutAction),
 
@@ -185,6 +187,12 @@ pub struct DidDecryptedAction {
 	pub from_peer: PeerId,
 	pub from_endpoints: BTreeSet<Multiaddr>,
 	pub response: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct DialFailedAction {
+	pub request_id: Option<u64>,
+	pub peer_id: PeerId,
 }
 
 #[derive(Debug, Clone)]

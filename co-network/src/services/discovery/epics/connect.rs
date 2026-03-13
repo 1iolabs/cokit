@@ -5,7 +5,7 @@
 
 use crate::services::{
 	discovery::{
-		action::{DialPeerAction, DiscoveryAction, SendResolveAction},
+		action::{DialFailedAction, DiscoveryAction, SendResolveAction},
 		actor::DiscoveryContext,
 		state::DiscoveryState,
 	},
@@ -22,20 +22,23 @@ pub fn dial_epic(
 	_state: &DiscoveryState,
 	context: &DiscoveryContext,
 ) -> Option<impl Stream<Item = Result<DiscoveryAction, anyhow::Error>> + Send + 'static> {
-	let DiscoveryAction::DialPeer(DialPeerAction { peer_id, addresses, .. }) = action else {
+	let DiscoveryAction::DialPeer(dial_action) = action else {
 		return None;
 	};
 	let network = context.network.clone();
-	let peer_id = *peer_id;
-	let addresses = addresses.clone();
+	let peer_id = dial_action.peer_id;
+	let request_id = dial_action.request_id;
+	let addresses = dial_action.addresses.clone();
 	Some(
 		async move {
 			let result = DialNetworkTask::dial(&network, Some(peer_id), addresses).await;
-			if let Err(err) = &result {
-				tracing::warn!(?err, ?peer_id, "discovery-dial-failed");
+			match result {
+				Ok(_) => Ok(None),
+				Err(err) => {
+					tracing::warn!(?err, ?peer_id, "discovery-dial-failed");
+					Ok(Some(DiscoveryAction::DialFailed(DialFailedAction { request_id, peer_id })))
+				},
 			}
-			// dial result is handled via PeerConnected/PeerDisconnected swarm events.
-			Ok(None)
 		}
 		.into_stream()
 		.filter_map(|result: Result<Option<DiscoveryAction>, anyhow::Error>| ready(result.transpose())),

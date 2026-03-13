@@ -93,6 +93,9 @@ fn connect(
 				discovery::Event::InsufficentPeers { id: _,  } => {
 					yield ConnectionAction::InsufficentPeers;
 				},
+				discovery::Event::Failed { id: _, } => {
+					yield ConnectionAction::Disconnected(DisconnectedAction { network: network.clone(), reason: DisconnectReason::Failure("all discovery attempts failed".into()) });
+				},
 				discovery::Event::Timeout { id: _,  } => {
 					yield ConnectionAction::Disconnected(DisconnectedAction { network: network.clone(), reason: DisconnectReason::Timeout });
 				},

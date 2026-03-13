@@ -123,11 +123,18 @@ fn dispatch_events(
 			if let Some(s) = streams.get_mut(&id) {
 				s.send(event.clone());
 			}
+			// terminal events — close the stream.
+			if matches!(event, discovery::Event::Failed { .. }) {
+				streams.remove(&id);
+			}
 		},
 		DiscoveryAction::Release(release) => {
 			streams.remove(&release.id);
 		},
 		DiscoveryAction::Timeout(timeout) => {
+			if let Some(s) = streams.get_mut(&timeout.id) {
+				s.send(discovery::Event::Timeout { id: timeout.id });
+			}
 			streams.remove(&timeout.id);
 		},
 		_ => {},
@@ -139,6 +146,7 @@ fn event_id(event: &discovery::Event) -> u64 {
 		discovery::Event::Connected { id, .. } => *id,
 		discovery::Event::Disconnected { id, .. } => *id,
 		discovery::Event::InsufficentPeers { id } => *id,
+		discovery::Event::Failed { id } => *id,
 		discovery::Event::Timeout { id } => *id,
 	}
 }

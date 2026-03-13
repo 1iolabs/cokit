@@ -10,10 +10,12 @@ pub enum Event {
 	/// A peer to be discovered has disconnected.
 	Disconnected { id: u64, peer: PeerId },
 
-	/// A discovery connect has infufficent peers to amke a connection.
+	/// A discovery connect has insufficient peers to make a connection (and asks for more connections).
 	InsufficentPeers { id: u64 },
 
-	/// A discovery connect has timedout.
-	/// TODO: Does it always mean it has failed?
+	/// All discovery attempts have been exhausted with no connections.
+	Failed { id: u64 },
+
+	/// A discovery connect has timed-out.
 	Timeout { id: u64 },
 }

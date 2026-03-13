@@ -108,7 +108,9 @@ async fn test_contact() {
 /// Contact request with no peers available should fail.
 #[tokio::test]
 async fn test_contact_no_peers() {
-	let timeout_duration = Duration::from_secs(30);
+	// Note: The discovery service uses a 30s timeout for connect requests,
+	//  so the test timeout must exceed that to allow the full chain to complete.
+	let timeout_duration = Duration::from_secs(45);
 
 	let mut instances = Instances::new("test_contact_no_peers");
 	let mut peer1 = instances.create().await;

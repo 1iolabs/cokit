@@ -28,6 +28,8 @@ pub struct DiscoveryConnectRequest {
 	pub discovery: BTreeSet<Discovery>,
 	/// Cache for all direct PeerId we are interested in.
 	pub discovery_peers: BTreeSet<PeerId>,
+	/// Discovery items that are currently in flight (produced an action in try_connect).
+	pub pending: BTreeSet<Discovery>,
 	pub timeout: Duration,
 	pub max_peers: Option<u16>,
 	pub connected_peers: BTreeSet<PeerId>,
@@ -56,6 +58,24 @@ impl DiscoveryConnectRequest {
 			})
 			.collect::<Result<_, _>>()?;
 		Ok(())
+	}
+
+	/// Remove the pending `Discovery::Peer` matching the given `PeerId`.
+	fn remove_pending_peer(&mut self, peer_id: &PeerId) {
+		self.pending
+			.retain(|d| !matches!(d, Discovery::Peer(p) if PeerId::from_bytes(&p.peer).ok().as_ref() == Some(peer_id)));
+	}
+
+	/// Re-add a `Discovery::Peer` from the original discovery set to pending (e.g. on mDNS re-dial).
+	fn add_pending_peer(&mut self, peer_id: &PeerId) {
+		if let Some(item) = self
+			.discovery
+			.iter()
+			.find(|d| matches!(d, Discovery::Peer(p) if PeerId::from_bytes(&p.peer).ok().as_ref() == Some(peer_id)))
+			.cloned()
+		{
+			self.pending.insert(item);
+		}
 	}
 }
 
@@ -102,6 +122,7 @@ impl Reducer<DiscoveryAction> for DiscoveryState {
 			DiscoveryAction::DidPublishPending(action) => self.reduce_did_publish_pending(action),
 			DiscoveryAction::MeshPeersResult(action) => self.reduce_mesh_peers_result(action),
 			DiscoveryAction::DidDecrypted(action) => self.reduce_did_decrypted(action),
+			DiscoveryAction::DialFailed(action) => self.reduce_dial_failed(action),
 			DiscoveryAction::Timeout(action) => self.reduce_timeout(action),
 			// actions handled by epics only — no state change.
 			DiscoveryAction::GossipMessage(_)
@@ -127,6 +148,7 @@ impl DiscoveryState {
 			max_peers: self.max_peers,
 			timeout: self.timeout,
 			discovery_peers: Default::default(),
+			pending: Default::default(),
 			connected_peers: Default::default(),
 			span: span.clone(),
 		};
@@ -139,12 +161,17 @@ impl DiscoveryState {
 		tracing::trace!(timeout = ?request.timeout, discovery = ?request.discovery, "discovery");
 		self.requests.insert(id, request);
 
-		let mut actions = self.try_connect(id);
+		let (mut actions, pending) = self.try_connect(id);
+
+		if let Some(request) = self.requests.get_mut(&id) {
+			request.pending = pending;
+		}
 
 		// check if any requested peers are already connected.
 		if let Some(request) = self.requests.get_mut(&id) {
 			for peer in request.discovery_peers.clone() {
 				if self.connected_peers.contains(&peer) && request.connected_peers.insert(peer) {
+					request.remove_pending_peer(&peer);
 					actions.push(DiscoveryAction::Event(discovery::Event::Connected { id, peer }));
 				}
 			}
@@ -153,28 +180,34 @@ impl DiscoveryState {
 		actions
 	}
 
-	fn try_connect(&mut self, request_id: u64) -> Vec<DiscoveryAction> {
+	fn try_connect(&mut self, request_id: u64) -> (Vec<DiscoveryAction>, BTreeSet<Discovery>) {
 		let request = match self.requests.get(&request_id) {
 			Some(r) => r,
-			None => return vec![],
+			None => return (vec![], Default::default()),
 		};
 
 		let mut actions = Vec::new();
+		let mut pending = BTreeSet::new();
 		let mut discovery_used = 0;
 
 		for item in request.discovery.clone() {
-			match item {
+			match &item {
 				Discovery::DidDiscovery(did_disc) => {
 					let topic = did_discovery_topic(&did_disc.network);
 					if !self.did_subscriptions.contains_key(&topic.hash()) {
 						tracing::trace!(network = ?did_disc.network, ?topic, "discovery-did-unsubscribed");
 						continue;
 					}
-					actions.push(DiscoveryAction::DidPublish(DidPublishAction { request_id, discovery: did_disc }));
+					actions.push(DiscoveryAction::DidPublish(DidPublishAction {
+						request_id,
+						discovery: did_disc.clone(),
+					}));
 				},
 				Discovery::Topic(topic_str) => {
-					actions
-						.push(DiscoveryAction::QueryMeshPeers(QueryMeshPeersAction { request_id, topic: topic_str }));
+					actions.push(DiscoveryAction::QueryMeshPeers(QueryMeshPeersAction {
+						request_id,
+						topic: topic_str.clone(),
+					}));
 				},
 				Discovery::Rendezvous(_) => {
 					// TODO: implement
@@ -188,6 +221,11 @@ impl DiscoveryState {
 					if peer_id == self.local_peer_id {
 						continue;
 					}
+					// skip already-connected peers — detected in reduce_connect after try_connect.
+					if self.connected_peers.contains(&peer_id) {
+						discovery_used += 1;
+						continue;
+					}
 					let addresses: Vec<Multiaddr> =
 						peer.addresses.iter().filter_map(|a| a.parse::<Multiaddr>().ok()).collect();
 					actions.push(DiscoveryAction::DialPeer(DialPeerAction {
@@ -197,6 +235,7 @@ impl DiscoveryState {
 					}));
 				},
 			}
+			pending.insert(item);
 			discovery_used += 1;
 		}
 
@@ -206,7 +245,7 @@ impl DiscoveryState {
 			tracing::trace!(request_id, "discovery-no-network");
 		}
 
-		actions
+		(actions, pending)
 	}
 
 	fn reduce_release(&mut self, action: ReleaseAction) -> Vec<DiscoveryAction> {
@@ -296,6 +335,7 @@ impl DiscoveryState {
 		let mut actions = Vec::new();
 		for request_id in request_ids {
 			if let Some(request) = self.requests.get_mut(&request_id) {
+				request.remove_pending_peer(&action.peer_id);
 				if request.connected_peers.insert(action.peer_id) {
 					tracing::trace!(parent: request.span.id(), peer = ?action.peer_id, "discovery-connected");
 					actions.push(DiscoveryAction::Event(discovery::Event::Connected {
@@ -319,7 +359,7 @@ impl DiscoveryState {
 			.collect();
 
 		let mut actions = Vec::new();
-		for request_id in request_ids {
+		for &request_id in &request_ids {
 			if let Some(request) = self.requests.get_mut(&request_id) {
 				if request.connected_peers.remove(&action.peer_id) {
 					tracing::trace!(parent: request.span.id(), peer = ?action.peer_id, "discovery-disconnected");
@@ -330,6 +370,12 @@ impl DiscoveryState {
 				}
 			}
 		}
+
+		// check if any affected requests are now exhausted.
+		for &request_id in &request_ids {
+			actions.extend(self.check_request_exhausted(request_id));
+		}
+
 		actions
 	}
 
@@ -447,16 +493,23 @@ impl DiscoveryState {
 	}
 
 	fn reduce_mdns_discovered(&mut self, action: MdnsDiscoveredAction) -> Vec<DiscoveryAction> {
-		let mut actions = Vec::new();
+		let to_dial: Vec<(u64, PeerId)> = self
+			.all_discovery_peers()
+			.filter(|(request, peer_id)| {
+				!request.connected_peers.contains(peer_id) && !request.is_max_peers() && action.peers.contains(peer_id)
+			})
+			.map(|(request, peer_id)| (request.id, peer_id))
+			.collect();
 
-		for (request, peer_id) in self.all_discovery_peers() {
-			if !request.connected_peers.contains(&peer_id) && !request.is_max_peers() && action.peers.contains(&peer_id)
-			{
-				actions.push(DiscoveryAction::DialPeer(DialPeerAction {
-					request_id: Some(request.id),
-					peer_id,
-					addresses: vec![],
-				}));
+		let mut actions = Vec::new();
+		for (request_id, peer_id) in to_dial {
+			actions.push(DiscoveryAction::DialPeer(DialPeerAction {
+				request_id: Some(request_id),
+				peer_id,
+				addresses: vec![],
+			}));
+			if let Some(request) = self.requests.get_mut(&request_id) {
+				request.add_pending_peer(&peer_id);
 			}
 		}
 
@@ -500,6 +553,39 @@ impl DiscoveryState {
 			}));
 		}
 		actions
+	}
+
+	fn reduce_dial_failed(&mut self, action: DialFailedAction) -> Vec<DiscoveryAction> {
+		let request_id = match action.request_id {
+			Some(id) => id,
+			None => return vec![],
+		};
+
+		if let Some(request) = self.requests.get_mut(&request_id) {
+			request.remove_pending_peer(&action.peer_id);
+		}
+
+		self.check_request_exhausted(request_id)
+	}
+
+	/// Check if a discovery request has exhausted all its pending attempts with no connections.
+	/// If so, remove the request and emit a Timeout event to end the stream.
+	fn check_request_exhausted(&mut self, request_id: u64) -> Vec<DiscoveryAction> {
+		let request = match self.requests.get(&request_id) {
+			Some(r) => r,
+			None => return vec![],
+		};
+
+		// still have pending discovery items or connected peers — keep waiting.
+		if !request.pending.is_empty() || !request.connected_peers.is_empty() {
+			return vec![];
+		}
+
+		// all attempts exhausted — end the request immediately.
+		tracing::trace!(parent: request.span.id(), "discovery-exhausted");
+		self.pending_discovery.retain(|(req, _, _)| *req != request_id);
+		self.requests.remove(&request_id);
+		vec![DiscoveryAction::Event(discovery::Event::Failed { id: request_id })]
 	}
 
 	fn reduce_timeout(&mut self, action: TimeoutAction) -> Vec<DiscoveryAction> {
@@ -1051,5 +1137,127 @@ mod tests {
 
 		let dial = actions.iter().find(|a| matches!(a, DiscoveryAction::DialPeer(_)));
 		assert!(dial.is_some(), "expected DialPeer for mDNS-discovered peer");
+	}
+
+	#[test]
+	fn test_dial_failed_exhausts_request() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state(local);
+
+		let (id, actions) = connect(&mut state, vec![peer_discovery(remote, vec![])]);
+
+		// should have a pending discovery item.
+		assert_eq!(state.requests.get(&id).unwrap().pending.len(), 1);
+		assert!(actions.iter().any(|a| matches!(a, DiscoveryAction::DialPeer(_))));
+
+		// dial fails → request should be exhausted immediately.
+		let actions =
+			state.reduce(DiscoveryAction::DialFailed(DialFailedAction { request_id: Some(id), peer_id: remote }));
+
+		assert!(!state.requests.contains_key(&id), "request should be removed");
+		let event = actions
+			.iter()
+			.find(|a| matches!(a, DiscoveryAction::Event(Event::Failed { .. })));
+		assert!(event.is_some(), "expected Failed event when all dials fail");
+	}
+
+	#[test]
+	fn test_dial_failed_partial_keeps_request() {
+		let local = test_peer(0);
+		let remote1 = test_peer(1);
+		let remote2 = test_peer(2);
+		let mut state = new_state(local);
+
+		let (id, _) = connect(
+			&mut state,
+			vec![peer_discovery(remote1, vec![]), peer_discovery(remote2, vec!["/ip4/127.0.0.1/tcp/1234".into()])],
+		);
+
+		// both should be pending.
+		assert_eq!(state.requests.get(&id).unwrap().pending.len(), 2);
+
+		// first dial fails — request should stay open.
+		let actions =
+			state.reduce(DiscoveryAction::DialFailed(DialFailedAction { request_id: Some(id), peer_id: remote1 }));
+		assert!(state.requests.contains_key(&id), "request should still exist");
+		assert!(actions.is_empty());
+
+		// second dial fails — now exhausted.
+		let actions =
+			state.reduce(DiscoveryAction::DialFailed(DialFailedAction { request_id: Some(id), peer_id: remote2 }));
+		assert!(!state.requests.contains_key(&id), "request should be removed");
+		assert!(actions
+			.iter()
+			.any(|a| matches!(a, DiscoveryAction::Event(Event::Failed { .. }))));
+	}
+
+	#[test]
+	fn test_peer_disconnected_exhausts_request() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state(local);
+
+		let (id, _) = connect(&mut state, vec![peer_discovery(remote, vec!["/ip4/127.0.0.1/tcp/1234".into()])]);
+
+		// peer connects → pending item resolved.
+		state.reduce(DiscoveryAction::PeerConnected(PeerConnectedAction { peer_id: remote }));
+		assert!(state.requests.get(&id).unwrap().pending.is_empty());
+		assert!(state.requests.get(&id).unwrap().connected_peers.contains(&remote));
+
+		// peer disconnects — request exhausted (no pending, no connected peers).
+		let actions = state.reduce(DiscoveryAction::PeerDisconnected(PeerDisconnectedAction { peer_id: remote }));
+		assert!(!state.requests.contains_key(&id), "request should be removed");
+		assert!(actions
+			.iter()
+			.any(|a| matches!(a, DiscoveryAction::Event(Event::Failed { .. }))));
+	}
+
+	#[test]
+	fn test_dial_failed_with_did_discovery_keeps_request() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state(local);
+
+		// subscribe so DID discovery will be activated.
+		state.reduce(DiscoveryAction::DidSubscribe(DidSubscribeAction {
+			subscription: DidDiscoverySubscription::Default,
+			topic_str: "co-contact".to_owned(),
+		}));
+
+		let disc = did_discovery("msg-1");
+		let (id, _) = connect(&mut state, vec![peer_discovery(remote, vec![]), Discovery::DidDiscovery(disc)]);
+
+		// both Peer and DidDiscovery should be pending.
+		assert_eq!(state.requests.get(&id).unwrap().pending.len(), 2);
+
+		// peer dial fails — request should stay open because DidDiscovery is still pending.
+		let actions =
+			state.reduce(DiscoveryAction::DialFailed(DialFailedAction { request_id: Some(id), peer_id: remote }));
+		assert!(state.requests.contains_key(&id), "request should still exist");
+		assert!(actions.is_empty());
+		assert_eq!(state.requests.get(&id).unwrap().pending.len(), 1);
+	}
+
+	#[test]
+	fn test_dial_failed_with_unsubscribed_did_exhausts() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state(local);
+
+		// do NOT subscribe — DID discovery will be skipped.
+		let disc = did_discovery("msg-1");
+		let (id, _) = connect(&mut state, vec![peer_discovery(remote, vec![]), Discovery::DidDiscovery(disc)]);
+
+		// only Peer should be pending (DID was skipped).
+		assert_eq!(state.requests.get(&id).unwrap().pending.len(), 1);
+
+		// peer dial fails → exhausted (DID was never activated).
+		let actions =
+			state.reduce(DiscoveryAction::DialFailed(DialFailedAction { request_id: Some(id), peer_id: remote }));
+		assert!(!state.requests.contains_key(&id), "request should be removed");
+		assert!(actions
+			.iter()
+			.any(|a| matches!(a, DiscoveryAction::Event(Event::Failed { .. }))));
 	}
 }
