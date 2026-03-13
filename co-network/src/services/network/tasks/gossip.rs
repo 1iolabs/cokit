@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	network::{Behaviour, Context, NetworkEvent},
+	network::{Behaviour, NetworkEvent},
 	services::network::CoNetworkTaskSpawner,
 	types::network_task::{NetworkTask, NetworkTaskSpawner},
 	NetworkError,
@@ -45,15 +45,15 @@ impl ListenGossipTask {
 		tokio_stream::wrappers::UnboundedReceiverStream::new(rx)
 	}
 }
-impl NetworkTask<Behaviour, Context> for ListenGossipTask {
-	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>, _context: &mut Context) {}
+impl NetworkTask<Behaviour> for ListenGossipTask {
+	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>) {}
 
 	/// Handle swarm events.
 	/// Events can be consumed by this handler or forwarded to next handler.
 	fn on_swarm_event(
 		&mut self,
 		_swarm: &mut Swarm<Behaviour>,
-		_context: &mut Context,
+
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
 		if let SwarmEvent::Behaviour(NetworkEvent::Gossipsub(gossipsub::Event::Message {
@@ -112,8 +112,8 @@ impl PublishGossipTask {
 		Ok(rx.await.map_err(|_| PublishGossipTaskError::Canceled)??)
 	}
 }
-impl NetworkTask<Behaviour, Context> for PublishGossipTask {
-	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
+impl NetworkTask<Behaviour> for PublishGossipTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>) {
 		if let Some((topic, message, result)) = take(&mut self.payload) {
 			let publish_result = swarm.behaviour_mut().gossipsub.publish(topic, message);
 			result.send(publish_result).ok();
@@ -134,8 +134,8 @@ impl SubscribeGossipTask {
 		rx.await?
 	}
 }
-impl NetworkTask<Behaviour, Context> for SubscribeGossipTask {
-	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
+impl NetworkTask<Behaviour> for SubscribeGossipTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>) {
 		if let Some(result) = take(&mut self.result) {
 			let subscribe_result = swarm.behaviour_mut().gossipsub.subscribe(&self.topic);
 			result.send(subscribe_result.map_err(anyhow::Error::from)).ok();
@@ -159,8 +159,8 @@ impl UnsubscribeGossipTask {
 		rx.await?
 	}
 }
-impl NetworkTask<Behaviour, Context> for UnsubscribeGossipTask {
-	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
+impl NetworkTask<Behaviour> for UnsubscribeGossipTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>) {
 		if let Some(result) = take(&mut self.result) {
 			let unsubscribe_result = swarm.behaviour_mut().gossipsub.unsubscribe(&self.topic);
 			result.send(Ok(unsubscribe_result)).ok();
@@ -185,8 +185,8 @@ impl MeshPeersNetworkTask {
 		Ok(rx.await?)
 	}
 }
-impl NetworkTask<Behaviour, Context> for MeshPeersNetworkTask {
-	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
+impl NetworkTask<Behaviour> for MeshPeersNetworkTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>) {
 		if let Some(result) = take(&mut self.result) {
 			let peers: Vec<PeerId> = swarm.behaviour().gossipsub.mesh_peers(&self.topic).copied().collect();
 			result.send(peers).ok();

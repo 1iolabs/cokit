@@ -11,18 +11,17 @@ use libp2p::{
 };
 use std::fmt::Debug;
 
-pub trait NetworkTask<B, C>: Debug
+pub trait NetworkTask<B>: Debug
 where
 	B: NetworkBehaviour,
 {
-	fn execute(&mut self, swarm: &mut Swarm<B>, context: &mut C);
+	fn execute(&mut self, swarm: &mut Swarm<B>);
 
 	/// Handle swarm events.
 	/// Events can be consumed by this handler or forwarded to next handler.
 	fn on_swarm_event(
 		&mut self,
 		_swarm: &mut Swarm<B>,
-		_context: &mut C,
 		event: SwarmEvent<B::ToSwarm>,
 	) -> Option<SwarmEvent<B::ToSwarm>> {
 		Some(event)
@@ -43,7 +42,7 @@ where
 		}
 	}
 }
-pub type NetworkTaskBox<B, C> = Box<dyn NetworkTask<B, C> + Send + 'static>;
+pub type NetworkTaskBox<B> = Box<dyn NetworkTask<B> + Send + 'static>;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NetworkTaskState {
@@ -54,35 +53,35 @@ pub enum NetworkTaskState {
 }
 
 #[derive(Debug)]
-pub struct TokioNetworkTaskSpawner<B, C> {
-	pub(crate) tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<B, C>>,
+pub struct TokioNetworkTaskSpawner<B> {
+	pub(crate) tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<B>>,
 }
 
-impl<B, C> Clone for TokioNetworkTaskSpawner<B, C> {
+impl<B> Clone for TokioNetworkTaskSpawner<B> {
 	fn clone(&self) -> Self {
 		Self { tasks: self.tasks.clone() }
 	}
 }
-impl<B, C> NetworkTaskSpawner<B, C> for TokioNetworkTaskSpawner<B, C>
+impl<B> NetworkTaskSpawner<B> for TokioNetworkTaskSpawner<B>
 where
 	B: NetworkBehaviour,
 {
-	fn spawn_box(&self, task: NetworkTaskBox<B, C>) -> Result<(), NetworkError> {
+	fn spawn_box(&self, task: NetworkTaskBox<B>) -> Result<(), NetworkError> {
 		self.tasks.send(task)?;
 		Ok(())
 	}
 }
 
-pub trait NetworkTaskSpawner<B, C>
+pub trait NetworkTaskSpawner<B>
 where
 	B: NetworkBehaviour,
 {
 	fn spawn<T>(&self, task: T) -> Result<(), NetworkError>
 	where
-		T: NetworkTask<B, C> + Send + 'static,
+		T: NetworkTask<B> + Send + 'static,
 	{
 		self.spawn_box(Box::new(task))
 	}
 
-	fn spawn_box(&self, task: NetworkTaskBox<B, C>) -> Result<(), NetworkError>;
+	fn spawn_box(&self, task: NetworkTaskBox<B>) -> Result<(), NetworkError>;
 }

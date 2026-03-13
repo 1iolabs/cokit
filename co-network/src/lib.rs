@@ -5,7 +5,6 @@
 
 mod bitswap;
 mod didcomm;
-mod discovery;
 mod library;
 mod network;
 mod services;

@@ -4,7 +4,6 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	discovery,
 	library::network_discovery::network_discovery,
 	services::{
 		connections::{
@@ -12,7 +11,8 @@ use crate::{
 			actor::ConnectionsContext,
 			ConnectionState,
 		},
-		network::{DiscoveryConnectNetworkTask, ListnersNetworkTask},
+		discovery,
+		network::ListnersNetworkTask,
 	},
 };
 use co_actor::{Actions, Epic};
@@ -66,8 +66,8 @@ fn connect(
 		let from_identity = context.private_identity_resolver.resolve_private(&from).await?;
 		let discovery = network_discovery(context.date.clone(), Some(&context.identity_resolver), context.network.local_peer_id(), &from_identity, [network.clone()], [], endpoints).try_collect().await?;
 
-		// connect
-		let events = DiscoveryConnectNetworkTask::discover(context.network.clone(), discovery);
+		// connect via discovery actor
+		let events = context.discovery.connect(discovery);
 
 		// yield
 		let mut peers = BTreeSet::new();

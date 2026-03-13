@@ -20,13 +20,13 @@ pub struct DialNetworkTask {
 	tx: Option<oneshot::Sender<Result<PeerId, anyhow::Error>>>,
 }
 impl DialNetworkTask {
-	pub async fn dial<B, C, N>(
+	pub async fn dial<B, N>(
 		spawner: &N,
 		peer_id: Option<PeerId>,
 		addresses: Vec<Multiaddr>,
 	) -> Result<PeerId, anyhow::Error>
 	where
-		N: NetworkTaskSpawner<B, C>,
+		N: NetworkTaskSpawner<B>,
 		B: NetworkBehaviour,
 	{
 		let opts = match peer_id {
@@ -62,11 +62,11 @@ impl DialNetworkTask {
 		}
 	}
 }
-impl<B, C> NetworkTask<B, C> for DialNetworkTask
+impl<B> NetworkTask<B> for DialNetworkTask
 where
 	B: NetworkBehaviour,
 {
-	fn execute(&mut self, swarm: &mut Swarm<B>, _context: &mut C) {
+	fn execute(&mut self, swarm: &mut Swarm<B>) {
 		if let Some(opts) = take(&mut self.opts) {
 			let peer_id = opts.get_peer_id();
 
@@ -96,7 +96,6 @@ where
 	fn on_swarm_event(
 		&mut self,
 		_swarm: &mut Swarm<B>,
-		_context: &mut C,
 		event: SwarmEvent<B::ToSwarm>,
 	) -> Option<SwarmEvent<B::ToSwarm>> {
 		match &event {

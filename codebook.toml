@@ -7,6 +7,7 @@ words = [
     "cranelift",
     "dcutr",
     "didcomm",
+    "diddiscovery",
     "dioxus",
     "gossipsub",
     "jsc",
@@ -16,7 +17,7 @@ words = [
     "thid",
     "tokio",
     "wasmer",
-    "webrtc",
     "wasmi",
+    "webrtc",
 ]
 ignore_patterns = ["COkit|BRANDGUARDIAN GmbH|AGPLv3|libp2p"]

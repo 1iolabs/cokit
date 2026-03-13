@@ -8,14 +8,13 @@ use crate::{
 	didcomm::EncodedMessage,
 	services::{
 		connections::ConnectionMessage,
+		discovery::DiscoveryApi,
 		heads::HeadsApi,
 		network::{
 			CoNetworkTaskSpawner, DialNetworkTask, DidCommReceiveNetworkTask, DidCommSendNetworkTask,
-			DidDiscoverySubscribe, DidDiscoveryUnsubscribe, ListnersNetworkTask, NetworkMessage, PeersNetworkTask,
-			SubscribeGossipTask,
+			ListnersNetworkTask, NetworkMessage, PeersNetworkTask, SubscribeGossipTask,
 		},
 	},
-	types::network_task::NetworkTaskSpawner,
 };
 use cid::Cid;
 use co_actor::ActorHandle;
@@ -31,12 +30,17 @@ use std::{collections::BTreeSet, fmt::Debug, time::Duration};
 pub struct NetworkApi {
 	pub(crate) _handle: ActorHandle<NetworkMessage>,
 	pub(crate) connections: ActorHandle<ConnectionMessage>,
+	pub(crate) discovery: DiscoveryApi,
 	pub(crate) heads: HeadsApi,
 	pub(crate) spawner: CoNetworkTaskSpawner,
 }
 impl NetworkApi {
 	pub fn connections(&self) -> &ActorHandle<ConnectionMessage> {
 		&self.connections
+	}
+
+	pub fn discovery(&self) -> &DiscoveryApi {
+		&self.discovery
 	}
 
 	pub fn heads(&self) -> &HeadsApi {
@@ -65,38 +69,27 @@ impl NetworkApi {
 	}
 
 	/// Subscribe identity for contact discovery.
-	pub async fn didcontact_subscribe<P>(&self, identity: P, network: NetworkDidDiscovery) -> Result<(), anyhow::Error>
+	pub fn didcontact_subscribe<P>(&self, identity: P, network: NetworkDidDiscovery) -> Result<(), anyhow::Error>
 	where
 		P: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
 	{
-		let (task, result) = DidDiscoverySubscribe::new(PrivateIdentityBox::new(identity), Some(network));
-		self.spawner.spawn(task)?;
-		result.await??;
-		Ok(())
+		self.discovery
+			.did_subscribe(Some(PrivateIdentityBox::new(identity)), Some(network))
 	}
 
 	/// Unsubscribe identity from contact discovery.
-	pub async fn didcontact_unsubscribe(&self, identity: Did) -> Result<(), anyhow::Error> {
-		let (task, result) = DidDiscoveryUnsubscribe::new(identity);
-		self.spawner.spawn(task)?;
-		result.await??;
-		Ok(())
+	pub fn didcontact_unsubscribe(&self, identity: Did) -> Result<(), anyhow::Error> {
+		self.discovery.did_unsubscribe(Some(identity))
 	}
 
 	/// Subscribe identity for contact discovery.
-	pub async fn didcontact_subscribe_default(&self) -> Result<(), anyhow::Error> {
-		let (task, result) = DidDiscoverySubscribe::default();
-		self.spawner.spawn(task)?;
-		result.await??;
-		Ok(())
+	pub fn didcontact_subscribe_default(&self) -> Result<(), anyhow::Error> {
+		self.discovery.did_subscribe(None, None)
 	}
 
 	/// Unsubscribe identity from contact discovery.
-	pub async fn didcontact_unsubscribe_default(&self) -> Result<(), anyhow::Error> {
-		let (task, result) = DidDiscoveryUnsubscribe::default();
-		self.spawner.spawn(task)?;
-		result.await??;
-		Ok(())
+	pub fn didcontact_unsubscribe_default(&self) -> Result<(), anyhow::Error> {
+		self.discovery.did_unsubscribe(None)
 	}
 
 	/// Send a DIDComm message to peers.

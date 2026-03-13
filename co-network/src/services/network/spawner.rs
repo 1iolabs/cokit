@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	network::{Behaviour, Context},
+	network::Behaviour,
 	types::network_task::{NetworkTaskBox, NetworkTaskSpawner, TokioNetworkTaskSpawner},
 	NetworkError,
 };
@@ -12,7 +12,7 @@ use libp2p::PeerId;
 
 #[derive(Clone)]
 pub struct CoNetworkTaskSpawner {
-	pub(crate) spawner: TokioNetworkTaskSpawner<Behaviour, Context>,
+	pub(crate) spawner: TokioNetworkTaskSpawner<Behaviour>,
 	pub(crate) local_peer: PeerId,
 }
 impl CoNetworkTaskSpawner {
@@ -34,8 +34,8 @@ impl std::fmt::Debug for CoNetworkTaskSpawner {
 			.finish()
 	}
 }
-impl NetworkTaskSpawner<Behaviour, Context> for CoNetworkTaskSpawner {
-	fn spawn_box(&self, task: NetworkTaskBox<Behaviour, Context>) -> Result<(), NetworkError> {
+impl NetworkTaskSpawner<Behaviour> for CoNetworkTaskSpawner {
+	fn spawn_box(&self, task: NetworkTaskBox<Behaviour>) -> Result<(), NetworkError> {
 		self.spawner.spawn_box(task)
 	}
 }

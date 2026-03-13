@@ -35,14 +35,9 @@ impl GetNetworkTask {
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(spawner, tokens))]
-	pub async fn get<C, N>(
-		spawner: &N,
-		cid: Cid,
-		tokens: Vec<Token>,
-		peers: BTreeSet<PeerId>,
-	) -> Result<(), StorageError>
+	pub async fn get<N>(spawner: &N, cid: Cid, tokens: Vec<Token>, peers: BTreeSet<PeerId>) -> Result<(), StorageError>
 	where
-		N: NetworkTaskSpawner<Behaviour, C>,
+		N: NetworkTaskSpawner<Behaviour>,
 	{
 		let (tx, rx) = oneshot::channel();
 		let task = GetNetworkTask::new(cid, tokens, peers, tx);
@@ -51,8 +46,8 @@ impl GetNetworkTask {
 		Ok::<(), StorageError>(())
 	}
 }
-impl<C> NetworkTask<Behaviour, C> for GetNetworkTask {
-	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut C) {
+impl NetworkTask<Behaviour> for GetNetworkTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>) {
 		let bitswap = &mut swarm.behaviour_mut().bitswap;
 
 		// state
@@ -70,7 +65,6 @@ impl<C> NetworkTask<Behaviour, C> for GetNetworkTask {
 	fn on_swarm_event(
 		&mut self,
 		_swarm: &mut Swarm<Behaviour>,
-		_context: &mut C,
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
 		match event {

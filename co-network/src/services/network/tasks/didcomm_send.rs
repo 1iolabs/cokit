@@ -5,7 +5,7 @@
 
 use crate::{
 	didcomm,
-	network::{Behaviour, Context, NetworkEvent},
+	network::{Behaviour, NetworkEvent},
 	types::network_task::{NetworkTask, NetworkTaskSpawner},
 };
 use co_actor::time;
@@ -30,7 +30,7 @@ impl DidCommSendNetworkTask {
 		timeout: Duration,
 	) -> anyhow::Result<PeerId>
 	where
-		S: NetworkTaskSpawner<Behaviour, Context> + Send + Sync + 'static,
+		S: NetworkTaskSpawner<Behaviour> + Send + Sync + 'static,
 	{
 		let (tx, rx) = tokio::sync::oneshot::channel();
 		let task = Self { message, peers: peers.into_iter().collect(), sent: Some(tx) };
@@ -38,8 +38,8 @@ impl DidCommSendNetworkTask {
 		time::timeout(timeout, rx).await??
 	}
 }
-impl NetworkTask<Behaviour, Context> for DidCommSendNetworkTask {
-	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
+impl NetworkTask<Behaviour> for DidCommSendNetworkTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>) {
 		for peer in &self.peers {
 			swarm.behaviour_mut().didcomm.send(peer, self.message.clone());
 		}
@@ -48,7 +48,6 @@ impl NetworkTask<Behaviour, Context> for DidCommSendNetworkTask {
 	fn on_swarm_event(
 		&mut self,
 		_swarm: &mut Swarm<Behaviour>,
-		_context: &mut Context,
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
 		if let SwarmEvent::Behaviour(NetworkEvent::Didcomm(didcomm_event)) = &event {
