@@ -7,7 +7,7 @@ use crate::types::network_task::{NetworkTask, NetworkTaskSpawner};
 use anyhow::anyhow;
 use futures::channel::oneshot;
 use libp2p::{
-	swarm::{dial_opts::DialOpts, ConnectionId, NetworkBehaviour, SwarmEvent},
+	swarm::{dial_opts::DialOpts, ConnectionId, DialError, NetworkBehaviour, SwarmEvent},
 	Multiaddr, PeerId, Swarm,
 };
 use std::mem::take;
@@ -43,6 +43,24 @@ impl DialNetworkTask {
 		spawner.spawn(Self { complete: opts.connection_id(), opts: Some(opts), tx: Some(tx) })?;
 		rx.await?
 	}
+
+	fn send_if_connected<B>(&mut self, swarm: &mut Swarm<B>, peer_id: Option<PeerId>) -> bool
+	where
+		B: NetworkBehaviour,
+	{
+		if let Some(peer_id) = peer_id {
+			if swarm.is_connected(&peer_id) {
+				if let Some(tx) = Option::take(&mut self.tx) {
+					tx.send(Ok(peer_id)).ok();
+				}
+				true
+			} else {
+				false
+			}
+		} else {
+			false
+		}
+	}
 }
 impl<B, C> NetworkTask<B, C> for DialNetworkTask
 where
@@ -50,22 +68,25 @@ where
 {
 	fn execute(&mut self, swarm: &mut Swarm<B>, _context: &mut C) {
 		if let Some(opts) = take(&mut self.opts) {
+			let peer_id = opts.get_peer_id();
+
 			// already connected?
-			if let Some(peer_id) = &opts.get_peer_id() {
-				if swarm.is_connected(peer_id) {
-					if let Some(tx) = Option::take(&mut self.tx) {
-						tx.send(Ok(*peer_id)).ok();
-					}
-					return;
-				}
+			if self.send_if_connected(swarm, peer_id) {
+				return;
 			}
 
-			// dail
+			// dial
 			tracing::trace!(?opts, "network-dial");
-			if let Err(e) = swarm.dial(opts) {
-				if let Some(tx) = Option::take(&mut self.tx) {
-					tx.send(Err(e.into())).ok();
-				}
+			match swarm.dial(opts) {
+				Err(DialError::DialPeerConditionFalse(_condition)) => {
+					self.send_if_connected(swarm, peer_id);
+				},
+				Err(e) => {
+					if let Some(tx) = Option::take(&mut self.tx) {
+						tx.send(Err(e.into())).ok();
+					}
+				},
+				_ => (),
 			}
 		}
 	}
