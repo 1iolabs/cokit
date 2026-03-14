@@ -157,7 +157,29 @@ impl CoContext {
 		});
 	}
 
+	/// Execute future task using CO Application and ignore its result.
+	/// The future will be executed as soon as the application is ready.
+	///
+	/// # Note
+	/// - Only use this as last resort when you need to break out of the normal co-dioxus APIs
+	/// - A valid use case is initialization in main of your application
+	pub fn with_application<F, Fut>(&self, f: F)
+	where
+		Fut: Future<Output = ()> + Send + 'static,
+		F: FnOnce(Application) -> Fut + Send + 'static,
+	{
+		self.execute_future_box(move |application| {
+			Box::pin(async move {
+				f(application).await;
+			})
+		});
+	}
+
 	/// Execute future task using CO Application and return its result when done.
+	/// The future will be executed as soon as the application is ready.
+	///
+	/// # Note
+	/// - Only use this as last resort when you need to break out of the normal co-dioxus APIs
 	pub async fn try_with_application<F, Fut, T, E>(&self, f: F) -> Result<T, CoContextError<E>>
 	where
 		Fut: Future<Output = Result<T, E>> + Send + 'static,

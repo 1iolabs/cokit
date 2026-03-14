@@ -25,7 +25,7 @@ pub mod time;
 mod tokio_task_spawner;
 
 // exports
-pub use actor::{Actor, ActorError, ActorHandle, ActorInstance, ActorState};
+pub use actor::{Actor, ActorError, ActorHandle, ActorInstance, ActorSpawner, ActorState};
 pub use actor_local::{LocalActor, LocalActorInstance, LocalActorSpawner};
 pub use backend::{TaskHandle, TaskSpawner};
 pub use epic::{
