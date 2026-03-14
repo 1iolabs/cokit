@@ -393,13 +393,11 @@ impl DiscoveryState {
 				indices_to_remove.push(index);
 			}
 		}
+
 		// remove in reverse order to preserve indices.
 		for index in indices_to_remove.into_iter().rev() {
-			if let Some((_request, _topic, discovery)) = self.pending_discovery.remove(index) {
-				actions.push(DiscoveryAction::DidPublish(DidPublishAction {
-					request_id: 0, // retry — request_id not tracked in pending_discovery
-					discovery,
-				}));
+			if let Some((request_id, _topic, discovery)) = self.pending_discovery.remove(index) {
+				actions.push(DiscoveryAction::DidPublish(DidPublishAction { request_id, discovery }));
 			}
 		}
 
