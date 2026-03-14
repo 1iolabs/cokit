@@ -13,6 +13,7 @@ use futures::{FutureExt, Stream};
 
 /// Spawns a timeout future for each `Connect` action.
 /// When the timeout expires, dispatches a `Timeout` action.
+/// TODO: Should this be conditional? Only dispatch when no connection could be made?
 pub struct TimeoutEpic;
 impl TimeoutEpic {
 	pub fn new() -> Self {

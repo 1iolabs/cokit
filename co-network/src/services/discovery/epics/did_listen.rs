@@ -122,6 +122,7 @@ fn did_discovery_resolve(
 	let message = identity.jws(response, "null")?;
 
 	Ok(DiscoveryAction::DidDecrypted(DidDecryptedAction {
+		from_did: Some(request_from.clone()),
 		from_peer: request_from_peer,
 		from_endpoints: request_from_endpoints,
 		response: message,

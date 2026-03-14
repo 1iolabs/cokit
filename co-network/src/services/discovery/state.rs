@@ -7,12 +7,18 @@ use super::action::*;
 use crate::services::discovery::{self, DidDiscovery, DidDiscoveryMessageType, Discovery};
 use co_actor::Reducer;
 use co_identity::{Identity, PrivateIdentityBox};
-use co_primitives::NetworkDidDiscovery;
+use co_primitives::{Did, NetworkDidDiscovery};
 use libp2p::{gossipsub, Multiaddr, PeerId};
 use std::{
-	collections::{BTreeMap, BTreeSet, VecDeque},
+	collections::{BTreeMap, BTreeSet, HashMap, VecDeque},
 	time::Duration,
 };
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CachedPeer {
+	pub peer_id: PeerId,
+	pub endpoints: BTreeSet<Multiaddr>,
+}
 
 /// Active subscription listening for DID Discovery requests.
 #[derive(Debug, Clone, PartialEq)]
@@ -33,6 +39,8 @@ pub struct DiscoveryConnectRequest {
 	pub timeout: Duration,
 	pub max_peers: Option<u16>,
 	pub connected_peers: BTreeSet<PeerId>,
+	/// Cached dial attempts: PeerId / DidDiscovery items for fallback on dial failure.
+	pub cached_dial: BTreeMap<PeerId, BTreeSet<DidDiscovery>>,
 	pub span: tracing::Span,
 }
 impl DiscoveryConnectRequest {
@@ -98,6 +106,8 @@ pub struct DiscoveryState {
 	pub max_peers: Option<u16>,
 	/// Currently connected peers.
 	pub connected_peers: BTreeSet<PeerId>,
+	/// DID / cached peer from successful DID discoveries.
+	pub did_peer_cache: HashMap<Did, CachedPeer>,
 }
 impl DiscoveryState {
 	pub fn allocate_id(&mut self) -> u64 {
@@ -106,6 +116,16 @@ impl DiscoveryState {
 		id
 	}
 }
+#[derive(Debug, Default)]
+struct TryConnectResult {
+	actions: Vec<DiscoveryAction>,
+	pending: BTreeSet<Discovery>,
+	/// Peers resolved from cache to add to discovery_peers.
+	cached_peers: BTreeSet<PeerId>,
+	/// Cached dial attempts: PeerId / DidDiscovery items for fallback.
+	cached_dial: BTreeMap<PeerId, BTreeSet<DidDiscovery>>,
+}
+
 impl Reducer<DiscoveryAction> for DiscoveryState {
 	fn reduce(&mut self, action: DiscoveryAction) -> Vec<DiscoveryAction> {
 		match action {
@@ -150,6 +170,7 @@ impl DiscoveryState {
 			discovery_peers: Default::default(),
 			pending: Default::default(),
 			connected_peers: Default::default(),
+			cached_dial: Default::default(),
 			span: span.clone(),
 		};
 
@@ -161,10 +182,13 @@ impl DiscoveryState {
 		tracing::trace!(timeout = ?request.timeout, discovery = ?request.discovery, "discovery");
 		self.requests.insert(id, request);
 
-		let (mut actions, pending) = self.try_connect(id);
+		let try_result = self.try_connect(id);
+		let mut actions = try_result.actions;
 
 		if let Some(request) = self.requests.get_mut(&id) {
-			request.pending = pending;
+			request.pending = try_result.pending;
+			request.cached_dial = try_result.cached_dial;
+			request.discovery_peers.extend(try_result.cached_peers);
 		}
 
 		// check if any requested peers are already connected.
@@ -180,31 +204,51 @@ impl DiscoveryState {
 		actions
 	}
 
-	fn try_connect(&mut self, request_id: u64) -> (Vec<DiscoveryAction>, BTreeSet<Discovery>) {
+	fn try_connect(&mut self, request_id: u64) -> TryConnectResult {
 		let request = match self.requests.get(&request_id) {
 			Some(r) => r,
-			None => return (vec![], Default::default()),
+			None => return TryConnectResult::default(),
 		};
 
-		let mut actions = Vec::new();
-		let mut pending = BTreeSet::new();
+		let mut result = TryConnectResult::default();
 		let mut discovery_used = 0;
 
 		for item in request.discovery.clone() {
 			match &item {
 				Discovery::DidDiscovery(did_disc) => {
+					// check cache before gossip publish
+					if let Some(cached) = self.did_peer_cache.get(&did_disc.network.did) {
+						let cached_peer = cached.peer_id;
+						let cached_endpoints = cached.endpoints.clone();
+						result.cached_peers.insert(cached_peer);
+
+						if !self.connected_peers.contains(&cached_peer) {
+							result.actions.push(DiscoveryAction::DialPeer(DialPeerAction {
+								request_id: Some(request_id),
+								peer_id: cached_peer,
+								addresses: cached_endpoints.into_iter().collect(),
+							}));
+							result.cached_dial.entry(cached_peer).or_default().insert(did_disc.clone());
+						}
+
+						result.pending.insert(item);
+						discovery_used += 1;
+						continue;
+					}
+
+					// gossip
 					let topic = did_discovery_topic(&did_disc.network);
 					if !self.did_subscriptions.contains_key(&topic.hash()) {
 						tracing::trace!(network = ?did_disc.network, ?topic, "discovery-did-unsubscribed");
 						continue;
 					}
-					actions.push(DiscoveryAction::DidPublish(DidPublishAction {
+					result.actions.push(DiscoveryAction::DidPublish(DidPublishAction {
 						request_id,
 						discovery: did_disc.clone(),
 					}));
 				},
 				Discovery::Topic(topic_str) => {
-					actions.push(DiscoveryAction::QueryMeshPeers(QueryMeshPeersAction {
+					result.actions.push(DiscoveryAction::QueryMeshPeers(QueryMeshPeersAction {
 						request_id,
 						topic: topic_str.clone(),
 					}));
@@ -228,14 +272,14 @@ impl DiscoveryState {
 					}
 					let addresses: Vec<Multiaddr> =
 						peer.addresses.iter().filter_map(|a| a.parse::<Multiaddr>().ok()).collect();
-					actions.push(DiscoveryAction::DialPeer(DialPeerAction {
+					result.actions.push(DiscoveryAction::DialPeer(DialPeerAction {
 						request_id: Some(request_id),
 						peer_id,
 						addresses,
 					}));
 				},
 			}
-			pending.insert(item);
+			result.pending.insert(item);
 			discovery_used += 1;
 		}
 
@@ -245,7 +289,7 @@ impl DiscoveryState {
 			tracing::trace!(request_id, "discovery-no-network");
 		}
 
-		(actions, pending)
+		result
 	}
 
 	fn reduce_release(&mut self, action: ReleaseAction) -> Vec<DiscoveryAction> {
@@ -368,6 +412,25 @@ impl DiscoveryState {
 						peer: action.peer_id,
 					}));
 				}
+
+				// fall back to full DID discovery if this was a cache-resolved peer
+				if let Some(discoveries) = request.cached_dial.remove(&action.peer_id) {
+					request.discovery_peers.remove(&action.peer_id);
+
+					for did_disc in discoveries {
+						self.did_peer_cache.remove(&did_disc.network.did);
+
+						let topic = did_discovery_topic(&did_disc.network);
+						if self.did_subscriptions.contains_key(&topic.hash()) {
+							actions.push(DiscoveryAction::DidPublish(DidPublishAction {
+								request_id,
+								discovery: did_disc,
+							}));
+						} else if let Some(request) = self.requests.get_mut(&request_id) {
+							request.pending.remove(&Discovery::DidDiscovery(did_disc));
+						}
+					}
+				}
 			}
 		}
 
@@ -475,6 +538,20 @@ impl DiscoveryState {
 			.map(|(id, _)| *id)
 			.collect();
 
+		// cache DID / PeerId for matching discoveries
+		for (_, request) in self.requests.iter() {
+			for disc in &request.discovery {
+				if let Discovery::DidDiscovery(did_discovery) = disc {
+					if action.header.thid.as_ref() == Some(&did_discovery.message_id) {
+						self.did_peer_cache.insert(
+							did_discovery.network.did.clone(),
+							CachedPeer { peer_id: action.peer_id, endpoints: Default::default() },
+						);
+					}
+				}
+			}
+		}
+
 		let mut actions = Vec::new();
 		for request_id in request_ids {
 			if let Some(request) = self.requests.get_mut(&request_id) {
@@ -536,6 +613,14 @@ impl DiscoveryState {
 	}
 
 	fn reduce_did_decrypted(&mut self, action: DidDecryptedAction) -> Vec<DiscoveryAction> {
+		// cache requester DID / peer for future reconnections
+		if let Some(did) = &action.from_did {
+			self.did_peer_cache.insert(
+				did.clone(),
+				CachedPeer { peer_id: action.from_peer, endpoints: action.from_endpoints.clone() },
+			);
+		}
+
 		// a DID discovery message was decrypted. Send the resolve response.
 		let should_dial = !self.connected_peers.contains(&action.from_peer) && !action.from_endpoints.is_empty();
 		let mut actions = vec![DiscoveryAction::SendResolve(SendResolveAction {
@@ -559,11 +644,30 @@ impl DiscoveryState {
 			None => return vec![],
 		};
 
+		let mut actions = Vec::new();
+
 		if let Some(request) = self.requests.get_mut(&request_id) {
 			request.remove_pending_peer(&action.peer_id);
+
+			// fall back to full DID discovery if this was a cached dial attempt
+			if let Some(discoveries) = request.cached_dial.remove(&action.peer_id) {
+				request.discovery_peers.remove(&action.peer_id);
+
+				for did_disc in discoveries {
+					self.did_peer_cache.remove(&did_disc.network.did);
+
+					let topic = did_discovery_topic(&did_disc.network);
+					if self.did_subscriptions.contains_key(&topic.hash()) {
+						actions.push(DiscoveryAction::DidPublish(DidPublishAction { request_id, discovery: did_disc }));
+					} else if let Some(request) = self.requests.get_mut(&request_id) {
+						request.pending.remove(&Discovery::DidDiscovery(did_disc));
+					}
+				}
+			}
 		}
 
-		self.check_request_exhausted(request_id)
+		actions.extend(self.check_request_exhausted(request_id));
+		actions
 	}
 
 	/// Check if a discovery request has exhausted all its pending attempts with no connections.
@@ -644,6 +748,7 @@ mod tests {
 			timeout: Duration::from_secs(10),
 			max_peers: None,
 			connected_peers: Default::default(),
+			did_peer_cache: Default::default(),
 		}
 	}
 
@@ -653,7 +758,7 @@ mod tests {
 
 	fn did_discovery(message_id: &str) -> DidDiscovery {
 		DidDiscovery {
-			network: NetworkDidDiscovery { topic: None, did: "did:key:test".to_owned() },
+			network: NetworkDidDiscovery { topic: None, did: "did:local:test".to_owned() },
 			message_id: message_id.to_owned(),
 			message: "encrypted-message".to_owned(),
 		}
@@ -937,6 +1042,7 @@ mod tests {
 		endpoints.insert(addr.clone());
 
 		let actions = state.reduce(DiscoveryAction::DidDecrypted(DidDecryptedAction {
+			from_did: None,
 			from_peer: remote,
 			from_endpoints: endpoints,
 			response: "resolve-response".to_owned(),
@@ -966,6 +1072,7 @@ mod tests {
 		endpoints.insert(addr);
 
 		let actions = state.reduce(DiscoveryAction::DidDecrypted(DidDecryptedAction {
+			from_did: None,
 			from_peer: remote,
 			from_endpoints: endpoints,
 			response: "resolve-response".to_owned(),
@@ -1257,5 +1364,201 @@ mod tests {
 		assert!(actions
 			.iter()
 			.any(|a| matches!(a, DiscoveryAction::Event(Event::Failed { .. }))));
+	}
+
+	fn did_discovery_with_did(message_id: &str, did: &str) -> DidDiscovery {
+		DidDiscovery {
+			network: NetworkDidDiscovery { topic: None, did: did.to_owned() },
+			message_id: message_id.to_owned(),
+			message: "encrypted-message".to_owned(),
+		}
+	}
+
+	/// Subscribe for DID discovery and seed the cache with a DID / PeerId mapping.
+	fn setup_cache(state: &mut DiscoveryState, did: &str, peer_id: PeerId, endpoints: BTreeSet<Multiaddr>) {
+		state.reduce(DiscoveryAction::DidSubscribe(DidSubscribeAction {
+			subscription: DidDiscoverySubscription::Default,
+			topic_str: "co-contact".to_owned(),
+		}));
+		state.did_peer_cache.insert(did.to_owned(), CachedPeer { peer_id, endpoints });
+	}
+
+	#[test]
+	fn test_cache_hit_already_connected_skips_publish() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state(local);
+
+		setup_cache(&mut state, "did:local:target", remote, Default::default());
+		state.connected_peers.insert(remote);
+
+		let disc = did_discovery_with_did("msg-1", "did:local:target");
+		let (_id, actions) = connect(&mut state, vec![Discovery::DidDiscovery(disc)]);
+
+		// no DidPublish — cache hit + already connected
+		assert!(!actions.iter().any(|a| matches!(a, DiscoveryAction::DidPublish(_))));
+		// should emit Connected immediately
+		assert!(actions
+			.iter()
+			.any(|a| matches!(a, DiscoveryAction::Event(Event::Connected { .. }))));
+	}
+
+	#[test]
+	fn test_cache_hit_emits_dial_not_publish() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state(local);
+
+		let addr: Multiaddr = "/ip4/127.0.0.1/tcp/5678".parse().unwrap();
+		setup_cache(&mut state, "did:local:target", remote, [addr.clone()].into());
+
+		let disc = did_discovery_with_did("msg-1", "did:local:target");
+		let (id, actions) = connect(&mut state, vec![Discovery::DidDiscovery(disc)]);
+
+		// should emit DialPeer with cached address, not DidPublish
+		assert!(!actions.iter().any(|a| matches!(a, DiscoveryAction::DidPublish(_))));
+		let dial = actions.iter().find(|a| matches!(a, DiscoveryAction::DialPeer(_)));
+		assert!(dial.is_some(), "expected DialPeer for cached peer");
+		if let DiscoveryAction::DialPeer(d) = dial.unwrap() {
+			assert_eq!(d.peer_id, remote);
+			assert_eq!(d.request_id, Some(id));
+			assert!(d.addresses.contains(&addr));
+		}
+
+		// cached peer should be in discovery_peers
+		let request = state.requests.get(&id).unwrap();
+		assert!(request.discovery_peers.contains(&remote));
+		assert!(!request.cached_dial.is_empty());
+	}
+
+	#[test]
+	fn test_cache_hit_dial_succeeds_emits_connected() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state(local);
+
+		setup_cache(&mut state, "did:local:target", remote, Default::default());
+
+		let disc = did_discovery_with_did("msg-1", "did:local:target");
+		let (id, _actions) = connect(&mut state, vec![Discovery::DidDiscovery(disc)]);
+
+		// simulate peer connection
+		let actions = state.reduce(DiscoveryAction::PeerConnected(PeerConnectedAction { peer_id: remote }));
+
+		assert!(actions.iter().any(
+			|a| matches!(a, DiscoveryAction::Event(Event::Connected { id: eid, peer } ) if *eid == id && *peer == remote)
+		));
+
+		// cached_dial kept for disconnect fallback
+		let request = state.requests.get(&id).unwrap();
+		assert!(!request.cached_dial.is_empty());
+	}
+
+	#[test]
+	fn test_cache_peer_disconnect_falls_back_to_publish() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state(local);
+
+		setup_cache(&mut state, "did:local:target", remote, Default::default());
+
+		let disc = did_discovery_with_did("msg-1", "did:local:target");
+		let (id, _) = connect(&mut state, vec![Discovery::DidDiscovery(disc)]);
+
+		// cached dial succeeds
+		state.reduce(DiscoveryAction::PeerConnected(PeerConnectedAction { peer_id: remote }));
+
+		// peer disconnects
+		let actions = state.reduce(DiscoveryAction::PeerDisconnected(PeerDisconnectedAction { peer_id: remote }));
+
+		// should fall back to DidPublish
+		assert!(actions.iter().any(|a| matches!(a, DiscoveryAction::DidPublish(_))));
+		// cache should be invalidated
+		assert!(!state.did_peer_cache.contains_key("did:local:target"));
+		// request should still be alive
+		assert!(state.requests.contains_key(&id));
+	}
+
+	#[test]
+	fn test_cache_hit_dial_fails_falls_back_to_publish() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state(local);
+
+		setup_cache(&mut state, "did:local:target", remote, Default::default());
+
+		let disc = did_discovery_with_did("msg-1", "did:local:target");
+		let (id, _actions) = connect(&mut state, vec![Discovery::DidDiscovery(disc)]);
+
+		// dial fails
+		let actions =
+			state.reduce(DiscoveryAction::DialFailed(DialFailedAction { request_id: Some(id), peer_id: remote }));
+
+		// should fall back to DidPublish
+		let publish = actions.iter().find(|a| matches!(a, DiscoveryAction::DidPublish(_)));
+		assert!(publish.is_some(), "expected DidPublish fallback");
+		if let DiscoveryAction::DidPublish(p) = publish.unwrap() {
+			assert_eq!(p.request_id, id);
+		}
+
+		// cache should be invalidated
+		assert!(!state.did_peer_cache.contains_key("did:local:target"));
+
+		// request should still be alive (pending via DidPublish)
+		assert!(state.requests.contains_key(&id));
+	}
+
+	#[test]
+	fn test_didcomm_resolve_populates_cache() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state(local);
+
+		state.reduce(DiscoveryAction::DidSubscribe(DidSubscribeAction {
+			subscription: DidDiscoverySubscription::Default,
+			topic_str: "co-contact".to_owned(),
+		}));
+
+		let disc = did_discovery_with_did("msg-1", "did:local:target");
+		let (_id, _) = connect(&mut state, vec![Discovery::DidDiscovery(disc)]);
+
+		// receive resolve
+		state.reduce(DiscoveryAction::DidCommReceived(DidCommReceivedAction {
+			peer_id: remote,
+			header: co_identity::DidCommHeader {
+				id: "resp-1".to_owned(),
+				message_type: DidDiscoveryMessageType::Resolve.to_string(),
+				thid: Some("msg-1".to_owned()),
+				..Default::default()
+			},
+		}));
+
+		// cache should be populated
+		let cached = state.did_peer_cache.get("did:local:target");
+		assert!(cached.is_some(), "cache should be populated after resolve");
+		assert_eq!(cached.unwrap().peer_id, remote);
+	}
+
+	#[test]
+	fn test_did_decrypted_populates_cache_with_endpoints() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state(local);
+
+		let addr: Multiaddr = "/ip4/127.0.0.1/tcp/5678".parse().unwrap();
+		let endpoints: BTreeSet<Multiaddr> = [addr.clone()].into();
+
+		state.reduce(DiscoveryAction::DidDecrypted(DidDecryptedAction {
+			from_did: Some("did:local:requester".to_owned()),
+			from_peer: remote,
+			from_endpoints: endpoints,
+			response: "resolve-response".to_owned(),
+		}));
+
+		let cached = state.did_peer_cache.get("did:local:requester");
+		assert!(cached.is_some(), "responder should cache requester DID");
+		let cached = cached.unwrap();
+		assert_eq!(cached.peer_id, remote);
+		assert!(cached.endpoints.contains(&addr));
 	}
 }

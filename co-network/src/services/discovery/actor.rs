@@ -63,6 +63,7 @@ impl Actor for DiscoveryActor {
 				timeout: Duration::from_secs(30),
 				max_peers: None,
 				connected_peers: Default::default(),
+				did_peer_cache: Default::default(),
 			},
 			epic: EpicRuntime::new(epic(tags.clone()), |err| {
 				tracing::error!(?err, "discovery-epic-error");

@@ -184,6 +184,7 @@ pub struct MeshPeersResultAction {
 
 #[derive(Debug, Clone)]
 pub struct DidDecryptedAction {
+	pub from_did: Option<String>,
 	pub from_peer: PeerId,
 	pub from_endpoints: BTreeSet<Multiaddr>,
 	pub response: String,
