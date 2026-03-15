@@ -27,7 +27,7 @@ pub enum ConnectionAction {
 	NetworkResolve(NetworkResolveAction),
 
 	/// CO networks has been resolved.
-	NetworkResolved(NetworkResolvedAction),
+	NetworkResolveComplete(NetworkResolveCompleteAction),
 
 	/// Connect to a network.
 	///
@@ -125,7 +125,7 @@ pub struct NetworkResolveAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NetworkResolvedAction {
+pub struct NetworkResolveCompleteAction {
 	pub id: CoId,
 	pub result: Result<BTreeSet<Network>, String>,
 	pub time: Instant,
