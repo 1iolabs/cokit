@@ -113,7 +113,7 @@ pub async fn command(
 
 	// network
 	if let Some(network) = application.co().network().await {
-		network.didcontact_subscribe_default().await?;
+		network.didcontact_subscribe_default()?;
 	}
 
 	// COs

@@ -11,6 +11,7 @@ use super::{
 use crate::{
 	services::{
 		connections::{library::bootstrap_from_multiaddrs::bootstrap_from_multiaddrs, resolve::DynamicNetworkResolver},
+		discovery::DiscoveryApi,
 		network::CoNetworkTaskSpawner,
 	},
 	NetworkSettings,
@@ -30,6 +31,7 @@ pub struct ConnectionsContext {
 	pub private_identity_resolver: PrivateIdentityResolverBox,
 	pub network_resolver: DynamicNetworkResolver,
 	pub date: DynamicCoDate,
+	pub discovery: DiscoveryApi,
 }
 
 pub struct State {

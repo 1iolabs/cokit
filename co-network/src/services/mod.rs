@@ -4,5 +4,6 @@
 // retention—approved secure tools may process solely for internal use.
 
 pub mod connections;
+pub mod discovery;
 pub mod heads;
 pub mod network;

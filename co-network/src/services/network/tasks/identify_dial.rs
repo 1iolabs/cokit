@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	network::{Behaviour, Context, NetworkEvent},
+	network::{Behaviour, NetworkEvent},
 	types::network_task::NetworkTask,
 };
 use libp2p::{
@@ -25,13 +25,13 @@ impl IdentifyDialNetworkTask {
 		Self { agent }
 	}
 }
-impl NetworkTask<Behaviour, Context> for IdentifyDialNetworkTask {
-	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>, _context: &mut Context) {}
+impl NetworkTask<Behaviour> for IdentifyDialNetworkTask {
+	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>) {}
 
 	fn on_swarm_event(
 		&mut self,
 		swarm: &mut Swarm<Behaviour>,
-		_context: &mut Context,
+
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
 		if let SwarmEvent::Behaviour(NetworkEvent::Identify(identify::Event::Received { info, .. })) = &event {

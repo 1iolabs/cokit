@@ -66,7 +66,7 @@ pub fn keystore_changed(
 										subscribe(&private_identity_resolver, &network, &did).await?;
 									},
 									SubscribeAction::Unsubscribe(did) => {
-										network.didcontact_unsubscribe(did).await?;
+										network.didcontact_unsubscribe(did)?;
 									},
 								}
 							}

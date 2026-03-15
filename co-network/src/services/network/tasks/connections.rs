@@ -26,18 +26,17 @@ impl ConnectionsNetworkTask {
 		Self { handle }
 	}
 }
-impl<B, C> NetworkTask<B, C> for ConnectionsNetworkTask
+impl<B> NetworkTask<B> for ConnectionsNetworkTask
 where
 	B: NetworkBehaviour,
 {
-	fn execute(&mut self, _swarm: &mut Swarm<B>, _context: &mut C) {}
+	fn execute(&mut self, _swarm: &mut Swarm<B>) {}
 
 	/// Handle swarm events.
 	/// Events can be consumed by this handler or forwarded to next handler.
 	fn on_swarm_event(
 		&mut self,
 		_swarm: &mut Swarm<B>,
-		_context: &mut C,
 		event: SwarmEvent<B::ToSwarm>,
 	) -> Option<SwarmEvent<B::ToSwarm>> {
 		match &event {

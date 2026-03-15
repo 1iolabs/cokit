@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	network::{Behaviour, Context, NetworkEvent},
+	network::{Behaviour, NetworkEvent},
 	types::network_task::NetworkTask,
 };
 use libp2p::{mdns, swarm::SwarmEvent, Swarm};
@@ -17,13 +17,13 @@ impl MdnsGossipNetworkTask {
 		Self {}
 	}
 }
-impl NetworkTask<Behaviour, Context> for MdnsGossipNetworkTask {
-	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>, _context: &mut Context) {}
+impl NetworkTask<Behaviour> for MdnsGossipNetworkTask {
+	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>) {}
 
 	fn on_swarm_event(
 		&mut self,
 		swarm: &mut Swarm<Behaviour>,
-		_context: &mut Context,
+
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
 		match &event {

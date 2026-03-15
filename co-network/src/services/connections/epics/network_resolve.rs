@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::services::connections::{
-	action::{ConnectionAction, NetworkResolveAction, NetworkResolvedAction},
+	action::{ConnectionAction, NetworkResolveAction, NetworkResolveCompleteAction},
 	actor::ConnectionsContext,
 	ConnectionState, NetworkResolver,
 };
@@ -30,13 +30,14 @@ impl Epic<ConnectionAction, ConnectionState, ConnectionsContext> for NetworkReso
 				let id = id.clone();
 				Some(
 					async move {
-						Ok(ConnectionAction::NetworkResolved(NetworkResolvedAction {
-							id: id.clone(),
-							result: context
-								.network_resolver
-								.networks(id)
-								.await
-								.map_err(|err| format!("Resolve failed: {err}")),
+						let result = context
+							.network_resolver
+							.networks(id.clone())
+							.await
+							.map_err(|err| format!("Resolve failed: {err}"));
+						Ok(ConnectionAction::NetworkResolveComplete(NetworkResolveCompleteAction {
+							id,
+							result,
 							time: Instant::now(),
 						}))
 					}

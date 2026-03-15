@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	network::{Behaviour, Context, NetworkEvent},
+	network::{Behaviour, NetworkEvent},
 	services::network::CoNetworkTaskSpawner,
 	types::network_task::{NetworkTask, NetworkTaskSpawner},
 };
@@ -31,8 +31,8 @@ impl ListnersNetworkTask {
 		Ok(rx.await?)
 	}
 }
-impl NetworkTask<Behaviour, Context> for ListnersNetworkTask {
-	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
+impl NetworkTask<Behaviour> for ListnersNetworkTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>) {
 		let mut listeners: BTreeSet<Multiaddr> = BTreeSet::new();
 		if self.local {
 			listeners.extend(swarm.listeners().cloned());
@@ -50,15 +50,14 @@ impl NetworkTask<Behaviour, Context> for ListnersNetworkTask {
 	fn on_swarm_event(
 		&mut self,
 		swarm: &mut Swarm<Behaviour>,
-		context: &mut Context,
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
 		match &event {
 			SwarmEvent::NewListenAddr { listener_id: _, address: _ } => {
-				self.execute(swarm, context);
+				self.execute(swarm);
 			},
 			SwarmEvent::ExternalAddrConfirmed { address: _ } => {
-				self.execute(swarm, context);
+				self.execute(swarm);
 			},
 			_ => {},
 		}

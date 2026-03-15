@@ -7,7 +7,7 @@ use crate::{
 	find_membership,
 	library::{invite_networks::invite_networks, shared_membership::shared_membership},
 	services::reducers::ReducerOptions,
-	state, CoContext, CoReducer, CoReducerFactoryResultExt, CoStorage,
+	state, CoContext, CoReducerFactoryResultExt, CoReducerState, CoStorage,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -29,6 +29,13 @@ impl CoNetworkResolver {
 }
 #[async_trait]
 impl NetworkResolver for CoNetworkResolver {
+	/// Resolve networks from reducer.
+	///
+	/// # Note
+	/// The reducer is may working internally in the actor when a push or something is ongoing.
+	/// This means we could not ask for current reducer_state as this will be queued until the push is done.
+	/// This means we can not fetch the network settings from the reducer while it is working and would deadlock.
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
 	async fn networks(&self, id: CoId) -> Result<BTreeSet<Network>, anyhow::Error> {
 		// check membership to know if we can read networks from co
 		// Note: find membership assumes that its local maybe change that later.
@@ -73,13 +80,17 @@ impl NetworkResolver for CoNetworkResolver {
 					// get CO networks
 					// - or participant networks if CO networks are empty
 					// - or invite metadata if the previous fail (because the block is not loaded yet)
-					match networks_co(&self.context, storage, &reducer).await {
-						Ok(networks) => {
-							return Ok(networks);
-						},
-						Err(err) => {
-							tracing::warn!(?err, co = ?id, "co-resolve-networks-failed (fallback to invite)");
-						},
+					//
+					// note: we use last_reducer_state as we may get called from within the actor
+					if let Some(reducer_state) = reducer.context.last_reducer_state() {
+						match networks_co(&self.context, storage, &reducer_state).await {
+							Ok(networks) => {
+								return Ok(networks);
+							},
+							Err(err) => {
+								tracing::warn!(?err, co = ?id, "co-resolve-networks-failed (fallback to invite)");
+							},
+						}
 					}
 				}
 			}
@@ -105,14 +116,13 @@ impl NetworkResolver for CoNetworkResolver {
 async fn networks_co(
 	context: &CoContext,
 	storage: &CoStorage,
-	reducer: &CoReducer,
+	reducer_state: &CoReducerState,
 ) -> Result<BTreeSet<Network>, anyhow::Error> {
-	let co_state = reducer.reducer_state().await.co();
-	let networks = state::networks(storage, co_state).await?;
+	let networks = state::networks(storage, reducer_state.co()).await?;
 	if networks.is_empty() {
 		// get participant networks
 		let identity_resolver = context.identity_resolver().await?;
-		let participants = state::participants_active(storage, co_state).await?;
+		let participants = state::participants_active(storage, reducer_state.co()).await?;
 		Ok(identities_networks(Some(&identity_resolver), participants.into_iter().map(|item| item.did))
 			.try_collect()
 			.await?)
