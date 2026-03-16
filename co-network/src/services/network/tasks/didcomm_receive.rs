@@ -5,7 +5,7 @@
 
 use crate::{
 	didcomm,
-	network::{Behaviour, Context, NetworkEvent},
+	network::{Behaviour, NetworkEvent},
 	services::network::CoNetworkTaskSpawner,
 	types::network_task::{NetworkTask, NetworkTaskSpawner},
 };
@@ -39,13 +39,12 @@ impl DidCommReceiveNetworkTask {
 		tokio_stream::wrappers::UnboundedReceiverStream::new(rx)
 	}
 }
-impl NetworkTask<Behaviour, Context> for DidCommReceiveNetworkTask {
-	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>, _context: &mut Context) {}
+impl NetworkTask<Behaviour> for DidCommReceiveNetworkTask {
+	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>) {}
 
 	fn on_swarm_event(
 		&mut self,
 		_swarm: &mut Swarm<Behaviour>,
-		_context: &mut Context,
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
 		if let SwarmEvent::Behaviour(NetworkEvent::Didcomm(didcomm::Event::Received { peer_id, message })) = &event {

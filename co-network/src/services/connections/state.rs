@@ -5,9 +5,9 @@
 
 use super::action::{
 	ConnectAction, ConnectedAction, ConnectionAction, DidPeersChangedAction, DidReleaseAction, DidReleasedAction,
-	DidUseAction, DisconnectAction, DisconnectReason, DisconnectedAction, NetworkResolveAction, NetworkResolvedAction,
-	PeerConnectionClosedAction, PeerConnectionEstablishedAction, PeerRelateCoAction, PeerRelateDidAction,
-	PeersChangedAction, ReleaseAction, ReleasedAction, UseAction,
+	DidUseAction, DisconnectAction, DisconnectReason, DisconnectedAction, NetworkResolveAction,
+	NetworkResolveCompleteAction, PeerConnectionClosedAction, PeerConnectionEstablishedAction, PeerRelateCoAction,
+	PeerRelateDidAction, PeersChangedAction, ReleaseAction, ReleasedAction, UseAction,
 };
 use crate::connections::{DialAction, DialCompletedAction};
 use co_actor::{time::Instant, Reducer};
@@ -150,7 +150,7 @@ impl Reducer<ConnectionAction> for ConnectionState {
 			ConnectionAction::Connected(ConnectedAction { network, result }) => {
 				reduce_connected(state, &mut actions, network, result);
 			},
-			ConnectionAction::NetworkResolved(NetworkResolvedAction { id, result, time }) => {
+			ConnectionAction::NetworkResolveComplete(NetworkResolveCompleteAction { id, result, time }) => {
 				reduce_network_resolved(state, &mut actions, id, result, time);
 			},
 			ConnectionAction::Disconnected(DisconnectedAction { network, reason: _ }) => {

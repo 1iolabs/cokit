@@ -36,7 +36,7 @@ pub fn publish(
 						action.heads.iter().map(WeakCid::from).collect(),
 					);
 					let data = to_cbor(&message)?;
-					PublishGossipTask::publish(network, topic, data).await
+					Ok(PublishGossipTask::publish(network, topic, data).await?)
 				}
 				.into_stream()
 				.try_ignore_elements(),

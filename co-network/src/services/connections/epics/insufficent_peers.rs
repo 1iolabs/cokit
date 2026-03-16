@@ -106,6 +106,7 @@ mod tests {
 			identity_resolver: MemoryIdentityResolver::default().boxed(),
 			private_identity_resolver: MemoryPrivateIdentityResolver::default().boxed(),
 			network_resolver: StaticNetworkResolver::default().boxed(),
+			discovery: crate::services::discovery::DiscoveryApi::new_closed(),
 		};
 		let mut epic = InsufficentPeersEpic::default();
 		let stream = epic

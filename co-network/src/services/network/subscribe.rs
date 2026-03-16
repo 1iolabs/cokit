@@ -29,7 +29,7 @@ where
 	// subscribe
 	//  by returning on any error happens in between
 	for item in networks {
-		network.didcontact_subscribe(identity.clone(), item).await?;
+		network.didcontact_subscribe(identity.clone(), item)?;
 	}
 
 	// result

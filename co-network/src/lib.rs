@@ -10,7 +10,6 @@ compile_error!("feature \"js\" can only used for \"wasm32-unknown-unknown\" targ
 // modules
 mod bitswap;
 mod didcomm;
-mod discovery;
 mod library;
 mod network;
 mod services;

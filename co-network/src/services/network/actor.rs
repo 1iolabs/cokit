@@ -9,10 +9,11 @@ use crate::{
 	network::{Libp2pNetwork, CO_AGENT},
 	services::{
 		connections::{Connections, ConnectionsContext, DynamicNetworkResolver},
+		discovery::{DiscoveryActor, DiscoveryApi, DiscoveryContext},
 		heads::{HeadsActor, HeadsApi, HeadsContext},
 		network::{
 			tasks::{identify_dial::IdentifyDialNetworkTask, relay_listen::RelayListenTask},
-			CoNetworkTaskSpawner, ConnectionsNetworkTask, NetworkApi, NetworkSettings,
+			CoNetworkTaskSpawner, ConnectionsNetworkTask, DiscoveryNetworkTask, NetworkApi, NetworkSettings,
 		},
 	},
 	types::network_task::NetworkTaskSpawner,
@@ -56,7 +57,6 @@ impl Actor for Network {
 			initialize.identifier.clone(),
 			initialize.keypair.clone(),
 			initialize.settings.clone(),
-			initialize.date.clone(),
 			initialize.tasks.clone(),
 			initialize.identity_resolver.clone(),
 			initialize.private_identity_resolver.clone(),
@@ -78,6 +78,24 @@ impl Actor for Network {
 			.spawn(super::MdnsGossipNetworkTask::new())
 			.map_err(|err| ActorError::Actor(err.into()))?;
 
+		// discovery
+		let discovery_context = DiscoveryContext {
+			tasks: initialize.tasks.clone(),
+			network: spawner.clone(),
+			date: initialize.date.clone(),
+			resolver: initialize.identity_resolver.clone(),
+			local_peer_id: network_peer_id,
+		};
+		let discovery = Actor::spawn_with(
+			initialize.tasks.clone(),
+			tags!("type": "discovery", "application": &initialize.identifier),
+			DiscoveryActor::new(discovery_context),
+			(),
+		)?;
+		spawner
+			.spawn(DiscoveryNetworkTask::new(discovery.handle()))
+			.map_err(|err| ActorError::Actor(err.into()))?;
+
 		// connections
 		let connections_context = ConnectionsContext {
 			date: initialize.date.clone(),
@@ -87,6 +105,7 @@ impl Actor for Network {
 			settings: initialize.settings.clone(),
 			network: spawner.clone(),
 			network_resolver: initialize.network_resolver,
+			discovery: DiscoveryApi::from(&discovery),
 		};
 		let connections = Actor::spawn_with(
 			initialize.tasks.clone(),
@@ -117,7 +136,7 @@ impl Actor for Network {
 		tracing::info!(application = initialize.identifier, peer_id = ?network_peer_id, "network");
 
 		// result
-		Ok(NetworkState { network, peer_id: network_peer_id, connections, heads })
+		Ok(NetworkState { network, peer_id: network_peer_id, discovery, connections, heads })
 	}
 
 	async fn handle(
@@ -135,6 +154,7 @@ impl Actor for Network {
 				response.respond(NetworkApi {
 					spawner: CoNetworkTaskSpawner { spawner: state.network.spawner(), local_peer: state.peer_id },
 					connections: state.connections.handle(),
+					discovery: DiscoveryApi::from(&state.discovery),
 					heads: HeadsApi::from(&state.heads),
 					_handle: handle.clone(),
 				});
@@ -148,6 +168,7 @@ impl Actor for Network {
 	async fn shutdown(&self, state: Self::State) -> Result<(), ActorError> {
 		state.network.shutdown().shutdown();
 		state.connections.shutdown();
+		state.discovery.shutdown();
 		state.heads.shutdown();
 		Ok(())
 	}
@@ -156,6 +177,7 @@ impl Actor for Network {
 pub struct NetworkState {
 	network: Libp2pNetwork,
 	peer_id: PeerId,
+	discovery: ActorInstance<DiscoveryActor>,
 	connections: ActorInstance<Connections>,
 	heads: ActorInstance<HeadsActor>,
 }

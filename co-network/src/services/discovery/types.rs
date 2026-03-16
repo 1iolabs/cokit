@@ -4,7 +4,10 @@
 // retention—approved secure tools may process solely for internal use.
 
 use co_identity::{network_did_discovery, DidCommHeader, Identity, PeerDidCommHeader, PrivateIdentity};
-use co_primitives::{serde_string_enum, to_json_string, CoDateRef, NetworkDidDiscovery};
+use co_primitives::{
+	serde_string_enum, to_json_string, CoDateRef, NetworkDidDiscovery, NetworkPeer, NetworkRendezvous,
+};
+use derive_more::From;
 use libp2p::{Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -66,4 +69,48 @@ pub struct DiscoverMessage {
 	/// This are the callback endpoints when the discovery request is accepted.
 	#[serde(rename = "e")]
 	pub endpoints: BTreeSet<Multiaddr>,
+}
+
+/// Single actionable discovery item with all context.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From)]
+pub enum Discovery {
+	/// DID Discovery protocol.
+	#[from]
+	DidDiscovery(DidDiscovery),
+
+	/// Discover subscribed peers from a topic.
+	/// The value is the [`libp2p::gossipsub::TopicHash`] string representation.
+	/// Note: This will not subscribe to an topic which needs to done by the caller.
+	#[from]
+	Topic(String),
+
+	/// Rendezvous protocol.
+	#[from]
+	Rendezvous(NetworkRendezvous),
+
+	/// Direct peer connection.
+	#[from]
+	Peer(NetworkPeer),
+}
+impl Discovery {
+	/// Validate the discovery contains parseable data.
+	pub fn validate(&self) -> Result<(), anyhow::Error> {
+		match self {
+			Discovery::DidDiscovery(_item) => {
+				// none?
+			},
+			Discovery::Topic(_item) => {
+				// none?
+			},
+			Discovery::Rendezvous(item) => {
+				for address in item.addresses.iter() {
+					address.parse::<Multiaddr>()?;
+				}
+			},
+			Discovery::Peer(item) => {
+				PeerId::from_bytes(&item.peer)?;
+			},
+		}
+		Ok(())
+	}
 }

@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	network::{Behaviour, Context, NetworkEvent},
+	network::{Behaviour, NetworkEvent},
 	services::network::CoNetworkTaskSpawner,
 	types::network_task::{NetworkTask, NetworkTaskSpawner},
 };
@@ -27,13 +27,13 @@ impl PeersNetworkTask {
 		UnboundedReceiverStream::new(rx)
 	}
 }
-impl NetworkTask<Behaviour, Context> for PeersNetworkTask {
-	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>, _context: &mut Context) {}
+impl NetworkTask<Behaviour> for PeersNetworkTask {
+	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>) {}
 
 	fn on_swarm_event(
 		&mut self,
 		_swarm: &mut Swarm<Behaviour>,
-		_context: &mut Context,
+
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
 		#[cfg(feature = "native")]

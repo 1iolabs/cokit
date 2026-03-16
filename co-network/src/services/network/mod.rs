@@ -22,11 +22,13 @@ pub use tasks::mdns_gossip::MdnsGossipNetworkTask;
 pub use tasks::{
 	connections::ConnectionsNetworkTask,
 	dial::DialNetworkTask,
-	did_discovery::{DidDiscoverySubscribe, DidDiscoveryUnsubscribe},
 	didcomm_receive::DidCommReceiveNetworkTask,
 	didcomm_send::DidCommSendNetworkTask,
-	discovery_connect::DiscoveryConnectNetworkTask,
-	gossip::{ListenGossipTask, PublishGossipTask, SubscribeGossipTask, UnsubscribeGossipTask},
+	discovery::DiscoveryNetworkTask,
+	gossip::{
+		ListenGossipTask, MeshPeersNetworkTask, PublishGossipTask, PublishGossipTaskError, SubscribeGossipTask,
+		UnsubscribeGossipTask,
+	},
 	listeners::ListnersNetworkTask,
 	peers::PeersNetworkTask,
 };

@@ -3,8 +3,17 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-mod behaviour;
-mod did_discovery;
+pub mod action;
+pub mod actor;
+mod api;
+mod epics;
+mod event;
+pub mod message;
+pub mod state;
+mod types;
 
-pub use behaviour::{ConnectError, Discovery, DiscoveryBehaviour, DiscoveryEvent, DiscoveryState, Event};
-pub use did_discovery::{DidDiscovery, DidDiscoveryMessageType, DiscoverMessage};
+pub use actor::{DiscoveryActor, DiscoveryContext};
+pub use api::DiscoveryApi;
+pub use event::Event;
+pub use message::DiscoveryMessage;
+pub use types::{DidDiscovery, DidDiscoveryMessageType, DiscoverMessage, Discovery};

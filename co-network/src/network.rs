@@ -7,18 +7,14 @@
 use crate::services::network::NetworkDns;
 use crate::{
 	bitswap::{BitswapMessage, BitswapStoreClient},
-	didcomm, discovery,
+	didcomm,
 	library::find_peer_id::try_peer_id,
-	types::{
-		layer_behaviour::{Layer, LayerBehaviour},
-		network_task::{NetworkTaskBox, NetworkTaskState, TokioNetworkTaskSpawner},
-	},
+	types::network_task::{NetworkTaskBox, NetworkTaskState, TokioNetworkTaskSpawner},
 	NetworkSettings,
 };
 use anyhow::{anyhow, Context as _};
 use co_actor::{time, ActorHandle, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
-use co_primitives::DynamicCoDate;
 use futures::{pin_mut, Stream, StreamExt};
 #[cfg(feature = "native")]
 use libp2p::mdns::{self, tokio::Behaviour as MdnsBehaviour};
@@ -29,17 +25,18 @@ use libp2p::{
 	swarm::{behaviour::toggle::Toggle, dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
 	yamux, PeerId, StreamProtocol, Swarm, SwarmBuilder,
 };
-use libp2p_bitswap::{Bitswap, BitswapEvent};
+use libp2p_bitswap::Bitswap;
 use rand::rngs::OsRng;
-use std::{cmp::min, future::Future, task::Poll, time::Duration};
+use std::{cmp::min, future::Future, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
+
 pub const CO_AGENT: &str = "co/0.1.0";
 pub const IPFS_IDENTIFY_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/id/1.0.0");
 
 pub struct Libp2pNetwork {
 	shutdown: CancellationToken,
-	tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<Behaviour, Context>>,
+	tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<Behaviour>>,
 }
 impl Libp2pNetwork {
 	#[allow(clippy::too_many_arguments)]
@@ -47,7 +44,6 @@ impl Libp2pNetwork {
 		identifier: String,
 		keypair: Keypair,
 		config: NetworkSettings,
-		date: DynamicCoDate,
 		tasks: TaskSpawner,
 		resolver: IdentityResolverBox,
 		private_resolver: PrivateIdentityResolverBox,
@@ -252,17 +248,6 @@ impl Libp2pNetwork {
 			swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
 		}
 
-		// context
-		let context = Context {
-			discovery: discovery::DiscoveryState::new(
-				date.clone(),
-				resolver.clone(),
-				local_peer_id,
-				Duration::from_secs(30),
-				None,
-			),
-		};
-
 		// tasks
 		let (tasks_tx, tasks_rx) = tokio::sync::mpsc::unbounded_channel();
 
@@ -284,7 +269,7 @@ impl Libp2pNetwork {
 
 		// run
 		tasks.spawn(async move {
-			run(swarm, context, runtime, tokio_stream::wrappers::UnboundedReceiverStream::new(tasks_rx))
+			run(swarm, runtime, tokio_stream::wrappers::UnboundedReceiverStream::new(tasks_rx))
 				.instrument(tracing::trace_span!("network", application = identifier))
 				.await;
 		});
@@ -293,7 +278,7 @@ impl Libp2pNetwork {
 		Ok(Self { shutdown, tasks: tasks_tx })
 	}
 
-	pub fn spawner(&self) -> TokioNetworkTaskSpawner<Behaviour, Context> {
+	pub fn spawner(&self) -> TokioNetworkTaskSpawner<Behaviour> {
 		TokioNetworkTaskSpawner { tasks: self.tasks.clone() }
 	}
 
@@ -324,7 +309,7 @@ struct Runtime {
 	#[cfg(not(target_arch = "wasm32"))]
 	listener_id: Option<libp2p::core::transport::ListenerId>,
 	/// Tasks which have been executed but waiting for events.
-	pending_tasks: Vec<(NetworkTaskBox<Behaviour, Context>, Span)>,
+	pending_tasks: Vec<(NetworkTaskBox<Behaviour>, Span)>,
 	shutdown: CancellationToken,
 	next_delayed_task: Option<time::Instant>,
 }
@@ -358,87 +343,8 @@ impl Runtime {
 	}
 }
 
-#[derive(Debug, Clone)]
-pub enum ContextEvent {
-	Discovery(discovery::Event),
-}
-
-#[derive(Debug, Clone)]
-pub enum ContextLayerEvent {
-	Discovery(discovery::DiscoveryEvent),
-}
-
-pub struct Context {
-	pub discovery: discovery::DiscoveryState<IdentityResolverBox>,
-}
-impl LayerBehaviour<Behaviour> for Context {
-	type ToSwarm = ContextEvent;
-	type ToLayer = ContextLayerEvent;
-
-	fn on_swarm_event(&mut self, event: &SwarmEvent<<Behaviour as NetworkBehaviour>::ToSwarm>) {
-		LayerBehaviour::<Behaviour>::on_swarm_event(&mut self.discovery, event);
-	}
-
-	fn on_layer_event(&mut self, swarm: &mut Swarm<Behaviour>, event: Self::ToLayer) -> Option<Self::ToSwarm> {
-		match event {
-			ContextLayerEvent::Discovery(event) => {
-				self.discovery.on_layer_event(swarm, event).map(ContextEvent::Discovery)
-			},
-		}
-	}
-
-	fn poll(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Self::ToLayer> {
-		match LayerBehaviour::<Behaviour>::poll(&mut self.discovery, cx) {
-			Poll::Ready(event) => return Poll::Ready(ContextLayerEvent::Discovery(event)),
-			Poll::Pending => {},
-		}
-		Poll::Pending
-	}
-}
-
-#[allow(unused)]
-#[derive(Debug, derive_more::From)]
-#[non_exhaustive]
-#[allow(clippy::large_enum_variant)]
-pub enum NetworkEvent {
-	Didcomm(didcomm::Event),
-	Gossipsub(gossipsub::Event),
-	Identify(identify::Event),
-	#[cfg(feature = "native")]
-	Mdns(libp2p::mdns::Event),
-	Ping(ping::Event),
-	// Kad(kad::Event),
-	Bitswap(BitswapEvent),
-	Discovery(discovery::Event),
-	Dcutr(dcutr::Event),
-	RelayServer(relay::Event),
-	RelayClient(relay::client::Event),
-	AutonatServer(autonat::v2::server::Event),
-	AutonatClient(autonat::v2::client::Event),
-}
-// impl From<BehaviourEvent> for NetworkEvent {
-// 	fn from(value: BehaviourEvent) -> Self {
-// 		match value {
-// 			BehaviourEvent::Didcomm(e) => NetworkEvent::Didcomm(e),
-// 			BehaviourEvent::Gossipsub(e) => NetworkEvent::Gossipsub(e),
-// 			BehaviourEvent::Identify(e) => NetworkEvent::Identify(e),
-// 			BehaviourEvent::Mdns(e) => NetworkEvent::Mdns(e),
-// 			BehaviourEvent::Ping(e) => NetworkEvent::Ping(e),
-// 			BehaviourEvent::Kad(e) => NetworkEvent::Kad(e),
-// 			BehaviourEvent::Bitswap(e) => NetworkEvent::Bitswap(e),
-// 		}
-// 	}
-// }
-impl From<ContextEvent> for NetworkEvent {
-	fn from(value: ContextEvent) -> Self {
-		match value {
-			ContextEvent::Discovery(e) => NetworkEvent::Discovery(e),
-		}
-	}
-}
-
 #[derive(NetworkBehaviour)]
-#[behaviour(to_swarm = "NetworkEvent")]
+// #[behaviour(to_swarm = "NetworkEvent")]
 pub struct Behaviour {
 	pub didcomm: didcomm::Behaviour,
 	pub gossipsub: gossipsub::Behaviour,
@@ -454,68 +360,12 @@ pub struct Behaviour {
 	pub autonat_server: Toggle<autonat::v2::server::Behaviour>,
 	pub autonat_client: Toggle<autonat::v2::client::Behaviour>,
 }
-impl discovery::DiscoveryBehaviour for Behaviour {
-	fn rendezvous_client_mut(&mut self) -> Option<&mut libp2p::rendezvous::client::Behaviour> {
-		None
-	}
 
-	fn rendezvous_client_event(
-		_event: &<Self as NetworkBehaviour>::ToSwarm,
-	) -> Option<&libp2p::rendezvous::client::Event> {
-		None
-	}
+pub type NetworkEvent = BehaviourEvent;
 
-	#[cfg(feature = "native")]
-	fn mdns_mut(&mut self) -> Option<&mut libp2p::mdns::tokio::Behaviour> {
-		self.mdns.as_mut()
-	}
-
-	#[cfg(feature = "native")]
-	fn mdns_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&libp2p::mdns::Event> {
-		match event {
-			NetworkEvent::Mdns(e) => Some(e),
-			_ => None,
-		}
-	}
-
-	fn didcomm_mut(&mut self) -> &mut didcomm::Behaviour {
-		&mut self.didcomm
-	}
-
-	fn didcomm_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&didcomm::Event> {
-		match event {
-			NetworkEvent::Didcomm(e) => Some(e),
-			_ => None,
-		}
-	}
-
-	fn gossipsub(&self) -> &gossipsub::Behaviour {
-		&self.gossipsub
-	}
-
-	fn gossipsub_mut(&mut self) -> &mut gossipsub::Behaviour {
-		&mut self.gossipsub
-	}
-
-	fn gossipsub_event(event: &<Self as NetworkBehaviour>::ToSwarm) -> Option<&gossipsub::Event> {
-		match event {
-			NetworkEvent::Gossipsub(e) => Some(e),
-			_ => None,
-		}
-	}
-}
-
-async fn run(
-	mut swarm: Swarm<Behaviour>,
-	context: Context,
-	mut runtime: Runtime,
-	tasks: impl Stream<Item = NetworkTaskBox<Behaviour, Context>>,
-) {
+async fn run(mut swarm: Swarm<Behaviour>, mut runtime: Runtime, tasks: impl Stream<Item = NetworkTaskBox<Behaviour>>) {
 	// log
 	tracing::info!("network-running");
-
-	// layer
-	let mut context_layer = Layer::new(swarm.behaviour(), context);
 
 	// handle
 	let shutdown = runtime.shutdown.child_token();
@@ -529,7 +379,7 @@ async fn run(
 			biased;
 
 			// events
-			_ = run_once(&mut swarm, &mut context_layer, &mut runtime) => {}
+			_ = run_once(&mut swarm, &mut runtime) => {}
 
 			// tasks
 			Some(mut task) = tasks.next(), if !tasks.is_done() => {
@@ -537,7 +387,7 @@ async fn run(
 
 				// execute
 				let task_state = task_span.in_scope(|| {
-					task.execute(&mut swarm, context_layer.layer_mut());
+					task.execute(&mut swarm);
 					task.task_state()
 				});
 
@@ -565,15 +415,11 @@ async fn run(
 	tracing::info!("network-shutdown");
 }
 
-async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, Context>, runtime: &mut Runtime) {
+async fn run_once(swarm: &mut Swarm<Behaviour>, runtime: &mut Runtime) {
 	// event
 	let network_event: Option<SwarmEvent<NetworkEvent>> = ::tokio::select! {
 		swarm_event = swarm.select_next_some() => {
-			context.on_swarm_event(&swarm_event);
 			Some(swarm_event)
-		},
-		layer_event = context.select_next_some() => {
-			context.on_layer_event(swarm, layer_event).map(|layer_event| SwarmEvent::Behaviour(NetworkEvent::from(layer_event)))
 		},
 		Some(_) = option_await(runtime.next_delayed_task.map(time::sleep_until)) => {
 			runtime.next_delayed_task = None;
@@ -617,7 +463,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 				let _enter = task_span.enter();
 
 				// run
-				result_event = task.on_swarm_event(swarm, context.layer_mut(), result_event.unwrap());
+				result_event = task.on_swarm_event(swarm, result_event.unwrap());
 
 				// complete?
 				task.task_state()
@@ -653,7 +499,7 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, context: &mut Layer<Behaviour, C
 						let _enter = task_span.enter();
 
 						// run
-						task.execute(swarm, context.layer_mut());
+						task.execute(swarm);
 
 						// complete?
 						task.task_state()

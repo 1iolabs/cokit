@@ -228,6 +228,7 @@ pub enum ActorMessage<M> {
 	Shutdown,
 
 	/// Actor received message.
+	#[allow(unused)]
 	Message(M),
 
 	/// Actor received message.
@@ -313,6 +314,15 @@ impl<M> Clone for ActorHandle<M> {
 		Self { tx: self.tx.clone(), state: self.state.clone(), tags: self.tags.clone() }
 	}
 }
+impl<M> ActorHandle<M> {
+	/// Create a closed (disconnected) handle useful for tests.
+	pub fn new_closed() -> Self {
+		let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+		let (_state_tx, state_rx) = watch::channel(ActorState::Stopping);
+		Self { tx, state: state_rx, tags: Arc::new(Tags::default()) }
+	}
+}
+
 impl<M> ActorHandle<M>
 where
 	M: Send + 'static,
@@ -381,7 +391,7 @@ where
 	/// Will only fail when the actor already has been stopped.
 	pub fn dispatch(&self, message: impl Into<M>) -> Result<(), ActorError> {
 		self.tx
-			.send(ActorMessage::Message(message.into()))
+			.send(ActorMessage::MessageWithSpan(message.into(), Span::current()))
 			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running."), self.tags().clone()))?;
 		Ok(())
 	}
@@ -421,9 +431,10 @@ where
 		let (responder, response) = ResponseStreamReceiver::new();
 		let send_result = self
 			.tx
-			.send(ActorMessage::Message(message(responder)))
+			.send(ActorMessage::MessageWithSpan(message(responder), Span::current()))
 			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running."), self.tags().clone()));
 		let handle = self.clone();
+		let span = Span::current();
 		async_stream::stream! {
 			// force keep actor alive while stream is running
 			let _handle = handle;
@@ -432,6 +443,7 @@ where
 			match send_result {
 				Ok(_) => {},
 				Err(err) => {
+					let _span_guard = span.enter();
 					yield Err(err);
 					return;
 				}
@@ -439,6 +451,7 @@ where
 
 			// forward items
 			for await item in response {
+				let _span_guard = span.enter();
 				yield Ok(item);
 			}
 		}
@@ -450,7 +463,7 @@ where
 		self.stream(message).filter_map(|item| ready(item.ok()))
 	}
 
-	/// Request with streaming response wtih backpressure.
+	/// Request with streaming response with back-pressure.
 	pub fn stream_backpressure<T: std::fmt::Debug>(
 		&self,
 		buffer: usize,
@@ -459,9 +472,10 @@ where
 		let (responder, response) = ResponseBackPressureStreamReceiver::new(buffer);
 		let send_result = self
 			.tx
-			.send(ActorMessage::Message(message(responder)))
+			.send(ActorMessage::MessageWithSpan(message(responder), Span::current()))
 			.map_err(|_| ActorError::InvalidState(anyhow!("Actor not running."), self.tags().clone()));
 		let handle = self.clone();
+		let span = Span::current();
 		async_stream::stream! {
 			// force keep actor alive while stream is running
 			let _handle = handle;
@@ -470,6 +484,7 @@ where
 			match send_result {
 				Ok(_) => {},
 				Err(err) => {
+					let _span_guard = span.enter();
 					yield Err(err);
 					return;
 				}
@@ -482,6 +497,7 @@ where
 						break;
 					},
 					item => {
+						let _span_guard = span.enter();
 						yield item;
 					},
 				}

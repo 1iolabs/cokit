@@ -46,7 +46,10 @@ use co_storage::{
 };
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
 use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
+use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
+#[cfg(feature = "js")]
+use tokio_with_wasm::alias as tokio;
 
 pub const CO_ID_LOCAL: &str = "local";
 
@@ -168,6 +171,7 @@ struct LocalCoInstance<L> {
 	storage: CoStorage,
 	encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
 	locals: L,
+	reducer_state: Option<watch::Receiver<Option<(Cid, BTreeSet<Cid>)>>>,
 	#[cfg(feature = "pinning")]
 	pinning: (CoReducerState, crate::library::storage_pinning::StoragePinningContext),
 }
@@ -176,8 +180,8 @@ where
 	L: Locals + Clone + Debug + Send + Sync + 'static,
 {
 	/// Read the local co state from disk.
-	/// As we trust all of the local states we use all the states without fuhter checks to continue.
-	/// We use a explicit shutdown signal for this as the reducer is self referencial (through a box) and will not be
+	/// As we trust all of the local states we use all the states without further checks to continue.
+	/// We use a explicit shutdown signal for this as the reducer is self referential (through a box) and will not be
 	/// dropped when a watcher is active.
 	///
 	/// NOTE: This assumes the same encryption key is used by all local applications.
@@ -213,14 +217,14 @@ where
 		};
 
 		// result
-		let result = Self {
+		let mut result = Self {
 			locals: locals.clone(),
 			storage: base_storage,
 			encrypted_storage: encrypted_storage.clone(),
+			reducer_state: None, // initalize later
 			#[cfg(feature = "pinning")]
 			pinning: (Default::default(), pinning),
 		};
-		let context = Arc::new(result.clone());
 
 		// create log
 		let log = Log::new_local(CO_ID_LOCAL.as_bytes().to_vec(), Default::default());
@@ -254,6 +258,9 @@ where
 		let reducer = reducer_builder.build(&storage, runtime.runtime(), date).await?;
 		let initial = reducer.is_empty();
 
+		// watch
+		result.reducer_state = Some(reducer.watch());
+
 		// flush
 		let flush = result.clone();
 		#[cfg(feature = "pinning")]
@@ -272,7 +279,7 @@ where
 			tasks.clone(),
 			runtime,
 			reducer,
-			context,
+			Arc::new(result.clone()),
 			Box::new(flush),
 			false,
 			local_co.verify_links,
@@ -436,6 +443,14 @@ where
 			CoReducerFeature::Encryption => self.encrypted_storage.is_some(),
 			_ => false,
 		}
+	}
+
+	fn last_reducer_state(&self) -> Option<CoReducerState> {
+		self.reducer_state
+			.as_ref()?
+			.borrow()
+			.clone()
+			.map(|(state, heads)| CoReducerState::new(Some(state), heads))
 	}
 }
 #[async_trait]

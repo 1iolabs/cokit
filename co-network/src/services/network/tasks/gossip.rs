@@ -4,9 +4,10 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	network::{Behaviour, Context, NetworkEvent},
+	network::{Behaviour, NetworkEvent},
 	services::network::CoNetworkTaskSpawner,
 	types::network_task::{NetworkTask, NetworkTaskSpawner},
+	NetworkError,
 };
 use futures::Stream;
 use libp2p::{gossipsub, swarm::SwarmEvent, PeerId, Swarm};
@@ -44,15 +45,15 @@ impl ListenGossipTask {
 		tokio_stream::wrappers::UnboundedReceiverStream::new(rx)
 	}
 }
-impl NetworkTask<Behaviour, Context> for ListenGossipTask {
-	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>, _context: &mut Context) {}
+impl NetworkTask<Behaviour> for ListenGossipTask {
+	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>) {}
 
 	/// Handle swarm events.
 	/// Events can be consumed by this handler or forwarded to next handler.
 	fn on_swarm_event(
 		&mut self,
 		_swarm: &mut Swarm<Behaviour>,
-		_context: &mut Context,
+
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
 		if let SwarmEvent::Behaviour(NetworkEvent::Gossipsub(gossipsub::Event::Message {
@@ -81,12 +82,22 @@ impl NetworkTask<Behaviour, Context> for ListenGossipTask {
 	}
 }
 
+#[derive(Debug, thiserror::Error, derive_more::From)]
+pub enum PublishGossipTaskError {
+	#[error("Canceled")]
+	Canceled,
+	#[error("Network error")]
+	Network(NetworkError),
+	#[error("Gossip error")]
+	Gossip(gossipsub::PublishError),
+}
+
 #[derive(Debug)]
 pub struct PublishGossipTask {
 	payload: Option<(
 		gossipsub::TopicHash,
 		Vec<u8>,
-		tokio::sync::oneshot::Sender<Result<gossipsub::MessageId, anyhow::Error>>,
+		tokio::sync::oneshot::Sender<Result<gossipsub::MessageId, gossipsub::PublishError>>,
 	)>,
 }
 impl PublishGossipTask {
@@ -94,18 +105,18 @@ impl PublishGossipTask {
 		spawner: CoNetworkTaskSpawner,
 		topic: gossipsub::TopicHash,
 		message: Vec<u8>,
-	) -> Result<gossipsub::MessageId, anyhow::Error> {
+	) -> Result<gossipsub::MessageId, PublishGossipTaskError> {
 		let (tx, rx) = tokio::sync::oneshot::channel();
 		let task = Self { payload: Some((topic, message, tx)) };
 		spawner.spawn(task)?;
-		rx.await?
+		Ok(rx.await.map_err(|_| PublishGossipTaskError::Canceled)??)
 	}
 }
-impl NetworkTask<Behaviour, Context> for PublishGossipTask {
-	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
+impl NetworkTask<Behaviour> for PublishGossipTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>) {
 		if let Some((topic, message, result)) = take(&mut self.payload) {
 			let publish_result = swarm.behaviour_mut().gossipsub.publish(topic, message);
-			result.send(publish_result.map_err(anyhow::Error::from)).ok();
+			result.send(publish_result).ok();
 		}
 	}
 }
@@ -123,8 +134,8 @@ impl SubscribeGossipTask {
 		rx.await?
 	}
 }
-impl NetworkTask<Behaviour, Context> for SubscribeGossipTask {
-	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
+impl NetworkTask<Behaviour> for SubscribeGossipTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>) {
 		if let Some(result) = take(&mut self.result) {
 			let subscribe_result = swarm.behaviour_mut().gossipsub.subscribe(&self.topic);
 			result.send(subscribe_result.map_err(anyhow::Error::from)).ok();
@@ -148,11 +159,37 @@ impl UnsubscribeGossipTask {
 		rx.await?
 	}
 }
-impl NetworkTask<Behaviour, Context> for UnsubscribeGossipTask {
-	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
+impl NetworkTask<Behaviour> for UnsubscribeGossipTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>) {
 		if let Some(result) = take(&mut self.result) {
 			let unsubscribe_result = swarm.behaviour_mut().gossipsub.unsubscribe(&self.topic);
 			result.send(Ok(unsubscribe_result)).ok();
+		}
+	}
+}
+
+/// Query mesh peers for a gossipsub topic.
+#[derive(Debug)]
+pub struct MeshPeersNetworkTask {
+	topic: gossipsub::TopicHash,
+	result: Option<tokio::sync::oneshot::Sender<Vec<PeerId>>>,
+}
+impl MeshPeersNetworkTask {
+	pub async fn mesh_peers(
+		spawner: &CoNetworkTaskSpawner,
+		topic: gossipsub::TopicHash,
+	) -> Result<Vec<PeerId>, anyhow::Error> {
+		let (tx, rx) = tokio::sync::oneshot::channel();
+		let task = Self { topic, result: Some(tx) };
+		spawner.spawn(task)?;
+		Ok(rx.await?)
+	}
+}
+impl NetworkTask<Behaviour> for MeshPeersNetworkTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>) {
+		if let Some(result) = take(&mut self.result) {
+			let peers: Vec<PeerId> = swarm.behaviour().gossipsub.mesh_peers(&self.topic).copied().collect();
+			result.send(peers).ok();
 		}
 	}
 }

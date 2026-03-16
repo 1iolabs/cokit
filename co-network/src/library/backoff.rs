@@ -7,7 +7,7 @@ use rand::Rng;
 use std::time::Duration;
 
 pub fn backoff(retry: u32) -> Duration {
-	let base = Duration::from_secs(3000);
+	let base = Duration::from_secs(3);
 	let max = Duration::from_secs(60);
 	let backoff = base * 2u32.pow(retry.min(10)); // cap to avoid overflow
 	std::cmp::min(backoff, max)

@@ -5,7 +5,7 @@
 
 use crate::{
 	backoff,
-	network::{Behaviour, Context, NetworkEvent},
+	network::{Behaviour, NetworkEvent},
 	types::network_task::{NetworkTask, NetworkTaskState},
 };
 use co_actor::time::Instant;
@@ -25,8 +25,8 @@ impl RelayListenTask {
 		Self { relay, listener_id: None, backoff_retry: 0, backoff_until: None }
 	}
 }
-impl NetworkTask<Behaviour, Context> for RelayListenTask {
-	fn execute(&mut self, swarm: &mut Swarm<Behaviour>, _context: &mut Context) {
+impl NetworkTask<Behaviour> for RelayListenTask {
+	fn execute(&mut self, swarm: &mut Swarm<Behaviour>) {
 		let listen_addr = self.relay.clone().with(Protocol::P2pCircuit);
 		let result = swarm.listen_on(listen_addr.clone());
 		tracing::trace!(?result, ?listen_addr, "network-relay-listen");
@@ -36,7 +36,7 @@ impl NetworkTask<Behaviour, Context> for RelayListenTask {
 	fn on_swarm_event(
 		&mut self,
 		_swarm: &mut Swarm<Behaviour>,
-		_context: &mut Context,
+
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
 		// event
