@@ -47,9 +47,6 @@ use std::{
 	sync::Arc,
 	time::Duration,
 };
-use tokio::sync::watch;
-#[cfg(feature = "js")]
-use tokio_with_wasm::alias as tokio;
 
 /// Shared CO Builder.
 /// The Shared CO state is stored in a membership of an other CO (typically the Local CO).
@@ -269,9 +266,6 @@ impl SharedCoBuilder {
 		// reducer
 		let reducer = reducer_builder.build(&co_storage, runtime.runtime(), date).await?;
 
-		// setup context reducer state watcher
-		context.reducer_state = Some(reducer.watch());
-
 		// setup auto write to parent co
 		let membership_writer = MembershipWriter::new(
 			self.membership.id.clone(),
@@ -483,14 +477,6 @@ struct SharedContext {
 	/// # Layers
 	/// `BASE + NETWORK + ENCRYPTION`
 	network_storage: CoStorage,
-
-	/// Reducer state watcher.
-	///
-	/// Sometimes we need the reducer state from inside of the reducer and can not wait  for queued actor messages.
-	/// One example for this is when a internal asks for a block on network.
-	/// In this case we need the latest network settings from the CO while the reducer is blocked.
-	/// Otherwise this would deadlock.
-	reducer_state: Option<watch::Receiver<Option<(Cid, BTreeSet<Cid>)>>>,
 }
 impl SharedContext {
 	/// Update `co` membership if necessary.
@@ -569,14 +555,6 @@ impl CoReducerContext for SharedContext {
 			CoReducerFeature::Encryption => self.encrypted_storage.is_some(),
 			_ => false,
 		}
-	}
-
-	fn last_reducer_state(&self) -> Option<CoReducerState> {
-		self.reducer_state
-			.as_ref()?
-			.borrow()
-			.clone()
-			.map(|(state, heads)| CoReducerState::new(Some(state), heads))
 	}
 }
 

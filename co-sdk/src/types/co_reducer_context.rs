@@ -3,7 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{CoReducer, CoReducerState, CoStorage};
+use crate::{CoReducer, CoStorage};
 use async_trait::async_trait;
 use std::{borrow::Cow, fmt::Debug, sync::Arc};
 
@@ -28,11 +28,6 @@ pub trait CoReducerContext: Debug {
 	/// - `network` - Networking is enabled.
 	/// - `encryption` - Storage encryption is enabled.
 	fn has_feature(&self, feature: &CoReducerFeature<'_>) -> bool;
-
-	/// Get last known reducer state.
-	/// This will not block as [`crate::CoReducer::reducer_state`] and return the latest
-	/// known reducer state immediately. However this state is may be stale.
-	fn last_reducer_state(&self) -> Option<CoReducerState>;
 }
 
 pub type CoReducerContextRef = Arc<dyn CoReducerContext + Send + Sync + 'static>;

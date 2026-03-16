@@ -46,10 +46,7 @@ use co_storage::{
 };
 use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
 use std::{collections::BTreeSet, fmt::Debug, sync::Arc};
-use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
-#[cfg(feature = "js")]
-use tokio_with_wasm::alias as tokio;
 
 pub const CO_ID_LOCAL: &str = "local";
 
@@ -171,7 +168,6 @@ struct LocalCoInstance<L> {
 	storage: CoStorage,
 	encrypted_storage: Option<EncryptedBlockStorage<CoStorage>>,
 	locals: L,
-	reducer_state: Option<watch::Receiver<Option<(Cid, BTreeSet<Cid>)>>>,
 	#[cfg(feature = "pinning")]
 	pinning: (CoReducerState, crate::library::storage_pinning::StoragePinningContext),
 }
@@ -217,11 +213,10 @@ where
 		};
 
 		// result
-		let mut result = Self {
+		let result = Self {
 			locals: locals.clone(),
 			storage: base_storage,
 			encrypted_storage: encrypted_storage.clone(),
-			reducer_state: None, // initalize later
 			#[cfg(feature = "pinning")]
 			pinning: (Default::default(), pinning),
 		};
@@ -257,9 +252,6 @@ where
 		// create reducer
 		let reducer = reducer_builder.build(&storage, runtime.runtime(), date).await?;
 		let initial = reducer.is_empty();
-
-		// watch
-		result.reducer_state = Some(reducer.watch());
 
 		// flush
 		let flush = result.clone();
@@ -444,14 +436,6 @@ where
 			_ => false,
 		}
 	}
-
-	fn last_reducer_state(&self) -> Option<CoReducerState> {
-		self.reducer_state
-			.as_ref()?
-			.borrow()
-			.clone()
-			.map(|(state, heads)| CoReducerState::new(Some(state), heads))
-	}
 }
 #[async_trait]
 impl<L, S, R> ReducerFlush<S, R> for LocalCoInstance<L>
@@ -470,7 +454,7 @@ where
 	///
 	/// # Pinning
 	/// We need to write intermediate states/heads to in order to have them recycled eventually.
-	/// When we rect this point they already has been flushed to the permananet storage.
+	/// When we rect this point they already has been flushed to the permanent storage.
 	async fn flush(
 		&mut self,
 		storage: &S,
