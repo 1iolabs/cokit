@@ -470,7 +470,7 @@ where
 	///
 	/// # Pinning
 	/// We need to write intermediate states/heads to in order to have them recycled eventually.
-	/// When we rect this point they alredy has been flushed to the permananet storage.
+	/// When we rect this point they already has been flushed to the permananet storage.
 	async fn flush(
 		&mut self,
 		storage: &S,
@@ -487,7 +487,7 @@ where
 			let (last_reducer_state, context) = &self.pinning;
 
 			// add last state from disk
-			//  we add the lastest state (from disk) as first root
+			//  we add the latest state (from disk) as first root
 			//  this contains the pinnings (state updates below) from the last time
 			//  we need this to have a full history of heads
 			//  TODO: do we need to add intermediate heads from below (or encapsulate them into one transaction)?

@@ -566,7 +566,7 @@ where
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, storage))]
 	async fn on_state_changed(&mut self, storage: &S, context: &ReducerChangeContext) -> Result<(), LogError> {
 		// handlers
-		//  run sequencial in same order to not have non deterministic results
+		//  run sequential in same order to not have non deterministic results
 		let mut change_handlers = Vec::new();
 		swap(&mut change_handlers, &mut self.change_handlers);
 		let mut last_result: Result<(), anyhow::Error> = Ok(());

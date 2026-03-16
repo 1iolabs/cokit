@@ -81,8 +81,8 @@ impl NetworkResolver for CoNetworkResolver {
 					// - or participant networks if CO networks are empty
 					// - or invite metadata if the previous fail (because the block is not loaded yet)
 					//
-					// note: we use last_reducer_state as we may get called from within the actor
-					if let Some(reducer_state) = reducer.context.last_reducer_state() {
+					// note: we use reducer_cache reducer_state as we may get called from within the actor
+					if let Some(reducer_state) = reducer.reducer_cache().reducer_state() {
 						match networks_co(&self.context, storage, &reducer_state).await {
 							Ok(networks) => {
 								return Ok(networks);

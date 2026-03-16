@@ -8,6 +8,7 @@ use crate::{
 	application::memory::create_memory_reducer,
 	library::create_reducer_action::{create_reducer_action, store_reducer_action},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
+	services::reducer::actor::ReducerCache,
 	types::{co_dispatch::CoDispatch, co_reducer_context::CoReducerContextRef, co_reducer_state::CoReducerState},
 	ApplicationMessage, CoStorage, Reducer, Runtime, Storage,
 };
@@ -42,6 +43,7 @@ pub struct CoReducer {
 	runtime: Runtime,
 	core_resolver: DynamicCoreResolver<CoStorage>,
 	verify_links: Option<BlockLinks>,
+	reducer_cache: ReducerCache,
 }
 impl CoReducer {
 	#[allow(clippy::too_many_arguments)]
@@ -61,11 +63,12 @@ impl CoReducer {
 		let date = reducer.date().clone();
 		let core_resolver = reducer.core_resolver().clone();
 		let storage = Self::create_storage(&verify_links, &context.storage(false));
+		let reducer_cache = ReducerCache::default();
 		let actor = Actor::spawn_with(
 			tasks.clone(),
 			tags!("application": application_identifier, "co": id.as_str()),
 			ReducerActor::new(id.clone(), runtime.clone(), application_handle, context.clone()),
-			(initialize, storage.clone(), reducer, flush),
+			(initialize, storage.clone(), reducer, flush, reducer_cache.clone()),
 		)?;
 		Ok(Self {
 			id,
@@ -78,7 +81,13 @@ impl CoReducer {
 			runtime,
 			core_resolver,
 			verify_links,
+			reducer_cache,
 		})
+	}
+
+	/// Cache for latest values.
+	pub(crate) fn reducer_cache(&self) -> &ReducerCache {
+		&self.reducer_cache
 	}
 
 	/// Test if reducer is running.
@@ -116,6 +125,7 @@ impl CoReducer {
 			storage,
 			overlay_storage,
 			verify_links: self.verify_links.clone(),
+			reducer_cache: self.reducer_cache.clone(),
 		}
 	}
 
@@ -128,7 +138,7 @@ impl CoReducer {
 		self
 	}
 
-	/// Create the actural storage instance.
+	/// Create the actual storage instance.
 	fn create_storage<S>(verify_links: &Option<BlockLinks>, storage: &S) -> CoStorage
 	where
 		S: BlockStorage + ExtendedBlockStorage + BlockStorageContentMapping + CloneWithBlockStorageSettings + 'static,

@@ -196,7 +196,7 @@ impl SharedCoBuilder {
 		};
 
 		// context
-		let mut context = SharedContext {
+		let context = SharedContext {
 			storage: match &encrypted_storage {
 				Some(storage) => storage.storage().clone(),
 				None => storage.storage().clone(),
@@ -204,7 +204,6 @@ impl SharedCoBuilder {
 			encrypted_storage: encrypted_storage.clone(),
 			network_storage,
 			id: self.membership.id.clone(),
-			reducer_state: None,
 		};
 		let co_storage = context.storage(false);
 

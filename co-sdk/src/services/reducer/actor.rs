@@ -28,7 +28,11 @@ use co_storage::{BlockStorageContentMapping, BlockStorageExt, OverlayBlockStorag
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use indexmap::IndexSet;
 use ipld_core::ipld::Ipld;
-use std::{collections::BTreeSet, mem::take};
+use std::{
+	collections::BTreeSet,
+	mem::take,
+	sync::{Arc, Mutex},
+};
 
 pub struct ReducerActor {
 	id: CoId,
@@ -50,18 +54,20 @@ impl ReducerActor {
 impl Actor for ReducerActor {
 	type Message = ReducerMessage;
 	type State = ReducerState;
-	type Initialize = (bool, CoStorage, Reducer<CoStorage, DynamicCoreResolver<CoStorage>>, CoReducerFlush);
+	type Initialize =
+		(bool, CoStorage, Reducer<CoStorage, DynamicCoreResolver<CoStorage>>, CoReducerFlush, ReducerCache);
 
 	async fn initialize(
 		&self,
 		_handle: &ActorHandle<Self::Message>,
 		_tags: &Tags,
-		(initialize, storage, mut reducer, flush): Self::Initialize,
+		(initialize, storage, mut reducer, flush, reducer_cache): Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		// initialize
 		if initialize {
 			reducer.initialize(&storage, self.runtime.runtime()).await?;
 		}
+		reducer_cache.set_reducer_state(CoReducerState::new_reducer(&reducer));
 
 		// state
 		let state = ReducerState {
@@ -71,6 +77,7 @@ impl Actor for ReducerActor {
 			flush_roots: Default::default(),
 			network_feature: self.context.has_feature(&CoReducerFeature::Network),
 			state_streams: Default::default(),
+			reducer_cache: Default::default(),
 		};
 
 		// result
@@ -114,6 +121,25 @@ pub struct ReducerState {
 	flush_roots: IndexSet<CoReducerState>,
 	network_feature: bool,
 	state_streams: ResponseStreams<CoReducerState>,
+	reducer_cache: ReducerCache,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ReducerCache {
+	reducer_state: Arc<Mutex<Option<CoReducerState>>>,
+}
+impl ReducerCache {
+	pub fn set_reducer_state(&self, value: CoReducerState) {
+		*self.reducer_state.lock().unwrap() = Some(value);
+	}
+
+	/// Sometimes we need the reducer state from inside of the reducer and can not wait for queued actor messages.
+	/// One example for this is when a internal asks for a block on network.
+	/// In this case we need the latest network settings from the CO while the reducer is blocked.
+	/// Otherwise this would deadlock.
+	pub fn reducer_state(&self) -> Option<CoReducerState> {
+		self.reducer_state.lock().unwrap().clone()
+	}
 }
 
 fn changed(
@@ -161,6 +187,9 @@ async fn handle_push(
 	// flush
 	flush(actor, reducer_state, overlay_storage, &storage).await?;
 
+	// cache
+	reducer_state.reducer_cache.set_reducer_state(result_state.clone());
+
 	// reactive
 	actor.application_handle.dispatch(Action::CoreAction {
 		co: actor.id.clone(),
@@ -192,6 +221,11 @@ async fn handle_join_state(
 
 	// flush
 	flush(actor, reducer_state, overlay_storage, &storage).await?;
+
+	// cache
+	reducer_state
+		.reducer_cache
+		.set_reducer_state(CoReducerState::new_reducer(&reducer_state.reducer));
 
 	// reactive
 	//  walk all actions from previous state to new state and dispatch the actions
