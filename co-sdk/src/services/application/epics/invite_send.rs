@@ -5,7 +5,7 @@
 
 use crate::{
 	library::invite::{create_invite_message, CoInvitePayload},
-	services::application::action::{CoDidCommSendAction, NotifyAction},
+	services::application::action::{DidDidCommSendAction, NotifyAction},
 	state, Action, CoContext, CoNetwork, CoReducerFactory, CoStorage, KnownTag, CO_CORE_NAME_CO,
 };
 use anyhow::anyhow;
@@ -42,8 +42,9 @@ pub fn invite_send(
 					Some(
 						async move {
 							let (message_header, message, networks) = create_invite(&context, &co, &from, &to).await?;
-							Ok(Action::CoDidCommSend(CoDidCommSendAction {
-								co,
+							Ok(Action::DidDidCommSend(DidDidCommSendAction {
+								to: to.clone(),
+								co: Some(co),
 								networks,
 								notification: Some(NotifyAction::InviteSent { to }),
 								message_from: from,
@@ -64,7 +65,7 @@ pub fn invite_send(
 
 /// Dispatch InviteSent when message sent succeeded.
 ///
-/// In: [`Action::CoDidCommSent`]
+/// In: [`Action::DidDidCommSent`]
 /// Out: [`Action::InviteSent`]
 pub fn invite_sent(
 	_actions: &Actions<Action, (), CoContext>,
@@ -73,8 +74,8 @@ pub fn invite_sent(
 	_context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::CoDidCommSent {
-			message: CoDidCommSendAction { co, notification: Some(NotifyAction::InviteSent { to }), .. },
+		Action::DidDidCommSent {
+			message: DidDidCommSendAction { co: Some(co), notification: Some(NotifyAction::InviteSent { to }), .. },
 			result: Ok(peers),
 		} => peers
 			.first()

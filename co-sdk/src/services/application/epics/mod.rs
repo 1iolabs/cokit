@@ -11,6 +11,8 @@ use co_primitives::Tags;
 #[cfg(feature = "network")]
 mod co_didcomm_send;
 #[cfg(feature = "network")]
+mod did_didcomm_send;
+#[cfg(feature = "network")]
 mod co_heads_publish;
 #[cfg(feature = "network")]
 mod co_heads_subscribe;
@@ -96,6 +98,9 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(contact_send::contact_send)
 		.join(contact_receive::contact_receive)
 		.join(co_didcomm_send::co_didcomm_send)
+		.join(did_didcomm_send::did_didcomm_send)
+		.join(did_didcomm_send::did_didcomm_send_queue)
+		.join(did_didcomm_send::network_task_execute)
 		.join(network_queue::network_queue_message_epic)
 		.join(network_queue::network_started_epic)
 		.join(network_queue::NetworkQueueProcessEpic::default())
