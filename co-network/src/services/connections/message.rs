@@ -38,6 +38,12 @@ impl ConnectionMessage {
 		actor.stream(|response| Self::Use(action, response))
 	}
 
+	/// Use connections to a DID.
+	///
+	/// # Args
+	/// - `from` - The source of the connection attempt.
+	/// - `to` - The target of the connection attempt.
+	/// - `networks` - The networks to connect `to`. Required to be non empty.
 	pub fn did_use(
 		actor: ActorHandle<Self>,
 		from: Did,

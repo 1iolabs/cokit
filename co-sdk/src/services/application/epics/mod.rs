@@ -11,8 +11,6 @@ use co_primitives::Tags;
 #[cfg(feature = "network")]
 mod co_didcomm_send;
 #[cfg(feature = "network")]
-mod did_didcomm_send;
-#[cfg(feature = "network")]
 mod co_heads_publish;
 #[cfg(feature = "network")]
 mod co_heads_subscribe;
@@ -21,6 +19,8 @@ mod contact_receive;
 #[cfg(feature = "network")]
 mod contact_send;
 mod core_action_push;
+#[cfg(feature = "network")]
+mod did_didcomm_send;
 #[cfg(feature = "network")]
 mod did_subscribe;
 #[cfg(feature = "network")]

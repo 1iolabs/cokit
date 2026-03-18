@@ -4,9 +4,8 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	library::network_queue::TaskState,
-	services::application::action::DidDidCommSendAction,
-	Action, CoContext, CO_ID_LOCAL,
+	library::network_queue::TaskState, services::application::action::DidDidCommSendAction, Action, CoContext,
+	CO_ID_LOCAL,
 };
 use co_actor::{Actions, ActorHandle};
 use co_network::connections::ConnectionMessage;
@@ -115,8 +114,8 @@ pub fn network_task_execute(
 					};
 
 					// send
-					Either::Right(
-						did_didcomm_send_message(connections, actions, message).flat_map(move |item| match item {
+					Either::Right(did_didcomm_send_message(connections, actions, message).flat_map(move |item| {
+						match item {
 							Ok(Action::DidDidCommSent { message, result }) => {
 								let task_state = match &result {
 									Ok(peers) if peers.is_empty() => TaskState::Backlog,
@@ -133,8 +132,8 @@ pub fn network_task_execute(
 								])
 							},
 							item => stream::iter(vec![item]),
-						}),
-					)
+						}
+					}))
 				}
 				.into_stream()
 				.flatten(),
