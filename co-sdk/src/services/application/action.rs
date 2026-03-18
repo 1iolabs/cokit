@@ -454,33 +454,33 @@ pub struct CoDidCommSendAction {
 	pub message: EncodedMessage,
 }
 
-/// Send a DIDComm message to a specific DID's peers.
+/// Send a DIDComm message to a specific DID's.
 #[cfg(feature = "network")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DidDidCommSendAction {
-	/// target DID.
+	/// Target DID.
 	pub to: Did,
 
-	/// optional associated CO (for queue filtering).
+	/// Optional associated CO (for queue filtering).
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub co: Option<CoId>,
 
-	/// networks to use.
+	/// Networks to use.
 	pub networks: BTreeSet<Network>,
 
-	/// notification when sent.
+	/// Notification when sent.
 	pub notification: Option<NotifyAction>,
 
-	/// internal tracking tags.
+	/// Internal tracking tags.
 	pub tags: Tags,
 
-	/// message sender.
+	/// Message sender.
 	pub message_from: Did,
 
-	/// message header.
+	/// Message header.
 	pub message_header: DidCommHeader,
 
-	/// encoded message.
+	/// Encoded message.
 	pub message: EncodedMessage,
 }
 

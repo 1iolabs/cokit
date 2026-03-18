@@ -11,8 +11,6 @@ mod message;
 #[cfg(feature = "network")]
 pub use action::CoDidCommSendAction;
 #[cfg(feature = "network")]
-pub use action::DidDidCommSendAction;
-#[cfg(feature = "network")]
 pub use action::HeadsMessageReceivedAction;
 #[cfg(feature = "network")]
 pub use action::KeyRequestAction;
