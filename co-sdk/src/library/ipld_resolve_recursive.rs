@@ -34,9 +34,11 @@ pub async fn ipld_resolve_recursive(
 			Work::Resolve(ipld, link_depth) => {
 				nodes_processed += 1;
 				if nodes_processed > MAX_NODES {
-					anyhow::bail!(
-						"ipld_resolve_recursive: exceeded maximum node count ({MAX_NODES})"
+					tracing::warn!(
+						"ipld_resolve_recursive: exceeded maximum node count ({MAX_NODES}), returning as-is"
 					);
+					result_stack.push(ipld);
+					continue;
 				}
 
 				match ipld {
@@ -62,9 +64,9 @@ pub async fn ipld_resolve_recursive(
 					Ipld::Link(cid) => {
 						if MultiCodec::is_cbor(cid) {
 							if link_depth >= MAX_LINK_DEPTH {
-								anyhow::bail!(
-									"ipld_resolve_recursive: exceeded maximum link depth ({MAX_LINK_DEPTH}) at {cid}"
-								);
+								tracing::warn!(%cid, "ipld_resolve_recursive: exceeded maximum link depth ({MAX_LINK_DEPTH}), returning link as-is");
+								result_stack.push(Ipld::Link(cid));
+								continue;
 							}
 							match storage.get_deserialized::<Ipld>(&cid).await {
 								Ok(resolved) => {
