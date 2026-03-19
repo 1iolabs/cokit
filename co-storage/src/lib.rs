@@ -22,6 +22,8 @@ pub use library::unixfs_add_file::unixfs_add_file;
 pub use storage::fs::FsStorage;
 #[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
 pub use storage::indexeddb::IndexedDbBlockStorage;
+#[cfg(feature = "overlay")]
+pub use storage::overlay::{OverlayBlockStorage, OverlayChange, OverlayChangeReference};
 #[cfg(feature = "native")]
 pub use storage::sync::{SyncBlockStorage, SyncStorage};
 pub use storage::{
@@ -31,7 +33,6 @@ pub use storage::{
 	links::LinksBlockStorage,
 	mapped::MappedBlockStorage,
 	memory::{MemoryBlockStorage, MemoryStorage},
-	overlay::{OverlayBlockStorage, OverlayChange, OverlayChangeReference},
 	request,
 	static_storage::StaticBlockStorage,
 	store_params::StoreParamsBlockStorage,

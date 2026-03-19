@@ -3,6 +3,11 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+// fail with proper error message when try to us js for non wasm32
+#[cfg(all(feature = "js", not(target_arch = "wasm32"), not(clippy)))]
+compile_error!("feature \"js\" can only used for \"wasm32-unknown-unknown\" target");
+
+// modules
 mod application;
 mod library;
 mod pin;
@@ -11,6 +16,7 @@ mod services;
 pub mod state;
 mod types;
 
+// exports
 #[cfg(feature = "pinning")]
 pub use crate::library::{
 	storage_cleanup::storage_cleanup,

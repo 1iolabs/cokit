@@ -11,6 +11,7 @@ words = [
     "diddiscovery",
     "dioxus",
     "gossipsub",
+    "indexeddb",
     "jsc",
     "kad",
     "kademlia",

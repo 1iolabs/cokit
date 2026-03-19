@@ -13,6 +13,7 @@ cid = { workspace = true }
 co-api = { workspace = true }
 co-messaging = { workspace = true }
 co-primitives = { workspace = true }
+futures = { workspace = true }
 ipld-core = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -21,8 +22,8 @@ serde_repr = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-co-runtime = { workspace = true }
 co-storage = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "io-util"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
