@@ -6,7 +6,7 @@
 use super::message::NetworkMessage;
 use crate::{
 	bitswap::BitswapMessage,
-	network::{Libp2pNetwork, CO_AGENT},
+	network::{Libp2pNetwork, Libp2pNetworkContext, CO_AGENT},
 	services::{
 		connections::{Connections, ConnectionsContext, DynamicNetworkResolver},
 		discovery::{DiscoveryActor, DiscoveryApi, DiscoveryContext},
@@ -54,13 +54,15 @@ impl Actor for Network {
 
 		// network
 		let network = Libp2pNetwork::new(
-			initialize.identifier.clone(),
+			Libp2pNetworkContext {
+				identifier: initialize.identifier.clone(),
+				tasks: initialize.tasks.clone(),
+				resolver: initialize.identity_resolver.clone(),
+				private_resolver: initialize.private_identity_resolver.clone(),
+				bitswap: initialize.bitswap,
+			},
 			initialize.keypair.clone(),
 			initialize.settings.clone(),
-			initialize.tasks.clone(),
-			initialize.identity_resolver.clone(),
-			initialize.private_identity_resolver.clone(),
-			initialize.bitswap,
 		)
 		.await?;
 

@@ -3,7 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{from_cbor, to_cbor, Block, CborError, KnownMultiCodec, StoreParams};
+use crate::{from_cbor, to_cbor, Block, KnownMultiCodec, StoreParams};
 use cid::Cid;
 use serde::Serialize;
 
@@ -12,11 +12,11 @@ pub enum BlockSerializerError {
 	#[error("Block size {1} exceeds {0}.")]
 	BlockToLarge(usize, usize),
 
-	#[error("CBOR failed.")]
-	Cbor(#[from] CborError),
+	#[error("Serialize failed")]
+	Serialize(#[source] anyhow::Error),
 
 	#[error("Deserialize {0} as CBOR failed")]
-	CborDeserialize(Cid, #[source] CborError),
+	Deserialize(Cid, #[source] anyhow::Error),
 }
 
 /// DagCbor Block Serializer/Deserializer.
@@ -58,7 +58,7 @@ impl BlockSerializer {
 	where
 		T: Serialize,
 	{
-		let data = to_cbor(item)?;
+		let data = to_cbor(item).map_err(|err| BlockSerializerError::Serialize(err.into()))?;
 		if let Some(max_block_size) = self.max_block_size {
 			if max_block_size < data.len() {
 				return Err(BlockSerializerError::BlockToLarge(max_block_size, data.len()));
@@ -73,7 +73,7 @@ impl BlockSerializer {
 		T: serde::de::Deserialize<'a>,
 	{
 		// MultiCodec::with_cbor(item.cid())?;
-		from_cbor(item.data()).map_err(|err| BlockSerializerError::CborDeserialize(*item.cid(), err))
+		from_cbor(item.data()).map_err(|err| BlockSerializerError::Deserialize(*item.cid(), err.into()))
 	}
 }
 

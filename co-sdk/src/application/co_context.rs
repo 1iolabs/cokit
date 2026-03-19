@@ -41,7 +41,7 @@ use co_primitives::{
 	BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoId, Did, DynamicCoDate, IgnoreFilter,
 	Network,
 };
-use futures::{Stream, TryStreamExt};
+use futures::{FutureExt, Stream, TryStreamExt};
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	fmt::Debug,
@@ -433,6 +433,7 @@ impl CoContextInner {
 				},
 				&self.cores,
 			)
+			.boxed()
 			.await?;
 		Ok(local_co_reducer)
 	}

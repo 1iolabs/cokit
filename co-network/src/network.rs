@@ -15,7 +15,7 @@ use crate::{
 use anyhow::{anyhow, Context as _};
 use co_actor::{time, ActorHandle, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
-use futures::{pin_mut, Stream, StreamExt};
+use futures::{pin_mut, FutureExt, Stream, StreamExt};
 #[cfg(feature = "native")]
 use libp2p::mdns::{self, tokio::Behaviour as MdnsBehaviour};
 use libp2p::{
@@ -34,6 +34,14 @@ use tracing::{Instrument, Span};
 pub const CO_AGENT: &str = "co/0.1.0";
 pub const IPFS_IDENTIFY_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/id/1.0.0");
 
+pub struct Libp2pNetworkContext {
+	pub identifier: String,
+	pub tasks: TaskSpawner,
+	pub resolver: IdentityResolverBox,
+	pub private_resolver: PrivateIdentityResolverBox,
+	pub bitswap: ActorHandle<BitswapMessage>,
+}
+
 pub struct Libp2pNetwork {
 	shutdown: CancellationToken,
 	tasks: tokio::sync::mpsc::UnboundedSender<NetworkTaskBox<Behaviour>>,
@@ -41,186 +49,12 @@ pub struct Libp2pNetwork {
 impl Libp2pNetwork {
 	#[allow(clippy::too_many_arguments)]
 	pub async fn new(
-		identifier: String,
+		context: Libp2pNetworkContext,
 		keypair: Keypair,
 		config: NetworkSettings,
-		tasks: TaskSpawner,
-		resolver: IdentityResolverBox,
-		private_resolver: PrivateIdentityResolverBox,
-		bitswap: ActorHandle<BitswapMessage>,
 	) -> anyhow::Result<Libp2pNetwork> {
-		let resolver = IdentityResolverBox::new(resolver);
-		let private_resolver = PrivateIdentityResolverBox::new(private_resolver);
-		let local_peer_id = PeerId::from(keypair.public().clone());
-
-		// kad
-		// let kademlia_config: KademliaConfig = Default::default();
-		// let kad = kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()),
-		// kademlia_config);
-
-		// gossipsub
-		let gossipsub_config = gossipsub::ConfigBuilder::default()
-			.max_transmit_size(256 * 1024)
-			.build()
-			.expect("valid config");
-		let gossipsub =
-			gossipsub::Behaviour::new(gossipsub::MessageAuthenticity::Signed(keypair.clone()), gossipsub_config)
-				.map_err(|err| anyhow!("gossip failed: {}", err))?;
-
-		// bitswap
-		let bitswap = Bitswap::<libipld::DefaultParams>::new(Default::default(), BitswapStoreClient::new(bitswap), {
-			let bitswap_identifier = identifier.clone();
-			let tasks = tasks.clone();
-			Box::new(move |t| {
-				tasks.spawn(async move {
-					t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
-						.await
-				});
-			})
-		});
-
-		// relay
-		let relay_server = if config.relay {
-			let mut relay_config = relay::Config::default();
-			if let Some(bytes) = config.max_circuit_bytes {
-				relay_config.max_circuit_bytes = bytes;
-			}
-			if let Some(duration) = config.max_circuit_duration {
-				relay_config.max_circuit_duration = duration;
-			}
-			Some(libp2p::relay::Behaviour::new(local_peer_id, relay_config))
-		} else {
-			None
-		}
-		.into();
-
-		// identify
-		let identify_config = identify::Config::new(IPFS_IDENTIFY_PROTOCOL_NAME.to_string(), keypair.public())
-			.with_agent_version(CO_AGENT.into());
-		let identify = identify::Behaviour::new(identify_config);
-
-		// mdns
-		#[cfg(feature = "native")]
-		let mdns: Toggle<MdnsBehaviour> =
-			if config.mdns { Some(MdnsBehaviour::new(mdns::Config::default(), local_peer_id)?) } else { None }.into();
-
-		// didcomm
-		let didcomm = didcomm::Behaviour::new(resolver.clone(), private_resolver, didcomm::Config { auto_dail: false });
-
-		// autonat
-		let autonat_server = if config.relay { Some(autonat::v2::server::Behaviour::new(OsRng)) } else { None }.into();
-		let autonat_client = if config.nat {
-			Some(autonat::v2::client::Behaviour::new(OsRng, autonat::v2::client::Config::default()))
-		} else {
-			None
-		}
-		.into();
-
-		// dcutr
-		let dcutr = if config.nat { Some(dcutr::Behaviour::new(local_peer_id)) } else { None }.into();
-
-		// behaviour
-		let mut behaviour = Behaviour {
-			identify,
-			ping: ping::Behaviour::new(ping::Config::new()),
-			#[cfg(feature = "native")]
-			mdns,
-			// kad,
-			bitswap,
-			gossipsub,
-			didcomm,
-			dcutr,
-			relay_server,
-			relay_client: None.into(),
-			autonat_server,
-			autonat_client,
-		};
-
-		// swarm helper
-		macro_rules! build_swarm {
-			(@finalize $builder:expr) => {
-				if config.nat {
-					$builder
-						.with_relay_client(noise::Config::new, yamux::Config::default)?
-						.with_behaviour(move |_keypair, relay_client| {
-							behaviour.relay_client = Some(relay_client).into();
-							behaviour
-						})
-						.context("behaviour")?
-						.with_swarm_config(|c| c.with_idle_connection_timeout(config.keep_alive))
-						.build()
-				} else {
-					$builder
-						.with_behaviour(move |_keypair| behaviour)?
-						.with_swarm_config(|c| c.with_idle_connection_timeout(config.keep_alive))
-						.build()
-				}
-			};
-			(@websocket $builder:expr) => {
-				if config.websocket {
-					let b = $builder
-						.with_websocket(noise::Config::new, yamux::Config::default)
-						.await
-						.context("websocket")?;
-					build_swarm!(@finalize b)
-				} else {
-					build_swarm!(@finalize $builder)
-				}
-			};
-			($builder:expr) => {
-				match config.dns {
-					NetworkDns::None => {
-						let b = $builder.with_dns_config(
-							libp2p::dns::ResolverConfig::new(),
-							libp2p::dns::ResolverOpts::default(),
-						);
-						build_swarm!(@websocket b)
-					}
-					NetworkDns::System => {
-						let b = $builder.with_dns().context("dns")?;
-						build_swarm!(@websocket b)
-					}
-					NetworkDns::Cloudflare => {
-						let b = $builder.with_dns_config(
-							libp2p::dns::ResolverConfig::cloudflare(),
-							libp2p::dns::ResolverOpts::default(),
-						);
-						build_swarm!(@websocket b)
-					}
-				}
-			};
-		}
-
-		// swarm: native
-		#[cfg(feature = "native")]
-		let mut swarm = {
-			let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
-				.with_tokio()
-				.with_tcp(libp2p::tcp::Config::default(), noise::Config::new, yamux::Config::default)
-				.context("tcp")?
-				.with_quic();
-			build_swarm!(swarm_builder)
-		};
-
-		// swarm: webrtc
-		#[cfg(all(feature = "js", target_arch = "wasm32"))]
-		let mut swarm = {
-			use libp2p::core::{upgrade::Version, Transport};
-			let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
-				.with_wasm_bindgen()
-				.with_other_transport(|keypair| {
-					Ok(libp2p::websocket_websys::Transport::default()
-						.upgrade(Version::V1Lazy)
-						.authenticate(noise::Config::new(&keypair).expect("noise config"))
-						.multiplex(yamux::Config::default())
-						.boxed())
-				})
-				.context("webrtc")?
-				.with_other_transport(|keypair| {
-					libp2p::webrtc_websys::Transport::new(libp2p::webrtc_websys::Config::new(&keypair))
-				})?;
-			build_swarm!(@finalize swarm_builder)
-		};
+		// swarm
+		let (local_peer_id, mut swarm) = build_swarm(&context, &keypair, &config).boxed().await?;
 
 		// external addresses
 		for external_address in config.external_addresses.iter() {
@@ -268,9 +102,9 @@ impl Libp2pNetwork {
 		};
 
 		// run
-		tasks.spawn(async move {
-			run(swarm, runtime, tokio_stream::wrappers::UnboundedReceiverStream::new(tasks_rx))
-				.instrument(tracing::trace_span!("network", application = identifier))
+		context.tasks.spawn(async move {
+			run(&mut swarm, runtime, tokio_stream::wrappers::UnboundedReceiverStream::new(tasks_rx))
+				.instrument(tracing::trace_span!("network", application = context.identifier))
 				.await;
 		});
 
@@ -287,6 +121,210 @@ impl Libp2pNetwork {
 	pub fn shutdown(&self) -> Shutdown {
 		Shutdown { shutdown: self.shutdown.clone() }
 	}
+}
+
+/// Build swarm.
+///
+/// # Clippy
+/// - `clippy::large_stack_frames`: Building the swam is large on stack therefore we return it boxed and call this
+///   function boxed.
+#[allow(clippy::large_stack_frames)]
+async fn build_swarm(
+	context: &Libp2pNetworkContext,
+	keypair: &Keypair,
+	config: &NetworkSettings,
+) -> Result<(PeerId, Box<Swarm<Behaviour>>), anyhow::Error> {
+	let local_peer_id = PeerId::from(keypair.public().clone());
+
+	// behaviour
+	let mut behaviour = build_behaviour(context, keypair, config, local_peer_id)?;
+
+	// swarm helper
+	macro_rules! build_swarm {
+		(@finalize $builder:expr) => {
+			if config.nat {
+				$builder
+					.with_relay_client(noise::Config::new, yamux::Config::default)?
+					.with_behaviour(move |_keypair, relay_client| {
+						behaviour.relay_client = Some(relay_client).into();
+						behaviour
+					})
+					.context("behaviour")?
+					.with_swarm_config(|c| c.with_idle_connection_timeout(config.keep_alive))
+					.build()
+			} else {
+				$builder
+					.with_behaviour(move |_keypair| behaviour)?
+					.with_swarm_config(|c| c.with_idle_connection_timeout(config.keep_alive))
+					.build()
+			}
+		};
+		(@websocket $builder:expr) => {
+			if config.websocket {
+				let b = $builder
+					.with_websocket(noise::Config::new, yamux::Config::default)
+					.await
+					.context("websocket")?;
+				build_swarm!(@finalize b)
+			} else {
+				build_swarm!(@finalize $builder)
+			}
+		};
+		($builder:expr) => {
+			match config.dns {
+				NetworkDns::None => {
+					let b = $builder.with_dns_config(
+						libp2p::dns::ResolverConfig::new(),
+						libp2p::dns::ResolverOpts::default(),
+					);
+					build_swarm!(@websocket b)
+				}
+				NetworkDns::System => {
+					let b = $builder.with_dns().context("dns")?;
+					build_swarm!(@websocket b)
+				}
+				NetworkDns::Cloudflare => {
+					let b = $builder.with_dns_config(
+						libp2p::dns::ResolverConfig::cloudflare(),
+						libp2p::dns::ResolverOpts::default(),
+					);
+					build_swarm!(@websocket b)
+				}
+			}
+		};
+	}
+
+	// swarm: native
+	#[cfg(feature = "native")]
+	let swarm = {
+		let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
+			.with_tokio()
+			.with_tcp(libp2p::tcp::Config::default(), noise::Config::new, yamux::Config::default)
+			.context("tcp")?
+			.with_quic();
+		build_swarm!(swarm_builder)
+	};
+
+	// swarm: webrtc
+	#[cfg(all(feature = "js", target_arch = "wasm32"))]
+	let swarm = {
+		use libp2p::core::{upgrade::Version, Transport};
+		let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
+			.with_wasm_bindgen()
+			.with_other_transport(|keypair| {
+				Ok(libp2p::websocket_websys::Transport::default()
+					.upgrade(Version::V1Lazy)
+					.authenticate(noise::Config::new(&keypair).expect("noise config"))
+					.multiplex(yamux::Config::default())
+					.boxed())
+			})
+			.context("webrtc")?
+			.with_other_transport(|keypair| {
+				libp2p::webrtc_websys::Transport::new(libp2p::webrtc_websys::Config::new(&keypair))
+			})?;
+		build_swarm!(@finalize swarm_builder)
+	};
+
+	// result
+	Ok((local_peer_id, Box::new(swarm)))
+}
+
+fn build_behaviour(
+	context: &Libp2pNetworkContext,
+	keypair: &Keypair,
+	config: &NetworkSettings,
+	local_peer_id: PeerId,
+) -> Result<Behaviour, anyhow::Error> {
+	// kad
+	// let kademlia_config: KademliaConfig = Default::default();
+	// let kad = kad: Kademlia::with_config(local_peer_id.clone(), MemoryStore::new(local_peer_id.clone()),
+	// kademlia_config);
+
+	// gossipsub
+	let gossipsub_config = gossipsub::ConfigBuilder::default()
+		.max_transmit_size(256 * 1024)
+		.build()
+		.expect("valid config");
+	let gossipsub =
+		gossipsub::Behaviour::new(gossipsub::MessageAuthenticity::Signed(keypair.clone()), gossipsub_config)
+			.map_err(|err| anyhow!("gossip failed: {}", err))?;
+
+	// bitswap
+	let bitswap =
+		Bitswap::<libipld::DefaultParams>::new(Default::default(), BitswapStoreClient::new(context.bitswap.clone()), {
+			let bitswap_identifier = context.identifier.to_owned();
+			let tasks = context.tasks.clone();
+			Box::new(move |t| {
+				tasks.spawn(async move {
+					t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
+						.await
+				});
+			})
+		});
+
+	// relay
+	let relay_server = if config.relay {
+		let mut relay_config = relay::Config::default();
+		if let Some(bytes) = config.max_circuit_bytes {
+			relay_config.max_circuit_bytes = bytes;
+		}
+		if let Some(duration) = config.max_circuit_duration {
+			relay_config.max_circuit_duration = duration;
+		}
+		Some(libp2p::relay::Behaviour::new(local_peer_id, relay_config))
+	} else {
+		None
+	}
+	.into();
+
+	// identify
+	let identify_config = identify::Config::new(IPFS_IDENTIFY_PROTOCOL_NAME.to_string(), keypair.public())
+		.with_agent_version(CO_AGENT.into());
+	let identify = identify::Behaviour::new(identify_config);
+
+	// mdns
+	#[cfg(feature = "native")]
+	let mdns: Toggle<MdnsBehaviour> =
+		if config.mdns { Some(MdnsBehaviour::new(mdns::Config::default(), local_peer_id)?) } else { None }.into();
+
+	// didcomm
+	let didcomm = didcomm::Behaviour::new(
+		context.resolver.clone(),
+		context.private_resolver.clone(),
+		didcomm::Config { auto_dail: false },
+	);
+
+	// autonat
+	let autonat_server = if config.relay { Some(autonat::v2::server::Behaviour::new(OsRng)) } else { None }.into();
+	let autonat_client = if config.nat {
+		Some(autonat::v2::client::Behaviour::new(OsRng, autonat::v2::client::Config::default()))
+	} else {
+		None
+	}
+	.into();
+
+	// dcutr
+	let dcutr = if config.nat { Some(dcutr::Behaviour::new(local_peer_id)) } else { None }.into();
+
+	// behaviour
+	let behaviour = Behaviour {
+		identify,
+		ping: ping::Behaviour::new(ping::Config::new()),
+		#[cfg(feature = "native")]
+		mdns,
+		// kad,
+		bitswap,
+		gossipsub,
+		didcomm,
+		dcutr,
+		relay_server,
+		relay_client: None.into(),
+		autonat_server,
+		autonat_client,
+	};
+
+	// result
+	Ok(behaviour)
 }
 impl Drop for Libp2pNetwork {
 	fn drop(&mut self) {
@@ -363,7 +401,7 @@ pub struct Behaviour {
 
 pub type NetworkEvent = BehaviourEvent;
 
-async fn run(mut swarm: Swarm<Behaviour>, mut runtime: Runtime, tasks: impl Stream<Item = NetworkTaskBox<Behaviour>>) {
+async fn run(swarm: &mut Swarm<Behaviour>, mut runtime: Runtime, tasks: impl Stream<Item = NetworkTaskBox<Behaviour>>) {
 	// log
 	tracing::info!("network-running");
 
@@ -379,7 +417,7 @@ async fn run(mut swarm: Swarm<Behaviour>, mut runtime: Runtime, tasks: impl Stre
 			biased;
 
 			// events
-			_ = run_once(&mut swarm, &mut runtime) => {}
+			_ = run_once(swarm, &mut runtime) => {}
 
 			// tasks
 			Some(mut task) = tasks.next(), if !tasks.is_done() => {
@@ -387,7 +425,7 @@ async fn run(mut swarm: Swarm<Behaviour>, mut runtime: Runtime, tasks: impl Stre
 
 				// execute
 				let task_state = task_span.in_scope(|| {
-					task.execute(&mut swarm);
+					task.execute(swarm);
 					task.task_state()
 				});
 
