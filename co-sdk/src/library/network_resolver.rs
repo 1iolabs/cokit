@@ -35,7 +35,7 @@ impl NetworkResolver for CoNetworkResolver {
 	/// The reducer is may working internally in the actor when a push or something is ongoing.
 	/// This means we could not ask for current reducer_state as this will be queued until the push is done.
 	/// This means we can not fetch the network settings from the reducer while it is working and would deadlock.
-	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
+	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip_all, fields(co = ?id))]
 	async fn networks(&self, id: CoId) -> Result<BTreeSet<Network>, anyhow::Error> {
 		// check membership to know if we can read networks from co
 		// Note: find membership assumes that its local maybe change that later.
@@ -83,6 +83,7 @@ impl NetworkResolver for CoNetworkResolver {
 					//
 					// note: we use reducer_cache reducer_state as we may get called from within the actor
 					if let Some(reducer_state) = reducer.reducer_cache().reducer_state() {
+						tracing::trace!(co = ?id, ?reducer_state, "co-resolve-networks-co");
 						match networks_co(&self.context, storage, &reducer_state).await {
 							Ok(networks) => {
 								return Ok(networks);

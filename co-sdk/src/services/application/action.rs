@@ -134,6 +134,21 @@ pub enum Action {
 		result: Result<BTreeSet<PeerId>, ActionError>,
 	},
 
+	/// Send a DIDComm message to a specific DID's peers.
+	#[cfg(feature = "network")]
+	DidDidCommSend(DidDidCommSendAction),
+
+	/// DID-targeted DIDComm message send result.
+	/// Emitted once per [`Action::DidDidCommSend`].
+	#[cfg(feature = "network")]
+	DidDidCommSent {
+		/// The message.
+		message: DidDidCommSendAction,
+		/// Peers the message has sent to or error.
+		/// If the peers list is empty no peer could be connected.
+		result: Result<BTreeSet<PeerId>, ActionError>,
+	},
+
 	/// Staged changes to a CO has been flushed.
 	CoFlush {
 		/// The flushed CO.
@@ -436,6 +451,36 @@ pub struct CoDidCommSendAction {
 	pub message_header: DidCommHeader,
 
 	/// The message.
+	pub message: EncodedMessage,
+}
+
+/// Send a DIDComm message to a specific DID's.
+#[cfg(feature = "network")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DidDidCommSendAction {
+	/// Target DID.
+	pub to: Did,
+
+	/// Optional associated CO (for queue filtering).
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub co: Option<CoId>,
+
+	/// Networks to use.
+	pub networks: BTreeSet<Network>,
+
+	/// Notification when sent.
+	pub notification: Option<NotifyAction>,
+
+	/// Internal tracking tags.
+	pub tags: Tags,
+
+	/// Message sender.
+	pub message_from: Did,
+
+	/// Message header.
+	pub message_header: DidCommHeader,
+
+	/// Encoded message.
 	pub message: EncodedMessage,
 }
 

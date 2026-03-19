@@ -77,7 +77,7 @@ impl Actor for ReducerActor {
 			flush_roots: Default::default(),
 			network_feature: self.context.has_feature(&CoReducerFeature::Network),
 			state_streams: Default::default(),
-			reducer_cache: Default::default(),
+			reducer_cache,
 		};
 
 		// result
@@ -163,7 +163,7 @@ fn changed(
 }
 
 fn handle_state(state: &ReducerState) -> CoReducerState {
-	CoReducerState(*state.reducer.state(), state.reducer.heads().clone())
+	CoReducerState::new_reducer(&state.reducer)
 }
 
 async fn handle_push(
@@ -186,9 +186,6 @@ async fn handle_push(
 
 	// flush
 	flush(actor, reducer_state, overlay_storage, &storage).await?;
-
-	// cache
-	reducer_state.reducer_cache.set_reducer_state(result_state.clone());
 
 	// reactive
 	actor.application_handle.dispatch(Action::CoreAction {
@@ -221,11 +218,6 @@ async fn handle_join_state(
 
 	// flush
 	flush(actor, reducer_state, overlay_storage, &storage).await?;
-
-	// cache
-	reducer_state
-		.reducer_cache
-		.set_reducer_state(CoReducerState::new_reducer(&reducer_state.reducer));
 
 	// reactive
 	//  walk all actions from previous state to new state and dispatch the actions
@@ -342,6 +334,11 @@ async fn flush(
 				removed_blocks,
 			)
 			.await?;
+
+		// cache
+		reducer_state
+			.reducer_cache
+			.set_reducer_state(CoReducerState::new_reducer(&reducer_state.reducer));
 
 		// notify
 		actor

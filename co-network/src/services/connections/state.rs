@@ -218,7 +218,10 @@ fn reduce_use(
 	let mut networks = networks.clone();
 
 	// if no networks was specified we need to resolve them
-	let networks_resolve = networks.is_empty();
+	//  we always do this if none way specified as they may changed over time (new participants etc)
+	if create && networks.is_empty() {
+		actions.push(ConnectionAction::NetworkResolve(NetworkResolveAction { id: id.clone() }));
+	}
 
 	// use already connected peers
 	let mut connected_networks = HashMap::new();
@@ -250,6 +253,9 @@ fn reduce_use(
 		}
 	}
 
+	// snapshot peers before modifying CO networks (for correct PeersChanged diff)
+	let previous_co_peers = if !networks.is_empty() { Some(state.co_peers(id)) } else { None };
+
 	// co connections
 	match state.co.get_mut(id) {
 		Some(co_connection) => {
@@ -273,11 +279,6 @@ fn reduce_use(
 						networks: networks.clone(),
 					},
 				);
-
-				// resolve networks if not specified
-				if networks_resolve {
-					actions.push(ConnectionAction::NetworkResolve(NetworkResolveAction { id: id.clone() }));
-				}
 			} else {
 				networks.clear();
 			}
@@ -294,7 +295,7 @@ fn reduce_use(
 		};
 
 		// networks: get/create
-		reference_network_connection(state, actions, network, id, connected_peers, connect, time);
+		reference_network_connection(state, actions, network, id, connected_peers, connect, time, &previous_co_peers);
 	}
 }
 
@@ -534,7 +535,7 @@ fn reduce_peer_connection_established(
 	let network = Network::Peer(NetworkPeer { peer: peer_id.to_bytes(), addresses: Default::default() });
 	for co in cos {
 		if state.co.contains_key(&co) {
-			reference_network_connection(state, actions, &network, &co, [peer_id].into(), None, time);
+			reference_network_connection(state, actions, &network, &co, [peer_id].into(), None, time, &None);
 		}
 	}
 
@@ -646,7 +647,16 @@ fn reduce_peer_relate_did(
 			Default::default()
 		};
 		for co in cos {
-			reference_network_connection(state, actions, &network, &co, [action.peer_id].into(), None, &action.time);
+			reference_network_connection(
+				state,
+				actions,
+				&network,
+				&co,
+				[action.peer_id].into(),
+				None,
+				&action.time,
+				&None,
+			);
 		}
 	}
 }
@@ -676,7 +686,16 @@ fn reduce_peer_relate_co(
 		.map(|peer_connection| peer_connection.connected)
 		.unwrap_or(false);
 	if peer_connected {
-		reference_network_connection(state, actions, &network, &action.co, [action.peer_id].into(), None, &action.time);
+		reference_network_connection(
+			state,
+			actions,
+			&network,
+			&action.co,
+			[action.peer_id].into(),
+			None,
+			&action.time,
+			&None,
+		);
 	}
 }
 
@@ -929,6 +948,7 @@ fn peer_relate(
 
 /// Update/Create NetworkConnection and relate it with an Co.
 /// If the Co is not currently in use this does nothing.
+#[allow(clippy::too_many_arguments)]
 fn reference_network_connection(
 	state: &mut ConnectionState,
 	actions: &mut Vec<ConnectionAction>,
@@ -937,6 +957,7 @@ fn reference_network_connection(
 	connected_peers: BTreeSet<PeerId>,
 	connect: Option<Did>,
 	time: &Instant,
+	previous_co_peers: &Option<BTreeSet<PeerId>>,
 ) {
 	let co_has_network_reference = match state.co.get(co) {
 		Some(co_connection) => co_connection.networks.contains(network),
@@ -953,8 +974,9 @@ fn reference_network_connection(
 	};
 
 	// get current peers
+	//  use pre-computed snapshot from caller when available (taken before CO networks were modified)
 	let previous_co_peers = if !co_has_network_reference || !network_has_co_reference || !network_has_peer_references {
-		Some(state.co_peers(co))
+		Some(previous_co_peers.clone().unwrap_or_else(|| state.co_peers(co)))
 	} else {
 		None
 	};
