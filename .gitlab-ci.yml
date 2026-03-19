@@ -34,7 +34,7 @@ lint:
     <<: *global_cache
   script:
     - cargo +nightly-2025-12-09 fmt --check
-    - cargo clippy --workspace --all-targets --all-features -- -D warnings
+    - cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::large_stack_frames -W clippy::large_futures
 
 # check web build is working
 check:
@@ -53,7 +53,6 @@ test:
     <<: *global_cache
   variables:
     RUST_BACKTRACE: "full"
-    RUST_MIN_STACK: "33554432" # 32Mib
   script:
     - cargo test
   artifacts:

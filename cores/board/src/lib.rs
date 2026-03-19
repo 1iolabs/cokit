@@ -9,7 +9,7 @@ use co_api::{
 	async_api::Reducer, co_data, co_state, BlockStorage, BlockStorageExt, CoList, CoListIndex, CoMap, CoTryStreamExt,
 	CoreBlockStorage, IsDefault, LazyTransaction, Link, OptionLink, ReducerAction, Tags,
 };
-use futures::{pin_mut, TryStreamExt};
+use futures::{pin_mut, FutureExt, TryStreamExt};
 use std::future::ready;
 
 pub type ListName = String;
@@ -145,28 +145,40 @@ where
 
 	// reduce
 	match action {
-		BoardAction::BoardRename(name) => reduce_board_rename(state, name).await?,
-		BoardAction::BoardTagsInsert(tags) => reduce_board_tags_insert(state, tags).await?,
-		BoardAction::BoardTagsRemove(tags) => reduce_board_tags_remove(state, tags).await?,
-		BoardAction::ListCreate { list, after } => reduce_list_create(&mut transaction, list, after).await?,
-		BoardAction::ListArrange { name, after } => reduce_list_arrange(&mut transaction, name, after).await?,
+		BoardAction::BoardRename(name) => reduce_board_rename(state, name).boxed().await?,
+		BoardAction::BoardTagsInsert(tags) => reduce_board_tags_insert(state, tags).boxed().await?,
+		BoardAction::BoardTagsRemove(tags) => reduce_board_tags_remove(state, tags).boxed().await?,
+		BoardAction::ListCreate { list, after } => reduce_list_create(&mut transaction, list, after).boxed().await?,
+		BoardAction::ListArrange { name, after } => reduce_list_arrange(&mut transaction, name, after).boxed().await?,
 		BoardAction::ListDelete { name, move_tasks_to_list } => {
-			reduce_list_delete(&mut transaction, name, move_tasks_to_list).await?
+			reduce_list_delete(&mut transaction, name, move_tasks_to_list).boxed().await?
 		},
-		BoardAction::ListTagsInsert(name, tags) => reduce_list_tags_insert(&mut transaction, name, tags).await?,
-		BoardAction::ListTagsRemove(name, tags) => reduce_list_tags_remove(&mut transaction, name, tags).await?,
+		BoardAction::ListTagsInsert(name, tags) => {
+			reduce_list_tags_insert(&mut transaction, name, tags).boxed().await?
+		},
+		BoardAction::ListTagsRemove(name, tags) => {
+			reduce_list_tags_remove(&mut transaction, name, tags).boxed().await?
+		},
 		BoardAction::TaskCreate { list, task, after } => {
-			reduce_task_create(&mut transaction, list, task, after).await?
+			reduce_task_create(&mut transaction, list, task, after).boxed().await?
 		},
 		BoardAction::TaskMove { from_list, list, task, after, lock } => {
-			reduce_task_move(&mut transaction, from_list, list, task, after, lock).await?
+			reduce_task_move(&mut transaction, from_list, list, task, after, lock)
+				.boxed()
+				.await?
 		},
-		BoardAction::TaskArrange { task, after } => reduce_task_arrange(&mut transaction, task, after).await?,
-		BoardAction::TaskDelete(task) => reduce_task_delete(&mut transaction, task).await?,
-		BoardAction::TaskRename(task, name) => reduce_task_rename(&mut transaction, task, name).await?,
-		BoardAction::TaskPayloadChange(task, cid) => reduce_task_payload_change(&mut transaction, task, cid).await?,
-		BoardAction::TaskTagsInsert(task, tags) => reduce_task_tags_insert(&mut transaction, task, tags).await?,
-		BoardAction::TaskTagsRemove(task, tags) => reduce_task_tags_remove(&mut transaction, task, tags).await?,
+		BoardAction::TaskArrange { task, after } => reduce_task_arrange(&mut transaction, task, after).boxed().await?,
+		BoardAction::TaskDelete(task) => reduce_task_delete(&mut transaction, task).boxed().await?,
+		BoardAction::TaskRename(task, name) => reduce_task_rename(&mut transaction, task, name).boxed().await?,
+		BoardAction::TaskPayloadChange(task, cid) => {
+			reduce_task_payload_change(&mut transaction, task, cid).boxed().await?
+		},
+		BoardAction::TaskTagsInsert(task, tags) => {
+			reduce_task_tags_insert(&mut transaction, task, tags).boxed().await?
+		},
+		BoardAction::TaskTagsRemove(task, tags) => {
+			reduce_task_tags_remove(&mut transaction, task, tags).boxed().await?
+		},
 	}
 
 	// store

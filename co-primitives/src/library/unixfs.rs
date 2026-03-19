@@ -72,7 +72,7 @@ where
 {
 	let mut result = Vec::new();
 	let mut adder = FileAdder::default();
-	let mut buf = [0u8; 16384];
+	let mut buf = vec![0u8; 16384];
 	loop {
 		// read
 		let bytes = stream.read(&mut buf).await.map_err(|e| StorageError::Internal(e.into()))?;

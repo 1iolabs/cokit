@@ -9,7 +9,7 @@ use co_api::{
 	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoTryStreamExt, CoreBlockStorage, IsDefault,
 	LazyTransaction, Link, OptionLink, ReducerAction, TagValue, WeakCid,
 };
-use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+use futures::{pin_mut, FutureExt, Stream, StreamExt, TryStreamExt};
 use std::{
 	collections::{BTreeMap, BTreeSet},
 	future::ready,
@@ -301,9 +301,21 @@ where
 {
 	let mut transaction = Transaction::open(storage, state).await?;
 	match action {
-		RichTextAction::Insert(action) => reduce_text_insert(storage, state, &mut transaction, head, action).await?,
-		RichTextAction::Delete(action) => reduce_text_delete(storage, state, &mut transaction, head, action).await?,
-		RichTextAction::Format(action) => reduce_text_format(storage, state, &mut transaction, head, action).await?,
+		RichTextAction::Insert(action) => {
+			reduce_text_insert(storage, state, &mut transaction, head, action)
+				.boxed()
+				.await?
+		},
+		RichTextAction::Delete(action) => {
+			reduce_text_delete(storage, state, &mut transaction, head, action)
+				.boxed()
+				.await?
+		},
+		RichTextAction::Format(action) => {
+			reduce_text_format(storage, state, &mut transaction, head, action)
+				.boxed()
+				.await?
+		},
 	}
 	if transaction.runs.is_mut_access() {
 		state.runs = transaction.runs.get_mut().await?.store().await?;

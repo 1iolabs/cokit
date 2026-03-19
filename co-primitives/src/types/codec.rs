@@ -175,7 +175,7 @@ impl MultiCodec {
 		if actual_codec == codec {
 			Ok(cid)
 		} else {
-			Err(MultiCodecError(*cid, codec, actual_codec))
+			Err(MultiCodecError::new(*cid, codec, actual_codec))
 		}
 	}
 
@@ -191,8 +191,9 @@ impl MultiCodec {
 
 	/// Error if not DAG-CBOR or a codec that is represented in DAG-CBOR.
 	pub fn with_cbor(cid: &Cid) -> Result<&Cid, MultiCodecError> {
-		Self::is_any_codec([KnownMultiCodec::DagCbor, KnownMultiCodec::CoReference], cid)
-			.ok_or_else(|| MultiCodecError(*cid, MultiCodec::Known(KnownMultiCodec::DagCbor), MultiCodec::from(cid)))
+		Self::is_any_codec([KnownMultiCodec::DagCbor, KnownMultiCodec::CoReference], cid).ok_or_else(|| {
+			MultiCodecError::new(*cid, MultiCodec::Known(KnownMultiCodec::DagCbor), MultiCodec::from(cid))
+		})
 	}
 
 	/// Is DAG-CBOR or a codec that is represented in DAG-CBOR.
@@ -259,9 +260,18 @@ impl From<Cid> for MultiCodec {
 	}
 }
 
+/// Multi Codec Error.
+///
+/// # Note
+/// Inner values are boxed to keep stack small.
 #[derive(Debug, thiserror::Error)]
-#[error("Expected {0} codec to be {1} got {2}")]
-pub struct MultiCodecError(Cid, MultiCodec, MultiCodec);
+#[error("Expected {} codec to be {} got {}", .0.0, .0.1, .0.2)]
+pub struct MultiCodecError(Box<(Cid, MultiCodec, MultiCodec)>);
+impl MultiCodecError {
+	pub fn new(cid: Cid, expected: MultiCodec, actual: MultiCodec) -> Self {
+		Self(Box::new((cid, expected, actual)))
+	}
+}
 
 #[cfg(test)]
 mod tests {

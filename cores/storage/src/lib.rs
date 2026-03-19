@@ -8,7 +8,7 @@ use co_api::{
 	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoList, CoListTransaction, CoMap, CoMapTransaction, CoSet,
 	CoreBlockStorage, IsDefault, LazyTransaction, Link, OptionLink, ReducerAction, StorageError, Tags, WeakCid,
 };
-use futures::{pin_mut, TryStreamExt};
+use futures::{pin_mut, FutureExt, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[co(state)]
@@ -464,22 +464,26 @@ where
 	S: BlockStorage + Clone + 'static,
 {
 	match action {
-		StorageAction::Reference(info, references) => reduce_reference(transaction, info, references).await?,
-		StorageAction::Unreference(info, references) => reduce_unreference(transaction, info, references).await?,
-		StorageAction::Structure(structure) => reduce_structure(transaction, structure).await?,
+		StorageAction::Reference(info, references) => reduce_reference(transaction, info, references).boxed().await?,
+		StorageAction::Unreference(info, references) => {
+			reduce_unreference(transaction, info, references).boxed().await?
+		},
+		StorageAction::Structure(structure) => reduce_structure(transaction, structure).boxed().await?,
 		StorageAction::ReferenceCreate(info, references) => {
-			reduce_reference_create(transaction, info, references).await?
+			reduce_reference_create(transaction, info, references).boxed().await?
 		},
-		StorageAction::Remove(info, cids, zero) => reduce_remove(transaction, cids, zero, info).await?,
-		StorageAction::Delete(info, cids, force) => reduce_delete(transaction, cids, force, info).await?,
-		StorageAction::TagsInsert(cids, tags) => reduce_tags_insert(transaction, cids, tags).await?,
-		StorageAction::TagsRemove(cids, tags) => reduce_tags_remove(transaction, cids, tags).await?,
+		StorageAction::Remove(info, cids, zero) => reduce_remove(transaction, cids, zero, info).boxed().await?,
+		StorageAction::Delete(info, cids, force) => reduce_delete(transaction, cids, force, info).boxed().await?,
+		StorageAction::TagsInsert(cids, tags) => reduce_tags_insert(transaction, cids, tags).boxed().await?,
+		StorageAction::TagsRemove(cids, tags) => reduce_tags_remove(transaction, cids, tags).boxed().await?,
 		StorageAction::PinCreate(key, strategy, references) => {
-			reduce_pin_create(transaction, key, strategy, references).await?
+			reduce_pin_create(transaction, key, strategy, references).boxed().await?
 		},
-		StorageAction::PinUpdate(key, strategy) => reduce_pin_update(transaction, key, strategy).await?,
-		StorageAction::PinReference(key, references) => reduce_pin_reference(transaction, key, references).await?,
-		StorageAction::PinRemove(key) => reduce_pin_remove(transaction, key).await?,
+		StorageAction::PinUpdate(key, strategy) => reduce_pin_update(transaction, key, strategy).boxed().await?,
+		StorageAction::PinReference(key, references) => {
+			reduce_pin_reference(transaction, key, references).boxed().await?
+		},
+		StorageAction::PinRemove(key) => reduce_pin_remove(transaction, key).boxed().await?,
 		StorageAction::Batch(actions) => {
 			let actions_stream = actions.stream(transaction.storage());
 			pin_mut!(actions_stream);

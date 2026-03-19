@@ -12,16 +12,16 @@ use crate::{
 };
 use anyhow::anyhow;
 use co_api::{BlockStorageExt, CoMap, CoMapTransaction, CoSet, CoreBlockStorage, Did, TagValue};
-use futures::{pin_mut, TryStreamExt};
+use futures::{pin_mut, FutureExt, TryStreamExt};
 
 pub async fn reduce(state: &mut NamesTransaction, from: Did, action: NamesAction) -> Result<(), anyhow::Error> {
 	match action {
-		NamesAction::RecordInsert(action) => reduce_record_insert(state, from, action).await,
-		NamesAction::RecordUpdate(action) => reduce_record_update(state, from, action).await,
-		NamesAction::RecordRemove(action) => reduce_record_remove(state, from, action).await,
-		NamesAction::IndexInsert(action) => reduce_index_insert(state, from, action).await,
-		NamesAction::IndexRemove(action) => reduce_index_remove(state, from, action).await,
-		NamesAction::Name(action) => reduce_name_record(state, from, action).await,
+		NamesAction::RecordInsert(action) => reduce_record_insert(state, from, action).boxed().await,
+		NamesAction::RecordUpdate(action) => reduce_record_update(state, from, action).boxed().await,
+		NamesAction::RecordRemove(action) => reduce_record_remove(state, from, action).boxed().await,
+		NamesAction::IndexInsert(action) => reduce_index_insert(state, from, action).boxed().await,
+		NamesAction::IndexRemove(action) => reduce_index_remove(state, from, action).boxed().await,
+		NamesAction::Name(action) => reduce_name_record(state, from, action).boxed().await,
 	}
 }
 
