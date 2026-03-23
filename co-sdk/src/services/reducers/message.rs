@@ -81,9 +81,6 @@ impl From<ActorHandle<ReducerRequest>> for ReducersControl {
 
 #[derive(Debug, Clone, Default)]
 pub struct ReducerOptions {
-	/// When set to [`true`] return [`None`]/[`CoReducerFactoryError::Pending`] if the reducer create is pending.
-	pub no_pending_create: bool,
-
 	/// When set to [`true`] do not attempt to create and return [`None`]/[`CoReducerFactoryError::WouldCreate`].
 	pub no_create: bool,
 
@@ -93,11 +90,6 @@ pub struct ReducerOptions {
 impl ReducerOptions {
 	pub fn with_no_create(mut self) -> Self {
 		self.no_create = true;
-		self
-	}
-
-	pub fn with_no_pending_create(mut self) -> Self {
-		self.no_pending_create = true;
 		self
 	}
 

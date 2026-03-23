@@ -99,9 +99,6 @@ impl Actor for ReducersActor {
 				// get/create
 				if let Some(storage) = state.storages.get(&id) {
 					response.send(Ok(storage.clone())).ok();
-				} else if options.no_pending_create && state.pending_storage_count(&id) > 0 {
-					// would block while reducer is being created
-					response.send(Err(CoReducerFactoryError::Pending)).ok();
 				} else if options.no_create {
 					// would create but create is not allowed
 					response.send(Err(CoReducerFactoryError::WouldCreate)).ok();
@@ -153,9 +150,6 @@ impl Actor for ReducersActor {
 					response
 						.send(Ok(co_reducer_instance(&state.context, reducer, state.keep_open)))
 						.ok();
-				} else if options.no_pending_create && state.pending_request_count(&id) > 0 {
-					// would block while reducer is being created
-					response.send(Err(CoReducerFactoryError::Pending)).ok();
 				} else if options.no_create {
 					// would create but create is not allowed
 					response.send(Err(CoReducerFactoryError::WouldCreate)).ok();
@@ -374,7 +368,6 @@ fn co_reducerfactory_error_clone(err: &CoReducerFactoryError) -> CoReducerFactor
 		},
 		CoReducerFactoryError::Other(err) => CoReducerFactoryError::Other(anyhow!("source: {:?}", err)),
 		CoReducerFactoryError::Actor(err) => CoReducerFactoryError::Other(anyhow!("source: {:?}", err)),
-		CoReducerFactoryError::Pending => CoReducerFactoryError::Pending,
 		CoReducerFactoryError::WouldCreate => CoReducerFactoryError::WouldCreate,
 	}
 }
