@@ -338,6 +338,10 @@ impl Actor for ReducersActor {
 					}
 				}
 			},
+			ReducerRequest::IsRunning(id, result) => {
+				// test if reducer instance exists and is running (has been fully initialized)
+				result.respond(state.reducers.get(&id).map(|reducer| reducer.is_running()).unwrap_or_default());
+			},
 		}
 		return Ok(());
 	}

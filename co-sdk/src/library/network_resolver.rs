@@ -6,8 +6,7 @@
 use crate::{
 	find_membership,
 	library::{invite_networks::invite_networks, shared_membership::shared_membership},
-	services::reducers::ReducerOptions,
-	state, CoContext, CoReducerFactoryResultExt, CoReducerState, CoStorage,
+	state, CoContext, CoReducerState, CoStorage,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -57,12 +56,17 @@ impl NetworkResolver for CoNetworkResolver {
 		//  also we want to ignore storage creation errors and fallback to other strategies (invite)
 		if use_co {
 			let reducers = self.context.inner.reducers_control();
-			if let Ok(Some(reducer_storage)) = reducers
-				.storage(id.clone(), ReducerOptions::default().with_no_pending_create())
-				.await
-				.opt()
-			{
+
+			// we only access the reducer when is already has been initialized
+			//  if it has not initialized we can be sure here that the initialize is caused the networking request
+			//  and this would deadlock.
+			//  there are only two cases:
+			//  - network access in initialize
+			//  - network access after initialize (join/read) in which case the reducer is already running
+			if reducers.is_running(id.clone()).await {
 				// storage
+				//  we use the reducer storage instance as it dont uses any networking
+				let reducer_storage = reducers.storage(id.clone(), Default::default()).await?;
 				let storage = reducer_storage.storage();
 
 				// reducer
@@ -70,28 +74,16 @@ impl NetworkResolver for CoNetworkResolver {
 				//  no networking is involved because the reducer is initialized in the actor
 				let reducer = reducers.reducer(id.clone(), Default::default()).await?;
 
-				// we only access the reducer when is already has been initialized
-				//  if it has not initialized we can be sure here that the initialize is caused the networking request
-				//  and this would deadlock.
-				//  there are only two cases:
-				//  - network access in initialize
-				//  - network access after initialize (join/read) in which case the reducer is already running
-				if reducer.is_running() {
-					// get CO networks
-					// - or participant networks if CO networks are empty
-					// - or invite metadata if the previous fail (because the block is not loaded yet)
-					//
-					// note: we use reducer_cache reducer_state as we may get called from within the actor
-					if let Some(reducer_state) = reducer.reducer_cache().reducer_state() {
-						tracing::trace!(co = ?id, ?reducer_state, "co-resolve-networks-co");
-						match networks_co(&self.context, storage, &reducer_state).await {
-							Ok(networks) => {
-								return Ok(networks);
-							},
-							Err(err) => {
-								tracing::warn!(?err, co = ?id, "co-resolve-networks-failed (fallback to invite)");
-							},
-						}
+				// we use reducer_cache reducer_state as we may get called from within the actor
+				if let Some(reducer_state) = reducer.reducer_cache().reducer_state() {
+					tracing::trace!(co = ?id, ?reducer_state, "co-resolve-networks-co");
+					match networks_co(&self.context, storage, &reducer_state).await {
+						Ok(networks) => {
+							return Ok(networks);
+						},
+						Err(err) => {
+							tracing::warn!(?err, co = ?id, "co-resolve-networks-failed (fallback to invite)");
+						},
 					}
 				}
 			}

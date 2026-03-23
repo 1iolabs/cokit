@@ -22,6 +22,8 @@ pub enum ReducerRequest {
 	Clear(Response<Result<(), CoReducerFactoryError>>),
 	/// Clear a specific reducer instance.
 	ClearOne(CoId, Response<Result<(), CoReducerFactoryError>>),
+	/// Test if a CO instance is running already.
+	IsRunning(CoId, Response<bool>),
 }
 
 #[derive(Clone)]
@@ -29,6 +31,13 @@ pub struct ReducersControl {
 	pub(crate) handle: ActorHandle<ReducerRequest>,
 }
 impl ReducersControl {
+	pub async fn is_running(&self, co: CoId) -> bool {
+		self.handle
+			.request(|response| ReducerRequest::IsRunning(co, response))
+			.await
+			.unwrap_or_default()
+	}
+
 	pub async fn storage(&self, co: CoId, options: ReducerOptions) -> Result<ReducerStorage, CoReducerFactoryError> {
 		// tracing::trace!(?co, err = ?anyhow::anyhow!("test"), "co-reducer-request");
 		Ok(self
