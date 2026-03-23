@@ -311,20 +311,13 @@ async fn conflicting_membership_update(encryption: bool) {
 	.await
 	.unwrap();
 	let (storage, memberships) = query_core(CO_CORE_NAME_MEMBERSHIP).execute_reducer(&local_co).await.unwrap();
-	let heads = stream::iter(
-		memberships
-			.memberships
-			.iter()
-			.find(|i| i.id.as_str() == "co")
-			.unwrap()
-			.state
-			.iter(),
-	)
-	.then(|state| async { storage.get_value(&state.state).await })
-	.map_ok(|state| state.into_value().1)
-	.try_collect::<Vec<BTreeSet<Cid>>>()
-	.await
-	.unwrap();
+	let membership = memberships.memberships.get(&storage, &CoId::new("co")).await.unwrap().unwrap();
+	let heads = stream::iter(membership.state.iter())
+		.then(|state| async { storage.get_value(&state.state).await })
+		.map_ok(|state| state.into_value().1)
+		.try_collect::<Vec<BTreeSet<Cid>>>()
+		.await
+		.unwrap();
 
 	// check
 	assert_eq!(heads.len(), 1);

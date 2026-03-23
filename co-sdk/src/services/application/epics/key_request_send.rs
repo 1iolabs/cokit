@@ -118,11 +118,7 @@ fn handle_key_request(
 					.push(
 						&from,
 						CO_CORE_NAME_MEMBERSHIP,
-						&MembershipsAction::ChangeKey {
-							id: action.co.clone(),
-							did: from.identity().to_owned(),
-							key: key_uri.clone(),
-						},
+						&MembershipsAction::ChangeKey { id: action.co.clone(), key: key_uri.clone() },
 					)
 					.await?;
 

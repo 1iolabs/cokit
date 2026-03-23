@@ -22,6 +22,8 @@ pub enum ReducerRequest {
 	Clear(Response<Result<(), CoReducerFactoryError>>),
 	/// Clear a specific reducer instance.
 	ClearOne(CoId, Response<Result<(), CoReducerFactoryError>>),
+	/// Test if a CO instance is running already.
+	IsRunning(CoId, Response<bool>),
 }
 
 #[derive(Clone)]
@@ -29,6 +31,13 @@ pub struct ReducersControl {
 	pub(crate) handle: ActorHandle<ReducerRequest>,
 }
 impl ReducersControl {
+	pub async fn is_running(&self, co: CoId) -> bool {
+		self.handle
+			.request(|response| ReducerRequest::IsRunning(co, response))
+			.await
+			.unwrap_or_default()
+	}
+
 	pub async fn storage(&self, co: CoId, options: ReducerOptions) -> Result<ReducerStorage, CoReducerFactoryError> {
 		// tracing::trace!(?co, err = ?anyhow::anyhow!("test"), "co-reducer-request");
 		Ok(self
@@ -72,9 +81,6 @@ impl From<ActorHandle<ReducerRequest>> for ReducersControl {
 
 #[derive(Debug, Clone, Default)]
 pub struct ReducerOptions {
-	/// When set to [`true`] return [`None`]/[`CoReducerFactoryError::Pending`] if the reducer create is pending.
-	pub no_pending_create: bool,
-
 	/// When set to [`true`] do not attempt to create and return [`None`]/[`CoReducerFactoryError::WouldCreate`].
 	pub no_create: bool,
 
@@ -84,11 +90,6 @@ pub struct ReducerOptions {
 impl ReducerOptions {
 	pub fn with_no_create(mut self) -> Self {
 		self.no_create = true;
-		self
-	}
-
-	pub fn with_no_pending_create(mut self) -> Self {
-		self.no_pending_create = true;
 		self
 	}
 

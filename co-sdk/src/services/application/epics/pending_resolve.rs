@@ -4,15 +4,14 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	is_cid_encrypted,
+	find_membership_by, is_cid_encrypted,
 	library::invite_networks::invite_networks,
 	services::application::action::{CoDidCommSendAction, KeyRequestAction},
-	state::{query_core, Query},
 	Action, CoContext, CoReducerState, CoStorage, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
 use co_actor::{ActionDispatch, Actions};
-use co_core_membership::{MembershipState, MembershipsAction};
+use co_core_membership::{MembershipOptions, MembershipsAction};
 use co_identity::{Identity, PrivateIdentityResolver};
 use co_network::{EncodedMessage, HeadsMessage};
 use co_primitives::{BlockStorageExt, CoId, CoInviteMetadata, Did, KnownTags, WeakCid};
@@ -34,10 +33,7 @@ pub fn pending_resolve(
 		{
 			let membership_action: MembershipsAction = action.get_payload().ok()?;
 			match membership_action {
-				MembershipsAction::Join(membership) if membership.membership_state == MembershipState::Pending => {
-					Some((context.clone(), storage.clone(), actions.clone(), membership.id, membership.did))
-				},
-				MembershipsAction::ChangeMembershipState { id, did, membership_state: MembershipState::Pending } => {
+				MembershipsAction::JoinPending { id, did, .. } => {
 					Some((context.clone(), storage.clone(), actions.clone(), id, did))
 				},
 				_ => None,
@@ -64,13 +60,8 @@ fn handle_pending_resolve(
 		move |dispatch| async move {
 			// read membership from local CO
 			let local = context.local_co_reducer().await?;
-			let memberships = query_core(CO_CORE_NAME_MEMBERSHIP)
-				.execute(&storage, local.reducer_state().await.co())
-				.await?;
-			let membership = memberships
-				.memberships
-				.into_iter()
-				.find(|m| m.id == co_id && m.did == did)
+			let membership = find_membership_by(&local, &co_id, None, None)
+				.await?
 				.ok_or_else(|| anyhow!("Membership not found: {co_id}"))?;
 
 			// read CoInviteMetadata from tags
@@ -85,7 +76,7 @@ fn handle_pending_resolve(
 
 			// resolve identity
 			let private_identity_resolver = context.private_identity_resolver().await?;
-			let identity = private_identity_resolver.resolve_private(&membership.did).await?;
+			let identity = private_identity_resolver.resolve_private(&did).await?;
 
 			// send HeadsMessage::StateRequest
 			let body = HeadsMessage::StateRequest(co_id.clone());
@@ -115,7 +106,7 @@ fn handle_pending_resolve(
 					co: membership.id.clone(),
 					parent_co: CoId::from(CO_ID_LOCAL),
 					key: None,
-					from: Some(membership.did.clone()),
+					from: Some(did.clone()),
 					network: None,
 				};
 				let request_clone = key_request.clone();
@@ -135,27 +126,15 @@ fn handle_pending_resolve(
 				.await?
 				.ok_or_else(|| anyhow!("Expected state after resolve"))?;
 
-			local_co
-				.push(
-					&identity,
-					CO_CORE_NAME_MEMBERSHIP,
-					&MembershipsAction::Update {
-						id: membership.id.clone(),
-						state: co_state,
-						remove: Default::default(),
-					},
-				)
-				.await?;
-
 			// transition to Active
 			local_co
 				.push(
 					&identity,
 					CO_CORE_NAME_MEMBERSHIP,
-					&MembershipsAction::ChangeMembershipState {
+					&MembershipsAction::Join {
 						id: membership.id.clone(),
-						did: membership.did.clone(),
-						membership_state: MembershipState::Active,
+						did: did.clone(),
+						options: MembershipOptions::default().with_added_state(co_state),
 					},
 				)
 				.await?;

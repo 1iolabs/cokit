@@ -10,13 +10,12 @@ use crate::{
 };
 use anyhow::anyhow;
 use co_actor::Actions;
-use co_core_membership::{Membership, MembershipState, MembershipsAction};
+use co_core_membership::{MembershipOptions, MembershipState, MembershipsAction};
 use co_identity::DidCommHeader;
 use co_network::PeerId;
-use co_primitives::{from_json_string, tags, CoInviteMetadata, Did, KnownTags, Tags};
-use co_storage::{BlockStorage, BlockStorageExt, StorageError};
+use co_primitives::{from_json_string, tags, CoInviteMetadata, KnownTags};
+use co_storage::BlockStorageExt;
 use futures::{FutureExt, Stream, StreamExt};
-use std::collections::BTreeSet;
 
 /// When we receive a invite message:
 /// - decide if want to be invited
@@ -90,32 +89,17 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 		);
 
 		// membership
-		local
-			.push(
-				&context.local_identity(),
-				CO_CORE_NAME_MEMBERSHIP,
-				&MembershipsAction::Join(membership(&storage, did, payload, membership_state, membership_tags).await?),
-			)
-			.await?;
+		let reducer_state = CoReducerState::new(Some(payload.state), payload.heads.clone());
+		let co_state = reducer_state.to_external_co_state(&storage).await?.unwrap();
+		let options = MembershipOptions::default()
+			.with_added_state(co_state)
+			.with_tags(membership_tags);
+		let action = match membership_state {
+			MembershipState::Invite => MembershipsAction::Invited { id: payload.id, did, options },
+			MembershipState::Join => MembershipsAction::InviteAccept { id: payload.id, did, options },
+			_ => unreachable!(),
+		};
+		local.push(&context.local_identity(), CO_CORE_NAME_MEMBERSHIP, &action).await?;
 	}
 	Ok(vec![])
-}
-
-async fn membership(
-	storage: &impl BlockStorage,
-	did: Did,
-	payload: CoInvitePayload,
-	membership_state: MembershipState,
-	membership_tags: Tags,
-) -> Result<Membership, StorageError> {
-	let reducer_state = CoReducerState::new(Some(payload.state), payload.heads.clone());
-	let co_state = reducer_state.to_external_co_state(storage).await?.unwrap();
-	Ok(Membership {
-		id: payload.id,
-		did,
-		state: BTreeSet::from([co_state]),
-		key: None,
-		membership_state,
-		tags: membership_tags,
-	})
 }

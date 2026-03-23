@@ -8,34 +8,38 @@ use crate::{
 	CoReducer, CO_CORE_NAME_MEMBERSHIP,
 };
 use co_core_membership::{Membership, MembershipState};
-use co_primitives::CoId;
+use co_primitives::{CoId, Did};
 use co_storage::StorageError;
 
 /// Find the first active [`Membership`] entry in `reducer` for `co`.
 pub async fn find_membership(reducer: &CoReducer, co: impl AsRef<CoId>) -> Result<Option<Membership>, StorageError> {
-	Ok(memberships(reducer, co, Some(MembershipState::Active)).await?.next())
+	find_membership_by(reducer, co, None, Some(MembershipState::Active)).await
 }
 
-/// Find the active [`Membership`] entries in `reducer` for `co`.
-pub async fn find_memberships(reducer: &CoReducer, co: impl AsRef<CoId>) -> Result<Vec<Membership>, StorageError> {
-	Ok(memberships(reducer, co, Some(MembershipState::Active)).await?.collect())
-}
-
-/// Find the [`Membership`] entries in `reducer` for `co`.
-/// Optionally filtered by `state`.
-pub async fn memberships<'a>(
+/// Find the [`Membership`] entry in `reducer` for `co` for `did` or any and `state` or any.
+pub async fn find_membership_by(
 	reducer: &CoReducer,
-	co: impl AsRef<CoId> + 'a,
+	co: impl AsRef<CoId>,
+	did: Option<&Did>,
 	state: Option<MembershipState>,
-) -> Result<impl Iterator<Item = Membership> + 'a, StorageError> {
-	let (_, memberships) = query_core(CO_CORE_NAME_MEMBERSHIP)
+) -> Result<Option<Membership>, StorageError> {
+	let (storage, memberships) = query_core(CO_CORE_NAME_MEMBERSHIP)
 		.with_default()
 		.execute_reducer(reducer)
 		.await
 		.map_err(Into::<StorageError>::into)?;
-	Ok(memberships
-		.memberships
-		.into_iter()
-		.filter(move |membership| &membership.id == co.as_ref())
-		.filter(move |membership| if let Some(state) = state { membership.membership_state == state } else { true }))
+	let membership = memberships.memberships.get(&storage, co.as_ref()).await?;
+	Ok(membership.filter(|membership| {
+		membership
+			.did
+			.iter()
+			.filter(move |(membership_did, _)| match did {
+				Some(did) => *membership_did == did,
+				None => true,
+			})
+			.any(move |(_, membership_state)| match &state {
+				Some(state) => membership_state == state,
+				None => true,
+			})
+	}))
 }

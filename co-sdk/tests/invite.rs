@@ -5,7 +5,7 @@
 
 use anyhow::anyhow;
 use co_core_co::{CoAction, ParticipantState};
-use co_core_membership::{MembershipState, MembershipsAction};
+use co_core_membership::{MembershipOptions, MembershipState, MembershipsAction};
 use co_primitives::CoTryStreamExt;
 use co_sdk::{Action, CoId, CoReducer, CreateCo, Did, Identity, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL};
 use futures::{join, Stream, StreamExt, TryStreamExt};
@@ -106,10 +106,10 @@ async fn test_invite() {
 	//  set membership to join and wait for membership set to active when join is complete
 	async {
 		let local_co = peer2.application.local_co_reducer().await.unwrap();
-		let payload = MembershipsAction::ChangeMembershipState {
+		let payload = MembershipsAction::InviteAccept {
 			id: "shared".into(),
 			did: identity2.identity().to_owned(),
-			membership_state: MembershipState::Join,
+			options: MembershipOptions::default(),
 		};
 		let (push, membership_state) = join!(local_co.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &payload), async {
 			timeout(
@@ -162,19 +162,23 @@ async fn test_invite() {
 	// check pinning
 	#[cfg(feature = "pinning")]
 	{
-		let peer2_local_co = peer2.application.local_co_reducer().await.unwrap();
-		let peer2_shared_co_snapshots = co_sdk::storage_snapshots(
-			peer2_local_co.storage(),
-			peer2_local_co.co_state().await,
-			peer2_shared_co.id(),
-			peer2_shared_co.storage(),
-		)
-		.try_collect::<Vec<_>>()
+		timeout(timeout_duration, async move {
+			let peer2_local_co = peer2.application.local_co_reducer().await.unwrap();
+			let peer2_shared_co_snapshots = co_sdk::storage_snapshots(
+				peer2_local_co.storage(),
+				peer2_local_co.co_state().await,
+				peer2_shared_co.id(),
+				peer2_shared_co.storage(),
+			)
+			.try_collect::<Vec<_>>()
+			.await
+			.unwrap();
+			assert_eq!(peer2_shared_co_snapshots.len(), 2);
+			assert_eq!(peer2_shared_co_snapshots[0], join_state);
+			assert_eq!(peer2_shared_co_snapshots[1], invite_state);
+		})
 		.await
 		.unwrap();
-		assert_eq!(peer2_shared_co_snapshots.len(), 2);
-		assert_eq!(peer2_shared_co_snapshots[0], join_state);
-		assert_eq!(peer2_shared_co_snapshots[1], invite_state);
 	}
 }
 
@@ -193,13 +197,16 @@ async fn test_invite_encrypted() {
 	let mut instances = Instances::new("test_invite_encrypted");
 	let mut peer1 = instances.create().await;
 	let mut peer2 = instances.create().await;
+	tracing::info!(?timeout_duration, "test-peers");
 
 	// network
-	let (_network1, network2) = Instances::networking(&mut peer1, &mut peer2, true, false).await;
+	let (_network1, network2) = Instances::networking(&mut peer1, &mut peer2, true, true).await;
+	tracing::info!("test-network");
 
 	// create identity
 	let identity1 = peer1.create_identity().await;
 	let identity2 = peer2.create_identity().await;
+	tracing::info!("test-identity");
 
 	// peer1: create shared co
 	let shared_co = async {
@@ -211,6 +218,7 @@ async fn test_invite_encrypted() {
 	}
 	.instrument(info_span!("peer1: created shared co", application = peer1.application.settings().identifier))
 	.await;
+	tracing::info!("test-peer1-create");
 
 	// peer1: invite peer2
 	let peer1_invite = async {
@@ -224,6 +232,7 @@ async fn test_invite_encrypted() {
 			.unwrap()
 	}
 	.instrument(info_span!("peer1: added other peer identity", application = peer1.application.settings().identifier));
+	tracing::info!("test-peer1-invite-peer2");
 
 	// peer1: invite-sent/error
 	let peer1_invite_sent = peer1
@@ -247,6 +256,7 @@ async fn test_invite_encrypted() {
 			.expect("not empty")
 			.expect("invite sent")
 	};
+	tracing::info!("test-peer1-invite-sent");
 
 	// peer2: membership-invite
 	let peer2_membership_invite = wait_membership_state(peer2.application.actions(), [MembershipState::Invite]);
@@ -256,6 +266,7 @@ async fn test_invite_encrypted() {
 			.expect("peer2 to recv invite in time")
 			.expect("not empty")
 	};
+	tracing::info!("test-membership-invite");
 
 	// check
 	let ((_, membership_co, membership_participant), (_, invited_participant, invited_peer), invite_state) =
@@ -264,15 +275,16 @@ async fn test_invite_encrypted() {
 	assert_eq!(invited_peer, network2.local_peer_id());
 	assert_eq!(membership_co, CoId::from("shared"));
 	assert_eq!(membership_participant, identity2.identity());
+	tracing::info!("test-check");
 
 	// peer2: join
 	//  set membership to join and wait for membership set to active when join is complete
 	async {
 		let local_co = peer2.application.local_co_reducer().await.unwrap();
-		let payload = MembershipsAction::ChangeMembershipState {
+		let payload = MembershipsAction::InviteAccept {
 			id: "shared".into(),
 			did: identity2.identity().to_owned(),
-			membership_state: MembershipState::Join,
+			options: MembershipOptions::default(),
 		};
 		let (push, membership_state) = join!(
 			local_co.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &payload),
@@ -286,6 +298,7 @@ async fn test_invite_encrypted() {
 	}
 	.instrument(info_span!("peer2: join", application = peer2.application.settings().identifier))
 	.await;
+	tracing::info!("test-join");
 
 	// peer2: wait for participant to become active
 	timeout(
@@ -296,6 +309,7 @@ async fn test_invite_encrypted() {
 	.unwrap()
 	.unwrap();
 	let join_state = shared_co.reducer_state().await;
+	tracing::info!("test-joined");
 
 	// peer2: read state
 	let peer2_shared_co = peer2.application.co_reducer(CoId::from("shared")).await.unwrap().unwrap();
@@ -303,6 +317,7 @@ async fn test_invite_encrypted() {
 	let (_, co) = shared_co.co().await.unwrap();
 	let (_, peer2_co) = peer2_shared_co.co().await.unwrap();
 	assert_eq!(peer2_co, co);
+	tracing::info!("test-read");
 
 	// peer1: check state
 	assert_eq!(
@@ -317,24 +332,30 @@ async fn test_invite_encrypted() {
 			.unwrap(),
 		ParticipantState::Active
 	);
+	tracing::info!("test-check");
 
 	// check pinning
 	#[cfg(feature = "pinning")]
 	{
-		let peer2_local_co = peer2.application.local_co_reducer().await.unwrap();
-		let peer2_shared_co_snapshots = co_sdk::storage_snapshots(
-			peer2_local_co.storage(),
-			peer2_local_co.co_state().await,
-			peer2_shared_co.id(),
-			peer2_shared_co.storage(),
-		)
-		.try_collect::<Vec<_>>()
+		timeout(timeout_duration, async move {
+			let peer2_local_co = peer2.application.local_co_reducer().await.unwrap();
+			let peer2_shared_co_snapshots = co_sdk::storage_snapshots(
+				peer2_local_co.storage(),
+				peer2_local_co.co_state().await,
+				peer2_shared_co.id(),
+				peer2_shared_co.storage(),
+			)
+			.try_collect::<Vec<_>>()
+			.await
+			.unwrap();
+			assert_eq!(peer2_shared_co_snapshots.len(), 2);
+			assert_eq!(peer2_shared_co_snapshots[0], join_state);
+			assert_eq!(peer2_shared_co_snapshots[1], invite_state);
+		})
 		.await
 		.unwrap();
-		assert_eq!(peer2_shared_co_snapshots.len(), 2);
-		assert_eq!(peer2_shared_co_snapshots[0], join_state);
-		assert_eq!(peer2_shared_co_snapshots[1], invite_state);
 	}
+	tracing::info!("test-done");
 }
 
 async fn wait_membership_state(
@@ -352,13 +373,29 @@ async fn wait_membership_state(
 					{
 						let membership_action: MembershipsAction = action.get_payload().ok()?;
 						match membership_action {
-							MembershipsAction::Join(membership) if state.contains(&membership.membership_state) => {
-								Some((membership.membership_state, membership.id, membership.did))
+							MembershipsAction::Join { id, did, .. } if state.contains(&MembershipState::Active) => {
+								Some((MembershipState::Active, id, did))
 							},
-							MembershipsAction::ChangeMembershipState { id, did, membership_state }
-								if state.contains(&membership_state) =>
+							MembershipsAction::Invited { id, did, .. } if state.contains(&MembershipState::Invite) => {
+								Some((MembershipState::Invite, id, did))
+							},
+							MembershipsAction::JoinRequest { id, did, .. }
+								if state.contains(&MembershipState::Join) =>
 							{
-								Some((membership_state, id, did))
+								Some((MembershipState::Join, id, did))
+							},
+							MembershipsAction::JoinPending { id, did, .. }
+								if state.contains(&MembershipState::Pending) =>
+							{
+								Some((MembershipState::Pending, id, did))
+							},
+							MembershipsAction::InviteAccept { id, did, .. }
+								if state.contains(&MembershipState::Join) =>
+							{
+								Some((MembershipState::Join, id, did))
+							},
+							MembershipsAction::Deactivate { id, did } if state.contains(&MembershipState::Inactive) => {
+								Some((MembershipState::Inactive, id, did))
 							},
 							_ => None,
 						}

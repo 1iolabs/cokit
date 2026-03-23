@@ -5,12 +5,13 @@
 
 use crate::{state, Action, CoContext, CoReducerFactory, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL};
 use co_actor::Actions;
-use co_core_membership::{MembershipState, MembershipsAction};
+use co_core_membership::{MembershipOptions, MembershipsAction};
 use co_primitives::{CoId, Did};
 use futures::{stream, Stream, StreamExt, TryStreamExt};
 use std::future::ready;
 
-/// Fetch co core state and set membership to active when joined or back to invite when failed.
+/// Fetch co core state and set membership to active when joined failed.
+/// Note: We do not set back to invite when failed as the network queue will retry to send the message.
 /// TODO: validate consensus?
 /// In: [`Action::Joined`]
 /// Out: [`Action::CoreActionPush`]
@@ -21,16 +22,11 @@ pub fn joined(
 	context: &CoContext,
 ) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
 	match action {
-		Action::Joined { co, participant, success, peer: _ } => Some(stream::once(ready({
-			// active
-			let payload = MembershipsAction::ChangeMembershipState {
+		Action::Joined { co, participant, success, peer: _ } if *success => Some(stream::once(ready({
+			let payload = MembershipsAction::Join {
 				id: co.clone(),
 				did: participant.clone(),
-				membership_state: if *success {
-					co_core_membership::MembershipState::Active
-				} else {
-					co_core_membership::MembershipState::Invite
-				},
+				options: MembershipOptions::default(),
 			};
 			Ok(Action::push(CO_ID_LOCAL, participant, CO_CORE_NAME_MEMBERSHIP, payload, context.date()))
 		}))),
@@ -52,7 +48,7 @@ pub fn joined_fetch(
 		{
 			let membership_action: MembershipsAction = action.get_payload().ok()?;
 			match membership_action {
-				MembershipsAction::ChangeMembershipState { id, did, membership_state: MembershipState::Active } => {
+				MembershipsAction::Join { id, did, .. } => {
 					Some(
 						stream::once({
 							let context = context.clone();

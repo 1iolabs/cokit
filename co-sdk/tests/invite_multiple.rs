@@ -5,7 +5,7 @@
 
 use anyhow::anyhow;
 use co_core_co::{CoAction, ParticipantState};
-use co_core_membership::{MembershipState, MembershipsAction};
+use co_core_membership::{MembershipOptions, MembershipState, MembershipsAction};
 use co_network::NetworkApi;
 use co_sdk::{
 	update_co, Action, CoId, CoReducer, CreateCo, Did, Identity, NetworkSettings, CO_CORE_NAME_CO,
@@ -155,10 +155,10 @@ async fn test_invite_multiple_participants() {
 	// peer2: join
 	async {
 		let local_co = peer2.application.local_co_reducer().await.unwrap();
-		let payload = MembershipsAction::ChangeMembershipState {
+		let payload = MembershipsAction::InviteAccept {
 			id: "shared".into(),
 			did: identity2.identity().to_owned(),
-			membership_state: MembershipState::Join,
+			options: MembershipOptions::default(),
 		};
 		let (push, membership_state) = join!(local_co.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &payload), async {
 			timeout(
@@ -180,10 +180,10 @@ async fn test_invite_multiple_participants() {
 	// peer3: join
 	async {
 		let local_co = peer3.application.local_co_reducer().await.unwrap();
-		let payload = MembershipsAction::ChangeMembershipState {
+		let payload = MembershipsAction::InviteAccept {
 			id: "shared".into(),
 			did: identity3.identity().to_owned(),
-			membership_state: MembershipState::Join,
+			options: MembershipOptions::default(),
 		};
 		let (push, membership_state) = join!(local_co.push(&identity3, CO_CORE_NAME_MEMBERSHIP, &payload), async {
 			timeout(
@@ -276,13 +276,29 @@ async fn wait_membership_state(
 					{
 						let membership_action: MembershipsAction = action.get_payload().ok()?;
 						match membership_action {
-							MembershipsAction::Join(membership) if state.contains(&membership.membership_state) => {
-								Some((membership.membership_state, membership.id, membership.did))
+							MembershipsAction::Join { id, did, .. } if state.contains(&MembershipState::Active) => {
+								Some((MembershipState::Active, id, did))
 							},
-							MembershipsAction::ChangeMembershipState { id, did, membership_state }
-								if state.contains(&membership_state) =>
+							MembershipsAction::Invited { id, did, .. } if state.contains(&MembershipState::Invite) => {
+								Some((MembershipState::Invite, id, did))
+							},
+							MembershipsAction::JoinRequest { id, did, .. }
+								if state.contains(&MembershipState::Join) =>
 							{
-								Some((membership_state, id, did))
+								Some((MembershipState::Join, id, did))
+							},
+							MembershipsAction::JoinPending { id, did, .. }
+								if state.contains(&MembershipState::Pending) =>
+							{
+								Some((MembershipState::Pending, id, did))
+							},
+							MembershipsAction::InviteAccept { id, did, .. }
+								if state.contains(&MembershipState::Join) =>
+							{
+								Some((MembershipState::Join, id, did))
+							},
+							MembershipsAction::Deactivate { id, did } if state.contains(&MembershipState::Inactive) => {
+								Some((MembershipState::Inactive, id, did))
 							},
 							_ => None,
 						}

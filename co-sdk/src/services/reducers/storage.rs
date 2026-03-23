@@ -5,7 +5,10 @@
 
 use crate::{
 	application::shared::SharedCoBuilder,
-	library::{builtin_cores::builtin_cores, shared_membership::shared_membership_active},
+	library::{
+		builtin_cores::builtin_cores, network_identity::network_identity_did,
+		shared_membership::shared_membership_active,
+	},
 	types::co_reducer_factory::CoReducerFactoryError,
 	ApplicationMessage, CoReducer, CoStorage,
 };
@@ -59,9 +62,10 @@ impl ReducerStorage {
 		membership: Membership,
 		key_request_timeout: Duration,
 	) -> Result<ReducerStorage, StorageError> {
+		let did = network_identity_did(parent, &membership.id, None).await?;
 		let builder =
 			SharedCoBuilder::new(parent.clone(), membership.clone()).with_key_request_timeout(key_request_timeout);
-		let secret = builder.secret(Some(handle)).await?;
+		let secret = builder.secret(Some(handle), Some(did)).await?;
 		Ok(match secret {
 			Some(secret) => {
 				let encrypted_storage =

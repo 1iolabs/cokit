@@ -60,9 +60,6 @@ pub enum CoReducerFactoryError {
 	#[error("CO actor error")]
 	Actor(#[from] ActorError),
 
-	#[error("CO create pending")]
-	Pending,
-
 	#[error("CO not initialized yet")]
 	WouldCreate,
 }
@@ -74,7 +71,6 @@ pub trait CoReducerFactoryResultExt<T> {
 impl<T> CoReducerFactoryResultExt<T> for Result<T, CoReducerFactoryError> {
 	fn opt(self) -> Result<Option<T>, CoReducerFactoryError> {
 		match self {
-			Err(CoReducerFactoryError::Pending) => Ok(None),
 			Err(CoReducerFactoryError::WouldCreate) => Ok(None),
 			Ok(value) => Ok(Some(value)),
 			Err(err) => Err(err),

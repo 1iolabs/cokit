@@ -1,5 +1,5 @@
 use crate::{CoContext, CO_CORE_NAME_MEMBERSHIP};
-use co_core_membership::{Membership, MembershipState, MembershipsAction};
+use co_core_membership::{MembershipOptions, MembershipsAction};
 use co_identity::{Identity, IdentityBox, PrivateIdentityBox};
 use co_primitives::{tags, CoConnectivity, CoId, CoInviteMetadata, KnownTags, Network};
 use co_storage::BlockStorageExt;
@@ -22,19 +22,19 @@ pub async fn join_unrelated_co(
 		peer: None,
 		network: CoConnectivity { network: to_networks, participants: Default::default() },
 	};
-	let membership = Membership {
-		id: to_co,
-		did: from.identity().to_owned(),
-		state: Default::default(),
-		key: None,
-		membership_state: MembershipState::Pending,
-		tags: tags!(
-			"owner": to.identity(),
-			{KnownTags::CoInviteMetadata}: local_co.storage().set_serialized(&metadata).await?,
-		),
-	};
 	local_co
-		.push(from, CO_CORE_NAME_MEMBERSHIP, &MembershipsAction::Join(membership))
+		.push(
+			from,
+			CO_CORE_NAME_MEMBERSHIP,
+			&MembershipsAction::JoinPending {
+				id: to_co,
+				did: from.identity().to_owned(),
+				options: MembershipOptions::default().with_tags(tags!(
+					"owner": to.identity(),
+					{KnownTags::CoInviteMetadata}: local_co.storage().set_serialized(&metadata).await?,
+				)),
+			},
+		)
 		.await?;
 
 	// result
