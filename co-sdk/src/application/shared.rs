@@ -35,10 +35,8 @@ use co_core_keystore::{Key, KeyStoreAction};
 use co_core_membership::{Membership, MembershipOptions, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::{IdentityEntryVerifier, Log};
-#[cfg(feature = "network")]
-use co_primitives::Did;
 use co_primitives::{
-	tags, BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoDate, CoId, DynamicCoDate,
+	tags, BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoDate, CoId, Did, DynamicCoDate,
 	OptionMappedCid, Tags,
 };
 use co_storage::{Algorithm, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, Secret};
