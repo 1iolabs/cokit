@@ -1,4 +1,5 @@
 import { getCoState, resolveCid, sessionClose, sessionOpen } from "./invoke-utils.js";
+import { MembershipState } from "./types/index.js";
 
 export async function getResolvedCoState(co: string, externalSessionId?: string): Promise<any | undefined> {
   // open session if no external session given
@@ -47,8 +48,8 @@ export async function getCoIds(): Promise<ReadonlyArray<string>> {
   if (Array.isArray(memberships?.memberships)) {
     return (
       memberships.memberships
-        // only get joined COs
-        .filter((membership: any) => membership?.membership_state === 0)
+        // only get active COs
+        .filter((membership: any) => membership?.did && Object.values(membership.did).some((s: any) => s === MembershipState.Active))
         .map((membership: any) => membership?.id)
         .filter((i: any) => i !== null)
     );
@@ -63,8 +64,8 @@ export async function getInvitedCoIds(): Promise<ReadonlyArray<string>> {
   if (Array.isArray(memberships?.memberships)) {
     return (
       memberships.memberships
-        // only get joined COs
-        .filter((membership: any) => membership?.membership_state === 2)
+        // only get invited COs
+        .filter((membership: any) => membership?.did && Object.values(membership.did).some((s: any) => s === MembershipState.Invite))
         .map((membership: any) => membership?.id)
         .filter((i: any) => i !== null)
     );

@@ -6,7 +6,7 @@
 use crate::{cli::Cli, library::cli_context::CliContext};
 use co_core_keystore::KeyStoreAction;
 use co_core_membership::MembershipsAction;
-use co_sdk::{find_memberships, CoId, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP};
+use co_sdk::{find_membership_by, CoId, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP};
 use exitcode::ExitCode;
 
 #[derive(Debug, Clone, clap::Args)]
@@ -24,22 +24,17 @@ pub async fn command(context: &CliContext, cli: &Cli, command: &Command) -> Resu
 	let identity = application.local_identity();
 
 	// membership
-	let mut memberships = find_memberships(&local, &command.co).await?;
-	if let Some(did) = &command.did {
-		memberships.retain(|item| &item.did == did);
-	}
-
-	// remove
-	for membership in memberships {
+	let membership = find_membership_by(&local, &command.co, command.did.as_ref(), None).await?;
+	if let Some(membership) = membership {
 		// log
-		tracing::info!(co = ?membership.id, did = membership.did, "remove-co");
+		tracing::info!(co = ?membership.id, did = ?command.did, ?membership, "remove-co");
 
 		// remove membership
 		local
 			.push(
 				&identity,
 				CO_CORE_NAME_MEMBERSHIP,
-				&MembershipsAction::Remove { id: membership.id, did: Some(membership.did) },
+				&MembershipsAction::Remove { id: membership.id, did: command.did.clone() },
 			)
 			.await?;
 

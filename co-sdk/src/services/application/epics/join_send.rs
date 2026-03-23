@@ -4,17 +4,17 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
+	find_membership_by,
 	library::{
 		invite_networks::invite_networks, is_membership_heads_encrypted::is_membership_heads_encrypted,
 		join::create_join_message_from,
 	},
 	services::application::action::{CoDidCommSendAction, NotifyAction},
-	state::{query_core, Query},
 	Action, CoContext, CoStorage, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use anyhow::anyhow;
 use co_actor::Actions;
-use co_core_membership::{Membership, MembershipState, MembershipsAction};
+use co_core_membership::{Membership, MembershipsAction};
 use co_identity::{Identity, PrivateIdentityResolver};
 use co_primitives::{CoId, CoInviteMetadata, Did, KnownTags};
 use co_storage::BlockStorageExt;
@@ -36,12 +36,8 @@ pub fn join_send(
 		{
 			let membership_action: MembershipsAction = action.get_payload().ok()?;
 			match membership_action {
-				MembershipsAction::Join(membership) if membership.membership_state == MembershipState::Join => {
-					Some((context.clone(), storage.clone(), membership.id, membership.did))
-				},
-				MembershipsAction::ChangeMembershipState { id, did, membership_state: MembershipState::Join } => {
-					Some((context.clone(), storage.clone(), id, did))
-				},
+				MembershipsAction::JoinRequest { id, did, .. } => Some((context.clone(), storage.clone(), id, did)),
+				MembershipsAction::InviteAccept { id, did, .. } => Some((context.clone(), storage.clone(), id, did)),
 				_ => None,
 			}
 		},
@@ -91,33 +87,21 @@ async fn join_with_result(
 	id: CoId,
 	did: Did,
 ) -> Result<Vec<Action>, anyhow::Error> {
-	if let Some(membership) = find_membership(&context, &storage, &id, &did).await? {
-		Ok(vec![create_join_action(context, storage, membership).await?])
+	let local = context.local_co_reducer().await?;
+	if let Some(membership) = find_membership_by(&local, id, Some(&did), None).await? {
+		Ok(vec![create_join_action(context, storage, membership, did).await?])
 	} else {
 		Ok(vec![])
 	}
 }
 
-async fn find_membership(
-	context: &CoContext,
-	storage: &CoStorage,
-	id: &CoId,
-	did: &Did,
-) -> anyhow::Result<Option<Membership>> {
-	let local = context.local_co_reducer().await?;
-	let memberships = query_core(CO_CORE_NAME_MEMBERSHIP)
-		.execute(storage, local.reducer_state().await.co())
-		.await?;
-	Ok(memberships.memberships.into_iter().find(|membership| {
-		&membership.id == id && &membership.did == did
-		// // we only handle remote invites
-		// //  a join action is also used when an co is created
-		// && membership.tags.find_key(&KnownTags::CoInviteMetadata.to_string()).is_some()
-	}))
-}
-
 /// Create co join message action.
-async fn create_join_action(context: CoContext, storage: CoStorage, membership: Membership) -> anyhow::Result<Action> {
+async fn create_join_action(
+	context: CoContext,
+	storage: CoStorage,
+	membership: Membership,
+	did: Did,
+) -> anyhow::Result<Action> {
 	// metadata
 	let invite_cid = membership
 		.tags
@@ -127,7 +111,7 @@ async fn create_join_action(context: CoContext, storage: CoStorage, membership: 
 
 	// message
 	let private_identity_resolver = context.private_identity_resolver().await?;
-	let identity = private_identity_resolver.resolve_private(&membership.did).await?;
+	let identity = private_identity_resolver.resolve_private(&did).await?;
 	let (message_header, message) =
 		create_join_message_from(context.date(), &identity, membership.id.clone(), Some(invite.id.clone()))?;
 
@@ -143,7 +127,7 @@ async fn create_join_action(context: CoContext, storage: CoStorage, membership: 
 		message_header,
 		networks,
 		notification: Some(NotifyAction::JoinSent {
-			participant: membership.did.clone(),
+			participant: did,
 			encrypted: is_membership_heads_encrypted(&storage, &membership).await?,
 		}),
 		tags: Default::default(),

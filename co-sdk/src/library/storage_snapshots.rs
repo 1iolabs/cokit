@@ -13,7 +13,7 @@ use co_primitives::{AnyBlockStorage, CoId, Link, OptionLink};
 use co_storage::{BlockStorageContentMapping, BlockStorageExt};
 use futures::{pin_mut, Stream, TryStreamExt};
 
-/// Read all pinned CO roots from the stroage core.
+/// Read all pinned CO roots from the storage core.
 /// The roots are returned from newest (first) to oldest (last).
 /// This method return internal/mapped Cid's.
 pub fn storage_snapshots(

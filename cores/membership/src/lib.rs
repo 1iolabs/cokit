@@ -36,6 +36,20 @@ pub struct Membership {
 	/// Membership tags.
 	pub tags: Tags,
 }
+impl Membership {
+	/// Get (best) membership state.
+	pub fn membership_state(&self) -> Option<MembershipState> {
+		self.did.values().min().copied()
+	}
+
+	/// Get (best) membership.
+	pub fn membership(&self) -> Option<(&Did, MembershipState)> {
+		self.did
+			.iter()
+			.min_by_key(|(_, membership_state)| *membership_state)
+			.map(|(did, membership_state)| (did, *membership_state))
+	}
+}
 
 /// A CO State entry.
 /// Contains heads the computed state for the heads and an option encryption mapping.

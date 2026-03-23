@@ -11,7 +11,7 @@ use crate::{
 use anyhow::anyhow;
 use cid::Cid;
 use co_actor::{time, ActionDispatch, Actions};
-use co_core_membership::{Membership, MembershipState};
+use co_core_membership::MembershipState;
 use co_identity::PeerDidCommHeader;
 use co_network::{connections::PeerRelateCoAction, EncodedMessage, HeadsErrorCode, HeadsMessage, PeerId};
 use co_primitives::{CoId, Did, WeakCid};
@@ -122,13 +122,15 @@ fn handle_heads(
 				// verify we got a active membership for this co
 				let local_co = context.local_co_reducer().await?;
 				match shared_membership(&local_co, &co, None).await? {
-					Some(Membership { membership_state: MembershipState::Active, .. }) => {
+					Some(membership) if membership.membership_state() == Some(MembershipState::Active) => {
 						// active -> ok
 					},
-					Some(Membership {
-						membership_state: MembershipState::Invite | MembershipState::Join | MembershipState::Pending,
-						..
-					}) => {
+					Some(membership)
+						if matches!(
+							membership.membership_state(),
+							Some(MembershipState::Invite | MembershipState::Join | MembershipState::Pending)
+						) =>
+					{
 						// pending -> queue
 						return Err(HeadsError::Transient(ActionError::from(anyhow!("Pending membership"))));
 					},

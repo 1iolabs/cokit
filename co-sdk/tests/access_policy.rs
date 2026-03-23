@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 use co_core_co::CoAction;
-use co_core_membership::{Membership, MembershipState, MembershipsAction};
+use co_core_membership::{MembershipOptions, MembershipsAction};
 use co_network::connections::PeerRelateCoAction;
 use co_primitives::{CoId, CoInviteMetadata};
 use co_sdk::{
@@ -16,7 +16,7 @@ use futures::StreamExt;
 use helper::instance::Instances;
 #[allow(unused_imports)]
 use helper::shared_co::SharedCo;
-use std::{collections::BTreeSet, time::Duration};
+use std::time::Duration;
 use tokio::time::timeout;
 
 pub mod helper;
@@ -162,16 +162,16 @@ async fn test_unrelated_peer_joins() {
 		.await
 		.expect("to_external_co_state")
 		.expect("co_state");
-	let membership = Membership {
-		id: CoId::from("shared"),
-		did: identity2.identity().to_owned(),
-		state: BTreeSet::from([co_state]),
-		key: None,
-		membership_state: MembershipState::Active,
-		tags: Default::default(),
-	};
 	local_co
-		.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &MembershipsAction::Join(membership))
+		.push(
+			&identity2,
+			CO_CORE_NAME_MEMBERSHIP,
+			&MembershipsAction::Join {
+				id: CoId::from("shared"),
+				did: identity2.identity().to_owned(),
+				options: MembershipOptions::default().with_added_state(co_state),
+			},
+		)
 		.await
 		.unwrap();
 	tracing::info!("peer2: created Active membership");
@@ -260,11 +260,7 @@ async fn test_unrelated_peer_auto_state() {
 				Action::CoreAction { co, action, .. } if co.as_str() == CO_ID_LOCAL => {
 					let membership_action: MembershipsAction = action.get_payload().ok()?;
 					match membership_action {
-						MembershipsAction::ChangeMembershipState {
-							id,
-							membership_state: MembershipState::Active,
-							..
-						} if id.as_str() == "shared" => Some(()),
+						MembershipsAction::Join { id, .. } if id.as_str() == "shared" => Some(()),
 						_ => None,
 					}
 				},
@@ -275,16 +271,16 @@ async fn test_unrelated_peer_auto_state() {
 		.collect::<Vec<_>>();
 
 	// peer2: create Pending membership with empty state + metadata tags
-	let membership = Membership {
-		id: CoId::from("shared"),
-		did: identity2.identity().to_owned(),
-		state: BTreeSet::new(),
-		key: None,
-		membership_state: MembershipState::Pending,
-		tags: membership_tags,
-	};
 	local_co
-		.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &MembershipsAction::Join(membership))
+		.push(
+			&identity2,
+			CO_CORE_NAME_MEMBERSHIP,
+			&MembershipsAction::JoinPending {
+				id: CoId::from("shared"),
+				did: identity2.identity().to_owned(),
+				options: MembershipOptions::default().with_tags(membership_tags),
+			},
+		)
 		.await
 		.unwrap();
 	tracing::info!("peer2: created Pending membership with empty state");
@@ -364,11 +360,7 @@ async fn test_unrelated_auto_state_encrypted() {
 				Action::CoreAction { co, action, .. } if co.as_str() == CO_ID_LOCAL => {
 					let membership_action: MembershipsAction = action.get_payload().ok()?;
 					match membership_action {
-						MembershipsAction::ChangeMembershipState {
-							id,
-							membership_state: MembershipState::Active,
-							..
-						} if id.as_str() == "shared" => Some(()),
+						MembershipsAction::Join { id, .. } if id.as_str() == "shared" => Some(()),
 						_ => None,
 					}
 				},
@@ -379,16 +371,16 @@ async fn test_unrelated_auto_state_encrypted() {
 		.collect::<Vec<_>>();
 
 	// peer2: create Pending membership with empty state + metadata tags
-	let membership = Membership {
-		id: CoId::from("shared"),
-		did: identity2.identity().to_owned(),
-		state: BTreeSet::new(),
-		key: None,
-		membership_state: MembershipState::Pending,
-		tags: membership_tags,
-	};
 	local_co
-		.push(&identity2, CO_CORE_NAME_MEMBERSHIP, &MembershipsAction::Join(membership))
+		.push(
+			&identity2,
+			CO_CORE_NAME_MEMBERSHIP,
+			&MembershipsAction::JoinPending {
+				id: CoId::from("shared"),
+				did: identity2.identity().to_owned(),
+				options: MembershipOptions::default().with_tags(membership_tags),
+			},
+		)
 		.await
 		.unwrap();
 	tracing::info!("peer2: created Pending membership with empty state");

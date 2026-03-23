@@ -30,14 +30,32 @@ pub async fn network_identity_by_id(
 	prefered: Option<&Did>,
 ) -> Result<PrivateIdentityBox, anyhow::Error> {
 	let parent_co = context.try_co_reducer(parent_co_id).await?;
-	let identity_did = shared_membership(&parent_co, co_id, prefered)
-		.await?
-		.ok_or(anyhow::anyhow!("No active membership"))?
-		.did;
+	let identity_did = network_identity_did(&parent_co, co_id, prefered).await?;
 	let identity = context
 		.private_identity_resolver()
 		.await?
 		.resolve_private(&identity_did)
 		.await?;
 	Ok(identity)
+}
+
+/// Network identity to sign messages to send into the network.
+///
+/// Currently this looks for the first membership found.
+pub async fn network_identity_did(
+	parent_co: &CoReducer,
+	co_id: &CoId,
+	prefered: Option<&Did>,
+) -> Result<Did, anyhow::Error> {
+	let membership = shared_membership(parent_co, co_id, None)
+		.await?
+		.ok_or(anyhow::anyhow!("No membership: {co_id:?}"))?;
+	let identity_did = match prefered {
+		Some(did) if membership.did.get(did) == Some(&co_core_membership::MembershipState::Active) => did,
+		_ => membership
+			.membership()
+			.map(|(did, _)| did)
+			.ok_or(anyhow::anyhow!("No DID in membership"))?,
+	};
+	Ok(identity_did.to_owned())
 }

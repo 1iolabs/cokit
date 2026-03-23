@@ -32,9 +32,11 @@ use cid::Cid;
 use co_actor::ActorHandle;
 use co_core_co::{CoAction, CreateAction};
 use co_core_keystore::{Key, KeyStoreAction};
-use co_core_membership::{Membership, MembershipsAction};
+use co_core_membership::{Membership, MembershipOptions, MembershipsAction};
 use co_identity::PrivateIdentity;
 use co_log::{IdentityEntryVerifier, Log};
+#[cfg(feature = "network")]
+use co_primitives::Did;
 use co_primitives::{
 	tags, BlockLinks, BlockStorageCloneSettings, CloneWithBlockStorageSettings, CoDate, CoId, DynamicCoDate,
 	OptionMappedCid, Tags,
@@ -98,13 +100,14 @@ impl SharedCoBuilder {
 	pub async fn secret(
 		&self,
 		_handle: Option<ActorHandle<ApplicationMessage>>,
+		_from: Option<Did>,
 	) -> anyhow::Result<Option<co_primitives::Secret>> {
 		if let Some(key_reference) = &self.membership.key {
 			Ok(Some(find_co_secret_by_reference(&self.parent, key_reference, Some(&self.keystore_core_name)).await?))
 		} else if is_membership_heads_encrypted(&self.parent.storage(), &self.membership).await? {
 			#[cfg(feature = "network")]
 			if let Some(handle) = _handle {
-				return Ok(Some(self.request_secret(handle).await?));
+				return Ok(Some(self.request_secret(handle, _from).await?));
 			}
 			Err(anyhow!("Key not available"))
 		} else {
@@ -117,12 +120,13 @@ impl SharedCoBuilder {
 	pub async fn request_secret(
 		&self,
 		handle: ActorHandle<ApplicationMessage>,
+		from: Option<Did>,
 	) -> Result<co_primitives::Secret, anyhow::Error> {
 		let request = KeyRequestAction {
 			co: self.membership.id.clone(),
 			parent_co: self.parent.id().to_owned(),
 			key: None,
-			from: Some(self.membership.did.clone()),
+			from,
 			network: None,
 		};
 		let key = request_response_timeout(
@@ -682,14 +686,17 @@ impl SharedCoCreator {
 			.push(
 				&identity,
 				&self.membership_core_name,
-				&MembershipsAction::Join(Membership {
+				&MembershipsAction::Join {
 					id: self.co.id.to_owned(),
 					did: identity.identity().to_owned(),
-					state: BTreeSet::from([state]),
-					key: key_uri,
-					membership_state: co_core_membership::MembershipState::Active,
-					tags: tags!(),
-				}),
+					options: {
+						let opts = MembershipOptions::default().with_added_state(state);
+						match key_uri {
+							Some(k) => opts.with_key(k),
+							None => opts,
+						}
+					},
+				},
 			)
 			.await?;
 

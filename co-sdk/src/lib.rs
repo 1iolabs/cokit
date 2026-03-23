@@ -76,7 +76,7 @@ pub use library::{
 	find_co_by_pin::find_co_by_pin,
 	find_co_identities::{find_co_identities, find_co_private_identity},
 	find_co_secret::find_co_secret,
-	find_membership::{find_membership, find_memberships},
+	find_membership::{find_membership, find_membership_by},
 	generate_random_name::generate_random_name,
 	ipld_resolve_recursive::ipld_resolve_recursive,
 	is_cid_encrypted::is_cid_encrypted,

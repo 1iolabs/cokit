@@ -5,11 +5,16 @@ export enum MembershipState {
   /// Active membership.
   Active = 10,
 
+  /// Pending state resolution.
+  /// Has CoInviteMetadata to connect, but needs to resolve CO state
+  /// (and optionally encryption key) from network before use.
+  Pending = 15,
+
   /// Pending join by us.
   ///
   /// Use Cases:
   /// - This is a pending join triggered by an invite waiting for completion.
-  /// - This is waiting for CO participant acception/rejection (remote).
+  /// - This is waiting for CO participant acceptation/rejection (remote).
   ///
   /// Related membership Tags:
   ///  `co-invite: CoInviteMetadata`
@@ -19,7 +24,7 @@ export enum MembershipState {
   /// Pending invite by some participant of the CO.
   ///
   /// Use Cases:
-  /// - This is waiting for our acception/rejection.
+  /// - This is waiting for our acceptation/rejection.
   /// - Accept invite by change membership state to [`MembershipState::Join`].
   /// - Reject invite by removing the membership using [`MembershipsAction::Remove`].
   ///
@@ -36,10 +41,9 @@ export enum MembershipState {
  *
  * pub struct Membership {
  *   id: CoId,
- *   did: Did,
+ *   did: Record<Did, MembershipState>,
  *   state: BTreeSet<CoState>,
  *   key: Option<String>,
- *   membership_state: MembershipState,
  *   tags: Tags,
  * }
  */
@@ -47,8 +51,8 @@ export interface Membership {
   /** CO Unique Identifier */
   id: CoId;
 
-  /** The DID used for the membership */
-  did: Did;
+  /** The membership states per DID */
+  did: Record<Did, MembershipState>;
 
   /**
    * currently not needed
@@ -61,9 +65,6 @@ export interface Membership {
    */
   key?: string;
 
-  /** Membership state */
-  membership_state: MembershipState;
-
   /** Membership tags */
   tags: Tags;
 }
@@ -73,9 +74,60 @@ export interface Memberships {
   memberships: Membership[];
 }
 
+export interface MembershipOptions {
+  state?: any;
+  key?: string;
+  tags?: Tags;
+}
+
 export type MembershipsAction =
-  /// Join a Co. The membership state indicates if it was an invite from someone.
-  | { Join: { Membership: Membership } }
+  /// Active membership — CO creation, direct join, or activation.
+  | {
+      Join: {
+        id: CoId;
+        did: Did;
+        options?: MembershipOptions;
+      };
+    }
+  /// Received invite, awaiting user acceptance.
+  | {
+      Invited: {
+        id: CoId;
+        did: Did;
+        options?: MembershipOptions;
+      };
+    }
+  /// Auto-accepted or user-accepted invite, pending join completion.
+  | {
+      JoinRequest: {
+        id: CoId;
+        did: Did;
+        options?: MembershipOptions;
+      };
+    }
+  /// Pending state resolution.
+  | {
+      JoinPending: {
+        id: CoId;
+        did: Did;
+        options?: MembershipOptions;
+      };
+    }
+  /// User accepts invite. Invite -> Join.
+  | {
+      InviteAccept: {
+        id: CoId;
+        did: Did;
+        options?: MembershipOptions;
+      };
+    }
+  /// Membership deactivated. * -> Inactive.
+  | {
+      Deactivate: {
+        id: CoId;
+        did: Did;
+      };
+    }
   | {
       Update: {
         id: CoId;
@@ -84,32 +136,22 @@ export type MembershipsAction =
         remove: CID[];
       };
     }
-  | {
-      ChangeMembershipState: {
-        id: CoId;
-        did: Did;
-        membership_state: MembershipState;
-      };
-    }
   /// Change the active encryption key reference which is used the read the current heads/state.
   | {
       ChangeKey: {
         id: CoId;
-        did: Did;
         key: String;
       };
     }
   | {
       TagsInsert: {
         id: CoId;
-        did: Did;
         tags: Tags;
       };
     }
   | {
       TagsRemove: {
         id: CoId;
-        did: Did;
         tags: Tags;
       };
     }

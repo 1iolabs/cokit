@@ -17,7 +17,7 @@ use futures::Stream;
 /// Returns memberships contained in the CO (`co_state`)`.
 ///
 /// # Warning
-/// - This will return all memberships and will not filter by [`co_core_membership::Membership::membership_state`].
+/// - This will return all memberships and will not filter by [`co_core_membership::MembershipState`].
 ///
 /// # Arguments
 /// - `storage` - The BlockStorage.
@@ -35,8 +35,12 @@ pub fn memberships<S: BlockStorage + Clone + 'static>(
 
 		// memberships
 		let memberships = query_core(CO_CORE_NAME_MEMBERSHIP).with_default().execute(&storage, co_state).await?;
-		for membership in memberships.memberships {
-			yield (membership.id, membership.did, membership.tags, membership.membership_state);
+		let stream = memberships.memberships.stream(&storage);
+		for await result in stream {
+			let (_co_id, membership) = result?;
+			for (did, membership_state) in &membership.did {
+				yield (membership.id.clone(), did.clone(), membership.tags.clone(), *membership_state);
+			}
 		}
 	}
 }

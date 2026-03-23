@@ -12,7 +12,7 @@ export function useCoIds(membershipsState: any): string[] | undefined {
       setCoIds(
         membershipsState.memberships
           // only get joined COs
-          .filter((membership: any) => membership?.membership_state === MembershipState.Active)
+          .filter((membership: any) => membership?.did && Object.values(membership.did).some((s: any) => s === MembershipState.Active))
           .map((membership: any) => membership?.id)
           .filter((i: any) => i !== undefined && i !== null),
       );

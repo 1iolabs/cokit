@@ -524,9 +524,13 @@ impl CoContextInner {
 		};
 
 		// resolve identity
+		let did = match &identity {
+			Some(identity) => identity,
+			None => membership.membership().ok_or(anyhow::anyhow!("no valid identity"))?.0,
+		};
 		let identity = create_private_identity_resolver(parent.clone())
 			.await?
-			.resolve_private(&membership.did)
+			.resolve_private(did)
 			.await?;
 
 		// instance

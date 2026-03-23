@@ -42,7 +42,7 @@ impl NetworkResolver for CoNetworkResolver {
 		let membership = shared_membership(&local_co, &id, None)
 			.await?
 			.ok_or(anyhow!("No membership found: {:?}", id))?;
-		let use_co = match membership.membership_state {
+		let use_co = match membership.membership_state().unwrap_or(MembershipState::Inactive) {
 			MembershipState::Join | MembershipState::Invite | MembershipState::Inactive | MembershipState::Pending => {
 				false
 			},
