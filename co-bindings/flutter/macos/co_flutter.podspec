@@ -29,22 +29,54 @@ A new Flutter FFI plugin project.
   s.dependency 'FlutterMacOS'
 
   s.platform = :osx, '10.11'
-  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
+  s.pod_target_xcconfig = {
+    'DEFINES_MODULE' => 'YES',
+    'OTHER_LDFLAGS' => '-lco_bindings',
+    'LIBRARY_SEARCH_PATHS' => '"$(BUILT_PRODUCTS_DIR)"',
+  }
   s.swift_version = '5.0'
+
   s.script_phase = {
     :name => 'Build Rust library',
     :execution_position => :before_compile,
     :shell_path => '/bin/sh',
+    :output_files => ['$(BUILT_PRODUCTS_DIR)/libco_bindings.dylib'],
     :script => <<-SCRIPT
       set -e
 
-      echo "Building Rust library"
-
       export PATH="$HOME/.cargo/bin:$PATH"
 
-      cd "$PODS_TARGET_SRCROOT"
-      cargo build -p co-bindings -F frb
+      # Resolve symlinks (Flutter's .symlinks/) to get the real paths
+      SRCROOT="$(cd "$PODS_TARGET_SRCROOT" && pwd -P)"
+      # podspec dir (macos/) -> flutter/ -> co-bindings/ -> co-sdk/
+      WORKSPACE_ROOT="$(cd "$SRCROOT/../../.." && pwd -P)"
+
+      CARGO_ARGS="-p co-bindings -F frb"
+      if [ "$CONFIGURATION" = "Release" ] || [ "$CONFIGURATION" = "Profile" ]; then
+        CARGO_ARGS="$CARGO_ARGS --release"
+        CARGO_PROFILE="release"
+      else
+        CARGO_PROFILE="debug"
+      fi
+
+      # Map Xcode architectures to Rust targets
+      LIPO_INPUTS=""
+      for ARCH in $ARCHS; do
+        case "$ARCH" in
+          x86_64) RUST_TARGET="x86_64-apple-darwin" ;;
+          arm64)  RUST_TARGET="aarch64-apple-darwin" ;;
+          *)      echo "error: unsupported architecture $ARCH" >&2; exit 1 ;;
+        esac
+
+        echo "Building Rust library ($CARGO_PROFILE) for $RUST_TARGET"
+        cd "$WORKSPACE_ROOT"
+        cargo build $CARGO_ARGS --target "$RUST_TARGET"
+
+        LIPO_INPUTS="$LIPO_INPUTS $WORKSPACE_ROOT/target/$RUST_TARGET/$CARGO_PROFILE/libco_bindings.dylib"
+      done
+
+      echo "Creating universal binary"
+      lipo -create $LIPO_INPUTS -output "${BUILT_PRODUCTS_DIR}/libco_bindings.dylib"
     SCRIPT
   }
-  s.vendored_libraries = 'Frameworks/libco_bindings.dylib'
 end

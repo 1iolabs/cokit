@@ -4,7 +4,7 @@ import '../co_flutter.dart';
 
 Future<CoContext> openCoContext(CoSettings settings) async {
   await CoKit.init(
-      externalLibrary: ExternalLibrary.open("libco_bindings.dylib"));
+      externalLibrary: ExternalLibrary.open("co_flutter.framework/co_flutter"));
   return await CoContext.open(settings: settings);
 }
 
