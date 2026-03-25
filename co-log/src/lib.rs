@@ -8,7 +8,7 @@ mod types;
 
 pub use library::{
 	entry::{EntryBlock, EntryError},
-	log::Log,
+	log::{Log, PushPending, PushPendingStored},
 	stream::{create_stream, LogIterator},
 	verify_entry::{EntryVerifier, IdentityEntryVerifier, NoEntryVerifier, ReadOnlyEntryVerifier},
 };

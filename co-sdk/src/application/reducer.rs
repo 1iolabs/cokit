@@ -408,7 +408,7 @@ where
 	/// The resulting state.
 	///
 	/// # Note
-	/// Specifing a `core_state_link` may is dangerous and the caller is responsible to know that:
+	/// Specifying a `core_state_link` may is dangerous and the caller is responsible to know that:
 	/// `action_link + current core state = core_state_link`.
 	pub async fn push_reference_with_state<I>(
 		&mut self,
@@ -428,22 +428,19 @@ where
 			return Err(anyhow!("Invalid argument: identity"));
 		}
 
-		// apply to log
-		let entry = self
+		// prepare log entry without updating heads
+		let pending = self
 			.log
-			.push(storage, identity, *action_link.cid())
+			.push_prepare(storage, identity, *action_link.cid())
 			.await
-			.with_context(|| format!("push event core: {}: {:?}", action.core, action_link))?;
-
-		// // debug
-		// let block = self.log.storage().get(entry.as_ref()).await.unwrap();
-		// let ipld: Ipld = IpldCodec::DagCbor.decode(block.data()).unwrap();
-		// println!("entry = {:?}", ipld);
+			.with_context(|| format!("push event core: {}: {:?}", action.core, action_link))?
+			.store(storage)
+			.await?;
 
 		// apply to state
 		let context = CoreResolverContext {
 			change: ReducerChangeContext { cause: ReducerChangeCause::Push },
-			entry,
+			entry: pending.entry().clone(),
 			state: core_state_link,
 		};
 		let runtime_context = self
@@ -457,7 +454,6 @@ where
 					self.state,
 					action_link,
 					context.entry.cid(),
-					// to_json_string(&action.payload)
 				)
 			})?;
 
@@ -473,12 +469,15 @@ where
 			);
 		}
 
-		// fail and ignore result when we got a failure disgnostic
+		// fail and ignore result when we got a failure diagnostic
 		//  this is technically optional because its fine to have failing transactions
 		//  which just have no effect to the state
 		//  but in case of push which is always local we can just skip it
 		//  it makes no sense to propagate it to peers etc.
 		runtime_context.ok(storage).await?;
+
+		// commit log heads now that execution succeeded
+		self.log.push_commit(pending)?;
 
 		// snapshot
 		if let Some(state) = self.state {

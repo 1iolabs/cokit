@@ -119,6 +119,15 @@ impl Log {
 		S: AnyBlockStorage,
 		I: PrivateIdentity + Send + Sync,
 	{
+		self.push_commit(self.push_prepare(storage, identity, item).await?.store(storage).await?)
+	}
+
+	/// Prepare a push without updating heads.
+	pub async fn push_prepare<S, I>(&self, storage: &S, identity: &I, item: Cid) -> Result<PushPending, LogError>
+	where
+		S: AnyBlockStorage,
+		I: PrivateIdentity + Send + Sync,
+	{
 		// heads
 		let head_entries = get_entry_blocks(storage, self.heads.iter()).await?;
 
@@ -126,7 +135,7 @@ impl Log {
 		let entry = Entry {
 			id: self.id().to_vec(),
 			clock: Clock::new(
-				// todo: use peerid as the identity could be used one more devices?
+				// todo: use PeerId as the identity could be used one more devices?
 				identity.identity().as_bytes().to_vec(),
 				max_clock(head_entries.iter().map(|e| e.entry())),
 			)
@@ -138,13 +147,23 @@ impl Log {
 		let entry_block = EntryBlock::from_entry(identity, entry)?;
 		let entry_cid = *entry_block.cid();
 
-		// set state
-		storage.set(entry_block.block()?).await?; // to be atomic in case of error do this first
-		self.index.insert(entry_cid);
-		self.heads_set([entry_cid].into_iter());
+		// result
+		Ok(PushPending { entry: entry_block, entry_cid })
+	}
+
+	/// Commit a pending push by updating log heads.
+	pub fn push_commit(&mut self, pending: PushPendingStored) -> Result<EntryBlock, LogError> {
+		// verify
+		if pending.entry.entry().next != self.heads {
+			return Err(LogError::InvalidArgument(anyhow::anyhow!("Log has been modified between prepare and commit")));
+		}
+
+		// commit
+		self.index.insert(pending.entry_cid);
+		self.heads_set([pending.entry_cid].into_iter());
 
 		// result
-		Ok(entry_block)
+		Ok(pending.entry)
 	}
 
 	/// Push serializable item as new entry.
@@ -292,5 +311,41 @@ impl Log {
 
 		// not found despite traversing the whole log
 		Ok(false)
+	}
+}
+
+/// Prepared log entry, not yet stored and not yet committed to heads.
+pub struct PushPending {
+	entry: EntryBlock,
+	entry_cid: Cid,
+}
+impl PushPending {
+	/// Store entry to BlockStorage in idempotent fashion.
+	pub async fn store(self, storage: &impl AnyBlockStorage) -> Result<PushPendingStored, LogError> {
+		storage.set(self.entry.block()?).await?;
+		Ok(PushPendingStored { entry: self.entry, entry_cid: self.entry_cid })
+	}
+
+	pub fn entry(&self) -> &EntryBlock {
+		&self.entry
+	}
+
+	pub fn cid(&self) -> &Cid {
+		&self.entry_cid
+	}
+}
+
+/// Prepared log entry, not yet committed to heads.
+pub struct PushPendingStored {
+	entry: EntryBlock,
+	entry_cid: Cid,
+}
+impl PushPendingStored {
+	pub fn entry(&self) -> &EntryBlock {
+		&self.entry
+	}
+
+	pub fn cid(&self) -> &Cid {
+		&self.entry_cid
 	}
 }

@@ -15,6 +15,7 @@ words = [
     "jsc",
     "kad",
     "kademlia",
+    "lamport",
     "mdns",
     "thid",
     "tokio",
