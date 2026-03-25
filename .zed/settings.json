@@ -33,9 +33,6 @@
         "rustfmt": {
           "extraArgs": ["+nightly"],
         },
-        "check": {
-          "command": "clippy",
-        },
       },
     },
   },
