@@ -3,6 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+use crate::{Core, ExecuteError, GuardReference, RuntimeContext, RuntimePool};
 use cid::Cid;
 #[cfg(not(feature = "js"))]
 use co_actor::TaskSpawner;
@@ -10,7 +11,6 @@ use co_actor::{ActorError, ActorHandle, Response};
 #[cfg(feature = "js")]
 use co_actor::{JsLocalTaskSpawner, LocalActor};
 use co_primitives::{tags, AnyBlockStorage, CoreBlockStorage, Tags};
-use co_runtime::{Core, ExecuteError, GuardReference, RuntimeContext, RuntimePool};
 
 #[derive(Debug, Clone)]
 pub struct RuntimeHandle {

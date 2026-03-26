@@ -5,7 +5,7 @@
 
 use crate::helper::shared_co::SharedCo;
 use co_core_co::CoAction;
-use co_sdk::{tags, CreateCo, Guards, CO_CORE_CO, CO_CORE_NAME_CO};
+use co_sdk::{create_default_guards, tags, CreateCo, CO_CORE_CO, CO_CORE_NAME_CO};
 use helper::instance::Instances;
 
 pub mod helper;
@@ -48,7 +48,7 @@ async fn test_guard_push() {
 			CO_CORE_NAME_CO,
 			&CoAction::GuardCreate {
 				guard: "participant".to_owned(),
-				binary: Guards::default().binary(CO_CORE_CO).unwrap(),
+				binary: create_default_guards().binary(CO_CORE_CO).unwrap(),
 				tags: Default::default(),
 			},
 		)
@@ -108,7 +108,7 @@ async fn test_guard_join() {
 			CO_CORE_NAME_CO,
 			&CoAction::GuardCreate {
 				guard: "participant".to_owned(),
-				binary: Guards::default().binary(CO_CORE_CO).unwrap(),
+				binary: create_default_guards().binary(CO_CORE_CO).unwrap(),
 				tags: Default::default(),
 			},
 		)

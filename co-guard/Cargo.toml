@@ -1,0 +1,19 @@
+[package]
+name = "co-guard"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.91"
+
+[dependencies]
+anyhow = { workspace = true }
+cid = { workspace = true }
+co-api = { workspace = true }
+co-primitives = { workspace = true }
+co-runtime = { workspace = true }
+co-storage = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[features]
+default = []

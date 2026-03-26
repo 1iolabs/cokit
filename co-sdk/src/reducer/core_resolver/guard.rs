@@ -3,47 +3,31 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{
-	services::runtime::RuntimeHandle, types::guards::Guards, CoreResolver, CoreResolverContext, CoreResolverError,
-};
+use crate::{CoreResolver, CoreResolverContext, CoreResolverError, Guards, RuntimeHandle};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::GuardInput;
-use co_runtime::{GuardReference, RuntimeContext};
+use co_guard::{GuardDefinition, GuardError, GuardResolver};
+use co_runtime::RuntimeContext;
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
-use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct CoGuardResolver<C> {
-	mapping: HashMap<Cid, GuardReference>,
+	guard_resolver: GuardResolver,
 	next: C,
-	mode: GuardRejectionMode,
 }
 impl<C> CoGuardResolver<C> {
 	pub fn new(core_resolver: C, guards: &Guards) -> Self {
-		Self { next: core_resolver, mapping: guards.mapping(), mode: GuardRejectionMode::Skip }
-	}
-
-	pub fn with_mapping(self, mapping: HashMap<Cid, GuardReference>) -> Self {
-		Self { next: self.next, mapping, mode: GuardRejectionMode::Skip }
+		Self { next: core_resolver, guard_resolver: GuardResolver::new(guards.mapping()) }
 	}
 
 	pub fn with_ignore_mode(mut self, ignore: bool) -> Self {
-		if ignore {
-			self.mode = GuardRejectionMode::Ignore;
-		} else {
-			self.mode = GuardRejectionMode::Skip;
-		}
+		self.guard_resolver = self.guard_resolver.with_ignore_mode(ignore);
 		self
 	}
 
 	pub fn with_failure_mode(mut self) -> Self {
-		self.mode = GuardRejectionMode::Fail;
+		self.guard_resolver = self.guard_resolver.with_failure_mode();
 		self
-	}
-
-	fn guard(&self, wasm: Cid) -> GuardReference {
-		self.mapping.get(&wasm).cloned().unwrap_or(GuardReference::Wasm(wasm))
 	}
 }
 #[async_trait]
@@ -60,62 +44,28 @@ where
 		state: &Option<Cid>,
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
-		// verify
+		// verify guards
 		if let Some(state) = *state {
 			let co_state: co_core_co::Co = storage.get_deserialized(&state).await?;
-			for (guard_name, guard) in co_state.guards {
-				let heads = context.entry.entry().next.clone();
-				let next_head = *context.entry.cid();
-				let guard_reference = self.guard(guard.binary);
-				let (mut result, valid) = runtime
-					.execute_guard(
-						storage,
-						&guard.binary,
-						&guard_reference,
-						RuntimeContext::new(&GuardInput { guard: guard_name.clone(), state, heads, next_head })?,
-					)
-					.await
-					.map_err(|err| {
-						CoreResolverError::Middleware(
-							anyhow::Error::from(err).context(format!("execute guard: {}", guard_name)),
-						)
-					})?;
-				if !valid {
-					// trace
-					tracing::trace!(
-						co = ?co_state.id,
-						guard_name,
-						?guard,
-						?state,
-						heads = ?context.entry.entry().next,
-						next_head = ?context.entry.cid(),
-						mode = ?self.mode,
-						result = ?result.result,
-						"guard-reject"
-					);
+			let guard_defs: std::collections::BTreeMap<String, GuardDefinition> = co_state
+				.guards
+				.into_iter()
+				.map(|(name, guard)| (name, GuardDefinition { binary: guard.binary, tags: guard.tags }))
+				.collect();
+			let heads = context.entry.entry().next.clone();
+			let next_head = *context.entry.cid();
 
-					// handle permission failure
-					match self.mode {
-						// fail
-						GuardRejectionMode::Fail => {
-							return Err(CoreResolverError::Middleware(anyhow::anyhow!(
-								"Guard \"{}\" rejected head \"{}\"",
-								guard_name,
-								next_head
-							)))
-						},
-						// skip to compute
-						GuardRejectionMode::Skip => {
-							result.result =
-								Some(Err(format!("Guard \"{}\" rejected head \"{}\"", guard_name, next_head)));
-							return Ok(result);
-						},
-						// warn and ignore
-						GuardRejectionMode::Ignore => {
-							tracing::warn!(?guard_name, ?next_head, "guard-reject-ignore");
-						},
-					};
-				}
+			match self
+				.guard_resolver
+				.verify_guards(runtime, storage, &guard_defs, &state, &heads, &next_head)
+				.await
+			{
+				Ok(()) => {},
+				Err(GuardError::Skipped(_message, result)) => return Ok(result),
+				Err(GuardError::Rejected(message)) => {
+					return Err(CoreResolverError::Middleware(anyhow::anyhow!(message)))
+				},
+				Err(GuardError::Execute(err)) => return Err(CoreResolverError::Middleware(err)),
 			}
 		}
 
@@ -125,15 +75,4 @@ where
 		// result
 		Ok(result)
 	}
-}
-
-/// Guard rejection mode.
-#[derive(Debug, Clone, Copy)]
-enum GuardRejectionMode {
-	/// Ignore rejection and just trace a warning.
-	Ignore,
-	/// Skip the computation and insert a diagnostic message.
-	Skip,
-	/// Fail the operation hard.
-	Fail,
 }

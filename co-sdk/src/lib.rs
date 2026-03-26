@@ -36,6 +36,7 @@ pub use application::{
 };
 pub use co_actor::TaskSpawner;
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
+pub use co_guard::Guards;
 pub use co_identity::{
 	DidCommHeader, DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver,
 	IdentityResolverError, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
@@ -94,6 +95,7 @@ pub use services::application::KeyRequestAction;
 pub use services::{
 	application::{Action, ActionError, ApplicationMessage, ContactAction},
 	reducer::CoReducer,
+	runtime::RuntimeHandle,
 };
 #[cfg(feature = "js")]
 pub use types::js_co_date::JsCoDate;
@@ -115,5 +117,5 @@ pub use types::{
 		CO_CORE_ROOM,
 	},
 	error::{ErrorContext, ErrorKind, IntoAction},
-	guards::Guards,
+	guards::create_default_guards,
 };

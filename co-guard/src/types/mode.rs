@@ -3,4 +3,13 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-pub use co_runtime::{RuntimeActor, RuntimeHandle};
+/// Guard rejection mode.
+#[derive(Debug, Clone, Copy)]
+pub enum GuardRejectionMode {
+	/// Ignore rejection and just trace a warning.
+	Ignore,
+	/// Skip the computation and insert a diagnostic message.
+	Skip,
+	/// Fail the operation hard.
+	Fail,
+}

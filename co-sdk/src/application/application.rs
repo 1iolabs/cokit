@@ -7,6 +7,7 @@
 use super::tracing::TracingBuilder;
 use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
 use crate::{
+	create_default_guards,
 	library::{
 		contact_handler::{ContactHandler, DynamicContactHandler},
 		wait_response::request_response,
@@ -390,7 +391,7 @@ impl ApplicationBuilder {
 			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
-			guards: Default::default(),
+			guards: create_default_guards(),
 			access_policy: None,
 			contact_handler: None,
 		}
@@ -412,7 +413,7 @@ impl ApplicationBuilder {
 			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
-			guards: Default::default(),
+			guards: create_default_guards(),
 			access_policy: None,
 			contact_handler: None,
 		}
@@ -438,7 +439,7 @@ impl ApplicationBuilder {
 			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
-			guards: Default::default(),
+			guards: create_default_guards(),
 			access_policy: None,
 			contact_handler: None,
 		}
@@ -460,7 +461,7 @@ impl ApplicationBuilder {
 			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
-			guards: Default::default(),
+			guards: create_default_guards(),
 			access_policy: None,
 			contact_handler: None,
 		}

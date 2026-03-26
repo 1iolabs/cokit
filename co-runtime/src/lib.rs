@@ -12,6 +12,7 @@ mod library;
 mod macros;
 mod modules;
 mod runtimes;
+mod services;
 mod types;
 
 // exports
@@ -24,6 +25,7 @@ pub use library::{
 };
 pub(crate) use macros::cfg_wasmer;
 pub use modules::co_v1;
+pub use services::runtime::{RuntimeActor, RuntimeHandle};
 pub use types::{
 	cid_resolver::{
 		create_cid_resolver, CidResolver, CidResolverBox, IpldResolver, JoinCidResolver, MultiLayerCidResolver,

@@ -5,6 +5,7 @@ members = [
     "co-bindings",
     "co-cli",
     "co-dioxus",
+    "co-guard",
     "co-identity",
     "co-js",
     "co-log",
@@ -112,6 +113,7 @@ co-core-role = { path = "cores/role" }
 co-core-room = { path = "cores/room" }
 co-core-storage = { path = "cores/storage" }
 co-dioxus = { path = "co-dioxus" }
+co-guard = { path = "co-guard" }
 co-identity = { path = "co-identity" }
 co-log = { path = "co-log" }
 co-macros = { path = "co-macros" }
