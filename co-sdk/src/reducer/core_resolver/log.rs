@@ -6,7 +6,7 @@
 use crate::{services::runtime::RuntimeHandle, CoreResolver, CoreResolverContext, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{BlockStorage, BlockStorageExt, CoDate, CoId, DiagnosticMessage, DynamicCoDate, ReducerAction};
+use co_primitives::{BlockStorage, BlockStorageExt, CoDate, CoId, DynamicCoDate, ReducerAction};
 use co_runtime::RuntimeContext;
 use ipld_core::ipld::Ipld;
 
@@ -37,34 +37,36 @@ where
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
 		let start = self.date.now();
-		let mut runtime_context = self.next.execute(storage, runtime, context, state, action).await?;
+		let runtime_context = self.next.execute(storage, runtime, context, state, action).await?;
 
 		// log
 		let action_ipld: Option<ReducerAction<Ipld>> = storage.get_deserialized(action).await.ok();
 		let duration = self.date.now() - start;
-		tracing::trace!(
-			co = ?self.co,
-			previous_state = ?state,
-			next_state = ?runtime_context.state,
-			head = ?context.entry.cid(),
-			?duration,
-			?action_ipld,
-			?action,
-			"reducer-action"
-		);
 
-		// resolve diagnostics
-		runtime_context.resolve_diagnostics(storage).await?;
-
-		// trace diagnostics
-		for diagnostic in runtime_context.diagnostics.iter() {
-			if let Some(message) = diagnostic.message() {
-				match message {
-					DiagnosticMessage::Failure(err) => {
-						tracing::error!(err, "action-failed");
-					},
-				}
-			}
+		// trace
+		if let Some(Err(err)) = &runtime_context.result {
+			tracing::error!(
+				err,
+				co = ?self.co,
+				previous_state = ?state,
+				next_state = ?runtime_context.state,
+				head = ?context.entry.cid(),
+				?duration,
+				?action_ipld,
+				?action,
+				"reducer-action"
+			);
+		} else {
+			tracing::trace!(
+				co = ?self.co,
+				previous_state = ?state,
+				next_state = ?runtime_context.state,
+				head = ?context.entry.cid(),
+				?duration,
+				?action_ipld,
+				?action,
+				"reducer-action"
+			);
 		}
 
 		// result

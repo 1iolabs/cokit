@@ -452,8 +452,8 @@ fn find_next_index<T: PartialOrd>(values: impl Iterator<Item = T>, value: T) -> 
 
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
-pub extern "C" fn state() {
-	co_api::sync_api::reduce::<DataSeries>()
+pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
+	co_api::sync_api::reduce::<DataSeries>(unsafe { &*input }, unsafe { &mut *output })
 }
 
 #[cfg(test)]

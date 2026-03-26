@@ -3,7 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use co_api::{BlockSerializer, ReducerAction, Tags};
+use co_api::{BlockSerializer, ReducerAction, ReducerInput, Tags};
 use co_core_co::{Co, CoAction};
 use co_runtime::{RuntimeContext, RuntimePool};
 use co_storage::{unixfs_add_file, BlockStorage, MemoryBlockStorage};
@@ -55,7 +55,12 @@ async fn integration_test() {
 
 	// execute
 	let next_state = RuntimePool::default()
-		.execute_state(&storage, &wasm, &wasm.into(), RuntimeContext::new(None, action_cid))
+		.execute_state(
+			&storage,
+			&wasm,
+			&wasm.into(),
+			RuntimeContext::new(&ReducerInput { state: None, action: action_cid }).unwrap(),
+		)
 		.await
 		.unwrap()
 		.state;

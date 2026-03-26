@@ -3,89 +3,71 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{async_api::Context, library::wasm_context::WasmContext, Guard};
-use co_primitives::{from_cbor, BlockStorageExt, DiagnosticMessage, GuardVerifyPayload};
+use crate::{
+	library::{
+		data::{read_input_sync, write_output_sync},
+		wasm_storage::WasmStorage,
+	},
+	Guard,
+};
+use co_primitives::{CoreBlockStorage, GuardInput, GuardOutput, RawCid, Tags};
 use futures::{executor::LocalPool, future::LocalBoxFuture, task::LocalSpawnExt, FutureExt};
 use std::sync::Arc;
 
-pub fn guard<R>() -> bool
+pub fn guard<R>(input: &RawCid, output: &mut RawCid)
 where
 	R: Guard + 'static,
 {
-	GuardRef::new::<R>().execute_blocking(WasmContext::new()).1
-}
+	let mut storage = WasmStorage::new();
+	let block_storage = CoreBlockStorage::new(storage.clone(), false);
 
-async fn execute<C, R>(context: &C) -> Result<bool, anyhow::Error>
-where
-	C: Context + 'static,
-	R: Guard + 'static,
-{
-	let payload = context.payload();
-	let guard_payload: GuardVerifyPayload = from_cbor(&payload)?;
+	// input
+	let guard_input: GuardInput = read_input_sync(&storage, input);
 
-	// guard
-	let next_state = R::verify(
-		context.storage(),
-		guard_payload.guard,
-		guard_payload.state,
-		guard_payload.heads,
-		guard_payload.next_head,
-	)
-	.await?;
+	// execute
+	let guard_output = GuardRef::new::<R>().execute_blocking(guard_input, block_storage);
 
-	// result
-	Ok(next_state)
+	// output
+	write_output_sync(&mut storage, &guard_output, output);
 }
 
 #[allow(clippy::type_complexity)]
-pub struct GuardRef<C>(
-	Arc<dyn for<'a> Fn(&'a C) -> LocalBoxFuture<'a, Result<bool, anyhow::Error>> + Sync + Send + 'static>,
-)
-where
-	C: Context + 'static;
-impl<C> GuardRef<C>
-where
-	C: Context + 'static,
-{
+pub struct GuardRef(
+	Arc<dyn Fn(GuardInput, CoreBlockStorage) -> LocalBoxFuture<'static, GuardOutput> + Sync + Send + 'static>,
+);
+impl GuardRef {
 	pub fn new<R>() -> Self
 	where
 		R: Guard + 'static,
 	{
-		Self(Arc::new(|context| async { execute::<C, R>(context).await }.boxed_local()))
+		Self(Arc::new(|input, storage| {
+			async move {
+				match R::verify(&storage, input.guard, input.state, input.heads, input.next_head).await {
+					Ok(valid) => GuardOutput { result: valid, error: None, tags: Tags::default() },
+					Err(err) => GuardOutput { result: false, error: Some(err.to_string()), tags: Tags::default() },
+				}
+			}
+			.boxed_local()
+		}))
 	}
 
-	pub fn execute_blocking(self, context: C) -> (C, bool) {
+	pub fn execute_blocking(&self, input: GuardInput, storage: CoreBlockStorage) -> GuardOutput {
 		let mut pool = LocalPool::new();
 		let handle = pool
 			.spawner()
-			.spawn_local_with_handle(async move { self.execute_async(context).await })
+			.spawn_local_with_handle({
+				let execute = self.0.clone();
+				async move { execute(input, storage).await }
+			})
 			.expect("future to execute");
 		pool.run_until(handle)
 	}
 
-	pub async fn execute_async(&self, mut context: C) -> (C, bool) {
-		match self.execute(&context).await {
-			Ok(result) => (context, result),
-			Err(err) => {
-				let cid = context
-					.storage()
-					.set_serialized(&DiagnosticMessage::from(err))
-					.await
-					.expect("DiagnosticMessage to serialize");
-				context.write_diagnostic(cid);
-				(context, false)
-			},
-		}
-	}
-
-	async fn execute(&self, context: &C) -> Result<bool, anyhow::Error> {
-		(self.0)(context).await
+	pub async fn execute_async(&self, input: GuardInput, storage: CoreBlockStorage) -> GuardOutput {
+		(self.0)(input, storage).await
 	}
 }
-impl<C> Clone for GuardRef<C>
-where
-	C: Context + 'static,
-{
+impl Clone for GuardRef {
 	fn clone(&self) -> Self {
 		Self(self.0.clone())
 	}

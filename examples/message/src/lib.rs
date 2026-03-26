@@ -171,6 +171,6 @@ impl MessageState {
 
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
-pub extern "C" fn state() {
-	co_api::sync_api::reduce::<MessageState>()
+pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
+	co_api::sync_api::reduce::<MessageState>(unsafe { &*input }, unsafe { &mut *output })
 }

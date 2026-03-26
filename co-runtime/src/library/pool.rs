@@ -6,12 +6,12 @@
 #[cfg(feature = "js")]
 use crate::library::deferred_storage::DeferredStorage;
 use crate::{
-	co_v1::CoV1Api, runtimes::RuntimeError, types::guard::GuardReference, ApiContext, AsyncContext, Core,
-	RuntimeContext, RuntimeInstance,
+	co_v1::CoV1Api, runtimes::RuntimeError, types::guard::GuardReference, ApiContext, Core, RuntimeContext,
+	RuntimeInstance,
 };
 use cid::Cid;
 use co_actor::TaskSpawner;
-use co_primitives::AnyBlockStorage;
+use co_primitives::{from_cbor, AnyBlockStorage, CoreBlockStorage, GuardInput, ReducerInput};
 use co_storage::{BlockStorage, StorageError};
 use std::{
 	collections::VecDeque,
@@ -78,7 +78,7 @@ impl RuntimePool {
 		storage: &S,
 		core_cid: &Cid,
 		core: &Core,
-		context: RuntimeContext,
+		mut context: RuntimeContext,
 	) -> Result<RuntimeContext, ExecuteError>
 	where
 		S: BlockStorage + Send + Sync + Clone + 'static,
@@ -147,22 +147,28 @@ impl RuntimePool {
 				result
 			},
 			Core::NativeAsync(f) => {
-				// api
-				let api = AsyncContext::new(storage.clone(), context, checked);
+				let reducer_storage = CoreBlockStorage::new(storage.clone(), checked);
+
+				// input
+				let reducer_input: ReducerInput =
+					from_cbor(&context.input).map_err(|err| ExecuteError::Other(err.into()))?;
 
 				// execute
 				let execute = f.clone();
 				#[cfg(not(feature = "js"))]
-				let result = self
+				let reducer_output = self
 					.spawner
-					.spawn_blocking(Default::default(), move || execute.execute_blocking(api).context())
+					.spawn_blocking(Default::default(), move || {
+						execute.execute_blocking(reducer_input, reducer_storage)
+					})
 					.await
 					.map_err(|e| ExecuteError::Other(e.into()))?;
 				#[cfg(feature = "js")]
-				let result = execute.execute_async(api).await.context();
+				let reducer_output = execute.execute_async(reducer_input, block_storage).await;
 
 				// result
-				result
+				context.apply_reducer_output(reducer_output);
+				context
 			},
 		};
 
@@ -176,7 +182,7 @@ impl RuntimePool {
 		storage: &S,
 		guard_cid: &Cid,
 		guard: &GuardReference,
-		context: RuntimeContext,
+		mut context: RuntimeContext,
 	) -> Result<(RuntimeContext, bool), ExecuteError>
 	where
 		S: BlockStorage + Send + Sync + Clone + 'static,
@@ -235,22 +241,27 @@ impl RuntimePool {
 				result
 			},
 			GuardReference::Native(f) => {
-				// api
-				let api = AsyncContext::new(storage.clone(), context, checked);
+				let guard_storage = CoreBlockStorage::new(storage.clone(), checked);
+
+				// input
+				let guard_input: GuardInput =
+					from_cbor(&context.input).map_err(|err| ExecuteError::Other(err.into()))?;
 
 				// execute
 				let guard = f.clone();
 				#[cfg(not(feature = "js"))]
-				let (api, result) = self
+				let guard_output = self
 					.spawner
-					.spawn_blocking(Default::default(), move || guard.execute_blocking(api))
+					.spawn_blocking(Default::default(), move || guard.execute_blocking(guard_input, guard_storage))
 					.await
 					.map_err(|e| ExecuteError::Other(e.into()))?;
 				#[cfg(feature = "js")]
-				let (api, result) = guard.execute_async(api).await;
+				let guard_output = guard.execute_async(guard_input, block_storage).await;
 
-				// result
-				(api.context(), result)
+				// output
+				let result = guard_output.result;
+				context.apply_guard_output(guard_output);
+				(context, result)
 			},
 		};
 

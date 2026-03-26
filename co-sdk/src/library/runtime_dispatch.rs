@@ -8,7 +8,7 @@ use crate::{services::runtime::RuntimeHandle, types::co_dispatch::CoDispatch, Co
 use async_trait::async_trait;
 use cid::Cid;
 use co_identity::PrivateIdentityBox;
-use co_primitives::StaticCoDate;
+use co_primitives::{ReducerInput, StaticCoDate};
 use co_runtime::{Core, RuntimeContext};
 use co_storage::ExtendedBlockStorage;
 use serde::Serialize;
@@ -65,7 +65,7 @@ where
 				&self.storage,
 				&self.core_binary,
 				&self.core,
-				RuntimeContext::new(self.state, action_cid.into()),
+				RuntimeContext::new(&ReducerInput { state: self.state, action: action_cid.into() })?,
 			)
 			.await
 			.map_err(|e| CoreResolverError::Execute(self.core_name.clone(), e))?;
@@ -78,7 +78,7 @@ where
 		// check diagnostics
 		//  (albeit they only happen due to bugs)
 		//  we should always use diagnostics for implicit actions to not silently fail tasks
-		runtime_context.ok(&self.storage).await?;
+		runtime_context.ok()?;
 
 		// result
 		Ok(runtime_context.state)

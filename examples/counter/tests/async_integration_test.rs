@@ -5,6 +5,7 @@
 
 use cid::Cid;
 use co_api::{BlockSerializer, ReducerAction};
+use co_primitives::ReducerInput;
 use co_sdk::{RuntimeContext, RuntimePool};
 use co_storage::{unixfs_add_file, BlockStorage, MemoryBlockStorage};
 use example_counter::{Counter, CounterAction};
@@ -54,7 +55,12 @@ async fn async_integration_test() {
 
 	// execute
 	let next_state = RuntimePool::default()
-		.execute_state(&storage, &wasm, &wasm.into(), RuntimeContext::new(None, action_cid))
+		.execute_state(
+			&storage,
+			&wasm,
+			&wasm.into(),
+			RuntimeContext::new(&ReducerInput { state: None, action: action_cid }).unwrap(),
+		)
 		.await
 		.unwrap()
 		.state;

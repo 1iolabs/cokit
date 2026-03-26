@@ -4,7 +4,6 @@
 // retention—approved secure tools may process solely for internal use.
 
 pub mod api_context;
-pub mod async_context;
 #[cfg(feature = "llvm")]
 pub mod compile;
 #[cfg(feature = "js")]

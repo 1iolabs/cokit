@@ -6,6 +6,7 @@
 use crate::{services::runtime::RuntimeHandle, CoreResolver, CoreResolverContext, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
+use co_primitives::ReducerInput;
 use co_runtime::{Core, RuntimeContext};
 use co_storage::BlockStorage;
 
@@ -33,7 +34,12 @@ where
 		action: &Cid,
 	) -> Result<RuntimeContext, CoreResolverError> {
 		Ok(runtime
-			.execute_state(storage, &self.core_binary, &self.core, RuntimeContext::new(*state, action.into()))
+			.execute_state(
+				storage,
+				&self.core_binary,
+				&self.core,
+				RuntimeContext::new(&ReducerInput { state: *state, action: *action })?,
+			)
 			.await
 			.map_err(|e| CoreResolverError::Execute("root".to_owned(), e))?)
 	}

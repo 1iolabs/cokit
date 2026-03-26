@@ -3,7 +3,6 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::AsyncContext;
 use cid::Cid;
 use co_api::{Guard, GuardRef};
 use std::fmt::Debug;
@@ -13,7 +12,7 @@ use std::fmt::Debug;
 pub enum GuardReference {
 	Wasm(Cid),
 	Binary(Vec<u8>),
-	Native(GuardRef<AsyncContext>),
+	Native(GuardRef),
 }
 impl GuardReference {
 	pub fn native<R>() -> GuardReference

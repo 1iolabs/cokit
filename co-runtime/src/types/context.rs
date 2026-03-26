@@ -5,97 +5,48 @@
 
 use cid::Cid;
 use co_api::to_cbor;
-use co_primitives::{BlockStorage, BlockStorageExt, DiagnosticMessage};
-use derive_more::From;
+use co_primitives::{GuardOutput, ReducerOutput, Tags};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct RuntimeContext {
-	/// The acutual state.
+	/// State CID. Set as output after state execution.
+	#[serde(default)]
 	pub state: Option<Cid>,
 
-	/// The event to apply to the state.
-	pub event: Cid,
+	/// Serialized input (e.g. `ReducerInput` or `GuardInput`).
+	#[serde(default)]
+	pub input: Vec<u8>,
 
-	/// Runtime payload.
-	pub payload: Vec<u8>,
+	/// Execution result. `None` before execution, `Some(Ok(()))` on success, `Some(Err(msg))` on failure.
+	#[serde(default)]
+	pub result: Option<Result<(), String>>,
 
-	/// Diagnostics returned from the COre.
-	pub diagnostics: Vec<RuntimeDiagnosic>,
+	/// Tags returned from the COre.
+	#[serde(default)]
+	pub tags: Tags,
 }
 impl RuntimeContext {
-	pub fn new(state: Option<Cid>, event: Cid) -> Self {
-		Self { state, event, payload: Default::default(), diagnostics: Default::default() }
+	pub fn new<T: Serialize>(input: &T) -> Result<Self, anyhow::Error> {
+		Ok(Self { input: to_cbor(input)?, ..Default::default() })
 	}
 
-	pub fn new_payload<T: Serialize>(payload: &T) -> Result<Self, anyhow::Error> {
-		Self {
-			state: Default::default(),
-			event: Default::default(),
-			payload: Default::default(),
-			diagnostics: Default::default(),
-		}
-		.with_payload(payload)
+	pub fn apply_reducer_output(&mut self, output: ReducerOutput) {
+		self.state = output.state;
+		self.result = output.error.map(Err).or(Some(Ok(())));
+		self.tags = output.tags;
 	}
 
-	pub fn with_payload<T: Serialize>(mut self, payload: &T) -> Result<Self, anyhow::Error> {
-		self.payload = to_cbor(payload)?;
-		Ok(self)
+	pub fn apply_guard_output(&mut self, output: GuardOutput) {
+		self.result = output.error.map(Err).or(Some(Ok(())));
+		self.tags = output.tags;
 	}
 
-	/// Resolve diagnostics to messages.
-	pub async fn resolve_diagnostics<S: BlockStorage>(&mut self, storage: &S) -> Result<(), anyhow::Error> {
-		for diagnostic in self.diagnostics.iter_mut() {
-			diagnostic.resolve(storage).await;
-		}
-		Ok(())
-	}
-
-	pub fn push_diagnostic(&mut self, message: DiagnosticMessage) {
-		self.diagnostics.push(RuntimeDiagnosic::Message(message));
-	}
-
-	/// Test for failures in diagnostics.
-	pub async fn ok<S: BlockStorage>(&self, storage: &S) -> Result<(), anyhow::Error> {
-		for diagnostic in self.diagnostics.iter() {
-			let mut diagnostic = diagnostic.clone();
-			diagnostic.resolve(storage).await;
-			if let RuntimeDiagnosic::Message(message) = diagnostic {
-				match message {
-					DiagnosticMessage::Failure(diagnostic) => {
-						return Err(anyhow::anyhow!(diagnostic));
-					},
-				}
-			}
-		}
-		Ok(())
-	}
-}
-
-#[derive(Debug, Clone, From, Serialize, Deserialize)]
-pub enum RuntimeDiagnosic {
-	Reference(Cid),
-	Message(DiagnosticMessage),
-}
-impl RuntimeDiagnosic {
-	pub async fn resolve<S: BlockStorage>(&mut self, storage: &S) {
-		if let RuntimeDiagnosic::Reference(diagnostic_cid) = &self {
-			match storage.get_deserialized::<DiagnosticMessage>(diagnostic_cid).await {
-				Ok(message) => {
-					*self = RuntimeDiagnosic::Message(message);
-				},
-				Err(err) => {
-					tracing::warn!(?diagnostic_cid, ?err, "resolve-diagnostic-failed");
-				},
-			}
-		}
-	}
-
-	pub fn message(&self) -> Option<&DiagnosticMessage> {
-		if let RuntimeDiagnosic::Message(message) = self {
-			Some(message)
-		} else {
-			None
+	/// Get execute result.
+	pub fn ok(&self) -> Result<(), anyhow::Error> {
+		match &self.result {
+			Some(Err(error)) => Err(anyhow::anyhow!("{error}")),
+			_ => Ok(()),
 		}
 	}
 }

@@ -640,8 +640,8 @@ fn create_folder(
 
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
-pub extern "C" fn state() {
-	co_api::sync_api::reduce::<File>()
+pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
+	co_api::sync_api::reduce::<File>(unsafe { &*input }, unsafe { &mut *output })
 }
 
 #[cfg(test)]
@@ -668,11 +668,7 @@ mod tests {
 			self
 		}
 
-		fn payload(&self) -> Vec<u8> {
-			unimplemented!()
-		}
-
-		fn event(&self) -> Cid {
+		fn action(&self) -> Cid {
 			unimplemented!()
 		}
 
@@ -681,10 +677,6 @@ mod tests {
 		}
 
 		fn store_state(&mut self, _cid: Cid) {
-			unimplemented!()
-		}
-
-		fn write_diagnostic(&mut self, _cid: Cid) {
 			unimplemented!()
 		}
 	}

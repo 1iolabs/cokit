@@ -5,6 +5,7 @@
 
 use cid::Cid;
 use co_api::{BlockSerializer, ReducerAction};
+use co_primitives::ReducerInput;
 use co_runtime::{co_v1::CoV1Api, create_runtime, RuntimeContext};
 use co_storage::{MemoryStorage, Storage, SyncStorage};
 use example_counter::{Counter, CounterAction};
@@ -49,7 +50,10 @@ fn integration_test() {
 	storage.set(action_block).unwrap();
 
 	// api
-	let api = CoV1Api::new(Box::new(storage.clone()), RuntimeContext::new(None, action_cid));
+	let api = CoV1Api::new(
+		Box::new(storage.clone()),
+		RuntimeContext::new(&ReducerInput { state: None, action: action_cid }).unwrap(),
+	);
 
 	// wasm
 	let wasm_path = "../../target-wasm/wasm32-unknown-unknown/release/example_counter.wasm";

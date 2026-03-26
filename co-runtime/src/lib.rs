@@ -19,7 +19,6 @@ mod types;
 pub use library::compile::compile_native;
 pub use library::{
 	api_context::ApiContext,
-	async_context::AsyncContext,
 	instance::RuntimeInstance,
 	pool::{ExecuteError, IdleRuntimePool, RuntimePool},
 };

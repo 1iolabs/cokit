@@ -6,16 +6,19 @@
 use crate::{co_v1::CoV1Api, RuntimeContext};
 use cid::Cid;
 use co_api::{sync_api::Context, Block, Storage};
+use co_primitives::{from_cbor, ReducerInput};
 
 /// Native api context.
 /// This should be only used for testing purposes.
 pub struct ApiContext {
 	api: CoV1Api,
+	action: Cid,
 }
 impl ApiContext {
-	pub fn new(api: CoV1Api) -> Self {
-		// let (storage, context) = api.into_inner();
-		Self { api }
+	pub fn new(mut api: CoV1Api) -> Self {
+		let reducer_input: ReducerInput = from_cbor(&api.context().input).expect("valid ReducerInput in context.input");
+		api.context_mut().state = reducer_input.state;
+		Self { action: reducer_input.action, api }
 	}
 
 	pub fn context(&self) -> &RuntimeContext {
@@ -31,12 +34,8 @@ impl Context for ApiContext {
 		self
 	}
 
-	fn payload(&self) -> Vec<u8> {
-		self.api.payload().to_vec()
-	}
-
-	fn event(&self) -> Cid {
-		*self.api.event()
+	fn action(&self) -> Cid {
+		self.action
 	}
 
 	fn state(&self) -> Option<Cid> {
@@ -45,10 +44,6 @@ impl Context for ApiContext {
 
 	fn store_state(&mut self, cid: Cid) {
 		self.api.set_state(cid);
-	}
-
-	fn write_diagnostic(&mut self, cid: Cid) {
-		self.api.write_diagnostic(cid);
 	}
 }
 impl Storage for ApiContext {

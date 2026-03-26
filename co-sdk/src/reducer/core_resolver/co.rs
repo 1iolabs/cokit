@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use cid::Cid;
 use co_core_co::{CoAction, CreateAction};
 use co_identity::{LocalIdentity, PrivateIdentity};
-use co_primitives::{reducer_action_core_from_storage, ReducerAction};
+use co_primitives::{reducer_action_core_from_storage, ReducerAction, ReducerInput};
 use co_runtime::{Core, RuntimeContext};
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use ipld_core::ipld::Ipld;
@@ -195,10 +195,19 @@ where
 		// apply to state
 		//  use precomputed state if specified
 		let mut result = if let Some(result_core_state) = context.state {
-			RuntimeContext::new(Some(result_core_state), action.into())
+			let mut runtime_context =
+				RuntimeContext::new(&ReducerInput { state: Some(result_core_state), action: *action })?;
+			runtime_context.state = Some(result_core_state);
+			runtime_context.result = Some(Ok(()));
+			runtime_context
 		} else {
 			runtime
-				.execute_state(storage, &core_binary, &core, RuntimeContext::new(core_state, action.into()))
+				.execute_state(
+					storage,
+					&core_binary,
+					&core,
+					RuntimeContext::new(&ReducerInput { state: core_state, action: *action })?,
+				)
 				.await
 				.map_err(|e| CoreResolverError::Execute(core_name.clone(), e))?
 		};

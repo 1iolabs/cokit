@@ -36,16 +36,8 @@ impl CoV1Api {
 		self.context.state = Some(state);
 	}
 
-	pub fn event(&self) -> &Cid {
-		&self.context.event
-	}
-
-	pub fn payload(&self) -> &[u8] {
-		&self.context.payload
-	}
-
-	pub fn write_diagnostic(&mut self, data: Cid) {
-		self.context.diagnostics.push(data.into());
+	pub fn context_mut(&mut self) -> &mut RuntimeContext {
+		&mut self.context
 	}
 
 	pub fn swap(&mut self, other: &mut CoV1Api) {
@@ -128,12 +120,10 @@ impl Storage for CoV1Api {
 }
 
 pub fn storage_block_get(api: &mut CoV1Api, cid: &[u8], buffer: &mut [u8]) -> Result<u32, anyhow::Error> {
-	// let cid_buffer: &[u8] = unsafe { from_raw_parts(cid as *const u8, cid_size) };
 	let cid = Cid::try_from(cid)?;
 	let block = api.get(&cid)?;
 	let size = min(block.data().len(), buffer.len());
 	buffer[0..size].copy_from_slice(&block.data()[0..size]);
-	// unsafe { copy_nonoverlapping(block.data().as_ptr(), buffer as *mut u8, min(block.data().len(), buffer_size)) };
 	Ok(block.data().len().try_into()?)
 }
 
@@ -143,40 +133,4 @@ pub fn storage_block_set(api: &mut CoV1Api, cid: &[u8], buffer: &[u8]) -> Result
 	let result = block.data().len().try_into()?;
 	api.set(block)?;
 	Ok(result)
-}
-
-pub fn payload_read(api: &CoV1Api, buffer: &mut [u8], offset: u32) -> Result<u32, anyhow::Error> {
-	let len = api.context.payload.len();
-	let size = min(len - (offset as usize), buffer.len());
-	buffer[0..size].copy_from_slice(&api.context.payload[0..size]);
-	Ok(len.try_into()?)
-}
-
-pub fn state_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> Result<u32, anyhow::Error> {
-	Ok(match api.context.state {
-		Some(cid) => {
-			let cid_buffer = cid.to_bytes();
-			let size = min(buffer.len(), cid_buffer.len());
-			buffer[0..size].copy_from_slice(&cid_buffer.as_slice()[0..size]);
-			cid_buffer.len().try_into()?
-		},
-		None => 0,
-	})
-}
-
-pub fn state_cid_write(api: &mut CoV1Api, buffer: &[u8]) -> Result<u32, anyhow::Error> {
-	api.context.state = Some(Cid::try_from(buffer)?);
-	Ok(buffer.len().try_into()?)
-}
-
-pub fn event_cid_read(api: &CoV1Api, buffer: &mut [u8]) -> Result<u32, anyhow::Error> {
-	let cid_buffer = api.context.event.to_bytes();
-	let size = min(buffer.len(), cid_buffer.len());
-	buffer[0..size].copy_from_slice(&cid_buffer.as_slice()[0..size]);
-	Ok(cid_buffer.len().try_into()?)
-}
-
-pub fn diagnostic_cid_write(api: &mut CoV1Api, buffer: &[u8]) -> Result<u32, anyhow::Error> {
-	api.context.diagnostics.push(Cid::try_from(buffer)?.into());
-	Ok(buffer.len().try_into()?)
 }

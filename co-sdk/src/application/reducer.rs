@@ -474,10 +474,10 @@ where
 		//  which just have no effect to the state
 		//  but in case of push which is always local we can just skip it
 		//  it makes no sense to propagate it to peers etc.
-		runtime_context.ok(storage).await?;
+		runtime_context.ok()?;
 
 		// commit log heads now that execution succeeded
-		self.log.push_commit(pending)?;
+		let entry = self.log.push_commit(pending)?;
 
 		// snapshot
 		if let Some(state) = self.state {
@@ -497,7 +497,8 @@ where
 		Ok(PushResult {
 			entry: context.entry.cid().into(),
 			context: context.change,
-			head: runtime_context.event,
+			action: *action_link.cid(),
+			head: *entry.cid(),
 			state: runtime_context.state,
 		})
 	}
@@ -681,6 +682,8 @@ where
 pub struct PushResult {
 	/// The resuting state.
 	pub state: Option<Cid>,
+	/// The action referenced by the head.
+	pub action: Cid,
 	/// The latest head after the push operation.
 	pub head: Cid,
 	/// The entry reference. Normally the same as the head (if not changed by an CoreResolver).

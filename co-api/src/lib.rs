@@ -12,19 +12,18 @@ mod types;
 pub use cid::Cid;
 pub use co_macros::{co, co_data, co_state};
 pub use co_primitives::{
-	from_cbor, from_json, reducer_action_core, reducer_action_core_from_storage, serde_map_as_list, tags, to_cbor,
-	to_json, to_json_string, AbsolutePath, AbsolutePathOwned, Block, BlockSerializer, BlockSerializerError,
-	BlockStorage, BlockStorageExt, Clock, CoId, CoList, CoListIndex, CoListTransaction, CoMap, CoMapTransaction,
-	CoMetadata, CoReference, CoSet, CoSetTransaction, CoTryStreamExt, Component, Components, CoreBlockStorage,
-	DagCollection, DagCollectionExt, DagMap, DagMapExt, DagSet, DagSetExt, DagVec, DagVecExt, Date,
-	DefaultNodeSerializer, DefaultParams, Did, Entry, IsDefault, LazyTransaction, Link, Linkable, Metadata, Network,
-	Node, NodeBuilder, NodeBuilderError, NodeSerializer, OptionLink, Path, PathExt, PathOwned, ReducerAction,
-	RelativePath, RelativePathOwned, Secret, SignedEntry, Storage, StorageError, StoreParams, Tag, TagMatcher,
-	TagPattern, TagValue, Tags, TagsExpr, TotalFloat64, WeakCid, WithCoMetadata,
+	cid_to_raw, from_cbor, from_json, raw_to_cid, reducer_action_core, reducer_action_core_from_storage,
+	serde_map_as_list, tags, to_cbor, to_json, to_json_string, AbsolutePath, AbsolutePathOwned, Block, BlockSerializer,
+	BlockSerializerError, BlockStorage, BlockStorageExt, Clock, CoId, CoList, CoListIndex, CoListTransaction, CoMap,
+	CoMapTransaction, CoMetadata, CoReference, CoSet, CoSetTransaction, CoTryStreamExt, Component, Components,
+	CoreBlockStorage, DagCollection, DagCollectionExt, DagMap, DagMapExt, DagSet, DagSetExt, DagVec, DagVecExt, Date,
+	DefaultNodeSerializer, DefaultParams, Did, Entry, GuardInput, GuardOutput, IsDefault, LazyTransaction, Link,
+	Linkable, Metadata, Network, Node, NodeBuilder, NodeBuilderError, NodeSerializer, OptionLink, Path, PathExt,
+	PathOwned, RawCid, ReducerAction, ReducerInput, ReducerOutput, RelativePath, RelativePathOwned, Secret,
+	SignedEntry, Storage, StorageError, StoreParams, Tag, TagMatcher, TagPattern, TagValue, Tags, TagsExpr,
+	TotalFloat64, WeakCid, WithCoMetadata, CID_MAX_SIZE,
 };
-pub use co_v1::{
-	diagnostic_cid_write, event_cid_read, state_cid_read, state_cid_write, storage_block_get, storage_block_set,
-};
+pub use co_v1::{storage_block_get, storage_block_set};
 pub use library::guard::{guard, GuardRef};
 pub use types::guard::Guard;
 

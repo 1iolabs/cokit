@@ -8,7 +8,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use cid::Cid;
-use co_primitives::{DiagnosticMessage, GuardVerifyPayload};
+use co_primitives::GuardInput;
 use co_runtime::{GuardReference, RuntimeContext};
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use std::collections::HashMap;
@@ -72,12 +72,7 @@ where
 						storage,
 						&guard.binary,
 						&guard_reference,
-						RuntimeContext::new(Some(state), *action).with_payload(&GuardVerifyPayload {
-							guard: guard_name.clone(),
-							state,
-							heads,
-							next_head,
-						})?,
+						RuntimeContext::new(&GuardInput { guard: guard_name.clone(), state, heads, next_head })?,
 					)
 					.await
 					.map_err(|err| {
@@ -86,9 +81,6 @@ where
 						)
 					})?;
 				if !valid {
-					// diagnostics
-					result.resolve_diagnostics(storage).await?;
-
 					// trace
 					tracing::trace!(
 						co = ?co_state.id,
@@ -98,7 +90,7 @@ where
 						heads = ?context.entry.entry().next,
 						next_head = ?context.entry.cid(),
 						mode = ?self.mode,
-						diagnostics = ?result.diagnostics,
+						result = ?result.result,
 						"guard-reject"
 					);
 
@@ -114,10 +106,8 @@ where
 						},
 						// skip to compute
 						GuardRejectionMode::Skip => {
-							result.push_diagnostic(DiagnosticMessage::Failure(format!(
-								"Guard \"{}\" rejected head \"{}\"",
-								guard_name, next_head
-							)));
+							result.result =
+								Some(Err(format!("Guard \"{}\" rejected head \"{}\"", guard_name, next_head)));
 							return Ok(result);
 						},
 						// warn and ignore

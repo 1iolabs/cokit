@@ -34,6 +34,8 @@ pub mod mapped_cid;
 pub mod metadata;
 pub mod network;
 pub mod path;
+pub mod raw_cid;
+pub mod reducer;
 pub mod secret;
 pub mod storage;
 pub mod store_params;

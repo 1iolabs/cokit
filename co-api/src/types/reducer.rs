@@ -16,15 +16,11 @@ pub trait Context {
 
 	fn storage_mut(&mut self) -> &mut dyn Storage;
 
-	fn payload(&self) -> Vec<u8>;
-
-	fn event(&self) -> Cid;
+	fn action(&self) -> Cid;
 
 	fn state(&self) -> Option<Cid>;
 
 	fn store_state(&mut self, cid: Cid);
-
-	fn write_diagnostic(&mut self, cid: Cid);
 }
 
 pub mod async_reducer {

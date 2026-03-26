@@ -3,7 +3,6 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::AsyncContext;
 use cid::Cid;
 use co_api::{
 	async_api,
@@ -18,7 +17,7 @@ pub enum Core {
 	Wasm(Cid),
 	Binary(Vec<u8>),
 	Native(Arc<dyn Fn(&mut dyn Context) + Send + Sync>),
-	NativeAsync(async_api::ReducerRef<AsyncContext>),
+	NativeAsync(async_api::ReducerRef),
 }
 impl Core {
 	pub fn native<S>() -> Core

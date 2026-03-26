@@ -89,6 +89,6 @@ where
 
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
-pub extern "C" fn state() {
-	co_api::async_api::reduce::<Counter, CounterAction>()
+pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
+	co_api::async_api::reduce::<Counter, CounterAction>(unsafe { &*input }, unsafe { &mut *output })
 }
