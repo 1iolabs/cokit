@@ -1542,7 +1542,7 @@ dependencies = [
  "chrono",
  "cid 0.11.1",
  "clap 4.5.60",
- "co-core-co 0.1.0",
+ "co-core-co",
  "co-core-file",
  "co-core-keystore",
  "co-core-membership",
@@ -1620,20 +1620,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "co-core-co"
-version = "0.1.0"
-source = "git+https://gitlab.1io.com/1io/co-sdk.git?branch=main#93b8e038d4d5000d222aa066b65ee987af8ce13f"
-dependencies = [
- "anyhow",
- "cid 0.11.1",
- "co-api 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
- "ipld-core",
- "serde",
- "serde_repr",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1718,7 +1704,7 @@ dependencies = [
  "async-trait",
  "cid 0.11.1",
  "co-api 0.1.0",
- "co-core-co 0.1.0",
+ "co-core-co",
  "co-runtime 0.1.0",
  "co-storage 0.1.0",
  "derive_more 0.99.20",
@@ -1748,24 +1734,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "co-core-poa"
-version = "0.1.0"
-source = "git+https://gitlab.1io.com/1io/co-guard.git?branch=main#5eb437add4a6e01b721a02ca4714dbbb4e587173"
-dependencies = [
- "anyhow",
- "async-trait",
- "cid 0.11.1",
- "co-api 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
- "co-core-co 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
- "futures",
- "ipld-core",
- "num-rational",
- "serde",
- "serde_repr",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1858,7 +1826,7 @@ dependencies = [
  "cid 0.11.1",
  "clap 4.5.60",
  "co-actor 0.1.0",
- "co-core-co 0.1.0",
+ "co-core-co",
  "co-core-membership",
  "co-guard",
  "co-primitives 0.1.0",
@@ -2191,14 +2159,13 @@ dependencies = [
  "cid 0.11.1",
  "co-actor 0.1.0",
  "co-core-board",
- "co-core-co 0.1.0",
+ "co-core-co",
  "co-core-data-series",
  "co-core-file",
  "co-core-keystore",
  "co-core-membership",
  "co-core-names",
  "co-core-pin",
- "co-core-poa",
  "co-core-rich-text",
  "co-core-role",
  "co-core-room",
@@ -2952,7 +2919,7 @@ dependencies = [
  "axum-macros",
  "cid 0.11.1",
  "clap 4.5.60",
- "co-core-co 0.1.0",
+ "co-core-co",
  "co-core-keystore",
  "co-core-membership",
  "co-sdk",
@@ -10592,7 +10559,7 @@ dependencies = [
  "cid 0.11.1",
  "clap 4.5.60",
  "co-actor 0.1.0",
- "co-core-co 0.1.0",
+ "co-core-co",
  "co-core-membership",
  "co-core-room",
  "co-log",
