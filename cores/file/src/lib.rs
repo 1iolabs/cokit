@@ -9,7 +9,7 @@ use co_api::{
 	async_api::Reducer, co, tags, AbsolutePath, AbsolutePathOwned, BlockStorageExt, CoMap, CoSet, CoreBlockStorage,
 	Date, Did, Link, OptionLink, PathExt, PathOwned, ReducerAction, Tags,
 };
-use futures::TryStreamExt;
+use futures::{FutureExt, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 #[co(state)]
@@ -120,13 +120,15 @@ impl Reducer<FileAction> for File {
 		let mut result = storage.get_value_or_default(&state).await?;
 		match &action.payload {
 			FileAction::Create { path, node, recursive } => {
-				reduce_create(storage, &mut result, path, node, &action.from, action.time, *recursive).await?;
+				reduce_create(storage, &mut result, path, node, &action.from, action.time, *recursive)
+					.boxed()
+					.await?;
 			},
 			FileAction::Remove { path, recursive } => {
-				reduce_remove(storage, &mut result, path, *recursive).await?;
+				reduce_remove(storage, &mut result, path, *recursive).boxed().await?;
 			},
 			FileAction::Modify { path, modifications } => {
-				reduce_modify(storage, &mut result, path, modifications).await?;
+				reduce_modify(storage, &mut result, path, modifications).boxed().await?;
 			},
 		}
 		Ok(storage.set_value(&result).await?)
@@ -576,10 +578,8 @@ async fn create_node(
 	let mut node_set = nodes.get(storage, &validated_parent_path).await?.unwrap_or_default();
 
 	// insert node if name not exists yet
-	let name_exists = node_set
-		.stream(storage)
-		.try_any(|existing| std::future::ready(existing.name() == node.name()))
-		.await?;
+	let all_nodes: Vec<Node> = node_set.stream(storage).try_collect().await?;
+	let name_exists = all_nodes.iter().any(|existing| existing.name() == node.name());
 	if !name_exists {
 		node_set.insert(storage, node).await?;
 		nodes.insert(storage, validated_parent_path, node_set).await?;
