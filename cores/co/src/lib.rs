@@ -5,8 +5,8 @@
 
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoId, CoMap, CoSet, CoreBlockStorage, Did, Link, Network,
-	OptionLink, ReducerAction, SignedEntry, StorageError, Tags,
+	co, BlockStorage, BlockStorageExt, CoId, CoMap, CoSet, CoreBlockStorage, Did, Link, Network, OptionLink, Reducer,
+	ReducerAction, SignedEntry, StorageError, Tags,
 };
 use serde::de::IgnoredAny;
 use std::collections::{BTreeMap, BTreeSet};

@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use cid::Cid;
-use co_api::async_api;
+use co_api::{Reducer, ReducerRef};
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 
@@ -13,15 +13,15 @@ use std::fmt::Debug;
 pub enum Core {
 	Wasm(Cid),
 	Binary(Vec<u8>),
-	Native(async_api::ReducerRef),
+	Native(ReducerRef),
 }
 impl Core {
 	pub fn native<R, A>() -> Core
 	where
-		R: async_api::Reducer<A> + Default + 'static,
+		R: Reducer<A> + Default + 'static,
 		A: Clone + DeserializeOwned + 'static,
 	{
-		Core::Native(async_api::ReducerRef::new::<R, A>())
+		Core::Native(ReducerRef::new::<R, A>())
 	}
 }
 impl Debug for Core {

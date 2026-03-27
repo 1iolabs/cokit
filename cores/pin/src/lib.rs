@@ -4,9 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use cid::Cid;
-use co_api::{
-	async_api::Reducer, co, BlockStorageExt, CoMap, CoSet, CoreBlockStorage, Link, OptionLink, ReducerAction, Tags,
-};
+use co_api::{co, BlockStorageExt, CoMap, CoSet, CoreBlockStorage, Link, OptionLink, Reducer, ReducerAction, Tags};
 use futures::TryStreamExt;
 
 /// COre that handles pinning and unpinning

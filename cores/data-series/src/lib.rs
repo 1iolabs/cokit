@@ -4,8 +4,8 @@
 // retention—approved secure tools may process solely for internal use.
 
 use co_api::{
-	async_api::Reducer, co, BlockStorageExt, CoList, CoMap, CoreBlockStorage, Date, Did, Link, OptionLink,
-	ReducerAction, Tags, TotalFloat64,
+	co, BlockStorageExt, CoList, CoMap, CoreBlockStorage, Date, Did, Link, OptionLink, Reducer, ReducerAction, Tags,
+	TotalFloat64,
 };
 use futures::TryStreamExt;
 

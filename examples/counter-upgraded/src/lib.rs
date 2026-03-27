@@ -3,7 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use co_api::{async_api::Reducer, BlockStorage, BlockStorageExt, CoreBlockStorage, Link, OptionLink, ReducerAction};
+use co_api::{BlockStorage, BlockStorageExt, CoreBlockStorage, Link, OptionLink, Reducer, ReducerAction};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::future::Future;
 
@@ -90,5 +90,5 @@ where
 #[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 #[no_mangle]
 pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
-	co_api::async_api::reduce::<Counter, CounterAction>(unsafe { &*input }, unsafe { &mut *output })
+	co_api::reduce::<Counter, CounterAction>(unsafe { &*input }, unsafe { &mut *output })
 }

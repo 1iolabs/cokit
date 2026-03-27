@@ -3,9 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use co_api::{
-	async_api::Reducer, co, BlockStorageExt, CoMap, CoSet, CoreBlockStorage, Did, Link, OptionLink, ReducerAction,
-};
+use co_api::{co, BlockStorageExt, CoMap, CoSet, CoreBlockStorage, Did, Link, OptionLink, Reducer, ReducerAction};
 
 #[co(state)]
 pub struct Roles {

@@ -5,7 +5,7 @@
 
 use crate::RuntimeContext;
 use cid::Cid;
-use co_api::{async_api, BlockStorage, CoreBlockStorage};
+use co_api::{BlockStorage, CoreBlockStorage};
 
 pub struct AsyncContext {
 	storage: CoreBlockStorage,
@@ -23,7 +23,7 @@ impl AsyncContext {
 		self.context
 	}
 }
-impl async_api::Context for AsyncContext {
+impl co_api::Context for AsyncContext {
 	fn storage(&self) -> &CoreBlockStorage {
 		&self.storage
 	}

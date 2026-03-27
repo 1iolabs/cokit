@@ -6,8 +6,8 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co, tags, AbsolutePath, AbsolutePathOwned, BlockStorageExt, CoMap, CoSet, CoreBlockStorage,
-	Date, Did, Link, OptionLink, PathExt, PathOwned, ReducerAction, Tags,
+	co, tags, AbsolutePath, AbsolutePathOwned, BlockStorageExt, CoMap, CoSet, CoreBlockStorage, Date, Did, Link,
+	OptionLink, PathExt, PathOwned, Reducer, ReducerAction, Tags,
 };
 use futures::{FutureExt, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -643,8 +643,8 @@ async fn create_folder(
 mod tests {
 	use crate::{File, FileAction, FileModification, FileNode, Node};
 	use co_api::{
-		async_api::Reducer, AbsolutePath, AbsolutePathOwned, BlockSerializer, BlockStorage, BlockStorageExt,
-		CoreBlockStorage, Link, OptionLink, ReducerAction,
+		AbsolutePath, AbsolutePathOwned, BlockSerializer, BlockStorage, BlockStorageExt, CoreBlockStorage, Link,
+		OptionLink, Reducer, ReducerAction,
 	};
 	use co_storage::MemoryBlockStorage;
 	use futures::TryStreamExt;

@@ -6,8 +6,8 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoMapTransaction, CoSet, CoSetTransaction,
-	CoreBlockStorage, Did, Guard, Link, OptionLink, ReducerAction, SignedEntry, WeakCid,
+	co, BlockStorage, BlockStorageExt, CoMap, CoMapTransaction, CoSet, CoSetTransaction, CoreBlockStorage, Did, Guard,
+	Link, OptionLink, Reducer, ReducerAction, SignedEntry, WeakCid,
 };
 use co_core_co::Co;
 use futures::{pin_mut, TryStreamExt};

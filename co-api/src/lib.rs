@@ -23,13 +23,11 @@ pub use co_primitives::{
 	Tags, TagsExpr, TotalFloat64, WeakCid, WithCoMetadata, CID_MAX_SIZE,
 };
 pub use co_v1::{storage_block_get, storage_block_set};
-pub use library::guard::{guard, GuardRef};
-pub use types::guard::Guard;
-
-// async export
-pub mod async_api {
-	pub use crate::{
-		library::reduce::async_reduce::{reduce, ReducerRef},
-		types::reducer::async_reducer::{Context, Reducer},
-	};
-}
+pub use library::{
+	guard::{guard, GuardRef},
+	reduce::{reduce, ReducerRef},
+};
+pub use types::{
+	guard::Guard,
+	reducer::{Context, Reducer},
+};

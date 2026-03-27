@@ -5,8 +5,7 @@
 
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co, BlockStorageExt, CoMetadata, CoreBlockStorage, Date, Did, Link, Metadata, OptionLink,
-	ReducerAction,
+	co, BlockStorageExt, CoMetadata, CoreBlockStorage, Date, Did, Link, Metadata, OptionLink, Reducer, ReducerAction,
 };
 use std::collections::BTreeMap;
 
