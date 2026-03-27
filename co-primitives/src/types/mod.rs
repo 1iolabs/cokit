@@ -20,7 +20,6 @@ pub mod codec;
 pub mod core_name;
 pub mod dag_collection;
 pub mod dag_collection_async_ext;
-pub mod dag_collection_ext;
 pub mod date;
 pub mod diagnostic_message;
 pub mod did;

@@ -166,13 +166,15 @@ fn get_native(name: &str) -> Core {
 	#[cfg(not(feature = "bundle-wasm-cores"))]
 	match name {
 		CO_CORE_CO => Core::native_async::<co_core_co::Co, co_core_co::CoAction>(),
-		CO_CORE_FILE => Core::native::<co_core_file::File>(),
+		CO_CORE_FILE => Core::native_async::<co_core_file::File, co_core_file::FileAction>(),
 		CO_CORE_KEYSTORE => Core::native_async::<co_core_keystore::KeyStore, co_core_keystore::KeyStoreAction>(),
 		CO_CORE_MEMBERSHIP => Core::native_async::<co_core_membership::Memberships, _>(),
-		CO_CORE_PIN => Core::native::<co_core_pin::Pin>(),
+		CO_CORE_PIN => Core::native_async::<co_core_pin::Pin, co_core_pin::PinAction>(),
 		CO_CORE_ROOM => Core::native_async::<co_core_room::Room, co_core_room::MatrixEvent>(),
-		CO_CORE_ROLE => Core::native::<co_core_role::Roles>(),
-		CO_CORE_DATA_SERIES => Core::native::<co_core_data_series::DataSeries>(),
+		CO_CORE_ROLE => Core::native_async::<co_core_role::Roles, co_core_role::RoleAction>(),
+		CO_CORE_DATA_SERIES => {
+			Core::native_async::<co_core_data_series::DataSeries, co_core_data_series::DataSeriesAction>()
+		},
 		CO_CORE_STORAGE => Core::native_async::<co_core_storage::Storage, co_core_storage::StorageAction>(),
 		CO_CORE_POA => Core::native_async::<co_core_poa::Authority, co_core_poa::AuthorityAction>(),
 		CO_CORE_BOARD => Core::native_async::<co_core_board::Board, co_core_board::BoardAction>(),

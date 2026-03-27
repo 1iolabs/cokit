@@ -3,35 +3,29 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use co_api::{sync_api::Reducer, DagMap, DagSet, Did};
-use serde::{Deserialize, Serialize};
-use std::cmp::Ord;
+use co_api::{
+	async_api::Reducer, co, BlockStorageExt, CoMap, CoSet, CoreBlockStorage, Did, Link, OptionLink, ReducerAction,
+};
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[co(state)]
 pub struct Roles {
-	pub roles: DagMap<Did, DagSet<Role>>,
+	pub roles: CoMap<Did, CoSet<Role>>,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[co]
 pub struct Role {}
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[co]
 pub enum RoleAction {}
 
-impl Reducer for Roles {
-	type Action = RoleAction;
-
-	fn reduce(
-		self,
-		_event: &co_api::ReducerAction<Self::Action>,
-		_context: &mut dyn co_api::sync_api::Context,
-	) -> Self {
-		todo!()
+impl Reducer<RoleAction> for Roles {
+	async fn reduce(
+		state: OptionLink<Self>,
+		event: Link<ReducerAction<RoleAction>>,
+		storage: &CoreBlockStorage,
+	) -> Result<Link<Self>, anyhow::Error> {
+		let _action = storage.get_value(&event).await?;
+		let result = storage.get_value_or_default(&state).await?;
+		Ok(storage.set_value(&result).await?)
 	}
-}
-
-#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
-#[no_mangle]
-pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
-	co_api::sync_api::reduce::<Roles>(unsafe { &*input }, unsafe { &mut *output })
 }

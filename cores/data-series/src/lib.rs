@@ -4,37 +4,37 @@
 // retention—approved secure tools may process solely for internal use.
 
 use co_api::{
-	sync_api::{Context, Reducer},
-	DagCollectionExt, DagMap, DagVec, Date, Did, ReducerAction, Storage, Tags, TotalFloat64,
+	async_api::Reducer, co, BlockStorageExt, CoList, CoMap, CoreBlockStorage, Date, Did, Link, OptionLink,
+	ReducerAction, Tags, TotalFloat64,
 };
-use serde::{Deserialize, Serialize};
+use futures::TryStreamExt;
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[co(state)]
 pub struct DataSeries {
 	/// The data points.
-	pub data: DagMap<String, Series>,
+	pub data: CoMap<String, Series>,
 
-	/// Aggragates.
-	pub aggregates: DagMap<String, Aggregate>,
+	/// Aggregates.
+	pub aggregates: CoMap<String, Aggregate>,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[co]
 pub struct Series {
 	/// Metadata for this series.
 	#[serde(default, skip_serializing_if = "Tags::is_empty")]
 	pub tags: Tags,
 
 	/// Data points. Sorted on data.time.
-	pub data: DagVec<Data>,
+	pub data: CoList<Data>,
 
 	/// Pending data points.
-	pub pending_data: DagMap<String, Data>,
+	pub pending_data: CoMap<String, Data>,
 
 	/// Only keep series for specified amount of seconds.
 	pub time_to_live: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[co]
 pub struct Data {
 	/// The data issuer.
 	pub did: Did,
@@ -58,11 +58,11 @@ fn default_value() -> i32 {
 	1
 }
 
-fn is_default_value(v: &i32) -> bool {
-	*v == 1
+fn is_default_value(value: &i32) -> bool {
+	*value == 1
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[co]
 pub struct Aggregate {
 	series: String,
 
@@ -71,56 +71,61 @@ pub struct Aggregate {
 	by: AggregateBy,
 
 	/// Aggregated values. Sorted by date.
-	values: DagVec<AggregateValue>,
+	values: CoList<AggregateValue>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[co]
 pub struct AggregateValue {
 	time: Date,
 	count: u64,
 	value: TotalFloat64,
 }
 
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[co(repr)]
+#[derive(Default)]
+#[repr(u8)]
 pub enum AggregateBy {
 	/// Sum.
 	#[default]
-	Sum,
+	Sum = 0,
 
 	/// Average.
-	Average,
+	Average = 1,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[co(repr)]
+#[repr(u8)]
 pub enum AggregateGroup {
 	/// By Minute.
-	TimeMinute,
+	TimeMinute = 0,
 
 	/// By Hour.
-	TimeHour,
+	TimeHour = 1,
 
 	/// By Day.
-	TimeDay,
+	TimeDay = 2,
 
 	/// By Week.
-	TimeWeek,
+	TimeWeek = 3,
 
 	/// By Month.
-	TimeMonth,
+	TimeMonth = 4,
 
 	/// By Year.
-	TimeYear,
+	TimeYear = 5,
 }
 
 /// Create a series.
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
+#[derive(Default)]
 pub struct CreateSeriesPayload {
 	pub series: String,
 	pub tags: Tags,
 	pub time_to_live: Option<u64>,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
+#[derive(Default)]
 pub struct DataPayload {
 	pub series: String,
 	pub pending_id: Option<String>,
@@ -129,7 +134,8 @@ pub struct DataPayload {
 	pub value: Option<i32>,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
+#[derive(Default)]
 pub struct PendingDataPayload {
 	pub series: String,
 	pub id: String,
@@ -138,7 +144,8 @@ pub struct PendingDataPayload {
 	pub value: Option<i32>,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
+#[derive(Default)]
 pub struct CreateAggregatePayload {
 	pub aggregate: String,
 	pub series: String,
@@ -146,7 +153,7 @@ pub struct CreateAggregatePayload {
 	pub by: AggregateBy,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
 pub enum DataSeriesAction {
 	/// Create a series.
 	CreateSeries(CreateSeriesPayload),
@@ -170,223 +177,242 @@ pub enum DataSeriesAction {
 	RemoveAggregate { aggregate: String, series: String },
 }
 
-impl Reducer for DataSeries {
-	type Action = DataSeriesAction;
-
-	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
-		match &event.payload {
-			DataSeriesAction::CreateSeries(payload) => reduce_create_series(context.storage_mut(), self, payload),
-			DataSeriesAction::RemoveSeries { series } => reduce_remove_series(context.storage_mut(), self, series),
+impl Reducer<DataSeriesAction> for DataSeries {
+	async fn reduce(
+		state: OptionLink<Self>,
+		event: Link<ReducerAction<DataSeriesAction>>,
+		storage: &CoreBlockStorage,
+	) -> Result<Link<Self>, anyhow::Error> {
+		let action = storage.get_value(&event).await?;
+		let mut result = storage.get_value_or_default(&state).await?;
+		match &action.payload {
+			DataSeriesAction::CreateSeries(payload) => reduce_create_series(storage, &mut result, payload).await?,
+			DataSeriesAction::RemoveSeries { series } => reduce_remove_series(storage, &mut result, series).await?,
 			DataSeriesAction::Data(payload) => {
-				reduce_data(context.storage_mut(), &event.from, event.time, self, payload)
+				reduce_data(storage, &action.from, action.time, &mut result, payload).await?
 			},
 			DataSeriesAction::PendingData(PendingDataPayload { series, id, tags, time, value }) => {
-				reduce_pending_data(context.storage_mut(), &event.from, event.time, self, series, id, tags, time, value)
+				reduce_pending_data(storage, &action.from, action.time, &mut result, series, id, tags, time, value)
+					.await?
 			},
 			DataSeriesAction::PendingCancel { series, id } => {
-				reduce_pending_cancel(context.storage_mut(), self, series, id)
+				reduce_pending_cancel(storage, &mut result, series, id).await?
 			},
 			DataSeriesAction::CreateAggregate(CreateAggregatePayload { aggregate, series, group, by }) => {
-				reduce_create_aggregate(context.storage_mut(), self, aggregate, series, *group, *by)
+				reduce_create_aggregate(storage, &mut result, aggregate, series, *group, *by).await?
 			},
 			DataSeriesAction::RemoveAggregate { aggregate, series } => {
-				reduce_remove_aggregate(context.storage_mut(), self, series, aggregate)
+				reduce_remove_aggregate(storage, &mut result, series, aggregate).await?
 			},
 		}
+		Ok(storage.set_value(&result).await?)
 	}
 }
 
-fn reduce_create_series(context: &mut dyn Storage, mut state: DataSeries, payload: &CreateSeriesPayload) -> DataSeries {
-	state.data.update(context, |_context, data| {
-		if !data.contains_key(&payload.series) {
-			let value = Series {
-				tags: payload.tags.clone(),
-				data: Default::default(),
-				pending_data: Default::default(),
-				time_to_live: payload.time_to_live,
-			};
-			data.insert(payload.series.to_owned(), value);
-		}
-	});
-	state
+async fn reduce_create_series(
+	storage: &CoreBlockStorage,
+	state: &mut DataSeries,
+	payload: &CreateSeriesPayload,
+) -> Result<(), anyhow::Error> {
+	if !state.data.contains(storage, &payload.series).await? {
+		let value = Series {
+			tags: payload.tags.clone(),
+			data: Default::default(),
+			pending_data: Default::default(),
+			time_to_live: payload.time_to_live,
+		};
+		state.data.insert(storage, payload.series.clone(), value).await?;
+	}
+	Ok(())
 }
 
-fn reduce_remove_series(storage: &mut dyn Storage, mut state: DataSeries, series: &str) -> DataSeries {
-	state.data.update(storage, |_storage, data| {
-		data.remove(series);
-	});
-	state.aggregates.update_owned(storage, |_storage, aggregates| {
-		aggregates.into_iter().filter(|(_key, value)| value.series != series).collect()
-	});
-	state
+async fn reduce_remove_series(
+	storage: &CoreBlockStorage,
+	state: &mut DataSeries,
+	series: &str,
+) -> Result<(), anyhow::Error> {
+	state.data.remove(storage, series.to_owned()).await?;
+
+	// remove aggregates referencing this series
+	let keys_to_remove: Vec<String> = state
+		.aggregates
+		.stream(storage)
+		.try_filter_map(|(key, aggregate): (String, Aggregate)| async move {
+			Ok(if aggregate.series == series { Some(key) } else { None })
+		})
+		.try_collect()
+		.await?;
+	for key in keys_to_remove {
+		state.aggregates.remove(storage, key).await?;
+	}
+	Ok(())
 }
 
-fn reduce_data(
-	storage: &mut dyn Storage,
+async fn reduce_data(
+	storage: &CoreBlockStorage,
 	did: &Did,
 	action_time: Date,
-	mut state: DataSeries,
+	state: &mut DataSeries,
 	payload: &DataPayload,
-) -> DataSeries {
-	state.data.update(storage, |storage, data| {
-		if let Some(series) = data.get_mut(&payload.series) {
-			// pending?
-			let mut pending = None;
-			if let Some(pending_id) = &payload.pending_id {
-				series
-					.pending_data
-					.update(storage, |_context, pending_data| pending = pending_data.remove(pending_id));
+) -> Result<(), anyhow::Error> {
+	let Some(mut series) = state.data.get(storage, &payload.series).await? else {
+		return Ok(());
+	};
+
+	// pending?
+	let mut pending = None;
+	if let Some(pending_id) = &payload.pending_id {
+		pending = series.pending_data.remove(storage, pending_id.clone()).await?;
+	}
+
+	// data
+	let data = match pending {
+		Some(mut pending) => {
+			if let Some(tags) = &payload.tags {
+				pending.tags.extend(tags.iter().cloned());
 			}
+			pending.tags.set(co_api::tags!("completed": action_time as i128));
+			pending
+		},
+		None => Data {
+			did: did.clone(),
+			time: payload.time.unwrap_or(action_time),
+			tags: payload.tags.clone().unwrap_or_default(),
+			value: payload.value.unwrap_or(1),
+		},
+	};
 
-			// data
-			let data_time = payload.time.unwrap_or(action_time);
-			let data = match pending {
-				Some(mut pending) => {
-					if let Some(tags) = &payload.tags {
-						pending.tags.extend(tags.iter().cloned());
-					}
-					pending.tags.set(co_api::tags!("completed": data_time as i128));
-					pending
-				},
-				None => Data {
-					did: did.clone(),
-					time: payload.time.unwrap_or(action_time),
-					tags: payload.tags.clone().unwrap_or_default(),
-					value: payload.value.unwrap_or(1),
-				},
-			};
+	// aggregate
+	let aggregate_keys: Vec<(String, Aggregate)> = state
+		.aggregates
+		.stream(storage)
+		.try_filter(|(_, value)| std::future::ready(value.series == payload.series))
+		.try_collect()
+		.await?;
+	for (key, mut agg) in aggregate_keys {
+		let mut values = agg.values.vec(storage, None).await?;
 
-			// aggregate
-			state.aggregates.update(storage, |storage, aggregates| {
-				for (_, value) in aggregates.iter_mut() {
-					if value.series == payload.series {
-						let group = value.group;
-						let by = value.by;
-						value.values.update_owned(storage, |_, mut values| {
-							// apply
-							aggregate(group, by, &data, &mut values);
+		// apply
+		aggregate(agg.group, agg.by, &data, &mut values);
 
-							// ttl
-							if let Some(time_to_live) = series.time_to_live {
-								let expire = action_time - time_to_live;
-								values.retain(|item| item.time == 0 || item.time < expire);
-							}
-
-							// result
-							values
-						});
-					}
-				}
-			});
-
-			// insert
-			series.data.update_owned(storage, |_storage, mut items| {
-				// insert as position
-				match find_next_index(items.iter().map(|item| &item.time), &data.time) {
-					Some(index) => {
-						items.insert(index, data);
-					},
-					None => {
-						items.push(data);
-					},
-				}
-
-				// ttl?
-				if let Some(time_to_live) = series.time_to_live {
-					let expire = action_time - time_to_live;
-					items.retain(|item| item.time < expire);
-				}
-
-				// result
-				items
-			});
+		// ttl
+		if let Some(time_to_live) = series.time_to_live {
+			let expire = action_time - time_to_live;
+			values.retain(|item| item.time == 0 || item.time < expire);
 		}
-	});
-	state
+
+		agg.values = CoList::from_iter(storage, values).await?;
+		state.aggregates.insert(storage, key, agg).await?;
+	}
+
+	// insert data at sorted position
+	let mut items = series.data.vec(storage, None).await?;
+	match find_next_index(items.iter().map(|item| &item.time), &data.time) {
+		Some(index) => items.insert(index, data),
+		None => items.push(data),
+	}
+
+	// ttl?
+	if let Some(time_to_live) = series.time_to_live {
+		let expire = action_time - time_to_live;
+		items.retain(|item| item.time < expire);
+	}
+
+	series.data = CoList::from_iter(storage, items).await?;
+	state.data.insert(storage, payload.series.clone(), series).await?;
+	Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
-fn reduce_pending_data(
-	storage: &mut dyn Storage,
+async fn reduce_pending_data(
+	storage: &CoreBlockStorage,
 	did: &Did,
 	action_time: Date,
-	mut state: DataSeries,
+	state: &mut DataSeries,
 	series_key: &str,
 	id: &str,
 	tags: &Option<Tags>,
 	time: &Option<Date>,
 	value: &Option<i32>,
-) -> DataSeries {
-	state.data.update(storage, |storage, data| {
-		if let Some(series) = data.get_mut(series_key) {
-			series.pending_data.update(storage, |_context, pending_data| {
-				if !pending_data.contains_key(id) {
-					let data = Data {
-						did: did.clone(),
-						tags: tags.clone().unwrap_or_default(),
-						time: time.unwrap_or(action_time),
-						value: value.unwrap_or(1),
-					};
-					pending_data.insert(id.to_owned(), data);
-				}
-			});
-		}
-	});
-	state
+) -> Result<(), anyhow::Error> {
+	let Some(mut series) = state.data.get(storage, &series_key.to_owned()).await? else {
+		return Ok(());
+	};
+
+	if !series.pending_data.contains(storage, &id.to_owned()).await? {
+		let data = Data {
+			did: did.clone(),
+			tags: tags.clone().unwrap_or_default(),
+			time: time.unwrap_or(action_time),
+			value: value.unwrap_or(1),
+		};
+		series.pending_data.insert(storage, id.to_owned(), data).await?;
+		state.data.insert(storage, series_key.to_owned(), series).await?;
+	}
+	Ok(())
 }
 
-fn reduce_pending_cancel(storage: &mut dyn Storage, mut state: DataSeries, series_key: &str, id: &str) -> DataSeries {
-	state.data.update(storage, |storage, data| {
-		if let Some(series) = data.get_mut(series_key) {
-			series.pending_data.update(storage, |_context, pending_data| {
-				pending_data.remove(id);
-			});
-		}
-	});
-	state
+async fn reduce_pending_cancel(
+	storage: &CoreBlockStorage,
+	state: &mut DataSeries,
+	series_key: &str,
+	id: &str,
+) -> Result<(), anyhow::Error> {
+	let Some(mut series) = state.data.get(storage, &series_key.to_owned()).await? else {
+		return Ok(());
+	};
+
+	series.pending_data.remove(storage, id.to_owned()).await?;
+	state.data.insert(storage, series_key.to_owned(), series).await?;
+	Ok(())
 }
 
-fn reduce_create_aggregate(
-	storage: &mut dyn Storage,
-	mut state: DataSeries,
+async fn reduce_create_aggregate(
+	storage: &CoreBlockStorage,
+	state: &mut DataSeries,
 	aggregate_key: &str,
 	series_key: &str,
 	group: Option<AggregateGroup>,
 	by: AggregateBy,
-) -> DataSeries {
-	if !state.aggregates.iter(storage).any(|(key, _)| key == aggregate_key) {
-		let item = state.data.iter(storage).find(|(key, _)| key == series_key);
-		if let Some((_, series)) = item {
-			// calculate
-			let mut values = Vec::new();
-			for data in series.data.iter(storage) {
-				aggregate(group, by, &data, &mut values);
-			}
-
-			// insert
-			state.aggregates.update(storage, |storage, aggregates| {
-				aggregates.insert(
-					aggregate_key.to_owned(),
-					Aggregate { by, group, series: series_key.to_owned(), values: DagVec::create(storage, values) },
-				);
-			});
-		}
+) -> Result<(), anyhow::Error> {
+	if state.aggregates.contains(storage, &aggregate_key.to_owned()).await? {
+		return Ok(());
 	}
+
+	let Some(series) = state.data.get(storage, &series_key.to_owned()).await? else {
+		return Ok(());
+	};
+
+	// calculate initial aggregates from existing data
+	let mut values = Vec::new();
+	let data_items = series.data.vec(storage, None).await?;
+	for data in &data_items {
+		aggregate(group, by, data, &mut values);
+	}
+
 	state
+		.aggregates
+		.insert(
+			storage,
+			aggregate_key.to_owned(),
+			Aggregate { by, group, series: series_key.to_owned(), values: CoList::from_iter(storage, values).await? },
+		)
+		.await?;
+	Ok(())
 }
 
-fn reduce_remove_aggregate(
-	storage: &mut dyn Storage,
-	mut state: DataSeries,
+async fn reduce_remove_aggregate(
+	storage: &CoreBlockStorage,
+	state: &mut DataSeries,
 	series_key: &str,
 	aggregate_key: &str,
-) -> DataSeries {
-	state.aggregates.update(storage, |_storage, aggregates| {
-		if aggregates.get(aggregate_key).is_some_and(|item| item.series == series_key) {
-			aggregates.remove(aggregate_key);
+) -> Result<(), anyhow::Error> {
+	if let Some(item) = state.aggregates.get(storage, &aggregate_key.to_owned()).await? {
+		if item.series == series_key {
+			state.aggregates.remove(storage, aggregate_key.to_owned()).await?;
 		}
-	});
-	state
+	}
+	Ok(())
 }
 
 fn aggregate(group: Option<AggregateGroup>, by: AggregateBy, data: &Data, values: &mut Vec<AggregateValue>) {
@@ -448,12 +474,6 @@ fn find_next_index<T: PartialOrd>(values: impl Iterator<Item = T>, value: T) -> 
 		.filter(|(_index, item)| *item < value)
 		.last()
 		.map(|(index, _)| index + 1)
-}
-
-#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
-#[no_mangle]
-pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
-	co_api::sync_api::reduce::<DataSeries>(unsafe { &*input }, unsafe { &mut *output })
 }
 
 #[cfg(test)]

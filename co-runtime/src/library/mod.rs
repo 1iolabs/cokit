@@ -3,7 +3,6 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-pub mod api_context;
 #[cfg(feature = "llvm")]
 pub mod compile;
 #[cfg(feature = "js")]

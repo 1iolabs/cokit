@@ -3,16 +3,12 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use co_api::{
-	sync_api::{Context, Reducer},
-	ReducerAction,
-};
-use serde::{Deserialize, Serialize};
+use co_api::{async_api::Reducer, co, BlockStorageExt, CoreBlockStorage, Link, OptionLink, ReducerAction};
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[co(state)]
 pub struct Counter(pub i64);
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
 pub enum CounterAction {
 	#[serde(rename = "i")]
 	Increment(i64),
@@ -23,22 +19,20 @@ pub enum CounterAction {
 	#[serde(rename = "s")]
 	Set(i64),
 }
-
-impl Reducer for Counter {
-	type Action = CounterAction;
-
-	fn reduce(self, event: &ReducerAction<Self::Action>, _: &mut dyn Context) -> Self {
-		match event.payload {
-			CounterAction::Increment(i) => Counter(self.0 + i),
-			CounterAction::Decrement(i) => Counter(self.0 - i),
-			CounterAction::Multiply(i) => Counter(self.0 * i),
-			CounterAction::Set(i) => Counter(i),
-		}
+impl Reducer<CounterAction> for Counter {
+	async fn reduce(
+		state: OptionLink<Self>,
+		event: Link<ReducerAction<CounterAction>>,
+		storage: &CoreBlockStorage,
+	) -> Result<Link<Self>, anyhow::Error> {
+		let event = storage.get_value(&event).await?;
+		let current = storage.get_value_or_default(&state).await?;
+		let next = match event.payload {
+			CounterAction::Increment(value) => Counter(current.0 + value),
+			CounterAction::Decrement(value) => Counter(current.0 - value),
+			CounterAction::Multiply(value) => Counter(current.0 * value),
+			CounterAction::Set(value) => Counter(value),
+		};
+		Ok(storage.set_value(&next).await?)
 	}
-}
-
-#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
-#[no_mangle]
-pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
-	co_api::sync_api::reduce::<Counter>(unsafe { &*input }, unsafe { &mut *output })
 }

@@ -6,7 +6,7 @@
 use crate::{cli::Cli, library::cli_context::CliContext};
 use anyhow::anyhow;
 use cid::Cid;
-use co_primitives::{from_cbor, CoId, DagCollectionAsyncExt};
+use co_primitives::{from_cbor, CoId};
 use co_runtime::{create_cid_resolver, MultiLayerCidResolver};
 use co_sdk::{
 	state::{memberships, query_core, QueryExt},

@@ -3,26 +3,6 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{Cid, ReducerAction, Storage};
-
-pub trait Reducer {
-	type Action: Clone;
-
-	fn reduce(self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self;
-}
-
-pub trait Context {
-	fn storage(&self) -> &dyn Storage;
-
-	fn storage_mut(&mut self) -> &mut dyn Storage;
-
-	fn action(&self) -> Cid;
-
-	fn state(&self) -> Option<Cid>;
-
-	fn store_state(&mut self, cid: Cid);
-}
-
 pub mod async_reducer {
 	use crate::CoreBlockStorage;
 	use cid::Cid;

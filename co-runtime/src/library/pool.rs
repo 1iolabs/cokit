@@ -6,8 +6,7 @@
 #[cfg(feature = "js")]
 use crate::library::deferred_storage::DeferredStorage;
 use crate::{
-	co_v1::CoV1Api, runtimes::RuntimeError, types::guard::GuardReference, ApiContext, Core, RuntimeContext,
-	RuntimeInstance,
+	co_v1::CoV1Api, runtimes::RuntimeError, types::guard::GuardReference, Core, RuntimeContext, RuntimeInstance,
 };
 use cid::Cid;
 use co_actor::TaskSpawner;
@@ -128,20 +127,6 @@ impl RuntimePool {
 
 				// pool instance
 				self.reuse_runtime_instance(instance);
-
-				// result
-				result
-			},
-			Core::Native(f) => {
-				// execute
-				let execute = f.clone();
-				let (result, _) =
-					execute_with_api(self.spawner.clone(), storage, context, checked, (), move |_, api| {
-						let mut context = ApiContext::new(api);
-						execute(&mut context);
-						Ok(context.context().clone())
-					})
-					.await?;
 
 				// result
 				result
