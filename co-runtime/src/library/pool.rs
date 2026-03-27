@@ -131,7 +131,7 @@ impl RuntimePool {
 				// result
 				result
 			},
-			Core::NativeAsync(f) => {
+			Core::Native(f) => {
 				let reducer_storage = CoreBlockStorage::new(storage.clone(), checked);
 
 				// input

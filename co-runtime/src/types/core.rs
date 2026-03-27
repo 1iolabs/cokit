@@ -13,15 +13,15 @@ use std::fmt::Debug;
 pub enum Core {
 	Wasm(Cid),
 	Binary(Vec<u8>),
-	NativeAsync(async_api::ReducerRef),
+	Native(async_api::ReducerRef),
 }
 impl Core {
-	pub fn native_async<R, A>() -> Core
+	pub fn native<R, A>() -> Core
 	where
 		R: async_api::Reducer<A> + Default + 'static,
 		A: Clone + DeserializeOwned + 'static,
 	{
-		Core::NativeAsync(async_api::ReducerRef::new::<R, A>())
+		Core::Native(async_api::ReducerRef::new::<R, A>())
 	}
 }
 impl Debug for Core {
@@ -29,7 +29,7 @@ impl Debug for Core {
 		match self {
 			Self::Wasm(arg0) => f.debug_tuple("Wasm").field(arg0).finish(),
 			Self::Binary(arg0) => f.debug_tuple("Binary").field(&arg0.len()).finish(),
-			Self::NativeAsync(_) => f.debug_tuple("NativeAsync").field(&"[native]").finish(),
+			Self::Native(_) => f.debug_tuple("Native").field(&"[native]").finish(),
 		}
 	}
 }

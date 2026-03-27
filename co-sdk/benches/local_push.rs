@@ -19,7 +19,7 @@ async fn build_counter(native: bool) -> (Cid, Core, BuildCoreArtifact) {
 	let core_path = repository_path.join("examples/counter");
 	let counter_artifact = build_core(repository_path, core_path).unwrap();
 	let counter = counter_artifact.store_artifact(&core_storage).await.unwrap();
-	let native_counter = Core::native_async::<Counter, CounterAction>();
+	let native_counter = Core::native::<Counter, CounterAction>();
 	(counter, if native { native_counter } else { Core::Wasm(counter) }, counter_artifact)
 }
 

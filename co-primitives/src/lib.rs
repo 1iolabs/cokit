@@ -46,8 +46,6 @@ pub use types::{
 	co_set::{CoSet, CoSetTransaction},
 	codec::{KnownMultiCodec, MultiCodec, MultiCodecError},
 	core_name::CoreName,
-	dag_collection::DagCollection,
-	dag_collection_async_ext::DagCollectionAsyncExt,
 	date::Date,
 	diagnostic_message::DiagnosticMessage,
 	did::Did,

@@ -840,7 +840,7 @@ mod tests {
 		let date = MonotonicCoDate::default().boxed();
 		let runtime = RuntimeActor::spawn("test", Default::default()).unwrap();
 		let core_resolver = SingleCoreResolver::new(wasm, wasm.into());
-		let native_core_resolver = SingleCoreResolver::new(wasm, Core::native_async::<Counter, CounterAction>());
+		let native_core_resolver = SingleCoreResolver::new(wasm, Core::native::<Counter, CounterAction>());
 
 		// reducer
 		let mut reducer1 = ReducerBuilder::new(native_core_resolver, log1)
@@ -1033,8 +1033,7 @@ mod tests {
 			Default::default(),
 		);
 		let runtime = RuntimeActor::spawn("test", Default::default()).unwrap();
-		let native_core_resolver =
-			SingleCoreResolver::new(Cid::default(), Core::native_async::<Counter, CounterAction>());
+		let native_core_resolver = SingleCoreResolver::new(Cid::default(), Core::native::<Counter, CounterAction>());
 		let mut reducer = ReducerBuilder::new(native_core_resolver, log)
 			.build(&storage, &runtime, MonotonicCoDate::default())
 			.await
@@ -1087,8 +1086,7 @@ mod tests {
 		let storage = MemoryBlockStorage::default();
 		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
 		let runtime = RuntimeActor::spawn("test", Default::default()).unwrap();
-		let native_core_resolver =
-			SingleCoreResolver::new(Cid::default(), Core::native_async::<Counter, CounterAction>());
+		let native_core_resolver = SingleCoreResolver::new(Cid::default(), Core::native::<Counter, CounterAction>());
 		let co_date = MonotonicCoDate::default().boxed();
 
 		// reducer1
@@ -1192,8 +1190,7 @@ mod tests {
 		let storage = MemoryBlockStorage::default();
 		let identity = LocalIdentityResolver::default().private_identity("did:local:p1").unwrap();
 		let runtime = RuntimeActor::spawn("test", Default::default()).unwrap();
-		let native_core_resolver =
-			SingleCoreResolver::new(Cid::default(), Core::native_async::<Counter, CounterAction>());
+		let native_core_resolver = SingleCoreResolver::new(Cid::default(), Core::native::<Counter, CounterAction>());
 		let co_date = MonotonicCoDate::default().boxed();
 
 		// reducer1
@@ -1419,7 +1416,7 @@ mod tests {
 		from: Option<&Reducer<MemoryBlockStorage, SingleCoreResolver>>,
 	) -> Reducer<MemoryBlockStorage, SingleCoreResolver> {
 		let mut builder = ReducerBuilder::new(
-			SingleCoreResolver::new(Cid::default(), Core::native_async::<Counter, CounterAction>()),
+			SingleCoreResolver::new(Cid::default(), Core::native::<Counter, CounterAction>()),
 			Log::new_local("test".as_bytes().to_vec(), from.map(|log| log.heads().clone()).unwrap_or_default()),
 		);
 		if let Some(from) = from {
