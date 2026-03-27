@@ -7,7 +7,9 @@ use crate::library::cli::{Cli, CoLogLevel};
 use cid::Cid;
 use clap::Parser;
 #[cfg(feature = "guard")]
-use co_guard::{AccessGuard, DynamicAccessGuard, GuardReference, Guards};
+use co_guard::{AccessGuard, DynamicAccessGuard, Guards};
+#[cfg(feature = "guard")]
+use co_sdk::GuardReference;
 #[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
 use co_sdk::{CoStorageSetting, ContactHandler, Core, Cores, DynamicContactHandler, DynamicLocalSecret, LocalSecret};

@@ -11,11 +11,11 @@ use co_storage::BlockStorageExt;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 #[derive(Debug, Clone)]
-pub struct GuardResolver {
+pub struct CoreGuard {
 	mapping: HashMap<Cid, GuardReference>,
 	mode: GuardRejectionMode,
 }
-impl GuardResolver {
+impl CoreGuard {
 	pub fn new(mapping: HashMap<Cid, GuardReference>) -> Self {
 		Self { mapping, mode: GuardRejectionMode::Skip }
 	}

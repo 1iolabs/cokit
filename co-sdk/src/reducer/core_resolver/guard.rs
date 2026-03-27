@@ -6,27 +6,27 @@
 use crate::{CoreResolver, CoreResolverContext, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_guard::{GuardDefinition, GuardError, GuardResolver, Guards};
+use co_guard::{CoreGuard, GuardDefinition, GuardError, Guards};
 use co_runtime::{RuntimeContext, RuntimeHandle};
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 
 #[derive(Debug, Clone)]
 pub struct CoGuardResolver<C> {
-	guard_resolver: GuardResolver,
+	guard: CoreGuard,
 	next: C,
 }
 impl<C> CoGuardResolver<C> {
 	pub fn new(core_resolver: C, guards: &Guards) -> Self {
-		Self { next: core_resolver, guard_resolver: GuardResolver::new(guards.mapping()) }
+		Self { next: core_resolver, guard: CoreGuard::new(guards.mapping()) }
 	}
 
 	pub fn with_ignore_mode(mut self, ignore: bool) -> Self {
-		self.guard_resolver = self.guard_resolver.with_ignore_mode(ignore);
+		self.guard = self.guard.with_ignore_mode(ignore);
 		self
 	}
 
 	pub fn with_failure_mode(mut self) -> Self {
-		self.guard_resolver = self.guard_resolver.with_failure_mode();
+		self.guard = self.guard.with_failure_mode();
 		self
 	}
 }
@@ -56,7 +56,7 @@ where
 			let next_head = *context.entry.cid();
 
 			match self
-				.guard_resolver
+				.guard
 				.verify_guards(runtime, storage, &guard_defs, &state, &heads, &next_head)
 				.await
 			{
