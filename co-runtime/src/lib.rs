@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 // fail with proper error message when try to us js for non wasm32
-#[cfg(all(feature = "js", not(target_arch = "wasm32"), not(clippy)))]
+#[cfg(all(feature = "js", not(target_arch = "wasm32"), not(clippy), not(test)))]
 compile_error!("feature \"js\" can only used for \"wasm32-unknown-unknown\" target");
 
 // modules
@@ -16,16 +16,12 @@ mod services;
 mod types;
 
 // exports
+pub use library::api_context::ApiContext;
 #[cfg(feature = "llvm")]
 pub use library::compile::compile_native;
-pub use library::{
-	api_context::ApiContext,
-	instance::RuntimeInstance,
-	pool::{ExecuteError, IdleRuntimePool, RuntimePool},
-};
 pub(crate) use macros::cfg_wasmer;
 pub use modules::co_v1;
-pub use services::runtime::{RuntimeActor, RuntimeHandle};
+pub use services::runtime::RuntimeHandle;
 pub use types::{
 	cid_resolver::{
 		create_cid_resolver, CidResolver, CidResolverBox, IpldResolver, JoinCidResolver, MultiLayerCidResolver,
@@ -33,9 +29,15 @@ pub use types::{
 	},
 	context::RuntimeContext,
 	core::Core,
+	execute_error::ExecuteError,
 	guard::GuardReference,
 };
 cfg_wasmer! {
+	pub use services::runtime::RuntimeActor;
+	pub use library::{
+		instance::RuntimeInstance,
+		pool::{IdleRuntimePool, RuntimePool},
+	};
 	pub use runtimes::wasmer::{create_runtime, create_runtime_with_engines, WasmerRuntimeKind};
 	pub use library::module_description::ModuleDescription;
 }
