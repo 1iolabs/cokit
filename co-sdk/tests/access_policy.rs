@@ -3,6 +3,8 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+#![cfg(feature = "guard")]
+
 use async_trait::async_trait;
 use co_core_co::CoAction;
 use co_core_membership::{MembershipOptions, MembershipsAction};

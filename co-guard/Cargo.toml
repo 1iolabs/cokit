@@ -6,6 +6,7 @@ rust-version = "1.91"
 
 [dependencies]
 anyhow = { workspace = true }
+async-trait = { workspace = true }
 cid = { workspace = true }
 co-api = { workspace = true }
 co-primitives = { workspace = true }

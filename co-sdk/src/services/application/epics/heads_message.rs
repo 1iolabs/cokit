@@ -6,7 +6,7 @@
 use crate::{
 	library::{network_identity::network_identity, shared_membership::shared_membership},
 	services::application::{HeadsError, HeadsMessageReceivedAction},
-	state, Action, ActionError, CoAccessPolicy, CoContext, CoReducer, CoReducerFactory, MappedCoReducerState,
+	state, Action, ActionError, CoContext, CoReducer, CoReducerFactory, MappedCoReducerState,
 };
 use anyhow::anyhow;
 use cid::Cid;
@@ -298,13 +298,11 @@ async fn verify_from_participant(
 
 	// verify
 	if !state::is_participant(&storage, state.co(), from).await? {
-		if let Some(did) = from {
-			match context.access_policy() {
-				Some(policy) if policy.check_access(co_reducer.id(), did).await? => return Ok(()),
-				_ => {},
-			}
-		}
-		return Err(anyhow!("Not a participant {:?} of {}", from, co_reducer.id()));
+		context
+			.check_access_or(co_reducer.id(), from.as_ref(), || {
+				anyhow!("Permission denied for {:?} to {}", from, co_reducer.id())
+			})
+			.await?;
 	}
 
 	// result

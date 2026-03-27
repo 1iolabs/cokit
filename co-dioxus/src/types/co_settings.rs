@@ -6,12 +6,11 @@
 use crate::library::cli::{Cli, CoLogLevel};
 use cid::Cid;
 use clap::Parser;
+#[cfg(feature = "guard")]
+use co_guard::{CoAccessPolicy, DynamicCoAccessPolicy, GuardReference, Guards};
 #[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
-use co_sdk::{
-	CoAccessPolicy, CoStorageSetting, ContactHandler, Core, Cores, DynamicCoAccessPolicy, DynamicContactHandler,
-	DynamicLocalSecret, GuardReference, Guards, LocalSecret,
-};
+use co_sdk::{CoStorageSetting, ContactHandler, Core, Cores, DynamicContactHandler, DynamicLocalSecret, LocalSecret};
 
 #[derive(Debug, Clone, Default)]
 pub struct CoSettings {
@@ -37,9 +36,11 @@ pub struct CoSettings {
 	pub no_default_features: bool,
 	pub feature: Vec<String>,
 	pub local_secret: Option<DynamicLocalSecret>,
+	#[cfg(feature = "guard")]
 	pub access_policy: Option<DynamicCoAccessPolicy>,
 	pub contact_handler: Option<DynamicContactHandler>,
 	pub cores: Cores,
+	#[cfg(feature = "guard")]
 	pub guards: Guards,
 }
 impl CoSettings {
@@ -91,6 +92,7 @@ impl CoSettings {
 		Self { local_secret: Some(DynamicLocalSecret::new(secret)), ..self }
 	}
 
+	#[cfg(feature = "guard")]
 	pub fn with_access_policy(self, policy: impl CoAccessPolicy + 'static) -> Self {
 		Self { access_policy: Some(DynamicCoAccessPolicy::new(policy)), ..self }
 	}
@@ -104,6 +106,7 @@ impl CoSettings {
 		self
 	}
 
+	#[cfg(feature = "guard")]
 	pub fn with_guard(mut self, guard_cid: Cid, guard: GuardReference) -> Self {
 		self.guards = self.guards.with_override(guard_cid, guard);
 		self

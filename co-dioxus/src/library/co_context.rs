@@ -255,9 +255,12 @@ type Task = Box<TaskFn>;
 // type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
 
 async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Result<(), anyhow::Error> {
-	let mut application_builder = ApplicationBuilder::new_with_storage(settings.identifier, settings.storage)
-		.with_cores(settings.cores)
-		.with_guards(settings.guards);
+	let mut application_builder =
+		ApplicationBuilder::new_with_storage(settings.identifier, settings.storage).with_cores(settings.cores);
+	#[cfg(feature = "guard")]
+	{
+		application_builder = application_builder.with_guards(settings.guards);
+	}
 	if settings.no_keychain {
 		application_builder = application_builder.without_keychain();
 	}
@@ -270,6 +273,7 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 	if let Some(local_secret) = settings.local_secret {
 		application_builder = application_builder.with_local_secret(local_secret);
 	}
+	#[cfg(feature = "guard")]
 	if let Some(access_policy) = settings.access_policy {
 		application_builder = application_builder.with_access_policy(access_policy);
 	}

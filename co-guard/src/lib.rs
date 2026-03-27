@@ -3,10 +3,12 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+mod access_policy;
 mod guards;
 mod resolver;
 mod types;
 
+pub use access_policy::{CoAccessPolicy, DynamicCoAccessPolicy};
 pub use guards::Guards;
 pub use resolver::GuardResolver;
 pub use types::{definition::GuardDefinition, error::GuardError, mode::GuardRejectionMode};

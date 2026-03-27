@@ -3,6 +3,8 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
+#![cfg(feature = "guard")]
+
 use crate::helper::shared_co::SharedCo;
 use co_core_co::CoAction;
 use co_sdk::{create_default_guards, tags, CreateCo, CO_CORE_CO, CO_CORE_NAME_CO};

@@ -16,16 +16,16 @@ use crate::{
 		shared_membership::{shared_membership_active, wait_shared_membership_active},
 		wait_response::request_response,
 	},
-	reducer::core_resolver::{dynamic::DynamicCoreResolver, guard::CoGuardResolver, log::LogCoreResolver},
+	reducer::core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
 	services::{
 		application::{ApplicationMessage, ContactAction},
 		reducers::{ReducerOptions, ReducerStorage, ReducersControl},
 	},
 	state,
 	types::co_reducer_factory::CoReducerFactoryError,
-	Action, CoCoreResolver, CoOptions, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoAccessPolicy,
-	DynamicCoUuid, DynamicLocalSecret, Guards, LocalCoBuilder, Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE,
-	CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	Action, CoCoreResolver, CoOptions, CoReducer, CoReducerFactory, CoStorage, Cores, CreateCo, DynamicCoUuid,
+	DynamicLocalSecret, LocalCoBuilder, Runtime, Storage, TaskSpawner, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
+	CO_ID_LOCAL,
 };
 use async_trait::async_trait;
 use cid::Cid;
@@ -188,8 +188,29 @@ impl CoContext {
 	}
 
 	/// CO access policy for non-participants.
-	pub fn access_policy(&self) -> Option<&DynamicCoAccessPolicy> {
+	#[cfg(feature = "guard")]
+	pub fn access_policy(&self) -> Option<&co_guard::DynamicCoAccessPolicy> {
 		self.inner.access_policy.as_ref()
+	}
+
+	/// Check access policy for a CO and requester.
+	/// Succeedes if the policy allows access, otherwise returns the provided error.
+	pub async fn check_access_or(
+		&self,
+		_co: &CoId,
+		_did: Option<impl AsRef<str>>,
+		err: impl FnOnce() -> anyhow::Error,
+	) -> Result<(), anyhow::Error> {
+		#[cfg(feature = "guard")]
+		{
+			use co_guard::CoAccessPolicy;
+			if let (Some(did), Some(policy)) = (_did, self.access_policy()) {
+				if policy.check_access(_co, did).await? {
+					return Ok(());
+				}
+			}
+		}
+		Err(err())
 	}
 
 	/// Contact handler for incoming contact requests.
@@ -293,9 +314,11 @@ pub(crate) struct CoContextInner {
 	block_links: BlockLinks,
 	block_links_builtin: BlockLinks,
 	cores: Cores,
-	guards: Guards,
+	#[cfg(feature = "guard")]
+	guards: co_guard::Guards,
 	local_secret: Option<DynamicLocalSecret>,
-	access_policy: Option<DynamicCoAccessPolicy>,
+	#[cfg(feature = "guard")]
+	access_policy: Option<co_guard::DynamicCoAccessPolicy>,
 	contact_handler: Option<DynamicContactHandler>,
 }
 impl CoContextInner {
@@ -313,9 +336,9 @@ impl CoContextInner {
 		date: DynamicCoDate,
 		uuid: DynamicCoUuid,
 		cores: Cores,
-		guards: Guards,
+		#[cfg(feature = "guard")] guards: co_guard::Guards,
 		local_secret: Option<DynamicLocalSecret>,
-		access_policy: Option<DynamicCoAccessPolicy>,
+		#[cfg(feature = "guard")] access_policy: Option<co_guard::DynamicCoAccessPolicy>,
 		contact_handler: Option<DynamicContactHandler>,
 	) -> Self {
 		let block_links = BlockLinks::default();
@@ -336,8 +359,10 @@ impl CoContextInner {
 			block_links,
 			block_links_builtin,
 			cores,
+			#[cfg(feature = "guard")]
 			guards,
 			local_secret,
+			#[cfg(feature = "guard")]
 			access_policy,
 			contact_handler,
 		}
@@ -448,8 +473,11 @@ impl CoContextInner {
 	/// Creates the Core Resolver for a shared CO.
 	pub(crate) fn create_shared_core_resolver(&self, id: CoId) -> DynamicCoreResolver<CoStorage> {
 		let core_resolver = CoCoreResolver::new(&self.cores);
-		let core_resolver =
-			CoGuardResolver::new(core_resolver, &self.guards).with_ignore_mode(self.settings.feature_co_guard_ignore());
+		#[cfg(feature = "guard")]
+		let core_resolver = {
+			crate::reducer::core_resolver::guard::CoGuardResolver::new(core_resolver, &self.guards)
+				.with_ignore_mode(self.settings.feature_co_guard_ignore())
+		};
 		let core_resolver = LogCoreResolver::new(core_resolver, id, self.date.clone());
 		DynamicCoreResolver::new(core_resolver)
 	}

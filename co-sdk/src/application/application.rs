@@ -6,28 +6,33 @@
 #[cfg(feature = "tracing")]
 use super::tracing::TracingBuilder;
 use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
+#[cfg(feature = "guard")]
+use crate::types::guards::create_default_guards;
 use crate::{
-	create_default_guards,
 	library::{
 		contact_handler::{ContactHandler, DynamicContactHandler},
 		wait_response::request_response,
 	},
-	services::application::ApplicationMessage,
+	services::application::{ApplicationInitialize, ApplicationMessage},
 	types::co_date::co_date_env,
-	Action, CoAccessPolicy, CoReducer, CoReducerFactory, CoStorage, CoStorageSetting, CoUuid, Cores,
-	DynamicCoAccessPolicy, DynamicCoUuid, DynamicLocalSecret, Guards, LocalSecret, RandomCoUuid, Storage,
+	Action, CoReducer, CoReducerFactory, CoStorage, CoStorageSetting, CoUuid, Cores, DynamicCoUuid, DynamicLocalSecret,
+	LocalSecret, RandomCoUuid, Storage,
 };
 use anyhow::anyhow;
 use cid::Cid;
 use co_actor::{Actor, ActorHandle, ActorInstance, TaskOptions, TaskSpawner};
 use co_core_storage::PinStrategy;
+#[cfg(feature = "guard")]
+use co_guard::{CoAccessPolicy, DynamicCoAccessPolicy, Guards};
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
 #[cfg(feature = "network")]
 use co_network::NetworkSettings;
 use co_primitives::{tag, tags, CoDate, CoId, DynamicCoDate, TagValue, Tags};
-use co_runtime::{Core, GuardReference};
+use co_runtime::Core;
+#[cfg(feature = "guard")]
+use co_runtime::GuardReference;
 use co_storage::StaticBlockStorage;
 #[cfg(feature = "fs")]
 use directories::ProjectDirs;
@@ -324,6 +329,7 @@ impl ApplicationSettings {
 	/// Ignore guards when checking actions.
 	/// Disabled in release builds.
 	/// Warning: This may destroys your CO. Only use this for development/testing.
+	#[cfg(feature = "guard")]
 	pub fn feature_co_guard_ignore(&self) -> bool {
 		#[cfg(debug_assertions)]
 		return self.has_feature("co-guard-ignore");
@@ -357,7 +363,9 @@ pub struct ApplicationBuilder {
 	local_secret: Option<DynamicLocalSecret>,
 	static_blocks: Vec<StaticBlockStorage<'static>>,
 	cores: Cores,
+	#[cfg(feature = "guard")]
 	guards: Guards,
+	#[cfg(feature = "guard")]
 	access_policy: Option<DynamicCoAccessPolicy>,
 	contact_handler: Option<DynamicContactHandler>,
 }
@@ -391,7 +399,9 @@ impl ApplicationBuilder {
 			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
+			#[cfg(feature = "guard")]
 			guards: create_default_guards(),
+			#[cfg(feature = "guard")]
 			access_policy: None,
 			contact_handler: None,
 		}
@@ -413,7 +423,9 @@ impl ApplicationBuilder {
 			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
+			#[cfg(feature = "guard")]
 			guards: create_default_guards(),
+			#[cfg(feature = "guard")]
 			access_policy: None,
 			contact_handler: None,
 		}
@@ -439,7 +451,9 @@ impl ApplicationBuilder {
 			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
+			#[cfg(feature = "guard")]
 			guards: create_default_guards(),
+			#[cfg(feature = "guard")]
 			access_policy: None,
 			contact_handler: None,
 		}
@@ -461,7 +475,9 @@ impl ApplicationBuilder {
 			local_secret: None,
 			static_blocks: Default::default(),
 			cores: Default::default(),
+			#[cfg(feature = "guard")]
 			guards: create_default_guards(),
+			#[cfg(feature = "guard")]
 			access_policy: None,
 			contact_handler: None,
 		}
@@ -514,6 +530,7 @@ impl ApplicationBuilder {
 		self
 	}
 
+	#[cfg(feature = "guard")]
 	pub fn with_guard(mut self, guard_cid: Cid, guard: GuardReference) -> Self {
 		self.guards = self.guards.with_override(guard_cid, guard);
 		self
@@ -524,11 +541,13 @@ impl ApplicationBuilder {
 		self
 	}
 
+	#[cfg(feature = "guard")]
 	pub fn with_guards(mut self, guards: Guards) -> Self {
 		self.guards = guards;
 		self
 	}
 
+	#[cfg(feature = "guard")]
 	pub fn with_access_policy(self, policy: impl CoAccessPolicy + 'static) -> Self {
 		Self { access_policy: Some(DynamicCoAccessPolicy::new(policy)), ..self }
 	}
@@ -614,17 +633,19 @@ impl ApplicationBuilder {
 		let service = Actor::spawn(
 			tags!("type": "application", "application": settings.identifier.clone()),
 			crate::services::application::Application::new(settings.clone()),
-			(
+			ApplicationInitialize {
 				storage,
-				tasks.clone(),
+				tasks: tasks.clone(),
 				date,
 				uuid,
-				self.cores,
-				self.guards,
-				self.local_secret,
-				self.access_policy,
-				self.contact_handler,
-			),
+				cores: self.cores,
+				#[cfg(feature = "guard")]
+				guards: self.guards,
+				local_secret: self.local_secret,
+				#[cfg(feature = "guard")]
+				access_policy: self.access_policy,
+				contact_handler: self.contact_handler,
+			},
 		)?;
 
 		// wait for context

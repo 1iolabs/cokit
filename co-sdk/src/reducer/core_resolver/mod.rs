@@ -3,15 +3,16 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{services::runtime::RuntimeHandle, ReducerChangeContext};
+use crate::ReducerChangeContext;
 use async_trait::async_trait;
 use cid::Cid;
 use co_log::EntryBlock;
-use co_runtime::{ExecuteError, RuntimeContext};
+use co_runtime::{ExecuteError, RuntimeContext, RuntimeHandle};
 use co_storage::StorageError;
 
 pub mod co;
 pub mod dynamic;
+#[cfg(feature = "guard")]
 pub mod guard;
 pub mod log;
 pub mod single;

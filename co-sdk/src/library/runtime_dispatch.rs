@@ -4,12 +4,12 @@
 // retention—approved secure tools may process solely for internal use.
 
 use super::create_reducer_action::create_reducer_action;
-use crate::{services::runtime::RuntimeHandle, types::co_dispatch::CoDispatch, CoreResolverError};
+use crate::{types::co_dispatch::CoDispatch, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
 use co_identity::PrivateIdentityBox;
 use co_primitives::{ReducerInput, StaticCoDate};
-use co_runtime::{Core, RuntimeContext};
+use co_runtime::{Core, RuntimeContext, RuntimeHandle};
 use co_storage::ExtendedBlockStorage;
 use serde::Serialize;
 use std::{fmt::Debug, marker::PhantomData};

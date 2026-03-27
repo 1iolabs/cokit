@@ -18,6 +18,11 @@ pub struct Guards {
 	#[serde(skip, default)]
 	overrides: HashMap<Cid, GuardReference>,
 }
+impl Default for Guards {
+	fn default() -> Self {
+		Self::new()
+	}
+}
 impl Guards {
 	pub fn new() -> Self {
 		Self { guards: Default::default(), overrides: Default::default() }

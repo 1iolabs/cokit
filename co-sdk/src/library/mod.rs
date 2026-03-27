@@ -8,7 +8,6 @@ pub mod all_tags;
 pub mod build_core;
 pub mod builtin_cores;
 pub mod cancel;
-pub mod co_access_policy;
 #[cfg(feature = "network")]
 pub mod connections_peer_provider;
 #[cfg(feature = "network")]

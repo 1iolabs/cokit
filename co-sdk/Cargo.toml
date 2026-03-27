@@ -23,7 +23,7 @@ co-core-rich-text = { workspace = true }
 co-core-role = { workspace = true }
 co-core-room = { workspace = true }
 co-core-storage = { workspace = true }
-co-guard = { workspace = true }
+co-guard = { workspace = true, optional = true }
 co-identity = { workspace = true }
 co-log = { workspace = true }
 co-network = { workspace = true, optional = true }
@@ -91,6 +91,9 @@ co-test = { workspace = true }
 
 # Meta: Recommended platform neutral features
 "recommended" = ["pinning", "native", "network"]
+
+# Enable guard system.
+"guard" = ["dep:co-guard"]
 
 # Meta: Enable to run in a apple sandbox.
 "apple-sandbox" = ["co-runtime/apple-sandbox"]

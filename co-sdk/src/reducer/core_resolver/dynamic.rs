@@ -3,10 +3,10 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{services::runtime::RuntimeHandle, CoreResolver, CoreResolverContext, CoreResolverError};
+use crate::{CoreResolver, CoreResolverContext, CoreResolverError};
 use async_trait::async_trait;
 use cid::Cid;
-use co_runtime::RuntimeContext;
+use co_runtime::{RuntimeContext, RuntimeHandle};
 use co_storage::BlockStorage;
 use std::{
 	fmt::{Debug, Formatter},

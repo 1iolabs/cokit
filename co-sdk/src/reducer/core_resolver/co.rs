@@ -4,8 +4,8 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	library::runtime_dispatch::RuntimeDispatch, services::runtime::RuntimeHandle, types::co_dispatch::CoDispatch,
-	CoreResolver, CoreResolverContext, CoreResolverError, Cores, CO_CORE_NAME_CO,
+	library::runtime_dispatch::RuntimeDispatch, types::co_dispatch::CoDispatch, CoreResolver, CoreResolverContext,
+	CoreResolverError, Cores, CO_CORE_NAME_CO,
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -13,7 +13,7 @@ use cid::Cid;
 use co_core_co::{CoAction, CreateAction};
 use co_identity::{LocalIdentity, PrivateIdentity};
 use co_primitives::{reducer_action_core_from_storage, ReducerAction, ReducerInput};
-use co_runtime::{Core, RuntimeContext};
+use co_runtime::{Core, RuntimeContext, RuntimeHandle};
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use ipld_core::ipld::Ipld;
 use std::collections::HashMap;

@@ -36,7 +36,8 @@ pub use application::{
 };
 pub use co_actor::TaskSpawner;
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
-pub use co_guard::Guards;
+#[cfg(feature = "guard")]
+pub use co_guard::{CoAccessPolicy, DynamicCoAccessPolicy, Guards};
 pub use co_identity::{
 	DidCommHeader, DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver,
 	IdentityResolverError, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,
@@ -53,7 +54,9 @@ pub use co_primitives::{
 	OptionLink, Path, PathError, PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag,
 	Tags,
 };
-pub use co_runtime::{co_v1, Core, ExecuteError, GuardReference, RuntimeContext, RuntimeInstance, RuntimePool};
+pub use co_runtime::{
+	co_v1, Core, ExecuteError, GuardReference, RuntimeContext, RuntimeHandle, RuntimeInstance, RuntimePool,
+};
 pub use co_storage::{BlockStorageContentMapping, MemoryBlockStorage};
 #[cfg(feature = "fs")]
 pub use library::build_core::{
@@ -70,7 +73,6 @@ pub use library::token::{CoToken, CoTokenParameters};
 #[cfg(feature = "network")]
 pub use library::update_co::update_co;
 pub use library::{
-	co_access_policy::{CoAccessPolicy, DynamicCoAccessPolicy},
 	contact_handler::{ContactHandler, DynamicContactHandler},
 	core_source::CoreSource,
 	did_key_provider::DidKeyProvider,
@@ -95,8 +97,9 @@ pub use services::application::KeyRequestAction;
 pub use services::{
 	application::{Action, ActionError, ApplicationMessage, ContactAction},
 	reducer::CoReducer,
-	runtime::RuntimeHandle,
 };
+#[cfg(feature = "guard")]
+pub use types::guards::create_default_guards;
 #[cfg(feature = "js")]
 pub use types::js_co_date::JsCoDate;
 #[cfg(feature = "native")]
@@ -117,5 +120,4 @@ pub use types::{
 		CO_CORE_ROOM,
 	},
 	error::{ErrorContext, ErrorKind, IntoAction},
-	guards::create_default_guards,
 };

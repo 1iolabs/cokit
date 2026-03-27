@@ -8,7 +8,6 @@ use crate::{
 	reducer::state_resolver::{
 		DynamicStateResolver, JoinStateResolver, StateResolver, StateResolverContext, StaticStateResolver,
 	},
-	services::runtime::RuntimeHandle,
 	CoDate, CoreResolver, CoreResolverContext,
 };
 use anyhow::{anyhow, Context};
@@ -17,6 +16,7 @@ use cid::Cid;
 use co_identity::PrivateIdentity;
 use co_log::{EntryBlock, Log, LogError};
 use co_primitives::{DynamicCoDate, Link, ReducerAction, SignedEntry};
+use co_runtime::RuntimeHandle;
 use co_storage::{BlockStorageExt, ExtendedBlockStorage};
 use futures::{pin_mut, stream, StreamExt, TryStreamExt};
 use ipld_core::ipld::Ipld;
@@ -789,17 +789,15 @@ impl ReducerChangeCause {
 mod tests {
 	use super::Reducer;
 	use crate::{
-		application::reducer::ReducerBuilder,
-		build_core, crate_repository_path,
-		services::runtime::{RuntimeActor, RuntimeHandle},
-		CoDate, CoreResolver, ReducerChangeContext, ReducerChangedHandler, SingleCoreResolver,
+		application::reducer::ReducerBuilder, build_core, crate_repository_path, CoDate, CoreResolver,
+		ReducerChangeContext, ReducerChangedHandler, SingleCoreResolver,
 	};
 	use async_trait::async_trait;
 	use cid::Cid;
 	use co_identity::{IdentityResolverBox, LocalIdentityResolver};
 	use co_log::{IdentityEntryVerifier, Log};
 	use co_primitives::{BlockSerializer, MonotonicCoDate, ReducerAction};
-	use co_runtime::Core;
+	use co_runtime::{Core, RuntimeActor, RuntimeHandle};
 	use co_storage::{ExtendedBlockStorage, MemoryBlockStorage};
 	use example_counter::{Counter, CounterAction};
 	use futures::StreamExt;

@@ -15,6 +15,7 @@ pub mod co_storage_setting;
 pub mod co_uuid;
 pub mod cores;
 pub mod error;
+#[cfg(feature = "guard")]
 pub mod guards;
 #[cfg(feature = "js")]
 pub mod js_co_date;

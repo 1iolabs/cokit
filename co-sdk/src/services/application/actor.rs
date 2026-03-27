@@ -6,15 +6,17 @@
 use super::{epics::epic, Action, ApplicationMessage};
 use crate::{
 	application::{application::ApplicationSettings, co_context::CoContextInner},
-	services::{reducers::ReducersActor, runtime::RuntimeActor},
-	CoContext, Cores, DynamicCoAccessPolicy, DynamicCoUuid, DynamicContactHandler, DynamicLocalSecret, Guards, Runtime,
-	Storage,
+	services::reducers::ReducersActor,
+	CoContext, Cores, DynamicCoUuid, DynamicContactHandler, DynamicLocalSecret, Runtime, Storage,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, ResponseStreams, TaskSpawner};
+#[cfg(feature = "guard")]
+use co_guard::{DynamicCoAccessPolicy, Guards};
 use co_identity::LocalIdentityResolver;
 use co_primitives::{tags, DynamicCoDate, Tags};
+use co_runtime::RuntimeActor;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Debug)]
@@ -26,28 +28,46 @@ impl Application {
 		Self { settings }
 	}
 }
+pub struct ApplicationInitialize {
+	pub storage: Storage,
+	pub tasks: TaskSpawner,
+	pub date: DynamicCoDate,
+	pub uuid: DynamicCoUuid,
+	pub cores: Cores,
+	#[cfg(feature = "guard")]
+	pub guards: Guards,
+	pub local_secret: Option<DynamicLocalSecret>,
+	#[cfg(feature = "guard")]
+	pub access_policy: Option<DynamicCoAccessPolicy>,
+	pub contact_handler: Option<DynamicContactHandler>,
+}
+
 #[async_trait]
 impl Actor for Application {
 	type Message = ApplicationMessage;
 	type State = ApplicationState;
-	type Initialize = (
-		Storage,
-		TaskSpawner,
-		DynamicCoDate,
-		DynamicCoUuid,
-		Cores,
-		Guards,
-		Option<DynamicLocalSecret>,
-		Option<DynamicCoAccessPolicy>,
-		Option<DynamicContactHandler>,
-	);
+	type Initialize = ApplicationInitialize;
 
 	async fn initialize(
 		&self,
 		handle: &ActorHandle<Self::Message>,
 		tags: &Tags,
-		(storage, spawner, date, uuid, cores, guards, local_secret, co_access_policy, contact_handler): Self::Initialize,
+		init: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
+		let ApplicationInitialize {
+			storage,
+			tasks: spawner,
+			date,
+			uuid,
+			cores,
+			#[cfg(feature = "guard")]
+			guards,
+			local_secret,
+			#[cfg(feature = "guard")]
+				access_policy: co_access_policy,
+			contact_handler,
+		} = init;
+
 		tracing::trace!(settings = ?self.settings, "application-initialize");
 		let shutdown = CancellationToken::new();
 		let local_identity = LocalIdentityResolver::default().private_identity("did:local:device").unwrap();
@@ -79,8 +99,10 @@ impl Actor for Application {
 			date,
 			uuid,
 			cores,
+			#[cfg(feature = "guard")]
 			guards,
 			local_secret,
+			#[cfg(feature = "guard")]
 			co_access_policy,
 			contact_handler,
 		)

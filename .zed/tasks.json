@@ -14,7 +14,7 @@
     },
     {
         "label": "fmt",
-        "command": "cargo +nightly fmt"
+        "command": "cargo +nightly fmt -- -l"
     },
     {
         "label": "co-cli: build (debug)",

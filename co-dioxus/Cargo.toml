@@ -10,11 +10,12 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
 clap = { version = "^4.3.23", features = ["derive", "env"] }
+co-actor = { workspace = true, default-features = false }
 co-core-co = { workspace = true }
 co-core-membership = { workspace = true }
+co-guard = { workspace = true, optional = true }
 co-primitives = { workspace = true }
 co-sdk = { workspace = true, default-features = false }
-co-actor = { workspace = true, default-features = false }
 dioxus = { version = "^0.7.3", default-features = false, features = ["hooks", "signals"] }
 futures = { workspace = true }
 ipld-core = { workspace = true }
@@ -24,11 +25,11 @@ tokio = { workspace = true }
 tokio-util = { workspace = true }
 tokio_with_wasm = { workspace = true, optional = true, features = ["sync"] }
 tracing = { workspace = true }
+tracing-oslog = { version = "0.2", optional = true }
+tracing-subscriber = { workspace = true, optional = true }
 uuid = { workspace = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
-tracing-oslog = { version = "0.2", optional = true }
-tracing-subscriber = { workspace = true, optional = true }
 
 [features]
 default = []
@@ -39,6 +40,7 @@ mobile = ["fs", "network", "tracing-oslog", "co-sdk/recommended", "co-sdk/apple-
 web = ["js", "network", "indexeddb", "co-sdk/web", "co-actor/web"]
 
 # features
+guard = ["dep:co-guard", "co-sdk/guard"]
 fs = ["co-sdk/fs"]
 network = ["co-sdk/network"]
 js = ["co-sdk/js", "co-actor/js", "uuid/js", "dioxus/logger", "dep:wasm-bindgen-futures", "dep:web-sys", "dep:tokio_with_wasm"]
