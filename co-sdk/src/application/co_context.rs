@@ -205,7 +205,7 @@ impl CoContext {
 		{
 			use co_guard::AccessGuard;
 			if let (Some(did), Some(guard)) = (_did, self.access_guard()) {
-				if guard.check_access(_co, did).await? {
+				if guard.check_access(_co, did.as_ref()).await? {
 					return Ok(());
 				}
 			}

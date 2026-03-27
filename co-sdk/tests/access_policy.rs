@@ -10,9 +10,10 @@ use co_core_co::CoAction;
 use co_core_membership::{MembershipOptions, MembershipsAction};
 use co_network::connections::PeerRelateCoAction;
 use co_primitives::{CoId, CoInviteMetadata};
+use co_guard::AccessGuard;
 use co_sdk::{
-	request_co_state, tags, update_co, Action, AccessGuard, BlockStorageExt, CoReducerState, CreateCo, Identity,
-	KeyRequestAction, KnownTags, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
+	request_co_state, tags, update_co, Action, BlockStorageExt, CoReducerState, CreateCo, Identity, KeyRequestAction,
+	KnownTags, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use futures::StreamExt;
 use helper::instance::Instances;
