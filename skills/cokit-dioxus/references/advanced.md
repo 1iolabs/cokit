@@ -120,14 +120,14 @@ let settings = CoSettings::new("com.example.app", "my-app")
     .with_guard(guard_cid, guard_reference);
 ```
 
-### Access policies
+### Access Guards
 
 ```rust
 let settings = CoSettings::new("com.example.app", "my-app")
-    .with_access_policy(MyAccessPolicy);
+    .with_access_guard(MyAccessGuard);
 ```
 
-The `CoAccessPolicy` trait controls which COs the Application will accept and process.
+The `AccessGuard` trait controls which COs the Application will accept and process.
 
 ## Networking Configuration
 

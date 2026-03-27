@@ -13,7 +13,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, ResponseStreams, TaskSpawner};
 #[cfg(feature = "guard")]
-use co_guard::{DynamicCoAccessPolicy, Guards};
+use co_guard::{DynamicAccessGuard, Guards};
 use co_identity::LocalIdentityResolver;
 use co_primitives::{tags, DynamicCoDate, Tags};
 use co_runtime::RuntimeActor;
@@ -38,7 +38,7 @@ pub struct ApplicationInitialize {
 	pub guards: Guards,
 	pub local_secret: Option<DynamicLocalSecret>,
 	#[cfg(feature = "guard")]
-	pub access_policy: Option<DynamicCoAccessPolicy>,
+	pub access_guard: Option<DynamicAccessGuard>,
 	pub contact_handler: Option<DynamicContactHandler>,
 }
 
@@ -64,7 +64,7 @@ impl Actor for Application {
 			guards,
 			local_secret,
 			#[cfg(feature = "guard")]
-				access_policy: co_access_policy,
+				access_guard: co_access_guard,
 			contact_handler,
 		} = init;
 
@@ -103,7 +103,7 @@ impl Actor for Application {
 			guards,
 			local_secret,
 			#[cfg(feature = "guard")]
-			co_access_policy,
+			co_access_guard,
 			contact_handler,
 		)
 		.into();

@@ -23,7 +23,7 @@ use cid::Cid;
 use co_actor::{Actor, ActorHandle, ActorInstance, TaskOptions, TaskSpawner};
 use co_core_storage::PinStrategy;
 #[cfg(feature = "guard")]
-use co_guard::{CoAccessPolicy, DynamicCoAccessPolicy, Guards};
+use co_guard::{AccessGuard, DynamicAccessGuard, Guards};
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolverBox,
 };
@@ -366,7 +366,7 @@ pub struct ApplicationBuilder {
 	#[cfg(feature = "guard")]
 	guards: Guards,
 	#[cfg(feature = "guard")]
-	access_policy: Option<DynamicCoAccessPolicy>,
+	access_guard: Option<DynamicAccessGuard>,
 	contact_handler: Option<DynamicContactHandler>,
 }
 impl ApplicationBuilder {
@@ -402,7 +402,7 @@ impl ApplicationBuilder {
 			#[cfg(feature = "guard")]
 			guards: create_default_guards(),
 			#[cfg(feature = "guard")]
-			access_policy: None,
+			access_guard: None,
 			contact_handler: None,
 		}
 	}
@@ -426,7 +426,7 @@ impl ApplicationBuilder {
 			#[cfg(feature = "guard")]
 			guards: create_default_guards(),
 			#[cfg(feature = "guard")]
-			access_policy: None,
+			access_guard: None,
 			contact_handler: None,
 		}
 	}
@@ -454,7 +454,7 @@ impl ApplicationBuilder {
 			#[cfg(feature = "guard")]
 			guards: create_default_guards(),
 			#[cfg(feature = "guard")]
-			access_policy: None,
+			access_guard: None,
 			contact_handler: None,
 		}
 	}
@@ -478,7 +478,7 @@ impl ApplicationBuilder {
 			#[cfg(feature = "guard")]
 			guards: create_default_guards(),
 			#[cfg(feature = "guard")]
-			access_policy: None,
+			access_guard: None,
 			contact_handler: None,
 		}
 	}
@@ -548,8 +548,8 @@ impl ApplicationBuilder {
 	}
 
 	#[cfg(feature = "guard")]
-	pub fn with_access_policy(self, policy: impl CoAccessPolicy + 'static) -> Self {
-		Self { access_policy: Some(DynamicCoAccessPolicy::new(policy)), ..self }
+	pub fn with_access_guard(self, guard: impl AccessGuard + 'static) -> Self {
+		Self { access_guard: Some(DynamicAccessGuard::new(guard)), ..self }
 	}
 
 	pub fn with_contact_handler(self, handler: impl ContactHandler + 'static) -> Self {
@@ -643,7 +643,7 @@ impl ApplicationBuilder {
 				guards: self.guards,
 				local_secret: self.local_secret,
 				#[cfg(feature = "guard")]
-				access_policy: self.access_policy,
+				access_guard: self.access_guard,
 				contact_handler: self.contact_handler,
 			},
 		)?;

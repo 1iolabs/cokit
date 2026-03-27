@@ -187,14 +187,14 @@ impl CoContext {
 		}
 	}
 
-	/// CO access policy for non-participants.
+	/// CO access guard for non-participants.
 	#[cfg(feature = "guard")]
-	pub fn access_policy(&self) -> Option<&co_guard::DynamicCoAccessPolicy> {
-		self.inner.access_policy.as_ref()
+	pub fn access_guard(&self) -> Option<&co_guard::DynamicAccessGuard> {
+		self.inner.access_guard.as_ref()
 	}
 
-	/// Check access policy for a CO and requester.
-	/// Succeedes if the policy allows access, otherwise returns the provided error.
+	/// Check access guard for a CO and requester.
+	/// Succeeds if the guard allows access, otherwise returns the provided error.
 	pub async fn check_access_or(
 		&self,
 		_co: &CoId,
@@ -203,9 +203,9 @@ impl CoContext {
 	) -> Result<(), anyhow::Error> {
 		#[cfg(feature = "guard")]
 		{
-			use co_guard::CoAccessPolicy;
-			if let (Some(did), Some(policy)) = (_did, self.access_policy()) {
-				if policy.check_access(_co, did).await? {
+			use co_guard::AccessGuard;
+			if let (Some(did), Some(guard)) = (_did, self.access_guard()) {
+				if guard.check_access(_co, did).await? {
 					return Ok(());
 				}
 			}
@@ -318,7 +318,7 @@ pub(crate) struct CoContextInner {
 	guards: co_guard::Guards,
 	local_secret: Option<DynamicLocalSecret>,
 	#[cfg(feature = "guard")]
-	access_policy: Option<co_guard::DynamicCoAccessPolicy>,
+	access_guard: Option<co_guard::DynamicAccessGuard>,
 	contact_handler: Option<DynamicContactHandler>,
 }
 impl CoContextInner {
@@ -338,7 +338,7 @@ impl CoContextInner {
 		cores: Cores,
 		#[cfg(feature = "guard")] guards: co_guard::Guards,
 		local_secret: Option<DynamicLocalSecret>,
-		#[cfg(feature = "guard")] access_policy: Option<co_guard::DynamicCoAccessPolicy>,
+		#[cfg(feature = "guard")] access_guard: Option<co_guard::DynamicAccessGuard>,
 		contact_handler: Option<DynamicContactHandler>,
 	) -> Self {
 		let block_links = BlockLinks::default();
@@ -363,7 +363,7 @@ impl CoContextInner {
 			guards,
 			local_secret,
 			#[cfg(feature = "guard")]
-			access_policy,
+			access_guard,
 			contact_handler,
 		}
 	}

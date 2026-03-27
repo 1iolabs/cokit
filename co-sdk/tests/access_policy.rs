@@ -11,7 +11,7 @@ use co_core_membership::{MembershipOptions, MembershipsAction};
 use co_network::connections::PeerRelateCoAction;
 use co_primitives::{CoId, CoInviteMetadata};
 use co_sdk::{
-	request_co_state, tags, update_co, Action, BlockStorageExt, CoAccessPolicy, CoReducerState, CreateCo, Identity,
+	request_co_state, tags, update_co, Action, AccessGuard, BlockStorageExt, CoReducerState, CreateCo, Identity,
 	KeyRequestAction, KnownTags, CO_CORE_NAME_CO, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL,
 };
 use futures::StreamExt;
@@ -26,13 +26,13 @@ pub mod helper;
 struct AllowAll;
 
 #[async_trait]
-impl CoAccessPolicy for AllowAll {
+impl AccessGuard for AllowAll {
 	async fn check_access(&self, _co: &CoId, _requester: &str) -> Result<bool, anyhow::Error> {
 		Ok(true)
 	}
 }
 
-/// Test that a removed participant can still request a key when a CoAccessPolicy is configured.
+/// Test that a removed participant can still request a key when a AccessGuard is configured.
 ///
 /// Steps:
 /// - Create two peers (peer1 with access policy, peer2 standard)
@@ -46,7 +46,7 @@ async fn test_allows_removed_participant() {
 	let mut instances = Instances::new("test_access_policy");
 
 	// peer1: with access policy
-	let peer1 = instances.create_builder(|b| b.with_access_policy(AllowAll)).await;
+	let peer1 = instances.create_builder(|b| b.with_access_guard(AllowAll)).await;
 	let peer2 = instances.create().await;
 	let shared_co = SharedCo::create_with_peers(peer1, peer2, "shared").await;
 
@@ -121,7 +121,7 @@ async fn test_unrelated_peer_joins() {
 	let mut instances = Instances::new("test_access_policy_unrelated");
 
 	// peer1: with access policy
-	let mut peer1 = instances.create_builder(|b| b.with_access_policy(AllowAll)).await;
+	let mut peer1 = instances.create_builder(|b| b.with_access_guard(AllowAll)).await;
 	let mut peer2 = instances.create().await;
 
 	// network
@@ -222,7 +222,7 @@ async fn test_unrelated_peer_auto_state() {
 	let mut instances = Instances::new("test_access_policy_auto_state");
 
 	// peer1: with access policy
-	let mut peer1 = instances.create_builder(|b| b.with_access_policy(AllowAll)).await;
+	let mut peer1 = instances.create_builder(|b| b.with_access_guard(AllowAll)).await;
 	let mut peer2 = instances.create().await;
 
 	// network
@@ -322,7 +322,7 @@ async fn test_unrelated_auto_state_encrypted() {
 	let mut instances = Instances::new("test_access_policy_auto_state");
 
 	// peer1: with access policy
-	let mut peer1 = instances.create_builder(|b| b.with_access_policy(AllowAll)).await;
+	let mut peer1 = instances.create_builder(|b| b.with_access_guard(AllowAll)).await;
 	let mut peer2 = instances.create().await;
 
 	// network

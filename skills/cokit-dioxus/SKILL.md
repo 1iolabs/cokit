@@ -61,7 +61,7 @@ programmatic configuration, then chain builders:
 - `.with_network(network_settings)` - enable P2P networking
 - `.without_keychain()` - skip OS keychain (dev only)
 - `.with_local_secret(secret)` - encryption secret
-- `.with_access_policy(policy)` - CO access policy
+- `.with_access_guard(policy)` - CO access guard
 - `.with_contact_handler(handler)` - handle contact requests
 - `.with_core(cid, core)` / `.with_guard(cid, guard)` - register Cores/Guards
 - `.with_log(co_log)` / `.with_log_level(level)` - logging configuration

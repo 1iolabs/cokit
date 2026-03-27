@@ -274,8 +274,8 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 		application_builder = application_builder.with_local_secret(local_secret);
 	}
 	#[cfg(feature = "guard")]
-	if let Some(access_policy) = settings.access_policy {
-		application_builder = application_builder.with_access_policy(access_policy);
+	if let Some(access_guard) = settings.access_guard {
+		application_builder = application_builder.with_access_guard(access_guard);
 	}
 	if let Some(contact_handler) = settings.contact_handler {
 		application_builder = application_builder.with_contact_handler(contact_handler);

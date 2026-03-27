@@ -37,7 +37,7 @@ pub use application::{
 pub use co_actor::TaskSpawner;
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 #[cfg(feature = "guard")]
-pub use co_guard::{CoAccessPolicy, DynamicCoAccessPolicy, Guards};
+pub use co_guard::{AccessGuard, DynamicAccessGuard, Guards};
 pub use co_identity::{
 	DidCommHeader, DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver,
 	IdentityResolverError, PrivateIdentity, PrivateIdentityBox, PrivateIdentityResolver, PrivateIdentityResolverBox,

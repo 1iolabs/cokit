@@ -7,7 +7,7 @@ use crate::library::cli::{Cli, CoLogLevel};
 use cid::Cid;
 use clap::Parser;
 #[cfg(feature = "guard")]
-use co_guard::{CoAccessPolicy, DynamicCoAccessPolicy, GuardReference, Guards};
+use co_guard::{AccessGuard, DynamicAccessGuard, GuardReference, Guards};
 #[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
 use co_sdk::{CoStorageSetting, ContactHandler, Core, Cores, DynamicContactHandler, DynamicLocalSecret, LocalSecret};
@@ -37,7 +37,7 @@ pub struct CoSettings {
 	pub feature: Vec<String>,
 	pub local_secret: Option<DynamicLocalSecret>,
 	#[cfg(feature = "guard")]
-	pub access_policy: Option<DynamicCoAccessPolicy>,
+	pub access_guard: Option<DynamicAccessGuard>,
 	pub contact_handler: Option<DynamicContactHandler>,
 	pub cores: Cores,
 	#[cfg(feature = "guard")]
@@ -93,8 +93,8 @@ impl CoSettings {
 	}
 
 	#[cfg(feature = "guard")]
-	pub fn with_access_policy(self, policy: impl CoAccessPolicy + 'static) -> Self {
-		Self { access_policy: Some(DynamicCoAccessPolicy::new(policy)), ..self }
+	pub fn with_access_guard(self, guard: impl AccessGuard + 'static) -> Self {
+		Self { access_guard: Some(DynamicAccessGuard::new(guard)), ..self }
 	}
 
 	pub fn with_contact_handler(self, handler: impl ContactHandler + 'static) -> Self {

@@ -10,26 +10,26 @@ use std::{
 	sync::Arc,
 };
 
-/// Application-defined policy for granting CO key access to non-participants.
+/// Application-defined guard for granting CO key access to non-participants.
 #[async_trait]
-pub trait CoAccessPolicy: Send + Sync + 'static {
+pub trait AccessGuard: Send + Sync + 'static {
 	async fn check_access(&self, co: &CoId, requester: &str) -> Result<bool, anyhow::Error>;
 }
 
 #[derive(Clone)]
-pub struct DynamicCoAccessPolicy(Arc<dyn CoAccessPolicy>);
-impl Debug for DynamicCoAccessPolicy {
+pub struct DynamicAccessGuard(Arc<dyn AccessGuard>);
+impl Debug for DynamicAccessGuard {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		f.debug_tuple("DynamicCoAccessPolicy").finish()
+		f.debug_tuple("DynamicAccessGuard").finish()
 	}
 }
-impl DynamicCoAccessPolicy {
-	pub fn new(policy: impl CoAccessPolicy) -> Self {
-		Self(Arc::new(policy))
+impl DynamicAccessGuard {
+	pub fn new(guard: impl AccessGuard) -> Self {
+		Self(Arc::new(guard))
 	}
 }
 #[async_trait]
-impl CoAccessPolicy for DynamicCoAccessPolicy {
+impl AccessGuard for DynamicAccessGuard {
 	async fn check_access(&self, co: &CoId, requester: &str) -> Result<bool, anyhow::Error> {
 		self.0.check_access(co, requester).await
 	}
