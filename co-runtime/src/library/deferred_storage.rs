@@ -6,7 +6,7 @@
 use crate::RuntimeContext;
 use anyhow::anyhow;
 use cid::Cid;
-use co_primitives::{AnyBlockStorage, Block, BlockLinks, DefaultParams, StorageError};
+use co_primitives::{AnyBlockStorage, Block, BlockLinks, DefaultParams, KnownMultiCodec, StorageError};
 use co_storage::Storage;
 use std::{
 	collections::{HashMap, VecDeque},
@@ -67,26 +67,21 @@ impl DeferredStorage {
 		links: &BlockLinks,
 		runtime_context: &RuntimeContext,
 	) -> Result<(), anyhow::Error> {
-		// stack
-		let mut stack = VecDeque::with_capacity(10);
-		if let Some(cid) = runtime_context.state {
-			stack.push_back((cid, 0));
-		}
-		stack.push_back((runtime_context.event, 1));
+		// use all direct links from input (which is state and action for ReducerInput)
+		let input_block = Block::new_data(KnownMultiCodec::DagCbor, runtime_context.input.clone());
+		let mut stack: VecDeque<(Cid, u8)> = links.links(&input_block)?.map(|cid| (cid, 1)).collect();
 
-		// process
+		// fetch blocks and follow one level of links
 		let mut blocks = Vec::new();
 		while let Some((cid, depth)) = stack.pop_front() {
 			let block = storage.get(&cid).await?;
 
-			// links
 			if depth > 0 && links.has_links(block.cid()) {
 				for link in links.links(&block)? {
 					stack.push_back((link, depth - 1));
 				}
 			}
 
-			// add
 			blocks.push(block);
 		}
 
@@ -95,8 +90,6 @@ impl DeferredStorage {
 		for block in blocks {
 			context.blocks.insert(*block.cid(), block);
 		}
-
-		// result
 		Ok(())
 	}
 }

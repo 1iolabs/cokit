@@ -164,7 +164,7 @@ impl RuntimePool {
 					.await
 					.map_err(|e| ExecuteError::Other(e.into()))?;
 				#[cfg(feature = "js")]
-				let reducer_output = execute.execute_async(reducer_input, block_storage).await;
+				let reducer_output = execute.execute_async(reducer_input, reducer_storage).await;
 
 				// result
 				context.apply_reducer_output(reducer_output);
@@ -256,7 +256,7 @@ impl RuntimePool {
 					.await
 					.map_err(|e| ExecuteError::Other(e.into()))?;
 				#[cfg(feature = "js")]
-				let guard_output = guard.execute_async(guard_input, block_storage).await;
+				let guard_output = guard.execute_async(guard_input, guard_storage).await;
 
 				// output
 				let result = guard_output.result;

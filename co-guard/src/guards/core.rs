@@ -73,7 +73,7 @@ impl CoreGuard {
 						heads: heads.clone(),
 						next_head: *next_head,
 					})
-					.map_err(|err| GuardError::Execute(err))?,
+					.map_err(GuardError::Execute)?,
 				)
 				.await
 				.map_err(|err| {
