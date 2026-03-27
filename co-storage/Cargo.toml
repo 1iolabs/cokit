@@ -49,7 +49,7 @@ default = []
 logging-verbose = []
 fs = ["tokio/fs", "tokio/io-util"]
 web = ["js", "overlay", "co-actor/web"]
-native = ["fs", "overlay", "co-actor/native"]
+native = ["fs", "overlay"]
 js = ["uuid/js", "getrandom/js", "co-actor/js"]
 
 # backends

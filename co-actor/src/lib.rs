@@ -3,8 +3,8 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-// fail with proper error message when try to us js for non wasm32
-#[cfg(all(feature = "js", not(target_arch = "wasm32"), not(clippy)))]
+// fail with proper error message when try to use js for non wasm32
+#[cfg(all(feature = "js", not(target_arch = "wasm32"), not(clippy), not(test)))]
 compile_error!("feature \"js\" can only used for \"wasm32-unknown-unknown\" target");
 
 // modules
@@ -21,7 +21,7 @@ mod task_handle;
 mod task_options;
 mod task_spawner_local;
 pub mod time;
-#[cfg(feature = "native")]
+#[cfg(not(feature = "js"))]
 mod tokio_task_spawner;
 
 // exports
@@ -43,15 +43,15 @@ pub use task_options::TaskOptions;
 pub use task_spawner_local::{LocalTaskHandle, LocalTaskSpawner};
 
 // backends
-#[cfg(feature = "native")]
+#[cfg(not(feature = "js"))]
 mod backend {
 	pub use super::tokio_task_spawner::{TaskHandle, TaskSpawner};
 }
-#[cfg(feature = "native")]
+#[cfg(not(feature = "js"))]
 pub mod tokio {
 	pub use super::tokio_task_spawner::{TaskHandle, TaskSpawner};
 }
-#[cfg(all(feature = "js", not(feature = "native")))]
+#[cfg(feature = "js")]
 mod backend {
 	pub use super::js_task_spawner::{TaskHandle, TaskSpawner};
 }

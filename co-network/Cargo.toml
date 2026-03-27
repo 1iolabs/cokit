@@ -10,7 +10,7 @@ async-stream = { workspace = true }
 async-trait = { workspace = true }
 asynchronous-codec = "0.7.0"
 cid = { workspace = true }
-co-actor = { workspace = true, default-features = false }
+co-actor = { workspace = true }
 co-identity = { workspace = true }
 co-primitives = { workspace = true }
 co-storage = { workspace = true }
@@ -50,7 +50,6 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 [features]
 default = ["native"]
 native = [
-    "co-actor/native",
     "libp2p/tokio", "libp2p/tcp", "libp2p/quic", "libp2p/dns", "libp2p/mdns", "libp2p/upnp", "libp2p/websocket", "libp2p/tls",
     "libp2p-bitswap/metrics",
     "tokio/sync", "tokio/time",

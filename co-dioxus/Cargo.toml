@@ -35,8 +35,8 @@ web-sys = { workspace = true, optional = true }
 default = []
 
 # targets
-desktop = ["fs", "network", "tracing", "co-sdk/recommended", "co-sdk/apple-sandbox", "co-actor/native"]
-mobile = ["fs", "network", "tracing-oslog", "co-sdk/recommended", "co-sdk/apple-sandbox", "co-actor/native"]
+desktop = ["fs", "network", "tracing", "co-sdk/recommended", "co-sdk/apple-sandbox"]
+mobile = ["fs", "network", "tracing-oslog", "co-sdk/recommended", "co-sdk/apple-sandbox"]
 web = ["js", "network", "indexeddb", "co-sdk/web", "co-actor/web"]
 
 # features
