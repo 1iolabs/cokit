@@ -385,7 +385,7 @@
     },
     "timestamp": {
       "type": "integer",
-      "format": "uint128",
+      "format": "uint64",
       "minimum": 0.0
     }
   },

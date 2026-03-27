@@ -54,13 +54,18 @@ pub struct RoomEvent {
 	pub is_closed: bool,
 }
 
+/// eCO Messenger room core
 #[co(state)]
 #[derive(JsonSchema)]
 pub struct Room {
+	/// Name of the room
 	pub name: String,
+	/// A short description for the room
 	pub description: String,
+	/// Content ID for the room avatar
 	#[schemars(with = "Option<CoCid>")]
 	pub avatar: Option<Cid>,
+	/// All currently pinned messages in relevant order
 	pub pinned_messages: Vec<String>,
 	pub tags: Tags,
 
