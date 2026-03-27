@@ -12,7 +12,6 @@ anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
 cid = { workspace = true }
-co-actor = { workspace = true, features = ["native"] }
 co-primitives = { workspace = true }
 futures = { workspace = true }
 ipld-core = { workspace = true }
@@ -25,6 +24,12 @@ wasm-bindgen = { workspace = true }
 wasm-bindgen-futures = { workspace = true, features = ["futures-core-03-stream"] }
 wasm-streams = "0.4.2"
 web-sys = { workspace = true, features = ["console"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+co-actor = { workspace = true, features = ["js"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+co-actor = { workspace = true, features = ["native"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.55"
