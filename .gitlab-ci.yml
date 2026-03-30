@@ -13,7 +13,7 @@ variables:
 
 default:
   before_script:
-    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.1io.com/".insteadOf "https://gitlab.1io.com/"
+    - ./ci/scripts/ci-default-before.sh
 
 cache: &global_cache
   key: ${DOCKERFILE_HASH}
