@@ -6,11 +6,11 @@
 use super::multimedia::ImageInfo;
 use crate::{EventContent, EventType};
 use cid::Cid;
-use co_macros::co_data;
+use co_macros::co;
 use co_primitives::CoCid;
 use schemars::JsonSchema;
 
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct RoomNameContent {
 	pub name: String,
@@ -34,7 +34,7 @@ impl From<RoomNameContent> for EventContent {
 	}
 }
 
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct RoomTopicContent {
 	pub topic: String,
@@ -58,7 +58,7 @@ impl From<RoomTopicContent> for EventContent {
 	}
 }
 
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct RoomAvatarContent {
 	#[schemars(with = "Option<CoCid>")]
@@ -84,7 +84,7 @@ impl From<RoomAvatarContent> for EventContent {
 	}
 }
 
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct PinnedEventsContent {
 	pub pinned: Vec<String>,

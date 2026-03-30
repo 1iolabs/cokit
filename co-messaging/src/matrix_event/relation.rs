@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{EventContent, EventType};
-use co_macros::co_data;
+use co_macros::co;
 use schemars::JsonSchema;
 
 pub trait Relation {
@@ -14,7 +14,7 @@ pub trait Relation {
 
 /// Empty content as the only purpose is holding a relation to another event.
 /// Mostly used for annotation events
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct ReactionContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -59,7 +59,7 @@ impl EventType for ReactionContent {
 }
 
 /// Used in some event contents to define a relation to other events
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 #[serde(rename = "relates_to")]
 pub struct RelatesTo {
@@ -161,7 +161,7 @@ impl Relation for RelatesTo {
 }
 
 /// Simple enum containing all different types of relation that events can have to other events
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub enum RelationType {
 	#[serde(rename = "annotation")]
@@ -191,7 +191,7 @@ impl Relation for RelationType {
 	}
 }
 
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct ReplyContent {
 	pub event_id: String,
@@ -200,7 +200,7 @@ pub struct ReplyContent {
 /// Event content used to redact other events. Sender of this event must be either the same as the sender of the
 /// original event or a user with the necessary permissions.
 /// Redactions are idempotent and irreversible. They do not use the same relation fields as other events
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct RedactionContent {
 	/// An optional reason field mostly used when event got redacted by another user

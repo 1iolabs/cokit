@@ -12,7 +12,7 @@ use crate::matrix_event::receipts::PublicReceiptContent;
 pub use crate::matrix_event::{
 	call_event, ephemeral_event, message_event, multimedia, poll_event, receipts, relation, state_event, user_events,
 };
-use co_macros::co_data;
+use co_macros::co;
 use co_primitives::Date;
 use matrix_event::{
 	call_event::{
@@ -32,7 +32,7 @@ pub trait EventType {
 }
 
 /// Collection of all possible actions for the room core
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct MatrixEvent {
 	pub event_id: String,
@@ -107,7 +107,7 @@ impl EventType for MatrixEvent {
 /// # User events
 ///
 /// Events for interacting with users profiles
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 #[serde(tag = "type", content = "content")]
 pub enum EventContent {

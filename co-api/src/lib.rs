@@ -10,7 +10,7 @@ mod types;
 
 /// exports
 pub use cid::Cid;
-pub use co_macros::{co, co_data, co_state};
+pub use co_macros::co;
 pub use co_primitives::{
 	cid_to_raw, from_cbor, from_json, raw_to_cid, reducer_action_core, reducer_action_core_from_storage,
 	serde_map_as_list, tags, to_cbor, to_json, to_json_string, AbsolutePath, AbsolutePathOwned, Block, BlockSerializer,

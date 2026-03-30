@@ -7,36 +7,6 @@ use quote::quote;
 use std::collections::BTreeSet;
 use syn::{parse_macro_input, DeriveInput};
 
-pub fn macro_co_data(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	let input = parse_macro_input!(input as DeriveInput);
-
-	let expanded = quote! {
-		#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
-		#input
-	};
-
-	proc_macro::TokenStream::from(expanded)
-}
-
-pub fn macro_co_state(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	let input = parse_macro_input!(input as DeriveInput);
-
-	let name = &input.ident;
-
-	let expanded = quote! {
-		#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
-		#input
-
-		#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
-		#[no_mangle]
-		pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
-			co_api::reduce::<#name, _>(unsafe { &*input }, unsafe { &mut *output })
-		}
-	};
-
-	proc_macro::TokenStream::from(expanded)
-}
-
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CoMacroFeature {
 	State,
