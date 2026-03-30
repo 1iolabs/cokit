@@ -16,7 +16,6 @@ mod services;
 mod types;
 
 // exports
-pub use library::api_context::ApiContext;
 #[cfg(feature = "llvm")]
 pub use library::compile::compile_native;
 pub(crate) use macros::cfg_wasmer;

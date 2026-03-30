@@ -30,7 +30,7 @@ pub fn macro_co_state(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 		#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 		#[no_mangle]
 		pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
-			co_api::async_api::reduce::<#name, _>(unsafe { &*input }, unsafe { &mut *output })
+			co_api::reduce::<#name, _>(unsafe { &*input }, unsafe { &mut *output })
 		}
 	};
 
@@ -41,7 +41,6 @@ pub fn macro_co_state(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 pub enum CoMacroFeature {
 	State,
 	Guard,
-	StateSync,
 	NoDefault,
 	NoDerive,
 	Repr,
@@ -52,7 +51,6 @@ impl TryFrom<&str> for CoMacroFeature {
 	fn try_from(value: &str) -> Result<Self, Self::Error> {
 		Ok(match value {
 			"state" => Self::State,
-			"state_sync" => Self::StateSync,
 			"guard" => Self::Guard,
 			"no_default" => Self::NoDefault,
 			"no_derive" => Self::NoDerive,
@@ -88,9 +86,7 @@ pub fn macro_co(input: proc_macro::TokenStream, features: BTreeSet<CoMacroFeatur
 			derives.push(syn::parse_quote!(serde::Serialize));
 			derives.push(syn::parse_quote!(serde::Deserialize));
 		}
-		if !features.contains(&CoMacroFeature::NoDefault)
-			&& (features.contains(&CoMacroFeature::State) || features.contains(&CoMacroFeature::StateSync))
-		{
+		if !features.contains(&CoMacroFeature::NoDefault) && features.contains(&CoMacroFeature::State) {
 			derives.push(syn::parse_quote!(Default));
 		}
 		derives
@@ -105,18 +101,7 @@ pub fn macro_co(input: proc_macro::TokenStream, features: BTreeSet<CoMacroFeatur
 			#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
 			#[no_mangle]
 			pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
-				co_api::async_api::reduce::<#name, _>(unsafe { &*input }, unsafe { &mut *output })
-			}
-		});
-	}
-
-	// feature: state sync
-	if features.contains(&CoMacroFeature::StateSync) {
-		tokens.push(quote! {
-			#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
-			#[no_mangle]
-			pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
-				co_api::sync_api::reduce::<#name>(unsafe { &*input }, unsafe { &mut *output })
+				co_api::reduce::<#name, _>(unsafe { &*input }, unsafe { &mut *output })
 			}
 		});
 	}

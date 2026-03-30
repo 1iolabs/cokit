@@ -6,8 +6,8 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co_data, co_state, BlockStorage, BlockStorageExt, CoList, CoListIndex, CoMap, CoTryStreamExt,
-	CoreBlockStorage, IsDefault, LazyTransaction, Link, OptionLink, ReducerAction, Tags,
+	co_data, co_state, BlockStorage, BlockStorageExt, CoList, CoListIndex, CoMap, CoTryStreamExt, CoreBlockStorage,
+	IsDefault, LazyTransaction, Link, OptionLink, Reducer, ReducerAction, Tags,
 };
 use futures::{pin_mut, FutureExt, TryStreamExt};
 use std::future::ready;

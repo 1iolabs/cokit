@@ -5,7 +5,7 @@
 
 use co_core_co::CoAction;
 use co_core_file::{FolderNode, Node};
-use co_primitives::{tags, AbsolutePath, AbsolutePathOwned, CoreName, DagCollectionAsyncExt, PathError, PathExt};
+use co_primitives::{tags, AbsolutePath, AbsolutePathOwned, CoreName, PathError, PathExt};
 use co_sdk::{
 	state::{query_core, QueryError, QueryExt},
 	CoReducer, CoStorage, Cores, PrivateIdentity, StorageError, CO_CORE_FILE, CO_CORE_NAME_CO,

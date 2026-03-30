@@ -4,92 +4,115 @@
 // retention—approved secure tools may process solely for internal use.
 
 use cid::Cid;
-use co_api::{sync_api::Reducer, DagCollectionExt, DagMap, DagSet, DagSetExt, Tags};
-use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use co_api::{co, BlockStorageExt, CoMap, CoSet, CoreBlockStorage, Link, OptionLink, Reducer, ReducerAction, Tags};
+use futures::TryStreamExt;
 
 /// COre that handles pinning and unpinning
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[co(state)]
 pub struct Pin {
-	/// A DAG map containing all pinned content ids. Map is keyed by the referenced content ids. The value is a set
+	/// Map of pinned content ids. Keyed by the referenced content ids. The value is a set
 	/// of tags making pinning and unpinning idempotent. A service may use tags with unique identifiers to ensure
 	/// that a cid stays pinned as it then cannot be unpinned by other services. To unpin, all tags must match.
-	pub pins: DagMap<Cid, DagSet<Tags>>,
+	pub pins: CoMap<Cid, CoSet<Tags>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
 pub enum PinAction {
 	Pin(Cid, Tags),
 	Unpin(Cid, Tags),
 	UnpinAll(Tags),
 }
 
-impl Reducer for Pin {
-	type Action = PinAction;
-	fn reduce(self, event: &co_api::ReducerAction<Self::Action>, context: &mut dyn co_api::sync_api::Context) -> Self {
-		let mut result = self;
-		let mut pin_map = result.pins.collection(context.storage_mut());
-		match &event.payload {
+impl Reducer<PinAction> for Pin {
+	async fn reduce(
+		state: OptionLink<Self>,
+		event: Link<ReducerAction<PinAction>>,
+		storage: &CoreBlockStorage,
+	) -> Result<Link<Self>, anyhow::Error> {
+		let action = storage.get_value(&event).await?;
+		let mut result = storage.get_value_or_default(&state).await?;
+		match &action.payload {
 			PinAction::Pin(cid, tags) => {
-				// get current or new
-				let mut pinned_tags = pin_map.get(cid).cloned().unwrap_or_default();
-
-				// push new tag to tags vec
-				if pinned_tags.insert(context.storage_mut(), tags.clone()) {
-					// update map
-					pin_map.insert(*cid, pinned_tags);
-				}
+				reduce_pin(&mut result.pins, storage, cid, tags).await?;
 			},
-			// unpin single cid with tags
 			PinAction::Unpin(cid, tags) => {
-				pin_map = unpin(pin_map, cid, tags, context);
+				unpin(&mut result.pins, storage, cid, tags).await?;
 			},
-			// unpin all cid that match tags using these tags
 			PinAction::UnpinAll(tags) => {
-				// iterate all current pins
-				for (cid, pin_tag_set) in pin_map.clone().iter() {
-					// resolve tags for current cid
-					let pin_tag_set = pin_tag_set.collection(context.storage());
-					// check if tag set contains given tags
-					for pin_tags in pin_tag_set {
-						if tags.matches(&pin_tags) {
-							// unpin found cid
-							pin_map = unpin(pin_map, cid, tags, context);
-							continue;
-						}
-					}
-				}
+				reduce_unpin_all(&mut result.pins, storage, tags).await?;
 			},
-		};
-		result.pins.set_collection(context.storage_mut(), pin_map);
-		result
+		}
+		Ok(storage.set_value(&result).await?)
 	}
 }
 
-fn unpin(
-	mut pin_map: BTreeMap<Cid, DagSet<Tags>>,
+async fn reduce_pin(
+	pins: &mut CoMap<Cid, CoSet<Tags>>,
+	storage: &CoreBlockStorage,
 	cid: &Cid,
 	tags: &Tags,
-	context: &mut dyn co_api::sync_api::Context,
-) -> BTreeMap<Cid, DagSet<Tags>> {
-	// get current tags for cid
-	if let Some(mut pinned_tags) = pin_map.get(cid).cloned() {
-		// remove given tag from array
-		let filtered_tags: BTreeSet<Tags> = pinned_tags.iter(context.storage()).filter(|t| *t != *tags).collect();
-		if filtered_tags.is_empty() {
-			// last tags removed from set -> remove cid from map
-			pin_map.remove(cid);
-		} else {
-			// update map with filtered tags
-			pinned_tags.set_collection(context.storage_mut(), filtered_tags);
-			pin_map.insert(*cid, pinned_tags);
-		}
-	}
-	pin_map
+) -> Result<(), anyhow::Error> {
+	// get current or new
+	let mut pinned_tags = pins.get(storage, cid).await?.unwrap_or_default();
+
+	// insert new tag into the set
+	pinned_tags.insert(storage, tags.clone()).await?;
+
+	// update map
+	pins.insert(storage, *cid, pinned_tags).await?;
+	Ok(())
 }
 
-#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
-#[no_mangle]
-pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
-	co_api::sync_api::reduce::<Pin>(unsafe { &*input }, unsafe { &mut *output })
+async fn unpin(
+	pins: &mut CoMap<Cid, CoSet<Tags>>,
+	storage: &CoreBlockStorage,
+	cid: &Cid,
+	tags: &Tags,
+) -> Result<(), anyhow::Error> {
+	// get current tags for cid
+	if let Some(mut pinned_tags) = pins.get(storage, cid).await? {
+		// remove given tag from set
+		pinned_tags.remove(storage, tags.clone()).await?;
+
+		// check if set is now empty
+		if pinned_tags.is_empty() {
+			// last tags removed from set -> remove cid from map
+			pins.remove(storage, *cid).await?;
+		} else {
+			// update map with filtered tags
+			pins.insert(storage, *cid, pinned_tags).await?;
+		}
+	}
+	Ok(())
+}
+
+async fn reduce_unpin_all(
+	pins: &mut CoMap<Cid, CoSet<Tags>>,
+	storage: &CoreBlockStorage,
+	tags: &Tags,
+) -> Result<(), anyhow::Error> {
+	// collect all cids that have matching tags
+	let cids_to_unpin: Vec<Cid> = pins
+		.stream(storage)
+		.try_filter_map(|(cid, pin_tag_set): (Cid, CoSet<Tags>)| {
+			let tags = tags.clone();
+			let storage = storage.clone();
+			async move {
+				// check if any tag in the set matches
+				let has_match = pin_tag_set
+					.stream(&storage)
+					.try_any(|pin_tags| std::future::ready(tags.matches(&pin_tags)))
+					.await
+					.unwrap_or(false);
+				Ok(if has_match { Some(cid) } else { None })
+			}
+		})
+		.try_collect()
+		.await?;
+
+	// unpin matched cids
+	for cid in &cids_to_unpin {
+		unpin(pins, storage, cid, tags).await?;
+	}
+	Ok(())
 }

@@ -5,8 +5,8 @@
 
 use anyhow::anyhow;
 use co_api::{
-	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoList, CoListTransaction, CoMap, CoMapTransaction, CoSet,
-	CoreBlockStorage, IsDefault, LazyTransaction, Link, OptionLink, ReducerAction, StorageError, Tags, WeakCid,
+	co, BlockStorage, BlockStorageExt, CoList, CoListTransaction, CoMap, CoMapTransaction, CoSet, CoreBlockStorage,
+	IsDefault, LazyTransaction, Link, OptionLink, Reducer, ReducerAction, StorageError, Tags, WeakCid,
 };
 use futures::{pin_mut, FutureExt, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet};
@@ -970,9 +970,7 @@ where
 mod tests {
 	use crate::{PinStrategy, References, Storage, StorageAction};
 	use cid::Cid;
-	use co_api::{
-		async_api::Reducer, BlockSerializer, BlockStorageExt, CoreBlockStorage, OptionLink, ReducerAction, WeakCid,
-	};
+	use co_api::{BlockSerializer, BlockStorageExt, CoreBlockStorage, OptionLink, Reducer, ReducerAction, WeakCid};
 	use co_storage::MemoryBlockStorage;
 	use futures::TryStreamExt;
 	use ipld_core::{ipld::Ipld, serde::to_ipld};

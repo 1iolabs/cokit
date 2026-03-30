@@ -12,7 +12,7 @@ use anyhow::anyhow;
 use bloomfilter::Bloom;
 use cid::Cid;
 use either::Either;
-use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
+use futures::{pin_mut, stream, FutureExt, Stream, StreamExt, TryStreamExt};
 use num_rational::Ratio;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
@@ -463,7 +463,7 @@ where
 
 		// flush?
 		if self.active.len() >= self.settings.max_active_entries as usize {
-			self.flush_active().await?;
+			self.flush_active().boxed().await?;
 		}
 
 		// result
@@ -483,7 +483,7 @@ where
 
 		// flush?
 		if self.active.len() >= self.settings.max_active_entries as usize {
-			self.flush_active().await?;
+			self.flush_active().boxed().await?;
 		}
 
 		// result
@@ -656,7 +656,7 @@ where
 	/// - `flush_active` - Flush active "in memory" entries to L0.
 	pub async fn compact(&mut self, flush_active: bool) -> Result<(), StorageError> {
 		if flush_active {
-			self.flush_active().await?;
+			self.flush_active().boxed().await?;
 		}
 		self.compact_level(0, Some(self.settings.max_run_count as usize)).await?;
 		Ok(())

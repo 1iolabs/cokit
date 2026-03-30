@@ -5,8 +5,8 @@
 
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoList, CoListIndex, CoMap, CoreBlockStorage, IsDefault,
-	Link, OptionLink, ReducerAction, Tags,
+	co, BlockStorage, BlockStorageExt, CoList, CoListIndex, CoMap, CoreBlockStorage, IsDefault, Link, OptionLink,
+	Reducer, ReducerAction, Tags,
 };
 pub use co_messaging::MatrixEvent;
 use co_messaging::{message_event::MessageType, relation::Relation, EventContent};
@@ -386,7 +386,7 @@ fn get_relates_to_event_id(msg_type: &MessageType) -> Option<String> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use co_api::{async_api::Reducer, BlockStorageExt, CoreBlockStorage, Date, ReducerAction};
+	use co_api::{BlockStorageExt, CoreBlockStorage, Date, Reducer, ReducerAction};
 	use co_messaging::{
 		message_event::{NoticeContent, TextContent},
 		poll_event::{PollAnswer, PollEndContent, PollKind, PollResponseContent, PollStartContent},
