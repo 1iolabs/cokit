@@ -30,10 +30,10 @@ wasmer = { version = "7.1.0", default-features = false, optional = true }
 wasmer-compiler = { version = "7.1.0", optional = true }
 wasmer-compiler-cranelift = { version = "7.1.0", optional = true }
 wasmer-compiler-llvm = { version = "7.1.0", optional = true }
-wasmer-types = { version = "7.1.0" }
+wasmer-types = { version = "7.1.0", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasmer = { version = "7.1.0", default-features = false, optional = true, features = ["js", "std", "wasm-types-polyfill", "js-serializable-module", "enable-serde"] }
+wasmer = { version = "7.1.0", default-features = false, features = ["js", "std", "wasm-types-polyfill", "js-serializable-module", "enable-serde"] }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 wasmer = { version = "7.1.0", default-features = false, optional = true, features = ["jsc", "std"] }
@@ -47,16 +47,16 @@ wasmer = { version = "7.1.0" }
 [features]
 default = []
 native = ["fs", "tokio/rt", "co-storage/native"]
-web = ["uuid/js", "js", "co-storage/web", "co-actor/web"]
+web = ["uuid/js", "js", "co-actor/js", "co-storage/web", "co-actor/web"]
 fs = []
 
 # backends
-headless = ["wasmer/headless", "wasmer/compiler"]
-llvm = ["wasmer/llvm", "wasmer/compiler", "dep:wasmer-compiler", "dep:wasmer-compiler-llvm"]
-cranelift = ["wasmer/cranelift", "wasmer/compiler", "dep:wasmer-compiler", "dep:wasmer-compiler-cranelift"]
+headless = ["wasmer/headless", "wasmer/compiler", "dep:wasmer-types"]
+llvm = ["wasmer/llvm", "wasmer/compiler", "dep:wasmer-types", "dep:wasmer-compiler", "dep:wasmer-compiler-llvm"]
+cranelift = ["wasmer/cranelift", "wasmer/compiler", "dep:wasmer-types", "dep:wasmer-compiler", "dep:wasmer-compiler-cranelift"]
 wasmi = ["wasmer/wasmi"]
 wamr = ["wasmer/wamr"]
-js = ["dep:wasmer", "co-actor/js"]
+js = [] # for js we explicitly only pull wasmer for wasm32
 jsc = ["dep:wasmer"]
 
 # meta

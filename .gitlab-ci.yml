@@ -9,6 +9,11 @@ stages:
 variables:
   RUST_VERSION: "1.91"
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+
+default:
+  before_script:
+    - ./ci/scripts/ci-default-before.sh
 
 cache: &global_cache
   key: ${DOCKERFILE_HASH}

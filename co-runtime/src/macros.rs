@@ -8,7 +8,7 @@ macro_rules! cfg_wasmer {
                 feature = "cranelift",
                 feature = "wasmi",
                 feature = "wamr",
-                feature = "js",
+                all(feature = "js", target_arch = "wasm32"),
                 all(feature = "jsc", target_vendor = "apple"),
             ))]
             $item

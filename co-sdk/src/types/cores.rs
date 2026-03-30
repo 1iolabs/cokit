@@ -15,7 +15,6 @@ pub const CO_CORE_KEYSTORE: &str = "co-core-keystore";
 pub const CO_CORE_MEMBERSHIP: &str = "co-core-membership";
 pub const CO_CORE_ROOM: &str = "co-core-room";
 pub const CO_CORE_STORAGE: &str = "co-core-storage";
-pub const CO_CORE_POA: &str = "co-core-poa";
 pub const CO_CORE_BOARD: &str = "co-core-board";
 pub const CO_CORE_RICH_TEXT: &str = "co-core-rich-text";
 pub const CO_CORE_NAMES: &str = "co-core-names";
@@ -150,7 +149,6 @@ fn get_native(name: &str) -> Core {
 		CO_CORE_MEMBERSHIP => include_prebuild_core!("membership"),
 		CO_CORE_ROOM => include_prebuild_core!("room"),
 		CO_CORE_STORAGE => include_prebuild_core!("storage"),
-		CO_CORE_POA => include_prebuild_core!("poa"),
 		CO_CORE_BOARD => include_prebuild_core!("board"),
 		CO_CORE_RICH_TEXT => include_prebuild_core!("rich_text"),
 		CO_CORE_NAMES => include_prebuild_core!("names"),
@@ -164,7 +162,6 @@ fn get_native(name: &str) -> Core {
 		CO_CORE_MEMBERSHIP => Core::native::<co_core_membership::Memberships, _>(),
 		CO_CORE_ROOM => Core::native::<co_core_room::Room, co_core_room::MatrixEvent>(),
 		CO_CORE_STORAGE => Core::native::<co_core_storage::Storage, co_core_storage::StorageAction>(),
-		CO_CORE_POA => Core::native::<co_core_poa::Authority, co_core_poa::AuthorityAction>(),
 		CO_CORE_BOARD => Core::native::<co_core_board::Board, co_core_board::BoardAction>(),
 		CO_CORE_RICH_TEXT => Core::native::<co_core_rich_text::RichText, co_core_rich_text::RichTextAction>(),
 		CO_CORE_NAMES => Core::native::<co_core_names::Names, co_core_names::NamesAction>(),

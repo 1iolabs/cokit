@@ -3,7 +3,7 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{types::cores::CO_CORE_POA, Cores, CO_CORE_CO};
+use crate::{Cores, CO_CORE_CO};
 use co_guard::Guards;
 use co_runtime::{Core, GuardReference};
 
@@ -28,14 +28,12 @@ fn get_native_opt(name: &str) -> Option<GuardReference> {
 	#[cfg(feature = "bundle-wasm-cores")]
 	match name {
 		CO_CORE_CO => Some(get_from_core(name)),
-		CO_CORE_POA => Some(get_from_core(name)),
 		_ => None,
 	}
 
 	#[cfg(not(feature = "bundle-wasm-cores"))]
 	match name {
 		CO_CORE_CO => Some(GuardReference::native::<co_core_co::Co>()),
-		CO_CORE_POA => Some(GuardReference::native::<co_core_poa::Authority>()),
 		_ => None,
 	}
 }

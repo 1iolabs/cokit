@@ -10,13 +10,13 @@ pub use std::time::Instant;
 pub use web_time::Instant;
 
 /// Platform-agnostic sleep for a duration. Send-safe on all platforms.
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "js"))]
 pub async fn sleep(duration: Duration) {
 	tokio::time::sleep(duration).await;
 }
 
 /// Platform-agnostic sleep for a duration. Send-safe on all platforms.
-#[cfg(target_arch = "wasm32")]
+#[cfg(feature = "js")]
 pub async fn sleep(duration: Duration) {
 	futures_timer::Delay::new(duration).await;
 }
