@@ -1,10 +1,10 @@
 # App API Overview (co-sdk)
 
-The [`co-sdk`](/crate/co_sdk/index.html) is the foundation package to create COkit-based applications.
+The [`co-sdk`](/crate/co_sdk/index.html) is the foundation package to create COKIT-based applications.
 
 ## `Application`
 
-The `Application` is the main entry point into COkit for an app.  
+The `Application` is the main entry point into COKIT for an app.  
 Use the `ApplicationBuilder` to initialize an `Application`.
 
 ```rust
@@ -124,7 +124,7 @@ For further information, see:
 ## UnixFS
 
 UnixFS is an IPFS Standard that allows you to store files in a graph.  
-COkit has some built-in primitives to read and write UnixFS files.
+COKIT has some built-in primitives to read and write UnixFS files.
 
 For further information, see:
 - [UnixFS](https://specs.ipfs.tech/unixfs/)

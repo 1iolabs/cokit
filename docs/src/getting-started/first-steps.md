@@ -1,5 +1,5 @@
 # First Steps
-Before we start working with COkit, we'll first look at some basic concepts, and sketch out a few cases to demonstrate how it is useful.
+Before we start working with COKIT, we'll first look at some basic concepts, and sketch out a few cases to demonstrate how it is useful.
 
 ## Introducing CO
 A [CO](../reference/co.md) is a virtual room for collaboration.  
@@ -32,8 +32,8 @@ pub struct TodoTask {
 ```
 
 ## Use Case: Collaborative to-do list
-A simple example of how to use COkit is a collaborative to-do list. This is what we will build in the Quick-Start sections of this documentation.
+A simple example of how to use COKIT is a collaborative to-do list. This is what we will build in the Quick-Start sections of this documentation.
 
-The Core Quick Start covers the fundamentals of using COkit, while also demonstrating just how easy it is to create and use a collaborative Core.
+The Core Quick Start covers the fundamentals of using COKIT, while also demonstrating just how easy it is to create and use a collaborative Core.
 
 The App Quick Starts are for those who want some guidance in developing a simple app to use the to-do list Core.

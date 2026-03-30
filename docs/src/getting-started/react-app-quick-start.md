@@ -1,6 +1,6 @@
 # React App Quick Start
 
-In this tutorial we will build our To-do List App in Typescript, using React with Tailwind and DaisyUI, alongside COkit and our [To-do List Core](rust-core-quick-start.md).  
+In this tutorial we will build our To-do List App in Typescript, using React with Tailwind and DaisyUI, alongside COKIT and our [To-do List Core](rust-core-quick-start.md).  
 We will use [Tauri](https://tauri.app/) to create a Desktop app that runs using the OS-specific browser.
 
 ## Table of Contents
@@ -97,14 +97,14 @@ export default defineConfig(() => ({
 	}));
 ```
 
-4. Add the COkit Tauri plugin:
+4. Add the COKIT Tauri plugin:
 
 ```sh
 cd src-tauri
 cargo add tauri-plugin-co-sdk --git https://gitlab.1io.com/1io/co-sdk.git --branch main
 ```
 
-5. The COkit Tauri plugin uses async code, so we also need an async runtime.  
+5. The COKIT Tauri plugin uses async code, so we also need an async runtime.  
 We can use Tokio for this:
 
 ```sh
@@ -160,7 +160,7 @@ async fn main() {
    - Add `"devtools": true` if you are a developer, and you want the app to start with devtools opened.  
 
 ```admonish info
-The steps below detail how to use COkit to create an App with React.  
+The steps below detail how to use COKIT to create an App with React.  
 
 However, if you wish to try out the complete React App with Tauri, please see the [Full Example](#full-example) at the end of this page for details on how to get the full code from the git repository.
 ```
@@ -186,12 +186,12 @@ You can delete all of the generated files from the `src` folder, except `vite-en
 ```
 
 #### Setup
-There is no need to inittialize COkit here because the Tauri plugin does that for us.  
+There is no need to inittialize COKIT here because the Tauri plugin does that for us.  
 Instead we just need to write the code for the frontend.
 
 ##### Main
 ```admonish info
-Some code is hidden in the examples below, allowing us to focus on the interactions with COkit.  
+Some code is hidden in the examples below, allowing us to focus on the interactions with COKIT.  
 Make sure to unhide these lines if you want to view or copy the full component code.
 ```
 
@@ -342,7 +342,7 @@ export function TodoOverview(props: TodoOverviewProps) {
   let memberships = useResolveCid<Memberships>(membershipCoreCid, localCoSession)?.memberships;
   const identity = useDidKeyIdentity(TODO_IDENTITY_NAME);
 
-~  // TODO can probably do this better
+~  
 ~  // memberships can be undefined if there is no state yet, but we want an empty array in that case
 ~  if (membershipCoreCid === null) {
 ~    memberships = [];
@@ -460,7 +460,7 @@ We call the `pushAction` function using:
 
 This will then push the join action to the membership Core.
 
-The `ChangeMembershipState` action comes from COkit, and we have TypeScript types for it in the `@1io/tauri-plugin-co-sdk-api` package.  
+The `ChangeMembershipState` action comes from COKIT, and we have TypeScript types for it in the `@1io/tauri-plugin-co-sdk-api` package.  
 To join a CO that we have been invited to, we need to set our membership status for that CO from `Invite` to `Join`.
 
 
@@ -815,7 +815,7 @@ Start your app with:
 npm run tauri dev
 ```
 
-(**Optional**) You can set the following environment variables when using the COkit Tauri plugin by prepending them to the command above when starting your app:  
+(**Optional**) You can set the following environment variables when using the COKIT Tauri plugin by prepending them to the command above when starting your app:  
 - `CO_NO_KEYCHAIN=true` : Set this to `true` if you don't want to save keys to your keychain. 
   - **NOTE**: While this can improve handling during development, by skipping the pop-ups that ask for permission to save the keys, it is **highly unsafe** in production.
 - `CO_BASE_PATH={path}` : Change the path where the data is stored.

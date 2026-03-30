@@ -1,10 +1,10 @@
-# COkit
-A software development kit for building decentralized applications. COkit is written in Rust.
-COkit enables you to build data rooms called COs using data models called COres.
-## COkit is like ...
+# COKIT
+A software development kit for building decentralized applications. COKIT is written in Rust.
+COKIT enables you to build data rooms called COs using data models called COres.
+## COKIT is like ...
 ...a database that combines blockchain's zero trust functionalities and (optional) consensus with git, CRDT, and then integrates with verifiable identity.
 
-## COkit for ...
+## COKIT for ...
 
 ### ... Frontend Developers
 - Like Backend as a Service (BaaS) but for free
@@ -21,13 +21,13 @@ COkit enables you to build data rooms called COs using data models called COres.
 - No more managing database clusters
 - Move latency off the critical path - make the client instant
 - You still design the data model, indexing, and business rules - just in a distributed way as a Core
-- Your COkit-built app can be integrated with current backends and APIs (REST, GraphQL etc.)
+- Your COKIT-built app can be integrated with current backends and APIs (REST, GraphQL etc.)
 
 ### ... Database Nerds
 - [Cores](../reference/core.md) are like databases with built-in atomicity, consistency, isolation and durability
 - The [Log](../reference/log.md) with its resulting states, is a Multiversion concurrency control
  (MVCC)
-- COkit is like a database with Master-Master replication, where your business logic can decide what happens on conflicts.
+- COKIT is like a database with Master-Master replication, where your business logic can decide what happens on conflicts.
   - With transactions only the database can make decisions upon conflicts.
 	- With conventional databases only transactions/operations can be reapplied/reordered, but without knowing the business logic behind. Cores reapply the whole business logic when reordering a transaction.
 - No need for an interface or API between data and business logic because it's one thing: a Core

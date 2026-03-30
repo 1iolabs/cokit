@@ -2,17 +2,19 @@
 authors = ["DK"]
 language = "en"
 src = "src"
-title = "COkit"
+title = "COKIT"
 
 [build]
 create-missing = false
 
 [preprocessor.admonish]
 command = "mdbook-admonish"
-assets_version = "3.1.0"    # do not edit: managed by `mdbook-admonish install`
+assets_version = "3.1.0" # do not edit: managed by `mdbook-admonish install`
 
 [output.html]
 additional-css = ["./custom.css", "./mdbook-admonish.css"]
+default-theme = "light"
+preferred-dark-theme = "coal"
 additional-js = ["mermaid.min.js", "mermaid-init.js"]
 
 [output.html.playground]

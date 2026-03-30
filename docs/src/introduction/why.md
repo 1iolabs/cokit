@@ -19,7 +19,7 @@ Here is a simple, comparative outline to clarify the benefits of decentralized, 
 7. Implement your frontend.
 8. Provision and deploy the backend to the infrastructure (Server, Cloud, ...).
 
-### Building a COkit app
+### Building a COKIT app
 1. Model data in a Core that combines data, business logic and permissions.
 2. Implement your frontend and use the data directly.
 
@@ -39,10 +39,10 @@ Establish data ownership and app interoperability as the standard for every digi
 No Backend. No Cloud-Dependencies. No Bullshit.
 
 ### Fuck Big Tech
-First of all - if you are big tech - Hi! You're welcome to use COkit as well. But you might want to skip the next part, as we're not being nice. Big tech owns your online life. We have traded privacy for convenience, entrusting our personal data to closed systems that scarcely work together. At 1iO, we are turning the tables on centralization with a new technological foundation for truly decentralized collaboration. Applications developed using COkit empower users with control of their own data.
+First of all - if you are big tech - Hi! You're welcome to use COKIT as well. But you might want to skip the next part, as we're not being nice. Big tech owns your online life. We have traded privacy for convenience, entrusting our personal data to closed systems that scarcely work together. At 1io, we are turning the tables on centralization with a new technological foundation for truly decentralized collaboration. Applications developed using COKIT empower users with control of their own data.
 
 ### Kill the Middleman
 We eliminate intermediaries. You individually decide with whom you want to share your data and under what conditions. [CO](..reference/co.md) lives on your local device and is directly synced only with your peers over the network. All apps are built on this fundamental concept.
 
 ### Take back what's yours
-Local-first, always in sync via peer-to-peer, and fully open source. Start developing decentralized apps with COkit today, with data management and identity all worked out for you – No servers required.
+Local-first, always in sync via peer-to-peer, and fully open source. Start developing decentralized apps with COKIT today, with data management and identity all worked out for you – No servers required.

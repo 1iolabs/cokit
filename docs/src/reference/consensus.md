@@ -2,8 +2,8 @@
 
 The Consensus is the mechanism to reach a validated CO state.
 
-## What makes a Consensus in COkit
-Consensus in COkit provides finality.  
+## What makes a Consensus in COKIT
+Consensus in COKIT provides finality.  
 
 When heads from different participants are joined, the event order in the [Log](../reference/log.md#example) may change.  
 This is necessary, from a technical perspective, to make the [Merkle-CRDT](../glossary/glossary.md#merkle-crdt) work.
@@ -38,11 +38,11 @@ If no other mechanism is applied (proof of authority, etc.), then the Merkle-CRD
 Depending on your project requirements, you can implement any other consensus mechanism.
 
 ## Asynchronous
-In COkit, consensus is asynchronous and on-demand, meaning users only have to wait for it, if it is really needed.  
+In COKIT, consensus is asynchronous and on-demand, meaning users only have to wait for it, if it is really needed.  
 While conventional databases normally provide finality by default (i.e. when a change is written/committed, it is final), this comes at the cost of every change losing time by having a lot of overhead (latency, routing, compute, ...)
 
 ## Proof of Authority
-Proof of Authority (PoA) is the built-in consensus mechanism used in COkit.
+Proof of Authority (PoA) is the built-in consensus mechanism used in COKIT.
 
 It is implemented in the [`co-core-poa`](/crate/co_core_poa/index.html) Core.
 
@@ -57,7 +57,7 @@ For further information, see:
 - [co-core-poa](../reference/core.md#co-core-poa)
 
 ## Config
-COkit allows you to choose the level of coordination needed for each CO:
+COKIT allows you to choose the level of coordination needed for each CO:
 - `none`: No explicit agreement rules - relies solely on CRDT merge guarantees.
 - `proof-of-authority`: Updates must be approved or signed by designated participants.
 - `manual`[^issue-87]: Users or admins explicitly approve changes before commit.
