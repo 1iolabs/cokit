@@ -9,6 +9,11 @@ stages:
 variables:
   RUST_VERSION: "1.91"
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+
+default:
+  before_script:
+    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.1io.com/".insteadOf "https://gitlab.1io.com/"
 
 cache: &global_cache
   key: ${DOCKERFILE_HASH}
