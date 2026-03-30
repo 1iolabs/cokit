@@ -4,12 +4,12 @@
 // retention—approved secure tools may process solely for internal use.
 
 use cid::Cid;
-use co_macros::co_data;
+use co_macros::co;
 use co_primitives::CoCid;
 use schemars::JsonSchema;
 
 /// Contains metadata of images
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct ImageInfo {
 	/// Intended display height in px
@@ -28,7 +28,7 @@ pub struct ImageInfo {
 }
 
 /// Contains metadata of images used as a thumbnail
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct ThumbnailInfo {
 	/// Intended display height in px
@@ -42,7 +42,7 @@ pub struct ThumbnailInfo {
 }
 
 /// Contains metadata of audio files
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct AudioInfo {
 	/// Duration of the audio clip in ms
@@ -54,7 +54,7 @@ pub struct AudioInfo {
 }
 
 /// Contains metadata of video files
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct VideoInfo {
 	/// Intended display height in px
@@ -75,7 +75,7 @@ pub struct VideoInfo {
 }
 
 /// Contains metadata of any other filetypes
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct FileInfo {
 	/// Mimetype of the file
@@ -90,7 +90,7 @@ pub struct FileInfo {
 }
 
 /// Contains metadata of any location based content
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct LocationInfo {
 	/// CID to an image file that is to be used as the thumbnail

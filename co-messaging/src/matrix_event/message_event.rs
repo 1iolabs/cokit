@@ -9,12 +9,12 @@ use super::{
 };
 use crate::{matrix_event::relation::RelatesTo, multimedia::VideoInfo, relation::Relation, EventContent};
 use cid::Cid;
-use co_macros::co_data;
+use co_macros::co;
 use co_primitives::{CoCid, Did};
 use schemars::JsonSchema;
 
 /// Events that sent actual messages that can be seen by all participants in a room.
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 #[serde(tag = "msgtype")]
 pub enum MessageType {
@@ -106,7 +106,7 @@ pub trait Formattable {
 }
 
 /// Used to describe which users got mentioned in the body of a message
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct Mentions {
 	pub user_ids: Vec<Did>,
@@ -114,7 +114,7 @@ pub struct Mentions {
 
 /// Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
 /// also given.
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct TextContent {
 	/// A formatted version of the body
@@ -188,7 +188,7 @@ impl Relation for TextContent {
 
 /// Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
 /// also given
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct NoticeContent {
 	/// A formatted version of the body
@@ -260,7 +260,7 @@ impl Relation for NoticeContent {
 	}
 }
 
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct ImageContent {
 	/// A text representing the image in some way
@@ -305,7 +305,7 @@ impl Relation for ImageContent {
 	}
 }
 
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct AudioContent {
 	/// A text representing the audio in same way
@@ -350,7 +350,7 @@ impl Relation for AudioContent {
 	}
 }
 
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct VideoContent {
 	/// Textual representation of the video
@@ -395,7 +395,7 @@ impl Relation for VideoContent {
 	}
 }
 
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct FileContent {
 	/// A text representing the file in some way
@@ -450,7 +450,7 @@ impl Relation for FileContent {
 	}
 }
 
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct LocationContent {
 	/// Textual representation of the location
