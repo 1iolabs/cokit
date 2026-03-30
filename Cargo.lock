@@ -1507,7 +1507,6 @@ dependencies = [
  "co-core-file",
  "co-core-keystore",
  "co-core-membership",
- "co-core-pin",
  "co-core-room",
  "co-core-storage",
  "co-log",
@@ -1661,24 +1660,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tokio-util",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "co-core-pin"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cid 0.11.1",
- "co-api",
- "co-runtime",
- "co-storage",
- "futures",
- "ipld-core",
- "serde",
- "serde_repr",
- "thiserror 1.0.69",
  "tracing",
  "tracing-subscriber",
 ]
@@ -2055,7 +2036,6 @@ dependencies = [
  "co-core-keystore",
  "co-core-membership",
  "co-core-names",
- "co-core-pin",
  "co-core-poa",
  "co-core-rich-text",
  "co-core-role",

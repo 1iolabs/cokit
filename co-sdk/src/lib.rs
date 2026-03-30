@@ -10,7 +10,6 @@ compile_error!("feature \"js\" can only used for \"wasm32-unknown-unknown\" targ
 // modules
 mod application;
 mod library;
-mod pin;
 pub mod reducer;
 mod services;
 pub mod state;
@@ -85,7 +84,6 @@ pub use library::{
 	local_secret_password::PasswordLocalSecret,
 	memory_dispatch::MemoryDispatch,
 };
-pub use pin::PinAPI;
 pub use reducer::core_resolver::{
 	co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverContext, CoreResolverError,
 };
@@ -113,7 +111,7 @@ pub use types::{
 	co_uuid::{CoUuid, DynamicCoUuid, MonotonicCoUuid, RandomCoUuid},
 	cores::{
 		Cores, CO_CORE_CO, CO_CORE_FILE, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
-		CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_PIN, CO_CORE_NAME_STORAGE, CO_CORE_PIN, CO_CORE_ROOM,
+		CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_CORE_ROOM,
 	},
 	error::{ErrorContext, ErrorKind, IntoAction},
 };

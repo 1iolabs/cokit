@@ -13,7 +13,6 @@ pub const CO_CORE_CO: &str = "co-core-co";
 pub const CO_CORE_FILE: &str = "co-core-file";
 pub const CO_CORE_KEYSTORE: &str = "co-core-keystore";
 pub const CO_CORE_MEMBERSHIP: &str = "co-core-membership";
-pub const CO_CORE_PIN: &str = "co-core-pin";
 pub const CO_CORE_ROOM: &str = "co-core-room";
 pub const CO_CORE_ROLE: &str = "co-core-role";
 pub const CO_CORE_STORAGE: &str = "co-core-storage";
@@ -28,7 +27,6 @@ pub const CO_CORE_NAME_CO: CoreName<'static, co_core_co::Co> = CoreName::new("co
 pub const CO_CORE_NAME_KEYSTORE: CoreName<'static, co_core_keystore::KeyStore> = CoreName::new("keystore");
 /// Membership core names expected by the SDK implementation (key to `co.cores`).
 pub const CO_CORE_NAME_MEMBERSHIP: CoreName<'static, co_core_membership::Memberships> = CoreName::new("membership");
-pub const CO_CORE_NAME_PIN: CoreName<'static, co_core_pin::Pin> = CoreName::new("pin");
 pub const CO_CORE_NAME_STORAGE: CoreName<'static, co_core_storage::Storage> = CoreName::new("storage");
 
 /// Registry for builtin cores.
@@ -55,8 +53,8 @@ impl Cores {
 		self
 	}
 
-	/// Returns the core name used across the co-sdk fot an core create name.
-	/// Example: `co-core-co` reutrns `co`
+	/// Returns the core name used across the co-sdk for an core create name.
+	/// Example: `co-core-co` returns `co`
 	/// See:
 	/// - [`CO_CORE_NAME_CO`]
 	/// - [`CO_CORE_NAME_KEYSTORE`]
@@ -151,7 +149,6 @@ fn get_native(name: &str) -> Core {
 		CO_CORE_FILE => include_prebuild_core!("file"),
 		CO_CORE_KEYSTORE => include_prebuild_core!("keystore"),
 		CO_CORE_MEMBERSHIP => include_prebuild_core!("membership"),
-		CO_CORE_PIN => include_prebuild_core!("pin"),
 		CO_CORE_ROOM => include_prebuild_core!("room"),
 		CO_CORE_ROLE => include_prebuild_core!("role"),
 		CO_CORE_STORAGE => include_prebuild_core!("storage"),
@@ -167,7 +164,6 @@ fn get_native(name: &str) -> Core {
 		CO_CORE_FILE => Core::native::<co_core_file::File, co_core_file::FileAction>(),
 		CO_CORE_KEYSTORE => Core::native::<co_core_keystore::KeyStore, co_core_keystore::KeyStoreAction>(),
 		CO_CORE_MEMBERSHIP => Core::native::<co_core_membership::Memberships, _>(),
-		CO_CORE_PIN => Core::native::<co_core_pin::Pin, co_core_pin::PinAction>(),
 		CO_CORE_ROOM => Core::native::<co_core_room::Room, co_core_room::MatrixEvent>(),
 		CO_CORE_ROLE => Core::native::<co_core_role::Roles, co_core_role::RoleAction>(),
 		CO_CORE_STORAGE => Core::native::<co_core_storage::Storage, co_core_storage::StorageAction>(),

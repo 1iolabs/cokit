@@ -9,6 +9,5 @@ export enum Cores {
   "co-core-names" = "QmanRnzqnQ6VQSakxotciseoLXP1qRb7rnJdcqNHz6fE1J",
   "co-core-poa" = "QmRH7Azi8qtv9AstFzuq7JYnLDTuMJHzZ4hYtrPa5ZDswz",
   "co-core-file" = "QmWCaLk4z1pxwh97dEsUnrcC5vam5scJQqpKWz9fjEJ2xq",
-  "co-core-pin" = "QmXGbKa6EmZ42VvKqHdF9ZbpCKuy38rC6W4F8mb43Nh5YR",
   "co-core-membership" = "Qmc2R1onbzTtUamBn6LtZCGoAtZsaJjfk2FkAQjCBKnKwc",
 }

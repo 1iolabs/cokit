@@ -19,7 +19,6 @@ co-core-co = { workspace = true }
 co-core-file = { workspace = true }
 co-core-keystore = { workspace = true }
 co-core-membership = { workspace = true }
-co-core-pin = { workspace = true }
 co-core-room = { workspace = true }
 co-core-storage = { workspace = true }
 co-log = { workspace = true }
