@@ -30,7 +30,6 @@ members = [
     "cores/role",
     "cores/room",
     "cores/storage",
-    "did-co",
     "examples/counter",
     "examples/counter-upgraded",
     "examples/message",
