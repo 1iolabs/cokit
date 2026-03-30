@@ -122,3 +122,33 @@ co-sdk = { path = "co-sdk", default-features = false }
 co-storage = { path = "co-storage", default-features = false }
 co-test = { path = "co-test" }
 tauri-plugin-co-sdk = { path = "tauri-plugin-co-sdk" }
+
+# force dependencies to use local crates if they reference them
+#  required to make co-guard work
+[patch."https://gitlab.1io.com/1io/co-sdk.git"]
+co-actor = { path = "co-actor" }
+co-api = { path = "co-api" }
+co-cli = { path = "co-cli" }
+co-core-board = { path = "cores/board" }
+co-core-co = { path = "cores/co" }
+co-core-data-series = { path = "cores/data-series" }
+co-core-file = { path = "cores/file" }
+co-core-keystore = { path = "cores/keystore" }
+co-core-membership = { path = "cores/membership" }
+co-core-names = { path = "cores/names" }
+co-core-pin = { path = "cores/pin" }
+co-core-rich-text = { path = "cores/rich-text" }
+co-core-role = { path = "cores/role" }
+co-core-room = { path = "cores/room" }
+co-core-storage = { path = "cores/storage" }
+co-dioxus = { path = "co-dioxus" }
+co-identity = { path = "co-identity" }
+co-log = { path = "co-log" }
+co-macros = { path = "co-macros" }
+co-messaging = { path = "co-messaging" }
+co-network = { path = "co-network" }
+co-primitives = { path = "co-primitives" }
+co-runtime = { path = "co-runtime" }
+co-sdk = { path = "co-sdk" }
+co-storage = { path = "co-storage" }
+co-test = { path = "co-test" }
