@@ -1,5 +1,5 @@
 # Identity
-COkit uses a DID (Decentralized Identifier) as the fundamental identifier for identities.  
+COKIT uses a DID (Decentralized Identifier) as the fundamental identifier for identities.  
 A DID is structured to align with the [W3C DID Core specification](https://www.w3.org/TR/did-1.0/).
 
 ## What is a DID
@@ -13,8 +13,8 @@ DIDs are typically of the form: `did:<method>:<method-specific-identifier>`
 
 For example: `did:example:alice123`.
 
-## Why COkit uses DID
-In COkit, every interaction is signed by a DID to make everything cryptographically verifiable.
+## Why COKIT uses DID
+In COKIT, every interaction is signed by a DID to make everything cryptographically verifiable.
 
 A DID is:
 - decentralized
@@ -29,11 +29,11 @@ When building an application, developers can extend supported DID methods.
 
 DIDs can be created on a per-relationship or per-service basis, giving you potentially thousands of pairwise-unique identifiers that cannot be correlated without your consent.  
 This approach makes it harder for services and participants to track you across contexts, since each one sees a different identifier.  
-So rather than a participant having only a single DID (like a cell number, or national ID number), participants may have thousands of DIDs, yet can still manage them easily using COkit.
+So rather than a participant having only a single DID (like a cell number, or national ID number), participants may have thousands of DIDs, yet can still manage them easily using COKIT.
 
-## How COkit uses DID
-DIDs appear in almost every part of COkit since every interaction is signed by a DID.  
-Here's how DIDs are handled in all of COkit.
+## How COKIT uses DID
+DIDs appear in almost every part of COKIT since every interaction is signed by a DID.  
+Here's how DIDs are handled in all of COKIT.
 
 ### CO Participants
 Every participant has at least one DID. A participant can be human or machine (service, device, IOT-device, AI-agent, ...).  
@@ -53,7 +53,7 @@ The [didcomm](../reference/network.md#protocol-didcomm) and [didcontact](../refe
 In the [Log](../reference/log.md), each event in the conflict-free replicated event stream is signed by the DID of CO participants.
 
 ## Usage
-This example shows how to create a new `did:key:` identity using COkit:
+This example shows how to create a new `did:key:` identity using COKIT:
 
 ```rust
 use co_sdk::{Application, DidKeyIdentity, DidKeyProvider, CO_CORE_NAME_KEYSTORE};
@@ -117,7 +117,7 @@ DID Identities are portable, and can be moved or used across systems without los
 This is not the case with centralized or federated identites, as they are tied to the issuing platform - you can lose access if your account is suspended, or if the provider shuts down.
 
 ### Usability
-DIDs are convienient to use like federated identites.  
+DIDs are convenient to use like federated identites.  
 Centralized identities however are limited to certain systems, and often provide a very different user experience that is prone to errors.
 
 ## References

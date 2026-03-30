@@ -1,6 +1,6 @@
 # Core API Overview (co-api)
 
-The [`co-api`](/crate/co_api/index.html) is the foundation package to create COkit [Cores](../reference/core.md).  
+The [`co-api`](/crate/co_api/index.html) is the foundation package to create COKIT [Cores](../reference/core.md).  
 It re-exports those [`co-primitives`](/crate/co_primitives/index.html) used to implement Cores.
 
 ## `Reducer`
@@ -66,7 +66,7 @@ impl<S: BlockStorage + Clone + 'static> Guard<S> for MyGuard {
 ```
 
 For further information, see:
-- [Guard](../reference/guard.md)
+- [Guard](../reference/guards.md)
 - [co-core-co: Co](/crate/co_core_co/struct.Co.html#impl-Guard<S>-for-Co)
 
 ## Core
@@ -117,6 +117,6 @@ A single binary may export both.
 
 ## References
 - [Core](../reference/core.md)
-- [Guard](../reference/guard.md)
+- [Guard](../reference/guards.md)
 - [co-api](/crate/co_api/index.html)
 - [Glossary: WASM](../glossary/glossary.md#wasm)

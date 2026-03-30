@@ -1,0 +1,328 @@
+
+/* Globals */
+
+:root {
+    --sidebar-target-width: 300px;
+    --sidebar-width: min(var(--sidebar-target-width), 80vw);
+    --sidebar-resize-indicator-width: 8px;
+    --sidebar-resize-indicator-space: 2px;
+    --page-padding: 15px;
+    --content-max-width: 780px;
+    --menu-bar-height: 50px;
+    --mono-font: "Source Code Pro", Consolas, "Ubuntu Mono", Menlo, "DejaVu Sans Mono", monospace, monospace;
+    --code-font-size: 0.875em; /* please adjust the ace font size accordingly in editor.js */
+    --searchbar-margin-block-start: 5px;
+}
+
+/* Themes */
+
+/* ── LIGHT ── */
+.light, html:not(.js) {
+    --bg: #FAFAF7;
+    --fg: #1A1D23;
+
+    --sidebar-bg: #F2F1EC;
+    --sidebar-fg: #4A4F5A;
+    --sidebar-non-existant: #9BA1AB;
+    --sidebar-active: #0D7C66;
+    --sidebar-spacer: #E5E4DF;
+
+    --scrollbar: #D0CFC8;
+
+    --icons: #5A6070;
+    --icons-hover: #0D7C66;
+
+    --links: #0D7C66;
+
+    --inline-code-color: #0A6654;
+
+    --theme-popup-bg: #FFFFFF;
+    --theme-popup-border: #E5E4DF;
+    --theme-hover: #F2F1EC;
+
+    --quote-bg: #F2F1EC;
+    --quote-border: #0D7C66;
+
+    --warning-border: #B8860B;
+
+    --table-border-color: #E5E4DF;
+    --table-header-bg: #F2F1EC;
+    --table-alternate-bg: #F8F7F3;
+
+    --searchbar-border-color: #E5E4DF;
+    --searchbar-bg: #FFFFFF;
+    --searchbar-fg: #1A1D23;
+    --searchbar-shadow-color: rgba(0,0,0,0.04);
+    --searchresults-header-fg: #0D7C66;
+    --searchresults-border-color: #E5E4DF;
+    --searchresults-li-bg: #FFFFFF;
+    --search-mark-bg: #E6F5F0;
+
+    --color-scheme: light;
+
+    /* Same as `--icons` */
+    --copy-button-filter: invert(37%) sepia(10%) saturate(600%) hue-rotate(190deg) brightness(90%) contrast(88%);
+    /* Same as `--sidebar-active` / --links */
+    --copy-button-filter-hover: invert(38%) sepia(80%) saturate(500%) hue-rotate(130deg) brightness(85%) contrast(95%);
+
+    --footnote-highlight: #0D7C66;
+
+    --overlay-bg: rgba(200, 200, 205, 0.4);
+}
+
+/* ── RUST (same as light) ── */
+.rust {
+    --bg: #FAFAF7;
+    --fg: #1A1D23;
+
+    --sidebar-bg: #F2F1EC;
+    --sidebar-fg: #4A4F5A;
+    --sidebar-non-existant: #9BA1AB;
+    --sidebar-active: #0D7C66;
+    --sidebar-spacer: #E5E4DF;
+
+    --scrollbar: #D0CFC8;
+
+    --icons: #5A6070;
+    --icons-hover: #0D7C66;
+
+    --links: #0D7C66;
+
+    --inline-code-color: #0A6654;
+
+    --theme-popup-bg: #FFFFFF;
+    --theme-popup-border: #E5E4DF;
+    --theme-hover: #F2F1EC;
+
+    --quote-bg: #F2F1EC;
+    --quote-border: #0D7C66;
+
+    --warning-border: #B8860B;
+
+    --table-border-color: #E5E4DF;
+    --table-header-bg: #F2F1EC;
+    --table-alternate-bg: #F8F7F3;
+
+    --searchbar-border-color: #E5E4DF;
+    --searchbar-bg: #FFFFFF;
+    --searchbar-fg: #1A1D23;
+    --searchbar-shadow-color: rgba(0,0,0,0.04);
+    --searchresults-header-fg: #0D7C66;
+    --searchresults-border-color: #E5E4DF;
+    --searchresults-li-bg: #FFFFFF;
+    --search-mark-bg: #E6F5F0;
+
+    --color-scheme: light;
+
+    --copy-button-filter: invert(37%) sepia(10%) saturate(600%) hue-rotate(190deg) brightness(90%) contrast(88%);
+    --copy-button-filter-hover: invert(38%) sepia(80%) saturate(500%) hue-rotate(130deg) brightness(85%) contrast(95%);
+
+    --footnote-highlight: #0D7C66;
+
+    --overlay-bg: rgba(200, 200, 205, 0.4);
+}
+
+/* ── COAL (primary dark) ── */
+.coal {
+    --bg: #14181E;
+    --fg: #D4D4D4;
+
+    --sidebar-bg: #1B2028;
+    --sidebar-fg: #9BA1AB;
+    --sidebar-non-existant: #5A6070;
+    --sidebar-active: #2EAF8F;
+    --sidebar-spacer: rgba(255,255,255,0.06);
+
+    --scrollbar: rgba(255,255,255,0.12);
+
+    --icons: rgba(255,255,255,0.45);
+    --icons-hover: #2EAF8F;
+
+    --links: #2EAF8F;
+
+    --inline-code-color: #2EAF8F;
+
+    --theme-popup-bg: #1B2028;
+    --theme-popup-border: rgba(255,255,255,0.08);
+    --theme-hover: rgba(255,255,255,0.04);
+
+    --quote-bg: rgba(255,255,255,0.03);
+    --quote-border: #0D7C66;
+
+    --warning-border: #ff8e00;
+
+    --table-border-color: rgba(255,255,255,0.08);
+    --table-header-bg: rgba(255,255,255,0.04);
+    --table-alternate-bg: rgba(255,255,255,0.02);
+
+    --searchbar-border-color: rgba(255,255,255,0.1);
+    --searchbar-bg: #1B2028;
+    --searchbar-fg: #D4D4D4;
+    --searchbar-shadow-color: rgba(0,0,0,0.3);
+    --searchresults-header-fg: #2EAF8F;
+    --searchresults-border-color: rgba(255,255,255,0.08);
+    --searchresults-li-bg: #1B2028;
+    --search-mark-bg: rgba(13,124,102,0.25);
+
+    --color-scheme: dark;
+
+    --copy-button-filter: invert(70%) sepia(0%) saturate(0%) brightness(90%);
+    --copy-button-filter-hover: invert(60%) sepia(50%) saturate(500%) hue-rotate(120deg) brightness(95%) contrast(90%);
+
+    --footnote-highlight: #2EAF8F;
+
+    --overlay-bg: rgba(33, 40, 48, 0.4);
+}
+
+/* ── NAVY (same as coal) ── */
+.navy {
+    --bg: #14181E;
+    --fg: #D4D4D4;
+
+    --sidebar-bg: #1B2028;
+    --sidebar-fg: #9BA1AB;
+    --sidebar-non-existant: #5A6070;
+    --sidebar-active: #2EAF8F;
+    --sidebar-spacer: rgba(255,255,255,0.06);
+
+    --scrollbar: rgba(255,255,255,0.12);
+
+    --icons: rgba(255,255,255,0.45);
+    --icons-hover: #2EAF8F;
+
+    --links: #2EAF8F;
+
+    --inline-code-color: #2EAF8F;
+
+    --theme-popup-bg: #1B2028;
+    --theme-popup-border: rgba(255,255,255,0.08);
+    --theme-hover: rgba(255,255,255,0.04);
+
+    --quote-bg: rgba(255,255,255,0.03);
+    --quote-border: #0D7C66;
+
+    --warning-border: #ff8e00;
+
+    --table-border-color: rgba(255,255,255,0.08);
+    --table-header-bg: rgba(255,255,255,0.04);
+    --table-alternate-bg: rgba(255,255,255,0.02);
+
+    --searchbar-border-color: rgba(255,255,255,0.1);
+    --searchbar-bg: #1B2028;
+    --searchbar-fg: #D4D4D4;
+    --searchbar-shadow-color: rgba(0,0,0,0.3);
+    --searchresults-header-fg: #2EAF8F;
+    --searchresults-border-color: rgba(255,255,255,0.08);
+    --searchresults-li-bg: #1B2028;
+    --search-mark-bg: rgba(13,124,102,0.25);
+
+    --color-scheme: dark;
+
+    --copy-button-filter: invert(70%) sepia(0%) saturate(0%) brightness(90%);
+    --copy-button-filter-hover: invert(60%) sepia(50%) saturate(500%) hue-rotate(120deg) brightness(95%) contrast(90%);
+
+    --footnote-highlight: #2EAF8F;
+
+    --overlay-bg: rgba(33, 40, 48, 0.4);
+}
+
+/* ── AYU (same as coal) ── */
+.ayu {
+    --bg: #14181E;
+    --fg: #D4D4D4;
+
+    --sidebar-bg: #1B2028;
+    --sidebar-fg: #9BA1AB;
+    --sidebar-non-existant: #5A6070;
+    --sidebar-active: #2EAF8F;
+    --sidebar-spacer: rgba(255,255,255,0.06);
+
+    --scrollbar: rgba(255,255,255,0.12);
+
+    --icons: rgba(255,255,255,0.45);
+    --icons-hover: #2EAF8F;
+
+    --links: #2EAF8F;
+
+    --inline-code-color: #2EAF8F;
+
+    --theme-popup-bg: #1B2028;
+    --theme-popup-border: rgba(255,255,255,0.08);
+    --theme-hover: rgba(255,255,255,0.04);
+
+    --quote-bg: rgba(255,255,255,0.03);
+    --quote-border: #0D7C66;
+
+    --warning-border: #ff8e00;
+
+    --table-border-color: rgba(255,255,255,0.08);
+    --table-header-bg: rgba(255,255,255,0.04);
+    --table-alternate-bg: rgba(255,255,255,0.02);
+
+    --searchbar-border-color: rgba(255,255,255,0.1);
+    --searchbar-bg: #1B2028;
+    --searchbar-fg: #D4D4D4;
+    --searchbar-shadow-color: rgba(0,0,0,0.3);
+    --searchresults-header-fg: #2EAF8F;
+    --searchresults-border-color: rgba(255,255,255,0.08);
+    --searchresults-li-bg: #1B2028;
+    --search-mark-bg: rgba(13,124,102,0.25);
+
+    --color-scheme: dark;
+
+    --copy-button-filter: invert(70%) sepia(0%) saturate(0%) brightness(90%);
+    --copy-button-filter-hover: invert(60%) sepia(50%) saturate(500%) hue-rotate(120deg) brightness(95%) contrast(90%);
+
+    --footnote-highlight: #2EAF8F;
+
+    --overlay-bg: rgba(33, 40, 48, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+    html:not(.js) {
+        --bg: #14181E;
+        --fg: #D4D4D4;
+
+        --sidebar-bg: #1B2028;
+        --sidebar-fg: #9BA1AB;
+        --sidebar-non-existant: #5A6070;
+        --sidebar-active: #2EAF8F;
+        --sidebar-spacer: rgba(255,255,255,0.06);
+
+        --scrollbar: rgba(255,255,255,0.12);
+
+        --icons: rgba(255,255,255,0.45);
+        --icons-hover: #2EAF8F;
+
+        --links: #2EAF8F;
+
+        --inline-code-color: #2EAF8F;
+
+        --theme-popup-bg: #1B2028;
+        --theme-popup-border: rgba(255,255,255,0.08);
+        --theme-hover: rgba(255,255,255,0.04);
+
+        --quote-bg: rgba(255,255,255,0.03);
+        --quote-border: #0D7C66;
+
+        --warning-border: #ff8e00;
+
+        --table-border-color: rgba(255,255,255,0.08);
+        --table-header-bg: rgba(255,255,255,0.04);
+        --table-alternate-bg: rgba(255,255,255,0.02);
+
+        --searchbar-border-color: rgba(255,255,255,0.1);
+        --searchbar-bg: #1B2028;
+        --searchbar-fg: #D4D4D4;
+        --searchbar-shadow-color: rgba(0,0,0,0.3);
+        --searchresults-header-fg: #2EAF8F;
+        --searchresults-border-color: rgba(255,255,255,0.08);
+        --searchresults-li-bg: #1B2028;
+        --search-mark-bg: rgba(13,124,102,0.25);
+
+        --color-scheme: dark;
+
+        --copy-button-filter: invert(70%) sepia(0%) saturate(0%) brightness(90%);
+        --copy-button-filter-hover: invert(60%) sepia(50%) saturate(500%) hue-rotate(120deg) brightness(95%) contrast(90%);
+    }
+}

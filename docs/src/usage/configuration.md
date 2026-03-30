@@ -41,7 +41,7 @@ For further information, see:
 
 
 ## Application
-Application-specific configurations available to app developers leveraging COkit.
+Application-specific configurations available to app developers leveraging COKIT.
 
 ### Network
 When starting the network, it's possible to pass startup options.

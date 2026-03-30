@@ -1,10 +1,10 @@
 # Summary
 
-# COkit
+# COKIT
 
 # Introduction
 - [Welcome](./introduction/welcome.md)
-- [About COkit](./introduction/about-co-kit.md)
+- [About COKIT](./introduction/about-co-kit.md)
 - [Why](./introduction/why.md)
 - [Key Principles](./introduction/key-principles.md)
 - [Features](./introduction/features.md)
@@ -18,7 +18,7 @@
 - [Next Steps](./getting-started/next-steps.md)
 
 # Reference
-- [COkit](./reference/co-kit.md)
+- [COKIT](./reference/co-kit.md)
 - [Architecture](./reference/architecture.md)
 - [CO](./reference/co.md)
 - [Core](./reference/core.md)

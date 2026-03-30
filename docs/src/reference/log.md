@@ -8,7 +8,7 @@ Whenever the same heads are joined, the resulting log is guaranteed to be equal.
 This can be thought of as a git graph where each commit is an operation/transaction.
 The heads represent the end of the log and also a specific state of the data.
 
-## How it is used in COkit
+## How it is used in COKIT
 Each [CO](./co.md) is event-sourced by a Log.
 The [CO](../reference/co.md) state is materialized from the log through its set of [cores](../reference/core.md).
 The Log is implemented in the [`co-log`](/crate/co_log/index.html) project.
