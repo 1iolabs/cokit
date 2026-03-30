@@ -77,7 +77,6 @@ logic. No special migration framework needed.
 | co-core-poa | Proof-of-Authority consensus implementation |
 | co-core-room | Matrix-compatible messaging |
 | co-core-file | Hierarchical file structures |
-| co-core-data-series | Data series, counters, aggregations |
 | co-core-rich-text | Conflict-free rich text |
 | co-core-role | Role-based access control rules |
 

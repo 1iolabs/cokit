@@ -5,8 +5,8 @@
 
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co, BlockStorageExt, CoId, CoMap, CoReference, CoreBlockStorage, Did, IsDefault, Link,
-	OptionLink, ReducerAction, StorageError, Tags, WeakCid,
+	co, BlockStorageExt, CoId, CoMap, CoReference, CoreBlockStorage, Did, IsDefault, Link, OptionLink, Reducer,
+	ReducerAction, StorageError, Tags, WeakCid,
 };
 use futures::{FutureExt, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet};

@@ -6,13 +6,12 @@
 #[cfg(feature = "js")]
 use crate::library::deferred_storage::DeferredStorage;
 use crate::{
-	co_v1::CoV1Api, runtimes::RuntimeError, types::guard::GuardReference, ApiContext, Core, RuntimeContext,
-	RuntimeInstance,
+	co_v1::CoV1Api, types::guard::GuardReference, Core, ExecuteError, RuntimeContext, RuntimeInstance,
 };
 use cid::Cid;
 use co_actor::TaskSpawner;
 use co_primitives::{from_cbor, AnyBlockStorage, CoreBlockStorage, GuardInput, ReducerInput};
-use co_storage::{BlockStorage, StorageError};
+use co_storage::BlockStorage;
 use std::{
 	collections::VecDeque,
 	sync::{Arc, Mutex},
@@ -133,20 +132,6 @@ impl RuntimePool {
 				result
 			},
 			Core::Native(f) => {
-				// execute
-				let execute = f.clone();
-				let (result, _) =
-					execute_with_api(self.spawner.clone(), storage, context, checked, (), move |_, api| {
-						let mut context = ApiContext::new(api);
-						execute(&mut context);
-						Ok(context.context().clone())
-					})
-					.await?;
-
-				// result
-				result
-			},
-			Core::NativeAsync(f) => {
 				let reducer_storage = CoreBlockStorage::new(storage.clone(), checked);
 
 				// input
@@ -352,16 +337,4 @@ fn create_cov1_api(storage: &impl AnyBlockStorage, context: RuntimeContext, chec
 #[cfg(feature = "js")]
 fn create_cov1_api(storage: DeferredStorage, context: RuntimeContext, _checked: bool) -> CoV1Api {
 	CoV1Api::new(Box::new(storage.clone()), context)
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum ExecuteError {
-	#[error("Create runtime failed")]
-	Create(#[from] StorageError),
-
-	#[error("Execute runtime failed")]
-	Runtime(#[from] RuntimeError),
-
-	#[error("Generic runtime error")]
-	Other(#[from] anyhow::Error),
 }

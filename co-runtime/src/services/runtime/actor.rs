@@ -3,88 +3,13 @@
 // by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
 // retention—approved secure tools may process solely for internal use.
 
-use crate::{Core, ExecuteError, GuardReference, RuntimeContext, RuntimePool};
-use cid::Cid;
+use crate::{services::runtime::RuntimeMessage, RuntimeHandle, RuntimePool};
 #[cfg(not(feature = "js"))]
 use co_actor::TaskSpawner;
-use co_actor::{ActorError, ActorHandle, Response};
+use co_actor::{ActorError, ActorHandle};
 #[cfg(feature = "js")]
 use co_actor::{JsLocalTaskSpawner, LocalActor};
-use co_primitives::{tags, AnyBlockStorage, CoreBlockStorage, Tags};
-
-#[derive(Debug, Clone)]
-pub struct RuntimeHandle {
-	handle: ActorHandle<RuntimeMessage>,
-}
-impl RuntimeHandle {
-	pub async fn execute_state(
-		&self,
-		storage: &impl AnyBlockStorage,
-		core_cid: &Cid,
-		core: &Core,
-		context: RuntimeContext,
-	) -> Result<RuntimeContext, ExecuteError> {
-		self.handle
-			.request(|response| {
-				RuntimeMessage::ExecuteState(
-					ExecuteStateAction {
-						storage: CoreBlockStorage::new(storage.clone(), false),
-						core_cid: *core_cid,
-						core: core.clone(),
-						context,
-					},
-					response,
-				)
-			})
-			.await
-			.map_err(|err| ExecuteError::Other(err.into()))?
-	}
-
-	pub async fn execute_guard(
-		&self,
-		storage: &impl AnyBlockStorage,
-		guard_cid: &Cid,
-		guard: &GuardReference,
-		context: RuntimeContext,
-	) -> Result<(RuntimeContext, bool), ExecuteError> {
-		self.handle
-			.request(|response| {
-				RuntimeMessage::ExecuteGuard(
-					ExecuteGuardAction {
-						storage: CoreBlockStorage::new(storage.clone(), false),
-						guard_cid: *guard_cid,
-						guard: guard.clone(),
-						context,
-					},
-					response,
-				)
-			})
-			.await
-			.map_err(|err| ExecuteError::Other(err.into()))?
-	}
-}
-
-#[derive(Debug)]
-pub enum RuntimeMessage {
-	ExecuteState(ExecuteStateAction, Response<Result<RuntimeContext, ExecuteError>>),
-	ExecuteGuard(ExecuteGuardAction, Response<Result<(RuntimeContext, bool), ExecuteError>>),
-}
-
-#[derive(Debug, Clone)]
-pub struct ExecuteStateAction {
-	pub storage: CoreBlockStorage,
-	pub core_cid: Cid,
-	pub core: Core,
-	pub context: RuntimeContext,
-}
-
-#[derive(Debug, Clone)]
-pub struct ExecuteGuardAction {
-	pub storage: CoreBlockStorage,
-	pub guard_cid: Cid,
-	pub guard: GuardReference,
-	pub context: RuntimeContext,
-}
+use co_primitives::{tags, Tags};
 
 #[derive(Debug, Default)]
 pub struct RuntimeActor {}

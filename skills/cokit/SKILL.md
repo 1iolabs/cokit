@@ -74,7 +74,7 @@ ensuring deterministic, verifiable state transitions across all peers.
 Key properties: passive (no side effects), atomic, serializable, composable (higher-order Cores).
 
 **Built-in Cores:** co-core-co (root), co-core-keystore, co-core-membership, co-core-board,
-co-core-storage, co-core-poa, co-core-room, co-core-file, co-core-data-series,
+co-core-storage, co-core-poa, co-core-room, co-core-file,
 co-core-rich-text, co-core-role.
 
 ### Log (Merkle-CRDT)

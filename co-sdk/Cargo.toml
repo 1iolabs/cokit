@@ -12,12 +12,10 @@ cid = { workspace = true }
 co-actor = { workspace = true }
 co-core-board = { workspace = true }
 co-core-co = { workspace = true }
-co-core-data-series = { workspace = true }
 co-core-file = { workspace = true }
 co-core-keystore = { workspace = true }
 co-core-membership = { workspace = true }
 co-core-names = { workspace = true }
-co-core-pin = { workspace = true }
 co-core-rich-text = { workspace = true }
 co-core-role = { workspace = true }
 co-core-room = { workspace = true }
@@ -86,7 +84,7 @@ tokio = { workspace = true, features = ["full", "tracing"] }
 co-test = { workspace = true }
 
 [features]
-"default" = ["recommended", "co-runtime/llvm"]
+"default" = ["recommended", "co-runtime/cranelift"]
 
 # Meta: Recommended platform neutral features
 "recommended" = ["pinning", "native", "network"]
@@ -129,7 +127,7 @@ co-test = { workspace = true }
 "tracing" = ["dep:tracing-subscriber"]
 
 # Native Target
-"native" = ["co-runtime/native", "co-actor/native", "co-storage/native", "co-network?/native", "fs", "tokio/full", "tracing", "bunyan", "keychain"]
+"native" = ["co-runtime/native", "co-storage/native", "co-network?/native", "fs", "tokio/full", "tracing", "bunyan", "keychain"]
 
 # IndexedDB persistent locals (WASM only)
 "indexeddb" = ["js", "co-storage/indexeddb", "dep:web-sys", "dep:wasm-bindgen"]

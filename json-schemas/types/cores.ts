@@ -8,7 +8,5 @@ export enum Cores {
   "co-core-rich-text" = "QmakNGVBRy9eEjnMqjvS8iRFrt4kTbefLw5xybhatB1uph",
   "co-core-names" = "QmanRnzqnQ6VQSakxotciseoLXP1qRb7rnJdcqNHz6fE1J",
   "co-core-file" = "QmWCaLk4z1pxwh97dEsUnrcC5vam5scJQqpKWz9fjEJ2xq",
-  "co-core-data-series" = "QmU9HDJz5BZY4Towjq4sdwkfoLGFeGo27iVxV3ehkWSzM6",
-  "co-core-pin" = "QmXGbKa6EmZ42VvKqHdF9ZbpCKuy38rC6W4F8mb43Nh5YR",
   "co-core-membership" = "Qmc2R1onbzTtUamBn6LtZCGoAtZsaJjfk2FkAQjCBKnKwc",
 }

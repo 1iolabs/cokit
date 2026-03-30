@@ -4,11 +4,11 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{EventContent, EventType};
-use co_macros::co_data;
+use co_macros::co;
 use schemars::JsonSchema;
 
 /// Session description object for sdp offers and answers
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct SessionDescription {
 	pub sdp: String,
@@ -23,7 +23,7 @@ impl SessionDescription {
 }
 
 /// ICE candidate for WebRTC exchange protocol
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct ICECandidate {
 	pub candidate: String, // SDP 'a' line of the candidate
@@ -40,7 +40,7 @@ impl ICECandidate {
 }
 
 /// Initial event to invite other parties to a call
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct CallInviteContent {
 	pub call_id: String,
@@ -87,7 +87,7 @@ impl CallInviteContent {
 }
 
 ///Event used when answering an invite event
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct AnswerCallContent {
 	pub call_id: String,
@@ -120,7 +120,7 @@ impl AnswerCallContent {
 }
 
 /// Event used to exchange viable ICE candidates with the other party upon answering a call
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct CallCandidatesContent {
 	pub call_id: String,
@@ -148,7 +148,7 @@ impl CallCandidatesContent {
 }
 
 /// Event used to select one of possibly multiple call answers
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct SelectCallAnswerContent {
 	pub call_id: String,
@@ -184,7 +184,7 @@ impl SelectCallAnswerContent {
 /// Event used to renegotiate between participants. First an offer containing a lifetime is sent. Other participants
 /// then send an answer. Offer and answer should never both be set. To ensure this they are not public to force the
 /// users to use the setters.
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct CallNegotiationContent {
 	pub call_id: String,
@@ -261,7 +261,7 @@ impl CallNegotiationContent {
 }
 
 /// Event sent if call was rejected by a user.
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct RejectCallContent {
 	pub call_id: String,
@@ -288,7 +288,7 @@ impl RejectCallContent {
 }
 
 /// Enum containg possible reasons for a hangup event
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub enum HangupCallReason {
 	/// ICE negotiation has failed and connection could not be established
@@ -315,7 +315,7 @@ pub enum HangupCallReason {
 }
 
 /// Hangup event used to signal the termination of the call.
-#[co_data]
+#[co]
 #[derive(JsonSchema)]
 pub struct HangupCallContent {
 	pub call_id: String,

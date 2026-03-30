@@ -6,7 +6,6 @@
 // modules
 mod application;
 mod library;
-mod pin;
 pub mod reducer;
 mod services;
 pub mod state;
@@ -43,10 +42,9 @@ pub use co_primitives::{
 	unixfs_encode_buffer, unixfs_stream, AbsolutePath, AbsolutePathOwned, AnyBlockStorage, Block, BlockSerializer,
 	BlockStat, BlockStorage, BlockStorageExt, CloneWithBlockStorageSettings, CoDate, CoDateRef, CoId, CoInvite, CoList,
 	CoListIndex, CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, CoTryStreamExt,
-	Component, Components, CoreName, DagCollection, DagCollectionAsyncExt, DagCollectionExt, Date, DefaultParams, Did,
-	DynamicCoDate, IsDefault, KnownMultiCodec, KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, NodeStream,
-	OptionLink, Path, PathError, PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag,
-	Tags,
+	Component, Components, CoreName, Date, DefaultParams, Did, DynamicCoDate, IsDefault, KnownMultiCodec, KnownTag,
+	KnownTags, Link, MultiCodec, MultiCodecError, NodeStream, OptionLink, Path, PathError, PathExt, PathOwned,
+	ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag, Tags,
 };
 pub use co_runtime::{
 	co_v1, Core, ExecuteError, GuardReference, RuntimeContext, RuntimeHandle, RuntimeInstance, RuntimePool,
@@ -82,7 +80,6 @@ pub use library::{
 	local_secret_password::PasswordLocalSecret,
 	memory_dispatch::MemoryDispatch,
 };
-pub use pin::PinAPI;
 pub use reducer::core_resolver::{
 	co::CoCoreResolver, single::SingleCoreResolver, CoreResolver, CoreResolverContext, CoreResolverError,
 };
@@ -109,9 +106,8 @@ pub use types::{
 	co_storage_setting::CoStorageSetting,
 	co_uuid::{CoUuid, DynamicCoUuid, MonotonicCoUuid, RandomCoUuid},
 	cores::{
-		Cores, CO_CORE_CO, CO_CORE_DATA_SERIES, CO_CORE_FILE, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO,
-		CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_PIN, CO_CORE_NAME_STORAGE, CO_CORE_PIN,
-		CO_CORE_ROOM,
+		Cores, CO_CORE_CO, CO_CORE_FILE, CO_CORE_KEYSTORE, CO_CORE_MEMBERSHIP, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
+		CO_CORE_NAME_MEMBERSHIP, CO_CORE_NAME_STORAGE, CO_CORE_ROOM,
 	},
 	error::{ErrorContext, ErrorKind, IntoAction},
 };

@@ -25,11 +25,14 @@ web-time = { workspace = true, optional = true }
 [target.'cfg(tokio_unstable)'.dependencies]
 tokio = { workspace = true, features = ["full", "tracing"] }
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["sync", "time", "rt"] }
+tokio-util = { workspace = true, features = ["rt"] }
+
 [dev-dependencies]
 insta = { version = "1.34.0", features = ["default", "yaml"] }
 
 [features]
-default = ["native"]
+default = []
 web = ["js"]
-native = ["tokio/time", "tokio-util/rt"]
 js = ["dep:web-time", "dep:futures-timer", "dep:wasm-bindgen-futures", "dep:tokio_with_wasm"]

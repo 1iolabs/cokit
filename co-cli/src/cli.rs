@@ -4,7 +4,7 @@
 // retention—approved secure tools may process solely for internal use.
 
 use crate::{
-	commands::{co, core, did, file, ipld, network, pin, room, schemars, storage},
+	commands::{co, core, did, file, ipld, network, room, schemars, storage},
 	library::cli_context::CliContext,
 };
 use clap::{ArgAction, ValueEnum};
@@ -126,9 +126,6 @@ pub enum CliCommand {
 	/// Room
 	Room(room::Command),
 
-	/// Pin
-	Pin(pin::Command),
-
 	/// Json schemas
 	Schemars(schemars::Command),
 }
@@ -151,7 +148,6 @@ pub async fn command(cli: &Cli) -> Result<ExitCode, anyhow::Error> {
 		CliCommand::Storage(command) => storage::command(&context, cli, command).await,
 		CliCommand::File(command) => file::command(&context, cli, command).await,
 		CliCommand::Room(command) => room::command(&context, cli, command).await,
-		CliCommand::Pin(command) => pin::command(&context, cli, command).await,
 		CliCommand::Schemars(command) => schemars::command(&context, cli, command).await,
 	};
 

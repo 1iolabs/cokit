@@ -18,18 +18,14 @@ members = [
     "co-test",
     "cores/board",
     "cores/co",
-    "cores/data-series",
     "cores/file",
     "cores/keystore",
     "cores/membership",
     "cores/names",
-    "cores/pin",
     "cores/rich-text",
     "cores/role",
     "cores/room",
     "cores/storage",
-    "daemon",
-    "did-co",
     "examples/counter",
     "examples/counter-upgraded",
     "examples/message",
@@ -100,12 +96,10 @@ co-api = { path = "co-api" }
 co-cli = { path = "co-cli" }
 co-core-board = { path = "cores/board" }
 co-core-co = { path = "cores/co" }
-co-core-data-series = { path = "cores/data-series" }
 co-core-file = { path = "cores/file" }
 co-core-keystore = { path = "cores/keystore" }
 co-core-membership = { path = "cores/membership" }
 co-core-names = { path = "cores/names" }
-co-core-pin = { path = "cores/pin" }
 co-core-rich-text = { path = "cores/rich-text" }
 co-core-role = { path = "cores/role" }
 co-core-room = { path = "cores/room" }
@@ -131,12 +125,10 @@ co-api = { path = "co-api" }
 co-cli = { path = "co-cli" }
 co-core-board = { path = "cores/board" }
 co-core-co = { path = "cores/co" }
-co-core-data-series = { path = "cores/data-series" }
 co-core-file = { path = "cores/file" }
 co-core-keystore = { path = "cores/keystore" }
 co-core-membership = { path = "cores/membership" }
 co-core-names = { path = "cores/names" }
-co-core-pin = { path = "cores/pin" }
 co-core-rich-text = { path = "cores/rich-text" }
 co-core-role = { path = "cores/role" }
 co-core-room = { path = "cores/room" }

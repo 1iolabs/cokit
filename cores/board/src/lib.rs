@@ -6,8 +6,8 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co_data, co_state, BlockStorage, BlockStorageExt, CoList, CoListIndex, CoMap, CoTryStreamExt,
-	CoreBlockStorage, IsDefault, LazyTransaction, Link, OptionLink, ReducerAction, Tags,
+	co, BlockStorage, BlockStorageExt, CoList, CoListIndex, CoMap, CoTryStreamExt, CoreBlockStorage, IsDefault,
+	LazyTransaction, Link, OptionLink, Reducer, ReducerAction, Tags,
 };
 use futures::{pin_mut, FutureExt, TryStreamExt};
 use std::future::ready;
@@ -16,7 +16,7 @@ pub type ListName = String;
 pub type TaskId = String;
 
 /// Board actions.
-#[co_data]
+#[co]
 pub enum BoardAction {
 	BoardRename(String),
 	BoardTagsInsert(Tags),
@@ -38,7 +38,7 @@ pub enum BoardAction {
 	TaskTagsRemove(TaskId, Tags),
 }
 
-#[co_state]
+#[co(state)]
 pub struct Board {
 	/// Board name.
 	#[serde(rename = "n", default, skip_serializing_if = "String::is_empty")]
@@ -69,7 +69,7 @@ impl Reducer<BoardAction> for Board {
 	}
 }
 
-#[co_data]
+#[co]
 pub struct List {
 	/// List name.
 	#[serde(rename = "n")]
@@ -89,7 +89,7 @@ impl List {
 	}
 }
 
-#[co_data]
+#[co]
 pub struct Task {
 	/// Task unique id.
 	#[serde(rename = "u")]
@@ -112,7 +112,7 @@ pub struct Task {
 	pub lock: Option<String>,
 }
 
-#[co_data]
+#[co]
 #[derive(Default)]
 pub enum TaskLock {
 	/// No lock.

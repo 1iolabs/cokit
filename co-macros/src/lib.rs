@@ -15,16 +15,6 @@ use syn::{
 mod co;
 mod tagged_fields;
 
-#[proc_macro_attribute]
-pub fn co_data(_metadata: TokenStream, input: TokenStream) -> TokenStream {
-	co::macro_co_data(input)
-}
-
-#[proc_macro_attribute]
-pub fn co_state(_metadata: TokenStream, input: TokenStream) -> TokenStream {
-	co::macro_co_state(input)
-}
-
 struct CoArgs {
 	features: BTreeSet<CoMacroFeature>,
 }
@@ -43,14 +33,6 @@ impl Parse for CoArgs {
 				match CoMacroFeature::try_from(flag.as_str()) {
 					Ok(flag) => {
 						features.insert(flag);
-
-						// verfiy
-						if features.contains(&CoMacroFeature::State) && features.contains(&CoMacroFeature::StateSync) {
-							return Err(syn::Error::new_spanned(
-								arg,
-								"Flags state and state_sync can not be used together",
-							));
-						}
 					},
 					Err(err) => {
 						return Err(err);
@@ -70,11 +52,6 @@ pub fn co(metadata: TokenStream, input: TokenStream) -> TokenStream {
 	// generate
 	co::macro_co(input, args.features)
 }
-
-// #[proc_macro_derive(CoData)]
-// pub fn derive_co_data(input: TokenStream) -> TokenStream {
-// 	co::macro_co_data(input)
-// }
 
 /**
  * Attribute usage:

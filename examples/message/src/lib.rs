@@ -5,13 +5,11 @@
 
 use cid::Cid;
 use co_api::{
-	sync_api::{Context, Reducer, StorageExt},
-	CoMetadata, Date, Did, Link, Metadata, ReducerAction, Storage,
+	co, BlockStorageExt, CoMetadata, CoreBlockStorage, Date, Did, Link, Metadata, OptionLink, Reducer, ReducerAction,
 };
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[co(state)]
 pub struct MessageState {
 	#[serde(rename = "v")]
 	pub version: MessageVersion,
@@ -35,13 +33,14 @@ impl CoMetadata for MessageState {
 	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[co]
+#[derive(Default)]
 pub enum MessageVersion {
 	#[default]
 	V1 = 1,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
 pub enum Permission {
 	Send,
 	Read,
@@ -54,10 +53,10 @@ pub enum Permission {
 	Pin,
 }
 impl Permission {
-	pub fn has(&self, storage: &dyn Storage, state: &MessageState, participant: &Did) -> bool {
+	pub async fn has(&self, storage: &CoreBlockStorage, state: &MessageState, participant: &Did) -> bool {
 		match state.participants.get(participant) {
 			Some(link) => {
-				let role = storage.get_value(link).unwrap_or(Role::None);
+				let role = storage.get_value(link).await.unwrap_or(Role::None);
 				match role {
 					Role::None => false,
 					Role::Custom { name: _, permissions } => permissions.contains(self),
@@ -80,7 +79,7 @@ impl Permission {
 	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[co]
 pub enum Role {
 	None,
 	Custom { name: String, permissions: Vec<Permission> },
@@ -88,7 +87,7 @@ pub enum Role {
 	Admin,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[co]
 pub enum MessageAction {
 	SetName(String),
 	Message,
@@ -96,56 +95,61 @@ pub enum MessageAction {
 	SetRole(Did, Link<Role>),
 }
 
-impl Reducer for MessageState {
-	type Action = MessageAction;
-
-	fn reduce(self, action: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
-		match &action.payload {
+impl Reducer<MessageAction> for MessageState {
+	async fn reduce(
+		state: OptionLink<Self>,
+		event: Link<ReducerAction<MessageAction>>,
+		storage: &CoreBlockStorage,
+	) -> Result<Link<Self>, anyhow::Error> {
+		let action = storage.get_value(&event).await?;
+		let current = storage.get_value_or_default(&state).await?;
+		let next = match &action.payload {
 			MessageAction::SetName(name) => {
-				if Permission::Name.has(context.storage(), &self, &action.from) {
-					MessageState { name: name.clone(), ..self }
+				if Permission::Name.has(storage, &current, &action.from).await {
+					MessageState { name: name.clone(), ..current }
 				} else {
-					self
+					current
 				}
 			},
 			MessageAction::Message => {
-				let participants = match self.participants.get(&action.from) {
-					Some(_) => self.participants,
+				let participants = match current.participants.get(&action.from) {
+					Some(_) => current.participants,
 					None => {
-						let mut new = self.participants.clone();
-						new.insert(action.from.clone(), context.storage_mut().set_value(&Role::Participant));
+						let mut new = current.participants.clone();
+						new.insert(action.from.clone(), storage.set_value(&Role::Participant).await?);
 						new
 					},
 				};
-				MessageState { participants, message_count: self.message_count + 1, ..self }
+				MessageState { participants, message_count: current.message_count + 1, ..current }
 			},
 			MessageAction::Pin(id) => {
-				let mut pinned = self.pinned.clone();
+				let mut pinned = current.pinned.clone();
 				pinned.push(*id);
-				MessageState { pinned, ..self }
+				MessageState { pinned, ..current }
 			},
 			MessageAction::SetRole(did, role_link) => {
-				let from_role_link_option = self.participants.get(&action.from);
+				let from_role_link_option = current.participants.get(&action.from);
 				match from_role_link_option {
 					Some(from_role_link) => {
-						let role = context.storage().get_value(from_role_link).expect("valid role");
+						let role: Role = storage.get_value(from_role_link).await?;
 						if role == Role::Admin {
-							let mut participants = self.participants.clone();
+							let mut participants = current.participants.clone();
 							participants.insert(did.clone(), *role_link);
-							MessageState { participants, ..self }
+							MessageState { participants, ..current }
 						} else {
-							self
+							current
 						}
 					},
-					None => self,
+					None => current,
 				}
 			},
-		}
+		};
+		Ok(storage.set_value(&next).await?)
 	}
 }
 
 pub struct CallContext {
-	pub storage: Box<dyn Storage>,
+	pub storage: CoreBlockStorage,
 	pub from: Did,
 	pub time: Date,
 }
@@ -155,22 +159,11 @@ pub enum CallError {
 }
 
 impl MessageState {
-	pub fn set_name(&mut self, context: &CallContext, name: String) -> Result<(), CallError> {
-		if !Permission::Name.has(context.storage.as_ref(), self, &context.from) {
+	pub async fn set_name(&mut self, context: &CallContext, name: String) -> Result<(), CallError> {
+		if !Permission::Name.has(&context.storage, self, &context.from).await {
 			return Err(CallError::Permission);
 		}
 		self.name = name;
 		Ok(())
 	}
-}
-
-// impl MessageState {
-// 	// #[api]
-// 	pub fn set_name(name: String) -> SetNameEvent {}
-// }
-
-#[cfg(all(feature = "core", target_arch = "wasm32", target_os = "unknown"))]
-#[no_mangle]
-pub extern "C" fn state(input: *const co_api::RawCid, output: *mut co_api::RawCid) {
-	co_api::sync_api::reduce::<MessageState>(unsafe { &*input }, unsafe { &mut *output })
 }

@@ -8,9 +8,7 @@ use crate::{
 	transaction::NamesTransaction,
 	Config, Index, IndexKey, NamesAction, Record, RecordId,
 };
-use co_api::{
-	async_api::Reducer, co, BlockStorageExt, CoMap, CoreBlockStorage, Guard, Link, OptionLink, ReducerAction,
-};
+use co_api::{co, BlockStorageExt, CoMap, CoreBlockStorage, Guard, Link, OptionLink, Reducer, ReducerAction};
 
 #[co(state, guard)]
 pub struct Names {
