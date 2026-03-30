@@ -12,7 +12,6 @@ cid = { workspace = true }
 co-actor = { workspace = true }
 co-core-board = { workspace = true }
 co-core-co = { workspace = true }
-co-core-data-series = { workspace = true }
 co-core-file = { workspace = true }
 co-core-keystore = { workspace = true }
 co-core-membership = { workspace = true }

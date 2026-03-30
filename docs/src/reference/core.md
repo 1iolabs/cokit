@@ -167,12 +167,6 @@ Stores hierarchical file structures like a file system.
 For further information, see:
 - [`co-core-file`](/crate/co_core_file/index.html)
 
-#### `co-core-data-series`
-Stores data series, counters, and aggregations on the data.
-
-For further information, see:
-- [`co-core-data-series`](/crate/co_core_data_series/index.html)
-
 #### `co-core-rich-text`
 Stores conflict-free rich text.
 

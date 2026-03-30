@@ -16,7 +16,6 @@ pub const CO_CORE_MEMBERSHIP: &str = "co-core-membership";
 pub const CO_CORE_PIN: &str = "co-core-pin";
 pub const CO_CORE_ROOM: &str = "co-core-room";
 pub const CO_CORE_ROLE: &str = "co-core-role";
-pub const CO_CORE_DATA_SERIES: &str = "co-core-data-series";
 pub const CO_CORE_STORAGE: &str = "co-core-storage";
 pub const CO_CORE_POA: &str = "co-core-poa";
 pub const CO_CORE_BOARD: &str = "co-core-board";
@@ -155,7 +154,6 @@ fn get_native(name: &str) -> Core {
 		CO_CORE_PIN => include_prebuild_core!("pin"),
 		CO_CORE_ROOM => include_prebuild_core!("room"),
 		CO_CORE_ROLE => include_prebuild_core!("role"),
-		CO_CORE_DATA_SERIES => include_prebuild_core!("data_series"),
 		CO_CORE_STORAGE => include_prebuild_core!("storage"),
 		CO_CORE_POA => include_prebuild_core!("poa"),
 		CO_CORE_BOARD => include_prebuild_core!("board"),
@@ -172,7 +170,6 @@ fn get_native(name: &str) -> Core {
 		CO_CORE_PIN => Core::native::<co_core_pin::Pin, co_core_pin::PinAction>(),
 		CO_CORE_ROOM => Core::native::<co_core_room::Room, co_core_room::MatrixEvent>(),
 		CO_CORE_ROLE => Core::native::<co_core_role::Roles, co_core_role::RoleAction>(),
-		CO_CORE_DATA_SERIES => Core::native::<co_core_data_series::DataSeries, co_core_data_series::DataSeriesAction>(),
 		CO_CORE_STORAGE => Core::native::<co_core_storage::Storage, co_core_storage::StorageAction>(),
 		CO_CORE_POA => Core::native::<co_core_poa::Authority, co_core_poa::AuthorityAction>(),
 		CO_CORE_BOARD => Core::native::<co_core_board::Board, co_core_board::BoardAction>(),

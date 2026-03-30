@@ -19,7 +19,6 @@ members = [
     "co-test",
     "cores/board",
     "cores/co",
-    "cores/data-series",
     "cores/file",
     "cores/keystore",
     "cores/membership",
@@ -99,7 +98,6 @@ co-api = { path = "co-api" }
 co-cli = { path = "co-cli" }
 co-core-board = { path = "cores/board" }
 co-core-co = { path = "cores/co" }
-co-core-data-series = { path = "cores/data-series" }
 co-core-file = { path = "cores/file" }
 co-core-keystore = { path = "cores/keystore" }
 co-core-membership = { path = "cores/membership" }

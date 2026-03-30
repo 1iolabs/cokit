@@ -86,7 +86,7 @@ actions sequentially. `reduce(state, action) -> new_state`.
 
 ### Built-in Cores (under cores/)
 - co-core-co, co-core-keystore, co-core-membership, co-core-board, co-core-storage,
-  co-core-poa, co-core-room, co-core-file, co-core-data-series, co-core-rich-text, co-core-role
+  co-core-poa, co-core-room, co-core-file, co-core-rich-text, co-core-role
 
 ## Source Map
 
