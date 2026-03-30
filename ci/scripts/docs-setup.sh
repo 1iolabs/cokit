@@ -18,7 +18,7 @@ cargo_install_package () {
 }
 
 # install
-cargo_install_package mdbook "0.4.36"
-cargo_install_package mdbook-mermaid "0.15.0"
+cargo_install_package mdbook "0.4.52"
+cargo_install_package mdbook-mermaid "0.16.0"
 cargo_install_package mdbook-toc "0.14.2"
 cargo_install_package mdbook-admonish "1.20.0"
