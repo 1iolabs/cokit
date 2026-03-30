@@ -172,10 +172,3 @@ Stores conflict-free rich text.
 
 For further information, see:
 - [`co-core-rich-text`](/crate/co_core_rich_text/index.html)
-
-#### `co-core-role`
-Basic role-based access rules.  
-Used as a go-to data model for daily permission management.
-
-For further information, see:
-- [`co-core-role`](/crate/co_core_role/index.html)

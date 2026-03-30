@@ -4,7 +4,6 @@ export enum Cores {
   "co-core-room" = "QmXzU5G6K8japFjL1uNiqfTCb96mNrDEKcPsGpapQNQKXF",
   "co-core-keystore" = "Qmb76AGH1Lo3joDvrB3Vn48Y8yUT78KHq5Bg5taaGv2aTK",
   "co-core-storage" = "QmQKm12jJ6arR1Tf3AAPscsKyxDAaJWJSmB4Lg4byhSMSW",
-  "co-core-role" = "QmS7qqu8SfvhLR2DZBqnR9vYv4o5CND8R9yBnvQiVfi9JW",
   "co-core-rich-text" = "QmakNGVBRy9eEjnMqjvS8iRFrt4kTbefLw5xybhatB1uph",
   "co-core-names" = "QmanRnzqnQ6VQSakxotciseoLXP1qRb7rnJdcqNHz6fE1J",
   "co-core-poa" = "QmRH7Azi8qtv9AstFzuq7JYnLDTuMJHzZ4hYtrPa5ZDswz",
