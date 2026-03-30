@@ -1,6 +1,6 @@
 # Best Practices
 In the [getting started](../getting-started/installation.md#building-your-first-app) chapter, we built a simple to-do list together.  
-Now let's take a look at how you really can kick things off in your development process with COkit.
+Now let's take a look at how you really can kick things off in your development process with COKIT.
 
 ## Do
 ### Core: Use stable identifiers

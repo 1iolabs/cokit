@@ -60,7 +60,7 @@ They have no facilities to react to state changes or perform any side effects.
 
 ### Serialization
 The Core is the description of how state will be serialized to a persistable format.  
-COkit uses content-addressed blocks through [IPLD](https://ipld.io/) with a default block size limit of 1MiB.  
+COKIT uses content-addressed blocks through [IPLD](https://ipld.io/) with a default block size limit of 1MiB.  
 
 We recommend using the [DAG-CBOR](../glossary/glossary.md#dag-cbor) format because it is optimized for content-addressed data, and it directly supports content-addressed links (via [CIDs](../glossary/glossary.md#cid)).  
 
@@ -172,10 +172,3 @@ Stores conflict-free rich text.
 
 For further information, see:
 - [`co-core-rich-text`](/crate/co_core_rich_text/index.html)
-
-#### `co-core-role`
-Basic role-based access rules.  
-Used as a go-to data model for daily permission management.
-
-For further information, see:
-- [`co-core-role`](/crate/co_core_role/index.html)

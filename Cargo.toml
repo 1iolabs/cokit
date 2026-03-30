@@ -23,7 +23,6 @@ members = [
     "cores/membership",
     "cores/names",
     "cores/rich-text",
-    "cores/role",
     "cores/room",
     "cores/storage",
     "examples/counter",
@@ -101,7 +100,6 @@ co-core-keystore = { path = "cores/keystore" }
 co-core-membership = { path = "cores/membership" }
 co-core-names = { path = "cores/names" }
 co-core-rich-text = { path = "cores/rich-text" }
-co-core-role = { path = "cores/role" }
 co-core-room = { path = "cores/room" }
 co-core-storage = { path = "cores/storage" }
 co-dioxus = { path = "co-dioxus" }

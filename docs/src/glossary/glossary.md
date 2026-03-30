@@ -34,7 +34,7 @@ For further information, see:
 
 ## DAG-CBOR
 IPLD Data Model as a subset of CBOR.  
-DAG-CBOR is the go-to serialization method for data used throughout COkit.
+DAG-CBOR is the go-to serialization method for data used throughout COKIT.
 
 For further information, see:
 - [Core](../reference/core.md#serialization)
@@ -76,8 +76,8 @@ Specs:
 - ***Deterministic & Immutable***: Any change yields a totally different CID to ensure verifiability and immutable data.
 - ***Self-Describing Format***: CIDs combine a hash (via *multihash*), a content-type code (*multicodec*), and encoding info (*multibase*).
 
-Why COkit uses CIDs:  
-CIDs allow consistent, tamper-evident data referencing across decentralized storage backends – be they local, IPFS, cloud–supporting, or COkit’s file-based, content-addressed architecture.
+Why COKIT uses CIDs:  
+CIDs allow consistent, tamper-evident data referencing across decentralized storage backends – be they local, IPFS, cloud–supporting, or COKIT’s file-based, content-addressed architecture.
 
 
 For further information, see:
@@ -97,17 +97,17 @@ For further information, see:
 - [Core](../reference/core.md)
 
 ## CO-API
-The CO-API is the foundation package to create COkit Cores.
+The CO-API is the foundation package to create COKIT Cores.
 
 For further information, see:
 - [Core](../reference/core.md#serialization)
 - [Core API Overview](../usage/api-overview-core.md)
 - [`co-api`](/crate/co_api/index.html)
 
-## COkit
-In essence, COkit is a Software Development Kit written in Rust.
+## COKIT
+In essence, COKIT is a Software Development Kit written in Rust.
 
-With COkit, you can easily build...
+With COKIT, you can easily build...
 
 - decentralized
 - secure
@@ -120,11 +120,11 @@ With COkit, you can easily build...
 There are virtually no limitations that you might find with cloud providers or other SDKs.
 
 For further information, see:
-- [COkit](../reference/COkit.md)
-- [COkit in the FAQs](../faq/faq.md#general)
+- [COKIT](../reference/COKIT.md)
+- [COKIT in the FAQs](../faq/faq.md#general)
 
 ## Consensus
-In COkit, consensus refers to the protocols ensuring that multiple peers agree on a shared state or actions – even in the presence of unreliable networks or malicious actors.
+In COKIT, consensus refers to the protocols ensuring that multiple peers agree on a shared state or actions – even in the presence of unreliable networks or malicious actors.
 
 For further information, see:
 - [Consensus](../reference/consensus.md)
@@ -164,7 +164,7 @@ Benefits:
 - ***Strong eventual consistency***: When all updates are delivered, every replica reaches the same final state.
 - ***No coordination needed***: Replicas can be updated offline and merge upon reconnection.
 
-COkit leverages CRDTs to implement the built-in log-based Merkle-CRDT:
+COKIT leverages CRDTs to implement the built-in log-based Merkle-CRDT:
 - Distributed nodes stay in sync without locking or conflicts.
 - Network partitions or offline work don’t block progress.
 - Updates merge correctly once communication resumes.
@@ -212,7 +212,7 @@ For further information, see:
 mDNS (Multicast Domain Name System) is a lightweight, zero-configuration networking protocol that resolves hostnames to IP addresses within local networks without the need for a dedicated DNS server.  
 It enables devices on the same network to discover each other using human-readable names rather than IP addresses.
 
-COkit uses mDNS as an optional networking mode to automatically discover peer nodes on a local network.
+COKIT uses mDNS as an optional networking mode to automatically discover peer nodes on a local network.
 
 ## Merkle-CRDT
 A Merkle‑CRDT combines the benefits of [Merkle-DAGs](../glossary/glossary.md#merkle-dag) (Merkle Directed Acyclic Graphs) and [CRDTs](../glossary/glossary.md#crdt) (Conflict‑Free Replicated Data Types) to create a robust, decentralized synchronization layer.
@@ -228,7 +228,7 @@ Specifics:
 - ***Graph, not tree***: Unlike strict Merkle trees, Merkle DAGs allow nodes to have multiple parents and include data payloads in non-leaf nodes.
 - ***Content-addressed deduplication***: Identical content chunks share the same [CID](#cid) and need not to be stored more than once, reducing storage and bandwidth.
 
-In COkit, we use Merkle-DAGs as the foundation for the built-in Merkle log-based CRDT and storage.
+In COKIT, we use Merkle-DAGs as the foundation for the built-in Merkle log-based CRDT and storage.
 
 For further information, see:
 - [IPLD - The data model of the content-addressable web](https://ipld.io/)
@@ -241,7 +241,7 @@ For further information, see:
 A Peer Identity (often written `PeerID`) is a unique reference to a specific peer within the overall p2p-network.  
 It is derived by hashing a node’s public key. The corresponding private key remains secret and is used to sign messages, and to authenticate the identity of the peer.
 
-In COkit, each node may generate or be assigned a Peer ID, which then acts as a verifiable handle across the decentralized networking layers.
+In COKIT, each node may generate or be assigned a Peer ID, which then acts as a verifiable handle across the decentralized networking layers.
 
 For further information, see:
 - [Network](../reference/network.md)
@@ -255,10 +255,10 @@ For further information, see:
 - [Glossary: Consensus](#consensus)
 
 ## Storage
-One of the base building blocks of COkit is the content addressed storage [CID](../glossary/glossary.md#cid).  
+One of the base building blocks of COKIT is the content addressed storage [CID](../glossary/glossary.md#cid).  
 The storage is represented as a very simple interface that writes and reads CID/BLOB pairs called Blocks.  
 
-The recommended serialization format (also used throughout COkit) is [DAG-CBOR](../glossary/glossary.md#dag-cbor), which is a subset of [CBOR](../glossary/glossary.md#cbor) with links to [CIDs](../glossary/glossary.md#cid).  
+The recommended serialization format (also used throughout COKIT) is [DAG-CBOR](../glossary/glossary.md#dag-cbor), which is a subset of [CBOR](../glossary/glossary.md#cbor) with links to [CIDs](../glossary/glossary.md#cid).  
 [Cores](../reference/core.md) are not restricted to [DAG-CBOR](../glossary/glossary.md#dag-cbor), however, and may use any given structure.
 
 For further information, see:
@@ -282,7 +282,7 @@ For further information, see:
 WebAssembly (WASM) is an open-standard, portable binary format designed for high-performance execution in a sandboxed environment - initially for web browsers, and increasingly for broader contexts, including servers, edge devices, and embedded systems.  
 It serves as a compilation target for languages such as Rust, C, C++, and others, enabling near-native speeds while maintaining security and cross-platform compatibility
 
-For COkit, WASM is a mechanism to compile and execute schema logic.
+For COKIT, WASM is a mechanism to compile and execute schema logic.
 
 For further information, see:
 - [Core](../reference/core.md)

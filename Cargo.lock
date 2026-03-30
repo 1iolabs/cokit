@@ -1688,21 +1688,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "co-core-role"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cid 0.11.1",
- "co-api",
- "ipld-core",
- "serde",
- "serde_repr",
- "thiserror 1.0.69",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "co-core-room"
 version = "0.1.0"
 dependencies = [
@@ -2019,7 +2004,6 @@ dependencies = [
  "co-core-membership",
  "co-core-names",
  "co-core-rich-text",
- "co-core-role",
  "co-core-room",
  "co-core-storage",
  "co-guard",

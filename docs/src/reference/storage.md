@@ -1,8 +1,8 @@
 # Storage
-One of the base building blocks of COkit is the content-addressed storage [CID](../glossary/glossary.md#cid).  
+One of the base building blocks of COKIT is the content-addressed storage [CID](../glossary/glossary.md#cid).  
 The storage is represented as a very simple interface that writes and reads CID/BLOB pairs called Blocks.  
 
-The recommended serialization format (also used throughout COkit) is [DAG-CBOR](../glossary/glossary.md#dag-cbor), which is a subset of CBOR with links to CIDs.  
+The recommended serialization format (also used throughout COKIT) is [DAG-CBOR](../glossary/glossary.md#dag-cbor), which is a subset of CBOR with links to CIDs.  
 However, [Cores](../reference/core.md) are not restricted to using only [DAG-CBOR](../glossary/glossary.md#dag-cbor), and may use any given structure.
 
 ## Layers
@@ -11,7 +11,7 @@ Storages can be layered to add functionality.
 ### Encryption Layer
 The encryption layer encrypts Blocks before writing them to storage through a configurable encryption algorithm.  
 
-The default encryption algorithm used in COkit is [XChaCha20-Poly1305](https://datatracker.ietf.org/doc/html/rfc8439).
+The default encryption algorithm used in COKIT is [XChaCha20-Poly1305](https://datatracker.ietf.org/doc/html/rfc8439).
 
 ### Network Layer
 The network layer will fetch Blocks on demand while being used.  

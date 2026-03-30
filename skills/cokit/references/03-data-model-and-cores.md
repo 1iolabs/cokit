@@ -78,7 +78,6 @@ logic. No special migration framework needed.
 | co-core-room | Matrix-compatible messaging |
 | co-core-file | Hierarchical file structures |
 | co-core-rich-text | Conflict-free rich text |
-| co-core-role | Role-based access control rules |
 
 ## Common Data Types (co-primitives)
 

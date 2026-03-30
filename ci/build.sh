@@ -2,7 +2,7 @@
 set -e
 
 BASE_PATH="$(dirname "$0")/.."
-DOCKERFILE_HASH="$(sha256sum Dockerfile | cut -d' ' -f1)"
+DOCKERFILE_HASH="$(sha256sum "$BASE_PATH/ci/Dockerfile" | cut -d' ' -f1)"
 DOCKERFILE_IMAGE="docker-registry.intranet.1io.com/build/co:$DOCKERFILE_HASH"
 
 echo "> $DOCKERFILE_IMAGE"

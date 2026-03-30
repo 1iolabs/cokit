@@ -75,7 +75,7 @@ Key properties: passive (no side effects), atomic, serializable, composable (hig
 
 **Built-in Cores:** co-core-co (root), co-core-keystore, co-core-membership, co-core-board,
 co-core-storage, co-core-poa, co-core-room, co-core-file,
-co-core-rich-text, co-core-role.
+co-core-rich-text.
 
 ### Log (Merkle-CRDT)
 

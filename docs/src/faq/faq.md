@@ -3,10 +3,10 @@
 <!-- toc -->
 
 ## General
-### What is COkit and what are its primary use cases?
-COkit has been built to provide an SDK that finally allows you to stop worrying about backends and dependencies, and lets you focus on the task at hand.
+### What is COKIT and what are its primary use cases?
+COKIT has been built to provide an SDK that finally allows you to stop worrying about backends and dependencies, and lets you focus on the task at hand.
 
-Each and every application built on COkit shall be:
+Each and every application built on COKIT shall be:
 - easy to build and easy to use
 - decentralized
 - usable on local infrastructure
@@ -14,7 +14,7 @@ Each and every application built on COkit shall be:
 - non-reliant on middlemen through peer-to-peer networking
 - a place where users may keep control of (and keep track of) their data
 
-COkit is especially useful for:
+COKIT is especially useful for:
 - Collaborative applications with a focus on usability and data-ownership for the users
 - Communication platforms and messengers in general, with a focus on privacy and data security
 - Dual-use in the defence sector: communication for the battlefield and catastrophe management
@@ -22,32 +22,32 @@ COkit is especially useful for:
 For further information, see:
 - [1io.com](https://1io.com/)
 
-### Is COkit open-source? Under what license is it distributed?
-Yes COkit is open-source.
+### Is COKIT open-source? Under what license is it distributed?
+Yes COKIT is open-source.
 
 We use APLGv3 as the license of choice.
 
 For further information, see:
 - [Legal Notice](../license/legal-notice.md)
 
-### What platforms does COkit support? (e.g. Linux, Windows, macOS, etc.)
-COkit is platform-agnostic and supports all major OSes.
+### What platforms does COKIT support? (e.g. Linux, Windows, macOS, etc.)
+COKIT is platform-agnostic and supports all major OSes.
 
-And of course, because COkit is written in Rust, it should run on other platforms.
+And of course, because COKIT is written in Rust, it should run on other platforms.
 
-### How does COkit differ from other CRDT or P2P-based frameworks?
-COkit not only provides end-to-end encryption in processes, but also end-to-end verification, meaning:
+### How does COKIT differ from other CRDT or P2P-based frameworks?
+COKIT not only provides end-to-end encryption in processes, but also end-to-end verification, meaning:
 - Cryptographic integrity verification (e.g. This message is unaltered)
 - Cryptographic identity verification (e.g. This person is who they claim to be)
 
-Included in COkit (thus significantly reducing programming time when building apps) are the following:
+Included in COKIT (thus significantly reducing programming time when building apps) are the following:
 - Identity through [DID](../reference/identity.md#what-is-a-did)
 - Auditable and non-repudiable history of states
 - Zero-trust environment
 - Decentralization from the get-go
 - Private data handling – not even encrypted data is shared with unknown peers
 
-### Can COkit-based applications be used offline and sync later?
+### Can COKIT-based applications be used offline and sync later?
 Yes.  
 
 Every change happens only locally and is eventually distributed to other participants over time.  
@@ -65,9 +65,9 @@ For further information, see:
 
 
 ## Architecture & Design
-### What does "file-based" mean in the context of COkit?
+### What does "file-based" mean in the context of COKIT?
 All data is stored as files without special filesystem requirements like locks, links, or consistency levels.  
-Therefore, you can store COkit-managed files on a local disk, on cloud storages, or on object stores.  
+Therefore, you can store COKIT-managed files on a local disk, on cloud storages, or on object stores.  
 All files are stored verifiable using content addressing.
 
 For further information, see:
@@ -96,8 +96,8 @@ For further information, see:
 - [Key Principles](../introduction/key-principles.md#file-based)
 - [Storage](../reference/storage.md)
 
-### How does the decentralized architecture of COkit ensure data integrity?
-COkit uses a data graph per CO, which we call the [Log](../reference/log.md).  
+### How does the decentralized architecture of COKIT ensure data integrity?
+COKIT uses a data graph per CO, which we call the [Log](../reference/log.md).  
 The Log is powered by a Merkle-CRDT, which deterministically orders transactions based on a logical clock.  
 Each piece of data is stored as a content-addressed block, which allows for cryptographic verification – at anytime.
 
@@ -105,14 +105,14 @@ For further information, see:
 - [Log](../reference/log.md)
 - [Glossary: Merkle-CRDT](../glossary/glossary.md#merkle-crdt)
 
-### Can COkit be integrated with traditional centralized systems?
+### Can COKIT be integrated with traditional centralized systems?
 Yes.
 
 COs would be serving as an added layer of trust and security when in use in centralized systems.
 
-The library can be integrated anywhere, and you can also build your backend/data models with COkit.
+The library can be integrated anywhere, and you can also build your backend/data models with COKIT.
 
-Another useful scenario is COkit-built apps in processes that are fed back into traditional centralized systems.  
+Another useful scenario is COKIT-built apps in processes that are fed back into traditional centralized systems.  
 As COs are lightweight, they can be stored and used as receipts (leveraging non-repudiability).
 
 It can also be used to amplify the edge.  
@@ -120,8 +120,8 @@ Use low-overhead edge caching through content-addressing, which allows for effic
 Let the edge work locally, occasionally syncing to server/cloud/infrastructure in a batch.
 
 ## Networking & Synchronization
-### How does peer discovery work in COkit's networking model?
-For general discovery, COkit uses a GossipSub-based protocol to discover/contact peers.  
+### How does peer discovery work in COKIT's networking model?
+For general discovery, COKIT uses a GossipSub-based protocol to discover/contact peers.  
 Local peer discovery is done by utilizing mDNS.
 
 The networking is entirely optional, and one could just use HTTP or a plain filesystem for syncing and transferring blocks.
@@ -131,27 +131,27 @@ For further information, see:
 - [Glossary: mDNS](../glossary/glossary.md#mdns)
 
 ### What networking mode should I use for local, LAN-only collaboration?
-By default, COkit uses mDNS for local device discovery.  
+By default, COKIT uses mDNS for local device discovery.  
 
 For discovery over the internet, a bootstrap peer can be configured that defaults to `bootstrap.1io.com`. Technically, this bootstrap peer exposes a libp2p gossip-sub endpoint.  
 You are free to choose any or no bootstrap peer(s) at all, or to use your own device as bootstrap for your other devices.
 
 Both methods can be used to discover new peers, but they can be changed or disabled depending on your demands.
 
-### Is it possible to run COkit without any network connectivity?
+### Is it possible to run COKIT without any network connectivity?
 Yes.
 
-It is possible to use COkit only with files.  
-COkit requires no strong feature set for file systems - just files.  
+It is possible to use COKIT only with files.  
+COKIT requires no strong feature set for file systems - just files.  
 As each file is content-addressed using its CID, we just need to read and write them.  
-This also makes it possible to just use any cloud storage drive to share the COkit-managed files.
+This also makes it possible to just use any cloud storage drive to share the COKIT-managed files.
 
 For further information, see:
 - [Glossary: content addressing](../glossary/glossary.md#cid)
 - [Key Principles](../introduction/key-principles.md#file-based)
 - [Storage](../reference/storage.md)
 
-### How does COkit handle NAT traversal and firewalls in P2P mode?
+### How does COKIT handle NAT traversal and firewalls in P2P mode?
 This is handled through a variety of possibilities. 
 
 The first option is through a circuit relay.  
@@ -172,7 +172,7 @@ This may cause participants heads to diverge.
 When a peer reconnects, the heads are shared again and the Log joins new heads, deterministically sorting all events to a consistent order, which is then used to recalculate the state.
 
 ## Data & Consensus
-### How are conflicts resolved using Merkle-CRDTs in COkit?
+### How are conflicts resolved using Merkle-CRDTs in COKIT?
 Conflicts are resolved by the [Log](../reference/log.md), which sorts the stream of events by the event's logical clock.
 
 ### Can I define custom consensus logic for my application?
@@ -184,14 +184,14 @@ For further information, see:
 - [Guards](../reference/guards.md)
 - [Consensus](../reference/consensus.md)
 
-### What level of schema validation or migration support does COkit offer?
+### What level of schema validation or migration support does COKIT offer?
 Schema validation is up to the developer of the [Core](../reference/core.md), and can be implemented as desired.  
 Cores can be migrated between versions. The migration itself is just another event that can be implemented in code.
 
 For further information, see:
 - [Core](../reference/core.md#migrations)
 
-### How does COkit manage partial data availability across distributed nodes?
+### How does COKIT manage partial data availability across distributed nodes?
 As all data is represented as a graph, more precisely as a DAG (directed acyclic graph), the data is always accessed top-down.  
 This means that we can fetch more data as we walk down the graph.  
 

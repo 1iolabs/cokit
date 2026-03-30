@@ -17,7 +17,6 @@ co-core-keystore = { workspace = true }
 co-core-membership = { workspace = true }
 co-core-names = { workspace = true }
 co-core-rich-text = { workspace = true }
-co-core-role = { workspace = true }
 co-core-room = { workspace = true }
 co-core-storage = { workspace = true }
 co-guard = { workspace = true, optional = true }

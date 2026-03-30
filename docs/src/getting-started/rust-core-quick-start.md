@@ -27,7 +27,7 @@ We configure the crate-type as [`cdylib`](https://doc.rust-lang.org/reference/li
 "core" = []
 ```
 
-This feature will be activated when compiling the crate to a COkit-compatible WebAssembly binary.
+This feature will be activated when compiling the crate to a COKIT-compatible WebAssembly binary.
 
 ## Implementation
 Now we implement the core in `src/lib.rs`.
