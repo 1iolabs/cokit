@@ -6,4 +6,5 @@
 pub mod cid_resolver;
 pub mod context;
 pub mod core;
+pub mod execute_error;
 pub mod guard;
