@@ -8,9 +8,7 @@ use co_storage::{BlockStorage, StorageError};
 use futures::Stream;
 use serde::de::DeserializeOwned;
 
-/// Stream element of an [`NodeContainer`].
-///
-/// See: [`co_api::DagCollection`]
+/// Stream elements of a [`Streamable`] container.
 pub fn stream<T, N, S>(storage: S, container: &N) -> impl Stream<Item = Result<T, StorageError>> + 'static
 where
 	S: BlockStorage + Sync + Send + Clone + 'static,

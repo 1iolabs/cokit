@@ -121,7 +121,7 @@ impl PartialEq<RelativePath> for Path {
 }
 
 /// Owned  Path.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct PathOwned(String);
 impl PathOwned {
@@ -324,7 +324,7 @@ impl AsRef<AbsolutePath> for str {
 }
 
 /// Owned Absolute Path.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct AbsolutePathOwned(String);
 impl AbsolutePathOwned {

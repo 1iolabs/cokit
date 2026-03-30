@@ -47,10 +47,9 @@ pub use co_primitives::{
 	unixfs_encode_buffer, unixfs_stream, AbsolutePath, AbsolutePathOwned, AnyBlockStorage, Block, BlockSerializer,
 	BlockStat, BlockStorage, BlockStorageExt, CloneWithBlockStorageSettings, CoDate, CoDateRef, CoId, CoInvite, CoList,
 	CoListIndex, CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, CoTryStreamExt,
-	Component, Components, CoreName, DagCollection, DagCollectionAsyncExt, DagCollectionExt, Date, DefaultParams, Did,
-	DynamicCoDate, IsDefault, KnownMultiCodec, KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, NodeStream,
-	OptionLink, Path, PathError, PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag,
-	Tags,
+	Component, Components, CoreName, Date, DefaultParams, Did, DynamicCoDate, IsDefault, KnownMultiCodec, KnownTag,
+	KnownTags, Link, MultiCodec, MultiCodecError, NodeStream, OptionLink, Path, PathError, PathExt, PathOwned,
+	ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag, Tags,
 };
 pub use co_runtime::{
 	co_v1, Core, ExecuteError, GuardReference, RuntimeContext, RuntimeHandle, RuntimeInstance, RuntimePool,

@@ -33,14 +33,6 @@ impl Parse for CoArgs {
 				match CoMacroFeature::try_from(flag.as_str()) {
 					Ok(flag) => {
 						features.insert(flag);
-
-						// verfiy
-						if features.contains(&CoMacroFeature::State) && features.contains(&CoMacroFeature::StateSync) {
-							return Err(syn::Error::new_spanned(
-								arg,
-								"Flags state and state_sync can not be used together",
-							));
-						}
 					},
 					Err(err) => {
 						return Err(err);

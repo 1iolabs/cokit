@@ -6,8 +6,8 @@
 use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
-	async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoTryStreamExt, CoreBlockStorage, IsDefault,
-	LazyTransaction, Link, OptionLink, ReducerAction, TagValue, WeakCid,
+	co, BlockStorage, BlockStorageExt, CoMap, CoTryStreamExt, CoreBlockStorage, IsDefault, LazyTransaction, Link,
+	OptionLink, Reducer, ReducerAction, TagValue, WeakCid,
 };
 use futures::{pin_mut, FutureExt, Stream, StreamExt, TryStreamExt};
 use std::{
@@ -1021,9 +1021,7 @@ mod tests {
 		RichTextAction, Run,
 	};
 	use cid::Cid;
-	use co_api::{
-		async_api::Reducer, BlockStorage, BlockStorageExt, CoTryStreamExt, CoreBlockStorage, Date, ReducerAction,
-	};
+	use co_api::{BlockStorage, BlockStorageExt, CoTryStreamExt, CoreBlockStorage, Date, Reducer, ReducerAction};
 	use co_storage::MemoryBlockStorage;
 	use futures::{StreamExt, TryStreamExt};
 

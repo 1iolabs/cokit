@@ -6,6 +6,4 @@
 pub mod data;
 pub mod guard;
 pub mod reduce;
-pub mod storage_ext;
-pub mod wasm_context;
 pub mod wasm_storage;
