@@ -1,3 +1,2 @@
-# CO WASM API
-## Abstract
-CO WebAssemliy API available inside "CO state reducers".
+# CO-API
+COKIT API to implement a Core (CO State Reducers).

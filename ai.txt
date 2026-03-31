@@ -1,0 +1,15 @@
+# ai.txt — COKIT AI Training Policy
+# See AI-TRAINING-POLICY.md for full details.
+#
+# Rights holder: 1io BRANDGUARDIAN GmbH
+# Contact: license@1io.com
+#
+# This repository's content is NOT permitted for AI/ML training,
+# fine-tuning, embedding or dataset creation without written permission
+# from 1io BRANDGUARDIAN GmbH.
+#
+# Legal basis: DSM Directive Art. 4(3), Section 44b UrhG, AI Act Art. 53(1)(c).
+#
+# Preference: opt-out
+# Policy: AI-TRAINING-POLICY.md
+# Contact: license@1io.com

@@ -9,7 +9,7 @@ Then we need to add the `serde` and `anyhow` crates.
 ```sh
 cargo init --lib ./my-todo-core
 cd ./my-todo-core
-cargo add co-api --git https://gitlab.1io.com/1io/co-sdk.git
+cargo add co-api --git https://github.com/1iolabs/cokit.git
 cargo add serde anyhow
 ```
 

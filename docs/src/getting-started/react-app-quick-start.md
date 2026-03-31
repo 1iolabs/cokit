@@ -101,7 +101,7 @@ export default defineConfig(() => ({
 
 ```sh
 cd src-tauri
-cargo add tauri-plugin-co-sdk --git https://gitlab.1io.com/1io/co-sdk.git --branch main
+cargo add tauri-plugin-co-sdk --git https://github.com/1iolabs/cokit.git --branch main
 ```
 
 5. The COKIT Tauri plugin uses async code, so we also need an async runtime.  

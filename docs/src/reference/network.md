@@ -53,7 +53,7 @@ This can be used to host the CO on a dedicated server/cloud or other infrastruct
 
 Coming soon[^issue-78].
 
-[^issue-78]: [Network: HTTP (#78)](https://gitlab.1io.com/1io/co-sdk/-/issues/78)
+[^issue-78]: [Network: HTTP (#78)](https://gitlab.1io.com/1io/cokit/-/issues/78)
 
 ## Supported Interfaces
 - Ethernet / Wi-Fi (TCP/IP, QUIC)
@@ -61,9 +61,9 @@ Coming soon[^issue-78].
 - WebRTC / WebSocket (Coming soon[^issue-89])
 - Wi-Fi Direct (Coming soon[^issue-90])
 
-[^issue-79]: [Network: Bluetooth (BLE) (#79)](https://gitlab.1io.com/1io/co-sdk/-/issues/79)
-[^issue-89]: [Network: WebRTC (#89)](https://gitlab.1io.com/1io/co-sdk/-/issues/89)
-[^issue-90]: [Network: Wi-Fi Direct (#90)](https://gitlab.1io.com/1io/co-sdk/-/issues/90)
+[^issue-79]: [Network: Bluetooth (BLE) (#79)](https://gitlab.1io.com/1io/cokit/-/issues/79)
+[^issue-89]: [Network: WebRTC (#89)](https://gitlab.1io.com/1io/cokit/-/issues/89)
+[^issue-90]: [Network: Wi-Fi Direct (#90)](https://gitlab.1io.com/1io/cokit/-/issues/90)
 
 ## libp2p
 libp2p is a networking framework that enables the development of P2P applications.  

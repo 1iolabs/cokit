@@ -1434,7 +1434,7 @@ dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
- "co-primitives",
+ "co-primitives 0.1.0",
  "derive_more 0.99.20",
  "futures",
  "futures-timer",
@@ -1451,14 +1451,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-actor"
+version = "0.1.0"
+source = "git+https://gitlab.1io.com/1io/co-sdk.git?branch=main#bf85e7a931b77a7e822c2399415bab67146f1e3b"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "async-trait",
+ "co-primitives 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
+ "derive_more 0.99.20",
+ "futures",
+ "static_assertions",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "co-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
- "co-macros",
- "co-primitives",
+ "co-macros 0.1.0",
+ "co-primitives 0.1.0",
+ "either",
+ "futures",
+ "ipld-core",
+ "multihash-codetable",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "co-api"
+version = "0.1.0"
+source = "git+https://gitlab.1io.com/1io/co-sdk.git?branch=main#bf85e7a931b77a7e822c2399415bab67146f1e3b"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cid 0.11.1",
+ "co-macros 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
+ "co-primitives 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
  "either",
  "futures",
  "ipld-core",
@@ -1476,8 +1514,8 @@ dependencies = [
  "async-stream",
  "async-trait",
  "cid 0.11.1",
- "co-actor",
- "co-primitives",
+ "co-actor 0.1.0",
+ "co-primitives 0.1.0",
  "co-sdk",
  "derive_more 0.99.20",
  "flutter_rust_bridge",
@@ -1511,10 +1549,10 @@ dependencies = [
  "co-core-storage",
  "co-log",
  "co-messaging",
- "co-primitives",
- "co-runtime",
+ "co-primitives 0.1.0",
+ "co-runtime 0.1.0",
  "co-sdk",
- "co-storage",
+ "co-storage 0.1.0",
  "colored",
  "exitcode",
  "futures",
@@ -1552,7 +1590,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
- "co-api",
+ "co-api 0.1.0",
  "futures",
  "ipld-core",
  "num-rational",
@@ -1569,9 +1607,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api",
- "co-runtime",
- "co-storage",
+ "co-api 0.1.0",
+ "co-runtime 0.1.0",
+ "co-storage 0.1.0",
  "ipld-core",
  "serde",
  "serde_repr",
@@ -1588,8 +1626,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api",
- "co-storage",
+ "co-api 0.1.0",
+ "co-storage 0.1.0",
  "futures",
  "ipld-core",
  "serde",
@@ -1606,9 +1644,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api",
- "co-runtime",
- "co-storage",
+ "co-api 0.1.0",
+ "co-runtime 0.1.0",
+ "co-storage 0.1.0",
  "ipld-core",
  "schemars 0.8.22",
  "serde",
@@ -1625,10 +1663,10 @@ dependencies = [
  "anyhow",
  "async-stream",
  "cid 0.11.1",
- "co-api",
- "co-macros",
- "co-runtime",
- "co-storage",
+ "co-api 0.1.0",
+ "co-macros 0.1.0",
+ "co-runtime 0.1.0",
+ "co-storage 0.1.0",
  "futures",
  "ipld-core",
  "serde",
@@ -1648,10 +1686,10 @@ dependencies = [
  "async-stream",
  "async-trait",
  "cid 0.11.1",
- "co-api",
+ "co-api 0.1.0",
  "co-core-co",
- "co-runtime",
- "co-storage",
+ "co-runtime 0.1.0",
+ "co-storage 0.1.0",
  "derive_more 0.99.20",
  "futures",
  "ipld-core",
@@ -1672,8 +1710,8 @@ dependencies = [
  "async-stream",
  "async-trait",
  "cid 0.11.1",
- "co-api",
- "co-storage",
+ "co-api 0.1.0",
+ "co-storage 0.1.0",
  "derive_more 0.99.20",
  "futures",
  "ipld-core",
@@ -1693,10 +1731,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api",
+ "co-api 0.1.0",
  "co-messaging",
- "co-primitives",
- "co-storage",
+ "co-primitives 0.1.0",
+ "co-storage 0.1.0",
  "futures",
  "ipld-core",
  "schemars 0.8.22",
@@ -1716,9 +1754,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
- "co-api",
- "co-runtime",
- "co-storage",
+ "co-api 0.1.0",
+ "co-runtime 0.1.0",
+ "co-storage 0.1.0",
  "futures",
  "ipld-core",
  "serde",
@@ -1738,11 +1776,11 @@ dependencies = [
  "async-trait",
  "cid 0.11.1",
  "clap 4.6.0",
- "co-actor",
+ "co-actor 0.1.0",
  "co-core-co",
  "co-core-membership",
  "co-guard",
- "co-primitives",
+ "co-primitives 0.1.0",
  "co-sdk",
  "dioxus",
  "futures",
@@ -1768,10 +1806,10 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
- "co-api",
- "co-primitives",
- "co-runtime",
- "co-storage",
+ "co-api 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
+ "co-primitives 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
+ "co-runtime 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
+ "co-storage 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
  "serde",
  "thiserror 1.0.69",
  "tracing",
@@ -1785,7 +1823,7 @@ dependencies = [
  "async-trait",
  "cid 0.11.1",
  "co-core-keystore",
- "co-primitives",
+ "co-primitives 0.1.0",
  "did-key 0.2.1 (git+https://github.com/dkuhnert/did-key.rs.git)",
  "didcomm-rs",
  "form_urlencoded",
@@ -1811,8 +1849,8 @@ dependencies = [
  "async-stream",
  "async-trait",
  "cid 0.11.1",
- "co-actor",
- "co-primitives",
+ "co-actor 0.1.0",
+ "co-primitives 0.1.0",
  "futures",
  "ipld-core",
  "serde",
@@ -1836,8 +1874,8 @@ dependencies = [
  "async-trait",
  "cid 0.11.1",
  "co-identity",
- "co-primitives",
- "co-storage",
+ "co-primitives 0.1.0",
+ "co-storage 0.1.0",
  "futures",
  "ipld-core",
  "serde",
@@ -1858,12 +1896,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-macros"
+version = "0.1.0"
+source = "git+https://gitlab.1io.com/1io/co-sdk.git?branch=main#bf85e7a931b77a7e822c2399415bab67146f1e3b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "co-messaging"
 version = "0.1.0"
 dependencies = [
  "cid 0.11.1",
- "co-macros",
- "co-primitives",
+ "co-macros 0.1.0",
+ "co-primitives 0.1.0",
  "ipld-core",
  "schemars 0.8.22",
  "serde",
@@ -1881,10 +1929,10 @@ dependencies = [
  "async-trait",
  "asynchronous-codec",
  "cid 0.11.1",
- "co-actor",
+ "co-actor 0.1.0",
  "co-identity",
- "co-primitives",
- "co-storage",
+ "co-primitives 0.1.0",
+ "co-storage 0.1.0",
  "derive_more 0.99.20",
  "did-key 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
@@ -1924,7 +1972,7 @@ dependencies = [
  "async-trait",
  "bloomfilter",
  "cid 0.11.1",
- "co-macros",
+ "co-macros 0.1.0",
  "criterion",
  "derive_more 0.99.20",
  "either",
@@ -1954,16 +2002,52 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-primitives"
+version = "0.1.0"
+source = "git+https://gitlab.1io.com/1io/co-sdk.git?branch=main#bf85e7a931b77a7e822c2399415bab67146f1e3b"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "async-trait",
+ "bloomfilter",
+ "cid 0.11.1",
+ "co-macros 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
+ "derive_more 0.99.20",
+ "either",
+ "futures",
+ "ipld-core",
+ "ipld-dagpb",
+ "multihash 0.19.3",
+ "multihash-codetable",
+ "num-rational",
+ "ordered-float",
+ "pin-project",
+ "rust-unixfs",
+ "schemars 0.8.22",
+ "serde",
+ "serde_bytes",
+ "serde_ipld_dagcbor",
+ "serde_ipld_dagjson",
+ "serde_json",
+ "serde_repr",
+ "thiserror 1.0.69",
+ "tokio-stream",
+ "tokio-util",
+ "unsigned-varint 0.8.0",
+ "zeroize",
+]
+
+[[package]]
 name = "co-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
- "co-actor",
- "co-api",
- "co-primitives",
- "co-storage",
+ "co-actor 0.1.0",
+ "co-api 0.1.0",
+ "co-primitives 0.1.0",
+ "co-storage 0.1.0",
  "colored",
  "derive_more 0.99.20",
  "futures",
@@ -1989,6 +2073,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "co-runtime"
+version = "0.1.0"
+source = "git+https://gitlab.1io.com/1io/co-sdk.git?branch=main#bf85e7a931b77a7e822c2399415bab67146f1e3b"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cid 0.11.1",
+ "co-actor 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
+ "co-api 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
+ "co-primitives 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
+ "co-storage 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
+ "colored",
+ "derive_more 0.99.20",
+ "futures",
+ "ipld-core",
+ "rust-unixfs",
+ "serde",
+ "serde_bytes",
+ "serde_repr",
+ "target-lexicon 0.12.16",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+ "wasmer",
+]
+
+[[package]]
 name = "co-sdk"
 version = "0.1.0"
 dependencies = [
@@ -1996,7 +2108,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "cid 0.11.1",
- "co-actor",
+ "co-actor 0.1.0",
  "co-core-board",
  "co-core-co",
  "co-core-file",
@@ -2010,9 +2122,9 @@ dependencies = [
  "co-identity",
  "co-log",
  "co-network",
- "co-primitives",
- "co-runtime",
- "co-storage",
+ "co-primitives 0.1.0",
+ "co-runtime 0.1.0",
+ "co-storage 0.1.0",
  "co-test",
  "criterion",
  "derive_more 0.99.20",
@@ -2076,8 +2188,8 @@ dependencies = [
  "blake3",
  "chacha20poly1305",
  "cid 0.11.1",
- "co-actor",
- "co-primitives",
+ "co-actor 0.1.0",
+ "co-primitives 0.1.0",
  "co-test",
  "derive_more 0.99.20",
  "either",
@@ -2105,6 +2217,39 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "co-storage"
+version = "0.1.0"
+source = "git+https://gitlab.1io.com/1io/co-sdk.git?branch=main#bf85e7a931b77a7e822c2399415bab67146f1e3b"
+dependencies = [
+ "aead",
+ "anyhow",
+ "async-stream",
+ "async-trait",
+ "blake3",
+ "chacha20poly1305",
+ "cid 0.11.1",
+ "co-primitives 0.1.0 (git+https://gitlab.1io.com/1io/co-sdk.git?branch=main)",
+ "derive_more 0.99.20",
+ "either",
+ "futures",
+ "ipld-core",
+ "ipld-dagpb",
+ "multihash 0.19.3",
+ "multihash-codetable",
+ "serde",
+ "serde_bytes",
+ "serde_ipld_dagcbor",
+ "serde_ipld_dagjson",
+ "serde_repr",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -3680,11 +3825,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api",
- "co-primitives",
- "co-runtime",
+ "co-api 0.1.0",
+ "co-primitives 0.1.0",
+ "co-runtime 0.1.0",
  "co-sdk",
- "co-storage",
+ "co-storage 0.1.0",
  "ipld-core",
  "serde",
  "thiserror 1.0.69",
@@ -3699,11 +3844,11 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api",
- "co-primitives",
- "co-runtime",
+ "co-api 0.1.0",
+ "co-primitives 0.1.0",
+ "co-runtime 0.1.0",
  "co-sdk",
- "co-storage",
+ "co-storage 0.1.0",
  "ipld-core",
  "serde",
  "thiserror 1.0.69",
@@ -3718,11 +3863,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api",
- "co-primitives",
- "co-runtime",
+ "co-api 0.1.0",
+ "co-primitives 0.1.0",
+ "co-runtime 0.1.0",
  "co-sdk",
- "co-storage",
+ "co-storage 0.1.0",
  "ipld-core",
  "serde",
  "thiserror 1.0.69",
@@ -10371,13 +10516,13 @@ dependencies = [
  "async-trait",
  "cid 0.11.1",
  "clap 4.6.0",
- "co-actor",
+ "co-actor 0.1.0",
  "co-core-co",
  "co-core-membership",
  "co-core-room",
  "co-log",
  "co-messaging",
- "co-primitives",
+ "co-primitives 0.1.0",
  "co-sdk",
  "derive_more 0.99.20",
  "futures",

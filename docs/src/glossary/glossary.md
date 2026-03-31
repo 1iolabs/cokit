@@ -12,7 +12,6 @@ Overview:
 - ***Differs from GPLv3***: AGPLv3 closes the "SaaS loophole" by requiring modified source code to be provided when the software is used over a network.
 - ***Copyleft principle***: Any changes or extensions (including those accessed remotely) must remain under AGPLv3.
 - ***Compatibility***: AGPLv3 is compatible with GPLv3. You can combine AGPLv3 and GPLv3 code, but section 13 ensures that the combined work is covered by the AGPL terms.
-- ***Linking Exception***: An optional addendum that allows proprietary or differently-licensed software to link to AGPLv3 code without forcing the entire application to adopt AGPLv3, granted you don’t modify the interface itself.
 
 For further information, see:
 - [GNU Affero General Public License](https://www.gnu.org/licenses/agpl-3.0.html)
@@ -103,6 +102,15 @@ For further information, see:
 - [Core](../reference/core.md#serialization)
 - [Core API Overview](../usage/api-overview-core.md)
 - [`co-api`](/crate/co_api/index.html)
+
+## GUARD
+GUARD is the optional trust and governance layer for COKIT. It is distributed separately (in the `guard` repository) under a source-available license (not open source). It adds advanced access policy, trust controls, certification hooks, and the Proof-of-Authority consensus guard on top of the open-source COKIT platform.
+
+COKIT works without GUARD.
+
+For further information, see:
+- [Guards](../reference/guards.md)
+- [Legal notice](../license/legal-notice.md)
 
 ## COKIT
 In essence, COKIT is a Software Development Kit written in Rust.

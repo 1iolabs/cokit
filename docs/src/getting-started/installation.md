@@ -76,14 +76,14 @@ This script may duplicate the '[env]' table, which would need to be fixed manual
 COKIT ships pre-built binaries[^issue-94] for its `co` CLI using [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall?tab=readme-ov-file#installation).  
 This means you can install `co` without needing to compile from source:
 ```sh
-cargo binstall co-cli --git https://gitlab.1io.com/1io/co-sdk.git
+cargo binstall co-cli --git https://github.com/1iolabs/cokit.git
 ```
 
-[^issue-94]: [Support cargo binstall (#94)](https://gitlab.1io.com/1io/co-sdk/-/issues/94)
+[^issue-94]: [Support cargo binstall (#94)](https://gitlab.1io.com/1io/cokit/-/issues/94)
 
 Of course, you can build it from source, too:
 ```sh
-cargo install co-cli --git https://gitlab.1io.com/1io/co-sdk.git
+cargo install co-cli --git https://github.com/1iolabs/cokit.git
 ```
 
 ## Building your first app

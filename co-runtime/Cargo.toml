@@ -3,6 +3,11 @@ name = "co-runtime"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.91"
+license = "AGPL-3.0-only"
+homepage = "https://www.cokit.org"
+repository = "https://github.com/1iolabs/cokit.git"
+documentation = "https://www.cokit.org/docs/"
+description = "COKIT WebAssembly Runtime to execute Cores (CO State Reducers)."
 
 [dependencies]
 anyhow = { workspace = true }

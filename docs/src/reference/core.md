@@ -148,11 +148,10 @@ For further information, see:
 - [`co-core-storage`](/crate/co_core_storage/index.html)
 
 #### `co-core-poa`
-Proof-of-authority (PoA) Core.  
+Proof-of-authority (PoA) Core.
 Provides PoA [consensus](../reference/consensus.md) for a CO.
 
-For further information, see:
-- [`co-core-poa`](/crate/co_core_poa/index.html)
+This core is part of **GUARD** (the optional, separately distributed trust and governance layer) and is not included in COKIT by default.
 
 #### `co-core-room`
 Messaging Core.  

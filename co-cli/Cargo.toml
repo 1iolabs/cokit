@@ -3,6 +3,11 @@ name = "co-cli"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.91"
+license = "AGPL-3.0-only"
+homepage = "https://www.cokit.org"
+repository = "https://github.com/1iolabs/cokit.git"
+documentation = "https://www.cokit.org/docs/"
+description = ""
 
 [[bin]]
 name = "co"
@@ -57,7 +62,7 @@ uuid = { workspace = true }
 zstd = { workspace = true, optional = true }
 
 [features]
-default = ["llvm", "wasmi", "pinning", "network"]
+default = ["cranelift", "wasmi", "pinning", "network"]
 zst = ["dep:zstd"]
 
 # sdk

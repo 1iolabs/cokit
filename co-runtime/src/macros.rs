@@ -1,4 +1,6 @@
-/// Any wasmer backend enabled?
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 1io BRANDGUARDIAN GmbH
+
 macro_rules! cfg_wasmer {
     ($($item:item)*) => {
         $(

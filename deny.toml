@@ -1,0 +1,88 @@
+# deny.toml
+# Public baseline policy for the co-sdk repository.
+# Goal:
+# - license-check the public/open-source baseline
+# - keep the allowlist explicit but practical
+# - do NOT silently allow the optional LLVM path
+#
+# If the optional LLVM compiler path is truly removed from the default/public graph,
+# this file should pass once the code changes are present in the checked-out branch.
+
+[graph]
+# Only check the targets you actually publish/build for in the public baseline.
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+]
+
+# Important:
+# - do not use --all-features for the public baseline job
+# - keep dev-dependencies out of the public baseline graph
+all-features = false
+no-default-features = false
+exclude-dev = true
+
+# If some workspace members are not part of the public baseline release,
+# prune them from the graph. Remove entries here if/when you want them
+# to be included in the public license check.
+exclude = [
+  "co-bindings",
+  "co-cli",
+  "tauri-plugin-co-sdk",
+  "example-counter",
+  "example-counter-upgraded",
+  "example-message",
+]
+
+# If unpublished workspace crates should not become roots for the graph,
+# keep this enabled.
+exclude-unpublished = true
+
+[licenses]
+confidence-threshold = 0.8
+unused-allowed-license = "allow"
+
+allow = [
+  "AGPL-3.0-only",
+  "GPL-3.0-only",
+  "GPL-3.0-or-later",
+  "LGPL-3.0-only",
+  "LGPL-3.0-or-later",
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "MPL-2.0",
+  "0BSD",
+  "CC0-1.0",
+  "Unicode-3.0",
+  "Unicode-DFS-2016",
+]
+
+# Prefer narrow per-crate exceptions over broad global allowlisting
+exceptions = [
+  { allow = ["CDLA-Permissive-2.0"], crate = "webpki-roots" },
+]
+
+[licenses.private]
+# Ignore unpublished/private workspace members for the license check
+ignore = true
+
+[advisories]
+unmaintained = "workspace"
+yanked = "warn"
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

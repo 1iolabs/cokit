@@ -1,7 +1,5 @@
-// CONFIDENTIAL — © 1io BRANDGUARDIAN GmbH. Proprietary COkit code/docs for internal use within our company domain and
-// authorized users/tools only; do not copy, disclose, or transmit any part outside this domain. No license is granted
-// by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
-// retention—approved secure tools may process solely for internal use.
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use crate::{state, Action, CoContext, CoReducerFactory, CO_CORE_NAME_MEMBERSHIP, CO_ID_LOCAL};
 use co_actor::Actions;
@@ -83,7 +81,7 @@ async fn joined_initialize(context: &CoContext, id: &CoId, did: Did) -> anyhow::
 
 	// fetch network settings and participants
 	state::stream(storage, &co.network).try_collect::<Vec<_>>().await?;
-	// TODO: participants DAG (https://gitlab.1io.com/1io/co-sdk/-/issues/39)
+	// TODO: participants DAG (https://gitlab.1io.com/1io/cokit/-/issues/39)
 	// state::stream(co_reducer.storage(), &co.participants).try_collect::<Vec<_>>().await?;
 
 	// fetch

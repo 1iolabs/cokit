@@ -1,7 +1,5 @@
-// CONFIDENTIAL — © 1io BRANDGUARDIAN GmbH. Proprietary COkit code/docs for internal use within our company domain and
-// authorized users/tools only; do not copy, disclose, or transmit any part outside this domain. No license is granted
-// by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
-// retention—approved secure tools may process solely for internal use.
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use crate::{
 	Response, ResponseBackPressureStream, ResponseBackPressureStreamReceiver, ResponseReceiver, ResponseStream,
@@ -29,7 +27,7 @@ pub enum ActorError {
 	Actor(#[from] anyhow::Error),
 }
 
-/// Simple actor model implemetation.
+/// Simple actor model implementation.
 /// Accepts messages which will be applied to the actor state.
 /// Actor state is different to the actual actor instance in order to allow initialization of it within the actor
 /// context.
@@ -82,7 +80,6 @@ pub trait Actor: Send + Sync + 'static {
 	}
 
 	/// Spawn actor using a task spawner.
-	/// TODO: to simplyfy lifecycle make async and wait for intitalize?
 	#[track_caller]
 	fn spawn_with(
 		spawner: TaskSpawner,

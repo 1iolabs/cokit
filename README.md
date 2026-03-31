@@ -1,216 +1,85 @@
-# CO
+# COKIT
 
-## Abstract
-CO implementation using the rust progamming language.
+COKIT implementation using the rust programming language.
+
+## Project Status
+
+**Status: Early Public Release** — COKIT is under active development.
+APIs may change. Use in production at your own discretion.
 
 ## Usage
 
-### Define a COre data structure
+### Define a Core data structure
 
 ```rust
-#[derive(CoreType)]
-struct Todos {
-    next_todo_id: u64,
-    todos: CoreVec<Todo>,
+use co_api::{async_api::Reducer, co, BlockStorageExt, CoMap, CoreBlockStorage, Link, OptionLink, ReducerAction};
+
+/// Todo task actions.
+#[co]
+pub enum TodoAction {
+	TaskCreate(TodoTask),
+	TaskDone { id: String },
+	TaskUndone { id: String },
+	TaskSetTitle { id: String, title: String },
+	TaskDelete { id: String },
+	DeleteAllDoneTasks,
 }
 
-#[derive(CoreType)]
-struct Todo {
-    id: u64,
-    title: String,
-    done: bool,
+/// A todo task.
+#[co]
+pub struct TodoTask {
+	/// Task UUID.
+	pub id: String,
+	/// Task title.
+	pub title: String,
+	/// Whether the task is done.
+	pub done: bool,
 }
 
-#[derive(CoreAction)]
-enum TodosAction {
-    /// Create TODO.
-    Create { title: String },
-
-    /// Set done state of a TODO.
-    SetDone { id: u64, done: bool },
-
-    /// Delete one TODO.
-    Delete { id: u64 },
-
-    /// Delete all TODOs which are done.
-    DeleteDone,
+/// The todo core state.
+#[co(state)]
+pub struct Todo {
+	/// Tasks.
+	pub tasks: CoMap<String, TodoTask>,
 }
-
-impl Reducer<TodosAction> for Todos {
-    type Action = TodosAction;
-
-	fn reduce(mut self, event: &ReducerAction<Self::Action>, context: &mut dyn Context) -> Self {
-        match event.action {
-            TodosAction::Create { title } => {
-                let id = self.next_todo_id;
-                self.next_todo_id = self.next_todo + 1;
-                self.todos.push(context, Todo { id, title, done: false })
-            },
-            TodosAction::SetDone { id, done } => {
-                self.todos.update_one(
-                    context,
-                    |todo| todo.id == id,
-                    |toto| {
-                        todo.done = done;
-                    }
-                );
-            },
-            TodosAction::Delete { id } => {
-               self.todos.delete_one(context, |todo| todo.id == id);
-            },
-            TodosAction::DeleteDone => {
-               self.todos.delete_many(context, |todo| todo.done);
-            },
-        }
-        self
-    }
-}
-```
-
-#### Possible Rust with API style
-```rust
-impl Todos {
-    #[reducer]
-    fn create(&mut self, title: String, context: &mut dyn Context) {
-        let id = self.next_todo_id;
-        self.next_todo_id = self.next_todo + 1;
-        self.todos.push(context, Todo { id, title, done: false })
-    }
-
-    #[reducer]
-    fn set_done(&mut self, id: u64, done: bool, context: &mut dyn Context) {
-        self.todos.update_one(
-            context,
-            |todo| todo.id == id,
-            |toto| {
-                todo.done = done;
-            }
-        );
-    }
-
-    #[reducer]
-    fn delete(&mut self,  id: u64, context: &mut dyn Context) {
-        self.todos.delete_one(context, |todo| todo.id == id);
-    },
-
-    #[reducer]
-    fn delete_done(&mut self, context: &mut dyn Context) {
-        self.todos.delete_many(context, |todo| todo.done);
-    }
+impl Reducer<TodoAction> for Todo {
+	async fn reduce(
+		state_link: OptionLink<Self>,
+		event_link: Link<ReducerAction<TodoAction>>,
+		storage: &CoreBlockStorage,
+	) -> Result<Link<Self>, anyhow::Error> {
+		let event = storage.get_value(&event_link).await?;
+		let mut state = storage.get_value_or_default(&state_link).await?;
+		let mut tasks = state.tasks.open(storage).await?;
+		match event.payload {
+			TodoAction::TaskCreate(todo_task) => {
+				tasks.insert(todo_task.id.clone(), todo_task).await?;
+			},
+			TodoAction::TaskDone { id } => {
+				tasks.update(id, move |task| task.done = true).await?;
+			},
+			TodoAction::TaskUndone { id } => {
+				tasks.update(id, move |task| task.done = false).await?;
+			},
+			TodoAction::TaskSetTitle { id, title } => {
+				tasks.update(id, move |task| task.title = title).await?;
+			},
+			TodoAction::TaskDelete { id } => {
+				tasks.remove(id).await?;
+			},
+			TodoAction::DeleteAllDoneTasks => {
+				tasks.remove_stream(tasks.stream_filter(|task| task.done)).await?;
+			},
+		}
+		state.tasks = tasks.store().await?;
+		Ok(storage.set_value(&state).await?)
+	}
 }
 ```
 
-#### Possible Assembly Script
-
-#### 1
-
-```typescript
-@state
-interface Todos {
-    next_todo_id: number;
-    todos: CoreVec<Todo>;
-}
-
-interface Todo {
-    id: number;
-    title: String;
-    done: bool;
-}
-
-@action
-function create(state: Todos, title: String) {
-    let id = state.next_todo_id;
-    state.next_todo_id = state.next_todo + 1;
-    state.todos.push({id, title, done: false});
-}
-
-@action
-function set_done(state: Todos, done: bool) {
-    const id = state.next_todo_id;
-    state.next_todo_id = state.next_todo + 1;
-    state.todos.update_one(
-        (todo) => todo.id == id,
-        (toto) => {
-            todo.done = done;
-        }
-    );
-}
-```
-
-#### 2
-
-Schema:
-
-```typescript
-import { CoList, Co } from "co/core";
-
-export interface ShoppingListItem {
-  id: string;
-  title: string;
-  done: boolean;
-}
-
-export interface ShoppingList extends Co {
-  items: CoList<ShoppingListItem>;
-}
-```
-
-Reducer:
-
-```typescript
-import { defineReducer } from "co/core";
-import { ShoppingList } from "./schema";
-
-export const actions = {
-  addItem: defineReducer((state: ShoppingList, { id, title }) => {
-    state.items.push({ id, title, done: false });
-  }),
-  markAsDone: defineReducer((state: ShoppingList, { id }) => {
-    state.items.updateOne(
-      (item) => item.id == id,
-      (item) => item.done = true,
-    );
-  })
-}
-```
-
-### Build an Application
-
-```typescript
-function Todos({co}) {
-    // read
-    const {title, todos} = useCoSelector(co, "todos", (storage, core) => {
-        let state = await storage.get<Todos>(core);
-        let todos = storage.entries<Todo>(state.todos);
-        return {title: state.title, todos }
-    });
-
-    // write
-    const api = useCoApi<Todos>();
-    const [create, setCreate] = useState("");
-    const onCreate = useCallback(
-        () => {
-            api.dispatch(TodosAction.Create { title: create });
-            setCreate("");
-        },
-        [api, setCreate]
-    );
-
-    // render
-    return (
-        <section>
-            <h2>TODOs: {title}</h2>
-            {todos.map(todo => (
-                <Todo key={todo.id} todo={todo} />
-            ))}
-            <form>
-                <input name="title" value={create} onchange={title => setCreate(title)} />
-                <button type="submit" onclick={onCreate}>Add</button>
-            </form>
-        </section>
-    );
-}
-```
+For further information, see:
+- [Example Todo List](https://gitlab.1io.com/1io/example-todo-list)
+- [Documentation](https://www.cokit.org/docs/)
 
 ## Development
 
@@ -221,7 +90,6 @@ Dependencies:
 - `rustfmt`
 - `wasm32-unknown-unknown` to build cores.
 - `toolchain nightly` to use `rustfmt +nightly`
-- `llvm-21`
 
 Commands:
 ```shell
@@ -231,28 +99,21 @@ rustup toolchain install nightly
 rustup component add --toolchain nightly rustfmt
 ```
 
-MacOS:
-```shell
-brew install llvm@21
-echo "Add environment to `.cargo/config.toml` file:"
-echo "[env]"
-echo "LLVM_SYS_211_PREFIX = \"$("brew" "--prefix" "llvm@21")\""
-```
+## Licensing
 
-### Rust
+COKIT is the open-source platform core and is released under **AGPL-3.0-only**.
 
-#### Features (MSRV)
-- `1.82`: https://blog.rust-lang.org/2024/10/17/Rust-1.82.0.html#precise-capturing-use-syntax
+GUARD is maintained in a separate repository (`guard`) under separate licensing terms.
+It is **not** part of the open-source licensing of this repository.
 
-### Utility
+Commercial licensing, support and enterprise terms may be available from **1io BRANDGUARDIAN GmbH**, any **successor in title to the relevant rights**, or any **affiliate expressly authorized by the relevant rights holder**.
 
-fmt:
-```shell
-cargo +nightly fmt --check
-```
+Commercial contact: `license@1io.com`  
+More information: <https://www.cokit.org>
 
-## Log
+Additional repository-specific context for this first public AGPL release is provided in:
+- `LICENSE.md`
+- `NOTICE.md`
+- `AI-TRAINING-POLICY.md`
 
-```shell
-tail -f data/log/co.log | bunyan -c '!/^(libp2p|hickory_proto|dioxus_core|log|quinn|tower|tonic|h2|hyper|quinn_proto|tokio_util::codec::framed_impl)/.test(this.target)'
-```
+Copyright (C) 2020-2026 1io BRANDGUARDIAN GmbH

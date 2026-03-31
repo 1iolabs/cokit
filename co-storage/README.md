@@ -1,3 +1,2 @@
-# CO Storage
-## Abstract
-Content addressed block storage.
+# co-storage
+COKIT content addressed block storage implementations.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 1io BRANDGUARDIAN GmbH
+
 use co_primitives::{cid_to_raw, raw_to_cid, BlockSerializer, RawCid, Storage};
 use serde::{de::DeserializeOwned, Serialize};
 

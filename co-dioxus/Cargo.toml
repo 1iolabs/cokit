@@ -4,6 +4,11 @@ version = "0.1.0"
 authors = ["DK <34+dk@users.noreply.1io.com>"]
 edition = "2021"
 rust-version = "1.91"
+license = "AGPL-3.0-only"
+homepage = "https://www.cokit.org"
+repository = "https://github.com/1iolabs/cokit.git"
+documentation = "https://www.cokit.org/docs/"
+description = "High level components for using COKIT in dioxus applications."
 
 [dependencies]
 anyhow = { workspace = true }

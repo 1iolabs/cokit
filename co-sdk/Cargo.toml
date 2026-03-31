@@ -3,6 +3,11 @@ name = "co-sdk"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.91"
+license = "AGPL-3.0-only"
+homepage = "https://www.cokit.org"
+repository = "https://github.com/1iolabs/cokit.git"
+documentation = "https://www.cokit.org/docs/"
+description = "Open-source local-first, peer-to-peer collaboration SDK from 1io."
 
 [dependencies]
 anyhow = { workspace = true }

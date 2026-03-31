@@ -50,6 +50,16 @@ check:
   script:
     - ./ci/scripts/check-web.sh
 
+# check licenses
+license:
+  stage: lint
+  image: ${DOCKERFILE_IMAGE}
+  cache:
+    <<: *global_cache
+  script:
+    - cargo install cargo-deny --locked || true
+    - cargo deny check licenses
+
 # verify all tests are running to success
 test:
   stage: test

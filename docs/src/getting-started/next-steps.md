@@ -136,4 +136,4 @@ const ProfileForm = () => {
 The [Core](../reference/core.md) ensures the email format is correct, and optional constraints like uniqueness or required fields can be enforced at runtime through WASM-based validation.
 
 ### Peer-to-Peer Messaging Application
-One obvious, cool use for COKIT is building a messaging application. We have already built a demo for such a use case that you can check out here: [Gitlab](https://gitlab.1io.com/1io/co-sdk/-/tree/tauri-messenger-demo/tauri-plugin-co-sdk/examples/messenger)
+One obvious, cool use for COKIT is building a messaging application. We have already built a demo for such a use case that you can check out here: [Gitlab](https://github.com/1iolabs/cokit/tree/tauri-messenger-demo/tauri-plugin-co-sdk/examples/messenger)

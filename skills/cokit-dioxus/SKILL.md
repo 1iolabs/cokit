@@ -1,33 +1,33 @@
 ---
 name: cokit-dioxus
 description: >-
-  Guides planning and implementation for Dioxus applications built with COkit's co-dioxus
+  Guides planning and implementation for Dioxus applications built with COKIT's co-dioxus
   crate. Covers initialization (CoContext, CoSettings), all co-dioxus hooks (use_co,
   use_cos, use_selector, use_selector_state, use_selectors, use_selector_states,
   use_co_reducer_state, use_co_id, use_did_key_identity, use_co_context), the reactive
   data-flow model, hierarchical DAG state access, dispatching actions, creating COs,
   and cross-platform feature flags.
-  Enforces COkit-specific Dioxus rules: no optimistic rendering, no copied state, no
-  global AppState, CoKit as single source of truth, hooks for all state, derive state
+  Enforces COKIT-specific Dioxus rules: no optimistic rendering, no copied state, no
+  global AppState, COKIT as single source of truth, hooks for all state, derive state
   reactively.
   Trigger this skill whenever the user is building, planning, or modifying a Dioxus
-  application that uses co-dioxus, or asks about using COkit with Dioxus, even if they
-  just say "dioxus component" or "add a view" in a COkit project context.
+  application that uses co-dioxus, or asks about using COKIT with Dioxus, even if they
+  just say "dioxus component" or "add a view" in a COKIT project context.
 ---
 
-# COkit Dioxus Integration
+# COKIT Dioxus Integration
 
-For general COkit concepts (COs, Cores, Log, Identity, Permissions, etc.) see the
+For general COKIT concepts (COs, Cores, Log, Identity, Permissions, etc.) see the
 [cokit skill](../cokit/SKILL.md). This skill focuses on the Dioxus integration layer.
 
 ## Architecture Overview
 
-`co-dioxus` bridges COkit and Dioxus 0.7. It runs the COkit `Application` on a
+`co-dioxus` bridges COKIT and Dioxus 0.7. It runs the COKIT `Application` on a
 dedicated thread (native) or via `wasm_bindgen_futures` (web), communicates through
 an actor-based message channel, and exposes CO state as reactive Dioxus signals.
 
 ```
-Dioxus UI thread                    COkit thread
+Dioxus UI thread                    COKIT thread
   +-----------+    mpsc channel     +-------------+
   | CoContext  | =================> | Application |
   | (hooks)   | <--- signals ---   | (Cores,     |
@@ -37,7 +37,7 @@ Dioxus UI thread                    COkit thread
 ```
 
 The `CoContext` is a Dioxus context provider. Hooks subscribe to CO state via
-`SyncSignal`s that the COkit actor updates whenever the underlying Log changes.
+`SyncSignal`s that the COKIT actor updates whenever the underlying Log changes.
 
 ## Initialization
 
@@ -87,7 +87,7 @@ Target features and what they enable:
 ## Reactivity Rules
 
 These rules are fundamental to how co-dioxus applications work. They stem from how
-COkit handles data: COs are local-first and always available, so the patterns common
+COKIT handles data: COs are local-first and always available, so the patterns common
 in client-server apps (optimistic updates, caching layers, global state stores) are
 unnecessary and actively harmful.
 
@@ -106,7 +106,7 @@ This is a core Dioxus principle (Pillar 3 of reactivity). Rendering must be a pu
 function of state. Side effects and state mutations belong in event handlers and
 callbacks, not in the render path.
 
-### 3. CoKit is the single source of truth
+### 3. COKIT is the single source of truth
 
 All application state that matters lives in COs. The UI reads state through selectors
 and writes state through dispatched actions. This is the only data flow.
@@ -137,7 +137,7 @@ bypasses the reactive pipeline and creates race conditions.
 
 ## Hierarchical State and the DAG
 
-COkit state is organized as a DAG (Directed Acyclic Graph) of content-addressed blocks.
+COKIT state is organized as a DAG (Directed Acyclic Graph) of content-addressed blocks.
 This maps naturally to how most apps structure data hierarchically. The two selector
 hooks are designed around this:
 
@@ -610,11 +610,11 @@ use std::future::ready;
 
 ## Dependency Setup
 
-COkit crates are NOT on crates.io. Add via git:
+COKIT crates are NOT on crates.io. Add via git:
 
 ```sh
 cargo add co-sdk co-dioxus co-core-membership co-core-co \
-  --git https://gitlab.1io.com/1io/co-sdk.git
+  --git https://github.com/1iolabs/cokit.git
 ```
 
 Additional useful dependencies:
@@ -635,5 +635,5 @@ For advanced operations beyond the standard hook-based workflow, see
 ## For Deeper Reference
 
 - Full todo app example: `https://gitlab.1io.com/1io/example-todo-list`
-- co-dioxus source: `co-dioxus/src/` in the co-sdk repository
-- COkit domain concepts: see [cokit skill](../cokit/SKILL.md) and its references
+- co-dioxus source: `co-dioxus/src/` in the cokit repository
+- COKIT domain concepts: see [cokit skill](../cokit/SKILL.md) and its references

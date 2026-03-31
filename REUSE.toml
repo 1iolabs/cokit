@@ -1,0 +1,14 @@
+version = 1
+
+[[annotations]]
+path = ["**/*.rs"]
+SPDX-FileCopyrightText = "2026 1io BRANDGUARDIAN GmbH"
+SPDX-License-Identifier = "AGPL-3.0-only"
+
+[[annotations]]
+path = ["**/*.toml", "**/*.yml", "**/*.yaml", "**/*.json", "**/*.md", "**/*.txt", "**/*.sh"]
+SPDX-FileCopyrightText = "2026 1io BRANDGUARDIAN GmbH"
+SPDX-License-Identifier = "AGPL-3.0-only"
+
+# If specific crates later move to MIT OR Apache-2.0, override them here
+# with crate-specific annotations or per-file SPDX headers.

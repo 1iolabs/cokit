@@ -16,7 +16,7 @@ COKIT provides a pluggable networking layer with optional components:
 	- When devices are able to connect locally (LAN, Wifi, Bluetooth[^issue-79], ...) no internet is used.
 - [Configurable connectivity](../reference/network.md#network-configuration) per [CO](../reference/co.md)
 
-[^issue-79]: [Network: Bluetooth (BLE) (#79)](https://gitlab.1io.com/1io/co-sdk/-/issues/79)
+[^issue-79]: [Network: Bluetooth (BLE) (#79)](https://gitlab.1io.com/1io/cokit/-/issues/79)
 
 ## Flexible Sync And Data Integrity
 - Conflict-Free Collaboration

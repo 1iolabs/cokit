@@ -1,7 +1,5 @@
-// CONFIDENTIAL — © 1io BRANDGUARDIAN GmbH. Proprietary COkit code/docs for internal use within our company domain and
-// authorized users/tools only; do not copy, disclose, or transmit any part outside this domain. No license is granted
-// by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
-// retention—approved secure tools may process solely for internal use.
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use anyhow::{anyhow, Context};
 use cid::Cid;
@@ -136,15 +134,6 @@ impl BuildCoreArtifact {
 		self.store_artifact(&storage).await
 	}
 }
-
-// // {"reason":"compiler-artifact","package_id":"path+file:///Users/dominik/Workspaces/test/co/examples/counter#example-counter@0.1.0","manifest_path":"/Users/dominik/Workspaces/test/co/examples/counter/Cargo.toml","target":{"kind":["lib","cdylib"],"crate_types":["lib","cdylib"],"name":"example_counter","src_path":"/Users/dominik/Workspaces/test/co/examples/counter/src/lib.rs","edition":"2021","doc":true,"doctest":true,"test":true},"profile":{"opt_level":"3","debuginfo":0,"debug_assertions":false,"overflow_checks":false,"test":false},"features":[],"filenames":["/Users/dominik/Workspaces/test/co/co-sdk/../target-wasm/wasm32-unknown-unknown/release/libexample_counter.rlib","/Users/dominik/Workspaces/test/co/co-sdk/../target-wasm/wasm32-unknown-unknown/release/example_counter.wasm"],"executable":null,"fresh":true}
-// #[derive(Debug, Deserialize)]
-// struct BuildOutput {
-// 	reason: String,
-// 	manifest_path: String,
-// 	#[serde(default)]
-// 	filenames: Vec<PathBuf>,
-// }
 
 #[derive(Debug, Deserialize)]
 struct Cargo {

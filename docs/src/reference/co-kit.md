@@ -40,56 +40,55 @@ High-level architecture overview.
 ### Libraries to build on top of COKIT
 These are the main crates that are used to build on top of COKIT:
 
-- [co-sdk](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-sdk): The main package to develop COKIT based applications.
-- [co-api](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-api): The main package to develop Cores.
+- [co-sdk](https://github.com/1iolabs/cokit/tree/main/co-sdk): The main package to develop COKIT based applications.
+- [co-api](https://github.com/1iolabs/cokit/tree/main/co-api): The main package to develop Cores.
 
 ### Command line
 Utilities to accelerate development and integrations.
 
-- [co-cli](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-cli): `co` command-line interface to interact with COs from the command line.
-- [daemon](https://gitlab.1io.com/1io/co-sdk/-/tree/main/daemon): HTTP daemon that exposes COs as HTTP API.
+- [co-cli](https://github.com/1iolabs/cokit/tree/main/co-cli): `co` command-line interface to interact with COs from the command line.
 
 ### Framework integrations
 Ready-to-use COKIT integrations for different platforms and frameworks.
 
-- [co-dioxus](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-dioxus): Integrations and hooks for Dioxus.
-- [tauri-plugin-co-sdk](https://gitlab.1io.com/1io/co-sdk/-/tree/main/tauri-plugin-co-sdk): Integrations and hooks for Tauri and React.
+- [co-dioxus](https://github.com/1iolabs/cokit/tree/main/co-dioxus): Integrations and hooks for Dioxus.
+- [tauri-plugin-co-sdk](https://github.com/1iolabs/cokit/tree/main/tauri-plugin-co-sdk): Integrations and hooks for Tauri and React.
 - co-swift[^issue-95]: Integrations for macOS and iOS application development (Coming soon).
 - co-android[^issue-96]: Integrations for Android application development (Coming soon).
 
-[^issue-95]: [Swift Bindings](https://gitlab.1io.com/1io/co-sdk/-/issues/95)
-[^issue-96]: [Android Bindings](https://gitlab.1io.com/1io/co-sdk/-/issues/96)
+[^issue-95]: [Swift Bindings](https://gitlab.1io.com/1io/cokit/-/issues/95)
+[^issue-96]: [Android Bindings](https://gitlab.1io.com/1io/cokit/-/issues/96)
 
 ### Network and Sync
 These are the necessary components to enable the distributed use of COs.
 
-- [co-network](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-network): Peer-to-Peer networking implementation.
-- [co-log](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-log): Merkle-CRDT log (event stream) implementation.
+- [co-network](https://github.com/1iolabs/cokit/tree/main/co-network): Peer-to-Peer networking implementation.
+- [co-log](https://github.com/1iolabs/cokit/tree/main/co-log): Merkle-CRDT log (event stream) implementation.
 
 ### Storage and Encryption
 Storage in COKIT is content-addressed.
 
-- [co-storage](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-storage): BlockStorage implementations. Including filesystem, memory and encryption.
+- [co-storage](https://github.com/1iolabs/cokit/tree/main/co-storage): BlockStorage implementations. Including filesystem, memory and encryption.
 
 ### Identity
 Identities in COKIT are fully decentralized.
 
-- [co-identity](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-identity): [DID](../glossary/glossary.md#did) Integration, DIDComm primitives and [DID](../glossary/glossary.md#did) methods supported by default.
+- [co-identity](https://github.com/1iolabs/cokit/tree/main/co-identity): [DID](../glossary/glossary.md#did) Integration, DIDComm primitives and [DID](../glossary/glossary.md#did) methods supported by default.
 
 ### Built-in Cores
 COKIT ships with built-in cores that are either used to build/further develop COKIT itself, or which are useful in general when building applications.
 
-- [cores](https://gitlab.1io.com/1io/co-sdk/-/tree/main/cores): The built-in cores with a description file of the current CIDs.
+- [cores](https://github.com/1iolabs/cokit/tree/main/cores): The built-in cores with a description file of the current CIDs.
 
 ### Internals
 Packages for internals of COKIT. These are used by contributors of COKIT.
 
-- [co-primitives](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-primitives): Primitives used throughout the [`co-sdk`](/crate/co_sdk/index.html) and [`co-api`](/crate/co_api/index.html) and [Core](../reference/core.md) implementations.
-- [co-macros](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-macros): Macro implementations.
-- [co-actor](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-actor): Very lightweight actor abstraction over [tokio](../glossary/glossary.md#tokio) channels. Used to model local services.
-- [co-runtime](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-runtime): WebAssembly runtime implementation.
-- [co-messaging](https://gitlab.1io.com/1io/co-sdk/-/tree/main/co-messaging): Matrix-compatible messaging primitives. Used in [co-core-room](../reference/core.md#co-core-room).
+- [co-primitives](https://github.com/1iolabs/cokit/tree/main/co-primitives): Primitives used throughout the [`co-sdk`](/crate/co_sdk/index.html) and [`co-api`](/crate/co_api/index.html) and [Core](../reference/core.md) implementations.
+- [co-macros](https://github.com/1iolabs/cokit/tree/main/co-macros): Macro implementations.
+- [co-actor](https://github.com/1iolabs/cokit/tree/main/co-actor): Very lightweight actor abstraction over [tokio](../glossary/glossary.md#tokio) channels. Used to model local services.
+- [co-runtime](https://github.com/1iolabs/cokit/tree/main/co-runtime): WebAssembly runtime implementation.
+- [co-messaging](https://github.com/1iolabs/cokit/tree/main/co-messaging): Matrix-compatible messaging primitives. Used in [co-core-room](../reference/core.md#co-core-room).
 
 ### Documentation
 
-- [docs](https://gitlab.1io.com/1io/co-sdk/-/tree/main/docs): We used the [mdBook](https://rust-lang.github.io/mdBook/) sources for this documentation.
+- [docs](https://github.com/1iolabs/cokit/tree/main/docs): We used the [mdBook](https://rust-lang.github.io/mdBook/) sources for this documentation.

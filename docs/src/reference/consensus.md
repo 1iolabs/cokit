@@ -44,7 +44,7 @@ While conventional databases normally provide finality by default (i.e. when a c
 ## Proof of Authority
 Proof of Authority (PoA) is the built-in consensus mechanism used in COKIT.
 
-It is implemented in the [`co-core-poa`](/crate/co_core_poa/index.html) Core.
+It is implemented in the `co-core-poa` Core, which is part of **GUARD** — the optional, separately distributed trust and governance layer. See [Guards](../reference/guards.md) for licensing details.
 
 When the creator of a CO adds this Core, the authority can be specified as a list of DIDs.
 This authority is then responsible for voting — and once a majority is reached on a checkpoint, it is finalized.
@@ -82,5 +82,5 @@ When collaborating globally, even across continents (e.g. Europe, North America,
 - [Guards](../reference/guards.md)
 
 
-[^issue-87]: [Consensus: Manual (#87)](https://gitlab.1io.com/1io/co-sdk/-/issues/87)
-[^issue-88]: [Consensus: Public (#88)](https://gitlab.1io.com/1io/co-sdk/-/issues/88)
+[^issue-87]: [Consensus: Manual (#87)](https://gitlab.1io.com/1io/cokit/-/issues/87)
+[^issue-88]: [Consensus: Public (#88)](https://gitlab.1io.com/1io/cokit/-/issues/88)

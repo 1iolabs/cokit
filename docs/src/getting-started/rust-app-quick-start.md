@@ -41,7 +41,7 @@ dx new my-todo-app --subtemplate Bare-Bones -o is_fullstack=false -o is_router=f
 2. In the `my-todo-app` folder, install `co-sdk`, `co-core-membership`, `co-core-co` and `co-dioxus` (the dioxus integration) as dependencies:
 ```sh
 cd my-todo-app
-cargo add co-sdk co-dioxus co-core-membership co-core-co --git https://gitlab.1io.com/1io/co-sdk.git
+cargo add co-sdk co-dioxus co-core-membership co-core-co --git https://github.com/1iolabs/cokit.git
 ```
 3. Install our to-do list Core as a dependency:
 ```sh

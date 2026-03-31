@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 1io BRANDGUARDIAN GmbH
+
 use crate::{CoContext, CO_CORE_NAME_MEMBERSHIP};
 use co_core_membership::{MembershipOptions, MembershipsAction};
 use co_identity::{Identity, IdentityBox, PrivateIdentityBox};

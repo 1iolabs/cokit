@@ -1,7 +1,5 @@
-// CONFIDENTIAL — © 1io BRANDGUARDIAN GmbH. Proprietary COkit code/docs for internal use within our company domain and
-// authorized users/tools only; do not copy, disclose, or transmit any part outside this domain. No license is granted
-// by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
-// retention—approved secure tools may process solely for internal use.
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use crate::{actor::ActorMessage, ActorError, ActorHandle, ActorState, LocalTaskHandle, LocalTaskSpawner};
 use co_primitives::Tags;
@@ -12,7 +10,7 @@ use tokio_with_wasm::alias as tokio;
 use tracing::Instrument;
 
 /// A LocalActor will not moved between threads.
-/// This is sometimes neccesarry when interfacing with external code.
+/// This is sometimes necessary when interfacing with external code.
 /// This trait allows to implement such behaviour with same public interface as a normal [`Actor`] ([`ActorHandle`]).
 /// For new code that dont have this requirement is usually better to use [`Actor`] as it allows to use multithreading.
 #[allow(async_fn_in_trait)]

@@ -2,10 +2,13 @@
 name = "tauri-plugin-co-sdk"
 version = "0.1.0"
 description = "Tauri plugin to access co sdk functionality"
-authors = ["you"]
 edition = "2021"
 exclude = ["/examples", "/webview-dist", "/webview-src", "/node_modules"]
 links = "tauri-plugin-co-sdk"
+license = "AGPL-3.0-only"
+homepage = "https://www.cokit.org"
+repository = "https://github.com/1iolabs/cokit.git"
+documentation = "https://www.cokit.org/docs/"
 
 [dependencies]
 anyhow = { workspace = true }

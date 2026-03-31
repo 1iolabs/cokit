@@ -1,7 +1,5 @@
-// CONFIDENTIAL — © 1io BRANDGUARDIAN GmbH. Proprietary COkit code/docs for internal use within our company domain and
-// authorized users/tools only; do not copy, disclose, or transmit any part outside this domain. No license is granted
-// by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
-// retention—approved secure tools may process solely for internal use.
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use co_identity::{IdentityResolver, LocalIdentityResolver};
 use co_log::{IdentityEntryVerifier, Log};
@@ -9,7 +7,7 @@ use co_storage::MemoryBlockStorage;
 
 /// Test unseen but already integrated joins.
 ///
-/// See: https://gitlab.1io.com/1io/co-sdk/-/issues/57
+/// See: https://gitlab.1io.com/1io/cokit/-/issues/57
 #[tokio::test]
 async fn test_previous_heads() {
 	let identities = LocalIdentityResolver::new();

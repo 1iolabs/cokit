@@ -1,10 +1,12 @@
 words = [
+    "agpl",
     "autonat",
     "backpressure",
     "bitswap",
     "brandguardian",
     "cbor",
     "clippy",
+    "cokit",
     "cranelift",
     "dcutr",
     "didcomm",
@@ -23,4 +25,4 @@ words = [
     "wasmi",
     "webrtc",
 ]
-ignore_patterns = ["COkit|BRANDGUARDIAN GmbH|AGPLv3|libp2p"]
+ignore_patterns = ["COKIT|BRANDGUARDIAN GmbH|AGPLv3|libp2p"]

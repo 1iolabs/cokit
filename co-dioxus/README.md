@@ -1,12 +1,12 @@
 # CO Dioxus
 
-High level components for using CO-kit in dioxus applications.
+High level components for using COKIT in dioxus applications.
 
 ## Usage
 
 ### Initialize the application
 
-To initialize CO-kit create a new `CoContext` and provide it to the app as context.
+To initialize COKIT create a new `CoContext` and provide it to the app as context.
 
 ```rust
 use co_dioxus::{CoContext, CoSettings};
@@ -23,7 +23,7 @@ fn main() {
 
 ### Select data from a CO
 
-Most interactions with CO-kit are done using hooks.
+Most interactions with COKIT are done using hooks.
 
 ```rust
 use co_dioxus::{use_co, use_did_key_identity, use_selector, CoContext};

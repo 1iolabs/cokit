@@ -117,7 +117,7 @@ tauri-plugin-co-sdk = { path = "tauri-plugin-co-sdk" }
 
 # force dependencies to use local crates if they reference them
 #  required to make co-guard work
-[patch."https://gitlab.1io.com/1io/co-sdk.git"]
+[patch."https://gitlab.1io.com/1io/cokit.git"]
 co-actor = { path = "co-actor" }
 co-api = { path = "co-api" }
 co-cli = { path = "co-cli" }
@@ -128,7 +128,6 @@ co-core-keystore = { path = "cores/keystore" }
 co-core-membership = { path = "cores/membership" }
 co-core-names = { path = "cores/names" }
 co-core-rich-text = { path = "cores/rich-text" }
-co-core-role = { path = "cores/role" }
 co-core-room = { path = "cores/room" }
 co-core-storage = { path = "cores/storage" }
 co-dioxus = { path = "co-dioxus" }

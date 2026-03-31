@@ -23,12 +23,27 @@ For further information, see:
 - [1io.com](https://1io.com/)
 
 ### Is COKIT open-source? Under what license is it distributed?
-Yes COKIT is open-source.
+**COKIT** is open source under **AGPL-3.0-only**.
 
-We use APLGv3 as the license of choice.
+Optional trust and governance components, collectively called **GUARD**, will be distributed separately (in the `guard` repository) under a source-available license. GUARD is not open source.
 
 For further information, see:
 - [Legal Notice](../license/legal-notice.md)
+
+### What does AGPL mean for my application?
+If you modify COKIT and make it available as a network service, AGPL requires you to make your modifications available under AGPL. Your application code that calls the SDK API is typically not affected — the boundary depends on your deployment model.
+
+If AGPL is a concern for your use case, commercial licensing may be available. Contact license@1io.com.
+
+### What is GUARD?
+GUARD is the optional, separately distributed trust and governance layer for COKIT. It adds advanced access policy, trust controls, and certification hooks on top of the open COKIT platform.
+
+GUARD is **not** part of this repository and is **not** covered by the AGPL license of COKIT. It will be distributed in a separate `guard` repository under its own source-available license.
+
+COKIT works without GUARD.
+
+### Can I use GUARD in my application?
+When GUARD becomes available, you will be able to use official signed guard artifacts in non-competing applications under the guard license terms. Certain commercial uses will require a separate agreement. Details will be published at [cokit.org](https://www.cokit.org).
 
 ### What platforms does COKIT support? (e.g. Linux, Windows, macOS, etc.)
 COKIT is platform-agnostic and supports all major OSes.

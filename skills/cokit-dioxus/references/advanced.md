@@ -15,27 +15,27 @@ them — prefer `use_co` + selectors + `dispatch` for all normal state access.
 
 ## CoContext Direct Access
 
-`CoContext::try_with_application` gives direct access to the COkit `Application` on
-the COkit thread. This is a last resort — it bypasses the reactive hook system and
+`CoContext::try_with_application` gives direct access to the COKIT `Application` on
+the COKIT thread. This is a last resort — it bypasses the reactive hook system and
 requires manual error handling.
 
 ```rust
 let context = use_co_context();
 let result = context
     .try_with_application(move |application| async move {
-        // You now have full Application access on the COkit thread
+        // You now have full Application access on the COKIT thread
         // Do something that hooks can't do
         Ok(some_result)
     })
     .await;
 ```
 
-The closure runs on the COkit thread, not the Dioxus UI thread. Results come back
+The closure runs on the COKIT thread, not the Dioxus UI thread. Results come back
 through a oneshot channel.
 
 `CoContextError` variants:
 - `CoContextError::Execute(E)` - the closure returned an error
-- `CoContextError::Shutdown` - the COkit Application has shut down
+- `CoContextError::Shutdown` - the COKIT Application has shut down
 
 ## Joining Unrelated COs
 
@@ -78,7 +78,7 @@ let settings = CoSettings::new("com.example.app", "my-app")
 
 ## Waiting for Initialization
 
-The COkit Application starts asynchronously. Normally hooks handle this transparently
+The COKIT Application starts asynchronously. Normally hooks handle this transparently
 (selectors suspend until data is ready). For cases where you need to ensure the
 Application is ready before proceeding:
 

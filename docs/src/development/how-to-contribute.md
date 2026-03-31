@@ -24,6 +24,6 @@ When reporting a bug, please include as many of the following details as possibl
 - What you expected to happen vs. what actually happened
 - Any logs, error messages, or screenshots
 
-You can submit bugs through our [issue tracker](https://gitlab.1io.com/1io/co-sdk/-/issues).
+You can submit bugs through our [issue tracker](https://gitlab.1io.com/1io/cokit/-/issues).
 
 Thank you for your support!

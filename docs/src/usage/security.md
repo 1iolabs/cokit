@@ -39,4 +39,4 @@ As specified by the [didcomm](../reference/network.md#protocol-didcomm) spec, th
 The recipient is encrypted, however, so this can only be used to relate a PeerID to a DID.
 
 ## Related
-- [Security (#24)](https://gitlab.1io.com/1io/co-sdk/-/issues/24)
+- [Security (#24)](https://gitlab.1io.com/1io/cokit/-/issues/24)

@@ -1,7 +1,5 @@
-// CONFIDENTIAL — © 1io BRANDGUARDIAN GmbH. Proprietary COkit code/docs for internal use within our company domain and
-// authorized users/tools only; do not copy, disclose, or transmit any part outside this domain. No license is granted
-// by access (any AGPLv3 references are non-operative until official publication); prohibited for AI/model training or
-// retention—approved secure tools may process solely for internal use.
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use super::Command as NetworkCommand;
 use crate::{cli::Cli, library::cli_context::CliContext};
@@ -118,7 +116,7 @@ pub async fn command(
 
 	// COs
 	// TODO: watch local co
-	// TODO: https://gitlab.1io.com/1io/co-sdk/-/issues/52
+	// TODO: https://gitlab.1io.com/1io/cokit/-/issues/52
 	let cos: Vec<CoId> = match &command.co {
 		Some(dids) => dids.iter().map(CoId::from).collect(),
 		None => {

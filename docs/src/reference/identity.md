@@ -127,4 +127,4 @@ Centralized identities however are limited to certain systems, and often provide
 
 
 [^1]: [Webinar 46 DIDs fundamentals - IdentityBook](https://docs.google.com/presentation/d/1KGLw6WThb3Q2UUOD2tZiarb_2Q_cpUZ1jzEzWCZSGII/edit?slide=id.g7d45b6a65b_4_1294#slide=id.g7d45b6a65b_4_1294)
-[^issue-82]: [Personal CO (#82)](https://gitlab.1io.com/1io/co-sdk/-/issues/82)
+[^issue-82]: [Personal CO (#82)](https://gitlab.1io.com/1io/cokit/-/issues/82)

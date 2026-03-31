@@ -45,4 +45,4 @@ First of all - if you are big tech - Hi! You're welcome to use COKIT as well. Bu
 We eliminate intermediaries. You individually decide with whom you want to share your data and under what conditions. [CO](..reference/co.md) lives on your local device and is directly synced only with your peers over the network. All apps are built on this fundamental concept.
 
 ### Take back what's yours
-Local-first, always in sync via peer-to-peer, and fully open source. Start developing decentralized apps with COKIT today, with data management and identity all worked out for you – No servers required.
+Local-first, always in sync via peer-to-peer, and open source. Start developing decentralized apps with COKIT today, with data management and identity all worked out for you – No servers required.
