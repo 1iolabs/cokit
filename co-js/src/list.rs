@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use crate::{from_js_value, to_js_value, JsBlockStorage};
+use crate::{dynamic_value::DynamicValue, from_js_value, to_js_value, JsBlockStorage};
 use cid::Cid;
-use co_primitives::{CoList, CoListTransaction, TagValue};
+use co_primitives::{CoList, CoListTransaction};
 use wasm_bindgen::prelude::*;
 use web_sys::js_sys::Uint8Array;
 
@@ -103,7 +103,7 @@ impl JsCoList {
 	}
 }
 impl JsCoList {
-	fn list(&self) -> CoList<TagValue> {
+	fn list(&self) -> CoList<DynamicValue> {
 		CoList::from(self.root)
 	}
 }
@@ -112,14 +112,14 @@ impl From<Option<Cid>> for JsCoList {
 		Self { root: value }
 	}
 }
-impl From<CoList<TagValue>> for JsCoList {
-	fn from(value: CoList<TagValue>) -> Self {
+impl From<CoList<DynamicValue>> for JsCoList {
+	fn from(value: CoList<DynamicValue>) -> Self {
 		Self { root: Into::<Option<Cid>>::into(&value) }
 	}
 }
 
 #[wasm_bindgen(js_name = "CoListTransaction")]
-pub struct JsCoListTransaction(CoListTransaction<JsBlockStorage, TagValue>);
+pub struct JsCoListTransaction(CoListTransaction<JsBlockStorage, DynamicValue>);
 
 #[wasm_bindgen(js_class = "CoListTransaction")]
 impl JsCoListTransaction {
@@ -129,7 +129,7 @@ impl JsCoListTransaction {
 	}
 
 	pub async fn push(&mut self, value: JsValue) -> Result<(), JsValue> {
-		let value: TagValue = from_js_value(value)?;
+		let value: DynamicValue = from_js_value(value)?;
 		self.0.push(value).await.map_err(|err| format!("Push failed: {:?}", err))?;
 		Ok(())
 	}
