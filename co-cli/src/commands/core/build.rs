@@ -51,7 +51,7 @@ pub async fn command(
 	let artifact = build_core(workspace_path, core_path)?;
 
 	// result
-	let mut result = JsonResult {
+	let result = JsonResult {
 		name: artifact.name,
 		version: artifact.version,
 		artifact_path: artifact.artifact_path,
@@ -61,26 +61,30 @@ pub async fn command(
 
 	// native target
 	#[cfg(feature = "llvm")]
-	for target in &command.target {
-		// path
-		let target_path = create_target_path(&result.artifact_path, target, "dylib")?;
+	let result = {
+		let mut result = result;
+		for target in &command.target {
+			// path
+			let target_path = create_target_path(&result.artifact_path, target, "dylib")?;
 
-		// log
-		tracing::info!(?target, ?target_path, "building-core-native");
+			// log
+			tracing::info!(?target, ?target_path, "building-core-native");
 
-		// compile
-		let wasm_bytes = tokio::fs::read(&result.artifact_path).await?;
-		let target_bytes = compile_native(wasm_bytes, target).await?;
+			// compile
+			let wasm_bytes = tokio::fs::read(&result.artifact_path).await?;
+			let target_bytes = compile_native(wasm_bytes, target).await?;
 
-		// store
-		if let Some(parent_path) = target_path.parent() {
-			tokio::fs::create_dir_all(parent_path).await?;
+			// store
+			if let Some(parent_path) = target_path.parent() {
+				tokio::fs::create_dir_all(parent_path).await?;
+			}
+			tokio::fs::write(&target_path, &target_bytes).await?;
+
+			// add
+			result.target_path.insert(target.to_owned(), target_path);
 		}
-		tokio::fs::write(&target_path, &target_bytes).await?;
-
-		// add
-		result.target_path.insert(target.to_owned(), target_path);
-	}
+		result
+	};
 
 	// output
 	println!("{}", serde_json::to_string_pretty(&result)?);
