@@ -1,12 +1,12 @@
 # Legal notice
 
-COKIT
+COKIT(tm)
 
 Copyright (C) 2020-2026 1io BRANDGUARDIAN GmbH
 
-This repository is the **first public distribution** of COKIT under **AGPL-3.0-only**.
+This repository is the **public distribution** of COKIT under **AGPL-3.0-only**.
 
-All prior commits in this repository's history were developed privately and were never publicly distributed. Those private revisions were subject to the proprietary internal notices and terms that were in force for those private revisions. No rights are granted on prior commits.
+All prior commits before the first public commit (fc3103759f0b42efc3a4ddd1d2003738decf68b9) in this repository's history were developed privately and were never publicly distributed. Those private revisions were subject to the proprietary internal notices and terms that were in force for those private revisions. No rights are granted on these historic commits.
 
 This repository (`cokit`) contains the open-source platform core of COKIT.
 
@@ -40,5 +40,8 @@ Except to the extent rights, if any, arise under **AGPL-3.0-only** itself, no ad
 
 ---
 
-This page does not modify the GNU Affero General Public License text in [LICENSE.md](./license.md).
-It provides repository-specific context for this first public release.
+This NOTICE does not modify the GNU Affero General Public License text in `LICENSE.md`.
+It provides repository-specific context for this public release.
+
+Under AGPL-3.0-only sections 4, 5 and 7, this NOTICE and all legal notices
+in this repository must be preserved in copies and derivative works.
