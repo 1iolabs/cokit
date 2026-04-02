@@ -849,4 +849,4 @@ pub fn TodoList(co_id: ReadOnlySignal<CoId>, on_back: EventHandler<()>) -> Eleme
 ### Full Example Project
 
 You can find the full example as a git project here:
-- [1io / example-todo-list - GitLab](https://gitlab.1io.com/1io/example-todo-list.git)
+- [1io / example-todo-list - GitLab](https://github.com/1iolabs/example-cokit-todo-list.git)

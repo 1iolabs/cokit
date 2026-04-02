@@ -827,13 +827,13 @@ To have a better structural overview we split the code so that each component li
 As copying the code into this documentation would unnecessarily bloat it, we instead link to a repository where all the code can be viewed.  
 
 You can find the full example in the `my-todo-app-tauri` folder of this git repository:
-- [1io / example-todo-list - GitLab](https://gitlab.1io.com/1io/example-todo-list.git)
+- [1io / example-todo-list - GitLab](https://github.com/1iolabs/example-cokit-todo-list.git)
 
 If you followed the [earlier steps](#setup) to create your example app workspace, these last steps will complete your app:
 
 1. Delete all files from your `src` folder.
 
-2. Copy all files from the `src` folder of the [existing React Todo-List example repository](https://gitlab.1io.com/1io/example-todo-list/-/tree/main/my-todo-app-tauri) into your `src` folder.
+2. Copy all files from the `src` folder of the [existing React Todo-List example repository](https://github.com/1iolabs/example-cokit-todo-list/tree/main/my-todo-app-tauri) into your `src` folder.
 
 3. Copy the WASM file from your Core into the `public` folder as `my_todo_core.wasm`.
 

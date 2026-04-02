@@ -137,4 +137,4 @@ You should find the resulting `.wasm` file at:
 ## Full example
 
 You can find the full example as a git project here:
-- [my-todo-core - 1io / example-todo-list - GitLab](https://gitlab.1io.com/1io/example-todo-list/-/blob/main/my-todo-core)
+- [my-todo-core - 1io / example-todo-list - GitLab](https://github.com/1iolabs/example-cokit-todo-list/blob/main/my-todo-core)

@@ -78,7 +78,7 @@ impl Reducer<TodoAction> for Todo {
 ```
 
 For further information, see:
-- [Example Todo List](https://gitlab.1io.com/1io/example-todo-list)
+- [Example Todo List](https://github.com/1iolabs/example-cokit-todo-list.git)
 - [Documentation](https://www.cokit.org/docs/)
 
 ## Development
