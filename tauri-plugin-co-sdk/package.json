@@ -1,5 +1,6 @@
 {
-  "name": "@1io/tauri-plugin-co-sdk-api",
+  "name": "@1io/tauri-plugin-co-sdk",
+  "license": "AGPL-3.0-only",
   "version": "0.0.1-0",
   "description": "Typescript api for using COKit functionality via tauri commands and events",
   "author": "1io",
