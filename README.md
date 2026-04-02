@@ -12,7 +12,7 @@ APIs may change. Use in production at your own discretion.
 ### Define a Core data structure
 
 ```rust
-use co_api::{async_api::Reducer, co, BlockStorageExt, CoMap, CoreBlockStorage, Link, OptionLink, ReducerAction};
+use co_api::{Reducer, co, BlockStorageExt, CoMap, CoreBlockStorage, Link, OptionLink, ReducerAction};
 
 /// Todo task actions.
 #[co]

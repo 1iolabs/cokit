@@ -12,7 +12,7 @@ Its purpose is to apply actions to the current state.
 Minimal usage example:
 
 ```rust
-use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt, Link, OptionLink, ReducerAction};
+use co_api::{Reducer, co, BlockStorage, BlockStorageExt, Link, OptionLink, ReducerAction};
 
 #[co]
 pub enum MyAction {}

@@ -116,7 +116,7 @@ We implement how the events are applied to the existing state:
 For completeness, here are the imports to add to the top of your file:
 
 ```rust
-use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoreBlockStorage, Link, OptionLink, ReducerAction};
+use co_api::{Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoreBlockStorage, Link, OptionLink, ReducerAction};
 ```
 
 ## Build as WebAssembly
