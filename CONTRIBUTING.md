@@ -41,7 +41,9 @@ it to license@1io.com.
 
 ## Code of Conduct
 
-Please be respectful and constructive in all interactions.
+This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
+By participating, you are expected to uphold this code. Please report
+unacceptable behavior to conduct@1io.com.
 
 ## License
 

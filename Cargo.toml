@@ -40,7 +40,7 @@ anyhow = { version = "1", features = ["backtrace"] }
 async-stream = "0.3.3"
 async-trait = "0.1.57"
 cid = "0.11.1"
-co-guard = { git = "https://gitlab.1io.com/1io/co-guard.git", branch = "main" }
+co-guard = { git = "https://gitlab.1io.com/1io/guard.git", branch = "main" }
 derive_more = "0.99.17"
 either = { version = "1" }
 futures = "0.3.30"

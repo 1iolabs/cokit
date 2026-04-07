@@ -12,7 +12,7 @@ APIs may change. Use in production at your own discretion.
 ### Define a Core data structure
 
 ```rust
-use co_api::{async_api::Reducer, co, BlockStorageExt, CoMap, CoreBlockStorage, Link, OptionLink, ReducerAction};
+use co_api::{Reducer, co, BlockStorageExt, CoMap, CoreBlockStorage, Link, OptionLink, ReducerAction};
 
 /// Todo task actions.
 #[co]
@@ -78,7 +78,7 @@ impl Reducer<TodoAction> for Todo {
 ```
 
 For further information, see:
-- [Example Todo List](https://gitlab.1io.com/1io/example-todo-list)
+- [Example Todo List](https://github.com/1iolabs/example-cokit-todo-list.git)
 - [Documentation](https://www.cokit.org/docs/)
 
 ## Development

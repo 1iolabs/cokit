@@ -116,7 +116,7 @@ We implement how the events are applied to the existing state:
 For completeness, here are the imports to add to the top of your file:
 
 ```rust
-use co_api::{async_api::Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoreBlockStorage, Link, OptionLink, ReducerAction};
+use co_api::{Reducer, co, BlockStorage, BlockStorageExt, CoMap, CoreBlockStorage, Link, OptionLink, ReducerAction};
 ```
 
 ## Build as WebAssembly
@@ -137,4 +137,4 @@ You should find the resulting `.wasm` file at:
 ## Full example
 
 You can find the full example as a git project here:
-- [my-todo-core - 1io / example-todo-list - GitLab](https://gitlab.1io.com/1io/example-todo-list/-/blob/main/my-todo-core)
+- [my-todo-core - 1io / example-todo-list - GitLab](https://github.com/1iolabs/example-cokit-todo-list/blob/main/my-todo-core)
