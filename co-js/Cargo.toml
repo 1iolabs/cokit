@@ -9,9 +9,6 @@ repository = "https://github.com/1iolabs/cokit.git"
 documentation = "https://www.cokit.org/docs/"
 description = "COKIT primitives for the browser using WebAssembly."
 
-[package.metadata.wasm-pack]
-package-name = "@1io/co-js"
-
 [lib]
 crate-type = ["lib", "cdylib"]
 
