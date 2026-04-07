@@ -1,4 +1,4 @@
-import { BlockStorage } from "co-js";
+import { BlockStorage } from "@1io/co-js";
 import { CID } from "multiformats";
 import { useMemo } from "react";
 import { storageGet, storageSet } from "../../invoke-utils.js";
