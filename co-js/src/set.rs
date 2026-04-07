@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use crate::{from_js_value, to_js_value, JsBlockStorage};
+use crate::{dynamic_value::DynamicValue, from_js_value, to_js_value, JsBlockStorage};
 use cid::Cid;
-use co_primitives::{CoSet, CoSetTransaction, TagValue};
+use co_primitives::{CoSet, CoSetTransaction};
 use wasm_bindgen::prelude::*;
 use web_sys::js_sys::Uint8Array;
 
@@ -85,7 +85,7 @@ impl JsCoSet {
 	}
 }
 impl JsCoSet {
-	fn set(&self) -> CoSet<TagValue> {
+	fn set(&self) -> CoSet<DynamicValue> {
 		CoSet::from(self.root)
 	}
 }
@@ -94,14 +94,14 @@ impl From<Option<Cid>> for JsCoSet {
 		Self { root: value }
 	}
 }
-impl From<CoSet<TagValue>> for JsCoSet {
-	fn from(value: CoSet<TagValue>) -> Self {
+impl From<CoSet<DynamicValue>> for JsCoSet {
+	fn from(value: CoSet<DynamicValue>) -> Self {
 		Into::<Option<Cid>>::into(&value).into()
 	}
 }
 
 #[wasm_bindgen(js_name = "CoSetTransaction")]
-pub struct JsCoSetTransaction(CoSetTransaction<JsBlockStorage, TagValue>);
+pub struct JsCoSetTransaction(CoSetTransaction<JsBlockStorage, DynamicValue>);
 
 #[wasm_bindgen(js_class = "CoSetTransaction")]
 impl JsCoSetTransaction {
@@ -110,7 +110,7 @@ impl JsCoSetTransaction {
 		Ok(co_set.into())
 	}
 	pub async fn contains(&self, key: JsValue) -> Result<bool, JsValue> {
-		let key: TagValue = from_js_value(key)?;
+		let key: DynamicValue = from_js_value(key)?;
 		Ok(self
 			.0
 			.contains(&key)
@@ -118,11 +118,11 @@ impl JsCoSetTransaction {
 			.map_err(|err| format!("Contains failed: {:?}", err))?)
 	}
 	pub async fn insert(&mut self, key: JsValue) -> Result<(), JsValue> {
-		let key: TagValue = from_js_value(key)?;
+		let key: DynamicValue = from_js_value(key)?;
 		Ok(self.0.insert(key).await.map_err(|err| format!("Insert failed: {:?}", err))?)
 	}
 	pub async fn remove(&mut self, key: JsValue) -> Result<bool, JsValue> {
-		let key: TagValue = from_js_value(key)?;
+		let key: DynamicValue = from_js_value(key)?;
 		Ok(self.0.remove(key).await.map_err(|err| format!("Remove failed: {:?}", err))?)
 	}
 	pub fn stream(&self) -> web_sys::ReadableStream {

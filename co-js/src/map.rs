@@ -2,11 +2,12 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use crate::{
+	dynamic_value::DynamicValue,
 	js::{from_js_value, to_js_value},
 	JsBlockStorage,
 };
 use cid::Cid;
-use co_primitives::{CoMap, CoMapTransaction, TagValue};
+use co_primitives::{CoMap, CoMapTransaction};
 use wasm_bindgen::prelude::*;
 use web_sys::js_sys::Uint8Array;
 
@@ -85,7 +86,7 @@ impl JsCoMap {
 	}
 }
 impl JsCoMap {
-	fn map(&self) -> CoMap<TagValue, TagValue> {
+	fn map(&self) -> CoMap<DynamicValue, DynamicValue> {
 		CoMap::from(self.root)
 	}
 }
@@ -96,7 +97,7 @@ impl From<Option<Cid>> for JsCoMap {
 }
 
 #[wasm_bindgen(js_name = "CoMapTransaction")]
-pub struct JsCoMapTransaction(CoMapTransaction<JsBlockStorage, TagValue, TagValue>);
+pub struct JsCoMapTransaction(CoMapTransaction<JsBlockStorage, DynamicValue, DynamicValue>);
 
 #[wasm_bindgen(js_class = "CoMapTransaction")]
 impl JsCoMapTransaction {
@@ -105,20 +106,20 @@ impl JsCoMapTransaction {
 		Ok(Into::<Option<Cid>>::into(&co_map).into())
 	}
 	pub async fn get(&self, key: JsValue) -> Result<Option<JsValue>, JsValue> {
-		let key: TagValue = from_js_value(key)?;
+		let key: DynamicValue = from_js_value(key)?;
 		let result = self.0.get(&key).await.map_err(|err| format!("Get failed: {:?}", err))?;
 		result.as_ref().map(to_js_value).transpose()
 	}
 	pub async fn contains_key(&self, key: JsValue) -> Result<bool, JsValue> {
-		let key: TagValue = from_js_value(key)?;
+		let key: DynamicValue = from_js_value(key)?;
 		self.0
 			.contains_key(&key)
 			.await
 			.map_err(|err| format!("Contains key failed: {:?}", err).into())
 	}
 	pub async fn insert(&mut self, key: JsValue, value: JsValue) -> Result<(), JsValue> {
-		let key: TagValue = from_js_value(key)?;
-		let value: TagValue = from_js_value(value)?;
+		let key: DynamicValue = from_js_value(key)?;
+		let value: DynamicValue = from_js_value(value)?;
 		self.0
 			.insert(key, value)
 			.await
