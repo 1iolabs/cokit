@@ -90,30 +90,30 @@ zeroize = "1.7.0"
 zstd = "0.13.3"
 
 # local workspace crates
-co-actor = { path = "co-actor", default-features = false }
-co-api = { path = "co-api" }
-co-cli = { path = "co-cli" }
-co-core-board = { path = "cores/board" }
-co-core-co = { path = "cores/co" }
-co-core-file = { path = "cores/file" }
-co-core-keystore = { path = "cores/keystore" }
-co-core-membership = { path = "cores/membership" }
-co-core-names = { path = "cores/names" }
-co-core-rich-text = { path = "cores/rich-text" }
-co-core-room = { path = "cores/room" }
-co-core-storage = { path = "cores/storage" }
-co-dioxus = { path = "co-dioxus" }
-co-identity = { path = "co-identity" }
-co-log = { path = "co-log" }
-co-macros = { path = "co-macros" }
-co-messaging = { path = "co-messaging" }
-co-network = { path = "co-network", default-features = false }
-co-primitives = { path = "co-primitives" }
-co-runtime = { path = "co-runtime" }
-co-sdk = { path = "co-sdk", default-features = false }
-co-storage = { path = "co-storage", default-features = false }
-co-test = { path = "co-test" }
-tauri-plugin-co-sdk = { path = "tauri-plugin-co-sdk" }
+co-actor = { path = "co-actor", version = "0.1.0", default-features = false }
+co-api = { path = "co-api", version = "0.1.0" }
+co-cli = { path = "co-cli", version = "0.1.0" }
+co-core-board = { path = "cores/board", version = "0.1.0" }
+co-core-co = { path = "cores/co", version = "0.1.0" }
+co-core-file = { path = "cores/file", version = "0.1.0" }
+co-core-keystore = { path = "cores/keystore", version = "0.1.0" }
+co-core-membership = { path = "cores/membership", version = "0.1.0" }
+co-core-names = { path = "cores/names", version = "0.1.0" }
+co-core-rich-text = { path = "cores/rich-text", version = "0.1.0" }
+co-core-room = { path = "cores/room", version = "0.1.0" }
+co-core-storage = { path = "cores/storage", version = "0.1.0" }
+co-dioxus = { path = "co-dioxus", version = "0.1.0" }
+co-identity = { path = "co-identity", version = "0.1.0" }
+co-log = { path = "co-log", version = "0.1.0" }
+co-macros = { path = "co-macros", version = "0.1.0" }
+co-messaging = { path = "co-messaging", version = "0.1.0" }
+co-network = { path = "co-network", version = "0.1.0", default-features = false }
+co-primitives = { path = "co-primitives", version = "0.1.0" }
+co-runtime = { path = "co-runtime", version = "0.1.0" }
+co-sdk = { path = "co-sdk", version = "0.1.0", default-features = false }
+co-storage = { path = "co-storage", version = "0.1.0", default-features = false }
+co-test = { path = "co-test", version = "0.1.0" }
+tauri-plugin-co-sdk = { path = "tauri-plugin-co-sdk", version = "0.1.0" }
 
 # force dependencies to use local crates if they reference them
 #  required to make co-guard work

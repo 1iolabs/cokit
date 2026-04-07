@@ -8,6 +8,7 @@ homepage = "https://www.cokit.org"
 repository = "https://github.com/1iolabs/cokit.git"
 documentation = "https://www.cokit.org/docs/"
 description = ""
+publish = false
 
 [lib]
 crate-type = ["lib", "cdylib"]

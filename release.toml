@@ -1,0 +1,15 @@
+allow-branch = ["main"]
+sign-commit = false
+sign-tag = false
+consolidate-commits = true
+pre-release-commit-message = "chore(release): {{version}}"
+tag-message = "chore(release): {{crate_name}} v{{version}}"
+dependent-version = "upgrade"
+push = true
+push-remote = "origin"
+tag-name = "{{crate_name}}-v{{version}}"
+
+pre-release-hook = [
+    "sh", "-c",
+    "git-cliff --workdir . --config cliff.toml --output \"${CRATE_ROOT}/CHANGELOG.md\" --tag \"${CRATE_NAME}-v${NEW_VERSION}\" --include-path \"${CRATE_ROOT}/**\""
+]

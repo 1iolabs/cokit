@@ -7,7 +7,7 @@ license = "AGPL-3.0-only"
 homepage = "https://www.cokit.org"
 repository = "https://github.com/1iolabs/cokit.git"
 documentation = "https://www.cokit.org/docs/"
-description = ""
+description = "COKIT command-line interface for managing COs and Cores."
 
 [[bin]]
 name = "co"
@@ -75,3 +75,14 @@ llvm = ["co-runtime/llvm"]
 wamr = ["co-runtime/wamr"]
 wasmi = ["co-runtime/wasmi"]
 cranelift = ["co-runtime/cranelift"]
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/{ name }-v{ version }/{ name }-{ target }-v{ version }{ archive-suffix }"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
+
+[package.metadata.binstall.overrides.aarch64-pc-windows-msvc]
+pkg-fmt = "zip"
