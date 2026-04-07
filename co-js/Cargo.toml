@@ -19,6 +19,7 @@ async-trait = { workspace = true }
 cid = { workspace = true }
 co-actor = { workspace = true }
 co-primitives = { workspace = true }
+derive_more = { workspace = true }
 futures = { workspace = true }
 ipld-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

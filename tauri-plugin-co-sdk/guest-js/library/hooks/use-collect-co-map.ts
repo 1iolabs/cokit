@@ -1,4 +1,4 @@
-import { BlockStorage, CoMap } from "co-js";
+import { BlockStorage, CoMap } from "@1io/co-js";
 import { useEffect, useState } from "react";
 
 /**
