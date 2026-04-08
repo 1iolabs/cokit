@@ -89,8 +89,8 @@ npm packages (`@1io/co-js`, `@1io/tauri-plugin-co-sdk`) are published by
 CI alongside the Rust crates when a tag is pushed. To publish manually:
 
 ```bash
-(cd co-js && wasm-pack build --target web && cd pkg && npm publish --access public)
-(cd tauri-plugin-co-sdk && npm run build && npm publish --access public)
+(cd co-js && npm run build && cd pkg && npm publish --access public --registry https://registry.npmjs.org)
+(cd tauri-plugin-co-sdk && npm run build && npm publish --access public --registry https://registry.npmjs.org)
 ```
 
 ## What Happens on Tag Push
