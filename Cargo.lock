@@ -1434,7 +1434,7 @@ dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
- "co-primitives 0.1.0",
+ "co-primitives",
  "derive_more 0.99.20",
  "futures",
  "futures-timer",
@@ -1451,54 +1451,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "co-actor"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "089c4e089a494eaea1b92b5b70b89a4b3a694fac313888e385bf5eebb15f3b8a"
-dependencies = [
- "anyhow",
- "async-stream",
- "async-trait",
- "co-primitives 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "derive_more 0.99.20",
- "futures",
- "static_assertions",
- "thiserror 1.0.69",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
 name = "co-api"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
- "co-macros 0.1.0",
- "co-primitives 0.1.0",
- "either",
- "futures",
- "ipld-core",
- "multihash-codetable",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "co-api"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70280c6700c83516c0e36165d842e3444f85d083c5a12d9165e20655150fb83a"
-dependencies = [
- "anyhow",
- "async-trait",
- "cid 0.11.1",
- "co-macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "co-primitives 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "co-macros",
+ "co-primitives",
  "either",
  "futures",
  "ipld-core",
@@ -1516,8 +1476,8 @@ dependencies = [
  "async-stream",
  "async-trait",
  "cid 0.11.1",
- "co-actor 0.1.0",
- "co-primitives 0.1.0",
+ "co-actor",
+ "co-primitives",
  "co-sdk",
  "derive_more 0.99.20",
  "flutter_rust_bridge",
@@ -1551,10 +1511,10 @@ dependencies = [
  "co-core-storage",
  "co-log",
  "co-messaging",
- "co-primitives 0.1.0",
- "co-runtime 0.1.0",
+ "co-primitives",
+ "co-runtime",
  "co-sdk",
- "co-storage 0.1.0",
+ "co-storage",
  "co-tracing-bunyan-formatter",
  "colored",
  "exitcode",
@@ -1592,7 +1552,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
- "co-api 0.1.0",
+ "co-api",
  "futures",
  "ipld-core",
  "num-rational",
@@ -1609,9 +1569,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api 0.1.0",
- "co-runtime 0.1.0",
- "co-storage 0.1.0",
+ "co-api",
+ "co-runtime",
+ "co-storage",
  "ipld-core",
  "serde",
  "serde_repr",
@@ -1628,8 +1588,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api 0.1.0",
- "co-storage 0.1.0",
+ "co-api",
+ "co-storage",
  "futures",
  "ipld-core",
  "serde",
@@ -1646,9 +1606,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api 0.1.0",
- "co-runtime 0.1.0",
- "co-storage 0.1.0",
+ "co-api",
+ "co-runtime",
+ "co-storage",
  "ipld-core",
  "schemars 0.8.22",
  "serde",
@@ -1665,10 +1625,10 @@ dependencies = [
  "anyhow",
  "async-stream",
  "cid 0.11.1",
- "co-api 0.1.0",
- "co-macros 0.1.0",
- "co-runtime 0.1.0",
- "co-storage 0.1.0",
+ "co-api",
+ "co-macros",
+ "co-runtime",
+ "co-storage",
  "futures",
  "ipld-core",
  "serde",
@@ -1688,10 +1648,10 @@ dependencies = [
  "async-stream",
  "async-trait",
  "cid 0.11.1",
- "co-api 0.1.0",
+ "co-api",
  "co-core-co",
- "co-runtime 0.1.0",
- "co-storage 0.1.0",
+ "co-runtime",
+ "co-storage",
  "derive_more 0.99.20",
  "futures",
  "ipld-core",
@@ -1712,8 +1672,8 @@ dependencies = [
  "async-stream",
  "async-trait",
  "cid 0.11.1",
- "co-api 0.1.0",
- "co-storage 0.1.0",
+ "co-api",
+ "co-storage",
  "derive_more 0.99.20",
  "futures",
  "ipld-core",
@@ -1733,10 +1693,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api 0.1.0",
+ "co-api",
  "co-messaging",
- "co-primitives 0.1.0",
- "co-storage 0.1.0",
+ "co-primitives",
+ "co-storage",
  "futures",
  "ipld-core",
  "schemars 0.8.22",
@@ -1756,9 +1716,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
- "co-api 0.1.0",
- "co-runtime 0.1.0",
- "co-storage 0.1.0",
+ "co-api",
+ "co-runtime",
+ "co-storage",
  "futures",
  "ipld-core",
  "serde",
@@ -1834,11 +1794,11 @@ dependencies = [
  "async-trait",
  "cid 0.11.1",
  "clap 4.6.0",
- "co-actor 0.1.0",
+ "co-actor",
  "co-core-co",
  "co-core-membership",
  "co-guard",
- "co-primitives 0.1.0",
+ "co-primitives",
  "co-sdk",
  "dioxus",
  "futures",
@@ -1865,10 +1825,10 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
- "co-api 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "co-primitives 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "co-runtime 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "co-storage 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "co-api",
+ "co-primitives",
+ "co-runtime",
+ "co-storage",
  "serde",
  "thiserror 1.0.69",
  "tracing",
@@ -1884,7 +1844,7 @@ dependencies = [
  "co-core-keystore",
  "co-did-key",
  "co-didcomm",
- "co-primitives 0.1.0",
+ "co-primitives",
  "form_urlencoded",
  "futures",
  "hex",
@@ -1908,8 +1868,8 @@ dependencies = [
  "async-stream",
  "async-trait",
  "cid 0.11.1",
- "co-actor 0.1.0",
- "co-primitives 0.1.0",
+ "co-actor",
+ "co-primitives",
  "derive_more 0.99.20",
  "futures",
  "ipld-core",
@@ -1955,8 +1915,8 @@ dependencies = [
  "async-trait",
  "cid 0.11.1",
  "co-identity",
- "co-primitives 0.1.0",
- "co-storage 0.1.0",
+ "co-primitives",
+ "co-storage",
  "futures",
  "ipld-core",
  "serde",
@@ -1977,23 +1937,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "co-macros"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe039fe17a0bba54e49a170bb19b66283c4ae34bb0b376cedf7fac19aa6ce8bd"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
 name = "co-messaging"
 version = "0.1.0"
 dependencies = [
  "cid 0.11.1",
- "co-macros 0.1.0",
- "co-primitives 0.1.0",
+ "co-macros",
+ "co-primitives",
  "ipld-core",
  "schemars 0.8.22",
  "serde",
@@ -2011,11 +1960,11 @@ dependencies = [
  "async-trait",
  "asynchronous-codec",
  "cid 0.11.1",
- "co-actor 0.1.0",
+ "co-actor",
  "co-identity",
  "co-libp2p-bitswap",
- "co-primitives 0.1.0",
- "co-storage 0.1.0",
+ "co-primitives",
+ "co-storage",
  "derive_more 0.99.20",
  "did-key",
  "futures",
@@ -2054,7 +2003,7 @@ dependencies = [
  "async-trait",
  "bloomfilter",
  "cid 0.11.1",
- "co-macros 0.1.0",
+ "co-macros",
  "criterion",
  "derive_more 0.99.20",
  "either",
@@ -2084,53 +2033,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "co-primitives"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce8ba489baca23e2a7342f3370599ea6a404fa17a71992601f90382c73caa28a"
-dependencies = [
- "anyhow",
- "async-stream",
- "async-trait",
- "bloomfilter",
- "cid 0.11.1",
- "co-macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "derive_more 0.99.20",
- "either",
- "futures",
- "ipld-core",
- "ipld-dagpb",
- "multihash 0.19.3",
- "multihash-codetable",
- "num-rational",
- "ordered-float",
- "pin-project",
- "rust-unixfs",
- "schemars 0.8.22",
- "serde",
- "serde_bytes",
- "serde_ipld_dagcbor",
- "serde_ipld_dagjson",
- "serde_json",
- "serde_repr",
- "thiserror 1.0.69",
- "tokio-stream",
- "tokio-util",
- "unsigned-varint 0.8.0",
- "zeroize",
-]
-
-[[package]]
 name = "co-runtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "cid 0.11.1",
- "co-actor 0.1.0",
- "co-api 0.1.0",
- "co-primitives 0.1.0",
- "co-storage 0.1.0",
+ "co-actor",
+ "co-api",
+ "co-primitives",
+ "co-storage",
  "colored",
  "derive_more 0.99.20",
  "futures",
@@ -2156,35 +2068,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "co-runtime"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c4712144b4a2244883a4cb2b0adda2a83899ce8ce0a8926511a0162d38d2fca"
-dependencies = [
- "anyhow",
- "async-trait",
- "cid 0.11.1",
- "co-actor 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "co-api 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "co-primitives 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "co-storage 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "colored",
- "derive_more 0.99.20",
- "futures",
- "ipld-core",
- "rust-unixfs",
- "serde",
- "serde_bytes",
- "serde_repr",
- "target-lexicon 0.12.16",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "uuid",
- "wasmer",
-]
-
-[[package]]
 name = "co-sdk"
 version = "0.1.0"
 dependencies = [
@@ -2192,7 +2075,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "cid 0.11.1",
- "co-actor 0.1.0",
+ "co-actor",
  "co-core-board",
  "co-core-co",
  "co-core-file",
@@ -2206,9 +2089,9 @@ dependencies = [
  "co-identity",
  "co-log",
  "co-network",
- "co-primitives 0.1.0",
- "co-runtime 0.1.0",
- "co-storage 0.1.0",
+ "co-primitives",
+ "co-runtime",
+ "co-storage",
  "co-test",
  "co-tracing-bunyan-formatter",
  "criterion",
@@ -2272,8 +2155,8 @@ dependencies = [
  "blake3",
  "chacha20poly1305",
  "cid 0.11.1",
- "co-actor 0.1.0",
- "co-primitives 0.1.0",
+ "co-actor",
+ "co-primitives",
  "co-test",
  "derive_more 0.99.20",
  "either",
@@ -2301,40 +2184,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
-]
-
-[[package]]
-name = "co-storage"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67423c09359e4d40e562a7e7657fbd28aa8ed2c9ed83e23bbb6861095ba6451e"
-dependencies = [
- "aead",
- "anyhow",
- "async-stream",
- "async-trait",
- "blake3",
- "chacha20poly1305",
- "cid 0.11.1",
- "co-primitives 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "derive_more 0.99.20",
- "either",
- "futures",
- "ipld-core",
- "ipld-dagpb",
- "multihash 0.19.3",
- "multihash-codetable",
- "serde",
- "serde_bytes",
- "serde_ipld_dagcbor",
- "serde_ipld_dagjson",
- "serde_repr",
- "thiserror 1.0.69",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -3874,11 +3723,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api 0.1.0",
- "co-primitives 0.1.0",
- "co-runtime 0.1.0",
+ "co-api",
+ "co-primitives",
+ "co-runtime",
  "co-sdk",
- "co-storage 0.1.0",
+ "co-storage",
  "ipld-core",
  "serde",
  "thiserror 1.0.69",
@@ -3893,11 +3742,11 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api 0.1.0",
- "co-primitives 0.1.0",
- "co-runtime 0.1.0",
+ "co-api",
+ "co-primitives",
+ "co-runtime",
  "co-sdk",
- "co-storage 0.1.0",
+ "co-storage",
  "ipld-core",
  "serde",
  "thiserror 1.0.69",
@@ -3912,11 +3761,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "co-api 0.1.0",
- "co-primitives 0.1.0",
- "co-runtime 0.1.0",
+ "co-api",
+ "co-primitives",
+ "co-runtime",
  "co-sdk",
- "co-storage 0.1.0",
+ "co-storage",
  "ipld-core",
  "serde",
  "thiserror 1.0.69",
@@ -10552,13 +10401,13 @@ dependencies = [
  "async-trait",
  "cid 0.11.1",
  "clap 4.6.0",
- "co-actor 0.1.0",
+ "co-actor",
  "co-core-co",
  "co-core-membership",
  "co-core-room",
  "co-log",
  "co-messaging",
- "co-primitives 0.1.0",
+ "co-primitives",
  "co-sdk",
  "derive_more 0.99.20",
  "futures",
