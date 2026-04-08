@@ -114,3 +114,11 @@ co-sdk = { path = "co-sdk", version = "0.1.0", default-features = false }
 co-storage = { path = "co-storage", version = "0.1.0", default-features = false }
 co-test = { path = "co-test" }
 tauri-plugin-co-sdk = { path = "tauri-plugin-co-sdk", version = "0.1.0" }
+
+# override transitive co-guard dependencies with local for development
+[patch.crates-io]
+co-api = { path = "co-api" }
+co-core-co = { path = "cores/co" }
+co-primitives = { path = "co-primitives" }
+co-runtime = { path = "co-runtime" }
+co-storage = { path = "co-storage" }
