@@ -40,7 +40,7 @@ anyhow = { version = "1", features = ["backtrace"] }
 async-stream = "0.3.3"
 async-trait = "0.1.57"
 cid = "0.11.1"
-co-guard = { git = "https://gitlab.1io.com/1io/guard.git", branch = "main" }
+co-guard = { version = "0.1.0" }
 derive_more = "0.99.17"
 either = { version = "1" }
 futures = "0.3.30"
@@ -114,30 +114,3 @@ co-sdk = { path = "co-sdk", version = "0.1.0", default-features = false }
 co-storage = { path = "co-storage", version = "0.1.0", default-features = false }
 co-test = { path = "co-test" }
 tauri-plugin-co-sdk = { path = "tauri-plugin-co-sdk", version = "0.1.0" }
-
-# force dependencies to use local crates if they reference them
-#  required to make co-guard work
-[patch."https://gitlab.1io.com/1io/cokit.git"]
-co-actor = { path = "co-actor" }
-co-api = { path = "co-api" }
-co-cli = { path = "co-cli" }
-co-core-board = { path = "cores/board" }
-co-core-co = { path = "cores/co" }
-co-core-file = { path = "cores/file" }
-co-core-keystore = { path = "cores/keystore" }
-co-core-membership = { path = "cores/membership" }
-co-core-names = { path = "cores/names" }
-co-core-rich-text = { path = "cores/rich-text" }
-co-core-room = { path = "cores/room" }
-co-core-storage = { path = "cores/storage" }
-co-dioxus = { path = "co-dioxus" }
-co-identity = { path = "co-identity" }
-co-log = { path = "co-log" }
-co-macros = { path = "co-macros" }
-co-messaging = { path = "co-messaging" }
-co-network = { path = "co-network" }
-co-primitives = { path = "co-primitives" }
-co-runtime = { path = "co-runtime" }
-co-sdk = { path = "co-sdk" }
-co-storage = { path = "co-storage" }
-co-test = { path = "co-test" }
