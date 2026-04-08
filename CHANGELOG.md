@@ -37,7 +37,7 @@
 
 ## Milestone Releases
 
-### v0.1.0 — Initial Release
+### v0.1.0 — Initial Release (2026-04-08)
 
 | Crate | Version |
 |-------|---------|
@@ -56,6 +56,7 @@
 | co-dioxus | 0.1.0 |
 | co-bindings | 0.1.0 |
 | co-cli | 0.1.0 |
+| co-guard | 0.1.0 |
 | tauri-plugin-co-sdk | 0.1.0 |
 | co-core-board | 0.1.0 |
 | co-core-co | 0.1.0 |
@@ -66,6 +67,11 @@
 | co-core-rich-text | 0.1.0 |
 | co-core-room | 0.1.0 |
 | co-core-storage | 0.1.0 |
+
+| npm Package | Version |
+|-------------|---------|
+| @1io/co-js | 0.1.0 |
+| @1io/tauri-plugin-co-sdk | 0.1.0 |
 
 ## Changelog
 
