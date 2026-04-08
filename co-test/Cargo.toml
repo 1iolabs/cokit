@@ -8,6 +8,10 @@ homepage = "https://www.cokit.org"
 repository = "https://github.com/1iolabs/cokit.git"
 documentation = "https://www.cokit.org/docs/"
 description = "COKIT testing fixtures."
+publish = false
+
+[package.metadata.release]
+release = false
 
 [dependencies]
 anyhow = { workspace = true }

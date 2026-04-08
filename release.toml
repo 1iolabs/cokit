@@ -1,0 +1,15 @@
+allow-branch = ["main"]
+sign-commit = false
+sign-tag = false
+consolidate-commits = true
+pre-release-commit-message = "chore(release): {{version}}"
+tag-message = "chore(release): {{crate_name}} v{{version}}"
+dependent-version = "upgrade"
+publish = false
+push = true
+push-remote = "origin"
+tag-name = "{{crate_name}}-v{{version}}"
+
+# changelog generation is decoupled — run ./ci/scripts/update-changelog.sh before releasing
+# this hook verifies the changelog was updated before allowing the release
+pre-release-hook = ["sh", "-c", "${WORKSPACE_ROOT}/ci/scripts/verify-changelog.sh"]
