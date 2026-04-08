@@ -31,11 +31,26 @@ submit your first pull request.
 details including Schedule A (authorized employees), sign it, and send
 it to license@1io.com.
 
+## Commit Messages
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/).
+Prefix your commit messages with a type:
+
+- `feat:` new feature
+- `fix:` bug fix
+- `docs:` documentation only
+- `chore:` maintenance (deps, CI, etc.)
+- `refactor:` code change that neither fixes a bug nor adds a feature
+- `test:` adding or updating tests
+- `perf:` performance improvement
+
+Breaking changes should include `!` after the type (e.g., `feat!: remove old API`).
+
 ## How to Contribute
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
+3. Make your changes (using conventional commit messages)
 4. Ensure tests pass: `cargo test -p co-sdk`
 5. Submit a pull request
 

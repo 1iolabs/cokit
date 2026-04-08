@@ -128,6 +128,37 @@ docs:
     paths:
       - docs/book
 
+# detect accidental semver violations
+semver-check:
+  stage: lint
+  image: ${DOCKERFILE_IMAGE}
+  cache:
+    <<: *global_cache
+  script:
+    - cargo semver-checks check-release --workspace
+  allow_failure: true
+
+# validate release readiness
+release-check:
+  stage: lint
+  image: ${DOCKERFILE_IMAGE}
+  cache:
+    <<: *global_cache
+  script:
+    - ./ci/scripts/release-check.sh
+  allow_failure: true
+
+# publish to crates.io (triggered by version tag push)
+release:
+  stage: publish
+  image: ${DOCKERFILE_IMAGE}
+  cache:
+    <<: *global_cache
+  script:
+    - ./ci/scripts/release-publish.sh
+  only:
+    - /^co-.*-v.*$/
+
 # export pages
 pages:
   stage: publish
