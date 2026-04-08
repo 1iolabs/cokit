@@ -207,13 +207,6 @@ impl Actor for ApplicationActor {
 					async move {
 						let changed = application.handle().stream(ApplicationMessage::Subscribe).filter_map(|action| {
 							ready(match action {
-								// Ok(Action::CoreAction { co, storage: _, context: _, action: _, cid: _, head: _ }) =>
-								// { 	Some(co)
-								// },
-								// Ok(Action::Invite { co, from: _, to: _ }) => Some(co),
-								// Ok(Action::InviteSent { co, to: _, peer: _ }) => Some(co),
-								// Ok(Action::JoinKeyRequest { co, participant: _, peer: _ }) => Some(co),
-								// Ok(Action::Joined { co, participant: _, success: _, peer: _ }) => Some(co),
 								Ok(Action::CoFlush { co, info: _ }) => Some(co),
 								_ => None,
 							})
@@ -223,7 +216,6 @@ impl Actor for ApplicationActor {
 						while let Some(co) = changed.next().await {
 							if let Ok(reducer) = context.try_co_reducer(&co).await {
 								let (state, heads) = reducer.reducer_state().await.into();
-								tracing::debug!("tauri watch: new state: {:?}, {:?}", co, state);
 								if response.send((co, state, heads)).is_err() {
 									break;
 								}
