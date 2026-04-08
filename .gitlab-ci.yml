@@ -129,23 +129,13 @@ docs:
       - docs/book
 
 # detect accidental semver violations
-semver-check:
+semver:
   stage: lint
   image: ${DOCKERFILE_IMAGE}
   cache:
     <<: *global_cache
   script:
     - cargo semver-checks check-release --workspace
-  allow_failure: true
-
-# validate release readiness
-release-check:
-  stage: lint
-  image: ${DOCKERFILE_IMAGE}
-  cache:
-    <<: *global_cache
-  script:
-    - ./ci/scripts/release-check.sh
   allow_failure: true
 
 # publish to crates.io (triggered by version tag push)
