@@ -86,7 +86,7 @@ pub async fn command(command: &Command) -> Result<ExitCode, anyhow::Error> {
 	}
 
 	// write
-	let cores_path = repository_path.join("cores/Cores.toml");
+	let cores_path = repository_path.join("co-sdk/Cores.toml");
 	println!("write: {:?}", cores_path);
 	tokio::fs::write(cores_path, toml::to_string(&cores)?.as_bytes()).await?;
 

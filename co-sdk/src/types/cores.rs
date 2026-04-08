@@ -39,7 +39,7 @@ pub struct Cores {
 }
 impl Default for Cores {
 	fn default() -> Self {
-		toml::from_str(include_str!("../../../cores/Cores.toml")).unwrap()
+		toml::from_str(include_str!("../../Cores.toml")).unwrap()
 	}
 }
 impl Cores {
