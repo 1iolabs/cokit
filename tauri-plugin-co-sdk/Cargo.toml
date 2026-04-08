@@ -22,7 +22,7 @@ co-core-room = { workspace = true }
 co-log = { workspace = true }
 co-messaging = { workspace = true }
 co-primitives = { workspace = true }
-co-sdk = { workspace = true }
+co-sdk = { workspace = true, default-features = false }
 derive_more = { workspace = true }
 futures = { workspace = true }
 ipld-core = { workspace = true }
@@ -44,4 +44,4 @@ uuid = { workspace = true }
 tauri-plugin = { version = "2.1.0", features = ["build"] }
 
 [features]
-default = ["co-sdk/default"]
+default = ["co-sdk/recommended", "co-sdk/apple-sandbox"]
