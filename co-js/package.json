@@ -1,9 +1,15 @@
 {
   "name": "@1io/co-js",
-  "version": "0.1.0-0",
+  "license": "AGPL-3.0-only",
+  "version": "0.1.0",
   "author": "1io",
+  "description": "COKIT primitives for the Web.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/1iolabs/cokit.git"
+  },
   "publishConfig": {
-    "registry": "http://npm.intranet.1io.com"
+    "registry": "https://registry.npmjs.org"
   },
   "scripts": {
     "build": "webpack",

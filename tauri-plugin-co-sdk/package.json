@@ -1,11 +1,15 @@
 {
   "name": "@1io/tauri-plugin-co-sdk",
   "license": "AGPL-3.0-only",
-  "version": "0.0.1-1",
-  "description": "Typescript api for using COKit functionality via tauri commands and events",
+  "version": "0.1.0",
+  "description": "Typescript API for using COKit functionality via tauri commands and events",
   "author": "1io",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/1iolabs/cokit.git"
+  },
   "publishConfig": {
-    "registry": "http://npm.intranet.1io.com"
+    "registry": "https://registry.npmjs.org"
   },
   "contributors": [
     {
@@ -27,9 +31,9 @@
     "README.md"
   ],
   "scripts": {
-    "build": "rollup -c",
-    "prepublishOnly": "yarn build",
-    "pretest": "yarn build"
+    "build": "npx rollup -c",
+    "prepublishOnly": "npm run build",
+    "pretest": "npm run build"
   },
   "dependencies": {
     "@1io/compare": "^0.2.0",
