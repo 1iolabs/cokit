@@ -13,6 +13,7 @@ module.exports = {
     new HtmlWebpackPlugin({ template: "./index.html" }),
     new WasmPackPlugin({
       crateDirectory: __dirname,
+      extraArgs: "--scope 1io",
     }),
   ],
   mode: "development",

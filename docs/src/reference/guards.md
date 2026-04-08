@@ -22,9 +22,9 @@ Therefore, transactions rejected by Guards will not make it to the [CO](../refer
 ```admonish info title="COKIT and GUARD"
 GUARD is the optional **trust layer extension** for COKIT. It adds advanced governance, policy enforcement and trust verification on top of the open COKIT platform.
 
-GUARD implementations live in a separate repository: **`guard`**. This repository is source-available under the Guard Source License (CGSL-1.0) — anyone can inspect and audit the trust logic.
+GUARD implementations live in a separate repository: **`guard`**. This repository is source-available under the COKIT Guard Source License (CGSL) — anyone can inspect and audit the trust logic.
 
-The COKIT repository contains the guard **interfaces** (traits and hooks), behind the `guard` feature flag (`--features guard`). GUARD **implementations** — including the participant guard in `co-core-co` and the PoA consensus guard — require the `co-guard` package.
+The COKIT repository contains the guard **interfaces** (traits and hooks), behind the `guard` feature flag (`--features guard`). GUARD **implementations** — including the participant guard in `co-core-co` and the PoA consensus guard — require the `co-guard` crate from the `guard` repository.
 
 COKIT builds and runs fully without GUARD. See the [Legal Notice](../license/legal-notice.md) for details.
 ```

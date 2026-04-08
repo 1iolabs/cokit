@@ -3,6 +3,7 @@
 
 mod actor;
 mod block_storage;
+mod dynamic_value;
 mod js;
 mod list;
 mod map;

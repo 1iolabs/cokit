@@ -23,7 +23,7 @@ This reservation is directed at:
 
 - AGPL-licensed COKIT source code, documentation, examples and comments;
 - source-available GUARD components (distributed separately under the
-  1io Guard Source License CGSL-1.0);
+  COKIT Guard Source License (CGSL));
 - repository documentation, metadata, configuration and website content;
 - automated crawling and ingestion of the above for AI/ML model training,
   fine-tuning, embedding, or indexing workflows that rely on statutory TDM

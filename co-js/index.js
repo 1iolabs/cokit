@@ -221,6 +221,13 @@ async function test_co_list() {
   );
 }
 
+async function test_big_int() {
+  const [storage, _] = newStorage();
+  const list = new CoList();
+  console.debug("test", await list.push(storage, 10));
+  assertEq(await list.pop(storage), 10);
+}
+
 async function test_unixfs_add() {
   const [storage, _] = newStorage();
   const stream = new ReadableStream({
@@ -301,6 +308,8 @@ function assertEq(actual, expected) {
 }
 
 async function tests() {
+  await test_async(test_big_int);
+
   await test_async(test_co_map);
   await test_async(test_co_set);
   await test_async(test_co_list);
