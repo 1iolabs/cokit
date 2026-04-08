@@ -94,12 +94,12 @@ build:
     - rustc -vV
     - echo "> building cores"
     - cargo run --package co-cli --release --features zst -- core build-builtin --zst
-    - cat "cores/Cores.toml"
+    - cat "co-sdk/Cores.toml"
     - echo "> building binaries"
     - cargo build --release --features bundle-wasm-cores
   artifacts:
     paths:
-      - cores/Cores.toml
+      - co-sdk/Cores.toml
       - target/release/co
       - target/release/daemon
       - target-wasm/wasm32-unknown-unknown/release/*.wasm
