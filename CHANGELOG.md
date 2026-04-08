@@ -37,7 +37,7 @@
 
 ## Milestone Releases
 
-### cokit-v0.1.0 — Initial Release
+### v0.1.0 — Initial Release
 
 | Crate | Version |
 |-------|---------|
