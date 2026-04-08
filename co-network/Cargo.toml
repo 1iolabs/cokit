@@ -25,7 +25,7 @@ futures = { workspace = true }
 ipld-core = { workspace = true }
 libipld = "0.16"
 libp2p = { version = "0.56", default-features = false, features = ["identify", "ping", "gossipsub", "relay", "dcutr", "autonat", "noise", "yamux", "macros", "request-response", "serde", "rendezvous"] }
-libp2p-bitswap = { version = "0.25.0", git = "https://github.com/dkuhnert/libp2p-bitswap.git", branch = "auth", default-features = false, features = ["compat"] }
+libp2p-bitswap = { package = "co-libp2p-bitswap", version = "0.26.0", default-features = false, features = ["compat"] }
 multiaddr = { workspace = true }
 pin-project = { workspace = true }
 rand = { workspace = true }

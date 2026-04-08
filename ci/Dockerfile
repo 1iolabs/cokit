@@ -30,6 +30,9 @@ RUN rustup component add rustfmt \
 # cargo-binstall
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
 
+# TOOLS
+RUN cargo binstall -y cargo-deny cargo-release git-cliff cargo-semver-checks wasm-pack
+
 # MDBOOK
 COPY scripts/docs-setup.sh /usr/local/bin/docs-setup.sh
 RUN /usr/local/bin/docs-setup.sh \

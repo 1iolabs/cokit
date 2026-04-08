@@ -57,7 +57,6 @@ license:
   cache:
     <<: *global_cache
   script:
-    - cargo install cargo-deny --locked || true
     - cargo deny check licenses
 
 # verify all tests are running to success
@@ -128,6 +127,27 @@ docs:
   artifacts:
     paths:
       - docs/book
+
+# detect accidental semver violations
+semver:
+  stage: lint
+  image: ${DOCKERFILE_IMAGE}
+  cache:
+    <<: *global_cache
+  script:
+    - cargo semver-checks check-release --workspace
+  allow_failure: true
+
+# publish to crates.io (triggered by version tag push)
+release:
+  stage: publish
+  image: ${DOCKERFILE_IMAGE}
+  cache:
+    <<: *global_cache
+  script:
+    - ./ci/scripts/release-publish.sh
+  only:
+    - /^co-.*-v.*$/
 
 # export pages
 pages:
