@@ -610,10 +610,14 @@ For workspace cores, add `co-storage` to `[dev-dependencies]`. For standalone co
 
 ## Action Design
 
-Actions are sorted by the Log and should be **as order-independent as possible**. The more order-independent they are, the better the CRDT handles conflicts between concurrent participants.
+Cokit uses **command sourcing** — actions represent semantic intent, not generic CRUD operations. This is critical for CRDT conflict resolution: when concurrent actions are reordered, the reducer can apply their *meaning* dynamically rather than blindly executing static operations.
+
+For example, instead of generic `Update { field: "status", value: "approved" }`, use `Approve { id }`. The reducer for `Approve` knows to check the current workflow state, validate the approver's permissions, and transition correctly — regardless of what other actions were reordered around it. A generic `Update` would just overwrite a field, losing the semantic context needed to resolve conflicts.
 
 Key principles:
-- **Keep actions as logical operations** — a "move" should be a single `Move { from, to }` action, not a `Remove` followed by an `Add`. Splitting logical operations into multiple actions creates ordering dependencies that break under CRDT reordering.
+- **Name actions by what they mean** — `Invite`, `Accept`, `Archive`, `Move { from, to }`, not `Set`, `Update`, `Delete`. The action name should describe the user's intent, not the storage operation.
+- **Keep actions as logical operations** — a "move" should be a single `Move { from, to }` action, not a `Remove` followed by an `Add`. Splitting logical operations creates ordering dependencies that break under CRDT reordering.
+- **Actions should be as order-independent as possible** — the more order-independent they are, the better the CRDT handles conflicts. Semantic actions naturally achieve this because the reducer can interpret intent against current state.
 - **Each action sees a consistent state** and is applied atomically (all or nothing).
 - **Actions must be serializable** into content-addressed blocks (the `#[co]` macro handles this).
 
