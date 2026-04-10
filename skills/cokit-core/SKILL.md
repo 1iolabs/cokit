@@ -5,7 +5,7 @@ description: "Build cokit cores using the co_api package. Use this skill wheneve
 
 # Building Cokit Cores
 
-A cokit **core** (CO Reducer) is a Rust library compiled to WASM that implements state management via the **Reducer** pattern. Cores receive actions, transform state, and return a link to the new state. All data is content-addressed (CID-based) and stored via `CoreBlockStorage`.
+A cokit **core** (CO Reducer) is a Rust library compiled to WASM that combines **data model, business logic, and storage** in one unit. Cores receive actions, validate and verify them, apply business rules, and produce the next state. They are responsible for permission checks, input validation, and enforcing invariants — not just storing data. All state is content-addressed (CID-based) and persisted via `CoreBlockStorage`.
 
 Cores can live **anywhere** — inside the cokit workspace (under `cores/`) or as standalone crates in their own repository. The only requirement is a dependency on `co-api`.
 
