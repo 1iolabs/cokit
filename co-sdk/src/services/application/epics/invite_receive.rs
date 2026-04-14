@@ -81,6 +81,8 @@ async fn invited(context: CoContext, peer: PeerId, header: DidCommHeader, body: 
 			from,
 			network: payload.connectivity.clone(),
 			peer: Some(peer.to_bytes()),
+			name: payload.name.clone(),
+			tags: payload.tags.clone(),
 		};
 		let membership_tags = tags!(
 			{KnownTags::CoInviteMetadata}: storage.set_serialized(&metadata).await?,

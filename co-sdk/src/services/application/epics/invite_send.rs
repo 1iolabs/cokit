@@ -102,6 +102,7 @@ async fn create_invite(
 		&to_identity,
 		CoInvitePayload {
 			id: co_id.to_owned(),
+			name: Some(co.name.clone()),
 			tags: co.tags.clone(),
 			state: state.ok_or(anyhow!("Can not invite to empty CO"))?,
 			heads,
