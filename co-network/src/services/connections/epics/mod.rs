@@ -3,7 +3,7 @@
 
 use super::{action::ConnectionAction, ConnectionState};
 use crate::services::connections::actor::ConnectionsContext;
-use co_actor::{Epic, MergeEpic, TracingEpic};
+use co_actor::{Epic, MergeEpic, TapEpic};
 use co_primitives::Tags;
 
 mod bootstrap_health;
@@ -23,5 +23,7 @@ pub fn epic(tags: Tags) -> impl Epic<ConnectionAction, ConnectionState, Connecti
 		.join(insufficent_peers::InsufficentPeersEpic::default())
 		.join(peers_threshold::peers_threshold_epic)
 		.join(bootstrap_health::bootstrap_health_epic)
-		.join(TracingEpic::new(tags))
+		.join(TapEpic::new(move |action: &ConnectionAction, state: &ConnectionState| {
+			tracing::debug!(?action, ?state, ?tags, "connections-action");
+		}))
 }

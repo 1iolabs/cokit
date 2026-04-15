@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use crate::{library::find_membership::find_membership_by, CoReducer};
+use crate::{library::find_membership::find_membership_by, CoOptions, CoReducer};
+use co_actor::time;
 use co_core_membership::{Membership, MembershipState};
 use co_primitives::{CoId, CoTryStreamExt, Did};
 use futures::{StreamExt, TryStreamExt};
@@ -55,4 +56,23 @@ pub async fn wait_shared_membership_active(
 	} else {
 		Ok(None)
 	}
+}
+
+/// Find active shared membership with options.
+pub async fn shared_membership_active_options(
+	parent: &CoReducer,
+	co: &CoId,
+	identity: Option<&Did>,
+	options: CoOptions,
+) -> Result<Option<Membership>, anyhow::Error> {
+	// find first active membership
+	Ok(if options.wait {
+		if let Some(timeout) = options.wait_timeout {
+			time::timeout(timeout, wait_shared_membership_active(parent, co, identity)).await??
+		} else {
+			wait_shared_membership_active(parent, co, identity).await?
+		}
+	} else {
+		shared_membership_active(parent, co, identity).await?
+	})
 }

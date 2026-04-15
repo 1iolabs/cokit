@@ -298,6 +298,31 @@ where
 	}
 }
 
+/// Observe each action and state for side effects without producing actions.
+pub struct TapEpic<F>(F);
+impl<F> TapEpic<F> {
+	pub fn new(callback: F) -> Self {
+		Self(callback)
+	}
+}
+impl<A, S, C, F> Epic<A, S, C> for TapEpic<F>
+where
+	A: Send + 'static,
+	S: Send + 'static,
+	F: Fn(&A, &S) + Send + 'static,
+{
+	fn epic(
+		&mut self,
+		_actions: &Actions<A, S, C>,
+		action: &A,
+		state: &S,
+		_context: &C,
+	) -> Option<impl Stream<Item = Result<A, anyhow::Error>> + 'static> {
+		(self.0)(action, state);
+		Option::<Empty<_>>::None
+	}
+}
+
 /// Only allow to run epic once.
 /// Once the epic returns another stream the previous will be dropped.
 pub struct SwitchEpic<E>(E, Option<CancellationToken>);

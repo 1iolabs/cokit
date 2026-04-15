@@ -3,7 +3,7 @@
 
 use super::Action;
 use crate::CoContext;
-use co_actor::{Epic, MergeEpic, TracingEpic};
+use co_actor::{Epic, MergeEpic, TapEpic};
 use co_primitives::Tags;
 
 #[cfg(feature = "network")]
@@ -108,5 +108,7 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(pending_resolve::pending_resolve);
 
 	// trace
-	epic.join(TracingEpic::new(tags))
+	epic.join(TapEpic::new(move |action: &Action, state: &()| {
+		tracing::debug!(?action, ?state, ?tags, "application-action");
+	}))
 }

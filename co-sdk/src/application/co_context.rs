@@ -9,10 +9,8 @@ use crate::{
 		shared::{SharedCoBuilder, SharedCoCreator},
 	},
 	library::{
-		builtin_cores::builtin_cores,
-		contact_handler::DynamicContactHandler,
-		shared_membership::{shared_membership_active, wait_shared_membership_active},
-		wait_response::request_response,
+		builtin_cores::builtin_cores, contact_handler::DynamicContactHandler,
+		shared_membership::shared_membership_active_options, wait_response::request_response,
 	},
 	reducer::core_resolver::{dynamic::DynamicCoreResolver, log::LogCoreResolver},
 	services::{
@@ -27,7 +25,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use cid::Cid;
-use co_actor::{time, ActorHandle};
+use co_actor::ActorHandle;
 use co_core_membership::Membership;
 use co_identity::{
 	IdentityResolverBox, LocalIdentity, PrivateIdentity, PrivateIdentityResolver, PrivateIdentityResolverBox,
@@ -535,16 +533,7 @@ impl CoContextInner {
 		options: CoOptions,
 	) -> Result<Option<CoReducer>, anyhow::Error> {
 		// find first active membership
-		let membership = if options.wait {
-			if let Some(timeout) = options.wait_timeout {
-				time::timeout(timeout, wait_shared_membership_active(&parent, co, identity.as_ref())).await??
-			} else {
-				wait_shared_membership_active(&parent, co, identity.as_ref()).await?
-			}
-		} else {
-			shared_membership_active(&parent, co, identity.as_ref()).await?
-		};
-		let membership = match membership {
+		let membership = match shared_membership_active_options(&parent, co, identity.as_ref(), options).await? {
 			Some(m) => m,
 			None => return Ok(None),
 		};

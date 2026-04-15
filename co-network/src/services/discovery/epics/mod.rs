@@ -2,7 +2,7 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use super::{action::DiscoveryAction, actor::DiscoveryContext, state::DiscoveryState};
-use co_actor::{Epic, MergeEpic, TracingEpic};
+use co_actor::{Epic, MergeEpic, TapEpic};
 use co_primitives::Tags;
 
 mod connect;
@@ -23,5 +23,7 @@ pub fn epic(tags: Tags) -> impl Epic<DiscoveryAction, DiscoveryState, DiscoveryC
 		.join(did_listen::DidListenEpic::new())
 		.join(mesh_peers::mesh_peers_epic)
 		.join(timeout::TimeoutEpic::new())
-		.join(TracingEpic::new(tags))
+		.join(TapEpic::new(move |action: &DiscoveryAction, state: &DiscoveryState| {
+			tracing::debug!(?action, ?state, ?tags, "discovery-action");
+		}))
 }

@@ -23,7 +23,7 @@ pub use actor::{Actor, ActorError, ActorHandle, ActorInstance, ActorSpawner, Act
 pub use actor_local::{LocalActor, LocalActorInstance, LocalActorSpawner};
 pub use backend::{TaskHandle, TaskSpawner};
 pub use epic::{
-	ActionDispatch, Actions, BoxEpic, Epic, EpicExt, EpicRuntime, JoinEpic, MergeEpic, SwitchEpic, TracingEpic,
+	ActionDispatch, Actions, BoxEpic, Epic, EpicExt, EpicRuntime, JoinEpic, MergeEpic, SwitchEpic, TapEpic, TracingEpic,
 };
 #[cfg(feature = "js")]
 pub use js::JsLocalTaskSpawner;

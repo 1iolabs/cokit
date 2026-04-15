@@ -5,7 +5,7 @@ use crate::services::heads::{
 	actor::{HeadsContext, HeadsState},
 	HeadsAction,
 };
-use co_actor::{Epic, EpicExt, TracingEpic};
+use co_actor::{Epic, EpicExt, TapEpic};
 use co_primitives::Tags;
 
 mod listen;
@@ -18,5 +18,7 @@ pub fn epic(tags: Tags) -> impl Epic<HeadsAction, HeadsState, HeadsContext> {
 		.join(unsubscribe::unsubscribe)
 		.join(publish::publish)
 		.join(listen::listen)
-		.join(TracingEpic::new(tags))
+		.join(TapEpic::new(move |action: &HeadsAction, state: &HeadsState| {
+			tracing::debug!(?action, ?state, ?tags, "heads-action");
+		}))
 }
