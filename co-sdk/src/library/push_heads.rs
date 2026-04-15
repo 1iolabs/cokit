@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use cid::Cid;
 use co_actor::{
-	Actions, Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, Reducer, SwitchEpic, TaskSpawner, TracingEpic,
+	Actions, Actor, ActorError, ActorHandle, Epic, EpicExt, EpicRuntime, Reducer, SwitchEpic, TapEpic, TaskSpawner,
 };
 use co_identity::{Identity, PeerDidCommHeader, PrivateIdentity, PrivateIdentityBox};
 use co_network::{connections::ConnectionMessage, EncodedMessage, HeadsMessage, NetworkApi, PeerId};
@@ -83,9 +83,12 @@ impl Actor for PushHeadsActor {
 		Ok((
 			initialize,
 			EpicRuntime::new(
-				PushHeadsSendEpic::new()
-					.join(PushHeadsConnectEpic::new())
-					.join(TracingEpic::new(tags.clone())),
+				PushHeadsSendEpic::new().join(PushHeadsConnectEpic::new()).join(TapEpic::new({
+					let tags = tags.clone();
+					move |action: &PushHeadsAction, state: &PushHeadsState| {
+						tracing::debug!(?action, ?state, ?tags, "push-heads-action");
+					}
+				})),
 				move |err| {
 					tracing::error!(?err, ?co, "push-heads-error");
 					None
