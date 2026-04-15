@@ -39,7 +39,7 @@ panic = "unwind"
 anyhow = { version = "1", features = ["backtrace"] }
 async-stream = "0.3.3"
 async-trait = "0.1.57"
-cid = "0.11.1"
+cid = "0.11.2"
 co-guard = { version = "0.1.0" }
 derive_more = "0.99.17"
 either = { version = "1" }
@@ -53,7 +53,7 @@ js-sys = "0.3"
 multiaddr = "0.18.2"
 multibase = "0.9.1"
 multihash = "0.19.3"
-multihash-codetable = { version = "0.1.4", features = ["blake3"] }
+multihash-codetable = { version = "0.2.1", features = ["blake3"] }
 num-rational = "0.4"
 pin-project = "1.1.4"
 rand = "0.8.5"
