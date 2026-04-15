@@ -246,6 +246,8 @@ async fn test_unrelated_peer_auto_state() {
 		from: identity1.identity().to_owned(),
 		peer: Some(network1.local_peer_id().to_bytes()),
 		network: Default::default(),
+		tags: Default::default(),
+		name: Default::default(),
 	};
 	let metadata_cid = local_co.storage().set_serialized(&metadata).await.unwrap();
 	let membership_tags = tags!(
@@ -346,6 +348,8 @@ async fn test_unrelated_auto_state_encrypted() {
 		from: identity1.identity().to_owned(),
 		peer: Some(network1.local_peer_id().to_bytes()),
 		network: Default::default(),
+		tags: Default::default(),
+		name: Default::default(),
 	};
 	let metadata_cid = local_co.storage().set_serialized(&metadata).await.unwrap();
 	let membership_tags = tags!(
