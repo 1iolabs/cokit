@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use crate::{Did, IsDefault, Network};
+use crate::{Did, IsDefault, Network, Tags};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -20,6 +20,14 @@ pub struct CoInviteMetadata {
 	/// CO Connectivity
 	#[serde(default, skip_serializing_if = "IsDefault::is_default")]
 	pub network: CoConnectivity,
+
+	/// CO name.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub name: Option<String>,
+
+	/// CO tags from the invite.
+	#[serde(default, skip_serializing_if = "IsDefault::is_default")]
+	pub tags: Tags,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]

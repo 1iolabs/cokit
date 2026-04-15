@@ -34,7 +34,11 @@ pub struct CoInvitePayload {
 	/// The CO ID.
 	pub id: CoId,
 
-	/// The invite tags.
+	/// The CO name.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub name: Option<String>,
+
+	/// The CO tags.
 	pub tags: Tags,
 
 	/// The latest known CO State (external - encrypted if the CO is not public).

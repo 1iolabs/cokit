@@ -24,6 +24,8 @@ pub async fn join_unrelated_co(
 		from: to.identity().to_owned(),
 		peer: None,
 		network: CoConnectivity { network: to_networks, participants: Default::default() },
+		name: Default::default(),
+		tags: Default::default(),
 	};
 	local_co
 		.push(
