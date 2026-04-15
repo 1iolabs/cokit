@@ -122,6 +122,7 @@ impl Actor for ReducersActor {
 									parent,
 									id.clone(),
 									timeout,
+									options.co,
 								)
 								.await;
 								control.create_storage(id, result).await;
@@ -175,7 +176,7 @@ impl Actor for ReducersActor {
 											Ok(Some(reducer)) => Ok(reducer),
 											Ok(None) => Err(CoReducerFactoryError::CoNotFound(
 												id.clone(),
-												anyhow!("Create retuned None"),
+												anyhow!("Create returned None"),
 											)),
 											Err(err) => Err(CoReducerFactoryError::Create(id.clone(), err)),
 										}

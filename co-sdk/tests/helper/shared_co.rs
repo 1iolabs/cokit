@@ -171,7 +171,7 @@ impl SharedCo {
 	}
 }
 
-async fn wait_membership_state(
+pub async fn wait_membership_state(
 	actions: impl Stream<Item = Action>,
 	state: impl IntoIterator<Item = MembershipState>,
 ) -> Option<(MembershipState, CoId, Did)> {

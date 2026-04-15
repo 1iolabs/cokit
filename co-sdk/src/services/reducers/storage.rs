@@ -5,10 +5,10 @@ use crate::{
 	application::shared::SharedCoBuilder,
 	library::{
 		builtin_cores::builtin_cores, network_identity::network_identity_did,
-		shared_membership::shared_membership_active,
+		shared_membership::shared_membership_active_options,
 	},
 	types::co_reducer_factory::CoReducerFactoryError,
-	ApplicationMessage, CoReducer, CoStorage,
+	ApplicationMessage, CoOptions, CoReducer, CoStorage,
 };
 use anyhow::anyhow;
 use co_actor::ActorHandle;
@@ -44,8 +44,9 @@ impl ReducerStorage {
 		parent: CoReducer,
 		id: CoId,
 		key_request_timeout: Duration,
+		options: CoOptions,
 	) -> Result<ReducerStorage, CoReducerFactoryError> {
-		let membership = shared_membership_active(&parent, &id, None)
+		let membership = shared_membership_active_options(&parent, &id, None, options)
 			.await?
 			.ok_or(CoReducerFactoryError::CoNotFound(id, anyhow!("No active membership")))?;
 		Self::from_membership(handle, &storage, &parent, membership, key_request_timeout)
