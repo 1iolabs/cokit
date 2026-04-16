@@ -9,8 +9,9 @@ use co_sdk::{
 	build_core, crate_repository_path, Application, ApplicationBuilder, BuildCoreArtifact, CoReducer, CO_CORE_NAME_CO,
 };
 use co_storage::MemoryBlockStorage;
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode};
 use example_counter::{Counter, CounterAction};
+use std::time::Duration;
 use tokio::runtime::Builder;
 
 async fn build_counter() -> (Cid, Core, BuildCoreArtifact) {
@@ -64,16 +65,42 @@ async fn transaction_push(local_co: &CoReducer, count: usize) {
 	tx.commit().await.unwrap();
 }
 
+/// Maximum wall-clock time per benchmark case (sequential or transaction at a given count).
+const MAX_BENCH_DURATION: Duration = Duration::from_secs(30);
+const SAMPLE_SIZE: usize = 10;
+const COUNTS: &[usize] = &[10, 100, 1000];
+
 fn benchmark(c: &mut Criterion) {
 	let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 
-	let mut group = c.benchmark_group("push_batch");
-	for count in [10, 100, 1000] {
-		let (_app_seq, co_seq) = runtime.block_on(setup());
-		group.bench_with_input(BenchmarkId::new("sequential", count), &count, |b, &count| {
-			b.to_async(&runtime).iter(|| sequential_push(&co_seq, count));
-		});
+	// probe: measure one sequential push to estimate per-action cost
+	let (_probe_app, probe_co) = runtime.block_on(setup());
+	let probe_start = std::time::Instant::now();
+	runtime.block_on(sequential_push(&probe_co, 1));
+	let push_cost = probe_start.elapsed();
+	drop((_probe_app, probe_co));
 
+	let mut group = c.benchmark_group("push_batch");
+	group.sample_size(SAMPLE_SIZE);
+	group.sampling_mode(SamplingMode::Flat);
+
+	for &count in COUNTS {
+		// estimate sequential duration: per-action cost * count * samples
+		let estimated = push_cost * (count as u32) * (SAMPLE_SIZE as u32);
+		if estimated < MAX_BENCH_DURATION {
+			group.measurement_time(estimated.max(Duration::from_secs(1)));
+			let (_app_seq, co_seq) = runtime.block_on(setup());
+			group.bench_with_input(BenchmarkId::new("sequential", count), &count, |b, &count| {
+				b.to_async(&runtime).iter(|| sequential_push(&co_seq, count));
+			});
+		} else {
+			eprintln!(
+				"skipping sequential/{count}: estimated {estimated:.1?} exceeds {MAX_BENCH_DURATION:.0?} (push_cost={push_cost:.1?})"
+			);
+		}
+
+		// transaction is fast — always bench
+		group.measurement_time(Duration::from_secs(5));
 		let (_app_tx, co_tx) = runtime.block_on(setup());
 		group.bench_with_input(BenchmarkId::new("transaction", count), &count, |b, &count| {
 			b.to_async(&runtime).iter(|| transaction_push(&co_tx, count));
