@@ -33,6 +33,15 @@ pub enum ReducerMessage {
 		Response<Result<CoReducerState, anyhow::Error>>,
 	),
 
+	/// Integrate a committed transaction into the reducer.
+	PushBatch(
+		Option<OverlayBlockStorage<CoStorage>>,
+		CoStorage,
+		PrivateIdentityBox,
+		CoReducerState,
+		Response<Result<CoReducerState, anyhow::Error>>,
+	),
+
 	/// Clear reducer caches.
 	Clear(Response<CoReducerState>),
 }

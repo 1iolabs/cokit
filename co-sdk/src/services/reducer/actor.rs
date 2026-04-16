@@ -17,6 +17,7 @@ use crate::{
 	Action, ApplicationMessage, CoStorage, Reducer, ReducerChangeContext, Runtime,
 };
 use async_trait::async_trait;
+use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, ResponseStreams};
 use co_identity::{Identity, PrivateIdentityBox};
 use co_primitives::{
@@ -100,6 +101,10 @@ impl Actor for ReducerActor {
 			},
 			ReducerMessage::Push(overlay_storage, storage, identity, action_link, response) => {
 				response.respond(handle_push(self, overlay_storage, state, identity, storage, action_link).await);
+			},
+			ReducerMessage::PushBatch(overlay_storage, storage, identity, memory_state, response) => {
+				response
+					.respond(handle_push_batch(self, overlay_storage, state, identity, storage, memory_state).await);
 			},
 			ReducerMessage::JoinState(overlay_storage, storage, join_state, response) => {
 				response.respond(handle_join_state(self, overlay_storage, state, storage, join_state).await);
@@ -199,6 +204,46 @@ async fn handle_push(
 	Ok(result_state)
 }
 
+async fn handle_push_batch(
+	actor: &ReducerActor,
+	overlay_storage: Option<OverlayBlockStorage<CoStorage>>,
+	reducer_state: &mut ReducerState,
+	identity: PrivateIdentityBox,
+	storage: CoStorage,
+	memory_state: CoReducerState,
+) -> Result<CoReducerState, anyhow::Error> {
+	// save previous heads for reactive dispatch walk
+	let previous_heads = reducer_state.reducer.heads().clone();
+
+	// integrate pre-computed state via snapshot + join
+	if let Some((state, heads)) = memory_state.some() {
+		reducer_state.reducer.insert_snapshot(&storage, state, heads).await?;
+	}
+	let join_result = reducer_state
+		.reducer
+		.join(&storage, &memory_state.1, actor.runtime.runtime())
+		.await?;
+
+	if join_result.is_some() {
+		// changed (local push semantics, not join)
+		let roots = [CoReducerState::new_reducer(&reducer_state.reducer), memory_state];
+		changed(reducer_state, true, Some(identity.identity()), roots);
+	}
+
+	// capture heads before flush — flush can add pinning batch actions (local.rs)
+	// that must not be included in the transaction's reactive dispatch
+	let transaction_heads = reducer_state.reducer.heads().clone();
+
+	// flush
+	flush(actor, reducer_state, overlay_storage, &storage).await?;
+
+	// reactive dispatch — walk only transaction entries (pre-flush heads), not flush-generated ones
+	dispatch_actions(actor, storage, transaction_heads, previous_heads).await?;
+
+	// result
+	Ok(handle_state(reducer_state))
+}
+
 /// See: [`handle_join`]
 async fn handle_join_state(
 	actor: &ReducerActor,
@@ -224,33 +269,42 @@ async fn handle_join_state(
 		// we use the current heads as the flush may applied more actions
 		let heads = reducer_state.reducer.heads().clone();
 		let previous_heads = join_result.previous_heads.clone();
-		let mut actions = log_entries_until(storage.clone(), heads, previous_heads)
-			.map(|entry| {
-				let storage = storage.clone();
-				async move {
-					let entry = entry?;
-					let link = entry.entry().payload.into();
-					Result::<Action, anyhow::Error>::Ok(Action::CoreAction {
-						co: actor.id.clone(),
-						action: storage.get_value(&link).await?,
-						storage,
-						context: ReducerChangeContext::new_join(),
-						cid: link,
-						head: *entry.cid(),
-					})
-				}
-			})
-			.buffered(10)
-			.try_collect::<Vec<Action>>()
-			.await?;
-		actions.reverse();
-		for action in actions {
-			actor.application_handle.dispatch(action)?;
-		}
+		dispatch_actions(actor, storage, heads, previous_heads).await?;
 	}
 
 	// result
 	Ok(handle_state(reducer_state))
+}
+
+async fn dispatch_actions(
+	actor: &ReducerActor,
+	storage: CoStorage,
+	heads: BTreeSet<Cid>,
+	previous_heads: BTreeSet<Cid>,
+) -> Result<(), anyhow::Error> {
+	let mut actions = log_entries_until(storage.clone(), heads, previous_heads)
+		.map(|entry| {
+			let storage = storage.clone();
+			async move {
+				let entry = entry?;
+				let link = entry.entry().payload.into();
+				Result::<Action, anyhow::Error>::Ok(Action::CoreAction {
+					co: actor.id.clone(),
+					action: storage.get_value(&link).await?,
+					storage,
+					context: ReducerChangeContext::new_join(),
+					cid: link,
+					head: *entry.cid(),
+				})
+			}
+		})
+		.buffered(10)
+		.try_collect::<Vec<Action>>()
+		.await?;
+	actions.reverse();
+	Ok(for action in actions {
+		actor.application_handle.dispatch(action)?;
+	})
 }
 
 async fn flush(

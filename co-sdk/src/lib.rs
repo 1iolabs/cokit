@@ -85,7 +85,7 @@ pub use reducer::core_resolver::{
 pub use services::application::KeyRequestAction;
 pub use services::{
 	application::{Action, ActionError, ApplicationMessage, ContactAction},
-	reducer::CoReducer,
+	reducer::{CoReducer, CoReducerTransaction},
 };
 #[cfg(feature = "guard")]
 pub use types::guards::create_default_guards;
