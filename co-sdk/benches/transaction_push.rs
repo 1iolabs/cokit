@@ -6,8 +6,7 @@ use co_core_co::CoAction;
 use co_identity::LocalIdentity;
 use co_runtime::Core;
 use co_sdk::{
-	build_core, crate_repository_path, Application, ApplicationBuilder, BuildCoreArtifact, CoReducer,
-	CO_CORE_NAME_CO,
+	build_core, crate_repository_path, Application, ApplicationBuilder, BuildCoreArtifact, CoReducer, CO_CORE_NAME_CO,
 };
 use co_storage::MemoryBlockStorage;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
@@ -49,7 +48,10 @@ async fn setup() -> (Application, CoReducer) {
 async fn sequential_push(local_co: &CoReducer, count: usize) {
 	let identity = LocalIdentity::new("bench");
 	for index in 0..count {
-		local_co.push(&identity, "counter", &CounterAction::Increment(index as i64)).await.unwrap();
+		local_co
+			.push(&identity, "counter", &CounterAction::Increment(index as i64))
+			.await
+			.unwrap();
 	}
 }
 
