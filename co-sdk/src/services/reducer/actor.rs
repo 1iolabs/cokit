@@ -238,7 +238,7 @@ async fn handle_push_batch(
 	flush(actor, reducer_state, overlay_storage, &storage).await?;
 
 	// reactive dispatch — walk only transaction entries (pre-flush heads), not flush-generated ones
-	dispatch_actions(actor, storage, transaction_heads, previous_heads).await?;
+	dispatch_actions(actor, storage, transaction_heads, previous_heads, ReducerChangeContext::new()).await?;
 
 	// result
 	Ok(handle_state(reducer_state))
@@ -269,7 +269,7 @@ async fn handle_join_state(
 		// we use the current heads as the flush may applied more actions
 		let heads = reducer_state.reducer.heads().clone();
 		let previous_heads = join_result.previous_heads.clone();
-		dispatch_actions(actor, storage, heads, previous_heads).await?;
+		dispatch_actions(actor, storage, heads, previous_heads, ReducerChangeContext::new_join()).await?;
 	}
 
 	// result
@@ -281,10 +281,12 @@ async fn dispatch_actions(
 	storage: CoStorage,
 	heads: BTreeSet<Cid>,
 	previous_heads: BTreeSet<Cid>,
+	context: ReducerChangeContext,
 ) -> Result<(), anyhow::Error> {
 	let mut actions = log_entries_until(storage.clone(), heads, previous_heads)
 		.map(|entry| {
 			let storage = storage.clone();
+			let context = context.clone();
 			async move {
 				let entry = entry?;
 				let link = entry.entry().payload.into();
@@ -292,7 +294,7 @@ async fn dispatch_actions(
 					co: actor.id.clone(),
 					action: storage.get_value(&link).await?,
 					storage,
-					context: ReducerChangeContext::new_join(),
+					context,
 					cid: link,
 					head: *entry.cid(),
 				})
@@ -302,9 +304,10 @@ async fn dispatch_actions(
 		.try_collect::<Vec<Action>>()
 		.await?;
 	actions.reverse();
-	Ok(for action in actions {
+	for action in actions {
 		actor.application_handle.dispatch(action)?;
-	})
+	}
+	Ok(())
 }
 
 async fn flush(

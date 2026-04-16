@@ -105,7 +105,7 @@ async fn test_transaction_same_state_as_sequential_push() {
 	let (_app1, co1, identity1) = setup_shared_counter(counter, counter_core.clone(), &counter_artifact).await;
 	let (_app2, co2, identity2) = setup_shared_counter(counter, counter_core, &counter_artifact).await;
 
-	let actions: Vec<CounterAction> = (1..=20).map(|index| CounterAction::Increment(index)).collect();
+	let actions: Vec<CounterAction> = (1..=20).map(CounterAction::Increment).collect();
 
 	// sequential push on co1
 	for action in &actions {

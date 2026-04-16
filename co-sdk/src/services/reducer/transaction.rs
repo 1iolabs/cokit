@@ -150,7 +150,7 @@ impl CoReducerTransaction {
 		}
 
 		// get pre-computed state from transaction actor
-		let memory_state = self.handle.try_request(|response| TransactionMessage::Commit(response)).await?;
+		let memory_state = self.handle.try_request(TransactionMessage::Commit).await?;
 
 		// integrate into main reducer
 		self.reducer.commit_transaction(self.identity, memory_state).await
