@@ -6,8 +6,10 @@ mod api;
 mod flush;
 mod message;
 mod storage;
+mod transaction;
 
 pub use actor::ReducerActor;
 pub use api::CoReducer;
 pub use flush::{FlushInfo, ReducerFlush};
 pub use storage::ReducerBlockStorage;
+pub use transaction::CoReducerTransaction;
