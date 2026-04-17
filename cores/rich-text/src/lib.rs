@@ -861,7 +861,10 @@ where
 			if start_found {
 				if let Some(last) = last {
 					if run.contains(*last) {
-						return Ok(Range { start, end: if !run.deleted { index + at.1 - run.id.1 } else { index } });
+						return Ok(Range {
+							start,
+							end: if !run.deleted { index + last.1 - run.id.1 + 1 } else { index },
+						});
 					}
 				} else if run.deleted && start_deleted {
 					// return a empty range as the range is fully deleted
@@ -1244,5 +1247,40 @@ mod tests {
 		let last = *characters.last().unwrap();
 		let state = dispatch(&storage, &mut time, state, DeleteAction { at: first, last: Some(last) }).await;
 		assert_eq!(state.plain_text(&storage).await.unwrap().as_str(), "hellorld");
+	}
+
+	#[tokio::test]
+	async fn test_text_model_range_uses_last_position_for_span_end() {
+		use crate::TextModel;
+
+		let storage = MemoryBlockStorage::default();
+		let mut time = 1;
+
+		let state = dispatch(
+			&storage,
+			&mut time,
+			RichText::default(),
+			InsertAction { at: InsertionPoint::Start, attributes: Default::default(), text: "hello".to_owned() },
+		)
+		.await;
+
+		let positions = state
+			.chars(storage.clone())
+			.map_ok(|(_char, position, _attributes)| position)
+			.skip(1)
+			.take(3)
+			.try_collect::<Vec<_>>()
+			.await
+			.unwrap();
+
+		let at = *positions.first().unwrap();
+		let last = *positions.last().unwrap();
+
+		let state_link = storage.set_value(&state).await.unwrap();
+		let model = TextModel { storage: storage.clone(), state: state_link.into() };
+
+		let range = model.range(&at, &Some(last)).await.unwrap();
+
+		assert_eq!(range, 1..4);
 	}
 }
