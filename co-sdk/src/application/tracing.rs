@@ -150,7 +150,7 @@ impl TracingBuilder {
 			let result = set_global_default(subscriber);
 			match result {
 				Ok(_) => {
-					LogTracer::init()?;
+					init_log_tracer()?;
 					Ok(())
 				},
 				Err(err) if optional => {
@@ -169,13 +169,27 @@ impl TracingBuilder {
 		// init
 		if let Some(subscriber) = self.build_subscriber()? {
 			let result = set_default(subscriber);
-			LogTracer::init()?;
+			init_log_tracer()?;
 			Ok(Some(result))
 		} else {
 			// result
 			Ok(None)
 		}
 	}
+}
+
+/// Bridge `log` crate events into `tracing`, ignoring crates that emit excessive trace/debug
+/// output (mainly the wasmer cranelift compiler backend, which can produce tens of millions of
+/// records per module compilation and trash the log file).
+fn init_log_tracer() -> Result<(), anyhow::Error> {
+	LogTracer::builder()
+		.ignore_crate("cranelift_codegen")
+		.ignore_crate("cranelift_frontend")
+		.ignore_crate("cranelift_entity")
+		.ignore_crate("cranelift_bforest")
+		.ignore_crate("regalloc2")
+		.init()?;
+	Ok(())
 }
 
 #[cfg(feature = "opentelemetry")]
