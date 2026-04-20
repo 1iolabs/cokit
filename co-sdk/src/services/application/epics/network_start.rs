@@ -8,7 +8,7 @@ use crate::{
 };
 use co_actor::{Actions, Actor};
 use co_network::{connections::DynamicNetworkResolver, Network, NetworkInitialize, NetworkMessage, NetworkSettings};
-use co_primitives::{tags, DefaultParams, StoreParams};
+use co_primitives::tags;
 use co_storage::BlockStorage;
 use futures::{FutureExt, Stream};
 
