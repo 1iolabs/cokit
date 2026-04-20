@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use super::{flush::CoReducerFlush, message::ReducerMessage, ReducerActor};
+use super::{
+	flush::CoReducerFlush,
+	message::ReducerMessage,
+	transaction::{CoReducerTransaction, TransactionActor},
+	ReducerActor,
+};
 use crate::{
 	application::memory::create_memory_reducer,
 	library::create_reducer_action::{create_reducer_action, store_reducer_action},
@@ -42,6 +47,7 @@ pub struct CoReducer {
 	core_resolver: DynamicCoreResolver<CoStorage>,
 	verify_links: Option<BlockLinks>,
 	reducer_cache: ReducerCache,
+	tasks: TaskSpawner,
 }
 impl CoReducer {
 	#[allow(clippy::too_many_arguments)]
@@ -80,6 +86,7 @@ impl CoReducer {
 			core_resolver,
 			verify_links,
 			reducer_cache,
+			tasks: tasks.clone(),
 		})
 	}
 
@@ -124,6 +131,7 @@ impl CoReducer {
 			overlay_storage,
 			verify_links: self.verify_links.clone(),
 			reducer_cache: self.reducer_cache.clone(),
+			tasks: self.tasks.clone(),
 		}
 	}
 
@@ -357,6 +365,45 @@ impl CoReducer {
 
 		// result
 		Ok(co_reducer_state)
+	}
+
+	/// Integrate a pre-computed transaction state into the reducer.
+	pub(crate) async fn commit_transaction(
+		&self,
+		identity: PrivateIdentityBox,
+		memory_state: CoReducerState,
+	) -> Result<CoReducerState, anyhow::Error> {
+		Ok(self
+			.handle
+			.try_request(|response| {
+				ReducerMessage::PushBatch(
+					self.overlay_storage.clone(),
+					self.storage.clone(),
+					identity,
+					memory_state,
+					response,
+				)
+			})
+			.await?)
+	}
+
+	/// Create a transaction for batching push operations.
+	///
+	/// Spawns a background actor that processes actions in parallel with the caller.
+	/// Call [`CoReducerTransaction::commit`] to integrate all actions and flush in one step.
+	/// Transactions are atomic — if any action fails, none are applied.
+	pub fn transaction<I>(&self, identity: I) -> Result<CoReducerTransaction, anyhow::Error>
+	where
+		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
+	{
+		let identity = PrivateIdentity::boxed(identity);
+		let actor = Actor::spawn_with(
+			self.tasks.clone(),
+			tags!("co": self.id.as_str()),
+			TransactionActor::new(self.runtime.clone(), identity.clone()),
+			(self.handle.clone(), self.storage.clone(), self.core_resolver.clone(), self.date.clone(), self.id.clone()),
+		)?;
+		Ok(CoReducerTransaction { reducer: self.clone(), identity, handle: actor.handle(), count: 0 })
 	}
 
 	/// Create a action dispatcher.
