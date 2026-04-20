@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use crate::{
-	bitswap::Token,
-	library::libipld_interop::{from_libipld_block, from_libipld_cid, to_libipld_cid},
-};
+use crate::{bitswap::Token, library::libipld_interop::from_bitswap_block};
 use anyhow::Result;
 use async_trait::async_trait;
 use cid::Cid;
@@ -12,7 +9,7 @@ use co_actor::{ActorHandle, Response};
 use co_primitives::Block;
 use co_storage::StorageError;
 use libp2p::PeerId;
-use libp2p_bitswap::BitswapStore;
+use libp2p_bitswap::{Block as BitswapBlock, BitswapStore};
 
 #[derive(Debug)]
 pub enum BitswapMessage {
@@ -33,49 +30,35 @@ impl BitswapStoreClient {
 }
 #[async_trait]
 impl BitswapStore for BitswapStoreClient {
-	type Params = libipld::DefaultParams;
-
 	#[tracing::instrument(level = tracing::Level::TRACE, ret, err(Debug), skip(self))]
-	async fn contains(&mut self, cid: &libipld::Cid, remote_peer: &PeerId, tokens: &[Token]) -> Result<bool> {
+	async fn contains(&mut self, cid: &Cid, remote_peer: &PeerId, tokens: &[Token]) -> Result<bool> {
 		Ok(self
 			.handle
-			.request(|response| {
-				BitswapMessage::Contains(from_libipld_cid(*cid), *remote_peer, tokens.to_vec(), response)
-			})
+			.request(|response| BitswapMessage::Contains(*cid, *remote_peer, tokens.to_vec(), response))
 			.await??)
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
-	async fn get(&mut self, cid: &libipld::Cid, remote_peer: &PeerId, tokens: &[Token]) -> Result<Option<Vec<u8>>> {
+	async fn get(&mut self, cid: &Cid, remote_peer: &PeerId, tokens: &[Token]) -> Result<Option<Vec<u8>>> {
 		Ok(self
 			.handle
-			.request(|response| BitswapMessage::Get(from_libipld_cid(*cid), *remote_peer, tokens.to_vec(), response))
+			.request(|response| BitswapMessage::Get(*cid, *remote_peer, tokens.to_vec(), response))
 			.await??)
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self, block), fields(cid = ?block.cid()))]
-	async fn insert(
-		&mut self,
-		block: &libipld::Block<Self::Params>,
-		remote_peer: &PeerId,
-		tokens: &[Token],
-	) -> Result<()> {
+	async fn insert(&mut self, block: &BitswapBlock, remote_peer: &PeerId, tokens: &[Token]) -> Result<()> {
 		Ok(self
 			.handle
-			.request(|response| {
-				BitswapMessage::Insert(from_libipld_block(block.clone()), *remote_peer, tokens.to_vec(), response)
-			})
+			.request(|response| BitswapMessage::Insert(from_bitswap_block(block), *remote_peer, tokens.to_vec(), response))
 			.await??)
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug), skip(self))]
-	async fn missing_blocks(&mut self, cid: &libipld::Cid, tokens: &[Token]) -> Result<Vec<libipld::Cid>> {
+	async fn missing_blocks(&mut self, cid: &Cid, tokens: &[Token]) -> Result<Vec<Cid>> {
 		Ok(self
 			.handle
-			.request(|response| BitswapMessage::MissingBlocks(from_libipld_cid(*cid), tokens.to_vec(), response))
-			.await??
-			.into_iter()
-			.map(to_libipld_cid)
-			.collect())
+			.request(|response| BitswapMessage::MissingBlocks(*cid, tokens.to_vec(), response))
+			.await??)
 	}
 }

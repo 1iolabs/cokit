@@ -248,17 +248,16 @@ fn build_behaviour(
 			.map_err(|err| anyhow!("gossip failed: {}", err))?;
 
 	// bitswap
-	let bitswap =
-		Bitswap::<libipld::DefaultParams>::new(Default::default(), BitswapStoreClient::new(context.bitswap.clone()), {
-			let bitswap_identifier = context.identifier.to_owned();
-			let tasks = context.tasks.clone();
-			Box::new(move |t| {
-				tasks.spawn(async move {
-					t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
-						.await
-				});
-			})
-		});
+	let bitswap = Bitswap::new(Default::default(), BitswapStoreClient::new(context.bitswap.clone()), {
+		let bitswap_identifier = context.identifier.to_owned();
+		let tasks = context.tasks.clone();
+		Box::new(move |t| {
+			tasks.spawn(async move {
+				t.instrument(tracing::trace_span!("bitswap", application = bitswap_identifier))
+					.await
+			});
+		})
+	});
 
 	// relay
 	let relay_server = if config.relay {
@@ -389,7 +388,7 @@ pub struct Behaviour {
 	pub mdns: Toggle<MdnsBehaviour>,
 	pub ping: ping::Behaviour,
 	// pub kad: Kademlia<MemoryStore>,
-	pub bitswap: Bitswap<libipld::DefaultParams>,
+	pub bitswap: Bitswap,
 	pub dcutr: Toggle<dcutr::Behaviour>,
 	pub relay_server: Toggle<relay::Behaviour>,
 	pub relay_client: Toggle<relay::client::Behaviour>,
