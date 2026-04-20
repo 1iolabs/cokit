@@ -9,7 +9,7 @@ use co_actor::{ActorHandle, Response};
 use co_primitives::Block;
 use co_storage::StorageError;
 use libp2p::PeerId;
-use libp2p_bitswap::{Block as BitswapBlock, BitswapStore};
+use libp2p_bitswap::{BitswapStore, Block as BitswapBlock};
 
 #[derive(Debug)]
 pub enum BitswapMessage {
@@ -50,7 +50,9 @@ impl BitswapStore for BitswapStoreClient {
 	async fn insert(&mut self, block: &BitswapBlock, remote_peer: &PeerId, tokens: &[Token]) -> Result<()> {
 		Ok(self
 			.handle
-			.request(|response| BitswapMessage::Insert(from_bitswap_block(block), *remote_peer, tokens.to_vec(), response))
+			.request(|response| {
+				BitswapMessage::Insert(from_bitswap_block(block), *remote_peer, tokens.to_vec(), response)
+			})
 			.await??)
 	}
 
