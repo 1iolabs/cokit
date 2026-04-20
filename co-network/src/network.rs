@@ -23,7 +23,7 @@ use libp2p::{
 	swarm::{behaviour::toggle::Toggle, dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
 	yamux, PeerId, StreamProtocol, Swarm, SwarmBuilder,
 };
-use libp2p_bitswap::Bitswap;
+use libp2p_bitswap::{Bitswap, BitswapConfig};
 use rand::rngs::OsRng;
 use std::{cmp::min, future::Future, time::Duration};
 use tokio_util::sync::CancellationToken;
@@ -38,6 +38,8 @@ pub struct Libp2pNetworkContext {
 	pub resolver: IdentityResolverBox,
 	pub private_resolver: PrivateIdentityResolverBox,
 	pub bitswap: ActorHandle<BitswapMessage>,
+	/// Maximum accepted bitswap block size in bytes.
+	pub max_block_size: usize,
 }
 
 pub struct Libp2pNetwork {
@@ -248,7 +250,8 @@ fn build_behaviour(
 			.map_err(|err| anyhow!("gossip failed: {}", err))?;
 
 	// bitswap
-	let bitswap = Bitswap::new(Default::default(), BitswapStoreClient::new(context.bitswap.clone()), {
+	let bitswap_config = BitswapConfig { max_block_size: context.max_block_size, ..BitswapConfig::new() };
+	let bitswap = Bitswap::new(bitswap_config, BitswapStoreClient::new(context.bitswap.clone()), {
 		let bitswap_identifier = context.identifier.to_owned();
 		let tasks = context.tasks.clone();
 		Box::new(move |t| {

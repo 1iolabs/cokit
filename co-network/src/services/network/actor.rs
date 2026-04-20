@@ -30,6 +30,8 @@ pub struct NetworkInitialize {
 	pub identity_resolver: IdentityResolverBox,
 	pub private_identity_resolver: PrivateIdentityResolverBox,
 	pub bitswap: ActorHandle<BitswapMessage>,
+	/// Maximum accepted bitswap block size in bytes (wire-level DoS cap).
+	pub max_block_size: usize,
 	pub tasks: TaskSpawner,
 	pub network_resolver: DynamicNetworkResolver,
 }
@@ -58,6 +60,7 @@ impl Actor for Network {
 				resolver: initialize.identity_resolver.clone(),
 				private_resolver: initialize.private_identity_resolver.clone(),
 				bitswap: initialize.bitswap,
+				max_block_size: initialize.max_block_size,
 			},
 			initialize.keypair.clone(),
 			initialize.settings.clone(),
