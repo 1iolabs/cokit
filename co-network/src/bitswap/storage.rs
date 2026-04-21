@@ -3,7 +3,6 @@
 
 use crate::{
 	bitswap::Token,
-	library::libipld_interop::to_libipld_cid,
 	network::{Behaviour, NetworkEvent},
 	types::network_task::{NetworkTask, NetworkTaskSpawner},
 };
@@ -54,7 +53,7 @@ impl NetworkTask<Behaviour> for GetNetworkTask {
 
 		// execute
 		if let GetNetworkTaskState::Pending(peers, result) = state {
-			let query = bitswap.get(to_libipld_cid(self.cid), peers.clone(), self.tokens.clone());
+			let query = bitswap.get(self.cid, peers.clone(), self.tokens.clone());
 			tracing::debug!(?self.cid, ?peers, ?query, "bitswap-get");
 			self.state = GetNetworkTaskState::Query(query, result);
 		}

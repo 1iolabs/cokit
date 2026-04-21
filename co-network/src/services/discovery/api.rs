@@ -90,7 +90,7 @@ mod tests {
 		DidKeyIdentity, DidKeyIdentityResolver, IdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentityBox,
 		PrivateIdentityResolver,
 	};
-	use co_primitives::{tags, CoDate, NetworkPeer, StaticCoDate};
+	use co_primitives::{tags, CoDate, DefaultParams, NetworkPeer, StaticCoDate, StoreParams};
 	use futures::StreamExt;
 	use libp2p::identity::Keypair;
 	use std::{collections::BTreeSet, time::Duration};
@@ -129,6 +129,7 @@ mod tests {
 				bitswap,
 				tasks,
 				network_resolver: EmptyNetworkResolver.boxed(),
+				max_block_size: DefaultParams::MAX_BLOCK_SIZE,
 			},
 		)
 		.unwrap();

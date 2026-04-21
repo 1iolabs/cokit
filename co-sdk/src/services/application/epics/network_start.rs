@@ -9,6 +9,7 @@ use crate::{
 use co_actor::{Actions, Actor};
 use co_network::{connections::DynamicNetworkResolver, Network, NetworkInitialize, NetworkMessage, NetworkSettings};
 use co_primitives::tags;
+use co_storage::BlockStorage;
 use futures::{FutureExt, Stream};
 
 pub fn network_start(
@@ -57,6 +58,7 @@ async fn network_service(context: CoContext, settings: NetworkSettings) -> Resul
 		identifier: context.identifier().to_owned(),
 		identity_resolver: context.identity_resolver().await?,
 		keypair: network_key,
+		max_block_size: local_co.storage().max_block_size(),
 		private_identity_resolver: context.private_identity_resolver().await?,
 		tasks: context.tasks(),
 		settings,
