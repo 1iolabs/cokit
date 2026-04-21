@@ -1874,8 +1874,9 @@ dependencies = [
 
 [[package]]
 name = "co-libp2p-bitswap"
-version = "0.26.1"
-source = "git+https://gitlab.1io.com/1io/co-libp2p-bitswap.git?branch=remove-libipld#c135ce814b1fb3ad3b4dc6c12ae7794e1f0a4ecb"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "166225344a99c6b5c7e6f65f40d22d90b545143d38d6088ddfe0aad0c2bf7a18"
 dependencies = [
  "anyhow",
  "async-trait",
