@@ -58,9 +58,11 @@ async fn sequential_push(local_co: &CoReducer, count: usize) {
 
 async fn transaction_push(local_co: &CoReducer, count: usize) {
 	let identity = LocalIdentity::new("bench");
-	let mut tx = local_co.transaction(identity).unwrap();
+	let mut tx = local_co.transaction().unwrap();
 	for index in 0..count {
-		tx.push("counter", &CounterAction::Increment(index as i64)).await.unwrap();
+		tx.push(&identity, "counter", &CounterAction::Increment(index as i64))
+			.await
+			.unwrap();
 	}
 	tx.commit().await.unwrap();
 }
