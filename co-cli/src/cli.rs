@@ -13,18 +13,19 @@ const APP_IDENTIFIER: &str = "co-cli";
 
 /// CO CLI
 #[derive(Debug, Clone, clap::Parser)]
+#[command(version)]
 pub struct Cli {
 	/// Command.
 	#[command(subcommand)]
 	pub command: CliCommand,
 
-	/// The instance ID of the daemon. Must be uniqure for every instance that runs in parallel.
+	/// The instance ID of the daemon. Must be unique for every instance that runs in parallel.
 	#[arg(long, default_value_t = String::from(APP_IDENTIFIER), env = "CO_INSTANCE_ID")]
 	pub instance_id: String,
 
 	/// Base path.
 	///
-	/// If this option ispecified all files are stored in this path (if not explicitly overwritten):
+	/// If this option is specified all files are stored in this path (if not explicitly overwritten):
 	/// - storage_path: <base_path>/storage
 	/// - config_path: <base_path>/etc
 	/// - log_path: <base_path>/log
