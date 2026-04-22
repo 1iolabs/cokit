@@ -113,9 +113,9 @@ async fn test_transaction_same_state_as_sequential_push() {
 	}
 
 	// transaction push on co2
-	let mut tx = co2.transaction(identity2).unwrap();
+	let mut tx = co2.transaction().unwrap();
 	for action in &actions {
-		tx.push("counter", action).await.unwrap();
+		tx.push(&identity2, "counter", action).await.unwrap();
 	}
 	tx.commit().await.unwrap();
 
@@ -137,7 +137,7 @@ async fn test_transaction_empty_commit() {
 	let (application, local_co) = setup_local_counter().await;
 
 	let state_before = local_co.reducer_state().await;
-	let tx = local_co.transaction(application.local_identity()).unwrap();
+	let tx = local_co.transaction().unwrap();
 	let state_after = tx.commit().await.unwrap();
 	assert_eq!(state_before, state_after);
 
@@ -157,10 +157,12 @@ async fn test_transaction_atomic_on_error() {
 	assert_eq!(counter_count(&local_co).await, 5);
 
 	// create a transaction that pushes a valid action then an invalid one
-	let mut tx = local_co.transaction(identity.clone()).unwrap();
-	tx.push("counter", &CounterAction::Increment(10)).await.unwrap();
+	let mut tx = local_co.transaction().unwrap();
+	tx.push(&identity, "counter", &CounterAction::Increment(10)).await.unwrap();
 	// push to a non-existent core to trigger an error in the transaction actor
-	tx.push("nonexistent_core", &CounterAction::Increment(1)).await.unwrap();
+	tx.push(&identity, "nonexistent_core", &CounterAction::Increment(1))
+		.await
+		.unwrap();
 	let result = tx.commit().await;
 	assert!(result.is_err(), "commit should fail when a push targets a missing core");
 
@@ -179,17 +181,17 @@ async fn test_transaction_multiple_commits() {
 	let identity = LocalIdentity::new("user");
 
 	// first transaction
-	let mut tx = local_co.transaction(identity.clone()).unwrap();
+	let mut tx = local_co.transaction().unwrap();
 	for i in 1..=5 {
-		tx.push("counter", &CounterAction::Increment(i)).await.unwrap();
+		tx.push(&identity, "counter", &CounterAction::Increment(i)).await.unwrap();
 	}
 	tx.commit().await.unwrap();
 	assert_eq!(counter_count(&local_co).await, 15);
 
 	// second transaction
-	let mut tx = local_co.transaction(identity).unwrap();
+	let mut tx = local_co.transaction().unwrap();
 	for i in 1..=5 {
-		tx.push("counter", &CounterAction::Multiply(i)).await.unwrap();
+		tx.push(&identity, "counter", &CounterAction::Multiply(i)).await.unwrap();
 	}
 	tx.commit().await.unwrap();
 

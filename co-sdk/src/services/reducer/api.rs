@@ -390,20 +390,18 @@ impl CoReducer {
 	/// Create a transaction for batching push operations.
 	///
 	/// Spawns a background actor that processes actions in parallel with the caller.
+	/// Identity is passed per push (matching [`CoReducer::push`]), which also allows
+	/// multiple identities within a single transaction.
 	/// Call [`CoReducerTransaction::commit`] to integrate all actions and flush in one step.
 	/// Transactions are atomic — if any action fails, none are applied.
-	pub fn transaction<I>(&self, identity: I) -> Result<CoReducerTransaction, anyhow::Error>
-	where
-		I: PrivateIdentity + Debug + Clone + Send + Sync + 'static,
-	{
-		let identity = PrivateIdentity::boxed(identity);
+	pub fn transaction(&self) -> Result<CoReducerTransaction, anyhow::Error> {
 		let actor = Actor::spawn_with(
 			self.tasks.clone(),
 			tags!("co": self.id.as_str()),
-			TransactionActor::new(self.runtime.clone(), identity.clone()),
+			TransactionActor::new(self.runtime.clone()),
 			(self.handle.clone(), self.storage.clone(), self.core_resolver.clone(), self.date.clone(), self.id.clone()),
 		)?;
-		Ok(CoReducerTransaction { reducer: self.clone(), identity, handle: actor.handle(), count: 0 })
+		Ok(CoReducerTransaction { reducer: self.clone(), handle: actor.handle(), count: 0 })
 	}
 
 	/// Create a action dispatcher.
