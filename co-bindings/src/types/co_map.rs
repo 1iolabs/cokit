@@ -93,6 +93,7 @@ impl CoMap {
 			.await
 	}
 
+	#[cfg(feature = "frb")]
 	pub async fn stream(
 		&self,
 		storage: &BlockStorage,

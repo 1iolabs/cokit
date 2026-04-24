@@ -137,6 +137,7 @@ impl Actor for CoApplication {
 				let co_context = state.co().clone();
 				move || ensure_did_key_identity(co_context, name)
 			}),
+			#[cfg(feature = "frb")]
 			CoMessage::CoSubscribe(co, cancel, sink) => co_subscribe(state.context().tasks(), co, cancel, sink),
 		}
 		Ok(())
@@ -165,6 +166,7 @@ async fn co_create(
 	Ok(Co::from((handle.into(), co)))
 }
 
+#[cfg(feature = "frb")]
 fn co_subscribe(
 	tasks: TaskSpawner,
 	co: Co,

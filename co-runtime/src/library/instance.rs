@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use crate::{
-	create_runtime,
-	runtimes::{Runtime, RuntimeBox},
-};
+#[cfg(wasmer_backend)]
+use crate::create_runtime;
+use crate::runtimes::{Runtime, RuntimeBox};
+#[cfg(wasmer_backend)]
 use anyhow::anyhow;
 use cid::Cid;
+#[cfg(wasmer_backend)]
 use co_primitives::{unixfs_cat_buffer, AnyBlockStorage, KnownMultiCodec, MultiCodec};
+#[cfg(wasmer_backend)]
 use co_storage::StorageError;
 use std::fmt::Debug;
 
@@ -17,6 +19,7 @@ pub struct RuntimeInstance {
 }
 impl RuntimeInstance {
 	/// Create a new runtime element which can be used immediately or inserted to the pool.
+	#[cfg(wasmer_backend)]
 	pub async fn create<S>(storage: &S, core: &Cid) -> Result<Self, StorageError>
 	where
 		S: AnyBlockStorage,
@@ -29,6 +32,7 @@ impl RuntimeInstance {
 	}
 
 	/// Create a new runtime element which can be used immediately or inserted to the pool.
+	#[cfg(wasmer_backend)]
 	pub async fn create_native(core: &Cid, bytes: &[u8]) -> Result<Self, StorageError> {
 		Ok(RuntimeInstance { core: *core, runtime: create_runtime(true, bytes.to_vec()) })
 	}
@@ -48,6 +52,7 @@ impl Debug for RuntimeInstance {
 	}
 }
 
+#[cfg(wasmer_backend)]
 async fn read_core(storage: &impl AnyBlockStorage, cid: &Cid) -> Result<(bool, Vec<u8>), StorageError> {
 	Ok(match MultiCodec::from(cid) {
 		// dag-pb (unixfs)

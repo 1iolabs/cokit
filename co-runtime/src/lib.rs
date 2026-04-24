@@ -3,7 +3,6 @@
 
 // modules
 mod library;
-mod macros;
 mod modules;
 mod runtimes;
 mod services;
@@ -12,9 +11,18 @@ mod types;
 // exports
 #[cfg(feature = "llvm")]
 pub use library::compile::compile_native;
-pub(crate) use macros::cfg_wasmer;
+#[cfg(wasmer_backend)]
+pub use library::module_description::ModuleDescription;
+pub use library::{
+	instance::RuntimeInstance,
+	pool::{IdleRuntimePool, RuntimePool},
+};
 pub use modules::co_v1;
-pub use services::runtime::RuntimeHandle;
+#[cfg(wasmer_backend)]
+pub use runtimes::create_runtime;
+#[cfg(wasmer_backend)]
+pub use runtimes::wasmer::{create_runtime_with_engines, WasmerRuntimeKind};
+pub use services::runtime::{RuntimeActor, RuntimeHandle};
 pub use types::{
 	cid_resolver::{
 		create_cid_resolver, CidResolver, CidResolverBox, IpldResolver, JoinCidResolver, MultiLayerCidResolver,
@@ -25,12 +33,3 @@ pub use types::{
 	execute_error::ExecuteError,
 	guard::GuardReference,
 };
-cfg_wasmer! {
-	pub use services::runtime::RuntimeActor;
-	pub use library::{
-		instance::RuntimeInstance,
-		pool::{IdleRuntimePool, RuntimePool},
-	};
-	pub use runtimes::wasmer::{create_runtime, create_runtime_with_engines, WasmerRuntimeKind};
-	pub use library::module_description::ModuleDescription;
-}
