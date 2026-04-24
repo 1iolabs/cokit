@@ -7,6 +7,6 @@ mod runtime;
 pub mod wasmer;
 
 // export
-pub use runtime::{Runtime, RuntimeBox, RuntimeError};
 #[cfg(wasmer_backend)]
 pub use self::wasmer::create_runtime;
+pub use runtime::{Runtime, RuntimeBox, RuntimeError};

@@ -7,9 +7,9 @@ use crate::co_v1::CoV1Api;
 use crate::library::deferred_storage::DeferredStorage;
 use crate::{types::guard::GuardReference, Core, ExecuteError, RuntimeContext, RuntimeInstance};
 use cid::Cid;
+use co_actor::TaskSpawner;
 #[cfg(wasmer_backend)]
 use co_primitives::AnyBlockStorage;
-use co_actor::TaskSpawner;
 use co_primitives::{from_cbor, CoreBlockStorage, GuardInput, ReducerInput};
 use co_storage::BlockStorage;
 use std::collections::VecDeque;
