@@ -77,6 +77,7 @@ impl CoSet {
 			.await
 	}
 
+	#[cfg(feature = "frb")]
 	pub async fn stream(&self, storage: &BlockStorage, sink: crate::frb_generated::StreamSink<Option<Vec<u8>>>) {
 		let map = match to_set(self) {
 			Ok(map) => map,

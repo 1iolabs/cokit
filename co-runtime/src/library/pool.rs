@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
+#[cfg(wasmer_backend)]
+use crate::co_v1::CoV1Api;
 #[cfg(feature = "js")]
 use crate::library::deferred_storage::DeferredStorage;
-use crate::{
-	co_v1::CoV1Api, types::guard::GuardReference, Core, ExecuteError, RuntimeContext, RuntimeInstance,
-};
+use crate::{types::guard::GuardReference, Core, ExecuteError, RuntimeContext, RuntimeInstance};
 use cid::Cid;
 use co_actor::TaskSpawner;
-use co_primitives::{from_cbor, AnyBlockStorage, CoreBlockStorage, GuardInput, ReducerInput};
+#[cfg(wasmer_backend)]
+use co_primitives::AnyBlockStorage;
+use co_primitives::{from_cbor, CoreBlockStorage, GuardInput, ReducerInput};
 use co_storage::BlockStorage;
-use std::{
-	collections::VecDeque,
-	sync::{Arc, Mutex},
-};
+use std::collections::VecDeque;
+#[cfg(wasmer_backend)]
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
 pub struct IdleRuntimePool {
@@ -51,20 +52,29 @@ impl Default for IdleRuntimePool {
 
 #[derive(Debug, Clone)]
 pub struct RuntimePool {
+	#[cfg(wasmer_backend)]
 	#[cfg_attr(feature = "js", allow(clippy::arc_with_non_send_sync))]
 	pool: Arc<Mutex<IdleRuntimePool>>,
 	spawner: TaskSpawner,
 }
 impl RuntimePool {
 	pub fn new(spawner: TaskSpawner, pool: IdleRuntimePool) -> Self {
-		#[cfg_attr(feature = "js", allow(clippy::arc_with_non_send_sync))]
-		Self { pool: Arc::new(Mutex::new(pool)), spawner }
+		#[cfg(not(wasmer_backend))]
+		let _ = pool;
+		Self {
+			#[cfg(wasmer_backend)]
+			#[cfg_attr(feature = "js", allow(clippy::arc_with_non_send_sync))]
+			pool: Arc::new(Mutex::new(pool)),
+			spawner,
+		}
 	}
 
+	#[cfg(wasmer_backend)]
 	fn get_runtime_instance(&self, core: &Cid) -> Option<RuntimeInstance> {
 		self.pool.lock().unwrap().get(core)
 	}
 
+	#[cfg(wasmer_backend)]
 	fn reuse_runtime_instance(&self, runtime_instance: RuntimeInstance) {
 		self.pool.lock().unwrap().insert(runtime_instance);
 	}
@@ -86,7 +96,9 @@ impl RuntimePool {
 		let checked = false;
 
 		// execute
+		#[allow(unused_variables)]
 		let result = match core {
+			#[cfg(wasmer_backend)]
 			Core::Wasm(core) => {
 				// get/create instance
 				let pool_instance = self.get_runtime_instance(core);
@@ -108,6 +120,7 @@ impl RuntimePool {
 				// result
 				result
 			},
+			#[cfg(wasmer_backend)]
 			Core::Binary(bytes) => {
 				// get/create instance
 				let pool_instance = self.get_runtime_instance(core_cid);
@@ -128,6 +141,12 @@ impl RuntimePool {
 
 				// result
 				result
+			},
+			#[cfg(not(wasmer_backend))]
+			Core::Wasm(_) | Core::Binary(_) => {
+				return Err(ExecuteError::Other(anyhow::anyhow!(
+					"No wasmer backend selected: enable one of co-runtime's cranelift/llvm/wasmi/wamr/headless/js/jsc features to execute WASM cores"
+				)))
 			},
 			Core::Native(f) => {
 				let reducer_storage = CoreBlockStorage::new(storage.clone(), checked);
@@ -176,7 +195,9 @@ impl RuntimePool {
 		let checked = false;
 
 		// execute
+		#[allow(unused_variables)]
 		let result = match guard {
+			#[cfg(wasmer_backend)]
 			GuardReference::Wasm(core) => {
 				// get/create instance
 				let pool_instance = self.get_runtime_instance(core);
@@ -198,6 +219,7 @@ impl RuntimePool {
 				// result
 				result
 			},
+			#[cfg(wasmer_backend)]
 			GuardReference::Binary(bytes) => {
 				// get/create instance
 				let pool_instance = self.get_runtime_instance(guard_cid);
@@ -222,6 +244,12 @@ impl RuntimePool {
 
 				// result
 				result
+			},
+			#[cfg(not(wasmer_backend))]
+			GuardReference::Wasm(_) | GuardReference::Binary(_) => {
+				return Err(ExecuteError::Other(anyhow::anyhow!(
+					"No wasmer backend selected: enable one of co-runtime's cranelift/llvm/wasmi/wamr/headless/js/jsc features to execute WASM guards"
+				)))
 			},
 			GuardReference::Native(f) => {
 				let guard_storage = CoreBlockStorage::new(storage.clone(), checked);
@@ -258,7 +286,7 @@ impl Default for RuntimePool {
 	}
 }
 
-#[cfg(not(feature = "js"))]
+#[cfg(all(wasmer_backend, not(feature = "js")))]
 async fn execute_with_api<T: Send + 'static, I: Send + 'static>(
 	spawner: TaskSpawner,
 	storage: &impl AnyBlockStorage,
@@ -280,7 +308,7 @@ async fn execute_with_api<T: Send + 'static, I: Send + 'static>(
 	Ok((result?, instance))
 }
 
-#[cfg(feature = "js")]
+#[cfg(all(wasmer_backend, feature = "js"))]
 async fn execute_with_api<T: 'static, I: 'static>(
 	_spawner: TaskSpawner,
 	storage: &impl AnyBlockStorage,
@@ -317,7 +345,7 @@ async fn execute_with_api<T: 'static, I: 'static>(
 	}
 }
 
-#[cfg(not(feature = "js"))]
+#[cfg(all(wasmer_backend, not(feature = "js")))]
 fn create_cov1_api(storage: &impl AnyBlockStorage, context: RuntimeContext, checked: bool) -> CoV1Api {
 	CoV1Api::new(
 		Box::new(co_storage::SyncBlockStorage::new(
@@ -332,7 +360,7 @@ fn create_cov1_api(storage: &impl AnyBlockStorage, context: RuntimeContext, chec
 	)
 }
 
-#[cfg(feature = "js")]
+#[cfg(all(wasmer_backend, feature = "js"))]
 fn create_cov1_api(storage: DeferredStorage, context: RuntimeContext, _checked: bool) -> CoV1Api {
 	CoV1Api::new(Box::new(storage.clone()), context)
 }

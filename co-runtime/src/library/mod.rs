@@ -5,8 +5,7 @@
 pub mod compile;
 #[cfg(feature = "js")]
 pub mod deferred_storage;
-crate::cfg_wasmer! {
-	pub mod instance;
-	pub mod module_description;
-	pub mod pool;
-}
+pub mod instance;
+#[cfg(wasmer_backend)]
+pub mod module_description;
+pub mod pool;

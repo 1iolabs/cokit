@@ -49,6 +49,7 @@ check:
     <<: *global_cache
   script:
     - ./ci/scripts/check-web.sh
+    - ./ci/scripts/check-no-default-features.sh
 
 # check licenses
 license:

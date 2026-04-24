@@ -2,6 +2,22 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 fn main() {
+	// emit `wasmer_backend` cfg when any wasmer backend is active
+	println!("cargo:rustc-check-cfg=cfg(wasmer_backend)");
+	let has_feature = |f: &str| std::env::var(format!("CARGO_FEATURE_{}", f.to_uppercase())).is_ok();
+	let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+	let target_vendor = std::env::var("CARGO_CFG_TARGET_VENDOR").unwrap_or_default();
+	if has_feature("headless")
+		|| has_feature("llvm")
+		|| has_feature("cranelift")
+		|| has_feature("wasmi")
+		|| has_feature("wamr")
+		|| (has_feature("js") && target_arch == "wasm32")
+		|| (has_feature("jsc") && target_vendor == "apple")
+	{
+		println!("cargo:rustc-cfg=wasmer_backend");
+	}
+
 	// try to use homebrew for dependencies
 	#[cfg(all(target_os = "macos", feature = "llvm"))]
 	{
