@@ -695,7 +695,7 @@ pub struct JoinResult {
 	/// The change context.
 	pub context: ReducerChangeContext,
 
-	/// The resuting state.
+	/// The resulting state.
 	pub state: Option<Cid>,
 	/// The latest head after the join operation.
 	pub heads: BTreeSet<Cid>,
