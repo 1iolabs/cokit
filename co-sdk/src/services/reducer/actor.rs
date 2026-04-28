@@ -219,13 +219,17 @@ async fn handle_push_batch(
 	// `previous_heads` and the new heads; the stream yields newest first, so
 	// reverse for chronological (push) order — the flush iterates roots in
 	// insertion order, and recording parents before children lets the
-	// encryption layer map each one before its child is encrypted
+	// encryption layer map each one before its child is encrypted; drop the
+	// final heads from the list because the trailing roots below already cover
+	// them with state, and a duplicate root would cause flush to walk and
+	// pin them twice
 	let mut intermediate_heads: Vec<Cid> =
 		log_entries_until(storage.clone(), memory_state.1.clone(), previous_heads.clone())
 			.map_ok(|entry| *entry.cid())
 			.try_collect()
 			.await?;
 	intermediate_heads.reverse();
+	intermediate_heads.retain(|intermediate_head| !memory_state.1.contains(intermediate_head));
 
 	// integrate pre-computed state via snapshot + join
 	if let Some((state, heads)) = memory_state.some() {
