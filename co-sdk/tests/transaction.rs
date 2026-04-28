@@ -61,6 +61,7 @@ async fn setup_local_counter() -> (co_sdk::Application, CoReducer) {
 /// Setup a shared CO with counter core. Pinning only applies to the local CO,
 /// so a shared CO gives deterministic CIDs between sequential and transaction paths.
 async fn setup_shared_counter(
+	encrypted: bool,
 	counter: Cid,
 	counter_core: Core,
 	counter_artifact: &BuildCoreArtifact,
@@ -80,7 +81,7 @@ async fn setup_shared_counter(
 
 	// create shared CO
 	let co = application
-		.create_co(identity.clone(), CreateCo::new("shared", None).with_public(true))
+		.create_co(identity.clone(), CreateCo::new("shared", None).with_public(!encrypted))
 		.await
 		.unwrap();
 	counter_artifact.store_artifact(&co.storage()).await.unwrap();
@@ -102,8 +103,41 @@ async fn setup_shared_counter(
 #[tokio::test]
 async fn test_transaction_same_state_as_sequential_push() {
 	let (counter, counter_core, counter_artifact) = build_counter().await;
-	let (_app1, co1, identity1) = setup_shared_counter(counter, counter_core.clone(), &counter_artifact).await;
-	let (_app2, co2, identity2) = setup_shared_counter(counter, counter_core, &counter_artifact).await;
+	let (_app1, co1, identity1) = setup_shared_counter(false, counter, counter_core.clone(), &counter_artifact).await;
+	let (_app2, co2, identity2) = setup_shared_counter(false, counter, counter_core, &counter_artifact).await;
+
+	let actions: Vec<CounterAction> = (1..=20).map(CounterAction::Increment).collect();
+
+	// sequential push on co1
+	for action in &actions {
+		co1.push(&identity1, "counter", action).await.unwrap();
+	}
+
+	// transaction push on co2
+	let mut tx = co2.transaction().unwrap();
+	for action in &actions {
+		tx.push(&identity2, "counter", action).await.unwrap();
+	}
+	tx.commit().await.unwrap();
+
+	// verify same counter value and structure
+	assert_eq!(counter_count(&co1).await, 210, "sequential push counter");
+	assert_eq!(counter_count(&co2).await, 210, "transaction push counter");
+
+	let state1 = co1.reducer_state().await;
+	let state2 = co2.reducer_state().await;
+	assert!(state1.state().is_some(), "sequential state should exist");
+	assert!(state2.state().is_some(), "transaction state should exist");
+	assert_eq!(state1.heads().len(), 1, "sequential should have one head");
+	assert_eq!(state2.heads().len(), 1, "transaction should have one head");
+}
+
+/// Encrypted-shared-CO variant of `test_transaction_same_state_as_sequential_push`.
+#[tokio::test]
+async fn test_transaction_same_state_as_sequential_push_on_encrypted_co() {
+	let (counter, counter_core, counter_artifact) = build_counter().await;
+	let (_app1, co1, identity1) = setup_shared_counter(true, counter, counter_core.clone(), &counter_artifact).await;
+	let (_app2, co2, identity2) = setup_shared_counter(true, counter, counter_core, &counter_artifact).await;
 
 	let actions: Vec<CounterAction> = (1..=20).map(CounterAction::Increment).collect();
 

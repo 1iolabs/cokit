@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 /// The read starts with the latest entries in the log.
 /// The `newer` heads are included.
 /// The `older` heads are excluded.
-/// Note: When `older` heads are never found the whole log will be retuned.
+/// Note: When `older` heads are never found the whole log will be returned.
 pub fn log_entries_until<S>(
 	storage: S,
 	newer: BTreeSet<Cid>,
@@ -35,7 +35,7 @@ where
 				break;
 			}
 
-			// wals both stacks backward
+			// walk both stacks backward
 			if stack_newer.remove(entry.cid()) {
 				stack_newer.extend(entry.entry().next.iter().clone());
 			}

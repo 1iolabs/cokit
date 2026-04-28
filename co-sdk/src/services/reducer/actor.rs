@@ -212,8 +212,24 @@ async fn handle_push_batch(
 	storage: CoStorage,
 	memory_state: CoReducerState,
 ) -> Result<CoReducerState, anyhow::Error> {
-	// save previous heads for reactive dispatch walk
+	// save previous heads for reactive dispatch walk and intermediate head walk
 	let previous_heads = reducer_state.reducer.heads().clone();
+
+	// derive the heads created by the batch from the log range between
+	// `previous_heads` and the new heads; the stream yields newest first, so
+	// reverse for chronological (push) order — the flush iterates roots in
+	// insertion order, and recording parents before children lets the
+	// encryption layer map each one before its child is encrypted; drop the
+	// final heads from the list because the trailing roots below already cover
+	// them with state, and a duplicate root would cause flush to walk and
+	// pin them twice
+	let mut intermediate_heads: Vec<Cid> =
+		log_entries_until(storage.clone(), memory_state.1.clone(), previous_heads.clone())
+			.map_ok(|entry| *entry.cid())
+			.try_collect()
+			.await?;
+	intermediate_heads.reverse();
+	intermediate_heads.retain(|intermediate_head| !memory_state.1.contains(intermediate_head));
 
 	// integrate pre-computed state via snapshot + join
 	if let Some((state, heads)) = memory_state.some() {
@@ -226,8 +242,16 @@ async fn handle_push_batch(
 
 	if join_result.is_some() {
 		// changed (local push semantics, not join)
-		let roots = [CoReducerState::new_reducer(&reducer_state.reducer), memory_state];
-		changed(reducer_state, true, Some(identity.identity()), roots);
+		// each per-push head becomes its own root with no state so the flush
+		// promotes its block (and its action block via the link walk) to the
+		// next storage, forwards its mapping to the storage core and hands it
+		// to ReducerFlush::flush for pinning; intermediate roots are
+		// chronological, the final state and memory_state come last
+		let intermediate_roots = intermediate_heads
+			.iter()
+			.map(|intermediate_head| CoReducerState::new(None, BTreeSet::from([*intermediate_head])));
+		let trailing_roots = [CoReducerState::new_reducer(&reducer_state.reducer), memory_state];
+		changed(reducer_state, true, Some(identity.identity()), intermediate_roots.chain(trailing_roots));
 	}
 
 	// capture heads before flush — flush can add pinning batch actions (local.rs)
