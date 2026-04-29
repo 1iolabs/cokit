@@ -250,7 +250,7 @@ where
 		//  try to resolve all children references using the mapping
 		//   the node creator has either:
 		//    the mapping from loading the original node before
-		//    all children nodes as he created it from sratch
+		//    all children nodes as he created it from scratch
 		//  as a fallback check if the Cid exists in the parent so we know this is a unencrypted reference
 		//  Question: are there any valid cases for not unencrypted and not known reference?
 		// 	  Yes: encrypted local CO stores references to unencrypted shared CO.
@@ -386,10 +386,21 @@ where
 		self.set_block(extended_block).await
 	}
 
+	/// Check block exists and belongs to us.
+	///
+	/// An unmapped CID may still exist in the `next` storage but belong to a different CO.
+	/// Which can be:
+	/// - a plain CID stored by a public CO
+	/// - an encrypted CID owned by another encrypted CO.
+	/// To confirm ownership for an unmapped encrypted CID, decrypt it with our key.
+	/// Plain CIDs without a mapping are never belongs to us.
+	/// The encryption design ensures that all blocks references are encrypted too
 	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
 		match self.mapping.get(cid).await {
 			Some(encrypted_cid) => self.next.exists(&encrypted_cid).await,
-			None => self.next.exists(cid).await,
+			None => Ok(MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock)
+				&& self.next.exists(cid).await?
+				&& self.get_unencrypted(cid).await.is_ok()),
 		}
 	}
 
@@ -571,6 +582,7 @@ impl EncryptedBlockStorageMapping {
 		self.mapping.write().unwrap().clear();
 	}
 
+	/// Get mapping from mapped/internal/unencrypted to plain/external/encrypted [`Cid`].
 	pub async fn get(&self, key: &Cid) -> Option<Cid> {
 		match self.mapping.read().unwrap().get(key) {
 			Some(cid) => Some(cid),
@@ -711,7 +723,7 @@ impl From<BlockMappingError> for StorageError {
 /// This is used to store the mapping itself as an block.
 #[derive(Clone, Debug)]
 pub struct BlockMapping {
-	/// Mapping from mapped/internal to plain/external.
+	/// Mapping from mapped/internal/unencrypted to plain/external/encrypted.
 	map: BTreeMap<Cid, Cid>,
 }
 impl BlockMapping {
@@ -719,6 +731,7 @@ impl BlockMapping {
 		Self { map: BTreeMap::new() }
 	}
 
+	/// Get mapping from mapped/internal/unencrypted to plain/external/encrypted [`Cid`].
 	pub fn get(&self, key: &Cid) -> Option<Cid> {
 		self.map.get(key).cloned()
 	}
