@@ -392,16 +392,28 @@ where
 	/// Which can be:
 	/// - a plain CID stored by a public CO
 	/// - an encrypted CID owned by another encrypted CO.
-	/// To confirm ownership for an unmapped encrypted CID, decrypt it with our key.
-	/// Plain CIDs without a mapping are never belongs to us.
-	/// The encryption design ensures that all blocks references are encrypted too
+	/// Confirms ownership for unmapped CIDs:
+	/// - Encrypted CIDs are owned only when we can decrypt them with our key.
+	/// - Plain CIDs are owned only when the configured [`EncryptionReferenceMode`] permits them as plain references and
+	///   they exist in the next storage.
 	async fn exists(&self, cid: &Cid) -> Result<bool, StorageError> {
-		match self.mapping.get(cid).await {
-			Some(encrypted_cid) => self.next.exists(&encrypted_cid).await,
-			None => Ok(MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock)
-				&& self.next.exists(cid).await?
-				&& self.get_unencrypted(cid).await.is_ok()),
+		if let Some(encrypted_cid) = self.mapping.get(cid).await {
+			return self.next.exists(&encrypted_cid).await;
 		}
+		if !self.next.exists(cid).await? {
+			return Ok(false);
+		}
+		if MultiCodec::is(cid, KnownMultiCodec::CoEncryptedBlock) {
+			return Ok(self.get_unencrypted(cid).await.is_ok());
+		}
+		Ok(match &self.reference_mode {
+			EncryptionReferenceMode::DisallowPlain => false,
+			EncryptionReferenceMode::DisallowPlainExcept(allowed) => allowed.contains(cid),
+			EncryptionReferenceMode::DisallowExcept(allowed) => allowed.contains(cid),
+			EncryptionReferenceMode::AllowPlain => true,
+			EncryptionReferenceMode::AllowPlainIfExists => true,
+			EncryptionReferenceMode::Warning => true,
+		})
 	}
 
 	async fn clear(&self) -> Result<(), StorageError> {
@@ -917,12 +929,13 @@ mod tests {
 			block::{Algorithm, BLOCK_MULTICODEC},
 			secret::Secret,
 		},
-		BlockStorage, EncryptedBlockStorage, MemoryBlockStorage,
+		BlockStorage, BlockStorageContentMapping, EncryptedBlockStorage, EncryptionReferenceMode, ExtendedBlockStorage,
+		MemoryBlockStorage,
 	};
 	use cid::Cid;
 	use co_primitives::{BlockSerializer, DefaultParams, StorageError, StoreParams};
 	use serde::{Deserialize, Serialize};
-	use std::iter::repeat_n;
+	use std::{collections::BTreeSet, iter::repeat_n};
 
 	#[derive(Debug, Serialize, Deserialize)]
 	struct Test {
@@ -988,5 +1001,159 @@ mod tests {
 		for cid in cids {
 			encryption.get(&cid).await.unwrap();
 		}
+	}
+
+	fn test_secret(byte: u8) -> Secret {
+		Secret::new(repeat_n(byte, Algorithm::default().key_size()).collect())
+	}
+
+	fn test_block(payload: &str) -> co_primitives::Block {
+		BlockSerializer::default()
+			.serialize(&Test { hello: payload.to_owned() })
+			.unwrap()
+	}
+
+	async fn plain_block_in_next(
+		mode: EncryptionReferenceMode,
+	) -> (Cid, MemoryBlockStorage, EncryptedBlockStorage<MemoryBlockStorage>) {
+		let memory = MemoryBlockStorage::new();
+		let block = test_block("shared");
+		let plain_cid = *block.cid();
+		memory.set(block).await.unwrap();
+		let encryption =
+			EncryptedBlockStorage::new(memory.clone(), test_secret(42), Algorithm::default(), Default::default())
+				.with_encryption_reference_mode(mode);
+		(plain_cid, memory, encryption)
+	}
+
+	#[tokio::test]
+	async fn exists_mapped_present_in_next_returns_true() {
+		let memory = MemoryBlockStorage::new();
+		let encryption = EncryptedBlockStorage::new(memory, test_secret(42), Algorithm::default(), Default::default());
+
+		let block = test_block("world");
+		let plain_cid = *block.cid();
+		encryption.set(block).await.unwrap();
+
+		assert!(encryption.exists(&plain_cid).await.unwrap());
+	}
+
+	#[tokio::test]
+	async fn exists_mapped_missing_in_next_returns_false() {
+		let memory = MemoryBlockStorage::new();
+		let encryption =
+			EncryptedBlockStorage::new(memory.clone(), test_secret(42), Algorithm::default(), Default::default());
+
+		let block = test_block("world");
+		let plain_cid = *block.cid();
+		encryption.set(block).await.unwrap();
+		let encrypted_cid = encryption.to_plain(&plain_cid).await.expect("mapping populated by set");
+
+		memory.remove(&encrypted_cid).await.unwrap();
+
+		assert!(!encryption.exists(&plain_cid).await.unwrap());
+	}
+
+	#[tokio::test]
+	async fn exists_unmapped_not_in_next_returns_false() {
+		let memory = MemoryBlockStorage::new();
+		let encryption = EncryptedBlockStorage::new(memory, test_secret(42), Algorithm::default(), Default::default());
+
+		let ghost = test_block("ghost");
+		assert!(!encryption.exists(ghost.cid()).await.unwrap());
+	}
+
+	#[tokio::test]
+	async fn exists_unmapped_encrypted_decryptable_returns_true() {
+		let memory = MemoryBlockStorage::new();
+
+		// writer creates the encrypted block and remembers the mapping.
+		let writer =
+			EncryptedBlockStorage::new(memory.clone(), test_secret(42), Algorithm::default(), Default::default());
+		let block = test_block("world");
+		let plain_cid = *block.cid();
+		writer.set(block).await.unwrap();
+		let encrypted_cid = writer.to_plain(&plain_cid).await.expect("mapping populated by set");
+
+		// reader shares next+key but starts with an empty mapping.
+		let reader = EncryptedBlockStorage::new(memory, test_secret(42), Algorithm::default(), Default::default());
+		assert!(reader.exists(&encrypted_cid).await.unwrap());
+	}
+
+	#[tokio::test]
+	async fn exists_unmapped_encrypted_other_key_returns_false() {
+		let memory = MemoryBlockStorage::new();
+
+		// writer encrypts under key_a.
+		let writer =
+			EncryptedBlockStorage::new(memory.clone(), test_secret(1), Algorithm::default(), Default::default());
+		let block = test_block("world");
+		let plain_cid = *block.cid();
+		writer.set(block).await.unwrap();
+		let encrypted_cid = writer.to_plain(&plain_cid).await.expect("mapping populated by set");
+
+		// other CO with key_b cannot decrypt; the block must not be reported as present.
+		let other = EncryptedBlockStorage::new(memory, test_secret(2), Algorithm::default(), Default::default());
+		assert!(!other.exists(&encrypted_cid).await.unwrap());
+	}
+
+	#[tokio::test]
+	async fn exists_unmapped_plain_disallow_plain_returns_false() {
+		let (cid, _memory, encryption) = plain_block_in_next(EncryptionReferenceMode::DisallowPlain).await;
+		assert!(!encryption.exists(&cid).await.unwrap());
+	}
+
+	#[tokio::test]
+	async fn exists_unmapped_plain_allow_plain_returns_true() {
+		let (cid, _memory, encryption) = plain_block_in_next(EncryptionReferenceMode::AllowPlain).await;
+		assert!(encryption.exists(&cid).await.unwrap());
+	}
+
+	#[tokio::test]
+	async fn exists_unmapped_plain_allow_plain_if_exists_returns_true() {
+		let (cid, _memory, encryption) = plain_block_in_next(EncryptionReferenceMode::AllowPlainIfExists).await;
+		assert!(encryption.exists(&cid).await.unwrap());
+	}
+
+	#[tokio::test]
+	async fn exists_unmapped_plain_warning_returns_true() {
+		let (cid, _memory, encryption) = plain_block_in_next(EncryptionReferenceMode::Warning).await;
+		assert!(encryption.exists(&cid).await.unwrap());
+	}
+
+	#[tokio::test]
+	async fn exists_unmapped_plain_disallow_plain_except_in_set_returns_true() {
+		let memory = MemoryBlockStorage::new();
+		let block = test_block("shared");
+		let cid = *block.cid();
+		memory.set(block).await.unwrap();
+		let encryption = EncryptedBlockStorage::new(memory, test_secret(42), Algorithm::default(), Default::default())
+			.with_encryption_reference_mode(EncryptionReferenceMode::DisallowPlainExcept(BTreeSet::from([cid])));
+		assert!(encryption.exists(&cid).await.unwrap());
+	}
+
+	#[tokio::test]
+	async fn exists_unmapped_plain_disallow_plain_except_not_in_set_returns_false() {
+		let (cid, _memory, encryption) =
+			plain_block_in_next(EncryptionReferenceMode::DisallowPlainExcept(BTreeSet::new())).await;
+		assert!(!encryption.exists(&cid).await.unwrap());
+	}
+
+	#[tokio::test]
+	async fn exists_unmapped_plain_disallow_except_in_set_returns_true() {
+		let memory = MemoryBlockStorage::new();
+		let block = test_block("shared");
+		let cid = *block.cid();
+		memory.set(block).await.unwrap();
+		let encryption = EncryptedBlockStorage::new(memory, test_secret(42), Algorithm::default(), Default::default())
+			.with_encryption_reference_mode(EncryptionReferenceMode::DisallowExcept(BTreeSet::from([cid])));
+		assert!(encryption.exists(&cid).await.unwrap());
+	}
+
+	#[tokio::test]
+	async fn exists_unmapped_plain_disallow_except_not_in_set_returns_false() {
+		let (cid, _memory, encryption) =
+			plain_block_in_next(EncryptionReferenceMode::DisallowExcept(BTreeSet::new())).await;
+		assert!(!encryption.exists(&cid).await.unwrap());
 	}
 }
