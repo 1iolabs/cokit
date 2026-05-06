@@ -1926,6 +1926,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+ "tokio",
 ]
 
 [[package]]
@@ -2182,6 +2183,7 @@ name = "co-test"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "co-macros",
  "uuid",
 ]
 

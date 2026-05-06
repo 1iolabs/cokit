@@ -54,7 +54,7 @@ impl Membership {
 #[co]
 pub struct CoState {
 	/// The CO root state (usually co-core-co) and heads.
-	/// Note: This is not an Option so we can not be member of an emtpy CO (which has no id anyway).
+	/// Note: This is not an Option so we can not be member of an empty CO (which has no id anyway).
 	/// Note: We want to use `CoReference::Weak` instead of `WeakCid` here because we need to have mappings generated
 	/// for it.
 	pub state: Link<CoReference<(Cid, BTreeSet<Cid>)>>,
