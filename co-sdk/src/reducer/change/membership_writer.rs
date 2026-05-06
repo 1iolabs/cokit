@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use co_core_membership::{CoState, MembershipsAction};
 use co_identity::PrivateIdentityBox;
 use co_primitives::{CoId, StaticCoDate, WeakCid};
-use co_storage::EncryptedBlockStorage;
+use co_storage::{BlockStorageContentMapping, EncryptedBlockStorage};
 use std::collections::BTreeSet;
 
 /// Apply reducer state/head changes to the membership core in the parent CO.
@@ -40,7 +40,27 @@ impl MembershipWriter {
 	pub async fn write(&mut self, storage: &CoStorage, reducer_state: CoReducerState) -> Result<(), anyhow::Error> {
 		// action
 		let parent_storage = self.parent.storage();
-		if let Some((state, mappings)) = reducer_state.to_co_state(&parent_storage, storage).await? {
+
+		// When the parent has a content-mapping layer (e.g., local CO is
+		// encrypted), keep the wrapper's CIDs in their internal (plain) form:
+		// parent's encryption embeds the per-CO mapping as `with_references`
+		// and recovers it on read, and identical plain wrappers across
+		// instances let `BTreeSet<CoState>` deduplicate. Without that layer,
+		// fall back to storing external (encrypted) CIDs in the wrapper —
+		// same path as `invite_receive`, with
+		// `MembershipStateResolver::ensure_internal` decrypting on read.
+		let co_state_and_mappings = if parent_storage.is_content_mapped().await {
+			reducer_state.to_co_state(&parent_storage, storage).await?
+		} else {
+			let external_state = reducer_state.to_external_force(storage).await?;
+			if let Some(state) = external_state.to_external_co_state(&parent_storage).await? {
+				let mappings = reducer_state.to_external_mapping(storage).await;
+				Some((state, mappings))
+			} else {
+				None
+			}
+		};
+		if let Some((state, mappings)) = co_state_and_mappings {
 			// log
 			tracing::trace!(?reducer_state, co = ?self.id, "membership-write");
 

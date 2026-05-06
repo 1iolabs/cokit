@@ -81,11 +81,11 @@ opentelemetry-stdout = { version = "0.3.0", features = ["trace"], optional = tru
 tracing-opentelemetry = { version = "0.23", optional = true }
 
 [dev-dependencies]
+co-test = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio"] }
 example-counter = { path = "../examples/counter" }
 example-counter-upgraded = { path = "../examples/counter-upgraded" }
 tokio = { workspace = true, features = ["full", "tracing"] }
-co-test = { workspace = true }
 
 [features]
 "default" = ["recommended", "co-runtime/cranelift"]

@@ -16,3 +16,4 @@ release = false
 [dependencies]
 anyhow = { workspace = true }
 uuid = { workspace = true }
+co-macros = { workspace = true }

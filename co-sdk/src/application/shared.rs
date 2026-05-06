@@ -673,11 +673,29 @@ impl SharedCoCreator {
 		};
 
 		// add membership to parent co
+		//
+		// When the parent storage has a content-mapping layer (e.g., the local
+		// CO is itself encrypted), keep the wrapper's CIDs in their internal
+		// (plain) form: parent's encryption embeds the per-CO mapping as
+		// `with_references` and recovers it on read, and identical plain
+		// wrappers across instances let `BTreeSet<CoState>` deduplicate.
+		// Without that layer, fall back to storing external (encrypted) CIDs
+		// in the wrapper — same path as `invite_receive`, with
+		// `MembershipStateResolver::ensure_internal` decrypting on read.
 		let parent_storage = self.parent.storage();
-		let (state, _mappings) = reducer_state
-			.to_co_state(&parent_storage, &co_storage)
-			.await?
-			.ok_or(anyhow::anyhow!("Expected state after create"))?;
+		let state = if parent_storage.is_content_mapped().await {
+			let (state, _mappings) = reducer_state
+				.to_co_state(&parent_storage, &co_storage)
+				.await?
+				.ok_or(anyhow::anyhow!("Expected state after create"))?;
+			state
+		} else {
+			let external_state = reducer_state.to_external_force(&co_storage).await?;
+			external_state
+				.to_external_co_state(&parent_storage)
+				.await?
+				.ok_or(anyhow::anyhow!("Expected state after create"))?
+		};
 		self.parent
 			.push(
 				&identity,

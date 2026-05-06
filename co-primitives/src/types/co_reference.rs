@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 /// ## FAQ
 /// ### When to use [`CoReference::Weak`] and when [`co_primitives::WeakCid`]?
 /// Use [`CoReference::Weak`] when you want to reference a root.
-/// When the garbage collection reaches a [`CoReference::Weak`] it will not try to keep it alve with its parent.
+/// When the garbage collection reaches a [`CoReference::Weak`] it will not try to keep it alive with its parent.
 /// Example: Keeping a historic root for reference or fast traversing.
 ///
 /// Use [`co_primitives::WeakCid`] when the reference should not been handled as a link and will not be
