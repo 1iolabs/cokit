@@ -12,6 +12,7 @@ use syn::{
 
 mod co;
 mod tagged_fields;
+mod timeout;
 
 struct CoArgs {
 	features: BTreeSet<CoMacroFeature>,
@@ -62,4 +63,9 @@ pub fn co(metadata: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_derive(TaggedFields, attributes(tagged))]
 pub fn derive_tagged_fields(item: TokenStream) -> TokenStream {
 	tagged_fields::derive_tagged_fields(item)
+}
+
+#[proc_macro_attribute]
+pub fn timeout(attr: TokenStream, item: TokenStream) -> TokenStream {
+	timeout::macro_timeout(attr, item)
 }
