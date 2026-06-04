@@ -18,7 +18,8 @@ pub use co_primitives::{
 	LazyTransaction, Link, Linkable, Metadata, Network, Node, NodeBuilder, NodeBuilderError, NodeSerializer,
 	OptionLink, Path, PathExt, PathOwned, RawCid, ReducerAction, ReducerInput, ReducerOutput, RelativePath,
 	RelativePathOwned, Secret, SignedEntry, Storage, StorageError, StoreParams, Tag, TagMatcher, TagPattern, TagValue,
-	Tags, TagsExpr, TotalFloat64, WeakCid, WithCoMetadata, CID_MAX_SIZE,
+	Tags, TagsAction, TagsClearAction, TagsExpr, TagsInsertAction, TagsRemoveAction, TagsSetAction, TotalFloat64,
+	WeakCid, WithCoMetadata, CID_MAX_SIZE,
 };
 pub use co_v1::{storage_block_get, storage_block_set};
 pub use library::{
