@@ -36,10 +36,10 @@ Establish data ownership and app interoperability as the standard for every digi
 
 
 ## Our Philosophy
-No Backend. No Cloud-Dependencies. No Bullshit.
+No Backend. No Cloud-Dependencies. No Single Point of Failure.
 
-### Fuck Big Tech
-First of all - if you are big tech - Hi! You're welcome to use COKIT as well. But you might want to skip the next part, as we're not being nice. Big tech owns your online life. We have traded privacy for convenience, entrusting our personal data to closed systems that scarcely work together. At 1io, we are turning the tables on centralization with a new technological foundation for truly decentralized collaboration. Applications developed using COKIT empower users with control of their own data.
+### A Paradigm Shift
+Big tech owns your online life. We have traded privacy for convenience, entrusting our personal data to closed systems that scarcely work together. At 1io, we are turning the tables on centralization with a new technological foundation for truly decentralized collaboration. Applications developed using COKIT empower users with control of their own data.
 
 ### Kill the Middleman
 We eliminate intermediaries. You individually decide with whom you want to share your data and under what conditions. [CO](..reference/co.md) lives on your local device and is directly synced only with your peers over the network. All apps are built on this fundamental concept.
