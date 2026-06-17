@@ -14,7 +14,9 @@ use co_messaging::{
 fn test_text_content() {
 	let mut event_content = message_event::TextContent::new("Some message");
 	event_content.set_format("formatted_body", FORMATTED_BODY_FORMAT);
-	event_content.mentions = Mentions { user_ids: vec!["did:some:user".into()] }.into();
+	let mut mentions = Mentions::default();
+	mentions.user_ids = vec!["did:some:user".into()];
+	event_content.mentions = Some(mentions);
 	let event = MatrixEvent::new("some_event", 1577836800000, "@some.room", event_content);
 	assert_eq!(event.event_type(), "m.room.message");
 	assert_eq!(event.content.generate_message_type().unwrap(), "m.text");
@@ -43,14 +45,18 @@ fn test_notice_content() {
 
 #[test]
 fn test_image_content() {
-	let info = ImageInfo {
-		h: 10,
-		w: 20,
-		mimetype: "image/jpeg".to_string(),
-		size: 5000,
-		thumbnail_file: Cid::default(),
-		thumbnail_info: ThumbnailInfo { h: 10, w: 10, mimetype: "image/jpeg".to_string(), size: 500 },
-	};
+	let mut thumbnail_info = ThumbnailInfo::default();
+	thumbnail_info.h = 10;
+	thumbnail_info.w = 10;
+	thumbnail_info.mimetype = "image/jpeg".to_string();
+	thumbnail_info.size = 500;
+	let mut info = ImageInfo::default();
+	info.h = 10;
+	info.w = 20;
+	info.mimetype = "image/jpeg".to_string();
+	info.size = 5000;
+	info.thumbnail_file = Cid::default();
+	info.thumbnail_info = thumbnail_info;
 	let event_content = message_event::ImageContent::new("Some image", Cid::default(), info);
 	let event = MatrixEvent::new("some_event", 1577836800000, "@some.room", event_content);
 	assert_eq!(event.event_type(), "m.room.message");
@@ -63,7 +69,10 @@ fn test_image_content() {
 
 #[test]
 fn test_audio_content() {
-	let info = AudioInfo { duration: 50, mimetype: "audio/wav".to_string(), size: 5000 };
+	let mut info = AudioInfo::default();
+	info.duration = 50;
+	info.mimetype = "audio/wav".to_string();
+	info.size = 5000;
 	let event_content = message_event::AudioContent::new("Some message", Cid::default(), info);
 	let event = MatrixEvent::new("some_event", 1577836800000, "@some.room", event_content);
 	assert_eq!(event.event_type(), "m.room.message");
@@ -76,15 +85,19 @@ fn test_audio_content() {
 
 #[test]
 fn test_video_content() {
-	let info = VideoInfo {
-		h: 1080,
-		w: 1690,
-		thumbnail_file: Cid::default(),
-		thumbnail_info: ThumbnailInfo { h: 10, w: 10, mimetype: "image/jpeg".to_string(), size: 500 },
-		duration: 50,
-		mimetype: "video/mp4".to_string(),
-		size: 5000,
-	};
+	let mut thumbnail_info = ThumbnailInfo::default();
+	thumbnail_info.h = 10;
+	thumbnail_info.w = 10;
+	thumbnail_info.mimetype = "image/jpeg".to_string();
+	thumbnail_info.size = 500;
+	let mut info = VideoInfo::default();
+	info.h = 1080;
+	info.w = 1690;
+	info.duration = 50;
+	info.mimetype = "video/mp4".to_string();
+	info.size = 5000;
+	info.thumbnail_file = Cid::default();
+	info.thumbnail_info = thumbnail_info;
 	let event_content = message_event::VideoContent::new("Some message", Cid::default(), info);
 	let event = MatrixEvent::new("some_event", 1577836800000, "@some.room", event_content);
 	assert_eq!(event.event_type(), "m.room.message");
@@ -97,12 +110,16 @@ fn test_video_content() {
 
 #[test]
 fn test_file_content() {
-	let info = FileInfo {
-		thumbnail_file: Cid::default(),
-		thumbnail_info: ThumbnailInfo { h: 10, w: 10, mimetype: "image/jpeg".to_string(), size: 500 },
-		mimetype: "application/msword".to_string(),
-		size: 5000,
-	};
+	let mut thumbnail_info = ThumbnailInfo::default();
+	thumbnail_info.h = 10;
+	thumbnail_info.w = 10;
+	thumbnail_info.mimetype = "image/jpeg".to_string();
+	thumbnail_info.size = 500;
+	let mut info = FileInfo::default();
+	info.thumbnail_file = Cid::default();
+	info.thumbnail_info = thumbnail_info;
+	info.mimetype = "application/msword".to_string();
+	info.size = 5000;
 	let event_content = message_event::FileContent::new("Some message", Cid::default(), "", info);
 	let event = MatrixEvent::new("some_event", 1577836800000, "@some.room", event_content);
 	assert_eq!(event.event_type(), "m.room.message");
@@ -115,10 +132,14 @@ fn test_file_content() {
 
 #[test]
 fn test_location_content() {
-	let info = LocationInfo {
-		thumbnail_file: Cid::default(),
-		thumbnail_info: ThumbnailInfo { h: 20, w: 20, mimetype: "image/jpeg".to_string(), size: 500 },
-	};
+	let mut thumbnail_info = ThumbnailInfo::default();
+	thumbnail_info.h = 20;
+	thumbnail_info.w = 20;
+	thumbnail_info.mimetype = "image/jpeg".to_string();
+	thumbnail_info.size = 500;
+	let mut info = LocationInfo::default();
+	info.thumbnail_file = Cid::default();
+	info.thumbnail_info = thumbnail_info;
 	let event_content = LocationContent::new("Eiffeltower", "wherever the eiffeltower is", info);
 	let event = MatrixEvent::new("some_event", 1577836800000, "@some.room", event_content);
 	assert_eq!(event.event_type(), "m.room.message");

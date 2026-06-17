@@ -31,7 +31,8 @@ pub trait EventType {
 
 /// Collection of all possible actions for the room core
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct MatrixEvent {
 	pub event_id: String,
 	pub timestamp: Date,
@@ -153,6 +154,12 @@ pub enum EventContent {
 	ViewStory(ViewUserStoryContent),
 	#[serde(rename = "user_profile_update")]
 	UpdateProfile(UpdateProfileContent),
+}
+
+impl Default for EventContent {
+	fn default() -> Self {
+		EventContent::Message(MessageType::default())
+	}
 }
 
 impl EventContent {

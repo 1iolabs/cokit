@@ -12,20 +12,16 @@ fn room_name() {
 	println!("{json}");
 	assert_eq!(event, serde_json::from_str(&json).unwrap());
 
-	state_event::RoomAvatarContent::new(
-		Some(Cid::default()),
-		ImageInfo {
-			h: 100,
-			w: 100,
-			size: 10000,
-			mimetype: "image/png".into(),
-			thumbnail_info: co_messaging::multimedia::ThumbnailInfo {
-				h: 10,
-				w: 10,
-				mimetype: "image/png".into(),
-				size: 1000,
-			},
-			thumbnail_file: Default::default(),
-		},
-	);
+	let mut thumbnail_info = co_messaging::multimedia::ThumbnailInfo::default();
+	thumbnail_info.h = 10;
+	thumbnail_info.w = 10;
+	thumbnail_info.mimetype = "image/png".into();
+	thumbnail_info.size = 1000;
+	let mut image_info = ImageInfo::default();
+	image_info.h = 100;
+	image_info.w = 100;
+	image_info.size = 10000;
+	image_info.mimetype = "image/png".into();
+	image_info.thumbnail_info = thumbnail_info;
+	state_event::RoomAvatarContent::new(Some(Cid::default()), image_info);
 }

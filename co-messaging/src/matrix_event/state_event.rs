@@ -9,7 +9,8 @@ use co_primitives::CoCid;
 use schemars::JsonSchema;
 
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct RoomNameContent {
 	pub name: String,
 }
@@ -33,7 +34,8 @@ impl From<RoomNameContent> for EventContent {
 }
 
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct RoomTopicContent {
 	pub topic: String,
 }
@@ -57,7 +59,8 @@ impl From<RoomTopicContent> for EventContent {
 }
 
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct RoomAvatarContent {
 	#[schemars(with = "Option<CoCid>")]
 	pub file: Option<Cid>,
@@ -83,7 +86,8 @@ impl From<RoomAvatarContent> for EventContent {
 }
 
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct PinnedEventsContent {
 	pub pinned: Vec<String>,
 }

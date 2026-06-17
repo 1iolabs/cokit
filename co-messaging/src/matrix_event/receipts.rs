@@ -10,7 +10,8 @@ use std::collections::BTreeMap;
 /// event were read by the user that sent this receipt event. This becomes public knowledge to all users
 /// participating in the CO.
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct PublicReceiptContent {
 	/// The ID of the latest event read by the user
 	#[serde(rename = "m_read")]
@@ -28,7 +29,8 @@ impl From<PublicReceiptContent> for EventContent {
 // TODO move to another core as these should not be visible to other co participants
 /// A read receipt for one specific room. Indicates that a user has read all messages up to the given event.
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct PrivateReceipt {
 	/// The ID of the event the receipt references
 	pub event_id: String,
@@ -40,7 +42,8 @@ pub struct PrivateReceipt {
 /// in this event only needs to contain the delta on the users receipts. This means that there is no need to contain
 /// the complete read receipt state in this event but only the changes.
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct PrivateReceiptContent {
 	/// Map of all room IDs to receipts
 	#[serde(rename = "m.read.private")]

@@ -8,7 +8,8 @@ use schemars::JsonSchema;
 
 /// Contains metadata of images
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct ImageInfo {
 	/// Intended display height in px
 	pub h: u32,
@@ -27,7 +28,8 @@ pub struct ImageInfo {
 
 /// Contains metadata of images used as a thumbnail
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct ThumbnailInfo {
 	/// Intended display height in px
 	pub h: u32,
@@ -41,7 +43,8 @@ pub struct ThumbnailInfo {
 
 /// Contains metadata of audio files
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct AudioInfo {
 	/// Duration of the audio clip in ms
 	pub duration: u32,
@@ -49,11 +52,17 @@ pub struct AudioInfo {
 	pub mimetype: String,
 	/// Size of the audio file in bytes
 	pub size: u32,
+	/// Vector with data for the waveform visualisation. Values from 0 to 256 are possible.
+	/// The entries in the vector should be distributed in a linear fashion.
+	/// Not in the official specs yet, but introduced [in this proposal](https://github.com/matrix-org/matrix-spec-proposals/pull/3246)
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub waveform: Option<Vec<u8>>,
 }
 
 /// Contains metadata of video files
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct VideoInfo {
 	/// Intended display height in px
 	pub h: u32,
@@ -74,7 +83,8 @@ pub struct VideoInfo {
 
 /// Contains metadata of any other filetypes
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct FileInfo {
 	/// Mimetype of the file
 	pub mimetype: String,
@@ -89,7 +99,8 @@ pub struct FileInfo {
 
 /// Contains metadata of any location based content
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct LocationInfo {
 	/// CID to an image file that is to be used as the thumbnail
 	#[schemars(with = "CoCid")]

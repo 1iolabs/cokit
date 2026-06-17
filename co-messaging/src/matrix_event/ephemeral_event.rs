@@ -12,7 +12,8 @@ use schemars::JsonSchema;
 /// participant. Information should be updated regularly and have a timout after which no users should count as
 /// typing when no new event was sent.
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct TypingContent {
 	/// List of users currently typing in the room
 	pub user_ids: Vec<String>,
@@ -44,8 +45,9 @@ impl TypingContent {
 ///
 /// DnD: As 'Online' but the user doesn't want to be disturbed
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
 pub enum PresenceType {
+	#[default]
 	#[serde(rename = "online")]
 	Online,
 	#[serde(rename = "offline")]
@@ -58,7 +60,8 @@ pub enum PresenceType {
 /// In contrast to typing events, the sender is important here and always corresponds to the user the information is
 /// about.
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct PresenceContent {
 	pub presence: PresenceType,
 	/// Timestampt in milliseconds when the user last performed an action

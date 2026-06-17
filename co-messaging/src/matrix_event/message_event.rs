@@ -88,6 +88,12 @@ impl Relation for MessageType {
 	}
 }
 
+impl Default for MessageType {
+	fn default() -> Self {
+		MessageType::Text(TextContent::default())
+	}
+}
+
 impl From<MessageType> for EventContent {
 	fn from(val: MessageType) -> Self {
 		EventContent::Message(val)
@@ -105,7 +111,8 @@ pub trait Formattable {
 
 /// Used to describe which users got mentioned in the body of a message
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct Mentions {
 	pub user_ids: Vec<Did>,
 }
@@ -113,7 +120,8 @@ pub struct Mentions {
 /// Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
 /// also given.
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct TextContent {
 	/// A formatted version of the body
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -187,7 +195,8 @@ impl Relation for TextContent {
 /// Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
 /// also given
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct NoticeContent {
 	/// A formatted version of the body
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -259,7 +268,8 @@ impl Relation for NoticeContent {
 }
 
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct ImageContent {
 	/// A text representing the image in some way
 	pub body: String,
@@ -304,7 +314,8 @@ impl Relation for ImageContent {
 }
 
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct AudioContent {
 	/// A text representing the audio in same way
 	pub body: String,
@@ -349,7 +360,8 @@ impl Relation for AudioContent {
 }
 
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct VideoContent {
 	/// Textual representation of the video
 	pub body: String,
@@ -394,7 +406,8 @@ impl Relation for VideoContent {
 }
 
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct FileContent {
 	/// A text representing the file in some way
 	pub body: String,
@@ -449,7 +462,8 @@ impl Relation for FileContent {
 }
 
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct LocationContent {
 	/// Textual representation of the location
 	pub body: String,
