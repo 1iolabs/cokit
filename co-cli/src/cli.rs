@@ -46,6 +46,22 @@ pub struct Cli {
 	#[arg(long, value_enum, default_value_t, env = "CO_LOG_LEVEL")]
 	pub log_level: CliLogLevel,
 
+	/// Configure the log file sink (and its path).
+	///
+	/// Values: `off`/`0`/`false` (no file), `on`/`1`/`true` or `file` (default path), `-`/`stderr`
+	/// (no file), or a path. When set, takes precedence over `--no-log` and `--log-path`.
+	/// Stderr verbosity is controlled separately by `-v`/`-q`.
+	/// Env: CO_LOG
+	#[arg(long, env = "CO_LOG", value_parser = co_sdk::parse_log_sink)]
+	pub log: Option<co_sdk::LogSink>,
+
+	/// `EnvFilter` directives for the file log, e.g. `co_sdk=debug,libp2p=warn`.
+	///
+	/// Layered on top of `--log-level`. Falls back to `RUST_LOG` when unset.
+	/// Env: CO_LOG_FILTER
+	#[arg(long, env = "CO_LOG_FILTER")]
+	pub log_filter: Option<String>,
+
 	/// Read/Write Local CO encryption key to file instead of the OS keychain.
 	///
 	/// Warning: This option is INSECURE only use when you know the implications.

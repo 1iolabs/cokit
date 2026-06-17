@@ -17,7 +17,7 @@ use tracing::{
 #[cfg(feature = "bunyan")]
 use tracing_bunyan_formatter::BunyanFormattingLayer;
 use tracing_log::LogTracer;
-use tracing_subscriber::{fmt::writer::MakeWriterExt, layer::SubscriberExt, EnvFilter, Registry};
+use tracing_subscriber::{filter::LevelFilter, fmt::writer::MakeWriterExt, layer::SubscriberExt, EnvFilter, Registry};
 
 pub struct TracingBuilder {
 	identifier: String,
@@ -93,6 +93,12 @@ impl TracingBuilder {
 
 	pub fn with_env_filter_directives(self, directives: &str) -> Result<Self, anyhow::Error> {
 		Ok(Self { env_filter: Some(EnvFilter::try_new(directives)?), ..self })
+	}
+
+	/// Set the subscriber's `EnvFilter` from `level` (global default directive) plus optional
+	/// lenient `directives`. See [`env_filter`].
+	pub fn with_level_filter(self, level: Level, directives: Option<&str>) -> Self {
+		Self { env_filter: Some(env_filter(level, directives)), ..self }
 	}
 
 	fn build_subscriber(self) -> Result<Option<impl tracing::Subscriber + Send + Sync + 'static>, anyhow::Error> {
@@ -178,6 +184,15 @@ impl TracingBuilder {
 	}
 }
 
+/// Build a lossy `EnvFilter` with `level` as the global default directive and optional `directives`
+/// (e.g. `co_sdk=debug`) layered on top. Invalid directives are ignored with a warning rather than
+/// causing a failure.
+pub fn env_filter(level: Level, directives: Option<&str>) -> EnvFilter {
+	EnvFilter::builder()
+		.with_default_directive(LevelFilter::from_level(level).into())
+		.parse_lossy(directives.unwrap_or_default())
+}
+
 /// Bridge `log` crate events into `tracing`, ignoring crates that emit excessive trace/debug
 /// output (mainly the wasmer cranelift compiler backend, which can produce tens of millions of
 /// records per module compilation and trash the log file).
@@ -219,5 +234,32 @@ fn init_tracer(
 		pipeline.install_simple()
 	} else {
 		pipeline.install_batch(runtime::Tokio)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn env_filter_level_only() {
+		let _ = env_filter(Level::INFO, None);
+	}
+
+	#[test]
+	fn env_filter_with_directives() {
+		let _ = env_filter(Level::INFO, Some("co_sdk=debug"));
+	}
+
+	#[test]
+	fn env_filter_is_lossy_on_bad_directives() {
+		// A malformed directive must NOT panic (parse_lossy ignores it).
+		let _ = env_filter(Level::INFO, Some("@@@not-valid@@@"));
+	}
+
+	#[test]
+	fn with_level_filter_sets_env_filter() {
+		let builder = TracingBuilder::new("test".to_owned(), None).with_level_filter(Level::INFO, Some("co_sdk=debug"));
+		assert!(builder.env_filter.is_some());
 	}
 }

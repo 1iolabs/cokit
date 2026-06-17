@@ -24,9 +24,11 @@ impl CoContext {
 			},
 			#[cfg(feature = "tracing")]
 			crate::CoLog::Print => {
+				let rust_log = std::env::var("RUST_LOG").ok();
+				let directives = co_sdk::resolve_filter(settings.log_filter.as_deref(), rust_log.as_deref());
 				co_sdk::TracingBuilder::new(settings.identifier.clone(), None)
 					.with_stderr_logging()
-					.with_max_level(settings.log_level.into())
+					.with_level_filter(settings.log_level.into(), directives.as_deref())
 					.init()
 					.expect("tracing init");
 			},
@@ -41,9 +43,11 @@ impl CoContext {
 						co_sdk::CoStorageSetting::PathDefault => Some(ApplicationBuilder::default_path()),
 						_ => None,
 					};
+					let rust_log = std::env::var("RUST_LOG").ok();
+					let directives = co_sdk::resolve_filter(settings.log_filter.as_deref(), rust_log.as_deref());
 					co_sdk::TracingBuilder::new(settings.identifier.clone(), base_path)
 						.with_bunyan_logging(path)
-						.with_max_level(settings.log_level.into())
+						.with_level_filter(settings.log_level.into(), directives.as_deref())
 						.init()
 						.expect("tracing init");
 				}

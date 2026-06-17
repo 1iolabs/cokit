@@ -10,7 +10,9 @@ use co_guard::{AccessGuard, DynamicAccessGuard, Guards};
 use co_sdk::GuardReference;
 #[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
-use co_sdk::{CoStorageSetting, ContactHandler, Core, Cores, DynamicContactHandler, DynamicLocalSecret, LocalSecret};
+use co_sdk::{
+	CoStorageSetting, ContactHandler, Core, Cores, DynamicContactHandler, DynamicLocalSecret, LocalSecret, LogSink,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct CoSettings {
@@ -33,6 +35,7 @@ pub struct CoSettings {
 	pub no_keychain: bool,
 	pub log: CoLog,
 	pub log_level: CoLogLevel,
+	pub log_filter: Option<String>,
 	pub no_default_features: bool,
 	pub feature: Vec<String>,
 	pub local_secret: Option<DynamicLocalSecret>,
@@ -63,6 +66,10 @@ impl CoSettings {
 
 	pub fn with_log_level(self, log_level: impl Into<CoLogLevel>) -> Self {
 		Self { log_level: log_level.into(), ..self }
+	}
+
+	pub fn with_log_filter(self, log_filter: impl Into<String>) -> Self {
+		Self { log_filter: Some(log_filter.into()), ..self }
 	}
 
 	#[cfg(feature = "fs")]
@@ -112,7 +119,9 @@ impl CoSettings {
 		self
 	}
 
-	pub fn from_cli(bundle_identifier: String, cli: Cli) -> CoSettings {
+	pub fn from_cli(bundle_identifier: String, mut cli: Cli) -> CoSettings {
+		let log = resolve_log_from(cli.log.take(), cli.no_log);
+		let log_filter = cli.log_filter.take();
 		CoSettings {
 			bundle_identifier,
 			storage: co_storage(&cli),
@@ -122,8 +131,9 @@ impl CoSettings {
 			#[cfg(feature = "network")]
 			network_settings: NetworkSettings::default().with_force_new_peer_id(cli.force_new_peer_id),
 			no_keychain: cli.no_keychain,
-			log: if cli.no_log { CoLog::None } else { CoLog::Default },
+			log,
 			log_level: cli.log_level,
+			log_filter,
 			no_default_features: cli.no_default_features,
 			feature: cli.feature,
 			..Default::default()
@@ -182,6 +192,37 @@ impl CoLog {
 	}
 }
 
+/// Resolve the configured `CoLog` from the parsed `--log`/`CO_LOG` value and the legacy `--no-log`
+/// flag. An explicit `--log`/`CO_LOG` wins over `--no-log`.
+fn resolve_log_from(log: Option<LogSink>, no_log: bool) -> CoLog {
+	match log {
+		Some(sink) => co_log_from(sink),
+		None if no_log => CoLog::None,
+		None => CoLog::Default,
+	}
+}
+
+/// Map a parsed `LogSink` to a `CoLog`, degrading sinks not compiled in on this target to
+/// `CoLog::Default`.
+fn co_log_from(sink: LogSink) -> CoLog {
+	match sink {
+		LogSink::Off => CoLog::None,
+		LogSink::Default => CoLog::Default,
+		#[cfg(feature = "tracing")]
+		LogSink::Stderr => CoLog::Print,
+		#[cfg(all(feature = "fs", feature = "tracing"))]
+		LogSink::File => CoLog::File(None),
+		#[cfg(all(feature = "fs", feature = "tracing"))]
+		LogSink::Path(path) => CoLog::File(Some(path)),
+		#[cfg(not(feature = "tracing"))]
+		LogSink::Stderr => CoLog::Default,
+		#[cfg(not(all(feature = "fs", feature = "tracing")))]
+		LogSink::File => CoLog::Default,
+		#[cfg(not(all(feature = "fs", feature = "tracing")))]
+		LogSink::Path(_) => CoLog::Default,
+	}
+}
+
 fn co_storage(_cli: &Cli) -> CoStorageSetting {
 	#[cfg(feature = "fs")]
 	if !_cli.memory {
@@ -191,4 +232,51 @@ fn co_storage(_cli: &Cli) -> CoStorageSetting {
 		};
 	}
 	CoStorageSetting::Memory
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn resolve_log_explicit_beats_no_log() {
+		// --log on  +  --no-log  => Default (explicit --log wins)
+		assert!(matches!(resolve_log_from(Some(LogSink::Default), true), CoLog::Default));
+	}
+
+	#[test]
+	fn resolve_log_no_log_only() {
+		assert!(matches!(resolve_log_from(None, true), CoLog::None));
+	}
+
+	#[test]
+	fn resolve_log_default_when_nothing_set() {
+		assert!(matches!(resolve_log_from(None, false), CoLog::Default));
+	}
+
+	#[test]
+	fn resolve_log_off() {
+		assert!(matches!(resolve_log_from(Some(LogSink::Off), false), CoLog::None));
+	}
+
+	#[cfg(feature = "tracing")]
+	#[test]
+	fn co_log_stderr_maps_to_print() {
+		assert!(matches!(co_log_from(LogSink::Stderr), CoLog::Print));
+	}
+
+	#[cfg(all(feature = "fs", feature = "tracing"))]
+	#[test]
+	fn co_log_file_maps_to_file_none() {
+		assert!(matches!(co_log_from(LogSink::File), CoLog::File(None)));
+	}
+
+	#[cfg(all(feature = "fs", feature = "tracing"))]
+	#[test]
+	fn co_log_path_maps_to_file_some() {
+		match co_log_from(LogSink::Path(std::path::PathBuf::from("/tmp/x.log"))) {
+			CoLog::File(Some(p)) => assert_eq!(p, std::path::PathBuf::from("/tmp/x.log")),
+			other => panic!("expected File(Some), got {other:?}"),
+		}
+	}
 }

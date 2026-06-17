@@ -40,6 +40,22 @@ pub struct Cli {
 	#[arg(long, value_enum, default_value_t, env = "CO_LOG_LEVEL")]
 	pub log_level: CoLogLevel,
 
+	/// Configure the logging sink (and optional file path).
+	///
+	/// Values: `off`/`0`/`false`, `on`/`1`/`true` (platform default), `file` (default path),
+	/// `-`/`stderr`, or a path (absolute, or starting with `./`, `../`, `~`, or containing `/`).
+	/// Takes precedence over `--no-log`.
+	/// Env: CO_LOG
+	#[arg(long, env = "CO_LOG", value_parser = co_sdk::parse_log_sink)]
+	pub log: Option<co_sdk::LogSink>,
+
+	/// `EnvFilter` directives for per-target log filtering, e.g. `co_sdk=debug,libp2p=warn`.
+	///
+	/// Layered on top of `--log-level` (the global default). Falls back to `RUST_LOG` when unset.
+	/// Env: CO_LOG_FILTER
+	#[arg(long, env = "CO_LOG_FILTER")]
+	pub log_filter: Option<String>,
+
 	/// Read/Write Local CO encryption key to file instead of the OS keychain.
 	///
 	/// Warning: This option is INSECURE only use when you know the implications.
@@ -104,5 +120,28 @@ impl From<tracing::Level> for CoLogLevel {
 			tracing::Level::DEBUG => CoLogLevel::Debug,
 			tracing::Level::TRACE => CoLogLevel::Trace,
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use clap::Parser;
+
+	#[test]
+	fn cli_parses_log_flag() {
+		let cli = Cli::try_parse_from(["co", "--log", "off"]).unwrap();
+		assert_eq!(cli.log, Some(co_sdk::LogSink::Off));
+	}
+
+	#[test]
+	fn cli_parses_log_path() {
+		let cli = Cli::try_parse_from(["co", "--log", "/tmp/x.log"]).unwrap();
+		assert_eq!(cli.log, Some(co_sdk::LogSink::Path("/tmp/x.log".into())));
+	}
+
+	#[test]
+	fn cli_rejects_unknown_log_value() {
+		assert!(Cli::try_parse_from(["co", "--log", "debug"]).is_err());
 	}
 }
