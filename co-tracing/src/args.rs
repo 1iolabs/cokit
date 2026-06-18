@@ -13,7 +13,7 @@ pub struct LogArgs {
 	/// Logging config: `sink[:filter]` entries separated by `;`, or `off`/`on`.
 	/// Examples: `file`, `stderr:error`, `file:info,co_sdk=trace;stderr:error`. Quote it in your shell.
 	/// Env: CO_LOG
-	#[arg(long, env = "CO_LOG", value_parser = crate::parse_log)]
+	#[arg(long, env = "CO_LOG", value_parser = crate::parse_log, allow_hyphen_values = true)]
 	pub log: Option<LogConfig>,
 
 	/// Increase stderr verbosity (`-v` debug, `-vv` trace). Ignored if `CO_LOG` names a stderr sink.
@@ -70,8 +70,11 @@ impl LogArgs {
 			Some(LogConfig::Sinks(s)) => s.clone(),
 			Some(LogConfig::Default) | None => self.default_sinks(context),
 		};
+		// An explicit `CO_LOG` sink list is authoritative: suppress the default stderr baseline
+		// (as if `-q` for the default). `-v` can still add stderr; a `stderr:` entry is honored above.
+		let stderr_default = if matches!(self.log, Some(LogConfig::Sinks(_))) { None } else { context.default_stderr };
 		if !sinks.iter().any(|s| matches!(s.sink, LogSink::Stderr)) {
-			if let Some(level) = level_from_verbosity(self.verbose, self.quiet, context.default_stderr) {
+			if let Some(level) = level_from_verbosity(self.verbose, self.quiet, stderr_default) {
 				sinks.push(SinkSpec { sink: LogSink::Stderr, filter: Some(level_directive(level).to_owned()) });
 			}
 		}
@@ -225,5 +228,52 @@ mod tests {
 		let sinks = a.resolve_sinks(&context(), Some("co_sdk=trace"));
 		assert_eq!(sinks.len(), 1);
 		assert_eq!(sinks[0].filter.as_deref(), Some("co_sdk=trace"));
+	}
+
+	#[test]
+	fn explicit_co_log_suppresses_default_stderr() {
+		// CO_LOG names only a file, no -v ⇒ default stderr is suppressed (just the file).
+		let a = LogArgs {
+			log: Some(LogConfig::Sinks(vec![SinkSpec { sink: LogSink::File(None), filter: None }])),
+			..Default::default()
+		};
+		let sinks = a.resolve_sinks(&context(), None);
+		assert_eq!(sinks.len(), 1);
+		assert!(matches!(sinks[0].sink, LogSink::File(None)));
+	}
+
+	#[test]
+	fn explicit_co_log_plus_verbose_still_adds_stderr() {
+		let a = LogArgs {
+			log: Some(LogConfig::Sinks(vec![SinkSpec { sink: LogSink::File(None), filter: None }])),
+			verbose: 1,
+			..Default::default()
+		};
+		let sinks = a.resolve_sinks(&context(), None);
+		assert_eq!(sinks.len(), 2);
+		assert!(matches!(sinks[1].sink, LogSink::Stderr));
+		assert_eq!(sinks[1].filter.as_deref(), Some("debug"));
+	}
+
+	#[test]
+	fn cli_accepts_hyphen_leading_log_value() {
+		use clap::Parser;
+		#[derive(Parser)]
+		struct Harness {
+			#[command(flatten)]
+			log: LogArgs,
+		}
+		// `--log -:trace` → stderr sink with inline filter "trace"
+		let h = Harness::try_parse_from(["x", "--log", "-:trace"]).unwrap();
+		assert_eq!(
+			h.log.log,
+			Some(LogConfig::Sinks(vec![SinkSpec { sink: LogSink::Stderr, filter: Some("trace".into()) }]))
+		);
+		// bare `--log -` → stderr, no filter
+		let h2 = Harness::try_parse_from(["x", "--log", "-"]).unwrap();
+		assert_eq!(
+			h2.log.log,
+			Some(LogConfig::Sinks(vec![SinkSpec { sink: LogSink::Stderr, filter: None }]))
+		);
 	}
 }
