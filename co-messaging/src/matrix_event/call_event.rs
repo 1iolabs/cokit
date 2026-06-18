@@ -7,7 +7,7 @@ use schemars::JsonSchema;
 
 /// Session description object for sdp offers and answers
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct SessionDescription {
 	pub sdp: String,
@@ -23,7 +23,7 @@ impl SessionDescription {
 
 /// ICE candidate for WebRTC exchange protocol
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct ICECandidate {
 	pub candidate: String, // SDP 'a' line of the candidate
@@ -41,7 +41,7 @@ impl ICECandidate {
 
 /// Initial event to invite other parties to a call
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct CallInviteContent {
 	pub call_id: String,
@@ -83,14 +83,13 @@ impl CallInviteContent {
 			invitee,
 			lifetime,
 			offer: SessionDescription::new(offer_sdp, "offer"),
-			..Default::default()
 		}
 	}
 }
 
 ///Event used when answering an invite event
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct AnswerCallContent {
 	pub call_id: String,
@@ -124,7 +123,7 @@ impl AnswerCallContent {
 
 /// Event used to exchange viable ICE candidates with the other party upon answering a call
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct CallCandidatesContent {
 	pub call_id: String,
@@ -153,7 +152,7 @@ impl CallCandidatesContent {
 
 /// Event used to select one of possibly multiple call answers
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct SelectCallAnswerContent {
 	pub call_id: String,
@@ -190,7 +189,7 @@ impl SelectCallAnswerContent {
 /// then send an answer. Offer and answer should never both be set. To ensure this they are not public to force the
 /// users to use the setters.
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct CallNegotiationContent {
 	pub call_id: String,
@@ -221,10 +220,17 @@ impl EventType for CallNegotiationContent {
 
 impl CallNegotiationContent {
 	pub fn new(call_id: impl Into<String>, party_id: impl Into<String>) -> Self {
-		Self { call_id: call_id.into(), party_id: party_id.into(), version: "1".into(), ..Default::default() }
+		Self {
+			call_id: call_id.into(),
+			party_id: party_id.into(),
+			version: "1".into(),
+			answer: Default::default(),
+			offer: Default::default(),
+			lifetime: Default::default(),
+		}
 	}
 
-	pub fn offer(
+	pub fn new_offer(
 		call_id: impl Into<String>,
 		party_id: impl Into<String>,
 		offer_sdp: impl Into<String>,
@@ -234,19 +240,19 @@ impl CallNegotiationContent {
 			call_id: call_id.into(),
 			party_id: party_id.into(),
 			version: "1".into(),
-			answer: None,
+			answer: Default::default(),
 			offer: Some(SessionDescription::new(offer_sdp, "offer")),
 			lifetime: Some(lifetime),
 		}
 	}
-	pub fn answer(call_id: impl Into<String>, party_id: impl Into<String>, answer_sdp: impl Into<String>) -> Self {
+	pub fn new_answer(call_id: impl Into<String>, party_id: impl Into<String>, answer_sdp: impl Into<String>) -> Self {
 		Self {
 			call_id: call_id.into(),
 			party_id: party_id.into(),
 			version: "1".into(),
 			answer: Some(SessionDescription::new(answer_sdp, "answer")),
-			offer: None,
-			lifetime: None,
+			offer: Default::default(),
+			lifetime: Default::default(),
 		}
 	}
 	pub fn set_offer(&mut self, offer_sdp: impl Into<String>, lifetime: u32) {
@@ -259,20 +265,20 @@ impl CallNegotiationContent {
 		self.offer = None;
 		self.lifetime = None;
 	}
-	pub fn get_offer(&self) -> Option<SessionDescription> {
+	pub fn offer(&self) -> Option<SessionDescription> {
 		self.offer.clone()
 	}
-	pub fn get_answer(&self) -> Option<SessionDescription> {
+	pub fn answer(&self) -> Option<SessionDescription> {
 		self.answer.clone()
 	}
-	pub fn get_lifetime(&self) -> Option<u32> {
+	pub fn lifetime(&self) -> Option<u32> {
 		self.lifetime
 	}
 }
 
 /// Event sent if call was rejected by a user.
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct RejectCallContent {
 	pub call_id: String,
@@ -298,14 +304,15 @@ impl RejectCallContent {
 	}
 }
 
-/// Enum containg possible reasons for a hangup event
+/// Enum containing possible reasons for a hangup event
 #[co]
 #[derive(JsonSchema, Default)]
 pub enum HangupCallReason {
 	/// ICE negotiation has failed and connection could not be established
 	#[serde(rename = "ice_failed")]
 	IceFailed,
-	/// Connection failed after some media was exchanged. Includes when renegotiation fails if media was sent prviously
+	/// Connection failed after some media was exchanged. Includes when renegotiation fails if media was sent
+	/// previously
 	#[serde(rename = "ice_timeout")]
 	IceTimeout,
 	/// The other party did not answer in time
@@ -328,7 +335,7 @@ pub enum HangupCallReason {
 
 /// Hangup event used to signal the termination of the call.
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct HangupCallContent {
 	pub call_id: String,

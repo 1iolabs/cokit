@@ -8,7 +8,7 @@ use co_primitives::CoCid;
 use schemars::JsonSchema;
 
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct PostUserStoryContent {
 	/// How long users can view the story after it was posted in ms
@@ -39,10 +39,10 @@ impl PostUserStoryContent {
 }
 
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct ViewUserStoryContent {
-	/// ID of the event that containes the viewed story
+	/// ID of the event that contains the viewed story
 	pub story: String,
 }
 
@@ -65,7 +65,7 @@ impl ViewUserStoryContent {
 }
 
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct UpdateProfileContent {
 	/// The name that the user likes to use as a default

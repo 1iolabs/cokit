@@ -88,12 +88,6 @@ impl Relation for MessageType {
 	}
 }
 
-impl Default for MessageType {
-	fn default() -> Self {
-		MessageType::Text(TextContent::default())
-	}
-}
-
 impl From<MessageType> for EventContent {
 	fn from(val: MessageType) -> Self {
 		EventContent::Message(val)
@@ -126,7 +120,7 @@ impl Mentions {
 /// Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
 /// also given.
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct TextContent {
 	/// A formatted version of the body
@@ -150,7 +144,15 @@ pub struct TextContent {
 
 impl TextContent {
 	pub fn new(body: impl Into<String>) -> Self {
-		Self { body: body.into(), ..Default::default() }
+		Self {
+			body: body.into(),
+			formatted_body: Default::default(),
+			format: Default::default(),
+			mentions: Default::default(),
+			is_silent: Default::default(),
+			relates_to: Default::default(),
+			new_content: Default::default(),
+		}
 	}
 }
 
@@ -171,7 +173,7 @@ impl Formattable for TextContent {
 		self.format = None;
 	}
 	fn format_body(&self) -> String {
-		todo!()
+		unimplemented!()
 	}
 }
 
@@ -193,7 +195,7 @@ impl Relation for TextContent {
 /// Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
 /// also given
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct NoticeContent {
 	/// A formatted version of the body
@@ -217,7 +219,15 @@ pub struct NoticeContent {
 
 impl NoticeContent {
 	pub fn new(body: impl Into<String>) -> Self {
-		Self { body: body.into(), ..Default::default() }
+		Self {
+			body: body.into(),
+			formatted_body: Default::default(),
+			format: Default::default(),
+			mentions: Default::default(),
+			is_silent: Default::default(),
+			relates_to: Default::default(),
+			new_content: Default::default(),
+		}
 	}
 }
 
@@ -238,7 +248,7 @@ impl Formattable for NoticeContent {
 		self.format = None;
 	}
 	fn format_body(&self) -> String {
-		todo!()
+		unimplemented!()
 	}
 }
 
@@ -258,7 +268,7 @@ impl Relation for NoticeContent {
 }
 
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct ImageContent {
 	/// A text representing the image in some way
@@ -278,7 +288,14 @@ pub struct ImageContent {
 
 impl ImageContent {
 	pub fn new(body: impl Into<String>, file: Cid, info: ImageInfo) -> Self {
-		Self { body: body.into(), file, info, ..Default::default() }
+		Self {
+			body: body.into(),
+			file,
+			info,
+			is_silent: Default::default(),
+			relates_to: Default::default(),
+			new_content: Default::default(),
+		}
 	}
 }
 
@@ -304,7 +321,7 @@ impl Relation for ImageContent {
 }
 
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct AudioContent {
 	/// A text representing the audio in same way
@@ -324,7 +341,14 @@ pub struct AudioContent {
 
 impl AudioContent {
 	pub fn new(body: impl Into<String>, file: Cid, info: AudioInfo) -> Self {
-		Self { body: body.into(), file, info, ..Default::default() }
+		Self {
+			body: body.into(),
+			file,
+			info,
+			is_silent: Default::default(),
+			relates_to: Default::default(),
+			new_content: Default::default(),
+		}
 	}
 }
 
@@ -350,7 +374,7 @@ impl Relation for AudioContent {
 }
 
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct VideoContent {
 	/// Textual representation of the video
@@ -370,7 +394,14 @@ pub struct VideoContent {
 
 impl VideoContent {
 	pub fn new(body: impl Into<String>, file: Cid, info: VideoInfo) -> Self {
-		Self { body: body.into(), file, info, ..Default::default() }
+		Self {
+			body: body.into(),
+			file,
+			info,
+			is_silent: Default::default(),
+			relates_to: Default::default(),
+			new_content: Default::default(),
+		}
 	}
 }
 
@@ -396,7 +427,7 @@ impl Relation for VideoContent {
 }
 
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct FileContent {
 	/// A text representing the file in some way
@@ -418,7 +449,15 @@ pub struct FileContent {
 
 impl FileContent {
 	pub fn new(body: impl Into<String>, file: Cid, filename: impl Into<String>, info: FileInfo) -> Self {
-		Self { body: body.into(), file, filename: filename.into(), info, ..Default::default() }
+		Self {
+			body: body.into(),
+			file,
+			filename: filename.into(),
+			info,
+			is_silent: Default::default(),
+			relates_to: Default::default(),
+			new_content: Default::default(),
+		}
 	}
 }
 
@@ -444,7 +483,7 @@ impl Relation for FileContent {
 }
 
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct LocationContent {
 	/// Textual representation of the location
@@ -463,7 +502,14 @@ pub struct LocationContent {
 
 impl LocationContent {
 	pub fn new(body: impl Into<String>, geo_uri: impl Into<String>, info: LocationInfo) -> Self {
-		Self { body: body.into(), geo_uri: geo_uri.into(), info, ..Default::default() }
+		Self {
+			body: body.into(),
+			geo_uri: geo_uri.into(),
+			info,
+			is_silent: Default::default(),
+			relates_to: Default::default(),
+			new_content: Default::default(),
+		}
 	}
 }
 

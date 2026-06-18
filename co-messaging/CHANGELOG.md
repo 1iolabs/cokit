@@ -15,7 +15,13 @@
   - `ReactionContent`, `RelatesTo`, `ReplyContent`, `RedactionContent`
   - `SessionDescription`, `ICECandidate`, `CallInviteContent`, `AnswerCallContent`, `CallCandidatesContent`, `SelectCallAnswerContent`, `CallNegotiationContent`, `RejectCallContent`, `HangupCallContent`
   - `PublicReceiptContent`, `PrivateReceipt`, `PrivateReceiptContent`
-- The same structs now have a `Default` derive so the correct way to initialize them now is either `let mut struct = Struct::default();` and then setting the needed fields directly or using the `new()` functions that all structs have now
+- These structs now have a `Default` derive:
+  - `ImageInfo`, `ThumbnailInfo`, `AudioInfo`, `VideoInfo`, `FileInfo`, `LocationInfo`
+  - `PinnedEventsContent`
+  - `TypingContent`
+  - `Mentions`
+  - `PollEndContent`
+  - `ReactionContent`, `RelatesTo`
 
 ### Added
 

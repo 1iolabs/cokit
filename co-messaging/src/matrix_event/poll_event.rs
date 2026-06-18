@@ -7,7 +7,7 @@ use schemars::JsonSchema;
 
 /// Event used to create a poll.
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct PollStartContent {
 	/// A textual representation of the poll, i.e. the question
@@ -25,7 +25,13 @@ pub struct PollStartContent {
 impl PollStartContent {
 	pub fn new(question: impl Into<String>, answers: Vec<PollAnswer>, kind: PollKind) -> Self {
 		let question: String = question.into();
-		Self { body: question.clone(), info: PollCreationInfo::new(question, answers, kind), ..Default::default() }
+		Self {
+			body: question.clone(),
+			info: PollCreationInfo::new(question, answers, kind),
+			is_silent: Default::default(),
+			relates_to: Default::default(),
+			new_content: Default::default(),
+		}
 	}
 	pub fn add_answer(&mut self, answer: PollAnswer) {
 		self.info.add_answer(answer)
@@ -58,7 +64,7 @@ impl Relation for PollStartContent {
 
 /// Metadata for poll creation event
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct PollCreationInfo {
 	/// The question the poll was created for
@@ -87,7 +93,7 @@ impl PollCreationInfo {
 
 /// One possible answer in a poll. ID should be unique across answers.
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct PollAnswer {
 	/// Unique ID to identify an answer
@@ -118,7 +124,7 @@ pub enum PollKind {
 }
 
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct PollResponseContent {
 	/// Textual representation of the answers
@@ -135,7 +141,13 @@ pub struct PollResponseContent {
 
 impl PollResponseContent {
 	pub fn new(body: impl Into<String>, answers: Vec<String>, poll_event: impl Into<String>) -> Self {
-		Self { body: body.into(), answers, relates_to: Some(RelatesTo::poll(poll_event)), ..Default::default() }
+		Self {
+			body: body.into(),
+			answers,
+			relates_to: Some(RelatesTo::poll(poll_event)),
+			is_silent: Default::default(),
+			new_content: Default::default(),
+		}
 	}
 	pub fn add_answer(&mut self, answer: String) {
 		self.answers.push(answer);
@@ -168,7 +180,7 @@ impl From<PollResponseContent> for EventContent {
 pub struct PollEndContent {
 	/// Textual representation of the poll ending
 	pub body: String,
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub is_silent: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub relates_to: Option<RelatesTo>,

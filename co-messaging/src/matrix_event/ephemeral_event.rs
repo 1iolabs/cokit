@@ -45,9 +45,8 @@ impl TypingContent {
 ///
 /// DnD: As 'Online' but the user doesn't want to be disturbed
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 pub enum PresenceType {
-	#[default]
 	#[serde(rename = "online")]
 	Online,
 	#[serde(rename = "offline")]
@@ -60,7 +59,7 @@ pub enum PresenceType {
 /// In contrast to typing events, the sender is important here and always corresponds to the user the information is
 /// about.
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct PresenceContent {
 	pub presence: PresenceType,

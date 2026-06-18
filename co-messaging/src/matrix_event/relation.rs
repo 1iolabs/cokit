@@ -196,7 +196,7 @@ impl Relation for RelationType {
 }
 
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct ReplyContent {
 	pub event_id: String,
@@ -212,7 +212,7 @@ impl ReplyContent {
 /// original event or a user with the necessary permissions.
 /// Redactions are idempotent and irreversible. They do not use the same relation fields as other events
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct RedactionContent {
 	/// An optional reason field mostly used when event got redacted by another user
