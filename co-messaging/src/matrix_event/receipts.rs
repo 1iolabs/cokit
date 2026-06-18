@@ -20,6 +20,12 @@ pub struct PublicReceiptContent {
 	pub thread_id: Option<String>,
 }
 
+impl PublicReceiptContent {
+	pub fn new(read: impl Into<String>) -> Self {
+		Self { read: read.into(), ..Default::default() }
+	}
+}
+
 impl From<PublicReceiptContent> for EventContent {
 	fn from(val: PublicReceiptContent) -> Self {
 		EventContent::Receipt(val)
@@ -38,6 +44,12 @@ pub struct PrivateReceipt {
 	pub thread_id: String,
 }
 
+impl PrivateReceipt {
+	pub fn new(event_id: impl Into<String>, thread_id: impl Into<String>) -> Self {
+		Self { event_id: event_id.into(), thread_id: thread_id.into() }
+	}
+}
+
 /// Private read receipts are saved in a users private CO so other users cannot infer the read status. The read map
 /// in this event only needs to contain the delta on the users receipts. This means that there is no need to contain
 /// the complete read receipt state in this event but only the changes.
@@ -48,4 +60,10 @@ pub struct PrivateReceiptContent {
 	/// Map of all room IDs to receipts
 	#[serde(rename = "m.read.private")]
 	pub read: BTreeMap<String, PrivateReceipt>,
+}
+
+impl PrivateReceiptContent {
+	pub fn new(read: BTreeMap<String, PrivateReceipt>) -> Self {
+		Self { read }
+	}
 }

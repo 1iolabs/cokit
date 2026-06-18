@@ -26,6 +26,19 @@ pub struct ImageInfo {
 	pub thumbnail_info: ThumbnailInfo,
 }
 
+impl ImageInfo {
+	pub fn new(
+		h: u32,
+		w: u32,
+		mimetype: impl Into<String>,
+		size: u32,
+		thumbnail_file: Cid,
+		thumbnail_info: ThumbnailInfo,
+	) -> Self {
+		Self { h, w, mimetype: mimetype.into(), size, thumbnail_file, thumbnail_info }
+	}
+}
+
 /// Contains metadata of images used as a thumbnail
 #[co]
 #[derive(JsonSchema, Default)]
@@ -39,6 +52,12 @@ pub struct ThumbnailInfo {
 	pub mimetype: String,
 	/// Size of the image file in bytes
 	pub size: u32,
+}
+
+impl ThumbnailInfo {
+	pub fn new(h: u32, w: u32, mimetype: impl Into<String>, size: u32) -> Self {
+		Self { h, w, mimetype: mimetype.into(), size }
+	}
 }
 
 /// Contains metadata of audio files
@@ -57,6 +76,12 @@ pub struct AudioInfo {
 	/// Not in the official specs yet, but introduced [in this proposal](https://github.com/matrix-org/matrix-spec-proposals/pull/3246)
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub waveform: Option<Vec<u8>>,
+}
+
+impl AudioInfo {
+	pub fn new(duration: u32, mimetype: impl Into<String>, size: u32) -> Self {
+		Self { duration, mimetype: mimetype.into(), size, ..Default::default() }
+	}
 }
 
 /// Contains metadata of video files
@@ -81,6 +106,20 @@ pub struct VideoInfo {
 	pub thumbnail_info: ThumbnailInfo,
 }
 
+impl VideoInfo {
+	pub fn new(
+		h: u32,
+		w: u32,
+		duration: u32,
+		mimetype: impl Into<String>,
+		size: u32,
+		thumbnail_file: Cid,
+		thumbnail_info: ThumbnailInfo,
+	) -> Self {
+		Self { h, w, duration, mimetype: mimetype.into(), size, thumbnail_file, thumbnail_info }
+	}
+}
+
 /// Contains metadata of any other filetypes
 #[co]
 #[derive(JsonSchema, Default)]
@@ -97,6 +136,12 @@ pub struct FileInfo {
 	pub thumbnail_info: ThumbnailInfo,
 }
 
+impl FileInfo {
+	pub fn new(mimetype: impl Into<String>, size: u32, thumbnail_file: Cid, thumbnail_info: ThumbnailInfo) -> Self {
+		Self { mimetype: mimetype.into(), size, thumbnail_file, thumbnail_info }
+	}
+}
+
 /// Contains metadata of any location based content
 #[co]
 #[derive(JsonSchema, Default)]
@@ -107,4 +152,10 @@ pub struct LocationInfo {
 	pub thumbnail_file: Cid,
 	/// Thumbnail metadata
 	pub thumbnail_info: ThumbnailInfo,
+}
+
+impl LocationInfo {
+	pub fn new(thumbnail_file: Cid, thumbnail_info: ThumbnailInfo) -> Self {
+		Self { thumbnail_file, thumbnail_info }
+	}
 }

@@ -117,6 +117,12 @@ pub struct Mentions {
 	pub user_ids: Vec<Did>,
 }
 
+impl Mentions {
+	pub fn new(user_ids: Vec<Did>) -> Self {
+		Self { user_ids }
+	}
+}
+
 /// Formatted body and format are not pub to ensure with setters that formatted body is only set when a format is
 /// also given.
 #[co]
@@ -144,15 +150,7 @@ pub struct TextContent {
 
 impl TextContent {
 	pub fn new(body: impl Into<String>) -> Self {
-		Self {
-			body: body.into(),
-			formatted_body: None,
-			format: None,
-			is_silent: None,
-			relates_to: None,
-			mentions: None,
-			new_content: None,
-		}
+		Self { body: body.into(), ..Default::default() }
 	}
 }
 
@@ -219,15 +217,7 @@ pub struct NoticeContent {
 
 impl NoticeContent {
 	pub fn new(body: impl Into<String>) -> Self {
-		Self {
-			body: body.into(),
-			formatted_body: None,
-			format: None,
-			is_silent: Default::default(),
-			relates_to: None,
-			mentions: None,
-			new_content: None,
-		}
+		Self { body: body.into(), ..Default::default() }
 	}
 }
 
@@ -288,7 +278,7 @@ pub struct ImageContent {
 
 impl ImageContent {
 	pub fn new(body: impl Into<String>, file: Cid, info: ImageInfo) -> Self {
-		Self { body: body.into(), file, info, is_silent: None, relates_to: None, new_content: None }
+		Self { body: body.into(), file, info, ..Default::default() }
 	}
 }
 
@@ -334,7 +324,7 @@ pub struct AudioContent {
 
 impl AudioContent {
 	pub fn new(body: impl Into<String>, file: Cid, info: AudioInfo) -> Self {
-		Self { body: body.into(), file, info, is_silent: None, relates_to: None, new_content: None }
+		Self { body: body.into(), file, info, ..Default::default() }
 	}
 }
 
@@ -380,7 +370,7 @@ pub struct VideoContent {
 
 impl VideoContent {
 	pub fn new(body: impl Into<String>, file: Cid, info: VideoInfo) -> Self {
-		Self { body: body.into(), file, info, is_silent: None, relates_to: None, new_content: None }
+		Self { body: body.into(), file, info, ..Default::default() }
 	}
 }
 
@@ -428,15 +418,7 @@ pub struct FileContent {
 
 impl FileContent {
 	pub fn new(body: impl Into<String>, file: Cid, filename: impl Into<String>, info: FileInfo) -> Self {
-		Self {
-			body: body.into(),
-			file,
-			filename: filename.into(),
-			info,
-			is_silent: None,
-			relates_to: None,
-			new_content: None,
-		}
+		Self { body: body.into(), file, filename: filename.into(), info, ..Default::default() }
 	}
 }
 
@@ -481,7 +463,7 @@ pub struct LocationContent {
 
 impl LocationContent {
 	pub fn new(body: impl Into<String>, geo_uri: impl Into<String>, info: LocationInfo) -> Self {
-		Self { body: body.into(), geo_uri: geo_uri.into(), info, is_silent: None, relates_to: None, new_content: None }
+		Self { body: body.into(), geo_uri: geo_uri.into(), info, ..Default::default() }
 	}
 }
 

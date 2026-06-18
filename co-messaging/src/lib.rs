@@ -50,7 +50,13 @@ impl MatrixEvent {
 		room_id: impl Into<String>,
 		content: impl Into<EventContent>,
 	) -> Self {
-		Self { event_id: event_id.into(), timestamp, room_id: room_id.into(), content: content.into(), state_key: None }
+		Self {
+			event_id: event_id.into(),
+			timestamp,
+			room_id: room_id.into(),
+			content: content.into(),
+			..Default::default()
+		}
 	}
 	pub fn event_type(&self) -> String {
 		self.content.generate_event_type()

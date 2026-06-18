@@ -25,13 +25,7 @@ pub struct PollStartContent {
 impl PollStartContent {
 	pub fn new(question: impl Into<String>, answers: Vec<PollAnswer>, kind: PollKind) -> Self {
 		let question: String = question.into();
-		Self {
-			body: question.clone(),
-			info: PollCreationInfo::new(question, answers, kind),
-			is_silent: None,
-			relates_to: None,
-			new_content: None,
-		}
+		Self { body: question.clone(), info: PollCreationInfo::new(question, answers, kind), ..Default::default() }
 	}
 	pub fn add_answer(&mut self, answer: PollAnswer) {
 		self.info.add_answer(answer)
@@ -141,13 +135,7 @@ pub struct PollResponseContent {
 
 impl PollResponseContent {
 	pub fn new(body: impl Into<String>, answers: Vec<String>, poll_event: impl Into<String>) -> Self {
-		Self {
-			body: body.into(),
-			answers,
-			is_silent: None,
-			relates_to: Some(RelatesTo::poll(poll_event)),
-			new_content: None,
-		}
+		Self { body: body.into(), answers, relates_to: Some(RelatesTo::poll(poll_event)), ..Default::default() }
 	}
 	pub fn add_answer(&mut self, answer: String) {
 		self.answers.push(answer);
@@ -190,7 +178,7 @@ pub struct PollEndContent {
 
 impl PollEndContent {
 	pub fn new(body: impl Into<String>, poll_event: impl Into<String>) -> Self {
-		Self { body: body.into(), is_silent: None, relates_to: Some(RelatesTo::poll(poll_event)), new_content: None }
+		Self { body: body.into(), relates_to: Some(RelatesTo::poll(poll_event)), ..Default::default() }
 	}
 }
 

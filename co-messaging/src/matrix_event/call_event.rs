@@ -83,6 +83,7 @@ impl CallInviteContent {
 			invitee,
 			lifetime,
 			offer: SessionDescription::new(offer_sdp, "offer"),
+			..Default::default()
 		}
 	}
 }
@@ -219,6 +220,10 @@ impl EventType for CallNegotiationContent {
 }
 
 impl CallNegotiationContent {
+	pub fn new(call_id: impl Into<String>, party_id: impl Into<String>) -> Self {
+		Self { call_id: call_id.into(), party_id: party_id.into(), version: "1".into(), ..Default::default() }
+	}
+
 	pub fn offer(
 		call_id: impl Into<String>,
 		party_id: impl Into<String>,

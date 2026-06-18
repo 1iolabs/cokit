@@ -26,7 +26,7 @@ pub struct ReactionContent {
 
 impl ReactionContent {
 	pub fn new(relation: RelatesTo) -> Self {
-		Self { is_silent: None, relates_to: Some(relation), new_content: None }
+		Self { relates_to: Some(relation), ..Default::default() }
 	}
 }
 
@@ -82,6 +82,10 @@ pub struct RelatesTo {
 }
 
 impl RelatesTo {
+	pub fn new() -> Self {
+		Self::default()
+	}
+
 	/// Helper function to create a RelatesTo body used for replies
 	pub fn in_reply_to(event_id: impl Into<String>) -> Self {
 		Self {
@@ -196,6 +200,12 @@ impl Relation for RelationType {
 #[non_exhaustive]
 pub struct ReplyContent {
 	pub event_id: String,
+}
+
+impl ReplyContent {
+	pub fn new(event_id: impl Into<String>) -> Self {
+		Self { event_id: event_id.into() }
+	}
 }
 
 /// Event content used to redact other events. Sender of this event must be either the same as the sender of the
