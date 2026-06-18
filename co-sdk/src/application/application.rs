@@ -589,19 +589,26 @@ impl ApplicationBuilder {
 		Self { settings, ..self }
 	}
 
-	pub async fn build(self) -> Result<Application, anyhow::Error> {
-		let tasks = TaskSpawner::new(self.identifier.clone());
+	/// Get base path, if one.
+	pub fn base_path(&self) -> Option<PathBuf> {
+		match &self.storage {
+			#[cfg(feature = "fs")]
+			CoStorageSetting::PathDefault => Some(Self::default_path()),
+			#[cfg(feature = "fs")]
+			CoStorageSetting::Path(path) => Some(path.clone()),
+			_ => None,
+		}
+	}
 
-		// log
-		#[cfg(feature = "tracing")]
-		self.tracing.init()?;
+	/// Get log path, if one.
+	pub fn log_path(&self) -> Option<PathBuf> {
+		self.base_path().map(|base_path| base_path.join("log/co.log"))
+	}
 
-		// sources
-		let date = self.date.unwrap_or_else(co_date_env);
-		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
-
-		// storage
-		let (mut storage, path): (_, Option<PathBuf>) = match self.storage.clone() {
+	/// Create storage.
+	#[cfg_attr(not(feature = "fs"), allow(unused_variables))]
+	async fn build_storage(&self, uuid: &DynamicCoUuid) -> Result<(Storage, Option<PathBuf>), anyhow::Error> {
+		Ok(match self.storage.clone() {
 			#[cfg(feature = "fs")]
 			CoStorageSetting::PathDefault => {
 				let path = Self::default_path();
@@ -612,10 +619,25 @@ impl ApplicationBuilder {
 			CoStorageSetting::Memory => (Storage::new_memory(), None),
 			#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
 			CoStorageSetting::IndexedDb => (Storage::new_indexeddb().await?, None),
-		};
+		})
+	}
+
+	pub async fn build(mut self) -> Result<Application, anyhow::Error> {
+		let tasks = TaskSpawner::new(self.identifier.clone());
+
+		// sources
+		let date = self.date.take().unwrap_or_else(co_date_env);
+		let uuid = self.uuid.take().unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
+
+		// storage
+		let (mut storage, path) = self.build_storage(&uuid).await?;
 		if !self.static_blocks.is_empty() {
 			storage = storage.with_static(self.static_blocks);
 		}
+
+		// log
+		#[cfg(feature = "tracing")]
+		self.tracing.init()?;
 
 		// settings
 		let settings = ApplicationSettings {

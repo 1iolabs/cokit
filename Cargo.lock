@@ -1466,6 +1466,7 @@ dependencies = [
  "co-actor",
  "co-primitives",
  "co-sdk",
+ "co-tracing",
  "derive_more 0.99.20",
  "flutter_rust_bridge",
  "futures",

@@ -21,6 +21,7 @@ cid = { workspace = true }
 co-actor = { workspace = true }
 co-primitives = { workspace = true }
 co-sdk = { workspace = true, default-features = false, features = ["recommended", "apple-sandbox"] }
+co-tracing = { workspace = true, features = ["subscriber", "bunyan", "clap"] }
 derive_more = { workspace = true }
 flutter_rust_bridge = { version = "=2.11.1", optional = true }
 futures = { workspace = true }

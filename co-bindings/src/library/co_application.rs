@@ -9,6 +9,7 @@ use co_sdk::{
 	DidKeyIdentity, DidKeyProvider, PrivateIdentity, PrivateIdentityResolver, Tags, TaskSpawner, CO_CORE_NAME_KEYSTORE,
 	CO_ID_LOCAL,
 };
+use co_tracing::{parse_log, LogArgs, LogContext};
 use futures::{StreamExt, TryStreamExt};
 use std::{future::ready, path::PathBuf};
 
@@ -63,16 +64,12 @@ impl Actor for CoApplication {
 		_tags: &Tags,
 		settings: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
+		// builder
+		let identifier = settings.identifier.clone();
 		let mut application_builder = match settings.path {
 			Some(path) => ApplicationBuilder::new_with_path(settings.identifier, PathBuf::from(&path)),
 			None => ApplicationBuilder::new(settings.identifier),
 		};
-		if !settings
-			.no_log
-			.unwrap_or_else(|| CoSettings::default().no_log.unwrap_or_default())
-		{
-			application_builder = application_builder.with_bunyan_logging(None);
-		}
 		if settings
 			.no_keychain
 			.unwrap_or_else(|| CoSettings::default().no_keychain.unwrap_or_default())
@@ -85,14 +82,29 @@ impl Actor for CoApplication {
 		{
 			application_builder = application_builder.with_setting("default-features", false);
 		}
-		application_builder = application_builder.with_log_max_level(settings.log_level.unwrap_or_default().into());
 		for feature in settings
 			.feature
 			.unwrap_or_else(|| CoSettings::default().feature.unwrap_or_default())
 		{
 			application_builder = application_builder.with_setting("feature", feature.to_owned());
 		}
-		application_builder = application_builder.with_optional_tracing();
+
+		// tracing
+		let _tracing = if let Some(log) = &settings.log {
+			let log_args = LogArgs { log: Some(parse_log(log).map_err(anyhow::Error::msg)?), ..LogArgs::default() };
+			Some(
+				log_args
+					.tracing_builder(
+						&LogContext::new(&identifier).with_base_path(application_builder.base_path().as_deref()),
+					)
+					.with_optional()
+					.init()?,
+			)
+		} else {
+			None
+		};
+
+		// application
 		let mut application = application_builder.build().await?;
 
 		// network
