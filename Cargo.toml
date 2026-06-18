@@ -115,7 +115,7 @@ co-runtime = { path = "co-runtime", version = "0.1.0" }
 co-sdk = { path = "co-sdk", version = "0.1.0", default-features = false }
 co-storage = { path = "co-storage", version = "0.1.0", default-features = false }
 co-test = { path = "co-test" }
-co-tracing = { path = "co-tracing", version = "0.1.0" }
+co-tracing = { path = "co-tracing", version = "0.1.0", default-features = false }
 tauri-plugin-co-sdk = { path = "tauri-plugin-co-sdk", version = "0.1.0" }
 
 # override transitive co-guard dependencies with local for development

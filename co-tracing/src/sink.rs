@@ -10,6 +10,8 @@ pub enum LogSink {
 	Stderr,
 	/// A file: `File(None)` = default path (`file`); `File(Some(p))` = explicit path.
 	File(Option<PathBuf>),
+	/// Apple unified logging (`oslog` / `os`).
+	Oslog,
 }
 
 /// One `CO_LOG` entry: a sink plus its optional inline `EnvFilter` directives.
@@ -61,12 +63,13 @@ fn parse_sink(s: &str) -> Result<LogSink, String> {
 	match s.to_ascii_lowercase().as_str() {
 		"stderr" | "-" => return Ok(LogSink::Stderr),
 		"file" => return Ok(LogSink::File(None)),
+		"oslog" | "os" => return Ok(LogSink::Oslog),
 		_ => {},
 	}
 	if is_path_like(s) {
 		Ok(LogSink::File(Some(PathBuf::from(s))))
 	} else {
-		Err(format!("unknown CO_LOG sink '{s}'; expected stderr, file, or a path"))
+		Err(format!("unknown CO_LOG sink '{s}'; expected stderr, file, oslog, or a path"))
 	}
 }
 
@@ -158,6 +161,18 @@ mod tests {
 		assert!(parse_log("co.log").is_err());
 		assert!(parse_log("").is_err());
 		assert!(parse_log("file;;stderr").is_err());
+	}
+
+	#[test]
+	fn parse_oslog() {
+		assert_eq!(
+			parse_log("oslog").unwrap(),
+			LogConfig::Sinks(vec![SinkSpec { sink: LogSink::Oslog, filter: None }])
+		);
+		assert_eq!(
+			parse_log("os:debug").unwrap(),
+			LogConfig::Sinks(vec![SinkSpec { sink: LogSink::Oslog, filter: Some("debug".into()) }])
+		);
 	}
 
 	#[test]

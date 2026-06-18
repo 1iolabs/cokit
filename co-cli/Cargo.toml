@@ -32,7 +32,7 @@ co-primitives = { workspace = true }
 co-runtime = { workspace = true }
 co-sdk = { workspace = true, features = ["native"] }
 co-storage = { workspace = true }
-co-tracing = { workspace = true, features = ["subscriber", "bunyan", "opentelemetry", "clap"] }
+co-tracing = { workspace = true, features = ["subscriber", "bunyan", "opentelemetry", "oslog", "clap"] }
 colored = "2.1.0"
 exitcode = "1.1.2"
 futures = { workspace = true }

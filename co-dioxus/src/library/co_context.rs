@@ -5,6 +5,7 @@ use crate::CoSettings;
 use anyhow::Result;
 use co_primitives::Network;
 use co_sdk::{state, Application, ApplicationBuilder, CoId, Did, IdentityResolver};
+use co_tracing::{LogContext, TracingGuard};
 use futures::{future::BoxFuture, Future};
 use std::collections::{BTreeMap, BTreeSet};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -17,60 +18,27 @@ pub struct CoContext {
 }
 impl CoContext {
 	pub fn new(settings: CoSettings) -> Self {
-		match settings.log.clone().with_resolved_default() {
-			#[cfg(feature = "web")]
-			crate::CoLog::Console => {
-				dioxus::logger::init(settings.log_level.into()).expect("logger");
-			},
-			#[cfg(feature = "tracing")]
-			crate::CoLog::Print => {
-				let rust_log = std::env::var("RUST_LOG").ok();
-				let directives = co_sdk::resolve_filter(settings.log_filter.as_deref(), rust_log.as_deref());
-				co_sdk::TracingBuilder::new(settings.identifier.clone(), None)
-					.with_stderr_logging()
-					.with_level_filter(settings.log_level.into(), directives.as_deref())
-					.init()
-					.expect("tracing init");
-			},
-			#[cfg(all(feature = "fs", feature = "tracing"))]
-			crate::CoLog::File(path) => {
-				#[cfg(feature = "tracing")]
-				{
-					let base_path = match settings.storage.clone() {
-						#[cfg(feature = "fs")]
-						co_sdk::CoStorageSetting::Path(path) => Some(path),
-						#[cfg(feature = "fs")]
-						co_sdk::CoStorageSetting::PathDefault => Some(ApplicationBuilder::default_path()),
-						_ => None,
-					};
-					let rust_log = std::env::var("RUST_LOG").ok();
-					let directives = co_sdk::resolve_filter(settings.log_filter.as_deref(), rust_log.as_deref());
-					co_sdk::TracingBuilder::new(settings.identifier.clone(), base_path)
-						.with_bunyan_logging(path)
-						.with_level_filter(settings.log_level.into(), directives.as_deref())
-						.init()
-						.expect("tracing init");
-				}
-			},
-			#[cfg(feature = "tracing-oslog")]
-			crate::CoLog::Os => {
-				use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-				tracing_subscriber::registry()
-					.with(
-						tracing_subscriber::filter::EnvFilter::builder()
-							.with_default_directive(
-								tracing_subscriber::filter::LevelFilter::from_level(settings.log_level.into()).into(),
-							)
-							.from_env_lossy(),
-					)
-					.with(tracing_oslog::OsLogger::new(&settings.bundle_identifier, "default"))
-					.init();
-			},
-			_ => {},
+		// tracing
+		#[allow(unused_mut, unused_assignments)]
+		let mut base_path: Option<std::path::PathBuf> = None;
+		#[cfg(feature = "fs")]
+		{
+			base_path = match &settings.storage {
+				co_sdk::CoStorageSetting::Path(path) => Some(path.clone()),
+				co_sdk::CoStorageSetting::PathDefault => Some(co_sdk::ApplicationBuilder::default_path()),
+				_ => None,
+			};
 		}
+		let guard = settings
+			.log
+			.init(
+				&LogContext::new(&settings.identifier)
+					.with_base_path(base_path.as_deref())
+					.with_oslog_subsystem(Some(&settings.bundle_identifier)),
+			)
+			.expect("tracing init");
 
-		// spawn
-		Self::spawn(settings)
+		Self::spawn(settings, guard)
 	}
 
 	/// Wait until the context is ready.
@@ -94,15 +62,15 @@ impl CoContext {
 		Ok(())
 	}
 
-	pub(crate) fn spawn(settings: CoSettings) -> Self {
+	pub(crate) fn spawn(settings: CoSettings, guard: TracingGuard) -> Self {
 		let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Task>();
 		#[cfg(not(feature = "web"))]
 		std::thread::Builder::new()
 			.name("co".to_owned())
-			.spawn(|| co_main(settings, rx))
+			.spawn(move || co_main(settings, rx, guard))
 			.expect("co thread to start");
 		#[cfg(feature = "web")]
-		co_main(settings, rx);
+		co_main(settings, rx, guard);
 		Self { tasks: tx }
 	}
 
@@ -300,9 +268,10 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 	Ok(())
 }
 
-fn co_main(settings: CoSettings, tasks: UnboundedReceiver<Task>) {
+fn co_main(settings: CoSettings, tasks: UnboundedReceiver<Task>, guard: TracingGuard) {
 	#[cfg(feature = "web")]
 	wasm_bindgen_futures::spawn_local(async move {
+		let _guard = guard;
 		co_app(settings, tasks).await.expect("app to run");
 	});
 
@@ -311,5 +280,8 @@ fn co_main(settings: CoSettings, tasks: UnboundedReceiver<Task>) {
 		.enable_all()
 		.build()
 		.unwrap()
-		.block_on(async move { co_app(settings, tasks).await.expect("app to run") });
+		.block_on(async move {
+			let _guard = guard;
+			co_app(settings, tasks).await.expect("app to run")
+		});
 }

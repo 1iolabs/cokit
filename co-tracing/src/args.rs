@@ -43,20 +43,29 @@ pub struct LogArgs {
 	pub open_telemetry_endpoint: String,
 }
 impl LogArgs {
-	/// Default sink set when `CO_LOG` is unset/`on` (native): the legacy file sink (honoring
-	/// `--no-log`/`--log-path`). Stderr is added by the verbosity shorthand in `resolve_sinks`.
+	/// Default sink set when `CO_LOG` is unset/`on` (native): on iOS, the oslog sink; on other
+	/// native targets, the legacy file sink (honoring `--no-log`/`--log-path`). Stderr is added
+	/// by the verbosity shorthand in `resolve_sinks`.
 	#[cfg(not(target_arch = "wasm32"))]
 	fn default_sinks(&self, context: &LogContext) -> Vec<SinkSpec> {
-		if self.no_log {
-			return Vec::new();
+		#[cfg(target_os = "ios")]
+		{
+			let _ = context;
+			return vec![SinkSpec { sink: LogSink::Oslog, filter: None }];
 		}
-		let path = self
-			.log_path
-			.clone()
-			.or_else(|| context.base_path.map(|b| b.join("log/co.log")));
-		match path {
-			Some(path) => vec![SinkSpec { sink: LogSink::File(Some(path)), filter: None }],
-			None => Vec::new(),
+		#[cfg(not(target_os = "ios"))]
+		{
+			if self.no_log {
+				return Vec::new();
+			}
+			let path = self
+				.log_path
+				.clone()
+				.or_else(|| context.base_path.map(|b| b.join("log/co.log")));
+			match path {
+				Some(path) => vec![SinkSpec { sink: LogSink::File(Some(path)), filter: None }],
+				None => Vec::new(),
+			}
 		}
 	}
 
@@ -115,6 +124,13 @@ impl LogArgs {
 					},
 					#[cfg(not(feature = "bunyan"))]
 					LogSink::File(_) => {},
+					#[cfg(all(feature = "oslog", target_vendor = "apple"))]
+					LogSink::Oslog => {
+						let subsystem = context.oslog_subsystem.unwrap_or(context.identifier);
+						builder = builder.with_oslog(subsystem, Level::INFO, spec.filter.as_deref());
+					},
+					#[cfg(not(all(feature = "oslog", target_vendor = "apple")))]
+					LogSink::Oslog => {},
 				}
 			}
 			#[cfg(feature = "opentelemetry")]
@@ -133,11 +149,45 @@ impl LogArgs {
 }
 
 /// App-supplied context/defaults — the per-app configurability knob.
+///
+/// Construct with [`LogContext::new`] and the `with_*` setters; the struct is `#[non_exhaustive]`
+/// so new context fields can be added without breaking callers.
+#[non_exhaustive]
 pub struct LogContext<'a> {
 	pub identifier: &'a str,
 	pub base_path: Option<&'a Path>,
 	/// stderr level when `CO_LOG` is silent on stderr and no `-v`/`-q`. `None` ⇒ no stderr by default.
 	pub default_stderr: Option<Level>,
+	/// `os_log` subsystem (reverse-DNS) for an `oslog` sink; falls back to `identifier` when `None`.
+	pub oslog_subsystem: Option<&'a str>,
+}
+impl<'a> LogContext<'a> {
+	/// A context for an app identified by `identifier` (the otel service name and the `oslog`
+	/// subsystem fallback). Every other field defaults to `None`; set them with the `with_*` setters.
+	pub fn new(identifier: &'a str) -> Self {
+		Self { identifier, base_path: None, default_stderr: None, oslog_subsystem: None }
+	}
+
+	/// Base path for the default file sink (the legacy `<base>/log/co.log`).
+	#[must_use]
+	pub fn with_base_path(mut self, base_path: Option<&'a Path>) -> Self {
+		self.base_path = base_path;
+		self
+	}
+
+	/// stderr level when `CO_LOG` is silent on stderr and no `-v`/`-q` is given.
+	#[must_use]
+	pub fn with_default_stderr(mut self, level: Option<Level>) -> Self {
+		self.default_stderr = level;
+		self
+	}
+
+	/// `os_log` subsystem (reverse-DNS) for an `oslog` sink; falls back to `identifier` when `None`.
+	#[must_use]
+	pub fn with_oslog_subsystem(mut self, subsystem: Option<&'a str>) -> Self {
+		self.oslog_subsystem = subsystem;
+		self
+	}
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -157,7 +207,12 @@ mod tests {
 	use super::*;
 
 	fn context() -> LogContext<'static> {
-		LogContext { identifier: "test", base_path: Some(Path::new("/base")), default_stderr: Some(Level::INFO) }
+		LogContext {
+			identifier: "test",
+			base_path: Some(Path::new("/base")),
+			default_stderr: Some(Level::INFO),
+			oslog_subsystem: None,
+		}
 	}
 
 	#[test]
@@ -271,9 +326,18 @@ mod tests {
 		);
 		// bare `--log -` → stderr, no filter
 		let h2 = Harness::try_parse_from(["x", "--log", "-"]).unwrap();
-		assert_eq!(
-			h2.log.log,
-			Some(LogConfig::Sinks(vec![SinkSpec { sink: LogSink::Stderr, filter: None }]))
-		);
+		assert_eq!(h2.log.log, Some(LogConfig::Sinks(vec![SinkSpec { sink: LogSink::Stderr, filter: None }])));
+	}
+
+	#[test]
+	fn oslog_entry_is_a_sink() {
+		let a = LogArgs {
+			log: Some(LogConfig::Sinks(vec![SinkSpec { sink: LogSink::Oslog, filter: Some("debug".into()) }])),
+			..Default::default()
+		};
+		let sinks = a.resolve_sinks(&context(), None);
+		assert_eq!(sinks.len(), 1);
+		assert!(matches!(sinks[0].sink, LogSink::Oslog));
+		assert_eq!(sinks[0].filter.as_deref(), Some("debug"));
 	}
 }

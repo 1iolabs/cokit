@@ -1779,6 +1779,7 @@ dependencies = [
  "co-guard",
  "co-primitives",
  "co-sdk",
+ "co-tracing",
  "dioxus",
  "futures",
  "ipld-core",
@@ -1788,8 +1789,6 @@ dependencies = [
  "tokio-util",
  "tokio_with_wasm",
  "tracing",
- "tracing-oslog",
- "tracing-subscriber",
  "uuid",
  "wasm-bindgen-futures",
  "web-sys",
@@ -2195,6 +2194,7 @@ dependencies = [
  "tracing",
  "tracing-log 0.1.4",
  "tracing-opentelemetry",
+ "tracing-oslog",
  "tracing-subscriber",
  "tracing-web",
 ]
@@ -3143,17 +3143,10 @@ dependencies = [
  "dioxus-config-macros",
  "dioxus-core",
  "dioxus-hooks",
- "dioxus-logger",
  "dioxus-signals",
  "dioxus-stores",
  "subsecond",
 ]
-
-[[package]]
-name = "dioxus-cli-config"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86a13d42c5defcea333bdbae1dc5d64d078acd0fda1d8a1441c37e06be5146e3"
 
 [[package]]
 name = "dioxus-config-macros"
@@ -3202,18 +3195,6 @@ dependencies = [
  "rustversion",
  "slab",
  "tracing",
-]
-
-[[package]]
-name = "dioxus-logger"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4742b16791a71eb4db2d0747f15c50b278b27369b3d93e5a4d6ec2570bcb9bc"
-dependencies = [
- "dioxus-cli-config",
- "tracing",
- "tracing-subscriber",
- "tracing-wasm",
 ]
 
 [[package]]
@@ -11008,17 +10989,6 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log 0.2.0",
-]
-
-[[package]]
-name = "tracing-wasm"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4575c663a174420fa2d78f4108ff68f65bf2fbb7dd89f33749b6e826b3626e07"
-dependencies = [
- "tracing",
- "tracing-subscriber",
- "wasm-bindgen",
 ]
 
 [[package]]

@@ -31,6 +31,9 @@ tracing-opentelemetry = { workspace = true, optional = true }
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 tracing-web = { workspace = true, optional = true }
 
+[target.'cfg(target_vendor = "apple")'.dependencies]
+tracing-oslog = { version = "0.2", optional = true }
+
 [features]
 default = ["subscriber", "bunyan"]
 subscriber = ["dep:tracing-subscriber", "dep:tracing-log"]
@@ -38,6 +41,7 @@ bunyan = ["subscriber", "dep:tracing-bunyan-formatter"]
 opentelemetry = ["subscriber", "dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:opentelemetry-semantic-conventions", "dep:opentelemetry-stdout", "dep:tracing-opentelemetry"]
 console = ["subscriber", "dep:tracing-web"]
 clap = ["dep:clap"]
+oslog = ["subscriber", "dep:tracing-oslog"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }

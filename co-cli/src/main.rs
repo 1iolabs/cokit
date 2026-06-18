@@ -2,6 +2,7 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use clap::Parser;
+use co_tracing::LogContext;
 
 mod cli;
 mod commands;
@@ -20,11 +21,11 @@ async fn app_main() -> anyhow::Result<exitcode::ExitCode> {
 	let cli = cli::Cli::parse();
 
 	// tracing
-	let _guard = cli.log.init(&co_tracing::LogContext {
-		identifier: &cli.instance_id,
-		base_path: cli.base_path.as_deref(),
-		default_stderr: Some(tracing::Level::INFO),
-	})?;
+	let _guard = cli.log.init(
+		&LogContext::new(&cli.instance_id)
+			.with_base_path(cli.base_path.as_deref())
+			.with_default_stderr(Some(tracing::Level::INFO)),
+	)?;
 
 	// execute
 	cli::command(&cli).await

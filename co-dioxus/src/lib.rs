@@ -7,6 +7,7 @@ mod library;
 mod types;
 
 // exports
+pub use co_tracing::{LogArgs, LogConfig};
 pub use hooks::{
 	use_co::{use_co, Co},
 	use_co_context::use_co_context,
@@ -18,11 +19,8 @@ pub use hooks::{
 	use_selectors::{use_selector_states, use_selectors, CoSelector, CoSelectorState},
 };
 pub use library::{
-	cli::{Cli, CoLogLevel},
+	cli::Cli,
 	co_block_storage::CoBlockStorage,
 	co_context::{CoContext, CoContextError},
 };
-pub use types::{
-	co_settings::{CoLog, CoSettings},
-	error::CoError,
-};
+pub use types::{co_settings::CoSettings, error::CoError};

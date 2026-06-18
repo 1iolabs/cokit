@@ -63,6 +63,18 @@ pub struct TracingGuard {
 	/// Private zero-sized field to prevent external construction without `Default`.
 	_priv: (),
 }
+impl TracingGuard {
+	/// Leak the guard so the installed subscriber stays active for the rest of the process.
+	///
+	/// Convenience for callers that install tracing once and have nowhere to hold the guard
+	/// (e.g. from a constructor or `main` that never returns) — replaces a manual
+	/// `std::mem::forget`. Because this skips the guard's `Drop`, an OpenTelemetry sink will not
+	/// be flushed/shut down at exit; prefer holding the guard if you rely on OpenTelemetry.
+	#[allow(clippy::forget_non_drop)]
+	pub fn forget(self) {
+		std::mem::forget(self);
+	}
+}
 
 pub struct TracingBuilder {
 	#[cfg_attr(not(feature = "bunyan"), allow(dead_code))]
@@ -74,6 +86,8 @@ pub struct TracingBuilder {
 	open_telemetry: Option<String>,
 	#[cfg(all(feature = "console", target_arch = "wasm32"))]
 	console: Option<SinkFilter>,
+	#[cfg(all(feature = "oslog", target_vendor = "apple"))]
+	oslog: Option<(String, SinkFilter)>,
 	log_ignores: Vec<&'static str>,
 	optional: bool,
 }
@@ -88,6 +102,8 @@ impl TracingBuilder {
 			open_telemetry: None,
 			#[cfg(all(feature = "console", target_arch = "wasm32"))]
 			console: None,
+			#[cfg(all(feature = "oslog", target_vendor = "apple"))]
+			oslog: None,
 			log_ignores: DEFAULT_LOG_IGNORES.to_vec(),
 			optional: false,
 		}
@@ -152,6 +168,13 @@ impl TracingBuilder {
 		self
 	}
 
+	/// Log to Apple unified logging (`os_log`) under `subsystem`, with optional per-target directives.
+	#[cfg(all(feature = "oslog", target_vendor = "apple"))]
+	pub fn with_oslog(mut self, subsystem: impl Into<String>, level: Level, directives: Option<&str>) -> Self {
+		self.oslog = Some((subsystem.into(), SinkFilter { level, directives: directives.map(str::to_owned) }));
+		self
+	}
+
 	/// Browser-console layer (wasm), filtered per-sink. Replaces the native stub.
 	#[cfg(all(feature = "console", target_arch = "wasm32"))]
 	fn build_console(&self) -> Option<impl Layer<Registry> + Send + Sync> {
@@ -205,6 +228,16 @@ impl TracingBuilder {
 					.serialize_span_id(true)
 					.serialize_span_type(true)
 					.serialize_span_fields(false)
+					.with_filter(sink.env_filter())
+					.boxed(),
+			);
+		}
+
+		// Apple unified logging (oslog)
+		#[cfg(all(feature = "oslog", target_vendor = "apple"))]
+		if let Some((subsystem, sink)) = &self.oslog {
+			layers.push(
+				tracing_oslog::OsLogger::new(subsystem, "default")
 					.with_filter(sink.env_filter())
 					.boxed(),
 			);
