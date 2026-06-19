@@ -23,7 +23,7 @@ co-log = { workspace = true }
 co-messaging = { workspace = true }
 co-primitives = { workspace = true }
 co-sdk = { workspace = true, default-features = false }
-co-tracing = { workspace = true, features = ["subscriber", "bunyan"] }
+co-tracing = { workspace = true, features = ["subscriber", "bunyan", "clap"] }
 derive_more = { workspace = true }
 futures = { workspace = true }
 ipld-core = { workspace = true }

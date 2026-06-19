@@ -37,6 +37,7 @@ check co-runtime
 check co-sdk
 check co-storage
 check co-test
+check co-tracing
 check example-counter
 check example-counter-upgraded
 check example-message
