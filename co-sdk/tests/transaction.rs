@@ -12,7 +12,6 @@ use co_sdk::{
 	PrivateIdentity, PrivateIdentityBox, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE,
 };
 use co_storage::MemoryBlockStorage;
-use co_test::test_log_path;
 use example_counter::{Counter, CounterAction};
 
 async fn build_counter() -> (Cid, Core, BuildCoreArtifact) {
@@ -36,8 +35,6 @@ async fn counter_count(co: &CoReducer) -> i64 {
 async fn setup_local_counter() -> (co_sdk::Application, CoReducer) {
 	let (counter, counter_core, counter_artifact) = build_counter().await;
 	let application = ApplicationBuilder::new_memory(format!("test_transaction-{}", uuid::Uuid::new_v4()))
-		.with_bunyan_logging(Some(test_log_path()))
-		.with_optional_tracing()
 		.without_keychain()
 		.with_disabled_feature("co-local-encryption")
 		.with_core(counter, counter_core)
@@ -102,6 +99,7 @@ async fn setup_shared_counter(
 /// Both paths push the same actions and must produce the same counter value and structure.
 #[tokio::test]
 async fn test_transaction_same_state_as_sequential_push() {
+	co_test::init_test_log();
 	let (counter, counter_core, counter_artifact) = build_counter().await;
 	let (_app1, co1, identity1) = setup_shared_counter(false, counter, counter_core.clone(), &counter_artifact).await;
 	let (_app2, co2, identity2) = setup_shared_counter(false, counter, counter_core, &counter_artifact).await;
@@ -135,6 +133,7 @@ async fn test_transaction_same_state_as_sequential_push() {
 /// Encrypted-shared-CO variant of `test_transaction_same_state_as_sequential_push`.
 #[tokio::test]
 async fn test_transaction_same_state_as_sequential_push_on_encrypted_co() {
+	co_test::init_test_log();
 	let (counter, counter_core, counter_artifact) = build_counter().await;
 	let (_app1, co1, identity1) = setup_shared_counter(true, counter, counter_core.clone(), &counter_artifact).await;
 	let (_app2, co2, identity2) = setup_shared_counter(true, counter, counter_core, &counter_artifact).await;
@@ -168,6 +167,7 @@ async fn test_transaction_same_state_as_sequential_push_on_encrypted_co() {
 /// Verify that an empty transaction returns the current state without side effects.
 #[tokio::test]
 async fn test_transaction_empty_commit() {
+	co_test::init_test_log();
 	let (application, local_co) = setup_local_counter().await;
 
 	let state_before = local_co.reducer_state().await;
@@ -182,6 +182,7 @@ async fn test_transaction_empty_commit() {
 /// the real reducer state is untouched.
 #[tokio::test]
 async fn test_transaction_atomic_on_error() {
+	co_test::init_test_log();
 	let (application, local_co) = setup_local_counter().await;
 	let identity = application.local_identity();
 
@@ -211,6 +212,7 @@ async fn test_transaction_atomic_on_error() {
 /// Verify multiple sequential transactions accumulate state correctly.
 #[tokio::test]
 async fn test_transaction_multiple_commits() {
+	co_test::init_test_log();
 	let (application, local_co) = setup_local_counter().await;
 	let identity = LocalIdentity::new("user");
 

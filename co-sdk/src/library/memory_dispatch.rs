@@ -293,13 +293,11 @@ mod tests {
 	use co_identity::PrivateIdentity;
 	use co_log::EntryBlock;
 	use co_primitives::{tags, BlockStorage, MonotonicCoDate};
-	use co_test::test_log_path;
 
 	#[tokio::test]
 	async fn smoke() {
+		co_test::init_test_log();
 		let application = ApplicationBuilder::new_memory("test")
-			.with_bunyan_logging(Some(test_log_path()))
-			.with_optional_tracing()
 			.with_disabled_feature("co-local-encryption")
 			.with_co_date(MonotonicCoDate::default())
 			.with_co_uuid(MonotonicCoUuid::default())
@@ -332,9 +330,8 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_push_with_state() {
+		co_test::init_test_log();
 		let application = ApplicationBuilder::new_memory("test")
-			.with_bunyan_logging(Some(test_log_path()))
-			.with_optional_tracing()
 			.with_disabled_feature("co-local-encryption")
 			.with_co_date(MonotonicCoDate::default())
 			.with_co_uuid(MonotonicCoUuid::default())
@@ -401,9 +398,8 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_push_with_core_state() {
+		co_test::init_test_log();
 		let application = ApplicationBuilder::new_memory("test")
-			.with_bunyan_logging(Some(test_log_path()))
-			.with_optional_tracing()
 			.with_disabled_feature("co-local-encryption")
 			.with_co_date(MonotonicCoDate::default())
 			.with_co_uuid(MonotonicCoUuid::default())

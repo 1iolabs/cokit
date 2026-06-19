@@ -16,13 +16,10 @@ pub use crate::library::{
 	storage_snapshots::storage_snapshots,
 	storage_structure::{storage_structure_recursive, CoStructureResolver, StructureResolveResult, StructureResolver},
 };
-#[cfg(feature = "tracing")]
-pub use application::tracing::{env_filter, TracingBuilder};
 pub use application::{
 	application::{Application, ApplicationBuilder},
 	co_context::CoContext,
 	local::{LocalCoBuilder, CO_ID_LOCAL},
-	logging::{parse_log_sink, resolve_filter, LogSink},
 	reducer::{Reducer, ReducerBuilder, ReducerChangeContext, ReducerChangedHandler},
 	runtime::Runtime,
 	shared::CreateCo,

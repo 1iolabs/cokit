@@ -6,11 +6,8 @@ pub mod application;
 pub mod co_context;
 pub mod identity;
 pub mod local;
-pub mod logging;
 pub mod memory;
 pub mod reducer;
 pub mod runtime;
 pub mod shared;
 pub mod storage;
-#[cfg(feature = "tracing")]
-pub mod tracing;

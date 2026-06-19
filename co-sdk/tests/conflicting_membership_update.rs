@@ -12,7 +12,7 @@ use co_sdk::{
 	CoReducerState, CoStorage, Cores, CreateCo, DidKeyIdentity, DidKeyProvider, Identity, MonotonicCoUuid,
 	CO_CORE_FILE, CO_CORE_NAME_CO, CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_MEMBERSHIP,
 };
-use co_test::{test_application_identifier, test_log_path, test_tmp_dir};
+use co_test::{test_application_identifier, test_tmp_dir};
 use futures::{join, pin_mut, stream, StreamExt, TryStreamExt};
 use ipld_core::ipld::Ipld;
 use std::{
@@ -59,11 +59,13 @@ async fn trace_heads(note: &str, co: &str, _context: &CoContext, storage: &CoSto
 /// - https://gitlab.1io.com/1io/cokit/-/issues/59
 #[tokio::test]
 async fn test_conflicting_membership_update_plain() {
+	co_test::init_test_log();
 	conflicting_membership_update(false).await;
 }
 
 #[tokio::test]
 async fn test_conflicting_membership_update_encrypted() {
+	co_test::init_test_log();
 	conflicting_membership_update(true).await;
 }
 
@@ -77,8 +79,6 @@ async fn conflicting_membership_update(encryption: bool) {
 	.without_keychain()
 	.with_disabled_feature("co-local-watch")
 	.with_setting("feature", "co-storage-verify-links")
-	.with_bunyan_logging(Some(test_log_path()))
-	.with_optional_tracing()
 	.with_co_date(MonotonicCoDate::default())
 	.with_co_uuid(MonotonicCoUuid::default());
 	if !encryption {

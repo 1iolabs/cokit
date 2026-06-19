@@ -151,7 +151,7 @@ mod tests {
 	use co_identity::DidKeyIdentity;
 	use co_primitives::{tags, CoId, MonotonicCoDate};
 	use co_storage::ExtendedBlockStorage;
-	use co_test::{test_application_identifier, test_log_path, test_tmp_dir};
+	use co_test::{test_application_identifier, test_tmp_dir};
 	use futures::TryStreamExt;
 
 	async fn count_pin_references(local_co: &CoReducer, co: &CoId, pin: CoPinningKey) -> u32 {
@@ -180,11 +180,10 @@ mod tests {
 	/// Note: The pinned state is always one state late.
 	#[tokio::test]
 	async fn integration_test_storage_cleanup_local() {
+		co_test::init_test_log();
 		let application_identifier = test_application_identifier("integration_test_storage_cleanup");
 		let tmp = test_tmp_dir();
 		let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
-			.with_bunyan_logging(Some(test_log_path()))
-			.with_optional_tracing()
 			.with_disabled_feature("co-local-encryption")
 			.with_setting("feature", "co-storage-free")
 			.with_co_date(MonotonicCoDate::default())
@@ -260,11 +259,10 @@ mod tests {
 	/// ```
 	#[tokio::test]
 	async fn integration_test_storage_cleanup_shared() {
+		co_test::init_test_log();
 		let application_identifier = test_application_identifier("integration_test_storage_cleanup_shared");
 		let tmp = test_tmp_dir();
 		let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
-			.with_bunyan_logging(Some(test_log_path()))
-			.with_optional_tracing()
 			.with_disabled_feature("co-local-encryption")
 			.with_setting("feature", "co-storage-free")
 			.with_co_date(MonotonicCoDate::default())

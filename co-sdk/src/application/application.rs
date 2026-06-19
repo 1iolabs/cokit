@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-#[cfg(feature = "tracing")]
-use super::tracing::TracingBuilder;
 use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
 #[cfg(feature = "guard")]
 use crate::types::guards::create_default_guards;
@@ -353,8 +351,6 @@ pub struct ApplicationBuilder {
 	identifier: String,
 	storage: CoStorageSetting,
 	keychain: bool,
-	#[cfg(feature = "tracing")]
-	tracing: TracingBuilder,
 	settings: Tags,
 	date: Option<DynamicCoDate>,
 	uuid: Option<DynamicCoUuid>,
@@ -377,17 +373,7 @@ impl ApplicationBuilder {
 	/// Create new instance with storage.
 	pub fn new_with_storage(identifier: impl Into<String>, storage: CoStorageSetting) -> Self {
 		let identifier = identifier.into();
-		#[cfg(feature = "tracing")]
-		let path = match &storage {
-			#[cfg(feature = "fs")]
-			CoStorageSetting::Path(path) => Some(path.clone()),
-			#[cfg(feature = "fs")]
-			CoStorageSetting::PathDefault => Some(Self::default_path()),
-			_ => None,
-		};
 		Self {
-			#[cfg(feature = "tracing")]
-			tracing: TracingBuilder::new(identifier.clone(), path),
 			identifier,
 			storage,
 			keychain: true,
@@ -410,8 +396,6 @@ impl ApplicationBuilder {
 	pub fn new_with_path(identifier: impl Into<String>, path: PathBuf) -> Self {
 		let identifier = identifier.into();
 		Self {
-			#[cfg(feature = "tracing")]
-			tracing: TracingBuilder::new(identifier.clone(), Some(path.clone())),
 			identifier,
 			storage: CoStorageSetting::Path(path),
 			keychain: true,
@@ -438,8 +422,6 @@ impl ApplicationBuilder {
 	pub fn new_memory(identifier: impl Into<String>) -> Self {
 		let identifier = identifier.into();
 		Self {
-			#[cfg(feature = "tracing")]
-			tracing: TracingBuilder::new(identifier.clone(), None),
 			identifier,
 			storage: CoStorageSetting::Memory,
 			keychain: false,
@@ -462,8 +444,6 @@ impl ApplicationBuilder {
 	pub fn new_indexeddb(identifier: impl Into<String>) -> Self {
 		let identifier = identifier.into();
 		Self {
-			#[cfg(feature = "tracing")]
-			tracing: TracingBuilder::new(identifier.clone(), None),
 			identifier,
 			storage: CoStorageSetting::IndexedDb,
 			keychain: false,
@@ -479,32 +459,6 @@ impl ApplicationBuilder {
 			access_guard: None,
 			contact_handler: None,
 		}
-	}
-
-	/// Enable bunyan logging to log_path.
-	/// If no path is specified {path}/log/application.log is used.
-	/// Command read without network stuff:
-	/// ```sh
-	/// tail -0f ~/Application\ Support/co.app/log/application.log | bunyan -c '!/^(libp2p|hickory_proto)/.test(this.target)'
-	/// ```
-	#[cfg(feature = "bunyan")]
-	pub fn with_bunyan_logging(self, log_path: Option<PathBuf>) -> Self {
-		Self { tracing: self.tracing.with_bunyan_logging(log_path), ..self }
-	}
-
-	#[cfg(feature = "tracing")]
-	pub fn with_log_max_level(self, max_level: tracing::Level) -> Self {
-		Self { tracing: self.tracing.with_max_level(max_level), ..self }
-	}
-
-	#[cfg(feature = "tracing")]
-	pub fn with_optional_tracing(self) -> Self {
-		Self { tracing: self.tracing.with_optional_tracing(), ..self }
-	}
-
-	#[cfg(feature = "opentelemetry")]
-	pub fn with_open_telemetry(self, endpoint: impl Into<String>) -> Self {
-		Self { tracing: self.tracing.with_open_telemetry(endpoint), ..self }
 	}
 
 	pub fn without_keychain(self) -> Self {
@@ -589,6 +543,11 @@ impl ApplicationBuilder {
 		Self { settings, ..self }
 	}
 
+	/// Get application identifier.
+	pub fn identifier(&self) -> &str {
+		&self.identifier
+	}
+
 	/// Get base path, if one.
 	pub fn base_path(&self) -> Option<PathBuf> {
 		match &self.storage {
@@ -634,10 +593,6 @@ impl ApplicationBuilder {
 		if !self.static_blocks.is_empty() {
 			storage = storage.with_static(self.static_blocks);
 		}
-
-		// log
-		#[cfg(feature = "tracing")]
-		self.tracing.init()?;
 
 		// settings
 		let settings = ApplicationSettings {

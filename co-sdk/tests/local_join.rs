@@ -11,7 +11,7 @@ use co_sdk::{
 	Action, AnyBlockStorage, ApplicationBuilder, BlockStorageExt, CoReducer, CoreName, MonotonicCoUuid, ReducerAction,
 	CO_CORE_NAME_CO, CO_ID_LOCAL,
 };
-use co_test::{test_log_path, test_tmp_dir};
+use co_test::test_tmp_dir;
 use example_counter::{Counter, CounterAction};
 use futures::{StreamExt, TryStreamExt};
 use ipld_core::serde::from_ipld;
@@ -40,12 +40,11 @@ async fn counter_count(co: &CoReducer) -> i64 {
 
 #[tokio::test]
 async fn test_local_join() {
+	co_test::init_test_log();
 	// app
 	let application_identifier = format!("test_local_join-{}", uuid::Uuid::new_v4());
 	let tmp = test_tmp_dir().without_clear();
 	let application1 = ApplicationBuilder::new_with_path(application_identifier.clone(), tmp.path().to_owned())
-		.with_bunyan_logging(Some(test_log_path()))
-		.with_optional_tracing()
 		.without_keychain()
 		.with_disabled_feature("co-local-watch")
 		.with_disabled_feature("co-local-encryption")
