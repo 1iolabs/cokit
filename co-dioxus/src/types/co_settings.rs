@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use crate::library::cli::{Cli, CoLogLevel};
+use crate::library::cli::Cli;
 use cid::Cid;
 use clap::Parser;
 #[cfg(feature = "guard")]
@@ -11,6 +11,7 @@ use co_sdk::GuardReference;
 #[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
 use co_sdk::{CoStorageSetting, ContactHandler, Core, Cores, DynamicContactHandler, DynamicLocalSecret, LocalSecret};
+use co_tracing::LogArgs;
 
 #[derive(Debug, Clone, Default)]
 pub struct CoSettings {
@@ -31,8 +32,7 @@ pub struct CoSettings {
 	#[cfg(feature = "network")]
 	pub network: bool,
 	pub no_keychain: bool,
-	pub log: CoLog,
-	pub log_level: CoLogLevel,
+	pub log: LogArgs,
 	pub no_default_features: bool,
 	pub feature: Vec<String>,
 	pub local_secret: Option<DynamicLocalSecret>,
@@ -57,12 +57,8 @@ impl CoSettings {
 		Self::from_cli(bundle_identifier.into(), cli)
 	}
 
-	pub fn with_log(self, log: CoLog) -> Self {
-		Self { log, ..self }
-	}
-
-	pub fn with_log_level(self, log_level: impl Into<CoLogLevel>) -> Self {
-		Self { log_level: log_level.into(), ..self }
+	pub fn with_log(self, logging: LogArgs) -> Self {
+		Self { log: logging, ..self }
 	}
 
 	#[cfg(feature = "fs")]
@@ -122,62 +118,10 @@ impl CoSettings {
 			#[cfg(feature = "network")]
 			network_settings: NetworkSettings::default().with_force_new_peer_id(cli.force_new_peer_id),
 			no_keychain: cli.no_keychain,
-			log: if cli.no_log { CoLog::None } else { CoLog::Default },
-			log_level: cli.log_level,
+			log: cli.log,
 			no_default_features: cli.no_default_features,
 			feature: cli.feature,
 			..Default::default()
-		}
-	}
-}
-
-#[derive(Debug, Clone, Default)]
-pub enum CoLog {
-	/// No (COKIT managed) logging.
-	#[default]
-	None,
-
-	/// Use default logging for the platform using identifier.
-	Default,
-
-	/// Print logs to stderr.
-	#[cfg(feature = "tracing")]
-	Print,
-
-	/// Print logs to browser console.
-	#[cfg(feature = "web")]
-	Console,
-
-	/// Write logs to file in bunyan format.
-	/// If no path is specified `$CO_BASE_PATH/log/co.log` is used.
-	#[cfg(all(feature = "fs", feature = "tracing"))]
-	File(Option<std::path::PathBuf>),
-
-	/// Send logs to OS logger (Console).
-	#[cfg(feature = "tracing-oslog")]
-	Os,
-}
-impl CoLog {
-	/// Resolve default to platform specific logger.
-	#[allow(unreachable_code)]
-	pub fn with_resolved_default(self) -> Self {
-		if let Self::Default = self {
-			// web
-			#[cfg(feature = "web")]
-			return Self::Console;
-
-			// mobile
-			#[cfg(all(feature = "mobile", feature = "tracing-oslog"))]
-			return Self::Os;
-
-			// tracing
-			#[cfg(all(feature = "desktop", feature = "fs", feature = "tracing"))]
-			return Self::File(None);
-
-			// none
-			Self::None
-		} else {
-			self
 		}
 	}
 }

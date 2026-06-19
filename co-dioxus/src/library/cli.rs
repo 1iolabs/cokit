@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use clap::ValueEnum;
+use co_tracing::LogArgs;
 #[cfg(feature = "fs")]
 use std::path::PathBuf;
 
@@ -32,13 +32,9 @@ pub struct Cli {
 	#[arg(long, env = "CO_MEMORY")]
 	pub memory: bool,
 
-	/// Disable logging to file.
-	#[arg(long, default_value_t = false)]
-	pub no_log: bool,
-
-	/// Only log level and above.
-	#[arg(long, value_enum, default_value_t, env = "CO_LOG_LEVEL")]
-	pub log_level: CoLogLevel,
+	/// Logging configuration (`CO_LOG`, `-v`/`-q` — see `co-tracing`).
+	#[command(flatten)]
+	pub log: LogArgs,
 
 	/// Read/Write Local CO encryption key to file instead of the OS keychain.
 	///
@@ -72,37 +68,5 @@ fn parse_bool(s: &str) -> Result<bool, String> {
 		"1" | "true" => Ok(true),
 		"0" | "false" => Ok(false),
 		_ => Err(format!("invalid bool: {s}")),
-	}
-}
-
-#[derive(Debug, Default, Clone, Copy, ValueEnum)]
-pub enum CoLogLevel {
-	Error,
-	Warn,
-	#[default]
-	Info,
-	Debug,
-	Trace,
-}
-impl From<CoLogLevel> for tracing::Level {
-	fn from(value: CoLogLevel) -> Self {
-		match value {
-			CoLogLevel::Error => tracing::Level::ERROR,
-			CoLogLevel::Warn => tracing::Level::WARN,
-			CoLogLevel::Info => tracing::Level::INFO,
-			CoLogLevel::Debug => tracing::Level::DEBUG,
-			CoLogLevel::Trace => tracing::Level::TRACE,
-		}
-	}
-}
-impl From<tracing::Level> for CoLogLevel {
-	fn from(value: tracing::Level) -> Self {
-		match value {
-			tracing::Level::ERROR => CoLogLevel::Error,
-			tracing::Level::WARN => CoLogLevel::Warn,
-			tracing::Level::INFO => CoLogLevel::Info,
-			tracing::Level::DEBUG => CoLogLevel::Debug,
-			tracing::Level::TRACE => CoLogLevel::Trace,
-		}
 	}
 }

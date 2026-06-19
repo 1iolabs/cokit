@@ -17,7 +17,6 @@ import 'types/cid.dart';
 import 'types/co_map.dart';
 import 'types/co_set.dart';
 import 'types/identity.dart';
-import 'types/level.dart';
 import 'types/network_settings.dart';
 import 'types/storage.dart';
 import 'types/unixfs.dart';
@@ -79,7 +78,7 @@ class CoKit extends BaseEntrypoint<CoKitApi, CoKitApiImpl, CoKitWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -397335583;
+  int get rustContentHash => -1810396169;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -155,8 +154,6 @@ abstract class CoKitApi extends BaseApi {
   String crateTypesCidCidToString({required Cid that});
 
   BigInt crateTypesCidCidVersion({required Cid that});
-
-  Future<CoLogLevel> crateTypesLevelCoLogLevelDefault();
 
   Future<bool> crateTypesCoMapCoMapContains(
       {required CoMap that,
@@ -912,30 +909,6 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       );
 
   @override
-  Future<CoLogLevel> crateTypesLevelCoLogLevelDefault() {
-    return handler.executeNormal(NormalTask(
-      callFfi: (port_) {
-        final serializer = SseSerializer(generalizedFrbRustBinding);
-        pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 24, port: port_);
-      },
-      codec: SseCodec(
-        decodeSuccessData: sse_decode_co_log_level,
-        decodeErrorData: null,
-      ),
-      constMeta: kCrateTypesLevelCoLogLevelDefaultConstMeta,
-      argValues: [],
-      apiImpl: this,
-    ));
-  }
-
-  TaskConstMeta get kCrateTypesLevelCoLogLevelDefaultConstMeta =>
-      const TaskConstMeta(
-        debugName: "co_log_level_default",
-        argNames: [],
-      );
-
-  @override
   Future<bool> crateTypesCoMapCoMapContains(
       {required CoMap that,
       required BlockStorage storage,
@@ -948,7 +921,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             storage, serializer);
         sse_encode_list_prim_u_8_loose(key, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 25, port: port_);
+            funcId: 24, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_bool,
@@ -973,7 +946,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 26, port: port_);
+            funcId: 25, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_map,
@@ -1006,7 +979,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_opt_box_autoadd_usize(skip, serializer);
         sse_encode_opt_box_autoadd_usize(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 27, port: port_);
+            funcId: 26, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -1039,7 +1012,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             storage, serializer);
         sse_encode_list_prim_u_8_loose(key, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 28, port: port_);
+            funcId: 27, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_opt_list_prim_u_8_strict,
@@ -1072,7 +1045,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_list_prim_u_8_loose(key, serializer);
         sse_encode_list_prim_u_8_loose(value, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 29, port: port_);
+            funcId: 28, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_map,
@@ -1097,7 +1070,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_box_autoadd_co_map(that, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 30, port: port_);
+            funcId: 29, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_bool,
@@ -1122,7 +1095,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_opt_box_autoadd_cid(root, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_map,
@@ -1152,7 +1125,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_StreamSink_opt_box_autoadd_record_list_prim_u_8_strict_list_prim_u_8_strict_Sse(
             sink, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 32, port: port_);
+            funcId: 31, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -1177,7 +1150,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 33, port: port_);
+            funcId: 32, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_network_settings,
@@ -1209,7 +1182,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             storage, serializer);
         sse_encode_list_prim_u_8_loose(key, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 34, port: port_);
+            funcId: 33, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_bool,
@@ -1234,7 +1207,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 35, port: port_);
+            funcId: 34, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_set,
@@ -1267,7 +1240,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_encode_opt_box_autoadd_usize(skip, serializer);
         sse_encode_opt_box_autoadd_usize(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 36, port: port_);
+            funcId: 35, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_list_prim_u_8_strict,
@@ -1299,7 +1272,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             storage, serializer);
         sse_encode_list_prim_u_8_loose(value, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 37, port: port_);
+            funcId: 36, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_set,
@@ -1324,7 +1297,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_box_autoadd_co_set(that, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 38, port: port_);
+            funcId: 37, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_bool,
@@ -1349,7 +1322,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_opt_box_autoadd_cid(root, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 38)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_set,
@@ -1378,7 +1351,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             storage, serializer);
         sse_encode_StreamSink_opt_list_prim_u_8_strict_Sse(sink, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 40, port: port_);
+            funcId: 39, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -1402,7 +1375,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 41, port: port_);
+            funcId: 40, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_co_settings,
@@ -1430,7 +1403,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
             storage, serializer);
         sse_encode_list_prim_u_8_loose(bytes, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 42, port: port_);
+            funcId: 41, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_cid,
@@ -1713,12 +1686,6 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
-  CoLogLevel dco_decode_box_autoadd_co_log_level(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_co_log_level(raw);
-  }
-
-  @protected
   CoMap dco_decode_box_autoadd_co_map(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_co_map(raw);
@@ -1780,12 +1747,6 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
-  CoLogLevel dco_decode_co_log_level(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return CoLogLevel.values[raw as int];
-  }
-
-  @protected
   CoMap dco_decode_co_map(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1830,18 +1791,17 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   CoSettings dco_decode_co_settings(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 9)
-      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return CoSettings(
       identifier: dco_decode_String(arr[0]),
       path: dco_decode_opt_String(arr[1]),
       networkSettings: dco_decode_opt_box_autoadd_co_network_settings(arr[2]),
       network: dco_decode_opt_box_autoadd_bool(arr[3]),
       noKeychain: dco_decode_opt_box_autoadd_bool(arr[4]),
-      noLog: dco_decode_opt_box_autoadd_bool(arr[5]),
-      logLevel: dco_decode_opt_box_autoadd_co_log_level(arr[6]),
-      noDefaultFeatures: dco_decode_opt_box_autoadd_bool(arr[7]),
-      feature: dco_decode_opt_list_String(arr[8]),
+      log: dco_decode_opt_String(arr[5]),
+      noDefaultFeatures: dco_decode_opt_box_autoadd_bool(arr[6]),
+      feature: dco_decode_opt_list_String(arr[7]),
     );
   }
 
@@ -1882,12 +1842,6 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       coreReference: dco_decode_opt_box_autoadd_cid(arr[1]),
       coreBytes: dco_decode_opt_list_prim_u_8_strict(arr[2]),
     );
-  }
-
-  @protected
-  int dco_decode_i_32(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw as int;
   }
 
   @protected
@@ -1955,12 +1909,6 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   Cid? dco_decode_opt_box_autoadd_cid(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_cid(raw);
-  }
-
-  @protected
-  CoLogLevel? dco_decode_opt_box_autoadd_co_log_level(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null ? null : dco_decode_box_autoadd_co_log_level(raw);
   }
 
   @protected
@@ -2300,12 +2248,6 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
-  CoLogLevel sse_decode_box_autoadd_co_log_level(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_co_log_level(deserializer));
-  }
-
-  @protected
   CoMap sse_decode_box_autoadd_co_map(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_co_map(deserializer));
@@ -2365,13 +2307,6 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
-  CoLogLevel sse_decode_co_log_level(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var inner = sse_decode_i_32(deserializer);
-    return CoLogLevel.values[inner];
-  }
-
-  @protected
   CoMap sse_decode_co_map(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_root = sse_decode_opt_box_autoadd_cid(deserializer);
@@ -2419,8 +2354,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         sse_decode_opt_box_autoadd_co_network_settings(deserializer);
     var var_network = sse_decode_opt_box_autoadd_bool(deserializer);
     var var_noKeychain = sse_decode_opt_box_autoadd_bool(deserializer);
-    var var_noLog = sse_decode_opt_box_autoadd_bool(deserializer);
-    var var_logLevel = sse_decode_opt_box_autoadd_co_log_level(deserializer);
+    var var_log = sse_decode_opt_String(deserializer);
     var var_noDefaultFeatures = sse_decode_opt_box_autoadd_bool(deserializer);
     var var_feature = sse_decode_opt_list_String(deserializer);
     return CoSettings(
@@ -2429,8 +2363,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         networkSettings: var_networkSettings,
         network: var_network,
         noKeychain: var_noKeychain,
-        noLog: var_noLog,
-        logLevel: var_logLevel,
+        log: var_log,
         noDefaultFeatures: var_noDefaultFeatures,
         feature: var_feature);
   }
@@ -2464,12 +2397,6 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         coreType: var_coreType,
         coreReference: var_coreReference,
         coreBytes: var_coreBytes);
-  }
-
-  @protected
-  int sse_decode_i_32(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getInt32();
   }
 
   @protected
@@ -2579,18 +2506,6 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_cid(deserializer));
-    } else {
-      return null;
-    }
-  }
-
-  @protected
-  CoLogLevel? sse_decode_opt_box_autoadd_co_log_level(
-      SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    if (sse_decode_bool(deserializer)) {
-      return (sse_decode_box_autoadd_co_log_level(deserializer));
     } else {
       return null;
     }
@@ -2714,6 +2629,12 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   BigInt sse_decode_usize(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getBigUint64();
+  }
+
+  @protected
+  int sse_decode_i_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getInt32();
   }
 
   @protected
@@ -2982,13 +2903,6 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
-  void sse_encode_box_autoadd_co_log_level(
-      CoLogLevel self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_co_log_level(self, serializer);
-  }
-
-  @protected
   void sse_encode_box_autoadd_co_map(CoMap self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_co_map(self, serializer);
@@ -3048,12 +2962,6 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   }
 
   @protected
-  void sse_encode_co_log_level(CoLogLevel self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_i_32(self.index, serializer);
-  }
-
-  @protected
   void sse_encode_co_map(CoMap self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_opt_box_autoadd_cid(self.root, serializer);
@@ -3089,8 +2997,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         self.networkSettings, serializer);
     sse_encode_opt_box_autoadd_bool(self.network, serializer);
     sse_encode_opt_box_autoadd_bool(self.noKeychain, serializer);
-    sse_encode_opt_box_autoadd_bool(self.noLog, serializer);
-    sse_encode_opt_box_autoadd_co_log_level(self.logLevel, serializer);
+    sse_encode_opt_String(self.log, serializer);
     sse_encode_opt_box_autoadd_bool(self.noDefaultFeatures, serializer);
     sse_encode_opt_list_String(self.feature, serializer);
   }
@@ -3117,12 +3024,6 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
     sse_encode_String(self.coreType, serializer);
     sse_encode_opt_box_autoadd_cid(self.coreReference, serializer);
     sse_encode_opt_list_prim_u_8_strict(self.coreBytes, serializer);
-  }
-
-  @protected
-  void sse_encode_i_32(int self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putInt32(self);
   }
 
   @protected
@@ -3218,17 +3119,6 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_cid(self, serializer);
-    }
-  }
-
-  @protected
-  void sse_encode_opt_box_autoadd_co_log_level(
-      CoLogLevel? self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    sse_encode_bool(self != null, serializer);
-    if (self != null) {
-      sse_encode_box_autoadd_co_log_level(self, serializer);
     }
   }
 
@@ -3342,6 +3232,12 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   void sse_encode_usize(BigInt self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putBigUint64(self);
+  }
+
+  @protected
+  void sse_encode_i_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putInt32(self);
   }
 }
 

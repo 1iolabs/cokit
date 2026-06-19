@@ -4,7 +4,6 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
-import '../types/level.dart';
 import '../types/network_settings.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
@@ -16,8 +15,12 @@ class CoSettings {
   final CoNetworkSettings? networkSettings;
   final bool? network;
   final bool? noKeychain;
-  final bool? noLog;
-  final CoLogLevel? logLevel;
+
+  /// Logging
+  ///
+  /// See:
+  /// - [`co_tracing::LogArgs::log`]
+  final String? log;
   final bool? noDefaultFeatures;
   final List<String>? feature;
 
@@ -27,8 +30,7 @@ class CoSettings {
     this.networkSettings,
     this.network,
     this.noKeychain,
-    this.noLog,
-    this.logLevel,
+    this.log,
     this.noDefaultFeatures,
     this.feature,
   });
@@ -43,8 +45,7 @@ class CoSettings {
       networkSettings.hashCode ^
       network.hashCode ^
       noKeychain.hashCode ^
-      noLog.hashCode ^
-      logLevel.hashCode ^
+      log.hashCode ^
       noDefaultFeatures.hashCode ^
       feature.hashCode;
 
@@ -58,8 +59,7 @@ class CoSettings {
           networkSettings == other.networkSettings &&
           network == other.network &&
           noKeychain == other.noKeychain &&
-          noLog == other.noLog &&
-          logLevel == other.logLevel &&
+          log == other.log &&
           noDefaultFeatures == other.noDefaultFeatures &&
           feature == other.feature;
 }

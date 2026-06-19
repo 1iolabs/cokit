@@ -12,13 +12,13 @@ use co_core_co::CoAction;
 use co_primitives::MonotonicCoDate;
 use co_sdk::{ApplicationBuilder, BlockStorageExt, CreateCo, MonotonicCoUuid, CO_CORE_NAME_CO};
 use co_storage::MemoryBlockStorage;
-use co_test::test_log_path;
 
 const MARKER: &str = "repro-binary-marker";
 
 #[co_test::timeout(10000)]
 #[tokio::test]
 async fn core_create_on_fresh_co_with_disabled_encryption_hangs() {
+	co_test::init_test_log();
 	// Compute the CID of the marker bytes. Storing the same bytes in the CO's
 	// own storage later produces the same CID (deterministic), so the binary
 	// reference in CoreCreate resolves locally without needing a real wasm.
@@ -27,8 +27,6 @@ async fn core_create_on_fresh_co_with_disabled_encryption_hangs() {
 
 	let id = format!("repro-{}", uuid::Uuid::new_v4());
 	let application = ApplicationBuilder::new_memory(id)
-		.with_bunyan_logging(Some(test_log_path()))
-		.with_optional_tracing()
 		.without_keychain()
 		.with_disabled_feature("co-local-encryption")
 		.with_co_date(MonotonicCoDate::default())

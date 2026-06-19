@@ -2,7 +2,7 @@
 [
   {
     "label": "lint",
-    "command": "cargo +nightly fmt --check && cargo clippy --workspace --all-targets --all-features -- -D warnings && ./ci/scripts/check-web.sh",
+    "command": "cargo +nightly fmt --check && cargo clippy --workspace --all-targets --all-features -- -D warnings && ./ci/scripts/check-web.sh && ./ci/scripts/check-no-default-features.sh",
   },
   {
     "label": "lint: clippy",
@@ -43,5 +43,9 @@
   {
     "label": "check: web",
     "command": "./ci/scripts/check-web.sh",
+  },
+  {
+    "label": "check: no-default-features",
+    "command": "./ci/scripts/check-no-default-features.sh",
   },
 ]

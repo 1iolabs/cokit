@@ -2,6 +2,7 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use crate::library::co_application::CoApplicationSettings;
+use co_tracing::LogArgs;
 use std::path::PathBuf;
 
 /// Run COs via an HTTP Daemon.
@@ -24,9 +25,9 @@ pub struct Cli {
 	#[arg(long, env = "CO_BASE_PATH")]
 	pub base_path: Option<PathBuf>,
 
-	/// Disable logging to file.
-	#[arg(long, default_value_t = false)]
-	pub no_log: bool,
+	/// Logging configuration (`CO_LOG`, `-v`/`-q`, OpenTelemetry — see `co-tracing`).
+	#[command(flatten)]
+	pub log: LogArgs,
 
 	/// Read/Write Local CO encryption key to file instead of the OS keychain.
 	///
@@ -52,7 +53,7 @@ impl From<Cli> for CoApplicationSettings {
 			force_new_peer_id: value.force_new_peer_id,
 			no_keychain: value.no_keychain,
 			base_path: value.base_path,
-			no_log: value.no_log,
+			log: value.log,
 		}
 	}
 }

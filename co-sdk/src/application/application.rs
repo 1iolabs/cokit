@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-#[cfg(feature = "tracing")]
-use super::tracing::TracingBuilder;
 use super::{co_context::CoContext, identity::resolve_private_identity, shared::CreateCo};
 #[cfg(feature = "guard")]
 use crate::types::guards::create_default_guards;
@@ -74,6 +72,17 @@ impl Application {
 
 	pub fn shutdown(&self) -> CancellationToken {
 		self.context().inner.shutdown().child_token()
+	}
+
+	/// Keep `value` alive until the application shuts down, then drop it (on an untracked task).
+	/// Handy for tying a resource's lifetime to the app — e.g. hold a `co_tracing::TracingGuard` so
+	/// OpenTelemetry flushes on shutdown: `application.drop_on_shutdown(guard);`.
+	pub fn drop_on_shutdown<T: Send + 'static>(&self, value: T) {
+		let shutdown = self.shutdown();
+		self.tasks.spawn_options(TaskOptions::untracked(), async move {
+			shutdown.cancelled().await;
+			drop(value);
+		});
 	}
 
 	pub fn handle(&self) -> ActorHandle<ApplicationMessage> {
@@ -370,8 +379,6 @@ pub struct ApplicationBuilder {
 	identifier: String,
 	storage: CoStorageSetting,
 	keychain: bool,
-	#[cfg(feature = "tracing")]
-	tracing: TracingBuilder,
 	settings: Tags,
 	date: Option<DynamicCoDate>,
 	uuid: Option<DynamicCoUuid>,
@@ -394,17 +401,7 @@ impl ApplicationBuilder {
 	/// Create new instance with storage.
 	pub fn new_with_storage(identifier: impl Into<String>, storage: CoStorageSetting) -> Self {
 		let identifier = identifier.into();
-		#[cfg(feature = "tracing")]
-		let path = match &storage {
-			#[cfg(feature = "fs")]
-			CoStorageSetting::Path(path) => Some(path.clone()),
-			#[cfg(feature = "fs")]
-			CoStorageSetting::PathDefault => Some(Self::default_path()),
-			_ => None,
-		};
 		Self {
-			#[cfg(feature = "tracing")]
-			tracing: TracingBuilder::new(identifier.clone(), path),
 			identifier,
 			storage,
 			keychain: true,
@@ -427,8 +424,6 @@ impl ApplicationBuilder {
 	pub fn new_with_path(identifier: impl Into<String>, path: PathBuf) -> Self {
 		let identifier = identifier.into();
 		Self {
-			#[cfg(feature = "tracing")]
-			tracing: TracingBuilder::new(identifier.clone(), Some(path.clone())),
 			identifier,
 			storage: CoStorageSetting::Path(path),
 			keychain: true,
@@ -455,8 +450,6 @@ impl ApplicationBuilder {
 	pub fn new_memory(identifier: impl Into<String>) -> Self {
 		let identifier = identifier.into();
 		Self {
-			#[cfg(feature = "tracing")]
-			tracing: TracingBuilder::new(identifier.clone(), None),
 			identifier,
 			storage: CoStorageSetting::Memory,
 			keychain: false,
@@ -479,8 +472,6 @@ impl ApplicationBuilder {
 	pub fn new_indexeddb(identifier: impl Into<String>) -> Self {
 		let identifier = identifier.into();
 		Self {
-			#[cfg(feature = "tracing")]
-			tracing: TracingBuilder::new(identifier.clone(), None),
 			identifier,
 			storage: CoStorageSetting::IndexedDb,
 			keychain: false,
@@ -496,32 +487,6 @@ impl ApplicationBuilder {
 			access_guard: None,
 			contact_handler: None,
 		}
-	}
-
-	/// Enable bunyan logging to log_path.
-	/// If no path is specified {path}/log/application.log is used.
-	/// Command read without network stuff:
-	/// ```sh
-	/// tail -0f ~/Application\ Support/co.app/log/application.log | bunyan -c '!/^(libp2p|hickory_proto)/.test(this.target)'
-	/// ```
-	#[cfg(feature = "bunyan")]
-	pub fn with_bunyan_logging(self, log_path: Option<PathBuf>) -> Self {
-		Self { tracing: self.tracing.with_bunyan_logging(log_path), ..self }
-	}
-
-	#[cfg(feature = "tracing")]
-	pub fn with_log_max_level(self, max_level: tracing::Level) -> Self {
-		Self { tracing: self.tracing.with_max_level(max_level), ..self }
-	}
-
-	#[cfg(feature = "tracing")]
-	pub fn with_optional_tracing(self) -> Self {
-		Self { tracing: self.tracing.with_optional_tracing(), ..self }
-	}
-
-	#[cfg(feature = "opentelemetry")]
-	pub fn with_open_telemetry(self, endpoint: impl Into<String>) -> Self {
-		Self { tracing: self.tracing.with_open_telemetry(endpoint), ..self }
 	}
 
 	pub fn without_keychain(self) -> Self {
@@ -606,19 +571,31 @@ impl ApplicationBuilder {
 		Self { settings, ..self }
 	}
 
-	pub async fn build(self) -> Result<Application, anyhow::Error> {
-		let tasks = TaskSpawner::new(self.identifier.clone());
+	/// Get application identifier.
+	pub fn identifier(&self) -> &str {
+		&self.identifier
+	}
 
-		// log
-		#[cfg(feature = "tracing")]
-		self.tracing.init()?;
+	/// Get base path, if one.
+	pub fn base_path(&self) -> Option<PathBuf> {
+		match &self.storage {
+			#[cfg(feature = "fs")]
+			CoStorageSetting::PathDefault => Some(Self::default_path()),
+			#[cfg(feature = "fs")]
+			CoStorageSetting::Path(path) => Some(path.clone()),
+			_ => None,
+		}
+	}
 
-		// sources
-		let date = self.date.unwrap_or_else(co_date_env);
-		let uuid = self.uuid.unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
+	/// Get log path, if one.
+	pub fn log_path(&self) -> Option<PathBuf> {
+		self.base_path().map(|base_path| base_path.join("log/co.log"))
+	}
 
-		// storage
-		let (mut storage, path): (_, Option<PathBuf>) = match self.storage.clone() {
+	/// Create storage.
+	#[cfg_attr(not(feature = "fs"), allow(unused_variables))]
+	async fn build_storage(&self, uuid: &DynamicCoUuid) -> Result<(Storage, Option<PathBuf>), anyhow::Error> {
+		Ok(match self.storage.clone() {
 			#[cfg(feature = "fs")]
 			CoStorageSetting::PathDefault => {
 				let path = Self::default_path();
@@ -629,7 +606,18 @@ impl ApplicationBuilder {
 			CoStorageSetting::Memory => (Storage::new_memory(), None),
 			#[cfg(all(feature = "indexeddb", target_arch = "wasm32"))]
 			CoStorageSetting::IndexedDb => (Storage::new_indexeddb().await?, None),
-		};
+		})
+	}
+
+	pub async fn build(mut self) -> Result<Application, anyhow::Error> {
+		let tasks = TaskSpawner::new(self.identifier.clone());
+
+		// sources
+		let date = self.date.take().unwrap_or_else(co_date_env);
+		let uuid = self.uuid.take().unwrap_or_else(|| DynamicCoUuid::new(RandomCoUuid));
+
+		// storage
+		let (mut storage, path) = self.build_storage(&uuid).await?;
 		if !self.static_blocks.is_empty() {
 			storage = storage.with_static(self.static_blocks);
 		}

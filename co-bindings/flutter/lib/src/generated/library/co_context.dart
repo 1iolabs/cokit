@@ -6,7 +6,6 @@
 import '../frb_generated.dart';
 import '../types/cid.dart';
 import '../types/identity.dart';
-import '../types/level.dart';
 import '../types/network_settings.dart';
 import 'co.dart';
 import 'co_error.dart';

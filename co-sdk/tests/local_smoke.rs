@@ -10,7 +10,7 @@ use co_sdk::{
 	AnyBlockStorage, ApplicationBuilder, DidKeyIdentity, Identity, MonotonicCoUuid, CO_CORE_NAME_CO,
 	CO_CORE_NAME_KEYSTORE,
 };
-use co_test::{test_application_identifier, test_log_path, test_tmp_dir, TmpDir};
+use co_test::{test_application_identifier, test_tmp_dir, TmpDir};
 use example_counter::CounterAction;
 use std::collections::BTreeMap;
 
@@ -29,6 +29,7 @@ async fn counter_core(storage: &impl AnyBlockStorage) -> Cid {
 /// This test is designed to not have random values and should therefore always use the same Cids.
 #[tokio::test]
 async fn test_local_smoke() {
+	co_test::init_test_log();
 	let tmp = test_tmp_dir();
 
 	// create
@@ -36,8 +37,6 @@ async fn test_local_smoke() {
 	{
 		let application =
 			ApplicationBuilder::new_with_path(test_application_identifier("test_local_smoke"), tmp.path().to_owned())
-				.with_bunyan_logging(Some(test_log_path()))
-				.with_optional_tracing()
 				.without_keychain()
 				.with_disabled_feature("co-local-encryption")
 				.with_co_date(MonotonicCoDate::default())
@@ -80,14 +79,13 @@ async fn test_local_smoke() {
 /// Create Local CO in tmpdir and exit.
 #[tokio::test]
 async fn test_local_smoke_encrypted() {
+	co_test::init_test_log();
 	let tmp = test_tmp_dir();
 
 	// create
 	let identity = DidKeyIdentity::generate(None);
 	{
 		let application = ApplicationBuilder::new_with_path("test".to_owned(), tmp.path().to_owned())
-			.with_bunyan_logging(Some(test_log_path()))
-			.with_optional_tracing()
 			.without_keychain()
 			.build()
 			.await
@@ -122,12 +120,11 @@ async fn test_local_smoke_encrypted() {
 /// This test is designed to not have random values and should therefore always use the same Cids.
 #[tokio::test]
 async fn test_local_push() {
+	co_test::init_test_log();
 	// app
 	let application_identifier = format!("test_local_push-{}", uuid::Uuid::new_v4());
 	let tmp = TmpDir::new("co");
 	let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
-		.with_bunyan_logging(Some(test_log_path()))
-		.with_optional_tracing()
 		.without_keychain()
 		.with_disabled_feature("co-local-encryption")
 		// .with_setting("feature", "co-storage-free")
@@ -161,12 +158,11 @@ async fn test_local_push() {
 /// Create Local CO in tmpdir and exit.
 #[tokio::test]
 async fn test_local_push_encrypted() {
+	co_test::init_test_log();
 	// app
 	let application_identifier = format!("test_local_push_encrypted-{}", uuid::Uuid::new_v4());
 	let tmp = TmpDir::new("co");
 	let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
-		.with_bunyan_logging(Some(test_log_path()))
-		.with_optional_tracing()
 		.without_keychain()
 		.build()
 		.await

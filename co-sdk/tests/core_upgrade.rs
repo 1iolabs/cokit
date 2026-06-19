@@ -9,7 +9,6 @@ use co_sdk::{
 	state::{query_core, QueryExt},
 	AnyBlockStorage, ApplicationBuilder, BlockStorageExt, MonotonicCoUuid, CO_CORE_NAME_CO,
 };
-use co_test::test_log_path;
 
 async fn counter_core(storage: &impl AnyBlockStorage) -> Cid {
 	let repository_path = crate_repository_path(true).unwrap();
@@ -36,11 +35,10 @@ async fn counter_upgraded_core(storage: &impl AnyBlockStorage) -> Cid {
 /// Upgrades from `example_counter` to `example_counter_upgraded` and verifes the migration take place.
 #[tokio::test]
 async fn test_core_upgrade() {
+	co_test::init_test_log();
 	// app
 	let application_identifier = format!("test_core_upgrade-{}", uuid::Uuid::new_v4());
 	let application = ApplicationBuilder::new_memory(application_identifier)
-		.with_bunyan_logging(Some(test_log_path()))
-		.with_optional_tracing()
 		.without_keychain()
 		.with_disabled_feature("co-local-encryption")
 		.with_co_date(MonotonicCoDate::default())

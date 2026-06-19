@@ -5,7 +5,7 @@ use crate::{
 	commands::{co, core, did, file, ipld, network, room, schemars, storage},
 	library::cli_context::CliContext,
 };
-use clap::{ArgAction, ValueEnum};
+use co_tracing::LogArgs;
 use exitcode::ExitCode;
 use std::path::PathBuf;
 
@@ -34,40 +34,15 @@ pub struct Cli {
 	#[arg(long, env = "CO_BASE_PATH")]
 	pub base_path: Option<PathBuf>,
 
-	/// Log path.
-	#[arg(long)]
-	pub log_path: Option<PathBuf>,
-
-	/// Disable logging to file.
-	#[arg(long)]
-	pub no_log: bool,
-
-	/// Only log level and above.
-	#[arg(long, value_enum, default_value_t, env = "CO_LOG_LEVEL")]
-	pub log_level: CliLogLevel,
+	/// Logging configuration (`CO_LOG`, `-v`/`-q`, OpenTelemetry — see `co-tracing`).
+	#[command(flatten)]
+	pub log: LogArgs,
 
 	/// Read/Write Local CO encryption key to file instead of the OS keychain.
 	///
 	/// Warning: This option is INSECURE only use when you know the implications.
 	#[arg(long, default_value_t = false, env = "CO_NO_KEYCHAIN", value_parser = parse_bool)]
 	pub no_keychain: bool,
-
-	/// No output.
-	#[arg(short)]
-	pub quiet: bool,
-
-	/// Verbose level.
-	/// By default prints info and above levels. To prevent this use `quiet` option.
-	#[arg(short, default_value_t = 1, action = ArgAction::Count)]
-	pub verbose: u8,
-
-	/// Enable open telemetry tracing to endpoint.
-	#[arg(long)]
-	pub open_telemetry: bool,
-
-	/// Open telemetry endpoint.
-	#[arg(long, default_value_t = String::from("http://localhost:4317"))]
-	pub open_telemetry_endpoint: String,
 
 	/// Disable default features.
 	#[arg(long)]
@@ -76,27 +51,6 @@ pub struct Cli {
 	/// Enable feature.
 	#[arg(long, short = 'F')]
 	pub feature: Vec<String>,
-}
-
-#[derive(Debug, Default, Clone, ValueEnum)]
-pub enum CliLogLevel {
-	Error,
-	Warn,
-	#[default]
-	Info,
-	Debug,
-	Trace,
-}
-impl CliLogLevel {
-	pub fn to_level(&self) -> tracing::Level {
-		match self {
-			CliLogLevel::Error => tracing::Level::ERROR,
-			CliLogLevel::Warn => tracing::Level::WARN,
-			CliLogLevel::Info => tracing::Level::INFO,
-			CliLogLevel::Debug => tracing::Level::DEBUG,
-			CliLogLevel::Trace => tracing::Level::TRACE,
-		}
-	}
 }
 
 #[derive(Debug, Clone, clap::Subcommand)]

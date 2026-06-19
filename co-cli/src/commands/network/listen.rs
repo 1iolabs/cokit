@@ -95,7 +95,7 @@ pub async fn command(
 	application.create_network(network_settings).await?;
 
 	// verbose
-	if cli.verbose > 0 {
+	if cli.log.verbose > 0 {
 		if let Some(network) = application.context().network().await {
 			// peer-id
 			let peer_id = network.local_peer_id();

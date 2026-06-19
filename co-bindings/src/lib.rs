@@ -24,7 +24,6 @@ pub use types::{
 	co_map::CoMap,
 	co_set::CoSet,
 	identity::CoPrivateIdentity,
-	level::CoLogLevel,
 	storage::{Block, BlockStorage},
 	unixfs::unixfs_add_buffer,
 };

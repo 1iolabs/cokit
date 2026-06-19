@@ -16,8 +16,6 @@ pub use crate::library::{
 	storage_snapshots::storage_snapshots,
 	storage_structure::{storage_structure_recursive, CoStructureResolver, StructureResolveResult, StructureResolver},
 };
-#[cfg(feature = "tracing")]
-pub use application::tracing::TracingBuilder;
 pub use application::{
 	application::{Application, ApplicationBuilder},
 	co_context::CoContext,
