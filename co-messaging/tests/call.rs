@@ -58,24 +58,25 @@ fn select_call_answer() {
 fn call_negotiation() {
 	// create offer event content
 	let mut event_content_offer =
-		CallNegotiationContent::offer("call_1", "some_device_address", "some_sdp_offer_string", 10000);
+		CallNegotiationContent::new_offer("call_1", "some_device_address", "some_sdp_offer_string", 10000);
 	// assert that answer is not set
-	assert_eq!(event_content_offer.get_answer(), None);
+	assert_eq!(event_content_offer.answer(), None);
 	// swap to answer
 	event_content_offer.set_answer("some_answer_sdp");
 	// assert that offer fields are not set
-	assert_eq!(event_content_offer.get_offer(), None);
-	assert_eq!(event_content_offer.get_lifetime(), None);
+	assert_eq!(event_content_offer.offer(), None);
+	assert_eq!(event_content_offer.lifetime(), None);
 
 	// create answer event content
-	let mut event_content = CallNegotiationContent::answer("call_1", "some_device_address", "some_sdp_answer_string");
+	let mut event_content =
+		CallNegotiationContent::new_answer("call_1", "some_device_address", "some_sdp_answer_string");
 	// assert that offer fields are not set
-	assert_eq!(event_content.get_offer(), None);
-	assert_eq!(event_content.get_lifetime(), None);
+	assert_eq!(event_content.offer(), None);
+	assert_eq!(event_content.lifetime(), None);
 	// swap to offer
 	event_content.set_offer("some_offer_sdp", 10000);
 	// assert that answer is not set
-	assert_eq!(event_content.get_answer(), None);
+	assert_eq!(event_content.answer(), None);
 	let event = MatrixEvent::new("some_event", 1577836800000, "some_room", event_content);
 	assert_eq!(event.generate_event_type(), "m.call.negotiate");
 	let json = serde_json::to_string_pretty(&event).unwrap();

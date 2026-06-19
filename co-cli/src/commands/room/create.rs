@@ -80,14 +80,7 @@ pub async fn command(
 			RoomAvatarContent::new(
 				Some(*avatar),
 				// TODO: generate metadata for image
-				ImageInfo {
-					h: 0,
-					w: 0,
-					mimetype: "".into(),
-					size: 0,
-					thumbnail_file: Default::default(),
-					thumbnail_info: ThumbnailInfo { h: 0, w: 0, mimetype: "".into(), size: 0 },
-				},
+				ImageInfo::new(0, 0, "", 0, Default::default(), ThumbnailInfo::new(0, 0, "", 0)),
 			),
 		);
 		co_reducer.push(&identity, core, &set_avatar).await?;

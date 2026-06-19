@@ -32,6 +32,7 @@ pub trait EventType {
 /// Collection of all possible actions for the room core
 #[co]
 #[derive(JsonSchema)]
+#[non_exhaustive]
 pub struct MatrixEvent {
 	pub event_id: String,
 	pub timestamp: Date,
@@ -49,7 +50,13 @@ impl MatrixEvent {
 		room_id: impl Into<String>,
 		content: impl Into<EventContent>,
 	) -> Self {
-		Self { event_id: event_id.into(), timestamp, room_id: room_id.into(), content: content.into(), state_key: None }
+		Self {
+			event_id: event_id.into(),
+			timestamp,
+			room_id: room_id.into(),
+			content: content.into(),
+			state_key: Default::default(),
+		}
 	}
 	pub fn event_type(&self) -> String {
 		self.content.generate_event_type()
