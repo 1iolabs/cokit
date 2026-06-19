@@ -146,13 +146,7 @@ impl Actor for Network {
 		tracing::info!(application = initialize.identifier, peer_id = ?network_peer_id, "network");
 
 		// result
-		Ok(NetworkState {
-			network,
-			peer_id: network_peer_id,
-			discovery,
-			connections,
-			heads,
-		})
+		Ok(NetworkState { network, peer_id: network_peer_id, discovery, connections, heads })
 	}
 
 	async fn handle(

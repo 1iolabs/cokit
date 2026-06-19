@@ -37,6 +37,6 @@ pub fn macro_timeout(attr: TokenStream, item: TokenStream) -> TokenStream {
 		}
 	};
 
-	input.block = Box::new(new_block);
+	*input.block = new_block;
 	quote!(#input).into()
 }

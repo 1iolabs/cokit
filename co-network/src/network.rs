@@ -611,12 +611,10 @@ mod dns_fallback_tests {
 	fn system_dns_failure_is_detected_by_type() {
 		// Tagged exactly as the swarm build does; detection is by type via downcast,
 		// not by matching the error message string.
-		let tagged: anyhow::Error = Result::<(), std::io::Error>::Err(std::io::Error::new(
-			std::io::ErrorKind::Other,
-			"no nameservers found in config",
-		))
-		.map_err(|source| anyhow::Error::new(source).context(SystemDnsConfigError))
-		.unwrap_err();
+		let tagged: anyhow::Error =
+			Result::<(), std::io::Error>::Err(std::io::Error::other("no nameservers found in config"))
+				.map_err(|source| anyhow::Error::new(source).context(SystemDnsConfigError))
+				.unwrap_err();
 		assert!(tagged.downcast_ref::<SystemDnsConfigError>().is_some());
 	}
 
