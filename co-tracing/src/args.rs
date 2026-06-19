@@ -43,6 +43,12 @@ pub struct LogArgs {
 	pub open_telemetry_endpoint: String,
 }
 impl LogArgs {
+	/// Build `LogArgs` from a single `CO_LOG`-grammar string (e.g. `"file:info"`, `"stderr:debug"`,
+	/// `"off"`), leaving the other fields (`-v`/`-q`, OpenTelemetry, …) at their defaults.
+	pub fn parse(spec: &str) -> Result<Self, anyhow::Error> {
+		Ok(Self { log: Some(crate::parse_log(spec).map_err(anyhow::Error::msg)?), ..Default::default() })
+	}
+
 	/// Default sink set when `CO_LOG` is unset/`on` (native): on iOS, the oslog sink; on other
 	/// native targets, the legacy file sink (honoring `--no-log`/`--log-path`). Stderr is added
 	/// by the verbosity shorthand in `resolve_sinks`.

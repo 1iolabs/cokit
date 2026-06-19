@@ -74,6 +74,17 @@ impl Application {
 		self.context().inner.shutdown().child_token()
 	}
 
+	/// Keep `value` alive until the application shuts down, then drop it (on an untracked task).
+	/// Handy for tying a resource's lifetime to the app — e.g. hold a `co_tracing::TracingGuard` so
+	/// OpenTelemetry flushes on shutdown: `application.drop_on_shutdown(guard);`.
+	pub fn drop_on_shutdown<T: Send + 'static>(&self, value: T) {
+		let shutdown = self.shutdown();
+		self.tasks.spawn_options(TaskOptions::untracked(), async move {
+			shutdown.cancelled().await;
+			drop(value);
+		});
+	}
+
 	pub fn handle(&self) -> ActorHandle<ApplicationMessage> {
 		self.service.handle()
 	}

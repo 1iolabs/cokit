@@ -3,13 +3,13 @@
 
 use crate::{Co, CoPrivateIdentity, CoSettings, CoState};
 use async_trait::async_trait;
-use co_actor::{Actor, ActorError, ActorHandle, Response, TaskOptions};
+use co_actor::{Actor, ActorError, ActorHandle, Response};
 use co_sdk::{
 	state, Application, ApplicationBuilder, CoContext, CoId, CoReducerFactory, CoTryStreamExt, CreateCo, Did,
 	DidKeyIdentity, DidKeyProvider, PrivateIdentity, PrivateIdentityResolver, Tags, TaskSpawner, CO_CORE_NAME_KEYSTORE,
 	CO_ID_LOCAL,
 };
-use co_tracing::{parse_log, LogArgs, LogContext};
+use co_tracing::{LogArgs, LogContext};
 use futures::{StreamExt, TryStreamExt};
 use std::{future::ready, path::PathBuf};
 
@@ -90,9 +90,8 @@ impl Actor for CoApplication {
 
 		// tracing
 		let tracing = if let Some(log) = &settings.log {
-			let log_args = LogArgs { log: Some(parse_log(log).map_err(anyhow::Error::msg)?), ..LogArgs::default() };
 			Some(
-				log_args
+				LogArgs::parse(log)?
 					.tracing_builder(
 						&LogContext::new(application_builder.identifier())
 							.with_base_path(application_builder.base_path().as_deref()),
@@ -109,14 +108,7 @@ impl Actor for CoApplication {
 
 		// tracing
 		if let Some(tracing) = tracing {
-			let shutdown = application.shutdown();
-			application
-				.context()
-				.tasks()
-				.spawn_options(TaskOptions::untracked(), async move {
-					shutdown.cancelled().await;
-					drop(tracing);
-				});
+			application.drop_on_shutdown(tracing);
 		}
 
 		// network

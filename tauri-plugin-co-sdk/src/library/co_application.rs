@@ -3,7 +3,6 @@
 
 use crate::library::cli::Cli;
 use clap::Parser;
-use co_actor::TaskOptions;
 use co_sdk::{Application, ApplicationBuilder, NetworkSettings};
 use co_tracing::{LogArgs, LogContext};
 use std::path::PathBuf;
@@ -70,13 +69,7 @@ pub async fn start_application(settings: CoApplicationSettings) -> Result<Applic
 	let mut application = application_builder.build().await?;
 
 	// tracing
-	application.context().tasks().spawn_options(TaskOptions::untracked(), {
-		let shutdown = application.shutdown();
-		async move {
-			shutdown.cancelled().await;
-			drop(tracing);
-		}
-	});
+	application.drop_on_shutdown(tracing);
 
 	// network
 	if settings.network {

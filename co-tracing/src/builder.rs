@@ -120,6 +120,18 @@ impl TracingBuilder {
 		self
 	}
 
+	/// Convenience constructor: a builder logging (bunyan) to `path` at INFO when `Some`. A drop-in
+	/// for the old `ApplicationBuilder::with_bunyan_logging` — pass `application_builder.log_path()`.
+	/// Chain `.with_optional()` / `.init()` (and other `with_*` sinks) as usual.
+	#[cfg(feature = "bunyan")]
+	pub fn file(identifier: impl Into<String>, path: Option<PathBuf>) -> Self {
+		let builder = Self::new(identifier);
+		match path {
+			Some(path) => builder.with_file(path, Level::INFO, None),
+			None => builder,
+		}
+	}
+
 	pub fn with_optional(mut self) -> Self {
 		self.optional = true;
 		self
