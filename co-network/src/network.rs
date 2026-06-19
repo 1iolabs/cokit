@@ -54,7 +54,24 @@ impl Libp2pNetwork {
 		config: NetworkSettings,
 	) -> anyhow::Result<Libp2pNetwork> {
 		// swarm
-		let (local_peer_id, mut swarm) = build_swarm(&context, &keypair, &config).boxed().await?;
+		// If System DNS has no nameservers (no adapter up yet) the build fails fatally.
+		// Fall back to the static Cloudflare resolver so startup never crashes offline;
+		// the resolver self-heals once routing returns.
+		//
+		// TODO: Find something better - is it possible to delay system resolve?
+		let (local_peer_id, mut swarm) = match build_swarm(&context, &keypair, &config).boxed().await {
+			Ok(result) => result,
+			#[cfg(not(target_arch = "wasm32"))]
+			Err(err)
+				if matches!(config.dns, NetworkDns::System) && err.downcast_ref::<SystemDnsConfigError>().is_some() =>
+			{
+				tracing::warn!(?err, "network-dns-system-failed-fallback-cloudflare");
+				let mut fallback = config.clone();
+				fallback.dns = NetworkDns::Cloudflare;
+				build_swarm(&context, &keypair, &fallback).boxed().await?
+			},
+			Err(err) => return Err(err),
+		};
 
 		// external addresses
 		for external_address in config.external_addresses.iter() {
@@ -66,11 +83,6 @@ impl Libp2pNetwork {
 			let peer_id = try_peer_id(bootstrap)?;
 			if local_peer_id == peer_id {
 				continue;
-			}
-
-			// listen on bootstrap as relay
-			if config.nat {
-				swarm.listen_on(bootstrap.clone().with(multiaddr::Protocol::P2pCircuit)).ok();
 			}
 
 			// dial bootstrap
@@ -88,18 +100,6 @@ impl Libp2pNetwork {
 		// runtime
 		let shutdown = CancellationToken::new();
 		let runtime = Runtime::new(shutdown.child_token());
-
-		// listen (browsers connect via relay, not direct listen)
-		#[cfg(not(target_arch = "wasm32"))]
-		let runtime = {
-			let mut runtime = runtime;
-			runtime.listen(
-				swarm
-					.listen_on(config.listen.clone())
-					.with_context(|| format!("listen_on: {:?}", config.listen))?,
-			);
-			runtime
-		};
 
 		// run
 		context.tasks.spawn(async move {
@@ -120,6 +120,20 @@ impl Libp2pNetwork {
 	/// This will stop accepting new connections and waits until established connections are done.
 	pub fn shutdown(&self) -> Shutdown {
 		Shutdown { shutdown: self.shutdown.clone() }
+	}
+}
+
+/// Marker attached to the swarm-build error when the System DNS resolver fails to
+/// configure — e.g. hickory returns `"no nameservers found in config"` because no network
+/// adapter is up yet. It is detected via [`anyhow::Error::downcast_ref`] (by type, not by
+/// message string) so `Libp2pNetwork::new` can fall back to a static resolver.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Debug)]
+struct SystemDnsConfigError;
+#[cfg(not(target_arch = "wasm32"))]
+impl std::fmt::Display for SystemDnsConfigError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_str("system DNS configuration failed")
 	}
 }
 
@@ -180,7 +194,12 @@ async fn build_swarm(
 					build_swarm!(@websocket b)
 				}
 				NetworkDns::System => {
-					let b = $builder.with_dns().context("dns")?;
+					// Tag a System-DNS configuration failure with a typed marker so
+					// `Libp2pNetwork::new` can detect it via downcast (not string matching)
+					// and fall back to a static resolver.
+					let b = $builder
+						.with_dns()
+						.map_err(|source| anyhow::Error::new(source).context(SystemDnsConfigError))?;
 					build_swarm!(@websocket b)
 				}
 				NetworkDns::Cloudflare => {
@@ -344,8 +363,6 @@ impl Shutdown {
 }
 
 struct Runtime {
-	#[cfg(not(target_arch = "wasm32"))]
-	listener_id: Option<libp2p::core::transport::ListenerId>,
 	/// Tasks which have been executed but waiting for events.
 	pending_tasks: Vec<(NetworkTaskBox<Behaviour>, Span)>,
 	shutdown: CancellationToken,
@@ -353,18 +370,7 @@ struct Runtime {
 }
 impl Runtime {
 	fn new(shutdown: CancellationToken) -> Self {
-		Self {
-			#[cfg(not(target_arch = "wasm32"))]
-			listener_id: None,
-			shutdown,
-			pending_tasks: Default::default(),
-			next_delayed_task: Default::default(),
-		}
-	}
-
-	#[cfg(not(target_arch = "wasm32"))]
-	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
-		self.listener_id = Some(id);
+		Self { shutdown, pending_tasks: Default::default(), next_delayed_task: Default::default() }
 	}
 
 	fn is_running(&self) -> bool {
@@ -491,6 +497,17 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, runtime: &mut Runtime) {
 			tracing::trace!(?event, "network-event");
 		}
 
+		// recovery diagnostics: surface listener death prominently
+		match &event {
+			SwarmEvent::ListenerClosed { listener_id, addresses, reason } => {
+				tracing::info!(?listener_id, ?addresses, ?reason, "network-listener-closed");
+			},
+			SwarmEvent::ListenerError { listener_id, error } => {
+				tracing::info!(?listener_id, ?error, "network-listener-error");
+			},
+			_ => {},
+		}
+
 		// tasks
 		let mut result_event = Some(event);
 		let mut task_index = 0;
@@ -583,5 +600,29 @@ where
 	match t {
 		Some(fut) => Some(fut.await),
 		None => None,
+	}
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod dns_fallback_tests {
+	use super::SystemDnsConfigError;
+
+	#[test]
+	fn system_dns_failure_is_detected_by_type() {
+		// Tagged exactly as the swarm build does; detection is by type via downcast,
+		// not by matching the error message string.
+		let tagged: anyhow::Error = Result::<(), std::io::Error>::Err(std::io::Error::new(
+			std::io::ErrorKind::Other,
+			"no nameservers found in config",
+		))
+		.map_err(|source| anyhow::Error::new(source).context(SystemDnsConfigError))
+		.unwrap_err();
+		assert!(tagged.downcast_ref::<SystemDnsConfigError>().is_some());
+	}
+
+	#[test]
+	fn unrelated_error_is_not_detected() {
+		let err = anyhow::anyhow!("some other transport failure");
+		assert!(err.downcast_ref::<SystemDnsConfigError>().is_none());
 	}
 }

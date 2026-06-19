@@ -13,4 +13,7 @@ pub enum NetworkMessage {
 
 	/// Get network APIs.
 	Network(Response<NetworkApi>),
+
+	/// Recover the network after a suspend/resume or interface change.
+	Recover(Response<()>),
 }
