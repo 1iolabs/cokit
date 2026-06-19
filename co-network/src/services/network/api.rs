@@ -121,4 +121,14 @@ impl NetworkApi {
 	pub async fn bitswap_get(&self, cid: Cid, tokens: Vec<Token>, peers: BTreeSet<PeerId>) -> Result<(), StorageError> {
 		GetNetworkTask::get(&self.spawner, cid, tokens, peers).await
 	}
+
+	/// Recover the network after a suspend/resume or interface change.
+	///
+	/// Asks the network actor to inject a recovery task that re-listens (fresh QUIC socket)
+	/// and restarts mDNS. Returns once recovery has been initiated; healing happens
+	/// asynchronously in the swarm loop. Idempotent and safe to call repeatedly.
+	pub async fn recover(&self) -> Result<(), anyhow::Error> {
+		self._handle.request(NetworkMessage::Recover).await?;
+		Ok(())
+	}
 }

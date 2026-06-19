@@ -2,7 +2,10 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use cid::Cid;
-use co_messaging::{multimedia::ImageInfo, state_event, MatrixEvent};
+use co_messaging::{
+	multimedia::{ImageInfo, ThumbnailInfo},
+	state_event, MatrixEvent,
+};
 
 #[test]
 fn room_name() {
@@ -12,20 +15,7 @@ fn room_name() {
 	println!("{json}");
 	assert_eq!(event, serde_json::from_str(&json).unwrap());
 
-	state_event::RoomAvatarContent::new(
-		Some(Cid::default()),
-		ImageInfo {
-			h: 100,
-			w: 100,
-			size: 10000,
-			mimetype: "image/png".into(),
-			thumbnail_info: co_messaging::multimedia::ThumbnailInfo {
-				h: 10,
-				w: 10,
-				mimetype: "image/png".into(),
-				size: 1000,
-			},
-			thumbnail_file: Default::default(),
-		},
-	);
+	let thumbnail_info = ThumbnailInfo::new(10, 10, "image/png", 1000);
+	let image_info = ImageInfo::new(100, 100, "image/png", 10000, Cid::default(), thumbnail_info);
+	state_event::RoomAvatarContent::new(Some(Cid::default()), image_info);
 }

@@ -10,7 +10,7 @@ use crate::{
 		discovery::{DiscoveryActor, DiscoveryApi, DiscoveryContext},
 		heads::{HeadsActor, HeadsApi, HeadsContext},
 		network::{
-			tasks::{identify_dial::IdentifyDialNetworkTask, relay_listen::RelayListenTask},
+			tasks::{identify_dial::IdentifyDialNetworkTask, listen::ListenTask, recover::RecoverTask},
 			CoNetworkTaskSpawner, ConnectionsNetworkTask, DiscoveryNetworkTask, NetworkApi, NetworkSettings,
 		},
 	},
@@ -21,6 +21,7 @@ use co_actor::{Actor, ActorError, ActorHandle, ActorInstance, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
 use co_primitives::{tags, DynamicCoDate, Tags};
 use libp2p::{identity::Keypair, PeerId};
+use multiaddr::Protocol;
 
 pub struct NetworkInitialize {
 	pub settings: NetworkSettings,
@@ -128,10 +129,16 @@ impl Actor for Network {
 			HeadsContext { network: spawner.clone(), spawner: initialize.tasks.clone() },
 		)?;
 
-		// use bootstraps as relay
+		// keep the main listener alive (browsers connect via relay, not direct listen)
+		#[cfg(not(target_arch = "wasm32"))]
+		spawner
+			.spawn(ListenTask::new(initialize.settings.listen.clone()))
+			.map_err(|err| ActorError::Actor(err.into()))?;
+
+		// keep a relay-circuit listener alive per bootstrap
 		for bootstrap in initialize.settings.bootstrap.iter() {
 			spawner
-				.spawn(RelayListenTask::new(bootstrap.clone()))
+				.spawn(ListenTask::new(bootstrap.clone().with(Protocol::P2pCircuit)))
 				.map_err(|err| ActorError::Actor(err.into()))?;
 		}
 
@@ -161,6 +168,12 @@ impl Actor for Network {
 					heads: HeadsApi::from(&state.heads),
 					_handle: handle.clone(),
 				});
+			},
+			NetworkMessage::Recover(response) => {
+				if let Err(err) = state.network.spawner().spawn(RecoverTask) {
+					tracing::warn!(?err, "network-recover-spawn-failed");
+				}
+				response.respond(());
 			},
 		}
 

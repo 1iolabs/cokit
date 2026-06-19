@@ -143,6 +143,23 @@ impl Application {
 		Ok(())
 	}
 
+	/// Recover the network after a suspend/resume or interface change.
+	///
+	/// Re-establishes the network listener and restarts mDNS on the running network. Idempotent
+	/// and safe to call repeatedly; the host calls it on resume / connectivity-up events.
+	/// Returns an error if the network was never started.
+	#[cfg(feature = "network")]
+	pub async fn network_recover(&self) -> Result<(), anyhow::Error> {
+		request_response(self.service.handle(), Action::NetworkRecover, move |action| match action {
+			Action::NetworkRecoverComplete(result) => Some(result.clone()),
+			_ => None,
+		})
+		.await??;
+
+		// done
+		Ok(())
+	}
+
 	/// Access Identity.
 	///
 	/// Todo: Identity Permissions?

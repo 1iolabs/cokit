@@ -8,6 +8,7 @@ use schemars::JsonSchema;
 /// Event used to create a poll.
 #[co]
 #[derive(JsonSchema)]
+#[non_exhaustive]
 pub struct PollStartContent {
 	/// A textual representation of the poll, i.e. the question
 	pub body: String,
@@ -27,9 +28,9 @@ impl PollStartContent {
 		Self {
 			body: question.clone(),
 			info: PollCreationInfo::new(question, answers, kind),
-			is_silent: None,
-			relates_to: None,
-			new_content: None,
+			is_silent: Default::default(),
+			relates_to: Default::default(),
+			new_content: Default::default(),
 		}
 	}
 	pub fn add_answer(&mut self, answer: PollAnswer) {
@@ -64,6 +65,7 @@ impl Relation for PollStartContent {
 /// Metadata for poll creation event
 #[co]
 #[derive(JsonSchema)]
+#[non_exhaustive]
 pub struct PollCreationInfo {
 	/// The question the poll was created for
 	pub question: String,
@@ -92,6 +94,7 @@ impl PollCreationInfo {
 /// One possible answer in a poll. ID should be unique across answers.
 #[co]
 #[derive(JsonSchema)]
+#[non_exhaustive]
 pub struct PollAnswer {
 	/// Unique ID to identify an answer
 	pub id: String,
@@ -106,9 +109,10 @@ impl PollAnswer {
 }
 
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
 pub enum PollKind {
 	/// In disclosed polls all participants can see the already cast votes (including who cast them)
+	#[default]
 	#[serde(rename = "disclosed")]
 	Disclosed,
 	/// In undisclosed polls the votes will only appear when the poll has ended
@@ -121,6 +125,7 @@ pub enum PollKind {
 
 #[co]
 #[derive(JsonSchema)]
+#[non_exhaustive]
 pub struct PollResponseContent {
 	/// Textual representation of the answers
 	pub body: String,
@@ -139,9 +144,9 @@ impl PollResponseContent {
 		Self {
 			body: body.into(),
 			answers,
-			is_silent: None,
 			relates_to: Some(RelatesTo::poll(poll_event)),
-			new_content: None,
+			is_silent: Default::default(),
+			new_content: Default::default(),
 		}
 	}
 	pub fn add_answer(&mut self, answer: String) {
@@ -171,10 +176,11 @@ impl From<PollResponseContent> for EventContent {
 /// Event that closes the poll. For undisclosed and anonymous polls, this is the point where the reults are shown.
 #[co]
 #[derive(JsonSchema)]
+#[non_exhaustive]
 pub struct PollEndContent {
 	/// Textual representation of the poll ending
 	pub body: String,
-	#[serde(skip_serializing_if = "Option::is_none")]
+	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub is_silent: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub relates_to: Option<RelatesTo>,
@@ -184,7 +190,12 @@ pub struct PollEndContent {
 
 impl PollEndContent {
 	pub fn new(body: impl Into<String>, poll_event: impl Into<String>) -> Self {
-		Self { body: body.into(), is_silent: None, relates_to: Some(RelatesTo::poll(poll_event)), new_content: None }
+		Self {
+			body: body.into(),
+			relates_to: Some(RelatesTo::poll(poll_event)),
+			is_silent: Default::default(),
+			new_content: Default::default(),
+		}
 	}
 }
 

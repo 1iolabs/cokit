@@ -73,6 +73,14 @@ pub enum Action {
 	#[cfg(feature = "network")]
 	NetworkStartComplete(Result<(), ActionError>),
 
+	/// Recover the network (re-listen + restart mDNS) after suspend/resume or interface change.
+	#[cfg(feature = "network")]
+	NetworkRecover,
+
+	/// Network recovery has been initiated.
+	#[cfg(feature = "network")]
+	NetworkRecoverComplete(Result<(), ActionError>),
+
 	/// Send a contact request.
 	Contact(ContactAction),
 

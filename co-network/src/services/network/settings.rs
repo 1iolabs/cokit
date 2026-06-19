@@ -125,10 +125,19 @@ impl NetworkSettings {
 		Ok(self)
 	}
 
-	/// Set local listen endpoint.
-	pub fn with_localhost(mut self) -> Self {
-		self.listen = "/ip4/127.0.0.1/tcp/0".parse().unwrap();
-		self
+	/// Local-only profile for tests/dev: a loopback TCP listener with mDNS, NAT and bootstrap
+	/// disabled.
+	///
+	/// None of them are meaningful on `127.0.0.1`, and same-machine mDNS actively
+	/// interferes — it advertises the host's LAN IP, where loopback peers do not listen, so peers
+	/// get stuck dialing the wrong address.
+	///
+	/// Connect localhost peers with an explicit `dial`.
+	pub fn with_localhost(self) -> Self {
+		self.with_listen("/ip4/127.0.0.1/tcp/0".parse().unwrap())
+			.without_bootstrap()
+			.with_nat(false)
+			.with_mdns(false)
 	}
 
 	/// Clear all bootstrap endpoints.

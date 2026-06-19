@@ -209,6 +209,14 @@ impl CoContext {
 			})
 			.await?)
 	}
+
+	/// Recover the network after suspend/resume or interface change.
+	#[cfg(feature = "network")]
+	pub async fn network_recover(&self) -> Result<(), anyhow::Error> {
+		Ok(self
+			.try_with_application(|application| async move { application.network_recover().await })
+			.await?)
+	}
 }
 
 #[derive(Debug, thiserror::Error)]

@@ -12,7 +12,8 @@ use schemars::JsonSchema;
 /// participant. Information should be updated regularly and have a timout after which no users should count as
 /// typing when no new event was sent.
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct TypingContent {
 	/// List of users currently typing in the room
 	pub user_ids: Vec<String>,
@@ -59,6 +60,7 @@ pub enum PresenceType {
 /// about.
 #[co]
 #[derive(JsonSchema)]
+#[non_exhaustive]
 pub struct PresenceContent {
 	pub presence: PresenceType,
 	/// Timestampt in milliseconds when the user last performed an action

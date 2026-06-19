@@ -12,6 +12,7 @@
   `;`-separated list of `sink[:envfilter]` entries, e.g. `CO_LOG=file:info,co_sdk=trace;stderr:error`,
   with `RUST_LOG` as the per-sink fallback. `-v`/`-q`, `--log-path`, and `--open-telemetry[-endpoint]`
   are unchanged.
+- Fixed `ImageInfo` init errors caused by breaking `co-messaging` changes
 
 ## [0.1.0] - 2026-03-31
 
