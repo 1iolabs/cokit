@@ -8,7 +8,7 @@ use schemars::JsonSchema;
 
 /// Contains metadata of images
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct ImageInfo {
 	/// Intended display height in px
@@ -25,7 +25,6 @@ pub struct ImageInfo {
 	/// Thumbnail metadata
 	pub thumbnail_info: ThumbnailInfo,
 }
-
 impl ImageInfo {
 	pub fn new(
 		h: u32,
@@ -41,7 +40,7 @@ impl ImageInfo {
 
 /// Contains metadata of images used as a thumbnail
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct ThumbnailInfo {
 	/// Intended display height in px
@@ -53,7 +52,6 @@ pub struct ThumbnailInfo {
 	/// Size of the image file in bytes
 	pub size: u32,
 }
-
 impl ThumbnailInfo {
 	pub fn new(h: u32, w: u32, mimetype: impl Into<String>, size: u32) -> Self {
 		Self { h, w, mimetype: mimetype.into(), size }
@@ -62,7 +60,7 @@ impl ThumbnailInfo {
 
 /// Contains metadata of audio files
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct AudioInfo {
 	/// Duration of the audio clip in ms
@@ -77,16 +75,15 @@ pub struct AudioInfo {
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub waveform: Option<Vec<u8>>,
 }
-
 impl AudioInfo {
 	pub fn new(duration: u32, mimetype: impl Into<String>, size: u32) -> Self {
-		Self { duration, mimetype: mimetype.into(), size, ..Default::default() }
+		Self { duration, mimetype: mimetype.into(), size, waveform: Default::default() }
 	}
 }
 
 /// Contains metadata of video files
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct VideoInfo {
 	/// Intended display height in px
@@ -105,7 +102,6 @@ pub struct VideoInfo {
 	/// Thumbnail metadata
 	pub thumbnail_info: ThumbnailInfo,
 }
-
 impl VideoInfo {
 	pub fn new(
 		h: u32,
@@ -122,7 +118,7 @@ impl VideoInfo {
 
 /// Contains metadata of any other filetypes
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct FileInfo {
 	/// Mimetype of the file
@@ -135,7 +131,6 @@ pub struct FileInfo {
 	/// Thumbnail metadata
 	pub thumbnail_info: ThumbnailInfo,
 }
-
 impl FileInfo {
 	pub fn new(mimetype: impl Into<String>, size: u32, thumbnail_file: Cid, thumbnail_info: ThumbnailInfo) -> Self {
 		Self { mimetype: mimetype.into(), size, thumbnail_file, thumbnail_info }
@@ -144,7 +139,7 @@ impl FileInfo {
 
 /// Contains metadata of any location based content
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct LocationInfo {
 	/// CID to an image file that is to be used as the thumbnail

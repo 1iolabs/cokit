@@ -4,7 +4,7 @@
 use super::{create::Command, Command as RoomCommand};
 use crate::{cli::Cli, library::cli_context::CliContext};
 use co_messaging::{
-	multimedia::ImageInfo,
+	multimedia::{ImageInfo, ThumbnailInfo},
 	state_event::{RoomAvatarContent, RoomNameContent, RoomTopicContent},
 	MatrixEvent,
 };
@@ -46,7 +46,7 @@ pub async fn command(
 			RoomAvatarContent::new(
 				Some(*avatar),
 				// TODO: generate metadata for image
-				ImageInfo::default(),
+				ImageInfo::new(0, 0, "", 0, Default::default(), ThumbnailInfo::new(0, 0, "", 0)),
 			),
 		);
 		co_reducer.push(&identity, core, &set_avatar).await?;

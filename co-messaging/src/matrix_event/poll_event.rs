@@ -175,7 +175,7 @@ impl From<PollResponseContent> for EventContent {
 
 /// Event that closes the poll. For undisclosed and anonymous polls, this is the point where the reults are shown.
 #[co]
-#[derive(JsonSchema, Default)]
+#[derive(JsonSchema)]
 #[non_exhaustive]
 pub struct PollEndContent {
 	/// Textual representation of the poll ending
@@ -190,7 +190,12 @@ pub struct PollEndContent {
 
 impl PollEndContent {
 	pub fn new(body: impl Into<String>, poll_event: impl Into<String>) -> Self {
-		Self { body: body.into(), relates_to: Some(RelatesTo::poll(poll_event)), ..Default::default() }
+		Self {
+			body: body.into(),
+			relates_to: Some(RelatesTo::poll(poll_event)),
+			is_silent: Default::default(),
+			new_content: Default::default(),
+		}
 	}
 }
 
