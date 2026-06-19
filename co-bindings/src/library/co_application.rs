@@ -3,7 +3,7 @@
 
 use crate::{Co, CoPrivateIdentity, CoSettings, CoState};
 use async_trait::async_trait;
-use co_actor::{Actor, ActorError, ActorHandle, Response};
+use co_actor::{Actor, ActorError, ActorHandle, Response, TaskOptions};
 use co_sdk::{
 	state, Application, ApplicationBuilder, CoContext, CoId, CoReducerFactory, CoTryStreamExt, CreateCo, Did,
 	DidKeyIdentity, DidKeyProvider, PrivateIdentity, PrivateIdentityResolver, Tags, TaskSpawner, CO_CORE_NAME_KEYSTORE,
@@ -65,7 +65,6 @@ impl Actor for CoApplication {
 		settings: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		// builder
-		let identifier = settings.identifier.clone();
 		let mut application_builder = match settings.path {
 			Some(path) => ApplicationBuilder::new_with_path(settings.identifier, PathBuf::from(&path)),
 			None => ApplicationBuilder::new(settings.identifier),
@@ -90,12 +89,13 @@ impl Actor for CoApplication {
 		}
 
 		// tracing
-		let _tracing = if let Some(log) = &settings.log {
+		let tracing = if let Some(log) = &settings.log {
 			let log_args = LogArgs { log: Some(parse_log(log).map_err(anyhow::Error::msg)?), ..LogArgs::default() };
 			Some(
 				log_args
 					.tracing_builder(
-						&LogContext::new(&identifier).with_base_path(application_builder.base_path().as_deref()),
+						&LogContext::new(application_builder.identifier())
+							.with_base_path(application_builder.base_path().as_deref()),
 					)
 					.with_optional()
 					.init()?,
@@ -106,6 +106,18 @@ impl Actor for CoApplication {
 
 		// application
 		let mut application = application_builder.build().await?;
+
+		// tracing
+		if let Some(tracing) = tracing {
+			let shutdown = application.shutdown();
+			application
+				.context()
+				.tasks()
+				.spawn_options(TaskOptions::untracked(), async move {
+					shutdown.cancelled().await;
+					drop(tracing);
+				});
+		}
 
 		// network
 		#[cfg(feature = "network")]
