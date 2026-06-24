@@ -5,12 +5,13 @@ use crate::{
 	bitswap::GetNetworkTask,
 	didcomm::EncodedMessage,
 	services::{
-		connections::ConnectionMessage,
+		connections::{ConnectionMessage, ConnectionOverview, NetworkOverview},
 		discovery::DiscoveryApi,
 		heads::HeadsApi,
 		network::{
 			CoNetworkTaskSpawner, DialNetworkTask, DidCommReceiveNetworkTask, DidCommSendNetworkTask,
-			ListnersNetworkTask, NetworkMessage, PeersNetworkTask, SubscribeGossipTask,
+			ListnersNetworkTask, NetworkMessage, PeersNetworkTask, SubscribeGossipTask, SwarmState,
+			SwarmStateWatchTask,
 		},
 	},
 };
@@ -19,7 +20,11 @@ use co_actor::ActorHandle;
 use co_identity::{Message, PrivateIdentity, PrivateIdentityBox};
 use co_primitives::{Did, NetworkDidDiscovery};
 use co_storage::StorageError;
-use futures::{stream::BoxStream, StreamExt};
+use futures::{
+	future,
+	stream::{self, BoxStream},
+	StreamExt,
+};
 use libp2p_bitswap::Token;
 use multiaddr::{Multiaddr, PeerId};
 use std::{collections::BTreeSet, fmt::Debug, time::Duration};
@@ -32,6 +37,7 @@ pub struct NetworkApi {
 	pub(crate) heads: HeadsApi,
 	pub(crate) spawner: CoNetworkTaskSpawner,
 }
+
 impl NetworkApi {
 	pub fn connections(&self) -> &ActorHandle<ConnectionMessage> {
 		&self.connections
@@ -58,6 +64,55 @@ impl NetworkApi {
 	/// If no listener is present it will wait for the first to come available.
 	pub async fn listeners(&self, local: bool, external: bool) -> Result<BTreeSet<Multiaddr>, anyhow::Error> {
 		ListnersNetworkTask::listeners(&self.spawner, local, external).await
+	}
+
+	/// Get a read-only snapshot of the current network state for diagnostics.
+	pub async fn overview(&self) -> Result<NetworkOverview, anyhow::Error> {
+		let local_peer_id = self.local_peer_id();
+
+		// listeners + mDNS in a single swarm read: the watch task's first item.
+		let mut swarm_state = SwarmStateWatchTask::watch(&self.spawner);
+		let (listeners, mdns) = swarm_state.next().await.unwrap_or_default();
+
+		let connections = self.connections.request(ConnectionMessage::Overview).await?;
+
+		Ok(NetworkOverview { local_peer_id, listeners, mdns, connections })
+	}
+
+	/// Subscribe to a live stream of [`NetworkOverview`]s for diagnostics.
+	pub fn overview_stream(&self) -> BoxStream<'static, NetworkOverview> {
+		let local_peer_id = self.local_peer_id();
+		let connections = self.connections.stream_graceful(ConnectionMessage::OverviewStream);
+		let swarm_state = SwarmStateWatchTask::watch(&self.spawner);
+
+		enum Update {
+			Connections(ConnectionOverview),
+			Swarm(SwarmState),
+		}
+		#[derive(Default)]
+		struct Latest {
+			listeners: BTreeSet<Multiaddr>,
+			mdns: BTreeSet<PeerId>,
+			connections: ConnectionOverview,
+		}
+
+		stream::select(connections.map(Update::Connections), swarm_state.map(Update::Swarm))
+			.scan(Latest::default(), move |latest, update| {
+				match update {
+					Update::Connections(connections) => latest.connections = connections,
+					Update::Swarm((listeners, mdns)) => {
+						latest.listeners = listeners;
+						latest.mdns = mdns;
+					},
+				}
+				future::ready(Some(NetworkOverview {
+					local_peer_id,
+					listeners: latest.listeners.clone(),
+					mdns: latest.mdns.clone(),
+					connections: latest.connections.clone(),
+				}))
+			})
+			.boxed()
 	}
 
 	/// Dial and wait for connection to be made or fail.

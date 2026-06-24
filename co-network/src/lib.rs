@@ -20,6 +20,7 @@ pub use library::{
 	static_peer_provider::StaticPeerProvider,
 };
 pub use services::{
+	connections::NetworkOverview,
 	heads::HeadsApi,
 	network::{subscribe_identity, Network, NetworkApi, NetworkInitialize, NetworkMessage, NetworkSettings},
 };
@@ -30,8 +31,9 @@ pub use types::{
 };
 pub mod connections {
 	pub use crate::services::connections::{
-		action::*, CoConnection, ConnectionMessage, ConnectionState, Connections, DidConnection,
-		DynamicNetworkResolver, NetworkConnection, NetworkResolver, PeerConnection,
+		action::*, BootstrapEntry, CoConnection, CoEntry, ConnectionDirection, ConnectionEndpoint, ConnectionMessage,
+		ConnectionOverview, ConnectionState, Connections, DidConnection, DidEntry, DynamicNetworkResolver,
+		NetworkConnection, NetworkEntry, NetworkResolver, PeerConnection, PeerEntry, PeerRelation,
 	};
 }
 

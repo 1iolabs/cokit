@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use super::action::{ConnectionAction, DidPeersChangedAction, DidUseAction, PeersChangedAction, UseAction};
-use co_actor::{time::Instant, ActorError, ActorHandle, ResponseStream};
+use super::{
+	action::{ConnectionAction, DidPeersChangedAction, DidUseAction, PeersChangedAction, UseAction},
+	overview::ConnectionOverview,
+};
+use co_actor::{time::Instant, ActorError, ActorHandle, Response, ResponseStream};
 use co_primitives::{CoId, Did, Network};
 use futures::Stream;
 
@@ -16,6 +19,13 @@ pub enum ConnectionMessage {
 
 	/// Action.
 	Action(ConnectionAction),
+
+	/// Get the current connection overview.
+	Overview(Response<ConnectionOverview>),
+
+	/// Subscribe to a live stream of connection snapshots.
+	/// The current snapshot is sent immediately, then a fresh one after every state change.
+	OverviewStream(ResponseStream<ConnectionOverview>),
 }
 impl<T> From<T> for ConnectionMessage
 where
