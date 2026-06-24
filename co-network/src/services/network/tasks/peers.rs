@@ -13,7 +13,7 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 #[cfg(feature = "js")]
 use tokio_with_wasm::alias as tokio;
 
-/// Notify about discovered peers.
+/// Notify about newly connected peers.
 #[derive(Debug)]
 pub struct PeersNetworkTask {
 	tx: mpsc::UnboundedSender<PeerId>,
@@ -34,11 +34,11 @@ impl NetworkTask<Behaviour> for PeersNetworkTask {
 
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
-		#[cfg(feature = "native")]
-		if let SwarmEvent::Behaviour(NetworkEvent::Mdns(libp2p::mdns::Event::Discovered(list))) = &event {
-			for (peer_id, _) in list {
+		match &event {
+			SwarmEvent::ConnectionEstablished { peer_id, num_established, .. } if num_established.get() == 1 => {
 				self.tx.send(*peer_id).ok();
-			}
+			},
+			_ => (),
 		}
 		Some(event)
 	}

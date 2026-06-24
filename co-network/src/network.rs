@@ -297,8 +297,10 @@ fn build_behaviour(
 	.into();
 
 	// identify
+	//  we push our updated listen addresses to connected peers when they change so we can use other transports too
 	let identify_config = identify::Config::new(IPFS_IDENTIFY_PROTOCOL_NAME.to_string(), keypair.public())
-		.with_agent_version(CO_AGENT.into());
+		.with_agent_version(CO_AGENT.into())
+		.with_push_listen_addr_updates(true);
 	let identify = identify::Behaviour::new(identify_config);
 
 	// mdns
