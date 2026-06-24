@@ -9,7 +9,7 @@ pub use sink::{parse_log, resolve_filter, LogConfig, LogSink, SinkSpec};
 #[cfg(feature = "subscriber")]
 mod builder;
 #[cfg(feature = "subscriber")]
-pub use builder::{env_filter, level_from_verbosity, TracingBuilder, TracingGuard};
+pub use builder::{env_filter, level_from_verbosity, BoxedLayer, TracingBuilder, TracingGuard};
 
 #[cfg(feature = "opentelemetry")]
 mod builder_open_telemetry;

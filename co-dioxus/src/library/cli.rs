@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
+#[cfg(feature = "tracing")]
 use co_tracing::LogArgs;
 #[cfg(feature = "fs")]
 use std::path::PathBuf;
@@ -33,6 +34,7 @@ pub struct Cli {
 	pub memory: bool,
 
 	/// Logging configuration (`CO_LOG`, `-v`/`-q` — see `co-tracing`).
+	#[cfg(feature = "tracing")]
 	#[command(flatten)]
 	pub log: LogArgs,
 

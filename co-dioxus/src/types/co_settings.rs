@@ -11,9 +11,16 @@ use co_sdk::GuardReference;
 #[cfg(feature = "network")]
 use co_sdk::NetworkSettings;
 use co_sdk::{CoStorageSetting, ContactHandler, Core, Cores, DynamicContactHandler, DynamicLocalSecret, LocalSecret};
-use co_tracing::LogArgs;
+#[cfg(feature = "tracing")]
+use co_tracing::{BoxedLayer, LogArgs};
+#[cfg(feature = "tracing")]
+use std::{
+	fmt::{Formatter, Result},
+	sync::Arc,
+};
 
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct CoSettings {
 	/// Application Bundle Identifier.
 	///
@@ -32,7 +39,11 @@ pub struct CoSettings {
 	#[cfg(feature = "network")]
 	pub network: bool,
 	pub no_keychain: bool,
+	#[cfg(feature = "tracing")]
 	pub log: LogArgs,
+	/// App-provided tracing layer, applied when co-dioxus builds the subscriber.
+	#[cfg(feature = "tracing")]
+	pub(crate) log_layer: Option<LogLayer>,
 	pub no_default_features: bool,
 	pub feature: Vec<String>,
 	pub local_secret: Option<DynamicLocalSecret>,
@@ -57,8 +68,15 @@ impl CoSettings {
 		Self::from_cli(bundle_identifier.into(), cli)
 	}
 
+	#[cfg(feature = "tracing")]
 	pub fn with_log(self, logging: LogArgs) -> Self {
 		Self { log: logging, ..self }
+	}
+
+	/// Attach a tracing layer, built lazily when co-dioxus creates the global subscriber.
+	#[cfg(feature = "tracing")]
+	pub fn with_log_layer(self, factory: impl Fn() -> BoxedLayer + Send + Sync + 'static) -> Self {
+		Self { log_layer: Some(LogLayer(Arc::new(factory))), ..self }
 	}
 
 	#[cfg(feature = "fs")]
@@ -118,11 +136,31 @@ impl CoSettings {
 			#[cfg(feature = "network")]
 			network_settings: NetworkSettings::default().with_force_new_peer_id(cli.force_new_peer_id),
 			no_keychain: cli.no_keychain,
+			#[cfg(feature = "tracing")]
 			log: cli.log,
 			no_default_features: cli.no_default_features,
 			feature: cli.feature,
 			..Default::default()
 		}
+	}
+}
+
+/// A factory for an app-provided tracing layer, applied when co-dioxus builds the
+/// global subscriber (see [`CoSettings::with_log_layer`]). Wrapped in `Arc` so
+/// `CoSettings` stays `Clone`, with a manual `Debug` so it stays `Debug`.
+#[cfg(feature = "tracing")]
+#[derive(Clone)]
+pub(crate) struct LogLayer(Arc<dyn Fn() -> BoxedLayer + Send + Sync>);
+#[cfg(feature = "tracing")]
+impl std::fmt::Debug for LogLayer {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+		f.write_str("LogLayer(..)")
+	}
+}
+#[cfg(feature = "tracing")]
+impl LogLayer {
+	pub(crate) fn build(&self) -> BoxedLayer {
+		(self.0)()
 	}
 }
 

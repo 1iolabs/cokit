@@ -7,6 +7,8 @@
 - Initial release: opinionated logging/tracing setup for COKIT, extracted from `co-sdk`.
 - `TracingBuilder` + `TracingGuard` — compose per-sink layers (stderr, bunyan file, OpenTelemetry,
   browser console, Apple `oslog`) and install them globally (`init`) or scoped (`init_scope`).
+- `TracingBuilder::with_layer` and the `BoxedLayer` type alias — attach extra app-provided
+  `tracing` layers to the composed subscriber (repeatable).
 - `TracingBuilder::file(identifier, path)` — a one-call bunyan-file builder; drop-in for the old
   `ApplicationBuilder::with_bunyan_logging` (pass `application_builder.log_path()`).
 - Unified `CO_LOG` grammar (`parse_log`): a `;`-separated list of `sink[:envfilter]` entries (e.g.

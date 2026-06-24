@@ -76,6 +76,10 @@ impl TracingGuard {
 	}
 }
 
+/// A boxed per-`Registry` layer — the unit downstream callers add via
+/// [`TracingBuilder::with_layer`].
+pub type BoxedLayer = Box<dyn Layer<Registry> + Send + Sync>;
+
 pub struct TracingBuilder {
 	#[cfg_attr(not(feature = "bunyan"), allow(dead_code))]
 	identifier: String,
@@ -90,6 +94,7 @@ pub struct TracingBuilder {
 	oslog: Option<(String, SinkFilter)>,
 	log_ignores: Vec<&'static str>,
 	optional: bool,
+	extra_layers: Vec<BoxedLayer>,
 }
 impl TracingBuilder {
 	pub fn new(identifier: impl Into<String>) -> Self {
@@ -106,7 +111,14 @@ impl TracingBuilder {
 			oslog: None,
 			log_ignores: DEFAULT_LOG_IGNORES.to_vec(),
 			optional: false,
+			extra_layers: Vec::new(),
 		}
+	}
+
+	/// Add a layer to the subscriber (repeatable).
+	pub fn with_layer(mut self, layer: BoxedLayer) -> Self {
+		self.extra_layers.push(layer);
+		self
 	}
 
 	pub fn with_stderr(mut self, level: Level, directives: Option<&str>) -> Self {
@@ -205,7 +217,7 @@ impl TracingBuilder {
 	}
 
 	fn build_subscriber(
-		&self,
+		&mut self,
 	) -> Result<Option<(impl tracing::Subscriber + Send + Sync + 'static, TracingGuard)>, anyhow::Error> {
 		let mut layers: Vec<Box<dyn Layer<Registry> + Send + Sync>> = Vec::new();
 
@@ -255,6 +267,8 @@ impl TracingBuilder {
 			);
 		}
 
+		// extra layers
+		layers.extend(std::mem::take(&mut self.extra_layers));
 		if layers.is_empty() {
 			return Ok(None);
 		}
@@ -268,7 +282,7 @@ impl TracingBuilder {
 	}
 
 	#[must_use = "hold the guard for the program's lifetime so OpenTelemetry can flush"]
-	pub fn init(self) -> Result<TracingGuard, anyhow::Error> {
+	pub fn init(mut self) -> Result<TracingGuard, anyhow::Error> {
 		let optional = self.optional;
 		let ignores = self.log_ignores.clone();
 		match self.build_subscriber()? {
@@ -288,7 +302,7 @@ impl TracingBuilder {
 	}
 
 	#[must_use = "hold the returned guards for as long as the scoped subscriber should be active"]
-	pub fn init_scope(self) -> Result<Option<(DefaultGuard, TracingGuard)>, anyhow::Error> {
+	pub fn init_scope(mut self) -> Result<Option<(DefaultGuard, TracingGuard)>, anyhow::Error> {
 		let ignores = self.log_ignores.clone();
 		match self.build_subscriber()? {
 			Some((subscriber, guard)) => {
