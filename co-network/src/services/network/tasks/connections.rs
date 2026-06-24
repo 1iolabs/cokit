@@ -4,12 +4,13 @@
 use crate::{
 	services::connections::{
 		action::{ConnectionAction, PeerConnectionClosedAction, PeerConnectionEstablishedAction},
-		ConnectionMessage,
+		ConnectionDirection, ConnectionEndpoint, ConnectionMessage,
 	},
 	types::network_task::NetworkTask,
 };
 use co_actor::{time::Instant, ActorHandle};
 use libp2p::{
+	core::ConnectedPoint,
 	swarm::{NetworkBehaviour, SwarmEvent},
 	Swarm,
 };
@@ -38,27 +39,31 @@ where
 		event: SwarmEvent<B::ToSwarm>,
 	) -> Option<SwarmEvent<B::ToSwarm>> {
 		match &event {
-			SwarmEvent::ConnectionEstablished {
-				peer_id,
-				connection_id: _,
-				endpoint: _,
-				num_established,
-				concurrent_dial_errors: _,
-				established_in: _,
-			} if num_established.get() == 1 => {
+			SwarmEvent::ConnectionEstablished { peer_id, connection_id, endpoint, .. } => {
+				let (local, direction) = match endpoint {
+					ConnectedPoint::Listener { local_addr, .. } => {
+						(Some(local_addr.clone()), ConnectionDirection::Incoming)
+					},
+					ConnectedPoint::Dialer { .. } => (None, ConnectionDirection::Outgoing),
+				};
 				self.handle
 					.dispatch(ConnectionAction::PeerConnectionEstablished(PeerConnectionEstablishedAction {
 						peer_id: *peer_id,
+						connection_id: *connection_id,
+						endpoint: ConnectionEndpoint {
+							remote: endpoint.get_remote_address().clone(),
+							local,
+							direction,
+						},
 						time: Instant::now(),
 					}))
 					.ok();
 			},
-			SwarmEvent::ConnectionClosed { peer_id, connection_id: _, endpoint: _, num_established, cause: _ }
-				if *num_established == 0 =>
-			{
+			SwarmEvent::ConnectionClosed { peer_id, connection_id, .. } => {
 				self.handle
 					.dispatch(ConnectionAction::PeerConnectionClosed(PeerConnectionClosedAction {
 						peer_id: *peer_id,
+						connection_id: *connection_id,
 						time: Instant::now(),
 					}))
 					.ok();

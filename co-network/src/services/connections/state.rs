@@ -4,15 +4,15 @@
 use super::action::{
 	ConnectAction, ConnectedAction, ConnectionAction, DidPeersChangedAction, DidReleaseAction, DidReleasedAction,
 	DidUseAction, DisconnectAction, DisconnectReason, DisconnectedAction, NetworkResolveAction,
-	NetworkResolveCompleteAction, PeerConnectionClosedAction, PeerConnectionEstablishedAction, PeerRelateCoAction,
-	PeerRelateDidAction, PeersChangedAction, ReleaseAction, ReleasedAction, UseAction,
+	NetworkResolveCompleteAction, PeerRelateCoAction, PeerRelateDidAction, PeersChangedAction, ReleaseAction,
+	ReleasedAction, UseAction,
 };
 use crate::connections::{DialAction, DialCompletedAction};
 use co_actor::{time::Instant, Reducer};
 use co_primitives::{CoId, Did, Network, NetworkDidDiscovery, NetworkPeer};
-use libp2p::{Multiaddr, PeerId};
+use libp2p::{swarm::ConnectionId, Multiaddr, PeerId};
 use std::{
-	collections::{BTreeSet, HashMap},
+	collections::{BTreeMap, BTreeSet, HashMap},
 	time::Duration,
 };
 #[derive(Debug, Clone)]
@@ -40,11 +40,32 @@ pub struct NetworkConnection {
 	pub keep_alive: Instant,
 }
 
+/// Direction of a connection from our point of view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ConnectionDirection {
+	/// We dialed the peer.
+	Outgoing,
+	/// The peer dialed us (hit one of our listeners).
+	Incoming,
+}
+
+/// A single live connection to a peer.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ConnectionEndpoint {
+	/// Remote address of the peer on this connection.
+	pub remote: Multiaddr,
+	/// For incoming connections, the local listener address that was dialed.
+	pub local: Option<Multiaddr>,
+	pub direction: ConnectionDirection,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct PeerConnection {
 	pub connected: bool,
 	pub co: BTreeSet<CoId>,
 	pub network: BTreeSet<Network>,
+	/// Live connections keyed by swarm connection id.
+	pub endpoints: BTreeMap<ConnectionId, ConnectionEndpoint>,
 }
 
 #[derive(Debug, Clone)]
@@ -160,11 +181,32 @@ impl Reducer<ConnectionAction> for ConnectionState {
 			ConnectionAction::Released(ReleasedAction { id }) => {
 				reduce_released(state, &mut actions, id);
 			},
-			ConnectionAction::PeerConnectionEstablished(PeerConnectionEstablishedAction { peer_id, time }) => {
-				reduce_peer_connection_established(state, &mut actions, *peer_id, time);
+			ConnectionAction::PeerConnectionEstablished(action) => {
+				// record this connection's endpoint
+				// the first connection drives peer-level connectivity.
+				let first = {
+					let peer_connection = state.peers.entry(action.peer_id).or_default();
+					let first = peer_connection.endpoints.is_empty();
+					peer_connection.endpoints.insert(action.connection_id, action.endpoint.clone());
+					first
+				};
+				if first {
+					reduce_peer_connection_established(state, &mut actions, action.peer_id, &action.time);
+				}
 			},
-			ConnectionAction::PeerConnectionClosed(PeerConnectionClosedAction { peer_id, time }) => {
-				reduce_peer_connection_closed(state, &mut actions, *peer_id, time);
+			ConnectionAction::PeerConnectionClosed(action) => {
+				// drop this connection's endpoint
+				// the last connection drives peer-level disconnection.
+				let last = match state.peers.get_mut(&action.peer_id) {
+					Some(peer_connection) => {
+						peer_connection.endpoints.remove(&action.connection_id);
+						peer_connection.endpoints.is_empty()
+					},
+					None => false,
+				};
+				if last {
+					reduce_peer_connection_closed(state, &mut actions, action.peer_id, &action.time);
+				}
 			},
 			ConnectionAction::PeerRelateDid(action) => {
 				reduce_peer_relate_did(state, &mut actions, action);
@@ -1034,13 +1076,13 @@ fn reference_network_connection(
 #[cfg(test)]
 mod tests {
 	use crate::connections::{
-		ConnectAction, ConnectedAction, ConnectionAction, ConnectionState, DidPeersChangedAction, DidReleaseAction,
-		DidReleasedAction, DidUseAction, DisconnectAction, PeerConnectionEstablishedAction, PeerRelateDidAction,
-		UseAction,
+		ConnectAction, ConnectedAction, ConnectionAction, ConnectionDirection, ConnectionEndpoint, ConnectionState,
+		DidPeersChangedAction, DidReleaseAction, DidReleasedAction, DidUseAction, DisconnectAction,
+		PeerConnectionEstablishedAction, PeerRelateDidAction, UseAction,
 	};
 	use co_actor::Reducer;
 	use co_primitives::{Network, NetworkPeer, NetworkRendezvous};
-	use libp2p::PeerId;
+	use libp2p::{swarm::ConnectionId, PeerId};
 	use std::{collections::BTreeSet, time::Instant, vec};
 
 	#[test]
@@ -1099,6 +1141,12 @@ mod tests {
 		// add peer as connected
 		let action = ConnectionAction::PeerConnectionEstablished(PeerConnectionEstablishedAction {
 			peer_id,
+			connection_id: ConnectionId::new_unchecked(1),
+			endpoint: ConnectionEndpoint {
+				remote: "/ip4/127.0.0.1/tcp/1".parse().unwrap(),
+				local: None,
+				direction: ConnectionDirection::Outgoing,
+			},
 			time: Instant::now(),
 		});
 		state.reduce(action);

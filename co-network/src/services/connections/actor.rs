@@ -4,7 +4,7 @@
 use super::{
 	action::{ConnectionAction, DidPeersChangedAction, PeersChangedAction},
 	epics::epic,
-	ConnectionMessage, ConnectionState,
+	ConnectionMessage, ConnectionOverview, ConnectionState,
 };
 use crate::{
 	services::{
@@ -37,6 +37,7 @@ pub struct State {
 	epic: EpicRuntime<ConnectionMessage, ConnectionAction, ConnectionState, ConnectionsContext>,
 	peers_changed: BTreeMap<CoId, ResponseStreams<PeersChangedAction>>,
 	did_peers_changed: BTreeMap<Did, ResponseStreams<DidPeersChangedAction>>,
+	overviews: ResponseStreams<ConnectionOverview>,
 }
 
 pub struct Connections {
@@ -74,6 +75,7 @@ impl Actor for Connections {
 			}),
 			peers_changed: Default::default(),
 			did_peers_changed: Default::default(),
+			overviews: Default::default(),
 		})
 	}
 
@@ -94,6 +96,17 @@ impl Actor for Connections {
 				(ConnectionAction::DidUse(action), Some(ResponseKind::Did(did, response)))
 			},
 			ConnectionMessage::Action(action) => (action, None),
+			ConnectionMessage::Overview(response) => {
+				response.respond(ConnectionOverview::from(&state.state));
+				return Ok(());
+			},
+			ConnectionMessage::OverviewStream(mut stream) => {
+				// send the current state immediately, then keep the subscriber for
+				// the post-reduce broadcast below (dropped automatically when closed).
+				stream.send(ConnectionOverview::from(&state.state)).ok();
+				state.overviews.push(stream);
+				return Ok(());
+			},
 		};
 
 		// reduce
@@ -141,6 +154,11 @@ impl Actor for Connections {
 				state.did_peers_changed.remove(&released_did_action.to);
 			},
 			_ => {},
+		}
+
+		// overview snapshot stream
+		if !state.overviews.is_empty() {
+			state.overviews.send(ConnectionOverview::from(&state.state));
 		}
 
 		// dispatch
