@@ -21,7 +21,7 @@ co-core-membership = { workspace = true }
 co-guard = { workspace = true, optional = true }
 co-primitives = { workspace = true }
 co-sdk = { workspace = true, default-features = false }
-co-tracing = { workspace = true, default-features = false }
+co-tracing = { workspace = true, default-features = false, optional = true }
 dioxus = { version = "^0.7.3", default-features = false, features = ["hooks", "signals"] }
 futures = { workspace = true }
 ipld-core = { workspace = true }
@@ -36,14 +36,15 @@ wasm-bindgen-futures = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
 
 [features]
-default = ["desktop"]
+default = ["desktop", "tracing"]
 
-# targets
-desktop = ["fs", "network", "co-tracing/subscriber", "co-tracing/bunyan", "co-tracing/clap", "co-sdk/recommended", "co-sdk/apple-sandbox"]
-mobile = ["fs", "network", "co-tracing/oslog", "co-tracing/subscriber", "co-tracing/clap", "co-sdk/recommended", "co-sdk/apple-sandbox"]
-web = ["js", "network", "indexeddb", "co-tracing/subscriber", "co-tracing/console", "co-tracing/clap", "co-sdk/web", "co-actor/web"]
+desktop = ["fs", "network", "co-tracing?/bunyan", "co-sdk/recommended", "co-sdk/apple-sandbox"]
+mobile = ["fs", "network", "co-sdk/recommended", "co-sdk/apple-sandbox"]
+web = ["js", "network", "indexeddb", "co-tracing?/console", "co-sdk/web", "co-actor/web"]
 
 # features
+tracing = ["dep:co-tracing", "co-tracing/subscriber", "co-tracing/clap"]
+oslog = ["co-tracing?/oslog"]
 guard = ["dep:co-guard", "co-sdk/guard"]
 fs = ["co-sdk/fs"]
 network = ["co-sdk/network"]

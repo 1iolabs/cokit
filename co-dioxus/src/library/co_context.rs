@@ -5,7 +5,8 @@ use crate::CoSettings;
 use anyhow::Result;
 use co_primitives::Network;
 use co_sdk::{state, Application, ApplicationBuilder, CoId, Did, IdentityResolver};
-use co_tracing::{LogContext, TracingGuard};
+#[cfg(feature = "tracing")]
+use co_tracing::LogContext;
 use futures::{future::BoxFuture, Future};
 use std::collections::{BTreeMap, BTreeSet};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -19,25 +20,31 @@ pub struct CoContext {
 impl CoContext {
 	pub fn new(settings: CoSettings) -> Self {
 		// tracing
-		#[allow(unused_mut, unused_assignments)]
-		let mut base_path: Option<std::path::PathBuf> = None;
-		#[cfg(feature = "fs")]
-		{
-			base_path = match &settings.storage {
-				co_sdk::CoStorageSetting::Path(path) => Some(path.clone()),
-				co_sdk::CoStorageSetting::PathDefault => Some(co_sdk::ApplicationBuilder::default_path()),
-				_ => None,
-			};
-		}
-		let guard = settings
-			.log
-			.init(
-				&LogContext::new(&settings.identifier)
-					.with_base_path(base_path.as_deref())
-					.with_oslog_subsystem(Some(&settings.bundle_identifier)),
-			)
-			.expect("tracing init");
+		#[cfg(feature = "tracing")]
+		let guard = {
+			#[allow(unused_mut, unused_assignments)]
+			let mut base_path: Option<std::path::PathBuf> = None;
+			#[cfg(feature = "fs")]
+			{
+				base_path = match &settings.storage {
+					co_sdk::CoStorageSetting::Path(path) => Some(path.clone()),
+					co_sdk::CoStorageSetting::PathDefault => Some(co_sdk::ApplicationBuilder::default_path()),
+					_ => None,
+				};
+			}
+			let context = LogContext::new(&settings.identifier)
+				.with_base_path(base_path.as_deref())
+				.with_oslog_subsystem(Some(&settings.bundle_identifier));
+			let mut builder = settings.log.tracing_builder(&context);
+			if let Some(layer) = settings.log_layer.as_ref() {
+				builder = builder.with_layer(layer.build());
+			}
+			builder.init().expect("tracing init")
+		};
+		#[cfg(not(feature = "tracing"))]
+		let guard = ();
 
+		// spwan
 		Self::spawn(settings, guard)
 	}
 
@@ -62,7 +69,7 @@ impl CoContext {
 		Ok(())
 	}
 
-	pub(crate) fn spawn(settings: CoSettings, guard: TracingGuard) -> Self {
+	pub(crate) fn spawn(settings: CoSettings, guard: impl Send + 'static) -> Self {
 		let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Task>();
 		#[cfg(not(feature = "web"))]
 		std::thread::Builder::new()
@@ -276,7 +283,7 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 	Ok(())
 }
 
-fn co_main(settings: CoSettings, tasks: UnboundedReceiver<Task>, guard: TracingGuard) {
+fn co_main(settings: CoSettings, tasks: UnboundedReceiver<Task>, guard: impl Send + 'static) {
 	#[cfg(feature = "web")]
 	wasm_bindgen_futures::spawn_local(async move {
 		let _guard = guard;

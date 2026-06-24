@@ -7,6 +7,7 @@ mod library;
 mod types;
 
 // exports
+#[cfg(feature = "tracing")]
 pub use co_tracing::{LogArgs, LogConfig};
 pub use hooks::{
 	use_co::{use_co, Co},
