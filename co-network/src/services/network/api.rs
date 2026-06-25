@@ -5,7 +5,7 @@ use crate::{
 	bitswap::GetNetworkTask,
 	didcomm::EncodedMessage,
 	services::{
-		connections::{ConnectionMessage, ConnectionOverview, NetworkOverview},
+		connections::{CoConnectionOverview, ConnectionMessage, ConnectionOverview, NetworkOverview},
 		discovery::DiscoveryApi,
 		heads::HeadsApi,
 		network::{
@@ -18,7 +18,7 @@ use crate::{
 use cid::Cid;
 use co_actor::ActorHandle;
 use co_identity::{Message, PrivateIdentity, PrivateIdentityBox};
-use co_primitives::{Did, NetworkDidDiscovery};
+use co_primitives::{CoId, Did, NetworkDidDiscovery};
 use co_storage::StorageError;
 use futures::{
 	future,
@@ -112,6 +112,22 @@ impl NetworkApi {
 					connections: latest.connections.clone(),
 				}))
 			})
+			.boxed()
+	}
+
+	/// Get a CO-scoped connection overview.
+	/// Who we're connected to for `co` and how (per-endpoint transport/direction).
+	pub async fn co_overview(&self, co: CoId) -> Result<CoConnectionOverview, anyhow::Error> {
+		Ok(self
+			.connections
+			.request(move |response| ConnectionMessage::CoOverview(co, response))
+			.await?)
+	}
+
+	/// Subscribe to a live CO-scoped connection overview, re-emitted on every connection-state change.
+	pub fn co_overview_stream(&self, co: CoId) -> BoxStream<'static, CoConnectionOverview> {
+		self.connections
+			.stream_graceful(move |response| ConnectionMessage::CoOverviewStream(co, response))
 			.boxed()
 	}
 
