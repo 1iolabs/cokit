@@ -4,7 +4,7 @@
 use super::{
 	action::{ConnectionAction, DidPeersChangedAction, PeersChangedAction},
 	epics::epic,
-	ConnectionMessage, ConnectionOverview, ConnectionState,
+	CoConnectionOverview, ConnectionMessage, ConnectionOverview, ConnectionState,
 };
 use crate::{
 	services::{
@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use co_actor::{Actor, ActorError, ActorHandle, EpicRuntime, Reducer, ResponseStream, ResponseStreams, TaskSpawner};
 use co_identity::{IdentityResolverBox, PrivateIdentityResolverBox};
 use co_primitives::{CoId, Did, DynamicCoDate, Tags};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug, Clone)]
 pub struct ConnectionsContext {
@@ -38,6 +38,7 @@ pub struct State {
 	peers_changed: BTreeMap<CoId, ResponseStreams<PeersChangedAction>>,
 	did_peers_changed: BTreeMap<Did, ResponseStreams<DidPeersChangedAction>>,
 	overviews: ResponseStreams<ConnectionOverview>,
+	co_overviews: HashMap<CoId, ResponseStreams<CoConnectionOverview>>,
 }
 
 pub struct Connections {
@@ -76,6 +77,7 @@ impl Actor for Connections {
 			peers_changed: Default::default(),
 			did_peers_changed: Default::default(),
 			overviews: Default::default(),
+			co_overviews: Default::default(),
 		})
 	}
 
@@ -105,6 +107,17 @@ impl Actor for Connections {
 				// the post-reduce broadcast below (dropped automatically when closed).
 				stream.send(ConnectionOverview::from(&state.state)).ok();
 				state.overviews.push(stream);
+				return Ok(());
+			},
+			ConnectionMessage::CoOverview(co, response) => {
+				response.respond(CoConnectionOverview::from_state(&state.state, &co));
+				return Ok(());
+			},
+			ConnectionMessage::CoOverviewStream(co, mut stream) => {
+				// send the current CO-scoped overview immediately, then keep the
+				// subscriber under its CO for the post-reduce broadcast below.
+				stream.send(CoConnectionOverview::from_state(&state.state, &co)).ok();
+				state.co_overviews.entry(co).or_default().push(stream);
 				return Ok(());
 			},
 		};
@@ -160,6 +173,15 @@ impl Actor for Connections {
 		if !state.overviews.is_empty() {
 			state.overviews.send(ConnectionOverview::from(&state.state));
 		}
+
+		// CO overview streams
+		state.co_overviews.retain(|co, streams| {
+			if streams.is_empty() {
+				return false;
+			}
+			streams.send(CoConnectionOverview::from_state(&state.state, co));
+			!streams.is_empty()
+		});
 
 		// dispatch
 		for next_action in next_actions {

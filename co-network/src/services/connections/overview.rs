@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use super::state::{ConnectionEndpoint, ConnectionState};
+use super::state::{ConnectionEndpoint, ConnectionState, PeerConnection};
 use co_primitives::{CoId, Did, Network};
 use libp2p::{Multiaddr, PeerId};
 use std::collections::BTreeSet;
@@ -118,32 +118,42 @@ pub struct ConnectionOverview {
 	pub networks: Vec<NetworkEntry>,
 	pub bootstrap: Vec<BootstrapEntry>,
 }
+
+/// DIDs related to a set of networks, via the networks' DID references.
+fn dids_for(state: &ConnectionState, networks: &BTreeSet<Network>) -> BTreeSet<Did> {
+	networks
+		.iter()
+		.filter_map(|network| state.networks.get(network))
+		.flat_map(|network_connection| network_connection.did_references.iter().cloned())
+		.collect()
+}
+
+/// Build a [`PeerEntry`] for one tracked peer and what it serves.
+fn peer_entry(state: &ConnectionState, peer_id: PeerId, peer_connection: &PeerConnection) -> PeerEntry {
+	PeerEntry {
+		peer_id,
+		connected: peer_connection.connected,
+		relation: PeerRelation::primary(&peer_connection.network),
+		endpoints: peer_connection.endpoints.values().cloned().collect(),
+		cos: peer_connection.co.clone(),
+		dids: dids_for(state, &peer_connection.network),
+		networks: peer_connection.network.clone(),
+	}
+}
+
+/// Sort peers connected-first, then by peer id, for a stable layout across refreshes.
+fn sort_peers(peers: &mut [PeerEntry]) {
+	peers.sort_by(|a, b| b.connected.cmp(&a.connected).then_with(|| a.peer_id.cmp(&b.peer_id)));
+}
+
 impl From<&ConnectionState> for ConnectionOverview {
 	fn from(state: &ConnectionState) -> Self {
-		// dids related to a set of networks, via the networks' did references.
-		let dids_for = |networks: &BTreeSet<Network>| -> BTreeSet<Did> {
-			networks
-				.iter()
-				.filter_map(|network| state.networks.get(network))
-				.flat_map(|network_connection| network_connection.did_references.iter().cloned())
-				.collect()
-		};
-
 		let mut peers: Vec<PeerEntry> = state
 			.peers
 			.iter()
-			.map(|(peer_id, peer_connection)| PeerEntry {
-				peer_id: *peer_id,
-				connected: peer_connection.connected,
-				relation: PeerRelation::primary(&peer_connection.network),
-				endpoints: peer_connection.endpoints.values().cloned().collect(),
-				cos: peer_connection.co.clone(),
-				dids: dids_for(&peer_connection.network),
-				networks: peer_connection.network.clone(),
-			})
+			.map(|(peer_id, peer_connection)| peer_entry(state, *peer_id, peer_connection))
 			.collect();
-		// connected peers first, then by peer id for a stable layout across refreshes.
-		peers.sort_by(|a, b| b.connected.cmp(&a.connected).then_with(|| a.peer_id.cmp(&b.peer_id)));
+		sort_peers(&mut peers);
 
 		let mut cos: Vec<CoEntry> = state
 			.co
@@ -192,6 +202,32 @@ impl From<&ConnectionState> for ConnectionOverview {
 		bootstrap.sort_by(|a, b| a.peer_id.cmp(&b.peer_id));
 
 		Self { peers, cos, dids, networks, bootstrap }
+	}
+}
+
+/// A connection overview scoped to a single CO: the peers serving it and how
+/// (per-endpoint transport/direction). Produced by `NetworkApi::co_overview` /
+/// `co_overview_stream` for a CO-scoped data-path view (who we're connected to for
+/// a chat/group, and over which transport).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CoConnectionOverview {
+	pub co: CoId,
+	/// Peers whose connectivity serves this CO (connected first), with their live endpoints.
+	pub peers: Vec<PeerEntry>,
+}
+impl CoConnectionOverview {
+	/// Build the CO-scoped overview directly from the connection state: only the
+	/// peers serving `co` (connected first), without materializing the full
+	/// [`ConnectionOverview`].
+	pub fn from_state(state: &ConnectionState, co: &CoId) -> Self {
+		let mut peers: Vec<PeerEntry> = state
+			.peers
+			.iter()
+			.filter(|(_, peer_connection)| peer_connection.co.contains(co))
+			.map(|(peer_id, peer_connection)| peer_entry(state, *peer_id, peer_connection))
+			.collect();
+		sort_peers(&mut peers);
+		Self { co: co.clone(), peers }
 	}
 }
 

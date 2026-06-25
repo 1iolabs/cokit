@@ -31,9 +31,10 @@ pub use types::{
 };
 pub mod connections {
 	pub use crate::services::connections::{
-		action::*, BootstrapEntry, CoConnection, CoEntry, ConnectionDirection, ConnectionEndpoint, ConnectionMessage,
-		ConnectionOverview, ConnectionState, Connections, DidConnection, DidEntry, DynamicNetworkResolver,
-		NetworkConnection, NetworkEntry, NetworkResolver, PeerConnection, PeerEntry, PeerRelation,
+		action::*, BootstrapEntry, CoConnection, CoConnectionOverview, CoEntry, ConnectionDirection,
+		ConnectionEndpoint, ConnectionMessage, ConnectionOverview, ConnectionState, Connections, DidConnection,
+		DidEntry, DynamicNetworkResolver, NetworkConnection, NetworkEntry, NetworkResolver, PeerConnection, PeerEntry,
+		PeerRelation,
 	};
 }
 

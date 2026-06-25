@@ -13,7 +13,8 @@ mod state;
 pub use actor::{Connections, ConnectionsContext};
 pub use message::ConnectionMessage;
 pub use overview::{
-	BootstrapEntry, CoEntry, ConnectionOverview, DidEntry, NetworkEntry, NetworkOverview, PeerEntry, PeerRelation,
+	BootstrapEntry, CoConnectionOverview, CoEntry, ConnectionOverview, DidEntry, NetworkEntry, NetworkOverview,
+	PeerEntry, PeerRelation,
 };
 pub use resolve::{DynamicNetworkResolver, NetworkResolver};
 pub use state::{

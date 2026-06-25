@@ -3,7 +3,7 @@
 
 use super::{
 	action::{ConnectionAction, DidPeersChangedAction, DidUseAction, PeersChangedAction, UseAction},
-	overview::ConnectionOverview,
+	overview::{CoConnectionOverview, ConnectionOverview},
 };
 use co_actor::{time::Instant, ActorError, ActorHandle, Response, ResponseStream};
 use co_primitives::{CoId, Did, Network};
@@ -26,6 +26,13 @@ pub enum ConnectionMessage {
 	/// Subscribe to a live stream of connection snapshots.
 	/// The current snapshot is sent immediately, then a fresh one after every state change.
 	OverviewStream(ResponseStream<ConnectionOverview>),
+
+	/// Get the current connection overview scoped to a single CO.
+	CoOverview(CoId, Response<CoConnectionOverview>),
+
+	/// Subscribe to a live stream of CO-scoped connection overviews.
+	/// The current overview is sent immediately, then a fresh one after every state change.
+	CoOverviewStream(CoId, ResponseStream<CoConnectionOverview>),
 }
 impl<T> From<T> for ConnectionMessage
 where
