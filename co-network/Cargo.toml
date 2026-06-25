@@ -23,6 +23,7 @@ derive_more = { workspace = true }
 did-key = "0.2.1"
 futures = { workspace = true }
 ipld-core = { workspace = true }
+ipnet = "2"
 libp2p = { version = "0.56", default-features = false, features = ["identify", "ping", "gossipsub", "relay", "dcutr", "autonat", "noise", "yamux", "macros", "request-response", "serde", "rendezvous"] }
 libp2p-bitswap = { package = "co-libp2p-bitswap", version = "0.27.0", default-features = false, features = ["compat"] }
 multiaddr = { workspace = true }
@@ -46,6 +47,9 @@ wasm-bindgen-futures = { workspace = true, optional = true }
 web-time = { workspace = true, optional = true }
 getrandom = { version = "0.2", features = ["js"], optional = true }
 getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"], optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+if-addrs = "0.15"
 
 [dev-dependencies]
 insta = { version = "1.34.0", features = ["default", "yaml"] }
