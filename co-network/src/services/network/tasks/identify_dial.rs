@@ -254,8 +254,7 @@ mod tests {
 	}
 
 	#[test]
-	fn ble_and_circuit_addrs_are_skipped() {
-		assert!(!is_dialable_addr(&addr("/ble"), &[]));
+	fn circuit_addrs_are_skipped() {
 		assert!(!is_dialable_addr(&addr("/ip4/1.1.1.1/tcp/4001/p2p-circuit"), &[]));
 	}
 
@@ -292,7 +291,7 @@ mod tests {
 		let listen = vec![
 			addr("/ip4/192.168.1.42/udp/4001/quic-v1"), // dialable
 			addr("/ip4/10.0.0.9/udp/4001/quic-v1"),     // private, not our subnet → skip
-			addr("/ble"),                               // proximity → skip
+			addr("/p2p-circuit"),                       // relay → skip
 		];
 		let first = task.addresses_to_dial(peer, &listen, &local);
 		assert_eq!(first, vec![addr("/ip4/192.168.1.42/udp/4001/quic-v1")]);
