@@ -263,6 +263,7 @@ mod tests {
 						remote: "/ip4/127.0.0.1/udp/1/quic-v1".parse().unwrap(),
 						local: None,
 						direction: ConnectionDirection::Outgoing,
+						hole_punched: false,
 					},
 				)]
 				.into(),
@@ -320,7 +321,12 @@ mod tests {
 		state.reduce(ConnectionAction::PeerConnectionEstablished(PeerConnectionEstablishedAction {
 			peer_id: peer,
 			connection_id: ConnectionId::new_unchecked(1),
-			endpoint: ConnectionEndpoint { remote: quic, local: None, direction: ConnectionDirection::Outgoing },
+			endpoint: ConnectionEndpoint {
+				remote: quic,
+				local: None,
+				direction: ConnectionDirection::Outgoing,
+				hole_punched: false,
+			},
 			time: Instant::now(),
 		}));
 		state.reduce(ConnectionAction::PeerConnectionEstablished(PeerConnectionEstablishedAction {
@@ -330,6 +336,7 @@ mod tests {
 				remote: tcp.clone(),
 				local: Some("/ip4/0.0.0.0/tcp/2".parse().unwrap()),
 				direction: ConnectionDirection::Incoming,
+				hole_punched: false,
 			},
 			time: Instant::now(),
 		}));
