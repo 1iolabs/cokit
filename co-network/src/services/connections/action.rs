@@ -64,6 +64,9 @@ pub enum ConnectionAction {
 	/// Fired for **every** connection.
 	PeerConnectionClosed(PeerConnectionClosedAction),
 
+	/// A relayed connection to a peer was upgraded to a direct one via hole-punching (libp2p-dcutr).
+	PeerHolePunched(PeerHolePunchedAction),
+
 	/// Try to dial a peer.
 	Dial(DialAction),
 
@@ -168,6 +171,13 @@ pub struct PeerConnectionClosedAction {
 	pub peer_id: PeerId,
 	pub connection_id: ConnectionId,
 	pub time: Instant,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PeerHolePunchedAction {
+	pub peer_id: PeerId,
+	/// The direct connection the hole-punch successfully created.
+	pub connection_id: ConnectionId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, thiserror::Error)]

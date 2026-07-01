@@ -2,18 +2,17 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use crate::{
+	network::{Behaviour, NetworkEvent},
 	services::connections::{
-		action::{ConnectionAction, PeerConnectionClosedAction, PeerConnectionEstablishedAction},
+		action::{
+			ConnectionAction, PeerConnectionClosedAction, PeerConnectionEstablishedAction, PeerHolePunchedAction,
+		},
 		ConnectionDirection, ConnectionEndpoint, ConnectionMessage,
 	},
 	types::network_task::NetworkTask,
 };
 use co_actor::{time::Instant, ActorHandle};
-use libp2p::{
-	core::ConnectedPoint,
-	swarm::{NetworkBehaviour, SwarmEvent},
-	Swarm,
-};
+use libp2p::{core::ConnectedPoint, swarm::SwarmEvent, Swarm};
 
 /// Monitor connnections.
 #[derive(Debug)]
@@ -25,19 +24,16 @@ impl ConnectionsNetworkTask {
 		Self { handle }
 	}
 }
-impl<B> NetworkTask<B> for ConnectionsNetworkTask
-where
-	B: NetworkBehaviour,
-{
-	fn execute(&mut self, _swarm: &mut Swarm<B>) {}
+impl NetworkTask<Behaviour> for ConnectionsNetworkTask {
+	fn execute(&mut self, _swarm: &mut Swarm<Behaviour>) {}
 
 	/// Handle swarm events.
 	/// Events can be consumed by this handler or forwarded to next handler.
 	fn on_swarm_event(
 		&mut self,
-		_swarm: &mut Swarm<B>,
-		event: SwarmEvent<B::ToSwarm>,
-	) -> Option<SwarmEvent<B::ToSwarm>> {
+		_swarm: &mut Swarm<Behaviour>,
+		event: SwarmEvent<NetworkEvent>,
+	) -> Option<SwarmEvent<NetworkEvent>> {
 		match &event {
 			SwarmEvent::ConnectionEstablished { peer_id, connection_id, endpoint, .. } => {
 				let (local, direction) = match endpoint {
@@ -54,6 +50,7 @@ where
 							remote: endpoint.get_remote_address().clone(),
 							local,
 							direction,
+							hole_punched: false,
 						},
 						time: Instant::now(),
 					}))
@@ -67,6 +64,17 @@ where
 						time: Instant::now(),
 					}))
 					.ok();
+			},
+			// new direct connection via a successful hole-punch by libp2p-dcutr
+			SwarmEvent::Behaviour(NetworkEvent::Dcutr(dcutr_event)) => {
+				if let Ok(connection_id) = &dcutr_event.result {
+					self.handle
+						.dispatch(ConnectionAction::PeerHolePunched(PeerHolePunchedAction {
+							peer_id: dcutr_event.remote_peer_id,
+							connection_id: *connection_id,
+						}))
+						.ok();
+				}
 			},
 			_ => {},
 		}
