@@ -108,16 +108,20 @@ mod tests {
 
 	#[test]
 	fn comma_separated_listen_parses_into_set() {
-		let mut settings = CoNetworkSettings::default();
-		settings.listen = "/ip4/0.0.0.0/udp/0/quic-v1,/ip6/::/udp/0/quic-v1".to_string();
+		let settings = CoNetworkSettings {
+			listen: "/ip4/0.0.0.0/udp/0/quic-v1,/ip6/::/udp/0/quic-v1".to_string(),
+			..Default::default()
+		};
 		let parsed: NetworkSettings = settings.try_into().unwrap();
 		assert_eq!(parsed.listen.len(), 2);
 	}
 
 	#[test]
 	fn comma_separated_with_space_listen_parses_into_set() {
-		let mut settings = CoNetworkSettings::default();
-		settings.listen = "/ip4/0.0.0.0/udp/0/quic-v1, /ip6/::/udp/0/quic-v1".to_string();
+		let settings = CoNetworkSettings {
+			listen: "/ip4/0.0.0.0/udp/0/quic-v1, /ip6/::/udp/0/quic-v1".to_string(),
+			..Default::default()
+		};
 		let parsed: NetworkSettings = settings.try_into().unwrap();
 		assert_eq!(parsed.listen.len(), 2);
 	}
