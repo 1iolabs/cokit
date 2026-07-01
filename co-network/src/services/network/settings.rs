@@ -11,8 +11,8 @@ pub struct NetworkSettings {
 	/// Force to create a new [`PeerId`] on network startup.
 	pub force_new_peer_id: bool,
 
-	/// The endpoint to listen to.
-	pub listen: Multiaddr,
+	/// The endpoints to listen to.
+	pub listen: BTreeSet<Multiaddr>,
 
 	/// The bootstrap peers to increase connectivity.
 	pub bootstrap: BTreeSet<Multiaddr>,
@@ -98,8 +98,11 @@ impl NetworkSettings {
 			.with_bootstrap_from_string(relay_multiaddr)
 	}
 
-	fn default_listen() -> Multiaddr {
-		"/ip4/0.0.0.0/udp/0/quic-v1".parse().expect("to parse")
+	fn default_listen() -> BTreeSet<Multiaddr> {
+		["/ip4/0.0.0.0/udp/0/quic-v1", "/ip6/::/udp/0/quic-v1"]
+			.into_iter()
+			.map(|addr| addr.parse().expect("to parse"))
+			.collect()
 	}
 
 	fn default_bootstrap() -> BTreeSet<Multiaddr> {
@@ -113,15 +116,27 @@ impl NetworkSettings {
 		self
 	}
 
-	/// Set listen endpoint.
+	/// Set listen endpoint, replacing any existing listen addresses.
 	pub fn with_listen(mut self, listen: Multiaddr) -> Self {
-		self.listen = listen;
+		self.listen = [listen].into_iter().collect();
 		self
 	}
 
-	/// Set listen endpoint.
+	/// Set listen endpoints, replacing any existing listen addresses.
+	pub fn with_listens(mut self, listen: impl IntoIterator<Item = Multiaddr>) -> Self {
+		self.listen = listen.into_iter().collect();
+		self
+	}
+
+	/// Add a listen endpoint.
+	pub fn with_added_listen(mut self, listen: Multiaddr) -> Self {
+		self.listen.insert(listen);
+		self
+	}
+
+	/// Set listen endpoint from a string, replacing any existing listen addresses.
 	pub fn with_listen_from_string(mut self, listen: &str) -> Result<Self, anyhow::Error> {
-		self.listen = listen.parse()?;
+		self.listen = [listen.parse()?].into_iter().collect();
 		Ok(self)
 	}
 
@@ -243,4 +258,32 @@ pub enum NetworkDns {
 
 	/// Use preconfigured Cloudflare DNS.
 	Cloudflare,
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn default_listen_is_dual_stack_quic() {
+		let settings = NetworkSettings::default();
+		assert!(settings.listen.contains(&"/ip4/0.0.0.0/udp/0/quic-v1".parse().unwrap()));
+		assert!(settings.listen.contains(&"/ip6/::/udp/0/quic-v1".parse().unwrap()));
+		assert_eq!(settings.listen.len(), 2);
+	}
+
+	#[test]
+	fn with_listen_replaces_with_single() {
+		let settings = NetworkSettings::default().with_listen("/ip4/127.0.0.1/tcp/0".parse().unwrap());
+		assert_eq!(settings.listen.len(), 1);
+		assert!(settings.listen.contains(&"/ip4/127.0.0.1/tcp/0".parse().unwrap()));
+	}
+
+	#[test]
+	fn with_added_listen_inserts() {
+		let extra: Multiaddr = "/ip6/::/udp/4001/quic-v1".parse().unwrap();
+		let settings = NetworkSettings::default().with_added_listen(extra.clone());
+		assert!(settings.listen.contains(&extra));
+		assert_eq!(settings.listen.len(), 3);
+	}
 }
