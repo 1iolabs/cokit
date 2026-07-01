@@ -132,6 +132,11 @@ fn is_dialable_ipv4(ip: Ipv4Addr, local_nets: &[IpNet]) -> bool {
 		return false;
 	}
 
+	// 192.0.0.0/24 (incl. the 464xlat clat stub) is not globally routable.
+	if is_ietf_protocol_ipv4(ip) {
+		return false;
+	}
+
 	// RFC1918 private or RFC6598 CGNAT (100.64.0.0/10): not globally routable -
 	// dial only if it is one of our own local networks.
 	if ip.is_private() || is_cgnat_ipv4(ip) {
@@ -145,6 +150,12 @@ fn is_dialable_ipv4(ip: Ipv4Addr, local_nets: &[IpNet]) -> bool {
 /// RFC 6598 shared address space (100.64.0.0/10), used for carrier-grade NAT.
 fn is_cgnat_ipv4(ip: Ipv4Addr) -> bool {
 	u32::from(ip) & 0xffc0_0000 == 0x6440_0000
+}
+
+/// rfc 6890 / rfc 7335 ietf protocol assignments (192.0.0.0/24), which contains the 464xlat clat
+/// stub (192.0.0.0/29); not globally routable.
+fn is_ietf_protocol_ipv4(ip: Ipv4Addr) -> bool {
+	u32::from(ip) & 0xffff_ff00 == 0xc000_0000
 }
 
 fn is_dialable_ipv6(ip: Ipv6Addr, local_nets: &[IpNet]) -> bool {
@@ -251,6 +262,13 @@ mod tests {
 	fn broadcast_and_multicast_ipv4_are_skipped() {
 		assert!(!is_dialable_addr(&addr("/ip4/255.255.255.255/udp/4001/quic-v1"), &[]));
 		assert!(!is_dialable_addr(&addr("/ip4/224.0.0.1/udp/4001/quic-v1"), &[]));
+	}
+
+	#[test]
+	fn ietf_protocol_ipv4_is_skipped() {
+		// 192.0.0.0/24 (rfc 6890/7335), including the 464xlat clat stub 192.0.0.2, is never dialable.
+		assert!(!is_dialable_addr(&addr("/ip4/192.0.0.2/udp/4001/quic-v1"), &[]));
+		assert!(!is_dialable_addr(&addr("/ip4/192.0.0.1/udp/4001/quic-v1"), &[]));
 	}
 
 	#[test]

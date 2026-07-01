@@ -129,11 +129,13 @@ impl Actor for Network {
 			HeadsContext { network: spawner.clone(), spawner: initialize.tasks.clone() },
 		)?;
 
-		// keep the main listener alive (browsers connect via relay, not direct listen)
+		// keep the main listeners alive (browsers connect via relay, not direct listen)
 		#[cfg(not(target_arch = "wasm32"))]
-		spawner
-			.spawn(ListenTask::new(initialize.settings.listen.clone()))
-			.map_err(|err| ActorError::Actor(err.into()))?;
+		for listen in initialize.settings.listen.iter() {
+			spawner
+				.spawn(ListenTask::new(listen.clone()))
+				.map_err(|err| ActorError::Actor(err.into()))?;
+		}
 
 		// keep a relay-circuit listener alive per bootstrap
 		for bootstrap in initialize.settings.bootstrap.iter() {
