@@ -11,4 +11,4 @@ if [ "$1" = "--fix" ] || [ "$1" = "fix" ]; then
 fi
 
 # fmt
-cargo +nightly fmt "${fmt_args[@]}"
+cargo +nightly-2025-12-09 fmt "${fmt_args[@]}"
