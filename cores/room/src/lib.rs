@@ -72,6 +72,11 @@ pub struct Room {
 	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
 	pub read_receipts: BTreeMap<String, String>,
 
+	/// Received receipts: sender DID / event_id of the last message they received (device ingested)
+	#[schemars(skip)]
+	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+	pub received_receipts: BTreeMap<String, String>,
+
 	/// Typing indicators: sender DID / timestamp of typing event
 	#[schemars(skip)]
 	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -189,6 +194,26 @@ where
 				};
 				if should_update {
 					state.read_receipts.insert(sender.to_owned(), event_id.to_owned());
+				}
+			}
+			return Ok(());
+		}
+		if nc.body.starts_with("__RECEIVED_RECEIPT__") {
+			let event_id = nc.body["__RECEIVED_RECEIPT__".len()..].to_string();
+			if !event_id.is_empty() {
+				let should_update = if let Some(existing_id) = state.received_receipts.get(sender) {
+					let existing_idx = state.event_index.get(storage, existing_id).await?;
+					let new_idx = state.event_index.get(storage, &event_id).await?;
+					match (existing_idx, new_idx) {
+						(Some(e), Some(n)) => n > e,
+						(None, Some(_)) => true,
+						_ => false,
+					}
+				} else {
+					state.event_index.get(storage, &event_id).await?.is_some()
+				};
+				if should_update {
+					state.received_receipts.insert(sender.to_owned(), event_id.to_owned());
 				}
 			}
 			return Ok(());
@@ -574,6 +599,39 @@ mod tests {
 		let state =
 			dispatch(&storage, &mut time, state, "alice", "$rr3", NoticeContent::new("__READ_RECEIPT__$msg2")).await;
 		assert_eq!(state.read_receipts.get("alice"), Some(&"$msg3".to_string()));
+	}
+
+	#[tokio::test]
+	async fn received_receipt_tracked_in_state() {
+		let storage = MemoryBlockStorage::default();
+		let mut time: Date = 1000;
+		let state = Room::default();
+
+		// Create real messages so they get indexed in event_index
+		let state = dispatch(&storage, &mut time, state, "bob", "$msg1", TextContent::new("hello")).await;
+		let state = dispatch(&storage, &mut time, state, "bob", "$msg2", TextContent::new("world")).await;
+		let state = dispatch(&storage, &mut time, state, "bob", "$msg3", TextContent::new("foo")).await;
+
+		// Received receipt pointing to $msg1
+		let state =
+			dispatch(&storage, &mut time, state, "alice", "$rcv1", NoticeContent::new("__RECEIVED_RECEIPT__$msg1"))
+				.await;
+		assert_eq!(state.received_receipts.get("alice"), Some(&"$msg1".to_string()));
+
+		// Later receipt ($msg3) wins
+		let state =
+			dispatch(&storage, &mut time, state, "alice", "$rcv2", NoticeContent::new("__RECEIVED_RECEIPT__$msg3"))
+				.await;
+		assert_eq!(state.received_receipts.get("alice"), Some(&"$msg3".to_string()));
+
+		// Earlier receipt ($msg2) does not overwrite (monotonic guard)
+		let state =
+			dispatch(&storage, &mut time, state, "alice", "$rcv3", NoticeContent::new("__RECEIVED_RECEIPT__$msg2"))
+				.await;
+		assert_eq!(state.received_receipts.get("alice"), Some(&"$msg3".to_string()));
+
+		// Received is a separate channel — read_receipts untouched
+		assert!(state.read_receipts.get("alice").is_none());
 	}
 
 	#[tokio::test]
