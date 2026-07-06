@@ -631,7 +631,7 @@ mod tests {
 		assert_eq!(state.received_receipts.get("alice"), Some(&"$msg3".to_string()));
 
 		// Received is a separate channel — read_receipts untouched
-		assert!(state.read_receipts.get("alice").is_none());
+		assert!(!state.read_receipts.contains_key("alice"));
 	}
 
 	#[tokio::test]
