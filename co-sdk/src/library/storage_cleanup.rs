@@ -146,13 +146,18 @@ mod tests {
 		ApplicationBuilder, CoReducer, CreateCo, DidKeyProvider, MonotonicCoUuid, CO_CORE_NAME_CO,
 		CO_CORE_NAME_KEYSTORE, CO_CORE_NAME_STORAGE,
 	};
+	use cid::Cid;
 	use co_core_co::CoAction;
-	use co_core_storage::{PinStrategy, StorageAction};
+	use co_core_storage::{BlockInfo, PinStrategy, StorageAction};
 	use co_identity::DidKeyIdentity;
-	use co_primitives::{tags, CoId, MonotonicCoDate};
+	use co_primitives::{tags, CoId, MonotonicCoDate, WeakCid};
 	use co_storage::ExtendedBlockStorage;
 	use co_test::{test_application_identifier, test_tmp_dir};
 	use futures::TryStreamExt;
+	use std::{
+		collections::{BTreeMap, BTreeSet},
+		str::FromStr,
+	};
 
 	async fn count_pin_references(local_co: &CoReducer, co: &CoId, pin: CoPinningKey) -> u32 {
 		let storage = local_co.storage();
@@ -331,5 +336,39 @@ mod tests {
 		assert!(storage.exists(external_next_co_state.heads().first().unwrap()).await.unwrap());
 		assert!(!storage.exists(co_state.heads().first().unwrap()).await.unwrap());
 		assert!(storage.exists(next_co_state.heads().first().unwrap()).await.unwrap());
+	}
+
+	/// Pushing a `Delete` action that carries a non-empty CID map must dispatch cleanly through
+	/// the reducer. Once the action is applied, its block is re-read generically as
+	/// `ReducerAction<Ipld>` for reactive dispatch, so the CID map has to be encoded as a list of
+	/// pairs — DAG-CBOR map keys must be text strings, so binary CID keys are not valid Ipld.
+	#[tokio::test]
+	async fn integration_test_push_delete_action() {
+		co_test::init_test_log();
+		let application_identifier = test_application_identifier("integration_test_push_delete_action");
+		let tmp = test_tmp_dir();
+		let application = ApplicationBuilder::new_with_path(application_identifier, tmp.path().to_owned())
+			.with_disabled_feature("co-local-encryption")
+			.with_co_date(MonotonicCoDate::default())
+			.with_co_uuid(MonotonicCoUuid::default())
+			.without_keychain()
+			.build()
+			.await
+			.unwrap();
+		let local_co = application.local_co_reducer().await.unwrap();
+
+		// a real cid; the entry need not exist in state for the action to be logged and dispatched
+		let cid: WeakCid = Cid::from_str("bagakbqabdyqar5vlsfqd3g4mxngt3yl7nx2na2kb4jybylzn5bktwnihjhih42a")
+			.unwrap()
+			.into();
+		let mut delete = BTreeMap::<WeakCid, BTreeSet<WeakCid>>::new();
+		delete.insert(cid, BTreeSet::new());
+		let info = BlockInfo { pins: Default::default(), block_type: Default::default() };
+
+		// push through the actor api — this exercises the reactive dispatch path
+		local_co
+			.push(&application.local_identity(), CO_CORE_NAME_STORAGE, &StorageAction::Delete(info, delete, false))
+			.await
+			.unwrap();
 	}
 }
