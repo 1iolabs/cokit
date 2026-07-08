@@ -1904,7 +1904,8 @@ dependencies = [
 [[package]]
 name = "co-libp2p-dns"
 version = "0.45.0"
-source = "git+https://gitlab.1io.com/1io/co-libp2p.git?branch=cokit#cff2272b8c877841b99f1cdd14a65fc16535bd94"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92c2562e5d1a1a91be5d7d34b8bc19d84bde9a384cb7c03c14a5d1554be12c8e"
 dependencies = [
  "futures",
  "hickory-resolver 0.26.1",
