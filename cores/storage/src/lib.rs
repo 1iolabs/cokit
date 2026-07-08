@@ -296,7 +296,7 @@ pub enum StorageAction {
 	/// - `0`: The [`Cid`] of entries to remove with all of its direct children.
 	/// - `1`: Force delete. If false only references with a zero ref count will be removed.
 	#[serde(rename = "d")]
-	Delete(BlockInfo, BTreeMap<WeakCid, BTreeSet<WeakCid>>, bool),
+	Delete(BlockInfo, #[serde(with = "co_api::serde_map_as_list")] BTreeMap<WeakCid, BTreeSet<WeakCid>>, bool),
 
 	/// Append tags to references.
 	#[serde(rename = "ti")]
@@ -966,13 +966,16 @@ where
 
 #[cfg(test)]
 mod tests {
-	use crate::{PinStrategy, References, Storage, StorageAction};
+	use crate::{BlockInfo, PinStrategy, References, Storage, StorageAction};
 	use cid::Cid;
 	use co_api::{BlockSerializer, BlockStorageExt, CoreBlockStorage, OptionLink, Reducer, ReducerAction, WeakCid};
 	use co_storage::MemoryBlockStorage;
 	use futures::TryStreamExt;
 	use ipld_core::{ipld::Ipld, serde::to_ipld};
-	use std::{collections::BTreeMap, str::FromStr};
+	use std::{
+		collections::{BTreeMap, BTreeSet},
+		str::FromStr,
+	};
 
 	#[test]
 	fn test_serialize_storage_action() {
@@ -1007,6 +1010,37 @@ mod tests {
 		let reducer_action_ipld_deserialize: ReducerAction<Ipld> =
 			BlockSerializer::default().deserialize(&block).unwrap();
 
+		assert_eq!(reducer_action_ipld_deserialize, reducer_action_ipld);
+	}
+
+	#[test]
+	fn test_serialize_storage_action_delete() {
+		let cid1 = *BlockSerializer::default().serialize(&1).unwrap().cid();
+		let cid2 = *BlockSerializer::default().serialize(&2).unwrap().cid();
+		let mut map = BTreeMap::<WeakCid, BTreeSet<WeakCid>>::new();
+		map.entry(cid1.into()).or_default().insert(cid2.into());
+
+		// action
+		let action =
+			StorageAction::Delete(BlockInfo { pins: Default::default(), block_type: Default::default() }, map, false);
+		let block = BlockSerializer::default().serialize(&action).unwrap();
+		let action_deserialize: StorageAction = BlockSerializer::default().deserialize(&block).unwrap();
+		assert_eq!(action_deserialize, action);
+
+		// reducer action ipld
+		//  the same bytes must also deserialize generically as Ipld — the WeakCid-keyed map has to be
+		//  encoded as a list of pairs because DAG-CBOR requires map keys to be text strings
+		let reducer_action: ReducerAction<StorageAction> =
+			ReducerAction { core: "storage".to_owned(), from: "test".to_owned(), payload: action.clone(), time: 123 };
+		let block = BlockSerializer::default().serialize(&reducer_action).unwrap();
+		let reducer_action_ipld_deserialize: ReducerAction<Ipld> =
+			BlockSerializer::default().deserialize(&block).unwrap();
+		let reducer_action_ipld: ReducerAction<Ipld> = ReducerAction {
+			core: "storage".to_owned(),
+			from: "test".to_owned(),
+			payload: to_ipld(action).unwrap(),
+			time: 123,
+		};
 		assert_eq!(reducer_action_ipld_deserialize, reducer_action_ipld);
 	}
 

@@ -13,8 +13,11 @@ description = "COKIT DID and DIDComm implementations."
 crate-type = ["lib"]
 
 [dependencies]
+aes-kw = "0.3.1"
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+base64 = "0.22"
+chacha20poly1305 = "0.10"
 cid = { workspace = true }
 co-core-keystore = { workspace = true }
 co-primitives = { workspace = true }
@@ -24,12 +27,15 @@ futures = { workspace = true }
 hex = { version = "0.4" }
 ipld-core = { workspace = true }
 multibase = "0.9.1"
+rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
+sha2 = "0.10"
 thiserror = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
+x25519-dalek = { version = "2.0.1", features = ["static_secrets", "getrandom"] }
 
 # workarounds
 ## error: the `alloc` feature must currently be enabled
