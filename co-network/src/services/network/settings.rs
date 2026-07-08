@@ -84,7 +84,7 @@ impl NetworkSettings {
 
 	/// Mobile configuration.
 	pub fn mobile() -> Self {
-		Self { websocket: false, dns: NetworkDns::Cloudflare, ..Default::default() }
+		Self { websocket: false, ..Default::default() }
 	}
 
 	/// Web configuration.
@@ -245,14 +245,16 @@ impl NetworkSettings {
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
 pub enum NetworkDns {
-	/// Do not use and DNS.
+	/// Do not use any DNS.
 	None,
 
-	/// Use system configuration.
+	/// Use system configuration, with automatic static fallback and live refresh.
 	///
 	/// # Note
-	/// - Uses /etc/resolv.conf
-	/// - Not available on mobile yet.
+	/// - Linux + macOS: `/etc/resolv.conf` mtime drives per-dial staleness detection
+	/// - `recover()` force-refreshes on all native platforms
+	/// - Note: iOS/Windows/Android have no usable staleness file and rely on `recover()` alone
+	/// - Falls back to the preconfigured (Cloudflare) resolver while the OS has no nameservers
 	#[default]
 	System,
 
@@ -285,5 +287,12 @@ mod tests {
 		let settings = NetworkSettings::default().with_added_listen(extra.clone());
 		assert!(settings.listen.contains(&extra));
 		assert_eq!(settings.listen.len(), 3);
+	}
+
+	#[test]
+	fn mobile_uses_system_dns() {
+		let settings = NetworkSettings::mobile();
+		assert!(matches!(settings.dns, NetworkDns::System));
+		assert!(!settings.websocket);
 	}
 }

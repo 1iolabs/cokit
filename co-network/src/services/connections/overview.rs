@@ -2,15 +2,16 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use super::state::{ConnectionEndpoint, ConnectionState, PeerConnection};
+use crate::services::dns::DnsSource;
 use co_primitives::{CoId, Did, Network};
 use libp2p::{Multiaddr, PeerId};
 use std::collections::BTreeSet;
 
 /// A read-only snapshot of the current network state for diagnostics.
 ///
-/// Combines the local peer id, current listeners, mDNS discoveries and a
-/// [`ConnectionSnapshot`] (peers, COs, DIDs, networks, bootstrap). Produced by
-/// `NetworkApi::overview` (one-shot) and `NetworkApi::overview_stream` (live).
+/// Combines the local peer id, current listeners, mDNS discoveries, DNS resolver
+/// diagnostics and a [`ConnectionSnapshot`] (peers, COs, DIDs, networks, bootstrap).
+/// Produced by `NetworkApi::overview` (one-shot) and `NetworkApi::overview_stream` (live).
 #[derive(Debug, Clone)]
 pub struct NetworkOverview {
 	pub local_peer_id: PeerId,
@@ -18,6 +19,8 @@ pub struct NetworkOverview {
 	/// Peers currently discovered via mDNS (native only; empty elsewhere).
 	pub mdns: BTreeSet<PeerId>,
 	pub connections: ConnectionOverview,
+	/// DNS resolver diagnostics (`None` on wasm / before first refresh).
+	pub dns: Option<DnsSource>,
 }
 
 /// How a peer relates to us, derived from its connectivity networks.

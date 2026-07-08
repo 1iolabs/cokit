@@ -22,10 +22,13 @@ co-storage = { workspace = true }
 derive_more = { workspace = true }
 did-key = "0.2.1"
 futures = { workspace = true }
+hickory-resolver = { version = "0.26.1", default-features = false, features = ["system-config", "tokio"], optional = true }
 ipld-core = { workspace = true }
 ipnet = "2"
 libp2p = { version = "0.56", default-features = false, features = ["identify", "ping", "gossipsub", "relay", "dcutr", "autonat", "noise", "yamux", "macros", "request-response", "serde", "rendezvous"] }
 libp2p-bitswap = { package = "co-libp2p-bitswap", version = "0.27.0", default-features = false, features = ["compat"] }
+libp2p-dns = { package = "co-libp2p-dns", version = "0.45.0", default-features = false, features = ["tokio"], optional = true }
+libp2p-websocket = { version = "0.45.1", optional = true }
 multiaddr = { workspace = true }
 pin-project = { workspace = true }
 rand = { workspace = true }
@@ -58,9 +61,10 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 [features]
 default = ["native"]
 native = [
-    "libp2p/tokio", "libp2p/tcp", "libp2p/quic", "libp2p/dns", "libp2p/mdns", "libp2p/upnp", "libp2p/websocket", "libp2p/tls",
+    "libp2p/tokio", "libp2p/tcp", "libp2p/quic", "libp2p/mdns", "libp2p/upnp", "dep:libp2p-websocket", "libp2p/tls",
     "libp2p-bitswap/metrics",
     "tokio/sync", "tokio/time",
+    "dep:hickory-resolver", "dep:libp2p-dns",
 ]
 web = ["js", "co-actor/web"]
 js = [
