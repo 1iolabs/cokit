@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use super::{didcomm_jwe::didcomm_jwe_receive, into_didcomm_rs_header::from_didcomm_rs_header};
+use super::{
+	didcomm_anoncrypt::didcomm_anoncrypt_receive, didcomm_jwe::didcomm_jwe_receive,
+	into_didcomm_rs_header::from_didcomm_rs_header,
+};
 use crate::{DidCommHeader, IdentityResolver, ReceiveError};
 use co_primitives::Secret;
 use didcomm_rs::Message;
@@ -26,7 +29,14 @@ pub async fn didcomm_receive<R: IdentityResolver>(
 				)
 				.await;
 			},
-			Err(err) => return Err(ReceiveError::UnknownFormat(err.into())),
+			Err(err) => {
+				if let Some(private_key) = &to_key_agreement_private_key {
+					if let Ok((header, body)) = didcomm_anoncrypt_receive(private_key.clone(), incoming) {
+						return Ok((header, body.unwrap_or_else(|| "null".to_owned())));
+					}
+				}
+				return Err(ReceiveError::UnknownFormat(err.into()));
+			},
 		};
 
 	// header
@@ -42,7 +52,10 @@ pub async fn didcomm_receive<R: IdentityResolver>(
 #[cfg(test)]
 mod tests {
 	use crate::{
-		library::{didcomm_jwe::didcomm_jwe, didcomm_jws::didcomm_jws, didcomm_receive::didcomm_receive},
+		library::{
+			didcomm_anoncrypt::didcomm_anoncrypt_to_public_key, didcomm_jwe::didcomm_jwe, didcomm_jws::didcomm_jws,
+			didcomm_receive::didcomm_receive,
+		},
 		DidCommHeader, DidKeyIdentity, DidKeyIdentityResolver, Identity,
 	};
 
@@ -69,6 +82,32 @@ mod tests {
 				.unwrap();
 		assert_eq!("test", receviced_header.id);
 		assert_eq!("null", receviced_body);
+	}
+
+	#[tokio::test]
+	async fn anoncrypt() {
+		// create x25519 identity (recipient)
+		let from = DidKeyIdentity::generate(Some(&[3; 32]));
+		let to = DidKeyIdentity::generate_x25519(Some(&[4; 32]));
+
+		// create
+		let header = DidCommHeader {
+			id: "anoncrypt".to_owned(),
+			from: Some(from.identity().to_owned()),
+			to: vec![to.identity().to_owned()].into_iter().collect(),
+			message_type: "test".to_owned(),
+			..Default::default()
+		};
+		let message = didcomm_anoncrypt_to_public_key(to.public_key_bytes(), header, Some("\"payload\"")).unwrap();
+
+		// receive through generic inbound path
+		let (receviced_header, receviced_body) =
+			didcomm_receive(Some(to.private_key_bytes()), &DidKeyIdentityResolver::new(), &message)
+				.await
+				.unwrap();
+		assert_eq!("anoncrypt", receviced_header.id);
+		assert_eq!(None, receviced_header.from);
+		assert_eq!("\"payload\"", receviced_body);
 	}
 
 	#[tokio::test]
