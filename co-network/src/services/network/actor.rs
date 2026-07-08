@@ -55,8 +55,7 @@ impl Actor for Network {
 		let network_peer_id = PeerId::from(initialize.keypair.public());
 
 		// dns
-		let dns_spawner =
-			DnsActor::spawner(tags!("type": "dns", "application": &initialize.identifier), DnsActor::default())?;
+		let dns_spawner = DnsActor::spawner(tags!("type": "dns", "application": &initialize.identifier), DnsActor)?;
 		let dns_handle = dns_spawner.handle();
 		let dns_initialize = DnsInitialize::new(&initialize.settings.dns, dns_handle);
 		let dns_resolver = dns_initialize.resolver();

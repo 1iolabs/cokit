@@ -73,11 +73,10 @@ impl Refresher {
 				(empty_resolver(), DnsSource::Unavailable)
 			},
 		};
-		let refresher = Arc::new(Self {
+		Arc::new(Self {
 			mode: Mode::Static,
 			tracking: Mutex::new(Tracking { source, mtime: None, resolver: Arc::new(resolver) }),
-		});
-		refresher
+		})
 	}
 
 	/// Re-read the OS configuration and swap the resolver accordingly.
