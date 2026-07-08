@@ -90,8 +90,8 @@ pub fn didcomm_anoncrypt_receive(
 	to_private_key: Secret,
 	incoming: &str,
 ) -> Result<(DidCommHeader, Option<String>), ReceiveError> {
-	let plaintext = didcomm_anoncrypt_envelope::open(incoming, to_private_key.divulge())
-		.map_err(|e| ReceiveError::Decrypt(e.into()))?;
+	let plaintext =
+		didcomm_anoncrypt_envelope::open(incoming, to_private_key.divulge()).map_err(ReceiveError::Decrypt)?;
 	let message: Message = serde_json::from_slice(&plaintext).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
 
 	let mut header = from_didcomm_rs_header(message.get_didcomm_header().clone());
@@ -121,8 +121,8 @@ mod tests {
 
 	#[test]
 	fn anoncrypt_uses_ecdh_es_without_sender_or_signature_headers() {
-		let from = DidKeyIdentity::generate(Some(&vec![10; 32]));
-		let to = DidKeyIdentity::generate_x25519(Some(&vec![11; 32]));
+		let from = DidKeyIdentity::generate(Some(&[10; 32]));
+		let to = DidKeyIdentity::generate_x25519(Some(&[11; 32]));
 
 		let header = DidCommHeader {
 			id: "spec-anoncrypt".to_owned(),
@@ -151,8 +151,8 @@ mod tests {
 
 	#[test]
 	fn custom_header_fields_round_trip() {
-		let from = DidKeyIdentity::generate(Some(&vec![12; 32]));
-		let to = DidKeyIdentity::generate_x25519(Some(&vec![13; 32]));
+		let from = DidKeyIdentity::generate(Some(&[12; 32]));
+		let to = DidKeyIdentity::generate_x25519(Some(&[13; 32]));
 
 		let header = DidCommHeader {
 			id: "custom-fields".to_owned(),
@@ -173,9 +173,9 @@ mod tests {
 
 	#[test]
 	fn smoke() {
-		let from = DidKeyIdentity::generate_x25519(Some(&vec![1; 32]));
-		let to = DidKeyIdentity::generate_x25519(Some(&vec![2; 32]));
-		let other = DidKeyIdentity::generate_x25519(Some(&vec![3; 32]));
+		let from = DidKeyIdentity::generate_x25519(Some(&[1; 32]));
+		let to = DidKeyIdentity::generate_x25519(Some(&[2; 32]));
+		let other = DidKeyIdentity::generate_x25519(Some(&[3; 32]));
 		println!("from: {}", from.identity());
 		println!("to: {}", to.identity());
 
@@ -205,8 +205,8 @@ mod tests {
 	fn deprecated_sender_key_wrapper_delegates_to_sender_free_anoncrypt() {
 		use super::didcomm_anoncrypt;
 
-		let from = DidKeyIdentity::generate(Some(&vec![41; 32]));
-		let to = DidKeyIdentity::generate_x25519(Some(&vec![42; 32]));
+		let from = DidKeyIdentity::generate(Some(&[41; 32]));
+		let to = DidKeyIdentity::generate_x25519(Some(&[42; 32]));
 		let header = DidCommHeader {
 			id: "compat-wrapper".to_owned(),
 			from: Some(from.identity().to_owned()),
