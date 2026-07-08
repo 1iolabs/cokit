@@ -3,5 +3,6 @@
 
 pub mod connections;
 pub mod discovery;
+pub mod dns;
 pub mod heads;
 pub mod network;

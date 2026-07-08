@@ -7,6 +7,7 @@ use crate::{
 	services::{
 		connections::{CoConnectionOverview, ConnectionMessage, ConnectionOverview, NetworkOverview},
 		discovery::DiscoveryApi,
+		dns::{DnsApi, DnsSource},
 		heads::HeadsApi,
 		network::{
 			CoNetworkTaskSpawner, DialNetworkTask, DidCommReceiveNetworkTask, DidCommSendNetworkTask,
@@ -36,6 +37,7 @@ pub struct NetworkApi {
 	pub(crate) discovery: DiscoveryApi,
 	pub(crate) heads: HeadsApi,
 	pub(crate) spawner: CoNetworkTaskSpawner,
+	pub(crate) dns: DnsApi,
 }
 
 impl NetworkApi {
@@ -75,8 +77,9 @@ impl NetworkApi {
 		let (listeners, mdns) = swarm_state.next().await.unwrap_or_default();
 
 		let connections = self.connections.request(ConnectionMessage::Overview).await?;
+		let dns = self.dns.source().await?;
 
-		Ok(NetworkOverview { local_peer_id, listeners, mdns, connections })
+		Ok(NetworkOverview { local_peer_id, listeners, mdns, connections, dns })
 	}
 
 	/// Subscribe to a live stream of [`NetworkOverview`]s for diagnostics.
@@ -84,35 +87,43 @@ impl NetworkApi {
 		let local_peer_id = self.local_peer_id();
 		let connections = self.connections.stream_graceful(ConnectionMessage::OverviewStream);
 		let swarm_state = SwarmStateWatchTask::watch(&self.spawner);
+		let dns_source = self.dns.source_stream();
 
 		enum Update {
 			Connections(ConnectionOverview),
 			Swarm(SwarmState),
+			Dns(Option<DnsSource>),
 		}
 		#[derive(Default)]
 		struct Latest {
 			listeners: BTreeSet<Multiaddr>,
 			mdns: BTreeSet<PeerId>,
 			connections: ConnectionOverview,
+			dns: Option<DnsSource>,
 		}
 
-		stream::select(connections.map(Update::Connections), swarm_state.map(Update::Swarm))
-			.scan(Latest::default(), move |latest, update| {
-				match update {
-					Update::Connections(connections) => latest.connections = connections,
-					Update::Swarm((listeners, mdns)) => {
-						latest.listeners = listeners;
-						latest.mdns = mdns;
-					},
-				}
-				future::ready(Some(NetworkOverview {
-					local_peer_id,
-					listeners: latest.listeners.clone(),
-					mdns: latest.mdns.clone(),
-					connections: latest.connections.clone(),
-				}))
-			})
-			.boxed()
+		stream::select(
+			stream::select(connections.map(Update::Connections), swarm_state.map(Update::Swarm)),
+			dns_source.map(Update::Dns),
+		)
+		.scan(Latest::default(), move |latest, update| {
+			match update {
+				Update::Connections(connections) => latest.connections = connections,
+				Update::Swarm((listeners, mdns)) => {
+					latest.listeners = listeners;
+					latest.mdns = mdns;
+				},
+				Update::Dns(dns) => latest.dns = dns,
+			}
+			future::ready(Some(NetworkOverview {
+				local_peer_id,
+				listeners: latest.listeners.clone(),
+				mdns: latest.mdns.clone(),
+				connections: latest.connections.clone(),
+				dns: latest.dns,
+			}))
+		})
+		.boxed()
 	}
 
 	/// Get a CO-scoped connection overview.

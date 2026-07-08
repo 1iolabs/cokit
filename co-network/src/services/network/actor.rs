@@ -8,6 +8,7 @@ use crate::{
 	services::{
 		connections::{Connections, ConnectionsContext, DynamicNetworkResolver},
 		discovery::{DiscoveryActor, DiscoveryApi, DiscoveryContext},
+		dns::{DnsActor, DnsApi, DnsInitialize},
 		heads::{HeadsActor, HeadsApi, HeadsContext},
 		network::{
 			tasks::{identify_dial::IdentifyDialNetworkTask, listen::ListenTask, recover::RecoverTask},
@@ -53,6 +54,13 @@ impl Actor for Network {
 	) -> Result<Self::State, ActorError> {
 		let network_peer_id = PeerId::from(initialize.keypair.public());
 
+		// dns
+		let dns_spawner =
+			DnsActor::spawner(tags!("type": "dns", "application": &initialize.identifier), DnsActor::default())?;
+		let dns_handle = dns_spawner.handle();
+		let dns_initialize = DnsInitialize::new(&initialize.settings.dns, dns_handle);
+		let dns_resolver = dns_initialize.resolver();
+
 		// network
 		let network = Libp2pNetwork::new(
 			Libp2pNetworkContext {
@@ -65,8 +73,11 @@ impl Actor for Network {
 			},
 			initialize.keypair.clone(),
 			initialize.settings.clone(),
+			dns_resolver,
 		)
 		.await?;
+
+		let dns = dns_spawner.spawn(initialize.tasks.clone(), dns_initialize);
 
 		// spawner
 		let spawner = CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id };
@@ -148,7 +159,7 @@ impl Actor for Network {
 		tracing::info!(application = initialize.identifier, peer_id = ?network_peer_id, "network");
 
 		// result
-		Ok(NetworkState { network, peer_id: network_peer_id, discovery, connections, heads })
+		Ok(NetworkState { network, peer_id: network_peer_id, discovery, connections, heads, dns })
 	}
 
 	async fn handle(
@@ -168,10 +179,14 @@ impl Actor for Network {
 					connections: state.connections.handle(),
 					discovery: DiscoveryApi::from(&state.discovery),
 					heads: HeadsApi::from(&state.heads),
+					dns: DnsApi::from(&state.dns),
 					_handle: handle.clone(),
 				});
 			},
 			NetworkMessage::Recover(response) => {
+				if let Err(err) = DnsApi::from(&state.dns).refresh() {
+					tracing::warn!(?err, "network-dns-refresh-dispatch-failed");
+				}
 				if let Err(err) = state.network.spawner().spawn(RecoverTask) {
 					tracing::warn!(?err, "network-recover-spawn-failed");
 				}
@@ -188,6 +203,7 @@ impl Actor for Network {
 		state.connections.shutdown();
 		state.discovery.shutdown();
 		state.heads.shutdown();
+		state.dns.shutdown();
 		Ok(())
 	}
 }
@@ -198,4 +214,5 @@ pub struct NetworkState {
 	discovery: ActorInstance<DiscoveryActor>,
 	connections: ActorInstance<Connections>,
 	heads: ActorInstance<HeadsActor>,
+	dns: ActorInstance<DnsActor>,
 }

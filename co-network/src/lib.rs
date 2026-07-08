@@ -4,6 +4,8 @@
 // modules
 mod bitswap;
 mod didcomm;
+#[cfg(feature = "native")]
+mod dns;
 mod library;
 mod network;
 mod services;
@@ -21,6 +23,7 @@ pub use library::{
 };
 pub use services::{
 	connections::NetworkOverview,
+	dns::DnsSource,
 	heads::HeadsApi,
 	network::{subscribe_identity, Network, NetworkApi, NetworkInitialize, NetworkMessage, NetworkSettings},
 };
