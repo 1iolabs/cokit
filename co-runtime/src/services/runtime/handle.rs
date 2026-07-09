@@ -59,4 +59,9 @@ impl RuntimeHandle {
 			.await
 			.map_err(|err| ExecuteError::Other(err.into()))?
 	}
+
+	/// Request a graceful shutdown of the runtime actor.
+	pub fn shutdown(&self) {
+		self.handle.shutdown();
+	}
 }

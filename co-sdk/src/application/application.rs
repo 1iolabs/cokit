@@ -33,8 +33,11 @@ use co_storage::StaticBlockStorage;
 #[cfg(feature = "fs")]
 use directories::ProjectDirs;
 use futures::{future::BoxFuture, FutureExt, Stream, StreamExt};
-use std::{collections::BTreeSet, fmt::Debug, future::ready, path::PathBuf, sync::Arc};
+use std::{collections::BTreeSet, fmt::Debug, future::ready, path::PathBuf, sync::Arc, time::Duration};
 use tokio_util::sync::{CancellationToken, DropGuard};
+
+/// Upper bound for `shutdown_application()` to wait for spawned tasks to drain before returning.
+const APPLICATION_SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
 #[derive(Clone)]
 pub struct Application {
@@ -110,8 +113,14 @@ impl Application {
 		// signal
 		self.context().inner.shutdown().cancel();
 
-		// wait
-		self.joiner().await;
+		// wait, bounded so a task that fails to drain can never hang graceful shutdown
+		if co_actor::time::timeout(APPLICATION_SHUTDOWN_GRACE, self.joiner())
+			.await
+			.is_err()
+		{
+			#[cfg(not(feature = "js"))]
+			tracing::warn!(remaining = self.tasks.tracker().len(), "application-shutdown-drain-timeout");
+		}
 	}
 
 	/// Created a futures that resolves when all pending tasks are done.
