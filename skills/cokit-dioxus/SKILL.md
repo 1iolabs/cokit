@@ -156,6 +156,24 @@ typed `Link<T>` values, and pass them as `ReadSignal<Link<T>>` props to children
 child calls `use_selector` with that link to resolve its own data. This way, when data
 deep in the DAG changes, only the affected child re-renders.
 
+### Rendering lists
+
+A list is always split across two components with a fixed division of labor:
+
+1. **The list component's selector returns identifiers only** — `Link<T>`, `Cid`, or
+   ids. One entry per item, nothing resolved, no per-item loop that calls
+   `get_value`/`get_deserialized`, no precomputed row models.
+2. **Each item component receives its identifier as a prop** and runs its own
+   `use_selector` to resolve and derive *everything* it renders. This includes
+   lookups into other parts of the state (author names, statuses, joins): do the
+   lookup in the item's selector, not the parent's.
+
+Why: Dioxus memoizes components on their props. Identifiers are content-addressed,
+so when one item changes, only that item's prop changes — only that one component
+re-runs its selector and re-renders, and the rest of the list stays cached. A parent
+selector that resolves item data re-runs in full on every change to any item and
+re-renders every row.
+
 ```rust
 // Parent: get top-level state, extract links
 #[component]
@@ -499,6 +517,41 @@ co.dispatch(
 ```
 
 ## Common Anti-Patterns
+
+### Precomputing resolved list items in the parent selector
+
+```rust
+// WRONG: parent selector resolves every item into a row model.
+// Any change to any item re-runs this selector, re-resolves ALL items,
+// and re-renders every row.
+let rows_resource = use_selector_state(&co, move |storage, co_state| async move {
+    let chat: Chat = state::core_or_default(&storage, co_state.co(), "chat").await?;
+    let links: Vec<Link<Message>> = chat.messages
+        .stream(&storage).map_ok(|(_id, link)| link).try_collect().await?;
+    let mut rows = Vec::new();
+    for link in links {
+        let msg: Message = storage.get_value(&link).await?; // resolving per item
+        rows.push(MessageRowModel { body: msg.body, author: msg.author });
+    }
+    Ok(rows)
+});
+
+// CORRECT: parent selector returns identifiers only; each row resolves
+// its own data (see "Rendering lists")
+let links_resource = use_selector_state(&co, move |storage, co_state| async move {
+    let chat: Chat = state::core_or_default(&storage, co_state.co(), "chat").await?;
+    let links: Vec<Link<Message>> = chat.messages
+        .stream(&storage).map_ok(|(_id, link)| link).try_collect().await?;
+    Ok(links)
+});
+// MessageRow { co: co.clone(), message: link } — the row's own use_selector
+// resolves the message and any lookups (e.g. author display name). Only the
+// changed row re-renders; Dioxus caches the rest.
+```
+
+This also holds when a row needs data from elsewhere in the state (a join, e.g.
+resolving an author id to a display name): the lookup belongs in the row's
+selector, not in a parent loop that pre-pairs each item with its related data.
 
 ### Copying selector data into signals
 
