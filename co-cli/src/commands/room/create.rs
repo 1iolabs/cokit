@@ -9,7 +9,7 @@ use co_core_co::CoAction;
 use co_core_room::Room;
 use co_messaging::{
 	multimedia::{ImageInfo, ThumbnailInfo},
-	state_event::{RoomAvatarContent, RoomNameContent, RoomTopicContent},
+	state_event::{Avatar, RoomAvatarContent, RoomNameContent, RoomTopicContent},
 	MatrixEvent,
 };
 use co_primitives::CoreName;
@@ -77,11 +77,11 @@ pub async fn command(
 			uuid::Uuid::new_v4(),
 			timestamp,
 			core,
-			RoomAvatarContent::new(
-				Some(*avatar),
+			RoomAvatarContent::new(Avatar::Image {
+				cid: *avatar,
 				// TODO: generate metadata for image
-				ImageInfo::new(0, 0, "", 0, Default::default(), ThumbnailInfo::new(0, 0, "", 0)),
-			),
+				info: ImageInfo::new(0, 0, "", 0, Default::default(), ThumbnailInfo::new(0, 0, "", 0)),
+			}),
 		);
 		co_reducer.push(&identity, core, &set_avatar).await?;
 	}

@@ -17,5 +17,5 @@ fn room_name() {
 
 	let thumbnail_info = ThumbnailInfo::new(10, 10, "image/png", 1000);
 	let image_info = ImageInfo::new(100, 100, "image/png", 10000, Cid::default(), thumbnail_info);
-	state_event::RoomAvatarContent::new(Some(Cid::default()), image_info);
+	state_event::RoomAvatarContent::new(state_event::Avatar::Image { cid: Cid::default(), info: image_info });
 }
