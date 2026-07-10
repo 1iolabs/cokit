@@ -37,6 +37,9 @@ type BuildDns = ();
 pub const CO_AGENT: &str = "co/0.1.0";
 pub const IPFS_IDENTIFY_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/id/1.0.0");
 
+/// Upper bound for actively draining connections during a graceful network shutdown.
+const NETWORK_SHUTDOWN_DRAIN: Duration = Duration::from_millis(1000);
+
 pub struct Libp2pNetworkContext {
 	pub identifier: String,
 	pub tasks: TaskSpawner,
@@ -109,7 +112,8 @@ impl Libp2pNetwork {
 	}
 
 	/// Token to gracefully shutdown the network stack.
-	/// This will stop accepting new connections and waits until established connections are done.
+	/// Stops accepting new connections, actively disconnects established connections, and drains
+	/// remaining events for up to `NETWORK_SHUTDOWN_DRAIN` before the run loop exits.
 	pub fn shutdown(&self) -> Shutdown {
 		Shutdown { shutdown: self.shutdown.clone() }
 	}
@@ -412,7 +416,6 @@ async fn run(swarm: &mut Swarm<Behaviour>, mut runtime: Runtime, tasks: impl Str
 
 	// handle
 	let shutdown = runtime.shutdown.child_token();
-	let mut shutdown_timeout = None;
 	let tasks = tasks.fuse();
 	pin_mut!(tasks);
 	while runtime.is_running() {
@@ -447,10 +450,24 @@ async fn run(swarm: &mut Swarm<Behaviour>, mut runtime: Runtime, tasks: impl Str
 				}
 			},
 
-			// shutdown
-			_ = shutdown.cancelled(), if shutdown_timeout.is_none() => {
-				shutdown_timeout = Some(Duration::from_millis(1000));
-			}
+			// shutdown: wake so the loop re-checks is_running() and exits into the drain phase
+			_ = shutdown.cancelled() => {}
+		}
+	}
+
+	// graceful drain: actively close every connection, then pump events until all connections
+	// are gone or the drain deadline elapses, so shutdown never waits on the remote to close.
+	let peers: Vec<PeerId> = swarm.connected_peers().copied().collect();
+	tracing::info!(peers = peers.len(), "network-draining");
+	for peer in peers {
+		let _ = swarm.disconnect_peer_id(peer);
+	}
+	let deadline = time::Instant::now() + NETWORK_SHUTDOWN_DRAIN;
+	while swarm.connected_peers().next().is_some() && time::Instant::now() < deadline {
+		::tokio::select! {
+			biased;
+			_ = run_once(swarm, &mut runtime) => {}
+			_ = time::sleep_until(deadline) => {}
 		}
 	}
 

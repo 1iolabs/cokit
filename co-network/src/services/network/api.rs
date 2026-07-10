@@ -57,6 +57,12 @@ impl NetworkApi {
 		&self.spawner
 	}
 
+	/// Request a graceful shutdown of the network actor, which cascades to the swarm and the
+	/// connections/discovery/heads/dns sub-actors.
+	pub fn shutdown(&self) {
+		self._handle.shutdown();
+	}
+
 	/// Get our local peer id.
 	pub fn local_peer_id(&self) -> PeerId {
 		self.spawner.local_peer_id()
