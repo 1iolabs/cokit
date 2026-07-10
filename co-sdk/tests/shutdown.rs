@@ -27,10 +27,7 @@ async fn shutdown_completes_while_counterparty_stays_connected() {
 	let elapsed = started.elapsed();
 
 	// keep peer2 alive across the assertion so the connection stayed open during shutdown
-	assert!(
-		elapsed < Duration::from_secs(3),
-		"shutdown_application() took {elapsed:?}; expected a clean drain in ~1s"
-	);
+	assert!(elapsed < Duration::from_secs(3), "shutdown_application() took {elapsed:?}; expected a clean drain in ~1s");
 	drop(peer2);
 }
 
@@ -48,10 +45,7 @@ async fn shutdown_completes_for_all_peers_concurrently() {
 	let (_network1, _network2) = Instances::networking(&mut peer1, &mut peer2, true, false).await;
 
 	let started = Instant::now();
-	tokio::join!(
-		peer1.application.shutdown_application(),
-		peer2.application.shutdown_application(),
-	);
+	tokio::join!(peer1.application.shutdown_application(), peer2.application.shutdown_application(),);
 	let elapsed = started.elapsed();
 
 	assert!(
