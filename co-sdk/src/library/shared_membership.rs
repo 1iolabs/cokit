@@ -36,35 +36,37 @@ pub async fn wait_shared_membership_active(
 	identity: Option<&Did>,
 	unknown: bool,
 ) -> Result<Option<Membership>, anyhow::Error> {
-	if let Some(membership) = shared_membership(parent, co, identity).await? {
-		if let Some(MembershipState::Active) = membership.membership_state() {
-			Ok(Some(membership))
-		} else {
-			let wait = match membership.membership_state() {
-				Some(MembershipState::Pending | MembershipState::Join) => true,
-				None if unknown => true,
-				_ => false,
-			};
-			if wait {
-				let result = parent
-					.reducer_state_stream()
-					.map(Ok)
-					.try_filter_map(move |_parent_reducer_state| {
-						let parent = parent.clone();
-						let co = co.clone();
-						let identity = identity.cloned();
-						async move { shared_membership_active(&parent, &co, identity.as_ref()).await }
-					})
-					.try_first()
-					.await;
-				result
-			} else {
-				Ok(None)
-			}
-		}
-	} else {
-		Ok(None)
+	// decide whether to wait, based on the current membership state.
+	let should_wait = match shared_membership(parent, co, identity).await? {
+		Some(membership) => match membership.membership_state() {
+			// already active — done.
+			Some(MembershipState::Active) => return Ok(Some(membership)),
+			// in-flight join - wait for it to become active.
+			Some(MembershipState::Pending | MembershipState::Join) => true,
+			// entry exists without a resolved state - wait only for unknown COs.
+			None if unknown => true,
+			_ => false,
+		},
+		// no membership entry yet
+		None => unknown,
+	};
+
+	if !should_wait {
+		return Ok(None);
 	}
+
+	// wait until a membership appears (if needed) and becomes active.
+	parent
+		.reducer_state_stream()
+		.map(Ok)
+		.try_filter_map(move |_parent_reducer_state| {
+			let parent = parent.clone();
+			let co = co.clone();
+			let identity = identity.cloned();
+			async move { shared_membership_active(&parent, &co, identity.as_ref()).await }
+		})
+		.try_first()
+		.await
 }
 
 /// Find active shared membership with options.
