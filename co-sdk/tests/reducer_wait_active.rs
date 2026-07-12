@@ -56,7 +56,7 @@ async fn test_try_co_reducer_waits_after_invite_accept() {
 		.unwrap();
 
 	// this should wait for Join → Active, but fails with "No active membership"
-	let options = CoOptions { wait: true, wait_timeout: Some(Duration::from_secs(10)) };
+	let options = CoOptions::default().with_wait(Some(Duration::from_secs(10)));
 	let reducer = peer1
 		.application
 		.context()
