@@ -13,6 +13,7 @@ Logging/tracing setup has moved to the dedicated `co-tracing` crate; `co-sdk` ke
 
 ### Changed
 
+- **Breaking.** Changed `join_unrelated_co`, `to_networks` from `BTreeSet<Network>` to `impl Into<CoConnectivity>`.
 - **Breaking.** `ApplicationBuilder::build()` no longer installs a tracing subscriber. Set logging
   up via `co-tracing` first — e.g.
   `co_tracing::TracingBuilder::file(builder.identifier(), builder.log_path()).with_optional().init()?`

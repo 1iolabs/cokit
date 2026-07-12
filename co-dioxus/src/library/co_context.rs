@@ -3,7 +3,7 @@
 
 use crate::CoSettings;
 use anyhow::Result;
-use co_primitives::Network;
+use co_primitives::{CoConnectivity, Network};
 use co_sdk::{state, Application, ApplicationBuilder, CoId, Did, IdentityResolver};
 #[cfg(feature = "tracing")]
 use co_tracing::LogContext;
@@ -185,8 +185,9 @@ impl CoContext {
 		from: state::Identity,
 		to: Did,
 		to_co: CoId,
-		to_networks: BTreeSet<Network>,
+		to_networks: impl Into<CoConnectivity>,
 	) -> Result<(), anyhow::Error> {
+		let to_networks = to_networks.into();
 		Ok(self
 			.try_with_application(move |application| async move {
 				let to_identity = application.identity_resolver().await?.resolve(&to).await?;
