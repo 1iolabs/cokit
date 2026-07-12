@@ -40,27 +40,27 @@ impl Actor for CoActor {
 		{
 			Ok(reducer) => {
 				// subscribe state and update signal on change
-				context.tasks().spawn({
-					let reducer = reducer.clone();
-					let weak_handle = handle.clone().downgrade();
-					async move {
-						reducer
-							.reducer_state_stream()
-							.take_until(weak_handle.closed())
-							.for_each(|reducer_state| {
-								signal.set(Some(Ok(reducer_state)));
-								ready(())
-							})
-							.await;
-					}
-				});
+				subscribe_reducer_state(&context, handle, &reducer, signal);
 
 				// result
 				reducer
 			},
 			Err(err) => {
+				// error
+				//  we show the error
 				signal.set(Some(Err(CoError::new(err))));
-				return Err(ActorError::Canceled);
+
+				// wait for unknown as we may recover from the error
+				let reducer = context
+					.try_co_reducer_with_options(&self.id, CoOptions::default().with_wait_unknown(None))
+					.await
+					.map_err(|_e| ActorError::Canceled)?;
+
+				// subscribe state and update signal on change
+				subscribe_reducer_state(&context, handle, &reducer, signal);
+
+				// result
+				reducer
 			},
 		};
 		Ok(CoActorState { tasks: context.tasks(), reducer })
@@ -103,6 +103,28 @@ impl Actor for CoActor {
 		}
 		Ok(())
 	}
+}
+
+fn subscribe_reducer_state(
+	context: &CoContext,
+	handle: &ActorHandle<CoMessage>,
+	reducer: &CoReducer,
+	mut signal: SyncSignal<Option<Result<CoReducerState, CoError>>>,
+) {
+	context.tasks().spawn({
+		let reducer = reducer.clone();
+		let weak_handle = handle.clone().downgrade();
+		async move {
+			reducer
+				.reducer_state_stream()
+				.take_until(weak_handle.closed())
+				.for_each(|reducer_state| {
+					signal.set(Some(Ok(reducer_state)));
+					ready(())
+				})
+				.await;
+		}
+	});
 }
 
 fn storage_with_settings(state: &CoActorState, settings: Option<BlockStorageCloneSettings>) -> CoStorage {

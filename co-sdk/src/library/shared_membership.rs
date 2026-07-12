@@ -29,15 +29,23 @@ pub async fn shared_membership_active(
 
 /// Find active shared membership.
 /// If it is not active yet wait for it to become active.
+/// If `unknown` is `true` also wait if there is no membership yet.
 pub async fn wait_shared_membership_active(
 	parent: &CoReducer,
 	co: &CoId,
 	identity: Option<&Did>,
+	unknown: bool,
 ) -> Result<Option<Membership>, anyhow::Error> {
 	if let Some(membership) = shared_membership(parent, co, identity).await? {
-		match membership.membership_state() {
-			Some(MembershipState::Active) => Ok(Some(membership)),
-			Some(MembershipState::Pending | MembershipState::Join) => {
+		if let Some(MembershipState::Active) = membership.membership_state() {
+			Ok(Some(membership))
+		} else {
+			let wait = match membership.membership_state() {
+				Some(MembershipState::Pending | MembershipState::Join) => true,
+				None if unknown => true,
+				_ => false,
+			};
+			if wait {
 				let result = parent
 					.reducer_state_stream()
 					.map(Ok)
@@ -50,8 +58,9 @@ pub async fn wait_shared_membership_active(
 					.try_first()
 					.await;
 				result
-			},
-			_ => Ok(None),
+			} else {
+				Ok(None)
+			}
 		}
 	} else {
 		Ok(None)
@@ -66,11 +75,11 @@ pub async fn shared_membership_active_options(
 	options: CoOptions,
 ) -> Result<Option<Membership>, anyhow::Error> {
 	// find first active membership
-	Ok(if options.wait {
+	Ok(if options.wait || options.wait_unknown {
 		if let Some(timeout) = options.wait_timeout {
-			time::timeout(timeout, wait_shared_membership_active(parent, co, identity)).await??
+			time::timeout(timeout, wait_shared_membership_active(parent, co, identity, options.wait_unknown)).await??
 		} else {
-			wait_shared_membership_active(parent, co, identity).await?
+			wait_shared_membership_active(parent, co, identity, options.wait_unknown).await?
 		}
 	} else {
 		shared_membership_active(parent, co, identity).await?
