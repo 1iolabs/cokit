@@ -13,6 +13,7 @@
 
 ### Changed
 
+- **Breaking.** Changed `CoContext::join_unrelated_co` `to_networks` from `BTreeSet<Network>` to `impl Into<CoConnectivity>`.
 - **Breaking.** Logging is configured via a `co_tracing::LogArgs` instead of `CoLog`/`CoLogLevel`,
   and the subscriber is installed automatically when the context starts (desktop = stderr/file,
   web = browser console). Migrate with e.g.

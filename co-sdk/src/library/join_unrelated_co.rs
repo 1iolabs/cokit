@@ -4,9 +4,8 @@
 use crate::{CoContext, CO_CORE_NAME_MEMBERSHIP};
 use co_core_membership::{MembershipOptions, MembershipsAction};
 use co_identity::{Identity, IdentityBox, PrivateIdentityBox};
-use co_primitives::{tags, CoConnectivity, CoId, CoInviteMetadata, KnownTags, Network};
+use co_primitives::{tags, CoConnectivity, CoId, CoInviteMetadata, KnownTags};
 use co_storage::BlockStorageExt;
-use std::collections::BTreeSet;
 
 /// Add a membership to a CO which are not participant of.
 pub async fn join_unrelated_co(
@@ -14,16 +13,21 @@ pub async fn join_unrelated_co(
 	from: &PrivateIdentityBox,
 	to: &IdentityBox,
 	to_co: CoId,
-	to_networks: BTreeSet<Network>,
+	to_networks: impl Into<CoConnectivity>,
 ) -> Result<(), anyhow::Error> {
 	let local_co = context.local_co_reducer().await?;
+
+	// make sure connectivity contains at least `to` DID
+	//  we need at least one pointer who to connect for unrelated COs
+	let mut to_networks = to_networks.into();
+	to_networks.participants.insert(to.identity().to_owned());
 
 	// add membership
 	let metadata = CoInviteMetadata {
 		id: "unrelated".to_string(),
 		from: to.identity().to_owned(),
 		peer: None,
-		network: CoConnectivity { network: to_networks, participants: Default::default() },
+		network: to_networks,
 		name: Default::default(),
 		tags: Default::default(),
 	};
