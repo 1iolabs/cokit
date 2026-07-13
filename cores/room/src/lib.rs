@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use cid::Cid;
 use co_api::{
 	co, BlockStorage, BlockStorageExt, CoList, CoListIndex, CoMap, CoreBlockStorage, IsDefault, Link, OptionLink,
 	Reducer, ReducerAction, Tags,
 };
 pub use co_messaging::MatrixEvent;
-use co_messaging::{message_event::MessageType, relation::Relation, EventContent};
-use co_primitives::CoCid;
+use co_messaging::{
+	message_event::MessageType, receipts::ReceiptKind, relation::Relation, state_event::Avatar, EventContent,
+};
 use schemars::JsonSchema;
 use std::collections::BTreeMap;
 
@@ -60,17 +60,27 @@ pub struct Room {
 	pub name: String,
 	/// A short description for the room
 	pub description: String,
-	/// Content ID for the room avatar
-	#[schemars(with = "Option<CoCid>")]
-	pub avatar: Option<Cid>,
+	/// Room/group avatar (image or emoji), applied from RoomAvatar events.
+	#[schemars(skip)]
+	#[serde(default)]
+	pub avatar: Option<Avatar>,
 	/// All currently pinned messages in relevant order
 	pub pinned_messages: Vec<String>,
+	/// LWW guard for pins: event_id -> timestamp of its last applied pin/unpin.
+	#[schemars(skip)]
+	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+	pub pinned_at: BTreeMap<String, u64>,
 	pub tags: Tags,
 
 	/// Read receipts: sender DID / event_id of last message they read
 	#[schemars(skip)]
 	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
 	pub read_receipts: BTreeMap<String, String>,
+
+	/// Received receipts: sender DID / event_id of the last message they received (device ingested)
+	#[schemars(skip)]
+	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+	pub received_receipts: BTreeMap<String, String>,
 
 	/// Typing indicators: sender DID / timestamp of typing event
 	#[schemars(skip)]
@@ -98,8 +108,19 @@ impl Reducer<MatrixEvent> for Room {
 		match &event.payload.content {
 			EventContent::RoomName(c) => state.name = c.name.clone(),
 			EventContent::RoomTopic(c) => state.description = c.topic.clone(),
-			EventContent::RoomAvatar(c) => state.avatar = c.file,
-			EventContent::PinnedEvents(c) => state.pinned_messages = c.pinned.clone(),
+			EventContent::RoomAvatar(c) => state.avatar = c.avatar.clone(),
+			EventContent::PinnedEvents(c) => {
+				let ts = event.payload.timestamp;
+				let newer = state.pinned_at.get(&c.event_id).map(|prev| ts >= *prev).unwrap_or(true);
+				if newer {
+					state.pinned_at.insert(c.event_id.clone(), ts);
+					state.pinned_messages.retain(|id| id != &c.event_id);
+					if c.pinned {
+						state.pinned_messages.push(c.event_id.clone());
+						state.pinned_messages.sort();
+					}
+				}
+			},
 			_ => {},
 		}
 
@@ -155,7 +176,22 @@ where
 			})
 			.await
 		},
-		// state events, ephemeral, calls — skip
+		EventContent::Receipt(rc) => match rc.kind {
+			ReceiptKind::Read => {
+				advance_receipt(&mut state.read_receipts, &state.event_index, sender, &rc.up_to, storage).await
+			},
+			ReceiptKind::Received => {
+				advance_receipt(&mut state.received_receipts, &state.event_index, sender, &rc.up_to, storage).await
+			},
+			// ReceiptKind is #[non_exhaustive]; unknown future kinds are ignored
+			_ => Ok(()),
+		},
+		EventContent::Typing(_) => {
+			state.typing.insert(sender.to_owned(), matrix_event.timestamp);
+			Ok(())
+		},
+		// state events (name/topic/avatar/pinned) are applied in reduce(); presence, calls, stories,
+		// and profile updates are intentionally not recorded here
 		_ => Ok(()),
 	}
 }
@@ -171,32 +207,7 @@ async fn reduce_message<S>(
 where
 	S: BlockStorage + Clone + 'static,
 {
-	// control notices: read receipts and typing indicators / track in Room state
 	if let MessageType::Notice(nc) = msg_type {
-		if nc.body.starts_with("__READ_RECEIPT__") {
-			let event_id = nc.body["__READ_RECEIPT__".len()..].to_string();
-			if !event_id.is_empty() {
-				let should_update = if let Some(existing_id) = state.read_receipts.get(sender) {
-					let existing_idx = state.event_index.get(storage, existing_id).await?;
-					let new_idx = state.event_index.get(storage, &event_id).await?;
-					match (existing_idx, new_idx) {
-						(Some(e), Some(n)) => n > e,
-						(None, Some(_)) => true,
-						_ => false,
-					}
-				} else {
-					state.event_index.get(storage, &event_id).await?.is_some()
-				};
-				if should_update {
-					state.read_receipts.insert(sender.to_owned(), event_id.to_owned());
-				}
-			}
-			return Ok(());
-		}
-		if nc.body == "__TYPING__" {
-			state.typing.insert(sender.to_owned(), matrix_event.timestamp);
-			return Ok(());
-		}
 		// checklist item addition — attach to target
 		if nc.body.starts_with("__CHECKLIST_ADD__") {
 			if let Some(checklist_id) = nc.body["__CHECKLIST_ADD__".len()..].split_once('\n').map(|(id, _)| id) {
@@ -277,6 +288,39 @@ where
 	let room_event_link: Link<RoomEvent> = storage.set_value(&room_event).await?;
 	let idx = state.events.push(storage, room_event_link).await?;
 	state.event_index.insert(storage, matrix_event.event_id.clone(), idx).await?;
+	Ok(())
+}
+
+/// Advance a per-sender cursor map to `up_to`, only if `up_to` is further forward
+/// in `event_index` than the sender's current entry (monotonic). No-op if `up_to`
+/// is empty or not yet indexed.
+async fn advance_receipt<S>(
+	map: &mut BTreeMap<String, String>,
+	event_index: &CoMap<String, CoListIndex>,
+	sender: &str,
+	up_to: &String,
+	storage: &S,
+) -> Result<(), anyhow::Error>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	if up_to.is_empty() {
+		return Ok(());
+	}
+	let should_update = if let Some(existing_id) = map.get(sender) {
+		let existing_idx = event_index.get(storage, existing_id).await?;
+		let new_idx = event_index.get(storage, up_to).await?;
+		match (existing_idx, new_idx) {
+			(Some(e), Some(n)) => n > e,
+			(None, Some(_)) => true,
+			_ => false,
+		}
+	} else {
+		event_index.get(storage, up_to).await?.is_some()
+	};
+	if should_update {
+		map.insert(sender.to_owned(), up_to.to_owned());
+	}
 	Ok(())
 }
 
@@ -384,12 +428,16 @@ fn get_relates_to_event_id(msg_type: &MessageType) -> Option<String> {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use cid::Cid;
 	use co_api::{BlockStorageExt, CoreBlockStorage, Date, Reducer, ReducerAction};
 	use co_messaging::{
+		ephemeral_event::TypingContent,
 		message_event::{NoticeContent, TextContent},
+		multimedia::{ImageInfo, ThumbnailInfo},
 		poll_event::{PollAnswer, PollEndContent, PollKind, PollResponseContent, PollStartContent},
+		receipts::{ReceiptContent, ReceiptKind},
 		relation::{ReactionContent, RedactionContent, RelatesTo},
-		state_event::{RoomNameContent, RoomTopicContent},
+		state_event::{Avatar, PinnedEventsContent, RoomAvatarContent, RoomNameContent, RoomTopicContent},
 		EventContent, MatrixEvent,
 	};
 	use co_storage::MemoryBlockStorage;
@@ -550,45 +598,55 @@ mod tests {
 	}
 
 	#[tokio::test]
-	async fn read_receipt_tracked_in_state() {
+	async fn typed_read_receipt_advances_monotonically() {
 		let storage = MemoryBlockStorage::default();
 		let mut time: Date = 1000;
 		let state = Room::default();
 
-		// First create real messages so they get indexed in event_index
 		let state = dispatch(&storage, &mut time, state, "bob", "$msg1", TextContent::new("hello")).await;
 		let state = dispatch(&storage, &mut time, state, "bob", "$msg2", TextContent::new("world")).await;
-		let state = dispatch(&storage, &mut time, state, "bob", "$msg3", TextContent::new("foo")).await;
 
-		// Read receipt pointing to $msg1
 		let state =
-			dispatch(&storage, &mut time, state, "alice", "$rr1", NoticeContent::new("__READ_RECEIPT__$msg1")).await;
-		assert_eq!(state.read_receipts.get("alice"), Some(&"$msg1".to_string()));
+			dispatch(&storage, &mut time, state, "alice", "$rr1", ReceiptContent::new(ReceiptKind::Read, "$msg2"))
+				.await;
+		assert_eq!(state.read_receipts.get("alice"), Some(&"$msg2".to_string()));
 
-		// Later receipt pointing to $msg3 (later in list) wins
+		// Earlier target does not overwrite
 		let state =
-			dispatch(&storage, &mut time, state, "alice", "$rr2", NoticeContent::new("__READ_RECEIPT__$msg3")).await;
-		assert_eq!(state.read_receipts.get("alice"), Some(&"$msg3".to_string()));
-
-		// Earlier receipt pointing to $msg2 does not overwrite (before $msg3 in list)
-		let state =
-			dispatch(&storage, &mut time, state, "alice", "$rr3", NoticeContent::new("__READ_RECEIPT__$msg2")).await;
-		assert_eq!(state.read_receipts.get("alice"), Some(&"$msg3".to_string()));
+			dispatch(&storage, &mut time, state, "alice", "$rr2", ReceiptContent::new(ReceiptKind::Read, "$msg1"))
+				.await;
+		assert_eq!(state.read_receipts.get("alice"), Some(&"$msg2".to_string()));
+		// Read is a separate channel from received
+		assert!(!state.received_receipts.contains_key("alice"));
 	}
 
 	#[tokio::test]
-	async fn typing_tracked_in_state() {
+	async fn typed_received_receipt_advances_monotonically() {
 		let storage = MemoryBlockStorage::default();
 		let mut time: Date = 1000;
 		let state = Room::default();
 
-		let state = dispatch(&storage, &mut time, state, "alice", "$e1", NoticeContent::new("__TYPING__")).await;
+		let state = dispatch(&storage, &mut time, state, "bob", "$msg1", TextContent::new("hello")).await;
+		let state = dispatch(&storage, &mut time, state, "bob", "$msg2", TextContent::new("world")).await;
+
+		let state =
+			dispatch(&storage, &mut time, state, "alice", "$rc1", ReceiptContent::new(ReceiptKind::Received, "$msg2"))
+				.await;
+		assert_eq!(state.received_receipts.get("alice"), Some(&"$msg2".to_string()));
+		assert!(!state.read_receipts.contains_key("alice"));
+	}
+
+	#[tokio::test]
+	async fn typed_typing_tracked_in_state() {
+		let storage = MemoryBlockStorage::default();
+		let mut time: Date = 1000;
+		let state = Room::default();
+
+		let state =
+			dispatch(&storage, &mut time, state, "alice", "$t1", TypingContent::new(vec!["alice".to_owned()])).await;
+		// typing is not a timeline event
 		assert_eq!(event_count(&storage, &state).await, 0);
 		assert_eq!(state.typing.get("alice"), Some(&1000));
-
-		// Second typing event updates timestamp
-		let state = dispatch(&storage, &mut time, state, "alice", "$e2", NoticeContent::new("__TYPING__")).await;
-		assert_eq!(state.typing.get("alice"), Some(&1001));
 	}
 
 	#[tokio::test]
@@ -851,13 +909,76 @@ mod tests {
 		let state = dispatch(&storage, &mut time, state, "carol", "$msg2", TextContent::new("there")).await;
 
 		let state =
-			dispatch(&storage, &mut time, state, "alice", "$rr1", NoticeContent::new("__READ_RECEIPT__$msg1")).await;
+			dispatch(&storage, &mut time, state, "alice", "$rr1", ReceiptContent::new(ReceiptKind::Read, "$msg1"))
+				.await;
 		let state =
-			dispatch(&storage, &mut time, state, "bob", "$rr2", NoticeContent::new("__READ_RECEIPT__$msg2")).await;
+			dispatch(&storage, &mut time, state, "bob", "$rr2", ReceiptContent::new(ReceiptKind::Read, "$msg2")).await;
 
 		assert_eq!(state.read_receipts.get("alice"), Some(&"$msg1".to_string()));
 		assert_eq!(state.read_receipts.get("bob"), Some(&"$msg2".to_string()));
 		// Read receipts don't count as visible events (only the 2 messages do)
 		assert_eq!(event_count(&storage, &state).await, 2);
+	}
+
+	#[tokio::test]
+	async fn room_avatar_image_and_emoji_applied() {
+		let storage = MemoryBlockStorage::default();
+		let mut time: Date = 1000;
+		let state = Room::default();
+
+		let info = ImageInfo::new(0, 0, "image/png", 10, Cid::default(), ThumbnailInfo::new(0, 0, "image/png", 10));
+		let state = dispatch(
+			&storage,
+			&mut time,
+			state,
+			"alice",
+			"$av1",
+			RoomAvatarContent::new(Avatar::Image { cid: Cid::default(), info }),
+		)
+		.await;
+		assert!(matches!(state.avatar, Some(Avatar::Image { .. })));
+
+		let state = dispatch(
+			&storage,
+			&mut time,
+			state,
+			"alice",
+			"$av2",
+			RoomAvatarContent::new(Avatar::Emoji("🎉".to_owned())),
+		)
+		.await;
+		assert!(matches!(state.avatar, Some(Avatar::Emoji(ref s)) if s == "🎉"));
+
+		// a RoomAvatar event with no avatar clears it back to None
+		let state = dispatch(&storage, &mut time, state, "alice", "$av3", RoomAvatarContent::remove()).await;
+		assert!(state.avatar.is_none());
+	}
+
+	#[tokio::test]
+	async fn pins_apply_sorted_and_unpin_removes() {
+		let storage = MemoryBlockStorage::default();
+		let mut time: Date = 1000;
+		let state = Room::default();
+
+		let state = dispatch(&storage, &mut time, state, "alice", "$p1", PinnedEventsContent::new("$m2", true)).await;
+		let state = dispatch(&storage, &mut time, state, "bob", "$p2", PinnedEventsContent::new("$m1", true)).await;
+		assert_eq!(state.pinned_messages, vec!["$m1".to_string(), "$m2".to_string()]); // event_id-sorted, both survive
+
+		let state = dispatch(&storage, &mut time, state, "alice", "$p3", PinnedEventsContent::new("$m2", false)).await;
+		assert_eq!(state.pinned_messages, vec!["$m1".to_string()]);
+	}
+
+	#[tokio::test]
+	async fn pin_toggle_is_lww_by_timestamp() {
+		let storage = MemoryBlockStorage::default();
+		let mut time: Date = 1000;
+		let state = Room::default();
+
+		// pin $m1 at ts=1000
+		let state = dispatch(&storage, &mut time, state, "alice", "$p1", PinnedEventsContent::new("$m1", true)).await;
+		// a STALE unpin at ts=500 must be rejected (older than the pin)
+		time = 500;
+		let state = dispatch(&storage, &mut time, state, "bob", "$p2", PinnedEventsContent::new("$m1", false)).await;
+		assert_eq!(state.pinned_messages, vec!["$m1".to_string()]);
 	}
 }

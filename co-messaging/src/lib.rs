@@ -6,7 +6,7 @@ mod matrix_event;
 // TODO
 pub static FORMATTED_BODY_FORMAT: &str = "some.html.standard.format";
 
-use crate::matrix_event::receipts::PublicReceiptContent;
+use crate::matrix_event::receipts::ReceiptContent;
 pub use crate::matrix_event::{
 	call_event, ephemeral_event, message_event, multimedia, poll_event, receipts, relation, state_event, user_events,
 };
@@ -123,7 +123,7 @@ pub enum EventContent {
 	#[serde(rename = "m_room_redaction")]
 	Redaction(RedactionContent),
 	#[serde(rename = "m_receipt")]
-	Receipt(PublicReceiptContent),
+	Receipt(ReceiptContent),
 
 	#[serde(rename = "room_name")]
 	RoomName(RoomNameContent),

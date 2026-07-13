@@ -14,7 +14,10 @@
   - `PostUserStoryContent`, `ViewUserStoryContent`, `UpdateProfileContent`
   - `ReactionContent`, `RelatesTo`, `ReplyContent`, `RedactionContent`
   - `SessionDescription`, `ICECandidate`, `CallInviteContent`, `AnswerCallContent`, `CallCandidatesContent`, `SelectCallAnswerContent`, `CallNegotiationContent`, `RejectCallContent`, `HangupCallContent`
-  - `PublicReceiptContent`, `PrivateReceipt`, `PrivateReceiptContent`
+  - `ReceiptContent`, `PrivateReceipt`, `PrivateReceiptContent`
+- **Breaking:** `PublicReceiptContent` is replaced by `ReceiptContent { kind: ReceiptKind, up_to, thread_id }` (its old `read` field is renamed `up_to`), with a new `ReceiptKind` enum (`Read`, `Received`) so the type now covers both read and received (delivered) receipts.
+- **Breaking:** `RoomAvatarContent` is reshaped to carry `avatar: Option<Avatar>` (was `{ file: Option<Cid>, info: ImageInfo }`), constructed via the new `RoomAvatarContent::new(Avatar)` / `RoomAvatarContent::remove()`. New `Avatar` enum: `Image { cid, info }` or `Emoji(String)`.
+- **Breaking:** `PinnedEventsContent` is reshaped from `{ pinned: Vec<String> }` (whole-list) to a per-event toggle `{ event_id: String, pinned: bool }`, constructed via `PinnedEventsContent::new(event_id, pinned)`. Pins now merge per event instead of wholesale-replacing the list.
 - These structs now have a `Default` derive:
   - `ImageInfo`, `ThumbnailInfo`, `AudioInfo`, `VideoInfo`, `FileInfo`, `LocationInfo`
   - `PinnedEventsContent`

@@ -6,28 +6,37 @@ use co_macros::co;
 use schemars::JsonSchema;
 use std::collections::BTreeMap;
 
-/// These receipts are always sent into a room and indicate to all users that the messages sent up to the indicated
-/// event were read by the user that sent this receipt event. This becomes public knowledge to all users
-/// participating in the CO.
+/// Whether a receipt marks the sender's read cursor or received (delivered) cursor.
 #[co]
 #[derive(JsonSchema)]
 #[non_exhaustive]
-pub struct PublicReceiptContent {
-	/// The ID of the latest event read by the user
-	#[serde(rename = "m_read")]
-	pub read: String,
-	/// The ID of the thread if receipt is threaded
+pub enum ReceiptKind {
+	Read,
+	Received,
+}
+
+/// A public receipt sent into a room: the sender read (or received) all messages
+/// up to `up_to`. Becomes visible to all CO participants.
+#[co]
+#[derive(JsonSchema)]
+#[non_exhaustive]
+pub struct ReceiptContent {
+	/// Read vs received cursor.
+	pub kind: ReceiptKind,
+	/// The ID of the latest event read/received by the user.
+	pub up_to: String,
+	/// The ID of the thread if the receipt is threaded.
 	pub thread_id: Option<String>,
 }
 
-impl PublicReceiptContent {
-	pub fn new(read: impl Into<String>) -> Self {
-		Self { read: read.into(), thread_id: Default::default() }
+impl ReceiptContent {
+	pub fn new(kind: ReceiptKind, up_to: impl Into<String>) -> Self {
+		Self { kind, up_to: up_to.into(), thread_id: None }
 	}
 }
 
-impl From<PublicReceiptContent> for EventContent {
-	fn from(val: PublicReceiptContent) -> Self {
+impl From<ReceiptContent> for EventContent {
+	fn from(val: ReceiptContent) -> Self {
 		EventContent::Receipt(val)
 	}
 }
