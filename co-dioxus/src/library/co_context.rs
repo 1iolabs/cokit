@@ -18,6 +18,8 @@ pub struct CoContext {
 	tasks: UnboundedSender<Task>,
 }
 impl CoContext {
+	/// Create a new CoContext.
+	/// This will spawn a new thread, runtime and application.
 	pub fn new(settings: CoSettings) -> Self {
 		// tracing
 		#[cfg(feature = "tracing")]
@@ -44,8 +46,18 @@ impl CoContext {
 		#[cfg(not(feature = "tracing"))]
 		let guard = ();
 
-		// spwan
+		// spawn
 		Self::spawn(settings, guard)
+	}
+
+	/// Create a dioxus context from a [`Application`] directly.
+	/// Use this if the application is already app owned.
+	pub fn new_application(application: Application) -> Self {
+		let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Task>();
+		application.context().tasks().spawn(async move {
+			co_execute(application, rx).await;
+		});
+		Self { tasks: tx }
 	}
 
 	/// Wait until the context is ready.
@@ -240,7 +252,7 @@ type TaskFn = dyn (FnOnce(Application) -> BoxFuture<'static, ()>) + Send + 'stat
 type Task = Box<TaskFn>;
 // type Task = Box<dyn FnOnce(&Application) + Send + 'static>;
 
-async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Result<(), anyhow::Error> {
+async fn co_app(settings: CoSettings, tasks: UnboundedReceiver<Task>) -> Result<(), anyhow::Error> {
 	let mut application_builder =
 		ApplicationBuilder::new_with_storage(settings.identifier, settings.storage).with_cores(settings.cores);
 	#[cfg(feature = "guard")]
@@ -276,12 +288,16 @@ async fn co_app(settings: CoSettings, mut tasks: UnboundedReceiver<Task>) -> Res
 	}
 
 	// execute
-	while let Some(task) = tasks.recv().await {
-		task(application.clone()).await;
-	}
+	co_execute(application, tasks).await;
 
 	// result
 	Ok(())
+}
+
+async fn co_execute(application: Application, mut tasks: UnboundedReceiver<Task>) {
+	while let Some(task) = tasks.recv().await {
+		task(application.clone()).await;
+	}
 }
 
 fn co_main(settings: CoSettings, tasks: UnboundedReceiver<Task>, guard: impl Send + 'static) {
