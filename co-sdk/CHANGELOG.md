@@ -20,6 +20,7 @@ Logging/tracing setup has moved to the dedicated `co-tracing` crate; `co-sdk` ke
   as a drop-in for the old `with_bunyan_logging`, then `application.drop_on_shutdown(guard)` (or use
   `co_tracing::LogArgs` for `CO_LOG`-string / CLI configuration).
 - **Breaking.** `CoOptions` is now `non_exhaustive`.
+- `network_service` function now checks for the new `ephemeral_peer_id` setting
 
 ### Removed
 
