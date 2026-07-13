@@ -7,7 +7,9 @@ use crate::{
 	Action, ActionError, CoContext,
 };
 use co_actor::{Actions, Actor};
-use co_network::{connections::DynamicNetworkResolver, Network, NetworkInitialize, NetworkMessage, NetworkSettings};
+use co_network::{
+	connections::DynamicNetworkResolver, Keypair, Network, NetworkInitialize, NetworkMessage, NetworkSettings,
+};
 use co_primitives::tags;
 use co_storage::BlockStorage;
 use futures::{FutureExt, Stream};
@@ -40,8 +42,11 @@ async fn network_service(context: CoContext, settings: NetworkSettings) -> Resul
 	// resolve key
 	let local_identity = context.local_identity();
 	let local_co = context.local_co_reducer().await?;
-	let network_key =
-		local_keypair_fetch(context.identifier(), &local_co, &local_identity, settings.force_new_peer_id).await?;
+	let network_key = if settings.ephemeral_peer_id {
+		Keypair::generate_ed25519()
+	} else {
+		local_keypair_fetch(context.identifier(), &local_co, &local_identity, settings.force_new_peer_id).await?
+	};
 
 	// bitswap
 	let bitswap = Actor::spawn_with(
