@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
 	co, BlockStorage, BlockStorageExt, CoList, CoListIndex, CoMap, CoTryStreamExt, CoreBlockStorage, IsDefault,
-	LazyTransaction, Link, OptionLink, Reducer, ReducerAction, Tags,
+	LazyTransaction, Link, OptionLink, Reducer, ReducerAction, Tags, TagsAction,
 };
 use futures::{pin_mut, FutureExt, TryStreamExt};
 use std::future::ready;
@@ -17,23 +17,57 @@ pub type TaskId = String;
 #[co]
 pub enum BoardAction {
 	BoardRename(String),
+	#[deprecated(note = "use `BoardTags` with a `TagsAction`")]
 	BoardTagsInsert(Tags),
+	#[deprecated(note = "use `BoardTags` with a `TagsAction`")]
 	BoardTagsRemove(Tags),
-	ListCreate { list: List, after: Option<ListName> },
-	ListArrange { name: ListName, after: Option<ListName> },
-	ListDelete { name: ListName, move_tasks_to_list: Option<ListName> },
+	ListCreate {
+		list: List,
+		after: Option<ListName>,
+	},
+	ListArrange {
+		name: ListName,
+		after: Option<ListName>,
+	},
+	ListDelete {
+		name: ListName,
+		move_tasks_to_list: Option<ListName>,
+	},
+	#[deprecated(note = "use `ListTags` with a `TagsAction`")]
 	ListTagsInsert(ListName, Tags),
+	#[deprecated(note = "use `ListTags` with a `TagsAction`")]
 	ListTagsRemove(ListName, Tags),
 	// ListTasksDelete(ListName),
 	// ListTasksMove { from: ListName, to: ListName },
-	TaskCreate { list: ListName, task: Task, after: Option<TaskId> },
-	TaskMove { from_list: Option<ListName>, list: ListName, task: TaskId, after: Option<TaskId>, lock: TaskLock },
-	TaskArrange { task: TaskId, after: Option<TaskId> },
+	TaskCreate {
+		list: ListName,
+		task: Task,
+		after: Option<TaskId>,
+	},
+	TaskMove {
+		from_list: Option<ListName>,
+		list: ListName,
+		task: TaskId,
+		after: Option<TaskId>,
+		lock: TaskLock,
+	},
+	TaskArrange {
+		task: TaskId,
+		after: Option<TaskId>,
+	},
 	TaskDelete(TaskId),
 	TaskRename(TaskId, String),
 	TaskPayloadChange(TaskId, Option<Cid>),
+	#[deprecated(note = "use `TaskTags` with a `TagsAction`")]
 	TaskTagsInsert(TaskId, Tags),
+	#[deprecated(note = "use `TaskTags` with a `TagsAction`")]
 	TaskTagsRemove(TaskId, Tags),
+	/// apply a [`TagsAction`] to the board tags.
+	BoardTags(TagsAction),
+	/// apply a [`TagsAction`] to a list's tags.
+	ListTags(ListName, TagsAction),
+	/// apply a [`TagsAction`] to a task's tags.
+	TaskTags(TaskId, TagsAction),
 }
 
 #[co(state)]
@@ -130,6 +164,7 @@ pub enum TaskLock {
 	Unlock(String),
 }
 
+#[allow(deprecated)]
 async fn reduce<S>(storage: &S, state: &mut Board, action: BoardAction) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
@@ -177,6 +212,9 @@ where
 		BoardAction::TaskTagsRemove(task, tags) => {
 			reduce_task_tags_remove(&mut transaction, task, tags).boxed().await?
 		},
+		BoardAction::BoardTags(action) => reduce_board_tags(state, action).boxed().await?,
+		BoardAction::ListTags(name, action) => reduce_list_tags(&mut transaction, name, action).boxed().await?,
+		BoardAction::TaskTags(task, action) => reduce_task_tags(&mut transaction, task, action).boxed().await?,
 	}
 
 	// store
@@ -675,6 +713,51 @@ async fn reduce_board_rename(state: &mut Board, name: String) -> Result<(), anyh
 	Ok(())
 }
 
+async fn reduce_board_tags(state: &mut Board, action: TagsAction) -> Result<(), anyhow::Error> {
+	state.tags.reduce(action);
+	Ok(())
+}
+
+async fn reduce_list_tags<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	name: String,
+	action: TagsAction,
+) -> Result<(), anyhow::Error> {
+	// find
+	let (list_index, mut list) = transaction
+		.find_list_by_name(&name)
+		.await?
+		.ok_or(anyhow!("List not found: {}", name))?;
+
+	// apply
+	list.tags.reduce(action);
+
+	// store
+	transaction.lists.get_mut().await?.set(list_index, list).await?;
+	Ok(())
+}
+
+async fn reduce_task_tags<S: BlockStorage + Clone + 'static>(
+	transaction: &mut BoardTransaction<S>,
+	task_id: TaskId,
+	action: TagsAction,
+) -> Result<(), anyhow::Error> {
+	let mut task = transaction
+		.tasks
+		.get()
+		.await?
+		.get(&task_id)
+		.await?
+		.ok_or(anyhow!("Task not found: {}", task_id))?;
+
+	// apply
+	task.tags.reduce(action);
+
+	// store
+	transaction.tasks.get_mut().await?.insert(task_id, task).await?;
+	Ok(())
+}
+
 async fn task_lock<S: BlockStorage + Clone + 'static>(
 	transaction: &mut BoardTransaction<S>,
 	task_id: &TaskId,
@@ -714,5 +797,144 @@ async fn task_lock<S: BlockStorage + Clone + 'static>(
 				None => Ok(()),
 			}
 		},
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{Board, BoardAction, List, Task};
+	use co_api::{BlockStorageExt, CoreBlockStorage, Link, OptionLink, Reducer, ReducerAction, Tags, TagsAction};
+	use co_storage::MemoryBlockStorage;
+	use futures::TryStreamExt;
+
+	fn tags(pairs: &[(&str, &str)]) -> Tags {
+		let mut result = Tags::new();
+		for (key, value) in pairs {
+			result.insert(((*key).to_owned(), (*value).to_owned().into()));
+		}
+		result
+	}
+
+	async fn reduce_action(
+		storage: &MemoryBlockStorage,
+		core_storage: &CoreBlockStorage,
+		state: OptionLink<Board>,
+		payload: BoardAction,
+	) -> (Board, Link<Board>) {
+		let action = ReducerAction { from: "did:local:test".to_owned(), core: "board".to_owned(), time: 0, payload };
+		let action_link = storage.set_value(&action).await.unwrap();
+		let link = Board::reduce(state, action_link, core_storage).await.unwrap();
+		let next = storage.get_value(&link).await.unwrap();
+		(next, link)
+	}
+
+	#[tokio::test]
+	async fn test_board_tags_action() {
+		let storage = MemoryBlockStorage::default();
+		let core_storage = CoreBlockStorage::new(storage.clone(), false);
+
+		let (state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			OptionLink::none(),
+			BoardAction::BoardTags(TagsAction::insert(tags(&[("a", "1"), ("b", "2")]))),
+		)
+		.await;
+		assert_eq!(state.tags, tags(&[("a", "1"), ("b", "2")]));
+
+		// set replaces the value for key "a"
+		let (state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			BoardAction::BoardTags(TagsAction::set(tags(&[("a", "9")]))),
+		)
+		.await;
+		assert_eq!(state.tags, tags(&[("a", "9"), ("b", "2")]));
+
+		let (state, _link) =
+			reduce_action(&storage, &core_storage, link.into(), BoardAction::BoardTags(TagsAction::remove_key("a")))
+				.await;
+		assert_eq!(state.tags, tags(&[("b", "2")]));
+	}
+
+	#[tokio::test]
+	async fn test_list_tags_action() {
+		let storage = MemoryBlockStorage::default();
+		let core_storage = CoreBlockStorage::new(storage.clone(), false);
+
+		// seed a list named "backlog"
+		let (_state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			OptionLink::none(),
+			BoardAction::ListCreate { list: List::new("backlog"), after: None },
+		)
+		.await;
+
+		// insert then remove tags on the list
+		let (_state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			BoardAction::ListTags("backlog".to_owned(), TagsAction::insert(tags(&[("a", "1"), ("b", "2")]))),
+		)
+		.await;
+		let (state, _link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			BoardAction::ListTags("backlog".to_owned(), TagsAction::remove_key("a")),
+		)
+		.await;
+
+		// read the "backlog" list back
+		let lists: Vec<(_, List)> = state.lists.stream(&core_storage).try_collect().await.unwrap();
+		let (_index, list) = lists.into_iter().find(|(_index, list)| list.name == "backlog").unwrap();
+		assert_eq!(list.tags, tags(&[("b", "2")]));
+	}
+
+	#[tokio::test]
+	async fn test_task_tags_action() {
+		let storage = MemoryBlockStorage::default();
+		let core_storage = CoreBlockStorage::new(storage.clone(), false);
+
+		// seed a list and a task with id "t1" in it
+		let (_state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			OptionLink::none(),
+			BoardAction::ListCreate { list: List::new("backlog"), after: None },
+		)
+		.await;
+		let task =
+			Task { id: "t1".to_owned(), name: "Task 1".to_owned(), tags: Tags::new(), payload: None, lock: None };
+		let (_state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			BoardAction::TaskCreate { list: "backlog".to_owned(), task, after: None },
+		)
+		.await;
+
+		// insert then remove tags on the task
+		let (_state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			BoardAction::TaskTags("t1".to_owned(), TagsAction::insert(tags(&[("a", "1"), ("b", "2")]))),
+		)
+		.await;
+		let (state, _link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			BoardAction::TaskTags("t1".to_owned(), TagsAction::remove_key("a")),
+		)
+		.await;
+
+		// read task "t1" back
+		let task = state.tasks.get(&core_storage, &"t1".to_owned()).await.unwrap().unwrap();
+		assert_eq!(task.tags, tags(&[("b", "2")]));
 	}
 }

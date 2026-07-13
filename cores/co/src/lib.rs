@@ -4,7 +4,7 @@
 use cid::Cid;
 use co_api::{
 	co, BlockStorage, BlockStorageExt, CoId, CoMap, CoSet, CoreBlockStorage, Did, Link, Network, OptionLink, Reducer,
-	ReducerAction, SignedEntry, StorageError, Tags,
+	ReducerAction, SignedEntry, StorageError, Tags, TagsAction,
 };
 use serde::de::IgnoredAny;
 use std::collections::{BTreeMap, BTreeSet};
@@ -266,9 +266,11 @@ pub enum CoAction {
 		binary: Cid,
 		migrate: Option<Cid>,
 	},
+	#[deprecated(note = "use `Tags` with a `TagsAction`")]
 	TagsInsert {
 		tags: Tags,
 	},
+	#[deprecated(note = "use `Tags` with a `TagsAction`")]
 	TagsRemove {
 		tags: Tags,
 	},
@@ -288,10 +290,12 @@ pub enum CoAction {
 		participant: Did,
 		tags: Tags,
 	},
+	#[deprecated(note = "use `ParticipantTags` with a `TagsAction`")]
 	ParticipantTagsInsert {
 		participant: Did,
 		tags: Tags,
 	},
+	#[deprecated(note = "use `ParticipantTags` with a `TagsAction`")]
 	ParticipantTagsRemove {
 		participant: Did,
 		tags: Tags,
@@ -324,10 +328,12 @@ pub enum CoAction {
 		/// Must deserialize to a action using the new `binary`.
 		migrate: Option<Cid>,
 	},
+	#[deprecated(note = "use `CoreTags` with a `TagsAction`")]
 	CoreTagsInsert {
 		core: String,
 		tags: Tags,
 	},
+	#[deprecated(note = "use `CoreTags` with a `TagsAction`")]
 	CoreTagsRemove {
 		core: String,
 		tags: Tags,
@@ -345,18 +351,40 @@ pub enum CoAction {
 		/// The new binary.
 		binary: Cid,
 	},
+	#[deprecated(note = "use `GuardTags` with a `TagsAction`")]
 	GuardTagsInsert {
 		guard: String,
 		tags: Tags,
 	},
+	#[deprecated(note = "use `GuardTags` with a `TagsAction`")]
 	GuardTagsRemove {
 		guard: String,
 		tags: Tags,
+	},
+	/// apply a [`TagsAction`] to the co tags.
+	Tags {
+		action: TagsAction,
+	},
+	/// apply a [`TagsAction`] to a participant's tags.
+	ParticipantTags {
+		participant: Did,
+		action: TagsAction,
+	},
+	/// apply a [`TagsAction`] to a core's tags.
+	CoreTags {
+		core: String,
+		action: TagsAction,
+	},
+	/// apply a [`TagsAction`] to a guard's tags.
+	GuardTags {
+		guard: String,
+		action: TagsAction,
 	},
 }
 
 /// Reduce [`CoAction`] to result [`Co`] state.
 /// Returns [`true`] if anything in result has changed.
+#[allow(deprecated)]
 async fn reduce<S>(storage: &S, result: &mut Co, action: &CoAction) -> Result<bool, anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
@@ -397,6 +425,12 @@ where
 		CoAction::GuardUpgrade { guard, binary } => reduce_guard_upgrade(result, guard, binary),
 		CoAction::GuardTagsInsert { guard, tags } => reduce_guard_tags_insert(result, guard, tags),
 		CoAction::GuardTagsRemove { guard, tags } => reduce_guard_tags_remove(result, guard, tags),
+		CoAction::Tags { action } => reduce_tags(result, action),
+		CoAction::ParticipantTags { participant, action } => {
+			reduce_participant_tags(storage, result, participant, action).await?
+		},
+		CoAction::CoreTags { core, action } => reduce_core_tags(result, core, action),
+		CoAction::GuardTags { guard, action } => reduce_guard_tags(result, guard, action),
 	})
 }
 
@@ -701,5 +735,264 @@ fn reduce_guard_tags_remove(result: &mut Co, guard_name: &String, tags: &Tags) -
 		guard.tags.clear(Some(tags))
 	} else {
 		false
+	}
+}
+
+fn reduce_tags(result: &mut Co, action: &TagsAction) -> bool {
+	result.tags.reduce(action.clone())
+}
+
+fn reduce_core_tags(result: &mut Co, core: &String, action: &TagsAction) -> bool {
+	if let Some(core) = result.cores.get_mut(core) {
+		core.tags.reduce(action.clone())
+	} else {
+		false
+	}
+}
+
+fn reduce_guard_tags(result: &mut Co, guard_name: &String, action: &TagsAction) -> bool {
+	if let Some(guard) = result.guards.get_mut(guard_name) {
+		guard.tags.reduce(action.clone())
+	} else {
+		false
+	}
+}
+
+async fn reduce_participant_tags<S>(
+	storage: &S,
+	result: &mut Co,
+	participant: &String,
+	action: &TagsAction,
+) -> Result<bool, anyhow::Error>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	let mut participants = result.participants.open(storage).await?;
+	Ok(if let Some(mut item) = participants.get(participant).await? {
+		let changed = item.tags.reduce(action.clone());
+		if changed {
+			participants.insert(participant.clone(), item).await?;
+			result.participants = participants.store().await?;
+		}
+		changed
+	} else {
+		false
+	})
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{Co, CoAction};
+	use cid::Cid;
+	use co_api::{BlockStorageExt, CoreBlockStorage, Link, OptionLink, Reducer, ReducerAction, Tags, TagsAction};
+	use co_storage::MemoryBlockStorage;
+	use std::str::FromStr;
+
+	fn tags(pairs: &[(&str, &str)]) -> Tags {
+		let mut result = Tags::new();
+		for (key, value) in pairs {
+			result.insert(((*key).to_owned(), (*value).to_owned().into()));
+		}
+		result
+	}
+
+	fn cid() -> Cid {
+		Cid::from_str("bagakbqabdyqar5vlsfqd3g4mxngt3yl7nx2na2kb4jybylzn5bktwnihjhih42a").unwrap()
+	}
+
+	async fn reduce_action(
+		storage: &MemoryBlockStorage,
+		core_storage: &CoreBlockStorage,
+		state: OptionLink<Co>,
+		payload: CoAction,
+	) -> (Co, Link<Co>) {
+		let action = ReducerAction { from: "did:local:test".to_owned(), core: "co".to_owned(), time: 0, payload };
+		let action_link = storage.set_value(&action).await.unwrap();
+		let link = Co::reduce(state, action_link, core_storage).await.unwrap();
+		let next = storage.get_value(&link).await.unwrap();
+		(next, link)
+	}
+
+	#[tokio::test]
+	async fn test_reduce_tags_action() {
+		let storage = MemoryBlockStorage::default();
+		let core_storage = CoreBlockStorage::new(storage.clone(), false);
+
+		// insert two tags on the co itself
+		let (state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			OptionLink::none(),
+			CoAction::Tags { action: TagsAction::insert(tags(&[("a", "1"), ("b", "2")])) },
+		)
+		.await;
+		assert_eq!(state.tags, tags(&[("a", "1"), ("b", "2")]));
+
+		// remove one tag by key
+		let (state, link) =
+			reduce_action(&storage, &core_storage, link.into(), CoAction::Tags { action: TagsAction::remove_key("a") })
+				.await;
+		assert_eq!(state.tags, tags(&[("b", "2")]));
+
+		// clear the rest
+		let (state, _link) =
+			reduce_action(&storage, &core_storage, link.into(), CoAction::Tags { action: TagsAction::clear() }).await;
+		assert!(state.tags.is_empty());
+	}
+
+	#[tokio::test]
+	async fn test_reduce_participant_tags_action() {
+		let storage = MemoryBlockStorage::default();
+		let core_storage = CoreBlockStorage::new(storage.clone(), false);
+		let participant = "did:local:p1".to_owned();
+
+		// seed a participant with no tags
+		let (_state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			OptionLink::none(),
+			CoAction::ParticipantInvite { participant: participant.clone(), tags: Tags::new() },
+		)
+		.await;
+
+		// insert two tags on the participant
+		let (state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			CoAction::ParticipantTags {
+				participant: participant.clone(),
+				action: TagsAction::insert(tags(&[("a", "1"), ("b", "2")])),
+			},
+		)
+		.await;
+		let item = state.participants.get(&core_storage, &participant).await.unwrap().unwrap();
+		assert_eq!(item.tags, tags(&[("a", "1"), ("b", "2")]));
+
+		// remove one tag by key
+		let (state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			CoAction::ParticipantTags { participant: participant.clone(), action: TagsAction::remove_key("a") },
+		)
+		.await;
+		let item = state.participants.get(&core_storage, &participant).await.unwrap().unwrap();
+		assert_eq!(item.tags, tags(&[("b", "2")]));
+
+		// inserting a duplicate tag does not change the participant (skips the store-back)
+		let (state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			CoAction::ParticipantTags {
+				participant: participant.clone(),
+				action: TagsAction::insert(tags(&[("b", "2")])),
+			},
+		)
+		.await;
+		let item = state.participants.get(&core_storage, &participant).await.unwrap().unwrap();
+		assert_eq!(item.tags, tags(&[("b", "2")]));
+
+		// a missing participant is a no-op
+		let missing = "did:local:missing".to_owned();
+		let (state, _link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			CoAction::ParticipantTags { participant: missing.clone(), action: TagsAction::insert(tags(&[("x", "1")])) },
+		)
+		.await;
+		assert!(state.participants.get(&core_storage, &missing).await.unwrap().is_none());
+	}
+
+	#[tokio::test]
+	async fn test_reduce_core_tags_action() {
+		let storage = MemoryBlockStorage::default();
+		let core_storage = CoreBlockStorage::new(storage.clone(), false);
+
+		// seed a core with no tags
+		let (_state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			OptionLink::none(),
+			CoAction::CoreCreate { core: "c1".to_owned(), binary: cid(), tags: Tags::new() },
+		)
+		.await;
+
+		// insert two tags on the core
+		let (state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			CoAction::CoreTags { core: "c1".to_owned(), action: TagsAction::insert(tags(&[("a", "1"), ("b", "2")])) },
+		)
+		.await;
+		assert_eq!(state.cores.get("c1").unwrap().tags, tags(&[("a", "1"), ("b", "2")]));
+
+		// remove one tag by key
+		let (state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			CoAction::CoreTags { core: "c1".to_owned(), action: TagsAction::remove_key("a") },
+		)
+		.await;
+		assert_eq!(state.cores.get("c1").unwrap().tags, tags(&[("b", "2")]));
+
+		// a missing core is a no-op
+		let (state, _link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			CoAction::CoreTags { core: "missing".to_owned(), action: TagsAction::insert(tags(&[("x", "1")])) },
+		)
+		.await;
+		assert!(state.cores.get("missing").is_none());
+	}
+
+	#[tokio::test]
+	async fn test_reduce_guard_tags_action() {
+		let storage = MemoryBlockStorage::default();
+		let core_storage = CoreBlockStorage::new(storage.clone(), false);
+
+		// seed a guard with no tags
+		let (_state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			OptionLink::none(),
+			CoAction::GuardCreate { guard: "g1".to_owned(), binary: cid(), tags: Tags::new() },
+		)
+		.await;
+
+		// insert two tags on the guard
+		let (state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			CoAction::GuardTags { guard: "g1".to_owned(), action: TagsAction::insert(tags(&[("a", "1"), ("b", "2")])) },
+		)
+		.await;
+		assert_eq!(state.guards.get("g1").unwrap().tags, tags(&[("a", "1"), ("b", "2")]));
+
+		// remove one tag by key
+		let (state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			CoAction::GuardTags { guard: "g1".to_owned(), action: TagsAction::remove_key("a") },
+		)
+		.await;
+		assert_eq!(state.guards.get("g1").unwrap().tags, tags(&[("b", "2")]));
+
+		// a missing guard is a no-op
+		let (state, _link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			CoAction::GuardTags { guard: "missing".to_owned(), action: TagsAction::insert(tags(&[("x", "1")])) },
+		)
+		.await;
+		assert!(state.guards.get("missing").is_none());
 	}
 }

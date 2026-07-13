@@ -2,6 +2,7 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use co_core_co::CoAction;
+use co_primitives::TagsAction;
 use co_sdk::{tags, BlockStorageExt, CreateCo, CO_CORE_NAME_CO};
 use helper::instance::Instances;
 
@@ -35,7 +36,7 @@ async fn test_shared_co_store_block_via_tag_public_then_encrypted() {
 		.unwrap();
 	let block_cid = public_co.storage().set_serialized(&block_payload).await.unwrap();
 	public_co
-		.push(&identity, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("block": block_cid) })
+		.push(&identity, CO_CORE_NAME_CO, &CoAction::Tags { action: TagsAction::insert(tags!("block": block_cid)) })
 		.await
 		.unwrap();
 
@@ -47,7 +48,7 @@ async fn test_shared_co_store_block_via_tag_public_then_encrypted() {
 		.unwrap();
 	let block_cid = encrypted_co.storage().set_serialized(&block_payload).await.unwrap();
 	let result = encrypted_co
-		.push(&identity, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("block": block_cid) })
+		.push(&identity, CO_CORE_NAME_CO, &CoAction::Tags { action: TagsAction::insert(tags!("block": block_cid)) })
 		.await;
 
 	// check

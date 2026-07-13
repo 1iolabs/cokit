@@ -4,7 +4,7 @@
 use cid::Cid;
 use co_api::{
 	co, BlockStorageExt, CoId, CoMap, CoReference, CoreBlockStorage, Did, IsDefault, Link, OptionLink, Reducer,
-	ReducerAction, StorageError, Tags, WeakCid,
+	ReducerAction, StorageError, Tags, TagsAction, WeakCid,
 };
 use futures::{FutureExt, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet};
@@ -249,10 +249,15 @@ pub enum MembershipsAction {
 	},
 
 	/// Insert tags for membership.
+	#[deprecated(note = "use `Tags` with a `TagsAction`")]
 	TagsInsert { id: CoId, tags: Tags },
 
 	/// Remove tags for membership.
+	#[deprecated(note = "use `Tags` with a `TagsAction`")]
 	TagsRemove { id: CoId, tags: Tags },
+
+	/// apply a [`TagsAction`] to a membership's tags.
+	Tags { id: CoId, action: TagsAction },
 
 	/// Remove CO membership.
 	Remove {
@@ -266,6 +271,7 @@ pub enum MembershipsAction {
 }
 
 impl Reducer<MembershipsAction> for Memberships {
+	#[allow(deprecated)]
 	async fn reduce(
 		state_ref: OptionLink<Self>,
 		action_ref: Link<ReducerAction<MembershipsAction>>,
@@ -313,6 +319,9 @@ impl Reducer<MembershipsAction> for Memberships {
 			},
 			MembershipsAction::TagsRemove { id, tags } => {
 				reduce_tags_remove(&mut result.memberships, storage, id, tags).boxed().await?;
+			},
+			MembershipsAction::Tags { id, action } => {
+				reduce_tags(&mut result.memberships, storage, id, action).boxed().await?;
 			},
 			MembershipsAction::Remove { id, did } => {
 				reduce_remove(&mut result.memberships, storage, id, did).boxed().await?;
@@ -510,6 +519,21 @@ async fn reduce_tags_remove(
 	Ok(())
 }
 
+async fn reduce_tags(
+	memberships: &mut CoMap<CoId, Membership>,
+	storage: &CoreBlockStorage,
+	id: &CoId,
+	action: &TagsAction,
+) -> Result<(), anyhow::Error> {
+	let action = action.clone();
+	memberships
+		.update(storage, id.clone(), move |membership| {
+			membership.tags.reduce(action);
+		})
+		.await?;
+	Ok(())
+}
+
 async fn reduce_remove(
 	memberships: &mut CoMap<CoId, Membership>,
 	storage: &CoreBlockStorage,
@@ -608,4 +632,81 @@ async fn filter_state(
 	}
 	.try_collect()
 	.await
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{MembershipOptions, Memberships, MembershipsAction};
+	use co_api::{BlockStorageExt, CoreBlockStorage, Link, OptionLink, Reducer, ReducerAction, Tags, TagsAction};
+	use co_storage::MemoryBlockStorage;
+
+	fn tags(pairs: &[(&str, &str)]) -> Tags {
+		let mut result = Tags::new();
+		for (key, value) in pairs {
+			result.insert(((*key).to_owned(), (*value).to_owned().into()));
+		}
+		result
+	}
+
+	async fn reduce_action(
+		storage: &MemoryBlockStorage,
+		core_storage: &CoreBlockStorage,
+		state: OptionLink<Memberships>,
+		payload: MembershipsAction,
+	) -> (Memberships, Link<Memberships>) {
+		let action =
+			ReducerAction { from: "did:local:test".to_owned(), core: "membership".to_owned(), time: 0, payload };
+		let action_link = storage.set_value(&action).await.unwrap();
+		let link = Memberships::reduce(state, action_link, core_storage).await.unwrap();
+		let next = storage.get_value(&link).await.unwrap();
+		(next, link)
+	}
+
+	#[tokio::test]
+	async fn test_tags_action() {
+		let storage = MemoryBlockStorage::default();
+		let core_storage = CoreBlockStorage::new(storage.clone(), false);
+
+		// seed a membership
+		let (_state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			OptionLink::none(),
+			MembershipsAction::Join {
+				id: "test-co".into(),
+				did: "did:local:device".to_owned(),
+				options: MembershipOptions::default(),
+			},
+		)
+		.await;
+
+		// insert tags via the new Tags variant
+		let (_state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			MembershipsAction::Tags {
+				id: "test-co".into(),
+				action: TagsAction::insert(tags(&[("a", "1"), ("b", "2")])),
+			},
+		)
+		.await;
+
+		// remove one by key
+		let (state, _link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			MembershipsAction::Tags { id: "test-co".into(), action: TagsAction::remove_key("a") },
+		)
+		.await;
+
+		let membership = state
+			.memberships
+			.get(&core_storage, &"test-co".into())
+			.await
+			.unwrap()
+			.expect("membership exists");
+		assert_eq!(membership.tags, tags(&[("b", "2")]));
+	}
 }

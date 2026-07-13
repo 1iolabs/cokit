@@ -292,7 +292,7 @@ mod tests {
 	use co_core_co::CoAction;
 	use co_identity::PrivateIdentity;
 	use co_log::EntryBlock;
-	use co_primitives::{tags, BlockStorage, MonotonicCoDate};
+	use co_primitives::{tags, BlockStorage, MonotonicCoDate, TagsAction};
 
 	#[tokio::test]
 	async fn smoke() {
@@ -318,7 +318,7 @@ mod tests {
 		.await
 		.unwrap();
 		memory_dispatch
-			.dispatch(&CoAction::TagsInsert { tags: tags!("hello": "world") })
+			.dispatch(&CoAction::Tags { action: TagsAction::insert(tags!("hello": "world")) })
 			.await
 			.unwrap();
 		let memory_dispatch_reducer_state = memory_dispatch.reducer_state();
@@ -352,7 +352,7 @@ mod tests {
 		.await
 		.unwrap();
 		memory_dispatch
-			.dispatch(&CoAction::TagsInsert { tags: tags!("hello": "world") })
+			.dispatch(&CoAction::Tags { action: TagsAction::insert(tags!("hello": "world")) })
 			.await
 			.unwrap();
 		let memory_dispatch_reducer_state = memory_dispatch.reducer_state();
@@ -420,7 +420,7 @@ mod tests {
 		.await
 		.unwrap();
 		memory_dispatch
-			.dispatch(&CoAction::TagsInsert { tags: tags!("hello": "world") })
+			.dispatch(&CoAction::Tags { action: TagsAction::insert(tags!("hello": "world")) })
 			.await
 			.unwrap();
 		let memory_dispatch_reducer_state = memory_dispatch.reducer_state();

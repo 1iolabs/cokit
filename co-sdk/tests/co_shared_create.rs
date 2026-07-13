@@ -2,6 +2,7 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use co_core_co::CoAction;
+use co_primitives::TagsAction;
 use co_sdk::{tags, CreateCo, CO_CORE_NAME_CO};
 use helper::instance::Instances;
 
@@ -23,7 +24,7 @@ async fn test_co_shared_create() {
 
 	// push
 	shared_co
-		.push(&identity, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("hello": "world") })
+		.push(&identity, CO_CORE_NAME_CO, &CoAction::Tags { action: TagsAction::insert(tags!("hello": "world")) })
 		.await
 		.unwrap();
 }

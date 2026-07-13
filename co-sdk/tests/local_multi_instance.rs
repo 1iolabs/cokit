@@ -2,6 +2,7 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use co_core_co::CoAction;
+use co_primitives::TagsAction;
 use co_sdk::{tags, ApplicationBuilder, CO_CORE_NAME_CO};
 use co_test::{test_tmp_dir, TmpDir};
 use futures::{pin_mut, StreamExt};
@@ -80,7 +81,7 @@ async fn test_local_multi_instance_push() {
 
 	// push
 	let push_state = local_co1
-		.push(&identity, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("hello": "world") })
+		.push(&identity, CO_CORE_NAME_CO, &CoAction::Tags { action: TagsAction::insert(tags!("hello": "world")) })
 		.await
 		.unwrap();
 	let local_co1_state = local_co1.reducer_state().await;

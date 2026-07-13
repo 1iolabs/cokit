@@ -5,6 +5,7 @@
 
 use crate::helper::shared_co::SharedCo;
 use co_core_co::CoAction;
+use co_primitives::TagsAction;
 use co_sdk::{create_default_guards, tags, CreateCo, CO_CORE_CO, CO_CORE_NAME_CO};
 use helper::instance::Instances;
 
@@ -27,7 +28,7 @@ async fn test_guard_push() {
 
 	// push
 	shared_co
-		.push(&identity, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("hello": "world") })
+		.push(&identity, CO_CORE_NAME_CO, &CoAction::Tags { action: TagsAction::insert(tags!("hello": "world")) })
 		.await
 		.unwrap();
 
@@ -36,7 +37,11 @@ async fn test_guard_push() {
 
 	// push (without guard)
 	let result = shared_co
-		.push(&identity_not_a_participant, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("test": "123") })
+		.push(
+			&identity_not_a_participant,
+			CO_CORE_NAME_CO,
+			&CoAction::Tags { action: TagsAction::insert(tags!("test": "123")) },
+		)
 		.await;
 	tracing::info!(?result, "push-with-non-participant-without-guard");
 	assert!(result.is_ok());
@@ -57,7 +62,11 @@ async fn test_guard_push() {
 
 	// push (with guard)
 	let result = shared_co
-		.push(&identity_not_a_participant, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("not": "allowed") })
+		.push(
+			&identity_not_a_participant,
+			CO_CORE_NAME_CO,
+			&CoAction::Tags { action: TagsAction::insert(tags!("not": "allowed")) },
+		)
 		.await;
 	tracing::info!(?result, "push-with-non-participant");
 	assert!(result.is_err());
@@ -87,7 +96,7 @@ async fn test_guard_join() {
 
 	// push
 	peer0_co
-		.push(&peer0_identity, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("hello": "world") })
+		.push(&peer0_identity, CO_CORE_NAME_CO, &CoAction::Tags { action: TagsAction::insert(tags!("hello": "world")) })
 		.await
 		.unwrap();
 
@@ -96,7 +105,7 @@ async fn test_guard_join() {
 
 	// push (without guard)
 	let result = peer0_co
-		.push(&peer0_identity, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("test": "123") })
+		.push(&peer0_identity, CO_CORE_NAME_CO, &CoAction::Tags { action: TagsAction::insert(tags!("test": "123")) })
 		.await;
 	tracing::info!(?result, "push-with-non-participant-without-guard");
 	assert!(result.is_ok());
@@ -120,7 +129,11 @@ async fn test_guard_join() {
 
 	// push (with guard)
 	let result = peer1_co
-		.push(&identity_not_a_participant, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("not": "allowed") })
+		.push(
+			&identity_not_a_participant,
+			CO_CORE_NAME_CO,
+			&CoAction::Tags { action: TagsAction::insert(tags!("not": "allowed")) },
+		)
 		.await;
 	tracing::info!(?result, "push-with-non-participant");
 	assert!(result.is_ok()); // as we forced to ignore the guard using "co-guard-ignore"
