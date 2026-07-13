@@ -9,7 +9,7 @@
 ### Added
 - [`NetworkSettings::with_listens`]
 - [`NetworkSettings::with_added_listen`]
-- [`NetworkSettings.ephemeral_peer_id`] sets if new peer ids should be created without saving on startup of network
+- [`NetworkSettings::ephemeral_peer_id`] sets if new peer ids should be created without saving on startup of network
 - [`NetworkSettings::with_ephemeral_peer_id`] sets the new setting
 
 ## [0.1.0] - 2026-03-31
