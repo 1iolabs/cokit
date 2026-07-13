@@ -161,6 +161,21 @@ impl Actor for Application {
 	async fn shutdown(&self, state: Self::State) -> Result<(), ActorError> {
 		state.context.inner.shutdown().cancel();
 		state.context.inner.reducers_control().handle.shutdown();
+
+		// the runtime actor outlives every reducer and holds no link to the shutdown token, so
+		// it must be told explicitly or its task keeps the tracker from ever draining.
+		state.context.inner.runtime().shutdown();
+
+		// tear the network down explicitly: it runs on its own cancellation token and is held
+		// alive by a context reference cycle, so it never stops on app-cancel by itself.
+		#[cfg(feature = "network")]
+		{
+			if let Some(network) = state.context.network().await {
+				network.shutdown();
+			}
+			let _ = state.context.inner.set_network(None).await;
+		}
+
 		Ok(())
 	}
 }

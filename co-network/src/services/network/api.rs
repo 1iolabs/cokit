@@ -5,21 +5,27 @@ use crate::{
 	bitswap::GetNetworkTask,
 	didcomm::EncodedMessage,
 	services::{
-		connections::ConnectionMessage,
+		connections::{CoConnectionOverview, ConnectionMessage, ConnectionOverview, NetworkOverview},
 		discovery::DiscoveryApi,
+		dns::{DnsApi, DnsSource},
 		heads::HeadsApi,
 		network::{
 			CoNetworkTaskSpawner, DialNetworkTask, DidCommReceiveNetworkTask, DidCommSendNetworkTask,
-			ListnersNetworkTask, NetworkMessage, PeersNetworkTask, SubscribeGossipTask,
+			ListnersNetworkTask, NetworkMessage, PeersNetworkTask, SubscribeGossipTask, SwarmState,
+			SwarmStateWatchTask,
 		},
 	},
 };
 use cid::Cid;
 use co_actor::ActorHandle;
 use co_identity::{Message, PrivateIdentity, PrivateIdentityBox};
-use co_primitives::{Did, NetworkDidDiscovery};
+use co_primitives::{CoId, Did, NetworkDidDiscovery};
 use co_storage::StorageError;
-use futures::{stream::BoxStream, StreamExt};
+use futures::{
+	future,
+	stream::{self, BoxStream},
+	StreamExt,
+};
 use libp2p_bitswap::Token;
 use multiaddr::{Multiaddr, PeerId};
 use std::{collections::BTreeSet, fmt::Debug, time::Duration};
@@ -31,7 +37,9 @@ pub struct NetworkApi {
 	pub(crate) discovery: DiscoveryApi,
 	pub(crate) heads: HeadsApi,
 	pub(crate) spawner: CoNetworkTaskSpawner,
+	pub(crate) dns: DnsApi,
 }
+
 impl NetworkApi {
 	pub fn connections(&self) -> &ActorHandle<ConnectionMessage> {
 		&self.connections
@@ -49,6 +57,12 @@ impl NetworkApi {
 		&self.spawner
 	}
 
+	/// Request a graceful shutdown of the network actor, which cascades to the swarm and the
+	/// connections/discovery/heads/dns sub-actors.
+	pub fn shutdown(&self) {
+		self._handle.shutdown();
+	}
+
 	/// Get our local peer id.
 	pub fn local_peer_id(&self) -> PeerId {
 		self.spawner.local_peer_id()
@@ -58,6 +72,80 @@ impl NetworkApi {
 	/// If no listener is present it will wait for the first to come available.
 	pub async fn listeners(&self, local: bool, external: bool) -> Result<BTreeSet<Multiaddr>, anyhow::Error> {
 		ListnersNetworkTask::listeners(&self.spawner, local, external).await
+	}
+
+	/// Get a read-only snapshot of the current network state for diagnostics.
+	pub async fn overview(&self) -> Result<NetworkOverview, anyhow::Error> {
+		let local_peer_id = self.local_peer_id();
+
+		// listeners + mDNS in a single swarm read: the watch task's first item.
+		let mut swarm_state = SwarmStateWatchTask::watch(&self.spawner);
+		let (listeners, mdns) = swarm_state.next().await.unwrap_or_default();
+
+		let connections = self.connections.request(ConnectionMessage::Overview).await?;
+		let dns = self.dns.source().await?;
+
+		Ok(NetworkOverview { local_peer_id, listeners, mdns, connections, dns })
+	}
+
+	/// Subscribe to a live stream of [`NetworkOverview`]s for diagnostics.
+	pub fn overview_stream(&self) -> BoxStream<'static, NetworkOverview> {
+		let local_peer_id = self.local_peer_id();
+		let connections = self.connections.stream_graceful(ConnectionMessage::OverviewStream);
+		let swarm_state = SwarmStateWatchTask::watch(&self.spawner);
+		let dns_source = self.dns.source_stream();
+
+		enum Update {
+			Connections(ConnectionOverview),
+			Swarm(SwarmState),
+			Dns(Option<DnsSource>),
+		}
+		#[derive(Default)]
+		struct Latest {
+			listeners: BTreeSet<Multiaddr>,
+			mdns: BTreeSet<PeerId>,
+			connections: ConnectionOverview,
+			dns: Option<DnsSource>,
+		}
+
+		stream::select(
+			stream::select(connections.map(Update::Connections), swarm_state.map(Update::Swarm)),
+			dns_source.map(Update::Dns),
+		)
+		.scan(Latest::default(), move |latest, update| {
+			match update {
+				Update::Connections(connections) => latest.connections = connections,
+				Update::Swarm((listeners, mdns)) => {
+					latest.listeners = listeners;
+					latest.mdns = mdns;
+				},
+				Update::Dns(dns) => latest.dns = dns,
+			}
+			future::ready(Some(NetworkOverview {
+				local_peer_id,
+				listeners: latest.listeners.clone(),
+				mdns: latest.mdns.clone(),
+				connections: latest.connections.clone(),
+				dns: latest.dns,
+			}))
+		})
+		.boxed()
+	}
+
+	/// Get a CO-scoped connection overview.
+	/// Who we're connected to for `co` and how (per-endpoint transport/direction).
+	pub async fn co_overview(&self, co: CoId) -> Result<CoConnectionOverview, anyhow::Error> {
+		Ok(self
+			.connections
+			.request(move |response| ConnectionMessage::CoOverview(co, response))
+			.await?)
+	}
+
+	/// Subscribe to a live CO-scoped connection overview, re-emitted on every connection-state change.
+	pub fn co_overview_stream(&self, co: CoId) -> BoxStream<'static, CoConnectionOverview> {
+		self.connections
+			.stream_graceful(move |response| ConnectionMessage::CoOverviewStream(co, response))
+			.boxed()
 	}
 
 	/// Dial and wait for connection to be made or fail.
@@ -120,5 +208,15 @@ impl NetworkApi {
 	/// Get block `cid` from bitswap.
 	pub async fn bitswap_get(&self, cid: Cid, tokens: Vec<Token>, peers: BTreeSet<PeerId>) -> Result<(), StorageError> {
 		GetNetworkTask::get(&self.spawner, cid, tokens, peers).await
+	}
+
+	/// Recover the network after a suspend/resume or interface change.
+	///
+	/// Asks the network actor to inject a recovery task that re-listens (fresh QUIC socket)
+	/// and restarts mDNS. Returns once recovery has been initiated; healing happens
+	/// asynchronously in the swarm loop. Idempotent and safe to call repeatedly.
+	pub async fn recover(&self) -> Result<(), anyhow::Error> {
+		self._handle.request(NetworkMessage::Recover).await?;
+		Ok(())
 	}
 }

@@ -13,7 +13,8 @@ pub trait Relation {
 /// Empty content as the only purpose is holding a relation to another event.
 /// Mostly used for annotation events
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct ReactionContent {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub is_silent: Option<bool>,
@@ -25,7 +26,7 @@ pub struct ReactionContent {
 
 impl ReactionContent {
 	pub fn new(relation: RelatesTo) -> Self {
-		Self { is_silent: None, relates_to: Some(relation), new_content: None }
+		Self { relates_to: Some(relation), ..Default::default() }
 	}
 }
 
@@ -58,8 +59,9 @@ impl EventType for ReactionContent {
 
 /// Used in some event contents to define a relation to other events
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
 #[serde(rename = "relates_to")]
+#[non_exhaustive]
 pub struct RelatesTo {
 	/// The type of the relation
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -80,6 +82,10 @@ pub struct RelatesTo {
 }
 
 impl RelatesTo {
+	pub fn new() -> Self {
+		Self::default()
+	}
+
 	/// Helper function to create a RelatesTo body used for replies
 	pub fn in_reply_to(event_id: impl Into<String>) -> Self {
 		Self {
@@ -191,8 +197,15 @@ impl Relation for RelationType {
 
 #[co]
 #[derive(JsonSchema)]
+#[non_exhaustive]
 pub struct ReplyContent {
 	pub event_id: String,
+}
+
+impl ReplyContent {
+	pub fn new(event_id: impl Into<String>) -> Self {
+		Self { event_id: event_id.into() }
+	}
 }
 
 /// Event content used to redact other events. Sender of this event must be either the same as the sender of the
@@ -200,6 +213,7 @@ pub struct ReplyContent {
 /// Redactions are idempotent and irreversible. They do not use the same relation fields as other events
 #[co]
 #[derive(JsonSchema)]
+#[non_exhaustive]
 pub struct RedactionContent {
 	/// An optional reason field mostly used when event got redacted by another user
 	#[serde(skip_serializing_if = "Option::is_none")]

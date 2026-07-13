@@ -15,4 +15,9 @@ impl Runtime {
 	pub fn runtime(&self) -> &RuntimeHandle {
 		&self.handle
 	}
+
+	/// Request a graceful shutdown of the runtime actor.
+	pub fn shutdown(&self) {
+		self.handle.shutdown();
+	}
 }

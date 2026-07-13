@@ -43,3 +43,8 @@ pub struct CoConnectivity {
 	#[serde(rename = "p", default, skip_serializing_if = "BTreeSet::is_empty")]
 	pub participants: BTreeSet<Did>,
 }
+impl From<BTreeSet<Network>> for CoConnectivity {
+	fn from(network: BTreeSet<Network>) -> Self {
+		Self { network, participants: Default::default() }
+	}
+}

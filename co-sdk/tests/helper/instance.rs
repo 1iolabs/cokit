@@ -3,31 +3,17 @@
 
 use co_network::NetworkApi;
 use co_sdk::{
-	Application, ApplicationBuilder, DidKeyIdentity, DidKeyProvider, Identity, NetworkSettings, TracingBuilder,
-	CO_CORE_NAME_KEYSTORE,
+	Application, ApplicationBuilder, DidKeyIdentity, DidKeyProvider, Identity, NetworkSettings, CO_CORE_NAME_KEYSTORE,
 };
-use co_test::test_log_path;
-use tracing::subscriber::DefaultGuard;
 
 pub struct Instances {
 	next_instance_id: u8,
-	_guard: Option<DefaultGuard>,
 }
 impl Instances {
 	pub fn new(name: impl Into<String>) -> Self {
-		// log
-		let _guard = TracingBuilder::new(name.into(), None)
-			.with_bunyan_logging(Some(test_log_path()))
-			//.with_open_telemetry("http://localhost:4317")
-			//.with_stderr_logging()
-			.with_env_filter_directives(
-				"trace,log=warn,quinn_proto=warn,hickory_proto=warn,co_storage::storage::memory=warn",
-			)
-			.unwrap()
-			//.with_env_filter_directives("info,co_sdk=trace,co_network=trace")
-			.init()
-			.ok();
-		Self { next_instance_id: 1, _guard: None }
+		let _ = name;
+		co_test::init_test_log();
+		Self { next_instance_id: 1 }
 	}
 
 	/// Create a new peer.

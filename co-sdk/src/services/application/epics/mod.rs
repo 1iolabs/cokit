@@ -50,6 +50,8 @@ mod network_block_get;
 #[cfg(feature = "network")]
 mod network_queue;
 #[cfg(feature = "network")]
+mod network_recover;
+#[cfg(feature = "network")]
 mod network_start;
 #[cfg(feature = "network")]
 mod pending_resolve;
@@ -105,6 +107,7 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(network_block_get::network_block_get)
 		.join(network_block_get::network_task_execute)
 		.join(network_start::network_start)
+		.join(network_recover::network_recover)
 		.join(pending_resolve::pending_resolve);
 
 	// trace

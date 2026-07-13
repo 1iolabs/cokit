@@ -107,11 +107,7 @@ mod tests {
 	async fn spawn_peer(name: &str, identities: Vec<PrivateIdentityBox>) -> (ActorHandle<NetworkMessage>, NetworkApi) {
 		let keypair = Keypair::generate_ed25519();
 		let tasks = TaskSpawner::default();
-		let settings = NetworkSettings::default()
-			.with_localhost()
-			.without_bootstrap()
-			.with_mdns(false)
-			.with_nat(false);
+		let settings = NetworkSettings::default().with_localhost();
 		let identity_resolver = DidKeyIdentityResolver::new().boxed();
 		let private_identity_resolver = MemoryPrivateIdentityResolver::from(identities).boxed();
 		let bitswap: ActorHandle<BitswapMessage> = ActorHandle::new_closed();

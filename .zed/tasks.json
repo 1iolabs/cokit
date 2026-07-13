@@ -2,46 +2,62 @@
 [
   {
     "label": "lint",
-    "command": "cargo +nightly fmt --check && cargo clippy --workspace --all-targets --all-features -- -D warnings && ./ci/scripts/check-web.sh",
+    "command": "./ci/scripts/lint.sh"
   },
   {
     "label": "lint: clippy",
-    "command": "cargo clippy --workspace --all-targets --all-features -- -D warnings",
+    "command": "./ci/scripts/lint-clippy.sh"
   },
   {
     "label": "lint: fmt",
-    "command": "cargo +nightly fmt --check",
+    "command": "./ci/scripts/lint-fmt.sh"
   },
   {
-    "label": "fmt",
-    "command": "cargo +nightly fmt -- -l",
+    "label": "lint: fmt: fix",
+    "command": "./ci/scripts/lint-fmt.sh --fix"
+  },
+  {
+    "label": "lint: clippy: fix",
+    "command": "./ci/scripts/lint-clippy.sh --fix"
   },
   {
     "label": "co-cli: build (debug)",
-    "command": "cargo build -p co-cli",
+    "command": "cargo build -p co-cli"
   },
   {
     "label": "co-bindings: generate flutter",
-    "command": "$ZED_WORKTREE_ROOT/co-bindings/flutter/build.sh",
+    "command": "$ZED_WORKTREE_ROOT/co-bindings/flutter/build.sh"
   },
   {
     "label": "tauri-plugin-co-sdk: npm install",
-    "command": "cd $ZED_WORKTREE_ROOT/tauri-plugin-co-sdk; npm install",
+    "command": "cd $ZED_WORKTREE_ROOT/tauri-plugin-co-sdk; npm install"
   },
   {
     "label": "tauri-plugin-co-sdk: build dist-js",
-    "command": "cd $ZED_WORKTREE_ROOT/tauri-plugin-co-sdk; npm run build",
+    "command": "cd $ZED_WORKTREE_ROOT/tauri-plugin-co-sdk; npm run build"
   },
   {
     "label": "json-schemas: generate json schemas and ts interfaces",
-    "command": "$ZED_WORKTREE_ROOT/json-schemas/generate-ts.sh",
+    "command": "$ZED_WORKTREE_ROOT/json-schemas/generate-ts.sh"
   },
   {
     "label": "cores: build builtin",
-    "command": "cargo run --bin co-cli -- --no-keychain core build-builtin",
+    "command": "cargo run --bin co-cli -- --no-keychain core build-builtin"
+  },
+  {
+    "label": "check",
+    "command": "./ci/scripts/check.sh"
   },
   {
     "label": "check: web",
-    "command": "./ci/scripts/check-web.sh",
+    "command": "./ci/scripts/check-web.sh"
   },
+  {
+    "label": "check: no-default-features",
+    "command": "./ci/scripts/check-no-default-features.sh"
+  },
+  {
+    "label": "test: all",
+    "command": "cargo test"
+  }
 ]

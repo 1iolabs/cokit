@@ -29,4 +29,5 @@ pub use tasks::{
 	},
 	listeners::ListnersNetworkTask,
 	peers::PeersNetworkTask,
+	swarm_state::{SwarmState, SwarmStateWatchTask},
 };

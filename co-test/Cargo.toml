@@ -17,3 +17,5 @@ release = false
 anyhow = { workspace = true }
 uuid = { workspace = true }
 co-macros = { workspace = true }
+co-tracing = { workspace = true, features = ["subscriber", "bunyan"] }
+tracing = { workspace = true }

@@ -5,6 +5,8 @@ mod library;
 mod resolvers;
 mod types;
 
+#[allow(deprecated)]
+pub use library::didcomm_anoncrypt::{didcomm_anoncrypt, didcomm_anoncrypt_receive, didcomm_anoncrypt_to_public_key};
 pub use library::network_did_discovery::network_did_discovery;
 pub use resolvers::{
 	did_key::{DidKeyIdentity, DidKeyIdentityResolver},

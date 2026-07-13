@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use crate::types::level::CoLogLevel;
 #[cfg(feature = "network")]
 use crate::types::network_settings::CoNetworkSettings;
 
@@ -14,8 +13,11 @@ pub struct CoSettings {
 	pub network_settings: Option<CoNetworkSettings>,
 	pub network: Option<bool>,
 	pub no_keychain: Option<bool>,
-	pub no_log: Option<bool>,
-	pub log_level: Option<CoLogLevel>,
+	/// Logging
+	///
+	/// See:
+	/// - [`co_tracing::LogArgs::log`]
+	pub log: Option<String>,
 	pub no_default_features: Option<bool>,
 	pub feature: Option<Vec<String>>,
 }
@@ -28,8 +30,7 @@ impl Default for CoSettings {
 			network_settings: Default::default(),
 			network: Some(true),
 			no_keychain: Some(true),
-			no_log: Default::default(),
-			log_level: Default::default(),
+			log: Some("file:info".to_owned()),
 			no_default_features: Default::default(),
 			feature: Default::default(),
 		}

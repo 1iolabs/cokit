@@ -11,8 +11,11 @@ pub struct NetworkSettings {
 	/// Force to create a new [`PeerId`] on network startup.
 	pub force_new_peer_id: bool,
 
-	/// The endpoint to listen to.
-	pub listen: Multiaddr,
+	/// Force a new peer id on each startup that doesn't get saved in the keystore
+	pub ephemeral_peer_id: bool,
+
+	/// The endpoints to listen to.
+	pub listen: BTreeSet<Multiaddr>,
 
 	/// The bootstrap peers to increase connectivity.
 	pub bootstrap: BTreeSet<Multiaddr>,
@@ -62,6 +65,7 @@ impl Default for NetworkSettings {
 	fn default() -> Self {
 		Self {
 			force_new_peer_id: Default::default(),
+			ephemeral_peer_id: Default::default(),
 			listen: Self::default_listen(),
 			bootstrap: Self::default_bootstrap(),
 			external_addresses: Default::default(),
@@ -84,7 +88,7 @@ impl NetworkSettings {
 
 	/// Mobile configuration.
 	pub fn mobile() -> Self {
-		Self { websocket: false, dns: NetworkDns::Cloudflare, ..Default::default() }
+		Self { websocket: false, ..Default::default() }
 	}
 
 	/// Web configuration.
@@ -98,8 +102,11 @@ impl NetworkSettings {
 			.with_bootstrap_from_string(relay_multiaddr)
 	}
 
-	fn default_listen() -> Multiaddr {
-		"/ip4/0.0.0.0/udp/0/quic-v1".parse().expect("to parse")
+	fn default_listen() -> BTreeSet<Multiaddr> {
+		["/ip4/0.0.0.0/udp/0/quic-v1", "/ip6/::/udp/0/quic-v1"]
+			.into_iter()
+			.map(|addr| addr.parse().expect("to parse"))
+			.collect()
 	}
 
 	fn default_bootstrap() -> BTreeSet<Multiaddr> {
@@ -113,22 +120,48 @@ impl NetworkSettings {
 		self
 	}
 
-	/// Set listen endpoint.
-	pub fn with_listen(mut self, listen: Multiaddr) -> Self {
-		self.listen = listen;
+	pub fn with_ephemeral_peer_id(mut self, value: bool) -> Self {
+		self.ephemeral_peer_id = value;
 		self
 	}
 
-	/// Set listen endpoint.
+	/// Set listen endpoint, replacing any existing listen addresses.
+	pub fn with_listen(mut self, listen: Multiaddr) -> Self {
+		self.listen = [listen].into_iter().collect();
+		self
+	}
+
+	/// Set listen endpoints, replacing any existing listen addresses.
+	pub fn with_listens(mut self, listen: impl IntoIterator<Item = Multiaddr>) -> Self {
+		self.listen = listen.into_iter().collect();
+		self
+	}
+
+	/// Add a listen endpoint.
+	pub fn with_added_listen(mut self, listen: Multiaddr) -> Self {
+		self.listen.insert(listen);
+		self
+	}
+
+	/// Set listen endpoint from a string, replacing any existing listen addresses.
 	pub fn with_listen_from_string(mut self, listen: &str) -> Result<Self, anyhow::Error> {
-		self.listen = listen.parse()?;
+		self.listen = [listen.parse()?].into_iter().collect();
 		Ok(self)
 	}
 
-	/// Set local listen endpoint.
-	pub fn with_localhost(mut self) -> Self {
-		self.listen = "/ip4/127.0.0.1/tcp/0".parse().unwrap();
-		self
+	/// Local-only profile for tests/dev: a loopback TCP listener with mDNS, NAT and bootstrap
+	/// disabled.
+	///
+	/// None of them are meaningful on `127.0.0.1`, and same-machine mDNS actively
+	/// interferes — it advertises the host's LAN IP, where loopback peers do not listen, so peers
+	/// get stuck dialing the wrong address.
+	///
+	/// Connect localhost peers with an explicit `dial`.
+	pub fn with_localhost(self) -> Self {
+		self.with_listen("/ip4/127.0.0.1/tcp/0".parse().unwrap())
+			.without_bootstrap()
+			.with_nat(false)
+			.with_mdns(false)
 	}
 
 	/// Clear all bootstrap endpoints.
@@ -221,17 +254,54 @@ impl NetworkSettings {
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
 pub enum NetworkDns {
-	/// Do not use and DNS.
+	/// Do not use any DNS.
 	None,
 
-	/// Use system configuration.
+	/// Use system configuration, with automatic static fallback and live refresh.
 	///
 	/// # Note
-	/// - Uses /etc/resolv.conf
-	/// - Not available on mobile yet.
+	/// - Linux + macOS: `/etc/resolv.conf` mtime drives per-dial staleness detection
+	/// - `recover()` force-refreshes on all native platforms
+	/// - Note: iOS/Windows/Android have no usable staleness file and rely on `recover()` alone
+	/// - Falls back to the preconfigured (Cloudflare) resolver while the OS has no nameservers
 	#[default]
 	System,
 
 	/// Use preconfigured Cloudflare DNS.
 	Cloudflare,
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn default_listen_is_dual_stack_quic() {
+		let settings = NetworkSettings::default();
+		assert!(settings.listen.contains(&"/ip4/0.0.0.0/udp/0/quic-v1".parse().unwrap()));
+		assert!(settings.listen.contains(&"/ip6/::/udp/0/quic-v1".parse().unwrap()));
+		assert_eq!(settings.listen.len(), 2);
+	}
+
+	#[test]
+	fn with_listen_replaces_with_single() {
+		let settings = NetworkSettings::default().with_listen("/ip4/127.0.0.1/tcp/0".parse().unwrap());
+		assert_eq!(settings.listen.len(), 1);
+		assert!(settings.listen.contains(&"/ip4/127.0.0.1/tcp/0".parse().unwrap()));
+	}
+
+	#[test]
+	fn with_added_listen_inserts() {
+		let extra: Multiaddr = "/ip6/::/udp/4001/quic-v1".parse().unwrap();
+		let settings = NetworkSettings::default().with_added_listen(extra.clone());
+		assert!(settings.listen.contains(&extra));
+		assert_eq!(settings.listen.len(), 3);
+	}
+
+	#[test]
+	fn mobile_uses_system_dns() {
+		let settings = NetworkSettings::mobile();
+		assert!(matches!(settings.dns, NetworkDns::System));
+		assert!(!settings.websocket);
+	}
 }

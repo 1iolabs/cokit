@@ -2,8 +2,8 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use crate::{
-	library::didcomm_receive::didcomm_receive, DidCommContext, DidCommHeader, Identity, IdentityResolver,
-	PrivateIdentity, PrivateIdentityResolver, ReceiveError,
+	library::{didcomm_anoncrypt_envelope, didcomm_receive::didcomm_receive},
+	DidCommContext, DidCommHeader, Identity, IdentityResolver, PrivateIdentity, PrivateIdentityResolver, ReceiveError,
 };
 use anyhow::anyhow;
 use co_primitives::{from_json_string, Did};
@@ -62,7 +62,31 @@ impl Message {
 		let message = std::str::from_utf8(data).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
 		let message_type = get_message_type(message).map_err(ReceiveError::UnknownFormat)?;
 		if message_type == MessageType::DidCommJwe {
-			let jwe: Jwe = serde_json::from_str(message).map_err(|e| ReceiveError::UnknownFormat(e.into()))?;
+			let jwe: Jwe = match serde_json::from_str(message) {
+				Ok(jwe) => jwe,
+				Err(err) => {
+					if let Ok(recipents) = didcomm_anoncrypt_envelope::recipient_kids(message) {
+						let recipent_resolver_ref = &recipent_resolver;
+						for recipent_did in &recipents {
+							let recipent_identity = match recipent_resolver_ref.resolve_private(recipent_did).await {
+								Ok(i) => i,
+								Err(_) => continue,
+							};
+							let recipent_didcomm_context = match recipent_identity.didcomm_private() {
+								Some(i) => i,
+								None => continue,
+							};
+							let (header, body) = recipent_didcomm_context.anoncrypt_receive(message)?;
+							return Ok(Message::AnonCryptJson {
+								header,
+								body: body.unwrap_or_else(|| "null".to_owned()),
+							});
+						}
+						return Err(ReceiveError::NoRecipent);
+					}
+					return Err(ReceiveError::UnknownFormat(err.into()));
+				},
+			};
 
 			// for anoncrypt this is usually the ephemeral sender did
 			let sender_identity = if let Some(sender_kid) = &jwe.get_skid() {
@@ -276,4 +300,41 @@ struct DidCommMessage<'a> {
 	header: DidCommHeader,
 	#[serde(borrow)]
 	body: Option<&'a RawValue>,
+}
+
+#[cfg(test)]
+mod tests {
+	use super::Message;
+	use crate::{
+		didcomm_anoncrypt_to_public_key, DidCommHeader, DidKeyIdentity, DidKeyIdentityResolver, Identity,
+		MemoryPrivateIdentityResolver, PrivateIdentity,
+	};
+
+	#[tokio::test]
+	async fn receive_classifies_true_anoncrypt() {
+		let from = DidKeyIdentity::generate(Some(&[5; 32]));
+		let to = DidKeyIdentity::generate_x25519(Some(&[6; 32]));
+		let header = DidCommHeader {
+			id: "typed-anoncrypt".to_owned(),
+			from: Some(from.identity().to_owned()),
+			to: vec![to.identity().to_owned()].into_iter().collect(),
+			message_type: "test".to_owned(),
+			..Default::default()
+		};
+		let packed = didcomm_anoncrypt_to_public_key(to.public_key_bytes(), header, Some("\"payload\"")).unwrap();
+		let private_resolver = MemoryPrivateIdentityResolver::from(vec![to.boxed()]);
+
+		let received = Message::receive(DidKeyIdentityResolver::new(), private_resolver, packed.as_bytes())
+			.await
+			.unwrap();
+
+		match received {
+			Message::AnonCryptJson { header, body } => {
+				assert_eq!(header.id, "typed-anoncrypt");
+				assert_eq!(header.from, None);
+				assert_eq!(body, "\"payload\"");
+			},
+			other => panic!("expected anoncrypt message, got {other:?}"),
+		}
+	}
 }

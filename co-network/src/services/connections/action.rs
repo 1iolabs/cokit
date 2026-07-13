@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
+use super::state::ConnectionEndpoint;
 use co_actor::time::Instant;
 use co_primitives::{CoId, Did, Network};
 use derive_more::{From, TryInto};
-use libp2p::{Multiaddr, PeerId};
+use libp2p::{swarm::ConnectionId, Multiaddr, PeerId};
 use std::collections::BTreeSet;
 #[derive(Debug, Clone, From, TryInto, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ConnectionAction {
@@ -56,10 +57,15 @@ pub enum ConnectionAction {
 	Disconnected(DisconnectedAction),
 
 	/// A connection to a peer has been established.
+	/// Fired for **every** connection.
 	PeerConnectionEstablished(PeerConnectionEstablishedAction),
 
 	/// A connection to a peer has been closed.
+	/// Fired for **every** connection.
 	PeerConnectionClosed(PeerConnectionClosedAction),
+
+	/// A relayed connection to a peer was upgraded to a direct one via hole-punching (libp2p-dcutr).
+	PeerHolePunched(PeerHolePunchedAction),
 
 	/// Try to dial a peer.
 	Dial(DialAction),
@@ -155,13 +161,23 @@ pub struct DisconnectedAction {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PeerConnectionEstablishedAction {
 	pub peer_id: PeerId,
+	pub connection_id: ConnectionId,
+	pub endpoint: ConnectionEndpoint,
 	pub time: Instant,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PeerConnectionClosedAction {
 	pub peer_id: PeerId,
+	pub connection_id: ConnectionId,
 	pub time: Instant,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PeerHolePunchedAction {
+	pub peer_id: PeerId,
+	/// The direct connection the hole-punch successfully created.
+	pub connection_id: ConnectionId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, thiserror::Error)]

@@ -22,9 +22,9 @@ pub struct Command {
 	#[arg(long)]
 	pub identity: Option<Vec<Did>>,
 
-	/// Listen address.
-	#[arg(long, value_name = "MULTIADDR", default_value_t = default_listen())]
-	pub listen: Multiaddr,
+	/// Listen addresses (comma separated).
+	#[arg(long, value_name = "MULTIADDR", value_delimiter = ',', default_values_t = default_listen())]
+	pub listen: Vec<Multiaddr>,
 
 	/// Bootstap addresses.
 	///
@@ -63,8 +63,8 @@ pub fn default_bootstrap() -> Vec<Multiaddr> {
 	NetworkSettings::default().bootstrap.into_iter().collect()
 }
 
-pub fn default_listen() -> Multiaddr {
-	NetworkSettings::default().listen
+pub fn default_listen() -> Vec<Multiaddr> {
+	NetworkSettings::default().listen.into_iter().collect()
 }
 
 pub fn parse_bootstrap(str: &str) -> Result<Multiaddr, anyhow::Error> {
@@ -82,7 +82,7 @@ pub async fn command(
 	// setting
 	let network_settings = NetworkSettings::new()
 		.with_force_new_peer_id(network_command.force_new_peer_id)
-		.with_listen(command.listen.clone())
+		.with_listens(command.listen.clone())
 		.with_bootstraps(if !command.no_bootstrap { command.bootstrap.clone() } else { Default::default() })
 		.with_added_external_addresses(command.external_address.clone())
 		.with_relay(command.relay)
@@ -95,7 +95,7 @@ pub async fn command(
 	application.create_network(network_settings).await?;
 
 	// verbose
-	if cli.verbose > 0 {
+	if cli.log.verbose > 0 {
 		if let Some(network) = application.context().network().await {
 			// peer-id
 			let peer_id = network.local_peer_id();
@@ -161,4 +161,28 @@ pub async fn command(
 
 	// result
 	Ok(exitcode::OK)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::Command;
+	use clap::Parser;
+
+	#[derive(Parser)]
+	struct Wrapper {
+		#[command(flatten)]
+		command: Command,
+	}
+
+	#[test]
+	fn listen_accepts_comma_separated() {
+		let wrapper = Wrapper::parse_from(["test", "--listen", "/ip4/0.0.0.0/udp/0/quic-v1,/ip6/::/udp/0/quic-v1"]);
+		assert_eq!(wrapper.command.listen.len(), 2);
+	}
+
+	#[test]
+	fn listen_defaults_to_dual_stack() {
+		let wrapper = Wrapper::parse_from(["test"]);
+		assert_eq!(wrapper.command.listen.len(), 2);
+	}
 }

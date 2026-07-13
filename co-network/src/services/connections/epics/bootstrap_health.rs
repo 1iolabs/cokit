@@ -81,7 +81,7 @@ mod tests {
 	};
 	use co_primitives::{CoDate, StaticCoDate};
 	use futures::TryStreamExt;
-	use libp2p::{Multiaddr, PeerId};
+	use libp2p::{swarm::ConnectionId, Multiaddr, PeerId};
 	use std::{
 		collections::{BTreeSet, HashMap},
 		str::FromStr,
@@ -122,8 +122,11 @@ mod tests {
 		bootstrap.insert(peer1, bootstrap1);
 		let state = ConnectionState { keep_alive: Duration::from_secs(30), bootstrap, ..Default::default() };
 
-		let message =
-			ConnectionAction::PeerConnectionClosed(PeerConnectionClosedAction { peer_id: peer1, time: Instant::now() });
+		let message = ConnectionAction::PeerConnectionClosed(PeerConnectionClosedAction {
+			peer_id: peer1,
+			connection_id: ConnectionId::new_unchecked(1),
+			time: Instant::now(),
+		});
 		let stream = bootstrap_health_epic(&actions, &message, &state, &context).unwrap();
 		let result = timeout(Duration::from_secs(1), stream.try_collect::<Vec<_>>())
 			.await
@@ -146,8 +149,11 @@ mod tests {
 
 		let state = ConnectionState { keep_alive: Duration::from_secs(30), bootstrap, peers, ..Default::default() };
 
-		let message =
-			ConnectionAction::PeerConnectionClosed(PeerConnectionClosedAction { peer_id: peer1, time: Instant::now() });
+		let message = ConnectionAction::PeerConnectionClosed(PeerConnectionClosedAction {
+			peer_id: peer1,
+			connection_id: ConnectionId::new_unchecked(1),
+			time: Instant::now(),
+		});
 		let result = bootstrap_health_epic(&actions, &message, &state, &context);
 		assert!(result.is_none());
 	}
@@ -163,6 +169,7 @@ mod tests {
 
 		let message = ConnectionAction::PeerConnectionClosed(PeerConnectionClosedAction {
 			peer_id: non_bootstrap,
+			connection_id: ConnectionId::new_unchecked(1),
 			time: Instant::now(),
 		});
 		let result = bootstrap_health_epic(&actions, &message, &state, &context);

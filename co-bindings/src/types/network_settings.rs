@@ -45,7 +45,12 @@ impl Default for CoNetworkSettings {
 		let def = NetworkSettings::default();
 		Self {
 			force_new_peer_id: def.force_new_peer_id,
-			listen: def.listen.into_iter().map(|s| s.to_string()).collect(),
+			listen: def
+				.listen
+				.into_iter()
+				.map(|addr| addr.to_string())
+				.collect::<Vec<_>>()
+				.join(","),
 			bootstrap: def.bootstrap.into_iter().map(|s| s.to_string()).collect(),
 			external_addresses: def.external_addresses.into_iter().map(|s| s.to_string()).collect(),
 			keep_alive_ms: def.keep_alive.as_millis().try_into().unwrap_or(u64::MAX),
@@ -62,7 +67,13 @@ impl TryInto<NetworkSettings> for CoNetworkSettings {
 	fn try_into(self) -> Result<NetworkSettings, anyhow::Error> {
 		let mut result = NetworkSettings::default();
 		result.force_new_peer_id = self.force_new_peer_id;
-		result.listen = self.listen.parse()?;
+		result.listen = self
+			.listen
+			.split(',')
+			.map(|addr| addr.trim())
+			.filter(|addr| !addr.is_empty())
+			.map(|addr| addr.parse())
+			.collect::<Result<_, multiaddr::Error>>()?;
 		result.bootstrap = self
 			.bootstrap
 			.into_iter()
@@ -79,5 +90,39 @@ impl TryInto<NetworkSettings> for CoNetworkSettings {
 		result.nat = self.nat;
 		result.mdns = self.mdns;
 		Ok(result)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::CoNetworkSettings;
+	use co_sdk::NetworkSettings;
+
+	#[test]
+	fn default_listen_is_comma_joined_dual_stack() {
+		let settings = CoNetworkSettings::default();
+		assert!(settings.listen.contains("/ip4/0.0.0.0/udp/0/quic-v1"));
+		assert!(settings.listen.contains("/ip6/::/udp/0/quic-v1"));
+		assert!(settings.listen.contains(','));
+	}
+
+	#[test]
+	fn comma_separated_listen_parses_into_set() {
+		let settings = CoNetworkSettings {
+			listen: "/ip4/0.0.0.0/udp/0/quic-v1,/ip6/::/udp/0/quic-v1".to_string(),
+			..Default::default()
+		};
+		let parsed: NetworkSettings = settings.try_into().unwrap();
+		assert_eq!(parsed.listen.len(), 2);
+	}
+
+	#[test]
+	fn comma_separated_with_space_listen_parses_into_set() {
+		let settings = CoNetworkSettings {
+			listen: "/ip4/0.0.0.0/udp/0/quic-v1, /ip6/::/udp/0/quic-v1".to_string(),
+			..Default::default()
+		};
+		let parsed: NetworkSettings = settings.try_into().unwrap();
+		assert_eq!(parsed.listen.len(), 2);
 	}
 }

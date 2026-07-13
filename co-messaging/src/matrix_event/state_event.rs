@@ -10,6 +10,7 @@ use schemars::JsonSchema;
 
 #[co]
 #[derive(JsonSchema)]
+#[non_exhaustive]
 pub struct RoomNameContent {
 	pub name: String,
 }
@@ -34,6 +35,7 @@ impl From<RoomNameContent> for EventContent {
 
 #[co]
 #[derive(JsonSchema)]
+#[non_exhaustive]
 pub struct RoomTopicContent {
 	pub topic: String,
 }
@@ -56,17 +58,34 @@ impl From<RoomTopicContent> for EventContent {
 	}
 }
 
+/// Room/group avatar: either a content-addressed image or an emoji.
+/// The `Emoji` arm is a cokit extension — Matrix `m.room.avatar` is image-only.
 #[co]
 #[derive(JsonSchema)]
+#[non_exhaustive]
+pub enum Avatar {
+	Image {
+		#[schemars(with = "CoCid")]
+		cid: Cid,
+		info: ImageInfo,
+	},
+	Emoji(String),
+}
+
+#[co]
+#[derive(JsonSchema)]
+#[non_exhaustive]
 pub struct RoomAvatarContent {
-	#[schemars(with = "Option<CoCid>")]
-	pub file: Option<Cid>,
-	pub info: ImageInfo,
+	pub avatar: Option<Avatar>,
 }
 
 impl RoomAvatarContent {
-	pub fn new(file: Option<Cid>, info: ImageInfo) -> Self {
-		Self { file, info }
+	pub fn new(avatar: Avatar) -> Self {
+		Self { avatar: Some(avatar) }
+	}
+
+	pub fn remove() -> Self {
+		Self { avatar: None }
 	}
 }
 
@@ -82,15 +101,22 @@ impl From<RoomAvatarContent> for EventContent {
 	}
 }
 
+/// A single pin/unpin toggle for one event. The room core LWW-merges these per
+/// `event_id` (by timestamp) into `Room.pinned_messages` — concurrent pins on
+/// different events do not clobber each other. (Diverges from the Matrix
+/// whole-list `m.room.pinned_events` state event, which the room core no longer
+/// applies wholesale.)
 #[co]
-#[derive(JsonSchema)]
+#[derive(JsonSchema, Default)]
+#[non_exhaustive]
 pub struct PinnedEventsContent {
-	pub pinned: Vec<String>,
+	pub event_id: String,
+	pub pinned: bool,
 }
 
 impl PinnedEventsContent {
-	pub fn new(pinned: Vec<String>) -> Self {
-		Self { pinned }
+	pub fn new(event_id: impl Into<String>, pinned: bool) -> Self {
+		Self { event_id: event_id.into(), pinned }
 	}
 }
 

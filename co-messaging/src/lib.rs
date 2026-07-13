@@ -6,7 +6,7 @@ mod matrix_event;
 // TODO
 pub static FORMATTED_BODY_FORMAT: &str = "some.html.standard.format";
 
-use crate::matrix_event::receipts::PublicReceiptContent;
+use crate::matrix_event::receipts::ReceiptContent;
 pub use crate::matrix_event::{
 	call_event, ephemeral_event, message_event, multimedia, poll_event, receipts, relation, state_event, user_events,
 };
@@ -32,6 +32,7 @@ pub trait EventType {
 /// Collection of all possible actions for the room core
 #[co]
 #[derive(JsonSchema)]
+#[non_exhaustive]
 pub struct MatrixEvent {
 	pub event_id: String,
 	pub timestamp: Date,
@@ -49,7 +50,13 @@ impl MatrixEvent {
 		room_id: impl Into<String>,
 		content: impl Into<EventContent>,
 	) -> Self {
-		Self { event_id: event_id.into(), timestamp, room_id: room_id.into(), content: content.into(), state_key: None }
+		Self {
+			event_id: event_id.into(),
+			timestamp,
+			room_id: room_id.into(),
+			content: content.into(),
+			state_key: Default::default(),
+		}
 	}
 	pub fn event_type(&self) -> String {
 		self.content.generate_event_type()
@@ -116,7 +123,7 @@ pub enum EventContent {
 	#[serde(rename = "m_room_redaction")]
 	Redaction(RedactionContent),
 	#[serde(rename = "m_receipt")]
-	Receipt(PublicReceiptContent),
+	Receipt(ReceiptContent),
 
 	#[serde(rename = "room_name")]
 	RoomName(RoomNameContent),

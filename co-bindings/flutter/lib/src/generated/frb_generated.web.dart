@@ -18,7 +18,6 @@ import 'types/cid.dart';
 import 'types/co_map.dart';
 import 'types/co_set.dart';
 import 'types/identity.dart';
-import 'types/level.dart';
 import 'types/network_settings.dart';
 import 'types/storage.dart';
 import 'types/unixfs.dart';
@@ -176,9 +175,6 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   Cid dco_decode_box_autoadd_cid(dynamic raw);
 
   @protected
-  CoLogLevel dco_decode_box_autoadd_co_log_level(dynamic raw);
-
-  @protected
   CoMap dco_decode_box_autoadd_co_map(dynamic raw);
 
   @protected
@@ -208,9 +204,6 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   Cid dco_decode_cid(dynamic raw);
 
   @protected
-  CoLogLevel dco_decode_co_log_level(dynamic raw);
-
-  @protected
   CoMap dco_decode_co_map(dynamic raw);
 
   @protected
@@ -230,9 +223,6 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   CreateCore dco_decode_create_core(dynamic raw);
-
-  @protected
-  int dco_decode_i_32(dynamic raw);
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
@@ -266,9 +256,6 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   Cid? dco_decode_opt_box_autoadd_cid(dynamic raw);
-
-  @protected
-  CoLogLevel? dco_decode_opt_box_autoadd_co_log_level(dynamic raw);
 
   @protected
   CoNetworkSettings? dco_decode_opt_box_autoadd_co_network_settings(
@@ -441,9 +428,6 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   Cid sse_decode_box_autoadd_cid(SseDeserializer deserializer);
 
   @protected
-  CoLogLevel sse_decode_box_autoadd_co_log_level(SseDeserializer deserializer);
-
-  @protected
   CoMap sse_decode_box_autoadd_co_map(SseDeserializer deserializer);
 
   @protected
@@ -474,9 +458,6 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   Cid sse_decode_cid(SseDeserializer deserializer);
 
   @protected
-  CoLogLevel sse_decode_co_log_level(SseDeserializer deserializer);
-
-  @protected
   CoMap sse_decode_co_map(SseDeserializer deserializer);
 
   @protected
@@ -497,9 +478,6 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   CreateCore sse_decode_create_core(SseDeserializer deserializer);
-
-  @protected
-  int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
@@ -534,10 +512,6 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   Cid? sse_decode_opt_box_autoadd_cid(SseDeserializer deserializer);
-
-  @protected
-  CoLogLevel? sse_decode_opt_box_autoadd_co_log_level(
-      SseDeserializer deserializer);
 
   @protected
   CoNetworkSettings? sse_decode_opt_box_autoadd_co_network_settings(
@@ -585,6 +559,9 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   BigInt sse_decode_usize(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
   void sse_encode_AnyhowException(
@@ -717,10 +694,6 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   void sse_encode_box_autoadd_cid(Cid self, SseSerializer serializer);
 
   @protected
-  void sse_encode_box_autoadd_co_log_level(
-      CoLogLevel self, SseSerializer serializer);
-
-  @protected
   void sse_encode_box_autoadd_co_map(CoMap self, SseSerializer serializer);
 
   @protected
@@ -752,9 +725,6 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
   void sse_encode_cid(Cid self, SseSerializer serializer);
 
   @protected
-  void sse_encode_co_log_level(CoLogLevel self, SseSerializer serializer);
-
-  @protected
   void sse_encode_co_map(CoMap self, SseSerializer serializer);
 
   @protected
@@ -775,9 +745,6 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void sse_encode_create_core(CreateCore self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
@@ -812,10 +779,6 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_cid(Cid? self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_opt_box_autoadd_co_log_level(
-      CoLogLevel? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_box_autoadd_co_network_settings(
@@ -861,6 +824,9 @@ abstract class CoKitApiImplPlatform extends BaseApiImpl<CoKitWire> {
 
   @protected
   void sse_encode_usize(BigInt self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_i_32(int self, SseSerializer serializer);
 }
 
 // Section: wire_class

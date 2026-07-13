@@ -5,7 +5,6 @@ pub mod cid;
 pub mod co_map;
 pub mod co_set;
 pub mod identity;
-pub mod level;
 #[cfg(feature = "network")]
 pub mod network_settings;
 pub mod storage;

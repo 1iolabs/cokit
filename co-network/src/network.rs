@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-#[cfg(feature = "native")]
-use crate::services::network::NetworkDns;
 use crate::{
 	bitswap::{BitswapMessage, BitswapStoreClient},
 	didcomm,
@@ -29,8 +27,18 @@ use std::{cmp::min, future::Future, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
 
+/// Live-refreshing DNS resolver used by the native DNS transport.
+#[cfg(feature = "native")]
+type BuildDns = crate::dns::AutoResolver;
+/// WASM has no DNS transport
+#[cfg(not(feature = "native"))]
+type BuildDns = ();
+
 pub const CO_AGENT: &str = "co/0.1.0";
 pub const IPFS_IDENTIFY_PROTOCOL_NAME: StreamProtocol = StreamProtocol::new("/ipfs/id/1.0.0");
+
+/// Upper bound for actively draining connections during a graceful network shutdown.
+const NETWORK_SHUTDOWN_DRAIN: Duration = Duration::from_millis(1000);
 
 pub struct Libp2pNetworkContext {
 	pub identifier: String,
@@ -52,9 +60,13 @@ impl Libp2pNetwork {
 		context: Libp2pNetworkContext,
 		keypair: Keypair,
 		config: NetworkSettings,
+		dns: BuildDns,
 	) -> anyhow::Result<Libp2pNetwork> {
 		// swarm
-		let (local_peer_id, mut swarm) = build_swarm(&context, &keypair, &config).boxed().await?;
+		// DNS can no longer fail the build: the AutoResolver picks system config with a
+		// static fallback and live-refreshes (see crate::dns). BLE/mDNS/loopback come up
+		// regardless of adapter state.
+		let (local_peer_id, mut swarm) = build_swarm(&context, &keypair, &config, dns).boxed().await?;
 
 		// external addresses
 		for external_address in config.external_addresses.iter() {
@@ -66,11 +78,6 @@ impl Libp2pNetwork {
 			let peer_id = try_peer_id(bootstrap)?;
 			if local_peer_id == peer_id {
 				continue;
-			}
-
-			// listen on bootstrap as relay
-			if config.nat {
-				swarm.listen_on(bootstrap.clone().with(multiaddr::Protocol::P2pCircuit)).ok();
 			}
 
 			// dial bootstrap
@@ -89,18 +96,6 @@ impl Libp2pNetwork {
 		let shutdown = CancellationToken::new();
 		let runtime = Runtime::new(shutdown.child_token());
 
-		// listen (browsers connect via relay, not direct listen)
-		#[cfg(not(target_arch = "wasm32"))]
-		let runtime = {
-			let mut runtime = runtime;
-			runtime.listen(
-				swarm
-					.listen_on(config.listen.clone())
-					.with_context(|| format!("listen_on: {:?}", config.listen))?,
-			);
-			runtime
-		};
-
 		// run
 		context.tasks.spawn(async move {
 			run(&mut swarm, runtime, tokio_stream::wrappers::UnboundedReceiverStream::new(tasks_rx))
@@ -117,7 +112,8 @@ impl Libp2pNetwork {
 	}
 
 	/// Token to gracefully shutdown the network stack.
-	/// This will stop accepting new connections and waits until established connections are done.
+	/// Stops accepting new connections, actively disconnects established connections, and drains
+	/// remaining events for up to `NETWORK_SHUTDOWN_DRAIN` before the run loop exits.
 	pub fn shutdown(&self) -> Shutdown {
 		Shutdown { shutdown: self.shutdown.clone() }
 	}
@@ -133,6 +129,7 @@ async fn build_swarm(
 	context: &Libp2pNetworkContext,
 	keypair: &Keypair,
 	config: &NetworkSettings,
+	dns: BuildDns,
 ) -> Result<(PeerId, Box<Swarm<Behaviour>>), anyhow::Error> {
 	let local_peer_id = PeerId::from(keypair.public().clone());
 
@@ -159,50 +156,70 @@ async fn build_swarm(
 					.build()
 			}
 		};
-		(@websocket $builder:expr) => {
+		(@websocket $builder:expr, $dns:expr) => {
 			if config.websocket {
+				let dns = $dns.clone();
 				let b = $builder
-					.with_websocket(noise::Config::new, yamux::Config::default)
-					.await
+					.with_other_transport(move |keypair| {
+						// ws(dns(tcp)): DNS inside ws so hostnames reach the ws layer
+						// intact (wss certificate semantics) - upstream composition.
+						let tcp = libp2p::tcp::tokio::Transport::new(libp2p::tcp::Config::default());
+						let dns_tcp = crate::dns::Transport::with_resolver(tcp, dns);
+						// `Box<dyn Error>`: the only fallible closure-result type accepted by
+						// `with_other_transport`'s sealed `TryIntoTransport` (anyhow is not).
+						Ok::<_, Box<dyn std::error::Error + Send + Sync>>(
+							libp2p_websocket::Config::new(dns_tcp)
+								.upgrade(libp2p::core::upgrade::Version::V1Lazy)
+								.authenticate(noise::Config::new(keypair)?)
+								.multiplex(yamux::Config::default())
+								.map(|(peer, muxer), _| (peer, libp2p::core::muxing::StreamMuxerBox::new(muxer)))
+								.boxed(),
+						)
+					})
 					.context("websocket")?;
-				build_swarm!(@finalize b)
+				build_swarm!(@dns b, $dns)
 			} else {
-				build_swarm!(@finalize $builder)
+				build_swarm!(@dns $builder, $dns)
 			}
 		};
-		($builder:expr) => {
-			match config.dns {
-				NetworkDns::None => {
-					let b = $builder.with_dns_config(
-						libp2p::dns::ResolverConfig::new(),
-						libp2p::dns::ResolverOpts::default(),
-					);
-					build_swarm!(@websocket b)
-				}
-				NetworkDns::System => {
-					let b = $builder.with_dns().context("dns")?;
-					build_swarm!(@websocket b)
-				}
-				NetworkDns::Cloudflare => {
-					let b = $builder.with_dns_config(
-						libp2p::dns::ResolverConfig::cloudflare(),
-						libp2p::dns::ResolverOpts::default(),
-					);
-					build_swarm!(@websocket b)
-				}
-			}
-		};
+		(@dns $builder:expr, $dns:expr) => {{
+			let dns = $dns.clone();
+			let b = $builder
+				.with_other_transport(move |keypair| {
+					// dns(tcp or quic): dial-only stack claiming /dns*/ addresses the
+					// primary (listening) tcp/quic transports reject. The vendored dns
+					// transport claims EVERY address containing a /dns* component without
+					// falling through (inner rejection surfaces only asynchronously), so it
+					// must be registered after the websocket stack or it would starve ws of
+					// dns-hosted ws/wss dials.
+					let tcp = libp2p::tcp::tokio::Transport::new(libp2p::tcp::Config::default())
+						.upgrade(libp2p::core::upgrade::Version::V1Lazy)
+						.authenticate(noise::Config::new(keypair)?)
+						.multiplex(yamux::Config::default())
+						.map(|(peer, muxer), _| (peer, libp2p::core::muxing::StreamMuxerBox::new(muxer)));
+					let quic = libp2p::quic::tokio::Transport::new(libp2p::quic::Config::new(keypair))
+						.map(|(peer, muxer), _| (peer, libp2p::core::muxing::StreamMuxerBox::new(muxer)));
+					let tcp_or_quic = tcp.or_transport(quic).map(|either, _| either.into_inner());
+					// `Box<dyn Error>`: see the websocket arm.
+					Ok::<_, Box<dyn std::error::Error + Send + Sync>>(
+						crate::dns::Transport::with_resolver(tcp_or_quic, dns).boxed(),
+					)
+				})
+				.context("dns")?;
+			build_swarm!(@finalize b)
+		}};
 	}
 
 	// swarm: native
 	#[cfg(feature = "native")]
 	let swarm = {
+		use libp2p::core::transport::Transport as _;
 		let swarm_builder = SwarmBuilder::with_existing_identity(keypair.clone())
 			.with_tokio()
 			.with_tcp(libp2p::tcp::Config::default(), noise::Config::new, yamux::Config::default)
 			.context("tcp")?
 			.with_quic();
-		build_swarm!(swarm_builder)
+		build_swarm!(@websocket swarm_builder, dns)
 	};
 
 	// swarm: webrtc
@@ -224,6 +241,9 @@ async fn build_swarm(
 			})?;
 		build_swarm!(@finalize swarm_builder)
 	};
+
+	#[cfg(not(feature = "native"))]
+	let _ = dns;
 
 	// result
 	Ok((local_peer_id, Box::new(swarm)))
@@ -278,8 +298,10 @@ fn build_behaviour(
 	.into();
 
 	// identify
+	//  we push our updated listen addresses to connected peers when they change so we can use other transports too
 	let identify_config = identify::Config::new(IPFS_IDENTIFY_PROTOCOL_NAME.to_string(), keypair.public())
-		.with_agent_version(CO_AGENT.into());
+		.with_agent_version(CO_AGENT.into())
+		.with_push_listen_addr_updates(true);
 	let identify = identify::Behaviour::new(identify_config);
 
 	// mdns
@@ -344,8 +366,6 @@ impl Shutdown {
 }
 
 struct Runtime {
-	#[cfg(not(target_arch = "wasm32"))]
-	listener_id: Option<libp2p::core::transport::ListenerId>,
 	/// Tasks which have been executed but waiting for events.
 	pending_tasks: Vec<(NetworkTaskBox<Behaviour>, Span)>,
 	shutdown: CancellationToken,
@@ -353,18 +373,7 @@ struct Runtime {
 }
 impl Runtime {
 	fn new(shutdown: CancellationToken) -> Self {
-		Self {
-			#[cfg(not(target_arch = "wasm32"))]
-			listener_id: None,
-			shutdown,
-			pending_tasks: Default::default(),
-			next_delayed_task: Default::default(),
-		}
-	}
-
-	#[cfg(not(target_arch = "wasm32"))]
-	fn listen(&mut self, id: libp2p::core::transport::ListenerId) {
-		self.listener_id = Some(id);
+		Self { shutdown, pending_tasks: Default::default(), next_delayed_task: Default::default() }
 	}
 
 	fn is_running(&self) -> bool {
@@ -407,7 +416,6 @@ async fn run(swarm: &mut Swarm<Behaviour>, mut runtime: Runtime, tasks: impl Str
 
 	// handle
 	let shutdown = runtime.shutdown.child_token();
-	let mut shutdown_timeout = None;
 	let tasks = tasks.fuse();
 	pin_mut!(tasks);
 	while runtime.is_running() {
@@ -442,10 +450,24 @@ async fn run(swarm: &mut Swarm<Behaviour>, mut runtime: Runtime, tasks: impl Str
 				}
 			},
 
-			// shutdown
-			_ = shutdown.cancelled(), if shutdown_timeout.is_none() => {
-				shutdown_timeout = Some(Duration::from_millis(1000));
-			}
+			// shutdown: wake so the loop re-checks is_running() and exits into the drain phase
+			_ = shutdown.cancelled() => {}
+		}
+	}
+
+	// graceful drain: actively close every connection, then pump events until all connections
+	// are gone or the drain deadline elapses, so shutdown never waits on the remote to close.
+	let peers: Vec<PeerId> = swarm.connected_peers().copied().collect();
+	tracing::info!(peers = peers.len(), "network-draining");
+	for peer in peers {
+		let _ = swarm.disconnect_peer_id(peer);
+	}
+	let deadline = time::Instant::now() + NETWORK_SHUTDOWN_DRAIN;
+	while swarm.connected_peers().next().is_some() && time::Instant::now() < deadline {
+		::tokio::select! {
+			biased;
+			_ = run_once(swarm, &mut runtime) => {}
+			_ = time::sleep_until(deadline) => {}
 		}
 	}
 
@@ -489,6 +511,17 @@ async fn run_once(swarm: &mut Swarm<Behaviour>, runtime: &mut Runtime) {
 		// log
 		if is_log(&event) {
 			tracing::trace!(?event, "network-event");
+		}
+
+		// recovery diagnostics: surface listener death prominently
+		match &event {
+			SwarmEvent::ListenerClosed { listener_id, addresses, reason } => {
+				tracing::info!(?listener_id, ?addresses, ?reason, "network-listener-closed");
+			},
+			SwarmEvent::ListenerError { listener_id, error } => {
+				tracing::info!(?listener_id, ?error, "network-listener-error");
+			},
+			_ => {},
 		}
 
 		// tasks

@@ -42,7 +42,7 @@ pub async fn command(context: &CliContext, cli: &Cli, _command: &Command) -> Res
 				let co_storage = co.storage();
 
 				// output
-				if !cli.quiet {
+				if !cli.log.quiet {
 					println!("checking {} ...", co.id().as_str());
 				}
 
@@ -69,7 +69,7 @@ pub async fn command(context: &CliContext, cli: &Cli, _command: &Command) -> Res
 				.await?;
 
 				// remove
-				if !cli.quiet {
+				if !cli.log.quiet {
 					println!("cleaning {} ...", co.id().as_str());
 				}
 				storage_cleanup(

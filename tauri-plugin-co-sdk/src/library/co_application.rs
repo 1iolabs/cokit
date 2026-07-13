@@ -4,6 +4,7 @@
 use crate::library::cli::Cli;
 use clap::Parser;
 use co_sdk::{Application, ApplicationBuilder, NetworkSettings};
+use co_tracing::{LogArgs, LogContext};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default)]
@@ -13,7 +14,7 @@ pub struct CoApplicationSettings {
 	pub force_new_peer_id: bool,
 	pub network: bool,
 	pub no_keychain: bool,
-	pub no_log: bool,
+	pub log: LogArgs,
 }
 impl CoApplicationSettings {
 	pub fn new(identifier: &str) -> Self {
@@ -43,15 +44,32 @@ impl CoApplicationSettings {
 }
 
 pub async fn start_application(settings: CoApplicationSettings) -> Result<Application, anyhow::Error> {
-	let identifier = settings.instance_id;
-	let mut builder = match settings.base_path {
+	let identifier = settings.instance_id.clone();
+
+	// builder
+	let mut application_builder = match settings.base_path {
 		Some(path) => ApplicationBuilder::new_with_path(identifier, path),
 		None => ApplicationBuilder::new(identifier),
 	};
 	if settings.no_keychain {
-		builder = builder.without_keychain()
+		application_builder = application_builder.without_keychain()
 	}
-	let mut application = builder.with_bunyan_logging(None).build().await?;
+
+	// tracing
+	let tracing = settings
+		.log
+		.tracing_builder(
+			&LogContext::new(application_builder.identifier())
+				.with_base_path(application_builder.base_path().as_deref()),
+		)
+		.with_optional()
+		.init()?;
+
+	// application
+	let mut application = application_builder.build().await?;
+
+	// tracing
+	application.drop_on_shutdown(tracing);
 
 	// network
 	if settings.network {

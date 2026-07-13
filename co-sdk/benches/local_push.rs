@@ -6,7 +6,6 @@ use co_core_co::CoAction;
 use co_runtime::Core;
 use co_sdk::{build_core, crate_repository_path, Application, ApplicationBuilder, BuildCoreArtifact, CO_CORE_NAME_CO};
 use co_storage::MemoryBlockStorage;
-use co_test::test_log_path;
 use criterion::{criterion_group, criterion_main, Criterion};
 use example_counter::{Counter, CounterAction};
 use tokio::runtime::Builder;
@@ -27,8 +26,6 @@ async fn setup_local_memory() -> Application {
 
 	// application
 	let application = ApplicationBuilder::new_memory("test".to_owned())
-		.with_bunyan_logging(Some(test_log_path()))
-		.with_optional_tracing()
 		.without_keychain()
 		.with_core(counter, counter_core)
 		.build()
@@ -52,6 +49,7 @@ async fn setup_local_memory() -> Application {
 }
 
 fn local_push_benchmark(c: &mut Criterion) {
+	co_test::init_test_log();
 	let runtime = Builder::new_multi_thread().enable_all().build().unwrap();
 	let application = runtime.block_on(setup_local_memory());
 	c.bench_function("local_push", move |b| b.to_async(&runtime).iter(|| local_push(application.clone())));

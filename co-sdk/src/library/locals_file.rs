@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
+use super::fs_write::fs_write_atomic;
 use crate::library::locals::{ApplicationLocal, Locals};
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -9,26 +10,19 @@ use co_primitives::{tags, to_cbor, Tags};
 use futures::{pin_mut, stream, Stream, StreamExt, TryStreamExt};
 use libc::flock;
 use nix::fcntl::{fcntl, FcntlArg, Flock, Flockable};
-use notify::{
-	event::{CreateKind, ModifyKind},
-	RecursiveMode, Watcher,
-};
+use notify::{Event, EventKind, RecursiveMode, Watcher};
 use pin_project::{pin_project, pinned_drop};
 use std::{
 	collections::BTreeMap,
 	fmt::Debug,
 	future::ready,
 	io::ErrorKind,
-	ops::DerefMut,
 	os::fd::AsRawFd,
-	path::PathBuf,
+	path::{Path, PathBuf},
 	pin::Pin,
 	task::{Context, Poll},
 };
-use tokio::{
-	fs::File,
-	io::{AsyncSeekExt, AsyncWriteExt},
-};
+use tokio::fs::File;
 use tokio_util::sync::{CancellationToken, DropGuard};
 
 #[derive(Debug, Clone)]
@@ -77,7 +71,15 @@ impl FileLocals {
 
 				// try to read local.cbor
 				let local_path = child.path().join("local.cbor");
-				let local = ApplicationLocal::read(&local_path).await?;
+				let local = match ApplicationLocal::read(&local_path).await {
+					Ok(local) => local,
+					Err(err) => {
+						// log and ignore
+						//  a single unreadable/foreign file must not abort the whole read
+						tracing::warn!(?local_path, ?err, "locals-read-failed");
+						continue;
+					},
+				};
 				if let Some(local) = local {
 					yield (local_path, local);
 				}
@@ -276,62 +278,50 @@ impl Actor for FileLocalsActor {
 impl FileLocalsActor {
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
 	async fn open(&self) -> Result<FileLocalsFile, anyhow::Error> {
+		// the data file + parent dir are created lazily by the first atomic write
 		let path = self.config_path.join(&self.identifier).join("local.cbor");
-
-		// create parent dir
-		tokio::fs::create_dir_all(path.parent().ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?).await?;
-
-		// open
-		let file = tokio::fs::OpenOptions::new()
-			.create(true)
-			.truncate(false)
-			.write(true)
-			.open(&path)
-			.await?;
-
-		// result
-		Ok(FileLocalsFile::File(path, file))
+		Ok(FileLocalsFile::Unlocked(path))
 	}
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
 	async fn open_and_lock(&self) -> Result<FileLocalsFile, anyhow::Error> {
-		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
+		let mut dir = self.config_path.join(&self.identifier);
 
-		// create and lock
+		// find a slot whose lock sidecar is free
 		let mut index = 1;
 		loop {
-			// create parent dir
-			tokio::fs::create_dir_all(path.parent().ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?).await?;
+			// create slot dir
+			tokio::fs::create_dir_all(&dir).await?;
 
-			// open
+			// open lock sidecar (never renamed, stable inode keeps the lock valid)
+			let lock_path = dir.join("local.cbor.lock");
 			let file = tokio::fs::OpenOptions::new()
 				.read(true)
 				.write(true)
 				.create(true)
 				.truncate(false)
-				.open(&path)
+				.open(&lock_path)
 				.await?;
 
 			// lock
 			let lock = flock { l_start: 0, l_len: 0, l_pid: 0, l_type: libc::F_WRLCK as libc::c_short, l_whence: 0 };
+			// F_SETLK is non-blocking: if another process holds the slot, fail fast and try the next index
 			match fcntl(file.as_raw_fd(), FcntlArg::F_SETLK(&lock)) {
 				Ok(_) => {
+					let path = dir.join("local.cbor");
 					tracing::info!(?path, "locals-lock");
-					return Ok(FileLocalsFile::LockedFile(path, file));
+					return Ok(FileLocalsFile::Locked(path, file));
 				},
 				Err(errno) => {
 					// close file
-					// note: this should not drop any locks as we exepct we only have one local.cbor per process!
+					// note: this should not drop any locks as we expect we only have one local.cbor per process!
 					drop(file);
 
 					// log
-					tracing::warn!(?path, ?errno, "locals-lock-failed");
+					tracing::warn!(?lock_path, ?errno, "locals-lock-failed");
 
 					// index
-					path = self
-						.config_path
-						.join(format!("{}-{}", self.identifier, index))
-						.join("local.cbor");
+					dir = self.config_path.join(format!("{}-{}", self.identifier, index));
 					index += 1;
 				},
 			}
@@ -340,44 +330,43 @@ impl FileLocalsActor {
 
 	#[tracing::instrument(level = tracing::Level::TRACE, err(Debug))]
 	async fn open_and_flock(&self) -> Result<FileLocalsFile, anyhow::Error> {
-		let mut path = self.config_path.join(&self.identifier).join("local.cbor");
+		let mut dir = self.config_path.join(&self.identifier);
 
-		// create and lock
+		// find a slot whose lock sidecar is free
 		let mut index = 1;
 		loop {
-			// create parent dir
-			tokio::fs::create_dir_all(path.parent().ok_or(std::io::Error::from(std::io::ErrorKind::NotFound))?).await?;
+			// create slot dir
+			tokio::fs::create_dir_all(&dir).await?;
 
-			// open
+			// open lock sidecar (never renamed, stable inode keeps the lock valid)
+			let lock_path = dir.join("local.cbor.lock");
 			let file = TokioFile(
 				tokio::fs::OpenOptions::new()
 					.read(true)
 					.write(true)
 					.create(true)
 					.truncate(false)
-					.open(&path)
+					.open(&lock_path)
 					.await?,
 			);
 
 			// lock
 			match Flock::lock(file, nix::fcntl::FlockArg::LockExclusiveNonblock) {
 				Ok(lock) => {
+					let path = dir.join("local.cbor");
 					tracing::info!(?path, "locals-lock (flock)");
 					return Ok(FileLocalsFile::Flock(path, lock));
 				},
 				Err((file, errno)) => {
 					// close file
-					// note: this should not drop any locks as we exepct we only have one local.cbor per process!
+					// note: this should not drop any locks as we expect we only have one local.cbor per process!
 					drop(file);
 
 					// log
-					tracing::warn!(?path, ?errno, "locals-lock-failed");
+					tracing::warn!(?lock_path, ?errno, "locals-lock-failed");
 
 					// index
-					path = self
-						.config_path
-						.join(format!("{}-{}", self.identifier, index))
-						.join("local.cbor");
+					dir = self.config_path.join(format!("{}-{}", self.identifier, index));
 					index += 1;
 				},
 			}
@@ -407,20 +396,23 @@ enum FileLocalsMessage {
 }
 
 #[derive(Debug, Default)]
+#[allow(dead_code)] // second field holds the lock alive (fcntl fd / flock guard) and releases it on drop; never read directly
 enum FileLocalsFile {
 	#[default]
 	None,
-	File(PathBuf, tokio::fs::File),
+	/// Data path only. No lock held (`Lock::None`).
+	Unlocked(PathBuf),
+	/// Data path + `flock` guard held on the `.lock` sidecar.
 	Flock(PathBuf, Flock<TokioFile>),
-	LockedFile(PathBuf, tokio::fs::File),
+	/// Data path + `fcntl`-locked fd held on the `.lock` sidecar.
+	Locked(PathBuf, tokio::fs::File),
 }
 impl FileLocalsFile {
-	fn file_mut(&mut self) -> Option<(&PathBuf, &mut tokio::fs::File)> {
+	/// The `local.cbor` data path for this slot, if a slot has been opened.
+	fn path(&self) -> Option<&PathBuf> {
 		match self {
 			Self::None => None,
-			Self::File(path, file) => Some((path, file)),
-			Self::Flock(path, lock) => Some((path, &mut lock.deref_mut().0)),
-			Self::LockedFile(path, file) => Some((path, file)),
+			Self::Unlocked(path) | Self::Flock(path, _) | Self::Locked(path, _) => Some(path),
 		}
 	}
 
@@ -462,10 +454,11 @@ impl FileLocalsState {
 		}
 	}
 
-	/// Write local to the locked file.
+	/// Write local atomically so concurrent readers never see a torn file.
 	async fn write(&mut self, local: ApplicationLocal) -> Result<(), anyhow::Error> {
-		// get file
-		let (path, file) = self.file.file_mut().ok_or(anyhow!("No file."))?;
+		// get path
+		//  note: the lock guard is held by self.file for the actor's lifetime
+		let path = self.file.path().ok_or(anyhow!("No file."))?.to_owned();
 
 		// apply
 		self.locals.insert(path.clone(), local.clone());
@@ -476,11 +469,8 @@ impl FileLocalsState {
 		// log
 		tracing::debug!(?path, ?local, "locals-write");
 
-		// write
-		file.set_len(0).await?;
-		file.seek(std::io::SeekFrom::Start(0)).await?;
-		file.write_all(&data).await?;
-		file.flush().await?;
+		// atomic write
+		fs_write_atomic(&path, &data, true).await?;
 
 		// result
 		Ok(())
@@ -495,6 +485,25 @@ impl FileLocalsState {
 		}
 		Ok(())
 	}
+}
+
+/// Extract `local.cbor` paths from a watch event that indicate the file appeared or changed.
+///
+/// # Arguments
+/// - `event`: Any `Create`/`Modify` events.
+fn local_event_paths(event: &Event, config_path: &Path) -> Vec<PathBuf> {
+	if !matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_)) {
+		return Vec::new();
+	}
+	event
+		.paths
+		.iter()
+		.filter(|path| {
+			path.parent().and_then(|f| f.parent()) == Some(config_path)
+				&& path.file_name().and_then(|f| f.to_str()) == Some("local.cbor")
+		})
+		.cloned()
+		.collect()
 }
 
 /// Watch for all local.cbor changes in config_path.
@@ -536,36 +545,7 @@ fn watch(tasks: TaskSpawner, config_path: PathBuf) -> Result<impl Stream<Item = 
 				})
 			}
 		})
-		.filter_map(move |event| {
-			ready(match &event.kind {
-				notify::EventKind::Create(CreateKind::File) | notify::EventKind::Modify(ModifyKind::Data(_)) => {
-					let paths = event
-						.paths
-						.iter()
-						.filter(|path| {
-							path.parent().and_then(|f| f.parent()) == Some(config_path.as_ref())
-								&& path.file_name().and_then(|f| f.to_str()) == Some("local.cbor")
-						})
-						.cloned()
-						.collect();
-
-					// log
-					#[cfg(feature = "logging-verbose")]
-					tracing::trace!(?paths, ?event, "locals-watch-send");
-
-					// result
-					Some(paths)
-				},
-				_ => {
-					// log
-					#[cfg(feature = "logging-verbose")]
-					tracing::trace!(?event, "locals-watch-ignore");
-
-					// none
-					None
-				},
-			})
-		})
+		.filter_map(move |event| ready(Some(local_event_paths(&event, &config_path))))
 		.flat_map(|paths: Vec<PathBuf>| stream::iter(paths));
 
 	// result
@@ -589,6 +569,13 @@ mod tests {
 	};
 	use co_primitives::BlockSerializer;
 	use co_test::TmpDir;
+	use std::{
+		path::PathBuf,
+		sync::{
+			atomic::{AtomicBool, Ordering},
+			Arc,
+		},
+	};
 
 	#[tokio::test]
 	async fn test_file_locals_overwrite() {
@@ -630,5 +617,132 @@ mod tests {
 		let items = locals.get().await.unwrap();
 		assert_eq!(items.len(), 1);
 		assert_eq!(&items.first().unwrap().state, v2.cid());
+	}
+
+	#[tokio::test]
+	async fn test_file_locals_uses_sidecar_lock() {
+		let tmp = TmpDir::new("co");
+		let mut locals = FileLocals::new(Default::default(), tmp.path().into(), "test".to_owned(), true).unwrap();
+
+		let v = BlockSerializer::default().serialize(&1).unwrap();
+		locals
+			.set(ApplicationLocal::new([*v.cid()].into(), *v.cid(), None))
+			.await
+			.unwrap();
+
+		let dir = tmp.path().join("test");
+		assert!(dir.join("local.cbor").exists(), "data file should exist");
+		assert!(dir.join("local.cbor.lock").exists(), "sidecar lock file should exist");
+		assert!(!dir.join("local.cbor.tmp").exists(), "no temp file should remain");
+	}
+
+	#[tokio::test]
+	async fn test_read_all_skips_unreadable_local() {
+		let tmp = TmpDir::new("co");
+		let config: PathBuf = tmp.path().into();
+
+		// a valid local under "good"
+		let mut good = FileLocals::new(Default::default(), config.clone(), "good".to_owned(), true).unwrap();
+		let v = BlockSerializer::default().serialize(&42u64).unwrap();
+		good.set(ApplicationLocal::new([*v.cid()].into(), *v.cid(), None))
+			.await
+			.unwrap();
+
+		// a corrupt local under "bad" (empty file == the mid-truncation state that triggers CBOR Eof)
+		let bad_dir = config.join("bad");
+		tokio::fs::create_dir_all(&bad_dir).await.unwrap();
+		tokio::fs::write(bad_dir.join("local.cbor"), b"").await.unwrap();
+
+		// ReadAll returns the good local and skips the bad one (no error)
+		let reader = FileLocals::new(Default::default(), config.clone(), "reader".to_owned(), true).unwrap();
+		let items = reader.get().await.unwrap();
+		assert_eq!(items.len(), 1);
+		assert_eq!(&items.first().unwrap().state, v.cid());
+	}
+
+	#[test]
+	fn test_local_event_paths_matches_create_modify_and_rename() {
+		use notify::{
+			event::{AccessKind, CreateKind, DataChange, ModifyKind, RenameMode},
+			Event, EventKind,
+		};
+
+		let config = PathBuf::from("/cfg");
+		let local = PathBuf::from("/cfg/app/local.cbor");
+		let tmp = PathBuf::from("/cfg/app/local.cbor.tmp");
+		let lock = PathBuf::from("/cfg/app/local.cbor.lock");
+
+		// rename-into-place (atomic write) - the case the old filter missed
+		let ev = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To))).add_path(local.clone());
+		assert_eq!(super::local_event_paths(&ev, &config), vec![local.clone()]);
+
+		// in-place data modify still matches
+		let ev = Event::new(EventKind::Modify(ModifyKind::Data(DataChange::Any))).add_path(local.clone());
+		assert_eq!(super::local_event_paths(&ev, &config), vec![local.clone()]);
+
+		// create still matches
+		let ev = Event::new(EventKind::Create(CreateKind::File)).add_path(local.clone());
+		assert_eq!(super::local_event_paths(&ev, &config), vec![local.clone()]);
+
+		// `.tmp` / `.lock` siblings are ignored (filename gate)
+		let ev = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To)))
+			.add_path(tmp)
+			.add_path(lock);
+		assert!(super::local_event_paths(&ev, &config).is_empty());
+
+		// unrelated event kinds are ignored
+		let ev = Event::new(EventKind::Access(AccessKind::Read)).add_path(local);
+		assert!(super::local_event_paths(&ev, &config).is_empty());
+	}
+
+	#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+	async fn test_file_locals_concurrent_read_during_write() {
+		let tmp = TmpDir::new("co");
+		let config: PathBuf = tmp.path().into();
+
+		// writer instance; seed an initial value so `local.cbor` exists and is complete
+		let mut writer = FileLocals::new(Default::default(), config.clone(), "writer".to_owned(), true).unwrap();
+		let v0 = BlockSerializer::default().serialize(&0u64).unwrap();
+		writer
+			.set(ApplicationLocal::new([*v0.cid()].into(), *v0.cid(), None))
+			.await
+			.unwrap();
+
+		// reader instance over the same config dir (reads `writer/local.cbor` via ReadAll)
+		let reader = FileLocals::new(Default::default(), config.clone(), "reader".to_owned(), true).unwrap();
+
+		let stop = Arc::new(AtomicBool::new(false));
+
+		// writer task: hammer atomic writes
+		let writer_task = tokio::spawn({
+			let stop = stop.clone();
+			async move {
+				for i in 1..=5000u64 {
+					let v = BlockSerializer::default().serialize(&i).unwrap();
+					writer
+						.set(ApplicationLocal::new([*v.cid()].into(), *v.cid(), None))
+						.await
+						.unwrap();
+				}
+				stop.store(true, Ordering::Release);
+			}
+		});
+
+		// reader task: read continuously while the writer runs; must never error.
+		// the meaningful assertion is the `.unwrap()` on each read (it panics on a torn file);
+		// the final `assert!(reads > 0)` is just a sanity check that the loop body ran at all.
+		let reader_task = tokio::spawn(async move {
+			let mut reads = 0u64;
+			while !stop.load(Ordering::Acquire) {
+				// before the fix this intermittently panics with: CBOR ... Eof
+				reader.get().await.unwrap();
+				reads += 1;
+			}
+			reads
+		});
+
+		writer_task.await.unwrap();
+		let reads = reader_task.await.unwrap();
+		assert!(reads > 0, "reader should have completed at least one read");
 	}
 }

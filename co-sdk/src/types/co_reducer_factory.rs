@@ -24,6 +24,7 @@ pub trait CoReducerFactory {
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
+#[non_exhaustive]
 pub struct CoOptions {
 	/// Wait for CO to become active.
 	///
@@ -32,12 +33,22 @@ pub struct CoOptions {
 	/// - [`co_core_membership::MembershipState::Join`]
 	pub wait: bool,
 
+	/// Wait for CO to become a member even if there is no membership yet.
+	pub wait_unknown: bool,
+
 	/// Optional wait timeout before to fail.
 	pub wait_timeout: Option<Duration>,
 }
 impl CoOptions {
 	pub fn with_wait(mut self, timeout: Option<Duration>) -> Self {
 		self.wait = true;
+		self.wait_timeout = timeout;
+		self
+	}
+
+	pub fn with_wait_unknown(mut self, timeout: Option<Duration>) -> Self {
+		self.wait = true;
+		self.wait_unknown = true;
 		self.wait_timeout = timeout;
 		self
 	}
