@@ -11,6 +11,9 @@ pub struct NetworkSettings {
 	/// Force to create a new [`PeerId`] on network startup.
 	pub force_new_peer_id: bool,
 
+	/// Force a new peer id on each startup that doesn't get saved in the keystore
+	pub ephemeral_peer_id: bool,
+
 	/// The endpoints to listen to.
 	pub listen: BTreeSet<Multiaddr>,
 
@@ -62,6 +65,7 @@ impl Default for NetworkSettings {
 	fn default() -> Self {
 		Self {
 			force_new_peer_id: Default::default(),
+			ephemeral_peer_id: Default::default(),
 			listen: Self::default_listen(),
 			bootstrap: Self::default_bootstrap(),
 			external_addresses: Default::default(),
@@ -113,6 +117,11 @@ impl NetworkSettings {
 
 	pub fn with_force_new_peer_id(mut self, value: bool) -> Self {
 		self.force_new_peer_id = value;
+		self
+	}
+
+	pub fn with_ephemeral_peer_id(mut self, value: bool) -> Self {
+		self.ephemeral_peer_id = value;
 		self
 	}
 
