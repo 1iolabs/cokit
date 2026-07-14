@@ -29,6 +29,7 @@
 ### Added
 
 - The structs that didn't already have one, now also have an impl block with a `new()` function to help initialize those structs
+- `TextContent` now supports an optional URL-preview card through `url_preview` and the chainable `with_url_preview()` helper, with new `UrlPreview` and `PreviewImage` types for preview metadata and content-addressed images.
 
 ## [0.1.0] - 2026-03-31
 
