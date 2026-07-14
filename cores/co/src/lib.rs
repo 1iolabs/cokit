@@ -948,7 +948,7 @@ mod tests {
 			CoAction::CoreTags { core: "missing".to_owned(), action: TagsAction::insert(tags(&[("x", "1")])) },
 		)
 		.await;
-		assert!(state.cores.get("missing").is_none());
+		assert!(!state.cores.contains_key("missing"));
 	}
 
 	#[tokio::test]
@@ -993,6 +993,6 @@ mod tests {
 			CoAction::GuardTags { guard: "missing".to_owned(), action: TagsAction::insert(tags(&[("x", "1")])) },
 		)
 		.await;
-		assert!(state.guards.get("missing").is_none());
+		assert!(!state.guards.contains_key("missing"));
 	}
 }
