@@ -255,12 +255,14 @@ impl Tags {
 		self.find_key(key).is_some()
 	}
 
-	/// Set tag(s). By removing all tags with the same key before insert.
+	/// Set tag(s): drop every existing tag whose key appears in `tags`, then insert
+	/// all of `tags`. Multiple supplied entries that share a key are all retained.
 	pub fn set(&mut self, tags: impl Into<Tags>) {
-		for tag in tags.into().into_iter() {
-			self.clear_key(&tag.0);
-			self.insert(tag);
+		let tags = tags.into();
+		for (key, _) in tags.iter() {
+			self.clear_key(key);
 		}
+		self.extend(tags);
 	}
 
 	/// Remove specified tags.
@@ -893,6 +895,34 @@ mod tests {
 		let changed = tags.reduce(TagsAction::set(tags!()));
 		assert!(!changed);
 		assert_eq!(tags, tags!("a": "1"));
+	}
+
+	#[test]
+	fn test_set_multiple_values_same_key() {
+		// `set` with several entries sharing one key must keep every supplied value,
+		// not just the last one iterated.
+		let mut tags = tags!("a": "0");
+		tags.set(tags!("a": "1", "a": "2"));
+		assert_eq!(tags, tags!("a": "1", "a": "2"));
+	}
+
+	#[test]
+	fn test_reduce_set_multiple_values_same_key() {
+		// dropping existing tags by key then inserting all new tags keeps both
+		// values and reports a change.
+		let mut tags = tags!("a": "0");
+		let changed = tags.reduce(TagsAction::set(tags!("a": "1", "a": "2")));
+		assert!(changed);
+		assert_eq!(tags, tags!("a": "1", "a": "2"));
+	}
+
+	#[test]
+	fn test_reduce_set_multiple_values_same_key_idempotent() {
+		// setting the exact multi-value state that already exists is a no-op.
+		let mut tags = tags!("a": "1", "a": "2");
+		let changed = tags.reduce(TagsAction::set(tags!("a": "1", "a": "2")));
+		assert!(!changed);
+		assert_eq!(tags, tags!("a": "1", "a": "2"));
 	}
 
 	#[test]
