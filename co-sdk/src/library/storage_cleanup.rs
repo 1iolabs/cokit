@@ -150,7 +150,7 @@ mod tests {
 	use co_core_co::CoAction;
 	use co_core_storage::{BlockInfo, PinStrategy, StorageAction};
 	use co_identity::DidKeyIdentity;
-	use co_primitives::{tags, CoId, MonotonicCoDate, WeakCid};
+	use co_primitives::{tags, CoId, MonotonicCoDate, TagsAction, WeakCid};
 	use co_storage::ExtendedBlockStorage;
 	use co_test::{test_application_identifier, test_tmp_dir};
 	use futures::TryStreamExt;
@@ -209,7 +209,7 @@ mod tests {
 			.push(
 				&application.local_identity(),
 				CO_CORE_NAME_CO,
-				&CoAction::TagsInsert { tags: tags!("hello": "world") },
+				&CoAction::Tags { action: TagsAction::insert(tags!("hello": "world")) },
 			)
 			.await
 			.unwrap();
@@ -229,7 +229,11 @@ mod tests {
 		// push
 		//  this will trigger the cleanup as the previous has set to one we not got items to remove
 		local_co
-			.push(&application.local_identity(), CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("test": 123) })
+			.push(
+				&application.local_identity(),
+				CO_CORE_NAME_CO,
+				&CoAction::Tags { action: TagsAction::insert(tags!("test": 123)) },
+			)
 			.await
 			.unwrap();
 		let next_local_co_state = local_co.reducer_state().await;
@@ -299,7 +303,7 @@ mod tests {
 		let co_state = co.reducer_state().await;
 		let external_co_state = co_state.to_external_force(&storage).await.unwrap();
 		tracing::trace!(?co_state, ?external_co_state, "test-state");
-		co.push(&identity, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("hello": "world") })
+		co.push(&identity, CO_CORE_NAME_CO, &CoAction::Tags { action: TagsAction::insert(tags!("hello": "world")) })
 			.await
 			.unwrap();
 		assert_eq!(count_pin_references(&local_co, co.id(), CoPinningKey::Root).await, 2); // this contains the intermediate point before pinning, the actual state before and the next intermediate point.
@@ -317,7 +321,7 @@ mod tests {
 
 		// push
 		//  this will trigger the cleanup as the previous has set to one we not got items to remove
-		co.push(&identity, CO_CORE_NAME_CO, &CoAction::TagsInsert { tags: tags!("test": 123) })
+		co.push(&identity, CO_CORE_NAME_CO, &CoAction::Tags { action: TagsAction::insert(tags!("test": 123)) })
 			.await
 			.unwrap();
 		let next_co_state = co.reducer_state().await;

@@ -4,7 +4,7 @@
 use anyhow::anyhow;
 use co_api::{
 	co, BlockStorage, BlockStorageExt, CoList, CoListTransaction, CoMap, CoMapTransaction, CoSet, CoreBlockStorage,
-	IsDefault, LazyTransaction, Link, OptionLink, Reducer, ReducerAction, StorageError, Tags, WeakCid,
+	IsDefault, LazyTransaction, Link, OptionLink, Reducer, ReducerAction, StorageError, Tags, TagsAction, WeakCid,
 };
 use futures::{pin_mut, FutureExt, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet};
@@ -299,12 +299,18 @@ pub enum StorageAction {
 	Delete(BlockInfo, #[serde(with = "co_api::serde_map_as_list")] BTreeMap<WeakCid, BTreeSet<WeakCid>>, bool),
 
 	/// Append tags to references.
+	#[deprecated(note = "use `Tags` with a `TagsAction`")]
 	#[serde(rename = "ti")]
 	TagsInsert(BTreeSet<WeakCid>, Tags),
 
 	/// Remove tags from references.
+	#[deprecated(note = "use `Tags` with a `TagsAction`")]
 	#[serde(rename = "tr")]
 	TagsRemove(BTreeSet<WeakCid>, Tags),
+
+	/// apply a [`TagsAction`] to references.
+	#[serde(rename = "t")]
+	Tags(BTreeSet<WeakCid>, TagsAction),
 
 	/// Create a named pin and reference all specified [`Cid`]s.
 	#[serde(rename = "pc")]
@@ -457,6 +463,7 @@ where
 	}
 }
 
+#[allow(deprecated)]
 async fn reduce<S>(transaction: &mut StorageTransaction<S>, action: StorageAction) -> Result<(), anyhow::Error>
 where
 	S: BlockStorage + Clone + 'static,
@@ -474,6 +481,7 @@ where
 		StorageAction::Delete(info, cids, force) => reduce_delete(transaction, cids, force, info).boxed().await?,
 		StorageAction::TagsInsert(cids, tags) => reduce_tags_insert(transaction, cids, tags).boxed().await?,
 		StorageAction::TagsRemove(cids, tags) => reduce_tags_remove(transaction, cids, tags).boxed().await?,
+		StorageAction::Tags(cids, action) => reduce_tags(transaction, cids, action).boxed().await?,
 		StorageAction::PinCreate(key, strategy, references) => {
 			reduce_pin_create(transaction, key, strategy, references).boxed().await?
 		},
@@ -759,6 +767,30 @@ where
 	Ok(())
 }
 
+async fn reduce_tags<S>(
+	transaction: &mut StorageTransaction<S>,
+	cids: BTreeSet<WeakCid>,
+	action: TagsAction,
+) -> Result<(), anyhow::Error>
+where
+	S: BlockStorage + Clone + 'static,
+{
+	for cid in cids {
+		transaction
+			.blocks_mut()
+			.await?
+			.try_update_or_insert_async(cid, |mut block| {
+				let action = action.clone();
+				async move {
+					block.tags.reduce(action);
+					Ok(block)
+				}
+			})
+			.await?;
+	}
+	Ok(())
+}
+
 async fn reduce_remove<S>(
 	transaction: &mut StorageTransaction<S>,
 	cids: impl IntoIterator<Item = WeakCid>,
@@ -968,7 +1000,10 @@ where
 mod tests {
 	use crate::{BlockInfo, PinStrategy, References, Storage, StorageAction};
 	use cid::Cid;
-	use co_api::{BlockSerializer, BlockStorageExt, CoreBlockStorage, OptionLink, Reducer, ReducerAction, WeakCid};
+	use co_api::{
+		BlockSerializer, BlockStorageExt, CoreBlockStorage, OptionLink, Reducer, ReducerAction, Tags, TagsAction,
+		WeakCid,
+	};
 	use co_storage::MemoryBlockStorage;
 	use futures::TryStreamExt;
 	use ipld_core::{ipld::Ipld, serde::to_ipld};
@@ -976,6 +1011,39 @@ mod tests {
 		collections::{BTreeMap, BTreeSet},
 		str::FromStr,
 	};
+
+	fn tags(pairs: &[(&str, &str)]) -> Tags {
+		let mut result = Tags::new();
+		for (key, value) in pairs {
+			result.insert(((*key).to_owned(), (*value).to_owned().into()));
+		}
+		result
+	}
+
+	#[tokio::test]
+	async fn test_reduce_tags_action() {
+		let storage = CoreBlockStorage::new(MemoryBlockStorage::default(), true);
+		let reference: WeakCid = Cid::from_str("bagakbqabdyqar5vlsfqd3g4mxngt3yl7nx2na2kb4jybylzn5bktwnihjhih42a")
+			.unwrap()
+			.into();
+
+		fn action(payload: StorageAction) -> ReducerAction<StorageAction> {
+			ReducerAction { from: "did:local:device".to_owned(), time: 0, core: "storage".to_owned(), payload }
+		}
+
+		let mut state = OptionLink::none();
+		for payload in [
+			StorageAction::Tags([reference].into(), TagsAction::insert(tags(&[("a", "1"), ("b", "2")]))),
+			StorageAction::Tags([reference].into(), TagsAction::remove_key("a")),
+		] {
+			let action_link = storage.set_value(&action(payload)).await.unwrap();
+			state = Storage::reduce(state, action_link, &storage).await.unwrap().into();
+		}
+
+		let state = storage.get_value(&state.unwrap()).await.unwrap();
+		let block = state.blocks.get(&storage, &reference).await.unwrap().expect("block exists");
+		assert_eq!(block.tags, tags(&[("b", "2")]));
+	}
 
 	#[test]
 	fn test_serialize_storage_action() {

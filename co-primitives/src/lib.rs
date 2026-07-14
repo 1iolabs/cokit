@@ -66,7 +66,10 @@ pub use types::{
 	storage::Storage,
 	store_params::{DefaultParams, StoreParams},
 	streamable::Streamable,
-	tags::{Tag, TagMatcher, TagPattern, TagValue, Tags, TagsExpr},
+	tags::{
+		Tag, TagMatcher, TagPattern, TagValue, Tags, TagsAction, TagsClearAction, TagsExpr, TagsInsertAction,
+		TagsRemoveAction, TagsSetAction,
+	},
 	total_float::TotalFloat64,
 	weak_cid::WeakCid,
 };

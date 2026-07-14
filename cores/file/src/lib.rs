@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use cid::Cid;
 use co_api::{
 	co, tags, AbsolutePath, AbsolutePathOwned, BlockStorageExt, CoMap, CoSet, CoreBlockStorage, Date, Did, Link,
-	OptionLink, PathExt, PathOwned, Reducer, ReducerAction, Tags,
+	OptionLink, PathExt, PathOwned, Reducer, ReducerAction, Tags, TagsAction,
 };
 use futures::{FutureExt, TryStreamExt};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -94,9 +94,11 @@ pub enum FileModification {
 	SetOwner(Did),
 
 	/// Insert tags.
+	#[deprecated(note = "use `Tags` with a `TagsAction`")]
 	TagsInsert(Tags),
 
 	/// Remove tags.
+	#[deprecated(note = "use `Tags` with a `TagsAction`")]
 	TagsRemove(Tags),
 
 	/// Set file contents.
@@ -106,6 +108,9 @@ pub enum FileModification {
 	/// Set link target.
 	/// Only applicable to [`Node::Link`].
 	SetLink(PathOwned),
+
+	/// apply a [`TagsAction`] to the node tags.
+	Tags(TagsAction),
 }
 
 impl Reducer<FileAction> for File {
@@ -168,6 +173,7 @@ impl Node {
 }
 
 impl FileNode {
+	#[allow(deprecated)]
 	pub fn modify(
 		&mut self,
 		_context: &mut FileModificationContext,
@@ -202,6 +208,9 @@ impl FileNode {
 				self.contents = *cid;
 				self.size = *size;
 			},
+			FileModification::Tags(action) => {
+				self.tags.reduce(action.clone());
+			},
 			modification => return Err(anyhow!("Unsupported modification: {:?}", modification)),
 		}
 		Ok(())
@@ -209,6 +218,7 @@ impl FileNode {
 }
 
 impl FolderNode {
+	#[allow(deprecated)]
 	pub fn modify(
 		&mut self,
 		context: &mut FileModificationContext,
@@ -249,6 +259,9 @@ impl FolderNode {
 			FileModification::TagsRemove(tags) => {
 				self.tags.clear(Some(tags));
 			},
+			FileModification::Tags(action) => {
+				self.tags.reduce(action.clone());
+			},
 			modification => return Err(anyhow!("Unsupported modification: {:?}", modification)),
 		}
 		Ok(())
@@ -256,6 +269,7 @@ impl FolderNode {
 }
 
 impl LinkNode {
+	#[allow(deprecated)]
 	pub fn modify(
 		&mut self,
 		_context: &mut FileModificationContext,
@@ -295,6 +309,9 @@ impl LinkNode {
 			},
 			FileModification::SetLink(path) => {
 				self.contents = path.to_owned();
+			},
+			FileModification::Tags(action) => {
+				self.tags.reduce(action.clone());
 			},
 			modification => return Err(anyhow!("Unsupported modification: {:?}", modification)),
 		}
@@ -642,7 +659,7 @@ mod tests {
 	use crate::{File, FileAction, FileModification, FileNode, Node};
 	use co_api::{
 		AbsolutePath, AbsolutePathOwned, BlockSerializer, BlockStorage, BlockStorageExt, CoreBlockStorage, Link,
-		OptionLink, Reducer, ReducerAction,
+		OptionLink, Reducer, ReducerAction, Tags, TagsAction,
 	};
 	use co_storage::MemoryBlockStorage;
 	use futures::TryStreamExt;
@@ -653,6 +670,14 @@ mod tests {
 
 	fn core_storage(storage: &MemoryBlockStorage) -> CoreBlockStorage {
 		CoreBlockStorage::new(storage.clone(), false)
+	}
+
+	fn tags(pairs: &[(&str, &str)]) -> Tags {
+		let mut result = Tags::new();
+		for (key, value) in pairs {
+			result.insert(((*key).to_owned(), (*value).to_owned().into()));
+		}
+		result
 	}
 
 	async fn create_test_file_state() -> (MemoryBlockStorage, Link<File>) {
@@ -730,6 +755,15 @@ mod tests {
 		let next_link = File::reduce(state_link.into(), action_link, &cs).await.unwrap();
 		let state: File = storage.get_value(&next_link).await.unwrap();
 		(state, next_link)
+	}
+
+	fn modify(path: &str, modifications: Vec<FileModification>) -> ReducerAction<FileAction> {
+		ReducerAction {
+			from: "did:local:test".to_owned(),
+			core: "file".to_owned(),
+			time: 0,
+			payload: FileAction::Modify { path: path.try_into().unwrap(), modifications },
+		}
 	}
 
 	#[tokio::test]
@@ -840,5 +874,58 @@ mod tests {
 		hello_names.sort();
 		assert_eq!(hello_names, vec!["test.txt", "world"]);
 		assert!(names(&storage, &state, "/hello/world").await.is_empty());
+	}
+
+	#[tokio::test]
+	async fn test_modify_tags() {
+		let (storage, state_link) = create_test_file_state().await;
+
+		// tag the file node
+		let (state, link) = reduce_action(
+			&storage,
+			state_link,
+			modify(
+				"/hello/world/test.txt",
+				vec![FileModification::Tags(TagsAction::insert(tags(&[("a", "1"), ("b", "2")])))],
+			),
+		)
+		.await;
+		let node = nodes_at(&storage, &state, "/hello/world")
+			.await
+			.into_iter()
+			.find(|node| node.name() == "test.txt")
+			.unwrap();
+		let Node::File(file_node) = node else { panic!("expected a file node") };
+		assert_eq!(file_node.tags, tags(&[("a", "1"), ("b", "2")]));
+
+		// remove one tag from the file node
+		let (state, link) = reduce_action(
+			&storage,
+			link,
+			modify("/hello/world/test.txt", vec![FileModification::Tags(TagsAction::remove_key("a"))]),
+		)
+		.await;
+		let node = nodes_at(&storage, &state, "/hello/world")
+			.await
+			.into_iter()
+			.find(|node| node.name() == "test.txt")
+			.unwrap();
+		let Node::File(file_node) = node else { panic!("expected a file node") };
+		assert_eq!(file_node.tags, tags(&[("b", "2")]));
+
+		// tag a folder node
+		let (state, _link) = reduce_action(
+			&storage,
+			link,
+			modify("/hello/world", vec![FileModification::Tags(TagsAction::insert(tags(&[("x", "9")])))]),
+		)
+		.await;
+		let node = nodes_at(&storage, &state, "/hello")
+			.await
+			.into_iter()
+			.find(|node| node.name() == "world")
+			.unwrap();
+		let Node::Folder(folder_node) = node else { panic!("expected a folder node") };
+		assert_eq!(folder_node.tags, tags(&[("x", "9")]));
 	}
 }

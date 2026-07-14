@@ -8,6 +8,7 @@ use co_storage::{unixfs_add_file, BlockStorage, MemoryBlockStorage};
 use std::process::Command;
 
 #[tokio::test]
+#[allow(deprecated)]
 async fn integration_test() {
 	// tracing_subscriber::fmt::fmt()
 	// 	.with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
