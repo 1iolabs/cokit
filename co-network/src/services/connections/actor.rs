@@ -125,14 +125,11 @@ impl Actor for Connections {
 		// reduce
 		let next_actions = state.state.reduce(action.clone());
 
-		// handle internal actions (atomic)
+		// handle internal actions (atomic within the handle call)
 		for next_action in &next_actions {
-			match next_action {
-				// we need to handle DidReleased atomic when its occured to not have a race condition with next actions
-				ConnectionAction::DidReleased(released) => {
-					state.did_peers_changed.remove(&released.to);
-				},
-				_ => {},
+			// we need to handle DidReleased atomic when its occured to not have a race condition with next actions
+			if let ConnectionAction::DidReleased(released) = next_action {
+				state.did_peers_changed.remove(&released.to);
 			}
 		}
 
