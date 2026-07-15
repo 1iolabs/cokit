@@ -9,6 +9,7 @@
 - `ConnectionMessage::did_use` now owns and automatically releases one DID connection lease when its returned stream is dropped. Raw `DidUse` messages must retain `DidUseAction::release()`, close or drop their response receiver, and then dispatch that exact lease release.
 - Authoritative DID route failures close the failed response streams in the same actor turn. Later `DidReleased` notifications cannot close a newly acquired route.
 - Stale close completions no longer disconnect networks whose CO or DID routes were reacquired. Failure and timeout completions remain authoritative.
+- Builds that enable the platform-neutral network API without a transport backend now compile. Network initialization reports that `native` or wasm `web` must be enabled.
 
 ### Added
 - [`NetworkSettings::with_listens`]
