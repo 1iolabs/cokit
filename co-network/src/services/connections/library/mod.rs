@@ -2,4 +2,5 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 pub mod bootstrap_from_multiaddrs;
+pub mod did_use_stream;
 pub mod find_connectable_bootstrap;
