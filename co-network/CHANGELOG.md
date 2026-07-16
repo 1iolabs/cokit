@@ -12,6 +12,9 @@
 - [`NetworkSettings::ephemeral_peer_id`] sets if new peer ids should be created without saving on startup of network
 - [`NetworkSettings::with_ephemeral_peer_id`] sets the new setting
 
+### Fixed
+- Identify dial (automatic upgrade to a direct connection on a peer's listen addresses): a failed upgrade dial now releases its addresses and is retried on the peer's next identify, instead of staying blocked until the peer fully disconnects. Dial attempts and failures are logged at `debug`/`info` (`network-identify-dial`, `network-identify-dial-error`) for on-device diagnosis.
+
 ## [0.1.0] - 2026-03-31
 
 Initial release.
