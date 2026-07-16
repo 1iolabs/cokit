@@ -10,7 +10,7 @@ use libp2p::{
 	identify,
 	swarm::{
 		dial_opts::{DialOpts, PeerCondition},
-		SwarmEvent,
+		ConnectionId, SwarmEvent,
 	},
 	Multiaddr, PeerId, Swarm,
 };
@@ -26,12 +26,17 @@ use std::{
 pub struct IdentifyDialNetworkTask {
 	agent: String,
 	/// Addresses already dialed per peer, so repeated identify pushes do not
-	/// open duplicate connections. Cleared when a peer fully disconnects.
+	/// open duplicate connections. Released again when their dial fails, so
+	/// transient failures (e.g. a pending local-network permission prompt) are
+	/// retried on the next identify. Cleared when a peer fully disconnects.
 	dialed: HashMap<PeerId, HashSet<Multiaddr>>,
+	/// Upgrade dials in flight, keyed by their dial connection id, to resolve
+	/// each dial's outcome back to the addresses it attempted.
+	pending: HashMap<ConnectionId, (PeerId, Vec<Multiaddr>)>,
 }
 impl IdentifyDialNetworkTask {
 	pub fn new(agent: String) -> Self {
-		Self { agent, dialed: HashMap::new() }
+		Self { agent, dialed: HashMap::new(), pending: HashMap::new() }
 	}
 
 	/// Dialable addresses for `peer_id` not already attempted
@@ -54,6 +59,37 @@ impl IdentifyDialNetworkTask {
 	/// Forget a fully-disconnected peer so a future reconnection can re-dial.
 	fn forget_peer(&mut self, peer_id: &PeerId) {
 		self.dialed.remove(peer_id);
+	}
+
+	/// Remember an in-flight upgrade dial to track its outcome.
+	fn record_pending(&mut self, connection_id: ConnectionId, peer_id: PeerId, addresses: Vec<Multiaddr>) {
+		self.pending.insert(connection_id, (peer_id, addresses));
+	}
+
+	/// A pending upgrade dial resolved into a connection; keep its addresses
+	/// marked so repeated identifies do not open duplicate connections.
+	fn dial_established(&mut self, connection_id: &ConnectionId) -> bool {
+		self.pending.remove(connection_id).is_some()
+	}
+
+	/// A pending upgrade dial failed entirely; release its addresses so the
+	/// next identify of the peer may retry them.
+	fn dial_failed(&mut self, connection_id: &ConnectionId) -> Option<PeerId> {
+		let (peer_id, addresses) = self.pending.remove(connection_id)?;
+		self.unmark(&peer_id, &addresses);
+		Some(peer_id)
+	}
+
+	/// Release `addresses` from the attempted set of `peer_id`.
+	fn unmark(&mut self, peer_id: &PeerId, addresses: &[Multiaddr]) {
+		if let Some(attempted) = self.dialed.get_mut(peer_id) {
+			for address in addresses {
+				attempted.remove(address);
+			}
+			if attempted.is_empty() {
+				self.dialed.remove(peer_id);
+			}
+		}
 	}
 }
 impl NetworkTask<Behaviour> for IdentifyDialNetworkTask {
@@ -79,11 +115,30 @@ impl NetworkTask<Behaviour> for IdentifyDialNetworkTask {
 							.addresses(to_dial.clone())
 							.condition(PeerCondition::NotDialing)
 							.build();
+						let connection_id = opts.connection_id();
 						match swarm.dial(opts) {
-							Ok(_) => tracing::trace!(?peer_id, ?to_dial, "network-identify-dial"),
-							Err(err) => tracing::debug!(?err, ?peer_id, ?to_dial, "network-identify-dial-failed"),
+							Ok(_) => {
+								self.record_pending(connection_id, peer_id, to_dial.clone());
+								tracing::debug!(?peer_id, ?to_dial, "network-identify-dial");
+							},
+							Err(err) => {
+								// rejected synchronously (e.g. a concurrent pending dial):
+								// release the addresses so the next identify retries them.
+								self.unmark(&peer_id, &to_dial);
+								tracing::debug!(?err, ?peer_id, ?to_dial, "network-identify-dial-rejected");
+							},
 						}
 					}
+				}
+			},
+			SwarmEvent::ConnectionEstablished { connection_id, endpoint, .. } => {
+				if self.dial_established(connection_id) {
+					tracing::debug!(remote = ?endpoint.get_remote_address(), "network-identify-dial-established");
+				}
+			},
+			SwarmEvent::OutgoingConnectionError { connection_id, error, .. } => {
+				if let Some(peer_id) = self.dial_failed(connection_id) {
+					tracing::info!(?peer_id, ?error, "network-identify-dial-error");
 				}
 			},
 			SwarmEvent::ConnectionClosed { peer_id, num_established, .. } => {
@@ -327,5 +382,74 @@ mod tests {
 		assert!(task.addresses_to_dial(peer, &listen, &local).is_empty());
 		task.forget_peer(&peer);
 		assert_eq!(task.addresses_to_dial(peer, &listen, &local).len(), 1);
+	}
+
+	#[test]
+	fn failed_dial_releases_addresses_for_retry() {
+		let mut task = IdentifyDialNetworkTask::new("co/0.1.0".to_string());
+		let peer = PeerId::random();
+		let local = nets(&["192.168.1.5/24"]);
+		let listen = vec![addr("/ip4/192.168.1.42/udp/4001/quic-v1")];
+		let to_dial = task.addresses_to_dial(peer, &listen, &local);
+		assert_eq!(to_dial.len(), 1);
+		let connection_id = ConnectionId::new_unchecked(1);
+		task.record_pending(connection_id, peer, to_dial.clone());
+		assert!(task.addresses_to_dial(peer, &listen, &local).is_empty());
+
+		// the dial failed: its addresses are released, the next identify retries them.
+		assert_eq!(task.dial_failed(&connection_id), Some(peer));
+		assert_eq!(task.addresses_to_dial(peer, &listen, &local), to_dial);
+	}
+
+	#[test]
+	fn established_dial_keeps_addresses_deduplicated() {
+		let mut task = IdentifyDialNetworkTask::new("co/0.1.0".to_string());
+		let peer = PeerId::random();
+		let local = nets(&["192.168.1.5/24"]);
+		let listen = vec![addr("/ip4/192.168.1.42/udp/4001/quic-v1")];
+		let to_dial = task.addresses_to_dial(peer, &listen, &local);
+		let connection_id = ConnectionId::new_unchecked(1);
+		task.record_pending(connection_id, peer, to_dial);
+		assert!(task.dial_established(&connection_id));
+
+		// established: repeated identifies must not open duplicate connections.
+		assert!(task.addresses_to_dial(peer, &listen, &local).is_empty());
+	}
+
+	#[test]
+	fn rejected_dial_releases_addresses_for_retry() {
+		// the swarm rejected the dial synchronously (e.g. a concurrent pending
+		// dial): the addresses are released immediately.
+		let mut task = IdentifyDialNetworkTask::new("co/0.1.0".to_string());
+		let peer = PeerId::random();
+		let local = nets(&["192.168.1.5/24"]);
+		let listen = vec![addr("/ip4/192.168.1.42/udp/4001/quic-v1")];
+		let to_dial = task.addresses_to_dial(peer, &listen, &local);
+		task.unmark(&peer, &to_dial);
+		assert_eq!(task.addresses_to_dial(peer, &listen, &local), to_dial);
+	}
+
+	#[test]
+	fn unknown_dial_outcomes_are_noops() {
+		let mut task = IdentifyDialNetworkTask::new("co/0.1.0".to_string());
+		let connection_id = ConnectionId::new_unchecked(7);
+		assert_eq!(task.dial_failed(&connection_id), None);
+		assert!(!task.dial_established(&connection_id));
+	}
+
+	#[test]
+	fn failed_dial_after_full_disconnect_does_not_resurrect_peer() {
+		let mut task = IdentifyDialNetworkTask::new("co/0.1.0".to_string());
+		let peer = PeerId::random();
+		let local = nets(&["192.168.1.5/24"]);
+		let listen = vec![addr("/ip4/192.168.1.42/udp/4001/quic-v1")];
+		let to_dial = task.addresses_to_dial(peer, &listen, &local);
+		let connection_id = ConnectionId::new_unchecked(1);
+		task.record_pending(connection_id, peer, to_dial);
+		task.forget_peer(&peer);
+
+		// the failure resolves the pending dial without recreating peer state.
+		assert_eq!(task.dial_failed(&connection_id), Some(peer));
+		assert!(task.dialed.is_empty());
 	}
 }
