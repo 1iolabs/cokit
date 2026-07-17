@@ -2,7 +2,7 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use super::state::DidDiscoverySubscription;
-use crate::services::discovery;
+use crate::services::{discovery, network::DialIntent};
 use co_identity::DidCommHeader;
 use derive_more::From;
 use libp2p::{gossipsub::TopicHash, Multiaddr, PeerId};
@@ -158,6 +158,28 @@ pub struct DialPeerAction {
 	pub request_id: Option<u64>,
 	pub peer_id: PeerId,
 	pub addresses: Vec<Multiaddr>,
+	pub(crate) intent: DialIntent,
+}
+
+impl DialPeerAction {
+	pub(crate) fn for_connectivity(
+		request_id: Option<u64>,
+		peer_id: PeerId,
+		addresses: Vec<Multiaddr>,
+		connected: bool,
+		dial_redundancy: bool,
+	) -> Option<Self> {
+		let (intent, request_id) = if connected {
+			if !dial_redundancy {
+				return None;
+			}
+			(DialIntent::Redundancy, None)
+		} else {
+			(DialIntent::Reachability, request_id)
+		};
+
+		Some(Self { request_id, peer_id, addresses, intent })
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -197,4 +219,41 @@ pub struct DialFailedAction {
 #[derive(Debug, Clone)]
 pub struct TimeoutAction {
 	pub id: u64,
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::services::network::DialIntent;
+
+	fn dial(connected: bool, dial_redundancy: bool) -> Option<DialPeerAction> {
+		DialPeerAction::for_connectivity(
+			Some(7),
+			PeerId::random(),
+			vec!["/ip4/127.0.0.1/tcp/1234".parse().unwrap()],
+			connected,
+			dial_redundancy,
+		)
+	}
+
+	#[test]
+	fn disconnected_dial_is_request_bound_reachability() {
+		for dial_redundancy in [false, true] {
+			let dial = dial(false, dial_redundancy).expect("disconnected peers should be dialed");
+			assert_eq!(dial.request_id, Some(7));
+			assert_eq!(dial.intent, DialIntent::Reachability);
+		}
+	}
+
+	#[test]
+	fn connected_dial_is_suppressed_when_redundancy_disabled() {
+		assert!(dial(true, false).is_none());
+	}
+
+	#[test]
+	fn connected_dial_is_detached_redundancy_when_enabled() {
+		let dial = dial(true, true).expect("connected peers should get an opt-in redundancy dial");
+		assert_eq!(dial.request_id, None);
+		assert_eq!(dial.intent, DialIntent::Redundancy);
+	}
 }

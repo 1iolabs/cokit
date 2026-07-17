@@ -40,6 +40,16 @@ pub struct NetworkInitialize {
 
 #[derive(Debug, Default)]
 pub struct Network;
+
+fn spawn_identify_dial_task(spawner: &CoNetworkTaskSpawner, enabled: bool) -> Result<(), ActorError> {
+	if enabled {
+		spawner
+			.spawn(IdentifyDialNetworkTask::new(CO_AGENT.to_string()))
+			.map_err(|err| ActorError::Actor(err.into()))?;
+	}
+	Ok(())
+}
+
 #[async_trait]
 impl Actor for Network {
 	type Message = NetworkMessage;
@@ -53,6 +63,7 @@ impl Actor for Network {
 		initialize: Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		let network_peer_id = PeerId::from(initialize.keypair.public());
+		let dial_redundancy = initialize.settings.dial_redundancy;
 
 		// dns
 		let dns_spawner = DnsActor::spawner(tags!("type": "dns", "application": &initialize.identifier), DnsActor)?;
@@ -82,9 +93,7 @@ impl Actor for Network {
 		let spawner = CoNetworkTaskSpawner { spawner: network.spawner(), local_peer: network_peer_id };
 
 		// dial identified peer addresses
-		spawner
-			.spawn(IdentifyDialNetworkTask::new(CO_AGENT.to_string()))
-			.map_err(|err| ActorError::Actor(err.into()))?;
+		spawn_identify_dial_task(&spawner, dial_redundancy)?;
 
 		// use mdns discoverd peers for gossip discovery
 		#[cfg(feature = "native")]
@@ -99,6 +108,7 @@ impl Actor for Network {
 			date: initialize.date.clone(),
 			resolver: initialize.identity_resolver.clone(),
 			local_peer_id: network_peer_id,
+			dial_redundancy,
 		};
 		let discovery = Actor::spawn_with(
 			initialize.tasks.clone(),
@@ -107,7 +117,7 @@ impl Actor for Network {
 			(),
 		)?;
 		spawner
-			.spawn(DiscoveryNetworkTask::new(discovery.handle()))
+			.spawn(DiscoveryNetworkTask::new(discovery.handle(), dial_redundancy))
 			.map_err(|err| ActorError::Actor(err.into()))?;
 
 		// connections
@@ -214,4 +224,17 @@ pub struct NetworkState {
 	connections: ActorInstance<Connections>,
 	heads: ActorInstance<HeadsActor>,
 	dns: ActorInstance<DnsActor>,
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn identify_dial_task_is_only_spawned_when_enabled() {
+		let spawner = CoNetworkTaskSpawner::new_closed(PeerId::random());
+
+		assert!(spawn_identify_dial_task(&spawner, false).is_ok());
+		assert!(spawn_identify_dial_task(&spawner, true).is_err());
+	}
 }

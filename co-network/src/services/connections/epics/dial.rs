@@ -5,11 +5,15 @@ use crate::{
 	connections::DialCompletedAction,
 	services::{
 		connections::{action::ConnectionAction, actor::ConnectionsContext, ConnectionState},
-		network::DialNetworkTask,
+		network::{is_concurrent_dial_rejection, DialNetworkTask},
 	},
 };
 use co_actor::{time, Actions};
 use futures::{FutureExt, Stream};
+
+fn dial_completed_ok<T>(result: &Result<T, anyhow::Error>) -> bool {
+	result.is_ok() || result.as_ref().err().is_some_and(is_concurrent_dial_rejection)
+}
 
 /// Dial a peer.
 pub fn dial_epic(
@@ -32,7 +36,7 @@ pub fn dial_epic(
 					.await;
 					Ok(ConnectionAction::DialCompleted(DialCompletedAction {
 						peer_id: action.peer_id,
-						ok: result.is_ok(),
+						ok: dial_completed_ok(&result),
 						time: time::Instant::now(),
 					}))
 				}
@@ -40,5 +44,19 @@ pub fn dial_epic(
 			)
 		},
 		_ => None,
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use libp2p::swarm::{dial_opts::PeerCondition, DialError};
+
+	#[test]
+	fn concurrent_dial_rejection_is_non_failure() {
+		let result: Result<(), anyhow::Error> =
+			Err(DialError::DialPeerConditionFalse(PeerCondition::DisconnectedAndNotDialing).into());
+
+		assert!(dial_completed_ok(&result));
 	}
 }

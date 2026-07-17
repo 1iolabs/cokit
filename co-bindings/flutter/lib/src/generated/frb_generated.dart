@@ -1761,8 +1761,8 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
   CoNetworkSettings dco_decode_co_network_settings(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 9)
-      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
     return CoNetworkSettings(
       forceNewPeerId: dco_decode_bool(arr[0]),
       listen: dco_decode_String(arr[1]),
@@ -1773,6 +1773,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
       relay: dco_decode_bool(arr[6]),
       nat: dco_decode_bool(arr[7]),
       mdns: dco_decode_bool(arr[8]),
+      dialRedundancy: dco_decode_bool(arr[9]),
     );
   }
 
@@ -2326,6 +2327,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
     var var_relay = sse_decode_bool(deserializer);
     var var_nat = sse_decode_bool(deserializer);
     var var_mdns = sse_decode_bool(deserializer);
+    var var_dialRedundancy = sse_decode_bool(deserializer);
     return CoNetworkSettings(
         forceNewPeerId: var_forceNewPeerId,
         listen: var_listen,
@@ -2335,7 +2337,8 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
         peersThreshold: var_peersThreshold,
         relay: var_relay,
         nat: var_nat,
-        mdns: var_mdns);
+        mdns: var_mdns,
+        dialRedundancy: var_dialRedundancy);
   }
 
   @protected
@@ -2980,6 +2983,7 @@ class CoKitApiImpl extends CoKitApiImplPlatform implements CoKitApi {
     sse_encode_bool(self.relay, serializer);
     sse_encode_bool(self.nat, serializer);
     sse_encode_bool(self.mdns, serializer);
+    sse_encode_bool(self.dialRedundancy, serializer);
   }
 
   @protected

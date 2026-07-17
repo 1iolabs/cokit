@@ -578,6 +578,12 @@ fn reduce_peer_connection_established(
 	peer_id: PeerId,
 	time: &Instant,
 ) {
+	if let Some(bootstrap) = state.bootstrap.get_mut(&peer_id) {
+		bootstrap.connecting = false;
+		bootstrap.failed = 0;
+		bootstrap.failed_at = None;
+	}
+
 	// mark as connected
 	let (cos, networks) = {
 		let peer_connection = state.peers.entry(peer_id).or_default();
@@ -921,10 +927,7 @@ fn reduce_dial_completed(
 ) {
 	if let Some(bootstrap) = state.bootstrap.get_mut(&action.peer_id) {
 		bootstrap.connecting = false;
-		if action.ok {
-			bootstrap.failed_at = None;
-			bootstrap.failed = 0;
-		} else {
+		if !action.ok {
 			bootstrap.failed_at = Some(action.time);
 			bootstrap.failed += 1;
 		}
@@ -1096,11 +1099,12 @@ fn reference_network_connection(
 
 #[cfg(test)]
 mod tests {
+	use super::BootstrapPeer;
 	use crate::connections::{
 		ConnectAction, ConnectedAction, ConnectionAction, ConnectionDirection, ConnectionEndpoint, ConnectionState,
-		DidPeersChangedAction, DidReleaseAction, DidReleasedAction, DidUseAction, DidUseLeaseId, DisconnectAction,
-		DisconnectReason, DisconnectedAction, PeerConnectionClosedAction, PeerConnectionEstablishedAction,
-		PeerHolePunchedAction, PeerRelateDidAction, UseAction,
+		DialCompletedAction, DidPeersChangedAction, DidReleaseAction, DidReleasedAction, DidUseAction, DidUseLeaseId,
+		DisconnectAction, DisconnectReason, DisconnectedAction, PeerConnectionClosedAction,
+		PeerConnectionEstablishedAction, PeerHolePunchedAction, PeerRelateDidAction, UseAction,
 	};
 	use co_actor::Reducer;
 	use co_primitives::{Network, NetworkPeer, NetworkRendezvous};
@@ -1605,5 +1609,57 @@ mod tests {
 		}));
 		assert!(!state.peers[&peer_id].connected);
 		assert!(state.peers[&peer_id].endpoints.is_empty());
+	}
+
+	#[test]
+	fn successful_bootstrap_dial_preserves_failure_history() {
+		let mut state = ConnectionState::default();
+		let peer_id = PeerId::random();
+		let failed_at = Instant::now();
+		let mut bootstrap = BootstrapPeer::new(peer_id, Default::default());
+		bootstrap.connecting = true;
+		bootstrap.failed = 2;
+		bootstrap.failed_at = Some(failed_at);
+		state.bootstrap.insert(peer_id, bootstrap);
+
+		state.reduce(ConnectionAction::DialCompleted(DialCompletedAction {
+			peer_id,
+			ok: true,
+			time: failed_at + std::time::Duration::from_secs(1),
+		}));
+
+		let bootstrap = &state.bootstrap[&peer_id];
+		assert!(!bootstrap.connecting);
+		assert_eq!(bootstrap.failed, 2);
+		assert_eq!(bootstrap.failed_at, Some(failed_at));
+	}
+
+	#[test]
+	fn first_bootstrap_connection_resets_failure_history() {
+		let mut state = ConnectionState::default();
+		let peer_id = PeerId::random();
+		let failed_at = Instant::now();
+		let mut bootstrap = BootstrapPeer::new(peer_id, Default::default());
+		bootstrap.connecting = true;
+		bootstrap.failed = 2;
+		bootstrap.failed_at = Some(failed_at);
+		state.bootstrap.insert(peer_id, bootstrap);
+
+		state.reduce(ConnectionAction::PeerConnectionEstablished(PeerConnectionEstablishedAction {
+			peer_id,
+			connection_id: ConnectionId::new_unchecked(1),
+			endpoint: ConnectionEndpoint {
+				remote: "/ip4/127.0.0.1/tcp/1".parse().unwrap(),
+				local: None,
+				direction: ConnectionDirection::Outgoing,
+				hole_punched: false,
+			},
+			time: failed_at + std::time::Duration::from_secs(1),
+		}));
+
+		let bootstrap = &state.bootstrap[&peer_id];
+		assert!(!bootstrap.connecting);
+		assert_eq!(bootstrap.failed, 0);
+		assert_eq!(bootstrap.failed_at, None);
 	}
 }

@@ -2016,6 +2016,7 @@ dependencies = [
  "co-libp2p-dns",
  "co-primitives",
  "co-storage",
+ "co-test",
  "derive_more 0.99.20",
  "did-key",
  "futures",

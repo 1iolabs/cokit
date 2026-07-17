@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Breaking (FFI).** `CoNetworkSettings::dial_redundancy` (Dart: `dialRedundancy`) exposes
+  opt-in automatic redundant dialing. Direct record constructors must provide the new field;
+  generated defaults use `false`.
+
 ### Changed
 
 - **Breaking (FFI).** `CoSettings` configures logging via a single `log` string (the `CO_LOG`
