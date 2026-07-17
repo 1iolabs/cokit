@@ -487,22 +487,41 @@ impl FileLocalsState {
 	}
 }
 
-/// Extract `local.cbor` paths from a watch event that indicate the file appeared or changed.
+/// Extract the `local.cbor` paths to re-read from a watch event.
+///
+/// Watch backends disagree on how an atomic write (temp file + rename-into-place, see
+/// [`fs_write_atomic`]) surfaces, so we cannot key purely on `Create`/`Modify` of the target path:
+/// - inotify (Linux) and FSEvents report `Create`/`Modify` directly on the `local.cbor` path.
+/// - kqueue (macOS) reports a `Remove` of the replaced `local.cbor` plus a `Modify` of the containing slot directory,
+///   and *never* a `Create`/`Modify` of the `local.cbor` path itself.
+///
+/// To cover every backend we map an event to a `local.cbor` re-read when it touches either the
+/// `local.cbor` file directly or the slot directory (`<config_path>/<slot>`) that holds it.
+/// A re-read is idempotent — [`FileLocalsState::update`] deduplicates by heads — so re-reading on a
+/// spurious or coalesced event is harmless.
 ///
 /// # Arguments
-/// - `event`: Any `Create`/`Modify` events.
+/// - `event`: Any `Create`/`Modify`/`Remove` events.
 fn local_event_paths(event: &Event, config_path: &Path) -> Vec<PathBuf> {
-	if !matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_)) {
+	if !matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)) {
 		return Vec::new();
 	}
 	event
 		.paths
 		.iter()
-		.filter(|path| {
-			path.parent().and_then(|f| f.parent()) == Some(config_path)
-				&& path.file_name().and_then(|f| f.to_str()) == Some("local.cbor")
+		.filter_map(|path| {
+			// event on `<config_path>/<slot>/local.cbor` (inotify / FSEvents, and kqueue's remove)
+			if path.file_name().and_then(|f| f.to_str()) == Some("local.cbor")
+				&& path.parent().and_then(|f| f.parent()) == Some(config_path)
+			{
+				return Some(path.clone());
+			}
+			// event on the `<config_path>/<slot>` directory itself (kqueue's rename signal)
+			if path.parent() == Some(config_path) {
+				return Some(path.join("local.cbor"));
+			}
+			None
 		})
-		.cloned()
 		.collect()
 }
 
@@ -693,6 +712,35 @@ mod tests {
 		// unrelated event kinds are ignored
 		let ev = Event::new(EventKind::Access(AccessKind::Read)).add_path(local);
 		assert!(super::local_event_paths(&ev, &config).is_empty());
+	}
+
+	/// The exact event sequence the macOS `kqueue` backend delivers for an atomic write
+	/// (temp file + rename-into-place): a `Create` of the temp sibling, a `Modify` of the slot
+	/// directory, and a `Remove` of the replaced `local.cbor` - never a `Create`/`Modify` of the
+	/// `local.cbor` path itself. At least one event must map to a `local.cbor` re-read.
+	#[test]
+	fn test_local_event_paths_matches_kqueue_atomic_rename() {
+		use notify::{
+			event::{CreateKind, DataChange, ModifyKind, RemoveKind},
+			Event, EventKind,
+		};
+
+		let config = PathBuf::from("/cfg");
+		let slot = PathBuf::from("/cfg/app");
+		let local = PathBuf::from("/cfg/app/local.cbor");
+		let tmp = PathBuf::from("/cfg/app/.tmp0wJ1Zw");
+
+		// temp-file create in the slot dir must NOT trigger a re-read
+		let ev = Event::new(EventKind::Create(CreateKind::File)).add_path(tmp);
+		assert!(super::local_event_paths(&ev, &config).is_empty());
+
+		// modify of the slot directory itself maps to that slot's `local.cbor`
+		let ev = Event::new(EventKind::Modify(ModifyKind::Data(DataChange::Any))).add_path(slot);
+		assert_eq!(super::local_event_paths(&ev, &config), vec![local.clone()]);
+
+		// remove of the replaced `local.cbor` (fired after the rename completes) maps to a re-read
+		let ev = Event::new(EventKind::Remove(RemoveKind::Any)).add_path(local.clone());
+		assert_eq!(super::local_event_paths(&ev, &config), vec![local]);
 	}
 
 	#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
