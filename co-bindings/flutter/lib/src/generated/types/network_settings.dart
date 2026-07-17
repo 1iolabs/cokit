@@ -42,6 +42,9 @@ class CoNetworkSettings {
   /// Enable mDNS protocol.
   final bool mdns;
 
+  /// Allow COKIT-owned automatic discovery to dial an already-connected peer.
+  final bool dialRedundancy;
+
   const CoNetworkSettings({
     required this.forceNewPeerId,
     required this.listen,
@@ -52,6 +55,7 @@ class CoNetworkSettings {
     required this.relay,
     required this.nat,
     required this.mdns,
+    required this.dialRedundancy,
   });
 
   static Future<CoNetworkSettings> default_() =>
@@ -67,7 +71,8 @@ class CoNetworkSettings {
       peersThreshold.hashCode ^
       relay.hashCode ^
       nat.hashCode ^
-      mdns.hashCode;
+      mdns.hashCode ^
+      dialRedundancy.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -82,5 +87,6 @@ class CoNetworkSettings {
           peersThreshold == other.peersThreshold &&
           relay == other.relay &&
           nat == other.nat &&
-          mdns == other.mdns;
+          mdns == other.mdns &&
+          dialRedundancy == other.dialRedundancy;
 }

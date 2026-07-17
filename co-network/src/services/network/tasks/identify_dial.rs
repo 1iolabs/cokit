@@ -3,15 +3,13 @@
 
 use crate::{
 	network::{Behaviour, NetworkEvent},
+	services::network::{known_peer_dial_opts, DialIntent},
 	types::network_task::NetworkTask,
 };
 use ipnet::IpNet;
 use libp2p::{
 	identify,
-	swarm::{
-		dial_opts::{DialOpts, PeerCondition},
-		ConnectionId, SwarmEvent,
-	},
+	swarm::{ConnectionId, SwarmEvent},
 	Multiaddr, PeerId, Swarm,
 };
 use multiaddr::Protocol;
@@ -108,13 +106,7 @@ impl NetworkTask<Behaviour> for IdentifyDialNetworkTask {
 					let local_nets = local_subnets();
 					let to_dial = self.addresses_to_dial(peer_id, &info.listen_addrs, &local_nets);
 					if !to_dial.is_empty() {
-						// NotDialing (not the default DisconnectedAndNotDialing) so we can dial a
-						// peer we are already connected to, establishing a direct LAN
-						// connection alongside it. One dial races all addresses.
-						let opts = DialOpts::peer_id(peer_id)
-							.addresses(to_dial.clone())
-							.condition(PeerCondition::NotDialing)
-							.build();
+						let opts = known_peer_dial_opts(peer_id, to_dial.clone(), DialIntent::Redundancy);
 						let connection_id = opts.connection_id();
 						match swarm.dial(opts) {
 							Ok(_) => {

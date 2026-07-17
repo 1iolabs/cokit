@@ -1887,6 +1887,7 @@ impl SseDecode for crate::types::network_settings::CoNetworkSettings {
 		let mut var_relay = <bool>::sse_decode(deserializer);
 		let mut var_nat = <bool>::sse_decode(deserializer);
 		let mut var_mdns = <bool>::sse_decode(deserializer);
+		let mut var_dialRedundancy = <bool>::sse_decode(deserializer);
 		return crate::types::network_settings::CoNetworkSettings {
 			force_new_peer_id: var_forceNewPeerId,
 			listen: var_listen,
@@ -1897,6 +1898,7 @@ impl SseDecode for crate::types::network_settings::CoNetworkSettings {
 			relay: var_relay,
 			nat: var_nat,
 			mdns: var_mdns,
+			dial_redundancy: var_dialRedundancy,
 		};
 	}
 }
@@ -2408,6 +2410,7 @@ impl flutter_rust_bridge::IntoDart for crate::types::network_settings::CoNetwork
 			self.relay.into_into_dart().into_dart(),
 			self.nat.into_into_dart().into_dart(),
 			self.mdns.into_into_dart().into_dart(),
+			self.dial_redundancy.into_into_dart().into_dart(),
 		]
 		.into_dart()
 	}
@@ -2703,6 +2706,7 @@ impl SseEncode for crate::types::network_settings::CoNetworkSettings {
 		<bool>::sse_encode(self.relay, serializer);
 		<bool>::sse_encode(self.nat, serializer);
 		<bool>::sse_encode(self.mdns, serializer);
+		<bool>::sse_encode(self.dial_redundancy, serializer);
 	}
 }
 

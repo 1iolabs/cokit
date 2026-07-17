@@ -39,6 +39,9 @@ pub struct CoNetworkSettings {
 
 	/// Enable mDNS protocol.
 	pub mdns: bool,
+
+	/// Allow COKIT-owned automatic discovery to dial an already-connected peer.
+	pub dial_redundancy: bool,
 }
 impl Default for CoNetworkSettings {
 	fn default() -> Self {
@@ -58,6 +61,7 @@ impl Default for CoNetworkSettings {
 			relay: def.relay,
 			nat: def.nat,
 			mdns: def.mdns,
+			dial_redundancy: def.dial_redundancy,
 		}
 	}
 }
@@ -89,6 +93,7 @@ impl TryInto<NetworkSettings> for CoNetworkSettings {
 		result.relay = self.relay;
 		result.nat = self.nat;
 		result.mdns = self.mdns;
+		result.dial_redundancy = self.dial_redundancy;
 		Ok(result)
 	}
 }
@@ -124,5 +129,15 @@ mod tests {
 		};
 		let parsed: NetworkSettings = settings.try_into().unwrap();
 		assert_eq!(parsed.listen.len(), 2);
+	}
+
+	#[test]
+	fn dial_redundancy_maps_to_network_settings() {
+		let defaults = CoNetworkSettings::default();
+		assert!(!defaults.dial_redundancy);
+
+		let settings = CoNetworkSettings { dial_redundancy: true, ..Default::default() };
+		let parsed: NetworkSettings = settings.try_into().unwrap();
+		assert!(parsed.dial_redundancy);
 	}
 }

@@ -22,6 +22,7 @@ pub struct DiscoveryContext {
 	pub date: DynamicCoDate,
 	pub resolver: IdentityResolverBox,
 	pub local_peer_id: PeerId,
+	pub dial_redundancy: bool,
 }
 
 pub struct State {
@@ -54,6 +55,7 @@ impl Actor for DiscoveryActor {
 		Ok(State {
 			state: DiscoveryState {
 				local_peer_id: self.context.local_peer_id,
+				dial_redundancy: self.context.dial_redundancy,
 				next_id: 1,
 				requests: Default::default(),
 				did_subscriptions: Default::default(),

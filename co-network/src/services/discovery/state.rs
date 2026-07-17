@@ -2,7 +2,10 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use super::action::*;
-use crate::services::discovery::{self, DidDiscovery, DidDiscoveryMessageType, Discovery};
+use crate::services::{
+	discovery::{self, DidDiscovery, DidDiscoveryMessageType, Discovery},
+	network::DialIntent,
+};
 use co_actor::Reducer;
 use co_identity::{Identity, PrivateIdentityBox};
 use co_primitives::{Did, NetworkDidDiscovery};
@@ -90,6 +93,8 @@ impl DiscoveryConnectRequest {
 pub struct DiscoveryState {
 	/// Our PeerId.
 	pub local_peer_id: PeerId,
+	/// Whether automatic discovery may dial peers that are already connected.
+	pub dial_redundancy: bool,
 	/// Next discovery request id.
 	pub next_id: u64,
 	/// Active discovery requests.
@@ -219,17 +224,22 @@ impl DiscoveryState {
 						let cached_peer = cached.peer_id;
 						let cached_endpoints = cached.endpoints.clone();
 						result.cached_peers.insert(cached_peer);
-
-						if !self.connected_peers.contains(&cached_peer) {
-							result.actions.push(DiscoveryAction::DialPeer(DialPeerAction {
-								request_id: Some(request_id),
-								peer_id: cached_peer,
-								addresses: cached_endpoints.into_iter().collect(),
-							}));
-							result.cached_dial.entry(cached_peer).or_default().insert(did_disc.clone());
+						let connected = self.connected_peers.contains(&cached_peer);
+						if let Some(dial) = DialPeerAction::for_connectivity(
+							Some(request_id),
+							cached_peer,
+							cached_endpoints.into_iter().collect(),
+							connected,
+							self.dial_redundancy,
+						) {
+							if dial.intent == DialIntent::Reachability {
+								debug_assert_eq!(dial.request_id, Some(request_id));
+								result.pending.insert(item.clone());
+								result.cached_dial.entry(cached_peer).or_default().insert(did_disc.clone());
+							}
+							result.actions.push(DiscoveryAction::DialPeer(dial));
 						}
 
-						result.pending.insert(item);
 						discovery_used += 1;
 						continue;
 					}
@@ -263,21 +273,27 @@ impl DiscoveryState {
 					if peer_id == self.local_peer_id {
 						continue;
 					}
-					// skip already-connected peers — detected in reduce_connect after try_connect.
-					if self.connected_peers.contains(&peer_id) {
-						discovery_used += 1;
-						continue;
-					}
 					let addresses: Vec<Multiaddr> =
 						peer.addresses.iter().filter_map(|a| a.parse::<Multiaddr>().ok()).collect();
-					result.actions.push(DiscoveryAction::DialPeer(DialPeerAction {
-						request_id: Some(request_id),
+					let connected = self.connected_peers.contains(&peer_id);
+					if let Some(dial) = DialPeerAction::for_connectivity(
+						Some(request_id),
 						peer_id,
 						addresses,
-					}));
+						connected,
+						self.dial_redundancy,
+					) {
+						if dial.intent == DialIntent::Reachability {
+							debug_assert_eq!(dial.request_id, Some(request_id));
+							result.pending.insert(item.clone());
+						}
+						result.actions.push(DiscoveryAction::DialPeer(dial));
+					}
 				},
 			}
-			result.pending.insert(item);
+			if !matches!(item, Discovery::Peer(_)) {
+				result.pending.insert(item);
+			}
 			discovery_used += 1;
 		}
 
@@ -566,23 +582,30 @@ impl DiscoveryState {
 	}
 
 	fn reduce_mdns_discovered(&mut self, action: MdnsDiscoveredAction) -> Vec<DiscoveryAction> {
-		let to_dial: Vec<(u64, PeerId)> = self
+		let to_dial: Vec<(u64, PeerId, bool)> = self
 			.all_discovery_peers()
-			.filter(|(request, peer_id)| {
-				!request.connected_peers.contains(peer_id) && !request.is_max_peers() && action.peers.contains(peer_id)
+			.filter_map(|(request, peer_id)| {
+				if !action.peers.contains(&peer_id) {
+					return None;
+				}
+				let connected = self.connected_peers.contains(&peer_id);
+				let should_dial = if connected { self.dial_redundancy } else { !request.is_max_peers() };
+				should_dial.then_some((request.id, peer_id, connected))
 			})
-			.map(|(request, peer_id)| (request.id, peer_id))
 			.collect();
 
 		let mut actions = Vec::new();
-		for (request_id, peer_id) in to_dial {
-			actions.push(DiscoveryAction::DialPeer(DialPeerAction {
-				request_id: Some(request_id),
-				peer_id,
-				addresses: vec![],
-			}));
-			if let Some(request) = self.requests.get_mut(&request_id) {
-				request.add_pending_peer(&peer_id);
+		for (request_id, peer_id, connected) in to_dial {
+			if let Some(dial) =
+				DialPeerAction::for_connectivity(Some(request_id), peer_id, vec![], connected, self.dial_redundancy)
+			{
+				if dial.intent == DialIntent::Reachability {
+					debug_assert_eq!(dial.request_id, Some(request_id));
+					if let Some(request) = self.requests.get_mut(&request_id) {
+						request.add_pending_peer(&peer_id);
+					}
+				}
+				actions.push(DiscoveryAction::DialPeer(dial));
 			}
 		}
 
@@ -620,18 +643,22 @@ impl DiscoveryState {
 		}
 
 		// a DID discovery message was decrypted. Send the resolve response.
-		let should_dial = !self.connected_peers.contains(&action.from_peer) && !action.from_endpoints.is_empty();
 		let mut actions = vec![DiscoveryAction::SendResolve(SendResolveAction {
 			from_peer: action.from_peer,
 			from_endpoints: action.from_endpoints.clone(),
 			response: action.response,
 		})];
-		if should_dial {
-			actions.push(DiscoveryAction::DialPeer(DialPeerAction {
-				request_id: None,
-				peer_id: action.from_peer,
-				addresses: action.from_endpoints.into_iter().collect(),
-			}));
+		if !action.from_endpoints.is_empty() {
+			let connected = self.connected_peers.contains(&action.from_peer);
+			if let Some(dial) = DialPeerAction::for_connectivity(
+				None,
+				action.from_peer,
+				action.from_endpoints.into_iter().collect(),
+				connected,
+				self.dial_redundancy,
+			) {
+				actions.push(DiscoveryAction::DialPeer(dial));
+			}
 		}
 		actions
 	}
@@ -737,8 +764,13 @@ mod tests {
 	}
 
 	fn new_state(local_peer: PeerId) -> DiscoveryState {
+		new_state_with_redundancy(local_peer, false)
+	}
+
+	fn new_state_with_redundancy(local_peer: PeerId, dial_redundancy: bool) -> DiscoveryState {
 		DiscoveryState {
 			local_peer_id: local_peer,
+			dial_redundancy,
 			next_id: 1,
 			requests: Default::default(),
 			did_subscriptions: Default::default(),
@@ -770,7 +802,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_peer_connect_emits_dial() {
+	fn peer_connect_emits_request_bound_reachability() {
 		let local = test_peer(0);
 		let remote = test_peer(1);
 		let mut state = new_state(local);
@@ -786,7 +818,9 @@ mod tests {
 		if let DiscoveryAction::DialPeer(dial) = dial.unwrap() {
 			assert_eq!(dial.peer_id, remote);
 			assert_eq!(dial.request_id, Some(id));
+			assert_eq!(dial.intent, DialIntent::Reachability);
 		}
+		assert_eq!(state.requests.get(&id).unwrap().pending.len(), 1);
 	}
 
 	#[test]
@@ -812,7 +846,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_peer_already_connected() {
+	fn peer_already_connected_without_redundancy_skips_dial() {
 		let local = test_peer(0);
 		let remote = test_peer(1);
 		let mut state = new_state(local);
@@ -821,6 +855,8 @@ mod tests {
 		state.connected_peers.insert(remote);
 
 		let (id, actions) = connect(&mut state, vec![peer_discovery(remote, vec!["/ip4/127.0.0.1/tcp/1234".into()])]);
+		assert!(!actions.iter().any(|a| matches!(a, DiscoveryAction::DialPeer(_))));
+		assert!(state.requests.get(&id).unwrap().pending.is_empty());
 
 		// should still emit Connected event for the already-connected peer.
 		let event = actions
@@ -831,6 +867,31 @@ mod tests {
 			assert_eq!(*eid, id);
 			assert_eq!(*peer, remote);
 		}
+	}
+
+	#[test]
+	fn peer_already_connected_with_redundancy_emits_detached_dial() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state_with_redundancy(local, true);
+		state.connected_peers.insert(remote);
+
+		let (id, actions) = connect(&mut state, vec![peer_discovery(remote, vec!["/ip4/127.0.0.1/tcp/1234".into()])]);
+
+		let dial = actions
+			.iter()
+			.find_map(|action| match action {
+				DiscoveryAction::DialPeer(dial) => Some(dial),
+				_ => None,
+			})
+			.expect("opt-in connected peer should be dialed redundantly");
+		assert_eq!(dial.peer_id, remote);
+		assert_eq!(dial.request_id, None);
+		assert_eq!(dial.intent, DialIntent::Redundancy);
+		assert!(state.requests.get(&id).unwrap().pending.is_empty());
+		assert!(actions.iter().any(
+			|action| matches!(action, DiscoveryAction::Event(Event::Connected { id: event_id, peer }) if *event_id == id && *peer == remote)
+		));
 	}
 
 	#[test]
@@ -1030,7 +1091,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_did_decrypted_emits_send_resolve_and_dial() {
+	fn did_decrypted_disconnected_uses_reachability() {
 		let local = test_peer(0);
 		let remote = test_peer(1);
 		let mut state = new_state(local);
@@ -1054,12 +1115,14 @@ mod tests {
 		assert!(dial.is_some(), "expected DialPeer action");
 		if let DiscoveryAction::DialPeer(d) = dial.unwrap() {
 			assert_eq!(d.peer_id, remote);
+			assert_eq!(d.request_id, None);
+			assert_eq!(d.intent, DialIntent::Reachability);
 			assert!(d.addresses.contains(&addr));
 		}
 	}
 
 	#[test]
-	fn test_did_decrypted_already_connected_skips_dial() {
+	fn did_decrypted_already_connected_without_redundancy_skips_dial() {
 		let local = test_peer(0);
 		let remote = test_peer(1);
 		let mut state = new_state(local);
@@ -1081,6 +1144,53 @@ mod tests {
 		assert!(send.is_some(), "expected SendResolve");
 		let dial = actions.iter().find(|a| matches!(a, DiscoveryAction::DialPeer(_)));
 		assert!(dial.is_none(), "should not dial already-connected peer");
+	}
+
+	#[test]
+	fn did_decrypted_already_connected_with_redundancy_emits_detached_dial() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state_with_redundancy(local, true);
+		state.connected_peers.insert(remote);
+
+		let addr: Multiaddr = "/ip4/127.0.0.1/tcp/5678".parse().unwrap();
+		let actions = state.reduce(DiscoveryAction::DidDecrypted(DidDecryptedAction {
+			from_did: None,
+			from_peer: remote,
+			from_endpoints: [addr.clone()].into(),
+			response: "resolve-response".to_owned(),
+		}));
+
+		assert!(actions.iter().any(|action| matches!(action, DiscoveryAction::SendResolve(_))));
+		let dial = actions
+			.iter()
+			.find_map(|action| match action {
+				DiscoveryAction::DialPeer(dial) => Some(dial),
+				_ => None,
+			})
+			.expect("connected inbound DID should dial when redundancy is enabled");
+		assert_eq!(dial.peer_id, remote);
+		assert_eq!(dial.request_id, None);
+		assert_eq!(dial.intent, DialIntent::Redundancy);
+		assert!(dial.addresses.contains(&addr));
+	}
+
+	#[test]
+	fn did_decrypted_empty_endpoints_only_sends_resolve() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state_with_redundancy(local, true);
+		state.connected_peers.insert(remote);
+
+		let actions = state.reduce(DiscoveryAction::DidDecrypted(DidDecryptedAction {
+			from_did: None,
+			from_peer: remote,
+			from_endpoints: Default::default(),
+			response: "resolve-response".to_owned(),
+		}));
+
+		assert_eq!(actions.len(), 1);
+		assert!(matches!(&actions[0], DiscoveryAction::SendResolve(_)));
 	}
 
 	#[test]
@@ -1227,19 +1337,101 @@ mod tests {
 	}
 
 	#[test]
-	fn test_mdns_discovered_emits_dial_for_known_peers() {
+	fn mdns_disconnected_uses_request_bound_reachability() {
 		let local = test_peer(0);
 		let remote = test_peer(1);
 		let mut state = new_state(local);
 
-		connect(&mut state, vec![peer_discovery(remote, vec![])]);
+		let (id, _) = connect(&mut state, vec![peer_discovery(remote, vec![])]);
 
 		let mut peers = BTreeSet::new();
 		peers.insert(remote);
 		let actions = state.reduce(DiscoveryAction::MdnsDiscovered(MdnsDiscoveredAction { peers }));
 
-		let dial = actions.iter().find(|a| matches!(a, DiscoveryAction::DialPeer(_)));
-		assert!(dial.is_some(), "expected DialPeer for mDNS-discovered peer");
+		let dial = actions
+			.iter()
+			.find_map(|action| match action {
+				DiscoveryAction::DialPeer(dial) => Some(dial),
+				_ => None,
+			})
+			.expect("expected DialPeer for mDNS-discovered peer");
+		assert_eq!(dial.request_id, Some(id));
+		assert_eq!(dial.intent, DialIntent::Reachability);
+		assert_eq!(state.requests.get(&id).unwrap().pending.len(), 1);
+	}
+
+	#[test]
+	fn mdns_disconnected_at_max_peers_skips_dial() {
+		let local = test_peer(0);
+		let connected = test_peer(1);
+		let disconnected = test_peer(2);
+		let mut state = new_state(local);
+		state.max_peers = Some(1);
+
+		let (id, _) =
+			connect(&mut state, vec![peer_discovery(connected, vec![]), peer_discovery(disconnected, vec![])]);
+		state.reduce(DiscoveryAction::PeerConnected(PeerConnectedAction { peer_id: connected }));
+		state.reduce(DiscoveryAction::DialFailed(DialFailedAction { request_id: Some(id), peer_id: disconnected }));
+
+		assert!(!state.connected_peers.contains(&disconnected));
+		let request = state.requests.get(&id).expect("connected peer should keep the request active");
+		assert!(request.is_max_peers());
+		assert!(request.pending.is_empty());
+		let connected_before = request.connected_peers.clone();
+
+		let actions =
+			state.reduce(DiscoveryAction::MdnsDiscovered(MdnsDiscoveredAction { peers: [disconnected].into() }));
+
+		assert!(!actions.iter().any(|action| matches!(action, DiscoveryAction::DialPeer(_))));
+		let request = state.requests.get(&id).unwrap();
+		assert!(request.pending.is_empty());
+		assert_eq!(request.connected_peers, connected_before);
+		assert!(!request.connected_peers.contains(&disconnected));
+	}
+
+	#[test]
+	fn mdns_connected_without_redundancy_skips_dial() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state(local);
+		state.connected_peers.insert(remote);
+		let (id, connect_actions) = connect(&mut state, vec![peer_discovery(remote, vec![])]);
+		assert!(connect_actions.iter().any(
+			|action| matches!(action, DiscoveryAction::Event(Event::Connected { id: event_id, peer }) if *event_id == id && *peer == remote)
+		));
+
+		let actions = state.reduce(DiscoveryAction::MdnsDiscovered(MdnsDiscoveredAction { peers: [remote].into() }));
+
+		assert!(!actions.iter().any(|action| matches!(action, DiscoveryAction::DialPeer(_))));
+		assert!(state.requests.get(&id).unwrap().pending.is_empty());
+		assert!(state.requests.get(&id).unwrap().connected_peers.contains(&remote));
+	}
+
+	#[test]
+	fn mdns_connected_with_redundancy_emits_detached_dial() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state_with_redundancy(local, true);
+		state.max_peers = Some(1);
+		state.connected_peers.insert(remote);
+		let (id, connect_actions) = connect(&mut state, vec![peer_discovery(remote, vec![])]);
+		assert!(connect_actions.iter().any(
+			|action| matches!(action, DiscoveryAction::Event(Event::Connected { id: event_id, peer }) if *event_id == id && *peer == remote)
+		));
+
+		let actions = state.reduce(DiscoveryAction::MdnsDiscovered(MdnsDiscoveredAction { peers: [remote].into() }));
+
+		let dial = actions
+			.iter()
+			.find_map(|action| match action {
+				DiscoveryAction::DialPeer(dial) => Some(dial),
+				_ => None,
+			})
+			.expect("connected mDNS peer should dial despite max_peers");
+		assert_eq!(dial.request_id, None);
+		assert_eq!(dial.intent, DialIntent::Redundancy);
+		assert!(state.requests.get(&id).unwrap().pending.is_empty());
+		assert!(state.requests.get(&id).unwrap().connected_peers.contains(&remote));
 	}
 
 	#[test]
@@ -1391,7 +1583,7 @@ mod tests {
 		state.connected_peers.insert(remote);
 
 		let disc = did_discovery_with_did("msg-1", "did:local:target");
-		let (_id, actions) = connect(&mut state, vec![Discovery::DidDiscovery(disc)]);
+		let (id, actions) = connect(&mut state, vec![Discovery::DidDiscovery(disc)]);
 
 		// no DidPublish — cache hit + already connected
 		assert!(!actions.iter().any(|a| matches!(a, DiscoveryAction::DidPublish(_))));
@@ -1399,10 +1591,13 @@ mod tests {
 		assert!(actions
 			.iter()
 			.any(|a| matches!(a, DiscoveryAction::Event(Event::Connected { .. }))));
+		assert!(!actions.iter().any(|a| matches!(a, DiscoveryAction::DialPeer(_))));
+		assert!(state.requests.get(&id).unwrap().pending.is_empty());
+		assert!(state.requests.get(&id).unwrap().cached_dial.is_empty());
 	}
 
 	#[test]
-	fn test_cache_hit_emits_dial_not_publish() {
+	fn cache_hit_disconnected_uses_reachability_and_cached_fallback() {
 		let local = test_peer(0);
 		let remote = test_peer(1);
 		let mut state = new_state(local);
@@ -1420,6 +1615,7 @@ mod tests {
 		if let DiscoveryAction::DialPeer(d) = dial.unwrap() {
 			assert_eq!(d.peer_id, remote);
 			assert_eq!(d.request_id, Some(id));
+			assert_eq!(d.intent, DialIntent::Reachability);
 			assert!(d.addresses.contains(&addr));
 		}
 
@@ -1427,6 +1623,39 @@ mod tests {
 		let request = state.requests.get(&id).unwrap();
 		assert!(request.discovery_peers.contains(&remote));
 		assert!(!request.cached_dial.is_empty());
+		assert_eq!(request.pending.len(), 1);
+	}
+
+	#[test]
+	fn cache_hit_connected_with_redundancy_emits_detached_dial_without_cached_fallback() {
+		let local = test_peer(0);
+		let remote = test_peer(1);
+		let mut state = new_state_with_redundancy(local, true);
+		let addr: Multiaddr = "/ip4/127.0.0.1/tcp/5678".parse().unwrap();
+		setup_cache(&mut state, "did:local:target", remote, [addr.clone()].into());
+		state.connected_peers.insert(remote);
+
+		let disc = did_discovery_with_did("msg-1", "did:local:target");
+		let (id, actions) = connect(&mut state, vec![Discovery::DidDiscovery(disc)]);
+
+		let dial = actions
+			.iter()
+			.find_map(|action| match action {
+				DiscoveryAction::DialPeer(dial) => Some(dial),
+				_ => None,
+			})
+			.expect("connected cached peer should dial when redundancy is enabled");
+		assert_eq!(dial.peer_id, remote);
+		assert_eq!(dial.request_id, None);
+		assert_eq!(dial.intent, DialIntent::Redundancy);
+		assert!(dial.addresses.contains(&addr));
+		assert!(actions.iter().any(
+			|action| matches!(action, DiscoveryAction::Event(Event::Connected { id: event_id, peer }) if *event_id == id && *peer == remote)
+		));
+		let request = state.requests.get(&id).unwrap();
+		assert!(request.discovery_peers.contains(&remote));
+		assert!(request.cached_dial.is_empty());
+		assert!(request.pending.is_empty());
 	}
 
 	#[test]

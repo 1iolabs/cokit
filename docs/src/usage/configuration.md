@@ -62,3 +62,23 @@ This uses all available interfaces and a random port with QUIC connectivity.
 #### Bootstrap
 Bootstrap endpoints to improve connectivity.  
 Defaults to: `/dns4/bootstrap.1io.com/udp/5000/quic-v1/p2p/12D3KooWEinh2zCgGbJaDfepoiiPiBgFcysSMYSc1EQrgEEZi9aX`
+
+#### Dial Redundancy
+Automatic dial redundancy is disabled by default. Enable it with the Rust
+`NetworkSettings::with_dial_redundancy` builder, for example
+`NetworkSettings::default().with_dial_redundancy(true)`, or set
+`dialRedundancy` to `true` in Flutter network settings.
+
+When enabled, COKIT-owned automatic discovery may attempt an additional
+connection to an already-connected peer using automatically discovered suitable
+addresses. The policy is transport-neutral: for example, it may keep BLE
+alongside QUIC or add a direct IP connection alongside a relay connection.
+Automatic direct-address upgrades learned through Identify are also opt-in
+through this setting. Explicit calls to `NetworkApi::dial` remain
+reachability-only.
+
+Redundant dials are best-effort and use libp2p's peer-wide `NotDialing`
+condition. The setting does not guarantee exactly one connection per protocol
+or protocol family, prevent sequential duplicate connections, close existing
+connections, or retry redundant dials on a timer. Keeping a BLE connection warm
+may also increase battery and radio use.

@@ -40,6 +40,12 @@ pub struct NetworkSettings {
 	/// Enable NAT related protocols.
 	pub nat: bool,
 
+	/// Allow COKIT-owned automatic discovery to dial an already-connected peer.
+	///
+	/// This is best-effort and does not enforce one connection per transport
+	/// family. Disabled by default.
+	pub dial_redundancy: bool,
+
 	/// Enable mDNS protocol.
 	pub mdns: bool,
 
@@ -73,6 +79,7 @@ impl Default for NetworkSettings {
 			peers_threshold: Some(10),
 			relay: false,
 			nat: true,
+			dial_redundancy: false,
 			mdns: true,
 			websocket: true,
 			dns: Default::default(),
@@ -230,6 +237,12 @@ impl NetworkSettings {
 		self
 	}
 
+	/// Allow automatic dials to add a redundant connection to a connected peer.
+	pub fn with_dial_redundancy(mut self, dial_redundancy: bool) -> Self {
+		self.dial_redundancy = dial_redundancy;
+		self
+	}
+
 	/// Set the maximum number of bytes allowed on a relay circuit.
 	pub fn with_max_circuit_bytes(mut self, max_circuit_bytes: u64) -> Self {
 		self.max_circuit_bytes = Some(max_circuit_bytes);
@@ -296,6 +309,15 @@ mod tests {
 		let settings = NetworkSettings::default().with_added_listen(extra.clone());
 		assert!(settings.listen.contains(&extra));
 		assert_eq!(settings.listen.len(), 3);
+	}
+
+	#[test]
+	fn dial_redundancy_is_opt_in() {
+		let defaults = NetworkSettings::default();
+		assert!(!defaults.dial_redundancy);
+		assert!(!NetworkSettings::mobile().dial_redundancy);
+		assert!(!NetworkSettings::default().with_localhost().dial_redundancy);
+		assert!(defaults.with_dial_redundancy(true).dial_redundancy);
 	}
 
 	#[test]

@@ -26,7 +26,7 @@ pub struct DiscoveryNetworkTask {
 	handle: ActorHandle<DiscoveryMessage>,
 }
 impl DiscoveryNetworkTask {
-	pub fn new(handle: ActorHandle<DiscoveryMessage>) -> Self {
+	pub fn new(handle: ActorHandle<DiscoveryMessage>, _dial_redundancy: bool) -> Self {
 		Self { handle }
 	}
 }
@@ -36,7 +36,6 @@ impl NetworkTask<Behaviour> for DiscoveryNetworkTask {
 	fn on_swarm_event(
 		&mut self,
 		_swarm: &mut Swarm<Behaviour>,
-
 		event: SwarmEvent<NetworkEvent>,
 	) -> Option<SwarmEvent<NetworkEvent>> {
 		match &event {
