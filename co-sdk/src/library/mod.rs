@@ -27,6 +27,10 @@ pub mod fs_read;
 pub mod fs_write;
 pub mod generate_random_name;
 #[cfg(feature = "network")]
+pub mod head_delivery;
+#[cfg(feature = "network")]
+pub(crate) mod head_delivery_queue;
+#[cfg(feature = "network")]
 pub mod invite;
 #[cfg(feature = "network")]
 pub mod invite_networks;
@@ -64,8 +68,6 @@ pub mod network_identity;
 pub mod network_queue;
 #[cfg(feature = "network")]
 pub mod network_resolver;
-#[cfg(feature = "network")]
-pub mod push_heads;
 #[cfg(feature = "network")]
 pub mod request_co_state;
 pub mod runtime_dispatch;

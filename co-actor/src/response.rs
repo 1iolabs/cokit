@@ -254,6 +254,11 @@ where
 			.retain_mut(|stream| !matches!(stream.send(value.clone()), Err(ActorError::Canceled)));
 	}
 
+	/// Remove response streams whose receivers have been dropped.
+	pub fn retain_open(&mut self) {
+		self.streams.retain(|stream| !stream.is_closed());
+	}
+
 	pub fn is_empty(&self) -> bool {
 		self.streams.is_empty() || self.is_closed()
 	}
@@ -261,5 +266,25 @@ where
 	/// Test if the streams has been closed by the caller.
 	pub fn is_closed(&self) -> bool {
 		!self.streams.iter().any(|s| !s.is_closed())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn retain_open_prunes_only_closed_response_streams() {
+		let (closed, closed_receiver) = ResponseStreamReceiver::<usize>::new();
+		let (open, _open_receiver) = ResponseStreamReceiver::<usize>::new();
+		let mut streams = ResponseStreams::default();
+		streams.push(closed);
+		streams.push(open);
+		drop(closed_receiver);
+
+		streams.retain_open();
+
+		assert_eq!(streams.streams.len(), 1);
+		assert!(!streams.is_closed());
 	}
 }

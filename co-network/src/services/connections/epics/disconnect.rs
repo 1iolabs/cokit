@@ -15,16 +15,24 @@ impl DisconnectEpic {
 		Self()
 	}
 }
+
+fn network_can_disconnect(state: &ConnectionState, network: &co_primitives::Network) -> bool {
+	state
+		.networks
+		.get(network)
+		.is_some_and(|connection| connection.references.is_empty() && connection.did_references.is_empty())
+}
+
 impl Epic<ConnectionAction, ConnectionState, ConnectionsContext> for DisconnectEpic {
 	fn epic(
 		&mut self,
 		_actions: &Actions<ConnectionAction, ConnectionState, ConnectionsContext>,
 		message: &ConnectionAction,
-		_state: &ConnectionState,
+		state: &ConnectionState,
 		_context: &ConnectionsContext,
 	) -> Option<impl Stream<Item = Result<ConnectionAction, anyhow::Error>> + 'static> {
 		match message {
-			ConnectionAction::Disconnect(DisconnectAction { network }) => {
+			ConnectionAction::Disconnect(DisconnectAction { network }) if network_can_disconnect(state, network) => {
 				// TODO: implement
 				Some(stream::iter([Ok(ConnectionAction::Disconnected(DisconnectedAction {
 					network: network.clone(),
@@ -33,5 +41,28 @@ impl Epic<ConnectionAction, ConnectionState, ConnectionsContext> for DisconnectE
 			},
 			_ => None,
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::connections::DidUseAction;
+	use co_actor::{time::Instant, Reducer};
+	use co_primitives::{Network, NetworkRendezvous};
+
+	#[test]
+	fn reacquired_network_cannot_run_a_stale_disconnect() {
+		let mut state = ConnectionState::default();
+		let network =
+			Network::Rendezvous(NetworkRendezvous { namespace: "disconnect-reuse".to_owned(), addresses: vec![] });
+		state.reduce(ConnectionAction::DidUse(DidUseAction::new(
+			"did:local:alice".to_owned(),
+			"did:local:bob".to_owned(),
+			Instant::now(),
+			[network.clone()].into(),
+		)));
+
+		assert!(!network_can_disconnect(&state, &network));
 	}
 }

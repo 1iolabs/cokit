@@ -57,12 +57,14 @@ async fn trace_heads(note: &str, co: &str, _context: &CoContext, storage: &CoSto
 
 /// See:
 /// - https://gitlab.1io.com/1io/cokit/-/issues/59
+#[co_test::timeout(10000)]
 #[tokio::test]
 async fn test_conflicting_membership_update_plain() {
 	co_test::init_test_log();
 	conflicting_membership_update(false).await;
 }
 
+#[co_test::timeout(10000)]
 #[tokio::test]
 async fn test_conflicting_membership_update_encrypted() {
 	co_test::init_test_log();

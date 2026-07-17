@@ -13,5 +13,9 @@ pub use action::HeadsMessageReceivedAction;
 #[cfg(feature = "network")]
 pub use action::KeyRequestAction;
 pub use action::{Action, ActionError, ContactAction, HeadsError, NetworkBlockGetAction};
+#[cfg(feature = "network")]
+pub use action::{
+	HeadsDeliveryCompleteAction, HeadsDeliveryOutcome, HeadsDeliveryPhase, HeadsRecipient, PushHeadsToDidsAction,
+};
 pub use actor::{Application, ApplicationInitialize};
 pub use message::ApplicationMessage;

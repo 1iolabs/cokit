@@ -125,6 +125,14 @@ impl Actor for Connections {
 		// reduce
 		let next_actions = state.state.reduce(action.clone());
 
+		// handle internal actions (atomic within the handle call)
+		for next_action in &next_actions {
+			// we need to handle DidReleased atomic when its occured to not have a race condition with next actions
+			if let ConnectionAction::DidReleased(released) = next_action {
+				state.did_peers_changed.remove(&released.to);
+			}
+		}
+
 		// response
 		//  note: must be done after reducer to have use_initial return the correct results
 		match response {
@@ -163,8 +171,15 @@ impl Actor for Connections {
 					responses.send(did_peers_action.clone());
 				}
 			},
-			ConnectionAction::DidReleased(released_did_action) => {
-				state.did_peers_changed.remove(&released_did_action.to);
+			ConnectionAction::DidRelease(release) => {
+				if let Some(responses) = state.did_peers_changed.get_mut(&release.to) {
+					responses.retain_open();
+				}
+				if !state.state.did.contains_key(&release.to)
+					|| state.did_peers_changed.get(&release.to).is_some_and(ResponseStreams::is_empty)
+				{
+					state.did_peers_changed.remove(&release.to);
+				}
 			},
 			_ => {},
 		}
@@ -196,4 +211,98 @@ impl Actor for Connections {
 enum ResponseKind {
 	Co(CoId, ResponseStream<PeersChangedAction>),
 	Did(Did, ResponseStream<DidPeersChangedAction>),
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::{
+		connections::{DidReleasedAction, DidUseAction, DisconnectReason, DisconnectedAction},
+		services::{
+			connections::resolve::{NetworkResolver, StaticNetworkResolver},
+			discovery::DiscoveryApi,
+			network::CoNetworkTaskSpawner,
+		},
+	};
+	use co_actor::{time::Instant, ResponseStreamReceiver};
+	use co_identity::{
+		IdentityResolver, MemoryIdentityResolver, MemoryPrivateIdentityResolver, PrivateIdentityResolver,
+	};
+	use co_primitives::{CoDate, Network, NetworkRendezvous, StaticCoDate};
+	use futures::StreamExt;
+	use libp2p::PeerId;
+	use std::time::Duration;
+
+	async fn initialized_connections() -> (Connections, State, ActorHandle<ConnectionMessage>) {
+		let local_peer = PeerId::random();
+		let connections = Connections::new(ConnectionsContext {
+			date: StaticCoDate(0).boxed(),
+			tasks: TaskSpawner::default(),
+			settings: NetworkSettings::default(),
+			network: CoNetworkTaskSpawner::new_closed(local_peer),
+			identity_resolver: MemoryIdentityResolver::default().boxed(),
+			private_identity_resolver: MemoryPrivateIdentityResolver::default().boxed(),
+			network_resolver: StaticNetworkResolver::default().boxed(),
+			discovery: DiscoveryApi::new_closed(),
+		});
+		let handle = ActorHandle::new_closed();
+		let state = connections.initialize(&handle, &Tags::default(), ()).await.unwrap();
+		(connections, state, handle)
+	}
+
+	fn did_use(from: &Did, to: &Did, network: &Network) -> DidUseAction {
+		DidUseAction::new(from.clone(), to.clone(), Instant::now(), [network.clone()].into())
+	}
+
+	#[tokio::test]
+	async fn failure_closes_the_failed_did_response_group_in_the_same_turn() {
+		let (connections, mut state, handle) = initialized_connections().await;
+		let from = Did::from("did:local:alice");
+		let to = Did::from("did:local:bob");
+		let network =
+			Network::Rendezvous(NetworkRendezvous { namespace: "failed-response".to_owned(), addresses: vec![] });
+		let (response, mut receiver) = ResponseStreamReceiver::new();
+
+		connections
+			.handle(&handle, ConnectionMessage::DidUse(did_use(&from, &to, &network), response), &mut state)
+			.await
+			.unwrap_err();
+		connections
+			.handle(
+				&handle,
+				DisconnectedAction { network, reason: DisconnectReason::Failure("route failed".to_owned()) }.into(),
+				&mut state,
+			)
+			.await
+			.unwrap_err();
+
+		let closed = co_actor::time::timeout(Duration::from_secs(1), receiver.next())
+			.await
+			.expect("failed DID response group stayed open");
+		assert!(closed.is_none());
+	}
+
+	#[tokio::test]
+	async fn stale_did_released_notification_preserves_a_new_response_group() {
+		let (connections, mut state, handle) = initialized_connections().await;
+		let from = Did::from("did:local:alice");
+		let to = Did::from("did:local:bob");
+		let network =
+			Network::Rendezvous(NetworkRendezvous { namespace: "new-response".to_owned(), addresses: vec![] });
+		let action = did_use(&from, &to, &network);
+		state.state.reduce(action.into());
+		let (response, mut receiver) = ResponseStreamReceiver::new();
+		state.did_peers_changed.entry(to.clone()).or_default().push(response);
+
+		connections
+			.handle(&handle, DidReleasedAction { to: to.clone() }.into(), &mut state)
+			.await
+			.unwrap();
+
+		assert!(state.state.did.contains_key(&to));
+		assert!(state.state.networks[&network].did_references.contains(&to));
+		assert!(co_actor::time::timeout(Duration::from_millis(10), receiver.next())
+			.await
+			.is_err());
+	}
 }

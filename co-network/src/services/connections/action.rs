@@ -7,6 +7,8 @@ use co_primitives::{CoId, Did, Network};
 use derive_more::{From, TryInto};
 use libp2p::{swarm::ConnectionId, Multiaddr, PeerId};
 use std::collections::BTreeSet;
+use uuid::Uuid;
+
 #[derive(Debug, Clone, From, TryInto, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ConnectionAction {
 	/// Use a CO by utilising the specified networks.
@@ -74,6 +76,9 @@ pub enum ConnectionAction {
 	DialCompleted(DialCompletedAction),
 
 	/// Use a DID connection by utilising the specified networks.
+	///
+	/// Raw message callers must retain [`DidUseAction::release`], close or drop the
+	/// response receiver, and then dispatch that exact release action.
 	DidUse(DidUseAction),
 
 	/// DID related peers changed.
@@ -222,10 +227,36 @@ pub struct DialCompletedAction {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DidUseAction {
+	/// Unique lease paired with the matching [`DidReleaseAction`].
+	pub lease_id: DidUseLeaseId,
 	pub from: Did,
 	pub to: Did,
 	pub time: Instant,
 	pub networks: BTreeSet<Network>,
+}
+impl DidUseAction {
+	pub fn new(from: Did, to: Did, time: Instant, networks: BTreeSet<Network>) -> Self {
+		Self { lease_id: DidUseLeaseId::new(), from, to, time, networks }
+	}
+
+	/// Create the release action paired with this use.
+	pub fn release(&self) -> DidReleaseAction {
+		DidReleaseAction::new(self.to.clone(), self.lease_id)
+	}
+}
+
+/// Unique identity of one DID connection use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DidUseLeaseId(Uuid);
+impl DidUseLeaseId {
+	pub fn new() -> Self {
+		Self(Uuid::new_v4())
+	}
+}
+impl Default for DidUseLeaseId {
+	fn default() -> Self {
+		Self::new()
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -238,7 +269,14 @@ pub struct DidPeersChangedAction {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DidReleaseAction {
+	/// Lease created by the matching [`DidUseAction`].
+	pub lease_id: DidUseLeaseId,
 	pub to: Did,
+}
+impl DidReleaseAction {
+	pub fn new(to: Did, lease_id: DidUseLeaseId) -> Self {
+		Self { lease_id, to }
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

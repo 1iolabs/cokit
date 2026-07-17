@@ -19,6 +19,16 @@ pub async fn participants(storage: &CoStorage, co_state: OptionLink<Co>) -> Resu
 		.await?)
 }
 
+/// Read one participant from a CO by DID.
+pub async fn participant(
+	storage: &CoStorage,
+	co_state: OptionLink<Co>,
+	participant: &Did,
+) -> Result<Option<Participant>, QueryError> {
+	let co = query_core(CO_CORE_NAME_CO).with_default().execute(storage, co_state).await?;
+	Ok(co.participants.get(storage, participant).await?)
+}
+
 /// Read active participants from a CO.
 pub async fn participants_active(
 	storage: &CoStorage,
