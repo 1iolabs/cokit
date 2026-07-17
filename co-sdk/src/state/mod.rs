@@ -22,5 +22,5 @@ pub use heads::{heads_action_stream, heads_stream};
 pub use identities::{identities, is_identity, Identity};
 pub use memberships::memberships;
 pub use networks::networks;
-pub use participants::{is_participant, participant_identities, participants, participants_active};
+pub use participants::{is_participant, participant, participant_identities, participants, participants_active};
 pub use query::{query, query_core, Query, QueryError, QueryExt};

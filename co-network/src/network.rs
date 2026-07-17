@@ -17,10 +17,12 @@ use libp2p::mdns::{self, tokio::Behaviour as MdnsBehaviour};
 use libp2p::{
 	autonat, dcutr, gossipsub, identify,
 	identity::Keypair,
-	noise, ping, relay,
+	ping, relay,
 	swarm::{behaviour::toggle::Toggle, dial_opts::DialOpts, NetworkBehaviour, SwarmEvent},
-	yamux, PeerId, StreamProtocol, Swarm, SwarmBuilder,
+	PeerId, StreamProtocol, Swarm,
 };
+#[cfg(any(feature = "native", all(feature = "js", target_arch = "wasm32")))]
+use libp2p::{noise, yamux, SwarmBuilder};
 use libp2p_bitswap::{Bitswap, BitswapConfig};
 use rand::rngs::OsRng;
 use std::{cmp::min, future::Future, time::Duration};
@@ -125,6 +127,7 @@ impl Libp2pNetwork {
 /// - `clippy::large_stack_frames`: Building the swam is large on stack therefore we return it boxed and call this
 ///   function boxed.
 #[allow(clippy::large_stack_frames)]
+#[cfg(any(feature = "native", all(feature = "js", target_arch = "wasm32")))]
 async fn build_swarm(
 	context: &Libp2pNetworkContext,
 	keypair: &Keypair,
@@ -247,6 +250,18 @@ async fn build_swarm(
 
 	// result
 	Ok((local_peer_id, Box::new(swarm)))
+}
+
+#[cfg(not(any(feature = "native", all(feature = "js", target_arch = "wasm32"))))]
+async fn build_swarm(
+	_context: &Libp2pNetworkContext,
+	_keypair: &Keypair,
+	_config: &NetworkSettings,
+	_dns: BuildDns,
+) -> Result<(PeerId, Box<Swarm<Behaviour>>), anyhow::Error> {
+	Err(anyhow!(
+		"co-network has no transport backend; enable `native` on native targets or `web` when building for wasm32"
+	))
 }
 
 fn build_behaviour(
