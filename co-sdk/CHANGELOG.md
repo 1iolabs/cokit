@@ -10,6 +10,8 @@ Logging/tracing setup has moved to the dedicated `co-tracing` crate; `co-sdk` ke
 - `ApplicationBuilder::{base_path, log_path, identifier}` — helpers for wiring up `co-tracing`.
 - `Application::drop_on_shutdown(value)` — keep a value (e.g. a `co_tracing::TracingGuard`) alive
   until the application shuts down, then drop it (so OpenTelemetry flushes).
+- `push_heads_to_dids` and `HeadsRecipient` for sending current CO heads to
+  selected DIDs with durable retries.
 
 ### Changed
 
@@ -20,7 +22,17 @@ Logging/tracing setup has moved to the dedicated `co-tracing` crate; `co-sdk` ke
   as a drop-in for the old `with_bunyan_logging`, then `application.drop_on_shutdown(guard)` (or use
   `co_tracing::LogArgs` for `CO_LOG`-string / CLI configuration).
 - **Breaking.** `CoOptions` is now `non_exhaustive`.
-- `network_service` function now checks for the new `ephemeral_peer_id` setting
+- `network_service` function now checks for the new `ephemeral_peer_id` setting.
+- Head delivery persists tagged intent before authorization, preparation,
+  routing, or network send.
+- Pending delivery tasks coalesce atomically by `(task-type, co, recipient)`,
+  retaining the latest pending delivery intent for each key.
+- Queue claims and completions are conditional; stale operations are no-ops and
+  cannot mutate a newer task generation.
+- **Breaking.** `HeadsDeliveryAttempt` is now `HeadsDeliveryPhase`, with
+  `Admission` and `Execution` variants.
+- The queue does not provide exactly-once sends or takeover of tasks abandoned
+  by crashed executors.
 
 ### Removed
 

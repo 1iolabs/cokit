@@ -12,6 +12,8 @@ use co_identity::PrivateIdentityBox;
 use co_identity::{DidCommHeader, Message};
 #[cfg(feature = "network")]
 use co_network::{EncodedMessage, HeadsMessage, NetworkSettings, PeerId};
+#[cfg(feature = "network")]
+use co_primitives::CoConnectivity;
 use co_primitives::{Block, BlockSerializer, CoDate, CoId, Did, Link, Network, ReducerAction, Tags};
 use co_storage::{BlockStorage, BlockStorageExt, StorageError};
 use futures::{stream::once, Stream, StreamExt};
@@ -154,6 +156,14 @@ pub enum Action {
 		/// If the peers list is empty no peer could be connected.
 		result: Result<BTreeSet<PeerId>, ActionError>,
 	},
+
+	/// Schedule head delivery for explicit DID recipients.
+	#[cfg(feature = "network")]
+	PushHeadsToDids(PushHeadsToDidsAction),
+
+	/// Per-recipient admission or execution outcome.
+	#[cfg(feature = "network")]
+	HeadsDeliveryComplete(HeadsDeliveryCompleteAction),
 
 	/// Staged changes to a CO has been flushed.
 	CoFlush {
@@ -391,6 +401,49 @@ impl std::fmt::Display for ActionError {
 			ActionError::Native { err } => write!(f, "{}", err),
 		}
 	}
+}
+
+#[cfg(feature = "network")]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct HeadsRecipient {
+	pub did: Did,
+	#[serde(default)]
+	pub connectivity: CoConnectivity,
+}
+
+#[cfg(feature = "network")]
+#[derive(Debug, Clone)]
+pub struct PushHeadsToDidsAction {
+	pub co: CoId,
+	pub from: Did,
+	pub recipients: Vec<HeadsRecipient>,
+}
+
+#[cfg(feature = "network")]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum HeadsDeliveryPhase {
+	Admission,
+	Execution,
+}
+
+#[cfg(feature = "network")]
+#[derive(Debug, Clone)]
+pub enum HeadsDeliveryOutcome {
+	Delivered { peers: BTreeSet<PeerId> },
+	Queued,
+	Cancelled,
+	Failed(ActionError),
+}
+
+#[cfg(feature = "network")]
+#[derive(Debug, Clone)]
+pub struct HeadsDeliveryCompleteAction {
+	pub co: CoId,
+	pub recipient: Did,
+	/// Current generation actually prepared by worker.
+	pub attempted_heads: Option<BTreeSet<Cid>>,
+	pub phase: HeadsDeliveryPhase,
+	pub outcome: HeadsDeliveryOutcome,
 }
 
 /// Contact request.

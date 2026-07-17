@@ -25,7 +25,7 @@ pub use application::{
 	shared::CreateCo,
 	storage::Storage,
 };
-pub use co_actor::TaskSpawner;
+pub use co_actor::{ActorError, TaskSpawner};
 pub use co_core_keystore::{Key, KeyStore, KeyStoreAction};
 pub use co_identity::{
 	DidCommHeader, DidKeyIdentity, DidKeyIdentityResolver, Identity, IdentityBox, IdentityResolver,
@@ -36,11 +36,11 @@ pub use co_network::NetworkSettings;
 pub use co_primitives::{
 	from_cbor, from_json, from_json_string, tag, tags, to_cbor, to_json, to_json_string, unixfs_add, unixfs_cat_buffer,
 	unixfs_encode_buffer, unixfs_stream, AbsolutePath, AbsolutePathOwned, AnyBlockStorage, Block, BlockSerializer,
-	BlockStat, BlockStorage, BlockStorageExt, CloneWithBlockStorageSettings, CoDate, CoDateRef, CoId, CoInvite, CoList,
-	CoListIndex, CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction, CoTryStreamExt,
-	Component, Components, CoreName, Date, DefaultParams, Did, DynamicCoDate, IsDefault, KnownMultiCodec, KnownTag,
-	KnownTags, Link, MultiCodec, MultiCodecError, NodeStream, OptionLink, Path, PathError, PathExt, PathOwned,
-	ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag, Tags,
+	BlockStat, BlockStorage, BlockStorageExt, CloneWithBlockStorageSettings, CoConnectivity, CoDate, CoDateRef, CoId,
+	CoInvite, CoList, CoListIndex, CoListTransaction, CoMap, CoMapTransaction, CoNetwork, CoSet, CoSetTransaction,
+	CoTryStreamExt, Component, Components, CoreName, Date, DefaultParams, Did, DynamicCoDate, IsDefault,
+	KnownMultiCodec, KnownTag, KnownTags, Link, MultiCodec, MultiCodecError, NodeStream, OptionLink, Path, PathError,
+	PathExt, PathOwned, ReducerAction, RelativePath, RelativePathOwned, StorageError, Tag, Tags,
 };
 pub use co_runtime::{
 	co_v1, Core, ExecuteError, GuardReference, RuntimeContext, RuntimeHandle, RuntimeInstance, RuntimePool,
@@ -50,6 +50,8 @@ pub use co_storage::{BlockStorageContentMapping, MemoryBlockStorage};
 pub use library::build_core::{
 	build_core, build_core_with_options, crate_repository_path, BuildCoreArtifact, BuildCoreOptions,
 };
+#[cfg(feature = "network")]
+pub use library::head_delivery::push_heads_to_dids;
 #[cfg(feature = "network")]
 pub use library::keystore_fetch::keystore_fetch;
 #[cfg(feature = "network")]
@@ -81,6 +83,10 @@ pub use reducer::core_resolver::{
 };
 #[cfg(feature = "network")]
 pub use services::application::KeyRequestAction;
+#[cfg(feature = "network")]
+pub use services::application::{
+	HeadsDeliveryCompleteAction, HeadsDeliveryOutcome, HeadsDeliveryPhase, HeadsRecipient, PushHeadsToDidsAction,
+};
 pub use services::{
 	application::{Action, ActionError, ApplicationMessage, ContactAction},
 	reducer::{CoReducer, CoReducerTransaction},

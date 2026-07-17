@@ -28,6 +28,8 @@ mod didcomm_receive;
 #[cfg(feature = "network")]
 mod didcomm_send;
 #[cfg(feature = "network")]
+mod head_delivery;
+#[cfg(feature = "network")]
 mod heads_message;
 #[cfg(feature = "network")]
 mod invite_receive;
@@ -92,7 +94,7 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(key_request_send::network_task_execute)
 		.join(membership_update::membership_update)
 		.join(membership_update::membership_remove)
-		.join(push_heads::PushHeadsEpic::default())
+		.join(push_heads::PushHeadsEpic)
 		.join(co_heads_publish::co_heads_publish)
 		.join(co_heads_subscribe::CoHeadsSubscribeEpic::default())
 		.join(contact_send::contact_send)
@@ -103,7 +105,9 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(did_didcomm_send::network_task_execute)
 		.join(network_queue::network_queue_message_epic)
 		.join(network_queue::network_started_epic)
+		.join(head_delivery::HeadDeliveryEpic)
 		.join(network_queue::NetworkQueueProcessEpic::default())
+		.join(network_queue::network_queue_joined_epic)
 		.join(network_block_get::network_block_get)
 		.join(network_block_get::network_task_execute)
 		.join(network_start::network_start)

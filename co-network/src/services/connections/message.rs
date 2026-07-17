@@ -75,6 +75,9 @@ impl ConnectionMessage {
 	) -> impl Stream<Item = Result<DidPeersChangedAction, ActorError>> {
 		let action = DidUseAction::new(from, to, Instant::now(), networks.into_iter().collect());
 		let release = action.release();
+		// build the response stream explicitly instead of using `ActorHandle::stream`:
+		// `DidUseStream` must know whether registration succeeded and, when dropped,
+		// close the response before dispatching this lease's exact release action.
 		let (response, receiver) = ResponseStreamReceiver::new();
 		let start_error = actor.dispatch(Self::DidUse(action, response)).err();
 		DidUseStream {

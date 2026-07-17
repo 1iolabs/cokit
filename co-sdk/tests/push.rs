@@ -4,14 +4,133 @@
 use co_core_co::CoAction;
 use co_core_file::{FileAction, FolderNode};
 use co_network::connections::{ConnectionAction, ConnectionMessage, ReleaseAction};
-use co_primitives::AbsolutePathOwned;
-use co_sdk::{tags, CoDate, Cores, Identity, CO_CORE_NAME_CO};
-use futures::{pin_mut, StreamExt};
+use co_primitives::{AbsolutePathOwned, TagsAction};
+use co_sdk::{
+	tags, Action, Application, CoDate, CoId, Cores, CreateCo, Did, DidKeyIdentity, HeadsDeliveryCompleteAction,
+	HeadsDeliveryOutcome, HeadsDeliveryPhase, Identity, CO_CORE_NAME_CO,
+};
+use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
 use helper::{instance::Instances, shared_co::SharedCo};
-use std::{future::ready, time::Duration};
+use std::{future::ready, pin::Pin, time::Duration};
 use tokio::time::{sleep, timeout};
 
 pub mod helper;
+
+fn queued_completions(
+	application: &Application,
+	co: CoId,
+	recipient: Did,
+	phase: HeadsDeliveryPhase,
+) -> Pin<Box<dyn Stream<Item = HeadsDeliveryCompleteAction> + Send>> {
+	Box::pin(application.actions().filter_map(move |action| {
+		let co = co.clone();
+		let recipient = recipient.clone();
+		async move {
+			match action {
+				Action::HeadsDeliveryComplete(done)
+					if done.co == co
+						&& done.recipient == recipient
+						&& done.phase == phase
+						&& matches!(&done.outcome, HeadsDeliveryOutcome::Queued) =>
+				{
+					Some(done)
+				},
+				_ => None,
+			}
+		}
+	}))
+}
+
+async fn wait_for_queued(
+	completions: &mut Pin<Box<dyn Stream<Item = HeadsDeliveryCompleteAction> + Send>>,
+) -> HeadsDeliveryCompleteAction {
+	timeout(Duration::from_secs(10), completions.next()).await.unwrap().unwrap()
+}
+
+async fn head_backlog_count(application: &Application, co: &CoId, recipient: &Did) -> usize {
+	let local_co = application.context().local_co_reducer().await.unwrap();
+	let tasks = co_sdk::state::board::tasks(
+		local_co.storage(),
+		local_co.reducer_state().await,
+		"network_queue".to_owned(),
+		"backlog".to_owned(),
+	);
+	tasks
+		.try_filter(|task| {
+			ready(
+				task.tags.string("task-type") == Some("co-heads-did")
+					&& task.tags.string("co") == Some(co.as_str())
+					&& task.tags.string("recipient") == Some(recipient.as_str()),
+			)
+		})
+		.try_collect::<Vec<_>>()
+		.await
+		.unwrap()
+		.len()
+}
+
+async fn wait_for_head_backlog_count(application: &Application, co: &CoId, recipient: &Did, expected: usize) {
+	timeout(Duration::from_secs(10), async {
+		loop {
+			if head_backlog_count(application, co, recipient).await == expected {
+				break;
+			}
+			sleep(Duration::from_millis(10)).await;
+		}
+	})
+	.await
+	.unwrap();
+}
+
+#[tokio::test]
+async fn active_offline_participant_uses_targeted_queue() {
+	let mut instances = Instances::new("participant-head-queue");
+	let peer = instances.create().await;
+	let identity = peer.create_identity().await;
+	let offline = DidKeyIdentity::generate(None);
+	let co = CoId::from("offline-participant");
+	let recipient = offline.identity().to_owned();
+	let reducer = peer
+		.application
+		.create_co(identity.clone(), CreateCo::new(co.clone(), None))
+		.await
+		.unwrap();
+	reducer
+		.push(
+			&identity,
+			CO_CORE_NAME_CO,
+			&CoAction::ParticipantInvite { participant: offline.identity().to_owned(), tags: Default::default() },
+		)
+		.await
+		.unwrap();
+	let mut join_admission =
+		queued_completions(&peer.application, co.clone(), recipient.clone(), HeadsDeliveryPhase::Admission);
+	let mut join_execution =
+		queued_completions(&peer.application, co.clone(), recipient.clone(), HeadsDeliveryPhase::Execution);
+	reducer
+		.push(
+			&identity,
+			CO_CORE_NAME_CO,
+			&CoAction::ParticipantJoin { participant: offline.identity().to_owned(), tags: Default::default() },
+		)
+		.await
+		.unwrap();
+	wait_for_queued(&mut join_admission).await;
+	wait_for_queued(&mut join_execution).await;
+	wait_for_head_backlog_count(&peer.application, &co, &recipient, 1).await;
+
+	let mut tag_admission =
+		queued_completions(&peer.application, co.clone(), recipient.clone(), HeadsDeliveryPhase::Admission);
+	let mut tag_execution =
+		queued_completions(&peer.application, co.clone(), recipient.clone(), HeadsDeliveryPhase::Execution);
+	reducer
+		.push(&identity, CO_CORE_NAME_CO, &CoAction::Tags { action: TagsAction::insert(tags!("change": "queued")) })
+		.await
+		.unwrap();
+	wait_for_queued(&mut tag_admission).await;
+	wait_for_queued(&mut tag_execution).await;
+	wait_for_head_backlog_count(&peer.application, &co, &recipient, 1).await;
+}
 
 /// Push changes to peer.
 #[tokio::test]
