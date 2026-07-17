@@ -38,6 +38,7 @@ async fn test_local_multi_instance() {
 }
 
 /// Create Local CO in tmpdir open a second instance, push someting and exit.
+#[co_test::timeout(10000)]
 #[tokio::test]
 async fn test_local_multi_instance_push() {
 	co_test::init_test_log();
