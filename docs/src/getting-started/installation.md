@@ -45,7 +45,8 @@ apt-get install --no-install-recommends -y wget gnupg lsb-release software-prope
 To install it using macOS use:
 
 ```sh
-brew install llvm@21
+brew install llvm@21 cmake ninja
+brew link llvm@21
 ```
 
 #### Set up cargo (macOS)
