@@ -545,12 +545,17 @@ async fn reduce_remove(
 			memberships.remove(storage, id.clone()).await?;
 		},
 		Some(did) => {
-			let did = did.clone();
-			memberships
-				.update(storage, id.clone(), move |membership| {
-					membership.did.remove(&did);
-				})
-				.await?;
+			let mut transaction = memberships.open(storage).await?;
+			if let Some(mut membership) = transaction.get(id).await? {
+				if membership.did.remove(did).is_some() {
+					if membership.did.is_empty() {
+						transaction.remove(id.clone()).await?;
+					} else {
+						transaction.insert(id.clone(), membership).await?;
+					}
+					*memberships = transaction.store().await?;
+				}
+			}
 		},
 	}
 	Ok(())
@@ -636,7 +641,7 @@ async fn filter_state(
 
 #[cfg(test)]
 mod tests {
-	use crate::{MembershipOptions, Memberships, MembershipsAction};
+	use crate::{MembershipOptions, MembershipState, Memberships, MembershipsAction};
 	use co_api::{BlockStorageExt, CoreBlockStorage, Link, OptionLink, Reducer, ReducerAction, Tags, TagsAction};
 	use co_storage::MemoryBlockStorage;
 
@@ -708,5 +713,65 @@ mod tests {
 			.unwrap()
 			.expect("membership exists");
 		assert_eq!(membership.tags, tags(&[("b", "2")]));
+	}
+
+	#[tokio::test]
+	async fn test_remove_did_preserves_membership_until_last_did() {
+		let storage = MemoryBlockStorage::default();
+		let core_storage = CoreBlockStorage::new(storage.clone(), false);
+
+		let (_state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			OptionLink::none(),
+			MembershipsAction::Join {
+				id: "test-co".into(),
+				did: "did:local:first".to_owned(),
+				options: MembershipOptions::default(),
+			},
+		)
+		.await;
+		let (_state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			MembershipsAction::Join {
+				id: "test-co".into(),
+				did: "did:local:second".to_owned(),
+				options: MembershipOptions::default(),
+			},
+		)
+		.await;
+
+		let (state, link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			MembershipsAction::Remove { id: "test-co".into(), did: Some("did:local:first".to_owned()) },
+		)
+		.await;
+
+		let membership = state
+			.memberships
+			.get(&core_storage, &"test-co".into())
+			.await
+			.unwrap()
+			.expect("membership remains while a DID survives");
+		assert_eq!(membership.did.len(), 1);
+		assert!(!membership.did.contains_key("did:local:first"));
+		assert_eq!(membership.did.get("did:local:second"), Some(&MembershipState::Active));
+
+		let (state, _link) = reduce_action(
+			&storage,
+			&core_storage,
+			link.into(),
+			MembershipsAction::Remove { id: "test-co".into(), did: Some("did:local:second".to_owned()) },
+		)
+		.await;
+
+		assert!(
+			state.memberships.get(&core_storage, &"test-co".into()).await.unwrap().is_none(),
+			"membership is removed after its final DID"
+		);
 	}
 }
