@@ -35,6 +35,9 @@ uuid = { workspace = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
 
+[dev-dependencies]
+co-test = { workspace = true }
+
 [features]
 default = ["desktop", "tracing"]
 

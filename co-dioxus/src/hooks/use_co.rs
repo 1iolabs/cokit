@@ -2,7 +2,10 @@
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
 use crate::{
-	library::co_actor::{CoActor, CoMessage},
+	library::{
+		co_actor::{CoActor, CoMessage},
+		co_attachment::CoAttachment,
+	},
 	use_co_context, CoBlockStorage, CoContext, CoError,
 };
 use anyhow::anyhow;
@@ -15,34 +18,87 @@ use co_sdk::{
 use dioxus::prelude::*;
 use futures::{future::Either, io::Cursor};
 use serde::Serialize;
-use std::fmt::Debug;
+use std::{cell::RefCell, fmt::Debug, rc::Rc};
 
+/// Use a single CO.
+///
+/// The requested CO is read on every render, so a component that re-renders with another id is
+/// served the new CO in that very render while the previous one is detached.
 pub fn use_co(co: ReadSignal<CoId>) -> Co {
-	let reducer_state = use_signal_sync(|| None);
-	let last_error = use_signal_sync(|| Ok(()));
 	let context = use_co_context();
-	use_hook(move || {
-		let co_id = co();
-		let actor_spawner = Actor::spawner(Default::default(), CoActor::new(co_id.clone())).expect("actor");
-		let handle = actor_spawner.handle();
-		context.execute_future_parallel(move |application| async move {
-			actor_spawner.spawn(application.context().tasks(), (application.context().clone(), reducer_state));
-		});
-		let storage = CoBlockStorage::new(handle.clone(), None);
-		Co { co_id, last_error, context, reducer_state, handle, storage }
-	})
+	let co_id = co();
+	let mounted = use_hook({
+		let context = context.clone();
+		let co_id = co_id.clone();
+		move || Rc::new(RefCell::new(MountedCo::attach(&context, co_id)))
+	});
+
+	// reconcile before returning so the current render never sees the previous CO again
+	let mut mounted = mounted.borrow_mut();
+	if mounted.co().co_id != co_id {
+		*mounted = MountedCo::attach(&context, co_id);
+	}
+	mounted.co().clone()
+}
+
+/// A CO occurrence owned by a hook.
+///
+/// Dropping it requests shutdown of the CO actor, so a replaced, removed or unmounted occurrence
+/// stops its background work even while public [`Co`] clones are still around.
+///
+/// Note: It is not cloneable by design: only the hook state may run the shutdown
+pub(crate) struct MountedCo(Co);
+impl MountedCo {
+	pub(crate) fn attach(context: &CoContext, co_id: CoId) -> Self {
+		Self(Co::attach(context.clone(), co_id))
+	}
+
+	pub(crate) fn co(&self) -> &Co {
+		&self.0
+	}
+}
+impl Drop for MountedCo {
+	fn drop(&mut self) {
+		self.0.handle.shutdown();
+	}
 }
 
 #[derive(Debug, Clone)]
 pub struct Co {
 	pub(crate) co_id: CoId,
 	pub(crate) context: CoContext,
+	/// Owner of `reducer_state` and `last_error`. Background work keeps a clone so its late writes
+	/// stay valid after this CO was detached.
+	pub(crate) attachment: CoAttachment,
 	pub(crate) reducer_state: SyncSignal<Option<Result<CoReducerState, CoError>>>,
 	pub(crate) last_error: SyncSignal<Result<(), CoError>>,
 	pub(crate) handle: ActorHandle<CoMessage>,
 	pub(crate) storage: CoBlockStorage,
 }
 impl Co {
+	/// Attach to a CO with a freshly created actor, storage handle and render state.
+	pub(crate) fn attach(context: CoContext, co_id: CoId) -> Self {
+		let attachment = CoAttachment::new();
+		let actor_spawner = Actor::spawner(Default::default(), CoActor::new(co_id.clone())).expect("actor");
+		let handle = actor_spawner.handle();
+		context.execute_future_parallel({
+			let attachment = attachment.clone();
+			move |application| async move {
+				actor_spawner.spawn(application.context().tasks(), (application.context().clone(), attachment));
+			}
+		});
+		let storage = CoBlockStorage::new(handle.clone(), None);
+		Co {
+			co_id,
+			context,
+			reducer_state: attachment.reducer_state,
+			last_error: attachment.last_error,
+			attachment,
+			handle,
+			storage,
+		}
+	}
+
 	pub fn co(&self) -> CoId {
 		self.co_id.clone()
 	}
@@ -94,12 +150,12 @@ impl Co {
 	{
 		let co = self.co_id.clone();
 		let core = core.into();
-		let mut last_error = self.last_error;
+		let attachment = self.attachment.clone();
 		self.context.execute_future(move |application| async move {
 			match dispatch(application, identity, &co, &core, &action).await {
 				Ok(_) => {},
 				Err(err) => {
-					last_error.set(Err(err.into()));
+					attachment.set_last_error(err.into());
 				},
 			}
 		});
@@ -107,20 +163,20 @@ impl Co {
 
 	/// Create a new Co.
 	pub fn create_co(&self, identity: Identity, co: CreateCo) {
-		let mut last_error = self.last_error;
-
 		// check
 		if self.co_id.as_str() != CO_ID_LOCAL {
-			last_error.set(Err(anyhow!("Create COs only support for local").into()));
+			self.attachment
+				.set_last_error(anyhow!("Create COs only support for local").into());
 			return;
 		}
 
 		// create
+		let attachment = self.attachment.clone();
 		self.context.execute_future(move |application| async move {
 			match create_co(application, identity, co).await {
 				Ok(()) => {},
 				Err(err) => {
-					last_error.set(Err(err.into()));
+					attachment.set_last_error(err.into());
 				},
 			}
 		});
@@ -132,12 +188,12 @@ impl Co {
 		let core_name = core_name.to_owned();
 		let core_tags = tags!("type": core_type);
 		let core_binary = Either::Left(core_binary);
-		let mut last_error = self.last_error;
+		let attachment = self.attachment.clone();
 		self.context.execute_future(move |application| async move {
 			match create_core(application, identity, co, core_name, core_tags, core_binary).await {
 				Ok(()) => {},
 				Err(err) => {
-					last_error.set(Err(err.into()));
+					attachment.set_last_error(err.into());
 				},
 			}
 		});
@@ -155,12 +211,12 @@ impl Co {
 		let core_name = core_name.to_owned();
 		let core_tags = tags!("type": core_type);
 		let core_binary = Either::Right(core_binary.into());
-		let mut last_error = self.last_error;
+		let attachment = self.attachment.clone();
 		self.context.execute_future(move |application| async move {
 			match create_core(application, identity, co, core_name, core_tags, core_binary).await {
 				Ok(()) => {},
 				Err(err) => {
-					last_error.set(Err(err.into()));
+					attachment.set_last_error(err.into());
 				},
 			}
 		});

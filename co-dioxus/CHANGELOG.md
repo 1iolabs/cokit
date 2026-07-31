@@ -13,6 +13,11 @@
 
 ### Changed
 
+- `use_co` and `use_cos` follow changes of the requested CO instead of staying on the one they
+  mounted with, and shut down the actor of a replaced, removed or unmounted CO.
+- `use_co_reducer_state`, `use_selector`, `use_selector_state`, `use_selectors` and
+  `use_selector_states` restart for another CO instead of serving the previous CO's result.
+- `use_did_key_identity` follows a name change instead of keeping the identity of the first name.
 - **Breaking.** Changed `CoContext::join_unrelated_co` `to_networks` from `BTreeSet<Network>` to `impl Into<CoConnectivity>`.
 - **Breaking.** Logging is configured via a `co_tracing::LogArgs` instead of `CoLog`/`CoLogLevel`,
   and the subscriber is installed automatically when the context starts (desktop = stderr/file,
