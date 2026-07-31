@@ -1824,6 +1824,7 @@ dependencies = [
  "co-guard",
  "co-primitives",
  "co-sdk",
+ "co-test",
  "co-tracing",
  "dioxus",
  "futures",

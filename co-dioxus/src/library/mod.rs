@@ -3,5 +3,6 @@
 
 pub mod cli;
 pub mod co_actor;
+pub mod co_attachment;
 pub mod co_block_storage;
 pub mod co_context;

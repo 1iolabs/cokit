@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use crate::CoError;
+use crate::{library::co_attachment::CoAttachment, CoError};
 use cid::Cid;
 use co_actor::{Actor, ActorError, ActorHandle, Response};
 use co_primitives::BlockStorageCloneSettings;
@@ -9,7 +9,6 @@ use co_sdk::{
 	Block, BlockStat, BlockStorage, CloneWithBlockStorageSettings, CoContext, CoId, CoOptions, CoReducer,
 	CoReducerFactory, CoReducerState, CoStorage, StorageError, Tags, TaskSpawner,
 };
-use dioxus::signals::{SyncSignal, WritableExt};
 use futures::{
 	future::{select, Either},
 	pin_mut, StreamExt,
@@ -29,28 +28,28 @@ impl CoActor {
 impl Actor for CoActor {
 	type Message = CoMessage;
 	type State = CoActorState;
-	type Initialize = (CoContext, SyncSignal<Option<Result<CoReducerState, CoError>>>);
+	type Initialize = (CoContext, CoAttachment);
 
 	async fn initialize(
 		&self,
 		handle: &ActorHandle<Self::Message>,
 		_tags: &Tags,
-		(context, mut signal): Self::Initialize,
+		(context, attachment): Self::Initialize,
 	) -> Result<Self::State, ActorError> {
 		let reducer = match context.try_co_reducer_with_options(&self.id, CoOptions::default()).await {
 			Ok(reducer) => {
-				// subscribe state and update signal on change
-				subscribe_reducer_state(&context, handle, &reducer, signal);
+				// subscribe state and update the attachment on change
+				subscribe_reducer_state(&context, handle, &reducer, attachment);
 				Some(reducer)
 			},
 			Err(err) => {
 				// surface the error for the current render
-				signal.set(Some(Err(CoError::new(err))));
+				attachment.set_reducer_state(Err(CoError::new(err)));
 
 				// subscribe for future unknown memberships
 				// 	we do this in a task to be able to detect component unmount
 				//  which drops handle
-				subscribe_unknown(&context, handle, self.id.clone(), signal);
+				subscribe_unknown(&context, handle, self.id.clone(), attachment);
 
 				None
 			},
@@ -107,13 +106,11 @@ impl Actor for CoActor {
 }
 
 /// Wait for the CO to become available and install its reducer back into the
-/// actor via [`CoMessage::SetReducer`], updating the render signal.
-fn subscribe_unknown(
-	context: &CoContext,
-	handle: &ActorHandle<CoMessage>,
-	id: CoId,
-	mut signal: SyncSignal<Option<Result<CoReducerState, CoError>>>,
-) {
+/// actor via [`CoMessage::SetReducer`], updating the attachment.
+///
+/// The attachment travels with the task so a late result is still written into the state of its
+/// own attachment, even when the component moved on to another CO.
+fn subscribe_unknown(context: &CoContext, handle: &ActorHandle<CoMessage>, id: CoId, attachment: CoAttachment) {
 	let tasks = context.tasks();
 	let context = context.clone();
 	let weak_handle = handle.clone().downgrade();
@@ -126,15 +123,15 @@ fn subscribe_unknown(
 			Either::Left((Ok(reducer), _)) => {
 				if let Some(handle) = weak_handle.upgrade() {
 					// install the reducer first so subsequent data calls succeed,
-					// then start pushing state updates to the render signal.
+					// then start pushing state updates to the attachment.
 					let _ = handle.dispatch(CoMessage::SetReducer(reducer.clone()));
-					subscribe_reducer_state(&context, &handle, &reducer, signal);
+					subscribe_reducer_state(&context, &handle, &reducer, attachment);
 				}
 			},
 			Either::Left((Err(err), _)) => {
-				signal.set(Some(Err(CoError::new(err))));
+				attachment.set_reducer_state(Err(CoError::new(err)));
 			},
-			// actor closed (component unmounted) - stop without leaking.
+			// actor closed (component unmounted or switched target) - stop without leaking.
 			Either::Right(_) => {},
 		}
 	});
@@ -144,7 +141,7 @@ fn subscribe_reducer_state(
 	context: &CoContext,
 	handle: &ActorHandle<CoMessage>,
 	reducer: &CoReducer,
-	mut signal: SyncSignal<Option<Result<CoReducerState, CoError>>>,
+	attachment: CoAttachment,
 ) {
 	context.tasks().spawn({
 		let reducer = reducer.clone();
@@ -154,7 +151,7 @@ fn subscribe_reducer_state(
 				.reducer_state_stream()
 				.take_until(weak_handle.closed())
 				.for_each(|reducer_state| {
-					signal.set(Some(Ok(reducer_state)));
+					attachment.set_reducer_state(Ok(reducer_state));
 					ready(())
 				})
 				.await;

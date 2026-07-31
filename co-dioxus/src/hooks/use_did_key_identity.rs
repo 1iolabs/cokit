@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright (C) 2026 1io BRANDGUARDIAN GmbH
 
-use crate::use_co_context;
+use crate::{hooks::use_target_resource::use_target_resource, use_co_context};
 use co_sdk::{
 	state, Application, CoId, CoReducerFactory, CoTryStreamExt, DidKeyIdentity, DidKeyProvider, Identity,
 	CO_CORE_NAME_KEYSTORE, CO_ID_LOCAL,
 };
 use dioxus::{
-	hooks::use_resource,
 	prelude::RenderError,
 	signals::{ReadSignal, ReadableExt},
 };
@@ -15,10 +14,13 @@ use futures::TryStreamExt;
 use std::future::ready;
 
 /// Use `did:key:` by name and creating a new one if it not exists.
+///
+/// Switching names looks up again and suspends until it resolves, while a signal handed out
+/// earlier keeps reporting the previous identity.
 pub fn use_did_key_identity(name: impl Into<String>) -> Result<ReadSignal<state::Identity>, RenderError> {
 	let context = use_co_context();
-	let result = use_resource({
-		let name = name.into();
+	let name = name.into();
+	let result = use_target_resource(name.clone(), {
 		let context = context.clone();
 		move || {
 			let name = name.clone();
