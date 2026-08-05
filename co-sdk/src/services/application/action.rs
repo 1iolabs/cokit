@@ -200,16 +200,22 @@ pub enum Action {
 	#[cfg(feature = "network")]
 	NetworkTaskExecuteComplete { co: CoId, task_id: String, task_state: TaskState },
 
-	/// Network Queue Process
+	/// Request network queue processing.
 	NetworkQueueProcess {
 		/// Only process given co.
 		co: Option<CoId>,
 
-		/// Retry count.
+		/// Retry metadata for this request
 		retry: u32,
 	},
 
-	/// Network Queue Process Complete
+	/// A scheduled network queue retry is ready.
+	NetworkQueueRetryReady {
+		/// Ephemeral identity of the schedule that fired.
+		token: String,
+	},
+
+	/// Network queue processing has completed.
 	NetworkQueueProcessComplete {
 		/// Only process given co.
 		co: Option<CoId>,
@@ -217,7 +223,7 @@ pub enum Action {
 		/// Whether the queue is now empty (if specified for the given `co`).
 		is_empty: bool,
 
-		/// Retry count.
+		/// Retry count used by the completed run.
 		retry: u32,
 	},
 

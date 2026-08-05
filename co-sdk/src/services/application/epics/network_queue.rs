@@ -129,17 +129,83 @@ pub fn network_queue_joined_epic(
 
 /// Process board tasks.
 ///
-/// In: [`Action::NetworkQueueProcess`]
-/// Out: [`Action::NetworkQueueProcessComplete`], [`Action::NetworkQueueProcess`]
+/// In: [`Action::NetworkQueueProcess`], [`Action::NetworkQueueProcessComplete`], [`Action::NetworkQueueRetryReady`]
+/// Out: [`Action::NetworkQueueProcessComplete`], [`Action::NetworkQueueRetryReady`]
 ///
-/// TODO: Concurrency.
 /// TODO: On error clear task locks.
 /// TODO: Add trigger when have mDNS discovery.
 #[derive(Debug, Default)]
 pub struct NetworkQueueProcessEpic {
-	processing: bool,
+	processing: Option<Option<CoId>>,
 	pending: Pending,
+	retry: u32,
+	scheduled: Option<String>,
 }
+
+#[derive(Debug, PartialEq)]
+enum QueueProcessEffect {
+	Run { co: Option<CoId>, retry: u32 },
+	Schedule { token: String, retry: u32 },
+}
+
+impl NetworkQueueProcessEpic {
+	fn wake(&mut self, co: &Option<CoId>) -> Option<QueueProcessEffect> {
+		if self.processing.is_some() {
+			self.pending.insert(co);
+			return None;
+		}
+
+		self.scheduled = None;
+		self.pending.insert(co);
+		self.pending.remove(co);
+		Some(self.start(co.clone()))
+	}
+
+	fn complete(
+		&mut self,
+		co: &Option<CoId>,
+		is_empty: bool,
+		token: impl FnOnce() -> String,
+	) -> Option<QueueProcessEffect> {
+		self.processing = None;
+		if !is_empty {
+			self.pending.insert(co);
+			self.retry = self.retry.saturating_add(1);
+		}
+		self.schedule(token)
+	}
+
+	fn retry_ready(&mut self, token: &str) -> Option<QueueProcessEffect> {
+		if self.scheduled.as_deref() != Some(token) {
+			return None;
+		}
+
+		self.scheduled = None;
+		let Some(co) = self.pending.pop() else {
+			self.retry = 0;
+			return None;
+		};
+		Some(self.start(co))
+	}
+
+	fn start(&mut self, co: Option<CoId>) -> QueueProcessEffect {
+		self.processing = Some(co.clone());
+		QueueProcessEffect::Run { co, retry: self.retry }
+	}
+
+	fn schedule(&mut self, token: impl FnOnce() -> String) -> Option<QueueProcessEffect> {
+		if self.pending.is_empty() {
+			self.scheduled = None;
+			self.retry = 0;
+			return None;
+		}
+
+		let token = token();
+		self.scheduled = Some(token.clone());
+		Some(QueueProcessEffect::Schedule { token, retry: self.retry })
+	}
+}
+
 impl Epic<Action, (), CoContext> for NetworkQueueProcessEpic {
 	fn epic(
 		&mut self,
@@ -148,46 +214,36 @@ impl Epic<Action, (), CoContext> for NetworkQueueProcessEpic {
 		_state: &(),
 		context: &CoContext,
 	) -> Option<impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static> {
-		match action {
-			Action::NetworkQueueProcess { co, retry } => {
-				// already processing?
-				if self.processing {
-					self.pending.insert(co);
-					return None;
-				}
-				self.processing = true;
-
-				// process
-				let process = process(actions, context, co);
-
-				// complete
-				let process_complete = process_complete(context, co, *retry);
-
-				// result
-				Some(Either::Left(process.chain(process_complete)))
-			},
-			Action::NetworkQueueProcessComplete { co, is_empty, retry } => {
-				self.pending.complete_run(co, *is_empty);
-
-				// clear processing
-				self.processing = false;
-
-				// retry
-				self.pending.pop().map(|co| {
-					Either::Right(
-						{
-							let retry = *retry + 1;
-							async move {
-								time::sleep(backoff_with_jitter(retry)).await;
-								Ok(Action::NetworkQueueProcess { co, retry })
-							}
-						}
-						.into_stream(),
-					)
-				})
+		let effect = match action {
+			Action::NetworkQueueProcess { co, retry: _ } => self.wake(co),
+			Action::NetworkQueueRetryReady { token } => self.retry_ready(token),
+			Action::NetworkQueueProcessComplete { co, is_empty, retry: _ } => {
+				self.complete(co, *is_empty, || context.uuid().uuid())
 			},
 			_ => None,
-		}
+		};
+		effect.map(|effect| queue_process_effect(effect, actions, context))
+	}
+}
+
+fn queue_process_effect(
+	effect: QueueProcessEffect,
+	actions: &Actions<Action, (), CoContext>,
+	context: &CoContext,
+) -> impl Stream<Item = Result<Action, anyhow::Error>> + Send + 'static {
+	match effect {
+		QueueProcessEffect::Run { co, retry } => {
+			let process = process(actions, context, &co);
+			let process_complete = process_complete(context, &co, retry);
+			Either::Left(process.chain(process_complete))
+		},
+		QueueProcessEffect::Schedule { token, retry } => Either::Right(
+			async move {
+				time::sleep(backoff_with_jitter(retry)).await;
+				Ok(Action::NetworkQueueRetryReady { token })
+			}
+			.into_stream(),
+		),
 	}
 }
 
@@ -221,12 +277,23 @@ impl Pending {
 		}
 	}
 
-	/// Preserve triggers accumulated while the current run was in flight, and
-	/// requeue the completed scope only when work remains for a retry.
-	fn complete_run(&mut self, co: &Option<CoId>, is_empty: bool) {
-		if !is_empty {
-			self.insert(co);
+	/// Remove a scope that is starting now.
+	fn remove(&mut self, co: &Option<CoId>) {
+		match co {
+			None => *self = Pending::None,
+			Some(co) => {
+				if let Pending::Co(cos) = self {
+					cos.remove(co);
+					if cos.is_empty() {
+						*self = Pending::None;
+					}
+				}
+			},
 		}
+	}
+
+	fn is_empty(&self) -> bool {
+		matches!(self, Pending::None)
 	}
 
 	/// Pop next pending flag.
@@ -347,6 +414,7 @@ mod tests {
 	use super::*;
 	use crate::{ApplicationBuilder, ReducerChangeContext, CO_ID_LOCAL};
 	use cid::Cid;
+	use co_actor::EpicExt;
 	use co_primitives::{Did, ReducerAction};
 	use ipld_core::ipld::Ipld;
 
@@ -411,13 +479,145 @@ mod tests {
 	}
 
 	#[test]
-	fn empty_all_run_preserves_co_request_accumulated_while_processing() {
-		let co = CoId::from("co-pending");
-		let mut pending = Pending::None;
-		pending.insert(&Some(co.clone()));
+	fn stable_non_empty_lineage_advances_and_caps_backoff() {
+		let mut epic = NetworkQueueProcessEpic::default();
+		assert_eq!(epic.wake(&None), Some(QueueProcessEffect::Run { co: None, retry: 0 }));
 
-		pending.complete_run(&None, true);
+		let mut ceilings = Vec::new();
+		for expected_retry in 1..=6 {
+			let token = format!("retry-{expected_retry}");
+			assert_eq!(
+				epic.complete(&None, false, || token.clone()),
+				Some(QueueProcessEffect::Schedule { token: token.clone(), retry: expected_retry })
+			);
+			ceilings.push(co_network::backoff(expected_retry).as_secs());
+			assert_eq!(epic.retry_ready(&token), Some(QueueProcessEffect::Run { co: None, retry: expected_retry }));
+		}
 
-		assert_eq!(pending.pop(), Some(Some(co)));
+		assert_eq!(ceilings, vec![6, 12, 24, 48, 60, 60]);
+	}
+
+	#[test]
+	fn retry_history_saturates_for_permanently_unreachable_work() {
+		let mut epic = NetworkQueueProcessEpic::default();
+		assert_eq!(epic.wake(&None), Some(QueueProcessEffect::Run { co: None, retry: 0 }));
+		epic.retry = u32::MAX;
+
+		assert_eq!(
+			epic.complete(&None, false, || "retry-max".to_owned()),
+			Some(QueueProcessEffect::Schedule { token: "retry-max".to_owned(), retry: u32::MAX })
+		);
+	}
+
+	#[test]
+	fn retry_zero_wakes_replace_schedule_without_resetting_history() {
+		let mut epic = NetworkQueueProcessEpic::default();
+		assert_eq!(epic.wake(&None), Some(QueueProcessEffect::Run { co: None, retry: 0 }));
+
+		for expected_retry in 1..=8 {
+			let stale_token = format!("stale-{expected_retry}");
+			assert_eq!(
+				epic.complete(&None, false, || stale_token.clone()),
+				Some(QueueProcessEffect::Schedule { token: stale_token.clone(), retry: expected_retry })
+			);
+			assert_eq!(epic.wake(&None), Some(QueueProcessEffect::Run { co: None, retry: expected_retry }));
+			assert_eq!(epic.retry_ready(&stale_token), None);
+		}
+
+		let current_token = "current-9".to_owned();
+		assert_eq!(
+			epic.complete(&None, false, || current_token.clone()),
+			Some(QueueProcessEffect::Schedule { token: current_token.clone(), retry: 9 })
+		);
+		assert_eq!(epic.retry_ready(&current_token), Some(QueueProcessEffect::Run { co: None, retry: 9 }));
+		assert_eq!(epic.retry_ready(&current_token), None);
+	}
+
+	#[test]
+	fn wake_during_active_run_is_coalesced_for_later() {
+		let first = CoId::from("co-first");
+		let later = CoId::from("co-later");
+		let mut epic = NetworkQueueProcessEpic::default();
+		assert_eq!(
+			epic.wake(&Some(first.clone())),
+			Some(QueueProcessEffect::Run { co: Some(first.clone()), retry: 0 })
+		);
+		assert_eq!(epic.wake(&Some(later.clone())), None);
+		assert_eq!(epic.wake(&Some(later.clone())), None);
+
+		assert_eq!(
+			epic.complete(&Some(first), true, || "later-0".to_owned()),
+			Some(QueueProcessEffect::Schedule { token: "later-0".to_owned(), retry: 0 })
+		);
+		assert_eq!(epic.retry_ready("later-0"), Some(QueueProcessEffect::Run { co: Some(later), retry: 0 }));
+	}
+
+	#[test]
+	fn specific_wake_during_global_sleep_retains_displaced_global_scope() {
+		let co = CoId::from("co-immediate");
+		let mut epic = NetworkQueueProcessEpic::default();
+		assert_eq!(epic.wake(&None), Some(QueueProcessEffect::Run { co: None, retry: 0 }));
+		assert_eq!(
+			epic.complete(&None, false, || "global-1".to_owned()),
+			Some(QueueProcessEffect::Schedule { token: "global-1".to_owned(), retry: 1 })
+		);
+
+		assert_eq!(epic.wake(&Some(co.clone())), Some(QueueProcessEffect::Run { co: Some(co.clone()), retry: 1 }));
+		assert_eq!(epic.retry_ready("global-1"), None);
+		assert_eq!(
+			epic.complete(&Some(co), true, || "global-2".to_owned()),
+			Some(QueueProcessEffect::Schedule { token: "global-2".to_owned(), retry: 1 })
+		);
+		assert_eq!(epic.retry_ready("global-2"), Some(QueueProcessEffect::Run { co: None, retry: 1 }));
+		assert_eq!(epic.complete(&None, true, || unreachable!()), None);
+		assert_eq!(epic.retry_ready("global-2"), None);
+		assert_eq!(epic.retry, 0);
+		assert_eq!(epic.processing, None);
+		assert_eq!(epic.scheduled, None);
+	}
+
+	#[derive(Debug, Clone, PartialEq)]
+	enum SwitchProbe {
+		Wait,
+		Emit(u8),
+	}
+
+	struct SwitchProbeEpic;
+
+	impl Epic<SwitchProbe, (), ()> for SwitchProbeEpic {
+		fn epic(
+			&mut self,
+			_actions: &Actions<SwitchProbe, (), ()>,
+			action: &SwitchProbe,
+			_state: &(),
+			_context: &(),
+		) -> Option<impl Stream<Item = Result<SwitchProbe, anyhow::Error>> + Send + 'static> {
+			match action {
+				SwitchProbe::Wait => Some(Either::Left(stream::pending())),
+				SwitchProbe::Emit(value) => Some(Either::Right(stream::once(ready(Ok(SwitchProbe::Emit(*value)))))),
+			}
+		}
+	}
+
+	#[co_test::timeout(10000)]
+	#[tokio::test]
+	async fn switch_epic_cancels_each_started_stream_before_latest() {
+		let actions = Actions::default();
+		let mut epic = SwitchProbeEpic.switch();
+
+		let first = epic.epic(&actions, &SwitchProbe::Wait, &(), &()).expect("first stream");
+		futures::pin_mut!(first);
+		assert!(futures::poll!(first.next()).is_pending());
+
+		let second = epic.epic(&actions, &SwitchProbe::Wait, &(), &()).expect("second stream");
+		futures::pin_mut!(second);
+		assert!(first.next().await.is_none());
+		assert!(futures::poll!(second.next()).is_pending());
+
+		let latest = epic.epic(&actions, &SwitchProbe::Emit(7), &(), &()).expect("latest stream");
+		futures::pin_mut!(latest);
+		assert!(second.next().await.is_none());
+		assert!(matches!(latest.next().await, Some(Ok(SwitchProbe::Emit(7)))));
+		assert!(latest.next().await.is_none());
 	}
 }
