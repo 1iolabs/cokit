@@ -6,8 +6,11 @@ use crate::{
 	CoReducer, CO_CORE_NAME_KEYSTORE,
 };
 use async_trait::async_trait;
-use co_identity::{DidKeyIdentity, IdentityResolverError, PrivateIdentityBox, PrivateIdentityResolver};
+use co_identity::{DidKeyIdentity, Identity, IdentityResolverError, PrivateIdentityBox, PrivateIdentityResolver};
 
+/// Keystore-backed [`PrivateIdentityResolver`] for [`DidKeyIdentity`].
+///
+/// Successful resolution returns only the exact requested DID.
 #[derive(Debug, Clone)]
 pub struct DidKeyProvider {
 	reducer: CoReducer,
@@ -41,6 +44,14 @@ impl PrivateIdentityResolver for DidKeyProvider {
 			.await
 			.map_err(|err| IdentityResolverError::Other(err.into()))?
 			.ok_or(IdentityResolverError::NotFound)?;
-		Ok(PrivateIdentityBox::new(DidKeyIdentity::import(&key).map_err(IdentityResolverError::Other)?))
+		let resolved = DidKeyIdentity::import(&key).map_err(IdentityResolverError::Other)?;
+		if resolved.identity() != identity {
+			return Err(IdentityResolverError::Other(anyhow::anyhow!(
+				"resolved private identity {} does not match requested identity {}",
+				resolved.identity(),
+				identity
+			)));
+		}
+		Ok(PrivateIdentityBox::new(resolved))
 	}
 }

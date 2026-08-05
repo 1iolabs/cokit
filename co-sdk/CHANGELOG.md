@@ -15,6 +15,8 @@ Logging/tracing setup has moved to the dedicated `co-tracing` crate; `co-sdk` ke
 
 ### Changed
 
+- `DidKeyProvider` rejects stored private keys whose derived DID does not
+  exactly match the requested DID.
 - **Breaking.** Changed `join_unrelated_co`, `to_networks` from `BTreeSet<Network>` to `impl Into<CoConnectivity>`.
 - **Breaking.** `ApplicationBuilder::build()` no longer installs a tracing subscriber. Set logging
   up via `co-tracing` first — e.g.
