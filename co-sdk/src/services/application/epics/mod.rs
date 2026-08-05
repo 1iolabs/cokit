@@ -3,7 +3,7 @@
 
 use super::Action;
 use crate::CoContext;
-use co_actor::{Epic, MergeEpic, TapEpic};
+use co_actor::{Epic, EpicExt, MergeEpic, TapEpic};
 use co_primitives::Tags;
 
 #[cfg(feature = "network")]
@@ -106,7 +106,7 @@ pub fn epic(tags: Tags) -> impl Epic<Action, (), CoContext> + Send + 'static {
 		.join(network_queue::network_queue_message_epic)
 		.join(network_queue::network_started_epic)
 		.join(head_delivery::HeadDeliveryEpic)
-		.join(network_queue::NetworkQueueProcessEpic::default())
+		.join(network_queue::NetworkQueueProcessEpic::default().switch())
 		.join(network_queue::network_queue_joined_epic)
 		.join(network_block_get::network_block_get)
 		.join(network_block_get::network_task_execute)
