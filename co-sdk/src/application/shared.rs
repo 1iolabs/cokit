@@ -17,7 +17,7 @@ use crate::{
 		state_resolver::MembershipStateResolver,
 	},
 	services::{
-		reducer::{FlushInfo, ReducerBlockStorage, ReducerFlush},
+		reducer::{FlushInfo, ReducerBlockStorage, ReducerFlush, ReducerFlushError},
 		reducers::ReducerStorage,
 	},
 	types::co_reducer_context::{CoReducerContext, CoReducerFeature},
@@ -321,11 +321,16 @@ impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 		_info: &FlushInfo,
 		_new_roots: Vec<CoReducerState>,
 		_removed_blocks: BTreeSet<OptionMappedCid>,
-	) -> anyhow::Result<()> {
+	) -> Result<(), ReducerFlushError> {
 		let reducer_state = CoReducerState::new_reducer(reducer);
 
 		// membership
-		self.membership_writer.write(storage, reducer_state.clone()).await?;
+		// every boundary below runs after the actor completed the child storage phase, so the child state is
+		// already committed when any of them fails
+		self.membership_writer
+			.write(storage, reducer_state.clone())
+			.await
+			.map_err(ReducerFlushError::Committed)?;
 
 		// pinning
 		#[cfg(feature = "pinning")]
@@ -346,11 +351,15 @@ impl ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> for SharedFlush {
 				new_roots,
 				removed_blocks,
 			)
-			.await?;
+			.await
+			.map_err(ReducerFlushError::Committed)?;
 
 			// apply
 			if let Some(parent_pinning_state) = parent_pinning_state {
-				parent.join_state(parent_pinning_state).await?;
+				parent
+					.join_state(parent_pinning_state)
+					.await
+					.map_err(ReducerFlushError::Committed)?;
 			}
 		}
 

@@ -17,7 +17,7 @@ use crate::{
 		locals_memory::MemoryLocals,
 	},
 	reducer::core_resolver::dynamic::DynamicCoreResolver,
-	services::reducer::{FlushInfo, ReducerFlush},
+	services::reducer::{FlushInfo, ReducerFlush, ReducerFlushError},
 	types::{
 		co_reducer_context::{CoReducerContext, CoReducerFeature},
 		co_reducer_state::MappedCoReducerState,
@@ -460,8 +460,13 @@ where
 		_info: &FlushInfo,
 		_new_roots: Vec<CoReducerState>,
 		_removed_blocks: BTreeSet<OptionMappedCid>,
-	) -> anyhow::Result<()> {
+	) -> Result<(), ReducerFlushError> {
 		// write references
+		// local has no separate commit boundary: the state is persisted by the write below, so every failure
+		// here leaves the child uncommitted
+		#[cfg(feature = "pinning")]
+		let mut next_pinning_state = None;
+
 		#[cfg(feature = "pinning")]
 		if _info.local {
 			let new_roots = _new_roots;
@@ -479,7 +484,7 @@ where
 			}
 			let next_reducer_state = CoReducerState::new_reducer(reducer);
 			if !new_roots.contains(&next_reducer_state) {
-				return Err(anyhow::anyhow!("Missing current state from roots"));
+				return Err(ReducerFlushError::Fatal(anyhow::anyhow!("Missing current state from roots")));
 			}
 
 			// compute
@@ -493,24 +498,31 @@ where
 				new_roots,
 				removed_blocks,
 			)
-			.await?;
+			.await
+			.map_err(ReducerFlushError::Fatal)?;
 
 			// apply
 			if let Some(pinning_state) = pinning_state {
 				if let Some((state, heads)) = pinning_state.some() {
-					reducer.insert_snapshot(storage, state, heads.clone()).await?;
-					reducer.join(storage, &heads, context.runtime.runtime()).await?;
+					reducer
+						.insert_snapshot(storage, state, heads.clone())
+						.await
+						.map_err(ReducerFlushError::Fatal)?;
+					reducer
+						.join(storage, &heads, context.runtime.runtime())
+						.await
+						.map_err(|error| ReducerFlushError::Fatal(error.into()))?;
 				}
 			}
 
 			// write including the pinning changes
-			self.pinning.0 = CoReducerState::new_reducer(reducer);
+			next_pinning_state = Some(CoReducerState::new_reducer(reducer));
 		}
 
 		// forward mapping to root storage
 		let external_reducer_state = if let Some(encrypted_storage) = &self.encrypted_storage {
 			let mapped_reducer_state = MappedCoReducerState::new_reducer(storage, reducer).await;
-			let extenal_reducer_state = mapped_reducer_state.force_external()?;
+			let extenal_reducer_state = mapped_reducer_state.force_external().map_err(ReducerFlushError::Fatal)?;
 			encrypted_storage.insert_mappings(mapped_reducer_state.iter_mapped()).await;
 			extenal_reducer_state
 		} else {
@@ -518,7 +530,13 @@ where
 		};
 
 		// write local
-		self.write(external_reducer_state, None).await?;
+		self.write(external_reducer_state, None)
+			.await
+			.map_err(ReducerFlushError::Fatal)?;
+		#[cfg(feature = "pinning")]
+		if let Some(next_pinning_state) = next_pinning_state {
+			self.pinning.0 = next_pinning_state;
+		}
 
 		Ok(())
 	}
@@ -600,4 +618,111 @@ async fn setup_local_co(
 
 	// done
 	Ok(())
+}
+
+#[cfg(all(test, feature = "pinning"))]
+mod tests {
+	use super::*;
+	use crate::{
+		application::memory::create_memory_reducer, library::create_reducer_action::create_reducer_action,
+		ApplicationBuilder, MonotonicCoUuid,
+	};
+	use co_core_co::CoAction;
+	use co_primitives::{tags, CoId, MonotonicCoDate, TagsAction};
+	use std::sync::atomic::{AtomicBool, Ordering};
+
+	const TEST_LOCAL_WRITE_ERROR: &str = "test local write failed";
+
+	#[derive(Debug, Clone)]
+	struct FailOnceLocals {
+		fail: Arc<AtomicBool>,
+	}
+
+	#[async_trait]
+	impl Locals for FailOnceLocals {
+		async fn get(&self) -> Result<Vec<ApplicationLocal>, anyhow::Error> {
+			Ok(Vec::new())
+		}
+
+		fn watch(&self) -> impl Stream<Item = ApplicationLocal> + Send + Sync + 'static {
+			futures::stream::empty()
+		}
+
+		async fn set(&mut self, _local: ApplicationLocal) -> Result<(), anyhow::Error> {
+			if self.fail.swap(false, Ordering::SeqCst) {
+				Err(anyhow::anyhow!(TEST_LOCAL_WRITE_ERROR))
+			} else {
+				Ok(())
+			}
+		}
+	}
+
+	#[co_test::timeout(10000)]
+	#[tokio::test]
+	async fn pinning_state_advances_only_after_local_write_succeeds() {
+		co_test::init_test_log();
+		let application = ApplicationBuilder::new_memory("local-pinning-write-order")
+			.without_keychain()
+			.with_disabled_feature("co-local-encryption")
+			.with_co_date(MonotonicCoDate::default())
+			.with_co_uuid(MonotonicCoUuid::default())
+			.build()
+			.await
+			.expect("application");
+		let local = application.local_co_reducer().await.expect("local reducer");
+		let baseline = local.reducer_state().await;
+		let storage = local.storage();
+		let runtime = application.context().inner.runtime();
+		let co = CoId::from(CO_ID_LOCAL);
+		let core_resolver = application.context().inner.create_shared_core_resolver(co.clone());
+		let mut reducer = create_memory_reducer(
+			runtime.runtime(),
+			local.date().clone(),
+			&co,
+			&storage,
+			Some(core_resolver),
+			baseline.clone(),
+		)
+		.await
+		.expect("memory reducer");
+		let identity = application.local_identity();
+		let action = create_reducer_action(
+			&storage,
+			&identity,
+			CO_CORE_NAME_CO,
+			&CoAction::Tags { action: TagsAction::insert(tags!("flush-test": "attempted")) },
+			Default::default(),
+			local.date(),
+		)
+		.await
+		.expect("tag action");
+		reducer
+			.push_reference(&storage, runtime.runtime(), &identity, action)
+			.await
+			.expect("push tag action");
+		let attempted = CoReducerState::new_reducer(&reducer);
+		assert_ne!(attempted, baseline, "attempted state differs from baseline");
+
+		let mut flush = LocalCoInstance {
+			storage: storage.clone(),
+			encrypted_storage: None,
+			locals: FailOnceLocals { fail: Arc::new(AtomicBool::new(true)) },
+			pinning: (baseline.clone(), application.context().inner.create_pinning_context()),
+		};
+		let info = FlushInfo { local: true, ..Default::default() };
+		let first =
+			ReducerFlush::flush(&mut flush, &storage, &mut reducer, &info, vec![attempted], BTreeSet::new()).await;
+		match first {
+			Err(ReducerFlushError::Fatal(_)) => {},
+			Err(ReducerFlushError::Committed(_)) => panic!("local write failure must be fatal"),
+			Ok(()) => panic!("first local write must fail"),
+		}
+		assert_eq!(flush.pinning.0, baseline);
+
+		let current = CoReducerState::new_reducer(&reducer);
+		ReducerFlush::flush(&mut flush, &storage, &mut reducer, &info, vec![current], BTreeSet::new())
+			.await
+			.expect("second local write");
+		assert_eq!(flush.pinning.0, CoReducerState::new_reducer(&reducer));
+	}
 }

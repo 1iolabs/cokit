@@ -10,6 +10,6 @@ mod transaction;
 
 pub use actor::ReducerActor;
 pub use api::CoReducer;
-pub use flush::{FlushInfo, ReducerFlush};
+pub use flush::{FlushInfo, ReducerFlush, ReducerFlushError};
 pub use storage::ReducerBlockStorage;
 pub use transaction::CoReducerTransaction;
