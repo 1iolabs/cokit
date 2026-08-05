@@ -25,7 +25,20 @@ where
 		info: &FlushInfo,
 		new_roots: Vec<CoReducerState>,
 		removed_blocks: BTreeSet<OptionMappedCid>,
-	) -> anyhow::Result<()>;
+	) -> Result<(), ReducerFlushError>;
+}
+
+/// Why a flush failed, which decides whether the reducer actor still publishes the child state.
+///
+/// There is deliberately no [`From<anyhow::Error>`] conversion: every fallible boundary has to name its
+/// variant, so a future unclassified `?` fails to compile instead of silently choosing commit semantics.
+#[derive(Debug)]
+pub enum ReducerFlushError {
+	/// Failure before the child state is committed.
+	Fatal(anyhow::Error),
+
+	/// Failure after the child state is committed.
+	Committed(anyhow::Error),
 }
 
 pub type CoReducerFlush = Box<dyn ReducerFlush<CoStorage, DynamicCoreResolver<CoStorage>> + Send + Sync + 'static>;
