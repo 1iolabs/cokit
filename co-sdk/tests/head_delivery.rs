@@ -1543,7 +1543,6 @@ async fn concurrent_local_instances_converge_for_completion_and_enqueue_orders()
 }
 
 #[tokio::test]
-#[cfg_attr(target_os = "macos", ignore = "notify/kqueue watcher is broken on macOS; exercised on non-macOS CI")]
 async fn joined_queue_mutation_wakes_idle_network_queue_processor() {
 	co_test::init_test_log();
 	let tmp = test_tmp_dir();

@@ -743,6 +743,52 @@ mod tests {
 		assert_eq!(super::local_event_paths(&ev, &config), vec![local]);
 	}
 
+	#[cfg(target_os = "macos")]
+	#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+	async fn test_file_locals_watcher_survives_atomic_replacements() {
+		use futures::StreamExt;
+		use tokio::time::{timeout, Duration};
+
+		let tmp = TmpDir::new("co");
+		let config: PathBuf = tmp.path().into();
+
+		let mut writer = FileLocals::new(Default::default(), config.clone(), "writer".to_owned(), true).unwrap();
+		let initial = BlockSerializer::default().serialize(&0u64).unwrap();
+		writer
+			.set(ApplicationLocal::new([*initial.cid()].into(), *initial.cid(), None))
+			.await
+			.unwrap();
+
+		let observer = FileLocals::new(Default::default(), config, "observer".to_owned(), true).unwrap();
+		let mut changes = Box::pin(observer.watch());
+		observer.get().await.unwrap();
+
+		let expected = BlockSerializer::default().serialize(&5000u64).unwrap();
+		let expected_state = *expected.cid();
+		let observer_task = tokio::spawn(async move {
+			timeout(Duration::from_secs(10), async move {
+				while let Some(local) = changes.next().await {
+					if local.state == expected_state {
+						return;
+					}
+				}
+				panic!("filesystem-locals watch stream ended before the final state");
+			})
+			.await
+			.expect("filesystem-locals watcher did not deliver the final state");
+		});
+
+		for i in 1..=5000u64 {
+			let value = BlockSerializer::default().serialize(&i).unwrap();
+			writer
+				.set(ApplicationLocal::new([*value.cid()].into(), *value.cid(), None))
+				.await
+				.unwrap();
+		}
+
+		observer_task.await.unwrap();
+	}
+
 	#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 	async fn test_file_locals_concurrent_read_during_write() {
 		let tmp = TmpDir::new("co");
